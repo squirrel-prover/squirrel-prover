@@ -1,0 +1,266 @@
+\documentclass[a4paper]{article}
+
+\usepackage{lipsum}
+\usepackage[normalem]{ulem}
+\usepackage{mathtools}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{amsthm}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{framed}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{xspace}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{cite}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{placeins}
+\usepackage[margin=2cm]{geometry}
+
+\usepackage{url}
+\usepackage{tikz}
+\usepackage{proof}
+\usepackage{hyperref}
+\usepackage{enumerate}
+
+\setlength{\ULdepth}{0.15em}
+
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{intersections}
+\usetikzlibrary{scopes}
+\usetikzlibrary{calc}
+\usetikzlibrary{decorations.pathreplacing}
+\usetikzlibrary{decorations.pathmorphing,shapes}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{shapes.misc}
+
+\newtheorem{assumption}{Assumption}
+\newtheorem*{theorem*}{Theorem}
+\newtheorem*{lemma*}{Lemma}
+\newtheorem*{proposition*}{Proposition}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\todo}[1]{\textcolor{red}{(\textbf{TD:} #1)}}
+\newcommand{\toadd}[1]{\textcolor{blue}{(\textbf{TA:} #1)}}
+
+\input{macros.tex}
+
+\begin{document}
+\title{Meta-BC}
+
+
+\author{Adrien Koutsos}
+
+\maketitle
+
+\paragraph{Facts}
+Facts are schemas of $\bc$ formulas indexed by path constraints:
+\[
+  \phi \mdef
+  \cforall_\theta\, \valpha.\;
+  \psi_0
+  \ra
+  \cexists_\gamma \vbeta. \psi_1
+\]
+
+\paragraph{Environments}
+Environments are sets of pairs of a path constraint and a set of inductive term declarations.
+\[
+  \env \mdef
+  \pcnstr \mid
+  \decls
+  \qquad
+  \text{ where }
+  \qquad
+  \decls \mdef
+  \left\{
+    \decl{t_\sfx}{\aset}
+    {(\act \mapsto t_\sfx^\act)_{\act \in \aset}}
+  \right\}
+\]
+
+\paragraph{Judgments}
+\[
+  \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
+\]
+where:
+\begin{itemize}
+\item $\env$ is the environment.
+\item $\pvtype{\valpha}{\theta}$ declares a set of constrained path variables.
+\item $\Gamma$ is a set of facts.
+\item $\phi$ is the goal.
+\end{itemize}
+
+\paragraph{Introduction Rules}
+\begin{mathpar}
+    \inferrule[\pvintro]{
+    \judge{\env}{\facts{\valpha,\vbeta}{\theta\wedge\gamma}{\Gamma}}
+    {
+      {\textstyle\bigwedge_{i}} \psi_i
+      \ra
+      \cexists_\gammap \vdelta. \psi
+    }\\
+    \valpha \cap \vbeta = \emptyset
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}
+    {
+      \cforall_\gamma\, \vbeta.\;
+      {\textstyle\bigwedge_{i}} \psi_i
+      \ra
+      \cexists_\gammap \vdelta. \psi
+    }
+  }
+
+  \inferrule[\fintro]{
+    \judge{\env}{\facts{\valpha}{\theta}{
+        \Gamma \cup \{\psi_0\}}}
+    {
+      \cexists_\gammap \vdelta. \psi
+    }
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}
+    {
+      \psi_0
+      \ra
+      \cexists_\gammap \vdelta. \psi
+    }
+  }
+\end{mathpar}
+
+\paragraph{Propositional Rules}
+\begin{mathpar}
+    \inferrule[\landelim]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma \cup \{ \psi \} \cup \{\psi'\}}}
+    {\phi}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma \cup \{ \psi \wedge \psi'\}}}
+    {\phi}
+  }
+
+  \inferrule[\lorelim]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma \cup \{ \psi \}}}
+    {\phi}\\
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma \cup \{\psi'\}}}
+    {\phi}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma \cup \{ \psi \vee \psi'\}}}
+    {\phi}
+  }
+
+  \inferrule[\randelim]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\psi}\\
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\psi'}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\psi \wedge \psi'}
+  }
+\end{mathpar}
+
+\paragraph{Path Constraints Rules}
+\begin{mathpar}
+  \inferrule[\clstrength]{
+    \judge{\env}
+    {\facts{\valpha}{\gamma}{\Gamma}}{\phi}\\
+    \centail{\pcnstr(\env)}{\theta}{\gamma}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
+  }
+
+  \inferrule[\crstrength]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\delta \vbeta. \phi}\\
+    \centail{\pcnstr(\env)}{\delta}{\gamma}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \phi}
+  }
+  
+  \inferrule[\cempty]{
+    \centail{\pcnstr(\env)}{\theta}{\bot}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{
+      \phi
+    }
+  }
+
+  \inferrule[\cdisj]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}\\
+    \judge{\env}{\facts{\valpha}{\gamma}{\Gamma}}{\phi}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta \vee \gamma}{\Gamma}}{\phi}
+  }
+
+  \inferrule[\ceelim]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi\nu}\\
+    \nu : \vbeta \mapsto \valpha\\
+    \centail{\pcnstr(\env)}{\theta}{\gamma\nu}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \phi}
+  }  
+\end{mathpar}
+
+\paragraph{Rules}
+\begin{mathpar}
+  \inferrule[\defunroll{t_\tau}]{
+    \left(
+      \judge{\env}
+      {\facts{\valpha}{\theta}{\subst{\Gamma}{t_\tau}{t_\tau^\act}}}
+      {\subst{\phi}{t_\tau}{t_\tau^\act}}
+    \right)_{\act \in \aset}\\
+    \decl{t_\sfx}{\aset}
+    {(\act \mapsto t_\sfx^\act)_{\act \in \aset}} \in \decls(\env)
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
+  }
+  
+  \inferrule[\apply]{
+    \left(
+      \cforall_\thetao\, \valphao.\;
+      \psi_0
+      \ra
+      \cexists_\gamma \vbeta. \psi_1
+    \right) \in \Gamma\\
+    \nu : \valphao \mapsto \valpha\\
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\psi_0\nu}\\
+    \judge{\env}{\facts{\valpha, \vbeta}{\theta \wedge \gamma\nu}
+      {\Gamma \cup \{\psi_1\nu\}}}{\phi}\\
+    \centail{\pcnstr(\env)}{\theta}{\thetao\nu}
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
+  }
+  
+  \inferrule[\requ]{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi[s]}\\
+    \judge{\env}{\facts{\valpha, \vbeta, \vgamma}
+      {\theta \wedge \gamma \wedge \gammap}{\Gamma}}
+    {s = t}\\
+    \phi[s] \equiv
+    \cforall_\gamma\, \vbeta.\;
+    {\textstyle\bigwedge_{i}} \psi_i
+    \ra
+    \cexists_\gammap \vdelta. \psi\\
+    \wf(\phi[t])
+  }{
+    \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{
+      \phi[t]
+    }
+  }
+
+\end{mathpar}
+
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

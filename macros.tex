@@ -1,0 +1,89 @@
+\newcommand{\true}{\textsf{true}}
+\newcommand{\false}{\textsf{false}}
+
+\newcommand{\pvec}[1]{\vec{#1}\mkern2mu\vphantom{#1}}
+
+\newcommand{\sfr}{\textsf{r}}
+\newcommand{\sfx}{\textsf{x}}
+\newcommand{\sfy}{\textsf{y}}
+\newcommand{\sfz}{\textsf{z}}
+\newcommand{\sfb}{\textsf{b}}
+
+\newcommand{\bc}{\textsf{BC}}
+\newcommand{\ra}{\rightarrow}
+\newcommand{\mdp}{\mathbin{\|}}
+
+\newcommand{\mdef}{\;\;\mathbin{:=}\;\;}
+
+\newcommand{\cexists}{\exists}
+\newcommand{\cforall}{\forall}
+
+\newcommand{\judge}[3]{#1 \mdp #2 \vdash #3}
+\newcommand{\subst}[3]{#1\{#2 \mapsto #3\}}
+\newcommand{\substs}[2]{#1\{#2\}}
+
+\newcommand{\thetap}{{\theta'}}
+\newcommand{\thetapp}{{\theta''}}
+\newcommand{\thetao}{{\theta_0}}
+\newcommand{\thetat}{{\theta_1}}
+\newcommand{\psip}{{\psi'}}
+\newcommand{\deltap}{{\delta'}}
+\newcommand{\gammap}{{\gamma'}}
+
+\newcommand{\valpha}{\pvec{\alpha}}
+\newcommand{\valphap}{\pvec{\alpha}'}
+\newcommand{\valphao}{{\pvec{\alpha}_0}}
+\newcommand{\valphat}{{\pvec{\alpha}_1}}
+\newcommand{\valphatt}{{\pvec{\alpha}_2}}
+\newcommand{\vbeta}{\pvec{\beta}}
+\newcommand{\vbetap}{\pvec{\beta}'}
+\newcommand{\vgamma}{\pvec{\gamma}}
+\newcommand{\vgammap}{\pvec{\gamma}'}
+\newcommand{\vdelta}{\pvec{\delta}}
+\newcommand{\vdeltap}{\pvec{\delta}'}
+
+\newcommand{\wf}{\textsf{well-formed}}
+
+\newcommand{\env}{\textsf{E}}
+\newcommand{\envp}{\textsf{E'}}
+
+\newcommand{\pcnstr}{\mathcal{P}}
+\newcommand{\cnstr}{\textsf{C}}
+
+\newcommand{\act}{{\textsf{a}}}
+\newcommand{\aset}{\mathcal{S}}
+
+\newcommand{\decl}[3]{\left(#1 , #2 : #3\right)}
+\newcommand{\decls}{\mathcal{D}}
+
+\newcommand{\pvars}{\textsf{p-vars}}
+\newcommand{\pvtype}[2]{#1 : #2}
+\newcommand{\facts}[3]{\pvtype{#1}{#2} \mid #3}
+
+\newcommand{\centail}[3]{#1 \mid #2 \vdash_{\textsf{c}} #3}
+% Rules
+\newcommand{\defunroll}[1]{\textsf{unroll}($#1$)}
+\newcommand{\pvintro}{\textsf{pv-intro}}
+\newcommand{\fintro}{\textsf{f-intro}}
+
+\newcommand{\clstrength}{\textsf{c-left-strength}}
+\newcommand{\crstrength}{\textsf{c-right-strength}}
+\newcommand{\cempty}{\textsf{c-empty}}
+\newcommand{\cdisj}{\textsf{c-disj}}
+
+\newcommand{\ceelim}{\textsf{c-}$\exists$\textsf{-elim}}
+
+\newcommand{\landelim}{$\wedge$\textsf{-left-elim}}
+\newcommand{\lorelim}{$\vee$\textsf{-left-elim}}
+
+\newcommand{\randelim}{$\wedge$\textsf{-right-elim}}
+
+
+\newcommand{\apply}{\textsf{apply}}
+\newcommand{\requ}{\textsf{r-equ}}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
