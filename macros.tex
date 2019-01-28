@@ -1,7 +1,15 @@
 \newcommand{\true}{\textsf{true}}
 \newcommand{\false}{\textsf{false}}
 
+\newcommand{\sem}[1]{[\![#1]\!]}
 \newcommand{\pvec}[1]{\vec{#1}\mkern2mu\vphantom{#1}}
+
+\newcommand{\tsuc}[1]{\textsf{suc}(#1)}
+
+\newcommand{\tauo}{{\tau_0}}
+\newcommand{\taut}{{\tau_1}}
+\newcommand{\tautt}{{\tau_2}}
+\newcommand{\taui}{{\tau_i}}
 
 \newcommand{\sfr}{\textsf{r}}
 \newcommand{\sfx}{\textsf{x}}
@@ -29,6 +37,7 @@
 \newcommand{\psip}{{\psi'}}
 \newcommand{\deltap}{{\delta'}}
 \newcommand{\gammap}{{\gamma'}}
+\newcommand{\gammao}{{\gamma_0}}
 
 \newcommand{\valpha}{\pvec{\alpha}}
 \newcommand{\valphap}{\pvec{\alpha}'}
@@ -61,6 +70,7 @@
 \newcommand{\facts}[3]{\pvtype{#1}{#2} \mid #3}
 
 \newcommand{\centail}[3]{#1 \mid #2 \vdash_{\textsf{c}} #3}
+
 % Rules
 \newcommand{\defunroll}[1]{\textsf{unroll}($#1$)}
 \newcommand{\pvintro}{\textsf{pv-intro}}
@@ -78,10 +88,11 @@
 
 \newcommand{\randelim}{$\wedge$\textsf{-right-elim}}
 
-
 \newcommand{\apply}{\textsf{apply}}
 \newcommand{\requ}{\textsf{r-equ}}
 
+\newcommand{\induc}{\textsf{induction}}
+\newcommand{\induct}{\textsf{induction-}$2$}
 
 %%% Local Variables:
 %%% mode: latex

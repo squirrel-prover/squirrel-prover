@@ -58,7 +58,7 @@
 \input{macros.tex}
 
 \begin{document}
-\title{Meta-BC}
+\title{Meta-Logic for BC}
 
 
 \author{Adrien Koutsos}
@@ -87,7 +87,7 @@ Environments are sets of pairs of a path constraint and a set of inductive term 
   \decls \mdef
   \left\{
     \decl{t_\sfx}{\aset}
-    {(\act \mapsto t_\sfx^\act)_{\act \in \aset}}
+    {(\act \mapsto t_\sfy^\act)_{\act \in \aset}}
   \right\}
 \]
 
@@ -213,11 +213,15 @@ where:
   \inferrule[\defunroll{t_\tau}]{
     \left(
       \judge{\env}
-      {\facts{\valpha}{\theta}{\subst{\Gamma}{t_\tau}{t_\tau^\act}}}
-      {\subst{\phi}{t_\tau}{t_\tau^\act}}
+      {\facts{\valpha,\tauo}
+        {\theta\wedge\tau = \tsuc{\tauo}}
+        {\subst{\Gamma}{t_\tau}{t_\tauo^\act}}}
+      {\subst{\phi}{t_\tau}{t_\tauo^\act}}
     \right)_{\act \in \aset}\\
     \decl{t_\sfx}{\aset}
-    {(\act \mapsto t_\sfx^\act)_{\act \in \aset}} \in \decls(\env)
+    {(\act \mapsto t_\sfy^\act)_{\act \in \aset}} \in \decls(\env)\\
+    \tau \in \valpha\\
+    \tauo \not \in \valpha
   }{
     \judge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
   }
@@ -255,8 +259,55 @@ where:
     }
   }
 
+  \inferrule[\induc]{
+    \judge{\env}
+    {\facts{\valpha,\tau}{\theta\wedge\gamma}{\Gamma\cup\{\phi'\}}}
+    {\phi}\\
+    \phi' \equiv
+    \cforall_{\gammao} \tauo.\phi\\
+    \gammao \equiv
+    \subst{\gamma}{\tau}{\tauo}\wedge\tauo < \tau\\
+    \tau,\tauo \not \in \valpha  }{
+    \judge{\env}
+    {\facts{\valpha}{\theta}{\Gamma}}
+    {\cforall_\gamma \tau.\phi}
+  }
+
+  \inferrule[\induct]{
+    \judge{\env}
+    {\facts{\valpha,\tau}{\thetap}{\Gamma\cup\{\phi'\}}}
+    {\phi}\\
+    \phi' \equiv
+    \cforall_{\gammao} \tauo.\phi\\
+    \gammao \equiv
+    \subst{\gamma}{\tau}{\tauo}\wedge\tauo < \tau\\
+    \tau,\tauo \not \in \valpha\\
+    \thetap \equiv \theta\wedge\gamma \wedge
+    \left(
+      \taui < \tau
+    \right)_{\taui \in \mathcal{S}_i}\\
+    \left(
+      \judge{\env}
+      {\facts{\valpha,\tau}{\theta\wedge\gamma\wedge\tau=\taui}
+        {\Gamma}}
+      {\phi}
+    \right)_{\taui \in \mathcal{S}_i}\\
+    \mathcal{S}_i \supseteq
+    \min_{\tau}(\centail{\pcnstr(\env)}{\emptyset}{\theta\wedge\gamma})
+  }{
+    \judge{\env}
+    {\facts{\valpha}{\theta}{\Gamma}}
+    {\cforall_\gamma \tau.\phi}
+  }  
 \end{mathpar}
 
+\begin{remark}
+  In general, there is no symbolic representation of $\min_{\tau}(\centail{\pcnstr(\env)}{\emptyset}{\theta\wedge\gamma})$. But we only need to be find a symbolic over-approximattion of it, i.e. we only need a $\mathcal{S}_i$ such that:
+  \[
+    \sem{\min_{\tau}(\centail{\pcnstr(\env)}{\emptyset}{\theta\wedge\gamma})}
+    \subseteq \mathcal{S}_i
+  \]
+\end{remark}
 
 \end{document}
 
