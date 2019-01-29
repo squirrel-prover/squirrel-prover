@@ -211,6 +211,11 @@ where:
 \paragraph{Rules}
 \begin{mathpar}
   \inferrule[\defunroll{t_\tau}]{
+    \judge{\env}
+    {\facts{\valpha,\tauo}
+      {\theta\wedge\tau = \epsilon}
+      {\subst{\Gamma}{t_\tau}{t_\epsilon}}}
+    {\subst{\phi}{t_\tau}{t_\epsilon}}\\\\
     \left(
       \judge{\env}
       {\facts{\valpha,\tauo}
