@@ -5,6 +5,7 @@
 \newcommand{\pvec}[1]{\vec{#1}\mkern2mu\vphantom{#1}}
 
 \newcommand{\tsuc}[1]{\textsf{suc}(#1)}
+\newcommand{\tpred}[1]{\textsf{pred}(#1)}
 
 \newcommand{\tauo}{{\tau_0}}
 \newcommand{\taut}{{\tau_1}}
@@ -23,10 +24,11 @@
 
 \newcommand{\mdef}{\;\;\mathbin{:=}\;\;}
 
-\newcommand{\cexists}{\exists}
-\newcommand{\cforall}{\forall}
+\newcommand{\cexists}{\mathsf{P}}
+\newcommand{\cforall}{\mathsf{G}}
 
-\newcommand{\judge}[3]{#1 \mdp #2 \vdash #3}
+\newcommand{\ejudge}[3]{#1 \mdp #2 \vdash #3}
+\newcommand{\judge}[2]{#1 \vdash #2}
 \newcommand{\subst}[3]{#1\{#2 \mapsto #3\}}
 \newcommand{\substs}[2]{#1\{#2\}}
 
@@ -36,8 +38,10 @@
 \newcommand{\thetat}{{\theta_1}}
 \newcommand{\psip}{{\psi'}}
 \newcommand{\deltap}{{\delta'}}
+\newcommand{\deltai}{{\delta_i}}
 \newcommand{\gammap}{{\gamma'}}
 \newcommand{\gammao}{{\gamma_0}}
+\newcommand{\gammai}{{\gamma_i}}
 
 \newcommand{\valpha}{\pvec{\alpha}}
 \newcommand{\valphap}{\pvec{\alpha}'}
@@ -45,10 +49,13 @@
 \newcommand{\valphat}{{\pvec{\alpha}_1}}
 \newcommand{\valphatt}{{\pvec{\alpha}_2}}
 \newcommand{\vbeta}{\pvec{\beta}}
+\newcommand{\vbetai}{\pvec{\beta}_i}
 \newcommand{\vbetap}{\pvec{\beta}'}
 \newcommand{\vgamma}{\pvec{\gamma}}
+\newcommand{\vgammai}{\pvec{\gamma}_i}
 \newcommand{\vgammap}{\pvec{\gamma}'}
 \newcommand{\vdelta}{\pvec{\delta}}
+\newcommand{\vdeltai}{\pvec{\delta}_i}
 \newcommand{\vdeltap}{\pvec{\delta}'}
 
 \newcommand{\wf}{\textsf{well-formed}}
@@ -69,24 +76,27 @@
 \newcommand{\pvtype}[2]{#1 : #2}
 \newcommand{\facts}[3]{\pvtype{#1}{#2} \mid #3}
 
-\newcommand{\centail}[3]{#1 \mid #2 \vdash_{\textsf{c}} #3}
+\newcommand{\centail}[2]{#1 \vdash_{\textsf{c}} #2}
 
 % Rules
 \newcommand{\defunroll}[1]{\textsf{unroll}($#1$)}
-\newcommand{\pvintro}{\textsf{pv-intro}}
-\newcommand{\fintro}{\textsf{f-intro}}
+\newcommand{\rraintro}{$\ra$-\textsf{r-intro}}
+\newcommand{\grintro}{$\cforall$\textsf{-r-intro}}
 
-\newcommand{\clstrength}{\textsf{c-left-strength}}
-\newcommand{\crstrength}{\textsf{c-right-strength}}
+\newcommand{\clweaken}{\textsf{c-l-weaken}}
+\newcommand{\crstrengthen}{\textsf{c-r-strengthen}}
 \newcommand{\cempty}{\textsf{c-empty}}
 \newcommand{\cdisj}{\textsf{c-disj}}
 
-\newcommand{\ceelim}{\textsf{c-}$\exists$\textsf{-elim}}
+\newcommand{\printro}{$\cexists$\textsf{-r-intro}}
 
-\newcommand{\landelim}{$\wedge$\textsf{-left-elim}}
-\newcommand{\lorelim}{$\vee$\textsf{-left-elim}}
+\newcommand{\andlintro}{$\wedge$\textsf{-l-intro}}
+\newcommand{\orlintro}{$\vee$\textsf{-l-intro}}
 
-\newcommand{\randelim}{$\wedge$\textsf{-right-elim}}
+\newcommand{\andrintro}{$\wedge$\textsf{-r-intro}}
+\newcommand{\orrintro}{$\vee$\textsf{-r-intro}}
+
+\newcommand{\toprintro}{$\top$\textsf{-r-intro}}
 
 \newcommand{\apply}{\textsf{apply}}
 \newcommand{\requ}{\textsf{r-equ}}
