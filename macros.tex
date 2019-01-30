@@ -69,7 +69,7 @@
 \newcommand{\act}{{\textsf{a}}}
 \newcommand{\aset}{\mathcal{S}}
 
-\newcommand{\decl}[3]{\left(#1 , #2 : #3\right)}
+\newcommand{\decl}[2]{\left(#1 : #2\right)}
 \newcommand{\decls}{\mathcal{D}}
 
 \newcommand{\pvars}{\textsf{p-vars}}
@@ -80,25 +80,32 @@
 
 % Rules
 \newcommand{\defunroll}[1]{\textsf{unroll}($#1$)}
-\newcommand{\rraintro}{$\ra$-\textsf{r-intro}}
-\newcommand{\grintro}{$\cforall$\textsf{-r-intro}}
+\newcommand{\rraintro}{\ensuremath{\ra}-\textsf{r-intro}}
+\newcommand{\grintro}{\ensuremath{\cforall}\textsf{-r-intro}}
 
 \newcommand{\clweaken}{\textsf{c-l-weaken}}
 \newcommand{\crstrengthen}{\textsf{c-r-strengthen}}
 \newcommand{\cempty}{\textsf{c-empty}}
 \newcommand{\cdisj}{\textsf{c-disj}}
 
-\newcommand{\printro}{$\cexists$\textsf{-r-intro}}
+\newcommand{\printro}{\ensuremath{\cexists}\textsf{-r-intro}}
+\newcommand{\printrogen}{\ensuremath{\cexists}\textsf{-r-intro-gen}}
 
-\newcommand{\andlintro}{$\wedge$\textsf{-l-intro}}
-\newcommand{\orlintro}{$\vee$\textsf{-l-intro}}
+\newcommand{\andlintro}{\ensuremath{\wedge}\textsf{-l-intro}}
+\newcommand{\orlintro}{\ensuremath{\vee}\textsf{-l-intro}}
 
-\newcommand{\andrintro}{$\wedge$\textsf{-r-intro}}
-\newcommand{\orrintro}{$\vee$\textsf{-r-intro}}
+\newcommand{\andrintro}{\ensuremath{\wedge}\textsf{-r-intro}}
+\newcommand{\orrintro}{\ensuremath{\vee}\textsf{-r-intro}}
 
-\newcommand{\toprintro}{$\top$\textsf{-r-intro}}
+\newcommand{\toprintro}{\ensuremath{\top}\textsf{-r-intro}}
+\newcommand{\botrelim}{\ensuremath{\bot}\textsf{-r-elim}}
+
+\newcommand{\axiom}{\textsf{axiom}}
 
 \newcommand{\apply}{\textsf{apply}}
+\newcommand{\botapply}{\ensuremath{\bot}\textsf{-apply}}
+\newcommand{\papply}{\textsf{p-apply}}
+
 \newcommand{\requ}{\textsf{r-equ}}
 
 \newcommand{\induc}{\textsf{induction}}

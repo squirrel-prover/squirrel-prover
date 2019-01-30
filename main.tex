@@ -77,9 +77,9 @@ Facts are schemas of $\bc$ formulas indexed by path constraints:
 \]
 
 \paragraph{Environments}
-Environments are sets of pairs of a path constraint and a set of inductive term declarations.
 \[
   \env \mdef
+  \aset \mid
   \pcnstr \mid
   \decls
   \qquad
@@ -87,11 +87,16 @@ Environments are sets of pairs of a path constraint and a set of inductive term 
   \qquad
   \decls \mdef
   \left\{
-    \decl{t_\sfx}{\aset}
+    \decl{t_\sfx}
     {t_\epsilon,(t_\sfy^\act)_{\act \in \aset}}
   \right\}
 \]
-
+where:
+\begin{itemize}
+\item $\aset$ is the set of symbolic actions.
+\item $\pcnstr$ is a set of path constraints.
+\item $\decls$ is a set of inductive term declarations.
+\end{itemize}
 \paragraph{Judgments}
 \[
   \ejudge{\env}{\facts{\valpha}{\theta}{\Gamma}}{\phi}
@@ -108,28 +113,8 @@ where:
   $\env$ will be invariant during derivations. We omit when there is no ambiguity.
 \end{remark}
 
-\paragraph{Introduction Rules}
+\paragraph{Standard Introduction Rules}
 \begin{mathpar}
-    \inferrule[\grintro]{
-      \judge{\facts{\valpha,\vbeta}{\theta\wedge\gamma}{\Gamma}}
-    { \phi }\\
-    \valpha \cap \vbeta = \emptyset
-  }{
-    \judge{\facts{\valpha}{\theta}{\Gamma}}
-    {
-      \cforall_\gamma\, \vbeta.\;
-      \phi
-    }
-  }
-
-  \inferrule[\printro]{
-    \judge{\facts{\valpha}{\theta}{\Gamma}}{\phi\nu}\\
-    \nu : \vbeta \mapsto \valpha\\
-    \centail{\theta}{\gamma\nu}
-  }{
-    \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \phi}
-  }  
-
   \inferrule[\rraintro]{
     \judge{\facts{\valpha}{\theta}{
         \Gamma \cup \{\psi_0\}}}
@@ -144,11 +129,8 @@ where:
       \cexists_\gammap \vdelta. \psi
     }
   }
-% \end{mathpar}
 
-% \paragraph{Propositional Rules}
-% \begin{mathpar}
-    \inferrule[\andlintro]{
+  \inferrule[\andlintro]{
     \judge{\facts{\valpha}{\theta}{\Gamma \cup \{ \psi \} \cup \{\psi'\}}}
     {\phi}
   }{
@@ -189,7 +171,45 @@ where:
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\top}
   }
+\end{mathpar}
 
+\paragraph{Other Rules}
+\begin{mathpar}
+  \inferrule[\botrelim]{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\bot}
+  }{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}
+  }
+
+  \inferrule[\axiom]{
+    \psi \in \Gamma
+  }{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi}
+  }  
+
+\end{mathpar}
+
+\paragraph{Modal Introduction Rules}
+\begin{mathpar}
+  \inferrule[\grintro]{
+    \judge{\facts{\valpha,\vbeta}{\theta\wedge\gamma}{\Gamma}}
+    { \phi }\\
+    \valpha \cap \vbeta = \emptyset
+  }{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}
+    {
+      \cforall_\gamma\, \vbeta.\;
+      \phi
+    }
+  }
+
+  \inferrule[\printro]{
+    \nu : \vbeta \mapsto \valpha\\
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi\nu}\\
+    \centail{\theta}{\gamma\nu}
+  }{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \psi}
+  }
 \end{mathpar}
 
 \paragraph{Path Constraints Rules}
@@ -228,7 +248,7 @@ where:
 \paragraph{Rules}
 \begin{mathpar}
   \inferrule[\defunroll{t_\tau}]{
-        \decl{t_\sfx}{\aset}
+    \decl{t_\sfx}
     {t_\epsilon,(t_\sfy^\act)_{\act \in \aset}} \in \decls\\
     \tau \in \valpha\\
     \tauo \not \in \valpha\\\\
@@ -240,7 +260,7 @@ where:
     \left(
       \judge
       {\facts{\valpha,\tauo}
-        {\theta\wedge\tauo = \tpred{\tau}}
+        {\theta\wedge\tauo = \tpred{\tau}\wedge \tauo = \act}
         {\Gamma \wedge t_\tau = t_\tauo^\act}}
       {\phi}
     \right)_{\act \in \aset}
@@ -259,72 +279,75 @@ where:
     }
   }
   
-  \inferrule[\apply]{
+  \inferrule[\papply]{
     \left(
-      \cforall_\thetao\, \valphao.\;
-      \psi_0
-      \ra
-      \cexists_\gamma \vbeta. \psi_1
+      \cexists_\gamma \vbeta. \psi
     \right) \in \Gamma\\
-    \nu : \valphao \mapsto \valpha\\
-    \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi_0\nu}\\
-    \judge{\facts{\valpha, \vbeta}{\theta \wedge \gamma\nu}
-      {\Gamma \cup \{\psi_1\nu\}}}{\phi}\\
-    \centail{\theta}{\thetao\nu}
+    \valpha \cap \vbeta = \emptyset\\
+    \judge{\facts{\valpha, \vbeta}{\theta \wedge \gamma}
+      {\Gamma \cup \{\psi\}}}{\phi}
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}
   }
 
-  \inferrule[\induc]{
-    \judge
-    {\facts{\valpha,\tau}{\theta\wedge\gamma}{\Gamma\cup\{\phi'\}}}
-    {\phi}\\
-    \phi' \equiv
-    \cforall_{\gammao} \tauo.\phi\\
-    \gammao \equiv
-    \subst{\gamma}{\tau}{\tauo}\wedge\tauo < \tau\\
-    \tau,\tauo \not \in \valpha  }{
-    \judge
-    {\facts{\valpha}{\theta}{\Gamma}}
-    {\cforall_\gamma \tau.\phi}
-  }
+  \inferrule[\apply]{
+    \left(
+      \cforall_\gamma\, \vbeta.\;
+      \psi
+      \ra
+      \phi_0
+    \right) \in \Gamma\\
+    \nu : \vbeta \mapsto \valpha\\
+    \centail{\theta}{\gamma\nu}\\
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi\nu}\\
+    \judge{\facts{\valpha}{\theta}
+      {\Gamma \cup \{\phi_0\nu\}}}{\phi}
+  }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
 
-  \inferrule[\induct]{
-    \judge
-    {\facts{\valpha,\tau}{\thetap}{\Gamma\cup\{\phi'\}}}
-    {\phi}\\
+  \inferrule[\induc]{
     \phi' \equiv
     \cforall_{\gammao} \tauo.\phi\\
     \gammao \equiv
     \subst{\gamma}{\tau}{\tauo}\wedge\tauo < \tau\\
     \tau,\tauo \not \in \valpha\\
-    \thetap \equiv \theta\wedge\gamma \wedge
-    \left(
-      \taui < \tau
-    \right)_{\taui \in \mathcal{S}_i}\\
-    \left(
-      \judge
-      {\facts{\valpha,\tau}{\theta\wedge\gamma\wedge\tau=\taui}
-        {\Gamma}}
-      {\phi}
-    \right)_{\taui \in \mathcal{S}_i}\\
-    \mathcal{S}_i \supseteq
-    \min_{\tau}(\centail{\emptyset}{\theta\wedge\gamma})
+    \judge
+    {\facts{\valpha,\tau}{\theta\wedge\gamma}{\Gamma\cup\{\phi'\}}}
+    {\phi}
   }{
     \judge
     {\facts{\valpha}{\theta}{\Gamma}}
     {\cforall_\gamma \tau.\phi}
-  }  
+  }
 \end{mathpar}
 
-\begin{remark}
-  In general, there is no symbolic representation of $\min_{\tau}(\centail{\emptyset}{\theta\wedge\gamma})$. But we only need to be find a symbolic over-approximattion of it, i.e. we only need a $\mathcal{S}_i$ such that:
+\paragraph{Superpositions of $\clweaken$ or $\crstrengthen$ with other rules}
+\begin{itemize}
+\item $\clweaken$ with \printro:
   \[
-    \sem{\min_{\tau}(\centail{\emptyset}{\theta\wedge\gamma})}
-    \subseteq \mathcal{S}_i
-  \]
-\end{remark}
+  \inferrule[\printrogen]{
+    \nu : \vbeta \mapsto \valpha\\
+    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\bot}
+  }{
+    \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \psi}
+  }
+\]
 
+\item $\crstrengthen$ with $\apply$:
+\[
+  \inferrule[\botapply]{
+    \left(
+      \cforall_\gamma\, \vbeta.\;
+      \psi
+      \ra
+      \bot
+    \right) \in \Gamma\\
+    \nu : \vbeta \mapsto \valpha\\
+    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
+  }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
+\]
+\end{itemize}
 \end{document}
 
 %%% Local Variables:
