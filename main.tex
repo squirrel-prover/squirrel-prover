@@ -175,8 +175,8 @@ where:
 
 \paragraph{Other Rules}
 \begin{mathpar}
-  \inferrule[\botrelim]{
-    \judge{\facts{\valpha}{\theta}{\Gamma}}{\bot}
+  \inferrule[\absurd]{
+    \bot \in \Gamma
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}
   }
@@ -322,7 +322,7 @@ where:
 
 \paragraph{Superpositions of $\clweaken$ or $\crstrengthen$ with other rules}
 \begin{itemize}
-\item $\clweaken$ with \printro:
+\item $\mrule{\clweaken}$ with $\mrule{\printro}$:
   \[
   \inferrule[\printrogen]{
     \nu : \vbeta \mapsto \valpha\\
@@ -333,7 +333,7 @@ where:
   }
 \]
 
-\item $\crstrengthen$ with $\apply$:
+\item $\mrule{\crstrengthen}$ with $\mrule{\apply}$ and $\mrule{\absurd}$:
 \[
   \inferrule[\botapply]{
     \left(
@@ -347,6 +347,25 @@ where:
     \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
   }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
 \]
+
+\item $\mrule{\crstrengthen}$ with $\mrule{\apply}$ (general case):
+\[
+  \inferrule[\botapply]{
+    \left(
+      \cforall_\gamma\, \vbeta.\;
+      \psi
+      \ra
+      \phio
+    \right) \in \Gamma\\
+    \nu : \vbeta \mapsto \valpha\\
+    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}
+      {\Gamma \cup \{ \phio\nu\}}}
+    {\phi}\\
+    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
+  }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
+\]
+
 \end{itemize}
 \end{document}
 
