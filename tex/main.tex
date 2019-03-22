@@ -280,9 +280,8 @@ where:
   }
   
   \inferrule[\papply]{
-    \left(
-      \cexists_\gamma \vbeta. \psi
-    \right) \in \Gamma\\
+    \cexists_\gamma \vbeta. \psi
+    \in \Gamma\\
     \valpha \cap \vbeta = \emptyset\\
     \judge{\facts{\valpha, \vbeta}{\theta \wedge \gamma}
       {\Gamma \cup \{\psi\}}}{\phi}
@@ -291,12 +290,11 @@ where:
   }
 
   \inferrule[\apply]{
-    \left(
-      \cforall_\gamma\, \vbeta.\;
-      \psi
-      \ra
-      \phi_0
-    \right) \in \Gamma\\
+    (\cforall_\gamma\, \vbeta.\;
+    \psi
+    \ra
+    \phi_0)
+    \in \Gamma\\
     \nu : \vbeta \mapsto \valpha\\
     \centail{\theta}{\gamma\nu}\\
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi\nu}\\
@@ -324,47 +322,47 @@ where:
 \begin{itemize}
 \item $\mrule{\clweaken}$ with $\mrule{\printro}$:
   \[
-  \inferrule[\printrogen]{
-    \nu : \vbeta \mapsto \valpha\\
-    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
-    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\bot}
-  }{
-    \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \psi}
-  }
-\]
+    \inferrule[\printrogen]{
+      \nu : \vbeta \mapsto \valpha\\
+      \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+      \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\bot}
+    }{
+      \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \psi}
+    }
+  \]
 
 \item $\mrule{\crstrengthen}$ with $\mrule{\apply}$ and $\mrule{\absurd}$:
-\[
-  \inferrule[\botapply]{
-    \left(
+  \[
+    \inferrule[\botapply]{
+      (
       \cforall_\gamma\, \vbeta.\;
       \psi
       \ra
       \bot
-    \right) \in \Gamma\\
-    \nu : \vbeta \mapsto \valpha\\
-    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
-    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
-  }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
-\]
+      ) \in \Gamma\\
+      \nu : \vbeta \mapsto \valpha\\
+      \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+      \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
+    }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
+  \]
 
 \item $\mrule{\crstrengthen}$ with $\mrule{\apply}$ (general case):
-\[
-  \inferrule[\botapply]{
-    \left(
+  \[
+    \inferrule[\botapply]{
+      (
       \cforall_\gamma\, \vbeta.\;
       \psi
       \ra
       \phio
-    \right) \in \Gamma\\
-    \nu : \vbeta \mapsto \valpha\\
-    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
-    \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}
-      {\Gamma \cup \{ \phio\nu\}}}
-    {\phi}\\
-    \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
-  }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
-\]
+      ) \in \Gamma\\
+      \nu : \vbeta \mapsto \valpha\\
+      \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}{\Gamma}}{\psi\nu}\\
+      \judge{\facts{\valpha}{\theta \wedge (\gamma\nu)}
+        {\Gamma \cup \{ \phio\nu\}}}
+      {\phi}\\
+      \judge{\facts{\valpha}{\theta \wedge \neg(\gamma\nu)}{\Gamma}}{\phi}
+    }{\judge{\facts{\valpha}{\theta}{\Gamma}}{\phi}}
+  \]
 
 \end{itemize}
 \end{document}
