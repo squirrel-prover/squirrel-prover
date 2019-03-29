@@ -20,8 +20,10 @@ debug: sanity
 	$(OCB) -tag debug main.byte
 
 sanity:
-# check that menhir is installed, use "opam install menhir"
-	which menhir
+	# check that menhir is installed
+	@which menhir || ( \
+	  echo "Please install menhir, e.g. using \"opam install menhir\"." ; \
+	  false )
 
 test: byte
 	./scripts/run_tests.sh
