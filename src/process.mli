@@ -1,14 +1,16 @@
 (** Bi-processes *)
 
-(** Terms may evaluate to indices or messages. *)
+(** Terms may evaluate to indices or messages.
+  * TODO distinguish booleans and bitstrings ? *)
 type kind = Index | Message
 
 (** A function symbol of type [k1,...,kn] allows to build a message
   * from [n] terms of the required kinds. *)
 type fkind = kind list
 
-(** State variable kinds have the same meaning as [fkind]s. *)
-type skind = fkind
+(** A state variable only takes indices as arguments, so its kind
+  * is simply an arity. *)
+type skind = int
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
@@ -37,21 +39,27 @@ type process =
   | Out of Channel.t * term * process       (** Output *)
   | Parallel of process * process           (** Parallel composition *)
   | Let of string * term * process          (** Local definition *)
-  | Apply of id * term list                 (** Named process invocation *)
   | Repl of string * process
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
   | Exists of string list * term * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exist [indices] such that [test[vars:=indices]]
-        * is true, and [q] otherwise. *)
+        * is true, and [q] otherwise. Note that this construct
+        * subsumes the common conditional construct. *)
+  | Apply of id * term list * id
+      (** Named process invocation: [Apply (p,ts,q)] gets expanded
+        * to [p(ts)] and its actions will be generated using the
+        * name [q] rather than [p], which may be important to obtain
+        * unique action identifiers. *)
 
 (** Declarations *)
 
 val declare_fun : string -> fkind -> unit
-val declare_state : string -> fkind -> unit
+val declare_state : string -> skind -> unit
 
 (** When declaring a process, the body of the definition is type-checked,
   * process invocations are inlined, and unique name, state, and
-  * action identifiers are obtained. *)
-val declare : id:id -> args:pkind -> process -> unit
+  * action identifiers are obtained, as part of a conversion to
+  * a big-step internal process representation. *)
+val declare : id -> pkind -> process -> unit
