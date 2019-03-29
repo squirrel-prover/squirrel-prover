@@ -1,8 +1,12 @@
-OCB_FLAGS   = -use-ocamlfind -use-menhir -I src -pkgs fmt -pkgs fmt.tty
+OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
+			-pkgs fmt,fmt.tty,alcotest
 
-OCB = 		ocamlbuild $(OCB_FLAGS)
+OCB = ocamlbuild $(OCB_FLAGS)
 
-all: byte
+all: byte test
+
+test: byte
+	./main.byte
 
 clean:
 	$(OCB) -clean
@@ -19,13 +23,10 @@ profile: sanity
 debug: sanity
 	$(OCB) -tag debug main.byte
 
+# check that menhir is installed
 sanity:
-	# check that menhir is installed
 	@which menhir || ( \
 	  echo "Please install menhir, e.g. using \"opam install menhir\"." ; \
 	  false )
-
-test: byte
-	./scripts/run_tests.sh
 
 .PHONY: clean byte native profile debug sanity
