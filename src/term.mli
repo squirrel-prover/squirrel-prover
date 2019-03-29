@@ -10,8 +10,13 @@
 type index
 type indices = index list
 
+val pp_index : Format.formatter -> index -> unit
+val pp_indices : Format.formatter -> indices -> unit
+
 (** Finite set of action identifiers *)
 type action
+
+val pp_action : Format.formatter -> action -> unit
 
 (** Timestamps represent positions in a trace *)
 
@@ -20,6 +25,9 @@ type timestamp =
   | TVar of tvar
   | TPred of timestamp
   | TName of action * indices
+
+val pp_tvar : Format.formatter -> tvar -> unit
+val pp_timestamp : Format.formatter -> timestamp -> unit
 
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
@@ -65,6 +73,9 @@ type 'a bformula =
   | Impl of 'a bformula * 'a bformula
   | Atom of 'a
 
+val pp_bformula :
+  (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a bformula -> unit
+
 (** Predicates *)
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
@@ -72,10 +83,15 @@ type predicate = ord * term * term
 
 type fact = predicate bformula
 
+val pp_ord : Format.formatter -> ord -> unit
+
 (** Constraints *)
 
 type tpredicate = ord * timestamp * timestamp
 type constr = tpredicate bformula
+
+val pp_tpredicate : Format.formatter -> tpredicate -> unit
+val pp_constr : Format.formatter -> constr -> unit
 
 (** Correspondence formulas *)
 
