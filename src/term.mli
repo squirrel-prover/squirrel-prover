@@ -85,31 +85,39 @@ type fact = predicate bformula
 
 val pp_ord : Format.formatter -> ord -> unit
 
-(** Constraints *)
+(** Constraints:
+    - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
+type tpredicate =
+  | Pts of ord * timestamp * timestamp
+  | Pind of ord * index * index
 
-type tpredicate = ord * timestamp * timestamp
 type constr = tpredicate bformula
 
 val pp_tpredicate : Format.formatter -> tpredicate -> unit
 val pp_constr : Format.formatter -> constr -> unit
 
+(** Put a constraint in DNF using only predicates Neq and Leq *)
+val constr_dnf : constr -> tpredicate list list
+
 (** Correspondence formulas *)
 
 
 (** A formula is always of the form
-  *   forall [uvars] such that [uconstr],
+  *   forall [uvars,uindices] such that [uconstr],
   *   [ufact] => [postcond],
   * with a postcondition that is a disjunction
   * of formulas of the form
-  *   exists [evars] such that [econstr] and [efact]. *)
+  *   exists [evars,eindices] such that [econstr] and [efact]. *)
 type formula = {
   uvars : tvar list;
+  uindices : indices;
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
   evars : tvar list;
+  eindices : indices;
   econstr : constr;
   efact : fact
 }

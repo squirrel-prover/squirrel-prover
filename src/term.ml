@@ -146,7 +146,7 @@ let not_ord o = match o with
 let not_xpred (o,l,r) = (not_ord o, l, r)
 
 (** Replace a predicate by an equivalent list of predicates using
-    only Eq,Neq,Leq *)
+    only Neq and Leq *)
 let norm_xpredicate (o,l,r) = match o with
   | Eq | Neq | Leq -> [(o,l,r)]
   | Geq -> [(Leq,r,l)]
@@ -154,37 +154,59 @@ let norm_xpredicate (o,l,r) = match o with
   | Gt -> (Leq,r,l) :: [(Neq,r,l)]
 
 
-(** Constraints *)
+(** Constraints:
+    - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
+type tpredicate =
+  | Pts of ord * timestamp * timestamp
+  | Pind of ord * index * index
 
-type tpredicate = ord * timestamp * timestamp
 type constr = tpredicate bformula
 
-let pp_tpredicate ppf (o,tl,tr) =
-  Fmt.pf ppf "@[<h>%a%a%a@]" pp_timestamp tl pp_ord o  pp_timestamp tr
+let pts (o,t,t') = Pts (o,t,t')
+let pind (o,i,i') = Pind (o,i,i')
+
+let pp_tpredicate ppf = function
+  | Pts (o,tl,tr) ->
+    Fmt.pf ppf "@[<h>%a%a%a@]" pp_timestamp tl pp_ord o pp_timestamp tr
+  | Pind (o,il,ir) ->
+    Fmt.pf ppf "@[<h>%a%a%a@]" pp_index il pp_ord o pp_index ir
+
+let not_tpred = function
+  | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
+  | Pind (o,i,i') -> pind (not_xpred (o,i,i'))
+
+let norm_tpredicate = function
+  | Pts (o,t,t') -> norm_xpredicate (o,t,t') |> List.map pts
+  | Pind _ as x -> [x]
 
 let pp_constr ppf = pp_bformula pp_tpredicate ppf
 
-let constr_dnf c = bf_dnf not_xpred c
-                   |> List.map (fun l -> List.map norm_xpredicate l
-                                         |> List.flatten)
+(** Put a constraint in DNF using only predicates Neq and Leq *)
+let constr_dnf (c : constr) =
+  bf_dnf not_tpred c
+  |> List.map (fun l -> List.map norm_tpredicate l
+                        |> List.flatten)
+
 
 (** Correspondence formulas *)
 
 
 (** A formula is always of the form
-  *   forall [uvars] such that [uconstr],
+  *   forall [uvars,uindices] such that [uconstr],
   *   [ufact] => [postcond],
   * with a postcondition that is a disjunction
   * of formulas of the form
-  *   exists [evars] such that [econstr] and [efact]. *)
+  *   exists [evars,eindices] such that [econstr] and [efact]. *)
 type formula = {
   uvars : tvar list;
+  uindices : indices;
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
   evars : tvar list;
+  eindices : indices;
   econstr : constr;
   efact : fact
 }
