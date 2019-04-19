@@ -289,34 +289,44 @@ let () =
 
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
-           let _ : Uuf.t = unify [Pts (Eq,tau, TPred tau)] in ()
-        );
+           let _ : Uuf.t = unify [Pts (Eq,tau, TPred tau)] in () );
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
            let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
-                                  :: [Pts (Eq,tau'', tau)]) in ()
-        );
+                                  :: [Pts (Eq,tau'', tau)]) in () );
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
            let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: (Pts (Eq,tau, TName (a,[i])))
-                                  :: [Pts (Eq,tau'', TName (a,[i]))]) in ()
-        );
-      Alcotest.check_raises "fails" Mgu
+                                  :: [Pts (Eq,tau'', TName (a,[i]))]) in () );
+      Alcotest.check_raises "fails" No_mgu
+        (fun () ->
+           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+                                  :: (Pts (Eq,tau', TName (a,[i'])))
+                                  :: (Pts (Eq,tau, TName (a,[i])))
+                                  :: (Pts (Eq,tau'', TName (a,[i])))
+                                  :: [Pts (Eq,tau'', TName (a,[i']))]) in () );
+      Alcotest.check_raises "success" Mgu
+        (fun () ->
+           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+                                  :: (Pts (Eq,tau', TName (a,[i'])))
+                                  :: (Pts (Eq,tau, TName (a,[i])))
+                                  :: (Pts (Eq,tau''', TName (a,[i])))
+                                  :: [Pts (Eq,tau'', TName (a,[i']))]) in
+           raise Mgu );
+      Alcotest.check_raises "success" Mgu
         (fun () ->
            let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: (Pts (Eq,tau, TName (a,[i])))
                                   :: [Pts (Eq,tau'', TName (a,[i']))]) in
-           raise Mgu
-        );
+           raise Mgu );
       Alcotest.check_raises "success" Mgu
         (fun () ->
            let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: [Pts (Eq,tau'', tau''')]) in
-           raise Mgu
-        );
+           raise Mgu );
   ]
