@@ -231,14 +231,49 @@ let unify (l : tpredicate list) =
   try
     let uf = unif uf eqs |> fpt_unif_idx in
 
-    (* (\* REM *\)
-     * Fmt.epr "@[<v>Uf:@;%a@]@." Uuf.print uf; *)
-
     (* We compute all mgu's, to check for the absence of cycles. *)
     let _ : Uuf.v list = List.map (fun x -> mgu x uf) elems in
 
     uf
   with Unify_cycle -> raise No_mgu
+
+
+(*****************************)
+(* Order models using graphs *)
+(*****************************)
+
+module UtG = Persistent.Digraph.Concrete(struct
+    type t = ut
+    let compare t t' = Pervasives.compare t.hash t'.hash
+    let equal t t' = t.hash = t'.hash
+    let hash t = t.hash
+  end)
+
+module Scc = Components.Make(UtG)
+
+(* Build the graph. There is a vertex from u to v if u <= v *)
+let build_graph uf leqs =
+  let rec bg leqs g = match leqs with
+    | [] -> g
+    | (u,v) :: leqs ->
+      UtG.add_edge g (mgu uf u) (mgu uf v)
+      |> bg leqs in
+
+  bg leqs UtG.empty
+
+let new_eqs uf leqs =
+  let g = build_graph uf leqs in
+  let sccs = Scc.scc_list g in
+  List.fold_left (fun acc scc -> match scc with
+      | [] -> raise (Failure "Constraints: Empty SCC")
+      | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
+    [] sccs
+
+
+(* Dont forget to somehow populate the Uf structure at the beginning *)
+(* And dont forget to add edges for predecessor nodes *)
+(* Probably need to have a variable size Uf structure *)
+
 
 
 (* Fmt.epr "@[<v>Uf:@;%a@]@." Uuf.print uf; *)
@@ -280,7 +315,7 @@ let () =
       and i' = fresh_index ()
       and a = mk_action "a" in
 
-      Printexc.record_backtrace true;
+      (* Printexc.record_backtrace true; *)
       let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
                              :: (Pts (Eq,tau', TPred tau''))
                              :: (Pts (Eq,tau, TName (a,[i])))
