@@ -1,84 +1,72 @@
 open Graph
 open Term
+open Utils
 
 (* Huet's unification algorithm using union-find
-   Cf: Unification: A Multidisciplinary Survey by Kevin Knight *)
+   See "Unification: A Multidisciplinary Survey" by Kevin Knight *)
 
-type usymb =
-  | UVar of tvar
-  | UIndex of index
-  | UPred
-  | UName of action
+type uvar = Utv of tvar | Uind of index
 
-type unode = { symb : usymb;
-               children : unode list;
-               mutable eqc : int };;
+type ut = { hash : int;
+            cnt : ut_cnt }
 
-module IMap = Utils.IMap
+and ut_cnt =
+  | UVar of uvar
+  | UPred of ut
+  | UName of action * ut list
 
-(** Create a union-find data-structure over a map of unode. *)
-module Uf : sig
-  type t
-  (** When calling [create m], [m] domain must be of the form [0,...,n-1] *)
-  val create : unode IMap.t -> t
-  val find : t -> unode -> unode
-  val union : t -> unode -> unode -> t
-end = struct
-  type t = { map : unode IMap.t;
-             puf : Puf.t }
+module Ut = struct
+  type t = ut
+  let hash t = Hashtbl.hash t.cnt
+  let equal t t' =  t.cnt = t'.cnt
+end
+module Hut = Weak.Make(Ut)
 
-  let create m = { map = m;
-                   puf = Puf.create (IMap.cardinal m) }
+let hcons_cpt = ref 0
+let ht = Hut.create 257
 
-  let find t u =
-    let ru_eqc = Puf.find t.puf u.eqc in
-    IMap.find ru_eqc t.map
+let make cnt =
+  let ut = { hash = !hcons_cpt ; cnt = cnt } in
+  try Hut.find ht ut with
+  | Not_found ->
+    incr hcons_cpt;
+    Hut.add ht ut;
+    ut
 
-  let union t u u' = { t with puf = Puf.union t.puf u.eqc u'.eqc }
+let uvar tv = make (UVar (Utv tv))
+
+let uvari i = make (UVar (Uind i))
+
+let rec uts ts = match ts with
+  | TVar tv -> uvar tv
+  | TPred ts -> make (UPred (uts ts))
+  | TName (a,is) -> make (UName (a, List.map uvari is))
+
+let ut_equal t t' = t.hash = t'.hash
+
+let ut_compare t t' = Pervasives.compare t.hash t'.hash
+
+module OrdUt = struct
+  type t = ut
+  let compare t t' = ut_compare t t'
 end
 
+module Uuf = Uf(OrdUt)
 
-let mk_unify (l : tpredicate list) =
-  let cpt = ref 0 in
-
-  let mk_uniq m s cs =
-    let x = { symb = s;
-              children = cs;
-              eqc =  !cpt } in
-    incr cpt;
-    (IMap.add x.eqc x m,x) in
-
-  let rec mk_i m i = mk_uniq m (UIndex i) []
-
-  and mk_ts m = function
-    | TVar tv -> mk_uniq m (UVar tv) []
-    | TPred ts ->
-      let m',nts = mk_ts m ts in
-      mk_uniq m' UPred [nts]
-
-    | TName (a,is) ->
-      let m',nis = List.fold_left (fun (m,acc) i ->
-          let m, ni = mk_i m i in
-          (m, ni :: acc)) (m,[]) is in
-      mk_uniq m' (UName a) nis in
-
-  let m,eqs = List.fold_left (fun (m,acc) x -> match x with
-      | Pts (Eq,ts1,ts2) ->
-        let m',nt1 = mk_ts m ts1 in
-        let m'',nt2 = mk_ts m' ts2 in
-        (m'',(nt1,nt2) :: acc)
-
-      | Pind (Eq,i1,i2) ->
-        let m',ni1 = mk_i m i1 in
-        let m'',ni2 = mk_i m' i2 in
-        (m'',(ni1,ni2) :: acc)
-
+let mk_upred (l : tpredicate list) =
+  let eqs = List.fold_left (fun acc x -> match x with
+      | Pts (Eq,ts1,ts2) -> (uts ts1, uts ts2) :: acc
+      | Pind (Eq,i1,i2) -> (uvari i1, uvari i2) :: acc
       | Pts (_,_,_) | Pind (_,_,_) -> raise (Failure "mk_unify"))
-      (IMap.empty ,[]) l in
+      [] l in
 
-  (Uf.create m,eqs)
+  let uf = List.fold_left (fun acc (a,b) -> a :: b :: acc) [] eqs
+           |> List.sort_uniq ut_compare
+           |> Uuf.create in
 
-exception Not_unif
+  ( uf, eqs )
+
+exception No_mgu
 
 (* (\** Swap, and checks that action names match *\)
  * let swap uf x y = match x.symb, y.symb with
@@ -92,52 +80,49 @@ exception Not_unif
  *   | _, UVar _ -> y, x
  *   | UVar _, _ -> x,y
  *   | _, UName _ -> y, x
- *   | _ -> x,y
- *
- * let rec eq_unode x y =
- *   (x.eqc = y.eqc) ||
- *   (match x.symb, y.symb with
- *    | UVar sx, UVar sy -> sx = sy
- *    | UIndex sx, UIndex sy -> sx = sy
- *    | UName a, UName a' -> a = a' && List.for_all2 eq_unode x.children y.children
- *    | _ -> false)
- *
- * let unify (l : tpredicate list) =
- *   let (uf,eqs) = mk_unify l in
- *
- *   let unif (uf,eqs) (x,y) =
- *     let rx,ry = Uf.find uf x, Uf.find uf y in
- *     if eq_unode rx ry then (uf,eqs)
- *     else begin
- *       let uf = Uf.union uf rx ry in
- *       let rx,ry = swap uf rx ry in
- *       match rx.symb, ry.symb with
- *       | UVar _, _ -> rx.eqc <- ry.eqc
- *       |
- *
- *     end in
- *
- *   assert false
- *
- *
- *
- *
- *
- * let build_graph conj =
- *   let rec bg (v, edge_neq, edge_leq) = function
- *     | [] -> (v, edge_neq, edge_leq)
- *     | (o,r,l) :: conj -> match o with
- *       | Neq -> assert false
- *       | Leq -> assert false
- *       | _ -> assert false in
- *
- *   assert false
- *
- *
- * (\** Check if a conjunctive clause, using only Neq and Leq, is satisfiable  *\)
- * let sat_conjunct conj =
- *   assert false
- *
- * (\** Check if a constraint is satisfiable *\)
- * let is_sat constr =
- *   constr_dnf constr |> List.exists sat_conjunct *)
+ *   | _ -> x,y *)
+
+let no_mgu x y = match x.cnt, y.cnt with
+  | UName (a,_), UName (a',_) -> if a <> a' then raise No_mgu else ()
+  | _ -> ()
+
+let unify (l : tpredicate list) =
+  let (uf,eqs) = mk_upred l in
+
+  let unif (uf,eqs) (x,y) =
+    let rx,ry = Uuf.find uf x, Uuf.find uf y in
+    if ut_equal rx ry then (uf,eqs)
+    else begin
+      no_mgu rx ry;
+      let uf = Uf.union uf rx ry in
+      let rx,ry = swap uf rx ry in
+      match rx.symb, ry.symb with
+      | UVar _, _ -> rx.eqc <- ry.eqc
+      |
+
+    end in
+
+  assert false
+
+
+
+
+
+let build_graph conj =
+  let rec bg (v, edge_neq, edge_leq) = function
+    | [] -> (v, edge_neq, edge_leq)
+    | (o,r,l) :: conj -> match o with
+      | Neq -> assert false
+      | Leq -> assert false
+      | _ -> assert false in
+
+  assert false
+
+
+(** Check if a conjunctive clause, using only Neq and Leq, is satisfiable  *)
+let sat_conjunct conj =
+  assert false
+
+(** Check if a constraint is satisfiable *)
+let is_sat constr =
+  constr_dnf constr |> List.exists sat_conjunct
