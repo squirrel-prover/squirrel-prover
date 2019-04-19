@@ -16,8 +16,13 @@ let pp_indices ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_index) l
 
+let idx_cpt = ref 0
+let fresh_index () = incr idx_cpt; Index (!idx_cpt - 1)
+
 (** Finite set of action identifiers *)
 type action = Action of string
+
+let mk_action s = Action s
 
 let pp_action ppf = function Action s -> Fmt.pf ppf "%s" s
 
@@ -26,6 +31,9 @@ let pp_action ppf = function Action s -> Fmt.pf ppf "%s" s
 type tvar = Tvar_i of int
 
 let pp_tvar ppf = function Tvar_i i -> Fmt.pf ppf "ts%d" i
+
+let tvar_cpt = ref 0
+let fresh_tvar () = incr tvar_cpt; Tvar_i (!tvar_cpt - 1)
 
 type timestamp =
   | TVar of tvar

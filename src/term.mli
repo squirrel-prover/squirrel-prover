@@ -13,8 +13,12 @@ type indices = index list
 val pp_index : Format.formatter -> index -> unit
 val pp_indices : Format.formatter -> indices -> unit
 
+val fresh_index : unit -> index
+
 (** Finite set of action identifiers *)
 type action
+
+val mk_action : string -> action
 
 val pp_action : Format.formatter -> action -> unit
 
@@ -28,6 +32,8 @@ type timestamp =
 
 val pp_tvar : Format.formatter -> tvar -> unit
 val pp_timestamp : Format.formatter -> timestamp -> unit
+
+val fresh_tvar : unit -> tvar
 
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and

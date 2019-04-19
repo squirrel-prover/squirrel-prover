@@ -1,26 +1,42 @@
+module List = struct
+  include List
+
+  (** [init n f] returns the list containing the results of
+      [(f 0)],[(f 1)] ... [(f (n-1))].  *)
+  let init n f =
+    if n < 0 then raise (Failure "List.init")
+    else
+      let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
+      ini 0
+end
+
 module Imap = Map.Make (struct
   type t = int
   let compare = Pervasives.compare
 end)
 
-module type OrderedType = Map.OrderedType
+module type Ordered = sig
+  type t
+  val compare : t -> t -> int
+  val print : Format.formatter -> t -> unit
+end
 
 (** Create a union-find data-structure over elements of type 'a. *)
-module Uf (Ord: OrderedType) : sig
-  type v = Ord.t
-  type t
-  val create : v list -> t
-  val find : t -> v  -> v
-  val union : t -> v -> v -> t
-
-end = struct
-
+module Uf (Ord: Ordered) = struct
   type v = Ord.t
   module Vmap = Map.Make(Ord)
   (* rmap is the inverse of map *)
   type t = { map : int Vmap.t;
              rmap : v Imap.t;
              puf : Puf.t }
+
+  let print ppf t =
+    let binds = Imap.bindings t.rmap
+                |> List.sort (fun (i,_) (i',_) -> Pervasives.compare i i') in
+    Fmt.pf ppf "@[<v 0>%a@]"
+      (Fmt.list (fun ppf (i,u) ->
+           Fmt.pf ppf "@[%d->%d : @,%a@]" i (Puf.find t.puf i) Ord.print u
+         )) binds
 
   let create l =
     let _,m,rm =
@@ -46,11 +62,35 @@ end = struct
                     |> Imap.add i' u }
 
   let union t u u' =
-    let i' = Vmap.find u' t.map in
+    let i' = Vmap.find u' t.map |> Puf.find t.puf in
 
     let t' = { t with puf = Puf.union t.puf
                           (Vmap.find u t.map)
                           (Vmap.find u' t.map) } in
 
-    if i' <> Vmap.find u' t'.map then swap t' u u' else t'
+    let n_i' = Vmap.find u' t'.map |> Puf.find t'.puf in
+
+    if i' <> n_i' then swap t' u u' else t'
+
+  let add_acc a acc = match acc with
+    | [] -> raise (Failure "Uf: add_acc")
+    | l :: t -> (a :: l) :: t
+
+  (** [classes t] return the list of equivalence classes of [t], where a class
+      is represented by the list of its elements. *)
+  let classes t =
+    let l = List.init (Imap.cardinal t.rmap) (fun i -> (Puf.find t.puf i, i))
+            |> List.sort (fun (a,_) (a',_) -> Pervasives.compare a a') in
+
+    let l_eqc = match l with
+      | [] -> [[]]
+      | (x,_) :: _ ->
+        List.fold_left (fun (acc,x_old) (x,y) ->
+            if x = x_old then (add_acc y acc, x)
+            else ([y] :: acc, x)
+          ) ([[]], x) l
+        |> fst in
+
+    List.map (List.map (fun x -> Imap.find x t.rmap)) l_eqc
+
 end
