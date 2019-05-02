@@ -25,10 +25,12 @@ end
 module Uf (Ord: Ordered) = struct
   type v = Ord.t
   module Vmap = Map.Make(Ord)
-  (* rmap is the inverse of map *)
+  (* [rmap] is the inverse of map.
+     [cpt] counts the number of non-trivial unions *)
   type t = { map : int Vmap.t;
              rmap : v Imap.t;
-             puf : Puf.t }
+             puf : Puf.t;
+             cpt : int }
 
   let print ppf t =
     let binds = Imap.bindings t.rmap
@@ -46,7 +48,8 @@ module Uf (Ord: Ordered) = struct
 
     { map = m;
       rmap = rm;
-      puf = Puf.create (List.length l) }
+      puf = Puf.create (List.length l);
+      cpt = 0 }
 
   let find t u =
     let ru_eqc = Vmap.find u t.map |> Puf.find t.puf in
@@ -62,15 +65,15 @@ module Uf (Ord: Ordered) = struct
                     |> Imap.add i' u }
 
   let union t u u' =
-    let i' = Vmap.find u' t.map |> Puf.find t.puf in
+    let iu,iu' = Vmap.find u t.map, Vmap.find u' t.map in
+    let ri,ri' = Puf.find t.puf iu, Puf.find t.puf iu' in
 
-    let t' = { t with puf = Puf.union t.puf
-                          (Vmap.find u t.map)
-                          (Vmap.find u' t.map) } in
+    let t' = { t with puf = Puf.union t.puf iu iu';
+                      cpt = if ri <> ri' then t.cpt + 1 else t.cpt } in
 
-    let n_i' = Vmap.find u' t'.map |> Puf.find t'.puf in
+    let n_ri' = Vmap.find u' t'.map |> Puf.find t'.puf in
 
-    if i' <> n_i' then swap t' u u' else t'
+    if ri' <> n_ri' then swap t' u u' else t'
 
   let add_acc a acc = match acc with
     | [] -> raise (Failure "Uf: add_acc")
@@ -93,4 +96,10 @@ module Uf (Ord: Ordered) = struct
 
     List.map (List.map (fun x -> Imap.find x t.rmap)) l_eqc
 
+  (** [union_count t] is the number of non-trivial unions done building [t] *)
+  let union_count t = t.cpt
 end
+
+let opt_get = function
+  | Some u -> u
+  | None -> raise Not_found

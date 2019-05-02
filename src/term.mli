@@ -106,7 +106,7 @@ type constr = tpredicate bformula
 val pp_tpredicate : Format.formatter -> tpredicate -> unit
 val pp_constr : Format.formatter -> constr -> unit
 
-(** Put a constraint in DNF using only predicates Neq and Leq *)
+(** Put a constraint in DNF using only predicates Eq, Neq and Leq *)
 val constr_dnf : constr -> tpredicate list list
 
 (** Correspondence formulas *)

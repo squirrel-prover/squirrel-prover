@@ -164,7 +164,7 @@ let not_ord o = match o with
 let not_xpred (o,l,r) = (not_ord o, l, r)
 
 (** Replace a predicate by an equivalent list of predicates using
-    only Neq and Leq *)
+    only Eq,Neq and Leq *)
 let norm_xpredicate (o,l,r) = match o with
   | Eq | Neq | Leq -> [(o,l,r)]
   | Geq -> [(Leq,r,l)]
@@ -199,7 +199,7 @@ let norm_tpredicate = function
 
 let pp_constr ppf = pp_bformula pp_tpredicate ppf
 
-(** Put a constraint in DNF using only predicates Neq and Leq *)
+(** Put a constraint in DNF using only predicates Eq, Neq and Leq *)
 let constr_dnf (c : constr) =
   bf_dnf not_tpred c
   |> List.map (fun l -> List.map norm_tpredicate l

@@ -2,11 +2,16 @@ open Graph
 open Term
 open Utils
 
-(* Huet's unification algorithm using union-find.
-   See "Unification: A Multidisciplinary Survey" by Kevin Knight
-   Note that there is difficulty in the handling of names, which is not
+(* - Huet's unification algorithm using union-find.
+   See "Unification: A Multidisciplinary Survey" by Kevin Knight.
+
+   - Note that there is difficulty in the handling of names, which is not
    standard. Basically, they should behave as function symbols that dont have
-   to be unified, except with other names. *)
+   to be unified, except with other names.
+
+   - Also, note that during the unification and graph-based inequality
+   constraints solving, the union-find structure contains an
+   *under-approximation* of equality equivalence classes. *)
 
 type uvar = Utv of tvar | Uind of index
 
@@ -72,14 +77,19 @@ end
 
 module Uuf = Uf(OrdUt)
 
-(* Prepare the tpredicates list by transforming it into a list of equalities
+let add_xeq od xeq (eqs,leqs,neqs) = match od with
+  | Eq -> (xeq :: eqs, leqs, neqs)
+  | Leq -> (eqs, xeq :: leqs, neqs)
+  | Neq -> (eqs, leqs, xeq :: neqs)
+  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
+
+(** Prepare the tpredicates list by transforming it into a list of equalities
    that must be unified.  *)
 let mk_upred (l : tpredicate list) =
-  let eqs = List.fold_left (fun acc x -> match x with
-      | Pts (Eq,ts1,ts2) -> (uts ts1, uts ts2) :: acc
-      | Pind (Eq,i1,i2) -> (uvari i1, uvari i2) :: acc
-      | Pts (_,_,_) | Pind (_,_,_) -> raise (Failure "mk_unify"))
-      [] l in
+  let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
+      | Pts (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
+      | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
+      ([],[],[]) l in
 
   let elems = List.fold_left (fun acc (a,b) -> a :: b :: acc) [] eqs
               |> List.fold_left (fun acc x -> match x.cnt with
@@ -88,14 +98,14 @@ let mk_upred (l : tpredicate list) =
               |> List.sort_uniq ut_compare in
   let uf = Uuf.create elems in
 
-  ( uf, eqs, elems )
+  ( uf, eqs, leqs, neqs, elems )
 
 
 exception Unify_cycle
 
 (** [mgu ut uf] applies the mgu represented by [uf] to [ut].
     Raise [Unify_cycle] if it contains a cycle. *)
-let mgu ut uf =
+let mgu (uf : Uuf.t) (ut : ut) =
   let rec mgu_ ut lv =
     if List.mem ut lv then raise Unify_cycle
     else match ut.cnt with
@@ -198,7 +208,7 @@ let unif_idx uf =
   (!finished, uf)
 
 
-(* Merges classes which are identical *)
+(** Merges union-find classes with the same mgus. *)
 let merge_eq_class uf =
 
   let reps =
@@ -209,7 +219,7 @@ let merge_eq_class uf =
   let rec aux uf cls = match cls with
     | [] -> uf
     | rcl :: cls' -> List.fold_left (fun uf rcl' ->
-        if (mgu rcl uf).cnt = (mgu rcl' uf).cnt then Uuf.union uf rcl rcl'
+        if (mgu uf rcl).cnt = (mgu uf rcl').cnt then Uuf.union uf rcl rcl'
         else uf) uf cls' in
 
   aux uf reps
@@ -224,18 +234,22 @@ let rec fpt_unif_idx uf =
 (* Final unification algorithm. *)
 (********************************)
 
-(* Returns the mgu for l *)
-let unify (l : tpredicate list) =
-  let uf, eqs, elems = mk_upred l in
-
+(** Returns the mgu for [eqs], starting from the mgu [uf] *)
+let unify uf eqs elems =
   try
     let uf = unif uf eqs |> fpt_unif_idx in
 
     (* We compute all mgu's, to check for the absence of cycles. *)
-    let _ : Uuf.v list = List.map (fun x -> mgu x uf) elems in
+    let _ : Uuf.v list = List.map (fun x -> mgu uf x) elems in
 
     uf
   with Unify_cycle -> raise No_mgu
+
+(** Only compute the mgu for the equality constraints in [l] *)
+let mgu_eqs (l : tpredicate list) =
+  let uf, eqs, _, _, elems = mk_upred l in
+
+  unify uf eqs elems
 
 
 (*****************************)
@@ -251,42 +265,127 @@ module UtG = Persistent.Digraph.Concrete(struct
 
 module Scc = Components.Make(UtG)
 
-(* Build the graph. There is a vertex from u to v if u <= v *)
-let build_graph uf leqs =
+(** Build the inequality graph. There is a vertex from S to S' if there exits
+    u in S and v in S' such that u <= v, or if u = P^{k+1}(t) and v = P^k(t).
+    Remark: we use [mgu uf u] as a representant for the class of u *)
+let build_graph (uf : Uuf.t) leqs =
   let rec bg leqs g = match leqs with
     | [] -> g
     | (u,v) :: leqs ->
       UtG.add_edge g (mgu uf u) (mgu uf v)
       |> bg leqs in
 
-  bg leqs UtG.empty
+  let add_preds g =
+    UtG.fold_vertex (fun v g -> match v.cnt with
+        | UPred u -> UtG.add_edge g u v
+        | _ -> g) g g in
 
-let new_eqs uf leqs =
-  let g = build_graph uf leqs in
+  bg leqs UtG.empty |> add_preds
+
+
+(** For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
+   x=x_1 /\ ... /\ x = x_n   *)
+let cycle_eqs uf g =
   let sccs = Scc.scc_list g in
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
     [] sccs
 
+let rec leq_unify uf leqs elems =
+  let g = build_graph uf leqs in
+  let uf' = unify uf (cycle_eqs uf g) elems in
+  if Uuf.union_count uf = Uuf.union_count uf' then uf,g
+  else leq_unify uf' leqs elems
 
-(* Dont forget to somehow populate the Uf structure at the beginning *)
-(* And dont forget to add edges for predecessor nodes *)
-(* Probably need to have a variable size Uf structure *)
+
+(***********************************)
+(* Discrete Order Case Disjunction *)
+(***********************************)
+
+let rec root_var = function
+  | TPred u -> root_var u
+  | TVar _ | TName _ as u -> u
+
+let get_vars elems =
+  List.map root_var elems |> List.sort_uniq Pervasives.compare
+
+(** [min_pred uf g u x] returns [j] where [j] is the smallest integer such
+    that [P^j(x) <= u] in the graph [g], if it exists.
+    Precond: [g] must be a transitive graph, and [u] normalized. *)
+let min_pred uf g u x =
+  let rec minp j cx =
+    if UtG.mem_vertex g (mgu uf cx) then
+      if UtG.mem_edge g (mgu uf cx) u then Some (j)
+      else minp (j+1) (make (UPred cx))
+    else None in
+
+  minp 0 x
+
+(* let peel x = match x.cnt with
+ *   | UPred x' -> x'
+ *   | _ -> assert false *)
+
+(** [max_pred uf g u x] returns [j] where [j] is the largest integer such
+    that [u <= P^j(x)] in the graph [g], if it exists.
+    Precond: [g] must be a transitive graph, and [u] normalized. *)
+let max_pred uf g u x =
+  let rec maxp j cx =
+    if UtG.mem_vertex g (mgu uf cx) then
+      if UtG.mem_edge g u (mgu uf cx) then maxp (j+1) (make (UPred cx))
+      else Some (j - 1)
+    else Some (j) in
+
+  if (UtG.mem_vertex g (mgu uf x))
+  && (UtG.mem_edge g u (mgu uf x)) then maxp 0 x
+  else None
+
+let dec u =
+  let rec fdec i u = match u.cnt with
+    | UPred u' -> fdec (i + 1) u'
+    | _ -> (i,u) in
+
+  fdec 0 u
+
+(** [nu] must be normalized *)
+let no_case_disj uf nu x minj maxj =
+  let nu_i, nu_x = dec nu in
+  (nu_x = mgu uf x) && (maxj <= nu_i) && (nu_i <= minj)
+
+module UtGOp = Oper.P(UtG)
+
+(** [g] must be transitive *)
+let add_disj uf g u x =
+  let nu = mgu uf u in
+  match min_pred uf g nu x, max_pred uf g nu x with
+  | Some minj, Some maxj ->
+    assert (minj >= maxj);        (* And not the converse ! *)
+    if no_case_disj uf u x minj maxj then []
+    else assert false (* List.init (minj - maxj) *)
+  | _ -> []
+
+
+
+(* let g = UtGOp.transitive_closure g in *)
+
+
+
+
+
+
+
+(* Need to check that we never have P^k(u) = P^{k+1}(u) *)
+
+(** Checks if [l] is a satisfiable list of constraits *)
+let is_sat (l : tpredicate list) =
+  let uf, eqs, leqs, neqs, elems = mk_upred l in
+
+  (* TODO:finish *)
+  unify uf eqs elems
 
 
 
 (* Fmt.epr "@[<v>Uf:@;%a@]@." Uuf.print uf; *)
-
-(* let build_graph conj =
- *   let rec bg (v, edge_neq, edge_leq) = function
- *     | [] -> (v, edge_neq, edge_leq)
- *     | (o,r,l) :: conj -> match o with
- *       | Neq -> assert false
- *       | Leq -> assert false
- *       | _ -> assert false in
- *
- *   assert false *)
 
 
 (** Check if a conjunctive clause, using only Neq and Leq, is satisfiable  *)
@@ -316,7 +415,7 @@ let () =
       and a = mk_action "a" in
 
       (* Printexc.record_backtrace true; *)
-      let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+      let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                              :: (Pts (Eq,tau', TPred tau''))
                              :: (Pts (Eq,tau, TName (a,[i])))
                              :: [Pts (Eq,tau'', TName (a,[i']))]) in ();
@@ -324,28 +423,28 @@ let () =
 
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
-           let _ : Uuf.t = unify [Pts (Eq,tau, TPred tau)] in () );
+           let _ : Uuf.t = mgu_eqs [Pts (Eq,tau, TPred tau)] in () );
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: [Pts (Eq,tau'', tau)]) in () );
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: (Pts (Eq,tau, TName (a,[i])))
                                   :: [Pts (Eq,tau'', TName (a,[i]))]) in () );
       Alcotest.check_raises "fails" No_mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TName (a,[i'])))
                                   :: (Pts (Eq,tau, TName (a,[i])))
                                   :: (Pts (Eq,tau'', TName (a,[i])))
                                   :: [Pts (Eq,tau'', TName (a,[i']))]) in () );
       Alcotest.check_raises "success" Mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TName (a,[i'])))
                                   :: (Pts (Eq,tau, TName (a,[i])))
                                   :: (Pts (Eq,tau''', TName (a,[i])))
@@ -353,14 +452,14 @@ let () =
            raise Mgu );
       Alcotest.check_raises "success" Mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: (Pts (Eq,tau, TName (a,[i])))
                                   :: [Pts (Eq,tau'', TName (a,[i']))]) in
            raise Mgu );
       Alcotest.check_raises "success" Mgu
         (fun () ->
-           let _ : Uuf.t = unify ((Pts (Eq,tau, TPred tau'))
+           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
                                   :: (Pts (Eq,tau', TPred tau''))
                                   :: [Pts (Eq,tau'', tau''')]) in
            raise Mgu );

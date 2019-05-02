@@ -1,3 +1,8 @@
+module List : sig
+  include module type of struct include List end
+  val init : int -> (int -> 'a) -> 'a list
+end
+
 module Imap : Map.S with type key = int
 
 module type Ordered = sig
@@ -21,4 +26,9 @@ module Uf (Ord: Ordered) : sig
   val classes: t -> v list list
 
   val print : Format.formatter -> t -> unit
+
+  (** [union_count t] is the number of non-trivial unions done building [t] *)
+  val union_count : t -> int
 end
+
+val opt_get : 'a option -> 'a
