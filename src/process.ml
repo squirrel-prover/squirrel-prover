@@ -1,26 +1,46 @@
-(** Bi-processes *)
+(** {1 Bi-processes}
+  *
+  * This module defines bi-processes and an internal representation that is
+  * useful to perform backward reachability analysis on them. It is
+  * independent of whether we perform this analysis to check correspondence or
+  * reachability properties. In particular we do not perform the folding
+  * of conditionals, since it is not necessary for correspondences. We will
+  * do it separately for equivalences. *)
 
-type kind = Index | Message
+(** {2 Kinds}
+  * For messages, function, state and processes. For the latter,
+  * the name of variables is given together with their kinds. *)
+
+type kind = Index | Message (* TODO change to bitstring, add bool *)
 type fkind = kind list
 type skind = int
 type pkind = (string*kind) list
+
 type id = string
 
+(** Front-end terms differ from back-end terms (of type [Term.t])
+  * since they can use variables bound by inputs, let constructs,
+  * name creations. Choices are also present, and will only be
+  * useful when checking diff-equivalence rather than correspondences. *)
 type term =
   | Var of string
   | Fun of string * term list
   | Get of string * term list
   | Choice of term * term
 
-type predicate =
-  | True
+type ord = Eq | Neq | Leq | Geq | Lt | Gt
+type predicate = ord * term * term
 
 type fact = predicate Term.bformula
 
 (** Front-end processes. The computational semantics is action-deterministic
   * (e.g. existential lookup is arbitrarily made deterministic) but in the tool
   * some constructs may be non-deterministic: we are reasoning over unknown
-  * determinizations. *)
+  * determinizations.
+  *
+  * It may be useful in the future to check for sources of non-determinism
+  * other than existential choices. They may be useful, though, e.g. to
+  * model mixnets. *)
 (* TODO add parsing positions *)
 type process =
   | Null
@@ -33,20 +53,6 @@ type process =
   | Repl of string * process
   | Exists of string list * fact * process * process
   | Apply of id * term list * id
-
-(** We do not need action-determinism to analyze bi-processes,
-  * though the computational semantics is only defined on
-  * action-deterministic processes. For now we won't check for
-  * action-determinism, although this could be useful in the future.
-  * For these reasons we decide against having a choice operator.
-  * 
-  * TODO can we compromise to be able to analyze e.g. mixnets ?
-  *
-  * We decide to not perform the folding of conditionals inside terms
-  * in our internal representation of processes. This way we can produce
-  * simpler goals in the meta-logic for correspondence properties.
-  * The folding will be computed from our internal representation for
-  * proving equivalences. *)
 
 (** Tables of declared symbols *)
 
@@ -157,29 +163,20 @@ let declare id args proc =
 
 (** Internal representation of processes
   * 
-  * Processes are compiled to synthetic processes on which the
-  * meta-logic works. Name creations are compiled away and process
-  * constructs are grouped to form blocks of input, followed by
-  * a tree of conditionals, with state updates and an output for
-  * each non-empty conditional. From a system we obtain a finite
-  * set of actions of the following form:
-  *
-  * Action =
-  *   root with index variables,
-  *   sequence of past choices (at each step, 1 among N, 1<=N)
-  *
-  * and we associate a behaviour block to each action.
-  *
-  * TODO to support nested parallel composition we actually
-  *   consider sequences of
-  *    - a choice among conditionals
-  *    - a choice among parallel compositions.
-  *   indices are spread across the sequence of choices (action_items)
+  * Processes are compiled to an internal representation used by
+  * the meta-logic. Name creations and let constructs are compiled
+  * away and process constructs are grouped to form blocks of input,
+  * followed by a tree of conditionals, with state updates and an output
+  * for each non-empty conditional. From a process we obtain a finite
+  * set of actions consisting of a sequence of choices: at each step
+  * it indicates which component of a parallel composition is chosen
+  * (possibly using newly introduced index variables), and which
+  * outcome of a tree of conditionals is chosen. We associate to each
+  * such action a behaviour block.
   *
   * In an execution the system, we will instantiate these symbolic
   * actions into concrete ones, using a substitution for its
-  * index variables (which actually maps these indices to other
-  * index variables).
+  * index variables (which actually maps them to other index variables).
   *
   * Past choices are used to identify that two actions are in conflict:
   * they are when they have the same root and their sequence of choices
@@ -208,11 +205,17 @@ let declare id args proc =
 
 module Action = struct
 
-  type t = item list
-  and item = {
+  (** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
+    * actions of C have par_choice 2, and those of B have par_choice
+    * (1,i) which will later be instantiated to (1,i_1), (1,i_2), etc.
+    *
+    * Then, in a process (if cond then P else Q), the sum_choice 0 will
+    * denote a success of the conditional, while 1 will denote a failure. *)
+  type item = {
     par_choice : int * string list ;
     sum_choice : int
   }
+  type t = item list
 
   (** Checks whether two actions are in conflict. *)
   let rec conflict a b = match a,b with
@@ -242,17 +245,20 @@ module Action = struct
 
 end
 
+(** A block features an input, a condition (which sums up several [Exist]
+  * constructs which might have succeeded or not) and subsequent
+  * updates and outputs. The condition binds variables in the updates
+  * and output. A block may feature free index variables, that are in
+  * a sense bound by the corresponding action. *)
 type block = {
   input : Channel.t*string ;
-  condition : string list * fact ; (* binds variables used below *)
+  condition : string list * fact ;
   updates : (string*term) list ;
   output : Channel.t*term
 }
 
+(** Associates a block to each action *)
 let action_to_block = Hashtbl.create 97
-
-(** Set of available (symbolic) actions *)
-let actions = Hashtbl.create 97
 
 module Aliases = struct
 
@@ -287,7 +293,7 @@ let rec parse_proc action proc : unit =
     * here [pos] is the position in parallel compositions,
     * [vars] the index variables for products.
     * Return the next position in parallel compositions. *)
-  let rec p_in : pos:int -> vars:string list -> process -> int = fun ~pos ~vars -> function
+  let rec p_in ~pos ~vars = function
     | Null -> pos
     | In (c,x,p) ->
         let _:int =
@@ -309,12 +315,7 @@ let rec parse_proc action proc : unit =
     * a conjonction of [facts] in construction, a [pos] and [vars] indicating
     * the position in existential conditions and the associated
     * bound variables. *)
-  and p_cond : par_choice:(int*string list) ->
-               pos:int ->
-               vars:string list ->
-               input:(Channel.t*string) ->
-               facts:fact list -> process -> int =
-    fun ~par_choice ~pos ~vars ~input ~facts -> function
+  and p_cond ~par_choice ~pos ~vars ~input ~facts = function
     | Exists (evars,cond,p,q) ->
         let facts_p = cond::facts in
         let facts_q = facts in (* TODO negation of existential *)
@@ -324,7 +325,7 @@ let rec parse_proc action proc : unit =
           p_cond ~par_choice ~pos ~vars ~facts:facts_q ~input q
     | p ->
         let rec conj = function
-          | [] -> Term.Atom True
+          | [] -> Term.True
           | [f] -> f
           | f::fs -> Term.And (f, conj fs)
         in
