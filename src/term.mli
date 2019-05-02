@@ -80,6 +80,8 @@ type 'a bformula =
   | Not of 'a bformula
   | Impl of 'a bformula * 'a bformula
   | Atom of 'a
+  | True
+  | False
 
 val pp_bformula :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a bformula -> unit

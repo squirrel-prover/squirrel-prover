@@ -90,6 +90,8 @@ type 'a bformula =
   | Not of 'a bformula
   | Impl of 'a bformula * 'a bformula
   | Atom of 'a
+  | True
+  | False
 
 let rec pp_bformula pp_atom ppf = function
   | And (bl,br) ->
@@ -104,12 +106,16 @@ let rec pp_bformula pp_atom ppf = function
   | Not b ->
     Fmt.pf ppf "@[<hv>not(%a)@]" (pp_bformula pp_atom) b
   | Atom a -> pp_atom ppf a
+  | True -> Fmt.pf ppf "true"
+  | False -> Fmt.pf ppf "false"
 
 (** [bf_dnf nlit b] puts the  bformula [b] in DNF, using [nlit] to transform
     negative atoms into positive atoms *)
 let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
   let rec simp flip = function
     | Atom a -> if flip then Atom (nlit a) else Atom a
+    | True -> if flip then False else True
+    | False -> if flip then True else False
     | Or (l,r) -> Or (simp flip l, simp flip r)
     | And (l,r) -> And (simp flip l, simp flip r)
     | Impl (l,r) ->  Or (Not l, r) |> simp flip
@@ -117,6 +123,8 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
 
   let rec dnf = function
     | Or (a,b) -> dnf a @ dnf b
+    | False -> []
+    | True -> [[]]
     | Atom a -> [[a]]
     | And (a,b) ->
       let bdnf = dnf b in
