@@ -31,18 +31,21 @@ type term =
         * [(s,terms)] where [terms] are evaluated as indices. *)
   | Choice of term * term
 
+type fact
+
 (** Processes *)
 type process =
   | Null                                    (** Null process *)
   | New of string * process                 (** Name creation *)
   | In of Channel.t * string * process      (** Input *)
   | Out of Channel.t * term * process       (** Output *)
+  | Set of string * term * process          (** Assignment *)
   | Parallel of process * process           (** Parallel composition *)
   | Let of string * term * process          (** Local definition *)
   | Repl of string * process
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
-  | Exists of string list * term * process * process
+  | Exists of string list * fact * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exist [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct
