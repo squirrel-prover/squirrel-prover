@@ -81,6 +81,8 @@ type term =
   | Output of timestamp
   | Input of timestamp
 
+type t = term
+
 (** Boolean formulas *)
 type 'a bformula =
   | And of 'a bformula * 'a bformula
