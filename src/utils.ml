@@ -100,6 +100,11 @@ module Uf (Ord: Ordered) = struct
   let union_count t = t.cpt
 end
 
+
+(* Option type functions *)
 let opt_get = function
   | Some u -> u
   | None -> raise Not_found
+
+
+let some x = Some x

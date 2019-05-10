@@ -13,15 +13,67 @@ open Utils
    constraints solving, the union-find structure contains an
    *under-approximation* of equality equivalence classes. *)
 
-type uvar = Utv of tvar | Uind of index
+module Utv : sig
+  type uvar = Utv of tvar | Uind of index
 
-type ut = { hash : int;
-            cnt : ut_cnt }
+  type ut = { hash : int;
+              cnt : ut_cnt }
 
-and ut_cnt =
-  | UVar of uvar
-  | UPred of ut
-  | UName of action * ut list
+  and ut_cnt = private
+    | UVar of uvar
+    | UPred of ut
+    | UName of action * ut list
+
+  val uvar : tvar -> ut
+  val uvari : index -> ut
+  val uts : timestamp -> ut
+  val uname : action -> ut list -> ut
+  val upred : ut -> ut
+
+end = struct
+  type uvar = Utv of tvar | Uind of index
+
+  type ut = { hash : int;
+              cnt : ut_cnt }
+
+  and ut_cnt =
+    | UVar of uvar
+    | UPred of ut
+    | UName of action * ut list
+
+  module Ut = struct
+    type t = ut
+    let hash t = Hashtbl.hash t.cnt
+    let equal t t' =  t.cnt = t'.cnt
+  end
+  module Hut = Weak.Make(Ut)
+
+  let hcons_cpt = ref 0
+  let ht = Hut.create 257
+
+  let make cnt =
+    let ut = { hash = !hcons_cpt ; cnt = cnt } in
+    try Hut.find ht ut with
+    | Not_found ->
+      incr hcons_cpt;
+      Hut.add ht ut;
+      ut
+
+  let uvar tv = UVar (Utv tv) |> make
+
+  let uvari i = UVar (Uind i) |> make
+
+  let uname a us = UName (a, us) |> make
+
+  let upred u = UPred u |> make
+
+  let rec uts ts = match ts with
+    | TVar tv -> uvar tv
+    | TPred ts -> upred (uts ts)
+    | TName (a,is) -> uname a (List.map uvari is)
+end
+
+open Utv
 
 let pp_uvar ppf = function
   | Utv tv -> pp_tvar ppf tv
@@ -36,33 +88,6 @@ let rec pp_ut_cnt ppf = function
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
 
 let pp_ut ppf ut = pp_ut_cnt ppf ut.cnt
-
-module Ut = struct
-  type t = ut
-  let hash t = Hashtbl.hash t.cnt
-  let equal t t' =  t.cnt = t'.cnt
-end
-module Hut = Weak.Make(Ut)
-
-let hcons_cpt = ref 0
-let ht = Hut.create 257
-
-let make cnt =
-  let ut = { hash = !hcons_cpt ; cnt = cnt } in
-  try Hut.find ht ut with
-  | Not_found ->
-    incr hcons_cpt;
-    Hut.add ht ut;
-    ut
-
-let uvar tv = make (UVar (Utv tv))
-
-let uvari i = make (UVar (Uind i))
-
-let rec uts ts = match ts with
-  | TVar tv -> uvar tv
-  | TPred ts -> make (UPred (uts ts))
-  | TName (a,is) -> make (UName (a, List.map uvari is))
 
 let ut_equal t t' = t.hash = t'.hash
 
@@ -83,9 +108,16 @@ let add_xeq od xeq (eqs,leqs,neqs) = match od with
   | Neq -> (eqs, leqs, xeq :: neqs)
   | _ -> raise (Failure ("add_xeq: bad comparison operator"))
 
+type constr_instance = { eqs : (ut * ut) list;
+                         new_eqs : (ut * ut) list;
+                         neqs : (ut * ut) list;
+                         leqs : (ut * ut) list;
+                         elems : ut list;
+                         uf : Uuf.t }
+
 (** Prepare the tpredicates list by transforming it into a list of equalities
    that must be unified.  *)
-let mk_upred (l : tpredicate list) =
+let mk_instance (l : tpredicate list) =
   let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
       | Pts (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
@@ -98,7 +130,7 @@ let mk_upred (l : tpredicate list) =
               |> List.sort_uniq ut_compare in
   let uf = Uuf.create elems in
 
-  ( uf, eqs, leqs, neqs, elems )
+  { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
 
 
 exception Unify_cycle
@@ -119,10 +151,10 @@ let mgu (uf : Uuf.t) (ut : ut) =
           (* In that case, we need to apply the mgu on the index variable of
              the name. Since these cannot appear in [lv], we use the empty
              list [[]] *)
-          make (UName (a, List.map (fun x -> mgu_ x []) is))
+          uname a (List.map (fun x -> mgu_ x []) is)
         else mgu_ rut (ut :: lv)
 
-      | UPred ut' -> make (UPred (mgu_ ut' lv)) in
+      | UPred ut' -> upred (mgu_ ut' lv) in
 
   mgu_ ut []
 
@@ -247,9 +279,9 @@ let unify uf eqs elems =
 
 (** Only compute the mgu for the equality constraints in [l] *)
 let mgu_eqs (l : tpredicate list) =
-  let uf, eqs, _, _, elems = mk_upred l in
+  let instance = mk_instance l in
 
-  unify uf eqs elems
+  unify instance.uf instance.eqs instance.elems
 
 
 (*****************************)
@@ -292,6 +324,10 @@ let cycle_eqs uf g =
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
     [] sccs
 
+(** [leq_unify uf leqs elems] compute the fixpoint of:
+    - compute the inequality graph [g]
+    - get [g] SCCs and the corresponding equalities
+    - unify the new equalities *)
 let rec leq_unify uf leqs elems =
   let g = build_graph uf leqs in
   let uf' = unify uf (cycle_eqs uf g) elems in
@@ -312,27 +348,25 @@ let get_vars elems =
 
 (** [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
-    Precond: [g] must be a transitive graph, and [u] normalized. *)
+    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let min_pred uf g u x =
   let rec minp j cx =
-    if UtG.mem_vertex g (mgu uf cx) then
-      if UtG.mem_edge g (mgu uf cx) u then Some (j)
-      else minp (j+1) (make (UPred cx))
+    let ncx = mgu uf cx in
+    if UtG.mem_vertex g ncx then
+      if UtG.mem_edge g ncx u then Some (j)
+      else minp (j+1) (upred ncx)
     else None in
 
   minp 0 x
 
-(* let peel x = match x.cnt with
- *   | UPred x' -> x'
- *   | _ -> assert false *)
-
 (** [max_pred uf g u x] returns [j] where [j] is the largest integer such
     that [u <= P^j(x)] in the graph [g], if it exists.
-    Precond: [g] must be a transitive graph, and [u] normalized. *)
+    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
   let rec maxp j cx =
-    if UtG.mem_vertex g (mgu uf cx) then
-      if UtG.mem_edge g u (mgu uf cx) then maxp (j+1) (make (UPred cx))
+    let ncx = mgu uf cx in
+    if UtG.mem_vertex g ncx then
+      if UtG.mem_edge g u ncx then maxp (j+1) (upred ncx)
       else Some (j - 1)
     else Some (j) in
 
@@ -340,61 +374,114 @@ let max_pred uf g u x =
   && (UtG.mem_edge g u (mgu uf x)) then maxp 0 x
   else None
 
-let dec u =
+(** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
+    such that [u] equals [P^k(x)]. *)
+let decomp u =
   let rec fdec i u = match u.cnt with
     | UPred u' -> fdec (i + 1) u'
     | _ -> (i,u) in
 
   fdec 0 u
 
-(** [nu] must be normalized *)
+(** [nu] must be normalized and [x] basic *)
 let no_case_disj uf nu x minj maxj =
-  let nu_i, nu_x = dec nu in
-  (nu_x = mgu uf x) && (maxj <= nu_i) && (nu_i <= minj)
+  let nu_i, nu_y = decomp nu in
+  (nu_y = mgu uf x) && (maxj <= nu_i) && (nu_i <= minj)
 
 module UtGOp = Oper.P(UtG)
 
-(** [g] must be transitive *)
+(** [kpred x i] return [P^i(x)] *)
+let rec kpred x = function
+  | 0 -> x
+  | i -> kpred (upred x) (i - 1)
+
+(** [g] must be transitive and [x] basic *)
 let add_disj uf g u x =
   let nu = mgu uf u in
   match min_pred uf g nu x, max_pred uf g nu x with
   | Some minj, Some maxj ->
     assert (minj >= maxj);        (* And not the converse ! *)
-    if no_case_disj uf u x minj maxj then []
-    else assert false (* List.init (minj - maxj) *)
-  | _ -> []
+    if no_case_disj uf u x minj maxj then None
+    else
+      List.init
+        (minj - maxj + 1)
+        (fun i -> ( nu, kpred x (minj + i) |> mgu uf) )
+      |> some
+
+  | _ -> None
+
+let forall_edges f g =
+  let exception Foe in
+  try
+    let () = UtG.iter_edges (fun v v' ->
+        if not (f v v') then raise Foe else ()) g in
+    true
+  with Foe -> false
 
 
+(** Check that [instance] dis-equalities are satisfied.
+    [g] must be transitive. *)
+let neq_sat uf g neqs =
+  (* CHeck dis-equalities in neqs *)
+  List.for_all (fun (u,v) ->
+      not (ut_equal (mgu uf u) (mgu uf v))
+    ) neqs
 
-(* let g = UtGOp.transitive_closure g in *)
+  (* Check that we never have P^k(u) >= (u) *)
+  && forall_edges (fun v v' -> match decomp v, decomp v' with
+      | (k,y), (k',y') ->
+        not (ut_equal y y') || k >= k'
+    ) g
+
+let get_basics uf elems =
+  List.map (mgu uf) elems
+  |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
+  |> List.sort_uniq Pervasives.compare
 
 
+(** [split instance] return a disjunction of satisfiable and normalized instances
+    equivalent to [instance] *)
+let rec split instance =
+  let uf = unify instance.uf instance.eqs instance.elems in
+  let uf,g = leq_unify uf instance.leqs instance.elems in
+  let g = UtGOp.transitive_closure g in
+
+  if not (neq_sat uf g instance.neqs) then []
+  else
+    let basics = get_basics uf instance.elems in
+    let exception Found of (ut * ut) list in
+    try
+      let () = UtG.iter_vertex (fun u ->
+          List.iter (fun x -> match add_disj uf g u x with
+              | None -> ()
+              | Some l -> raise (Found l)
+            ) basics
+        ) g in
+
+      [instance]
+
+    with Found new_eqs ->
+      List.map (fun eq ->
+          split { instance with uf = uf;
+                                eqs = eq :: instance.eqs;
+                                new_eqs = eq :: instance.new_eqs }
+        ) new_eqs
+      |> List.flatten
 
 
+(** [is_sat l] check that l is a satisfiable conjunct of constraints *)
+let is_sat_conjunct (l : tpredicate list) =
+  let instance = mk_instance l in
 
-
-
-(* Need to check that we never have P^k(u) = P^{k+1}(u) *)
-
-(** Checks if [l] is a satisfiable list of constraits *)
-let is_sat (l : tpredicate list) =
-  let uf, eqs, leqs, neqs, elems = mk_upred l in
-
-  (* TODO:finish *)
-  unify uf eqs elems
+  split instance <> []
 
 
 
 (* Fmt.epr "@[<v>Uf:@;%a@]@." Uuf.print uf; *)
 
-
-(** Check if a conjunctive clause, using only Neq and Leq, is satisfiable  *)
-let sat_conjunct conj =
-  assert false
-
 (** Check if a constraint is satisfiable *)
 let is_sat constr =
-  constr_dnf constr |> List.exists sat_conjunct
+  constr_dnf constr |> List.exists is_sat_conjunct
 
 
 (****************)
