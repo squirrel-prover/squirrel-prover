@@ -11,7 +11,7 @@
   * For messages, function, state and processes. For the latter,
   * the name of variables is given together with their kinds. *)
 
-type kind = Index | Message (* TODO change to bitstring, add bool *)
+type kind = Theory.kind
 type fkind = kind list
 type skind = int
 type pkind = (string*kind) list
@@ -22,16 +22,10 @@ type id = string
   * since they can use variables bound by inputs, let constructs,
   * name creations. Choices are also present, and will only be
   * useful when checking diff-equivalence rather than correspondences. *)
-type term =
-  | Var of string
-  | Fun of string * term list
-  | Get of string * term list
-  | Choice of term * term
+(* TODO update comment *)
+type term = Theory.term
 
-type ord = Eq | Neq | Leq | Geq | Lt | Gt
-type predicate = ord * term * term
-
-type fact = predicate Term.bformula
+type fact = Theory.fact
 
 (** Front-end processes. The computational semantics is action-deterministic
   * (e.g. existential lookup is arbitrarily made deterministic) but in the tool
@@ -66,6 +60,9 @@ let fdecls : (string,fkind) Hashtbl.t = Hashtbl.create 97
 (** Table of typed state symbols *)
 let sdecls : (string,skind) Hashtbl.t = Hashtbl.create 97
 
+(** Table of typed name symbols *)
+let ndecls : (string,skind) Hashtbl.t = Hashtbl.create 97
+
 (** Table of typed (bi)processes *)
 let pdecls : (string,pkind*process) Hashtbl.t = Hashtbl.create 97
 
@@ -79,10 +76,12 @@ let pkind_of_pname id = Hashtbl.find pdecls id
 exception Type_error
 exception Unbound_identifier
 
+open Theory (* TODO get rid of this and move stuff to Theory *)
+
 let rec check_index env = function
   | Var x ->
       if List.assoc x env <> Index then raise Type_error
-  | Choice (u,v) -> check_index env u ; check_index env v
+  (* TODO | Choice (u,v) -> check_index env u ; check_index env v *)
   | _ -> raise Type_error
 
 let rec check_msg env = function
@@ -98,7 +97,7 @@ let rec check_msg env = function
         | Not_found -> raise Unbound_identifier
         | Invalid_argument _ -> raise Type_error
       end
-  | Get (s,ts) ->
+  | Get (s,ts) | Name (s,ts) ->
       begin try
         let arity = skind_of_sname s in
           if List.length ts <> arity then raise Type_error ;
@@ -106,11 +105,14 @@ let rec check_msg env = function
             (fun t -> check_index env t)
             ts
       with Not_found -> raise Unbound_identifier end
-  | Choice (u,v) -> check_msg env u ; check_msg env v
+  | Compare _ -> raise Type_error
+        (* TODO
+  | Choice (u,v) -> check_msg env u ; check_msg env v *)
 
 and check_term k env t = match k with
   | Index -> check_index env t
   | Message -> check_msg env t
+  | Boolean -> failwith "TODO"
 
 let rec check_proc env = function
   | Null -> ()
@@ -155,6 +157,10 @@ let declare_fun f k =
 let declare_state s k =
   if Hashtbl.mem sdecls s then raise Multiple_declarations ;
   Hashtbl.add sdecls s k
+
+let declare_name s k =
+  if Hashtbl.mem ndecls s then raise Multiple_declarations ;
+  Hashtbl.add ndecls s k
 
 let declare id args proc =
   if Hashtbl.mem pdecls id then raise Multiple_declarations ;

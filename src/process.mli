@@ -2,7 +2,7 @@
 
 (** Terms may evaluate to indices or messages.
   * TODO distinguish booleans and bitstrings ? *)
-type kind = Index | Message
+type kind = Theory.kind
 
 (** A function symbol of type [k1,...,kn] allows to build a message
   * from [n] terms of the required kinds. *)
@@ -19,19 +19,11 @@ type pkind = (string*kind) list
 (** Process declarations allow to bind identifiers to processes *)
 type id = string
 
-(** Terms to be used in processes *)
-type term =
-  | Var of string
-  | Fun of string * term list
-      (** Function symbol application,
-        * where terms will be evaluated as indices or messages
-        * depending on the type of the function symbol. *)
-  | Get of string * term list
-      (** [Get (s,terms)] reads the contents of memory cell
-        * [(s,terms)] where [terms] are evaluated as indices. *)
-  | Choice of term * term
+(** Terms to be used in processes: the same as [Theory.term]
+  * where choice operators may be used as function symbols. *)
+type term = Theory.term
 
-type fact
+type fact = Theory.fact
 
 (** Processes *)
 type process =
@@ -60,9 +52,14 @@ type process =
 
 val declare_fun : string -> fkind -> unit
 val declare_state : string -> skind -> unit
+val declare_name : string -> skind -> unit
 
 (** When declaring a process, the body of the definition is type-checked,
   * process invocations are inlined, and unique name, state, and
   * action identifiers are obtained, as part of a conversion to
   * a big-step internal process representation. *)
 val declare : id -> pkind -> process -> unit
+
+(** Final declaration of the system under consideration,
+  * which triggers the computation of its internal representation. *)
+val declare_system : process -> unit
