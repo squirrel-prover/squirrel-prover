@@ -31,4 +31,6 @@ module Uf (Ord: Ordered) : sig
   val union_count : t -> int
 end
 
+(* Option type functions *)
 val opt_get : 'a option -> 'a
+val some : 'a -> 'a option
