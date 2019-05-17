@@ -174,3 +174,49 @@ let make_term s l =
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v])
+
+(** Tests *)
+let () =
+  Checks.add_suite "Theory" [
+    "Declarations", `Quick,
+    begin fun () ->
+      initialize_symbols () ;
+      declare_hash "h" ;
+      Alcotest.check_raises
+        "h cannot be defined twice"
+        Multiple_declarations
+        (fun () -> declare_hash "h") ;
+      Alcotest.check_raises
+        "h cannot be defined twice"
+        Multiple_declarations
+        (fun () -> declare_aenc "h") ;
+      initialize_symbols () ;
+      declare_hash "h"
+    end ;
+    "Term building", `Quick,
+    begin fun () ->
+      initialize_symbols () ;
+      declare_hash "h" ;
+      Alcotest.check_raises
+        "hash function expects two arguments"
+        Type_error
+        (fun () ->
+           ignore (make_term "h" [make_term "x" []])) ;
+      ignore (make_term "h" [make_term "x" []; make_term "y" []])
+    end ;
+    "Type checking", `Quick,
+    begin fun () ->
+      initialize_symbols () ;
+      declare_aenc "e" ;
+      declare_hash "h" ;
+      let x = make_term "x" [] in
+      let y = Var "y" in
+      let t = make_term "e" [make_term "h" [x;y];x;y] in
+      let env = ["x",Message;"y",Message] in
+        check_term env t Message ;
+        Alcotest.check_raises
+          "message is not a boolean"
+          Type_error
+          (fun () -> check_term env t Boolean)
+    end
+  ]
