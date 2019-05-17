@@ -12,19 +12,11 @@
   * the name of variables is given together with their kinds. *)
 
 type kind = Theory.kind
-type fkind = kind list
-type skind = int
 type pkind = (string*kind) list
 
 type id = string
 
-(** Front-end terms differ from back-end terms (of type [Term.t])
-  * since they can use variables bound by inputs, let constructs,
-  * name creations. Choices are also present, and will only be
-  * useful when checking diff-equivalence rather than correspondences. *)
-(* TODO update comment *)
 type term = Theory.term
-
 type fact = Theory.fact
 
 (** Front-end processes. The computational semantics is action-deterministic
@@ -41,96 +33,45 @@ type process =
   | New of string * process
   | In of Channel.t * string * process
   | Out of Channel.t * term * process
-  | Set of string * term * process
+  | Set of string * term list * term * process
+              (** [Set (s,l,t,p)] stores [t] in cell [s(l)]
+                * and continues with [p]. *)
   | Parallel of process * process
   | Let of string * term * process
   | Repl of string * process
   | Exists of string list * fact * process * process
   | Apply of id * term list * id
 
-(** Tables of declared symbols *)
-
-(** Table of typed function symbols
-  *
-  * At some point we talked about types not being necessarily
-  * the same on both sides of bi-processes, this doesn't seem necessary
-  * so I'd rather avoid it *)
-let fdecls : (string,fkind) Hashtbl.t = Hashtbl.create 97
-
-(** Table of typed state symbols *)
-let sdecls : (string,skind) Hashtbl.t = Hashtbl.create 97
-
-(** Table of typed name symbols *)
-let ndecls : (string,skind) Hashtbl.t = Hashtbl.create 97
-
-(** Table of typed (bi)processes *)
+(** Table of declared (bi)processes with their types *)
 let pdecls : (string,pkind*process) Hashtbl.t = Hashtbl.create 97
 
-(** Lookup functions *)
-let fkind_of_fname f = Hashtbl.find fdecls f
-let skind_of_sname s = Hashtbl.find sdecls s
-let pkind_of_pname id = Hashtbl.find pdecls id
+let pkind_of_pname name = Hashtbl.find pdecls name
 
-(** Type checking for terms and processes *)
-
-exception Type_error
-exception Unbound_identifier
-
-open Theory (* TODO get rid of this and move stuff to Theory *)
-
-let rec check_index env = function
-  | Var x ->
-      if List.assoc x env <> Index then raise Type_error
-  (* TODO | Choice (u,v) -> check_index env u ; check_index env v *)
-  | _ -> raise Type_error
-
-let rec check_msg env = function
-  | Var x ->
-      if List.assoc x env <> Message then raise Type_error
-  | Fun (f,ts) ->
-      begin try
-        let ks = fkind_of_fname f in
-          List.iter2
-            (fun t k -> check_term k env t)
-            ts ks
-      with
-        | Not_found -> raise Unbound_identifier
-        | Invalid_argument _ -> raise Type_error
-      end
-  | Get (s,ts) | Name (s,ts) ->
-      begin try
-        let arity = skind_of_sname s in
-          if List.length ts <> arity then raise Type_error ;
-          List.iter
-            (fun t -> check_index env t)
-            ts
-      with Not_found -> raise Unbound_identifier end
-  | Compare _ -> raise Type_error
-        (* TODO
-  | Choice (u,v) -> check_msg env u ; check_msg env v *)
-
-and check_term k env t = match k with
-  | Index -> check_index env t
-  | Message -> check_msg env t
-  | Boolean -> failwith "TODO"
+(** Type checking for processes *)
 
 let rec check_proc env = function
   | Null -> ()
-  | New (x,p) -> check_proc ((x,Message)::env) p
-  | In (c,x,p) -> check_proc ((x,Message)::env) p
-  | Out (c,m,p) -> check_msg env m ; check_proc env p
-  | Set (s,m,p) -> check_msg env m ; check_proc env p (* TODO s *)
+  | New (x,p) -> check_proc ((x,Theory.Message)::env) p
+  | In (c,x,p) -> check_proc ((x,Theory.Message)::env) p
+  | Out (c,m,p) ->
+      Theory.check_term env m Theory.Message ;
+      check_proc env p
+  | Set (s,l,m,p) ->
+      let k = Theory.check_state s (List.length l) in
+        Theory.check_term env m k ;
+        List.iter (fun x -> Theory.check_term env x Theory.Index) l ;
+        check_proc env p
   | Parallel (p,q) -> check_proc env p ; check_proc env q
   | Let (x,t,p) ->
-      check_msg env t ;
-      check_proc ((x,Message)::env) p
-  | Repl (x,p) -> check_proc ((x,Index)::env) p
+      Theory.check_term env t Theory.Message ;
+      check_proc ((x,Theory.Message)::env) p
+  | Repl (x,p) -> check_proc ((x,Theory.Index)::env) p
   | Exists (vars,test,p,q) ->
       check_proc env q ;
-      (* check_msg env test ; TODO check fact *)
+      Theory.check_fact env test ;
       let env =
         List.rev_append
-          (List.map (fun x -> x,Index) vars)
+          (List.map (fun x -> x,Theory.Index) vars)
           env
       in
         check_proc env p
@@ -138,32 +79,17 @@ let rec check_proc env = function
       begin try
         let kind,_ = pkind_of_pname id in
           List.iter2
-            (fun (x,k) t ->
-               check_term k env t)
+            (fun (x,k) t -> Theory.check_term env t k)
             kind ts
       with
-        | Not_found -> raise Type_error
-        | Invalid_argument _ -> raise Type_error
+        | Not_found -> raise Theory.Type_error
+        | Invalid_argument _ -> raise Theory.Type_error
       end
 
 (** New declarations *)
 
-exception Multiple_declarations
-
-let declare_fun f k =
-  if Hashtbl.mem fdecls f then raise Multiple_declarations ;
-  Hashtbl.add fdecls f k
-
-let declare_state s k =
-  if Hashtbl.mem sdecls s then raise Multiple_declarations ;
-  Hashtbl.add sdecls s k
-
-let declare_name s k =
-  if Hashtbl.mem ndecls s then raise Multiple_declarations ;
-  Hashtbl.add ndecls s k
-
 let declare id args proc =
-  if Hashtbl.mem pdecls id then raise Multiple_declarations ;
+  if Hashtbl.mem pdecls id then raise Theory.Multiple_declarations ;
   check_proc args proc ;
   Hashtbl.add pdecls id (args,proc)
 
@@ -259,7 +185,7 @@ end
 type block = {
   input : Channel.t*string ;
   condition : string list * fact ;
-  updates : (string*term) list ;
+  updates : (string*term list*term) list ;
   output : Channel.t*term
 }
 
@@ -343,8 +269,8 @@ let rec parse_proc action proc : unit =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and block are registered. *)
   and p_update ~par_choice ~sum_choice ~input ~condition ~updates = function
-    | Set (s,t,p) ->
-        let updates = (s,t)::updates in
+    | Set (s,l,t,p) ->
+        let updates = (s,l,t)::updates in
           p_update ~par_choice ~sum_choice ~input ~condition ~updates p
     | Out (c,t,p) ->
         let block = { input ; condition ; updates ; output = c,t } in

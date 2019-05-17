@@ -6,10 +6,8 @@
 type channel
 type t = channel
 
-exception Multiple_declarations
-
 (** [declare s] declares a channel named [s].
-  * @raise Multiple_declaration if the channel is already declared. *)
+  * @raise Theory.Multiple_declaration if the channel is already declared. *)
 val declare : string -> unit
 
 (** [of_string s] retrieves the channel previously declared

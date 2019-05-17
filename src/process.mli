@@ -1,37 +1,27 @@
 (** Bi-processes *)
 
-(** Terms may evaluate to indices or messages.
-  * TODO distinguish booleans and bitstrings ? *)
-type kind = Theory.kind
-
-(** A function symbol of type [k1,...,kn] allows to build a message
-  * from [n] terms of the required kinds. *)
-type fkind = kind list
-
-(** A state variable only takes indices as arguments, so its kind
-  * is simply an arity. *)
-type skind = int
-
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type pkind = (string*kind) list
+type pkind = (string*Theory.kind) list
 
 (** Process declarations allow to bind identifiers to processes *)
 type id = string
 
-(** Terms to be used in processes: the same as [Theory.term]
-  * where choice operators may be used as function symbols. *)
+(** Processes, using terms and facts from [Theory] *)
+
 type term = Theory.term
 
 type fact = Theory.fact
 
-(** Processes *)
 type process =
   | Null                                    (** Null process *)
   | New of string * process                 (** Name creation *)
   | In of Channel.t * string * process      (** Input *)
   | Out of Channel.t * term * process       (** Output *)
-  | Set of string * term * process          (** Assignment *)
+  | Set of string * term list * term * process
+                                            (** [Set (s,l,t,p)] stores [t]
+                                              * in cell [s(l)] and
+                                              * continues with [p]. *)
   | Parallel of process * process           (** Parallel composition *)
   | Let of string * term * process          (** Local definition *)
   | Repl of string * process
@@ -47,12 +37,6 @@ type process =
         * to [p(ts)] and its actions will be generated using the
         * name [q] rather than [p], which may be important to obtain
         * unique action identifiers. *)
-
-(** Declarations *)
-
-val declare_fun : string -> fkind -> unit
-val declare_state : string -> skind -> unit
-val declare_name : string -> skind -> unit
 
 (** When declaring a process, the body of the definition is type-checked,
   * process invocations are inlined, and unique name, state, and

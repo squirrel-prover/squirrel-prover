@@ -80,17 +80,26 @@ arg_list:
 | ID COLON kind                  { [$1,$3] }
 | ID COLON kind COMMA arg_list   { ($1,$3)::$5 }
 
-basic_type:
+name_type:
 | MESSAGE                        { 0 }
-| INDEX ARROW basic_type         { 1+$3 }
+| INDEX ARROW name_type          { 1+$3 }
+
+msg_or_bool:
+| MESSAGE                        { Theory.Message }
+| BOOLEAN                        { Theory.Boolean }
+
+state_type:
+| msg_or_bool                    { 0, $1 }
+| INDEX ARROW state_type         { let n,k = $3 in n+1,k }
 
 declaration:
 | HASH ID                        { Theory.declare_hash $2 }
 | AENC ID                        { Theory.declare_aenc $2 }
-| NAME ID COLON basic_type       { Process.declare_name $2 $4 }
-| MUTABLE ID COLON basic_type    { Process.declare_state $2 $4 }
+| NAME ID COLON name_type        { Theory.declare_name $2 $4 }
+| MUTABLE ID COLON state_type    { Theory.declare_state $2 (fst $4) (snd $4) }
 | CHANNEL ID                     { Channel.declare $2 }
-| TERM ID arg_list EQ term       { Theory.declare_term $2 $3 $5 }
+| TERM ID arg_list COLON msg_or_bool EQ term
+                                 { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID arg_list EQ process { Process.declare $2 $3 $5 }
 
 theory:

@@ -3,12 +3,10 @@ type t = channel
 
 let channels : (channel,unit) Hashtbl.t = Hashtbl.create 13
 
-exception Multiple_declarations
-
 let declare s =
   try
     Hashtbl.find channels s ;
-    raise Multiple_declarations
+    raise Theory.Multiple_declarations
   with Not_found ->
     Hashtbl.add channels s ()
 
@@ -28,7 +26,7 @@ let () =
         Not_found (fun () -> ignore (of_string "d")) ;
       ignore (of_string "c") ;
       Alcotest.check_raises "fails"
-        Multiple_declarations (fun () -> declare "c") ;
+        Theory.Multiple_declarations (fun () -> declare "c") ;
       declare "d" ;
       Alcotest.(check string) "same channels"
         (of_string "c") (of_string "c") ;
