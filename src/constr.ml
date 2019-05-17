@@ -123,7 +123,7 @@ let mk_instance (l : tpredicate list) =
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
       ([],[],[]) l in
 
-  let elems = List.fold_left (fun acc (a,b) -> a :: b :: acc) [] eqs
+  let elems = List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
               |> List.fold_left (fun acc x -> match x.cnt with
                   | UName (_,is) -> x :: is @ acc
                   | _ -> x :: acc) []
@@ -174,6 +174,7 @@ let no_mgu x y = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) -> if a <> a' then raise No_mgu else ()
   | _ -> ()
 
+
 (**************************************)
 (* This is alsmost Huet's unification *)
 (**************************************)
@@ -181,22 +182,25 @@ let no_mgu x y = match x.cnt, y.cnt with
 let rec unif uf eqs = match eqs with
   | [] -> uf
   | (x,y) :: eqs ->
-    let rx,ry = Uuf.find uf x, Uuf.find uf y in
-    if ut_equal rx ry then unif uf eqs
-    else
-      let () = no_mgu rx ry in
-      let rx,ry = swap rx ry in
+    try
+      let rx,ry = Uuf.find uf x, Uuf.find uf y in
+      if ut_equal rx ry then unif uf eqs
+      else
+        let () = no_mgu rx ry in
+        let rx,ry = swap rx ry in
 
-      (* Union always uses [ry]'s representent, in that case [ry] itself, as
-         representent of the union of [rx] and [ry]'s classes. *)
-      let uf = Uuf.union uf rx ry in
+        (* Union always uses [ry]'s representent, in that case [ry] itself, as
+           representent of the union of [rx] and [ry]'s classes. *)
+        let uf = Uuf.union uf rx ry in
 
-      let eqs = match rx.cnt, ry.cnt with
-        | UName (_,isx), UName (_,isy) -> List.combine isx isy @ eqs
-        | UPred a, UPred b -> (a,b) :: eqs
-        | _ -> eqs in
+        let eqs = match rx.cnt, ry.cnt with
+          | UName (_,isx), UName (_,isy) -> List.combine isx isy @ eqs
+          | UPred a, UPred b -> (a,b) :: eqs
+          | _ -> eqs in
 
-      unif uf eqs
+        unif uf eqs
+    with Not_found -> Fmt.epr "Not: %a %a@;@[%a@]@." pp_ut x pp_ut y Uuf.print uf; raise Not_found
+
 
 (*********************)
 (* Names unification *)
@@ -242,6 +246,10 @@ let unif_idx uf =
 
 (** Merges union-find classes with the same mgus. *)
 let merge_eq_class uf =
+  (* let pp_sep ppf () = Fmt.pf ppf ";;@;@;" in
+   * Fmt.epr "@[<v>Uf:@;%a@;Classes:@;@[<hov>%a@]@]@."
+   *   Uuf.print uf
+   *   (Fmt.list ~sep:pp_sep (Fmt.list pp_ut)) (Uuf.classes uf); *)
 
   let reps =
     List.map (fun l -> match l with
@@ -309,7 +317,7 @@ let build_graph (uf : Uuf.t) leqs =
 
   let add_preds g =
     UtG.fold_vertex (fun v g -> match v.cnt with
-        | UPred u -> UtG.add_edge g u v
+        | UPred u -> UtG.add_edge g v u
         | _ -> g) g g in
 
   bg leqs UtG.empty |> add_preds
@@ -418,11 +426,45 @@ let forall_edges f g =
     true
   with Foe -> false
 
+let exist_edge f g =
+  let exception Exist in
+  try
+    let () = UtG.iter_edges (fun v v' ->
+        if f v v' then raise Exist else ()) g in
+    false
+  with Exist -> true
+
+let find_edge f g =
+  let exception Found of ut * ut in
+  try
+    let () = UtG.iter_edges (fun v v' ->
+        if f v v' then raise (Found (v,v')) else ()) g in
+    raise Not_found
+  with Found (v,v') -> (v,v')
+
 
 (** Check that [instance] dis-equalities are satisfied.
     [g] must be transitive. *)
 let neq_sat uf g neqs =
-  (* CHeck dis-equalities in neqs *)
+  (* (\* REM *\)
+   * if List.exists (fun (u,v) ->
+   *     (ut_equal (mgu uf u) (mgu uf v))
+   *   ) neqs then
+   *   Fmt.epr "Found 1: %a" (Fmt.pair pp_ut pp_ut)
+   *     (List.find (fun (u,v) ->
+   *          (ut_equal (mgu uf u) (mgu uf v))
+   *        ) neqs);
+   *
+   * (\* REM *\)
+   * if exist_edge (fun v v' -> match decomp v, decomp v' with
+   *     | (k,y), (k',y') ->
+   *       (ut_equal y y') && k < k') g then
+   *   Fmt.epr "Found 2: %a" (Fmt.pair pp_ut pp_ut)
+   *     (find_edge (fun v v' -> match decomp v, decomp v' with
+   *          | (k,y), (k',y') ->
+   *            (ut_equal y y') && k < k') g); *)
+
+  (* Check dis-equalities in neqs *)
   List.for_all (fun (u,v) ->
       not (ut_equal (mgu uf u) (mgu uf v))
     ) neqs
@@ -442,39 +484,41 @@ let get_basics uf elems =
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance] *)
 let rec split instance =
-  let uf = unify instance.uf instance.eqs instance.elems in
-  let uf,g = leq_unify uf instance.leqs instance.elems in
-  let g = UtGOp.transitive_closure g in
+  try begin
+    let uf = unify instance.uf instance.eqs instance.elems in
+    let uf,g = leq_unify uf instance.leqs instance.elems in
+    let g = UtGOp.transitive_closure g in
 
-  if not (neq_sat uf g instance.neqs) then []
-  else
-    let basics = get_basics uf instance.elems in
-    let exception Found of (ut * ut) list in
-    try
-      let () = UtG.iter_vertex (fun u ->
-          List.iter (fun x -> match add_disj uf g u x with
-              | None -> ()
-              | Some l -> raise (Found l)
-            ) basics
-        ) g in
+    if not (neq_sat uf g instance.neqs) then []
+    else
+      let basics = get_basics uf instance.elems in
+      let exception Found of (ut * ut) list in
+      try
+        let () = UtG.iter_vertex (fun u ->
+            List.iter (fun x -> match add_disj uf g u x with
+                | None -> ()
+                | Some l -> raise (Found l)
+              ) basics
+          ) g in
 
-      [instance]
+        [instance]
 
-    with Found new_eqs ->
-      List.map (fun eq ->
-          split { instance with uf = uf;
-                                eqs = eq :: instance.eqs;
-                                new_eqs = eq :: instance.new_eqs }
-        ) new_eqs
-      |> List.flatten
+      with Found new_eqs ->
+        List.map (fun eq ->
+            split { instance with uf = uf;
+                                  eqs = eq :: instance.eqs;
+                                  new_eqs = eq :: instance.new_eqs }
+          ) new_eqs
+        |> List.flatten end
+  with No_mgu -> []
 
 
-(** [is_sat l] check that l is a satisfiable conjunct of constraints *)
+(** [is_sat l] check that l is a satisfiable conjunct of constraints.
+    [l] must use only Eq, Neq and Leq. *)
 let is_sat_conjunct (l : tpredicate list) =
   let instance = mk_instance l in
 
   split instance <> []
-
 
 
 (* Fmt.epr "@[<v>Uf:@;%a@]@." Uuf.print uf; *)
@@ -487,67 +531,118 @@ let is_sat constr =
 (****************)
 (* Tests Suites *)
 (****************)
+let tau = TVar (fresh_tvar ())
+and tau' = TVar (fresh_tvar ())
+and tau'' = TVar (fresh_tvar ())
+and tau''' = TVar (fresh_tvar ())
+and tau3 = TVar (fresh_tvar ())
+and tau4 = TVar (fresh_tvar ())
+and tau5 = TVar (fresh_tvar ())
+and i = fresh_index ()
+and i' = fresh_index ()
+and a = mk_action "a"
+
+let pb_eq1 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TPred tau''))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
+and pb_eq2 = [Pts (Eq,tau, TPred tau)]
+and pb_eq3 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TPred tau''))
+             :: [Pts (Eq,tau'', tau)]
+and pb_eq4 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TPred tau''))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i]))]
+and pb_eq5 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TName (a,[i'])))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: (Pts (Eq,tau'', TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
+and pb_eq6 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TName (a,[i'])))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: (Pts (Eq,tau''', TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
+and pb_eq7 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TPred tau''))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
+and pb_eq8 = (Pts (Eq,tau, TPred tau'))
+             :: (Pts (Eq,tau', TPred tau''))
+             :: [Pts (Eq,tau'', tau''')];;
+
+Printexc.record_backtrace true;
+
+ignore(is_sat_conjunct
+         ((Pts (Neq, tau, tau3)) ::
+          (Pts (Neq, tau3, tau'')) ::
+          (Pts (Leq, tau, tau3)) ::
+          (Pts (Leq, tau3, tau'')) ::
+          pb_eq1));;
 
 let () =
   let exception Mgu in
+  let exception Unsat in
+  let exception Sat in
   Checks.add_suite "Unification" [
-    "Cycles", `Quick,
-    fun () ->
-      let tau = TVar (fresh_tvar ())
-      and tau' = TVar (fresh_tvar ())
-      and tau'' = TVar (fresh_tvar ())
-      and tau''' = TVar (fresh_tvar ())
-      and i = fresh_index ()
-      and i' = fresh_index ()
-      and a = mk_action "a" in
+    ("Cycles", `Quick,
+     fun () ->
+       let successes = [pb_eq1; pb_eq6; pb_eq7; pb_eq8]
+       and failures = [pb_eq2; pb_eq3; pb_eq4; pb_eq5] in
 
-      (* Printexc.record_backtrace true; *)
-      let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                             :: (Pts (Eq,tau', TPred tau''))
-                             :: (Pts (Eq,tau, TName (a,[i])))
-                             :: [Pts (Eq,tau'', TName (a,[i']))]) in ();
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("mgu" ^ string_of_int i) Mgu
+             (fun () -> let _ : Uuf.t = mgu_eqs pb in raise Mgu ))
+         successes;
 
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("no mgu" ^ string_of_int i) No_mgu
+             (fun () -> let _ : Uuf.t = mgu_eqs pb in () ))
+         failures;);
 
-      Alcotest.check_raises "fails" No_mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs [Pts (Eq,tau, TPred tau)] in () );
-      Alcotest.check_raises "fails" No_mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TPred tau''))
-                                  :: [Pts (Eq,tau'', tau)]) in () );
-      Alcotest.check_raises "fails" No_mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TPred tau''))
-                                  :: (Pts (Eq,tau, TName (a,[i])))
-                                  :: [Pts (Eq,tau'', TName (a,[i]))]) in () );
-      Alcotest.check_raises "fails" No_mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TName (a,[i'])))
-                                  :: (Pts (Eq,tau, TName (a,[i])))
-                                  :: (Pts (Eq,tau'', TName (a,[i])))
-                                  :: [Pts (Eq,tau'', TName (a,[i']))]) in () );
-      Alcotest.check_raises "success" Mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TName (a,[i'])))
-                                  :: (Pts (Eq,tau, TName (a,[i])))
-                                  :: (Pts (Eq,tau''', TName (a,[i])))
-                                  :: [Pts (Eq,tau'', TName (a,[i']))]) in
-           raise Mgu );
-      Alcotest.check_raises "success" Mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TPred tau''))
-                                  :: (Pts (Eq,tau, TName (a,[i])))
-                                  :: [Pts (Eq,tau'', TName (a,[i']))]) in
-           raise Mgu );
-      Alcotest.check_raises "success" Mgu
-        (fun () ->
-           let _ : Uuf.t = mgu_eqs ((Pts (Eq,tau, TPred tau'))
-                                  :: (Pts (Eq,tau', TPred tau''))
-                                  :: [Pts (Eq,tau'', tau''')]) in
-           raise Mgu );
+    ("Cycles_2", `Quick,
+     fun () ->
+       let successes = [pb_eq1; pb_eq6; pb_eq7; pb_eq8]
+       and failures = [pb_eq2; pb_eq3; pb_eq4; pb_eq5] in
+
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("mgu" ^ string_of_int i) Sat
+             (fun () -> if is_sat_conjunct pb then raise Sat else ()))
+         successes;
+
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("no mgu" ^ string_of_int i) Unsat
+             (fun () -> if is_sat_conjunct pb then () else raise Unsat ))
+         failures;);
+
+    ("Graph", `Quick,
+     fun () ->
+       let successes = [(Pts (Leq, tau, tau'')) :: pb_eq1;
+
+                        (Pts (Neq, tau, tau3)) ::
+                        (Pts (Neq, tau3, tau'')) ::
+                        (Pts (Leq, tau, tau3)) ::
+                        (Pts (Leq, tau3, tau'')) ::
+                        pb_eq1]
+       and failures = [(Pts (Leq, tau'', tau)) :: pb_eq1;
+
+                       (Pts (Neq, tau, tau3)) ::
+                       (Pts (Neq, tau3, tau4)) ::
+                       (Pts (Neq, tau4, tau'')) ::
+                       (Pts (Leq, tau, tau3)) ::
+                       (Pts (Leq, tau3, tau4)) ::
+                       (Pts (Leq, tau4, tau'')) ::
+                       pb_eq1] in
+
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("sat" ^ string_of_int i) Sat
+             (fun () -> if is_sat_conjunct pb then raise Sat else ()))
+         successes;
+
+       List.iteri (fun i pb ->
+           Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
+             (fun () -> if is_sat_conjunct pb then () else raise Unsat ))
+         failures;)
+
   ]

@@ -86,7 +86,7 @@ module Uf (Ord: Ordered) = struct
             |> List.sort (fun (a,_) (a',_) -> Pervasives.compare a a') in
 
     let l_eqc = match l with
-      | [] -> [[]]
+      | [] -> []
       | (x,_) :: _ ->
         List.fold_left (fun (acc,x_old) (x,y) ->
             if x = x_old then (add_acc y acc, x)
