@@ -12,13 +12,21 @@ module type Ordered = sig
 end
 
 (** Create a union-find data-structure over elements of type 'a.
-    [union t u v] always uses the representent of [v], i.e.
-    [find [union t u v] u] = [find t v] *)
+    - [union] and [find] must only be used on elements present at the
+    creation, or on elements added afterwards trough [extend]. *)
 module Uf (Ord: Ordered) : sig
   type v = Ord.t
   type t
+
   val create : v list -> t
+
+  (** [extend t v] add the element [v] to [t], if necessary. *)
+  val extend : t -> v -> t
+
   val find : t -> v  -> v
+
+  (** [union t u v] always uses the representent of [v], i.e.
+    [find [union t u v] u] = [find t v] *)
   val union : t -> v -> v -> t
 
   (** [classes t] return the list of equivalence classes of [t], where a class
@@ -34,3 +42,4 @@ end
 (* Option type functions *)
 val opt_get : 'a option -> 'a
 val some : 'a -> 'a option
+val opt_map : 'a option -> ('a -> 'b option) -> 'b option
