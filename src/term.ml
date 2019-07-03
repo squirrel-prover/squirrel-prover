@@ -56,12 +56,19 @@ type nsymb = name * indices
 (** Function symbols are built from a name (from a finite set)
   * and a list of indices.
   *
-  * TODO must include builtins such as if-then-else, equality, successor...
+  * TODO must include builtins such as if-then-else, equality, successor, xor ...
+  * Adrien: already added xor and successor
   *)
 
-type fname
+type fname = string
 
 type fsymb = fname * indices
+
+(** Xor function symbol *)
+let fxor = ("xor", [])
+
+(** Successor function symbol *)
+let fsucc = ("succ", [])
 
 (** Memory cells are represented by state variable, themselves
   * derived from a name (from a finite set) and indices.

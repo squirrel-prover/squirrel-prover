@@ -13,7 +13,7 @@ end
 
 (** Create a union-find data-structure over elements of type 'a.
     - [union] and [find] must only be used on elements present at the
-    creation, or on elements added afterwards trough [extend]. *)
+    creation, or on elements added afterwards through [extend]. *)
 module Uf (Ord: Ordered) : sig
   type v = Ord.t
   type t
