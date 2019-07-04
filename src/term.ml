@@ -49,26 +49,35 @@ let rec pp_timestamp ppf = function
   * A name symbol is derived from a name (from a finite set) and
   * a list of indices. *)
 
-type name
+type name = Name of string
+
+let pp_name ppf = function Name s -> Fmt.pf ppf "n!%s" s
 
 type nsymb = name * indices
+
+let pp_nsymb ppf (n,is) = Fmt.pf ppf "%a(%a)" pp_name n pp_indices is
 
 (** Function symbols are built from a name (from a finite set)
   * and a list of indices.
   *
   * TODO must include builtins such as if-then-else, equality, successor, xor ...
   * Adrien: already added xor and successor
+  * Some keywords should probably be forbidden, e.g. "in", "out"
   *)
 
-type fname = string
+type fname = Fname of string
+
+let pp_fname ppf = function Fname s -> Fmt.pf ppf "f!%s" s
 
 type fsymb = fname * indices
 
+let pp_fsymb ppf (fn,is) = Fmt.pf ppf "%a(%a)" pp_fname fn pp_indices is
+
 (** Xor function symbol *)
-let fxor = ("xor", [])
+let fxor = (Fname "xor", [])
 
 (** Successor function symbol *)
-let fsucc = ("succ", [])
+let fsucc = (Fname "succ", [])
 
 (** Memory cells are represented by state variable, themselves
   * derived from a name (from a finite set) and indices.
@@ -76,9 +85,13 @@ let fsucc = ("succ", [])
   * TODO simplify design to merge name, function and state names ?
   *)
 
-type sname
+type sname = Sname of string
+
+let pp_sname ppf = function Sname s -> Fmt.pf ppf "s!%s" s
 
 type state = sname * indices
+
+let pp_state ppf (sn,is) = Fmt.pf ppf "%a(%a)" pp_sname sn pp_indices is
 
 (** Terms *)
 type term =

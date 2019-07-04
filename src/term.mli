@@ -43,6 +43,8 @@ type name
 
 type nsymb = name * indices
 
+val pp_nsymb : Format.formatter -> nsymb -> unit
+
 (** Function symbols are built from a name (from a finite set)
   * and a list of indices.
   *
@@ -53,6 +55,8 @@ type nsymb = name * indices
 type fname
 
 type fsymb = fname * indices
+
+val pp_fsymb : Format.formatter -> fsymb -> unit
 
 (** Xor function symbol *)
 val fxor : fsymb
@@ -70,6 +74,8 @@ val fsucc : fsymb
 type sname
 
 type state = sname * indices
+
+val pp_state : Format.formatter -> state -> unit
 
 (** Terms *)
 type term =
