@@ -1,6 +1,9 @@
 module List : sig
   include module type of struct include List end
+
   val init : int -> (int -> 'a) -> 'a list
+
+  val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
 end
 
 module Imap : Map.S with type key = int

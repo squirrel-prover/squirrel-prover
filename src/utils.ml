@@ -8,6 +8,12 @@ module List = struct
     else
       let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
       ini 0
+
+  let rec split3 = function
+      [] -> ([], [], [])
+    | (x,y,z)::l ->
+      let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
+
 end
 
 module Imap = Map.Make (struct

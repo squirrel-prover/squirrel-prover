@@ -66,22 +66,40 @@ let get_cst = function
   | Ccst c -> c
   | _ -> assert false
 
-(* let ccsuc t = Ccst (Cst.Csucc (get_cst t)) *)
+module Cset = Set.Make(Cst)
 
-(** Flatten a ground terms, introducing new constants and rewrite rules *)
+(** Flatten a ground term, introducing new constants and rewrite rules. *)
 let rec flatten t = match t with
   | Cfun (f, [t']) when f = Term.fsucc ->
-    let eqs,cst = flatten t' in
-    ( eqs, Cst.Csucc cst )
+    let eqs, xeqs, cst = flatten t' in
+    ( eqs, xeqs, Cst.Csucc cst )
+
+  | Cfun (f, _) when f = Term.fxor ->
+    let eqs, xeqs, csts = flatten_xor [] t in
+    let a = Cst.mk_flat () in
+    ( eqs, (Cset.of_list csts, a) :: xeqs, a)
 
   | Cfun (f,ts) ->
-    let eqss,csts = List.map flatten ts |> List.split in
+    let eqss, xeqss, csts = List.map flatten ts |> List.split3 in
     let a = Cst.mk_flat () in
 
-    ((Cfun (f,List.map (fun x -> Ccst x) csts), a) :: List.flatten eqss, a)
+    ( (Cfun (f,List.map (fun x -> Ccst x) csts), a)
+      :: List.flatten eqss,
+      List.flatten xeqss,
+      a )
 
-  | Ccst c -> ([],c)
+  | Ccst c -> ([], [], c)
   | Cvar _ -> assert false
+
+and flatten_xor acc t = match t with
+  | Cfun (f, [t';t'']) when f = Term.fxor ->
+    let eqs, xeqs, acc = flatten_xor acc t' in
+    let eqs', xeqs', acc = flatten_xor acc t'' in
+    ( eqs' @ eqs, xeqs' @ xeqs, acc )
+
+  | Ccst c -> ([], [], c :: acc)
+
+  | _ -> let eqs, xeqs, c = flatten t in (eqs, xeqs, c :: acc)
 
 
 module CufTmp = Uf (Cst)
@@ -114,13 +132,12 @@ end = struct
     else CufTmp.union t v v'
 end
 
-module Cset = Set.Make(Cst)
 
 (** State of the completion algorithm:
- * uf :  Equalities between constants.
- * xor_rules : A set {a1,...,an} corresponds to a1 + ... + an -> 0
- * grnd_rules : Grounds rules of the form "ground term -> constant"
- * e_rules : general rules. For the completion algorithm to succeed, these
+ * - uf :  Equalities between constants.
+ * - xor_rules : A set {a1,...,an} corresponds to a1 + ... + an -> 0
+ * - grnd_rules : Grounds flat rules of the form "ground term -> constant"
+ * - e_rules : general rules. For the completion algorithm to succeed, these
  *           rules must be of a restricted form:
  *           - No "xor" and no "succ".
  *           - initially, each rule in e_rule must start by a destructor, which
@@ -129,6 +146,7 @@ type state = { uf : Cuf.t;
                xor_rules : Cset.t list;
                grnd_rules : (cterm * Cst.t) list;
                e_rules : (cterm * cterm) list }
+
 
 let rec term_uf_normalize state t = match t with
   | Cfun (f,ts) -> Cfun (f, List.map (term_uf_normalize state) ts)
@@ -144,7 +162,11 @@ let disjoint_union s s' =
   let u, i = Cset.union s s', Cset.inter s s' in
   Cset.diff u i
 
-module Xor = struct
+
+module Xor : sig
+  val deduce_eqs : state -> state
+end = struct
+
   (** Add to [xrules] the rules obtained from the critical pairs with [xr]. *)
   let add_cp xr xrules =
     List.fold_left (fun acc xr' ->
@@ -175,7 +197,10 @@ module Xor = struct
         { state with uf = Cuf.union state.uf a b } ) state
 end
 
-module Ground = struct
+
+module Ground : sig
+  val deduce_eqs : state -> state
+end = struct
 
   (** Deduce constants equalities from the ground rules. *)
   let deduce_eqs state =
@@ -240,18 +265,14 @@ module Unify = struct
 end
 
 
-module NotGround = struct
+module Erules : sig
+  val deduce_eqs : state -> state
+end = struct
 
-  (* (\** [add_grnd_rules eqs state] adds ground rules.
-   *     Precondition: rules in [eqs] must be flat. *\)
-   * let add_grnd_rules eqs state =
-   *   { state with grnd_rules =
-   *                  eqs @ state.grnd_rules
-   *                  |> List.sort_uniq Pervasives.compare } *)
-
-  (** [l] must be a ground term. *)
+  (** [add_grnd_rule state l a]: the term [l] must be ground. *)
   let add_grnd_rule state l a =
-    let eqs, b = flatten l in
+    let eqs, xeqs, b = flatten l in
+    assert (xeqs = []);
     { state with uf = Cuf.union state.uf a b;
                  grnd_rules = eqs @ state.grnd_rules
                               |> List.sort_uniq Pervasives.compare }
@@ -273,61 +294,100 @@ module NotGround = struct
          not ground, we should probably always abort. *)
       | _ -> assert false
 
-  (** Try all superposition of a ground rule into an e_rule, and add new
-      equalities to get local confluence if necessary. *)
+  (** [grnd_superpose state (l,r) (t,a)]: Try all superposition of a ground rule
+      [t] -> [a] into an e_rule [l] -> [r], and add new equalities to get local
+      confluence if necessary. *)
   let grnd_superpose state (l,r) (t,a) =
 
     (* Invariant in [aux acc lst f]:
-     *  - [acc] is the list of new rules added so far.
+     *  - [acc] is the list of e_rules to add so far.
      *  - [lst] is a subterm of [l].
      *  - [f_cntxt] is function building the context where [lst] appears.
           For example, we have that [f_cntxt lst = l]. *)
-    let rec aux acc lst f_cntxt = match lst with
-      | Ccst _ | Cvar _ -> acc
+    let rec aux state acc lst f_cntxt = match lst with
+      | Ccst _ | Cvar _ -> ( state, acc )
       | Cfun (fn, ts) ->
-        let acc = match Unify.unify state lst t with
-          | Unify.No_mgu -> acc
+        let state, acc = match Unify.unify state lst t with
+          | Unify.No_mgu -> ( state, acc )
           | Unify.Mgu sigma ->
             (* Here, we have the critical pair:
                r sigma <- l[t] sigma -> l[a] sigma *)
-            let la_sigma = Unify.subst_apply (f_cntxt a) sigma
+            let la_sigma = Unify.subst_apply (f_cntxt (Ccst a)) sigma
             and r_sigma = Unify.subst_apply r sigma in
-            if la_sigma = r_sigma then acc
-            else match la_sigma with
-              | Ccst _ ->
-                assert (is_ground r_sigma);
 
-              | _ -> (la_sigma,r_sigma) :: acc in
+            (* No critical pair *)
+            if la_sigma = r_sigma then ( state, acc )
+
+            else match la_sigma with
+              | Ccst c ->
+                (* Using the subterm property, we know that if [la_sigma] is
+                   ground, then so is [r_sigma] *)
+                assert (is_ground r_sigma);
+                ( add_grnd_rule state r_sigma c, acc)
+
+              | _ -> ( state, (la_sigma,r_sigma) :: acc ) in
 
         (* Invariant: [(List.rev left) @ [lst'] @ right = ts] *)
-        let acc, _, _ = List.fold_left (fun (acc,left,right) lst' ->
+        let (state, acc), _, _ = List.fold_left (fun ((state,acc),left,right) lst' ->
             let f_cntxt' hole =
               f_cntxt (Cfun (fn, (List.rev left) @ [hole] @ right)) in
 
             let right' = if right = [] then [] else List.tl right in
 
-            ( aux acc lst' f_cntxt', lst' :: left, right' )
-          ) (acc,[],ts) ts in
+            ( aux state acc lst' f_cntxt', lst' :: left, right' )
+          ) ((state,acc),[],ts) ts in
 
-        acc in
+        ( state, acc ) in
 
-    aux [] l (fun x -> x)
-
-
-
-  (* r_closed: rules already superposed with all other rules.
-     r_open: rules to superpose. *)
-  let deduce_aux r_open r_closed = match r_open with
-    | [] -> r_closed
-    | r :: r_open' -> assert false
+    aux state [] l (fun x -> x)
 
 
-  (** Deduce constants equalities from the non-ground rules. *)
+  (** [deduce_aux state r_open r_closed]. Invariant:
+      - r_closed: e_rules already superposed with all other rules.
+      - r_open: e_rules to superpose. *)
+  let rec deduce_aux state r_open r_closed = match r_open with
+    | [] -> { state with e_rules = List.sort_uniq Pervasives.compare r_closed }
+
+    | rule :: r_open' ->
+      let state, r_open' = List.fold_left (fun (state, r_open') rule' ->
+          let (state, new_rs) = grnd_superpose state rule rule' in
+          ( state, new_rs @ r_open' )
+        ) ( state, r_open') state.grnd_rules in
+
+      let state = List.fold_left (fun state rule' ->
+          head_superpose state rule rule'
+        ) state r_closed in
+
+      let state = List.fold_left (fun state rule' ->
+          head_superpose state rule rule'
+        ) state r_open' in
+
+      deduce_aux state r_open' (rule :: r_closed )
+
+
+  (** Deduce new rules (constant, ground and e_) from the non-ground rules. *)
   let deduce_eqs state =
-    (* We get all e_equality rules, normalized by constant equality rules *)
+    (* We get all e_rules, normalized by constant equality rules *)
     let erules = state.e_rules
                  |> List.map (p_terms_uf_normalize state) in
 
-
-    assert false
+    deduce_aux state erules []
 end
+
+let stop_cond state =
+  ( Cuf.union_count state.uf,
+    List.length state.grnd_rules,
+    List.length state.e_rules )
+
+(** The completion algorithm. *)
+let rec complete_aux state =
+
+  let start = stop_cond state in
+
+  let state = Xor.deduce_eqs state
+              |> Ground.deduce_eqs
+              |> Erules.deduce_eqs in
+
+  if start <> stop_cond state then complete_aux state else state
+
+let complete a = assert false
