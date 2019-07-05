@@ -172,6 +172,10 @@ module Uf (Ord: Ordered) = struct
 end
 
 
+let rec fpt f a =
+  let b = f a in
+  if b = a then b else fpt f b
+
 (* Option type functions *)
 let opt_get = function
   | Some u -> u

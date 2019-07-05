@@ -21,7 +21,7 @@ module Cst = struct
     Cflat !cst_cpt
 
   let rec print ppf = function
-    | Cflat i -> Fmt.pf ppf "%d" i
+    | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
@@ -43,11 +43,19 @@ end
 
 type varname = int
 
-(** Terms used during the completion *)
+(** Terms used during the completion and normalization.
+    Remark: Cxor never appears during the completion. *)
 type cterm =
   | Cfun of fsymb * cterm list
   | Ccst of Cst.t
   | Cvar of varname
+  | Cxor of cterm list
+
+let var_cpt = ref 0
+
+let mk_var () =
+  let () = incr var_cpt in
+  Cvar !var_cpt
 
 (** Translation from [term] to [cterm] *)
 let rec cterm_of_term = function
@@ -57,27 +65,98 @@ let rec cterm_of_term = function
   | Input n -> Ccst (Cst.Cinput n)
   | Output n -> Ccst (Cst.Coutput n)
 
+let rec pp_cterm ppf = function
+  | Cvar v -> Fmt.pf ppf "v#%d" v
+  | Ccst c -> Cst.print ppf c
+  | Cfun (f, ts) ->
+    Fmt.pf ppf "%a(@[<hov 1>%a@])"
+      pp_fsymb f
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
+  | Cxor ts ->
+    Fmt.pf ppf "++(@[<hov 1>%a@])"
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
+
+
 let rec is_ground = function
   | Ccst _ -> true
   | Cvar _ -> false
-  | Cfun (_, ts) -> List.for_all is_ground ts
+  | Cxor ts | Cfun (_, ts) -> List.for_all is_ground ts
+
+let is_cst = function | Ccst _ -> true | _ -> false
 
 let get_cst = function
   | Ccst c -> c
   | _ -> assert false
 
+
+(** Create equational rules for some common theories.
+    TODO: Arity checks should probably be done somehow. *)
+module Theories = struct
+
+  (** N-ary pair. *)
+  let mk_pair arity pair projs =
+    assert (arity = List.length projs);
+    List.mapi (fun i proj ->
+        let vars = List.init arity (fun _ -> mk_var ()) in
+        (Cfun (proj, [Cfun (pair, vars)]), List.nth vars i)
+      ) projs
+
+  (** Asymmetric encryption.
+      dec(enc(m, pk(k)), sk(k)) -> m *)
+  let mk_aenc enc dec pk sk =
+    let m, k = mk_var (), mk_var () in
+    let t_pk, t_sk = Cfun (pk, [k]), Cfun (sk, [k]) in
+    ( Cfun (dec, [Cfun (enc, [m; t_pk]); t_sk] ), m )
+
+  (** Symmetric encryption.
+      dec(enc(m, kg(k)), kg(k)) -> m *)
+  let mk_senc enc dec kg =
+    let m, k = mk_var (), mk_var () in
+    let t_k = Cfun (kg, [k]) in
+    ( Cfun (dec, [Cfun (enc, [m; t_k]); t_k] ), m )
+
+  let t_true = Cfun (Term.f_true, [])
+  let t_false = Cfun (Term.f_true, [])
+
+  (** Simple Boolean rules to allow for some boolean reasonig. *)
+  let mk_simpl_bool () =
+    let u, v, t = mk_var (), mk_var (), mk_var () in
+    let and_rules = [( Cfun (Term.f_and, [t_true; u]), u);
+                     ( Cfun (Term.f_and, [v; t_true]), v);
+                     ( Cfun (Term.f_and, [t_false; mk_var ()]), t_false);
+                     ( Cfun (Term.f_and, [mk_var (); t_false]), t_false);
+                     ( Cfun (Term.f_and, [t; t]), t)] in
+
+    let u, v, t = mk_var (), mk_var (), mk_var () in
+    let or_rules = [( Cfun (Term.f_or, [t_true; mk_var ()]), t_true);
+                     ( Cfun (Term.f_or, [mk_var (); t_true]), t_true);
+                     ( Cfun (Term.f_or, [t_false; u]), u);
+                     ( Cfun (Term.f_or, [v; t_false]), v);
+                     ( Cfun (Term.f_or, [t; t]), t)] in
+
+    and_rules @ or_rules
+
+  (** Some simple IfThenElse rules. A lot of rules are missing. *)
+  let mk_simpl_ite () =
+    let u, v, s, b = mk_var (), mk_var (), mk_var (), mk_var () in
+    [( Cfun (Term.f_ite, [t_true; u; mk_var ()]), u);
+     ( Cfun (Term.f_ite, [t_false; mk_var (); v]), v);
+     ( Cfun (Term.f_ite, [b; s; s]), s)]
+end
+
+
 module Cset = Set.Make(Cst)
 
 (** Flatten a ground term, introducing new constants and rewrite rules. *)
 let rec flatten t = match t with
-  | Cfun (f, [t']) when f = Term.fsucc ->
+  | Cfun (f, [t']) when f = Term.f_succ ->
     let eqs, xeqs, cst = flatten t' in
     ( eqs, xeqs, Cst.Csucc cst )
 
-  | Cfun (f, _) when f = Term.fxor ->
+  | Cfun (f, _) when f = Term.f_xor ->
     let eqs, xeqs, csts = flatten_xor [] t in
     let a = Cst.mk_flat () in
-    ( eqs, (Cset.of_list csts, a) :: xeqs, a)
+    ( eqs, Cset.of_list (a :: csts) :: xeqs, a)
 
   | Cfun (f,ts) ->
     let eqss, xeqss, csts = List.map flatten ts |> List.split3 in
@@ -89,10 +168,10 @@ let rec flatten t = match t with
       a )
 
   | Ccst c -> ([], [], c)
-  | Cvar _ -> assert false
+  | Cxor _ | Cvar _ -> assert false
 
 and flatten_xor acc t = match t with
-  | Cfun (f, [t';t'']) when f = Term.fxor ->
+  | Cfun (f, [t';t'']) when f = Term.f_xor ->
     let eqs, xeqs, acc = flatten_xor acc t' in
     let eqs', xeqs', acc = flatten_xor acc t'' in
     ( eqs' @ eqs, xeqs' @ xeqs, acc )
@@ -150,6 +229,7 @@ type state = { uf : Cuf.t;
 
 let rec term_uf_normalize state t = match t with
   | Cfun (f,ts) -> Cfun (f, List.map (term_uf_normalize state) ts)
+  | Cxor ts -> Cxor (List.map (term_uf_normalize state) ts)
   | Ccst c -> Ccst (Cuf.find state.uf c)
   | Cvar _ -> t
 
@@ -199,8 +279,18 @@ end
 
 
 module Ground : sig
+  val deduce_triv_eqs : state -> state
   val deduce_eqs : state -> state
 end = struct
+
+  (** Deduce trivial constants equalities from the ground rules. *)
+  let deduce_triv_eqs state =
+    let r_trivial, r_other =
+      List.partition (fun (a,_) -> is_cst a) state.grnd_rules in
+
+    List.fold_left (fun state (a,b) ->
+        { state with uf = Cuf.union state.uf (get_cst a) b }
+      ) { state with grnd_rules = r_other } r_trivial
 
   (** Deduce constants equalities from the ground rules. *)
   let deduce_eqs state =
@@ -234,6 +324,7 @@ module Unify = struct
   let subst_apply t sigma =
     let rec aux sigma occurs t = match t with
       | Cfun (f, ts) -> Cfun (f, List.map (aux sigma occurs) ts)
+      | Cxor ts -> Cxor (List.map (aux sigma occurs) ts)
       | Ccst _ -> t
       | Cvar v ->
         if List.mem v occurs then raise Unify_cycle
@@ -245,10 +336,13 @@ module Unify = struct
 
   let rec unify_aux eqs sigma = match eqs with
     | [] -> Mgu sigma
-    | (u,v) :: eqs' ->  match subst_apply u sigma, subst_apply v sigma with
+    | (u,v) :: eqs' ->
+      match subst_apply u sigma, subst_apply v sigma with
       | Cfun (f,ts), Cfun (g,ts') ->
         if f <> g then No_mgu
         else unify_aux ((List.combine ts ts') @ eqs') sigma
+
+      | Cxor ts, Cxor ts' -> unify_aux ((List.combine ts ts') @ eqs') sigma
 
       | Ccst a, Ccst b -> if a = b then unify_aux eqs' sigma else No_mgu
 
@@ -258,7 +352,8 @@ module Unify = struct
 
       | _ ->  No_mgu
 
-  (** We normalize by constant equality rules before unifying. *)
+  (** We normalize by constant equality rules before unifying.
+      This is *not* modulo ACUN. *)
   let unify state u v =
     let u,v = p_terms_uf_normalize state (u,v) in
     unify_aux [(u,v)] empty_subst
@@ -305,7 +400,10 @@ end = struct
      *  - [f_cntxt] is function building the context where [lst] appears.
           For example, we have that [f_cntxt lst = l]. *)
     let rec aux state acc lst f_cntxt = match lst with
+      (* never superpose at variable position *)
       | Ccst _ | Cvar _ -> ( state, acc )
+      | Cxor _ -> assert false
+
       | Cfun (fn, ts) ->
         let state, acc = match Unify.unify state lst t with
           | Unify.No_mgu -> ( state, acc )
@@ -328,14 +426,15 @@ end = struct
               | _ -> ( state, (la_sigma,r_sigma) :: acc ) in
 
         (* Invariant: [(List.rev left) @ [lst'] @ right = ts] *)
-        let (state, acc), _, _ = List.fold_left (fun ((state,acc),left,right) lst' ->
-            let f_cntxt' hole =
-              f_cntxt (Cfun (fn, (List.rev left) @ [hole] @ right)) in
+        let (state, acc), _, _ =
+          List.fold_left (fun ((state,acc),left,right) lst' ->
+              let f_cntxt' hole =
+                f_cntxt (Cfun (fn, (List.rev left) @ [hole] @ right)) in
 
-            let right' = if right = [] then [] else List.tl right in
+              let right' = if right = [] then [] else List.tl right in
 
-            ( aux state acc lst' f_cntxt', lst' :: left, right' )
-          ) ((state,acc),[],ts) ts in
+              ( aux state acc lst' f_cntxt', lst' :: left, right' )
+            ) ((state,acc),[],ts) ts in
 
         ( state, acc ) in
 
@@ -374,20 +473,190 @@ end = struct
     deduce_aux state erules []
 end
 
-let stop_cond state =
+
+(**************)
+(* Completion *)
+(**************)
+
+let rec complete_state state =
+
+  let stop_cond state =
   ( Cuf.union_count state.uf,
     List.length state.grnd_rules,
-    List.length state.e_rules )
-
-(** The completion algorithm. *)
-let rec complete_aux state =
+    List.length state.e_rules ) in
 
   let start = stop_cond state in
 
-  let state = Xor.deduce_eqs state
+  let state = Ground.deduce_triv_eqs state
+              |> Xor.deduce_eqs
               |> Ground.deduce_eqs
               |> Erules.deduce_eqs in
 
-  if start <> stop_cond state then complete_aux state else state
+  if start <> stop_cond state then complete_state state
+  else state
 
-let complete a = assert false
+
+let complete_cterms : (cterm * cterm) list -> state = fun l ->
+  let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
+      let eqs, xeqs, a = flatten u
+      and  eqs', xeqs', b = flatten v in
+      ( (Ccst a, b) :: eqs @ eqs' @ acc, xeqs @ xeqs' @ xacc )
+    ) ([], []) l in
+
+  complete_state { uf = Cuf.create [];
+                 grnd_rules = grnd_rules;
+                 xor_rules = xor_rules;
+                 e_rules = [] }
+
+
+let complete : (term * term) list -> state = fun l ->
+  List.map (fun (u,v) -> ( cterm_of_term u, cterm_of_term v )) l
+  |> complete_cterms
+
+
+(*****************)
+(* Normalization *)
+(*****************)
+
+(** [max comp s] : Return the maximal element of [s], using comparison
+    function [comp] *)
+let max comp s =
+  let m = Cset.choose s in
+  Cset.fold (fun m a -> if comp a m = 1 then a else m) s m
+
+(** [csts_le s s'] : Return true if [s] is strictly smaller than [s'],
+    where [s] and [s'] are sets of constants. *)
+let csts_le s s' =
+  if Cset.is_empty s' then false
+  else if Cset.is_empty s then true
+  else max Cst.compare s < max Cst.compare s'
+
+
+(* TODO: the normalization procedure is uncomplete, need to handle the xors *)
+
+let rec term_grnd_normalize state u = match u with
+  | Ccst _ | Cvar _ -> u
+
+  | Cxor ts -> Cxor (List.map (term_grnd_normalize state) ts)
+
+  | Cfun (fn, ts) ->
+    let nts = List.map (term_grnd_normalize state) ts in
+    let u' = Cfun (fn, nts) in
+
+    (* Optimisation: storing rules by head function symbols would help here. *)
+    if List.for_all is_cst nts then
+      try
+        let _, a = List.find (fun (l,_) -> l = u') state.grnd_rules in
+        Ccst a
+      with Not_found -> u'
+    else u'
+
+(** [term_e_normalize state u]
+    Precondition: [u] must be ground. *)
+let rec term_e_normalize state u = match u with
+  | Ccst _ | Cvar _ -> u
+
+  | Cxor ts -> Cxor (List.map (term_e_normalize state) ts)
+
+  | Cfun (fn, ts) ->
+    let nts = List.map (term_e_normalize state) ts in
+    let u' = Cfun (fn, nts) in
+
+    let rec find_unif = function
+      | [] -> raise Not_found
+      | (l, r) :: l' -> match Unify.unify state u l with
+        | Unify.No_mgu -> raise Not_found
+        | Unify.Mgu sigma -> l, r, sigma in
+    try
+      let l,r,sigma = find_unif state.e_rules in
+      assert (Unify.subst_apply l sigma = u);
+      Unify.subst_apply r sigma
+    with Not_found -> u'
+
+(** [normalize_cterm state u]
+    Precondition: [u] must be ground. *)
+let normalize state u =
+  fpt (fun x -> term_uf_normalize state x
+                |> term_grnd_normalize state
+                |> term_e_normalize state) u
+
+
+(****************)
+(* Dis-equality *)
+(****************)
+
+(** [check_disequality_cterm state (u,v)]
+     Preconditions:
+    - [state] must have been completed.
+    - [u] and [v] must be ground *)
+let check_disequality_cterm state (u,v) =
+  normalize state u <> normalize state v
+
+let check_disequality state (u,v) =
+  check_disequality_cterm state (cterm_of_term u, cterm_of_term v)
+
+let check_disequalities state l = List.for_all (check_disequality state) l
+
+
+(****************)
+(* Tests Suites *)
+(****************)
+
+let mk_cst () = Ccst (Cst.mk_flat ())
+
+let (++) a b = Cfun (Term.f_xor, [a;b])
+
+let ffs, gfs = mk_fname "f", mk_fname "g"
+
+let f a b = Cfun (ffs, [a;b])
+
+let g a b = Cfun (gfs, [a;b])
+
+let () =
+  Checks.add_suite "Completion" [
+    ("Basic", `Quick,
+     fun () ->
+       let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
+                              mk_cst (), mk_cst (), mk_cst () in
+
+
+       let state0 = complete_cterms [(a,b); (b,c); (b,d); (e,e')] in
+
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (c,e')) true;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (c,d)) false;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (a,c)) false;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (f c d, f a b)) false;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (f c d, f a e')) true;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 (f a a, g a a)) true;
+
+       (* let state1 = complete_cterms [(a,e'); (a ++ b, c); (e' ++ d, e)] in
+        * Alcotest.(check bool) "xor"
+        *   (check_disequality_cterm state1 (b ++ c ++ d, e)) false;
+        * Alcotest.(check bool) "xor"
+        *   (check_disequality_cterm state1 (a ++ b ++ d, e)) true;
+        * Alcotest.(check bool) "xor"
+        *   (check_disequality_cterm state1 ( f (b ++ d) a, f (c ++ e) a)) false;
+        * Alcotest.(check bool) "xor"
+        *   (check_disequality_cterm state1 ( f (b ++ d) a, f (a) a)) true; *)
+    )]
+
+
+       (* REM *)
+       (* Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  f:%a@;@."
+        *   pp_cterm a pp_cterm b pp_cterm c
+        *   pp_cterm d pp_cterm e pp_cterm f;
+        *
+        * Fmt.pf Fmt.stdout "uf:@;%a@;left:@[%a@]@;right:@[%a@]@."
+        *   Cuf.print state0.uf
+        *   pp_cterm (normalize state0 (Cfun (ffs,[c;d])))
+        *   pp_cterm (normalize state0 (Cfun (ffs,[a;b])));
+        *
+        * Fmt.pf Fmt.stdout "left:@[%a@]@;right:@[%a@]@."
+        *   pp_cterm (b)
+        *   pp_cterm (normalize state0 b); *)

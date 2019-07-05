@@ -61,23 +61,36 @@ let pp_nsymb ppf (n,is) = Fmt.pf ppf "%a(%a)" pp_name n pp_indices is
   * and a list of indices.
   *
   * TODO must include builtins such as if-then-else, equality, successor, xor ...
-  * Adrien: already added xor and successor
+  * Adrien: already added some
   * Some keywords should probably be forbidden, e.g. "in", "out"
   *)
 
 type fname = Fname of string
 
-let pp_fname ppf = function Fname s -> Fmt.pf ppf "f!%s" s
+let pp_fname ppf = function Fname s -> Fmt.pf ppf "%s" s
 
 type fsymb = fname * indices
 
-let pp_fsymb ppf (fn,is) = Fmt.pf ppf "%a(%a)" pp_fname fn pp_indices is
+let pp_fsymb ppf (fn,is) = match is with
+  | [] -> Fmt.pf ppf "%a" pp_fname fn
+  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn pp_indices is
+
+let mk_fname f = (Fname f, [])
+
+(** Boolean function symbols *)
+let f_false = (Fname "false", [])
+let f_true = (Fname "true", [])
+let f_and = (Fname "and", [])
+let f_or = (Fname "or", [])
+
+(** IfThenElse function symbol *)
+let f_ite = (Fname "ite", [])
 
 (** Xor function symbol *)
-let fxor = (Fname "xor", [])
+let f_xor = (Fname "xor", [])
 
 (** Successor function symbol *)
-let fsucc = (Fname "succ", [])
+let f_succ = (Fname "succ", [])
 
 (** Memory cells are represented by state variable, themselves
   * derived from a name (from a finite set) and indices.

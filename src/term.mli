@@ -49,7 +49,7 @@ val pp_nsymb : Format.formatter -> nsymb -> unit
   * and a list of indices.
   *
   * TODO must include builtins such as if-then-else, equality, successor, xor ...
-  * Adrien: already added xor and successor
+  * Adrien: already added some of them
   *)
 
 type fname
@@ -58,11 +58,24 @@ type fsymb = fname * indices
 
 val pp_fsymb : Format.formatter -> fsymb -> unit
 
+(** Makes a simple function name, with no indices.
+    TODO: nothing is checked here (e.g. name clashes etc).*)
+val mk_fname : string -> fsymb
+
+(** Boolean function symbols *)
+val f_false : fsymb
+val f_true : fsymb
+val f_and : fsymb
+val f_or : fsymb
+
+(** IfThenElse function symbol *)
+val f_ite : fsymb
+
 (** Xor function symbol *)
-val fxor : fsymb
+val f_xor : fsymb
 
 (** Successor function symbol *)
-val fsucc : fsymb
+val f_succ : fsymb
 
 
 (** Memory cells are represented by state variable, themselves
