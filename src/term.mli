@@ -74,6 +74,9 @@ val f_ite : fsymb
 (** Xor function symbol *)
 val f_xor : fsymb
 
+(** Zero function symbol. Satisfies 0 + a -> a *)
+val f_zero : fsymb
+
 (** Successor function symbol *)
 val f_succ : fsymb
 

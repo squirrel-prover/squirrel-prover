@@ -9,6 +9,16 @@ module List = struct
       let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
       ini 0
 
+  (** [split_pred f l] split [l] into the list of elements where [f] holds and
+      the list of elements where [f] does not hold, while respecting the
+      ordering in [l]. *)
+  let split_pred f l =
+    let rec aux t_l f_l = function
+      | [] -> (t_l, f_l)
+      | a :: l' ->
+        if f a then aux (a :: t_l) f_l l' else aux t_l (a :: f_l) l' in
+    aux [] [] l
+
   let rec split3 = function
       [] -> ([], [], [])
     | (x,y,z)::l ->
@@ -98,7 +108,9 @@ module Uf (Ord: Ordered) = struct
                 |> List.sort (fun (i,_) (i',_) -> Pervasives.compare i i') in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list (fun ppf (i,u) ->
-           Fmt.pf ppf "@[%d->%d : @,%a@]" i (Vuf.find t.puf i) Ord.print u
+           let ri = Vuf.find t.puf i in
+           Fmt.pf ppf "@[%d->%d : @,%a->%a@]"
+             i ri Ord.print u Ord.print (Imap.find ri t.rmap)
          )) binds
 
   let create l =

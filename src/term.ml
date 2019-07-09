@@ -89,6 +89,9 @@ let f_ite = (Fname "ite", [])
 (** Xor function symbol *)
 let f_xor = (Fname "xor", [])
 
+(** Zero function symbol. Satisfies 0 + a -> a *)
+let f_zero = (Fname "zero", [])
+
 (** Successor function symbol *)
 let f_succ = (Fname "succ", [])
 

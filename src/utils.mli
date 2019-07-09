@@ -1,9 +1,17 @@
 module List : sig
   include module type of struct include List end
 
+  (** [init n f] returns the list containing the results of
+      [(f 0)],[(f 1)] ... [(f (n-1))].  *)
   val init : int -> (int -> 'a) -> 'a list
 
   val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
+
+
+  (** [split_pred f l] split [l] into the list of elements where [f] holds and
+      the list of elements where [f] does not hold, while respecting the
+      ordering in [l]. *)
+  val split_pred : ('a -> bool) -> 'a list -> 'a list * 'a list
 end
 
 module Imap : Map.S with type key = int

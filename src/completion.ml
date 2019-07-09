@@ -145,7 +145,56 @@ module Theories = struct
 end
 
 
-module Cset = Set.Make(Cst)
+(** [nilpotence_norm l] normalize [l] using the nilpotence rule x + x -> 0. *)
+let nilpotence_norm l =
+  let l = List.sort Pervasives.compare l in
+  let rec aux = function
+    | a :: b :: l' ->
+      if a = b then aux l'
+      else a :: (aux (b :: l'))
+    | [a] -> [a]
+    | [] -> [] in
+
+  aux l
+
+module Cset = struct
+  include Set.Make(Cst)
+
+  (** Because of the nilpotence rule for the xor, [map] can only be used on
+      injective functions. To avoid mistake, I removed it. *)
+  let map _ _ = assert false
+
+  (** [of_list l] is modulo nilpotence. For example:
+      [of_list [a;b;a;c] = [b;c]] *)
+  let of_list l = nilpotence_norm l |> of_list
+
+  let print ppf s =
+    Fmt.pf ppf "@[<hov>%a@]"
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf " + ") Cst.print)
+      (elements s)
+
+
+  (** [max comp s] : Return the maximal element of [s], using comparison
+      function [comp] *)
+  let max comp s =
+    let m = choose s in
+    fold (fun m a -> if comp a m = 1 then a else m) s m
+
+  (** [compare s s'] : Return true if [s] is strictly smaller than [s'],
+      where [s] and [s'] are sets of constants. *)
+  let rec set_compare s s' =
+    if equal s s' then 0
+    else if is_empty s' then 1
+    else if is_empty s then -1
+    else
+      let m,m' = max Cst.compare s, max Cst.compare s' in
+      if Cst.compare m m' = 0 then
+        set_compare (remove m s) (remove m' s')
+      else Cst.compare m m'
+
+  let compare = set_compare
+end
+
 
 (** Flatten a ground term, introducing new constants and rewrite rules. *)
 let rec flatten t = match t with
@@ -181,6 +230,21 @@ and flatten_xor acc t = match t with
   | _ -> let eqs, xeqs, c = flatten t in (eqs, xeqs, c :: acc)
 
 
+let rec grp_xor = function
+  | Cfun (f, _) as t when f = Term.f_xor ->
+    Cxor (grp_xor_aux [] t)
+
+  | Cfun (f,ts) -> Cfun (f,List.map grp_xor ts)
+  | Ccst _ as t -> t
+  | Cxor _ | Cvar _ -> assert false
+
+and grp_xor_aux acc t = match t with
+  | Cfun (f, [t';t'']) when f = Term.f_xor ->
+    grp_xor_aux (grp_xor_aux acc t') t''
+
+  | _ -> grp_xor t :: acc
+
+
 module CufTmp = Uf (Cst)
 
 module Cuf : sig
@@ -213,28 +277,87 @@ end
 
 
 (** State of the completion algorithm:
- * - uf :  Equalities between constants.
- * - xor_rules : A set {a1,...,an} corresponds to a1 + ... + an -> 0
- * - grnd_rules : Grounds flat rules of the form "ground term -> constant"
- * - e_rules : general rules. For the completion algorithm to succeed, these
- *           rules must be of a restricted form:
- *           - No "xor" and no "succ".
- *           - initially, each rule in e_rule must start by a destructor, which
- *             may appear only once in e_rule. *)
+   - uf :  Equalities between constants.
+   - xor_rules : List of initial xor rules, normalized by uf.
+                 Remark that we do not saturate this set by ACUN (this is an
+                 optimisation, to have a faster saturation).
+                 A set {a1,...,an} corresponds to a1 + ... + an -> 0
+   - sat_xor_rules : List of saturated xor rules, to avoid re-computing it.
+                     The integer counter indicates the version of [state.uf] that
+                     was used when the saturated set was computed.
+   - grnd_rules : Grounds flat rules of the form "ground term -> constant"
+   - e_rules : general rules. For the completion algorithm to succeed, these
+             rules must be of a restricted form:
+             - No "xor" and no "succ".
+             - initially, each rule in e_rule must start by a destructor, which
+               may appear only once in e_rule. *)
 type state = { uf : Cuf.t;
                xor_rules : Cset.t list;
+               sat_xor_rules : (Cset.t list * int) option;
                grnd_rules : (cterm * Cst.t) list;
                e_rules : (cterm * cterm) list }
+
+let pp_xor_rules ppf s =
+  Fmt.pf ppf "@[<v>%a@]"
+    (Fmt.list
+       ~sep:(fun ppf () -> Fmt.pf ppf "@;")
+       (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
+    ) s.xor_rules
+
+let pp_sat_xor_rules ppf s = match s.sat_xor_rules with
+  | None ->   Fmt.pf ppf "Not yet saturated"
+  | Some (sat,_) ->
+    Fmt.pf ppf "@[<v>%a@]"
+      (Fmt.list
+         ~sep:(fun ppf () -> Fmt.pf ppf "@;")
+         (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
+      ) sat
+
+let pp_grnd_rules ppf s =
+  Fmt.pf ppf "@[<v>%a@]"
+  (Fmt.list
+     ~sep:(fun ppf () -> Fmt.pf ppf "@;")
+     (fun ppf (t,a) -> Fmt.pf ppf "%a -> %a" pp_cterm t Cst.print a)
+  ) s.grnd_rules
+
+let pp_e_rules ppf s =
+  Fmt.pf ppf "@[<v>%a@]"
+  (Fmt.list
+     ~sep:(fun ppf () -> Fmt.pf ppf "@;")
+     (fun ppf (t,s) -> Fmt.pf ppf "%a -> %a" pp_cterm t pp_cterm s)
+  ) s.e_rules
+
+let pp_state ppf s =
+  Fmt.pf ppf "@[<v 0>\
+              @[<v 2>uf:@;%a@]@;\
+              @[<v 2>xor_rules:@;%a@]@;\
+              @[<v 2>sat_xor_rules:@;%a@]@;\
+              @[<v 2>grnd_rules:@;%a@]@;\
+              @[<v 2>e_rules:@;%a@]@;\
+              ;@]%!"
+    Cuf.print s.uf
+    pp_xor_rules s
+    pp_sat_xor_rules s
+    pp_grnd_rules s
+    pp_e_rules s
 
 
 let rec term_uf_normalize state t = match t with
   | Cfun (f,ts) -> Cfun (f, List.map (term_uf_normalize state) ts)
-  | Cxor ts -> Cxor (List.map (term_uf_normalize state) ts)
+  | Cxor ts -> Cxor ( List.map (term_uf_normalize state) ts
+                      |> nilpotence_norm )
   | Ccst c -> Ccst (Cuf.find state.uf c)
   | Cvar _ -> t
 
 let p_terms_uf_normalize state (t,t') =
   ( term_uf_normalize state t, term_uf_normalize state t')
+
+(* Remark: here, we cannot act directly on the set, as this would silently
+   remove duplicates, which we need to apply the nilpotence rule. *)
+let set_uf_normalize state s =
+  Cset.elements s
+  |> List.map (Cuf.find state.uf)
+  |> Cset.of_list               (* Cset.of_list is modulo nilpotence *)
 
 let disjoint s s' = Cset.inter s s' |> Cset.is_empty
 
@@ -253,28 +376,43 @@ end = struct
         if disjoint xr xr' then acc
         else disjoint_union xr xr' :: acc) xrules xrules
 
-  (** Deduce constants equalities from the xor rules.
-      Example: from
+  (** - Deduce constants equalities from the xor rules.
+      - Example: from
       a + b -> 0
       a + c -> 0
       we deduce that
-      b + c -> 0 *)
+      b + c -> 0
+      - Store the result in [state.sat_xor_rules]. If no constant equalities
+      have been added, we do not need to recompute the saturated set.  *)
   let deduce_eqs state =
-    (* We get all xor rules, normalized by constant equality rules. *)
-    let xrules = state.xor_rules |> List.map (Cset.map (Cuf.find state.uf)) in
+    let already_sat = match state.sat_xor_rules with
+      | None -> false
+      | Some (_,cpt) -> cpt = Cuf.union_count state.uf in
 
-    (* First, we saturate the xor rules. *)
-    List.fold_left (fun acc xr -> add_cp xr acc) xrules xrules
+    if already_sat then state
+    else
+      (* We get all xor rules, normalized by constant equality rules. *)
+      let xrules = List.map (set_uf_normalize state) state.xor_rules in
 
-    (* Then, we keep rules of the form a + b -> 0, or equivalently, a = b. *)
-    |> List.filter (fun xr -> Cset.cardinal xr = 2)
-    |> List.map (fun xr -> match Cset.elements xr with
-        | [a;b] -> (a,b)
-        | _ -> assert false)
+      (* First, we saturate the xor rules. *)
+      let sat_xrules =
+        List.fold_left (fun acc xr -> add_cp xr acc) xrules xrules
+        |> List.sort_uniq Cset.compare
+        |> List.filter (fun x -> not @@ Cset.is_empty x) in
 
-    (* We update the union-find structure with a = b *)
-    |> List.fold_left (fun state (a,b) ->
-        { state with uf = Cuf.union state.uf a b } ) state
+      let state =
+        { state with sat_xor_rules = Some ( sat_xrules,
+                                            Cuf.union_count state.uf ) } in
+
+      (* Then, we keep rules of the form a + b -> 0. *)
+      List.filter (fun xr -> Cset.cardinal xr = 2) sat_xrules
+      |> List.map (fun xr -> match Cset.elements xr with
+          | [a;b] -> (a,b)
+          | _ -> assert false)
+
+      (* We update the union-find structure with a = b *)
+      |> List.fold_left (fun state (a,b) ->
+          { state with uf = Cuf.union state.uf a b } ) state
 end
 
 
@@ -503,10 +641,17 @@ let complete_cterms : (cterm * cterm) list -> state = fun l ->
       ( (Ccst a, b) :: eqs @ eqs' @ acc, xeqs @ xeqs' @ xacc )
     ) ([], []) l in
 
-  complete_state { uf = Cuf.create [];
-                 grnd_rules = grnd_rules;
-                 xor_rules = xor_rules;
-                 e_rules = [] }
+  let i_state =
+  (* complete_state *) { uf = Cuf.create [];
+                   grnd_rules = grnd_rules;
+                   xor_rules = xor_rules;
+                   sat_xor_rules = None;
+                   e_rules = [] } in
+
+  let f_state = complete_state i_state in
+  Fmt.pf Fmt.stdout "@[<v>init:@;@[%a@]@;@;end:@;@[%a@]@]@."
+    pp_state i_state pp_state f_state;
+  f_state
 
 
 let complete : (term * term) list -> state = fun l ->
@@ -518,26 +663,54 @@ let complete : (term * term) list -> state = fun l ->
 (* Normalization *)
 (*****************)
 
-(** [max comp s] : Return the maximal element of [s], using comparison
-    function [comp] *)
-let max comp s =
-  let m = Cset.choose s in
-  Cset.fold (fun m a -> if comp a m = 1 then a else m) s m
+(** [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
+    using the xor rules in [state].
+    Precondition: [state] must have been completed. *)
+let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
+  let sat_rules = match state.sat_xor_rules with
+    | Some (rules,_) -> rules
+    | _ -> assert false (* impossible when [state] has been completed *) in
 
-(** [csts_le s s'] : Return true if [s] is strictly smaller than [s'],
-    where [s] and [s'] are sets of constants. *)
-let csts_le s s' =
-  if Cset.is_empty s' then false
-  else if Cset.is_empty s then true
-  else max Cst.compare s < max Cst.compare s'
+  let rec aux s = function
+    | [] -> s
+    | xrule :: xrules' ->
+      if disjoint s xrule then aux s xrules'
+      else
+        let a = Cset.inter s xrule in
+        let b = Cset.diff xrule a in
+        (* xrule : a + b -> 0
+           s     : a + c
+           if b < a, then we do:
+           s = a + c ----> b + c *)
+        if Cset.compare b a = -1 then aux (disjoint_union xrule s) xrules'
+        else aux s xrules' in
 
+  aux s sat_rules
 
-(* TODO: the normalization procedure is uncomplete, need to handle the xors *)
+let simplify_set t = match t with
+  | Cxor [] -> Cfun (f_zero,[])
+  | Cxor [t] -> t
+  | _ -> t
 
-let rec term_grnd_normalize state u = match u with
+(** [term_grnd_normalize state u]
+    Preconditions: [u] must be ground and its xor grouped.
+                   [state] must have been completed. *)
+let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
   | Ccst _ | Cvar _ -> u
 
-  | Cxor ts -> Cxor (List.map (term_grnd_normalize state) ts)
+  | Cxor ts ->
+    let ts_csts, ts_fterms = List.map (term_grnd_normalize state) ts
+                             |> nilpotence_norm
+                             |> List.split_pred is_cst in
+
+    (* We only have to normalize the constants in [ts], i.e. [ts_csts]. *)
+    let ts_csts_norm = List.map get_cst ts_csts
+                       |> Cset.of_list (* Cset.of_list is modulo nilpotence *)
+                       |> set_grnd_normalize state
+                       |> Cset.elements
+                       |> List.map (fun x -> Ccst x) in
+
+    simplify_set @@ Cxor (ts_csts_norm @ ts_fterms)
 
   | Cfun (fn, ts) ->
     let nts = List.map (term_grnd_normalize state) ts in
@@ -551,12 +724,15 @@ let rec term_grnd_normalize state u = match u with
       with Not_found -> u'
     else u'
 
+
+
 (** [term_e_normalize state u]
-    Precondition: [u] must be ground. *)
+    Precondition: [u] must be ground and its xor grouped. *)
 let rec term_e_normalize state u = match u with
   | Ccst _ | Cvar _ -> u
 
-  | Cxor ts -> Cxor (List.map (term_e_normalize state) ts)
+  | Cxor ts -> simplify_set @@ Cxor ( List.map (term_e_normalize state) ts
+                                      |> nilpotence_norm )
 
   | Cfun (fn, ts) ->
     let nts = List.map (term_e_normalize state) ts in
@@ -574,11 +750,12 @@ let rec term_e_normalize state u = match u with
     with Not_found -> u'
 
 (** [normalize_cterm state u]
-    Precondition: [u] must be ground. *)
+    Preconditions: [u] must be ground.
+                   [state] must have been completed. *)
 let normalize state u =
   fpt (fun x -> term_uf_normalize state x
                 |> term_grnd_normalize state
-                |> term_e_normalize state) u
+                |> term_e_normalize state) (grp_xor u)
 
 
 (****************)
@@ -636,21 +813,34 @@ let () =
          (check_disequality_cterm state0 (f a a, g a a)) true;
 
        (* let state1 = complete_cterms [(a,e'); (a ++ b, c); (e' ++ d, e)] in
-        * Alcotest.(check bool) "xor"
+        *
+        * Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  e':%a@;@."
+        *   pp_cterm a pp_cterm b pp_cterm c
+        *   pp_cterm d pp_cterm e pp_cterm e';
+        *
+        * Fmt.pf Fmt.stdout "@[<v>uf:@;@[%a@]@;left:@[%a@]@;right:@[%a@]\
+        *                    @;left:@[%a@]@;right:@[%a@]@]@."
+        *   Cuf.print state1.uf
+        *   pp_cterm (grp_xor (b ++ c ++ d))
+        *   pp_cterm (normalize state1 (b ++ c ++ d))
+        *   pp_cterm (grp_xor (e))
+        *   pp_cterm (normalize state1 (e));
+        *
+        * Alcotest.(check bool) "xor1"
         *   (check_disequality_cterm state1 (b ++ c ++ d, e)) false;
-        * Alcotest.(check bool) "xor"
+        * Alcotest.(check bool) "xor2"
         *   (check_disequality_cterm state1 (a ++ b ++ d, e)) true;
-        * Alcotest.(check bool) "xor"
+        * Alcotest.(check bool) "xor3"
         *   (check_disequality_cterm state1 ( f (b ++ d) a, f (c ++ e) a)) false;
-        * Alcotest.(check bool) "xor"
+        * Alcotest.(check bool) "xor4"
         *   (check_disequality_cterm state1 ( f (b ++ d) a, f (a) a)) true; *)
     )]
 
 
        (* REM *)
-       (* Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  f:%a@;@."
+       (* Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  e':%a@;@."
         *   pp_cterm a pp_cterm b pp_cterm c
-        *   pp_cterm d pp_cterm e pp_cterm f;
+        *   pp_cterm d pp_cterm e pp_cterm e';
         *
         * Fmt.pf Fmt.stdout "uf:@;%a@;left:@[%a@]@;right:@[%a@]@."
         *   Cuf.print state0.uf
