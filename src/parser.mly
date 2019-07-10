@@ -3,16 +3,20 @@
 %token LANGLE RANGLE
 %token EQ COMMA SEMICOLON COLON
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token NEW OUT PARALLEL AS
+%token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN ARROW
 %token EOF
 
-%left PARALLEL
-%right ELSE
+%token EMPTY_ELSE
+
+%nonassoc EMPTY_ELSE
+%nonassoc ELSE
 
 %start theory
+%start top_process
 %type <unit> theory
+%type <Process.process> top_process
 %type <Theory.fact> fact
 
 %%
@@ -44,26 +48,33 @@ fact:
 (* Processes *)
 
 process:
-|                                { Process.Null }
-| process PARALLEL process       { Process.Parallel ($1,$3) }
-| LPAREN process RPAREN          { $2 }
+| NULL                           { Process.Null }
+| LPAREN processes RPAREN        { $2 }
 | ID term_list                   { Process.Apply ($1,$2,$1) }
 | ID term_list AS ID             { Process.Apply ($1,$2,$4) }
 | NEW ID SEMICOLON process       { Process.New ($2,$4) }
-| IN LPAREN ID COMMA ID RPAREN SEMICOLON process
+| IN LPAREN ID COMMA ID RPAREN process_cont
                                  { let c = Channel.of_string $3 in
-                                     Process.In (c,$5,$8) }
-| OUT LPAREN ID COMMA term RPAREN SEMICOLON process
+                                     Process.In (c,$5,$7) }
+| OUT LPAREN ID COMMA term RPAREN process_cont
                                  { let c = Channel.of_string $3 in
-                                     Process.Out (c,$5,$8) }
+                                     Process.Out (c,$5,$7) }
 | IF fact THEN process else_process
                                  { Process.Exists ([],$2,$4,$5) }
 | FIND indices SUCHTHAT fact IN process else_process
                                  { Process.Exists ($2,$4,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
 
-else_process:
+processes:
+| process                        { $1 }
+| process PARALLEL processes     { Process.Parallel ($1,$3) }
+
+process_cont:
 |                                { Process.Null }
+| SEMICOLON process              { $2 }
+
+else_process:
+| %prec EMPTY_ELSE               { Process.Null }
 | ELSE process                   { $2 }
 
 indices:
@@ -104,4 +115,7 @@ declaration:
 
 theory:
 | declaration theory             { () }
-| SYSTEM process EOF             { Process.declare_system $2 }
+| SYSTEM process EOF             { Process.declare_system Process.Null }
+
+top_process:
+| process EOF                    { $1 }

@@ -32,12 +32,13 @@ rule token = parse
 | "process"           { PROCESS }
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
-| "mutable"           { SYSTEM }
+| "system"            { SYSTEM }
 | "hash"              { HASH }
 | "aenc"              { AENC }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
 | "boolean"           { BOOLEAN }
 | "as"                { AS }
+| "null"              { NULL }
 | name as n           { ID (n) }
 | eof                 { EOF }
