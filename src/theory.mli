@@ -50,3 +50,6 @@ type env = (string*kind) list
 val check_term : env -> term -> kind -> unit
 val check_state : string -> int -> kind
 val check_fact : env -> fact -> unit
+
+(** Reset all declarations *)
+val reset : unit -> unit

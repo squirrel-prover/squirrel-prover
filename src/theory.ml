@@ -37,6 +37,7 @@ type symbol_info =
          * return type [k]. *)
 
 let symbols : (string,symbol_info) Hashtbl.t = Hashtbl.create 97
+let reset () = Hashtbl.reset symbols
 
 (** Sets the symbol table to one where only builtins are declared *)
 let initialize_symbols () =

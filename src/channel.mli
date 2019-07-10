@@ -14,3 +14,6 @@ val declare : string -> unit
   * under the name [s].
   * @raise Not_found if the channel is not declared. *)
 val of_string : string -> channel
+
+(** Forget all declarations, used for testing purposes. *)
+val reset : unit -> unit

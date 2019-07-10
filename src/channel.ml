@@ -3,6 +3,8 @@ type t = channel
 
 let channels : (channel,unit) Hashtbl.t = Hashtbl.create 13
 
+let reset () = Hashtbl.reset channels
+
 let declare s =
   try
     Hashtbl.find channels s ;
@@ -35,5 +37,5 @@ let () =
       Alcotest.(check (neg string))
         "not the same channels"
         (of_string "c") (of_string "d") ;
-      Hashtbl.reset channels
+      reset ()
   ]
