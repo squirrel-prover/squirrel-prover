@@ -37,6 +37,7 @@ rule token = parse
 | "aenc"              { AENC }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
+| "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
 | "as"                { AS }
 | "null"              { NULL }
