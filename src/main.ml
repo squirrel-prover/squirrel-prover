@@ -1,31 +1,48 @@
-open Channel
-open Process
-open Term
-open Constr
-open Lexer
-open Completion
-
-let parse_theory filename =
+let parse_theory ?(test=false) filename =
+  Theory.initialize_symbols () ;
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
     try
       Parser.theory Lexer.token lexbuf
     with
       | Parser.Error as e ->
           Format.printf
-            "Cannot parse model before %S at position TODO %d.@."
+            "@[Cannot parse model @,\
+               in %S @,at line %d char %d @,\
+               before %S.@]@."
+            filename
+            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+            (Lexing.lexeme lexbuf) ;
+          if test then raise e else exit 1
+      | Failure s as e ->
+          Format.printf
+            "@[Error in %S @,at line %d char %d @,\
+               before %S: @,%s.@]@."
+            filename
+            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
             (Lexing.lexeme lexbuf)
-            lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum ;
-          raise e
+            s ;
+          if test then raise e else exit 1
       | e ->
           Format.printf
-            "Error before %S at position TODO.@."
-            (Lexing.lexeme lexbuf) ;
-          raise e
+            "@[Error @,\
+               in %S @,at line %d char %d @,\
+               before %S: @,%s.@]@."
+            filename
+            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+            (Lexing.lexeme lexbuf)
+            (Printexc.to_string e) ;
+          if test then raise e else exit 1
 
 let parse_process string =
   let lexbuf = Lexing.from_string string in
   try
-      Parser.top_process Lexer.token lexbuf
+    Parser.top_process Lexer.token lexbuf
   with Parser.Error as e ->
     Format.printf
       "Cannot parse process before %S at position TODO.@."
@@ -51,21 +68,37 @@ let () =
       ignore (parse_process "if u then if v then null else null else null") ;
       Channel.reset ()
     end ;
+    "Pairs", `Quick, begin fun () ->
+      Theory.initialize_symbols () ;
+      Channel.declare "c" ;
+      ignore (parse_process "in(c,x);out(c,<x,x>)")
+    end
   ]
 
 let () =
+  let test = true in
   Checks.add_suite "Models" [
     "Null model", `Quick, begin fun () ->
-      parse_theory "examples/null.mbc"
+      parse_theory ~test "examples/null.mbc"
     end ;
     "Simple model", `Quick, begin fun () ->
-      parse_theory "examples/process.mbc"
+      parse_theory ~test "examples/process.mbc"
     end ;
-    (* TODO "LAK model", `Quick, begin fun () ->
-      Theory.reset () ;
-      Channel.reset () ;
-      parse_theory "examples/lak.mbc"
-    end ; *)
+    "Name declaration", `Quick, begin fun () ->
+      parse_theory ~test "examples/name.mbc"
+    end ;
+    "Pairs", `Quick, begin fun () ->
+      parse_theory ~test "examples/pairs.mbc"
+    end ;
+    "Basic theory", `Quick, begin fun () ->
+      parse_theory ~test "examples/theory.mbc"
+    end ;
+    "Multiple declarations", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "multiple declarations")
+        (fun () -> parse_theory ~test "examples/multiple.mbc")
+    end ;
+    "LAK model", `Quick, begin fun () ->
+      parse_theory ~test "examples/lak.mbc"
+    end ;
   ]
-
-let () = Checks.run ()

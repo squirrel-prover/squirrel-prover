@@ -37,14 +37,16 @@ type symbol_info =
          * return type [k]. *)
 
 let symbols : (string,symbol_info) Hashtbl.t = Hashtbl.create 97
-let reset () = Hashtbl.reset symbols
 
 (** Sets the symbol table to one where only builtins are declared *)
 let initialize_symbols () =
   Hashtbl.clear symbols ;
+  Channel.reset () ;
   List.iter
     (fun (s,a,k) -> Hashtbl.add symbols s (Abstract_symbol (a,k)))
     [ "pair",[Message;Message],Message ;
+      "fst",[Message],Message ;
+      "snd",[Message],Message ;
       "choice",[Message;Message],Message ;
       "if",[Boolean;Message;Message],Message ]
 
@@ -69,7 +71,7 @@ let check_state s n =
     | Mutable_symbol (arity,kind) ->
         if arity <> n then raise Type_error ;
         kind
-    | _ -> assert false
+    | _ -> failwith (s ^ " should be a mutable")
   with Not_found -> assert false
 
 let check_name s n =
@@ -81,18 +83,18 @@ let check_name s n =
 
 let rec check_term env tm kind = match tm with
   | Var x ->
-      if List.assoc x env <> kind then raise Type_error
-  | Fun (f,ts) ->
       begin try
-        let ks,f_k = function_kind f in
-          if f_k <> kind then raise Type_error ;
-          List.iter2
-            (fun t k -> check_term env t k)
-            ts ks
+        if List.assoc x env <> kind then raise Type_error
       with
-        | Not_found -> assert false
-        | Invalid_argument _ -> raise Type_error
+        | Not_found -> failwith ("unbound variable "^x)
       end
+  | Fun (f,ts) ->
+      let ks,f_k = function_kind f in
+        if f_k <> kind then raise Type_error ;
+        if List.length ts <> List.length ks then raise Type_error ;
+        List.iter2
+          (fun t k -> check_term env t k)
+          ts ks
   | Get (s,ts) ->
       let k = check_state s (List.length ts) in
         if k <> kind then raise Type_error ;
@@ -101,11 +103,14 @@ let rec check_term env tm kind = match tm with
           ts
   | Name (s,ts) ->
       check_name s (List.length ts) ;
-      if Index <> kind then raise Type_error ;
+      if Message <> kind then raise Type_error ;
       List.iter
         (fun t -> check_term env t Index)
         ts
-  | Compare _ -> raise Type_error
+  | Compare (_,u,v) ->
+      if kind <> Boolean then raise Type_error ;
+      check_term env u Message ;
+      check_term env v Message
 
 let rec check_fact env = let open Term in function
   | And (f,g) | Or (f,g) | Impl (f,g) ->

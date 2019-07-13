@@ -51,5 +51,5 @@ val check_term : env -> term -> kind -> unit
 val check_state : string -> int -> kind
 val check_fact : env -> fact -> unit
 
-(** Reset all declarations *)
-val reset : unit -> unit
+(** Populate theory with only builtin declarations *)
+val initialize_symbols : unit -> unit

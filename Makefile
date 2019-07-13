@@ -3,26 +3,30 @@ OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 
-all: byte test
+all: metabc test
 
-test: byte
-	./main.byte
+test: sanity
+	$(OCB) test.byte
+	./test.byte
 
 clean:
 	$(OCB) -clean
 	rm -f sanity
 
+metabc: sanity
+	$(OCB) metabc.byte
+
 native: sanity
-	$(OCB) main.native
+	$(OCB) test.native
 
 byte: sanity
-	$(OCB) main.byte
+	$(OCB) test.byte
 
 profile: sanity
-	$(OCB) -tag profile main.native
+	$(OCB) -tag profile test.native
 
 debug: sanity
-	$(OCB) -tag debug main.byte
+	$(OCB) -tag debug test.byte
 
 # check that menhir is installed
 PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"." 

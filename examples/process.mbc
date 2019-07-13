@@ -1,1 +1,5 @@
+process A(c:boolean) = if c then null else null
+process B(c:boolean) = if c then null
+process C = null
+process D = (null|(null)) # () not allowed; empty | operand not allowed
 system if x=x then if x=x then null else null else null

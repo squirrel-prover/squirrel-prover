@@ -8,7 +8,7 @@ let reset () = Hashtbl.reset channels
 let declare s =
   try
     Hashtbl.find channels s ;
-    raise Theory.Multiple_declarations
+    failwith "multiple declarations"
   with Not_found ->
     Hashtbl.add channels s ()
 
@@ -28,7 +28,7 @@ let () =
         Not_found (fun () -> ignore (of_string "d")) ;
       ignore (of_string "c") ;
       Alcotest.check_raises "fails"
-        Theory.Multiple_declarations (fun () -> declare "c") ;
+        (Failure "multiple declarations") (fun () -> declare "c") ;
       declare "d" ;
       Alcotest.(check string) "same channels"
         (of_string "c") (of_string "c") ;
