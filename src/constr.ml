@@ -117,9 +117,9 @@ type constr_instance = { eqs : (ut * ut) list;
                          elems : ut list;
                          uf : Uuf.t }
 
-(** Prepare the tpredicates list by transforming it into a list of equalities
+(** Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
-let mk_instance (l : tpredicate list) =
+let mk_instance (l : tatom list) =
   let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
       | Pts (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
@@ -308,7 +308,7 @@ let unify uf eqs elems =
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs (l : tpredicate list) =
+let mgu_eqs (l : tatom list) =
   let instance = mk_instance l in
 
   unify instance.uf instance.eqs instance.elems
@@ -558,7 +558,7 @@ let rec split instance =
 
 (** [is_sat l] check that l is a satisfiable conjunct of constraints.
     [l] must use only Eq, Neq and Leq. *)
-let is_sat_conjunct (l : tpredicate list) =
+let is_sat_conjunct (l : tatom list) =
   let instance = mk_instance l in
 
   split instance <> []

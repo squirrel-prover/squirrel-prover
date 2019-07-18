@@ -173,12 +173,12 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
   simp false b |> dnf
 
 
-(** Predicates *)
+(** Atoms *)
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
-type predicate = ord * term * term
+type atom = ord * term * term
 
-type fact = predicate bformula
+type fact = atom bformula
 
 let pp_ord ppf = function
   | Eq -> Fmt.pf ppf "Eq"
@@ -196,12 +196,12 @@ let not_ord o = match o with
   | Lt -> Geq
   | Gt -> Leq
 
-(** Negate the predicate *)
+(** Negate the atom *)
 let not_xpred (o,l,r) = (not_ord o, l, r)
 
-(** Replace a predicate by an equivalent list of predicates using
+(** Replace an atom by an equivalent list of atoms using
     only Eq,Neq and Leq *)
-let norm_xpredicate (o,l,r) = match o with
+let norm_xatom (o,l,r) = match o with
   | Eq | Neq | Leq -> [(o,l,r)]
   | Geq -> [(Leq,r,l)]
   | Lt -> (Leq,l,r) :: [(Neq,l,r)]
@@ -210,16 +210,16 @@ let norm_xpredicate (o,l,r) = match o with
 
 (** Constraints:
     - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
-type tpredicate =
+type tatom =
   | Pts of ord * timestamp * timestamp
   | Pind of ord * index * index
 
-type constr = tpredicate bformula
+type constr = tatom bformula
 
 let pts (o,t,t') = Pts (o,t,t')
 let pind (o,i,i') = Pind (o,i,i')
 
-let pp_tpredicate ppf = function
+let pp_tatom ppf = function
   | Pts (o,tl,tr) ->
     Fmt.pf ppf "@[<h>%a%a%a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
@@ -229,16 +229,16 @@ let not_tpred = function
   | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
   | Pind (o,i,i') -> pind (not_xpred (o,i,i'))
 
-let norm_tpredicate = function
-  | Pts (o,t,t') -> norm_xpredicate (o,t,t') |> List.map pts
+let norm_tatom = function
+  | Pts (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
   | Pind _ as x -> [x]
 
-let pp_constr ppf = pp_bformula pp_tpredicate ppf
+let pp_constr ppf = pp_bformula pp_tatom ppf
 
-(** Put a constraint in DNF using only predicates Eq, Neq and Leq *)
+(** Put a constraint in DNF using only atoms Eq, Neq and Leq *)
 let constr_dnf (c : constr) =
   bf_dnf not_tpred c
-  |> List.map (fun l -> List.map norm_tpredicate l
+  |> List.map (fun l -> List.map norm_tatom l
                         |> List.flatten)
 
 

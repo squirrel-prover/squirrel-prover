@@ -116,28 +116,28 @@ type 'a bformula =
 val pp_bformula :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a bformula -> unit
 
-(** Predicates *)
+(** Atomic Formulas *)
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
-type predicate = ord * term * term
+type atom = ord * term * term
 
-type fact = predicate bformula
+type fact = atom bformula
 
 val pp_ord : Format.formatter -> ord -> unit
 
 (** Constraints:
     - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
-type tpredicate =
+type tatom =
   | Pts of ord * timestamp * timestamp
   | Pind of ord * index * index
 
-type constr = tpredicate bformula
+type constr = tatom bformula
 
-val pp_tpredicate : Format.formatter -> tpredicate -> unit
+val pp_tatom : Format.formatter -> tatom -> unit
 val pp_constr : Format.formatter -> constr -> unit
 
-(** Put a constraint in DNF using only predicates Eq, Neq and Leq *)
-val constr_dnf : constr -> tpredicate list list
+(** Put a constraint in DNF using only atoms Eq, Neq and Leq *)
+val constr_dnf : constr -> tatom list list
 
 (** Correspondence formulas *)
 
