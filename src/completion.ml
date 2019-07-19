@@ -870,17 +870,3 @@ let () =
         *   pp_cterm (normalize state1 (b ++ c ++ d))
         *   pp_cterm (grp_xor (e))
         *   pp_cterm (normalize state1 (e)); *)
-
-       (* REM *)
-       (* Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  e':%a@;@."
-        *   pp_cterm a pp_cterm b pp_cterm c
-        *   pp_cterm d pp_cterm e pp_cterm e';
-        *
-        * Fmt.pf Fmt.stdout "uf:@;%a@;left:@[%a@]@;right:@[%a@]@."
-        *   Cuf.print state0.uf
-        *   pp_cterm (normalize state0 (Cfun (ffs,[c;d])))
-        *   pp_cterm (normalize state0 (Cfun (ffs,[a;b])));
-        *
-        * Fmt.pf Fmt.stdout "left:@[%a@]@;right:@[%a@]@."
-        *   pp_cterm (b)
-        *   pp_cterm (normalize state0 b); *)

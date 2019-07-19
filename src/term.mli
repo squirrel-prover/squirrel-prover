@@ -139,6 +139,7 @@ val pp_constr : Format.formatter -> constr -> unit
 (** Put a constraint in DNF using only atoms Eq, Neq and Leq *)
 val constr_dnf : constr -> tatom list list
 
+
 (** Correspondence formulas *)
 
 
@@ -161,3 +162,41 @@ and postcond = {
   econstr : constr;
   efact : fact
 }
+
+
+val app_subst : ('a * 'a) list -> 'a -> 'a
+
+(** Timestamp variables substitution in a term *)
+val tvar_subst_term : (tvar * tvar) list -> term -> term
+
+(** Index variables substitution in a term *)
+val ivar_subst_term : (index * index) list -> term -> term
+
+(** Timestamp variables substitution in a fact *)
+val tvar_subst_fact : (tvar * tvar) list -> fact -> fact
+
+(** Index variables substitution in a fact *)
+val ivar_subst_fact : (index * index) list -> fact -> fact
+
+(** Timestamp variables substitution in a constraint *)
+val tvar_subst_constr : (tvar * tvar) list -> constr -> constr
+
+(** Index variables substitution in a constraint *)
+val ivar_subst_constr : (index * index) list -> constr -> constr
+
+(** Timestamp variables substitution in a post-condition.
+    Pre-condition: [tvar_subst_postcond subst pc] require that [subst]
+    co-domain is fresh in [pc]. *)
+val tvar_subst_postcond : (tvar * tvar) list -> postcond -> postcond
+
+  (** Index variables substitution in a post-condition.
+    Pre-condition: [ivar_subst_postcond isubst pc] require that [isubst]
+    co-domain is fresh in [pc]. *)
+val ivar_subst_postcond : (index * index) list -> postcond -> postcond
+
+
+(** [term_vars t] returns the timestamp and index variables of [t]*)
+val term_vars : term -> tvar list * index list
+
+(** [tss_vars tss] returns the timestamp and index variables of [tss]*)
+val tss_vars : timestamp list -> tvar list * index list

@@ -145,6 +145,7 @@ let rec pp_bformula pp_atom ppf = function
   | True -> Fmt.pf ppf "true"
   | False -> Fmt.pf ppf "false"
 
+
 (** [bf_dnf nlit b] puts the  bformula [b] in DNF, using [nlit] to transform
     negative atoms into positive atoms *)
 let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
@@ -242,6 +243,7 @@ let constr_dnf (c : constr) =
                         |> List.flatten)
 
 
+
 (** Correspondence formulas *)
 
 
@@ -264,3 +266,113 @@ and postcond = {
   econstr : constr;
   efact : fact
 }
+
+
+let app_subst subst x = try List.assoc x subst with Not_found -> x
+
+let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
+
+let rec tvar_subst_ts tsubst ts = match ts with
+  | TVar tv -> TVar (app_subst tsubst tv)
+  | TPred ts' -> TPred (tvar_subst_ts tsubst ts')
+  | TName _ -> ts
+
+let rec ivar_subst_ts isubst = function
+  | TVar _ as ts -> ts
+  | TPred ts' -> TPred (ivar_subst_ts isubst ts')
+  | TName (n,is) -> TName (n,  List.map (app_subst isubst) is)
+
+(** Timestamp variables substitution in a term*)
+let rec tvar_subst_term tsubst t = match t with
+  | Fun (fs, lt) -> Fun (fs, List.map (tvar_subst_term tsubst) lt)
+  | Name _ -> t
+  | State (s, ts) -> State (s, tvar_subst_ts tsubst ts)
+  | Output ts -> Output (tvar_subst_ts tsubst ts)
+  | Input ts -> Input (tvar_subst_ts tsubst ts)
+
+(** Index variables substitution in a term *)
+let rec ivar_subst_term isubst t = match t with
+  | Fun (fs, lt) -> Fun ( ivar_subst_symb isubst fs,
+                          List.map (ivar_subst_term isubst) lt )
+  | Name n -> Name (ivar_subst_symb isubst n)
+  | State (s, ts) -> State ( ivar_subst_symb isubst s,
+                             ivar_subst_ts isubst ts )
+  | Output ts -> Output (ivar_subst_ts isubst ts)
+  | Input ts -> Input (ivar_subst_ts isubst ts)
+
+(** Variables substitution in a formula *)
+let rec var_subst_form at_subst subst f = match f with
+  | And (a,b) -> And ( var_subst_form at_subst subst a,
+                       var_subst_form at_subst subst b )
+  | Or (a,b) -> Or ( var_subst_form at_subst subst a,
+                     var_subst_form at_subst subst b )
+  | Impl (a,b) -> Impl ( var_subst_form at_subst subst a,
+                         var_subst_form at_subst subst b )
+  | Not a -> Not (var_subst_form at_subst subst a)
+  | Atom at -> Atom (at_subst subst at)
+  | True | False -> f
+
+let tvar_subst_atom subst (ord,t,t') =
+  (ord, tvar_subst_term subst t, tvar_subst_term subst t')
+
+let ivar_subst_atom isubst (ord,t,t') =
+  (ord, ivar_subst_term isubst t, ivar_subst_term isubst t')
+
+(** Timestamp variables substitution in a fact *)
+let tvar_subst_fact = var_subst_form tvar_subst_atom
+
+(** Index variables substitution in a fact *)
+let ivar_subst_fact = var_subst_form ivar_subst_atom
+
+let tvar_subst_tatom subst = function
+  | Pts (ord, ts, ts') ->
+    Pts (ord, tvar_subst_ts subst ts, tvar_subst_ts subst ts')
+  | Pind _ as at -> at
+
+let ivar_subst_tatom isubst = function
+  | Pts (ord, ts, ts') ->
+    Pts (ord, ivar_subst_ts isubst ts, ivar_subst_ts isubst ts')
+  | Pind (ord, i, i') -> Pind (ord, app_subst isubst i, app_subst isubst i')
+
+(** Timestamp variables substitution in a constraint *)
+let tvar_subst_constr = var_subst_form tvar_subst_tatom
+
+(** Index variables substitution in a constraint *)
+let ivar_subst_constr = var_subst_form ivar_subst_tatom
+
+(** Timestamp variables substitution in a post-condition.
+    Pre-condition: [tvar_subst_postcond subst pc] require that [subst]
+    co-domain is fresh in [pc]. *)
+let tvar_subst_postcond subst pc =
+  let subst = List.filter (fun (v,_) -> not @@ List.mem v pc.evars) subst in
+  { pc with econstr = tvar_subst_constr subst pc.econstr;
+            efact = tvar_subst_fact subst pc.efact }
+
+(** Index variables substitution in a post-condition.
+    Pre-condition: [ivar_subst_postcond isubst pc] require that [isubst]
+    co-domain is fresh in [pc]. *)
+let ivar_subst_postcond subst pc =
+  let subst = List.filter (fun (v,_) -> not @@ List.mem v pc.eindices) subst in
+  { pc with econstr = ivar_subst_constr subst pc.econstr;
+            efact = ivar_subst_fact subst pc.efact }
+
+
+let svars (tvs,ivs) (_, is) =
+  (tvs, List.sort_uniq Pervasives.compare (is @ ivs))
+
+let rec tsvars (tvs,ivs) = function
+  | TVar tv -> (List.sort_uniq Pervasives.compare (tv :: tvs), ivs)
+  | TName (_, is) -> (tvs, List.sort_uniq Pervasives.compare (is @ ivs))
+  | TPred ts -> tsvars (tvs,ivs) ts
+
+let rec tvars acc = function
+  | Fun (fs, lt) -> List.fold_left tvars (svars acc fs) lt
+  | Name n -> svars acc n
+  | State (s, ts) -> tsvars (svars acc s) ts
+  | Input ts | Output ts -> tsvars acc ts
+
+(** [term_vars t] returns the timestamp and index variables of [t]*)
+let term_vars t = tvars ([],[]) t
+
+(** [tss_vars tss] returns the timestamp and index variables of [tss]*)
+let tss_vars tss = List.fold_left tsvars ([],[]) tss
