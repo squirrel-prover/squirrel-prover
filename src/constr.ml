@@ -104,12 +104,6 @@ end
 
 module Uuf = Uf(OrdUt)
 
-let add_xeq od xeq (eqs,leqs,neqs) = match od with
-  | Eq -> (xeq :: eqs, leqs, neqs)
-  | Leq -> (eqs, xeq :: leqs, neqs)
-  | Neq -> (eqs, leqs, xeq :: neqs)
-  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
-
 type constr_instance = { eqs : (ut * ut) list;
                          new_eqs : (ut * ut) list;
                          neqs : (ut * ut) list;
@@ -443,7 +437,11 @@ let add_disj uf g u x =
                         |> mgus uf in
 
             log_constr (fun () ->
-                Fmt.epr "@[<v 2>Disjunction:@;to_split:%a@;minj:%d@;maxj:%d@;base:%a@;@]@."
+                Fmt.epr "@[<v 2>Disjunction:@;\
+                         to_split:%a@;\
+                         minj:%d@;\
+                         maxj:%d@;\
+                         base:%a@;@]@."
                   pp_ut u
                   minj maxj pp_ut x);
             Some (uf, List.map (fun x -> (nu,x)) l)

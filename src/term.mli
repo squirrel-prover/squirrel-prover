@@ -123,6 +123,14 @@ type atom = ord * term * term
 
 type fact = atom bformula
 
+(** Negate the atom *)
+val not_xpred : atom -> atom
+
+(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
+val norm_xatom : atom -> atom list
+
+val add_xeq : ord -> 'a -> 'a list * 'a list * 'a list -> 'a list * 'a list * 'a list
+
 val pp_ord : Format.formatter -> ord -> unit
 
 (** Constraints:

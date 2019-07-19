@@ -1,17 +1,58 @@
 open Term
 open Constr
 
-(** Type of judgment contexts. We separate facts that have already been treated
-    from those that have not.
-    Moreover, we store in [trs] the state of the completion algorithm when it was
-    called on [old_facts]. *)
-type gamma = { old_facts : fact list;
-               new_facts : fact list;
+
+(** Tags used to record some information on gamma elements:
+    - [trs] records whether it is included in the last completion.
+    - [euf] records whether the EUF axiom has been applied. *)
+type tag = { t_trs : bool;
+             t_euf : bool }
+
+(** Type of judgment contexts. We separate atoms from more complexe facts.
+    We store in [trs] the state of the completion algorithm when it was last
+    called *)
+type gamma = { facts : (fact * tag) list;
+               atoms : (atom * tag) list;
                trs : Completion.state }
 
+let new_tag () = { t_trs = false; t_euf = false }
 
-let add_fact gamma fact = { gamma with new_facts = fact :: gamma.new_facts }
+let set_trs b (x, t) = (x, { t with t_trs = b })
 
+(** We remove atoms that are already a consequence of gamma. *)
+let add_atom g at =
+  let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
+
+  match at with
+  | (Eq,s,t) ->
+    if Completion.check_equalities g.trs [s,t] then g else add at
+  | (Neq,s,t) ->
+    if Completion.check_disequalities g.trs [s,t] then g else add at
+  | _ -> add at                 (* TODO: do not add useless inequality atoms *)
+
+(** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
+let rec add_fact g = function
+  | Atom at -> add_atom g at
+  | Not (Atom at) ->  add_atom g (not_xpred at)
+  | True -> g
+  | And (f,f') -> add_fact (add_fact g f) f'
+  | _ as f -> { g with facts = (f, new_tag ()) :: g.facts }
+
+(** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
+    otherwise, where [g'] has been completed. *)
+let complete_gamma g =
+  let eqs, _, neqs = List.map fst g.atoms
+                        |> List.map norm_xatom
+                        |> List.flatten
+                        |> List.fold_left (fun acc (od,a,b) ->
+                            add_xeq od (a,b) acc) ([],[],[]) in
+
+  (* TODO: for now, we ignore inequalities *)
+  let trs = Completion.complete eqs in
+  if Completion.check_disequalities trs neqs then
+    Utils.some { g with trs = trs;
+                        atoms = List.map (set_trs false) g.atoms }
+  else None
 
 (** Type of judgments:
     - [environment] contains the current protocol declaration (TODO).
@@ -101,3 +142,21 @@ let goal_forall_intro (judge : formula judgment) sk fk =
 let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | False -> fk ()
   | _ -> raise @@ Failure "goal ill-formed"
+
+let constr_absurd (judge : 'a judgment) sk fk =
+  if not @@ Constr.is_sat judge.constr then sk () else fk ()
+
+let gamma_absurd (judge : 'a judgment) sk fk =
+  match complete_gamma judge.gamma with
+  | None -> sk ()
+  | Some _ -> fk ()
+
+
+(* Utils *)
+
+(** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
+let modulo_sym f at = match at with
+  | (Eq as ord,t1,t2) | (Neq as ord,t1,t2) -> begin match f at with
+      | Some _ as res -> res
+      | None -> f (ord,t2,t1) end
+  | _ -> f at

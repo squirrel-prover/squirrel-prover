@@ -200,13 +200,18 @@ let not_ord o = match o with
 (** Negate the atom *)
 let not_xpred (o,l,r) = (not_ord o, l, r)
 
-(** Replace an atom by an equivalent list of atoms using
-    only Eq,Neq and Leq *)
+(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o,l,r) = match o with
   | Eq | Neq | Leq -> [(o,l,r)]
   | Geq -> [(Leq,r,l)]
   | Lt -> (Leq,l,r) :: [(Neq,l,r)]
   | Gt -> (Leq,r,l) :: [(Neq,r,l)]
+
+let add_xeq od xeq (eqs,leqs,neqs) = match od with
+  | Eq -> (xeq :: eqs, leqs, neqs)
+  | Leq -> (eqs, xeq :: leqs, neqs)
+  | Neq -> (eqs, leqs, xeq :: neqs)
+  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
 
 
 (** Constraints:

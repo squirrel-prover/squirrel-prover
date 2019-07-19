@@ -94,7 +94,7 @@ let declare id args proc =
   Hashtbl.add pdecls id (args,proc)
 
 (** Internal representation of processes
-  * 
+  *
   * Processes are compiled to an internal representation used by
   * the meta-logic. Name creations and let constructs are compiled
   * away and process constructs are grouped to form blocks of input,
@@ -135,7 +135,19 @@ let declare id args proc =
   * (e.g. <Role>.<sequence_number>) if the choices of conditional
   * branches is clear from the context. *)
 
-module Action = struct
+module Action : sig
+  type item = {
+    par_choice : int * string list ;
+    sum_choice : int
+  }
+  type t = item list
+
+  val conflict : t -> t -> bool
+
+  val depends : t -> t -> bool
+
+  val enables : t -> t -> bool
+end = struct
 
   (** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
     * actions of C have par_choice 2, and those of B have par_choice
@@ -183,14 +195,14 @@ end
   * and output. A block may feature free index variables, that are in
   * a sense bound by the corresponding action. *)
 type block = {
-  input : Channel.t*string ;
+  input : Channel.t * string ;
   condition : string list * fact ;
-  updates : (string*term list*term) list ;
-  output : Channel.t*term
+  updates : (string * term list * term) list ;
+  output : Channel.t * term
 }
 
 (** Associates a block to each action *)
-let action_to_block = Hashtbl.create 97
+let action_to_block : (Action.t, block) Hashtbl.t = Hashtbl.create 97
 
 module Aliases = struct
 

@@ -809,6 +809,17 @@ let check_disequality state (u,v) =
 
 let check_disequalities state l = List.for_all (check_disequality state) l
 
+(** [check_equality_cterm state (u,v)]
+     Precondition: [u] and [v] must be ground *)
+let check_equality_cterm state (u,v) =
+  assert (state.completed);
+  normalize state u = normalize state v
+
+let check_equality state (u,v) =
+  check_equality_cterm state (cterm_of_term u, cterm_of_term v)
+
+let check_equalities state l = List.for_all (check_equality state) l
+
 
 (****************)
 (* Tests Suites *)
