@@ -1,3 +1,4 @@
+open Utils
 open Term
 open Constr
 
@@ -11,7 +12,7 @@ type tag = { t_trs : bool;
 (** Type of judgment contexts. We separate atoms from more complexe facts.
     We store in [trs] the state of the completion algorithm when it was last
     called *)
-type gamma = { facts : (fact * tag) list;
+type gamma = { facts : fact list;
                atoms : (atom * tag) list;
                trs : Completion.state }
 
@@ -36,7 +37,11 @@ let rec add_fact g = function
   | Not (Atom at) ->  add_atom g (not_xpred at)
   | True -> g
   | And (f,f') -> add_fact (add_fact g f) f'
-  | _ as f -> { g with facts = (f, new_tag ()) :: g.facts }
+  | _ as f -> { g with facts = f :: g.facts }
+
+let rec add_facts g = function
+  | [] -> g
+  | f :: fs -> add_facts (add_fact g f) fs
 
 (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
     otherwise, where [g'] has been completed. *)
@@ -78,6 +83,14 @@ type ('a,'b) sk = 'a -> 'b fk -> 'b
 
 type ('a,'b,'c) t = 'a -> ('b,'c) sk -> 'c fk -> 'c
 
+
+type ('a,'b) mem_fk = 'a -> 'b
+
+type ('a,'b,'c) mem_sk = 'a -> ('b,'c) mem_fk -> 'c
+
+type ('a,'b,'c,'d) mem_t = 'a -> ('b,'c,'d) mem_sk -> ('c,'d) mem_fk -> 'd
+
+
 let tact_wrap f v sk fk = sk (f v) fk
 
 let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
@@ -115,7 +128,7 @@ let goal_and_intro (judge : fact judgment) sk fk = match judge.goal with
   | _ -> raise @@ Failure "goal ill-formed"
 
 
-(** Introduce the universally quantified variables and the precondition. *)
+(** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : formula judgment) sk fk =
   let compute_alpha ffresh l l' =
     List.fold_left (fun subst x ->
@@ -125,18 +138,42 @@ let goal_forall_intro (judge : formula judgment) sk fk =
   let tv_subst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
   and iv_subst = compute_alpha fresh_index judge.goal.uindices judge.indices in
 
-  { judge with constr = And ( judge.constr,
-                              ivar_subst_constr iv_subst judge.goal.uconstr
-                              |> tvar_subst_constr tv_subst );
+  sk { judge with constr = And ( judge.constr,
+                                 ivar_subst_constr iv_subst judge.goal.uconstr
+                                 |> tvar_subst_constr tv_subst );
 
-               gamma = ivar_subst_fact iv_subst judge.goal.ufact
-                       |> tvar_subst_fact tv_subst
-                       |> add_fact judge.gamma;
+                  gamma = ivar_subst_fact iv_subst judge.goal.ufact
+                          |> tvar_subst_fact tv_subst
+                          |> add_fact judge.gamma;
 
-               goal = List.map (fun goal ->
-                   ivar_subst_postcond iv_subst goal
-                   |> tvar_subst_postcond tv_subst
-                 ) judge.goal.postcond }
+                  goal = List.map (fun goal ->
+                      ivar_subst_postcond iv_subst goal
+                      |> tvar_subst_postcond tv_subst
+                    ) judge.goal.postcond }
+    fk
+
+(** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
+    quantified variables and the goal, assuming the constraint on the
+    existential variables is satisfied (if [force] is true, then the introduction
+    is done even is the constraint is not satisfied by updating the judgment
+    constraint.
+    [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
+    timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
+    variables. *)
+let goal_exists_intro (judge : postcond judgment) sk fk ?force:(f=false) vnu inu =
+  let pc_constr = tvar_subst_constr vnu judge.constr
+               |> ivar_subst_constr inu in
+
+  if Constr.is_sat (Impl (judge.constr,pc_constr)) then
+    sk { judge with goal = tvar_subst_postcond vnu judge.goal
+                           |> ivar_subst_postcond inu }
+      fk
+  else if f then
+    sk { judge with goal = tvar_subst_postcond vnu judge.goal
+                           |> ivar_subst_postcond inu;
+                    constr = And (judge.constr, Not pc_constr) }
+      fk
+  else fk ()
 
 
 let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
@@ -144,13 +181,46 @@ let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | _ -> raise @@ Failure "goal ill-formed"
 
 let constr_absurd (judge : 'a judgment) sk fk =
-  if not @@ Constr.is_sat judge.constr then sk () else fk ()
+  if not @@ Constr.is_sat judge.constr then sk () fk else fk ()
 
-let gamma_absurd (judge : 'a judgment) sk fk =
+(** In case of failure, we pass the judgement with the completed gamma to the
+    failure continuation. *)
+let gamma_absurd (judge : 'a judgment) msk mfk =
   match complete_gamma judge.gamma with
-  | None -> sk ()
-  | Some _ -> fk ()
+  | None -> msk () mfk
+  | Some g' -> mfk g'
 
+
+let or_to_list f =
+  let rec aux acc = function
+    | Or (g,h) -> aux (aux acc g) h
+    | _ as a -> a :: acc in
+
+  (* Remark that we simplify the formula. *)
+  aux [] (simpl_fact f)
+
+let gamma_or_intro (judge : 'a judgment) sk fk select_pred =
+  let sel, nsel = List.split_pred select_pred judge.gamma.facts in
+
+  let rec mk_facts acc = function
+    | [] -> [acc]
+    | l :: ors -> List.map (fun x -> mk_facts (x :: acc) ors) l
+                  |> List.flatten in
+
+  let judges =
+    mk_facts [] (List.map or_to_list sel)
+    |> List.map (fun fs ->
+        { judge with
+          gamma = add_facts { judge.gamma with facts = nsel } fs } ) in
+
+  sk judges fk
+
+
+let rec prove_all (judges : 'a judgment list) sk sk_end fk = match judges with
+  | [] -> sk_end () fk
+  | j :: judges' ->
+    sk j fk;
+    prove_all judges sk sk_end fk
 
 (* Utils *)
 

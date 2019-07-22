@@ -126,6 +126,9 @@ type fact = atom bformula
 (** Negate the atom *)
 val not_xpred : atom -> atom
 
+(** Uses only And and Or (no Not, no Impl). *)
+val simpl_fact : fact -> fact
+
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 val norm_xatom : atom -> atom list
 

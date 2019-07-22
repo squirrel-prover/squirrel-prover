@@ -146,17 +146,53 @@ let rec pp_bformula pp_atom ppf = function
   | False -> Fmt.pf ppf "false"
 
 
-(** [bf_dnf nlit b] puts the  bformula [b] in DNF, using [nlit] to transform
-    negative atoms into positive atoms *)
-let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
+let rec triv_eval = function
+  | Or (a,b) ->
+    begin match triv_eval a, triv_eval b with
+      | _, True | True,_ -> True
+      | _ as te, False | False, (_ as te) -> te
+      | _ as ta, (_ as tb) -> Or (ta, tb) end
+
+  | And (a,b) ->
+    begin match triv_eval a, triv_eval b with
+      | _ as te, True | True, (_ as te) -> te
+      | _, False | False,_ -> False
+      | _ as ta, (_ as tb) -> And (ta, tb) end
+
+  | Impl (a,b) ->
+    begin match triv_eval a, triv_eval b with
+      | _, True | False, _ -> True
+      | True, (_ as te) -> te
+      | _ as ta, (_ as tb) -> Impl (ta, tb) end
+
+  | Not a -> begin match triv_eval a with
+      | True -> False
+      | False -> True
+      | _ as ta -> Not ta end
+
+  | _ as a -> a
+
+(** [simpl_formula nlit b] simplifies the bformula [b], using [nlit] to
+    transform negative atoms into positive atoms *)
+let simpl_formula nlit b =
   let rec simp flip = function
     | Atom a -> if flip then Atom (nlit a) else Atom a
     | True -> if flip then False else True
     | False -> if flip then True else False
-    | Or (l,r) -> Or (simp flip l, simp flip r)
-    | And (l,r) -> And (simp flip l, simp flip r)
+    | Or (l,r) ->
+      if flip then And (simp flip l, simp flip r)
+      else Or (simp flip l, simp flip r)
+    | And (l,r) ->
+      if flip then Or (simp flip l, simp flip r)
+      else And (simp flip l, simp flip r)
     | Impl (l,r) ->  Or (Not l, r) |> simp flip
     | Not b -> simp (not flip) b in
+  simp false b |> triv_eval
+
+
+(** [bf_dnf nlit b] puts the  bformula [b] in DNF, using [nlit] to transform
+    negative atoms into positive atoms *)
+let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
 
   let rec dnf = function
     | Or (a,b) -> dnf a @ dnf b
@@ -171,7 +207,7 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
         [] (dnf a)
     | Impl _ | Not _ -> assert false in
 
-  simp false b |> dnf
+  simpl_formula nlit b |> dnf
 
 
 (** Atoms *)
@@ -199,6 +235,8 @@ let not_ord o = match o with
 
 (** Negate the atom *)
 let not_xpred (o,l,r) = (not_ord o, l, r)
+
+let simpl_fact f = simpl_formula not_xpred f
 
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o,l,r) = match o with
