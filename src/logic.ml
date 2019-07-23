@@ -2,67 +2,83 @@ open Utils
 open Term
 open Constr
 
-(** Tags used to record some information on gamma elements:
-    - [trs] records whether it is included in the last completion.
-    - [euf] records whether the EUF axiom has been applied. *)
-type tag = { t_trs : bool;
-             t_euf : bool }
+module Gamma = struct
+  (** Tags used to record some information on gamma elements:
+      - [trs] records whether it is included in the last completion.
+      - [euf] records whether the EUF axiom has been applied. *)
+  type tag = { t_trs : bool;
+               t_euf : bool }
 
-(** Type of judgment contexts. We separate atoms from more complexe facts.
-    We store in [trs] the state of the completion algorithm when it was last
-    called *)
-type gamma = { facts : fact list;
-               atoms : (atom * tag) list;
-               trs : Completion.state }
+  (** Type of judgment contexts. We separate atoms from more complexe facts.
+      We store in [trs] the state of the completion algorithm when it was last
+      called *)
+  type gamma = { facts : fact list;
+                 atoms : (atom * tag) list;
+                 trs : Completion.state }
 
-let new_tag () = { t_trs = false; t_euf = false }
+  let get_el (at,_) = at
+  let get_tag (_,tag) = tag
 
-let set_trs b (x, t) = (x, { t with t_trs = b })
+  let new_tag () = { t_trs = false; t_euf = false }
 
-let set_euf b (x, t) = (x, { t with t_euf = b })
+  let set_trs b (x, t) = (x, { t with t_trs = b })
 
-(** We remove atoms that are already a consequence of gamma. *)
-let add_atom g at =
-  let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
+  let set_euf b (x, t) = (x, { t with t_euf = b })
 
-  match at with
-  | (Eq,s,t) ->
-    if Completion.check_equalities g.trs [s,t] then g else add at
-  | (Neq,s,t) ->
-    if Completion.check_disequalities g.trs [s,t] then g else add at
-  | _ -> add at                 (* TODO: do not add useless inequality atoms *)
+  (** We remove atoms that are already a consequence of gamma. *)
+  let add_atom g at =
+    let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
 
-let rec add_atoms g = function
-  | [] -> g
-  | at :: ats -> add_atoms (add_atom g at) ats
+    match at with
+    | (Eq,s,t) ->
+      if Completion.check_equalities g.trs [s,t] then g else add at
+    | (Neq,s,t) ->
+      if Completion.check_disequalities g.trs [s,t] then g else add at
+    | _ -> add at                 (* TODO: do not add useless inequality atoms *)
 
-(** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
-let rec add_fact g = function
-  | Atom at -> add_atom g at
-  | Not (Atom at) ->  add_atom g (not_xpred at)
-  | True -> g
-  | And (f,f') -> add_fact (add_fact g f) f'
-  | _ as f -> { g with facts = f :: g.facts }
+  let rec add_atoms g = function
+    | [] -> g
+    | at :: ats -> add_atoms (add_atom g at) ats
 
-let rec add_facts g = function
-  | [] -> g
-  | f :: fs -> add_facts (add_fact g f) fs
+  (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
+  let rec add_fact g = function
+    | Atom at -> add_atom g at
+    | Not (Atom at) ->  add_atom g (not_xpred at)
+    | True -> g
+    | And (f,f') -> add_fact (add_fact g f) f'
+    | _ as f -> { g with facts = f :: g.facts }
 
-(** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
-    otherwise, where [g'] has been completed. *)
-let complete_gamma g =
-  let eqs, _, neqs = List.map fst g.atoms
-                        |> List.map norm_xatom
-                        |> List.flatten
-                        |> List.fold_left (fun acc (od,a,b) ->
-                            add_xeq od (a,b) acc) ([],[],[]) in
+  let rec add_facts g = function
+    | [] -> g
+    | f :: fs -> add_facts (add_fact g f) fs
 
-  (* TODO: for now, we ignore inequalities *)
-  let trs = Completion.complete eqs in
-  if Completion.check_disequalities trs neqs then
-    Utils.some { g with trs = trs;
-                        atoms = List.map (set_trs false) g.atoms }
-  else None
+  (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
+      otherwise, where [g'] has been completed. *)
+  let complete g =
+    let eqs, _, neqs = List.map fst g.atoms
+                       |> List.map norm_xatom
+                       |> List.flatten
+                       |> List.fold_left (fun acc (od,a,b) ->
+                           add_xeq od (a,b) acc) ([],[],[]) in
+
+    (* TODO: for now, we ignore inequalities *)
+    let trs = Completion.complete eqs in
+    if Completion.check_disequalities trs neqs then
+      Utils.some { g with trs = trs;
+                          atoms = List.map (set_trs false) g.atoms }
+    else None
+end
+
+module Theta = struct
+
+  type theta = { constrs : constr list;
+                 tatoms : tatom list;
+               }
+
+end
+
+open Gamma
+open Theta
 
 (** Type of judgments:
     - [environment] contains the current protocol declaration.
@@ -177,19 +193,21 @@ let goal_exists_intro (judge : postcond judgment) sk fk ?force:(f=false) vnu inu
   else fk ()
 
 let goal_intro (judge : fact judgment) sk fk =
-  sk (add_fact judge.gamma judge.goal) fk
+  sk { judge with gamma = add_fact judge.gamma (Not judge.goal);
+                  goal = False } fk
 
 let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | False -> fk ()
   | _ -> raise @@ Failure "goal ill-formed"
 
 let constr_absurd (judge : 'a judgment) sk fk =
-  if not @@ Constr.is_sat judge.constr then sk () fk else fk ()
+  let models = Constr.models judge.constr in
+  if not @@ Constr.m_is_sat models then sk () fk else fk ()
 
 (** In case of failure, we pass the judgement with the completed gamma to the
     failure continuation. *)
 let gamma_absurd (judge : 'a judgment) msk mfk =
-  match complete_gamma judge.gamma with
+  match Gamma.complete judge.gamma with
   | None -> msk () mfk
   | Some g' -> mfk g'
 
@@ -214,7 +232,8 @@ let gamma_or_intro (judge : 'a judgment) sk fk select_pred =
     mk_facts [] (List.map or_to_list sel)
     |> List.map (fun fs ->
         { judge with
-          gamma = add_facts { judge.gamma with facts = nsel } fs } ) in
+          gamma = add_facts { judge.gamma with facts = nsel } fs
+        } ) in
 
   sk judges fk
 
@@ -265,8 +284,7 @@ let mk_and_cnstr l = match l with
 
     mk_c a l'
 
-
-let euf_apply_case judge (_, (_, key_is), m, s) case =
+let euf_apply_case (_, (_, key_is), m, s) case =
   let open Euf in
   (* We create fresh indices to rename in the block *)
   let inu = List.map (fun i -> (i, fresh_index ())) case.block.binded_indices in
@@ -277,7 +295,8 @@ let euf_apply_case judge (_, (_, key_is), m, s) case =
   (* We create the block hashed message. *)
   let blk_m = subst_term inu vnu case.message in
   (* We create the term equality *)
-  let eq = (Eq, blk_m, m) in
+  let eq = Atom (Eq, blk_m, m) in
+  let new_f = And (eq, subst_fact inu vnu case.block.condition) in
 
   (* Now, we need to add the timestamp constraints. *)
 
@@ -303,30 +322,29 @@ let euf_apply_case judge (_, (_, key_is), m, s) case =
 
   let constr = And (ts_eq, And (eq_cnstr, le_cnstr)) in
 
-  (eq, constr)
+  (new_f, constr)
 
 
 let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Failure "bad euf application"
-  | Some (hash_fn, (key_n, key_is), m, s) ->
+  | Some p ->
+    let (hash_fn, (key_n, key_is), m, s) = p in
     let rule = Euf.mk_rule judge.environment hash_fn key_n in
-
-    assert false
-
-
-  (* let block = subst_block inu vnu case.block in *)
+    List.map (fun case ->
+        let new_f, new_cnstr = euf_apply_case p case in
+        { judge with constr = And (judge.constr, new_cnstr);
+                     gamma = add_fact judge.gamma new_f }
+      ) rule.Euf.cases
 
 let euf_apply (judge : 'a judgment) sk fk select =
-  let at, ats = select judge.gamma in
+  let t_at, ats = select judge.gamma in
+  let judge = { judge with
+                gamma = { judge.gamma with
+                          atoms = (set_euf true t_at) :: ats } } in
 
-  let new_ats = assert false in
+  (* TODO: need to add block equalities somewhere. *)
+  sk (euf_apply_facts judge (get_el t_at)) fk
 
-  let g =
-    add_atoms
-      { judge.gamma with atoms = (set_euf true at) :: ats }
-      new_ats in
-
-  sk { judge with gamma = g } fk
 
 
 (* let () =

@@ -511,9 +511,14 @@ let get_basics uf elems =
   |> List.sort_uniq Pervasives.compare
 
 
+(** Type of a satisfiable and normalized instance. The graph represents the
+    inequality graph of the instance, and must be transitive. *)
+type norm_instance = { inst : constr_instance;
+                       tr_graph : UtG.t }
+
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance] *)
-let rec split instance =
+let rec split instance : norm_instance list =
   try begin
     let uf = unify instance.uf instance.eqs instance.elems in
     let uf,g = leq_unify uf instance.leqs instance.elems in
@@ -531,7 +536,7 @@ let rec split instance =
               ) basics
           ) g in
 
-        [instance]
+        [ { inst = instance; tr_graph = g } ]
 
       with Found (uf, new_eqs) ->
         List.map (fun eq ->
@@ -553,18 +558,24 @@ let rec split instance =
     log_constr (fun () -> Fmt.epr "@[<v 2>No_mgu:@;@]@.");
     []
 
+type models = norm_instance list
 
-(** [is_sat l] check that l is a satisfiable conjunct of constraints.
+(** [models_conjunct l] returns the list of "minimal models" of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let is_sat_conjunct (l : tatom list) =
+let models_conjunct (l : tatom list) : models =
   let instance = mk_instance l in
 
-  split instance <> []
+  split instance
 
+(** [models l] returns the list of "minimal models" of a constraint. *)
+let models constr =
+  constr_dnf constr
+  |> List.map models_conjunct
+  |> List.flatten
 
-(** Check if a constraint is satisfiable *)
-let is_sat constr =
-  constr_dnf constr |> List.exists is_sat_conjunct
+let m_is_sat models = models <> []
+
+let is_sat constr = m_is_sat @@ models constr
 
 
 (****************)
@@ -643,12 +654,12 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("mgu" ^ string_of_int i) Sat
-             (fun () -> if is_sat_conjunct pb then raise Sat else ()))
+             (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("no mgu" ^ string_of_int i) Unsat
-             (fun () -> if is_sat_conjunct pb then () else raise Unsat ))
+             (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
          failures;);
 
     ("Graph", `Quick,
@@ -679,12 +690,12 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> if is_sat_conjunct pb then raise Sat else ()))
+             (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> if is_sat_conjunct pb then () else raise Unsat ))
+             (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
          failures;)
 
   ]
