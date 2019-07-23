@@ -1,15 +1,35 @@
 open Term
 
 (** This is [Process.block], but using the types of module [Term] instead of
-    module [Theory]. Binded indices appear in the [binded_indices] field. *)
+    module [Theory].
+    - binded indices appear in the [binded_indices] field.
+    - [ts] contains the variable representing the block timestamp. *)
 type block = {
-  action : action;
-  binded_indices : indices;
-  condition : fact;
-  updates : (state * term) list;
-  output : term }
+  ts : Term.tvar;
+  action : Term.action;
+  binded_indices : Term.indices;
+  condition : Term.fact;
+  updates : (Term.state * Term.term) list;
+  output : Term.term }
 
 type process = block list
+
+let subst_block inu tnu blk =
+  { ts = app_subst tnu blk.ts;
+    action = blk.action;
+    binded_indices = List.map (app_subst inu) blk.binded_indices;
+    condition = subst_fact inu tnu blk.condition;
+    updates = List.map (fun (s,t) -> ivar_subst_state inu s,
+                                     subst_term inu tnu t
+                       ) blk.updates;
+    output = subst_term inu tnu blk.output }
+
+(* let block_ts block =
+ *   let open Euf in
+ *   List.fold_left (fun acc (_,t) ->
+ *       term_ts t @ acc
+ *     ) (term_ts block.output) block.updates
+ *   |> List.sort_uniq Pervasives.compare *)
 
 (** Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
@@ -59,13 +79,13 @@ let hashes_of_blk blk hash_fn key_n =
   |> List.sort_uniq Pervasives.compare
 
 
+
 (** Type of an euf axiom case.
-   [e] of type [euf_case] represents the fact that, at timestamp
-   [e.action(e.eindices)], the message [e.m] has been hashed.
-   [e.block] stores the relevant block for future potential use.  *)
-type euf_case = { eindices : indices;
-                  action : action;
-                  message : term;
+    [e] of type [euf_case] represents the fact that the message [e.m]
+    has been hashed, and the key indices were [e.eindices].
+    [e.block] stores the relevant block for future potential use.  *)
+type euf_case = { key_indices : Term.indices;
+                  message : Term.term;
                   block : block }
 
 (** Type of an euf axiom rule:
@@ -77,20 +97,22 @@ type euf_rule = { hash : fname;
                   key : name;
                   cases : euf_case list }
 
+(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
-    hash function and key in a process. *)
+    hash function and key in a process.
+    TODO: memoisation *)
 let mk_rule proc hash_fn key_n =
-  if not @@ euf_key_ssc proc hash_fn key_n then raise Bad_ssc;
-  { hash = hash_fn; key = key_n;
-    cases =
-      List.map (fun blk ->
-          hashes_of_blk blk hash_fn key_n
-          |> List.map (fun (is,m) ->
-              { eindices = is;
-                action = blk.action;
-                message = m;
-                block = blk })
-        ) proc
-      |> List.flatten }
+  if not @@ euf_key_ssc proc hash_fn key_n then raise Bad_ssc
+  else { hash = hash_fn;
+         key = key_n;
+         cases =
+           List.map (fun blk ->
+               hashes_of_blk blk hash_fn key_n
+               |> List.map (fun (is,m) ->
+                   { key_indices = is;
+                     message = m;
+                     block = blk })
+             ) proc
+           |> List.flatten }

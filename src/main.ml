@@ -1,3 +1,5 @@
+open Logic
+
 let parse_theory ?(test=false) filename =
   Theory.initialize_symbols () ;
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in

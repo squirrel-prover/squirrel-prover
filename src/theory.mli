@@ -51,5 +51,7 @@ val check_term : env -> term -> kind -> unit
 val check_state : string -> int -> kind
 val check_fact : env -> fact -> unit
 
+val is_hash : Term.fname -> bool
+
 (** Populate theory with only builtin declarations *)
 val initialize_symbols : unit -> unit

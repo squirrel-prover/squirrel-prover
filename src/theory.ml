@@ -181,6 +181,10 @@ let make_term s l =
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v])
 
+let is_hash (Term.Fname s) =
+  try Hashtbl.find symbols s = Hash_symbol
+  with Not_found -> raise @@ Failure "symbol not found"
+
 (** Tests *)
 let () =
   Checks.add_suite "Theory" [

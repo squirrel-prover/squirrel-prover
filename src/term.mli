@@ -52,7 +52,7 @@ val pp_nsymb : Format.formatter -> nsymb -> unit
   * Adrien: already added some of them
   *)
 
-type fname
+type fname = private Fname of string
 
 type fsymb = fname * indices
 
@@ -174,36 +174,40 @@ and postcond = {
   efact : fact
 }
 
+type 'a subst = ('a * 'a) list
 
 val app_subst : ('a * 'a) list -> 'a -> 'a
 
-(** Timestamp variables substitution in a term *)
-val tvar_subst_term : (tvar * tvar) list -> term -> term
+val ivar_subst_state : index subst -> state -> state
 
-(** Index variables substitution in a term *)
-val ivar_subst_term : (index * index) list -> term -> term
+val tvar_subst_term : tvar subst -> term -> term
+val ivar_subst_term : index subst -> term -> term
+val subst_term : index subst -> tvar subst -> term -> term
 
-(** Timestamp variables substitution in a fact *)
-val tvar_subst_fact : (tvar * tvar) list -> fact -> fact
+val tvar_subst_fact : tvar subst -> fact -> fact
+val ivar_subst_fact : index subst -> fact -> fact
+val subst_fact : index subst -> tvar subst -> fact -> fact
 
-(** Index variables substitution in a fact *)
-val ivar_subst_fact : (index * index) list -> fact -> fact
+val tvar_subst_constr : tvar subst -> constr -> constr
+val ivar_subst_constr : index subst -> constr -> constr
+val subst_constr : index subst -> tvar subst -> constr -> constr
 
-(** Timestamp variables substitution in a constraint *)
-val tvar_subst_constr : (tvar * tvar) list -> constr -> constr
-
-(** Index variables substitution in a constraint *)
-val ivar_subst_constr : (index * index) list -> constr -> constr
 
 (** Timestamp variables substitution in a post-condition.
     Pre-condition: [tvar_subst_postcond subst pc] require that [subst]
     co-domain is fresh in [pc]. *)
-val tvar_subst_postcond : (tvar * tvar) list -> postcond -> postcond
+val tvar_subst_postcond : tvar subst -> postcond -> postcond
 
   (** Index variables substitution in a post-condition.
     Pre-condition: [ivar_subst_postcond isubst pc] require that [isubst]
     co-domain is fresh in [pc]. *)
-val ivar_subst_postcond : (index * index) list -> postcond -> postcond
+val ivar_subst_postcond : index subst -> postcond -> postcond
+
+(** Substitution in a post-condition.
+    Pre-condition: [subst_postcond isubst tsubst pc] require that [isubst]
+    and [tsubst] co-domains are fresh in [pc]. *)
+val subst_postcond : index subst -> tvar subst -> postcond -> postcond
+
 
 
 (** [term_vars t] returns the timestamp and index variables of [t]*)
@@ -211,3 +215,7 @@ val term_vars : term -> tvar list * index list
 
 (** [tss_vars tss] returns the timestamp and index variables of [tss]*)
 val tss_vars : timestamp list -> tvar list * index list
+
+
+(** [term_ts t] returns the timestamps appearing in [t] *)
+val term_ts : term -> timestamp list

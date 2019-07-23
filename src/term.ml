@@ -310,10 +310,13 @@ and postcond = {
   efact : fact
 }
 
+type 'a subst = ('a * 'a) list
 
 let app_subst subst x = try List.assoc x subst with Not_found -> x
 
 let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
+
+let ivar_subst_state isubst (s : state) = ivar_subst_symb isubst s
 
 let rec tvar_subst_ts tsubst ts = match ts with
   | TVar tv -> TVar (app_subst tsubst tv)
@@ -325,7 +328,6 @@ let rec ivar_subst_ts isubst = function
   | TPred ts' -> TPred (ivar_subst_ts isubst ts')
   | TName (n,is) -> TName (n,  List.map (app_subst isubst) is)
 
-(** Timestamp variables substitution in a term*)
 let rec tvar_subst_term tsubst t = match t with
   | Fun (fs, lt) -> Fun (fs, List.map (tvar_subst_term tsubst) lt)
   | Name _ -> t
@@ -333,7 +335,6 @@ let rec tvar_subst_term tsubst t = match t with
   | Output ts -> Output (tvar_subst_ts tsubst ts)
   | Input ts -> Input (tvar_subst_ts tsubst ts)
 
-(** Index variables substitution in a term *)
 let rec ivar_subst_term isubst t = match t with
   | Fun (fs, lt) -> Fun ( ivar_subst_symb isubst fs,
                           List.map (ivar_subst_term isubst) lt )
@@ -343,7 +344,9 @@ let rec ivar_subst_term isubst t = match t with
   | Output ts -> Output (ivar_subst_ts isubst ts)
   | Input ts -> Input (ivar_subst_ts isubst ts)
 
-(** Variables substitution in a formula *)
+let subst_term isubst tsubst m = ivar_subst_term isubst m
+                                 |> tvar_subst_term tsubst
+
 let rec var_subst_form at_subst subst f = match f with
   | And (a,b) -> And ( var_subst_form at_subst subst a,
                        var_subst_form at_subst subst b )
@@ -361,11 +364,12 @@ let tvar_subst_atom subst (ord,t,t') =
 let ivar_subst_atom isubst (ord,t,t') =
   (ord, ivar_subst_term isubst t, ivar_subst_term isubst t')
 
-(** Timestamp variables substitution in a fact *)
 let tvar_subst_fact = var_subst_form tvar_subst_atom
 
-(** Index variables substitution in a fact *)
 let ivar_subst_fact = var_subst_form ivar_subst_atom
+
+let subst_fact isubst tsubst m = ivar_subst_fact isubst m
+                                 |> tvar_subst_fact tsubst
 
 let tvar_subst_tatom subst = function
   | Pts (ord, ts, ts') ->
@@ -377,11 +381,13 @@ let ivar_subst_tatom isubst = function
     Pts (ord, ivar_subst_ts isubst ts, ivar_subst_ts isubst ts')
   | Pind (ord, i, i') -> Pind (ord, app_subst isubst i, app_subst isubst i')
 
-(** Timestamp variables substitution in a constraint *)
 let tvar_subst_constr = var_subst_form tvar_subst_tatom
 
-(** Index variables substitution in a constraint *)
 let ivar_subst_constr = var_subst_form ivar_subst_tatom
+
+let subst_constr isubst tsubst m = ivar_subst_constr isubst m
+                                   |> tvar_subst_constr tsubst
+
 
 (** Timestamp variables substitution in a post-condition.
     Pre-condition: [tvar_subst_postcond subst pc] require that [subst]
@@ -399,13 +405,18 @@ let ivar_subst_postcond subst pc =
   { pc with econstr = ivar_subst_constr subst pc.econstr;
             efact = ivar_subst_fact subst pc.efact }
 
+(** Substitution in a post-condition.
+    Pre-condition: [subst_postcond isubst tsubst pc] require that [isubst]
+    and [tsubst] co-domains are fresh in [pc]. *)
+let subst_postcond isubst tsubst m = ivar_subst_postcond isubst m
+                                     |> tvar_subst_postcond tsubst
 
 let svars (tvs,ivs) (_, is) =
-  (tvs, List.sort_uniq Pervasives.compare (is @ ivs))
+  (tvs, is @ ivs)
 
 let rec tsvars (tvs,ivs) = function
-  | TVar tv -> (List.sort_uniq Pervasives.compare (tv :: tvs), ivs)
-  | TName (_, is) -> (tvs, List.sort_uniq Pervasives.compare (is @ ivs))
+  | TVar tv -> (tv :: tvs, ivs)
+  | TName (_, is) -> (tvs, is @ ivs)
   | TPred ts -> tsvars (tvs,ivs) ts
 
 let rec tvars acc = function
@@ -415,7 +426,22 @@ let rec tvars acc = function
   | Input ts | Output ts -> tsvars acc ts
 
 (** [term_vars t] returns the timestamp and index variables of [t]*)
-let term_vars t = tvars ([],[]) t
+let term_vars t =
+  let tvs, ivs = tvars ([],[]) t in
+  ( List.sort_uniq Pervasives.compare tvs,
+    List.sort_uniq Pervasives.compare ivs )
 
 (** [tss_vars tss] returns the timestamp and index variables of [tss]*)
-let tss_vars tss = List.fold_left tsvars ([],[]) tss
+let tss_vars tss =
+  let tvs, ivs = List.fold_left tsvars ([],[]) tss in
+  ( List.sort_uniq Pervasives.compare tvs,
+    List.sort_uniq Pervasives.compare ivs )
+
+
+let rec tts acc = function
+  | Fun (fs, lt) -> List.fold_left tts acc lt
+  | Name n -> acc
+  | State (_, ts) | Input ts | Output ts -> ts :: acc
+
+(** [term_ts t] returns the timestamps appearing in [t] *)
+let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare

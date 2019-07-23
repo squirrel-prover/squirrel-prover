@@ -2,7 +2,6 @@ open Utils
 open Term
 open Constr
 
-
 (** Tags used to record some information on gamma elements:
     - [trs] records whether it is included in the last completion.
     - [euf] records whether the EUF axiom has been applied. *)
@@ -20,6 +19,8 @@ let new_tag () = { t_trs = false; t_euf = false }
 
 let set_trs b (x, t) = (x, { t with t_trs = b })
 
+let set_euf b (x, t) = (x, { t with t_euf = b })
+
 (** We remove atoms that are already a consequence of gamma. *)
 let add_atom g at =
   let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
@@ -30,6 +31,10 @@ let add_atom g at =
   | (Neq,s,t) ->
     if Completion.check_disequalities g.trs [s,t] then g else add at
   | _ -> add at                 (* TODO: do not add useless inequality atoms *)
+
+let rec add_atoms g = function
+  | [] -> g
+  | at :: ats -> add_atoms (add_atom g at) ats
 
 (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
 let rec add_fact g = function
@@ -60,12 +65,13 @@ let complete_gamma g =
   else None
 
 (** Type of judgments:
-    - [environment] contains the current protocol declaration (TODO).
+    - [environment] contains the current protocol declaration.
+      For now, this is [Euf.process] but should be changed (TODO).
     - [vars] and [indices] are the judgment free timestamp and index variables.
     - [constr] constrains the judgment timestamp and index variables.
     - [gamma] is the judgment context.
     - [goal] contains the current goal, which is of type 'a.  *)
-type 'a judgment = { environment : unit;
+type 'a judgment = { environment : Euf.process;
                      vars : tvar list;
                      indices: indices;
                      constr : constr;
@@ -138,18 +144,16 @@ let goal_forall_intro (judge : formula judgment) sk fk =
   let tv_subst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
   and iv_subst = compute_alpha fresh_index judge.goal.uindices judge.indices in
 
-  sk { judge with constr = And ( judge.constr,
-                                 ivar_subst_constr iv_subst judge.goal.uconstr
-                                 |> tvar_subst_constr tv_subst );
+  sk { judge with
+       constr = And ( judge.constr,
+                      subst_constr iv_subst tv_subst judge.goal.uconstr);
 
-                  gamma = ivar_subst_fact iv_subst judge.goal.ufact
-                          |> tvar_subst_fact tv_subst
-                          |> add_fact judge.gamma;
+       gamma = subst_fact iv_subst tv_subst judge.goal.ufact
+               |> add_fact judge.gamma;
 
-                  goal = List.map (fun goal ->
-                      ivar_subst_postcond iv_subst goal
-                      |> tvar_subst_postcond tv_subst
-                    ) judge.goal.postcond }
+       goal = List.map (fun goal ->
+           subst_postcond iv_subst tv_subst goal
+         ) judge.goal.postcond }
     fk
 
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
@@ -161,20 +165,19 @@ let goal_forall_intro (judge : formula judgment) sk fk =
     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
     variables. *)
 let goal_exists_intro (judge : postcond judgment) sk fk ?force:(f=false) vnu inu =
-  let pc_constr = tvar_subst_constr vnu judge.constr
-               |> ivar_subst_constr inu in
+  let pc_constr = subst_constr inu vnu judge.constr in
 
   if Constr.is_sat (Impl (judge.constr,pc_constr)) then
-    sk { judge with goal = tvar_subst_postcond vnu judge.goal
-                           |> ivar_subst_postcond inu }
+    sk { judge with goal = subst_postcond inu vnu judge.goal }
       fk
   else if f then
-    sk { judge with goal = tvar_subst_postcond vnu judge.goal
-                           |> ivar_subst_postcond inu;
+    sk { judge with goal = subst_postcond inu vnu judge.goal;
                     constr = And (judge.constr, Not pc_constr) }
       fk
   else fk ()
 
+let goal_intro (judge : fact judgment) sk fk =
+  sk (add_fact judge.gamma judge.goal) fk
 
 let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | False -> fk ()
@@ -222,7 +225,11 @@ let rec prove_all (judges : 'a judgment list) sk sk_end fk = match judges with
     sk j fk;
     prove_all judges sk sk_end fk
 
-(* Utils *)
+
+(* TODO: add a new block equalities *)
+let add_block _ = assert false
+
+(** EUF Axiom *)
 
 (** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
 let modulo_sym f at = match at with
@@ -230,3 +237,101 @@ let modulo_sym f at = match at with
       | Some _ as res -> res
       | None -> f (ord,t2,t1) end
   | _ -> f at
+
+let euf_param (at : atom) = match at with
+  | (Eq, Fun ((hash,_), [m; Name key]), s) ->
+    if Theory.is_hash hash then
+      Some (hash,key,m,s)
+    else None
+  | _ -> None
+
+let mk_or_cnstr l = match l with
+  | [] -> raise @@ Failure "empty list"
+  | [a] -> a
+  | a :: l' ->
+    let rec mk_c acc = function
+      | [] -> acc
+      | x :: l -> mk_c (Or (x,acc)) l in
+
+    mk_c a l'
+
+let mk_and_cnstr l = match l with
+  | [] -> raise @@ Failure "empty list"
+  | [a] -> a
+  | a :: l' ->
+    let rec mk_c acc = function
+      | [] -> acc
+      | x :: l -> mk_c (And (x,acc)) l in
+
+    mk_c a l'
+
+
+let euf_apply_case judge (_, (_, key_is), m, s) case =
+  let open Euf in
+  (* We create fresh indices to rename in the block *)
+  let inu = List.map (fun i -> (i, fresh_index ())) case.block.binded_indices in
+  (* We create a fresh timestamp variable rename in the block. *)
+  let fresh_ts = fresh_tvar () in
+  let vnu = [case.block.ts, fresh_ts] in
+
+  (* We create the block hashed message. *)
+  let blk_m = subst_term inu vnu case.message in
+  (* We create the term equality *)
+  let eq = (Eq, blk_m, m) in
+
+  (* Now, we need to add the timestamp constraints. *)
+
+  (* The block action name and the block timestamp variable are equal. *)
+  let blk_ts = TName (case.block.action, List.map snd inu) in
+  let ts_eq = Atom (Pts (Eq, TVar fresh_ts, blk_ts)) in
+
+  (* The block occured before the test H(m,k) = s. *)
+  (* TODO: this is brutal, because we are using a Or, and are not simplifying
+     the list of timestampts by keeping only the maximal elements. *)
+  let le_cnstr =
+    List.map (fun ts ->
+        Atom (Pts (Leq, blk_ts, ts))
+      ) (term_ts s @ term_ts m)
+    |> mk_or_cnstr in
+
+  (* The key indices in the bock and when m was hashed are the same. *)
+  let eq_cnstr =
+    List.map2 (fun i i' ->
+        Atom (Pind (Eq, i, i'))
+      ) key_is case.key_indices
+    |> mk_and_cnstr in
+
+  let constr = And (ts_eq, And (eq_cnstr, le_cnstr)) in
+
+  (eq, constr)
+
+
+let euf_apply_facts judge at = match modulo_sym euf_param at with
+  | None -> raise @@ Failure "bad euf application"
+  | Some (hash_fn, (key_n, key_is), m, s) ->
+    let rule = Euf.mk_rule judge.environment hash_fn key_n in
+
+    assert false
+
+
+  (* let block = subst_block inu vnu case.block in *)
+
+let euf_apply (judge : 'a judgment) sk fk select =
+  let at, ats = select judge.gamma in
+
+  let new_ats = assert false in
+
+  let g =
+    add_atoms
+      { judge.gamma with atoms = (set_euf true at) :: ats }
+      new_ats in
+
+  sk { judge with gamma = g } fk
+
+
+(* let () =
+ *   Checks.add_suite "Logic" [
+ *     "Empty", `Quick,
+ *     begin fun () -> ()
+ *     end
+ *   ] *)
