@@ -213,7 +213,10 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
 (** Atoms *)
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
-type atom = ord * term * term
+
+type 'a _atom = ord * 'a * 'a
+
+type atom = term _atom
 
 type fact = atom bformula
 
@@ -255,8 +258,8 @@ let add_xeq od xeq (eqs,leqs,neqs) = match od with
 (** Constraints:
     - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
 type tatom =
-  | Pts of ord * timestamp * timestamp
-  | Pind of ord * index * index
+  | Pts of timestamp _atom
+  | Pind of index _atom
 
 type constr = tatom bformula
 

@@ -7,6 +7,10 @@ module List : sig
 
   val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
 
+  (** [merge_uniq cmp l1 l2] behaves like [List.merge cmp l1 l2], except that
+      it removes duplicates, w.r.t. [cmp], between [l1] and [l2].
+      Duplicates already in [l1] or [l2] may remains. *)
+  val merge_uniq : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
 
   (** [split_pred f l] split [l] into the list of elements where [f] holds and
       the list of elements where [f] does not hold, while respecting the
@@ -56,3 +60,7 @@ val fpt : ('a -> 'a) -> 'a -> 'a
 val opt_get : 'a option -> 'a
 val some : 'a -> 'a option
 val opt_map : 'a option -> ('a -> 'b option) -> 'b option
+
+(** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
+    assuming [f_eq] is an equivalence relation. *)
+val classes : ('a -> 'a -> bool) -> 'a list -> 'a list list

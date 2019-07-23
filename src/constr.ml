@@ -205,8 +205,8 @@ let rec unif uf eqs = match eqs with
       let () = no_mgu rx ry in
       let rx,ry = swap rx ry in
 
-      (* Union always uses [ry]'s representent, in that case [ry] itself, as
-         representent of the union of [rx] and [ry]'s classes. *)
+      (* Union always uses [ry]'s representant, in that case [ry] itself, as
+         representant of the union of [rx] and [ry]'s classes. *)
       let uf = Uuf.union uf rx ry in
 
       let eqs = match rx.cnt, ry.cnt with
@@ -314,14 +314,14 @@ let mgu_eqs (l : tatom list) =
 
 module UtG = Persistent.Digraph.Concrete(struct
     type t = ut
-    let compare t t' = Pervasives.compare t.hash t'.hash
+    let compare t t' = ut_compare t t'
     let equal t t' = t.hash = t'.hash
     let hash t = t.hash
   end)
 
 module Scc = Components.Make(UtG)
 
-(** Build the inequality graph. There is a vertex from S to S' if there exits
+(** Build the inequality graph. There is a edge from S to S' if there exits
     u in S and v in S' such that u <= v, or if u = P^{k+1}(t) and v = P^k(t).
     Remark: we use [mgu uf u] as a representant for the class of u *)
 let build_graph (uf : Uuf.t) leqs =
@@ -508,17 +508,18 @@ let neq_sat uf g neqs =
 let get_basics uf elems =
   List.map (fun x -> mgu uf x |> snd) elems
   |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
-  |> List.sort_uniq Pervasives.compare
+  |> List.sort_uniq ut_compare
 
 
-(** Type of a satisfiable and normalized instance. The graph represents the
-    inequality graph of the instance, and must be transitive. *)
-type norm_instance = { inst : constr_instance;
-                       tr_graph : UtG.t }
+(** Type of a model, which is a satisfiable and normalized instance, and the
+    graph representing the inequalities of the instance (which is always
+    transitive). *)
+type model = { inst : constr_instance;
+               tr_graph : UtG.t }
 
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance] *)
-let rec split instance : norm_instance list =
+let rec split instance : model list =
   try begin
     let uf = unify instance.uf instance.eqs instance.elems in
     let uf,g = leq_unify uf instance.leqs instance.elems in
@@ -558,16 +559,18 @@ let rec split instance : norm_instance list =
     log_constr (fun () -> Fmt.epr "@[<v 2>No_mgu:@;@]@.");
     []
 
-type models = norm_instance list
+(** The minimal models a of constraint.
+    Here, minimanility means inclusion w.r.t. the predicates. *)
+type models = model list
 
-(** [models_conjunct l] returns the list of "minimal models" of the conjunct.
+(** [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
 let models_conjunct (l : tatom list) : models =
   let instance = mk_instance l in
 
   split instance
 
-(** [models l] returns the list of "minimal models" of a constraint. *)
+(** [models l] returns the list of minimal models of a constraint. *)
 let models constr =
   constr_dnf constr
   |> List.map models_conjunct
@@ -576,6 +579,78 @@ let models constr =
 let m_is_sat models = models <> []
 
 let is_sat constr = m_is_sat @@ models constr
+
+(** Only Eq, Neq and Leq. *)
+let ts_query (model : model) (ord, ts, ts') : bool =
+  let u,v = mgu model.inst.uf (uts ts) |> snd,
+            mgu model.inst.uf (uts ts') |> snd in
+  match ord with
+  | Eq -> ut_equal u v
+  | Leq -> UtG.mem_edge model.tr_graph u v
+  | Neq ->
+    (* In that case, we are very unprecise, as we only check whether
+       the inequality already appeared, modulo known equalities. *)
+    List.exists (fun (a,b) ->
+        let na, nb = mgu model.inst.uf a |> snd,
+                     mgu model.inst.uf b |> snd in
+        ((u = na) && (v = nb))
+        || ((v = na) && (u = nb))
+      ) model.inst.neqs
+  | _ -> assert false
+
+(** Only Eq and Neq. *)
+let ind_query (model : model) (ord, i, i') : bool =
+  let u,v = mgu model.inst.uf (uvari i) |> snd,
+            mgu model.inst.uf (uvari i') |> snd in
+  match ord with
+  | Eq -> ut_equal u v
+  | Leq -> UtG.mem_edge model.tr_graph u v
+  | _ -> assert false
+
+let _query (model : model) = function
+  | Pts (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
+  | Pind (o,a,b) -> List.for_all (ind_query model) (norm_xatom (o,a,b))
+
+(** [query models at] returns [true] if the conjunction of the atoms in [ats]
+    is always true in [models].
+    This is an under-approximation (i.e. correct but not complete).
+    Because we under-approximate, we are very unprecise on dis-equalities
+    (i.e. atoms of the form [(Neq,_,_)]). *)
+let query (models : models) ats =
+  List.for_all (fun model -> List.for_all (_query model) ats) models
+
+
+(** [max_elems_model model elems] returns the maximal elements of [elems]
+    in [model], *with* redundancy modulo [model]'s equality relation. *)
+let max_elems_model (model : model) elems =
+  (* We normalize to obtain the representant of each timestamp. *)
+  let l = List.map (fun ts -> ts, mgu model.inst.uf (uts ts) |> snd) elems in
+  (* |> List.sort_uniq (fun (_,a) (_,b) = ut_compare a b) sp_cmp *)
+
+  (* We keep elements that are maximal in [model] *)
+  List.filter (fun (ts,u) ->
+      List.for_all (fun (ts',u') ->
+          ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
+        ) l ) l
+  |> List.map fst
+  |> List.sort_uniq Pervasives.compare
+
+(* (\** [maximal_elems models elems] computes a set of elements which contains
+ *     the maximal elements of [elems] in every model in [models].
+ *     This can only be over-approximated, and our result may not be the best.
+ *     This function may not be deterministic. *\)
+ * let maximal_elems (models : models) (elems : timestamp list) =
+ *   (\* Invariant: [maxs_acc] is sorted and without duplicates. *\)
+ *   let maxs = List.fold_left (fun maxs_acc m ->
+ *       let m_maxs = max_elems_model m elems in
+ *       List.merge_uniq Pervasives.compare maxs_acc m_maxs
+ *     ) [] models in
+ *
+ *   Utils.classes (fun ts ts' -> query models [Eq,ts,ts'])
+ *   |> List.map fst *)
+
+  (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
+     and are equal in every model of [models] *)
 
 
 (****************)

@@ -119,7 +119,10 @@ val pp_bformula :
 (** Atomic Formulas *)
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
-type atom = ord * term * term
+
+type 'a _atom = ord * 'a * 'a
+
+type atom = term _atom
 
 type fact = atom bformula
 
@@ -130,7 +133,7 @@ val not_xpred : atom -> atom
 val simpl_fact : fact -> fact
 
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
-val norm_xatom : atom -> atom list
+val norm_xatom : 'a _atom -> 'a _atom list
 
 val add_xeq : ord -> 'a -> 'a list * 'a list * 'a list -> 'a list * 'a list * 'a list
 
@@ -139,8 +142,8 @@ val pp_ord : Format.formatter -> ord -> unit
 (** Constraints:
     - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
 type tatom =
-  | Pts of ord * timestamp * timestamp
-  | Pind of ord * index * index
+  | Pts of timestamp _atom
+  | Pind of index _atom
 
 type constr = tatom bformula
 

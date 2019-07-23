@@ -9,6 +9,20 @@ module List = struct
       let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
       ini 0
 
+  (** [merge_uniq cmp l1 l2] behaves like [List.merge cmp l1 l2], except that
+      it removes duplicates, w.r.t. [cmp], between [l1] and [l2].
+      Duplicates already in [l1] or [l2] may remains. *)
+  let rec merge_uniq cmp l1 l2 =
+    match l1, l2 with
+    | [], l2 -> l2
+    | l1, [] -> l1
+    | h1 :: t1, h2 :: t2 ->
+      let c = cmp h1 h2 in
+      if c = 0 then h1 :: merge cmp t1 t2
+      else if c < 0
+      then h1 :: merge cmp t1 l2
+      else h2 :: merge cmp l1 t2
+
   (** [split_pred f l] split [l] into the list of elements where [f] holds and
       the list of elements where [f] does not hold, while respecting the
       ordering in [l]. *)
@@ -23,6 +37,7 @@ module List = struct
       [] -> ([], [], [])
     | (x,y,z)::l ->
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
+
 
 end
 
@@ -198,3 +213,21 @@ let some x = Some x
 let opt_map a f = match a with
   | None -> None
   | Some x -> f x
+
+
+(** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
+    assuming [f_eq] is an equivalence relation. *)
+let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
+  let rec get_cl cl rem x = function
+    | [] -> cl,rem
+    | y :: l ->
+      if f_eq x y then get_cl (y :: cl) rem x l
+      else get_cl cl (y :: rem) x l in
+
+  let rec comp cls = function
+    | [] -> cls
+    | x :: rem ->
+      let cl, rem' = get_cl [x] [] x rem in
+      comp (cl :: cls) rem' in
+
+  comp [] l
