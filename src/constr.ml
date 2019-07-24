@@ -635,22 +635,23 @@ let max_elems_model (model : model) elems =
   |> List.map fst
   |> List.sort_uniq Pervasives.compare
 
-(* (\** [maximal_elems models elems] computes a set of elements which contains
- *     the maximal elements of [elems] in every model in [models].
- *     This can only be over-approximated, and our result may not be the best.
- *     This function may not be deterministic. *\)
- * let maximal_elems (models : models) (elems : timestamp list) =
- *   (\* Invariant: [maxs_acc] is sorted and without duplicates. *\)
- *   let maxs = List.fold_left (fun maxs_acc m ->
- *       let m_maxs = max_elems_model m elems in
- *       List.merge_uniq Pervasives.compare maxs_acc m_maxs
- *     ) [] models in
- *
- *   Utils.classes (fun ts ts' -> query models [Eq,ts,ts'])
- *   |> List.map fst *)
+(** [maximal_elems models elems] computes a set of elements which contains
+    the maximal elements of [elems] in every model in [models].
+    This can only be over-approximated, and our result may not be the best.
+    This function may not be deterministic. *)
+let maximal_elems (models : models) (elems : timestamp list) =
+  (* Invariant: [maxs_acc] is sorted and without duplicates. *)
+  let maxs = List.fold_left (fun maxs_acc m ->
+      let m_maxs = max_elems_model m elems in
+      List.merge_uniq Pervasives.compare maxs_acc m_maxs
+    ) [] models in
 
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
-     and are equal in every model of [models] *)
+     and are equal in every model of [models], by picking an arbitrary
+     element in each equivalence class. *)
+  Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) maxs
+  |> List.map List.hd
+
 
 
 (****************)

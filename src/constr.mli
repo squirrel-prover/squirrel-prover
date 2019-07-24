@@ -14,3 +14,9 @@ val m_is_sat : models -> bool
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
 val query : models -> Term.tatom list -> bool
+
+(** [maximal_elems models elems] computes a set of elements which contains
+    the maximal elements of [elems] in every model in [models].
+    This can only be over-approximated, and our result may not be the best.
+    This function may not be deterministic. *)
+val maximal_elems : models -> Term.timestamp list -> Term.timestamp list
