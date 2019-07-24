@@ -47,3 +47,22 @@ val declare : id -> pkind -> process -> unit
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation. *)
 val declare_system : process -> unit
+
+(** TODO better terminology ?
+  *   Current type Action.t is really an action label from a finite
+  *   set of possibilities (~ locations in process AST).
+  *   Current type Action.descr represents concrete actions, obtained
+  *   by instantiating blocks with arbitrary indices. *)
+type action
+type descr = {
+  action : action ;
+  indices : Term.indices ;
+  condition : Term.fact ;
+  updates : (Term.state * Term.term) list ;
+  output : Term.term
+}
+val pp_action : Format.formatter -> action -> unit
+val timestamp_of_descr : descr -> Term.timestamp
+
+(** Iterate over a complete set of action descriptions. *)
+val iter_csa : (descr -> unit) -> unit

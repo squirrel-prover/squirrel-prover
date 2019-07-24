@@ -17,6 +17,22 @@ type term =
 
 type fact = term Term.bformula
 
+let to_index subst = function
+  | Var i -> List.assoc i subst
+  | _ -> assert false
+
+let rec convert ts subst = function
+  | Fun (f,l) -> Term.Fun (Term.mk_fname f, List.map (convert ts subst) l)
+  | Get (s,i) ->
+      let s = Term.mk_sname s in
+      let i = List.map (to_index subst) i in
+        Term.State ((s,i),ts)
+  | Name (n,i) ->
+      let i = List.map (to_index subst) i in
+      Term.Name (Term.mk_name n,i)
+  | Var x -> assert false (* TODO may be an input, let ... *)
+  | Compare (o,u,v) -> assert false (* TODO *)
+
 (** Table of symbols *)
 
 type kind = Index | Message | Boolean

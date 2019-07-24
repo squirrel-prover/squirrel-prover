@@ -40,6 +40,7 @@ val fresh_tvar : unit -> tvar
   * a list of indices. *)
 
 type name
+val mk_name : string -> name (* TODO *)
 
 type nsymb = name * indices
 
@@ -88,8 +89,9 @@ val f_succ : fsymb
   *)
 
 type sname
-
 type state = sname * indices
+
+val mk_sname : string -> sname (* TODO *)
 
 val pp_state : Format.formatter -> state -> unit
 

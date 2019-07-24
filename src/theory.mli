@@ -2,6 +2,7 @@
 
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
 
+(* TODO replace term list by string list when indices are expected ? *)
 type term =
   | Var of string
   | Name of string * term list
@@ -55,3 +56,6 @@ val is_hash : Term.fname -> bool
 
 (** Populate theory with only builtin declarations *)
 val initialize_symbols : unit -> unit
+
+(** Convert to [Term.term]. *)
+val convert : Term.timestamp -> (string*Term.index) list -> term -> Term.term

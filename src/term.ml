@@ -50,6 +50,7 @@ let rec pp_timestamp ppf = function
   * a list of indices. *)
 
 type name = Name of string
+let mk_name x = Name x
 
 let pp_name ppf = function Name s -> Fmt.pf ppf "n!%s" s
 
@@ -102,6 +103,7 @@ let f_succ = (Fname "succ", [])
   *)
 
 type sname = Sname of string
+let mk_sname x = Sname x
 
 let pp_sname ppf = function Sname s -> Fmt.pf ppf "s!%s" s
 

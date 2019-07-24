@@ -136,17 +136,19 @@ let declare id args proc =
   * branches is clear from the context. *)
 
 module Action : sig
-  type item = {
-    par_choice : int * string list ;
+
+  type 'a item = {
+    par_choice : int * 'a list ;
     sum_choice : int
   }
-  type t = item list
+  type 'a t = ('a item) list
 
-  val conflict : t -> t -> bool
+  val conflict : 'a t -> 'a t -> bool
 
-  val depends : t -> t -> bool
+  val depends : 'a t -> 'a t -> bool
 
-  val enables : t -> t -> bool
+  val enables : 'a t -> 'a t -> bool
+
 end = struct
 
   (** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
@@ -155,11 +157,11 @@ end = struct
     *
     * Then, in a process (if cond then P else Q), the sum_choice 0 will
     * denote a success of the conditional, while 1 will denote a failure. *)
-  type item = {
-    par_choice : int * string list ;
+  type 'a item = {
+    par_choice : int * 'a list ;
     sum_choice : int
   }
-  type t = item list
+  type 'a t = 'a item list
 
   (** Checks whether two actions are in conflict. *)
   let rec conflict a b = match a,b with
@@ -189,6 +191,40 @@ end = struct
 
 end
 
+type descr = {
+  action : Term.index Action.t ;
+  indices : Term.indices ;
+  condition : Term.fact ;
+  updates : (Term.state * Term.term) list ;
+  output : Term.term
+}
+
+let pp_par_choice ppf (k,indices) =
+  if indices = [] then
+    Format.fprintf ppf "%d" k
+  else
+    Format.fprintf ppf "%d[%a]" k Term.pp_indices indices
+
+let rec pp_action ppf = function
+  | [] -> Format.fprintf ppf ""
+  | {Action.par_choice;sum_choice}::l ->
+      if sum_choice = 0 then
+        Format.fprintf ppf "%a.%a"
+          pp_par_choice par_choice
+          pp_action l
+      else
+        Format.fprintf ppf "%a/%d.%a"
+          pp_par_choice par_choice
+          sum_choice
+          pp_action l
+
+let ts action indices =
+  Term.TName (Term.mk_action (Format.asprintf "%a" pp_action action), indices)
+let timestamp_of_descr {action;indices} =
+  ts action indices
+
+type action = Term.index Action.t
+
 (** A block features an input, a condition (which sums up several [Exist]
   * constructs which might have succeeded or not) and subsequent
   * updates and outputs. The condition binds variables in the updates
@@ -202,7 +238,41 @@ type block = {
 }
 
 (** Associates a block to each action *)
-let action_to_block : (Action.t, block) Hashtbl.t = Hashtbl.create 97
+let action_to_block : (string Action.t, block) Hashtbl.t =
+  Hashtbl.create 97
+
+let rec fresh_indices_subst = function
+  | [] -> [],[]
+  | {Action.par_choice=(k,is);sum_choice}::l ->
+      let is' = List.map (fun i -> i, Term.fresh_index ()) is in
+      let action,subst = fresh_indices_subst l in
+        { Action.
+          par_choice= k,List.map snd is' ;
+          sum_choice } :: action,
+        is' @ subst
+
+let fresh_instance action block =
+  (* TODO replace assertions with full support *)
+  let action,subst = fresh_indices_subst action in
+  let indices = List.map snd subst in
+  let convert = Theory.convert (ts action indices) subst in
+  let condition =
+    assert false
+    (* assert (fst block.condition = []) ;
+    snd block.condition *)
+  in
+  let updates =
+    assert false (* List.map
+      (function
+         | s,[],t -> s,t
+         | _ -> assert false)
+      block.updates *)
+  in
+  let output = convert (snd block.output) in
+    { action; indices; condition; updates; output }
+
+let iter_csa f =
+  Hashtbl.iter (fun a b -> f (fresh_instance a b)) action_to_block
 
 module Aliases = struct
 
