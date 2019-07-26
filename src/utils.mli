@@ -64,3 +64,7 @@ val opt_map : 'a option -> ('a -> 'b option) -> 'b option
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
     assuming [f_eq] is an equivalence relation. *)
 val classes : ('a -> 'a -> bool) -> 'a list -> 'a list list
+
+val ident : Format.formatter -> string -> unit
+
+val kw : Fmt.style -> string Fmt.t

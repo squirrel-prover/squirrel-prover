@@ -1,6 +1,6 @@
 (** Terms *)
 
-type ord = Eq | Neq | Leq | Geq | Lt | Gt
+type ord = Term.ord
 
 (* TODO replace term list by string list when indices are expected ? *)
 type term =
@@ -15,9 +15,13 @@ type term =
         * depending on the type of the function symbol. *)
   | Compare of ord*term*term
 
+val pp_term : Format.formatter -> term -> unit
+
 (** Facts *)
 
 type fact = term Term.bformula
+
+val pp_fact : Format.formatter -> fact -> unit
 
 (** Terms may represent indices, messages or booleans *)
 

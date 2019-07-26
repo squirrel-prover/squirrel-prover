@@ -231,3 +231,6 @@ let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
       comp (cl :: cls) rem' in
 
   comp [] l
+
+let ident ppf s = Fmt.pf ppf "%s" s
+let kw style = (Fmt.styled style ident)

@@ -38,6 +38,8 @@ type process =
         * name [q] rather than [p], which may be important to obtain
         * unique action identifiers. *)
 
+val pp_process : Format.formatter -> process -> unit
+
 (** When declaring a process, the body of the definition is type-checked,
   * process invocations are inlined, and unique name, state, and
   * action identifiers are obtained, as part of a conversion to

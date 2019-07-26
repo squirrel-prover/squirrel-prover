@@ -1,6 +1,6 @@
 (** Terms and facts *)
 
-type ord = Eq | Neq | Leq | Geq | Lt | Gt
+type ord = Term.ord
 
 type term =
   | Var of string
@@ -15,7 +15,20 @@ type term =
         * depending on the type of the function symbol. *)
   | Compare of ord*term*term
 
+let rec pp_term ppf = function
+  | Var s -> Fmt.pf ppf "%s" s
+  | Fun (f,terms) ->
+    Fmt.pf ppf "%s(@[<hov 1>%a@])" f (Fmt.list pp_term) terms
+  | Name (n,terms) ->
+    Fmt.pf ppf "@n:%s[@[<hov 1>%a@]]" n (Fmt.list pp_term) terms
+  | Get (s,terms) ->
+    Fmt.pf ppf "@get:%s[@[<hov 1>%a@]]" s (Fmt.list pp_term) terms
+  | Compare (ord,tl,tr) ->
+    Fmt.pf ppf "@[<h>%a%a%a@]" pp_term tl Term.pp_ord ord pp_term tr
+
 type fact = term Term.bformula
+
+let pp_fact = Term.pp_bformula pp_term
 
 let to_index subst = function
   | Var i -> List.assoc i subst

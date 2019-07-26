@@ -43,7 +43,7 @@ tm_list:
 (* Facts, aka booleans *)
 
 ord:
-| EQ                             { Theory.Eq }
+| EQ                             { Term.Eq }
 
 fact:
 | term ord term                  { Term.Atom (Theory.Compare ($2,$1,$3)) }

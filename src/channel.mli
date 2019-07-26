@@ -6,6 +6,8 @@
 type channel
 type t = channel
 
+val pp_channel : Format.formatter -> channel -> unit
+
 (** [declare s] declares a channel named [s].
   * @raise Theory.Multiple_declaration if the channel is already declared. *)
 val declare : string -> unit

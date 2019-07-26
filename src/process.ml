@@ -42,6 +42,86 @@ type process =
   | Exists of string list * fact * process * process
   | Apply of id * term list * id
 
+
+let rec pp_process ppf process =
+  let open Fmt in
+  let open Utils in
+  match process with
+  | Null ->  (styled `Blue (styled `Bold ident)) ppf "Null"
+
+  | Apply (s,l,_) ->
+    (* TODO: what is the third argument for? *)
+    pf ppf "@[<hov>%a@ %a@]"
+      (styled `Bold (styled `Blue ident)) s
+      (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
+
+  | Repl (s,p) ->
+    pf ppf "@[<hov 2>%s@,@[%a@]@]"
+      s pp_process p
+
+  | Set (s,indices,t,p) ->
+    pf ppf "@[<hov 2>%s[%a] %a@ %a.@;@[%a@]@]"
+      s
+      (list Theory.pp_term) indices
+      (kw `Bold) ":="
+      Theory.pp_term t
+      pp_process p
+
+  | New (s,p) ->
+    pf ppf "@[<hov>%a %a.@,@[%a@]@]"
+      (kw `Red) "new"
+      (kw `Magenta) s
+      pp_process p
+
+  | In (c, s, p) ->
+    pf ppf "@[<hov>%a(%a,@,%a).@,%a@]"
+      (kw `Bold) "in"
+      Channel.pp_channel c
+      (styled `Magenta (styled `Bold ident)) s
+      pp_process p
+
+  | Out (c, t, p) ->
+    pf ppf "@[<hov>%a(%a,@,%a).@,%a@]"
+      (kw `Bold) "out"
+      Channel.pp_channel c
+      Theory.pp_term t
+      pp_process p
+
+  | Parallel (p1,p2) ->
+    pf ppf "@[<hv>@[(%a)@]@ | @[(%a)@]@]"
+      pp_process p1
+      pp_process p2
+
+  | Let (s,t,p) ->
+    pf ppf "@[<v>@[<2>%a %a =@ @[%a@] %a@]@ %a@]"
+      (kw `Bold) "let"
+      (styled `Magenta (styled `Bold ident)) s
+      Theory.pp_term t
+      (styled `Bold ident) "in"
+      pp_process p
+
+  | Exists (ss,f,p1,p2) ->
+    if p2 <> Null then
+      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a@ %a@;<1 2>%a@]"
+        (styled `Red (styled `Underline ident)) "find"
+        (list Fmt.string) ss
+        (styled `Red (styled `Underline ident)) "such that"
+        Theory.pp_fact f
+        (styled `Red (styled `Underline ident)) "in"
+        pp_process p1
+        (styled `Red (styled `Underline ident)) "else"
+        pp_process p2
+    else
+      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a@]"
+        (styled `Red (styled `Underline ident)) "find"
+        (list Fmt.string) ss
+        (styled `Red (styled `Underline ident)) "such that"
+        Theory.pp_fact f
+        (styled `Red (styled `Underline ident)) "in"
+        pp_process p1
+
+
+
 (** Table of declared (bi)processes with their types *)
 let pdecls : (string,pkind*process) Hashtbl.t = Hashtbl.create 97
 
