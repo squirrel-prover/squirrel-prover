@@ -148,13 +148,13 @@ let rec check_proc env = function
   | Repl (x,p) -> check_proc ((x,Theory.Index)::env) p
   | Exists (vars,test,p,q) ->
       check_proc env q ;
-      Theory.check_fact env test ;
       let env =
         List.rev_append
           (List.map (fun x -> x,Theory.Index) vars)
           env
       in
-        check_proc env p
+      Theory.check_fact env test ;
+      check_proc env pm
   | Apply (id,ts,_) ->
       begin try
         let kind,_ = pkind_of_pname id in
@@ -288,7 +288,7 @@ module Aliases = struct
 
   let decl_action_name name action pos =
     if Hashtbl.mem name_to_action name then
-      failwith "multiple declarations"
+      failwith (Fmt.strf "multiple declarations of %s" name)
     else begin
       Hashtbl.add name_to_action name (action,pos) ;
       Hashtbl.add action_to_name action (pos,name)
@@ -326,9 +326,9 @@ let rec parse_proc action proc : unit =
         let vars = i::vars in
           p_in ~pos ~vars p
     | Apply (id,args,id') ->
-        Aliases.decl_action_name id' action pos ;
+        (* Aliases.decl_action_name id' action pos ; *)
         p_in ~pos ~vars (get_apply id args)
-    | _ -> failwith "unsupported"
+    | _ -> failwith "p_in: unsupported"
 
   (** Similar to [p_in] but with an [input] and [par_choice] already known,
     * a conjonction of [facts] in construction, a [pos] and [vars] indicating
@@ -366,7 +366,7 @@ let rec parse_proc action proc : unit =
         Hashtbl.add action_to_block
           (action |> List.rev |> Action.mk_shape) block ;
         parse_proc action p
-    | _ -> failwith "unsupported"
+    | _ -> failwith "p_update: unsupported"
 
   in
 
