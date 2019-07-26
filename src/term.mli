@@ -25,6 +25,9 @@ val fresh_tvar : unit -> tvar
   * a list of indices. *)
 
 type name
+
+val pp_name : Format.formatter -> name -> unit
+
 val mk_name : string -> name (* TODO *)
 
 type nsymb = name * indices
@@ -39,6 +42,8 @@ val pp_nsymb : Format.formatter -> nsymb -> unit
   *)
 
 type fname = private Fname of string
+
+val pp_fname : Format.formatter -> fname -> unit
 
 type fsymb = fname * indices
 

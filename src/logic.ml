@@ -369,12 +369,11 @@ let euf_apply_case theta (_, (_, key_is), m, s) case =
   (* We create fresh indices to rename in the block *)
   let inu = List.map (fun i -> (i, fresh_index ())) case.blk_descr.indices in
   (* We create a fresh timestamp variable rename in the block. *)
-  (* let fresh_ts = fresh_tvar () in
-   * let vnu = [case.blk_descr.ts, fresh_ts] in *)
   let vnu = [] in
 
   (* We create the block hashed message. *)
   let blk_m = subst_term inu vnu case.message in
+
   (* We create the term equality *)
   let eq = Atom (Eq, blk_m, m) in
   let new_f = And (eq, subst_fact inu vnu case.blk_descr.condition) in
@@ -382,8 +381,7 @@ let euf_apply_case theta (_, (_, key_is), m, s) case =
   (* Now, we need to add the timestamp constraints. *)
 
   (* The block action name and the block timestamp variable are equal. *)
-  let blk_ts = assert false (* TName (case.blk_descr.action, List.map snd inu) *) in
-  (* let ts_eq = Atom (Pts (Eq, TVar fresh_ts, blk_ts)) in *)
+  let blk_ts = TName case.blk_descr.action in
 
   (* The block occured before the test H(m,k) = s. *)
   let le_cnstr =

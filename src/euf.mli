@@ -26,6 +26,8 @@ type euf_case = { key_indices : indices;
                   message : Term.term;
                   blk_descr : descr }
 
+val pp_euf_case : Format.formatter -> euf_case -> unit
+
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.
     - [key] stores the key considered in this rule.
@@ -34,6 +36,8 @@ type euf_case = { key_indices : indices;
 type euf_rule = { hash : Term.fname;
                   key : Term.name;
                   cases : euf_case list }
+
+val pp_euf_rule : Format.formatter -> euf_rule -> unit
 
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc

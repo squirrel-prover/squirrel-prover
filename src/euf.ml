@@ -1,23 +1,10 @@
 open Term
 open Process
 
-(* (\** This is [Process.block], but using the types of module [Term] instead of
- *     module [Theory].
- *     - binded indices appear in the [binded_indices] field.
- *     - [ts] contains the variable representing the block timestamp. *\)
- * type block = {
- *   ts : Term.tvar;
- *   action : Term.action;
- *   binded_indices : Term.indices;
- *   condition : Term.fact;
- *   updates : (Term.state * Term.term) list;
- *   output : Term.term } *)
-
 type process = descr list
 
 let subst_descr inu tnu blk =
-  { (* ts = app_subst tnu blk.ts; *)
-    action = blk.action;
+  { action = blk.action;
     indices = List.map (Action.app_subst inu) blk.indices;
     condition = subst_fact inu tnu blk.condition;
     updates = List.map (fun (s,t) -> ivar_subst_state inu s,
@@ -91,6 +78,15 @@ type euf_case = { key_indices : Action.indices;
                   message : Term.term;
                   blk_descr : descr }
 
+let pp_euf_case ppf case =
+  Fmt.pf ppf "@[<v>*action:@;  @[<hov>%a@]\
+              *key indices:@;  @[<hov>%a@]\
+              *message:@;  @[<hov>%a@]@]"
+    Action.pp_action case.blk_descr.action
+    Action.pp_indices case.key_indices
+    Term.pp_term case.message
+
+
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.
     - [key] stores the key considered in this rule.
@@ -99,6 +95,14 @@ type euf_case = { key_indices : Action.indices;
 type euf_rule = { hash : fname;
                   key : name;
                   cases : euf_case list }
+
+let pp_euf_rule ppf rule =
+  Fmt.pf ppf "@[<v>*hash:@;  @[<hov>%a@]\
+              *key:@;  @[<hov>%a@]\
+              *cases:@;<1;2>@[<v>%a@]@]"
+    Term.pp_fname rule.hash
+    Term.pp_name rule.key
+    (Fmt.list pp_euf_case) rule.cases
 
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
