@@ -100,6 +100,14 @@ type term =
   | Output of timestamp
   | Input of timestamp
 
+let rec pp_term ppf = function
+  | Fun (f,terms) -> Fmt.pf ppf "%a(@[<hov 1>%a@])"
+                       pp_fsymb f (Fmt.list pp_term) terms
+  | Name n -> pp_nsymb ppf n
+  | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
+  | Output ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
+  | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts
+
 type t = term
 
 (** Boolean formulas *)
@@ -218,6 +226,11 @@ let not_ord o = match o with
   | Geq -> Lt
   | Lt -> Geq
   | Gt -> Leq
+
+let pp_atom ppf (o,tl,tr) =
+    Fmt.pf ppf "@[<h>%a%a%a@]" pp_term tl pp_ord o pp_term tr
+
+let pp_fact = pp_bformula pp_atom
 
 (** Negate the atom *)
 let not_xpred (o,l,r) = (not_ord o, l, r)

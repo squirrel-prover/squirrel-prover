@@ -90,6 +90,8 @@ type term =
 
 type t = term
 
+val pp_term : Format.formatter -> term -> unit
+
 (** Boolean formulas *)
 type 'a bformula =
   | And of 'a bformula * 'a bformula
@@ -112,6 +114,8 @@ type 'a _atom = ord * 'a * 'a
 type atom = term _atom
 
 type fact = atom bformula
+
+val pp_fact : Format.formatter -> fact -> unit
 
 (** Negate the atom *)
 val not_xpred : atom -> atom

@@ -146,6 +146,17 @@ type descr = {
   output : Term.term
 }
 
+let pp_descr ppf descr =
+  Fmt.pf ppf "@[<v>*name:@;  @[<hov>%a@]\
+              *indices:@;  @[<hov>%a@]\
+              *condition:@;  @[<hov>%a@]\
+              *updates:@;  @[<hov>%a@]\
+              *output:@;  @[<hov>%a@]@]"
+    pp_action descr.action
+    pp_indices descr.indices
+    Term.pp_fact descr.condition
+    (Fmt.list (Fmt.pair Term.pp_state Term.pp_term)) descr.updates
+    Term.pp_term descr.output
 
 (** A block features an input, a condition (which sums up several [Exist]
   * constructs which might have succeeded or not) and subsequent
@@ -266,15 +277,15 @@ let rec parse_proc action proc : unit =
     * at which point the completed action and block are registered. *)
   and p_update ~par_choice ~sum_choice ~input ~condition ~updates = function
     | Set (s,l,t,p) ->
-        let updates = (s,l,t)::updates in
-          p_update ~par_choice ~sum_choice ~input ~condition ~updates p
+      let updates = (s,l,t)::updates in
+      p_update ~par_choice ~sum_choice ~input ~condition ~updates p
     | Out (c,t,p) ->
         let block = { input ; condition ; updates ; output = c,t } in
         let item = { par_choice ; sum_choice } in
         let action = item::action in
         Hashtbl.add action_to_block
           (action |> List.rev |> Action.mk_shape) block ;
-          parse_proc action p
+        parse_proc action p
     | _ -> failwith "unsupported"
 
   in

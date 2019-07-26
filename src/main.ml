@@ -103,4 +103,40 @@ let () =
     "LAK model", `Quick, begin fun () ->
       parse_theory ~test "examples/lak.mbc"
     end ;
-  ]
+  ];;
+
+
+(* let pp_proc ppf =
+ *   let cpt = ref 0 in
+ *   Fmt.pf ppf "@[<v>";
+ *   Process.iter_csa (fun descr ->
+ *       Fmt.pf ppf "%d:@;@[%a@]@;done@;"
+ *         !cpt Process.pp_descr descr);
+ *   incr cpt;
+ *   Fmt.pf ppf "@]%!@.";;
+ *
+ * Fmt.pf Fmt.stdout "Testing null.mbc\n@.";;
+ * parse_theory "examples/null.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Fmt.pf Fmt.stdout "Testing process.mbc\n@.";;
+ * parse_theory "examples/process.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Fmt.pf Fmt.stdout "Testing name.mbc\n@.";;
+ * parse_theory "examples/name.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Fmt.pf Fmt.stdout "Testing pairs.mbc\n@.";;
+ * parse_theory "examples/pairs.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Fmt.pf Fmt.stdout "Testing theory.mbc\n@.";;
+ * parse_theory "examples/theory.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Fmt.pf Fmt.stdout "Testing lak.mbc\n@.";;
+ * parse_theory "examples/lak.mbc";;
+ * pp_proc Fmt.stdout;;
+ *
+ * Channel.reset () *)

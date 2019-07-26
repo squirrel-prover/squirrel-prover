@@ -62,5 +62,7 @@ type descr = {
   output : Term.term
 }
 
+val pp_descr : Format.formatter -> descr -> unit
+
 (** Iterate over a complete set of action descriptions. *)
 val iter_csa : (descr -> unit) -> unit
