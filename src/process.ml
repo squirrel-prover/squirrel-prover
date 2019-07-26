@@ -154,7 +154,7 @@ let rec check_proc env = function
           env
       in
       Theory.check_fact env test ;
-      check_proc env pm
+      check_proc env p
   | Apply (id,ts,_) ->
       begin try
         let kind,_ = pkind_of_pname id in
