@@ -1,4 +1,5 @@
 open Graph
+open Action
 open Term
 open Utils
 
@@ -24,12 +25,12 @@ module Utv : sig
   and ut_cnt = private
     | UVar of uvar
     | UPred of ut
-    | UName of action * ut list
+    | UName of action_shape * ut list
 
   val uvar : tvar -> ut
   val uvari : index -> ut
   val uts : timestamp -> ut
-  val uname : action -> ut list -> ut
+  val uname : action_shape -> ut list -> ut
   val upred : ut -> ut
 
 end = struct
@@ -41,7 +42,7 @@ end = struct
   and ut_cnt =
     | UVar of uvar
     | UPred of ut
-    | UName of action * ut list
+    | UName of action_shape * ut list
 
   module Ut = struct
     type t = ut
@@ -72,7 +73,7 @@ end = struct
   let rec uts ts = match ts with
     | TVar tv -> uvar tv
     | TPred ts -> upred (uts ts)
-    | TName (a,is) -> uname a (List.map uvari is)
+    | TName a -> uname (get_shape a) (List.map uvari (action_indices a))
 end
 
 open Utv
@@ -86,7 +87,7 @@ let rec pp_ut_cnt ppf = function
   | UPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_ut_cnt ts.cnt
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
-      pp_action a
+      pp_action_shape a
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
 
 let pp_ut ppf ut = pp_ut_cnt ppf ut.cnt
@@ -666,34 +667,35 @@ and tau4 = TVar (fresh_tvar ())
 and tau5 = TVar (fresh_tvar ())
 and i = fresh_index ()
 and i' = fresh_index ()
-and a = mk_action "a"
+and a indices = mk_action [{ par_choice = 0, List.map (fun i -> "",i) indices;
+                           sum_choice = 0 }]
 
 let pb_eq1 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
+             :: (Pts (Eq,tau, TName (a [i])))
+             :: [Pts (Eq,tau'', TName (a [i']))]
 and pb_eq2 = [Pts (Eq,tau, TPred tau)]
 and pb_eq3 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
              :: [Pts (Eq,tau'', tau)]
 and pb_eq4 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i]))]
+             :: (Pts (Eq,tau, TName (a [i])))
+             :: [Pts (Eq,tau'', TName (a [i]))]
 and pb_eq5 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a,[i'])))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: (Pts (Eq,tau'', TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
+             :: (Pts (Eq,tau', TName (a [i'])))
+             :: (Pts (Eq,tau, TName (a [i])))
+             :: (Pts (Eq,tau'', TName (a [i])))
+             :: [Pts (Eq,tau'', TName (a [i']))]
 and pb_eq6 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a,[i'])))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: (Pts (Eq,tau3, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
+             :: (Pts (Eq,tau', TName (a [i'])))
+             :: (Pts (Eq,tau, TName (a [i])))
+             :: (Pts (Eq,tau3, TName (a [i])))
+             :: [Pts (Eq,tau'', TName (a [i']))]
 and pb_eq7 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
+             :: (Pts (Eq,tau, TName (a [i])))
+             :: [Pts (Eq,tau'', TName (a [i']))]
 and pb_eq8 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
              :: [Pts (Eq,tau'', tau3)];;

@@ -135,95 +135,17 @@ let declare id args proc =
   * (e.g. <Role>.<sequence_number>) if the choices of conditional
   * branches is clear from the context. *)
 
-module Action : sig
+open Action
 
-  type 'a item = {
-    par_choice : int * 'a list ;
-    sum_choice : int
-  }
-  type 'a t = ('a item) list
-
-  val conflict : 'a t -> 'a t -> bool
-
-  val depends : 'a t -> 'a t -> bool
-
-  val enables : 'a t -> 'a t -> bool
-
-end = struct
-
-  (** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
-    * actions of C have par_choice 2, and those of B have par_choice
-    * (1,i) which will later be instantiated to (1,i_1), (1,i_2), etc.
-    *
-    * Then, in a process (if cond then P else Q), the sum_choice 0 will
-    * denote a success of the conditional, while 1 will denote a failure. *)
-  type 'a item = {
-    par_choice : int * 'a list ;
-    sum_choice : int
-  }
-  type 'a t = 'a item list
-
-  (** Checks whether two actions are in conflict. *)
-  let rec conflict a b = match a,b with
-    | hda::tla, hdb::tlb ->
-        hda.par_choice = hdb.par_choice &&
-        (hda.sum_choice <> hdb.sum_choice ||
-         conflict tla tlb)
-    | _ -> false
-
-  (** [depends a b] test if [a] must occur before [b] as far
-    * as the control-flow is concerned -- it does not (cannot)
-    * take messages into account. *)
-  let rec depends a b = match a,b with
-    | [],_ -> true
-    | hda::tla, hdb::tlb ->
-        hda = hdb &&
-        depends tla tlb
-    | _ -> false
-
-  (** [enables a b] tests whether action [a] enables [b]. *)
-  let rec enables a b = match a,b with
-    | [],[_] -> true
-    | hda::tla, hdb::tlb ->
-        hda = hdb &&
-        enables tla tlb
-    | _ -> false
-
-end
 
 type descr = {
-  action : Term.index Action.t ;
-  indices : Term.indices ;
+  action : action ;
+  indices : indices ;
   condition : Term.fact ;
   updates : (Term.state * Term.term) list ;
   output : Term.term
 }
 
-let pp_par_choice ppf (k,indices) =
-  if indices = [] then
-    Format.fprintf ppf "%d" k
-  else
-    Format.fprintf ppf "%d[%a]" k Term.pp_indices indices
-
-let rec pp_action ppf = function
-  | [] -> Format.fprintf ppf ""
-  | {Action.par_choice;sum_choice}::l ->
-      if sum_choice = 0 then
-        Format.fprintf ppf "%a.%a"
-          pp_par_choice par_choice
-          pp_action l
-      else
-        Format.fprintf ppf "%a/%d.%a"
-          pp_par_choice par_choice
-          sum_choice
-          pp_action l
-
-let ts action indices =
-  Term.TName (Term.mk_action (Format.asprintf "%a" pp_action action), indices)
-let timestamp_of_descr {action;indices} =
-  ts action indices
-
-type action = Term.index Action.t
 
 (** A block features an input, a condition (which sums up several [Exist]
   * constructs which might have succeeded or not) and subsequent
@@ -238,35 +160,27 @@ type block = {
 }
 
 (** Associates a block to each action *)
-let action_to_block : (string Action.t, block) Hashtbl.t =
+let action_to_block : (action_shape, block) Hashtbl.t =
   Hashtbl.create 97
 
-let rec fresh_indices_subst = function
-  | [] -> [],[]
-  | {Action.par_choice=(k,is);sum_choice}::l ->
-      let is' = List.map (fun i -> i, Term.fresh_index ()) is in
-      let action,subst = fresh_indices_subst l in
-        { Action.
-          par_choice= k,List.map snd is' ;
-          sum_choice } :: action,
-        is' @ subst
+let fresh_instance _ _ = assert false
 
 let fresh_instance action block =
   (* TODO replace assertions with full support *)
   let action,subst = fresh_indices_subst action in
   let indices = List.map snd subst in
-  let convert = Theory.convert (ts action indices) subst in
+  let convert = Theory.convert (Term.TName action) subst in
   let condition =
     assert false
     (* assert (fst block.condition = []) ;
     snd block.condition *)
   in
   let updates =
-    assert false (* List.map
+    List.map
       (function
-         | s,[],t -> s,t
+         | s,[],t -> (Term.mk_sname s, indices),convert t
          | _ -> assert false)
-      block.updates *)
+      block.updates
   in
   let output = convert (snd block.output) in
     { action; indices; condition; updates; output }
@@ -356,9 +270,10 @@ let rec parse_proc action proc : unit =
           p_update ~par_choice ~sum_choice ~input ~condition ~updates p
     | Out (c,t,p) ->
         let block = { input ; condition ; updates ; output = c,t } in
-        let item = { Action.par_choice ; sum_choice } in
+        let item = { par_choice ; sum_choice } in
         let action = item::action in
-          Hashtbl.add action_to_block (List.rev action) block ;
+        Hashtbl.add action_to_block
+          (action |> List.rev |> Action.mk_shape) block ;
           parse_proc action p
     | _ -> failwith "unsupported"
 

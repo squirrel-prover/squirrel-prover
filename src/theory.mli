@@ -58,4 +58,4 @@ val is_hash : Term.fname -> bool
 val initialize_symbols : unit -> unit
 
 (** Convert to [Term.term]. *)
-val convert : Term.timestamp -> (string*Term.index) list -> term -> Term.term
+val convert : Term.timestamp -> (string*Action.index) list -> term -> Term.term

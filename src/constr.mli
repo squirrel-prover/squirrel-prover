@@ -18,5 +18,5 @@ val query : models -> Term.tatom list -> bool
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].
     This can only be over-approximated, and our result may not be the best.
-    This function may not be deterministic. *)
+    This function may be non-deterministic. *)
 val maximal_elems : models -> Term.timestamp list -> Term.timestamp list

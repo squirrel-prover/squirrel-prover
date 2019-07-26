@@ -1,34 +1,35 @@
 open Term
+open Process
 
-(** This is [Process.block], but using the types of module [Term] instead of
-    module [Theory].
-    - binded indices appear in the [binded_indices] field.
-    - [ts] contains the variable representing the block timestamp. *)
-type block = {
-  ts : Term.tvar;
-  action : Term.action;
-  binded_indices : Term.indices;
-  condition : Term.fact;
-  updates : (Term.state * Term.term) list;
-  output : Term.term }
+(* (\** This is [Process.block], but using the types of module [Term] instead of
+ *     module [Theory].
+ *     - binded indices appear in the [binded_indices] field.
+ *     - [ts] contains the variable representing the block timestamp. *\)
+ * type block = {
+ *   ts : Term.tvar;
+ *   action : Term.action;
+ *   binded_indices : Term.indices;
+ *   condition : Term.fact;
+ *   updates : (Term.state * Term.term) list;
+ *   output : Term.term } *)
 
-type process = block list
+type process = descr list
 
-let subst_block inu tnu blk =
-  { ts = app_subst tnu blk.ts;
+let subst_descr inu tnu blk =
+  { (* ts = app_subst tnu blk.ts; *)
     action = blk.action;
-    binded_indices = List.map (app_subst inu) blk.binded_indices;
+    indices = List.map (Action.app_subst inu) blk.indices;
     condition = subst_fact inu tnu blk.condition;
     updates = List.map (fun (s,t) -> ivar_subst_state inu s,
                                      subst_term inu tnu t
                        ) blk.updates;
     output = subst_term inu tnu blk.output }
 
-(* let block_ts block =
+(* let descr_ts descr =
  *   let open Euf in
  *   List.fold_left (fun acc (_,t) ->
  *       term_ts t @ acc
- *     ) (term_ts block.output) block.updates
+ *     ) (term_ts descr.output) descr.updates
  *   |> List.sort_uniq Pervasives.compare *)
 
 (** Check the key syntactic side-condition:
@@ -60,8 +61,9 @@ let euf_key_ssc proc hash_fn key_n =
 
 
 (** [hashes_of_blk blk hash_fn key_n] return the pairs of indices and messages
-    where a hash using occurs in a block. I.e. we have a pair (is,m) iff
-    hash_fn(m,key_n(is)) occurs in the block output or state updates.
+    where a hash using occurs in a block description. I.e. we have a pair
+    (is,m) iff hash_fn(m,key_n(is)) occurs in the block description output or
+    state updates.
     Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
 let hashes_of_blk blk hash_fn key_n =
   let rec h_o_term acc = function
@@ -83,10 +85,11 @@ let hashes_of_blk blk hash_fn key_n =
 (** Type of an euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices].
-    [e.block] stores the relevant block for future potential use.  *)
-type euf_case = { key_indices : Term.indices;
+    [e.blk_block] stores the relevant block description for future potential
+    use.  *)
+type euf_case = { key_indices : Action.indices;
                   message : Term.term;
-                  block : block }
+                  blk_descr : descr }
 
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.
@@ -113,6 +116,6 @@ let mk_rule proc hash_fn key_n =
                |> List.map (fun (is,m) ->
                    { key_indices = is;
                      message = m;
-                     block = blk })
+                     blk_descr = blk })
              ) proc
            |> List.flatten }

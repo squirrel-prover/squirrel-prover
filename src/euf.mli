@@ -1,26 +1,30 @@
-(** This is [Process.block], but using the types of module [Term] instead of
-    module [Theory].
-    - binded indices appear in the [binded_indices] field.
-    - [ts] contains the variable representing the block timestamp. *)
-type block = {
-  ts : Term.tvar;
-  action : Term.action;
-  binded_indices : Term.indices;
-  condition : Term.fact;
-  updates : (Term.state * Term.term) list;
-  output : Term.term }
+open Action
+open Process
 
-type process = block list
+(* (\** This is [Process.block], but using the types of module [Term] instead of
+ *     module [Theory].
+ *     - binded indices appear in the [binded_indices] field.
+ *     - [ts] contains the variable representing the block timestamp. *\)
+ * type block = {
+ *   ts : Term.tvar;
+ *   action : Term.action;
+ *   binded_indices : Term.indices;
+ *   condition : Term.fact;
+ *   updates : (Term.state * Term.term) list;
+ *   output : Term.term } *)
 
-val subst_block : Term.index Term.subst -> Term.tvar Term.subst -> block -> block
+type process = descr list
+
+val subst_descr : index subst -> Term.tvar subst -> descr -> descr
 
 (** Type of an euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices].
-    [e.block] stores the relevant block for future potential use.  *)
-type euf_case = { key_indices : Term.indices;
+    [e.blk_descr] stores the relevant block description for future potential
+    use.  *)
+type euf_case = { key_indices : indices;
                   message : Term.term;
-                  block : block }
+                  blk_descr : descr }
 
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.

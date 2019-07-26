@@ -1,3 +1,4 @@
+open Action
 (** Terms and formulas for the Meta-BC logic.
   *
   * This modules describes the syntax of the logic. It does not
@@ -6,29 +7,13 @@
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
-(** Indices are used to generate arbitrary families of terms *)
-type index
-type indices = index list
-
-val pp_index : Format.formatter -> index -> unit
-val pp_indices : Format.formatter -> indices -> unit
-
-val fresh_index : unit -> index
-
-(** Finite set of action identifiers *)
-type action
-
-val mk_action : string -> action
-
-val pp_action : Format.formatter -> action -> unit
-
 (** Timestamps represent positions in a trace *)
 
 type tvar
 type timestamp =
   | TVar of tvar
   | TPred of timestamp
-  | TName of action * indices
+  | TName of action
 
 val pp_tvar : Format.formatter -> tvar -> unit
 val pp_timestamp : Format.formatter -> timestamp -> unit
@@ -178,10 +163,6 @@ and postcond = {
   econstr : constr;
   efact : fact
 }
-
-type 'a subst = ('a * 'a) list
-
-val app_subst : ('a * 'a) list -> 'a -> 'a
 
 val ivar_subst_state : index subst -> state -> state
 

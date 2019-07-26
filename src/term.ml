@@ -1,3 +1,4 @@
+open Action
 (** Terms and formulas for the Meta-BC logic.
   *
   * This modules describes the syntax of the logic. It does not
@@ -5,26 +6,6 @@
   * are to be used in automated reasoning, nor does it provide
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
-
-(** Indices are used to generate arbitrary families of terms *)
-type index = Index of int
-type indices = index list
-
-let pp_index ppf = function Index i -> Fmt.pf ppf "i%d" i
-
-let pp_indices ppf l =
-  Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_index) l
-
-let idx_cpt = ref 0
-let fresh_index () = incr idx_cpt; Index (!idx_cpt - 1)
-
-(** Finite set of action identifiers *)
-type action = Action of string
-
-let mk_action s = Action s
-
-let pp_action ppf = function Action s -> Fmt.pf ppf "%s" s
 
 (** Timestamps represent positions in a trace *)
 
@@ -38,12 +19,12 @@ let fresh_tvar () = incr tvar_cpt; Tvar_i (!tvar_cpt - 1)
 type timestamp =
   | TVar of tvar
   | TPred of timestamp
-  | TName of action * indices
+  | TName of action
 
 let rec pp_timestamp ppf = function
   | TVar tv -> pp_tvar ppf tv
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
-  | TName (a,is) -> Fmt.pf ppf "@[%a[%a]@]" pp_action a pp_indices is
+  | TName a -> Action.pp_action ppf a
 
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
@@ -315,10 +296,6 @@ and postcond = {
   efact : fact
 }
 
-type 'a subst = ('a * 'a) list
-
-let app_subst subst x = try List.assoc x subst with Not_found -> x
-
 let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
 
 let ivar_subst_state isubst (s : state) = ivar_subst_symb isubst s
@@ -331,7 +308,7 @@ let rec tvar_subst_ts tsubst ts = match ts with
 let rec ivar_subst_ts isubst = function
   | TVar _ as ts -> ts
   | TPred ts' -> TPred (ivar_subst_ts isubst ts')
-  | TName (n,is) -> TName (n,  List.map (app_subst isubst) is)
+  | TName a -> TName (ivar_subst_action isubst a)
 
 let rec tvar_subst_term tsubst t = match t with
   | Fun (fs, lt) -> Fun (fs, List.map (tvar_subst_term tsubst) lt)
@@ -421,7 +398,7 @@ let svars (tvs,ivs) (_, is) =
 
 let rec tsvars (tvs,ivs) = function
   | TVar tv -> (tv :: tvs, ivs)
-  | TName (_, is) -> (tvs, is @ ivs)
+  | TName a -> (tvs, action_indices a @ ivs)
   | TPred ts -> tsvars (tvs,ivs) ts
 
 let rec tvars acc = function

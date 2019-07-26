@@ -53,16 +53,14 @@ val declare_system : process -> unit
   *   set of possibilities (~ locations in process AST).
   *   Current type Action.descr represents concrete actions, obtained
   *   by instantiating blocks with arbitrary indices. *)
-type action
+
 type descr = {
-  action : action ;
-  indices : Term.indices ;
+  action : Action.action ;
+  indices : Action.indices ;
   condition : Term.fact ;
   updates : (Term.state * Term.term) list ;
   output : Term.term
 }
-val pp_action : Format.formatter -> action -> unit
-val timestamp_of_descr : descr -> Term.timestamp
 
 (** Iterate over a complete set of action descriptions. *)
 val iter_csa : (descr -> unit) -> unit
