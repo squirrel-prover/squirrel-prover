@@ -15,6 +15,10 @@
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
 
+%left OR
+%left AND
+%nonassoc NOT
+
 %start theory
 %start top_process
 %type <unit> theory

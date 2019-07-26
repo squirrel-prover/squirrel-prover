@@ -260,11 +260,11 @@ let fresh_instance action block =
   (* TODO replace assertions with full support *)
   let action,subst = fresh_indices_subst action in
   let indices = List.map snd subst in
-  let convert = Theory.convert (Term.TName action) subst in
+  let convert = Theory.convert (Term.TName action) subst
+  and convert_fact = Theory.convert_fact (Term.TName action) subst in
   let condition =
-    assert false
-    (* assert (fst block.condition = []) ;
-    snd block.condition *)
+    assert (fst block.condition = []) ;
+    convert_fact @@ snd block.condition
   in
   let updates =
     List.map
