@@ -43,7 +43,7 @@ process Tag(i:index,j:index) =
   else
     out(cT,ko)
 
-process Reader(i:index,j:index) =
+process Reader =
   new nR;
   out(cR,nR);
   in(cR,x);

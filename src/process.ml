@@ -328,7 +328,12 @@ let rec parse_proc action proc : unit =
     | Apply (id,args,id') ->
         (* Aliases.decl_action_name id' action pos ; *)
         p_in ~pos ~vars (get_apply id args)
-    | _ -> failwith "p_in: unsupported"
+    | _ as p ->
+      (* Debug *)
+      pp_process Fmt.stderr p;
+      Fmt.pf Fmt.stderr "@.";
+
+      failwith "p_in: unsupported :"
 
   (** Similar to [p_in] but with an [input] and [par_choice] already known,
     * a conjonction of [facts] in construction, a [pos] and [vars] indicating

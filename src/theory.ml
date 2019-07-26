@@ -24,7 +24,7 @@ let rec pp_term ppf = function
   | Get (s,terms) ->
     Fmt.pf ppf "@get:%s[@[<hov 1>%a@]]" s (Fmt.list pp_term) terms
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a%a%a@]" pp_term tl Term.pp_ord ord pp_term tr
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
 
 type fact = term Term.bformula
 

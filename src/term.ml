@@ -212,12 +212,12 @@ type atom = term _atom
 type fact = atom bformula
 
 let pp_ord ppf = function
-  | Eq -> Fmt.pf ppf "Eq"
-  | Neq -> Fmt.pf ppf "Neq"
-  | Leq -> Fmt.pf ppf "Leq"
-  | Geq -> Fmt.pf ppf "Geq"
-  | Lt -> Fmt.pf ppf "Lt"
-  | Gt -> Fmt.pf ppf "Gt"
+  | Eq -> Fmt.pf ppf "="
+  | Neq -> Fmt.pf ppf "<>"
+  | Leq -> Fmt.pf ppf "<="
+  | Geq -> Fmt.pf ppf ">="
+  | Lt -> Fmt.pf ppf "<"
+  | Gt -> Fmt.pf ppf ">"
 
 let not_ord o = match o with
   | Eq -> Neq

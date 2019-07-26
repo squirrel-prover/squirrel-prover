@@ -1,45 +1,49 @@
 open Logic
 
+let () = Printexc.record_backtrace true
+
 let parse_theory ?(test=false) filename =
   Theory.initialize_symbols () ;
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
     try
       Parser.theory Lexer.token lexbuf
     with
-      | Parser.Error as e ->
-          Format.printf
-            "@[Cannot parse model @,\
-               in %S @,at line %d char %d @,\
-               before %S.@]@."
-            filename
-            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-            (Lexing.lexeme lexbuf) ;
-          if test then raise e else exit 1
-      | Failure s as e ->
-          Format.printf
-            "@[Error in %S @,at line %d char %d @,\
-               before %S: @,%s.@]@."
-            filename
-            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-            (Lexing.lexeme lexbuf)
-            s ;
-          if test then raise e else exit 1
-      | e ->
-          Format.printf
-            "@[Error @,\
-               in %S @,at line %d char %d @,\
-               before %S: @,%s.@]@."
-            filename
-            lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-            (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-             lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-            (Lexing.lexeme lexbuf)
-            (Printexc.to_string e) ;
-          if test then raise e else exit 1
+    | Parser.Error as e ->
+      Printexc.print_backtrace Pervasives.stderr;
+      Format.printf
+        "@[Cannot parse model @,\
+         in %S @,at line %d char %d @,\
+         before %S.@]@."
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf) ;
+      if test then raise e else exit 1
+    | Failure s as e ->
+      Format.printf
+        "@[Error in %S @,at line %d char %d @,\
+         before %S: @,%s.@]@."
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf)
+        s ;
+      if test then raise e else exit 1
+    | e ->
+      Printexc.print_backtrace Pervasives.stderr;
+      Format.printf
+        "@[Error @,\
+         in %S @,at line %d char %d @,\
+         before %S: @,%s.@]@."
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf)
+        (Printexc.to_string e) ;
+      if test then raise e else exit 1
 
 let parse_process string =
   let lexbuf = Lexing.from_string string in
@@ -75,7 +79,7 @@ let () =
       Channel.declare "c" ;
       ignore (parse_process "in(c,x);out(c,<x,x>)")
     end
-  ]
+  ];;
 
 let () =
   let test = true in
@@ -106,37 +110,11 @@ let () =
   ];;
 
 
-(* let pp_proc ppf =
- *   let cpt = ref 0 in
- *   Fmt.pf ppf "@[<v>";
- *   Process.iter_csa (fun descr ->
- *       Fmt.pf ppf "%d:@;@[%a@]@;done@;"
- *         !cpt Process.pp_descr descr);
- *   incr cpt;
- *   Fmt.pf ppf "@]%!@.";;
- *
- * Fmt.pf Fmt.stdout "Testing null.mbc\n@.";;
- * parse_theory "examples/null.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Fmt.pf Fmt.stdout "Testing process.mbc\n@.";;
- * parse_theory "examples/process.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Fmt.pf Fmt.stdout "Testing name.mbc\n@.";;
- * parse_theory "examples/name.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Fmt.pf Fmt.stdout "Testing pairs.mbc\n@.";;
- * parse_theory "examples/pairs.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Fmt.pf Fmt.stdout "Testing theory.mbc\n@.";;
- * parse_theory "examples/theory.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Fmt.pf Fmt.stdout "Testing lak.mbc\n@.";;
- * parse_theory "examples/lak.mbc";;
- * pp_proc Fmt.stdout;;
- *
- * Channel.reset () *)
+let pp_proc ppf =
+  let cpt = ref 0 in
+  Fmt.pf ppf "@[<v>";
+  Process.iter_csa (fun descr ->
+      Fmt.pf ppf "%d:@;@[%a@]@;done@;"
+        !cpt Process.pp_descr descr);
+  incr cpt;
+  Fmt.pf ppf "@]%!@.";;
