@@ -127,6 +127,9 @@ module Theories = struct
                      ( Cfun (Term.f_and, [mk_var (); t_false]), t_false);
                      ( Cfun (Term.f_and, [t; t]), t)] in
 
+    let not_rules = [( Cfun (Term.f_not, [t_true]), t_false);
+                     ( Cfun (Term.f_not, [t_false]), t_true)] in
+
     let u, v, t = mk_var (), mk_var (), mk_var () in
     let or_rules = [( Cfun (Term.f_or, [t_true; mk_var ()]), t_true);
                      ( Cfun (Term.f_or, [mk_var (); t_true]), t_true);
@@ -134,7 +137,7 @@ module Theories = struct
                      ( Cfun (Term.f_or, [v; t_false]), v);
                      ( Cfun (Term.f_or, [t; t]), t)] in
 
-    and_rules @ or_rules
+    not_rules @ and_rules @ or_rules
 
   (** Some simple IfThenElse rules. A lot of rules are missing. *)
   let mk_simpl_ite () =

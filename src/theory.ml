@@ -46,6 +46,21 @@ let rec convert ts subst = function
   | Var x -> assert false (* TODO may be an input, let ... *)
   | Compare (o,u,v) -> assert false (* TODO *)
 
+let convert_fact ts subst f =
+  let open Term in
+  let rec conv = function
+    | Atom (Compare (o,u,v)) ->
+      Atom ((o, convert ts subst u, convert ts subst v))
+    | Atom (_) -> assert false
+    | And (f,g) -> And (conv f, conv g)
+    | Or (f,g) -> Or (conv f, conv g)
+    | Impl (f,g) -> Impl (conv f, conv g)
+    | Not f -> Not (conv f)
+    | True -> True
+    | False -> False in
+
+  conv f
+
 (** Table of symbols *)
 
 type kind = Index | Message | Boolean
@@ -77,7 +92,12 @@ let initialize_symbols () =
       "fst",[Message],Message ;
       "snd",[Message],Message ;
       "choice",[Message;Message],Message ;
-      "if",[Boolean;Message;Message],Message ]
+      "if",[Boolean;Message;Message],Message;
+      "and",[Boolean;Boolean],Boolean;
+      "or",[Boolean;Boolean],Boolean;
+      "not",[Boolean],Boolean;
+      "true",[],Boolean;
+      "false",[],Boolean;]
 
 (** Type checking *)
 

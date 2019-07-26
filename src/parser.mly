@@ -2,6 +2,7 @@
 %token <string> BANG
 %token LPAREN RPAREN
 %token LANGLE RANGLE
+%token AND OR NOT TRUE FALSE
 %token EQ COMMA SEMICOLON COLON
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
@@ -46,6 +47,12 @@ ord:
 | EQ                             { Term.Eq }
 
 fact:
+| LPAREN fact RPAREN             { $2 }
+| fact AND fact                  { Term.And  ($1,$3) }
+| fact OR fact                   { Term.Or  ($1,$3) }
+| NOT fact                       { Term.Not  ($2) }
+| FALSE                          { Term.False }
+| TRUE                           { Term.True }
 | term ord term                  { Term.Atom (Theory.Compare ($2,$1,$3)) }
 | ID term_list                   { Term.Atom (Theory.make_term $1 $2) }
 

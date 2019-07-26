@@ -58,6 +58,7 @@ val f_false : fsymb
 val f_true : fsymb
 val f_and : fsymb
 val f_or : fsymb
+val f_not : fsymb
 
 (** IfThenElse function symbol *)
 val f_ite : fsymb

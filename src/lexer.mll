@@ -19,6 +19,11 @@ rule token = parse
 | '\n'                    { newline lexbuf ; token lexbuf }
 | '#' [^'\n']* '\n'       { newline lexbuf ; token lexbuf }
 | "!_" (['a'-'z']* as i)  { BANG i }
+| "and"               { AND }
+| "or"                { OR }
+| "not"               { NOT }
+| "true"              { TRUE }
+| "false"             { FALSE }
 | '<'                 { LANGLE }
 | '>'                 { RANGLE }
 | ','                 { COMMA }

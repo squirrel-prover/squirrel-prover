@@ -64,9 +64,10 @@ let f_false = (Fname "false", [])
 let f_true = (Fname "true", [])
 let f_and = (Fname "and", [])
 let f_or = (Fname "or", [])
+let f_not = (Fname "not", [])
 
 (** IfThenElse function symbol *)
-let f_ite = (Fname "ite", [])
+let f_ite = (Fname "if", [])
 
 (** Xor function symbol *)
 let f_xor = (Fname "xor", [])
