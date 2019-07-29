@@ -298,6 +298,12 @@ module Aliases = struct
 
 end
 
+let show_actions () =
+  Format.printf "Available actions:@." ;
+  Hashtbl.iter
+    (fun a _ -> Format.printf " - %a@." Action.pp_action_shape a)
+    action_to_block
+
 let rec parse_proc action proc : unit =
 
   let get_apply id args =

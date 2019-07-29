@@ -68,3 +68,6 @@ val pp_descr : Format.formatter -> descr -> unit
 
 (** Iterate over a complete set of action descriptions. *)
 val iter_csa : (descr -> unit) -> unit
+
+(** Debug *)
+val show_actions : unit -> unit
