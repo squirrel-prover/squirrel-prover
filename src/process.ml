@@ -257,9 +257,13 @@ let pp_descr ppf descr =
   * constructs which might have succeeded or not) and subsequent
   * updates and outputs. The condition binds variables in the updates
   * and output. A block may feature free index variables, that are in
-  * a sense bound by the corresponding action. *)
+  * a sense bound by the corresponding action. We also include a list of
+  * all used indices, since they are not explicitly declared as part of
+  * the action or current condition (they could be introduced by previous
+  * conditions). *)
 type block = {
   input : Channel.t * string ;
+  indices : Action.indices ;
   condition : Action.index list * Term.fact ;
   updates : (string * Action.index list * Term.term) list ;
   output : Channel.t * Term.term
@@ -270,11 +274,8 @@ let action_to_block : (action, block) Hashtbl.t =
   Hashtbl.create 97
 
 let fresh_instance action block =
-  let action,subst = Action.refresh action in
-  let subst =
-    (List.map (fun i -> i, Action.fresh_index ()) (fst block.condition)) @
-    subst
-  in
+  let subst = List.map (fun i -> i, Action.fresh_index ()) block.indices in
+  let action = Action.ivar_subst_action subst action in
   let refresh_term = Term.ivar_subst_term subst in
   let refresh_fact = Term.ivar_subst_fact subst in
   let indices = List.map snd subst in
@@ -553,7 +554,8 @@ let parse_proc proc : unit =
                conv_term env t)
             updates
         in
-        let block = { input ; condition ; updates ; output } in
+        let indices = List.map snd env.isubst in
+        let block = { input ; indices ; condition ; updates ; output } in
           Hashtbl.add action_to_block (List.rev env.action) block ;
           ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
     | p ->
