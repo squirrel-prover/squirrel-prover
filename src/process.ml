@@ -353,7 +353,12 @@ let rec parse_proc action proc : unit =
   and p_cond ~par_choice ~pos ~vars ~input ~facts = function
     | Exists (evars,cond,p,q) ->
         let facts_p = cond::facts in
-        let facts_q = facts in (* TODO negation of existential *)
+        let facts_q =
+          if evars = [] then
+            Term.Not cond :: facts
+          else
+            facts
+        in
         let pos =
           p_cond ~par_choice ~pos ~vars:(evars@vars) ~facts:facts_p ~input p
         in
