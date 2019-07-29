@@ -54,6 +54,7 @@ val pp_fsymb : Format.formatter -> fsymb -> unit
 (** Makes a simple function name, with no indices.
     TODO: nothing is checked here (e.g. name clashes etc).*)
 val mk_fname : string -> fsymb
+val mk_fname_idx : string -> indices -> fsymb
 
 (** Boolean function symbols *)
 val f_false : fsymb

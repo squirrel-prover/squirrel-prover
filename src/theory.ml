@@ -40,62 +40,6 @@ type fact = term Term.bformula
 
 let pp_fact = Term.pp_bformula pp_term
 
-let conv_index isubst = function
-  | Var x -> List.assoc x isubst
-  | _ -> failwith "ill-formed index"
-
-let convert a subst isubst t =
-  let rec conv = function
-    | Fun (f,l,None) -> Term.Fun (Term.mk_fname f, List.map conv l)
-    | Get (s,None,i) ->
-        let s = Term.mk_sname s in
-        let i = List.map (conv_index isubst) i in
-          Term.State ((s,i),Term.TName a)
-    | Name (n,i) ->
-        let i = List.map (conv_index isubst) i in
-          Term.Name (Term.mk_name n,i)
-    | Var x -> List.assoc x subst
-    | Compare (o,u,v) -> assert false (* TODO *)
-    | Get (_,Some _,_) | Fun (_,_,Some _) ->
-      assert false (* reserved for global terms *)
-
-  in conv t
-
-let conv_timestamp subst ts = List.assoc ts subst
-
-let convert_glob tssubst isubst t =
-  let rec conv = function
-    | Fun (f,l,ots) -> begin match ots with
-        | None -> Term.Fun (Term.mk_fname f, List.map conv l)
-        | Some ts -> assert false (* TODO *) end
-  | Get (s,Some ts,i) ->
-      let s = Term.mk_sname s in
-      let i = List.map (conv_index isubst) i in
-        Term.State ((s,i), conv_timestamp tssubst ts)
-  | Name (n,i) ->
-      let i = List.map (conv_index isubst) i in
-      Term.Name (Term.mk_name n,i)
-  | Var x -> assert false (* TODO *)
-  | Compare (o,u,v) -> assert false (* TODO *)
-  | Get (s,None,_) ->
-    raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
-
-  conv t
-
-let convert_fact a subst isubst f =
-  let open Term in
-  let rec conv = function
-    | Atom (Compare (o,u,v)) ->
-      Atom ((o, convert a subst isubst u, convert a subst isubst v))
-    | Atom (_) -> assert false
-    | And (f,g) -> And (conv f, conv g)
-    | Or (f,g) -> Or (conv f, conv g)
-    | Impl (f,g) -> Impl (conv f, conv g)
-    | Not f -> Not (conv f)
-    | True -> True
-    | False -> False in
-  conv f
-
 (** Table of symbols *)
 
 type kind = Index | Message | Boolean | Timestamp
@@ -292,10 +236,82 @@ let make_ts t = assert false
  *         if l <> [] then raise Type_error ;
  *         Var (s,at_ts) *)
 
-
 let is_hash (Term.Fname s) =
   try Hashtbl.find symbols s = Hash_symbol
   with Not_found -> raise @@ Failure "symbol not found"
+
+(* Conversion *)
+
+let conv_index isubst = function
+  | Var x -> List.assoc x isubst
+  | _ -> failwith "ill-formed index"
+
+let convert a subst isubst t =
+  let rec conv = function
+    | Fun (f,l,None) ->
+       begin match Hashtbl.find symbols f with
+         | Hash_symbol | AEnc_symbol ->
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | Abstract_symbol (args,_) ->
+             assert (List.for_all (fun k -> k = Message) args) ;
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | Macro_symbol (args,_,_) when
+             List.for_all (fun (_,k) -> k = Index) args ->
+             Term.Fun (Term.mk_fname_idx f (List.map (conv_index isubst) l),
+                       [])
+         | Macro_symbol (args,_,_) when
+             List.for_all (fun (_,k) -> k = Message) args ->
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | _ -> failwith "unsupported"
+       end
+    | Get (s,None,i) ->
+        let s = Term.mk_sname s in
+        let i = List.map (conv_index isubst) i in
+          Term.State ((s,i),Term.TName a)
+    | Name (n,i) ->
+        let i = List.map (conv_index isubst) i in
+          Term.Name (Term.mk_name n,i)
+    | Var x -> List.assoc x subst
+    | Compare (o,u,v) -> assert false (* TODO *)
+    | Get (_,Some _,_) | Fun (_,_,Some _) ->
+      assert false (* reserved for global terms *)
+
+  in conv t
+
+let conv_timestamp subst ts = List.assoc ts subst
+
+let convert_glob tssubst isubst t =
+  let rec conv = function
+    | Fun (f,l,ots) -> begin match ots with
+        | None -> Term.Fun (Term.mk_fname f, List.map conv l)
+        | Some ts -> assert false (* TODO *) end
+  | Get (s,Some ts,i) ->
+      let s = Term.mk_sname s in
+      let i = List.map (conv_index isubst) i in
+        Term.State ((s,i), conv_timestamp tssubst ts)
+  | Name (n,i) ->
+      let i = List.map (conv_index isubst) i in
+      Term.Name (Term.mk_name n,i)
+  | Var x -> assert false (* TODO *)
+  | Compare (o,u,v) -> assert false (* TODO *)
+  | Get (s,None,_) ->
+    raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
+
+  conv t
+
+let convert_fact a subst isubst f =
+  let open Term in
+  let rec conv = function
+    | Atom (Compare (o,u,v)) ->
+      Atom ((o, convert a subst isubst u, convert a subst isubst v))
+    | Atom (_) -> assert false
+    | And (f,g) -> And (conv f, conv g)
+    | Or (f,g) -> Or (conv f, conv g)
+    | Impl (f,g) -> Impl (conv f, conv g)
+    | Not f -> Not (conv f)
+    | True -> True
+    | False -> False in
+  conv f
 
 (** Tests *)
 let () =

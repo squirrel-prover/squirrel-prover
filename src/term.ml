@@ -61,6 +61,7 @@ let pp_fsymb ppf (fn,is) = match is with
   | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn pp_indices is
 
 let mk_fname f = (Fname f, [])
+let mk_fname_idx f l = (Fname f, l)
 
 (** Boolean function symbols *)
 let f_false = (Fname "false", [])
