@@ -14,7 +14,6 @@
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
-
 %left OR
 %left AND
 %nonassoc NOT
@@ -31,14 +30,15 @@
 
 term:
 | aterm                          { $1 }
-| LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | LPAREN term RPAREN             { $2 }
 
 aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
+| LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 
 term_list:
 |                                { [] }
+| LPAREN RPAREN                  { [] }
 | LPAREN term tm_list RPAREN     { $2::$3 }
 
 tm_list:
@@ -57,7 +57,7 @@ fact:
 | NOT fact                       { Term.Not  ($2) }
 | FALSE                          { Term.False }
 | TRUE                           { Term.True }
-| term ord term                  { Term.Atom (Theory.Compare ($2,$1,$3)) }
+| aterm ord aterm                { Term.Atom (Theory.Compare ($2,$1,$3)) }
 | ID term_list                   { Term.Atom (Theory.make_term $1 $2) }
 
 (* Processes *)

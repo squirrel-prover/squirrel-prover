@@ -189,6 +189,9 @@ let declare_macro s typed_args k t =
   check_term typed_args t k ;
   declare_symbol s (Macro_symbol (typed_args,k,t))
 
+let declare_abstract s arg_types k =
+  declare_symbol s (Abstract_symbol (arg_types,k))
+
 (** Removal of all declarations *)
 
 let clear_declarations () = Hashtbl.clear symbols

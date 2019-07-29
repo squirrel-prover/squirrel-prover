@@ -41,6 +41,7 @@ val declare_hash : string -> unit
 val declare_aenc : string -> unit
 val declare_name : string -> int -> unit
 val declare_state : string -> int -> kind -> unit
+val declare_abstract : string -> kind list -> kind -> unit
 val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 
 (** Term builders *)
