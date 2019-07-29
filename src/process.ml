@@ -227,15 +227,25 @@ type descr = {
 }
 
 let pp_descr ppf descr =
-  Fmt.pf ppf "@[<v>*name:@;  @[<hov>%a@]\
-              *indices:@;  @[<hov>%a@]\
-              *condition:@;  @[<hov>%a@]\
-              *updates:@;  @[<hov>%a@]\
-              *output:@;  @[<hov>%a@]@]"
+  Fmt.pf ppf "@[<v 0>*name: @[<hov>%a@]@;\
+              %a\
+              @[<hv 2>*condition:@ @[<hov>%a@]@]@;\
+              %a\
+              @[<hv 2>*output:@ @[<hov>%a@]@]@]"
     pp_action descr.action
-    pp_indices descr.indices
+    (fun ppf () ->
+       if descr.indices = [] then Fmt.pf ppf ""
+       else
+         Fmt.pf ppf "@[<hv 2>*indices:@ @[<hov>%a@]@]@;\ "
+           pp_indices descr.indices
+    ) ()
     Term.pp_fact descr.condition
-    (Fmt.list (Fmt.pair Term.pp_state Term.pp_term)) descr.updates
+    (fun ppf () ->
+       if descr.updates = [] then Fmt.pf ppf ""
+       else
+         Fmt.pf ppf "*updates:@;  @[<hov>%a@]@;\ "
+           (Fmt.list (Fmt.pair Term.pp_state Term.pp_term)) descr.updates
+    ) ()
     Term.pp_term descr.output
 
 (** A block features an input, a condition (which sums up several [Exist]

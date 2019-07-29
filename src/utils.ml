@@ -37,8 +37,6 @@ module List = struct
       [] -> ([], [], [])
     | (x,y,z)::l ->
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
-
-
 end
 
 module Imap = Map.Make (struct
