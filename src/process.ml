@@ -49,11 +49,16 @@ let rec pp_process ppf process =
   match process with
   | Null ->  (styled `Blue (styled `Bold ident)) ppf "Null"
 
-  | Apply (s,l,_) ->
-    (* TODO: what is the third argument for? *)
-    pf ppf "@[<hov>%a@ %a@]"
-      (styled `Bold (styled `Blue ident)) s
-      (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
+  | Apply (s,l,a) ->
+    if s=a then
+      pf ppf "@[<hov>%a@ %a@]"
+        (styled `Bold (styled `Blue ident)) s
+        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
+    else
+      pf ppf "@[<hov>%a@ %a@ as@ %a@]"
+        (styled `Bold (styled `Blue ident)) s
+        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
+        (styled `Bold (styled `Blue ident)) a
 
   | Repl (s,p) ->
     pf ppf "@[<hov 2>%s@,@[%a@]@]"
@@ -265,21 +270,21 @@ let action_to_block : (action, block) Hashtbl.t =
   Hashtbl.create 97
 
 let fresh_instance action block =
-  (* TODO replace assertions with full support *)
   let action,subst = Action.refresh action in
-  let refresh_term = Term.ivar_subst_term subst in
-  let indices = List.map snd subst in
-  let condition =
-    assert (fst block.condition = []) ;
-    (* TODO apply subst *)
-    snd block.condition
+  let subst =
+    (List.map (fun i -> i, Action.fresh_index ()) (fst block.condition)) @
+    subst
   in
+  let refresh_term = Term.ivar_subst_term subst in
+  let refresh_fact = Term.ivar_subst_fact subst in
+  let indices = List.map snd subst in
+  let condition = refresh_fact (snd block.condition) in
   let updates =
     List.map
-      (function
-         (* TODO [] --> indices seems wrong *)
-         | s,[],t -> (Term.mk_sname s, indices), refresh_term t
-         | _ -> assert false)
+      (fun (s,l,t) ->
+         (Term.mk_sname s,
+          List.map (fun i -> List.assoc i subst) l),
+         refresh_term t)
       block.updates
   in
   let output = refresh_term (snd block.output) in
@@ -549,16 +554,6 @@ let parse_proc proc : unit =
   let env = { p_id = None ; subst = [] ; isubst = [] ; action = [] } in
   let _:int = p_in ~pos:0 ~env proc in
   ()
-
-(** TODO take care of terms, notably name creations and translation
-  * from Process.term to Term.term...
-  *
-  * For instance,
-  *   ! new k. ! new k',n. P(choice[k,k'],n)
-  * should become
-  *   !_i !_j P(choice[k(i),k'(i,j)],n(i,j))
-  * and in each copy of P the actions will be indexed by i and j
-  * in order to be uniquely identified. *)
 
 let declare_system proc = check_proc [] proc ; parse_proc proc
 
