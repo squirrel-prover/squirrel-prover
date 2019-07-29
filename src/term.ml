@@ -31,7 +31,10 @@ let rec pp_timestamp ppf = function
   * a list of indices. *)
 
 type name = Name of string
+
+(* TODO declarations, freshness conditions ? *)
 let mk_name x = Name x
+let fresh_name x = Name x
 
 let pp_name ppf = function Name s -> Fmt.pf ppf "n!%s" s
 
@@ -101,6 +104,8 @@ type term =
   | Output of timestamp
   | Input of timestamp
 
+let dummy = Fun ((Fname "_",[]),[])
+
 let rec pp_term ppf = function
   | Fun (f,terms) -> Fmt.pf ppf "%a(@[<hov 1>%a@])"
                        pp_fsymb f (Fmt.list pp_term) terms
@@ -110,6 +115,12 @@ let rec pp_term ppf = function
   | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts
 
 type t = term
+
+let macros = Hashtbl.create 97
+let fresh_macro n f =
+  assert (not (Hashtbl.mem macros n)) ;
+  Hashtbl.add macros n f ;
+  Fname n
 
 (** Boolean formulas *)
 type 'a bformula =

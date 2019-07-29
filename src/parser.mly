@@ -78,7 +78,12 @@ process:
                                  { Process.Exists ($2,$4,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
 | ID term_list ASSIGN term process_cont
-                                 { Process.Set ($1,$2,$4,$5) }
+                                 { let to_idx = function
+                                     | Theory.Var x -> x
+                                     | _ -> failwith "index variable expected"
+                                   in
+                                   let l = List.map to_idx $2 in
+                                   Process.Set ($1,l,$4,$5) }
 | BANG process                   { Process.Repl ($1,$2) }
 
 processes:

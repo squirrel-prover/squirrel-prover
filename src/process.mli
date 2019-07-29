@@ -18,7 +18,7 @@ type process =
   | New of string * process                 (** Name creation *)
   | In of Channel.t * string * process      (** Input *)
   | Out of Channel.t * term * process       (** Output *)
-  | Set of string * term list * term * process
+  | Set of string * string list * term * process
                                             (** [Set (s,l,t,p)] stores [t]
                                               * in cell [s(l)] and
                                               * continues with [p]. *)

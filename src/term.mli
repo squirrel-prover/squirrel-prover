@@ -30,6 +30,8 @@ val pp_name : Format.formatter -> name -> unit
 
 val mk_name : string -> name (* TODO *)
 
+val fresh_name : string -> name
+
 type nsymb = name * indices
 
 val pp_nsymb : Format.formatter -> nsymb -> unit
@@ -96,7 +98,14 @@ type term =
 
 type t = term
 
+val dummy : term
+
 val pp_term : Format.formatter -> term -> unit
+
+(** [fresh_macro x f] declares a new macro with a name resembling [x],
+  * associated to a substitution function which takes the target timestamp
+  * as argument. *)
+val fresh_macro : string -> (action -> term) -> fname
 
 (** Boolean formulas *)
 type 'a bformula =

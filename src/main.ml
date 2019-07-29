@@ -112,6 +112,9 @@ let () =
         (Failure "multiple declarations")
         (fun () -> parse_theory ~test "examples/multiple.mbc")
     end ;
+    "Block creation", `Quick, begin fun () ->
+      parse_theory ~test "examples/blocks.mbc"
+    end ;
     "LAK model", `Quick, begin fun () ->
       parse_theory ~test "examples/lak.mbc"
     end ;

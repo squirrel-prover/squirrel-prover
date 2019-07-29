@@ -15,8 +15,6 @@ type term =
         * depending on the type of the function symbol. *)
   | Compare of ord*term*term
 
-let dummy = Fun ("_",[])
-
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
   | Fun (f,terms) ->
@@ -32,27 +30,29 @@ type fact = term Term.bformula
 
 let pp_fact = Term.pp_bformula pp_term
 
-let to_index subst = function
-  | Var i -> List.assoc i subst
-  | _ -> assert false
+let convert a subst isubst t =
+  let conv_index = function
+    | Var x -> List.assoc x isubst
+    | _ -> failwith "ill-formed index"
+  in
+  let rec conv = function
+    | Fun (f,l) -> Term.Fun (Term.mk_fname f, List.map conv l)
+    | Get (s,i) ->
+        let s = Term.mk_sname s in
+        let i = List.map conv_index i in
+          Term.State ((s,i),TName a)
+    | Name (n,i) ->
+        let i = List.map conv_index i in
+          Term.Name (Term.mk_name n,i)
+    | Var x -> List.assoc x subst
+    | Compare (o,u,v) -> assert false (* TODO *)
+  in conv t
 
-let rec convert ts subst = function
-  | Fun (f,l) -> Term.Fun (Term.mk_fname f, List.map (convert ts subst) l)
-  | Get (s,i) ->
-      let s = Term.mk_sname s in
-      let i = List.map (to_index subst) i in
-        Term.State ((s,i),ts)
-  | Name (n,i) ->
-      let i = List.map (to_index subst) i in
-      Term.Name (Term.mk_name n,i)
-  | Var x -> assert false (* TODO may be an input, let ... *)
-  | Compare (o,u,v) -> assert false (* TODO *)
-
-let convert_fact ts subst f =
+let convert_fact a subst isubst f =
   let open Term in
   let rec conv = function
     | Atom (Compare (o,u,v)) ->
-      Atom ((o, convert ts subst u, convert ts subst v))
+      Atom ((o, convert a subst isubst u, convert a subst isubst v))
     | Atom (_) -> assert false
     | And (f,g) -> And (conv f, conv g)
     | Or (f,g) -> Or (conv f, conv g)
@@ -60,7 +60,6 @@ let convert_fact ts subst f =
     | Not f -> Not (conv f)
     | True -> True
     | False -> False in
-
   conv f
 
 (** Table of symbols *)

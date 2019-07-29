@@ -17,8 +17,6 @@ type term =
 
 val pp_term : Format.formatter -> term -> unit
 
-val dummy : term
-
 (** Facts *)
 
 type fact = term Term.bformula
@@ -65,7 +63,17 @@ val is_hash : Term.fname -> bool
 val initialize_symbols : unit -> unit
 
 (** Convert to [Term.term]. *)
-val convert : Term.timestamp -> (string * Action.index) list -> term -> Term.term
+val convert :
+  Action.action ->
+  (string * Term.term) list ->
+  (string * Action.index) list ->
+  term ->
+  Term.term
 
 (** Convert to [Term.fact]. *)
-val convert_fact : Term.timestamp -> (string * Action.index) list -> fact -> Term.fact
+val convert_fact :
+  Action.action ->
+  (string * Term.term) list ->
+  (string * Action.index) list ->
+  fact ->
+  Term.fact

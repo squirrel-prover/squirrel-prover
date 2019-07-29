@@ -96,15 +96,17 @@ let rec constr_equal a b = match a,b with
          List.map2 (fun (_,ind) (_,ind') -> (ind, ind')) sis sis'
          @ res)
 
-let rec fresh_indices_subst = function
+let rec refresh = function
   | [] -> [],[]
   | {par_choice=(k,is);sum_choice}::l ->
-      let is' = List.map (fun i -> i, fresh_index ()) is in
-      let action,subst = fresh_indices_subst l in
+      let l3 = List.map (fun (i0,i) -> i0, i, fresh_index ()) is in
+      let is' = List.map (fun (i,_,j) -> i,j) l3 in
+      let newsubst = List.map (fun (_,j,j') -> j,j') l3 in
+      let action,subst = refresh l in
         { par_choice= k, is' ;
           sum_choice }
         :: action,
-        is' @ subst
+        newsubst @ subst
 
 type 'a subst = ('a * 'a) list
 

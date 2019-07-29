@@ -22,7 +22,7 @@ val enables : 'a t -> 'a t -> bool
 
 type action_shape
 
-type action
+type action = (string*index) item list
 
 val mk_shape : string item list -> action_shape
 
@@ -47,7 +47,9 @@ val app_subst : ('a * 'a) list -> 'a -> 'a
 
 val ivar_subst_action : index subst -> action -> action
 
-val fresh_indices_subst : action_shape -> action * (string * index) list
+(** Given an action, generate a fresh instance of it together with
+  * the corresponding substitution for indices. *)
+val refresh : action -> action * index subst
 
 val pp_action : Format.formatter -> action -> unit
 

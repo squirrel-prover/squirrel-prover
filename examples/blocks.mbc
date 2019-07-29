@@ -1,0 +1,5 @@
+# Testing block creation
+channel c
+process IO = in(c,x);out(c,<x,x>)
+process IOIO = in(c,x);out(c,<x,x>);in(c,x);out(c,x)
+system (IO | IOIO | !_i (IO as IOi))
