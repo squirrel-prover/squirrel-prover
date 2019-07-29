@@ -33,7 +33,7 @@ PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
 sanity: Makefile
 	@(echo -n "Checking for menhir... " ; \
 	  which menhir ) || ( \
-	  pkg=menhir echo $(PLEASE) ; \
+	  pkg=menhir ; echo $(PLEASE) ; \
 	  false )
 	@for pkg in ocamlgraph alcotest ; do \
 	  (echo -n "Checking for $$pkg... " ; \
