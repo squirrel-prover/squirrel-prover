@@ -2,4 +2,4 @@
 hash h
 channel c
 process IO = in(c,x);out(c,h(x,x))
-system (IO as IO1 | IO as IO2 | IO as IO3)
+system IO
