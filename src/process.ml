@@ -326,7 +326,7 @@ let rec parse_proc action proc : unit =
         let vars = i::vars in
           p_in ~pos ~vars p
     | Apply (id,args,id') ->
-        (* Aliases.decl_action_name id' action pos ; *)
+        Aliases.decl_action_name id' action pos ;
         p_in ~pos ~vars (get_apply id args)
     | _ as p ->
       (* Debug *)
