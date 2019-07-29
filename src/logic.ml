@@ -23,20 +23,119 @@ let convert_vars vars =
   ( List.map (fun x -> (x, Term.fresh_tvar ())) tss,
     List.map (fun i -> (i, Action.fresh_index ())) indices )
 
-let declare_goal (uvars,uconstr) (evars,econstr) ufact efact =
-  assert false
-  (* let uts_subst, uindex_subst = convert_vars uvars
-   * and ets_subst, eindex_subst = convert_vars evars in
-   *
-   * add_goal
-   *   { uvars = List.map snd uts_subst;
-   *     uindices = List.map snd uindex_subst;
-   *     uconstr = Theory.convert_constr uconstr;
-   *     ufact = Theory.convert_fact ?? efact;
-   *     postcond = { evars = List.map snd ets_subst;
-   *                  eindices = List.map snd eindex_subst;
-   *                  econstr = Theory.convert_constr econstr;
-   *                  efact = Theory.convert_fact ?? efact } } *)
+(* DUP *)
+let conv_index isubst = function
+  | Theory.Var x -> List.assoc x isubst
+  | _ -> failwith "ill-formed index"
+
+(* update initialize symbols *)
+let pred_fs = "pred"
+
+(* For now, we do not allow to build directly a timestamp through its name. *)
+let convert_ts tssubst t =
+  let open Theory in
+  let rec conv = function
+    | Fun (f,[t'],None) when f = pred_fs -> Term.TPred (conv t')
+    | Var x -> List.assoc x tssubst
+
+    | Fun _ | Get _ | Name _ | Compare _ ->
+      raise @@ Failure ("not a timestamp") in
+
+  conv t
+
+let convert_glob tssubst isubst t =
+  let open Theory in
+  let rec conv = function
+    | Fun (f,l,ots) -> begin match ots with
+        | None -> Term.Fun (Term.mk_fname f, List.map conv l)
+        | Some ts -> assert false (* TODO *) end
+    | Get (s,Some ts,i) ->
+      let s = Term.mk_sname s in
+      let i = List.map (conv_index isubst) i in
+      Term.State ((s,i), convert_ts tssubst ts)
+    | Name (n,i) ->
+      let i = List.map (conv_index isubst) i in
+      Term.Name (Term.mk_name n,i)
+    | Var x -> assert false (* TODO *)
+    | Compare (o,u,v) -> assert false (* TODO *)
+    | Get (s,None,_) ->
+      raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
+
+  conv t
+
+let convert_atom a subst isubst atom =
+  let open Theory in
+  match atom with
+  | Compare (o,u,v) -> (o, convert a subst isubst u, convert a subst isubst v)
+  | _ -> assert false
+
+let convert_bformula conv_atom f =
+  let open Term in
+  let rec conv = function
+    | Atom at -> Atom (conv_atom at)
+    | And (f,g) -> And (conv f, conv g)
+    | Or (f,g) -> Or (conv f, conv g)
+    | Impl (f,g) -> Impl (conv f, conv g)
+    | Not f -> Not (conv f)
+    | True -> True
+    | False -> False in
+  conv f
+
+let convert_fact a subst isubst f : Term.fact =
+  convert_bformula (convert_atom a subst isubst) f
+
+(* Not clean at all. *)
+let get_kind env t =
+  let open Theory in
+  try check_term env t Index; Index
+  with Type_error -> try check_term env t Timestamp; Timestamp
+    with Type_error -> try check_term env t Message; Message
+      with Type_error -> check_term env t Boolean; Boolean
+
+let convert_tatom args_kind tssubst isubst f : Term.tatom =
+  let open Term in
+  let open Theory in
+  match f with
+  | Compare (o,u,v) ->
+    begin match get_kind args_kind u, get_kind args_kind v with
+      | Index, Index ->
+        Pind (o, conv_index isubst u, conv_index isubst v)
+      | Timestamp, Timestamp ->
+        Pts (o, convert_ts tssubst u, convert_ts tssubst v)
+      | _ -> raise Type_error end
+  | _ -> assert false
+
+let convert_constr args_kind tssubst isubst f : Term.constr =
+  convert_bformula (convert_tatom args_kind tssubst isubst) f
+
+let declare_goal (uargs,uconstr) (eargs,econstr) ufact efact =
+  let to_ts subst = List.map (fun (x,y) -> x, Term.TVar y) subst in
+
+  (* In the rest of this function, the lists need to be reversed and appended
+     carefully to properly handle variable shadowing.  *)
+  let uts_subst, uindex_subst = convert_vars uargs
+  and ets_subst, eindex_subst = convert_vars eargs in
+
+  let uconstr =
+    convert_constr (List.rev uargs) (to_ts uts_subst) uindex_subst uconstr in
+
+  let econstr =
+    convert_constr
+      (List.rev_append eargs (List.rev uargs))
+      (to_ts ets_subst @ to_ts uts_subst)
+      (eindex_subst @ uindex_subst)
+      econstr in
+
+  add_goal
+    { uvars = List.map snd uts_subst;
+      uindices = List.map snd uindex_subst;
+      uconstr = uconstr;
+      ufact = assert false(* Theory.convert_fact2 ?? ufact *);
+      postcond = [{ evars = List.map snd ets_subst;
+                    eindices = List.map snd eindex_subst;
+                    econstr = econstr;
+                    efact = assert false (* Theory.convert_fact2 ?? efact *) }]
+    }
 
 
 (** Tags used to record some information on gamma elements:
