@@ -349,13 +349,6 @@ type p_env = {
 (** Parse a process with a given action prefix. *)
 let parse_proc proc : unit =
 
-  let get_apply id args =
-    let t,p = Hashtbl.find pdecls id in
-      assert (t = [] && args = []) ;
-      (* TODO check kind, apply subst *)
-      p
-  in
-
   let conv_term env t =
     let action = List.rev env.action in
     Theory.convert action env.subst env.isubst t
@@ -387,10 +380,27 @@ let parse_proc proc : unit =
         (* TODO
          *  - use more precise action prefix
          *  - support Apply in other places *)
-        assert (args = []) ; (* TODO full support *)
         Aliases.decl_action_name id' env.action pos ;
-        let env = { env with p_id = Some id' } in
-          p_in ~env ~pos (get_apply id args)
+        let t,p = Hashtbl.find pdecls id in
+        let env =
+          if List.for_all (fun (_,k) -> k = Theory.Index) t then
+            { env with
+              p_id = Some id' ;
+              isubst =
+                (List.map2 (fun (x,_) -> function
+                              | (Theory.Var v) -> x, List.assoc v env.isubst
+                              | _ -> assert false) t args) @
+                env.isubst }
+          else
+            { env with
+              p_id = Some id' ;
+              (* TODO it might be too early to convert the arguments,
+              * e.g. we don't know the final timestamp *)
+              subst =
+                (List.map2 (fun (x,_) v -> x, conv_term env v) t args) @
+                env.subst }
+        in
+          p_in ~env ~pos p
     | In _ | Exists _ | Set _ | Out _ as proc ->
         let input,p =
           (* Get the input data,
