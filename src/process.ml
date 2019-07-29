@@ -427,6 +427,30 @@ let parse_proc proc : unit =
     * do it in the next step just to avoid redundant preparation of the
     * appropriate timestamp. *)
   and p_cond ~env ~par_choice ~input ~pos ~vars ~facts = function
+    | New (n,p) ->
+        let n' =
+          Term.Name
+            (Term.fresh_name n,
+             List.map snd env.isubst)
+        in
+        let env = { env with subst = (n,n')::env.subst } in
+          p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
+    | Let (x,t,p) ->
+        (* TODO lift this limitation
+         *   the problem is that we add the binding for x only later
+         *   when we know the timestamp, so it breaks scoping;
+         *   a similar problem might show because we un-interleave
+         *   introductions of index and other variables
+         *   -> we probably need a more complex notion of substitution *)
+        assert (x <> snd input) ;
+        let x' =
+          Term.fresh_macro
+            x
+            (fun action' -> reconvert env action' t)
+        in
+        let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
+        let env = { env with subst = (x,t')::env.subst } in
+          p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
     | Exists (evars,cond,p,q) ->
         let facts_p = cond::facts in
         let facts_q =
@@ -447,7 +471,7 @@ let parse_proc proc : unit =
             ~env ~par_choice ~input
             ~pos ~vars ~facts:facts_q
             q
-    (* TODO support for let, new, etc. factorize all p_... functions ? *)
+    (* TODO factorize code for new, let... *)
     | p ->
         let rec conj = function
           | [] -> Term.True
@@ -472,6 +496,24 @@ let parse_proc proc : unit =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and block are registered. *)
   and p_update ~env ~input ~condition ~updates = function
+    | New (n,p) ->
+        let n' =
+          Term.Name
+            (Term.fresh_name n,
+             List.map snd env.isubst)
+        in
+        let env = { env with subst = (n,n')::env.subst } in
+          p_update ~env ~input ~condition ~updates p
+    | Let (x,t,p) ->
+        assert (x <> snd input) ; (* TODO see above *)
+        let x' =
+          Term.fresh_macro
+            x
+            (fun action' -> reconvert env action' t)
+        in
+        let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
+        let env = { env with subst = (x,t')::env.subst } in
+          p_update ~env ~input ~condition ~updates p
     | Set (s,l,t,p) ->
         let updates = (s,l,t)::updates in
           p_update ~env ~input ~condition ~updates p
@@ -498,7 +540,9 @@ let parse_proc proc : unit =
         let block = { input ; condition ; updates ; output } in
           Hashtbl.add action_to_block (List.rev env.action) block ;
           ignore (p_in ~env ~pos:0 p)
-    | _ -> failwith "p_update: unsupported"
+    | p ->
+        Format.eprintf "%a@." pp_process p ;
+        failwith "p_update: unsupported"
 
   in
 

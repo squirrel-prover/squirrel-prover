@@ -1,0 +1,3 @@
+channel c
+name n:message
+system let x = n in !_i in(c,y); let z = x in out(c,<x,z>)
