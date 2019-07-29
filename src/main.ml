@@ -126,7 +126,7 @@ let pp_proc ppf =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
   Process.iter_csa (fun descr ->
-      Fmt.pf ppf "%d:@;@[%a@]@;done@;"
-        !cpt Process.pp_descr descr);
-  incr cpt;
+      Fmt.pf ppf "@[<v 1>%d:@;@[%a@]@;@]@;"
+        !cpt Process.pp_descr descr;
+      incr cpt;);
   Fmt.pf ppf "@]%!@.";;
