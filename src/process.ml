@@ -339,6 +339,7 @@ let show_actions () =
  * It also stores the current action. *)
 type p_env = {
   action : Action.action ;
+  p_indices : Action.indices ;
   p_id : string option ;          (** current process identifier *)
   subst : (string*Term.term) list ;
     (** substitution for all free variables, standing for inputs,
@@ -375,7 +376,11 @@ let parse_proc proc : unit =
           p_in ~env ~pos ~pos_indices q
     | Repl (i,p) ->
         let i' = Action.fresh_index () in
-        let env = { env with isubst = (i,i') :: env.isubst } in
+        let env =
+          { env with
+            isubst = (i,i') :: env.isubst ;
+            p_indices = i' :: env.p_indices }
+        in
         let pos_indices = (i,i')::pos_indices in
           p_in ~env ~pos ~pos_indices p
     | Apply (id,args,id') ->
@@ -391,16 +396,14 @@ let parse_proc proc : unit =
               isubst =
                 (List.map2 (fun (x,_) -> function
                               | (Theory.Var v) -> x, List.assoc v env.isubst
-                              | _ -> assert false) t args) @
-                env.isubst }
+                              | _ -> assert false) t args) }
           else
             { env with
               p_id = Some id' ;
               (* TODO it might be too early to convert the arguments,
               * e.g. we don't know the final timestamp *)
               subst =
-                (List.map2 (fun (x,_) v -> x, conv_term env v) t args) @
-                env.subst }
+                (List.map2 (fun (x,_) v -> x, conv_term env v) t args) }
         in
           p_in ~env ~pos ~pos_indices p
     | In _ | Exists _ | Set _ | Out _ as proc ->
@@ -423,7 +426,7 @@ let parse_proc proc : unit =
         let n' =
           Term.Name
             (Term.fresh_name n,
-             List.map snd env.isubst)
+             env.p_indices)
         in
         let env = { env with subst = (n,n')::env.subst } in
           p_in ~env ~pos ~pos_indices p
@@ -433,7 +436,7 @@ let parse_proc proc : unit =
             x
             (fun action' -> reconvert env action' t)
         in
-        let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
+        let t' = Term.Fun ((x',env.p_indices),[]) in
         let env = { env with subst = (x,t')::env.subst } in
           p_in ~env ~pos ~pos_indices p
 
@@ -448,7 +451,7 @@ let parse_proc proc : unit =
         let n' =
           Term.Name
             (Term.fresh_name n,
-             List.map snd env.isubst)
+             env.p_indices)
         in
         let env = { env with subst = (n,n')::env.subst } in
           p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
@@ -465,7 +468,7 @@ let parse_proc proc : unit =
             x
             (fun action' -> reconvert env action' t)
         in
-        let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
+        let t' = Term.Fun ((x',env.p_indices),[]) in
         let env = { env with subst = (x,t')::env.subst } in
           p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
     | Exists (evars,cond,p,q) ->
@@ -479,7 +482,9 @@ let parse_proc proc : unit =
         let newsubst = List.map (fun i -> i, Action.fresh_index ()) evars in
         let pos =
           p_cond
-            ~env:{ env with isubst = newsubst @ env.isubst }
+            ~env:{ env with
+                   isubst = newsubst @ env.isubst ;
+                   p_indices = List.map snd newsubst @ env.p_indices }
             ~par_choice ~input
             ~pos ~vars:(evars@vars) ~facts:facts_p
             p
@@ -517,7 +522,7 @@ let parse_proc proc : unit =
         let n' =
           Term.Name
             (Term.fresh_name n,
-             List.map snd env.isubst)
+             env.p_indices)
         in
         let env = { env with subst = (n,n')::env.subst } in
           p_update ~env ~input ~condition ~updates p
@@ -528,7 +533,7 @@ let parse_proc proc : unit =
             x
             (fun action' -> reconvert env action' t)
         in
-        let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
+        let t' = Term.Fun ((x',env.p_indices),[]) in
         let env = { env with subst = (x,t')::env.subst } in
           p_update ~env ~input ~condition ~updates p
     | Set (s,l,t,p) ->
@@ -554,7 +559,7 @@ let parse_proc proc : unit =
                conv_term env t)
             updates
         in
-        let indices = List.map snd env.isubst in
+        let indices = env.p_indices in
         let block = { input ; indices ; condition ; updates ; output } in
           Hashtbl.add action_to_block (List.rev env.action) block ;
           ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
@@ -564,7 +569,11 @@ let parse_proc proc : unit =
 
   in
 
-  let env = { p_id = None ; subst = [] ; isubst = [] ; action = [] } in
+  let env =
+    { p_id = None ;
+      action = [] ; p_indices = [] ;
+      subst = [] ; isubst = [] }
+  in
   let _:int = p_in ~pos:0 ~env ~pos_indices:[] proc in
   ()
 
