@@ -342,10 +342,12 @@ let parse_proc proc : unit =
   in
 
   let conv_term env t =
-      Theory.convert env.action env.subst env.isubst t
+    let action = List.rev env.action in
+    Theory.convert action env.subst env.isubst t
   in
   let conv_fact env t =
-    Theory.convert_fact env.action env.subst env.isubst t
+    let action = List.rev env.action in
+    Theory.convert_fact action env.subst env.isubst t
   in
   let conv_indices env l =
     List.map (fun x -> List.assoc x env.isubst) l
@@ -444,10 +446,11 @@ let parse_proc proc : unit =
         in
         let condition = vars, conj facts in
         let action = { par_choice ; sum_choice=pos }::env.action in
+        let in_tm = Term.Input (Term.TName (List.rev action)) in
         let env =
           { env with
             action = action ;
-            subst = (snd input,Term.Input (Term.TName action))::env.subst }
+            subst = (snd input,in_tm)::env.subst }
         in
           p_update
             ~env ~input ~condition

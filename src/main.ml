@@ -114,6 +114,7 @@ let () =
     end ;
     "Block creation", `Quick, begin fun () ->
       parse_theory ~test "examples/blocks.mbc"
+      (* TODO test resulting block structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
       parse_theory ~test "examples/lak.mbc"
