@@ -367,15 +367,16 @@ let parse_proc proc : unit =
     * and accumulate parts of the new action item and block:
     * [pos] is the position in parallel compositions.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos = function
+  let rec p_in ~env ~pos ~pos_indices = function
     | Null -> pos
     | Parallel (p,q) ->
-        let pos = p_in ~env ~pos p in
-          p_in ~env ~pos q
+        let pos = p_in ~env ~pos ~pos_indices p in
+          p_in ~env ~pos ~pos_indices q
     | Repl (i,p) ->
         let i' = Action.fresh_index () in
         let env = { env with isubst = (i,i') :: env.isubst } in
-          p_in ~env ~pos p
+        let pos_indices = (i,i')::pos_indices in
+          p_in ~env ~pos ~pos_indices p
     | Apply (id,args,id') ->
         (* TODO
          *  - use more precise action prefix
@@ -400,7 +401,7 @@ let parse_proc proc : unit =
                 (List.map2 (fun (x,_) v -> x, conv_term env v) t args) @
                 env.subst }
         in
-          p_in ~env ~pos p
+          p_in ~env ~pos ~pos_indices p
     | In _ | Exists _ | Set _ | Out _ as proc ->
         let input,p =
           (* Get the input data,
@@ -409,7 +410,7 @@ let parse_proc proc : unit =
             | In (c,x,p) -> (c,x),p
             | _ -> (Channel.dummy,"_"),proc
         in
-        let par_choice = pos,env.isubst in
+        let par_choice = pos,pos_indices in
         let _:int =
           p_cond
             ~env ~par_choice ~input
@@ -424,7 +425,7 @@ let parse_proc proc : unit =
              List.map snd env.isubst)
         in
         let env = { env with subst = (n,n')::env.subst } in
-          p_in ~env ~pos p
+          p_in ~env ~pos ~pos_indices p
     | Let (x,t,p) ->
         let x' =
           Term.fresh_macro
@@ -433,7 +434,7 @@ let parse_proc proc : unit =
         in
         let t' = Term.Fun ((x',List.map snd env.isubst),[]) in
         let env = { env with subst = (x,t')::env.subst } in
-          p_in ~env ~pos p
+          p_in ~env ~pos ~pos_indices p
 
   (** Similar to [p_in] but with an [input] and [par_choice] already known,
     * a conjonction of [facts] in construction, a [pos] and [vars] indicating
@@ -554,7 +555,7 @@ let parse_proc proc : unit =
         in
         let block = { input ; condition ; updates ; output } in
           Hashtbl.add action_to_block (List.rev env.action) block ;
-          ignore (p_in ~env ~pos:0 p)
+          ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
     | p ->
         Format.eprintf "%a@." pp_process p ;
         failwith "p_update: unsupported"
@@ -562,7 +563,7 @@ let parse_proc proc : unit =
   in
 
   let env = { p_id = None ; subst = [] ; isubst = [] ; action = [] } in
-  let _:int = p_in ~pos:0 ~env proc in
+  let _:int = p_in ~pos:0 ~env ~pos_indices:[] proc in
   ()
 
 let declare_system proc = check_proc [] proc ; parse_proc proc
