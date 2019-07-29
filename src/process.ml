@@ -314,11 +314,6 @@ let rec parse_proc action proc : unit =
     * Return the next position in parallel compositions. *)
   let rec p_in ~pos ~vars = function
     | Null -> pos
-    | In (c,x,p) ->
-        let _:int =
-          p_cond ~par_choice:(pos,vars) ~pos:0 ~vars:[] ~input:(c,x) ~facts:[] p
-        in
-          pos + 1
     | Parallel (p,q) ->
         let pos = p_in ~pos ~vars p in
           p_in ~pos ~vars q
@@ -328,6 +323,16 @@ let rec parse_proc action proc : unit =
     | Apply (id,args,id') ->
         Aliases.decl_action_name id' action pos ;
         p_in ~pos ~vars (get_apply id args)
+    | In _ | Exists _ | Set _ | Out _ as proc ->
+        let input,p =
+          match proc with
+            | In (c,x,p) -> (c,x),p
+            | _ -> (Channel.dummy,"_"),proc
+        in
+        let _:int =
+          p_cond ~par_choice:(pos,vars) ~pos:0 ~vars:[] ~input ~facts:[] p
+        in
+          pos + 1
     | _ as p ->
       (* Debug *)
       pp_process Fmt.stderr p;
@@ -364,8 +369,13 @@ let rec parse_proc action proc : unit =
     | Set (s,l,t,p) ->
       let updates = (s,l,t)::updates in
       p_update ~par_choice ~sum_choice ~input ~condition ~updates p
-    | Out (c,t,p) ->
-        let block = { input ; condition ; updates ; output = c,t } in
+    | Out _ | Null as proc ->
+        let output,p =
+          match proc with
+            | Out (c,t,p) -> (c,t),p
+            | _ -> (Channel.dummy,Theory.dummy),proc
+        in
+        let block = { input ; condition ; updates ; output } in
         let item = { par_choice ; sum_choice } in
         let action = item::action in
         Hashtbl.add action_to_block

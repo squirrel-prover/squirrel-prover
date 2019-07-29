@@ -15,6 +15,8 @@ type term =
         * depending on the type of the function symbol. *)
   | Compare of ord*term*term
 
+let dummy = Var "_"
+
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
   | Fun (f,terms) ->

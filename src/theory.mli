@@ -17,6 +17,8 @@ type term =
 
 val pp_term : Format.formatter -> term -> unit
 
+val dummy : term
+
 (** Facts *)
 
 type fact = term Term.bformula

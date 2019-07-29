@@ -14,6 +14,8 @@ let declare s =
 
 let of_string s = Hashtbl.find channels s ; s
 
+let dummy = "_"
+
 let pp_channel ppf c = Fmt.pf ppf "%a" (Utils.kw Fmt.(`None)) c
 
 let () =
