@@ -140,7 +140,7 @@ declaration:
 
 theory:
 | declaration theory             { () }
-| SYSTEM process EOF             { Process.declare_system Process.Null }
+| SYSTEM process EOF             { Process.declare_system $2 }
 
 top_process:
 | process EOF                    { $1 }
