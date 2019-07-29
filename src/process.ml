@@ -144,7 +144,7 @@ let rec check_proc env = function
   | Set (s,l,m,p) ->
       let k = Theory.check_state s (List.length l) in
         Theory.check_term env m k ;
-        List.iter (fun x -> Theory.check_term env (Var x) Theory.Index) l ;
+        List.iter (fun x -> Theory.check_term env (Theory.Var x) Theory.Index) l ;
         check_proc env p
   | Parallel (p,q) -> check_proc env p ; check_proc env q
   | Let (x,t,p) ->

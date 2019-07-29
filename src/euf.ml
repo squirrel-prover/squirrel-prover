@@ -47,79 +47,110 @@ let euf_key_ssc proc hash_fn key_n =
   List.for_all ssc_blk  proc
 
 
+let rec h_o_term hh kk acc = function
+  | Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
+      | Name (key_n',is) ->
+        if key_n' = kk then h_o_term hh kk ((is,m) :: acc) m
+        else h_o_term hh kk acc m
+      | _ -> h_o_term hh kk (h_o_term hh kk acc m) k end
+
+  | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
+  | Output _ | Input _ | State _ -> acc
+  | Name (n,_) -> acc
+
 (** [hashes_of_blk blk hash_fn key_n] return the pairs of indices and messages
     where a hash using occurs in a block description. I.e. we have a pair
     (is,m) iff hash_fn(m,key_n(is)) occurs in the block description output or
     state updates.
     Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
 let hashes_of_blk blk hash_fn key_n =
-  let rec h_o_term acc = function
-    | Fun ((fn,_), [m;k]) when fn = hash_fn -> begin match k with
-        | Name (key_n',is) ->
-          if key_n' = key_n then h_o_term ((is,m) :: acc) m
-          else h_o_term acc m
-        | _ -> h_o_term (h_o_term acc m) k end
-
-    | Fun (_,l) -> List.fold_left h_o_term acc l
-    | Output _ | Input _ | State _ -> acc
-    | Name (n,_) -> acc in
-
-  List.fold_left h_o_term [] (blk.output :: (List.map snd blk.updates))
+  List.fold_left (h_o_term hash_fn key_n)
+    [] (blk.output :: (List.map snd blk.updates))
   |> List.sort_uniq Pervasives.compare
 
+let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
 
-(** Type of an euf axiom case.
-    [e] of type [euf_case] represents the fact that the message [e.m]
+
+(** Type of an euf axiom case schema.
+    [e] of type [euf_schema] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices].
-    [e.blk_block] stores the relevant block description for future potential
-    use.  *)
-type euf_case = { key_indices : Action.indices;
-                  message : Term.term;
-                  blk_descr : descr }
+    [e.blk_block] stores the relevant block description for future use.  *)
+type euf_schema = { key_indices : Action.indices;
+                    message : Term.term;
+                    blk_descr : descr }
 
-let pp_euf_case ppf case =
-  Fmt.pf ppf "@[<v>*action:@;  @[<hov>%a@]\
-              *key indices:@;  @[<hov>%a@]\
-              *message:@;  @[<hov>%a@]@]"
+
+let pp_euf_schema ppf case =
+  Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
+              @[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
+              @[<hv 2>*message:@ @[<hov>%a@]@]"
     Action.pp_action case.blk_descr.action
     Action.pp_indices case.key_indices
     Term.pp_term case.message
+
+(** Type of a direct euf axiom case.
+    [e] of type [euf_case] represents the fact that the message [e.m]
+    has been hashed, and the key indices were [e.eindices]. *)
+type euf_direct = { d_key_indices : Action.indices;
+                    d_message : Term.term }
+
+
+let pp_euf_direct ppf case =
+  Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
+              @[<hv 2>*message:@ @[<hov>%a@]@]"
+    Action.pp_indices case.d_key_indices
+    Term.pp_term case.d_message
 
 
 (** Type of an euf axiom rule:
     - [hash] stores the hash function name.
     - [key] stores the key considered in this rule.
-    - [cases] is the list (seen as a disjunction) of cases, with all relevant
-    information.*)
+    - [case_schemata] is the list (seen as a disjunction) of case schemata.
+    - [cases_direct] is the list (seen as a disjunction) of direct cases. *)
 type euf_rule = { hash : fname;
                   key : name;
-                  cases : euf_case list }
+                  case_schemata : euf_schema list;
+                  cases_direct : euf_direct list }
+
 
 let pp_euf_rule ppf rule =
-  Fmt.pf ppf "@[<v>*hash:@;  @[<hov>%a@]\
-              *key:@;  @[<hov>%a@]\
-              *cases:@;<1;2>@[<v>%a@]@]"
+  Fmt.pf ppf "@[<v>*hash: @[<hov>%a@]@;\
+              *key: @[<hov>%a@]@;\
+              *case schemata:@;<1;2>@[<v>%a@]@;\
+              *direct cases:@;<1;2>@[<v>%a@]@]"
     Term.pp_fname rule.hash
     Term.pp_name rule.key
-    (Fmt.list pp_euf_case) rule.cases
+    (Fmt.list pp_euf_schema) rule.case_schemata
+    (Fmt.list pp_euf_direct) rule.cases_direct
 
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
-(** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
-    hash function and key in a process.
+(** [mk_rule proc mess sign hash_fn key_n] create the euf rule associated to
+    an given hash function, key, message and signature in a process.
     TODO: memoisation *)
-let mk_rule proc hash_fn key_n =
+let mk_rule proc mess sign hash_fn key_n =
   if not @@ euf_key_ssc proc hash_fn key_n then raise Bad_ssc
-  else { hash = hash_fn;
-         key = key_n;
-         cases =
-           List.map (fun blk ->
-               hashes_of_blk blk hash_fn key_n
-               |> List.map (fun (is,m) ->
-                   { key_indices = is;
-                     message = m;
-                     blk_descr = blk })
-             ) proc
-           |> List.flatten }
+  else
+    { hash = hash_fn;
+      key = key_n;
+
+      case_schemata =
+        List.map (fun blk ->
+            hashes_of_blk blk hash_fn key_n
+            |> List.map (fun (is,m) ->
+                { key_indices = is;
+                  message = m;
+                  blk_descr = blk })
+          ) proc
+        |> List.flatten;
+
+      cases_direct =
+        List.map (fun term ->
+            hashes_of_term term hash_fn key_n
+            |> List.map (fun (is,m) ->
+                { d_key_indices = is;
+                  d_message = m })
+          ) [mess;sign]
+        |> List.flatten }

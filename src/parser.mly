@@ -1,19 +1,22 @@
 %token <string> ID
 %token <string> BANG
+%token AT
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ COMMA SEMICOLON COLON
+%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
-%token INDEX MESSAGE BOOLEAN ARROW ASSIGN
+%token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
+%token EXISTS FORALL GOAL DARROW
 %token EOF
 
 %token EMPTY_ELSE
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
+%left ARROW
 %left OR
 %left AND
 %nonassoc NOT
@@ -34,6 +37,8 @@ term:
 
 aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
+| ID term_list AT term           { let ts = Theory.make_ts $4 in
+		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 
 term_list:
@@ -49,11 +54,17 @@ tm_list:
 
 ord:
 | EQ                             { Term.Eq }
+| NEQ                            { Term.Neq }
+| LEQ                            { Term.Leq }
+| LT                             { Term.Lt }
+| GEQ                            { Term.Geq }
+| GT                             { Term.Gt }
 
 fact:
 | LPAREN fact RPAREN             { $2 }
 | fact AND fact                  { Term.And  ($1,$3) }
 | fact OR fact                   { Term.Or  ($1,$3) }
+| fact ARROW fact                { Term.Impl  ($1,$3) }
 | NOT fact                       { Term.Not  ($2) }
 | FALSE                          { Term.False }
 | TRUE                           { Term.True }
@@ -110,6 +121,7 @@ kind:
 | INDEX                          { Theory.Index }
 | MESSAGE                        { Theory.Message }
 | BOOLEAN                        { Theory.Boolean }
+| TIMESTAMP                      { Theory.Timestamp }
 
 arg_list:
 |                                { [] }
@@ -143,9 +155,26 @@ declaration:
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
 
+q_vars:
+| arg_list                       { ($1, Term.True) }
+| arg_list SUCHTHAT fact         { ($1, $3) }
+
+formula:
+| fact                           { Logic.declare_goal ([],Term.True) ([],Term.True) Term.True $1 }
+| EXISTS q_vars COLON fact       { Logic.declare_goal ([],Term.True) $2 Term.True $4 }
+| FORALL q_vars COLON fact       { Logic.declare_goal $2 ([],Term.True) Term.True $4 }
+| FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
+                                 { Logic.declare_goal $2 $7 $4 $9 }
+goal_decl:
+| GOAL formula                   { () }
+
+goal_decls:
+|                                { () }
+| goal_decl goal_decls           { () }
+
 theory:
 | declaration theory             { () }
-| SYSTEM process EOF             { Process.declare_system $2 }
+| SYSTEM process goal_decls EOF  { Process.declare_system $2 }
 
 top_process:
 | process EOF                    { $1 }

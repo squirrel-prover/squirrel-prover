@@ -1,0 +1,9 @@
+# TODO (not finished)
+# Simple hash example
+hash h
+
+name n1:message
+name n2:message
+channel c
+system in(c,x);out(c,n1)
+goal forall (tau:timestamp) : out@tau <> n2

@@ -6,13 +6,19 @@ type ord = Term.ord
 type term =
   | Var of string
   | Name of string * term list
-  | Get  of string * term list
-      (** [Get (s,terms)] reads the contents of memory cell
-        * [(s,terms)] where [terms] are evaluated as indices. *)
-  | Fun  of string * term list
+      (** A name, whose arguments will always be indices. *)
+  | Get of string * term option * term list
+      (** [Get (s,ots,terms)] reads the contents of memory cell
+        * [(s,terms)] where [terms] are evaluated as indices.
+        * The second argument [ots] is for the optional timestamp at which the
+        * memory read is performed. This is used for the terms appearing in
+        * goals. *)
+  | Fun of string * term list * term option
       (** Function symbol application,
         * where terms will be evaluated as indices or messages
-        * depending on the type of the function symbol. *)
+        * depending on the type of the function symbol.
+        * The third argument is for the optional timestamp. This is used for
+        * the terms appearing in goals.*)
   | Compare of ord*term*term
 
 val pp_term : Format.formatter -> term -> unit
@@ -25,7 +31,7 @@ val pp_fact : Format.formatter -> fact -> unit
 
 (** Terms may represent indices, messages or booleans *)
 
-type kind = Index | Message | Boolean
+type kind = Index | Message | Boolean | Timestamp
 
 (** Declaration of new symbols
   *
@@ -46,8 +52,9 @@ val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 
 (** Term builders *)
 
-val make_term : string -> term list -> term
+val make_term : ?at_ts:term option -> string -> term list -> term
 val make_pair : term -> term -> term
+val make_ts : term -> term
 
 (** Type-checking *)
 

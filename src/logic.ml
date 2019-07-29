@@ -2,6 +2,43 @@ open Utils
 open Action
 open Term
 
+type args = (string * Theory.kind) list
+
+let goals = ref []
+
+let add_goal g = goals := g :: !goals
+
+(** [convert_vars vars] Returns the timestamp and index variables substitution,
+    in reverse order of declaration. By consequence, List.assoc properly handles
+    the shadowing. *)
+let convert_vars vars =
+  let rec conv tss indices = function
+    | [] -> List.rev tss, List.rev indices
+    | (a, Theory.Index) :: l -> conv tss (a :: indices) l
+    | (a, Theory.Timestamp) :: l -> conv (a :: tss) indices l
+    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
+                             in goals" in
+  let tss, indices = conv [] [] vars in
+
+  ( List.map (fun x -> (x, Term.fresh_tvar ())) tss,
+    List.map (fun i -> (i, Action.fresh_index ())) indices )
+
+let declare_goal (uvars,uconstr) (evars,econstr) ufact efact =
+  assert false
+  (* let uts_subst, uindex_subst = convert_vars uvars
+   * and ets_subst, eindex_subst = convert_vars evars in
+   *
+   * add_goal
+   *   { uvars = List.map snd uts_subst;
+   *     uindices = List.map snd uindex_subst;
+   *     uconstr = Theory.convert_constr uconstr;
+   *     ufact = Theory.convert_fact ?? efact;
+   *     postcond = { evars = List.map snd ets_subst;
+   *                  eindices = List.map snd eindex_subst;
+   *                  econstr = Theory.convert_constr econstr;
+   *                  efact = Theory.convert_fact ?? efact } } *)
+
+
 (** Tags used to record some information on gamma elements:
     - [trs] records whether it is included in the last completion.
     - [euf] records whether the EUF axiom has been applied. *)
@@ -363,7 +400,7 @@ let mk_and_cnstr l = match l with
 
     mk_c a l'
 
-let euf_apply_case theta (_, (_, key_is), m, s) case =
+let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in
   let open Process in
   (* We create fresh indices to rename in the block *)
@@ -402,16 +439,44 @@ let euf_apply_case theta (_, (_, key_is), m, s) case =
   (new_f, constr)
 
 
+let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
+  let open Euf in
+  let open Process in
+
+  (* We create the term equality *)
+  let eq = Atom (Eq, dcase.d_message, m) in
+
+  (* Now, we need to add the timestamp constraint between [key_is] and
+     [dcase.d_key_indices]. *)
+  let eq_cnstr =
+    List.map2 (fun i i' ->
+        Atom (Pind (Eq, i, i'))
+      ) key_is dcase.d_key_indices
+    |> mk_and_cnstr in
+
+  (eq, eq_cnstr)
+
+
 let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Failure "bad euf application"
   | Some p ->
     let (hash_fn, (key_n, key_is), m, s) = p in
-    let rule = Euf.mk_rule judge.environment hash_fn key_n in
-    List.map (fun case ->
-        let new_f, new_cnstr = euf_apply_case judge.theta p case in
-        { judge with theta = Theta.add_constr judge.theta new_cnstr;
-                     gamma = Gamma.add_fact judge.gamma new_f }
-      ) rule.Euf.cases
+    let rule = Euf.mk_rule judge.environment m s hash_fn key_n in
+    let schemata_premises =
+      List.map (fun case ->
+          let new_f, new_cnstr = euf_apply_schema judge.theta p case in
+          { judge with theta = Theta.add_constr judge.theta new_cnstr;
+                       gamma = Gamma.add_fact judge.gamma new_f }
+        ) rule.Euf.case_schemata
+
+    and direct_premises =
+      List.map (fun case ->
+          let new_f, new_cnstr = euf_apply_direct judge.theta p case in
+          { judge with theta = Theta.add_constr judge.theta new_cnstr;
+                       gamma = Gamma.add_fact judge.gamma new_f }
+        ) rule.Euf.cases_direct in
+
+    schemata_premises @ direct_premises
 
 let euf_apply (judge : 'a judgment) sk fk f_select =
   let g, at = Gamma.select judge.gamma f_select (set_euf true) in

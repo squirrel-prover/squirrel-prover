@@ -30,11 +30,18 @@ rule token = parse
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | "="                 { EQ }
+| "<>"                { NEQ }
+| ">="                { GEQ }
+| ">"                 { GT }
+| "<="                { LEQ }
+| "<"                 { LT }
 | '('                 { LPAREN }
 | ')'                 { RPAREN }
 | '|'                 { PARALLEL }
 | "->"                { ARROW }
+| "=>"                { DARROW }
 | ":="                { ASSIGN }
+| "@"                 { AT }
 | "if"                { IF }
 | "then"              { THEN }
 | "else"              { ELSE }
@@ -55,7 +62,11 @@ rule token = parse
 | "message"           { MESSAGE }
 | "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
+| "timestamp"         { TIMESTAMP }
 | "as"                { AS }
 | "null"              { NULL }
+| "forall"            { FORALL }
+| "exists"            { EXISTS }
+| "goal"              { GOAL }
 | name as n           { ID (n) }
 | eof                 { EOF }
