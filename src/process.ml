@@ -411,3 +411,9 @@ let rec parse_proc action proc : unit =
   * in order to be uniquely identified. *)
 
 let declare_system proc = check_proc [] proc ; parse_proc [] proc
+
+let reset () =
+  Hashtbl.clear pdecls ;
+  Hashtbl.clear action_to_block ;
+  Hashtbl.clear Aliases.name_to_action ;
+  Hashtbl.clear Aliases.action_to_name

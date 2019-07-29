@@ -4,6 +4,7 @@ let () = Printexc.record_backtrace true
 
 let parse_theory ?(test=false) filename =
   Theory.initialize_symbols () ;
+  Process.reset () ;
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
     try
       Parser.theory Lexer.token lexbuf

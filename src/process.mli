@@ -50,6 +50,9 @@ val declare : id -> pkind -> process -> unit
   * which triggers the computation of its internal representation. *)
 val declare_system : process -> unit
 
+(** Reset all process declarations. *)
+val reset : unit -> unit
+
 (** TODO better terminology ?
   *   Current type Action.t is really an action label from a finite
   *   set of possibilities (~ locations in process AST).
