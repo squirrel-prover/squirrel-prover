@@ -6,6 +6,8 @@ type args = (string * Theory.kind) list
 
 let goals = ref []
 
+let iter_goals f = List.iter f !goals
+
 let add_goal g = goals := g :: !goals
 
 
@@ -18,28 +20,38 @@ let declare_goal (uargs,uconstr) (eargs,econstr) ufact efact =
   and ets_subst, eindex_subst = Theory.convert_vars eargs in
 
   let uconstr =
-    Theory.convert_constr
+    Theory.convert_constr_glob
       (List.rev uargs)
       (to_ts uts_subst)
       uindex_subst
       uconstr in
+  let ufact =
+    Theory.convert_fact_glob
+      (to_ts uts_subst)
+      uindex_subst
+      ufact in
 
   let econstr =
-    Theory.convert_constr
+    Theory.convert_constr_glob
       (List.rev_append eargs (List.rev uargs))
       (to_ts ets_subst @ to_ts uts_subst)
       (eindex_subst @ uindex_subst)
       econstr in
+  let efact =
+    Theory.convert_fact_glob
+      (to_ts ets_subst @ to_ts uts_subst)
+      (eindex_subst @ uindex_subst)
+      efact in
 
   add_goal
     { uvars = List.map snd uts_subst;
       uindices = List.map snd uindex_subst;
       uconstr = uconstr;
-      ufact = assert false(* Theory.convert_fact2 ?? ufact *);
+      ufact = ufact;
       postcond = [{ evars = List.map snd ets_subst;
                     eindices = List.map snd eindex_subst;
                     econstr = econstr;
-                    efact = assert false (* Theory.convert_fact2 ?? efact *) }]
+                    efact = efact }]
     }
 
 

@@ -116,6 +116,8 @@ val pp_term : Format.formatter -> term -> unit
 (** [is_built_in mn] returns true iff [mn] is a built-in.  *)
 val is_built_in : mname -> bool
 
+val is_declared : string -> mname
+
 (** [declare_macro x f] declares a new macro with a name resembling [x],
   * associated to a substitution function which takes the target timestamp
   * as argument. *)
@@ -205,6 +207,9 @@ and postcond = {
   econstr : constr;
   efact : fact
 }
+
+val pp_postcond : Format.formatter -> postcond -> unit
+val pp_formula : Format.formatter -> formula -> unit
 
 val ivar_subst_state : index subst -> state -> state
 

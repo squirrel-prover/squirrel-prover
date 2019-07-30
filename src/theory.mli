@@ -69,7 +69,7 @@ val is_hash : Term.fname -> bool
 (** Populate theory with only builtin declarations *)
 val initialize_symbols : unit -> unit
 
-(** Convert to [Term.term]. *)
+(** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
   Term.timestamp ->
   (string * Term.term) list ->
@@ -77,7 +77,7 @@ val convert :
   term ->
   Term.term
 
-(** Convert to [Term.fact]. *)
+(** Convert to [Term.fact], for local terms (i.e. with no timestamps). *)
 val convert_fact :
   Term.timestamp ->
   (string * Term.term) list ->
@@ -85,13 +85,27 @@ val convert_fact :
   fact ->
   Term.fact
 
-(** Convert to [Term.constr]. *)
-val convert_constr :
+(** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
+val convert_glob :
+  (string * Term.timestamp) list ->
+  (string * Action.index) list ->
+  term ->
+  Term.term
+
+(** Convert to [Term.constr], for global terms (i.e. with attached timestamps). *)
+val convert_constr_glob :
   (string * kind) list ->
   (string * Term.timestamp) list ->
   (string * Action.index) list ->
   fact ->
   Term.constr
+
+(** Convert to [Term.fact], for global terms (i.e. with attached timestamps). *)
+val convert_fact_glob :
+  (string * Term.timestamp) list ->
+  (string * Action.index) list ->
+  fact ->
+  Term.fact
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,
     in reverse order of declaration. By consequence, List.assoc properly handles

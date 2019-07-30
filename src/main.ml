@@ -135,6 +135,9 @@ let () =
     "LAK model", `Quick, begin fun () ->
       parse_theory ~test "examples/lak.mbc"
     end ;
+    "Simple goal", `Quick, begin fun () ->
+      parse_theory ~test "examples/simple_goal.mbc"
+    end ;
   ];;
 
 
@@ -144,5 +147,14 @@ let pp_proc ppf =
   Process.iter_csa (fun descr ->
       Fmt.pf ppf "@[<v 1>%d:@;@[%a@]@;@]@;"
         !cpt Process.pp_descr descr;
+      incr cpt;);
+  Fmt.pf ppf "@]%!@.";;
+
+let pp_goals ppf =
+  let cpt = ref 0 in
+  Fmt.pf ppf "@[<v>";
+  Logic.iter_goals (fun goal ->
+      Fmt.pf ppf "@[<v 1>%d:@;@[%a@]@;@]@;"
+        !cpt Term.pp_formula goal;
       incr cpt;);
   Fmt.pf ppf "@]%!@.";;

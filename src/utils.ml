@@ -232,3 +232,6 @@ let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
 
 let ident ppf s = Fmt.pf ppf "%s" s
 let kw style = (Fmt.styled style ident)
+
+let pp_ne_list s pp_list ppf l =
+  if l <> [] then Fmt.pf ppf "" else Fmt.pf ppf s pp_list l

@@ -295,9 +295,29 @@ let convert_ts tssubst t =
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 let convert_glob tssubst isubst t =
   let rec conv = function
-    | Fun (f,l,ots) -> begin match ots with
-        | None -> Term.Fun (Term.mk_fname f, List.map conv l)
-        | Some ts -> assert false (* TODO *) end
+    | Fun (f,l,None) ->
+       begin match Hashtbl.find symbols f with
+         | Hash_symbol | AEnc_symbol ->
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | Abstract_symbol (args,_) ->
+             assert (List.for_all (fun k -> k = Message) args) ;
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | Macro_symbol (args,_,_) when
+             List.for_all (fun (_,k) -> k = Index) args ->
+             Term.Fun (Term.mk_fname_idx f (List.map (conv_index isubst) l),
+                       [])
+         | Macro_symbol (args,_,_) when
+             List.for_all (fun (_,k) -> k = Message) args ->
+             Term.Fun (Term.mk_fname f, List.map conv l)
+         | _ -> failwith "unsupported"
+       end
+
+
+    | Fun (f,l,Some ts) ->
+      Term.Macro ( ( Term.is_declared f,
+                     List.map (conv_index isubst) l ),
+                   convert_ts tssubst ts)
+
     | Get (s,Some ts,i) ->
       let s = Term.mk_sname s in
       let i = List.map (conv_index isubst) i in
@@ -352,8 +372,19 @@ let convert_tatom args_kind tssubst isubst f : Term.tatom =
       | _ -> raise Type_error end
   | _ -> assert false
 
-let convert_constr args_kind tssubst isubst f : Term.constr =
+let convert_constr_glob args_kind tssubst isubst f : Term.constr =
   convert_bformula (convert_tatom args_kind tssubst isubst) f
+
+
+let convert_atom_glob tssubst isubst atom =
+  match atom with
+  | Compare (o,u,v) -> (o,
+                        convert_glob tssubst isubst u,
+                        convert_glob tssubst isubst v)
+  | _ -> assert false
+
+let convert_fact_glob tssubst isubst f : Term.fact =
+  convert_bformula (convert_atom_glob tssubst isubst) f
 
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,

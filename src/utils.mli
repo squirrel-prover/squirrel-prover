@@ -68,3 +68,7 @@ val classes : ('a -> 'a -> bool) -> 'a list -> 'a list list
 val ident : Format.formatter -> string -> unit
 
 val kw : Fmt.style -> string Fmt.t
+
+val pp_ne_list :
+  ('a -> 'b list -> unit, Format.formatter, unit) format ->
+  'a -> Format.formatter -> 'b list -> unit

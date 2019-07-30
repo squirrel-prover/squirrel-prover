@@ -116,7 +116,7 @@ let dummy = Fun ((Fname "_",[]),[])
 
 let rec pp_term ppf = function
   | Fun (f,terms) -> Fmt.pf ppf "%a(@[<hov 1>%a@])"
-                       pp_fsymb f (Fmt.list pp_term) terms
+                       pp_fsymb f (Fmt.list ~sep:Fmt.comma pp_term) terms
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
@@ -131,6 +131,10 @@ let built_ins = ["in";"out"]
 
 (** [is_built_in mn] returns true iff [mn] is a built-in.  *)
 let is_built_in mn = List.mem mn built_ins
+
+let is_declared mn =
+  if Hashtbl.mem macros mn || List.mem mn built_ins then mn
+  else raise @@ Failure (Printf.sprintf "macro %s is not declared" mn)
 
 let declare_macro mn f =
   assert (not (is_built_in mn) && not (Hashtbl.mem macros mn)) ;
@@ -348,6 +352,59 @@ and postcond = {
   econstr : constr;
   efact : fact
 }
+
+let pp_q_vars s_q vars indices constr ppf () =
+  let open Fmt in
+  let open Utils in
+  if vars <> [] then
+    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
+     (styled `Red (styled `Underline ident)) s_q
+     (list pp_tvar) vars
+     (styled `Blue (styled `Bold ident)) "timestamp"
+  else ();
+  if indices <> [] then
+    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
+     (styled `Red (styled `Underline ident)) s_q
+     pp_indices indices
+     (styled `Blue (styled `Bold ident)) "index"
+  else ();
+  if constr <> True then
+    Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@;"
+     (styled `Red (styled `Underline ident)) "suchthat"
+     pp_constr constr
+  else ();;
+
+let pp_postcond ppf f =
+  Fmt.pf ppf "@[<v 0>%a%a@]"
+    (pp_q_vars "exists" f.evars f.eindices f.econstr) ()
+    pp_fact f.efact
+
+let pp_precond ppf f =
+  Fmt.pf ppf "@[<v 0>%a%a@]"
+    (pp_q_vars "forall" f.uvars f.uindices f.uconstr) ()
+    pp_fact f.ufact
+
+let pp_formula ppf f =
+  let open Fmt in
+  let open Utils in
+  match f.postcond with
+  | [] -> pp_precond ppf f
+  | [a] ->
+    Fmt.pf ppf "@[<v 0>%a@;%a %a@]"
+      pp_precond f
+      (styled `Red (styled `Underline ident)) "=>"
+      pp_postcond a
+  | a :: l ->
+    Fmt.pf ppf "@[<v 0>%a@;%a %a%a@]"
+      pp_precond f
+      (styled `Red (styled `Underline ident)) "=>"
+      pp_postcond a
+      (list
+         ~sep:(fun ppf () ->
+             Fmt.pf ppf "%a "
+             (styled `Red (styled `Underline ident)) "@;\\/")
+         pp_postcond) l
+
 
 let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
 

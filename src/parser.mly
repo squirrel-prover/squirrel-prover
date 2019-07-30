@@ -156,13 +156,22 @@ declaration:
                                  { Process.declare $2 $3 $5 }
 
 q_vars:
-| arg_list                       { ($1, Term.True) }
-| arg_list SUCHTHAT fact         { ($1, $3) }
+| LPAREN arg_list RPAREN                       { ($2, Term.True) }
+| LPAREN arg_list RPAREN SUCHTHAT fact         { ($2, $5) }
 
 formula:
-| fact                           { Logic.declare_goal ([],Term.True) ([],Term.True) Term.True $1 }
-| EXISTS q_vars COLON fact       { Logic.declare_goal ([],Term.True) $2 Term.True $4 }
-| FORALL q_vars COLON fact       { Logic.declare_goal $2 ([],Term.True) Term.True $4 }
+| fact                           { Logic.declare_goal
+				       ([],Term.True)
+				       ([],Term.True)
+				       Term.True $1 }
+| EXISTS q_vars COLON fact       { Logic.declare_goal
+				       ([],Term.True)
+                   	               $2
+				       Term.True $4 }
+| FORALL q_vars COLON fact       { Logic.declare_goal
+				       $2
+				       ([],Term.True)
+				       Term.True $4 }
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
                                  { Logic.declare_goal $2 $7 $4 $9 }
 goal_decl:
