@@ -241,14 +241,14 @@ let pp_descr ppf descr =
     (fun ppf () ->
        if descr.indices = [] then Fmt.pf ppf ""
        else
-         Fmt.pf ppf "@[<hv 2>*indices:@ @[<hov>%a@]@]@;\ "
+         Fmt.pf ppf "@[<hv 2>*indices:@ @[<hov>%a@]@]@;"
            pp_indices descr.indices
     ) ()
     Term.pp_fact descr.condition
     (fun ppf () ->
        if descr.updates = [] then Fmt.pf ppf ""
        else
-         Fmt.pf ppf "*updates:@;  @[<hov>%a@]@;\ "
+         Fmt.pf ppf "*updates:@;  @[<hov>%a@]@;"
            (Fmt.list (Fmt.pair Term.pp_state Term.pp_term)) descr.updates
     ) ()
     Term.pp_term descr.output
@@ -341,7 +341,7 @@ type p_env = {
   action : Action.action ;
   p_indices : Action.indices ;
   p_id : string option ;          (** current process identifier *)
-  subst : (string*Term.term) list ;
+  subst : (string * (Term.timestamp -> Term.term)) list ;
     (** substitution for all free variables, standing for inputs,
       * names, and local definitions *)
   isubst : (string*Action.index) list
@@ -351,18 +351,21 @@ type p_env = {
 (** Parse a process with a given action prefix. *)
 let parse_proc proc : unit =
 
+  let conv_term_at_ts env ts t =
+    let subst = List.map (fun (x,f) -> x,f ts) env.subst in
+    Theory.convert ts subst env.isubst t in
   let conv_term env t =
-    let action = List.rev env.action in
-    Theory.convert action env.subst env.isubst t
+    let ts = Term.TName (List.rev env.action) in
+    conv_term_at_ts env ts t
   in
   let conv_fact env t =
-    let action = List.rev env.action in
-    Theory.convert_fact action env.subst env.isubst t
+    let ts = Term.TName (List.rev env.action) in
+    let subst = List.map (fun (x,f) -> x,f ts) env.subst in
+    Theory.convert_fact ts subst env.isubst t
   in
   let conv_indices env l =
     List.map (fun x -> List.assoc x env.isubst) l
   in
-  let reconvert env action' t = assert false in
 
   (** Parse the process, which should be in the expected normal
     * form (input, conditionals, assignments, output, and so on)
@@ -400,10 +403,11 @@ let parse_proc proc : unit =
           else
             { env with
               p_id = Some id' ;
-              (* TODO it might be too early to convert the arguments,
-              * e.g. we don't know the final timestamp *)
               subst =
-                (List.map2 (fun (x,_) v -> x, conv_term env v) t args) }
+                (List.map2 (fun (x,_) v ->
+                     x,
+                     fun ts ->
+                       conv_term_at_ts env ts v) t args) }
         in
           p_in ~env ~pos ~pos_indices p
     | In _ | Exists _ | Set _ | Out _ as proc ->
@@ -428,17 +432,26 @@ let parse_proc proc : unit =
             (Term.fresh_name n,
              env.p_indices)
         in
-        let env = { env with subst = (n,n')::env.subst } in
+        let env = { env with subst = (n,fun _ -> n')::env.subst } in
           p_in ~env ~pos ~pos_indices p
     | Let (x,t,p) ->
         let x' =
-          Term.fresh_macro
+          Term.declare_macro
             x
-            (fun action' -> reconvert env action' t)
+            (fun ts indices ->
+               let t' = conv_term_at_ts env ts t in
+               Term.ivar_subst_term
+                 (List.map2
+                    (fun i' i'' -> i', i'')
+                    env.p_indices
+                    indices)
+                 t')
         in
-        let t' = Term.Fun ((x',env.p_indices),[]) in
+        let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
+                                     ts ) in
         let env = { env with subst = (x,t')::env.subst } in
           p_in ~env ~pos ~pos_indices p
+
 
   (** Similar to [p_in] but with an [input] and [par_choice] already known,
     * a conjonction of [facts] in construction, a [pos] and [vars] indicating
@@ -448,71 +461,79 @@ let parse_proc proc : unit =
     * appropriate timestamp. *)
   and p_cond ~env ~par_choice ~input ~pos ~vars ~facts = function
     | New (n,p) ->
-        let n' =
-          Term.Name
-            (Term.fresh_name n,
-             env.p_indices)
-        in
-        let env = { env with subst = (n,n')::env.subst } in
-          p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
+      let n' =
+        Term.Name
+          (Term.fresh_name n,
+           env.p_indices)
+      in
+      let env = { env with subst = (n,fun _ -> n')::env.subst } in
+      p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
     | Let (x,t,p) ->
-        (* TODO lift this limitation
-         *   the problem is that we add the binding for x only later
-         *   when we know the timestamp, so it breaks scoping;
-         *   a similar problem might show because we un-interleave
-         *   introductions of index and other variables
-         *   -> we probably need a more complex notion of substitution *)
-        assert (x <> snd input) ;
-        let x' =
-          Term.fresh_macro
-            x
-            (fun action' -> reconvert env action' t)
-        in
-        let t' = Term.Fun ((x',env.p_indices),[]) in
-        let env = { env with subst = (x,t')::env.subst } in
-          p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
+      (* TODO lift this limitation
+       *   the problem is that we add the binding for x only later
+       *   when we know the timestamp, so it breaks scoping;
+       *   a similar problem might show because we un-interleave
+       *   introductions of index and other variables
+       *   -> we probably need a more complex notion of substitution *)
+      assert (x <> snd input) ;
+      let x' =
+        Term.declare_macro
+          x
+          (fun ts indices ->
+             let t' = conv_term_at_ts env ts t in
+             Term.ivar_subst_term
+               (List.map2
+                  (fun i' i'' -> i', i'')
+                  env.p_indices
+                  indices)
+               t')
+      in
+      let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
+                                   ts ) in
+      let env = { env with subst = (x,t')::env.subst } in
+      p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
     | Exists (evars,cond,p,q) ->
-        let facts_p = cond::facts in
-        let facts_q =
-          if evars = [] then
-            Term.Not cond :: facts
-          else
-            facts
-        in
-        let newsubst = List.map (fun i -> i, Action.fresh_index ()) evars in
-        let pos =
-          p_cond
-            ~env:{ env with
-                   isubst = newsubst @ env.isubst ;
-                   p_indices = List.map snd newsubst @ env.p_indices }
-            ~par_choice ~input
-            ~pos ~vars:(evars@vars) ~facts:facts_p
-            p
-        in
-          p_cond
-            ~env ~par_choice ~input
-            ~pos ~vars ~facts:facts_q
-            q
+      let facts_p = cond::facts in
+      let facts_q =
+        if evars = [] then
+          Term.Not cond :: facts
+        else
+          facts
+      in
+      let newsubst = List.map (fun i -> i, Action.fresh_index ()) evars in
+      let pos =
+        p_cond
+          ~env:{ env with
+                 isubst = newsubst @ env.isubst ;
+                 p_indices = List.map snd newsubst @ env.p_indices }
+          ~par_choice ~input
+          ~pos ~vars:(evars@vars) ~facts:facts_p
+          p
+      in
+      p_cond
+        ~env ~par_choice ~input
+        ~pos ~vars ~facts:facts_q
+        q
     (* TODO factorize code for new, let... *)
     | p ->
-        let rec conj = function
-          | [] -> Term.True
-          | [f] -> f
-          | f::fs -> Term.And (f, conj fs)
-        in
-        let condition = vars, conj facts in
-        let action = { par_choice ; sum_choice=pos }::env.action in
-        let in_tm = Term.Input (Term.TName (List.rev action)) in
-        let env =
-          { env with
-            action = action ;
-            subst = (snd input,in_tm)::env.subst }
-        in
-          p_update
-            ~env ~input ~condition
-            ~updates:[]
-            p ;
-          pos + 1
+      let rec conj = function
+        | [] -> Term.True
+        | [f] -> f
+        | f::fs -> Term.And (f, conj fs)
+      in
+      let condition = vars, conj facts in
+      let action = { par_choice ; sum_choice=pos }::env.action in
+      let in_tm = Term.Macro (Term.in_macro, Term.TName (List.rev action)) in
+      let env =
+        { env with
+          action = action ;
+          subst = (snd input,fun _ -> in_tm)::env.subst }
+      in
+      p_update
+        ~env ~input ~condition
+        ~updates:[]
+        p ;
+      pos + 1
 
   (** Similar to previous functions, with [sum_choice] and [facts] finalized,
     * and now accumulating a list of [updates] until an output is reached,
@@ -524,18 +545,26 @@ let parse_proc proc : unit =
             (Term.fresh_name n,
              env.p_indices)
         in
-        let env = { env with subst = (n,n')::env.subst } in
+        let env = { env with subst = (n,fun _ -> n')::env.subst } in
           p_update ~env ~input ~condition ~updates p
     | Let (x,t,p) ->
-        assert (x <> snd input) ; (* TODO see above *)
-        let x' =
-          Term.fresh_macro
-            x
-            (fun action' -> reconvert env action' t)
-        in
-        let t' = Term.Fun ((x',env.p_indices),[]) in
-        let env = { env with subst = (x,t')::env.subst } in
-          p_update ~env ~input ~condition ~updates p
+      assert (x <> snd input) ; (* TODO see above *)
+      let x' =
+        Term.declare_macro
+          x
+          (fun ts indices ->
+             let t' = conv_term_at_ts env ts t in
+             Term.ivar_subst_term
+               (List.map2
+                  (fun i' i'' -> i', i'')
+                  env.p_indices
+                  indices)
+               t')
+      in
+      let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
+                               ts ) in
+      let env = { env with subst = (x,t')::env.subst } in
+      p_update ~env ~input ~condition ~updates p
     | Set (s,l,t,p) ->
         let updates = (s,l,t)::updates in
           p_update ~env ~input ~condition ~updates p

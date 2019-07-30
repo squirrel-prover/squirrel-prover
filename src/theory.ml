@@ -248,7 +248,7 @@ let conv_index isubst = function
   | Var x -> List.assoc x isubst
   | _ -> failwith "ill-formed index"
 
-let convert a subst isubst t =
+let convert ts subst isubst t =
   let rec conv = function
     | Fun (f,l,None) ->
        begin match Hashtbl.find symbols f with
@@ -269,7 +269,7 @@ let convert a subst isubst t =
     | Get (s,None,i) ->
         let s = Term.mk_sname s in
         let i = List.map (conv_index isubst) i in
-          Term.State ((s,i),Term.TName a)
+          Term.State ((s,i),ts)
     | Name (n,i) ->
         let i = List.map (conv_index isubst) i in
           Term.Name (Term.mk_name n,i)
@@ -313,9 +313,9 @@ let convert_glob tssubst isubst t =
   conv t
 
 
-let convert_atom a subst isubst atom =
+let convert_atom ts subst isubst atom =
   match atom with
-  | Compare (o,u,v) -> (o, convert a subst isubst u, convert a subst isubst v)
+  | Compare (o,u,v) -> (o, convert ts subst isubst u, convert ts subst isubst v)
   | _ -> assert false
 
 let convert_bformula conv_atom f =
@@ -330,8 +330,8 @@ let convert_bformula conv_atom f =
     | False -> False in
   conv f
 
-let convert_fact a subst isubst f : Term.fact =
-  convert_bformula (convert_atom a subst isubst) f
+let convert_fact ts subst isubst f : Term.fact =
+  convert_bformula (convert_atom ts subst isubst) f
 
 (* Not clean at all. *)
 let get_kind env t =

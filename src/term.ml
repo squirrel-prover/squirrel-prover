@@ -97,13 +97,20 @@ type state = sname * indices
 
 let pp_state ppf (sn,is) = Fmt.pf ppf "%a(%a)" pp_sname sn pp_indices is
 
+(** Type of macros name *)
+type mname = string
+type msymb = mname * indices
+
+let pp_mname ppf = function s -> Fmt.pf ppf "m!%s" s
+let pp_msymb ppf = function (m,is) -> Fmt.pf ppf "%a(%a)" pp_mname m pp_indices is
+
 (** Terms *)
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
   | State of state * timestamp
-  | Output of timestamp
-  | Input of timestamp
+  (* | Input of timestamp *)
+  | Macro of msymb * timestamp
 
 let dummy = Fun ((Fname "_",[]),[])
 
@@ -112,16 +119,36 @@ let rec pp_term ppf = function
                        pp_fsymb f (Fmt.list pp_term) terms
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
-  | Output ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
-  | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts
+  | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
+  (* | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts *)
 
 type t = term
 
-let macros = Hashtbl.create 97
-let fresh_macro n f =
-  assert (not (Hashtbl.mem macros n)) ;
-  Hashtbl.add macros n f ;
-  Fname n
+let macros : (string, (timestamp -> indices -> term)) Hashtbl.t =
+  Hashtbl.create 97
+
+let built_ins = ["in";"out"]
+
+(** [is_built_in mn] returns true iff [mn] is a built-in.  *)
+let is_built_in mn = List.mem mn built_ins
+
+let declare_macro mn f =
+  assert (not (is_built_in mn) && not (Hashtbl.mem macros mn)) ;
+  Hashtbl.add macros mn f;
+  mn                            (* TODO: refresh if already there *)
+
+
+(** Return the term corresponding to the declared macro, except for the
+    built-ins "in" and "out". *)
+let macro_declaration mn =
+  if is_built_in mn then
+    raise @@ Failure "look-up of a built-in declaration"
+  else Hashtbl.find macros mn
+
+let mk_mname mn indices = (mn,indices)
+
+let in_macro = ("in",[])
+let out_macro = ("out",[])
 
 (** Boolean formulas *)
 type 'a bformula =
@@ -340,8 +367,8 @@ let rec tvar_subst_term tsubst t = match t with
   | Fun (fs, lt) -> Fun (fs, List.map (tvar_subst_term tsubst) lt)
   | Name _ -> t
   | State (s, ts) -> State (s, tvar_subst_ts tsubst ts)
-  | Output ts -> Output (tvar_subst_ts tsubst ts)
-  | Input ts -> Input (tvar_subst_ts tsubst ts)
+  | Macro (m,ts) -> Macro (m,tvar_subst_ts tsubst ts)
+  (* | Input ts -> Input (tvar_subst_ts tsubst ts) *)
 
 let rec ivar_subst_term isubst t = match t with
   | Fun (fs, lt) -> Fun ( ivar_subst_symb isubst fs,
@@ -349,8 +376,8 @@ let rec ivar_subst_term isubst t = match t with
   | Name n -> Name (ivar_subst_symb isubst n)
   | State (s, ts) -> State ( ivar_subst_symb isubst s,
                              ivar_subst_ts isubst ts )
-  | Output ts -> Output (ivar_subst_ts isubst ts)
-  | Input ts -> Input (ivar_subst_ts isubst ts)
+  | Macro (m,ts) -> Macro (m,ivar_subst_ts isubst ts)
+  (* | Input ts -> Input (ivar_subst_ts isubst ts) *)
 
 let subst_term isubst tsubst m = ivar_subst_term isubst m
                                  |> tvar_subst_term tsubst
@@ -431,7 +458,8 @@ let rec tvars acc = function
   | Fun (fs, lt) -> List.fold_left tvars (svars acc fs) lt
   | Name n -> svars acc n
   | State (s, ts) -> tsvars (svars acc s) ts
-  | Input ts | Output ts -> tsvars acc ts
+  (* | Input ts *)
+  | Macro (_,ts) -> tsvars acc ts
 
 (** [term_vars t] returns the timestamp and index variables of [t]*)
 let term_vars t =
@@ -449,7 +477,9 @@ let tss_vars tss =
 let rec tts acc = function
   | Fun (fs, lt) -> List.fold_left tts acc lt
   | Name n -> acc
-  | State (_, ts) | Input ts | Output ts -> ts :: acc
+  | State (_, ts)
+  (* | Input ts *)
+  | Macro (_,ts) -> ts :: acc
 
 (** [term_ts t] returns the timestamps appearing in [t] *)
 let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare

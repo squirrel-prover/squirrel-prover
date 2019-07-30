@@ -71,7 +71,7 @@ val initialize_symbols : unit -> unit
 
 (** Convert to [Term.term]. *)
 val convert :
-  Action.action ->
+  Term.timestamp ->
   (string * Term.term) list ->
   (string * Action.index) list ->
   term ->
@@ -79,7 +79,7 @@ val convert :
 
 (** Convert to [Term.fact]. *)
 val convert_fact :
-  Action.action ->
+  Term.timestamp ->
   (string * Term.term) list ->
   (string * Action.index) list ->
   fact ->

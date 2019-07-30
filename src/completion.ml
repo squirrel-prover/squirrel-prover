@@ -11,8 +11,9 @@ module Cst = struct
     (** Constants appearing in the original terms *)
     | Cname of nsymb
     | Cstate of state * timestamp
-    | Coutput of timestamp
-    | Cinput of timestamp
+    | Cmacro of msymb * timestamp
+    (* | Coutput of timestamp
+     * | Cinput of timestamp *)
 
   let cst_cpt = ref 0
 
@@ -25,8 +26,9 @@ module Cst = struct
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
-    | Coutput ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
-    | Cinput ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts
+    | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
+    (* | Coutput ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
+     * | Cinput ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts *)
 
   (** The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
@@ -59,11 +61,12 @@ let mk_var () =
 
 (** Translation from [term] to [cterm] *)
 let rec cterm_of_term = function
-  | Fun (f,ts) -> Cfun (f, List.map cterm_of_term ts)
+  | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
-  | State (s,t) -> Ccst (Cst.Cstate (s,t))
-  | Input n -> Ccst (Cst.Cinput n)
-  | Output n -> Ccst (Cst.Coutput n)
+  | State (s,ts) -> Ccst (Cst.Cstate (s,ts))
+  | Macro (m,ts) -> Ccst (Cst.Cmacro (m,ts))
+  (* | Input n -> Ccst (Cst.Cinput n)
+   * | Output n -> Ccst (Cst.Coutput n) *)
 
 let rec pp_cterm ppf = function
   | Cvar v -> Fmt.pf ppf "v#%d" v

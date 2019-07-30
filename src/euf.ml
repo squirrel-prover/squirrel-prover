@@ -22,6 +22,8 @@ let subst_descr inu tnu blk =
 (** Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
 let euf_key_ssc proc hash_fn key_n =
+  let checked_macros = ref [] in
+
   let rec ssc_blk blk =
     ssc_fact blk.condition
     && ssc_term blk.output
@@ -41,8 +43,17 @@ let euf_key_ssc proc hash_fn key_n =
         | _ -> ssc_term m && ssc_term k end
 
     | Fun (_,l) -> List.for_all ssc_term l
-    | Output _ | Input _ | State _ -> true
-    | Name (n,_) -> n <> key_n in
+    (* | Output _ | Input _ *)
+    | Macro ((mn,is),_) -> ssc_macro mn is
+    | State _ -> true
+    | Name (n,_) -> n <> key_n
+
+  and ssc_macro mn is =
+    if List.mem mn !checked_macros || Term.is_built_in mn then true
+    else begin
+      checked_macros := mn :: !checked_macros;
+      let a_dummy = Action.mk_action [] in
+      ssc_term (Term.macro_declaration mn (TName a_dummy) is) end in
 
   List.for_all ssc_blk  proc
 
@@ -55,7 +66,11 @@ let rec h_o_term hh kk acc = function
       | _ -> h_o_term hh kk (h_o_term hh kk acc m) k end
 
   | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
-  | Output _ | Input _ | State _ -> acc
+  | Macro ((mn,is),a) ->
+    if Term.is_built_in mn then acc
+    else Term.macro_declaration mn a is
+         |> h_o_term hh kk acc
+  | State _ -> acc
   | Name (n,_) -> acc
 
 (** [hashes_of_blk blk hash_fn key_n] return the pairs of indices and messages

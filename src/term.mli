@@ -89,13 +89,23 @@ val mk_sname : string -> sname (* TODO *)
 
 val pp_state : Format.formatter -> state -> unit
 
+(** Type of macros name.
+    A macro is either a user-defined macro, through a let construct in
+    a process, or a built-in macro such as "in" or "out". *)
+
+type mname = private string
+type msymb = mname * indices
+
+val pp_mname :  Format.formatter -> mname -> unit
+val pp_msymb :  Format.formatter -> msymb -> unit
+
 (** Terms *)
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
   | State of state * timestamp
-  | Output of timestamp
-  | Input of timestamp
+  (* | Input of timestamp *)
+  | Macro of msymb * timestamp
 
 type t = term
 
@@ -103,10 +113,22 @@ val dummy : term
 
 val pp_term : Format.formatter -> term -> unit
 
-(** [fresh_macro x f] declares a new macro with a name resembling [x],
+(** [is_built_in mn] returns true iff [mn] is a built-in.  *)
+val is_built_in : mname -> bool
+
+(** [declare_macro x f] declares a new macro with a name resembling [x],
   * associated to a substitution function which takes the target timestamp
   * as argument. *)
-val fresh_macro : string -> (action -> term) -> fname
+val declare_macro : string -> (timestamp -> indices -> term) -> mname
+
+(** Return the term corresponding to the declared macro, except for the
+    built-ins "in" and "out". *)
+val macro_declaration : mname -> timestamp -> indices -> term
+
+val mk_mname : mname -> indices -> msymb
+
+val in_macro : msymb
+val out_macro : msymb
 
 (** Boolean formulas *)
 type 'a bformula =
