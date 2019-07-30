@@ -37,7 +37,7 @@ term:
 
 aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
-| ID term_list AT term           { let ts = Theory.make_ts $4 in
+| ID term_list AT term           { let ts = $4 in
 		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 

@@ -6,7 +6,7 @@ let pp_index ppf = function Index i -> Fmt.pf ppf "i%d" i
 
 let pp_indices ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_index) l
+    (Fmt.list ~sep:Fmt.comma pp_index) l
 
 let idx_cpt = ref 0
 let fresh_index () = incr idx_cpt; Index (!idx_cpt - 1)

@@ -54,7 +54,6 @@ val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 
 val make_term : ?at_ts:term option -> string -> term list -> term
 val make_pair : term -> term -> term
-val make_ts : term -> term
 
 (** Type-checking *)
 

@@ -36,23 +36,25 @@ type name = Name of string
 let mk_name x = Name x
 let fresh_name x = Name x
 
-let pp_name ppf = function Name s -> Fmt.pf ppf "n!%s" s
+let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf ("n!"^s)
 
 type nsymb = name * indices
 
-let pp_nsymb ppf (n,is) = Fmt.pf ppf "%a(%a)" pp_name n pp_indices is
+let pp_nsymb ppf (n,is) =
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n pp_indices is
+  else Fmt.pf ppf "%a" pp_name n
 
 (** Function symbols are built from a name (from a finite set)
   * and a list of indices.
   *
   * TODO must include builtins such as if-then-else, equality, successor, xor ...
   * Adrien: already added some
-  * Some keywords should probably be forbidden, e.g. "in", "out"
+  * Some keywords should probably be forbidden, e.g. "input", "output"
   *)
 
 type fname = Fname of string
 
-let pp_fname ppf = function Fname s -> Fmt.pf ppf "%s" s
+let pp_fname ppf = function Fname s -> (Utils.kw `Bold) ppf s
 
 type fsymb = fname * indices
 
@@ -91,18 +93,25 @@ let f_succ = (Fname "succ", [])
 type sname = Sname of string
 let mk_sname x = Sname x
 
-let pp_sname ppf = function Sname s -> Fmt.pf ppf "s!%s" s
+let pp_sname ppf = function Sname s -> (Utils.kw `Red) ppf ("s!"^s)
 
 type state = sname * indices
 
-let pp_state ppf (sn,is) = Fmt.pf ppf "%a(%a)" pp_sname sn pp_indices is
+let pp_state ppf (sn,is) =
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_sname sn pp_indices is
+  else Fmt.pf ppf "%a" pp_sname sn
 
 (** Type of macros name *)
 type mname = string
 type msymb = mname * indices
 
-let pp_mname ppf = function s -> Fmt.pf ppf "m!%s" s
-let pp_msymb ppf = function (m,is) -> Fmt.pf ppf "%a(%a)" pp_mname m pp_indices is
+let pp_mname ppf s =
+  let open Fmt in
+  (styled `Bold (styled `Magenta Utils.ident)) ppf ("m!"^s)
+
+let pp_msymb ppf (m,is) =
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_mname m pp_indices is
+  else Fmt.pf ppf "%a" pp_mname m
 
 (** Terms *)
 type term =
@@ -127,14 +136,14 @@ type t = term
 let macros : (string, (timestamp -> indices -> term)) Hashtbl.t =
   Hashtbl.create 97
 
-let built_ins = ["in";"out"]
+let built_ins = ["input";"output"]
 
 (** [is_built_in mn] returns true iff [mn] is a built-in.  *)
 let is_built_in mn = List.mem mn built_ins
 
 let is_declared mn =
   if Hashtbl.mem macros mn || List.mem mn built_ins then mn
-  else raise @@ Failure (Printf.sprintf "macro %s is not declared" mn)
+  else raise Not_found
 
 let declare_macro mn f =
   assert (not (is_built_in mn) && not (Hashtbl.mem macros mn)) ;
@@ -143,7 +152,7 @@ let declare_macro mn f =
 
 
 (** Return the term corresponding to the declared macro, except for the
-    built-ins "in" and "out". *)
+    built-ins "input" and "output". *)
 let macro_declaration mn =
   if is_built_in mn then
     raise @@ Failure "look-up of a built-in declaration"
@@ -151,8 +160,8 @@ let macro_declaration mn =
 
 let mk_mname mn indices = (mn,indices)
 
-let in_macro = ("in",[])
-let out_macro = ("out",[])
+let in_macro = ("input",[])
+let out_macro = ("output",[])
 
 (** Boolean formulas *)
 type 'a bformula =
@@ -272,7 +281,7 @@ let not_ord o = match o with
   | Gt -> Leq
 
 let pp_atom ppf (o,tl,tr) =
-    Fmt.pf ppf "@[<h>%a%a%a@]" pp_term tl pp_ord o pp_term tr
+    Fmt.pf ppf "@[<h>%a %a %a@]" pp_term tl pp_ord o pp_term tr
 
 let pp_fact = pp_bformula pp_atom
 
@@ -308,9 +317,9 @@ let pind (o,i,i') = Pind (o,i,i')
 
 let pp_tatom ppf = function
   | Pts (o,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a%a%a@]" pp_timestamp tl pp_ord o pp_timestamp tr
+    Fmt.pf ppf "@[<h>%a %a %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<h>%a%a%a@]" pp_index il pp_ord o pp_index ir
+    Fmt.pf ppf "@[<h>%a %a %a@]" pp_index il pp_ord o pp_index ir
 
 let not_tpred = function
   | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
@@ -359,7 +368,7 @@ let pp_q_vars s_q vars indices constr ppf () =
   if vars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     (list pp_tvar) vars
+     (list ~sep:Fmt.comma pp_tvar) vars
      (styled `Blue (styled `Bold ident)) "timestamp"
   else ();
   if indices <> [] then
@@ -370,7 +379,7 @@ let pp_q_vars s_q vars indices constr ppf () =
   else ();
   if constr <> True then
     Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@;"
-     (styled `Red (styled `Underline ident)) "suchthat"
+     (styled `Red (styled `Underline ident)) "such that"
      pp_constr constr
   else ();;
 

@@ -215,28 +215,23 @@ let make_term ?at_ts:(at_ts=None) s l =
       Fun (s,l,None)
     | Macro_symbol (args,_,t) ->
       if List.length args <> List.length l then raise Type_error ;
-      Fun (s,l,at_ts)
+      assert (at_ts = None);
+      Fun (s,l,None)
   with
-    | Not_found ->
+  | Not_found ->
+    (** If [at_ts] is not [None], we look whether this is a declared macro. *)
+    if at_ts <> None then
+      try let _ = Term.is_declared s in
+        Fun (s, l, at_ts)
+      with Not_found ->
+        if l <> [] then raise Type_error ;
+        Var s
+    else begin
       if l <> [] then raise Type_error ;
-      Var s
+      Var s end
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v],None)
-
-let make_ts t = assert false
-(* let make_ts t =
- *   try match Hashtbl.find symbols s with
- *     | Abstract_symbol (args,_) ->
- *         if List.length args <> List.length l then raise Type_error ;
- *         Fun (s,l)
- *     | Macro_symbol (args,_,t) ->
- *         if List.length args <> List.length l then raise Type_error ;
- *         Fun (s,l)
- *   with
- *     | Not_found ->
- *         if l <> [] then raise Type_error ;
- *         Var (s,at_ts) *)
 
 let is_hash (Term.Fname s) =
   try Hashtbl.find symbols s = Hash_symbol
@@ -325,7 +320,7 @@ let convert_glob tssubst isubst t =
     | Name (n,i) ->
       let i = List.map (conv_index isubst) i in
       Term.Name (Term.mk_name n,i)
-    | Var x -> raise @@ Failure (Printf.sprintf "unbound variable %s" x)
+    | Var x -> raise @@ Failure (Printf.sprintf "convert: unbound variable %s" x)
     | Compare (o,u,v) -> assert false (* TODO *)
     | Get (s,None,_) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in

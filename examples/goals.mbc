@@ -1,0 +1,22 @@
+# Simple
+name n1:message
+name n2:message
+channel c
+system in(c,x);out(c,n1)
+goal forall (tau:timestamp) : output@tau <> n2
+
+goal
+forall (tau1:timestamp, tau2:timestamp) :
+output@tau1 = output@tau2
+
+goal
+forall (tau1:timestamp, tau2:timestamp) such that tau1 <> tau2 :
+output@tau1 = output@tau2
+
+goal
+forall (tau1:timestamp, tau2:timestamp) such that tau1 <= tau2 :
+output@tau1 = output@tau2
+=>
+exists (tau3:timestamp, i:index, i2:index) such that
+tau1 <= tau3 and tau3 <= tau2 :
+output@tau1 = output@tau2
