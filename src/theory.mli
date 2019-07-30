@@ -84,3 +84,18 @@ val convert_fact :
   (string * Action.index) list ->
   fact ->
   Term.fact
+
+(** Convert to [Term.constr]. *)
+val convert_constr :
+  (string * kind) list ->
+  (string * Term.timestamp) list ->
+  (string * Action.index) list ->
+  fact ->
+  Term.constr
+
+(** [convert_vars vars] Returns the timestamp and index variables substitution,
+    in reverse order of declaration. By consequence, List.assoc properly handles
+    the shadowing. *)
+val convert_vars :
+  ('a * kind) list ->
+  ('a * Term.tvar) list * ('a * Action.index) list

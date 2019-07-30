@@ -59,6 +59,8 @@ type symbol_info =
          * with arguments [xi] of respective types [ki], and
          * return type [k]. *)
 
+let pred_fs = "pred"
+
 let symbols : (string,symbol_info) Hashtbl.t = Hashtbl.create 97
 
 (** Sets the symbol table to one where only builtins are declared *)
@@ -67,17 +69,17 @@ let initialize_symbols () =
   Channel.reset () ;
   List.iter
     (fun (s,a,k) -> Hashtbl.add symbols s (Abstract_symbol (a,k)))
-    [ "pair",[Message;Message],Message ;
-      "fst",[Message],Message ;
-      "snd",[Message],Message ;
-      "choice",[Message;Message],Message ;
-      "if",[Boolean;Message;Message],Message;
-      "and",[Boolean;Boolean],Boolean;
-      "or",[Boolean;Boolean],Boolean;
-      "not",[Boolean],Boolean;
-      "true",[],Boolean;
-      "false",[],Boolean;
-      "pred",[Timestamp],Timestamp]
+    [ "pair", [Message;Message], Message ;
+      "fst", [Message], Message ;
+      "snd", [Message], Message ;
+      "choice", [Message; Message], Message ;
+      "if", [Boolean; Message; Message], Message;
+      "and", [Boolean; Boolean], Boolean;
+      "or", [Boolean; Boolean], Boolean;
+      "not", [Boolean], Boolean;
+      "true", [], Boolean;
+      "false", [], Boolean;
+      pred_fs, [Timestamp], Timestamp]
 
 (** Type checking *)
 
@@ -278,33 +280,48 @@ let convert a subst isubst t =
 
   in conv t
 
-let conv_timestamp subst ts = List.assoc ts subst
 
+(* For now, we do not allow to build directly a timestamp through its name. *)
+let convert_ts tssubst t =
+  let rec conv = function
+    | Fun (f,[t'],None) when f = pred_fs -> Term.TPred (conv t')
+    | Var x -> List.assoc x tssubst
+
+    | Fun _ | Get _ | Name _ | Compare _ ->
+      raise @@ Failure ("not a timestamp") in
+
+  conv t
+
+(** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 let convert_glob tssubst isubst t =
   let rec conv = function
     | Fun (f,l,ots) -> begin match ots with
         | None -> Term.Fun (Term.mk_fname f, List.map conv l)
         | Some ts -> assert false (* TODO *) end
-  | Get (s,Some ts,i) ->
+    | Get (s,Some ts,i) ->
       let s = Term.mk_sname s in
       let i = List.map (conv_index isubst) i in
-        Term.State ((s,i), conv_timestamp tssubst ts)
-  | Name (n,i) ->
+      Term.State ((s,i), convert_ts tssubst ts)
+    | Name (n,i) ->
       let i = List.map (conv_index isubst) i in
       Term.Name (Term.mk_name n,i)
-  | Var x -> assert false (* TODO *)
-  | Compare (o,u,v) -> assert false (* TODO *)
-  | Get (s,None,_) ->
-    raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
+    | Var x -> raise @@ Failure (Printf.sprintf "unbound variable %s" x)
+    | Compare (o,u,v) -> assert false (* TODO *)
+    | Get (s,None,_) ->
+      raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
 
   conv t
 
-let convert_fact a subst isubst f =
+
+let convert_atom a subst isubst atom =
+  match atom with
+  | Compare (o,u,v) -> (o, convert a subst isubst u, convert a subst isubst v)
+  | _ -> assert false
+
+let convert_bformula conv_atom f =
   let open Term in
   let rec conv = function
-    | Atom (Compare (o,u,v)) ->
-      Atom ((o, convert a subst isubst u, convert a subst isubst v))
-    | Atom (_) -> assert false
+    | Atom at -> Atom (conv_atom at)
     | And (f,g) -> And (conv f, conv g)
     | Or (f,g) -> Or (conv f, conv g)
     | Impl (f,g) -> Impl (conv f, conv g)
@@ -312,6 +329,48 @@ let convert_fact a subst isubst f =
     | True -> True
     | False -> False in
   conv f
+
+let convert_fact a subst isubst f : Term.fact =
+  convert_bformula (convert_atom a subst isubst) f
+
+(* Not clean at all. *)
+let get_kind env t =
+  try check_term env t Index; Index
+  with Type_error -> try check_term env t Timestamp; Timestamp
+    with Type_error -> try check_term env t Message; Message
+      with Type_error -> check_term env t Boolean; Boolean
+
+let convert_tatom args_kind tssubst isubst f : Term.tatom =
+  let open Term in
+  match f with
+  | Compare (o,u,v) ->
+    begin match get_kind args_kind u, get_kind args_kind v with
+      | Index, Index ->
+        Pind (o, conv_index isubst u, conv_index isubst v)
+      | Timestamp, Timestamp ->
+        Pts (o, convert_ts tssubst u, convert_ts tssubst v)
+      | _ -> raise Type_error end
+  | _ -> assert false
+
+let convert_constr args_kind tssubst isubst f : Term.constr =
+  convert_bformula (convert_tatom args_kind tssubst isubst) f
+
+
+(** [convert_vars vars] Returns the timestamp and index variables substitution,
+    in reverse order of declaration. By consequence, List.assoc properly handles
+    the shadowing. *)
+let convert_vars vars =
+  let rec conv tss indices = function
+    | [] -> List.rev tss, List.rev indices
+    | (a, Index) :: l -> conv tss (a :: indices) l
+    | (a, Timestamp) :: l -> conv (a :: tss) indices l
+    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
+                             in goals" in
+  let tss, indices = conv [] [] vars in
+
+  ( List.map (fun x -> (x, Term.fresh_tvar ())) tss,
+    List.map (fun i -> (i, Action.fresh_index ())) indices )
+
 
 (** Tests *)
 let () =
