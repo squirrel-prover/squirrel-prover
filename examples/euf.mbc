@@ -1,0 +1,18 @@
+hash h
+
+name cst:message
+
+channel c
+
+mutable key : message
+mutable sname : index->message
+
+system new k;  key:= k; out(c,cst);
+(
+  (!_a new n; sname(a) := n; out(c,h(n,k)))
+  | (!_b new n; sname(b) := n; out(c,h(<n,n>,k)))
+  | (!_c new n; new m; sname(c) := n; out(c,h(<n,m>,k)))
+)
+
+goal forall (tau1 : timestamp) :
+output@tau1 = output@tau1
