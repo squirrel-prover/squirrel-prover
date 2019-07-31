@@ -4,6 +4,7 @@ type ord = Term.ord
 
 type term =
   | Var of string
+  | Taction of Action.action_shape
   | Name of string * term list
       (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -23,6 +24,7 @@ type term =
 
 let rec pp_term ppf = function
   | Var (s) -> Fmt.pf ppf "%s" s
+  | Taction a -> Action.pp_action_shape ppf a
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s(@[<hov 1>%a@])%a" f (Fmt.list pp_term) terms pp_ots ots
   | Name (n,terms) ->
@@ -118,6 +120,15 @@ let rec check_term env tm kind = match tm with
           if List.assoc x env <> kind then raise Type_error;
         with
         | Not_found -> failwith ("unbound variable "^x) end
+  | Taction a ->
+    if kind <> Timestamp then raise Type_error ;
+    if not @@ List.for_all (fun it ->
+        let _,indices = it.Action.par_choice in
+        List.for_all (fun i ->
+            try List.assoc i env = Index with
+            | Not_found -> failwith ("unbound variable "^i)
+          ) indices) a
+    then raise Type_error
   | Fun (f,ts,ots) ->
       begin match ots with
       | Some ts -> check_term env ts Timestamp
@@ -230,6 +241,10 @@ let make_term ?at_ts:(at_ts=None) s l =
       if l <> [] then raise Type_error ;
       Var s end
 
+let make_action l =
+  List.map (fun (i,l,i') -> Action.({ par_choice = i,l; sum_choice = i'})) l
+  |> Action.mk_shape
+
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v],None)
 
@@ -270,6 +285,7 @@ let convert ts subst isubst t =
           Term.Name (Term.mk_name n,i)
     | Var x -> List.assoc x subst
     | Compare (o,u,v) -> assert false (* TODO *)
+    | Taction _ -> assert false       (* reserved for constraints *)
     | Get (_,Some _,_) | Fun (_,_,Some _) ->
       assert false (* reserved for global terms *)
 
@@ -277,11 +293,19 @@ let convert ts subst isubst t =
 
 
 (* For now, we do not allow to build directly a timestamp through its name. *)
-let convert_ts tssubst t =
+let convert_ts tssubst isubst t =
   let rec conv = function
     | Fun (f,[t'],None) when f = pred_fs -> Term.TPred (conv t')
     | Var x -> List.assoc x tssubst
-
+    | Taction a ->
+      let act =
+        List.map (fun it ->
+            let i,l = it.Action.par_choice in
+            Action.({
+                par_choice = i, List.map (fun x -> x, List.assoc x isubst) l;
+                sum_choice = it.sum_choice })
+          ) a in
+      Term.TName act
     | Fun _ | Get _ | Name _ | Compare _ ->
       raise @@ Failure ("not a timestamp") in
 
@@ -311,17 +335,18 @@ let convert_glob tssubst isubst t =
     | Fun (f,l,Some ts) ->
       Term.Macro ( ( Term.is_declared f,
                      List.map (conv_index isubst) l ),
-                   convert_ts tssubst ts)
+                   convert_ts tssubst isubst ts)
 
     | Get (s,Some ts,i) ->
       let s = Term.mk_sname s in
       let i = List.map (conv_index isubst) i in
-      Term.State ((s,i), convert_ts tssubst ts)
+      Term.State ((s,i), convert_ts tssubst isubst ts)
     | Name (n,i) ->
       let i = List.map (conv_index isubst) i in
       Term.Name (Term.mk_name n,i)
-    | Var x -> raise @@ Failure (Printf.sprintf "convert: unbound variable %s" x)
     | Compare (o,u,v) -> assert false (* TODO *)
+    | Var x -> raise @@ Failure (Printf.sprintf "convert: unbound variable %s" x)
+    | Taction _ -> assert false
     | Get (s,None,_) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
 
@@ -361,9 +386,13 @@ let convert_tatom args_kind tssubst isubst f : Term.tatom =
   | Compare (o,u,v) ->
     begin match get_kind args_kind u, get_kind args_kind v with
       | Index, Index ->
-        Pind (o, conv_index isubst u, conv_index isubst v)
+        Pind ( o,
+               conv_index isubst u,
+               conv_index isubst v )
       | Timestamp, Timestamp ->
-        Pts (o, convert_ts tssubst u, convert_ts tssubst v)
+        Pts ( o,
+              convert_ts tssubst isubst u,
+              convert_ts tssubst isubst v )
       | _ -> raise Type_error end
   | _ -> assert false
 

@@ -27,6 +27,7 @@ rule token = parse
 | '<'                 { LANGLE }
 | '>'                 { RANGLE }
 | ','                 { COMMA }
+| '.'                 { DOT }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | "="                 { EQ }
@@ -37,7 +38,10 @@ rule token = parse
 | "<"                 { LT }
 | '('                 { LPAREN }
 | ')'                 { RPAREN }
+| '['                 { LBRACKET }
+| ']'                 { RBRACKET }
 | '|'                 { PARALLEL }
+| '/'                 { SLASH }
 | "->"                { ARROW }
 | "=>"                { DARROW }
 | ":="                { ASSIGN }
@@ -69,4 +73,5 @@ rule token = parse
 | "exists"            { EXISTS }
 | "goal"              { GOAL }
 | name as n           { ID (n) }
+| int as i            { INT (int_of_string i) }
 | eof                 { EOF }

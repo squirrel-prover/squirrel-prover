@@ -142,7 +142,7 @@ let pp_par_choice_shape2 =
 
 let rec pp_action_f f ppf = function
   | [] -> Fmt.pf ppf ""
-  | {par_choice;sum_choice}::l ->
+  | { par_choice; sum_choice } :: l ->
       if sum_choice = 0 then
         Fmt.pf ppf "%a.%a"
           f par_choice

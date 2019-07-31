@@ -1,3 +1,4 @@
+%token <int> INT
 %token <string> ID
 %token <string> BANG
 %token AT
@@ -10,6 +11,7 @@
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW
+%token LBRACKET RBRACKET DOT SLASH
 %token EOF
 
 %token EMPTY_ELSE
@@ -29,6 +31,27 @@
 
 %%
 
+(* Actions *)
+
+i_list:
+|                                 { [] }
+| COMMA; ind = ID; l = i_list     { ind :: l }
+
+index_list:
+|                                 { [] }
+| LBRACKET RBRACKET               { [] }
+| LBRACKET; ind = ID; l = i_list; RBRACKET
+                                  { ind :: l }
+saction:
+| item = INT; indices = index_list
+                                  { (item,indices,0) }
+| item = INT; indices = index_list; SLASH; sum = INT
+                                  { (item,indices,sum) }
+
+action:
+| act = saction; DOT              { [act] }
+| act = saction; DOT; l = action  { act :: l }
+
 (* Terms *)
 
 term:
@@ -36,6 +59,7 @@ term:
 | LPAREN term RPAREN             { $2 }
 
 aterm:
+| a = action                     { Theory.Taction (Theory.make_action a) }
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
 		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }

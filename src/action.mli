@@ -20,7 +20,7 @@ val depends : 'a t -> 'a t -> bool
 
 val enables : 'a t -> 'a t -> bool
 
-type action_shape
+type action_shape = string item list
 
 type action = (string*index) item list
 
