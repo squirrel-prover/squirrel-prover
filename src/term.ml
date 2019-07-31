@@ -41,7 +41,7 @@ let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf ("n!"^s)
 type nsymb = name * indices
 
 let pp_nsymb ppf (n,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n pp_indices is
+  if is <> [] then Fmt.pf ppf "%a[%a]" pp_name n pp_indices is
   else Fmt.pf ppf "%a" pp_name n
 
 (** Function symbols are built from a name (from a finite set)
@@ -110,8 +110,9 @@ let pp_mname ppf s =
   (styled `Bold (styled `Magenta Utils.ident)) ppf ("m!"^s)
 
 let pp_msymb ppf (m,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_mname m pp_indices is
-  else Fmt.pf ppf "%a" pp_mname m
+  Fmt.pf ppf "%a%a"
+    pp_mname m
+    (Utils.pp_ne_list "(%a)" pp_indices) is
 
 (** Terms *)
 type term =
@@ -125,9 +126,11 @@ let dummy = Fun ((Fname "_",[]),[])
 
 let rec pp_term ppf = function
   | Fun (f,terms) ->
-     if terms = [] then pp_fsymb ppf f else
-       Fmt.pf ppf "%a(@[<hov>%a@])"
-         pp_fsymb f (Fmt.list ~sep:Fmt.comma pp_term) terms
+      Fmt.pf ppf "%a%a"
+        pp_fsymb f
+        (Utils.pp_ne_list
+           "(@[<hov>%a@])"
+           (Fmt.list ~sep:Fmt.comma pp_term)) terms
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
