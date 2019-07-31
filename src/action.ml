@@ -71,16 +71,22 @@ let rec action_indices = function
   | a :: l -> let _,sis = a.par_choice in
     List.map snd sis @ action_indices l
 
-(** [same_shape a b] returns [true] if and only if [a] and [b] have the same
-    action shapes. *)
-let rec same_shape a b = match a,b with
-  | [],[] -> true
-  | [], _ | _, [] -> false
+(** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
+    shapes. Return [None] otherwise.
+    If [a] indices appear at most once in [a], then [subst] is the index
+    substitution sending [a] to [b]. *)
+let same_shape a b =
+  let rec same acc a b = match a,b with
+  | [],[] -> Some acc
+  | [], _ | _, [] -> None
   | i :: l, i' :: l' ->
     let p,sis = i.par_choice and p',sis' = i'.par_choice in
-    p = p'
-    && List.for_all2 (fun (a,_) (b,_) -> a = b) sis sis'
-    && same_shape a b
+    if p = p' && List.for_all2 (fun (a,_) (b,_) -> a = b) sis sis' then
+      let acc' = List.map2 (fun (_,i) (_,i') -> i,i') sis sis' in
+      same (acc' @ acc) l l'
+    else None in
+
+  same [] a b
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
     [a] and [b] equal, if there is one. Return None otherwise. *)

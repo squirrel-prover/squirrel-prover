@@ -33,9 +33,11 @@ val get_shape : action -> action_shape
 
 val action_indices : action -> indices
 
-(** [same_shape a b] returns [true] if and only if [a] and [b] have the same
-    action shapes. *)
-val same_shape : action -> action -> bool
+(** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
+    shapes. Return [None] otherwise.
+    If [a] indices appear at most once in [a], then [subst] is the index
+    substitution sending [a] to [b]. *)
+val same_shape : action -> action -> (index * index) list option
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
     [a] and [b] equal, if there is one. Return None otherwise. *)

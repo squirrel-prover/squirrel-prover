@@ -1,13 +1,13 @@
 hash h
 
+name k:message
 name cst:message
 
 channel c
 
-mutable key : message
 mutable sname : index->message
 
-system new k;  key:= k; out(c,cst);
+system  out(c,cst);
 (
   (!_a new n; sname(a) := n; out(c,h(n,k)))
   | (!_b new n; sname(b) := n; out(c,h(<n,n>,k)))
@@ -16,5 +16,6 @@ system new k;  key:= k; out(c,cst);
 
 goal forall (tau1 : timestamp, a: index)
 such that
-tau1 = 0.0[a].:
-output@tau1 = sname(a)@tau1
+tau1 <> 0.0[a].:
+output@tau1 = h(sname(a)@tau1,k)
+=> exists () : false

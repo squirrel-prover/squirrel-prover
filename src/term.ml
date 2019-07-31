@@ -194,7 +194,7 @@ let rec pp_bformula pp_atom ppf = function
   | True -> Fmt.pf ppf "true"
   | False -> Fmt.pf ppf "false"
 
-
+(** Evaluate trivial subformula. *)
 let rec triv_eval = function
   | Or (a,b) ->
     begin match triv_eval a, triv_eval b with
@@ -554,3 +554,30 @@ let rec tts acc = function
 
 (** [term_ts t] returns the timestamps appearing in [t] *)
 let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare
+
+let rec atsts acc = function
+  | [] -> acc
+  | (_,t,t') :: l -> atsts (tts (tts acc t) t') l
+
+(** [atoms_ts ats] returns the timestamps appearing in [ats] *)
+let atoms_ts at = atsts [] at |> List.sort_uniq Pervasives.compare
+
+let rec tatsts acc = function
+  | [] -> acc
+  | (Pind _) :: l -> tatsts acc l
+  | (Pts (_,ts,ts')) :: l -> tatsts (ts :: ts' :: acc) l
+
+let f_fts f_at acc fact =
+  let rec fts acc = function
+  | True | False -> acc
+  | And (a,b) | Or (a,b) | Impl (a,b) -> fts (fts acc a) b
+  | Not a -> fts acc a
+  | Atom at -> f_at acc at in
+
+  fts acc fact
+
+(** [fact_ts f] returns the timestamps appearing in [f] *)
+let fact_ts f = f_fts (fun acc x -> atsts acc [x]) [] f
+
+(** [constr_ts c] returns the timestamps appearing in [c] *)
+let constr_ts c = f_fts (fun acc x -> tatsts acc [x]) [] c

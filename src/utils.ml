@@ -235,3 +235,9 @@ let kw style = (Fmt.styled style ident)
 
 let pp_ne_list s pp_list ppf l =
   if l = [] then Fmt.pf ppf "" else Fmt.pf ppf s pp_list l
+
+let map_of_iter (iter : ('a -> unit) -> unit) (f : 'a -> 'b) =
+  let l = ref [] in
+  let f_side x = l := (f x) :: !l in
+  iter f_side;
+  !l

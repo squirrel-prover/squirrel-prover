@@ -1,7 +1,7 @@
 open Term
 open Process
 
-type process = descr list
+(* type process = descr list *)
 
 let subst_descr inu tnu blk =
   { action = blk.action;
@@ -19,43 +19,46 @@ let subst_descr inu tnu blk =
  *     ) (term_ts descr.output) descr.updates
  *   |> List.sort_uniq Pervasives.compare *)
 
+(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
+exception Bad_ssc
+
 (** Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
-let euf_key_ssc proc hash_fn key_n =
+let euf_key_ssc hash_fn key_n =
   let checked_macros = ref [] in
 
   let rec ssc_blk blk =
-    ssc_fact blk.condition
-    && ssc_term blk.output
-    && List.for_all (fun (_,t) -> ssc_term t) blk.updates
+    ssc_fact blk.condition;
+    ssc_term blk.output;
+    List.iter (fun (_,t) -> ssc_term t) blk.updates
 
   and ssc_fact = function
-    | And (l,r) -> ssc_fact l && ssc_fact r
-    | Or (l,r) -> ssc_fact l && ssc_fact r
-    | Impl (l,r) -> ssc_fact l && ssc_fact r
+    | And (l,r) -> ssc_fact l; ssc_fact r
+    | Or (l,r) -> ssc_fact l; ssc_fact r
+    | Impl (l,r) -> ssc_fact l; ssc_fact r
     | Not f -> ssc_fact f
-    | True | False -> true
-    | Atom (_,t,t') -> ssc_term t && ssc_term t'
+    | True | False -> ()
+    | Atom (_,t,t') -> ssc_term t; ssc_term t'
 
   and ssc_term = function
     | Fun ((fn,_), [m;k]) when fn = hash_fn -> begin match k with
         | Name _ -> ssc_term m
-        | _ -> ssc_term m && ssc_term k end
+        | _ -> ssc_term m; ssc_term k end
 
-    | Fun (_,l) -> List.for_all ssc_term l
+    | Fun (_,l) -> List.iter ssc_term l
     (* | Output _ | Input _ *)
     | Macro ((mn,is),_) -> ssc_macro mn is
-    | State _ -> true
-    | Name (n,_) -> n <> key_n
+    | State _ -> ()
+    | Name (n,_) -> if n = key_n then raise Bad_ssc
 
   and ssc_macro mn is =
-    if List.mem mn !checked_macros || Term.is_built_in mn then true
+    if List.mem mn !checked_macros || Term.is_built_in mn then ()
     else begin
       checked_macros := mn :: !checked_macros;
       let a_dummy = Action.mk_action [] in
       ssc_term (Term.macro_declaration mn (TName a_dummy) is) end in
 
-  List.for_all ssc_blk  proc
+  Process.iter_csa ssc_blk
 
 
 let rec h_o_term hh kk acc = function
@@ -139,33 +142,32 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
-exception Bad_ssc
 
-(** [mk_rule proc mess sign hash_fn key_n] create the euf rule associated to
+(** [mk_rule mess sign hash_fn key_n] create the euf rule associated to
     an given hash function, key, message and signature in a process.
     TODO: memoisation *)
-let mk_rule proc mess sign hash_fn key_n =
-  if not @@ euf_key_ssc proc hash_fn key_n then raise Bad_ssc
-  else
-    { hash = hash_fn;
-      key = key_n;
+let mk_rule mess sign hash_fn key_n =
+  euf_key_ssc hash_fn key_n;
 
-      case_schemata =
-        List.map (fun blk ->
-            hashes_of_blk blk hash_fn key_n
-            |> List.map (fun (is,m) ->
-                { key_indices = is;
-                  message = m;
-                  blk_descr = blk })
-          ) proc
-        |> List.flatten;
+  { hash = hash_fn;
+    key = key_n;
 
-      cases_direct =
-        List.map (fun term ->
-            hashes_of_term term hash_fn key_n
-            |> List.map (fun (is,m) ->
-                { d_key_indices = is;
-                  d_message = m })
-          ) [mess;sign]
-        |> List.flatten }
+    case_schemata =
+      Utils.map_of_iter Process.iter_csa
+        (fun blk ->
+           hashes_of_blk blk hash_fn key_n
+           |> List.map (fun (is,m) ->
+               { key_indices = is;
+                 message = m;
+                 blk_descr = blk })
+        )
+      |> List.flatten;
+
+    cases_direct =
+      List.map (fun term ->
+          hashes_of_term term hash_fn key_n
+          |> List.map (fun (is,m) ->
+              { d_key_indices = is;
+                d_message = m })
+        ) [mess;sign]
+      |> List.flatten }

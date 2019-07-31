@@ -291,6 +291,32 @@ let fresh_instance action block =
 let iter_csa f =
   Hashtbl.iter (fun a b -> f (fresh_instance a b)) action_to_block
 
+let subst_descr subst (descr : descr) =
+  let action = Action.ivar_subst_action subst descr.action in
+  let subst_term = Term.ivar_subst_term subst in
+  let subst_fact = Term.ivar_subst_fact subst in
+  let indices = List.map (fun i -> List.assoc i subst) descr.indices in
+  let condition = subst_fact descr.condition in
+  let updates =
+    List.map
+      (fun (s,t) ->
+         Term.ivar_subst_state subst s,
+         subst_term t)
+      descr.updates
+  in
+  let output = subst_term descr.output in
+    { action; indices; condition; updates; output }
+
+let get_descr a =
+  let exception Found of descr in
+  try iter_csa (fun d ->
+      match Action.same_shape d.action a with
+      | None -> ()
+      | Some subst -> raise @@ Found (subst_descr subst d)
+    );
+    raise Not_found
+  with Found b -> b
+
 module Aliases = struct
 
   (** Aliases for actions, for concise display *)

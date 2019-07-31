@@ -153,12 +153,17 @@ type 'a _atom = ord * 'a * 'a
 
 type atom = term _atom
 
+val pp_atom : Format.formatter -> atom -> unit
+
 type fact = atom bformula
 
 val pp_fact : Format.formatter -> fact -> unit
 
 (** Negate the atom *)
 val not_xpred : atom -> atom
+
+(** Evaluate trivial subformula. *)
+val triv_eval : 'a bformula -> 'a bformula
 
 (** Uses only And and Or (no Not, no Impl). *)
 val simpl_fact : fact -> fact
@@ -252,3 +257,12 @@ val tss_vars : timestamp list -> tvar list * index list
 
 (** [term_ts t] returns the timestamps appearing in [t] *)
 val term_ts : term -> timestamp list
+
+(** [atoms_ts ats] returns the timestamps appearing in [ats] *)
+val atoms_ts : atom list -> timestamp list
+
+(** [fact_ts f] returns the timestamps appearing in [f] *)
+val fact_ts : fact -> timestamp list
+
+(** [constr_ts c] returns the timestamps appearing in [c] *)
+val constr_ts : constr -> timestamp list

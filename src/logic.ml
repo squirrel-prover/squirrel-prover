@@ -55,6 +55,12 @@ let declare_goal (uargs,uconstr) (eargs,econstr) ufact efact =
     }
 
 
+
+let rec action_of_ts = function
+  | TName a -> Some a
+  | TPred ts -> action_of_ts ts
+  | TVar _ -> None
+
 (** Tags used to record some information on gamma elements:
     - [trs] records whether it is included in the last completion.
     - [euf] records whether the EUF axiom has been applied. *)
@@ -72,6 +78,8 @@ module Gamma : sig
   (** Type of judgment contexts. *)
   type gamma
 
+  val pp_gamma : Format.formatter -> gamma -> unit
+
   val mk : unit -> gamma
 
   val add_fact : gamma -> fact -> gamma
@@ -83,15 +91,28 @@ module Gamma : sig
   val complete : gamma -> gamma option
 
   val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
+
+  val add_descr : gamma -> Process.descr -> gamma
 end = struct
   (** Type of judgment contexts. We separate atoms from more complexe facts.
       We store in [trs] the state of the completion algorithm when it was last
       called on [atoms]. *)
   type gamma = { facts : fact list;
                  atoms : (atom * tag) list;
-                 trs : Completion.state option }
+                 trs : Completion.state option;
+                 actions_described : Action.action list }
 
-  let mk () = { facts = []; atoms = []; trs = None }
+  let pp_gamma ppf gamma =
+    Fmt.pf ppf "@[<v 0>\
+                @[<hov 2>Actions described:@ %a@]@;\
+                @[<hv 2>facts:@ @[<v 0>%a@]@]@;\
+                @[<hv 2>atoms:@ @[<v 0>%a@]@]@;@]"
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
+      gamma.actions_described
+      (Fmt.list Term.pp_fact) gamma.facts
+      (Fmt.list (fun ppf (at,_) -> Term.pp_atom ppf at)) gamma.atoms
+
+  let mk () = { facts = []; atoms = []; trs = None; actions_described = [] }
 
   (** We do not add atoms that are already a consequence of gamma. *)
   let add_atom g at =
@@ -158,13 +179,37 @@ end = struct
 
     aux [] g.atoms
 
+  let rec add_descr g d =
+    let open Process in
+    if List.mem d.action g.actions_described then g
+    else
+      let g =  { g with actions_described = d.action :: g.actions_described } in
+      let new_atoms =
+        (Eq, Macro (out_macro, TName d.action), d.output)
+        :: List.map (fun (s,t) ->
+            (Eq, State (s, TName d.action), t)
+          ) d.updates in
+
+      (* We recursively add necessary descriptions. *)
+      let actions = Term.atoms_ts new_atoms
+                    |> List.fold_left (fun acc ts -> match action_of_ts ts with
+                        | None -> acc
+                        | Some a -> a :: acc
+                      ) [] in
+
+      let descrs = List.map Process.get_descr actions in
+      let g = List.fold_left add_descr g descrs in
+
+      add_atoms g new_atoms
 end
 
-(** Allow to store constraint. We remember the last models that was computed,
+(** Store the constraints. We remember the last models that was computed,
     potentially on a less restricted constraint.
     We should guarrantee that TODO (give the invariant on models and queries) *)
 module Theta : sig
   type theta
+
+  val pp_theta : Format.formatter -> theta -> unit
 
   val mk : constr -> theta
 
@@ -182,12 +227,15 @@ end = struct
                  models : models option ref;
                  models_is_exact : bool ref }
 
+  let pp_theta ppf theta = Term.pp_constr ppf theta.constr
+
   let mk constr = { constr = constr;
                     models = ref None;
                     models_is_exact = ref false }
 
-  let add_constr theta c = { theta with constr = And(theta.constr, c);
-                                        models_is_exact = ref false }
+  let add_constr theta c =
+    { theta with constr = Term.triv_eval (And(theta.constr, c));
+                 models_is_exact = ref false }
 
   let compute_models theta =
     if !(theta.models_is_exact) then ()
@@ -205,25 +253,139 @@ end = struct
     Constr.maximal_elems (opt_get !(theta.models)) tss
 end
 
-(** Type of judgments:
-    - [environment] contains the current protocol declaration.
-      For now, this is [Euf.process] but should be changed (TODO).
-    - [vars] and [indices] are the judgment free timestamp and index variables.
-    - [theta.constr] constrains the judgment timestamp and index variables.
-    - [theta.models] store the last minimal models of [theta.constr].
-    - [gamma] is the judgment context.
-    - [goal] contains the current goal, which is of type 'a.  *)
-type 'a judgment = { environment : Euf.process;
-                     vars : tvar list;
-                     indices: Action.indices;
-                     theta : Theta.theta;
-                     gamma : Gamma.gamma;
-                     goal : 'a }
+module Judgment : sig
+  (** Type of judgments:
+      - [vars] and [indices] are the judgment free timestamp and index variables.
+      - [theta.constr] constrains the judgment timestamp and index variables.
+      - [theta.models] store the last minimal models of [theta.constr].
+      - [gamma] is the judgment context.
+      - [goal] contains the current goal, which is of type 'a.  *)
+  type 'a judgment = private { vars : tvar list;
+                               indices: Action.indices;
+                               theta : Theta.theta;
+                               gamma : Gamma.gamma;
+                               goal : 'a }
 
+  val pp_judgment :
+    (Format.formatter -> 'a -> unit) ->
+    Format.formatter ->
+    'a judgment ->
+    unit
 
-(***********)
-(* Tactics *)
-(***********)
+  val init : formula -> formula judgment
+
+  val add_vars : Term.tvar list -> 'a judgment -> 'a judgment
+  val add_indices : Action.indices -> 'a judgment -> 'a judgment
+
+  (** Side-effect: Add necessary action descriptions. *)
+  val add_fact : Term.fact -> 'a judgment -> 'a judgment
+
+  (** Side-effect: Add necessary action descriptions. *)
+  val add_constr : Term.constr -> 'a judgment -> 'a judgment
+
+  (** Side-effect: Add necessary action descriptions. *)
+  val set_goal_fact : fact -> 'a judgment -> fact judgment
+
+  val set_goal : 'b -> 'a judgment -> 'b judgment
+
+  val set_gamma : Gamma.gamma -> 'a judgment ->  'a judgment
+end = struct
+  type 'a judgment = { vars : tvar list;
+                       indices: Action.indices;
+                       theta : Theta.theta;
+                       gamma : Gamma.gamma;
+                       goal : 'a }
+
+  let pp_judgment pp_goal ppf judge =
+    let open Fmt in
+    let open Utils in
+    pf ppf "@[<v 0>%a@;\
+            @[<v 0>%a@]\
+            @[<v 0>%a@]\
+            @[<hv 2>Theta:@ @[%a@]@]@;\
+            Gamma:@;<1 2>@[%a@]@;\
+            %a@;\
+            %a@;@;@]"
+      (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
+      (list ~sep:nop (fun ppf v ->
+           pf ppf "%a : %a@;"
+             Term.pp_tvar v
+             (styled `Blue (styled `Bold ident)) "timestamp"))
+      judge.vars
+      (list ~sep:nop (fun ppf v ->
+           pf ppf "%a : %a@;"
+             Action.pp_index v
+             (styled `Blue (styled `Bold ident)) "index"))
+      judge.indices
+      Theta.pp_theta judge.theta
+      Gamma.pp_gamma judge.gamma
+      (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
+      pp_goal judge.goal
+
+  let init (goal : formula) =
+    { vars = [];
+      indices = [];
+      theta = Theta.mk Term.True;
+      gamma = Gamma.mk ();
+      goal = goal }
+
+  let rec add_vars vars j = match vars with
+    | [] -> j
+    | v :: vars ->
+      let j' =
+        if List.mem v j.vars then j
+        else { j with vars = v :: j.vars } in
+      add_vars vars j'
+
+  let rec add_indices indices j = match indices with
+    | [] -> j
+    | i :: indices ->
+      let j' =
+        if List.mem i j.indices then j
+        else { j with indices = i :: j.indices } in
+      add_indices indices j'
+
+  let fact_actions f =
+    Term.fact_ts f
+    |> List.fold_left (fun acc ts -> match action_of_ts ts with
+        | None -> acc
+        | Some a -> a :: acc
+      ) []
+
+  let constr_actions c =
+    Term.constr_ts c
+    |> List.fold_left (fun acc ts -> match action_of_ts ts with
+        | None -> acc
+        | Some a -> a :: acc
+      ) []
+
+  let update_descr j actions =
+    let descrs = List.map Process.get_descr actions in
+    let g = List.fold_left Gamma.add_descr j.gamma descrs in
+    { j with gamma = g }
+
+  let add_fact f j =
+    let j = update_descr j (fact_actions f) in
+
+    { j with gamma = Gamma.add_fact j.gamma f }
+
+  let add_constr c j =
+    let j = update_descr j (constr_actions c) in
+
+    { j with theta = Theta.add_constr j.theta c }
+
+  let set_goal_fact f j =
+    let j = update_descr j (fact_actions f) in
+    { j with goal = f }
+
+  let set_goal a j = { j with goal = a }
+
+  let set_gamma g j = { j with gamma = g }
+end
+
+open Judgment
+
+(** Tactics types *)
 
 type 'a fk = unit -> 'a
 
@@ -253,11 +415,11 @@ let tact_or a b sk fk v = a v sk (fun () -> b v sk fk)
 (**********************)
 
 let goal_or_intro_l (judge : fact judgment) sk fk = match judge.goal with
-  | Or (lgoal, _) -> sk { judge with goal = lgoal } fk
+  | Or (lgoal, _) -> sk (set_goal_fact lgoal judge) fk
   | _ -> raise @@ Failure "goal ill-formed"
 
 let goal_or_intro_r (judge : fact judgment) sk fk = match judge.goal with
-  | Or (_, rgoal) -> sk { judge with goal = rgoal } fk
+  | Or (_, rgoal) -> sk (set_goal_fact rgoal judge) fk
   | _ -> raise @@ Failure "goal ill-formed"
 
 (** To prove phi \/ psi, try first to prove phi and then psi *)
@@ -270,8 +432,8 @@ let goal_true_intro (judge : fact judgment) sk fk = match judge.goal with
 
 let goal_and_intro (judge : fact judgment) sk fk = match judge.goal with
   | And (lgoal,rgoal) ->
-    sk { judge with goal = lgoal } fk;
-    sk { judge with goal = rgoal } fk;
+    sk (set_goal_fact lgoal judge) fk;
+    sk (set_goal_fact rgoal judge) fk;
 
   | _ -> raise @@ Failure "goal ill-formed"
 
@@ -280,25 +442,27 @@ let goal_and_intro (judge : fact judgment) sk fk = match judge.goal with
 let goal_forall_intro (judge : formula judgment) sk fk =
   let compute_alpha ffresh l l' =
     List.fold_left (fun subst x ->
-        if List.mem x l' then (x, ffresh ()) :: subst else subst
+        if List.mem x l' then (x, ffresh ()) :: subst else (x,x) :: subst
       ) [] l in
 
-  let tv_subst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
-  and iv_subst = compute_alpha fresh_index judge.goal.uindices judge.indices in
+  let tsubst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
+  and isubst = compute_alpha fresh_index judge.goal.uindices judge.indices in
 
-  sk { judge with
-       theta =
-         Theta.add_constr
-           judge.theta
-           (subst_constr iv_subst tv_subst judge.goal.uconstr);
+  let new_cnstr = subst_constr isubst tsubst judge.goal.uconstr
+  and new_fact = subst_fact isubst tsubst judge.goal.ufact
+  and new_goals =
+    List.map (fun goal ->
+        subst_postcond isubst tsubst goal
+      ) judge.goal.postcond in
 
-       gamma = subst_fact iv_subst tv_subst judge.goal.ufact
-               |> Gamma.add_fact judge.gamma;
+  let judge =
+    Judgment.set_goal new_goals judge
+    |> Judgment.add_indices @@ List.map snd isubst
+    |> Judgment.add_vars @@ List.map snd tsubst
+    |> Judgment.add_fact new_fact
+    |> Judgment.add_constr new_cnstr in
 
-       goal = List.map (fun goal ->
-           subst_postcond iv_subst tv_subst goal
-         ) judge.goal.postcond }
-    fk
+  sk judge fk
 
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
     quantified variables and the goal, assuming the constraint on the
@@ -308,28 +472,31 @@ let goal_forall_intro (judge : formula judgment) sk fk =
     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
     variables. *)
-let goal_exists_intro (judge : postcond judgment) sk fk ?force:(f=false) vnu inu =
+let goal_exists_intro (judge : postcond judgment) sk fk vnu inu =
   let pc_constr = subst_constr inu vnu judge.goal.econstr in
 
-  (* We check whether [judge.theta.constr] implies [pc_constr].
-     Equivalently, we could check whether:
-     (Impl (judge.theta.constr,pc_constr)) is satisifable
-     But [pc_constr] should be usually smaller than [judge.theta], and
-     therefore it is better to negate [pc_constr], as this yields smaller
-     formula when we put the constraint in DNF. *)
-  let theta' = Theta.add_constr judge.theta (Not pc_constr) in
-  if not @@ Theta.is_sat theta' then
-    sk { judge with goal = subst_postcond inu vnu judge.goal }
-      fk
-  else if f then
-    sk { judge with goal = subst_postcond inu vnu judge.goal;
-                    theta = theta' }
-      fk
-  else fk ()
+  (* (\* We check whether [judge.theta.constr] implies [pc_constr].
+   *    Equivalently, we could check whether:
+   *    (Impl (judge.theta.constr,pc_constr)) is satisifable
+   *    But [pc_constr] should be usually smaller than [judge.theta], and
+   *    therefore it is better to negate [pc_constr], as this yields smaller
+   *    formula when we put the constraint in DNF. *\)
+   * let theta' = Theta.add_constr judge.theta (Not pc_constr) in
+   * if not @@ Theta.is_sat theta' then
+   *   sk (set_goal judge (subst_postcond inu vnu judge.goal)) fk
+   * else if f then
+   *   sk (set_goal judge (subst_postcond inu vnu judge.goal))
+   *                   theta = theta' }
+   *     fk
+   * else fk () *)
+  let judge = set_goal (subst_postcond inu vnu judge.goal) judge
+              |> Judgment.add_constr (Not pc_constr) in
+  sk judge fk
 
 let goal_intro (judge : fact judgment) sk fk =
-  sk { judge with gamma = Gamma.add_fact judge.gamma (Not judge.goal);
-                  goal = False } fk
+  let judge = Judgment.add_fact (Not judge.goal) judge
+              |> set_goal_fact False in
+  sk judge fk
 
 let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | False -> fk ()
@@ -365,20 +532,18 @@ let gamma_or_intro (judge : 'a judgment) sk fk select_pred =
   let judges =
     mk_facts [] (List.map or_to_list sel)
     |> List.map (fun fs ->
-        { judge with gamma = Gamma.set_facts judge.gamma (fs @ nsel) } ) in
+        Judgment.set_gamma (Gamma.set_facts judge.gamma (fs @ nsel)) judge ) in
 
   sk judges fk
 
-
-let rec prove_all (judges : 'a judgment list) sk sk_end fk = match judges with
+(** Careful, we do not add action descriptions in new goals here. *)
+let rec prove_all (judges : 'a list judgment) sk sk_end fk =
+  match judges.goal with
   | [] -> sk_end () fk
-  | j :: judges' ->
-    sk j fk;
-    prove_all judges sk sk_end fk
+  | j :: goals ->
+    sk (set_goal j judges) fk;
+    prove_all (set_goal goals judges) sk sk_end fk
 
-
-(* TODO: add a new block equalities *)
-let add_block _ = assert false
 
 (** EUF Axiom *)
 
@@ -397,7 +562,7 @@ let euf_param (at : atom) = match at with
   | _ -> None
 
 let mk_or_cnstr l = match l with
-  | [] -> raise @@ Failure "empty list"
+  | [] -> False
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
@@ -407,7 +572,7 @@ let mk_or_cnstr l = match l with
     mk_c a l'
 
 let mk_and_cnstr l = match l with
-  | [] -> raise @@ Failure "empty list"
+  | [] -> True
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
@@ -419,17 +584,9 @@ let mk_and_cnstr l = match l with
 let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in
   let open Process in
-  (* We create fresh indices to rename in the block *)
-  let inu = List.map (fun i -> (i, fresh_index ())) case.blk_descr.indices in
-  (* We create a fresh timestamp variable rename in the block. *)
-  let vnu = [] in
-
-  (* We create the block hashed message. *)
-  let blk_m = subst_term inu vnu case.message in
-
   (* We create the term equality *)
-  let eq = Atom (Eq, blk_m, m) in
-  let new_f = And (eq, subst_fact inu vnu case.blk_descr.condition) in
+  let eq = Atom (Eq, case.message, m) in
+  let new_f = And (eq, case.blk_descr.condition) in
 
   (* Now, we need to add the timestamp constraints. *)
 
@@ -477,28 +634,33 @@ let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Failure "bad euf application"
   | Some p ->
     let (hash_fn, (key_n, key_is), m, s) = p in
-    let rule = Euf.mk_rule judge.environment m s hash_fn key_n in
+    let rule = Euf.mk_rule m s hash_fn key_n in
     let schemata_premises =
       List.map (fun case ->
           let new_f, new_cnstr = euf_apply_schema judge.theta p case in
-          { judge with theta = Theta.add_constr judge.theta new_cnstr;
-                       gamma = Gamma.add_fact judge.gamma new_f }
+          (* let g = Gamma.add_fact judge.gamma new_f in
+           * let g = Gamma.add_descr g case.Euf.blk_descr in
+           * { judge with theta = Theta.add_constr judge.theta new_cnstr;
+           *              gamma = g } *)
+          Judgment.add_fact new_f judge
+          |> Judgment.add_constr new_cnstr
+          |> Judgment.add_indices case.Euf.blk_descr.Process.indices
         ) rule.Euf.case_schemata
 
     and direct_premises =
       List.map (fun case ->
           let new_f, new_cnstr = euf_apply_direct judge.theta p case in
-          { judge with theta = Theta.add_constr judge.theta new_cnstr;
-                       gamma = Gamma.add_fact judge.gamma new_f }
+          Judgment.add_fact new_f judge
+          |> Judgment.add_constr new_cnstr
         ) rule.Euf.cases_direct in
 
     schemata_premises @ direct_premises
 
 let euf_apply (judge : 'a judgment) sk fk f_select =
   let g, at = Gamma.select judge.gamma f_select (set_euf true) in
-  let judge = { judge with gamma = g } in
+  let judge = Judgment.set_gamma g judge in
 
-  (* TODO: need to add block equalities somewhere. *)
+  (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
 
 

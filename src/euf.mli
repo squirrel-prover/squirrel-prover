@@ -2,20 +2,6 @@ open Action
 open Process
 open Term
 
-(* (\** This is [Process.block], but using the types of module [Term] instead of
- *     module [Theory].
- *     - binded indices appear in the [binded_indices] field.
- *     - [ts] contains the variable representing the block timestamp. *\)
- * type block = {
- *   ts : Term.tvar;
- *   action : Term.action;
- *   binded_indices : Term.indices;
- *   condition : Term.fact;
- *   updates : (Term.state * Term.term) list;
- *   output : Term.term } *)
-
-type process = descr list
-
 val subst_descr : index subst -> tvar subst -> descr -> descr
 
 (** Type of an euf axiom case schema.
@@ -56,4 +42,4 @@ exception Bad_ssc
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)
-val mk_rule : process -> term -> term -> fname -> name -> euf_rule
+val mk_rule : term -> term -> fname -> name -> euf_rule

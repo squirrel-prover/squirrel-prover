@@ -72,3 +72,5 @@ val kw : Fmt.style -> string Fmt.t
 val pp_ne_list :
   ('a -> 'b list -> unit, Format.formatter, unit) format ->
   'a -> Format.formatter -> 'b list -> unit
+
+val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list
