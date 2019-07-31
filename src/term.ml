@@ -124,8 +124,10 @@ type term =
 let dummy = Fun ((Fname "_",[]),[])
 
 let rec pp_term ppf = function
-  | Fun (f,terms) -> Fmt.pf ppf "%a(@[<hov 1>%a@])"
-                       pp_fsymb f (Fmt.list ~sep:Fmt.comma pp_term) terms
+  | Fun (f,terms) ->
+     if terms = [] then pp_fsymb ppf f else
+       Fmt.pf ppf "%a(@[<hov>%a@])"
+         pp_fsymb f (Fmt.list ~sep:Fmt.comma pp_term) terms
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts

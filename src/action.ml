@@ -6,7 +6,7 @@ let pp_index ppf = function Index i -> Fmt.pf ppf "i%d" i
 
 let pp_indices ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:Fmt.comma pp_index) l
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp_index) l
 
 let idx_cpt = ref 0
 let fresh_index () = incr idx_cpt; Index (!idx_cpt - 1)
@@ -153,7 +153,8 @@ let rec pp_action_f f ppf = function
           sum_choice
           (pp_action_f f) l
 
-let pp_action = pp_action_f pp_par_choice
+let pp_action ppf a =
+ Fmt.styled `Green (pp_action_f pp_par_choice) ppf a
 
 let pp_shape = pp_action_f pp_par_choice_shape
 

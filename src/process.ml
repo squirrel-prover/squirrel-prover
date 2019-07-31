@@ -243,7 +243,9 @@ let pp_descr ppf descr =
     descr.indices
     Term.pp_fact descr.condition
     (Utils.pp_ne_list "*updates:@;  @[<hov>%a@]@;"
-       (Fmt.list (Fmt.pair Term.pp_state Term.pp_term)))
+       (Fmt.list
+          (fun ppf (s,t) ->
+             Fmt.pf ppf "%a :=@ %a" Term.pp_state s Term.pp_term t)))
     descr.updates
     Term.pp_term descr.output
 
