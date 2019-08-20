@@ -132,6 +132,7 @@ val mk_mname : mname -> indices -> msymb
 val in_macro : msymb
 val out_macro : msymb
 
+
 (** Boolean formulas *)
 type 'a bformula =
   | And of 'a bformula * 'a bformula
@@ -144,6 +145,10 @@ type 'a bformula =
 
 val pp_bformula :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a bformula -> unit
+
+(** [atoms b] returns the list of atoms appearing in [b] *)
+val atoms : 'a bformula -> 'a list
+
 
 (** Atomic Formulas *)
 
@@ -171,7 +176,10 @@ val simpl_fact : fact -> fact
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 val norm_xatom : 'a _atom -> 'a _atom list
 
-val add_xeq : ord -> 'a -> 'a list * 'a list * 'a list -> 'a list * 'a list * 'a list
+val add_xeq :
+  ord -> 'a ->
+  'a list * 'a list * 'a list ->
+  'a list * 'a list * 'a list
 
 val pp_ord : Format.formatter -> ord -> unit
 

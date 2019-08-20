@@ -88,6 +88,10 @@ module Gamma : sig
   val get_facts : gamma -> fact list
   val set_facts : gamma -> fact list -> gamma
 
+  val get_atoms : gamma -> atom list
+
+  val get_trs : gamma -> Completion.state
+
   val complete : gamma -> gamma option
 
   val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
@@ -105,8 +109,8 @@ end = struct
   let pp_gamma ppf gamma =
     Fmt.pf ppf "@[<v 0>\
                 @[<hov 2>Actions described:@ %a@]@;\
-                @[<hv 2>facts:@ @[<v 0>%a@]@]@;\
-                @[<hv 2>atoms:@ @[<v 0>%a@]@]@;@]"
+                @[<hv 2>Facts:@ @[<v 0>%a@]@]@;\
+                @[<hv 2>Atoms:@ @[<v 0>%a@]@]@;@]"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
       gamma.actions_described
       (Fmt.list Term.pp_fact) gamma.facts
@@ -147,6 +151,10 @@ end = struct
 
   let set_facts g fs = add_facts { g with facts = [] } fs
 
+  let get_atoms g = List.map fst g.atoms
+
+  let get_trs g = match g.trs with Some x -> x | None -> raise Not_found
+
   (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
       otherwise, where [g'] has been completed. *)
   let complete g =
@@ -161,7 +169,7 @@ end = struct
     if Completion.check_disequalities trs neqs then
       Utils.some { g with trs = Some trs;
                           atoms = List.map (fun (at,t) ->
-                              ( at, set_trs false t )
+                              ( at, set_trs true t )
                             ) g.atoms }
     else None
 
@@ -510,7 +518,7 @@ let constr_absurd (judge : 'a judgment) sk fk =
 let gamma_absurd (judge : 'a judgment) msk mfk =
   match Gamma.complete judge.gamma with
   | None -> msk () mfk
-  | Some g' -> mfk g'
+  | Some g' -> mfk (Judgment.set_gamma g' judge)
 
 
 let or_to_list f =
@@ -545,21 +553,9 @@ let rec prove_all (judges : 'a list judgment) sk sk_end fk =
     prove_all (set_goal goals judges) sk sk_end fk
 
 
-(** EUF Axiom *)
-
-(** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
-let modulo_sym f at = match at with
-  | (Eq as ord,t1,t2) | (Neq as ord,t1,t2) -> begin match f at with
-      | Some _ as res -> res
-      | None -> f (ord,t2,t1) end
-  | _ -> f at
-
-let euf_param (at : atom) = match at with
-  | (Eq, Fun ((hash,_), [m; Name key]), s) ->
-    if Theory.is_hash hash then
-      Some (hash,key,m,s)
-    else None
-  | _ -> None
+(*********)
+(* Utils *)
+(*********)
 
 let mk_or_cnstr l = match l with
   | [] -> False
@@ -580,6 +576,54 @@ let mk_and_cnstr l = match l with
       | x :: l -> mk_c (And (x,acc)) l in
 
     mk_c a l'
+
+
+(*******************)
+(* Eq-Indep Axioms *)
+(*******************)
+
+(* We include here rules that are specialization of the Eq-Indep axiom. *)
+
+(** Add index constraints resulting from names equalities, modulo the TRS.
+    [judge.gamma] must have been completed before calling [eq_names]. *)
+let eq_names (judge : 'a judgment) sk fk =
+  let atoms = Gamma.get_atoms judge.gamma
+  and facts = Gamma.get_facts judge.gamma in
+
+  let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
+  let terms = List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms in
+
+  let cnstrs = Completion.name_index_cnstrs (Gamma.get_trs judge.gamma) terms in
+
+  let judge =
+    List.fold_left (fun judge c ->
+        Judgment.add_constr c judge
+      ) judge cnstrs in
+
+  sk judge fk
+
+
+let eq_constants (judge : 'a judgment) sk fk =
+  assert false (* TODO: uses Completion.constant_index_cnstrs *)
+
+(**************)
+(* EUF Axioms *)
+(**************)
+
+(** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
+let modulo_sym f at = match at with
+  | (Eq as ord,t1,t2) | (Neq as ord,t1,t2) -> begin match f at with
+      | Some _ as res -> res
+      | None -> f (ord,t2,t1) end
+  | _ -> f at
+
+let euf_param (at : atom) = match at with
+  | (Eq, Fun ((hash,_), [m; Name key]), s) ->
+    if Theory.is_hash hash then
+      Some (hash,key,m,s)
+    else None
+  | _ -> None
+
 
 let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in

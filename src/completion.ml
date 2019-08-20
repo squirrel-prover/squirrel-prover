@@ -91,6 +91,17 @@ let get_cst = function
   | Ccst c -> c
   | _ -> assert false
 
+let subterms l =
+  let rec subs acc = function
+    | [] -> acc
+    | x :: l -> match x with
+      | Ccst _ | Cvar _ -> subs (x :: acc) l
+      | Cfun (_,fl) -> subs (x :: acc) (fl @ l)
+      | Cxor xl -> subs (x :: acc) (xl @ l) in
+
+  subs [] l
+
+
 
 (** Create equational rules for some common theories.
     TODO: Arity checks should probably be done somehow. *)
@@ -800,6 +811,7 @@ let complete : (term * term) list -> state = fun l ->
   |> complete_cterms
 
 
+
 (****************)
 (* Dis-equality *)
 (****************)
@@ -825,6 +837,64 @@ let check_equality state (u,v) =
   check_equality_cterm state (cterm_of_term u, cterm_of_term v)
 
 let check_equalities state l = List.for_all (check_equality state) l
+
+
+(**********************************)
+(* Names and Constants Equalities *)
+(**********************************)
+
+(** [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
+    first element of [l] and all the other elements of [l], and return the
+    concatenation of the results of these application.
+    If [l] is the list [a1],...,[an], then [star_apply f l] returns:
+    [(f a1 a2) @ ... @ (f a1 an)] *)
+let star_apply f = function
+  | [] -> []
+  | a :: l ->
+    let rec star acc = function
+      | [] -> acc
+      | b :: rem -> star ((f a b) @ acc) rem in
+
+    star [] l
+
+let x_index_cnstrs state l select f_cnstr =
+  List.map cterm_of_term l
+  |> subterms
+  |> List.filter select
+  |> List.sort_uniq Pervasives.compare
+  |> List.map (fun x -> x, normalize state x)
+  |> Utils.classes (fun (_,x) (_,y) -> x = y)
+  |> List.map @@ List.map fst
+  |> List.map (star_apply f_cnstr)
+  |> List.flatten
+
+
+(** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
+    rewrite relation in [state], and add the corresponding index equalities.
+    E.g., if n[i,j] and n[k,l] are equal, then i = k and j = l.*)
+let name_index_cnstrs state l =
+  let n_cnstr a b = match a,b with
+    | Ccst Cst.Cname (n,is), Ccst Cst.Cname (n',is') ->
+      if n <> n' then [False]
+      else List.map2 (fun x y -> Atom (Pind (Eq, x, y))) is is'
+    | _ -> assert false in
+
+  x_index_cnstrs state l
+    (function Ccst Cst.Cname _ -> true | _ -> false)
+    n_cnstr
+
+
+(** [constant_index_cnstrs] is the same as [name_index_cnstrs], but for
+    constant function symbols equalities. *)
+let constant_index_cnstrs fcst state l =
+  let f_cnstr a b = match a,b with
+    | Cfun ((_,is),[]), Cfun ((_',is'),[]) ->
+      List.map2 (fun x y -> Atom (Pind (Eq, x, y))) is is'
+    | _ -> assert false in
+
+  x_index_cnstrs state l
+    (function Cfun ((fn,_),[]) -> fn = fcst | _ -> false)
+    f_cnstr
 
 
 (****************)

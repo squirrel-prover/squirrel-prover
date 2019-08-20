@@ -194,6 +194,18 @@ let rec pp_bformula pp_atom ppf = function
   | True -> Fmt.pf ppf "true"
   | False -> Fmt.pf ppf "false"
 
+(** [atoms b] returns the list of atoms appearing in [b] *)
+let atoms b =
+  let rec aux acc = function
+    | True | False -> acc
+    | And (a,b) | Or (a,b) | Impl (a,b) -> aux (aux acc a) b
+    | Not a -> aux acc a
+    | Atom at -> at :: acc in
+
+  aux [] b
+
+
+
 (** Evaluate trivial subformula. *)
 let rec triv_eval = function
   | Or (a,b) ->
