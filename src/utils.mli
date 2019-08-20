@@ -5,6 +5,8 @@ module List : sig
       [(f 0)],[(f 1)] ... [(f (n-1))].  *)
   val init : int -> (int -> 'a) -> 'a list
 
+  val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
+
   val split3 : ('a * 'b * 'c) list -> 'a list * 'b list * 'c list
 
   (** [merge_uniq cmp l1 l2] behaves like [List.merge cmp l1 l2], except that

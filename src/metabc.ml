@@ -22,8 +22,8 @@ let () =
   Fmt.pr "Trying to prove the goal using a hard-coded tactic.@;@.";
 
   let cont judge fk =
-    Logic.gamma_absurd judge (fun _ _ -> Fmt.pr "cont 1%!")
-      (fun judge ->
+    Logic.gamma_absurd judge (fun _ _ -> Fmt.pr "cont 1%!"; assert false)
+      (fun () ->
          Logic.eq_names judge (fun judge fk ->
              Judgment.pp_judgment Term.pp_postcond Fmt.stdout judge;
              Logic.constr_absurd judge
@@ -35,7 +35,7 @@ let () =
       let judge = Judgment.init goal in
       Judgment.pp_judgment Term.pp_formula Fmt.stdout judge;
       Logic.goal_forall_intro judge (fun judge fk ->
-          Logic.prove_all judge (fun judge fk ->
+          Logic.prove_all judge (fun judge _ fk ->
               Judgment.pp_judgment Term.pp_postcond Fmt.stdout judge;
               Logic.euf_apply judge (fun judges fk ->
                   List.iter (fun judge ->

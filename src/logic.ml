@@ -62,16 +62,12 @@ let rec action_of_ts = function
   | TVar _ -> None
 
 (** Tags used to record some information on gamma elements:
-    - [trs] records whether it is included in the last completion.
     - [euf] records whether the EUF axiom has been applied. *)
-type tag = { t_trs : bool;
-             t_euf : bool }
+type tag = { t_euf : bool }
 
-let new_tag () = { t_trs = false; t_euf = false }
+let new_tag () = { t_euf = false }
 
-let set_trs b t = { t with t_trs = b }
-
-let set_euf b t = { t with t_euf = b }
+let set_euf b t = { t_euf = b }
 
 
 module Gamma : sig
@@ -92,7 +88,7 @@ module Gamma : sig
 
   val get_trs : gamma -> Completion.state
 
-  val complete : gamma -> gamma option
+  val is_sat : gamma -> bool
 
   val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
 
@@ -103,7 +99,7 @@ end = struct
       called on [atoms]. *)
   type gamma = { facts : fact list;
                  atoms : (atom * tag) list;
-                 trs : Completion.state option;
+                 trs : Completion.state option ref;
                  actions_described : Action.action list }
 
   let pp_gamma ppf gamma =
@@ -116,18 +112,18 @@ end = struct
       (Fmt.list Term.pp_fact) gamma.facts
       (Fmt.list (fun ppf (at,_) -> Term.pp_atom ppf at)) gamma.atoms
 
-  let mk () = { facts = []; atoms = []; trs = None; actions_described = [] }
+  let mk () = { facts = []; atoms = []; trs = ref None; actions_described = [] }
 
   (** We do not add atoms that are already a consequence of gamma. *)
   let add_atom g at =
     let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
-    if g.trs = None then add at else
+    if !(g.trs) = None then add at else
       match at with
       | (Eq,s,t) ->
-        if Completion.check_equalities (opt_get g.trs) [s,t] then g
+        if Completion.check_equalities (opt_get !(g.trs)) [s,t] then g
         else add at
       | (Neq,s,t) ->
-        if Completion.check_disequalities (opt_get g.trs) [s,t] then g
+        if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then g
         else add at
       | _ -> add at (* TODO: do not add useless inequality atoms *)
 
@@ -153,11 +149,11 @@ end = struct
 
   let get_atoms g = List.map fst g.atoms
 
-  let get_trs g = match g.trs with Some x -> x | None -> raise Not_found
+  let get_trs g = match !(g.trs) with Some x -> x | None -> raise Not_found
 
   (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
       otherwise, where [g'] has been completed. *)
-  let complete g =
+  let is_sat g =
     let eqs, _, neqs = List.map fst g.atoms
                        |> List.map norm_xatom
                        |> List.flatten
@@ -167,11 +163,8 @@ end = struct
     (* TODO: for now, we ignore inequalities *)
     let trs = Completion.complete eqs in
     if Completion.check_disequalities trs neqs then
-      Utils.some { g with trs = Some trs;
-                          atoms = List.map (fun (at,t) ->
-                              ( at, set_trs true t )
-                            ) g.atoms }
-    else None
+      let () = g.trs := Some trs in true
+    else false
 
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
@@ -267,7 +260,7 @@ module Judgment : sig
       - [theta.constr] constrains the judgment timestamp and index variables.
       - [theta.models] store the last minimal models of [theta.constr].
       - [gamma] is the judgment context.
-      - [goal] contains the current goal, which is of type 'a.  *)
+      - [goal] contains the current goal, which is of type 'a. *)
   type 'a judgment = private { vars : tvar list;
                                indices: Action.indices;
                                theta : Theta.theta;
@@ -393,7 +386,10 @@ end
 
 open Judgment
 
-(** Tactics types *)
+
+(***********************)
+(* Basic Tactics Types *)
+(***********************)
 
 type 'a fk = unit -> 'a
 
@@ -408,6 +404,9 @@ type ('a,'b,'c) mem_sk = 'a -> ('b,'c) mem_fk -> 'c
 
 type ('a,'b,'c,'d) mem_t = 'a -> ('b,'c,'d) mem_sk -> ('c,'d) mem_fk -> 'd
 
+(*****************)
+(* Basic Tactics *)
+(*****************)
 
 let tact_wrap f v sk fk = sk (f v) fk
 
@@ -415,7 +414,7 @@ let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
 
 let tact_andthen a b sk fk v = a v (fun v fk' -> b v sk fk') fk
 
-let tact_or a b sk fk v = a v sk (fun () -> b v sk fk)
+let tact_orelse a b sk fk v = a v sk (fun () -> b v sk fk)
 
 
 (**********************)
@@ -432,7 +431,7 @@ let goal_or_intro_r (judge : fact judgment) sk fk = match judge.goal with
 
 (** To prove phi \/ psi, try first to prove phi and then psi *)
 let goal_or_intro (judge : fact judgment) sk fk =
-  tact_or goal_or_intro_l goal_or_intro_r sk fk judge
+  tact_orelse goal_or_intro_l goal_or_intro_r sk fk judge
 
 let goal_true_intro (judge : fact judgment) sk fk = match judge.goal with
   | True -> sk () fk
@@ -472,32 +471,42 @@ let goal_forall_intro (judge : formula judgment) sk fk =
 
   sk judge fk
 
+
+(* (\** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
+ *     quantified variables and the goal, assuming the constraint on the
+ *     existential variables is satisfied (if [force] is true, then the
+ *     introduction is done even is the constraint is not satisfied by updating
+ *     the judgment constraint.
+ *     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
+ *     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
+ *     variables. *\)
+ * let goal_exists_intro (judge : postcond judgment) sk fk vnu inu =
+ *   let pc_constr = subst_constr inu vnu judge.goal.econstr in
+ *
+ *   (\* We check whether [judge.theta.constr] implies [pc_constr].
+ *      Equivalently, we could check whether:
+ *      (Impl (judge.theta.constr,pc_constr)) is satisifable
+ *      But [pc_constr] should be usually smaller than [judge.theta], and
+ *      therefore it is better to negate [pc_constr], as this yields smaller
+ *      formula when we put the constraint in DNF. *\)
+ *   let theta' = Theta.add_constr judge.theta (Not pc_constr) in
+ *   if not @@ Theta.is_sat theta' then
+ *     sk (set_goal judge (subst_postcond inu vnu judge.goal)) fk
+ *   else if f then
+ *     sk (set_goal judge (subst_postcond inu vnu judge.goal))
+ *                     theta = theta' }
+ *       fk
+ *   else fk () *)
+
+
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
-    quantified variables and the goal, assuming the constraint on the
-    existential variables is satisfied (if [force] is true, then the
-    introduction is done even is the constraint is not satisfied by updating
-    the judgment constraint.
+    quantified variables and the goal.
     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
     variables. *)
 let goal_exists_intro (judge : postcond judgment) sk fk vnu inu =
   let pc_constr = subst_constr inu vnu judge.goal.econstr in
-
-  (* (\* We check whether [judge.theta.constr] implies [pc_constr].
-   *    Equivalently, we could check whether:
-   *    (Impl (judge.theta.constr,pc_constr)) is satisifable
-   *    But [pc_constr] should be usually smaller than [judge.theta], and
-   *    therefore it is better to negate [pc_constr], as this yields smaller
-   *    formula when we put the constraint in DNF. *\)
-   * let theta' = Theta.add_constr judge.theta (Not pc_constr) in
-   * if not @@ Theta.is_sat theta' then
-   *   sk (set_goal judge (subst_postcond inu vnu judge.goal)) fk
-   * else if f then
-   *   sk (set_goal judge (subst_postcond inu vnu judge.goal))
-   *                   theta = theta' }
-   *     fk
-   * else fk () *)
-  let judge = set_goal (subst_postcond inu vnu judge.goal) judge
+  let judge = set_goal (subst_fact inu vnu judge.goal.efact) judge
               |> Judgment.add_constr (Not pc_constr) in
   sk judge fk
 
@@ -513,12 +522,8 @@ let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
 let constr_absurd (judge : 'a judgment) sk fk =
   if not @@ Theta.is_sat judge.theta then sk () fk else fk ()
 
-(** In case of failure, we pass the judgement with the completed gamma to the
-    failure continuation. *)
-let gamma_absurd (judge : 'a judgment) msk mfk =
-  match Gamma.complete judge.gamma with
-  | None -> msk () mfk
-  | Some g' -> mfk (Judgment.set_gamma g' judge)
+let gamma_absurd (judge : 'a judgment) sk fk =
+  if not @@ Gamma.is_sat judge.gamma then sk () fk else fk ()
 
 
 let or_to_list f =
@@ -545,13 +550,14 @@ let gamma_or_intro (judge : 'a judgment) sk fk select_pred =
   sk judges fk
 
 (** Careful, we do not add action descriptions in new goals here. *)
-let rec prove_all (judges : 'a list judgment) sk sk_end fk =
+let rec prove_all (judges : 'a list judgment) tac sk fk =
   match judges.goal with
-  | [] -> sk_end () fk
+  | [] -> sk () fk
   | j :: goals ->
-    sk (set_goal j judges) fk;
-    prove_all (set_goal goals judges) sk sk_end fk
-
+    tac (set_goal j judges)
+      (fun () fk ->
+         prove_all (set_goal goals judges) tac sk fk
+      ) fk
 
 (*********)
 (* Utils *)
@@ -603,8 +609,22 @@ let eq_names (judge : 'a judgment) sk fk =
   sk judge fk
 
 
-let eq_constants (judge : 'a judgment) sk fk =
-  assert false (* TODO: uses Completion.constant_index_cnstrs *)
+let eq_constants fn (judge : 'a judgment) sk fk =
+  let atoms = Gamma.get_atoms judge.gamma
+  and facts = Gamma.get_facts judge.gamma in
+
+  let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
+  let terms = List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms in
+
+  let cnstrs =
+    Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma) terms in
+
+  let judge =
+    List.fold_left (fun judge c ->
+        Judgment.add_constr c judge
+      ) judge cnstrs in
+
+  sk judge fk
 
 (**************)
 (* EUF Axioms *)
@@ -708,6 +728,77 @@ let euf_apply (judge : 'a judgment) sk fk f_select =
   sk (euf_apply_facts judge at) fk
 
 
+(***********)
+(* Tactics *)
+(***********)
+
+(** Tactics expression *)
+type (_,_) tac =
+  | Admit : ('a judgment, unit) tac
+
+  | GoalOrIntroL : (fact judgment, fact judgment) tac
+  | GoalOrIntroR : (fact judgment, fact judgment) tac
+  | GoalIntro : (fact judgment, fact judgment) tac
+  | GoalAndIntro : (fact judgment, fact judgment) tac
+
+  | GoalForallIntro : (formula judgment, postcond list judgment) tac
+  | GoalExistsIntro :
+      tvar subst * index subst ->
+    (postcond judgment, fact judgment) tac
+
+  | GammaAbsurd : ('a judgment, unit) tac
+  | ConstrAbsurd : ('a judgment, unit) tac
+
+  | EqNames : ('a judgment, 'a judgment) tac
+  | EqConstants : fname -> ('a judgment, 'a judgment) tac
+
+  | ProveAll : ('a judgment, unit) tac -> ('a list judgment, unit) tac
+  | AndThen : ('a,'b) tac * ('b,'c) tac -> ('a,'c) tac
+  | OrElse : ('a,'b) tac * ('a,'b) tac -> ('a,'b) tac
+
+let rec tac_apply :
+  type a b c. (a,b) tac -> a -> (b,c) sk -> c fk -> c =
+  fun tac judge sk fk -> match tac with
+    | Admit -> sk () fk
+
+    | GoalForallIntro -> goal_forall_intro judge sk fk
+    | GoalExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
+
+    | GoalOrIntroL -> goal_or_intro_l judge sk fk
+    | GoalOrIntroR -> goal_or_intro_r judge sk fk
+    | GoalAndIntro -> goal_and_intro judge sk fk
+    | GoalIntro -> goal_intro judge sk fk
+
+    | GammaAbsurd -> gamma_absurd judge sk fk
+    | ConstrAbsurd -> constr_absurd judge sk fk
+
+    | EqNames -> eq_names judge sk fk
+    | EqConstants fn -> eq_constants fn judge sk fk
+
+    | ProveAll tac -> prove_all judge (tac_apply tac) sk fk
+    | AndThen (tac,tac') ->
+      tact_andthen (tac_apply tac) (tac_apply tac') sk fk judge
+    | OrElse (tac,tac') ->
+      tact_orelse (tac_apply tac) (tac_apply tac') sk fk judge
+
+type _ goaltype =
+  | Gt_formula : formula goaltype
+  | Gt_postcond : formula goaltype
+  | Gt_fact : formula goaltype
+  | Gt_list : 'a goaltype -> 'a list goaltype
+
+type etac = | ETac : 'a goaltype * 'b goaltype * ('a,'b) tac -> etac
+
+exception Tactic_type_error
+
+let rec check_eq : type a b. a goaltype -> b goaltype -> a -> b =
+  fun agt bgt a -> match agt,bgt with
+  | Gt_fact, Gt_fact -> a
+  | Gt_formula, Gt_formula -> a
+  | Gt_postcond, Gt_postcond -> a
+  | Gt_list l, Gt_list l' -> List.map (check_eq l l') a
+
+  | _ -> raise Tactic_type_error
 
 (* let () =
  *   Checks.add_suite "Logic" [

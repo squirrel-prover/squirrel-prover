@@ -9,6 +9,12 @@ module List = struct
       let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
       ini 0
 
+  let rec map3 f l1 l2 l3 =
+    match (l1, l2, l3) with
+      ([], [], []) -> []
+    | (a1::l1, a2::l2, a3::l3) -> let r = f a1 a2 a3 in r :: map3 f l1 l2 l3
+    | (_, _, _) -> invalid_arg "Utils.List.map3"
+
   (** [merge_uniq cmp l1 l2] behaves like [List.merge cmp l1 l2], except that
       it removes duplicates, w.r.t. [cmp], between [l1] and [l2].
       Duplicates already in [l1] or [l2] may remains. *)
