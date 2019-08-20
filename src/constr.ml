@@ -397,7 +397,7 @@ let max_pred uf g u x =
     if UtG.mem_vertex g ncx then
       if UtG.mem_edge g u ncx then maxp uf (j+1) (upred ncx)
       else Some (uf, j - 1)
-    else Some (uf, j) in
+    else Some (uf, j - 1) in
 
   let uf, nx = mgu uf x in
   if (UtG.mem_vertex g nx)
