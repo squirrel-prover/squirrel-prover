@@ -477,24 +477,6 @@ let find_edge f g =
 (** Check that [instance] dis-equalities are satisfied.
     [g] must be transitive. *)
 let neq_sat uf g neqs =
-  (* REM *)
-  (* if List.exists (fun (u,v) ->
-   *     (ut_equal (mgu uf u |> snd) (mgu uf v |> snd))
-   *   ) neqs then
-   *   Fmt.epr "Neg 1: @[<h>%a@]@;@;@." (Fmt.pair ~sep:Fmt.comma pp_ut pp_ut)
-   *     (List.find (fun (u,v) ->
-   *          (ut_equal (mgu uf u |> snd) (mgu uf v |> snd))
-   *        ) neqs); *)
-
-  (* REM *)
-  (* if exist_edge (fun v v' -> match decomp v, decomp v' with
-   *     | (k,y), (k',y') ->
-   *       (ut_equal y y') && k < k') g then
-   *   Fmt.epr "Neg 2: @[<h>%a@]@;@;@." (Fmt.pair ~sep:Fmt.comma pp_ut pp_ut)
-   *     (find_edge (fun v v' -> match decomp v, decomp v' with
-   *          | (k,y), (k',y') ->
-   *            (ut_equal y y') && k < k') g); *)
-
   (* Check dis-equalities in neqs *)
   List.for_all (fun (u,v) ->
       not (ut_equal (mgu uf u |> snd) (mgu uf v |> snd))
