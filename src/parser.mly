@@ -12,6 +12,8 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW
 %token LBRACKET RBRACKET DOT SLASH
+%token ADMIT
+%token PROOF QED
 %token EOF
 
 %token EMPTY_ELSE
@@ -211,3 +213,9 @@ theory:
 
 top_process:
 | process EOF                    { $1 }
+
+tactic:
+| ADMIT                          { Logic.UAdmit }
+
+proof:
+|PROOF t = tactic QED            { t }

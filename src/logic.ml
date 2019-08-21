@@ -781,17 +781,33 @@ let rec tac_apply :
     | OrElse (tac,tac') ->
       tact_orelse (tac_apply tac) (tac_apply tac') sk fk judge
 
+
+type gtvar = Gtvar
+
 type _ goaltype =
+  | Gt_var : gtvar goaltype
+
+  | Gt_unit : unit goaltype
   | Gt_formula : formula goaltype
-  | Gt_postcond : formula goaltype
-  | Gt_fact : formula goaltype
+  | Gt_postcond : postcond goaltype
+  | Gt_fact : fact goaltype
+  | Gt_judgment : 'a goaltype -> 'a judgment goaltype
   | Gt_list : 'a goaltype -> 'a list goaltype
+
+type 'a gt = 'a goaltype
+
+type utac =
+  | UAdmit
+  | UGoalOrIntroL of utac
+  | UGammaAbsurd
+  | UAndThen of utac * utac
+  | UOrElse of utac * utac
 
 type etac = | ETac : 'a goaltype * 'b goaltype * ('a,'b) tac -> etac
 
 exception Tactic_type_error
 
-let rec check_eq : type a b. a goaltype -> b goaltype -> a -> b =
+let rec check_eq : type a b. a gt -> b gt -> a -> b =
   fun agt bgt a -> match agt,bgt with
   | Gt_fact, Gt_fact -> a
   | Gt_formula, Gt_formula -> a
@@ -799,6 +815,44 @@ let rec check_eq : type a b. a goaltype -> b goaltype -> a -> b =
   | Gt_list l, Gt_list l' -> List.map (check_eq l l') a
 
   | _ -> raise Tactic_type_error
+
+(* let rec subtype : type a b. a gt -> b gt -> a gt =
+ *   fun a b -> match a,b with
+ *     | _, Gt_var -> a
+ *     | Gt_fact, Gt_fact -> a
+ *     | Gt_formula, Gt_formula -> a
+ *     | Gt_postcond, Gt_postcond -> a
+ *     | Gt_list l, Gt_list l' -> Gt_list (subtype l l')
+ *
+ *     | _ -> raise Tactic_type_error *)
+
+let check_unit : type a. a gt -> unit gt = function
+  | Gt_unit -> Gt_unit
+  | Gt_var -> Gt_unit
+  | _ -> raise Tactic_type_error
+
+let check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
+  fun _ _ _ -> assert false
+
+let rec tac_type : type a b. a gt -> b gt -> utac -> etac =
+  fun l_gt r_gt utac -> match utac with
+    | UAdmit -> begin match l_gt with
+        | Gt_var -> ETac ( Gt_judgment Gt_var,
+                           check_unit r_gt,
+                           Admit )
+        | Gt_judgment _ -> ETac ( l_gt,
+                                  check_unit r_gt,
+                                  Admit )
+        | _ -> raise Tactic_type_error end
+
+    | UOrElse (utac_l, utac_r) -> begin match tac_type l_gt r_gt utac_l with
+        | ETac (l_gt, r_gt, _) -> match tac_type l_gt r_gt utac_r with
+          | ETac (l_gt, r_gt, tac_r) ->
+            let tac_l = check_type l_gt r_gt utac_l in
+            ETac (l_gt, r_gt, OrElse (tac_l, tac_r)) end
+
+    | _ -> assert false
+
 
 (* let () =
  *   Checks.add_suite "Logic" [

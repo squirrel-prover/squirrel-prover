@@ -72,6 +72,9 @@ rule token = parse
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "goal"              { GOAL }
+| "Proof."            { PROOF }
+| "Qed."              { QED }
+| "admit"             { ADMIT }
 | name as n           { ID (n) }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }
