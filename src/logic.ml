@@ -782,10 +782,18 @@ let rec tac_apply :
       tact_orelse (tac_apply tac) (tac_apply tac') sk fk judge
 
 
-type gtvar = Gtvar
+(************************************)
+(* Tactic Parsing and Type-Checking *)
+(************************************)
 
+type gtlat
+
+(** Type of goal types.
+    [Gt_top] and [Gt_bot] are, respectively, the top and bottom element of the
+    type lattice, and are for the type checking. *)
 type _ goaltype =
-  | Gt_var : gtvar goaltype
+  | Gt_top : gtlat goaltype
+  | Gt_bot : gtlat goaltype
 
   | Gt_unit : unit goaltype
   | Gt_formula : formula goaltype
@@ -796,62 +804,221 @@ type _ goaltype =
 
 type 'a gt = 'a goaltype
 
-type utac =
-  | UAdmit
-  | UGoalOrIntroL of utac
-  | UGammaAbsurd
-  | UAndThen of utac * utac
-  | UOrElse of utac * utac
+(** Flip [Gt_bot] element to [Gt_top]. *)
+let rec bot_to_top : type a. a gt -> a gt = function
+  | Gt_bot -> Gt_top
+  | Gt_top -> assert false
+  | Gt_unit -> Gt_unit
+  | Gt_formula -> Gt_formula
+  | Gt_postcond -> Gt_postcond
+  | Gt_fact -> Gt_fact
+  | Gt_judgment jt -> Gt_judgment (bot_to_top jt)
+  | Gt_list lt -> Gt_list (bot_to_top lt)
 
-type etac = | ETac : 'a goaltype * 'b goaltype * ('a,'b) tac -> etac
+(** Flip [Gt_top] element to [Gt_bot]. *)
+let rec top_to_bot : type a. a gt -> a gt = function
+  | Gt_top -> Gt_bot
+  | Gt_bot -> assert false
+  | Gt_unit -> Gt_unit
+  | Gt_formula -> Gt_formula
+  | Gt_postcond -> Gt_postcond
+  | Gt_fact -> Gt_fact
+  | Gt_judgment jt -> Gt_judgment (top_to_bot jt)
+  | Gt_list lt -> Gt_list (top_to_bot lt)
+
+(** Type for untyped tacitcs.
+    [UAndThen] can optionally be decorated with the tactic intermediate type,
+    which uses only [Gt_top]. *)
+type utac =
+  | UAdmit : utac
+
+  | UGoalOrIntroL : utac
+  | UGoalOrIntroR : utac
+  | UGoalIntro : utac
+  | UGoalAndIntro : utac
+
+  | UGoalForallIntro : utac
+  | UGoalExistsIntro : tvar subst * index subst -> utac
+
+  | UGammaAbsurd : utac
+  | UConstrAbsurd : utac
+
+  | UEqNames : utac
+  | UEqConstants : fname -> utac
+
+  | UProveAll : utac -> utac
+  | UAndThen : utac * utac * 'a gt option -> utac
+  | UOrElse : utac * utac -> utac
+
+(** Existential type for tactics. *)
+type etac = | ETac : 'a gt * 'b gt * ('a,'b) tac -> etac
+
 
 exception Tactic_type_error
 
+let rec subtype : type a b. a gt -> b gt -> bool =
+  fun agt bgt -> match agt,bgt with
+    | _, Gt_top -> true
+    | Gt_bot, _ -> true
+    | Gt_unit, Gt_unit -> true
+    | Gt_fact, Gt_fact -> true
+    | Gt_formula, Gt_formula -> true
+    | Gt_postcond, Gt_postcond -> true
+    | Gt_judgment jt, Gt_judgment jt' -> subtype jt jt'
+    | Gt_list lt, Gt_list lt' -> subtype lt lt'
+    | _ -> false
+
 let rec check_eq : type a b. a gt -> b gt -> a -> b =
   fun agt bgt a -> match agt,bgt with
-  | Gt_fact, Gt_fact -> a
-  | Gt_formula, Gt_formula -> a
-  | Gt_postcond, Gt_postcond -> a
-  | Gt_list l, Gt_list l' -> List.map (check_eq l l') a
+    | Gt_bot, _ -> assert false (* Gt_lat is not inhabited *)
+    | Gt_top, _ -> assert false (* Gt_lat is not inhabited *)
+    | _, Gt_bot -> assert false (* Gt_lat is not inhabited *)
+    | _, Gt_top -> assert false (* Gt_lat is not inhabited *)
 
-  | _ -> raise Tactic_type_error
+    | Gt_unit, Gt_unit -> a
+    | Gt_fact, Gt_fact -> a
+    | Gt_formula, Gt_formula -> a
+    | Gt_postcond, Gt_postcond -> a
 
-(* let rec subtype : type a b. a gt -> b gt -> a gt =
- *   fun a b -> match a,b with
- *     | _, Gt_var -> a
- *     | Gt_fact, Gt_fact -> a
- *     | Gt_formula, Gt_formula -> a
- *     | Gt_postcond, Gt_postcond -> a
- *     | Gt_list l, Gt_list l' -> Gt_list (subtype l l')
- *
- *     | _ -> raise Tactic_type_error *)
+    | Gt_judgment jt, Gt_judgment jt' ->
+      Judgment.set_goal (check_eq jt jt' a.goal) a
+
+    | Gt_list lt, Gt_list lt' -> List.map (check_eq lt lt') a
+
+    | _ -> raise Tactic_type_error
 
 let check_unit : type a. a gt -> unit gt = function
   | Gt_unit -> Gt_unit
-  | Gt_var -> Gt_unit
+  | Gt_bot -> Gt_unit
   | _ -> raise Tactic_type_error
 
-let check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
-  fun _ _ _ -> assert false
+let tac_of_simp_utac utac = match utac with
+  | UGoalOrIntroL -> GoalOrIntroL
+  | UGoalOrIntroR -> GoalOrIntroR
+  | UGoalIntro -> GoalIntro
+  | UGoalAndIntro -> GoalAndIntro
+  | _ -> assert false
 
-let rec tac_type : type a b. a gt -> b gt -> utac -> etac =
+let tac_of_simp_utac2 utac = match utac with
+  | UEqNames -> EqNames
+  | UEqConstants fn -> EqConstants fn
+  | _ -> assert false
+
+type (_,_) eq_type = | Refl : 'a * 'a -> ('a, 'a) eq_type
+
+exception Type_not_equal
+
+let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type =
+  fun a b -> match a, b with
+    | Gt_bot, Gt_bot -> Refl (a,b)
+    | Gt_top, Gt_top -> Refl (a,b)
+    | Gt_unit, Gt_unit -> Refl (a,b)
+    | Gt_formula, Gt_formula -> Refl (a,b)
+    | Gt_postcond, Gt_postcond -> Refl (a,b)
+    | Gt_list l, Gt_list r -> begin match get_refl l r with
+        | Refl _ -> Refl (a,b) end
+    | Gt_judgment l, Gt_judgment r -> begin match get_refl l r with
+        | Refl _ -> Refl (a,b) end
+    | _ -> raise Type_not_equal
+
+(** [check_type l_gt r_gt utac] checks that [l_gt] -> [r_gt] is a valid type of
+    [utac]. Requires all [UAndThen] tactic to be decorated with the intermediate
+    types. *)
+let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
   fun l_gt r_gt utac -> match utac with
-    | UAdmit -> begin match l_gt with
-        | Gt_var -> ETac ( Gt_judgment Gt_var,
-                           check_unit r_gt,
-                           Admit )
-        | Gt_judgment _ -> ETac ( l_gt,
-                                  check_unit r_gt,
-                                  Admit )
+    | UAdmit -> begin match l_gt, r_gt with
+        | Gt_judgment _, Gt_unit -> Admit
         | _ -> raise Tactic_type_error end
 
-    | UOrElse (utac_l, utac_r) -> begin match tac_type l_gt r_gt utac_l with
-        | ETac (l_gt, r_gt, _) -> match tac_type l_gt r_gt utac_r with
-          | ETac (l_gt, r_gt, tac_r) ->
-            let tac_l = check_type l_gt r_gt utac_l in
-            ETac (l_gt, r_gt, OrElse (tac_l, tac_r)) end
+    | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
+      begin match l_gt, r_gt with
+        | Gt_judgment Gt_fact, Gt_judgment Gt_fact -> tac_of_simp_utac utac
+        | _ -> raise Tactic_type_error end
 
-    | _ -> assert false
+    | UEqNames | UEqConstants _ -> begin match l_gt, r_gt with
+        | Gt_judgment jt, Gt_judgment jt' ->
+          begin try match get_refl jt jt' with
+            | Refl _ -> tac_of_simp_utac2 utac
+            with Type_not_equal -> raise Tactic_type_error end
+        | _ -> raise Tactic_type_error end
+
+    | UOrElse (utac_l, utac_r) ->
+      let tac_l = check_type l_gt r_gt utac_l
+      and tac_r = check_type l_gt r_gt utac_r in
+      OrElse (tac_l, tac_r)
+
+    | UAndThen (utac_l, utac_r, Some mid_gt) ->
+      let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l
+      and tac_r = check_type mid_gt r_gt utac_r in
+      AndThen (tac_l, tac_r)
+
+    | UAndThen (utac_l, utac_r, None) -> assert false
+
+    | _ -> assert false         (* TODO *)
+
+
+(** [tac_typ l_gt r_gt utac] infers the most general type of an untyped tactic,
+    knowing that the left type must be a subtype of [l_gt], and [r_gt] must be
+    a subtype of the right type.
+    Returns a pair [(utac', etac')], where [etac'] is the typed tactic
+    (wrapped), and [utac'] is the original untyped tactic decorated with types
+    information at the [UAndThen] node (necessary for the type_checking).  *)
+let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
+  fun l_gt r_gt utac -> match utac with
+    | UAdmit -> begin match l_gt with
+        | Gt_top -> ( utac, ETac ( Gt_judgment Gt_top,
+                                   check_unit r_gt,
+                                   Admit ))
+        | Gt_judgment _ -> ( utac, ETac ( l_gt,
+                                          check_unit r_gt,
+                                          Admit ))
+        | _ -> raise Tactic_type_error end
+
+    | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
+      if subtype (Gt_judgment Gt_fact) l_gt
+      && subtype r_gt (Gt_judgment Gt_fact) then
+        ( utac, ETac ( Gt_judgment Gt_fact,
+                       Gt_judgment Gt_fact,
+                       tac_of_simp_utac utac ))
+      else raise Tactic_type_error
+
+    | UEqNames | UEqConstants _ -> begin match l_gt, r_gt with
+        | Gt_top, Gt_bot -> ( utac, ETac ( Gt_judgment Gt_top,
+                                           Gt_judgment Gt_bot,
+                                           tac_of_simp_utac2 utac ))
+        | Gt_top, Gt_judgment jt ->
+          ( utac, ETac ( r_gt, r_gt, tac_of_simp_utac2 utac ))
+        | Gt_judgment jt, Gt_bot ->
+          ( utac, ETac ( l_gt, l_gt, tac_of_simp_utac2 utac ))
+        | Gt_judgment jt, Gt_judgment jt' ->
+          if subtype jt jt' then
+            ( utac, ETac ( l_gt, top_to_bot l_gt, tac_of_simp_utac2 utac ))
+          else if subtype jt' jt then
+            ( utac, ETac ( bot_to_top r_gt, r_gt, tac_of_simp_utac2 utac ))
+          else raise Tactic_type_error
+        | _ -> raise Tactic_type_error end
+
+    | UOrElse (utac_l, utac_r) -> begin match tac_typ l_gt r_gt utac_l with
+        | utac_l', ETac (l_gt, r_gt, _) -> match tac_typ l_gt r_gt utac_r with
+          | utac_r', ETac (l_gt, r_gt, tac_r) ->
+            let tac_l = check_type l_gt r_gt utac_l in
+            ( UOrElse (utac_l', utac_r'),
+              ETac (l_gt, r_gt, OrElse (tac_l, tac_r))) end
+
+    | UAndThen (utac_l, utac_r,_) ->
+      let mid_gt = Gt_bot in
+      begin match tac_typ l_gt mid_gt utac_l with
+        | utac_l', ETac (l_gt, mid_gt, _) ->
+          match tac_typ (bot_to_top mid_gt) r_gt utac_r with
+          | utac_r', ETac (mid_gt, r_gt, tac_r) ->
+            let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l in
+            ( UAndThen (utac_l', utac_r', Some mid_gt),
+              ETac (l_gt, r_gt, AndThen (tac_l, tac_r))) end
+
+    | _ -> assert false         (* TODO *)
+
+let tac_type : type a b. a gt -> b gt -> utac -> etac =
+  fun l_gt r_gt utac -> snd @@ tac_typ l_gt r_gt utac
 
 
 (* let () =
