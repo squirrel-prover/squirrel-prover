@@ -804,6 +804,17 @@ type _ goaltype =
 
 type 'a gt = 'a goaltype
 
+let rec pp_gt : type a. Format.formatter -> a gt -> unit = fun ppf gt ->
+  match gt with
+  | Gt_bot -> Fmt.pf ppf "bot"
+  | Gt_top -> Fmt.pf ppf "top"
+  | Gt_unit -> Fmt.pf ppf "unit"
+  | Gt_formula -> Fmt.pf ppf "formula"
+  | Gt_postcond -> Fmt.pf ppf "postcond"
+  | Gt_fact -> Fmt.pf ppf "fact"
+  | Gt_judgment jt -> Fmt.pf ppf "%a judgment" pp_gt jt
+  | Gt_list jt -> Fmt.pf ppf "%a list" pp_gt jt
+
 (** Flip [Gt_bot] element to [Gt_top]. *)
 let rec bot_to_top : type a. a gt -> a gt = function
   | Gt_bot -> Gt_top
@@ -850,6 +861,32 @@ type utac =
   | UAndThen : utac * utac * 'a gt option -> utac
   | UOrElse : utac * utac -> utac
 
+let rec pp_utac ppf = function
+  | UAdmit -> Fmt.pf ppf "admit"
+
+  | UGoalOrIntroL -> Fmt.pf ppf "goal_or_intro_l"
+  | UGoalOrIntroR -> Fmt.pf ppf "goal_or_intro_r"
+  | UGoalIntro -> Fmt.pf ppf "goal_intro"
+  | UGoalAndIntro -> Fmt.pf ppf "goal_and_intro"
+
+  | UGoalForallIntro -> Fmt.pf ppf "forall_intro"
+  | UGoalExistsIntro (vnu,inu) ->
+    Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
+      (pp_subst pp_tvar) vnu
+      (pp_subst pp_index) inu
+
+  | UGammaAbsurd -> Fmt.pf ppf "gamma_absurd"
+  | UConstrAbsurd -> Fmt.pf ppf "constr_absurd"
+
+  | UEqNames -> Fmt.pf ppf "eq_names"
+  | UEqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
+
+  | UProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_utac utac
+  | UAndThen (ut, ut',_) ->
+    Fmt.pf ppf "@[%a@];@[%a@]" pp_utac ut pp_utac ut'
+  | UOrElse (ut, ut') ->
+    Fmt.pf ppf "@[%a@]+@[%a@]" pp_utac ut pp_utac ut'
+
 (** Existential type for tactics. *)
 type etac = | ETac : 'a gt * 'b gt * ('a,'b) tac -> etac
 
@@ -885,12 +922,18 @@ let rec check_eq : type a b. a gt -> b gt -> a -> b =
 
     | Gt_list lt, Gt_list lt' -> List.map (check_eq lt lt') a
 
-    | _ -> raise Tactic_type_error
+    | _ ->
+      Log.log Log.LogTacticTC (fun () ->
+          Fmt.epr "@[%a@] is not a equal to @[%a@]@;%!" pp_gt agt pp_gt bgt);
+      raise Tactic_type_error
 
 let check_unit : type a. a gt -> unit gt = function
   | Gt_unit -> Gt_unit
   | Gt_bot -> Gt_unit
-  | _ -> raise Tactic_type_error
+  | _ as gt ->
+    Log.log Log.LogTacticTC (fun () ->
+        Fmt.epr "@[%a@] is not a subtype of @[%a@]@;%!" pp_gt gt pp_gt Gt_unit);
+    raise Tactic_type_error
 
 let tac_of_simp_utac utac = match utac with
   | UGoalOrIntroL -> GoalOrIntroL
@@ -904,43 +947,60 @@ let tac_of_simp_utac2 utac = match utac with
   | UEqConstants fn -> EqConstants fn
   | _ -> assert false
 
+let tac_of_simp_utac3 utac = match utac with
+  | UAdmit -> Admit
+  | UGammaAbsurd -> GammaAbsurd
+  | UConstrAbsurd -> ConstrAbsurd
+  | _ -> assert false
+
 type (_,_) eq_type = | Refl : 'a * 'a -> ('a, 'a) eq_type
 
-exception Type_not_equal
-
-let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type =
+let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type option =
   fun a b -> match a, b with
-    | Gt_bot, Gt_bot -> Refl (a,b)
-    | Gt_top, Gt_top -> Refl (a,b)
-    | Gt_unit, Gt_unit -> Refl (a,b)
-    | Gt_formula, Gt_formula -> Refl (a,b)
-    | Gt_postcond, Gt_postcond -> Refl (a,b)
+    | Gt_bot, Gt_bot -> Refl (a,b) |> some
+    | Gt_top, Gt_top -> Refl (a,b) |> some
+    | Gt_unit, Gt_unit -> Refl (a,b) |> some
+    | Gt_formula, Gt_formula -> Refl (a,b) |> some
+    | Gt_postcond, Gt_postcond -> Refl (a,b) |> some
     | Gt_list l, Gt_list r -> begin match get_refl l r with
-        | Refl _ -> Refl (a,b) end
+        | Some (Refl _) -> Refl (a,b) |> some
+        | None -> None end
     | Gt_judgment l, Gt_judgment r -> begin match get_refl l r with
-        | Refl _ -> Refl (a,b) end
-    | _ -> raise Type_not_equal
+        | Some (Refl _) -> Refl (a,b) |> some
+        | None -> None end
+    | _ -> None
+
+let fail_check_type : type a b. a gt -> b gt -> utac -> exn =
+  fun l_gt r_gt utac ->
+    Log.log Log.LogTacticTC (fun () ->
+        Fmt.epr "@[<v 0>%a@ cannot be given the type@;\
+                 %a@ %a@ %a@]%!"
+          pp_utac utac
+          pp_gt l_gt
+          Fmt.(styled `Red (styled `Underline ident)) "=>"
+          pp_gt r_gt);
+    Tactic_type_error
 
 (** [check_type l_gt r_gt utac] checks that [l_gt] -> [r_gt] is a valid type of
     [utac]. Requires all [UAndThen] tactic to be decorated with the intermediate
     types. *)
 let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
   fun l_gt r_gt utac -> match utac with
-    | UAdmit -> begin match l_gt, r_gt with
-        | Gt_judgment _, Gt_unit -> Admit
-        | _ -> raise Tactic_type_error end
+    | UAdmit | UGammaAbsurd | UConstrAbsurd -> begin match l_gt, r_gt with
+        | Gt_judgment _, Gt_unit -> tac_of_simp_utac3 utac
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
     | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
       begin match l_gt, r_gt with
         | Gt_judgment Gt_fact, Gt_judgment Gt_fact -> tac_of_simp_utac utac
-        | _ -> raise Tactic_type_error end
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
     | UEqNames | UEqConstants _ -> begin match l_gt, r_gt with
         | Gt_judgment jt, Gt_judgment jt' ->
-          begin try match get_refl jt jt' with
-            | Refl _ -> tac_of_simp_utac2 utac
-            with Type_not_equal -> raise Tactic_type_error end
-        | _ -> raise Tactic_type_error end
+          begin match get_refl jt jt' with
+            | Some (Refl _) -> tac_of_simp_utac2 utac
+            | None -> raise @@ fail_check_type l_gt r_gt utac end
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
     | UOrElse (utac_l, utac_r) ->
       let tac_l = check_type l_gt r_gt utac_l
@@ -957,6 +1017,18 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
     | _ -> assert false         (* TODO *)
 
 
+
+let fail_tac_type : type a b. a gt -> b gt -> utac -> exn =
+  fun l_gt r_gt utac ->
+    Log.log Log.LogTacticTC (fun () ->
+        Fmt.epr "@[<v 0>%a@ cannot be type in the context@;\
+                 %a@ %a@ %a@]%!"
+          pp_utac utac
+          pp_gt l_gt
+          Fmt.(styled `Red (styled `Underline ident)) "=>"
+          pp_gt r_gt);
+    Tactic_type_error
+
 (** [tac_typ l_gt r_gt utac] infers the most general type of an untyped tactic,
     knowing that the left type must be a subtype of [l_gt], and [r_gt] must be
     a subtype of the right type.
@@ -965,14 +1037,14 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
     information at the [UAndThen] node (necessary for the type_checking).  *)
 let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
   fun l_gt r_gt utac -> match utac with
-    | UAdmit -> begin match l_gt with
+    | UAdmit | UGammaAbsurd | UConstrAbsurd -> begin match l_gt with
         | Gt_top -> ( utac, ETac ( Gt_judgment Gt_top,
                                    check_unit r_gt,
-                                   Admit ))
+                                   tac_of_simp_utac3 utac ))
         | Gt_judgment _ -> ( utac, ETac ( l_gt,
                                           check_unit r_gt,
-                                          Admit ))
-        | _ -> raise Tactic_type_error end
+                                          tac_of_simp_utac3 utac ))
+        | _ -> raise @@ fail_tac_type l_gt r_gt utac end
 
     | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
       if subtype (Gt_judgment Gt_fact) l_gt
@@ -980,7 +1052,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
         ( utac, ETac ( Gt_judgment Gt_fact,
                        Gt_judgment Gt_fact,
                        tac_of_simp_utac utac ))
-      else raise Tactic_type_error
+      else raise @@ fail_tac_type l_gt r_gt utac
 
     | UEqNames | UEqConstants _ -> begin match l_gt, r_gt with
         | Gt_top, Gt_bot -> ( utac, ETac ( Gt_judgment Gt_top,
@@ -995,8 +1067,8 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
             ( utac, ETac ( l_gt, top_to_bot l_gt, tac_of_simp_utac2 utac ))
           else if subtype jt' jt then
             ( utac, ETac ( bot_to_top r_gt, r_gt, tac_of_simp_utac2 utac ))
-          else raise Tactic_type_error
-        | _ -> raise Tactic_type_error end
+          else raise @@ fail_tac_type l_gt r_gt utac
+        | _ -> raise @@ fail_tac_type l_gt r_gt utac end
 
     | UOrElse (utac_l, utac_r) -> begin match tac_typ l_gt r_gt utac_l with
         | utac_l', ETac (l_gt, r_gt, _) -> match tac_typ l_gt r_gt utac_r with
@@ -1020,6 +1092,39 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
 let tac_type : type a b. a gt -> b gt -> utac -> etac =
   fun l_gt r_gt utac -> snd @@ tac_typ l_gt r_gt utac
 
+
+(** Tests *)
+
+exception Tactic_type_ok
+
+let test_tac_type : type a b. a gt -> b gt -> utac -> etac -> unit =
+  fun l_gt r_gt utac etac -> match tac_type l_gt r_gt utac, etac with
+    | ETac (a,b,tac), ETac (a',b',tac') ->
+      match get_refl a a', get_refl b b' with
+      | Some (Refl _), Some (Refl _) ->
+        if tac = tac' then raise Tactic_type_ok
+        else raise Tactic_type_error
+      | None, _ | _, None -> raise Tactic_type_error
+
+let () =
+  Checks.add_suite "Logic" [
+    "Tactic type-checking", `Quick,
+    begin fun () ->
+      Alcotest.check_raises "Simple 0" Tactic_type_ok
+        (fun () -> test_tac_type (Gt_judgment Gt_fact) (Gt_unit) UAdmit
+            ( ETac (Gt_judgment Gt_fact, Gt_unit, Admit) ));
+      Alcotest.check_raises "Simple 1" Tactic_type_ok
+        (fun () -> test_tac_type (Gt_judgment Gt_postcond) (Gt_unit) UAdmit
+            ( ETac (Gt_judgment Gt_postcond, Gt_unit, Admit) ));
+      Alcotest.check_raises "Simple 2" Tactic_type_ok
+        (fun () ->
+           test_tac_type
+             (Gt_judgment (Gt_list Gt_postcond))
+             (Gt_unit) UGammaAbsurd
+             ( ETac ( Gt_judgment (Gt_list Gt_postcond),
+                      Gt_unit, GammaAbsurd ) ));
+    end
+  ]
 
 (* let () =
  *   Checks.add_suite "Logic" [

@@ -116,6 +116,11 @@ let rec refresh = function
 
 type 'a subst = ('a * 'a) list
 
+let pp_subst pp_el ppf nu =
+  Fmt.pf ppf "@[<hv 0>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,")
+       (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf " -> ") pp_el pp_el)) nu
+
 let app_subst subst x = try List.assoc x subst with Not_found -> x
 
 let rec ivar_subst_action subst = function

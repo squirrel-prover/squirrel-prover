@@ -45,6 +45,8 @@ val constr_equal : action -> action -> (index * index) list option
 
 type 'a subst = ('a * 'a) list
 
+val pp_subst : 'a Fmt.t -> Format.formatter -> 'a subst -> unit
+
 val app_subst : ('a * 'a) list -> 'a -> 'a
 
 val ivar_subst_action : index subst -> action -> action

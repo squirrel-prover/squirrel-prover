@@ -1,6 +1,6 @@
-type log_class = LogConstr
+type log_class = LogConstr | LogTacticTC
 
-let runtime_logs = ref [LogConstr]
+let runtime_logs = ref [LogConstr; LogTacticTC]
 
 let log cls f = if List.mem cls !runtime_logs then f () else ()
 
