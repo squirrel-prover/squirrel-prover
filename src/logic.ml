@@ -2,59 +2,6 @@ open Utils
 open Action
 open Term
 
-type args = (string * Theory.kind) list
-
-let goals = ref []
-
-let iter_goals f = List.iter f !goals
-
-let add_goal g = goals := g :: !goals
-
-
-let declare_goal (uargs,uconstr) (eargs,econstr) ufact efact =
-  let to_ts subst = List.map (fun (x,y) -> x, Term.TVar y) subst in
-
-  (* In the rest of this function, the lists need to be reversed and appended
-     carefully to properly handle variable shadowing.  *)
-  let uts_subst, uindex_subst = Theory.convert_vars uargs
-  and ets_subst, eindex_subst = Theory.convert_vars eargs in
-
-  let uconstr =
-    Theory.convert_constr_glob
-      (List.rev uargs)
-      (to_ts uts_subst)
-      uindex_subst
-      uconstr in
-  let ufact =
-    Theory.convert_fact_glob
-      (to_ts uts_subst)
-      uindex_subst
-      ufact in
-
-  let econstr =
-    Theory.convert_constr_glob
-      (List.rev_append eargs (List.rev uargs))
-      (to_ts ets_subst @ to_ts uts_subst)
-      (eindex_subst @ uindex_subst)
-      econstr in
-  let efact =
-    Theory.convert_fact_glob
-      (to_ts ets_subst @ to_ts uts_subst)
-      (eindex_subst @ uindex_subst)
-      efact in
-
-  add_goal
-    { uvars = List.map snd uts_subst;
-      uindices = List.map snd uindex_subst;
-      uconstr = uconstr;
-      ufact = ufact;
-      postcond = [{ evars = List.map snd ets_subst;
-                    eindices = List.map snd eindex_subst;
-                    econstr = econstr;
-                    efact = efact }]
-    }
-
-
 
 let rec action_of_ts = function
   | TName a -> Some a
@@ -387,9 +334,7 @@ end
 open Judgment
 
 
-(***********************)
-(* Basic Tactics Types *)
-(***********************)
+(** Basic Tactics Types *)
 
 type 'a fk = unit -> 'a
 
@@ -404,9 +349,8 @@ type ('a,'b,'c) mem_sk = 'a -> ('b,'c) mem_fk -> 'c
 
 type ('a,'b,'c,'d) mem_t = 'a -> ('b,'c,'d) mem_sk -> ('c,'d) mem_fk -> 'd
 
-(*****************)
-(* Basic Tactics *)
-(*****************)
+
+(** Basic Tactics *)
 
 let tact_wrap f v sk fk = sk (f v) fk
 
@@ -417,9 +361,7 @@ let tact_andthen a b sk fk v = a v (fun v fk' -> b v sk fk') fk
 let tact_orelse a b sk fk v = a v sk (fun () -> b v sk fk)
 
 
-(**********************)
-(* Introduction Rules *)
-(**********************)
+(** Introduction Rules *)
 
 let goal_or_intro_l (judge : fact judgment) sk fk = match judge.goal with
   | Or (lgoal, _) -> sk (set_goal_fact lgoal judge) fk
@@ -559,9 +501,8 @@ let rec prove_all (judges : 'a list judgment) tac sk fk =
          prove_all (set_goal goals judges) tac sk fk
       ) fk
 
-(*********)
-(* Utils *)
-(*********)
+
+(** Utils *)
 
 let mk_or_cnstr l = match l with
   | [] -> False
@@ -584,9 +525,7 @@ let mk_and_cnstr l = match l with
     mk_c a l'
 
 
-(*******************)
-(* Eq-Indep Axioms *)
-(*******************)
+(** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
 
@@ -626,9 +565,8 @@ let eq_constants fn (judge : 'a judgment) sk fk =
 
   sk judge fk
 
-(**************)
-(* EUF Axioms *)
-(**************)
+
+(** EUF Axioms *)
 
 (** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
 let modulo_sym f at = match at with
@@ -728,92 +666,7 @@ let euf_apply (judge : 'a judgment) sk fk f_select =
   sk (euf_apply_facts judge at) fk
 
 
-(***********)
-(* Tactics *)
-(***********)
-
-(** Tactics expression *)
-type (_,_) tac =
-  | Admit : ('a judgment, unit) tac
-
-  | GoalOrIntroL : (fact judgment, fact judgment) tac
-  | GoalOrIntroR : (fact judgment, fact judgment) tac
-  | GoalIntro : (fact judgment, fact judgment) tac
-  | GoalAndIntro : (fact judgment, fact judgment) tac
-
-  | GoalForallIntro : (formula judgment, postcond list judgment) tac
-  | GoalExistsIntro :
-      tvar subst * index subst ->
-    (postcond judgment, fact judgment) tac
-
-  | GammaAbsurd : ('a judgment, unit) tac
-  | ConstrAbsurd : ('a judgment, unit) tac
-
-  | EqNames : ('a judgment, 'a judgment) tac
-  | EqConstants : fname -> ('a judgment, 'a judgment) tac
-
-  | ProveAll : ('a judgment, unit) tac -> ('a list judgment, unit) tac
-  | AndThen : ('a,'b) tac * ('b,'c) tac -> ('a,'c) tac
-  | OrElse : ('a,'b) tac * ('a,'b) tac -> ('a,'b) tac
-
-
-let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
-  fun ppf tac -> match tac with
-    | Admit -> Fmt.pf ppf "admit"
-
-    | GoalOrIntroL -> Fmt.pf ppf "goal_or_intro_l"
-    | GoalOrIntroR -> Fmt.pf ppf "goal_or_intro_r"
-    | GoalIntro -> Fmt.pf ppf "goal_intro"
-    | GoalAndIntro -> Fmt.pf ppf "goal_and_intro"
-
-    | GoalForallIntro -> Fmt.pf ppf "forall_intro"
-    | GoalExistsIntro (vnu,inu) ->
-      Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
-        (pp_subst pp_tvar) vnu
-        (pp_subst pp_index) inu
-
-    | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
-    | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
-
-    | EqNames -> Fmt.pf ppf "eq_names"
-    | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
-
-    | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac
-    | AndThen (ut, ut') ->
-      Fmt.pf ppf "@[%a@];@[%a@]" pp_tac ut pp_tac ut'
-    | OrElse (ut, ut') ->
-      Fmt.pf ppf "@[%a@]+@[%a@]" pp_tac ut pp_tac ut'
-
-
-let rec tac_apply :
-  type a b c. (a,b) tac -> a -> (b,c) sk -> c fk -> c =
-  fun tac judge sk fk -> match tac with
-    | Admit -> sk () fk
-
-    | GoalForallIntro -> goal_forall_intro judge sk fk
-    | GoalExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
-
-    | GoalOrIntroL -> goal_or_intro_l judge sk fk
-    | GoalOrIntroR -> goal_or_intro_r judge sk fk
-    | GoalAndIntro -> goal_and_intro judge sk fk
-    | GoalIntro -> goal_intro judge sk fk
-
-    | GammaAbsurd -> gamma_absurd judge sk fk
-    | ConstrAbsurd -> constr_absurd judge sk fk
-
-    | EqNames -> eq_names judge sk fk
-    | EqConstants fn -> eq_constants fn judge sk fk
-
-    | ProveAll tac -> prove_all judge (tac_apply tac) sk fk
-    | AndThen (tac,tac') ->
-      tact_andthen (tac_apply tac) (tac_apply tac') sk fk judge
-    | OrElse (tac,tac') ->
-      tact_orelse (tac_apply tac) (tac_apply tac') sk fk judge
-
-
-(************************************)
-(* Tactic Parsing and Type-Checking *)
-(************************************)
+(** Tactics *)
 
 type gtlat
 
@@ -843,6 +696,111 @@ let rec pp_gt : type a. Format.formatter -> a gt -> unit = fun ppf gt ->
   | Gt_fact -> Fmt.pf ppf "fact"
   | Gt_judgment jt -> Fmt.pf ppf "%a judgment" pp_gt jt
   | Gt_list jt -> Fmt.pf ppf "%a list" pp_gt jt
+
+(** Tactics expression *)
+type (_,_) tac =
+  | Admit : ('a judgment, unit) tac
+
+  | Left : (fact judgment, fact judgment) tac
+  | Right : (fact judgment, fact judgment) tac
+  | Intro : (fact judgment, fact judgment) tac
+  | Split : (fact judgment, fact judgment) tac
+
+  | ForallIntro : (formula judgment, postcond list judgment) tac
+  | ExistsIntro :
+      tvar subst * index subst ->
+    (postcond judgment, fact judgment) tac
+
+  | GammaAbsurd : ('a judgment, unit) tac
+  | ConstrAbsurd : ('a judgment, unit) tac
+
+  | EqNames : ('a judgment, 'a judgment) tac
+  | EqConstants : fname -> ('a judgment, 'a judgment) tac
+
+  | ProveAll : ('a judgment, unit) tac -> ('a list judgment, unit) tac
+  | AndThen : ('a,'b) tac * ('b,'c) tac * 'b gt -> ('a,'c) tac
+  | OrElse : ('a,'b) tac * ('a,'b) tac -> ('a,'b) tac
+
+  | TacPrint : ('a,'b) tac -> ('a,'b) tac
+
+
+let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
+  fun ppf tac -> match tac with
+    | Admit -> Fmt.pf ppf "admit"
+
+    | Left -> Fmt.pf ppf "goal_or_intro_l"
+    | Right -> Fmt.pf ppf "goal_or_intro_r"
+    | Intro -> Fmt.pf ppf "goal_intro"
+    | Split -> Fmt.pf ppf "goal_and_intro"
+
+    | ForallIntro -> Fmt.pf ppf "forall_intro"
+    | ExistsIntro (vnu,inu) ->
+      Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
+        (pp_subst pp_tvar) vnu
+        (pp_subst pp_index) inu
+
+    | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
+    | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
+
+    | EqNames -> Fmt.pf ppf "eq_names"
+    | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
+
+    | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac
+    | AndThen (ut, ut',_) ->
+      Fmt.pf ppf "@[%a@];@,@[%a@]" pp_tac ut pp_tac ut'
+    | OrElse (ut, ut') ->
+      Fmt.pf ppf "@[%a@]+@,@[%a@]" pp_tac ut pp_tac ut'
+
+    | TacPrint ut ->
+      Fmt.pf ppf "@[%a@].@;" pp_tac ut
+
+
+let rec pp_gt_el : type a. a gt -> Format.formatter -> a -> unit =
+  fun gt ppf a -> match gt with
+    | Gt_top -> assert false
+    | Gt_bot -> assert false    (* Gtvar is not inhabited. *)
+    | Gt_unit -> Fmt.pf ppf "()"
+    | Gt_fact -> pp_fact ppf a
+    | Gt_postcond -> pp_postcond ppf a
+    | Gt_formula -> pp_formula ppf a
+    | Gt_judgment jt -> Judgment.pp_judgment (pp_gt_el jt) ppf a
+    | Gt_list jt ->
+      Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@;") (pp_gt_el jt) ppf a
+
+
+let rec tac_apply :
+  type a b c. b gt -> (a,b) tac -> a -> (b,c) sk -> c fk -> c =
+  fun gt tac judge sk fk -> match tac with
+    | Admit -> sk () fk
+
+    | ForallIntro -> goal_forall_intro judge sk fk
+    | ExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
+
+    | Left -> goal_or_intro_l judge sk fk
+    | Right -> goal_or_intro_r judge sk fk
+    | Split -> goal_and_intro judge sk fk
+    | Intro -> goal_intro judge sk fk
+
+    | GammaAbsurd -> gamma_absurd judge sk fk
+    | ConstrAbsurd -> constr_absurd judge sk fk
+
+    | EqNames -> eq_names judge sk fk
+    | EqConstants fn -> eq_constants fn judge sk fk
+
+    | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk
+    | AndThen (tac,tac',mid_gt) ->
+      tact_andthen (tac_apply mid_gt tac) (tac_apply gt tac') sk fk judge
+    | OrElse (tac,tac') ->
+      tact_orelse (tac_apply gt tac) (tac_apply gt tac') sk fk judge
+
+    | TacPrint tac ->
+      tac_apply gt tac judge (fun judge fk ->
+          Fmt.pr "%a@;%!" (pp_gt_el gt) judge;
+          sk judge fk)
+        fk
+
+
+(** Tactic Parsing and Type-Checking *)
 
 let rec pp_tact_type : type a b. Format.formatter -> (a gt * b gt) -> unit =
   fun ppf (gt,gt') ->
@@ -879,13 +837,13 @@ let rec top_to_bot : type a. a gt -> a gt = function
 type utac =
   | UAdmit : utac
 
-  | UGoalOrIntroL : utac
-  | UGoalOrIntroR : utac
-  | UGoalIntro : utac
-  | UGoalAndIntro : utac
+  | ULeft : utac
+  | URight : utac
+  | UIntro : utac
+  | USplit : utac
 
-  | UGoalForallIntro : utac
-  | UGoalExistsIntro : tvar subst * index subst -> utac
+  | UForallIntro : utac
+  | UExistsIntro : tvar subst * index subst -> utac
 
   | UGammaAbsurd : utac
   | UConstrAbsurd : utac
@@ -897,16 +855,18 @@ type utac =
   | UAndThen : utac * utac * 'a gt option -> utac
   | UOrElse : utac * utac -> utac
 
+  | UPrint : utac -> utac
+
 let rec pp_utac ppf = function
   | UAdmit -> Fmt.pf ppf "admit"
 
-  | UGoalOrIntroL -> Fmt.pf ppf "goal_or_intro_l"
-  | UGoalOrIntroR -> Fmt.pf ppf "goal_or_intro_r"
-  | UGoalIntro -> Fmt.pf ppf "goal_intro"
-  | UGoalAndIntro -> Fmt.pf ppf "goal_and_intro"
+  | ULeft -> Fmt.pf ppf "goal_or_intro_l"
+  | URight -> Fmt.pf ppf "goal_or_intro_r"
+  | UIntro -> Fmt.pf ppf "goal_intro"
+  | USplit -> Fmt.pf ppf "goal_and_intro"
 
-  | UGoalForallIntro -> Fmt.pf ppf "forall_intro"
-  | UGoalExistsIntro (vnu,inu) ->
+  | UForallIntro -> Fmt.pf ppf "forall_intro"
+  | UExistsIntro (vnu,inu) ->
     Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
       (pp_subst pp_tvar) vnu
       (pp_subst pp_index) inu
@@ -922,6 +882,9 @@ let rec pp_utac ppf = function
     Fmt.pf ppf "@[%a@];@[%a@]" pp_utac ut pp_utac ut'
   | UOrElse (ut, ut') ->
     Fmt.pf ppf "@[%a@]+@[%a@]" pp_utac ut pp_utac ut'
+
+  | UPrint ut ->
+    Fmt.pf ppf "@[%a@].@;" pp_utac ut
 
 (** Existential type for tactics. *)
 type etac = | ETac : 'a gt * 'b gt * ('a,'b) tac -> etac
@@ -943,9 +906,9 @@ let rec subtype : type a b. a gt -> b gt -> bool =
 
 let rec check_eq : type a b. a gt -> b gt -> a -> b =
   fun agt bgt a -> match agt,bgt with
-    | Gt_bot, _ -> assert false (* Gt_lat is not inhabited *)
-    | Gt_top, _ -> assert false (* Gt_lat is not inhabited *)
-    | _, Gt_bot -> assert false (* Gt_lat is not inhabited *)
+    | Gt_bot, _ -> assert false
+    | Gt_top, _ -> assert false
+    | _, Gt_bot -> assert false
     | _, Gt_top -> assert false (* Gt_lat is not inhabited *)
 
     | Gt_unit, Gt_unit -> a
@@ -972,10 +935,10 @@ let check_unit : type a. a gt -> unit gt = function
     raise Tactic_type_error
 
 let tac_of_simp_utac utac = match utac with
-  | UGoalOrIntroL -> GoalOrIntroL
-  | UGoalOrIntroR -> GoalOrIntroR
-  | UGoalIntro -> GoalIntro
-  | UGoalAndIntro -> GoalAndIntro
+  | ULeft -> Left
+  | URight -> Right
+  | UIntro -> Intro
+  | USplit -> Split
   | _ -> assert false
 
 let tac_of_simp_utac2 utac = match utac with
@@ -1010,8 +973,8 @@ let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type option =
 let fail_check_type : type a b. a gt -> b gt -> utac -> exn =
   fun l_gt r_gt utac ->
     Log.log Log.LogTacticTC (fun () ->
-        Fmt.epr "@[<v 0>%a@ cannot be given the type@;\
-                 %a]%!"
+        Fmt.epr "@[<hv 0>%a@ cannot be given the type@ \
+                 %a]@;%!"
           pp_utac utac
           pp_tact_type (l_gt,r_gt));
     Tactic_type_error
@@ -1025,7 +988,7 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
         | Gt_judgment _, Gt_unit -> tac_of_simp_utac3 utac
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
-    | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
+    | ULeft | URight | UIntro | USplit ->
       begin match l_gt, r_gt with
         | Gt_judgment Gt_fact, Gt_judgment Gt_fact -> tac_of_simp_utac utac
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
@@ -1037,6 +1000,21 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
             | None -> raise @@ fail_check_type l_gt r_gt utac end
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
+    | UForallIntro -> begin match l_gt, r_gt with
+        | Gt_judgment Gt_formula, Gt_judgment (Gt_list Gt_postcond) ->
+          ForallIntro
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
+
+    | UExistsIntro (vnu,inu) -> begin match l_gt, r_gt with
+        | Gt_judgment Gt_postcond, Gt_judgment Gt_fact ->
+          ExistsIntro (vnu,inu)
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
+
+    | UProveAll utac' -> begin match l_gt, r_gt with
+        | Gt_judgment (Gt_list jt), Gt_unit ->
+          ProveAll (check_type (Gt_judgment jt) Gt_unit utac')
+        | _ -> raise @@ fail_check_type l_gt r_gt utac end
+
     | UOrElse (utac_l, utac_r) ->
       let tac_l = check_type l_gt r_gt utac_l
       and tac_r = check_type l_gt r_gt utac_r in
@@ -1045,19 +1023,17 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
     | UAndThen (utac_l, utac_r, Some mid_gt) ->
       let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l
       and tac_r = check_type mid_gt r_gt utac_r in
-      AndThen (tac_l, tac_r)
+      AndThen (tac_l, tac_r, mid_gt)
 
+    | UPrint utac' -> TacPrint (check_type l_gt r_gt utac')
     | UAndThen (utac_l, utac_r, None) -> assert false
-
-    | _ -> assert false         (* TODO *)
-
 
 
 let fail_tac_type : type a b. a gt -> b gt -> utac -> exn =
   fun l_gt r_gt utac ->
     Log.log Log.LogTacticTC (fun () ->
-        Fmt.epr "@[<v 0>%a@ cannot be type in the context@;\
-                 %a@]%!"
+        Fmt.epr "@[<hv 0>%a@ cannot be type in the context@ \
+                 %a@]@;%!"
           pp_utac utac
           pp_tact_type (l_gt,r_gt));
     Tactic_type_error
@@ -1079,7 +1055,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
                                           tac_of_simp_utac3 utac ))
         | _ -> raise @@ fail_tac_type l_gt r_gt utac end
 
-    | UGoalOrIntroL | UGoalOrIntroR | UGoalIntro | UGoalAndIntro ->
+    | ULeft | URight | UIntro | USplit ->
       if subtype (Gt_judgment Gt_fact) l_gt
       && subtype r_gt (Gt_judgment Gt_fact) then
         ( utac, ETac ( Gt_judgment Gt_fact,
@@ -1103,6 +1079,41 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
           else raise @@ fail_tac_type l_gt r_gt utac
         | _ -> raise @@ fail_tac_type l_gt r_gt utac end
 
+    | UForallIntro ->
+      if subtype (Gt_judgment Gt_formula) l_gt
+      && subtype r_gt (Gt_judgment (Gt_list Gt_postcond)) then
+        ( utac, ETac ( Gt_judgment Gt_formula,
+                       Gt_judgment (Gt_list Gt_postcond),
+                       ForallIntro ))
+      else raise @@ fail_tac_type l_gt r_gt utac
+
+    | UExistsIntro (vnu,inu) ->
+      if subtype (Gt_judgment Gt_postcond) l_gt
+      && subtype r_gt (Gt_judgment Gt_fact) then
+        ( utac, ETac ( Gt_judgment Gt_postcond,
+                       Gt_judgment Gt_fact,
+                       ExistsIntro (vnu,inu) ))
+      else raise @@ fail_tac_type l_gt r_gt utac
+
+    | UProveAll utac' ->
+      let type_prove_all : type a. a gt -> utac * etac = fun in_l_gt ->
+        match tac_typ in_l_gt (check_unit r_gt) utac' with
+        | utac', ETac (Gt_judgment jt, r_gt, tac) ->
+          begin match get_refl r_gt Gt_unit with
+            | Some (Refl _) ->
+              ( UProveAll utac',
+                ETac ( Gt_judgment (Gt_list jt),
+                       Gt_unit,
+                       ProveAll tac) )
+            | None -> raise @@ fail_tac_type l_gt r_gt utac end
+        | _ -> raise @@ fail_tac_type l_gt r_gt utac in
+
+      begin match l_gt with
+        | Gt_top -> type_prove_all (Gt_judgment Gt_top)
+        | Gt_judgment Gt_top -> type_prove_all (Gt_judgment Gt_top)
+        | Gt_judgment (Gt_list jt) -> type_prove_all (Gt_judgment jt)
+        | _ -> raise @@ fail_tac_type l_gt r_gt utac end
+
     | UOrElse (utac_l, utac_r) -> begin match tac_typ l_gt r_gt utac_l with
         | utac_l', ETac (l_gt, r_gt, _) -> match tac_typ l_gt r_gt utac_r with
           | utac_r', ETac (l_gt, r_gt, tac_r) ->
@@ -1118,12 +1129,110 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
           | utac_r', ETac (mid_gt, r_gt, tac_r) ->
             let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l' in
             ( UAndThen (utac_l', utac_r', Some mid_gt),
-              ETac (l_gt, r_gt, AndThen (tac_l, tac_r))) end
+              ETac (l_gt, r_gt, AndThen (tac_l, tac_r, mid_gt))) end
 
-    | _ -> assert false         (* TODO *)
+    | UPrint iutac -> begin match tac_typ l_gt r_gt iutac with
+        | iutac', ETac (l_gt, r_gt, itac) ->
+          ( UPrint iutac',
+            ETac (l_gt, r_gt, TacPrint itac ) ) end
+
 
 let tac_type : type a b. a gt -> b gt -> utac -> etac =
   fun l_gt r_gt utac -> snd @@ tac_typ l_gt r_gt utac
+
+let rec list_to_and_then = function
+  | [] -> raise @@ Failure "Empty proof"
+  | a :: [] -> UPrint a
+  | a :: rem -> UAndThen (UPrint a, list_to_and_then rem, None)
+
+let proof_type : type a b. a gt -> b gt -> utac list -> etac =
+  fun l_gt r_gt utacs -> tac_type l_gt r_gt (list_to_and_then utacs)
+
+
+(** Declare Goals And Proofs *)
+
+type args = (string * Theory.kind) list
+
+let goals : (formula * utac list option) list ref = ref []
+
+let iter_goals f = List.iter f !goals
+
+let add_goal g p = goals := (g,p) :: !goals
+
+let declare_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) p_opt =
+  let to_ts subst = List.map (fun (x,y) -> x, Term.TVar y) subst in
+
+  (* In the rest of this function, the lists need to be reversed and appended
+     carefully to properly handle variable shadowing.  *)
+  let uts_subst, uindex_subst = Theory.convert_vars uargs
+  and ets_subst, eindex_subst = Theory.convert_vars eargs in
+
+  let uconstr =
+    Theory.convert_constr_glob
+      (List.rev uargs)
+      (to_ts uts_subst)
+      uindex_subst
+      uconstr in
+  let ufact =
+    Theory.convert_fact_glob
+      (to_ts uts_subst)
+      uindex_subst
+      ufact in
+
+  let econstr =
+    Theory.convert_constr_glob
+      (List.rev_append eargs (List.rev uargs))
+      (to_ts ets_subst @ to_ts uts_subst)
+      (eindex_subst @ uindex_subst)
+      econstr in
+  let efact =
+    Theory.convert_fact_glob
+      (to_ts ets_subst @ to_ts uts_subst)
+      (eindex_subst @ uindex_subst)
+      efact in
+
+  add_goal
+    { uvars = List.map snd uts_subst;
+      uindices = List.map snd uindex_subst;
+      uconstr = uconstr;
+      ufact = ufact;
+      postcond = [{ evars = List.map snd ets_subst;
+                    eindices = List.map snd eindex_subst;
+                    econstr = econstr;
+                    efact = efact }] }
+    p_opt
+
+
+let lemmas_proved = ref []
+
+let try_prove_goals () =
+  let not_proved : (formula * utac list option) list ref = ref [] in
+  let fail goal proof = not_proved := (goal, proof) :: !not_proved in
+  let success goal = lemmas_proved := goal :: !lemmas_proved in
+
+  List.iter (fun (goal, proof_opt) -> match proof_opt with
+      | None ->
+        Fmt.pr "@[<v>%a@;%a@;@;No proof provided.@;@;@]%!"
+          (Fmt.styled `Underline (Fmt.styled `Bold ident)) "Goal:"
+          pp_formula goal;
+        fail goal proof_opt
+      | Some proof ->
+        try match proof_type (Gt_judgment Gt_formula) Gt_unit proof with
+          | ETac (Gt_judgment Gt_formula, Gt_unit, tac) ->
+            Fmt.pr "@[<v 0>";
+            tac_apply Gt_unit tac (Judgment.init goal)
+            (fun _ _ ->
+               Fmt.pr "Goal proved.@;@]%!";
+               success goal)
+              (fun _ ->
+                 Fmt.pr "Proof failed.@;@]%!";
+                 fail goal proof_opt)
+          | _ -> Fmt.pr "Tactic is ill-typed.@;%!" (* TODO: better error message *);
+            fail goal proof_opt
+        with Tactic_type_error -> fail goal proof_opt
+    ) !goals;
+  goals := !not_proved
+
 
 
 (** Tests *)
@@ -1183,22 +1292,22 @@ let () =
         (fun () ->
            test_tac_type
              (Gt_judgment Gt_fact)
-             (Gt_judgment Gt_fact) (UAndThen (UGoalAndIntro,UEqNames,None))
+             (Gt_judgment Gt_fact) (UAndThen (USplit,UEqNames,None))
              ( ETac ( Gt_judgment Gt_fact,
                       Gt_judgment Gt_fact,
-                      AndThen (GoalAndIntro,EqNames) )));
+                      AndThen (Split,EqNames,Gt_judgment Gt_fact) )));
 
       Alcotest.check_raises "OrElse" Tactic_type_ok
         (fun () ->
            test_tac_type
              (Gt_judgment Gt_fact) Gt_unit
              (UOrElse
-                ( UAndThen (UGoalIntro, UGammaAbsurd, None),
+                ( UAndThen (UIntro, UGammaAbsurd, None),
                   UConstrAbsurd ))
              ( ETac ( Gt_judgment Gt_fact,
                       Gt_unit,
                       OrElse
-                        ( AndThen (GoalIntro, GammaAbsurd),
+                        ( AndThen (Intro, GammaAbsurd, Gt_judgment Gt_fact),
                           ConstrAbsurd ))));
 
       Alcotest.check_raises "Simple fail 0" Tactic_type_error

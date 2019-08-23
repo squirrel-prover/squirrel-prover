@@ -145,7 +145,7 @@ let pp_proc ppf =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
   Process.iter_csa (fun descr ->
-      Fmt.pf ppf "@[<v 1>%d:@;@[%a@]@;@]@;"
+      Fmt.pf ppf "@[<v>%d: @[<v 0>@[%a@]@;@]@;"
         !cpt Process.pp_descr descr;
       incr cpt;);
   Fmt.pf ppf "@]%!@.";;
@@ -153,8 +153,8 @@ let pp_proc ppf =
 let pp_goals ppf =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
-  Logic.iter_goals (fun goal ->
-      Fmt.pf ppf "@[<v 1>%d:@;@[%a@]@;@]@;"
+  Logic.iter_goals (fun (goal,_) ->
+      Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
         !cpt Term.pp_formula goal;
       incr cpt;);
   Fmt.pf ppf "@]%!@.";;

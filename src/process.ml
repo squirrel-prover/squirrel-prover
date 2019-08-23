@@ -233,16 +233,16 @@ type descr = {
 
 
 let pp_descr ppf descr =
-  Fmt.pf ppf "@[<v 0>*name: @[<hov>%a@]@;\
+  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
               %a\
-              @[<hv 2>*condition:@ @[<hov>%a@]@]@;\
+              @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
-              @[<hv 2>*output:@ @[<hov>%a@]@]@]"
+              @[<hv 2>output:@ @[<hov>%a@]@]@]"
     pp_action descr.action
-    (Utils.pp_ne_list "@[<hv 2>*indices:@ @[<hov>%a@]@]@;" pp_indices)
+    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" pp_indices)
     descr.indices
     Term.pp_fact descr.condition
-    (Utils.pp_ne_list "@[<hv 2>*updates:@ @[<hov>%a@]@]@;"
+    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
           (fun ppf (s,t) ->

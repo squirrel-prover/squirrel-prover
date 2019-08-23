@@ -75,6 +75,16 @@ rule token = parse
 | "Proof."            { PROOF }
 | "Qed."              { QED }
 | "admit"             { ADMIT }
+| "split"             { SPLIT }
+| "left"              { LEFT }
+| "right"             { RIGHT }
+| "intro"             { INTRO }
+| "forallintro"       { FORALLINTRO }
+| "congruence"        { CONGRUENCE }
+| "notraces"          { NOTRACES }
+| "eqnames"           { EQNAMES }
+| '+'                 { PLUS }
+
 | name as n           { ID (n) }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }

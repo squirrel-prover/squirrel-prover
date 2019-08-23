@@ -5,14 +5,14 @@
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON
+%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE NOTRACES EQNAMES
 %token PROOF QED
 %token EOF
 
@@ -24,6 +24,9 @@
 %left OR
 %left AND
 %nonassoc NOT
+
+%left PLUS
+%left SEMICOLON
 
 %start theory
 %start top_process
@@ -186,22 +189,43 @@ q_vars:
 | LPAREN arg_list RPAREN SUCHTHAT fact         { ($2, $5) }
 
 formula:
-| fact                           { Logic.declare_goal
-				       ([],Term.True)
-				       ([],Term.True)
-				       Term.True $1 }
-| EXISTS q_vars COLON fact       { Logic.declare_goal
-				       ([],Term.True)
-                   	               $2
-				       Term.True $4 }
-| FORALL q_vars COLON fact       { Logic.declare_goal
-				       $2
-				       ([],Term.True)
-				       Term.True $4 }
+| fact                           { ( ([],Term.True),
+				     ([],Term.True),
+				     Term.True, $1 ) }
+| EXISTS q_vars COLON fact       { ( ([],Term.True),
+                   	             $2,
+				     Term.True, $4 ) }
+| FORALL q_vars COLON fact       { ( $2,
+				     ([],Term.True),
+				     Term.True, $4 ) }
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
-                                 { Logic.declare_goal $2 $7 $4 $9 }
+                                 { ($2, $7, $4, $9) }
+
+tactic:
+  | LPAREN t = tactic RPAREN          { t }
+  | ADMIT                             { Logic.UAdmit }
+  | FORALLINTRO                       { Logic.UForallIntro }
+  | INTRO                             { Logic.UIntro }
+  | LEFT                              { Logic.ULeft }
+  | RIGHT                             { Logic.URight }
+  | SPLIT                             { Logic.USplit }
+  | CONGRUENCE                        { Logic.UGammaAbsurd }
+  | NOTRACES                          { Logic.UConstrAbsurd }
+  | EQNAMES                           { Logic.UEqNames }
+  | LBRACKET t = tactic RBRACKET      { Logic.UProveAll t }
+  | l = tactic SEMICOLON r = tactic   { Logic.UAndThen (l,r,None) }
+  | l = tactic PLUS r = tactic        { Logic.UOrElse (l, r) }
+
+tactic_list:
+|                                   { [] }
+| t = tactic DOT l = tactic_list    { t :: l }
+
+proof:
+|PROOF l = tactic_list QED            { l }
+
 goal_decl:
-| GOAL formula                   { () }
+| GOAL f = formula                          { Logic.declare_goal f None }
+| GOAL f = formula p = proof                { Logic.declare_goal f (Some p) }
 
 goal_decls:
 |                                { () }
@@ -213,9 +237,3 @@ theory:
 
 top_process:
 | process EOF                    { $1 }
-
-tactic:
-| ADMIT                          { Logic.UAdmit }
-
-proof:
-|PROOF t = tactic QED            { t }
