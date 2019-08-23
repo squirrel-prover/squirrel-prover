@@ -756,6 +756,35 @@ type (_,_) tac =
   | AndThen : ('a,'b) tac * ('b,'c) tac -> ('a,'c) tac
   | OrElse : ('a,'b) tac * ('a,'b) tac -> ('a,'b) tac
 
+
+let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
+  fun ppf tac -> match tac with
+    | Admit -> Fmt.pf ppf "admit"
+
+    | GoalOrIntroL -> Fmt.pf ppf "goal_or_intro_l"
+    | GoalOrIntroR -> Fmt.pf ppf "goal_or_intro_r"
+    | GoalIntro -> Fmt.pf ppf "goal_intro"
+    | GoalAndIntro -> Fmt.pf ppf "goal_and_intro"
+
+    | GoalForallIntro -> Fmt.pf ppf "forall_intro"
+    | GoalExistsIntro (vnu,inu) ->
+      Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
+        (pp_subst pp_tvar) vnu
+        (pp_subst pp_index) inu
+
+    | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
+    | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
+
+    | EqNames -> Fmt.pf ppf "eq_names"
+    | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
+
+    | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac
+    | AndThen (ut, ut') ->
+      Fmt.pf ppf "@[%a@];@[%a@]" pp_tac ut pp_tac ut'
+    | OrElse (ut, ut') ->
+      Fmt.pf ppf "@[%a@]+@[%a@]" pp_tac ut pp_tac ut'
+
+
 let rec tac_apply :
   type a b c. (a,b) tac -> a -> (b,c) sk -> c fk -> c =
   fun tac judge sk fk -> match tac with
@@ -814,6 +843,13 @@ let rec pp_gt : type a. Format.formatter -> a gt -> unit = fun ppf gt ->
   | Gt_fact -> Fmt.pf ppf "fact"
   | Gt_judgment jt -> Fmt.pf ppf "%a judgment" pp_gt jt
   | Gt_list jt -> Fmt.pf ppf "%a list" pp_gt jt
+
+let rec pp_tact_type : type a b. Format.formatter -> (a gt * b gt) -> unit =
+  fun ppf (gt,gt') ->
+    Fmt.pf ppf "@[<hv 0>%a@ %a@ %a@]"
+      pp_gt gt
+      Fmt.(styled `Red (styled `Underline ident)) "=>"
+      pp_gt gt'
 
 (** Flip [Gt_bot] element to [Gt_top]. *)
 let rec bot_to_top : type a. a gt -> a gt = function
@@ -962,6 +998,7 @@ let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type option =
     | Gt_unit, Gt_unit -> Refl (a,b) |> some
     | Gt_formula, Gt_formula -> Refl (a,b) |> some
     | Gt_postcond, Gt_postcond -> Refl (a,b) |> some
+    | Gt_fact, Gt_fact -> Refl (a,b) |> some
     | Gt_list l, Gt_list r -> begin match get_refl l r with
         | Some (Refl _) -> Refl (a,b) |> some
         | None -> None end
@@ -974,11 +1011,9 @@ let fail_check_type : type a b. a gt -> b gt -> utac -> exn =
   fun l_gt r_gt utac ->
     Log.log Log.LogTacticTC (fun () ->
         Fmt.epr "@[<v 0>%a@ cannot be given the type@;\
-                 %a@ %a@ %a@]%!"
+                 %a]%!"
           pp_utac utac
-          pp_gt l_gt
-          Fmt.(styled `Red (styled `Underline ident)) "=>"
-          pp_gt r_gt);
+          pp_tact_type (l_gt,r_gt));
     Tactic_type_error
 
 (** [check_type l_gt r_gt utac] checks that [l_gt] -> [r_gt] is a valid type of
@@ -1022,11 +1057,9 @@ let fail_tac_type : type a b. a gt -> b gt -> utac -> exn =
   fun l_gt r_gt utac ->
     Log.log Log.LogTacticTC (fun () ->
         Fmt.epr "@[<v 0>%a@ cannot be type in the context@;\
-                 %a@ %a@ %a@]%!"
+                 %a@]%!"
           pp_utac utac
-          pp_gt l_gt
-          Fmt.(styled `Red (styled `Underline ident)) "=>"
-          pp_gt r_gt);
+          pp_tact_type (l_gt,r_gt));
     Tactic_type_error
 
 (** [tac_typ l_gt r_gt utac] infers the most general type of an untyped tactic,
@@ -1103,16 +1136,36 @@ let test_tac_type : type a b. a gt -> b gt -> utac -> etac -> unit =
       match get_refl a a', get_refl b b' with
       | Some (Refl _), Some (Refl _) ->
         if tac = tac' then raise Tactic_type_ok
-        else raise Tactic_type_error
-      | None, _ | _, None -> raise Tactic_type_error
+        else begin
+          Log.log Log.LogTacticTC (fun () ->
+              Fmt.epr "@[<v 0>The two following tactics are not equal:@;\
+                       @[%a@]@;%a@;\
+                       @[%a@]@;%a@;@]%!"
+                pp_tac tac
+                pp_tact_type (a,b)
+                pp_tac tac'
+                pp_tact_type (a',b'));
+          raise Tactic_type_error end
+
+      | None, _ | _, None ->
+        Log.log Log.LogTacticTC (fun () ->
+            Fmt.epr "@[<v 0>Eqrefl fails on the following tactics:@;\
+                     @[%a@]@;%a@;\
+                     @[%a@]@;%a@;@]%!"
+              pp_tac tac
+              pp_tact_type (a,b)
+              pp_tac tac'
+              pp_tact_type (a',b'));
+        raise Tactic_type_error
 
 let () =
   Checks.add_suite "Logic" [
     "Tactic type-checking", `Quick,
     begin fun () ->
       Alcotest.check_raises "Simple 0" Tactic_type_ok
-        (fun () -> test_tac_type (Gt_judgment Gt_fact) (Gt_unit) UAdmit
-            ( ETac (Gt_judgment Gt_fact, Gt_unit, Admit) ));
+        (fun () ->
+           test_tac_type (Gt_judgment Gt_fact) (Gt_unit) UAdmit
+             ( ETac (Gt_judgment Gt_fact, Gt_unit, Admit) ));
       Alcotest.check_raises "Simple 1" Tactic_type_ok
         (fun () -> test_tac_type (Gt_judgment Gt_postcond) (Gt_unit) UAdmit
             ( ETac (Gt_judgment Gt_postcond, Gt_unit, Admit) ));
