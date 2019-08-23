@@ -1106,7 +1106,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
     | UOrElse (utac_l, utac_r) -> begin match tac_typ l_gt r_gt utac_l with
         | utac_l', ETac (l_gt, r_gt, _) -> match tac_typ l_gt r_gt utac_r with
           | utac_r', ETac (l_gt, r_gt, tac_r) ->
-            let tac_l = check_type l_gt r_gt utac_l in
+            let tac_l = check_type l_gt r_gt utac_l' in
             ( UOrElse (utac_l', utac_r'),
               ETac (l_gt, r_gt, OrElse (tac_l, tac_r))) end
 
@@ -1116,7 +1116,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
         | utac_l', ETac (l_gt, mid_gt, _) ->
           match tac_typ (bot_to_top mid_gt) r_gt utac_r with
           | utac_r', ETac (mid_gt, r_gt, tac_r) ->
-            let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l in
+            let tac_l = check_type l_gt (top_to_bot mid_gt) utac_l' in
             ( UAndThen (utac_l', utac_r', Some mid_gt),
               ETac (l_gt, r_gt, AndThen (tac_l, tac_r))) end
 
@@ -1166,9 +1166,11 @@ let () =
         (fun () ->
            test_tac_type (Gt_judgment Gt_fact) (Gt_unit) UAdmit
              ( ETac (Gt_judgment Gt_fact, Gt_unit, Admit) ));
+
       Alcotest.check_raises "Simple 1" Tactic_type_ok
         (fun () -> test_tac_type (Gt_judgment Gt_postcond) (Gt_unit) UAdmit
             ( ETac (Gt_judgment Gt_postcond, Gt_unit, Admit) ));
+
       Alcotest.check_raises "Simple 2" Tactic_type_ok
         (fun () ->
            test_tac_type
@@ -1176,6 +1178,41 @@ let () =
              (Gt_unit) UGammaAbsurd
              ( ETac ( Gt_judgment (Gt_list Gt_postcond),
                       Gt_unit, GammaAbsurd ) ));
+
+      Alcotest.check_raises "AndThen" Tactic_type_ok
+        (fun () ->
+           test_tac_type
+             (Gt_judgment Gt_fact)
+             (Gt_judgment Gt_fact) (UAndThen (UGoalAndIntro,UEqNames,None))
+             ( ETac ( Gt_judgment Gt_fact,
+                      Gt_judgment Gt_fact,
+                      AndThen (GoalAndIntro,EqNames) )));
+
+      Alcotest.check_raises "OrElse" Tactic_type_ok
+        (fun () ->
+           test_tac_type
+             (Gt_judgment Gt_fact) Gt_unit
+             (UOrElse
+                ( UAndThen (UGoalIntro, UGammaAbsurd, None),
+                  UConstrAbsurd ))
+             ( ETac ( Gt_judgment Gt_fact,
+                      Gt_unit,
+                      OrElse
+                        ( AndThen (GoalIntro, GammaAbsurd),
+                          ConstrAbsurd ))));
+
+      Alcotest.check_raises "Simple fail 0" Tactic_type_error
+        (fun () -> test_tac_type (Gt_postcond) (Gt_unit) UAdmit
+            ( ETac (Gt_judgment Gt_fact, Gt_unit, Admit) ));
+
+      Alcotest.check_raises "Simple fail 1" Tactic_type_error
+        (fun () ->
+           test_tac_type
+             (Gt_judgment (Gt_list Gt_fact))
+             (Gt_fact) UGammaAbsurd
+             ( ETac ( Gt_judgment (Gt_list Gt_fact),
+                      Gt_unit, GammaAbsurd ) ));
+
     end
   ]
 
