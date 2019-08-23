@@ -19,6 +19,7 @@ such that
 tau1 <> 0.0[a].:
 output@tau1 = h(sname(a)@tau1,k)
 => exists () : false
+
 Proof.
   forallintro.
   congruence + notraces.
