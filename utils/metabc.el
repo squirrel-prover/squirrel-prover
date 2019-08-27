@@ -6,8 +6,9 @@
 ;; add to proof-site.el inside the definition of proof-assistant-table-default the following line:
 ;;   (metabc "metabc" "mbc")
 
-
+(require 'proof)
 (require 'proof-site)
+(require 'proof-shell)
 
 ;;; Code:
 
@@ -51,9 +52,14 @@
 
  )
 
-;;(add-hook 'proof-shell-handle-error-or-interrupt-hook
-;;	    'proof-goto-end-of-locked-if-pos-not-visible-in-window)
+ (defun display-ansi-colors ()
+  (proof-with-current-buffer-if-exists proof-response-buffer
+  (let ((inhibit-read-only t))
+    (ansi-color-apply-on-region (point-min) (point-max)))))
 
-(provide 'metabc)
+ (add-hook 'proof-shell-handle-delayed-output-hook
+          'display-ansi-colors)
+
+ (provide 'metabc)
 ;;; metabc.el ends here
 
