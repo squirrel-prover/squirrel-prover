@@ -64,18 +64,21 @@ let run filename =
 
 
 let rec interactive_loop () =
+  Format.printf "[O]%!";
   match read_line () with
   | "exit" -> ()
   | "" -> interactive_loop ()
-  | s when (String.is_prefix "goal" s) -> Format.printf "[E] not supported yet@.[O]@."; interactive_loop ()
+  | s when (String.is_prefix "goal" s) -> Format.printf "[E] not supported yet@."; interactive_loop ()
   | s -> let lexbuf = Lexing.from_string s in
     Main.parse_theory_buf lexbuf "interactive";
-    Format.printf "[O] Process parsed.@.";
+    Process.show_actions () ;
+    Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+    Main.pp_proc Fmt.stdout;    
     interactive_loop ()
   | exception End_of_file -> ()      
            
 let interactive_prover () =
-  Format.printf "[W] MetaBC interactive mode.@.[O] Ready@.";
+  Format.printf "[W] MetaBC interactive mode.@.";
   
   interactive_loop ()
           

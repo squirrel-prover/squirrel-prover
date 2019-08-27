@@ -12,7 +12,8 @@
 ;;; Code:
 
 (require 'proof-easy-config)
-(require 'proof-syntax)
+;;(require 'proof-syntax)
+(require 'metabc-syntax)
 
 (proof-easy-config 'metabc "metabc"
 
@@ -41,12 +42,12 @@
 
  proof-shell-interrupt-regexp    "Interrupted"
 
- proof-script-font-lock-keywords
- (append
-  (list
-   (proof-ids-to-regexp '("Qed")))
-  (if (boundp 'lisp-font-lock-keywords) ;; wins if font-lock is loaded
-      lisp-font-lock-keywords))
+ proof-shell-start-goals-regexp         "^Current"
+ proof-shell-end-goals-regexp           nil  ; up to next prompt
+
+;; proof-shell-font-lock-keywords         metabc-font-lock-keywords
+ proof-script-font-lock-keywords         metabc-font-lock-keywords
+
 
  )
 
