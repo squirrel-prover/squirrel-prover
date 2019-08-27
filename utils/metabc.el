@@ -17,8 +17,9 @@
 (proof-easy-config 'metabc "metabc"
 
  proof-prog-name		     "metabc.byte -i"  ;; or your program
-;; proof-terminal-string                 "."        ;; end of commands
- proof-script-command-end-regexp "\\(goal\\)[ \n\t\r]"
+ proof-terminal-string                 "."        ;; end of commands
+ ;; proof-script-command-start-regexp "Proof\\|goal\\|hash[ \n\t\r]"
+ 
 
 
 ;; cannot get comments to be ignored :(

@@ -9,18 +9,18 @@ mutable sname : index->message
 system  out(c,cst);
 (
   (!_a new n; sname(a) := n; out(c,h(n,k)))
- # | (!_b new n; sname(b) := n; out(c,h(<n,n>,k)))
+  | (!_b new n; sname(b) := n; out(c,h(<n,n>,k)))
   | (!_c new n; new m; sname(c) := n; out(c,h(<n,m>,k)))
- )
+ ).
 
      
 goal forall (tau1 : timestamp, a: index)
 such that
-tau1 <> 0.0[a].:
+tau1 <> 0_0[a]_:
 output@tau1 = h(sname(a)@tau1,k)
-=> exists () : false
+=> exists () : false.
 
-Proof.
+ Proof.
   forallintro.
   congruence + notraces.
 Qed.

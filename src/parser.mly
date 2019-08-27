@@ -5,7 +5,7 @@
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS
+%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS UNDERSCORE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
@@ -54,8 +54,8 @@ saction:
                                   { (item,indices,sum) }
 
 action:
-| act = saction; DOT              { [act] }
-| act = saction; DOT; l = action  { act :: l }
+| act = saction; UNDERSCORE              { [act] }
+| act = saction; UNDERSCORE; l = action  { act :: l }
 
 (* Terms *)
 
@@ -224,8 +224,8 @@ proof:
 |PROOF l = tactic_list QED            { l }
 
 goal_decl:
-| GOAL f = formula                          { Logic.declare_goal f None }
-| GOAL f = formula p = proof                { Logic.declare_goal f (Some p) }
+| GOAL f = formula DOT                         { Logic.declare_goal f None }
+| GOAL f = formula DOT p = proof                { Logic.declare_goal f (Some p) }
 
 goal_decls:
 |                                { () }
@@ -233,7 +233,7 @@ goal_decls:
 
 theory:
 | declaration theory             { () }
-| SYSTEM process goal_decls EOF  { Process.declare_system $2 }
+| SYSTEM process DOT goal_decls EOF  { Process.declare_system $2 }
 
 top_process:
 | process EOF                    { $1 }

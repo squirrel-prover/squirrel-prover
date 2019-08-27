@@ -28,7 +28,7 @@ profile: sanity
 debug: sanity
 	$(OCB) -tag debug test.byte
 
-install: all
+install: metabc
 	cp metabc.byte ~/.local/bin/metabc.byte
 
 # check that menhir is installed

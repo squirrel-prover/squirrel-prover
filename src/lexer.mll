@@ -11,7 +11,7 @@
       lexbuf.Lexing.lex_curr_p <- q
 }
 
-let name = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
+let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
 let int = ['0'-'9'] ['0'-'9']*
 
 rule token = parse
@@ -28,6 +28,7 @@ rule token = parse
 | '>'                 { RANGLE }
 | ','                 { COMMA }
 | '.'                 { DOT }
+| '_'                 { UNDERSCORE }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | "="                 { EQ }

@@ -69,4 +69,4 @@ process Reader =
 # TODO add support for ! without explicit index
 # (add it when elaborating processes)
 
-system (!_r Reader | !_i !_j Tag(i,j))
+system (!_r Reader | !_i !_j Tag(i,j)).

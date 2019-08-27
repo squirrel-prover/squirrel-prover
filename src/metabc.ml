@@ -64,6 +64,7 @@ let run filename =
 let rec interactive_loop () =
   match read_line () with
   | "exit" -> ()
+  | "" -> interactive_loop ()
   | s ->
     Format.printf "input:@.@[%s@]@." s;
     let lexbuf = Lexing.from_string s in
