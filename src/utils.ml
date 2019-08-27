@@ -45,6 +45,17 @@ module List = struct
       let (rx, ry, rz) = split3 l in (x::rx, y::ry, z::rz)
 end
 
+module String = struct
+  include String
+
+  let is_prefix p s =
+    let l = String.length p in
+    try
+      (String.sub s 0 l) = p
+    with _ -> false
+  
+end
+
 module Imap = Map.Make (struct
   type t = int
   let compare = Pervasives.compare

@@ -2,4 +2,4 @@
 channel c
 process IO = in(c,x);out(c,<x,x>)
 process IOIO = in(c,x);out(c,x);in(c,y);out(c,<x,y>)
-system (IO | IOIO | !_i (IO as IOi) | !_i !_j (IO as IOij))
+system (IO | IOIO | !_i (IO as IOi) | !_i !_j (IO as IOij)).
