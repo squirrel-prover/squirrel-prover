@@ -1,6 +1,18 @@
 open Logic
-let () =
-  Main.parse_theory Sys.argv.(1) ;
+
+let usage = Printf.sprintf "Usage: %s filename" (Filename.basename Sys.argv.(0))
+
+let args  = ref []
+let verbose = ref false
+let interactive = ref false
+let speclist = [
+    ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
+    ("-v", Arg.Set verbose, "display more informations");
+    ]  
+
+
+let run filename =
+  Main.parse_theory filename ;
   Format.printf "Successfully parsed model.@." ;
   Process.show_actions () ;
   (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
@@ -9,7 +21,7 @@ let () =
   Main.pp_proc Fmt.stdout;
   Main.pp_goals Fmt.stdout;
 
-  Logic.try_prove_goals ();
+  Logic.try_prove_goals ()
 
   (* (\* TEMPORARY: *\)
    * let fk_fail () = Fmt.pr "Failure@.%!"; assert false in
@@ -48,3 +60,34 @@ let () =
    *           ) (fun _ _ -> ()) fk
    *       ) fk_fail
    *   ); *)
+
+let rec interactive_loop () =
+  match read_line () with
+  | "exit" -> ()
+  | s -> Format.printf "input:@.@[%s@]@." s; interactive_loop ()
+  | exception End_of_file -> ()      
+           
+let interactive_prover () =
+  Format.printf "MetaBC interactive mode.@.";
+  interactive_loop ()
+          
+let main () =
+  let collect arg = args := !args @ [arg] in
+  let _ = Arg.parse speclist collect usage in
+  if (List.length !args =0) && not(!interactive) then
+    Arg.usage speclist usage
+  else if  (List.length !args > 0) && (!interactive) then
+    (
+      Format.printf "No file arguments accepted when running in interactive mode.@."
+    )
+  else if !interactive then
+    (
+      interactive_prover ()
+    )
+  else
+    (
+      let filename = List.hd(!args) in
+      run filename
+    )
+    
+let () = main ()     
