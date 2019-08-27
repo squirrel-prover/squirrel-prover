@@ -28,6 +28,9 @@ profile: sanity
 debug: sanity
 	$(OCB) -tag debug test.byte
 
+install: all
+	cp metabc.byte ~/.local/bin/metabc.byte
+
 # check that menhir is installed
 PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"." 
 sanity: Makefile

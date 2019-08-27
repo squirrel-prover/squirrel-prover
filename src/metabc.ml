@@ -12,7 +12,7 @@ let speclist = [
 
 
 let run filename =
-  Main.parse_theory filename ;
+  Main.parse_theory filename;
   Format.printf "Successfully parsed model.@." ;
   Process.show_actions () ;
   (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
@@ -64,7 +64,13 @@ let run filename =
 let rec interactive_loop () =
   match read_line () with
   | "exit" -> ()
-  | s -> Format.printf "input:@.@[%s@]@." s; interactive_loop ()
+  | s ->
+    Format.printf "input:@.@[%s@]@." s;
+    let lexbuf = Lexing.from_string s in
+    Main.parse_theory_buf lexbuf "interactive";
+    Format.printf "Successfully parsed model.@." ;
+    Process.show_actions () ;
+    interactive_loop ()
   | exception End_of_file -> ()      
            
 let interactive_prover () =

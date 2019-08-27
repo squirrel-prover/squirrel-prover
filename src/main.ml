@@ -2,10 +2,9 @@ open Logic
 
 let () = Printexc.record_backtrace true
 
-let parse_theory ?(test=false) filename =
+let parse_theory_buf ?(test=false) lexbuf filename =
   Theory.initialize_symbols () ;
   Process.reset () ;
-  let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
     try
       Parser.theory Lexer.token lexbuf
     with
@@ -45,6 +44,10 @@ let parse_theory ?(test=false) filename =
         (Lexing.lexeme lexbuf)
         (Printexc.to_string e) ;
       if test then raise e else exit 1
+
+let parse_theory ?(test=false) filename =
+    let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
+    parse_theory_buf ~test lexbuf filename
 
 let parse_process string =
   let lexbuf = Lexing.from_string string in
