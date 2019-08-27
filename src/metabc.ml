@@ -1,5 +1,6 @@
 open Logic
-
+open Utils
+    
 let usage = Printf.sprintf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 let args  = ref []
@@ -61,21 +62,21 @@ let run filename =
    *       ) fk_fail
    *   ); *)
 
+
 let rec interactive_loop () =
   match read_line () with
   | "exit" -> ()
   | "" -> interactive_loop ()
-  | s ->
-    Format.printf "input:@.@[%s@]@." s;
-    let lexbuf = Lexing.from_string s in
+  | s when (String.is_prefix "goal" s) -> Format.printf "[E] not supported yet@.[O]@."; interactive_loop ()
+  | s -> let lexbuf = Lexing.from_string s in
     Main.parse_theory_buf lexbuf "interactive";
-    Format.printf "Successfully parsed model.@." ;
-    Process.show_actions () ;
+    Format.printf "[O] Process parsed.@.";
     interactive_loop ()
   | exception End_of_file -> ()      
            
 let interactive_prover () =
-  Format.printf "MetaBC interactive mode.@.";
+  Format.printf "[W] MetaBC interactive mode.@.[O] Ready@.";
+  
   interactive_loop ()
           
 let main () =

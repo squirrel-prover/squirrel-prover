@@ -29,22 +29,17 @@
  proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
  proof-script-comment-end-regexp	 "\n"      ;; comments
 
- proof-shell-syntax-table-entries
-   '(?\( "()1"
-     ?\) ")(4"
-     ?* ". 23"
-	 ?\# "<" 
-    ?\n ">"
-	 ?$ "w"
-     ?_ "w"
-     ?. "w")
- proof-script-fly-past-comments  t	        ;; nice for single-line
- proof-save-command-regexp  "^Qed" 
+ proof-shell-truncate-before-error      nil
 
+   proof-save-command-regexp  "^Qed" 
+ proof-tree-external-display nil
 ;; proof-shell-strip-crs-from-input nil
 
+ proof-shell-error-regexp "\\[E\\]"
+ proof-shell-annotated-prompt-regexp "\\[O\\]"
+ proof-shell-eager-annotation-start "\\[W\\]"
 
- proof-shell-annotated-prompt-regexp ""
+ proof-shell-interrupt-regexp    "Interrupted"
 
  proof-script-font-lock-keywords
  (append
@@ -54,6 +49,9 @@
       lisp-font-lock-keywords))
 
  )
+
+;;(add-hook 'proof-shell-handle-error-or-interrupt-hook
+;;	    'proof-goto-end-of-locked-if-pos-not-visible-in-window)
 
 (provide 'metabc)
 ;;; metabc.el ends here

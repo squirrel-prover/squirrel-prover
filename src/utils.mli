@@ -20,6 +20,12 @@ module List : sig
   val split_pred : ('a -> bool) -> 'a list -> 'a list * 'a list
 end
 
+module String : sig
+    include module type of struct include String end
+
+    val is_prefix : string -> string -> bool
+  end
+
 module Imap : Map.S with type key = int
 
 module type Ordered = sig
