@@ -30,10 +30,8 @@
 
 %start theory
 %start top_process
-%start tactic
 %type <unit> theory
 %type <Process.process> top_process
-%type <Logic.utac> tactic
 %type <Theory.fact> fact
 
 %%
@@ -214,7 +212,7 @@ tactic:
   | CONGRUENCE                        { Logic.UGammaAbsurd }
   | NOTRACES                          { Logic.UConstrAbsurd }
   | EQNAMES                           { Logic.UEqNames }
-  | LBRACKET t = tactic RBRACKET      { Logic.UProveAll t }
+  /* | LBRACKET t = tactic RBRACKET      { Logic.UProveAll t } */
   | l = tactic SEMICOLON r = tactic   { Logic.UAndThen (l,r,None) }
   | l = tactic PLUS r = tactic        { Logic.UOrElse (l, r) }
 
