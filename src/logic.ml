@@ -201,6 +201,35 @@ end = struct
     Constr.maximal_elems (opt_get !(theta.models)) tss
 end
 
+(** Type of goal types *)
+
+type gtlat
+
+(** Type of goal types.
+    [Gt_top] and [Gt_bot] are, respectively, the top and bottom element of the
+    type lattice, and are for the type checking. *)
+type _ goaltype =
+  | Gt_top : gtlat goaltype
+  | Gt_bot : gtlat goaltype
+
+  | Gt_unit : unit goaltype
+  | Gt_formula : formula goaltype
+  | Gt_postcond : postcond goaltype
+  | Gt_fact : fact goaltype
+  | Gt_list : 'a goaltype -> 'a list goaltype
+
+type 'a gt = 'a goaltype
+
+let rec pp_gt : type a. Format.formatter -> a gt -> unit = fun ppf gt ->
+  match gt with
+  | Gt_bot -> Fmt.pf ppf "bot"
+  | Gt_top -> Fmt.pf ppf "top"
+  | Gt_unit -> Fmt.pf ppf "unit"
+  | Gt_formula -> Fmt.pf ppf "formula"
+  | Gt_postcond -> Fmt.pf ppf "postcond"
+  | Gt_fact -> Fmt.pf ppf "fact"
+  | Gt_list jt -> Fmt.pf ppf "%a list" pp_gt jt
+
 module Judgment : sig
   (** Type of judgments:
       - [vars] and [indices] are the judgment free timestamp and index variables.
@@ -212,7 +241,8 @@ module Judgment : sig
                                indices: Action.indices;
                                theta : Theta.theta;
                                gamma : Gamma.gamma;
-                               goal : 'a }
+                               goal : 'a;
+                               gt : 'a gt }
 
   val pp_judgment :
     (Format.formatter -> 'a -> unit) ->
@@ -234,7 +264,7 @@ module Judgment : sig
   (** Side-effect: Add necessary action descriptions. *)
   val set_goal_fact : fact -> 'a judgment -> fact judgment
 
-  val set_goal : 'b -> 'a judgment -> 'b judgment
+  val set_goal : 'b -> 'b gt -> 'a judgment -> 'b judgment
 
   val set_gamma : Gamma.gamma -> 'a judgment ->  'a judgment
 end = struct
@@ -242,7 +272,8 @@ end = struct
                        indices: Action.indices;
                        theta : Theta.theta;
                        gamma : Gamma.gamma;
-                       goal : 'a }
+                       goal : 'a;
+                       gt : 'a gt }
 
   let pp_judgment pp_goal ppf judge =
     let open Fmt in
@@ -275,7 +306,8 @@ end = struct
       indices = [];
       theta = Theta.mk Term.True;
       gamma = Gamma.mk ();
-      goal = goal }
+      goal = goal;
+      gt = Gt_formula }
 
   let rec add_vars vars j = match vars with
     | [] -> j
@@ -324,9 +356,9 @@ end = struct
 
   let set_goal_fact f j =
     let j = update_descr j (fact_actions f) in
-    { j with goal = f }
+    { j with goal = f; gt = Gt_fact }
 
-  let set_goal a j = { j with goal = a }
+  let set_goal a agt j = { j with goal = a; gt = agt }
 
   let set_gamma g j = { j with gamma = g }
 end
@@ -405,7 +437,7 @@ let goal_forall_intro (judge : formula judgment) sk fk =
       ) judge.goal.postcond in
 
   let judge =
-    Judgment.set_goal new_goals judge
+    Judgment.set_goal new_goals (Gt_list Gt_postcond) judge
     |> Judgment.add_indices @@ List.map snd isubst
     |> Judgment.add_vars @@ List.map snd tsubst
     |> Judgment.add_fact new_fact
@@ -448,7 +480,7 @@ let goal_forall_intro (judge : formula judgment) sk fk =
     variables. *)
 let goal_exists_intro (judge : postcond judgment) sk fk vnu inu =
   let pc_constr = subst_constr inu vnu judge.goal.econstr in
-  let judge = set_goal (subst_fact inu vnu judge.goal.efact) judge
+  let judge = set_goal (subst_fact inu vnu judge.goal.efact) Gt_fact judge
               |> Judgment.add_constr (Not pc_constr) in
   sk judge fk
 
@@ -462,11 +494,13 @@ let fail_goal_false (judge : fact judgment) sk fk = match judge.goal with
   | _ -> raise @@ Failure "goal ill-formed"
 
 let constr_absurd (judge : 'a judgment) sk fk =
-  if not @@ Theta.is_sat judge.theta then sk (Judgment.set_goal () judge) fk
+  if not @@ Theta.is_sat judge.theta then
+    sk (Judgment.set_goal () Gt_unit judge) fk
   else fk ()
 
 let gamma_absurd (judge : 'a judgment) sk fk =
-  if not @@ Gamma.is_sat judge.gamma then sk (Judgment.set_goal () judge) fk
+  if not @@ Gamma.is_sat judge.gamma then
+    sk (Judgment.set_goal () Gt_unit judge) fk
   else fk ()
 
 
@@ -498,12 +532,13 @@ let gamma_or_intro (judge : 'a judgment) sk fk select_pred =
 let rec prove_all ?last:(last=None) (judges : 'a list judgment) tac sk fk =
   match judges.goal with
   | [] -> begin match last with
-      | None -> sk (Judgment.set_goal () judges) fk
+      | None -> sk (Judgment.set_goal () Gt_unit judges) fk
       | Some judge -> sk judge fk end
   | j :: goals ->
-    tac (set_goal j judges)
+    let jgt = match judges.gt with Gt_list jt -> jt in
+    tac (set_goal j jgt judges)
       (fun last fk ->
-         prove_all ~last:(Some last) (set_goal goals judges) tac sk fk
+         prove_all ~last:(Some last) (set_goal goals judges.gt judges) tac sk fk
       ) fk
 
 
@@ -673,33 +708,6 @@ let euf_apply (judge : 'a judgment) sk fk f_select =
 
 (** Tactics *)
 
-type gtlat
-
-(** Type of goal types.
-    [Gt_top] and [Gt_bot] are, respectively, the top and bottom element of the
-    type lattice, and are for the type checking. *)
-type _ goaltype =
-  | Gt_top : gtlat goaltype
-  | Gt_bot : gtlat goaltype
-
-  | Gt_unit : unit goaltype
-  | Gt_formula : formula goaltype
-  | Gt_postcond : postcond goaltype
-  | Gt_fact : fact goaltype
-  | Gt_list : 'a goaltype -> 'a list goaltype
-
-type 'a gt = 'a goaltype
-
-let rec pp_gt : type a. Format.formatter -> a gt -> unit = fun ppf gt ->
-  match gt with
-  | Gt_bot -> Fmt.pf ppf "bot"
-  | Gt_top -> Fmt.pf ppf "top"
-  | Gt_unit -> Fmt.pf ppf "unit"
-  | Gt_formula -> Fmt.pf ppf "formula"
-  | Gt_postcond -> Fmt.pf ppf "postcond"
-  | Gt_fact -> Fmt.pf ppf "fact"
-  | Gt_list jt -> Fmt.pf ppf "%a list" pp_gt jt
-
 (** Tactics expression *)
 type (_,_) tac =
   | Admit : ('a, unit) tac
@@ -777,7 +785,7 @@ let rec tac_apply :
   c judgment fk ->
   c judgment =
   fun gt tac judge sk fk -> match tac with
-    | Admit -> sk (Judgment.set_goal () judge) fk
+    | Admit -> sk (Judgment.set_goal () Gt_unit judge) fk
 
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
@@ -1124,13 +1132,14 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
 let tac_type : type a b. a gt -> b gt -> utac -> etac =
   fun l_gt r_gt utac -> snd @@ tac_typ l_gt r_gt utac
 
-let rec list_to_and_then = function
-  | [] -> raise @@ Failure "Empty proof"
-  | a :: [] -> UPrint a
-  | a :: rem -> UAndThen (UPrint a, list_to_and_then rem, None)
+(* let rec list_to_and_then = function
+ *   | [] -> raise @@ Failure "Empty proof"
+ *   | a :: [] -> UPrint a
+ *   | a :: rem -> UAndThen (UPrint a, list_to_and_then rem, None)
+ *
+ * let proof_type : type a b. a gt -> b gt -> utac list -> etac =
+ *   fun l_gt r_gt utacs -> tac_type l_gt r_gt (list_to_and_then utacs) *)
 
-let proof_type : type a b. a gt -> b gt -> utac list -> etac =
-  fun l_gt r_gt utacs -> tac_type l_gt r_gt (list_to_and_then utacs)
 
 
 (** Declare Goals And Proofs *)
@@ -1187,6 +1196,40 @@ let declare_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) p_opt =
     p_opt
 
 
+
+(** REPL *)
+
+(** Right existential type for tactics. *)
+type 'a ertac = | ERTac : 'b gt * ('a,'b) tac -> 'a ertac
+
+let parse_tactic : type a. a gt -> utac -> a ertac =
+  fun gt utac -> match tac_type gt Gt_bot utac with
+    | ETac (agt, bgt, tac) -> match get_refl gt agt with
+      | None ->
+        Log.log Log.LogTacticTC (fun () ->
+            Fmt.epr "@[<v 0>The tactic @[%a@] is ill-typed.@;\
+                     @[%a@] is incompatible with @[%a@]@;@]%!"
+              pp_utac utac pp_gt gt pp_gt agt);
+        raise Tactic_type_error
+
+      | Some (Refl _) -> ERTac (bgt, tac)
+
+let rec repl : type a b. (unit -> utac) -> a gt -> a judgment -> unit judgment =
+  fun next_utac agt judge -> match judge.gt with
+    | Gt_unit -> judge
+    | _ ->
+      let failure_k () = repl next_utac agt judge in
+
+      let suc_k bgt judge _ =
+        Fmt.pr "%a%!" (Judgment.pp_judgment (pp_gt_el bgt)) judge;
+        repl next_utac bgt judge in
+
+      match parse_tactic agt (next_utac ()) with
+      | ERTac (bgt, tac) ->
+        tac_apply bgt tac judge (suc_k bgt) failure_k
+
+(** Whole file processing *)
+
 let lemmas_proved = ref []
 
 let try_prove_goals () =
@@ -1201,25 +1244,26 @@ let try_prove_goals () =
           pp_formula goal;
         fail goal proof_opt
       | Some proof ->
-        try match proof_type Gt_formula Gt_unit proof with
-          | ETac (Gt_formula, Gt_unit, tac) ->
-            let init_judge = Judgment.init goal in
-            Fmt.pr "@[<v 0>%a@;" (Judgment.pp_judgment pp_formula) init_judge;
-            let exception No_proof in
-            begin try
-              let _ : unit judgment =
-                tac_apply Gt_unit tac init_judge
-                  (fun end_judgment _ ->
-                     Fmt.pr "Goal proved.@;@]%!";
-                     success goal;
-                     end_judgment)
-                  (fun () ->
-                     Fmt.pr "Proof failed.@;@]%!";
-                     raise No_proof) in ()
-              with No_proof -> () end
-          | _ -> Fmt.pr "Tactic is ill-typed.@;%!" (* TODO: better error message *);
-            fail goal proof_opt
-        with Tactic_type_error -> fail goal proof_opt
+        let exception No_more_tactics in
+        let tacs = ref proof in
+        let next_utac () = match !tacs with
+          | [] -> raise No_more_tactics
+          | t :: l -> tacs := l; t in
+
+        let init_judge = Judgment.init goal in
+        Fmt.pr "@[<v 0>%a@;" (Judgment.pp_judgment pp_formula) init_judge;
+
+        try match (repl next_utac Gt_formula init_judge).gt with
+          | Gt_unit ->
+            Fmt.pr "Goal proved.@;@]%!";
+            success goal;
+        with
+        | Tactic_type_error ->
+          Fmt.pr "Proof failed : tactic error.@;@]%!";
+          fail goal proof_opt
+        | No_more_tactics ->
+          Fmt.pr "Proof failed : no more tactics.@;@]%!";
+          fail goal proof_opt
     ) !goals;
   goals := !not_proved
 

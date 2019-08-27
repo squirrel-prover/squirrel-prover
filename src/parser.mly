@@ -30,8 +30,10 @@
 
 %start theory
 %start top_process
+%start tactic
 %type <unit> theory
 %type <Process.process> top_process
+%type <Logic.utac> tactic
 %type <Theory.fact> fact
 
 %%
