@@ -153,17 +153,24 @@ let pp_par_choice_shape2 =
 
 let rec pp_action_f f ppf = function
   | [] -> Fmt.pf ppf ""
+  | [{ par_choice; sum_choice }] ->
+      if sum_choice = 0 then
+        Fmt.pf ppf "%a"
+          f par_choice
+      else
+        Fmt.pf ppf "%a/%d"
+          f par_choice
+          sum_choice
   | { par_choice; sum_choice } :: l ->
       if sum_choice = 0 then
-        Fmt.pf ppf "%a.%a"
+        Fmt.pf ppf "%a_%a"
           f par_choice
           (pp_action_f f) l
       else
-        Fmt.pf ppf "%a/%d.%a"
+        Fmt.pf ppf "%a/%d_%a"
           f par_choice
           sum_choice
           (pp_action_f f) l
-
 let pp_action ppf a =
  Fmt.styled `Green (pp_action_f pp_par_choice) ppf a
 

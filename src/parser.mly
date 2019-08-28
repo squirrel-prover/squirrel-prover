@@ -60,7 +60,7 @@ saction:
                                   { (item,indices,sum) }
 
 action:
-| act = saction; UNDERSCORE              { [act] }
+| act = saction;                         { [act] }
 | act = saction; UNDERSCORE; l = action  { act :: l }
 
 (* Terms *)
