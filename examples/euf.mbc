@@ -15,7 +15,7 @@ system  out(c,cst);
 
 goal forall (tau1 : timestamp, a: index)
 such that
-tau1 <> 0_0[a]_:
+tau1 <> 0_0[a]:
 output@tau1 = h(sname(a)@tau1,k)
 => exists () : false.
 
