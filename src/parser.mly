@@ -234,7 +234,7 @@ goal:
 
 theory:
 | declaration theory             { () }
-| SYSTEM process DOT EOF         { Process.declare_system $2 }
+| SYSTEM process DOT             { Process.declare_system $2 }
 
 top_process:
 | process EOF                    { $1 }

@@ -1232,13 +1232,12 @@ let start_proof () = match !current_goal, !goals with
     assert (!subgoals = []);
     current_goal := Some goal;
     subgoals := [Ejudge (Gt_formula,Judgment.init goal)];
-    true
+    None
   | Some _,_ ->
-    Fmt.pr "[error> Cannot start a new proof (current proof is not done).@.";
-    false
+    Some "Cannot start a new proof (current proof is not done)."
+
   | _, [] ->
-    Fmt.pr "[error> Cannot start a new proof (no goal remaining to prove).@.";
-    false
+    Some "Cannot start a new proof (no goal remaining to prove)."
 
 let is_proof_completed () = !subgoals = []
 

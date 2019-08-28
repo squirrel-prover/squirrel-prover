@@ -8,8 +8,7 @@ let parse_from_buf ?(test=false) parse_fun lexbuf filename =
   | Parser.Error as e ->
     Printexc.print_backtrace Pervasives.stderr;
     Format.printf
-      "@[Cannot parse model @,\
-       in %S @,at line %d char %d @,\
+      "@[Error in %S @,at line %d char %d @,\
        before %S.@]@."
       filename
       lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
@@ -56,10 +55,6 @@ let parse_tactic_buf ?(test=false) lexbuf filename =
 let parse_qed_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test:test Parser.qed lexbuf filename
 
-let parse_theory ?(test=false) filename =
-    let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
-    parse_theory_buf ~test lexbuf filename
-
 let parse_process string =
   let lexbuf = Lexing.from_string string in
   try
@@ -69,6 +64,10 @@ let parse_process string =
       "Cannot parse process before %S at position TODO.@."
       (Lexing.lexeme lexbuf) ;
     raise e
+
+let parse_theory_test ?(test=false) filename =
+    let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
+    parse_theory_buf ~test lexbuf filename
 
 let () =
   Checks.add_suite "Parsing" [
@@ -107,51 +106,51 @@ let () =
   let test = true in
   Checks.add_suite "Models" [
     "Null model", `Quick, begin fun () ->
-      parse_theory ~test "examples/null.mbc"
+      parse_theory_test ~test "examples/null.mbc"
     end ;
     "Simple model", `Quick, begin fun () ->
-      parse_theory ~test "examples/process.mbc"
+      parse_theory_test ~test "examples/process.mbc"
     end ;
     "Name declaration", `Quick, begin fun () ->
-      parse_theory ~test "examples/name.mbc"
+      parse_theory_test ~test "examples/name.mbc"
     end ;
     "Pairs", `Quick, begin fun () ->
-      parse_theory ~test "examples/pairs.mbc"
+      parse_theory_test ~test "examples/pairs.mbc"
     end ;
     "Basic theory", `Quick, begin fun () ->
-      parse_theory ~test "examples/theory.mbc"
+      parse_theory_test ~test "examples/theory.mbc"
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "multiple declarations")
-        (fun () -> parse_theory ~test "examples/multiple.mbc")
+        (fun () -> parse_theory_test ~test "examples/multiple.mbc")
     end ;
     "Block creation", `Quick, begin fun () ->
-      parse_theory ~test "examples/blocks.mbc"
+      parse_theory_test ~test "examples/blocks.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Let in blocks", `Quick, begin fun () ->
-      parse_theory ~test "examples/block_let.mbc"
+      parse_theory_test ~test "examples/block_let.mbc"
       (* TODO test resulting block structure *)
     end ;
     "New in blocks", `Quick, begin fun () ->
-      parse_theory ~test "examples/block_name.mbc"
+      parse_theory_test ~test "examples/block_name.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Find in blocks", `Quick, begin fun () ->
-      parse_theory ~test "examples/block_find.mbc"
+      parse_theory_test ~test "examples/block_find.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Updates in blocks", `Quick, begin fun () ->
-      parse_theory ~test "examples/block_set.mbc"
+      parse_theory_test ~test "examples/block_set.mbc"
       (* TODO test resulting block structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
-      parse_theory ~test "examples/lak.mbc"
+      parse_theory_test ~test "examples/lak.mbc"
     end ;
-    "Simple goal", `Quick, begin fun () ->
-      parse_theory ~test "examples/simple_goal.mbc"
-    end ;
+    (* "Simple goal", `Quick, begin fun () ->
+     *   parse_theory_test ~test "examples/simple_goal.mbc"
+     * end ; *)
   ];;
 
 let pp_descrs ppf () =

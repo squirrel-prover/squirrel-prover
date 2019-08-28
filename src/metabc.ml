@@ -12,73 +12,92 @@ let speclist = [
     ]
 
 
-let run filename =
-  (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
-     option to remove it. *)
-  Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  Main.parse_theory filename;
-  Format.printf "Successfully parsed model.@." ;
-  Main.pp_proc Fmt.stdout ();
-  Main.pp_goals Fmt.stdout ();
-
-  assert false  (* TODO *)
-
 (** Current mode of the prover:
     - [InputDescr] : waiting for the process description.
     - [GoalMode] : waiting for the next goal.
     - [ProofMode] : proof of a goal in progress. *)
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
+let interactive_mode = ref false
 
-let read_line_buf () = Lexing.from_string (read_line ())
+(** Lexbuf used in non-interactive mode. *)
+let lexbuf : Lexing.lexbuf option ref = ref None
+let filename = ref "No file opened"
 
-let rec interactive_loop mode =
+let setup_lexbuf fname =
+  lexbuf := some @@ Lexing.from_channel (Pervasives.open_in fname);
+  filename := fname;;
+
+let parse_next parser_fun =
+  if !interactive_mode then
+    (* Requires input to be one-line long. *)
+    let lexbuf =  Lexing.from_string (read_line ()) in
+    parser_fun lexbuf "interactive"
+  else
+    parser_fun (Utils.opt_get !lexbuf) !filename
+
+
+let rec main_loop mode =
   Format.printf "[>@.";
   match mode with
   | InputDescr ->
-    Main.parse_theory_buf (read_line_buf ()) "interactive";
+    parse_next Main.parse_theory_buf;
     Main.pp_proc Fmt.stdout ();
-    interactive_loop GoalMode
+    main_loop GoalMode
   | ProofMode ->
     let utac =
-      Main.parse_tactic_buf (read_line_buf ()) "interactive" in
+      parse_next Main.parse_tactic_buf in
     begin try
         if eval_tactic utac then begin
           complete_proof ();
           Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
-          interactive_loop WaitQed end
+          main_loop WaitQed end
         else begin
           Fmt.pr "%a" pp_goal ();
-          interactive_loop ProofMode end
+          main_loop ProofMode end
       with
       | Tactic_failed ->
-        Fmt.pr "[error> Tactic failed.@.";
-        interactive_loop ProofMode end
+        error ProofMode "Tactic failed." end
 
   | WaitQed ->
-    Main.parse_qed_buf (read_line_buf ()) "interactive";
+    parse_next Main.parse_qed_buf;
     Fmt.pr "Exit proof mode.@.";
-    interactive_loop GoalMode
+    main_loop GoalMode
 
-  | GoalMode -> match Main.parse_goal_buf (read_line_buf ()) "interactive" with
-    | Goalmode.Gm_proof ->
-      if start_proof () then begin
-        Fmt.pr "%a" pp_goal ();
-        interactive_loop ProofMode end
-      else interactive_loop GoalMode
+  | GoalMode -> match parse_next Main.parse_goal_buf with
+    | Goalmode.Gm_proof -> begin match start_proof () with
+        | None ->
+          Fmt.pr "%a" pp_goal ();
+          main_loop ProofMode
+        | Some es -> error GoalMode es end
 
     | Goalmode.Gm_goal f ->
       add_new_goal f;
-      Fmt.pr "Goal added.@.";
-      interactive_loop GoalMode
+      Fmt.pr "@[<v 2>New goal:@;@[%a@]@]@."
+        Term.pp_formula f;
+      main_loop GoalMode
+
+and error mode s =
+  Fmt.pr "[error> %s@." s;
+  if !interactive_mode then main_loop mode
+  else exit 1
 
 
 let interactive_prover () =
   Format.printf "[start> MetaBC interactive mode.@.";
   Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-
-  try interactive_loop InputDescr
+  interactive_mode := true;
+  try main_loop InputDescr
   with End_of_file -> Fmt.epr "End of file, exiting.@."
+
+let run filename =
+  (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
+     option to remove it. *)
+  Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+  setup_lexbuf filename;
+
+  main_loop InputDescr
+
 
 let main () =
   let collect arg = args := !args @ [arg] in
