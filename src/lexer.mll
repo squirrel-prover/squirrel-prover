@@ -25,7 +25,6 @@ rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
 | "(*" { comment lexbuf; token lexbuf }
-| '#' [^'\n']* '\n'       { newline lexbuf ; token lexbuf }
 | "!_" (['a'-'z']* as i)  { BANG i }
 | "and"               { AND }
 | "or"                { OR }
