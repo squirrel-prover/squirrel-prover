@@ -1,4 +1,0 @@
-completion.ml:
-  * During the completion, we need to look for equalities between names, and add the corresponding index equalities.
-    E.g., if A(i,j) = A(i',j'), we need to add the equalities i = i' and j = j'.
-    We must do the same with function symbol equality if the symbol have been declared unique.

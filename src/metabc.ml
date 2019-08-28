@@ -56,8 +56,8 @@ let rec main_loop mode =
           Fmt.pr "%a" pp_goal ();
           main_loop ProofMode end
       with
-      | Tactic_failed ->
-        error ProofMode "Tactic failed." end
+      | Tactic_failed s -> error ProofMode ("Tactic failed: " ^ s ^ ".")
+      | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed." end
 
   | WaitQed ->
     parse_next Main.parse_qed_buf;
@@ -73,7 +73,7 @@ let rec main_loop mode =
 
     | Goalmode.Gm_goal f ->
       add_new_goal f;
-      Fmt.pr "@[<v 2>New goal:@;@[%a@]@]@."
+      Fmt.pr "@[<v 0>New goal:@;@[%a@]@]@."
         Term.pp_formula f;
       main_loop GoalMode
 

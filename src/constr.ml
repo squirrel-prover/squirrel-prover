@@ -501,7 +501,7 @@ type model = { inst : constr_instance;
                tr_graph : UtG.t }
 
 (** [split instance] return a disjunction of satisfiable and normalized instances
-    equivalent to [instance] *)
+    equivalent to [instance]. *)
 let rec split instance : model list =
   try begin
     let uf = unify instance.uf instance.eqs instance.elems in

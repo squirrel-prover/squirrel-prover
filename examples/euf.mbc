@@ -21,5 +21,10 @@ output@tau1 = h(sname(a)@tau1,k)
 
 Proof.
   forallintro.
-  congruence + notraces.
+  euf 0.
+  cycle -1.
+  try congruence orelse ident.
+  cycle 2.
+  eqnames.
+  try congruence + notraces orelse ident.
 Qed.

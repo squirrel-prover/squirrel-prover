@@ -53,6 +53,7 @@ rule token = parse
 | "->"                { ARROW }
 | "=>"                { DARROW }
 | ":="                { ASSIGN }
+| "-"                 { MINUS }
 | "@"                 { AT }
 | "if"                { IF }
 | "then"              { THEN }
@@ -91,6 +92,11 @@ rule token = parse
 | "congruence"        { CONGRUENCE }
 | "notraces"          { NOTRACES }
 | "eqnames"           { EQNAMES }
+| "euf"               { EUF }
+| "cycle"             { CYCLE }
+| "ident"             { IDENT }
+| "try"               { TRY }
+| "orelse"            { ORELSE }
 | '+'                 { PLUS }
 | name as n           { ID (n) }
 | int as i            { INT (int_of_string i) }

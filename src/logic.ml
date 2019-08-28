@@ -10,11 +10,16 @@ let rec action_of_ts = function
 
 (** Tags used to record some information on gamma elements:
     - [euf] records whether the EUF axiom has been applied. *)
-type tag = { t_euf : bool }
+type tag = { t_euf : bool; cpt : int }
 
-let new_tag () = { t_euf = false }
+let cpt_tag = ref 0
 
-let set_euf b t = { t_euf = b }
+let new_tag () =
+  let t = { t_euf = false; cpt = !cpt_tag } in
+  incr cpt_tag;
+  t
+
+let set_euf b t = { t with t_euf = b }
 
 
 module Gamma : sig
@@ -52,12 +57,13 @@ end = struct
   let pp_gamma ppf gamma =
     Fmt.pf ppf "@[<v 0>\
                 @[<hov 2>Actions described:@ %a@]@;\
-                @[<hv 2>Facts:@ @[<v 0>%a@]@]@;\
-                @[<hv 2>Atoms:@ @[<v 0>%a@]@]@;@]"
+                @[<hv 0>Atoms:@ @[<v 0>%a@]@]@;\
+                @[<hv 0>Facts:@ @[<v 0>%a@]@]@;@]"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
       gamma.actions_described
-      (Fmt.list Term.pp_fact) gamma.facts
-      (Fmt.list (fun ppf (at,_) -> Term.pp_atom ppf at)) gamma.atoms
+      (Fmt.list (fun ppf (at,t) ->
+           Fmt.pf ppf "%d: %a" t.cpt Term.pp_atom at)) (List.rev gamma.atoms)
+      (Fmt.list Term.pp_fact) (List.rev gamma.facts)
 
   let mk () = { facts = []; atoms = []; trs = ref None; actions_described = [] }
 
@@ -280,7 +286,7 @@ end = struct
             @[<v 0>%a@]\
             @[<v 0>%a@]\
             @[<hv 2>Theta:@ @[%a@]@]@;\
-            Gamma:@;<1 2>@[%a@]@;\
+            @[%a@]@;\
             %a@;\
             %a@;@;@]"
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
@@ -687,7 +693,7 @@ let euf_apply_facts judge at = match modulo_sym euf_param at with
 
     schemata_premises @ direct_premises
 
-let euf_apply (judge : 'a judgment) sk fk f_select =
+let euf_apply f_select (judge : 'a judgment) sk fk =
   let g, at = Gamma.select judge.gamma f_select (set_euf true) in
   let judge = Judgment.set_gamma g judge in
 
@@ -700,6 +706,7 @@ let euf_apply (judge : 'a judgment) sk fk f_select =
 (** Tactics expression *)
 type (_,_) tac =
   | Admit : ('a, unit) tac
+  | Ident : ('a,'a) tac
 
   | Left : (fact, fact) tac
   | Right : (fact, fact) tac
@@ -720,13 +727,19 @@ type (_,_) tac =
   (* | ProveAll : ('a, unit) tac -> ('a list, unit) tac *)
   | AndThen : ('a,'b) tac * ('b,'c) tac * 'b gt -> ('a,'c) tac
   | OrElse : ('a,'b) tac * ('a,'b) tac -> ('a,'b) tac
+  | Try : ('a, unit) tac * ('a,'a) tac -> ('a,'a) tac
 
-  | TacPrint : ('a,'b) tac -> ('a,'b) tac
+  | Euf : int -> ('a, 'a) tac
+
+  | Cycle : int -> ('a, 'a) tac
+
+  (* | TacPrint : ('a,'b) tac -> ('a,'b) tac *)
 
 
 let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
   fun ppf tac -> match tac with
     | Admit -> Fmt.pf ppf "admit"
+    | Ident -> Fmt.pf ppf "ident"
 
     | Left -> Fmt.pf ppf "goal_or_intro_l"
     | Right -> Fmt.pf ppf "goal_or_intro_r"
@@ -750,10 +763,13 @@ let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
       Fmt.pf ppf "@[%a@]; @,@[%a@]" pp_tac ut pp_tac ut'
     | OrElse (ut, ut') ->
       Fmt.pf ppf "@[%a@] + @,@[%a@]" pp_tac ut pp_tac ut'
+    | Try (ut, ut') ->
+      Fmt.pf ppf "try@[%a@] orelse @,@[%a@]" pp_tac ut pp_tac ut'
 
-    | TacPrint ut ->
-      Fmt.pf ppf "@[%a@].@;" pp_tac ut
+    (* | TacPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_tac ut *)
 
+    | Euf i -> Fmt.pf ppf "euf %d" i
+    | Cycle i -> Fmt.pf ppf "cycle %d" i
 
 let rec pp_gt_el : type a. a gt -> Format.formatter -> a -> unit =
   fun gt ppf a -> match gt with
@@ -772,6 +788,7 @@ let rec tac_apply :
   c fk -> c =
   fun gt tac judge sk fk -> match tac with
     | Admit -> sk [Judgment.set_goal () Gt_unit judge] fk
+    | Ident -> sk [judge] fk
 
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
@@ -786,6 +803,9 @@ let rec tac_apply :
 
     | EqNames -> eq_names judge sk fk
     | EqConstants fn -> eq_constants fn judge sk fk
+    | Euf i ->
+      let f_select _ t = t.cpt = i in
+      euf_apply f_select judge sk fk
 
     (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
 
@@ -814,7 +834,11 @@ let rec tac_apply :
     | OrElse (tac,tac') ->
       tact_orelse (tac_apply gt tac) (tac_apply gt tac') sk fk judge
 
-    | _ -> assert false
+    | Try (tac,tac') ->
+      tac_apply Gt_unit tac judge (fun _ fk -> sk [] fk)
+        (fun () -> tac_apply gt tac' judge sk fk)
+
+    | Cycle _ -> assert false   (* This is not a focused tactic. *)
 
     (* | TacPrint tac ->
      *   Fmt.pr "%a @[<hov 0>%a@]@;%!"
@@ -859,6 +883,7 @@ let rec top_to_bot : type a. a gt -> a gt = function
     which uses only [Gt_top]. *)
 type utac =
   | UAdmit : utac
+  | UIdent : utac
 
   | ULeft : utac
   | URight : utac
@@ -877,11 +902,16 @@ type utac =
   (* | UProveAll : utac -> utac *)
   | UAndThen : utac * utac * 'a gt option -> utac
   | UOrElse : utac * utac -> utac
+  | UTry : utac * utac -> utac
 
-  | UPrint : utac -> utac
+  | UEuf : int -> utac
+  | UCycle : int -> utac
+
+  (* | UPrint : utac -> utac *)
 
 let rec pp_utac ppf = function
   | UAdmit -> Fmt.pf ppf "admit"
+  | UIdent -> Fmt.pf ppf "ident"
 
   | ULeft -> Fmt.pf ppf "goal_or_intro_l"
   | URight -> Fmt.pf ppf "goal_or_intro_r"
@@ -905,9 +935,13 @@ let rec pp_utac ppf = function
     Fmt.pf ppf "@[%a@];@[%a@]" pp_utac ut pp_utac ut'
   | UOrElse (ut, ut') ->
     Fmt.pf ppf "@[%a@]+@[%a@]" pp_utac ut pp_utac ut'
+  | UTry (ut, ut') ->
+    Fmt.pf ppf "try@[%a@] orelse @,@[%a@]" pp_utac ut pp_utac ut'
 
-  | UPrint ut ->
-    Fmt.pf ppf "@[%a@].@;" pp_utac ut
+  | UEuf i -> Fmt.pf ppf "euf %d" i
+  | UCycle i -> Fmt.pf ppf "cycle %d" i
+
+  (* | UPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_utac ut *)
 
 (** Existential type for tactics. *)
 type etac = | ETac : 'a gt * 'b gt * ('a,'b) tac -> etac
@@ -961,8 +995,11 @@ let tac_of_simp_utac utac = match utac with
   | _ -> assert false
 
 let tac_of_simp_utac2 utac = match utac with
+  | UIdent -> Ident
   | UEqNames -> EqNames
   | UEqConstants fn -> EqConstants fn
+  | UEuf i -> Euf i
+  | UCycle i -> Cycle i
   | _ -> assert false
 
 let tac_of_simp_utac3 utac = match utac with
@@ -1009,7 +1046,8 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
         | Gt_fact, Gt_fact -> tac_of_simp_utac utac
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
-    | UEqNames | UEqConstants _ -> begin match get_refl l_gt r_gt with
+    | UEqNames | UEqConstants _ | UEuf _ | UIdent | UCycle _ ->
+      begin match get_refl l_gt r_gt with
         | Some (Refl _) -> tac_of_simp_utac2 utac
         | None -> raise @@ fail_check_type l_gt r_gt utac end
 
@@ -1035,7 +1073,15 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
       and tac_r = check_type mid_gt r_gt utac_r in
       AndThen (tac_l, tac_r, mid_gt)
 
-    | UPrint utac' -> TacPrint (check_type l_gt r_gt utac')
+    | UTry (utac_l, utac_r) -> begin match get_refl l_gt r_gt with
+        | Some (Refl _) ->
+          let tac_l = check_type l_gt Gt_unit utac_l
+          and tac_r = check_type l_gt r_gt utac_r in
+          Try (tac_l, tac_r)
+
+        | None -> raise @@ fail_check_type l_gt r_gt utac end
+
+    (* | UPrint utac' -> TacPrint (check_type l_gt r_gt utac') *)
     | UAndThen (utac_l, utac_r, None) -> assert false
 
 
@@ -1067,10 +1113,10 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
         ( utac, ETac ( Gt_fact, Gt_fact, tac_of_simp_utac utac ))
       else raise @@ fail_tac_type l_gt r_gt utac
 
-    | UEqNames | UEqConstants _ -> begin match l_gt, r_gt with
-        | Gt_top, Gt_bot -> ( utac, ETac ( Gt_top,
-                                           Gt_bot,
-                                           tac_of_simp_utac2 utac ))
+    | UIdent | UEqNames | UEqConstants _ | UEuf _ | UCycle _ ->
+      begin match l_gt, r_gt with
+        | Gt_top, Gt_bot ->
+          ( utac, ETac ( Gt_top, Gt_bot, tac_of_simp_utac2 utac ))
         | Gt_top, jt ->
           ( utac, ETac ( r_gt, r_gt, tac_of_simp_utac2 utac ))
         | jt, Gt_bot ->
@@ -1081,6 +1127,33 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
           else if subtype jt' jt then
             ( utac, ETac ( bot_to_top r_gt, r_gt, tac_of_simp_utac2 utac ))
           else raise @@ fail_tac_type l_gt r_gt utac end
+
+    | UTry (utac_l, utac_r) ->
+      begin match tac_typ l_gt Gt_unit utac_l with
+        | utac_l', ETac (l_gt, _, _) -> match tac_typ l_gt r_gt utac_r with
+          | utac_r', ETac (l_gt, r_gt, tac_r) -> match l_gt, r_gt with
+            | Gt_top, Gt_bot ->
+              let tac_l = check_type l_gt Gt_unit utac_l' in
+              ( UTry (utac_l', utac_r'),
+                ETac ( Gt_top, Gt_bot, Try (tac_l, tac_r)) )
+            | Gt_top, _ ->
+              let tac_l = check_type r_gt Gt_unit utac_l' in
+              let tac_r = check_type r_gt r_gt utac_r' in
+              ( UTry (utac_l', utac_r'),
+                ETac ( r_gt, r_gt, Try (tac_l, tac_r)) )
+
+            | _, Gt_bot ->
+              let tac_l = check_type l_gt Gt_unit utac_l' in
+              let tac_r = check_type l_gt l_gt utac_r' in
+              ( UTry (utac_l', utac_r'),
+                ETac ( l_gt, l_gt, Try (tac_l, tac_r)) )
+
+            | _, _ -> match get_refl l_gt r_gt with
+              | None -> raise @@ fail_tac_type l_gt r_gt utac
+              | Some (Refl _) ->
+                let tac_l = check_type r_gt Gt_unit utac_l' in
+                ( UTry (utac_l', utac_r'),
+                  ETac ( l_gt, r_gt, Try (tac_l, tac_r)) ) end
 
     | UForallIntro ->
       if subtype Gt_formula l_gt
@@ -1132,10 +1205,10 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
             ( UAndThen (utac_l', utac_r', Some mid_gt),
               ETac (l_gt, r_gt, AndThen (tac_l, tac_r, mid_gt))) end
 
-    | UPrint iutac -> begin match tac_typ l_gt r_gt iutac with
-        | iutac', ETac (l_gt, r_gt, itac) ->
-          ( UPrint iutac',
-            ETac (l_gt, r_gt, TacPrint itac ) ) end
+    (* | UPrint iutac -> begin match tac_typ l_gt r_gt iutac with
+     *     | iutac', ETac (l_gt, r_gt, itac) ->
+     *       ( UPrint iutac',
+     *         ETac (l_gt, r_gt, TacPrint itac ) ) end *)
 
 
 let tac_type : type a b. a gt -> b gt -> utac -> etac =
@@ -1216,6 +1289,22 @@ let parse_tactic : type a. a gt -> utac -> a ertac =
 (** Existential type for judgments. *)
 type ejudgment = Ejudge : 'a gt * 'a judgment -> ejudgment
 
+
+let remove_finished judges =
+  List.filter (function Ejudge (gt,_) -> match get_refl gt Gt_unit with
+      | None -> true
+      | Some (Refl _) -> false) judges
+
+let simplify judges =
+  List.map (function Ejudge (gt,j) -> match get_refl gt Gt_postcond with
+      | None -> Ejudge (gt,j)
+      | Some (Refl _) ->
+        if j.goal.eindices = [] && j.goal.evars = [] then
+          Ejudge (Gt_fact, Judgment.set_goal j.goal.efact Gt_fact j)
+        else Ejudge (gt,j)
+    ) judges
+
+(* State in proof mode. *)
 let goals : formula list ref = ref []
 let current_goal : formula option ref = ref None
 let subgoals : ejudgment list ref = ref []
@@ -1231,7 +1320,8 @@ let start_proof () = match !current_goal, !goals with
   | None, goal :: _ ->
     assert (!subgoals = []);
     current_goal := Some goal;
-    subgoals := [Ejudge (Gt_formula,Judgment.init goal)];
+    subgoals := [Ejudge (Gt_formula,Judgment.init goal)]
+                |> simplify;
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."
@@ -1256,33 +1346,45 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       (Judgment.pp_judgment (pp_gt_el gt)) j
   | _ -> assert false
 
-let remove_finished judges =
-  List.filter (function Ejudge (gt,_) -> match get_refl gt Gt_unit with
-      | None -> true
-      | Some (Refl _) -> false) judges
+exception Tactic_failed of string
 
-exception Tactic_failed
 
-(** [eval_tactic utac] tries to prove the focused subgoal using [utac].
+(** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
     Return [true] if there are no subgoals remaining. *)
-let eval_tactic : utac -> bool = fun utac -> match !subgoals with
+let eval_tactic_focus : utac -> bool = fun utac -> match !subgoals with
   | [] -> assert false
-  | Ejudge (agt, judge) :: ejs' -> match judge.gt with
-    | _ ->
-      let failure_k () = raise Tactic_failed in
-      let suc_k judges _ =
-        let ejs =
-          List.fold_left (fun ejs judge ->
-              Ejudge (judge.gt, judge) :: ejs
-            ) ejs' judges
-          |> remove_finished in
-        subgoals := ejs;
-        is_proof_completed () in
+  | Ejudge (agt, judge) :: ejs' ->
+    let failure_k () = raise @@ Tactic_failed "" in
+    let suc_k judges _ =
+      let ejs =
+        List.fold_left (fun ejs judge ->
+            Ejudge (judge.gt, judge) :: ejs
+          ) ejs' judges
+        |> remove_finished
+        |> simplify in
+      subgoals := ejs;
+      is_proof_completed () in
 
-      match parse_tactic agt utac with
-      | ERTac (bgt, tac) ->
-        tac_apply bgt tac judge suc_k failure_k
+    match parse_tactic agt utac with
+    | ERTac (bgt, tac) ->
+      tac_apply bgt tac judge suc_k failure_k
 
+let cycle i l =
+  let rec cyc acc i = function
+    | [] -> raise @@ Tactic_failed "cycle error"
+    | a :: l ->
+      if i = 1 then l @ (List.rev (a :: acc))
+      else cyc (a :: acc) (i - 1) l in
+
+  if i = 0 then l else
+  if i < 0 then cyc [] (List.length l + i) l
+  else cyc [] i l
+
+(** [eval_tactic utac] applies the tactic [utac].
+    Return [true] if there are no subgoals remaining. *)
+let eval_tactic : utac -> bool = fun utac -> match utac with
+  | UCycle i -> subgoals := cycle i !subgoals; false
+  | _ -> eval_tactic_focus utac
 
 (** Tests *)
 

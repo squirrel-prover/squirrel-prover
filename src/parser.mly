@@ -5,14 +5,15 @@
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS UNDERSCORE
+%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS MINUS UNDERSCORE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE NOTRACES EQNAMES
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE
+%token NOTRACES EQNAMES EUF TRY CYCLE IDENT ORELSE
 %token PROOF QED
 %token EOF
 
@@ -25,6 +26,7 @@
 %left AND
 %nonassoc NOT
 
+%left ORELSE
 %left PLUS
 %left SEMICOLON
 
@@ -210,6 +212,7 @@ formula:
 tac:
   | LPAREN t = tac RPAREN          { t }
   | ADMIT                             { Logic.UAdmit }
+  | IDENT                             { Logic.UIdent }
   | FORALLINTRO                       { Logic.UForallIntro }
   | INTRO                             { Logic.UIntro }
   | LEFT                              { Logic.ULeft }
@@ -218,9 +221,13 @@ tac:
   | CONGRUENCE                        { Logic.UGammaAbsurd }
   | NOTRACES                          { Logic.UConstrAbsurd }
   | EQNAMES                           { Logic.UEqNames }
+  | EUF i = INT                       { Logic.UEuf i }
+  | CYCLE i = INT                     { Logic.UCycle i }
+  | CYCLE MINUS i = INT               { Logic.UCycle (-i) }
   /* | LBRACKET t = tac RBRACKET      { Logic.UProveAll t } */
   | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
   | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
+  | TRY l = tac ORELSE r = tac        { Logic.UTry (l, r) }
 
 qed:
 | QED                                 { () }

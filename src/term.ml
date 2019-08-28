@@ -394,9 +394,9 @@ let pp_q_vars s_q vars indices constr ppf () =
      pp_indices indices
      (styled `Blue (styled `Bold ident)) "index"
   else ();
-  if vars = [] && indices = [] then
-    Fmt.pf ppf "@[<hv 2>%a@ ()@]@;"
-      (styled `Red (styled `Underline ident)) s_q;
+  (* if vars = [] && indices = [] then
+   *   Fmt.pf ppf "@[<hv 2>%a@ ()@]@;"
+   *     (styled `Red (styled `Underline ident)) s_q; *)
   Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
     (styled `Red (styled `Underline ident)) "such that"
     (fun ppf constr ->
