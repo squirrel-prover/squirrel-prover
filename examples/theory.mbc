@@ -1,4 +1,4 @@
-# A simple model using a declared primitive
+(* A simple model using a declared primitive *)
 hash h
 channel c
 process IO = in(c,x);out(c,h(x,x))

@@ -26,11 +26,18 @@
 
 ;; cannot get comments to be ignored :(
 
- proof-script-comment-start             "\#"	;; for inserting comments
- proof-script-comment-end               ""
- proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
- proof-script-comment-end-regexp	 "\n"      ;; comments
-
+ proof-script-comment-start             "(*"	;; for inserting comments
+ proof-script-comment-end               "*)"
+;; proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
+;; proof-script-comment-end-regexp	 "\n"      ;; comments
+;; proof-script-syntax-table-entries '(?\# "<" ?\n ">")
+ proof-script-syntax-table-entries 
+ 	'(?\* ". 23"
+ ?\* ". 23n"
+  ?\( "()1"
+  ?\) ")(4"
+		  )
+ comment-quote-nested nil
  proof-shell-truncate-before-error      nil
 
  proof-save-command-regexp  "^Qed"
@@ -50,6 +57,8 @@
  proof-script-font-lock-keywords         metabc-font-lock-keywords
 
 
+
+proof-script-fly-past-comments  t
  )
 
  (defun display-ansi-colors ()

@@ -1,4 +1,4 @@
-# Simple
+(* Simple *)
 name n1:message
 name n2:message
 channel c

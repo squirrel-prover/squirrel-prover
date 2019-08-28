@@ -9,6 +9,13 @@
         pos_bol = p.Lexing.pos_cnum }
     in
       lexbuf.Lexing.lex_curr_p <- q
+
+  exception LexicalError of string
+
+  let unterminated_comment () =
+    raise (LexicalError "unterminated comment")
+
+
 }
 
 let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
@@ -17,6 +24,7 @@ let int = ['0'-'9'] ['0'-'9']*
 rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
+| "(*" { comment lexbuf; token lexbuf }
 | '#' [^'\n']* '\n'       { newline lexbuf ; token lexbuf }
 | "!_" (['a'-'z']* as i)  { BANG i }
 | "and"               { AND }
@@ -85,7 +93,15 @@ rule token = parse
 | "notraces"          { NOTRACES }
 | "eqnames"           { EQNAMES }
 | '+'                 { PLUS }
-
 | name as n           { ID (n) }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }
+
+and comment = parse
+  | "*)"        { () }
+  | "(*"        { comment lexbuf; comment lexbuf }
+  | "\n"     { new_line lexbuf; comment lexbuf }
+  | eof         { unterminated_comment () }
+  | _           { comment lexbuf }
+
+
