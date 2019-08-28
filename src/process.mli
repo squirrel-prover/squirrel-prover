@@ -77,4 +77,4 @@ val iter_csa : (descr -> unit) -> unit
 val get_descr : Action.action -> descr
 
 (** Debug *)
-val show_actions : unit -> unit
+val show_actions : Format.formatter -> unit -> unit

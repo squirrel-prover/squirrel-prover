@@ -2,48 +2,59 @@ open Logic
 
 let () = Printexc.record_backtrace true
 
+
+let parse_from_buf ?(test=false) parse_fun lexbuf filename =
+  try parse_fun Lexer.token lexbuf with
+  | Parser.Error as e ->
+    Printexc.print_backtrace Pervasives.stderr;
+    Format.printf
+      "@[Cannot parse model @,\
+       in %S @,at line %d char %d @,\
+       before %S.@]@."
+      filename
+      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+      (Lexing.lexeme lexbuf) ;
+    if test then raise e else exit 1
+  | Failure s as e ->
+    Format.printf
+      "@[Error in %S @,at line %d char %d @,\
+       before %S: @,%s.@]@."
+      filename
+      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+      (Lexing.lexeme lexbuf)
+      s ;
+    if test then raise e else exit 1
+  | e ->
+    Printexc.print_backtrace Pervasives.stderr;
+    Format.printf
+      "@[Error @,\
+       in %S @,at line %d char %d @,\
+       before %S: @,%s.@]@."
+      filename
+      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+      (Lexing.lexeme lexbuf)
+      (Printexc.to_string e) ;
+    if test then raise e else exit 1
+
 let parse_theory_buf ?(test=false) lexbuf filename =
   Theory.initialize_symbols () ;
   Process.reset () ;
-    try
-      Parser.theory Lexer.token lexbuf
-    with
-    | Parser.Error as e ->
-      Printexc.print_backtrace Pervasives.stderr;
-      Format.printf
-        "@[Cannot parse model @,\
-         in %S @,at line %d char %d @,\
-         before %S.@]@."
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf) ;
-      if test then raise e else exit 1
-    | Failure s as e ->
-      Format.printf
-        "@[Error in %S @,at line %d char %d @,\
-         before %S: @,%s.@]@."
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf)
-        s ;
-      if test then raise e else exit 1
-    | e ->
-      Printexc.print_backtrace Pervasives.stderr;
-      Format.printf
-        "@[Error @,\
-         in %S @,at line %d char %d @,\
-         before %S: @,%s.@]@."
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf)
-        (Printexc.to_string e) ;
-      if test then raise e else exit 1
+  parse_from_buf ~test:test Parser.theory lexbuf filename
+
+let parse_goal_buf ?(test=false) lexbuf filename =
+  parse_from_buf ~test:test Parser.goal lexbuf filename
+
+let parse_tactic_buf ?(test=false) lexbuf filename =
+  parse_from_buf ~test:test Parser.tactic lexbuf filename
+
+let parse_qed_buf ?(test=false) lexbuf filename =
+  parse_from_buf ~test:test Parser.qed lexbuf filename
 
 let parse_theory ?(test=false) filename =
     let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
@@ -143,8 +154,7 @@ let () =
     end ;
   ];;
 
-
-let pp_proc ppf =
+let pp_descrs ppf () =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
   Process.iter_csa (fun descr ->
@@ -153,10 +163,16 @@ let pp_proc ppf =
       incr cpt;);
   Fmt.pf ppf "@]%!@.";;
 
-let pp_goals ppf =
+let pp_proc ppf () =
+  Fmt.pf ppf "@[<v>%a@;%a@;@]%!"
+  (* Fmt.pf ppf "@[<v>[descr>@;%a@;%a@;[descr:end>@;@]%!" *)
+    Process.show_actions ()
+    pp_descrs ()
+
+let pp_goals ppf () =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
-  Logic.iter_goals (fun (goal,_) ->
+  Logic.iter_goals (fun goal ->
       Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
         !cpt Term.pp_formula goal;
       incr cpt;);

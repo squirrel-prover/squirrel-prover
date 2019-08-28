@@ -33,17 +33,17 @@
 
  proof-shell-truncate-before-error      nil
 
-   proof-save-command-regexp  "^Qed"
+ proof-save-command-regexp  "^Qed"
  proof-tree-external-display nil
 ;; proof-shell-strip-crs-from-input nil
 
- proof-shell-error-regexp "\\[E\\]"
- proof-shell-annotated-prompt-regexp "\\[O\\]"
- proof-shell-eager-annotation-start "\\[W\\]"
+ proof-shell-error-regexp "\\[error>"
+ proof-shell-annotated-prompt-regexp "\\[>"
+ proof-shell-eager-annotation-start "\\[start>"
 
  proof-shell-interrupt-regexp    "Interrupted"
 
- proof-shell-start-goals-regexp         "^Current"
+ proof-shell-start-goals-regexp         "\\[goal>"
  proof-shell-end-goals-regexp           nil  ; up to next prompt
 
 ;; proof-shell-font-lock-keywords         metabc-font-lock-keywords
@@ -54,6 +54,9 @@
 
  (defun display-ansi-colors ()
   (proof-with-current-buffer-if-exists proof-response-buffer
+  (let ((inhibit-read-only t))
+    (ansi-color-apply-on-region (point-min) (point-max))))
+  (proof-with-current-buffer-if-exists proof-goals-buffer
   (let ((inhibit-read-only t))
     (ansi-color-apply-on-region (point-min) (point-max)))))
 

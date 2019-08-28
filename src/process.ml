@@ -334,11 +334,12 @@ module Aliases = struct
 
 end
 
-let show_actions () =
-  Format.printf "Available actions:@." ;
+let show_actions ppf () =
+  Fmt.pf ppf "@[<v 2>Available actions:@;" ;
   Hashtbl.iter
-    (fun a _ -> Format.printf " - %a@." Action.pp_action a)
-    action_to_block
+    (fun a _ -> Fmt.pf ppf "%a@;" Action.pp_action a)
+    action_to_block;
+  Fmt.pf ppf "@]" ;
 
 (* Environment for parsing the final process, i.e. the system to study,
  * to break it into blocks suitable for the analysis.

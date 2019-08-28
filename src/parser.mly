@@ -29,8 +29,14 @@
 %left SEMICOLON
 
 %start theory
+%start goal
+%start tactic
+%start qed
 %start top_process
 %type <unit> theory
+%type <Goalmode.gm_input> goal
+%type <Logic.utac> tactic
+%type <unit> qed
 %type <Process.process> top_process
 %type <Theory.fact> fact
 
@@ -201,8 +207,8 @@ formula:
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
                                  { ($2, $7, $4, $9) }
 
-tactic:
-  | LPAREN t = tactic RPAREN          { t }
+tac:
+  | LPAREN t = tac RPAREN          { t }
   | ADMIT                             { Logic.UAdmit }
   | FORALLINTRO                       { Logic.UForallIntro }
   | INTRO                             { Logic.UIntro }
@@ -212,28 +218,23 @@ tactic:
   | CONGRUENCE                        { Logic.UGammaAbsurd }
   | NOTRACES                          { Logic.UConstrAbsurd }
   | EQNAMES                           { Logic.UEqNames }
-  /* | LBRACKET t = tactic RBRACKET      { Logic.UProveAll t } */
-  | l = tactic SEMICOLON r = tactic   { Logic.UAndThen (l,r,None) }
-  | l = tactic PLUS r = tactic        { Logic.UOrElse (l, r) }
+  /* | LBRACKET t = tac RBRACKET      { Logic.UProveAll t } */
+  | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
+  | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
 
-tactic_list:
-|                                   { [] }
-| t = tactic DOT l = tactic_list    { t :: l }
+qed:
+| QED                                 { () }
 
-proof:
-|PROOF l = tactic_list QED            { l }
+tactic:
+| t = tac DOT                         { t }
 
-goal_decl:
-| GOAL f = formula DOT                         { Logic.declare_goal f None }
-| GOAL f = formula DOT p = proof                { Logic.declare_goal f (Some p) }
-
-goal_decls:
-|                                { () }
-| goal_decl goal_decls           { () }
+goal:
+| GOAL f = formula DOT            { Goalmode.Gm_goal (Logic.make_goal f) }
+| PROOF                           { Goalmode.Gm_proof }
 
 theory:
 | declaration theory             { () }
-| SYSTEM process DOT goal_decls EOF  { Process.declare_system $2 }
+| SYSTEM process DOT EOF         { Process.declare_system $2 }
 
 top_process:
 | process EOF                    { $1 }

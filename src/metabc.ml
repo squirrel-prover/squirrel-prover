@@ -1,6 +1,6 @@
 open Logic
 open Utils
-    
+
 let usage = Printf.sprintf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 let args  = ref []
@@ -9,79 +9,77 @@ let interactive = ref false
 let speclist = [
     ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
     ("-v", Arg.Set verbose, "display more informations");
-    ]  
+    ]
 
 
 let run filename =
-  Main.parse_theory filename;
-  Format.printf "Successfully parsed model.@." ;
-  Process.show_actions () ;
   (* TODO: I am forcing the usage of ANSI escape sequence. We probably want an
      option to remove it. *)
   Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  Main.pp_proc Fmt.stdout;
-  Main.pp_goals Fmt.stdout;
+  Main.parse_theory filename;
+  Format.printf "Successfully parsed model.@." ;
+  Main.pp_proc Fmt.stdout ();
+  Main.pp_goals Fmt.stdout ();
 
-  Logic.try_prove_goals ()
+  assert false  (* TODO *)
 
-  (* (\* TEMPORARY: *\)
-   * let fk_fail () = Fmt.pr "Failure@.%!"; assert false in
-   * let euf_select (_,t,t') tag =
-   *   let open Term in
-   *   if tag.Logic.t_euf then false
-   *   else match t, t' with
-   *     | Fun ((f,_),_), Fun ((f',_),_)  -> Theory.is_hash f || Theory.is_hash f'
-   *     | Fun ((f,_),_),_ | _,Fun ((f,_),_) -> Theory.is_hash f
-   *     | _ -> false in
-   *
-   * Fmt.pr "Trying to prove the goal using a hard-coded tactic.@;@.";
-   *
-   * let cont judge fk =
-   *   Logic.gamma_absurd judge (fun _ _ -> Fmt.pr "cont 1%!"; assert false)
-   *     (fun () ->
-   *        Logic.eq_names judge (fun judge fk ->
-   *            Judgment.pp_judgment Term.pp_postcond Fmt.stdout judge;
-   *            Logic.constr_absurd judge
-   *              (fun _ _ -> Fmt.pr "cont done%!") (fun () -> ())
-   *          ) fk
-   *     ) in
-   *
-   * Logic.iter_goals (fun (goal,_) ->
-   *     let judge = Judgment.init goal in
-   *     Judgment.pp_judgment Term.pp_formula Fmt.stdout judge;
-   *     Logic.goal_forall_intro judge (fun judge fk ->
-   *         Logic.prove_all judge (fun judge _ fk ->
-   *             Judgment.pp_judgment Term.pp_postcond Fmt.stdout judge;
-   *             Logic.euf_apply judge (fun judges fk ->
-   *                 List.iter (fun judge ->
-   *                     Judgment.pp_judgment Term.pp_postcond Fmt.stdout judge;
-   *                     cont judge fk
-   *                   ) judges
-   *               ) fk euf_select
-   *           ) (fun _ _ -> ()) fk
-   *       ) fk_fail
-   *   ); *)
+(** Current mode of the prover:
+    - [InputDescr] : waiting for the process description.
+    - [GoalMode] : waiting for the next goal.
+    - [ProofMode] : proof of a goal in progress. *)
+type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
 
-let rec interactive_loop () =
-  Format.printf "[O]%!";
-  match read_line () with
-  | "exit" -> ()
-  | "" -> interactive_loop ()
-  | s when (String.is_prefix "goal" s) -> Format.printf "[E] not supported yet@."; interactive_loop ()
-  | s -> let lexbuf = Lexing.from_string s in
-    Main.parse_theory_buf lexbuf "interactive";
-    Process.show_actions () ;
-    Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-    Main.pp_proc Fmt.stdout;    
-    interactive_loop ()
-  | exception End_of_file -> ()      
-           
+let read_line_buf () = Lexing.from_string (read_line ())
+
+let rec interactive_loop mode =
+  Format.printf "[>@.";
+  match mode with
+  | InputDescr ->
+    Main.parse_theory_buf (read_line_buf ()) "interactive";
+    Main.pp_proc Fmt.stdout ();
+    interactive_loop GoalMode
+  | ProofMode ->
+    let utac =
+      Main.parse_tactic_buf (read_line_buf ()) "interactive" in
+    begin try
+        if eval_tactic utac then begin
+          complete_proof ();
+          Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
+          interactive_loop WaitQed end
+        else begin
+          Fmt.pr "%a" pp_goal ();
+          interactive_loop ProofMode end
+      with
+      | Tactic_failed ->
+        Fmt.pr "[error> Tactic failed.@.";
+        interactive_loop ProofMode end
+
+  | WaitQed ->
+    Main.parse_qed_buf (read_line_buf ()) "interactive";
+    Fmt.pr "Exit proof mode.@.";
+    interactive_loop GoalMode
+
+  | GoalMode -> match Main.parse_goal_buf (read_line_buf ()) "interactive" with
+    | Goalmode.Gm_proof ->
+      if start_proof () then begin
+        Fmt.pr "%a" pp_goal ();
+        interactive_loop ProofMode end
+      else interactive_loop GoalMode
+
+    | Goalmode.Gm_goal f ->
+      add_new_goal f;
+      Fmt.pr "Goal added.@.";
+      interactive_loop GoalMode
+
+
 let interactive_prover () =
-  Format.printf "[W] MetaBC interactive mode.@.";
-  
-  interactive_loop ()
-          
+  Format.printf "[start> MetaBC interactive mode.@.";
+  Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
+
+  try interactive_loop InputDescr
+  with End_of_file -> Fmt.epr "End of file, exiting.@."
+
 let main () =
   let collect arg = args := !args @ [arg] in
   let _ = Arg.parse speclist collect usage in
@@ -100,5 +98,5 @@ let main () =
       let filename = List.hd(!args) in
       run filename
     )
-    
-let () = main ()     
+
+let () = main ()

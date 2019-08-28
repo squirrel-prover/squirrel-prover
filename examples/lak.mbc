@@ -61,10 +61,10 @@ process Reader =
 ## Bi-process expressing unlinkability
 
 # TODO Add possibilily to create mutable cells in process
-# (under the scope of replications) and pass them to Tag.
+# (under the scope of replications) and pass them to Tag
 # This may be done in a way that avoids introducing
-# an explicit ! operator (e.g. by specifying which arguments
-# should be passed by reference).
+# an explicit ! operator (eg by specifying which arguments
+# should be passed by reference)
 
 # TODO add support for ! without explicit index
 # (add it when elaborating processes)

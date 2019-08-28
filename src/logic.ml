@@ -1155,13 +1155,7 @@ let tac_type : type a b. a gt -> b gt -> utac -> etac =
 
 type args = (string * Theory.kind) list
 
-let goals : (formula * utac list option) list ref = ref []
-
-let iter_goals f = List.iter f !goals
-
-let add_goal g p = goals := (g,p) :: !goals
-
-let declare_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) p_opt =
+let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
   let to_ts subst = List.map (fun (x,y) -> x, Term.TVar y) subst in
 
   (* In the rest of this function, the lists need to be reversed and appended
@@ -1193,23 +1187,19 @@ let declare_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) p_opt =
       (eindex_subst @ uindex_subst)
       efact in
 
-  add_goal
-    { uvars = List.map snd uts_subst;
-      uindices = List.map snd uindex_subst;
-      uconstr = uconstr;
-      ufact = ufact;
-      postcond = [{ evars = List.map snd ets_subst;
-                    eindices = List.map snd eindex_subst;
-                    econstr = econstr;
-                    efact = efact }] }
-    p_opt
+  { uvars = List.map snd uts_subst;
+    uindices = List.map snd uindex_subst;
+    uconstr = uconstr;
+    ufact = ufact;
+    postcond = [{ evars = List.map snd ets_subst;
+                  eindices = List.map snd eindex_subst;
+                  econstr = econstr;
+                  efact = efact }] }
 
 
-
-(** REPL *)
 
 (** Right existential type for tactics. *)
-type 'a ertac = | ERTac : 'b gt * ('a,'b) tac -> 'a ertac
+type 'a ertac = ERTac : 'b gt * ('a,'b) tac -> 'a ertac
 
 let parse_tactic : type a. a gt -> utac -> a ertac =
   fun gt utac -> match tac_type gt Gt_bot utac with
@@ -1226,67 +1216,73 @@ let parse_tactic : type a. a gt -> utac -> a ertac =
 (** Existential type for judgments. *)
 type ejudgment = Ejudge : 'a gt * 'a judgment -> ejudgment
 
-(** [repl next_utac ejs] tries to prove the list of judgments [ejs] using the
-    tactics provided by [next_utac]. Can be used to make a REPL, or in a whole
-    file processing. *)
-let rec repl : (unit -> utac) -> ejudgment list -> unit =
-  fun next_utac ejs -> match ejs with
-    | [] -> ()
-    | Ejudge (agt, judge) :: ejs' -> match judge.gt with
-      | Gt_unit -> repl next_utac ejs'
-      | _ ->
-        let failure_k () = repl next_utac ejs in
+let goals : formula list ref = ref []
+let current_goal : formula option ref = ref None
+let subgoals : ejudgment list ref = ref []
+let goals_proved = ref []
 
-        let suc_k judges _ =
-          (* Fmt.pr "%a%!" (Judgment.pp_judgment (pp_gt_el bgt)) judge; *)
-          let ejs = List.fold_left (fun ejs judge ->
+let add_new_goal g = goals := g :: !goals
+
+let iter_goals f = List.iter f !goals
+
+let goals_to_proved () = !goals <> []
+
+let start_proof () = match !current_goal, !goals with
+  | None, goal :: _ ->
+    assert (!subgoals = []);
+    current_goal := Some goal;
+    subgoals := [Ejudge (Gt_formula,Judgment.init goal)];
+    true
+  | Some _,_ ->
+    Fmt.pr "[error> Cannot start a new proof (current proof is not done).@.";
+    false
+  | _, [] ->
+    Fmt.pr "[error> Cannot start a new proof (no goal remaining to prove).@.";
+    false
+
+let is_proof_completed () = !subgoals = []
+
+let complete_proof () =
+  assert (is_proof_completed ());
+  goals_proved := !current_goal :: !goals_proved;
+  current_goal := None;
+  subgoals := [];;
+
+let pp_goal ppf () = match !current_goal, !subgoals with
+  | None,[] -> assert false
+  | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
+  | Some _, (Ejudge (gt, j)) :: _ ->
+    Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]"
+      (List.length !subgoals)
+      (Judgment.pp_judgment (pp_gt_el gt)) j
+  | _ -> assert false
+
+let remove_finished judges =
+  List.filter (function Ejudge (gt,_) -> match get_refl gt Gt_unit with
+      | None -> true
+      | Some (Refl _) -> false) judges
+
+exception Tactic_failed
+
+(** [eval_tactic utac] tries to prove the focused subgoal using [utac].
+    Return [true] if there are no subgoals remaining. *)
+let eval_tactic : utac -> bool = fun utac -> match !subgoals with
+  | [] -> assert false
+  | Ejudge (agt, judge) :: ejs' -> match judge.gt with
+    | _ ->
+      let failure_k () = raise Tactic_failed in
+      let suc_k judges _ =
+        let ejs =
+          List.fold_left (fun ejs judge ->
               Ejudge (judge.gt, judge) :: ejs
-            ) ejs' judges in
-          repl next_utac ejs in
+            ) ejs' judges
+          |> remove_finished in
+        subgoals := ejs;
+        is_proof_completed () in
 
-        match parse_tactic agt (next_utac ()) with
-        | ERTac (bgt, tac) ->
-          tac_apply bgt tac judge suc_k failure_k
-
-(** Whole file processing *)
-
-let lemmas_proved = ref []
-
-let try_prove_goals () =
-  let not_proved : (formula * utac list option) list ref = ref [] in
-  let fail goal proof = not_proved := (goal, proof) :: !not_proved in
-  let success goal = lemmas_proved := goal :: !lemmas_proved in
-
-  List.iter (fun (goal, proof_opt) -> match proof_opt with
-      | None ->
-        Fmt.pr "@[<v>%a@;%a@;@;No proof provided.@;@;@]%!"
-          (Fmt.styled `Underline (Fmt.styled `Bold ident)) "Goal:"
-          pp_formula goal;
-        fail goal proof_opt
-      | Some proof ->
-        let exception No_more_tactics in
-        let tacs = ref proof in
-        let next_utac () = match !tacs with
-          | [] -> raise No_more_tactics
-          | t :: l -> tacs := l; t in
-
-        let init_judge = Judgment.init goal in
-        Fmt.pr "@[<v 0>%a@;" (Judgment.pp_judgment pp_formula) init_judge;
-
-        try
-          repl next_utac [Ejudge (Gt_formula,init_judge)];
-          Fmt.pr "Goal proved.@;@]%!";
-          success goal;
-        with
-        | Tactic_type_error ->
-          Fmt.pr "Proof failed : tactic error.@;@]%!";
-          fail goal proof_opt
-        | No_more_tactics ->
-          Fmt.pr "Proof failed : no more tactics.@;@]%!";
-          fail goal proof_opt
-    ) !goals;
-  goals := !not_proved
-
+      match parse_tactic agt utac with
+      | ERTac (bgt, tac) ->
+        tac_apply bgt tac judge suc_k failure_k
 
 
 (** Tests *)
