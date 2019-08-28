@@ -6,6 +6,7 @@
 ;; Moreover, in the file generic/proof-site.el, add to the list proof-assistant-table-default the following line:
 ;;   (metabc "metabc" "mbc")
 
+(require 'span)
 (require 'proof)
 (require 'proof-site)
 (require 'proof-shell)
@@ -56,9 +57,14 @@
 ;; proof-shell-font-lock-keywords         metabc-font-lock-keywords
  proof-script-font-lock-keywords         metabc-font-lock-keywords
 
+ proof-undo-n-times-cmd "undo %s."
+ proof-count-undos-fn 'proof-generic-count-undos
+ proof-find-and-forget-fn 'proof-generic-count-undos
+
+ proof-script-fly-past-comments  t
 
 
-proof-script-fly-past-comments  t
+
  )
 
  (defun display-ansi-colors ()
@@ -72,5 +78,6 @@ proof-script-fly-past-comments  t
  (add-hook 'proof-shell-handle-delayed-output-hook
           'display-ansi-colors)
 
- (provide 'metabc)
+
+(provide 'metabc)
 ;;; metabc.el ends here
