@@ -20,3 +20,6 @@ val query : models -> Term.tatom list -> bool
     This can only be over-approximated, and our result may not be the best.
     This function may be non-deterministic. *)
 val maximal_elems : models -> Term.timestamp list -> Term.timestamp list
+
+(** [get_equalities models ts], given a list of models [models] and a list of timespoints [ts], gives back the classes for equality in all models **)
+val get_equalities : models -> Term.timestamp list -> Term.timestamp list list

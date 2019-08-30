@@ -635,7 +635,11 @@ let maximal_elems (models : models) (elems : timestamp list) =
   Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) maxs
   |> List.map List.hd
 
+(** [get_equalities models ts], given a list of models [models] and a list of timespoints [ts], gives back the classes for equality in all models **)
+let get_equalities (models : models) ts =
+  Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) ts
 
+  
 
 (****************)
 (* Tests Suites *)

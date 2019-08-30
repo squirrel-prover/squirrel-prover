@@ -216,6 +216,12 @@ end = struct
   let maximal_elems theta tss =
     compute_models theta;
     Constr.maximal_elems (opt_get !(theta.models)) tss
+
+  let get_equalities theta =
+    compute_models theta;
+    let ts = Term.constr_ts theta.constr in
+    Constr.get_equalities (opt_get !(theta.models)) ts
+  
 end
 
 (** Type of goal types *)
