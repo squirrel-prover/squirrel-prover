@@ -45,6 +45,8 @@ module Gamma : sig
   val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
 
   val add_descr : gamma -> Process.descr -> gamma
+
+  val get_all_terms :gamma -> Term.term list
 end = struct
   (** Type of judgment contexts. We separate atoms from more complexe facts.
       We store in [trs] the state of the completion algorithm when it was last
@@ -155,6 +157,15 @@ end = struct
       let g = List.fold_left add_descr g descrs in
 
       add_atoms g new_atoms
+
+  (* Provides the list of all terms appearing inside atoms or facts of the Gamma *)
+  let get_all_terms g =
+    let atoms = get_atoms g
+    and facts = get_facts g in
+
+    let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
+    List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms
+
 end
 
 (** Store the constraints. We remember the last models that was computed,
@@ -567,13 +578,8 @@ let mk_and_cnstr l = match l with
 (** Add index constraints resulting from names equalities, modulo the TRS.
     [judge.gamma] must have been completed before calling [eq_names]. *)
 let eq_names (judge : 'a judgment) sk fk =
-  let atoms = Gamma.get_atoms judge.gamma
-  and facts = Gamma.get_facts judge.gamma in
-
-  let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
-  let terms = List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms in
-
-  let cnstrs = Completion.name_index_cnstrs (Gamma.get_trs judge.gamma) terms in
+  let cnstrs = Completion.name_index_cnstrs (Gamma.get_trs judge.gamma)
+      (Gamma.get_all_terms judge.gamma) in
 
   let judge =
     List.fold_left (fun judge c ->
@@ -584,15 +590,9 @@ let eq_names (judge : 'a judgment) sk fk =
 
 
 let eq_constants fn (judge : 'a judgment) sk fk =
-  let atoms = Gamma.get_atoms judge.gamma
-  and facts = Gamma.get_facts judge.gamma in
-
-  let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
-  let terms = List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms in
-
   let cnstrs =
-    Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma) terms in
-
+    Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma)
+      (Gamma.get_all_terms judge.gamma) in
   let judge =
     List.fold_left (fun judge c ->
         Judgment.add_constr c judge
