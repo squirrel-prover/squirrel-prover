@@ -14,19 +14,6 @@ system  out(c,cst);
  ).
 
 
-goal forall (tau1 : timestamp, tau2 : timestamp, a : index)
-such that
-tau1 = tau2 and tau1 = 0_0[a]:
-  output@tau1 <> output@tau2
-  => exists () : false.
-
-Proof.
-  forallintro.
-  eqnames.
-  eqtimestamps.
-  congruence.
-Qed.
-
 goal forall (tau1 : timestamp, a: index)
 such that
 tau1 <> 0_0[a]:
@@ -41,4 +28,18 @@ Proof.
   cycle 2.
   eqnames.
   try congruence + notraces orelse ident.
+Qed.
+
+
+goal forall (tau1 : timestamp, tau2 : timestamp, a : index)
+such that
+tau1 = tau2 and tau1 = 0_0[a]:
+  output@tau1 <> output@tau2
+  => exists () : false.
+
+Proof.
+  forallintro.
+  eqnames.
+  eqtimestamps.
+  congruence.
 Qed.
