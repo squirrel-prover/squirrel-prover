@@ -35,7 +35,7 @@ output@tau1 = h(sname(a)@tau1,k)
 
 Proof.
   forallintro.
-  euf 0.
+  euf 6.
   cycle -1.
   try congruence orelse ident.
   cycle 2.
