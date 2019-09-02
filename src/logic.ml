@@ -104,8 +104,6 @@ end = struct
 
   let get_atoms g = List.map fst g.atoms
 
-  let get_trs g = match !(g.trs) with Some x -> x | None -> raise Not_found
-
   (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
       otherwise, where [g'] has been completed. *)
   let is_sat g =
@@ -120,7 +118,15 @@ end = struct
     if Completion.check_disequalities trs neqs then
       let () = g.trs := Some trs in true
     else false
-
+  
+  let get_trs g =
+    if is_sat g then
+      match !(g.trs) with
+        Some x -> x
+      | None -> raise Not_found
+    else
+      raise Not_found
+        
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
       tag has been updated in [g] according to [f_up].
