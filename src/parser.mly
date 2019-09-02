@@ -13,7 +13,7 @@
 %token EXISTS FORALL GOAL DARROW
 %token LBRACKET RBRACKET DOT SLASH
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE
-%token NOTRACES EQNAMES EUF TRY CYCLE IDENT ORELSE
+%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE
 %token PROOF QED
 %token EOF
 
@@ -221,6 +221,7 @@ tac:
   | CONGRUENCE                        { Logic.UGammaAbsurd }
   | NOTRACES                          { Logic.UConstrAbsurd }
   | EQNAMES                           { Logic.UEqNames }
+  | EQTIMESTAMPS                      { Logic.UEqTimestamps }  
   | EUF i = INT                       { Logic.UEuf i }
   | CYCLE i = INT                     { Logic.UCycle i }
   | CYCLE MINUS i = INT               { Logic.UCycle (-i) }

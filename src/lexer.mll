@@ -92,6 +92,7 @@ rule token = parse
 | "congruence"        { CONGRUENCE }
 | "notraces"          { NOTRACES }
 | "eqnames"           { EQNAMES }
+| "eqtimestamps"      { EQTIMESTAMPS }
 | "euf"               { EUF }
 | "cycle"             { CYCLE }
 | "ident"             { IDENT }

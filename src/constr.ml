@@ -639,7 +639,12 @@ let maximal_elems (models : models) (elems : timestamp list) =
 let get_equalities (models : models) ts =
   Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) ts
 
-  
+let rec ts_normalize (norm : timestamp -> timestamp) t =
+  match t with
+  | Fun(f,terms) -> Fun(f,List.map (ts_normalize norm) terms)
+  | Name n -> Name n
+  | State(s,ts) -> State(s, norm ts)
+  | Macro(m,ts) -> Macro(m, norm ts)
 
 (****************)
 (* Tests Suites *)

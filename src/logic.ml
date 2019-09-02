@@ -185,6 +185,8 @@ module Theta : sig
   (** [maximal_elems theta elems] returns an over-approximation of the set of
       maximals elements of [elems] in [theta]. *)
   val maximal_elems : theta -> timestamp list -> timestamp list
+
+  val get_equalities : theta -> timestamp list list
 end = struct
   open Constr
 
@@ -219,7 +221,7 @@ end = struct
 
   let get_equalities theta =
     compute_models theta;
-    let ts = Term.constr_ts theta.constr in
+    let ts = Term.constr_ts theta.constr |> List.sort_uniq Pervasives.compare in
     Constr.get_equalities (opt_get !(theta.models)) ts
   
 end
@@ -594,7 +596,6 @@ let eq_names (judge : 'a judgment) sk fk =
 
   sk [judge] fk
 
-
 let eq_constants fn (judge : 'a judgment) sk fk =
   let cnstrs =
     Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma)
@@ -603,6 +604,32 @@ let eq_constants fn (judge : 'a judgment) sk fk =
     List.fold_left (fun judge c ->
         Judgment.add_constr c judge
       ) judge cnstrs in
+
+  sk [judge] fk
+
+let eq_timestamps (judge : 'a judgment) sk fk =
+  let ts_classes = Theta.get_equalities judge.theta
+           |> List.map (List.sort_uniq Pervasives.compare)
+  in
+  List.iter (fun x -> Format.printf "[";  List.iter (fun t -> Format.printf "%a," pp_timestamp t)  x;Format.printf "]"    ) ts_classes;
+  let norm ts =
+    try
+      List.find (List.mem ts) ts_classes |> List.hd
+    with Not_found -> ts
+  in
+  
+  let terms = (Gamma.get_all_terms judge.gamma) in
+  let facts = List.fold_left (fun acc t ->
+      let normt =  Constr.ts_normalize norm t in
+      Format.printf "t: %a, nt :%a" Term.pp_term t Term.pp_term normt; 
+      if normt = t then
+        acc
+      else
+        Atom( (Eq, t,normt))::acc ) [] terms in
+  let judge =
+    List.fold_left (fun judge c ->
+        Judgment.add_fact c judge
+      ) judge facts in
 
   sk [judge] fk
 
@@ -728,6 +755,7 @@ type (_,_) tac =
   | ConstrAbsurd : ('a, unit) tac
 
   | EqNames : ('a, 'a) tac
+  | EqTimestamps : ('a, 'a) tac
   | EqConstants : fname -> ('a, 'a) tac
 
   (* | ProveAll : ('a, unit) tac -> ('a list, unit) tac *)
@@ -762,6 +790,7 @@ let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
     | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
 
     | EqNames -> Fmt.pf ppf "eq_names"
+    | EqTimestamps -> Fmt.pf ppf "eq_timestamps"                   
     | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
 
     (* | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac *)
@@ -808,6 +837,7 @@ let rec tac_apply :
     | ConstrAbsurd -> constr_absurd judge sk fk
 
     | EqNames -> eq_names judge sk fk
+    | EqTimestamps -> eq_timestamps judge sk fk                   
     | EqConstants fn -> eq_constants fn judge sk fk
     | Euf i ->
       let f_select _ t = t.cpt = i in
@@ -903,6 +933,7 @@ type utac =
   | UConstrAbsurd : utac
 
   | UEqNames : utac
+  | UEqTimestamps : utac      
   | UEqConstants : fname -> utac
 
   (* | UProveAll : utac -> utac *)
@@ -934,6 +965,7 @@ let rec pp_utac ppf = function
   | UConstrAbsurd -> Fmt.pf ppf "constr_absurd"
 
   | UEqNames -> Fmt.pf ppf "eq_names"
+  | UEqTimestamps -> Fmt.pf ppf "eq_timestamps"                  
   | UEqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
 
   (* | UProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_utac utac *)
@@ -1003,6 +1035,7 @@ let tac_of_simp_utac utac = match utac with
 let tac_of_simp_utac2 utac = match utac with
   | UIdent -> Ident
   | UEqNames -> EqNames
+  | UEqTimestamps -> EqTimestamps
   | UEqConstants fn -> EqConstants fn
   | UEuf i -> Euf i
   | UCycle i -> Cycle i
@@ -1052,7 +1085,7 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
         | Gt_fact, Gt_fact -> tac_of_simp_utac utac
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
-    | UEqNames | UEqConstants _ | UEuf _ | UIdent | UCycle _ ->
+    | UEqNames | UEqTimestamps | UEqConstants _ | UEuf _ | UIdent | UCycle _ ->
       begin match get_refl l_gt r_gt with
         | Some (Refl _) -> tac_of_simp_utac2 utac
         | None -> raise @@ fail_check_type l_gt r_gt utac end
@@ -1119,7 +1152,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
         ( utac, ETac ( Gt_fact, Gt_fact, tac_of_simp_utac utac ))
       else raise @@ fail_tac_type l_gt r_gt utac
 
-    | UIdent | UEqNames | UEqConstants _ | UEuf _ | UCycle _ ->
+    | UIdent | UEqNames | UEqTimestamps | UEqConstants _ | UEuf _ | UCycle _ ->
       begin match l_gt, r_gt with
         | Gt_top, Gt_bot ->
           ( utac, ETac ( Gt_top, Gt_bot, tac_of_simp_utac2 utac ))
