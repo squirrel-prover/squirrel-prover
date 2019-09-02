@@ -519,7 +519,8 @@ let rec split instance : model list =
                 | Some (uf, l) -> raise (Found (uf,l))
               ) basics
           ) g in
-
+        (* TODO check with Adrien that this update is correct *)
+        let instance = { instance with uf = uf } in
         [ { inst = instance; tr_graph = g } ]
 
       with Found (uf, new_eqs) ->
