@@ -1413,6 +1413,7 @@ let goals_to_proved () = !goals <> []
 let start_proof () = match !current_goal, !goals with
   | None, goal :: _ ->
     assert (!subgoals = []);
+    cpt_tag := 0;
     current_goal := Some goal;
     subgoals := [Ejudge (Gt_formula,Judgment.init goal)]
                 |> simplify;
