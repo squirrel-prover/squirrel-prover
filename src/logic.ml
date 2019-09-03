@@ -69,7 +69,7 @@ end = struct
 
   let mk () = { facts = []; atoms = []; trs = ref None; actions_described = [] }
 
-  (** We do not add atoms that are already a consequence of gamma. *)
+  (* We do not add atoms that are already a consequence of gamma. *)
   let add_atom g at =
     let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
     if !(g.trs) = None then add at else
@@ -83,7 +83,7 @@ end = struct
       | _ -> add at (* TODO: do not add useless inequality atoms *)
 
   let rec add_atoms g = function
-    | [] -> g
+    | [] -> { g with trs = ref None } 
     | at :: ats -> add_atoms (add_atom g at) ats
 
   (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
@@ -95,38 +95,46 @@ end = struct
     | _ as f -> { g with facts = f :: g.facts }
 
   let rec add_facts g = function
-    | [] -> g
+    | [] -> { g with trs = ref None }
     | f :: fs -> add_facts (add_fact g f) fs
 
   let get_facts g = g.facts
 
-  let set_facts g fs = add_facts { g with facts = [] } fs
+  let set_facts g fs = add_facts { g with facts = []; trs = ref None} fs
 
   let get_atoms g = List.map fst g.atoms
 
-  (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
-      otherwise, where [g'] has been completed. *)
-  let is_sat g =
-    let eqs, _, neqs = List.map fst g.atoms
+
+  let get_eqs_neqs g =
+     let eqs, _, neqs = List.map fst g.atoms
                        |> List.map norm_xatom
                        |> List.flatten
                        |> List.fold_left (fun acc (od,a,b) ->
                            add_xeq od (a,b) acc) ([],[],[]) in
+     eqs,neqs
 
-    (* TODO: for now, we ignore inequalities *)
+  let compute_trs g =
+    let eqs,_ = get_eqs_neqs g in
     let trs = Completion.complete eqs in
-    if Completion.check_disequalities trs neqs then
-      let () = g.trs := Some trs in true
-    else false
-  
+    g.trs := Some trs
+
+  (* The value of the trs is stored inside a ref. It can be updated through compute_trs, 
+     and is set to None after adding list of atoms or facts *)
   let get_trs g =
-    if is_sat g then
+    match !(g.trs) with
+      Some x -> x
+    | None ->
+      compute_trs g;
       match !(g.trs) with
         Some x -> x
       | None -> raise Not_found
-    else
-      raise Not_found
-        
+                  
+  (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
+      otherwise, where [g'] has been completed. *)
+  let is_sat g =
+    let _, neqs = get_eqs_neqs g and trs = get_trs g in
+    Completion.check_disequalities trs neqs
+         
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
       tag has been updated in [g] according to [f_up].

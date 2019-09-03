@@ -16,13 +16,12 @@ system  out(c,cst);
 
 goal forall (tau1 : timestamp, tau2 : timestamp, a : index)
 such that
-tau1 = tau2 and tau1 = 0_0[a]:
-  output@tau1 <> output@tau2
-  => exists () : false.
+tau1 = tau2:
+output@tau1= output@tau2.
 
 Proof.
   forallintro.
-  eqnames.
+  intro.
   eqtimestamps.
   congruence.
 Qed.
