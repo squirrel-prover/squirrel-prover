@@ -11,13 +11,6 @@ let speclist = [
     ("-v", Arg.Set verbose, "display more informations");
     ]
 
-
-(** Current mode of the prover:
-    - [InputDescr] : waiting for the process description.
-    - [GoalMode] : waiting for the next goal.
-    - [ProofMode] : proof of a goal in progress. *)
-type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
-
 let interactive_mode = ref false
 
 (** Lexbuf used in non-interactive mode. *)
@@ -35,47 +28,64 @@ let parse_next parser_fun =
     parser_fun lexbuf "interactive"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
-
-
+    
 let rec main_loop mode =
   Format.printf "[>@.";
-  match mode with
-  | InputDescr ->
-    parse_next Main.parse_theory_buf;
+  (* if we are not waiting for a system description, we are at some break point and we save the state *)
+  if mode <> InputDescr then
+    save_state mode
+  else
+  (Theory.initialize_symbols () ;
+   Process.reset ());
+  let new_command = parse_next Main.parse_interactive_buf in
+  match mode, new_command with
+    mode, ParsedUndo(nb_undo) when mode <> InputDescr ->
+    (try
+       let new_mode = reset_state nb_undo in
+       (match new_mode with
+         ProofMode -> Fmt.pr "%a" pp_goal ()
+       | GoalMode ->     Main.pp_proc Fmt.stdout ()
+       | _ -> ()
+       );
+       main_loop new_mode
+     with
+       Cannot_undo -> error mode ("Cannot undo, no proof state ot go back to.")
+    )                  
+  | InputDescr,ParsedInputDescr ->
     Main.pp_proc Fmt.stdout ();
     main_loop GoalMode
-  | ProofMode ->
-    let utac =
-      parse_next Main.parse_tactic_buf in
-    begin try
-        if eval_tactic utac then begin
-          complete_proof ();
-          Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
-          main_loop WaitQed end
-        else begin
-          Fmt.pr "%a" pp_goal ();
-          main_loop ProofMode end
-      with
-      | Tactic_failed s -> error ProofMode ("Tactic failed: " ^ s ^ ".")
-      | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed." end
+  | ProofMode,ParsedTactic(utac) ->
+      begin try
+          if eval_tactic utac then begin
+            complete_proof ();
+            Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
+            main_loop WaitQed end
+          else begin
+            Fmt.pr "%a" pp_goal ();
+            main_loop ProofMode end
+        with
+        | Tactic_failed s -> error ProofMode ("Tactic failed: " ^ s ^ ".")
+        | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed." end
 
-  | WaitQed ->
-    parse_next Main.parse_qed_buf;
+  | WaitQed,ParsedQed ->
     Fmt.pr "Exit proof mode.@.";
     main_loop GoalMode
+      
+  | GoalMode,ParsedGoal(goal) ->
+    (match goal with
+      | Goalmode.Gm_proof -> begin match start_proof () with
+          | None ->
+            Fmt.pr "%a" pp_goal ();
+            main_loop ProofMode
+          | Some es -> error GoalMode es end
 
-  | GoalMode -> match parse_next Main.parse_goal_buf with
-    | Goalmode.Gm_proof -> begin match start_proof () with
-        | None ->
-          Fmt.pr "%a" pp_goal ();
-          main_loop ProofMode
-        | Some es -> error GoalMode es end
-
-    | Goalmode.Gm_goal f ->
-      add_new_goal f;
-      Fmt.pr "@[<v 0>New goal:@;@[%a@]@]@."
-        Term.pp_formula f;
-      main_loop GoalMode
+      | Goalmode.Gm_goal f ->
+        add_new_goal f;
+        Fmt.pr "@[<v 0>New goal:@;@[%a@]@]@."
+          Term.pp_formula f;
+        main_loop GoalMode
+    )
+  |_,_ -> error mode "Unexpected command."
 
 and error mode s =
   Fmt.pr "[error> %s@." s;

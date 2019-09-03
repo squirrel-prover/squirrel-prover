@@ -14,7 +14,7 @@
 %token LBRACKET RBRACKET DOT SLASH
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE
-%token PROOF QED
+%token PROOF QED UNDO
 %token EOF
 
 %token EMPTY_ELSE
@@ -34,11 +34,15 @@
 %start goal
 %start tactic
 %start qed
+%start undo
 %start top_process
+%start interactive
 %type <unit> theory
+%type <Logic.parsed_input> interactive
 %type <Goalmode.gm_input> goal
 %type <Logic.utac> tactic
 %type <unit> qed
+%type <int> undo
 %type <Process.process> top_process
 %type <Theory.fact> fact
 
@@ -233,6 +237,9 @@ tac:
 qed:
 | QED                                 { () }
 
+undo:
+| UNDO i = INT DOT                   {i} 
+
 tactic:
 | t = tac DOT                         { t }
 
@@ -246,3 +253,10 @@ theory:
 
 top_process:
 | process EOF                    { $1 }
+
+interactive :
+| theory                          { Logic.ParsedInputDescr }
+| undo                            { Logic.ParsedUndo $1 }
+| tactic                          { Logic.ParsedTactic $1 }
+| qed                             { Logic.ParsedQed }
+| goal                            { Logic.ParsedGoal $1 }

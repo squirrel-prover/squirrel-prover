@@ -41,7 +41,7 @@
  comment-quote-nested nil
  proof-shell-truncate-before-error      nil
 
- proof-save-command-regexp  "^Qed"
+;; proof-save-command-regexp  "^Qed"
  proof-tree-external-display nil
 ;; proof-shell-strip-crs-from-input nil
 

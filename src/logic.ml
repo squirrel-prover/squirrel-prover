@@ -1357,12 +1357,55 @@ let simplify judges =
         else Ejudge (gt,j)
     ) judges
 
+
+(** Current mode of the prover:
+    - [InputDescr] : waiting for the process description.
+    - [GoalMode] : waiting for the next goal.
+    - [ProofMode] : proof of a goal in progress. *)
+type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
+
+type parsed_input =
+    ParsedInputDescr
+  | ParsedQed
+  | ParsedTactic of utac
+  | ParsedUndo of int
+  | ParsedGoal of Goalmode.gm_input
+
 (* State in proof mode. *)
 let goals : formula list ref = ref []
 let current_goal : formula option ref = ref None
 let subgoals : ejudgment list ref = ref []
 let goals_proved = ref []
 
+exception Cannot_undo
+
+type proof_state = { goals : formula list;
+                     current_goal : formula option;
+                     subgoals : ejudgment list;
+                     goals_proved : formula option list;
+                     cpt_tag : int;
+                     prover_mode : prover_mode;
+                   }
+
+let proof_states_history : proof_state list ref = ref []
+
+let save_state mode =
+  proof_states_history :=  {goals = !goals; current_goal = !current_goal; subgoals = !subgoals; goals_proved = !goals_proved; cpt_tag = !cpt_tag; prover_mode = mode }::(!proof_states_history)
+
+let rec reset_state n =
+  match (!proof_states_history,n) with
+  | [],_ -> raise Cannot_undo
+  | p::q,0 ->
+    proof_states_history := q; 
+    goals := p.goals;
+    current_goal := p.current_goal;
+    subgoals := p.subgoals;
+    goals_proved := p.goals_proved;
+    cpt_tag := p.cpt_tag;
+    p.prover_mode
+  | p::q, n -> proof_states_history := q; reset_state (n-1)
+    
+  
 let add_new_goal g = goals := g :: !goals
 
 let iter_goals f = List.iter f !goals

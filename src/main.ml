@@ -49,11 +49,19 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 let parse_goal_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test:test Parser.goal lexbuf filename
 
+let parse_interactive_buf ?(test=false) lexbuf filename =
+  parse_from_buf ~test:test Parser.interactive lexbuf filename
+
+
 let parse_tactic_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test:test Parser.tactic lexbuf filename
 
 let parse_qed_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test:test Parser.qed lexbuf filename
+
+let parse_undo_buf ?(test=false) lexbuf filename =
+  parse_from_buf ~test:test Parser.undo lexbuf filename
+
 
 let parse_process string =
   let lexbuf = Lexing.from_string string in

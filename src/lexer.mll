@@ -95,6 +95,7 @@ rule token = parse
 | "eqtimestamps"      { EQTIMESTAMPS }
 | "euf"               { EUF }
 | "cycle"             { CYCLE }
+| "undo"              { UNDO }
 | "ident"             { IDENT }
 | "try"               { TRY }
 | "orelse"            { ORELSE }
