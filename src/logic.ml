@@ -625,7 +625,6 @@ let eq_timestamps (judge : 'a judgment) sk fk =
   let ts_classes = Theta.get_equalities judge.theta
            |> List.map (List.sort_uniq Pervasives.compare)
   in
-  List.iter (fun x -> Format.printf "[";  List.iter (fun t -> Format.printf "%a," pp_timestamp t)  x;Format.printf "]"    ) ts_classes;
   let norm ts =
     try
       List.find (List.mem ts) ts_classes |> List.hd
@@ -635,7 +634,6 @@ let eq_timestamps (judge : 'a judgment) sk fk =
   let terms = (Gamma.get_all_terms judge.gamma) in
   let facts = List.fold_left (fun acc t ->
       let normt =  Constr.ts_normalize norm t in
-      Format.printf "t: %a, nt :%a" Term.pp_term t Term.pp_term normt; 
       if normt = t then
         acc
       else
