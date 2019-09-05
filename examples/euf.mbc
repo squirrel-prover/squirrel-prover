@@ -6,7 +6,7 @@ channel c
 
 mutable sname : index->message
 
-axiom equalts
+axiom test
 forall (tau1 : timestamp, tau2 : timestamp)
 such that
 tau1 = tau2:
@@ -20,7 +20,7 @@ system  out(c,cst);
  ).
 
 
-goal equalts2 forall (tau1 : timestamp, tau2 : timestamp, a : index)
+goal forall (tau1 : timestamp, tau2 : timestamp, a : index)
 such that
 tau1 = tau2:output@tau1= output@tau2.
 
@@ -31,7 +31,7 @@ Proof.
   congruence.
 Qed.
 
-goal outtype forall (tau1 : timestamp, a: index)
+goal forall (tau1 : timestamp, a: index)
 such that
 tau1 <> 0_0[a]:
 output@tau1 = h(sname(a)@tau1,k)

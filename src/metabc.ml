@@ -81,7 +81,8 @@ let rec main_loop mode =
 
       | Goalmode.Gm_goal (i,f) ->
         add_new_goal (i,f);
-        Fmt.pr "@[<v 0>New goal:@;@[%a@]@]@."
+        Fmt.pr "@[<v 0>New goal: %s @;@[%a@]@]@."
+          i
           Term.pp_formula f;
         main_loop GoalMode
     )
