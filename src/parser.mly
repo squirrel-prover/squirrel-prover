@@ -10,7 +10,7 @@
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL GOAL DARROW
+%token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE
@@ -195,6 +195,8 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
+| AXIOM f=formula		 { Logic.add_proved_goal ("unnamed_goal", Logic.make_goal f) }		 				 
+| AXIOM i=ID f=formula		 { Logic.add_proved_goal (i, Logic.make_goal f) }		 
 
 q_vars:
 | LPAREN arg_list RPAREN                       { ($2, Term.True) }
@@ -244,7 +246,8 @@ tactic:
 | t = tac DOT                         { t }
 
 goal:
-| GOAL f = formula DOT            { Goalmode.Gm_goal (Logic.make_goal f) }
+| GOAL i =ID f = formula DOT            { Goalmode.Gm_goal (i, Logic.make_goal f) }
+| GOAL f = formula DOT            { Goalmode.Gm_goal ("unnamed_goal", Logic.make_goal f) }
 | PROOF                           { Goalmode.Gm_proof }
 
 theory:

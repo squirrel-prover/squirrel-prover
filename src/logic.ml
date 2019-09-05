@@ -1369,18 +1369,20 @@ type parsed_input =
   | ParsedUndo of int
   | ParsedGoal of Goalmode.gm_input
 
+type named_goal = string * formula
+
 (* State in proof mode. *)
-let goals : formula list ref = ref []
-let current_goal : formula option ref = ref None
+let goals : named_goal list ref = ref []
+let current_goal : named_goal option ref = ref None
 let subgoals : ejudgment list ref = ref []
 let goals_proved = ref []
 
 exception Cannot_undo
 
-type proof_state = { goals : formula list;
-                     current_goal : formula option;
+type proof_state = { goals : named_goal list;
+                     current_goal : named_goal option;
                      subgoals : ejudgment list;
-                     goals_proved : formula option list;
+                     goals_proved : named_goal list;
                      cpt_tag : int;
                      prover_mode : prover_mode;
                    }
@@ -1406,15 +1408,17 @@ let rec reset_state n =
   
 let add_new_goal g = goals := g :: !goals
 
+let add_proved_goal g = goals_proved := g :: !goals_proved
+
 let iter_goals f = List.iter f !goals
 
 let goals_to_proved () = !goals <> []
 
 let start_proof () = match !current_goal, !goals with
-  | None, goal :: _ ->
+  | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     cpt_tag := 0;
-    current_goal := Some goal;
+    current_goal := Some (gname,goal);
     subgoals := [Ejudge (Gt_formula,Judgment.init goal)]
                 |> simplify;
     None
@@ -1426,11 +1430,15 @@ let start_proof () = match !current_goal, !goals with
 
 let is_proof_completed () = !subgoals = []
 
+exception Tactic_failed of string
+
 let complete_proof () =
   assert (is_proof_completed ());
-  goals_proved := !current_goal :: !goals_proved;
-  current_goal := None;
-  subgoals := [];;
+  try
+    add_proved_goal (opt_get !current_goal);
+    current_goal := None;
+    subgoals := []
+  with Not_found ->  raise (Tactic_failed "Cannot complete proof with empty current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -1440,8 +1448,6 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       (List.length !subgoals)
       (Judgment.pp_judgment (pp_gt_el gt)) j
   | _ -> assert false
-
-exception Tactic_failed of string
 
 
 (** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].

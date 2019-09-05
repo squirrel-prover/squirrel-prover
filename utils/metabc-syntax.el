@@ -4,6 +4,7 @@
 
 (defvar metabc-prog-keywords '(
   "let"
+  "axiom"
   "in"
   "out"
   "if"

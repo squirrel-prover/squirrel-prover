@@ -79,8 +79,8 @@ let rec main_loop mode =
             main_loop ProofMode
           | Some es -> error GoalMode es end
 
-      | Goalmode.Gm_goal f ->
-        add_new_goal f;
+      | Goalmode.Gm_goal (i,f) ->
+        add_new_goal (i,f);
         Fmt.pr "@[<v 0>New goal:@;@[%a@]@]@."
           Term.pp_formula f;
         main_loop GoalMode
