@@ -3,14 +3,14 @@ open Process
 
 (* type process = descr list *)
 
-let subst_descr inu tnu blk =
+let subst_descr nu blk =
   { action = blk.action;
-    indices = List.map (Action.app_subst inu) blk.indices;
-    condition = subst_fact inu tnu blk.condition;
-    updates = List.map (fun (s,t) -> ivar_subst_state inu s,
-                                     subst_term inu tnu t
+    indices = List.map (subst_index nu) blk.indices;
+    condition = subst_fact nu blk.condition;
+    updates = List.map (fun (s,t) -> subst_state nu s,
+                                     subst_term nu t
                        ) blk.updates;
-    output = subst_term inu tnu blk.output }
+    output = subst_term nu blk.output }
 
 (* let descr_ts descr =
  *   let open Euf in

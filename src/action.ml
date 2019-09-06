@@ -114,24 +114,6 @@ let rec refresh = function
         :: action,
         newsubst @ subst
 
-type 'a subst = ('a * 'a) list
-
-let pp_subst pp_el ppf nu =
-  Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,")
-       (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf " -> ") pp_el pp_el)) nu
-
-let app_subst subst x = try List.assoc x subst with Not_found -> x
-
-let rec ivar_subst_action subst = function
-  | [] -> []
-  | a :: l ->
-    let p, sis = a.par_choice in
-    { par_choice = p, List.map (fun (s, ind) -> (s, app_subst subst ind)) sis;
-      sum_choice = a.sum_choice }
-    :: ivar_subst_action subst l
-
-
 let pp_par_choice_fg f g ppf (k,str_indices) =
   if str_indices = [] then
     Fmt.pf ppf "%d" k

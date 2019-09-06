@@ -43,17 +43,9 @@ val same_shape : action -> action -> (index * index) list option
     [a] and [b] equal, if there is one. Return None otherwise. *)
 val constr_equal : action -> action -> (index * index) list option
 
-type 'a subst = ('a * 'a) list
-
-val pp_subst : 'a Fmt.t -> Format.formatter -> 'a subst -> unit
-
-val app_subst : ('a * 'a) list -> 'a -> 'a
-
-val ivar_subst_action : index subst -> action -> action
-
 (** Given an action, generate a fresh instance of it together with
   * the corresponding substitution for indices. *)
-val refresh : action -> action * index subst
+val refresh : action -> action * (index * index) list
 
 val pp_action : Format.formatter -> action -> unit
 

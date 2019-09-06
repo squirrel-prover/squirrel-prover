@@ -271,17 +271,17 @@ let action_to_block : (action, block) Hashtbl.t =
   Hashtbl.create 97
 
 let fresh_instance action block =
-  let subst = List.map (fun i -> i, Action.fresh_index ()) block.indices in
-  let action = Action.ivar_subst_action subst action in
-  let refresh_term = Term.ivar_subst_term subst in
-  let refresh_fact = Term.ivar_subst_fact subst in
-  let indices = List.map snd subst in
+  let subst = List.map (fun i -> Term.Index(i, Action.fresh_index ())) block.indices in
+  let action = Term.subst_action subst action in
+  let refresh_term = Term.subst_term subst in
+  let refresh_fact = Term.subst_fact subst in
+  let indices = List.map snd (Term.to_isubst subst) in
   let condition = refresh_fact (snd block.condition) in
   let updates =
     List.map
       (fun (s,l,t) ->
          (Term.mk_sname s,
-          List.map (fun i -> List.assoc i subst) l),
+          List.map (fun i -> List.assoc i (Term.to_isubst subst)) l),
          refresh_term t)
       block.updates
   in
@@ -292,15 +292,15 @@ let iter_csa f =
   Hashtbl.iter (fun a b -> f (fresh_instance a b)) action_to_block
 
 let subst_descr subst (descr : descr) =
-  let action = Action.ivar_subst_action subst descr.action in
-  let subst_term = Term.ivar_subst_term subst in
-  let subst_fact = Term.ivar_subst_fact subst in
-  let indices = List.map (fun i -> List.assoc i subst) descr.indices in
+  let action = Term.subst_action subst descr.action in
+  let subst_term = Term.subst_term subst in
+  let subst_fact = Term.subst_fact subst in
+  let indices = List.map (fun i -> List.assoc i (Term.to_isubst subst)) descr.indices in
   let condition = subst_fact descr.condition in
   let updates =
     List.map
       (fun (s,t) ->
-         Term.ivar_subst_state subst s,
+         Term.subst_state subst s,
          subst_term t)
       descr.updates
   in
@@ -312,7 +312,7 @@ let get_descr a =
   try iter_csa (fun d ->
       match Action.same_shape d.action a with
       | None -> ()
-      | Some subst -> raise @@ Found (subst_descr subst d)
+      | Some subst -> raise @@ Found (subst_descr (Term.from_isubst subst) d)
     );
     raise Not_found
   with Found b -> b
@@ -464,9 +464,9 @@ let parse_proc proc : unit =
             x
             (fun ts indices ->
                let t' = conv_term_at_ts env ts t in
-               Term.ivar_subst_term
+               Term.subst_term
                  (List.map2
-                    (fun i' i'' -> i', i'')
+                    (fun i' i'' -> Term.Index(i', i''))
                     env.p_indices
                     indices)
                  t')
@@ -505,9 +505,9 @@ let parse_proc proc : unit =
           x
           (fun ts indices ->
              let t' = conv_term_at_ts env ts t in
-             Term.ivar_subst_term
+             Term.subst_term
                (List.map2
-                  (fun i' i'' -> i', i'')
+                  (fun i' i'' -> Term.Index(i', i''))
                   env.p_indices
                   indices)
                t')
@@ -578,9 +578,9 @@ let parse_proc proc : unit =
           x
           (fun ts indices ->
              let t' = conv_term_at_ts env ts t in
-             Term.ivar_subst_term
+             Term.subst_term
                (List.map2
-                  (fun i' i'' -> i', i'')
+                  (fun i' i'' -> Term.Index(i', i''))
                   env.p_indices
                   indices)
                t')

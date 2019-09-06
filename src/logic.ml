@@ -398,6 +398,7 @@ end = struct
   let set_goal a agt j = { j with goal = a; gt = agt }
 
   let set_gamma g j = { j with gamma = g }
+
 end
 
 open Judgment
@@ -479,12 +480,13 @@ let goal_forall_intro (judge : formula judgment) sk fk =
 
   let tsubst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
   and isubst = compute_alpha fresh_index judge.goal.uindices judge.indices in
-
-  let new_cnstr = subst_constr isubst tsubst judge.goal.uconstr
-  and new_fact = subst_fact isubst tsubst judge.goal.ufact
+  let subst = (from_tvarsubst tsubst) @ (from_isubst isubst) in
+    
+  let new_cnstr = subst_constr subst judge.goal.uconstr
+  and new_fact = subst_fact subst judge.goal.ufact
   and new_goals =
     List.map (fun goal ->
-        subst_postcond isubst tsubst goal
+        subst_postcond subst goal
       ) judge.goal.postcond in
 
   let judges =
@@ -505,9 +507,9 @@ let goal_forall_intro (judge : formula judgment) sk fk =
     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
     variables. *)
-let goal_exists_intro (judge : postcond judgment) sk fk vnu inu =
-  let pc_constr = subst_constr inu vnu judge.goal.econstr in
-  let judge = set_goal (subst_fact inu vnu judge.goal.efact) Gt_fact judge
+let goal_exists_intro (judge : postcond judgment) sk fk nu=
+  let pc_constr = subst_constr nu judge.goal.econstr in
+  let judge = set_goal (subst_fact nu judge.goal.efact) Gt_fact judge
               |> Judgment.add_constr (Not pc_constr) in
   sk [judge] fk
 
@@ -760,7 +762,7 @@ type (_,_) tac =
 
   | ForallIntro : (formula, postcond) tac
   | ExistsIntro :
-      tvar subst * index subst ->
+      subst ->
     (postcond, fact) tac
 
   | GammaAbsurd : ('a, unit) tac
@@ -793,10 +795,9 @@ let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
     | Split -> Fmt.pf ppf "goal_and_intro"
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
-    | ExistsIntro (vnu,inu) ->
-      Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
-        (pp_subst pp_tvar) vnu
-        (pp_subst pp_index) inu
+    | ExistsIntro (nu) ->
+      Fmt.pf ppf "@[<v 2>exists_intro@;%a@]"
+        pp_subst nu
 
     | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
     | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
@@ -838,7 +839,7 @@ let rec tac_apply :
     | Ident -> sk [judge] fk
 
     | ForallIntro -> goal_forall_intro judge sk fk
-    | ExistsIntro (vnu,inu) -> goal_exists_intro judge sk fk vnu inu
+    | ExistsIntro (nu) -> goal_exists_intro judge sk fk nu
 
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
@@ -939,7 +940,7 @@ type utac =
   | USplit : utac
 
   | UForallIntro : utac
-  | UExistsIntro : tvar subst * index subst -> utac
+  | UExistsIntro : subst -> utac
 
   | UGammaAbsurd : utac
   | UConstrAbsurd : utac
@@ -968,10 +969,10 @@ let rec pp_utac ppf = function
   | USplit -> Fmt.pf ppf "goal_and_intro"
 
   | UForallIntro -> Fmt.pf ppf "forall_intro"
-  | UExistsIntro (vnu,inu) ->
-    Fmt.pf ppf "@[<v 2>exists_intro@;%a@;%a@]"
-      (pp_subst pp_tvar) vnu
-      (pp_subst pp_index) inu
+  | UExistsIntro (nu) ->
+    Fmt.pf ppf "@[<v 2>exists_intro@;%a@]"
+      pp_subst nu
+      
 
   | UGammaAbsurd -> Fmt.pf ppf "gamma_absurd"
   | UConstrAbsurd -> Fmt.pf ppf "constr_absurd"
@@ -1106,8 +1107,8 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
         | Gt_formula, Gt_postcond -> ForallIntro
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
-    | UExistsIntro (vnu,inu) -> begin match l_gt, r_gt with
-        | Gt_postcond, Gt_fact -> ExistsIntro (vnu,inu)
+    | UExistsIntro (nu) -> begin match l_gt, r_gt with
+        | Gt_postcond, Gt_fact -> ExistsIntro (nu)
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
     (* | UProveAll utac' -> begin match l_gt, r_gt with
@@ -1214,12 +1215,12 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
                        ForallIntro ))
       else raise @@ fail_tac_type l_gt r_gt utac
 
-    | UExistsIntro (vnu,inu) ->
+    | UExistsIntro (nu) ->
       if subtype Gt_postcond l_gt
       && subtype r_gt Gt_fact then
         ( utac, ETac ( Gt_postcond,
                        Gt_fact,
-                       ExistsIntro (vnu,inu) ))
+                       ExistsIntro (nu) ))
       else raise @@ fail_tac_type l_gt r_gt utac
 
     (* | UProveAll utac' ->

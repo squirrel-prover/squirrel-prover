@@ -20,6 +20,14 @@ val pp_timestamp : Format.formatter -> timestamp -> unit
 
 val fresh_tvar : unit -> tvar
 
+(** Messages variables for formulas **)
+
+type mvar
+  
+val pp_mvar : Format.formatter -> mvar -> unit
+
+val fresh_mvar : unit -> mvar
+
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
   * a list of indices. *)
@@ -99,14 +107,17 @@ type msymb = mname * indices
 val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> msymb -> unit
 
+
+
 (** Terms *)
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
+  | MVar of mvar      
   | State of state * timestamp
   (* | Input of timestamp *)
   | Macro of msymb * timestamp
-
+      
 type t = term
 
 val dummy : term
@@ -224,38 +235,30 @@ and postcond = {
 val pp_postcond : Format.formatter -> postcond -> unit
 val pp_formula : Format.formatter -> formula -> unit
 
-val ivar_subst_state : index subst -> state -> state
 
-val tvar_subst_term : tvar subst -> term -> term
-val ivar_subst_term : index subst -> term -> term
-val subst_term : index subst -> tvar subst -> term -> term
+type asubst =
+  | Term of term * term
+  | TS of timestamp * timestamp
+  | Index of index * index
 
-val tvar_subst_fact : tvar subst -> fact -> fact
-val ivar_subst_fact : index subst -> fact -> fact
-val subst_fact : index subst -> tvar subst -> fact -> fact
+type subst = asubst list
 
-val tvar_subst_constr : tvar subst -> constr -> constr
-val ivar_subst_constr : index subst -> constr -> constr
-val subst_constr : index subst -> tvar subst -> constr -> constr
+val to_isubst : subst ->  (index * index) list
 
+val from_tvarsubst : (tvar * tvar) list -> subst
+val from_isubst : (index * index) list -> subst  
 
-(** Timestamp variables substitution in a post-condition.
-    Pre-condition: [tvar_subst_postcond subst pc] require that [subst]
-    co-domain is fresh in [pc]. *)
-val tvar_subst_postcond : tvar subst -> postcond -> postcond
+val pp_subst : Format.formatter -> subst -> unit
 
-  (** Index variables substitution in a post-condition.
-    Pre-condition: [ivar_subst_postcond isubst pc] require that [isubst]
-    co-domain is fresh in [pc]. *)
-val ivar_subst_postcond : index subst -> postcond -> postcond
-
-(** Substitution in a post-condition.
-    Pre-condition: [subst_postcond isubst tsubst pc] require that [isubst]
-    and [tsubst] co-domains are fresh in [pc]. *)
-val subst_postcond : index subst -> tvar subst -> postcond -> postcond
-
-
-
+val subst_index : subst -> index -> index
+val subst_ts : subst -> timestamp -> timestamp
+val subst_action : subst -> action -> action
+val subst_state : subst -> state -> state
+val subst_term : subst -> term -> term
+val subst_fact : subst -> fact -> fact
+val subst_constr : subst -> constr -> constr
+val subst_postcond : subst -> postcond -> postcond
+  
 (** [term_vars t] returns the timestamp and index variables of [t]*)
 val term_vars : term -> tvar list * index list
 

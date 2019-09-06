@@ -2,7 +2,7 @@ open Action
 open Process
 open Term
 
-val subst_descr : index subst -> tvar subst -> descr -> descr
+val subst_descr : subst -> descr -> descr
 
 (** Type of an euf axiom case schema.
     [e] of type [euf_schema] represents the fact that the message [e.m]

@@ -26,6 +26,15 @@ let rec pp_timestamp ppf = function
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
+(** Messages variables for formulas **)
+
+type mvar = Mvar_i of int
+
+let pp_mvar ppf = function Mvar_i i -> Fmt.pf ppf "mess%d" i
+
+let mvar_cpt = ref 0
+let fresh_mvar () = incr mvar_cpt; Mvar_i (!mvar_cpt - 1)
+
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
   * a list of indices. *)
@@ -118,6 +127,7 @@ let pp_msymb ppf (m,is) =
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
+  | MVar of mvar
   | State of state * timestamp
   (* | Input of timestamp *)
   | Macro of msymb * timestamp
@@ -134,6 +144,7 @@ let rec pp_term ppf = function
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
+  | MVar m -> Fmt.pf ppf "%a" pp_mvar m                     
   (* | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts *)
 
 type t = term
@@ -436,6 +447,136 @@ let pp_formula ppf f =
          pp_postcond) l
 
 
+(** Substitutions for all purpose, applicable to terms and timestamps alikes **)
+(** substitutions are performed bottom to top to avoid loops **)
+
+type asubst =
+  | Term of term * term
+  | TS of timestamp * timestamp
+  | Index of index * index
+             
+type subst = asubst list
+
+exception Substitution_error of string
+
+let pp_asubst ppf e =
+  let pp_el pp_t (t1,t2) = Fmt.pf ppf "%a->%a" pp_t t1 pp_t t2 in
+  match e with
+  | Term(t1,t2) -> pp_el pp_term (t1,t2)
+  | TS(ts1,ts2) -> pp_el pp_timestamp (ts1,ts2)
+  | Index(i1,i2) -> pp_el pp_index (i1,i2)
+                      
+
+let pp_subst ppf s =
+  Fmt.pf ppf "@[<hv 0>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_asubst) s
+
+     
+
+
+let term_subst (s:subst) =
+  List.fold_left (fun acc asubst -> match asubst with Term(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+let ts_subst (s:subst) =
+  List.fold_left (fun acc asubst -> match asubst with TS(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+let to_isubst (s:subst) =
+  List.fold_left (fun acc asubst -> match asubst with Index(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+let rec from_tvarsubst l =
+  match l with
+  | [] -> []
+  | (tv1,tv2)::l -> (TS(TVar tv1,TVar tv2))::(from_tvarsubst l)
+
+let rec from_isubst l =
+  match l with
+  | [] -> []
+  | (i1,i2)::l -> (Index(i1,i2))::(from_isubst l)
+
+let get_term_subst (s:subst) (t:term) =
+  try
+    List.assoc t (term_subst s)
+  with Not_found -> t
+
+let get_ts_subst (s:subst) (ts:timestamp) =
+  try
+    List.assoc ts (ts_subst s)
+  with Not_found -> ts
+
+let get_index_subst (s:subst) (i:index) =
+  try
+    List.assoc i (to_isubst s)
+  with Not_found -> i
+
+let subst_index = get_index_subst
+  
+let rec subst_action (s:subst) (a:action) =
+  match a with
+  | [] -> []
+  | a :: l ->
+    let p, sis = a.par_choice in
+    { par_choice = p, List.map (fun (sa, ind) -> (sa, get_index_subst s ind)) sis;
+      sum_choice = a.sum_choice }
+    :: subst_action s l
+
+let subst_state (s:subst) ((st,is):state) =
+  (st, List.map (get_index_subst s) is)
+
+let rec subst_ts (s:subst) (ts:timestamp) =
+  let newts = 
+    (match ts with
+     | TVar _ -> ts
+     | TPred ts' -> TPred (subst_ts s ts')
+     | TName (ac) -> TName (subst_action s ac)
+    ) in
+  get_ts_subst s newts
+
+let rec subst_term (s:subst) (t:term) =
+  let newt = (
+    match t with
+    | Fun (fs, lt) ->Fun (fs, List.map (subst_term s) lt) 
+    | Name _ -> t
+    | State (st, ts) -> State (subst_state s st, subst_ts s ts)
+    | Macro (m,ts) -> Macro (m,subst_ts s ts)
+    | MVar _ -> t
+  ) in
+  get_term_subst s newt
+
+
+let subst_atom (s:subst) ((ord,a1,a2): atom) =
+  (ord,subst_term s a1, subst_term s a2)
+
+let rec subst_formula a_subst (s:subst) f =
+  match f with
+  | And (a,b) -> And (subst_formula a_subst s a, subst_formula a_subst s b )
+  | Or (a,b) -> Or (subst_formula a_subst s a, subst_formula a_subst s b )
+  | Impl (a,b) -> Impl (subst_formula a_subst s a, subst_formula a_subst s b )
+  | Not a -> Not (subst_formula a_subst s a)
+  | Atom at -> Atom (a_subst s at)
+  | True | False -> f
+
+let subst_fact = subst_formula subst_atom
+    
+let subst_tatom (s:subst) = function
+  | Pts (ord, ts, ts') ->
+    Pts (ord, subst_ts s ts, subst_ts s ts')
+  | Pind (ord, i, i') ->  Pind(ord, get_index_subst s i,get_index_subst s i')
+
+let subst_constr = subst_formula subst_tatom
+
+(** Substitution in a post-condition.
+    Pre-condition: [subst_postcond subst pc] require that [subst]
+    co-domain is fresh in [pc]. *)
+let subst_postcond subst pc =
+  let subst = List.filter (function Index(v,_) -> not @@ List.mem v pc.eindices | _ -> true) subst in
+  let subst = List.filter (function TS(TVar v,_) -> not @@ List.mem v pc.evars | _ -> true ) subst in
+
+  { pc with econstr = subst_constr subst pc.econstr;
+            efact = subst_fact subst pc.efact }
+
+
+
+(*
 let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
 
 let ivar_subst_state isubst (s : state) = ivar_subst_symb isubst s
@@ -455,6 +596,7 @@ let rec tvar_subst_term tsubst t = match t with
   | Name _ -> t
   | State (s, ts) -> State (s, tvar_subst_ts tsubst ts)
   | Macro (m,ts) -> Macro (m,tvar_subst_ts tsubst ts)
+  | MVar _ -> t                    
   (* | Input ts -> Input (tvar_subst_ts tsubst ts) *)
 
 let rec ivar_subst_term isubst t = match t with
@@ -464,6 +606,7 @@ let rec ivar_subst_term isubst t = match t with
   | State (s, ts) -> State ( ivar_subst_symb isubst s,
                              ivar_subst_ts isubst ts )
   | Macro (m,ts) -> Macro (m,ivar_subst_ts isubst ts)
+  | MVar m -> m                    
   (* | Input ts -> Input (ivar_subst_ts isubst ts) *)
 
 let subst_term isubst tsubst m = ivar_subst_term isubst m
@@ -532,7 +675,7 @@ let ivar_subst_postcond subst pc =
     and [tsubst] co-domains are fresh in [pc]. *)
 let subst_postcond isubst tsubst m = ivar_subst_postcond isubst m
                                      |> tvar_subst_postcond tsubst
-
+*)
 let svars (tvs,ivs) (_, is) =
   (tvs, is @ ivs)
 
@@ -547,6 +690,7 @@ let rec tvars acc = function
   | State (s, ts) -> tsvars (svars acc s) ts
   (* | Input ts *)
   | Macro (_,ts) -> tsvars acc ts
+  | MVar _ ->  ([],[])
 
 (** [term_vars t] returns the timestamp and index variables of [t]*)
 let term_vars t =
@@ -567,7 +711,8 @@ let rec tts acc = function
   | State (_, ts)
   (* | Input ts *)
   | Macro (_,ts) -> ts :: acc
-
+  | MVar _ -> []
+              
 (** [term_ts t] returns the timestamps appearing in [t] *)
 let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare
 
