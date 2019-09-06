@@ -50,7 +50,8 @@ let euf_key_ssc hash_fn key_n =
     | Macro ((mn,is),_) -> ssc_macro mn is
     | State _ -> ()
     | Name (n,_) -> if n = key_n then raise Bad_ssc
-
+    | MVar m -> ()
+                
   and ssc_macro mn is =
     if List.mem mn !checked_macros || Term.is_built_in mn then ()
     else begin
@@ -75,6 +76,7 @@ let rec h_o_term hh kk acc = function
          |> h_o_term hh kk acc
   | State _ -> acc
   | Name (n,_) -> acc
+  | MVar m -> acc
 
 (** [hashes_of_blk blk hash_fn key_n] return the pairs of indices and messages
     where a hash using occurs in a block description. I.e. we have a pair

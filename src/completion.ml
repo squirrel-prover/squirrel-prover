@@ -10,6 +10,7 @@ module Cst = struct
 
     (** Constants appearing in the original terms *)
     | Cname of nsymb
+    | Cmvar of mvar
     | Cstate of state * timestamp
     | Cmacro of msymb * timestamp
     (* | Coutput of timestamp
@@ -25,6 +26,7 @@ module Cst = struct
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
+    | Cmvar m -> pp_mvar ppf m
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
     | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
     (* | Coutput ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
@@ -63,6 +65,7 @@ let mk_var () =
 let rec cterm_of_term = function
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
+  | MVar m -> Ccst (Cst.Cmvar m)                
   | State (s,ts) -> Ccst (Cst.Cstate (s,ts))
   | Macro (m,ts) -> Ccst (Cst.Cmacro (m,ts))
   (* | Input n -> Ccst (Cst.Cinput n)

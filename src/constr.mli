@@ -24,6 +24,3 @@ val maximal_elems : models -> Term.timestamp list -> Term.timestamp list
 (** [get_equalities models ts], given a list of models [models] and a list of timespoints [ts], gives back the classes for equality in all models **)
 val get_equalities : models -> Term.timestamp list -> Term.timestamp list list
 
-(** [ts normalize norm t] normalizes a term [t] by replacing the timestamps according to [norm] **)
-val ts_normalize : (Term.timestamp -> Term.timestamp) -> Term.term -> Term.term
-
