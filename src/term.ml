@@ -369,7 +369,22 @@ let constr_dnf (c : constr) =
 
 (** Correspondence formulas *)
 
+type fvar =
+    TSVar of tvar
+  | MessVar of mvar
+  | IndexVar of index
 
+let pp_fvar ppf = function
+    TSVar t -> pp_tvar ppf t
+  | MessVar m -> pp_mvar ppf m
+  | IndexVar i -> pp_index ppf i
+  
+let make_fresh_of_type (v:fvar) =
+    match v with
+    | TSVar _ -> TSVar (fresh_tvar ())
+    | MessVar _ -> MessVar (fresh_mvar ())
+    | IndexVar _ -> IndexVar (fresh_index ())
+      
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
   *   [ufact] => [postcond],
@@ -377,34 +392,57 @@ let constr_dnf (c : constr) =
   * of formulas of the form
   *   exists [evars,eindices] such that [econstr] and [efact]. *)
 type formula = {
-  uvars : tvar list;
-  uindices : indices;
+  uvars : fvar list;
+(*  uvars : tvar list;
+    uindices : indices; *)
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
-  evars : tvar list;
-  eindices : indices;
+  evars : fvar list;
+(*  evars : tvar list;
+    eindices : indices; *)
   econstr : constr;
   efact : fact
 }
 
-let pp_q_vars s_q vars indices constr ppf () =
+let get_tsvars (f:fvar list) =
+  List.fold_left (fun acc t -> match t with TSVar t -> t::acc | _ -> acc) [] f
+
+let get_messvars (f:fvar list) =
+  List.fold_left (fun acc t -> match t with MessVar t -> t::acc | _ -> acc) [] f
+
+let get_indexvars (f:fvar list) =
+  List.fold_left (fun acc t -> match t with IndexVar t -> t::acc | _ -> acc) [] f
+
+
+
+
+let pp_q_vars s_q vars constr ppf () =
   let open Fmt in
   let open Utils in
-  if vars <> [] then
+  let tsvars = get_tsvars vars in
+  if tsvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma pp_tvar) vars
+     (list ~sep:Fmt.comma pp_tvar) tsvars
      (styled `Blue (styled `Bold ident)) "timestamp"
   else ();
-  if indices <> [] then
+  let indexvars = get_indexvars vars in
+  if indexvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     pp_indices indices
+     pp_indices indexvars
      (styled `Blue (styled `Bold ident)) "index"
   else ();
+  let messvars = get_messvars vars in
+  if messvars <> [] then
+    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
+     (styled `Red (styled `Underline ident)) s_q
+     (list ~sep:Fmt.comma pp_mvar) messvars
+     (styled `Blue (styled `Bold ident)) "message"
+  else ();  
   (* if vars = [] && indices = [] then
    *   Fmt.pf ppf "@[<hv 2>%a@ ()@]@;"
    *     (styled `Red (styled `Underline ident)) s_q; *)
@@ -417,12 +455,12 @@ let pp_q_vars s_q vars indices constr ppf () =
 
 let pp_postcond ppf f =
   Fmt.pf ppf "@[<v 0>%a%a@]"
-    (pp_q_vars "exists" f.evars f.eindices f.econstr) ()
+    (pp_q_vars "exists" f.evars f.econstr) ()
     pp_fact f.efact
 
 let pp_precond ppf f =
   Fmt.pf ppf "@[<v 0>%a%a@]"
-    (pp_q_vars "forall" f.uvars f.uindices f.uconstr) ()
+    (pp_q_vars "forall" f.uvars f.uconstr) ()
     pp_fact f.ufact
 
 let pp_formula ppf f =
@@ -493,6 +531,18 @@ let rec from_isubst l =
   | [] -> []
   | (i1,i2)::l -> (Index(i1,i2))::(from_isubst l)
 
+
+let rec from_fvarsubst l =
+  match l with
+  | [] -> []
+  | (TSVar t1,TSVar t2)::l ->
+    (TS(TVar t1,TVar t2))::(from_fvarsubst l)
+  | (MessVar t1,MessVar t2)::l ->
+    (Term(MVar t1,MVar t2))::(from_fvarsubst l)
+  | (IndexVar t1,IndexVar t2)::l ->
+    (Index(t1,t2))::(from_fvarsubst l)
+  | _ -> failwith "ill-typed substitution"
+           
 let get_term_subst (s:subst) (t:term) =
   try
     List.assoc t (term_subst s)
@@ -568,8 +618,8 @@ let subst_constr = subst_formula subst_tatom
     Pre-condition: [subst_postcond subst pc] require that [subst]
     co-domain is fresh in [pc]. *)
 let subst_postcond subst pc =
-  let subst = List.filter (function Index(v,_) -> not @@ List.mem v pc.eindices | _ -> true) subst in
-  let subst = List.filter (function TS(TVar v,_) -> not @@ List.mem v pc.evars | _ -> true ) subst in
+  let subst = List.filter (function Index(v,_) -> not @@ List.mem v (get_indexvars pc.evars) | _ -> true) subst in
+  let subst = List.filter (function TS(TVar v,_) -> not @@ List.mem v (get_tsvars pc.evars) | _ -> true ) subst in
 
   { pc with econstr = subst_constr subst pc.econstr;
             efact = subst_fact subst pc.efact }

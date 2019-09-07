@@ -274,8 +274,7 @@ module Judgment : sig
       - [theta.models] store the last minimal models of [theta.constr].
       - [gamma] is the judgment context.
       - [goal] contains the current goal, which is of type 'a. *)
-  type 'a judgment = private { vars : tvar list;
-                               indices: Action.indices;
+  type 'a judgment = private { vars : fvar list;
                                theta : Theta.theta;
                                gamma : Gamma.gamma;
                                goal : 'a;
@@ -289,7 +288,7 @@ module Judgment : sig
 
   val init : formula -> formula judgment
 
-  val add_vars : Term.tvar list -> 'a judgment -> 'a judgment
+  val add_vars : Term.fvar list -> 'a judgment -> 'a judgment
   val add_indices : Action.indices -> 'a judgment -> 'a judgment
 
   (** Side-effect: Add necessary action descriptions. *)
@@ -305,8 +304,7 @@ module Judgment : sig
 
   val set_gamma : Gamma.gamma -> 'a judgment ->  'a judgment
 end = struct
-  type 'a judgment = { vars : tvar list;
-                       indices: Action.indices;
+  type 'a judgment = { vars : fvar list;
                        theta : Theta.theta;
                        gamma : Gamma.gamma;
                        goal : 'a;
@@ -315,7 +313,11 @@ end = struct
   let pp_judgment pp_goal ppf judge =
     let open Fmt in
     let open Utils in
+    let tsvars = get_tsvars judge.vars
+    and indexvars = get_indexvars judge.vars
+    and messvars = get_messvars judge.vars in
     pf ppf "@[<v 0>%a@;\
+            @[<v 0>%a@]\
             @[<v 0>%a@]\
             @[<v 0>%a@]\
             @[<hv 2>Theta:@ @[%a@]@]@;\
@@ -327,12 +329,17 @@ end = struct
            pf ppf "%a : %a@;"
              Term.pp_tvar v
              (styled `Blue (styled `Bold ident)) "timestamp"))
-      judge.vars
+      tsvars
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
              Action.pp_index v
              (styled `Blue (styled `Bold ident)) "index"))
-      judge.indices
+      indexvars
+      (list ~sep:nop (fun ppf v ->
+           pf ppf "%a : %a@;"
+             Term.pp_mvar v
+             (styled `Blue (styled `Bold ident)) "index"))
+      messvars      
       Theta.pp_theta judge.theta
       Gamma.pp_gamma judge.gamma
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
@@ -340,11 +347,12 @@ end = struct
 
   let init (goal : formula) =
     { vars = [];
-      indices = [];
       theta = Theta.mk Term.True;
       gamma = Gamma.mk ();
       goal = goal;
       gt = Gt_formula }
+
+   
 
   let rec add_vars vars j = match vars with
     | [] -> j
@@ -358,8 +366,8 @@ end = struct
     | [] -> j
     | i :: indices ->
       let j' =
-        if List.mem i j.indices then j
-        else { j with indices = i :: j.indices } in
+        if List.mem i (get_indexvars j.vars) then j
+        else { j with vars = (Term.IndexVar i) :: j.vars } in
       add_indices indices j'
 
   let fact_actions f =
@@ -473,14 +481,10 @@ let goal_and_intro (judge : fact judgment) sk fk = match judge.goal with
 
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : formula judgment) sk fk =
-  let compute_alpha ffresh l l' =
-    List.fold_left (fun subst x ->
-        if List.mem x l' then (x, ffresh ()) :: subst else (x,x) :: subst
-      ) [] l in
 
-  let tsubst = compute_alpha fresh_tvar judge.goal.uvars judge.vars
-  and isubst = compute_alpha fresh_index judge.goal.uindices judge.indices in
-  let subst = (from_tvarsubst tsubst) @ (from_isubst isubst) in
+
+  let vsubst =List.fold_left (fun subst x -> if List.mem x judge.vars then (x,make_fresh_of_type x):: subst else subst ) [] judge.goal.uvars in
+  let subst = from_fvarsubst vsubst in
     
   let new_cnstr = subst_constr subst judge.goal.uconstr
   and new_fact = subst_fact subst judge.goal.ufact
@@ -492,8 +496,7 @@ let goal_forall_intro (judge : formula judgment) sk fk =
   let judges =
     List.map (fun goal ->
         Judgment.set_goal goal Gt_postcond judge
-        |> Judgment.add_indices @@ List.map snd isubst
-        |> Judgment.add_vars @@ List.map snd tsubst
+        |> Judgment.add_vars @@ List.map snd vsubst
         |> Judgment.add_fact new_fact
         |> Judgment.add_constr new_cnstr
       ) new_goals in
@@ -1280,43 +1283,41 @@ let tac_type : type a b. a gt -> b gt -> utac -> etac =
 type args = (string * Theory.kind) list
 
 let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
-  let to_ts subst = List.map (fun (x,y) -> x, Term.TVar y) subst in
-
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
-  let uts_subst, uindex_subst = Theory.convert_vars uargs
-  and ets_subst, eindex_subst = Theory.convert_vars eargs in
+  let u_subst = Theory.convert_vars uargs
+  and e_subst = Theory.convert_vars eargs in
 
+  let rec get_fvars (s:Theory.tsubst) =
+    match s with
+    [] -> []
+    |Theory.Idx(a,i)::l -> (Term.IndexVar i) :: (get_fvars l)
+    |Theory.TS(a, Term.TVar i)::l -> (Term.TSVar i) :: (get_fvars l)                                      |Theory.Term(a, Term.MVar i)::l -> (Term.MessVar i) :: (get_fvars l)                                  | _ -> failwith "ill-typed substitution"               
+      in
   let uconstr =
     Theory.convert_constr_glob
       (List.rev uargs)
-      (to_ts uts_subst)
-      uindex_subst
+      u_subst
       uconstr in
   let ufact =
     Theory.convert_fact_glob
-      (to_ts uts_subst)
-      uindex_subst
+      u_subst
       ufact in
 
   let econstr =
     Theory.convert_constr_glob
       (List.rev_append eargs (List.rev uargs))
-      (to_ts ets_subst @ to_ts uts_subst)
-      (eindex_subst @ uindex_subst)
+      (e_subst @ u_subst)
       econstr in
   let efact =
     Theory.convert_fact_glob
-      (to_ts ets_subst @ to_ts uts_subst)
-      (eindex_subst @ uindex_subst)
+      (e_subst @ u_subst)
       efact in
 
-  { uvars = List.map snd uts_subst;
-    uindices = List.map snd uindex_subst;
+  { uvars = get_fvars u_subst;
     uconstr = uconstr;
     ufact = ufact;
-    postcond = [{ evars = List.map snd ets_subst;
-                  eindices = List.map snd eindex_subst;
+    postcond = [{ evars = get_fvars e_subst;
                   econstr = econstr;
                   efact = efact }] }
 
@@ -1350,7 +1351,7 @@ let simplify judges =
   List.map (function Ejudge (gt,j) -> match get_refl gt Gt_postcond with
       | None -> Ejudge (gt,j)
       | Some (Refl _) ->
-        if j.goal.eindices = [] && j.goal.evars = [] then
+        if j.goal.evars = [] then
           Ejudge (Gt_fact, Judgment.set_goal j.goal.efact Gt_fact j)
         else Ejudge (gt,j)
     ) judges

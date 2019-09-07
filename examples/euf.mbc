@@ -20,10 +20,10 @@ system  out(c,cst);
  ).
 
 
-goal forall (tau1 : timestamp, tau2 : timestamp, a : index)
+goal forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
 such that
-tau1 = tau2:output@tau1= output@tau2.
-
+  tau1 = tau2
+  :output@tau1= output@tau2.
 Proof.
   forallintro.
   intro.
@@ -31,7 +31,7 @@ Proof.
   congruence.
 Qed.
 
-goal forall (tau1 : timestamp, a: index)
+goal unforgeable forall (tau1 : timestamp, a: index)
 such that
 tau1 <> 0_0[a]:
 output@tau1 = h(sname(a)@tau1,k)

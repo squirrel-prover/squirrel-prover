@@ -70,41 +70,46 @@ val is_hash : Term.fname -> bool
 (** Populate theory with only builtin declarations *)
 val initialize_symbols : unit -> unit
 
+(* Conversion *)
+
+type atsubst =
+  | Term of string * Term.term
+  | TS of string * Term.timestamp
+  | Idx of string * Action.index
+             
+type tsubst = atsubst list
+
+
 (** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
   Term.timestamp ->
-  (string * Term.term) list ->
-  (string * Action.index) list ->
+  tsubst ->
   term ->
   Term.term
 
 (** Convert to [Term.fact], for local terms (i.e. with no timestamps). *)
 val convert_fact :
   Term.timestamp ->
-  (string * Term.term) list ->
-  (string * Action.index) list ->
+  tsubst ->
   fact ->
   Term.fact
 
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 val convert_glob :
-  (string * Term.timestamp) list ->
-  (string * Action.index) list ->
+  tsubst ->
   term ->
   Term.term
 
 (** Convert to [Term.constr], for global terms (i.e. with attached timestamps). *)
 val convert_constr_glob :
   (string * kind) list ->
-  (string * Term.timestamp) list ->
-  (string * Action.index) list ->
+  tsubst ->
   fact ->
   Term.constr
 
 (** Convert to [Term.fact], for global terms (i.e. with attached timestamps). *)
 val convert_fact_glob :
-  (string * Term.timestamp) list ->
-  (string * Action.index) list ->
+  tsubst ->
   fact ->
   Term.fact
 
@@ -112,5 +117,5 @@ val convert_fact_glob :
     in reverse order of declaration. By consequence, List.assoc properly handles
     the shadowing. *)
 val convert_vars :
-  ('a * kind) list ->
-  ('a * Term.tvar) list * ('a * Action.index) list
+  (string * kind) list ->
+  tsubst  

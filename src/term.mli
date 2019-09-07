@@ -212,6 +212,12 @@ val constr_dnf : constr -> tatom list list
 (** Correspondence formulas *)
 
 
+type fvar =
+    TSVar of tvar
+  | MessVar of mvar
+  | IndexVar of index
+
+val make_fresh_of_type : fvar -> fvar
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
   *   [ufact] => [postcond],
@@ -219,18 +225,23 @@ val constr_dnf : constr -> tatom list list
   * of formulas of the form
   *   exists [evars,eindices] such that [econstr] and [efact]. *)
 type formula = {
-  uvars : tvar list;
-  uindices : indices;
+  uvars : fvar list;
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
-  evars : tvar list;
-  eindices : indices;
+  evars : fvar list;
   econstr : constr;
   efact : fact
 }
+
+val get_tsvars : fvar list -> tvar list
+
+val get_messvars : fvar list -> mvar list
+
+val get_indexvars :fvar list -> index list
+
 
 val pp_postcond : Format.formatter -> postcond -> unit
 val pp_formula : Format.formatter -> formula -> unit
@@ -247,6 +258,7 @@ val to_isubst : subst ->  (index * index) list
 
 val from_tvarsubst : (tvar * tvar) list -> subst
 val from_isubst : (index * index) list -> subst  
+val from_fvarsubst : (fvar * fvar) list -> subst
 
 val pp_subst : Format.formatter -> subst -> unit
 

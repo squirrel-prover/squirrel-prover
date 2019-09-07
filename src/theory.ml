@@ -254,11 +254,40 @@ let is_hash (Term.Fname s) =
 
 (* Conversion *)
 
-let conv_index isubst = function
-  | Var x -> List.assoc x isubst
+type atsubst =
+  | Term of string * Term.term
+  | TS of string * Term.timestamp
+  | Idx of string * Action.index
+             
+type tsubst = atsubst list
+
+let term_subst (s:tsubst) =
+  List.fold_left (fun acc asubst -> match asubst with Term(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+let ts_subst (s:tsubst) =
+  List.fold_left (fun acc asubst -> match asubst with TS(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+let to_isubst (s:tsubst) =
+  List.fold_left (fun acc asubst -> match asubst with Idx(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+
+
+let subst_get_index subst x =
+  try List.assoc x (to_isubst subst)
+  with Not_found -> failwith "ill-typed variable usage" 
+
+let subst_get_ts subst x =
+  try List.assoc x (ts_subst subst)
+  with Not_found -> failwith "ill-typed variable usage" 
+
+let subst_get_mess subst x =
+  try List.assoc x (term_subst subst)
+  with Not_found -> failwith "ill-typed variable usage" 
+
+let conv_index subst = function
+  | Var x -> subst_get_index subst x
   | _ -> failwith "ill-formed index"
 
-let convert ts subst isubst t =
+let convert ts subst t =
   let rec conv = function
     | Fun (f,l,None) ->
        begin match Hashtbl.find symbols f with
@@ -269,7 +298,7 @@ let convert ts subst isubst t =
              Term.Fun (Term.mk_fname f, List.map conv l)
          | Macro_symbol (args,_,_) when
              List.for_all (fun (_,k) -> k = Index) args ->
-             Term.Fun (Term.mk_fname_idx f (List.map (conv_index isubst) l),
+             Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
                        [])
          | Macro_symbol (args,_,_) when
              List.for_all (fun (_,k) -> k = Message) args ->
@@ -278,12 +307,12 @@ let convert ts subst isubst t =
        end
     | Get (s,None,i) ->
         let s = Term.mk_sname s in
-        let i = List.map (conv_index isubst) i in
+        let i = List.map (conv_index subst) i in
           Term.State ((s,i),ts)
     | Name (n,i) ->
-        let i = List.map (conv_index isubst) i in
+        let i = List.map (conv_index subst) i in
           Term.Name (Term.mk_name n,i)
-    | Var x -> List.assoc x subst
+    | Var x -> subst_get_mess subst x
     | Compare (o,u,v) -> assert false (* TODO *)
     | Taction _ -> assert false       (* reserved for constraints *)
     | Get (_,Some _,_) | Fun (_,_,Some _) ->
@@ -293,16 +322,16 @@ let convert ts subst isubst t =
 
 
 (* For now, we do not allow to build directly a timestamp through its name. *)
-let convert_ts tssubst isubst t =
+let convert_ts subst t =
   let rec conv = function
     | Fun (f,[t'],None) when f = pred_fs -> Term.TPred (conv t')
-    | Var x -> List.assoc x tssubst
+    | Var x -> subst_get_ts subst x
     | Taction a ->
       let act =
         List.map (fun it ->
             let i,l = it.Action.par_choice in
             Action.({
-                par_choice = i, List.map (fun x -> x, List.assoc x isubst) l;
+                par_choice = i, List.map (fun x -> x, subst_get_index subst x) l;
                 sum_choice = it.sum_choice })
           ) a in
       Term.TName act
@@ -312,7 +341,7 @@ let convert_ts tssubst isubst t =
   conv t
 
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
-let convert_glob tssubst isubst t =
+let convert_glob subst t =
   let rec conv = function
     | Fun (f,l,None) ->
        begin match Hashtbl.find symbols f with
@@ -323,7 +352,7 @@ let convert_glob tssubst isubst t =
              Term.Fun (Term.mk_fname f, List.map conv l)
          | Macro_symbol (args,_,_) when
              List.for_all (fun (_,k) -> k = Index) args ->
-             Term.Fun (Term.mk_fname_idx f (List.map (conv_index isubst) l),
+             Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
                        [])
          | Macro_symbol (args,_,_) when
              List.for_all (fun (_,k) -> k = Message) args ->
@@ -334,15 +363,15 @@ let convert_glob tssubst isubst t =
 
     | Fun (f,l,Some ts) ->
       Term.Macro ( ( Term.is_declared f,
-                     List.map (conv_index isubst) l ),
-                   convert_ts tssubst isubst ts)
+                     List.map (conv_index subst) l ),
+                   convert_ts subst ts)
 
     | Get (s,Some ts,i) ->
       let s = Term.mk_sname s in
-      let i = List.map (conv_index isubst) i in
-      Term.State ((s,i), convert_ts tssubst isubst ts)
+      let i = List.map (conv_index subst) i in
+      Term.State ((s,i), convert_ts subst ts)
     | Name (n,i) ->
-      let i = List.map (conv_index isubst) i in
+      let i = List.map (conv_index subst) i in
       Term.Name (Term.mk_name n,i)
     | Compare (o,u,v) -> assert false (* TODO *)
     | Var x -> raise @@ Failure (Printf.sprintf "convert: unbound variable %s" x)
@@ -353,9 +382,9 @@ let convert_glob tssubst isubst t =
   conv t
 
 
-let convert_atom ts subst isubst atom =
+let convert_atom ts subst atom =
   match atom with
-  | Compare (o,u,v) -> (o, convert ts subst isubst u, convert ts subst isubst v)
+  | Compare (o,u,v) -> (o, convert ts subst u, convert ts subst v)
   | _ -> assert false
 
 let convert_bformula conv_atom f =
@@ -370,8 +399,8 @@ let convert_bformula conv_atom f =
     | False -> False in
   conv f
 
-let convert_fact ts subst isubst f : Term.fact =
-  convert_bformula (convert_atom ts subst isubst) f
+let convert_fact ts subst f : Term.fact =
+  convert_bformula (convert_atom ts subst) f
 
 (* Not clean at all. *)
 let get_kind env t =
@@ -380,52 +409,48 @@ let get_kind env t =
     with Type_error -> try check_term env t Message; Message
       with Type_error -> check_term env t Boolean; Boolean
 
-let convert_tatom args_kind tssubst isubst f : Term.tatom =
+let convert_tatom args_kind subst f : Term.tatom =
   let open Term in
   match f with
   | Compare (o,u,v) ->
     begin match get_kind args_kind u, get_kind args_kind v with
       | Index, Index ->
         Pind ( o,
-               conv_index isubst u,
-               conv_index isubst v )
+               conv_index subst u,
+               conv_index subst v )
       | Timestamp, Timestamp ->
         Pts ( o,
-              convert_ts tssubst isubst u,
-              convert_ts tssubst isubst v )
+              convert_ts subst u,
+              convert_ts subst v )
       | _ -> raise Type_error end
   | _ -> assert false
 
-let convert_constr_glob args_kind tssubst isubst f : Term.constr =
-  convert_bformula (convert_tatom args_kind tssubst isubst) f
+let convert_constr_glob args_kind subst f : Term.constr =
+  convert_bformula (convert_tatom args_kind subst) f
 
 
-let convert_atom_glob tssubst isubst atom =
+let convert_atom_glob subst atom =
   match atom with
   | Compare (o,u,v) -> (o,
-                        convert_glob tssubst isubst u,
-                        convert_glob tssubst isubst v)
+                        convert_glob subst u,
+                        convert_glob subst v)
   | _ -> assert false
 
-let convert_fact_glob tssubst isubst f : Term.fact =
-  convert_bformula (convert_atom_glob tssubst isubst) f
+let convert_fact_glob subst f : Term.fact =
+  convert_bformula (convert_atom_glob subst) f
 
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,
     in reverse order of declaration. By consequence, List.assoc properly handles
     the shadowing. *)
-let convert_vars vars =
-  let rec conv tss indices = function
-    | [] -> List.rev tss, List.rev indices
-    | (a, Index) :: l -> conv tss (a :: indices) l
-    | (a, Timestamp) :: l -> conv (a :: tss) indices l
-    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
-                             in goals" in
-  let tss, indices = conv [] [] vars in
-
-  ( List.map (fun x -> (x, Term.fresh_tvar ())) tss,
-    List.map (fun i -> (i, Action.fresh_index ())) indices )
-
+let rec convert_vars vars =
+  let rec conv vs =
+    match vs with
+    | [] -> []
+    | (a, Index) :: l -> Idx(a, Action.fresh_index () )::(conv l)
+    | (a, Timestamp) :: l -> TS(a, Term.TVar(Term.fresh_tvar ()) )::(conv l)                               | (a, Message) :: l -> Term(a, Term.MVar(Term.fresh_mvar ()) )::(conv l)                               | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
+  in
+  conv vars |> List.rev
 
 (** Tests *)
 let () =

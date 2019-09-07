@@ -169,9 +169,11 @@ arg_list:
 | ID COLON kind                  { [$1,$3] }
 | ID COLON kind COMMA arg_list   { ($1,$3)::$5 }
 
+
 opt_arg_list:
 | LPAREN arg_list RPAREN         { $2 }
 |                                { [] }
+
 
 name_type:
 | MESSAGE                        { 0 }
@@ -213,7 +215,7 @@ formula:
 				     ([],Term.True),
 				     Term.True, $4 ) }
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
-                                 { ($2, $7, $4, $9) }
+                                 { ($2, $7, $4, $9) } 
 
 tac:
   | LPAREN t = tac RPAREN          { t }
@@ -235,6 +237,8 @@ tac:
   | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
   | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
   | TRY l = tac ORELSE r = tac        { Logic.UTry (l, r) }
+
+
 
 qed:
 | QED                                 { () }

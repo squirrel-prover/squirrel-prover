@@ -376,16 +376,18 @@ type p_env = {
 let parse_proc proc : unit =
 
   let conv_term_at_ts env ts t =
-    let subst = List.map (fun (x,f) -> x,f ts) env.subst in
-    Theory.convert ts subst env.isubst t in
+    let subst = List.map (fun (x,f) -> Theory.Term(x,f ts)) env.subst
+                @ (List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst)  in
+    Theory.convert ts subst t in
   let conv_term env t =
     let ts = Term.TName (List.rev env.action) in
     conv_term_at_ts env ts t
   in
   let conv_fact env t =
     let ts = Term.TName (List.rev env.action) in
-    let subst = List.map (fun (x,f) -> x,f ts) env.subst in
-    Theory.convert_fact ts subst env.isubst t
+    let subst = List.map (fun (x,f) -> Theory.Term(x,f ts)) env.subst
+                @ (List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst)  in
+    Theory.convert_fact ts subst t
   in
   let conv_indices env l =
     List.map (fun x -> List.assoc x env.isubst) l
