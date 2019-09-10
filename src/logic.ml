@@ -412,6 +412,94 @@ end
 open Judgment
 
 
+(** Existential type for judgments. *)
+type ejudgment = Ejudge : 'a gt * 'a judgment -> ejudgment
+
+
+type (_,_) eq_type = | Refl : 'a * 'a -> ('a, 'a) eq_type
+
+let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type option =
+  fun a b -> match a, b with
+    | Gt_bot, Gt_bot -> Refl (a,b) |> some
+    | Gt_top, Gt_top -> Refl (a,b) |> some
+    | Gt_unit, Gt_unit -> Refl (a,b) |> some
+    | Gt_formula, Gt_formula -> Refl (a,b) |> some
+    | Gt_postcond, Gt_postcond -> Refl (a,b) |> some
+    | Gt_fact, Gt_fact -> Refl (a,b) |> some
+    (* | Gt_list l, Gt_list r -> begin match get_refl l r with
+     *     | Some (Refl _) -> Refl (a,b) |> some
+     *     | None -> None end *)
+    | _ -> None
+
+
+let remove_finished judges =
+  List.filter (function Ejudge (gt,_) -> match get_refl gt Gt_unit with
+      | None -> true
+      | Some (Refl _) -> false) judges
+
+let simplify judges =
+  List.map (function Ejudge (gt,j) -> match get_refl gt Gt_postcond with
+      | None -> Ejudge (gt,j)
+      | Some (Refl _) ->
+        if j.goal.evars = [] then
+          Ejudge (Gt_fact, Judgment.set_goal j.goal.efact Gt_fact j)
+        else Ejudge (gt,j)
+    ) judges
+
+(** Current mode of the prover:
+    - [InputDescr] : waiting for the process description.
+    - [GoalMode] : waiting for the next goal.
+    - [ProofMode] : proof of a goal in progress. *)
+type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
+
+
+(* State in proof mode. *)
+type named_goal = string * formula
+let goals : named_goal list ref = ref []
+let current_goal : named_goal option ref = ref None
+let subgoals : ejudgment list ref = ref []
+let goals_proved = ref []
+
+exception Cannot_undo
+
+type proof_state = { goals : named_goal list;
+                     current_goal : named_goal option;
+                     subgoals : ejudgment list;
+                     goals_proved : named_goal list;
+                     cpt_tag : int;
+                     prover_mode : prover_mode;
+                   }
+
+
+
+type arg = IDArg of string | TermArg of Theory.term
+
+let parse_args goalname ts : subst =
+  let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
+  match goals with
+  | [] -> failwith "No proved goal with given name"
+  | [(np,gp)] -> (
+      let uvars = gp.uvars in
+      if (List.length uvars) <> (List.length ts) then failwith "Number of parameters different than expected";
+      match !current_goal with
+      | None -> failwith "Cannot parse term with respect to empty current goal"
+      | Some((name,g)) -> let u_subst = List.map (function
+            IndexVar v -> Theory.Idx(Index.name v,v)
+          | TSVar v -> Theory.TS(Tvar.name v,TVar v)
+          | MessVar v -> Theory.Term(Mvar.name v,MVar v)) g.uvars in
+        List.map2 (fun t u -> match u,t with
+              TSVar a,TermArg t -> TS(TVar a, Theory.convert_ts u_subst t )
+            | TSVar a, IDArg iname -> TS(TVar a, TVar(Term.Tvar.get_or_make_fresh (Term.get_tsvars g.uvars) iname))                                                                                
+            | MessVar a, TermArg t -> Term(MVar a, Theory.convert_glob u_subst t)
+            | MessVar a, IDArg iname -> Term(MVar a, MVar(Term.Mvar.get_or_make_fresh (Term.get_messvars g.uvars) iname))                                                                                   
+            | IndexVar a, IDArg iname -> Index(a, (Action.Index.get_or_make_fresh (Term.get_indexvars g.uvars) iname))
+            | _ -> failwith "Type error in the arguments"
+
+          ) ts uvars
+)
+  | _ -> failwith "Multiple proved goals with same name"
+              
+
 (** Basic Tactics Types *)
 
 type 'a fk = unit -> 'a
@@ -762,6 +850,8 @@ type (_,_) tac =
   | Intro : (fact, fact) tac
   | Split : (fact, fact) tac
 
+  (*  | Apply : subst -> ('a, 'a) tac *)
+
   | ForallIntro : (formula, postcond) tac
   | ExistsIntro :
       subst ->
@@ -1062,21 +1152,6 @@ let tac_of_simp_utac3 utac = match utac with
   | UConstrAbsurd -> ConstrAbsurd
   | _ -> assert false
 
-type (_,_) eq_type = | Refl : 'a * 'a -> ('a, 'a) eq_type
-
-let rec get_refl : type a b. a gt -> b gt -> (a gt, b gt) eq_type option =
-  fun a b -> match a, b with
-    | Gt_bot, Gt_bot -> Refl (a,b) |> some
-    | Gt_top, Gt_top -> Refl (a,b) |> some
-    | Gt_unit, Gt_unit -> Refl (a,b) |> some
-    | Gt_formula, Gt_formula -> Refl (a,b) |> some
-    | Gt_postcond, Gt_postcond -> Refl (a,b) |> some
-    | Gt_fact, Gt_fact -> Refl (a,b) |> some
-    (* | Gt_list l, Gt_list r -> begin match get_refl l r with
-     *     | Some (Refl _) -> Refl (a,b) |> some
-     *     | None -> None end *)
-    | _ -> None
-
 let fail_check_type : type a b. a gt -> b gt -> utac -> exn =
   fun l_gt r_gt utac ->
     Log.log Log.LogTacticTC (fun () ->
@@ -1315,8 +1390,6 @@ let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
                   econstr = econstr;
                   efact = efact }] }
 
-
-
 (** Right existential type for tactics. *)
 type 'a ertac = ERTac : 'b gt * ('a,'b) tac -> 'a ertac
 
@@ -1332,30 +1405,7 @@ let parse_tactic : type a. a gt -> utac -> a ertac =
 
       | Some (Refl _) -> ERTac (bgt, tac)
 
-(** Existential type for judgments. *)
-type ejudgment = Ejudge : 'a gt * 'a judgment -> ejudgment
 
-
-let remove_finished judges =
-  List.filter (function Ejudge (gt,_) -> match get_refl gt Gt_unit with
-      | None -> true
-      | Some (Refl _) -> false) judges
-
-let simplify judges =
-  List.map (function Ejudge (gt,j) -> match get_refl gt Gt_postcond with
-      | None -> Ejudge (gt,j)
-      | Some (Refl _) ->
-        if j.goal.evars = [] then
-          Ejudge (Gt_fact, Judgment.set_goal j.goal.efact Gt_fact j)
-        else Ejudge (gt,j)
-    ) judges
-
-
-(** Current mode of the prover:
-    - [InputDescr] : waiting for the process description.
-    - [GoalMode] : waiting for the next goal.
-    - [ProofMode] : proof of a goal in progress. *)
-type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
 type parsed_input =
     ParsedInputDescr
@@ -1363,24 +1413,6 @@ type parsed_input =
   | ParsedTactic of utac
   | ParsedUndo of int
   | ParsedGoal of Goalmode.gm_input
-
-type named_goal = string * formula
-
-(* State in proof mode. *)
-let goals : named_goal list ref = ref []
-let current_goal : named_goal option ref = ref None
-let subgoals : ejudgment list ref = ref []
-let goals_proved = ref []
-
-exception Cannot_undo
-
-type proof_state = { goals : named_goal list;
-                     current_goal : named_goal option;
-                     subgoals : ejudgment list;
-                     goals_proved : named_goal list;
-                     cpt_tag : int;
-                     prover_mode : prover_mode;
-                   }
 
 let proof_states_history : proof_state list ref = ref []
 
@@ -1443,7 +1475,6 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       (List.length !subgoals)
       (Judgment.pp_judgment (pp_gt_el gt)) j
   | _ -> assert false
-
 
 (** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
     Return [true] if there are no subgoals remaining. *)

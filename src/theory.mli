@@ -94,6 +94,11 @@ val convert_fact :
   fact ->
   Term.fact
 
+val convert_ts :
+  tsubst ->
+  term ->
+  Term.timestamp
+
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 val convert_glob :
   tsubst ->

@@ -12,7 +12,7 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE APPLY
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE
 %token PROOF QED UNDO
 %token EOF
@@ -217,6 +217,16 @@ formula:
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
                                  { ($2, $7, $4, $9) } 
 
+tactic_param:
+| i=ID                           { IDArg i }
+| a=aterm	                 { TermArg a }
+
+tactic_params:
+|                                 { [] }
+| t=tactic_param                  { [t] }
+| t=tactic_param ts=tactic_params { t::ts }
+
+
 tac:
   | LPAREN t = tac RPAREN          { t }
   | ADMIT                             { Logic.UAdmit }
@@ -237,6 +247,7 @@ tac:
   | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
   | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
   | TRY l = tac ORELSE r = tac        { Logic.UTry (l, r) }
+/*  | APPLY i=ID t=tactic_params        { */
 
 
 

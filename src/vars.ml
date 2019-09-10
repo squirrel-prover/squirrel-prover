@@ -9,6 +9,7 @@ module type VarType = sig
   type t
   val make_fresh : ?name:string -> unit -> t
   val get_or_make_fresh : t list -> string -> t
+  val name : t -> string
   val pp : Format.formatter -> t -> unit
   val pp_list : Format.formatter -> t list -> unit
 end
@@ -25,7 +26,10 @@ module Var(V:VarParam) : VarType =
       match List.filter (fun t -> t.name = n) ts with
         [] -> make_fresh ~name:n ()
       | p::q -> p
-    
+
+    let name v =
+      v.name
+        
     let pp ppf v =
       Fmt.pf ppf "%s" v.name
                       
