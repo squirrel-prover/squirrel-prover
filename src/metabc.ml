@@ -37,24 +37,25 @@ let rec main_loop mode =
   else
   (Theory.initialize_symbols () ;
    Process.reset ());
-  let new_command = parse_next Main.parse_interactive_buf in
-  match mode, new_command with
-    mode, ParsedUndo(nb_undo) when mode <> InputDescr ->
-    (try
-       let new_mode = reset_state nb_undo in
-       (match new_mode with
-         ProofMode -> Fmt.pr "%a" pp_goal ()
-       | GoalMode ->     Main.pp_proc Fmt.stdout ()
-       | _ -> ()
-       );
-       main_loop new_mode
-     with
-       Cannot_undo -> error mode ("Cannot undo, no proof state ot go back to.")
-    )                  
-  | InputDescr,ParsedInputDescr ->
-    Main.pp_proc Fmt.stdout ();
-    main_loop GoalMode
-  | ProofMode,ParsedTactic(utac) ->
+  try
+    let new_command = parse_next Main.parse_interactive_buf in
+    match mode, new_command with
+      mode, ParsedUndo(nb_undo) when mode <> InputDescr ->
+      (try
+         let new_mode = reset_state nb_undo in
+         (match new_mode with
+            ProofMode -> Fmt.pr "%a" pp_goal ()
+          | GoalMode ->     Main.pp_proc Fmt.stdout ()
+          | _ -> ()
+         );
+         main_loop new_mode
+       with
+         Cannot_undo -> error mode ("Cannot undo, no proof state ot go back to.")
+      )                  
+    | InputDescr,ParsedInputDescr ->
+      Main.pp_proc Fmt.stdout ();
+      main_loop GoalMode
+    | ProofMode,ParsedTactic(utac) ->
       begin try
           if eval_tactic utac then begin
             complete_proof ();
@@ -65,29 +66,31 @@ let rec main_loop mode =
             main_loop ProofMode end
         with
         | Tactic_failed s -> error ProofMode ("Tactic failed: " ^ s ^ ".")
-        | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed." end
-
-  | WaitQed,ParsedQed ->
-    Fmt.pr "Exit proof mode.@.";
-    main_loop GoalMode
+        | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed."
+      end
       
-  | GoalMode,ParsedGoal(goal) ->
-    (match goal with
-      | Goalmode.Gm_proof -> begin match start_proof () with
-          | None ->
-            Fmt.pr "%a" pp_goal ();
-            main_loop ProofMode
-          | Some es -> error GoalMode es end
-
-      | Goalmode.Gm_goal (i,f) ->
-        add_new_goal (i,f);
-        Fmt.pr "@[<v 0>New goal: %s @;@[%a@]@]@."
-          i
-          Term.pp_formula f;
-        main_loop GoalMode
-    )
-  |_,_ -> error mode "Unexpected command."
-
+    | WaitQed,ParsedQed ->
+      Fmt.pr "Exit proof mode.@.";
+      main_loop GoalMode
+        
+    | GoalMode,ParsedGoal(goal) ->
+      (match goal with
+       | Goalmode.Gm_proof -> begin match start_proof () with
+           | None ->
+             Fmt.pr "%a" pp_goal ();
+             main_loop ProofMode
+           | Some es -> error GoalMode es end
+         
+       | Goalmode.Gm_goal (i,f) ->
+         add_new_goal (i,f);
+         Fmt.pr "@[<v 0>New goal: %s @;@[%a@]@]@."
+           i
+           Term.pp_formula f;
+         main_loop GoalMode
+      )
+    |_,_ -> error mode "Unexpected command."
+  with Failure s -> error mode s
+                      
 and error mode s =
   Fmt.pr "[error> %s@." s;
   if !interactive_mode then main_loop mode

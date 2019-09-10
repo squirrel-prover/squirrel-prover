@@ -3,9 +3,11 @@ open Logic
 let () = Printexc.record_backtrace true
 
 
-let parse_from_buf ?(test=false) parse_fun lexbuf filename =
+let parse_from_buf ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
   try parse_fun Lexer.token lexbuf with
   | Parser.Error as e ->
+    if not(interactive) then
+      (
     Printexc.print_backtrace Pervasives.stderr;
     Format.printf
       "@[Error in %S @,at line %d char %d @,\
@@ -14,9 +16,11 @@ let parse_from_buf ?(test=false) parse_fun lexbuf filename =
       lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
       (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
        lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf) ;
-    if test then raise e else exit 1
+      (Lexing.lexeme lexbuf) );
+    if test || interactive then raise e else exit 1
   | Failure s as e ->
+    if not(interactive) then
+      (    
     Format.printf
       "@[Error in %S @,at line %d char %d @,\
        before %S: @,%s.@]@."
@@ -25,9 +29,11 @@ let parse_from_buf ?(test=false) parse_fun lexbuf filename =
       (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
        lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
       (Lexing.lexeme lexbuf)
-      s ;
-    if test then raise e else exit 1
+      s );
+    if test || interactive then raise e else exit 1
   | e ->
+    if not(interactive) then
+      (
     Printexc.print_backtrace Pervasives.stderr;
     Format.printf
       "@[Error @,\
@@ -38,8 +44,8 @@ let parse_from_buf ?(test=false) parse_fun lexbuf filename =
       (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
        lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
       (Lexing.lexeme lexbuf)
-      (Printexc.to_string e) ;
-    if test then raise e else exit 1
+      (Printexc.to_string e)) ;
+    if test || interactive then raise e else exit 1
 
 let parse_theory_buf ?(test=false) lexbuf filename =
   Theory.initialize_symbols () ;
@@ -50,7 +56,7 @@ let parse_goal_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test:test Parser.goal lexbuf filename
 
 let parse_interactive_buf ?(test=false) lexbuf filename =
-  parse_from_buf ~test:test Parser.interactive lexbuf filename
+  parse_from_buf ~test:test ~interactive:true Parser.interactive lexbuf filename
 
 
 let parse_tactic_buf ?(test=false) lexbuf filename =
