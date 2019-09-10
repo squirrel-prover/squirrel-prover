@@ -79,8 +79,8 @@ end
 open Utv
 
 let pp_uvar ppf = function
-  | Utv tv -> Tvar.pp_var ppf tv
-  | Uind index -> Index.pp_var ppf index
+  | Utv tv -> Tvar.pp ppf tv
+  | Uind index -> Index.pp ppf index
 
 let rec pp_ut_cnt ppf = function
   | UVar uv -> pp_uvar ppf uv

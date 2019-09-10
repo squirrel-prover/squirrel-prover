@@ -24,11 +24,9 @@ val pp_timestamp : Format.formatter -> timestamp -> unit
 
 (** Messages variables for formulas **)
 
-type mvar
-  
-val pp_mvar : Format.formatter -> mvar -> unit
+module Mvar : VarType
 
-val fresh_mvar : unit -> mvar
+type mvar = Mvar.t
 
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and

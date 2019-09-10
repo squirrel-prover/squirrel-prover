@@ -448,7 +448,7 @@ let rec convert_vars vars =
     match vs with
     | [] -> []
     | (a, Index) :: l -> Idx(a, Action.Index.make_fresh () )::(conv l)
-    | (a, Timestamp) :: l -> TS(a, Term.TVar(Term.Tvar.make_fresh ()) )::(conv l)                               | (a, Message) :: l -> Term(a, Term.MVar(Term.fresh_mvar ()) )::(conv l)                               | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
+    | (a, Timestamp) :: l -> TS(a, Term.TVar(Term.Tvar.make_fresh ()) )::(conv l)                               | (a, Message) :: l -> Term(a, Term.MVar(Term.Mvar.make_fresh ()) )::(conv l)                               | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
   in
   conv vars |> List.rev
 

@@ -327,17 +327,17 @@ end = struct
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
-             Tvar.pp_var v
+             Tvar.pp v
              (styled `Blue (styled `Bold ident)) "timestamp"))
       tsvars
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
-             Action.Index.pp_var v
+             Action.Index.pp v
              (styled `Blue (styled `Bold ident)) "index"))
       indexvars
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
-             Term.pp_mvar v
+             Term.Mvar.pp v
              (styled `Blue (styled `Bold ident)) "index"))
       messvars      
       Theta.pp_theta judge.theta

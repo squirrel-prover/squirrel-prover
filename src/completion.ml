@@ -26,7 +26,7 @@ module Cst = struct
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
-    | Cmvar m -> pp_mvar ppf m
+    | Cmvar m -> Mvar.pp ppf m
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
     | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
     (* | Coutput ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts

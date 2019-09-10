@@ -26,18 +26,21 @@ type timestamp =
   | TName of action
 
 let rec pp_timestamp ppf = function
-  | TVar tv -> Tvar.pp_var ppf tv
+  | TVar tv -> Tvar.pp ppf tv
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
 (** Messages variables for formulas **)
+                 
+module MParam : VarParam =
+struct
+  let default_string = "mess"
+  let cpt = ref 0
+end
 
-type mvar = Mvar_i of int
+module Mvar = Var(MParam)
 
-let pp_mvar ppf = function Mvar_i i -> Fmt.pf ppf "mess%d" i
-
-let mvar_cpt = ref 0
-let fresh_mvar () = incr mvar_cpt; Mvar_i (!mvar_cpt - 1)
+type mvar = Mvar.t
 
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
@@ -148,7 +151,7 @@ let rec pp_term ppf = function
   | Name n -> pp_nsymb ppf n
   | State (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
-  | MVar m -> Fmt.pf ppf "%a" pp_mvar m                     
+  | MVar m -> Fmt.pf ppf "%a" Mvar.pp m                     
   (* | Input ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts *)
 
 type t = term
@@ -351,7 +354,7 @@ let pp_tatom ppf = function
   | Pts (o,tl,tr) ->
     Fmt.pf ppf "@[<h>%a %a %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<h>%a %a %a@]" Index.pp_var il pp_ord o Index.pp_var ir
+    Fmt.pf ppf "@[<h>%a %a %a@]" Index.pp il pp_ord o Index.pp ir
 
 let not_tpred = function
   | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
@@ -379,14 +382,14 @@ type fvar =
   | IndexVar of index
 
 let pp_fvar ppf = function
-    TSVar t -> Tvar.pp_var ppf t
-  | MessVar m -> pp_mvar ppf m
-  | IndexVar i -> Index.pp_var ppf i
+    TSVar t -> Tvar.pp ppf t
+  | MessVar m -> Mvar.pp ppf m
+  | IndexVar i -> Index.pp ppf i
   
 let make_fresh_of_type (v:fvar) =
     match v with
     | TSVar _ -> TSVar (Tvar.make_fresh ())
-    | MessVar _ -> MessVar (fresh_mvar ())
+    | MessVar _ -> MessVar (Mvar.make_fresh ())
     | IndexVar _ -> IndexVar (Index.make_fresh ())
       
 (** A formula is always of the form
@@ -430,7 +433,7 @@ let pp_q_vars s_q vars constr ppf () =
   if tsvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma Tvar.pp_var) tsvars
+     (list ~sep:Fmt.comma Tvar.pp) tsvars
      (styled `Blue (styled `Bold ident)) "timestamp"
   else ();
   let indexvars = get_indexvars vars in
@@ -444,7 +447,7 @@ let pp_q_vars s_q vars constr ppf () =
   if messvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma pp_mvar) messvars
+     (list ~sep:Fmt.comma Mvar.pp) messvars
      (styled `Blue (styled `Bold ident)) "message"
   else ();  
   (* if vars = [] && indices = [] then
@@ -506,7 +509,7 @@ let pp_asubst ppf e =
   match e with
   | Term(t1,t2) -> pp_el pp_term (t1,t2)
   | TS(ts1,ts2) -> pp_el pp_timestamp (ts1,ts2)
-  | Index(i1,i2) -> pp_el Index.pp_var (i1,i2)
+  | Index(i1,i2) -> pp_el Index.pp (i1,i2)
                       
 
 let pp_subst ppf s =
