@@ -477,12 +477,12 @@ type arg = IDArg of string | TermArg of Theory.term
 let parse_args goalname ts : subst =
   let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
   match goals with
-  | [] -> failwith "No proved goal with given name"
+  | [] ->  raise @@ Failure "No proved goal with given name"
   | [(np,gp)] -> (
       let uvars = gp.uvars in
-      if (List.length uvars) <> (List.length ts) then failwith "Number of parameters different than expected";
+      if (List.length uvars) <> (List.length ts) then raise @@ Failure "Number of parameters different than expected";
       match !current_goal with
-      | None -> failwith "Cannot parse term with respect to empty current goal"
+      | None ->  raise @@ Failure "Cannot parse term with respect to empty current goal"
       | Some((name,g)) -> let u_subst = List.map (function
             IndexVar v -> Theory.Idx(Index.name v,v)
           | TSVar v -> Theory.TS(Tvar.name v,TVar v)
@@ -493,11 +493,11 @@ let parse_args goalname ts : subst =
             | MessVar a, TermArg t -> Term(MVar a, Theory.convert_glob u_subst t)
             | MessVar a, IDArg iname -> Term(MVar a, MVar(Term.Mvar.get_or_make_fresh (Term.get_messvars g.uvars) iname))                                                                                   
             | IndexVar a, IDArg iname -> Index(a, (Action.Index.get_or_make_fresh (Term.get_indexvars g.uvars) iname))
-            | _ -> failwith "Type error in the arguments"
+            | _ ->  raise @@ Failure "Type error in the arguments"
 
           ) ts uvars
 )
-  | _ -> failwith "Multiple proved goals with same name"
+  | _ ->  raise @@ Failure "Multiple proved goals with same name"
               
 
 (** Basic Tactics Types *)
@@ -837,6 +837,8 @@ let euf_apply f_select (judge : 'a judgment) sk fk =
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
 
+let apply s (judge : 'a judgment) sk fk =
+  sk [judge] fk
 
 (** Tactics *)
 
@@ -850,7 +852,7 @@ type (_,_) tac =
   | Intro : (fact, fact) tac
   | Split : (fact, fact) tac
 
-  (*  | Apply : subst -> ('a, 'a) tac *)
+  | Apply : subst -> ('a, 'a) tac 
 
   | ForallIntro : (formula, postcond) tac
   | ExistsIntro :
@@ -885,6 +887,8 @@ let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
     | Right -> Fmt.pf ppf "goal_or_intro_r"
     | Intro -> Fmt.pf ppf "goal_intro"
     | Split -> Fmt.pf ppf "goal_and_intro"
+
+    | Apply t -> Fmt.pf ppf "apply"
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->
@@ -933,6 +937,7 @@ let rec tac_apply :
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (nu) -> goal_exists_intro judge sk fk nu
 
+    | Apply s -> apply s judge sk fk
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
     | Split -> goal_and_intro judge sk fk
@@ -1031,6 +1036,8 @@ type utac =
   | UIntro : utac
   | USplit : utac
 
+  | UApply : subst -> utac
+
   | UForallIntro : utac
   | UExistsIntro : subst -> utac
 
@@ -1054,6 +1061,8 @@ type utac =
 let rec pp_utac ppf = function
   | UAdmit -> Fmt.pf ppf "admit"
   | UIdent -> Fmt.pf ppf "ident"
+
+  | UApply s -> Fmt.pf ppf "apply"
 
   | ULeft -> Fmt.pf ppf "goal_or_intro_l"
   | URight -> Fmt.pf ppf "goal_or_intro_r"
@@ -1144,6 +1153,7 @@ let tac_of_simp_utac2 utac = match utac with
   | UEqConstants fn -> EqConstants fn
   | UEuf i -> Euf i
   | UCycle i -> Cycle i
+  | UApply s -> Apply s                
   | _ -> assert false
 
 let tac_of_simp_utac3 utac = match utac with
@@ -1175,7 +1185,7 @@ let rec check_type : type a b. a gt -> b gt -> utac -> (a,b) tac =
         | Gt_fact, Gt_fact -> tac_of_simp_utac utac
         | _ -> raise @@ fail_check_type l_gt r_gt utac end
 
-    | UEqNames | UEqTimestamps | UEqConstants _ | UEuf _ | UIdent | UCycle _ ->
+    | UEqNames | UEqTimestamps | UApply _ | UEqConstants _ | UEuf _ | UIdent | UCycle _ ->
       begin match get_refl l_gt r_gt with
         | Some (Refl _) -> tac_of_simp_utac2 utac
         | None -> raise @@ fail_check_type l_gt r_gt utac end
@@ -1242,7 +1252,7 @@ let rec tac_typ : type a b. a gt -> b gt -> utac -> utac * etac =
         ( utac, ETac ( Gt_fact, Gt_fact, tac_of_simp_utac utac ))
       else raise @@ fail_tac_type l_gt r_gt utac
 
-    | UIdent | UEqNames | UEqTimestamps | UEqConstants _ | UEuf _ | UCycle _ ->
+    | UIdent | UEqNames | UEqTimestamps | UApply _ | UEqConstants _ | UEuf _ | UCycle _ ->
       begin match l_gt, r_gt with
         | Gt_top, Gt_bot ->
           ( utac, ETac ( Gt_top, Gt_bot, tac_of_simp_utac2 utac ))
