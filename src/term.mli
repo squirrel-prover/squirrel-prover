@@ -1,3 +1,4 @@
+open Vars
 open Action
 (** Terms and formulas for the Meta-BC logic.
   *
@@ -9,16 +10,17 @@ open Action
 
 (** Timestamps represent positions in a trace *)
 
-type tvar
+module Tvar : VarType
+
+type tvar = Tvar.t
+              
 type timestamp =
   | TVar of tvar
   | TPred of timestamp
   | TName of action
 
-val pp_tvar : Format.formatter -> tvar -> unit
 val pp_timestamp : Format.formatter -> timestamp -> unit
 
-val fresh_tvar : unit -> tvar
 
 (** Messages variables for formulas **)
 
@@ -40,7 +42,7 @@ val mk_name : string -> name (* TODO *)
 
 val fresh_name : string -> name
 
-type nsymb = name * indices
+type nsymb = name * index list
 
 val pp_nsymb : Format.formatter -> nsymb -> unit
 
@@ -55,14 +57,14 @@ type fname = private Fname of string
 
 val pp_fname : Format.formatter -> fname -> unit
 
-type fsymb = fname * indices
+type fsymb = fname * index list
 
 val pp_fsymb : Format.formatter -> fsymb -> unit
 
 (** Makes a simple function name, with no indices.
     TODO: nothing is checked here (e.g. name clashes etc).*)
 val mk_fname : string -> fsymb
-val mk_fname_idx : string -> indices -> fsymb
+val mk_fname_idx : string -> index list -> fsymb
 
 (** Boolean function symbols *)
 val f_false : fsymb
@@ -91,7 +93,7 @@ val f_succ : fsymb
   *)
 
 type sname
-type state = sname * indices
+type state = sname * index list
 
 val mk_sname : string -> sname (* TODO *)
 
@@ -102,7 +104,7 @@ val pp_state : Format.formatter -> state -> unit
     a process, or a built-in macro such as "in" or "out". *)
 
 type mname = private string
-type msymb = mname * indices
+type msymb = mname * index list
 
 val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> msymb -> unit
@@ -132,13 +134,13 @@ val is_declared : string -> mname
 (** [declare_macro x f] declares a new macro with a name resembling [x],
   * associated to a substitution function which takes the target timestamp
   * as argument. *)
-val declare_macro : string -> (timestamp -> indices -> term) -> mname
+val declare_macro : string -> (timestamp -> index list -> term) -> mname
 
 (** Return the term corresponding to the declared macro, except for the
     built-ins "in" and "out". *)
-val macro_declaration : mname -> timestamp -> indices -> term
+val macro_declaration : mname -> timestamp -> index list -> term
 
-val mk_mname : mname -> indices -> msymb
+val mk_mname : mname -> index list -> msymb
 
 val in_macro : msymb
 val out_macro : msymb

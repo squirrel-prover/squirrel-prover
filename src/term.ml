@@ -1,3 +1,4 @@
+open Vars
 open Action
 (** Terms and formulas for the Meta-BC logic.
   *
@@ -9,12 +10,15 @@ open Action
 
 (** Timestamps represent positions in a trace *)
 
-type tvar = Tvar_i of int
+module TParam : VarParam =
+struct
+  let default_string = "tau"
+  let cpt = ref 0
+end
 
-let pp_tvar ppf = function Tvar_i i -> Fmt.pf ppf "ts%d" i
+module Tvar = Var(TParam)
 
-let tvar_cpt = ref 0
-let fresh_tvar () = incr tvar_cpt; Tvar_i (!tvar_cpt - 1)
+type tvar = Tvar.t
 
 type timestamp =
   | TVar of tvar
@@ -22,7 +26,7 @@ type timestamp =
   | TName of action
 
 let rec pp_timestamp ppf = function
-  | TVar tv -> pp_tvar ppf tv
+  | TVar tv -> Tvar.pp_var ppf tv
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
@@ -47,10 +51,10 @@ let fresh_name x = Name x
 
 let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf ("n!"^s)
 
-type nsymb = name * indices
+type nsymb = name * index list
 
 let pp_nsymb ppf (n,is) =
-  if is <> [] then Fmt.pf ppf "%a[%a]" pp_name n pp_indices is
+  if is <> [] then Fmt.pf ppf "%a[%a]" pp_name n Index.pp_list is
   else Fmt.pf ppf "%a" pp_name n
 
 (** Function symbols are built from a name (from a finite set)
@@ -65,11 +69,11 @@ type fname = Fname of string
 
 let pp_fname ppf = function Fname s -> (Utils.kw `Bold) ppf s
 
-type fsymb = fname * indices
+type fsymb = fname * index list
 
 let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn pp_indices is
+  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Index.pp_list is
 
 let mk_fname f = (Fname f, [])
 let mk_fname_idx f l = (Fname f, l)
@@ -104,15 +108,15 @@ let mk_sname x = Sname x
 
 let pp_sname ppf = function Sname s -> (Utils.kw `Red) ppf ("s!"^s)
 
-type state = sname * indices
+type state = sname * index list
 
 let pp_state ppf (sn,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_sname sn pp_indices is
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_sname sn Index.pp_list is
   else Fmt.pf ppf "%a" pp_sname sn
 
 (** Type of macros name *)
 type mname = string
-type msymb = mname * indices
+type msymb = mname * index list
 
 let pp_mname ppf s =
   let open Fmt in
@@ -121,7 +125,7 @@ let pp_mname ppf s =
 let pp_msymb ppf (m,is) =
   Fmt.pf ppf "%a%a"
     pp_mname m
-    (Utils.pp_ne_list "(%a)" pp_indices) is
+    (Utils.pp_ne_list "(%a)" Index.pp_list) is
 
 (** Terms *)
 type term =
@@ -149,7 +153,7 @@ let rec pp_term ppf = function
 
 type t = term
 
-let macros : (string, (timestamp -> indices -> term)) Hashtbl.t =
+let macros : (string, (timestamp -> index list -> term)) Hashtbl.t =
   Hashtbl.create 97
 
 let built_ins = ["input";"output"]
@@ -347,7 +351,7 @@ let pp_tatom ppf = function
   | Pts (o,tl,tr) ->
     Fmt.pf ppf "@[<h>%a %a %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<h>%a %a %a@]" pp_index il pp_ord o pp_index ir
+    Fmt.pf ppf "@[<h>%a %a %a@]" Index.pp_var il pp_ord o Index.pp_var ir
 
 let not_tpred = function
   | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
@@ -375,15 +379,15 @@ type fvar =
   | IndexVar of index
 
 let pp_fvar ppf = function
-    TSVar t -> pp_tvar ppf t
+    TSVar t -> Tvar.pp_var ppf t
   | MessVar m -> pp_mvar ppf m
-  | IndexVar i -> pp_index ppf i
+  | IndexVar i -> Index.pp_var ppf i
   
 let make_fresh_of_type (v:fvar) =
     match v with
-    | TSVar _ -> TSVar (fresh_tvar ())
+    | TSVar _ -> TSVar (Tvar.make_fresh ())
     | MessVar _ -> MessVar (fresh_mvar ())
-    | IndexVar _ -> IndexVar (fresh_index ())
+    | IndexVar _ -> IndexVar (Index.make_fresh ())
       
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
@@ -426,14 +430,14 @@ let pp_q_vars s_q vars constr ppf () =
   if tsvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma pp_tvar) tsvars
+     (list ~sep:Fmt.comma Tvar.pp_var) tsvars
      (styled `Blue (styled `Bold ident)) "timestamp"
   else ();
   let indexvars = get_indexvars vars in
   if indexvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
      (styled `Red (styled `Underline ident)) s_q
-     pp_indices indexvars
+     Index.pp_list indexvars
      (styled `Blue (styled `Bold ident)) "index"
   else ();
   let messvars = get_messvars vars in
@@ -502,7 +506,7 @@ let pp_asubst ppf e =
   match e with
   | Term(t1,t2) -> pp_el pp_term (t1,t2)
   | TS(ts1,ts2) -> pp_el pp_timestamp (ts1,ts2)
-  | Index(i1,i2) -> pp_el pp_index (i1,i2)
+  | Index(i1,i2) -> pp_el Index.pp_var (i1,i2)
                       
 
 let pp_subst ppf s =

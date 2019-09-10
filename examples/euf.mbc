@@ -27,6 +27,7 @@ such that
 Proof.
   forallintro.
   intro.
+
   eqtimestamps.
   congruence.
 Qed.
@@ -39,7 +40,7 @@ output@tau1 = h(sname(a)@tau1,k)
 
 Proof.
   forallintro.
-  euf 0.
+  euf 0.   (* why is ts10 not printed in the declared variables *)
   cycle -1.
   try congruence orelse ident.
   cycle 2.

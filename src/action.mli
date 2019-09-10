@@ -1,12 +1,9 @@
+open Vars
+
 (** Indices are used to generate arbitrary families of terms *)
-type index
-type indices = index list
+module Index : VarType
 
-val pp_index : Format.formatter -> index -> unit
-val pp_indices : Format.formatter -> indices -> unit
-
-val fresh_index : unit -> index
-
+type index = Index.t
 
 type 'a item = {
   par_choice : int * 'a list ;
@@ -31,7 +28,7 @@ val mk_action : (string * index) item list -> action
 
 val get_shape : action -> action_shape
 
-val action_indices : action -> indices
+val action_indices : action -> index list
 
 (** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
     shapes. Return [None] otherwise.

@@ -289,7 +289,7 @@ module Judgment : sig
   val init : formula -> formula judgment
 
   val add_vars : Term.fvar list -> 'a judgment -> 'a judgment
-  val add_indices : Action.indices -> 'a judgment -> 'a judgment
+  val add_indices : Action.index list -> 'a judgment -> 'a judgment
 
   (** Side-effect: Add necessary action descriptions. *)
   val add_fact : Term.fact -> 'a judgment -> 'a judgment
@@ -327,12 +327,12 @@ end = struct
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
-             Term.pp_tvar v
+             Tvar.pp_var v
              (styled `Blue (styled `Bold ident)) "timestamp"))
       tsvars
       (list ~sep:nop (fun ppf v ->
            pf ppf "%a : %a@;"
-             Action.pp_index v
+             Action.Index.pp_var v
              (styled `Blue (styled `Bold ident)) "index"))
       indexvars
       (list ~sep:nop (fun ppf v ->

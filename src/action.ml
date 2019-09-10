@@ -1,16 +1,15 @@
+open Vars
+   
 (** Indices are used to generate arbitrary families of terms *)
-type index = Index of int
-type indices = index list
+module IndexParam : VarParam =
+struct
+  let default_string = "index"
+  let cpt = ref 0 
+end
 
-let pp_index ppf = function Index i -> Fmt.pf ppf "i%d" i
+module Index = Var(IndexParam)
 
-let pp_indices ppf l =
-  Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp_index) l
-
-let idx_cpt = ref 0
-let fresh_index () = incr idx_cpt; Index (!idx_cpt - 1)
-
+type index = Index.t
 
 (** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
   * actions of C have par_choice 2, and those of B have par_choice
@@ -105,7 +104,7 @@ let rec constr_equal a b = match a,b with
 let rec refresh = function
   | [] -> [],[]
   | {par_choice=(k,is);sum_choice}::l ->
-      let l3 = List.map (fun (i0,i) -> i0, i, fresh_index ()) is in
+      let l3 = List.map (fun (i0,i) -> i0, i, Index.make_fresh ()) is in
       let is' = List.map (fun (i,_,j) -> i,j) l3 in
       let newsubst = List.map (fun (_,j,j') -> j,j') l3 in
       let action,subst = refresh l in
@@ -121,7 +120,7 @@ let pp_par_choice_fg f g ppf (k,str_indices) =
     Fmt.pf ppf "%d[%a]" k f (g str_indices)
 
 let pp_par_choice =
-  pp_par_choice_fg pp_indices (fun sis -> List.map snd sis)
+  pp_par_choice_fg Index.pp_list (fun sis -> List.map snd sis)
 
 let pp_par_choice_shape =
   pp_par_choice_fg

@@ -225,7 +225,7 @@ open Action
 
 type descr = {
   action : action ;
-  indices : indices ;
+  indices : index list ;
   condition : Term.fact ;
   updates : (Term.state * Term.term) list ;
   output : Term.term
@@ -239,7 +239,7 @@ let pp_descr ppf descr =
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
     pp_action descr.action
-    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" pp_indices)
+    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Index.pp_list)
     descr.indices
     Term.pp_fact descr.condition
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
@@ -260,9 +260,9 @@ let pp_descr ppf descr =
   * conditions). *)
 type block = {
   input : Channel.t * string ;
-  indices : Action.indices ;
-  condition : Action.index list * Term.fact ;
-  updates : (string * Action.index list * Term.term) list ;
+  indices : index list ;
+  condition : index list * Term.fact ;
+  updates : (string * index list * Term.term) list ;
   output : Channel.t * Term.term
 }
 
@@ -271,7 +271,7 @@ let action_to_block : (action, block) Hashtbl.t =
   Hashtbl.create 97
 
 let fresh_instance action block =
-  let subst = List.map (fun i -> Term.Index(i, Action.fresh_index ())) block.indices in
+  let subst = List.map (fun i -> Term.Index(i, Index.make_fresh ())) block.indices in
   let action = Term.subst_action subst action in
   let refresh_term = Term.subst_term subst in
   let refresh_fact = Term.subst_fact subst in
@@ -363,7 +363,7 @@ let show_actions ppf () =
  * It also stores the current action. *)
 type p_env = {
   action : Action.action ;
-  p_indices : Action.indices ;
+  p_indices : Action.index list ;
   p_id : string option ;          (** current process identifier *)
   subst : (string * (Term.timestamp -> Term.term)) list ;
     (** substitution for all free variables, standing for inputs,
@@ -404,7 +404,7 @@ let parse_proc proc : unit =
         let pos = p_in ~env ~pos ~pos_indices p in
           p_in ~env ~pos ~pos_indices q
     | Repl (i,p) ->
-        let i' = Action.fresh_index () in
+        let i' = Action.Index.make_fresh () in
         let env =
           { env with
             isubst = (i,i') :: env.isubst ;
@@ -526,7 +526,7 @@ let parse_proc proc : unit =
         else
           facts
       in
-      let newsubst = List.map (fun i -> i, Action.fresh_index ()) evars in
+      let newsubst = List.map (fun i -> i, Action.Index.make_fresh ()) evars in
       let pos =
         p_cond
           ~env:{ env with

@@ -8,7 +8,7 @@ val subst_descr : subst -> descr -> descr
     [e] of type [euf_schema] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices].
     [e.blk_block] stores the relevant block description for future use.  *)
-type euf_schema = { key_indices : Action.indices;
+type euf_schema = { key_indices : Action.index list;
                     message : Term.term;
                     blk_descr : descr }
 
@@ -19,7 +19,7 @@ val pp_euf_schema : Format.formatter -> euf_schema -> unit
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { d_key_indices : Action.indices;
+type euf_direct = { d_key_indices : Action.index list;
                     d_message : Term.term }
 
 val pp_euf_direct : Format.formatter -> euf_direct -> unit

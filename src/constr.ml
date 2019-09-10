@@ -79,8 +79,8 @@ end
 open Utv
 
 let pp_uvar ppf = function
-  | Utv tv -> pp_tvar ppf tv
-  | Uind index -> pp_index ppf index
+  | Utv tv -> Tvar.pp_var ppf tv
+  | Uind index -> Index.pp_var ppf index
 
 let rec pp_ut_cnt ppf = function
   | UVar uv -> pp_uvar ppf uv
@@ -642,14 +642,14 @@ let get_equalities (models : models) ts =
 (****************)
 (* Tests Suites *)
 (****************)
-let tau = TVar (fresh_tvar ())
-and tau' = TVar (fresh_tvar ())
-and tau'' = TVar (fresh_tvar ())
-and tau3 = TVar (fresh_tvar ())
-and tau4 = TVar (fresh_tvar ())
-and tau5 = TVar (fresh_tvar ())
-and i = fresh_index ()
-and i' = fresh_index ()
+let tau = TVar (Tvar.make_fresh ())
+and tau' = TVar (Tvar.make_fresh ())
+and tau'' = TVar (Tvar.make_fresh ())
+and tau3 = TVar (Tvar.make_fresh ())
+and tau4 = TVar (Tvar.make_fresh ())
+and tau5 = TVar (Tvar.make_fresh ())
+and i = Index.make_fresh ()
+and i' = Index.make_fresh ()
 and a indices = mk_action [{ par_choice = 0, List.map (fun i -> "",i) indices;
                            sum_choice = 0 }]
 

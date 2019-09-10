@@ -61,7 +61,7 @@ val reset : unit -> unit
 
 type descr = {
   action : Action.action ;
-  indices : Action.indices ;
+  indices : Action.index list ;
   condition : Term.fact ;
   updates : (Term.state * Term.term) list ;
   output : Term.term
