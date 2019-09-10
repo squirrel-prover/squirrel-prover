@@ -118,4 +118,4 @@ val convert_fact_glob :
     the shadowing. *)
 val convert_vars :
   (string * kind) list ->
-  tsubst  
+  tsubst * Term.fvar list

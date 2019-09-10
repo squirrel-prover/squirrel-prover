@@ -1285,15 +1285,9 @@ type args = (string * Theory.kind) list
 let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
-  let u_subst = Theory.convert_vars uargs
-  and e_subst = Theory.convert_vars eargs in
+  let (u_subst,ufvars) = Theory.convert_vars uargs
+  and (e_subst,efvars) = Theory.convert_vars eargs in
 
-  let rec get_fvars (s:Theory.tsubst) =
-    match s with
-    [] -> []
-    |Theory.Idx(a,i)::l -> (Term.IndexVar i) :: (get_fvars l)
-    |Theory.TS(a, Term.TVar i)::l -> (Term.TSVar i) :: (get_fvars l)                                      |Theory.Term(a, Term.MVar i)::l -> (Term.MessVar i) :: (get_fvars l)                                  | _ -> failwith "ill-typed substitution"               
-      in
   let uconstr =
     Theory.convert_constr_glob
       (List.rev uargs)
@@ -1314,10 +1308,10 @@ let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
       (e_subst @ u_subst)
       efact in
 
-  { uvars = get_fvars u_subst;
+  { uvars = ufvars;
     uconstr = uconstr;
     ufact = ufact;
-    postcond = [{ evars = get_fvars e_subst;
+    postcond = [{ evars = efvars;
                   econstr = econstr;
                   efact = efact }] }
 

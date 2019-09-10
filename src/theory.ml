@@ -442,15 +442,24 @@ let convert_fact_glob subst f : Term.fact =
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,
     in reverse order of declaration. By consequence, List.assoc properly handles
-    the shadowing. *)
+    the shadowing. Variables are not renamed. *)
 let rec convert_vars vars =
   let rec conv vs =
     match vs with
-    | [] -> []
-    | (a, Index) :: l -> Idx(a, Action.Index.make_fresh () )::(conv l)
-    | (a, Timestamp) :: l -> TS(a, Term.TVar(Term.Tvar.make_fresh ()) )::(conv l)                               | (a, Message) :: l -> Term(a, Term.MVar(Term.Mvar.make_fresh ()) )::(conv l)                               | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
+    | [] -> ([],[])
+    | (a, Index) :: l -> let (vl,acc) = conv l in
+      let a_var = Action.Index.get_or_make_fresh (Term.get_indexvars acc) a in
+      (Idx(a,a_var)::vl,(Term.IndexVar a_var)::acc)
+    | (a, Timestamp) :: l -> let (vl,acc) = conv l in
+      let a_var = Term.Tvar.get_or_make_fresh (Term.get_tsvars acc) a in
+      (TS(a, Term.TVar(a_var) )::vl,(Term.TSVar a_var)::acc)
+    | (a, Message) :: l -> let (vl,acc) = conv l in
+      let a_var = Term.Mvar.get_or_make_fresh (Term.get_messvars acc) a in
+      (Term(a, Term.MVar(Term.Mvar.make_fresh ()) )::vl,(Term.MessVar a_var)::acc)
+    | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
   in
-  conv vars |> List.rev
+  let (res,acc) =  conv vars in
+  (List.rev res,acc)
 
 (** Tests *)
 let () =
