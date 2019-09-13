@@ -6,7 +6,7 @@ module Index : VarType
 type index = Index.t
 
 type 'a item = {
-  par_choice : int * 'a list ;
+  par_choice : int * 'a ;
   sum_choice : int
 }
 type 'a t = ('a item) list
@@ -17,14 +17,14 @@ val depends : 'a t -> 'a t -> bool
 
 val enables : 'a t -> 'a t -> bool
 
-type action_shape = string item list
+type action_shape = int t
 
-type action = (string*index) item list
+type action = (index list) t
 
-val mk_shape : string item list -> action_shape
+val mk_shape : int t -> action_shape
 
 (** This is for testing, it should never be necessary in the actual code. *)
-val mk_action : (string * index) item list -> action
+val mk_action : (index list) t -> action
 
 val get_shape : action -> action_shape
 
@@ -44,8 +44,9 @@ val constr_equal : action -> action -> (index * index) list option
   * the corresponding substitution for indices. *)
 val refresh : action -> action * (index * index) list
 
-val pp_action : Format.formatter -> action -> unit
+val pp_action_f : (Format.formatter -> int * 'a -> unit) ->
+  Format.formatter -> 'a item list -> unit
 
-val pp_shape : Format.formatter -> action -> unit
+val pp_action : Format.formatter -> action -> unit
 
 val pp_action_shape : Format.formatter -> action_shape -> unit

@@ -2,9 +2,22 @@
 
 type ord = Term.ord
 
+type action_shape = (string list) Action.t
+
+let pp_par_choice_fg f g ppf (k,str_indices) =
+  if str_indices = [] then
+    Fmt.pf ppf "%d" k
+  else
+    Fmt.pf ppf "%d[%a]" k f (g str_indices)
+
+let pp_par_choice_shape2 =
+  pp_par_choice_fg
+    (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
+    (fun x -> x)
+    
 type term =
   | Var of string
-  | Taction of Action.action_shape
+  | Taction of action_shape
   | Name of string * term list
       (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -21,10 +34,11 @@ type term =
         * the terms appearing in goals.*)
   | Compare of ord*term*term
 
+let pp_action_shape = Action.pp_action_f pp_par_choice_shape2
 
 let rec pp_term ppf = function
   | Var (s) -> Fmt.pf ppf "%s" s
-  | Taction a -> Action.pp_action_shape ppf a
+  | Taction a -> pp_action_shape ppf a
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s(@[<hov 1>%a@])%a" f (Fmt.list pp_term) terms pp_ots ots
   | Name (n,terms) ->
@@ -241,9 +255,8 @@ let make_term ?at_ts:(at_ts=None) s l =
       if l <> [] then raise Type_error ;
       Var s end
 
-let make_action l =
+let make_action l : action_shape =
   List.map (fun (i,l,i') -> Action.({ par_choice = i,l; sum_choice = i'})) l
-  |> Action.mk_shape
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v],None)
@@ -344,7 +357,7 @@ let convert_ts subst t =
         List.map (fun it ->
             let i,l = it.Action.par_choice in
             Action.({
-                par_choice = i, List.map (fun x -> x, subst_get_index subst x) l;
+                par_choice = i, List.map (subst_get_index subst) l;
                 sum_choice = it.sum_choice })
           ) a in
       Term.TName act

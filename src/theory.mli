@@ -2,10 +2,12 @@
 
 type ord = Term.ord
 
+type action_shape
+  
 (* TODO replace term list by string list when indices are expected ? *)
 type term =
   | Var of string
-  | Taction of Action.action_shape
+  | Taction of action_shape
   | Name of string * term list
       (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -54,7 +56,7 @@ val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 (** Term builders *)
 
 val make_term : ?at_ts:term option -> string -> term list -> term
-val make_action : (int * string list * int) list -> Action.action_shape
+val make_action : (int * string list * int) list -> action_shape
 val make_pair : term -> term -> term
 
 (** Type-checking *)

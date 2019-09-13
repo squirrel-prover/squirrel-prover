@@ -577,7 +577,7 @@ let rec subst_action (s:subst) (a:action) =
   | [] -> []
   | a :: l ->
     let p, sis = a.par_choice in
-    { par_choice = p, List.map (fun (sa, ind) -> (sa, get_index_subst s ind)) sis;
+    { par_choice = p, List.map (get_index_subst s) sis;
       sum_choice = a.sum_choice }
     :: subst_action s l
 

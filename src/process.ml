@@ -259,6 +259,7 @@ let pp_descr ppf descr =
   * the action or current condition (they could be introduced by previous
   * conditions). *)
 type block = {
+  action : action;
   input : Channel.t * string ;
   indices : index list ;
   condition : index list * Term.fact ;
@@ -267,12 +268,17 @@ type block = {
 }
 
 (** Associates a block to each action *)
-let action_to_block : (action, block) Hashtbl.t =
+let action_to_block : (action_shape, block) Hashtbl.t =
   Hashtbl.create 97
 
-let fresh_instance action block =
+
+let to_descr (block:block) : descr =
+    let updates = List.map (fun (s,l,t) -> (Term.mk_sname s, l),  t) block.updates in
+  {action=block.action ; indices=block.indices; condition=(snd block.condition); updates=updates; output=snd block.output}
+
+let fresh_instance block =
   let subst = List.map (fun i -> Term.Index(i, Index.make_fresh ())) block.indices in
-  let action = Term.subst_action subst action in
+  let action = Term.subst_action subst block.action in
   let refresh_term = Term.subst_term subst in
   let refresh_fact = Term.subst_fact subst in
   let indices = List.map snd (Term.to_isubst subst) in
@@ -289,7 +295,7 @@ let fresh_instance action block =
     { action; indices; condition; updates; output }
 
 let iter_csa f =
-  Hashtbl.iter (fun a b -> f (fresh_instance a b)) action_to_block
+  Hashtbl.iter (fun a b -> f (fresh_instance b)) action_to_block
 
 let subst_descr subst (descr : descr) =
   let action = Term.subst_action subst descr.action in
@@ -309,13 +315,11 @@ let subst_descr subst (descr : descr) =
 
 let get_descr a =
   let exception Found of descr in
-  try iter_csa (fun d ->
-      match Action.same_shape d.action a with
-      | None -> ()
-      | Some subst -> raise @@ Found (subst_descr (Term.from_isubst subst) d)
-    );
-    raise @@ Failure "No matching shape"
-  with Found b -> b
+  let block = Hashtbl.find action_to_block (get_shape a) in
+      match Action.same_shape block.action a with
+      | None -> raise Not_found
+      | Some subst -> (subst_descr (Term.from_isubst subst) (to_descr block)  )
+
 
 module Aliases = struct
 
@@ -337,7 +341,7 @@ end
 let show_actions ppf () =
   Fmt.pf ppf "@[<v 2>Available actions:@;" ;
   Hashtbl.iter
-    (fun a _ -> Fmt.pf ppf "%a@;" Action.pp_action a)
+    (fun a _ -> Fmt.pf ppf "%a@;" Action.pp_action_shape a)
     action_to_block;
   Fmt.pf ppf "@]" ;
 
@@ -398,7 +402,7 @@ let parse_proc proc : unit =
     * and accumulate parts of the new action item and block:
     * [pos] is the position in parallel compositions.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos ~pos_indices = function
+  let rec p_in ~env ~pos ~(pos_indices:index list) = function
     | Null -> pos
     | Parallel (p,q) ->
         let pos = p_in ~env ~pos ~pos_indices p in
@@ -410,7 +414,7 @@ let parse_proc proc : unit =
             isubst = (i,i') :: env.isubst ;
             p_indices = i' :: env.p_indices }
         in
-        let pos_indices = (i,i')::pos_indices in
+        let pos_indices = i'::pos_indices in
           p_in ~env ~pos ~pos_indices p
     | Apply (id,args,id') ->
         (* TODO
@@ -615,8 +619,9 @@ let parse_proc proc : unit =
             updates
         in
         let indices = env.p_indices in
-        let block = { input ; indices ; condition ; updates ; output } in
-          Hashtbl.add action_to_block (List.rev env.action) block ;
+        let action = (List.rev env.action) in
+        let block = {action; input ; indices ; condition ; updates ; output } in
+          Hashtbl.add action_to_block (get_shape action) block ;
           ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
     | p ->
         Format.eprintf "%a@." pp_process p ;

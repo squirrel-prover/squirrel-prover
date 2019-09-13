@@ -18,7 +18,7 @@ type index = Index.t
   * Then, in a process (if cond then P else Q), the sum_choice 0 will
   * denote a success of the conditional, while 1 will denote a failure. *)
 type 'a item = {
-  par_choice : int * 'a list ;
+  par_choice : int * 'a ;
   sum_choice : int
 }
 type 'a t = 'a item list
@@ -51,9 +51,9 @@ let rec enables a b = match a,b with
 
 
 
-type action_shape = string t
+type action_shape = int t
 
-type action = (string * index) t
+type action = (index list) t
 
 let mk_shape l = l
 
@@ -63,14 +63,14 @@ let rec get_shape = function
   | [] -> []
   | i :: l ->
     let p, sis = i.par_choice in
-    { par_choice = (p, List.map fst sis) ;
+    { par_choice = (p, List.length sis) ;
       sum_choice = i.sum_choice }
     :: get_shape l
 
 let rec action_indices = function
   | [] -> []
   | a :: l -> let _,sis = a.par_choice in
-    List.map snd sis @ action_indices l
+    sis @ action_indices l
 
 (** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
     shapes. Return [None] otherwise.
@@ -96,7 +96,7 @@ let same_shape a b =
   | i :: l, i' :: l' ->
     let p,sis = i.par_choice and p',sis' = i'.par_choice in    
     if p = p' && List.length sis = List.length sis' then
-      let acc' = List.map2 (fun (_,i) (_,i') -> i,i') sis sis' in
+      let acc' = List.map2 (fun (i) (i') -> i,i') sis sis' in
       same (acc' @ acc) l l'
     else None in
    same [] a b 
@@ -115,15 +115,15 @@ let rec constr_equal a b = match a,b with
       (constr_equal a b)
       (fun res ->
          Utils.some @@
-         List.map2 (fun (_,ind) (_,ind') -> (ind, ind')) sis sis'
+         List.map2 (fun (ind) (ind') -> (ind, ind')) sis sis'
          @ res)
 
 let rec refresh = function
   | [] -> [],[]
   | {par_choice=(k,is);sum_choice}::l ->
-      let l3 = List.map (fun (i0,i) -> i0, i, Index.make_fresh ()) is in
-      let is' = List.map (fun (i,_,j) -> i,j) l3 in
-      let newsubst = List.map (fun (_,j,j') -> j,j') l3 in
+      let l3 = List.map (fun (i) -> i, Index.make_fresh ()) is in
+      let is' = List.map (fun (i,j) -> j) l3 in
+      let newsubst = l3 in
       let action,subst = refresh l in
         { par_choice= k, is' ;
           sum_choice }
@@ -136,13 +136,17 @@ let pp_par_choice_fg f g ppf (k,str_indices) =
   else
     Fmt.pf ppf "%d[%a]" k f (g str_indices)
 
-let pp_par_choice =
-  pp_par_choice_fg Index.pp_list (fun sis -> List.map snd sis)
 
-let pp_par_choice_shape =
-  pp_par_choice_fg
-    (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
-    (fun sis -> List.map fst sis)
+
+
+let pp_par_choice =
+  pp_par_choice_fg Index.pp_list (fun sis -> sis)
+
+let pp_par_choice_shape ppf (k,indice_length) =
+  if indice_length = 0 then
+    Fmt.pf ppf "%d" k
+  else
+    Fmt.pf ppf "%d[%i]" k (indice_length)
 
 let pp_par_choice_shape2 =
   pp_par_choice_fg
@@ -174,4 +178,4 @@ let pp_action ppf a =
 
 let pp_shape = pp_action_f pp_par_choice_shape
 
-let pp_action_shape = pp_action_f pp_par_choice_shape2
+let pp_action_shape = pp_action_f pp_par_choice_shape
