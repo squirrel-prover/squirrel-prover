@@ -261,6 +261,19 @@ type atsubst =
              
 type tsubst = atsubst list
 
+
+let pp_atsubst ppf e =
+  let pp_el pp_t (t1,t2) = Fmt.pf ppf "%s->%a" t1 pp_t t2 in
+  match e with
+  | Term(t1,t2) -> pp_el Term.pp_term (t1,t2)
+  | TS(ts1,ts2) -> pp_el Term.pp_timestamp (ts1,ts2)
+  | Idx(i1,i2) -> pp_el Action.Index.pp (i1,i2)
+                      
+let pp_tsubst ppf s =
+  Fmt.pf ppf "@[<hv 0>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_atsubst) s
+
+
 let term_subst (s:tsubst) =
   List.fold_left (fun acc asubst -> match asubst with Term(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
 
@@ -273,16 +286,16 @@ let to_isubst (s:tsubst) =
 
 let subst_get_index subst x =
   try List.assoc x (to_isubst subst)
-  with Not_found ->  raise @@ Failure "ill-typed variable usage" 
+  with Not_found ->  raise @@ Failure (Printf.sprintf "ill-typed or undefined variable usage : %s" x)
 
 let subst_get_ts subst x =
   try List.assoc x (ts_subst subst)
-  with Not_found ->  raise @@ Failure "ill-typed variable usage" 
+  with Not_found ->  raise @@ Failure  (Printf.sprintf "ill-typed or undefined variable usage : %s" x) 
 
 let subst_get_mess subst x =
   try List.assoc x (term_subst subst)
-  with Not_found ->  raise @@ Failure "ill-typed variable usage" 
-
+  with Not_found ->  raise @@ Failure  (Printf.sprintf "ill-typed or undefined variable usage : %s" x)
+      
 let conv_index subst = function
   | Var x -> subst_get_index subst x
   | _ -> failwith "ill-formed index"
@@ -374,7 +387,7 @@ let convert_glob subst t =
       let i = List.map (conv_index subst) i in
       Term.Name (Term.mk_name n,i)
     | Compare (o,u,v) -> assert false (* TODO *)
-    | Var x -> raise @@ Failure (Printf.sprintf "convert: unbound variable %s" x)
+    | Var x ->  subst_get_mess subst x
     | Taction _ -> assert false
     | Get (s,None,_) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
@@ -455,7 +468,7 @@ let rec convert_vars vars =
       (TS(a, Term.TVar(a_var) )::vl,(Term.TSVar a_var)::acc)
     | (a, Message) :: l -> let (vl,acc) = conv l in
       let a_var = Term.Mvar.get_or_make_fresh (Term.get_messvars acc) a in
-      (Term(a, Term.MVar(Term.Mvar.make_fresh ()) )::vl,(Term.MessVar a_var)::acc)
+      (Term(a, Term.MVar(a_var) )::vl,(Term.MessVar a_var)::acc)
     | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
   in
   let (res,acc) =  conv vars in

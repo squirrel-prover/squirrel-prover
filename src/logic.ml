@@ -313,33 +313,14 @@ end = struct
   let pp_judgment pp_goal ppf judge =
     let open Fmt in
     let open Utils in
-    let tsvars = get_tsvars judge.vars
-    and indexvars = get_indexvars judge.vars
-    and messvars = get_messvars judge.vars in
     pf ppf "@[<v 0>%a@;\
-            @[<v 0>%a@]\
-            @[<v 0>%a@]\
-            @[<v 0>%a@]\
+           @[<v 0>%a@]\
             @[<hv 2>Theta:@ @[%a@]@]@;\
             @[%a@]@;\
             %a@;\
             %a@;@;@]"
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
-      (list ~sep:nop (fun ppf v ->
-           pf ppf "%a : %a@;"
-             Tvar.pp v
-             (styled `Blue (styled `Bold ident)) "timestamp"))
-      tsvars
-      (list ~sep:nop (fun ppf v ->
-           pf ppf "%a : %a@;"
-             Action.Index.pp v
-             (styled `Blue (styled `Bold ident)) "index"))
-      indexvars
-      (list ~sep:nop (fun ppf v ->
-           pf ppf "%a : %a@;"
-             Term.Mvar.pp v
-             (styled `Blue (styled `Bold ident)) "index"))
-      messvars      
+      (Term.pp_typed_fvars "") judge.vars
       Theta.pp_theta judge.theta
       Gamma.pp_gamma judge.gamma
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
@@ -390,6 +371,7 @@ end = struct
     { j with gamma = g }
 
   let add_fact f j =
+
     let j = update_descr j (fact_actions f) in
 
     { j with gamma = Gamma.add_fact j.gamma f }
@@ -471,9 +453,11 @@ type proof_state = { goals : named_goal list;
                    }
 
 
-
-type arg = IDArg of string | TermArg of Theory.term
-
+(*
+let pp_arg ppf = function
+    IDArg s -> Fmt.pf ppf "%s:string" s
+  | TermArg t -> Theory.pp_term ppf t
+*)
 let parse_args goalname ts : subst =
   let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
   match goals with
@@ -481,18 +465,17 @@ let parse_args goalname ts : subst =
   | [(np,gp)] -> (
       let uvars = gp.uvars in
       if (List.length uvars) <> (List.length ts) then raise @@ Failure "Number of parameters different than expected";
-      match !current_goal with
-      | None ->  raise @@ Failure "Cannot parse term with respect to empty current goal"
-      | Some((name,g)) -> let u_subst = List.map (function
+      match !subgoals with
+      | [] ->  raise @@ Failure "Cannot parse term with respect to empty current goal"
+      |  Ejudge (gt,j)::_ -> let u_subst = List.map (function
             IndexVar v -> Theory.Idx(Index.name v,v)
           | TSVar v -> Theory.TS(Tvar.name v,TVar v)
-          | MessVar v -> Theory.Term(Mvar.name v,MVar v)) g.uvars in
+          | MessVar v -> Theory.Term(Mvar.name v,MVar v)) j.vars in
         List.map2 (fun t u -> match u,t with
-              TSVar a,TermArg t -> TS(TVar a, Theory.convert_ts u_subst t )
-            | TSVar a, IDArg iname -> TS(TVar a, TVar(Term.Tvar.get_or_make_fresh (Term.get_tsvars g.uvars) iname))                                                                                
-            | MessVar a, TermArg t -> Term(MVar a, Theory.convert_glob u_subst t)
-            | MessVar a, IDArg iname -> Term(MVar a, MVar(Term.Mvar.get_or_make_fresh (Term.get_messvars g.uvars) iname))                                                                                   
-            | IndexVar a, IDArg iname -> Index(a, (Action.Index.get_or_make_fresh (Term.get_indexvars g.uvars) iname))
+            | TSVar a, t -> TS(TVar a, Theory.convert_ts u_subst t )                                                                           
+            | MessVar a, t -> Term(MVar a, Theory.convert_glob u_subst t)
+
+            | IndexVar a, Theory.Var iname -> Index(a, (Action.Index.get_or_make_fresh (Term.get_indexvars j.vars) iname))
             | _ ->  raise @@ Failure "Type error in the arguments"
 
           ) ts uvars
@@ -571,9 +554,8 @@ let goal_and_intro (judge : fact judgment) sk fk = match judge.goal with
 let goal_forall_intro (judge : formula judgment) sk fk =
 
 
-  let vsubst =List.fold_left (fun subst x -> if List.mem x judge.vars then (x,make_fresh_of_type x):: subst else subst ) [] judge.goal.uvars in
+  let vsubst =List.fold_left (fun subst x -> if List.mem x judge.vars then (x,make_fresh_of_type x):: subst else (x,x)::subst ) [] judge.goal.uvars in
   let subst = from_fvarsubst vsubst in
-    
   let new_cnstr = subst_constr subst judge.goal.uconstr
   and new_fact = subst_fact subst judge.goal.ufact
   and new_goals =
@@ -837,8 +819,31 @@ let euf_apply f_select (judge : 'a judgment) sk fk =
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
 
-let apply s (judge : 'a judgment) sk fk =
-  sk [judge] fk
+let apply (gname:string) (subst:subst) (judge : 'a judgment) sk fk =
+  let goals = List.filter (fun (name,g) -> name = gname) !goals_proved in
+    match goals with
+    | [] ->  raise @@ Failure "No proved goal with given name"
+    | [(np,gp)] ->
+      (* the precondition which creates a new subgoal *)
+      let new_cnstr = subst_constr subst gp.uconstr in 
+      let new_fact = subst_fact subst gp.ufact in
+      
+      let new_subgoal = {uvars=[]; uconstr = new_cnstr; ufact= new_fact; postcond =[] } in
+      let new_judge =  Ejudge (Gt_formula,Judgment.init new_subgoal) in
+      subgoals := (new_judge) :: !(subgoals); 
+(* and the postconditions which are added to the current gamma and theta *)
+      let new_truths =
+    List.map (fun goal ->
+        subst_postcond subst goal
+      ) gp.postcond in
+        let judge =
+          List.fold_left (fun judge nt ->
+              Judgment.add_fact nt.efact judge
+              |> Judgment.add_constr nt.econstr
+            ) judge new_truths in 
+        sk [judge] fk
+  | _ ->  raise @@ Failure "Multiple proved goals with same name"
+
 
 (** Tactics *)
 
@@ -852,7 +857,7 @@ type (_,_) tac =
   | Intro : (fact, fact) tac
   | Split : (fact, fact) tac
 
-  | Apply : subst -> ('a, 'a) tac 
+  | Apply : (string * subst) -> ('a, 'a) tac
 
   | ForallIntro : (formula, postcond) tac
   | ExistsIntro :
@@ -888,7 +893,7 @@ let rec pp_tac : type a b. Format.formatter -> (a,b) tac -> unit =
     | Intro -> Fmt.pf ppf "goal_intro"
     | Split -> Fmt.pf ppf "goal_and_intro"
 
-    | Apply t -> Fmt.pf ppf "apply"
+    | Apply (s,t) -> Fmt.pf ppf "apply"
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->
@@ -937,7 +942,7 @@ let rec tac_apply :
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (nu) -> goal_exists_intro judge sk fk nu
 
-    | Apply s -> apply s judge sk fk
+    | Apply (gname,s) -> apply gname s judge sk fk
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
     | Split -> goal_and_intro judge sk fk
@@ -1036,7 +1041,7 @@ type utac =
   | UIntro : utac
   | USplit : utac
 
-  | UApply : subst -> utac
+  | UApply : (string * subst) -> utac
 
   | UForallIntro : utac
   | UExistsIntro : subst -> utac
@@ -1153,7 +1158,7 @@ let tac_of_simp_utac2 utac = match utac with
   | UEqConstants fn -> EqConstants fn
   | UEuf i -> Euf i
   | UCycle i -> Cycle i
-  | UApply s -> Apply s                
+  | UApply s -> Apply s                                      
   | _ -> assert false
 
 let tac_of_simp_utac3 utac = match utac with
@@ -1372,7 +1377,6 @@ let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
      carefully to properly handle variable shadowing.  *)
   let (u_subst,ufvars) = Theory.convert_vars uargs
   and (e_subst,efvars) = Theory.convert_vars eargs in
-
   let uconstr =
     Theory.convert_constr_glob
       (List.rev uargs)
@@ -1457,7 +1461,7 @@ let start_proof () = match !current_goal, !goals with
     cpt_tag := 0;
     current_goal := Some (gname,goal);
     subgoals := [Ejudge (Gt_formula,Judgment.init goal)]
-                |> simplify;
+                |> simplify ;
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."

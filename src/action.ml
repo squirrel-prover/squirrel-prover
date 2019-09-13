@@ -49,6 +49,8 @@ let rec enables a b = match a,b with
     enables tla tlb
   | _ -> false
 
+
+
 type action_shape = string t
 
 type action = (string * index) t
@@ -74,18 +76,33 @@ let rec action_indices = function
     shapes. Return [None] otherwise.
     If [a] indices appear at most once in [a], then [subst] is the index
     substitution sending [a] to [b]. *)
-let same_shape a b =
+(* let same_shape a b =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc
   | [], _ | _, [] -> None
   | i :: l, i' :: l' ->
-    let p,sis = i.par_choice and p',sis' = i'.par_choice in
+    let p,sis = i.par_choice and p',sis' = i'.par_choice in    
     if p = p' && List.for_all2 (fun (a,_) (b,_) -> a = b) sis sis' then
       let acc' = List.map2 (fun (_,i) (_,i') -> i,i') sis sis' in
       same (acc' @ acc) l l'
     else None in
 
-  same [] a b
+   same [] a b *)
+
+let same_shape a b =
+  let rec same acc a b = match a,b with
+  | [],[] -> Some acc
+  | [], _ | _, [] -> None
+  | i :: l, i' :: l' ->
+    let p,sis = i.par_choice and p',sis' = i'.par_choice in    
+    if p = p' && List.length sis = List.length sis' then
+      let acc' = List.map2 (fun (_,i) (_,i') -> i,i') sis sis' in
+      same (acc' @ acc) l l'
+    else None in
+   same [] a b 
+
+(* shape should be par_choice : int * int 8), where int is the length of the a list,
+   then we have a hash table shap to block, mapping shapes to descr. Then, given an aciton, we exctract the shape, use the table to get the block, use the action in the block to   *)
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
     [a] and [b] equal, if there is one. Return None otherwise. *)

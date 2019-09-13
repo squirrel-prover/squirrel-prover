@@ -314,7 +314,7 @@ let get_descr a =
       | None -> ()
       | Some subst -> raise @@ Found (subst_descr (Term.from_isubst subst) d)
     );
-    raise Not_found
+    raise @@ Failure "No matching shape"
   with Found b -> b
 
 module Aliases = struct

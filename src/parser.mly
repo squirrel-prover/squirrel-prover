@@ -217,13 +217,9 @@ formula:
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
                                  { ($2, $7, $4, $9) } 
 
-tactic_param:
-| a=aterm	                 { Logic.TermArg a }
-| i=ID                           { Logic.IDArg i }
-
 tactic_params:
 |                                 { [] }
-| t=tactic_param ts=tactic_params { t::ts }
+| t=term ts=tactic_params { t::ts }
 
 
 tac:
@@ -246,7 +242,7 @@ tac:
   | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
   | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
   | TRY l = tac ORELSE r = tac        { Logic.UTry (l, r) }
-  | APPLY i=ID t=tactic_params        { Logic.UApply (Logic.parse_args i t) }
+  | APPLY i=ID t=tactic_params        { Logic.UApply (i, Logic.parse_args i t) }
 
 
 

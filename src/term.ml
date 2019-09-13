@@ -385,7 +385,12 @@ let pp_fvar ppf = function
     TSVar t -> Tvar.pp ppf t
   | MessVar m -> Mvar.pp ppf m
   | IndexVar i -> Index.pp ppf i
-  
+
+let pp_typed_fvar ppf = function
+    TSVar t -> Fmt.pf ppf "%a:timestamp" Tvar.pp t
+  | MessVar m -> Fmt.pf ppf "%a:message" Mvar.pp m
+  | IndexVar i -> Fmt.pf ppf "%a:index" Index.pp i
+
 let make_fresh_of_type (v:fvar) =
     match v with
     | TSVar _ -> TSVar (Tvar.make_fresh ())
@@ -424,35 +429,35 @@ let get_indexvars (f:fvar list) =
   List.fold_left (fun acc t -> match t with IndexVar t -> t::acc | _ -> acc) [] f
 
 
-
-
-let pp_q_vars s_q vars constr ppf () =
+let pp_typed_fvars spref ppf vars =
   let open Fmt in
   let open Utils in
-  let tsvars = get_tsvars vars in
+ let tsvars = get_tsvars vars in
   if tsvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-     (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma Tvar.pp) tsvars
+     (styled `Red (styled `Underline ident)) spref
+     (Tvar.pp_list) tsvars
      (styled `Blue (styled `Bold ident)) "timestamp"
   else ();
   let indexvars = get_indexvars vars in
   if indexvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-     (styled `Red (styled `Underline ident)) s_q
+      (styled `Red (styled `Underline ident)) spref
      Index.pp_list indexvars
      (styled `Blue (styled `Bold ident)) "index"
   else ();
   let messvars = get_messvars vars in
   if messvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-     (styled `Red (styled `Underline ident)) s_q
-     (list ~sep:Fmt.comma Mvar.pp) messvars
+      (styled `Red (styled `Underline ident)) spref
+     (Mvar.pp_list) messvars
      (styled `Blue (styled `Bold ident)) "message"
-  else ();  
-  (* if vars = [] && indices = [] then
-   *   Fmt.pf ppf "@[<hv 2>%a@ ()@]@;"
-   *     (styled `Red (styled `Underline ident)) s_q; *)
+  else ()
+
+let pp_q_vars s_q vars constr ppf () =
+  let open Fmt in
+  let open Utils in
+  Fmt.pf ppf "%a" (pp_typed_fvars s_q) vars;
   Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
     (styled `Red (styled `Underline ident)) "such that"
     (fun ppf constr ->

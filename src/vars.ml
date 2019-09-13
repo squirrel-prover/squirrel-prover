@@ -20,8 +20,12 @@ module Var(V:VarParam) : VarType =
 
     let make_fresh ?(name=V.default_string) () =
       let id = !V.cpt in
-      incr V.cpt; {id = id; name =  Format.sprintf "%s" name }
-
+      incr V.cpt;
+      if name = V.default_string then
+        {id = id; name =  Format.sprintf "%s_%i" name id }
+      else
+        {id = id; name =  Format.sprintf "%s" name }
+  
     let get_or_make_fresh (ts:t list) (n:string) =
       match List.filter (fun t -> t.name = n) ts with
         [] -> make_fresh ~name:n ()

@@ -6,11 +6,9 @@ channel c
 
 mutable sname : index->message
 
-axiom test
-forall (tau1 : timestamp, tau2 : timestamp)
-such that
-tau1 = tau2:
-output@tau1= output@tau2
+axiom name_not_pair
+forall (tau1:timestamp, ma : message, a:index) :
+sname(a)@tau1 <>  <ma, ma>
 
 system  out(c,cst);
 (
@@ -27,12 +25,11 @@ such that
 Proof.
   forallintro.
   intro.
-
   eqtimestamps.
   congruence.
 Qed.
 
-goal unforgeable forall (tau1 : timestamp, a: index)
+goal unforgeable forall (tau1 : timestamp, a : index)
 such that
 tau1 <> 0_0[a]:
 output@tau1 = h(sname(a)@tau1,k)
@@ -40,8 +37,12 @@ output@tau1 = h(sname(a)@tau1,k)
 
 Proof.
   forallintro.
-  euf 0.   (* why is ts10 not printed in the declared variables *)
+  euf 0.
+  apply name_not_pair tau1 sname(index_18)@0_1[index_18] a.
+  congruence. (* why congruence does not return false ?? *)
+
   cycle -1.
+
   try congruence orelse ident.
   cycle 2.
   eqnames.

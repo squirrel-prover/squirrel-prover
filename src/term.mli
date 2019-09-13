@@ -217,6 +217,11 @@ type fvar =
   | MessVar of mvar
   | IndexVar of index
 
+val pp_typed_fvar : Format.formatter -> fvar -> unit
+
+val pp_typed_fvars : string -> Format.formatter -> fvar list -> unit
+
+
 val make_fresh_of_type : fvar -> fvar
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
