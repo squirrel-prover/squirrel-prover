@@ -29,10 +29,10 @@ let parse_next parser_fun =
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
     
-let rec main_loop mode =
+let rec main_loop ?(save=true) mode =
   Format.printf "[>@.";
   (* if we are not waiting for a system description, we are at some break point and we save the state *)
-  if mode <> InputDescr then
+  if save && mode <> InputDescr then
     save_state mode
   else
   (Theory.initialize_symbols () ;
@@ -93,7 +93,7 @@ let rec main_loop mode =
                       
 and error mode s =
   Fmt.pr "[error> %s@." s;
-  if !interactive_mode then main_loop mode
+  if !interactive_mode then main_loop ~save:false mode
   else exit 1
 
 
