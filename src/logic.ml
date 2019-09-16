@@ -241,8 +241,6 @@ end
 
 
 type typed_goal =
-  | Top
-  | Bot
   | Unit
   | Formula of formula
   | Postcond of postcond
@@ -250,14 +248,20 @@ type typed_goal =
 
 let pp_typed_goal fmt =
   function
-  | Top -> Fmt.pf fmt "top"
-  | Bot -> Fmt.pf fmt "bot"
   | Unit -> Fmt.pf fmt "unit"
   | Formula f -> pp_formula fmt f
   | Postcond p -> pp_postcond fmt p
   | Fact f -> pp_fact fmt f
 
-exception Goal_type_error
+let type_goal =
+    function
+  | Unit -> "unit"
+  | Formula f -> "formula"
+  | Postcond p -> "postcondition"
+  | Fact f -> "fact"
+
+
+exception Goal_type_error of string * string (* expected type and given type *)
 
 module Judgment : sig
   (** Type of judgments:
@@ -377,12 +381,11 @@ end = struct
 
   let set_gamma g j = { j with gamma = g }
 
-  let get_goal_fact j = match j.goal with  Fact f -> f | _ -> raise Goal_type_error
+  let get_goal_fact j = match j.goal with  Fact f -> f | _ -> raise @@ Goal_type_error ("fact", type_goal j.goal)
 
-  let get_goal_formula j = match j.goal with Formula f -> f | _ -> raise Goal_type_error
+  let get_goal_formula j = match j.goal with Formula f -> f | _ -> raise @@ Goal_type_error ("formula", type_goal j.goal)
 
-  let get_goal_postcond j = match j.goal with Postcond p -> p | _ -> raise Goal_type_error  
-
+  let get_goal_postcond j = match j.goal with Postcond p -> p | _ -> raise @@ Goal_type_error ("postcond", type_goal j.goal)
 end
 
 open Judgment
@@ -790,7 +793,7 @@ type tac =
   | Cycle : int -> tac
 
 
-let rec pp_tac : type a b. Format.formatter -> tac -> unit =
+let rec pp_tac : Format.formatter -> tac -> unit =
   fun ppf tac -> match tac with
     | Admit -> Fmt.pf ppf "admit"
     | Ident -> Fmt.pf ppf "ident"
@@ -1006,7 +1009,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
       Judgment.pp_judgment j
   | _ -> assert false
 
-exception Tactic_type_error
+exception Tactic_type_error of string
 
 (** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
     Return [true] if there are no subgoals remaining. *)
@@ -1022,9 +1025,8 @@ let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
       is_proof_completed () in
     try     
       tac_apply tac judge suc_k failure_k
-    with Goal_type_error ->  Log.log Log.LogTacticTC (fun () ->
-            Fmt.epr "@[<v 0>The tactic @[%a@] is ill-typed.@;"
-              pp_tac tac); raise  @@ Tactic_type_error
+    with Goal_type_error (expected,given)-> 
+      raise @@ Tactic_type_error (Fmt.strf "@[The tactic %a is ill-typed, it was expected to be applied to a %s, not to a %s." pp_tac tac expected given)
 let cycle i l =
   let rec cyc acc i = function
     | [] -> raise @@ Tactic_failed "cycle error"

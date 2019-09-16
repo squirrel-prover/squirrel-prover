@@ -66,7 +66,7 @@ let rec main_loop ?(save=true) mode =
             main_loop ProofMode end
         with
         | Tactic_failed s -> error ProofMode ("Tactic failed: " ^ s ^ ".")
-        | Logic.Tactic_type_error -> error ProofMode "Tactic is ill-formed."
+        | Logic.Tactic_type_error s -> error ProofMode s
       end
       
     | WaitQed,ParsedQed ->
