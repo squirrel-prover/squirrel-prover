@@ -11,11 +11,6 @@ axiom name_not_pair
 forall (tau1:timestamp, ma : message, mb : message, a:index) :
 sname(a)@tau1 <>  <ma, mb>
 
-axiom fresh
-forall (tau1:timestamp, tau2:timestamp, a:index) :
-sname(a)@tau1 <>  sname(a)@tau2
-
-
 system  out(c,cst);
 (
   (!_a new n; sname(a) := n; out(c,h(n,k)))
@@ -45,8 +40,7 @@ Proof.
   forallintro.
   euf 0.
   eqnames.
-  apply fresh tau1 0_0[a] a.
-  congruence.
+  notraces.
   apply name_not_pair tau1 sname(index_13)@0_1[index_13] sname(index_13)@0_1[index_13] a.
   congruence.
   apply name_not_pair tau1 sname(index_14)@0_2[index_14] mname(index_14)@0_2[index_14] a.
