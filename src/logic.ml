@@ -759,11 +759,6 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
       let tatom_list = to_cnf new_constr in
       if not( Theta.is_valid judge.theta tatom_list) then raise @@ Failure "Constraint on the variables not satisfied.";
       (* the precondition creates a new subgoal *)
-      let new_subgoal = {uvars=[];
-                         uconstr = True;
-                         ufact= subst_fact subst gp.ufact;
-                         postcond = []
-                         } in
       let new_judge =  Judgment.set_goal (Fact (subst_fact subst gp.ufact)) judge |> simplify  in
       let new_truths =
         List.map (fun goal ->
@@ -807,7 +802,6 @@ type tac =
 
   | Euf : int -> tac
   | Cycle : int -> tac
-
 
 let rec pp_tac : Format.formatter -> tac -> unit =
   fun ppf tac -> match tac with
@@ -1043,6 +1037,9 @@ let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
       tac_apply tac judge suc_k failure_k
     with Goal_type_error (expected,given)-> 
       raise @@ Tactic_type_error (Fmt.strf "@[The tactic %a is ill-typed, it was expected to be applied to a %s, not to a %s." pp_tac tac expected given)
+
+
+
 let cycle i l =
   let rec cyc acc i = function
     | [] -> raise @@ Tactic_failed "cycle error"
