@@ -44,10 +44,17 @@ output@tau1 = h(sname(a)@tau1,k)
 Proof.
   forallintro.
   euf 0.
-  apply fresh_state tau1 0_0[a] a.
-  congruence.
-  apply name_not_pair tau1 sname(index_13)@0_1[index_13] sname(index_13)@0_1[index_13] a.
-  congruence.
+
   apply name_not_pair tau1 sname(index_14)@0_2[index_14] mname(index_14)@0_2[index_14] a.
+  forallintro.
   congruence.
+
+  apply name_not_pair tau1 sname(index_13)@0_1[index_13] sname(index_13)@0_1[index_13] a.
+  forallintro.
+  congruence.
+
+  apply fresh_state tau1 0_0[a] a.
+  forallintro.
+  congruence.  
 Qed.
+

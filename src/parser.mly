@@ -40,7 +40,7 @@
 %type <unit> theory
 %type <Logic.parsed_input> interactive
 %type <Goalmode.gm_input> goal
-%type <Logic.utac> tactic
+%type <Logic.tac> tactic
 %type <unit> qed
 %type <int> undo
 %type <Process.process> top_process
@@ -224,25 +224,25 @@ tactic_params:
 
 tac:
   | LPAREN t = tac RPAREN          { t }
-  | ADMIT                             { Logic.UAdmit }
-  | IDENT                             { Logic.UIdent }
-  | FORALLINTRO                       { Logic.UForallIntro }
-  | INTRO                             { Logic.UIntro }
-  | LEFT                              { Logic.ULeft }
-  | RIGHT                             { Logic.URight }
-  | SPLIT                             { Logic.USplit }
-  | CONGRUENCE                        { Logic.UGammaAbsurd }
-  | NOTRACES                          { Logic.UConstrAbsurd }
-  | EQNAMES                           { Logic.UEqNames }
-  | EQTIMESTAMPS                      { Logic.UEqTimestamps }  
-  | EUF i = INT                       { Logic.UEuf i }
-  | CYCLE i = INT                     { Logic.UCycle i }
-  | CYCLE MINUS i = INT               { Logic.UCycle (-i) }
-  /* | LBRACKET t = tac RBRACKET      { Logic.UProveAll t } */
-  | l = tac SEMICOLON r = tac         { Logic.UAndThen (l,r,None) }
-  | l = tac PLUS r = tac              { Logic.UOrElse (l, r) }
-  | TRY l = tac ORELSE r = tac        { Logic.UTry (l, r) }
-  | APPLY i=ID t=tactic_params        { Logic.UApply (i, Logic.parse_args i t) }
+  | ADMIT                             { Logic.Admit }
+  | IDENT                             { Logic.Ident }
+  | FORALLINTRO                       { Logic.ForallIntro }
+  | INTRO                             { Logic.Intro }
+  | LEFT                              { Logic.Left }
+  | RIGHT                             { Logic.Right }
+  | SPLIT                             { Logic.Split }
+  | CONGRUENCE                        { Logic.GammaAbsurd }
+  | NOTRACES                          { Logic.ConstrAbsurd }
+  | EQNAMES                           { Logic.EqNames }
+  | EQTIMESTAMPS                      { Logic.EqTimestamps }  
+  | EUF i = INT                       { Logic.Euf i }
+  | CYCLE i = INT                     { Logic.Cycle i }
+  | CYCLE MINUS i = INT               { Logic.Cycle (-i) }
+  /* | LBRACKET t = tac RBRACKET      { Logic.ProveAll t } */
+  | l = tac SEMICOLON r = tac         { Logic.AndThen (l,r) }
+  | l = tac PLUS r = tac              { Logic.OrElse (l, r) }
+  | TRY l = tac ORELSE r = tac        { Logic.Try (l, r) }
+  | APPLY i=ID t=tactic_params        { Logic.Apply (i, Logic.parse_args i t) }
 
 
 
