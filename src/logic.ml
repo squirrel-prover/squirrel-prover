@@ -104,7 +104,6 @@ end = struct
 
   let get_atoms g = List.map fst g.atoms
 
-
   let get_eqs_neqs g =
      let eqs, _, neqs = List.map fst g.atoms
                        |> List.map norm_xatom
@@ -327,8 +326,6 @@ end = struct
       goal = Formula goal;
       }
 
-   
-
   let rec add_vars vars j = match vars with
     | [] -> j
     | v :: vars ->
@@ -365,14 +362,11 @@ end = struct
     { j with gamma = g }
 
   let add_fact f j =
-
     let j = update_descr j (fact_actions f) in
-
     { j with gamma = Gamma.add_fact j.gamma f }
 
   let add_constr c j =
     let j = update_descr j (constr_actions c) in
-
     { j with theta = Theta.add_constr j.theta c }
 
   let set_goal_fact f j =
@@ -388,6 +382,7 @@ end = struct
   let get_goal_formula j = match j.goal with Formula f -> f | _ -> raise Goal_type_error
 
   let get_goal_postcond j = match j.goal with Postcond p -> p | _ -> raise Goal_type_error  
+
 end
 
 open Judgment
@@ -404,14 +399,12 @@ let simplify =
     match j.goal with
     | Postcond p  when p.evars = [] -> Judgment.set_goal (Fact p.efact) j
     | _ -> j
-    
 
 (** Current mode of the prover:
     - [InputDescr] : waiting for the process description.
     - [GoalMode] : waiting for the next goal.
     - [ProofMode] : proof of a goal in progress. *)
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
-
 
 (* State in proof mode. *)
 type named_goal = string * formula
@@ -430,12 +423,6 @@ type proof_state = { goals : named_goal list;
                      prover_mode : prover_mode;
                    }
 
-
-(*
-let pp_arg ppf = function
-    IDArg s -> Fmt.pf ppf "%s:string" s
-  | TermArg t -> Theory.pp_term ppf t
-*)
 let parse_args goalname ts : subst =
   let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
   match goals with
@@ -488,8 +475,6 @@ let lift =
 
 (** Introduction Rules *)
 
-
-
 let goal_or_intro_l (judge : judgment) sk fk = match Judgment.get_goal_fact judge with
   | Or (lgoal, _) -> sk [set_goal_fact lgoal judge] fk
   | _ -> raise @@ Failure "goal ill-formed"
@@ -509,11 +494,9 @@ let goal_true_intro (judge : judgment) sk fk = match Judgment.get_goal_fact judg
 let goal_and_intro (judge : judgment) sk fk = match Judgment.get_goal_fact judge with
   | And (lgoal,rgoal) ->
     sk [ set_goal_fact lgoal judge;
-         set_goal_fact rgoal judge ] fk;
-
+         set_goal_fact rgoal judge ] fk
   | _ -> raise @@ Failure "goal ill-formed"
-
-
+      
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : judgment) sk fk =
   let jgoal = Judgment.get_goal_formula judge in
@@ -525,7 +508,6 @@ let goal_forall_intro (judge : judgment) sk fk =
     List.map (fun goal ->
         Postcond (subst_postcond subst goal)
       ) jgoal.postcond in
-
   let judges =
     List.map (fun goal ->
         Judgment.set_goal goal judge
@@ -533,7 +515,6 @@ let goal_forall_intro (judge : judgment) sk fk =
         |> Judgment.add_fact new_fact
         |> Judgment.add_constr new_cnstr
       ) new_goals in
-
   sk judges fk
 
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
@@ -567,7 +548,6 @@ let gamma_absurd (judge : judgment) sk fk =
     sk [Judgment.set_goal Unit judge] fk
   else fk ()
 
-
 let or_to_list f =
   let rec aux acc = function
     | Or (g,h) -> aux (aux acc g) h
@@ -578,17 +558,14 @@ let or_to_list f =
 
 let gamma_or_intro (judge : judgment) sk fk select_pred =
   let sel, nsel = List.split_pred select_pred (Gamma.get_facts judge.gamma) in
-
   let rec mk_facts acc = function
     | [] -> [acc]
     | l :: ors -> List.map (fun x -> mk_facts (x :: acc) ors) l
                   |> List.flatten in
-
   let judges =
     mk_facts [] (List.map or_to_list sel)
     |> List.map (fun fs ->
         Judgment.set_gamma (Gamma.set_facts judge.gamma (fs @ nsel)) judge ) in
-
   sk judges fk
 
 (* (\** Careful, we do not add action descriptions in new goals here.
@@ -605,10 +582,7 @@ let gamma_or_intro (judge : judgment) sk fk select_pred =
  *          prove_all ~last:(Some last) (set_goal goals judges.gt judges) tac sk fk
  *       ) fk *)
 
-
-
 (** Utils *)
-
 let mk_or_cnstr l = match l with
   | [] -> False
   | [a] -> a
@@ -616,7 +590,6 @@ let mk_or_cnstr l = match l with
     let rec mk_c acc = function
       | [] -> acc
       | x :: l -> mk_c (Or (x,acc)) l in
-
     mk_c a l'
 
 let mk_and_cnstr l = match l with
@@ -626,7 +599,6 @@ let mk_and_cnstr l = match l with
     let rec mk_c acc = function
       | [] -> acc
       | x :: l -> mk_c (And (x,acc)) l in
-
     mk_c a l'
 
 
@@ -639,12 +611,10 @@ let mk_and_cnstr l = match l with
 let eq_names (judge : judgment) sk fk =
   let cnstrs = Completion.name_index_cnstrs (Gamma.get_trs judge.gamma)
       (Gamma.get_all_terms judge.gamma) in
-
   let judge =
     List.fold_left (fun judge c ->
         Judgment.add_constr c judge
       ) judge cnstrs in
-
   sk [judge] fk
 
 let eq_constants fn (judge : judgment) sk fk =
@@ -655,7 +625,6 @@ let eq_constants fn (judge : judgment) sk fk =
     List.fold_left (fun judge c ->
         Judgment.add_constr c judge
       ) judge cnstrs in
-
   sk [judge] fk
 
 let eq_timestamps (judge : judgment) sk fk =
@@ -678,9 +647,7 @@ let eq_timestamps (judge : judgment) sk fk =
     List.fold_left (fun judge c ->
         Judgment.add_fact c judge
       ) judge facts in
-
   sk [judge] fk
-
 
 (** EUF Axioms *)
 
@@ -698,45 +665,36 @@ let euf_param (at : atom) = match at with
     else None
   | _ -> None
 
-
 let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in
   let open Process in
   (* We create the term equality *)
   let eq = Atom (Eq, case.message, m) in
   let new_f = And (eq, case.blk_descr.condition) in
-
   (* Now, we need to add the timestamp constraints. *)
-
   (* The block action name and the block timestamp variable are equal. *)
   let blk_ts = TName case.blk_descr.action in
-
   (* The block occured before the test H(m,k) = s. *)
   let le_cnstr =
     List.map (fun ts ->
         Atom (Pts (Leq, blk_ts, ts))
       ) (Theta.maximal_elems theta (term_ts s @ term_ts m))
     |> mk_or_cnstr in
-
   (* The key indices in the bock and when m was hashed are the same. *)
   let eq_cnstr =
     List.map2 (fun i i' ->
         Atom (Pind (Eq, i, i'))
       ) key_is case.key_indices
     |> mk_and_cnstr in
-
   let constr = And (eq_cnstr, le_cnstr) in
-
   (new_f, constr)
 
 
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
   let open Process in
-
   (* We create the term equality *)
   let eq = Atom (Eq, dcase.d_message, m) in
-
   (* Now, we need to add the timestamp constraint between [key_is] and
      [dcase.d_key_indices]. *)
   let eq_cnstr =
@@ -744,9 +702,7 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
         Atom (Pind (Eq, i, i'))
       ) key_is dcase.d_key_indices
     |> mk_and_cnstr in
-
   (eq, eq_cnstr)
-
 
 let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Failure "bad euf application"
@@ -764,20 +720,17 @@ let euf_apply_facts judge at = match modulo_sym euf_param at with
           |> Judgment.add_constr new_cnstr
           |> Judgment.add_indices case.Euf.blk_descr.Process.indices
         ) rule.Euf.case_schemata
-
     and direct_premises =
       List.map (fun case ->
           let new_f, new_cnstr = euf_apply_direct judge.theta p case in
           Judgment.add_fact new_f judge
           |> Judgment.add_constr new_cnstr
         ) rule.Euf.cases_direct in
-
     schemata_premises @ direct_premises
 
 let euf_apply f_select (judge : judgment) sk fk =
   let g, at = Gamma.select judge.gamma f_select (set_euf true) in
   let judge = Judgment.set_gamma g judge in
-
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
 
@@ -806,9 +759,7 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
       sk [new_judge; judge] fk
     | _ ->  raise @@ Failure "Multiple proved goals with same name"
 
-(** Type for untyped tacitcs.
-    [UAndThen] can optionally be decorated with the tactic intermediate type,
-    which uses only [Gt_top]. *)
+(** Type for tacitcs. **)
 type tac =
   | Admit : tac
   | Ident : tac
@@ -879,8 +830,6 @@ let rec pp_tac : type a b. Format.formatter -> tac -> unit =
 type 'a fk = unit -> 'a
 
 type ('a,'b) sk = 'a -> 'b fk -> 'b
-
-
 
 let rec tac_apply
  : type a.
