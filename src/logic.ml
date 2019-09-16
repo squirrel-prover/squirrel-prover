@@ -406,8 +406,9 @@ let remove_finished judges =
 let simplify =
  function j ->
     match j.goal with
-    | Postcond p  when p.evars = [] -> Judgment.set_goal (Fact p.efact) j
-    | _ -> j
+   | Postcond p  when p.evars = [] -> Judgment.set_goal (Fact p.efact) j
+   | Fact True -> Judgment.set_goal Unit j 
+   | _ -> j
 
 (** Current mode of the prover:
     - [InputDescr] : waiting for the process description.
@@ -763,7 +764,7 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
                          ufact= subst_fact subst gp.ufact;
                          postcond = []
                          } in
-      let new_judge =  Judgment.set_goal (Formula new_subgoal) judge |> simplify  in
+      let new_judge =  Judgment.set_goal (Fact (subst_fact subst gp.ufact)) judge |> simplify  in
       let new_truths =
         List.map (fun goal ->
             subst_postcond subst goal
