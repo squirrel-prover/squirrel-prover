@@ -880,13 +880,10 @@ let name_index_cnstrs state l =
     | Ccst Cst.Cname (n,is), Ccst Cst.Cname (n',is') ->
       if n <> n' then [False]
       else List.map2 (fun x y -> Atom (Pind (Eq, x, y))) is is'
-    | Ccst Cst.Cmacro (m,ts) , Ccst Cst.Cmacro (m',ts') ->
-      if m <> m' then [False]
-      else [Atom (Pts (Eq,ts,ts'))]    
     | _ -> assert false in
 
   x_index_cnstrs state l
-    (function Ccst Cst.Cname _ | Ccst Cst.Cmacro _  -> true | _ -> false)
+    (function Ccst Cst.Cname _ -> true | _ -> false)
     n_cnstr
 
 
