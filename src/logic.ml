@@ -829,20 +829,20 @@ let apply (gname:string) (subst:subst) (judge : 'a judgment) sk fk =
       let new_fact = subst_fact subst gp.ufact in
       
       let new_subgoal = {uvars=[]; uconstr = new_cnstr; ufact= new_fact; postcond =[] } in
-      let new_judge =  Ejudge (Gt_formula,Judgment.init new_subgoal) in
-      subgoals := (new_judge) :: !(subgoals); 
+      let new_judge =  Judgment.init new_subgoal in
+      (* HOW to add new judge to the output list, without breaking types *) 
 (* and the postconditions which are added to the current gamma and theta *)
       let new_truths =
-    List.map (fun goal ->
-        subst_postcond subst goal
-      ) gp.postcond in
-        let judge =
-          List.fold_left (fun judge nt ->
-              Judgment.add_fact nt.efact judge
-              |> Judgment.add_constr nt.econstr
-            ) judge new_truths in 
-        sk [judge] fk
-  | _ ->  raise @@ Failure "Multiple proved goals with same name"
+        List.map (fun goal ->
+            subst_postcond subst goal
+          ) gp.postcond in
+      let judge =
+        List.fold_left (fun judge nt ->
+            Judgment.add_fact nt.efact judge
+            |> Judgment.add_constr nt.econstr
+          ) judge new_truths in 
+      sk [judge] fk
+    | _ ->  raise @@ Failure "Multiple proved goals with same name"
 
 
 (** Tactics *)
