@@ -195,6 +195,8 @@ module Theta : sig
 
   val is_sat : theta -> bool
 
+  val is_valid : theta -> tatom list -> bool
+
   (** [maximal_elems theta elems] returns an over-approximation of the set of
       maximals elements of [elems] in [theta]. *)
   val maximal_elems : theta -> timestamp list -> timestamp list
@@ -232,6 +234,10 @@ end = struct
     compute_models theta;
     Constr.maximal_elems (opt_get !(theta.models)) tss
 
+  let is_valid theta (c:tatom list) =
+    compute_models theta;
+    Constr.query (opt_get !(theta.models)) c
+ 
   let get_equalities theta =
     compute_models theta;
     let ts = Term.constr_ts theta.constr |> List.sort_uniq Pervasives.compare in
@@ -742,9 +748,18 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
     match goals with
     | [] ->  raise @@ Failure "No proved goal with given name"
     | [(np,gp)] ->
+      (* we first check if constr is satisfied *)
+      let new_constr =subst_constr subst gp.uconstr in
+      let rec to_cnf c = match c with
+        | Atom a -> [a]
+        | True -> []
+        | And (a,b) -> (to_cnf a)@(to_cnf b)
+        | _ -> raise @@ Failure "Can only apply axiom with constraints restricted to conjunctions." in
+      let tatom_list = to_cnf new_constr in
+      if not( Theta.is_valid judge.theta tatom_list) then raise @@ Failure "Constraint on the variables not satisfied.";
       (* the precondition creates a new subgoal *)
       let new_subgoal = {uvars=[];
-                         uconstr = subst_constr subst gp.uconstr;
+                         uconstr = True;
                          ufact= subst_fact subst gp.ufact;
                          postcond = []
                          } in

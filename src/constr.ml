@@ -601,7 +601,7 @@ let _query (model : model) = function
     (i.e. atoms of the form [(Neq,_,_)]). *)
 let query (models : models) ats =
   List.for_all (fun model -> List.for_all (_query model) ats) models
-
+  
 
 (** [max_elems_model model elems] returns the maximal elements of [elems]
     in [model], *with* redundancy modulo [model]'s equality relation. *)
