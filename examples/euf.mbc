@@ -5,16 +5,17 @@ name cst:message
 channel c
 
 mutable sname : index->message
+mutable mname : index->message
 
 axiom name_not_pair
-forall (tau1:timestamp, ma : message, a:index) :
-sname(a)@tau1 <>  <ma, ma>
+forall (tau1:timestamp, ma : message, mb : message, a:index) :
+sname(a)@tau1 <>  <ma, mb>
 
 system  out(c,cst);
 (
   (!_a new n; sname(a) := n; out(c,h(n,k)))
   | (!_b new n; sname(b) := n; out(c,h(<n,n>,k)))
-  | (!_c new n; new m; sname(c) := n; out(c,h(<n,m>,k)))
+  | (!_c new n; new m; sname(c) := n; mname(c) := m; out(c,h(<n,m>,k)))
  ).
 
 
@@ -38,13 +39,12 @@ output@tau1 = h(sname(a)@tau1,k)
 Proof.
   forallintro.
   euf 0.
-  apply name_not_pair tau1 sname(index_18)@0_1[index_18] a.
-  congruence. (* why congruence does not return false ?? *)
-
-  cycle -1.
-
-  try congruence orelse ident.
-  cycle 2.
   eqnames.
-  try congruence + notraces orelse ident.
+  cycle 1.
+  apply name_not_pair tau1 sname(index_12)@0_1[index_12] sname(index_12)@0_1[index_12] a.
+  congruence.
+  apply name_not_pair tau1 sname(index_13)@0_2[index_13] mname(index_13)@0_2[index_13] a.
+  congruence.
+  try congruence orelse ident.
+
 Qed.

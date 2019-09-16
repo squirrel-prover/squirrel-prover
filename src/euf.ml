@@ -56,10 +56,10 @@ let euf_key_ssc hash_fn key_n =
     if List.mem mn !checked_macros || Term.is_built_in mn then ()
     else begin
       checked_macros := mn :: !checked_macros;
-      let a_dummy = Action.mk_action [] in
+      let a_dummy = [] in
       ssc_term (Term.macro_declaration mn (TName a_dummy) is) end in
 
-  Process.iter_csa ssc_blk
+  Process.iter_fresh_csa ssc_blk
 
 
 let rec h_o_term hh kk acc = function
@@ -155,7 +155,7 @@ let mk_rule mess sign hash_fn key_n =
     key = key_n;
 
     case_schemata =
-      Utils.map_of_iter Process.iter_csa
+      Utils.map_of_iter Process.iter_fresh_csa
         (fun blk ->
            hashes_of_blk blk hash_fn key_n
            |> List.map (fun (is,m) ->

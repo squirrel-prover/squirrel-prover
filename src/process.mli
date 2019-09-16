@@ -72,6 +72,8 @@ val pp_descr : Format.formatter -> descr -> unit
 (** Iterate over a complete set of action descriptions. *)
 val iter_csa : (descr -> unit) -> unit
 
+val iter_fresh_csa : (descr -> unit) -> unit
+  
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)
 val get_descr : Action.action -> descr

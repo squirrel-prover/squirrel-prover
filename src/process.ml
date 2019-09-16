@@ -294,8 +294,11 @@ let fresh_instance block =
   let output = refresh_term (snd block.output) in
     { action; indices; condition; updates; output }
 
-let iter_csa f =
+let iter_fresh_csa f =
   Hashtbl.iter (fun a b -> f (fresh_instance b)) action_to_block
+
+let iter_csa f =
+  Hashtbl.iter (fun a b -> f (to_descr b)) action_to_block
 
 let subst_descr subst (descr : descr) =
   let action = Term.subst_action subst descr.action in

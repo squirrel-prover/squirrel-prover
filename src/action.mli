@@ -23,9 +23,6 @@ type action = (index list) t
 
 val mk_shape : int t -> action_shape
 
-(** This is for testing, it should never be necessary in the actual code. *)
-val mk_action : (index list) t -> action
-
 val get_shape : action -> action_shape
 
 val action_indices : action -> index list
@@ -45,7 +42,7 @@ val constr_equal : action -> action -> (index * index) list option
 val refresh : action -> action * (index * index) list
 
 val pp_action_f : (Format.formatter -> int * 'a -> unit) ->
-  Format.formatter -> 'a item list -> unit
+  Format.formatter -> 'a t -> unit
 
 val pp_action : Format.formatter -> action -> unit
 
