@@ -28,11 +28,9 @@ goal forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
 such that
   tau1 = tau2
   :output@tau1= output@tau2.
-Proof.
-  forallintro.
+  Proof.
+forallintro. eqnames.
   intro.
-  eqtimestamps.
-  congruence.
 Qed.
 
 goal unforgeable forall (tau1 : timestamp, a : index)
