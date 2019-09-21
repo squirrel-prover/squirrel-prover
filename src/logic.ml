@@ -468,6 +468,16 @@ let tact_andthen a b sk fk v = a v (fun v fk' -> b v sk fk') fk
 
 let tact_orelse a b sk fk v = a v sk (fun () -> b v sk fk)
 
+let repeat t j sk fk =
+  let rec success_loop oldj v fk' =
+    match v with
+    | [a] when a = oldj -> sk v fk
+    | [b] -> t b (success_loop b) (fun _ -> sk v fk)
+    | _ -> raise @@ Failure "cannot repeat a tactic creating subgoals"
+  in
+  t j (success_loop j) fk
+
+
 let lift =
   fun tac vs sk fk ->
     let exception Suc_fail in
@@ -525,7 +535,7 @@ let goal_forall_intro (judge : judgment) sk fk =
         |> Judgment.add_fact new_fact
         |> Judgment.add_constr new_cnstr
       ) new_goals in
-  sk judges fk
+  sk (List.map simplify judges) fk
 
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
     quantified variables and the goal.
@@ -540,9 +550,17 @@ let goal_exists_intro (judge : judgment) sk fk nu=
   sk [judge] fk
 
 let goal_intro (judge : judgment) sk fk =
-  let judge = Judgment.add_fact (Not (Judgment.get_goal_fact judge)) judge
+  match Judgment.get_goal_fact judge with
+  | False -> sk [judge] fk
+  | f -> let judge = Judgment.add_fact (Not (f)) judge
               |> set_goal_fact False in
-  sk [judge] fk
+    sk [judge] fk
+
+let goal_any_intro (judge : judgment) sk fk =
+  match judge.goal with
+  | Formula _ -> goal_forall_intro judge sk fk
+  | Fact _ -> goal_intro judge sk fk
+  | _ -> fk ()
 
 let fail_goal_false (judge : judgment) sk fk = match Judgment.get_goal_fact judge with
   | False -> fk ()
@@ -787,7 +805,8 @@ type tac =
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
-
+  | AnyIntro : tac
+      
   | GammaAbsurd : tac
   | ConstrAbsurd : tac
 
@@ -799,6 +818,7 @@ type tac =
   | AndThen : tac * tac -> tac
   | OrElse : tac * tac -> tac
   | Try : tac * tac -> tac
+  | Repeat : tac -> tac
 
   | Euf : int -> tac
   | Cycle : int -> tac
@@ -819,7 +839,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     | ExistsIntro (nu) ->
       Fmt.pf ppf "@[<v 2>exists_intro@;%a@]"
         pp_subst nu
-
+    | AnyIntro -> Fmt.pf ppf "any_intro"
     | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
     | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
 
@@ -834,7 +854,8 @@ let rec pp_tac : Format.formatter -> tac -> unit =
       Fmt.pf ppf "@[%a@] + @,@[%a@]" pp_tac ut pp_tac ut'
     | Try (ut, ut') ->
       Fmt.pf ppf "try@[%a@] orelse @,@[%a@]" pp_tac ut pp_tac ut'
-
+    | Repeat t ->
+      Fmt.pf ppf "repeat @[%a@]]" pp_tac t
     (* | TacPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_tac ut *)
 
     | Euf i -> Fmt.pf ppf "euf %d" i
@@ -855,7 +876,7 @@ let rec tac_apply
 
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (nu) -> goal_exists_intro judge sk fk nu
-
+    | AnyIntro -> goal_any_intro judge sk fk
     | Apply (gname,s) -> apply gname s judge sk fk
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
@@ -902,7 +923,8 @@ let rec tac_apply
     | Try (tac,tac') ->
       tac_apply tac judge (fun _ fk -> sk [] fk)
         (fun () -> tac_apply tac' judge sk fk)
-
+    | Repeat tac ->
+      repeat (tac_apply tac) judge sk fk
     | Cycle _ -> assert false   (* This is not a focused tactic. *)
 
     (* | TacPrint tac ->

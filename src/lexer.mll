@@ -91,6 +91,7 @@ rule token = parse
 | "right"             { RIGHT }
 | "intro"             { INTRO }
 | "forallintro"       { FORALLINTRO }
+| "anyintro"          { ANYINTRO }
 | "congruence"        { CONGRUENCE }
 | "notraces"          { NOTRACES }
 | "eqnames"           { EQNAMES }
@@ -100,6 +101,7 @@ rule token = parse
 | "undo"              { UNDO }
 | "ident"             { IDENT }
 | "try"               { TRY }
+| "repeat"            { REPEAT }
 | "orelse"            { ORELSE }
 | '+'                 { PLUS }
 | name as n           { ID (n) }

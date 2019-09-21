@@ -12,8 +12,8 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO CONGRUENCE APPLY
-%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO CONGRUENCE APPLY
+%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT
 %token PROOF QED UNDO
 %token EOF
 
@@ -227,6 +227,7 @@ tac:
   | ADMIT                             { Logic.Admit }
   | IDENT                             { Logic.Ident }
   | FORALLINTRO                       { Logic.ForallIntro }
+  | ANYINTRO                          { Logic.AnyIntro }
   | INTRO                             { Logic.Intro }
   | LEFT                              { Logic.Left }
   | RIGHT                             { Logic.Right }
@@ -243,7 +244,7 @@ tac:
   | l = tac PLUS r = tac              { Logic.OrElse (l, r) }
   | TRY l = tac ORELSE r = tac        { Logic.Try (l, r) }
   | APPLY i=ID t=tactic_params        { Logic.Apply (i, Logic.parse_args i t) }
-
+  | REPEAT t=tac                      { Logic.Repeat (t) }
 
 
 qed:
