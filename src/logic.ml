@@ -69,19 +69,23 @@ end = struct
 
   let mk () = { facts = []; atoms = []; trs = ref None; actions_described = [] }
 
+  let get_atoms g = List.map fst g.atoms
+  
   (* We do not add atoms that are already a consequence of gamma. *)
   let add_atom g at =
-    let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
-    if !(g.trs) = None then add at else
-      match at with
-      | (Eq,s,t) ->
-        if Completion.check_equalities (opt_get !(g.trs)) [s,t] then g
-        else add at
-      | (Neq,s,t) ->
-        if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then g
-        else add at
-      | _ -> add at (* TODO: do not add useless inequality atoms *)
-
+    if List.mem at (get_atoms g) then g else
+      begin
+        let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
+        if !(g.trs) = None then add at else
+          match at with
+          | (Eq,s,t) ->
+            if Completion.check_equalities (opt_get !(g.trs)) [s,t] then g
+            else add at
+          | (Neq,s,t) ->
+            if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then g
+            else add at
+          | _ -> add at (* TODO: do not add useless inequality atoms *)
+      end
   let rec add_atoms g = function
     | [] -> { g with trs = ref None } 
     | at :: ats -> add_atoms (add_atom g at) ats
@@ -101,8 +105,6 @@ end = struct
   let get_facts g = g.facts
 
   let set_facts g fs = add_facts { g with facts = []; trs = ref None} fs
-
-  let get_atoms g = List.map fst g.atoms
 
   let get_eqs_neqs g =
      let eqs, _, neqs = List.map fst g.atoms
