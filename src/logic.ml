@@ -793,6 +793,7 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
       sk [new_judge; judge] fk
     | _ ->  raise @@ Failure "Multiple proved goals with same name"
 
+
 (** Type for tacitcs. **)
 type tac =
   | Admit : tac
@@ -911,7 +912,7 @@ let rec tac_apply
 
         (* We catch the exception before calling the continuation. *)
         match compute_judges () with
-        | judges -> sk judges fk
+        | j -> sk j fk
         | exception Suc_fail -> fk () in
 
       tact_andthen
@@ -936,7 +937,6 @@ let rec tac_apply
      *       Fmt.pr "%a%!" (Judgment.pp_judgment (pp_gt_el gt)) judge;
      *       sk judge fk)
      *     fk *)
-
 
 (** Declare Goals And Proofs *)
 
@@ -1008,20 +1008,6 @@ let iter_goals f = List.iter f !goals
 
 let goals_to_proved () = !goals <> []
 
-let start_proof () = match !current_goal, !goals with
-  | None, (gname,goal) :: _ ->
-    assert (!subgoals = []);
-    cpt_tag := 0;
-    current_goal := Some (gname,goal);
-    subgoals := [Judgment.init goal]
-                |> List.map simplify ;
-    None
-  | Some _,_ ->
-    Some "Cannot start a new proof (current proof is not done)."
-
-  | _, [] ->
-    Some "Cannot start a new proof (no goal remaining to prove)."
-
 let is_proof_completed () = !subgoals = []
 
 exception Tactic_failed of string
@@ -1045,24 +1031,44 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 
 exception Tactic_type_error of string
 
-(** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
-    Return [true] if there are no subgoals remaining. *)
-let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
-  | [] -> assert false
-  | judge :: ejs' ->
-    let failure_k () = raise @@ Tactic_failed "" in
-    let suc_k judges _ =
-      let ejs = judges @ ejs'
-                |> remove_finished
-                |> List.map simplify in
-      subgoals := ejs;
-      is_proof_completed () in
+(*
+let simpGoal = AndThen(Repeat AnyIntro,
+                       AndThen(EqNames,
+                               AndThen(EqTimestamps,
+                                       AndThen(Try(GammaAbsurd,Ident),
+                                               Try(ConstrAbsurd,Ident))
+                                      )
+                              )
+                      )
+  *)                    
+
+let rec eval_tactic_judge : tac -> judgment -> judgment list = fun tac judge ->
+   let failure_k () = raise @@ Tactic_failed "" in
+   let suc_k judges _ =
+     judges
+   in
     try     
       tac_apply tac judge suc_k failure_k
     with Goal_type_error (expected,given)-> 
       raise @@ Tactic_type_error (Fmt.strf "@[The tactic %a is ill-typed, it was expected to be applied to a %s, not to a %s." pp_tac tac expected given)
 
+let auto_simp judges =
+(*  List.map (eval_tactic_judge simpGoal) judges
+    |> List.flatten *)
+  judges
+  |>  List.map simplify 
+  |> remove_finished
 
+(** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
+    Return [true] if there are no subgoals remaining. *)
+let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
+  | [] -> assert false
+  | judge :: ejs' -> 
+    let ejs = (eval_tactic_judge tac judge) @ ejs'
+              |> auto_simp
+                 in
+      subgoals := ejs;
+      is_proof_completed ()
 
 let cycle i l =
   let rec cyc acc i = function
@@ -1070,7 +1076,6 @@ let cycle i l =
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in
-
   if i = 0 then l else
   if i < 0 then cyc [] (List.length l + i) l
   else cyc [] i l
@@ -1081,3 +1086,18 @@ let eval_tactic : tac -> bool = fun utac -> match utac with
   | Cycle i -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
+
+let start_proof () = match !current_goal, !goals with
+  | None, (gname,goal) :: _ ->
+    assert (!subgoals = []);
+    cpt_tag := 0;
+    current_goal := Some (gname,goal);
+    subgoals := [Judgment.init goal]
+                |> auto_simp
+    ;
+    None
+  | Some _,_ ->
+    Some "Cannot start a new proof (current proof is not done)."
+
+  | _, [] ->
+    Some "Cannot start a new proof (no goal remaining to prove)."

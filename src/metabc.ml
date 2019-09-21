@@ -78,7 +78,12 @@ let rec main_loop ?(save=true) mode =
        | Goalmode.Gm_proof -> begin match start_proof () with
            | None ->
              Fmt.pr "%a" pp_goal ();
-             main_loop ProofMode
+             if Logic.is_proof_completed () then
+               (complete_proof ();
+                Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
+                main_loop WaitQed)
+             else
+               main_loop ProofMode
            | Some es -> error GoalMode es end
          
        | Goalmode.Gm_goal (i,f) ->
