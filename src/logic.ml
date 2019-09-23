@@ -30,7 +30,6 @@ module Gamma : sig
 
   val mk : unit -> gamma
 
-  val add_fact : gamma -> fact -> gamma
   val add_facts : gamma -> fact list -> gamma
 
   val get_facts : gamma -> fact list
@@ -377,7 +376,7 @@ end = struct
 
   let add_fact f j =
     let j = update_descr j (fact_actions f) in
-    { j with gamma = Gamma.add_fact j.gamma f }
+    { j with gamma = Gamma.add_facts j.gamma [f] }
 
   let add_constr c j =
     let j = update_descr j (constr_actions c) in
