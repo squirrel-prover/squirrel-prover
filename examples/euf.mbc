@@ -29,8 +29,6 @@ such that
   tau1 = tau2
   :output@tau1= output@tau2.
   Proof.
-forallintro. eqnames.
-  intro.
 Qed.
 
 goal unforgeable forall (tau1 : timestamp, a : index)
@@ -40,19 +38,14 @@ output@tau1 = h(sname(a)@tau1,k)
 => exists () : false.
 
 Proof.
-  forallintro.
+
   euf 0.
 
   apply name_not_pair tau1 sname(index_14)@0_2[index_14] mname(index_14)@0_2[index_14] a.
-  forallintro.
-  congruence.
 
   apply name_not_pair tau1 sname(index_13)@0_1[index_13] sname(index_13)@0_1[index_13] a.
-  forallintro.
-  congruence.
 
   apply fresh_state tau1 0_0[a] a.
-  forallintro.
-  congruence.  
+
 Qed.
 
