@@ -203,42 +203,43 @@ end = struct
   open Constr
 
   type theta = { constr : constr;
-                 models : models option ref;
-                 models_is_exact : bool ref }
+                 models : models option;
+                 models_is_exact : bool }
 
   let pp_theta ppf theta = Term.pp_constr ppf theta.constr
 
   let mk constr = { constr = constr;
-                    models = ref None;
-                    models_is_exact = ref false }
+                    models = None;
+                    models_is_exact = false }
 
   let add_constr theta c =
     { theta with constr = Term.triv_eval (And(theta.constr, c));
-                 models_is_exact = ref false }
+                 models_is_exact = false }
 
   let compute_models theta =
-    if !(theta.models_is_exact) then ()
+    if (theta.models_is_exact) then theta
     else begin
       let models = Constr.models theta.constr in
-      theta.models := Some models;
-      theta.models_is_exact := true end
+      { theta with models = Some models;
+                   models_is_exact = true}
+    end
 
   let is_sat theta =
-    compute_models theta;
-    Constr.m_is_sat (opt_get !(theta.models))
+    let theta = compute_models theta in
+    Constr.m_is_sat (opt_get theta.models)
 
   let maximal_elems theta tss =
-    compute_models theta;
-    Constr.maximal_elems (opt_get !(theta.models)) tss
+    let theta = compute_models theta in    
+    Constr.maximal_elems (opt_get theta.models) tss
 
   let is_valid theta (c:tatom list) =
-    compute_models theta;
-    Constr.query (opt_get !(theta.models)) c
+    let theta = compute_models theta in    
+    Constr.query (opt_get (theta.models)) c
  
   let get_equalities theta =
-    compute_models theta;
+    let theta = compute_models theta in
     let ts = Term.constr_ts theta.constr |> List.sort_uniq Pervasives.compare in
-    Constr.get_equalities (opt_get !(theta.models)) ts
+    Constr.get_equalities (opt_get (theta.models)) ts
   
 end
 
