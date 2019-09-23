@@ -37,6 +37,8 @@ module Gamma : sig
 
   val get_atoms : gamma -> atom list
 
+  val update_trs : gamma -> gamma
+    
   val get_trs : gamma -> Completion.state
 
   val is_sat : gamma -> bool
@@ -52,7 +54,7 @@ end = struct
       called on [atoms]. *)
   type gamma = { facts : fact list;
                  atoms : (atom * tag) list;
-                 trs : Completion.state option ref;
+                 trs : Completion.state option;
                  actions_described : Action.action list }
 
   let pp_gamma ppf gamma =
@@ -66,7 +68,7 @@ end = struct
            Fmt.pf ppf "%d: %a" t.cpt Term.pp_atom at)) (List.rev gamma.atoms)
       (Fmt.list Term.pp_fact) (List.rev gamma.facts)
 
-  let mk () = { facts = []; atoms = []; trs = ref None; actions_described = [] }
+  let mk () = { facts = []; atoms = []; trs = None; actions_described = [] }
 
   let get_atoms g = List.map fst g.atoms
   
@@ -88,7 +90,7 @@ end = struct
            | _ -> add at (* TODO: do not add useless inequality atoms *) *)
       end
   let rec add_atoms g = function
-    | [] -> { g with trs = ref None } 
+    | [] -> { g with trs = None } 
     | at :: ats -> add_atoms (add_atom g at) ats
 
   (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
@@ -100,12 +102,12 @@ end = struct
     | _ as f -> { g with facts = f :: g.facts }
 
   let rec add_facts g = function
-    | [] -> { g with trs = ref None }
+    | [] -> { g with trs = None }
     | f :: fs -> add_facts (add_fact g f) fs
 
   let get_facts g = g.facts
 
-  let set_facts g fs = add_facts { g with facts = []; trs = ref None} fs
+  let set_facts g fs = add_facts { g with facts = []; trs = None} fs
 
   let get_eqs_neqs g =
      let eqs, _, neqs = List.map fst g.atoms
@@ -115,27 +117,19 @@ end = struct
                            add_xeq od (a,b) acc) ([],[],[]) in
      eqs,neqs
 
-  let compute_trs g =
+  let update_trs g =
     let eqs,_ = get_eqs_neqs g in
     let trs = Completion.complete eqs in
-    g.trs := Some trs
+    {g with trs = Some trs}
 
-  (* The value of the trs is stored inside a ref. It can be updated through compute_trs, 
-     and is set to None after adding list of atoms or facts *)
   let get_trs g =
-    match !(g.trs) with
-      Some x -> x
-    | None ->
-      compute_trs g;
-      match !(g.trs) with
-        Some x -> x
-      | None -> raise Not_found
-                  
+    opt_get g.trs
   (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
       otherwise, where [g'] has been completed. *)
   let is_sat g =
-    let _, neqs = get_eqs_neqs g and trs = get_trs g in
-    Completion.check_disequalities trs neqs
+    let g = update_trs g in
+    let _, neqs = get_eqs_neqs g in
+    Completion.check_disequalities (opt_get g.trs) neqs
          
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
@@ -300,6 +294,8 @@ module Judgment : sig
   (** Side-effect: Add necessary action descriptions. *)
   val set_goal_fact : fact -> judgment -> judgment
 
+  val update_trs : judgment -> judgment
+  
   val set_goal : typed_goal -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
@@ -339,6 +335,8 @@ end = struct
       goal = Formula goal;
       }
 
+  let update_trs j =
+    { j with gamma = Gamma.update_trs j.gamma }
   let rec add_vars vars j = match vars with
     | [] -> j
     | v :: vars ->
@@ -640,6 +638,7 @@ let mk_and_cnstr l = match l with
 (** Add index constraints resulting from names equalities, modulo the TRS.
     [judge.gamma] must have been completed before calling [eq_names]. *)
 let eq_names (judge : judgment) sk fk =
+  let judge = Judgment.update_trs judge in
   let cnstrs = Completion.name_index_cnstrs (Gamma.get_trs judge.gamma)
       (Gamma.get_all_terms judge.gamma) in
   let judge =
@@ -649,6 +648,7 @@ let eq_names (judge : judgment) sk fk =
   sk [judge] fk
 
 let eq_constants fn (judge : judgment) sk fk =
+  let judge = Judgment.update_trs judge in  
   let cnstrs =
     Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma)
       (Gamma.get_all_terms judge.gamma) in
