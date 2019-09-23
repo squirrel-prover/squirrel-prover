@@ -1032,7 +1032,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 
 exception Tactic_type_error of string
 
-(*
+
 let simpGoal = AndThen(Repeat AnyIntro,
                        AndThen(EqNames,
                                AndThen(EqTimestamps,
@@ -1041,10 +1041,9 @@ let simpGoal = AndThen(Repeat AnyIntro,
                                       )
                               )
                       )
-  *)                    
-
+                    
 let rec eval_tactic_judge : tac -> judgment -> judgment list = fun tac judge ->
-   let failure_k () = raise @@ Tactic_failed "" in
+   let failure_k () = raise @@ Tactic_failed (Fmt.strf "%a" pp_tac tac) in
    let suc_k judges _ =
      judges
    in
@@ -1054,9 +1053,10 @@ let rec eval_tactic_judge : tac -> judgment -> judgment list = fun tac judge ->
       raise @@ Tactic_type_error (Fmt.strf "@[The tactic %a is ill-typed, it was expected to be applied to a %s, not to a %s." pp_tac tac expected given)
 
 let auto_simp judges =
-(*  List.map (eval_tactic_judge simpGoal) judges
-    |> List.flatten *)
-  judges
+  List.map simplify judges
+  |> remove_finished
+  |>  List.map (eval_tactic_judge simpGoal)
+  |> List.flatten  
   |>  List.map simplify 
   |> remove_finished
 
