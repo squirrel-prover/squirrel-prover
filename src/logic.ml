@@ -75,16 +75,18 @@ end = struct
   let add_atom g at =
     if List.mem at (get_atoms g) then g else
       begin
-        let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
-        if !(g.trs) = None then add at else
+      let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
+      add at
+        (* if !(g.trs) = None then add at else
           match at with
           | (Eq,s,t) ->
             if Completion.check_equalities (opt_get !(g.trs)) [s,t] then g
             else add at
           | (Neq,s,t) ->
-            if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then g
+            if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then
+              g
             else add at
-          | _ -> add at (* TODO: do not add useless inequality atoms *)
+           | _ -> add at (* TODO: do not add useless inequality atoms *) *)
       end
   let rec add_atoms g = function
     | [] -> { g with trs = ref None } 
