@@ -458,12 +458,10 @@ let pp_q_vars s_q vars constr ppf () =
   let open Fmt in
   let open Utils in
   Fmt.pf ppf "%a" (pp_typed_fvars s_q) vars;
-  Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
-    (styled `Red (styled `Underline ident)) "such that"
-    (fun ppf constr ->
-       if constr <> True then pp_constr ppf constr
-       else Fmt.pf ppf "") constr;;
-
+  if constr <> True then
+    Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
+      (styled `Red (styled `Underline ident)) "such that"
+      pp_constr constr
 
 let pp_postcond ppf f =
   Fmt.pf ppf "@[<v 0>%a%a@]"
@@ -481,10 +479,17 @@ let pp_formula ppf f =
   match f.postcond with
   | [] -> pp_precond ppf f
   | [a] ->
-    Fmt.pf ppf "@[<v 0>%a@;%a %a@]"
-      pp_precond f
-      (styled `Red (styled `Underline ident)) "=>"
-      pp_postcond a
+      (* TODO refactor so that this prettier-printing
+       * applies to multiple (or empty) postconditions *)
+      if f.ufact = True then
+        Fmt.pf ppf "@[<v 0>%a@;%a@]"
+          (pp_q_vars "forall" f.uvars f.uconstr) ()
+          pp_postcond a
+      else
+        Fmt.pf ppf "@[<v 0>%a@;%a %a@]"
+          pp_precond f
+          (styled `Red (styled `Underline ident)) "=>"
+          pp_postcond a
   | a :: l ->
     Fmt.pf ppf "@[<v 0>%a@;%a %a%a@]"
       pp_precond f
