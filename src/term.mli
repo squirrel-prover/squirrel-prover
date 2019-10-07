@@ -2,7 +2,7 @@ open Vars
 open Action
 (** Terms and formulas for the Meta-BC logic.
   *
-  * This modules describes the syntax of the logic. It does not
+  * This module describes the syntax of the logic. It does not
   * provide low-level representations, normal forms, etc. that
   * are to be used in automated reasoning, nor does it provide
   * representations necessary for the front-end involving
