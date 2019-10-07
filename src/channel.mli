@@ -1,7 +1,8 @@
-(** Channels
-  *
-  * Channels are public and untyped.
-  * A channel must be declared before being used. *)
+(** Communication channels *)
+
+(** As all channels are public and untyped,
+  * channels are just identifiers.
+  * They must be declared before being used. *)
 
 type channel
 type t = channel

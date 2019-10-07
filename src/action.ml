@@ -1,6 +1,5 @@
 open Vars
    
-(** Indices are used to generate arbitrary families of terms *)
 module IndexParam : VarParam =
 struct
   let default_string = "index"

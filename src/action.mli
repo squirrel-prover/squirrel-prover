@@ -1,3 +1,5 @@
+(** Processes are decomposed as structured sets of actions. *)
+
 open Vars
 
 (** Indices are used to generate arbitrary families of terms *)

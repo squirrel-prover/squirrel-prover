@@ -1,3 +1,6 @@
+(** Main module for the testing binary.
+  * See the [Metabc] module for the prover. *)
+
 open Logic
 
 let () = Printexc.record_backtrace true

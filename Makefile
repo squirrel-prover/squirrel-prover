@@ -31,6 +31,9 @@ debug: sanity
 install: metabc
 	cp metabc.byte ~/.local/bin/metabc.byte
 
+doc: metabc
+	$(OCB) -ocamldoc "ocamldoc -stars" metabc.docdir/index.html
+
 # check that menhir is installed
 PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"." 
 sanity: Makefile
