@@ -41,7 +41,7 @@ sanity: Makefile
 	  which menhir ) || ( \
 	  pkg=menhir ; echo $(PLEASE) ; \
 	  false )
-	@for pkg in ocamlgraph alcotest ; do \
+	@for pkg in fmt ocamlgraph alcotest ; do \
 	  (echo -n "Checking for $$pkg... " ; \
 	   ocamlfind query $$pkg ) || ( \
 	   pkg=$$pkg ; echo $(PLEASE) ; \
