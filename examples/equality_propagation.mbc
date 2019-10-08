@@ -1,0 +1,10 @@
+system null.
+
+goal eq_timestamps :
+
+  forall (tau1:timestamp, tau2:timestamp)
+  such that tau1 = tau2:
+  output@tau1 = output@tau2.
+
+Proof.
+Qed.

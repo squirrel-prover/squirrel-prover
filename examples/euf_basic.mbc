@@ -1,0 +1,18 @@
+hash h
+name k : message
+name na : index->message
+
+system null.
+
+goal collision_absurd :
+
+  forall (b : index, a : index)
+  such that b <> a:
+  h(na(b),k) = h(na(a),k) => exists () : false.
+
+Proof.
+
+  euf 0.
+
+Qed.
+

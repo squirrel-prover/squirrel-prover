@@ -5,9 +5,17 @@ OCB = ocamlbuild $(OCB_FLAGS)
 
 all: metabc test
 
+PROVER_TESTS = examples/lak.mbc \
+			   examples/equality_propagation.mbc \
+			   examples/euf_basic.mbc
 test: sanity
 	$(OCB) test.byte
 	./test.byte
+	@echo "" ; for f in $(PROVER_TESTS) ; do \
+	  echo -n "Running prover on $$f... " ; \
+	  (./metabc $$f > /dev/null && echo OK) || \
+	  (echo "FAIL" ; exit 1) ; \
+	done
 
 clean:
 	$(OCB) -clean
