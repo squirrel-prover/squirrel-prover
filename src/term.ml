@@ -599,14 +599,14 @@ let rec subst_ts (s:subst) (ts:timestamp) =
   get_ts_subst s newts
 
 let rec subst_term (s:subst) (t:term) =
-  let newt = (
+  let newt =
     match t with
     | Fun (fs, lt) ->Fun (fs, List.map (subst_term s) lt) 
-    | Name _ -> t
+    | Name (ns, lt) -> Name (ns, List.map (subst_index s) lt)
     | State (st, ts) -> State (subst_state s st, subst_ts s ts)
-    | Macro (m,ts) -> Macro (m,subst_ts s ts)
+    | Macro ((m,idx),ts) -> Macro ((m,List.map (subst_index s) idx),subst_ts s ts)
     | MVar _ -> t
-  ) in
+  in
   get_term_subst s newt
 
 
