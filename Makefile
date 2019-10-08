@@ -11,10 +11,11 @@ test: sanity
 
 clean:
 	$(OCB) -clean
-	rm -f sanity
+	@rm -f metabc doc
 
 metabc: sanity
 	$(OCB) metabc.byte
+	@ln -s -f metabc.byte metabc
 
 native: sanity
 	$(OCB) test.native
@@ -33,10 +34,13 @@ install: metabc
 
 doc: metabc
 	$(OCB) -ocamldoc "ocamldoc -stars" metabc.docdir/index.html
+	@ln -s -f _build/metabc.docdir doc
 
-# check that menhir is installed
+sanity: _build/requirements
+
+# check that requirements are installed
 PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"." 
-sanity: Makefile
+_build/requirements: Makefile
 	@(echo -n "Checking for menhir... " ; \
 	  which menhir ) || ( \
 	  pkg=menhir ; echo $(PLEASE) ; \
@@ -47,6 +51,7 @@ sanity: Makefile
 	   pkg=$$pkg ; echo $(PLEASE) ; \
 	   false ) ; \
 	done
-	touch sanity
+	mkdir -p _build
+	touch _build/requirements
 
-.PHONY: clean byte native profile debug
+.PHONY: clean byte native profile debug sanity
