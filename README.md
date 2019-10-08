@@ -7,13 +7,15 @@ You need OCaml. Developers use versions 4.05 and 4.06. The software
 should build with versions up to 4.08, but with deprecation warnings.
 You need the following tools and libraries, to be installed e.g.
 with opam:
-
+```
 $ opam install menhir fmt ocamlgraph alcotest
+```
 
 You should then be able to build the software. The default target
 builds the prover and testing binaries and runs tests:
-
+```
 $ make
+```
 
 You can also just build the prover with `make metabc`, test with
 `make test`.
@@ -26,8 +28,9 @@ The documentation for developers may be built with `make doc`.
 ### Standalone
 
 You can check a proof development by simply passing the file to `metabc`:
-
+```
 $ ./metabc examples/euf.mbc
+```
 
 ### With proof general
 
@@ -65,8 +68,7 @@ term <id>(<args>) : <msg_type> = <term>            (* macro definition *)
 
 #### Processes
 
-Processes are then declared as follows, relying on channels that
-must be declared first:
+Processes are then declared as follows, using previously declared channels:
 ```
 channel <id>
 process <id>(<args>) = <process>
