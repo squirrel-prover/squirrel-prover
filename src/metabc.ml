@@ -99,7 +99,9 @@ let rec main_loop ?(save=true) mode =
                 main_loop GoalMode
           end
 
-      |_,_ -> error mode "Unexpected command."
+      | GoalMode,EOF -> Fmt.pr "Goodbye!@." ; exit 0
+
+      | _,_ -> error mode "Unexpected command."
 
   with Failure s -> error mode s
 

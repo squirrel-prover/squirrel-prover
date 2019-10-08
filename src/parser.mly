@@ -276,3 +276,4 @@ interactive :
 | tactic                          { Logic.ParsedTactic $1 }
 | qed                             { Logic.ParsedQed }
 | goal                            { Logic.ParsedGoal $1 }
+| EOF                             { Logic.EOF }

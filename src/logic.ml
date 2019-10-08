@@ -982,6 +982,7 @@ type parsed_input =
   | ParsedTactic of tac
   | ParsedUndo of int
   | ParsedGoal of Goalmode.gm_input
+  | EOF
 
 let proof_states_history : proof_state list ref = ref []
 
