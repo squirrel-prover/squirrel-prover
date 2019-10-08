@@ -838,7 +838,11 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     | Intro -> Fmt.pf ppf "goal_intro"
     | Split -> Fmt.pf ppf "goal_and_intro"
 
-    | Apply (s,t) -> Fmt.pf ppf "apply"
+    | Apply (s,t) ->
+        if t = [] then
+          Fmt.pf ppf "apply %s" s
+        else
+          Fmt.pf ppf "apply %s to .." s
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->

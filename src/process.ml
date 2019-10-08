@@ -342,11 +342,15 @@ module Aliases = struct
 end
 
 let show_actions ppf () =
-  Fmt.pf ppf "@[<v 2>Available actions:@;" ;
+  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
+  let comma = ref false in
   Hashtbl.iter
-    (fun a _ -> Fmt.pf ppf "%a@;" Action.pp_action_shape a)
-    action_to_block;
-  Fmt.pf ppf "@]" ;
+    (fun a _ ->
+       if !comma then Fmt.pf ppf ",@;" ;
+       comma := true ;
+       Action.pp_action_shape ppf a)
+    action_to_block ;
+  Fmt.pf ppf "@]@]@."
 
 (* Environment for parsing the final process, i.e. the system to study,
  * to break it into blocks suitable for the analysis.

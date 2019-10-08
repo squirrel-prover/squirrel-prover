@@ -30,7 +30,7 @@ let parse_next parser_fun =
     parser_fun (Utils.opt_get !lexbuf) !filename
     
 let rec main_loop ?(save=true) mode =
-  Format.printf "[>@.";
+  if !interactive then Format.printf "[>@.";
   (* if we are not waiting for a system description,
    * we are at some break point and we save the state *)
   if save && mode <> InputDescr then
@@ -47,7 +47,7 @@ let rec main_loop ?(save=true) mode =
             let new_mode = reset_state nb_undo in
             begin match new_mode with
               | ProofMode -> Fmt.pr "%a" pp_goal ()
-              | GoalMode ->     Main.pp_proc Fmt.stdout ()
+              | GoalMode -> Main.pp_proc Fmt.stdout ()
               | _ -> ()
             end ;
             main_loop new_mode
@@ -60,9 +60,13 @@ let rec main_loop ?(save=true) mode =
           main_loop GoalMode
       | ProofMode,ParsedTactic(utac) ->
           begin try
+            if not !interactive then Fmt.pr "@[[> %a.@.@]@." Logic.pp_tac utac ;
             if eval_tactic utac then begin
+              Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
+                (match !Logic.current_goal with
+                   | Some (i,_) -> i
+                   | None -> assert false) ;
               complete_proof ();
-              Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
               main_loop WaitQed end
             else begin
               Fmt.pr "%a" pp_goal ();
@@ -75,7 +79,7 @@ let rec main_loop ?(save=true) mode =
           end
       
       | WaitQed,ParsedQed ->
-          Fmt.pr "Exit proof mode.@.";
+          Fmt.pr "Exiting proof mode.@.";
           main_loop GoalMode
         
       | GoalMode,ParsedGoal(goal) ->
@@ -83,17 +87,20 @@ let rec main_loop ?(save=true) mode =
             | Goalmode.Gm_proof -> begin match start_proof () with
                 | None ->
                     Fmt.pr "%a" pp_goal ();
-                    if Logic.is_proof_completed () then
-                      (complete_proof ();
-                       Fmt.pr "@[<v 0>[goal> No subgoals remaining.@]@.";
-                       main_loop WaitQed)
-                    else
+                    if Logic.is_proof_completed () then begin
+                      Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
+                        (match !Logic.current_goal with
+                           | Some (i,_) -> i
+                           | None -> assert false) ;
+                      complete_proof ();
+                      main_loop WaitQed
+                    end else
                       main_loop ProofMode
                 | Some es -> error GoalMode es end
 
             | Goalmode.Gm_goal (i,f) ->
                 add_new_goal (i,f);
-                Fmt.pr "@[<v 0>New goal: %s @;@[%a@]@]@."
+                Fmt.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
                   i
                   Term.pp_formula f;
                 main_loop GoalMode

@@ -482,7 +482,7 @@ let pp_formula ppf f =
       (* TODO refactor so that this prettier-printing
        * applies to multiple (or empty) postconditions *)
       if f.ufact = True then
-        Fmt.pf ppf "@[<v 0>%a@;%a@]"
+        Fmt.pf ppf "@[<v 0>%a%a@]"
           (pp_q_vars "forall" f.uvars f.uconstr) ()
           pp_postcond a
       else

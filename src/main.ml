@@ -171,19 +171,16 @@ let () =
   ];;
 
 let pp_descrs ppf () =
-  let cpt = ref 0 in
-  Fmt.pf ppf "@[<v>";
+  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   Process.iter_csa (fun descr ->
-      Fmt.pf ppf "@[<v>%d: @[<v 0>@[%a@]@;@]@;"
-        !cpt Process.pp_descr descr;
-      incr cpt;);
-  Fmt.pf ppf "@]%!@.";;
+      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
+        Process.pp_descr descr) ;
+  Fmt.pf ppf "@]%!@."
 
 let pp_proc ppf () =
-  Fmt.pf ppf "@[<v>%a@;%a@;@]%!"
-  (* Fmt.pf ppf "@[<v>[descr>@;%a@;%a@;[descr:end>@;@]%!" *)
-    Process.show_actions ()
-    pp_descrs ()
+  Process.show_actions ppf () ;
+  Fmt.pf ppf "@." ;
+  pp_descrs ppf ()
 
 let pp_goals ppf () =
   let cpt = ref 0 in
