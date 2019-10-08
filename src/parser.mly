@@ -12,7 +12,7 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO CONGRUENCE APPLY
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO CONGRUENCE APPLY TO
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT
 %token PROOF QED UNDO
 %token EOF
@@ -28,6 +28,7 @@
 
 %left ORELSE
 %left PLUS
+%nonassoc REPEAT
 %left SEMICOLON
 
 %start theory
@@ -198,7 +199,7 @@ declaration:
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
 | AXIOM f=formula		 { Logic.add_proved_goal ("unnamed_goal", Logic.make_goal f) }		 				 
-| AXIOM i=ID f=formula		 { Logic.add_proved_goal (i, Logic.make_goal f) }		 
+| AXIOM i=ID COLON f=formula     { Logic.add_proved_goal (i, Logic.make_goal f) }
 
 q_vars:
 | LPAREN arg_list RPAREN                       { ($2, Term.True) }
@@ -218,9 +219,9 @@ formula:
                                  { ($2, $7, $4, $9) } 
 
 tactic_params:
-|                                 { [] }
-| t=term ts=tactic_params { t::ts }
-
+|                               { [] }
+| t=term                        { [t] }
+| t=term COMMA ts=tactic_params { t::ts }
 
 tac:
   | LPAREN t = tac RPAREN          { t }
@@ -243,7 +244,8 @@ tac:
   | l = tac SEMICOLON r = tac         { Logic.AndThen (l,r) }
   | l = tac PLUS r = tac              { Logic.OrElse (l, r) }
   | TRY l = tac ORELSE r = tac        { Logic.Try (l, r) }
-  | APPLY i=ID t=tactic_params        { Logic.Apply (i, Logic.parse_args i t) }
+  | APPLY i=ID                        { Logic.Apply (i, Logic.parse_args i []) }
+  | APPLY i=ID TO t=tactic_params     { Logic.Apply (i, Logic.parse_args i t) }
   | REPEAT t=tac                      { Logic.Repeat (t) }
 
 
@@ -257,7 +259,7 @@ tactic:
 | t = tac DOT                         { t }
 
 goal:
-| GOAL i =ID f = formula DOT            { Goalmode.Gm_goal (i, Logic.make_goal f) }
+| GOAL i=ID COLON f=formula DOT   { Goalmode.Gm_goal (i, Logic.make_goal f) }
 | GOAL f = formula DOT            { Goalmode.Gm_goal ("unnamed_goal", Logic.make_goal f) }
 | PROOF                           { Goalmode.Gm_proof }
 

@@ -7,11 +7,11 @@ channel c
 mutable sname : index->message
 mutable mname : index->message
 
-axiom name_not_pair
+axiom name_not_pair :
 forall (tau1:timestamp, ma : message, mb : message, a:index) :
 sname(a)@tau1 <>  <ma, mb>
 
-axiom fresh_state
+axiom fresh_state :
 forall (tau1:timestamp, tau2:timestamp, a:index)
 such that tau1 <> tau2 :
 sname(a)@tau1 <> sname(a)@tau2
@@ -24,28 +24,34 @@ system  out(c,cst);
  ).
 
 
-goal forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
-such that
-  tau1 = tau2
-  :output@tau1= output@tau2.
-  Proof.
+goal dummy :
+  forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
+  such that tau1 = tau2:
+  output@tau1= output@tau2.
+Proof.
 Qed.
 
-goal unforgeable forall (tau1 : timestamp, a : index)
-such that
-tau1 <> 0_0[a]:
-output@tau1 = h(sname(a)@tau1,k)
-=> exists () : false.
+goal unforgeable :
+  forall (tau1 : timestamp, a : index)
+  such that tau1 <> 0_0[a]:
+  output@tau1 = h(sname(a)@tau1,k) => exists () : false.
 
 Proof.
 
   euf 0.
 
-  apply name_not_pair tau1 sname(index_14)@0_2[index_14] mname(index_14)@0_2[index_14] a.
+  apply name_not_pair to
+    tau1,
+    sname(index_14)@0_2[index_14],
+    mname(index_14)@0_2[index_14],
+    a.
 
-  apply name_not_pair tau1 sname(index_13)@0_1[index_13] sname(index_13)@0_1[index_13] a.
+  apply name_not_pair to
+    tau1,
+    sname(index_13)@0_1[index_13],
+    sname(index_13)@0_1[index_13],
+    a.
 
-  apply fresh_state tau1 0_0[a] a.
+  apply fresh_state to tau1, 0_0[a], a.
 
 Qed.
-
