@@ -6,6 +6,7 @@ OCB = ocamlbuild $(OCB_FLAGS)
 all: metabc test
 
 PROVER_TESTS = examples/lak.mbc \
+			   examples/forall.mbc \
 			   examples/equality_propagation.mbc \
 			   examples/euf_basic.mbc
 test: sanity
