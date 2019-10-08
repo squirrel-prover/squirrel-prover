@@ -1,3 +1,8 @@
+(* This file contains an unsound axiom, fresh_state.
+ * It will eventually be subsumed by the other euf_*.mbc examples,
+ * but I keep it for now since it should pass, but it does
+ * not (anymore) for some reason that I'd like to understand. *)
+
 hash h
 name k:message
 name cst:message

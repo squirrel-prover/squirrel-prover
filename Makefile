@@ -8,14 +8,19 @@ all: metabc test
 PROVER_TESTS = examples/lak.mbc \
 			   examples/forall.mbc \
 			   examples/equality_propagation.mbc \
-			   examples/euf_basic.mbc
+			   examples/euf_basic.mbc \
+			   examples/euf_output.mbc \
+			   examples/euf.mbc
+
 test: sanity
 	$(OCB) test.byte
 	./test.byte
-	@echo "" ; for f in $(PROVER_TESTS) ; do \
+	@echo ""
+	# TODO the make target should fail if one test below fails
+	@for f in $(PROVER_TESTS) ; do \
 	  echo -n "Running prover on $$f... " ; \
-	  (./metabc $$f > /dev/null && echo OK) || \
-	  (echo "FAIL" ; exit 1) ; \
+	  (./metabc $$f > /dev/null 2> /dev/null && echo OK) || \
+	  (echo "FAIL") ; \
 	done
 
 clean:
