@@ -1,0 +1,28 @@
+hash h
+name k : message
+name n : message
+name m : message
+
+system null.
+
+goal one :
+
+  forall ():
+  h(m,k) = h(n,k) => exists () : false.
+
+Proof.
+
+  euf 0.
+
+Qed.
+
+goal two :
+
+  forall ():
+  n = h(n,k) => exists () : false.
+
+Proof.
+
+  euf 0.
+
+Qed.

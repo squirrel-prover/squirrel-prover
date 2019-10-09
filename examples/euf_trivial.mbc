@@ -4,7 +4,7 @@ name n : message
 name m : message
 channel c
 
-system out(c,h(n,k)).
+system out(c,n).
 
 goal collision_absurd :
 
