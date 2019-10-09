@@ -2,17 +2,18 @@ hash h
 name k:message
 channel c
 
-name n : index->message
+name n : message
+name m : message
 
 (* TODO having a new n under the ! should be equivalent;
         it does not seem to be the case at the moment *)
 
-system !_a out(c,h(n(a),k)).
+system !_a out(c,h(n,k)).
 
 goal unforgeable :
-  forall (a:index, b:index)
-  such that b <> a:
-  output@0[b] = h(n(a),k) => exists () : false.
+  forall (tau:timestamp)
+  such that tau=tau : (* TODO crash when constraint is empty *)
+  output@tau = h(m,k) => exists () : false.
 
 Proof.
 

@@ -12,6 +12,8 @@ PROVER_TESTS = examples/lak.mbc \
 			   examples/euf_trivial.mbc \
 			   examples/euf_basic.mbc \
 			   examples/euf_output.mbc \
+			   examples/euf_output2.mbc \
+			   examples/euf_output3.mbc \
 			   examples/euf.mbc
 
 test: sanity

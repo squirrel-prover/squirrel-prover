@@ -1,3 +1,5 @@
+(* Same as euf_output but with output@0[b] replaced by its definition *)
+
 hash h
 name k:message
 channel c
@@ -12,7 +14,7 @@ system !_a out(c,h(n(a),k)).
 goal unforgeable :
   forall (a:index, b:index)
   such that b <> a:
-  output@0[b] = h(n(a),k) => exists () : false.
+  h(n(b),k) = h(n(a),k) => exists () : false.
 
 Proof.
 
