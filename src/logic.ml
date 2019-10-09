@@ -38,7 +38,7 @@ module Gamma : sig
   val get_atoms : gamma -> atom list
 
   val update_trs : gamma -> gamma
-    
+
   val get_trs : gamma -> Completion.state
 
   val is_sat : gamma -> bool
@@ -71,7 +71,7 @@ end = struct
   let mk () = { facts = []; atoms = []; trs = None; actions_described = [] }
 
   let get_atoms g = List.map fst g.atoms
-  
+
   (* We do not add atoms that are already a consequence of gamma. *)
   let add_atom g at =
     if List.mem at (get_atoms g) then g else
@@ -90,7 +90,7 @@ end = struct
            | _ -> add at (* TODO: do not add useless inequality atoms *) *)
       end
   let rec add_atoms g = function
-    | [] -> { g with trs = None } 
+    | [] -> { g with trs = None }
     | at :: ats -> add_atoms (add_atom g at) ats
 
   (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
@@ -130,7 +130,7 @@ end = struct
     let g = update_trs g in
     let _, neqs = get_eqs_neqs g in
     Completion.check_disequalities (opt_get g.trs) neqs
-         
+
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
       tag has been updated in [g] according to [f_up].
@@ -229,18 +229,18 @@ end = struct
     Constr.m_is_sat (opt_get theta.models)
 
   let maximal_elems theta tss =
-    let theta = compute_models theta in    
+    let theta = compute_models theta in
     Constr.maximal_elems (opt_get theta.models) tss
 
   let is_valid theta (c:tatom list) =
-    let theta = compute_models theta in    
+    let theta = compute_models theta in
     Constr.query (opt_get (theta.models)) c
- 
+
   let get_equalities theta =
     let theta = compute_models theta in
     let ts = Term.constr_ts theta.constr |> List.sort_uniq Pervasives.compare in
     Constr.get_equalities (opt_get (theta.models)) ts
-  
+
 end
 
 
@@ -296,7 +296,7 @@ module Judgment : sig
   val set_goal_fact : fact -> judgment -> judgment
 
   val update_trs : judgment -> judgment
-  
+
   val set_goal : typed_goal -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
@@ -306,7 +306,7 @@ module Judgment : sig
   val get_goal_formula : judgment -> formula
 
   val get_goal_postcond : judgment -> postcond
-    
+
 end = struct
   type judgment = { vars : fvar list;
                        theta : Theta.theta;
@@ -409,7 +409,7 @@ let simplify =
  function j ->
     match j.goal with
    | Postcond p  when p.evars = [] -> Judgment.set_goal (Fact p.efact) j
-   | Fact True -> Judgment.set_goal Unit j 
+   | Fact True -> Judgment.set_goal Unit j
    | _ -> j
 
 (** Current mode of the prover:
@@ -449,7 +449,7 @@ let parse_args goalname ts : subst =
           | TSVar v -> Theory.TS(Tvar.name v,TVar v)
           | MessVar v -> Theory.Term(Mvar.name v,MVar v)) j.vars in
         List.map2 (fun t u -> match u,t with
-            | TSVar a, t -> TS(TVar a, Theory.convert_ts u_subst t )                                                                           
+            | TSVar a, t -> TS(TVar a, Theory.convert_ts u_subst t )
             | MessVar a, t -> Term(MVar a, Theory.convert_glob u_subst t)
 
             | IndexVar a, Theory.Var iname -> Index(a, (Action.Index.get_or_make_fresh (Term.get_indexvars j.vars) iname))
@@ -458,7 +458,7 @@ let parse_args goalname ts : subst =
           ) ts uvars
 )
   | _ ->  raise @@ Failure "Multiple proved goals with same name"
-              
+
 
 (** Basic Tactics *)
 
@@ -518,7 +518,7 @@ let goal_and_intro (judge : judgment) sk fk = match Judgment.get_goal_fact judge
     sk [ set_goal_fact lgoal judge;
          set_goal_fact rgoal judge ] fk
   | _ -> raise @@ Failure "goal ill-formed"
-      
+
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : judgment) sk fk =
   let jgoal = Judgment.get_goal_formula judge in
@@ -649,7 +649,7 @@ let eq_names (judge : judgment) sk fk =
   sk [judge] fk
 
 let eq_constants fn (judge : judgment) sk fk =
-  let judge = Judgment.update_trs judge in  
+  let judge = Judgment.update_trs judge in
   let cnstrs =
     Completion.constant_index_cnstrs fn (Gamma.get_trs judge.gamma)
       (Gamma.get_all_terms judge.gamma) in
@@ -667,7 +667,7 @@ let eq_timestamps (judge : judgment) sk fk =
     let rec asubst e = function
         [] -> []
       | p::q -> TS(p,e):: (asubst e q) in
-    List.map (function [] -> [] | p::q -> asubst p q) ts_classes |> List.flatten in 
+    List.map (function [] -> [] | p::q -> asubst p q) ts_classes |> List.flatten in
   let terms = (Gamma.get_all_terms judge.gamma) in
   let facts = List.fold_left (fun acc t ->
       let normt =  subst_term subst t in
@@ -791,7 +791,7 @@ let apply (gname:string) (subst:subst) (judge : judgment) sk fk =
         List.fold_left (fun judge nt ->
             Judgment.add_fact nt.efact judge
             |> Judgment.add_constr nt.econstr
-          ) judge new_truths in 
+          ) judge new_truths in
       sk [new_judge; judge] fk
     | _ ->  raise @@ Failure "Multiple proved goals with same name"
 
@@ -811,12 +811,12 @@ type tac =
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
   | AnyIntro : tac
-      
+
   | GammaAbsurd : tac
   | ConstrAbsurd : tac
 
   | EqNames : tac
-  | EqTimestamps : tac      
+  | EqTimestamps : tac
   | EqConstants : fname -> tac
 
   (* | UProveAll : utac -> utac *)
@@ -853,7 +853,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
 
     | EqNames -> Fmt.pf ppf "eq_names"
-    | EqTimestamps -> Fmt.pf ppf "eq_timestamps"                   
+    | EqTimestamps -> Fmt.pf ppf "eq_timestamps"
     | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
 
     (* | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac *)
@@ -896,7 +896,7 @@ let rec tac_apply
     | ConstrAbsurd -> constr_absurd judge sk fk
 
     | EqNames -> eq_names judge sk fk
-    | EqTimestamps -> eq_timestamps judge sk fk                   
+    | EqTimestamps -> eq_timestamps judge sk fk
     | EqConstants fn -> eq_constants fn judge sk fk
     | Euf i ->
       let f_select _ t = t.cpt = i in
@@ -997,7 +997,7 @@ let rec reset_state n =
   match (!proof_states_history,n) with
   | [],_ -> raise Cannot_undo
   | p::q,0 ->
-    proof_states_history := q; 
+    proof_states_history := q;
     goals := p.goals;
     current_goal := p.current_goal;
     subgoals := p.subgoals;
@@ -1005,8 +1005,8 @@ let rec reset_state n =
     cpt_tag := p.cpt_tag;
     p.prover_mode
   | p::q, n -> proof_states_history := q; reset_state (n-1)
-    
-  
+
+
 let add_new_goal g = goals := g :: !goals
 
 let add_proved_goal g = goals_proved := g :: !goals_proved
@@ -1038,42 +1038,44 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 
 exception Tactic_type_error of string
 
+let simpGoal =
+  AndThen(Repeat AnyIntro,
+          AndThen(EqNames,
+                  AndThen(EqTimestamps,
+                          AndThen(Try(GammaAbsurd,Ident),
+                                  Try(ConstrAbsurd,Ident)))))
 
-let simpGoal = AndThen(Repeat AnyIntro,
-                       AndThen(EqNames,
-                               AndThen(EqTimestamps,
-                                       AndThen(Try(GammaAbsurd,Ident),
-                                               Try(ConstrAbsurd,Ident))
-                                      )
-                              )
-                      )
-                    
 let rec eval_tactic_judge : tac -> judgment -> judgment list = fun tac judge ->
-   let failure_k () = raise @@ Tactic_failed (Fmt.strf "%a" pp_tac tac) in
-   let suc_k judges _ =
-     judges
-   in
-    try     
-      tac_apply tac judge suc_k failure_k
-    with Goal_type_error (expected,given)-> 
-      raise @@ Tactic_type_error (Fmt.strf "@[The tactic %a is ill-typed, it was expected to be applied to a %s, not to a %s." pp_tac tac expected given)
+  let failure_k () = raise @@ Tactic_failed (Fmt.strf "%a" pp_tac tac) in
+  let suc_k judges _ =
+    judges
+  in
+   try
+     tac_apply tac judge suc_k failure_k
+   with Goal_type_error (expected,given)->
+     raise @@ Tactic_type_error
+       (Fmt.strf
+          "@[The tactic %a is ill-typed, \
+           it was expected to be applied to a %s, not to a %s."
+          pp_tac tac expected given)
 
 let auto_simp judges =
   List.map simplify judges
   |> remove_finished
-  |>  List.map (eval_tactic_judge simpGoal)
-  |> List.flatten  
-  |>  List.map simplify 
+  |> List.map (eval_tactic_judge simpGoal)
+  |> List.flatten
+  |> List.map simplify
   |> remove_finished
 
-(** [eval_tactic_focus utac] tries to prove the focused subgoal using [utac].
-    Return [true] if there are no subgoals remaining. *)
+(** [eval_tactic_focus tac] applies [tac] to the focused goal.
+  * @return [true] if there are no subgoals remaining. *)
 let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
   | [] -> assert false
-  | judge :: ejs' -> 
-    let ejs = (eval_tactic_judge tac judge) @ ejs'
-              |> auto_simp
-                 in
+  | judge :: ejs' ->
+      let ejs =
+        (eval_tactic_judge tac judge) @ ejs'
+        |> auto_simp
+      in
       subgoals := ejs;
       is_proof_completed ()
 

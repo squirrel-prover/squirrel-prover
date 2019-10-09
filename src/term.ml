@@ -339,8 +339,9 @@ let add_xeq od xeq (eqs,leqs,neqs) = match od with
   | _ -> raise (Failure ("add_xeq: bad comparison operator"))
 
 
-(** Constraints:
-    - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
+(** Atomic constraints are comparisons over timestamps or indices.
+  * Indices may only be compared for (dis)equality, i.e.
+  * [Pind (o,i,i')] may only be used when [o] is either [Eq] or [Neq]. *)
 type tatom =
   | Pts of timestamp _atom
   | Pind of index _atom
@@ -357,8 +358,8 @@ let pp_tatom ppf = function
     Fmt.pf ppf "@[<h>%a %a %a@]" Index.pp il pp_ord o Index.pp ir
 
 let not_tpred = function
-  | Pts (o,t,t') -> pts (not_xpred (o,t,t'))
-  | Pind (o,i,i') -> pind (not_xpred (o,i,i'))
+  | Pts (o,t,t') -> Pts (not_xpred (o,t,t'))
+  | Pind (o,i,i') -> Pind (not_xpred (o,i,i'))
 
 let norm_tatom = function
   | Pts (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
