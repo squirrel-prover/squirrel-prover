@@ -32,20 +32,11 @@
 %left SEMICOLON
 
 %start theory
-%start goal
-%start tactic
-%start qed
-%start undo
 %start top_process
 %start interactive
 %type <unit> theory
-%type <Logic.parsed_input> interactive
-%type <Goalmode.gm_input> goal
-%type <Logic.tac> tactic
-%type <unit> qed
-%type <int> undo
 %type <Process.process> top_process
-%type <Theory.fact> fact
+%type <Logic.parsed_input> interactive
 
 %%
 
