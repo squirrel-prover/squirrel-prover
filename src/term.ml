@@ -170,8 +170,12 @@ let is_declared mn =
   if Hashtbl.mem macros mn || List.mem mn built_ins then mn
   else raise Not_found
 
+exception Reserved_identifier
+exception Multiple_declarations
+
 let declare_macro mn f =
-  assert (not (is_built_in mn) && not (Hashtbl.mem macros mn)) ;
+  if is_built_in mn then raise Reserved_identifier ;
+  if Hashtbl.mem macros mn then raise Multiple_declarations ;
   Hashtbl.add macros mn f;
   mn                            (* TODO: refresh if already there *)
 
