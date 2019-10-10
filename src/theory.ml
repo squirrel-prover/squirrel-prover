@@ -81,6 +81,7 @@ let symbols : (string,symbol_info) Hashtbl.t = Hashtbl.create 97
 
 (** Sets the symbol table to one where only builtins are declared *)
 let initialize_symbols () =
+  Term.initialize_macros () ;
   Hashtbl.clear symbols ;
   Channel.reset () ;
   List.iter

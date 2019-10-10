@@ -159,6 +159,8 @@ type t = term
 let macros : (string, (timestamp -> index list -> term)) Hashtbl.t =
   Hashtbl.create 97
 
+let initialize_macros () = Hashtbl.clear macros
+
 let built_ins = ["input";"output"]
 
 (** [is_built_in mn] returns true iff [mn] is a built-in.  *)

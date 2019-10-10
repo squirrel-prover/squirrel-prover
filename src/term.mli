@@ -129,6 +129,9 @@ val is_built_in : mname -> bool
 
 val is_declared : string -> mname
 
+(** Reset macro declarations *)
+val initialize_macros : unit -> unit
+
 (** [declare_macro x f] declares a new macro with a name resembling [x],
   * associated to a substitution function which takes the target timestamp
   * as argument. *)

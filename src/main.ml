@@ -151,6 +151,12 @@ let () =
     "LAK model", `Quick, begin fun () ->
       parse_theory_test ~test "examples/lak.mbc"
     end ;
+    "LAK model, again", `Quick, begin fun () ->
+      (* We do this again, on purpose, to check that all definitions
+       * from the previous run are gone. The macros from Term used
+       * to not be re-initialized. *)
+      parse_theory_test ~test "examples/lak.mbc"
+    end ;
     (* "Simple goal", `Quick, begin fun () ->
      *   parse_theory_test ~test "examples/simple_goal.mbc"
      * end ; *)
