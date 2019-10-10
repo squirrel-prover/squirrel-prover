@@ -1,0 +1,8 @@
+name n : message
+term t : message = n
+
+system null.
+
+goal forall (): t=n.
+Proof.
+Qed.
