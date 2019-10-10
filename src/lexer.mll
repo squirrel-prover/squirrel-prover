@@ -66,6 +66,7 @@ rule token = parse
 | "such that"         { SUCHTHAT }
 | "term"              { TERM }
 | "process"           { PROCESS }
+| "abstract"          { ABSTRACT }
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
 | "system"            { SYSTEM }

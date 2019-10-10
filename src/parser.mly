@@ -8,7 +8,7 @@
 %token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS MINUS UNDERSCORE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
-%token CHANNEL TERM PROCESS HASH AENC NAME MUTABLE SYSTEM
+%token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
@@ -179,10 +179,16 @@ state_type:
 | msg_or_bool                    { 0, $1 }
 | INDEX ARROW state_type         { let n,k = $3 in n+1,k }
 
+abs_type:
+| msg_or_bool                    { [],$1 }
+| msg_or_bool ARROW abs_type     { let l,r = $3 in $1::l,r }
+
 declaration:
 | HASH ID                        { Theory.declare_hash $2 }
 | AENC ID                        { Theory.declare_aenc $2 }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
+| ABSTRACT ID COLON abs_type     { let l,r = $4 in
+                                     Theory.declare_abstract $2 l r }
 | MUTABLE ID COLON state_type    { Theory.declare_state $2 (fst $4) (snd $4) }
 | CHANNEL ID                     { Channel.declare $2 }
 | TERM ID opt_arg_list COLON msg_or_bool EQ term

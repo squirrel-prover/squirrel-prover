@@ -6,9 +6,8 @@ hash hkey
 channel cT
 channel cR
 
-(* TODO constants ok,ko *)
-name ok:message
-name ko:message
+abstract ok:message
+abstract ko:message
 
 (* Reader database entries for keys and old keys *)
 
