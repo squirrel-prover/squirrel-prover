@@ -30,7 +30,7 @@ test: sanity
 
 clean:
 	$(OCB) -clean
-	@rm -f metabc doc
+	@rm -f metabc
 
 metabc: sanity
 	$(OCB) metabc.byte
@@ -53,7 +53,6 @@ install: metabc
 
 doc: metabc
 	$(OCB) -ocamldoc "ocamldoc -stars" metabc.docdir/index.html
-	@ln -s -f _build/metabc.docdir doc
 
 sanity: _build/requirements
 
