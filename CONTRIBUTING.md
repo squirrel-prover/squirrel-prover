@@ -8,31 +8,54 @@ Comments for functions should be put inside the `.mli` files.
 ## Coding conventions
 
 * 80 characters lines
-* rather use begin end than parenthesis inside if blocks
-* if a let construct goes for multiple line, the `in` should be on a new line at the end.
+* use `begin/end` than parenthesis to delimit block:
+```
+if .. then begin
+end
+
+begin match .. with
+  | ...
+end
+```
+* do not indent after `let`:
+```
+let x = ... in
+let y = ... in
+do something
+```
+* if a let construct spans across multiple line, it should be indented and the `in` should be on a new line at the end:
 
 Good: 
 ```
 let x =
-	...
-   in
+  ...
+in
+...
 ```
 Bad:
 ```
 let x =
-	...  in
+  ...  in
 ```
 * always put | for the first pattern matching definitions:
 
 Good:
 ```
 type t =
- | Toto
- | Tutu
+  | Toto
+  | Tutu
+
+match .. with
+  | Toto -> ...
+  | Tutu -> ...
 ```
 Bad:
 ```
 type t =
-  Toto
- | Tutu
+    Toto
+  | Tutu
+match .. with
+    Toto -> ...
+  | Tutu -> ...
 ```
+* in `mly` files, the `x=TOTO` notation should not have spaces
