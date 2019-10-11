@@ -31,14 +31,14 @@ let parse_next parser_fun =
     
 let rec main_loop ?(save=true) mode =
   if !interactive then Format.printf "[>@.";
-  (* if we are not waiting for a system description,
-   * we are at some break point and we save the state *)
-  if save && mode <> InputDescr then
-    save_state mode
-  else begin
+  (* Initialize definitions before parsing system description *)
+  if mode = InputDescr then begin
     Theory.initialize_symbols () ;
     Process.reset ()
-  end ;
+  end else
+  (* Otherwise save the state if instructed to do so.
+   * In practice we save except after errors. *)
+  if save then save_state mode ;
   try
     let new_command = parse_next Main.parse_interactive_buf in
     match mode, new_command with
