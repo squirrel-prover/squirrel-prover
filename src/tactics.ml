@@ -31,7 +31,7 @@ let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
 
 let tact_andthen a b sk fk v = a v (fun v fk' -> b v sk fk') fk
 
-let tact_orelse a b sk fk v = a v sk (fun () -> b v sk fk)
+let tact_orelse a b v sk fk = a v sk (fun () -> b v sk fk)
 
 let repeat t j sk fk =
   let rec success_loop oldj v fk' =
@@ -70,7 +70,7 @@ let goal_or_intro_r (judge : Judgment.t) sk fk = match Judgment.get_goal_fact ju
 
 (** To prove phi \/ psi, try first to prove phi and then psi *)
 let goal_or_intro (judge : Judgment.t) sk fk =
-  tact_orelse goal_or_intro_l goal_or_intro_r sk fk judge
+  tact_orelse goal_or_intro_l goal_or_intro_r judge sk fk
 
 let goal_true_intro (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
   | True -> sk () fk
@@ -116,7 +116,7 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
     timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
     variables. *)
-let goal_exists_intro (judge : Judgment.t) sk fk nu=
+let goal_exists_intro nu (judge : Judgment.t) sk fk =
   let jgoal = Judgment.get_goal_postcond judge in
   let pc_constr = subst_constr nu jgoal.econstr in
   let judge =
@@ -346,11 +346,7 @@ let euf_apply f_select (judge : Judgment.t) sk fk =
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
 
-let apply proved_goals (gname:string) (subst:subst) (judge : Judgment.t) sk fk =
-  let goals = List.filter (fun (name,g) -> name = gname) proved_goals in
-    match goals with
-    | [] ->  raise @@ Failure "No proved goal with given name"
-    | [(np,gp)] ->
+let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       (* we first check if constr is satisfied *)
       let new_constr =subst_constr subst gp.uconstr in
       let rec to_cnf c = match c with
@@ -373,4 +369,3 @@ let apply proved_goals (gname:string) (subst:subst) (judge : Judgment.t) sk fk =
             |> Judgment.add_constr nt.econstr
           ) judge new_truths in
       sk [new_judge; judge] fk
-    | _ ->  raise @@ Failure "Multiple proved goals with same name"

@@ -56,7 +56,8 @@ let rec reset_state n =
  *   type string tac could be printed
  *   type ('a Tactics.tac) tac could be evaluated
  *   problem: apply (and other tactics with arguments) make the
- *   general treatment difficult *)
+ *   general treatment difficult
+ *   solution: a general notion of tactic args and associated syntax ? *)
 
 type tac =
   | Admit : tac
@@ -143,9 +144,18 @@ let rec tac_apply :
     | Ident -> sk [judge] fk
 
     | ForallIntro -> goal_forall_intro judge sk fk
-    | ExistsIntro (nu) -> goal_exists_intro judge sk fk nu
+    | ExistsIntro (nu) -> goal_exists_intro nu judge sk fk
     | AnyIntro -> goal_any_intro judge sk fk
-    | Apply (gname,s) -> apply !goals_proved gname s judge sk fk
+    | Apply (gname,s) ->
+        let f =
+          match
+            List.filter (fun (name,g) -> name = gname) !goals_proved
+          with
+            | [(_,f)] -> f
+            | [] -> raise @@ Failure "No proved goal with given name"
+            | _ -> raise @@ Failure "Multiple proved goals with the same name"
+        in
+        apply f s judge sk fk
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
     | Split -> goal_and_intro judge sk fk
@@ -186,9 +196,10 @@ let rec tac_apply :
         sk fk judge
 
     | OrElse (tac,tac') ->
-      tact_orelse (tac_apply tac) (tac_apply tac') sk fk judge
+      tact_orelse (tac_apply tac) (tac_apply tac') judge sk fk
 
     | Try (tac,tac') ->
+        (* TODO what is the intended difference with previous one ? *)
       tac_apply tac judge (fun _ fk -> sk [] fk)
         (fun () -> tac_apply tac' judge sk fk)
     | Repeat tac ->
