@@ -177,7 +177,7 @@ let pp_proc ppf () =
 let pp_goals ppf () =
   let cpt = ref 0 in
   Fmt.pf ppf "@[<v>";
-  Logic.iter_goals (fun (gname,goal) ->
+  Prover.iter_goals (fun (gname,goal) ->
       Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
         !cpt Term.pp_formula goal;
       incr cpt;);

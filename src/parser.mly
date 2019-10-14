@@ -36,7 +36,7 @@
 %start interactive
 %type <unit> theory
 %type <Process.process> top_process
-%type <Logic.parsed_input> interactive
+%type <Prover.parsed_input> interactive
 
 %%
 
@@ -44,22 +44,22 @@
 
 i_list:
 |                                 { [] }
-| COMMA; ind = ID; l = i_list     { ind :: l }
+| COMMA; ind=ID; l=i_list         { ind :: l }
 
 index_list:
 |                                 { [] }
 | LBRACKET RBRACKET               { [] }
-| LBRACKET; ind = ID; l = i_list; RBRACKET
+| LBRACKET; ind=ID; l=i_list; RBRACKET
                                   { ind :: l }
 saction:
-| item = INT; indices = index_list
+| item=INT; indices=index_list
                                   { (item,indices,0) }
-| item = INT; indices = index_list; SLASH; sum = INT
+| item=INT; indices=index_list; SLASH; sum=INT
                                   { (item,indices,sum) }
 
 action:
-| act = saction;                         { [act] }
-| act = saction; UNDERSCORE; l = action  { act :: l }
+| act=saction;                       { [act] }
+| act=saction; UNDERSCORE; l=action  { act :: l }
 
 (* Terms *)
 
@@ -68,7 +68,7 @@ term:
 | LPAREN term RPAREN             { $2 }
 
 aterm:
-| a = action                     { Theory.Taction (Theory.make_action a) }
+| a=action                       { Theory.Taction (Theory.make_action a) }
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
 		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
@@ -195,8 +195,10 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM f=formula		 { Logic.add_proved_goal ("unnamed_goal", Logic.make_goal f) }		 				 
-| AXIOM i=ID COLON f=formula     { Logic.add_proved_goal (i, Logic.make_goal f) }
+| AXIOM f=formula		 { Prover.add_proved_goal
+                                     ("unnamed_goal", Prover.make_goal f) }
+| AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
+                                     (i, Prover.make_goal f) }
 
 q_vars:
 | LPAREN arg_list RPAREN                       { ($2, Term.True) }
@@ -213,7 +215,7 @@ formula:
 				     ([],Term.True),
 				     Term.True, $4 ) }
 | FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
-                                 { ($2, $7, $4, $9) } 
+                                 { ($2, $7, $4, $9) }
 
 tactic_params:
 |                               { [] }
@@ -221,43 +223,44 @@ tactic_params:
 | t=term COMMA ts=tactic_params { t::ts }
 
 tac:
-  | LPAREN t = tac RPAREN          { t }
-  | ADMIT                             { Logic.Admit }
-  | IDENT                             { Logic.Ident }
-  | FORALLINTRO                       { Logic.ForallIntro }
-  | ANYINTRO                          { Logic.AnyIntro }
-  | INTRO                             { Logic.Intro }
-  | LEFT                              { Logic.Left }
-  | RIGHT                             { Logic.Right }
-  | SPLIT                             { Logic.Split }
-  | CONGRUENCE                        { Logic.GammaAbsurd }
-  | NOTRACES                          { Logic.ConstrAbsurd }
-  | EQNAMES                           { Logic.EqNames }
-  | EQTIMESTAMPS                      { Logic.EqTimestamps }  
-  | EUF i = INT                       { Logic.Euf i }
-  | CYCLE i = INT                     { Logic.Cycle i }
-  | CYCLE MINUS i = INT               { Logic.Cycle (-i) }
-  /* | LBRACKET t = tac RBRACKET      { Logic.ProveAll t } */
-  | l = tac SEMICOLON r = tac         { Logic.AndThen (l,r) }
-  | l = tac PLUS r = tac              { Logic.OrElse (l, r) }
-  | TRY l = tac ORELSE r = tac        { Logic.Try (l, r) }
-  | APPLY i=ID                        { Logic.Apply (i, Logic.parse_args i []) }
-  | APPLY i=ID TO t=tactic_params     { Logic.Apply (i, Logic.parse_args i t) }
-  | REPEAT t=tac                      { Logic.Repeat (t) }
+  | LPAREN t=tac RPAREN               { t }
+  | ADMIT                             { Prover.Admit }
+  | IDENT                             { Prover.Ident }
+  | FORALLINTRO                       { Prover.ForallIntro }
+  | ANYINTRO                          { Prover.AnyIntro }
+  | INTRO                             { Prover.Intro }
+  | LEFT                              { Prover.Left }
+  | RIGHT                             { Prover.Right }
+  | SPLIT                             { Prover.Split }
+  | CONGRUENCE                        { Prover.GammaAbsurd }
+  | NOTRACES                          { Prover.ConstrAbsurd }
+  | EQNAMES                           { Prover.EqNames }
+  | EQTIMESTAMPS                      { Prover.EqTimestamps }
+  | EUF i=INT                         { Prover.Euf i }
+  | CYCLE i=INT                       { Prover.Cycle i }
+  | CYCLE MINUS i=INT                 { Prover.Cycle (-i) }
+  /* | LBRACKET t=tac RBRACKET        { Prover.ProveAll t } */
+  | l=tac SEMICOLON r=tac             { Prover.AndThen (l,r) }
+  | l=tac PLUS r=tac                  { Prover.OrElse (l, r) }
+  | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
+  | APPLY i=ID                        { Prover.Apply (i, Prover.parse_args i []) }
+  | APPLY i=ID TO t=tactic_params     { Prover.Apply (i, Prover.parse_args i t) }
+  | REPEAT t=tac                      { Prover.Repeat (t) }
 
 
 qed:
 | QED                                 { () }
 
 undo:
-| UNDO i = INT DOT                   {i} 
+| UNDO i=INT DOT                      { i }
 
 tactic:
-| t = tac DOT                         { t }
+| t=tac DOT                           { t }
 
 goal:
-| GOAL i=ID COLON f=formula DOT   { Goalmode.Gm_goal (i, Logic.make_goal f) }
-| GOAL f = formula DOT            { Goalmode.Gm_goal ("unnamed_goal", Logic.make_goal f) }
+| GOAL i=ID COLON f=formula DOT   { Goalmode.Gm_goal (i, Prover.make_goal f) }
+| GOAL f=formula DOT              { Goalmode.Gm_goal ("unnamed_goal",
+                                                      Prover.make_goal f) }
 | PROOF                           { Goalmode.Gm_proof }
 
 theory:
@@ -268,9 +271,9 @@ top_process:
 | process EOF                    { $1 }
 
 interactive :
-| theory                          { Logic.ParsedInputDescr }
-| undo                            { Logic.ParsedUndo $1 }
-| tactic                          { Logic.ParsedTactic $1 }
-| qed                             { Logic.ParsedQed }
-| goal                            { Logic.ParsedGoal $1 }
-| EOF                             { Logic.EOF }
+| theory                          { Prover.ParsedInputDescr }
+| undo                            { Prover.ParsedUndo $1 }
+| tactic                          { Prover.ParsedTactic $1 }
+| qed                             { Prover.ParsedQed }
+| goal                            { Prover.ParsedGoal $1 }
+| EOF                             { Prover.EOF }

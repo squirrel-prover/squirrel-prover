@@ -28,7 +28,9 @@ let parse_next parser_fun =
     parser_fun lexbuf "interactive"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
-    
+ 
+open Prover
+
 let rec main_loop ?(save=true) mode =
   if !interactive then Format.printf "[>@.";
   (* Initialize definitions before parsing system description *)
@@ -60,10 +62,10 @@ let rec main_loop ?(save=true) mode =
           main_loop GoalMode
       | ProofMode,ParsedTactic(utac) ->
           begin try
-            if not !interactive then Fmt.pr "@[[> %a.@.@]@." Logic.pp_tac utac ;
+            if not !interactive then Fmt.pr "@[[> %a.@.@]@." pp_tac utac ;
             if eval_tactic utac then begin
               Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-                (match !Logic.current_goal with
+                (match !current_goal with
                    | Some (i,_) -> i
                    | None -> assert false) ;
               complete_proof ();
@@ -74,7 +76,7 @@ let rec main_loop ?(save=true) mode =
           with
             | Tactic_failed s ->
                 error ProofMode ("Tactic failed: " ^ s ^ ".")
-            | Logic.Tactic_type_error s ->
+            | Tactic_type_error s ->
                 error ProofMode s
           end
       
@@ -87,9 +89,9 @@ let rec main_loop ?(save=true) mode =
             | Goalmode.Gm_proof -> begin match start_proof () with
                 | None ->
                     Fmt.pr "%a" pp_goal ();
-                    if Logic.is_proof_completed () then begin
+                    if is_proof_completed () then begin
                       Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-                        (match !Logic.current_goal with
+                        (match !current_goal with
                            | Some (i,_) -> i
                            | None -> assert false) ;
                       complete_proof ();
