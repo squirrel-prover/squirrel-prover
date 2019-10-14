@@ -252,7 +252,7 @@ let parse_args goalname ts : subst =
           let u_subst = List.map (function
             | IndexVar v -> Theory.Idx (Action.Index.name v,v)
             | TSVar v -> Theory.TS (Tvar.name v,TVar v)
-            | MessVar v -> Theory.Term(Mvar.name v,MVar v)) j.vars
+            | MessVar v -> Theory.Term (Mvar.name v,MVar v)) j.Judgment.vars
           in
           List.map2 (fun t u -> match u,t with
             | TSVar a, t -> TS (TVar a, Theory.convert_ts u_subst t )
@@ -260,7 +260,7 @@ let parse_args goalname ts : subst =
 
             | IndexVar a, Theory.Var iname ->
                 Index (a, Action.Index.get_or_make_fresh
-                            (Term.get_indexvars j.vars) iname)
+                            (Term.get_indexvars j.Judgment.vars) iname)
             | _ ->  raise @@ Failure "Type error in the arguments"
           ) ts uvars
       end
