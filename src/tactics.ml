@@ -1,5 +1,5 @@
 open Logic
-open Term (* TODO remove explicit Term.* *)
+open Term
 
 type 'a fk = unit -> 'a
 
@@ -18,9 +18,9 @@ let remove_finished judges =
 
 let simplify = function j ->
   match j.Judgment.goal with
-    | Postcond p when p.Term.evars = [] ->
-        Judgment.set_goal (Fact p.Term.efact) j
-    | Fact Term.True -> Judgment.set_goal Unit j
+    | Postcond p when p.evars = [] ->
+        Judgment.set_goal (Fact p.efact) j
+    | Fact True -> Judgment.set_goal Unit j
     | _ -> j
 
 (** Basic Tactics *)
@@ -61,11 +61,11 @@ let lift =
 (** Introduction Rules *)
 
 let goal_or_intro_l (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
-  | Term.Or (lgoal, _) -> sk [Judgment.set_goal_fact lgoal judge] fk
+  | Or (lgoal, _) -> sk [Judgment.set_goal_fact lgoal judge] fk
   | _ -> raise @@ Failure "goal ill-formed"
 
 let goal_or_intro_r (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
-  | Term.Or (_, rgoal) -> sk [Judgment.set_goal_fact rgoal judge] fk
+  | Or (_, rgoal) -> sk [Judgment.set_goal_fact rgoal judge] fk
   | _ -> raise @@ Failure "goal ill-formed"
 
 (** To prove phi \/ psi, try first to prove phi and then psi *)
@@ -73,11 +73,11 @@ let goal_or_intro (judge : Judgment.t) sk fk =
   tact_orelse goal_or_intro_l goal_or_intro_r sk fk judge
 
 let goal_true_intro (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
-  | Term.True -> sk () fk
+  | True -> sk () fk
   | _ -> raise @@ Failure "goal ill-formed"
 
 let goal_and_intro (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
-  | Term.And (lgoal,rgoal) ->
+  | And (lgoal,rgoal) ->
     sk [ Judgment.set_goal_fact lgoal judge;
          Judgment.set_goal_fact rgoal judge ] fk
   | _ -> raise @@ Failure "goal ill-formed"
@@ -89,18 +89,18 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
     List.fold_left
       (fun subst x ->
          if List.mem x judge.Judgment.vars then
-           (x,Term.make_fresh_of_type x):: subst
+           (x,make_fresh_of_type x):: subst
          else
-           (x,x)::subst ) [] jgoal.Term.uvars
+           (x,x)::subst ) [] jgoal.uvars
   in
-  let subst = Term.from_fvarsubst vsubst in
-  let new_cnstr = Term.subst_constr subst jgoal.Term.uconstr
-  and new_fact = Term.subst_fact subst jgoal.Term.ufact
+  let subst = from_fvarsubst vsubst in
+  let new_cnstr = subst_constr subst jgoal.uconstr
+  and new_fact = subst_fact subst jgoal.ufact
   and new_goals =
     List.map
       (fun goal ->
-         Postcond (Term.subst_postcond subst goal))
-      jgoal.Term.postcond
+         Postcond (subst_postcond subst goal))
+      jgoal.postcond
   in
   let judges =
     List.map (fun goal ->
@@ -118,18 +118,18 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
     variables. *)
 let goal_exists_intro (judge : Judgment.t) sk fk nu=
   let jgoal = Judgment.get_goal_postcond judge in
-  let pc_constr = Term.subst_constr nu jgoal.Term.econstr in
+  let pc_constr = subst_constr nu jgoal.econstr in
   let judge =
     Judgment.set_goal
-      (Fact (Term.subst_fact nu jgoal.Term.efact)) judge
-      |> Judgment.add_constr (Term.Not pc_constr) in
+      (Fact (subst_fact nu jgoal.efact)) judge
+      |> Judgment.add_constr (Not pc_constr) in
   sk [judge] fk
 
 let goal_intro (judge : Judgment.t) sk fk =
   match Judgment.get_goal_fact judge with
-  | Term.False -> sk [judge] fk
-  | f -> let judge = Judgment.add_fact (Term.Not (f)) judge
-              |> Judgment.set_goal_fact Term.False in
+  | False -> sk [judge] fk
+  | f -> let judge = Judgment.add_fact (Not (f)) judge
+              |> Judgment.set_goal_fact False in
     sk [judge] fk
 
 let goal_any_intro (judge : Judgment.t) sk fk =
@@ -139,7 +139,7 @@ let goal_any_intro (judge : Judgment.t) sk fk =
   | _ -> fk ()
 
 let fail_goal_false (judge : Judgment.t) sk fk = match Judgment.get_goal_fact judge with
-  | Term.False -> fk ()
+  | False -> fk ()
   | _ -> raise @@ Failure "goal ill-formed"
 
 let constr_absurd (judge : Judgment.t) sk fk =
@@ -154,11 +154,11 @@ let gamma_absurd (judge : Judgment.t) sk fk =
 
 let or_to_list f =
   let rec aux acc = function
-    | Term.Or (g,h) -> aux (aux acc g) h
+    | Or (g,h) -> aux (aux acc g) h
     | _ as a -> a :: acc in
 
   (* Remark that we simplify the formula. *)
-  aux [] (Term.simpl_fact f)
+  aux [] (simpl_fact f)
 
 let gamma_or_intro (judge : Judgment.t) sk fk select_pred =
   let sel, nsel =
@@ -190,21 +190,21 @@ let gamma_or_intro (judge : Judgment.t) sk fk select_pred =
 
 (** Utils *)
 let mk_or_cnstr l = match l with
-  | [] -> Term.False
+  | [] -> False
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Term.Or (x,acc)) l in
+      | x :: l -> mk_c (Or (x,acc)) l in
     mk_c a l'
 
 let mk_and_cnstr l = match l with
-  | [] -> Term.True
+  | [] -> True
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Term.And (x,acc)) l in
+      | x :: l -> mk_c (And (x,acc)) l in
     mk_c a l'
 
 
@@ -242,17 +242,17 @@ let eq_timestamps (judge : Judgment.t) sk fk =
   let subst =
     let rec asubst e = function
         [] -> []
-      | p::q -> Term.TS (p,e) :: (asubst e q) in
+      | p::q -> TS (p,e) :: (asubst e q) in
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes |> List.flatten in
   let terms = (Gamma.get_all_terms judge.Judgment.gamma) in
   let facts =
     List.fold_left
       (fun acc t ->
-         let normt = Term.subst_term subst t in
+         let normt = subst_term subst t in
            if normt = t then
              acc
            else
-             Term.Atom (Term.Eq, t,normt) ::acc )
+             Atom (Eq, t,normt) ::acc )
       [] terms in
   let judge =
     List.fold_left
@@ -265,13 +265,13 @@ let eq_timestamps (judge : Judgment.t) sk fk =
 
 (** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
 let modulo_sym f at = match at with
-  | (Term.Eq as ord,t1,t2) | (Term.Neq as ord,t1,t2) -> begin match f at with
+  | (Eq as ord,t1,t2) | (Neq as ord,t1,t2) -> begin match f at with
       | Some _ as res -> res
       | None -> f (ord,t2,t1) end
   | _ -> f at
 
-let euf_param (at : Term.atom) = match at with
-  | (Term.Eq, Term.Fun ((hash,_), [m; Term.Name key]), s) ->
+let euf_param (at : atom) = match at with
+  | (Eq, Fun ((hash,_), [m; Name key]), s) ->
     if Theory.is_hash hash then
       Some (hash,key,m,s)
     else None
