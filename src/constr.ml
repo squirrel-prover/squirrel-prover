@@ -112,7 +112,7 @@ type constr_instance = { eqs : (ut * ut) list;
                          elems : ut list;
                          uf : Uuf.t }
 
-(** Prepare the tatoms list by transforming it into a list of equalities
+(* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
 let mk_instance (l : tatom list) =
   let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
@@ -120,19 +120,20 @@ let mk_instance (l : tatom list) =
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
       ([],[],[]) l in
 
-  let elems = List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
+  let elems =
+    List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
               |> List.fold_left (fun acc x -> match x.cnt with
                   | UName (_,is) -> x :: is @ acc
                   | _ -> x :: acc) []
-              |> List.sort_uniq ut_compare in
+              |> List.sort_uniq ut_compare
+  in
   let uf = Uuf.create elems in
-
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
 
 
 exception Unify_cycle of Uuf.t
 
-(** [mgu ut uf] applies the mgu represented by [uf] to [ut].
+(* [mgu ut uf] applies the mgu represented by [uf] to [ut].
     Raise [Unify_cycle] if it contains a cycle. *)
 let mgu (uf : Uuf.t) (ut : ut) =
 
@@ -172,14 +173,16 @@ let mgu (uf : Uuf.t) (ut : ut) =
 
 let mgus uf uts =
   let uf, nuts_rev =
-    List.fold_left (fun (uf,acc) ut ->
-        let uf,nut = mgu uf ut in uf, nut :: acc)
-      (uf,[]) uts in
+    List.fold_left
+      (fun (uf,acc) ut ->
+         let uf,nut = mgu uf ut in uf, nut :: acc)
+      (uf,[]) uts
+  in
   (uf, List.rev nuts_rev)
 
 exception No_mgu
 
-(** [let sx,sy = swap x y] guarantees that if [x] or [y] is a variable, then
+(* [let sx,sy = swap x y] guarantees that if [x] or [y] is a variable, then
     [sx] is variable. Moreover, if [x] and [y] are not variables but one of
     them is a name, then [sx] is a name. *)
 let swap x y = match x.cnt, y.cnt with
@@ -189,7 +192,8 @@ let swap x y = match x.cnt, y.cnt with
   | _ -> x,y
 
 let no_mgu x y = match x.cnt, y.cnt with
-  | UName (a,_), UName (a',_) -> if a <> a' then raise No_mgu else ()
+  | UName (a,_), UName (a',_) ->
+    if a <> a' then raise No_mgu else ()
   | _ -> ()
 
 
@@ -260,13 +264,8 @@ let unif_idx uf =
   (!finished, uf)
 
 
-(** Merges union-find classes with the same mgus. *)
+(* Merges union-find classes with the same mgus. *)
 let merge_eq_class uf =
-  (* let pp_sep ppf () = Fmt.pf ppf ";;@;@;" in
-   * Fmt.epr "@[<v>Uf:@;%a@;Classes:@;@[<hov>%a@]@]@."
-   *   Uuf.print uf
-   *   (Fmt.list ~sep:pp_sep (Fmt.list pp_ut)) (Uuf.classes uf); *)
-
   let reps =
     List.map (fun l -> match l with
         | [] -> raise (Failure "merge_eq_class")
@@ -293,19 +292,16 @@ let rec fpt_unif_idx uf =
 (* Final unification algorithm. *)
 (********************************)
 
-(** Returns the mgu for [eqs], starting from the mgu [uf] *)
+(* Returns the mgu for [eqs], starting from the mgu [uf] *)
 let unify uf eqs elems =
   let uf = unif uf eqs |> fpt_unif_idx in
-
   (* We compute all mgu's, to check for the absence of cycles. *)
   let uf,_ = mgus uf elems in
-
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
 let mgu_eqs (l : tatom list) =
   let instance = mk_instance l in
-
   unify instance.uf instance.eqs instance.elems
 
 
@@ -322,7 +318,7 @@ module UtG = Persistent.Digraph.Concrete(struct
 
 module Scc = Components.Make(UtG)
 
-(** Build the inequality graph. There is a edge from S to S' if there exits
+(* Build the inequality graph. There is a edge from S to S' if there exits
     u in S and v in S' such that u <= v, or if u = P^{k+1}(t) and v = P^k(t).
     Remark: we use [mgu uf u] as a representant for the class of u *)
 let build_graph (uf : Uuf.t) leqs =
@@ -331,7 +327,6 @@ let build_graph (uf : Uuf.t) leqs =
     | (u,v) :: leqs ->
       let uf, nu = mgu uf u in
       let uf, nv = mgu uf v in
-
       UtG.add_edge g nu nv
       |> bg uf leqs in
 
@@ -344,7 +339,7 @@ let build_graph (uf : Uuf.t) leqs =
   (uf, add_preds g)
 
 
-(** For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
+(* For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
     x=x_1 /\ ... /\ x = x_n   *)
 let cycle_eqs uf g =
   let sccs = Scc.scc_list g in
@@ -353,7 +348,7 @@ let cycle_eqs uf g =
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
     [] sccs
 
-(** [leq_unify uf leqs elems] compute the fixpoint of:
+(* [leq_unify uf leqs elems] compute the fixpoint of:
     - compute the inequality graph [g]
     - get [g] SCCs and the corresponding equalities
     - unify the new equalities *)
@@ -375,7 +370,7 @@ let rec root_var = function
 let get_vars elems =
   List.map root_var elems |> List.sort_uniq Pervasives.compare
 
-(** [min_pred uf g u x] returns [j] where [j] is the smallest integer such
+(* [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
     Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let min_pred uf g u x =
@@ -384,48 +379,48 @@ let min_pred uf g u x =
     if UtG.mem_vertex g ncx then
       if UtG.mem_edge g ncx u then Some (uf,j)
       else minp uf (j+1) (upred ncx)
-    else None in
-
+    else None
+  in
   minp uf 0 x
 
-(** [max_pred uf g u x] returns [j] where [j] is the largest integer such
+(* [max_pred uf g u x] returns [j] where [j] is the largest integer such
     that [u <= P^j(x)] in the graph [g], if it exists.
     Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
   let rec maxp uf j cx =
     let uf, ncx = mgu uf cx in
-    if UtG.mem_vertex g ncx then
-      if UtG.mem_edge g u ncx then maxp uf (j+1) (upred ncx)
-      else Some (uf, j - 1)
-    else Some (uf, j - 1) in
-
+    if (UtG.mem_vertex g ncx) && (UtG.mem_edge g u ncx) then
+      maxp uf (j+1) (upred ncx)
+    else
+      Some (uf, j - 1)
+  in
   let uf, nx = mgu uf x in
-  if (UtG.mem_vertex g nx)
-  && (UtG.mem_edge g u nx) then maxp uf 0 x
-  else None
+  if (UtG.mem_vertex g nx) && (UtG.mem_edge g u nx) then
+    maxp uf 0 x
+  else
+    None
 
-(** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
+(* [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
     such that [u] equals [P^k(x)]. *)
 let decomp u =
   let rec fdec i u = match u.cnt with
     | UPred u' -> fdec (i + 1) u'
     | _ -> (i,u) in
-
   fdec 0 u
 
-(** [nu] must be normalized and [x] basic *)
+(* [nu] must be normalized and [x] basic *)
 let no_case_disj uf nu x minj maxj =
   let nu_i, nu_y = decomp nu in
   (nu_y = snd (mgu uf x)) && (maxj <= nu_i) && (nu_i <= minj)
 
 module UtGOp = Oper.P(UtG)
 
-(** [kpred x i] return [P^i(x)] *)
+(* [kpred x i] return [P^i(x)] *)
 let rec kpred x = function
   | 0 -> x
   | i -> kpred (upred x) (i - 1)
 
-(** [g] must be transitive and [x] basic *)
+(* [g] must be transitive and [x] basic *)
 let add_disj uf g u x =
   let uf, nu = mgu uf u in
   opt_map (min_pred uf g nu x) (fun (uf,minj) ->
@@ -474,7 +469,7 @@ let find_edge f g =
   with Found (v,v') -> (v,v')
 
 
-(** Check that [instance] dis-equalities are satisfied.
+(* Check that [instance] dis-equalities are satisfied.
     [g] must be transitive. *)
 let neq_sat uf g neqs =
   (* Check dis-equalities in neqs *)
@@ -494,13 +489,13 @@ let get_basics uf elems =
   |> List.sort_uniq ut_compare
 
 
-(** Type of a model, which is a satisfiable and normalized instance, and the
+(* Type of a model, which is a satisfiable and normalized instance, and the
     graph representing the inequalities of the instance (which is always
     transitive). *)
 type model = { inst : constr_instance;
                tr_graph : UtG.t }
 
-(** [split instance] return a disjunction of satisfiable and normalized instances
+(* [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split instance : model list =
   try begin
@@ -542,18 +537,17 @@ let rec split instance : model list =
     log_constr (fun () -> Fmt.epr "@[<v 2>No_mgu:@;@]@.");
     []
 
-(** The minimal models a of constraint.
+(* The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
 
-(** [models_conjunct l] returns the list of minimal models of the conjunct.
+(* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
 let models_conjunct (l : tatom list) : models =
   let instance = mk_instance l in
-
   split instance
 
-(** [models l] returns the list of minimal models of a constraint. *)
+(* [models l] returns the list of minimal models of a constraint. *)
 let models constr =
   constr_dnf constr
   |> List.map models_conjunct
@@ -594,16 +588,10 @@ let _query (model : model) = function
   | Pts (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
   | Pind (o,a,b) -> List.for_all (ind_query model) (norm_xatom (o,a,b))
 
-(** [query models at] returns [true] if the conjunction of the atoms in [ats]
-    is always true in [models].
-    This is an under-approximation (i.e. correct but not complete).
-    Because we under-approximate, we are very unprecise on dis-equalities
-    (i.e. atoms of the form [(Neq,_,_)]). *)
 let query (models : models) ats =
   List.for_all (fun model -> List.for_all (_query model) ats) models
-  
 
-(** [max_elems_model model elems] returns the maximal elements of [elems]
+(* [max_elems_model model elems] returns the maximal elements of [elems]
     in [model], *with* redundancy modulo [model]'s equality relation. *)
 let max_elems_model (model : model) elems =
   (* We normalize to obtain the representant of each timestamp. *)
@@ -618,10 +606,6 @@ let max_elems_model (model : model) elems =
   |> List.map fst
   |> List.sort_uniq Pervasives.compare
 
-(** [maximal_elems models elems] computes a set of elements which contains
-    the maximal elements of [elems] in every model in [models].
-    This can only be over-approximated, and our result may not be the best.
-    This function may not be deterministic. *)
 let maximal_elems (models : models) (elems : timestamp list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
   let maxs = List.fold_left (fun maxs_acc m ->
@@ -635,7 +619,6 @@ let maximal_elems (models : models) (elems : timestamp list) =
   Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) maxs
   |> List.map List.hd
 
-(** [get_equalities models ts], given a list of models [models] and a list of timespoints [ts], gives back the classes for equality in all models **)
 let get_equalities (models : models) ts =
   Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) ts
 

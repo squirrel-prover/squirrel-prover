@@ -1,9 +1,9 @@
 open Vars
-   
+
 module IndexParam : VarParam =
 struct
   let default_string = "index"
-  let cpt = ref 0 
+  let cpt = ref 0
 end
 
 module Index = Var(IndexParam)
@@ -39,35 +39,29 @@ type 'a item = {
   par_choice : int * 'a ; (** position in parallel compositions *)
   sum_choice : int * 'a   (** position in conditionals *)
 }
+
 type 'a t = 'a item list
 
-(** Checks whether two actions are in conflict. *)
-let rec conflict a b = match a,b with
+let rec conflict a b = match a, b with
   | hda::tla, hdb::tlb ->
     hda.par_choice = hdb.par_choice &&
     (hda.sum_choice <> hdb.sum_choice ||
      conflict tla tlb)
   | _ -> false
 
-(** [depends a b] test if [a] must occur before [b] as far
-  * as the control-flow is concerned -- it does not (cannot)
-  * take messages into account. *)
-let rec depends a b = match a,b with
-  | [],_ -> true
+let rec depends a b = match a, b with
+  | [], _ -> true
   | hda::tla, hdb::tlb ->
     hda = hdb &&
     depends tla tlb
   | _ -> false
 
-(** [enables a b] tests whether action [a] enables [b]. *)
-let rec enables a b = match a,b with
-  | [],[_] -> true
+let rec enables a b = match a, b with
+  | [], [_] -> true
   | hda::tla, hdb::tlb ->
     hda = hdb &&
     enables tla tlb
   | _ -> false
-
-
 
 type action_shape = int t
 

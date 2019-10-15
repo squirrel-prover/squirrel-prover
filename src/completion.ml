@@ -3,18 +3,16 @@ open Term
 
 module Cst = struct
   type t =
-    (** Constant introduced when flattening *)
+    (* Constant introduced when flattening *)
     | Cflat of int
-    (** Flattening of the successor of a constant *)
+    (* Flattening of the successor of a constant *)
     | Csucc of t
 
-    (** Constants appearing in the original terms *)
+    (* Constants appearing in the original terms *)
     | Cname of nsymb
     | Cmvar of mvar
     | Cstate of state * timestamp
     | Cmacro of msymb * timestamp
-    (* | Coutput of timestamp
-     * | Cinput of timestamp *)
 
   let cst_cpt = ref 0
 
@@ -29,10 +27,8 @@ module Cst = struct
     | Cmvar m -> Mvar.pp ppf m
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
     | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
-    (* | Coutput ts -> Fmt.pf ppf "@[out@%a@]" pp_timestamp ts
-     * | Cinput ts -> Fmt.pf ppf "@[in@%a@]" pp_timestamp ts *)
 
-  (** The successor function symbol is the second smallest in the precedence
+  (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
     | Csucc a, Csucc a' -> compare a a'
@@ -47,7 +43,7 @@ end
 
 type varname = int
 
-(** Terms used during the completion and normalization.
+(* Terms used during the completion and normalization.
     Remark: Cxor never appears during the completion. *)
 type cterm =
   | Cfun of fsymb * cterm list
@@ -65,11 +61,9 @@ let mk_var () =
 let rec cterm_of_term = function
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
-  | MVar m -> Ccst (Cst.Cmvar m)                
+  | MVar m -> Ccst (Cst.Cmvar m)
   | State (s,ts) -> Ccst (Cst.Cstate (s,ts))
   | Macro (m,ts) -> Ccst (Cst.Cmacro (m,ts))
-  (* | Input n -> Ccst (Cst.Cinput n)
-   * | Output n -> Ccst (Cst.Coutput n) *)
 
 let rec pp_cterm ppf = function
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -81,7 +75,6 @@ let rec pp_cterm ppf = function
   | Cxor ts ->
     Fmt.pf ppf "++(@[<hov 1>%a@])"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
-
 
 let rec is_ground = function
   | Ccst _ -> true
@@ -101,16 +94,14 @@ let subterms l =
       | Ccst _ | Cvar _ -> subs (x :: acc) l
       | Cfun (_,fl) -> subs (x :: acc) (fl @ l)
       | Cxor xl -> subs (x :: acc) (xl @ l) in
-
   subs [] l
 
 
-
-(** Create equational rules for some common theories.
+(* Create equational rules for some common theories.
     TODO: Arity checks should probably be done somehow. *)
 module Theories = struct
 
-  (** N-ary pair. *)
+  (* N-ary pair. *)
   let mk_pair arity pair projs =
     assert (arity = List.length projs);
     List.mapi (fun i proj ->
@@ -118,14 +109,14 @@ module Theories = struct
         (Cfun (proj, [Cfun (pair, vars)]), List.nth vars i)
       ) projs
 
-  (** Asymmetric encryption.
+  (* Asymmetric encryption.
       dec(enc(m, pk(k)), sk(k)) -> m *)
   let mk_aenc enc dec pk sk =
     let m, k = mk_var (), mk_var () in
     let t_pk, t_sk = Cfun (pk, [k]), Cfun (sk, [k]) in
     ( Cfun (dec, [Cfun (enc, [m; t_pk]); t_sk] ), m )
 
-  (** Symmetric encryption.
+  (* Symmetric encryption.
       dec(enc(m, kg(k)), kg(k)) -> m *)
   let mk_senc enc dec kg =
     let m, k = mk_var (), mk_var () in
@@ -135,7 +126,7 @@ module Theories = struct
   let t_true = Cfun (Term.f_true, [])
   let t_false = Cfun (Term.f_true, [])
 
-  (** Simple Boolean rules to allow for some boolean reasonig. *)
+  (* Simple Boolean rules to allow for some boolean reasonig. *)
   let mk_simpl_bool () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
     let and_rules = [( Cfun (Term.f_and, [t_true; u]), u);
@@ -156,7 +147,7 @@ module Theories = struct
 
     not_rules @ and_rules @ or_rules
 
-  (** Some simple IfThenElse rules. A lot of rules are missing. *)
+  (* Some simple IfThenElse rules. A lot of rules are missing. *)
   let mk_simpl_ite () =
     let u, v, s, b = mk_var (), mk_var (), mk_var (), mk_var () in
     [( Cfun (Term.f_ite, [t_true; u; mk_var ()]), u);
@@ -164,8 +155,7 @@ module Theories = struct
      ( Cfun (Term.f_ite, [b; s; s]), s)]
 end
 
-
-(** [nilpotence_norm l] normalize [l] using the nilpotence rule x + x -> 0. *)
+(* [nilpotence_norm l] normalize [l] using the nilpotence rule x + x -> 0. *)
 let nilpotence_norm l =
   let l = List.sort Pervasives.compare l in
   let rec aux = function
@@ -182,11 +172,11 @@ let sort_ts ts = List.sort Pervasives.compare ts
 module Cset = struct
   include Set.Make(Cst)
 
-  (** Because of the nilpotence rule for the xor, [map] can only be used on
+  (* Because of the nilpotence rule for the xor, [map] can only be used on
       injective functions. To avoid mistake, I removed it. *)
   let map _ _ = assert false
 
-  (** [of_list l] is modulo nilpotence. For example:
+  (* [of_list l] is modulo nilpotence. For example:
       [of_list [a;b;a;c] = [b;c]] *)
   let of_list l = nilpotence_norm l |> of_list
 
@@ -195,14 +185,13 @@ module Cset = struct
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf " + ") Cst.print)
       (elements s)
 
-
-  (** [max comp s] : Return the maximal element of [s], using comparison
+  (* [max comp s] : Return the maximal element of [s], using comparison
       function [comp] *)
   let max comp s =
     let m = choose s in
     fold (fun m a -> if comp a m = 1 then a else m) s m
 
-  (** [compare s s'] : Return true if [s] is strictly smaller than [s'],
+  (* [compare s s'] : Return true if [s] is strictly smaller than [s'],
       where [s] and [s'] are sets of constants. *)
   let rec set_compare s s' =
     if equal s s' then 0
@@ -217,8 +206,7 @@ module Cset = struct
   let compare = set_compare
 end
 
-
-(** Flatten a ground term, introducing new constants and rewrite rules. *)
+(* Flatten a ground term, introducing new constants and rewrite rules. *)
 let rec flatten t = match t with
   | Cfun (f, [t']) when f = Term.f_succ ->
     let eqs, xeqs, cst = flatten t' in
@@ -251,8 +239,7 @@ and flatten_xor acc t = match t with
 
   | _ -> let eqs, xeqs, c = flatten t in (eqs, xeqs, c :: acc)
 
-
-(** Group xors using a set representation. E.g.:
+(* Group xors using a set representation. E.g.:
     [grp_xor (a ++ (b ++ c)) = ++{a; b; c}] *)
 let rec grp_xor = function
   | Cfun (f, _) as t when f = Term.f_xor ->
@@ -292,14 +279,14 @@ end = struct
     let t = CufTmp.extend t v in
     CufTmp.find t v
 
-  (** We always use the smallest constant of a class as its representent. *)
+  (* We always use the smallest constant of a class as its representent. *)
   let union t v v' =
     let t = CufTmp.extend (CufTmp.extend t v) v' in
     if Cst.compare v v' < 0 then CufTmp.union t v' v
     else CufTmp.union t v v'
 end
 
-(** State of the completion and normalization algorithms, which stores a
+(* State of the completion and normalization algorithms, which stores a
     term rewriting system:
     - uf :  Equalities between constants.
     - xor_rules : List of initial xor rules, normalized by uf.
@@ -392,18 +379,17 @@ let disjoint_union s s' =
   let u, i = Cset.union s s', Cset.inter s s' in
   Cset.diff u i
 
-
 module Xor : sig
   val deduce_eqs : state -> state
 end = struct
 
-  (** Add to [xrules] the rules obtained from the critical pairs with [xr]. *)
+  (* Add to [xrules] the rules obtained from the critical pairs with [xr]. *)
   let add_cp xr xrules =
     List.fold_left (fun acc xr' ->
         if disjoint xr xr' then acc
         else disjoint_union xr xr' :: acc) xrules xrules
 
-  (** - Deduce constants equalities from the xor rules.
+  (* - Deduce constants equalities from the xor rules.
       - Example: from
       a + b -> 0
       a + c -> 0
@@ -448,7 +434,7 @@ module Ground : sig
   val deduce_eqs : state -> state
 end = struct
 
-  (** Deduce trivial constants equalities from the ground rules. *)
+  (* Deduce trivial constants equalities from the ground rules. *)
   let deduce_triv_eqs state =
     let r_trivial, r_other =
       List.partition (fun (a,_) -> is_cst a) state.grnd_rules in
@@ -457,7 +443,7 @@ end = struct
         { state with uf = Cuf.union state.uf (get_cst a) b }
       ) { state with grnd_rules = r_other } r_trivial
 
-  (** Deduce constants equalities from the ground rules. *)
+  (* Deduce constants equalities from the ground rules. *)
   let deduce_eqs state =
     (* We get all ground rules, normalized by constant equality rules. *)
     let grules = List.map (fun (t,c) ->
@@ -475,7 +461,7 @@ end = struct
       ) state grules
 end
 
-(** Simple unification implementation *)
+(* Simple unification implementation *)
 module Unify = struct
   type subst = cterm Imap.t
 
@@ -517,7 +503,7 @@ module Unify = struct
 
       | _ ->  No_mgu
 
-  (** We normalize by constant equality rules before unifying.
+  (* We normalize by constant equality rules before unifying.
       This is *not* modulo ACUN. *)
   let unify state u v =
     let u,v = p_terms_uf_normalize state (u,v) in
@@ -529,7 +515,7 @@ module Erules : sig
   val deduce_eqs : state -> state
 end = struct
 
-  (** [add_grnd_rule state l a]: the term [l] must be ground. *)
+  (* [add_grnd_rule state l a]: the term [l] must be ground. *)
   let add_grnd_rule state l a =
     let eqs, xeqs, b = flatten l in
     assert (xeqs = []);
@@ -537,7 +523,7 @@ end = struct
                  grnd_rules = eqs @ state.grnd_rules
                               |> List.sort_uniq Pervasives.compare }
 
-  (** Try to superpose two rules at head position, and add a new equality to get
+  (* Try to superpose two rules at head position, and add a new equality to get
       local confluence if necessary. *)
   let head_superpose state (l,r) (l',r') = match Unify.unify state l l' with
     | Unify.No_mgu -> state
@@ -554,7 +540,7 @@ end = struct
          not ground, we should probably always abort. *)
       | _ -> assert false
 
-  (** [grnd_superpose state (l,r) (t,a)]: Try all superposition of a ground rule
+  (* [grnd_superpose state (l,r) (t,a)]: Try all superposition of a ground rule
       [t] -> [a] into an e_rule [l] -> [r], and add new equalities to get local
       confluence if necessary. *)
   let grnd_superpose state (l,r) (t,a) =
@@ -606,7 +592,7 @@ end = struct
     aux state [] l (fun x -> x)
 
 
-  (** [deduce_aux state r_open r_closed]. Invariant:
+  (* [deduce_aux state r_open r_closed]. Invariant:
       - r_closed: e_rules already superposed with all other rules.
       - r_open: e_rules to superpose. *)
   let rec deduce_aux state r_open r_closed = match r_open with
@@ -629,7 +615,7 @@ end = struct
       deduce_aux state r_open' (rule :: r_closed )
 
 
-  (** Deduce new rules (constant, ground and e_) from the non-ground rules. *)
+  (* Deduce new rules (constant, ground and e_) from the non-ground rules. *)
   let deduce_eqs state =
     let erules = state.e_rules
                  |> List.map (p_terms_uf_normalize state) in
@@ -642,7 +628,7 @@ end
 (* Normalization *)
 (*****************)
 
-(** [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
+(* [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
     using the xor rules in [state]. *)
 let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
   let sat_rules = match state.sat_xor_rules with
@@ -671,7 +657,7 @@ let simplify_set t = match t with
   | _ -> t
 
 
-(** [term_grnd_normalize state u]
+(* [term_grnd_normalize state u]
     Precondition: [u] must be ground and its xor grouped. *)
 let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
   | Cvar _ -> u
@@ -740,7 +726,7 @@ let rec term_e_normalize state u = match u with
       Unify.subst_apply r sigma
     with Not_found -> u'
 
-(** [normalize_cterm state u]
+(* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
 let normalize state u =
   fpt (fun x -> term_uf_normalize state x
@@ -757,7 +743,7 @@ let rec normalize_csts state = function
 (* Completion *)
 (**************)
 
-(** Finalize the completion, by normalizing all ground and erules using the xor
+(* Finalize the completion, by normalizing all ground and erules using the xor
     rules. This handles critical pair of the form:
     (R1) : a + b + c -> 0, where a > b,c
     (R2) : f(a) -> d
@@ -819,7 +805,7 @@ let complete : (term * term) list -> state = fun l ->
 (* Dis-equality *)
 (****************)
 
-(** [check_disequality_cterm state (u,v)]
+(* [check_disequality_cterm state (u,v)]
      Precondition: [u] and [v] must be ground *)
 let check_disequality_cterm state (u,v) =
   assert (state.completed);
@@ -846,7 +832,7 @@ let check_equalities state l = List.for_all (check_equality state) l
 (* Names and Constants Equalities *)
 (**********************************)
 
-(** [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
+(* [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
     first element of [l] and all the other elements of [l], and return the
     concatenation of the results of these application.
     If [l] is the list [a1],...,[an], then [star_apply f l] returns:
@@ -872,7 +858,7 @@ let x_index_cnstrs state l select f_cnstr =
   |> List.flatten
 
 
-(** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
+(* [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
     rewrite relation in [state], and add the corresponding index equalities.
     E.g., if n[i,j] and n[k,l] are equal, then i = k and j = l.*)
 let name_index_cnstrs state l =
@@ -887,7 +873,7 @@ let name_index_cnstrs state l =
     n_cnstr
 
 
-(** [constant_index_cnstrs] is the same as [name_index_cnstrs], but for
+(* [constant_index_cnstrs] is the same as [name_index_cnstrs], but for
     constant function symbols equalities. *)
 let constant_index_cnstrs fcst state l =
   let f_cnstr a b = match a,b with
@@ -946,17 +932,3 @@ let () =
        Alcotest.(check bool) "xor"
          (check_disequality_cterm state1 ( f (b ++ d) a, f (a) a)) true;
     )]
-
-
-
-       (* Fmt.pf Fmt.stdout "a:%a  b:%a  c:%a  d:%a  e:%a  e':%a@;@."
-        *   pp_cterm a pp_cterm b pp_cterm c
-        *   pp_cterm d pp_cterm e pp_cterm e';
-        *
-        * Fmt.pf Fmt.stdout "@[<v>uf:@;@[%a@]@;left:@[%a@]@;right:@[%a@]\
-        *                    @;left:@[%a@]@;right:@[%a@]@]@."
-        *   Cuf.print state1.uf
-        *   pp_cterm (grp_xor (b ++ c ++ d))
-        *   pp_cterm (normalize state1 (b ++ c ++ d))
-        *   pp_cterm (grp_xor (e))
-        *   pp_cterm (normalize state1 (e)); *)
