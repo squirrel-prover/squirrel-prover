@@ -7,11 +7,20 @@ module Index : VarType
 
 type index = Index.t
 
-(** In the process (A | Pi_i B(i) | C) actions of A have par_choice actions of C
-    have par_choice 2, and those of B have par_choice (1,i)which will later be
-    instantiated to (1,i_1), (1,i_2), etc. Then, in a process (if cond then P
-    else Q), the sum_choice 0 will * denote a success of   the conditional,
-    while 1 will denote a failure. *)
+(** Actions uniquely describe execution points in a process.
+  * They consist of a list of items describing a position
+  * among a (possibly infinite) parallel composition, followed
+  * by a choice in a (possibly infinite) branching conditional.
+  *
+  * In the process (A | !_i B(i) | C), actions of A have parallel
+  * choice 0, actions of C have parallel choice 2, and those of B
+  * have parallel choice (1,i) which will later be instantiated to
+  * (1,i_1), (1,i_2), etc.
+  *
+  * Then, in a process (if cond then P else Q), the branching position 0
+  * will denote a success of the conditional, while 1 will denote a failure.
+  * Finally, in (find i such that ... in ..) the indexed position (0,i)
+  * will correspond to the success branches. *)
 type 'a item = {
   par_choice : int * 'a ;
   sum_choice : int * 'a
