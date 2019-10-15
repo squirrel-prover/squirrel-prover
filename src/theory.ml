@@ -34,10 +34,10 @@ type term =
         * the terms appearing in goals.*)
   | Compare of ord*term*term
 
-let pp_action_shape = Action.pp_action_f pp_par_choice_shape2
+let pp_action_shape = Action.pp_parsed_action
 
 let rec pp_term ppf = function
-  | Var (s) -> Fmt.pf ppf "%s" s
+  | Var s -> Fmt.pf ppf "%s" s
   | Taction a -> pp_action_shape ppf a
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s(@[<hov 1>%a@])%a" f (Fmt.list pp_term) terms pp_ots ots
@@ -257,7 +257,9 @@ let make_term ?at_ts:(at_ts=None) s l =
       Var s end
 
 let make_action l : action_shape =
-  List.map (fun (i,l,i') -> Action.({ par_choice = i,l; sum_choice = i'})) l
+  List.map
+    (fun (p,lp,s,ls) -> Action.{ par_choice = p,lp; sum_choice = s,ls})
+    l
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair",[u;v],None)
@@ -355,12 +357,12 @@ let convert_ts subst t =
     | Var x -> subst_get_ts subst x
     | Taction a ->
       let act =
-        List.map (fun it ->
-            let i,l = it.Action.par_choice in
-            Action.({
-                par_choice = i, List.map (subst_get_index subst) l;
-                sum_choice = it.sum_choice })
-          ) a in
+        List.map
+          (fun Action.{par_choice=(p,lp);sum_choice=(s,ls)} ->
+             Action.{
+               par_choice = p, List.map (subst_get_index subst) lp ;
+               sum_choice = s, List.map (subst_get_index subst) ls })
+          a in
       Term.TName act
     | Fun _ | Get _ | Name _ | Compare _ ->
       raise @@ Failure ("not a timestamp") in

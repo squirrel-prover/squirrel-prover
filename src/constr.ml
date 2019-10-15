@@ -651,7 +651,7 @@ and tau5 = TVar (Tvar.make_fresh ())
 and i = Index.make_fresh ()
 and i' = Index.make_fresh ()
 and a indices = [{ par_choice = 0, indices;
-                           sum_choice = 0 }]
+                   sum_choice = 0,[] }]
 
 let pb_eq1 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))

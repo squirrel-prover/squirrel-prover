@@ -52,10 +52,9 @@ index_list:
 | LBRACKET; ind=ID; l=i_list; RBRACKET
                                   { ind :: l }
 saction:
-| item=INT; indices=index_list
-                                  { (item,indices,0) }
-| item=INT; indices=index_list; SLASH; sum=INT
-                                  { (item,indices,sum) }
+| par=INT; lpar=index_list        { (par,lpar,0,[]) }
+| par=INT; lpar=index_list; SLASH; sum=INT; lsum=index_list
+                                  { (par,lpar,sum,lsum) }
 
 action:
 | act=saction;                       { [act] }

@@ -10,15 +10,34 @@ module Index = Var(IndexParam)
 
 type index = Index.t
 
-(** In the process (A | Pi_i B(i) | C) actions of A have par_choice 0,
-  * actions of C have par_choice 2, and those of B have par_choice
-  * (1,i) which will later be instantiated to (1,i_1), (1,i_2), etc.
+type isubst = (index*index) list
+
+let pp_isubst ppf subst =
+  Fmt.list
+    ~sep:(fun ppf () -> Fmt.pf ppf "@,")
+    (fun ppf (i,j) ->
+       Fmt.pf ppf "%a->%a" Index.pp i Index.pp j)
+    ppf
+    subst
+
+(** Actions uniquely describe execution points in a process.
+  * They consist of a list of items describing a position
+  * among a (possibly infinite) parallel composition, followed
+  * by a choice in a (possibly infinite) branching conditional.
   *
-  * Then, in a process (if cond then P else Q), the sum_choice 0 will
-  * denote a success of the conditional, while 1 will denote a failure. *)
+  * In the process (A | !_i B(i) | C), actions of A have parallel
+  * choice 0, actions of C have parallel choice 2, and those of B
+  * have parallel choice (1,i) which will later be instantiated to
+  * (1,i_1), (1,i_2), etc.
+  *
+  * Then, in a process (if cond then P else Q), the branching position 0
+  * will denote a success of the conditional, while 1 will denote a failure.
+  * Finally, in (find i such that ... in ..) the indexed position (0,i)
+  * will correspond to the success branches. *)
+
 type 'a item = {
-  par_choice : int * 'a ;
-  sum_choice : int
+  par_choice : int * 'a ; (** position in parallel compositions *)
+  sum_choice : int * 'a   (** position in conditionals *)
 }
 type 'a t = 'a item list
 
@@ -60,101 +79,105 @@ let mk_action l = l
 
 let rec get_shape = function
   | [] -> []
-  | i :: l ->
-    let p, sis = i.par_choice in
-    { par_choice = (p, List.length sis) ;
-      sum_choice = i.sum_choice }
+  | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
+    { par_choice = (p, List.length lp) ;
+      sum_choice = (s, List.length ls) }
     :: get_shape l
 
 let rec action_indices = function
   | [] -> []
-  | a :: l -> let _,sis = a.par_choice in
-    sis @ action_indices l
+  | a :: l ->
+    snd a.par_choice @ snd a.sum_choice @ action_indices l
 
 let same_shape a b =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc
   | [], _ | _, [] -> None
   | i :: l, i' :: l' ->
-    let p,sis = i.par_choice and p',sis' = i'.par_choice in    
-    if p = p' && List.length sis = List.length sis' then
-      let acc' = List.map2 (fun (i) (i') -> i,i') sis sis' in
-      same (acc' @ acc) l l'
+    let p,lp = i.par_choice and p',lp' = i'.par_choice in    
+    let s,ls = i.sum_choice and s',ls' = i'.sum_choice in
+    if p = p' && List.length lp = List.length lp' &&
+       s = s' && List.length ls = List.length ls'
+    then
+      let acc' = List.map2 (fun i i' -> i,i') lp lp' in
+      let acc'' = List.map2 (fun i i' -> i,i') ls ls' in
+      same (acc'' @ acc' @ acc) l l'
     else None in
-   same [] a b 
+  same [] a b 
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
-    [a] and [b] equal, if there is one. Return None otherwise. *)
+  * [a] and [b] equal, if there is one.
+  * @return [None] otherwise. *)
 let rec constr_equal a b = match a,b with
   | [],[] -> Some []
   | [], _ | _, [] -> None
   | i :: l, i' :: l' ->
-    let _,sis = i.par_choice and _,sis' = i'.par_choice in
+    let _,lp = i.par_choice and _,lp' = i'.par_choice in
+    let _,ls = i.sum_choice and _,ls' = i'.sum_choice in
     Utils.opt_map
       (constr_equal a b)
       (fun res ->
          Utils.some @@
-         List.map2 (fun (ind) (ind') -> (ind, ind')) sis sis'
-         @ res)
+         List.map2 (fun ind ind' -> ind, ind') lp lp' @
+         List.map2 (fun ind ind' -> ind, ind') ls ls' @
+         res)
 
 let rec refresh = function
   | [] -> [],[]
-  | {par_choice=(k,is);sum_choice}::l ->
-      let l3 = List.map (fun (i) -> i, Index.make_fresh ()) is in
-      let is' = List.map (fun (i,j) -> j) l3 in
-      let newsubst = l3 in
+  | {par_choice=(p,lp);sum_choice=(s,ls)}::l ->
+      let lp' = List.map (fun i -> i, Index.make_fresh ()) lp in
+      let ls' = List.map (fun i -> i, Index.make_fresh ()) ls in
+      let newsubst = lp' @ ls' in
       let action,subst = refresh l in
-        { par_choice= k, is' ;
-          sum_choice }
+        { par_choice = p, List.map snd lp' ;
+          sum_choice = s, List.map snd ls' }
         :: action,
         newsubst @ subst
 
-let pp_par_choice_fg f g ppf (k,str_indices) =
-  if str_indices = [] then
-    Fmt.pf ppf "%d" k
-  else
-    Fmt.pf ppf "%d[%a]" k f (g str_indices)
+(** Pretty-printing *)
 
+(** Print integers in action shapes. *)
+let pp_int ppf i =
+  if i <> 0 then Fmt.pf ppf "[%d]" i
 
+(** Print list of indices in actions. *)
+let pp_indices ppf l =
+  if l <> [] then Fmt.pf ppf "[%a]" Index.pp_list l
 
+(** Print list of strings in actions. *)
+let pp_strings ppf l =
+  let pp_list = Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.string in
+  if l <> [] then Fmt.pf ppf "[%a]" pp_list l
 
-let pp_par_choice =
-  pp_par_choice_fg Index.pp_list (fun sis -> sis)
+(** [pp_par_choice_f f] formats [int*'a] as parallel choices,
+  * relying on [f] to format ['a]. *)
+let pp_par_choice_f f ppf (k,a) =
+  Fmt.pf ppf "%d%a" k f a
 
-let pp_par_choice_shape ppf (k,indice_length) =
-  if indice_length = 0 then
-    Fmt.pf ppf "%d" k
-  else
-    Fmt.pf ppf "%d[%i]" k (indice_length)
+(** [pp_sum_choice_f f d] formats [int*'a] as sum choices,
+  * relying on [f] to format ['a]. It does not format
+  * the default choice [d]. *)
+let pp_sum_choice_f f d ppf (k,a) =
+  if (k,a) <> d then Fmt.pf ppf "/%d%a" k f a
 
-let pp_par_choice_shape2 =
-  pp_par_choice_fg
-    (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
-    (fun x -> x)
+(** [pp_action_f f d] is a formatter for ['a action],
+  * relying on the formatter [f] for ['a], and ignoring
+  * the default sum choice [d]. *)
+let pp_action_f f d ppf a =
+  Fmt.list
+    ~sep:(fun fmt () -> Fmt.pf fmt "_")
+    (fun ppf {par_choice;sum_choice} ->
+       Fmt.pf ppf "%a%a"
+         (pp_par_choice_f f) par_choice
+         (pp_sum_choice_f f d) sum_choice)
+    ppf
+    a
 
-let rec pp_action_f f ppf = function
-  | [] -> Fmt.pf ppf ""
-  | [{ par_choice; sum_choice }] ->
-      if sum_choice = 0 then
-        Fmt.pf ppf "%a"
-          f par_choice
-      else
-        Fmt.pf ppf "%a/%d"
-          f par_choice
-          sum_choice
-  | { par_choice; sum_choice } :: l ->
-      if sum_choice = 0 then
-        Fmt.pf ppf "%a_%a"
-          f par_choice
-          (pp_action_f f) l
-      else
-        Fmt.pf ppf "%a/%d_%a"
-          f par_choice
-          sum_choice
-          (pp_action_f f) l
 let pp_action ppf a =
- Fmt.styled `Green (pp_action_f pp_par_choice) ppf a
+  Fmt.styled `Green (pp_action_f pp_indices (0,[])) ppf a
 
-let pp_shape = pp_action_f pp_par_choice_shape
+let pp_action_shape ppf a = pp_action_f pp_int (0,0) ppf a
 
-let pp_action_shape = pp_action_f pp_par_choice_shape
+let pp = pp_action
+
+let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a

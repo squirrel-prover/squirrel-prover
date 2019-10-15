@@ -16,15 +16,16 @@ end
 
 module Var(V:VarParam) : VarType = 
   struct
+
     type t = var
 
     let make_fresh ?(name=V.default_string) () =
       let id = !V.cpt in
       incr V.cpt;
       if name = V.default_string then
-        {id = id; name =  Format.sprintf "%s_%i" name id }
+        { id = id; name = Format.sprintf "%s_%i" name id }
       else
-        {id = id; name =  Format.sprintf "%s" name }
+        { id = id; name = Format.sprintf "%s" name }
   
     let get_or_make_fresh (ts:t list) (n:string) =
       match List.filter (fun t -> t.name = n) ts with
@@ -40,4 +41,5 @@ module Var(V:VarParam) : VarType =
     let pp_list ppf l =
       Fmt.pf ppf "@[<hov>%a@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
- end
+
+  end

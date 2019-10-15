@@ -259,7 +259,7 @@ let pp_descr ppf descr =
   * the action or current condition (they could be introduced by previous
   * conditions). *)
 type block = {
-  action : action;
+  action : action ;
   input : Channel.t * string ;
   indices : index list ;
   condition : index list * Term.fact ;
@@ -271,13 +271,18 @@ type block = {
 let action_to_block : (action_shape, block) Hashtbl.t =
   Hashtbl.create 97
 
-
 let to_descr (block:block) : descr =
-    let updates = List.map (fun (s,l,t) -> (Term.mk_sname s, l),  t) block.updates in
-  {action=block.action ; indices=block.indices; condition=(snd block.condition); updates=updates; output=snd block.output}
+  let updates =
+    List.map (fun (s,l,t) -> (Term.mk_sname s, l),  t) block.updates in
+  { action = block.action ;
+    indices = block.indices ;
+    condition = (snd block.condition) ;
+    updates = updates ;
+    output = snd block.output }
 
 let fresh_instance block =
-  let subst = List.map (fun i -> Term.Index(i, Index.make_fresh ())) block.indices in
+  let subst =
+    List.map (fun i -> Term.Index(i, Index.make_fresh ())) block.indices in
   let action = Term.subst_action subst block.action in
   let refresh_term = Term.subst_term subst in
   let refresh_fact = Term.subst_fact subst in
@@ -300,11 +305,16 @@ let iter_fresh_csa f =
 let iter_csa f =
   Hashtbl.iter (fun a b -> f (to_descr b)) action_to_block
 
+(** Apply a substitution to a block description.
+  * The domain of the substitution must contain all indices
+  * occurring in the description. *)
 let subst_descr subst (descr : descr) =
   let action = Term.subst_action subst descr.action in
   let subst_term = Term.subst_term subst in
   let subst_fact = Term.subst_fact subst in
-  let indices = List.map (fun i -> List.assoc i (Term.to_isubst subst)) descr.indices in
+  let indices =
+    List.map (fun i -> List.assoc i (Term.to_isubst subst)) descr.indices
+  in
   let condition = subst_fact descr.condition in
   let updates =
     List.map
@@ -317,11 +327,14 @@ let subst_descr subst (descr : descr) =
     { action; indices; condition; updates; output }
 
 let get_descr a =
-  let exception Found of descr in
   let block = Hashtbl.find action_to_block (get_shape a) in
-      match Action.same_shape block.action a with
-      | None -> raise Not_found
-      | Some subst -> (subst_descr (Term.from_isubst subst) (to_descr block)  )
+  (* We know that [block.action] and [a] have the same shape,
+   * but run [same_shape] anyway to obtain the substitution from
+   * one to the other. *)
+  match Action.same_shape block.action a with
+    | None -> assert false
+    | Some subst ->
+        subst_descr (Term.from_isubst subst) (to_descr block)
 
 
 module Aliases = struct
@@ -484,8 +497,7 @@ let parse_proc proc : unit =
                     indices)
                  t')
         in
-        let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
-                                     ts ) in
+        let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
         let env = { env with subst = (x,t')::env.subst } in
           p_in ~env ~pos ~pos_indices p
 
@@ -525,8 +537,7 @@ let parse_proc proc : unit =
                   indices)
                t')
       in
-      let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
-                                   ts ) in
+      let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
       let env = { env with subst = (x,t')::env.subst } in
       p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
     | Exists (evars,cond,p,q) ->
@@ -559,7 +570,9 @@ let parse_proc proc : unit =
         | f::fs -> Term.And (f, conj fs)
       in
       let condition = vars, conj facts in
-      let action = { par_choice ; sum_choice=pos }::env.action in
+      let action =
+        { par_choice ;
+          sum_choice = pos, conv_indices env vars } :: env.action in
       let in_tm = Term.Macro (Term.in_macro, Term.TName (List.rev action)) in
       let env =
         { env with
@@ -598,8 +611,7 @@ let parse_proc proc : unit =
                   indices)
                t')
       in
-      let t' ts = Term.Macro ( Term.mk_mname x' env.p_indices,
-                               ts ) in
+      let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
       let env = { env with subst = (x,t')::env.subst } in
       p_update ~env ~input ~condition ~updates p
     | Set (s,l,t,p) ->
@@ -627,7 +639,7 @@ let parse_proc proc : unit =
         in
         let indices = env.p_indices in
         let action = (List.rev env.action) in
-        let block = {action; input ; indices ; condition ; updates ; output } in
+        let block = {action; input; indices; condition; updates; output} in
           Hashtbl.add action_to_block (get_shape action) block ;
           ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
     | p ->

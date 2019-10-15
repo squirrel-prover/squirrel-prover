@@ -56,7 +56,7 @@ val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 (** Term builders *)
 
 val make_term : ?at_ts:term option -> string -> term list -> term
-val make_action : (int * string list * int) list -> action_shape
+val make_action : (int * string list * int * string list) list -> action_shape
 val make_pair : term -> term -> term
 
 (** Type-checking *)
