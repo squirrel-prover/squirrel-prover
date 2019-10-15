@@ -12,4 +12,5 @@ output.tex
 *.toc
 *.synctex.gz
 *.out
+metabc
 sanity
