@@ -5,7 +5,7 @@
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ NEQ GT GEQ LT LEQ COMMA SEMICOLON COLON PLUS MINUS UNDERSCORE
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS UNDERSCORE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
@@ -89,9 +89,9 @@ ord:
 | EQ                             { Term.Eq }
 | NEQ                            { Term.Neq }
 | LEQ                            { Term.Leq }
-| LT                             { Term.Lt }
+| LANGLE                         { Term.Lt }
 | GEQ                            { Term.Geq }
-| GT                             { Term.Gt }
+| RANGLE                         { Term.Gt }
 
 fact:
 | LPAREN fact RPAREN             { $2 }

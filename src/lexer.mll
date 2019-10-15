@@ -41,9 +41,7 @@ rule token = parse
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }
-| ">"                 { GT }
 | "<="                { LEQ }
-| "<"                 { LT }
 | '('                 { LPAREN }
 | ')'                 { RPAREN }
 | '['                 { LBRACKET }
