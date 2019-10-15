@@ -1,11 +1,13 @@
-module type VarParam = sig
+module type VarParam =
+sig
   val default_string : string
   val cpt : int ref
 end
 
-type var = {id:int;name:string }
+type var = {id : int; name : string}
 
-module type VarType = sig
+module type VarType =
+sig
   type t
   val make_fresh : ?name:string -> unit -> t
   val get_or_make_fresh : t list -> string -> t
@@ -14,30 +16,32 @@ module type VarType = sig
   val pp_list : Format.formatter -> t list -> unit
 end
 
-module Var(V:VarParam) : VarType = 
-  struct
-    type t = var
+module Var(V:VarParam) : VarType =
+struct
+  type t = var
 
-    let make_fresh ?(name=V.default_string) () =
-      let id = !V.cpt in
-      incr V.cpt;
-      if name = V.default_string then
-        {id = id; name =  Format.sprintf "%s_%i" name id }
-      else
-        {id = id; name =  Format.sprintf "%s" name }
-  
-    let get_or_make_fresh (ts:t list) (n:string) =
-      match List.filter (fun t -> t.name = n) ts with
-        [] -> make_fresh ~name:n ()
-      | p::q -> p
+  let make_fresh ?(name=V.default_string) () =
+    let id = !V.cpt in
+    incr V.cpt;
+    if name = V.default_string then
+      { id = id;
+        name =  Format.sprintf "%s_%i" name id }
+    else
+      { id = id;
+        name =  Format.sprintf "%s" name }
 
-    let name v =
-      v.name
-        
-    let pp ppf v =
-      Fmt.pf ppf "%s" v.name
-                      
-    let pp_list ppf l =
-      Fmt.pf ppf "@[<hov>%a@]"
-        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
- end
+  let get_or_make_fresh (ts:t list) (n:string) =
+    match List.filter (fun t -> t.name = n) ts with
+    |  [] -> make_fresh ~name:n ()
+    | p::q -> p
+
+  let name v =
+    v.name
+
+  let pp ppf v =
+    Fmt.pf ppf "%s" v.name
+
+  let pp_list ppf l =
+    Fmt.pf ppf "@[<hov>%a@]"
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
+end
