@@ -30,8 +30,13 @@ let rec pp_timestamp ppf = function
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
+let rec action_of_ts = function
+  | TName a -> Some a
+  | TPred ts -> action_of_ts ts
+  | TVar _ -> None
+
 (** Messages variables for formulas **)
-                 
+
 module MParam : VarParam =
 struct
   let default_string = "mess"

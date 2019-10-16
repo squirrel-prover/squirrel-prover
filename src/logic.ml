@@ -2,14 +2,6 @@ open Utils
 open Action
 open Term
 
-
-let rec action_of_ts = function
-  | TName a -> Some a
-  | TPred ts -> action_of_ts ts
-  | TVar _ -> None
-
-(** Tags used to record some information on gamma elements:
-    - [euf] records whether the EUF axiom has been applied. *)
 type tag = { t_euf : bool; cpt : int }
 
 let cpt_tag = ref 0
@@ -23,7 +15,6 @@ let set_euf b t = { t with t_euf = b }
 
 
 module Gamma : sig
-
   (** Type of judgment contexts. *)
   type gamma
 
@@ -79,17 +70,13 @@ end = struct
     if List.mem at (get_atoms g) then g else
       begin
       let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
-      add at
-        (* if !(g.trs) = None then add at else
+         if (g.trs) = None then add at else
           match at with
           | (Eq,s,t) ->
-            if Completion.check_equalities (opt_get !(g.trs)) [s,t] then g
+            if Completion.check_equalities (opt_get g.trs) [s,t] then g
             else add at
-          | (Neq,s,t) ->
-            if Completion.check_disequalities (opt_get !(g.trs)) [s,t] then
-              g
-            else add at
-           | _ -> add at (* TODO: do not add useless inequality atoms *) *)
+          | (Neq,s,t) -> add at (* TODO : use a correct check_disequality *)
+          | _ -> add at (* TODO: do not add useless inequality atoms *)
       end
 
   let rec add_atoms g = function
@@ -128,17 +115,11 @@ end = struct
   let get_trs g =
     opt_get g.trs
 
-  (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
-      otherwise, where [g'] has been completed. *)
   let is_sat g =
     let g = update_trs g in
     let _, neqs = get_eqs_neqs g in
     Completion.check_disequalities (opt_get g.trs) neqs
 
-  (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
-      [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
-      tag has been updated in [g] according to [f_up].
-      Raise [Not_found] if no such element exists. *)
   let select g f f_up =
     let rec aux acc = function
       | [] -> raise Not_found
@@ -187,8 +168,6 @@ end = struct
       let descrs = List.map Process.get_descr actions in
       List.fold_left add_descr g descrs
 
-  (** Provides the list of all terms appearing inside atoms or facts
-    * of the Gamma context. *)
   let get_all_terms g =
     let atoms = get_atoms g
     and facts = get_facts g in
@@ -199,9 +178,6 @@ end = struct
 
 end
 
-(** Store the constraints. We remember the last models that was computed,
-    potentially on a less restricted constraint.
-    We should guarrantee that TODO (give the invariant on models and queries) *)
 module Theta : sig
   type theta
 
@@ -215,8 +191,6 @@ module Theta : sig
 
   val is_valid : theta -> tatom list -> bool
 
-  (** [maximal_elems theta elems] returns an over-approximation of the set of
-      maximals elements of [elems] in [theta]. *)
   val maximal_elems : theta -> timestamp list -> timestamp list
 
   val get_equalities : theta -> timestamp list list
@@ -259,7 +233,9 @@ end = struct
 
   let get_equalities theta =
     let theta = compute_models theta in
-    let ts = Term.constr_ts theta.constr |> List.sort_uniq Pervasives.compare in
+    let ts = Term.constr_ts theta.constr
+             |> List.sort_uniq Pervasives.compare
+    in
     Constr.get_equalities (opt_get (theta.models)) ts
 
 end
@@ -278,8 +254,7 @@ let pp_typed_goal fmt =
   | Postcond p -> pp_postcond fmt p
   | Fact f -> pp_fact fmt f
 
-let type_goal =
-    function
+let type_goal = function
   | Unit -> "unit"
   | Formula f -> "formula"
   | Postcond p -> "postcondition"
@@ -296,10 +271,10 @@ module Judgment : sig
       - [theta.models] store the last minimal models of [theta.constr].
       - [gamma] is the judgment context.
       - [goal] contains the current goal, which is of type 'a. *)
-  type judgment = private { vars : fvar list;
-                               theta : Theta.theta;
-                               gamma : Gamma.gamma;
-                               goal : typed_goal; }
+  type judgment = { vars : fvar list;
+                    theta : Theta.theta;
+                    gamma : Gamma.gamma;
+                    goal : typed_goal; }
 
   type t = judgment
 
@@ -364,6 +339,9 @@ end = struct
 
   let update_trs j =
     { j with gamma = Gamma.update_trs j.gamma }
+
+  let get_vars j = j.vars
+
   let rec add_vars vars j = match vars with
     | [] -> j
     | v :: vars ->
@@ -415,10 +393,16 @@ end = struct
 
   let set_gamma g j = { j with gamma = g }
 
-  let get_goal_fact j = match j.goal with  Fact f -> f | _ -> raise @@ Goal_type_error ("fact", type_goal j.goal)
+  let get_goal_fact j = match j.goal with
+    | Fact f -> f
+    | _ -> raise @@ Goal_type_error ("fact", type_goal j.goal)
 
-  let get_goal_formula j = match j.goal with Formula f -> f | _ -> raise @@ Goal_type_error ("formula", type_goal j.goal)
+  let get_goal_formula j = match j.goal with
+    | Formula f -> f
+    | _ -> raise @@ Goal_type_error ("formula", type_goal j.goal)
 
-  let get_goal_postcond j = match j.goal with Postcond p -> p | _ -> raise @@ Goal_type_error ("postcond", type_goal j.goal)
+  let get_goal_postcond j = match j.goal with
+    | Postcond p -> p
+    | _ -> raise @@ Goal_type_error ("postcond", type_goal j.goal)
 
 end

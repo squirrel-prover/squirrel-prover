@@ -13,7 +13,7 @@ open Action
 module Tvar : VarType
 
 type tvar = Tvar.t
-              
+
 type timestamp =
   | TVar of tvar
   | TPred of timestamp
@@ -21,6 +21,7 @@ type timestamp =
 
 val pp_timestamp : Format.formatter -> timestamp -> unit
 
+val action_of_ts : timestamp -> Action.action option
 
 (** Messages variables for formulas **)
 
