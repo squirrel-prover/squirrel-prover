@@ -302,15 +302,21 @@ let to_isubst (s:tsubst) =
 
 let subst_get_index subst x =
   try List.assoc x (to_isubst subst)
-  with Not_found ->  raise @@ Failure (Printf.sprintf "ill-typed or undefined variable usage : %s" x)
+  with Not_found ->
+    failwith
+      (Printf.sprintf "ill-typed or undefined use of %s as index" x)
 
 let subst_get_ts subst x =
   try List.assoc x (ts_subst subst)
-  with Not_found ->  raise @@ Failure  (Printf.sprintf "ill-typed or undefined variable usage : %s" x) 
+  with Not_found ->
+    failwith
+      (Printf.sprintf "ill-typed or undefined use of %s as timestamp" x)
 
 let subst_get_mess subst x =
   try List.assoc x (term_subst subst)
-  with Not_found ->  raise @@ Failure  (Printf.sprintf "ill-typed or undefined variable usage : %s" x)
+  with Not_found ->
+    failwith
+      (Printf.sprintf "ill-typed or undefined use of %s as message" x)
       
 let conv_index subst = function
   | Var x -> subst_get_index subst x

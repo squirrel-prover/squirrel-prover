@@ -23,6 +23,7 @@ let set_euf b t = { t with t_euf = b }
 
 
 module Gamma : sig
+
   (** Type of judgment contexts. *)
   type gamma
 
@@ -48,8 +49,9 @@ module Gamma : sig
   val add_descr : gamma -> Process.descr -> gamma
 
   val get_all_terms :gamma -> Term.term list
+
 end = struct
-  (** Type of judgment contexts. We separate atoms from more complexe facts.
+  (** Type of judgment contexts. We separate atoms from more complex facts.
       We store in [trs] the state of the completion algorithm when it was last
       called on [atoms]. *)
   type gamma = { facts : fact list;
@@ -89,6 +91,7 @@ end = struct
             else add at
            | _ -> add at (* TODO: do not add useless inequality atoms *) *)
       end
+
   let rec add_atoms g = function
     | [] -> { g with trs = None }
     | at :: ats -> add_atoms (add_atom g at) ats
@@ -124,6 +127,7 @@ end = struct
 
   let get_trs g =
     opt_get g.trs
+
   (** [complete_gamma g] returns [None] if [g] is inconsistent, and [Some g']
       otherwise, where [g'] has been completed. *)
   let is_sat g =
@@ -168,12 +172,14 @@ end = struct
 
       add_atoms g new_atoms
 
-  (* Provides the list of all terms appearing inside atoms or facts of the Gamma *)
+  (** Provides the list of all terms appearing inside atoms or facts
+    * of the Gamma context. *)
   let get_all_terms g =
     let atoms = get_atoms g
     and facts = get_facts g in
 
-    let all_atoms = List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
+    let all_atoms =
+      List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
     List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms
 
 end
