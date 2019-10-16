@@ -151,26 +151,41 @@ end = struct
 
   let rec add_descr g d =
     let open Process in
-    if List.mem d.action g.actions_described then g
-    else
-      let g =  { g with actions_described = d.action :: g.actions_described } in
-      let new_atoms =
-        (Eq, Macro (out_macro, TName d.action), d.output)
-        :: List.map (fun (s,t) ->
-            (Eq, State (s, TName d.action), t)
-          ) d.updates in
+    if List.mem d.action g.actions_described then g else
 
-      (* We recursively add necessary descriptions. *)
-      let actions = Term.atoms_ts new_atoms
-                    |> List.fold_left (fun acc ts -> match action_of_ts ts with
-                        | None -> acc
-                        | Some a -> a :: acc
-                      ) [] in
+      (* Add this action and its consequences regarding
+       * its condition, updates and output. *)
+      let g = { g with actions_described = d.action :: g.actions_described } in
+      let new_atoms =
+        (Eq, Macro (out_macro, TName d.action), d.output) ::
+        List.map
+          (fun (s,t) ->
+             (Eq, State (s, TName d.action), t))
+          d.updates
+      in
+      let new_facts = [d.condition] in
+      let g =
+        add_facts
+          (add_atoms g new_atoms)
+          new_facts
+      in
+
+      (* Recursively add descriptions for the actions appearing
+       * in the newly added items. *)
+      let actions =
+        (List.fold_left
+           (fun lts fact ->
+              List.rev_append lts (Term.fact_ts fact))
+           (Term.atoms_ts new_atoms)
+           new_facts)
+        |> List.fold_left
+             (fun acc ts -> match action_of_ts ts with
+                | None -> acc
+                | Some a -> a :: acc)
+             [] in
 
       let descrs = List.map Process.get_descr actions in
-      let g = List.fold_left add_descr g descrs in
-
-      add_atoms g new_atoms
+      List.fold_left add_descr g descrs
 
   (** Provides the list of all terms appearing inside atoms or facts
     * of the Gamma context. *)
