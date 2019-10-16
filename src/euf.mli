@@ -1,3 +1,5 @@
+(** Module for the euf axiom application *)
+
 open Action
 open Process
 open Term

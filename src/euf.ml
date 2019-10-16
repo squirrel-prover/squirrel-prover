@@ -7,22 +7,15 @@ let subst_descr nu blk =
   { action = blk.action;
     indices = List.map (subst_index nu) blk.indices;
     condition = subst_fact nu blk.condition;
-    updates = List.map (fun (s,t) -> subst_state nu s,
-                                     subst_term nu t
+    updates = List.map (fun (s, t) -> subst_state nu s,
+                                      subst_term nu t
                        ) blk.updates;
     output = subst_term nu blk.output }
 
-(* let descr_ts descr =
- *   let open Euf in
- *   List.fold_left (fun acc (_,t) ->
- *       term_ts t @ acc
- *     ) (term_ts descr.output) descr.updates
- *   |> List.sort_uniq Pervasives.compare *)
-
-(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
+(* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
-(** Check the key syntactic side-condition:
+(* Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
 let euf_key_ssc hash_fn key_n =
   let checked_macros = ref [] in
@@ -33,25 +26,26 @@ let euf_key_ssc hash_fn key_n =
     List.iter (fun (_,t) -> ssc_term t) blk.updates
 
   and ssc_fact = function
-    | And (l,r) -> ssc_fact l; ssc_fact r
-    | Or (l,r) -> ssc_fact l; ssc_fact r
-    | Impl (l,r) -> ssc_fact l; ssc_fact r
+    | And (l, r) -> ssc_fact l; ssc_fact r
+    | Or (l, r) -> ssc_fact l; ssc_fact r
+    | Impl (l, r) -> ssc_fact l; ssc_fact r
     | Not f -> ssc_fact f
     | True | False -> ()
-    | Atom (_,t,t') -> ssc_term t; ssc_term t'
+    | Atom (_, t, t') -> ssc_term t; ssc_term t'
 
   and ssc_term = function
-    | Fun ((fn,_), [m;k]) when fn = hash_fn -> begin match k with
+    | Fun ((fn, _), [m; k]) when fn = hash_fn ->
+      begin match k with
         | Name _ -> ssc_term m
-        | _ -> ssc_term m; ssc_term k end
+        | _ -> ssc_term m; ssc_term k
+      end
 
-    | Fun (_,l) -> List.iter ssc_term l
-    (* | Output _ | Input _ *)
-    | Macro ((mn,is),_) -> ssc_macro mn is
+    | Fun (_, l) -> List.iter ssc_term l
+    | Macro ((mn, is), _) -> ssc_macro mn is
     | State _ -> ()
-    | Name (n,_) -> if n = key_n then raise Bad_ssc
+    | Name (n, _) -> if n = key_n then raise Bad_ssc
     | MVar m -> ()
-                
+
   and ssc_macro mn is =
     if List.mem mn !checked_macros || Term.is_built_in mn then ()
     else begin
@@ -90,16 +84,9 @@ let hashes_of_blk blk hash_fn key_n =
 
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
-
-
-(** Type of an euf axiom case schema.
-    [e] of type [euf_schema] represents the fact that the message [e.m]
-    has been hashed, and the key indices were [e.eindices].
-    [e.blk_block] stores the relevant block description for future use.  *)
 type euf_schema = { key_indices : Action.index list;
                     message : Term.term;
                     blk_descr : descr }
-
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
@@ -122,17 +109,10 @@ let pp_euf_direct ppf case =
     Action.Index.pp_list case.d_key_indices
     Term.pp_term case.d_message
 
-
-(** Type of an euf axiom rule:
-    - [hash] stores the hash function name.
-    - [key] stores the key considered in this rule.
-    - [case_schemata] is the list (seen as a disjunction) of case schemata.
-    - [cases_direct] is the list (seen as a disjunction) of direct cases. *)
 type euf_rule = { hash : fname;
                   key : name;
                   case_schemata : euf_schema list;
                   cases_direct : euf_direct list }
-
 
 let pp_euf_rule ppf rule =
   Fmt.pf ppf "@[<v>*hash: @[<hov>%a@]@;\
@@ -144,13 +124,8 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-
-(** [mk_rule mess sign hash_fn key_n] create the euf rule associated to
-    an given hash function, key, message and signature in a process.
-    TODO: memoisation *)
 let mk_rule mess sign hash_fn key_n =
   euf_key_ssc hash_fn key_n;
-
   { hash = hash_fn;
     key = key_n;
 
@@ -158,7 +133,7 @@ let mk_rule mess sign hash_fn key_n =
       Utils.map_of_iter Process.iter_fresh_csa
         (fun blk ->
            hashes_of_blk blk hash_fn key_n
-           |> List.map (fun (is,m) ->
+           |> List.map (fun (is, m) ->
                { key_indices = is;
                  message = m;
                  blk_descr = blk })
