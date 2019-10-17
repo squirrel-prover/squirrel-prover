@@ -1,0 +1,12 @@
+hash h
+name k : message
+channel c
+system in(c,x); let y = x in out(c,h(y,k)).
+
+goal test :
+  output@0 = input@0.
+Proof.
+  euf 0.
+  (* This crashes, not due to a bug in EUF but due to the
+   * presence of the input variable x (rather than input@0)
+   * in the y macro. *)

@@ -9,6 +9,8 @@ PROVER_TESTS = examples/lak.mbc \
 			   examples/forall.mbc \
 			   examples/equality_propagation.mbc \
 			   examples/macros.mbc \
+			   examples/input.mbc \
+			   examples/macros_input.mbc \
 			   examples/euf_null.mbc \
 			   examples/euf_trivial.mbc \
 			   examples/euf_basic.mbc \

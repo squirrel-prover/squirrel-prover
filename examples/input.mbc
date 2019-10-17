@@ -1,0 +1,8 @@
+channel c
+system in(c,x);out(c,x).
+
+goal test :
+  output@0 = input@0.
+Proof.
+Qed.
+(* This should be immediate, the equality reasoning is missing something *)
