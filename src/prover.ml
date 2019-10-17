@@ -199,9 +199,12 @@ let rec tac_apply :
       tact_orelse (tac_apply tac) (tac_apply tac') judge sk fk
 
     | Try (tac,tac') ->
-        (* TODO what is the intended difference with previous one ? *)
-      tac_apply tac judge (fun _ fk -> sk [] fk)
-        (fun () -> tac_apply tac' judge sk fk)
+        (* TODO Try could be broken down into OrElse and a simpler
+         *   tactical Finish that succeeds if its argument tactic
+         *   finishes the proof *)
+        tac_apply tac judge
+          (fun l fk -> if l = [] then sk [] fk else fk ())
+          (fun () -> tac_apply tac' judge sk fk)
     | Repeat tac ->
       repeat (tac_apply tac) judge sk fk
     | Cycle _ -> assert false   (* This is not a focused tactic. *)
