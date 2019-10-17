@@ -78,5 +78,11 @@ val iter_fresh_csa : (descr -> unit) -> unit
     Raise Not_found if no action corresponds to [a]. *)
 val get_descr : Action.action -> descr
 
-(** Debug *)
-val show_actions : Format.formatter -> unit -> unit
+(** Pretty-print actions *)
+val pp_actions : Format.formatter -> unit -> unit
+
+(** Pretty-print block descriptions *)
+val pp_descrs : Format.formatter -> unit -> unit
+
+(** Pretty-print actions and block descriptions *)
+val pp_proc : Format.formatter -> unit -> unit

@@ -331,6 +331,16 @@ let add_proved_goal g = goals_proved := g :: !goals_proved
 
 let iter_goals f = List.iter f !goals
 
+(** Pretty-print goals. This is currently unused. *)
+let pp_goals ppf () =
+  let cpt = ref 0 in
+  Fmt.pf ppf "@[<v>";
+  iter_goals (fun (gname,goal) ->
+    Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
+      !cpt Term.pp_formula goal ;
+    incr cpt) ;
+  Fmt.pf ppf "@]%!@."
+
 let goals_to_proved () = !goals <> []
 
 let is_proof_completed () = !subgoals = []

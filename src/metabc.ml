@@ -49,7 +49,7 @@ let rec main_loop ?(save=true) mode =
             let new_mode = reset_state nb_undo in
             begin match new_mode with
               | ProofMode -> Fmt.pr "%a" pp_goal ()
-              | GoalMode -> Main.pp_proc Fmt.stdout ()
+              | GoalMode -> Process.pp_proc Fmt.stdout ()
               | _ -> ()
             end ;
             main_loop new_mode
@@ -58,7 +58,7 @@ let rec main_loop ?(save=true) mode =
                 error mode "Cannot undo, no proof state to go back to."
           end
       | InputDescr,ParsedInputDescr ->
-          Main.pp_proc Fmt.stdout () ;
+          Process.pp_proc Fmt.stdout () ;
           main_loop GoalMode
       | ProofMode,ParsedTactic(utac) ->
           begin try

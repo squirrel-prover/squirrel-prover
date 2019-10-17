@@ -354,17 +354,6 @@ module Aliases = struct
 
 end
 
-let show_actions ppf () =
-  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
-  let comma = ref false in
-  Hashtbl.iter
-    (fun a _ ->
-       if !comma then Fmt.pf ppf ",@;" ;
-       comma := true ;
-       Action.pp_action_shape ppf a)
-    action_to_block ;
-  Fmt.pf ppf "@]@]@."
-
 (* Environment for parsing the final process, i.e. the system to study,
  * to break it into blocks suitable for the analysis.
  *
@@ -663,3 +652,29 @@ let reset () =
   Hashtbl.clear action_to_block ;
   Hashtbl.clear Aliases.name_to_action ;
   Hashtbl.clear Aliases.action_to_name
+
+(** Pretty print actions. *)
+let pp_actions ppf () =
+  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
+  let comma = ref false in
+  Hashtbl.iter
+    (fun a _ ->
+       if !comma then Fmt.pf ppf ",@;" ;
+       comma := true ;
+       Action.pp_action_shape ppf a)
+    action_to_block ;
+  Fmt.pf ppf "@]@]@."
+
+(** Pretty print block descriptions. *)
+let pp_descrs ppf () =
+  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
+  iter_csa (fun descr ->
+      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
+        pp_descr descr) ;
+  Fmt.pf ppf "@]%!@."
+
+(** Pretty print actions and block descriptions. *)
+let pp_proc ppf () =
+  pp_actions ppf () ;
+  Fmt.pf ppf "@." ;
+  pp_descrs ppf ()

@@ -161,24 +161,3 @@ let () =
      *   parse_theory_test ~test "examples/simple_goal.mbc"
      * end ; *)
   ];;
-
-let pp_descrs ppf () =
-  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  Process.iter_csa (fun descr ->
-      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        Process.pp_descr descr) ;
-  Fmt.pf ppf "@]%!@."
-
-let pp_proc ppf () =
-  Process.show_actions ppf () ;
-  Fmt.pf ppf "@." ;
-  pp_descrs ppf ()
-
-let pp_goals ppf () =
-  let cpt = ref 0 in
-  Fmt.pf ppf "@[<v>";
-  Prover.iter_goals (fun (gname,goal) ->
-      Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
-        !cpt Term.pp_formula goal;
-      incr cpt;);
-  Fmt.pf ppf "@]%!@.";;
