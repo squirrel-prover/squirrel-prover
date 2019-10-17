@@ -24,11 +24,14 @@ test: sanity
 	./test.byte
 	@echo ""
 	# TODO the make target should fail if one test below fails
-	@for f in $(PROVER_TESTS) ; do \
+	@tests = 0 ; failures=0 ; for f in $(PROVER_TESTS) ; do \
 	  echo -n "Running prover on $$f... " ; \
-	  (./metabc $$f > /dev/null 2> /dev/null && echo OK) || \
-	  (echo "FAIL") ; \
-	done
+	  tests=$$((tests+1)) ; \
+	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
+	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
+	done ; \
+	echo "Total: $$tests tests, $$failures failures." ; \
+	test $$failures -eq 0
 
 clean:
 	$(OCB) -clean
