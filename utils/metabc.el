@@ -1,10 +1,18 @@
 ;;; metabc.el --- Proof General for metabc.
 
-;; create a folder metabc inside your PG folder
-;; (under .opam/ocamlversion/share/proofgeneral if opam installed)
-;; copy and paste this file inside of it
-;; Moreover, in the file generic/proof-site.el, add to the list proof-assistant-table-default the following line:
-;;   (metabc "metabc" "mbc")
+;; 1. Create a folder metabc inside your PG folder,
+;;    under ~/.emacs.d/lisp/PG if this is your git clone.
+
+;; 2. Copy and paste this file, and metabc-syntax.el inside it.
+
+;; 3. Moreover, in the file generic/proof-site.el,
+;;    add to the list proof-assistant-table-default the following line:
+;;    (metabc "metabc" "mbc")
+
+;; 4. Add the following two lines to your .emacs, the second one
+;;    with the correct path to your proof general folder:
+;;    (require 'ansi-color)
+;;    (load "~/.emacs.d/lisp/PG/generic/proof-site")
 
 (require 'span)
 (require 'proof)
