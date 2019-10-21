@@ -144,12 +144,12 @@ let fail_goal_false (judge : Judgment.t) sk fk = match Judgment.get_goal_fact ju
 
 let constr_absurd (judge : Judgment.t) sk fk =
   if not @@ Theta.is_sat judge.Judgment.theta then
-    sk [Judgment.set_goal Unit judge] fk
+    sk [] fk
   else fk ()
 
 let gamma_absurd (judge : Judgment.t) sk fk =
   if not @@ Gamma.is_sat judge.Judgment.gamma then
-    sk [Judgment.set_goal Unit judge] fk
+    sk [] fk
   else fk ()
 
 let or_to_list f =
