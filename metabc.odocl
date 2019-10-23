@@ -11,7 +11,9 @@ Main
 Metabc
 Parser
 Process
+Prover
 Puf
+Tactics
 Term
 Test
 Theory

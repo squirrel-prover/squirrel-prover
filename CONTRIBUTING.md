@@ -5,6 +5,8 @@
 The documentation for developers may be built with `make doc`. The standard ocamldoc syntax should be used for comments.
 Comments for functions should be put inside the `.mli` files.
 
+New modules should be added to `metabc.odocl`.
+
 ## Coding conventions
 
 * 80 characters lines
