@@ -279,7 +279,8 @@ val subst_term : subst -> term -> term
 val subst_fact : subst -> fact -> fact
 val subst_constr : subst -> constr -> constr
 val subst_postcond : subst -> postcond -> postcond
-  
+
+val fresh_postcond : postcond ->  postcond
 (** [term_vars t] returns the timestamp and index variables of [t]*)
 val term_vars : term -> tvar list * index list
 

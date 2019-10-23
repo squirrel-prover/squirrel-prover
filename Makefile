@@ -14,6 +14,7 @@ PROVER_TESTS = examples/lak.mbc \
 			   examples/euf_basic.mbc \
 			   examples/euf_output2.mbc \
 			   examples/euf_output3.mbc \
+			   examples/axiom.mbc \
 #			   examples/euf_output.mbc \
 			   examples/macros_input.mbc \
 			   examples/macros.mbc \

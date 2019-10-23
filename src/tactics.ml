@@ -360,12 +360,15 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       let new_judge =  Judgment.set_goal (Fact (subst_fact subst gp.ufact)) judge |> simplify  in
       let new_truths =
         List.map (fun goal ->
+            let goal = fresh_postcond goal in
             subst_postcond subst goal
-          ) gp.postcond in
+          ) gp.postcond
+      in
       (* TODO : handle existential in axioms *)
       let judge =
         List.fold_left (fun judge nt ->
             Judgment.add_fact nt.efact judge
             |> Judgment.add_constr nt.econstr
+            |> Judgment.add_vars nt.evars
           ) judge new_truths in
       sk [new_judge; judge] fk

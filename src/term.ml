@@ -653,7 +653,19 @@ let subst_postcond subst pc =
   { pc with econstr = subst_constr subst pc.econstr;
             efact = subst_fact subst pc.efact }
 
-
+(** [fresh_postcond p] instantiates [p] with fresh variables for variables
+    in p.evars *)
+let fresh_postcond p =
+  let fresh_vars = List.map (fun v -> make_fresh_of_type v) p.evars in
+  let subst = List.map2 (
+      fun v fv -> match v,fv with
+        | TSVar v, TSVar fv -> TS(TVar v, TVar fv)
+        | MessVar v, MessVar fv -> Term(MVar v, MVar fv)
+        | IndexVar v, IndexVar fv -> Index(v, fv)
+        | _, _ -> assert false
+    ) p.evars fresh_vars in
+  let postcond = subst_postcond subst p in
+  { postcond with evars = fresh_vars}
 
 (*
 let ivar_subst_symb isubst (fn, is) = (fn, List.map (app_subst isubst) is)
