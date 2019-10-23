@@ -1,4 +1,5 @@
-(** - Gamma contains a set of facts
+(** Logic instantiates three modules, to capture proofs contexts:
+    - Gamma contains a set of facts
     - Theta contains a set of constraints
     - Judgment is a goal inside a context, i.e a Gamma and a Theta *)
 open Term

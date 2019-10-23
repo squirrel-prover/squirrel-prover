@@ -1,3 +1,5 @@
+(** Logging utility *)
+
 type log_class = LogConstr | LogTacticTC
 
 val log : log_class -> (unit -> unit) -> unit
