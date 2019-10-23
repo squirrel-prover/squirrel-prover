@@ -257,10 +257,10 @@ tactic:
 | t=tac DOT                           { t }
 
 goal:
-| GOAL i=ID COLON f=formula DOT   { Goalmode.Gm_goal (i, Prover.make_goal f) }
-| GOAL f=formula DOT              { Goalmode.Gm_goal ("unnamed_goal",
+| GOAL i=ID COLON f=formula DOT   { Prover.Gm_goal (i, Prover.make_goal f) }
+| GOAL f=formula DOT              { Prover.Gm_goal ("unnamed_goal",
                                                       Prover.make_goal f) }
-| PROOF                           { Goalmode.Gm_proof }
+| PROOF                           { Prover.Gm_proof }
 
 theory:
 | declaration theory             { () }

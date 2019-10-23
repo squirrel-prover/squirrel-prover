@@ -19,6 +19,12 @@ let goals_proved = ref []
     - [ProofMode] : proof of a goal in progress. *)
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
+(** Goal mode input types:
+    - [Gm_goal f] : declare a new goal f.
+    - [Gm_proof] : start a proof. *)
+type gm_input = Gm_goal of string * Term.formula | Gm_proof
+
+
 (** History management *)
 
 exception Cannot_undo
@@ -321,7 +327,7 @@ type parsed_input =
   | ParsedQed
   | ParsedTactic of tac
   | ParsedUndo of int
-  | ParsedGoal of Goalmode.gm_input
+  | ParsedGoal of gm_input
   | EOF
 
 

@@ -86,7 +86,7 @@ let rec main_loop ?(save=true) mode =
         
       | GoalMode,ParsedGoal(goal) ->
           begin match goal with
-            | Goalmode.Gm_proof -> begin match start_proof () with
+            | Prover.Gm_proof -> begin match start_proof () with
                 | None ->
                     Fmt.pr "%a" pp_goal ();
                     if is_proof_completed () then begin
@@ -100,7 +100,7 @@ let rec main_loop ?(save=true) mode =
                       main_loop ProofMode
                 | Some es -> error GoalMode es end
 
-            | Goalmode.Gm_goal (i,f) ->
+            | Prover.Gm_goal (i,f) ->
                 add_new_goal (i,f);
                 Fmt.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
                   i
