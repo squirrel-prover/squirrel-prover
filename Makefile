@@ -8,15 +8,15 @@ all: metabc test
 PROVER_TESTS = examples/lak.mbc \
 			   examples/forall.mbc \
 			   examples/equality_propagation.mbc \
-			   examples/macros.mbc \
 			   examples/input.mbc \
-			   examples/macros_input.mbc \
 			   examples/euf_null.mbc \
 			   examples/euf_trivial.mbc \
 			   examples/euf_basic.mbc \
-			   examples/euf_output.mbc \
 			   examples/euf_output2.mbc \
 			   examples/euf_output3.mbc \
+#			   examples/euf_output.mbc \
+			   examples/macros_input.mbc \
+			   examples/macros.mbc \
 			   examples/euf.mbc
 
 test: sanity
