@@ -1,3 +1,4 @@
+(** Main tactics of the prover *)
 open Logic
 
 type 'a fk = unit -> 'a
@@ -25,6 +26,11 @@ val tact_andthen :
 (** Basic logic-specific tactics *)
 
 val goal_forall_intro : 'a tac
+(** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
+    quantified variables and the goal.
+    [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
+    timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
+    variables. *)
 val goal_exists_intro : Term.subst -> 'a tac
 val goal_any_intro : 'a tac
 val goal_or_intro_l : 'a tac
@@ -34,7 +40,9 @@ val goal_intro : 'a tac
 
 val gamma_absurd : 'a tac
 val constr_absurd : 'a tac
-
+    
+(** Add index constraints resulting from names equalities, modulo the TRS.
+    [judge.gamma] must have been completed before calling [eq_names]. *)
 val eq_names : 'a tac
 val eq_timestamps : 'a tac
 val eq_constants : Term.fname -> 'a tac
