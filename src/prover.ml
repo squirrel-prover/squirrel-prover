@@ -180,26 +180,10 @@ let rec tac_apply :
     (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
 
     | AndThen (tac,tac') ->
-      let suc_k judges sk fk =
-        let exception Suc_fail in
-        let compute_judges () =
-          List.fold_left (fun acc judge ->
-              let new_j =
-                tac_apply tac' judge
-                  (fun l _ -> l)
-                  (fun () -> raise Suc_fail) in
-              new_j @ acc
-            ) [] judges in
-
-        (* We catch the exception before calling the continuation. *)
-        match compute_judges () with
-        | j -> sk j fk
-        | exception Suc_fail -> fk () in
-
       tact_andthen
         (tac_apply tac)
-        suc_k
-        sk fk judge
+        (tac_apply tac')
+        judge sk fk
 
     | OrElse (tac,tac') ->
       tact_orelse (tac_apply tac) (tac_apply tac') judge sk fk

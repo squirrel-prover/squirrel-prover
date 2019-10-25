@@ -18,10 +18,11 @@ val simplify : Judgment.t -> Judgment.t
 val tact_orelse : 'a tac -> 'a tac -> 'a tac
 val repeat : 'a tac -> 'a tac
 
-(** TODO this makes no sense *)
 val tact_andthen :
-  ('a -> ('b -> 'c -> 'd) -> 'e -> 'f) ->
-  ('b -> 'g -> 'c -> 'd) -> 'g -> 'e -> 'a -> 'f
+  'a tac ->
+  Judgment.t list tac ->
+  'a tac
+
 
 (** Basic logic-specific tactics *)
 

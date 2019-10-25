@@ -29,7 +29,22 @@ let tact_wrap f v sk fk = sk (f v) fk
 
 let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
 
-let tact_andthen a b sk fk v = a v (fun v fk' -> b v sk fk') fk
+let tact_andthen tac1 tac2 judge sk fk =
+  let suc_k judges sk fk =
+        let exception Suc_fail in
+        let compute_judges () =
+          List.fold_left (fun acc judge ->
+              let new_j =
+                tac2 judge
+                  (fun l _ -> l)
+                  (fun () -> raise Suc_fail) in
+              new_j @ acc
+            ) [] judges in
+        match compute_judges () with
+        | j -> sk j fk
+        | exception Suc_fail -> fk () in
+ tac1 judge (fun v fk' -> suc_k v sk fk') fk
+
 
 let tact_orelse a b v sk fk = a v sk (fun () -> b v sk fk)
 
