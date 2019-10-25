@@ -215,7 +215,14 @@ let simpGoal =
 
 exception Tactic_failed of string
 
-let rec eval_tactic_judge : tac -> Judgment.t -> Judgment.t list = fun tac judge ->
+
+(** The evaluation of a tactic, may either raise a soft failure or a hard
+    failure (cf tactics.ml). A soft failure should be formatted inside the
+    Tactic_soft_failure exception.
+    A hard failure inside Tactic_hard_failure. Those exceptions are catched
+    inside the interactive loop. *)
+let eval_tactic_judge : tac -> Judgment.t -> Judgment.t list = fun tac judge ->
+  (* the failure should raise the soft failure, according to [pp_tac_error] *)
   let failure_k () = raise @@ Tactic_failed (Fmt.strf "%a" pp_tac tac) in
   let suc_k judges _ =
     judges

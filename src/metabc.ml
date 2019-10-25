@@ -77,9 +77,11 @@ let rec main_loop ?(save=true) mode =
             | Tactic_failed s ->
                 error ProofMode ("Tactic failed: " ^ s ^ ".")
             | Tactic_type_error s ->
-                error ProofMode s
+              error ProofMode s
+            (* catch here soft or hard tacticts failures.  Print anomily
+               for the rest. Use module Printexec.
+            *)
           end
-      
       | WaitQed,ParsedQed ->
           Fmt.pr "Exiting proof mode.@.";
           main_loop GoalMode

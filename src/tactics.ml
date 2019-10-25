@@ -45,7 +45,6 @@ let tact_andthen tac1 tac2 judge sk fk =
         | exception Suc_fail -> fk () in
  tac1 judge (fun v fk' -> suc_k v sk fk') fk
 
-
 let tact_orelse a b v sk fk = a v sk (fun () -> b v sk fk)
 
 let repeat t j sk fk =
@@ -101,6 +100,14 @@ let goal_and_intro (judge : Judgment.t) sk fk =
          Judgment.set_goal_fact rgoal judge ] fk
   | _ -> raise @@ Failure "goal ill-formed"
 
+let goal_intro (judge : Judgment.t) sk fk =
+  match Judgment.get_goal_fact judge with
+  | False -> sk [judge] fk
+  | f -> let judge = Judgment.add_fact (Not (f)) judge
+                     |> Judgment.set_goal_fact False
+    in
+    sk [judge] fk
+
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : Judgment.t) sk fk =
   let jgoal = Judgment.get_goal_formula judge in
@@ -140,14 +147,6 @@ let goal_exists_intro nu (judge : Judgment.t) sk fk =
     |> Judgment.add_constr (Not pc_constr)
   in
   sk [judge] fk
-
-let goal_intro (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | False -> sk [judge] fk
-  | f -> let judge = Judgment.add_fact (Not (f)) judge
-                     |> Judgment.set_goal_fact False
-    in
-    sk [judge] fk
 
 let goal_any_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.goal with
