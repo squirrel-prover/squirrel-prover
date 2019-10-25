@@ -1,0 +1,55 @@
+hash h
+
+abstract ok:message
+abstract ko:message
+
+name k : index->message
+
+channel cT
+channel cR
+
+process tag(i:index) =
+  new nT;
+  in(cR,nRt); (* errors if nR is used (conflict with toplevel decl) *)
+  (* TODO dont inline: let m2 = h(<nRt,nT>,k(i)) in *)
+  out(cT,<nT,h(<nRt,nT>,k(i))>);              (* 1[i,j] *)
+  in(cR,m3);
+  if m3 = h(<h(<nRt,nT>,k(i)),nRt>,k(i)) then
+    out(cT,ok)
+  else
+    out(cT,ko)
+
+(* why did I move the new below into a toplevel declaration ? *)
+name nR : index->message
+
+process reader(j:index) =
+  (* new nR; *)
+  out(cR,nR(j));                    (* 0[j] *)
+  in(cT,x);
+  (* TODO let <x1,x2> = x in *)
+  let x1 = fst(x) in
+  let x2 = snd(x) in
+  (* TODO I inlined x1,x2 in the condition because we lack macro support *)
+  try find i such that snd(x) = h(<nR(j),fst(x)>,k(i)) in
+    out(cR,h(<x2,nR(j)>,k(i)))      (* 0[j]_0/0[i] *)
+  else
+    out(cR,ko)
+
+system ((!_j reader(j)) | (!_i !_j tag(i))).
+
+(* TODO In the next lemma, it would be more natural to write
+ * something like happens(0[k]_0) rather than output@0[k]_0 = itself.
+ * This could be left implicit since 0[k]_0 occurs in the
+ * rest of the formula. The only cases I can think of where
+ * the implicit treatment might not work is that of unreachability
+ * statements: forall k, not(happens(def(0[k]_0))). *)
+goal wa :
+  forall (k:index, p:index):
+  output@0[k]_0/0[p] = output@0[k]_0/0[p] =>
+  exists (i:index,j:index) such that
+  0[k]_0/0[p] < 1[i,j]:
+  input@0[k]_0/0[p] = output@1[i,j].
+Proof.
+  euf 1.
+  (* TODO it seems we have problems with macros containing input variables,
+      the input variables are not replaced by input@tau terms *)
