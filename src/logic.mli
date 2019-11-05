@@ -73,21 +73,18 @@ module Theta : sig
   val get_equalities : theta -> timestamp list list
 end
 
-type typed_goal =
+type typed_formula =
   | Unit
   | Formula of formula
   | Postcond of postcond
   | Fact of fact
-
-exception Goal_type_error of string * string (* expected type and given type *)
-
 
 (** Judgments are the sequents of our proof system *)
 module Judgment : sig
   type judgment = { vars : fvar list;
                     theta : Theta.theta;
                     gamma : Gamma.gamma;
-                    goal : typed_goal; }
+                    formula : typed_formula; }
 
   type t = judgment
 
@@ -104,19 +101,10 @@ module Judgment : sig
   (** Side-effect: Add necessary action descriptions. *)
   val add_constr : Term.constr -> judgment -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
-  val set_goal_fact : fact -> judgment -> judgment
-
   val update_trs : judgment -> judgment
 
-  val set_goal : typed_goal -> judgment -> judgment
+  val set_formula : typed_formula -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
-
-  val get_goal_fact : judgment -> fact
-
-  val get_goal_formula : judgment -> formula
-
-  val get_goal_postcond : judgment -> postcond
 
 end

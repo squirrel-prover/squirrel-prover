@@ -146,7 +146,7 @@ let rec tac_apply :
 =
   let open Tactics in
   fun tac judge sk fk -> match tac with
-    | Admit -> sk [Judgment.set_goal Unit judge] fk
+    | Admit -> sk [Judgment.set_formula Unit judge] fk
     | Ident -> sk [judge] fk
 
     | ForallIntro -> goal_forall_intro judge sk fk
@@ -213,7 +213,7 @@ let simpGoal =
                           AndThen(Try(GammaAbsurd,Ident),
                                   Try(ConstrAbsurd,Ident)))))
 
-exception Tactic_failed of string
+exception Tactic_Soft_Failure of string
 
 
 (** The evaluation of a tactic, may either raise a soft failure or a hard
@@ -223,18 +223,13 @@ exception Tactic_failed of string
     inside the interactive loop. *)
 let eval_tactic_judge : tac -> Judgment.t -> Judgment.t list = fun tac judge ->
   (* the failure should raise the soft failure, according to [pp_tac_error] *)
-  let failure_k () = raise @@ Tactic_failed (Fmt.strf "%a" pp_tac tac) in
+  let failure_k tac_error =
+    raise @@ Tactic_Soft_Failure (Fmt.strf "%a" Tactics.pp_tac_error tac_error )
+  in
   let suc_k judges _ =
     judges
   in
-   try
      tac_apply tac judge suc_k failure_k
-   with Goal_type_error (expected,given)->
-     raise @@ Tactic_type_error
-       (Fmt.strf
-          "@[The tactic %a is ill-typed, \
-           it was expected to be applied to a %s, not to a %s."
-          pp_tac tac expected given)
 
 let auto_simp judges =
   List.map Tactics.simplify judges
@@ -345,7 +340,8 @@ let complete_proof () =
     add_proved_goal (Utils.opt_get !current_goal);
     current_goal := None;
     subgoals := []
-  with Not_found ->  raise (Tactic_failed "Cannot complete proof with empty current goal")
+  with Not_found ->  raise (Tactics.Tactic_Hard_Failure "Cannot complete proof
+with empty current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -370,7 +366,7 @@ let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
 
 let cycle i l =
   let rec cyc acc i = function
-    | [] -> raise @@ Tactic_failed "cycle error"
+    | [] -> raise @@ Tactics.Tactic_Hard_Failure "Cycle error."
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in

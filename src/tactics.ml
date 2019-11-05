@@ -1,7 +1,18 @@
 open Logic
 open Term
 
-type 'a fk = unit -> 'a
+exception Tactic_Hard_Failure of string
+
+type tac_error =
+  | Failure of string
+  | AndThen_Failure of tac_error
+
+let rec pp_tac_error ppf = function
+  | Failure s -> Fmt.pf ppf "%s" s
+  |AndThen_Failure t -> Fmt.pf ppf "An application of the second tactic to one
+of the subgoal failed with error : %a"  pp_tac_error t
+
+type 'a fk = tac_error -> 'a
 
 type ('a,'b) sk = 'a -> 'b fk -> 'b
 
@@ -11,16 +22,16 @@ type 'a tac =
 let remove_finished judges =
   List.filter
     (fun j ->
-       match j.Judgment.goal with
+       match j.Judgment.formula with
        | Unit -> false
        | _ -> true)
     judges
 
 let simplify j =
-  match j.Judgment.goal with
+  match j.Judgment.formula with
   | Postcond p when p.evars = [] ->
-    Judgment.set_goal (Fact p.efact) j
-  | Fact True -> Judgment.set_goal Unit j
+    Judgment.set_formula (Fact p.efact) j
+  | Fact True -> Judgment.set_formula Unit j
   | _ -> j
 
 (** Basic Tactics *)
@@ -31,28 +42,40 @@ let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
 
 let tact_andthen tac1 tac2 judge sk fk =
   let suc_k judges sk fk =
-        let exception Suc_fail in
+        let exception Suc_fail of tac_error in
         let compute_judges () =
           List.fold_left (fun acc judge ->
               let new_j =
                 tac2 judge
                   (fun l _ -> l)
-                  (fun () -> raise Suc_fail) in
+                  (fun error -> raise @@ Suc_fail error) in
               new_j @ acc
             ) [] judges in
         match compute_judges () with
         | j -> sk j fk
-        | exception Suc_fail -> fk () in
+        | exception Suc_fail e -> fk (AndThen_Failure e) in
  tac1 judge (fun v fk' -> suc_k v sk fk') fk
 
-let tact_orelse a b v sk fk = a v sk (fun () -> b v sk fk)
+let tact_orelse a b v sk fk = a v sk (fun tac_error -> b v sk fk)
+
+
+let rec assoc_apply tac tac_list judge sk fk =
+  let rec assoc_apply_build tac tac_list : 'a tac=
+    match tac_list with
+    | [] -> raise @@
+      Tactic_Hard_Failure "Cannot apply a binary tactic to no
+tactic"
+    | [t] -> t
+    | t :: q -> tac t (assoc_apply tac q) in
+  (assoc_apply_build tac tac_list) judge sk fk
 
 let repeat t j sk fk =
   let rec success_loop oldj v fk' =
     match v with
     | [a] when a = oldj -> sk v fk
     | [b] -> t b (success_loop b) (fun _ -> sk v fk)
-    | _ -> raise @@ Failure "cannot repeat a tactic creating subgoals"
+    | _ -> raise @@ Tactic_Hard_Failure
+        "cannot repeat a tactic creating subgoals"
   in
   t j (success_loop j) fk
 
@@ -75,99 +98,105 @@ let lift =
 (** Introduction Rules *)
 
 let goal_or_intro_l (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | Or (lgoal, _) -> sk [Judgment.set_goal_fact lgoal judge] fk
-  | _ -> raise @@ Failure "goal ill-formed"
+  match judge.Judgment.formula with
+  | Fact (Or (lformula, _)) -> sk
+                                 [Judgment.set_formula (Fact lformula) judge]
+                                 fk
+  | _ -> fk (Failure "Cannot introduce a disjunction
+if the goal does not contain one")
 
 let goal_or_intro_r (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | Or (_, rgoal) -> sk [Judgment.set_goal_fact rgoal judge] fk
-  | _ -> raise @@ Failure "goal ill-formed"
+  match judge.Judgment.formula with
+  | Fact (Or (_, rformula)) -> sk [Judgment.set_formula (Fact rformula) judge] fk
+  | _ -> fk (Failure "Cannot introduce a disjunction
+if the goal does not contain one")
 
 (** To prove phi \/ psi, try first to prove phi and then psi *)
 let goal_or_intro (judge : Judgment.t) sk fk =
   tact_orelse goal_or_intro_l goal_or_intro_r judge sk fk
 
 let goal_true_intro (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | True -> sk () fk
-  | _ -> raise @@ Failure "goal ill-formed"
+  match judge.Judgment.formula with
+  | Fact(True) -> sk () fk
+  | _ -> fk (Failure "Cannot introduce True
+if the formula is not True")
+
 
 let goal_and_intro (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | And (lgoal,rgoal) ->
-    sk [ Judgment.set_goal_fact lgoal judge;
-         Judgment.set_goal_fact rgoal judge ] fk
-  | _ -> raise @@ Failure "goal ill-formed"
+  match judge.Judgment.formula with
+  | Fact (And (lformula, rformula)) ->
+    sk [ Judgment.set_formula (Fact lformula) judge;
+         Judgment.set_formula (Fact rformula) judge ] fk
+ | _ -> fk (Failure "Cannot introduce a conjonction
+if the formula does not contain one" )
 
 let goal_intro (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | False -> sk [judge] fk
-  | f -> let judge = Judgment.add_fact (Not (f)) judge
-                     |> Judgment.set_goal_fact False
+  match judge.Judgment.formula with
+  | Fact(False) -> sk [judge] fk
+  | Fact(f) -> let judge = Judgment.add_fact (Not (f)) judge
+                           |> Judgment.set_formula (Fact False)
     in
     sk [judge] fk
+  | _ -> fk (Failure "Cannot introduce a formula which is not a fact.")
 
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : Judgment.t) sk fk =
-  let jgoal = Judgment.get_goal_formula judge in
-  let vsubst =
-    List.fold_left
-      (fun subst x ->
-         if List.mem x judge.Judgment.vars then
-           (x, make_fresh_of_type x):: subst
-         else
-           (x, x)::subst ) [] jgoal.uvars
-  in
-  let subst = from_fvarsubst vsubst in
-  let new_cnstr = subst_constr subst jgoal.uconstr
-  and new_fact = subst_fact subst jgoal.ufact
-  and new_goals =
-    List.map
-      (fun goal ->
-         Postcond (subst_postcond subst goal))
-      jgoal.postcond
-  in
-  let judges =
-    List.map (fun goal ->
-        Judgment.set_goal goal judge
-        |> Judgment.add_vars @@ List.map snd vsubst
-        |> Judgment.add_fact new_fact
-        |> Judgment.add_constr new_cnstr
-      ) new_goals
-  in
-  sk (List.map simplify judges) fk
+  match judge.Judgment.formula with
+  | Formula f ->
+    let vsubst =
+      List.fold_left
+        (fun subst x ->
+           if List.mem x judge.Judgment.vars then
+             (x, make_fresh_of_type x):: subst
+           else
+             (x, x)::subst ) [] f.uvars
+    in
+    let subst = from_fvarsubst vsubst in
+    let new_cnstr = subst_constr subst f.uconstr
+    and new_fact = subst_fact subst f.ufact
+    and new_typed_formulas =
+      List.map
+        (fun formula ->
+           Postcond (subst_postcond subst formula))
+        f.postcond
+    in
+    let judges =
+      List.map (fun tformula ->
+          Judgment.set_formula tformula judge
+          |> Judgment.add_vars @@ List.map snd vsubst
+          |> Judgment.add_fact new_fact
+          |> Judgment.add_constr new_cnstr
+        ) new_typed_formulas
+    in
+    sk (List.map simplify judges) fk
+  | _ -> fk (Failure "Cannot introduce a forall which does not exists")
 
 let goal_exists_intro nu (judge : Judgment.t) sk fk =
-  let jgoal = Judgment.get_goal_postcond judge in
-  let pc_constr = subst_constr nu jgoal.econstr in
-  let judge =
-    Judgment.set_goal
-      (Fact (subst_fact nu jgoal.efact)) judge
-    |> Judgment.add_constr (Not pc_constr)
-  in
-  sk [judge] fk
+  match judge.Judgment.formula with
+  | Postcond p ->
+    let pc_constr = subst_constr nu p.econstr in
+    let judge =
+      Judgment.set_formula
+        (Fact (subst_fact nu p.efact)) judge
+      |> Judgment.add_constr (Not pc_constr)
+    in
+    sk [judge] fk
+  | _ -> fk (Failure "Cannot introduce an existantial which does not exists")
 
-let goal_any_intro (judge : Judgment.t) sk fk =
-  match judge.Judgment.goal with
-  | Formula _ -> goal_forall_intro judge sk fk
-  | Fact _ -> goal_intro judge sk fk
-  | _ -> fk ()
 
-let fail_goal_false (judge : Judgment.t) sk fk =
-  match Judgment.get_goal_fact judge with
-  | False -> fk ()
-  | _ -> raise @@ Failure "goal ill-formed"
+let goal_any_intro j sk fk = assoc_apply tact_orelse [goal_and_intro;
+                                                      goal_intro;
+                                                      goal_forall_intro] j sk fk
 
 let constr_absurd (judge : Judgment.t) sk fk =
   if not @@ Theta.is_sat judge.Judgment.theta then
     sk [] fk
-  else fk ()
+  else fk (Failure "Constraints satisfiable")
 
 let gamma_absurd (judge : Judgment.t) sk fk =
   if not @@ Gamma.is_sat judge.Judgment.gamma then
     sk [] fk
-  else fk ()
+  else fk (Failure "Equations satisfiable")
 
 let or_to_list f =
   let rec aux acc = function
@@ -334,8 +363,9 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   in
   (eq, eq_cnstr)
 
+(* TODO : make error reporting for euf more informative *)
 let euf_apply_facts judge at = match modulo_sym euf_param at with
-  | None -> raise @@ Failure "bad euf application"
+  | None -> raise @@ Tactic_Hard_Failure "bad euf application"
   | Some p ->
     let (hash_fn, (key_n, key_is), m, s) = p in
     let rule = Euf.mk_rule m s hash_fn key_n in
@@ -368,21 +398,21 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
     | Atom a -> [a]
     | True -> []
     | And (a, b) -> (to_cnf a) @ (to_cnf b)
-    | _ -> raise @@ Failure
+    | _ -> raise @@ Tactic_Hard_Failure
         "Can only apply axiom with constraints restricted to conjunctions."
   in
   let tatom_list = to_cnf new_constr in
   if not( Theta.is_valid judge.Judgment.theta tatom_list) then
-    raise @@ Failure "Constraint on the variables not satisfied.";
+    raise @@ Tactic_Hard_Failure "Constraint on the variables not satisfied.";
   (* The precondition creates a new subgoal *)
   let new_judge =
-    Judgment.set_goal (Fact (subst_fact subst gp.ufact)) judge
+    Judgment.set_formula (Fact (subst_fact subst gp.ufact)) judge
     |> simplify
   in
   let new_truths =
-    List.map (fun goal ->
-        let goal = fresh_postcond goal in
-        subst_postcond subst goal
+    List.map (fun formula ->
+        let formula = fresh_postcond formula in
+        subst_postcond subst formula
       ) gp.postcond
   in
   let judge =

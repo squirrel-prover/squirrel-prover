@@ -1,16 +1,15 @@
 (** Main tactics of the prover *)
 open Logic
 
-(*
 type tac_error =
-    | Failure of string
+  | Failure of string
+  | AndThen_Failure of tac_error
 
-val pp_tac_error
+exception Tactic_Hard_Failure of string
+
+val pp_tac_error : Format.formatter -> tac_error -> unit
 
 type 'a fk = tac_error -> 'a
-*)
-
-type 'a fk = unit -> 'a
 
 type ('a,'b) sk = 'a -> 'b fk -> 'b
 
@@ -24,7 +23,7 @@ type ('a,'b) sk = 'a -> 'b fk -> 'b
     a failure continuation.
 
     As an example, the function [tac] given by [tac judge sk fk] should return
-    [sk new_judges fk] in case of success and [fk ()] in case of failure.
+    [sk new_judges fk] in case of success and [fk error] in case of failure.
 
     We allow tactics to not make progress and not fail.
 
@@ -50,7 +49,9 @@ val simplify : Judgment.t -> Judgment.t
 
 (** Generic tactic combinators *)
 
-(** [tact_orelse t1 t2] applies [t1] with [t2] as failure continuation. *)
+(** [tact_orelse t1 t2] applies [t1] with [t2] as failure continuation.
+    The error message raised by [t1] is dropped.
+*)
 val tact_orelse : 'a tac -> 'a tac -> 'a tac
 
 (** [repeat t] applies [t] until either [t] fails or a fix point is reached. *)
@@ -64,10 +65,7 @@ val tact_andthen :
   Judgment.t list tac ->
   'a tac
 
-
 (** Basic logic-specific tactics *)
-
-(** TODO: les intro raise des hard failure au lieu de soft *)
 
 (** [goal_or_intro_l judge sk fk] returns the left side of the goal if it is
     a disjunction. Else it calls [fk] *)
@@ -93,12 +91,13 @@ val goal_forall_intro : 'a tac
     variables. *)
 val goal_exists_intro : Term.subst -> 'a tac
 
-(** should not exist, syntactic sugar based on orelse *)
+(** Ayntactic sugar, trying to apply one of the intro. TODO inside prover ?*)
 val goal_any_intro : 'a tac
 
 (** [gamma_absurd judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 val gamma_absurd : 'a tac
+
 (** [constr_absurd judge sk fk] try to close the goal that the trace constraints
     cannot be satisfied, else calls [fk] *)
 val constr_absurd : 'a tac
@@ -106,6 +105,7 @@ val constr_absurd : 'a tac
 (** Add index constraints resulting from names equalities, modulo the TRS.
     [judge.gamma] must have been completed before calling [eq_names]. *)
 val eq_names : 'a tac
+
 (** Add terms constraints resulting from timestamp equalities. *)
 val eq_timestamps : 'a tac
 val eq_constants : Term.fname -> 'a tac

@@ -241,25 +241,25 @@ end = struct
 end
 
 
-type typed_goal =
+type typed_formula =
   | Unit
   | Formula of formula
   | Postcond of postcond
   | Fact of fact
 
-let pp_typed_goal fmt =
+let pp_typed_formula fmt =
   function
   | Unit -> Fmt.pf fmt "unit"
   | Formula f -> pp_formula fmt f
   | Postcond p -> pp_postcond fmt p
   | Fact f -> pp_fact fmt f
 
-let type_goal = function
+(*let type_goal = function
   | Unit -> "unit"
   | Formula f -> "formula"
   | Postcond p -> "postcondition"
   | Fact f -> "fact"
-
+*)
 
 exception Goal_type_error of string * string (* expected type and given type *)
 
@@ -274,7 +274,7 @@ module Judgment : sig
   type judgment = { vars : fvar list;
                     theta : Theta.theta;
                     gamma : Gamma.gamma;
-                    goal : typed_goal; }
+                    formula : typed_formula; }
 
   type t = judgment
 
@@ -291,26 +291,17 @@ module Judgment : sig
   (** Side-effect: Add necessary action descriptions. *)
   val add_constr : Term.constr -> judgment -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
-  val set_goal_fact : fact -> judgment -> judgment
-
   val update_trs : judgment -> judgment
 
-  val set_goal : typed_goal -> judgment -> judgment
+  val set_formula : typed_formula -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
-
-  val get_goal_fact : judgment -> fact
-
-  val get_goal_formula : judgment -> formula
-
-  val get_goal_postcond : judgment -> postcond
 
 end = struct
   type judgment = { vars : fvar list;
                        theta : Theta.theta;
                        gamma : Gamma.gamma;
-                       goal : typed_goal; }
+                       formula : typed_formula; }
 
   type t = judgment
 
@@ -328,13 +319,13 @@ end = struct
       Theta.pp_theta judge.theta
       Gamma.pp_gamma judge.gamma
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
-      pp_typed_goal judge.goal
+      pp_typed_formula judge.formula
 
   let init (goal : formula) =
     { vars = [];
       theta = Theta.mk Term.True;
       gamma = Gamma.mk ();
-      goal = Formula goal;
+      formula = Formula goal;
       }
 
   let update_trs j =
@@ -385,24 +376,8 @@ end = struct
     let j = update_descr j (constr_actions c) in
     { j with theta = Theta.add_constr j.theta c }
 
-  let set_goal_fact f j =
-    let j = update_descr j (fact_actions f) in
-    { j with goal = Fact f }
-
-  let set_goal a j = { j with goal = a }
+  let set_formula a j = { j with formula = a }
 
   let set_gamma g j = { j with gamma = g }
-
-  let get_goal_fact j = match j.goal with
-    | Fact f -> f
-    | _ -> raise @@ Goal_type_error ("fact", type_goal j.goal)
-
-  let get_goal_formula j = match j.goal with
-    | Formula f -> f
-    | _ -> raise @@ Goal_type_error ("formula", type_goal j.goal)
-
-  let get_goal_postcond j = match j.goal with
-    | Postcond p -> p
-    | _ -> raise @@ Goal_type_error ("postcond", type_goal j.goal)
 
 end

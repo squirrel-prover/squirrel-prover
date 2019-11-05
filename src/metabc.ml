@@ -28,8 +28,9 @@ let parse_next parser_fun =
     parser_fun lexbuf "interactive"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
- 
+
 open Prover
+open Tactics
 
 let rec main_loop ?(save=true) mode =
   if !interactive then Format.printf "[>@.";
@@ -74,10 +75,10 @@ let rec main_loop ?(save=true) mode =
               Fmt.pr "%a" pp_goal ();
               main_loop ProofMode end
           with
-            | Tactic_failed s ->
+            | Tactic_Soft_Failure s ->
                 error ProofMode ("Tactic failed: " ^ s ^ ".")
-            | Tactic_type_error s ->
-              error ProofMode s
+            | Tactic_Hard_Failure s ->
+              error ProofMode ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
             (* catch here soft or hard tacticts failures.  Print anomily
                for the rest. Use module Printexec.
             *)
@@ -85,7 +86,7 @@ let rec main_loop ?(save=true) mode =
       | WaitQed,ParsedQed ->
           Fmt.pr "Exiting proof mode.@.";
           main_loop GoalMode
-        
+
       | GoalMode,ParsedGoal(goal) ->
           begin match goal with
             | Prover.Gm_proof -> begin match start_proof () with
