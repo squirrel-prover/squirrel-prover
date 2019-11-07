@@ -134,8 +134,9 @@ let mk_instance (l : tatom list) =
 exception Unify_cycle of Uuf.t
 
 (* [mgu ut uf] applies the mgu represented by [uf] to [ut].
-    Raise [Unify_cycle] if it contains a cycle. *)
-let mgu (uf : Uuf.t) (ut : ut) =
+    Raise [Unify_cycle] if it contains a cycle.
+   If [ext_support] is [true], add [ut] to [uf]'s support if necessary. *)
+let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
 
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
@@ -146,10 +147,12 @@ let mgu (uf : Uuf.t) (ut : ut) =
     if List.mem ut lv then raise (Unify_cycle uf)
     else match ut.cnt with
       | UVar _ ->
+        let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
         if ut_equal rut ut then (uf, ut) else mgu_ uf rut (ut :: lv)
 
       | UName (a,is) ->
+        let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
         if ut_equal rut ut then
 
@@ -557,10 +560,17 @@ let m_is_sat models = models <> []
 
 let is_sat constr = m_is_sat @@ models constr
 
+(* Adds [ut] to the model [uf], if necessary, and return its normal form.
+   There is no need to modify the rest of the model, since we are not adding
+   and equality, disequality or inequality. *)
+let ext_support (model : model) (ut : ut) =
+  let uf, ut = mgu ~ext_support:true model.inst.uf ut in
+  { model with inst = { model.inst with uf = uf } }, ut
+
 (** Only Eq, Neq and Leq. *)
 let ts_query (model : model) (ord, ts, ts') : bool =
-  let u,v = mgu model.inst.uf (uts ts) |> snd,
-            mgu model.inst.uf (uts ts') |> snd in
+  let model, u = ext_support model (uts ts) in
+  let model, v = ext_support model (uts ts') in
   match ord with
   | Eq -> ut_equal u v
   | Leq -> UtG.mem_edge model.tr_graph u v
@@ -577,8 +587,8 @@ let ts_query (model : model) (ord, ts, ts') : bool =
 
 (** Only Eq and Neq. *)
 let ind_query (model : model) (ord, i, i') : bool =
-  let u,v = mgu model.inst.uf (uvari i) |> snd,
-            mgu model.inst.uf (uvari i') |> snd in
+  let model, u = ext_support model (uvari i) in
+  let model, v = ext_support model (uvari i') in
   match ord with
   | Eq -> ut_equal u v
   | Leq -> UtG.mem_edge model.tr_graph u v
@@ -595,23 +605,28 @@ let query (models : models) ats =
     in [model], *with* redundancy modulo [model]'s equality relation. *)
 let max_elems_model (model : model) elems =
   (* We normalize to obtain the representant of each timestamp. *)
-  let l = List.map (fun ts -> ts, mgu model.inst.uf (uts ts) |> snd) elems in
-  (* |> List.sort_uniq (fun (_,a) (_,b) = ut_compare a b) sp_cmp *)
+  let model, l = List.fold_left (fun (model, l) ts ->
+      let model, ut = ext_support model (uts ts) in
+      (model, (ts,ut) :: l)
+    ) (model,[]) elems in
 
   (* We keep elements that are maximal in [model] *)
-  List.filter (fun (ts,u) ->
+  let melems = List.filter (fun (ts,u) ->
       List.for_all (fun (ts',u') ->
           ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
         ) l ) l
-  |> List.map fst
-  |> List.sort_uniq Pervasives.compare
+               |> List.map fst
+               |> List.sort_uniq Pervasives.compare in
+
+  model, melems
 
 let maximal_elems (models : models) (elems : timestamp list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
-  let maxs = List.fold_left (fun maxs_acc m ->
-      let m_maxs = max_elems_model m elems in
-      List.merge_uniq Pervasives.compare maxs_acc m_maxs
-    ) [] models in
+  let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
+      let m, m_maxs = max_elems_model m elems in
+      (m :: models, List.merge_uniq Pervasives.compare maxs_acc m_maxs)
+    ) ([],[]) models in
+  let models = List.rev rmodels in
 
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary

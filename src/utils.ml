@@ -53,7 +53,7 @@ module String = struct
     try
       (String.sub s 0 l) = p
     with _ -> false
-  
+
 end
 
 module Imap = Map.Make (struct
@@ -127,7 +127,7 @@ module Uf (Ord: Ordered) = struct
   module Vmap = Map.Make(Ord)
 
   (** [rmap] is the inverse of map.
-     [cpt] counts the number of non-trivial unions *)
+      [cpt] counts the number of non-trivial unions *)
   type t = { map : int Vmap.t;
              rmap : v Imap.t;
              puf : Vuf.t;

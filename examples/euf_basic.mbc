@@ -9,8 +9,7 @@ system out(c,h(n,k)).
 goal collision_absurd :
 
   forall (tau:timestamp)
-  such that tau=tau: (* TODO euf crashes if constraint is empty *)
-  output@tau = h(m,k) => exists () : false.
+  : output@tau = h(m,k) => exists () : false.
 
 Proof.
 

@@ -403,7 +403,7 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   in
   let tatom_list = to_cnf new_constr in
   if not( Theta.is_valid judge.Judgment.theta tatom_list) then
-    raise @@ Tactic_Hard_Failure "Constraint on the variables not satisfied.";
+    raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
   (* The precondition creates a new subgoal *)
   let new_judge =
     Judgment.set_formula (Fact (subst_fact subst gp.ufact)) judge

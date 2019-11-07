@@ -11,8 +11,7 @@ name m : message
 system !_a out(c,h(n,k)).
 
 goal unforgeable :
-  forall (tau:timestamp)
-  such that tau=tau : (* TODO crash when constraint is empty *)
+  forall (tau:timestamp) :
   output@tau = h(m,k) => exists () : false.
 
 Proof.
