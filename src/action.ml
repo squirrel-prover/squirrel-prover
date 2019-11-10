@@ -6,11 +6,11 @@ struct
   let cpt = ref 0
 end
 
-module Index = Var(IndexParam)
+module Index : VarType = Var(IndexParam)
 
 type index = Index.t
 
-type isubst = (index*index) list
+type isubst = (index * index) list
 
 let pp_isubst ppf subst =
   Fmt.list
