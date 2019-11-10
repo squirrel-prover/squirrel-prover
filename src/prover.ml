@@ -66,6 +66,7 @@ type tac =
   | Admit : tac
   | Ident : tac
 
+  | NoSimp : tac -> tac
   | Left : tac
   | Right : tac
   | Intro : tac
@@ -98,7 +99,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
   fun ppf tac -> match tac with
     | Admit -> Fmt.pf ppf "admit"
     | Ident -> Fmt.pf ppf "ident"
-
+    | NoSimp t -> Fmt.pf ppf "no simplification for %a" pp_tac t
     | Left -> Fmt.pf ppf "goal_or_intro_l"
     | Right -> Fmt.pf ppf "goal_or_intro_r"
     | Intro -> Fmt.pf ppf "goal_intro"
@@ -147,7 +148,7 @@ let rec tac_apply :
   fun tac judge sk fk -> match tac with
     | Admit -> sk [Judgment.set_formula Unit judge] fk
     | Ident -> sk [judge] fk
-
+    | NoSimp tac -> tac_apply tac judge sk fk
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (nu) -> goal_exists_intro nu judge sk fk
     | AnyIntro -> goal_any_intro judge sk fk
@@ -366,10 +367,10 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
-      let ejs =
-        (eval_tactic_judge tac judge) @ ejs'
-        |> auto_simp
-      in
+    let new_j =  (eval_tactic_judge tac judge) in
+    let ejs =  (match tac with
+      | NoSimp t -> new_j
+      | _ -> auto_simp new_j) @ ejs' in
       subgoals := ejs;
       is_proof_completed ()
 

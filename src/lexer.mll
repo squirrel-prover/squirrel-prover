@@ -105,6 +105,7 @@ rule token = parse
 | "try"               { TRY }
 | "repeat"            { REPEAT }
 | "orelse"            { ORELSE }
+| "nosimpl"           { NOSIMPL }
 | '+'                 { PLUS }
 | name as n           { ID (n) }
 | int as i            { INT (int_of_string i) }

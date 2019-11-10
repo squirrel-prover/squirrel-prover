@@ -13,7 +13,7 @@
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO CONGRUENCE APPLY TO
-%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION
+%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION NOSIMPL
 %token PROOF QED UNDO
 %token EOF
 
@@ -225,6 +225,7 @@ tac:
   | LPAREN t=tac RPAREN               { t }
   | ADMIT                             { Prover.Admit }
   | IDENT                             { Prover.Ident }
+  | NOSIMPL t=tac                     { Prover.NoSimp t }
   | FORALLINTRO                       { Prover.ForallIntro }
   | EXISTSINTRO t=tactic_params       { Prover.ExistsIntro (Prover.parse_args_exists t)}
   | ANYINTRO                          { Prover.AnyIntro }

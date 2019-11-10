@@ -60,6 +60,7 @@ val reset_state : int -> prover_mode
 type tac =
   | Admit : tac
   | Ident : tac
+  | NoSimp : tac -> tac
 
   | Left : tac
   | Right : tac
