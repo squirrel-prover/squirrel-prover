@@ -12,7 +12,7 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO CONGRUENCE APPLY TO
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO CONGRUENCE APPLY TO
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION
 %token PROOF QED UNDO
 %token EOF
@@ -226,6 +226,7 @@ tac:
   | ADMIT                             { Prover.Admit }
   | IDENT                             { Prover.Ident }
   | FORALLINTRO                       { Prover.ForallIntro }
+  | EXISTSINTRO t=tactic_params       { Prover.ExistsIntro (Prover.parse_args_exists t)}
   | ANYINTRO                          { Prover.AnyIntro }
   | INTRO                             { Prover.Intro }
   | LEFT                              { Prover.Left }

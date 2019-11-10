@@ -235,21 +235,8 @@ let auto_simp judges =
   |> List.map Tactics.simplify
   |> Tactics.remove_finished
 
-let parse_args goalname ts : subst =
-  let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
-  match goals with
-  | [] ->  raise @@ Failure "No proved goal with given name"
-  | [(np, gp)] ->
-      begin
-      let uvars = gp.uvars in
-      if (List.length uvars) <> (List.length ts) then
-        raise @@ Failure "Number of parameters different than expected";
-      match !subgoals with
-      | [] ->
-          raise @@
-          Failure "Cannot parse term with respect to empty current goal"
-      |  j :: _ ->
-          let u_subst = List.map (function
+let parse_subst j uvars ts : subst =
+           let u_subst = List.map (function
             | IndexVar v -> Theory.Idx (Action.Index.name v,v)
             | TSVar v -> Theory.TS (Tvar.name v,TVar v)
             | MessVar v -> Theory.Term (Mvar.name v,MVar v)) j.Judgment.vars
@@ -263,8 +250,34 @@ let parse_args goalname ts : subst =
                             (Term.get_indexvars j.Judgment.vars) iname)
             | _ ->  raise @@ Failure "Type error in the arguments"
           ) ts uvars
+
+let parse_args goalname ts : subst =
+  let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
+  match goals with
+  | [] ->  raise @@ Failure "No goal with given name"
+  | [(np, gp)] ->
+      begin
+      let uvars = gp.uvars in
+      if (List.length uvars) <> (List.length ts) then
+        raise @@ Failure "Number of parameters different than expected";
+      match !subgoals with
+      | [] ->
+          raise @@
+          Failure "Cannot parse term with respect to empty current goal"
+      |  j :: _ -> parse_subst j uvars ts
       end
   | _ ->  raise @@ Failure "Multiple proved goals with same name"
+
+let parse_args_exists ts : subst =
+  match !subgoals with
+  | [] ->
+    raise @@
+    Failure "Cannot parse term with respect to empty current goal"
+  |  j :: _ -> match j.Judgment.formula with
+    | Postcond p -> parse_subst j p.evars ts
+    | _ -> raise @@ Failure "Cannot parse term for existential intro which does
+not exists"
+
 
 (** Declare Goals And Proofs *)
 

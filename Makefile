@@ -15,6 +15,7 @@ PROVER_TESTS = examples/lak.mbc \
 			   examples/euf_output.mbc \
 			   examples/euf_output2.mbc \
 			   examples/euf_output3.mbc \
+			   examples/euf.mbc \
 			   examples/axiom.mbc \
 			   examples/axiom_collision_resistance.mbc \
 			   examples/collisions.mbc \

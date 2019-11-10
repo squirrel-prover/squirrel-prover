@@ -91,6 +91,7 @@ rule token = parse
 | "right"             { RIGHT }
 | "intro"             { INTRO }
 | "forallintro"       { FORALLINTRO }
+| "existsintro"       { EXISTSINTRO }
 | "anyintro"          { ANYINTRO }
 | "congruence"        { CONGRUENCE }
 | "notraces"          { NOTRACES }
