@@ -32,7 +32,7 @@ Qed.
 goal unforgeable_1 :
   forall (a : index, b : index)
   such that b <> a:
-  output@0_0[b] = h(na(a)@tau1,k) => exists () : false.
+  output@0_0[b] = h(na(a),k) => exists () : false.
 
 Proof.
   collision.
@@ -41,7 +41,7 @@ Qed.
 goal unforgeable_2 :
   forall (a : index, b : index)
   such that b <> a:
-  output@0_1[b] = h(na(a)@tau1,k) => exists () : false.
+  output@0_1[b] = h(na(a),k) => exists () : false.
 
 Proof.
   collision.
@@ -56,7 +56,7 @@ Qed.
 goal unforgeable_3 :
   forall (a : index, b : index)
   such that b <> a:
-  output@0_2[b] = h(na(a)@tau1,k) => exists () : false.
+  output@0_2[b] = h(na(a),k) => exists () : false.
 
 Proof.
   collision.
