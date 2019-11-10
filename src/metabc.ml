@@ -1,17 +1,17 @@
+(** Main Module, instantiate both an interactive or a file mode. *)
+
 open Logic
 open Utils
 
-let usage = Printf.sprintf "Usage: %s filename" (Filename.basename Sys.argv.(0))
+let usage = Fmt.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 let args  = ref []
 let verbose = ref false
 let interactive = ref false
 let speclist = [
-    ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
-    ("-v", Arg.Set verbose, "display more informations");
-    ]
-
-let interactive_mode = ref false
+  ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
+  ("-v", Arg.Set verbose, "display more informations");
+]
 
 (** Lexbuf used in non-interactive mode. *)
 let lexbuf : Lexing.lexbuf option ref = ref None
@@ -21,8 +21,11 @@ let setup_lexbuf fname =
   lexbuf := some @@ Lexing.from_channel (Pervasives.open_in fname);
   filename := fname;;
 
+(** [parse_next parser_fun] parse the next line of the input (or a filename)
+    according to the given parsing function [parser_fun]. Used in interactive
+    mode, depending on what is the type of the next expected input. *)
 let parse_next parser_fun =
-  if !interactive_mode then
+  if !interactive then
     (* Requires input to be one-line long. *)
     let lexbuf =  Lexing.from_string (read_line ()) in
     parser_fun lexbuf "interactive"
@@ -32,101 +35,105 @@ let parse_next parser_fun =
 open Prover
 open Tactics
 
+(** The main loop of the prover. The mode defines in what state the prover is,
+    e.g is it waiting for a proof script, or a systemn description, etc.
+    [save] allows to specify is the current state must be saved, so that
+    one can backtrack.
+*)
 let rec main_loop ?(save=true) mode =
-  if !interactive then Format.printf "[>@.";
+  if !interactive then Fmt.pr "[>@.";
   (* Initialize definitions before parsing system description *)
   if mode = InputDescr then begin
     Theory.initialize_symbols () ;
     Process.reset ()
   end else
-  (* Otherwise save the state if instructed to do so.
-   * In practice we save except after errors. *)
+    (* Otherwise save the state if instructed to do so.
+     * In practice we save except after errors. *)
   if save then save_state mode ;
   try
     let new_command = parse_next Main.parse_interactive_buf in
     match mode, new_command with
-      | mode, ParsedUndo(nb_undo) when mode <> InputDescr ->
-          begin try
-            let new_mode = reset_state nb_undo in
-            begin match new_mode with
-              | ProofMode -> Fmt.pr "%a" pp_goal ()
-              | GoalMode -> Process.pp_proc Fmt.stdout ()
-              | _ -> ()
-            end ;
-            main_loop new_mode
-          with
-            | Cannot_undo ->
-                error mode "Cannot undo, no proof state to go back to."
-          end
-      | InputDescr,ParsedInputDescr ->
-          Process.pp_proc Fmt.stdout () ;
-          main_loop GoalMode
-      | ProofMode,ParsedTactic(utac) ->
-          begin try
-            if not !interactive then Fmt.pr "@[[> %a.@.@]@." pp_tac utac ;
-            if eval_tactic utac then begin
-              Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-                (match !current_goal with
-                   | Some (i,_) -> i
-                   | None -> assert false) ;
-              complete_proof ();
-              main_loop WaitQed end
-            else begin
+    (* if the command is an undo, we catch it only if we are not waiting for a
+        system description. *)
+    | mode, ParsedUndo nb_undo when mode <> InputDescr ->
+      begin try
+          let new_mode = reset_state nb_undo in
+          begin match new_mode with
+            | ProofMode -> Fmt.pr "%a" pp_goal ()
+            | GoalMode -> Process.pp_proc Fmt.stdout ()
+            | _ -> ()
+          end ;
+          main_loop new_mode
+        with
+        | Cannot_undo ->
+          error mode "Cannot undo, no proof state to go back to."
+      end
+    | InputDescr, ParsedInputDescr ->
+      Process.pp_proc Fmt.stdout () ;
+      main_loop GoalMode
+    | ProofMode, ParsedTactic utac ->
+      begin
+        try
+          if not !interactive then Fmt.pr "@[[> %a.@.@]@." pp_tac utac ;
+          if eval_tactic utac then begin
+            Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
+              (match !current_goal with
+               | Some (i, _) -> i
+               | None -> assert false) ;
+            complete_proof ();
+            main_loop WaitQed end
+          else begin
+            Fmt.pr "%a" pp_goal ();
+            main_loop ProofMode end
+        with
+        | Tactic_Soft_Failure s ->
+          error ProofMode ("Tactic failed: " ^ s ^ ".")
+        | Tactic_Hard_Failure s ->
+          error ProofMode ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
+      end
+    | WaitQed, ParsedQed ->
+      Fmt.pr "Exiting proof mode.@.";
+      main_loop GoalMode
+    | GoalMode, ParsedGoal goal ->
+      begin
+        match goal with
+        | Prover.Gm_proof ->
+          begin
+            match start_proof () with
+            | None ->
               Fmt.pr "%a" pp_goal ();
-              main_loop ProofMode end
-          with
-            | Tactic_Soft_Failure s ->
-                error ProofMode ("Tactic failed: " ^ s ^ ".")
-            | Tactic_Hard_Failure s ->
-              error ProofMode ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
-            (* catch here soft or hard tacticts failures.  Print anomily
-               for the rest. Use module Printexec.
-            *)
+              if is_proof_completed () then
+                begin
+                Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
+                  (match !current_goal with
+                   | Some (i, _) -> i
+                   | None -> assert false) ;
+                complete_proof ();
+                main_loop WaitQed
+              end
+              else
+                main_loop ProofMode
+            | Some es -> error GoalMode es
           end
-      | WaitQed,ParsedQed ->
-          Fmt.pr "Exiting proof mode.@.";
+
+        | Prover.Gm_goal (i,f) ->
+          add_new_goal (i,f);
+          Fmt.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
+            i
+            Term.pp_formula f;
           main_loop GoalMode
-
-      | GoalMode,ParsedGoal(goal) ->
-          begin match goal with
-            | Prover.Gm_proof -> begin match start_proof () with
-                | None ->
-                    Fmt.pr "%a" pp_goal ();
-                    if is_proof_completed () then begin
-                      Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-                        (match !current_goal with
-                           | Some (i,_) -> i
-                           | None -> assert false) ;
-                      complete_proof ();
-                      main_loop WaitQed
-                    end else
-                      main_loop ProofMode
-                | Some es -> error GoalMode es end
-
-            | Prover.Gm_goal (i,f) ->
-                add_new_goal (i,f);
-                Fmt.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
-                  i
-                  Term.pp_formula f;
-                main_loop GoalMode
-          end
-
-      | GoalMode,EOF -> Fmt.pr "Goodbye!@." ; exit 0
-
-      | _,_ -> error mode "Unexpected command."
-
+      end
+    | GoalMode, EOF -> Fmt.pr "Goodbye!@." ; exit 0
+    | _, _ -> error mode "Unexpected command."
   with Failure s -> error mode s
-
 and error mode s =
   Fmt.pr "[error> %s@." s;
-  if !interactive_mode then main_loop ~save:false mode
+  if !interactive then main_loop ~save:false mode
   else exit 1
-
 
 let interactive_prover () =
   Format.printf "[start> MetaBC interactive mode.@.";
   Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  interactive_mode := true;
   try main_loop InputDescr
   with End_of_file -> Fmt.epr "End of file, exiting.@."
 
@@ -135,7 +142,6 @@ let run filename =
      option to remove it. *)
   Fmt.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   setup_lexbuf filename;
-
   main_loop InputDescr
 
 
@@ -145,7 +151,7 @@ let main () =
   if List.length !args = 0 && not !interactive then
     Arg.usage speclist usage
   else if List.length !args > 0 && !interactive then
-    Format.printf "No file arguments accepted when running in interactive mode.@."
+    Fmt.pr "No file arguments accepted when running in interactive mode.@."
   else if !interactive then
     interactive_prover ()
   else
