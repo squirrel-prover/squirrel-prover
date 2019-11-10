@@ -77,7 +77,7 @@ let repeat t j sk fk =
     | _ -> raise @@ Tactic_Hard_Failure
         "cannot repeat a tactic creating subgoals"
   in
-  t j (success_loop j) fk
+  t j (success_loop j) (fun e -> sk [j] fk)
 
 
 let lift =
