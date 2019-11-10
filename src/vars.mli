@@ -1,4 +1,4 @@
-(** Basic module for variables, usde to instantiate timestamp, index and
+(** Basic module for variables, used to instantiate timestamp, index and
     messages variables *)
 
 (** A variable type depends on an identifier counter, and on a default name *)
