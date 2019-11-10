@@ -8,6 +8,8 @@ open Logic
 (** A goal of the prover is simply a name and a formula *)
 type named_goal = string * formula
 
+(** [current_goal] describes, if not None, the goal which is currently proved.
+*)
 val current_goal : named_goal option ref
 
 (** Current mode of the prover:
@@ -28,6 +30,16 @@ type gm_input = Gm_goal of string * Term.formula | Gm_proof
 (** History management. *)
 exception Cannot_undo
 
+(** A complete proof state:
+    - [goals] contains the list of all declared goals.
+    - [current_goal], if not None, points to the global goal at the beginning of
+    the current proof.
+    - [subgoals] contains the list of all subgoals of the current proof. It
+    is initialized with the value of [current_goal].
+    - [goals_proved] contains the list of proved goals.
+    - [cpt_tag] is used to label and refer to displayed equations.
+    - [prover_mode] stores the current prover_mode.
+*)
 type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
                      subgoals : Judgment.t list;

@@ -126,9 +126,13 @@ type descr = {
 
 val pp_descr : Format.formatter -> descr -> unit
 
-(** Iterate over a complete set of action descriptions. *)
+(** Iterate over a complete set of action descriptions.
+    Does not instantiate fresh copies of the actions, as it increases
+    unecessarily the variable counters. Can be used for display purposes. *)
 val iter_csa : (descr -> unit) -> unit
 
+(** Iterate over a complete set of action descriptions, and instantiate a fresh
+    action. Can be used to introduce a new action inside the logic. *)
 val iter_fresh_csa : (descr -> unit) -> unit
 
 (** [get_descr a] returns the description corresponding to the action [a].
