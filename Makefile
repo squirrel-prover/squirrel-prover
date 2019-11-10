@@ -12,11 +12,12 @@ PROVER_TESTS = examples/lak.mbc \
 			   examples/euf_null.mbc \
 			   examples/euf_trivial.mbc \
 			   examples/euf_basic.mbc \
+			   examples/euf_output.mbc \
 			   examples/euf_output2.mbc \
 			   examples/euf_output3.mbc \
 			   examples/axiom.mbc \
 			   examples/axiom_collision_resistance.mbc \
-			   examples/euf_output.mbc \
+			   examples/collisions.mbc \
 #			   examples/macros_input.mbc \
 			   examples/macros.mbc \
 			   examples/euf.mbc
