@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* A persistent union-find data structure.
+(** A persistent union-find data structure.
 
    The datatype [t] maintains a partition of the set [0,1,...,n-1],
    where [n] is the value passed to [create]. *)

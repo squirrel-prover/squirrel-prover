@@ -15,7 +15,8 @@
 
 (* Persistent union-find = Tarjan's algorithm with persistent arrays *)
 
-(* persistent arrays; see the https://www.lri.fr/~filliatr/ftp/ocaml/ds/parray.ml.html for explanations *)
+(* persistent arrays; see the
+   https://www.lri.fr/~filliatr/ftp/ocaml/ds/parray.ml.html for explanations *)
 module Pa = struct
 
   type t = data ref
