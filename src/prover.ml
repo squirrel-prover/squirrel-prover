@@ -1,6 +1,3 @@
-(** Infrastructure for interactive proofs:
-  * proved lemmas, current lemma, current goals. *)
-
 open Logic
 open Term
 
@@ -8,24 +5,18 @@ open Term
   * TODO goals do not belong here *)
 
 type named_goal = string * formula
+
 let goals : named_goal list ref = ref []
 let current_goal : named_goal option ref = ref None
 let subgoals : Judgment.t list ref = ref []
 let goals_proved = ref []
 
-(** Current mode of the prover:
-    - [InputDescr] : waiting for the process description.
-    - [GoalMode] : waiting for the next goal.
-    - [ProofMode] : proof of a goal in progress. *)
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
-(** Goal mode input types:
-    - [Gm_goal f] : declare a new goal f.
-    - [Gm_proof] : start a proof. *)
-type gm_input = Gm_goal of string * Term.formula | Gm_proof
+type gm_input =
+  | Gm_goal of string * Term.formula
+  | Gm_proof
 
-
-(** History management *)
 
 exception Cannot_undo
 
@@ -40,7 +31,13 @@ type proof_state = { goals : named_goal list;
 let proof_states_history : proof_state list ref = ref []
 
 let save_state mode =
-  proof_states_history :=  {goals = !goals; current_goal = !current_goal; subgoals = !subgoals; goals_proved = !goals_proved; cpt_tag = !cpt_tag; prover_mode = mode }::(!proof_states_history)
+  proof_states_history :=
+    {goals = !goals;
+     current_goal = !current_goal;
+     subgoals = !subgoals;
+     goals_proved = !goals_proved;
+     cpt_tag = !cpt_tag;
+     prover_mode = mode } :: (!proof_states_history)
 
 let rec reset_state n =
   match (!proof_states_history,n) with
@@ -106,7 +103,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     | Intro -> Fmt.pf ppf "goal_intro"
     | Split -> Fmt.pf ppf "goal_and_intro"
 
-    | Apply (s,t) ->
+    | Apply (s, t) ->
         if t = [] then
           Fmt.pf ppf "apply %s" s
         else
@@ -152,7 +149,7 @@ let rec tac_apply :
     | ForallIntro -> goal_forall_intro judge sk fk
     | ExistsIntro (nu) -> goal_exists_intro nu judge sk fk
     | AnyIntro -> goal_any_intro judge sk fk
-    | Apply (gname,s) ->
+    | Apply (gname, s) ->
         let f =
           match
             List.filter (fun (name,g) -> name = gname) !goals_proved
@@ -204,8 +201,6 @@ let rec tac_apply :
      *       sk judge fk)
      *     fk *)
 
-exception Tactic_type_error of string
-
 let simpGoal =
   AndThen(Repeat AnyIntro,
           AndThen(EqNames,
@@ -214,7 +209,6 @@ let simpGoal =
                                   Try(ConstrAbsurd,Ident)))))
 
 exception Tactic_Soft_Failure of string
-
 
 (** The evaluation of a tactic, may either raise a soft failure or a hard
     failure (cf tactics.ml). A soft failure should be formatted inside the
@@ -243,15 +237,16 @@ let parse_args goalname ts : subst =
   let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
   match goals with
   | [] ->  raise @@ Failure "No proved goal with given name"
-  | [(np,gp)] ->
+  | [(np, gp)] ->
       begin
       let uvars = gp.uvars in
-      if (List.length uvars) <> (List.length ts) then raise @@ Failure "Number of parameters different than expected";
+      if (List.length uvars) <> (List.length ts) then
+        raise @@ Failure "Number of parameters different than expected";
       match !subgoals with
       | [] ->
           raise @@
           Failure "Cannot parse term with respect to empty current goal"
-      |  j ::_ ->
+      |  j :: _ ->
           let u_subst = List.map (function
             | IndexVar v -> Theory.Idx (Action.Index.name v,v)
             | TSVar v -> Theory.TS (Tvar.name v,TVar v)
@@ -276,8 +271,8 @@ type args = (string * Theory.kind) list
 let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
-  let (u_subst,ufvars) = Theory.convert_vars uargs
-  and (e_subst,efvars) = Theory.convert_vars eargs in
+  let (u_subst, ufvars) = Theory.convert_vars uargs
+  and (e_subst, efvars) = Theory.convert_vars eargs in
   let uconstr =
     Theory.convert_constr_glob
       (List.rev uargs)
@@ -306,13 +301,12 @@ let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
                   efact = efact }] }
 
 type parsed_input =
-    ParsedInputDescr
+  | ParsedInputDescr
   | ParsedQed
   | ParsedTactic of tac
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
-
 
 let add_new_goal g = goals := g :: !goals
 
@@ -340,8 +334,8 @@ let complete_proof () =
     add_proved_goal (Utils.opt_get !current_goal);
     current_goal := None;
     subgoals := []
-  with Not_found ->  raise (Tactics.Tactic_Hard_Failure "Cannot complete proof
-with empty current goal")
+  with Not_found ->  raise @@ Tactics.Tactic_Hard_Failure "Cannot complete proof
+with empty current goal"
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -374,8 +368,6 @@ let cycle i l =
   if i < 0 then cyc [] (List.length l + i) l
   else cyc [] i l
 
-(** [eval_tactic utac] applies the tactic [utac].
-    Return [true] if there are no subgoals remaining. *)
 let eval_tactic : tac -> bool = fun utac -> match utac with
   | Cycle i -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
@@ -386,9 +378,7 @@ let start_proof () = match !current_goal, !goals with
     assert (!subgoals = []);
     cpt_tag := 0;
     current_goal := Some (gname,goal);
-    subgoals := [Judgment.init goal]
-                |> auto_simp
-    ;
+    subgoals := auto_simp [Judgment.init goal];
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."
