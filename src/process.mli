@@ -1,4 +1,13 @@
-(** Bi-processes *)
+(** This module defines bi-processes and an internal representation that is
+  * useful to perform backward reachability analysis on them. It is
+  * independent of whether we perform this analysis to check correspondence or
+  * reachability properties. In particular we do not perform the folding
+  * of conditionals, since it is not necessary for correspondences. We will
+  * do it separately for equivalences. *)
+
+(** {2 Kinds}
+  * For messages, function, state and processes. For the latter,
+  * the name of variables is given together with their kinds. *)
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
@@ -13,6 +22,17 @@ type term = Theory.term
 
 type fact = Theory.fact
 
+(** {2 Front-end processes}
+  * The computational semantics is action-deterministic
+  * (e.g. existential lookup is arbitrarily made deterministic) but in the tool
+  * some constructs may be non-deterministic: we are reasoning over unknown
+  * determinizations.
+  *
+  * It may be useful in the future to check for sources of non-determinism
+  * other than existential choices. They may be useful, though, e.g. to
+  * model mixnets. *)
+
+(** Process types *)
 type process =
   | Null                                    (** Null process *)
   | New of string * process                 (** Name creation *)
@@ -53,12 +73,49 @@ val declare_system : process -> unit
 (** Reset all process declarations. *)
 val reset : unit -> unit
 
-(** TODO better terminology ?
-  *   Current type Action.t is really an action label from a finite
-  *   set of possibilities (~ locations in process AST).
-  *   Current type Action.descr represents concrete actions, obtained
-  *   by instantiating blocks with arbitrary indices. *)
+(** {2 Internal representation of processes}
+  *
+  * Processes are compiled to an internal representation used by
+  * the meta-logic. Name creations and let constructs are compiled
+  * away and process constructs are grouped to form blocks of input,
+  * followed by a tree of conditionals, with state updates and an output
+  * for each non-empty conditional. From a process we obtain a finite
+  * set of actions consisting of a sequence of choices: at each step
+  * it indicates which component of a parallel composition is chosen
+  * (possibly using newly introduced index variables), and which
+  * outcome of a tree of conditionals is chosen. We associate to each
+  * such action a behaviour block.
+  *
+  * In an execution the system, we will instantiate these symbolic
+  * actions into concrete ones, using a substitution for its
+  * index variables (which actually maps them to other index variables).
+  *
+  * Past choices are used to identify that two actions are in conflict:
+  * they are when they have the same root and their sequence of choices
+  * diverges (i.e. none is a prefix of the other).
+  *
+  * For executing a system given as a set of concrete actions,
+  * take the behaviour block of one concrete action, execute it,
+  * compute the produced actions by adding the description of
+  * the chosen branch.
+  *
+  * For backward analysis, given a set of "concrete actions" (indices
+  * instantiated by index variables, possibly non-injectively) compute
+  * a finite yet complete set of potential past actions: for each
+  * symbolic action, generate index disequality constraints to guarantee
+  * the absence of conflicts with current actions -- we are often
+  * interested in a subset of such actions, obtained e.g. via a predicate
+  * on output messages, and we will often perform this filtering as part
+  * of the construction of the complete set.
+  *
+  * For user-friendliness, some actions may be given names, typically
+  * role names via named (sub)processes. Actions are unambiguous by
+  * design, we build on them to have unique names for input variables,
+  * output terms, etc. Actions may be displayed in a simplified form
+  * (e.g. <Role>.<sequence_number>) if the choices of conditional
+  * branches is clear from the context. *)
 
+(** Type descr *)
 type descr = {
   action : Action.action ;
   indices : Action.index list ;
@@ -73,7 +130,7 @@ val pp_descr : Format.formatter -> descr -> unit
 val iter_csa : (descr -> unit) -> unit
 
 val iter_fresh_csa : (descr -> unit) -> unit
-  
+
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)
 val get_descr : Action.action -> descr
