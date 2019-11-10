@@ -8,8 +8,8 @@ open Action
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
+(** {2 Timestamps} *)
 (** Timestamps represent positions in a trace *)
-
 module Tvar : VarType
 
 type tvar = Tvar.t
@@ -23,12 +23,14 @@ val pp_timestamp : Format.formatter -> timestamp -> unit
 
 val action_of_ts : timestamp -> Action.action option
 
+(** {2 Messages } *)
 (** Messages variables for formulas **)
-
 module Mvar : VarType
 
 type mvar = Mvar.t
 
+
+(** {2 Names} *)
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and
   * a list of indices. *)
@@ -41,16 +43,15 @@ val mk_name : string -> name (* TODO *)
 
 val fresh_name : string -> name
 
+(** {2 Functions} *)
+(** Function symbols are built from a name (from a finite set)
+  * and a list of indices.
+  *
+  *)
 type nsymb = name * index list
 
 val pp_nsymb : Format.formatter -> nsymb -> unit
 
-(** Function symbols are built from a name (from a finite set)
-  * and a list of indices.
-  *
-  * TODO must include builtins such as if-then-else, equality, successor, xor ...
-  * Adrien: already added some of them
-  *)
 
 type fname = private Fname of string
 
@@ -85,10 +86,9 @@ val f_zero : fsymb
 val f_succ : fsymb
 
 
+(** {2 States} *)
 (** Memory cells are represented by state variable, themselves
   * derived from a name (from a finite set) and indices.
-  *
-  * TODO simplify design to merge name, function and state names ?
   *)
 
 type sname
@@ -110,15 +110,15 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 
 
 
-(** Terms *)
+(** {2 Terms} *)
+
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
-  | MVar of mvar      
+  | MVar of mvar
   | State of state * timestamp
-  (* | Input of timestamp *)
   | Macro of msymb * timestamp
-      
+
 type t = term
 
 val dummy : term
@@ -148,6 +148,7 @@ val in_macro : msymb
 val out_macro : msymb
 
 
+(** {2 Generic Formulas} *)
 (** Boolean formulas *)
 type 'a bformula =
   | And of 'a bformula * 'a bformula
@@ -163,7 +164,6 @@ val pp_bformula :
 
 (** [atoms b] returns the list of atoms appearing in [b] *)
 val atoms : 'a bformula -> 'a list
-
 
 (** Atomic Formulas *)
 
@@ -198,7 +198,9 @@ val add_xeq :
 
 val pp_ord : Format.formatter -> ord -> unit
 
-(** Constraints:
+(** Atomic constraints are comparisons over timestamps or indices.
+    Indices may only be compared for (dis)equality, i.e.
+    Constraints:
     - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
 type tatom =
   | Pts of timestamp _atom
@@ -213,9 +215,8 @@ val pp_constr : Format.formatter -> constr -> unit
 val constr_dnf : constr -> tatom list list
 
 
-(** Correspondence formulas *)
-
-
+(** {2 Correspondence formulas} *)
+(** Formulas depends on variables inside [fvar]. *)
 type fvar =
     TSVar of tvar
   | MessVar of mvar
@@ -225,8 +226,8 @@ val pp_typed_fvar : Format.formatter -> fvar -> unit
 
 val pp_typed_fvars : string -> Format.formatter -> fvar list -> unit
 
-
 val make_fresh_of_type : fvar -> fvar
+
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
   *   [ufact] => [postcond],
@@ -255,7 +256,9 @@ val get_indexvars :fvar list -> index list
 val pp_postcond : Format.formatter -> postcond -> unit
 val pp_formula : Format.formatter -> formula -> unit
 
-
+(** {2 Substitutions} *)
+(** Substitutions for all purpose, applicable to terms and timestamps alikes.
+    Substitutions are performed bottom to top to avoid loops. *)
 type asubst =
   | Term of term * term
   | TS of timestamp * timestamp
@@ -266,7 +269,7 @@ type subst = asubst list
 val to_isubst : subst ->  (index * index) list
 
 val from_tvarsubst : (tvar * tvar) list -> subst
-val from_isubst : (index * index) list -> subst  
+val from_isubst : (index * index) list -> subst
 val from_fvarsubst : (fvar * fvar) list -> subst
 
 val pp_subst : Format.formatter -> subst -> unit
@@ -278,9 +281,16 @@ val subst_state : subst -> state -> state
 val subst_term : subst -> term -> term
 val subst_fact : subst -> fact -> fact
 val subst_constr : subst -> constr -> constr
+
+(** Substitution in a post-condition.
+    Pre-condition: [subst_postcond subst pc] require that [subst]
+    co-domain is fresh in [pc]. *)
 val subst_postcond : subst -> postcond -> postcond
 
+(** [fresh_postcond p] instantiates [p] with fresh variables for variables
+    in p.evars *)
 val fresh_postcond : postcond ->  postcond
+
 (** [term_vars t] returns the timestamp and index variables of [t]*)
 val term_vars : term -> tvar list * index list
 
