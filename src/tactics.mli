@@ -1,18 +1,7 @@
 (** Main tactics of the prover *)
 open Logic
 
-type tac_error =
-  | Failure of string
-  | AndThen_Failure of tac_error
-
-exception Tactic_Hard_Failure of string
-
-val pp_tac_error : Format.formatter -> tac_error -> unit
-
-type 'a fk = tac_error -> 'a
-
-type ('a,'b) sk = 'a -> 'b fk -> 'b
-
+(** {2 Tactics} *)
 
 (** A tactic ['a tac] is applied to a goal with both a success continuation [sk]
     and a failure continuation [fk].
@@ -39,15 +28,28 @@ type ('a,'b) sk = 'a -> 'b fk -> 'b
 
 
 *)
+
+type tac_error =
+  | Failure of string
+  | AndThen_Failure of tac_error
+
+exception Tactic_Hard_Failure of string
+
+val pp_tac_error : Format.formatter -> tac_error -> unit
+
+type 'a fk = tac_error -> 'a
+
+type ('a,'b) sk = 'a -> 'b fk -> 'b
+
 type 'a tac =
   Judgment.t -> (Judgment.t list,'a) sk -> 'a fk -> 'a
 
-(** Utilities *)
+(** {2 Utilities} *)
 
 val remove_finished : Judgment.t list -> Judgment.t list
 val simplify : Judgment.t -> Judgment.t
 
-(** Generic tactic combinators *)
+(** {2 Generic tactic combinators} *)
 
 (** [tact_orelse t1 t2] applies [t1] with [t2] as failure continuation.
     The error message raised by [t1] is dropped.
@@ -65,7 +67,7 @@ val tact_andthen :
   Judgment.t list tac ->
   'a tac
 
-(** Basic logic-specific tactics *)
+(** {2 Basic logic-specific tactics} *)
 
 (** [goal_or_intro_l judge sk fk] returns the left side of the goal if it is
     a disjunction. Else it calls [fk] *)
@@ -109,6 +111,8 @@ val eq_names : 'a tac
 (** Add terms constraints resulting from timestamp equalities. *)
 val eq_timestamps : 'a tac
 val eq_constants : Term.fname -> 'a tac
+
+(** {2 Advanced tactics} *)
 
 (** [apply gp subst judge sk fk] applies the axiom [gp] with its universally
     quantified variables instantied with [subst], adding to [judge] its
