@@ -1,5 +1,3 @@
-(** Terms and facts *)
-
 type ord = Term.ord
 
 type action_shape = (string list) Action.t
@@ -14,24 +12,26 @@ let pp_par_choice_shape2 =
   pp_par_choice_fg
     (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
     (fun x -> x)
-    
+
+(* TODO replace term list by string list when indices are expected ? *)
+
 type term =
   | Var of string
   | Taction of action_shape
   | Name of string * term list
-      (** A name, whose arguments will always be indices. *)
+  (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
-      (** [Get (s,ots,terms)] reads the contents of memory cell
-        * [(s,terms)] where [terms] are evaluated as indices.
-        * The second argument [ots] is for the optional timestamp at which the
-        * memory read is performed. This is used for the terms appearing in
-        * goals. *)
+  (** [Get (s,ots,terms)] reads the contents of memory cell
+    * [(s,terms)] where [terms] are evaluated as indices.
+    * The second argument [ots] is for the optional timestamp at which the
+    * memory read is performed. This is used for the terms appearing in
+    * goals. *)
   | Fun of string * term list * term option
-      (** Function symbol application,
-        * where terms will be evaluated as indices or messages
-        * depending on the type of the function symbol.
-        * The third argument is for the optional timestamp. This is used for
-        * the terms appearing in goals.*)
+  (** Function symbol application,
+    * where terms will be evaluated as indices or messages
+    * depending on the type of the function symbol.
+    * The third argument is for the optional timestamp. This is used for
+    * the terms appearing in goals.*)
   | Compare of ord*term*term
 
 let pp_action_shape = Action.pp_parsed_action
@@ -65,15 +65,15 @@ type symbol_info =
   | AEnc_symbol
   | Name_symbol of int
   | Mutable_symbol of int * kind
-       (** A mutable cell, parameterized by arities,
-         * with a given content kind. *)
+  (** A mutable cell, parameterized by arities,
+    * with a given content kind. *)
   | Abstract_symbol of kind list * kind
-       (** A function symbol that, given terms of kinds [k1,...,kn]
-         * allows to form a term of kind [k]. *)
+  (** A function symbol that, given terms of kinds [k1,...,kn]
+    * allows to form a term of kind [k]. *)
   | Macro_symbol of (string*kind) list * kind * term
-       (** [Macro_symbol ([x1,k1;...;xn,kn],k,t)] defines a macro [t]
-         * with arguments [xi] of respective types [ki], and
-         * return type [k]. *)
+  (** [Macro_symbol ([x1,k1;...;xn,kn],k,t)] defines a macro [t]
+    * with arguments [xi] of respective types [ki], and
+    * return type [k]. *)
 
 let pred_fs = "pred"
 
@@ -85,7 +85,7 @@ let initialize_symbols () =
   Hashtbl.clear symbols ;
   Channel.reset () ;
   List.iter
-    (fun (s,a,k) -> Hashtbl.add symbols s (Abstract_symbol (a,k)))
+    (fun (s, a, k) -> Hashtbl.add symbols s (Abstract_symbol (a,k)))
     [ "pair", [Message;Message], Message ;
       "fst", [Message], Message ;
       "snd", [Message], Message ;
@@ -106,35 +106,39 @@ exception Unbound_identifier
 type env = (string*kind) list
 
 let function_kind name =
-  try match Hashtbl.find symbols name with
-    | Hash_symbol -> [Message;Message],Message
-    | AEnc_symbol -> [Message;Message;Message],Message
-    | Abstract_symbol (args_k,ret_k) -> args_k, ret_k
-    | Macro_symbol (args,k,_) -> List.map snd args, k
+  try
+    match Hashtbl.find symbols name with
+    | Hash_symbol -> [Message; Message],Message
+    | AEnc_symbol -> [Message; Message; Message], Message
+    | Abstract_symbol (args_k, ret_k) -> args_k, ret_k
+    | Macro_symbol (args, k, _) -> List.map snd args, k
     | _ -> assert false
   with Not_found -> assert false
 
 let check_state s n =
-  try match Hashtbl.find symbols s with
+  try
+    match Hashtbl.find symbols s with
     | Mutable_symbol (arity,kind) ->
-        if arity <> n then raise Type_error ;
-        kind
+      if arity <> n then raise Type_error ;
+      kind
     | _ -> failwith (s ^ " should be a mutable")
   with Not_found -> assert false
 
 let check_name s n =
-  try match Hashtbl.find symbols s with
+  try
+    match Hashtbl.find symbols s with
     | Name_symbol arity ->
-        if arity <> n then raise Type_error
+      if arity <> n then raise Type_error
     | _ -> assert false
   with Not_found -> assert false
 
-let rec check_term env tm kind = match tm with
+let rec check_term env tm kind =
+  match tm with
   | Var x ->
-      begin try
-          if List.assoc x env <> kind then raise Type_error;
-        with
-        | Not_found -> failwith ("unbound variable "^x) end
+    begin try
+        if List.assoc x env <> kind then raise Type_error;
+      with
+      | Not_found -> failwith ("unbound variable "^x) end
   | Taction a ->
     if kind <> Timestamp then raise Type_error ;
     if not @@ List.for_all (fun it ->
@@ -144,44 +148,46 @@ let rec check_term env tm kind = match tm with
             | Not_found -> failwith ("unbound variable "^i)
           ) indices) a
     then raise Type_error
-  | Fun (f,ts,ots) ->
-      begin match ots with
+  | Fun (f, ts, ots) ->
+    begin
+      match ots with
+      | Some ts -> check_term env ts Timestamp
+      | None -> ()
+    end;
+    let ks, f_k = function_kind f in
+    if f_k <> kind then raise Type_error ;
+    if List.length ts <> List.length ks then raise Type_error ;
+    List.iter2
+      (fun t k -> check_term env t k)
+      ts ks
+  | Get (s, opt_ts, ts) ->
+    let k = check_state s (List.length ts) in
+    if k <> kind then raise Type_error ;
+    List.iter
+      (fun t -> check_term env t Index)
+      ts;
+    begin match opt_ts with
       | Some ts -> check_term env ts Timestamp
       | None -> () end;
-      let ks,f_k = function_kind f in
-        if f_k <> kind then raise Type_error ;
-        if List.length ts <> List.length ks then raise Type_error ;
-        List.iter2
-          (fun t k -> check_term env t k)
-          ts ks
-  | Get (s,opt_ts,ts) ->
-      let k = check_state s (List.length ts) in
-        if k <> kind then raise Type_error ;
-        List.iter
-          (fun t -> check_term env t Index)
-          ts;
-        begin match opt_ts with
-          | Some ts -> check_term env ts Timestamp
-          | None -> () end;
 
-  | Name (s,ts) ->
-      check_name s (List.length ts) ;
-      if Message <> kind then raise Type_error ;
-      List.iter
-        (fun t -> check_term env t Index)
-        ts
-  | Compare (_,u,v) ->
-      if kind <> Boolean then raise Type_error ;
-      check_term env u Message ;
-      check_term env v Message
+  | Name (s, ts) ->
+    check_name s (List.length ts) ;
+    if Message <> kind then raise Type_error ;
+    List.iter
+      (fun t -> check_term env t Index)
+      ts
+  | Compare (_, u, v) ->
+    if kind <> Boolean then raise Type_error ;
+    check_term env u Message ;
+    check_term env v Message
 
 let rec check_fact env = let open Term in function
-  | And (f,g) | Or (f,g) | Impl (f,g) ->
+    | And (f,g) | Or (f,g) | Impl (f,g) ->
       check_fact env f ;
       check_fact env g
-  | Not f -> check_fact env f
-  | True | False -> ()
-  | Atom t -> check_term env t Boolean
+    | Not f -> check_fact env f
+    | True | False -> ()
+    | Atom t -> check_term env t Boolean
 
 (** Declaration functions *)
 
@@ -212,13 +218,6 @@ let clear_declarations () = Hashtbl.clear symbols
 
 (** Term builders *)
 
-(** Given a string [s] and a list of terms [l] build the term [s(l)]
-  * according to what [s] refers to: if it is a declared primitive,
-  * name or mutable cell, then its arity must be respected; otherwise
-  * it is understood as a variable and [l] must be empty.
-  * Raises [Type_error] if arities are not respected.
-  * This function is intended for parsing, at a time where type
-  * checking cannot be performed due to free variables. *)
 let make_term ?at_ts:(at_ts=None) s l =
   try match Hashtbl.find symbols s with
     | Hash_symbol ->
@@ -258,47 +257,47 @@ let make_term ?at_ts:(at_ts=None) s l =
 
 let make_action l : action_shape =
   List.map
-    (fun (p,lp,s,ls) -> Action.{ par_choice = p,lp; sum_choice = s,ls})
+    (fun (p, lp, s, ls) -> Action.{ par_choice = p, lp; sum_choice = s, ls})
     l
 
 (** Build the term representing the pair of two messages. *)
-let make_pair u v = Fun ("pair",[u;v],None)
+let make_pair u v = Fun ("pair", [u; v], None)
 
 let is_hash (Term.Fname s) =
   try Hashtbl.find symbols s = Hash_symbol
   with Not_found -> raise @@ Failure "symbol not found"
 
 (* Conversion *)
-
 type atsubst =
   | Term of string * Term.term
   | TS of string * Term.timestamp
   | Idx of string * Action.index
-             
+
 type tsubst = atsubst list
 
-
 let pp_atsubst ppf e =
-  let pp_el pp_t (t1,t2) = Fmt.pf ppf "%s->%a" t1 pp_t t2 in
+  let pp_el pp_t (t1, t2) = Fmt.pf ppf "%s->%a" t1 pp_t t2 in
   match e with
-  | Term(t1,t2) -> pp_el Term.pp_term (t1,t2)
-  | TS(ts1,ts2) -> pp_el Term.pp_timestamp (ts1,ts2)
-  | Idx(i1,i2) -> pp_el Action.Index.pp (i1,i2)
-                      
+  | Term(t1, t2) -> pp_el Term.pp_term (t1, t2)
+  | TS(ts1, ts2) -> pp_el Term.pp_timestamp (ts1, ts2)
+  | Idx(i1, i2) -> pp_el Action.Index.pp (i1, i2)
+
 let pp_tsubst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_atsubst) s
 
 
 let term_subst (s:tsubst) =
-  List.fold_left (fun acc asubst -> match asubst with Term(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+  List.fold_left (fun acc asubst ->
+      match asubst with Term(t1, t2) -> (t1, t2)::acc | _ -> acc) [] s
 
 let ts_subst (s:tsubst) =
-  List.fold_left (fun acc asubst -> match asubst with TS(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
+  List.fold_left (fun acc asubst ->
+      match asubst with TS(t1, t2) -> (t1, t2)::acc | _ -> acc) [] s
 
 let to_isubst (s:tsubst) =
-  List.fold_left (fun acc asubst -> match asubst with Idx(t1,t2) -> (t1,t2)::acc | _ -> acc) [] s
-
+  List.fold_left (fun acc asubst ->
+      match asubst with Idx(t1, t2) -> (t1, t2)::acc | _ -> acc) [] s
 
 let subst_get_index subst x =
   try List.assoc x (to_isubst subst)
@@ -317,118 +316,114 @@ let subst_get_mess subst x =
   with Not_found ->
     failwith
       (Printf.sprintf "ill-typed or undefined use of %s as message" x)
-      
+
 let conv_index subst = function
   | Var x -> subst_get_index subst x
   | _ -> failwith "ill-formed index"
 
 let convert ts subst t =
   let rec conv = function
-    | Fun (f,l,None) ->
-       begin match Hashtbl.find symbols f with
-         | Hash_symbol | AEnc_symbol ->
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | Abstract_symbol (args,_) ->
-             assert (List.for_all (fun k -> k = Message) args) ;
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | Macro_symbol (args,_,_) when
-             List.for_all (fun (_,k) -> k = Index) args ->
-             Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
-                       [])
-         | Macro_symbol (args,_,_) when
-             List.for_all (fun (_,k) -> k = Message) args ->
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | _ -> failwith "unsupported"
-       end
-    | Get (s,None,i) ->
-        let s = Term.mk_sname s in
-        let i = List.map (conv_index subst) i in
-          Term.State ((s,i),ts)
-    | Name (n,i) ->
-        let i = List.map (conv_index subst) i in
-          Term.Name (Term.mk_name n,i)
+    | Fun (f, l, None) ->
+      begin
+        match Hashtbl.find symbols f with
+        | Hash_symbol | AEnc_symbol ->
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | Abstract_symbol (args, _) ->
+          assert (List.for_all (fun k -> k = Message) args) ;
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | Macro_symbol (args, _, _) when
+            List.for_all (fun (_, k) -> k = Index) args ->
+          Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
+                    [])
+        | Macro_symbol (args, _, _) when
+            List.for_all (fun (_, k) -> k = Message) args ->
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | _ -> failwith "unsupported"
+      end
+    | Get (s, None, i) ->
+      let s = Term.mk_sname s in
+      let i = List.map (conv_index subst) i in
+      Term.State ((s, i), ts)
+    | Name (n, i) ->
+      let i = List.map (conv_index subst) i in
+      Term.Name (Term.mk_name n, i)
     | Var x -> subst_get_mess subst x
-    | Compare (o,u,v) -> assert false (* TODO *)
+    | Compare (o, u, v) -> assert false (* TODO *)
     | Taction _ -> assert false       (* reserved for constraints *)
-    | Get (_,Some _,_) | Fun (_,_,Some _) ->
+    | Get (_, Some _, _) | Fun (_, _, Some _) ->
       assert false (* reserved for global terms *)
-
   in conv t
-
 
 (* For now, we do not allow to build directly a timestamp through its name. *)
 let convert_ts subst t =
   let rec conv = function
-    | Fun (f,[t'],None) when f = pred_fs -> Term.TPred (conv t')
+    | Fun (f, [t'], None) when f = pred_fs -> Term.TPred (conv t')
     | Var x -> subst_get_ts subst x
     | Taction a ->
       let act =
         List.map
-          (fun Action.{par_choice=(p,lp);sum_choice=(s,ls)} ->
+          (fun Action.{par_choice=(p, lp);sum_choice=(s, ls)} ->
              Action.{
                par_choice = p, List.map (subst_get_index subst) lp ;
                sum_choice = s, List.map (subst_get_index subst) ls })
-          a in
+          a
+      in
       Term.TName act
     | Fun _ | Get _ | Name _ | Compare _ ->
       raise @@ Failure ("not a timestamp") in
-
   conv t
 
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 let convert_glob subst t =
   let rec conv = function
-    | Fun (f,l,None) ->
-       begin match Hashtbl.find symbols f with
-         | Hash_symbol | AEnc_symbol ->
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | Abstract_symbol (args,_) ->
-             assert (List.for_all (fun k -> k = Message) args) ;
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | Macro_symbol (args,_,_) when
-             List.for_all (fun (_,k) -> k = Index) args ->
-             Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
-                       [])
-         | Macro_symbol (args,_,_) when
-             List.for_all (fun (_,k) -> k = Message) args ->
-             Term.Fun (Term.mk_fname f, List.map conv l)
-         | _ -> failwith "unsupported"
-       end
-
-
-    | Fun (f,l,Some ts) ->
+    | Fun (f, l, None) ->
+      begin
+        match Hashtbl.find symbols f with
+        | Hash_symbol | AEnc_symbol ->
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | Abstract_symbol (args, _) ->
+          assert (List.for_all (fun k -> k = Message) args) ;
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | Macro_symbol (args, _, _) when
+            List.for_all (fun (_, k) -> k = Index) args ->
+          Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
+                    [])
+        | Macro_symbol (args, _, _) when
+            List.for_all (fun (_, k) -> k = Message) args ->
+          Term.Fun (Term.mk_fname f, List.map conv l)
+        | _ -> failwith "unsupported"
+      end
+    | Fun (f, l, Some ts) ->
       Term.Macro ( ( Term.is_declared f,
                      List.map (conv_index subst) l ),
                    convert_ts subst ts)
 
-    | Get (s,Some ts,i) ->
+    | Get (s, Some ts, i) ->
       let s = Term.mk_sname s in
       let i = List.map (conv_index subst) i in
       Term.State ((s,i), convert_ts subst ts)
-    | Name (n,i) ->
+    | Name (n, i) ->
       let i = List.map (conv_index subst) i in
       Term.Name (Term.mk_name n,i)
-    | Compare (o,u,v) -> assert false (* TODO *)
+    | Compare (o, u, v) -> assert false (* TODO *)
     | Var x ->  subst_get_mess subst x
     | Taction _ -> assert false
-    | Get (s,None,_) ->
+    | Get (s, None, _) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
-
   conv t
-
 
 let convert_atom ts subst atom =
   match atom with
-  | Compare (o,u,v) -> (o, convert ts subst u, convert ts subst v)
+  | Compare (o, u, v) -> (o, convert ts subst u, convert ts subst v)
   | _ -> assert false
 
 let convert_bformula conv_atom f =
   let open Term in
   let rec conv = function
     | Atom at -> Atom (conv_atom at)
-    | And (f,g) -> And (conv f, conv g)
-    | Or (f,g) -> Or (conv f, conv g)
-    | Impl (f,g) -> Impl (conv f, conv g)
+    | And (f, g) -> And (conv f, conv g)
+    | Or (f, g) -> Or (conv f, conv g)
+    | Impl (f, g) -> Impl (conv f, conv g)
     | Not f -> Not (conv f)
     | True -> True
     | False -> False in
@@ -447,8 +442,9 @@ let get_kind env t =
 let convert_tatom args_kind subst f : Term.tatom =
   let open Term in
   match f with
-  | Compare (o,u,v) ->
-    begin match get_kind args_kind u, get_kind args_kind v with
+  | Compare (o, u, v) ->
+    begin
+      match get_kind args_kind u, get_kind args_kind v with
       | Index, Index ->
         Pind ( o,
                conv_index subst u,
@@ -463,10 +459,9 @@ let convert_tatom args_kind subst f : Term.tatom =
 let convert_constr_glob args_kind subst f : Term.constr =
   convert_bformula (convert_tatom args_kind subst) f
 
-
 let convert_atom_glob subst atom =
   match atom with
-  | Compare (o,u,v) -> (o,
+  | Compare (o, u, v) -> (o,
                         convert_glob subst u,
                         convert_glob subst v)
   | _ -> assert false
@@ -474,27 +469,30 @@ let convert_atom_glob subst atom =
 let convert_fact_glob subst f : Term.fact =
   convert_bformula (convert_atom_glob subst) f
 
-
-(** [convert_vars vars] Returns the timestamp and index variables substitution,
-    in reverse order of declaration. By consequence, List.assoc properly handles
-    the shadowing. Variables are not renamed. *)
 let rec convert_vars vars =
   let rec conv vs =
     match vs with
-    | [] -> ([],[])
-    | (a, Index) :: l -> let (vl,acc) = conv l in
+    | [] -> ([], [])
+    | (a, Index) :: l ->
+      let (vl, acc) = conv l in
       let a_var = Action.Index.get_or_make_fresh (Term.get_indexvars acc) a in
-      (Idx(a,a_var)::vl,(Term.IndexVar a_var)::acc)
-    | (a, Timestamp) :: l -> let (vl,acc) = conv l in
+      (Idx(a, a_var)::vl, (Term.IndexVar a_var)::acc)
+
+    | (a, Timestamp) :: l ->
+      let (vl, acc) = conv l in
       let a_var = Term.Tvar.get_or_make_fresh (Term.get_tsvars acc) a in
       (TS(a, Term.TVar(a_var) )::vl,(Term.TSVar a_var)::acc)
-    | (a, Message) :: l -> let (vl,acc) = conv l in
+
+    | (a, Message) :: l ->
+      let (vl, acc) = conv l in
       let a_var = Term.Mvar.get_or_make_fresh (Term.get_messvars acc) a in
       (Term(a, Term.MVar(a_var) )::vl,(Term.MessVar a_var)::acc)
-    | _ -> raise @@ Failure "can only quantify on indices and timestamps \                                                         and messages in goals"          
+
+    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
+                             and messages in goals"
   in
-  let (res,acc) =  conv vars in
-  (List.rev res,acc)
+  let (res, acc) =  conv vars in
+  (List.rev res, acc)
 
 (** Tests *)
 let () =
@@ -534,10 +532,10 @@ let () =
       let y = Var "y" in
       let t = make_term "e" [make_term "h" [x;y];x;y] in
       let env = ["x",Message;"y",Message] in
-        check_term env t Message ;
-        Alcotest.check_raises
-          "message is not a boolean"
-          Type_error
-          (fun () -> check_term env t Boolean)
+      check_term env t Message ;
+      Alcotest.check_raises
+        "message is not a boolean"
+        Type_error
+        (fun () -> check_term env t Boolean)
     end
   ]
