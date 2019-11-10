@@ -13,7 +13,7 @@
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO CONGRUENCE APPLY TO
-%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT
+%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION
 %token PROOF QED UNDO
 %token EOF
 
@@ -235,6 +235,7 @@ tac:
   | NOTRACES                          { Prover.ConstrAbsurd }
   | EQNAMES                           { Prover.EqNames }
   | EQTIMESTAMPS                      { Prover.EqTimestamps }
+  | COLLISION                         { Prover.CollisionResistance }
   | EUF i=INT                         { Prover.Euf i }
   | CYCLE i=INT                       { Prover.Cycle i }
   | CYCLE MINUS i=INT                 { Prover.Cycle (-i) }

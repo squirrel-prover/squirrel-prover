@@ -97,6 +97,7 @@ rule token = parse
 | "eqnames"           { EQNAMES }
 | "eqtimestamps"      { EQTIMESTAMPS }
 | "euf"               { EUF }
+| "collision"         { COLLISION }
 | "cycle"             { CYCLE }
 | "undo"              { UNDO }
 | "ident"             { IDENT }

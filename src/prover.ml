@@ -91,6 +91,7 @@ type tac =
   | Repeat : tac -> tac
 
   | Euf : int -> tac
+  | CollisionResistance : tac
   | Cycle : int -> tac
 
 let rec pp_tac : Format.formatter -> tac -> unit =
@@ -133,6 +134,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     (* | TacPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_tac ut *)
 
     | Euf i -> Fmt.pf ppf "euf %d" i
+    | CollisionResistance -> Fmt.pf ppf "collision resistance"
     | Cycle i -> Fmt.pf ppf "cycle %d" i
 
 let rec tac_apply :
@@ -175,7 +177,7 @@ let rec tac_apply :
       euf_apply f_select judge sk fk
 
     (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
-
+    | CollisionResistance -> collision_resistance judge sk fk
     | AndThen (tac,tac') ->
       tact_andthen
         (tac_apply tac)

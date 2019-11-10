@@ -86,6 +86,7 @@ type tac =
   | Repeat : tac -> tac
 
   | Euf : int -> tac
+  | CollisionResistance : tac
   | Cycle : int -> tac
 
 val pp_tac : Format.formatter -> tac -> unit

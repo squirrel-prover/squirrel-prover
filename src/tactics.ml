@@ -423,3 +423,42 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       ) judge new_truths
   in
   sk [new_judge; judge] fk
+
+
+let collision_resistance (judge : Judgment.t) sk fk =
+  let judge = Judgment.update_trs judge in
+  let hashes = List.filter
+      (fun t -> match t with
+         | Fun ((hash, _), [m; Name key]) -> Theory.is_hash hash
+         | _ -> false)
+      (Gamma.get_all_terms judge.Judgment.gamma)
+  in
+  let rec make_eq hash_list =
+    match hash_list with
+    | [] -> []
+    | h1::q -> List.fold_left (fun acc h2 ->
+        match h1, h2 with
+        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+          when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
+        | _ -> acc
+      ) [] q
+  in
+  let hash_eqs = make_eq hashes
+                 |> List.filter (fun eq -> Completion.check_equalities
+                                    (Gamma.get_trs judge.Judgment.gamma) [eq])
+  in
+  let new_facts =
+    List.fold_left (fun acc (h1,h2) ->
+        match h1, h2 with
+        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+          when hash = hash2 && key1 = key2 ->
+          Atom (Eq, m1, m2) :: acc
+        | _ -> acc
+      ) [] hash_eqs
+  in
+  let judge =
+    List.fold_left (fun judge f ->
+        Judgment.add_fact f  judge
+      ) judge new_facts
+  in
+  sk [judge] fk

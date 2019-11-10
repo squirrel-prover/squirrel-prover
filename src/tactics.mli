@@ -124,3 +124,9 @@ val apply : Term.formula -> Term.subst -> 'a tac
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
 val euf_apply : (Term.atom -> Logic.tag -> bool) -> 'a tac
+
+(** [collision_resistance judge sk fk] collects all equalities between hash,
+    and add to Gamma the equality of the messages if the hash and the key are
+    identical.
+*)
+val collision_resistance : 'a tac
