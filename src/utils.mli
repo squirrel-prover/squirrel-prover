@@ -1,3 +1,5 @@
+(** Utility modules. *)
+
 module List : sig
   include module type of struct include List end
 
