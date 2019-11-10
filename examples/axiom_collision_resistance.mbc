@@ -7,6 +7,10 @@ name n : index->message
 (* TODO having a new n under the ! should be equivalent;
         it does not seem to be the case at the moment *)
 
+axiom collision_resistance :
+forall ( ma : message, mb : message, k:message) :
+h(ma,k)=h(mb,k) => exists () : ma = mb
+
 system !_a out(c,h(n(a),k)).
 
 goal unforgeable :
@@ -16,6 +20,9 @@ goal unforgeable :
 
 Proof.
 
-  euf 0.
-
+apply collision_resistance to
+    n(b),
+    n(a),
+    k.
+ 
 Qed.
