@@ -24,8 +24,7 @@ test: sanity
 	$(OCB) test.byte
 	./test.byte
 	@echo ""
-	# TODO the make target should fail if one test below fails
-	@tests = 0 ; failures=0 ; for f in $(PROVER_TESTS) ; do \
+	@tests=0 ; failures=0 ; for f in $(PROVER_TESTS) ; do \
 	  echo -n "Running prover on $$f... " ; \
 	  tests=$$((tests+1)) ; \
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
