@@ -25,7 +25,7 @@ let setup_lexbuf fname =
 let parse_next parser_fun =
   if !interactive then
     (* Requires input to be one-line long. *)
-    let lexbuf =  Lexing.from_string (read_line ()) in
+    let lexbuf =  Lexing.from_channel stdin in
     parser_fun lexbuf "new input"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
