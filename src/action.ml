@@ -73,7 +73,7 @@ let same_shape a b =
   | [],[] -> Some acc
   | [], _ | _, [] -> None
   | i :: l, i' :: l' ->
-    let p,lp = i.par_choice and p',lp' = i'.par_choice in    
+    let p,lp = i.par_choice and p',lp' = i'.par_choice in
     let s,ls = i.sum_choice and s',ls' = i'.sum_choice in
     if p = p' && List.length lp = List.length lp' &&
        s = s' && List.length ls = List.length ls'
@@ -82,7 +82,7 @@ let same_shape a b =
       let acc'' = List.map2 (fun i i' -> i,i') ls ls' in
       same (acc'' @ acc' @ acc) l l'
     else None in
-  same [] a b 
+  same [] a b
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
   * [a] and [b] equal, if there is one.
