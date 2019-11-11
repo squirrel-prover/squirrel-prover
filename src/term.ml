@@ -41,7 +41,7 @@ type name = Name of string
 (* TODO declarations, freshness conditions ? *)
 let mk_name x = Name x
 let fresh_name x = Name x
-let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf ("n!"^s)
+let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf s
 
 type nsymb = name * index list
 let pp_nsymb ppf (n,is) =
@@ -90,7 +90,7 @@ let f_succ = (Fname "succ", [])
 type sname = Sname of string
 let mk_sname x = Sname x
 
-let pp_sname ppf = function Sname s -> (Utils.kw `Red) ppf ("s!"^s)
+let pp_sname ppf = function Sname s -> (Utils.kw `Red) ppf s
 
 type state = sname * index list
 
@@ -104,7 +104,7 @@ type msymb = mname * index list
 
 let pp_mname ppf s =
   let open Fmt in
-  (styled `Bold (styled `Magenta Utils.ident)) ppf ("m!"^s)
+  (styled `Bold (styled `Magenta Utils.ident)) ppf s
 
 let pp_msymb ppf (m,is) =
   Fmt.pf ppf "%a%a"
@@ -122,7 +122,14 @@ type term =
 let dummy = Fun ((Fname "_", []), [])
 
 let rec pp_term ppf = function
-  | Fun (f, terms) ->
+  | Fun ( (Fname s,ids) , terms) ->
+    if s = "pair" then
+    Fmt.pf ppf "%a"
+      (Utils.pp_ne_list
+         "<@[<hov>%a@]>"
+         (Fmt.list ~sep:Fmt.comma pp_term)) terms
+    else
+      let f =  (Fname s,ids) in
     Fmt.pf ppf "%a%a"
       pp_fsymb f
       (Utils.pp_ne_list
@@ -472,9 +479,6 @@ let pp_formula ppf f =
                (styled `Red (styled `Underline ident)) "@;\\/")
          pp_postcond) l
 
-
-(** Substitutions for all purpose, applicable to terms and timestamps alikes **)
-(** substitutions are performed bottom to top to avoid loops **)
 
 type asubst =
   | Term of term * term
