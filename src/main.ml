@@ -5,50 +5,64 @@ open Logic
 
 let () = Printexc.record_backtrace true
 
+exception Parse_error of string
 
 let parse_from_buf ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
   try parse_fun Lexer.token lexbuf with
   | Parser.Error as e ->
-    if not(interactive) then
-      (
-    Printexc.print_backtrace Pervasives.stderr;
-    Format.printf
-      "@[Error in %S @,at line %d char %d @,\
-       before %S.@]@."
-      filename
-      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf) );
-    if test || interactive then raise e else exit 1
-  | Failure s as e ->
-    if not(interactive) then
-      (    
-    Format.printf
-      "@[Error in %S @,at line %d char %d @,\
-       before %S: @,%s.@]@."
-      filename
-      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf)
-      s );
-    if test || interactive then raise e else exit 1
+    let error = Fmt.strf
+        "@[Error in %s @,at line %d char %d @,\
+         before %S.@]@."
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf) in
+    if interactive then
+      raise @@ Parse_error error
+    else if test then
+      raise e
+    else
+      begin
+        Fmt.pr "%s" error;
+        exit 1
+      end
+  | Failure s ->
+    let error = Fmt.strf
+        "@[Error in %s @,at line %d char %d @,\
+         before %S: @,%s.@]@."
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf)
+        s
+    in
+    if interactive then
+      raise @@ Parse_error error
+    else if test then
+      raise @@ Failure error
+    else
+      Fmt.pr "%s" error;
+    exit 1
   | e ->
-    if not(interactive) then
-      (
-    Printexc.print_backtrace Pervasives.stderr;
-    Format.printf
-      "@[Error @,\
-       in %S @,at line %d char %d @,\
-       before %S: @,%s.@]@."
-      filename
-      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-      (Lexing.lexeme lexbuf)
-      (Printexc.to_string e)) ;
-    if test || interactive then raise e else exit 1
+    let error = Fmt.strf
+        "%s@.
+      @[Error in %s @,at line %d char %d @,\
+         before %S: @,%s.@]@."
+        (Printexc.get_backtrace ())
+        filename
+        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+        (Lexing.lexeme lexbuf)
+        (Printexc.to_string e)
+    in
+    if test || interactive then raise e else
+      begin
+        Fmt.pr "%s" error;
+        exit 1
+      end
 
 let parse_theory_buf ?(test=false) lexbuf filename =
   Theory.initialize_symbols () ;
@@ -70,7 +84,7 @@ let parse_process string =
 
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
-    parse_theory_buf ~test lexbuf filename
+  parse_theory_buf ~test lexbuf filename
 
 let () =
   Checks.add_suite "Parsing" [

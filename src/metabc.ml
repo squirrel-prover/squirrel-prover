@@ -1,5 +1,3 @@
-(** Main Module, instantiate both an interactive or a file mode. *)
-
 open Logic
 open Utils
 
@@ -28,18 +26,13 @@ let parse_next parser_fun =
   if !interactive then
     (* Requires input to be one-line long. *)
     let lexbuf =  Lexing.from_string (read_line ()) in
-    parser_fun lexbuf "interactive"
+    parser_fun lexbuf "new input"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
 
 open Prover
 open Tactics
 
-(** The main loop of the prover. The mode defines in what state the prover is,
-    e.g is it waiting for a proof script, or a systemn description, etc.
-    [save] allows to specify is the current state must be saved, so that
-    one can backtrack.
-*)
 let rec main_loop ?(save=true) mode =
   if !interactive then Fmt.pr "[>@.";
   (* Initialize definitions before parsing system description *)
@@ -125,7 +118,10 @@ let rec main_loop ?(save=true) mode =
       end
     | GoalMode, EOF -> Fmt.pr "Goodbye!@." ; exit 0
     | _, _ -> error mode "Unexpected command."
-  with Failure s -> error mode s
+  with
+  | Failure s -> error mode s
+  | Main.Parse_error s -> error mode s
+                            
 and error mode s =
   Fmt.pr "[error> %s@." s;
   if !interactive then main_loop ~save:false mode
