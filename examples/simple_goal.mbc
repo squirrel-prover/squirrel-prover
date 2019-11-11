@@ -4,4 +4,4 @@ name n2:message
 (* other test *)
 channel c
 system out(c,n1).
-goal forall (tau:timestamp) : (n1 <> n2) and (n2 = n2).
+goal forall (tau:timestamp), (n1 <> n2) && (n2 = n2).

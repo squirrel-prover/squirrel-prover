@@ -100,7 +100,7 @@ let () =
       Theory.initialize_symbols () ;
       Theory.declare_abstract "p" [] Theory.Boolean ;
       Channel.declare "c" ;
-      ignore (parse_process "if p and p() then out(c,ok)") ;
+      ignore (parse_process "if p && p() then out(c,ok)") ;
       ignore (parse_process "if p() = p then out(c,ok)")
     end
   ];;

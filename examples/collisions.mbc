@@ -11,7 +11,7 @@ name mc : index -> message
 
 
 axiom name_not_pair :
-forall (ma : message, mb : message, a:index) :
+forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>
 
 system  out(c,cst);
@@ -24,15 +24,15 @@ system  out(c,cst);
 
 goal dummy :
   forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
-  such that tau1 = tau2:
+  such that tau1 = tau2,
   output@tau1= output@tau2.
 Proof.
 Qed.
 
 goal unforgeable_1 :
   forall (a : index, b : index)
-  such that b <> a:
-  output@0_0[b] = h(na(a),k) => exists () : false.
+  such that b <> a,
+  output@0_0[b] <> h(na(a),k).
 
 Proof.
   collision.
@@ -40,8 +40,8 @@ Qed.
 
 goal unforgeable_2 :
   forall (a : index, b : index)
-  such that b <> a:
-  output@0_1[b] = h(na(a),k) => exists () : false.
+  such that b <> a,
+  output@0_1[b] <> h(na(a),k).
 
 Proof.
   collision.
@@ -55,8 +55,8 @@ Qed.
 
 goal unforgeable_3 :
   forall (a : index, b : index)
-  such that b <> a:
-  output@0_2[b] = h(na(a),k) => exists () : false.
+  such that b <> a,
+  output@0_2[b] <> h(na(a),k).
 
 Proof.
   collision.

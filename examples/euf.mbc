@@ -11,7 +11,7 @@ name mc : index -> message
 mutable input : message
 
 axiom name_not_pair :
-forall (ma : message, mb : message, a:index) :
+forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>
 
 system  out(c,cst);
@@ -21,8 +21,8 @@ system  out(c,cst);
  ).
 
 goal unforgeable :
-  forall (tau : timestamp, m : message):
-  input@tau = h(m,k) => exists (a:index): m = na(a).
+  forall (tau : timestamp, m : message),
+  input@tau = h(m,k) => exists (a:index), m = na(a).
 Proof.
     euf 0.  
     existsintro index_6.

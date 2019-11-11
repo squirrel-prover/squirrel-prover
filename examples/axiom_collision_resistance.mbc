@@ -8,15 +8,15 @@ name n : index->message
         it does not seem to be the case at the moment *)
 
 axiom collision_resistance :
-forall ( ma : message, mb : message, k:message) :
-h(ma,k)=h(mb,k) => exists () : ma = mb
+forall ( ma : message, mb : message, k:message),
+h(ma,k)=h(mb,k) => ma = mb
 
 system !_a out(c,h(n(a),k)).
 
 goal unforgeable :
   forall (a:index, b:index)
-  such that b <> a:
-  output@0[b] = h(n(a),k) => exists () : false.
+  such that b <> a,
+  output@0[b] <> h(n(a),k).
 
 Proof.
 

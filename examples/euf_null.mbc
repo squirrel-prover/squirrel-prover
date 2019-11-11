@@ -6,9 +6,7 @@ name m : message
 system null.
 
 goal one :
-
-  forall ():
-  h(m,k) = h(n,k) => exists () : false.
+  h(m,k) <> h(n,k).
 
 Proof.
 
@@ -17,9 +15,7 @@ Proof.
 Qed.
 
 goal two :
-
-  forall ():
-  n = h(n,k) => exists () : false.
+  n <> h(n,k).
 
 Proof.
 

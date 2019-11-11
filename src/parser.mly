@@ -207,14 +207,18 @@ formula:
 | fact                           { ( ([],Term.True),
 				     ([],Term.True),
 				     Term.True, $1 ) }
-| EXISTS q_vars COLON fact       { ( ([],Term.True),
+| EXISTS q_vars COMMA fact       { ( ([],Term.True),
                    	             $2,
 				     Term.True, $4 ) }
-| FORALL q_vars COLON fact       { ( $2,
+| FORALL q_vars COMMA fact       { ( $2,
 				     ([],Term.True),
 				     Term.True, $4 ) }
-| FORALL q_vars COLON fact DARROW EXISTS q_vars COLON fact
-                                 { ($2, $7, $4, $9) }
+| FORALL q=q_vars COMMA f=fact DARROW EXISTS q2=q_vars COMMA f2=fact
+                                 { (q, q2, f, f2) }
+| FORALL q=q_vars COMMA EXISTS q2=q_vars COMMA f2=fact
+                                 { (q, q2, Term.True, f2) }
+| FORALL q_vars COMMA fact DARROW fact
+                                 { ($2, ([], Term.True) , $4, $6) }
 
 tactic_params:
 |                               { [] }

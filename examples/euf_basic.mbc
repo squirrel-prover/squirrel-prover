@@ -8,8 +8,8 @@ system out(c,h(n,k)).
 
 goal collision_absurd :
 
-  forall (tau:timestamp)
-  : output@tau = h(m,k) => exists () : false.
+  forall (tau:timestamp),
+  output@tau <> h(m,k).
 
 Proof.
 

@@ -11,8 +11,8 @@ name m : message
 system !_a out(c,h(n,k)).
 
 goal unforgeable :
-  forall (tau:timestamp) :
-  output@tau = h(m,k) => exists () : false.
+  forall (tau:timestamp),
+  output@tau <> h(m,k).
 
 Proof.
 

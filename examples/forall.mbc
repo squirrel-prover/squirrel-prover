@@ -11,8 +11,7 @@
 system null.
 
 goal test :
-  forall (x:timestamp, x:index, x:message)
-  such that true: (* TODO this should be optional *)
+  forall (x:timestamp, x:index, x:message),
   x=x.
 Proof.
 Qed.

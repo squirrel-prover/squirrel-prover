@@ -44,10 +44,10 @@ system ((!_j reader(j)) | (!_i !_j tag(i))).
  * the implicit treatment might not work is that of unreachability
  * statements: forall k, not(happens(def(0[k]_0))). *)
 goal wa :
-  forall (k:index, p:index):
+  forall (k:index, p:index),
   output@0[k]_0/0[p] = output@0[k]_0/0[p] =>
   exists (i:index,j:index) such that
-  0[k]_0/0[p] < 1[i,j]:
+  0[k]_0/0[p] < 1[i,j],
   input@0[k]_0/0[p] = output@1[i,j].
 Proof.
   euf 1.

@@ -5,14 +5,14 @@ name k:message
 
 
 axiom dummy_false_axiom :
-forall (ma : message) :
-true => exists (m:message) : m=k and ma=k
+forall (ma : message),
+exists (m:message), m=k && ma=k
 
 
 system  null.
 
 goal dummy :
-forall (ma : message) :
+forall (ma : message),
 ma=k.
 
 Proof.

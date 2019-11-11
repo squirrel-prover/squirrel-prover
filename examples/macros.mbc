@@ -3,6 +3,7 @@ term t : message = n
 
 system null.
 
-goal forall (): t=n.
+goal 
+  t=n.
 Proof.
 Qed.
