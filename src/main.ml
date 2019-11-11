@@ -41,7 +41,7 @@ let parse_from_buf ?(test=false) ?(interactive=false) parse_fun lexbuf filename 
     if interactive then
       raise @@ Parse_error error
     else if test then
-      raise @@ Failure error
+      raise @@ Failure s
     else
       Fmt.pr "%s" error;
     exit 1
