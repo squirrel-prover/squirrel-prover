@@ -123,55 +123,55 @@ let () =
   let test = true in
   Checks.add_suite "Models" [
     "Null model", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/null.mbc"
+      parse_theory_test ~test "tests/alcotest/null.mbc"
     end ;
     "Simple model", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/process.mbc"
+      parse_theory_test ~test "tests/alcotest/process.mbc"
     end ;
     "Name declaration", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/name.mbc"
+      parse_theory_test ~test "tests/alcotest/name.mbc"
     end ;
     "Pairs", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/pairs.mbc"
+      parse_theory_test ~test "tests/alcotest/pairs.mbc"
     end ;
     "Basic theory", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/theory.mbc"
+      parse_theory_test ~test "tests/alcotest/theory.mbc"
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "multiple declarations")
-        (fun () -> parse_theory_test ~test "examples/multiple.mbc")
+        (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
     "Block creation", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/blocks.mbc"
+      parse_theory_test ~test "tests/alcotest/blocks.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Let in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/block_let.mbc"
+      parse_theory_test ~test "tests/alcotest/block_let.mbc"
       (* TODO test resulting block structure *)
     end ;
     "New in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/block_name.mbc"
+      parse_theory_test ~test "tests/alcotest/block_name.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Find in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/block_find.mbc"
+      parse_theory_test ~test "tests/alcotest/block_find.mbc"
       (* TODO test resulting block structure *)
     end ;
     "Updates in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/block_set.mbc"
+      parse_theory_test ~test "tests/alcotest/block_set.mbc"
       (* TODO test resulting block structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
-      parse_theory_test ~test "examples/lak.mbc"
+      parse_theory_test ~test "tests/alcotest/lak.mbc"
     end ;
     "LAK model, again", `Quick, begin fun () ->
       (* We do this again, on purpose, to check that all definitions
        * from the previous run are gone. The macros from Term used
        * to not be re-initialized. *)
-      parse_theory_test ~test "examples/lak.mbc"
+      parse_theory_test ~test "tests/alcotest/lak.mbc"
     end ;
     (* "Simple goal", `Quick, begin fun () ->
-     *   parse_theory_test ~test "examples/simple_goal.mbc"
+     *   parse_theory_test ~test "tests/alcotest/simple_goal.mbc"
      * end ; *)
   ];;

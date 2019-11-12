@@ -5,29 +5,34 @@ OCB = ocamlbuild $(OCB_FLAGS)
 
 all: metabc test
 
-PROVER_TESTS = examples/lak.mbc \
-			   examples/forall.mbc \
-			   examples/equality_propagation.mbc \
-			   examples/input.mbc \
-			   examples/euf_null.mbc \
-			   examples/euf_trivial.mbc \
-			   examples/euf_basic.mbc \
-			   examples/euf_output.mbc \
-			   examples/euf_output2.mbc \
-			   examples/euf_output3.mbc \
-			   examples/euf.mbc \
-			   examples/axiom.mbc \
-			   examples/axiom_collision_resistance.mbc \
-			   examples/collisions.mbc \
-#			   examples/macros_input.mbc \
-			   examples/macros.mbc \
-			   examples/euf.mbc
+PROVER_OK_TESTS = tests/ok/forall.mbc \
+			   tests/ok/equality_propagation.mbc \
+			   tests/ok/input.mbc \
+			   tests/ok/euf_null.mbc \
+			   tests/ok/euf_trivial.mbc \
+			   tests/ok/euf_basic.mbc \
+			   tests/ok/euf_output.mbc \
+			   tests/ok/euf_output2.mbc \
+			   tests/ok/euf_output3.mbc \
+			   tests/ok/euf.mbc \
+			   tests/ok/axiom.mbc \
+			   tests/ok/axiom_collision_resistance.mbc \
+			   tests/ok/collisions.mbc \
+#			   tests/ok/macros_input.mbc \
+			   tests/ok/macros.mbc \
+			   tests/ok/euf.mbc
 
-test: sanity
+PROVER_FAIL_TESTS = tests/fail/existsintro_fail.mbc \
+
+test: alcotest ok_test fail_test
+
+alcotest: sanity
 	$(OCB) test.byte
 	./test.byte
-	@echo ""
-	@tests=0 ; failures=0 ; for f in $(PROVER_TESTS) ; do \
+
+ok_test: sanity
+	@echo "\n --- Running tests that must succeed --- \n"
+	@tests=0 ; failures=0 ; for f in $(PROVER_OK_TESTS) ; do \
 	  echo -n "Running prover on $$f... " ; \
 	  tests=$$((tests+1)) ; \
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
@@ -35,6 +40,18 @@ test: sanity
 	done ; \
 	echo "Total: $$tests tests, $$failures failures." ; \
 	test $$failures -eq 0
+
+fail_test: sanity
+	@echo "\n --- Running tests that must fail --- \n"
+	@tests=0 ; failures=0 ; for f in $(PROVER_FAIL_TESTS) ; do \
+	  echo -n "Running prover on $$f... " ; \
+	  tests=$$((tests+1)) ; \
+	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
+	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
+	done ; \
+	echo "Total: $$tests tests, $$failures failures." ; \
+	test $$failures -eq $$tests
+
 
 clean:
 	$(OCB) -clean
