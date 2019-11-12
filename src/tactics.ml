@@ -175,10 +175,20 @@ let goal_exists_intro nu (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
   | Postcond p ->
     let pc_constr = subst_constr nu p.econstr in
+    let rec to_cnf c = match c with
+      | Atom a -> [a]
+      | True -> []
+      | And (a, b) -> (to_cnf a) @ (to_cnf b)
+      | _ -> raise @@ Tactic_Hard_Failure
+          "Can only introduce existantial with constraints
+restricted to conjunctions."
+    in
+    let constr_list = to_cnf pc_constr in
+    if not( Theta.is_valid judge.Judgment.theta constr_list) then
+      raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint";
     let judge =
       Judgment.set_formula
         (Fact (subst_fact nu p.efact)) judge
-      |> Judgment.add_constr pc_constr
     in
     sk [judge] fk
   | _ -> fk (Failure "Cannot introduce an existantial which does not exists")
