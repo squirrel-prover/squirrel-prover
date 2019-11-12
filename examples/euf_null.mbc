@@ -1,24 +1,35 @@
+(** This test should fail, euf unsound when system null ! *)
+
 hash h
-name k : message
+name k:message
+name cst:message
+
+channel c
+
 name n : message
-name m : message
+
+
+axiom name_not_pair :
+forall (ma : message, mb : message),
+n <>  <ma, mb>
 
 system null.
 
-goal one :
-  h(m,k) <> h(n,k).
 
+goal cheat :
+forall (m1: message, m2:message, m3:message),
+h(m3,k) = m1 => m3 <> m2  .
 Proof.
-
-  euf 0.
-
+euf 0.
 Qed.
 
-goal two :
-  n <> h(n,k).
+
+goal abs :
+false .
 
 Proof.
-
-  euf 0.
-
+apply cheat to
+h(n,k),
+n,
+n.
 Qed.

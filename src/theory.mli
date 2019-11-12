@@ -94,6 +94,8 @@ type tsubst = atsubst list
 
 val pp_tsubst : Format.formatter -> tsubst -> unit
 
+val conv_index : tsubst -> term -> Action.index
+
 (** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
   Term.timestamp ->

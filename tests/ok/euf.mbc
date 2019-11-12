@@ -21,9 +21,9 @@ system  out(c,cst);
  ).
 
 goal unforgeable :
-  forall (tau : timestamp, m : message),
-  input@tau = h(m,k) => exists (a:index), m = na(a).
+  forall (tau : timestamp, m : message, b:index),
+  input@tau = h(m,k) => exists (a:index),  m = na(a).
 Proof.
     euf 0.  
-    existsintro index_6.
+    existsintro index_7.
 Qed.
