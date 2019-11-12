@@ -178,7 +178,7 @@ let goal_exists_intro nu (judge : Judgment.t) sk fk =
     let judge =
       Judgment.set_formula
         (Fact (subst_fact nu p.efact)) judge
-      |> Judgment.add_constr (Not pc_constr)
+      |> Judgment.add_constr pc_constr
     in
     sk [judge] fk
   | _ -> fk (Failure "Cannot introduce an existantial which does not exists")
