@@ -1,0 +1,25 @@
+(** This test should fail, euf unsound when system null ! *)
+
+hash h
+name k:message
+name cst:message
+
+channel c
+
+name n : message
+
+
+axiom name_not_pair :
+forall (ma : message, mb : message),
+n <>  <ma, mb>
+
+system null.
+
+
+goal unforgeable_1 :
+forall (m1: message, m2:message, a: index),
+h(n,k) = m1 
+=> n <> m2  .
+Proof.
+euf 0.
+Qed.
