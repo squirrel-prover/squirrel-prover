@@ -562,9 +562,10 @@ let rec subst_action (s : subst) (a : action) =
   match a with
   | [] -> []
   | a :: l ->
-    let p, sis = a.par_choice in
-    { par_choice = p, List.map (get_index_subst s) sis;
-      sum_choice = a.sum_choice }
+    let p,lp = a.par_choice in
+    let q,lq = a.sum_choice in
+    { par_choice = p, List.map (get_index_subst s) lp ;
+      sum_choice = q, List.map (get_index_subst s) lq }
     :: subst_action s l
 
 let subst_state (s : subst) ((st, is) : state) =
