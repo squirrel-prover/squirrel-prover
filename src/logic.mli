@@ -81,10 +81,12 @@ type typed_formula =
 
 (** Judgments are the sequents of our proof system *)
 module Judgment : sig
-  type judgment = { vars : fvar list;
-                    theta : Theta.theta;
-                    gamma : Gamma.gamma;
-                    formula : typed_formula; }
+  type judgment = private {
+    vars : fvar list;
+    theta : Theta.theta;
+    gamma : Gamma.gamma;
+    formula : typed_formula;
+  }
 
   type t = judgment
 

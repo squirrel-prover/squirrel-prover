@@ -271,10 +271,12 @@ module Judgment : sig
       - [theta.models] store the last minimal models of [theta.constr].
       - [gamma] is the judgment context.
       - [goal] contains the current goal, which is of type 'a. *)
-  type judgment = { vars : fvar list;
-                    theta : Theta.theta;
-                    gamma : Gamma.gamma;
-                    formula : typed_formula; }
+  type judgment = private {
+    vars : fvar list;
+    theta : Theta.theta;
+    gamma : Gamma.gamma;
+    formula : typed_formula;
+  }
 
   type t = judgment
 
@@ -298,10 +300,12 @@ module Judgment : sig
   val set_gamma : Gamma.gamma -> judgment ->  judgment
 
 end = struct
-  type judgment = { vars : fvar list;
-                       theta : Theta.theta;
-                       gamma : Gamma.gamma;
-                       formula : typed_formula; }
+  type judgment = {
+    vars : fvar list;
+    theta : Theta.theta;
+    gamma : Gamma.gamma;
+    formula : typed_formula;
+  }
 
   type t = judgment
 
