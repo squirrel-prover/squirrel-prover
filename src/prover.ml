@@ -246,9 +246,8 @@ let parse_subst j uvars ts : subst =
             | TSVar a, t -> TS (TVar a, Theory.convert_ts u_subst t )
             | MessVar a, t -> Term (MVar a, Theory.convert_glob u_subst t)
 
-            | IndexVar a, Theory.Var iname ->
-                Index (a, Action.Index.get_or_make_fresh
-                            (Term.get_indexvars j.Judgment.vars) iname)
+            | IndexVar a, t ->
+                Index (a, Theory.conv_index u_subst t)
             | _ ->  raise @@ Failure "Type error in the arguments"
           ) ts uvars
 

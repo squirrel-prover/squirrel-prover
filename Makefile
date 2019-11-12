@@ -23,6 +23,7 @@ PROVER_OK_TESTS = tests/ok/forall.mbc \
 			   tests/ok/euf.mbc
 
 PROVER_FAIL_TESTS = tests/fail/existsintro_fail.mbc \
+			tests/fail/existsintro_fail2.mbc \
 
 test: alcotest ok_test fail_test
 
