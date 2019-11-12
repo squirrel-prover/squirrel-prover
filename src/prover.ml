@@ -73,6 +73,7 @@ type tac =
   | Split : tac
 
   | Apply : (string * subst) -> tac
+  | Assert : Term.fact -> tac
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
@@ -110,6 +111,8 @@ let rec pp_tac : Format.formatter -> tac -> unit =
           Fmt.pf ppf "apply %s" s
         else
           Fmt.pf ppf "apply %s to .." s
+    | Assert f ->
+        Fmt.pf ppf "assert %a" Term.pp_fact f
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->
@@ -162,6 +165,7 @@ let rec tac_apply :
             | _ -> raise @@ Failure "Multiple proved goals with the same name"
         in
         apply f s judge sk fk
+    | Assert f -> tac_assert f judge sk fk
     | Left -> goal_or_intro_l judge sk fk
     | Right -> goal_or_intro_r judge sk fk
     | Split -> goal_and_intro judge sk fk
@@ -236,12 +240,22 @@ let auto_simp judges =
   |> List.map Tactics.simplify
   |> Tactics.remove_finished
 
+let tsubst_of_judgment j =
+  List.map
+    (function
+       | IndexVar v -> Theory.Idx (Action.Index.name v,v)
+       | TSVar v -> Theory.TS (Tvar.name v,TVar v)
+       | MessVar v -> Theory.Term (Mvar.name v,MVar v))
+    j.Judgment.vars
+
+let parse_fact fact =
+  match !subgoals with
+    | [] -> failwith "Cannot parse fact without a goal"
+    | j::_ ->
+        Theory.convert_fact_glob (tsubst_of_judgment j) fact
+
 let parse_subst j uvars ts : subst =
-           let u_subst = List.map (function
-            | IndexVar v -> Theory.Idx (Action.Index.name v,v)
-            | TSVar v -> Theory.TS (Tvar.name v,TVar v)
-            | MessVar v -> Theory.Term (Mvar.name v,MVar v)) j.Judgment.vars
-          in
+          let u_subst = tsubst_of_judgment j in
           List.map2 (fun t u -> match u,t with
             | TSVar a, t -> TS (TVar a, Theory.convert_ts u_subst t )
             | MessVar a, t -> Term (MVar a, Theory.convert_glob u_subst t)

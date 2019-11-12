@@ -120,6 +120,10 @@ val eq_constants : Term.fname -> 'a tac
     preconditions. *)
 val apply : Term.formula -> Term.subst -> 'a tac
 
+(** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
+  * to be proved, and the other where [f] is assumed. *)
+val tac_assert : Term.fact -> 'a tac
+
 (** [euf_apply f_select judge sk fk] selects an atom of the judgement according
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)

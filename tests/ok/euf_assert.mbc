@@ -2,6 +2,9 @@ hash h
 name k:message
 name cst:message
 
+axiom fst : forall (m:message, n:message),
+  fst(<m,n>) = m
+
 channel c
 
 name na : index -> message
@@ -24,6 +27,9 @@ goal unforgeable :
   forall (tau : timestamp, m : message, b:index),
   input@tau = <h(m,k),m> => exists (a:index),  m = na(a).
 Proof.
-    euf 0.  
+    assert(fst(input@tau_6)=h(m,k)).
+    cycle 1.
+    euf 1.
     existsintro index_7.
+    apply fst to h(m,k), m.
 Qed.

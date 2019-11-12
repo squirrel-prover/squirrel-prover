@@ -14,6 +14,7 @@ PROVER_OK_TESTS = tests/ok/forall.mbc \
 			   tests/ok/euf_output.mbc \
 			   tests/ok/euf_output2.mbc \
 			   tests/ok/euf_output3.mbc \
+			   tests/ok/euf_assert.mbc \
 			   tests/ok/euf.mbc \
 			   tests/ok/axiom.mbc \
 			   tests/ok/axiom_collision_resistance.mbc \

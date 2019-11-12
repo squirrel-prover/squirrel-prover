@@ -12,7 +12,8 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token LBRACKET RBRACKET DOT SLASH
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO CONGRUENCE APPLY TO
+%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
+%token CONGRUENCE APPLY TO ASSERT
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION NOSIMPL
 %token PROOF QED UNDO
 %token EOF
@@ -251,6 +252,7 @@ tac:
   | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
   | APPLY i=ID                        { Prover.Apply (i, Prover.parse_args i []) }
   | APPLY i=ID TO t=tactic_params     { Prover.Apply (i, Prover.parse_args i t) }
+  | ASSERT f=fact                     { Prover.Assert (Prover.parse_fact f) }
   | REPEAT t=tac                      { Prover.Repeat (t) }
 
 

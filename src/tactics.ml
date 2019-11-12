@@ -434,6 +434,10 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   in
   sk [new_judge; judge] fk
 
+let tac_assert fact j sk fk =
+  let j1 = Judgment.set_formula (Fact fact) j in
+  let j2 = Judgment.add_fact fact j in
+  sk [j1;j2] fk
 
 let collision_resistance (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in

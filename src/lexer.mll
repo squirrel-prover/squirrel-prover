@@ -82,6 +82,7 @@ rule token = parse
 | "goal"              { GOAL }
 | "axiom"             { AXIOM }
 | "apply"             { APPLY }
+| "assert"            { ASSERT }
 | "to"                { TO }
 | "Proof."            { PROOF }
 | "Qed."              { QED }

@@ -14,7 +14,7 @@ process tag(i:index) =
   (* TODO dont inline: let m2 = h(<nRt,nT>,k(i)) in *)
   out(cT,<nT,h(<nRt,nT>,k(i))>);              (* 1[i,j] *)
   in(cR,m3);
-  if m3 = h(<h(<nRt,nT>,k(i)),nRt>,k(i)) then
+  if m3@nT = h(<h(<nRt,nT>,k(i)),nRt>,k(i)) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -31,7 +31,8 @@ process reader(j:index) =
   let x2 = snd(x) in
   (* TODO I inlined x1,x2 in the condition because we lack macro support *)
   try find i such that snd(x) = h(<nR(j),fst(x)>,k(i)) in
-    out(cR,h(<x2,nR(j)>,k(i)))      (* 0[j]_0/0[i] *)
+    out(cR,h(<snd(x),nR(j)>,k(i)))      (* 0[j]_0/0[i] *)
+    (* TODO as accept *)
   else
     out(cR,ko)
 
@@ -47,9 +48,10 @@ goal wa :
   forall (k:index, p:index),
   output@0[k]_0/0[p] = output@0[k]_0/0[p] =>
   exists (i:index,j:index) such that
-  0[k]_0/0[p] < 1[i,j],
+  0[k]_0/0[p] > 1[i,j],
   input@0[k]_0/0[p] = output@1[i,j].
 Proof.
   euf 1.
+  euf 4.
   (* TODO it seems we have problems with macros containing input variables,
       the input variables are not replaced by input@tau terms *)
