@@ -7,6 +7,7 @@ all: metabc test
 
 PROVER_OK_TESTS = tests/ok/forall.mbc \
 			   tests/ok/equality_propagation.mbc \
+			   tests/ok/actions.mbc \
 			   tests/ok/input.mbc \
 			   tests/ok/euf_null.mbc \
 			   tests/ok/euf_trivial.mbc \

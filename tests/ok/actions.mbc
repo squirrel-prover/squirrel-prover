@@ -1,0 +1,9 @@
+channel c
+
+system (!_i new n; out(c,n)) as S.
+
+goal foo :
+  forall (i:index),
+  output@S(i) = n(i).
+Proof.
+Qed.
