@@ -5,72 +5,85 @@ open Logic
 
 let () = Printexc.record_backtrace true
 
-exception Parse_error of string
+(** Generic exception for user errors, that should be reported
+  * with the given explanation. *)
+exception Error of string
 
-let parse_from_buf ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
-  try parse_fun Lexer.token lexbuf with
-  | Parser.Error as e ->
-    let error = Fmt.strf
-        "@[Error in %s @,at line %d char %d @,\
-         before %S.@]@."
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf) in
-    if interactive then
-      raise @@ Parse_error error
-    else if test then
-      raise e
-    else
-      begin
-        Fmt.pr "%s" error;
-        exit 1
-      end
+(** Given an exception raised during parsing,
+  * and a pretty-printer for the location of the error,
+  * return [Some pp] where [pp] is a pretty-printer
+  * describing the error to the user.
+  *
+  * For bad, internal errors that should be
+  * reported with a backtrace, return [None]. *)
+let pp_error pp_loc e = match e with
+  | Parser.Error ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Syntax error %a.@]@."
+                pp_loc ())
   | Failure s ->
-    let error = Fmt.strf
-        "@[Error in %s @,at line %d char %d @,\
-         before %S: @,%s.@]@."
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf)
-        s
-    in
-    if interactive then
-      raise @@ Parse_error error
-    else if test then
-      raise @@ Failure s
-    else
-      Fmt.pr "%s" error;
-    exit 1
-  | e ->
-    let error = Fmt.strf
-        "%s@.
-      @[Error in %s @,at line %d char %d @,\
-         before %S: @,%s.@]@."
-        (Printexc.get_backtrace ())
-        filename
-        lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-        (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-         lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-        (Lexing.lexeme lexbuf)
-        (Printexc.to_string e)
-    in
-    if test || interactive then raise e else
-      begin
-        Fmt.pr "%s" error;
-        exit 1
-      end
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Error %a: @,%s.@]@."
+                pp_loc ()
+                s)
+  | Theory.Type_error ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Type error %a.@]@."
+                pp_loc ())
+  | Theory.Arity_error (s,i,j) ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Arity error %a: @,\
+                   %s is passed %d arguments @,\
+                   but has arity %d.@]@."
+                pp_loc ()
+                s i j)
+  | _ -> None
+
+(** Pretty-printer for parsing locations. *)
+let pp_loc filename lexbuf ppf () =
+  Fmt.pf ppf
+    "in %s @,\
+     at line %d char %d @,\
+     before %S"
+    filename
+    lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+    (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+     lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+    (Lexing.lexeme lexbuf)
+
+let parse_from_buf
+      ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
+  try parse_fun Lexer.token lexbuf with e ->
+    let pp_loc = pp_loc filename lexbuf in
+      match pp_error pp_loc e with
+        | Some pp_error ->
+            if test then raise e else
+            if interactive then
+              let msg = Fmt.strf "%a" pp_error () in
+                raise (Error msg)
+            else begin
+              Fmt.pr "%a" pp_error () ;
+              exit 1
+            end
+        | None ->
+            if test || interactive then raise e else begin
+              Fmt.pr
+                "%s@.\
+                 @[Exception %a: @,%s.@]@."
+                (Printexc.get_backtrace ())
+                pp_loc ()
+                (Printexc.to_string e) ;
+              exit 1
+            end
 
 let parse_theory_buf ?(test=false) lexbuf filename =
   Theory.initialize_symbols () ;
   Process.reset () ;
-  parse_from_buf ~test:test Parser.theory lexbuf filename
-
-let parse_interactive_buf ?(test=false) lexbuf filename =
-  parse_from_buf ~test:test ~interactive:true Parser.interactive lexbuf filename
+  parse_from_buf ~test Parser.theory lexbuf filename
 
 let parse_process string =
   let lexbuf = Lexing.from_string string in

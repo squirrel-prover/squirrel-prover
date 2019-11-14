@@ -44,7 +44,11 @@ let rec main_loop ?(save=true) mode =
      * In practice we save except after errors. *)
   if save then save_state mode ;
   try
-    let new_command = parse_next Main.parse_interactive_buf in
+    let parse_buf =
+      Main.parse_from_buf
+        ~test:false ~interactive:!interactive
+        Parser.interactive in
+    let new_command = parse_next parse_buf in
     match mode, new_command with
     (* if the command is an undo, we catch it only if we are not waiting for a
         system description. *)
@@ -120,8 +124,8 @@ let rec main_loop ?(save=true) mode =
     | _, _ -> error mode "Unexpected command."
   with
   | Failure s -> error mode s
-  | Main.Parse_error s -> error mode s
-                            
+  | Main.Error s -> error mode s
+
 and error mode s =
   Fmt.pr "[error> %s@." s;
   if !interactive then main_loop ~save:false mode
