@@ -35,7 +35,6 @@ rule token = parse
 | '>'                 { RANGLE }
 | ','                 { COMMA }
 | '.'                 { DOT }
-| '_'                 { UNDERSCORE }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | "="                 { EQ }
@@ -44,10 +43,7 @@ rule token = parse
 | "<="                { LEQ }
 | '('                 { LPAREN }
 | ')'                 { RPAREN }
-| '['                 { LBRACKET }
-| ']'                 { RBRACKET }
 | '|'                 { PARALLEL }
-| '/'                 { SLASH }
 | "->"                { ARROW }
 | "=>"                { DARROW }
 | ":="                { ASSIGN }

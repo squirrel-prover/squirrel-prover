@@ -5,13 +5,13 @@
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS UNDERSCORE
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
-%token LBRACKET RBRACKET DOT SLASH
+%token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
 %token CONGRUENCE APPLY TO ASSERT
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION NOSIMPL
@@ -41,17 +41,6 @@
 
 %%
 
-(* Actions *)
-
-i_list:
-|                                 { [] }
-| COMMA; ind=ID; l=i_list         { ind :: l }
-
-index_list:
-|                                 { [] }
-| LBRACKET RBRACKET               { [] }
-| LBRACKET; ind=ID; l=i_list; RBRACKET
-                                  { ind :: l }
 (* Terms *)
 
 term:
@@ -236,7 +225,6 @@ tac:
   | EUF i=INT                         { Prover.Euf i }
   | CYCLE i=INT                       { Prover.Cycle i }
   | CYCLE MINUS i=INT                 { Prover.Cycle (-i) }
-  /* | LBRACKET t=tac RBRACKET        { Prover.ProveAll t } */
   | l=tac SEMICOLON r=tac             { Prover.AndThen (l,r) }
   | l=tac PLUS r=tac                  { Prover.OrElse (l, r) }
   | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
