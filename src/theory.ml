@@ -103,6 +103,10 @@ let initialize_symbols () =
 exception Type_error
 exception Unbound_identifier
 
+exception Arity_error of string*int*int
+
+let arity_error s i j = raise (Arity_error (s,i,j))
+
 type env = (string*kind) list
 
 let function_kind name =
@@ -229,7 +233,8 @@ let make_term ?at_ts:(at_ts=None) s l =
       assert (at_ts = None);
       Fun (s,l,None)
     | Name_symbol arity ->
-      if List.length l <> arity then raise Type_error ;
+      if List.length l <> arity then
+        arity_error s (List.length l) arity ;
       Name (s,l)
     | Mutable_symbol (arity,_) ->
       if List.length l <> arity then raise Type_error ;

@@ -71,6 +71,11 @@ val make_pair : term -> term -> term
 (** {2 Type-checking} *)
 
 exception Type_error
+
+(** [Arity_error (s,i,j)] means that symbol [s] is used with
+  * arity [i] when it actually has arity [j]. *)
+exception Arity_error of string*int*int
+
 type env = (string*kind) list
 val check_term : env -> term -> kind -> unit
 val check_state : string -> int -> kind
