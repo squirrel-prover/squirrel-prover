@@ -36,15 +36,25 @@ type term =
 
 let pp_action_shape = Action.pp_parsed_action
 
+let sep ppf () = Fmt.pf ppf ","
+
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
   | Taction a -> pp_action_shape ppf a
   | Fun (f,terms,ots) ->
-    Fmt.pf ppf "%s(@[<hov 1>%a@])%a" f (Fmt.list pp_term) terms pp_ots ots
+    Fmt.pf ppf "%s(@[<hov 1>%a@])%a"
+      f
+      (Fmt.list ~sep pp_term) terms
+      pp_ots ots
   | Name (n,terms) ->
-    Fmt.pf ppf "@n:%s[@[<hov 1>%a@]]" n (Fmt.list pp_term) terms
+    Fmt.pf ppf "%a(@[<hov 1>%a@])"
+      Term.pp_name (Term.mk_name n)
+      (Fmt.list ~sep pp_term) terms
   | Get (s,ots,terms) ->
-    Fmt.pf ppf "@get:%s%a[@[<hov 1>%a@]]" s pp_ots ots (Fmt.list pp_term) terms
+    Fmt.pf ppf "@get:%s%a(@[<hov 1>%a@])"
+      s
+      pp_ots ots
+      (Fmt.list ~sep pp_term) terms
   | Compare (ord,tl,tr) ->
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
 

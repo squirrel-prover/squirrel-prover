@@ -24,7 +24,7 @@ let rec pp_process ppf process =
   let open Fmt in
   let open Utils in
   match process with
-  | Null ->  (styled `Blue (styled `Bold ident)) ppf "Null"
+  | Null ->  (styled `Blue (styled `Bold ident)) ppf "null"
 
   | Apply (s, l, a) ->
     if s = a then
@@ -38,7 +38,7 @@ let rec pp_process ppf process =
         (styled `Bold (styled `Blue ident)) a
 
   | Repl (s, p) ->
-    pf ppf "@[<hov 2>%s@,@[%a@]@]"
+    pf ppf "@[<hov 2>!_%s@,@[%a@]@]"
       s pp_process p
 
   | Set (s, indices, t, p) ->
@@ -50,20 +50,20 @@ let rec pp_process ppf process =
       pp_process p
 
   | New (s, p) ->
-    pf ppf "@[<hov>%a %a.@,@[%a@]@]"
+    pf ppf "@[<hov>%a %a;@,@[%a@]@]"
       (kw `Red) "new"
       (kw `Magenta) s
       pp_process p
 
   | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a).@,%a@]"
+    pf ppf "@[<hov>%a(%a,@,%a);@,%a@]"
       (kw `Bold) "in"
       Channel.pp_channel c
       (styled `Magenta (styled `Bold ident)) s
       pp_process p
 
   | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a).@,%a@]"
+    pf ppf "@[<hov>%a(%a,@,%a);@,%a@]"
       (kw `Bold) "out"
       Channel.pp_channel c
       Theory.pp_term t
