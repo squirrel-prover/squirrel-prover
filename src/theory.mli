@@ -58,6 +58,13 @@ val declare_macro : string -> (string*kind) list -> kind -> term -> unit
 (** Get a fresh name symbol and declare it. *)
 val fresh_name : string -> int -> Term.name
 
+(** Reserve a fresh action symbol. *)
+val fresh_action_symbol : string -> string
+
+(** Define an already reserved action symbol. *)
+val define_action_symbol :
+  string -> Action.Index.t list -> Action.action -> unit
+
 (** {2 Term builders }
     Given a string [s] and a list of terms [l] build the term [s(l)]
   * according to what [s] refers to: if it is a declared primitive,

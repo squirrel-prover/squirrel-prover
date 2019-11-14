@@ -84,6 +84,10 @@ type symbol_info =
   (** [Macro_symbol ([x1,k1;...;xn,kn],k,t)] defines a macro [t]
     * with arguments [xi] of respective types [ki], and
     * return type [k]. *)
+  | Action_symbol of Action.Index.t list * Action.action
+  (** [Action_symbol (l,a)] is a symbol with arguments [l],
+    * which stands for action [a] where indices are replaced
+    * according to [l] and the arguments of the symbol. *)
 
 let pred_fs = "pred"
 
@@ -238,6 +242,18 @@ let fresh_name n arity =
     declare_name n' arity ;
     Term.mk_name n'
 
+let fresh_action_symbol s =
+  let s' = get_fresh_symbol s in
+    Hashtbl.add symbols s' (Action_symbol ([],[])) ;
+    s'
+
+let define_action_symbol s l a =
+  assert (match Hashtbl.find symbols s with
+            | Action_symbol ([],[]) -> true
+            | _ -> false
+            | exception Not_found -> false) ;
+  Hashtbl.replace symbols s (Action_symbol (l,a))
+
 (** Removal of all declarations *)
 
 let clear_declarations () = Hashtbl.clear symbols
@@ -269,6 +285,11 @@ let make_term ?at_ts:(at_ts=None) s l =
       if List.length args <> List.length l then raise Type_error ;
       assert (at_ts = None);
       Fun (s,l,None)
+    | Action_symbol (args,a) ->
+      if List.length args <> List.length l then raise Type_error ;
+      assert (at_ts = None);
+      Fun (s,l,None)
+
   with
   | Not_found ->
     (** If [at_ts] is not [None], we look whether this is a declared macro. *)
