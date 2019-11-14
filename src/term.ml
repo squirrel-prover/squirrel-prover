@@ -40,7 +40,6 @@ type name = Name of string
 
 (* TODO declarations, freshness conditions ? *)
 let mk_name x = Name x
-let fresh_name x = Name x
 let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf s
 
 type nsymb = name * index list

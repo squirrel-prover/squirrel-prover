@@ -216,6 +216,18 @@ let declare_macro s typed_args k t =
 let declare_abstract s arg_types k =
   declare_symbol s (Abstract_symbol (arg_types,k))
 
+let get_fresh_symbol prefix =
+  let rec find i =
+    let s = if i=0 then prefix else prefix ^ string_of_int i in
+    if Hashtbl.mem symbols s then find (i+1) else s
+  in
+  find 0
+
+let fresh_name n arity =
+  let n' = get_fresh_symbol n in
+    declare_name n' arity ;
+    Term.mk_name n'
+
 (** Removal of all declarations *)
 
 let clear_declarations () = Hashtbl.clear symbols

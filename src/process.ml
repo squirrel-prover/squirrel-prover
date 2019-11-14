@@ -402,7 +402,7 @@ let parse_proc proc : unit =
     | New (n, p) ->
       let n' =
         Term.Name
-          (Term.fresh_name n,
+          (Theory.fresh_name n (List.length env.p_indices),
            env.p_indices)
       in
       let env = { env with subst = (n,fun _ -> n')::env.subst } in
@@ -435,7 +435,7 @@ let parse_proc proc : unit =
     | New (n, p) ->
       let n' =
         Term.Name
-          (Term.fresh_name n,
+          (Theory.fresh_name n (List.length env.p_indices),
            env.p_indices)
       in
       let env = { env with subst = (n,fun _ -> n')::env.subst } in
@@ -515,7 +515,7 @@ let parse_proc proc : unit =
     | New (n, p) ->
       let n' =
         Term.Name
-          (Term.fresh_name n,
+          (Theory.fresh_name n (List.length env.p_indices),
            env.p_indices)
       in
       let env = { env with subst = (n, fun _ -> n')::env.subst } in
