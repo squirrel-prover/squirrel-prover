@@ -52,11 +52,12 @@ type process =
         * if there exist [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct
         * subsumes the common conditional construct. *)
-  | Apply of id * term list * id
-      (** Named process invocation: [Apply (p,ts,q)] gets expanded
-        * to [p(ts)] and its actions will be generated using the
-        * name [q] rather than [p], which may be important to obtain
-        * unique action identifiers. *)
+  | Apply of id * term list
+      (** Process invocation: [Apply (p,ts)] gets expanded
+        * to [p(ts)]. *)
+  | Alias of process * id
+      (** [Alias (p,i)] behaves as [p] but [i] will be used
+        * as a naming prefix for its actions. *)
 
 val pp_process : Format.formatter -> process -> unit
 

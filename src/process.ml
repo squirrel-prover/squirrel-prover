@@ -18,7 +18,8 @@ type process =
   | Let of string * term * process
   | Repl of string * process
   | Exists of string list * fact * process * process
-  | Apply of id * term list * id
+  | Apply of id * term list
+  | Alias of process * id
 
 let rec pp_process ppf process =
   let open Fmt in
@@ -26,19 +27,18 @@ let rec pp_process ppf process =
   match process with
   | Null ->  (styled `Blue (styled `Bold ident)) ppf "null"
 
-  | Apply (s, l, a) ->
-    if s = a then
+  | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
         (styled `Bold (styled `Blue ident)) s
         (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
-    else
-      pf ppf "@[<hov>%a@ %a@ as@ %a@]"
-        (styled `Bold (styled `Blue ident)) s
-        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
-        (styled `Bold (styled `Blue ident)) a
+
+  | Alias (p,a) ->
+      pf ppf "@[%s:@ %a@]"
+        a
+        pp_process p
 
   | Repl (s, p) ->
-    pf ppf "@[<hov 2>!_%s@,@[%a@]@]"
+    pf ppf "@[<hov 2>!_%s@ @[%a@]@]"
       s pp_process p
 
   | Set (s, indices, t, p) ->
@@ -70,7 +70,7 @@ let rec pp_process ppf process =
       pp_process p
 
   | Parallel (p1, p2) ->
-    pf ppf "@[<hv>@[(%a)@]@ | @[(%a)@]@]"
+    pf ppf "@[<hv>@[(%a)@] |@ @[(%a)@]@]"
       pp_process p1
       pp_process p2
 
@@ -83,24 +83,26 @@ let rec pp_process ppf process =
       pp_process p
 
   | Exists (ss, f, p1, p2) ->
-    if p2 <> Null then
-      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a@ %a@;<1 2>%a@]"
-        (styled `Red (styled `Underline ident)) "find"
-        (list Fmt.string) ss
-        (styled `Red (styled `Underline ident)) "such that"
+    if ss = [] then
+      pf ppf "@[<hov>%a %a %a@;<1 2>%a"
+        (styled `Red (styled `Underline ident)) "if"
         Theory.pp_fact f
-        (styled `Red (styled `Underline ident)) "in"
+        (styled `Red (styled `Underline ident)) "then"
         pp_process p1
-        (styled `Red (styled `Underline ident)) "else"
-        pp_process p2
     else
-      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a@]"
+      pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
         (styled `Red (styled `Underline ident)) "find"
         (list Fmt.string) ss
         (styled `Red (styled `Underline ident)) "such that"
         Theory.pp_fact f
         (styled `Red (styled `Underline ident)) "in"
-        pp_process p1
+        pp_process p1 ;
+    if p2 <> Null then
+      pf ppf "@ %a@;<1 2>%a@]"
+      (styled `Red (styled `Underline ident)) "else"
+      pp_process p2
+    else
+      pf ppf "@]"
 
 
 (** Table of declared (bi)processes with their types *)
@@ -136,7 +138,7 @@ let rec check_proc env = function
     in
     Theory.check_fact env test ;
     check_proc env p
-  | Apply (id, ts, _) ->
+  | Apply (id, ts) ->
     begin try
         let kind,_ = pkind_of_pname id in
         List.iter2
@@ -146,6 +148,7 @@ let rec check_proc env = function
       | Not_found -> raise Theory.Type_error
       | Invalid_argument _ -> raise Theory.Type_error
     end
+  | Alias (p,_) -> check_proc env p
 
 let declare id args proc =
   if Hashtbl.mem pdecls id then raise Theory.Multiple_declarations ;
@@ -285,37 +288,6 @@ module Aliases = struct
 
 end
 
-(* Environment for parsing the final process, i.e. the system to study,
- * to break it into blocks suitable for the analysis.
- *
- * While the process is traversed, some constructs are removed/translated:
- *  - a current (sub-)process identifier is maintained: initially undefined,
- *    it is changed when traversing Apply constructs (in the concrete
- *    syntax, this is "P as Q"), and it is used to obtain more readable
- *    yet unambiguous identifiers for various things;
- *  - the current set of indices is maintained, for similar reasons;
- *  - input variables are changed into Term.Input values indexed by
- *    the corresponding action;
- *  - local name declarations (using "new") are changed into global
- *    name constants that are indexed and whose name depends on the
- *    current process identifier;
- *  - local term definitions (using "let") are also changed to global
- *    macro definitions of a special sort: they are stored as a closure
- *    which computes the macro expansion given a new target timestamp.
- * All this information is stored in a record of type [p_env],
- * the last three are handled together through the substitution.
- * It also stores the current action. *)
-type p_env = {
-  action : Action.action ;
-  p_indices : Action.index list ;
-  p_id : string option ;          (** current process identifier *)
-  subst : (string * (Term.timestamp -> Term.term)) list ;
-  (** substitution for all free variables, standing for inputs,
-    * names, and local definitions *)
-  isubst : (string*Action.index) list
-  (** current indices, mapped to fresh ones *)
-}
-
 (** Convert a Theory.term from a prepared process (see below)
   * with free variables for indices and inputs,
   * into a Term.term with some attached action.
@@ -350,9 +322,17 @@ let convert_term_at_action tm action idx_subst invars =
   let subst = insubst @ idx_subst in
     Theory.convert (Term.TName action) subst tm
 
-(** Prepare a process for the generation of actions,
-  * removing and refreshing name generations and let constructs,
-  * generating action identifiers, etc.
+(** Prepare a process for the generation of actions:
+  *
+  *  - the resulting process does not feature New and Let constructs,
+  *    which have been transformed into global declarations of
+  *    names and macros, properly refreshed;
+  *
+  *  - it satisfies the Barendregt convention for index variables;
+  *
+  *  - its outputs are decorated with unique aliases that will be
+  *    used to identify the corresponding actions.
+  *
   * The returned process is intended to be read by the user
   * to understand the actions generated by the system. *)
 let prepare : process -> process =
@@ -360,14 +340,15 @@ let prepare : process -> process =
   let rec prep
     (indices : string list)
     (subst : (string*Theory.term) list)
-    (invars : string list) =
+    (invars : string list)
+    (a : string) =
   function
 
     | Null -> Null
 
     | Parallel (p,q) ->
-        let p = prep indices subst invars p in
-        let q = prep indices subst invars q in
+        let p = prep indices subst invars a p in
+        let q = prep indices subst invars a q in
           Parallel (p,q)
 
     | Repl (i,p) ->
@@ -376,7 +357,7 @@ let prepare : process -> process =
         let i' = i in
         assert (not (List.mem i' indices)) ;
         let subst = (i, Theory.Var i') :: subst in
-        Repl (i', prep (i'::indices) subst invars p)
+        Repl (i', prep (i'::indices) subst invars a p)
 
     | New (n,p) ->
         let n' = Theory.fresh_name n (List.length indices) in
@@ -386,9 +367,11 @@ let prepare : process -> process =
              List.rev_map (fun i -> Theory.Var i) indices)
         in
         let subst = (n,n') :: subst in
-          prep indices subst invars p
+          prep indices subst invars a p
 
     | Let (x,t,p) ->
+        (* TODO be careful that x does not conflict with an input
+         * variable ? *)
         let x' =
           Term.declare_macro
             x
@@ -412,19 +395,21 @@ let prepare : process -> process =
              Some (Theory.Var "…"))
         in
         let subst = (x,x') :: subst in
-          prep indices subst invars p
+          prep indices subst invars a p
 
     | In (c,x,p) ->
         (* TODO check that x is not captured by indices... and glob decl? *)
-        In (c, x, prep indices subst (x::invars) p)
+        In (c, x, prep indices subst (x::invars) a p)
 
     | Out (c,t,p) ->
         (* TODO generate action name *)
         let t = Theory.subst t subst in
-        Out (c, t, prep indices subst invars p)
+        let a' = Theory.fresh_action_symbol a in
+          Alias
+            (Out (c, t, prep indices subst invars a p),
+             a')
 
-    | Apply (id,args,id') ->
-        assert (id = id') ;
+    | Apply (id,args) ->
         let t,p = Hashtbl.find pdecls id in
         let subst' =
           List.map2
@@ -436,7 +421,7 @@ let prepare : process -> process =
            * accessed by p, we need to pass them so that
            * the list has the expected length wrt the
            * actions that will eventually be generated. *)
-          prep indices subst' invars p
+          prep indices subst' invars a p
 
     | Set (s,l,t,p) ->
         let t' = Theory.subst t subst in
@@ -448,7 +433,7 @@ let prepare : process -> process =
                  | _ -> assert false)
             l
         in
-        Set (s, l', t', prep indices subst invars p)
+        Set (s, l', t', prep indices subst invars a p)
 
     | Exists (l,f,p,q) ->
         let s = List.map (fun i -> i, i) l in
@@ -460,29 +445,56 @@ let prepare : process -> process =
         let l' = List.map snd s in
         let subst' = List.map (fun (i,i') -> i, Theory.Var i') s @ subst in
         let f' = Theory.subst_fact f subst' in
-        let p' = prep (l'@indices) subst' invars p in
-        let q' = prep indices subst invars q in
+        let p' = prep (l'@indices) subst' invars a p in
+        let q' = prep indices subst invars a q in
           Exists (l',f',p',q')
 
-  in fun p -> prep [] [] [] p
+    | Alias (p,a) ->
+        prep indices subst invars a p
 
-(** Parse a process with a given action prefix. *)
+  in fun p -> prep [] [] [] "A" p
+
+(* Environment for parsing the final process, i.e. the system to study,
+ * to break it into blocks suitable for the analysis.
+ *
+ * While the process is traversed, some constructs are removed/translated:
+ *  - the current set of indices is maintained, as it will be used
+ *    to create actions and instantiate action symbols;
+ *  - a substitution mapping input variables to Term.Input values
+ *    indexed by the corresponding actions is computed;
+ *  - a substitution mapping index variables (string) to index variables
+ *    (Action.Index.t) for technical reasons only, since we have ensured
+ *    the Barendregt convention on indices.
+ * All this information is stored in a record of type [p_env].
+ * It also stores the current action. *)
+type p_env = {
+  action : Action.action ;
+  p_indices : Action.index list ;
+  subst : (string * Term.term) list ;
+    (** substitution for input variables *)
+  isubst : (string * Action.index) list
+}
+
+(** The extraction of actions from the system process
+  * has blocked on some sub-process. *)
+exception Cannot_parse of process
+
+(** Parse a prepared process to extract its actions. *)
 let parse_proc proc : unit =
 
-  let conv_term_at_ts env ts t =
-    let subst = List.map (fun (x, f) -> Theory.Term(x, f ts)) env.subst
-                @ (List.map (fun (x, i) -> Theory.Idx (x, i)) env.isubst)
+  let conv_term env t =
+    let ts = Term.TName (List.rev env.action) in
+    let subst =
+      List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
+      List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
     in
     Theory.convert ts subst t
   in
-  let conv_term env t =
-    let ts = Term.TName (List.rev env.action) in
-    conv_term_at_ts env ts t
-  in
   let conv_fact env t =
     let ts = Term.TName (List.rev env.action) in
-    let subst = List.map (fun (x,f) -> Theory.Term(x,f ts)) env.subst
-                @ (List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst)
+    let subst =
+      List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
+      List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
     in
     Theory.convert_fact ts subst t
   in
@@ -490,12 +502,13 @@ let parse_proc proc : unit =
     List.map (fun x -> List.assoc x env.isubst) l
   in
 
-  (** Parse the process, which should be in the expected normal
-    * form (input, conditionals, assignments, output, and so on)
-    * and accumulate parts of the new action item and block:
-    * [pos] is the position in parallel compositions.
+  (** Parse the process and accumulate parts of the new action:
+    * [pos] is the position in parallel compositions,
+    * [pos_indices] is the list of accumulated indices
+    * for the parallel choice part of the action item.
     * Return the next position in parallel compositions. *)
   let rec p_in ~env ~pos ~(pos_indices:index list) = function
+    | Apply _ | Let _ | New _ -> assert false
     | Null -> pos
     | Parallel (p, q) ->
       let pos = p_in ~env ~pos ~pos_indices p in
@@ -504,36 +517,12 @@ let parse_proc proc : unit =
       let i' = Action.Index.make_fresh () in
       let env =
         { env with
-          isubst = (i, i') :: env.isubst ;
+          isubst = (i,i') :: env.isubst ;
           p_indices = i' :: env.p_indices }
       in
       let pos_indices = i'::pos_indices in
       p_in ~env ~pos ~pos_indices p
-    | Apply (id, args, id') ->
-      (* TODO
-       *  - use more precise action prefix
-       *  - support Apply in other places *)
-      Aliases.decl_action_name id' env.action pos ;
-      let t, p = Hashtbl.find pdecls id in
-      let env =
-        if List.for_all (fun (_, k) -> k = Theory.Index) t then
-          { env with
-            p_id = Some id' ;
-            isubst =
-              (List.map2 (fun (x, _) -> function
-                   | (Theory.Var v) -> x, List.assoc v env.isubst
-                   | _ -> assert false) t args) }
-        else
-          { env with
-            p_id = Some id' ;
-            subst =
-              (List.map2 (fun (x, _) v ->
-                   x,
-                   fun ts ->
-                     conv_term_at_ts env ts v) t args) }
-      in
-      p_in ~env ~pos ~pos_indices p
-    | In _ | Exists _ | Set _ | Out _ as proc ->
+    | In _ | Exists _ | Set _ | Alias _ | Out _ as proc ->
       let input,p =
         (* Get the input data,
          * or a dummy value if the input is missing. *)
@@ -549,71 +538,15 @@ let parse_proc proc : unit =
           p
       in
       pos + 1
-    | New (n, p) ->
-      let n' =
-        Term.Name
-          (Theory.fresh_name n (List.length env.p_indices),
-           env.p_indices)
-      in
-      let env = { env with subst = (n,fun _ -> n')::env.subst } in
-      p_in ~env ~pos ~pos_indices p
-    | Let (x, t, p) ->
-      let x' =
-        Term.declare_macro
-          x
-          (fun ts indices ->
-             let t' = conv_term_at_ts env ts t in
-             Term.subst_term
-               (List.map2
-                  (fun i' i'' -> Term.Index(i', i''))
-                  env.p_indices
-                  indices)
-               t')
-      in
-      let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
-      let env = { env with subst = (x, t')::env.subst } in
-      p_in ~env ~pos ~pos_indices p
-
 
   (** Similar to [p_in] but with an [input] and [par_choice] already known,
-    * a conjonction of [facts] in construction, a [pos] and [vars] indicating
+    * a conjonction of [facts] in construction, and [pos] and [vars] indicating
     * the position in existential conditions and the associated
-    * bound variables. We do not convert facts to Term.fact yet, but
-    * do it in the next step just to avoid redundant preparation of the
-    * appropriate timestamp. *)
+    * bound index variables. We cannot convert facts to Term.fact yet,
+    * since we do not know for which action they should be converted. *)
   and p_cond ~env ~par_choice ~input ~pos ~vars ~facts = function
-    | New (n, p) ->
-      let n' =
-        Term.Name
-          (Theory.fresh_name n (List.length env.p_indices),
-           env.p_indices)
-      in
-      let env = { env with subst = (n,fun _ -> n')::env.subst } in
-      p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
-    | Let (x, t, p) ->
-      (* TODO lift this limitation
-       *   the problem is that we add the binding for x only later
-       *   when we know the timestamp, so it breaks scoping;
-       *   a similar problem might show because we un-interleave
-       *   introductions of index and other variables
-       *   -> we probably need a more complex notion of substitution *)
-      assert (x <> snd input) ;
-      let x' =
-        Term.declare_macro
-          x
-          (fun ts indices ->
-             let t' = conv_term_at_ts env ts t in
-             Term.subst_term
-               (List.map2
-                  (fun i' i'' -> Term.Index(i', i''))
-                  env.p_indices
-                  indices)
-               t')
-      in
-      let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
-      let env = { env with subst = (x,t')::env.subst } in
-      p_cond ~env ~par_choice ~input ~pos ~vars ~facts p
-    | Exists (evars, cond, p, q) ->
+  | Apply _ | Let _ | New _ -> assert false
+  | Exists (evars, cond, p, q) ->
       let facts_p = cond::facts in
       let facts_q =
         if evars = [] then
@@ -625,18 +558,21 @@ let parse_proc proc : unit =
       let pos =
         p_cond
           ~env:{ env with
-                 isubst = newsubst @ env.isubst ;
-                 p_indices = List.map snd newsubst @ env.p_indices }
+                 isubst = List.rev_append newsubst env.isubst ;
+                 p_indices =
+                   List.rev_append (List.map snd newsubst) env.p_indices }
           ~par_choice ~input
-          ~pos ~vars:(evars@vars) ~facts:facts_p
+          ~pos ~vars:(List.rev_append evars vars) ~facts:facts_p
           p
       in
       p_cond
         ~env ~par_choice ~input
         ~pos ~vars ~facts:facts_q
         q
-    (* TODO factorize code for new, let... *)
-    | p ->
+  | p ->
+      (* We are done processing conditionals, let's prepare
+       * for the next step, i.e. updates and output.
+       * At this point we know which action will be used. *)
       let rec conj = function
         | [] -> Term.True
         | [f] -> f
@@ -650,7 +586,7 @@ let parse_proc proc : unit =
       let env =
         { env with
           action = action ;
-          subst = (snd input,fun _ -> in_tm)::env.subst }
+          subst = (snd input,in_tm)::env.subst }
       in
       p_update
         ~env ~input ~condition
@@ -662,42 +598,26 @@ let parse_proc proc : unit =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and block are registered. *)
   and p_update ~env ~input ~condition ~updates = function
-    | New (n, p) ->
-      let n' =
-        Term.Name
-          (Theory.fresh_name n (List.length env.p_indices),
-           env.p_indices)
-      in
-      let env = { env with subst = (n, fun _ -> n')::env.subst } in
-      p_update ~env ~input ~condition ~updates p
-    | Let (x,t,p) ->
-      assert (x <> snd input) ; (* TODO see above *)
-      let x' =
-        Term.declare_macro
-          x
-          (fun ts indices ->
-             let t' = conv_term_at_ts env ts t in
-             Term.subst_term
-               (List.map2
-                  (fun i' i'' -> Term.Index(i', i''))
-                  env.p_indices
-                  indices)
-               t')
-      in
-      let t' ts = Term.Macro (Term.mk_mname x' env.p_indices, ts) in
-      let env = { env with subst = (x,t')::env.subst } in
-      p_update ~env ~input ~condition ~updates p
+  | Apply _ | Let _ | New _ | Out _ -> assert false
 
-    | Set (s, l, t, p) ->
+  | Set (s, l, t, p) ->
       let updates = (s, l, t)::updates in
       p_update ~env ~input ~condition ~updates p
 
-    | Out _ | Null as proc ->
-      let output,p =
+  | Alias _ | Null as proc ->
+      let output,a,p =
         (* Get output data, or dummy value if output is missing. *)
         match proc with
-        | Out (c, t, p) -> (c, conv_term env t),p
-        | _ -> (Channel.dummy, Term.dummy),proc
+        | Alias (Out (c,t,p),a) -> (c, conv_term env t),a,p
+        | Alias _ -> assert false
+        | Null ->
+            (* Generate block anyway, since it may contain important
+             * state updates. The problem is that we don't have an
+             * alias setup by the preparation phase.
+             * TODO aliases on "interesting" null processes *)
+            let a = Theory.fresh_action_symbol "A" in
+            (Channel.dummy, Term.dummy),a,proc
+        | _ -> assert false
       in
       let condition =
         let vars, facts = condition in
@@ -706,31 +626,33 @@ let parse_proc proc : unit =
       in
       let updates =
         List.map
-          (fun (s, l, t) ->
-             s,
-             conv_indices env l,
-             conv_term env t)
+          (fun (s,l,t) ->
+             s, conv_indices env l, conv_term env t)
           updates
       in
       let indices = env.p_indices in
       let action = (List.rev env.action) in
       let block = {action; input; indices; condition; updates; output} in
       Hashtbl.add action_to_block (get_shape action) block ;
+      Theory.define_action_symbol a indices action ;
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
-    | p ->
-      Format.eprintf "%a@." pp_process p ;
-      failwith "p_update: unsupported"
+
+  | p ->
+      raise (Cannot_parse p)
   in
 
   let env =
-    { p_id = None ;
-      action = [] ; p_indices = [] ;
+    { action = [] ; p_indices = [] ;
       subst = [] ; isubst = [] }
   in
   let _ : int = p_in ~pos:0 ~env ~pos_indices:[] proc in
   ()
 
-let declare_system proc = check_proc [] proc ; parse_proc proc
+let declare_system proc =
+  check_proc [] proc ;
+  let proc = prepare proc in
+  Fmt.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@." pp_process proc ;
+  parse_proc proc
 
 let reset () =
   Hashtbl.clear pdecls ;

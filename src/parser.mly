@@ -109,8 +109,8 @@ fact:
 process:
 | NULL                           { Process.Null }
 | LPAREN processes RPAREN        { $2 }
-| ID term_list                   { Process.Apply ($1,$2,$1) }
-| ID term_list AS ID             { Process.Apply ($1,$2,$4) }
+| ID term_list                   { Process.Apply ($1,$2) }
+| process AS ID                  { Process.Alias ($1,$3) }
 | NEW ID SEMICOLON process       { Process.New ($2,$4) }
 | IN LPAREN channel COMMA ID RPAREN process_cont
                                  { Process.In ($3,$5,$7) }

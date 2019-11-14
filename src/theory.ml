@@ -414,7 +414,14 @@ let convert ts subst t =
     | Var x -> subst_get_mess subst x
     | Compare (o, u, v) -> assert false (* TODO *)
     | Taction _ -> assert false       (* reserved for constraints *)
-    | Get (_, Some _, _) | Fun (_, _, Some _) ->
+    | Fun (f, l, Some _) ->
+        (* This special case, corresponding to a not-really-local term
+         * resulting from the input process preparation, can only
+         * happen when f is a global macro. *)
+        let f = Term.is_declared f in
+        let l = List.map (conv_index subst) l in
+        Term.Macro ((f,l),ts)
+    | Get (_, Some _, _) ->
       assert false (* reserved for global terms *)
   in conv t
 
