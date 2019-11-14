@@ -72,11 +72,11 @@ let parse_from_buf
         | None ->
             if test || interactive then raise e else begin
               Fmt.pr
-                "%s@.\
-                 @[Exception %a: @,%s.@]@."
-                (Printexc.get_backtrace ())
+                "@[Exception %a: @,%s.@]@.@.\
+                 %s@."
                 pp_loc ()
-                (Printexc.to_string e) ;
+                (Printexc.to_string e)
+                (Printexc.get_backtrace ()) ;
               exit 1
             end
 
