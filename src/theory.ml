@@ -313,6 +313,22 @@ let pp_tsubst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_atsubst) s
 
+(** Apply a partial substitution to a term.
+  * This is meant for local terms in processes,
+  * and does not support optional timestamps. *)
+let subst t s =
+  let rec aux = function
+    | Var x ->
+        begin try List.assoc x s with
+          | Not_found -> Var x
+        end
+    | Taction a -> Taction a
+    | Name (n,l) -> Name (n, List.map aux l)
+    | Get (s,None,l) -> Get (s, None, List.map aux l)
+    | Fun (s,l,None) -> Fun (s, List.map aux l, None)
+    | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
+    | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
+  in aux t
 
 let term_subst (s:tsubst) =
   List.fold_left (fun acc asubst ->
@@ -455,6 +471,8 @@ let convert_bformula conv_atom f =
     | True -> True
     | False -> False in
   conv f
+
+let subst_fact f s = convert_bformula (fun t -> subst t s) f
 
 let convert_fact ts subst f : Term.fact =
   convert_bformula (convert_atom ts subst) f

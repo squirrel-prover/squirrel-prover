@@ -93,6 +93,9 @@ val initialize_symbols : unit -> unit
     Convert terms inside the theory to to terms of the prover.
 *)
 
+val subst : term -> (string*term) list -> term
+val subst_fact : fact -> (string*term) list -> fact
+
 type atsubst =
   | Term of string * Term.term
   | TS of string * Term.timestamp

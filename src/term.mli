@@ -41,6 +41,8 @@ val pp_name : Format.formatter -> name -> unit
 
 val mk_name : string -> name (* TODO *)
 
+val string_of_name : name -> string
+
 (** {2 Functions} *)
 (** Function symbols are built from a name (from a finite set)
   * and a list of indices.

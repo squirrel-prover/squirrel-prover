@@ -38,13 +38,15 @@ type mvar = Mvar.t
 
 type name = Name of string
 
-(* TODO declarations, freshness conditions ? *)
+(* TODO having [name] abstract makes no sense currently
+ * since we can freely create names from strings *)
+let string_of_name (Name s) = s
 let mk_name x = Name x
 let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf s
 
 type nsymb = name * index list
 let pp_nsymb ppf (n,is) =
-  if is <> [] then Fmt.pf ppf "%a[%a]" pp_name n Index.pp_list is
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n Index.pp_list is
   else Fmt.pf ppf "%a" pp_name n
 
 (* TODO must include builtins such as if-then-else, equality, successor, xor ...
