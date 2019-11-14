@@ -262,7 +262,6 @@ let parse_subst j uvars ts : subst =
 
             | IndexVar a, t ->
                 Index (a, Theory.conv_index u_subst t)
-            | _ ->  raise @@ Failure "Type error in the arguments"
           ) ts uvars
 
 let parse_args goalname ts : subst =

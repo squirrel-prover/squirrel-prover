@@ -218,7 +218,7 @@ val constr_dnf : constr -> tatom list list
 (** {2 Correspondence formulas} *)
 (** Formulas depends on variables inside [fvar]. *)
 type fvar =
-    TSVar of tvar
+  | TSVar of tvar
   | MessVar of mvar
   | IndexVar of index
 
