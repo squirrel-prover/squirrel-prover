@@ -2,6 +2,6 @@ channel c
 system in(c,x);out(c,x).
 
 goal test :
-  output@0 = input@0.
+  output@A = input@A.
 Proof.
 Qed.

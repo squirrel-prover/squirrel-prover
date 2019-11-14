@@ -12,7 +12,7 @@ type action_shape
 
 type term =
   | Var of string
-  | Taction of action_shape
+  | Taction of string * term list
   | Name of string * term list
       (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -75,7 +75,6 @@ val define_action_symbol :
   * checking cannot be performed due to free variables. *)
 
 val make_term : ?at_ts:term option -> string -> term list -> term
-val make_action : (int * string list * int * string list) list -> action_shape
 val make_pair : term -> term -> term
 
 (** {2 Type-checking} *)

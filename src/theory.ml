@@ -17,7 +17,7 @@ let pp_par_choice_shape2 =
 
 type term =
   | Var of string
-  | Taction of action_shape
+  | Taction of string * term list
   | Name of string * term list
   (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -40,7 +40,10 @@ let sep ppf () = Fmt.pf ppf ","
 
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
-  | Taction a -> pp_action_shape ppf a
+  | Taction (a,l) ->
+    Fmt.pf ppf "%s(@[<hov 1>%a@])"
+      a
+      (Fmt.list ~sep pp_term) l
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s(@[<hov 1>%a@])%a"
       f
@@ -130,7 +133,10 @@ let function_kind name =
     | AEnc_symbol -> [Message; Message; Message], Message
     | Abstract_symbol (args_k, ret_k) -> args_k, ret_k
     | Macro_symbol (args, k, _) -> List.map snd args, k
-    | _ -> assert false
+    | Mutable_symbol _ | Name_symbol _ | Action_symbol _ ->
+        (* [make_term] does not build [Fun] terms for these,
+         * but [Get] and [Name] terms instead *)
+        assert false
   with Not_found -> assert false
 
 let check_state s n =
@@ -150,22 +156,21 @@ let check_name s n =
     | _ -> assert false
   with Not_found -> assert false
 
+let check_action s n =
+  match Hashtbl.find symbols s with
+    | Action_symbol (l,a) ->
+        if List.length l <> n then raise Type_error
+    | _ -> assert false
+    | exception Not_found -> assert false
+
 let rec check_term env tm kind =
   match tm with
   | Var x ->
     begin try
-        if List.assoc x env <> kind then raise Type_error;
-      with
-      | Not_found -> failwith ("unbound variable "^x) end
-  | Taction a ->
-    if kind <> Timestamp then raise Type_error ;
-    if not @@ List.for_all (fun it ->
-        let _,indices = it.Action.par_choice in
-        List.for_all (fun i ->
-            try List.assoc i env = Index with
-            | Not_found -> failwith ("unbound variable "^i)
-          ) indices) a
-    then raise Type_error
+      if List.assoc x env <> kind then raise Type_error
+    with
+      | Not_found -> failwith ("unbound variable "^x)
+    end
   | Fun (f, ts, ots) ->
     begin
       match ots with
@@ -194,6 +199,12 @@ let rec check_term env tm kind =
     List.iter
       (fun t -> check_term env t Index)
       ts
+  | Taction (a,l) ->
+    check_action a (List.length l) ;
+    if kind <> Timestamp then raise Type_error ;
+    List.iter
+      (fun t -> check_term env t Index)
+      l
   | Compare (_, u, v) ->
     if kind <> Boolean then raise Type_error ;
     check_term env u Message ;
@@ -288,7 +299,7 @@ let make_term ?at_ts:(at_ts=None) s l =
     | Action_symbol (args,a) ->
       if List.length args <> List.length l then raise Type_error ;
       assert (at_ts = None);
-      Fun (s,l,None)
+      Taction (s,l)
 
   with
   | Not_found ->
@@ -302,11 +313,6 @@ let make_term ?at_ts:(at_ts=None) s l =
     else begin
       if l <> [] then raise Type_error ;
       Var s end
-
-let make_action l : action_shape =
-  List.map
-    (fun (p, lp, s, ls) -> Action.{ par_choice = p, lp; sum_choice = s, ls})
-    l
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair", [u; v], None)
@@ -343,7 +349,7 @@ let subst t s =
         begin try List.assoc x s with
           | Not_found -> Var x
         end
-    | Taction a -> Taction a
+    | Taction (a,l) -> Taction (a, List.map aux l)
     | Name (n,l) -> Name (n, List.map aux l)
     | Get (s,None,l) -> Get (s, None, List.map aux l)
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
@@ -430,16 +436,22 @@ let convert_ts subst t =
   let rec conv = function
     | Fun (f, [t'], None) when f = pred_fs -> Term.TPred (conv t')
     | Var x -> subst_get_ts subst x
-    | Taction a ->
-      let act =
-        List.map
-          (fun Action.{par_choice=(p, lp);sum_choice=(s, ls)} ->
-             Action.{
-               par_choice = p, List.map (subst_get_index subst) lp ;
-               sum_choice = s, List.map (subst_get_index subst) ls })
-          a
-      in
-      Term.TName act
+    | Taction (a,l) ->
+        begin match Hashtbl.find symbols a with
+          | Action_symbol (args,action) ->
+              let s' : Term.subst =
+                List.map2
+                  (fun x -> function
+                     | Var y ->
+                         Term.Index (x, subst_get_index subst y)
+                     | _ -> assert false)
+                  args l
+              in
+              let action = Term.subst_action s' action in
+                Term.TName action
+          | _ -> assert false
+          | exception Not_found -> assert false
+        end
     | Fun _ | Get _ | Name _ | Compare _ ->
       raise @@ Failure ("not a timestamp") in
   conv t

@@ -9,17 +9,16 @@ name nb : index -> message
 name nc : index -> message
 name mc : index -> message
 
-
 axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>
 
-system  out(c,cst);
-(
-  (!_a out(c,h(na(a),k)))
-  | (!_b out(c,h(<nb(b),nb(b)>,k)))
-  | (!_c out(c,h(<nc(c),mc(c)>,k)))
- ).
+system (out(c,cst);
+ (
+  (!_a out(c,h(na(a),k)) as A)
+  | (!_b out(c,h(<nb(b),nb(b)>,k)) as B)
+  | (!_c out(c,h(<nc(c),mc(c)>,k)) as C)
+ )) as O.
 
 
 goal dummy :
@@ -32,16 +31,15 @@ Qed.
 goal unforgeable_1 :
   forall (a : index, b : index)
   such that b <> a,
-  output@0_0[b] <> h(na(a),k).
+  output@A(b) <> h(na(a),k).
 
 Proof.
   collision.
 Qed.
 
 goal unforgeable_2 :
-  forall (a : index, b : index)
-  such that b <> a,
-  output@0_1[b] <> h(na(a),k).
+  forall (a : index, b : index),
+  output@B(b) <> h(na(a),k).
 
 Proof.
   collision.
@@ -54,9 +52,8 @@ Qed.
 
 
 goal unforgeable_3 :
-  forall (a : index, b : index)
-  such that b <> a,
-  output@0_2[b] <> h(na(a),k).
+  forall (a : index, b : index),
+  output@C(b) <> h(na(a),k).
 
 Proof.
   collision.

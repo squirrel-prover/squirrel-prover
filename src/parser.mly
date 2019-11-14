@@ -52,15 +52,6 @@ index_list:
 | LBRACKET RBRACKET               { [] }
 | LBRACKET; ind=ID; l=i_list; RBRACKET
                                   { ind :: l }
-saction:
-| par=INT; lpar=index_list        { (par,lpar,0,[]) }
-| par=INT; lpar=index_list; SLASH; sum=INT; lsum=index_list
-                                  { (par,lpar,sum,lsum) }
-
-action:
-| act=saction;                       { [act] }
-| act=saction; UNDERSCORE; l=action  { act :: l }
-
 (* Terms *)
 
 term:
@@ -68,7 +59,6 @@ term:
 | LPAREN term RPAREN             { $2 }
 
 aterm:
-| a=action                       { Theory.Taction (Theory.make_action a) }
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
 		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
