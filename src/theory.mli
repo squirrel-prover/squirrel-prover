@@ -48,6 +48,8 @@ type kind = Index | Message | Boolean | Timestamp
 
 exception Multiple_declarations
 
+val check_rebound_symbol : string -> unit
+
 val declare_hash : string -> unit
 val declare_aenc : string -> unit
 val declare_name : string -> int -> unit

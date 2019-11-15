@@ -119,6 +119,7 @@ let initialize_symbols () =
 
 exception Type_error
 exception Unbound_identifier
+exception Rebound_identifier
 
 exception Arity_error of string*int*int
 
@@ -225,6 +226,9 @@ exception Multiple_declarations
 let declare_symbol name info =
   if Hashtbl.mem symbols name then raise Multiple_declarations ;
   Hashtbl.add symbols name info
+
+let check_rebound_symbol name =
+  if Hashtbl.mem symbols name then raise Multiple_declarations
 
 let declare_hash s = declare_symbol s Hash_symbol
 let declare_aenc s = declare_symbol s AEnc_symbol

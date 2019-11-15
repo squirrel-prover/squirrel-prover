@@ -1,12 +1,6 @@
 open Vars
 
-module IndexParam : VarParam =
-struct
-  let default_string = "index"
-  let cpt = ref 0
-end
-
-module Index : VarType = Var(IndexParam)
+module Index  = Vars.Index
 
 type index = Index.t
 
@@ -104,8 +98,12 @@ let rec constr_equal a b = match a,b with
 let rec refresh = function
   | [] -> [],[]
   | {par_choice=(p,lp);sum_choice=(s,ls)}::l ->
-      let lp' = List.map (fun i -> i, Index.make_fresh ()) lp in
-      let ls' = List.map (fun i -> i, Index.make_fresh ()) ls in
+    let lp' =
+      List.map (fun i -> i, Index.make_fresh ~name:(Index.name i) ()) lp
+    in
+    let ls' =
+      List.map (fun i -> i, Index.make_fresh ~name:(Index.name i) ()) ls
+    in
       let newsubst = lp' @ ls' in
       let action,subst = refresh l in
         { par_choice = p, List.map snd lp' ;

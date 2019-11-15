@@ -26,7 +26,7 @@ val action_of_ts : timestamp -> Action.action option
 (** {2 Messages } *)
 (** Messages variables for formulas **)
 module Mvar : VarType
-
+  
 type mvar = Mvar.t
 
 

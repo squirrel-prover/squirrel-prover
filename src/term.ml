@@ -1,13 +1,7 @@
 open Vars
 open Action
 
-module TParam : VarParam =
-struct
-  let default_string = "tau"
-  let cpt = ref 0
-end
-
-module Tvar = Var(TParam)
+module Tvar = Vars.Tvar
 
 type tvar = Tvar.t
 
@@ -26,13 +20,7 @@ let rec action_of_ts = function
   | TPred ts -> action_of_ts ts
   | TVar _ -> None
 
-module MParam : VarParam =
-struct
-  let default_string = "mess"
-  let cpt = ref 0
-end
-
-module Mvar = Var(MParam)
+module Mvar = Vars.Mvar
 
 type mvar = Mvar.t
 

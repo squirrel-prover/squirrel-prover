@@ -299,6 +299,7 @@ type args = (string * Theory.kind) list
 let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
+  List.iter (fun (s,k) -> Theory.check_rebound_symbol s) (uargs@eargs);
   let (u_subst, ufvars) = Theory.convert_vars uargs
   and (e_subst, efvars) = Theory.convert_vars eargs in
   let uconstr =
@@ -404,6 +405,7 @@ let eval_tactic : tac -> bool = fun utac -> match utac with
 let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
+    Vars.reset_id_names ();
     cpt_tag := 0;
     current_goal := Some (gname,goal);
     subgoals := auto_simp [Judgment.init goal];

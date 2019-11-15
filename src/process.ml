@@ -216,7 +216,8 @@ let to_descr (block:block) : descr =
 
 let fresh_instance block =
   let subst =
-    List.map (fun i -> Term.Index(i, Index.make_fresh ())) block.indices
+    List.map (fun i ->
+        Term.Index(i, Index.make_fresh ~name:(Index.name i) ())) block.indices
   in
   let action = Term.subst_action subst block.action in
   let refresh_term = Term.subst_term subst in
@@ -514,7 +515,7 @@ let parse_proc proc : unit =
       let pos = p_in ~env ~pos ~pos_indices p in
       p_in ~env ~pos ~pos_indices q
     | Repl (i, p) ->
-      let i' = Action.Index.make_fresh () in
+      let i' = Action.Index.make_fresh ~name:i () in
       let env =
         { env with
           isubst = (i,i') :: env.isubst ;
@@ -554,7 +555,9 @@ let parse_proc proc : unit =
         else
           facts
       in
-      let newsubst = List.map (fun i -> i, Action.Index.make_fresh ()) evars in
+      let newsubst = List.map (fun i ->
+          i, Action.Index.make_fresh ~name:i ()) evars
+      in
       let pos =
         p_cond
           ~env:{ env with
