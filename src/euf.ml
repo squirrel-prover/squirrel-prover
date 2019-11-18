@@ -44,7 +44,7 @@ let euf_key_ssc hash_fn key_n =
     | Macro ((mn, is), _) -> ssc_macro mn is
     | State _ -> ()
     | Name (n, _) -> if n = key_n then raise Bad_ssc
-    | MVar m -> ()
+    | MVar m -> raise Bad_ssc
 
   and ssc_macro mn is =
     if List.mem mn !checked_macros || Term.is_built_in mn then ()
