@@ -20,9 +20,7 @@ PROVER_OK_TESTS = tests/ok/forall.mbc \
 			   tests/ok/axiom.mbc \
 			   tests/ok/axiom_collision_resistance.mbc \
 			   tests/ok/collisions.mbc \
-#			   tests/ok/macros_input.mbc \
-			   tests/ok/macros.mbc \
-			   tests/ok/euf.mbc
+			   tests/ok/macros_input.mbc
 
 PROVER_FAIL_TESTS = tests/fail/existsintro_fail.mbc \
 			tests/fail/existsintro_fail2.mbc \
