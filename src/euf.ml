@@ -50,8 +50,13 @@ let euf_key_ssc hash_fn key_n =
     if List.mem mn !checked_macros || Term.is_built_in mn then ()
     else begin
       checked_macros := mn :: !checked_macros;
-      let a_dummy = [] in
-      ssc_term (Term.macro_declaration mn (TName a_dummy) is) end in
+      let rec dummy_action k =
+        if k = 0 then [] else
+          { Action.par_choice = 0,[] ; sum_choice = 0,[] }
+          :: dummy_action (k-1)
+      in
+      let dummy_action = dummy_action (Term.macro_domain mn) in
+      ssc_term (Term.macro_declaration mn dummy_action is) end in
 
   Process.iter_fresh_csa ssc_blk
 
@@ -66,8 +71,12 @@ let rec h_o_term hh kk acc = function
   | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
   | Macro ((mn,is),a) ->
     if Term.is_built_in mn then acc
-    else Term.macro_declaration mn a is
-         |> h_o_term hh kk acc
+    else begin match a with
+      | Term.TName a when List.length a = Term.macro_domain mn ->
+          Term.macro_declaration mn a is
+          |> h_o_term hh kk acc
+      | _ -> raise Bad_ssc
+    end
   | State _ -> acc
   | Name (n,_) -> acc
   | MVar m -> acc

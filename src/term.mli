@@ -128,19 +128,30 @@ val pp_term : Format.formatter -> term -> unit
 (** [is_built_in mn] returns true iff [mn] is a built-in.  *)
 val is_built_in : mname -> bool
 
+(** Converts a string to a macro name if a macro of that name exists,
+  * raises [Not_found] otherwise. *)
 val is_declared : string -> mname
 
 (** Reset macro declarations *)
 val initialize_macros : unit -> unit
 
-(** [declare_macro x f] declares a new macro with a name resembling [x],
-  * associated to a substitution function which takes the target timestamp
-  * as argument. *)
-val declare_macro : string -> (timestamp -> index list -> term) -> mname
+(** [declare_macro x l f] declares a new macro with a name resembling [x],
+  * where [f] is used to compute how the macro is expanded, and expansion
+  * is only allowed for explicit actions of length [l].
+  *
+  * TODO [f] should actually do only basic things (conversion,
+  * substitutions, and computation of action prefixes to obtain correct
+  * input symbols) and in fact [f] is always the same: at some point
+  * it would be good to avoid this closure. *)
+val declare_macro : string -> int -> (action -> index list -> term) -> mname
 
 (** Return the term corresponding to the declared macro, except for the
     built-ins "in" and "out". *)
-val macro_declaration : mname -> timestamp -> index list -> term
+val macro_declaration : mname -> action -> index list -> term
+
+(** Given the name of a defined macro, returns the action length that
+  * is required for unrolling that macro. *)
+val macro_domain : mname -> int
 
 val mk_mname : mname -> index list -> msymb
 

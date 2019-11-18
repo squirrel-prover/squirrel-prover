@@ -131,7 +131,7 @@ let rec pp_term ppf = function
 
 type t = term
 
-let macros : (string, (timestamp -> index list -> term)) Hashtbl.t =
+let macros : (string, int * (action -> index list -> term)) Hashtbl.t =
   Hashtbl.create 97
 
 let initialize_macros () = Hashtbl.clear macros
@@ -148,16 +148,22 @@ let is_declared mn =
 exception Reserved_identifier
 exception Multiple_declarations
 
-let declare_macro mn f =
+let declare_macro mn l f =
   if is_built_in mn then raise Reserved_identifier ;
   if Hashtbl.mem macros mn then raise Multiple_declarations ;
-  Hashtbl.add macros mn f;
+  Hashtbl.add macros mn (l,f) ;
   mn                            (* TODO: refresh if already there *)
 
-let macro_declaration mn =
-  if is_built_in mn then
-    raise @@ Failure "look-up of a built-in declaration"
-  else Hashtbl.find macros mn
+let macro_domain mn = fst (Hashtbl.find macros mn)
+
+let macro_declaration mn action indices =
+  let l,f =
+    if is_built_in mn then
+      failwith "look-up of a built-in declaration"
+    else Hashtbl.find macros mn
+  in
+  assert (List.length action = l) ;
+  f action indices
 
 let mk_mname mn indices = (mn,indices)
 
