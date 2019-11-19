@@ -111,6 +111,21 @@ let rec refresh = function
         :: action,
         newsubst @ subst
 
+(** Action symbols *)
+
+module ActionSymbols =
+  Symbols.Make (struct
+    type t = Index.t list * action
+  end)
+
+let shape_to_symb = Hashtbl.create 97
+
+let fresh_symbol name = ActionSymbols.reserve name
+let define_symbol symb args action =
+  Hashtbl.add shape_to_symb (get_shape action) symb ;
+  ActionSymbols.define symb (args,action)
+let find_symbol s = ActionSymbols.find s
+
 (** Pretty-printing *)
 
 (** Print integers in action shapes. *)
@@ -154,6 +169,14 @@ let pp_action ppf a =
   Fmt.styled `Green (pp_action_f pp_indices (0,[])) ppf a
 
 let pp_action_shape ppf a = pp_action_f pp_int (0,0) ppf a
+
+let pp_action ppf a =
+  let symb = Hashtbl.find shape_to_symb (get_shape a) in
+  let indices = action_indices a in
+  Fmt.styled `Green
+    (fun ppf a ->
+       Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
+    ppf a
 
 let pp = pp_action
 

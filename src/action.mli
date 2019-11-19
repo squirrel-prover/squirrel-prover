@@ -86,3 +86,15 @@ val pp_action_shape : Format.formatter -> action_shape -> unit
 
 (** Formatter for parsed actions. *)
 val pp_parsed_action : Format.formatter -> (string list) item list -> unit
+
+(** Action symbols *)
+
+(** Action symbols are associated to a list of indices and an action
+  * using these indices, which represents a function from indices to
+  * actions. *)
+
+val fresh_symbol : string -> (Index.t list * action) Symbols.t
+val define_symbol :
+  (Index.t list * action) Symbols.t ->
+  Index.t list -> action -> unit
+val find_symbol : string -> Index.t list * action

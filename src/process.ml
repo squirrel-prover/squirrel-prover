@@ -437,10 +437,10 @@ let prepare : process -> process =
 
     | Out (c,t,p) ->
         let t = Theory.subst t subst in
-        let a' = Theory.fresh_action_symbol a in
+        let a' = Action.fresh_symbol a in
           Alias
             (Out (c, t, prep p),
-             a')
+             Symbols.to_string a')
 
     | Apply (id,args) ->
         let t,p = Hashtbl.find pdecls id in
@@ -650,8 +650,10 @@ let parse_proc proc : unit =
              * state updates. The problem is that we don't have an
              * alias setup by the preparation phase.
              * TODO aliases on "interesting" null processes *)
-            let a = Theory.fresh_action_symbol "A" in
-            (Channel.dummy, Term.dummy),a,proc
+            let a = Action.fresh_symbol "A" in
+            (Channel.dummy, Term.dummy),
+            Symbols.to_string a,
+            proc
         | _ -> assert false
       in
       let condition =
@@ -669,7 +671,9 @@ let parse_proc proc : unit =
       let action = (List.rev env.action) in
       let block = {action; input; indices; condition; updates; output} in
       Hashtbl.add action_to_block (get_shape action) block ;
-      Theory.define_action_symbol a indices action ;
+      (* TODO temporary Obj.magic, I suspect it will disappear
+       *   by merging prepare and parse_proc, which makes sense anyway *)
+      Action.define_symbol (Obj.magic a) indices action ;
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
 
   | p ->

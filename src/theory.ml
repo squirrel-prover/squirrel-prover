@@ -87,10 +87,6 @@ type symbol_info =
   (** [Macro_symbol ([x1,k1;...;xn,kn],k,t)] defines a macro [t]
     * with arguments [xi] of respective types [ki], and
     * return type [k]. *)
-  | Action_symbol of Action.Index.t list * Action.action
-  (** [Action_symbol (l,a)] is a symbol with arguments [l],
-    * which stands for action [a] where indices are replaced
-    * according to [l] and the arguments of the symbol. *)
 
 let pred_fs = "pred"
 
@@ -134,7 +130,7 @@ let function_kind name =
     | AEnc_symbol -> [Message; Message; Message], Message
     | Abstract_symbol (args_k, ret_k) -> args_k, ret_k
     | Macro_symbol (args, k, _) -> List.map snd args, k
-    | Mutable_symbol _ | Name_symbol _ | Action_symbol _ ->
+    | Mutable_symbol _ | Name_symbol _ ->
         (* [make_term] does not build [Fun] terms for these,
          * but [Get] and [Name] terms instead *)
         assert false
@@ -158,10 +154,9 @@ let check_name s n =
   with Not_found -> assert false
 
 let check_action s n =
-  match Hashtbl.find symbols s with
-    | Action_symbol (l,a) ->
+  match Action.find_symbol s with
+    | (l,a) ->
         if List.length l <> n then raise Type_error
-    | _ -> assert false
     | exception Not_found -> assert false
 
 let rec check_term env tm kind =
@@ -257,18 +252,6 @@ let fresh_name n arity =
     declare_name n' arity ;
     Term.mk_name n'
 
-let fresh_action_symbol s =
-  let s' = get_fresh_symbol s in
-    Hashtbl.add symbols s' (Action_symbol ([],[])) ;
-    s'
-
-let define_action_symbol s l a =
-  assert (match Hashtbl.find symbols s with
-            | Action_symbol ([],[]) -> true
-            | _ -> false
-            | exception Not_found -> false) ;
-  Hashtbl.replace symbols s (Action_symbol (l,a))
-
 (** Removal of all declarations *)
 
 let clear_declarations () = Hashtbl.clear symbols
@@ -300,7 +283,8 @@ let make_term ?at_ts:(at_ts=None) s l =
       if List.length args <> List.length l then raise Type_error ;
       assert (at_ts = None);
       Fun (s,l,None)
-    | Action_symbol (args,a) ->
+    | exception Not_found ->
+      let (args,a) = Action.find_symbol s in
       if List.length args <> List.length l then raise Type_error ;
       assert (at_ts = None);
       Taction (s,l)
@@ -441,8 +425,8 @@ let convert_ts subst t =
     | Fun (f, [t'], None) when f = pred_fs -> Term.TPred (conv t')
     | Var x -> subst_get_ts subst x
     | Taction (a,l) ->
-        begin match Hashtbl.find symbols a with
-          | Action_symbol (args,action) ->
+        begin match Action.find_symbol a with
+          | (args,action) ->
               let s' : Term.subst =
                 List.map2
                   (fun x -> function
@@ -453,7 +437,6 @@ let convert_ts subst t =
               in
               let action = Term.subst_action s' action in
                 Term.TName action
-          | _ -> assert false
           | exception Not_found -> assert false
         end
     | Fun _ | Get _ | Name _ | Compare _ ->
