@@ -15,51 +15,24 @@ let subst_descr nu blk =
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
+class check_hash_key hash_fn key_n = object (self)
+  inherit Iter.iter_approx_macros as super
+  method visit_term t = match t with
+    | Fun ((fn,_), [m;Name _]) when fn = hash_fn -> self#visit_term m
+    | Name (n,_) when n = key_n -> raise Bad_ssc
+    | MVar m -> raise Bad_ssc
+    | _ -> super#visit_term t
+end
+
 (* Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
 let euf_key_ssc hash_fn key_n =
-  let checked_macros = ref [] in
-
-  let rec ssc_blk blk =
-    ssc_fact blk.condition;
-    ssc_term blk.output;
-    List.iter (fun (_,t) -> ssc_term t) blk.updates
-
-  and ssc_fact = function
-    | And (l, r) -> ssc_fact l; ssc_fact r
-    | Or (l, r) -> ssc_fact l; ssc_fact r
-    | Impl (l, r) -> ssc_fact l; ssc_fact r
-    | Not f -> ssc_fact f
-    | True | False -> ()
-    | Atom (_, t, t') -> ssc_term t; ssc_term t'
-
-  and ssc_term = function
-    | Fun ((fn, _), [m; k]) when fn = hash_fn ->
-      begin match k with
-        | Name _ -> ssc_term m
-        | _ -> ssc_term m; ssc_term k
-      end
-
-    | Fun (_, l) -> List.iter ssc_term l
-    | Macro ((mn, is), _) -> ssc_macro mn is
-    | State _ -> ()
-    | Name (n, _) -> if n = key_n then raise Bad_ssc
-    | MVar m -> raise Bad_ssc
-
-  and ssc_macro mn is =
-    if List.mem mn !checked_macros || Term.is_built_in mn then ()
-    else begin
-      checked_macros := mn :: !checked_macros;
-      let rec dummy_action k =
-        if k = 0 then [] else
-          { Action.par_choice = 0,[] ; sum_choice = 0,[] }
-          :: dummy_action (k-1)
-      in
-      let dummy_action = dummy_action (Term.macro_domain mn) in
-      ssc_term (Term.macro_declaration mn dummy_action is) end in
-
-  Process.iter_fresh_csa ssc_blk
-
+  let ssc = new check_hash_key hash_fn key_n in
+  Process.iter_fresh_csa
+    (fun blk ->
+       ssc#visit_fact blk.condition ;
+       ssc#visit_term blk.output ;
+       List.iter (fun (_,t) -> ssc#visit_term t) blk.updates)
 
 let rec h_o_term hh kk acc = function
   | Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
