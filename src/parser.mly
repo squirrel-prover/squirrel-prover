@@ -200,6 +200,9 @@ formula:
                                  { (q, q2, Term.True, f2) }
 | FORALL q_vars COMMA fact DARROW fact
                                  { ($2, ([], Term.True) , $4, $6) }
+| f=fact DARROW g=fact           { ([],Term.True),([],Term.True),f,g }
+| f=fact DARROW EXISTS q2=q_vars COMMA g=fact
+                                 { ([],Term.True),q2,f,g }
 
 tactic_params:
 |                               { [] }
