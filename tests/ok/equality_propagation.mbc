@@ -19,3 +19,15 @@ goal eq_names :
 
 Proof.
 Qed.
+
+goal functionality :
+  forall (x:message, y:message),
+  x = y => fst(x) = fst(y).
+Proof.
+Qed.
+
+goal contradiction :
+  forall (x:message, y:message),
+  (x = y && x <> y) => false.
+Proof.
+Qed.
