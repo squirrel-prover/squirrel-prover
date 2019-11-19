@@ -37,4 +37,10 @@ module Make (M:S) = struct
     match Hashtbl.find table name with
       | C v -> v
       | _ -> raise Not_found
+  let iter f =
+    Hashtbl.iter
+      (fun k def -> match def with
+         | C v -> f k v
+         | _ -> ())
+      table
 end

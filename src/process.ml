@@ -699,15 +699,24 @@ let reset () =
   Hashtbl.clear Aliases.name_to_action ;
   Hashtbl.clear Aliases.action_to_name
 
+let debug = false
+
 let pp_actions ppf () =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
-  Hashtbl.iter
-    (fun a _ ->
+  Action.iter
+    (fun symbol indices action ->
        if !comma then Fmt.pf ppf ",@;" ;
        comma := true ;
-       Action.pp_action_shape ppf a)
-    action_to_block ;
+       if debug then
+         Fmt.pf ppf "%s%a=%a"
+           (Symbols.to_string symbol)
+           Action.pp_indices indices
+           Action.pp_action_structure action
+       else
+         Fmt.pf ppf "%s%a"
+           (Symbols.to_string symbol)
+           Action.pp_indices indices) ;
   Fmt.pf ppf "@]@]@."
 
 let pp_descrs ppf () =
@@ -720,4 +729,4 @@ let pp_descrs ppf () =
 let pp_proc ppf () =
   pp_actions ppf () ;
   Fmt.pf ppf "@." ;
-  pp_descrs ppf ()
+  if debug then pp_descrs ppf ()

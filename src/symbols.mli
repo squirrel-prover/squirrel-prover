@@ -28,4 +28,7 @@ module Make (M:S) : sig
     * raise [Not_found] if it is not defined. *)
   val find : string -> M.t
 
+  (** Iter on the defined symbols of this namespace *)
+  val iter : (M.t t -> M.t -> unit) -> unit
+
 end

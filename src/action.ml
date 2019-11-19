@@ -125,6 +125,7 @@ let define_symbol symb args action =
   Hashtbl.add shape_to_symb (get_shape action) symb ;
   ActionSymbols.define symb (args,action)
 let find_symbol s = ActionSymbols.find s
+let iter f = ActionSymbols.iter (fun s (l,a) -> f s l a)
 
 (** Pretty-printing *)
 
@@ -165,7 +166,7 @@ let pp_action_f f d ppf a =
     ppf
     a
 
-let pp_action ppf a =
+let pp_action_structure ppf a =
   Fmt.styled `Green (pp_action_f pp_indices (0,[])) ppf a
 
 let pp_action_shape ppf a = pp_action_f pp_int (0,0) ppf a

@@ -7,6 +7,8 @@ module Index : VarType
 
 type index = Index.t
 
+val pp_indices : Format.formatter -> Index.t list -> unit
+
 (** Actions uniquely describe execution points in a process.
   * They consist of a list of items describing a position
   * among a (possibly infinite) parallel composition, followed
@@ -75,7 +77,10 @@ val constr_equal : action -> action -> isubst option
   * the corresponding substitution for indices. *)
 val refresh : action -> action * isubst
 
-(** Formatter for actions. *)
+(** Format an action, displayed through its symbol. *)
+val pp_action_structure : Format.formatter -> action -> unit
+
+(** Format an action, displayed through its structure. *)
 val pp_action : Format.formatter -> action -> unit
 
 (** Alias for [pp_action]. *)
@@ -98,3 +103,5 @@ val define_symbol :
   (Index.t list * action) Symbols.t ->
   Index.t list -> action -> unit
 val find_symbol : string -> Index.t list * action
+val iter :
+  ((Index.t list * action) Symbols.t -> Index.t list -> action -> unit) -> unit
