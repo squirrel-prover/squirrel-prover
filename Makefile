@@ -5,24 +5,9 @@ OCB = ocamlbuild $(OCB_FLAGS)
 
 all: metabc test
 
-PROVER_OK_TESTS = tests/ok/forall.mbc \
-			   tests/ok/equality_propagation.mbc \
-			   tests/ok/actions.mbc \
-			   tests/ok/input.mbc \
-			   tests/ok/euf_null.mbc \
-			   tests/ok/euf_trivial.mbc \
-			   tests/ok/euf_basic.mbc \
-			   tests/ok/euf_output.mbc \
-			   tests/ok/euf_output2.mbc \
-			   tests/ok/euf_output3.mbc \
-			   tests/ok/axiom.mbc \
-			   tests/ok/axiom_collision_resistance.mbc \
-			   tests/ok/collisions.mbc \
-			   tests/ok/macros_input.mbc
+PROVER_OK_TESTS = $(wildcard tests/ok/*)
 
-PROVER_FAIL_TESTS = tests/fail/existsintro_fail.mbc \
-			tests/fail/existsintro_fail2.mbc \
-			tests/fail/eufnull.mbc
+PROVER_FAIL_TESTS = $(wildcard tests/fail/*)
 
 test: alcotest ok_test fail_test
 
@@ -51,7 +36,6 @@ fail_test: sanity
 	done ; \
 	echo "Total: $$tests tests, $$failures failures." ; echo ; \
 	test $$failures -eq $$tests
-
 
 clean:
 	$(OCB) -clean
