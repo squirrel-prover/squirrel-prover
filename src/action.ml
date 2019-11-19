@@ -130,16 +130,16 @@ let find_symbol s = ActionSymbols.find s
 
 (** Print integers in action shapes. *)
 let pp_int ppf i =
-  if i <> 0 then Fmt.pf ppf "[%d]" i
+  if i <> 0 then Fmt.pf ppf "(%d)" i
 
 (** Print list of indices in actions. *)
 let pp_indices ppf l =
-  if l <> [] then Fmt.pf ppf "[%a]" Index.pp_list l
+  if l <> [] then Fmt.pf ppf "(%a)" Index.pp_list l
 
 (** Print list of strings in actions. *)
 let pp_strings ppf l =
   let pp_list = Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.string in
-  if l <> [] then Fmt.pf ppf "[%a]" pp_list l
+  if l <> [] then Fmt.pf ppf "(%a)" pp_list l
 
 (** [pp_par_choice_f f] formats [int*'a] as parallel choices,
   * relying on [f] to format ['a]. *)
