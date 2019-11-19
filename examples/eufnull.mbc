@@ -1,0 +1,9 @@
+hash h
+name k : message
+system null.
+
+goal shouldntpass :
+  h(k,k) = k => false.
+Proof.
+  euf 0.
+Qed.
