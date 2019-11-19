@@ -15,8 +15,6 @@ PROVER_OK_TESTS = tests/ok/forall.mbc \
 			   tests/ok/euf_output.mbc \
 			   tests/ok/euf_output2.mbc \
 			   tests/ok/euf_output3.mbc \
-			   tests/ok/euf_assert.mbc \
-			   tests/ok/euf.mbc \
 			   tests/ok/axiom.mbc \
 			   tests/ok/axiom_collision_resistance.mbc \
 			   tests/ok/collisions.mbc \
@@ -24,6 +22,7 @@ PROVER_OK_TESTS = tests/ok/forall.mbc \
 
 PROVER_FAIL_TESTS = tests/fail/existsintro_fail.mbc \
 			tests/fail/existsintro_fail2.mbc \
+			tests/fail/eufnull.mbc
 
 test: alcotest ok_test fail_test
 
@@ -50,7 +49,7 @@ fail_test: sanity
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
 	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
 	done ; \
-	echo "Total: $$tests tests, $$failures failures." ; \
+	echo "Total: $$tests tests, $$failures failures." ; echo ; \
 	test $$failures -eq $$tests
 
 

@@ -26,8 +26,9 @@ end
 
 (* Check the key syntactic side-condition:
     The key [key_n] must appear only in key position of the hash [hash_fn]. *)
-let euf_key_ssc hash_fn key_n =
+let euf_key_ssc hash_fn key_n messages =
   let ssc = new check_hash_key hash_fn key_n in
+  List.iter ssc#visit_term messages ;
   Process.iter_fresh_csa
     (fun blk ->
        ssc#visit_fact blk.condition ;
@@ -107,7 +108,7 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_direct) rule.cases_direct
 
 let mk_rule mess sign hash_fn key_n =
-  euf_key_ssc hash_fn key_n;
+  euf_key_ssc hash_fn key_n [mess;sign];
   { hash = hash_fn;
     key = key_n;
 
