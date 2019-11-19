@@ -3,55 +3,57 @@ hash h
 abstract ok:message
 abstract ko:message
 
-name k : index->message
+name key : index->message
 
 channel cT
 channel cR
 
+(* TODO when macro support is complete, use the definitions
+ * of m2, x1, and x2 which are currently inlined below *)
+
 process tag(i:index) =
   new nT;
-  in(cR,nRt); (* errors if nR is used (conflict with toplevel decl) *)
-  (* TODO dont inline: let m2 = h(<nRt,nT>,k(i)) in *)
-  out(cT,<nT,h(<nRt,nT>,k(i))>);              (* 1[i,j] *)
+  in(cR,nR);
+  let m2 = h(<nR,nT>,key(i)) in
+  out(cT,<nT,h(<nR,nT>,key(i))>);
   in(cR,m3);
-  if m3@nT = h(<h(<nRt,nT>,k(i)),nRt>,k(i)) then
+  if m3@nT = h(<h(<nR,nT>,key(i)),nR>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
 
-(* why did I move the new below into a toplevel declaration ? *)
-name nR : index->message
-
 process reader(j:index) =
-  (* new nR; *)
-  out(cR,nR(j));                    (* 0[j] *)
+  new nR;
+  out(cR,nR);
   in(cT,x);
   (* TODO let <x1,x2> = x in *)
   let x1 = fst(x) in
   let x2 = snd(x) in
-  (* TODO I inlined x1,x2 in the condition because we lack macro support *)
-  try find i such that snd(x) = h(<nR(j),fst(x)>,k(i)) in
-    out(cR,h(<snd(x),nR(j)>,k(i)))      (* 0[j]_0/0[i] *)
-    (* TODO as accept *)
+  try find i such that snd(x) = h(<nR,fst(x)>,key(i)) in
+    out(cR,h(<snd(x),nR>,key(i)))
   else
     out(cR,ko)
 
-system ((!_j reader(j)) | (!_i !_j tag(i))).
+system ((!_j R: reader(j)) | (!_i !_j T: tag(i))).
 
 (* TODO In the next lemma, it would be more natural to write
- * something like happens(0[k]_0) rather than output@0[k]_0 = itself.
- * This could be left implicit since 0[k]_0 occurs in the
+ * something like happens(ACTION) rather than ACTION=ACTION.
+ * This could be left implicit since ACTION occurs in the
  * rest of the formula. The only cases I can think of where
  * the implicit treatment might not work is that of unreachability
- * statements: forall k, not(happens(def(0[k]_0))). *)
+ * statements: forall k, not(happens(ACTION)). *)
+(* TODO we should not get a type error when using an inexistent
+ *   action name *)
 goal wa :
   forall (k:index, p:index),
-  output@0[k]_0/0[p] = output@0[k]_0/0[p] =>
+  output@R1(k,p) = output@R1(k,p) =>
   exists (i:index,j:index) such that
-  0[k]_0/0[p] > 1[i,j],
-  input@0[k]_0/0[p] = output@1[i,j].
+  R1(k,p) > T1(i,j),
+  input@R1(k,p) = output@T1(i,j).
 Proof.
   euf 1.
-  euf 4.
-  (* TODO it seems we have problems with macros containing input variables,
-      the input variables are not replaced by input@tau terms *)
+  (* TODO at this point eqnames should allow to conclude
+   * (perhaps after an assert, which will only work when reasoning
+   * on pairs and projections is completed) because we have
+   *   snd(input@..) = h(..) = nR(..)
+   * where the name does not occur in the hash. *)
