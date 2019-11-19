@@ -51,7 +51,7 @@ struct
           if idname = 0 then
             name
           else
-            Format.sprintf "%s_%i" name idname
+            name ^ string_of_int idname
       }
 
   let make_fresh_by_name (n:string) =

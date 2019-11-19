@@ -25,5 +25,5 @@ goal unforgeable :
   input@tau = h(m,k) => exists (a:index),  m = na(a).
 Proof.
     euf 0.  
-    existsintro a_1.
+    existsintro a1.
 Qed.
