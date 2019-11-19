@@ -34,7 +34,7 @@ process reader(j:index) =
   else
     out(cR,ko)
 
-system ((!_j R: reader(j)) | (!_i !_j T: tag(i))).
+system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
 (* TODO In the next lemma, it would be more natural to write
  * something like happens(ACTION) rather than ACTION=ACTION.
@@ -45,11 +45,11 @@ system ((!_j R: reader(j)) | (!_i !_j T: tag(i))).
 (* TODO we should not get a type error when using an inexistent
  *   action name *)
 goal wa :
-  forall (k:index, p:index),
-  output@R1(k,p) = output@R1(k,p) =>
-  exists (i:index,j:index) such that
-  R1(k,p) > T1(i,j),
-  input@R1(k,p) = output@T1(i,j).
+  forall (i:index, j:index),
+  output@R1(j,i) = output@R1(j,i) =>
+  exists (ii:index,k:index) such that
+  R1(j,i) > T1(ii,k),
+  input@R1(j,i) = output@T1(ii,k).
 Proof.
   euf 1.
   (* TODO at this point eqnames should allow to conclude
@@ -57,3 +57,13 @@ Proof.
    * on pairs and projections is completed) because we have
    *   snd(input@..) = h(..) = nR(..)
    * where the name does not occur in the hash. *)
+  assert(fst(<snd(input@R1(j5,i1)), nR(j5)>) =
+         fst(<nR(j), fst(input@R1(j,i))>)).
+  (* TODO this assert is so obvious
+       that the addition of the fact is cancelled *)
+  assert(h(<nR(j5), fst(input@R1(j5,i1))>, key(i1)) = nR(j)).
+  admit. (* need full support of fst(_) *)
+
+  eqnames. (* should add j = j 5 *)
+  assert(nR(j) = nR(j5)). (* TODO cannot simply write j=j5 *)
+  admit.
