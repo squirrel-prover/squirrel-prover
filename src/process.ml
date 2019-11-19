@@ -563,7 +563,7 @@ let parse_proc proc : unit =
         | In (c, x, p) -> (c, x), p
         | _ -> (Channel.dummy, "_"), proc
       in
-      let par_choice = pos, pos_indices in
+      let par_choice = pos, List.rev pos_indices in
       let _ : int =
         p_cond
           ~env ~par_choice ~input
@@ -667,7 +667,7 @@ let parse_proc proc : unit =
              s, conv_indices env l, conv_term env t)
           updates
       in
-      let indices = env.p_indices in
+      let indices = List.rev env.p_indices in
       let action = (List.rev env.action) in
       let block = {action; input; indices; condition; updates; output} in
       Hashtbl.add action_to_block (get_shape action) block ;
