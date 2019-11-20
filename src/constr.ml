@@ -1,5 +1,6 @@
 open Graph
 open Action
+open Vars
 open Term
 open Utils
 
@@ -17,7 +18,7 @@ open Utils
 let log_constr = Log.log Log.LogConstr
 
 module Utv : sig
-  type uvar = Utv of tvar | Uind of index
+  type uvar = Utv of var | Uind of index
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -27,14 +28,14 @@ module Utv : sig
     | UPred of ut
     | UName of action_shape * ut list
 
-  val uvar : tvar -> ut
+  val uvar : var -> ut
   val uvari : index -> ut
   val uts : timestamp -> ut
   val uname : action_shape -> ut list -> ut
   val upred : ut -> ut
 
 end = struct
-  type uvar = Utv of tvar | Uind of index
+  type uvar = Utv of var | Uind of index
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -79,8 +80,8 @@ end
 open Utv
 
 let pp_uvar ppf = function
-  | Utv tv -> Tvar.pp ppf tv
-  | Uind index -> Index.pp ppf index
+  | Utv tv -> Vars.pp ppf tv
+  | Uind index -> Vars.pp ppf index
 
 let rec pp_ut_cnt ppf = function
   | UVar uv -> pp_uvar ppf uv
@@ -640,14 +641,15 @@ let get_equalities (models : models) ts =
 (****************)
 (* Tests Suites *)
 (****************)
-let tau = TVar (Tvar.make_fresh ())
-and tau' = TVar (Tvar.make_fresh ())
-and tau'' = TVar (Tvar.make_fresh ())
-and tau3 = TVar (Tvar.make_fresh ())
-and tau4 = TVar (Tvar.make_fresh ())
-and tau5 = TVar (Tvar.make_fresh ())
-and i = Index.make_fresh ()
-and i' = Index.make_fresh ()
+let env = ref (Vars.empty_env ())
+let tau = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and tau' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and tau'' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and tau3 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and tau4 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and tau5 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+and i =  Vars.make_fresh_and_update env Index "i"
+and i' = Vars.make_fresh_and_update env Index "i"
 and a indices = [{ par_choice = 0, indices;
                    sum_choice = 0,[] }]
 

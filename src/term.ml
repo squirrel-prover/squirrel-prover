@@ -1,17 +1,14 @@
 open Vars
+
 open Action
 
-module Tvar = Vars.Tvar
-
-type tvar = Tvar.t
-
 type timestamp =
-  | TVar of tvar
+  | TVar of var
   | TPred of timestamp
   | TName of action
 
 let rec pp_timestamp ppf = function
-  | TVar tv -> Tvar.pp ppf tv
+  | TVar tv -> Vars.pp ppf tv
   | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
@@ -20,9 +17,7 @@ let rec action_of_ts = function
   | TPred ts -> action_of_ts ts
   | TVar _ -> None
 
-module Mvar = Vars.Mvar
-
-type mvar = Mvar.t
+type mvar = Vars.var
 
 type name = Name of string
 
@@ -34,7 +29,7 @@ let pp_name ppf = function Name s -> (Utils.kw `Yellow) ppf s
 
 type nsymb = name * index list
 let pp_nsymb ppf (n,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n Index.pp_list is
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n Vars.pp_list is
   else Fmt.pf ppf "%a" pp_name n
 
 (* TODO must include builtins such as if-then-else, equality, successor, xor ...
@@ -50,7 +45,7 @@ type fsymb = fname * index list
 
 let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Index.pp_list is
+  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Vars.pp_list is
 
 let mk_fname f = (Fname f, [])
 let mk_fname_idx f l = (Fname f, l)
@@ -84,7 +79,7 @@ let pp_sname ppf = function Sname s -> (Utils.kw `Red) ppf s
 type state = sname * index list
 
 let pp_state ppf (sn,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_sname sn Index.pp_list is
+  if is <> [] then Fmt.pf ppf "%a(%a)" pp_sname sn Vars.pp_list is
   else Fmt.pf ppf "%a" pp_sname sn
 
 (** Type of macros name *)
@@ -98,7 +93,7 @@ let pp_mname ppf s =
 let pp_msymb ppf (m,is) =
   Fmt.pf ppf "%a%a"
     pp_mname m
-    (Utils.pp_ne_list "(%a)" Index.pp_list) is
+    (Utils.pp_ne_list "(%a)" Vars.pp_list) is
 
 (** Terms *)
 type term =
@@ -127,7 +122,7 @@ let rec pp_term ppf = function
   | Name n -> pp_nsymb ppf n
   | State (s, ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m, ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
-  | MVar m -> Fmt.pf ppf "%a" Mvar.pp m
+  | MVar m -> Fmt.pf ppf "%a" Vars.pp m
 
 type t = term
 
@@ -341,7 +336,7 @@ let pp_tatom ppf = function
   | Pts (o,tl,tr) ->
     Fmt.pf ppf "@[<h>%a %a %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<h>%a %a %a@]" Index.pp il pp_ord o Index.pp ir
+    Fmt.pf ppf "@[<h>%a %a %a@]" Vars.pp il pp_ord o Vars.pp ir
 
 let not_tpred = function
   | Pts (o,t,t') -> Pts (not_xpred (o,t,t'))
@@ -358,79 +353,22 @@ let constr_dnf (c : constr) =
   |> List.map (fun l -> List.map norm_tatom l
                         |> List.flatten)
 
-type fvar =
-    TSVar of tvar
-  | MessVar of mvar
-  | IndexVar of index
-
-let pp_fvar ppf = function
-    TSVar t -> Tvar.pp ppf t
-  | MessVar m -> Mvar.pp ppf m
-  | IndexVar i -> Index.pp ppf i
-
-let pp_typed_fvar ppf = function
-    TSVar t -> Fmt.pf ppf "%a:timestamp" Tvar.pp t
-  | MessVar m -> Fmt.pf ppf "%a:message" Mvar.pp m
-  | IndexVar i -> Fmt.pf ppf "%a:index" Index.pp i
-
-let make_fresh_of_type (v:fvar) =
-  match v with
-  | TSVar _ -> TSVar (Tvar.make_fresh ())
-  | MessVar _ -> MessVar (Mvar.make_fresh ())
-  | IndexVar _ -> IndexVar (Index.make_fresh ())
-
 type formula = {
-  uvars : fvar list;
+  uvars : var list;
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
-  evars : fvar list;
+  evars : var list;
   econstr : constr;
   efact : fact
 }
 
-let get_tsvars (f : fvar list) =
-  List.fold_left (fun acc t -> match t with TSVar t -> t::acc | _ -> acc) [] f
-
-let get_messvars (f : fvar list) =
-  List.fold_left (fun acc t -> match t with MessVar t -> t::acc | _ -> acc) [] f
-
-let get_indexvars (f : fvar list) =
-  List.fold_left
-    (fun acc t -> match t with IndexVar t -> t::acc | _ -> acc) [] f
-
-
-let pp_typed_fvars spref ppf vars =
-  let open Fmt in
-  let open Utils in
-  let tsvars = get_tsvars vars in
-  if tsvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      (Tvar.pp_list) tsvars
-      (styled `Blue (styled `Bold ident)) "timestamp"
-  else ();
-  let indexvars = get_indexvars vars in
-  if indexvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      Index.pp_list indexvars
-      (styled `Blue (styled `Bold ident)) "index"
-  else ();
-  let messvars = get_messvars vars in
-  if messvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      (Mvar.pp_list) messvars
-      (styled `Blue (styled `Bold ident)) "message"
-  else ()
-
 let pp_q_vars s_q vars constr ppf () =
   let open Fmt in
   let open Utils in
-  Fmt.pf ppf "%a" (pp_typed_fvars s_q) vars;
+  Fmt.pf ppf "%a" (Vars.pp_typed_list s_q) vars;
   if constr <> True then
     Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
       (styled `Red (styled `Underline ident)) "such that"
@@ -489,7 +427,7 @@ let pp_asubst ppf e =
   match e with
   | Term(t1, t2) -> pp_el pp_term (t1, t2)
   | TS(ts1, ts2) -> pp_el pp_timestamp (ts1, ts2)
-  | Index(i1, i2) -> pp_el Index.pp (i1, i2)
+  | Index(i1, i2) -> pp_el Vars.pp (i1, i2)
 
 
 let pp_subst ppf s =
@@ -514,26 +452,15 @@ let to_isubst (s : subst) =
       match asubst with Index(t1, t2) -> (t1, t2)::acc | _ -> acc
     ) [] s
 
-let rec from_tvarsubst l =
+let rec from_varsubst l =
   match l with
   | [] -> []
-  | (tv1, tv2)::l -> (TS(TVar tv1, TVar tv2))::(from_tvarsubst l)
-
-let rec from_isubst l =
-  match l with
-  | [] -> []
-  | (i1, i2)::l -> (Index(i1, i2))::(from_isubst l)
-
-
-let rec from_fvarsubst l =
-  match l with
-  | [] -> []
-  | (TSVar t1, TSVar t2)::l ->
-    (TS(TVar t1, TVar t2))::(from_fvarsubst l)
-  | (MessVar t1, MessVar t2)::l ->
-    (Term(MVar t1, MVar t2))::(from_fvarsubst l)
-  | (IndexVar t1, IndexVar t2)::l ->
-    (Index(t1, t2))::(from_fvarsubst l)
+  | (t1, t2)::l when (var_type t1 = Timestamp) &&  (var_type t2 = Timestamp) ->
+    (TS(TVar t1, TVar t2))::(from_varsubst l)
+  | (t1, t2)::l when (var_type t1 = Message) &&  (var_type t2 = Message) ->
+    (Term(MVar t1, MVar t2))::(from_varsubst l)
+  | (t1, t2)::l when (var_type t1 = Index) &&  (var_type t2 = Index) ->
+    (Index(t1, t2))::(from_varsubst l)
   | _ -> failwith "ill-typed substitution"
 
 let get_term_subst (s : subst) (t : term) =
@@ -610,29 +537,18 @@ let subst_tatom (s:subst) = function
 let subst_constr = subst_formula subst_tatom
 
 let subst_postcond subst pc =
-  let subst = List.filter (function
-      |  Index(v,_) -> not @@ List.mem v (get_indexvars pc.evars)
-      | _ -> true)
-      subst
-  in
-  let subst = List.filter (function
-      | TS(TVar v,_) -> not @@ List.mem v (get_tsvars pc.evars)
-      | _ -> true )
-      subst
-  in
   { pc with econstr = subst_constr subst pc.econstr;
             efact = subst_fact subst pc.efact }
 
 
-let fresh_postcond p =
-  let fresh_vars = List.map (fun v -> make_fresh_of_type v) p.evars in
-  let subst = List.map2 (
-      fun v fv -> match v,fv with
-        | TSVar v, TSVar fv -> TS(TVar v, TVar fv)
-        | MessVar v, MessVar fv -> Term(MVar v, MVar fv)
-        | IndexVar v, IndexVar fv -> Index(v, fv)
-        | _, _ -> assert false
-    ) p.evars fresh_vars in
+let fresh_postcond env p =
+  let fresh_vars = List.map (fun v ->
+      make_fresh_from_and_update env v)
+      p.evars
+  in
+  let subst = List.combine p.evars fresh_vars
+              |> from_varsubst
+  in
   let postcond = subst_postcond subst p in
   { postcond with evars = fresh_vars}
 

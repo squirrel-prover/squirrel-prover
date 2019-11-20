@@ -322,7 +322,7 @@ let pp_atsubst ppf e =
   match e with
   | Term(t1, t2) -> pp_el Term.pp_term (t1, t2)
   | TS(ts1, ts2) -> pp_el Term.pp_timestamp (ts1, ts2)
-  | Idx(i1, i2) -> pp_el Action.Index.pp (i1, i2)
+  | Idx(i1, i2) -> pp_el Vars.pp (i1, i2)
 
 let pp_tsubst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
@@ -541,24 +541,24 @@ let convert_atom_glob subst atom =
 let convert_fact_glob subst f : Term.fact =
   convert_bformula (convert_atom_glob subst) f
 
-let rec convert_vars vars =
+let rec convert_vars env vars =
   let rec conv vs =
     match vs with
     | [] -> ([], [])
     | (a, Index) :: l ->
       let (vl, acc) = conv l in
-      let a_var = Action.Index.get_or_make_fresh (Term.get_indexvars acc) a in
-      (Idx(a, a_var)::vl, (Term.IndexVar a_var)::acc)
+      let a_var = Vars.make_fresh_and_update env Vars.Index a in
+      (Idx(a, a_var)::vl, a_var::acc)
 
     | (a, Timestamp) :: l ->
       let (vl, acc) = conv l in
-      let a_var = Term.Tvar.get_or_make_fresh (Term.get_tsvars acc) a in
-      (TS(a, Term.TVar(a_var) )::vl,(Term.TSVar a_var)::acc)
+      let a_var = Vars.make_fresh_and_update env Vars.Timestamp a in
+      (TS(a, Term.TVar(a_var) )::vl, a_var::acc)
 
     | (a, Message) :: l ->
       let (vl, acc) = conv l in
-      let a_var = Term.Mvar.get_or_make_fresh (Term.get_messvars acc) a in
-      (Term(a, Term.MVar(a_var) )::vl,(Term.MessVar a_var)::acc)
+      let a_var = Vars.make_fresh_and_update env Vars.Message a in
+      (Term(a, Term.MVar(a_var) )::vl, a_var::acc)
 
     | _ -> raise @@ Failure "can only quantify on indices and timestamps \
                              and messages in goals"

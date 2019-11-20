@@ -44,4 +44,4 @@ exception Bad_ssc
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)
-val mk_rule : term -> term -> fname -> name -> euf_rule
+val mk_rule : Vars.env ref -> term -> term -> fname -> name -> euf_rule

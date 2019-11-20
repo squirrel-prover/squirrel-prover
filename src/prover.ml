@@ -248,11 +248,13 @@ let auto_simp judges =
 
 let tsubst_of_judgment j =
   List.map
-    (function
-       | IndexVar v -> Theory.Idx (Action.Index.name v,v)
-       | TSVar v -> Theory.TS (Tvar.name v,TVar v)
-       | MessVar v -> Theory.Term (Mvar.name v,MVar v))
-    j.Judgment.vars
+    (fun v ->
+       match Vars.var_type v with
+       | Vars.Index -> Theory.Idx (Vars.name v,v)
+       | Vars.Timestamp -> Theory.TS (Vars.name v,TVar v)
+       | Vars.Message -> Theory.Term (Vars.name v,MVar v)
+    )
+    (Vars.to_list j.Judgment.env)
 
 let parse_fact fact =
   match !subgoals with
@@ -262,12 +264,11 @@ let parse_fact fact =
 
 let parse_subst j uvars ts : subst =
           let u_subst = tsubst_of_judgment j in
-          List.map2 (fun t u -> match u,t with
-            | TSVar a, t -> TS (TVar a, Theory.convert_ts u_subst t )
-            | MessVar a, t -> Term (MVar a, Theory.convert_glob u_subst t)
-
-            | IndexVar a, t ->
-                Index (a, Theory.conv_index u_subst t)
+          List.map2 (fun t u ->
+              match Vars.var_type u with
+              | Vars.Timestamp -> TS (TVar u, Theory.convert_ts u_subst t )
+              | Vars.Message -> Term (MVar u, Theory.convert_glob u_subst t)
+              | Vars.Index -> Index (u, Theory.conv_index u_subst t)
           ) ts uvars
 
 let parse_args goalname ts : subst =
@@ -305,9 +306,10 @@ type args = (string * Theory.kind) list
 let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
+  let env = ref (Vars.empty_env ()) in
   List.iter (fun (s,k) -> Theory.check_rebound_symbol s) (uargs@eargs);
-  let (u_subst, ufvars) = Theory.convert_vars uargs
-  and (e_subst, efvars) = Theory.convert_vars eargs in
+  let (u_subst, ufvars) = Theory.convert_vars env uargs
+  and (e_subst, efvars) = Theory.convert_vars env eargs in
   let uconstr =
     Theory.convert_constr_glob
       (List.rev uargs)
@@ -411,7 +413,6 @@ let eval_tactic : tac -> bool = fun utac -> match utac with
 let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
-    Vars.reset_id_names ();
     cpt_tag := 0;
     current_goal := Some (gname,goal);
     subgoals := auto_simp [Judgment.init goal];

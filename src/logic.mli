@@ -85,7 +85,7 @@ type typed_formula =
 (** Judgments are the sequents of our proof system *)
 module Judgment : sig
   type judgment = private {
-    vars : fvar list;
+    env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
     formula : typed_formula;
@@ -97,9 +97,6 @@ module Judgment : sig
 
   val init : formula -> judgment
 
-  val add_vars : Term.fvar list -> judgment -> judgment
-  val add_indices : Action.index list -> judgment -> judgment
-
   (** Side-effect: Add necessary action descriptions. *)
   val add_fact : Term.fact -> judgment -> judgment
 
@@ -109,6 +106,8 @@ module Judgment : sig
   val add_constr : Term.constr -> judgment -> judgment
 
   val update_trs : judgment -> judgment
+
+  val set_env : Vars.env -> judgment -> judgment
 
   val set_formula : typed_formula -> judgment -> judgment
 

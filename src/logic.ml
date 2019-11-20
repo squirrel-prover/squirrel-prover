@@ -280,7 +280,7 @@ module Judgment : sig
       - [gamma] is the judgment context.
       - [goal] contains the current goal, which is of type 'a. *)
   type judgment = private {
-    vars : fvar list;
+    env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
     formula : typed_formula;
@@ -292,9 +292,6 @@ module Judgment : sig
 
   val init : formula -> judgment
 
-  val add_vars : Term.fvar list -> judgment -> judgment
-  val add_indices : Action.index list -> judgment -> judgment
-
   (** Side-effect: Add necessary action descriptions. *)
   val add_fact : Term.fact -> judgment -> judgment
 
@@ -305,13 +302,15 @@ module Judgment : sig
 
   val update_trs : judgment -> judgment
 
+  val set_env : Vars.env -> judgment -> judgment
+
   val set_formula : typed_formula -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
 
 end = struct
   type judgment = {
-    vars : fvar list;
+    env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
     formula : typed_formula;
@@ -329,14 +328,14 @@ end = struct
             %a@;\
             %a@;@;@]"
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
-      (Term.pp_typed_fvars "") judge.vars
+      (Vars.pp_typed_env) judge.env
       Theta.pp_theta judge.theta
       Gamma.pp_gamma judge.gamma
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
       pp_typed_formula judge.formula
 
   let init (goal : formula) =
-    { vars = [];
+    { env = Vars.empty_env ();
       theta = Theta.mk Term.True;
       gamma = Gamma.mk ();
       formula = Formula goal;
@@ -344,24 +343,6 @@ end = struct
 
   let update_trs j =
     { j with gamma = Gamma.update_trs j.gamma }
-
-  let get_vars j = j.vars
-
-  let rec add_vars vars j = match vars with
-    | [] -> j
-    | v :: vars ->
-      let j' =
-        if List.mem v j.vars then j
-        else { j with vars = v :: j.vars } in
-      add_vars vars j'
-
-  let rec add_indices indices j = match indices with
-    | [] -> j
-    | i :: indices ->
-      let j' =
-        if List.mem i (get_indexvars j.vars) then j
-        else { j with vars = (Term.IndexVar i) :: j.vars } in
-      add_indices indices j'
 
   let fact_actions f =
     Term.fact_ts f
@@ -391,6 +372,8 @@ end = struct
   let add_constr c j =
     let j = update_descr j (constr_actions c) in
     { j with theta = Theta.add_constr j.theta c }
+
+  let set_env a j = { j with env = a }
 
   let set_formula a j = { j with formula = a }
 

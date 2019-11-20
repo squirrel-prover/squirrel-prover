@@ -10,25 +10,14 @@ open Action
 
 (** {2 Timestamps} *)
 (** Timestamps represent positions in a trace *)
-module Tvar : VarType
-
-type tvar = Tvar.t
-
 type timestamp =
-  | TVar of tvar
+  | TVar of var
   | TPred of timestamp
   | TName of action
 
 val pp_timestamp : Format.formatter -> timestamp -> unit
 
 val action_of_ts : timestamp -> Action.action option
-
-(** {2 Messages } *)
-(** Messages variables for formulas **)
-module Mvar : VarType
-  
-type mvar = Mvar.t
-
 
 (** {2 Names} *)
 (** Names represent random values, uniformly sampled by the process.
@@ -115,7 +104,7 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 type term =
   | Fun of fsymb * term list
   | Name of nsymb
-  | MVar of mvar
+  | MVar of var
   | State of state * timestamp
   | Macro of msymb * timestamp
 
@@ -227,17 +216,6 @@ val constr_dnf : constr -> tatom list list
 
 
 (** {2 Correspondence formulas} *)
-(** Formulas depends on variables inside [fvar]. *)
-type fvar =
-  | TSVar of tvar
-  | MessVar of mvar
-  | IndexVar of index
-
-val pp_typed_fvar : Format.formatter -> fvar -> unit
-
-val pp_typed_fvars : string -> Format.formatter -> fvar list -> unit
-
-val make_fresh_of_type : fvar -> fvar
 
 (** A formula is always of the form
   *   forall [uvars,uindices] such that [uconstr],
@@ -246,23 +224,16 @@ val make_fresh_of_type : fvar -> fvar
   * of formulas of the form
   *   exists [evars,eindices] such that [econstr] and [efact]. *)
 type formula = {
-  uvars : fvar list;
+  uvars : var list;
   uconstr : constr;
   ufact : fact;
   postcond : postcond list
 }
 and postcond = {
-  evars : fvar list;
+  evars : var list;
   econstr : constr;
   efact : fact
 }
-
-val get_tsvars : fvar list -> tvar list
-
-val get_messvars : fvar list -> mvar list
-
-val get_indexvars :fvar list -> index list
-
 
 val pp_postcond : Format.formatter -> postcond -> unit
 val pp_formula : Format.formatter -> formula -> unit
@@ -277,11 +248,9 @@ type asubst =
 
 type subst = asubst list
 
-val to_isubst : subst ->  (index * index) list
+val to_isubst : subst ->  (var * var) list
 
-val from_tvarsubst : (tvar * tvar) list -> subst
-val from_isubst : (index * index) list -> subst
-val from_fvarsubst : (fvar * fvar) list -> subst
+val from_varsubst : (var * var) list -> subst
 
 val pp_subst : Format.formatter -> subst -> unit
 
@@ -300,13 +269,13 @@ val subst_postcond : subst -> postcond -> postcond
 
 (** [fresh_postcond p] instantiates [p] with fresh variables for variables
     in p.evars *)
-val fresh_postcond : postcond ->  postcond
+val fresh_postcond : env ref -> postcond ->  postcond
 
 (** [term_vars t] returns the timestamp and index variables of [t]*)
-val term_vars : term -> tvar list * index list
+val term_vars : term -> var list * index list
 
 (** [tss_vars tss] returns the timestamp and index variables of [tss]*)
-val tss_vars : timestamp list -> tvar list * index list
+val tss_vars : timestamp list -> var list * index list
 
 
 (** [term_ts t] returns the timestamps appearing in [t] *)

@@ -150,5 +150,6 @@ val convert_fact_glob :
     in reverse order of declaration. By consequence, List.assoc properly handles
     the shadowing. *)
 val convert_vars :
+  Vars.env ref ->
   (string * kind) list ->
-  tsubst * Term.fvar list
+  tsubst * Vars.var list

@@ -1,42 +1,55 @@
-(** Basic module for variables, used to instantiate timestamp, index and
-    messages variables *)
+(** Basic module for variables, providing local environments to store
+    variables. *)
 
-(** A variable type depends on an identifier counter, and on a default name *)
-module type VarParam = sig
-  val default_string : string
-end
+type var_type =  Message | Index | Timestamp
 
-(** Module for a specific variable type *)
-module type VarType = sig
-  type t
+val pp_type : Format.formatter -> var_type -> unit
 
-  val reset_id_names : unit -> unit
+type var
 
-(** [make_fresh ?name] creates a fresh variable, whose name is either based on
-    the default name, or on [?name], concatenated with an integer to identify
-    the variable. There is a counter for each name, which can be reset with
-    [reset_id_names]. *)
-  val make_fresh : ?name:string -> unit -> t
+val name : var -> string
 
-(** [get_or_make_fresh l n] returns either the first variable with name [n]
-    inside the list [l] or returns a fresh variable, with name exactly the given
-    name. Using this to create fresh variables may create parsing confusions,
-    as multiple variables with the same name can be defined. *)
-  val get_or_make_fresh : t list -> string -> t
+val var_type : var -> var_type
 
-  (** [name t] extracts the name of a variable *)
-  val name : t -> string
+val pp : Format.formatter -> var -> unit
 
-  val pp : Format.formatter -> t -> unit
-  val pp_list : Format.formatter -> t list -> unit
-end
+val pp_typed : Format.formatter -> var -> unit
 
-module Var(V:VarParam) : VarType
+val pp_list : Format.formatter -> var list -> unit
 
-module Tvar : VarType
+val pp_typed_list : string -> Format.formatter -> var list -> unit
 
-module Mvar : VarType
+exception Undefined_Variable
 
-module Index : VarType
+exception Variable_Already_Defined
 
-val reset_id_names : unit -> unit
+(** Local environment containg a set of defined variables *)
+type env
+
+val pp_env : Format.formatter -> env -> unit
+
+val pp_typed_env : Format.formatter -> env -> unit
+
+val empty_env : unit -> env
+
+val to_list : env -> var list
+
+val mem : env -> string -> bool
+
+(** [get_var env name] returns the variable with the given name, and raises an
+    exception if it does not exists. The variable name used to match variables
+    is the one obtained through [var_name]. *)
+val get_var : env -> string -> var
+
+(** [make_fresh ?name] creates a fresh variable based on the name [name_prefix]
+    if a variable with the given name already exists inside the environment, a
+    variable with the given name concateneted with the smallest possible integer
+    is created. The new environment and the variable are returned.*)
+val make_fresh : env -> var_type -> string -> env * var
+
+(** Same as [make_fresh], but updates the mutable env given in input. *)
+val make_fresh_and_update : env ref -> var_type -> string -> var
+
+val make_fresh_from : env -> var -> env * var
+
+val make_fresh_from_and_update : env ref -> var -> var

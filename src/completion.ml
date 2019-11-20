@@ -10,7 +10,7 @@ module Cst = struct
 
     (* Constants appearing in the original terms *)
     | Cname of nsymb
-    | Cmvar of mvar
+    | Cmvar of Vars.var
     | Cstate of state * timestamp
     | Cmacro of msymb * timestamp
 
@@ -24,7 +24,7 @@ module Cst = struct
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
-    | Cmvar m -> Mvar.pp ppf m
+    | Cmvar m -> Vars.pp ppf m
     | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
     | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
 

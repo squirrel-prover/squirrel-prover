@@ -143,15 +143,14 @@ let goal_intro (judge : Judgment.t) sk fk =
 let goal_forall_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
   | Formula f ->
+    let env = ref judge.Judgment.env in
     let vsubst =
-      List.fold_left
-        (fun subst x ->
-           if List.mem x judge.Judgment.vars then
-             (x, make_fresh_of_type x):: subst
-           else
-             (x, x)::subst ) [] f.uvars
+      List.map
+        (fun x ->
+           (x, Vars.make_fresh_from_and_update env x))
+             f.uvars
     in
-    let subst = from_fvarsubst vsubst in
+    let subst = from_varsubst vsubst in
     let new_cnstr = subst_constr subst f.uconstr
     and new_fact = subst_fact subst f.ufact
     and new_typed_formulas =
@@ -163,7 +162,7 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
     let judges =
       List.map (fun tformula ->
           Judgment.set_formula tformula judge
-          |> Judgment.add_vars @@ List.map snd vsubst
+          |> Judgment.set_env (!env)
           |> Judgment.add_fact new_fact
           |> Judgment.add_constr new_cnstr
         ) new_typed_formulas
@@ -386,14 +385,15 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
 let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Tactic_Hard_Failure "bad euf application"
   | Some p ->
+    let env = ref judge.Judgment.env in
     let (hash_fn, (key_n, key_is), m, s) = p in
-    let rule = Euf.mk_rule m s hash_fn key_n in
+    let rule = Euf.mk_rule env m s hash_fn key_n in
     let schemata_premises =
       List.map (fun case ->
           let new_f, new_cnstr = euf_apply_schema judge.Judgment.theta p case in
           Judgment.add_fact new_f judge
           |> Judgment.add_constr new_cnstr
-          |> Judgment.add_indices case.Euf.blk_descr.Process.indices
+          |> Judgment.set_env !env
         ) rule.Euf.case_schemata
     and direct_premises =
       List.map (fun case ->
@@ -428,9 +428,10 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
     Judgment.set_formula (Fact (subst_fact subst gp.ufact)) judge
     |> simplify
   in
+  let env = ref judge.Judgment.env in
   let new_truths =
     List.map (fun formula ->
-        let formula = fresh_postcond formula in
+        let formula = fresh_postcond env formula in
         subst_postcond subst formula
       ) gp.postcond
   in
@@ -438,7 +439,7 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
     List.fold_left (fun judge nt ->
         Judgment.add_fact nt.efact judge
         |> Judgment.add_constr nt.econstr
-        |> Judgment.add_vars nt.evars
+        |> Judgment.set_env (!env)
       ) judge new_truths
   in
   sk [new_judge; judge] fk

@@ -1,8 +1,6 @@
-open Vars
+type index = Vars.var
 
-module Index  = Vars.Index
-
-type index = Index.t
+let pp_index = Vars.pp
 
 type isubst = (index * index) list
 
@@ -10,7 +8,7 @@ let pp_isubst ppf subst =
   Fmt.list
     ~sep:(fun ppf () -> Fmt.pf ppf "@,")
     (fun ppf (i,j) ->
-       Fmt.pf ppf "%a->%a" Index.pp i Index.pp j)
+       Fmt.pf ppf "%a->%a" pp_index i pp_index j)
     ppf
     subst
 
@@ -95,27 +93,35 @@ let rec constr_equal a b = match a,b with
          List.map2 (fun ind ind' -> ind, ind') ls ls' @
          res)
 
-let rec refresh = function
+let refresh env a =
+  let rec aux =
+  function
   | [] -> [],[]
   | {par_choice=(p,lp);sum_choice=(s,ls)}::l ->
     let lp' =
-      List.map (fun i -> i, Index.make_fresh ~name:(Index.name i) ()) lp
+      List.map (fun i ->
+          i, Vars.make_fresh_from_and_update env i
+        ) lp
     in
     let ls' =
-      List.map (fun i -> i, Index.make_fresh ~name:(Index.name i) ()) ls
+      List.map (fun i ->
+          i,  Vars.make_fresh_from_and_update env i
+        ) ls
     in
       let newsubst = lp' @ ls' in
-      let action,subst = refresh l in
+      let action,subst = aux l in
         { par_choice = p, List.map snd lp' ;
           sum_choice = s, List.map snd ls' }
         :: action,
         newsubst @ subst
+  in
+  aux a
 
 (** Action symbols *)
 
 module ActionSymbols =
   Symbols.Make (struct
-    type t = Index.t list * action
+    type t = index list * action
   end)
 
 let shape_to_symb = Hashtbl.create 97
@@ -135,7 +141,7 @@ let pp_int ppf i =
 
 (** Print list of indices in actions. *)
 let pp_indices ppf l =
-  if l <> [] then Fmt.pf ppf "(%a)" Index.pp_list l
+  if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
 
 (** Print list of strings in actions. *)
 let pp_strings ppf l =

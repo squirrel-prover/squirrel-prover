@@ -29,7 +29,7 @@ end
 let euf_key_ssc hash_fn key_n messages =
   let ssc = new check_hash_key hash_fn key_n in
   List.iter ssc#visit_term messages ;
-  Process.iter_fresh_csa
+  Process.iter_csa
     (fun blk ->
        ssc#visit_fact blk.condition ;
        ssc#visit_term blk.output ;
@@ -76,7 +76,7 @@ let pp_euf_schema ppf case =
               @[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
     Action.pp_action case.blk_descr.action
-    Action.Index.pp_list case.key_indices
+    Vars.pp_list case.key_indices
     Term.pp_term case.message
 
 (** Type of a direct euf axiom case.
@@ -89,7 +89,7 @@ type euf_direct = { d_key_indices : Action.index list;
 let pp_euf_direct ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Action.Index.pp_list case.d_key_indices
+    Vars.pp_list case.d_key_indices
     Term.pp_term case.d_message
 
 type euf_rule = { hash : fname;
@@ -107,13 +107,13 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule mess sign hash_fn key_n =
+let mk_rule env mess sign hash_fn key_n =
   euf_key_ssc hash_fn key_n [mess;sign];
   { hash = hash_fn;
     key = key_n;
 
     case_schemata =
-      Utils.map_of_iter Process.iter_fresh_csa
+      Utils.map_of_iter (Process.iter_fresh_csa env)
         (fun blk ->
            hashes_of_blk blk hash_fn key_n
            |> List.map (fun (is, m) ->

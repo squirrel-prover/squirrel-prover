@@ -134,7 +134,7 @@ val iter_csa : (descr -> unit) -> unit
 
 (** Iterate over a complete set of action descriptions, and instantiate a fresh
     action. Can be used to introduce a new action inside the logic. *)
-val iter_fresh_csa : (descr -> unit) -> unit
+val iter_fresh_csa : Vars.env ref -> (descr -> unit) -> unit
 
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)

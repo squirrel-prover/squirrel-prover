@@ -1,13 +1,10 @@
 (** Processes are decomposed as structured sets of actions. *)
-open Vars
 
 (** Indices are used to generate arbitrary families of terms, and thus duplicate
     of actions *)
-module Index : VarType
+type index = Vars.var
 
-type index = Index.t
-
-val pp_indices : Format.formatter -> Index.t list -> unit
+val pp_indices : Format.formatter -> index list -> unit
 
 (** Actions uniquely describe execution points in a process.
   * They consist of a list of items describing a position
@@ -75,7 +72,7 @@ val constr_equal : action -> action -> isubst option
 
 (** Given an action, generate a fresh instance of it together with
   * the corresponding substitution for indices. *)
-val refresh : action -> action * isubst
+val refresh : Vars.env ref -> action -> action * isubst
 
 (** Format an action, displayed through its symbol. *)
 val pp_action_structure : Format.formatter -> action -> unit
@@ -98,10 +95,10 @@ val pp_parsed_action : Format.formatter -> (string list) item list -> unit
   * using these indices, which represents a function from indices to
   * actions. *)
 
-val fresh_symbol : string -> (Index.t list * action) Symbols.t
+val fresh_symbol : string -> (index list * action) Symbols.t
 val define_symbol :
-  (Index.t list * action) Symbols.t ->
-  Index.t list -> action -> unit
-val find_symbol : string -> Index.t list * action
+  (index list * action) Symbols.t ->
+  index list -> action -> unit
+val find_symbol : string -> index list * action
 val iter :
-  ((Index.t list * action) Symbols.t -> Index.t list -> action -> unit) -> unit
+  ((index list * action) Symbols.t -> index list -> action -> unit) -> unit
