@@ -1,0 +1,30 @@
+(** This test should fail, euf should not apply when message variables
+  * are present. Specifically, the syntactic side condition should fail.
+  *
+  * This file shows that applications of euf in such cases can lead to
+  * a proof of false. *)
+
+hash h
+name k:message
+name cst:message
+
+channel c
+
+name n : message
+
+
+system null.
+
+
+goal cheat :
+  forall (m1: message, m2:message, m3:message),
+  h(m3,k) = m1 => m3 <> m2  .
+Proof.
+  euf 0.
+Qed.
+
+
+goal abs : false.
+Proof.
+  apply cheat to h(n,k), n, n.
+Qed.
