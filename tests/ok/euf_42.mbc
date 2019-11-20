@@ -2,9 +2,16 @@ name n : message
 name k : message
 hash h
 channel c
+
+axiom pair_neq_snd :
+  forall (x:message, y:message),
+  <x,y> <> y
+
 system in(c,x);out(c,h(x,k)).
 
 goal foo :
   h(<n,input@A>,k) = n => false.
 Proof.
-  euf 0.
+  euf 1.
+  apply pair_neq_snd to n, input@A.
+Qed.
