@@ -100,6 +100,10 @@ val goal_any_intro : 'a tac
     calls [fk] *)
 val gamma_absurd : 'a tac
 
+(** [assumption judge sk fk] try to close the goal by finding it in the 
+    context. *)
+val assumption : 'a tac
+
 (** [constr_absurd judge sk fk] try to close the goal that the trace constraints
     cannot be satisfied, else calls [fk] *)
 val constr_absurd : 'a tac

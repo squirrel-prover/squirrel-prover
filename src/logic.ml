@@ -29,6 +29,9 @@ module Gamma : sig
 
   val get_atoms : gamma -> atom list
 
+  (* Check if a fact is in gamma, as a fact or atom. *)
+  val mem : fact -> gamma -> bool
+
   val update_trs : gamma -> gamma
 
   val get_trs : gamma -> Completion.state
@@ -84,7 +87,7 @@ end = struct
     | at :: ats -> add_atoms (add_atom g at) ats
 
   (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
-  let rec add_fact g = function
+  let rec add_fact g at = match triv_eval at with
     | Atom at -> add_atom g at
     | Not (Atom at) ->  add_atom g (not_xpred at)
     | True -> g
@@ -98,6 +101,11 @@ end = struct
   let get_facts g = g.facts
 
   let set_facts g fs = add_facts { g with facts = []; trs = None} fs
+
+  let mem f g = match f with
+    | Atom at -> List.mem f g.facts || 
+                 List.exists (fun (at',_) -> at = at') g.atoms
+    | _ -> List.mem f g.facts
 
   let get_eqs_neqs g =
      let eqs, _, neqs = List.map fst g.atoms
@@ -290,6 +298,8 @@ module Judgment : sig
   (** Side-effect: Add necessary action descriptions. *)
   val add_fact : Term.fact -> judgment -> judgment
 
+  val mem_fact : Term.fact -> judgment -> bool
+
   (** Side-effect: Add necessary action descriptions. *)
   val add_constr : Term.constr -> judgment -> judgment
 
@@ -375,6 +385,8 @@ end = struct
   let add_fact f j =
     let j = update_descr j (fact_actions f) in
     { j with gamma = Gamma.add_facts j.gamma [f] }
+
+  let mem_fact f j = Gamma.mem f j.gamma
 
   let add_constr c j =
     let j = update_descr j (constr_actions c) in

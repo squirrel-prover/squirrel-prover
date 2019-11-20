@@ -208,6 +208,15 @@ let gamma_absurd (judge : Judgment.t) sk fk =
     sk [] fk
   else fk (Failure "Equations satisfiable")
 
+let assumption (judge : Judgment.t) sk fk =
+  match judge.Judgment.formula with
+  | Unit -> sk [] fk
+  | Fact f -> 
+    if Judgment.mem_fact f judge then
+      sk [] fk
+    else fk (Failure "Not in hypothesis")
+  | _ -> fk (Failure "Not in hypothesis")
+
 let or_to_list f =
   let rec aux acc = function
     | Or (g, h) -> aux (aux acc g) h

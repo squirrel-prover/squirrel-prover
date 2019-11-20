@@ -3,4 +3,5 @@ system null.
 goal trivial :
   true.
 Proof.
+assumption.
 Qed.

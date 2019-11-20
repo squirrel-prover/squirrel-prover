@@ -28,6 +28,9 @@ module Gamma : sig
 
   val get_atoms : gamma -> atom list
 
+  (* Check if a fact is in gamma, as a fact or atom. *)
+  val mem : fact -> gamma -> bool
+
   val update_trs : gamma -> gamma
 
   val get_trs : gamma -> Completion.state
@@ -99,6 +102,8 @@ module Judgment : sig
 
   (** Side-effect: Add necessary action descriptions. *)
   val add_fact : Term.fact -> judgment -> judgment
+
+  val mem_fact : Term.fact -> judgment -> bool
 
   (** Side-effect: Add necessary action descriptions. *)
   val add_constr : Term.constr -> judgment -> judgment

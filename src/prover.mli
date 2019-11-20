@@ -77,6 +77,8 @@ type tac =
   | GammaAbsurd : tac
   | ConstrAbsurd : tac
 
+  | Assumption : tac
+
   | EqNames : tac
   | EqTimestamps : tac
   | EqConstants : fname -> tac

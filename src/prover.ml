@@ -82,6 +82,8 @@ type tac =
   | GammaAbsurd : tac
   | ConstrAbsurd : tac
 
+  | Assumption : tac
+
   | EqNames : tac
   | EqTimestamps : tac
   | EqConstants : fname -> tac
@@ -121,6 +123,8 @@ let rec pp_tac : Format.formatter -> tac -> unit =
     | AnyIntro -> Fmt.pf ppf "any_intro"
     | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
     | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
+
+    | Assumption -> Fmt.pf ppf "assumption"
 
     | EqNames -> Fmt.pf ppf "eq_names"
     | EqTimestamps -> Fmt.pf ppf "eq_timestamps"
@@ -173,6 +177,8 @@ let rec tac_apply :
 
     | GammaAbsurd -> gamma_absurd judge sk fk
     | ConstrAbsurd -> constr_absurd judge sk fk
+
+    | Assumption -> assumption judge sk fk
 
     | EqNames -> eq_names judge sk fk
     | EqTimestamps -> eq_timestamps judge sk fk

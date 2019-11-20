@@ -13,7 +13,7 @@
 %token EXISTS FORALL GOAL DARROW AXIOM
 %token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
-%token CONGRUENCE APPLY TO ASSERT
+%token CONGRUENCE ASSUMPTION APPLY TO ASSERT
 %token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION NOSIMPL
 %token PROOF QED UNDO
 %token EOF
@@ -222,6 +222,7 @@ tac:
   | RIGHT                             { Prover.Right }
   | SPLIT                             { Prover.Split }
   | CONGRUENCE                        { Prover.GammaAbsurd }
+  | ASSUMPTION                        { Prover.Assumption }
   | NOTRACES                          { Prover.ConstrAbsurd }
   | EQNAMES                           { Prover.EqNames }
   | EQTIMESTAMPS                      { Prover.EqTimestamps }
