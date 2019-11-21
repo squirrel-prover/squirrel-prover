@@ -57,13 +57,13 @@ Proof.
    * on pairs and projections is completed) because we have
    *   snd(input@..) = h(..) = nR(..)
    * where the name does not occur in the hash. *)
-  assert(fst(<snd(input@R1(j5,i1)), nR(j5)>) =
+  assert(fst(<snd(input@R1(j3,i4)), nR(j3)>) =
          fst(<nR(j), fst(input@R1(j,i))>)).
   (* TODO this assert is so obvious
        that the addition of the fact is cancelled *)
-  assert(h(<nR(j5), fst(input@R1(j5,i1))>, key(i1)) = nR(j)).
+  assert(h(<nR(j3), fst(input@R1(j3,i4))>, key(i4)) = nR(j)).
   admit. (* need full support of fst(_) *)
 
-  eqnames. (* should add j = j 5 *)
-  assert(nR(j) = nR(j5)). (* TODO cannot simply write j=j5 *)
+  eqnames. (* should add j = j 3 *)
+  assert(nR(j) = nR(j3)). (* TODO cannot simply write j=j3 *)
   admit.
