@@ -1,0 +1,76 @@
+hash h
+
+abstract ok:message
+abstract ko:message
+abstract tag1:message
+abstract tag2:message
+
+name key : index->message
+
+axiom fst : forall (m:message, n:message),
+  fst(<m,n>) = m
+
+axiom snd : forall (m:message, n:message),
+  snd(<m,n>) = n
+
+channel cT
+channel cR
+
+(* TODO when macro support is complete, use the definitions
+ * of m2, x1, and x2 which are currently inlined below *)
+
+process tag(i:index) =
+  new nT;
+  in(cR,nR);
+  let m2 = h(<<nR,nT>,tag1>,key(i)) in
+  out(cT,<nT,h(<<nR,nT>,tag1>,key(i))>);
+  in(cR,m3);
+  if m3@nT = h(<<h(<nR,nT>,key(i)),nR>,tag2>,key(i)) then
+    out(cT,ok)
+  else
+    out(cT,ko)
+
+process reader(j:index) =
+  new nR;
+  out(cR,nR);
+  in(cT,x);
+  (* TODO let <x1,x2> = x in *)
+  let x1 = fst(x) in
+  let x2 = snd(x) in
+  try find i such that snd(x) = h(<<nR,fst(x)>,tag1>,key(i)) in
+    out(cR,h(<<snd(x),nR>,tag2>,key(i)))
+  else
+    out(cR,ko)
+
+system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
+
+(* TODO In the next lemma, it would be more natural to write
+ * something like happens(ACTION) rather than ACTION=ACTION.
+ * This could be left implicit since ACTION occurs in the
+ * rest of the formula. The only cases I can think of where
+ * the implicit treatment might not work is that of unreachability
+ * statements: forall k, not(happens(ACTION)). *)
+(* TODO we should not get a type error when using an inexistent
+ *   action name *)
+goal wa :
+  forall (i:index, j:index),
+  output@R1(j,i) = output@R1(j,i) =>
+  exists (ii:index,k:index) such that
+  T(ii,k) <= R1(j,i),
+  snd(input@R1(j,i)) = snd(output@T(ii,k)).
+Proof.
+  euf 1.
+  assert(tag2<>tag1).
+  cycle 1.
+  apply snd to <snd(input@R1(j3,i4)), nR(j3)>, tag2.
+  apply snd to <nR(j), fst(input@R1(j,i))>,tag1.
+  existsintro i3,k2.
+  cycle 1.
+
+
+
+(*
+  apply snd to nT(i3,k2),h(<<input@T(i3,k2), nT(i3,k2)>, tag1>, key(i3)).
+  assert(snd(output@T(i3,k2))=h(<<nR(j), fst(input@R1(j,i))>, tag1>, key(i))).
+  assert(snd(input@R1(j,i))=snd(output@T(i3,k2))).
+*)
