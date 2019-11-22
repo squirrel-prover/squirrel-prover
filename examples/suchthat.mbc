@@ -1,0 +1,4 @@
+system null.
+goal test : forall (i:index), exists () such that i=i, true.
+Proof.
+Qed.
