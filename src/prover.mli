@@ -3,6 +3,8 @@
     It contains the state of the proof and the history as mutable states. *)
 
 open Term
+open Bformula
+open Formula
 open Logic
 
 (** A goal of the prover is simply a name and a formula *)
@@ -23,7 +25,7 @@ type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof] : start a proof. *)
-type gm_input = Gm_goal of string * Term.formula | Gm_proof
+type gm_input = Gm_goal of string * formula | Gm_proof
 
 
 
@@ -68,7 +70,7 @@ type tac =
   | Split : tac
 
   | Apply : (string * subst) -> tac
-  | Assert : Term.fact -> tac
+  | Assert : fact -> tac
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
@@ -104,15 +106,14 @@ val parse_args : string -> Theory.term list -> Term.asubst list
 
 val parse_args_exists : Theory.term list -> Term.asubst list
 
-val parse_fact : Theory.fact -> Term.fact
+val parse_fact : Theory.fact -> fact
 
 (* Variable arguments, defined by a name and a kind (bool, messages, ...) *)
 type args = (string * Theory.kind) list
 
 (** Produces a goal formula given parsing informations. *)
-val make_goal : (args * Theory.fact) *
-                (args * Theory.fact) * Theory.fact * Theory.fact ->
-  Term.formula
+val make_goal : Theory.formula ->
+  formula
 
 type parsed_input =
     ParsedInputDescr

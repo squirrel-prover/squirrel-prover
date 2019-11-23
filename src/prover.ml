@@ -1,5 +1,6 @@
 open Logic
 open Term
+open Formula
 
 (** State in proof mode.
   * TODO goals do not belong here *)
@@ -14,7 +15,7 @@ let goals_proved = ref []
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
 type gm_input =
-  | Gm_goal of string * Term.formula
+  | Gm_goal of string * formula
   | Gm_proof
 
 
@@ -73,7 +74,7 @@ type tac =
   | Split : tac
 
   | Apply : (string * subst) -> tac
-  | Assert : Term.fact -> tac
+  | Assert : Bformula.fact -> tac
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
@@ -114,7 +115,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
         else
           Fmt.pf ppf "apply %s to .." s
     | Assert f ->
-        Fmt.pf ppf "assert %a" Term.pp_fact f
+        Fmt.pf ppf "assert %a" Bformula.pp_fact f
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->
@@ -153,7 +154,7 @@ let rec tac_apply :
 =
   let open Tactics in
   fun tac judge sk fk -> match tac with
-    | Admit -> sk [Judgment.set_formula Unit judge] fk
+    | Admit -> sk [Judgment.set_formula True judge] fk
     | Ident -> sk [judge] fk
     | NoSimp tac -> tac_apply tac judge sk fk
     | ForallIntro -> goal_forall_intro judge sk fk
@@ -277,7 +278,7 @@ let parse_args goalname ts : subst =
   | [] ->  raise @@ Failure "No goal with given name"
   | [(np, gp)] ->
       begin
-      let uvars = gp.uvars in
+      let uvars = formula_vars gp in
       if (List.length uvars) <> (List.length ts) then
         raise @@ Failure "Number of parameters different than expected";
       match !subgoals with
@@ -294,7 +295,7 @@ let parse_args_exists ts : subst =
     raise @@
     Failure "Cannot parse term with respect to empty current goal"
   |  j :: _ -> match j.Judgment.formula with
-    | Postcond p -> parse_subst j p.evars ts
+    | Exists (vs,f) -> parse_subst j vs ts
     | _ -> raise @@ Failure "Cannot parse term for existential intro which does
 not exists"
 
@@ -303,39 +304,17 @@ not exists"
 
 type args = (string * Theory.kind) list
 
-let make_goal ((uargs,uconstr), (eargs,econstr), ufact, efact) =
+let make_goal f  =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
   let env = ref (Vars.empty_env ()) in
-  List.iter (fun (s,k) -> Theory.check_rebound_symbol s) (uargs@eargs);
-  let (u_subst, ufvars) = Theory.convert_vars env uargs
-  and (e_subst, efvars) = Theory.convert_vars env eargs in
-  let uconstr =
-    Theory.convert_constr_glob
-      (List.rev uargs)
-      u_subst
-      uconstr in
-  let ufact =
-    Theory.convert_fact_glob
-      u_subst
-      ufact in
-
-  let econstr =
-    Theory.convert_constr_glob
-      (List.rev_append eargs (List.rev uargs))
-      (e_subst @ u_subst)
-      econstr in
-  let efact =
-    Theory.convert_fact_glob
-      (e_subst @ u_subst)
-      efact in
-
-  { uvars = ufvars;
-    uconstr = uconstr;
-    ufact = ufact;
-    postcond = [{ evars = efvars;
-                  econstr = econstr;
-                  efact = efact }] }
+  let argvars = Theory.formula_vars f in
+  List.iter (fun (s,k) -> Theory.check_rebound_symbol s) (argvars);
+  let (subst, vars) = Theory.convert_vars env argvars in
+    Theory.convert_formula_glob
+      (List.rev argvars)
+      subst
+      f
 
 type parsed_input =
   | ParsedInputDescr
@@ -357,7 +336,7 @@ let pp_goals ppf () =
   Fmt.pf ppf "@[<v>";
   iter_goals (fun (gname,goal) ->
     Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
-      !cpt Term.pp_formula goal ;
+      !cpt pp_formula goal ;
     incr cpt) ;
   Fmt.pf ppf "@]%!@."
 

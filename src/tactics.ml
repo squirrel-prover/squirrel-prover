@@ -1,5 +1,6 @@
 open Logic
 open Term
+open Formula
 
 exception Tactic_Hard_Failure of string
 
@@ -23,15 +24,15 @@ let remove_finished judges =
   List.filter
     (fun j ->
        match j.Judgment.formula with
-       | Unit -> false
+       | True -> false
        | _ -> true)
     judges
 
 let simplify j =
   match j.Judgment.formula with
-  | Postcond p when p.evars = [] ->
-    Judgment.set_formula (Fact p.efact) j
-  | Fact True -> Judgment.set_formula Unit j
+  | Exists (vs,p) when vs = [] ->
+    Judgment.set_formula (p) j
+  (* TODO add more ? *)
   | _ -> j
 
 (** Basic Tactics *)
@@ -99,15 +100,15 @@ let lift =
 
 let goal_or_intro_l (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Fact (Or (lformula, _)) -> sk
-                                 [Judgment.set_formula (Fact lformula) judge]
+  | (Or (lformula, _)) -> sk
+                                 [Judgment.set_formula (lformula) judge]
                                  fk
   | _ -> fk (Failure "Cannot introduce a disjunction
 if the goal does not contain one")
 
 let goal_or_intro_r (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Fact (Or (_, rformula)) -> sk [Judgment.set_formula (Fact rformula) judge] fk
+  | (Or (_, rformula)) -> sk [Judgment.set_formula (rformula) judge] fk
   | _ -> fk (Failure "Cannot introduce a disjunction
 if the goal does not contain one")
 
@@ -117,79 +118,58 @@ let goal_or_intro (judge : Judgment.t) sk fk =
 
 let goal_true_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Fact(True) -> sk () fk
+  | True -> sk () fk
   | _ -> fk (Failure "Cannot introduce True
 if the formula is not True")
 
 
 let goal_and_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Fact (And (lformula, rformula)) ->
-    sk [ Judgment.set_formula (Fact lformula) judge;
-         Judgment.set_formula (Fact rformula) judge ] fk
+  | And (lformula, rformula) ->
+    sk [ Judgment.set_formula (lformula) judge;
+         Judgment.set_formula (rformula) judge ] fk
  | _ -> fk (Failure "Cannot introduce a conjonction
 if the formula does not contain one" )
 
 let goal_intro (judge : Judgment.t) sk fk =
+  let open Bformula in
   match judge.Judgment.formula with
-  | Fact(False) -> sk [judge] fk
-  | Fact(f) -> let judge = Judgment.add_fact (Not (f)) judge
-                           |> Judgment.set_formula (Fact False)
+  | False -> sk [judge] fk
+  | Atom (Message f) -> let judge = Judgment.add_fact (Not (Atom (f))) judge
+                           |> Judgment.set_formula (False)
     in
     sk [judge] fk
-  | _ -> fk (Failure "Cannot introduce a formula which is not a fact.")
+  | Atom (Trace f) -> let judge = Judgment.add_constr (Not (Atom (f))) judge
+                           |> Judgment.set_formula (False)
+    in
+    sk [judge] fk
+  | _ -> fk (Failure "Cannot introduce a formula which is not atomic.")
 
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Formula f ->
+  | ForAll (vs,f) ->
     let env = ref judge.Judgment.env in
     let vsubst =
       List.map
         (fun x ->
            (x, Vars.make_fresh_from_and_update env x))
-             f.uvars
+             vs
     in
     let subst = from_varsubst vsubst in
-    let new_cnstr = subst_constr subst f.uconstr
-    and new_fact = subst_fact subst f.ufact
-    and new_typed_formulas =
-      List.map
-        (fun formula ->
-           Postcond (subst_postcond subst formula))
-        f.postcond
+    let new_formula = subst_formula subst f in
+    let new_judge = Judgment.set_formula new_formula judge
+                    |> Judgment.set_env (!env)
+                    |> simplify
     in
-    let judges =
-      List.map (fun tformula ->
-          Judgment.set_formula tformula judge
-          |> Judgment.set_env (!env)
-          |> Judgment.add_fact new_fact
-          |> Judgment.add_constr new_cnstr
-        ) new_typed_formulas
-    in
-    sk (List.map simplify judges) fk
+    sk [new_judge] fk
   | _ -> fk (Failure "Cannot introduce a forall which does not exists")
 
 let goal_exists_intro nu (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Postcond p ->
-    let pc_constr = subst_constr nu p.econstr in
-    let rec to_cnf c = match c with
-      | Atom a -> [a]
-      | True -> []
-      | And (a, b) -> (to_cnf a) @ (to_cnf b)
-      | _ -> raise @@ Tactic_Hard_Failure
-          "Can only introduce existantial with constraints
-restricted to conjunctions."
-    in
-    let constr_list = to_cnf pc_constr in
-    if not( Theta.is_valid judge.Judgment.theta constr_list) then
-      raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint";
-    let judge =
-      Judgment.set_formula
-        (Fact (subst_fact nu p.efact)) judge
-    in
-    sk [judge] fk
+  | Exists (vs,f) ->
+    let new_formula = subst_formula nu f in
+    sk [Judgment.set_formula new_formula judge] fk
   | _ -> fk (Failure "Cannot introduce an existantial which does not exists")
 
 
@@ -209,13 +189,14 @@ let gamma_absurd (judge : Judgment.t) sk fk =
 
 let assumption (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Unit -> sk [] fk
-  | Fact f -> 
-    if Judgment.mem_fact f judge then
+  | True -> sk [] fk
+  | Atom (Message f) ->
+    if Judgment.mem_fact (Bformula.Atom f) judge then
       sk [] fk
     else fk (Failure "Not in hypothesis")
   | _ -> fk (Failure "Not in hypothesis")
 
+      (*
 let or_to_list f =
   let rec aux acc = function
     | Or (g, h) -> aux (aux acc g) h
@@ -242,24 +223,25 @@ let gamma_or_intro (judge : Judgment.t) sk fk select_pred =
           judge )
   in
   sk judges fk
-
+*)
 (** Utils *)
+
 let mk_or_cnstr l = match l with
-  | [] -> False
+  | [] -> Bformula.False
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Or (x,acc)) l in
+      | x :: l -> mk_c (Bformula.Or (x,acc)) l in
     mk_c a l'
 
 let mk_and_cnstr l = match l with
-  | [] -> True
+  | [] -> Bformula.True
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (And (x,acc)) l in
+      | x :: l -> mk_c (Bformula.And (x,acc)) l in
     mk_c a l'
 
 
@@ -291,6 +273,8 @@ let eq_constants fn (judge : Judgment.t) sk fk =
       ) judge cnstrs
   in
   sk [judge] fk
+
+open Bformula
 
 let eq_timestamps (judge : Judgment.t) sk fk =
   let ts_classes = Theta.get_equalities judge.Judgment.theta
@@ -332,7 +316,7 @@ let modulo_sym f at = match at with
       | None -> f (ord, t2, t1) end
   | _ -> f at
 
-let euf_param (at : atom) = match at with
+let euf_param (at : term_atom) = match at with
   | (Eq, Fun ((hash, _), [m; Name key]), s) ->
     if Theory.is_hash hash then
       Some (hash, key, m, s)
@@ -411,7 +395,8 @@ let euf_apply f_select (judge : Judgment.t) sk fk =
   sk (euf_apply_facts judge at) fk
 
 let apply gp (subst:subst) (judge : Judgment.t) sk fk =
-  (* We first check if constr is satisfied *)
+  failwith "not implemented"
+(*  (* We first check if constr is satisfied *)
   let new_constr = subst_constr subst gp.uconstr in
   let rec to_cnf c = match c with
     | Atom a -> [a]
@@ -442,11 +427,11 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
         |> Judgment.set_env (!env)
       ) judge new_truths
   in
-  sk [new_judge; judge] fk
+    sk [new_judge; judge] fk *)
 
 let tac_assert fact j sk fk =
-  let j1 = Judgment.set_formula (Fact fact) j in
-  let j2 = Judgment.add_fact fact j in
+  let j1 = Judgment.set_formula (fact_to_formula fact) j in
+  let j2 = Judgment.add_fact (fact) j in
   sk [j1;j2] fk
 
 let collision_resistance (judge : Judgment.t) sk fk =

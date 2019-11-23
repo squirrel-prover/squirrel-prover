@@ -1,6 +1,7 @@
 open Utils
 open Term
-
+open Bformula
+    
 module Cst = struct
   type t =
     (* Constant introduced when flattening *)

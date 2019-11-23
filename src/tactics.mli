@@ -1,5 +1,7 @@
 (** Main tactics of the prover *)
 open Logic
+open Bformula
+open Formula
 
 (** {2 Tactics} *)
 
@@ -122,16 +124,16 @@ val eq_constants : Term.fname -> 'a tac
     quantified variables instantied with [subst], adding to [judge] its
     postconditions, and creating new subgoals from [judge] for the
     preconditions. *)
-val apply : Term.formula -> Term.subst -> 'a tac
+val apply : formula -> Term.subst -> 'a tac
 
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
-val tac_assert : Term.fact -> 'a tac
+val tac_assert : fact -> 'a tac
 
 (** [euf_apply f_select judge sk fk] selects an atom of the judgement according
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
-val euf_apply : (Term.atom -> Logic.tag -> bool) -> 'a tac
+val euf_apply : (term_atom -> Logic.tag -> bool) -> 'a tac
 
 (** [collision_resistance judge sk fk] collects all equalities between hash,
     and add to Gamma the equality of the messages if the hash and the key are

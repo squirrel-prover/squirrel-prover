@@ -6,7 +6,7 @@
     variable type.Function symbols can be defined at runtime, and each new
     term typed checked. *)
 
-type ord = Term.ord
+type ord = Bformula.ord
 
 type action_shape
 
@@ -31,12 +31,18 @@ type term =
 
 val pp_term : Format.formatter -> term -> unit
 
-type fact = term Term.bformula
+type fact = term Bformula.bformula
 
 val pp_fact : Format.formatter -> fact -> unit
 
 (** Terms may represent indices, messages or booleans *)
 type kind = Index | Message | Boolean | Timestamp
+
+type formula = (term, (string * kind) ) Formula.foformula
+
+val formula_to_fact : formula -> fact
+
+val formula_vars : formula -> (string * kind) list
 
 (** {2 Declaration of new symbols}
   *
@@ -120,7 +126,7 @@ val convert_fact :
   Term.timestamp ->
   tsubst ->
   fact ->
-  Term.fact
+  Bformula.fact
 
 val convert_ts :
   tsubst ->
@@ -138,13 +144,20 @@ val convert_constr_glob :
   (string * kind) list ->
   tsubst ->
   fact ->
-  Term.constr
+  Bformula.constr
 
 (** Convert to [Term.fact], for global terms (i.e. with attached timestamps). *)
 val convert_fact_glob :
   tsubst ->
   fact ->
-  Term.fact
+  Bformula.fact
+
+(** Convert to [T.constr], for global terms (i.e. with attached timestamps). *)
+val convert_formula_glob :
+  (string * kind) list ->
+  tsubst ->
+  formula ->
+  Formula.formula
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,
     in reverse order of declaration. By consequence, List.assoc properly handles

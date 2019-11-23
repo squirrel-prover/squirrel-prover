@@ -1,4 +1,5 @@
 open Term
+open Bformula
 
 class iter = object (self)
 
@@ -13,7 +14,7 @@ class iter = object (self)
     | State _ -> failwith "visiting state not implemented"
     | Name _ | MVar _ -> ()
 
-  method visit_fact (f:Term.fact) = match f with
+  method visit_fact (f:fact) = match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
         self#visit_fact l ;
         self#visit_fact r

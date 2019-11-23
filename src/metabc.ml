@@ -117,7 +117,7 @@ let rec main_loop ?(save=true) mode =
           add_new_goal (i,f);
           Fmt.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
-            Term.pp_formula f;
+            Formula.pp_formula f;
           main_loop GoalMode
       end
     | GoalMode, EOF -> Fmt.pr "Goodbye!@." ; exit 0

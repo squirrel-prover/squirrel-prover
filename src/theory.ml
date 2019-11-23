@@ -1,4 +1,4 @@
-type ord = Term.ord
+type ord = Bformula.ord
 
 type action_shape = (string list) Action.t
 
@@ -59,19 +59,27 @@ let rec pp_term ppf = function
       pp_ots ots
       (Fmt.list ~sep pp_term) terms
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Bformula.pp_ord ord pp_term tr
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
 and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
-type fact = term Term.bformula
+type fact = term Bformula.bformula
 
-let pp_fact = Term.pp_bformula pp_term
+let pp_fact = Bformula.pp_bformula pp_term
 
 (** Table of symbols *)
 
 type kind = Index | Message | Boolean | Timestamp
+
+type formula = (term, (string * kind) ) Formula.foformula
+
+let formula_vars = Formula.tformula_vars (fun x -> [])
+
+exception Cannot_convert_to_fact
+
+let formula_to_fact = Formula.foformula_to_bformula (fun x -> x)
 
 type symbol_info =
   | Hash_symbol
@@ -206,7 +214,7 @@ let rec check_term env tm kind =
     check_term env u Message ;
     check_term env v Message
 
-let rec check_fact env = let open Term in function
+let rec check_fact env = let open Bformula in function
     | And (f,g) | Or (f,g) | Impl (f,g) ->
       check_fact env f ;
       check_fact env g
@@ -488,7 +496,7 @@ let convert_atom ts subst atom =
   | _ -> assert false
 
 let convert_bformula conv_atom f =
-  let open Term in
+  let open Bformula in
   let rec conv = function
     | Atom at -> Atom (conv_atom at)
     | And (f, g) -> And (conv f, conv g)
@@ -501,7 +509,7 @@ let convert_bformula conv_atom f =
 
 let subst_fact f s = convert_bformula (fun t -> subst t s) f
 
-let convert_fact ts subst f : Term.fact =
+let convert_fact ts subst f : Bformula.fact =
   convert_bformula (convert_atom ts subst) f
 
 (* Not clean at all. *)
@@ -511,8 +519,8 @@ let get_kind env t =
     with Type_error -> try check_term env t Message; Message
       with Type_error -> check_term env t Boolean; Boolean
 
-let convert_tatom args_kind subst f : Term.tatom =
-  let open Term in
+let convert_ts_atom args_kind subst f : Bformula.ts_atom =
+  let open Bformula in
   match f with
   | Compare (o, u, v) ->
     begin
@@ -528,8 +536,8 @@ let convert_tatom args_kind subst f : Term.tatom =
       | _ -> raise Type_error end
   | _ -> assert false
 
-let convert_constr_glob args_kind subst f : Term.constr =
-  convert_bformula (convert_tatom args_kind subst) f
+let convert_constr_glob args_kind subst f : Bformula.constr =
+  convert_bformula (convert_ts_atom args_kind subst) f
 
 let convert_atom_glob subst atom =
   match atom with
@@ -538,8 +546,42 @@ let convert_atom_glob subst atom =
                         convert_glob subst v)
   | _ -> assert false
 
-let convert_fact_glob subst f : Term.fact =
+let convert_fact_glob subst f : Bformula.fact =
   convert_bformula (convert_atom_glob subst) f
+
+
+let subst_get_var subst (x,kind) =
+    match kind with
+      | Index -> subst_get_index subst x
+      | Message ->
+        (match subst_get_mess subst x with
+        | Term.MVar a -> a
+        | _ -> assert false)
+    | Timestamp -> (match subst_get_ts subst x with
+      | Term.TVar a -> a
+      |  _ -> assert false)
+    | _ -> assert false
+
+
+let convert_formula_glob args_kind subst f =
+  let open Formula in
+  let rec conv = function
+    | Atom (at) ->
+      (try
+         Atom (Trace (convert_ts_atom args_kind subst at))
+      with
+      | Type_error -> Atom (Message (convert_atom_glob subst at))
+      | _ -> assert false)
+    | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
+    | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
+    | And (f, g) -> And (conv f, conv g)
+    | Or (f, g) -> Or (conv f, conv g)
+    | Impl (f, g) -> Impl (conv f, conv g)
+    | Not f -> Not (conv f)
+    | True -> True
+    | False -> False
+  in
+  conv f
 
 let rec convert_vars env vars =
   let rec conv vs =

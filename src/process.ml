@@ -1,3 +1,5 @@
+open Bformula
+
 type kind = Theory.kind
 type pkind = (string * kind) list
 
@@ -160,7 +162,7 @@ open Action
 type descr = {
   action : action ;
   indices : index list ;
-  condition : Term.fact ;
+  condition : Bformula.fact ;
   updates : (Term.state * Term.term) list ;
   output : Term.term
 }
@@ -174,7 +176,7 @@ let pp_descr ppf descr =
     pp_action descr.action
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
-    Term.pp_fact descr.condition
+    pp_fact descr.condition
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
@@ -195,7 +197,7 @@ type block = {
   action : action ;
   input : Channel.t * string ;
   indices : index list ;
-  condition : index list * Term.fact ;
+  condition : index list * Bformula.fact ;
   updates : (string * index list * Term.term) list ;
   output : Channel.t * Term.term
 }
@@ -221,7 +223,7 @@ let fresh_instance env block =
   in
   let action = Term.subst_action subst block.action in
   let refresh_term = Term.subst_term subst in
-  let refresh_fact = Term.subst_fact subst in
+  let refresh_fact = subst_fact subst in
   let indices = List.map snd (Term.to_isubst subst) in
   let condition = refresh_fact (snd block.condition) in
   let updates =
@@ -247,7 +249,7 @@ let iter_csa f =
 let subst_descr subst (descr : descr) =
   let action = Term.subst_action subst descr.action in
   let subst_term = Term.subst_term subst in
-  let subst_fact = Term.subst_fact subst in
+  let subst_fact = subst_fact subst in
   let indices =
     List.map (fun i -> List.assoc i (Term.to_isubst subst)) descr.indices
   in
@@ -583,7 +585,7 @@ let var_env = ref (Vars.empty_env ()) in
       let facts_p = cond::facts in
       let facts_q =
         if evars = [] then
-          Term.Not cond :: facts
+          Bformula.Not cond :: facts
         else
           facts
       in
@@ -609,9 +611,9 @@ let var_env = ref (Vars.empty_env ()) in
        * for the next step, i.e. updates and output.
        * At this point we know which action will be used. *)
       let rec conj = function
-        | [] -> Term.True
+        | [] -> Bformula.True
         | [f] -> f
-        | f::fs -> Term.And (f, conj fs)
+        | f::fs -> Bformula.And (f, conj fs)
       in
       let condition = vars, conj facts in
       let action =

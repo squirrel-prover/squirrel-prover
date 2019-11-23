@@ -1,11 +1,12 @@
+open Bformula
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models
 
 (** [models l] returns the list of minimal models of a constraint. *)
-val models : Term.constr -> models
+val models : constr -> models
 
-val is_sat : Term.constr -> bool
+val is_sat : constr -> bool
 val m_is_sat : models -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
@@ -13,7 +14,7 @@ val m_is_sat : models -> bool
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : models -> Term.tatom list -> bool
+val query : models -> ts_atom list -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].

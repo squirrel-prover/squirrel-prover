@@ -1,4 +1,5 @@
 open Term
+open Bformula
 open Process
 
 (* type process = descr list *)

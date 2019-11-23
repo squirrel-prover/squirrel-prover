@@ -1,6 +1,8 @@
 open Utils
 open Action
 open Term
+open Bformula
+open Formula
 
 type tag = { t_euf : bool; cpt : int }
 
@@ -13,6 +15,7 @@ let new_tag () =
 
 let set_euf b t = { t with t_euf = b }
 
+exception Not_atom
 
 module Gamma : sig
   (** Type of judgment contexts. *)
@@ -24,12 +27,11 @@ module Gamma : sig
 
   val add_facts : gamma -> fact list -> gamma
 
-  val get_facts : gamma -> fact list
   val set_facts : gamma -> fact list -> gamma
 
-  val get_atoms : gamma -> atom list
+  val get_atoms : gamma -> term_atom list
 
-  (* Check if a fact is in gamma, as a fact or atom. *)
+  (* Check if a fact is in gamma, as an atom. *)
   val mem : fact -> gamma -> bool
 
   val update_trs : gamma -> gamma
@@ -38,7 +40,8 @@ module Gamma : sig
 
   val is_sat : gamma -> bool
 
-  val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
+  val select : gamma -> (term_atom -> tag -> bool)
+    -> (tag -> tag) -> gamma * term_atom
 
   val add_descr : gamma -> Process.descr -> gamma
 
@@ -48,23 +51,20 @@ end = struct
   (** Type of judgment contexts. We separate atoms from more complex facts.
       We store in [trs] the state of the completion algorithm when it was last
       called on [atoms]. *)
-  type gamma = { facts : fact list;
-                 atoms : (atom * tag) list;
+  type gamma = { atoms : (term_atom * tag) list;
                  trs : Completion.state option;
                  actions_described : Action.action list }
 
   let pp_gamma ppf gamma =
     Fmt.pf ppf "@[<v 0>\
                 @[<hov 2>Actions described:@ %a@]@;\
-                @[<hv 0>Atoms:@ @[<v 0>%a@]@]@;\
-                @[<hv 0>Facts:@ @[<v 0>%a@]@]@;@]"
+                @[<hv 0>Atoms:@ @[<v 0>%a@]@]@;"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
       gamma.actions_described
       (Fmt.list (fun ppf (at,t) ->
-           Fmt.pf ppf "%d: %a" t.cpt Term.pp_atom at)) (List.rev gamma.atoms)
-      (Fmt.list Term.pp_fact) (List.rev gamma.facts)
+           Fmt.pf ppf "%d: %a" t.cpt pp_term_atom at)) (List.rev gamma.atoms)
 
-  let mk () = { facts = []; atoms = []; trs = None; actions_described = [] }
+  let mk () = { atoms = []; trs = None; actions_described = [] }
 
   let get_atoms g = List.map fst g.atoms
 
@@ -92,20 +92,17 @@ end = struct
     | Not (Atom at) ->  add_atom g (not_xpred at)
     | True -> g
     | And (f,f') -> add_fact (add_fact g f) f'
-    | _ as f -> { g with facts = f :: g.facts }
+    | _ -> raise Not_atom
 
   let rec add_facts g = function
     | [] -> { g with trs = None }
     | f :: fs -> add_facts (add_fact g f) fs
 
-  let get_facts g = g.facts
-
-  let set_facts g fs = add_facts { g with facts = []; trs = None} fs
+  let set_facts g fs = add_facts { g with trs = None} fs
 
   let mem f g = match f with
-    | Atom at -> List.mem f g.facts || 
-                 List.exists (fun (at',_) -> at = at') g.atoms
-    | _ -> List.mem f g.facts
+    | Bformula.Atom at -> List.exists (fun (at',_) -> at = at') g.atoms
+    | _ -> false
 
   let get_eqs_neqs g =
      let eqs, _, neqs = List.map fst g.atoms
@@ -164,8 +161,8 @@ end = struct
       let actions =
         (List.fold_left
            (fun lts fact ->
-              List.rev_append lts (Term.fact_ts fact))
-           (Term.atoms_ts new_atoms)
+              List.rev_append lts (fact_ts fact))
+           (term_atoms_ts new_atoms)
            new_facts)
         |> List.fold_left
              (fun acc ts -> match action_of_ts ts with
@@ -177,12 +174,8 @@ end = struct
       List.fold_left add_descr g descrs
 
   let get_all_terms g =
-    let atoms = get_atoms g
-    and facts = get_facts g in
-
-    let all_atoms =
-      List.fold_left (fun l f -> Term.atoms f @ l) atoms facts in
-    List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] all_atoms
+    let atoms = get_atoms g in
+    List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
 
 end
 
@@ -197,7 +190,7 @@ module Theta : sig
 
   val is_sat : theta -> bool
 
-  val is_valid : theta -> tatom list -> bool
+  val is_valid : theta -> ts_atom list -> bool
 
   val maximal_elems : theta -> timestamp list -> timestamp list
 
@@ -209,14 +202,14 @@ end = struct
                  models : models option;
                  models_is_exact : bool }
 
-  let pp_theta ppf theta = Term.pp_constr ppf theta.constr
+  let pp_theta ppf theta = pp_constr ppf theta.constr
 
   let mk constr = { constr = constr;
                     models = None;
                     models_is_exact = false }
 
   let add_constr theta c =
-    { theta with constr = Term.triv_eval (And(theta.constr, c));
+    { theta with constr = triv_eval (And(theta.constr, c));
                  models_is_exact = false }
 
   let compute_models theta =
@@ -235,39 +228,18 @@ end = struct
     let theta = compute_models theta in
     Constr.maximal_elems (opt_get theta.models) tss
 
-  let is_valid theta (c:tatom list) =
+  let is_valid theta (c:ts_atom list) =
     let theta = compute_models theta in
     Constr.query (opt_get (theta.models)) c
 
   let get_equalities theta =
     let theta = compute_models theta in
-    let ts = Term.constr_ts theta.constr
+    let ts = constr_ts theta.constr
              |> List.sort_uniq Pervasives.compare
     in
     Constr.get_equalities (opt_get (theta.models)) ts
 
 end
-
-
-type typed_formula =
-  | Unit
-  | Formula of formula
-  | Postcond of postcond
-  | Fact of fact
-
-let pp_typed_formula fmt =
-  function
-  | Unit -> Fmt.pf fmt "unit"
-  | Formula f -> pp_formula fmt f
-  | Postcond p -> pp_postcond fmt p
-  | Fact f -> pp_fact fmt f
-
-(*let type_goal = function
-  | Unit -> "unit"
-  | Formula f -> "formula"
-  | Postcond p -> "postcondition"
-  | Fact f -> "fact"
-*)
 
 exception Goal_type_error of string * string (* expected type and given type *)
 
@@ -283,7 +255,7 @@ module Judgment : sig
     env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
-    formula : typed_formula;
+    formula : formula;
   }
 
   type t = judgment
@@ -293,18 +265,18 @@ module Judgment : sig
   val init : formula -> judgment
 
   (** Side-effect: Add necessary action descriptions. *)
-  val add_fact : Term.fact -> judgment -> judgment
+  val add_fact : fact -> judgment -> judgment
 
-  val mem_fact : Term.fact -> judgment -> bool
+  val mem_fact : fact -> judgment -> bool
 
   (** Side-effect: Add necessary action descriptions. *)
-  val add_constr : Term.constr -> judgment -> judgment
+  val add_constr : constr -> judgment -> judgment
 
   val update_trs : judgment -> judgment
 
   val set_env : Vars.env -> judgment -> judgment
 
-  val set_formula : typed_formula -> judgment -> judgment
+  val set_formula : formula -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
 
@@ -313,7 +285,7 @@ end = struct
     env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
-    formula : typed_formula;
+    formula : formula;
   }
 
   type t = judgment
@@ -332,27 +304,27 @@ end = struct
       Theta.pp_theta judge.theta
       Gamma.pp_gamma judge.gamma
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
-      pp_typed_formula judge.formula
+      pp_formula judge.formula
 
   let init (goal : formula) =
     { env = Vars.empty_env ();
-      theta = Theta.mk Term.True;
+      theta = Theta.mk Bformula.True;
       gamma = Gamma.mk ();
-      formula = Formula goal;
+      formula = goal;
       }
 
   let update_trs j =
     { j with gamma = Gamma.update_trs j.gamma }
 
   let fact_actions f =
-    Term.fact_ts f
+    fact_ts f
     |> List.fold_left (fun acc ts -> match action_of_ts ts with
         | None -> acc
         | Some a -> a :: acc
       ) []
 
   let constr_actions c =
-    Term.constr_ts c
+    constr_ts c
     |> List.fold_left (fun acc ts -> match action_of_ts ts with
         | None -> acc
         | Some a -> a :: acc

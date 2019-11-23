@@ -10,7 +10,7 @@
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL GOAL DARROW AXIOM
+%token EXISTS FORALL GOAL AXIOM
 %token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
 %token CONGRUENCE ASSUMPTION APPLY TO ASSERT
@@ -65,23 +65,25 @@ tm_list:
 (* Facts, aka booleans *)
 
 ord:
-| EQ                             { Term.Eq }
-| NEQ                            { Term.Neq }
-| LEQ                            { Term.Leq }
-| LANGLE                         { Term.Lt }
-| GEQ                            { Term.Geq }
-| RANGLE                         { Term.Gt }
+| EQ                             { Bformula.Eq }
+| NEQ                            { Bformula.Neq }
+| LEQ                            { Bformula.Leq }
+| LANGLE                         { Bformula.Lt }
+| GEQ                            { Bformula.Geq }
+| RANGLE                         { Bformula.Gt }
 
-fact:
-| LPAREN fact RPAREN             { $2 }
-| fact AND fact                  { Term.And  ($1,$3) }
-| fact OR fact                   { Term.Or  ($1,$3) }
-| fact ARROW fact                { Term.Impl  ($1,$3) }
-| NOT fact                       { Term.Not  ($2) }
-| FALSE                          { Term.False }
-| TRUE                           { Term.True }
-| aterm ord aterm                { Term.Atom (Theory.Compare ($2,$1,$3)) }
-| ID term_list                   { Term.Atom (Theory.make_term $1 $2) }
+formula:
+| LPAREN formula RPAREN             { $2 }
+| formula AND formula                  { Formula.And  ($1,$3) }
+| formula OR formula                   { Formula.Or  ($1,$3) }
+| formula ARROW formula                { Formula.Impl  ($1,$3) }
+| NOT formula                       { Formula.Not  ($2) }
+| FALSE                          { Formula.False }
+| TRUE                           { Formula.True }
+| aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }
+| ID term_list                   { Formula.Atom (Theory.make_term $1 $2) }
+| EXISTS vs=arg_list COMMA f=formula  { Formula.Exists (vs,f)  }
+| FORALL vs=arg_list COMMA f=formula  { Formula.ForAll (vs,f)  }
 
 (* Processes *)
 
@@ -96,10 +98,10 @@ process:
                                  { Process.In ($3,$5,$7) }
 | OUT LPAREN channel COMMA term RPAREN process_cont
                                  { Process.Out ($3,$5,$7) }
-| IF fact THEN process else_process
-                                 { Process.Exists ([],$2,$4,$5) }
-| FIND indices SUCHTHAT fact IN process else_process
-                                 { Process.Exists ($2,$4,$6,$7) }
+| IF f=formula THEN process else_process
+                                 { Process.Exists ([],Theory.formula_to_fact f,$4,$5) }
+| FIND indices SUCHTHAT f=formula IN process else_process
+                                 { Process.Exists ($2,Theory.formula_to_fact f,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
 | ID term_list ASSIGN term process_cont
                                  { let to_idx = function
@@ -180,30 +182,6 @@ declaration:
 | AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
                                      (i, Prover.make_goal f) }
 
-q_vars:
-| LPAREN arg_list RPAREN                       { ($2, Term.True) }
-| LPAREN arg_list RPAREN SUCHTHAT fact         { ($2, $5) }
-
-formula:
-| fact                           { ( ([],Term.True),
-				     ([],Term.True),
-				     Term.True, $1 ) }
-| EXISTS q_vars COMMA fact       { ( ([],Term.True),
-                   	             $2,
-				     Term.True, $4 ) }
-| FORALL q_vars COMMA fact       { ( $2,
-				     ([],Term.True),
-				     Term.True, $4 ) }
-| FORALL q=q_vars COMMA f=fact DARROW EXISTS q2=q_vars COMMA f2=fact
-                                 { (q, q2, f, f2) }
-| FORALL q=q_vars COMMA EXISTS q2=q_vars COMMA f2=fact
-                                 { (q, q2, Term.True, f2) }
-| FORALL q_vars COMMA fact DARROW fact
-                                 { ($2, ([], Term.True) , $4, $6) }
-| f=fact DARROW g=fact           { ([],Term.True),([],Term.True),f,g }
-| f=fact DARROW EXISTS q2=q_vars COMMA g=fact
-                                 { ([],Term.True),q2,f,g }
-
 tactic_params:
 |                               { [] }
 | t=term                        { [t] }
@@ -235,7 +213,7 @@ tac:
   | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
   | APPLY i=ID                        { Prover.Apply (i, Prover.parse_args i []) }
   | APPLY i=ID TO t=tactic_params     { Prover.Apply (i, Prover.parse_args i t) }
-  | ASSERT f=fact                     { Prover.Assert (Prover.parse_fact f) }
+  | ASSERT f=formula                     { Prover.Assert (Prover.parse_fact (Theory.formula_to_fact f)) }
   | REPEAT t=tac                      { Prover.Repeat (t) }
 
 

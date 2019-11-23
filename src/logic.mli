@@ -3,7 +3,9 @@
     - Theta contains a set of constraints
     - Judgment is a goal inside a context, i.e a Gamma and a Theta *)
 open Term
-
+open Bformula
+open Formula
+    
 (** Tags used to record some information on gamma elements:
     - [euf] records whether the EUF axiom has been applied. *)
 type tag = { t_euf : bool; cpt : int }
@@ -23,10 +25,9 @@ module Gamma : sig
 
   val add_facts : gamma -> fact list -> gamma
 
-  val get_facts : gamma -> fact list
   val set_facts : gamma -> fact list -> gamma
 
-  val get_atoms : gamma -> atom list
+  val get_atoms : gamma -> term_atom list
 
   (* Check if a fact is in gamma, as a fact or atom. *)
   val mem : fact -> gamma -> bool
@@ -43,7 +44,11 @@ module Gamma : sig
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
       tag has been updated in [g] according to [f_up].
       Raise [Not_found] if no such element exists. *)
-  val select : gamma -> (atom -> tag -> bool) -> (tag -> tag) -> gamma * atom
+  val select :
+    gamma
+    -> (term_atom -> tag -> bool)
+    -> (tag -> tag)
+    -> gamma * term_atom
 
   val add_descr : gamma -> Process.descr -> gamma
 
@@ -67,7 +72,7 @@ module Theta : sig
 
   val is_sat : theta -> bool
 
-  val is_valid : theta -> tatom list -> bool
+  val is_valid : theta -> ts_atom list -> bool
 
   (** [maximal_elems theta elems] returns an over-approximation of the set of
       maximals elements of [elems] in [theta]. *)
@@ -76,19 +81,13 @@ module Theta : sig
   val get_equalities : theta -> timestamp list list
 end
 
-type typed_formula =
-  | Unit
-  | Formula of formula
-  | Postcond of postcond
-  | Fact of fact
-
 (** Judgments are the sequents of our proof system *)
 module Judgment : sig
   type judgment = private {
     env : Vars.env;
     theta : Theta.theta;
     gamma : Gamma.gamma;
-    formula : typed_formula;
+    formula : Formula.formula;
   }
 
   type t = judgment
@@ -98,18 +97,18 @@ module Judgment : sig
   val init : formula -> judgment
 
   (** Side-effect: Add necessary action descriptions. *)
-  val add_fact : Term.fact -> judgment -> judgment
+  val add_fact : fact -> judgment -> judgment
 
-  val mem_fact : Term.fact -> judgment -> bool
+  val mem_fact : fact -> judgment -> bool
 
   (** Side-effect: Add necessary action descriptions. *)
-  val add_constr : Term.constr -> judgment -> judgment
+  val add_constr : constr -> judgment -> judgment
 
   val update_trs : judgment -> judgment
 
   val set_env : Vars.env -> judgment -> judgment
 
-  val set_formula : typed_formula -> judgment -> judgment
+  val set_formula : formula -> judgment -> judgment
 
   val set_gamma : Gamma.gamma -> judgment ->  judgment
 
