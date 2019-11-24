@@ -40,6 +40,8 @@ module Gamma : sig
       otherwise. *)
   val is_sat : gamma -> bool
 
+  val is_valid : gamma -> term_atom list -> bool
+
   (** [select g f f_up] returns the pair [(g',at)] where [at] is such that
       [f at tag] is true (where [tag] is the tag of [at] in [g]), and [at]'s
       tag has been updated in [g] according to [f_up].

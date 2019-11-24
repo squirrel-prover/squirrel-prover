@@ -115,17 +115,17 @@ let dummy = Fun ((Fname "_", []), [])
 let rec pp_term ppf = function
   | Fun ( (Fname s,ids) , terms) ->
     if s = "pair" then
-    Fmt.pf ppf "%a"
-      (Utils.pp_ne_list
-         "<@[<hov>%a@]>"
-         (Fmt.list ~sep:Fmt.comma pp_term)) terms
+      Fmt.pf ppf "%a"
+        (Utils.pp_ne_list
+           "<@[<hov>%a@]>"
+           (Fmt.list ~sep:Fmt.comma pp_term)) terms
     else
       let f =  (Fname s,ids) in
-    Fmt.pf ppf "%a%a"
-      pp_fsymb f
-      (Utils.pp_ne_list
-         "(@[<hov>%a@])"
-         (Fmt.list ~sep:Fmt.comma pp_term)) terms
+      Fmt.pf ppf "%a%a"
+        pp_fsymb f
+        (Utils.pp_ne_list
+           "(@[<hov>%a@])"
+           (Fmt.list ~sep:Fmt.comma pp_term)) terms
   | Name n -> pp_nsymb ppf n
   | State (s, ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
   | Macro (m, ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
@@ -216,9 +216,6 @@ let pp_asubst ppf e =
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_asubst) s
-
-
-
 
 let term_subst (s : subst) =
   List.fold_left (fun acc asubst ->

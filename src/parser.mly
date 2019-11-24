@@ -10,7 +10,7 @@
 %token NEW OUT PARALLEL AS NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL GOAL AXIOM
+%token EXISTS FORALL GOAL DARROW AXIOM
 %token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
 %token CONGRUENCE ASSUMPTION APPLY TO ASSERT
@@ -22,7 +22,7 @@
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
-%left ARROW
+%left DARROW
 %left OR
 %left AND
 %nonassoc NOT
@@ -72,18 +72,31 @@ ord:
 | GEQ                            { Bformula.Geq }
 | RANGLE                         { Bformula.Gt }
 
+kind:
+| INDEX                          { Theory.Index }
+| MESSAGE                        { Theory.Message }
+| BOOLEAN                        { Theory.Boolean }
+| TIMESTAMP                      { Theory.Timestamp }
+
+arg_list:
+|                                { [] }
+| ID COLON kind                  { [$1,$3] }
+| ID COLON kind COMMA arg_list   { ($1,$3)::$5 }
+
+
+
 formula:
 | LPAREN formula RPAREN             { $2 }
 | formula AND formula                  { Formula.And  ($1,$3) }
 | formula OR formula                   { Formula.Or  ($1,$3) }
-| formula ARROW formula                { Formula.Impl  ($1,$3) }
+| formula DARROW formula                { Formula.Impl  ($1,$3) }
 | NOT formula                       { Formula.Not  ($2) }
 | FALSE                          { Formula.False }
 | TRUE                           { Formula.True }
 | aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }
 | ID term_list                   { Formula.Atom (Theory.make_term $1 $2) }
-| EXISTS vs=arg_list COMMA f=formula  { Formula.Exists (vs,f)  }
-| FORALL vs=arg_list COMMA f=formula  { Formula.ForAll (vs,f)  }
+| EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula  { Formula.Exists (vs,f)  }
+| FORALL LPAREN vs=arg_list RPAREN COMMA f=formula  { Formula.ForAll (vs,f)  }
 
 (* Processes *)
 
@@ -131,18 +144,6 @@ channel:
 indices:
 | ID                             { [$1] }
 | ID COMMA indices               { $1::$3 }
-
-kind:
-| INDEX                          { Theory.Index }
-| MESSAGE                        { Theory.Message }
-| BOOLEAN                        { Theory.Boolean }
-| TIMESTAMP                      { Theory.Timestamp }
-
-arg_list:
-|                                { [] }
-| ID COLON kind                  { [$1,$3] }
-| ID COLON kind COMMA arg_list   { ($1,$3)::$5 }
-
 
 opt_arg_list:
 | LPAREN arg_list RPAREN         { $2 }

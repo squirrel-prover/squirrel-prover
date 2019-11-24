@@ -131,6 +131,8 @@ let arity_error s i j = raise (Arity_error (s,i,j))
 
 type env = (string*kind) list
 
+exception Untyped_symbol
+
 let function_kind name =
   try
     match Hashtbl.find symbols name with
@@ -142,7 +144,7 @@ let function_kind name =
         (* [make_term] does not build [Fun] terms for these,
          * but [Get] and [Name] terms instead *)
         assert false
-  with Not_found -> assert false
+  with Not_found -> raise Untyped_symbol
 
 let check_state s n =
   try
@@ -514,10 +516,12 @@ let convert_fact ts subst f : Bformula.fact =
 
 (* Not clean at all. *)
 let get_kind env t =
-  try check_term env t Index; Index
+  try
+  (try check_term env t Index; Index
   with Type_error -> try check_term env t Timestamp; Timestamp
     with Type_error -> try check_term env t Message; Message
-      with Type_error -> check_term env t Boolean; Boolean
+      with Type_error -> check_term env t Boolean; Boolean)
+  with Untyped_symbol -> Message
 
 let convert_ts_atom args_kind subst f : Bformula.ts_atom =
   let open Bformula in
@@ -566,12 +570,14 @@ let subst_get_var subst (x,kind) =
 let convert_formula_glob args_kind subst f =
   let open Formula in
   let rec conv = function
-    | Atom (at) ->
-      (try
-         Atom (Trace (convert_ts_atom args_kind subst at))
-      with
-      | Type_error -> Atom (Message (convert_atom_glob subst at))
-      | _ -> assert false)
+    | Atom (Compare (o,u,v)) ->
+      begin
+        let at = Compare (o,u,v) in
+        match get_kind args_kind u with
+        | Index | Timestamp -> Atom (Trace (convert_ts_atom args_kind subst at))
+        | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
+      end
+    | Atom _ -> assert false
     | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
     | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
     | And (f, g) -> And (conv f, conv g)

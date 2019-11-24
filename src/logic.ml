@@ -40,6 +40,8 @@ module Gamma : sig
 
   val is_sat : gamma -> bool
 
+  val is_valid : gamma -> term_atom list -> bool
+
   val select : gamma -> (term_atom -> tag -> bool)
     -> (tag -> tag) -> gamma * term_atom
 
@@ -104,12 +106,14 @@ end = struct
     | Bformula.Atom at -> List.exists (fun (at',_) -> at = at') g.atoms
     | _ -> false
 
+  let get_eqs_neqs_at_list atl =
+    List.map norm_xatom atl
+    |> List.flatten
+    |> List.fold_left (fun acc (od,a,b) ->
+        add_xeq od (a,b) acc) ([],[],[])
+
   let get_eqs_neqs g =
-     let eqs, _, neqs = List.map fst g.atoms
-                       |> List.map norm_xatom
-                       |> List.flatten
-                       |> List.fold_left (fun acc (od,a,b) ->
-                           add_xeq od (a,b) acc) ([],[],[]) in
+     let eqs, _, neqs = get_eqs_neqs_at_list (List.map fst g.atoms) in
      eqs,neqs
 
   let update_trs g =
@@ -124,6 +128,11 @@ end = struct
     let g = update_trs g in
     let _, neqs = get_eqs_neqs g in
     Completion.check_disequalities (opt_get g.trs) neqs
+
+  let is_valid g term_atom_lists =
+    let g = update_trs g in
+    let eqs,_,neqs = get_eqs_neqs_at_list term_atom_lists in
+    Completion.check_equalities (opt_get g.trs) eqs
 
   let select g f f_up =
     let rec aux acc = function
@@ -297,7 +306,7 @@ end = struct
            @[<v 0>%a@]\
             @[<hv 2>Theta:@ @[%a@]@]@;\
             @[%a@]@;\
-            %a@;\
+            %a@.\
             %a@;@;@]"
       (fun ppf i -> (styled `Bold ident) ppf (String.make i '=')) 40
       (Vars.pp_typed_env) judge.env

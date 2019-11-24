@@ -43,19 +43,19 @@ let tact_return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
 
 let tact_andthen tac1 tac2 judge sk fk =
   let suc_k judges sk fk =
-        let exception Suc_fail of tac_error in
-        let compute_judges () =
-          List.fold_left (fun acc judge ->
-              let new_j =
-                tac2 judge
-                  (fun l _ -> l)
-                  (fun error -> raise @@ Suc_fail error) in
-              new_j @ acc
-            ) [] judges in
-        match compute_judges () with
-        | j -> sk j fk
-        | exception Suc_fail e -> fk (AndThen_Failure e) in
- tac1 judge (fun v fk' -> suc_k v sk fk') fk
+    let exception Suc_fail of tac_error in
+    let compute_judges () =
+      List.fold_left (fun acc judge ->
+          let new_j =
+            tac2 judge
+              (fun l _ -> l)
+              (fun error -> raise @@ Suc_fail error) in
+          new_j @ acc
+        ) [] judges in
+    match compute_judges () with
+    | j -> sk j fk
+    | exception Suc_fail e -> fk (AndThen_Failure e) in
+  tac1 judge (fun v fk' -> suc_k v sk fk') fk
 
 let tact_orelse a b v sk fk = a v sk (fun tac_error -> b v sk fk)
 
@@ -101,8 +101,8 @@ let lift =
 let goal_or_intro_l (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
   | (Or (lformula, _)) -> sk
-                                 [Judgment.set_formula (lformula) judge]
-                                 fk
+                            [Judgment.set_formula (lformula) judge]
+                            fk
   | _ -> fk (Failure "Cannot introduce a disjunction
 if the goal does not contain one")
 
@@ -128,22 +128,32 @@ let goal_and_intro (judge : Judgment.t) sk fk =
   | And (lformula, rformula) ->
     sk [ Judgment.set_formula (lformula) judge;
          Judgment.set_formula (rformula) judge ] fk
- | _ -> fk (Failure "Cannot introduce a conjonction
+  | _ -> fk (Failure "Cannot introduce a conjonction
 if the formula does not contain one" )
 
 let goal_intro (judge : Judgment.t) sk fk =
-  let open Bformula in
-  match judge.Judgment.formula with
-  | False -> sk [judge] fk
-  | Atom (Message f) -> let judge = Judgment.add_fact (Not (Atom (f))) judge
-                           |> Judgment.set_formula (False)
+  let exception No_intro in
+  try
+    let ((facts,constrs),new_goal) =
+      match judge.Judgment.formula with
+      | f when is_disjunction f ->
+        let (f1,c1) = disjunction_to_atom_lists f in
+        (List.map (fun c -> Bformula.Not c) f1,
+         List.map (fun c -> Bformula.Not c) c1)
+      , False
+      | Impl(lhs,rhs) when is_conjunction lhs ->
+        (conjunction_to_atom_lists lhs, rhs)
+      | _ -> raise No_intro
     in
-    sk [judge] fk
-  | Atom (Trace f) -> let judge = Judgment.add_constr (Not (Atom (f))) judge
-                           |> Judgment.set_formula (False)
+    let judge = List.fold_left
+        (fun j f -> Judgment.add_fact f j) judge facts
     in
-    sk [judge] fk
-  | _ -> fk (Failure "Cannot introduce a formula which is not atomic.")
+    let judge = List.fold_left
+        (fun j c -> Judgment.add_constr c j) judge constrs
+    in
+    sk [Judgment.set_formula new_goal judge] fk
+  with No_intro -> fk (Failure "Can only introduce disjunction of atoms, or the
+left hand-side of an implication which is a conjonction.")
 
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : Judgment.t) sk fk =
@@ -154,7 +164,7 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
       List.map
         (fun x ->
            (x, Vars.make_fresh_from_and_update env x))
-             vs
+        vs
     in
     let subst = from_varsubst vsubst in
     let new_formula = subst_formula subst f in
@@ -196,34 +206,6 @@ let assumption (judge : Judgment.t) sk fk =
     else fk (Failure "Not in hypothesis")
   | _ -> fk (Failure "Not in hypothesis")
 
-      (*
-let or_to_list f =
-  let rec aux acc = function
-    | Or (g, h) -> aux (aux acc g) h
-    | _ as a -> a :: acc
-  in
-  (* Remark that we simplify the formula. *)
-  aux [] (simpl_fact f)
-
-let gamma_or_intro (judge : Judgment.t) sk fk select_pred =
-  let sel, nsel =
-    Utils.List.split_pred select_pred
-      (Gamma.get_facts judge.Judgment.gamma)
-  in
-  let rec mk_facts acc = function
-    | [] -> [acc]
-    | l :: ors -> List.map (fun x -> mk_facts (x :: acc) ors) l
-                  |> List.flatten
-  in
-  let judges =
-    mk_facts [] (List.map or_to_list sel)
-    |> List.map (fun fs ->
-        Judgment.set_gamma
-          (Gamma.set_facts judge.Judgment.gamma (fs @ nsel))
-          judge )
-  in
-  sk judges fk
-*)
 (** Utils *)
 
 let mk_or_cnstr l = match l with
@@ -395,39 +377,64 @@ let euf_apply f_select (judge : Judgment.t) sk fk =
   sk (euf_apply_facts judge at) fk
 
 let apply gp (subst:subst) (judge : Judgment.t) sk fk =
-  failwith "not implemented"
-(*  (* We first check if constr is satisfied *)
-  let new_constr = subst_constr subst gp.uconstr in
-  let rec to_cnf c = match c with
-    | Atom a -> [a]
-    | True -> []
-    | And (a, b) -> (to_cnf a) @ (to_cnf b)
-    | _ -> raise @@ Tactic_Hard_Failure
-        "Can only apply axiom with constraints restricted to conjunctions."
-  in
-  let tatom_list = to_cnf new_constr in
-  if not( Theta.is_valid judge.Judgment.theta tatom_list) then
-    raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
-  (* The precondition creates a new subgoal *)
-  let new_judge =
-    Judgment.set_formula (Fact (subst_fact subst gp.ufact)) judge
-    |> simplify
-  in
+  let exception No_apply in
   let env = ref judge.Judgment.env in
-  let new_truths =
-    List.map (fun formula ->
-        let formula = fresh_postcond env formula in
-        subst_postcond subst formula
-      ) gp.postcond
-  in
-  let judge =
-    List.fold_left (fun judge nt ->
-        Judgment.add_fact nt.efact judge
-        |> Judgment.add_constr nt.econstr
-        |> Judgment.set_env (!env)
-      ) judge new_truths
-  in
-    sk [new_judge; judge] fk *)
+  let formula = subst_formula subst gp in
+  try
+    let ((check_facts,check_constrs),(new_facts,new_constrs)) =
+      match formula with
+      | f when is_conjunction f ->
+        ([], []), conjunction_to_atom_lists f
+      | Impl(lhs,rhs) when is_disjunction lhs && is_conjunction rhs->
+        disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
+      | ForAll(vs,f) when is_conjunction f ->
+        let f = fresh_formula env f in
+        ([], []), conjunction_to_atom_lists f
+      | ForAll(vs, Exists(vs2, f)) when is_conjunction f ->
+        begin
+          match fresh_formula env (Exists(vs2, f)) with
+          |  (Exists(vs2, f)) ->
+            ([], []), conjunction_to_atom_lists f
+          | _ -> assert false
+        end
+      | ForAll(vs, Impl(lhs,rhs))
+        when is_disjunction lhs && is_conjunction rhs->
+        begin
+          match  fresh_formula env (Impl(lhs, rhs)) with
+          | Impl(lhs,rhs) ->
+            disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
+          | _ -> assert false
+        end
+      | ForAll(vs, Impl(lhs, Exists(vs2, rhs)))
+        when is_disjunction lhs && is_conjunction rhs->
+        begin
+          match  fresh_formula env (Impl(lhs, Exists(vs2, rhs))) with
+          | (Impl(lhs, Exists(vs2, rhs))) ->
+            disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
+          | _ -> assert false
+        end
+
+      | _ -> raise No_apply
+    in
+    let ts_atom_list = List.map (function
+        | Bformula.Atom a -> a
+        | _ -> assert false) check_constrs in
+    if not( Theta.is_valid judge.Judgment.theta ts_atom_list) then
+      raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
+    let term_atom_list = List.map (function
+        | Bformula.Atom a -> a
+        | _ -> assert false) check_facts in
+    if not( Gamma.is_valid judge.Judgment.gamma term_atom_list) then
+      raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
+    let judge = List.fold_left
+        (fun j f -> Judgment.add_fact f j) judge new_facts
+    in
+    let judge = List.fold_left
+        (fun j c -> Judgment.add_constr c j) judge new_constrs
+    in
+    sk [judge] fk
+  with No_apply -> fk (Failure "Can only apply quantified conjunction of atoms
+ or a disjunction implying a conjunction.")
 
 let tac_assert fact j sk fk =
   let j1 = Judgment.set_formula (fact_to_formula fact) j in

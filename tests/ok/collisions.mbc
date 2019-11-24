@@ -22,15 +22,15 @@ system (out(c,cst);
 
 
 goal dummy :
-  forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message)
-  such that tau1 = tau2,
+  forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message),
+  tau1 = tau2 =>
   output@tau1= output@tau2.
 Proof.
 Qed.
 
 goal unforgeable_1 :
-  forall (a : index, b : index)
-  such that b <> a,
+  forall (a : index, b : index),
+  b <> a =>
   output@A(b) <> h(na(a),k).
 
 Proof.
@@ -43,7 +43,6 @@ goal unforgeable_2 :
 
 Proof.
   collision.
-
   apply name_not_pair to
   nb(b),
   nb(b),

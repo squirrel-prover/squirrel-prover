@@ -111,7 +111,7 @@ type term =
 
 type t = term
 
-(** [term_vars t] returns the timestamp and index variables of [t]*)
+(** [term_vars t] returns the variables of [t]*)
 val term_vars : term -> var list
 
 (** [term_ts t] returns the timestamps appearing in [t] *)
@@ -157,6 +157,7 @@ val out_macro : msymb
 (** {2 Substitutions} *)
 (** Substitutions for all purpose, applicable to terms and timestamps alikes.
     Substitutions are performed bottom to top to avoid loops. *)
+
 type asubst =
   | Term of term * term
   | TS of timestamp * timestamp
@@ -166,14 +167,13 @@ type subst = asubst list
 
 val to_isubst : subst ->  (var * var) list
 
+(** From the type of the varibles, creates the corresponding substitution. *)
 val from_varsubst : (var * var) list -> subst
 
 val pp_subst : Format.formatter -> subst -> unit
 
 val get_term_subst : subst -> term -> term
-
 val get_ts_subst : subst -> timestamp -> timestamp
-
 val get_index_subst : subst -> index -> index
 
 val subst_index : subst -> index -> index

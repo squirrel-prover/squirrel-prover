@@ -1,15 +1,6 @@
 open Term
 open Bformula
 
-let pp_q_vars s_q vars (constr:constr) ppf () =
-  let open Fmt in
-  let open Utils in
-  Fmt.pf ppf "%a" (Vars.pp_typed_list s_q) vars;
-  if constr <> True then
-    Fmt.pf ppf "@[<hv 2>%a@ @[<hov>%a@]@]@; "
-      (styled `Red (styled `Underline ident)) "such that"
-      pp_constr constr
-
 type generic_atom =
   | Trace of ts_atom
   | Message of term_atom
@@ -74,14 +65,47 @@ type formula = (generic_atom, Vars.var) foformula
 let fact_to_formula =
   bformula_to_foformula (fun x -> Message x)
 
+let rec is_disjunction = function
+  | Atom(_) -> true
+  | Or(f1, f2) -> is_disjunction f1 && is_disjunction f2
+  | _ -> false
+
+let rec is_conjunction = function
+  | Atom(_) -> true
+  | And(f1, f2) -> is_disjunction f1 && is_disjunction f2
+  | _ -> false
+
+let conjunction_to_atom_lists f =
+  let rec ctal ms ts = function
+    | And(Atom (Message a), f) | And(f, Atom (Message a)) ->
+      ctal (Bformula.Atom a :: ms) ts f
+    | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
+    | And(Atom (Trace a), f) | And(f, Atom (Trace a)) ->
+      ctal ms (Bformula.Atom a :: ts) f
+    | Atom (Trace a) -> (ms, (Bformula.Atom a :: ts))
+    | _ -> assert false
+  in
+  ctal [] [] f
+
+let disjunction_to_atom_lists f =
+  let rec ctal ms ts = function
+    | Or(Atom (Message a), f) | Or(f, Atom (Message a)) ->
+      ctal (Bformula.Atom a :: ms) ts f
+    | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
+    | Or(Atom (Trace a), f) | Or(f, Atom (Trace a)) ->
+      ctal ms (Bformula.Atom a :: ts) f
+    | Atom (Trace a) -> (ms, (Bformula.Atom a :: ts))
+    | _ -> assert false
+  in
+  ctal [] [] f
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
-        Fmt.pf ppf "@[<v 0>forall %a%a@]"
-          pp_var_list vs (pp_foformula pp_atom pp_var_list)  b
+    Fmt.pf ppf "@[<v 0>forall %a%a@]"
+      pp_var_list vs (pp_foformula pp_atom pp_var_list)  b
   | Exists (vs, b) ->
-        Fmt.pf ppf "@[<v 0>exists %a%a@]"
-          (Vars.pp_typed_list "") vs (pp_foformula pp_atom pp_var_list) b
+    Fmt.pf ppf "@[<v 0>exists %a%a@]"
+      (Vars.pp_typed_list "") vs (pp_foformula pp_atom pp_var_list) b
   | And (bl, br) ->
     Fmt.pf ppf "@[<hv>(%a && %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
@@ -91,7 +115,7 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Impl (bl, br) ->
-    Fmt.pf ppf "@[<hv>(%a -> %a)@]"
+    Fmt.pf ppf "@[<hv>(%a => %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Not b ->
@@ -103,15 +127,20 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
 
 
 let rec tformula_vars atom_var = function
- | ForAll (vs,b) | Exists (vs,b) -> vs @ (tformula_vars atom_var b)
- | And (a,b) | Or (a,b) | Impl (a,b) ->
-   tformula_vars atom_var a @ tformula_vars atom_var b
- | Not s -> tformula_vars atom_var s
- | Atom a -> atom_var a
- | True | False -> []
+  | ForAll (vs,b) | Exists (vs,b) -> vs @ (tformula_vars atom_var b)
+  | And (a,b) | Or (a,b) | Impl (a,b) ->
+    tformula_vars atom_var a @ tformula_vars atom_var b
+  | Not s -> tformula_vars atom_var s
+  | Atom a -> atom_var a
+  | True | False -> []
 
 let formula_vars f =
   tformula_vars generic_atom_var f
+  |> List.sort_uniq Pervasives.compare
+
+
+let formula_qvars f =
+  tformula_vars (fun a -> []) f
   |> List.sort_uniq Pervasives.compare
 
 let pp_formula =  pp_foformula pp_generic_atom (Vars.pp_typed_list "")
@@ -133,17 +162,11 @@ let rec subst_foformula a_subst (s : subst) (f) =
 let subst_formula = subst_foformula subst_generic_atom
 
 let fresh_formula env f =
-  (* TODO *)
-  f
-(*
-let fresh_postcond env p =
-  let fresh_vars = List.map (fun v ->
-      make_fresh_from_and_update env v)
-      p.evars
-  in
-  let subst = List.combine p.evars fresh_vars
+  let vars = formula_qvars f in
+  let subst = List.map
+      (fun x ->
+         (x, Vars.make_fresh_from_and_update env x))
+      vars
               |> from_varsubst
   in
-  let postcond = subst_postcond subst p in
-  { postcond with evars = fresh_vars}
-*)
+  subst_formula subst f

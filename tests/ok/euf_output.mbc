@@ -10,8 +10,8 @@ name n : index->message
 system !_a out(c,h(n(a),k)).
 
 goal unforgeable :
-  forall (a:index, b:index)
-  such that b <> a,
+  forall (a:index, b:index),
+  b <> a =>
   output@A(b) <> h(n(a),k).
 
 Proof.

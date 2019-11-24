@@ -13,14 +13,13 @@ h(ma,k)=h(mb,k) => ma = mb
 system !_a out(c,h(n(a),k)).
 
 goal unforgeable :
-  forall (a:index, b:index)
-  such that b <> a,
-  output@A(b) <> h(n(a),k).
+  forall (a:index, b:index),
+  (b <> a =>
+  output@A(b) <> h(n(a),k)).
 
 Proof.
 
 apply collision_resistance to
     n(b),
     n(a).
- 
 Qed.

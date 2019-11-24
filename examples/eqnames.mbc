@@ -14,20 +14,22 @@ Proof.
 Qed.
 
 goal injectivity :
-  forall (i:index,j:index) such that i <> j,
-  m1(i) = m1(j) => false.
+forall (i:index,j:index),
+i <> j =>
+ m1(i) <> m1(j).
 Proof.
 Qed.
 
 goal independency :
-  h(n1,k) = n2 => false.
+  h(n1,k) <> n2.
 Proof.
   eqnames.
 Qed.
 
 goal independency_bis :
-  forall (i:index,j:index) such that i <> j,
-  h(m1(i),k) = m1(j) => false.
+forall (i:index,j:index), i <> j
+=>
+  h(m1(i),k) <> m1(j).
 Proof.
   eqnames.
 Qed.

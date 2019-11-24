@@ -277,8 +277,15 @@ let parse_args goalname ts : subst =
   match goals with
   | [] ->  raise @@ Failure "No goal with given name"
   | [(np, gp)] ->
-      begin
-      let uvars = formula_vars gp in
+    begin
+      let uvars =
+        begin
+          match gp with
+          | ForAll (vs,b) -> vs
+          | Exists _ -> raise @@ Failure "Cannot apply existential goal."
+          | _ -> []
+        end
+      in
       if (List.length uvars) <> (List.length ts) then
         raise @@ Failure "Number of parameters different than expected";
       match !subgoals with
