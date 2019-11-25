@@ -549,7 +549,7 @@ end = struct
     (* Invariant in [aux acc lst f]:
      *  - [acc] is the list of e_rules to add so far.
      *  - [lst] is a subterm of [l].
-     *  - [f_cntxt] is function building the context where [lst] appears.
+     *  - [f_cntxt] is a function building the context where [lst] appears.
           For example, we have that [f_cntxt lst = l]. *)
     let rec aux state acc lst f_cntxt = match lst with
       (* never superpose at variable position *)
@@ -577,19 +577,21 @@ end = struct
 
               | _ -> ( state, (la_sigma,r_sigma) :: acc ) in
 
-        (* Invariant: [(List.rev left) @ [lst'] @ right = ts] *)
-        let (state, acc), _, _ =
-          List.fold_left (fun ((state,acc),left,right) lst' ->
-              let f_cntxt' hole =
-                f_cntxt (Cfun (fn, (List.rev left) @ [hole] @ right)) in
+        if ts = [] then (state,acc)
+        else
+          (* Invariant: [(List.rev left) @ [lst'] @ right = ts] *)
+          let (state, acc), _, _ =
+            List.fold_left (fun ((state,acc),left,right) lst' ->
+                let f_cntxt' hole =
+                  f_cntxt (Cfun (fn, (List.rev left) @ [hole] @ right)) in
 
-              let right' = if right = [] then [] else List.tl right in
+                let right' = if right = [] then [] else List.tl right in
 
-              ( aux state acc lst' f_cntxt', lst' :: left, right' )
-            ) ((state,acc),[],ts) ts in
+                ( aux state acc lst' f_cntxt', lst' :: left, right' )
+              ) ((state,acc),[],List.tl ts) ts in
 
-        ( state, acc ) in
-
+          ( state, acc ) in
+    
     aux state [] l (fun x -> x)
 
 
@@ -736,7 +738,7 @@ let normalize state u =
 
 let rec normalize_csts state = function
   | Cfun (fn,ts) -> Cfun (fn, List.map (normalize_csts state) ts)
-  | Cvar _ -> assert false
+  | Cvar _ as t -> t
   | Ccst _ | Cxor _ as t -> normalize state t
 
 
@@ -779,7 +781,7 @@ let rec complete_state state =
   else { state with completed = true }
 
 
-let complete_cterms : (cterm * cterm) list -> state = fun l ->
+let complete_cterms (l : (cterm * cterm) list) : state = 
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
       and  eqs', xeqs', b = flatten v in
