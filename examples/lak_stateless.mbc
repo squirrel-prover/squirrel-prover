@@ -47,8 +47,8 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 goal wa :
   forall (i:index, j:index),
   output@R1(j,i) = output@R1(j,i) =>
-  exists (ii:index,k:index) such that
-  R1(j,i) > T1(ii,k),
+  exists (ii:index,k:index),
+  R1(j,i) > T1(ii,k) &&
   input@R1(j,i) = output@T1(ii,k).
 Proof.
   euf 1.
@@ -63,7 +63,3 @@ Proof.
        that the addition of the fact is cancelled *)
   assert(h(<nR(j3), fst(input@R1(j3,i4))>, key(i4)) = nR(j)).
   admit. (* need full support of fst(_) *)
-
-  eqnames. (* should add j = j 3 *)
-  assert(nR(j) = nR(j3)). (* TODO cannot simply write j=j3 *)
-  admit.
