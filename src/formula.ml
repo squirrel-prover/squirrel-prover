@@ -115,7 +115,7 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Impl (bl, br) ->
-    Fmt.pf ppf "@[<hv>(%a => %a)@]"
+    Fmt.pf ppf "@[<hv>(%a@ =>@ %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Not b ->

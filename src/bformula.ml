@@ -140,7 +140,7 @@ let not_ord o = match o with
   | Gt -> Leq
 
 let pp_term_atom ppf (o,tl,tr) =
-  Fmt.pf ppf "@[<h>%a %a %a@]" pp_term tl pp_ord o pp_term tr
+  Fmt.pf ppf "@[%a@ %a@ %a@]" pp_term tl pp_ord o pp_term tr
 
 let pp_fact = pp_bformula pp_term_atom
 
@@ -175,9 +175,9 @@ let pind (o, i, i') = Pind (o, i, i')
 
 let pp_ts_atom ppf = function
   | Pts (o,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a %a %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
+    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<h>%a %a %a@]" Vars.pp il pp_ord o Vars.pp ir
+    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
 
 let not_tpred = function
   | Pts (o,t,t') -> Pts (not_xpred (o,t,t'))
