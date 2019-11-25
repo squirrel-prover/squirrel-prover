@@ -790,7 +790,10 @@ let complete_cterms : (cterm * cterm) list -> state = fun l ->
     grnd_rules = grnd_rules;
     xor_rules = xor_rules;
     sat_xor_rules = None;
-    e_rules = [];
+    e_rules =
+      Theories.mk_pair 2
+        (Term.mk_fname "pair")
+        [Term.mk_fname "fst";Term.mk_fname "snd"];
     completed = false  }
   |> complete_state
   |> finalize_completion
