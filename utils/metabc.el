@@ -1,18 +1,30 @@
 ;;; metabc.el --- Proof General for metabc.
 
-;; 1. Create a folder metabc inside your PG folder,
-;;    under ~/.emacs.d/lisp/PG if this is your git clone.
+;; 0. Clone the git repository of proof general inside your ~/.emacs/lisp:
+;;    # cd ~/.emacs.d/lisp/
+;;    # git clone https://github.com/ProofGeneral/PG
 
-;; 2. Copy and paste this file, and metabc-syntax.el inside it.
+;; 1. Create a metabc subdirectory:
+;;    # mkdir ~/.emacs.d/lisp/PG/metabc
 
-;; 3. Moreover, in the file generic/proof-site.el,
+;; 2. Copy and paste this file, and metabc-syntax.el inside it:
+;;    # cp metabc.el metabc-syntax.el ~/.emacs.d/lisp/PG/metabc
+
+;; 3. Moreover, in the file ~/.emacs.d/lisp/PG/generic/proof-site.el,
 ;;    add to the list proof-assistant-table-default the following line:
-;;    (metabc "metabc" "mbc")
+;;      (metabc "metabc" "mbc")
+;;    Then erase the outdated compiled version of this file:
+;;    # rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
 
 ;; 4. Add the following two lines to your .emacs, the second one
 ;;    with the correct path to your proof general folder:
 ;;    (require 'ansi-color)
 ;;    (load "~/.emacs.d/lisp/PG/generic/proof-site")
+
+;; 5. Run emacs from the metabc repository on some example file,
+;;    with the metabc repository in the path:
+;;    # export PATH=$PATH:/path/to/metabc
+;;    # emacs examples/<file>.mbc
 
 (require 'span)
 (require 'proof)
