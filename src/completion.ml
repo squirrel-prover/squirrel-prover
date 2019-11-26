@@ -718,16 +718,18 @@ let rec term_e_normalize state u = match u with
     let nts = List.map (term_e_normalize state) ts in
     let u' = Cfun (fn, nts) in
 
+    let exception Find_unif_fail in
     let rec find_unif = function
-      | [] -> raise Not_found
-      | (l, r) :: l' -> match Unify.unify state u l with
-        | Unify.No_mgu -> raise Not_found
+      | [] -> raise Find_unif_fail
+      | (l, r) :: l' ->
+        match Unify.unify state u l with
+        | Unify.No_mgu -> find_unif l'
         | Unify.Mgu sigma -> l, r, sigma in
     try
       let l,r,sigma = find_unif state.e_rules in
       assert (Unify.subst_apply l sigma = u);
       Unify.subst_apply r sigma
-    with Not_found -> u'
+    with Find_unif_fail -> u'
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
@@ -735,7 +737,7 @@ let normalize state u =
   fpt (fun x -> term_uf_normalize state x
                 |> term_grnd_normalize state
                 |> term_e_normalize state) (grp_xor u)
-
+    
 let rec normalize_csts state = function
   | Cfun (fn,ts) -> Cfun (fn, List.map (normalize_csts state) ts)
   | Cvar _ as t -> t
@@ -778,7 +780,7 @@ let rec complete_state state =
               |> Erules.deduce_eqs in
 
   if start <> stop_cond state then complete_state state
-  else { state with completed = true }
+  else state
 
 
 let complete_cterms (l : (cterm * cterm) list) : state = 
@@ -800,8 +802,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   |> complete_state
   |> finalize_completion
 
-
-let complete : (term * term) list -> state = fun l ->
+let complete (l : (term * term) list) : state = 
   List.map (fun (u,v) -> ( cterm_of_term u, cterm_of_term v )) l
   |> complete_cterms
 
