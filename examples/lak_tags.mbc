@@ -2,16 +2,15 @@ hash h
 
 abstract ok:message
 abstract ko:message
+
 abstract tag1:message
 abstract tag2:message
+axiom tags_neq : tag1 <> tag2
+
+axiom pairs_surj : forall (x:message),
+x = <fst(x),snd(x)>
 
 name key : index->message
-
-axiom fst : forall (m:message, n:message),
-  fst(<m,n>) = m
-
-axiom snd : forall (m:message, n:message),
-  snd(<m,n>) = n
 
 channel cT
 channel cR
@@ -25,7 +24,7 @@ process tag(i:index) =
   let m2 = h(<<nR,nT>,tag1>,key(i)) in
   out(cT,<nT,h(<<nR,nT>,tag1>,key(i))>);
   in(cR,m3);
-  if m3@nT = h(<<h(<nR,nT>,key(i)),nR>,tag2>,key(i)) then
+  if m3@nT = h(<<h(<<nR,nT>,tag1>,key(i)),nR>,tag2>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -55,22 +54,16 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 goal wa :
   forall (i:index, j:index),
   output@R1(j,i) = output@R1(j,i) =>
-  exists (ii:index,k:index) such that
-  T(ii,k) <= R1(j,i),
-  snd(input@R1(j,i)) = snd(output@T(ii,k)).
+  exists (ii:index,k:index),
+  T(ii,k) <= R1(j,i) &&
+  input@R1(j,i) = output@T(ii,k).
 Proof.
   euf 1.
-  assert(tag2<>tag1).
-  cycle 1.
-  apply snd to <snd(input@R1(j3,i4)), nR(j3)>, tag2.
-  apply snd to <nR(j), fst(input@R1(j,i))>,tag1.
-  existsintro i3,k2.
-  cycle 1.
+  apply tags_neq.
+  nosimpl(existsintro i3,k2).
+  split.
+  assert(key(i)=key(i3)).
+  admit.
+  apply pairs_surj to input@R1(j,i).
+Qed.
 
-
-
-(*
-  apply snd to nT(i3,k2),h(<<input@T(i3,k2), nT(i3,k2)>, tag1>, key(i3)).
-  assert(snd(output@T(i3,k2))=h(<<nR(j), fst(input@R1(j,i))>, tag1>, key(i))).
-  assert(snd(input@R1(j,i))=snd(output@T(i3,k2))).
-*)
