@@ -4,14 +4,9 @@ open Term
 open Bformula
 open Formula
 
-type tag = { t_euf : bool; cpt : int }
+type tag = { t_euf : bool; id : int }
 
-let cpt_tag = ref 0
-
-let new_tag () =
-  let t = { t_euf = false; cpt = !cpt_tag } in
-  incr cpt_tag;
-  t
+let new_tag id = { t_euf = false ; id = id }
 
 let set_euf b t = { t with t_euf = b }
 
@@ -23,7 +18,7 @@ module Gamma : sig
 
   val pp_gamma : Format.formatter -> gamma -> unit
 
-  val mk : unit -> gamma
+  val empty : gamma
 
   val add_facts : gamma -> fact list -> gamma
 
@@ -55,7 +50,8 @@ end = struct
       called on [atoms]. *)
   type gamma = { atoms : (term_atom * tag) list;
                  trs : Completion.state option;
-                 actions_described : Action.action list }
+                 actions_described : Action.action list;
+                 cur_id : int }
 
   let pp_gamma ppf gamma =
     Fmt.pf ppf "@[<v 0>\
@@ -64,9 +60,9 @@ end = struct
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
       gamma.actions_described
       (Fmt.list (fun ppf (at,t) ->
-           Fmt.pf ppf "%d: %a" t.cpt pp_term_atom at)) (List.rev gamma.atoms)
+           Fmt.pf ppf "%d: %a" t.id pp_term_atom at)) (List.rev gamma.atoms)
 
-  let mk () = { atoms = []; trs = None; actions_described = [] }
+  let empty = { atoms = []; trs = None; actions_described = []; cur_id = 0 }
 
   let get_atoms g = List.map fst g.atoms
 
@@ -74,7 +70,10 @@ end = struct
   let add_atom g at =
     if List.mem at (get_atoms g) then g else
       begin
-      let add at =  { g with atoms = (at, new_tag ()) :: g.atoms } in
+      let add at =
+        { g with
+          cur_id = g.cur_id+1 ;
+          atoms = (at, new_tag g.cur_id) :: g.atoms } in
          if (g.trs) = None then add at else
           match at with
           | (Eq,s,t) ->
@@ -317,7 +316,7 @@ end = struct
   let init (goal : formula) =
     { env = Vars.empty_env ();
       theta = Theta.mk Bformula.True;
-      gamma = Gamma.mk ();
+      gamma = Gamma.empty;
       formula = goal;
       }
 

@@ -10,9 +10,9 @@ open Logic
 (** A goal of the prover is simply a name and a formula *)
 type named_goal = string * formula
 
-(** [current_goal] describes, if not None, the goal which is currently proved.
-*)
-val current_goal : named_goal option ref
+(** [current_goal] returns the current (sub)goal of the prover,
+  * if any. *)
+val current_goal : unit -> named_goal option
 
 (** Current mode of the prover:
     - [InputDescr] : waiting for the process description.
@@ -32,29 +32,14 @@ type gm_input = Gm_goal of string * formula | Gm_proof
 (** History management. *)
 exception Cannot_undo
 
-(** A complete proof state:
-    - [goals] contains the list of all declared goals.
-    - [current_goal], if not None, points to the global goal at the beginning of
-    the current proof.
-    - [subgoals] contains the list of all subgoals of the current proof. It
-    is initialized with the value of [current_goal].
-    - [goals_proved] contains the list of proved goals.
-    - [cpt_tag] is used to label and refer to displayed equations.
-    - [prover_mode] stores the current prover_mode.
-*)
-type proof_state = { goals : named_goal list;
-                     current_goal : named_goal option;
-                     subgoals : Judgment.t list;
-                     goals_proved : named_goal list;
-                     cpt_tag : int;
-                     prover_mode : prover_mode;
-                   }
+type proof_state
 
-(** Save the current prover state. the prover mode is the only external
-    information required.  *)
+(** Save the current prover state. The prover mode is the only external
+    information required. *)
 val save_state : prover_mode -> unit
 
-(** Restore the n-th previous prover state and returns it. *)
+(** Restore the n-th previous prover state and return the
+  * corresponding prover mode. *)
 val reset_state : int -> prover_mode
 
 (** Tactic expressions and their evaluation.

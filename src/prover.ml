@@ -25,7 +25,6 @@ type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
                      subgoals : Judgment.t list;
                      goals_proved : named_goal list;
-                     cpt_tag : int;
                      prover_mode : prover_mode;
                    }
 
@@ -37,7 +36,6 @@ let save_state mode =
      current_goal = !current_goal;
      subgoals = !subgoals;
      goals_proved = !goals_proved;
-     cpt_tag = !cpt_tag;
      prover_mode = mode } :: (!proof_states_history)
 
 let rec reset_state n =
@@ -49,7 +47,6 @@ let rec reset_state n =
     current_goal := p.current_goal;
     subgoals := p.subgoals;
     goals_proved := p.goals_proved;
-    cpt_tag := p.cpt_tag;
     p.prover_mode
   | p::q, n -> proof_states_history := q; reset_state (n-1)
 
@@ -185,7 +182,7 @@ let rec tac_apply :
     | EqTimestamps -> eq_timestamps judge sk fk
     | EqConstants fn -> eq_constants fn judge sk fk
     | Euf i ->
-      let f_select _ t = t.cpt = i in
+      let f_select _ t = t.id = i in
       euf_apply f_select judge sk fk
 
     (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
@@ -409,7 +406,6 @@ let eval_tactic : tac -> bool = fun utac -> match utac with
 let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
-    cpt_tag := 0;
     current_goal := Some (gname,goal);
     subgoals := auto_simp [Judgment.init goal];
     None
@@ -418,3 +414,5 @@ let start_proof () = match !current_goal, !goals with
 
   | _, [] ->
     Some "Cannot start a new proof (no goal remaining to prove)."
+
+let current_goal () = !current_goal

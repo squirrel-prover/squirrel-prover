@@ -74,7 +74,7 @@ let rec main_loop ?(save=true) mode =
           if not !interactive then Fmt.pr "@[[> %a.@.@]@." pp_tac utac ;
           if eval_tactic utac then begin
             Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-              (match !current_goal with
+              (match Prover.current_goal () with
                | Some (i, _) -> i
                | None -> assert false) ;
             complete_proof ();
@@ -102,7 +102,7 @@ let rec main_loop ?(save=true) mode =
               if is_proof_completed () then
                 begin
                 Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
-                  (match !current_goal with
+                  (match Prover.current_goal () with
                    | Some (i, _) -> i
                    | None -> assert false) ;
                 complete_proof ();

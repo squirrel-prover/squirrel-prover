@@ -9,12 +9,8 @@ open Formula
 (** Tags used to keep some information on gamma elements. *)
 type tag = {
   t_euf : bool;  (** [true] iff [euf] has been applied to this element *)
-  cpt : int      (** unique identifier in Gamma *)
+  id : int       (** unique identifier in Gamma *)
 }
-
-(** TODO the scope of the current identifier should be local to each
-  * judgment *)
-val cpt_tag : int ref
 
 val set_euf : bool -> tag -> tag
 
@@ -24,7 +20,7 @@ module Gamma : sig
 
   val pp_gamma : Format.formatter -> gamma -> unit
 
-  val mk : unit -> gamma
+  val empty : gamma
 
   val add_facts : gamma -> fact list -> gamma
 
