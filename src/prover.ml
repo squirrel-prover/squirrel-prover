@@ -89,7 +89,7 @@ type tac =
   (* | UProveAll : utac -> utac *)
   | AndThen : tac * tac -> tac
   | OrElse : tac * tac -> tac
-  | Try : tac * tac -> tac
+  | Try : tac -> tac
   | Repeat : tac -> tac
 
   | Euf : int -> tac
@@ -133,8 +133,8 @@ let rec pp_tac : Format.formatter -> tac -> unit =
       Fmt.pf ppf "@[%a@]; @,@[%a@]" pp_tac ut pp_tac ut'
     | OrElse (ut, ut') ->
       Fmt.pf ppf "@[%a@] + @,@[%a@]" pp_tac ut pp_tac ut'
-    | Try (ut, ut') ->
-      Fmt.pf ppf "try@[%a@] orelse @,@[%a@]" pp_tac ut pp_tac ut'
+    | Try ut ->
+      Fmt.pf ppf "try@[%a@]" pp_tac ut
     | Repeat t ->
       Fmt.pf ppf "repeat @[%a@]]" pp_tac t
     (* | TacPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_tac ut *)
@@ -195,8 +195,7 @@ let rec tac_apply :
       Tactics.orelse (tac_apply tac) (tac_apply tac') judge sk fk
 
     (* Try is just syntactic sugar *)
-    | Try (tac,tac') ->
-      tac_apply (OrElse(tac,Ident)) judge sk fk
+    | Try tac -> tac_apply (OrElse(tac,Ident)) judge sk fk
 
     | Repeat tac ->
       Tactics.repeat (tac_apply tac) judge sk fk
@@ -214,8 +213,8 @@ let simpGoal =
   AndThen(Repeat AnyIntro,
           AndThen(EqNames,
                   AndThen(EqTimestamps,
-                          AndThen(Try(GammaAbsurd,Ident),
-                                  Try(ConstrAbsurd,Ident)))))
+                          AndThen(Try GammaAbsurd,
+                                  Try ConstrAbsurd))))
 
 exception Tactic_Soft_Failure of string
 

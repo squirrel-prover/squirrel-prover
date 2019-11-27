@@ -14,7 +14,7 @@
 %token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
 %token CONGRUENCE ASSUMPTION APPLY TO ASSERT
-%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT ORELSE REPEAT COLLISION NOSIMPL
+%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT REPEAT COLLISION NOSIMPL
 %token PROOF QED UNDO
 %token EOF
 
@@ -27,7 +27,6 @@
 %left AND
 %nonassoc NOT
 
-%left ORELSE
 %left PLUS
 %nonassoc REPEAT
 %left SEMICOLON
@@ -211,7 +210,7 @@ tac:
   | CYCLE MINUS i=INT                 { Prover.Cycle (-i) }
   | l=tac SEMICOLON r=tac             { Prover.AndThen (l,r) }
   | l=tac PLUS r=tac                  { Prover.OrElse (l, r) }
-  | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
+  | TRY l=tac                         { Prover.Try l }
   | APPLY i=ID                        { Prover.Apply
                                           (i, Prover.parse_args i []) }
   | APPLY i=ID TO t=tactic_params     { Prover.Apply

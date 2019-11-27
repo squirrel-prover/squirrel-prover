@@ -102,7 +102,6 @@ rule token = parse
 | "ident"             { IDENT }
 | "try"               { TRY }
 | "repeat"            { REPEAT }
-| "orelse"            { ORELSE }
 | "nosimpl"           { NOSIMPL }
 | '+'                 { PLUS }
 | name as n           { ID (n) }

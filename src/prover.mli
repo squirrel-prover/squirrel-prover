@@ -73,7 +73,7 @@ type tac =
   (* | UProveAll : utac -> utac *)
   | AndThen : tac * tac -> tac
   | OrElse : tac * tac -> tac
-  | Try : tac * tac -> tac
+  | Try : tac -> tac
   | Repeat : tac -> tac
 
   | Euf : int -> tac
