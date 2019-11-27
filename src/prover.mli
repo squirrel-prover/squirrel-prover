@@ -70,7 +70,7 @@ type tac =
   | Split : tac
 
   | Apply : (string * subst) -> tac
-  | Assert : fact -> tac
+  | Assert : formula -> tac
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
@@ -106,7 +106,7 @@ val parse_args : string -> Theory.term list -> Term.asubst list
 
 val parse_args_exists : Theory.term list -> Term.asubst list
 
-val parse_fact : Theory.fact -> fact
+val parse_formula : Theory.formula -> formula
 
 (* Variable arguments, defined by a name and a kind (bool, messages, ...) *)
 type args = (string * Theory.kind) list

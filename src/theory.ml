@@ -73,6 +73,11 @@ let pp_fact = Bformula.pp_bformula pp_term
 
 type kind = Index | Message | Boolean | Timestamp
 
+let kind_of_vars_type = function
+  | Vars.Index -> Index
+  | Vars.Message -> Message
+  | Vars.Timestamp -> Timestamp
+
 type formula = (term, (string * kind) ) Formula.foformula
 
 let formula_vars = Formula.foformula_vars (fun x -> [])

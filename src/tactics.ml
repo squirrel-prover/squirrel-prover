@@ -436,10 +436,14 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   with No_apply -> fk (Failure "Can only apply quantified conjunction of atoms
  or a disjunction implying a conjunction.")
 
-let tac_assert fact j sk fk =
-  let j1 = Judgment.set_formula (fact_to_formula fact) j in
-  let j2 = Judgment.add_fact (fact) j in
-  sk [j1;j2] fk
+let tac_assert f j sk fk =
+  let j1 = Judgment.set_formula f j in
+  match Formula.formula_to_fact f with
+    | fact -> sk [j1; Judgment.add_fact fact j] fk
+    | exception Failure _ ->
+        match Formula.formula_to_constr f with
+          | constr -> sk [j1; Judgment.add_constr constr j] fk
+          | exception Failure _ -> fk (Failure "unsupported formula")
 
 let collision_resistance (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in

@@ -38,6 +38,8 @@ val pp_fact : Format.formatter -> fact -> unit
 (** Terms may represent indices, messages or booleans *)
 type kind = Index | Message | Boolean | Timestamp
 
+val kind_of_vars_type : Vars.var_type -> kind
+
 type formula = (term, (string * kind) ) Formula.foformula
 
 val formula_to_fact : formula -> fact

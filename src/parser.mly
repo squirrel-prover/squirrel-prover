@@ -212,9 +212,12 @@ tac:
   | l=tac SEMICOLON r=tac             { Prover.AndThen (l,r) }
   | l=tac PLUS r=tac                  { Prover.OrElse (l, r) }
   | TRY l=tac ORELSE r=tac            { Prover.Try (l, r) }
-  | APPLY i=ID                        { Prover.Apply (i, Prover.parse_args i []) }
-  | APPLY i=ID TO t=tactic_params     { Prover.Apply (i, Prover.parse_args i t) }
-  | ASSERT f=formula                     { Prover.Assert (Prover.parse_fact (Theory.formula_to_fact f)) }
+  | APPLY i=ID                        { Prover.Apply
+                                          (i, Prover.parse_args i []) }
+  | APPLY i=ID TO t=tactic_params     { Prover.Apply
+                                          (i, Prover.parse_args i t) }
+  | ASSERT f=formula                  { Prover.Assert
+                                          (Prover.parse_formula f) }
   | REPEAT t=tac                      { Prover.Repeat (t) }
 
 

@@ -74,7 +74,7 @@ type tac =
   | Split : tac
 
   | Apply : (string * subst) -> tac
-  | Assert : Bformula.fact -> tac
+  | Assert : Formula.formula -> tac
 
   | ForallIntro : tac
   | ExistsIntro : subst -> tac
@@ -115,7 +115,7 @@ let rec pp_tac : Format.formatter -> tac -> unit =
         else
           Fmt.pf ppf "apply %s to .." s
     | Assert f ->
-        Fmt.pf ppf "assert %a" Bformula.pp_fact f
+        Fmt.pf ppf "assert %a" Formula.pp_formula f
 
     | ForallIntro -> Fmt.pf ppf "forall_intro"
     | ExistsIntro (nu) ->
@@ -257,11 +257,21 @@ let tsubst_of_judgment j =
     )
     (Vars.to_list j.Judgment.env)
 
-let parse_fact fact =
+let parse_formula fact =
   match !subgoals with
     | [] -> failwith "Cannot parse fact without a goal"
     | j::_ ->
-        Theory.convert_fact_glob (tsubst_of_judgment j) fact
+        let env =
+          List.map
+            (fun v ->
+               Vars.name v,
+               Theory.kind_of_vars_type (Vars.var_type v))
+            (Vars.to_list j.Judgment.env)
+        in
+        Theory.convert_formula_glob
+          env
+          (tsubst_of_judgment j)
+          fact
 
 let parse_subst j uvars ts : subst =
           let u_subst = tsubst_of_judgment j in

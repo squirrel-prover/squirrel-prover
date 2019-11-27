@@ -62,6 +62,16 @@ type formula = (generic_atom, Vars.var) foformula
 let fact_to_formula =
   bformula_to_foformula (fun x -> Message x)
 
+let formula_to_fact f =
+  foformula_to_bformula
+    (function Message x -> x | _ -> failwith "not a fact")
+    f
+
+let formula_to_constr f =
+  foformula_to_bformula
+    (function Trace x -> x | _ -> failwith "not a constr")
+    f
+
 let rec is_disjunction = function
   | Atom(_) -> true
   | Or(f1, f2) -> is_disjunction f1 && is_disjunction f2

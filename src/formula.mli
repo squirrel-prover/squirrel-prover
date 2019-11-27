@@ -57,6 +57,10 @@ val formula_qvars : formula -> var list
 
 val fact_to_formula : fact -> formula
 
+val formula_to_fact : formula -> fact
+
+val formula_to_constr : formula -> constr
+
 val is_disjunction : formula -> bool
 val is_conjunction : formula -> bool
 
