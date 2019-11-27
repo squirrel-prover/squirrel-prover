@@ -79,7 +79,7 @@ module Theta : sig
 
   val is_sat : theta -> bool
 
-  val is_valid : theta -> ts_atom list -> bool
+  val is_valid : theta -> constr_atom list -> bool
 
   (** [maximal_elems theta elems] returns an over-approximation of the set of
       maximals elements of [elems] in [theta]. *)

@@ -86,11 +86,11 @@ arg_list:
 
 
 formula:
-| LPAREN formula RPAREN             { $2 }
-| formula AND formula                  { Formula.And  ($1,$3) }
-| formula OR formula                   { Formula.Or  ($1,$3) }
-| formula DARROW formula                { Formula.Impl  ($1,$3) }
-| NOT formula                       { Formula.Not  ($2) }
+| LPAREN formula RPAREN          { $2 }
+| formula AND formula            { Formula.And ($1,$3) }
+| formula OR formula             { Formula.Or ($1,$3) }
+| formula DARROW formula         { Formula.Impl ($1,$3) }
+| NOT formula                    { Formula.Not ($2) }
 | FALSE                          { Formula.False }
 | TRUE                           { Formula.True }
 | aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }

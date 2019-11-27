@@ -40,7 +40,7 @@ val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
 
 (** Atoms of the meta-logic are either timestamp or term atoms. *)
 type generic_atom =
-  | Trace of ts_atom
+  | Constraint of constr_atom
   | Message of term_atom
 
 type formula = (generic_atom, var) foformula

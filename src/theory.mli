@@ -141,20 +141,24 @@ val convert_glob :
   term ->
   Term.term
 
-(** Convert to [Term.constr], for global terms (i.e. with attached timestamps). *)
+(** Convert [fact] to [Bformula.constr],
+  * for global terms (i.e. with attached timestamps). *)
 val convert_constr_glob :
   (string * kind) list ->
   tsubst ->
   fact ->
   Bformula.constr
 
-(** Convert to [Term.fact], for global terms (i.e. with attached timestamps). *)
+(** Convert [fact] to [Bformula.fact],
+  * for global terms (i.e. with attached timestamps). *)
 val convert_fact_glob :
   tsubst ->
   fact ->
   Bformula.fact
 
-(** Convert to [T.constr], for global terms (i.e. with attached timestamps). *)
+(** Convert to [formula] to [Formula.formula],
+  * for global terms (i.e. with attached timestamps).
+  * Requires a typing environment. *)
 val convert_formula_glob :
   (string * kind) list ->
   tsubst ->

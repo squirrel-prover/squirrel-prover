@@ -71,31 +71,30 @@ val add_xeq :
 
 val pp_ord : Format.formatter -> ord -> unit
 
-(** {2 Timetamps formulas} *)
+(** {2 Constraint formulas} *)
 
 (** Atomic constraints are comparisons over timestamps or indices.
-    Indices may only be compared for (dis)equality, i.e.
-    Constraints:
-    - [Pind (o,i,i')] : [o] must be either [Eq] or [Neq] *)
-type ts_atom =
+    Indices may only be compared for (dis)equality:
+    in [Pind (o,i,i')], [o] must be either [Eq] or [Neq]. *)
+type constr_atom =
   | Pts of timestamp _atom
   | Pind of Action.index _atom
 
-val ts_atom_vars : ts_atom -> Vars.var list
+val constr_atom_vars : constr_atom -> Vars.var list
 
 (** Constr are boolean formulas over timestamps. *)
 
-type constr = ts_atom bformula
+type constr = constr_atom bformula
 
-val pp_ts_atom : Format.formatter -> ts_atom -> unit
+val pp_constr_atom : Format.formatter -> constr_atom -> unit
 val pp_constr : Format.formatter -> constr -> unit
 
 (** Put a constraint in DNF using only atoms Eq, Neq and Leq *)
-val constr_dnf : constr -> ts_atom list list
+val constr_dnf : constr -> constr_atom list list
 
 val subst_constr : subst -> constr -> constr
 
-val subst_ts_atom : subst -> ts_atom -> ts_atom
+val subst_constr_atom : subst -> constr_atom -> constr_atom
 
 (** [constr_ts c] returns the timestamps appearing in [c] *)
 val constr_ts : constr -> timestamp list

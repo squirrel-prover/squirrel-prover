@@ -528,7 +528,7 @@ let get_kind env t =
       with Type_error -> check_term env t Boolean; Boolean)
   with Untyped_symbol -> Message
 
-let convert_ts_atom args_kind subst f : Bformula.ts_atom =
+let convert_constr_atom args_kind subst f : Bformula.constr_atom =
   let open Bformula in
   match f with
   | Compare (o, u, v) ->
@@ -546,7 +546,7 @@ let convert_ts_atom args_kind subst f : Bformula.ts_atom =
   | _ -> assert false
 
 let convert_constr_glob args_kind subst f : Bformula.constr =
-  convert_bformula (convert_ts_atom args_kind subst) f
+  convert_bformula (convert_constr_atom args_kind subst) f
 
 let convert_atom_glob subst atom =
   match atom with
@@ -579,7 +579,8 @@ let convert_formula_glob args_kind subst f =
       begin
         let at = Compare (o,u,v) in
         match get_kind args_kind u with
-        | Index | Timestamp -> Atom (Trace (convert_ts_atom args_kind subst at))
+        | Index | Timestamp ->
+            Atom (Constraint (convert_constr_atom args_kind subst at))
         | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
       end
     | Atom _ -> assert false

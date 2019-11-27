@@ -2,20 +2,20 @@ open Term
 open Bformula
 
 type generic_atom =
-  | Trace of ts_atom
+  | Constraint of constr_atom
   | Message of term_atom
 
 let subst_generic_atom s =
   function
-  | Trace a -> Trace (subst_ts_atom s a)
+  | Constraint a -> Constraint (subst_constr_atom s a)
   | Message a -> Message (subst_term_atom s a)
 
 let pp_generic_atom  ppf =  function
-  | Trace a -> pp_ts_atom ppf a
+  | Constraint a -> pp_constr_atom ppf a
   | Message a -> pp_term_atom ppf a
 
 let generic_atom_var =  function
-  | Trace a -> ts_atom_vars a
+  | Constraint a -> constr_atom_vars a
   | Message a ->  term_atom_vars a
 
 (** First order formulas *)
@@ -69,7 +69,7 @@ let formula_to_fact f =
 
 let formula_to_constr f =
   foformula_to_bformula
-    (function Trace x -> x | _ -> failwith "not a constr")
+    (function Constraint x -> x | _ -> failwith "not a constr")
     f
 
 let rec is_disjunction = function
@@ -87,9 +87,9 @@ let conjunction_to_atom_lists f =
     | And(Atom (Message a), f) | And(f, Atom (Message a)) ->
       ctal (Bformula.Atom a :: ms) ts f
     | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
-    | And(Atom (Trace a), f) | And(f, Atom (Trace a)) ->
+    | And(Atom (Constraint a), f) | And(f, Atom (Constraint a)) ->
       ctal ms (Bformula.Atom a :: ts) f
-    | Atom (Trace a) -> (ms, (Bformula.Atom a :: ts))
+    | Atom (Constraint a) -> (ms, (Bformula.Atom a :: ts))
     | _ -> assert false
   in
   ctal [] [] f
@@ -99,9 +99,9 @@ let disjunction_to_atom_lists f =
     | Or(Atom (Message a), f) | Or(f, Atom (Message a)) ->
       ctal (Bformula.Atom a :: ms) ts f
     | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
-    | Or(Atom (Trace a), f) | Or(f, Atom (Trace a)) ->
+    | Or(Atom (Constraint a), f) | Or(f, Atom (Constraint a)) ->
       ctal ms (Bformula.Atom a :: ts) f
-    | Atom (Trace a) -> (ms, (Bformula.Atom a :: ts))
+    | Atom (Constraint a) -> (ms, (Bformula.Atom a :: ts))
     | _ -> assert false
   in
   ctal [] [] f

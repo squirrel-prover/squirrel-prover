@@ -116,7 +116,7 @@ type constr_instance = { eqs : (ut * ut) list;
 
 (* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
-let mk_instance (l : ts_atom list) =
+let mk_instance (l : constr_atom list) =
   let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
       | Pts (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
@@ -305,7 +305,7 @@ let unify uf eqs elems =
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs (l : ts_atom list) =
+let mgu_eqs (l : constr_atom list) =
   let instance = mk_instance l in
   unify instance.uf instance.eqs instance.elems
 
@@ -548,7 +548,7 @@ type models = model list
 
 (* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : ts_atom list) : models =
+let models_conjunct (l : constr_atom list) : models =
   let instance = mk_instance l in
   split instance
 

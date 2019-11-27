@@ -164,16 +164,16 @@ let add_xeq od xeq (eqs, leqs, neqs) =
   | Neq -> (eqs, leqs, xeq :: neqs)
   | _ -> raise (Failure ("add_xeq: bad comparison operator"))
 
-type ts_atom =
+type constr_atom =
   | Pts of timestamp _atom
   | Pind of Action.index _atom
 
-type constr = ts_atom bformula
+type constr = constr_atom bformula
 
 let pts (o, t, t') = Pts (o, t, t')
 let pind (o, i, i') = Pind (o, i, i')
 
-let pp_ts_atom ppf = function
+let pp_constr_atom ppf = function
   | Pts (o,tl,tr) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | Pind (o,il,ir) ->
@@ -187,7 +187,7 @@ let norm_tatom = function
   | Pts (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
   | Pind _ as x -> [x]
 
-let pp_constr ppf = pp_bformula pp_ts_atom ppf
+let pp_constr ppf = pp_bformula pp_constr_atom ppf
 
 let constr_dnf (c : constr) =
   bf_dnf not_tpred c
@@ -209,14 +209,14 @@ let rec subst_bformula a_subst (s : subst) (f) =
 
 let subst_fact = subst_bformula subst_term_atom
 
-let subst_ts_atom (s:subst) = function
+let subst_constr_atom (s:subst) = function
   | Pts (ord, ts, ts') ->
     Pts (ord, subst_ts s ts, subst_ts s ts')
   | Pind (ord, i, i') ->  Pind(ord, get_index_subst s i,get_index_subst s i')
 
-let subst_constr = subst_bformula subst_ts_atom
+let subst_constr = subst_bformula subst_constr_atom
 
-let ts_atom_vars = function
+let constr_atom_vars = function
   | Pts (_,ts,ts') -> ts_vars ts @ ts_vars ts'
   | Pind (o,i,i') -> [i;i']
 

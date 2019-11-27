@@ -199,7 +199,7 @@ module Theta : sig
 
   val is_sat : theta -> bool
 
-  val is_valid : theta -> ts_atom list -> bool
+  val is_valid : theta -> constr_atom list -> bool
 
   val maximal_elems : theta -> timestamp list -> timestamp list
 
@@ -237,7 +237,7 @@ end = struct
     let theta = compute_models theta in
     Constr.maximal_elems (opt_get theta.models) tss
 
-  let is_valid theta (c:ts_atom list) =
+  let is_valid theta (c:constr_atom list) =
     let theta = compute_models theta in
     Constr.query (opt_get (theta.models)) c
 
