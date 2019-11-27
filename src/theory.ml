@@ -75,7 +75,7 @@ type kind = Index | Message | Boolean | Timestamp
 
 type formula = (term, (string * kind) ) Formula.foformula
 
-let formula_vars = Formula.tformula_vars (fun x -> [])
+let formula_vars = Formula.foformula_vars (fun x -> [])
 
 exception Cannot_convert_to_fact
 

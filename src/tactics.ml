@@ -388,11 +388,11 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       | Impl(lhs,rhs) when is_disjunction lhs && is_conjunction rhs->
         disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
       | ForAll(vs,f) when is_conjunction f ->
-        let f = fresh_formula env f in
+        let f = fresh_quantifications env f in
         ([], []), conjunction_to_atom_lists f
       | ForAll(vs, Exists(vs2, f)) when is_conjunction f ->
         begin
-          match fresh_formula env (Exists(vs2, f)) with
+          match fresh_quantifications env (Exists(vs2, f)) with
           |  (Exists(vs2, f)) ->
             ([], []), conjunction_to_atom_lists f
           | _ -> assert false
@@ -400,7 +400,7 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       | ForAll(vs, Impl(lhs,rhs))
         when is_disjunction lhs && is_conjunction rhs->
         begin
-          match  fresh_formula env (Impl(lhs, rhs)) with
+          match fresh_quantifications env (Impl(lhs, rhs)) with
           | Impl(lhs,rhs) ->
             disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
           | _ -> assert false
@@ -408,7 +408,7 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
       | ForAll(vs, Impl(lhs, Exists(vs2, rhs)))
         when is_disjunction lhs && is_conjunction rhs->
         begin
-          match  fresh_formula env (Impl(lhs, Exists(vs2, rhs))) with
+          match fresh_quantifications env (Impl(lhs, Exists(vs2, rhs))) with
           | (Impl(lhs, Exists(vs2, rhs))) ->
             disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
           | _ -> assert false

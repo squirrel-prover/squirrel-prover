@@ -4,14 +4,10 @@ open Vars
 open Term
 open Bformula
 
-(** {2 First-order Formulas} *)
+(** {2 Generic first-order formulas} *)
 
-(** Atoms either for both terms and timestamps. *)
-type generic_atom =
-  | Trace of ts_atom
-  | Message of term_atom
-
-(** First order formulas *)
+(** A [('a,'b) foformula] is a first-order formula with
+  * atoms in ['a] and quantified variables in ['b]. *)
 type ('a, 'b) foformula =
   | ForAll of ('b list) * ('a, 'b) foformula
   | Exists of ('b list) * ('a, 'b) foformula
@@ -25,22 +21,38 @@ type ('a, 'b) foformula =
 
 exception Not_a_boolean_formula
 
+(** [foformula_to_bformula conv f] converts [f] to a [bformula],
+  * using [conv] to convert its atoms at the same time. *)
 val foformula_to_bformula :
   ('a -> 'b) -> ('a, 'c) foformula -> 'b Bformula.bformula
 
+(** [bformula_to_foformula conv bf] convers [bf] to a [formula],
+  * using [conv] to convert atoms at the same time. *)
 val bformula_to_foformula :
   ('a -> 'b) -> 'a Bformula.bformula -> ('b, 'c) foformula
 
-val tformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
+(** [foformula_vars fv_atom f] returns a list containing
+  * all the variables that appear either bound (quantified) in [f],
+  * or free in one of its atoms according to [fv_atom]. *)
+val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
+
+(** {2 Meta-logic formulas} *)
+
+(** Atoms of the meta-logic are either timestamp or term atoms. *)
+type generic_atom =
+  | Trace of ts_atom
+  | Message of term_atom
 
 type formula = (generic_atom, var) foformula
 
 val pp_formula : Format.formatter -> formula -> unit
 
-(** Returns all the variables appearing inside a formula. *)
+(** Returns a list containing all variables that appear either bound
+  * (quantified) or free in the formula. *)
 val formula_vars : formula -> var list
 
-(** Returns all the quantified varialbes appearing inside a formula. *)
+(** Returns a list containing all the variables that are
+  * quantified inside a formula. *)
 val formula_qvars : formula -> var list
 
 val fact_to_formula : fact -> formula
@@ -54,11 +66,11 @@ val disjunction_to_atom_lists : formula -> fact list * constr list
 
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
-    co-domain is fresh in [f]. *)
+    co-domain does not contain any variable that is bound in [f]. *)
 val subst_formula : subst -> formula -> formula
 
-(** [fresh_formula env p] instantiates [p] with fresh variables for
-    the quantified variables. *)
-val fresh_formula : env ref -> formula ->  formula
-
-
+(** [fresh_quantifications env f] returns a formula that is alpha-equivalent
+  * to [f] but where quantified variables are fresh wrt the original
+  * [!env], and it updates [env] with the declaration of these new
+  * variables. *)
+val fresh_quantifications : env ref -> formula -> formula

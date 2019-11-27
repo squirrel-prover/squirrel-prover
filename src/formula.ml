@@ -14,7 +14,6 @@ let pp_generic_atom  ppf =  function
   | Trace a -> pp_ts_atom ppf a
   | Message a -> pp_term_atom ppf a
 
-
 let generic_atom_var =  function
   | Trace a -> ts_atom_vars a
   | Message a ->  term_atom_vars a
@@ -46,7 +45,6 @@ let rec foformula_to_bformula fatom = function
   | False -> Bformula.False
   | _ -> raise Not_a_boolean_formula
 
-
 let rec bformula_to_foformula fatom = function
   | Bformula.And(a,b) ->
     And(bformula_to_foformula fatom a, bformula_to_foformula fatom b)
@@ -58,7 +56,6 @@ let rec bformula_to_foformula fatom = function
   | Bformula.Atom a -> Atom(fatom a)
   | Bformula.True -> True
   | Bformula.False -> False
-
 
 type formula = (generic_atom, Vars.var) foformula
 
@@ -124,26 +121,23 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
   | True -> Fmt.pf ppf "true"
   | False -> Fmt.pf ppf "false"
 
-
-
-let rec tformula_vars atom_var = function
-  | ForAll (vs,b) | Exists (vs,b) -> vs @ (tformula_vars atom_var b)
+let rec foformula_vars atom_var = function
+  | ForAll (vs,b) | Exists (vs,b) -> vs @ (foformula_vars atom_var b)
   | And (a,b) | Or (a,b) | Impl (a,b) ->
-    tformula_vars atom_var a @ tformula_vars atom_var b
-  | Not s -> tformula_vars atom_var s
+    foformula_vars atom_var a @ foformula_vars atom_var b
+  | Not s -> foformula_vars atom_var s
   | Atom a -> atom_var a
   | True | False -> []
 
 let formula_vars f =
-  tformula_vars generic_atom_var f
+  foformula_vars generic_atom_var f
   |> List.sort_uniq Pervasives.compare
-
 
 let formula_qvars f =
-  tformula_vars (fun a -> []) f
+  foformula_vars (fun a -> []) f
   |> List.sort_uniq Pervasives.compare
 
-let pp_formula =  pp_foformula pp_generic_atom (Vars.pp_typed_list "")
+let pp_formula = pp_foformula pp_generic_atom (Vars.pp_typed_list "")
 
 let rec subst_foformula a_subst (s : subst) (f) =
   match f with
@@ -161,12 +155,12 @@ let rec subst_foformula a_subst (s : subst) (f) =
 
 let subst_formula = subst_foformula subst_generic_atom
 
-let fresh_formula env f =
+let fresh_quantifications env f =
   let vars = formula_qvars f in
-  let subst = List.map
-      (fun x ->
-         (x, Vars.make_fresh_from_and_update env x))
+  let subst =
+    List.map
+      (fun x -> x, Vars.make_fresh_from_and_update env x)
       vars
-              |> from_varsubst
+    |> from_varsubst
   in
   subst_formula subst f

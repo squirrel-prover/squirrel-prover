@@ -252,7 +252,6 @@ end
 
 exception Goal_type_error of string * string (* expected type and given type *)
 
-(** Judgments are the sequents of our proof system *)
 module Judgment : sig
   (** Type of judgments:
       - [vars] and [indices] are the judgment free timestamp and index variables.

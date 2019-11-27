@@ -3,7 +3,7 @@ open Term
 
 (** {2 Boolean formulas} *)
 
-(** a generic type for boolean formulas *)
+(** Generic type for boolean formulas *)
 type 'a bformula =
   | And of 'a bformula * 'a bformula
   | Or of 'a bformula * 'a bformula
@@ -16,7 +16,7 @@ type 'a bformula =
 val pp_bformula :
   (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a bformula -> unit
 
-(** [atoms b] returns the list of atoms appearing in [b] *)
+(** [atoms b] returns the list of atoms appearing in [b]. *)
 val atoms : 'a bformula -> 'a list
 
 (** {2 Atomic Formulas} *)
@@ -24,7 +24,6 @@ val atoms : 'a bformula -> 'a list
 type ord = Eq | Neq | Leq | Geq | Lt | Gt
 
 type 'a _atom = ord * 'a * 'a
-
 
 (** {2 Term formulas} *)
 
@@ -53,13 +52,16 @@ val subst_fact : subst -> fact -> fact
 (** Negate the atom *)
 val not_xpred : term_atom -> term_atom
 
-(** Evaluate trivial subformula. *)
+(** Replace some subformula by the result of their evaluation
+  * when it is constant. *)
 val triv_eval : 'a bformula -> 'a bformula
 
-(** Uses only And and Or (no Not, no Impl). *)
+(** Transform a formula to an equivalent one using only
+  * [And] and [Or] (thus eliminating [Not] and [Impl]). *)
 val simpl_fact : fact -> fact
 
-(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
+(** Replace an atom by an equivalent list of atoms using only
+  * [Eq], [Neq] and [Leq]. *)
 val norm_xatom : 'a _atom -> 'a _atom list
 
 val add_xeq :

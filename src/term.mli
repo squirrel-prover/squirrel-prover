@@ -1,6 +1,6 @@
 open Vars
 open Action
-(** Terms and formulas for the Meta-BC logic.
+(** Terms for the Meta-BC logic.
   *
   * This module describes the syntax of the logic. It does not
   * provide low-level representations, normal forms, etc. that
@@ -20,6 +20,7 @@ val pp_timestamp : Format.formatter -> timestamp -> unit
 val action_of_ts : timestamp -> Action.action option
 
 val ts_vars : timestamp -> Vars.var list
+
 (** {2 Names} *)
 (** Names represent random values, uniformly sampled by the process.
   * A name symbol is derived from a name (from a finite set) and

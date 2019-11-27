@@ -6,16 +6,19 @@ open Term
 open Bformula
 open Formula
     
-(** Tags used to record some information on gamma elements:
-    - [euf] records whether the EUF axiom has been applied. *)
-type tag = { t_euf : bool; cpt : int }
+(** Tags used to keep some information on gamma elements. *)
+type tag = {
+  t_euf : bool;  (** [true] iff [euf] has been applied to this element *)
+  cpt : int      (** unique identifier in Gamma *)
+}
 
+(** TODO the scope of the current identifier should be local to each
+  * judgment *)
 val cpt_tag : int ref
 
 val set_euf : bool -> tag -> tag
 
-(** Gamma represent the current proved equalities or disequalities regarding
-    messages *)
+(** Collections of assumptions on messages. *)
 module Gamma : sig
   type gamma
 
@@ -60,9 +63,11 @@ module Gamma : sig
 
 end
 
-(** Store the constraints. We remember the last models that was computed,
-    potentially on a less restricted constraint.
-    We should guarrantee that TODO (give the invariant on models and queries) *)
+(** Collection of constraints on indices and timestamps.
+  *
+  * We remember the last models that was computed,
+  * potentially on a less restricted constraint.
+  * We should guarantee that TODO (give the invariant on models and queries). *)
 module Theta : sig
   type theta
 
@@ -83,7 +88,7 @@ module Theta : sig
   val get_equalities : theta -> timestamp list list
 end
 
-(** Judgments are the sequents of our proof system *)
+(** Judgments used in reachability proofs. *)
 module Judgment : sig
   type judgment = private {
     env : Vars.env;
