@@ -145,11 +145,9 @@ let rec pp_tac : Format.formatter -> tac -> unit =
 
 let rec tac_apply :
   type a.
-  tac -> Judgment.t ->
-  (Judgment.t list, a) Tactics.sk ->
-  a Tactics.fk -> a
+  tac -> a Trace_tactics.tac
 =
-  let open Tactics in
+  let open Trace_tactics in
   fun tac judge sk fk -> match tac with
     | Admit -> sk [Judgment.set_formula True judge] fk
     | Ident -> sk [judge] fk
@@ -188,20 +186,20 @@ let rec tac_apply :
     (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
     | CollisionResistance -> collision_resistance judge sk fk
     | AndThen (tac,tac') ->
-      tact_andthen
+      Tactics.andthen
         (tac_apply tac)
         (tac_apply tac')
         judge sk fk
 
     | OrElse (tac,tac') ->
-      tact_orelse (tac_apply tac) (tac_apply tac') judge sk fk
+      Tactics.orelse (tac_apply tac) (tac_apply tac') judge sk fk
 
     (* Try is just syntactic sugar *)
     | Try (tac,tac') ->
       tac_apply (OrElse(tac,Ident)) judge sk fk
 
     | Repeat tac ->
-      repeat (tac_apply tac) judge sk fk
+      Tactics.repeat (tac_apply tac) judge sk fk
     | Cycle _ -> assert false   (* This is not a focused tactic. *)
 
     (* | TacPrint tac ->
@@ -237,12 +235,12 @@ let eval_tactic_judge : tac -> Judgment.t -> Judgment.t list = fun tac judge ->
      tac_apply tac judge suc_k failure_k
 
 let auto_simp judges =
-  List.map Tactics.simplify judges
-  |> Tactics.remove_finished
+  List.map Trace_tactics.simplify judges
+  |> Trace_tactics.remove_finished
   |> List.map (eval_tactic_judge simpGoal)
   |> List.flatten
-  |> List.map Tactics.simplify
-  |> Tactics.remove_finished
+  |> List.map Trace_tactics.simplify
+  |> Trace_tactics.remove_finished
 
 let tsubst_of_judgment j =
   List.map

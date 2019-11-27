@@ -1,35 +1,29 @@
-(** Main tactics of the prover *)
-open Logic
-open Bformula
-open Formula
+(** Generic tactics *)
 
 (** {2 Tactics} *)
 
-(** A tactic ['a tac] is applied to a goal with both a success continuation [sk]
-    and a failure continuation [fk].
-    A tactic, in case of success, returns a set of subgoals. If the tactic
-    closed the focused goal, it returns the empty list.
+(** A tactic ['a tac] is applied to a goal and non-deterministically returns
+  * a list of subgoals.
+  *
+  * This non-deterministic computation is encoded by means of success and
+  * failure continuations. The success continuation takes as argument
+  * a possible result (a list of new subgoals) and a failure continuation
+  * that can be called to ask for other possible successes.
 
-    The success continuation takes as argument the new set of subgoals and
-    a failure continuation.
-
-    As an example, the function [tac] given by [tac judge sk fk] should return
-    [sk new_judges fk] in case of success and [fk error] in case of failure.
-
-    We allow tactics to not make progress and not fail.
-
-    A tactic should raise an exception only if the tactic is not well-formed
-    or applicable. For instance, a typing error or a syntax error should raise
-    an exception.
-
-    Tactic failures should pass to the failure continuation an error
-    under the type [tac_error]. [tac_error] can be extended for the need of
-    each tactic, [pp_tac_error] should then be extended accordingly.
-
-    Tactic combinators, may choose how to pass tactic errors, depending
-
-
-*)
+  * As an example, if a tactic [tac] simply needs to change a goal
+  * [j] into a list of subgoals [l], [tac j sk fk] should simply be
+  * [sk l fk]. In particular, if [l] is empty, the initial will
+  * be considered proved.
+  *
+  * When a tactic cannot produce new results, it should call its failure
+  * continuation with an error explaining the failure. This is also the
+  * way to go when the tactic fails to apply.
+  *
+  * A tactic should raise an exception only if the tactic invocation
+  * is not well-formed. For instance, a typing error or a syntax error
+  * should raise an exception.
+  *
+  * We allow tactics to not make progress and not fail. *)
 
 type tac_error =
   | Failure of string
@@ -43,100 +37,25 @@ type 'a fk = tac_error -> 'a
 
 type ('a,'b) sk = 'a -> 'b fk -> 'b
 
-type 'a tac =
-  Judgment.t -> (Judgment.t list,'a) sk -> 'a fk -> 'a
-
-(** {2 Utilities} *)
-
-val remove_finished : Judgment.t list -> Judgment.t list
-val simplify : Judgment.t -> Judgment.t
+(** A properly implemented tactic should always have its ['a]
+  * parameter unconstrained. *)
+type ('a,'j) tac = 'j -> ('j list,'a) sk -> 'a fk -> 'a
 
 (** {2 Generic tactic combinators} *)
 
-(** [tact_orelse t1 t2] applies [t1] with [t2] as failure continuation.
-    The error message raised by [t1] is dropped.
-*)
-val tact_orelse : 'a tac -> 'a tac -> 'a tac
+(** [orelse t1 t2] applies either [t1] or [t2]. *)
+val orelse : ('a,'j) tac -> ('a,'j) tac -> ('a,'j) tac
 
-(** [repeat t] applies [t] until either [t] fails or a fix point is reached. *)
-val repeat : 'a tac -> 'a tac
+(** [repeat t] applies [t] and applies it to the generated subgoals,
+  * until [t] fails. This tactic never fails. *)
+val repeat : ('a,'j) tac -> ('a,'j) tac
 
-(** [tact_andthen t1 t2] applies [t1], creating subgoals [gs] and try to apply
-    [t2] to each subgoal in [gs]. It succeed only if all applications of [t2]
-    succeeds. *)
-val tact_andthen :
-  'a tac ->
-  Judgment.t list tac ->
-  'a tac
+(** [andthen t1 t2] applies [t1] and then applies [t2] to each newly
+  * created subgoal. *)
+val andthen : ('a,'j) tac -> ('a,'j) tac -> ('a,'j) tac
 
-(** {2 Basic logic-specific tactics} *)
+(** n-ary variant of [orelse]. *)
+val orelse_list : ('a,'j) tac list -> ('a,'j) tac
 
-(** [goal_or_intro_l judge sk fk] returns the left side of the goal if it is
-    a disjunction. Else it calls [fk] *)
-val goal_or_intro_l : 'a tac
-(** [goal_or_intro_r judge sk fk] returns the right side of the goal if it is
-    a disjunction. Else it calls [fk] *)
-val goal_or_intro_r : 'a tac
-(** [goal_and_intro judge sk fk] returns the right side of the goal if it is
-    a conjonction. Else it calls [fk] *)
-val goal_and_intro : 'a tac
-
-(** [goal_intro judge sk fk] introduce a fact if the goal is one. Else it calls
-    [fk] *)
-val goal_intro : 'a tac
-
-(** [goal_forall_intro judge sk fk] introduces the universally
-    quantified variables and the goal. *)
-val goal_forall_intro : 'a tac
-(** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
-    quantified variables and the goal.
-    [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
-    timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
-    variables. *)
-val goal_exists_intro : Term.subst -> 'a tac
-
-(** Ayntactic sugar, trying to apply one of the intro. TODO inside prover ?*)
-val goal_any_intro : 'a tac
-
-(** [gamma_absurd judge sk fk] try to close the goal using congruence, else
-    calls [fk] *)
-val gamma_absurd : 'a tac
-
-(** [assumption judge sk fk] try to close the goal by finding it in the 
-    context. *)
-val assumption : 'a tac
-
-(** [constr_absurd judge sk fk] try to close the goal that the trace constraints
-    cannot be satisfied, else calls [fk] *)
-val constr_absurd : 'a tac
-
-(** Add index constraints resulting from names equalities, modulo the TRS.
-    [judge.gamma] must have been completed before calling [eq_names]. *)
-val eq_names : 'a tac
-
-(** Add terms constraints resulting from timestamp equalities. *)
-val eq_timestamps : 'a tac
-val eq_constants : Term.fname -> 'a tac
-
-(** {2 Advanced tactics} *)
-
-(** [apply gp subst judge sk fk] applies the axiom [gp] with its universally
-    quantified variables instantied with [subst], adding to [judge] its
-    postconditions, and creating new subgoals from [judge] for the
-    preconditions. *)
-val apply : formula -> Term.subst -> 'a tac
-
-(** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
-  * to be proved, and the other where [f] is assumed. *)
-val tac_assert : formula -> 'a tac
-
-(** [euf_apply f_select judge sk fk] selects an atom of the judgement according
-   to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
-   it calls [fk]*)
-val euf_apply : (term_atom -> Logic.tag -> bool) -> 'a tac
-
-(** [collision_resistance judge sk fk] collects all equalities between hash,
-    and add to Gamma the equality of the messages if the hash and the key are
-    identical.
-*)
-val collision_resistance : 'a tac
+(** n-ary variant of [andthen]. *)
+val andthen_list : ('a,'j) tac list -> ('a,'j) tac
