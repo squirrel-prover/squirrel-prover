@@ -20,11 +20,13 @@
 \usepackage{graphicx}
 \usepackage{placeins}
 \usepackage[margin=2cm]{geometry}
+\usepackage{multicol}
 
 \usepackage{url}
 \usepackage{tikz}
 \usepackage{proof}
 \usepackage{hyperref}
+\usepackage[capitalize,nameinlink,noabbrev]{cleveref}
 \usepackage{enumerate}
 
 \setlength{\ULdepth}{0.15em}
@@ -55,6 +57,8 @@
 \newcommand{\todo}[1]{\textcolor{red}{(\textbf{TD:} #1)}}
 \newcommand{\toadd}[1]{\textcolor{blue}{(\textbf{TA:} #1)}}
 
+\newcommand{\charlie}[1]{\textcolor{cyan}{(\textbf{Charlie:} #1)}}
+
 \input{macros.tex}
 
 \begin{document}
@@ -64,6 +68,128 @@
 \author{David Baelde, Adrien Koutsos}
 
 \maketitle
+
+\section{A Logic for protocols}
+
+\subsection{Syntax of the logic}
+We denote $\F$ a set of function symbols (used to model encryptions, 
+pairs,\dots). $\N$ denotes an 
+infinite set of names (used to model the randomness used in a 
+protocol), and $\I$ denotes an infinite set of indexes (used to talk 
+about multiple copies of the same agent). For 
+each name $n\in \N$ and sequence of indices $\ov{i} \in \I$, 
+$n(\ov{i})$ refers to a fresh unique name in $\N$. We denotes $\X$ an 
+infinite set of identifiers, used for variables.
+
+We finally denote $\States$ a set of identifiers used to model 
+mutable 
+states, which can also be parametrized by sequences of indices, 
+$\Actions$ a set of identifiers used to model actions 
+(which 
+will be used 
+to model an atomic step of a protocol), and $\Timestamps$ a set of 
+identifiers for timestamps in a trace. 
+
+The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
+
+\begin{figure}
+$$
+\begin{array}[t]{ccc}
+    \begin{array}{rcl}
+    f \in \F & & \text{function symbol}\\
+    i \in \I  & & \text{index}\\
+
+    x \in \X & & \text{variable}\\
+    \end{array}
+&     \begin{array}{rcll}
+\tau &:=& \tau \in \Timestamps  & \text{timestamp}\\
+& \mid & a \in \Actions & \text{action} \\
+& \mid & \suc(\tau) & \text{action} \\
+\end{array}
+   &
+    \begin{array}{rcll}
+    
+    n &:=& n \in \N & \text{name}\\
+    &\mid& n(i_1,\dots,i_n) & \text{name copy} \\
+    \\
+    
+    s&:=& s \in \States & \text{state}\\
+    &\mid& s(i_1,\dots,i_n) & \text{state copy}\\
+    
+    \end{array}
+\end{array}  
+$$
+
+        
+
+$$
+\begin{array}{c}
+     \begin{array}{rcll}
+    \T &  := & \mess \mid \timestamp \mid \idx \mid \bool & \text{ 
+        type of variables} \\
+    
+      \\
+   
+    t & := & n &\text{a name } \\
+           & \mid & s@\tau &\text{value of a state}\\
+    & \mid & x  & \text{a variable} \\
+    & \mid & \mout@\tau & \text{value of some output} \\
+    & \mid & \minp@\tau & \text{value of some input} \\
+    & \mid & f(t_1,\dots,t_n) &\text{function application}\\
+       \end{array}
+\\
+\\
+   \begin{array}{rcll}
+   \atom & := & t=t'  
+ & \text{atomic proposition over terms } \\
+  &\mid & \tau=\tau' \mid \tau \leq \tau' &  \text{atomic proposition 
+  over timestamps } \\
+  &\mid & i=i'  &  \text{atomic proposition 
+    over index } \\
+  &\mid & a= a'\mid  \happens(a)  &  \text{atomic proposition 
+    over actions } \\
+    \end{array}
+\\
+\\
+     \begin{array}{rcll}
+    \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi 
+    \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid 
+    \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom & 
+    \text{ 
+    first order formula} \\
+    \end{array}
+    
+\end{array}        
+    $$
+    \caption{Syntax of first order formulas.}\label{fig:syntax}
+\end{figure}
+
+
+Terms $t$ may represent messages of a protocol, where given a trace, 
+i.e a sequence of actions or timestamps, $\mout@\tau$ and 
+$\minp@\tau$ models the output and input of the protocol at this 
+point in the trace. We will only consider well typed formulas, i.e 
+formulas where all variables (which are typed) are used accordingly 
+to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
+
+
+Timestamps are ordered, and it is possible to consider the successor 
+of a timestamp.  Terms and indices are not ordered.
+
+\subsection{Protocols definitions}
+
+
+
+We will model protocols as a set of possible actions available to the 
+attacker. An action essentially models a step of the protocol, where 
+the attacker provides some inputs, some conditions are checked, some 
+updates are performed, and finally an output is performed.
+
+
+\newpage
+\section{Old stuff}
+
+
 
 \paragraph{Facts}
 Facts are schemas of $\bc$ formulas indexed by path constraints:
