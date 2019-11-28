@@ -1,6 +1,12 @@
 open Logic
 open Utils
 
+module Initialization = struct
+  (* Opening these modules is only useful for their side effects,
+   * e.g. registering tactics. *)
+  open Trace_tactics
+end
+
 let usage = Fmt.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 
 let args  = ref []
@@ -71,7 +77,7 @@ let rec main_loop ?(save=true) mode =
     | ProofMode, ParsedTactic utac ->
       begin
         try
-          if not !interactive then Fmt.pr "@[[> %a.@.@]@." pp_tac utac ;
+          if not !interactive then Fmt.pr "@[[> %a.@.@]@." Prover.AST.pp utac ;
           if eval_tactic utac then begin
             Fmt.pr "@[<v 0>[goal> Goal %s is proved.@]@."
               (match Prover.current_goal () with

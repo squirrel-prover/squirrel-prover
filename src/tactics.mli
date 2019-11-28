@@ -2,8 +2,8 @@
 
 (** {2 Tactics} *)
 
-(** A tactic ['a tac] is applied to a goal and non-deterministically returns
-  * a list of subgoals.
+(** A tactic ['a tac] is a non-deterministic computation
+  * transforming a goal of type ['a] into a list of subgoals.
   *
   * This non-deterministic computation is encoded by means of success and
   * failure continuations. The success continuation takes as argument
@@ -33,29 +33,80 @@ exception Tactic_Hard_Failure of string
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
 
-type 'a fk = tac_error -> 'a
+(** Purely abstract type "returned" by continuations and tactics *)
+type a
 
-type ('a,'b) sk = 'a -> 'b fk -> 'b
+type fk = tac_error -> a
+
+type 'a sk = 'a -> fk -> a
 
 (** A properly implemented tactic should always have its ['a]
   * parameter unconstrained. *)
-type ('a,'j) tac = 'j -> ('j list,'a) sk -> 'a fk -> 'a
+type 'a tac = 'a -> 'a list sk -> fk -> a
 
-(** {2 Generic tactic combinators} *)
+(** {2 Generic tactics and tactic combinators} *)
+
+val id : 'a tac
 
 (** [orelse t1 t2] applies either [t1] or [t2]. *)
-val orelse : ('a,'j) tac -> ('a,'j) tac -> ('a,'j) tac
+val orelse : 'a tac -> 'a tac -> 'a tac
 
 (** [repeat t] applies [t] and applies it to the generated subgoals,
   * until [t] fails. This tactic never fails. *)
-val repeat : ('a,'j) tac -> ('a,'j) tac
+val repeat : 'a tac -> 'a tac
 
 (** [andthen t1 t2] applies [t1] and then applies [t2] to each newly
   * created subgoal. *)
-val andthen : ('a,'j) tac -> ('a,'j) tac -> ('a,'j) tac
+val andthen : 'a tac -> 'a tac -> 'a tac
 
 (** n-ary variant of [orelse]. *)
-val orelse_list : ('a,'j) tac list -> ('a,'j) tac
+val orelse_list : 'a tac list -> 'a tac
 
 (** n-ary variant of [andthen]. *)
-val andthen_list : ('a,'j) tac list -> ('a,'j) tac
+val andthen_list : 'a tac list -> 'a tac
+
+val try_tac : 'a tac -> 'a tac
+
+(** {2 Generic tactic syntax trees} *)
+
+module type S = sig
+
+  type arg
+  val pp_arg : Format.formatter -> arg -> unit
+
+  type judgment
+
+  val eval_abstract : string -> arg list -> judgment tac
+  val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
+    string -> arg list -> Format.formatter -> unit
+
+end
+
+module type AST_sig = sig
+
+  type arg
+  type judgment
+
+  (** AST for tactics, with abstract leaves corresponding to prover-specific
+    * tactics, with prover-specific arguments. Modifiers have no internal
+    * semantics: they are printed, but ignored during evaluation -- they
+    * can only be used for cheap tricks now, but may be used to guide tactic
+    * evaluation in richer ways in the future. *)
+  type t =
+    | Abstract of string * arg list
+    | AndThen : t list -> t
+    | OrElse : t list -> t
+    | Try : t -> t
+    | Repeat : t -> t
+    | Ident : t
+    | Modifier : string * t -> t
+
+  val eval : t -> judgment tac
+
+  val pp : Format.formatter -> t -> unit
+
+end
+
+module AST (M:S) : AST_sig
+  with type arg = M.arg
+  with type judgment = M.judgment

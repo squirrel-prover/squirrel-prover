@@ -12,9 +12,7 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL DARROW AXIOM
 %token DOT
-%token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
-%token CONGRUENCE ASSUMPTION APPLY TO ASSERT
-%token NOTRACES EQNAMES EQTIMESTAMPS EUF TRY CYCLE IDENT REPEAT COLLISION NOSIMPL
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL
 %token PROOF QED UNDO
 %token EOF
 
@@ -195,36 +193,40 @@ tactic_params:
 
 tac:
   | LPAREN t=tac RPAREN               { t }
-  | ADMIT                             { Prover.Admit }
-  | IDENT                             { Prover.Ident }
-  | NOSIMPL t=tac                     { Prover.NoSimp t }
-  | FORALLINTRO                       { Prover.ForallIntro }
-  | EXISTSINTRO t=tactic_params       { Prover.ExistsIntro
-                                          (Prover.parse_args_exists t)}
-  | ANYINTRO                          { Prover.AnyIntro }
-  | INTRO                             { Prover.Intro }
-  | LEFT                              { Prover.Left }
-  | RIGHT                             { Prover.Right }
-  | SPLIT                             { Prover.Split }
-  | CONGRUENCE                        { Prover.GammaAbsurd }
-  | ASSUMPTION                        { Prover.Assumption }
-  | NOTRACES                          { Prover.ConstrAbsurd }
-  | EQNAMES                           { Prover.EqNames }
-  | EQTIMESTAMPS                      { Prover.EqTimestamps }
-  | COLLISION                         { Prover.CollisionResistance }
-  | EUF i=INT                         { Prover.Euf i }
-  | CYCLE i=INT                       { Prover.Cycle i }
-  | CYCLE MINUS i=INT                 { Prover.Cycle (-i) }
-  | l=tac SEMICOLON r=tac             { Prover.AndThen (l,r) }
-  | l=tac PLUS r=tac                  { Prover.OrElse (l, r) }
-  | TRY l=tac                         { Prover.Try l }
-  | APPLY i=ID                        { Prover.Apply
-                                          (i, Prover.parse_args i []) }
-  | APPLY i=ID TO t=tactic_params     { Prover.Apply
-                                          (i, Prover.parse_args i t) }
-  | ASSERT f=formula                  { Prover.Assert
-                                          (Prover.parse_formula f) }
-  | REPEAT t=tac                      { Prover.Repeat (t) }
+  | l=tac SEMICOLON r=tac             { Prover.AST.AndThen [l;r] }
+  | l=tac PLUS r=tac                  { Prover.AST.OrElse [l;r] }
+  | TRY l=tac                         { Prover.AST.Try l }
+  | REPEAT t=tac                      { Prover.AST.Repeat t }
+
+  | ID                                { Prover.AST.Abstract ($1,[]) }
+  | ID i=INT                          { Prover.AST.Abstract
+                                          ($1,[Prover.Int i]) }
+  | ID f=formula                      { Prover.AST.Abstract
+                                          ($1,
+                                           [Prover.Formula
+                                              (Prover.parse_formula f)]) }
+
+  | NOSIMPL t=tac                     { Prover.AST.Modifier
+                                          ("nosimpl", t) }
+  | CYCLE i=INT                       { Prover.AST.Abstract
+                                         ("cycle",[Prover.Int i]) }
+  | CYCLE MINUS i=INT                 { Prover.AST.Abstract
+                                         ("cycle",[Prover.Int (-i)]) }
+
+  | APPLY i=ID                        { Prover.AST.Abstract
+                                          ("apply",
+                                           [Prover.Goal_name i;
+                                            Prover.Subst
+                                              (Prover.parse_args i [])]) }
+  | APPLY i=ID TO t=tactic_params     { Prover.AST.Abstract
+                                          ("apply",
+                                           [Prover.Goal_name i;
+                                            Prover.Subst
+                                              (Prover.parse_args i t) ]) }
+  | EXISTS t=tactic_params            { Prover.AST.Abstract
+                                          ("exists",
+                                           [Prover.Subst
+                                              (Prover.parse_args_exists t)]) }
 
 
 qed:

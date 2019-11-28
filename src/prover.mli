@@ -42,47 +42,34 @@ val save_state : prover_mode -> unit
   * corresponding prover mode. *)
 val reset_state : int -> prover_mode
 
-(** Tactic expressions and their evaluation.
-    Cf the tactics module for their semantics. *)
-type tac =
-  | Admit : tac
-  | Ident : tac
-  | NoSimp : tac -> tac
+(** {2 Tactics syntax trees} *)
 
-  | Left : tac
-  | Right : tac
-  | Intro : tac
-  | Split : tac
+type tac_arg =
+  | Subst of subst
+  | Goal_name of string
+  | Formula of Formula.formula
+  | Function_name of fname
+  | Int of int
 
-  | Apply : (string * subst) -> tac
-  | Assert : formula -> tac
+module AST : Tactics.AST_sig
+  with type arg = tac_arg and type judgment = Logic.Judgment.judgment
 
-  | ForallIntro : tac
-  | ExistsIntro : subst -> tac
-  | AnyIntro : tac
-
-  | GammaAbsurd : tac
-  | ConstrAbsurd : tac
-
-  | Assumption : tac
-
-  | EqNames : tac
-  | EqTimestamps : tac
-  | EqConstants : fname -> tac
-
-  (* | UProveAll : utac -> utac *)
-  | AndThen : tac * tac -> tac
-  | OrElse : tac * tac -> tac
-  | Try : tac -> tac
-  | Repeat : tac -> tac
-
-  | Euf : int -> tac
-  | CollisionResistance : tac
-  | Cycle : int -> tac
-
-val pp_tac : Format.formatter -> tac -> unit
-
+(** TODO documentation *)
 exception Tactic_Soft_Failure of string
+
+(** Placeholder for tactics on judgments *)
+module Prover_tactics : sig
+  type tac = Judgment.t Tactics.tac
+  val register_general : string -> (tac_arg list -> tac) -> unit
+  val register : string -> tac -> unit
+  val register_subst : string -> (subst -> tac) -> unit
+  val register_int : string -> (int -> tac) -> unit
+  val register_formula : string -> (formula -> tac) -> unit
+  val register_fname : string -> (fname -> tac) -> unit
+  val register_macro : string -> AST.t -> unit
+end
+
+(** {2 Utilities for parsing} *)
 
 (** [parse_args goalname ts] parses the arguments [ts] given  the environment
     defined by the goal [goalname]. It needs to access the list of proved goals.
@@ -93,17 +80,15 @@ val parse_args_exists : Theory.term list -> Term.asubst list
 
 val parse_formula : Theory.formula -> formula
 
-(* Variable arguments, defined by a name and a kind (bool, messages, ...) *)
-type args = (string * Theory.kind) list
+val get_goal_formula : string -> formula
 
 (** Produces a goal formula given parsing informations. *)
-val make_goal : Theory.formula ->
-  formula
+val make_goal : Theory.formula -> formula
 
 type parsed_input =
-    ParsedInputDescr
+  | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of tac
+  | ParsedTactic of AST.t
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -123,7 +108,7 @@ val complete_proof : unit -> unit
 
 (** [eval_tactic utac] applies the tactic [utac].
     Return [true] if there are no subgoals remaining. *)
-val eval_tactic : tac -> bool
+val eval_tactic : AST.t -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
 val start_proof : unit -> string option

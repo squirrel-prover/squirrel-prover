@@ -3,26 +3,11 @@ open Logic
 open Formula
 open Term
 
-type 'a tac = ('a,Judgment.t) Tactics.tac
+type tac = Judgment.t Tactics.tac
 
-(** Simplification utilities *)
+module T = Prover.Prover_tactics
 
-let remove_finished judges =
-  List.filter
-    (fun j ->
-       match j.Judgment.formula with
-       | True -> false
-       | _ -> true)
-    judges
-
-let simplify j =
-  match j.Judgment.formula with
-  | Exists (vs,p) when vs = [] ->
-    Judgment.set_formula (p) j
-  (* TODO add more ? *)
-  | _ -> j
-
-(** Introduction Rules *)
+(** Propositional connectives *)
 
 let goal_or_intro_l (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
@@ -36,10 +21,10 @@ let goal_or_intro_r (judge : Judgment.t) sk fk =
   | (Or (_, rformula)) -> sk [Judgment.set_formula (rformula) judge] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-(** To prove phi \/ psi, try first to prove phi and then psi *)
-let goal_or_intro (judge : Judgment.t) sk fk =
-  Tactics.orelse goal_or_intro_l goal_or_intro_r judge sk fk
+let () = T.register "left" goal_or_intro_l
+let () = T.register "right" goal_or_intro_r
 
+(* TODO currently unused: remove? *)
 let goal_true_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
   | True -> sk () fk
@@ -52,6 +37,12 @@ let goal_and_intro (judge : Judgment.t) sk fk =
          Judgment.set_formula (rformula) judge ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
+let () = T.register "split" goal_and_intro
+
+(** Introduce various connectives to the right: currently,
+  * disjunction and implication (with conjunction on its left).
+  * TODO this is a bit arbitrary, and it will be surprising for
+  * users that "intro" does not introduce universal quantifiers. *)
 let goal_intro (judge : Judgment.t) sk fk =
   let exception No_intro in
   try
@@ -78,6 +69,10 @@ let goal_intro (judge : Judgment.t) sk fk =
                          or the left hand-side of an implication which \
                          is a conjonction")
 
+let () = T.register "intro" goal_intro
+
+(** Quantifiers *)
+
 (** Introduce the universally quantified variables and the goal. *)
 let goal_forall_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
@@ -93,10 +88,11 @@ let goal_forall_intro (judge : Judgment.t) sk fk =
     let new_formula = subst_formula subst f in
     let new_judge = Judgment.set_formula new_formula judge
                     |> Judgment.set_env (!env)
-                    |> simplify
     in
     sk [new_judge] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a forall")
+
+let () = T.register "forall_r" goal_forall_intro
 
 let goal_exists_intro nu (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
@@ -105,12 +101,31 @@ let goal_exists_intro nu (judge : Judgment.t) sk fk =
     sk [Judgment.set_formula new_formula judge] fk
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
 
+let () = T.register_subst "exists" goal_exists_intro
 
 let goal_any_intro j sk fk =
   Tactics.orelse_list
     [goal_and_intro;
      goal_intro;
      goal_forall_intro] j sk fk
+
+let () =
+  T.register_macro "intros"
+    Prover.AST.(
+      Repeat
+        (OrElse
+           [ Abstract ("intro",[]) ;
+             Abstract ("forall_r",[]) ]))
+
+let () =
+  T.register_macro "anyintro"
+    Prover.AST.(
+      OrElse
+        [ Abstract ("split",[]) ;
+          Abstract ("intro",[]) ;
+          Abstract ("forall_r",[]) ])
+
+(** Absurd *)
 
 let constr_absurd (judge : Judgment.t) sk fk =
   if not @@ Theta.is_sat judge.Judgment.theta then
@@ -122,6 +137,10 @@ let gamma_absurd (judge : Judgment.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
 
+let () = T.register "congruence" gamma_absurd
+
+let () = T.register "notraces" constr_absurd
+
 let assumption (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
   | True -> sk [] fk
@@ -130,6 +149,8 @@ let assumption (judge : Judgment.t) sk fk =
       sk [] fk
     else fk (Tactics.Failure "Not in hypothesis")
   | _ -> fk (Tactics.Failure "Not in hypothesis")
+
+let () = T.register "assumption" assumption
 
 (** Utils *)
 
@@ -151,7 +172,6 @@ let mk_and_cnstr l = match l with
       | x :: l -> mk_c (Bformula.And (x,acc)) l in
     mk_c a l'
 
-
 open Bformula
 
 (** Eq-Indep Axioms *)
@@ -170,6 +190,8 @@ let eq_names (judge : Judgment.t) sk fk =
   in
   sk [judge] fk
 
+let () = T.register "eqnames" eq_names
+
 let eq_constants fn (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in
   let cnstrs =
@@ -182,6 +204,8 @@ let eq_constants fn (judge : Judgment.t) sk fk =
       ) judge cnstrs
   in
   sk [judge] fk
+
+let () = T.register_fname "eqconstants" eq_constants
 
 let eq_timestamps (judge : Judgment.t) sk fk =
   let ts_classes = Theta.get_equalities judge.Judgment.theta
@@ -213,6 +237,8 @@ let eq_timestamps (judge : Judgment.t) sk fk =
       judge facts
   in
   sk [judge] fk
+
+let () = T.register "eqtimestamps" eq_timestamps
 
 (** EUF Axioms *)
 
@@ -255,7 +281,6 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
   in
   let constr = And (eq_cnstr, le_cnstr) in
   (new_f, constr)
-
 
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
@@ -300,6 +325,12 @@ let euf_apply f_select (judge : Judgment.t) sk fk =
   let judge = Judgment.set_gamma g judge in
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts judge at) fk
+
+let () =
+  T.register_int "euf"
+    (fun i ->
+       let f_select _ t = t.id = i in
+       euf_apply f_select)
 
 let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   let exception No_apply in
@@ -361,6 +392,14 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   with No_apply -> fk (Failure "Can only apply quantified conjunction of atoms
  or a disjunction implying a conjunction.")
 
+let () =
+  T.register_general "apply"
+    (function
+       | [Prover.Goal_name gname; Prover.Subst s] ->
+           let f = Prover.get_goal_formula gname in
+           apply f s
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+
 let tac_assert f j sk fk =
   let j1 = Judgment.set_formula f j in
   match Formula.formula_to_fact f with
@@ -369,6 +408,10 @@ let tac_assert f j sk fk =
         match Formula.formula_to_constr f with
           | constr -> sk [j1; Judgment.add_constr constr j] fk
           | exception Failure _ -> fk (Failure "unsupported formula")
+
+let () =
+  T.register_formula "assert"
+    (fun f j sk fk -> tac_assert f j sk fk)
 
 let collision_resistance (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in
@@ -407,3 +450,5 @@ let collision_resistance (judge : Judgment.t) sk fk =
       ) judge new_facts
   in
   sk [judge] fk
+
+let () = T.register "collision" collision_resistance

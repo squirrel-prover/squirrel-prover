@@ -13,11 +13,13 @@ let rec pp_tac_error ppf = function
          of the subgoal failed with error : %a"
         pp_tac_error t
 
-type 'a fk = tac_error -> 'a
+type a
 
-type ('a,'b) sk = 'a -> 'b fk -> 'b
+type fk = tac_error -> a
 
-type ('a,'j) tac = 'j -> ('j list,'a) sk -> 'a fk -> 'a
+type 'a sk = 'a -> fk -> a
+
+type 'a tac = 'a -> 'a list sk -> fk -> a
 
 (** Basic Tactics *)
 
@@ -56,9 +58,109 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
+let id j sk fk = sk [j] fk
+
+let try_tac t = orelse t id
+
 let repeat t j sk fk =
   let rec aux j sk fk =
     t j
       (fun l fk -> map aux l sk fk)
       (fun e -> sk [j] fk)
   in aux j sk fk
+
+(** Generic tactic syntax trees *)
+
+module type S = sig
+
+  type arg
+  val pp_arg : Format.formatter -> arg -> unit
+
+  type judgment
+
+  val eval_abstract : string -> arg list -> judgment tac
+  val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
+    string -> arg list -> Format.formatter -> unit
+
+end
+
+module type AST_sig = sig
+
+  type arg
+  type judgment
+
+  (** AST for tactics, with abstract leaves corresponding to prover-specific
+    * tactics, with prover-specific arguments. Modifiers have no internal
+    * semantics: they are printed, but ignored during evaluation -- they
+    * can only be used for cheap tricks now, but may be used to guide tactic
+    * evaluation in richer ways in the future. *)
+  type t =
+    | Abstract of string * arg list
+    | AndThen : t list -> t
+    | OrElse : t list -> t
+    | Try : t -> t
+    | Repeat : t -> t
+    | Ident : t
+    | Modifier : string * t -> t
+
+  val eval : t -> judgment tac
+
+  val pp : Format.formatter -> t -> unit
+
+end
+
+module AST (M:S) = struct
+
+  open M
+
+  (** AST for tactics, with abstract leaves corresponding to prover-specific
+    * tactics, with prover-specific arguments. *)
+  type t =
+    | Abstract of string * arg list
+    | AndThen : t list -> t
+    | OrElse : t list -> t
+    | Try : t -> t
+    | Repeat : t -> t
+    | Ident : t
+    | Modifier : string * t -> t
+
+  type arg = M.arg
+  type judgment = M.judgment
+
+  let rec eval = function
+    | Abstract (id,args) -> eval_abstract id args
+    | AndThen tl -> andthen_list (List.map eval tl)
+    | OrElse tl -> orelse_list (List.map eval tl)
+    | Try t -> try_tac (eval t)
+    | Repeat t -> repeat (eval t)
+    | Ident -> id
+    | Modifier (id,t) -> eval t
+
+  let pp_args fmt l =
+    Fmt.list
+      ~sep:(fun ppf () -> Fmt.string ppf ", ")
+      (fun ppf a -> Fmt.string ppf " " ; pp_arg ppf a)
+      fmt
+      l
+
+  let rec pp ppf = function
+    | Abstract (i,args) ->
+        begin try
+          pp_abstract ~pp_args i args ppf
+        with _ ->
+          if args = [] then Fmt.string ppf i else
+            Fmt.pf ppf "%s %a" i pp_args args
+        end
+    | Modifier (i,t) -> Fmt.pf ppf "%s(%a)" i pp t
+    | AndThen [t;t'] ->
+        Fmt.pf ppf "@[%a@]; @,@[%a@]" pp t pp t'
+    | OrElse [t;t'] ->
+        Fmt.pf ppf "@[%a@] + @,@[%a@]" pp t pp t'
+    | AndThen _ | OrElse _ -> assert false (* TODO *)
+    | Ident -> Fmt.pf ppf "id"
+    | Try t ->
+        Fmt.pf ppf "try @[%a@]" pp t
+    | Repeat t ->
+        Fmt.pf ppf "repeat @[%a@]" pp t
+
+end

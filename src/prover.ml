@@ -60,186 +60,179 @@ let rec reset_state n =
  *   general treatment difficult
  *   solution: a general notion of tactic args and associated syntax ? *)
 
-type tac =
-  | Admit : tac
-  | Ident : tac
-
-  | NoSimp : tac -> tac
-  | Left : tac
-  | Right : tac
-  | Intro : tac
-  | Split : tac
-
-  | Apply : (string * subst) -> tac
-  | Assert : Formula.formula -> tac
-
-  | ForallIntro : tac
-  | ExistsIntro : subst -> tac
-  | AnyIntro : tac
-
-  | GammaAbsurd : tac
-  | ConstrAbsurd : tac
-
-  | Assumption : tac
-
-  | EqNames : tac
-  | EqTimestamps : tac
-  | EqConstants : fname -> tac
-
-  (* | UProveAll : utac -> utac *)
-  | AndThen : tac * tac -> tac
-  | OrElse : tac * tac -> tac
-  | Try : tac -> tac
-  | Repeat : tac -> tac
-
-  | Euf : int -> tac
-  | CollisionResistance : tac
-  | Cycle : int -> tac
-
-let rec pp_tac : Format.formatter -> tac -> unit =
-  fun ppf tac -> match tac with
-    | Admit -> Fmt.pf ppf "admit"
-    | Ident -> Fmt.pf ppf "ident"
-    | NoSimp t -> Fmt.pf ppf "no simplification for %a" pp_tac t
-    | Left -> Fmt.pf ppf "goal_or_intro_l"
-    | Right -> Fmt.pf ppf "goal_or_intro_r"
-    | Intro -> Fmt.pf ppf "goal_intro"
-    | Split -> Fmt.pf ppf "goal_and_intro"
-
-    | Apply (s, t) ->
-        if t = [] then
-          Fmt.pf ppf "apply %s" s
-        else
-          Fmt.pf ppf "apply %s to .." s
-    | Assert f ->
-        Fmt.pf ppf "assert %a" Formula.pp_formula f
-
-    | ForallIntro -> Fmt.pf ppf "forall_intro"
-    | ExistsIntro (nu) ->
-      Fmt.pf ppf "@[<v 2>exists_intro@;%a@]"
-        pp_subst nu
-    | AnyIntro -> Fmt.pf ppf "any_intro"
-    | GammaAbsurd -> Fmt.pf ppf "gamma_absurd"
-    | ConstrAbsurd -> Fmt.pf ppf "constr_absurd"
-
-    | Assumption -> Fmt.pf ppf "assumption"
-
-    | EqNames -> Fmt.pf ppf "eq_names"
-    | EqTimestamps -> Fmt.pf ppf "eq_timestamps"
-    | EqConstants fn -> Fmt.pf ppf "eq_constants %a" pp_fname fn
-
-    (* | ProveAll utac -> Fmt.pf ppf "apply_all(@[%a@])" pp_tac utac *)
-    | AndThen (ut, ut') ->
-      Fmt.pf ppf "@[%a@]; @,@[%a@]" pp_tac ut pp_tac ut'
-    | OrElse (ut, ut') ->
-      Fmt.pf ppf "@[%a@] + @,@[%a@]" pp_tac ut pp_tac ut'
-    | Try ut ->
-      Fmt.pf ppf "try@[%a@]" pp_tac ut
-    | Repeat t ->
-      Fmt.pf ppf "repeat @[%a@]]" pp_tac t
-    (* | TacPrint ut -> Fmt.pf ppf "@[%a@].@;" pp_tac ut *)
-
-    | Euf i -> Fmt.pf ppf "euf %d" i
-    | CollisionResistance -> Fmt.pf ppf "collision resistance"
-    | Cycle i -> Fmt.pf ppf "cycle %d" i
-
-let rec tac_apply :
-  type a.
-  tac -> a Trace_tactics.tac
-=
-  let open Trace_tactics in
-  fun tac judge sk fk -> match tac with
-    | Admit -> sk [Judgment.set_formula True judge] fk
-    | Ident -> sk [judge] fk
-    | NoSimp tac -> tac_apply tac judge sk fk
-    | ForallIntro -> goal_forall_intro judge sk fk
-    | ExistsIntro (nu) -> goal_exists_intro nu judge sk fk
-    | AnyIntro -> goal_any_intro judge sk fk
-    | Apply (gname, s) ->
-        let f =
-          match
-            List.filter (fun (name,g) -> name = gname) !goals_proved
-          with
-            | [(_,f)] -> f
-            | [] -> raise @@ Failure "No proved goal with given name"
-            | _ -> raise @@ Failure "Multiple proved goals with the same name"
-        in
-        apply f s judge sk fk
-    | Assert f -> tac_assert f judge sk fk
-    | Left -> goal_or_intro_l judge sk fk
-    | Right -> goal_or_intro_r judge sk fk
-    | Split -> goal_and_intro judge sk fk
-    | Intro -> goal_intro judge sk fk
-
-    | GammaAbsurd -> gamma_absurd judge sk fk
-    | ConstrAbsurd -> constr_absurd judge sk fk
-
-    | Assumption -> assumption judge sk fk
-
-    | EqNames -> eq_names judge sk fk
-    | EqTimestamps -> eq_timestamps judge sk fk
-    | EqConstants fn -> eq_constants fn judge sk fk
-    | Euf i ->
-      let f_select _ t = t.id = i in
-      euf_apply f_select judge sk fk
-
-    (* | ProveAll tac -> prove_all judge (tac_apply gt tac) sk fk *)
-    | CollisionResistance -> collision_resistance judge sk fk
-    | AndThen (tac,tac') ->
-      Tactics.andthen
-        (tac_apply tac)
-        (tac_apply tac')
-        judge sk fk
-
-    | OrElse (tac,tac') ->
-      Tactics.orelse (tac_apply tac) (tac_apply tac') judge sk fk
-
-    (* Try is just syntactic sugar *)
-    | Try tac -> tac_apply (OrElse(tac,Ident)) judge sk fk
-
-    | Repeat tac ->
-      Tactics.repeat (tac_apply tac) judge sk fk
-    | Cycle _ -> assert false   (* This is not a focused tactic. *)
-
-    (* | TacPrint tac ->
-     *   Fmt.pr "%a @[<hov 0>%a@]@;%!"
-     *     (Fmt.styled `Bold ident) "Tactic:" pp_tac tac;
-     *   tac_apply gt tac judge (fun judge fk ->
-     *       Fmt.pr "%a%!" (Judgment.pp_judgment (pp_gt_el gt)) judge;
-     *       sk judge fk)
-     *     fk *)
-
-let simpGoal =
-  AndThen(Repeat AnyIntro,
-          AndThen(EqNames,
-                  AndThen(EqTimestamps,
-                          AndThen(Try GammaAbsurd,
-                                  Try ConstrAbsurd))))
+(* Tactic arguments. The presence of substitution is a bit ad-hoc,
+ * as visible in the parser: TODO we should probably just take a list
+ * of terms and let the tactic process it. *)
+type tac_arg =
+  | Subst of subst
+  | Goal_name of string
+  | Formula of Formula.formula
+  | Function_name of fname
+  | Int of int
 
 exception Tactic_Soft_Failure of string
 
+(** In the future this will have to be made generic since we will
+  * want the same declaration system for indistinguishability tactics. *)
+module rec Prover_tactics : sig
+
+  type tac = Judgment.t Tactics.tac
+
+  val register_general : string -> (tac_arg list -> tac) -> unit
+  val register : string -> tac -> unit
+  val register_subst : string -> (subst -> tac) -> unit
+  val register_int : string -> (int -> tac) -> unit
+  val register_formula : string -> (formula -> tac) -> unit
+  val register_fname : string -> (fname -> tac) -> unit
+  val register_macro : string -> AST.t -> unit
+
+  val get : string -> tac_arg list -> tac
+
+end = struct
+
+  type tac = Judgment.t Tactics.tac
+
+  let table :
+    (string, tac_arg list -> tac) Hashtbl.t =
+    Hashtbl.create 97
+
+  let get id =
+    try Hashtbl.find table id with
+      | Not_found -> failwith (Printf.sprintf "unknown tactic %S" id)
+
+  let register_general id f =
+    assert (not (Hashtbl.mem table id)) ;
+    Hashtbl.add table id f
+
+  let register id f =
+    register_general id
+      (fun args j sk fk ->
+         if args = [] then f j sk fk else
+           raise @@
+           Tactics.Tactic_Hard_Failure "this tactic does not take arguments")
+
+  let register_int id f =
+    register_general id
+      (fun args j sk fk -> match args with
+         | [Int x] -> f x j sk fk
+         | _ ->
+             raise @@
+             Tactics.Tactic_Hard_Failure "int argument expected")
+
+  let register_formula id f =
+    register_general id
+      (fun args j sk fk -> match args with
+         | [Formula x] -> f x j sk fk
+         | _ ->
+             raise @@
+             Tactics.Tactic_Hard_Failure "formula argument expected")
+
+  let register_fname id f =
+    register_general id
+      (fun args j sk fk -> match args with
+         | [Function_name x] -> f x j sk fk
+         | _ ->
+             raise @@
+             Tactics.Tactic_Hard_Failure "function name argument expected")
+
+  let register_subst id f =
+    register_general id
+      (fun args j sk fk -> match args with
+         | [Subst x] -> f x j sk fk
+         | _ ->
+             raise @@
+             Tactics.Tactic_Hard_Failure "illegal arguments")
+
+  let register_macro id m = Prover_tactics.register id (AST.eval m)
+
+end
+
+and AST :
+  Tactics.AST_sig with type arg = tac_arg with type judgment = Judgment.t
+= Tactics.AST(struct
+
+  type arg = tac_arg
+
+  type judgment = Logic.Judgment.judgment
+
+  let pp_arg ppf = function
+    | Int i -> Fmt.int ppf i
+    | Goal_name s -> Fmt.string ppf s
+    | Function_name fname -> pp_fname ppf fname
+    | Formula formula -> pp_formula ppf formula
+    | Subst subst -> pp_subst ppf subst
+
+  let eval_abstract id args : judgment Tactics.tac =
+    Prover_tactics.get id args
+
+  let pp_abstract ~pp_args s args ppf =
+    match s,args with
+      | "apply",[Goal_name id] ->
+          Fmt.pf ppf "apply %s" id
+      | "apply",Goal_name id::l ->
+          Fmt.pf ppf "apply %s to %a" id pp_args l
+      | _ -> raise Not_found
+
+end)
+
+let () =
+  Prover_tactics.register "admit" (fun j sk fk -> sk [] fk) ;
+  Prover_tactics.register "id" Tactics.id
+
+exception Return of Judgment.t list
+
 (** The evaluation of a tactic, may either raise a soft failure or a hard
-    failure (cf tactics.ml). A soft failure should be formatted inside the
-    Tactic_soft_failure exception.
-    A hard failure inside Tactic_hard_failure. Those exceptions are catched
-    inside the interactive loop. *)
-let eval_tactic_judge : tac -> Judgment.t -> Judgment.t list = fun tac judge ->
-  (* the failure should raise the soft failure, according to [pp_tac_error] *)
-  let failure_k tac_error =
-    raise @@ Tactic_Soft_Failure (Fmt.strf "%a" Tactics.pp_tac_error tac_error )
+  * failure (cf tactics.ml). A soft failure should be formatted inside the
+  * [Tactic_Soft_Failure] exception.
+  * A hard failure inside Tactic_hard_failure. Those exceptions are caught
+  * inside the interactive loop.
+  *
+  * TODO update and clarify this, the soft failure does not belong to
+  * Tactics *)
+let eval_tactic_judge ast j =
+  let tac = AST.eval ast in
+  (* The failure should raise the soft failure,
+   * according to [pp_tac_error]. *)
+  let fk tac_error =
+    raise @@
+    Tactic_Soft_Failure (Fmt.strf "%a" Tactics.pp_tac_error tac_error)
   in
-  let suc_k judges _ =
+  let sk l _ = raise (Return l) in
+  try ignore (tac j sk fk) ; assert false with Return l -> l
+
+(** Automatic simplification of generated subgoals *)
+
+let simpGoal =
+  AST.(
+    AndThen [
+      Repeat (Abstract ("anyintro",[])) ;
+      Abstract ("eqnames",[]) ;
+      Abstract ("eqtimestamps",[]) ;
+      Try (Abstract ("congruence",[])) ;
+      Try (Abstract ("notraces",[])) ])
+
+let remove_finished judges =
+  List.filter
+    (fun j ->
+       match j.Judgment.formula with
+       | True -> false
+       | _ -> true)
     judges
-  in
-     tac_apply tac judge suc_k failure_k
+
+let simplify j =
+  match j.Judgment.formula with
+  | Exists (vs,p) when vs = [] ->
+    Judgment.set_formula (p) j
+  (* TODO add more ? *)
+  | _ -> j
 
 let auto_simp judges =
-  List.map Trace_tactics.simplify judges
-  |> Trace_tactics.remove_finished
+  List.map simplify judges
+  |> remove_finished
   |> List.map (eval_tactic_judge simpGoal)
   |> List.flatten
-  |> List.map Trace_tactics.simplify
-  |> Trace_tactics.remove_finished
+  |> List.map simplify
+  |> remove_finished
 
 let tsubst_of_judgment j =
   List.map
@@ -310,10 +303,15 @@ let parse_args_exists ts : subst =
     | _ -> raise @@ Failure "Cannot parse term for existential intro which does
 not exists"
 
+let get_goal_formula gname =
+  match
+    List.filter (fun (name,g) -> name = gname) !goals_proved
+  with
+    | [(_,f)] -> f
+    | [] -> failwith "No proved goal with given name"
+    | _ -> failwith "Multiple proved goals with the same name"
 
 (** Declare Goals And Proofs *)
-
-type args = (string * Theory.kind) list
 
 let make_goal f  =
   (* In the rest of this function, the lists need to be reversed and appended
@@ -330,7 +328,7 @@ let make_goal f  =
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of tac
+  | ParsedTactic of AST.t
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -361,8 +359,9 @@ let complete_proof () =
     add_proved_goal (Utils.opt_get !current_goal);
     current_goal := None;
     subgoals := []
-  with Not_found ->  raise @@ Tactics.Tactic_Hard_Failure "Cannot complete proof
-with empty current goal"
+  with Not_found ->
+    raise @@ Tactics.Tactic_Hard_Failure "Cannot complete proof \
+               with empty current goal"
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -375,15 +374,16 @@ let pp_goal ppf () = match !current_goal, !subgoals with
 
 (** [eval_tactic_focus tac] applies [tac] to the focused goal.
   * @return [true] if there are no subgoals remaining. *)
-let eval_tactic_focus : tac -> bool = fun tac -> match !subgoals with
+let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | judge :: ejs' ->
-    let new_j =  (eval_tactic_judge tac judge) in
-    let ejs =  (match tac with
-      | NoSimp t -> new_j
-      | _ -> auto_simp new_j) @ ejs' in
-      subgoals := ejs;
-      is_proof_completed ()
+    let new_j = eval_tactic_judge tac judge in
+    let new_j = match tac with
+      | AST.Modifier ("nosimpl",t) -> new_j
+      | _ -> auto_simp new_j
+    in
+    subgoals := new_j @ ejs';
+    is_proof_completed ()
 
 let cycle i l =
   let rec cyc acc i = function
@@ -395,10 +395,9 @@ let cycle i l =
   if i < 0 then cyc [] (List.length l + i) l
   else cyc [] i l
 
-let eval_tactic : tac -> bool = fun utac -> match utac with
-  | Cycle i -> subgoals := cycle i !subgoals; false
+let eval_tactic utac = match utac with
+  | AST.Abstract ("cycle",[Int i]) -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
-
 
 let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
