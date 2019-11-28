@@ -10,7 +10,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL GOAL DARROW AXIOM
+%token EXISTS FORALL QUANTIF GOAL DARROW AXIOM
 %token DOT
 %token ADMIT SPLIT LEFT RIGHT INTRO FORALLINTRO ANYINTRO EXISTSINTRO
 %token CONGRUENCE ASSUMPTION APPLY TO ASSERT
@@ -22,6 +22,7 @@
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
+%nonassoc QUANTIF
 %left DARROW
 %left OR
 %left AND
@@ -30,6 +31,8 @@
 %left PLUS
 %nonassoc REPEAT
 %left SEMICOLON
+%nonassoc TRY
+%nonassoc NOSIMPL
 
 %start theory
 %start top_process
@@ -49,7 +52,7 @@ term:
 aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
-		                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
+                                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 
 term_list:
@@ -94,8 +97,10 @@ formula:
 | TRUE                           { Formula.True }
 | aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }
 | ID term_list                   { Formula.Atom (Theory.make_term $1 $2) }
-| EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula  { Formula.Exists (vs,f)  }
-| FORALL LPAREN vs=arg_list RPAREN COMMA f=formula  { Formula.ForAll (vs,f)  }
+| EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
+                                 { Formula.Exists (vs,f)  }
+| FORALL LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
+                                 { Formula.ForAll (vs,f)  }
 
 (* Processes *)
 
@@ -110,9 +115,11 @@ process:
 | OUT LPAREN channel COMMA term RPAREN process_cont
                                  { Process.Out ($3,$5,$7) }
 | IF f=formula THEN process else_process
-                                 { Process.Exists ([],Theory.formula_to_fact f,$4,$5) }
+                                 { Process.Exists
+                                     ([],Theory.formula_to_fact f,$4,$5) }
 | FIND indices SUCHTHAT f=formula IN process else_process
-                                 { Process.Exists ($2,Theory.formula_to_fact f,$6,$7) }
+                                 { Process.Exists
+                                     ($2,Theory.formula_to_fact f,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
 | ID term_list ASSIGN term process_cont
                                  { let to_idx = function
@@ -169,14 +176,14 @@ declaration:
 | AENC ID                        { Theory.declare_aenc $2 }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
 | ABSTRACT ID COLON abs_type     { let l,r = $4 in
-                                     Theory.declare_abstract $2 l r }
+                                   Theory.declare_abstract $2 l r }
 | MUTABLE ID COLON state_type    { Theory.declare_state $2 (fst $4) (snd $4) }
 | CHANNEL ID                     { Channel.declare $2 }
 | TERM ID opt_arg_list COLON msg_or_bool EQ term
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM f=formula		 { Prover.add_proved_goal
+| AXIOM f=formula		         { Prover.add_proved_goal
                                      ("unnamed_goal", Prover.make_goal f) }
 | AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
                                      (i, Prover.make_goal f) }
@@ -192,7 +199,8 @@ tac:
   | IDENT                             { Prover.Ident }
   | NOSIMPL t=tac                     { Prover.NoSimp t }
   | FORALLINTRO                       { Prover.ForallIntro }
-  | EXISTSINTRO t=tactic_params       { Prover.ExistsIntro (Prover.parse_args_exists t)}
+  | EXISTSINTRO t=tactic_params       { Prover.ExistsIntro
+                                          (Prover.parse_args_exists t)}
   | ANYINTRO                          { Prover.AnyIntro }
   | INTRO                             { Prover.Intro }
   | LEFT                              { Prover.Left }
@@ -231,7 +239,7 @@ tactic:
 goal:
 | GOAL i=ID COLON f=formula DOT   { Prover.Gm_goal (i, Prover.make_goal f) }
 | GOAL f=formula DOT              { Prover.Gm_goal ("unnamed_goal",
-                                                      Prover.make_goal f) }
+                                                    Prover.make_goal f) }
 | PROOF                           { Prover.Gm_proof }
 
 theory:
