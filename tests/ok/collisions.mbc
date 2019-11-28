@@ -13,12 +13,11 @@ axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>
 
-system (out(c,cst);
- (
-  (!_a out(c,h(na(a),k)) as A)
-  | (!_b out(c,h(<nb(b),nb(b)>,k)) as B)
-  | (!_c out(c,h(<nc(c),mc(c)>,k)) as C)
- )) as O.
+system O: out(c,cst); (
+    (A: !_a out(c,h(na(a),k)))
+  | (B: !_b out(c,h(<nb(b),nb(b)>,k)))
+  | (C: !_c out(c,h(<nc(c),mc(c)>,k)))
+).
 
 
 goal dummy :

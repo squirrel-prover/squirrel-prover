@@ -7,7 +7,7 @@
 %token AND OR NOT TRUE FALSE
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token NEW OUT PARALLEL AS NULL
+%token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL GOAL DARROW AXIOM
@@ -103,7 +103,6 @@ process:
 | NULL                           { Process.Null }
 | LPAREN processes RPAREN        { $2 }
 | ID term_list                   { Process.Apply ($1,$2) }
-| process AS ID                  { Process.Alias ($1,$3) }
 | ID COLON process               { Process.Alias ($3,$1) }
 | NEW ID SEMICOLON process       { Process.New ($2,$4) }
 | IN LPAREN channel COMMA ID RPAREN process_cont

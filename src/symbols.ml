@@ -9,12 +9,18 @@ let to_string s = s
 
 let table : (string,def) Hashtbl.t = Hashtbl.create 97
 
+let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+
 let fresh prefix =
+  let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
+  let prefix = Pcre.get_substring substrings 1 in
+  let i0 = Pcre.get_substring substrings 2 in
+  let i0 = if i0 = "" then 0 else int_of_string i0 in
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
     if Hashtbl.mem table s then find (i+1) else s
   in
-  find 0
+  find i0
 
 module type S = sig
   type t

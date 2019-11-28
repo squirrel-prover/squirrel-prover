@@ -1,6 +1,6 @@
 channel c
 
-system (!_i new n; out(c,n)) as S.
+system S : !_i new n; out(c,n).
 
 goal foo :
   forall (i:index),

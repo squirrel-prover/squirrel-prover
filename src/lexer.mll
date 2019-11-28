@@ -71,7 +71,6 @@ rule token = parse
 | "channel"           { CHANNEL }
 | "boolean"           { BOOLEAN }
 | "timestamp"         { TIMESTAMP }
-| "as"                { AS }
 | "null"              { NULL }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }

@@ -12,4 +12,5 @@ depends: [
   "ocamlgraph"
   "alcotest"
   "menhir"
+  "pcre"
 ]

@@ -444,7 +444,10 @@ let prepare : process -> process =
             (Out (c, t, prep p),
              Symbols.to_string a')
 
-    | Apply (id,args) ->
+    | Apply (id,args) | Alias (Apply (id,args), _) ->
+        (* Keep explicit alias if there is one,
+         * otherwise use id as the new alias. *)
+        let a = match p with Alias (_,a) -> a | _ -> id in
         let t,p = Hashtbl.find pdecls id in
         let subst =
           List.map2
@@ -456,7 +459,7 @@ let prepare : process -> process =
            * accessed by p, we need to pass them so that
            * the list has the expected length wrt the
            * actions that will eventually be generated. *)
-          prep ~subst p
+          prep ~a ~subst p
 
     | Set (s,l,t,p) ->
         let t' = Theory.subst t subst in

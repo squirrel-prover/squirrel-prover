@@ -156,7 +156,9 @@ let () =
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
     "Block creation", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/blocks.mbc"
+      parse_theory_test ~test "tests/alcotest/blocks.mbc" ;
+      ignore (Action.find_symbol "IOIO1") ;
+      ignore (Action.find_symbol "IOIO2")
       (* TODO test resulting block structure *)
     end ;
     "Let in blocks", `Quick, begin fun () ->
