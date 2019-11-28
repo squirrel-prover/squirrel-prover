@@ -72,23 +72,23 @@
 \section{A Logic for protocols}
 
 \subsection{Syntax of the logic}
-We denote $\F$ a set of function symbols (used to model encryptions, 
-pairs,\dots). $\N$ denotes an 
-infinite set of names (used to model the randomness used in a 
-protocol), and $\I$ denotes an infinite set of indexes (used to talk 
-about multiple copies of the same agent). For 
-each name $n\in \N$ and sequence of indices $\ov{i} \in \I$, 
-$n(\ov{i})$ refers to a fresh unique name in $\N$. We denotes $\X$ an 
+We denote $\F$ a set of function symbols (used to model encryptions,
+pairs,\dots). $\N$ denotes an
+infinite set of names (used to model the randomness used in a
+protocol), and $\I$ denotes an infinite set of indexes (used to talk
+about multiple copies of the same agent). For
+each name $n\in \N$ and sequence of indices $\ov{i} \in \I$,
+$n(\ov{i})$ refers to a fresh unique name in $\N$. We denotes $\X$ an
 infinite set of identifiers, used for variables.
 
-We finally denote $\States$ a set of identifiers used to model 
-mutable 
-states, which can also be parametrized by sequences of indices, 
-$\Actions$ a set of identifiers used to model actions 
-(which 
-will be used 
-to model an atomic step of a protocol), and $\Timestamps$ a set of 
-identifiers for timestamps in a trace. 
+We finally denote $\States$ a set of identifiers used to model
+mutable
+states, which can also be parametrized by sequences of indices,
+$\Actions$ a set of identifiers used to model actions
+(which
+will be used
+to model an atomic step of a protocol), and $\Timestamps$ a set of
+identifiers for timestamps in a trace.
 
 The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
 
@@ -108,28 +108,28 @@ $$
 \end{array}
    &
     \begin{array}{rcll}
-    
+
     n &:=& n \in \N & \text{name}\\
     &\mid& n(i_1,\dots,i_n) & \text{name copy} \\
     \\
-    
+
     s&:=& s \in \States & \text{state}\\
     &\mid& s(i_1,\dots,i_n) & \text{state copy}\\
-    
+
     \end{array}
-\end{array}  
+\end{array}
 $$
 
-        
+
 
 $$
 \begin{array}{c}
      \begin{array}{rcll}
-    \T &  := & \mess \mid \timestamp \mid \idx \mid \bool & \text{ 
+    \T &  := & \mess \mid \timestamp \mid \idx \mid \bool & \text{
         type of variables} \\
-    
+
       \\
-   
+
     t & := & n &\text{a name } \\
            & \mid & s@\tau &\text{value of a state}\\
     & \mid & x  & \text{a variable} \\
@@ -140,50 +140,68 @@ $$
 \\
 \\
    \begin{array}{rcll}
-   \atom & := & t=t'  
+   \atom & := & t=t'
  & \text{atomic proposition over terms } \\
-  &\mid & \tau=\tau' \mid \tau \leq \tau' &  \text{atomic proposition 
+  &\mid & \tau=\tau' \mid \tau \leq \tau' &  \text{atomic proposition
   over timestamps } \\
-  &\mid & i=i'  &  \text{atomic proposition 
+  &\mid & i=i'  &  \text{atomic proposition
     over index } \\
-  &\mid & a= a'\mid  \happens(a)  &  \text{atomic proposition 
+  &\mid & a= a'\mid  \happens(a)  &  \text{atomic proposition
     over actions } \\
     \end{array}
 \\
 \\
      \begin{array}{rcll}
-    \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi 
-    \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid 
-    \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom & 
-    \text{ 
+    \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi
+    \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
+    \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom &
+    \text{
     first order formula} \\
     \end{array}
-    
-\end{array}        
+
+\end{array}
     $$
     \caption{Syntax of first order formulas.}\label{fig:syntax}
 \end{figure}
 
 
-Terms $t$ may represent messages of a protocol, where given a trace, 
-i.e a sequence of actions or timestamps, $\mout@\tau$ and 
-$\minp@\tau$ models the output and input of the protocol at this 
-point in the trace. We will only consider well typed formulas, i.e 
-formulas where all variables (which are typed) are used accordingly 
+Terms $t$ may represent messages of a protocol, where given a trace,
+i.e a sequence of actions or timestamps, $\mout@\tau$ and
+$\minp@\tau$ models the output and input of the protocol at this
+point in the trace. We will only consider well typed formulas, i.e
+formulas where all variables (which are typed) are used accordingly
 to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
 
 
-Timestamps are ordered, and it is possible to consider the successor 
+Timestamps are ordered, and it is possible to consider the successor
 of a timestamp.  Terms and indices are not ordered.
 
 \subsection{Protocols definitions}
-
-
-
-We will model protocols as a set of possible actions available to the 
-attacker. An action essentially models a step of the protocol, where 
-the attacker provides some inputs, some conditions are checked, some 
+We  model protocols as a set of possible actions available to the
+attacker. An action essentially models a step of the protocol, where
+the attacker provides some inputs, some conditions are checked, some
 updates are performed, and finally an output is performed.
+
+Some actions may be available to the attacker in parallel, or one
+after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
+
+\begin{definition}
+A protocol step $s$ is a tuple $(I,\phi,U,o)$, where $I \subset \I$ is a list of indices variable, $\phi$ is a propositional formula, $U$ is a set of states updates (a mapping state symbols to terms), and $o$ is a list of terms.
+All indices appearing in $\phi,U,o$ must appear in $I$.
+
+A protocol is a tree labelled by protocol steps (nodes of arity one), $\|$ (unfixed arity) and $\oplus$ (unfixed arity), along with a mapping from $\Actions$ to the nodes. When going down inside the protocol, the indices set of the steps can only grow.
+\end{definition}
+
+Each protocol step may be instantiated an arbitrary number of time using distincts indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
+the trace with some defined indices, all its ancestors must have been executed previously in the trace.
+
+We may denote a protocol step $s(\ov{i})$ to give explicitely its set of indexes.
+For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1; (s_2 \| s_3(i))$ represents the protocol where the attacker can first execute $s_1$, and can then execute in any order $s_2$, and an arbitrary number of occurences of $s_3(i)$.
+
+There exists a natural translation from applied pi-calculus to this notion of protocol step, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
+
+\subsection{Semantics}
+
 
 
 \newpage
@@ -292,7 +310,7 @@ where:
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi \vee \psi'}
   }
-  
+
   \inferrule[\toprintro]{
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\top}
@@ -311,7 +329,7 @@ where:
     \psi \in \Gamma
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\psi}
-  }  
+  }
 
 \end{mathpar}
 
@@ -354,7 +372,7 @@ where:
   }{
     \judge{\facts{\valpha}{\theta}{\Gamma}}{\cexists_\gamma \vbeta. \phi}
   }
-  
+
   \inferrule[\cempty]{
     \centail{\theta}{\bot}
   }{
@@ -404,7 +422,7 @@ where:
       \psi[t]
     }
   }
-  
+
   \inferrule[\papply]{
     \cexists_\gamma \vbeta. \psi
     \in \Gamma\\
