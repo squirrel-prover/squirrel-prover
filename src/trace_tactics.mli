@@ -37,9 +37,6 @@ val goal_forall_intro : tac
     variables. *)
 val goal_exists_intro : Term.subst -> tac
 
-(** Syntactic sugar, trying to apply one of the intro. *)
-val goal_any_intro : tac
-
 (** [gamma_absurd judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 val gamma_absurd : tac

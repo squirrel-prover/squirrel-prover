@@ -139,6 +139,7 @@ end = struct
     register_general id
       (fun args j sk fk -> match args with
          | [Subst x] -> f x j sk fk
+         | [] -> f [] j sk fk
          | _ ->
              raise @@
              Tactics.Tactic_Hard_Failure "illegal arguments")
@@ -202,7 +203,7 @@ let eval_tactic_judge ast j =
 
 (** Automatic simplification of generated subgoals *)
 
-let simpGoal =
+let simpl =
   AST.(
     AndThen [
       Repeat (Abstract ("anyintro",[])) ;
@@ -211,28 +212,10 @@ let simpGoal =
       Try (Abstract ("congruence",[])) ;
       Try (Abstract ("notraces",[])) ])
 
-let remove_finished judges =
-  List.filter
-    (fun j ->
-       match j.Judgment.formula with
-       | True -> false
-       | _ -> true)
-    judges
-
-let simplify j =
-  match j.Judgment.formula with
-  | Exists (vs,p) when vs = [] ->
-    Judgment.set_formula (p) j
-  (* TODO add more ? *)
-  | _ -> j
-
 let auto_simp judges =
-  List.map simplify judges
-  |> remove_finished
-  |> List.map (eval_tactic_judge simpGoal)
+  judges
+  |> List.map (eval_tactic_judge simpl)
   |> List.flatten
-  |> List.map simplify
-  |> remove_finished
 
 let tsubst_of_judgment j =
   List.map

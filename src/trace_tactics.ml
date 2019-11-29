@@ -24,11 +24,12 @@ let goal_or_intro_r (judge : Judgment.t) sk fk =
 let () = T.register "left" goal_or_intro_l
 let () = T.register "right" goal_or_intro_r
 
-(* TODO currently unused: remove? *)
 let goal_true_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | True -> sk () fk
+  | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
+
+let () = T.register "true" goal_true_intro
 
 let goal_and_intro (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
@@ -39,8 +40,7 @@ let goal_and_intro (judge : Judgment.t) sk fk =
 
 let () = T.register "split" goal_and_intro
 
-(** Introduce various connectives to the right: currently,
-  * disjunction and implication (with conjunction on its left).
+(** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
   * users that "intro" does not introduce universal quantifiers. *)
 let goal_intro (judge : Judgment.t) sk fk =
@@ -51,8 +51,8 @@ let goal_intro (judge : Judgment.t) sk fk =
       | f when is_disjunction f ->
         let (f1,c1) = disjunction_to_atom_lists f in
         (List.map (fun c -> Bformula.Not c) f1,
-         List.map (fun c -> Bformula.Not c) c1)
-      , False
+         List.map (fun c -> Bformula.Not c) c1),
+        False
       | Impl(lhs,rhs) when is_conjunction lhs ->
         (conjunction_to_atom_lists lhs, rhs)
       | _ -> raise No_intro
@@ -103,27 +103,20 @@ let goal_exists_intro nu (judge : Judgment.t) sk fk =
 
 let () = T.register_subst "exists" goal_exists_intro
 
-let goal_any_intro j sk fk =
-  Tactics.orelse_list
-    [goal_and_intro;
-     goal_intro;
-     goal_forall_intro] j sk fk
-
 let () =
+  let open Prover.AST in
+  let non_branching_intro =
+    (* TODO neq *)
+    [ Abstract ("intro",[]) ;
+      Abstract ("exists",[]) ;
+      Abstract ("forall_r",[]) ;
+      Abstract ("true",[]) ]
+  in
   T.register_macro "intros"
-    Prover.AST.(
-      Repeat
-        (OrElse
-           [ Abstract ("intro",[]) ;
-             Abstract ("forall_r",[]) ]))
-
-let () =
+    (Repeat (OrElse non_branching_intro)) ;
   T.register_macro "anyintro"
-    Prover.AST.(
-      OrElse
-        [ Abstract ("split",[]) ;
-          Abstract ("intro",[]) ;
-          Abstract ("forall_r",[]) ])
+    (OrElse
+       (Abstract ("split",[]) :: non_branching_intro))
 
 (** Absurd *)
 
