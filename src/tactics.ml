@@ -138,10 +138,8 @@ module AST (M:S) = struct
 
   let pp_args fmt l =
     Fmt.list
-      ~sep:(fun ppf () -> Fmt.string ppf ", ")
-      (fun ppf a -> Fmt.string ppf " " ; pp_arg ppf a)
-      fmt
-      l
+      ~sep:(fun ppf () -> Fmt.string ppf ",@ ")
+      pp_arg fmt l
 
   let rec pp ppf = function
     | Abstract (i,args) ->

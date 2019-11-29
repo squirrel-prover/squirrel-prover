@@ -18,6 +18,9 @@ open Utils
 
 let log_constr = Log.log Log.LogConstr
 
+(* Comment this for debugging *)
+let log_constr = ignore
+
 module Utv : sig
   type uvar = Utv of var | Uind of index
 

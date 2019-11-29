@@ -118,7 +118,7 @@ let rec pp_term ppf = function
       Fmt.pf ppf "%a"
         (Utils.pp_ne_list
            "<@[<hov>%a@]>"
-           (Fmt.list ~sep:Fmt.comma pp_term)) terms
+           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_term)) terms
     else
       let f =  (Fname s,ids) in
       Fmt.pf ppf "%a%a"
@@ -215,7 +215,7 @@ let pp_asubst ppf e =
 
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_asubst) s
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_asubst) s
 
 let term_subst (s : subst) =
   List.fold_left (fun acc asubst ->

@@ -36,7 +36,7 @@ type term =
 
 let pp_action_shape = Action.pp_parsed_action
 
-let sep ppf () = Fmt.pf ppf ","
+let sep ppf () = Fmt.pf ppf ",@,"
 
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s

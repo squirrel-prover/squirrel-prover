@@ -168,10 +168,10 @@ and AST :
 
   let pp_abstract ~pp_args s args ppf =
     match s,args with
-      | "apply",[Goal_name id] ->
+      | "apply",[Goal_name id; Subst []] ->
           Fmt.pf ppf "apply %s" id
-      | "apply",Goal_name id::l ->
-          Fmt.pf ppf "apply %s to %a" id pp_args l
+      | "apply",[Goal_name id; Subst s] ->
+          Fmt.pf ppf "apply %s to %a" id pp_subst s
       | _ -> raise Not_found
 
 end)
