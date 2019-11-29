@@ -8,7 +8,7 @@ should build with versions up to 4.08, but with deprecation warnings.
 You need the following tools and libraries, to be installed e.g.
 with opam:
 ```
-$ opam install menhir fmt ocamlgraph alcotest
+$ opam install menhir fmt ocamlgraph alcotest pcre
 ```
 
 You should then be able to build the software. The default target
