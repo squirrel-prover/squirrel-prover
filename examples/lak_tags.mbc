@@ -60,7 +60,7 @@ goal wa :
 Proof.
   euf 1.
   apply tags_neq.
-  nosimpl(existsintro i3,k2).
+  nosimpl(exists i3,k2).
   split.
   assert(key(i)=key(i3)).
   admit.

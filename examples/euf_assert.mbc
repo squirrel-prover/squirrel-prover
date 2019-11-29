@@ -30,6 +30,6 @@ Proof.
     assert(fst(input@tau)=h(m,k)).
     cycle 1.
     euf 1.
-    existsintro a1.
+    exists a1.
     apply fst to h(m,k), m.
 Qed.

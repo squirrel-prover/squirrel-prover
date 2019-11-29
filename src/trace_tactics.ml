@@ -96,7 +96,7 @@ let () = T.register "forall_r" goal_forall_intro
 
 let goal_exists_intro nu (judge : Judgment.t) sk fk =
   match judge.Judgment.formula with
-  | Exists (vs,f) ->
+  | Exists (vs,f) when List.length nu = List.length vs ->
     let new_formula = subst_formula nu f in
     sk [Judgment.set_formula new_formula judge] fk
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
