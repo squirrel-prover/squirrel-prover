@@ -190,7 +190,7 @@ Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\
 
 
 \begin{definition}
-  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\sigma$ satisfies $\phi$. We define inductively $\models$, as:
+  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$. We define inductively $\models$ as:
   \begin{itemize}
   \item $A,\I,\M,\sigma \models t=t'$ if $\M, \sigma \models \EQ(t,t') \sim \true$,
 
@@ -226,31 +226,32 @@ An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a li
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
 Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node, $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
-\end{definition}
+\end{definition}.
 
-Each action depending on indices may be instantiated an arbitrary number of time using distincts indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
-the trace with some defined indices, all its ancestors must have been executed previously in the trace.
-
-We may denote a protocol step $s(\ov{id})$ to give explicitely its set of indexes.
+We may denote an acrion $s(\ov{id})$ to give explicitely its set of indexes.
 For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1; (s_2 \| s_3(id))$ represents the protocol where the attacker can first execute $s_1$, and can then execute in any order $s_2$, and an arbitrary number of occurences of $s_3(id)$.
 
-There exists a natural translation from applied pi-calculus to this notion of protocol step, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
+There exists a natural translation from applied pi-calculus to this notion of actions, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
 
 \subsection{Symbolic protocol execution}
 
 Protocols can be executed according to the odering constraints on protocol steps defined by the protocol tree.
+Each action depending on indices may be instantiated an arbitrary number of time using distinct indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
+the trace with some defined indices, all its ancestors must have been executed previously in the trace.
+
+
 \begin{definition}
   Given a protocol $P$, a symbolic trace of of $P$ is given, for any $n\in\mathbb{N}$, by a sequence of actions $a_0 (\ov{id}_0),\dots,a_n (\ov{id}_n)$, such that for all $1 \leq i,j \leq n$,
   \begin{itemize}
     \item each action is an instantiation of a protocol action and indices are uniformly instantiated, i.e, there exists $\sigma : \I \mapsto \I$, such that $a_i (\sigma (\ov{id})) \in\Actions(P)$,
     \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i \neq\ov{id}_j$,
-    \item if an action must happen before another one, it is respected in the trace, i.e
+    \item if an action must happen before another one, it is reflected in the trace, i.e
       if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
     \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$,
       \item the actions only depends on previous actions, i.e, for any $\out@a$ (resp. $\inp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
       \end{itemize}
 \end{definition}
-Intuitively, a symbolic trace represent a possible scheduling of the protocol, when abstracting all the inputs.
+Intuitively, a symbolic trace represent a possible scheduling of the protocol, when abstracting all the inputs. Some symbolic trace may not correspond to any actual execution of the protocol, if for instance an action require a condition which is never met.
 
 Notice that the number of symbolic traces is infinite as soon as there exists an accessible action with a non nil set of indices.
 
@@ -279,7 +280,7 @@ A trace of $P$ then corresponds to an actual possible evaluation of $P$. More st
 \subsection{Semantics of quantified formulas}
 
 \begin{definition}
-  Given a quantified formula $\phi$ and a trace $(A=a_0,\dots,a_n,\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ and $\sigma$ the instantiation of $A$, we define $\models$ by induction as:
+  Given a quantified formula $\phi$ and a trace $(A=(a_0,\dots,a_n),\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ and $\sigma$ the instantiation of $A$, we define $\models$ by induction as:
   \begin{itemize}
   \item $A,\M \models \forall x:\idx.\ \phi$ if $A,\M, \I,\sigma \models \bigwedge_{i\in \I} \phi\replace{x}{i}$
 
@@ -292,7 +293,7 @@ We say that $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, \M \models \p
 
 \end{definition}
 
-This semantics does match the intuition, for all possible executions of the protocol, this execution satisfies the formula.
+This semantics does match the intuition: for all possible executions of the protocol and for any security parameter, the execution satisfies the formula.
 
 
 \newpage
