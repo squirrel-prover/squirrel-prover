@@ -183,27 +183,28 @@ We start by giving the semantic of formulas restricted to propositional formulas
 
 We will execute protocols according to the \BC model. This means that any message will be interpreted as a Polynomial Time Turing Machine which given infinite random tapes and a security parameter outputs a bitstring. We denote $D$ the set of such Turing Machines, which we call messages.
 
-\charlie{insert here definition of a computational model $\M$ according to BC, which yelds an interpretation of terms $\sem{\dots}_\M^\eta$.}
+\charlie{insert here definition of a computational model $\M$ according to BC, which yelds an interpretation of terms $\sem{\dots}_\M^\eta$. Only honnest function symbols need to be interpreted for the moment.}
 
 Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\minp@a \mid a \in \Actions \} \mapsto D$, we define the evaluation of terms inside a formula as $\sem{t}_\M^{\eta,\sigma} := \sem{t\sigma}_\M^\eta$.
+\charlie{define here the \BC logic, which allows to test if $\sigma \models \EQ(t,t') \sim \true$}
 
 
 \begin{definition}
-  Given a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\sigma \models \phi$ the fact that $A,\I,\sigma$ satisfies $\phi$. We define inductively $\models$, as:
+  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\sigma$ satisfies $\phi$. We define inductively $\models$, as:
   \begin{itemize}
-  \item $A,\I,\sigma \models t=t'$ if for all $\eta$, $\sem{t}_\M^{\eta,\sigma}=\sem{t'}_\M^{\eta,\sigma}$,
+  \item $A,\I,\M,\sigma \models t=t'$ if $\M, \sigma \models \EQ(t,t') \sim \true$,
 
-  \item $A,\I, \sigma \models \tau = \tau' $ if $\tau \in \Timestamps$ and $\tau = \tau'$,
+  \item $A,\I,\M, \sigma \models \tau = \tau' $ if $\tau \in \Timestamps$ and $\tau = \tau'$,
 
-  \item $A,\I, \sigma \models \tau \leq \tau' $ if $\tau,\tau' \in \Timestamps$ and $\tau \leq \tau'$,
+  \item $A,\I,\M, \sigma \models \tau \leq \tau' $ if $\tau,\tau' \in \Timestamps$ and $\tau \leq \tau'$,
 
-  \item $A,\I, \sigma \models \happens(a)$ if $a \in A$,
-  \item $A,\I, \sigma \models a=a'$ if $a \in A$ and $a=a'$,
-  \item $A,\I, \sigma \models i=i'$ if $i \in I$ and  $i=i'$,
+  \item $A,\I,\M, \sigma \models \happens(a)$ if $a \in A$,
+  \item $A,\I,\M, \sigma \models a=a'$ if $a \in A$ and $a=a'$,
+  \item $A,\I,\M, \sigma \models i=i'$ if $i \in I$ and  $i=i'$,
 
   \end{itemize}
 
-  We inductively defines the evalutation of the logical connectors in the natural way.
+  We inductively define the evalutation of the logical connectors in the natural way.
 \end{definition}
 
 
@@ -221,7 +222,7 @@ Some actions may be available to the attacker in parallel, or one
 after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
 
 \begin{definition}
-An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms, $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
+An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms (called the condition of $s$), $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
 Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node, $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
@@ -247,21 +248,51 @@ Protocols can be executed according to the odering constraints on protocol steps
       if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
     \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$,
       \item the actions only depends on previous actions, i.e, for any $\out@a$ (resp. $\inp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
-\end{itemize}
+      \end{itemize}
 \end{definition}
+Intuitively, a symbolic trace represent a possible scheduling of the protocol, when abstracting all the inputs.
+
+Notice that the number of symbolic traces is infinite as soon as there exists an accessible action with a non nil set of indices.
 
 
 \subsection{Concrete protocol execution}
-
+As in the \BC model, we models arbitrary messages produced by the attacker using free function symbols $\{g_i\}_{i \in \mathbb{N}} \in \G$, and extend the definition of a computational model $\M$ so that it contains Turing machines for each attacker symbol.
 
 \begin{definition}
-
-
-We denote $\tr(P)$ the set of traces of $P$.
+  Given by a symbolic trace $A = a_0,\dots,a_n$ of $P$, we define inductively $\sigma$ the instantiation of the inputs and ouputs of $A$ such that:
+  \begin{itemize}
+  \item $\minp@a_i\sigma := g_i( \mout@a_0\sigma,\dots,\mout@a_{i-1}\sigma  ) $
+  \item $\mout@a_i\sigma := o_0\sigma, \dots, o_k\sigma$, where $o_0,\dots,o_k$ is the set of ouputs of  $a_i$,
+    \item $s@a_i := u\sigma$, where $s$ is a state and $s \mapsto u$ is the latest update corresponding to $s$ appearing inside the actions before $a_i$.
+\end{itemize}
 \end{definition}
-Notice that $\tr(P)$ is infinite as soon as there exists an accessible action with a non nil set of indices.
+Note that $\sigma$ can indeed be defined, as by definition of a symbolic traces, the outputs of the action $a_i$ only depends on input values of previous actions.
 
+\begin{definition}
+  A (concrete) trace of $P$ is given by a symbolic trace $A = a_0,\dots,a_n$ of $P$ along with a computational model $\M$, such that with $\sigma$ the instantiation of $A$, for all $\eta$, we have that $A,\I,\sigma \models \bigwedge_{1\leq i \leq n} \phi_i$, where $\phi_i$ is the condition of $a_i$.
 
+  We denote $\tr(P)$ the set of traces of $P$.
+\end{definition}
+
+A trace of $P$ then corresponds to an actual possible evaluation of $P$. More strongly, $\tr(P)$ represents the set of all possible executions of the protocol $P$ for all possible probabilistic polynomial time attackers.
+
+\subsection{Semantics of quantified formulas}
+
+\begin{definition}
+  Given a quantified formula $\phi$ and a trace $(A=a_0,\dots,a_n,\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ and $\sigma$ the instantiation of $A$, we define $\models$ by induction as:
+  \begin{itemize}
+  \item $A,\M \models \forall x:\idx.\ \phi$ if $A,\M, \I,\sigma \models \bigwedge_{i\in \I} \phi\replace{x}{i}$
+
+  \item $A,\M \models \forall x:\timestamp.\ \phi$ if $A,\M, \I,\sigma \models \bigwedge_{1 \leq \tau \leq n} \phi\replace{x}{\tau}$
+  \item $A,\M \models \forall x:\mess.\ t= t' $ if $\M, \sigma \models \forall x:\mess, \EQ(t,t') \sim \true$
+  \item $A,\M \models \forall x:\bool.\ t= t' $ if $\M, \sigma \models \forall x:\bool, \EQ(t,t') \sim \true$
+  \end{itemize}
+
+We say that $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, \M \models \phi$.
+
+\end{definition}
+
+This semantics does match the intuition, for all possible executions of the protocol, this execution satisfies the formula.
 
 
 \newpage
