@@ -45,6 +45,8 @@
 \newtheorem*{lemma*}{Lemma}
 \newtheorem*{proposition*}{Proposition}
 
+
+
 \newtheorem{definition}{Definition}
 \newtheorem{proposition}{Proposition}
 \newtheorem{theorem}{Theorem}
@@ -77,8 +79,8 @@ pairs,\dots). $\N$ denotes an
 infinite set of names (used to model the randomness used in a
 protocol), and $\I$ denotes an infinite set of indexes (used to talk
 about multiple copies of the same agent). For
-each name $n\in \N$ and sequence of indices $\ov{i} \in \I$,
-$n(\ov{i})$ refers to a fresh unique name in $\N$. We denotes $\X$ an
+each name $n\in \N$ and sequence of indices $\ov{id} \in \I$,
+$n(\ov{id})$ refers to a fresh unique name in $\N$. We denotes $\X$ an
 infinite set of identifiers, used for variables.
 
 We finally denote $\States$ a set of identifiers used to model
@@ -93,11 +95,11 @@ identifiers for timestamps in a trace.
 The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
 
 \begin{figure}
-$$
+\[
 \begin{array}[t]{ccc}
     \begin{array}{rcl}
     f \in \F & & \text{function symbol}\\
-    i \in \I  & & \text{index}\\
+    id \in \I  & & \text{index}\\
 
     x \in \X & & \text{variable}\\
     \end{array}
@@ -110,20 +112,18 @@ $$
     \begin{array}{rcll}
 
     n &:=& n \in \N & \text{name}\\
-    &\mid& n(i_1,\dots,i_n) & \text{name copy} \\
+    &\mid& n(id_1,\dots,id_n) & \text{name copy} \\
     \\
 
     s&:=& s \in \States & \text{state}\\
-    &\mid& s(i_1,\dots,i_n) & \text{state copy}\\
+    &\mid& s(id_1,\dots,id_n) & \text{state copy}\\
 
     \end{array}
 \end{array}
-$$
+\]
 
-
-
-$$
-\begin{array}{c}
+\[
+  \begin{array}{c}
      \begin{array}{rcll}
     \T &  := & \mess \mid \timestamp \mid \idx \mid \bool & \text{
         type of variables} \\
@@ -160,7 +160,7 @@ $$
     \end{array}
 
 \end{array}
-    $$
+    \]
     \caption{Syntax of first order formulas.}\label{fig:syntax}
 \end{figure}
 
@@ -171,6 +171,8 @@ $\minp@\tau$ models the output and input of the protocol at this
 point in the trace. We will only consider well typed formulas, i.e
 formulas where all variables (which are typed) are used accordingly
 to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
+
+
 
 
 Timestamps are ordered, and it is possible to consider the successor
@@ -186,21 +188,37 @@ Some actions may be available to the attacker in parallel, or one
 after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
 
 \begin{definition}
-A protocol step $s$ is a tuple $(I,\phi,U,o)$, where $I \subset \I$ is a list of indices variable, $\phi$ is a propositional formula, $U$ is a set of states updates (a mapping state symbols to terms), and $o$ is a list of terms.
+An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula, $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of terms.
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
-A protocol is a tree labelled by protocol steps (nodes of arity one), $\|$ (unfixed arity) and $\oplus$ (unfixed arity), along with a mapping from $\Actions$ to the nodes. When going down inside the protocol, the indices set of the steps can only grow.
+Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node, $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
 \end{definition}
 
-Each protocol step may be instantiated an arbitrary number of time using distincts indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
+Each action depending on indices may be instantiated an arbitrary number of time using distincts indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
 the trace with some defined indices, all its ancestors must have been executed previously in the trace.
 
-We may denote a protocol step $s(\ov{i})$ to give explicitely its set of indexes.
-For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1; (s_2 \| s_3(i))$ represents the protocol where the attacker can first execute $s_1$, and can then execute in any order $s_2$, and an arbitrary number of occurences of $s_3(i)$.
+We may denote a protocol step $s(\ov{id})$ to give explicitely its set of indexes.
+For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1; (s_2 \| s_3(id))$ represents the protocol where the attacker can first execute $s_1$, and can then execute in any order $s_2$, and an arbitrary number of occurences of $s_3(id)$.
 
 There exists a natural translation from applied pi-calculus to this notion of protocol step, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
 
-\subsection{Semantics}
+\subsection{Protocol execution}
+
+Protocols can be executed according to the odering constraints on protocol steps defined by the protocol tree.
+\begin{definition}
+  Given a protocol $P$, a symbolic trace of of $P$ is given, for any $n\in\mathbb{N}$, by a sequence of actions $a_0 (\ov{id}_0),\dots,a_n (\ov{id}_n)$, such that for all $1 \leq i,j \leq n$,
+  \begin{itemize}
+    \item each action is an instantiation of a protocol action and indices are uniformly instantiated, i.e, there exists $\sigma : \I \mapsto \I$, such that $a_i (\sigma (\ov{id})) \in\Actions(P)$,
+    \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i \neq\ov{id}_j$,
+    \item if an action must happen before another one, it is respected in the trace, i.e
+      if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
+\item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$.
+\end{itemize}
+
+We denote $\tr(P)$ the set of traces of $P$.
+\end{definition}
+Notice that $\tr(P)$ is infinite as soon as there exists an accessible action with a non nil set of indices.
+
 
 
 
@@ -509,6 +527,8 @@ where:
   \]
 
 \end{itemize}
+
+
 \end{document}
 
 %%% Local Variables:
