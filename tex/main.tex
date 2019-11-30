@@ -178,6 +178,39 @@ to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
 Timestamps are ordered, and it is possible to consider the successor
 of a timestamp.  Terms and indices are not ordered.
 
+\subsection{Semantic for propositional formulas}
+We start by giving the semantic of formulas restricted to propositional formulas, i.e formulas without quantifiers. Intuitively, those are the formulas which can be used as conditions inside a protocol.
+
+We will execute protocols according to the \BC model. This means that any message will be interpreted as a Polynomial Time Turing Machine which given infinite random tapes and a security parameter outputs a bitstring. We denote $D$ the set of such Turing Machines, which we call messages.
+
+\charlie{insert here definition of a computational model $\M$ according to BC, which yelds an interpretation of terms $\sem{\dots}_\M^\eta$.}
+
+Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\minp@a \mid a \in \Actions \} \mapsto D$, we define the evaluation of terms inside a formula as $\sem{t}_\M^{\eta,\sigma} := \sem{t\sigma}_\M^\eta$.
+
+
+\begin{definition}
+  Given a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\sigma \models \phi$ the fact that $A,\I,\sigma$ satisfies $\phi$. We define inductively $\models$, as:
+  \begin{itemize}
+  \item $A,\I,\sigma \models t=t'$ if for all $\eta$, $\sem{t}_\M^{\eta,\sigma}=\sem{t'}_\M^{\eta,\sigma}$,
+
+  \item $A,\I, \sigma \models \tau = \tau' $ if $\tau \in \Timestamps$ and $\tau = \tau'$,
+
+  \item $A,\I, \sigma \models \tau \leq \tau' $ if $\tau,\tau' \in \Timestamps$ and $\tau \leq \tau'$,
+
+  \item $A,\I, \sigma \models \happens(a)$ if $a \in A$,
+  \item $A,\I, \sigma \models a=a'$ if $a \in A$ and $a=a'$,
+  \item $A,\I, \sigma \models i=i'$ if $i \in I$ and  $i=i'$,
+
+  \end{itemize}
+
+  We inductively defines the evalutation of the logical connectors in the natural way.
+\end{definition}
+
+
+
+
+
+
 \subsection{Protocols definitions}
 We  model protocols as a set of possible actions available to the
 attacker. An action essentially models a step of the protocol, where
@@ -188,7 +221,7 @@ Some actions may be available to the attacker in parallel, or one
 after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
 
 \begin{definition}
-An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula, $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of terms.
+An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms, $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
 Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node, $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
@@ -202,7 +235,7 @@ For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1;
 
 There exists a natural translation from applied pi-calculus to this notion of protocol step, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
 
-\subsection{Protocol execution}
+\subsection{Symbolic protocol execution}
 
 Protocols can be executed according to the odering constraints on protocol steps defined by the protocol tree.
 \begin{definition}
@@ -212,8 +245,17 @@ Protocols can be executed according to the odering constraints on protocol steps
     \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i \neq\ov{id}_j$,
     \item if an action must happen before another one, it is respected in the trace, i.e
       if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
-\item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$.
+    \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$,
+      \item the actions only depends on previous actions, i.e, for any $\out@a$ (resp. $\inp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
 \end{itemize}
+\end{definition}
+
+
+\subsection{Concrete protocol execution}
+
+
+\begin{definition}
+
 
 We denote $\tr(P)$ the set of traces of $P$.
 \end{definition}
