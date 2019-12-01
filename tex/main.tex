@@ -146,7 +146,7 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
   over timestamps } \\
   &\mid & i=i'  &  \text{atomic proposition
     over index } \\
-  &\mid & a= a'\mid  \happens(a)  &  \text{atomic proposition
+  &\mid & a= a'\mid a@\tau \mid \happens(a)  &  \text{atomic proposition
     over actions } \\
     \end{array}
 \\
@@ -199,6 +199,7 @@ Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\
   \item $A,\I,\M, \sigma \models \tau \leq \tau' $ if $\tau,\tau' \in \Timestamps$ and $\tau \leq \tau'$,
 
   \item $A,\I,\M, \sigma \models \happens(a)$ if $a \in A$,
+  \item $A,\I,\M, \sigma \models a@\tau$ if $a_\tau = a$,
   \item $A,\I,\M, \sigma \models a=a'$ if $a \in A$ and $a=a'$,
   \item $A,\I,\M, \sigma \models i=i'$ if $i \in I$ and  $i=i'$,
 
@@ -225,7 +226,7 @@ after the other. A protocol will then be a tree, each node labelled by an action
 An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms (called the condition of $s$), $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
-Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node, $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
+Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node (including itself), $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
 \end{definition}.
 
 We may denote an acrion $s(\ov{id})$ to give explicitely its set of indexes.
@@ -247,7 +248,7 @@ the trace with some defined indices, all its ancestors must have been executed p
     \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i \neq\ov{id}_j$,
     \item if an action must happen before another one, it is reflected in the trace, i.e
       if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
-    \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(a_i(\sigma(\ov{id}_i)))$,
+    \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(\bro (a_i(\sigma(\ov{id}_i))))$,
       \item the actions only depends on previous actions, i.e, for any $\out@a$ (resp. $\inp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
       \end{itemize}
 \end{definition}
@@ -293,7 +294,46 @@ We say that $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, \M \models \p
 
 \end{definition}
 
-This semantics does match the intuition: for all possible executions of the protocol and for any security parameter, the execution satisfies the formula.
+This semantics does match the intuition: for all possible executions of the protocol and for any
+
+security parameter, the execution satisfies the formula.
+
+
+\section{The MetaBC-logic}
+
+Now that the semantics of the formula are defined given a specific protocol, we can define a logic allowing to prove such formulas. We will reason using classical sequent calculs, extended with some axioms obtained form the constraints based on the protocol, or computational axioms made about the primitives. We will use implicitely the axioms about equality.
+
+Given a protocol $P$, we define a set of path constraints axioms $C_P$ with the formulas:
+\begin{itemize}
+\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$, when $a'(id_1,\dots,id_k) = \pre (a(i_1,\dots,i_n))$,
+  \[\forall i_1, \dots, i_n:\idx, \tau:\timestamp, a(i_1,\dots,i_n)@\tau \Rightarrow \exists \tau', \tau'< \tau \wedge a'(i_1,\dots,i_k)@\tau' \qquad (i) \]
+\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$ such that $\pre (a(id_1,\dots,id_n)) =
+  \oplus$, for any $a'(id_1,\dots,id_k,id'_1,\dots, id'_l) \in \suc^*( \bro (a(id_1,\dots,id_n)))$,
+  \[\forall i_1, \dots, i_n, i'_1,\dots, i'_l:\idx, \tau,\tau':\timestamp, a(i_1,\dots,i_n)@\tau \wedge a'(id_1,\dots,id_k,id'_1,\dots, id'_l)@\tau' \Rightarrow \false   \qquad (ii) \]
+\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$,
+  \[\forall i_1, \dots, i_n, :\idx, \tau:\timestamp, a(i_1,\dots,i_n)@\tau \wedge a(id_1,\dots,id_n)@\tau' \Rightarrow \tau=\tau'  \qquad (iii)\]
+\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$ with output term $o(id_1,\dots,id_n)$ and condition $\phi(id_1,\dots,id_n)$,
+  \[\forall i_1, \dots, i_n, :\idx, \tau,\tau':\timestamp, a(i_1,\dots,i_n)@\tau \Rightarrow \mout@\tau = o(i_1,\dots,i_n) \wedge \phi(id_1,\dots,id_n)   \qquad (iv)\]
+\end{itemize}
+
+We have that $ P\models C_P$ by definitions of the traces of $P$.Intuitively $(i)$ captures the fact that an action can only happen if the previous actions in the protocol have happened before, $(ii)$ captures the fact that the protocol sometimes enforce a choice between two actions and both cannot then be in a trace, $(iii)$ captures the uniqueness of an action, and $(iv)$ simply enforces the equality given by an action.
+
+\charlie{need to define the axiom for the states, but I'm lazy right now}
+
+
+We also consider a set of computational sounds axioms $A_P$, which is based on classical axioms from the \BC model, which may contain EQ-INDEP, EUF-CMA, PRF, \dots.
+
+Finally, given a protocol $P$, we obtain a set of axioms $C_P$, and we may choose a set of computationaly sound axioms $A_P$.
+Then, we can prove statements of the form $ P \models \phi$, by reasoning using the rules of the sequence calculs, and proving that $A_P,C_P \vdash \phi$.
+
+\subsection{The tool}
+
+We develop a tool allowing to performs proofs as outlined before. It implements tactics that are either basic rules of the sequent calculus, or more complex deductions based on some specifix computational axiom.
+
+
+
+
+
 
 
 \newpage
