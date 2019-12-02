@@ -71,7 +71,9 @@
 
 \maketitle
 
-\section{A Logic for protocols}
+
+We first define a first order logic which allows to reason about abstract sequence of possible actions. We will then use this logic to reason about protocols, where sequences of actions will correspond to traces of a protocol. According to this aim, the terms used to model message will contain function symbols and macros allowing to symbollicaly model the inputs and outputs performed by the protocol at some point in the trace, or symbol allowing to model states. Indices will be used to instantiate multiple instances of the same term.
+\section{A Logic for abstract sequence of actions}
 
 \subsection{Syntax of the logic}
 We denote $\F$ a set of function symbols (used to model encryptions,
@@ -85,14 +87,15 @@ infinite set of identifiers, used for variables.
 
 We finally denote $\States$ a set of identifiers used to model
 mutable
-states, which can also be parametrized by sequences of indices,
+states, which can also be parametrized by sequences of indices, and
 $\Actions$ a set of identifiers used to model actions
 (which
 will be used
-to model an atomic step of a protocol), and $\Timestamps$ a set of
-identifiers for timestamps in a trace.
+to model an atomic step of a protocol).
 
-The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
+If we are given a sequence of unique actions, it defines what we call a timestamp, which is essentially an action and its position inside the sequence. Timestamps are then comlpetely ordered, and it is possible to consider the successor or the predecessor of an action. Terms and indices are not ordered.
+
+The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
 
 \begin{figure}
 \[
@@ -104,8 +107,7 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
     x \in \X & & \text{variable}\\
     \end{array}
 &     \begin{array}{rcll}
-\tau &:=& \tau \in \Timestamps  & \text{timestamp}\\
-& \mid & a \in \Actions & \text{action} \\
+\tau &:=& a \in \Actions & \text{action} \\
 & \mid & \suc(\tau) & \text{action} \\
 \end{array}
    &
@@ -168,60 +170,57 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
 
 
 Terms $t$ may represent messages of a protocol, where given a trace,
-i.e a sequence of actions or timestamps, $\mout@\tau$ and
+i.e a sequence of actions, $\mout@\tau$ and
 $\minp@\tau$ models the output and input of the protocol at this
 point in the trace. We will only consider well typed formulas, i.e
 formulas where all variables (which are typed) are used accordingly
 to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
 
-
-
-
-Timestamps are ordered, and it is possible to consider the successor
-of a timestamp.  Terms and indices are not ordered.
-
 \subsection{Semantics}
-We start by giving the semantic of formulas restricted to propositional formulas, i.e formulas without quantifiers. Intuitively, those are the formulas which can be used as conditions inside a protocol.
 
 We will execute protocols according to the \BC model. This means that any message will be interpreted as a Polynomial Time Turing Machine which given infinite random tapes and a security parameter outputs a bitstring. We denote $D$ the set of such Turing Machines, which we call messages.
 
 \charlie{insert here definition of a computational model $\M$ according to BC, which yelds an interpretation of terms $\sem{\dots}_\M^\eta$. Only honnest function symbols need to be interpreted for the moment.}
 
-Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\minp@a \mid a \in \Actions \} \mapsto D$, we define the evaluation of terms inside a formula as $\sem{t}_\M^{\eta,\sigma} := \sem{t\sigma}_\M^\eta$.
-\charlie{define here the \BC logic, which allows to test if $\sigma \models \EQ(t,t') \sim \true$}
+
+\charlie{define here the \BC logic, which allows to test if $\M,\sigma \models_\BC \phi \sim \true$}
+
+Our goal is to interpret formulas inside the \BC logic, to capture the fact that the formula holds with overwhelming probability for a given sequence of actions. However, we must take care of the quantifications over the indices and the timestamps. The main idea is that given an explicit sequence of actions, the set of possible timestamps becomes fixed, and we can capture a forall using a conjonction over all the timestamps of the sequence. If we fix the set of indices, we can do the same transformation. Remark that the quantifications over the messages do not need to be transformed, as they can be handled inside the \BC logic. However, they must only appear at top level, else it is difficult to provide a precise semantics modelling the expected behaviour.
+
+\begin{definition}
+  Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions, $\I$ a finite set of indices, and $\phi$ a first order formula such that all its terms are built over indices in $\I$,
+  We define inductively a transformation of the formulas $\phi^{\I,\A}$ as :
+  \begin{itemize}
+ \item $ (\forall x:\idx.\ \phi) ^{\I,A} :=  \bigwedge_{i\in \I} (\phi\replace{x}{i})^{\I,A}$
+ \item $ (\forall x:\timestamp.\ \phi)^{\I,A} := \bigwedge_{1 \leq i \leq n} (\phi\replace{x}{a_i})^{\I,A}$
+
+  \end{itemize}
+We propagate the transformation over all other quantifications and logical connectors homorphically.
+\end{definition}
+
+Once this transformation is performed over formulas, they can be naturally interpreted inside the BC model, if we consider in the computational model that timestamps form a completely ordered set and that the index set form a finite set of identifiers equipped with equality.
+
+\begin{definition}
+Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions and $\I$ a finite set of indices. We denote $\M_{\I,A}$ the computational model $\M$ extended with the interpretation of $\I$ as a finite set of identifiers equipped with equality and the intepretation of $\{a_i | 1 \leq i \leq n\}$ as a finite set, ordered such that $a_i \leq a_j \Leftrightarrow i\leq j$.
+\end{definition}
+
+
+We also need to interpret inside the \BC model the free variables and the inputs and outputs functions symbols. Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\minp@a \mid a \in \Actions \} \mapsto D$, we can consider the evaluation of terms inside a formula as $\sem{t\sigma}_\M^\eta$. Essentialy, this means that if we are given a valuation of the free variables and of the outputs and inputs symbols for each action, we can evaluate all the terms appearing in the formula. Given a protocol, we will later on interpret the outputs and the inputs with the corresponding valus.
 
 
 \begin{definition}
-  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a finite set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$.
-  We first define inductively a transformation of the formulas $\phi^{\I,\A}$ as :
+Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions, $\I$ a finite set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a first order formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$.
+
+
+  We denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$, defined by
   \begin{itemize}
-  \item $ (\tau = \tau')^{\I,A} := \true $ if $\tau \in A$ and $\tau = \tau'$, else $\false$,
-
-  \item $( \tau \leq \tau' )^{\I,A} := \true$ if $\tau,\tau' \in A$ and $\tau \leq \tau'$, else $\false$,
-
-  \item $(\happens(\tau))^{\I,A} := \true$ if $\tau \in A$, else $\false$,
-  \item $(i=i')^{\I,A} := \true$ if $i \in I$ and  $i=i'$, else $\false$,
-
- \item $ (\forall x:\idx.\ \phi) ^{\I,A} :=  \bigwedge_{i\in \I} (\phi\replace{x}{i})^{\I,A}$
-
-  \item $ (\forall x:\timestamp.\ \phi)^{\I,A} := \bigwedge_{1 \leq \tau \leq n} (\phi\replace{x}{\tau})^{\I,A}$
-
+  \item $A,\I,\M,\sigma \models \forall x_1,\dots,x_n : \mess.\ \phi $ if $\M_{\I,A}, \sigma \models_\BC \forall x_1,\dots,x_n : \mess. \phi^{\I,A} \sim \true$,
   \end{itemize}
-
-    We then define $\models$ as:
-  \begin{itemize}
-  \item $A,\I,\M,\sigma \models \forall x_1,\dots,x_n : \mess.\ \phi $ if $\M, \sigma \models \forall x_1,\dots,x_n : \mess. :\phi^{\I,A} \sim \true$,
-
-
-  \end{itemize}
-
-
-  We inductively define the evalutation of the logical connectors in the natural way.
 \end{definition}
 
 
 
-
+\section{Protocols and trace logic}
 
 
 \subsection{Protocols definitions}
@@ -234,7 +233,7 @@ Some actions may be available to the attacker in parallel, or one
 after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
 
 \begin{definition}
-An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in \I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms (called the condition of $s$), $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
+An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms (called the condition of $s$), $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
 All indices appearing in $\phi,U,o$ must appear in $I$.
 
 Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node (including itself), $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
@@ -269,10 +268,12 @@ Notice that the number of symbolic traces is infinite as soon as there exists an
 
 
 \subsection{Concrete protocol execution}
-As in the \BC model, we models arbitrary messages produced by the attacker using free function symbols $\{g_i\}_{i \in \mathbb{N}} \in \G$, and extend the definition of a computational model $\M$ so that it contains Turing machines for each attacker symbol.
+As in the \BC model, we models arbitrary messages produced by the attacker using free function symbols $\G = \{g_i | i \in \mathbb{N}\} $, and extend the definition of a computational model $\M$ so that it contains Turing Machines for each attacker symbol.
+
+Given a symbolic trace of the protocol, we can define the substitution which maps inputs, outputs and states to terms using the attacker function symbols, with the required attacker knowledge at each step.
 
 \begin{definition}
-  Given by a symbolic trace $A = a_0,\dots,a_n$ of $P$, we define inductively $\sigma$ the instantiation of the inputs and ouputs of $A$ such that:
+  Given a symbolic trace $A = a_0,\dots,a_n$ of $P$, we define inductively $\sigma$ the instantiation of the inputs and ouputs of $A$ such that:
   \begin{itemize}
   \item $\minp@a_i\sigma := g_i( \mout@a_0\sigma,\dots,\mout@a_{i-1}\sigma  ) $
   \item $\mout@a_i\sigma := o_0\sigma, \dots, o_k\sigma$, where $o_0,\dots,o_k$ is the set of ouputs of  $a_i$,
@@ -282,28 +283,27 @@ As in the \BC model, we models arbitrary messages produced by the attacker using
 Note that $\sigma$ can indeed be defined, as by definition of a symbolic traces, the outputs of the action $a_i$ only depends on input values of previous actions.
 
 \begin{definition}
-  A (concrete) trace of $P$ is given by a symbolic trace $A = a_0,\dots,a_n$ of $P$ along with a computational model $\M$, such that with $\sigma$ the instantiation of $A$, for all $\eta$, we have that $A,\I,\sigma \models \bigwedge_{1\leq i \leq n} \phi_i$, where $\phi_i$ is the condition of $a_i$.
+  A (concrete) trace of $P$ is given by a symbolic trace $A = a_0,\dots,a_n$ of $P$ along with a computational model $\M$, such that with $\sigma$ the instantiation of $A$, we have that $A,\I,\M,\sigma \models \bigwedge_{1\leq i \leq n} \phi_i$, where $\phi_i$ is the condition of $a_i$.
 
   We denote $\tr(P)$ the set of traces of $P$.
 \end{definition}
 
 A trace of $P$ then corresponds to an actual possible evaluation of $P$. More strongly, $\tr(P)$ represents the set of all possible executions of the protocol $P$ for all possible probabilistic polynomial time attackers.
 
-\subsection{Semantics of quantified formulas}
+\subsection{Semantics of formulas for protocols}
 
 \begin{definition}
-  Given a quantified formula $\phi$ and a trace $(A=(a_0,\dots,a_n),\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ extended with a set of size the number of indices variables in $I$, and $\sigma$ the instantiation of $A$, we define $\models$ as:
-  \begin{itemize}
-  \item $A,\M \models \phi$ if $A,\M, I,\sigma \models \phi$
-  \end{itemize}
+  Let $\phi$ be a formula and $(A=(a_0,\dots,a_n),\M)$ a trace of $P$. If we denote $I(A,\phi)$ the set of indices appearing in $A$ extended with fresh indices for each quantification over indices in $\phi$ , and $\sigma$ the instantiation of $A$,
 
-We say that $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, \M \models \phi$.
+we say that $P$ satisfies $\phi$, denoted $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, I(A,\phi), \M, \sigma \models \phi$.
 
 \end{definition}
 
 This semantics does match the intuition: for all possible executions of the protocol and for any
 
 security parameter, the execution satisfies the formula.
+
+$I(A,\phi)$ must depend both on the formula and the trace, so that the formula $\exists i:\idx, i=i$ is true, even when considering the empty protocol.
 
 
 \section{The MetaBC-logic}
