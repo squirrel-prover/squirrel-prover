@@ -125,8 +125,10 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
 \[
   \begin{array}{c}
      \begin{array}{rcll}
-    \T &  := & \mess \mid \timestamp \mid \idx \mid \bool & \text{
-        type of variables} \\
+    \T &  := & \timestamp \mid \idx & \text{
+        type of trace variables} \\
+    \T' &  := & \mess \mid \bool & \text{
+        type of term variables} \\
 
       \\
 
@@ -142,12 +144,10 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
    \begin{array}{rcll}
    \atom & := & t=t'
  & \text{atomic proposition over terms } \\
-  &\mid & \tau=\tau' \mid \tau \leq \tau' &  \text{atomic proposition
+  &\mid & \tau=\tau' \mid \tau \leq \tau' \mid \happens(\tau) &  \text{atomic proposition
   over timestamps } \\
   &\mid & i=i'  &  \text{atomic proposition
     over index } \\
-  &\mid & a= a'\mid a@\tau \mid \happens(a)  &  \text{atomic proposition
-    over actions } \\
     \end{array}
 \\
 \\
@@ -155,6 +155,8 @@ The syntax of the Meta-BC logic is then given in \cref{fig:syntax}.
     \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi
     \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
     \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom &
+\\
+    \psi & ::= &  \phi \mid \forall x : \T'. \phi \mid \exists x : \T'. \phi &
     \text{
     first order formula} \\
     \end{array}
@@ -178,7 +180,7 @@ to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
 Timestamps are ordered, and it is possible to consider the successor
 of a timestamp.  Terms and indices are not ordered.
 
-\subsection{Semantic for propositional formulas}
+\subsection{Semantics}
 We start by giving the semantic of formulas restricted to propositional formulas, i.e formulas without quantifiers. Intuitively, those are the formulas which can be used as conditions inside a protocol.
 
 We will execute protocols according to the \BC model. This means that any message will be interpreted as a Polynomial Time Turing Machine which given infinite random tapes and a security parameter outputs a bitstring. We denote $D$ the set of such Turing Machines, which we call messages.
@@ -190,20 +192,29 @@ Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\
 
 
 \begin{definition}
-  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$. We define inductively $\models$ as:
+  Given a computational model $\M$, a sequence of actions $A = a_1,\dots, a_n$, its ordered set of implied timestamp is $\{1,\dots,n\}$. Given $\I$ a finite set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a propositional formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$, we denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$.
+  We first define inductively a transformation of the formulas $\phi^{\I,\A}$ as :
   \begin{itemize}
-  \item $A,\I,\M,\sigma \models t=t'$ if $\M, \sigma \models \EQ(t,t') \sim \true$,
+  \item $ (\tau = \tau')^{\I,A} := \true $ if $\tau \in A$ and $\tau = \tau'$, else $\false$,
 
-  \item $A,\I,\M, \sigma \models \tau = \tau' $ if $\tau \in \Timestamps$ and $\tau = \tau'$,
+  \item $( \tau \leq \tau' )^{\I,A} := \true$ if $\tau,\tau' \in A$ and $\tau \leq \tau'$, else $\false$,
 
-  \item $A,\I,\M, \sigma \models \tau \leq \tau' $ if $\tau,\tau' \in \Timestamps$ and $\tau \leq \tau'$,
+  \item $(\happens(\tau))^{\I,A} := \true$ if $\tau \in A$, else $\false$,
+  \item $(i=i')^{\I,A} := \true$ if $i \in I$ and  $i=i'$, else $\false$,
 
-  \item $A,\I,\M, \sigma \models \happens(a)$ if $a \in A$,
-  \item $A,\I,\M, \sigma \models a@\tau$ if $a_\tau = a$,
-  \item $A,\I,\M, \sigma \models a=a'$ if $a \in A$ and $a=a'$,
-  \item $A,\I,\M, \sigma \models i=i'$ if $i \in I$ and  $i=i'$,
+ \item $ (\forall x:\idx.\ \phi) ^{\I,A} :=  \bigwedge_{i\in \I} (\phi\replace{x}{i})^{\I,A}$
+
+  \item $ (\forall x:\timestamp.\ \phi)^{\I,A} := \bigwedge_{1 \leq \tau \leq n} (\phi\replace{x}{\tau})^{\I,A}$
 
   \end{itemize}
+
+    We then define $\models$ as:
+  \begin{itemize}
+  \item $A,\I,\M,\sigma \models \forall x_1,\dots,x_n : \mess.\ \phi $ if $\M, \sigma \models \forall x_1,\dots,x_n : \mess. :\phi^{\I,A} \sim \true$,
+
+
+  \end{itemize}
+
 
   We inductively define the evalutation of the logical connectors in the natural way.
 \end{definition}
@@ -249,7 +260,7 @@ the trace with some defined indices, all its ancestors must have been executed p
     \item if an action must happen before another one, it is reflected in the trace, i.e
       if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
     \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(\bro (a_i(\sigma(\ov{id}_i))))$,
-      \item the actions only depends on previous actions, i.e, for any $\out@a$ (resp. $\inp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
+      \item the actions only depends on previous actions, i.e, for any $\mout@a$ (resp. $\minp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
       \end{itemize}
 \end{definition}
 Intuitively, a symbolic trace represent a possible scheduling of the protocol, when abstracting all the inputs. Some symbolic trace may not correspond to any actual execution of the protocol, if for instance an action require a condition which is never met.
@@ -281,13 +292,9 @@ A trace of $P$ then corresponds to an actual possible evaluation of $P$. More st
 \subsection{Semantics of quantified formulas}
 
 \begin{definition}
-  Given a quantified formula $\phi$ and a trace $(A=(a_0,\dots,a_n),\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ and $\sigma$ the instantiation of $A$, we define $\models$ by induction as:
+  Given a quantified formula $\phi$ and a trace $(A=(a_0,\dots,a_n),\M)$ of $P$, we write $A, \M \models \phi$ when the trace satisfies $\phi$. With $I$ the finite set of indices appearing in $A$ extended with a set of size the number of indices variables in $I$, and $\sigma$ the instantiation of $A$, we define $\models$ as:
   \begin{itemize}
-  \item $A,\M \models \forall x:\idx.\ \phi$ if $A,\M, \I,\sigma \models \bigwedge_{i\in \I} \phi\replace{x}{i}$
-
-  \item $A,\M \models \forall x:\timestamp.\ \phi$ if $A,\M, \I,\sigma \models \bigwedge_{1 \leq \tau \leq n} \phi\replace{x}{\tau}$
-  \item $A,\M \models \forall x:\mess.\ t= t' $ if $\M, \sigma \models \forall x:\mess, \EQ(t,t') \sim \true$
-  \item $A,\M \models \forall x:\bool.\ t= t' $ if $\M, \sigma \models \forall x:\bool, \EQ(t,t') \sim \true$
+  \item $A,\M \models \phi$ if $A,\M, I,\sigma \models \phi$
   \end{itemize}
 
 We say that $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, \M \models \phi$.
