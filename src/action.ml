@@ -119,19 +119,19 @@ let refresh env a =
 
 (** Action symbols *)
 
-module ActionSymbols =
+module Symbol =
   Symbols.Make (struct
-    type t = index list * action
+    type data = index list * action
   end)
 
 let shape_to_symb = Hashtbl.create 97
 
-let fresh_symbol name = ActionSymbols.reserve name
+let fresh_symbol name = Symbol.reserve name
 let define_symbol symb args action =
   Hashtbl.add shape_to_symb (get_shape action) symb ;
-  ActionSymbols.define symb (args,action)
-let find_symbol s = ActionSymbols.find s
-let iter f = ActionSymbols.iter (fun s (l,a) -> f s l a)
+  Symbol.define symb (args,action)
+let find_symbol s = Symbol.def_of_string s
+let iter f = Symbol.iter (fun s (l,a) -> f s l a)
 
 (** Pretty-printing *)
 

@@ -12,7 +12,6 @@ module Cst = struct
     (* Constants appearing in the original terms *)
     | Cname of nsymb
     | Cmvar of Vars.var
-    | Cstate of state * timestamp
     | Cmacro of msymb * timestamp
 
   let cst_cpt = ref 0
@@ -26,7 +25,6 @@ module Cst = struct
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> pp_nsymb ppf n
     | Cmvar m -> Vars.pp ppf m
-    | Cstate (s,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_state s pp_timestamp ts
     | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
 
   (* The successor function symbol is the second smallest in the precedence
@@ -63,8 +61,8 @@ let rec cterm_of_term = function
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
   | MVar m -> Ccst (Cst.Cmvar m)
-  | State (s,ts) -> Ccst (Cst.Cstate (s,ts))
-  | Macro (m,ts) -> Ccst (Cst.Cmacro (m,ts))
+  | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
+                      Ccst (Cst.Cmacro (m,ts))
 
 let rec pp_cterm ppf = function
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -795,9 +793,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
     xor_rules = xor_rules;
     sat_xor_rules = None;
     e_rules =
-      Theories.mk_pair 2
-        (Term.mk_fname "pair")
-        [Term.mk_fname "fst";Term.mk_fname "snd"];
+      Theories.mk_pair 2 Term.f_pair [Term.f_fst;Term.f_snd];
     completed = false  }
   |> complete_state
   |> finalize_completion
@@ -901,16 +897,18 @@ let mk_cst () = Ccst (Cst.mk_flat ())
 
 let (++) a b = Cfun (Term.f_xor, [a;b])
 
-let ffs, gfs = mk_fname "f", mk_fname "g"
-
-let f a b = Cfun (ffs, [a;b])
-
-let g a b = Cfun (gfs, [a;b])
-
 let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
-     fun () ->
+     Symbols.run_restore @@ fun () ->
+       let fi = 0, Abstract_symbol ([],Vars.Message) in
+       let ffs, gfs =
+         (Term.Function.declare_exact "f" fi, []),
+         (Term.Function.declare_exact "g" fi, [])
+       in
+       let f a b = Cfun (ffs, [a;b]) in
+       let g a b = Cfun (gfs, [a;b]) in
+
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in
 

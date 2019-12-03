@@ -95,10 +95,12 @@ val pp_parsed_action : Format.formatter -> (string list) item list -> unit
   * using these indices, which represents a function from indices to
   * actions. *)
 
-val fresh_symbol : string -> (index list * action) Symbols.t
+module Symbol : Symbols.Namespace with type data = (index list) * action
+
+val fresh_symbol : string -> Symbol.ns Symbols.t
 val define_symbol :
-  (index list * action) Symbols.t ->
+  Symbol.ns Symbols.t ->
   index list -> action -> unit
 val find_symbol : string -> index list * action
 val iter :
-  ((index list * action) Symbols.t -> index list -> action -> unit) -> unit
+  (Symbol.ns Symbols.t -> index list -> action -> unit) -> unit

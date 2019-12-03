@@ -22,12 +22,51 @@ let fresh prefix =
   in
   find i0
 
+type unknown
+
+exception Unbound_identifier
+exception Incorrect_namespace
+exception Multiple_declarations
+
+let of_string s = if Hashtbl.mem table s then s else raise Unbound_identifier
+let get_def s = Hashtbl.find table s
+let def_of_string s =
+  try Hashtbl.find table s with Not_found -> raise Unbound_identifier
+
+let exists s = Hashtbl.mem table s
+
+let run_restore f () =
+  let copy = Hashtbl.copy table in
+  let restore () =
+    Hashtbl.clear table ;
+    Hashtbl.iter
+      (fun k v -> Hashtbl.replace table k v)
+      copy
+  in
+  try ignore (f ()) ; restore () with e -> restore () ; raise e
+
 module type S = sig
-  type t
+  type data
 end
 
-module Make (M:S) = struct
-  type def += C of M.t
+module type Namespace = sig
+  type data
+  type ns
+  type def += C of data
+  val reserve : string -> data t
+  val define : data t -> data -> unit
+  val declare : string -> data -> ns t
+  val declare_exact : string -> data -> ns t
+  val of_string : string -> ns t
+  val get_def : ns t -> data
+  val def_of_string : string -> data
+  val iter : (ns t -> data -> unit) -> unit
+end
+
+module Make (M:S) : Namespace with type data = M.data = struct
+  type data = M.data
+  type def += C of data
+  type ns
   let reserve name =
     let symb = fresh name in
       Hashtbl.add table symb Reserved ;
@@ -39,10 +78,24 @@ module Make (M:S) = struct
     let symb = fresh name in
       Hashtbl.add table symb (C value) ;
       symb
-  let find name =
+  let declare_exact name value =
+    if Hashtbl.mem table name then raise Multiple_declarations ;
+    Hashtbl.add table name (C value) ;
+    name
+  let get_def name =
     match Hashtbl.find table name with
       | C v -> v
-      | _ -> raise Not_found
+      | _ -> assert false
+  let of_string name =
+    match Hashtbl.find table name with
+      | C _ -> name
+      | _ -> raise Unbound_identifier
+      | exception Not_found -> raise Unbound_identifier
+  let def_of_string s =
+    match Hashtbl.find table s with
+      | C v -> v
+      | _ -> raise Unbound_identifier
+      | exception Not_found -> raise Unbound_identifier
   let iter f =
     Hashtbl.iter
       (fun k def -> match def with

@@ -4,11 +4,12 @@ open Process
 
 (* type process = descr list *)
 
+(* TODO why is it different from [Process.subst_descr] ? *)
 let subst_descr nu blk =
   { action = blk.action;
     indices = List.map (subst_index nu) blk.indices;
     condition = subst_fact nu blk.condition;
-    updates = List.map (fun (s, t) -> subst_state nu s,
+    updates = List.map (fun (s, t) -> subst_macro nu s,
                                       subst_term nu t
                        ) blk.updates;
     output = subst_term nu blk.output }
@@ -44,15 +45,13 @@ let rec h_o_term hh kk acc = function
       | _ -> h_o_term hh kk (h_o_term hh kk acc m) k end
 
   | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
-  | Macro ((mn,is),a) ->
-    if Term.is_built_in mn then acc
-    else begin match a with
-      | Term.TName a when List.length a = Term.macro_domain mn ->
-          Term.macro_declaration mn a is
-          |> h_o_term hh kk acc
-      | _ -> raise Bad_ssc
-    end
-  | State _ -> acc
+  | Macro ((mn,is),l,a) ->
+    if mn = fst Term.in_macro || mn = fst Term.out_macro then acc
+    else if Term.Macro.is_defined mn a then
+      let acc = List.fold_left (fun acc t -> h_o_term hh kk acc t) acc l in
+      Term.Macro.get_definition mn is a
+      |> h_o_term hh kk acc
+    else raise Bad_ssc
   | Name (n,_) -> acc
   | MVar m -> acc
 

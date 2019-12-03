@@ -50,7 +50,7 @@ term:
 aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
-                                   Theory.make_term ~at_ts:(Some ts) $1 $2 }
+                                   Theory.make_term ~at_ts:ts $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 
 term_list:
@@ -73,10 +73,10 @@ ord:
 | RANGLE                         { Bformula.Gt }
 
 kind:
-| INDEX                          { Theory.Index }
-| MESSAGE                        { Theory.Message }
-| BOOLEAN                        { Theory.Boolean }
-| TIMESTAMP                      { Theory.Timestamp }
+| INDEX                          { Vars.Index }
+| MESSAGE                        { Vars.Message }
+| BOOLEAN                        { Vars.Boolean }
+| TIMESTAMP                      { Vars.Timestamp }
 
 arg_list:
 |                                { [] }
@@ -158,8 +158,8 @@ name_type:
 | INDEX ARROW name_type          { 1+$3 }
 
 msg_or_bool:
-| MESSAGE                        { Theory.Message }
-| BOOLEAN                        { Theory.Boolean }
+| MESSAGE                        { Vars.Message }
+| BOOLEAN                        { Vars.Boolean }
 
 state_type:
 | msg_or_bool                    { 0, $1 }

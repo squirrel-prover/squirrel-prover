@@ -41,9 +41,11 @@ open Tactics
 
 let rec main_loop ?(save=true) mode =
   if !interactive then Fmt.pr "[>@.";
-  (* Initialize definitions before parsing system description *)
+  (* Initialize definitions before parsing system description.
+   * TODO this is not doable anymore (with refactoring this code)
+   * concerning definitions of functions, names, ... symbols;
+   * it should not matter if we do not undo the initial definitions *)
   if mode = InputDescr then begin
-    Theory.initialize_symbols () ;
     Process.reset ()
   end else
     (* Otherwise save the state if instructed to do so.

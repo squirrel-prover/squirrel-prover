@@ -21,96 +21,116 @@ val action_of_ts : timestamp -> Action.action option
 
 val ts_vars : timestamp -> Vars.var list
 
-(** {2 Names} *)
-(** Names represent random values, uniformly sampled by the process.
-  * A name symbol is derived from a name (from a finite set) and
-  * a list of indices. *)
+(** {2 Symbols}
+  *
+  * We have function, name, state and macro symbols. Each symbol
+  * can then be indexed.
+  *
+  * Names represent random values, uniformly sampled by the process.
+  * State symbols reprenset memory cells.
+  * Macros represent input, outputs, and let definitions:
+  * everything that is expansed when translating the meta-logic to
+  * the base logic.
+  * TODO merge states into macros *)
 
-type name
+(** Type of indexed symbols in some namespace *)
+type 'a indexed_symbol = 'a Symbols.t * index list
+
+(** Names are indexed and correspond to uniformly sampled nonces.
+  * They are always of type message. *)
+module Name : Symbols.Namespace with type data = int
+
+type name = Name.ns Symbols.t
+type nsymb = Name.ns indexed_symbol
+
+type kind = Vars.sort
+
+type function_symbol_info =
+  | Hash_symbol
+  | AEnc_symbol
+  | Abstract_symbol of kind list * kind
+
+module Function : Symbols.Namespace
+  with type data = int * function_symbol_info
+
+type fname = Function.ns Symbols.t
+type fsymb = Function.ns indexed_symbol
+
+(** The type of macro definitions, parameterized by the type of terms,
+  * undefined at this point. *)
+type 'a macro_info =
+  | Input | Output
+  | State of int * kind
+    (** Macro that expands to the content of a state at a given
+      * timestamp. *)
+  | Global of Vars.var list * Action.index list * Vars.var * 'a
+    (** [Global (inputs,indices,ts,term)] is a macro [m] such that
+      * [m(i1,..,iN)@ts] expands to [term] where [indices] are replaced
+      * by [i1;..;iN], [ts] is replaced by [a], and [inputs] are
+        * replaced by the input macros corresponding to prefixes of [a]. *)
+  | Local of (Vars.var*kind) list * kind * Vars.var * 'a
+    (** [Simple ([x1,k1;...;xn,kn],k,ts,t)] corresponds to a macro [t]
+      * with arguments [xi] of respective types [ki], and
+      * return type [k].
+      * Even though the macro is local it defines a global term
+      * which uses a timestamp variable, given as the last Vars.var. *)
+
+(** Type of terms, parameterized by the type of the macro namespace *)
+type 'a _term =
+    | Fun of Function.ns indexed_symbol * 'a _term list
+    | Name of Name.ns indexed_symbol
+    | MVar of var
+    | Macro of 'a indexed_symbol * 'a _term list * timestamp
+
+module rec Macro : sig
+  
+  include Symbols.Namespace with type data = M.t macro_info
+
+  (** Declare a global (timestamp-dependent) macro,
+    * given a term abstracted over input variables, indices,
+    * and some timestamp.
+    * A fresh name is generated for the macro if needed. *)
+  val declare_global :
+    string ->
+    inputs:Vars.var list ->
+    indices:Action.index list ->
+    ts:Vars.var ->
+    M.t -> ns Symbols.t
+
+  (** Return the term corresponding to the declared macro,
+    * if the macro can be expanded. *)
+  val get_definition : ns Symbols.t -> index list -> timestamp -> M.t
+
+  (** TODO *)
+  val get_dummy_definition : ns Symbols.t -> index list -> M.t
+
+  (** Tells whether a macro symbol can be expanded when applied
+    * at a particular timestamp. *)
+  val is_defined : ns Symbols.t -> timestamp -> bool
+
+end
+
+and M : sig type t = Macro.ns _term end
+
+type term = Macro.ns _term
+
+type mname = Macro.ns Symbols.t
+type msymb = Macro.ns indexed_symbol
+
+type state = msymb
+
+(** Pretty printing *)
 
 val pp_name : Format.formatter -> name -> unit
-
-val mk_name : string -> name (* TODO *)
-
-val string_of_name : name -> string
-
-(** {2 Functions} *)
-(** Function symbols are built from a name (from a finite set)
-  * and a list of indices.
-  *
-  *)
-type nsymb = name * index list
-
 val pp_nsymb : Format.formatter -> nsymb -> unit
 
-
-type fname = private Fname of string
-
 val pp_fname : Format.formatter -> fname -> unit
-
-type fsymb = fname * index list
-
 val pp_fsymb : Format.formatter -> fsymb -> unit
-
-(** Makes a simple function name, with no indices.
-    TODO: nothing is checked here (e.g. name clashes etc).*)
-val mk_fname : string -> fsymb
-val mk_fname_idx : string -> index list -> fsymb
-
-(** Boolean function symbols *)
-val f_false : fsymb
-val f_true : fsymb
-val f_and : fsymb
-val f_or : fsymb
-val f_not : fsymb
-
-(** IfThenElse function symbol *)
-val f_ite : fsymb
-
-(** Xor function symbol *)
-val f_xor : fsymb
-
-(** Zero function symbol. Satisfies 0 + a -> a *)
-val f_zero : fsymb
-
-(** Successor function symbol *)
-val f_succ : fsymb
-
-
-(** {2 States} *)
-(** Memory cells are represented by state variable, themselves
-  * derived from a name (from a finite set) and indices.
-  *)
-
-type sname
-type state = sname * index list
-
-val mk_sname : string -> sname (* TODO *)
-
-val pp_state : Format.formatter -> state -> unit
-
-(** Type of macros name.
-    A macro is either a user-defined macro, through a let construct in
-    a process, or a built-in macro such as "in" or "out". *)
-
-type mname = private string
-type msymb = mname * index list
 
 val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> msymb -> unit
 
-
-
 (** {2 Terms} *)
-
-type term =
-  | Fun of fsymb * term list
-  | Name of nsymb
-  | MVar of var
-  | State of state * timestamp
-  | Macro of msymb * timestamp
-
-type t = term
 
 (** [term_vars t] returns the variables of [t]*)
 val term_vars : term -> var list
@@ -118,46 +138,12 @@ val term_vars : term -> var list
 (** [term_ts t] returns the timestamps appearing in [t] *)
 val term_ts : term -> timestamp list
 
-val dummy : term
-
 val pp_term : Format.formatter -> term -> unit
 
-(** [is_built_in mn] returns true iff [mn] is a built-in.  *)
-val is_built_in : mname -> bool
-
-(** Converts a string to a macro name if a macro of that name exists,
-  * raises [Not_found] otherwise. *)
-val is_declared : string -> mname
-
-(** Reset macro declarations *)
-val initialize_macros : unit -> unit
-
-(** [declare_macro x l f] declares a new macro with a name resembling [x],
-  * where [f] is used to compute how the macro is expanded, and expansion
-  * is only allowed for explicit actions of length [l].
-  *
-  * TODO [f] should actually do only basic things (conversion,
-  * substitutions, and computation of action prefixes to obtain correct
-  * input symbols) and in fact [f] is always the same: at some point
-  * it would be good to avoid this closure. *)
-val declare_macro : string -> int -> (action -> index list -> term) -> mname
-
-(** Return the term corresponding to the declared macro, except for the
-    built-ins "in" and "out". *)
-val macro_declaration : mname -> action -> index list -> term
-
-(** Given the name of a defined macro, returns the action length that
-  * is required for unrolling that macro. *)
-val macro_domain : mname -> int
-
-val mk_mname : mname -> index list -> msymb
-
-val in_macro : msymb
-val out_macro : msymb
-
 (** {2 Substitutions} *)
-(** Substitutions for all purpose, applicable to terms and timestamps alikes.
-    Substitutions are performed bottom to top to avoid loops. *)
+
+(** Substitutions for all purpose, applicable to terms and timestamps.
+  * Substitutions are performed bottom to top to avoid loops. *)
 
 type asubst =
   | Term of term * term
@@ -173,12 +159,34 @@ val from_varsubst : (var * var) list -> subst
 
 val pp_subst : Format.formatter -> subst -> unit
 
-val get_term_subst : subst -> term -> term
-val get_ts_subst : subst -> timestamp -> timestamp
 val get_index_subst : subst -> index -> index
 
 val subst_index : subst -> index -> index
 val subst_ts : subst -> timestamp -> timestamp
 val subst_action : subst -> action -> action
-val subst_state : subst -> state -> state
+val subst_macro : subst -> msymb -> msymb
 val subst_term : subst -> term -> term
+
+(** {2 Predefined symbols} *)
+
+val dummy : term
+
+val in_macro : msymb
+val out_macro : msymb
+
+val f_true : fsymb
+val f_false : fsymb
+val f_and : fsymb
+val f_or : fsymb
+val f_not : fsymb
+val f_ite : fsymb
+
+val f_pred : fsymb
+val f_succ : fsymb
+
+val f_xor : fsymb
+val f_zero : fsymb
+
+val f_pair : fsymb
+val f_fst : fsymb
+val f_snd : fsymb

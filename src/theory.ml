@@ -1,7 +1,5 @@
 type ord = Bformula.ord
 
-type action_shape = (string list) Action.t
-
 let pp_par_choice_fg f g ppf (k,str_indices) =
   if str_indices = [] then
     Fmt.pf ppf "%d" k
@@ -12,6 +10,8 @@ let pp_par_choice_shape2 =
   pp_par_choice_fg
     (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
     (fun x -> x)
+
+type kind = Vars.sort
 
 (* TODO replace term list by string list when indices are expected ? *)
 
@@ -51,13 +51,15 @@ let rec pp_term ppf = function
       pp_ots ots
   | Name (n,terms) ->
     Fmt.pf ppf "%a(@[<hov 1>%a@])"
-      Term.pp_name (Term.mk_name n)
+      (* Pretty-printing names with nice colors
+       * is well worth violating the type system ;) *)
+      Term.pp_name (Obj.magic n)
       (Fmt.list ~sep pp_term) terms
   | Get (s,ots,terms) ->
-    Fmt.pf ppf "@get:%s%a(@[<hov 1>%a@])"
+    Fmt.pf ppf "!%s(@[<hov 1>%a@])%a"
       s
-      pp_ots ots
       (Fmt.list ~sep pp_term) terms
+      pp_ots ots
   | Compare (ord,tl,tr) ->
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Bformula.pp_ord ord pp_term tr
 
@@ -69,16 +71,9 @@ type fact = term Bformula.bformula
 
 let pp_fact = Bformula.pp_bformula pp_term
 
-(** Table of symbols *)
+(** Intermediate formulas *)
 
-type kind = Index | Message | Boolean | Timestamp
-
-let kind_of_vars_type = function
-  | Vars.Index -> Index
-  | Vars.Message -> Message
-  | Vars.Timestamp -> Timestamp
-
-type formula = (term, (string * kind) ) Formula.foformula
+type formula = (term, (string * Term.kind) ) Formula.foformula
 
 let formula_vars = Formula.foformula_vars (fun x -> [])
 
@@ -86,86 +81,41 @@ exception Cannot_convert_to_fact
 
 let formula_to_fact = Formula.foformula_to_bformula (fun x -> x)
 
-type symbol_info =
-  | Hash_symbol
-  | AEnc_symbol
-  | Name_symbol of int
-  | Mutable_symbol of int * kind
-  (** A mutable cell, parameterized by arities,
-    * with a given content kind. *)
-  | Abstract_symbol of kind list * kind
-  (** A function symbol that, given terms of kinds [k1,...,kn]
-    * allows to form a term of kind [k]. *)
-  | Macro_symbol of (string*kind) list * kind * term
-  (** [Macro_symbol ([x1,k1;...;xn,kn],k,t)] defines a macro [t]
-    * with arguments [xi] of respective types [ki], and
-    * return type [k]. *)
-
-let pred_fs = "pred"
-
-let symbols : (string,symbol_info) Hashtbl.t = Hashtbl.create 97
-
-(** Sets the symbol table to one where only builtins are declared *)
-let initialize_symbols () =
-  Term.initialize_macros () ;
-  Hashtbl.clear symbols ;
-  Channel.reset () ;
-  List.iter
-    (fun (s, a, k) -> Hashtbl.add symbols s (Abstract_symbol (a,k)))
-    [ "pair", [Message;Message], Message ;
-      "fst", [Message], Message ;
-      "snd", [Message], Message ;
-      "choice", [Message; Message], Message ;
-      "if", [Boolean; Message; Message], Message;
-      "and", [Boolean; Boolean], Boolean;
-      "or", [Boolean; Boolean], Boolean;
-      "not", [Boolean], Boolean;
-      "true", [], Boolean;
-      "false", [], Boolean;
-      pred_fs, [Timestamp], Timestamp]
-
 (** Type checking *)
 
 exception Type_error
-exception Unbound_identifier
 exception Rebound_identifier
 
 exception Arity_error of string*int*int
 
 let arity_error s i j = raise (Arity_error (s,i,j))
 
-type env = (string*kind) list
+type env = (string*Term.kind) list
 
 exception Untyped_symbol
 
-let function_kind name =
+let function_kind f : kind list * kind =
   try
-    match Hashtbl.find symbols name with
-    | Hash_symbol -> [Message; Message],Message
-    | AEnc_symbol -> [Message; Message; Message], Message
-    | Abstract_symbol (args_k, ret_k) -> args_k, ret_k
-    | Macro_symbol (args, k, _) -> List.map snd args, k
-    | Mutable_symbol _ | Name_symbol _ ->
-        (* [make_term] does not build [Fun] terms for these,
-         * but [Get] and [Name] terms instead *)
-        assert false
+    let open Term in
+    let open Vars in
+    match Symbols.def_of_string f with
+    | Function.C (_, Hash_symbol) -> [Message; Message], Message
+    | Function.C (_, AEnc_symbol) -> [Message; Message; Message], Message
+    | Function.C (_, Abstract_symbol (args_k, ret_k)) -> args_k, ret_k
+    | Macro.C (Local (targs,k,_,_)) -> List.map snd targs, k
+    | _ -> raise Untyped_symbol
   with Not_found -> raise Untyped_symbol
 
 let check_state s n =
-  try
-    match Hashtbl.find symbols s with
-    | Mutable_symbol (arity,kind) ->
-      if arity <> n then raise Type_error ;
-      kind
-    | _ -> failwith (s ^ " should be a mutable")
-  with Not_found -> assert false
+  match Term.Macro.def_of_string s with
+    | Term.State (arity,kind) ->
+        if arity <> n then raise Type_error ;
+        kind
+    | _ -> failwith "can only assign a state"
 
 let check_name s n =
   try
-    match Hashtbl.find symbols s with
-    | Name_symbol arity ->
-      if arity <> n then raise Type_error
-    | _ -> assert false
+    if Term.Name.def_of_string s <> n then raise Type_error
   with Not_found -> assert false
 
 let check_action s n =
@@ -175,6 +125,8 @@ let check_action s n =
     | exception Not_found -> assert false
 
 let rec check_term env tm kind =
+  let open Term in
+  let open Vars in
   match tm with
   | Var x ->
     begin try
@@ -185,7 +137,7 @@ let rec check_term env tm kind =
   | Fun (f, ts, ots) ->
     begin
       match ots with
-      | Some ts -> check_term env ts Timestamp
+      | Some ts -> check_term env ts Vars.Timestamp
       | None -> ()
     end;
     let ks, f_k = function_kind f in
@@ -221,7 +173,10 @@ let rec check_term env tm kind =
     check_term env u Message ;
     check_term env v Message
 
-let rec check_fact env = let open Bformula in function
+let rec check_fact env =
+  let open Vars in
+  let open Bformula in
+  function
     | And (f,g) | Or (f,g) | Impl (f,g) ->
       check_fact env f ;
       check_fact env g
@@ -231,98 +186,86 @@ let rec check_fact env = let open Bformula in function
 
 (** Declaration functions *)
 
-exception Multiple_declarations
-
 let declare_symbol name info =
-  if Hashtbl.mem symbols name then raise Multiple_declarations ;
-  Hashtbl.add symbols name info
+  ignore (Term.Function.declare_exact name (0,info))
 
-let check_rebound_symbol name =
-  if Hashtbl.mem symbols name then raise Multiple_declarations
-
-let declare_hash s = declare_symbol s Hash_symbol
-let declare_aenc s = declare_symbol s AEnc_symbol
+let declare_hash s = declare_symbol s Term.Hash_symbol
+let declare_aenc s = declare_symbol s Term.AEnc_symbol
 
 let declare_state s arity kind =
-  declare_symbol s (Mutable_symbol (arity,kind))
-let declare_name s k =
-  declare_symbol s (Name_symbol k)
+  let info = Term.State (arity,kind) in
+  ignore (Term.Macro.declare_exact s info)
 
-let declare_macro s typed_args k t =
-  check_term typed_args t k ;
-  declare_symbol s (Macro_symbol (typed_args,k,t))
+let declare_name s arity = ignore (Term.Name.declare_exact s arity)
 
 let declare_abstract s arg_types k =
-  declare_symbol s (Abstract_symbol (arg_types,k))
-
-let get_fresh_symbol prefix =
-  let rec find i =
-    let s = if i=0 then prefix else prefix ^ string_of_int i in
-    if Hashtbl.mem symbols s then find (i+1) else s
-  in
-  find 0
-
-let fresh_name n arity =
-  let n' = get_fresh_symbol n in
-    declare_name n' arity ;
-    Term.mk_name n'
-
-(** Removal of all declarations *)
-
-let clear_declarations () = Hashtbl.clear symbols
+  let info = Term.Abstract_symbol (arg_types,k) in
+  ignore (Term.Function.declare_exact s (0,info))
 
 (** Term builders *)
 
-let make_term ?at_ts:(at_ts=None) s l =
-  try match Hashtbl.find symbols s with
-    | Hash_symbol ->
-      if List.length l <> 2 then raise Type_error ;
-      assert (at_ts = None);
-      Fun (s,l,None)
-    | AEnc_symbol ->
-      if List.length l <> 3 then raise Type_error ;
-      assert (at_ts = None);
-      Fun (s,l,None)
-    | Name_symbol arity ->
-      if List.length l <> arity then
-        arity_error s (List.length l) arity ;
-      Name (s,l)
-    | Mutable_symbol (arity,_) ->
-      if List.length l <> arity then raise Type_error ;
-      Get (s,at_ts,l)
-    | Abstract_symbol (args,_) ->
-      if List.length args <> List.length l then raise Type_error ;
-      assert (at_ts = None);
-      Fun (s,l,None)
-    | Macro_symbol (args,_,t) ->
-      if List.length args <> List.length l then raise Type_error ;
-      assert (at_ts = None);
-      Fun (s,l,None)
-    | exception Not_found ->
-      let (args,a) = Action.find_symbol s in
-      if List.length args <> List.length l then raise Type_error ;
-      assert (at_ts = None);
-      Taction (s,l)
-
-  with
-  | Not_found ->
-    (** If [at_ts] is not [None], we look whether this is a declared macro. *)
-    if at_ts <> None then
-      try let _ = Term.is_declared s in
-        Fun (s, l, at_ts)
-      with Not_found ->
-        if l <> [] then raise Type_error ;
+let make_term ?at_ts s l =
+  match Symbols.def_of_string s with
+    | Term.Function.C (a,i) ->
+        (* We do not support indexed symbols,
+         * which would require a distinction between
+         * function arguments and function indices. *)
+        if a <> 0 then raise Type_error ;
+        if at_ts <> None then raise Type_error ;
+        begin match i with
+          | Term.Hash_symbol ->
+              if List.length l <> 2 then raise Type_error ;
+              Fun (s,l,None)
+          | Term.AEnc_symbol ->
+              if List.length l <> 3 then raise Type_error ;
+              Fun (s,l,None)
+          | Term.Abstract_symbol (args,_) ->
+              if List.length args <> List.length l then raise Type_error ;
+              Fun (s,l,None)
+        end
+    | Term.Name.C arity ->
+        if List.length l <> arity then
+          arity_error s (List.length l) arity ;
+        Name (s,l)
+    | Term.Macro.C (Term.State (arity,_)) ->
+        if List.length l <> arity then raise Type_error ;
+        Get (s,at_ts,l)
+    | Term.Macro.C (Term.Global (_,indices,_,_)) ->
+        if at_ts <> None then raise Type_error ;
+        if List.length l <> List.length indices then raise Type_error ;
+        Fun (s,l,at_ts)
+    | Term.Macro.C (Term.Local (targs,_,_,_)) ->
+        if at_ts <> None then raise Type_error ;
+        if List.length targs <> List.length l then raise Type_error ;
+        Fun (s,l,None)
+    | Term.Macro.C (Term.Input|Term.Output) ->
+        if at_ts = None || l <> [] then raise Type_error ;
+        Fun (s,[],at_ts)
+    | Action.Symbol.C (args,a) ->
+        if List.length args <> List.length l then raise Type_error ;
+        Taction (s,l)
+    | _ ->
+        Fmt.pr "incorrect %s@." s ;
+        raise Symbols.Incorrect_namespace
+    | exception Symbols.Unbound_identifier ->
+        (* By default we interpret s as a variable,
+         * but this is only possible if it is not indexed.
+         * If that is not the case, the use probably meant
+         * for this symbol to not be a variable, hence
+         * we raise Unbound_identifier. We could also
+         * raise Type_error because a variable is never of
+         * a sort that can be applied to indices. *)
+        if l <> [] then raise Symbols.Unbound_identifier ;
         Var s
-    else begin
-      if l <> [] then raise Type_error ;
-      Var s end
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair", [u; v], None)
 
-let is_hash (Term.Fname s) =
-  try Hashtbl.find symbols s = Hash_symbol
-  with Not_found -> raise @@ Failure "symbol not found"
+let is_hash s =
+  match Term.Function.get_def s with
+    | _,Term.Hash_symbol -> true
+    | _ -> false
+    | exception Not_found -> failwith "symbol not found"
 
 (* Conversion *)
 type atsubst =
@@ -398,28 +341,41 @@ let convert ts subst t =
   let rec conv = function
     | Fun (f, l, None) ->
       begin
-        match Hashtbl.find symbols f with
-        | Hash_symbol | AEnc_symbol ->
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | Abstract_symbol (args, _) ->
-          assert (List.for_all (fun k -> k = Message) args) ;
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | Macro_symbol (args, _, _) when
-            List.for_all (fun (_, k) -> k = Index) args ->
-          Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
-                    [])
-        | Macro_symbol (args, _, _) when
-            List.for_all (fun (_, k) -> k = Message) args ->
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | _ -> failwith "unsupported"
+        match Symbols.def_of_string f with
+        | Term.(Function.C (_,(Hash_symbol|AEnc_symbol))) ->
+            Term.Fun ((Term.Function.of_string f,[]), List.map conv l)
+        | Term.Function.C (_, Term.Abstract_symbol (args, _)) ->
+            assert (List.for_all (fun k -> k = Vars.Message) args) ;
+            Term.Fun ((Term.Function.of_string f,[]), List.map conv l)
+        | Term.(Macro.C Input) when l = [] ->
+            Term.Macro (Term.in_macro,[],ts)
+        | Term.(Macro.C Output) when l = [] ->
+            Term.Macro (Term.out_macro,[],ts)
+        | Term.(Macro.C (Global _)) ->
+            let indices = List.map (conv_index subst) l in
+            Term.Macro ((Term.Macro.of_string f,indices),[],ts)
+        | Term.(Macro.C (Local (targs,_,_,_))) ->
+            let indices,terms =
+              List.fold_left2
+                (fun (indices,terms) (x,k) v ->
+                   if k = Vars.Index then
+                     conv_index subst v :: indices, terms
+                   else
+                     indices, conv v :: terms)
+                ([],[]) targs l
+            in
+            let indices = List.rev indices in
+            let terms = List.rev terms in
+            Term.Macro ((Term.Macro.of_string f,indices),terms,ts)
+        | _ -> failwith (Printf.sprintf "cannot convert %s(...)" f)
       end
     | Get (s, None, i) ->
-      let s = Term.mk_sname s in
       let i = List.map (conv_index subst) i in
-      Term.State ((s, i), ts)
+      let s = Term.Macro.of_string s, i in
+      Term.Macro (s,[],ts)
     | Name (n, i) ->
       let i = List.map (conv_index subst) i in
-      Term.Name (Term.mk_name n, i)
+      Term.Name (Term.Name.of_string n, i)
     | Var x -> subst_get_mess subst x
     | Compare (o, u, v) -> assert false (* TODO *)
     | Taction _ -> assert false       (* reserved for constraints *)
@@ -427,17 +383,17 @@ let convert ts subst t =
         (* This special case, corresponding to a not-really-local term
          * resulting from the input process preparation, can only
          * happen when f is a global macro. *)
-        let f = Term.is_declared f in
+        let f = Term.Macro.of_string f in
         let l = List.map (conv_index subst) l in
-        Term.Macro ((f,l),ts)
+        Term.Macro ((f,l),[],ts)
     | Get (_, Some _, _) ->
       assert false (* reserved for global terms *)
   in conv t
 
-(* For now, we do not allow to build directly a timestamp through its name. *)
 let convert_ts subst t =
   let rec conv = function
-    | Fun (f, [t'], None) when f = pred_fs -> Term.TPred (conv t')
+    | Fun (f, [t'], None) when f = Symbols.to_string (fst Term.f_pred) ->
+        Term.TPred (conv t')
     | Var x -> subst_get_ts subst x
     | Taction (a,l) ->
         begin match Action.find_symbol a with
@@ -463,35 +419,38 @@ let convert_glob subst t =
   let rec conv = function
     | Fun (f, l, None) ->
       begin
-        match Hashtbl.find symbols f with
-        | Hash_symbol | AEnc_symbol ->
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | Abstract_symbol (args, _) ->
-          assert (List.for_all (fun k -> k = Message) args) ;
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | Macro_symbol (args, _, _) when
-            List.for_all (fun (_, k) -> k = Index) args ->
-          Term.Fun (Term.mk_fname_idx f (List.map (conv_index subst) l),
-                    [])
-        | Macro_symbol (args, _, _) when
-            List.for_all (fun (_, k) -> k = Message) args ->
-          Term.Fun (Term.mk_fname f, List.map conv l)
-        | _ -> failwith "unsupported"
+        match Symbols.def_of_string f with
+        | Term.(Function.C (0,(Hash_symbol | AEnc_symbol))) ->
+            Term.Fun ((Term.Function.of_string f,[]), List.map conv l)
+        | Term.(Function.C (0,Abstract_symbol (args, _))) ->
+            assert (List.for_all (fun k -> k = Vars.Message) args) ;
+            Term.Fun ((Term.Function.of_string f,[]), List.map conv l)
+        | _ -> failwith "ill-formed function application without timestamp"
       end
     | Fun (f, l, Some ts) ->
-      Term.Macro ( ( Term.is_declared f,
-                     List.map (conv_index subst) l ),
-                   convert_ts subst ts)
-
+        begin match Symbols.def_of_string f with
+          | Term.(Macro.C (Input|Output)) ->
+              assert (l = []) ;
+              Term.Macro ((Term.Macro.of_string f,[]),[],convert_ts subst ts)
+          | Term.(Macro.C (Global (indices,_,_,_))) ->
+              assert (List.length indices = List.length l) ;
+              let l = List.map (conv_index subst) l in
+              Term.Macro ((Term.Macro.of_string f, l),[],convert_ts subst ts)
+          | Term.(Macro.C (Local (targs,_,_,_))) ->
+              assert (List.length targs = List.length l) ;
+              let l = List.map conv l in
+              Term.(Macro ((Macro.of_string f, []), l, convert_ts subst ts))
+          | _ -> failwith "ill-formed function application at timestamp"
+        end
     | Get (s, Some ts, i) ->
-      let s = Term.mk_sname s in
+      let s = Term.Macro.of_string s in
       let i = List.map (conv_index subst) i in
-      Term.State ((s,i), convert_ts subst ts)
+      Term.Macro ((s,i),[],convert_ts subst ts)
     | Name (n, i) ->
       let i = List.map (conv_index subst) i in
-      Term.Name (Term.mk_name n,i)
+      Term.Name (Term.Name.of_string n,i)
     | Compare (o, u, v) -> assert false (* TODO *)
-    | Var x ->  subst_get_mess subst x
+    | Var x -> subst_get_mess subst x
     | Taction _ -> assert false
     | Get (s, None, _) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
@@ -521,6 +480,7 @@ let convert_fact ts subst f : Bformula.fact =
 
 (* Not clean at all. *)
 let get_kind env t =
+  let open Vars in
   try
   (try check_term env t Index; Index
   with Type_error -> try check_term env t Timestamp; Timestamp
@@ -529,6 +489,7 @@ let get_kind env t =
   with Untyped_symbol -> Message
 
 let convert_constr_atom args_kind subst f : Bformula.constr_atom =
+  let open Vars in
   let open Bformula in
   match f with
   | Compare (o, u, v) ->
@@ -560,19 +521,23 @@ let convert_fact_glob subst f : Bformula.fact =
 
 
 let subst_get_var subst (x,kind) =
-    match kind with
-      | Index -> subst_get_index subst x
-      | Message ->
-        (match subst_get_mess subst x with
-        | Term.MVar a -> a
-        | _ -> assert false)
-    | Timestamp -> (match subst_get_ts subst x with
-      | Term.TVar a -> a
-      |  _ -> assert false)
+  let open Vars in
+  match kind with
+    | Index -> subst_get_index subst x
+    | Message ->
+        begin match subst_get_mess subst x with
+          | Term.MVar a -> a
+          | _ -> assert false
+        end
+    | Timestamp ->
+        begin match subst_get_ts subst x with
+          | Term.TVar a -> a
+          |  _ -> assert false
+        end
     | _ -> assert false
 
-
 let convert_formula_glob args_kind subst f =
+  let open Vars in
   let open Formula in
   let rec conv = function
     | Atom (Compare (o,u,v)) ->
@@ -599,17 +564,17 @@ let rec convert_vars env vars =
   let rec conv vs =
     match vs with
     | [] -> ([], [])
-    | (a, Index) :: l ->
+    | (a, Vars.Index) :: l ->
       let (vl, acc) = conv l in
       let a_var = Vars.make_fresh_and_update env Vars.Index a in
       (Idx(a, a_var)::vl, a_var::acc)
 
-    | (a, Timestamp) :: l ->
+    | (a, Vars.Timestamp) :: l ->
       let (vl, acc) = conv l in
       let a_var = Vars.make_fresh_and_update env Vars.Timestamp a in
       (TS(a, Term.TVar(a_var) )::vl, a_var::acc)
 
-    | (a, Message) :: l ->
+    | (a, Vars.Message) :: l ->
       let (vl, acc) = conv l in
       let a_var = Vars.make_fresh_and_update env Vars.Message a in
       (Term(a, Term.MVar(a_var) )::vl, a_var::acc)
@@ -620,28 +585,53 @@ let rec convert_vars env vars =
   let (res, acc) =  conv vars in
   (List.rev res, acc)
 
+let declare_macro s typed_args k t =
+  check_term typed_args t k ;
+  let env,typed_args,tsubst =
+    List.fold_left
+      (fun (env,vars,tsubst) (x,k) ->
+         let env,x' = Vars.make_fresh env k x in
+         let item = match k with
+           | Vars.Index -> Idx (x, x')
+           | Vars.Message -> Term (x, Term.MVar x')
+           | _ -> assert false
+         in
+           assert (Vars.name x' = x) ;
+           env, (x',k)::vars, item::tsubst)
+      (Vars.empty_env,[],[])
+      typed_args
+  in
+  let _,ts_var = Vars.make_fresh env Vars.Timestamp "ts" in
+  Fmt.pr "declare macro %s(%a)=%a@." s Vars.pp_env env pp_term t ;
+  let t = convert (Term.TVar ts_var) tsubst t in
+  Fmt.pr "... %a@." Term.pp_term t ;
+  ignore
+    (Term.Macro.declare_exact s
+       (Term.Local (List.rev typed_args,k,ts_var,t)))
+
 (** Tests *)
 let () =
   Checks.add_suite "Theory" [
     "Declarations", `Quick,
-    begin fun () ->
-      initialize_symbols () ;
+    begin let f =
+    Symbols.run_restore @@ begin fun () ->
       declare_hash "h" ;
       Alcotest.check_raises
         "h cannot be defined twice"
-        Multiple_declarations
+        Symbols.Multiple_declarations
         (fun () -> declare_hash "h") ;
       Alcotest.check_raises
         "h cannot be defined twice"
-        Multiple_declarations
-        (fun () -> declare_aenc "h") ;
-      initialize_symbols () ;
-      declare_hash "h"
+        Symbols.Multiple_declarations
+        (fun () -> declare_aenc "h")
+    end in
+    let g = Symbols.run_restore @@ fun () -> declare_hash "h" in
+    fun () -> f () ; g ()
     end ;
     "Term building", `Quick,
-    begin fun () ->
-      initialize_symbols () ;
+    Symbols.run_restore @@ begin fun () ->
       declare_hash "h" ;
+      ignore (make_term "x" []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
         Type_error
@@ -650,18 +640,17 @@ let () =
       ignore (make_term "h" [make_term "x" []; make_term "y" []])
     end ;
     "Type checking", `Quick,
-    begin fun () ->
-      initialize_symbols () ;
+    Symbols.run_restore @@ begin fun () ->
       declare_aenc "e" ;
       declare_hash "h" ;
       let x = make_term "x" [] in
       let y = Var "y" in
       let t = make_term "e" [make_term "h" [x;y];x;y] in
-      let env = ["x",Message;"y",Message] in
-      check_term env t Message ;
+      let env = ["x",Vars.Message;"y",Vars.Message] in
+      check_term env t Vars.Message ;
       Alcotest.check_raises
         "message is not a boolean"
         Type_error
-        (fun () -> check_term env t Boolean)
+        (fun () -> check_term env t Vars.Boolean)
     end
   ]

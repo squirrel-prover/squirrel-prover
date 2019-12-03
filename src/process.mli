@@ -109,12 +109,10 @@ val reset : unit -> unit
   * on output messages, and we will often perform this filtering as part
   * of the construction of the complete set.
   *
-  * For user-friendliness, some actions may be given names, typically
-  * role names via named (sub)processes. Actions are unambiguous by
-  * design, we build on them to have unique names for input variables,
-  * output terms, etc. Actions may be displayed in a simplified form
-  * (e.g. <Role>.<sequence_number>) if the choices of conditional
-  * branches is clear from the context. *)
+  * For user-friendliness, actions are described by action symbols.
+  * Actions are unambiguous by design, we build on them to have unique
+  * names for input variables, output terms, etc. Actions are displayed
+  * by default using their identifying symbol. *)
 
 (** Type descr *)
 type descr = {

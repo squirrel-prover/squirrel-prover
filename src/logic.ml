@@ -151,10 +151,10 @@ end = struct
        * its condition, updates and output. *)
       let g = { g with actions_described = d.action :: g.actions_described } in
       let new_atoms =
-        (Eq, Macro (out_macro, TName d.action), d.output) ::
+        (Eq, Macro (out_macro, [], TName d.action), d.output) ::
         List.map
           (fun (s,t) ->
-             (Eq, State (s, TName d.action), t))
+             (Eq, Macro (s, [], TName d.action), t))
           d.updates
       in
       let new_facts = [d.condition] in
@@ -314,7 +314,7 @@ end = struct
       pp_formula judge.formula
 
   let init (goal : formula) =
-    { env = Vars.empty_env ();
+    { env = Vars.empty_env;
       theta = Theta.mk Bformula.True;
       gamma = Gamma.empty;
       formula = goal;

@@ -1,45 +1,38 @@
-type channel = string
+include Symbols.Make(struct type data = unit end)
+
+type channel = ns Symbols.t
 type t = channel
 
-let channels : (channel,unit) Hashtbl.t = Hashtbl.create 13
+let declare s = ignore (declare_exact s ())
 
-let reset () = Hashtbl.reset channels
+let dummy = declare_exact "ø" ()
 
-let declare s =
-  try
-    Hashtbl.find channels s ;
-    failwith "multiple declarations"
-  with Not_found ->
-    Hashtbl.add channels s ()
-
-let of_string s = Hashtbl.find channels s ; s
-
-let dummy = "_"
-
-let pp_channel ppf c = Fmt.pf ppf "%a" (Utils.kw Fmt.(`None)) c
+let pp_channel ppf c =
+  Fmt.pf ppf "%a" (Utils.kw Fmt.(`None)) (Symbols.to_string c)
 
 let () =
   Checks.add_suite "Channel" [
     "Basic", `Quick,
-    fun () ->
-      assert (0 = Hashtbl.length channels) ;
+    Symbols.run_restore @@ fun () ->
       Alcotest.check_raises "fails"
-        Not_found (fun () -> ignore (of_string "c")) ;
+        Symbols.Unbound_identifier (fun () -> ignore (of_string "c")) ;
       Alcotest.check_raises "fails"
-        Not_found (fun () -> ignore (of_string "d")) ;
+        Symbols.Unbound_identifier (fun () -> ignore (of_string "d")) ;
       declare "c" ;
       Alcotest.check_raises "fails"
-        Not_found (fun () -> ignore (of_string "d")) ;
+        Symbols.Unbound_identifier (fun () -> ignore (of_string "d")) ;
       ignore (of_string "c") ;
       Alcotest.check_raises "fails"
-        (Failure "multiple declarations") (fun () -> declare "c") ;
+        Symbols.Multiple_declarations (fun () -> declare "c") ;
       declare "d" ;
-      Alcotest.(check string) "same channels"
-        (of_string "c") (of_string "c") ;
-      Alcotest.(check string) "same channels"
-        (of_string "d") (of_string "d") ;
-      Alcotest.(check (neg string))
+      Alcotest.(check bool) "same channels"
+        (of_string "c" = of_string "c")
+        true ;
+      Alcotest.(check bool) "same channels"
+        (of_string "d" = of_string "d")
+        true ;
+      Alcotest.(check bool)
         "not the same channels"
-        (of_string "c") (of_string "d") ;
-      reset ()
+        (of_string "c" = of_string "d")
+        false
   ]

@@ -1,15 +1,16 @@
-type var_type =  Message | Index | Timestamp
+type sort =  Message | Boolean | Index | Timestamp
 
 let pp_type ppf = function
   | Message -> Fmt.pf ppf "message"
   | Index -> Fmt.pf ppf "index"
   | Timestamp -> Fmt.pf ppf "timestamp"
+  | Boolean -> Fmt.pf ppf "bool"
 
 (* Variables contains two name value, a name_prefix and a name_suffix. The name
    of the variable is then the concatenation of both. This allows, given a set
    of previously defined variables with the same name_prefix, to create the
    simplest possible fresh variable, by incrementing the name_suffix. *)
-type var = {name_prefix : string; name_suffix : int; var_type : var_type }
+type var = {name_prefix : string; name_suffix : int; var_type : sort }
 
 let name v =
   if v.name_suffix <> 0 then
@@ -87,7 +88,7 @@ let pp_env ppf e =
 let pp_typed_env ppf e =
   pp_typed_list "" ppf (to_list e)
 
-let empty_env () : env = (M.empty,M.empty)
+let empty_env : env = (M.empty,M.empty)
 
 let mem (e1,e2) name =
   M.mem name e1

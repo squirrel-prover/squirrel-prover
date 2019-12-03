@@ -224,6 +224,7 @@ let tsubst_of_judgment j =
        | Vars.Index -> Theory.Idx (Vars.name v,v)
        | Vars.Timestamp -> Theory.TS (Vars.name v,TVar v)
        | Vars.Message -> Theory.Term (Vars.name v,MVar v)
+       | Vars.Boolean -> assert false
     )
     (Vars.to_list j.Judgment.env)
 
@@ -235,7 +236,7 @@ let parse_formula fact =
           List.map
             (fun v ->
                Vars.name v,
-               Theory.kind_of_vars_type (Vars.var_type v))
+               Vars.var_type v)
             (Vars.to_list j.Judgment.env)
         in
         Theory.convert_formula_glob
@@ -244,13 +245,15 @@ let parse_formula fact =
           fact
 
 let parse_subst j uvars ts : subst =
-          let u_subst = tsubst_of_judgment j in
-          List.map2 (fun t u ->
-              match Vars.var_type u with
-              | Vars.Timestamp -> TS (TVar u, Theory.convert_ts u_subst t )
-              | Vars.Message -> Term (MVar u, Theory.convert_glob u_subst t)
-              | Vars.Index -> Index (u, Theory.conv_index u_subst t)
-          ) ts uvars
+  let u_subst = tsubst_of_judgment j in
+    List.map2
+      (fun t u ->
+         match Vars.var_type u with
+           | Vars.Timestamp -> TS (TVar u, Theory.convert_ts u_subst t )
+           | Vars.Message -> Term (MVar u, Theory.convert_glob u_subst t)
+           | Vars.Index -> Index (u, Theory.conv_index u_subst t)
+           | Vars.Boolean -> assert false)
+      ts uvars
 
 let parse_args goalname ts : subst =
   let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
@@ -299,9 +302,11 @@ let get_goal_formula gname =
 let make_goal f  =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
-  let env = ref (Vars.empty_env ()) in
+  let env = ref Vars.empty_env in
   let argvars = Theory.formula_vars f in
-  List.iter (fun (s,k) -> Theory.check_rebound_symbol s) (argvars);
+  List.iter
+    (fun (s,k) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
+    argvars ;
   let (subst, vars) = Theory.convert_vars env argvars in
     Theory.convert_formula_glob
       (List.rev argvars)

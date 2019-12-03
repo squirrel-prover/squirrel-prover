@@ -81,7 +81,6 @@ let parse_from_buf
             end
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  Theory.initialize_symbols () ;
   Process.reset () ;
   parse_from_buf ~test Parser.theory lexbuf filename
 
@@ -99,13 +98,18 @@ let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
   parse_theory_buf ~test lexbuf filename
 
+let add_suite_restore name suite =
+  Checks.add_suite name
+    (List.map
+       (fun (a,b,c) -> a, b, Symbols.run_restore c)
+       suite)
+
 let () =
-  Checks.add_suite "Parsing" [
+  add_suite_restore "Parsing" [
     "Null", `Quick, begin fun () ->
       ignore (parse_process "null")
     end ;
     "Simple", `Quick, begin fun () ->
-      Channel.reset () ;
       Channel.declare "c" ;
       ignore (parse_process "in(c,x);out(c,x);null") ;
       ignore (parse_process "in(c,x);out(c,x)") ;
@@ -115,17 +119,14 @@ let () =
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process "if u then if v then null else null else null") ;
-      Channel.reset ()
+      ignore (parse_process "if u then if v then null else null else null")
     end ;
     "Pairs", `Quick, begin fun () ->
-      Theory.initialize_symbols () ;
       Channel.declare "c" ;
       ignore (parse_process "in(c,x);out(c,<x,x>)")
     end ;
     "Facts", `Quick, begin fun () ->
-      Theory.initialize_symbols () ;
-      Theory.declare_abstract "p" [] Theory.Boolean ;
+      Theory.declare_abstract "p" [] Vars.Boolean ;
       Channel.declare "c" ;
       ignore (parse_process "if p && p() then out(c,ok)") ;
       ignore (parse_process "if p() = p then out(c,ok)")
@@ -134,7 +135,7 @@ let () =
 
 let () =
   let test = true in
-  Checks.add_suite "Models" [
+  add_suite_restore "Models" [
     "Null model", `Quick, begin fun () ->
       parse_theory_test ~test "tests/alcotest/null.mbc"
     end ;
@@ -152,7 +153,7 @@ let () =
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Failure "multiple declarations")
+        Symbols.Multiple_declarations
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
     "Block creation", `Quick, begin fun () ->

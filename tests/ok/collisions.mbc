@@ -2,7 +2,7 @@ hash h
 name k:message
 name cst:message
 
-channel c
+channel ch
 
 name na : index -> message
 name nb : index -> message
@@ -13,10 +13,10 @@ axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>
 
-system O: out(c,cst); (
-    (A: !_a out(c,h(na(a),k)))
-  | (B: !_b out(c,h(<nb(b),nb(b)>,k)))
-  | (C: !_c out(c,h(<nc(c),mc(c)>,k)))
+system O: out(ch,cst); (
+    (A: !_a out(ch,h(na(a),k)))
+  | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
+  | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
 

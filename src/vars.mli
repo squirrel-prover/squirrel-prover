@@ -1,15 +1,15 @@
 (** Basic module for variables, providing local environments to store
     variables. *)
 
-type var_type =  Message | Index | Timestamp
+type sort =  Message | Boolean | Index | Timestamp
 
-val pp_type : Format.formatter -> var_type -> unit
+val pp_type : Format.formatter -> sort -> unit
 
 type var
 
 val name : var -> string
 
-val var_type : var -> var_type
+val var_type : var -> sort
 
 val pp : Format.formatter -> var -> unit
 
@@ -30,7 +30,7 @@ val pp_env : Format.formatter -> env -> unit
 
 val pp_typed_env : Format.formatter -> env -> unit
 
-val empty_env : unit -> env
+val empty_env : env
 
 val to_list : env -> var list
 
@@ -45,10 +45,10 @@ val get_var : env -> string -> var
     if a variable with the given name already exists inside the environment, a
     variable with the given name concateneted with the smallest possible integer
     is created. The new environment and the variable are returned.*)
-val make_fresh : env -> var_type -> string -> env * var
+val make_fresh : env -> sort -> string -> env * var
 
 (** Same as [make_fresh], but updates the mutable env given in input. *)
-val make_fresh_and_update : env ref -> var_type -> string -> var
+val make_fresh_and_update : env ref -> sort -> string -> var
 
 val make_fresh_from : env -> var -> env * var
 

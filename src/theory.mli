@@ -8,7 +8,8 @@
 
 type ord = Bformula.ord
 
-type action_shape
+(** Temporary alias, should eventually disappear *)
+type kind = Vars.sort
 
 type term =
   | Var of string
@@ -35,11 +36,6 @@ type fact = term Bformula.bformula
 
 val pp_fact : Format.formatter -> fact -> unit
 
-(** Terms may represent indices, messages or booleans *)
-type kind = Index | Message | Boolean | Timestamp
-
-val kind_of_vars_type : Vars.var_type -> kind
-
 type formula = (term, (string * kind) ) Formula.foformula
 
 val formula_to_fact : formula -> fact
@@ -54,19 +50,12 @@ val formula_vars : formula -> (string * kind) list
   * Names are of kind index^n->message. Mutable cells are
   * similar but may contain messages or booleans. *)
 
-exception Multiple_declarations
-
-val check_rebound_symbol : string -> unit
-
 val declare_hash : string -> unit
 val declare_aenc : string -> unit
 val declare_name : string -> int -> unit
 val declare_state : string -> int -> kind -> unit
 val declare_abstract : string -> kind list -> kind -> unit
 val declare_macro : string -> (string*kind) list -> kind -> term -> unit
-
-(** Get a fresh name symbol and declare it. *)
-val fresh_name : string -> int -> Term.name
 
 (** {2 Term builders }
     Given a string [s] and a list of terms [l] build the term [s(l)]
@@ -77,7 +66,7 @@ val fresh_name : string -> int -> Term.name
   * This function is intended for parsing, at a time where type
   * checking cannot be performed due to free variables. *)
 
-val make_term : ?at_ts:term option -> string -> term list -> term
+val make_term : ?at_ts:term -> string -> term list -> term
 val make_pair : term -> term -> term
 
 (** {2 Type-checking} *)
@@ -94,9 +83,6 @@ val check_state : string -> int -> kind
 val check_fact : env -> fact -> unit
 
 val is_hash : Term.fname -> bool
-
-(** Populate theory with only builtin declarations *)
-val initialize_symbols : unit -> unit
 
 (** {2 Conversions}
     Convert terms inside the theory to to terms of the prover.

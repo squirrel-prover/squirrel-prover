@@ -645,7 +645,7 @@ let get_equalities (models : models) ts =
 (****************)
 (* Tests Suites *)
 (****************)
-let env = ref (Vars.empty_env ())
+let env = ref Vars.empty_env
 let tau = TVar (Vars.make_fresh_and_update env Timestamp "tau")
 and tau' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
 and tau'' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
