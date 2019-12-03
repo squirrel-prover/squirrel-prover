@@ -66,31 +66,51 @@ end = struct
 
   let get_atoms g = List.map fst g.atoms
 
+  class iter_macros f = object (self)
+    inherit Iter.iter as super
+    method visit_term t =
+      match t with
+        | Macro ((m,is),[],a) ->
+            if Term.Macro.is_defined m a then
+              let def = Term.Macro.get_definition m is a in
+                f t def ;
+                self#visit_term def
+        | t -> super#visit_term t
+  end
+
   (* We do not add atoms that are already a consequence of gamma. *)
-  let add_atom g at =
+  let rec add_atom g at =
     if List.mem at (get_atoms g) then g else
-      begin
+      let macro_eqs : term_atom list ref = ref [] in
+      let iter =
+        new iter_macros
+          (fun t t' -> macro_eqs := (Eq,t,t') :: !macro_eqs)
+      in
+      let () = iter#visit_fact (Atom at) in
       let add at =
         { g with
           cur_id = g.cur_id+1 ;
-          atoms = (at, new_tag g.cur_id) :: g.atoms } in
-         if (g.trs) = None then add at else
+          atoms = (at, new_tag g.cur_id) :: g.atoms }
+      in
+      let g =
+        if (g.trs) = None then add at else
           match at with
           | (Eq,s,t) ->
             if Completion.check_equalities (opt_get g.trs) [s,t] then g
             else add at
           | (Neq,s,t) -> add at (* TODO : use a correct check_disequality *)
           | _ -> add at (* TODO: do not add useless inequality atoms *)
-      end
+      in
+      add_atoms g !macro_eqs
 
-  let rec add_atoms g = function
+  and add_atoms g = function
     | [] -> { g with trs = None }
     | at :: ats -> add_atoms (add_atom g at) ats
 
   (** [add_fact g f] adds [f] to [g]. We try some trivial simplification. *)
   let rec add_fact g at = match triv_eval at with
     | Atom at -> add_atom g at
-    | Not (Atom at) ->  add_atom g (not_xpred at)
+    | Not (Atom at) -> add_atom g (not_xpred at)
     | True -> g
     | And (f,f') -> add_fact (add_fact g f) f'
     | _ -> raise Not_atom
@@ -99,7 +119,7 @@ end = struct
     | [] -> { g with trs = None }
     | f :: fs -> add_facts (add_fact g f) fs
 
-  let set_facts g fs = add_facts { g with trs = None} fs
+  let set_facts g fs = add_facts { g with trs = None } fs
 
   let mem f g = match f with
     | Bformula.Atom at -> List.exists (fun (at',_) -> at = at') g.atoms

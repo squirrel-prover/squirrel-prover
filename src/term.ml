@@ -97,7 +97,7 @@ end = struct
       | Input -> false
       | Output | State _ ->
           begin match a with
-            | TName _ -> true
+            | TName _ -> false (* TODO *)
             | _ -> false (* We could compute predecessors. *)
           end
       | Local _ -> true
