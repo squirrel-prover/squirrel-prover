@@ -48,6 +48,7 @@
 
 
 \newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
 \newtheorem{proposition}{Proposition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{lemma}{Lemma}
@@ -103,21 +104,26 @@ with a distinguished kind of constant for representing names (written
 $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
 and featuring a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
-The terms are all of the same sort: they are meant to represent messages.
-\marginpar{
-  The distinction between booleans and messages may be ignored
-  for the theory?
-}
+The terms are all of the same sort: they are meant to represent 
+messages\footnote{
+  David: I hope/believe that the distinction between booleans and messages
+  can be ignored for the theory.
+}.
 
 In practice, the logic will be considered with function symbols for 
 representing cryptographic primitives as well as attacker computations, and 
 boolean constants and connectives.
 
 The formulas of the base logic are intended to be interpreted in 
-\emph{computational models}, where terms are interpreted as PPT Turing 
-machines, $\sim$ is interpreted as indistinguishability,
-names are independent random samplings,
-and function symbols correspond to deterministic machines.
+\emph{computational models}, where:
+\begin{itemize}
+  \item terms are interpreted as PPT Turing machines which,
+    given infinite random tapes and a security parameter output a bitstring;
+  \item $\sim$ is interpreted as indistinguishability;
+  \item names are independent random samplings;
+  \item function symbols correspond to deterministic machines.
+\end{itemize}
+
 In particular, function symbols corresponding to cryptographic primitives
 are interpreted as implementations of the primitives, subject to some
 assumptions.
@@ -167,36 +173,28 @@ We will typically assume macro symbols $\mout$ and $\minp$
 (with index arity $0$) for representing messages inputted and outputted
 at a particular point of an execution.
 
+We shall write $\F_k$ (resp.\ $\N_k$ or $\M_k$) for the set of function
+symbols (resp.\ name or macro symbols) of index arity $k$.
+
 \begin{figure}
 \[
-\begin{array}[t]{ccc}
-    \begin{array}{rcl}
-    f \in \F & & \text{function symbol}\\
-    M \in \M & & \text{macro symbol}\\
-    \mathsf{n} \in \N & & \text{name symbol}
-    \end{array}
-    &
-    \begin{array}{rcll}
-      n &:=& \mathsf{n}[i_1,\ldots,i_n]
-      \\
-      F &:=& f[i_1,\ldots,i_k] & (f\in\F \text{ of index arity } $k$)
-      \\
-      M &:=& m[i_1,\ldots,i_k] & (m\in\M \text{ of index arity } $k$)
-    \end{array}
-\end{array}
+  \begin{array}{rcll}
+    n &:=& \mathsf{n}[i_1,\ldots,i_n] & (\mathsf{n}\in\N_k)
+    \\
+    F &:=& f[i_1,\ldots,i_k] & (f\in\F_k)
+    \\
+    M &:=& m[i_1,\ldots,i_k] & (m\in\M_k)
+  \end{array}
 \]
 \[
   \begin{array}{rcll}
     T &:=& \tau & \text{timestamp variable} \\
       &\mid& a[i_1,\ldots,i_k] & \text{constant (for $a\in\mathbb{A}$)} \\
-      &\mid & \pre(T) & \text{successor} \\
+      &\mid & \pre(T) & \text{predecessor}
 \end{array}
    \]
 \[
      \begin{array}{rcll}
-
-      \\
-
     t & := & n &\text{name} \\
     & \mid & x  & \text{message variable $x\in\X$} \\
     & \mid & F(t_1,\dots,t_n) &\text{function application}\\
@@ -207,35 +205,98 @@ at a particular point of an execution.
 \end{figure}
 
 \begin{definition}
-  \cref{fig:terms} defines the syntax of terms
+  Given a signature $\Sigma = (\F,\N,\M,\Actions)$ and some sets of variables
+  $\X$, $\I$ and $\XT$,
+  \cref{fig:terms} defines the syntax of (meta-logic) terms
   of sort message (noted $t$) and timestamp (noted $T$).
   The only terms of sort index are index variables.
-  Given (interpretations $\hat{a}$ and $\hat{m}$ for action
-  constants are macro symbols and) a mapping\footnote{
-    The choice of $\mathbb{N}$ is arbitrary.
-    We could interpret indices and timestamps into different sets.
-  } $I : \I\to\mathbb{N}$ and $A : \XT\to\mathbb{N}$
-  we define $(T)^{I,A}$ and $(t)^{I,A}$ as follows:
+  The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
+\end{definition}
+
+We can now define a meta-interpretation as the structure needed to
+give a meaning to index and timestamp terms. A meta-interpretation
+also induces a translation from a meta-logic signature $\Sigma$
+to some base logic signature $\Sigma^I$. For example, if
+$\Sigma$ contains a name $\mathsf{n}$ with index arity $1$, and
+the meta-interpretation interprets indices in a domain $D_\I = \{
+  17, 22 \}$, the base logic signature will feature
+two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
+
+\begin{definition}
+  A meta-interpretation $I$ for $\Sigma = (\F,\M,\N)$ consists in:
+  \begin{itemize}
+    \item two finite sets $D_\I$ and $D_\XT$ called the index and timestamp
+      domains of the interpretation;
+    \item mappings $\sigma_\I : \I \to D_\I$
+      and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
+      timestamp variables as elements of their respective domains;
+    \item a total ordering $\leq$ over $D_\XT$,
+      a function $p : D_\XT \to D_\XT$ (for interpreting the 
+      predecessor\footnote{
+        It does not matter that the predecessor means anything
+        wrt.\ the ordering. We will impose later that it behaves
+        well enough.
+      })
+      and a subset $H_\XT\in D_\XT$ (for identifying timestamps
+      that actuallly happen in an execution\footnote{
+        We cannot identify timestamps freely in the meta-interpretation
+        because we want to be able to use axioms such as
+        $\forall i\neq j.~ a[i] \neq a[j]$ without restricting
+        them to timestamps that really happen.
+      });
+    \item for each constant $a \in \Actions$ of index arity $k$,
+      an interpretation $\hat{a} : D_\I^k \to D_\XT$;
+    \item for each macro symbol $m \in \M$ of index
+      arity $k$ and arity $n$, an interpretation
+      $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_XT \to \Msg^I_\Sigma$,
+      where $\Msg^I_\Sigma$ is the set of terms of the base
+      logic for the signature
+      $(\F^I,\N^I)$ with
+      $$ \F^I =
+      \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_I \}
+      \text{ and }
+      \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k, 
+      e_1,\ldots,e_k\in D_I \}.$$
+  \end{itemize}
+\end{definition}
+
+Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in 
+D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
+
+\begin{definition}
+  Given a meta-interpretation $I$
+  we define $(T)^{I} \in D_\XT$ and $(t)^{I} \in \Msg^I_\Sigma$ as follows:
   \begin{eqnarray*}
-    (\tau)^{I,A} &=& A(\tau) \\
-    (\pre(T))^{I,A} &=& (T)^{I,A}-1 \\
-    (a[i_1,\ldots,i_k])^{I,A} &=& \hat{a}(I(i_1),\ldots,I(i_k))
+    (\tau)^{I} &=& \sigma_\XT(\tau) \\
+    (\pre(T))^{I} &=& p((T)^{I}) \\
+    (a[i_1,\ldots,i_k])^{I} &=& \hat{a}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
   \end{eqnarray*}
   \begin{eqnarray*}
-    (\mathsf{n}[i_1,\ldots,i_k])^{I,A} &=& \mathsf{n}_{I(i_1),\ldots,I(i_k)}
+    (\mathsf{n}[i_1,\ldots,i_k])^{I} &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
     \\
-    (x)^{I,A} &=& x
+    (x)^{I} &=& x
     \\
-    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I,A} &=&
-    f_{I(i_1),\ldots,I(i_k)}\bigl(
-      (t_1)^{I,A},\ldots,(t_n)^{I,A}
+    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I} &=&
+    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
+      (t_1)^{I},\ldots,(t_n)^{I}
     \bigr)
     \\
-    (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I,A} &=&
-    \hat{m}(I(i_1),\ldots,I(i_k),
-      (t_1)^{I,A},\ldots,(t_n)^{I,A})
+    (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I} &=&
+    \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
+      (t_1)^{I},\ldots,(t_n)^{I},
+      (T)^{I})
   \end{eqnarray*}
 \end{definition}
+
+\begin{example}
+  Consider the meta-logic term $t := \mathsf{h}(\mout@a[i],\mathsf{k}[i])$
+  and an interpretation $I$ with $D_T = [1;10]$ and $D_I = [1;3]$
+  (which might be relevant if we are considering traces of ten actions
+  with three agents) such that $\sigma_I(i)=2$ and $\hat{a}(2)=10$
+  and $\hat{\mout}(10)=\mathsf{ok}$ (the message outputted at step 10
+  is $\mathsf{ok}$).
+  We then have $(t)^I = \mathsf{h}(\mathsf{ok},\mathsf{k}_2)$.
+\end{example}
 
 The reason why macros take only one timestamp argument is purely practical:
 we have no use for more. At this point one might wonder why we separate 
@@ -245,30 +306,13 @@ less structure on indices than on actions, making reasoning easier on them
 (one can simply compare indices, there is no ordering and no predecessor
 operation on them).
 
-Note that, for each name $\mathsf{n}\in \N$ and integers $i_1,\ldots,i_k$,
-$\mathsf{n}(i_1,\ldots,i_k)$ refers to a distinct name in the base logic.
-
-Terms of the meta-logic extend the base terms in two ways.
-First, the meta-logic features \emph{indexed} function symbols,
-representing families of function symbols of the base logic.
-For example, the indexed name $\mathsf{k}[i]$
-(where $i$ is an index variable, on which we can quantify in the meta-logic)
-may represent an infinity of distinct name constants $\mathsf{k}_n$
-of the base logic for $n\in\mathbb{N}$.
-Second, the meta-logic features \emph{macro} symbols, which get
-expanded when translating to the base logic.
-For example, the term $\mathsf{output}@a[i]$ may be expanded,
-when $i$ is interpreted by $n$, to the message outputted by
-action $a[n]$ of the protocol.
-
-
-\emph{TODO reprendre: cela n'est qu'une intuition sur l'utilisation qu'on fera 
-ensuite de la logique.}
-If we are given a sequence of unique actions, it defines what we call a timestamp, which is essentially an action and its position inside the sequence. Timestamps are then comlpetely ordered, and it is possible to consider the successor or the predecessor of an action. Terms and indices are not ordered.
-
 \subsection{Formulas}
 
-The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
+The syntax of the meta-logic formulas is given in \cref{fig:syntax}.
+We could have included more generally a notion of predicate macro that
+would have to be expanded when translating a formula from the meta-logic
+to the base logic. Instead we opted to list the few atoms that we
+will use in practice.
 
 \begin{figure}
   \[
@@ -277,11 +321,11 @@ The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
     \T &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
     \\[2ex]
    \atom & := & t=t'
- & \text{atomic proposition over terms } \\
-  &\mid & \tau=\tau' \mid \tau \leq \tau' \mid \happens(\tau) &  \text{atomic proposition
+ & \text{atomic proposition over messages } \\
+  &\mid & T=T' \mid T \leq T' \mid \happens(T) &  \text{atomic proposition
   over timestamps } \\
   &\mid & i=i'  &  \text{atomic proposition
-    over index } \\
+    over indices } \\
     \end{array}
 \\
 \\
@@ -296,60 +340,78 @@ The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
     \caption{Syntax of first order formulas.}\label{fig:syntax}
 \end{figure}
 
-
-Terms $t$ may represent messages of a protocol, where given a trace,
-i.e a sequence of actions, $\mout@\tau$ and
-$\minp@\tau$ models the output and input of the protocol at this
-point in the trace. We will only consider well typed formulas, i.e
-formulas where all variables (which are typed) are used accordingly
-to there type (e.g, $s@x$ is ill-typed if $x$ is of type $\mess$).
-
-\subsection{Semantics}
-
-We will execute protocols according to the \BC model. This means that any message will be interpreted as a Polynomial Time Turing Machine which given infinite random tapes and a security parameter outputs a bitstring. We denote $D$ the set of such Turing Machines, which we call messages.
-
-\charlie{insert here definition of a computational model $\M$ according to BC, which yelds an interpretation of terms $\sem{\dots}_\M^\eta$. Only honnest function symbols need to be interpreted for the moment.}
-
-
-\charlie{define here the \BC logic, which allows to test if $\M,\sigma \models_\BC \phi \sim \true$}
-
-Our goal is to interpret formulas inside the \BC logic, to capture the fact that the formula holds with overwhelming probability for a given sequence of actions. However, we must take care of the quantifications over the indices and the timestamps. The main idea is that given an explicit sequence of actions, the set of possible timestamps becomes fixed, and we can capture a forall using a conjonction over all the timestamps of the sequence. If we fix the set of indices, we can do the same transformation. Remark that the quantifications over the messages do not need to be transformed, as they can be handled inside the \BC logic. However, they must only appear at top level, else it is difficult to provide a precise semantics modelling the expected behaviour.
-
 \begin{definition}
-  Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions, $\I$ a finite set of indices, and $\phi$ a first order formula such that all its terms are built over indices in $\I$,
-  We define inductively a transformation of the formulas $\phi^{\I,\A}$ as :
-  \begin{itemize}
- \item $ (\forall x:\idx.\ \phi) ^{\I,A} :=  \bigwedge_{i\in \I} (\phi\replace{x}{i})^{\I,A}$
- \item $ (\forall x:\timestamp.\ \phi)^{\I,A} := \bigwedge_{1 \leq i \leq n} (\phi\replace{x}{a_i})^{\I,A}$
-
-  \end{itemize}
-We propagate the transformation over all other quantifications and logical connectors homorphically.
+  If $I$ is a meta-interpretation and $e\in D_\I$,
+  $I[i\mapsto e]$ is the interpretation where $\sigma_\I$ is
+  modified so that $\sigma_{\I}(i)=e$.
+  We define the translation of a meta-logic formula $\phi$
+  into the base logic \emph{term} $(\phi)^I$
+  as follows:
+  \begin{eqnarray*}
+    (\phi\wedge\phi')^I &=& (\phi)^I \stackrel{.}{\wedge} (\phi')^I
+    \quad \text{and similarly for other boolean connectives} \\
+    (\forall i:\idx. \phi)^I &=&
+    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
+    (\forall \tau:\timestamp. \phi)^I &=&
+    \stackrel{.}{\wedge}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
+    (\exists i:\idx. \phi)^I &=&
+    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
+    (\exists \tau:\timestamp. \phi)^I &=&
+    \stackrel{.}{\vee}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
+    (i=i')^I &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right. \\
+    (T = T')^I &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } (T)^I = (T')^I \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right.
+    \quad\text{ and similarly for $\leq$} \\
+    (\happens(T))^I &=& \mathsf{true}
+    \text{ if } (T)^I \in H_\XT
+    \text{ and } \mathsf{false} \text{ otherwise}
+    \\
+    (t=t')^I &=& (t)^I = (t')^I
+  \end{eqnarray*}
 \end{definition}
 
-Once this transformation is performed over formulas, they can be naturally interpreted inside the BC model, if we consider in the computational model that timestamps form a completely ordered set and that the index set form a finite set of identifiers equipped with equality.
-
 \begin{definition}
-Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions and $\I$ a finite set of indices. We denote $\M_{\I,A}$ the computational model $\M$ extended with the interpretation of $\I$ as a finite set of identifiers equipped with equality and the intepretation of $\{a_i | 1 \leq i \leq n\}$ as a finite set, ordered such that $a_i \leq a_j \Leftrightarrow i\leq j$.
+  A formula $\phi$ of the meta-logic is said to be valid when,
+  for any meta-interpretation $I$, the base logic formula
+  $(\phi)^I \sim \mathsf{true}$ is valid.
+  (In other words, we have $\M,\sigma\models(\phi)^I\sim\mathsf{true}$
+  i.e. the boolean term $(\phi)^I$ is true with overwhelming
+  probability in any computational model $\M$ and for any interpretation
+  $\sigma$ of the free message variables\footnote{
+    In the tool, we only allow universal quantification over messages, and
+  only allow it at toplevel. The validity of such formulas is the same as
+  when the variables are left free.}.)
 \end{definition}
 
+The above definition can be adapted in a standard way to obtain the
+notion of logical consequence: we say that a meta-logic formula $\phi$ is a
+logical consequence of a set $S$ of meta-logic formulas when
+$\M\models(\phi)^I\sim\mathsf{true}$ holds for any $\M$ and $I$ such that
+$\M\models(\psi)^I\sim\mathsf{true}$ holds for all $\psi\in S$.
 
-We also need to interpret inside the \BC model the free variables and the inputs and outputs functions symbols. Given $\sigma$ a mapping from $\X \cup \{\mout@a \mid a \in \Actions \} \cup \{\minp@a \mid a \in \Actions \} \mapsto D$, we can consider the evaluation of terms inside a formula as $\sem{t\sigma}_\M^\eta$. Essentialy, this means that if we are given a valuation of the free variables and of the outputs and inputs symbols for each action, we can evaluate all the terms appearing in the formula. Given a protocol, we will later on interpret the outputs and the inputs with the corresponding valus.
+This allows to ask the really interesting question for us:
+we want to verify that a formula $\phi$ (the security property)
+holds for all executions of some protocol, in all computational models
+satisfying some cryptographic assumptions.
+This can be formulated as the logical consequence $Ax_m,Ax_p\models\phi$
+where $Ax_m$ and $Ax_p$ are two recursive sets of (meta-logic) axioms
+respectively restricting the class of models and of meta-interpretations
+that we want to consider.
 
-
-\begin{definition}
-Let $\M$ be a computational model, $A = a_1,\dots, a_n$  a sequence of actions, $\I$ a finite set of indices, $\sigma$ an evaluation of messages for all actions in $A$, and $\phi$ a first order formula such that all its terms are built over indices in $\I$ and variables bounds by $\sigma$.
-
-
-  We denote $A,\I,\M,\sigma \models \phi$ the fact that $A,\I,\M,\sigma$ satisfies $\phi$, defined by
-  \begin{itemize}
-  \item $A,\I,\M,\sigma \models \forall x_1,\dots,x_n : \mess.\ \phi $ if $\M_{\I,A}, \sigma \models_\BC \forall x_1,\dots,x_n : \mess. \phi^{\I,A} \sim \true$,
-  \end{itemize}
-\end{definition}
-
-
+More concretely, we will manipulate sequents $\Gamma \vdash \phi$
+(which should be read as the meta-logic formula
+$(\wedge\Gamma) \Rightarrow \phi$) and attempt to derive them using
+a set of inference rules that is sound wrt.\ the intended class
+of models and of protocol executions.
 
 \section{Protocols and trace logic}
-
 
 \subsection{Protocols definitions}
 We  model protocols as a set of possible actions available to the
