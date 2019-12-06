@@ -66,84 +66,216 @@
 \begin{document}
 \title{Meta-Logic for BC}
 
-
-\author{David Baelde, Adrien Koutsos}
+\author{David Baelde, Stéphanie Delaune,
+  Charlie Jacomme, Adrien Koutsos, Solène Moreau}
 
 \maketitle
 
+Bana and Comon have introduced an approach, which they call
+\emph{computationally complete symbolic attacker} (CCSA),
+to formulate security properties in the computational model as a first-order
+logic formulas. Roughly, the translate a security property (for a finite set
+of traces) as a first-order formula, then they seek to show that this formula
+is valid in all \emph{computational models} where attacker computations
+are unspecified and primitives satisfy some cryptographic assumptions. They
+way this is done is by showing that the formula is a logical consequence of
+some axioms, which are sound wrt.\ the considered class of computational 
+models.
 
-We first define a first order logic which allows to reason about abstract sequence of possible actions. We will then use this logic to reason about protocols, where sequences of actions will correspond to traces of a protocol. According to this aim, the terms used to model message will contain function symbols and macros allowing to symbollicaly model the inputs and outputs performed by the protocol at some point in the trace, or symbol allowing to model states. Indices will be used to instantiate multiple instances of the same term.
+We introduce here a \emph{meta-logic} whose formulas correspond to schemas
+of formulas in the \emph{base logic}
+--- which we might call the CCSA or BC logic.
+We present inference rules which are sound in the same way as before,
+i.e.\ any instance of the schema is a formula that is valid in all
+computational models subject to the relevant cryptographic assumptions.
+
+We define next the meta-logic which abstractly allows to reason about
+executions of a protocol. The precise definition of protocols and their
+semantics is not needed for that first step, and is defined only in a
+second part.
+
 \section{A Logic for abstract sequence of actions}
 
-\subsection{Syntax of the logic}
-We denote $\F$ a set of function symbols (used to model encryptions,
-pairs,\dots). $\N$ denotes an
-infinite set of names (used to model the randomness used in a
-protocol), and $\I$ denotes an infinite set of indexes (used to talk
-about multiple copies of the same agent). For
-each name $n\in \N$ and sequence of indices $\ov{id} \in \I$,
-$n(\ov{id})$ refers to a fresh unique name in $\N$. We denotes $\X$ an
-infinite set of identifiers, used for variables.
+\subsection{The base logic}
 
-We finally denote $\States$ a set of identifiers used to model
-mutable
-states, which can also be parametrized by sequences of indices, and
-$\Actions$ a set of identifiers used to model actions
-(which
-will be used
-to model an atomic step of a protocol).
+The base logic is that of Bana and Comon (CCS'14). It is first-order logic
+with a distinguished kind of constant for representing names (written
+$\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
+and featuring a single predicate noted $\sim$ (or rather, a family
+of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
+The terms are all of the same sort: they are meant to represent messages.
+\marginpar{
+  The distinction between booleans and messages may be ignored
+  for the theory?
+}
 
-If we are given a sequence of unique actions, it defines what we call a timestamp, which is essentially an action and its position inside the sequence. Timestamps are then comlpetely ordered, and it is possible to consider the successor or the predecessor of an action. Terms and indices are not ordered.
+In practice, the logic will be considered with function symbols for 
+representing cryptographic primitives as well as attacker computations, and 
+boolean constants and connectives.
 
-The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
+The formulas of the base logic are intended to be interpreted in 
+\emph{computational models}, where terms are interpreted as PPT Turing 
+machines, $\sim$ is interpreted as indistinguishability,
+names are independent random samplings,
+and function symbols correspond to deterministic machines.
+In particular, function symbols corresponding to cryptographic primitives
+are interpreted as implementations of the primitives, subject to some
+assumptions.
+
+For example, if $\mathsf{n}$ and $\mathsf{m}$ are distinct names,
+the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and 
+$\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
+are valid.
+
+\subsection{Syntax of the meta-logic}
+
+Terms of the meta-logic are of three possible sorts: index, timestamps
+or message. Formulas of the meta-logic may feature predicates over each sort.
+Given interpretation $I$ and $T$ of index and timestamp variables
+into two finite sets, a formula $\phi$ of the meta-logic will be translated 
+into a term $(\phi)^{I,T}$ of the base logic in which index and action terms, 
+and predicates over them, will have disappeared. The validity of the 
+meta-logic formula $\phi$ will be defined as the validity of the base logic
+$(\phi)^{I,T}\sim\mathsf{true}$.
+
+\medskip
+
+We assume three infinite sets of variables:
+$\X$ (whose elements are noted $x$, $y$, $z$) for message variables;
+$\I$ (whose elements are noted $i$, $j$, $k$) for index variables;
+$\XT$ (whose elements are noted $\tau$) for timestamp variables.
+
+We assume a set $\F$ a set of indexed function symbols
+(used to model encryptions, pairs,\dots).
+Each of these symbols comes with an index arity as well as an unusual arity:
+if $f\in\F$ has index arity $k$ and arity $n$,
+then for all index variables $i_1,\ldots,i_k$ and terms $t_1,\ldots,t_n$,
+$f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
+
+We assume a set $\N$ of indexed names symbols,
+(used to model the randomness used in a protocol)
+and a sets of indexed constants $\Actions$
+(used to model specific timestamps).
+These indexed symbols only have an index arity: they
+cannot be applied to terms.
+
+We finally assume a set $\M$ of indexed macro symbols
+equipped with an arity and index arity, like function symbols.
+An indexed macro symbol will be applied to the specified number of
+indices, variables, and also to a single timestamp.
+We will typically assume macro symbols $\mout$ and $\minp$
+(with index arity $0$) for representing messages inputted and outputted
+at a particular point of an execution.
 
 \begin{figure}
 \[
 \begin{array}[t]{ccc}
     \begin{array}{rcl}
     f \in \F & & \text{function symbol}\\
-    id \in \I  & & \text{index}\\
-
-    x \in \X & & \text{variable}\\
+    M \in \M & & \text{macro symbol}\\
+    \mathsf{n} \in \N & & \text{name symbol}
     \end{array}
-&     \begin{array}{rcll}
-\tau &:=& a \in \Actions & \text{action} \\
-& \mid & \suc(\tau) & \text{action} \\
-\end{array}
-   &
+    &
     \begin{array}{rcll}
-
-    n &:=& n \in \N & \text{name}\\
-    &\mid& n(id_1,\dots,id_n) & \text{name copy} \\
-    \\
-
-    s&:=& s \in \States & \text{state}\\
-    &\mid& s(id_1,\dots,id_n) & \text{state copy}\\
-
+      n &:=& \mathsf{n}[i_1,\ldots,i_n]
+      \\
+      F &:=& f[i_1,\ldots,i_k] & (f\in\F \text{ of index arity } $k$)
+      \\
+      M &:=& m[i_1,\ldots,i_k] & (m\in\M \text{ of index arity } $k$)
     \end{array}
 \end{array}
 \]
-
 \[
-  \begin{array}{c}
+  \begin{array}{rcll}
+    T &:=& \tau & \text{timestamp variable} \\
+      &\mid& a[i_1,\ldots,i_k] & \text{constant (for $a\in\mathbb{A}$)} \\
+      &\mid & \pre(T) & \text{successor} \\
+\end{array}
+   \]
+\[
      \begin{array}{rcll}
-    \T &  := & \timestamp \mid \idx & \text{
-        type of trace variables} \\
-    \T' &  := & \mess \mid \bool & \text{
-        type of term variables} \\
 
       \\
 
-    t & := & n &\text{a name } \\
-           & \mid & s@\tau &\text{value of a state}\\
-    & \mid & x  & \text{a variable} \\
-    & \mid & \mout@\tau & \text{value of some output} \\
-    & \mid & \minp@\tau & \text{value of some input} \\
-    & \mid & f(t_1,\dots,t_n) &\text{function application}\\
+    t & := & n &\text{name} \\
+    & \mid & x  & \text{message variable $x\in\X$} \\
+    & \mid & F(t_1,\dots,t_n) &\text{function application}\\
+    & \mid & M(t_1,\ldots,t_n)@T &\text{macro application}\\
        \end{array}
-\\
-\\
+     \]
+     \caption{Meta-logic terms}\label{fig:terms}
+\end{figure}
+
+\begin{definition}
+  \cref{fig:terms} defines the syntax of terms
+  of sort message (noted $t$) and timestamp (noted $T$).
+  The only terms of sort index are index variables.
+  Given (interpretations $\hat{a}$ and $\hat{m}$ for action
+  constants are macro symbols and) a mapping\footnote{
+    The choice of $\mathbb{N}$ is arbitrary.
+    We could interpret indices and timestamps into different sets.
+  } $I : \I\to\mathbb{N}$ and $A : \XT\to\mathbb{N}$
+  we define $(T)^{I,A}$ and $(t)^{I,A}$ as follows:
+  \begin{eqnarray*}
+    (\tau)^{I,A} &=& A(\tau) \\
+    (\pre(T))^{I,A} &=& (T)^{I,A}-1 \\
+    (a[i_1,\ldots,i_k])^{I,A} &=& \hat{a}(I(i_1),\ldots,I(i_k))
+  \end{eqnarray*}
+  \begin{eqnarray*}
+    (\mathsf{n}[i_1,\ldots,i_k])^{I,A} &=& \mathsf{n}_{I(i_1),\ldots,I(i_k)}
+    \\
+    (x)^{I,A} &=& x
+    \\
+    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I,A} &=&
+    f_{I(i_1),\ldots,I(i_k)}\bigl(
+      (t_1)^{I,A},\ldots,(t_n)^{I,A}
+    \bigr)
+    \\
+    (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I,A} &=&
+    \hat{m}(I(i_1),\ldots,I(i_k),
+      (t_1)^{I,A},\ldots,(t_n)^{I,A})
+  \end{eqnarray*}
+\end{definition}
+
+The reason why macros take only one timestamp argument is purely practical:
+we have no use for more. At this point one might wonder why we separate 
+indices and actions given that they are interpreted similarly: it is again
+purely practical, we will use them for different purposes, and we will need
+less structure on indices than on actions, making reasoning easier on them
+(one can simply compare indices, there is no ordering and no predecessor
+operation on them).
+
+Note that, for each name $\mathsf{n}\in \N$ and integers $i_1,\ldots,i_k$,
+$\mathsf{n}(i_1,\ldots,i_k)$ refers to a distinct name in the base logic.
+
+Terms of the meta-logic extend the base terms in two ways.
+First, the meta-logic features \emph{indexed} function symbols,
+representing families of function symbols of the base logic.
+For example, the indexed name $\mathsf{k}[i]$
+(where $i$ is an index variable, on which we can quantify in the meta-logic)
+may represent an infinity of distinct name constants $\mathsf{k}_n$
+of the base logic for $n\in\mathbb{N}$.
+Second, the meta-logic features \emph{macro} symbols, which get
+expanded when translating to the base logic.
+For example, the term $\mathsf{output}@a[i]$ may be expanded,
+when $i$ is interpreted by $n$, to the message outputted by
+action $a[n]$ of the protocol.
+
+
+\emph{TODO reprendre: cela n'est qu'une intuition sur l'utilisation qu'on fera 
+ensuite de la logique.}
+If we are given a sequence of unique actions, it defines what we call a timestamp, which is essentially an action and its position inside the sequence. Timestamps are then comlpetely ordered, and it is possible to consider the successor or the predecessor of an action. Terms and indices are not ordered.
+
+\subsection{Formulas}
+
+The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
+
+\begin{figure}
+  \[
+  \begin{array}{c}
    \begin{array}{rcll}
+    \T &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
+    \\[2ex]
    \atom & := & t=t'
  & \text{atomic proposition over terms } \\
   &\mid & \tau=\tau' \mid \tau \leq \tau' \mid \happens(\tau) &  \text{atomic proposition
@@ -157,10 +289,6 @@ The syntax of the Meta-BC logic is given in \cref{fig:syntax}.
     \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi
     \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
     \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom &
-\\
-    \psi & ::= &  \phi \mid \forall x : \T'. \phi \mid \exists x : \T'. \phi &
-    \text{
-    first order formula} \\
     \end{array}
 
 \end{array}
