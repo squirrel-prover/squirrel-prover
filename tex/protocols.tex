@@ -1,0 +1,119 @@
+\section{Protocols and trace logic}
+
+Without entering into the details of the protocol semantics, we can already
+restrict the set of meta-interpretations of interest, to justify some of the
+rules that we use. We would alternatively impose these conditions from the
+beginning in the definition of meta-interpretations.
+
+\begin{definition}
+A meta-interpretation is trace-like when:
+\begin{itemize}
+\item for every $t,t''\in H_\XT$ and $t'\in D_\XT$
+  such that $t<t'<t''$, we have $t'\in H_\XT$;
+\item for every $t\in H_\XT$, $p(t) < t$ and there
+is no $t'\in D_\XT$ such that $p(t)<t'<t$;
+\item for any two constants $a,b\in\Actions$,
+  the images of $\hat{a}$ and $\hat{b}$ are disjoint,
+  and $\hat{a}$ is injective;
+\item probably some more\ldots
+\end{itemize}
+\end{definition}
+
+\emph{[David] Is it enough for what is used to solve constraints?
+  For example, this does not allow to derive a contradiction from 
+  $p(\tau)=\tau$, unless we know $\happens(\tau)$.}
+
+\begin{proposition}
+The rules of \cref{fig:tracelike} (\emph{TODO})
+are sound wrt.\ trace-like meta-interpretations.
+\end{proposition}
+
+It is important that any protocol execution (to be defined next) can be
+mapped to a trace-like meta-interpretation. This would not be possible,
+for instance, if we had only one point outside of $H_\XT$.
+
+\emph{[David] I have not carefully worked through what follows, and it
+probably needs (at least) to be updated following the changes in the previous
+section.}
+
+\subsection{Protocols definitions}
+We  model protocols as a set of possible actions available to the
+attacker. An action essentially models a step of the protocol, where
+the attacker provides some inputs, some conditions are checked, some
+updates are performed, and finally an output is performed.
+
+Some actions may be available to the attacker in parallel, or one
+after the other. A protocol will then be a tree, each node labelled by an action, a parallel operator or a choice operator.
+
+\begin{definition}
+An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in I^k$ is a list of indices variable, $\phi$ is a propositional formula over ground terms (called the condition of $s$), $U$ is a set of states updates (a mapping from state symbols to terms), and $o$ is a list of ground terms.
+All indices appearing in $\phi,U,o$ must appear in $I$.
+
+Given a set of actions $\Actions$, a protocol $P$ is a term built over the signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that when going down inside the protocol, the indices set of the actions can only grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We denote $\suc^*(a)$ all the descendants of a node (including itself), $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its brother, which are defined only if they exists.
+\end{definition}.
+
+We may denote an action $s(\ov{id})$ to give explicitely its set of indexes.
+For concision, we will denote protocols using $;,\|,\oplus$. For instance, $s_1; (s_2 \| s_3(id))$ represents the protocol where the attacker can first execute $s_1$, and can then execute in any order $s_2$, and an arbitrary number of occurences of $s_3(id)$.
+
+There exists a natural translation from applied pi-calculus to this notion of actions, reminescent of the translation inside Horn Clauses performed by Proverif, or the translation inside Multi Set Rewritting rules performed by Sapic (a Tamarin extension).
+
+\subsection{Symbolic protocol execution}
+
+Protocols can be executed according to the ordering constraints on protocol steps defined by the protocol tree.
+Each action depending on indices may be instantiated an arbitrary number of time using distinct indices. The protocol defines how the protocol steps may be executed. For instance, if some protocol step appears in
+the trace with some defined indices, all its ancestors must have been executed previously in the trace.
+
+
+\begin{definition}
+  Given a protocol $P$, a symbolic trace of of $P$ is given, for any $n\in\mathbb{N}$, by a sequence of actions $a_0 (\ov{id}_0),\dots,a_n (\ov{id}_n)$, such that for all $1 \leq i,j \leq n$,
+  \begin{itemize}
+    \item each action is an instantiation of a protocol action and indices are uniformly instantiated, i.e, there exists $\sigma : \I \mapsto \I$, such that $a_i (\sigma (\ov{id})) \in\Actions(P)$,
+    \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i \neq\ov{id}_j$,
+    \item if an action must happen before another one, it is reflected in the trace, i.e
+      if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
+    \item if the protocol enforces a choice between two actions, then it is respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(\bro (a_i(\sigma(\ov{id}_i))))$,
+      \item the actions only depends on previous actions, i.e, for any $\mout@a$ (resp. $\minp@a$) which appears in the terms of $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such that $a = a_k(\ov{id}_k)$.
+      \end{itemize}
+\end{definition}
+Intuitively, a symbolic trace represent a possible scheduling of the protocol, when abstracting all the inputs. Some symbolic trace may not correspond to any actual execution of the protocol, if for instance an action require a condition which is never met.
+
+Notice that the number of symbolic traces is infinite as soon as there exists an accessible action with a non nil set of indices.
+
+
+\subsection{Concrete protocol execution}
+As in the \BC model, we model arbitrary messages produced by the attacker using free function symbols $\G = \{g_i | i \in \mathbb{N}\} $, and extend the definition of a computational model $\M$ so that it contains Turing Machines for each attacker symbol.
+
+Given a symbolic trace of the protocol, we can define the substitution which maps inputs, outputs and states to terms using the attacker function symbols, with the required attacker knowledge at each step.
+
+\begin{definition}
+  Given a symbolic trace $A = a_0,\dots,a_n$ of $P$, we define inductively $\sigma$ the instantiation of the inputs and ouputs of $A$ such that:
+  \begin{itemize}
+  \item $\minp@a_i\sigma := g_i( \mout@a_0\sigma,\dots,\mout@a_{i-1}\sigma  ) $
+  \item $\mout@a_i\sigma := o_0\sigma, \dots, o_k\sigma$, where $o_0,\dots,o_k$ is the set of ouputs of  $a_i$,
+    \item $s@a_i := u\sigma$, where $s$ is a state and $s \mapsto u$ is the latest update corresponding to $s$ appearing inside the actions before $a_i$.
+\end{itemize}
+\end{definition}
+Note that $\sigma$ can indeed be defined, as by definition of a symbolic traces, the outputs of the action $a_i$ only depends on input values of previous actions.
+
+\begin{definition}
+  A (concrete) trace of $P$ is given by a symbolic trace $A = a_0,\dots,a_n$ of $P$ along with a computational model $\M$, such that with $\sigma$ the instantiation of $A$, we have that $A,\I,\M,\sigma \models \bigwedge_{1\leq i \leq n} \phi_i$, where $\phi_i$ is the condition of $a_i$.
+
+  We denote $\tr(P)$ the set of traces of $P$.
+\end{definition}
+
+A trace of $P$ then corresponds to an actual possible evaluation of $P$. More strongly, $\tr(P)$ represents the set of all possible executions of the protocol $P$ for all possible probabilistic polynomial time attackers.
+
+\subsection{Semantics of formulas for protocols}
+
+\begin{definition}
+  Let $\phi$ be a formula and $(A=(a_0,\dots,a_n),\M)$ a trace of $P$. If we denote $I(A,\phi)$ the set of indices appearing in $A$ extended with fresh indices for each quantification over indices in $\phi$ , and $\sigma$ the instantiation of $A$,
+
+we say that $P$ satisfies $\phi$, denoted $P \models \phi$, if for all $(A,\M)$ in $\tr(P)$, $A, I(A,\phi), \M, \sigma \models \phi$.
+
+\end{definition}
+
+This semantics does match the intuition: for all possible executions of the protocol and for any
+
+security parameter, the execution satisfies the formula.
+
+$I(A,\phi)$ must depend both on the formula and the trace, so that the formula $\exists i:\idx, i=i$ is true, even when considering the empty protocol.
