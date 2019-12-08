@@ -82,13 +82,13 @@
 
 Bana and Comon have introduced an approach, which they call
 \emph{computationally complete symbolic attacker} (CCSA),
-to formulate security properties in the computational model as a first-order
-logic formulas. Roughly, the translate a security property (for a finite set
+to formulate security properties in the computational model as first-order
+logic formulas. Roughly, they translate a security property (for a finite set
 of traces) as a first-order formula, then they seek to show that this formula
 is valid in all \emph{computational models} where attacker computations
-are unspecified and primitives satisfy some cryptographic assumptions. They
+are unspecified and primitives satisfy some cryptographic assumptions. The
 way this is done is by showing that the formula is a logical consequence of
-some axioms, which are sound wrt.\ the considered class of computational 
+some axioms, which are sound wrt.\ the considered class of computational
 models.
 
 We introduce here a \emph{meta-logic} whose formulas correspond to schemas
@@ -110,13 +110,13 @@ second part.
 \section{Concrete meta-logic}
 
 \emph{We are not defining a new logic, but identifying axioms (or inference
-rules, which would be closer to the tool) that hold in all 
+rules, which would be closer to the tool) that hold in all
 meta-interpretations corresponding to protocol executions.}
 
-Now that the semantics of formulas is defined given a specific protocol, we 
-can define a logic allowing to prove such formulas. We will reason using 
-classical sequent calculs, extended with some axioms obtained form the 
-constraints based on the protocol, or computational axioms made about the 
+Now that the semantics of formulas is defined given a specific protocol, we
+can define a logic allowing to prove such formulas. We will reason using
+classical sequent calculs, extended with some axioms obtained form the
+constraints based on the protocol, or computational axioms made about the
 primitives. We will use implicitely the axioms about equality.
 
 Given a protocol $P$, we define a set of path constraints axioms $C_P$ with the formulas:

@@ -12,17 +12,17 @@ with a distinguished kind of constant for representing names (written
 $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
 and featuring a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
-The terms are all of the same sort: they are meant to represent 
+The terms are all of the same sort: they are meant to represent
 messages\footnote{
   David: I hope/believe that the distinction between booleans and messages
   can be ignored for the theory.
 }.
 
-In practice, the logic will be considered with function symbols for 
-representing cryptographic primitives as well as attacker computations, and 
+In practice, the logic will be considered with function symbols for
+representing cryptographic primitives as well as attacker computations, and
 boolean constants and connectives.
 
-The formulas of the base logic are intended to be interpreted in 
+The formulas of the base logic are intended to be interpreted in
 \emph{computational models}, where:
 \begin{itemize}
   \item terms are interpreted as PPT Turing machines which,
@@ -37,7 +37,7 @@ are interpreted as implementations of the primitives, subject to some
 assumptions.
 
 For example, if $\mathsf{n}$ and $\mathsf{m}$ are distinct names,
-the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and 
+the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and
 $\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
 are valid.
 
@@ -46,9 +46,9 @@ are valid.
 Terms of the meta-logic are of three possible sorts: index, timestamps
 or message. Formulas of the meta-logic may feature predicates over each sort.
 Given interpretation $I$ and $T$ of index and timestamp variables
-into two finite sets, a formula $\phi$ of the meta-logic will be translated 
-into a term $(\phi)^{I,T}$ of the base logic in which index and action terms, 
-and predicates over them, will have disappeared. The validity of the 
+into two finite sets, a formula $\phi$ of the meta-logic will be translated
+into a term $(\phi)^{I,T}$ of the base logic in which index and action terms,
+and predicates over them, will have disappeared. The validity of the
 meta-logic formula $\phi$ will be defined as the validity of the base logic
 $(\phi)^{I,T}\sim\mathsf{true}$.
 
@@ -59,9 +59,9 @@ $\X$ (whose elements are noted $x$, $y$, $z$) for message variables;
 $\I$ (whose elements are noted $i$, $j$, $k$) for index variables;
 $\XT$ (whose elements are noted $\tau$) for timestamp variables.
 
-We assume a set $\F$ a set of indexed function symbols
+We assume a set $\F$ of indexed function symbols
 (used to model encryptions, pairs,\dots).
-Each of these symbols comes with an index arity as well as an unusual arity:
+Each of these symbols comes with an index arity as well as an usual arity:
 if $f\in\F$ has index arity $k$ and arity $n$,
 then for all index variables $i_1,\ldots,i_k$ and terms $t_1,\ldots,t_n$,
 $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
@@ -139,7 +139,7 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
       and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
       timestamp variables as elements of their respective domains;
     \item a total ordering $\leq$ over $D_\XT$,
-      a function $p : D_\XT \to D_\XT$ (for interpreting the 
+      a function $p : D_\XT \to D_\XT$ (for interpreting the
       predecessor\footnote{
         It does not matter that the predecessor means anything
         wrt.\ the ordering. We will impose later that it behaves
@@ -163,12 +163,12 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
       $$ \F^I =
       \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_I \}
       \text{ and }
-      \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k, 
+      \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
       e_1,\ldots,e_k\in D_I \}.$$
   \end{itemize}
 \end{definition}
 
-Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in 
+Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
 D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
 
 \begin{definition}
@@ -207,7 +207,7 @@ D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
 \end{example}
 
 The reason why macros take only one timestamp argument is purely practical:
-we have no use for more. At this point one might wonder why we separate 
+we have no use for more. At this point one might wonder why we separate
 indices and actions given that they are interpreted similarly: it is again
 purely practical, we will use them for different purposes, and we will need
 less structure on indices than on actions, making reasoning easier on them
@@ -313,8 +313,8 @@ satisfying some cryptographic assumptions.
 This can be guaranteed if we have $Ax\models\phi$
 where $Ax$ is a (recursive) set of axioms that are sound
 wrt.\ the intended class of meta-interpretations and computational models.
-We might be able to formulate such as set $Ax$ (which would consist of
-two parts, first the usual BC axioms, second some meta-logic axioms 
+We might be able to formulate such a set $Ax$ (which would consist of
+two parts, first the usual BC axioms, second some meta-logic axioms
 constraining the meta-interpretations to correspond to protocol executions).
 However, we will go for an easier task: designing a set of inference
 rules that allow to derive meta-logic formulas (rather, sequents)
@@ -474,3 +474,8 @@ when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
   This condition would be over-approximated in an implementation.}
   \label{fig:xor}
 \end{figure}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
