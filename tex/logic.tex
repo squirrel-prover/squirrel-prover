@@ -67,7 +67,7 @@ then for all index variables $i_1,\ldots,i_k$ and terms $t_1,\ldots,t_n$,
 $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
 
 We assume a set $\N$ of indexed names symbols,
-(used to model the randomness used in a protocol)
+(used to model random samplings)
 and a sets of indexed constants $\Actions$
 (used to model specific timestamps).
 These indexed symbols only have an index arity: they
@@ -77,6 +77,7 @@ We finally assume a set $\M$ of indexed macro symbols
 equipped with an arity and index arity, like function symbols.
 An indexed macro symbol will be applied to the specified number of
 indices, variables, and also to a single timestamp.
+This timestamp gives the instant at which the macro is evaluated.
 We will typically assume macro symbols $\mout$ and $\minp$
 (with index arity $0$) for representing messages inputted and outputted
 at a particular point of an execution.
@@ -131,7 +132,7 @@ the meta-interpretation interprets indices in a domain $D_\I = \{
 two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
 
 \begin{definition}
-  A meta-interpretation $I$ for $\Sigma = (\F,\M,\N)$ consists in:
+  A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }} for $\Sigma = (\F,\M,\N)$ consists in:
   \begin{itemize}
     \item two finite sets $D_\I$ and $D_\XT$ called the index and timestamp
       domains of the interpretation;
@@ -151,6 +152,7 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
         because we want to be able to use axioms such as
         $\forall i\neq j.~ a[i] \neq a[j]$ without restricting
         them to timestamps that really happen.
+        \adrien{I think there are more fundamental reason for that. Considering the way for formulate things, for any $a \in \bbA$ (of arity 1) and $i \in D_\I$, $a[i]$ has an interpretation. But the protocol may not allow for it (because of restrictions). By consequence we need to be able to interpret $a[i]$ without it being valid.}
       });
     \item for each constant $a \in \Actions$ of index arity $k$,
       an interpretation $\hat{a} : D_\I^k \to D_\XT$;
@@ -160,17 +162,22 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
       where $\Msg^I_\Sigma$ is the set of terms of the base
       logic for the signature
       $(\F^I,\N^I)$ with
-      $$ \F^I =
-      \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_I \}
-      \text{ and }
-      \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
-      e_1,\ldots,e_k\in D_I \}.$$
+      \[
+        \F^I =
+        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_I \}
+        \text{ and }
+        \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
+        e_1,\ldots,e_k\in D_I \}.
+      \]
+      \adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}
   \end{itemize}
 \end{definition}
 
 Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
 D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
+\adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
 
+Given a meta-interpratation $I$, we define the interpretation in $I$ of terms of the meta-logic has terms of the base logic.
 \begin{definition}
   Given a meta-interpretation $I$
   we define $(T)^{I} \in D_\XT$ and $(t)^{I} \in \Msg^I_\Sigma$ as follows:
@@ -202,7 +209,7 @@ D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
   (which might be relevant if we are considering traces of ten actions
   with three agents) such that $\sigma_I(i)=2$ and $\hat{a}(2)=10$
   and $\hat{\mout}(10)=\mathsf{ok}$ (the message outputted at step 10
-  is $\mathsf{ok}$).
+  is $\mathsf{ok}$ \adrien{I don't like this. It seems that macro can be interperted as the term we want at any timestamp.}).
   We then have $(t)^I = \mathsf{h}(\mathsf{ok},\mathsf{k}_2)$.
 \end{example}
 
@@ -281,7 +288,7 @@ will use in practice.
     \text{ if } (T)^I \in H_\XT
     \text{ and } \mathsf{false} \text{ otherwise}
     \\
-    (t=t')^I &=& (t)^I = (t')^I
+    (t=t')^I &=& (t)^I \stackrel{.}{=} (t')^I
   \end{eqnarray*}
 \end{definition}
 
@@ -292,10 +299,10 @@ will use in practice.
   (In other words, we have $\M,\sigma\models(\phi)^I\sim\mathsf{true}$
   i.e. the boolean term $(\phi)^I$ is true with overwhelming
   probability in any computational model $\M$ and for any interpretation
-  $\sigma$ of the free message variables\footnote{
+  $\sigma$ of the free message variables.\footnote{
     In the tool, we only allow universal quantification over messages, and
   only allow it at toplevel. The validity of such formulas is the same as
-  when the variables are left free.}.)
+  when the variables are left free.})
 \end{definition}
 
 \begin{definition}
@@ -305,6 +312,7 @@ will use in practice.
   when
   $\M\models(\phi)^I\sim\mathsf{true}$ holds for any $\M$ and $I$ such that
   $\M\models(\psi)^I\sim\mathsf{true}$ holds for all $\psi\in S$.
+  \adrien{This definition seems not necessary. We interpret meta-formula as (schemas of) first-order formulas. Hence entailment is exactly first-order logic entailment.}
 \end{definition}
 
 We want to verify that a formula $\phi$ (the security property)
