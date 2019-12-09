@@ -241,6 +241,9 @@ let fresh_instance env block =
 let iter_fresh_csa env f =
   Hashtbl.iter (fun a b -> f (fresh_instance env b)) action_to_block
 
+let iter_csa_block f =
+  Hashtbl.iter (fun a b -> f b) action_to_block
+
 let iter_csa f =
   Hashtbl.iter (fun a b -> f (to_descr b)) action_to_block
 

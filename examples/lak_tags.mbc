@@ -60,9 +60,9 @@ goal wa :
 Proof.
   euf 1.
   apply tags_neq.
-  nosimpl(exists i3,k2).
+  nosimpl(exists i1,k).
   split.
-  assert(key(i)=key(i3)).
+  assert(key(i)=key(i1)).
   admit.
   apply pairs_surj to input@R1(j,i).
 Qed.

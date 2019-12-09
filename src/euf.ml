@@ -69,7 +69,8 @@ let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
 type euf_schema = { key_indices : Action.index list;
                     message : Term.term;
-                    blk_descr : descr }
+                    blk_descr : descr;
+                    env : Vars.env }
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
@@ -107,19 +108,22 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule env mess sign hash_fn key_n =
+let mk_rule env_init mess sign hash_fn key_n =
   euf_key_ssc hash_fn key_n [mess;sign];
   { hash = hash_fn;
     key = key_n;
 
     case_schemata =
-      Utils.map_of_iter (Process.iter_fresh_csa env)
+      Utils.map_of_iter Process.iter_csa_block
         (fun blk ->
-           hashes_of_blk blk hash_fn key_n
-           |> List.map (fun (is, m) ->
-               { key_indices = is;
-                 message = m;
-                 blk_descr = blk })
+          let env = ref env_init in
+          let new_block = Process.fresh_instance env blk in
+          hashes_of_blk new_block hash_fn key_n
+          |> List.map (fun (is, m) ->
+            { key_indices = is;
+             message = m;
+             blk_descr = new_block;
+             env = !env })
         )
       |> List.flatten;
 

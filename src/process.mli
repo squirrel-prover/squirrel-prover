@@ -114,6 +114,16 @@ val reset : unit -> unit
   * names for input variables, output terms, etc. Actions are displayed
   * by default using their identifying symbol. *)
 
+(** Type block *)
+type block = {
+  action : Action.action ;
+  input : Channel.t * string ;
+  indices : Action.index list ;
+  condition : Action.index list * Bformula.fact ;
+  updates : (string * Action.index list * Term.term) list ;
+  output : Channel.t * Term.term
+}
+
 (** Type descr *)
 type descr = {
   action : Action.action ;
@@ -125,10 +135,15 @@ type descr = {
 
 val pp_descr : Format.formatter -> descr -> unit
 
+(** [fresh_instance env blk] returns a fresh instance (w.r.t. [env]) of the
+    description corresponding to the block [blk]. *)
+val fresh_instance : Vars.env ref -> block -> descr
+
 (** Iterate over a complete set of action descriptions.
     Does not instantiate fresh copies of the actions, as it increases
     unecessarily the variable counters. Can be used for display purposes. *)
 val iter_csa : (descr -> unit) -> unit
+val iter_csa_block : (block -> unit) -> unit
 
 (** Iterate over a complete set of action descriptions, and instantiate a fresh
     action. Can be used to introduce a new action inside the logic. *)

@@ -273,7 +273,7 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
     |> mk_and_cnstr
   in
   let constr = And (eq_cnstr, le_cnstr) in
-  (new_f, constr)
+  (new_f, constr, case.env)
 
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
@@ -294,15 +294,15 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
 let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Tactic_Hard_Failure "bad euf application"
   | Some p ->
-    let env = ref judge.Judgment.env in
+    let env = judge.Judgment.env in
     let (hash_fn, (key_n, key_is), m, s) = p in
     let rule = Euf.mk_rule env m s hash_fn key_n in
     let schemata_premises =
       List.map (fun case ->
-          let new_f, new_cnstr = euf_apply_schema judge.Judgment.theta p case in
+          let new_f, new_cnstr, new_env = euf_apply_schema judge.Judgment.theta p case in
           Judgment.add_fact new_f judge
           |> Judgment.add_constr new_cnstr
-          |> Judgment.set_env !env
+          |> Judgment.set_env new_env
         ) rule.Euf.case_schemata
     and direct_premises =
       List.map (fun case ->

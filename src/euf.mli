@@ -12,7 +12,8 @@ val subst_descr : subst -> descr -> descr
     [e.blk_block] stores the relevant block description for future use.  *)
 type euf_schema = { key_indices : Action.index list;
                     message : Term.term;
-                    blk_descr : descr }
+                    blk_descr : descr;
+                    env : Vars.env }
 
 
 val pp_euf_schema : Format.formatter -> euf_schema -> unit
@@ -44,4 +45,4 @@ exception Bad_ssc
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)
-val mk_rule : Vars.env ref -> term -> term -> fname -> name -> euf_rule
+val mk_rule : Vars.env -> term -> term -> fname -> name -> euf_rule
