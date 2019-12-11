@@ -33,6 +33,16 @@ let pp_error pp_loc e = match e with
               Fmt.pf ppf
                 "@[Type error %a.@]@."
                 pp_loc ())
+  | Symbols.Unbound_identifier ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Unbound identifier %a.@]@."
+                pp_loc ())
+  | Symbols.Multiple_declarations ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Multiple declarations %a.@]@."
+                pp_loc ())
   | Theory.Arity_error (s,i,j) ->
       Some (fun ppf () ->
               Fmt.pf ppf

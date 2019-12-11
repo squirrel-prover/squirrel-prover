@@ -83,4 +83,8 @@ val pp_ne_list :
   ('a -> 'b list -> unit, Format.formatter, unit) format ->
   'a -> Format.formatter -> 'b list -> unit
 
+val pp_list :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a list -> unit
+
 val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list

@@ -42,7 +42,7 @@ let get_indexvars (f : var list) =
 
 let pp_typed_list spref ppf vars =
   let open Fmt in
-  let open Utils in
+  let ident = Utils.ident in
   let tsvars = get_tsvars vars in
   if tsvars <> [] then
     Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"

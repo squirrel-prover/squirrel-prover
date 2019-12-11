@@ -242,3 +242,10 @@ let map_of_iter (iter : ('a -> unit) -> unit) (f : 'a -> 'b) =
   let f_side x = l := (f x) :: !l in
   iter f_side;
   !l
+
+let sep ppf () = Fmt.pf ppf ",@,"
+
+let pp_list pp_item ppf l =
+  if l <> [] then
+    Fmt.pf ppf "(@[<hov 1>%a@])"
+      (Fmt.list ~sep pp_item) l

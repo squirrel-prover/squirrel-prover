@@ -44,28 +44,28 @@ let rec pp_process ppf process =
       s pp_process p
 
   | Set (s, indices, t, p) ->
-    pf ppf "@[<hov 2>%s[%a] %a@ %a.@;@[%a@]@]"
+    pf ppf "@[<hov 2>%s%a %a@ %a.@;@[%a@]@]"
       s
-      (list Fmt.string) indices
+      (Utils.pp_list Fmt.string) indices
       (kw `Bold) ":="
       Theory.pp_term t
       pp_process p
 
   | New (s, p) ->
-    pf ppf "@[<hov>%a %a;@,@[%a@]@]"
+    pf ppf "@[<hov>%a %a;@ @[%a@]@]"
       (kw `Red) "new"
       (kw `Magenta) s
       pp_process p
 
   | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@,%a@]"
+    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
       (kw `Bold) "in"
       Channel.pp_channel c
       (styled `Magenta (styled `Bold ident)) s
       pp_process p
 
   | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@,%a@]"
+    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
       (kw `Bold) "out"
       Channel.pp_channel c
       Theory.pp_term t

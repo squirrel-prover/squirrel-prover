@@ -36,29 +36,27 @@ type term =
 
 let pp_action_shape = Action.pp_parsed_action
 
-let sep ppf () = Fmt.pf ppf ",@,"
-
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
   | Taction (a,l) ->
-    Fmt.pf ppf "%s(@[<hov 1>%a@])"
+    Fmt.pf ppf "%s%a"
       a
-      (Fmt.list ~sep pp_term) l
+      (Utils.pp_list pp_term) l
   | Fun (f,terms,ots) ->
-    Fmt.pf ppf "%s(@[<hov 1>%a@])%a"
+    Fmt.pf ppf "%s%a%a"
       f
-      (Fmt.list ~sep pp_term) terms
+      (Utils.pp_list pp_term) terms
       pp_ots ots
   | Name (n,terms) ->
-    Fmt.pf ppf "%a(@[<hov 1>%a@])"
+    Fmt.pf ppf "%a%a"
       (* Pretty-printing names with nice colors
        * is well worth violating the type system ;) *)
       Term.pp_name (Obj.magic n)
-      (Fmt.list ~sep pp_term) terms
+      (Utils.pp_list pp_term) terms
   | Get (s,ots,terms) ->
-    Fmt.pf ppf "!%s(@[<hov 1>%a@])%a"
+    Fmt.pf ppf "!%s%a%a"
       s
-      (Fmt.list ~sep pp_term) terms
+      (Utils.pp_list pp_term) terms
       pp_ots ots
   | Compare (ord,tl,tr) ->
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Bformula.pp_ord ord pp_term tr
@@ -132,7 +130,7 @@ let rec check_term env tm kind =
     begin try
       if List.assoc x env <> kind then raise Type_error
     with
-      | Not_found -> failwith ("unbound variable "^x)
+      | Not_found -> failwith (Printf.sprintf "unbound variable %S" x)
     end
   | Fun (f, ts, ots) ->
     begin
