@@ -552,8 +552,9 @@ exception Cannot_parse of process
 (** Parse a prepared process to extract its actions. *)
 let parse_proc proc : unit =
 let var_env = ref Vars.empty_env in
-  let conv_term env t =
+  let conv_term ?(pred=false) env t =
     let ts = Term.TName (List.rev env.action) in
+    let ts = if pred then Term.TPred ts else ts in
     let subst =
       List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
       List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
@@ -702,7 +703,7 @@ let var_env = ref Vars.empty_env in
       let updates =
         List.map
           (fun (s,l,t) ->
-             s, conv_indices env l, conv_term env t)
+             s, conv_indices env l, conv_term ~pred:true env t)
           updates
       in
       let indices = List.rev env.p_indices in
