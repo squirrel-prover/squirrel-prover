@@ -21,7 +21,7 @@
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
 %nonassoc QUANTIF
-%left DARROW
+%right DARROW
 %left OR
 %left AND
 %nonassoc NOT
