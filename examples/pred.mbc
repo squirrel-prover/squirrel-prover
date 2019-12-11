@@ -1,0 +1,5 @@
+system null.
+
+goal forall (t:timestamp), t <= pred(t) => false.
+Proof.
+Qed.
