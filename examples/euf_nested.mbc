@@ -1,0 +1,11 @@
+name n : message
+name k : message
+abstract f : message->message
+hash h
+system null.
+
+goal foo :
+  h(<f(n),f(f(n))>,k) = h(n,k) => n = <f(n),f(f(n))>.
+Proof.
+  euf 0.
+Qed.
