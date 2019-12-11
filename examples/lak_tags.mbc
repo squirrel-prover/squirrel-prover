@@ -15,16 +15,13 @@ name key : index->message
 channel cT
 channel cR
 
-(* TODO when macro support is complete, use the definitions
- * of m2, x1, and x2 which are currently inlined below *)
-
 process tag(i:index) =
   new nT;
   in(cR,nR);
   let m2 = h(<<nR,nT>,tag1>,key(i)) in
-  out(cT,<nT,h(<<nR,nT>,tag1>,key(i))>);
+  out(cT,<nT,m2>);
   in(cR,m3);
-  if m3@nT = h(<<h(<<nR,nT>,tag1>,key(i)),nR>,tag2>,key(i)) then
+  if m3@nT = h(<<m2,nR>,tag2>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -33,9 +30,6 @@ process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-  (* TODO let <x1,x2> = x in *)
-  let x1 = fst(x) in
-  let x2 = snd(x) in
   try find i such that snd(x) = h(<<nR,fst(x)>,tag1>,key(i)) in
     out(cR,h(<<snd(x),nR>,tag2>,key(i)))
   else
@@ -44,13 +38,7 @@ process reader(j:index) =
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
 (* TODO In the next lemma, it would be more natural to write
- * something like happens(ACTION) rather than ACTION=ACTION.
- * This could be left implicit since ACTION occurs in the
- * rest of the formula. The only cases I can think of where
- * the implicit treatment might not work is that of unreachability
- * statements: forall k, not(happens(ACTION)). *)
-(* TODO we should not get a type error when using an inexistent
- *   action name *)
+ * something like happens(ACTION) rather than ACTION=ACTION. *)
 goal wa :
   forall (i:index, j:index),
   output@R1(j,i) = output@R1(j,i) =>
@@ -66,4 +54,3 @@ Proof.
   admit.
   apply pairs_surj to input@R1(j,i).
 Qed.
-

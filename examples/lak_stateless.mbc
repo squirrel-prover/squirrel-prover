@@ -8,16 +8,13 @@ name key : index->message
 channel cT
 channel cR
 
-(* TODO when macro support is complete, use the definitions
- * of m2, x1, and x2 which are currently inlined below *)
-
 process tag(i:index) =
   new nT;
   in(cR,nR);
   let m2 = h(<nR,nT>,key(i)) in
-  out(cT,<nT,h(<nR,nT>,key(i))>);
+  out(cT,<nT,m2>);
   in(cR,m3);
-  if m3@nT = h(<h(<nR,nT>,key(i)),nR>,key(i)) then
+  if m3@nT = h(<m2,nR>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -26,9 +23,6 @@ process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-  (* TODO let <x1,x2> = x in *)
-  let x1 = fst(x) in
-  let x2 = snd(x) in
   try find i such that snd(x) = h(<nR,fst(x)>,key(i)) in
     out(cR,h(<snd(x),nR>,key(i)))
   else
@@ -37,29 +31,20 @@ process reader(j:index) =
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
 (* TODO In the next lemma, it would be more natural to write
- * something like happens(ACTION) rather than ACTION=ACTION.
- * This could be left implicit since ACTION occurs in the
- * rest of the formula. The only cases I can think of where
- * the implicit treatment might not work is that of unreachability
- * statements: forall k, not(happens(ACTION)). *)
-(* TODO we should not get a type error when using an inexistent
- *   action name *)
+ * something like happens(ACTION) rather than ACTION=ACTION. *)
 goal wa :
   forall (i:index, j:index),
   output@R1(j,i) = output@R1(j,i) =>
   exists (ii:index,k:index),
-  R1(j,i) > T1(ii,k) &&
-  input@R1(j,i) = output@T1(ii,k).
+  T(ii,k) <= R1(j,i) &&
+  fst(input@R1(j,i)) = nT(ii,k) &&
+  input@T(ii,k) = nR(j).
 Proof.
   euf 1.
-  (* TODO at this point eqnames should allow to conclude
-   * (perhaps after an assert, which will only work when reasoning
-   * on pairs and projections is completed) because we have
-   *   snd(input@..) = h(..) = nR(..)
-   * where the name does not occur in the hash. *)
-  assert(fst(<snd(input@R1(j1,i1)), nR(j1)>) =
-         fst(<nR(j), fst(input@R1(j,i))>)).
-  (* TODO this assert is so obvious
-       that the addition of the fact is cancelled *)
-  assert(h(<nR(j1), fst(input@R1(j1,i1))>, key(i1)) = nR(j)).
-  admit. (* need full support of fst(_) *)
+  admit. (* requires induction *)
+  nosimpl(exists i,k).
+  assert (input@T(i1,k)=input@T(i,k)).
+  admit.
+  assert (nT(i1,k)=nT(i,k)).
+  admit.
+Qed.
