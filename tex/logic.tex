@@ -114,7 +114,8 @@ symbols (resp.\ name or macro symbols) of index arity $k$.
 \end{figure}
 
 \begin{definition}
-  Given a signature $\Sigma = (\F,\N,\M,\Actions)$ and some sets of variables
+  Given a (meta logic) signature $\Sigma = (\F,\N,\M,\Actions)$
+  and some sets of variables
   $\X$, $\I$ and $\XT$,
   \cref{fig:terms} defines the syntax of (meta-logic) terms
   of sort message (noted $t$) and timestamp (noted $T$).
@@ -132,7 +133,8 @@ the meta-interpretation interprets indices in a domain $D_\I = \{
 two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
 
 \begin{definition}
-  A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }} for $\Sigma = (\F,\M,\N)$ consists in:
+  A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }}
+  for $\Sigma = (\F,\M,\N,\Actions)$ consists in:
   \begin{itemize}
     \item two finite sets $D_\I$ and $D_\XT$ called the index and timestamp
       domains of the interpretation;
@@ -146,7 +148,7 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
         wrt.\ the ordering. We will impose later that it behaves
         well enough.
       })
-      and a subset $H_\XT\in D_\XT$ (for identifying timestamps
+      and a subset $H_\XT\subseteq D_\XT$ (for identifying timestamps
       that actuallly happen in an execution\footnote{
         We cannot identify timestamps freely in the meta-interpretation
         because we want to be able to use axioms such as
@@ -160,21 +162,21 @@ two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
       arity $k$ and arity $n$, an interpretation
       $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_\XT \to \Msg^I_\Sigma$,
       where $\Msg^I_\Sigma$ is the set of terms of the base
-      logic for the signature
+      logic for the (base logic) signature
       $(\F^I,\N^I)$ with
       \[
         \F^I =
-        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_I \}
+        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_\I \}
         \text{ and }
         \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
-        e_1,\ldots,e_k\in D_I \}.
+        e_1,\ldots,e_k\in D_\I \}.
       \]
       \adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}
   \end{itemize}
 \end{definition}
 
 Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
-D_\I$, $\mathsf{n}_{i_1,\ldots,i_k}$ refers to a distinct name in $\N^I$.
+D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^I$.
 \adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
 
 Given a meta-interpratation $I$, we define the interpretation in $I$ of terms of the meta-logic has terms of the base logic.
