@@ -600,9 +600,7 @@ let declare_macro s typed_args k t =
       typed_args
   in
   let _,ts_var = Vars.make_fresh env Vars.Timestamp "ts" in
-  Fmt.pr "declare macro %s(%a)=%a@." s Vars.pp_env env pp_term t ;
   let t = convert (Term.TVar ts_var) tsubst t in
-  Fmt.pr "... %a@." Term.pp_term t ;
   ignore
     (Term.Macro.declare_exact s
        (Term.Local (List.rev typed_args,k,ts_var,t)))
