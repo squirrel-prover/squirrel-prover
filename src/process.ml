@@ -186,6 +186,21 @@ let pp_descr ppf descr =
     descr.updates
     Term.pp_term descr.output
 
+let subst_descr subst descr =
+  let action = Term.subst_action subst descr.action in
+  let subst_term = Term.subst_term subst in
+  let indices = List.map (Term.subst_index subst) descr.indices  in
+  let condition = Bformula.subst_fact subst descr.condition in
+  let updates =
+    List.map
+      (fun ((ss,is),t) ->
+         ((ss, List.map (Term.subst_index subst) is),
+          subst_term t))
+      descr.updates
+  in
+  let output = subst_term descr.output in
+  { action; indices; condition; updates; output }
+
 (** A block features an input, a condition (which sums up several [Exist]
   * constructs which might have succeeded or not) and subsequent
   * updates and outputs. The condition binds variables in the updates
@@ -222,21 +237,7 @@ let fresh_instance env block =
     List.map (fun i ->
         Term.Index(i, Vars.make_fresh_from_and_update env i)) block.indices
   in
-  let action = Term.subst_action subst block.action in
-  let refresh_term = Term.subst_term subst in
-  let refresh_fact = subst_fact subst in
-  let indices = List.map snd (Term.to_isubst subst) in
-  let condition = refresh_fact (snd block.condition) in
-  let updates =
-    List.map
-      (fun (s, l, t) ->
-         (Term.Macro.of_string s,
-          List.map (fun i -> List.assoc i (Term.to_isubst subst)) l),
-         refresh_term t)
-      block.updates
-  in
-  let output = refresh_term (snd block.output) in
-  { action; indices; condition; updates; output }
+  subst_descr subst (to_descr block)
 
 let iter_fresh_csa env f =
   Hashtbl.iter (fun a b -> f (fresh_instance env b)) action_to_block

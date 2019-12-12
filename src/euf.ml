@@ -67,17 +67,14 @@ let hashes_of_blk blk hash_fn key_n =
 
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
-type euf_schema = { key_indices : Action.index list;
-                    message : Term.term;
+type euf_schema = { message : Term.term;
                     blk_descr : descr;
                     env : Vars.env }
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
-              @[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
     Action.pp_action case.blk_descr.action
-    Vars.pp_list case.key_indices
     Term.pp_term case.message
 
 (** Type of a direct euf axiom case.
@@ -108,22 +105,32 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule env_init mess sign hash_fn key_n =
+let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
   euf_key_ssc hash_fn key_n [mess;sign];
   { hash = hash_fn;
     key = key_n;
-
     case_schemata =
-      Utils.map_of_iter Process.iter_csa_block
+      Utils.map_of_iter Process.iter_csa
         (fun blk ->
-          let env = ref env_init in
-          let new_block = Process.fresh_instance env blk in
-          hashes_of_blk new_block hash_fn key_n
-          |> List.map (fun (is, m) ->
-            { key_indices = is;
-             message = m;
-             blk_descr = new_block;
-             env = !env })
+          let env = ref env in
+          hashes_of_blk blk hash_fn key_n
+          |> List.map (fun (is,m) ->
+            let subst_fresh =
+              List.map
+                (fun i ->
+                   Term.Index (i, Vars.make_fresh_from_and_update env i))
+                (List.filter (fun x -> not (List.mem x is)) blk.indices)
+            in
+            let subst_is =
+              List.map2
+                (fun i j -> Term.Index (i,j))
+                is key_is
+            in
+            let subst = subst_fresh@subst_is in
+            let new_block = Process.subst_descr subst blk in
+            { message = Term.subst_term subst m ;
+              blk_descr = new_block;
+              env = !env })
         )
       |> List.flatten;
 

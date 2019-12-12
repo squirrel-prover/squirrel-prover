@@ -7,11 +7,12 @@ open Term
 val subst_descr : subst -> descr -> descr
 
 (** Type of an euf axiom case schema.
-    [e] of type [euf_schema] represents the fact that the message [e.m]
-    has been hashed, and the key indices were [e.eindices].
-    [e.blk_block] stores the relevant block description for future use.  *)
-type euf_schema = { key_indices : Action.index list;
-                    message : Term.term;
+    [e] of type [euf_schema] represents the fact that the message [e.message]
+    has been hashed.
+    [e.blk_descr] stores the relevant block description for future use,
+    with fresh indices where relevant (i.e. for indices other than the
+    key's indices).  *)
+type euf_schema = { message : Term.term;
                     blk_descr : descr;
                     env : Vars.env }
 
@@ -45,4 +46,5 @@ exception Bad_ssc
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)
-val mk_rule : Vars.env -> term -> term -> fname -> name -> euf_rule
+val mk_rule : env:Vars.env -> mess:term -> sign:term ->
+  hash_fn:fname -> key_n:name -> key_is:Action.index list -> euf_rule

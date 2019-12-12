@@ -161,3 +161,6 @@ val pp_descrs : Format.formatter -> unit -> unit
 
 (** Pretty-print actions and block descriptions *)
 val pp_proc : Format.formatter -> unit -> unit
+
+(** Apply a substitution to a description. *)
+val subst_descr : Term.subst -> descr -> descr

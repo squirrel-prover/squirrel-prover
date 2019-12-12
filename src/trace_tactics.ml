@@ -265,15 +265,7 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
       ) (Theta.maximal_elems theta (term_ts s @ term_ts m))
     |> mk_or_cnstr
   in
-  (* The key indices in the bock and when m was hashed are the same. *)
-  let eq_cnstr =
-    List.map2 (fun i i' ->
-        Atom (Pind (Eq, i, i'))
-      ) key_is case.key_indices
-    |> mk_and_cnstr
-  in
-  let constr = And (eq_cnstr, le_cnstr) in
-  (new_f, constr, case.env)
+  (new_f, le_cnstr, case.env)
 
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
@@ -295,8 +287,8 @@ let euf_apply_facts judge at = match modulo_sym euf_param at with
   | None -> raise @@ Tactic_Hard_Failure "bad euf application"
   | Some p ->
     let env = judge.Judgment.env in
-    let (hash_fn, (key_n, key_is), m, s) = p in
-    let rule = Euf.mk_rule env m s hash_fn key_n in
+    let (hash_fn, (key_n, key_is), mess, sign) = p in
+    let rule = Euf.mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
     let schemata_premises =
       List.map (fun case ->
           let new_f, new_cnstr, new_env = euf_apply_schema judge.Judgment.theta p case in
