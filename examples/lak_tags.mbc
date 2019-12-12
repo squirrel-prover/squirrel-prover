@@ -7,9 +7,6 @@ abstract tag1:message
 abstract tag2:message
 axiom tags_neq : tag1 <> tag2
 
-axiom pairs_surj : forall (x:message),
-x = <fst(x),snd(x)>
-
 name key : index->message
 
 channel cT
@@ -44,13 +41,10 @@ goal wa :
   output@R1(j,i) = output@R1(j,i) =>
   exists (ii:index,k:index),
   T(ii,k) <= R1(j,i) &&
-  input@R1(j,i) = output@T(ii,k).
+  fst(input@R1(j,i)) = fst(output@T(ii,k)) &&
+  snd(input@R1(j,i)) = snd(output@T(ii,k)).
 Proof.
   euf 1.
   apply tags_neq.
-  nosimpl(exists i1,k).
-  split.
-  assert(key(i)=key(i1)).
-  admit.
-  apply pairs_surj to input@R1(j,i).
+  exists i,k.
 Qed.

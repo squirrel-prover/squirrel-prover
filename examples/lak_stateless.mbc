@@ -42,9 +42,5 @@ goal wa :
 Proof.
   euf 1.
   admit. (* requires induction *)
-  nosimpl(exists i,k).
-  assert (input@T(i1,k)=input@T(i,k)).
-  admit.
-  assert (nT(i1,k)=nT(i,k)).
-  admit.
+  exists i,k.
 Qed.
