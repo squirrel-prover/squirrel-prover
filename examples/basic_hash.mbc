@@ -31,5 +31,5 @@ goal wa :
   fst(input@R(j,i)) = nT(ii,k).
 Proof.
  euf 1. 
- exists i1, k.
+ exists i, k.
 Qed.
