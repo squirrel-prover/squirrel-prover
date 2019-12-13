@@ -250,8 +250,7 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in
   let open Process in
   (* We create the term equality *)
-  let eq = Atom (Eq, case.message, m) in
-  let new_f = And (eq, case.blk_descr.condition) in
+  let new_f = Atom (Eq, case.message, m) in
   (* Now, we need to add the timestamp constraints. *)
   (* The block action name and the block timestamp variable are equal. *)
   let blk_ts = TName case.blk_descr.action in
