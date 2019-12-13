@@ -37,6 +37,12 @@ let euf_key_ssc hash_fn key_n messages =
        ssc#visit_term blk.output ;
        List.iter (fun (_,t) -> ssc#visit_term t) blk.updates)
 
+let hash_key_ssc hash_fn key_n messages =
+  try
+    euf_key_ssc hash_fn key_n messages;
+    true
+  with Bad_ssc -> false
+
 let rec h_o_term hh kk acc = function
   | Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
       | Name (key_n',is) ->

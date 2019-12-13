@@ -43,6 +43,10 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
+(** Returns true if the syntactic side condition of the key is met inside the
+    protocol and the messages. *)
+val hash_key_ssc : fname -> name -> term list -> bool
+
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)

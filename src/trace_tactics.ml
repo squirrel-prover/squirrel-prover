@@ -372,19 +372,19 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
 let () =
   T.register_general "apply"
     (function
-       | [Prover.Goal_name gname; Prover.Subst s] ->
-           let f = Prover.get_goal_formula gname in
-           apply f s
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+      | [Prover.Goal_name gname; Prover.Subst s] ->
+        let f = Prover.get_goal_formula gname in
+        apply f s
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let tac_assert f j sk fk =
   let j1 = Judgment.set_formula f j in
   match Formula.formula_to_fact f with
-    | fact -> sk [j1; Judgment.add_fact fact j] fk
-    | exception Failure _ ->
-        match Formula.formula_to_constr f with
-          | constr -> sk [j1; Judgment.add_constr constr j] fk
-          | exception Failure _ -> fk (Failure "unsupported formula")
+  | fact -> sk [j1; Judgment.add_fact fact j] fk
+  | exception Failure _ ->
+    match Formula.formula_to_constr f with
+    | constr -> sk [j1; Judgment.add_constr constr j] fk
+    | exception Failure _ -> fk (Failure "unsupported formula")
 
 let () =
   T.register_formula "assert"
@@ -392,40 +392,49 @@ let () =
 
 let collision_resistance (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in
+  (* We collect all hashes appearing inside the hypotheses, and which satisfy
+     the syntactic side condition. *)
   let hashes = List.filter
       (fun t -> match t with
-         | Fun ((hash, _), [m; Name key]) -> Theory.is_hash hash
+         | Fun ((hash, _), [m; Name (key,ki)]) ->
+           (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
          | _ -> false)
       (Gamma.get_all_terms judge.Judgment.gamma)
   in
-  let rec make_eq hash_list =
-    match hash_list with
-    | [] -> []
-    | h1::q -> List.fold_left (fun acc h2 ->
-        match h1, h2 with
-        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
-          when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
-        | _ -> acc
-      ) [] q
-  in
-  let hash_eqs = make_eq hashes
-                 |> List.filter (fun eq -> Completion.check_equalities
-                                    (Gamma.get_trs judge.Judgment.gamma) [eq])
-  in
-  let new_facts =
-    List.fold_left (fun acc (h1,h2) ->
-        match h1, h2 with
-        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
-          when hash = hash2 && key1 = key2 ->
-          Atom (Eq, m1, m2) :: acc
-        | _ -> acc
-      ) [] hash_eqs
-  in
-  let judge =
-    List.fold_left (fun judge f ->
-        Judgment.add_fact f  judge
-      ) judge new_facts
-  in
-  sk [judge] fk
+  if List.length hashes = 0 then
+    fk (Failure "no equality between hashes where the keys satisfiy the
+ syntactic condition has been found")
+  else
+    begin
+      let rec make_eq hash_list =
+        match hash_list with
+        | [] -> []
+        | h1::q -> List.fold_left (fun acc h2 ->
+            match h1, h2 with
+            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+              when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
+            | _ -> acc
+          ) [] q
+      in
+      let hash_eqs = make_eq hashes
+                     |> List.filter (fun eq -> Completion.check_equalities
+                                        (Gamma.get_trs judge.Judgment.gamma) [eq])
+      in
+      let new_facts =
+        List.fold_left (fun acc (h1,h2) ->
+            match h1, h2 with
+            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+              when hash = hash2 && key1 = key2 ->
+              Atom (Eq, m1, m2) :: acc
+            | _ -> acc
+          ) [] hash_eqs
+      in
+      let judge =
+        List.fold_left (fun judge f ->
+            Judgment.add_fact f  judge
+          ) judge new_facts
+      in
+      sk [judge] fk
+    end
 
 let () = T.register "collision" collision_resistance
