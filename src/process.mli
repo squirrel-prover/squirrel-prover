@@ -61,6 +61,9 @@ type process =
 
 val pp_process : Format.formatter -> process -> unit
 
+(** Check that a process is well-typed in some environment. *)
+val check_proc : Theory.env -> process -> unit
+
 (** When declaring a process, the body of the definition is type-checked,
   * process invocations are inlined, and unique name, state, and
   * action identifiers are obtained, as part of a conversion to

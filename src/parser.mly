@@ -1,5 +1,6 @@
 %token <int> INT
-%token <string> ID
+%token <string> ID   /* general purpose identifier */
+%token <string> PID  /* predicate identifier */
 %token <string> BANG
 %token AT
 %token LPAREN RPAREN
@@ -44,10 +45,7 @@
 (* Terms *)
 
 term:
-| aterm                          { $1 }
 | LPAREN term RPAREN             { $2 }
-
-aterm:
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT term           { let ts = $4 in
                                    Theory.make_term ~at_ts:ts $1 $2 }
@@ -93,8 +91,8 @@ formula:
 | NOT formula                    { Formula.Not ($2) }
 | FALSE                          { Formula.False }
 | TRUE                           { Formula.True }
-| aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }
-| ID term_list                   { Formula.Atom (Theory.make_term $1 $2) }
+| term ord term                  { Formula.Atom (Theory.Compare ($2,$1,$3)) }
+| PID term_list                  { Formula.Atom (Theory.make_term $1 $2) }
 | EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
                                  { Formula.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF

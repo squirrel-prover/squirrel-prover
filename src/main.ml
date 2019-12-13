@@ -94,10 +94,12 @@ let parse_theory_buf ?(test=false) lexbuf filename =
   Process.reset () ;
   parse_from_buf ~test Parser.theory lexbuf filename
 
-let parse_process string =
+let parse_process ?(typecheck=false) string =
   let lexbuf = Lexing.from_string string in
   try
-    Parser.top_process Lexer.token lexbuf
+    let p = Parser.top_process Lexer.token lexbuf in
+      if typecheck then Process.check_proc [] p ;
+      p
   with Parser.Error as e ->
     Format.printf
       "Cannot parse process before %S at position TODO.@."
@@ -129,7 +131,8 @@ let () =
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process "if u then if v then null else null else null")
+      ignore (parse_process
+                "if u=true then if True then null else null else null")
     end ;
     "Pairs", `Quick, begin fun () ->
       Channel.declare "c" ;
@@ -137,9 +140,12 @@ let () =
     end ;
     "Facts", `Quick, begin fun () ->
       Theory.declare_abstract "p" [] Vars.Boolean ;
+      Theory.declare_abstract "ok" [] Vars.Message ;
       Channel.declare "c" ;
-      ignore (parse_process "if p && p() then out(c,ok)") ;
-      ignore (parse_process "if p() = p then out(c,ok)")
+      ignore (parse_process ~typecheck:true
+                "if p=true && p()=true then out(c,ok)") ;
+      ignore (parse_process ~typecheck:true
+                "if p() = p then out(c,ok)")
     end
   ];;
 

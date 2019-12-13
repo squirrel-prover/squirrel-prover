@@ -26,11 +26,11 @@ rule token = parse
 | '\n'                    { newline lexbuf ; token lexbuf }
 | "(*" { comment lexbuf; token lexbuf }
 | "!_" (['a'-'z']* as i)  { BANG i }
-| "&&"               { AND }
+| "&&"                { AND }
 | "||"                { OR }
 | "not"               { NOT }
-| "true"              { TRUE }
-| "false"             { FALSE }
+| "True"              { TRUE }
+| "False"             { FALSE }
 | '<'                 { LANGLE }
 | '>'                 { RANGLE }
 | ','                 { COMMA }
