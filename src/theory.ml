@@ -168,8 +168,14 @@ let rec check_term env tm kind =
       l
   | Compare (_, u, v) ->
     if kind <> Boolean then raise Type_error ;
-    check_term env u Message ;
-    check_term env v Message
+    begin try
+      check_term env u Message ;
+      check_term env v Message
+    with
+      | Type_error ->
+          check_term env u Boolean ;
+          check_term env v Boolean
+    end
 
 let rec check_fact env =
   let open Vars in
