@@ -42,6 +42,7 @@ val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
 type generic_atom =
   | Constraint of constr_atom
   | Message of term_atom
+  | Happens of timestamp
 
 type formula = (generic_atom, var) foformula
 
@@ -64,9 +65,17 @@ val formula_to_constr : formula -> constr
 val is_disjunction : formula -> bool
 val is_conjunction : formula -> bool
 
-val conjunction_to_atom_lists : formula -> fact list * constr list
+(** Take a formula that must be a conjunction of atoms,
+  * and return the lists of term (dis)equalities, trace constraints,
+  * and timestamps that happen. *)
+val conjunction_to_atom_lists :
+  formula -> fact list * constr list * timestamp list
 
-val disjunction_to_atom_lists : formula -> fact list * constr list
+(** Take a formula that must be a conjunction of atoms,
+  * and return the lists of term (dis)equalities, trace constraints,
+  * and timestamps that happen. *)
+val disjunction_to_atom_lists :
+  formula -> fact list * constr list * timestamp list
 
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]

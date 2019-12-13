@@ -49,6 +49,7 @@ rule token = parse
 | ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }
+| "happens"           { HAPPENS }
 | "if"                { IF }
 | "then"              { THEN }
 | "else"              { ELSE }

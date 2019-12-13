@@ -99,13 +99,18 @@ module Judgment : sig
 
   val init : formula -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_fact : fact -> judgment -> judgment
+
+  (** Add happens(ts) hypothesis. *)
+  val add_happens : timestamp -> judgment -> judgment
 
   val mem_fact : fact -> judgment -> bool
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_constr : constr -> judgment -> judgment
+
+  (** Use add_fact, add_constr and add_atoms on appropriate list items. *)
+  val add_atoms :
+    fact list * constr list * timestamp list -> judgment -> judgment
 
   val update_trs : judgment -> judgment
 

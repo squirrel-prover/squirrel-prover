@@ -5,7 +5,7 @@
 %token AT
 %token LPAREN RPAREN
 %token LANGLE RANGLE
-%token AND OR NOT TRUE FALSE
+%token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL NULL
@@ -99,6 +99,9 @@ formula:
 | TRUE                           { Formula.True }
 | term ord term                  { Formula.Atom (Theory.Compare ($2,$1,$3)) }
 | PID term_list                  { Formula.Atom (Theory.make_term $1 $2) }
+| HAPPENS LPAREN timestamp RPAREN
+                                 { Formula.Atom
+                                     (Theory.Fun ("happens",[$3],None)) }
 | EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
                                  { Formula.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF

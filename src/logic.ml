@@ -70,6 +70,8 @@ end = struct
     inherit Iter.iter as super
     method visit_term t =
       match t with
+        | Macro (o,[],TName a) when o = Term.out_macro ->
+            f t (Process.get_descr a).output
         | Macro ((m,is),[],a) ->
             if Term.Macro.is_defined m a then
               let def = Term.Macro.get_definition m is a in
@@ -170,34 +172,18 @@ end = struct
       (* Add this action and its consequences regarding
        * its condition, updates and output. *)
       let g = { g with actions_described = d.action :: g.actions_described } in
-      let new_atoms =
-        (Eq, Macro (out_macro, [], TName d.action), d.output) ::
-        List.map
-          (fun (s,t) ->
-             (Eq, Macro (s, [], TName d.action), t))
-          d.updates
-      in
-      let new_facts = [d.condition] in
-      let g =
-        add_facts
-          (add_atoms g new_atoms)
-          new_facts
-      in
-
+      let g = add_facts g [d.condition] in
       (* Recursively add descriptions for the actions appearing
-       * in the newly added items. *)
+       * in the newly added item: they also happen in the trace.
+       * TODO we could immediately add all the actions that depend
+       * sequentially on our action *)
       let actions =
-        (List.fold_left
-           (fun lts fact ->
-              List.rev_append lts (fact_ts fact))
-           (term_atoms_ts new_atoms)
-           new_facts)
+        fact_ts d.condition
         |> List.fold_left
              (fun acc ts -> match action_of_ts ts with
                 | None -> acc
                 | Some a -> a :: acc)
              [] in
-
       let descrs = List.map Process.get_descr actions in
       List.fold_left add_descr g descrs
 
@@ -291,13 +277,16 @@ module Judgment : sig
 
   val init : formula -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_fact : fact -> judgment -> judgment
 
-  val mem_fact : fact -> judgment -> bool
+  val add_happens : timestamp -> judgment -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_constr : constr -> judgment -> judgment
+
+  val add_atoms :
+    fact list * constr list * timestamp list -> judgment -> judgment
+
+  val mem_fact : fact -> judgment -> bool
 
   val update_trs : judgment -> judgment
 
@@ -343,13 +332,6 @@ end = struct
   let update_trs j =
     { j with gamma = Gamma.update_trs j.gamma }
 
-  let fact_actions f =
-    fact_ts f
-    |> List.fold_left (fun acc ts -> match action_of_ts ts with
-        | None -> acc
-        | Some a -> a :: acc
-      ) []
-
   let constr_actions c =
     constr_ts c
     |> List.fold_left (fun acc ts -> match action_of_ts ts with
@@ -363,14 +345,26 @@ end = struct
     { j with gamma = g }
 
   let add_fact f j =
-    let j = update_descr j (fact_actions f) in
     { j with gamma = Gamma.add_facts j.gamma [f] }
 
   let mem_fact f j = Gamma.mem f j.gamma
 
   let add_constr c j =
-    let j = update_descr j (constr_actions c) in
     { j with theta = Theta.add_constr j.theta c }
+
+  let add_happens h j =
+    match h with
+      | TName a -> update_descr j [a]
+      | _ -> assert false (* TODO unsupported until judgments redesign *)
+
+  let add_atoms (facts,constrs,happens) judge =
+    List.fold_left (fun j f -> add_fact f j)
+      (List.fold_left (fun j c -> add_constr c j)
+         (List.fold_left (fun j h -> add_happens h j)
+            judge
+            happens)
+         constrs)
+      facts
 
   let set_env a j = { j with env = a }
 

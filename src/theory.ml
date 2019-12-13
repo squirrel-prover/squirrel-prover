@@ -552,6 +552,7 @@ let convert_formula_glob args_kind subst f =
             Atom (Constraint (convert_constr_atom args_kind subst at))
         | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
       end
+    | Atom (Fun ("happens",[ts],None)) -> Atom (Happens (convert_ts subst ts))
     | Atom _ -> assert false
     | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
     | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)

@@ -46,23 +46,20 @@ let () = T.register "split" goal_and_intro
 let goal_intro (judge : Judgment.t) sk fk =
   let exception No_intro in
   try
-    let ((facts,constrs),new_goal) =
+    let (new_atoms,new_goal) =
       match judge.Judgment.formula with
       | f when is_disjunction f ->
-        let (f1,c1) = disjunction_to_atom_lists f in
+        let (f1,c1,h1) = disjunction_to_atom_lists f in
+        assert (h1 = []) ; (* TODO don't know what to do with that yet *)
         (List.map (fun c -> Bformula.Not c) f1,
-         List.map (fun c -> Bformula.Not c) c1),
+         List.map (fun c -> Bformula.Not c) c1,
+         []),
         False
       | Impl(lhs,rhs) when is_conjunction lhs ->
         (conjunction_to_atom_lists lhs, rhs)
       | _ -> raise No_intro
     in
-    let judge = List.fold_left
-        (fun j f -> Judgment.add_fact f j) judge facts
-    in
-    let judge = List.fold_left
-        (fun j c -> Judgment.add_constr c j) judge constrs
-    in
+    let judge = Judgment.add_atoms new_atoms judge in
     sk [Judgment.set_formula new_goal judge] fk
   with No_intro ->
     fk (Tactics.Failure "Can only introduce disjunction of atoms, \
@@ -322,20 +319,20 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   let env = ref judge.Judgment.env in
   let formula = subst_formula subst gp in
   try
-    let ((check_facts,check_constrs),(new_facts,new_constrs)) =
+    let ((check_facts,check_constrs,check_happens),new_atoms) =
       match formula with
       | f when is_conjunction f ->
-        ([], []), conjunction_to_atom_lists f
+        ([],[],[]), conjunction_to_atom_lists f
       | Impl(lhs,rhs) when is_disjunction lhs && is_conjunction rhs->
         disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
       | ForAll(vs,f) when is_conjunction f ->
         let f = fresh_quantifications env f in
-        ([], []), conjunction_to_atom_lists f
+        ([],[],[]), conjunction_to_atom_lists f
       | ForAll(vs, Exists(vs2, f)) when is_conjunction f ->
         begin
           match fresh_quantifications env (Exists(vs2, f)) with
-          |  (Exists(vs2, f)) ->
-            ([], []), conjunction_to_atom_lists f
+          | Exists(vs2,f) ->
+            ([],[],[]), conjunction_to_atom_lists f
           | _ -> assert false
         end
       | ForAll(vs, Impl(lhs,rhs))
@@ -354,28 +351,24 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
             disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
           | _ -> assert false
         end
-
       | _ -> raise No_apply
     in
+    assert (check_happens = []) ; (* TODO improve after judgment redesign *)
     let ts_atom_list = List.map (function
         | Bformula.Atom a -> a
         | _ -> assert false) check_constrs in
-    if not( Theta.is_valid judge.Judgment.theta ts_atom_list) then
+    if not (Theta.is_valid judge.Judgment.theta ts_atom_list) then
       raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
     let term_atom_list = List.map (function
         | Bformula.Atom a -> a
         | _ -> assert false) check_facts in
-    if not( Gamma.is_valid judge.Judgment.gamma term_atom_list) then
+    if not (Gamma.is_valid judge.Judgment.gamma term_atom_list) then
       raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
-    let judge = List.fold_left
-        (fun j f -> Judgment.add_fact f j) judge new_facts
-    in
-    let judge = List.fold_left
-        (fun j c -> Judgment.add_constr c j) judge new_constrs
-    in
+    let judge = Judgment.add_atoms new_atoms judge in
     sk [judge] fk
-  with No_apply -> fk (Failure "Can only apply quantified conjunction of atoms
- or a disjunction implying a conjunction.")
+  with No_apply ->
+    fk (Failure "Can only apply quantified conjunction of atoms \
+                 or a disjunction implying a conjunction.")
 
 let () =
   T.register_general "apply"

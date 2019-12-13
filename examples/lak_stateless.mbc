@@ -33,14 +33,14 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 (* TODO In the next lemma, it would be more natural to write
  * something like happens(ACTION) rather than ACTION=ACTION. *)
 goal wa :
-  forall (i:index, j:index),
-  output@R1(j,i) = output@R1(j,i) =>
+  forall (i:index,j:index),
+  happens(R1(j,i)) =>
   exists (ii:index,k:index),
   T(ii,k) <= R1(j,i) &&
   fst(input@R1(j,i)) = nT(ii,k) &&
   input@T(ii,k) = nR(j).
 Proof.
-  euf 1.
+  euf 0.
   admit. (* requires induction *)
   exists i,k.
 Qed.

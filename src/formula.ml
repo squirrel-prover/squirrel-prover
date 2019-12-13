@@ -4,19 +4,22 @@ open Bformula
 type generic_atom =
   | Constraint of constr_atom
   | Message of term_atom
+  | Happens of timestamp
 
-let subst_generic_atom s =
-  function
+let subst_generic_atom s = function
   | Constraint a -> Constraint (subst_constr_atom s a)
   | Message a -> Message (subst_term_atom s a)
+  | Happens a -> Happens (subst_ts s a)
 
-let pp_generic_atom  ppf =  function
+let pp_generic_atom ppf = function
   | Constraint a -> pp_constr_atom ppf a
   | Message a -> pp_term_atom ppf a
+  | Happens a -> Fmt.pf ppf "happens(%a)" pp_timestamp a
 
 let generic_atom_var =  function
   | Constraint a -> constr_atom_vars a
-  | Message a ->  term_atom_vars a
+  | Message a -> term_atom_vars a
+  | Happens a -> ts_vars a
 
 (** First order formulas *)
 type ('a, 'b) foformula =
@@ -82,29 +85,27 @@ let rec is_conjunction = function
   | And(f1, f2) -> is_disjunction f1 && is_disjunction f2
   | _ -> false
 
-let conjunction_to_atom_lists f =
-  let rec ctal ms ts = function
-    | And(Atom (Message a), f) | And(f, Atom (Message a)) ->
-      ctal (Bformula.Atom a :: ms) ts f
-    | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
-    | And(Atom (Constraint a), f) | And(f, Atom (Constraint a)) ->
-      ctal ms (Bformula.Atom a :: ts) f
-    | Atom (Constraint a) -> (ms, (Bformula.Atom a :: ts))
+let conjunction_to_atom_lists (f:formula) =
+  let rec ctal fl cl tl = function
+    | [] -> fl,cl,tl
+    | And (f,g) :: l -> ctal fl cl tl (f::g::l)
+    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
+    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
+    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
     | _ -> assert false
   in
-  ctal [] [] f
+  ctal [] [] [] [f]
 
 let disjunction_to_atom_lists f =
-  let rec ctal ms ts = function
-    | Or(Atom (Message a), f) | Or(f, Atom (Message a)) ->
-      ctal (Bformula.Atom a :: ms) ts f
-    | Atom (Message a) -> ((Bformula.Atom a :: ms), ts)
-    | Or(Atom (Constraint a), f) | Or(f, Atom (Constraint a)) ->
-      ctal ms (Bformula.Atom a :: ts) f
-    | Atom (Constraint a) -> (ms, (Bformula.Atom a :: ts))
+  let rec ctal fl cl tl = function
+    | [] -> fl,cl,tl
+    | Or (f,g) :: l -> ctal fl cl tl (f::g::l)
+    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
+    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
+    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
     | _ -> assert false
   in
-  ctal [] [] f
+  ctal [] [] [] [f]
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
