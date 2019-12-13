@@ -5,7 +5,7 @@
 open Term
 open Bformula
 open Formula
-    
+
 (** Tags used to keep some information on gamma elements. *)
 type tag = {
   t_euf : bool;  (** [true] iff [euf] has been applied to this element *)
@@ -51,7 +51,7 @@ module Gamma : sig
     -> (tag -> tag)
     -> gamma * term_atom
 
-  val add_descr : gamma -> Process.descr -> gamma
+  val add_action_descr : gamma -> Process.action_descr -> gamma
 
   (** [get_all_terms g] provides the list of all terms appearing inside
       atoms or facts of the [g]. *)

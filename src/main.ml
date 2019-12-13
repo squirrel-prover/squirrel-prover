@@ -172,27 +172,27 @@ let () =
         Symbols.Multiple_declarations
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
-    "Block creation", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/blocks.mbc" ;
+    "Action creation", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/actions.mbc" ;
       ignore (Action.find_symbol "IOIO1") ;
       ignore (Action.find_symbol "IOIO2")
-      (* TODO test resulting block structure *)
+      (* TODO test resulting action structure *)
     end ;
-    "Let in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_let.mbc"
-      (* TODO test resulting block structure *)
+    "Let in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_let.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "New in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_name.mbc"
-      (* TODO test resulting block structure *)
+    "New in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_name.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "Find in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_find.mbc"
-      (* TODO test resulting block structure *)
+    "Find in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_find.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "Updates in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_set.mbc"
-      (* TODO test resulting block structure *)
+    "Updates in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_set.mbc"
+      (* TODO test resulting action structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
       parse_theory_test ~test "tests/alcotest/lak.mbc"

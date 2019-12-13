@@ -40,7 +40,7 @@ module Gamma : sig
   val select : gamma -> (term_atom -> tag -> bool)
     -> (tag -> tag) -> gamma * term_atom
 
-  val add_descr : gamma -> Process.descr -> gamma
+  val add_action_descr : gamma -> Process.action_descr -> gamma
 
   val get_all_terms :gamma -> Term.term list
 
@@ -71,7 +71,7 @@ end = struct
     method visit_term t =
       match t with
         | Macro (o,[],TName a) when o = Term.out_macro ->
-            f t (Process.get_descr a).output
+            f t (snd (Process.get_action_descr a).output)
         | Macro ((m,is),[],a) ->
             if Term.Macro.is_defined m a then
               let def = Term.Macro.get_definition m is a in
@@ -165,27 +165,28 @@ end = struct
 
     aux [] g.atoms
 
-  let rec add_descr g d =
+  let rec add_action_descr g d =
     let open Process in
     if List.mem d.action g.actions_described then g else
 
       (* Add this action and its consequences regarding
        * its condition, updates and output. *)
       let g = { g with actions_described = d.action :: g.actions_described } in
-      let g = add_facts g [d.condition] in
+      let g = add_facts g [snd d.condition] in
       (* Recursively add descriptions for the actions appearing
        * in the newly added item: they also happen in the trace.
        * TODO we could immediately add all the actions that depend
        * sequentially on our action *)
       let actions =
-        fact_ts d.condition
+        fact_ts (snd d.condition)
         |> List.fold_left
              (fun acc ts -> match action_of_ts ts with
                 | None -> acc
                 | Some a -> a :: acc)
              [] in
-      let descrs = List.map Process.get_descr actions in
-      List.fold_left add_descr g descrs
+
+      let action_descrs = List.map Process.get_action_descr actions in
+      List.fold_left add_action_descr g action_descrs
 
   let get_all_terms g =
     let atoms = get_atoms g in
@@ -340,8 +341,8 @@ end = struct
       ) []
 
   let update_descr j actions =
-    let descrs = List.map Process.get_descr actions in
-    let g = List.fold_left Gamma.add_descr j.gamma descrs in
+    let descrs = List.map Process.get_action_descr actions in
+    let g = List.fold_left Gamma.add_action_descr j.gamma descrs in
     { j with gamma = g }
 
   let add_fact f j =

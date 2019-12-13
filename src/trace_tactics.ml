@@ -252,12 +252,12 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
   (* We create the term equality *)
   let new_f = Atom (Eq, case.message, m) in
   (* Now, we need to add the timestamp constraints. *)
-  (* The block action name and the block timestamp variable are equal. *)
-  let blk_ts = TName case.blk_descr.action in
-  (* The block occured before the test H(m,k) = s. *)
+  (* The action name and the action timestamp variable are equal. *)
+  let action_descr_ts = TName case.action_descr.action in
+  (* The action occured before the test H(m,k) = s. *)
   let le_cnstr =
     List.map (fun ts ->
-        Atom (Pts (Leq, blk_ts, ts))
+        Atom (Pts (Leq, action_descr_ts, ts))
       ) (Theta.maximal_elems theta (term_ts s @ term_ts m))
     |> mk_or_cnstr
   in

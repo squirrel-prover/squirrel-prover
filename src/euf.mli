@@ -4,16 +4,14 @@ open Action
 open Process
 open Term
 
-val subst_descr : subst -> descr -> descr
-
 (** Type of an euf axiom case schema.
     [e] of type [euf_schema] represents the fact that the message [e.message]
     has been hashed.
-    [e.blk_descr] stores the relevant block description for future use,
+    [e.action_descr] stores the relevant action description for future use,
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = { message : Term.term;
-                    blk_descr : descr;
+                    action_descr : action_descr;
                     env : Vars.env }
 
 

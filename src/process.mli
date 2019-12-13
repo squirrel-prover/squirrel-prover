@@ -81,14 +81,14 @@ val reset : unit -> unit
   *
   * Processes are compiled to an internal representation used by
   * the meta-logic. Name creations and let constructs are compiled
-  * away and process constructs are grouped to form blocks of input,
-  * followed by a tree of conditionals, with state updates and an output
+  * away and process constructs are grouped to form actions consisting of an
+  * input, followed by a tree of conditionals, with state updates and an output
   * for each non-empty conditional. From a process we obtain a finite
   * set of actions consisting of a sequence of choices: at each step
   * it indicates which component of a parallel composition is chosen
   * (possibly using newly introduced index variables), and which
   * outcome of a tree of conditionals is chosen. We associate to each
-  * such action a behaviour block.
+  * such action an action description.
   *
   * In an execution the system, we will instantiate these symbolic
   * actions into concrete ones, using a substitution for its
@@ -99,7 +99,7 @@ val reset : unit -> unit
   * diverges (i.e. none is a prefix of the other).
   *
   * For executing a system given as a set of concrete actions,
-  * take the behaviour block of one concrete action, execute it,
+  * take the action description of one concrete action, execute it,
   * compute the produced actions by adding the description of
   * the chosen branch.
   *
@@ -117,53 +117,35 @@ val reset : unit -> unit
   * names for input variables, output terms, etc. Actions are displayed
   * by default using their identifying symbol. *)
 
-(** Type block *)
-type block = {
+(* Type action_descr *)
+type action_descr = {
   action : Action.action ;
   input : Channel.t * string ;
   indices : Action.index list ;
   condition : Action.index list * Bformula.fact ;
-  updates : (string * Action.index list * Term.term) list ;
+  updates : (Term.state * Term.term) list ;
   output : Channel.t * Term.term
 }
 
-(** Type descr *)
-type descr = {
-  action : Action.action ;
-  indices : Action.index list ;
-  condition : Bformula.fact ;
-  updates : (Term.state * Term.term) list ;
-  output : Term.term
-}
-
-val pp_descr : Format.formatter -> descr -> unit
-
-(** [fresh_instance env blk] returns a fresh instance (w.r.t. [env]) of the
-    description corresponding to the block [blk]. *)
-val fresh_instance : Vars.env ref -> block -> descr
+val pp_action_descr : Format.formatter -> action_descr -> unit
 
 (** Iterate over a complete set of action descriptions.
     Does not instantiate fresh copies of the actions, as it increases
     unecessarily the variable counters. Can be used for display purposes. *)
-val iter_csa : (descr -> unit) -> unit
-val iter_csa_block : (block -> unit) -> unit
-
-(** Iterate over a complete set of action descriptions, and instantiate a fresh
-    action. Can be used to introduce a new action inside the logic. *)
-val iter_fresh_csa : Vars.env ref -> (descr -> unit) -> unit
+val iter_csa : (action_descr -> unit) -> unit
 
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)
-val get_descr : Action.action -> descr
+val get_action_descr : Action.action -> action_descr
 
 (** Pretty-print actions *)
 val pp_actions : Format.formatter -> unit -> unit
 
-(** Pretty-print block descriptions *)
-val pp_descrs : Format.formatter -> unit -> unit
+(** Pretty-print action descriptions *)
+val pp_action_descrs : Format.formatter -> unit -> unit
 
-(** Pretty-print actions and block descriptions *)
+(** Pretty-print actions and action descriptions *)
 val pp_proc : Format.formatter -> unit -> unit
 
 (** Apply a substitution to a description. *)
-val subst_descr : Term.subst -> descr -> descr
+val subst_action_descr : Term.subst -> action_descr -> action_descr
