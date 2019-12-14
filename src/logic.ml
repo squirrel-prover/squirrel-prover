@@ -71,7 +71,7 @@ end = struct
     method visit_term t =
       match t with
         | Macro (o,[],TName a) when o = Term.out_macro ->
-            f t (snd (Process.get_action_descr a).output)
+            f t (snd Process.((get_action_descr a).output))
         | Macro ((m,is),[],a) ->
             if Term.Macro.is_defined m a then
               let def = Term.Macro.get_definition m is a in
