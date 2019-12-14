@@ -1,0 +1,12 @@
+mutable s : message
+abstract v : message
+
+channel c
+
+system
+  in(c,x);
+  s := <s,x>;
+  out(c,s).
+
+goal output@A = output@A => false.
+Proof.

@@ -21,15 +21,13 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
-(* TODO In the next lemma, it would be more natural to write
- * something like happens(ACTION) rather than ACTION=ACTION. *)
 goal wa :
   forall (i:index, j:index),
-  output@R(j,i) = output@R(j,i) =>
+  happens(R(j,i)) =>
   exists (ii:index,k:index),
   T(ii,k) <= R(j,i) &&
   fst(input@R(j,i)) = nT(ii,k).
 Proof.
- euf 1. 
- exists i1, k.
+ euf 0. 
+ exists i, k.
 Qed.
