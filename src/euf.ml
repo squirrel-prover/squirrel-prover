@@ -41,9 +41,9 @@ let rec h_o_term hh kk acc = function
   | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
   | Macro ((mn,is),l,a) ->
     if mn = fst Term.in_macro || mn = fst Term.out_macro then acc
-    else if Term.Macro.is_defined mn a then
+    else if Macros.is_defined mn a then
       let acc = List.fold_left (fun acc t -> h_o_term hh kk acc t) acc l in
-      Term.Macro.get_definition mn is a
+      Macros.get_definition mn is a
       |> h_o_term hh kk acc
     else raise Bad_ssc
   | Name (n,_) -> acc

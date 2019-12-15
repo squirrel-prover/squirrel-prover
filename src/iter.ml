@@ -9,7 +9,7 @@ class iter = object (self)
     | Fun (_, l) -> List.iter self#visit_term l
     | Macro ((mn, is),l,a) ->
         List.iter self#visit_term l ;
-        self#visit_term (Term.Macro.get_definition mn is a)
+        self#visit_term (Macros.get_definition mn is a)
     | Name _ | MVar _ -> ()
 
   method visit_fact (f:fact) = match f with
@@ -39,7 +39,7 @@ class iter_approx_macros = object (self)
         List.iter self#visit_term l ;
         if not (List.mem mn checked_macros) then begin
           checked_macros <- mn :: checked_macros ;
-          self#visit_term (Term.Macro.get_dummy_definition mn is)
+          self#visit_term (Macros.get_dummy_definition mn is)
         end
     | _ -> super#visit_term t
 

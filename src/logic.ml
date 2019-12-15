@@ -70,11 +70,9 @@ end = struct
     inherit Iter.iter as super
     method visit_term t =
       match t with
-        | Macro (o,[],TName a) when o = Term.out_macro ->
-            f t (snd Process.((get_action_descr a).output))
         | Macro ((m,is),[],a) ->
-            if Term.Macro.is_defined m a then
-              let def = Term.Macro.get_definition m is a in
+            if Macros.is_defined m a then
+              let def = Macros.get_definition m is a in
                 f t def ;
                 self#visit_term def
         | t -> super#visit_term t

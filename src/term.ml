@@ -22,8 +22,8 @@ let rec tsvars vs = function
   | TName a ->  action_indices a @ vs
   | TPred ts -> tsvars vs ts
 
-let ts_vars =
-  tsvars []
+let ts_vars = tsvars []
+
 type mvar = Vars.var
 
 (** Symbols *)
@@ -80,10 +80,6 @@ module rec Macro : sig
     indices:Action.index list ->
     ts:Vars.var ->
     M.t -> ns Symbols.t
-  val get_definition : ns Symbols.t -> index list -> timestamp -> M.t
-  val hack : (ns Symbols.t -> index list -> timestamp -> M.t) ref
-  val get_dummy_definition : ns Symbols.t -> index list -> M.t
-  val is_defined : ns Symbols.t -> timestamp -> bool
 end = struct
 
   include Symbols.Make(struct type data = M.t macro_info end)
@@ -91,51 +87,6 @@ end = struct
   let declare_global name ~inputs ~indices ~ts t =
     let d = Global (inputs,indices,ts,t) in
     declare name d
-
-  let is_defined name a =
-    match get_def name with
-      | Input -> false
-      | Output | State _ ->
-          begin match a with
-            | TName _ -> false (* TODO *)
-            | _ -> false (* We could compute predecessors. *)
-          end
-      | Local _ -> true
-      | Global (inputs,_,_,_) ->
-          begin match a with
-            | TName l ->
-                (* We could support |inputs| <= |l|. *)
-                List.length inputs = List.length l
-            | _ -> false (* We could compute predecessors. *)
-          end
-
-  (* We need substitutions to define macro expansions.
-   * I use a hack to avoid the circularity, the clean solution is
-   * to move substitutions to module M below. *)
-  let hack :
-        (ns Symbols.t -> index list -> timestamp -> M.t) ref
-        = ref (fun _ _ _ -> assert false)
-  let get_definition name indices a = !hack name indices a
-
-  (* let l,f =
-    if is_built_in mn then
-      failwith "look-up of a built-in declaration"
-    else Hashtbl.find macros (Symbols.to_string mn)
-  in
-  assert (List.length action = l) ;
-  f action indices *)
-
-  let get_dummy_definition mn indices =
-    match get_def mn with
-      | Global (inputs,indices,ts,term) ->
-          let rec dummy_action k =
-            if k = 0 then [] else
-              { Action.par_choice = 0,[] ; sum_choice = 0,[] }
-              :: dummy_action (k-1)
-          in
-          let dummy_action = dummy_action (List.length inputs) in
-            get_definition mn indices (TName dummy_action)
-      | _ -> assert false
 
 end
 
@@ -362,38 +313,3 @@ let dummy = Fun (mk_fname "_" [] Message, [])
 
 let in_macro = (Macro.declare_exact "input" Input, [])
 let out_macro = (Macro.declare_exact "output" Output, [])
-
-(** Macro expansions *)
-
-let get_definition name args a =
-  match Macro.get_def name with
-    | Input -> assert false
-    | Output | State _ -> assert false (* would make sense to expand that too *)
-    | Local _ -> assert false (* TODO *)
-    | Global (inputs,indices,ts,body) ->
-        begin match a with
-          | TName action when List.length inputs = List.length action ->
-              let idx_subst =
-                List.map2
-                  (fun i i' -> Index (i,i'))
-                  indices
-                  args
-              in
-              let ts_subst = TS (TVar ts,a) in
-              let subst,_ =
-                List.fold_left
-                  (fun (subst,action) x ->
-                     let in_tm =
-                       Macro (in_macro,[],
-                              TName (List.rev action))
-                     in
-                     Term (MVar x,in_tm) :: subst,
-                     List.tl action)
-                  (ts_subst::idx_subst,List.rev action)
-                  inputs
-              in
-              subst_term subst body
-          | _ -> assert false
-        end
-
-let () = Macro.hack := get_definition
