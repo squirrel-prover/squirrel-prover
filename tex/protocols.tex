@@ -5,176 +5,187 @@ restrict the set of meta-interpretations of interest, to justify some of the
 rules that we use. We would alternatively impose these conditions from the
 beginning in the definition of meta-interpretations.
 
-\begin{definition}
-A meta-interpretation is trace-like when:
-\begin{itemize}
-\item for every $t,t''\in H_\XT$ and $t'\in D_\XT$
-  such that $t<t'<t''$, we have $t'\in H_\XT$;
-\item for every $t\in H_\XT$, $p(t) < t$ and there
-is no $t'\in D_\XT$ such that $p(t)<t'<t$;
-\item for any two constants $a,b\in\Actions$,
-  the images of $\hat{a}$ and $\hat{b}$ are disjoint,
-  and $\hat{a}$ is injective;
-\item probably some more\ldots
-\end{itemize}
-\end{definition}
-
-\emph{[David] The current constraint solver is using more than these
-  axioms, and is in fact inconsistent with the finiteness of $D_\XT$,
-  cf. issue 22.
-  For example, our axioms do not allow to derive a contradiction from
-  $p(\tau)=\tau$, unless we know $\happens(\tau)$.}
-
-\begin{proposition}
-The rules of \cref{fig:tracelike} (\emph{TODO})
-are sound wrt.\ trace-like meta-interpretations.
-\end{proposition}
-
-It is important that any protocol execution (to be defined next) can be
-mapped to a trace-like meta-interpretation. This would not be possible,
-for instance, if we had only one point outside of $H_\XT$.
-
-\emph{[David] I have not carefully worked through what follows, and it
-probably needs (at least) to be updated following the changes in the previous
-section.}
-
-\subsection{Protocols definitions}
-We  model protocols as a set of possible actions available to the
-attacker. An action essentially models a step of the protocol, where
-the attacker provides some inputs, some conditions are checked, some
-updates are performed, and finally an output is performed.
-
-Some actions may be available to the attacker in parallel, or one
-after the other. A protocol will then be a tree, each node labelled by an 
-action, a parallel operator or a choice operator.
-
-\begin{definition}
-  An action $s(\ov{id})$ is a tuple $(\phi,U,o)$, where $\ov{id} \in I^k$ is a 
-  list of indices variable, $\phi$ is a propositional formula over ground 
-  terms (called the condition of $s$), $U$ is a set of states updates (a 
-  mapping from state symbols to terms), and $o$ is a list of ground terms.
-  All indices appearing in $\phi,U,o$ must appear in $I$.
-
-  Given a set of actions $\Actions$, a protocol $P$ is a term built over the 
-  signature $\{\|/2,\oplus/2\} \cup \{a/1 \mid a \in \Actions\}$, such that 
-  when going down inside the protocol, the indices set of the actions can only 
-  grow. We denote $\Actions(P)$ the set of actions appearing inside $P$. We 
-  denote $\suc^*(a)$ all the descendants of a node (including itself), 
-  $\pre(a)$ the predecessor (ancestor) of $a$ inside $P$ and $\bro(a)$ its 
-  brother, which are defined only if they exists.
-\end{definition}.
-
-We may denote an action $s(\ov{id})$ to give explicitely its set of indexes.
-For concision, we will denote protocols using $;,\|,\oplus$. For instance, 
-$s_1; (s_2 \| s_3(id))$ represents the protocol where the attacker can first 
-execute $s_1$, and can then execute in any order $s_2$, and an arbitrary 
-number of occurences of $s_3(id)$.
-
 There exists a natural translation from applied pi-calculus to this notion of 
 actions, reminescent of the translation inside Horn Clauses performed by 
 Proverif, or the translation inside Multi Set Rewritting rules performed by 
 Sapic (a Tamarin extension).
 
-\subsection{Symbolic protocol execution}
+\emph{[David] I have not carefully worked through what follows, and it
+probably needs (at least) to be updated following the changes in the previous
+section.}
 
-Protocols can be executed according to the ordering constraints on protocol 
-steps defined by the protocol tree.
-Each action depending on indices may be instantiated an arbitrary number of 
-time using distinct indices. The protocol defines how the protocol steps may 
-be executed. For instance, if some protocol step appears in
-the trace with some defined indices, all its ancestors must have been executed 
-previously in the trace.
+\subsection{Protocols}
 
+We  model a protocol as a set of possible actions available to the
+attacker. An action models a basic step of the protocol, where
+the attacker provides some input, some condition is checked, some
+state updates are performed, and finally an output is emitted.
+
+In this section we assume a fixed set of action symbols $\Actions$.
+We assume that macro symbols include $\minp$ and $\mout$,
+both of index and term arities zero.
+We also assume that all other macro symbols are of term arities zero.
+We call them \emph{state macros} as they will be used to model memory cells.
 
 \begin{definition}
-  Given a protocol $P$, a symbolic trace of of $P$ is given, for any 
-  $n\in\mathbb{N}$, by a sequence of actions $a_0 (\ov{id}_0),\dots,a_n 
-  (\ov{id}_n)$, such that for all $1 \leq i,j \leq n$,
-  \begin{itemize}
-    \item each action is an instantiation of a protocol action and indices are 
-      uniformly instantiated, i.e, there exists $\sigma : \I \mapsto \I$, such 
-      that $a_i (\sigma (\ov{id})) \in\Actions(P)$,
-    \item each action occurs only once, i.e, $a_i \neq{} a_j$ or $\ov{id}_i 
-      \neq\ov{id}_j$,
-    \item if an action must happen before another one, it is reflected in the 
-      trace, i.e
-      if $\pre (a_i(\sigma(\ov{id}_i)) \in \Actions(P)$, then there exists $k$ 
-      such that $\pre(a) = a_k(\sigma(\ov{id}_k))$,
-    \item if the protocol enforces a choice between two actions, then it is 
-      respected in the trace, i.e if $\pre(a_i(\sigma(\ov{id}_i))) = \oplus$, 
-      then $a_j(\sigma(\ov{id}_j)) \notin \suc^*(\bro 
-      (a_i(\sigma(\ov{id}_i))))$,
-      \item the actions only depends on previous actions, i.e, for any 
-        $\mout@a$ (resp. $\minp@a$) which appears in the terms of 
-        $a_i(\ov{id}_i)$, then there exists $k < i$ (resp. $k \leq i$) such 
-        that $a = a_k(\ov{id}_k)$.
-      \end{itemize}
+  An \emph{action} $a(\ov{n})$ is the application of
+  an action symbol $a\in\Actions$ of index arity $k$ to
+  some concrete indices $\ov{n}\in\mathbb{N}^k$.
+  Actions will be noted $\alpha$, $\beta$, $\gamma$.
+
+  We assume a transitive \emph{sequential dependency} relation
+  $\alpha\before\beta$ on actions, which intuitively means that
+  $\alpha$ must happen before $\beta$ in any execution,
+  and a \emph{conflict} relation $\alpha\conflict\beta$, 
+  which intuitively means $\alpha$ and $\beta$ cannot both occur in
+  any execution.
+  We say that an action $\alpha$ is \emph{enabled} after some (possibly empty)
+  sequence of actions $\alpha_1\ldots\alpha_n$ when, for all 
+  $\beta\before\alpha$ there exists $i\in[1;n]$ such that $\beta=\alpha_i$.
+
+  To each action $\alpha$ we associate:
+  a meta-logic formula $\phi_\alpha$ called the \emph{condition}
+  of $\alpha$;
+  for each state macro symbol $s$, a term $u^s_\alpha$ called
+  the \emph{update} of $s$ by $\alpha$;
+  a message term $o_\alpha$ called the \emph{output} of $\alpha$.
+  The condition, output and updates of an action $\alpha$ must not contain any
+  macro term and the only free variables that can occur in them are
+  $x_\alpha$, $x_\beta$ for $\beta\before\alpha$, and $x_s$ where $s$ a
+  state macro symbol.
 \end{definition}
-Intuitively, a symbolic trace represent a possible scheduling of the protocol, 
-when abstracting all the inputs. Some symbolic trace may not correspond to any 
-actual execution of the protocol, if for instance an action require a 
-condition which is never met.
 
-Notice that the number of symbolic traces is infinite as soon as there exists 
-an accessible action with a non nil set of indices.
+In our tool, actions are compiled from an applied pi-calculus process.
+Sequential dependencies are induced by the syntactic sequences in that 
+process, and conflicts are induced by conditionals.
 
+\medskip
 
-\subsection{Concrete protocol execution}
+We now give a notion of symbolic trace, which intuitively represents
+a possible scheduling of the protocol, when ignoring messages.
+
+\begin{definition}
+  A symbolic trace $\tr$ is a sequence $\alpha_1\ldots\alpha_n$ of actions
+  such that:
+  \begin{itemize}
+    \item for all $1 \leq i < j \leq n$,
+      $\alpha_i \neq \alpha_j$ and it is not the case
+      that $\alpha_i \conflict \alpha_j$;
+    \item for all $1 \leq i \leq n$,
+      for all $\beta \before \alpha_i$,
+      there exists $1 \leq j < i$ such that $\beta = \alpha_j$;
+  \end{itemize}
+\end{definition}
+
+\begin{remark}
+  We could get rid of the conflict relationship and still be able to
+  model conditionals: we would have more symbolic traces but, when conditions
+  are taken into account, the incompatible conditions of actions corresponding
+  to different branches of a conditional would allow to discard
+  the unwanted branches. For that reason, we should not need a tactic
+  relying on the conflict relationship in the prover.
+\end{remark}
+
+\begin{remark}
+  The structure that we have assumed on actions is restrictive and
+  does not allow to model e.g. phases. It does not matter because we can
+  impose other conditions on traces later on as axioms (similar to the 
+  restrictions of Tamarin).
+\end{remark}
+
+\subsection{Meta-interpretation of a trace}
+
 As in the \BC model, we model arbitrary messages produced by the attacker 
-using free function symbols $\G = \{g_i | i \in \mathbb{N}\} $, and extend the 
-definition of a computational model $\M$ so that it contains Turing Machines 
-for each attacker symbol.
+using free function symbols $\G = \{g_i | i \in \mathbb{N}\}$. We assume
+from now on that our signature contains such symbols.
 
-Given a symbolic trace of the protocol, we can define the substitution which 
-maps inputs, outputs and states to terms using the attacker function symbols, 
-with the required attacker knowledge at each step.
+We construct, for each symbolic trace, a meta-interpretation representing
+the trace. Some details of this definition will be understood in the next
+section, where we identify some axioms that hold in all such 
+meta-interpretations.
 
 \begin{definition}
-  Given a symbolic trace $A = a_0,\dots,a_n$ of $P$, we define inductively 
-  $\sigma$ the instantiation of the inputs and ouputs of $A$ such that:
+  Given a symbolic execution $\tr = \alpha_1\ldots\alpha_n$,
+  we define the meta-interpretation $I_\tr$ as follows
+  (\emph{TODO define the substitution for $x_s$ variables,
+  as well as $\hat{s}$\ldots)}):
   \begin{itemize}
-  \item $\minp@a_i\sigma := g_i( \mout@a_0\sigma,\dots,\mout@a_{i-1}\sigma  ) $
-  \item $\mout@a_i\sigma := o_0\sigma, \dots, o_k\sigma$, where 
-    $o_0,\dots,o_k$ is the set of ouputs of  $a_i$,
-  \item $s@a_i := u\sigma$, where $s$ is a state and $s \mapsto u$ is the 
-      latest update corresponding to $s$ appearing inside the actions before 
-      $a_i$.
-\end{itemize}
+    \item $\D_\I$ is the set of indices that occur in $\tr$;
+    \item $\D_\XT = \{ t_0 \} \uplus \{ a(\ov{n}) : a\in\Actions_k, 
+      \ov{n}\in\D_\I^k \}$;
+    \item the order $\leq$ is such that $\epsilon\leq t$ for all $t\in\D_\XT$,
+      and $\alpha\leq\beta$ if $\alpha$ occurs before $\beta$ in $\tr$;
+    \item the predecessor function $p$ maps $t_0$ to itself and all
+      other timestamps to their predecessor according to $\leq$;
+    \item $H_\XT$ is the set of actions that occur in $\tr$,
+      i.e.\ $H_\XT=\{\alpha_i : i\in[1;n]\}$;
+    \item $\sigma_\I$ and $\sigma_\XT$ are arbitrary;
+    \item for each $a\in\Actions_k$, $\hat{a}(\ov{n}) = a(\ov{n})$;
+    \item $\hat{\minp}$ and $\hat{\mout}$ have arbitrary values on
+      $t_0$ and otherwise are uniquely defined by the following
+      conditions, for all $i\in[1;n]$:
+      $$\hat{\minp}(\alpha_i) = 
+      g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))
+      \text{ and }
+      \hat{\mout}(\alpha_i) =
+      o_{\alpha_i}\{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j<i}.$$
+  \end{itemize}
 \end{definition}
-Note that $\sigma$ can indeed be defined, as by definition of a symbolic 
-traces, the outputs of the action $a_i$ only depends on input values of 
-previous actions.
+
+We can now formally define when a protocol satisfies some trace property 
+$\phi$:
+we require that the property holds in all traces that are actually executable
+--- more precisely, we require that $\phi_\tr \Rightarrow \phi$ is almost
+always true, where $\phi_\tr$ expresses that the trace is executable.
 
 \begin{definition}
-  A (concrete) trace of $P$ is given by a symbolic trace $A = a_0,\dots,a_n$ 
-  of $P$ along with a computational model $\M$, such that with $\sigma$ the 
-  instantiation of $A$, we have that $A,\I,\M,\sigma \models \bigwedge_{1\leq 
-  i \leq n} \phi_i$, where $\phi_i$ is the condition of $a_i$.
-
-  We denote $\tr(P)$ the set of traces of $P$.
+  Given a trace $\tr$, its executability formula
+  is $\phi_\tr = \bigwedge_{\alpha\in\tr} 
+  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}$.
 \end{definition}
-
-A trace of $P$ then corresponds to an actual possible evaluation of $P$. More 
-strongly, $\tr(P)$ represents the set of all possible executions of the 
-protocol $P$ for all possible probabilistic polynomial time attackers.
-
-\subsection{Semantics of formulas for protocols}
 
 \begin{definition}
-  Let $\phi$ be a formula and $(A=(a_0,\dots,a_n),\M)$ a trace of $P$. If we 
-  denote $I(A,\phi)$ the set of indices appearing in $A$ extended with fresh 
-  indices for each quantification over indices in $\phi$ , and $\sigma$ the 
-  instantiation of $A$,
-
-we say that $P$ satisfies $\phi$, denoted $P \models \phi$, if for all 
-  $(A,\M)$ in $\tr(P)$, $A, I(A,\phi), \M, \sigma \models \phi$.
-
+  A meta-logic formula $\phi$ is valid wrt.\ our protocol when,
+  for any symbolic trace $\tr$ of the protocol,
+  we have $I_\tr \models \phi_\tr \Rightarrow \phi$.
 \end{definition}
 
-This semantics does match the intuition: for all possible executions of the 
-protocol and for any
+In other words, we require that, for any $\tr$ and
+for any computational model,
+we have $\M \models (\phi_\tr\Rightarrow\phi)^{I_\tr} \sim \true$.
 
-security parameter, the execution satisfies the formula.
+In practice, we do not want to consider all computational models, but
+restrict to the ones satisfying some cryptographic assumption: reformulate
+what's above so that it's more natural.
 
-$I(A,\phi)$ must depend both on the formula and the trace, so that the formula 
-$\exists i:\idx, i=i$ is true, even when considering the empty protocol.
+\subsection{Trace axioms}
+
+We now identify some valid formulas, which can thus be used as axioms
+when trying to derive a trace property.
+
+\begin{proposition}
+  The following formulas are valid wrt.\ the protocol:
+  \begin{itemize}
+    \item for any $\alpha \before \beta$,
+      $\happens(\beta) \Rightarrow \happens(\alpha) \wedge \alpha < \beta$;
+    \item for any $\alpha \conflict \beta$,
+      $\happens(\alpha)\wedge\happens(\beta) \Rightarrow \bot$;
+    \item for any $\alpha$,
+      $\happens(\alpha) \Rightarrow 
+      \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta$.
+    \item
+      $\forall \tau,\tau',\tau'', \happens(\tau)\wedge\happens(\tau'')\wedge
+      \tau\leq\tau'\wedge\tau'\leq\tau''\Rightarrow\happens(\tau')$;
+    \item
+      $\forall \tau, \happens(\tau) \Rightarrow \pre(\tau)<\tau \wedge
+      \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
+      \tau'=\pre(\tau)$;
+    \item for any $a\neq b\in\Actions$,
+      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$;
+    \item for any $a\in\Actions$,
+      $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
+  \end{itemize}
+\end{proposition}
+
+Note that obvious axioms such as the predecessor or injectivity axioms
+would not hold for simpler constructions of $I_\tr$.
