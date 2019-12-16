@@ -27,7 +27,7 @@ val ts_vars : timestamp -> Vars.var list
   * can then be indexed.
   *
   * Names represent random values, uniformly sampled by the process.
-  * State symbols reprenset memory cells.
+  * State symbols represent memory cells.
   * Macros represent input, outputs, and let definitions:
   * everything that is expansed when translating the meta-logic to
   * the base logic.
@@ -96,17 +96,6 @@ module rec Macro : sig
     indices:Action.index list ->
     ts:Vars.var ->
     M.t -> ns Symbols.t
-
-  (** Return the term corresponding to the declared macro,
-    * if the macro can be expanded. *)
-  val get_definition : ns Symbols.t -> index list -> timestamp -> M.t
-
-  (** TODO *)
-  val get_dummy_definition : ns Symbols.t -> index list -> M.t
-
-  (** Tells whether a macro symbol can be expanded when applied
-    * at a particular timestamp. *)
-  val is_defined : ns Symbols.t -> timestamp -> bool
 
 end
 

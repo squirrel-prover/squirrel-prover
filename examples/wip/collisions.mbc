@@ -1,0 +1,73 @@
+(* This is an extension of tests/ok/collisions.mbc with an extra goal
+ * at the end, that does not work apparently due to a limitation of
+ * constraint solving. *)
+
+hash h
+name k:message
+name cst:message
+
+channel ch
+
+name na : index -> message
+name nb : index -> message
+name nc : index -> message
+name mc : index -> message
+
+axiom name_not_pair :
+forall (ma : message, mb : message, a:index),
+na(a) <>  <ma, mb>
+
+system O: out(ch,cst); (
+    (A: !_a out(ch,h(na(a),k)))
+  | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
+  | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
+).
+
+
+goal dummy :
+  forall (tau1 : timestamp, tau2 : timestamp, a : index, a: message),
+  tau1 = tau2 =>
+  output@tau1= output@tau2.
+Proof.
+Qed.
+
+goal unforgeable_1 :
+  forall (a : index, b : index),
+  b <> a =>
+  output@A(b) <> h(na(a),k).
+Proof.
+  collision.
+Qed.
+
+goal unforgeable_2 :
+  forall (a : index, b : index),
+  output@B(b) <> h(na(a),k).
+Proof.
+  collision.
+  apply name_not_pair to
+  nb(b),
+  nb(b),
+  a.
+Qed.
+
+
+goal unforgeable_3 :
+  forall (a : index, b : index),
+  output@C(b) <> h(na(a),k).
+Proof.
+  collision.
+  apply name_not_pair to
+  nc(b),
+  mc(b),
+  a.
+Qed.
+
+goal unforgeable_general :
+  forall (a : index, tau : timestamp),
+  output@tau = h(na(a),k) => tau = A(a).
+Proof.
+  euf 0.
+  apply name_not_pair to nc(c), mc(c), a.
+  apply name_not_pair to nb(b), nb(b), a.
+  (* Last goal should be closed by constraint solving *)
+Qed.

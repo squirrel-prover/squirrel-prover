@@ -2,18 +2,6 @@ open Term
 open Bformula
 open Process
 
-(* type process = descr list *)
-
-(* TODO why is it different from [Process.subst_descr] ? *)
-let subst_descr nu blk =
-  { action = blk.action;
-    indices = List.map (subst_index nu) blk.indices;
-    condition = subst_fact nu blk.condition;
-    updates = List.map (fun (s, t) -> subst_macro nu s,
-                                      subst_term nu t
-                       ) blk.updates;
-    output = subst_term nu blk.output }
-
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
@@ -32,10 +20,16 @@ let euf_key_ssc hash_fn key_n messages =
   let ssc = new check_hash_key hash_fn key_n in
   List.iter ssc#visit_term messages ;
   Process.iter_csa
-    (fun blk ->
-       ssc#visit_fact blk.condition ;
-       ssc#visit_term blk.output ;
-       List.iter (fun (_,t) -> ssc#visit_term t) blk.updates)
+    (fun action_descr ->
+       ssc#visit_fact (snd action_descr.condition) ;
+       ssc#visit_term (snd action_descr.output) ;
+       List.iter (fun (_,t) -> ssc#visit_term t) action_descr.updates)
+
+let hash_key_ssc hash_fn key_n messages =
+  try
+    euf_key_ssc hash_fn key_n messages;
+    true
+  with Bad_ssc -> false
 
 let rec h_o_term hh kk acc = function
   | Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
@@ -47,34 +41,34 @@ let rec h_o_term hh kk acc = function
   | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
   | Macro ((mn,is),l,a) ->
     if mn = fst Term.in_macro || mn = fst Term.out_macro then acc
-    else if Term.Macro.is_defined mn a then
+    else if Macros.is_defined mn a then
       let acc = List.fold_left (fun acc t -> h_o_term hh kk acc t) acc l in
-      Term.Macro.get_definition mn is a
+      Macros.get_definition mn is a
       |> h_o_term hh kk acc
     else raise Bad_ssc
   | Name (n,_) -> acc
   | MVar m -> acc
 
-(** [hashes_of_blk blk hash_fn key_n] return the pairs of indices and messages
-    where a hash using occurs in a block description. I.e. we have a pair
-    (is,m) iff hash_fn(m,key_n(is)) occurs in the block description output or
-    state updates.
+(** [hashes_of_action_descr action_descr hash_fn key_n] return the pairs of
+    indices and messages where a hash using occurs in an action description.
+    I.e. we have a pair (is,m) iff hash_fn(m,key_n(is)) occurs in the action
+    description output or state updates.
     Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
-let hashes_of_blk blk hash_fn key_n =
+let hashes_of_action_descr action_descr hash_fn key_n =
   List.fold_left (h_o_term hash_fn key_n)
-    [] (blk.output :: (List.map snd blk.updates))
+    [] (snd action_descr.output :: (List.map snd action_descr.updates))
   |> List.sort_uniq Pervasives.compare
 
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
 type euf_schema = { message : Term.term;
-                    blk_descr : descr;
+                    action_descr : action_descr;
                     env : Vars.env }
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Action.pp_action case.blk_descr.action
+    Action.pp_action case.action_descr.action
     Term.pp_term case.message
 
 (** Type of a direct euf axiom case.
@@ -111,15 +105,15 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
     key = key_n;
     case_schemata =
       Utils.map_of_iter Process.iter_csa
-        (fun blk ->
+        (fun action_descr ->
           let env = ref env in
-          hashes_of_blk blk hash_fn key_n
+          hashes_of_action_descr action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
             let subst_fresh =
               List.map
                 (fun i ->
                    Term.Index (i, Vars.make_fresh_from_and_update env i))
-                (List.filter (fun x -> not (List.mem x is)) blk.indices)
+                (List.filter (fun x -> not (List.mem x is)) action_descr.indices)
             in
             let subst_is =
               List.map2
@@ -127,9 +121,9 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
                 is key_is
             in
             let subst = subst_fresh@subst_is in
-            let new_block = Process.subst_descr subst blk in
+            let new_action_descr = Process.subst_action_descr subst action_descr in
             { message = Term.subst_term subst m ;
-              blk_descr = new_block;
+              action_descr = new_action_descr;
               env = !env })
         )
       |> List.flatten;

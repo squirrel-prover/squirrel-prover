@@ -160,124 +160,78 @@ let declare id args proc =
 
 open Action
 
-type descr = {
+
+(** An action description features an input, a condition (which sums up
+  * several [Exist] constructs which might have succeeded or not) and subsequent
+  * updates and outputs. The condition binds variables in the updates
+  * and output. An action description may feature free index variables, that are
+  * in a sense bound by the corresponding action. We also include a list of
+  * all used indices, since they are not explicitly declared as part of
+  * the action or current condition (they could be introduced by previous
+  * conditions). *)
+
+type action_descr = {
   action : action ;
+  input : Channel.t * string ;
   indices : index list ;
-  condition : Bformula.fact ;
+  condition : index list * Bformula.fact ;
   updates : (Term.state * Term.term) list ;
-  output : Term.term
+  output : Channel.t * Term.term
 }
 
-let pp_descr ppf descr =
+let pp_action_descr ppf action_descr =
   Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
               %a\
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
-    pp_action descr.action
+    pp_action action_descr.action
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
-    descr.indices
-    pp_fact descr.condition
+    action_descr.indices
+    pp_fact (snd action_descr.condition)
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
           (fun ppf (s, t) ->
              Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp_term t)))
-    descr.updates
-    Term.pp_term descr.output
+    action_descr.updates
+    Term.pp_term (snd action_descr.output)
 
-let subst_descr subst descr =
-  let action = Term.subst_action subst descr.action in
+(** Apply a substitution to an action description.
+  * The domain of the substitution must contain all indices
+  * occurring in the description. *)
+let subst_action_descr subst action_descr =
+  let action = Term.subst_action subst action_descr.action in
+  let input = action_descr.input in
   let subst_term = Term.subst_term subst in
-  let indices = List.map (Term.subst_index subst) descr.indices  in
-  let condition = Bformula.subst_fact subst descr.condition in
+  let indices = List.map (Term.subst_index subst) action_descr.indices  in
+  let condition = fst action_descr.condition, Bformula.subst_fact subst (snd action_descr.condition) in
   let updates =
     List.map
       (fun ((ss,is),t) ->
          ((ss, List.map (Term.subst_index subst) is),
           subst_term t))
-      descr.updates
+      action_descr.updates
   in
-  let output = subst_term descr.output in
-  { action; indices; condition; updates; output }
+  let output = fst action_descr.output, subst_term (snd action_descr.output) in
+  { action; input; indices; condition; updates; output }
 
-(** A block features an input, a condition (which sums up several [Exist]
-  * constructs which might have succeeded or not) and subsequent
-  * updates and outputs. The condition binds variables in the updates
-  * and output. A block may feature free index variables, that are in
-  * a sense bound by the corresponding action. We also include a list of
-  * all used indices, since they are not explicitly declared as part of
-  * the action or current condition (they could be introduced by previous
-  * conditions). *)
-type block = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : index list ;
-  condition : index list * Bformula.fact ;
-  updates : (string * index list * Term.term) list ;
-  output : Channel.t * Term.term
-}
-
-(** Associates a block to each action *)
-let action_to_block : (action_shape, block) Hashtbl.t =
+(** Associates a description to each action *)
+let action_to_action_descr : (action_shape, action_descr) Hashtbl.t =
   Hashtbl.create 97
 
-let to_descr (block:block) : descr =
-  let updates =
-    List.map (fun (s, l, t) -> (Term.Macro.of_string s, l),  t) block.updates
-  in
-  { action = block.action ;
-    indices = block.indices ;
-    condition = (snd block.condition) ;
-    updates = updates ;
-    output = snd block.output }
-
-let fresh_instance env block =
-  let subst =
-    List.map (fun i ->
-        Term.Index(i, Vars.make_fresh_from_and_update env i)) block.indices
-  in
-  subst_descr subst (to_descr block)
-
-let iter_fresh_csa env f =
-  Hashtbl.iter (fun a b -> f (fresh_instance env b)) action_to_block
-
-let iter_csa_block f =
-  Hashtbl.iter (fun a b -> f b) action_to_block
-
 let iter_csa f =
-  Hashtbl.iter (fun a b -> f (to_descr b)) action_to_block
+  Hashtbl.iter (fun a b -> f b) action_to_action_descr
 
-(** Apply a substitution to a block description.
-  * The domain of the substitution must contain all indices
-  * occurring in the description. *)
-let subst_descr subst (descr : descr) =
-  let action = Term.subst_action subst descr.action in
-  let subst_term = Term.subst_term subst in
-  let subst_fact = subst_fact subst in
-  let indices =
-    List.map (fun i -> List.assoc i (Term.to_isubst subst)) descr.indices
-  in
-  let condition = subst_fact descr.condition in
-  let updates =
-    List.map
-      (fun (s, t) ->
-         Term.subst_macro subst s,
-         subst_term t)
-      descr.updates
-  in
-  let output = subst_term descr.output in
-  { action; indices; condition; updates; output }
-
-let get_descr a =
-  let block = Hashtbl.find action_to_block (get_shape a) in
-  (* We know that [block.action] and [a] have the same shape,
+let get_action_descr a =
+  let action_descr = Hashtbl.find action_to_action_descr (get_shape a) in
+  (* We know that [action_descr.action] and [a] have the same shape,
    * but run [same_shape] anyway to obtain the substitution from
    * one to the other. *)
-  match Action.same_shape block.action a with
+  match Action.same_shape action_descr.action a with
   | None -> assert false
   | Some subst ->
-    subst_descr (Term.from_varsubst subst) (to_descr block)
+    subst_action_descr (Term.from_varsubst subst) action_descr
 
 
 module Aliases = struct
@@ -322,13 +276,13 @@ let prepare : process -> process =
     *
     * This should correspond "sufficiently" to what [parse_proc] does:
     * the important point is that [update] should maintain a list of
-    * input variables that corresponds exactly to the blocks that will
-    * be produced by [parse_proc].
+    * input variables that corresponds exactly to the action descriptions
+    * that will be produced by [parse_proc].
     * The current [update] is a bit more general (e.g. TODO allow
     * aliases in p_cond below, and do not make Alias end the p_in
     * phase) which is not a big deal. It also does not reflect the
     * intermediate [p_cond] phase and in that sense it may consider
-    * as a single block some processes that are two blocks for
+    * as a single action some processes that are two actions for
     * [parse_proc], e.g. Exists (Update (Exists (Update _))) TODO. *)
   let update (state:[`Start|`Input]) env invars p = match state,p with
 
@@ -526,7 +480,7 @@ let prepare : process -> process =
   in fun p -> prep env [] [] [] `Start "A" p
 
 (* Environment for parsing the final process, i.e. the system to study,
- * to break it into blocks suitable for the analysis.
+ * to break it into action descriptions suitable for the analysis.
  *
  * While the process is traversed, some constructs are removed/translated:
  *  - the current set of indices is maintained, as it will be used
@@ -671,7 +625,8 @@ let var_env = ref Vars.empty_env in
 
   (** Similar to previous functions, with [sum_choice] and [facts] finalized,
     * and now accumulating a list of [updates] until an output is reached,
-    * at which point the completed action and block are registered. *)
+    * at which point the completed action and corresponding description
+    * are registered. *)
   and p_update ~env ~input ~condition ~updates = function
   | Apply _ | Let _ | New _ | Out _ -> assert false
 
@@ -686,7 +641,7 @@ let var_env = ref Vars.empty_env in
         | Alias (Out (c,t,p),a) -> (c, conv_term env t),a,p
         | Alias _ -> assert false
         | Null ->
-            (* Generate block anyway, since it may contain important
+            (* Generate description anyway, since it may contain important
              * state updates. The problem is that we don't have an
              * alias setup by the preparation phase.
              * TODO aliases on "interesting" null processes *)
@@ -704,13 +659,13 @@ let var_env = ref Vars.empty_env in
       let updates =
         List.map
           (fun (s,l,t) ->
-             s, conv_indices env l, conv_term ~pred:true env t)
+             (Term.Macro.of_string s, conv_indices env l), conv_term ~pred:true env t)
           updates
       in
       let indices = List.rev env.p_indices in
       let action = (List.rev env.action) in
-      let block = {action; input; indices; condition; updates; output} in
-      Hashtbl.add action_to_block (get_shape action) block ;
+      let action_descr = {action; input; indices; condition; updates; output} in
+      Hashtbl.add action_to_action_descr (get_shape action) action_descr ;
       (* TODO temporary Obj.magic, I suspect it will disappear
        *   by merging prepare and parse_proc, which makes sense anyway *)
       Action.define_symbol (Obj.magic a) indices action ;
@@ -735,7 +690,7 @@ let declare_system proc =
 
 let reset () =
   Hashtbl.clear pdecls ;
-  Hashtbl.clear action_to_block ;
+  Hashtbl.clear action_to_action_descr ;
   Hashtbl.clear Aliases.name_to_action ;
   Hashtbl.clear Aliases.action_to_name
 
@@ -759,14 +714,14 @@ let pp_actions ppf () =
            Action.pp_indices indices) ;
   Fmt.pf ppf "@]@]@."
 
-let pp_descrs ppf () =
+let pp_action_descrs ppf () =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  iter_csa (fun descr ->
+  iter_csa (fun action_descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        pp_descr descr) ;
+        pp_action_descr action_descr) ;
   Fmt.pf ppf "@]%!@."
 
 let pp_proc ppf () =
   pp_actions ppf () ;
   Fmt.pf ppf "@." ;
-  if debug then pp_descrs ppf ()
+  if debug then pp_action_descrs ppf ()

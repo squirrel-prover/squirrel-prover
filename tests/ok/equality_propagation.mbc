@@ -28,6 +28,6 @@ Qed.
 
 goal contradiction :
   forall (x:message, y:message),
-  (x = y && x <> y) => false.
+  (x = y && x <> y) => False.
 Proof.
 Qed.

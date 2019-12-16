@@ -94,10 +94,12 @@ let parse_theory_buf ?(test=false) lexbuf filename =
   Process.reset () ;
   parse_from_buf ~test Parser.theory lexbuf filename
 
-let parse_process string =
+let parse_process ?(typecheck=false) string =
   let lexbuf = Lexing.from_string string in
   try
-    Parser.top_process Lexer.token lexbuf
+    let p = Parser.top_process Lexer.token lexbuf in
+      if typecheck then Process.check_proc [] p ;
+      p
   with Parser.Error as e ->
     Format.printf
       "Cannot parse process before %S at position TODO.@."
@@ -129,7 +131,8 @@ let () =
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process "if u then if v then null else null else null")
+      ignore (parse_process
+                "if u=true then if True then null else null else null")
     end ;
     "Pairs", `Quick, begin fun () ->
       Channel.declare "c" ;
@@ -137,9 +140,12 @@ let () =
     end ;
     "Facts", `Quick, begin fun () ->
       Theory.declare_abstract "p" [] Vars.Boolean ;
+      Theory.declare_abstract "ok" [] Vars.Message ;
       Channel.declare "c" ;
-      ignore (parse_process "if p && p() then out(c,ok)") ;
-      ignore (parse_process "if p() = p then out(c,ok)")
+      ignore (parse_process ~typecheck:true
+                "if p=true && p()=true then out(c,ok)") ;
+      ignore (parse_process ~typecheck:true
+                "if p() = p then out(c,ok)")
     end
   ];;
 
@@ -166,27 +172,27 @@ let () =
         Symbols.Multiple_declarations
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
-    "Block creation", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/blocks.mbc" ;
+    "Action creation", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/actions.mbc" ;
       ignore (Action.find_symbol "IOIO1") ;
       ignore (Action.find_symbol "IOIO2")
-      (* TODO test resulting block structure *)
+      (* TODO test resulting action structure *)
     end ;
-    "Let in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_let.mbc"
-      (* TODO test resulting block structure *)
+    "Let in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_let.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "New in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_name.mbc"
-      (* TODO test resulting block structure *)
+    "New in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_name.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "Find in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_find.mbc"
-      (* TODO test resulting block structure *)
+    "Find in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_find.mbc"
+      (* TODO test resulting action structure *)
     end ;
-    "Updates in blocks", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/block_set.mbc"
-      (* TODO test resulting block structure *)
+    "Updates in actions", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/action_set.mbc"
+      (* TODO test resulting action structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
       parse_theory_test ~test "tests/alcotest/lak.mbc"

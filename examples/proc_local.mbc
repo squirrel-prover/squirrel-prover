@@ -1,3 +1,0 @@
-name n : message
-channel c
-system out(c,n@n).

@@ -105,41 +105,6 @@ second part.
 
 \include{protocols}
 
-\section{Concrete meta-logic}
-
-\emph{We are not defining a new logic, but identifying axioms (or inference
-rules, which would be closer to the tool) that hold in all
-meta-interpretations corresponding to protocol executions.}
-
-Now that the semantics of formulas is defined given a specific protocol, we
-can define a logic allowing to prove such formulas. We will reason using
-classical sequent calculs, extended with some axioms obtained form the
-constraints based on the protocol, or computational axioms made about the
-primitives. We will use implicitely the axioms about equality.
-
-Given a protocol $P$, we define a set of path constraints axioms $C_P$ with the formulas:
-\begin{itemize}
-\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$, when $a'(id_1,\dots,id_k) = \pre (a(i_1,\dots,i_n))$,
-  \[\forall i_1, \dots, i_n:\idx, \tau:\timestamp, a(i_1,\dots,i_n)@\tau \Rightarrow \exists \tau', \tau'< \tau \wedge a'(i_1,\dots,i_k)@\tau' \qquad (i) \]
-\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$ such that $\pre (a(id_1,\dots,id_n)) =
-  \oplus$, for any $a'(id_1,\dots,id_k,id'_1,\dots, id'_l) \in \suc^*( \bro (a(id_1,\dots,id_n)))$,
-  \[\forall i_1, \dots, i_n, i'_1,\dots, i'_l:\idx, \tau,\tau':\timestamp, a(i_1,\dots,i_n)@\tau \wedge a'(id_1,\dots,id_k,id'_1,\dots, id'_l)@\tau' \Rightarrow \false   \qquad (ii) \]
-\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$,
-  \[\forall i_1, \dots, i_n, :\idx, \tau:\timestamp, a(i_1,\dots,i_n)@\tau \wedge a(id_1,\dots,id_n)@\tau' \Rightarrow \tau=\tau'  \qquad (iii)\]
-\item for any action $a(id_1,\dots,id_n) \in \Actions(P)$ with output term $o(id_1,\dots,id_n)$ and condition $\phi(id_1,\dots,id_n)$,
-  \[\forall i_1, \dots, i_n, :\idx, \tau,\tau':\timestamp, a(i_1,\dots,i_n)@\tau \Rightarrow \mout@\tau = o(i_1,\dots,i_n) \wedge \phi(id_1,\dots,id_n)   \qquad (iv)\]
-\end{itemize}
-
-We have that $ P\models C_P$ by definitions of the traces of $P$.Intuitively $(i)$ captures the fact that an action can only happen if the previous actions in the protocol have happened before, $(ii)$ captures the fact that the protocol sometimes enforce a choice between two actions and both cannot then be in a trace, $(iii)$ captures the uniqueness of an action, and $(iv)$ simply enforces the equality given by an action.
-
-\charlie{need to define the axiom for the states, but I'm lazy right now}
-
-
-We also consider a set of computational sounds axioms $A_P$, which is based on classical axioms from the \BC model, which may contain EQ-INDEP, EUF-CMA, PRF, \dots.
-
-Finally, given a protocol $P$, we obtain a set of axioms $C_P$, and we may choose a set of computationaly sound axioms $A_P$.
-Then, we can prove statements of the form $ P \models \phi$, by reasoning using the rules of the sequence calculs, and proving that $A_P,C_P \vdash \phi$.
-
 \newpage
 
 \section{Old stuff}

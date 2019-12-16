@@ -46,23 +46,20 @@ let () = T.register "split" goal_and_intro
 let goal_intro (judge : Judgment.t) sk fk =
   let exception No_intro in
   try
-    let ((facts,constrs),new_goal) =
+    let (new_atoms,new_goal) =
       match judge.Judgment.formula with
       | f when is_disjunction f ->
-        let (f1,c1) = disjunction_to_atom_lists f in
+        let (f1,c1,h1) = disjunction_to_atom_lists f in
+        assert (h1 = []) ; (* TODO don't know what to do with that yet *)
         (List.map (fun c -> Bformula.Not c) f1,
-         List.map (fun c -> Bformula.Not c) c1),
+         List.map (fun c -> Bformula.Not c) c1,
+         []),
         False
       | Impl(lhs,rhs) when is_conjunction lhs ->
         (conjunction_to_atom_lists lhs, rhs)
       | _ -> raise No_intro
     in
-    let judge = List.fold_left
-        (fun j f -> Judgment.add_fact f j) judge facts
-    in
-    let judge = List.fold_left
-        (fun j c -> Judgment.add_constr c j) judge constrs
-    in
+    let judge = Judgment.add_atoms new_atoms judge in
     sk [Judgment.set_formula new_goal judge] fk
   with No_intro ->
     fk (Tactics.Failure "Can only introduce disjunction of atoms, \
@@ -253,15 +250,14 @@ let euf_apply_schema theta (_, (_, key_is), m, s) case =
   let open Euf in
   let open Process in
   (* We create the term equality *)
-  let eq = Atom (Eq, case.message, m) in
-  let new_f = And (eq, case.blk_descr.condition) in
+  let new_f = Atom (Eq, case.message, m) in
   (* Now, we need to add the timestamp constraints. *)
-  (* The block action name and the block timestamp variable are equal. *)
-  let blk_ts = TName case.blk_descr.action in
-  (* The block occured before the test H(m,k) = s. *)
+  (* The action name and the action timestamp variable are equal. *)
+  let action_descr_ts = TName case.action_descr.action in
+  (* The action occured before the test H(m,k) = s. *)
   let le_cnstr =
     List.map (fun ts ->
-        Atom (Pts (Leq, blk_ts, ts))
+        Atom (Pts (Leq, action_descr_ts, ts))
       ) (Theta.maximal_elems theta (term_ts s @ term_ts m))
     |> mk_or_cnstr
   in
@@ -322,20 +318,20 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
   let env = ref judge.Judgment.env in
   let formula = subst_formula subst gp in
   try
-    let ((check_facts,check_constrs),(new_facts,new_constrs)) =
+    let ((check_facts,check_constrs,check_happens),new_atoms) =
       match formula with
       | f when is_conjunction f ->
-        ([], []), conjunction_to_atom_lists f
+        ([],[],[]), conjunction_to_atom_lists f
       | Impl(lhs,rhs) when is_disjunction lhs && is_conjunction rhs->
         disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
       | ForAll(vs,f) when is_conjunction f ->
         let f = fresh_quantifications env f in
-        ([], []), conjunction_to_atom_lists f
+        ([],[],[]), conjunction_to_atom_lists f
       | ForAll(vs, Exists(vs2, f)) when is_conjunction f ->
         begin
           match fresh_quantifications env (Exists(vs2, f)) with
-          |  (Exists(vs2, f)) ->
-            ([], []), conjunction_to_atom_lists f
+          | Exists(vs2,f) ->
+            ([],[],[]), conjunction_to_atom_lists f
           | _ -> assert false
         end
       | ForAll(vs, Impl(lhs,rhs))
@@ -354,45 +350,41 @@ let apply gp (subst:subst) (judge : Judgment.t) sk fk =
             disjunction_to_atom_lists lhs, conjunction_to_atom_lists rhs
           | _ -> assert false
         end
-
       | _ -> raise No_apply
     in
+    assert (check_happens = []) ; (* TODO improve after judgment redesign *)
     let ts_atom_list = List.map (function
         | Bformula.Atom a -> a
         | _ -> assert false) check_constrs in
-    if not( Theta.is_valid judge.Judgment.theta ts_atom_list) then
+    if not (Theta.is_valid judge.Judgment.theta ts_atom_list) then
       raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
     let term_atom_list = List.map (function
         | Bformula.Atom a -> a
         | _ -> assert false) check_facts in
-    if not( Gamma.is_valid judge.Judgment.gamma term_atom_list) then
+    if not (Gamma.is_valid judge.Judgment.gamma term_atom_list) then
       raise @@ Tactic_Hard_Failure "Failed to prove the variable constraint.";
-    let judge = List.fold_left
-        (fun j f -> Judgment.add_fact f j) judge new_facts
-    in
-    let judge = List.fold_left
-        (fun j c -> Judgment.add_constr c j) judge new_constrs
-    in
+    let judge = Judgment.add_atoms new_atoms judge in
     sk [judge] fk
-  with No_apply -> fk (Failure "Can only apply quantified conjunction of atoms
- or a disjunction implying a conjunction.")
+  with No_apply ->
+    fk (Failure "Can only apply quantified conjunction of atoms \
+                 or a disjunction implying a conjunction.")
 
 let () =
   T.register_general "apply"
     (function
-       | [Prover.Goal_name gname; Prover.Subst s] ->
-           let f = Prover.get_goal_formula gname in
-           apply f s
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+      | [Prover.Goal_name gname; Prover.Subst s] ->
+        let f = Prover.get_goal_formula gname in
+        apply f s
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let tac_assert f j sk fk =
   let j1 = Judgment.set_formula f j in
   match Formula.formula_to_fact f with
-    | fact -> sk [j1; Judgment.add_fact fact j] fk
-    | exception Failure _ ->
-        match Formula.formula_to_constr f with
-          | constr -> sk [j1; Judgment.add_constr constr j] fk
-          | exception Failure _ -> fk (Failure "unsupported formula")
+  | fact -> sk [j1; Judgment.add_fact fact j] fk
+  | exception Failure _ ->
+    match Formula.formula_to_constr f with
+    | constr -> sk [j1; Judgment.add_constr constr j] fk
+    | exception Failure _ -> fk (Failure "unsupported formula")
 
 let () =
   T.register_formula "assert"
@@ -400,40 +392,49 @@ let () =
 
 let collision_resistance (judge : Judgment.t) sk fk =
   let judge = Judgment.update_trs judge in
+  (* We collect all hashes appearing inside the hypotheses, and which satisfy
+     the syntactic side condition. *)
   let hashes = List.filter
       (fun t -> match t with
-         | Fun ((hash, _), [m; Name key]) -> Theory.is_hash hash
+         | Fun ((hash, _), [m; Name (key,ki)]) ->
+           (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
          | _ -> false)
       (Gamma.get_all_terms judge.Judgment.gamma)
   in
-  let rec make_eq hash_list =
-    match hash_list with
-    | [] -> []
-    | h1::q -> List.fold_left (fun acc h2 ->
-        match h1, h2 with
-        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
-          when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
-        | _ -> acc
-      ) [] q
-  in
-  let hash_eqs = make_eq hashes
-                 |> List.filter (fun eq -> Completion.check_equalities
-                                    (Gamma.get_trs judge.Judgment.gamma) [eq])
-  in
-  let new_facts =
-    List.fold_left (fun acc (h1,h2) ->
-        match h1, h2 with
-        | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
-          when hash = hash2 && key1 = key2 ->
-          Atom (Eq, m1, m2) :: acc
-        | _ -> acc
-      ) [] hash_eqs
-  in
-  let judge =
-    List.fold_left (fun judge f ->
-        Judgment.add_fact f  judge
-      ) judge new_facts
-  in
-  sk [judge] fk
+  if List.length hashes = 0 then
+    fk (Failure "no equality between hashes where the keys satisfiy the
+ syntactic condition has been found")
+  else
+    begin
+      let rec make_eq hash_list =
+        match hash_list with
+        | [] -> []
+        | h1::q -> List.fold_left (fun acc h2 ->
+            match h1, h2 with
+            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+              when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
+            | _ -> acc
+          ) [] q
+      in
+      let hash_eqs = make_eq hashes
+                     |> List.filter (fun eq -> Completion.check_equalities
+                                        (Gamma.get_trs judge.Judgment.gamma) [eq])
+      in
+      let new_facts =
+        List.fold_left (fun acc (h1,h2) ->
+            match h1, h2 with
+            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+              when hash = hash2 && key1 = key2 ->
+              Atom (Eq, m1, m2) :: acc
+            | _ -> acc
+          ) [] hash_eqs
+      in
+      let judge =
+        List.fold_left (fun judge f ->
+            Judgment.add_fact f  judge
+          ) judge new_facts
+      in
+      sk [judge] fk
+    end
 
 let () = T.register "collision" collision_resistance

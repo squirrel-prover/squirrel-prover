@@ -4,16 +4,14 @@ open Action
 open Process
 open Term
 
-val subst_descr : subst -> descr -> descr
-
 (** Type of an euf axiom case schema.
     [e] of type [euf_schema] represents the fact that the message [e.message]
     has been hashed.
-    [e.blk_descr] stores the relevant block description for future use,
+    [e.action_descr] stores the relevant action description for future use,
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = { message : Term.term;
-                    blk_descr : descr;
+                    action_descr : action_descr;
                     env : Vars.env }
 
 
@@ -42,6 +40,10 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
+
+(** Returns true if the syntactic side condition of the key is met inside the
+    protocol and the messages. *)
+val hash_key_ssc : fname -> name -> term list -> bool
 
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.

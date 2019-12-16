@@ -10,8 +10,8 @@ axiom pair_neq_snd :
 system in(c,x);out(c,h(x,k)).
 
 goal foo :
-  h(<n,input@A>,k) = n => false.
+  h(<n,input@A>,k) = n => False.
 Proof.
-  euf 1.
+  euf 0.
   apply pair_neq_snd to n, input@A.
 Qed.

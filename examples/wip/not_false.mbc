@@ -1,0 +1,8 @@
+system null.
+
+(* This should pass. *)
+
+goal two :
+  not(False).
+Proof.
+Qed.

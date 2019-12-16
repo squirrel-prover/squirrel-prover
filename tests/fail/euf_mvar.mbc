@@ -24,7 +24,7 @@ Proof.
 Qed.
 
 
-goal abs : false.
+goal abs : False.
 Proof.
   apply cheat to h(n,k), n, n.
 Qed.

@@ -168,8 +168,14 @@ let rec check_term env tm kind =
       l
   | Compare (_, u, v) ->
     if kind <> Boolean then raise Type_error ;
-    check_term env u Message ;
-    check_term env v Message
+    begin try
+      check_term env u Message ;
+      check_term env v Message
+    with
+      | Type_error ->
+          check_term env u Boolean ;
+          check_term env v Boolean
+    end
 
 let rec check_fact env =
   let open Vars in
@@ -546,6 +552,7 @@ let convert_formula_glob args_kind subst f =
             Atom (Constraint (convert_constr_atom args_kind subst at))
         | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
       end
+    | Atom (Fun ("happens",[ts],None)) -> Atom (Happens (convert_ts subst ts))
     | Atom _ -> assert false
     | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
     | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
@@ -600,9 +607,7 @@ let declare_macro s typed_args k t =
       typed_args
   in
   let _,ts_var = Vars.make_fresh env Vars.Timestamp "ts" in
-  Fmt.pr "declare macro %s(%a)=%a@." s Vars.pp_env env pp_term t ;
   let t = convert (Term.TVar ts_var) tsubst t in
-  Fmt.pr "... %a@." Term.pp_term t ;
   ignore
     (Term.Macro.declare_exact s
        (Term.Local (List.rev typed_args,k,ts_var,t)))

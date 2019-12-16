@@ -1,0 +1,42 @@
+hash H
+
+(* TODO abstract would be more natural but index->message not allowed *)
+name id : index->message
+
+name key : index->message
+
+abstract error : message
+abstract tag0 : message
+abstract tag1 : message
+axiom tags_neq : tag0 <> tag1
+
+channel c
+
+process tag(a:message,k:message) =
+  in(c,x);
+  new nt;
+  out(c,<nt,xor(a,H(<tag0,<x,nt>>,k))>)
+
+process reader =
+  new nr;
+  out(c,nr);
+  in(c,m);
+  try find i such that xor(id(i),snd(m)) = H(<tag0,<nr,fst(m)>>,key(i)) in
+    out(c,xor(id(i),H(<tag1,<nr,fst(m)>>,key(i))))
+  else
+    out(c,error)
+
+system (!_r R: reader | !_i !_t T: tag(id(i),key(i))).
+
+goal
+  forall (r:index,i:index),
+  happens(R1(r,i)) =>
+  exists (t:index),
+  T(i,t) <= R1(r,i) &&
+  fst(input@R1(r,i)) = nt(i,t) &&
+  input@T(i,t) = nr(r).
+Proof.
+  euf 0.
+  apply tags_neq.
+  exists t.
+Qed.

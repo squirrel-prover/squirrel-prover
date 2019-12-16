@@ -1,11 +1,12 @@
 %token <int> INT
-%token <string> ID
+%token <string> ID   /* general purpose identifier */
+%token <string> PID  /* predicate identifier */
 %token <string> BANG
 %token AT
 %token LPAREN RPAREN
 %token LANGLE RANGLE
-%token AND OR NOT TRUE FALSE
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
+%token AND OR NOT TRUE FALSE HAPPENS
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
@@ -17,6 +18,8 @@
 %token EOF
 
 %token EMPTY_ELSE
+
+%left XOR
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
@@ -43,15 +46,16 @@
 
 (* Terms *)
 
-term:
-| aterm                          { $1 }
-| LPAREN term RPAREN             { $2 }
-
-aterm:
+timestamp:
 | ID term_list                   { Theory.make_term $1 $2 }
-| ID term_list AT term           { let ts = $4 in
+
+term:
+| LPAREN term RPAREN             { $2 }
+| ID term_list                   { Theory.make_term $1 $2 }
+| ID term_list AT timestamp      { let ts = $4 in
                                    Theory.make_term ~at_ts:ts $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
+| term XOR term                  { Theory.make_term "xor" [$1;$3] }
 
 term_list:
 |                                { [] }
@@ -93,8 +97,11 @@ formula:
 | NOT formula                    { Formula.Not ($2) }
 | FALSE                          { Formula.False }
 | TRUE                           { Formula.True }
-| aterm ord aterm                { Formula.Atom (Theory.Compare ($2,$1,$3)) }
-| ID term_list                   { Formula.Atom (Theory.make_term $1 $2) }
+| term ord term                  { Formula.Atom (Theory.Compare ($2,$1,$3)) }
+| PID term_list                  { Formula.Atom (Theory.make_term $1 $2) }
+| HAPPENS LPAREN timestamp RPAREN
+                                 { Formula.Atom
+                                     (Theory.Fun ("happens",[$3],None)) }
 | EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
                                  { Formula.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF

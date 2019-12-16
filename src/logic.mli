@@ -5,7 +5,7 @@
 open Term
 open Bformula
 open Formula
-    
+
 (** Tags used to keep some information on gamma elements. *)
 type tag = {
   t_euf : bool;  (** [true] iff [euf] has been applied to this element *)
@@ -51,7 +51,7 @@ module Gamma : sig
     -> (tag -> tag)
     -> gamma * term_atom
 
-  val add_descr : gamma -> Process.descr -> gamma
+  val add_action_descr : gamma -> Process.action_descr -> gamma
 
   (** [get_all_terms g] provides the list of all terms appearing inside
       atoms or facts of the [g]. *)
@@ -99,13 +99,18 @@ module Judgment : sig
 
   val init : formula -> judgment
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_fact : fact -> judgment -> judgment
+
+  (** Add happens(ts) hypothesis. *)
+  val add_happens : timestamp -> judgment -> judgment
 
   val mem_fact : fact -> judgment -> bool
 
-  (** Side-effect: Add necessary action descriptions. *)
   val add_constr : constr -> judgment -> judgment
+
+  (** Use add_fact, add_constr and add_atoms on appropriate list items. *)
+  val add_atoms :
+    fact list * constr list * timestamp list -> judgment -> judgment
 
   val update_trs : judgment -> judgment
 

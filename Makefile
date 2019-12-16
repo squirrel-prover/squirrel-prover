@@ -9,11 +9,22 @@ PROVER_OK_TESTS = $(wildcard tests/ok/*)
 
 PROVER_FAIL_TESTS = $(wildcard tests/fail/*)
 
-test: alcotest ok_test fail_test
+test: alcotest ok_test fail_test examples_test
 
 alcotest: sanity
 	$(OCB) test.byte
 	./test.byte
+
+examples_test: sanity
+	@echo "\n --- Running examples/*.mbc --- \n"
+	@tests=0 ; failures=0 ; for f in $(wildcard examples/*.mbc) ; do \
+	  echo -n "Running prover on $$f... " ; \
+	  tests=$$((tests+1)) ; \
+	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
+	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
+	done ; \
+	echo "Total: $$tests tests, $$failures failures." ; \
+	test $$failures -eq 0
 
 ok_test: sanity
 	@echo "\n --- Running tests that must succeed --- \n"
@@ -34,7 +45,7 @@ fail_test: sanity
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
 	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
 	done ; \
-	echo "Total: $$tests tests, $$failures failures." ; echo ; \
+	echo "Total: $$tests tests, $$failures failures." ; \
 	test $$failures -eq $$tests
 
 clean:
