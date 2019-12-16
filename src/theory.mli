@@ -1,15 +1,17 @@
-(** Terms and facts used during parsing. *)
+(** This module defines terms and facts used during parsing,
+  * functions to type-check them, and convert them to proper
+  * terms and formulas of the logic. *)
 
 (** {2 Terms}
-    It is required to have two different kind of terms. The one in this module
-    is for parsing. Variables are identified by strings, instead of some
-    variable type.Function symbols can be defined at runtime, and each new
-    term typed checked. *)
-
-type ord = Bformula.ord
-
-(** Temporary alias, should eventually disappear *)
-type kind = Vars.sort
+  *
+  * We define here terms used for parsing. Their variables are strings,
+  * they are not attached to sorts. It will be the job of the typechecker
+  * to make sure that types make sense, and of the conversion to replace
+  * strings by proper sorted variables.
+  *
+  * Although function symbols are known when a term is parsed, we use
+  * here a very permissive [Fun] constructor which will be used to represent
+  * both function applications and macros. *)
 
 type term =
   | Var of string
@@ -28,7 +30,7 @@ type term =
         * depending on the type of the function symbol.
         * The third argument is for the optional timestamp. This is used for
         * the terms appearing in goals.*)
-  | Compare of ord*term*term
+  | Compare of Bformula.ord*term*term
 
 val pp_term : Format.formatter -> term -> unit
 
@@ -36,26 +38,40 @@ type fact = term Bformula.bformula
 
 val pp_fact : Format.formatter -> fact -> unit
 
-type formula = (term, (string * kind) ) Formula.foformula
+type formula = (term, (string * Vars.sort) ) Formula.foformula
 
 val formula_to_fact : formula -> fact
 
-val formula_vars : formula -> (string * kind) list
+val formula_vars : formula -> (string * Vars.sort) list
 
-(** {2 Declaration of new symbols}
-  *
-  * Hash function symbols are of kind message->message->message.
-  * Asymmetric encryption function symbols are of kind
-  * message->message->message->message.
-  * Names are of kind index^n->message. Mutable cells are
-  * similar but may contain messages or booleans. *)
+(** {2 Declaration of new symbols} *)
 
+
+(** Declare a new function symbol of type message->message->message,
+  * which satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash : string -> unit
+
+(** Asymmetric encryption function symbols are of type
+  * message->message->message->message. *)
 val declare_aenc : string -> unit
+
+(** [declare_name n i] declares a new name of type
+  * [index^i -> message]. *)
 val declare_name : string -> int -> unit
-val declare_state : string -> int -> kind -> unit
-val declare_abstract : string -> kind list -> kind -> unit
-val declare_macro : string -> (string*kind) list -> kind -> term -> unit
+
+(** [declare_state n i s] declares a new name of type
+  * [index^i -> s] where [s] is either [boolean] or [message]. *)
+val declare_state : string -> int -> Vars.sort -> unit
+
+(** [declare_abstract n l s] declares a new function symbol
+  * of type [l -> s]. *)
+val declare_abstract : string -> Vars.sort list -> Vars.sort -> unit
+
+(** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
+  * of type [s1->...->sn->s]
+  * such that [s(t1,...,tn)] expands to [t[x1:=t1,...,xn:=tn]]. *)
+val declare_macro :
+  string -> (string*Vars.sort) list -> Vars.sort -> term -> unit
 
 (** {2 Term builders }
     Given a string [s] and a list of terms [l] build the term [s(l)]
@@ -77,9 +93,9 @@ exception Type_error
   * arity [i] when it actually has arity [j]. *)
 exception Arity_error of string*int*int
 
-type env = (string*kind) list
-val check_term : env -> term -> kind -> unit
-val check_state : string -> int -> kind
+type env = (string*Vars.sort) list
+val check_term : env -> term -> Vars.sort -> unit
+val check_state : string -> int -> Vars.sort
 val check_fact : env -> fact -> unit
 
 val is_hash : Term.fname -> bool
@@ -130,7 +146,7 @@ val convert_glob :
 (** Convert [fact] to [Bformula.constr],
   * for global terms (i.e. with attached timestamps). *)
 val convert_constr_glob :
-  (string * kind) list ->
+  (string * Vars.sort) list ->
   tsubst ->
   fact ->
   Bformula.constr
@@ -146,7 +162,7 @@ val convert_fact_glob :
   * for global terms (i.e. with attached timestamps).
   * Requires a typing environment. *)
 val convert_formula_glob :
-  (string * kind) list ->
+  env ->
   tsubst ->
   formula ->
   Formula.formula
@@ -156,5 +172,5 @@ val convert_formula_glob :
     the shadowing. *)
 val convert_vars :
   Vars.env ref ->
-  (string * kind) list ->
+  env ->
   tsubst * Vars.var list

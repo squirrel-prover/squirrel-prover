@@ -1,7 +1,6 @@
 open Bformula
 
-type kind = Theory.kind
-type pkind = (string * kind) list
+type pkind = (string * Vars.sort) list
 
 type id = string
 
