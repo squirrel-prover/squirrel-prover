@@ -5,11 +5,11 @@
   * would be more useful if it could be seen by the user of the
   * prover. *)
 
-open Logic
+open Sequent
 open Bformula
 open Formula
 
-type tac = Judgment.t Tactics.tac
+type tac = sequent Tactics.tac
 
 (** {2 Basic logic-specific tactics} *)
 
@@ -23,13 +23,10 @@ val goal_or_intro_r : tac
     a conjonction. Else it calls [fk] *)
 val goal_and_intro : tac
 
-(** [goal_intro judge sk fk] introduce a fact if the goal is one. Else it calls
-    [fk] *)
+(** [goal_intro judge sk fk] perform one introduction, either of a forall
+    quantifier or an implication. Else, it returns [fk] *)
 val goal_intro : tac
 
-(** [goal_forall_intro judge sk fk] introduces the universally
-    quantified variables and the goal. *)
-val goal_forall_intro : tac
 (** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
     quantified variables and the goal.
     [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
@@ -41,7 +38,7 @@ val goal_exists_intro : Term.subst -> tac
     calls [fk] *)
 val gamma_absurd : tac
 
-(** [assumption judge sk fk] try to close the goal by finding it in the 
+(** [assumption judge sk fk] try to close the goal by finding it in the
     context. *)
 val assumption : tac
 
@@ -72,7 +69,7 @@ val tac_assert : formula -> tac
 (** [euf_apply f_select judge sk fk] selects an atom of the judgement according
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
-val euf_apply : (term_atom -> Logic.tag -> bool) -> tac
+val euf_apply : string -> tac
 
 (** [collision_resistance judge sk fk] collects all equalities between hash,
     and add to Gamma the equality of the messages if the hash and the key are

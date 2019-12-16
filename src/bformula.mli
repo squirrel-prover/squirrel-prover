@@ -71,30 +71,30 @@ val add_xeq :
 
 val pp_ord : Format.formatter -> ord -> unit
 
-(** {2 Constraint formulas} *)
+(** {2 Unquantified trace formulas} *)
 
 (** Atomic constraints are comparisons over timestamps or indices.
     Indices may only be compared for (dis)equality:
     in [Pind (o,i,i')], [o] must be either [Eq] or [Neq]. *)
-type constr_atom =
+type trace_formula_atom =
   | Pts of timestamp _atom
   | Pind of Action.index _atom
 
-val constr_atom_vars : constr_atom -> Vars.var list
+val trace_formula_atom_vars : trace_formula_atom -> Vars.var list
 
-(** Constr are boolean formulas over timestamps. *)
+(** Trace_Formula are boolean formulas over timestamps. *)
 
-type constr = constr_atom bformula
+type trace_formula = trace_formula_atom bformula
 
-val pp_constr_atom : Format.formatter -> constr_atom -> unit
-val pp_constr : Format.formatter -> constr -> unit
+val pp_trace_formula_atom : Format.formatter -> trace_formula_atom -> unit
+val pp_trace_formula : Format.formatter -> trace_formula -> unit
 
-(** Put a constraint in DNF using only atoms Eq, Neq and Leq *)
-val constr_dnf : constr -> constr_atom list list
+(** Put a trace_formulaaint in DNF using only atoms Eq, Neq and Leq *)
+val trace_formula_dnf : trace_formula -> trace_formula_atom list list
 
-val subst_constr : subst -> constr -> constr
+val subst_trace_formula : subst -> trace_formula -> trace_formula
 
-val subst_constr_atom : subst -> constr_atom -> constr_atom
+val subst_trace_formula_atom : subst -> trace_formula_atom -> trace_formula_atom
 
-(** [constr_ts c] returns the timestamps appearing in [c] *)
-val constr_ts : constr -> timestamp list
+(** [trace_formula_ts c] returns the timestamps appearing in [c] *)
+val trace_formula_ts : trace_formula -> timestamp list

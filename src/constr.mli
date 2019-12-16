@@ -4,9 +4,9 @@ open Bformula
 type models
 
 (** [models l] returns the list of minimal models of a constraint. *)
-val models : constr -> models
+val models : trace_formula -> models
 
-val is_sat : constr -> bool
+val is_sat : trace_formula -> bool
 val m_is_sat : models -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]
@@ -14,7 +14,7 @@ val m_is_sat : models -> bool
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : models -> constr_atom list -> bool
+val query : models -> trace_formula_atom list -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].
@@ -25,4 +25,3 @@ val maximal_elems : models -> Term.timestamp list -> Term.timestamp list
 (** [get_equalities models ts], given a list of models [models] and a list
     of timespoints [ts], gives back the classes for equality in all models **)
 val get_equalities : models -> Term.timestamp list -> Term.timestamp list list
-

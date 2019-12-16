@@ -5,7 +5,7 @@
 open Term
 open Bformula
 open Formula
-open Logic
+open Sequent
 
 (** A goal of the prover is simply a name and a formula *)
 type named_goal = string * formula
@@ -52,14 +52,14 @@ type tac_arg =
   | Int of int
 
 module AST : Tactics.AST_sig
-  with type arg = tac_arg and type judgment = Logic.Judgment.judgment
+  with type arg = tac_arg and type judgment = sequent
 
 (** TODO documentation *)
 exception Tactic_Soft_Failure of string
 
 (** Placeholder for tactics on judgments *)
 module Prover_tactics : sig
-  type tac = Judgment.t Tactics.tac
+  type tac = sequent Tactics.tac
   val register_general : string -> (tac_arg list -> tac) -> unit
   val register : string -> tac -> unit
   val register_subst : string -> (subst -> tac) -> unit

@@ -40,7 +40,7 @@ val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
 
 (** Atoms of the meta-logic are either timestamp or term atoms. *)
 type generic_atom =
-  | Constraint of constr_atom
+  | Constraint of trace_formula_atom
   | Message of term_atom
   | Happens of timestamp
 
@@ -60,7 +60,7 @@ val fact_to_formula : fact -> formula
 
 val formula_to_fact : formula -> fact
 
-val formula_to_constr : formula -> constr
+val formula_to_trace_formula : formula -> trace_formula option
 
 val is_disjunction : formula -> bool
 val is_conjunction : formula -> bool
@@ -69,13 +69,13 @@ val is_conjunction : formula -> bool
   * and return the lists of term (dis)equalities, trace constraints,
   * and timestamps that happen. *)
 val conjunction_to_atom_lists :
-  formula -> fact list * constr list * timestamp list
+  formula -> fact list * trace_formula list * timestamp list
 
 (** Take a formula that must be a conjunction of atoms,
   * and return the lists of term (dis)equalities, trace constraints,
   * and timestamps that happen. *)
 val disjunction_to_atom_lists :
-  formula -> fact list * constr list * timestamp list
+  formula -> fact list * trace_formula list * timestamp list
 
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
