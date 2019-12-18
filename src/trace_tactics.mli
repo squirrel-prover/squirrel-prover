@@ -27,16 +27,15 @@ val goal_and_intro : tac
     quantifier or an implication. Else, it returns [fk] *)
 val goal_intro : tac
 
-(** [goal_exists_intro judge sk fk vnu inu] introduces the existentially
-    quantified variables and the goal.
-    [vnu] (resp. [inu]) is a mapping from the postcondition existentially binded
-    timestamp (resp. index) variables to [judge.gamma] timestamp (resp. index)
-    variables. *)
+(** [goal_exists_intro judge sk fk nu] introduces the existentially
+    quantified variables in the conclusion of the judgment.
+    The substitution [nu] is a mapping from the existentially bound
+    variables to terms over the current variables of the judgment. *)
 val goal_exists_intro : Term.subst -> tac
 
-(** [gamma_absurd judge sk fk] try to close the goal using congruence, else
+(** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
-val gamma_absurd : tac
+val congruence : tac
 
 (** [assumption judge sk fk] try to close the goal by finding it in the
     context. *)

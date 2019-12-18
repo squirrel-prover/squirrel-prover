@@ -100,12 +100,12 @@ let constr_absurd (s : sequent) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
-let gamma_absurd (s : sequent) sk fk =
-  if not @@ message_hypotheses_is_sat s then
+let congruence (s : sequent) sk fk =
+  if message_atoms_valid s then
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
 
-let () = T.register "congruence" gamma_absurd
+let () = T.register "congruence" congruence
 
 let () = T.register "notraces" constr_absurd
 

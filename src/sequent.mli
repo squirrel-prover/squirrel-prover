@@ -69,10 +69,9 @@ val is_hypothesis : formula -> sequent -> bool
    implied by the set of messages hypotheses. *)
 val get_trs : sequent -> sequent * Completion.state
 
-(** [message_hypothesis_is_sat s] returns true if the equalities and
-   disequalities between messages inside the hypothesis of [s] can be satisfied,
-   e.g do not contradict themselves. *)
-val message_hypotheses_is_sat : sequent -> bool
+(** If [message_atoms_valid s] returns [true] then (dis)equalities over
+  * messages on both sides of the sequents make the sequent valid. *)
+val message_atoms_valid : sequent -> bool
 
 (** [trace_hypohesis_is_sat s] returns true if trace formulas inside the
    hypothesis of [s] can be satisfied, e.g do not contradict themselves. *)

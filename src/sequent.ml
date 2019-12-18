@@ -198,10 +198,16 @@ let get_trs s =
   | Some trs -> (s, trs)
 
 
-let message_hypotheses_is_sat s =
+let message_atoms_valid s =
   let _, trs = get_trs s in
   let _, neqs = get_eqs_neqs s in
-  Completion.check_disequalities trs neqs
+    (* The sequent is valid (at least) when equality hypotheses
+     * imply a disequality hypothesis or an equality conclusion. *)
+    List.exists
+      (fun eq -> Completion.check_equalities trs [eq])
+      (match s.formula with
+         | Atom (Message (Eq,u,v)) -> (u,v)::neqs
+         | _ -> neqs)
 
 let set_env a s = { s with env = a }
 
