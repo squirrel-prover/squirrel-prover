@@ -327,11 +327,7 @@ let apply f (subst:subst) (s : sequent) sk fk =
   let f =
     match f with
       | Formula.ForAll (_,f) -> subst_formula subst f
-      | _ ->
-          (* This should not happen with the current design where
-           * the substitution is created from the universally
-           * quantified goal that is applied. *)
-          assert false
+      | f -> assert (subst = []) ; f
   in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
