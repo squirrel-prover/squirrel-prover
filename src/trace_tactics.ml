@@ -40,6 +40,35 @@ let goal_and_right (s : sequent) sk fk =
 
 let () = T.register "split" goal_and_right
 
+(** Compute the goal resulting from the addition of a list of
+  * formulas as hypotheses,
+  * followed by the left intro of existentials and conjunctions. *)
+let rec left_introductions s = function
+  | Formula.And (f,g) :: l -> left_introductions s (f::g::l)
+  | Formula.Exists (vars,f) :: l ->
+      let env = Sequent.get_env s in
+      let subst,env =
+        List.fold_left
+          (fun (subst,env) v ->
+             let env,v' =
+               Vars.make_fresh env (Vars.var_type v) (Vars.name v)
+             in
+             let item =
+               match Vars.var_type v with
+                 | Vars.Index -> Term.Index (v,v')
+                 | Vars.Timestamp -> Term.TS (Term.TVar v, Term.TVar v')
+                 | Vars.Message -> Term.Term (Term.MVar v, Term.MVar v')
+                 | Vars.Boolean -> Term.Term (Term.MVar v, Term.MVar v')
+             in
+               item::subst, env)
+          ([],env)
+          vars
+      in
+      let f = Formula.subst_formula subst f in
+        left_introductions (Sequent.set_env env s) (f::l)
+  | f :: l -> left_introductions (add_formula f s) l
+  | [] -> s
+
 (** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
   * users that "intro" does not introduce universal quantifiers. *)
@@ -60,12 +89,7 @@ let goal_intro (s : sequent) sk fk =
     in
     sk [new_judge] fk
   | Impl(lhs,rhs)->
-    let s' =
-      List.fold_left
-        (fun s h -> add_formula h s)
-        (set_formula rhs s)
-        (Formula.conjuncts lhs)
-    in
+    let s' = left_introductions (set_formula rhs s) [lhs] in
     sk [s'] fk
   | Not f ->
     sk [set_formula False s |> add_formula f] fk
@@ -315,7 +339,7 @@ let apply f (subst:subst) (s : sequent) sk fk =
         let s' = set_formula h s in
           aux (s'::subgoals) c
     | f ->
-        add_formula f s ::
+        left_introductions s [f] ::
         List.rev subgoals
   in
   sk (aux [] f) fk

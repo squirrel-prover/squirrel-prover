@@ -62,10 +62,6 @@ val formula_to_fact : formula -> fact
 
 val formula_to_trace_formula : formula -> trace_formula option
 
-(** [conjuncts f] returns a list of formulas whose conjunctions
-  * is equivalent to [f]. *)
-val conjuncts : formula -> formula list
-
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
     co-domain does not contain any variable that is bound in [f]. *)

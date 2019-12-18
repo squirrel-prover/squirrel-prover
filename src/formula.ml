@@ -79,13 +79,6 @@ let formula_to_trace_formula f =
             f)
   with No_trace_formula | Not_a_boolean_formula -> None
 
-let conjuncts (f:formula) =
-  let rec aux acc = function
-    | And (f,g) :: l -> aux acc (f::g::l)
-    | f :: l -> aux (f::acc) l
-    | [] -> List.rev acc
-  in aux [] [f]
-
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[<v 0>forall %a%a@]"
