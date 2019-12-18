@@ -298,22 +298,27 @@ let () =
       | [Prover.Goal_name gname] -> euf_apply gname
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-let apply gp (subst:subst) (s : sequent) sk fk =
-  let exception No_apply in
-  let env = ref (get_env s) in
-  let formula =
-    (match gp with
-    | ForAll(vs,f) -> f
-    | _ -> gp
-    )
+let apply f (subst:subst) (s : sequent) sk fk =
+  (* Formula with universal quantifications introduced *)
+  let f =
+    match f with
+      | Formula.ForAll (_,f) -> subst_formula subst f
+      | _ ->
+          (* This should not happen with the current design where
+           * the substitution is created from the universally
+           * quantified goal that is applied. *)
+          assert false
   in
-  let formula =
-    subst_formula subst formula
-                |> fresh_quantifications env
+  (* Compute subgoals by introducing implications on the left. *)
+  let rec aux subgoals = function
+    | Formula.Impl (h,c) ->
+        let s' = set_formula h s in
+          aux (s'::subgoals) c
+    | f ->
+        add_formula f s ::
+        List.rev subgoals
   in
-  let s = add_formula formula s in
-  sk [s] fk
-
+  sk (aux [] f) fk
 
 let () =
   T.register_general "apply"
