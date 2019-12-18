@@ -105,7 +105,6 @@ type sequent = {
       * Must be set to [None] if trace hypotheses change. *)
 }
 
-
 let pp ppf s =
   let open Fmt in
   let open Utils in
@@ -124,17 +123,16 @@ let pp ppf s =
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" pp_formula s.formula
 
-let init (goal : formula) =  {
+let init_sequent = {
   env = Vars.empty_env;
   happens_hypotheses = [];
   message_hypotheses = empty_hypotheses;
   trace_hypotheses =  empty_hypotheses ;
   formula_hypotheses = empty_hypotheses;
-  formula = goal;
+  formula = Formula.True;
   trs = None;
   models = None;
 }
-
 
 let is_hypothesis f s =
   match formula_to_trace_formula f with
@@ -247,6 +245,8 @@ let set_formula a s =
     match a with
       | Atom (Message at) -> add_macro_defs s at
       | _ -> s
+
+let init (goal : formula) = set_formula goal init_sequent
 
 let get_formula s = s.formula
 
