@@ -260,12 +260,9 @@ let make_trace_formula s =
  List.fold_left
    (fun acc h -> Bformula.And (h,acc))
    Bformula.True
-   (match s.formula with
-      | Atom (Constraint atom) ->
-          (Bformula.Not (Bformula.Atom atom)) :: trace_hypotheses
-      | Formula.Not (Atom (Constraint atom)) ->
-          (Bformula.Atom atom) :: trace_hypotheses
-      | _ -> trace_hypotheses)
+   (match Formula.formula_to_trace_formula s.formula with
+      | Some f -> (Bformula.Not f) :: trace_hypotheses
+      | None -> trace_hypotheses)
 
 (** TODO  This is the only place where the model is computed,
   * and it is only called by functions that drop the sequent where
