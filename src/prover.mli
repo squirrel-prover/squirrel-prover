@@ -50,6 +50,7 @@ type tac_arg =
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
+  | Theory of Theory.term
 
 module AST : Tactics.AST_sig
   with type arg = tac_arg and type judgment = sequent

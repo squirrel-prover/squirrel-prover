@@ -319,7 +319,7 @@ let euf_apply hypothesis_name (s : sequent) sk fk =
 let () =
   T.register_general "euf"
     (function
-      | [Prover.Goal_name gname] -> euf_apply gname
+      | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let apply f (subst:subst) (s : sequent) sk fk =

@@ -69,6 +69,7 @@ type tac_arg =
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
+  | Theory of Theory.term
 
 exception Tactic_Soft_Failure of string
 
@@ -162,6 +163,7 @@ and AST :
     | Function_name fname -> pp_fname ppf fname
     | Formula formula -> pp_formula ppf formula
     | Subst subst -> pp_subst ppf subst
+    | Theory th -> Theory.pp_term ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
     Prover_tactics.get id args

@@ -208,6 +208,8 @@ tac:
   | ID                                { Prover.AST.Abstract ($1,[]) }
   | ID i=INT                          { Prover.AST.Abstract
                                           ($1,[Prover.Int i]) }
+  | ID term                           { Prover.AST.Abstract
+                                          ($1,[Prover.Theory $2]) }
   | ID f=formula                      { Prover.AST.Abstract
                                           ($1,
                                            [Prover.Formula

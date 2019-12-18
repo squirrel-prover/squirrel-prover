@@ -7,5 +7,5 @@ system null.
 goal test :
   h(n,k) = <f(n),h(f(n),k)> => f(n) = n.
 Proof.
-  euf 0.
+  euf M0.
 Qed.
