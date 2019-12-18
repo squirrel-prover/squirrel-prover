@@ -85,7 +85,7 @@ type sequent = {
   env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
-  happens_hypotheses : action list;
+  happens_hypotheses : Term.timestamp list;
     (** Hypotheses of the form [happens(t)]. *)
   message_hypotheses : message_hypotheses;
     (** Equalities and disequalities over messages. *)
@@ -109,10 +109,12 @@ let pp ppf s =
   let open Fmt in
   let open Utils in
   pf ppf "@[<v 0>" ;
+  if s.env <> Vars.empty_env then
+    pf ppf "Variables: %a@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
   if s.happens_hypotheses <> [] then
     pf ppf "@[<hov 2>Executed actions:@ %a@]@;"
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp_timestamp)
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
   pp_hypotheses pp_term_atom ppf s.message_hypotheses ;
@@ -149,9 +151,9 @@ let select_message_hypothesis name s update =
   with Non_existing_hypothesis -> raise Not_found
 
 
-let add_trace_formula tf s =
+let add_trace_formula ?(prefix="T") tf s =
   { s with
-    trace_hypotheses = add_hypothesis true () tf "T" s.trace_hypotheses;
+    trace_hypotheses = add_hypothesis true () tf prefix s.trace_hypotheses;
     models = None }
 
 class iter_macros f = object (self)
@@ -190,17 +192,32 @@ and add_message_hypothesis ?(prefix="M") s at =
     in
     add_macro_defs s at
 
+let rec add_happens s ts =
+  let s =
+    { s with happens_hypotheses = ts :: s.happens_hypotheses }
+  in
+    match ts with
+      | TName a ->
+          add_formula ~prefix:"C"
+            (Formula.bformula_to_foformula
+               (fun x -> Message x)
+               (snd (Process.get_action_descr a).Process.condition))
+            s
+      | _ -> s
+
 (* Depending on the shape of the formula, we add it to the corresponding set of
    hypotheses. *)
-let add_formula f s =
+and add_formula ?prefix f s =
   match formula_to_trace_formula f with
-  | Some tf -> add_trace_formula tf s
+  | Some tf -> add_trace_formula ?prefix tf s
   | None ->
     match f with
-    | Atom (Message at) -> add_message_hypothesis s at
+    | Atom (Message at) -> add_message_hypothesis ?prefix s at
+    | Atom (Happens ts) -> add_happens s ts
     | _ ->
+        let prefix = match prefix with Some p -> p | None -> "H" in
         { s with formula_hypotheses =
-                   add_hypothesis true () f "H" s.formula_hypotheses }
+                   add_hypothesis true () f prefix s.formula_hypotheses }
 
 let get_eqs_neqs_at_list atl =
   List.map norm_xatom atl
@@ -292,6 +309,11 @@ let constraints_valid s =
 
 let get_all_terms s =
   let atoms =
-    (List.map (fun h -> h.hypothesis) (hypotheses_to_list s.message_hypotheses))
+    List.map (fun h -> h.hypothesis) (hypotheses_to_list s.message_hypotheses)
+  in
+  let atoms =
+    match s.formula with
+      | Atom (Message at) -> at::atoms
+      | _ -> atoms
   in
   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms

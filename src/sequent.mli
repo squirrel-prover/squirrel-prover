@@ -31,11 +31,11 @@ val init : formula -> sequent
 
 (** [add_trace_formula tf s] returns the sequent [s] with [tf] added to its
     hypothesis. *)
-val add_trace_formula : trace_formula -> sequent -> sequent
+val add_trace_formula : ?prefix:string -> trace_formula -> sequent -> sequent
 
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
     hypothesis. *)
-val add_formula : formula -> sequent -> sequent
+val add_formula : ?prefix:string -> formula -> sequent -> sequent
 
 (** [set_env e s] set the environment of the sequent ot the given environment.
 *)
