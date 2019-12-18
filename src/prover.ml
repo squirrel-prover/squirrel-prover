@@ -210,7 +210,7 @@ let simpl =
       Abstract ("eqnames",[]) ;
       Abstract ("eqtimestamps",[]) ;
       Try (Abstract ("congruence",[])) ;
-      Try (Abstract ("notraces",[])) ])
+      Try (Abstract ("constraints",[])) ])
 
 let auto_simp judges =
   judges

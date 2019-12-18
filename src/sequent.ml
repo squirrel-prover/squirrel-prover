@@ -217,21 +217,33 @@ let set_formula a s = { s with formula = a }
 
 let get_formula s = s.formula
 
-let make_trace_formula_from_hypothesis s =
+(* Return the conjunction of all trace hypotheses, together with
+ * the possible negation of the conclusion formula if it is a trace
+ * atom. *)
+let make_trace_formula s =
  let trace_hypotheses =
-      (List.map (fun h -> h.hypothesis) (hypotheses_to_list s.trace_hypotheses))
-    in
-      List.fold_left (fun acc h -> Bformula.And(h,acc))
-        Bformula.True trace_hypotheses
+   List.map (fun h -> h.hypothesis) (hypotheses_to_list s.trace_hypotheses)
+ in
+ List.fold_left
+   (fun acc h -> Bformula.And (h,acc))
+   Bformula.True
+   (match s.formula with
+      | Atom (Constraint atom) ->
+          (Bformula.Not (Bformula.Atom atom)) :: trace_hypotheses
+      | Formula.Not (Atom (Constraint atom)) ->
+          (Bformula.Atom atom) :: trace_hypotheses
+      | _ -> trace_hypotheses)
 
+(** TODO  This is the only place where the model is computed,
+  * and it is only called by functions that drop the sequent where
+  * the model is cached, hence caching is useless. *)
 let compute_models s =
   match s.models with
   | None ->
-    let trace_hypothesis = make_trace_formula_from_hypothesis s in
-    let models = Constr.models trace_hypothesis in
+    let trace_hypotheses = make_trace_formula s in
+    let models = Constr.models trace_hypotheses in
     { s with models = Some models;}
   | Some m -> s
-
 
 let maximal_elems s tss =
   let s = compute_models s in
@@ -239,14 +251,14 @@ let maximal_elems s tss =
 
 let get_ts_equalities s =
   let s = compute_models s in
-  let ts = Bformula.trace_formula_ts (make_trace_formula_from_hypothesis s)
+  let ts = Bformula.trace_formula_ts (make_trace_formula s)
            |> List.sort_uniq Pervasives.compare
   in
   Constr.get_equalities (opt_get (s.models)) ts
 
-let trace_hypotheses_is_sat s =
-    let s = compute_models s in
-    Constr.m_is_sat (opt_get s.models)
+let constraints_valid s =
+  let s = compute_models s in
+  not (Constr.m_is_sat (opt_get s.models))
 
 let get_all_terms s =
   let atoms =

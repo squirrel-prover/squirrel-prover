@@ -41,9 +41,9 @@ val congruence : tac
     context. *)
 val assumption : tac
 
-(** [constr_absurd judge sk fk] try to close the goal that the trace constraints
-    cannot be satisfied, else calls [fk] *)
-val constr_absurd : tac
+(** [constraints judge sk fk] proves the sequent using its trace
+  * formulas. *)
+val constraints : tac
 
 (** Add index constraints resulting from names equalities, modulo the TRS.
     [judge.gamma] must have been completed before calling [eq_names]. *)

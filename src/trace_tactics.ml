@@ -93,10 +93,10 @@ let () =
     (OrElse
        (Abstract ("split",[]) :: non_branching_intro))
 
-(** Absurd *)
+(** Reasoning over constraints and messages *)
 
-let constr_absurd (s : sequent) sk fk =
-  if not @@ trace_hypotheses_is_sat s then
+let constraints (s : sequent) sk fk =
+  if constraints_valid s then
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
@@ -107,7 +107,7 @@ let congruence (s : sequent) sk fk =
 
 let () = T.register "congruence" congruence
 
-let () = T.register "notraces" constr_absurd
+let () = T.register "constraints" constraints
 
 let assumption (s : sequent) sk fk =
   if is_hypothesis (get_formula s) s then

@@ -73,9 +73,10 @@ val get_trs : sequent -> sequent * Completion.state
   * messages on both sides of the sequents make the sequent valid. *)
 val message_atoms_valid : sequent -> bool
 
-(** [trace_hypohesis_is_sat s] returns true if trace formulas inside the
-   hypothesis of [s] can be satisfied, e.g do not contradict themselves. *)
-val trace_hypotheses_is_sat : sequent -> bool
+(** [constraints_valid s] returns true if constraints make the sequent valid,
+  * taking into account constraint trace formula hypotheses and atomic
+  * constraint conclusion. *)
+val constraints_valid : sequent -> bool
 
 (** [get_all_terms s] return all the term appearing inside the messages
    hypothesis of [s]. *)
