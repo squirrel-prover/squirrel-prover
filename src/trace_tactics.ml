@@ -59,13 +59,25 @@ let goal_intro (s : sequent) sk fk =
                     |> set_env (!env)
     in
     sk [new_judge] fk
-  | Impl(lhs,rhs)-> let new_judge = set_formula rhs s
-                                    |> add_formula lhs
+  | Impl(lhs,rhs)->
+    let s' =
+      List.fold_left
+        (fun s h -> add_formula h s)
+        (set_formula rhs s)
+        (Formula.conjuncts lhs)
     in
-    sk [new_judge] fk
-  | _ ->  fk (Tactics.Failure "Can only introduce disjunction of atoms, \
-                         or the left hand-side of an implication which \
-                               is a conjonction")
+    sk [s'] fk
+  | Not f ->
+    sk [set_formula False s |> add_formula f] fk
+  | Atom (Message (Bformula.Neq,u,v)) ->
+    let h = Message (Bformula.Eq,u,v) in
+    let s' = set_formula False s |> add_formula (Atom h) in
+    sk [s'] fk
+  | _ ->
+      fk (Tactics.Failure
+            "Can only introduce implication, universal quantifications
+             and disequality conclusions.")
+
 let () = T.register "intro" goal_intro
 
 (** Quantifiers *)
@@ -82,7 +94,6 @@ let () = T.register_subst "exists" goal_exists_intro
 let () =
   let open Prover.AST in
   let non_branching_intro =
-    (* TODO neq *)
     [ Abstract ("intro",[]) ;
       Abstract ("exists",[]) ;
       Abstract ("true",[]) ]

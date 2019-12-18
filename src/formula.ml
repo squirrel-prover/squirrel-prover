@@ -79,37 +79,12 @@ let formula_to_trace_formula f =
             f)
   with No_trace_formula | Not_a_boolean_formula -> None
 
-let rec is_disjunction = function
-  | Atom(_) -> true
-  | Or(f1, f2) -> is_disjunction f1 && is_disjunction f2
-  | _ -> false
-
-let rec is_conjunction = function
-  | Atom(_) -> true
-  | And(f1, f2) -> is_disjunction f1 && is_disjunction f2
-  | _ -> false
-
-let conjunction_to_atom_lists (f:formula) =
-  let rec ctal fl cl tl = function
-    | [] -> fl,cl,tl
-    | And (f,g) :: l -> ctal fl cl tl (f::g::l)
-    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
-    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
-    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
-    | _ -> assert false
-  in
-  ctal [] [] [] [f]
-
-let disjunction_to_atom_lists f =
-  let rec ctal fl cl tl = function
-    | [] -> fl,cl,tl
-    | Or (f,g) :: l -> ctal fl cl tl (f::g::l)
-    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
-    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
-    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
-    | _ -> assert false
-  in
-  ctal [] [] [] [f]
+let conjuncts (f:formula) =
+  let rec aux acc = function
+    | And (f,g) :: l -> aux acc (f::g::l)
+    | f :: l -> aux (f::acc) l
+    | [] -> List.rev acc
+  in aux [] [f]
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->

@@ -62,20 +62,9 @@ val formula_to_fact : formula -> fact
 
 val formula_to_trace_formula : formula -> trace_formula option
 
-val is_disjunction : formula -> bool
-val is_conjunction : formula -> bool
-
-(** Take a formula that must be a conjunction of atoms,
-  * and return the lists of term (dis)equalities, trace constraints,
-  * and timestamps that happen. *)
-val conjunction_to_atom_lists :
-  formula -> fact list * trace_formula list * timestamp list
-
-(** Take a formula that must be a conjunction of atoms,
-  * and return the lists of term (dis)equalities, trace constraints,
-  * and timestamps that happen. *)
-val disjunction_to_atom_lists :
-  formula -> fact list * trace_formula list * timestamp list
+(** [conjuncts f] returns a list of formulas whose conjunctions
+  * is equivalent to [f]. *)
+val conjuncts : formula -> formula list
 
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
