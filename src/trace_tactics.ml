@@ -9,20 +9,20 @@ module T = Prover.Prover_tactics
 
 (** Propositional connectives *)
 
-let goal_or_intro_l (s : sequent) sk fk =
+let goal_or_right_1 (s : sequent) sk fk =
   match (get_formula s) with
   | (Or (lformula, _)) -> sk
                             [set_formula (lformula) s]
                             fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-let goal_or_intro_r (s : sequent) sk fk =
+let goal_or_right_2 (s : sequent) sk fk =
   match (get_formula s) with
   | (Or (_, rformula)) -> sk [set_formula (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-let () = T.register "left" goal_or_intro_l
-let () = T.register "right" goal_or_intro_r
+let () = T.register "left" goal_or_right_1
+let () = T.register "right" goal_or_right_2
 
 let goal_true_intro (s : sequent) sk fk =
   match (get_formula s) with
@@ -31,14 +31,14 @@ let goal_true_intro (s : sequent) sk fk =
 
 let () = T.register "true" goal_true_intro
 
-let goal_and_intro (s : sequent) sk fk =
+let goal_and_right (s : sequent) sk fk =
   match (get_formula s) with
   | And (lformula, rformula) ->
     sk [ set_formula (lformula) s;
          set_formula (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
-let () = T.register "split" goal_and_intro
+let () = T.register "split" goal_and_right
 
 (** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
@@ -124,7 +124,7 @@ let assumption (s : sequent) sk fk =
   if is_hypothesis (get_formula s) s then
       sk [] fk
   else
-    fk (Tactics.Failure "Not in hypothesis")
+    fk (Tactics.Failure "Conclusion is not an hypothesis")
 
 let () = T.register "assumption" assumption
 

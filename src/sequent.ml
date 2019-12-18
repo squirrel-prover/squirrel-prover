@@ -8,27 +8,24 @@ open Formula
 type ('a, 'b) hypothesis = {
   name_prefix : string;
   name_suffix : int;
+  tag :  'a;
   hypothesis : 'b;
-  tag :  'a ;
   visible : bool;
 }
 
 let name hypo =
-  if hypo.name_suffix <> 0 then
-    Fmt.strf "%s%i" hypo.name_prefix hypo.name_suffix
-  else
-    Fmt.strf "%s" hypo.name_prefix
+  Fmt.strf "%s%i" hypo.name_prefix hypo.name_suffix
 
 exception Non_existing_hypothesis
 
 module M = Map.Make(String)
 
 
-(* An set of hypothesis is made of two map. One maps hypothesis names
-   (accordingly to [name]) to variables, and the second maps
-   name prefixes to the current biggest name_suffix for this
+(* A set of hypotheses is made of two maps. One maps hypothesis names
+   (according to [name]) to variables, and the second maps
+   name prefixes to the current largest name_suffix for this
    name_prefix. *)
-type ('a, 'b) hypotheses = ((('a, 'b) hypothesis ) M.t * int M.t)
+type ('a, 'b) hypotheses = ((('a,'b) hypothesis) M.t * int M.t)
 
 let empty_hypotheses =  (M.empty,M.empty)
 

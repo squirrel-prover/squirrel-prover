@@ -13,15 +13,17 @@ type tac = sequent Tactics.tac
 
 (** {2 Basic logic-specific tactics} *)
 
-(** [goal_or_intro_l judge sk fk] returns the left side of the goal if it is
-    a disjunction. Else it calls [fk] *)
-val goal_or_intro_l : tac
-(** [goal_or_intro_r judge sk fk] returns the right side of the goal if it is
-    a disjunction. Else it calls [fk] *)
-val goal_or_intro_r : tac
-(** [goal_and_intro judge sk fk] returns the right side of the goal if it is
-    a conjonction. Else it calls [fk] *)
-val goal_and_intro : tac
+(** Reduce a goal with a disjunction conclusion into the goal
+  * where the conclusion has been replace with the first disjunct. *)
+val goal_or_right_1 : tac
+
+(** Reduce a goal with a disjunction conclusion into the goal
+  * where the conclusion has been replace with the second disjunct. *)
+val goal_or_right_2 : tac
+
+(** Split a conjunction conclusion,
+  * creating one subgoal per conjunct. *)
+val goal_and_right : tac
 
 (** [goal_intro judge sk fk] perform one introduction, either of a forall
     quantifier or an implication. Else, it returns [fk] *)
@@ -37,8 +39,7 @@ val goal_exists_intro : Term.subst -> tac
     calls [fk] *)
 val congruence : tac
 
-(** [assumption judge sk fk] try to close the goal by finding it in the
-    context. *)
+(** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 val assumption : tac
 
 (** [constraints judge sk fk] proves the sequent using its trace
@@ -46,7 +47,7 @@ val assumption : tac
 val constraints : tac
 
 (** Add index constraints resulting from names equalities, modulo the TRS.
-    [judge.gamma] must have been completed before calling [eq_names]. *)
+    The judgment must have been completed before calling [eq_names]. *)
 val eq_names : tac
 
 (** Add terms constraints resulting from timestamp equalities. *)
@@ -70,8 +71,6 @@ val tac_assert : formula -> tac
    it calls [fk]*)
 val euf_apply : string -> tac
 
-(** [collision_resistance judge sk fk] collects all equalities between hash,
-    and add to Gamma the equality of the messages if the hash and the key are
-    identical.
-*)
+(** [collision_resistance judge sk fk] collects all equalities between hashes,
+    and adds the equalities of the messages hashed with the same key. *)
 val collision_resistance : tac

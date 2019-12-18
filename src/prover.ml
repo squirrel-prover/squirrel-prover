@@ -286,8 +286,8 @@ let parse_args_exists ts : subst =
     Failure "Cannot parse term with respect to empty current goal"
   |  j :: _ -> match (get_formula j) with
     | Exists (vs,f) -> parse_subst j vs ts
-    | _ -> raise @@ Failure "Cannot parse term for existential intro which does
-not exists"
+    | _ ->
+        failwith "Conclusion formula must be existentially quantified."
 
 let get_goal_formula gname =
   match
