@@ -62,12 +62,12 @@ let mem_hypotheses f hs =
   |> List.exists (fun hypo -> hypo.hypothesis = f)
 
 let pp_hypothesis pp_formula ppf hypo =
-  Fmt.pf ppf "%s: %a" (name hypo) pp_formula hypo.hypothesis
+  Fmt.pf ppf "%s: %a@;" (name hypo) pp_formula hypo.hypothesis
 
 let pp_hypotheses pp_formula ppf hs =
-  Fmt.pf ppf "@[<hov>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@") (pp_hypothesis pp_formula))
-    (List.filter (fun h -> h.visible) (hypotheses_to_list hs))
+  List.iter
+    (fun h -> if h.visible then pp_hypothesis pp_formula ppf h)
+    (hypotheses_to_list hs)
 
 type mess_tag = { t_euf : bool}
 
@@ -86,42 +86,46 @@ let set_euf b h =
 
 type sequent = {
   env : Vars.env;
+    (** Must contain all free variables of the sequent,
+      * which are logically understood as universally quantified. *)
   happens_hypotheses : action list;
+    (** Hypotheses of the form [happens(t)]. *)
   message_hypotheses : message_hypotheses;
+    (** Equalities and disequalities over messages. *)
   trace_hypotheses :  trace_hypotheses;
+    (** Quantifier-free formula over index and timestamp predicates. *)
   formula_hypotheses : formula_hypotheses;
+    (** Other hypotheses. *)
   formula : formula;
-  (* trs is either None, or the current term rewritting system corresponding to
-     the message hypotheses. Must be se to None if the message hypotheses set
-     changes. *)
+    (** The conclusion / right-hand side formula of the sequent. *)
   trs : Completion.state option;
-  (* models is either None, or the current models corresponding to the trace
-     hypotheses. Must be se to None if the trace hypotheses set changes. *)
+    (** Either [None], or the term rewriting system
+      * corresponding to the current message hypotheses.
+      * Must be se to [None] if message hypotheses change. *)
   models : Constr.models option;
+    (** Either [None], or the models corresponding to the current
+      * trace hypotheses.
+      * Must be set to [None] if trace hypotheses change. *)
 }
 
 
 let pp ppf s =
   let open Fmt in
   let open Utils in
-  pf ppf "@[<v 0>\
-          @[<hov 2>Actions described:@ %a@]@;\
-          @[<hv 0>Atoms:@ @[<v 0>%a@]@]@;\
-          @[<hov 2>Trace constraints:@ %a@]@;\
-          @[<hov 2>Formulas:@ %a@]@;\
-            %a@.\
-          %a@;@;@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
-    s.happens_hypotheses
-    (pp_hypotheses pp_term_atom)
-    s.message_hypotheses
-    (pp_hypotheses pp_trace_formula)
-    s.trace_hypotheses
-    (pp_hypotheses pp_formula)
-    s.formula_hypotheses
-    (fun ppf i -> (styled `Bold ident) ppf (String.make i '-')) 40
-    pp_formula
-    s.formula
+  pf ppf "@[<v 0>" ;
+  (* Print happens hypotheses *)
+  if s.happens_hypotheses <> [] then
+    pf ppf "@[<hov 2>Executed actions:@ %a@]@;"
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Action.pp_action)
+      s.happens_hypotheses ;
+  (* Print message, trace and general hypotheses *)
+  pp_hypotheses pp_term_atom ppf s.message_hypotheses ;
+  pp_hypotheses pp_trace_formula ppf s.trace_hypotheses ;
+  pp_hypotheses pp_formula ppf s.formula_hypotheses ;
+  (* Print separation between hypotheses and conclusion *)
+  styled `Bold ident ppf (String.make 40 '-') ;
+  (* Print conclusion formula and close box. *)
+  pf ppf "@;%a@]" pp_formula s.formula
 
 let init (goal : formula) =  {
   env = Vars.empty_env;
