@@ -1,41 +1,40 @@
 open Tactics
-open Sequent
 open Formula
 open Term
 
-type tac = sequent Tactics.tac
+type tac = Sequent.t Tactics.tac
 
 module T = Prover.Prover_tactics
 
 (** Propositional connectives *)
 
-let goal_or_right_1 (s : sequent) sk fk =
-  match (get_conclusion s) with
+let goal_or_right_1 (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
   | (Or (lformula, _)) -> sk
-                            [set_conclusion (lformula) s]
+                            [Sequent.set_conclusion (lformula) s]
                             fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-let goal_or_right_2 (s : sequent) sk fk =
-  match (get_conclusion s) with
-  | (Or (_, rformula)) -> sk [set_conclusion (rformula) s] fk
+let goal_or_right_2 (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
+  | (Or (_, rformula)) -> sk [Sequent.set_conclusion (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 let () = T.register "left" goal_or_right_1
 let () = T.register "right" goal_or_right_2
 
-let goal_true_intro (s : sequent) sk fk =
-  match (get_conclusion s) with
+let goal_true_intro (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
   | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
 let () = T.register "true" goal_true_intro
 
-let goal_and_right (s : sequent) sk fk =
-  match (get_conclusion s) with
+let goal_and_right (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
   | And (lformula, rformula) ->
-    sk [ set_conclusion (lformula) s;
-         set_conclusion (rformula) s ] fk
+    sk [ Sequent.set_conclusion (lformula) s;
+         Sequent.set_conclusion (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
 let () = T.register "split" goal_and_right
@@ -66,16 +65,16 @@ let rec left_introductions s = function
       in
       let f = Formula.subst_formula subst f in
         left_introductions (Sequent.set_env env s) (f::l)
-  | f :: l -> left_introductions (add_formula f s) l
+  | f :: l -> left_introductions (Sequent.add_formula f s) l
   | [] -> s
 
 (** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
   * users that "intro" does not introduce universal quantifiers. *)
-let goal_intro (s : sequent) sk fk =
-  match (get_conclusion s) with
+let goal_intro (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
   | ForAll (vs,f) ->
-    let env = ref (get_env s) in
+    let env = ref (Sequent.get_env s) in
     let vsubst =
       List.map
         (fun x ->
@@ -84,18 +83,18 @@ let goal_intro (s : sequent) sk fk =
     in
     let subst = Term.from_varsubst vsubst in
     let new_formula = subst_formula subst f in
-    let new_judge = set_conclusion new_formula s
-                    |> set_env (!env)
+    let new_judge = Sequent.set_conclusion new_formula s
+                    |> Sequent.set_env (!env)
     in
     sk [new_judge] fk
   | Impl(lhs,rhs)->
-    let s' = left_introductions (set_conclusion rhs s) [lhs] in
+    let s' = left_introductions (Sequent.set_conclusion rhs s) [lhs] in
     sk [s'] fk
   | Not f ->
-    sk [set_conclusion False s |> add_formula f] fk
+    sk [Sequent.set_conclusion False s |> Sequent.add_formula f] fk
   | Atom (Message (Bformula.Neq,u,v)) ->
     let h = Message (Bformula.Eq,u,v) in
-    let s' = set_conclusion False s |> add_formula (Atom h) in
+    let s' = Sequent.set_conclusion False s |> Sequent.add_formula (Atom h) in
     sk [s'] fk
   | _ ->
       fk (Tactics.Failure
@@ -106,11 +105,11 @@ let () = T.register "intro" goal_intro
 
 (** Quantifiers *)
 
-let goal_exists_intro nu (s : sequent) sk fk =
-  match (get_conclusion s) with
+let goal_exists_intro nu (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
   | Exists (vs,f) when List.length nu = List.length vs ->
     let new_formula = subst_formula nu f in
-    sk [set_conclusion new_formula s] fk
+    sk [Sequent.set_conclusion new_formula s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
 
 let () = T.register_subst "exists" goal_exists_intro
@@ -130,13 +129,13 @@ let () =
 
 (** Reasoning over constraints and messages *)
 
-let constraints (s : sequent) sk fk =
-  if constraints_valid s then
+let constraints (s : Sequent.t) sk fk =
+  if Sequent.constraints_valid s then
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
-let congruence (s : sequent) sk fk =
-  if message_atoms_valid s then
+let congruence (s : Sequent.t) sk fk =
+  if Sequent.message_atoms_valid s then
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
 
@@ -144,8 +143,8 @@ let () = T.register "congruence" congruence
 
 let () = T.register "constraints" constraints
 
-let assumption (s : sequent) sk fk =
-  if is_hypothesis (get_conclusion s) s then
+let assumption (s : Sequent.t) sk fk =
+  if Sequent.is_hypothesis (Sequent.get_conclusion s) s then
       sk [] fk
   else
     fk (Tactics.Failure "Conclusion is not an hypothesis")
@@ -178,37 +177,37 @@ open Bformula
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
 
-let eq_names (s : sequent) sk fk =
-  let s,trs = get_trs s in
+let eq_names (s : Sequent.t) sk fk =
+  let s,trs = Sequent.get_trs s in
   let cnstrs = Completion.name_index_cnstrs trs
-      (get_all_terms s)
+      (Sequent.get_all_terms s)
   in
   let s =
     List.fold_left (fun judge c ->
-        add_trace_formula c s
+        Sequent.add_trace_formula c s
       ) s cnstrs
   in
   sk [s] fk
 
 let () = T.register "eqnames" eq_names
 
-let eq_constants fn (s : sequent) sk fk =
-  let s,trs = get_trs s in
+let eq_constants fn (s : Sequent.t) sk fk =
+  let s,trs = Sequent.get_trs s in
   let cnstrs =
     Completion.constant_index_cnstrs fn trs
-      (get_all_terms s)
+      (Sequent.get_all_terms s)
   in
   let s =
     List.fold_left (fun s c ->
-        add_trace_formula c s
+        Sequent.add_trace_formula c s
       ) s cnstrs
   in
   sk [s] fk
 
 let () = T.register_fname "eqconstants" eq_constants
 
-let eq_timestamps (s : sequent) sk fk =
-  let ts_classes = get_ts_equalities s
+let eq_timestamps (s : Sequent.t) sk fk =
+  let ts_classes = Sequent.get_ts_equalities s
                    |> List.map (List.sort_uniq Pervasives.compare)
   in
   let subst =
@@ -219,7 +218,7 @@ let eq_timestamps (s : sequent) sk fk =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let terms = (get_all_terms s) in
+  let terms = Sequent.get_all_terms s in
   let facts =
     List.fold_left
       (fun acc t ->
@@ -233,7 +232,7 @@ let eq_timestamps (s : sequent) sk fk =
   let s =
     List.fold_left
       (fun s c ->
-         add_formula c s)
+         Sequent.add_formula c s)
       s facts
   in
   sk [s] fk
@@ -268,7 +267,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let le_cnstr =
     List.map (fun ts ->
         Atom (Pts (Leq, action_descr_ts, ts))
-      ) (maximal_elems sequent (term_ts s @ term_ts m))
+      ) (Sequent.maximal_elems sequent (term_ts s @ term_ts m))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)
@@ -292,29 +291,29 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
 let euf_apply_facts s at = match modulo_sym euf_param at with
   | None -> raise @@ Tactic_Hard_Failure "bad euf application"
   | Some p ->
-    let env = get_env s in
+    let env = Sequent.get_env s in
     let (hash_fn, (key_n, key_is), mess, sign) = p in
     let rule = Euf.mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
     let schemata_premises =
       List.map (fun case ->
           let new_f, new_cnstr, new_env = euf_apply_schema s p case in
-          add_formula new_f s
-          |> add_trace_formula new_cnstr
-          |> set_env new_env
+          Sequent.add_formula new_f s
+          |> Sequent.add_trace_formula new_cnstr
+          |> Sequent.set_env new_env
         ) rule.Euf.case_schemata
     and direct_premises =
       List.map (fun case ->
           let new_f, new_cnstr = euf_apply_direct s p case in
-          add_formula new_f s
-          |> add_trace_formula new_cnstr
+          Sequent.add_formula new_f s
+          |> Sequent.add_trace_formula new_cnstr
         ) rule.Euf.cases_direct
     in
     schemata_premises @ direct_premises
 
-let set_euf t = { t_euf = true }
+let set_euf t = { Sequent.t_euf = true }
 
-let euf_apply hypothesis_name (s : sequent) sk fk =
-  let s, at = select_message_hypothesis hypothesis_name s set_euf in
+let euf_apply hypothesis_name (s : Sequent.t) sk fk =
+  let s, at = Sequent.select_message_hypothesis hypothesis_name s set_euf in
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts s at) fk
 
@@ -324,7 +323,7 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-let apply f (subst:subst) (s : sequent) sk fk =
+let apply f (subst:subst) (s : Sequent.t) sk fk =
   (* Formula with universal quantifications introduced *)
   let f =
     match f with
@@ -334,7 +333,7 @@ let apply f (subst:subst) (s : sequent) sk fk =
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Formula.Impl (h,c) ->
-        let s' = set_conclusion h s in
+        let s' = Sequent.set_conclusion h s in
           aux (s'::subgoals) c
     | f ->
         left_introductions s [f] ::
@@ -351,14 +350,14 @@ let () =
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let tac_assert f s sk fk =
-  let s1 = set_conclusion f s in
-  let s2 = add_formula f s in
+  let s1 = Sequent.set_conclusion f s in
+  let s2 = Sequent.add_formula f s in
   sk [s1 ;s2] fk
 
 let () =
   T.register_formula "assert" tac_assert
 
-let collision_resistance (s : sequent) sk fk =
+let collision_resistance (s : Sequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
   let hashes = List.filter
@@ -366,7 +365,7 @@ let collision_resistance (s : sequent) sk fk =
          | Fun ((hash, _), [m; Name (key,ki)]) ->
            (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
          | _ -> false)
-      (get_all_terms s)
+      (Sequent.get_all_terms s)
   in
   if List.length hashes = 0 then
     fk (Failure "no equality between hashes where the keys satisfiy the
@@ -383,7 +382,7 @@ let collision_resistance (s : sequent) sk fk =
             | _ -> acc
           ) [] q
       in
-      let s,trs = get_trs s in
+      let s,trs = Sequent.get_trs s in
       let hash_eqs = make_eq hashes
                      |> List.filter (fun eq -> Completion.check_equalities
                                         (trs) [eq])
@@ -399,7 +398,7 @@ let collision_resistance (s : sequent) sk fk =
       in
       let s =
         List.fold_left (fun s f ->
-            add_formula f s
+            Sequent.add_formula f s
           ) s new_facts
       in
       sk [s] fk

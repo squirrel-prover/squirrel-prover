@@ -5,11 +5,10 @@
   * would be more useful if it could be seen by the user of the
   * prover. *)
 
-open Sequent
 open Bformula
 open Formula
 
-type tac = sequent Tactics.tac
+type tac = Sequent.t Tactics.tac
 
 (** {2 Basic logic-specific tactics} *)
 
