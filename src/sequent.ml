@@ -151,29 +151,57 @@ let select_message_hypothesis name s update =
 
 
 let add_trace_formula tf s =
-  { s with trace_hypotheses = add_hypothesis true () tf "tf" s.trace_hypotheses;
-           models = None;}
+  { s with
+    trace_hypotheses = add_hypothesis true () tf "T" s.trace_hypotheses;
+    models = None }
 
+class iter_macros f = object (self)
+  inherit Iter.iter as super
+  method visit_term t =
+    match t with
+      | Macro ((m,is),[],a) ->
+          if Macros.is_defined m a then
+            let def = Macros.get_definition m is a in
+              f t def ;
+              self#visit_term def
+      | t -> super#visit_term t
+end
+
+(** Add to [s] equalities corresponding to the expansions of all macros
+  * occurring in [at]. *)
+let rec add_macro_defs s at =
+  let macro_eqs : term_atom list ref = ref [] in
+  let iter =
+    new iter_macros
+      (fun t t' -> macro_eqs := (Eq,t,t') :: !macro_eqs)
+  in
+    iter#visit_fact (Atom at) ;
+    List.fold_left
+      (add_message_hypothesis ~prefix:"D")
+      s
+      !macro_eqs
+
+and add_message_hypothesis ?(prefix="M") s at =
+  if mem_hypotheses at s.message_hypotheses then s else
+    let s =
+      { s with
+        message_hypotheses =
+          add_hypothesis true {t_euf = false} at prefix s.message_hypotheses;
+        trs = None }
+    in
+    add_macro_defs s at
 
 (* Depending on the shape of the formula, we add it to the corresponding set of
    hypotheses. *)
 let add_formula f s =
   match formula_to_trace_formula f with
-  | Some tf -> { s with
-                 trace_hypotheses =
-                   add_hypothesis true () tf "tf" s.trace_hypotheses;
-                 models = None;
-               }
+  | Some tf -> add_trace_formula tf s
   | None ->
     match f with
-    | Atom (Message at) ->
-      { s with
-        message_hypotheses =
-          add_hypothesis true {t_euf = false} at "mess" s.message_hypotheses;
-        trs = None
-      }
-    | _ ->  { s with formula_hypotheses =
-                       add_hypothesis true () f "f" s.formula_hypotheses}
+    | Atom (Message at) -> add_message_hypothesis s at
+    | _ ->
+        { s with formula_hypotheses =
+                   add_hypothesis true () f "H" s.formula_hypotheses }
 
 let get_eqs_neqs_at_list atl =
   List.map norm_xatom atl
@@ -213,7 +241,11 @@ let set_env a s = { s with env = a }
 
 let get_env s = s.env
 
-let set_formula a s = { s with formula = a }
+let set_formula a s =
+  let s = { s with formula = a } in
+    match a with
+      | Atom (Message at) -> add_macro_defs s at
+      | _ -> s
 
 let get_formula s = s.formula
 
