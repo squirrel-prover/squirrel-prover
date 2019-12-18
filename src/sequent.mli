@@ -1,32 +1,23 @@
-(** This module implement sequents from the sequent calculus. It contains:
+(** This module implement sequents used to prove trace properties.
+    A sequent is made of:
     - a set of hypotheses, that can be generic formulas, trace formulas or
-   (dis)equalities between messages, and a goal formula;
-    - a goal formula;
+   (dis)equalities between messages;
+    - a conclusion formula;
     - an environment to store all the variables appearing inside the formulas.
 *)
 open Term
 open Bformula
 open Formula
 
-(** Hypothesis about messages can be used with the euf_cma axiom, but only
-   once,each hypothesis is thus tagged with the following tag. *)
-type mess_tag =  { t_euf : bool}
+(** {2 Sequent type and basic operations} *)
 
-(** This type encapsulate an hypothesis about messages, e.g a (dis)equality
-   between messages, along with a tag and a name. *)
-type message_hypothesis
-
-(** [set_euf b mh], given an hypothesis about messages mh, set its tag to [b].*)
-val set_euf : bool -> message_hypothesis -> message_hypothesis
-
-(** {2 Main sequent type and basic operations} *)
-
-type sequent
+type t
+type sequent = t
 
 val pp : Format.formatter -> sequent -> unit
 
-(** [init formula] returns a sequent with an empty set of hypothesis, and the
-   given formula as goal. *)
+(** [init formula] returns a sequent with an empty set of hypotheses, and the
+   given formula as conclusion. *)
 val init : formula -> sequent
 
 (** [add_trace_formula tf s] returns the sequent [s] with [tf] added to its
@@ -34,35 +25,46 @@ val init : formula -> sequent
 val add_trace_formula : ?prefix:string -> trace_formula -> sequent -> sequent
 
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
-    hypothesis. *)
+    hypothesis. The new sequent will be automatically enriched with
+    equalities expressing relevant macro definitions, as well as conditions
+    of all named actions that are assumed to happen. *)
 val add_formula : ?prefix:string -> formula -> sequent -> sequent
 
-(** [set_env e s] set the environment of the sequent ot the given environment.
-*)
+(** [set_env e s] returns a new sequent with
+  * the environment set to [e]. *)
 val set_env : Vars.env -> sequent -> sequent
 
 (** [get_env s] returns the environment of the sequent. *)
 val get_env : sequent -> Vars.env
 
-(** [set_formula f s] set the goal formula of the sequent to [f]. *)
-val set_formula : formula -> sequent -> sequent
+(** [set_conclusion f s] set the conclusion formula of the sequent to [f]. *)
+val set_conclusion : formula -> sequent -> sequent
 
-(** [get_formula s] returns the goal formula of the sequent. *)
-val get_formula : sequent -> formula
+(** [get_conclusion s] returns the conclusion formula of the sequent. *)
+val get_conclusion : sequent -> formula
 
-(** [select_message_hypothesis name s update] gives back the message
-   (dis)equality corresponding to the given name inside the hypothesis of [s],
-   and also [s] after applying the [update] function to the selected
-   hypothesis. *)
-val select_message_hypothesis : string -> sequent -> (message_hypothesis ->
-   message_hypothesis) -> (sequent * term_atom)
-
-(** {2 Sequent logical operations} *)
+(** {2 Finding and hypotheses} *)
 
 (** [is_hypothesis f s] returns true if the formula appears inside the hypotesis
    of the sequent [s]. Might be used to prove the validity of a sequent, if its
-   formula appears inside its hypothesis. *)
+   conclusion formula appears inside its hypothesis. *)
 val is_hypothesis : formula -> sequent -> bool
+
+(** Tags attached to message hypotheses. *)
+type message_hypothesis_tag = {
+  t_euf : bool
+    (** Indicates that the euf tactic has been applied to the hypothesis. *)
+}
+
+(** [select_message_hypothesis name s update] returns the message
+   (dis)equality corresponding to the given name inside the hypothesis of [s],
+   together with a sequent identical to [s] except that the tag of the
+   selected hypothesis has been updated using [update]. *)
+val select_message_hypothesis : string -> sequent ->
+  (message_hypothesis_tag -> message_hypothesis_tag) ->
+  (sequent * term_atom)
+
+(** {2 Automated reasoning} *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
    equalities between messages. It can be used to check if an equality is
@@ -78,10 +80,6 @@ val message_atoms_valid : sequent -> bool
   * constraint conclusion. *)
 val constraints_valid : sequent -> bool
 
-(** [get_all_terms s] return all the term appearing inside the messages
-   hypothesis of [s]. *)
-val get_all_terms : sequent -> Term.term list
-
 (** [get_ts_equalities s] return all the equalities between timestamps
        derivable from its hypothesis. *)
 val get_ts_equalities : sequent -> timestamp list list
@@ -89,3 +87,9 @@ val get_ts_equalities : sequent -> timestamp list list
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
    according to their ordering derived from the hypothesis in [s]. *)
 val maximal_elems : sequent -> timestamp list -> timestamp list
+
+(** {2 Misc} *)
+
+(** [get_all_terms s] return all the term appearing inside the messages
+   hypothesis of [s]. *)
+val get_all_terms : sequent -> Term.term list

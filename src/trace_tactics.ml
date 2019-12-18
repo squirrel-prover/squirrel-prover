@@ -10,32 +10,32 @@ module T = Prover.Prover_tactics
 (** Propositional connectives *)
 
 let goal_or_right_1 (s : sequent) sk fk =
-  match (get_formula s) with
+  match (get_conclusion s) with
   | (Or (lformula, _)) -> sk
-                            [set_formula (lformula) s]
+                            [set_conclusion (lformula) s]
                             fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 let goal_or_right_2 (s : sequent) sk fk =
-  match (get_formula s) with
-  | (Or (_, rformula)) -> sk [set_formula (rformula) s] fk
+  match (get_conclusion s) with
+  | (Or (_, rformula)) -> sk [set_conclusion (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 let () = T.register "left" goal_or_right_1
 let () = T.register "right" goal_or_right_2
 
 let goal_true_intro (s : sequent) sk fk =
-  match (get_formula s) with
+  match (get_conclusion s) with
   | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
 let () = T.register "true" goal_true_intro
 
 let goal_and_right (s : sequent) sk fk =
-  match (get_formula s) with
+  match (get_conclusion s) with
   | And (lformula, rformula) ->
-    sk [ set_formula (lformula) s;
-         set_formula (rformula) s ] fk
+    sk [ set_conclusion (lformula) s;
+         set_conclusion (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
 let () = T.register "split" goal_and_right
@@ -73,7 +73,7 @@ let rec left_introductions s = function
   * TODO this is a bit arbitrary, and it will be surprising for
   * users that "intro" does not introduce universal quantifiers. *)
 let goal_intro (s : sequent) sk fk =
-  match (get_formula s) with
+  match (get_conclusion s) with
   | ForAll (vs,f) ->
     let env = ref (get_env s) in
     let vsubst =
@@ -84,18 +84,18 @@ let goal_intro (s : sequent) sk fk =
     in
     let subst = Term.from_varsubst vsubst in
     let new_formula = subst_formula subst f in
-    let new_judge = set_formula new_formula s
+    let new_judge = set_conclusion new_formula s
                     |> set_env (!env)
     in
     sk [new_judge] fk
   | Impl(lhs,rhs)->
-    let s' = left_introductions (set_formula rhs s) [lhs] in
+    let s' = left_introductions (set_conclusion rhs s) [lhs] in
     sk [s'] fk
   | Not f ->
-    sk [set_formula False s |> add_formula f] fk
+    sk [set_conclusion False s |> add_formula f] fk
   | Atom (Message (Bformula.Neq,u,v)) ->
     let h = Message (Bformula.Eq,u,v) in
-    let s' = set_formula False s |> add_formula (Atom h) in
+    let s' = set_conclusion False s |> add_formula (Atom h) in
     sk [s'] fk
   | _ ->
       fk (Tactics.Failure
@@ -107,10 +107,10 @@ let () = T.register "intro" goal_intro
 (** Quantifiers *)
 
 let goal_exists_intro nu (s : sequent) sk fk =
-  match (get_formula s) with
+  match (get_conclusion s) with
   | Exists (vs,f) when List.length nu = List.length vs ->
     let new_formula = subst_formula nu f in
-    sk [set_formula new_formula s] fk
+    sk [set_conclusion new_formula s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
 
 let () = T.register_subst "exists" goal_exists_intro
@@ -145,7 +145,7 @@ let () = T.register "congruence" congruence
 let () = T.register "constraints" constraints
 
 let assumption (s : sequent) sk fk =
-  if is_hypothesis (get_formula s) s then
+  if is_hypothesis (get_conclusion s) s then
       sk [] fk
   else
     fk (Tactics.Failure "Conclusion is not an hypothesis")
@@ -311,8 +311,10 @@ let euf_apply_facts s at = match modulo_sym euf_param at with
     in
     schemata_premises @ direct_premises
 
+let set_euf t = { t_euf = true }
+
 let euf_apply hypothesis_name (s : sequent) sk fk =
-  let s, at = select_message_hypothesis hypothesis_name s (set_euf true) in
+  let s, at = select_message_hypothesis hypothesis_name s set_euf in
   (* TODO: need to handle failure somewhere. *)
   sk (euf_apply_facts s at) fk
 
@@ -332,7 +334,7 @@ let apply f (subst:subst) (s : sequent) sk fk =
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Formula.Impl (h,c) ->
-        let s' = set_formula h s in
+        let s' = set_conclusion h s in
           aux (s'::subgoals) c
     | f ->
         left_introductions s [f] ::
@@ -349,7 +351,7 @@ let () =
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let tac_assert f s sk fk =
-  let s1 = set_formula f s in
+  let s1 = set_conclusion f s in
   let s2 = add_formula f s in
   sk [s1 ;s2] fk
 

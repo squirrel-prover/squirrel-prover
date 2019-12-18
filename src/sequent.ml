@@ -32,7 +32,7 @@ let empty_hypotheses =  (M.empty,M.empty)
 let select_and_update (e1,e2) name update =
   try
     let hypo = M.find name e1 in
-    (hypo, (M.add name (update hypo) e1,e2))
+    (hypo, (M.add name { hypo with tag = update hypo.tag } e1,e2))
   with Not_found -> raise Non_existing_hypothesis
 
 let add_hypothesis visible tag hypo name_prefix (e1,e2) : ('a, 'b) hypotheses =
@@ -66,22 +66,19 @@ let pp_hypotheses pp_formula ppf hs =
     (fun h -> if h.visible then pp_hypothesis pp_formula ppf h)
     (hypotheses_to_list hs)
 
-type mess_tag = { t_euf : bool}
+type message_hypothesis_tag = { t_euf : bool}
 
 type trace_tag = unit
 
 type formula_tag = unit
 
-type message_hypothesis = (mess_tag, term_atom) hypothesis
+type message_hypothesis = (message_hypothesis_tag, term_atom) hypothesis
 
-type message_hypotheses = (mess_tag, term_atom) hypotheses
+type message_hypotheses = (message_hypothesis_tag, term_atom) hypotheses
 type trace_hypotheses = (trace_tag, trace_formula) hypotheses
 type formula_hypotheses = (formula_tag, formula) hypotheses
 
-let set_euf b h =
-  {h with tag = {t_euf =b}}
-
-type sequent = {
+type t = {
   env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
@@ -93,7 +90,7 @@ type sequent = {
     (** Quantifier-free formula over index and timestamp predicates. *)
   formula_hypotheses : formula_hypotheses;
     (** Other hypotheses. *)
-  formula : formula;
+  conclusion : formula;
     (** The conclusion / right-hand side formula of the sequent. *)
   trs : Completion.state option;
     (** Either [None], or the term rewriting system
@@ -104,6 +101,7 @@ type sequent = {
       * trace hypotheses.
       * Must be set to [None] if trace hypotheses change. *)
 }
+type sequent = t
 
 let pp ppf s =
   let open Fmt in
@@ -123,7 +121,7 @@ let pp ppf s =
   (* Print separation between hypotheses and conclusion *)
   styled `Bold ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" pp_formula s.formula
+  pf ppf "@;%a@]" pp_formula s.conclusion
 
 let init_sequent = {
   env = Vars.empty_env;
@@ -131,7 +129,7 @@ let init_sequent = {
   message_hypotheses = empty_hypotheses;
   trace_hypotheses =  empty_hypotheses ;
   formula_hypotheses = empty_hypotheses;
-  formula = Formula.True;
+  conclusion = Formula.True;
   trs = None;
   models = None;
 }
@@ -249,7 +247,7 @@ let message_atoms_valid s =
      * imply a disequality hypothesis or an equality conclusion. *)
     List.exists
       (fun eq -> Completion.check_equalities trs [eq])
-      (match s.formula with
+      (match s.conclusion with
          | Atom (Message (Eq,u,v)) -> (u,v)::neqs
          | _ -> neqs)
 
@@ -257,15 +255,15 @@ let set_env a s = { s with env = a }
 
 let get_env s = s.env
 
-let set_formula a s =
-  let s = { s with formula = a } in
+let set_conclusion a s =
+  let s = { s with conclusion = a } in
     match a with
       | Atom (Message at) -> add_macro_defs s at
       | _ -> s
 
-let init (goal : formula) = set_formula goal init_sequent
+let init (goal : formula) = set_conclusion goal init_sequent
 
-let get_formula s = s.formula
+let get_conclusion s = s.conclusion
 
 (* Return the conjunction of all trace hypotheses, together with
  * the possible negation of the conclusion formula if it is a trace
@@ -277,7 +275,7 @@ let make_trace_formula s =
  List.fold_left
    (fun acc h -> Bformula.And (h,acc))
    Bformula.True
-   (match Formula.formula_to_trace_formula s.formula with
+   (match Formula.formula_to_trace_formula s.conclusion with
       | Some f -> (Bformula.Not f) :: trace_hypotheses
       | None -> trace_hypotheses)
 
@@ -312,7 +310,7 @@ let get_all_terms s =
     List.map (fun h -> h.hypothesis) (hypotheses_to_list s.message_hypotheses)
   in
   let atoms =
-    match s.formula with
+    match s.conclusion with
       | Atom (Message at) -> at::atoms
       | _ -> atoms
   in
