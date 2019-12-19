@@ -211,7 +211,8 @@ let simpl =
       Abstract ("eqnames",[]) ;
       Abstract ("eqtimestamps",[]) ;
       Try (Abstract ("congruence",[])) ;
-      Try (Abstract ("constraints",[])) ])
+      Try (Abstract ("constraints",[])) ;
+      Try (Abstract ("assumption",[])) ])
 
 let auto_simp judges =
   judges
