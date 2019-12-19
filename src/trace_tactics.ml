@@ -359,10 +359,7 @@ let apply id (ths:Theory.term list) (s : Sequent.t) =
   aux [] f
 
 let apply id l s sk fk =
-  match apply id l s with
-    | l -> sk l fk
-    | exception Failure s -> fk @@ Tactics.Failure s
-    | exception _ -> fk @@ Tactics.Failure "failure"
+  sk (apply id l s) fk
 
 let () =
   T.register_general "apply"

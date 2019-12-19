@@ -251,8 +251,8 @@ let get_goal_formula gname =
     List.filter (fun (name,g) -> name = gname) !goals_proved
   with
     | [(_,f)] -> f
-    | [] -> failwith "No proved goal with given name"
-    | _ -> failwith "Multiple proved goals with the same name"
+    | [] -> raise @@ Tactics.Tactic_Hard_Failure "No proved goal with given name"
+    | _ -> assert false
 
 (** Declare Goals And Proofs *)
 
