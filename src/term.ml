@@ -58,10 +58,10 @@ type 'a macro_info =
       * [m(i1,..,iN)@ts] expands to [term] where [indices] are replaced
       * by [i1;..;iN], [ts] is replaced by [a], and [inputs] are
         * replaced by the input macros corresponding to prefixes of [a]. *)
-  | Local of (Vars.var*kind) list * kind * Vars.var * 'a
-    (** [Simple ([x1,k1;...;xn,kn],k,v,t)] corresponds to a macro [t]
-      * with arguments [xi] of respective types [ki], and
-      * return type [k]. The [v] variable is the current timestamp. *)
+  | Local of (Vars.var) list * kind * Vars.var * 'a
+    (** [Simple (vars,k,v,t)] corresponds to a macro [t]
+      * with arguments [vars] and return type [k].
+      * The [v] variable is the current timestamp. *)
 
 type 'a indexed_symbol = 'a Symbols.t * index list
 

@@ -68,7 +68,7 @@ type 'a macro_info =
       * m(i1,..,iN)@a expands to [term] where [indices] are replaced
       * by [[i1;..;iN]], [ts] is replaced by a, and [inputs] are
       * replaced by the input macros corresponding to prefixes of a. *)
-  | Local of (Vars.var*kind) list * kind * Vars.var * 'a
+  | Local of Vars.var list * kind * Vars.var * 'a
     (** [Simple ([x1,k1;...;xn,kn],k,ts,t)] corresponds to a macro [t]
       * with arguments [xi] of respective types [ki], and
       * return type [k].

@@ -100,7 +100,7 @@ let function_kind f : kind list * kind =
     | Function.C (_, Hash_symbol) -> [Message; Message], Message
     | Function.C (_, AEnc_symbol) -> [Message; Message; Message], Message
     | Function.C (_, Abstract_symbol (args_k, ret_k)) -> args_k, ret_k
-    | Macro.C (Local (targs,k,_,_)) -> List.map snd targs, k
+    | Macro.C (Local (targs,k,_,_)) -> List.map Vars.var_type targs, k
     | Macro.C (Global (_,indices,_,_)) ->
       List.map (fun _ -> Index) indices, Message
     | Macro.C Input -> [], Message
@@ -365,8 +365,8 @@ let convert ts subst t =
         | Term.(Macro.C (Local (targs,_,_,_))) ->
             let indices,terms =
               List.fold_left2
-                (fun (indices,terms) (x,k) v ->
-                   if k = Vars.Index then
+                (fun (indices,terms) x v ->
+                   if Vars.var_type x = Vars.Index then
                      conv_index subst v :: indices, terms
                    else
                      indices, conv v :: terms)
@@ -627,7 +627,7 @@ let declare_macro s typed_args k t =
            | _ -> assert false
          in
            assert (Vars.name x' = x) ;
-           env, (x',k)::vars, item::tsubst)
+           env, x'::vars, item::tsubst)
       (Vars.empty_env,[],[])
       typed_args
   in
