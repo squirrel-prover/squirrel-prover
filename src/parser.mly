@@ -195,8 +195,8 @@ declaration:
 
 tactic_params:
 |                               { [] }
-| t=term                        { [t] }
-| t=term COMMA ts=tactic_params { t::ts }
+| t=term                        { [Prover.Theory t] }
+| t=term COMMA ts=tactic_params { Prover.Theory t :: ts }
 
 tac:
   | LPAREN t=tac RPAREN               { t }
@@ -208,6 +208,8 @@ tac:
   | ID                                { Prover.AST.Abstract ($1,[]) }
   | ID i=INT                          { Prover.AST.Abstract
                                           ($1,[Prover.Int i]) }
+  | ID term                           { Prover.AST.Abstract
+                                          ($1,[Prover.Theory $2]) }
   | ID f=formula                      { Prover.AST.Abstract
                                           ($1,
                                            [Prover.Formula
@@ -222,18 +224,11 @@ tac:
 
   | APPLY i=ID                        { Prover.AST.Abstract
                                           ("apply",
-                                           [Prover.Goal_name i;
-                                            Prover.Subst
-                                              (Prover.parse_args i [])]) }
+                                           [Prover.Goal_name i]) }
   | APPLY i=ID TO t=tactic_params     { Prover.AST.Abstract
                                           ("apply",
-                                           [Prover.Goal_name i;
-                                            Prover.Subst
-                                              (Prover.parse_args i t) ]) }
-  | EXISTS t=tactic_params            { Prover.AST.Abstract
-                                          ("exists",
-                                           [Prover.Subst
-                                              (Prover.parse_args_exists t)]) }
+                                           Prover.Goal_name i :: t) }
+  | EXISTS t=tactic_params            { Prover.AST.Abstract ("exists",t) }
 
 
 qed:

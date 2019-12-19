@@ -10,7 +10,7 @@ goal one :
 
 Proof.
 
-  euf 0.
+  euf M0.
 
 Qed.
 
@@ -19,6 +19,6 @@ goal two :
 
 Proof.
 
-  euf 0.
+  euf M0.
 
 Qed.

@@ -16,6 +16,6 @@ goal unforgeable :
 
 Proof.
 
-  euf 0.
+  euf M0.
 
 Qed.

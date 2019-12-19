@@ -1,4 +1,3 @@
-open Logic
 open Term
 open Formula
 
@@ -9,7 +8,7 @@ type named_goal = string * formula
 
 let goals : named_goal list ref = ref []
 let current_goal : named_goal option ref = ref None
-let subgoals : Judgment.t list ref = ref []
+let subgoals : Sequent.t list ref = ref []
 let goals_proved = ref []
 
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
@@ -23,7 +22,7 @@ exception Cannot_undo
 
 type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
-                     subgoals : Judgment.t list;
+                     subgoals : Sequent.t list;
                      goals_proved : named_goal list;
                      prover_mode : prover_mode;
                    }
@@ -64,11 +63,11 @@ let rec reset_state n =
  * as visible in the parser: TODO we should probably just take a list
  * of terms and let the tactic process it. *)
 type tac_arg =
-  | Subst of subst
   | Goal_name of string
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
+  | Theory of Theory.term
 
 exception Tactic_Soft_Failure of string
 
@@ -76,11 +75,10 @@ exception Tactic_Soft_Failure of string
   * want the same declaration system for indistinguishability tactics. *)
 module rec Prover_tactics : sig
 
-  type tac = Judgment.t Tactics.tac
+  type tac = Sequent.t Tactics.tac
 
   val register_general : string -> (tac_arg list -> tac) -> unit
   val register : string -> tac -> unit
-  val register_subst : string -> (subst -> tac) -> unit
   val register_int : string -> (int -> tac) -> unit
   val register_formula : string -> (formula -> tac) -> unit
   val register_fname : string -> (fname -> tac) -> unit
@@ -90,7 +88,7 @@ module rec Prover_tactics : sig
 
 end = struct
 
-  type tac = Judgment.t Tactics.tac
+  type tac = Sequent.t Tactics.tac
 
   let table :
     (string, tac_arg list -> tac) Hashtbl.t =
@@ -135,43 +133,35 @@ end = struct
              raise @@
              Tactics.Tactic_Hard_Failure "function name argument expected")
 
-  let register_subst id f =
-    register_general id
-      (fun args j sk fk -> match args with
-         | [Subst x] -> f x j sk fk
-         | [] -> f [] j sk fk
-         | _ ->
-             raise @@
-             Tactics.Tactic_Hard_Failure "illegal arguments")
-
   let register_macro id m = Prover_tactics.register id (AST.eval m)
 
 end
 
 and AST :
-  Tactics.AST_sig with type arg = tac_arg with type judgment = Judgment.t
+  Tactics.AST_sig with type arg = tac_arg with type judgment = Sequent.t
 = Tactics.AST(struct
 
   type arg = tac_arg
 
-  type judgment = Logic.Judgment.judgment
+  type judgment = Sequent.t
 
   let pp_arg ppf = function
     | Int i -> Fmt.int ppf i
     | Goal_name s -> Fmt.string ppf s
     | Function_name fname -> pp_fname ppf fname
     | Formula formula -> pp_formula ppf formula
-    | Subst subst -> pp_subst ppf subst
+    | Theory th -> Theory.pp_term ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
     Prover_tactics.get id args
 
   let pp_abstract ~pp_args s args ppf =
     match s,args with
-      | "apply",[Goal_name id; Subst []] ->
+      | "apply",[Goal_name id] ->
           Fmt.pf ppf "apply %s" id
-      | "apply",[Goal_name id; Subst s] ->
-          Fmt.pf ppf "apply %s to %a" id pp_subst s
+      | "apply", Goal_name id :: l ->
+          let l = List.map (function Theory t -> t | _ -> assert false) l in
+          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp_term) l
       | _ -> raise Not_found
 
 end)
@@ -180,7 +170,7 @@ let () =
   Prover_tactics.register "admit" (fun j sk fk -> sk [] fk) ;
   Prover_tactics.register "id" Tactics.id
 
-exception Return of Judgment.t list
+exception Return of Sequent.t list
 
 (** The evaluation of a tactic, may either raise a soft failure or a hard
   * failure (cf tactics.ml). A soft failure should be formatted inside the
@@ -210,7 +200,8 @@ let simpl =
       Abstract ("eqnames",[]) ;
       Abstract ("eqtimestamps",[]) ;
       Try (Abstract ("congruence",[])) ;
-      Try (Abstract ("notraces",[])) ])
+      Try (Abstract ("constraints",[])) ;
+      Try (Abstract ("assumption",[])) ])
 
 let auto_simp judges =
   judges
@@ -226,7 +217,7 @@ let tsubst_of_judgment j =
        | Vars.Message -> Theory.Term (Vars.name v,MVar v)
        | Vars.Boolean -> assert false
     )
-    (Vars.to_list j.Judgment.env)
+    (Vars.to_list (Sequent.get_env j))
 
 let parse_formula fact =
   match !subgoals with
@@ -237,7 +228,7 @@ let parse_formula fact =
             (fun v ->
                Vars.name v,
                Vars.var_type v)
-            (Vars.to_list j.Judgment.env)
+            (Vars.to_list (Sequent.get_env j))
         in
         Theory.convert_formula_glob
           env
@@ -255,47 +246,13 @@ let parse_subst j uvars ts : subst =
            | Vars.Boolean -> assert false)
       ts uvars
 
-let parse_args goalname ts : subst =
-  let goals = List.filter (fun (name,g) -> name = goalname) !goals_proved in
-  match goals with
-  | [] ->  raise @@ Failure "No goal with given name"
-  | [(np, gp)] ->
-    begin
-      let uvars =
-        begin
-          match gp with
-          | ForAll (vs,b) -> vs
-          | Exists _ -> raise @@ Failure "Cannot apply existential goal."
-          | _ -> []
-        end
-      in
-      if (List.length uvars) <> (List.length ts) then
-        raise @@ Failure "Number of parameters different than expected";
-      match !subgoals with
-      | [] ->
-          raise @@
-          Failure "Cannot parse term with respect to empty current goal"
-      |  j :: _ -> parse_subst j uvars ts
-      end
-  | _ ->  raise @@ Failure "Multiple proved goals with same name"
-
-let parse_args_exists ts : subst =
-  match !subgoals with
-  | [] ->
-    raise @@
-    Failure "Cannot parse term with respect to empty current goal"
-  |  j :: _ -> match j.Judgment.formula with
-    | Exists (vs,f) -> parse_subst j vs ts
-    | _ -> raise @@ Failure "Cannot parse term for existential intro which does
-not exists"
-
 let get_goal_formula gname =
   match
     List.filter (fun (name,g) -> name = gname) !goals_proved
   with
     | [(_,f)] -> f
-    | [] -> failwith "No proved goal with given name"
-    | _ -> failwith "Multiple proved goals with the same name"
+    | [] -> raise @@ Tactics.Tactic_Hard_Failure "No proved goal with given name"
+    | _ -> assert false
 
 (** Declare Goals And Proofs *)
 
@@ -357,7 +314,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
   | Some _, j :: _ ->
     Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]"
       (List.length !subgoals)
-      Judgment.pp_judgment j
+      Sequent.pp j
   | _ -> assert false
 
 (** [eval_tactic_focus tac] applies [tac] to the focused goal.
@@ -391,7 +348,7 @@ let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    subgoals := auto_simp [Judgment.init goal];
+    subgoals := auto_simp [Sequent.init goal];
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."

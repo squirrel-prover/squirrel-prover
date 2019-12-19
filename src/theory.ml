@@ -492,7 +492,7 @@ let get_kind env t =
       with Type_error -> check_term env t Boolean; Boolean)
   with Untyped_symbol -> Message
 
-let convert_constr_atom args_kind subst f : Bformula.constr_atom =
+let convert_trace_formula_atom args_kind subst f : Bformula.trace_formula_atom =
   let open Vars in
   let open Bformula in
   match f with
@@ -510,8 +510,8 @@ let convert_constr_atom args_kind subst f : Bformula.constr_atom =
       | _ -> raise Type_error end
   | _ -> assert false
 
-let convert_constr_glob args_kind subst f : Bformula.constr =
-  convert_bformula (convert_constr_atom args_kind subst) f
+let convert_trace_formula_glob args_kind subst f : Bformula.trace_formula =
+  convert_bformula (convert_trace_formula_atom args_kind subst) f
 
 let convert_atom_glob subst atom =
   match atom with
@@ -549,7 +549,7 @@ let convert_formula_glob args_kind subst f =
         let at = Compare (o,u,v) in
         match get_kind args_kind u with
         | Index | Timestamp ->
-            Atom (Constraint (convert_constr_atom args_kind subst at))
+            Atom (Constraint (convert_trace_formula_atom args_kind subst at))
         | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
       end
     | Atom (Fun ("happens",[ts],None)) -> Atom (Happens (convert_ts subst ts))
@@ -589,6 +589,28 @@ let rec convert_vars env vars =
   in
   let (res, acc) =  conv vars in
   (List.rev res, acc)
+
+let tsubst_of_env env =
+  List.map
+    (fun v ->
+       match Vars.var_type v with
+         | Vars.Index -> Idx (Vars.name v,v)
+         | Vars.Timestamp -> TS (Vars.name v,Term.TVar v)
+         | Vars.Message -> Term (Vars.name v,Term.MVar v)
+         | Vars.Boolean -> assert false)
+    (Vars.to_list env)
+
+let parse_subst env uvars ts : Term.subst =
+  let open Term in
+  let u_subst = tsubst_of_env env in
+    List.map2
+      (fun t u ->
+         match Vars.var_type u with
+           | Vars.Timestamp -> TS (TVar u, convert_ts u_subst t )
+           | Vars.Message -> Term (MVar u, convert_glob u_subst t)
+           | Vars.Index -> Index (u, conv_index u_subst t)
+           | Vars.Boolean -> assert false)
+      ts uvars
 
 let declare_macro s typed_args k t =
   check_term typed_args t k ;

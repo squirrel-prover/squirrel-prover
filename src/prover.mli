@@ -5,7 +5,6 @@
 open Term
 open Bformula
 open Formula
-open Logic
 
 (** A goal of the prover is simply a name and a formula *)
 type named_goal = string * formula
@@ -45,24 +44,23 @@ val reset_state : int -> prover_mode
 (** {2 Tactics syntax trees} *)
 
 type tac_arg =
-  | Subst of subst
   | Goal_name of string
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
+  | Theory of Theory.term
 
 module AST : Tactics.AST_sig
-  with type arg = tac_arg and type judgment = Logic.Judgment.judgment
+  with type arg = tac_arg and type judgment = Sequent.t
 
 (** TODO documentation *)
 exception Tactic_Soft_Failure of string
 
 (** Placeholder for tactics on judgments *)
 module Prover_tactics : sig
-  type tac = Judgment.t Tactics.tac
+  type tac = Sequent.t Tactics.tac
   val register_general : string -> (tac_arg list -> tac) -> unit
   val register : string -> tac -> unit
-  val register_subst : string -> (subst -> tac) -> unit
   val register_int : string -> (int -> tac) -> unit
   val register_formula : string -> (formula -> tac) -> unit
   val register_fname : string -> (fname -> tac) -> unit
@@ -70,13 +68,6 @@ module Prover_tactics : sig
 end
 
 (** {2 Utilities for parsing} *)
-
-(** [parse_args goalname ts] parses the arguments [ts] given  the environment
-    defined by the goal [goalname]. It needs to access the list of proved goals.
-*)
-val parse_args : string -> Theory.term list -> Term.asubst list
-
-val parse_args_exists : Theory.term list -> Term.asubst list
 
 val parse_formula : Theory.formula -> formula
 

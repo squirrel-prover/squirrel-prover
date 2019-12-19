@@ -2,22 +2,22 @@ open Term
 open Bformula
 
 type generic_atom =
-  | Constraint of constr_atom
+  | Constraint of trace_formula_atom
   | Message of term_atom
   | Happens of timestamp
 
 let subst_generic_atom s = function
-  | Constraint a -> Constraint (subst_constr_atom s a)
+  | Constraint a -> Constraint (subst_trace_formula_atom s a)
   | Message a -> Message (subst_term_atom s a)
   | Happens a -> Happens (subst_ts s a)
 
 let pp_generic_atom ppf = function
-  | Constraint a -> pp_constr_atom ppf a
+  | Constraint a -> pp_trace_formula_atom ppf a
   | Message a -> pp_term_atom ppf a
   | Happens a -> Fmt.pf ppf "happens(%a)" pp_timestamp a
 
 let generic_atom_var =  function
-  | Constraint a -> constr_atom_vars a
+  | Constraint a -> trace_formula_atom_vars a
   | Message a -> term_atom_vars a
   | Happens a -> ts_vars a
 
@@ -70,42 +70,14 @@ let formula_to_fact f =
     (function Message x -> x | _ -> failwith "not a fact")
     f
 
-let formula_to_constr f =
-  foformula_to_bformula
-    (function Constraint x -> x | _ -> failwith "not a constr")
-    f
+exception No_trace_formula
 
-let rec is_disjunction = function
-  | Atom(_) -> true
-  | Or(f1, f2) -> is_disjunction f1 && is_disjunction f2
-  | _ -> false
-
-let rec is_conjunction = function
-  | Atom(_) -> true
-  | And(f1, f2) -> is_disjunction f1 && is_disjunction f2
-  | _ -> false
-
-let conjunction_to_atom_lists (f:formula) =
-  let rec ctal fl cl tl = function
-    | [] -> fl,cl,tl
-    | And (f,g) :: l -> ctal fl cl tl (f::g::l)
-    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
-    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
-    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
-    | _ -> assert false
-  in
-  ctal [] [] [] [f]
-
-let disjunction_to_atom_lists f =
-  let rec ctal fl cl tl = function
-    | [] -> fl,cl,tl
-    | Or (f,g) :: l -> ctal fl cl tl (f::g::l)
-    | Atom (Message a) :: l -> ctal ((Bformula.Atom a)::fl) cl tl l
-    | Atom (Constraint c) :: l -> ctal fl ((Bformula.Atom c)::cl) tl l
-    | Atom (Happens ts) :: l -> ctal fl cl (ts::tl) l
-    | _ -> assert false
-  in
-  ctal [] [] [] [f]
+let formula_to_trace_formula f =
+  try
+    Some (foformula_to_bformula
+            (function Constraint x -> x | _ -> raise No_trace_formula)
+            f)
+  with No_trace_formula | Not_a_boolean_formula -> None
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->

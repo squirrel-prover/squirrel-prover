@@ -13,6 +13,6 @@ goal collision_absurd :
 
 Proof.
 
-  euf 0.
+  euf M0.
 
 Qed.
