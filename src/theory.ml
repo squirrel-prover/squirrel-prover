@@ -101,6 +101,10 @@ let function_kind f : kind list * kind =
     | Function.C (_, AEnc_symbol) -> [Message; Message; Message], Message
     | Function.C (_, Abstract_symbol (args_k, ret_k)) -> args_k, ret_k
     | Macro.C (Local (targs,k,_,_)) -> List.map snd targs, k
+    | Macro.C (Global (_,indices,_,_)) ->
+      List.map (fun _ -> Index) indices, Message
+    | Macro.C Input -> [], Message
+    | Macro.C Output -> [], Message
     | _ -> raise Untyped_symbol
   with Not_found -> raise Untyped_symbol
 
@@ -485,12 +489,11 @@ let convert_fact ts subst f : Bformula.fact =
 (* Not clean at all. *)
 let get_kind env t =
   let open Vars in
-  try
-  (try check_term env t Index; Index
+  try check_term env t Index; Index
   with Type_error -> try check_term env t Timestamp; Timestamp
     with Type_error -> try check_term env t Message; Message
-      with Type_error -> check_term env t Boolean; Boolean)
-  with Untyped_symbol -> Message
+      with Type_error -> check_term env t Boolean; Boolean
+
 
 let convert_trace_formula_atom args_kind subst f : Bformula.trace_formula_atom =
   let open Vars in
