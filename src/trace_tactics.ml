@@ -105,14 +105,25 @@ let () = T.register "intro" goal_intro
 
 (** Quantifiers *)
 
-let goal_exists_intro nu (s : Sequent.t) sk fk =
+let goal_exists_intro ths (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
-  | Exists (vs,f) when List.length nu = List.length vs ->
+  | Exists (vs,f) when List.length ths = List.length vs ->
+    let nu = Theory.parse_subst (Sequent.get_env s) vs ths in
     let new_formula = subst_formula nu f in
     sk [Sequent.set_conclusion new_formula s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
 
-let () = T.register_subst "exists" goal_exists_intro
+let () =
+  T.register_general "exists"
+    (fun l ->
+       let ths =
+         List.map
+           (function
+              | Prover.Theory tm -> tm
+              | _ -> raise @@ Tactic_Hard_Failure "Improper arguments")
+           l
+       in
+       goal_exists_intro ths)
 
 let () =
   let open Prover.AST in
@@ -323,13 +334,19 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-let apply f (subst:subst) (s : Sequent.t) sk fk =
-  (* Formula with universal quantifications introduced *)
+let apply id (ths:Theory.term list) (s : Sequent.t) =
+  (* Get formula to apply *)
   let f =
-    match f with
-      | Formula.ForAll (_,f) -> subst_formula subst f
-      | f -> assert (subst = []) ; f
+    try Sequent.get_hypothesis id s with
+      | Not_found -> Prover.get_goal_formula id
   in
+  let uvars,f = match f with
+    | ForAll (uvars,f) -> uvars,f
+    | _ -> [],f
+  in
+  let subst = Theory.parse_subst (Sequent.get_env s) uvars ths in
+  (* Formula with universal quantifications introduced *)
+  let f = subst_formula subst f in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Formula.Impl (h,c) ->
@@ -339,14 +356,26 @@ let apply f (subst:subst) (s : Sequent.t) sk fk =
         left_introductions s [f] ::
         List.rev subgoals
   in
-  sk (aux [] f) fk
+  aux [] f
+
+let apply id l s sk fk =
+  match apply id l s with
+    | l -> sk l fk
+    | exception Failure s -> fk @@ Tactics.Failure s
+    | exception _ -> fk @@ Tactics.Failure "failure"
 
 let () =
   T.register_general "apply"
     (function
-      | [Prover.Goal_name gname; Prover.Subst s] ->
-        let f = Prover.get_goal_formula gname in
-        apply f s
+      | Prover.Goal_name id :: th_terms ->
+          let th_terms =
+            List.map
+              (function
+                 | Prover.Theory th -> th
+                 | _ -> raise @@ Tactic_Hard_Failure "improper arguments")
+              th_terms
+          in
+          apply id th_terms
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let tac_assert f s sk fk =

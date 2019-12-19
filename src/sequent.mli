@@ -50,6 +50,10 @@ val get_conclusion : sequent -> formula
    conclusion formula appears inside its hypothesis. *)
 val is_hypothesis : formula -> sequent -> bool
 
+(** [get_hypothesis id s] returns the hypothesis named [id] in [s].
+  * @raise Not_found if there is no such hypothesis. *)
+val get_hypothesis : string -> sequent -> formula
+
 (** Tags attached to message hypotheses. *)
 type message_hypothesis_tag = {
   t_euf : bool

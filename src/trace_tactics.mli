@@ -28,11 +28,10 @@ val goal_and_right : tac
     quantifier or an implication. Else, it returns [fk] *)
 val goal_intro : tac
 
-(** [goal_exists_intro judge sk fk nu] introduces the existentially
-    quantified variables in the conclusion of the judgment.
-    The substitution [nu] is a mapping from the existentially bound
-    variables to terms over the current variables of the judgment. *)
-val goal_exists_intro : Term.subst -> tac
+(** [goal_exists_intro judge ths] introduces the existentially
+    quantified variables in the conclusion of the judgment,
+    using [ths] as existential witnesses. *)
+val goal_exists_intro : Theory.term list -> tac
 
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
@@ -55,11 +54,11 @@ val eq_constants : Term.fname -> tac
 
 (** {2 Advanced tactics} *)
 
-(** [apply gp subst judge sk fk] applies the axiom [gp] with its universally
-    quantified variables instantied with [subst], adding to [judge] its
+(** [apply gp ths judge sk fk] applies the axiom [gp] with its universally
+    quantified variables instantied with [ths], adding to [judge] its
     postconditions, and creating new subgoals from [judge] for the
     preconditions. *)
-val apply : formula -> Term.subst -> tac
+val apply : string -> Theory.term list -> tac
 
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)

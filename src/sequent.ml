@@ -58,6 +58,8 @@ let mem_hypotheses f hs =
   hypotheses_to_list hs
   |> List.exists (fun hypo -> hypo.hypothesis = f)
 
+let find_hypotheses id hs = M.find id (fst hs)
+
 let pp_hypothesis pp_formula ppf hypo =
   Fmt.pf ppf "%s: %a@;" (name hypo) pp_formula hypo.hypothesis
 
@@ -140,7 +142,17 @@ let is_hypothesis f s =
   | None ->
     match f with
     | Atom (Message at) -> mem_hypotheses at s.message_hypotheses
+    | Atom (Happens t) -> List.mem t s.happens_hypotheses
     | _ ->  mem_hypotheses f s.formula_hypotheses
+
+let get_hypothesis id s =
+  try (find_hypotheses id s.formula_hypotheses).hypothesis with Not_found ->
+    try
+      Atom (Message (find_hypotheses id s.message_hypotheses).hypothesis)
+    with Not_found ->
+      Formula.bformula_to_foformula
+        (fun x -> Formula.Constraint x)
+        (find_hypotheses id s.trace_hypotheses).hypothesis
 
 let select_message_hypothesis name s update =
   try

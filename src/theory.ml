@@ -590,6 +590,28 @@ let rec convert_vars env vars =
   let (res, acc) =  conv vars in
   (List.rev res, acc)
 
+let tsubst_of_env env =
+  List.map
+    (fun v ->
+       match Vars.var_type v with
+         | Vars.Index -> Idx (Vars.name v,v)
+         | Vars.Timestamp -> TS (Vars.name v,Term.TVar v)
+         | Vars.Message -> Term (Vars.name v,Term.MVar v)
+         | Vars.Boolean -> assert false)
+    (Vars.to_list env)
+
+let parse_subst env uvars ts : Term.subst =
+  let open Term in
+  let u_subst = tsubst_of_env env in
+    List.map2
+      (fun t u ->
+         match Vars.var_type u with
+           | Vars.Timestamp -> TS (TVar u, convert_ts u_subst t )
+           | Vars.Message -> Term (MVar u, convert_glob u_subst t)
+           | Vars.Index -> Index (u, conv_index u_subst t)
+           | Vars.Boolean -> assert false)
+      ts uvars
+
 let declare_macro s typed_args k t =
   check_term typed_args t k ;
   let env,typed_args,tsubst =
