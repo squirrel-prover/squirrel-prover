@@ -9,7 +9,7 @@ type timestamp =
 
 let rec pp_timestamp ppf = function
   | TVar tv -> Vars.pp ppf tv
-  | TPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_timestamp ts
+  | TPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_timestamp ts
   | TName a -> Action.pp_action ppf a
 
 let rec action_of_ts = function
@@ -107,6 +107,11 @@ type msymb = Macro.ns indexed_symbol
 
 type state = msymb
 
+(** Declare input and output macros.
+  * We assume that they are the only symbols bound to Input/Output. *)
+let in_macro = (Macro.declare_exact "input" Input, [])
+let out_macro = (Macro.declare_exact "output" Output, [])
+
 (** Pretty printing *)
 
 let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
@@ -168,10 +173,20 @@ let term_vars t =
 let rec tts acc = function
   | Fun (fs, lt) -> List.fold_left tts acc lt
   | Name n -> acc
-  | Macro (_, _, ts) -> ts :: acc
+  | Macro (_, l, ts) -> List.fold_left tts (ts :: acc) l
   | MVar _ -> []
 
 let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare
+
+let rec pts acc = function
+  | Fun (fs, lt) -> List.fold_left pts acc lt
+  | Macro (s, l, ts) ->
+     if s = in_macro then (TPred ts) :: acc else
+       List.fold_left pts (ts :: acc) l
+  | Name n -> acc
+  | MVar _ -> []
+
+let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
 
 (** Substitutions *)
 
@@ -308,8 +323,3 @@ let f_snd = mk_fname "snd" [Message] Message
 (** Dummy term *)
 
 let dummy = Fun (mk_fname "_" [] Message, [])
-
-(** Macros *)
-
-let in_macro = (Macro.declare_exact "input" Input, [])
-let out_macro = (Macro.declare_exact "output" Output, [])

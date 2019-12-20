@@ -276,9 +276,13 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let action_descr_ts = TName case.action_descr.action in
   (* The action occured before the test H(m,k) = s. *)
   let le_cnstr =
-    List.map (fun ts ->
-        Atom (Pts (Leq, action_descr_ts, ts))
-      ) (Sequent.maximal_elems sequent (term_ts s @ term_ts m))
+    List.map
+      (function
+         | TPred ts ->
+             Atom (Pts (Lt, action_descr_ts, ts))
+         | ts ->
+             Atom (Pts (Leq, action_descr_ts, ts)))
+      (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)

@@ -13,5 +13,4 @@ goal foo :
   h(<n,input@A>,k) = n => False.
 Proof.
   euf M0.
-  apply pair_neq_snd to n, input@A.
 Qed.

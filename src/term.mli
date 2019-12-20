@@ -124,8 +124,18 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 (** [term_vars t] returns the variables of [t]*)
 val term_vars : term -> var list
 
-(** [term_ts t] returns the timestamps appearing in [t] *)
+(** [term_ts t] returns the timestamps appearing in [t].
+  * The returned list is guaranteed to have no duplicate elements. *)
 val term_ts : term -> timestamp list
+
+(** [precise_ts t] returns a list [l] of timestamps such that
+  * any term that appears in [(t)^I] that is not an attacker
+  * symbol or a frame must appear in a macro applied to a timestamp
+  * that is less than [sigma_T(ts)] for some [ts] in [l].
+  * Concretely, this is achieved by taking the timestamps occurring
+  * in [t] but only the predecessors of timestamps occurring as
+  * input timestamps. *)
+val precise_ts : term -> timestamp list
 
 val pp_term : Format.formatter -> term -> unit
 
