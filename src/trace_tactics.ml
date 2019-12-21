@@ -138,6 +138,39 @@ let () =
     (OrElse
        (Abstract ("split",[]) :: non_branching_intro))
 
+(** Induction *)
+
+let induction s sk fk =
+  match Sequent.get_conclusion s with
+    | ForAll (v::vs,f) when Vars.var_type v = Vars.Timestamp ->
+        (* We need two fresh variables in env,
+         * but one will not be kept in the final environment. *)
+        let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
+        let _,v'' = Vars.make_fresh_from env v in
+        let vv,vv',vv'' = TVar v, TVar v', TVar v'' in
+        (* Introduce v as v'. *)
+        let f' = Formula.subst_formula [TS (vv,vv')] (ForAll (vs,f)) in
+        (* Use v'' to form induction hypothesis. *)
+        let ih =
+          ForAll (v''::vs,
+            Impl
+              (Atom (Constraint (Bformula.Pts (Bformula.Lt,vv'',vv))),
+               Formula.subst_formula [TS(vv,vv'')] f))
+        in
+        let s =
+          s
+          |> Sequent.set_env env
+          |> Sequent.set_conclusion f'
+          |> Sequent.add_formula ~prefix:"IH" ih
+        in
+          sk [s] fk
+    | _ ->
+        fk @@ Tactics.Failure
+                "Conclusion must be an \
+                 universal quantification over a timestamp"
+
+let () = T.register "induction" induction
+
 (** Reasoning over constraints and messages *)
 
 let constraints (s : Sequent.t) sk fk =
@@ -338,7 +371,7 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-let apply id (ths:Theory.term list) (s : Sequent.t) =
+let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   (* Get formula to apply *)
   let f =
     try Sequent.get_hypothesis id s with
@@ -355,15 +388,16 @@ let apply id (ths:Theory.term list) (s : Sequent.t) =
   let rec aux subgoals = function
     | Formula.Impl (h,c) ->
         let s' = Sequent.set_conclusion h s in
-          aux (s'::subgoals) c
+        aux (s'::subgoals) c
+    | Formula.Not h ->
+        let s' = Sequent.set_conclusion h s in
+        sk (List.rev (s'::subgoals)) fk
     | f ->
         left_introductions s [f] ::
         List.rev subgoals
+        |> fun subgoals -> sk subgoals fk
   in
   aux [] f
-
-let apply id l s sk fk =
-  sk (apply id l s) fk
 
 let () =
   T.register_general "apply"
