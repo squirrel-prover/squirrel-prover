@@ -15,3 +15,6 @@ goal test :
   x=x.
 Proof.
 Qed.
+
+goal forall x:timestamp, True.
+goal forall () True.

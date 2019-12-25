@@ -19,6 +19,11 @@ type ('a, 'b) foformula =
   | True
   | False
 
+val pp_foformula :
+  (Format.formatter -> 'a -> unit) ->
+  (Format.formatter -> 'b list -> unit) ->
+  Format.formatter -> ('a,'b) foformula -> unit
+
 exception Not_a_boolean_formula
 
 (** [foformula_to_bformula conv f] converts [f] to a [bformula],

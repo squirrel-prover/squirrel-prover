@@ -16,7 +16,7 @@ let pp_generic_atom ppf = function
   | Message a -> pp_term_atom ppf a
   | Happens a -> Fmt.pf ppf "happens(%a)" pp_timestamp a
 
-let generic_atom_var =  function
+let generic_atom_var = function
   | Constraint a -> trace_formula_atom_vars a
   | Message a -> term_atom_vars a
   | Happens a -> ts_vars a
@@ -81,28 +81,28 @@ let formula_to_trace_formula f =
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
-    Fmt.pf ppf "@[<v 0>forall %a%a@]"
-      pp_var_list vs (pp_foformula pp_atom pp_var_list)  b
+    Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
+      pp_var_list vs (pp_foformula pp_atom pp_var_list) b
   | Exists (vs, b) ->
-    Fmt.pf ppf "@[<v 0>exists %a%a@]"
-      (Vars.pp_typed_list "") vs (pp_foformula pp_atom pp_var_list) b
+    Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
+      pp_var_list vs (pp_foformula pp_atom pp_var_list) b
   | And (bl, br) ->
-    Fmt.pf ppf "@[<hv>(%a && %a)@]"
+    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Or (bl, br) ->
-    Fmt.pf ppf "@[<hv>(%a || %a)@]"
+    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Impl (bl, br) ->
-    Fmt.pf ppf "@[<hv>(%a@ =>@ %a)@]"
+    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
       (pp_foformula pp_atom pp_var_list) bl
       (pp_foformula pp_atom pp_var_list) br
   | Not b ->
-    Fmt.pf ppf "@[<hv>not(%a)@]" (pp_foformula pp_atom pp_var_list) b
+    Fmt.pf ppf "not(@[%a@])" (pp_foformula pp_atom pp_var_list) b
   | Atom a -> pp_atom ppf a
-  | True -> Fmt.pf ppf "true"
-  | False -> Fmt.pf ppf "false"
+  | True -> Fmt.pf ppf "True"
+  | False -> Fmt.pf ppf "False"
 
 let rec foformula_vars atom_var = function
   | ForAll (vs,b) | Exists (vs,b) -> vs @ (foformula_vars atom_var b)
@@ -120,7 +120,7 @@ let formula_qvars f =
   foformula_vars (fun a -> []) f
   |> List.sort_uniq Pervasives.compare
 
-let pp_formula = pp_foformula pp_generic_atom (Vars.pp_typed_list "")
+let pp_formula = pp_foformula pp_generic_atom Vars.pp_typed_list
 
 let rec subst_foformula a_subst (s : subst) (f) =
   match f with

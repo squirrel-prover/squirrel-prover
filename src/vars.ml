@@ -24,46 +24,29 @@ let pp ppf (v:var) =
   Fmt.pf ppf "%s" (name v)
 
 let pp_typed ppf (v:var) =
-  Fmt.pf ppf "%a%a" pp v pp_type v.var_type
+  Fmt.pf ppf "%a:%a" pp v pp_type v.var_type
 
 let pp_list ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") pp) l
 
-let get_tsvars (f : var list) =
-  List.filter (fun t -> t.var_type=Timestamp) f
-
-let get_messvars (f : var list) =
-  List.filter (fun t -> t.var_type=Message) f
-
-let get_indexvars (f : var list) =
-  List.filter (fun t -> t.var_type=Index) f
-
-
-let pp_typed_list spref ppf vars =
-  let open Fmt in
-  let ident = Utils.ident in
-  let tsvars = get_tsvars vars in
-  if tsvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      (pp_list) tsvars
-      (styled `Blue (styled `Bold ident)) "timestamp"
-  else ();
-  let indexvars = get_indexvars vars in
-  if indexvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      pp_list indexvars
-      (styled `Blue (styled `Bold ident)) "index"
-  else ();
-  let messvars = get_messvars vars in
-  if messvars <> [] then
-    Fmt.pf ppf "@[<hv 2>%a@ (@[<hov>%a@] : %a)@]@;"
-      (styled `Red (styled `Underline ident)) spref
-      (pp_list) messvars
-      (styled `Blue (styled `Bold ident)) "message"
-  else ()
+let pp_typed_list ppf vars =
+  let rec aux cur_vars cur_type = function
+    | v::vs when v.var_type = cur_type ->
+        aux (v::cur_vars) cur_type vs
+    | vs ->
+        if cur_vars <> [] then begin
+          Fmt.list
+            ~sep:(fun fmt () -> Fmt.pf fmt ",")
+            pp ppf (List.rev cur_vars) ;
+          Fmt.pf ppf ":%a" pp_type cur_type ;
+          if vs <> [] then Fmt.pf ppf ",@,"
+        end ;
+        match vs with
+          | [] -> ()
+          | v::vs -> aux [v] v.var_type vs
+  in
+  aux [] Message vars
 
 module M = Map.Make(String)
 
@@ -71,8 +54,7 @@ exception Undefined_Variable
 
 exception Variable_Already_Defined
 
-
-(* An environment is made of two map. One maps variables names
+(* An environment is made of two maps. One maps variables names
    (accordingly to [var_name]) to variables, and the second maps
    name prefixes to the current biggest name_suffix for this
    name_prefix. *)
@@ -86,7 +68,7 @@ let pp_env ppf e =
   pp_list ppf (to_list e)
 
 let pp_typed_env ppf e =
-  pp_typed_list "" ppf (to_list e)
+  pp_typed_list ppf (to_list e)
 
 let empty_env : env = (M.empty,M.empty)
 
@@ -115,7 +97,6 @@ let make_fresh_and_update (e:env ref) var_type name_prefix =
   let new_env,new_var = make_fresh (!e) var_type name_prefix in
   e := new_env;
   new_var
-
 
 let make_fresh_from env (v:var) =
   make_fresh env v.var_type v.name_prefix

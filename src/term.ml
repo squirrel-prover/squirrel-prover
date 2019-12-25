@@ -149,7 +149,7 @@ let rec pp_term ppf = function
         pp_fsymb f
         (Utils.pp_ne_list
            "(@[<hov>%a@])"
-           (Fmt.list ~sep:Fmt.comma pp_term)) terms
+           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_term)) terms
   | Name n -> pp_nsymb ppf n
   | Macro (m, l, ts) ->
       Fmt.pf ppf "@[%a%a@%a@]"

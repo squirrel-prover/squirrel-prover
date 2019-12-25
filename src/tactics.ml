@@ -138,7 +138,7 @@ module AST (M:S) = struct
 
   let pp_args fmt l =
     Fmt.list
-      ~sep:(fun ppf () -> Fmt.string ppf ",@ ")
+      ~sep:(fun ppf () -> Fmt.pf ppf ",@ ")
       pp_arg fmt l
 
   let rec pp ppf = function
@@ -147,7 +147,7 @@ module AST (M:S) = struct
           pp_abstract ~pp_args i args ppf
         with _ ->
           if args = [] then Fmt.string ppf i else
-            Fmt.pf ppf "%s %a" i pp_args args
+            Fmt.pf ppf "@[%s@ %a@]" i pp_args args
         end
     | Modifier (i,t) -> Fmt.pf ppf "%s(%a)" i pp t
     | AndThen [t;t'] ->

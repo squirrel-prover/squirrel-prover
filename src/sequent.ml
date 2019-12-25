@@ -110,7 +110,7 @@ let pp ppf s =
   let open Utils in
   pf ppf "@[<v 0>" ;
   if s.env <> Vars.empty_env then
-    pf ppf "Variables: %a@;" Vars.pp_env s.env ;
+    pf ppf "Variables: %a@;" Vars.pp_typed_env s.env ;
   (* Print happens hypotheses *)
   if s.happens_hypotheses <> [] then
     pf ppf "@[<hov 2>Executed actions:@ %a@]@;"

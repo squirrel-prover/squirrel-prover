@@ -73,6 +73,15 @@ let pp_fact = Bformula.pp_bformula pp_term
 
 type formula = (term, (string * Term.kind) ) Formula.foformula
 
+let pp_formula =
+  Formula.pp_foformula
+    pp_term
+    (fun fmt l ->
+       Vars.pp_typed_list fmt
+         (List.map
+            (function (v,t) -> snd @@ Vars.make_fresh Vars.empty_env t v)
+            l))
+
 let formula_vars = Formula.foformula_vars (fun x -> [])
 
 exception Cannot_convert_to_fact

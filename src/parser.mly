@@ -36,9 +36,11 @@
 %nonassoc NOSIMPL
 
 %start theory
+%start top_formula
 %start top_process
 %start interactive
 %type <unit> theory
+%type <Theory.formula> top_formula
 %type <Process.process> top_process
 %type <Prover.parsed_input> interactive
 
@@ -84,10 +86,15 @@ kind:
 
 arg_list:
 |                                { [] }
-| ID COLON kind                  { [$1,$3] }
-| ID COLON kind COMMA arg_list   { ($1,$3)::$5 }
+| ids COLON kind                 { List.map (fun x -> x,$3) $1 }
+| ids COLON kind COMMA arg_list  { List.map (fun x -> x,$3) $1 @ $5 }
 
+ids:
+| ID                             { [$1] }
+| ID COMMA ids                   { $1::$3 }
 
+top_formula:
+| formula EOF                    { $1 }
 
 formula:
 | LPAREN formula RPAREN          { $2 }
@@ -102,12 +109,23 @@ formula:
 | HAPPENS LPAREN timestamp RPAREN
                                  { Formula.Atom
                                      (Theory.Fun ("happens",[$3],None)) }
-| EXISTS LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
+| EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Formula.Exists (vs,f)  }
-| FORALL LPAREN vs=arg_list RPAREN COMMA f=formula %prec QUANTIF
+| FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Formula.ForAll (vs,f)  }
+| EXISTS ID COLON kind sep f=formula %prec QUANTIF
+                                 { Formula.Exists ([$2,$4],f)  }
+| FORALL ID COLON kind sep f=formula %prec QUANTIF
+                                 { Formula.ForAll ([$2,$4],f)  }
+
+sep:
+|       {()}
+| COMMA {()}
 
 (* Processes *)
+
+top_process:
+| process EOF                    { $1 }
 
 process:
 | NULL                           { Process.Null }
@@ -249,9 +267,6 @@ goal:
 theory:
 | declaration theory             { () }
 | SYSTEM process DOT             { Process.declare_system $2 }
-
-top_process:
-| process EOF                    { $1 }
 
 interactive :
 | theory                          { Prover.ParsedInputDescr }

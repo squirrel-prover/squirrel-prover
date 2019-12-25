@@ -17,7 +17,7 @@ val pp_typed : Format.formatter -> var -> unit
 
 val pp_list : Format.formatter -> var list -> unit
 
-val pp_typed_list : string -> Format.formatter -> var list -> unit
+val pp_typed_list : Format.formatter -> var list -> unit
 
 exception Undefined_Variable
 

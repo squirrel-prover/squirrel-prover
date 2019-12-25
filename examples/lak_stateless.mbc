@@ -46,10 +46,8 @@ goal no_confusion :
   <nR(j),fst(input@R1(j,i))> = <snd(input@R1(jj,i)),nR(jj)> =>
   False.
 (* TODO
- * - the pretty printer is shit on this formula
  * - if we write k(i) we get an uninformative unbound-identifier error
- * - with R(j,i), we get an uninformative type-error
- * - h(_, _) is printed with a space unlike <_,_>. *)
+ * - with R(j,i), we get an uninformative type-error *)
 Proof.
   nosimpl(right).
   nosimpl(induction).

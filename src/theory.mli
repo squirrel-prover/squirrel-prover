@@ -44,6 +44,8 @@ val formula_to_fact : formula -> fact
 
 val formula_vars : formula -> (string * Vars.sort) list
 
+val pp_formula : Format.formatter -> formula -> unit
+
 (** {2 Declaration of new symbols} *)
 
 

@@ -88,25 +88,32 @@ let parse_from_buf
               exit 1
             end
 
+(** Testing *)
+
 let parse_theory_buf ?(test=false) lexbuf filename =
   Process.reset () ;
   parse_from_buf ~test Parser.theory lexbuf filename
 
-let parse_process ?(typecheck=false) string =
-  let lexbuf = Lexing.from_string string in
-  try
-    let p = Parser.top_process Lexer.token lexbuf in
-      if typecheck then Process.check_proc [] p ;
-      p
-  with Parser.Error as e ->
-    Format.printf
-      "Cannot parse process before %S at position TODO.@."
-      (Lexing.lexeme lexbuf) ;
-    raise e
-
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
   parse_theory_buf ~test lexbuf filename
+
+let parse parser parser_name string =
+  let lexbuf = Lexing.from_string string in
+  try
+    parser Lexer.token lexbuf
+  with Parser.Error as e ->
+    Format.printf
+      "Cannot parse %s before %S at position TODO.@."
+      parser_name (Lexing.lexeme lexbuf) ;
+    raise e
+
+let parse_process ?(typecheck=false) str =
+  let p = parse Parser.top_process "process" str in
+    if typecheck then Process.check_proc [] p ;
+    p
+
+let parse_formula = parse Parser.top_formula "formula"
 
 let add_suite_restore name suite =
   Checks.add_suite name
@@ -115,7 +122,44 @@ let add_suite_restore name suite =
        suite)
 
 let () =
-  add_suite_restore "Parsing" [
+  let check s =
+    Alcotest.(check string) "round-trip" s
+      (Format.asprintf "%a" Theory.pp_formula (parse_formula s))
+  in
+  let eqf s ss =
+    let f = parse_formula s in
+    let ff = parse_formula ss in
+      Alcotest.(check bool) "equal formulas" true
+        (f = ff)
+  in
+  add_suite_restore "Formula parsing" [
+    "Boolean constants", `Quick, begin fun () ->
+      check "True" ;
+      check "False"
+    end ;
+    "Boolean connectives", `Quick, begin fun () ->
+      (* TODO improve without parentheses:
+       * the pretty-printer should ideally be aware of precedences
+       * between connectives (and quantifiers) and only insert parentheses
+       * and boxes when precedences require it  *)
+      check "not(True)" ;
+      check "(True => False)" ;
+      check "(True || False)" ;
+      check "((True && True) => False)" ;
+    end ;
+    "Quantifiers", `Quick, begin fun () ->
+      check "forall (x:index), True" ;
+      check "forall (x:index), (x = x && x <> x)" ;
+      check "exists (x:index), True" ;
+      check "exists (x:index,y:message,z:index,t:timestamp), True" ;
+      eqf "exists x:index, True" "exists (x:index) True" ;
+      check "exists (x,y:index,z:message,\
+                     k:index,u,v:timestamp), True" ;
+    end
+  ]
+
+let () =
+  add_suite_restore "Process parsing" [
     "Null", `Quick, begin fun () ->
       ignore (parse_process "null")
     end ;

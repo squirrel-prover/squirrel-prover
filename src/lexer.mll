@@ -18,7 +18,7 @@
 
 }
 
-let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']*
+let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
 let int = ['0'-'9'] ['0'-'9']*
 
 rule token = parse
