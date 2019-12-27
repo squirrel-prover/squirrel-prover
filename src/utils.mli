@@ -26,6 +26,8 @@ module String : sig
     include module type of struct include String end
 
     val is_prefix : string -> string -> bool
+
+    val split_on_integer : string -> string * int option
   end
 
 module Imap : Map.S with type key = int

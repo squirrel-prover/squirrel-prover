@@ -47,6 +47,25 @@ module String = struct
       (String.sub s 0 l) = p
     with _ -> false
 
+  let get_integer s =
+    try
+      Some (int_of_string s)
+    with Failure _ -> None
+
+  let split_on_integer s =
+    let res = ref None in
+    let len =  (String.length s) in
+    let l = ref (len - 1) in
+    let cond = ref true in
+    (* we start from the end of the string, and as soon as we don't recognize an
+       integer anymore, we stop. *)
+    while (!l >= 0) && !cond do
+      let new_res = get_integer (String.sub s !l (len - !l)) in
+      match new_res with
+      | None -> cond := false
+      | _ -> res:= new_res; decr l
+    done;
+    (String.sub s 0 (!l+1), !res)
 end
 
 module Imap = Map.Make (struct
