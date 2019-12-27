@@ -5,13 +5,54 @@ open Bformula
 open Formula
 
 (* The generic type for hypothesis, with arbtitry type of formulas and tag. *)
-type ('a, 'b) hypothesis = {
+
+module H : sig
+
+  type ('a, 'b) hypothesis = {
   name_prefix : string;
   name_suffix : int;
   tag :  'a;
   hypothesis : 'b;
   visible : bool;
 }
+
+  val name : ('a, 'b) hypothesis -> string
+
+  exception Non_existing_hypothesis
+
+  type ('a, 'b) hypotheses
+
+  val empty :  ('a, 'b) hypotheses
+
+  val select_and_update : ('a, 'b) hypotheses
+    -> string -> ('a -> 'a)
+    -> ('a, 'b) hypothesis * ('a, 'b) hypotheses
+
+  val to_list : ('a, 'b) hypotheses -> ('a, 'b) hypothesis list
+
+  val add : bool ->
+    'a -> 'b -> string -> ('a, 'b) hypotheses -> ('a, 'b) hypotheses
+
+  val mem : 'b -> ('a, 'b) hypotheses -> bool
+
+  val find : string -> ('a, 'b) hypotheses -> ('a, 'b) hypothesis
+
+  val pp : (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> ('b, 'a) hypothesis -> unit
+
+  val pps : (Format.formatter -> 'a -> unit) ->
+    Format.formatter -> ('b, 'a) hypotheses -> unit
+
+end = struct
+
+  type ('a, 'b) hypothesis = {
+  name_prefix : string;
+  name_suffix : int;
+  tag :  'a;
+  hypothesis : 'b;
+  visible : bool;
+}
+
 
 let name hypo =
   Fmt.strf "%s%i" hypo.name_prefix hypo.name_suffix
@@ -20,14 +61,14 @@ exception Non_existing_hypothesis
 
 module M = Map.Make(String)
 
-
 (* A set of hypotheses is made of two maps. One maps hypothesis names
    (according to [name]) to variables, and the second maps
    name prefixes to the current largest name_suffix for this
    name_prefix. *)
 type ('a, 'b) hypotheses = ((('a,'b) hypothesis) M.t * int M.t)
 
-let empty_hypotheses =  (M.empty,M.empty)
+
+let empty =  (M.empty,M.empty)
 
 let select_and_update (e1,e2) name update =
   try
@@ -35,7 +76,7 @@ let select_and_update (e1,e2) name update =
     (hypo, (M.add name { hypo with tag = update hypo.tag } e1,e2))
   with Not_found -> raise Non_existing_hypothesis
 
-let add_hypothesis visible tag hypo name_prefix (e1,e2) : ('a, 'b) hypotheses =
+let add visible tag hypo name_prefix (e1,e2) : ('a, 'b) hypotheses =
   let name_suffix =
     try
       (M.find name_prefix e2) + 1
@@ -50,23 +91,26 @@ let add_hypothesis visible tag hypo name_prefix (e1,e2) : ('a, 'b) hypotheses =
   in
   (M.add (name v) v e1, M.add name_prefix name_suffix e2)
 
-let hypotheses_to_list (e1,e2) =
+let to_list (e1,e2) =
   let r1,r2 = M.bindings e1 |> List.split in
   r2
 
-let mem_hypotheses f hs =
-  hypotheses_to_list hs
+let mem f hs =
+  to_list hs
   |> List.exists (fun hypo -> hypo.hypothesis = f)
 
-let find_hypotheses id hs = M.find id (fst hs)
+let find id hs = M.find id (fst hs)
 
-let pp_hypothesis pp_formula ppf hypo =
+let pp pp_formula ppf hypo =
   Fmt.pf ppf "%s: %a@;" (name hypo) pp_formula hypo.hypothesis
 
-let pp_hypotheses pp_formula ppf hs =
+let pps pp_formula ppf hs =
   List.iter
-    (fun h -> if h.visible then pp_hypothesis pp_formula ppf h)
-    (hypotheses_to_list hs)
+    (fun h -> if h.visible then pp pp_formula ppf h)
+    (to_list hs)
+
+
+end
 
 type message_hypothesis_tag = { t_euf : bool}
 
@@ -74,11 +118,11 @@ type trace_tag = unit
 
 type formula_tag = unit
 
-type message_hypothesis = (message_hypothesis_tag, term_atom) hypothesis
+type message_hypothesis = (message_hypothesis_tag, term_atom) H.hypothesis
 
-type message_hypotheses = (message_hypothesis_tag, term_atom) hypotheses
-type trace_hypotheses = (trace_tag, trace_formula) hypotheses
-type formula_hypotheses = (formula_tag, formula) hypotheses
+type message_hypotheses = (message_hypothesis_tag, term_atom) H.hypotheses
+type trace_hypotheses = (trace_tag, trace_formula) H.hypotheses
+type formula_hypotheses = (formula_tag, formula) H.hypotheses
 
 type t = {
   env : Vars.env;
@@ -117,9 +161,9 @@ let pp ppf s =
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp_timestamp)
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
-  pp_hypotheses pp_term_atom ppf s.message_hypotheses ;
-  pp_hypotheses pp_trace_formula ppf s.trace_hypotheses ;
-  pp_hypotheses pp_formula ppf s.formula_hypotheses ;
+  H.pps pp_term_atom ppf s.message_hypotheses ;
+  H.pps pp_trace_formula ppf s.trace_hypotheses ;
+  H.pps pp_formula ppf s.formula_hypotheses ;
   (* Print separation between hypotheses and conclusion *)
   styled `Bold ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
@@ -128,9 +172,9 @@ let pp ppf s =
 let init_sequent = {
   env = Vars.empty_env;
   happens_hypotheses = [];
-  message_hypotheses = empty_hypotheses;
-  trace_hypotheses =  empty_hypotheses ;
-  formula_hypotheses = empty_hypotheses;
+  message_hypotheses = H.empty;
+  trace_hypotheses =  H.empty ;
+  formula_hypotheses = H.empty;
   conclusion = Formula.True;
   trs = None;
   models = None;
@@ -138,32 +182,32 @@ let init_sequent = {
 
 let is_hypothesis f s =
   match formula_to_trace_formula f with
-  | Some tf -> mem_hypotheses tf s.trace_hypotheses
+  | Some tf -> H.mem tf s.trace_hypotheses
   | None ->
     match f with
-    | Atom (Message at) -> mem_hypotheses at s.message_hypotheses
+    | Atom (Message at) -> H.mem at s.message_hypotheses
     | Atom (Happens t) -> List.mem t s.happens_hypotheses
-    | _ ->  mem_hypotheses f s.formula_hypotheses
+    | _ ->  H.mem f s.formula_hypotheses
 
 let get_hypothesis id s =
-  try (find_hypotheses id s.formula_hypotheses).hypothesis with Not_found ->
+  try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
-      Atom (Message (find_hypotheses id s.message_hypotheses).hypothesis)
+      Atom (Message (H.find id s.message_hypotheses).H.hypothesis)
     with Not_found ->
       Formula.bformula_to_foformula
         (fun x -> Formula.Constraint x)
-        (find_hypotheses id s.trace_hypotheses).hypothesis
+        (H.find id s.trace_hypotheses).H.hypothesis
 
 let select_message_hypothesis name s update =
   try
-    let (hypo, hs) = select_and_update s.message_hypotheses name update in
-    ({s with message_hypotheses = hs}, hypo.hypothesis)
-  with Non_existing_hypothesis -> raise Not_found
+    let (hypo, hs) = H.select_and_update s.message_hypotheses name update in
+    ({s with message_hypotheses = hs}, hypo.H.hypothesis)
+  with H.Non_existing_hypothesis -> raise Not_found
 
 
 let add_trace_formula ?(prefix="T") tf s =
   { s with
-    trace_hypotheses = add_hypothesis true () tf prefix s.trace_hypotheses;
+    trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;
     models = None }
 
 class iter_macros f = object (self)
@@ -193,11 +237,11 @@ let rec add_macro_defs s at =
       !macro_eqs
 
 and add_message_hypothesis ?(prefix="M") s at =
-  if mem_hypotheses at s.message_hypotheses then s else
+  if H.mem at s.message_hypotheses then s else
     let s =
       { s with
         message_hypotheses =
-          add_hypothesis true {t_euf = false} at prefix s.message_hypotheses;
+          H.add true {t_euf = false} at prefix s.message_hypotheses;
         trs = None }
     in
     add_macro_defs s at
@@ -227,7 +271,7 @@ and add_formula ?prefix f s =
     | _ ->
         let prefix = match prefix with Some p -> p | None -> "H" in
         { s with formula_hypotheses =
-                   add_hypothesis true () f prefix s.formula_hypotheses }
+                   H.add true () f prefix s.formula_hypotheses }
 
 let get_eqs_neqs_at_list atl =
   List.map norm_xatom atl
@@ -237,7 +281,7 @@ let get_eqs_neqs_at_list atl =
 
 let get_eqs_neqs s =
   let eqs, _, neqs = get_eqs_neqs_at_list
-      (List.map (fun h -> h.hypothesis) (hypotheses_to_list s.message_hypotheses))
+      (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
   in
   eqs,neqs
 
@@ -282,7 +326,7 @@ let get_conclusion s = s.conclusion
  * atom. *)
 let make_trace_formula s =
  let trace_hypotheses =
-   List.map (fun h -> h.hypothesis) (hypotheses_to_list s.trace_hypotheses)
+   List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
  in
  List.fold_left
    (fun acc h -> Bformula.And (h,acc))
@@ -319,7 +363,7 @@ let constraints_valid s =
 
 let get_all_terms s =
   let atoms =
-    List.map (fun h -> h.hypothesis) (hypotheses_to_list s.message_hypotheses)
+    List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses)
   in
   let atoms =
     match s.conclusion with
