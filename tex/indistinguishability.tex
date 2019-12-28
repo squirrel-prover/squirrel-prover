@@ -1,0 +1,108 @@
+\section{Indistinguishability}
+
+Now equipped with a logic to reason about reachability properties, we turn ourself to proving general indistinguishability. We consider the case of bi-processes, where the set of actions available on both side is the same, but the actions may differ inside their terms. Thus, a bi-process is simply a protocol, where each action $\alpha$ has two versions, on for the left and on for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each possible trace $\tr$ of the protocol, there exists then the two versions $\tr^L$ and $\tr^R$.
+
+
+We first define the frame corresponding to a trace.
+\begin{definition}
+  Given a trace $\tr = \alpha_1,\dots,\alpha_n$, we define its frame $\mouts_\tr = \hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)$ as  the sequence of outputs produced by the trace.
+\end{definition}
+
+We can now define diff-equivalence for bi-processes. Essentialy, for each trace such that it can happen with non negligible probabilities, the left and right frames must be indistinguishable.
+
+\begin{definition}
+  A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol,
+  we have $\M \models \myif (\phi_{\tr^L})^{I_{\tr^L}} \mythen (\mouts_{\tr^L})^{I_{\tr^L}} \sim   \myif (\phi_{\tr^R})^{I_{\tr^R}} \mythen (\mouts_{\tr^R})^{I_{\tr^R}} $.
+\end{definition}
+
+To reason about those properties, we once again try to define a well-suited logic.
+\begin{definition}
+  A sequent $\Gamma \vDash t^L \sim t^R $ is composed of a set of meta-logic formulas
+  $\Gamma$ and sequences of terms $t^L,t^R$.
+  It is valid when, for any meta-interpretation $I$ and computational model $\M$, $\M \models \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^L \sim  \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^R $
+\end{definition}
+
+
+We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
+
+\begin{figure}
+  \begin{mathpar}
+    \inferrule[Expand]{\Gamma \vDash t^L \sim t^R}{\Gamma \cup \phi \vDash t^L \sim t^R}
+    \quad\quad
+    \inferrule[Cut]{
+      \Gamma \vDash t^L \sim t^R
+      \quad
+      \Gamma \vDash t^R \sim t^S
+    }{\Gamma \vDash t^L \sim t^S}
+  \end{mathpar}
+  \begin{mathpar}
+  \inferrule[\myif-R]{
+\Gamma \vDash \myif \phi \mythen t^L \sim \myif \phi \mythen t^R
+  }{
+ \Gamma \cup \phi \vDash t^L \sim t^R
+  }
+  \quad\quad
+  \inferrule[\myif-L]{
+ \Gamma \cup \phi \vDash t^L \sim t^R
+  }{
+\Gamma \vDash \myif \phi \mythen t^L \sim \myif \phi \mythen t^R
+  }
+  \end{mathpar}
+  \begin{mathpar}
+    \inferrule[${\lnot}$-R]{
+      \Gamma \vdash \bot
+    }{
+      \Gamma \vDash t^L \sim t^R
+    }
+    \quad\quad
+    \inferrule[fresh]{
+n,m \not \in \Gamma
+    }{
+      \Gamma \vDash n \sim m
+    }
+    \quad\quad
+    \inferrule[Subst]{
+      \Gamma \cup \{\EQ(t_1,t_2) \}  \vDash t^L \sim t^R
+    }{
+      \Gamma \cup \{\EQ(t_1,t_2) \} \vDash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
+    }
+  \end{mathpar}
+  \begin{mathpar}
+  \inferrule[F-Cut]{
+    \Gamma \vdash \phi
+    \quad
+    \Gamma \cup \phi \vDash t^1 \sim t^2
+  }{
+ \Gamma \vDash t^L \sim t^R
+  }
+  \quad\quad
+  \inferrule[Dup]{
+ \Gamma \vDash t^L,u \sim t^R,v
+  }{
+ \Gamma \vDash t^L,u,u \sim t^R,v,v
+  }
+  \end{mathpar}
+
+
+   \caption{Generic inference rules for indistinguishability}
+   \label{fig:lk-ind}
+\end{figure}
+
+
+
+We also give a small Lemma, which allows to reason on the traces in an incremental way.
+
+\begin{lemma}
+  A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol, and any available action $\alpha$,
+\[\phi_{\tr^L} \vDash
+\begin{array}[t]{l}
+    \myif (\phi_{\alpha^L})^{I_{\tr^L \cdot \alpha^L}} \mythen (\mouts_{\tr^L\cdot \alpha^L})^{I_{\tr^L\cdot \alpha^L}}
+    \\ \qquad
+    \sim  \myif (\phi_{\alpha^R})^{I_{\tr^L \cdot \alpha^R}} \mythen (\mouts_{\tr^L\cdot \alpha^R})^{I_{\tr^L\cdot \alpha^R}} \end{array}\]
+
+\end{lemma}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
