@@ -69,6 +69,9 @@ let get_name_prefix name =
   | s, None -> raise Not_found
   | s, Some u -> s,u
 
+let get_visible hs =
+  List.filter (fun h -> h.visible) hs
+
 let select_and_update hs name update =
   let rec aux id hsacc =
     match hsacc with
@@ -83,7 +86,7 @@ let select_and_update hs name update =
   in
   let name_prefix,_ = get_name_prefix name in
   let hs_list = M.find name_prefix hs in
-  let res,new_hs_list = aux 0 (List.rev hs_list) in
+  let res,new_hs_list = aux 0 (List.rev (get_visible hs_list)) in
   (res, M.add name_prefix new_hs_list hs)
 
 let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
@@ -124,8 +127,8 @@ let pp pp_formula id ppf hypo =
 let pps pp_formula ppf hs =
   M.iter (fun name hs_list ->
   List.iteri
-    (fun i h -> if h.visible then pp pp_formula i ppf h)
-    (List.rev hs_list)) hs
+    (fun i h -> pp pp_formula i ppf h)
+    (List.rev (get_visible hs_list))) hs
 end
 
 type message_hypothesis_tag = { t_euf : bool}
