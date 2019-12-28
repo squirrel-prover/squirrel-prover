@@ -44,7 +44,7 @@ val reset_state : int -> prover_mode
 (** {2 Tactics syntax trees} *)
 
 type tac_arg =
-  | Goal_name of string
+  | String_name of string
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
@@ -59,12 +59,13 @@ exception Tactic_Soft_Failure of string
 (** Placeholder for tactics on judgments *)
 module Prover_tactics : sig
   type tac = Sequent.t Tactics.tac
-  val register_general : string -> (tac_arg list -> tac) -> unit
-  val register : string -> tac -> unit
-  val register_int : string -> (int -> tac) -> unit
-  val register_formula : string -> (formula -> tac) -> unit
-  val register_fname : string -> (fname -> tac) -> unit
-  val register_macro : string -> AST.t -> unit
+
+  val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
+  val register : string -> ?help:string -> tac -> unit
+  val register_int : string -> ?help:string -> (int -> tac) -> unit
+  val register_formula : string -> ?help:string -> (formula -> tac) -> unit
+  val register_fname : string -> ?help:string -> (fname -> tac) -> unit
+  val register_macro : string -> ?help:string -> AST.t -> unit
 end
 
 (** {2 Utilities for parsing} *)

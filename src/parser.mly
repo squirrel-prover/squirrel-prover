@@ -13,7 +13,7 @@
 %token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL DARROW AXIOM
 %token DOT
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP
 %token PROOF QED UNDO
 %token EOF
 
@@ -242,10 +242,18 @@ tac:
 
   | APPLY i=ID                        { Prover.AST.Abstract
                                           ("apply",
-                                           [Prover.Goal_name i]) }
+                                           [Prover.String_name i]) }
   | APPLY i=ID TO t=tactic_params     { Prover.AST.Abstract
                                           ("apply",
-                                           Prover.Goal_name i :: t) }
+                                           Prover.String_name i :: t) }
+  | HELP                              { Prover.AST.Abstract
+                                          ("help",
+                                           []) }
+
+  | HELP i=ID                         { Prover.AST.Abstract
+                                          ("help",
+                                           [Prover.String_name i]) }
+
   | EXISTS t=tactic_params            { Prover.AST.Abstract ("exists",t) }
 
 

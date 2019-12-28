@@ -81,6 +81,7 @@ rule token = parse
 | "Proof."            { PROOF }
 | "Qed."              { QED }
 | "apply"             { APPLY }
+| "help"              { HELP }
 | "to"                { TO }
 | "cycle"             { CYCLE }
 | "undo"              { UNDO }
@@ -98,5 +99,3 @@ and comment = parse
   | "\n"     { new_line lexbuf; comment lexbuf }
   | eof         { unterminated_comment () }
   | _           { comment lexbuf }
-
-

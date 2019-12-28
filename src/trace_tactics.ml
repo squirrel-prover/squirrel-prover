@@ -20,15 +20,22 @@ let goal_or_right_2 (s : Sequent.t) sk fk =
   | (Or (_, rformula)) -> sk [Sequent.set_conclusion (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-let () = T.register "left" goal_or_right_1
-let () = T.register "right" goal_or_right_2
+let () = T.register "left"
+    ~help:"Reduce a goal with a disjunction conclusion into the goal
+where the conclusion has been replaced with the first disjunct."
+    goal_or_right_1
+let () = T.register "right"
+    ~help:"Reduce a goal with a disjunction conclusion into the goal
+where the conclusion has been replace with the second disjunct."
+    goal_or_right_2
 
 let goal_true_intro (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
-let () = T.register "true" goal_true_intro
+let () = T.register "true" ~help:"Concludes if the goal is true."
+    goal_true_intro
 
 let goal_and_right (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
@@ -37,7 +44,10 @@ let goal_and_right (s : Sequent.t) sk fk =
          Sequent.set_conclusion (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
-let () = T.register "split" goal_and_right
+let () = T.register "split"
+    ~help:"Split a conjunction conclusion,
+creating one subgoal per conjunct."
+    goal_and_right
 
 (** Compute the goal resulting from the addition of a list of
   * formulas as hypotheses,
@@ -101,7 +111,10 @@ let goal_intro (s : Sequent.t) sk fk =
             "Can only introduce implication, universal quantifications
              and disequality conclusions.")
 
-let () = T.register "intro" goal_intro
+let () = T.register "intro"
+    ~help:"Performs one introduction, either of a forall
+    quantifier or an implication."
+    goal_intro
 
 (** Quantifiers *)
 
@@ -115,6 +128,9 @@ let goal_exists_intro ths (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "exists"
+    ~help:"Introduces the existentially
+quantified variables in the conclusion of the judgment,
+using the arguments as existential witnesses. Usage : exists t_1, t_2."
     (fun l ->
        let ths =
          List.map
@@ -133,8 +149,10 @@ let () =
       Abstract ("true",[]) ]
   in
   T.register_macro "intros"
+    ~help:"Repeat intro."
     (Repeat (OrElse non_branching_intro)) ;
   T.register_macro "anyintro"
+    ~help:"Try any possible introduction."
     (OrElse
        (Abstract ("split",[]) :: non_branching_intro))
 
@@ -169,7 +187,9 @@ let induction s sk fk =
                 "Conclusion must be an \
                  universal quantification over a timestamp"
 
-let () = T.register "induction" induction
+let () = T.register "induction"
+    ~help:"Apply the induction scheme to the given formula."
+    induction
 
 (** Reasoning over constraints and messages *)
 
@@ -183,9 +203,13 @@ let congruence (s : Sequent.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
 
-let () = T.register "congruence" congruence
+let () = T.register "congruence"
+    ~help:"Tries to derive false from the messages equalities."
+    congruence
 
-let () = T.register "constraints" constraints
+let () = T.register "constraints"
+    ~help:"Tries to derive false from the trace formulas."
+    constraints
 
 let assumption (s : Sequent.t) sk fk =
   if Sequent.is_hypothesis (Sequent.get_conclusion s) s then
@@ -193,7 +217,9 @@ let assumption (s : Sequent.t) sk fk =
   else
     fk (Tactics.Failure "Conclusion is not an hypothesis")
 
-let () = T.register "assumption" assumption
+let () = T.register "assumption"
+    ~help:"Search for the conclusion inside the Hypothesis."
+    assumption
 
 (** Utils *)
 
@@ -233,7 +259,10 @@ let eq_names (s : Sequent.t) sk fk =
   in
   sk [s] fk
 
-let () = T.register "eqnames" eq_names
+let () = T.register "eqnames"
+    ~help:" Add index constraints resulting from names equalities, modulo the
+known equalities."
+    eq_names
 
 let eq_constants fn (s : Sequent.t) sk fk =
   let s,trs = Sequent.get_trs s in
@@ -248,7 +277,9 @@ let eq_constants fn (s : Sequent.t) sk fk =
   in
   sk [s] fk
 
-let () = T.register_fname "eqconstants" eq_constants
+let () = T.register_fname "eqconstants"
+    ~help:"Add terms constraints resulting from timestamp equalities."
+    eq_constants
 
 let eq_timestamps (s : Sequent.t) sk fk =
   let ts_classes = Sequent.get_ts_equalities s
@@ -281,7 +312,9 @@ let eq_timestamps (s : Sequent.t) sk fk =
   in
   sk [s] fk
 
-let () = T.register "eqtimestamps" eq_timestamps
+let () = T.register "eqtimestamps"
+    ~help:"Add terms constraints resulting from timestamp equalities."
+    eq_timestamps
 
 (** EUF Axioms *)
 
@@ -367,6 +400,7 @@ let euf_apply hypothesis_name (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "euf"
+    ~help:"euf H -> applies the euf axiom to the given hypothesis name."
     (function
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
@@ -401,8 +435,10 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "apply"
+    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its
+universally quantified variables instantied with t1,..."
     (function
-      | Prover.Goal_name id :: th_terms ->
+      | Prover.String_name id :: th_terms ->
           let th_terms =
             List.map
               (function
@@ -419,7 +455,9 @@ let tac_assert f s sk fk =
   sk [s1 ;s2] fk
 
 let () =
-  T.register_formula "assert" tac_assert
+  T.register_formula "assert"
+    ~help:"Add an assumption to the set of hypothesis."
+    tac_assert
 
 let collision_resistance (s : Sequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
@@ -468,4 +506,7 @@ let collision_resistance (s : Sequent.t) sk fk =
       sk [s] fk
     end
 
-let () = T.register "collision" collision_resistance
+let () = T.register "collision"
+    ~help:"Collects all equalities between hashes, and affs the equalities of the
+messages hashed with the same valid key."
+    collision_resistance

@@ -63,7 +63,7 @@ let rec reset_state n =
  * as visible in the parser: TODO we should probably just take a list
  * of terms and let the tactic process it. *)
 type tac_arg =
-  | Goal_name of string
+  | String_name of string
   | Formula of Formula.formula
   | Function_name of fname
   | Int of int
@@ -77,64 +77,83 @@ module rec Prover_tactics : sig
 
   type tac = Sequent.t Tactics.tac
 
-  val register_general : string -> (tac_arg list -> tac) -> unit
-  val register : string -> tac -> unit
-  val register_int : string -> (int -> tac) -> unit
-  val register_formula : string -> (formula -> tac) -> unit
-  val register_fname : string -> (fname -> tac) -> unit
-  val register_macro : string -> AST.t -> unit
+  val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
+  val register : string -> ?help:string -> tac -> unit
+  val register_int : string -> ?help:string -> (int -> tac) -> unit
+  val register_formula : string -> ?help:string -> (formula -> tac) -> unit
+  val register_fname : string -> ?help:string -> (fname -> tac) -> unit
+  val register_macro : string -> ?help:string -> AST.t -> unit
 
   val get : string -> tac_arg list -> tac
 
+  val pp : Format.formatter -> string -> unit
+  val pps : Format.formatter -> unit -> unit
 end = struct
+
 
   type tac = Sequent.t Tactics.tac
 
+  type tac_infos = {
+    maker : tac_arg list -> tac;
+    help : string
+  }
+
   let table :
-    (string, tac_arg list -> tac) Hashtbl.t =
+    (string, tac_infos) Hashtbl.t =
     Hashtbl.create 97
 
   let get id =
-    try Hashtbl.find table id with
+    try (Hashtbl.find table id).maker with
       | Not_found -> failwith (Printf.sprintf "unknown tactic %S" id)
 
-  let register_general id f =
+  let register_general id ?(help="") f =
     assert (not (Hashtbl.mem table id)) ;
-    Hashtbl.add table id f
+    Hashtbl.add table id { maker = f ; help = help}
 
-  let register id f =
-    register_general id
+  let register id ?(help="") f =
+    register_general id ~help:help
       (fun args j sk fk ->
          if args = [] then f j sk fk else
            raise @@
            Tactics.Tactic_Hard_Failure "this tactic does not take arguments")
 
-  let register_int id f =
-    register_general id
+  let register_int id ?(help="") f =
+    register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Int x] -> f x j sk fk
          | _ ->
              raise @@
              Tactics.Tactic_Hard_Failure "int argument expected")
 
-  let register_formula id f =
-    register_general id
+  let register_formula id ?(help="") f =
+    register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Formula x] -> f x j sk fk
          | _ ->
              raise @@
              Tactics.Tactic_Hard_Failure "formula argument expected")
 
-  let register_fname id f =
-    register_general id
+  let register_fname id ?(help="") f =
+    register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Function_name x] -> f x j sk fk
          | _ ->
              raise @@
              Tactics.Tactic_Hard_Failure "function name argument expected")
 
-  let register_macro id m = Prover_tactics.register id (AST.eval m)
+  let register_macro id ?(help="") m = Prover_tactics.register
+      id ~help:help (AST.eval m)
 
+  let pp fmt id =
+    let help_text =
+      try (Hashtbl.find table id).help with
+      | Not_found -> failwith (Printf.sprintf "unknown tactic %S" id)
+    in
+    Fmt.pf fmt "@[<v 0>- %s - @. %s@]@." id help_text
+
+  let pps fmt () =
+    Hashtbl.iter (fun name tac -> Fmt.pf fmt "@.@[<v 0>- %s - @. %s@]@."
+                     name tac.help) table
 end
 
 and AST :
@@ -147,7 +166,7 @@ and AST :
 
   let pp_arg ppf = function
     | Int i -> Fmt.int ppf i
-    | Goal_name s -> Fmt.string ppf s
+    | String_name s -> Fmt.string ppf s
     | Function_name fname -> pp_fname ppf fname
     | Formula formula -> pp_formula ppf formula
     | Theory th -> Theory.pp_term ppf th
@@ -157,18 +176,33 @@ and AST :
 
   let pp_abstract ~pp_args s args ppf =
     match s,args with
-      | "apply",[Goal_name id] ->
+      | "apply",[String_name id] ->
           Fmt.pf ppf "apply %s" id
-      | "apply", Goal_name id :: l ->
+      | "apply", String_name id :: l ->
           let l = List.map (function Theory t -> t | _ -> assert false) l in
           Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp_term) l
       | _ -> raise Not_found
 
 end)
 
+let get_help tac_name =
+  if tac_name = "" then
+    Fmt.pr "@[[result> @. %a @.@]@." Prover_tactics.pps ()
+  else
+    Fmt.pr "@[[result> @. %a @.@]@." Prover_tactics.pp tac_name;
+  Tactics.id
+
 let () =
-  Prover_tactics.register "admit" (fun j sk fk -> sk [] fk) ;
-  Prover_tactics.register "id" Tactics.id
+  Prover_tactics.register "admit"
+    ~help:"Closes the current goal."
+    (fun j sk fk -> sk [] fk) ;
+  Prover_tactics.register_general "help"
+    ~help:"Display all available commands."
+    (function
+      | [] -> get_help ""
+      | [String_name tac_name]-> get_help tac_name
+      | _ ->  raise @@ Tactics.Tactic_Hard_Failure "improper arguments" ) ;
+  Prover_tactics.register "id" ~help:"Identity." Tactics.id
 
 exception Return of Sequent.t list
 

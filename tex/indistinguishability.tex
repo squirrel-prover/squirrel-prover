@@ -17,9 +17,9 @@ We can now define diff-equivalence for bi-processes. Essentialy, for each trace 
 
 To reason about those properties, we once again try to define a well-suited logic.
 \begin{definition}
-  A sequent $\Gamma \vDash t^L \sim t^R $ is composed of a set of meta-logic formulas
-  $\Gamma$ and sequences of terms $t^L,t^R$.
-  It is valid when, for any meta-interpretation $I$ and computational model $\M$, $\M \models \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^L \sim  \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^R $
+  A sequent $\Delta, \Gamma \vDash t^L \sim t^R $ is composed of a set of meta-logic formulas
+  $\Gamma$, a set of indistinguishability $\Delta$, and sequences of terms $t^L,t^R$.
+  It is valid when, for any meta-interpretation $I$ and computational model $\M$, $\M, \Delta \models \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^L \sim  \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^R $
 \end{definition}
 
 
@@ -27,7 +27,9 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
 
 \begin{figure}
   \begin{mathpar}
-    \inferrule[Expand]{\Gamma \vDash t^L \sim t^R}{\Gamma \cup \phi \vDash t^L \sim t^R}
+    \inferrule[Expand]{\Gamma \vDash t^L \sim t^R
+\quad
+    }{\Gamma \cup \phi \vDash t^L \sim t^R}
     \quad\quad
     \inferrule[Cut]{
       \Gamma \vDash t^L \sim t^R
@@ -71,7 +73,7 @@ n,m \not \in \Gamma
   \inferrule[F-Cut]{
     \Gamma \vdash \phi
     \quad
-    \Gamma \cup \phi \vDash t^1 \sim t^2
+    \Gamma \cup \phi \vDash t^L \sim t^R
   }{
  \Gamma \vDash t^L \sim t^R
   }
@@ -87,7 +89,11 @@ n,m \not \in \Gamma
    \caption{Generic inference rules for indistinguishability}
    \label{fig:lk-ind}
 \end{figure}
+\begin{lemma}
+The rules presented in
 
+
+\end{lemma}
 
 
 We also give a small Lemma, which allows to reason on the traces in an incremental way.

@@ -66,6 +66,7 @@
 ;; proof-shell-strip-crs-from-input nil
 
  proof-shell-error-regexp "\\[error>"
+ proof-shell-result-regexp "\\[result>"
  proof-shell-annotated-prompt-regexp "\\[>"
  proof-shell-eager-annotation-start "\\[start>"
 

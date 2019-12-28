@@ -33,7 +33,9 @@ goal unforgeable_1 :
   output@A(b) <> h(na(a),k).
 
 Proof.
-  collision.
+ help left.
+ help.
+ collision.
 Qed.
 
 goal unforgeable_2 :
