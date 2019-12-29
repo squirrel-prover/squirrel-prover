@@ -50,7 +50,6 @@ val eq_names : tac
 
 (** Add terms constraints resulting from timestamp equalities. *)
 val eq_timestamps : tac
-val eq_constants : Term.fname -> tac
 
 (** {2 Advanced tactics} *)
 

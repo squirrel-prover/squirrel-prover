@@ -299,23 +299,6 @@ let () = T.register "eqnames"
 known equalities."
     eq_names
 
-let eq_constants fn (s : Sequent.t) sk fk =
-  let s,trs = Sequent.get_trs s in
-  let cnstrs =
-    Completion.constant_index_cnstrs fn trs
-      (Sequent.get_all_terms s)
-  in
-  let s =
-    List.fold_left (fun s c ->
-        Sequent.add_trace_formula c s
-      ) s cnstrs
-  in
-  sk [s] fk
-
-let () = T.register_fname "eqconstants"
-    ~help:"Add terms constraints resulting from timestamp equalities."
-    eq_constants
-
 let eq_timestamps (s : Sequent.t) sk fk =
   let ts_classes = Sequent.get_ts_equalities s
                    |> List.map (List.sort_uniq Pervasives.compare)
