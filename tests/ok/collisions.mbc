@@ -9,10 +9,6 @@ name nb : index -> message
 name nc : index -> message
 name mc : index -> message
 
-axiom name_not_pair :
-forall (ma : message, mb : message, a:index),
-na(a) <>  <ma, mb>
-
 system O: out(ch,cst); (
     (A: !_a out(ch,h(na(a),k)))
   | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
@@ -43,11 +39,8 @@ goal unforgeable_2 :
   output@B(b) <> h(na(a),k).
 
 Proof.
-  collision.
-  apply name_not_pair to
-  nb(b),
-  nb(b),
-  a.
+ nosimpl(collision).
+eqnames.
 Qed.
 
 
@@ -56,10 +49,6 @@ goal unforgeable_3 :
   output@C(b) <> h(na(a),k).
 
 Proof.
-  collision.
-
-  apply name_not_pair to
-  nc(b),
-  mc(b),
-  a.
+ collision.
+ splitleft H0.
 Qed.

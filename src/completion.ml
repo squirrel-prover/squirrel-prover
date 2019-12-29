@@ -1,7 +1,7 @@
 open Utils
 open Term
 open Bformula
-    
+
 module Cst = struct
   type t =
     (* Constant introduced when flattening *)
@@ -63,6 +63,14 @@ let rec cterm_of_term = function
   | MVar m -> Ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
                       Ccst (Cst.Cmacro (m,ts))
+
+let rec term_of_cterm = function
+  | Cfun (f,cterms) -> Fun (f, List.map term_of_cterm cterms)
+  | Ccst (Cst.Cname n) -> Name n
+  | Ccst (Cst.Cmvar m) -> MVar m
+  | Ccst (Cst.Cmacro (m,ts)) -> Macro (m,[],ts)
+  | _ -> assert false
+
 
 let rec pp_cterm ppf = function
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -589,7 +597,7 @@ end = struct
               ) ((state,acc),[],List.tl ts) ts in
 
           ( state, acc ) in
-    
+
     aux state [] l (fun x -> x)
 
 
@@ -735,7 +743,7 @@ let normalize state u =
   fpt (fun x -> term_uf_normalize state x
                 |> term_grnd_normalize state
                 |> term_e_normalize state) (grp_xor u)
-    
+
 let rec normalize_csts state = function
   | Cfun (fn,ts) -> Cfun (fn, List.map (normalize_csts state) ts)
   | Cvar _ as t -> t
@@ -781,7 +789,7 @@ let rec complete_state state =
   else state
 
 
-let complete_cterms (l : (cterm * cterm) list) : state = 
+let complete_cterms (l : (cterm * cterm) list) : state =
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
       and  eqs', xeqs', b = flatten v in
@@ -798,7 +806,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   |> complete_state
   |> finalize_completion
 
-let complete (l : (term * term) list) : state = 
+let complete (l : (term * term) list) : state =
   List.map (fun (u,v) -> ( cterm_of_term u, cterm_of_term v )) l
   |> complete_cterms
 
@@ -874,6 +882,36 @@ let name_index_cnstrs state l =
   x_index_cnstrs state l
     (function Ccst Cst.Cname _ -> true | _ -> false)
     n_cnstr
+
+
+(* [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
+    rewrite relation in [state], and adds the fact that the name must be equal
+    to one of the name appearing inside the term. *)
+let name_indep_cnstrs state l =
+  let n_cnstr a b = match a,b with
+    | Ccst Cst.Cname (n,is), t | t, Ccst Cst.Cname (n,is) ->
+      let name = Ccst (Cst.Cname (n,is)) in
+      let sub_names = subterms [t]
+                      |> List.filter (function Ccst Cst.Cname _ -> true
+                                             | _ -> false)
+                      |> List.sort_uniq Pervasives.compare
+      in
+      let rec mk_disjunction l =
+        let open Formula in
+        match l with
+        | [] -> True
+        | [p] -> Atom (Message (Eq, term_of_cterm p, term_of_cterm name ))
+        | p::q -> Or(Atom (Message (Eq, term_of_cterm p, term_of_cterm name )),
+                     mk_disjunction q)
+      in
+      [mk_disjunction sub_names]
+    | _ -> [] in
+
+  x_index_cnstrs state l
+    (function f -> is_ground f)
+    n_cnstr
+  |>  List.filter (function Formula.True -> false | _ -> true)
+  |>  List.sort_uniq Pervasives.compare
 
 
 (* [constant_index_cnstrs] is the same as [name_index_cnstrs], but for

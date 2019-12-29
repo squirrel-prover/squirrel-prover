@@ -22,7 +22,7 @@ module H : sig
   val empty :  ('a, 'b) hypotheses
 
   val select_and_update : ('a, 'b) hypotheses
-    -> string -> ('a -> 'a)
+    -> string-> ?pop:bool -> ('a -> 'a)
     -> ('a, 'b) hypothesis * ('a, 'b) hypotheses
 
   val to_list : ('a, 'b) hypotheses -> ('a, 'b) hypothesis list
@@ -72,17 +72,23 @@ let get_name_prefix name =
 let get_visible hs =
   List.filter (fun h -> h.visible) hs
 
-let select_and_update hs name update =
+let select_and_update hs name ?(pop=false) update =
   let rec aux id hsacc =
     match hsacc with
     | [] ->  raise Non_existing_hypothesis
     | p::q ->
+      let new_p,remainder =
       if name = (mk_name p id) then
         let p = { p with tag = update p.tag } in
-        p, p :: q
+        p, q
       else
         let res,l = (aux (id+1) q) in
-        res,p::l
+        res, l
+      in
+      if pop then
+        new_p,remainder
+      else
+        new_p,new_p :: remainder
   in
   let name_prefix,_ = get_name_prefix name in
   let hs_list = M.find name_prefix hs in
@@ -98,7 +104,9 @@ let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
   in
   try
     let hs_list = M.find name_prefix hs in
-    M.add name_prefix (v::hs_list) hs
+    (* we only add the formula if it is a fresh one. *)
+    let res = if List.mem v hs_list then hs_list else v::hs_list in
+    M.add name_prefix res hs
   with Not_found -> M.add name_prefix ([v]) hs
 
 let to_list hs =
@@ -217,11 +225,22 @@ let get_hypothesis id s =
         (fun x -> Formula.Constraint x)
         (H.find id s.trace_hypotheses).H.hypothesis
 
-let select_message_hypothesis name s update =
+let select_message_hypothesis name s ?(pop=false) update =
   try
-    let (hypo, hs) = H.select_and_update s.message_hypotheses name update in
+    let (hypo, hs) = H.select_and_update s.message_hypotheses name ~pop:pop
+        update
+    in
     ({s with message_hypotheses = hs}, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
+
+let select_formula_hypothesis name s ?(pop=false) update =
+  try
+    let (hypo, hs) = H.select_and_update s.formula_hypotheses name ~pop:pop
+        update
+    in
+    ({s with formula_hypotheses = hs}, hypo.H.hypothesis)
+  with H.Non_existing_hypothesis -> raise Not_found
+
 
 
 let add_trace_formula ?(prefix="T") tf s =

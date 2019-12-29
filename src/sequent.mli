@@ -60,13 +60,21 @@ type message_hypothesis_tag = {
     (** Indicates that the euf tactic has been applied to the hypothesis. *)
 }
 
+type formula_tag = unit
+
 (** [select_message_hypothesis name s update] returns the message
    (dis)equality corresponding to the given name inside the hypothesis of [s],
    together with a sequent identical to [s] except that the tag of the
    selected hypothesis has been updated using [update]. *)
 val select_message_hypothesis : string -> sequent ->
+  ?pop:bool ->
   (message_hypothesis_tag -> message_hypothesis_tag) ->
   (sequent * term_atom)
+
+val select_formula_hypothesis : string -> sequent ->
+  ?pop:bool ->
+  (formula_tag -> formula_tag) ->
+  (sequent * formula)
 
 (** {2 Automated reasoning} *)
 

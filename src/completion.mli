@@ -22,6 +22,12 @@ val check_equalities : state -> (term * term) list -> bool
     would contain [i=k] and [j=l]. *)
 val name_index_cnstrs : state -> term list -> trace_formula_atom bformula list
 
+
+(** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
+    rewrite relation in [state], and adds the fact that the name must be equal
+    to one of the name appearing inside the term. *)
+val name_indep_cnstrs : state -> term list -> Formula.formula list
+
 (** [constant_index_cnstrs] is the same as [name_index_cnstrs], but for
     constant function symbols equalities. *)
 val constant_index_cnstrs :

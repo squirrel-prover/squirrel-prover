@@ -23,13 +23,14 @@ Qed.
 goal independency :
   h(n1,k) <> n2.
 Proof.
-  eqnames.
+splitleft H0.
 Qed.
+
 
 goal independency_bis :
  forall (i:index,j:index),
   i <> j =>
   h(m1(i),k) <> m1(j).
 Proof.
-  eqnames.
+splitleft H0.
 Qed.

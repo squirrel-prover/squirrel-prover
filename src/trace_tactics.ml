@@ -78,6 +78,29 @@ let rec left_introductions s = function
   | f :: l -> left_introductions (Sequent.add_formula f s) l
   | [] -> s
 
+
+let left_split hypothesis_name (s : Sequent.t) sk fk =
+  let s, at = Sequent.select_formula_hypothesis hypothesis_name s ~pop:true
+      (fun a->a) in
+  let rec disjunction_to_list f =
+    match f with
+    | Atom a -> [Atom a]
+    | Or(Atom a, f) -> Atom a :: disjunction_to_list f
+    | _ ->  raise @@ Tactics.Tactic_Hard_Failure "Can only be applied to a
+disjunction."
+  in
+  let formulas = disjunction_to_list at in
+  sk (List.map (fun f -> Sequent.add_formula f s ) formulas) fk
+
+let () =
+  T.register_general "splitleft"
+    ~help:"split-left H -> split the given disjunction on the left,
+creating corresponding subgoals."
+    (function
+      | [Prover.Theory (Theory.Var h)] -> left_split h
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+
+
 (** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
   * users that "intro" does not introduce universal quantifiers. *)
@@ -248,6 +271,18 @@ open Bformula
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
 
 let eq_names (s : Sequent.t) sk fk =
+  let s,trs = Sequent.get_trs s in
+  let terms = Sequent.get_all_terms s in
+  (* we start by collecting equalities between names implied by the indep axiom.
+  *)
+  let new_eqs = Completion.name_indep_cnstrs trs terms in
+  let s =
+    List.fold_left (fun judge c ->
+        Sequent.add_formula c s
+      ) s new_eqs
+  in
+  (* we now collect equalities between timestamp implied by equalities between
+     names. *)
   let s,trs = Sequent.get_trs s in
   let cnstrs = Completion.name_index_cnstrs trs
       (Sequent.get_all_terms s)
