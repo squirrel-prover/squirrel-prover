@@ -336,19 +336,15 @@ let () = T.register "eqtimestamps"
 
 (** EUF Axioms *)
 
-(** [modulo_sym f at] applies [f] to [at] modulo symmetry of the equality. *)
-let modulo_sym f at = match at with
-  | (Eq as ord, t1, t2) | (Neq as ord, t1, t2) -> begin match f at with
-      | Some _ as res -> res
-      | None -> f (ord, t2, t1) end
-  | _ -> f at
-
 let euf_param (at : term_atom) = match at with
-  | (Eq, Fun ((hash, _), [m; Name key]), s) ->
+  | (Eq, Fun ((hash, _), [m; Name key]), s)
+  | (Eq, s, Fun ((hash, _), [m; Name key]))->
     if Theory.is_hash hash then
-      Some (hash, key, m, s)
-    else None
-  | _ -> None
+      (hash, key, m, s)
+    else raise @@ Tactic_Hard_Failure
+        "The function symbol is not a hash function."
+  | _ -> raise @@ Tactic_Hard_Failure
+        "Euf can only be applied to hypothesis of the form h(t,k)=m."
 
 let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let open Euf in
@@ -387,34 +383,37 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   (eq, eq_cnstr)
 
 (* TODO : make error reporting for euf more informative *)
-let euf_apply_facts s at = match modulo_sym euf_param at with
-  | None -> raise @@ Tactic_Hard_Failure "bad euf application"
-  | Some p ->
-    let env = Sequent.get_env s in
-    let (hash_fn, (key_n, key_is), mess, sign) = p in
-    let rule = Euf.mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
-    let schemata_premises =
-      List.map (fun case ->
-          let new_f, new_cnstr, new_env = euf_apply_schema s p case in
-          Sequent.add_formula new_f s
-          |> Sequent.add_trace_formula new_cnstr
-          |> Sequent.set_env new_env
-        ) rule.Euf.case_schemata
-    and direct_premises =
-      List.map (fun case ->
-          let new_f, new_cnstr = euf_apply_direct s p case in
-          Sequent.add_formula new_f s
-          |> Sequent.add_trace_formula new_cnstr
-        ) rule.Euf.cases_direct
-    in
-    schemata_premises @ direct_premises
+let euf_apply_facts s at =
+  let p = euf_param at in
+  let env = Sequent.get_env s in
+  let (hash_fn, (key_n, key_is), mess, sign) = p in
+  let rule = Euf.mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let schemata_premises =
+    List.map (fun case ->
+        let new_f, new_cnstr, new_env = euf_apply_schema s p case in
+        Sequent.add_formula new_f s
+        |> Sequent.add_trace_formula new_cnstr
+        |> Sequent.set_env new_env
+      ) rule.Euf.case_schemata
+  and direct_premises =
+    List.map (fun case ->
+        let new_f, new_cnstr = euf_apply_direct s p case in
+        Sequent.add_formula new_f s
+        |> Sequent.add_trace_formula new_cnstr
+      ) rule.Euf.cases_direct
+  in
+  schemata_premises @ direct_premises
+
 
 let set_euf t = { Sequent.t_euf = true }
 
 let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   let s, at = Sequent.select_message_hypothesis hypothesis_name s set_euf in
   (* TODO: need to handle failure somewhere. *)
-  sk (euf_apply_facts s at) fk
+  try
+    sk (euf_apply_facts s at) fk
+  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not satisfy
+the syntactic side condition")
 
 let () =
   T.register_general "euf"
