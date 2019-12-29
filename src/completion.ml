@@ -913,20 +913,6 @@ let name_indep_cnstrs state l =
   |>  List.filter (function Formula.True -> false | _ -> true)
   |>  List.sort_uniq Pervasives.compare
 
-
-(* [constant_index_cnstrs] is the same as [name_index_cnstrs], but for
-    constant function symbols equalities. *)
-let constant_index_cnstrs fcst state l =
-  let f_cnstr a b = match a,b with
-    | Cfun ((_,is),[]), Cfun ((_',is'),[]) ->
-      List.map2 (fun x y -> Atom (Pind (Eq, x, y))) is is'
-    | _ -> assert false in
-
-  x_index_cnstrs state l
-    (function Cfun ((fn,_),[]) -> fn = fcst | _ -> false)
-    f_cnstr
-
-
 (****************)
 (* Tests Suites *)
 (****************)
