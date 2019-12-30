@@ -50,5 +50,5 @@ goal unforgeable_3 :
 
 Proof.
  collision.
- splitleft H0.
+ case H0.
 Qed.

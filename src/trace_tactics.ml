@@ -77,11 +77,9 @@ let rec left_introductions s = function
   | f :: l -> left_introductions (Sequent.add_formula f s) l
   | [] -> s
 
-let timestamp_case th s sk fk =
+let timestamp_case ts s sk fk =
   (* TODO this is currently unsound: we need to check that ts is different
    *   from epsilon, or add corresponding case in formula. *)
-  let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
-  let ts = Theory.convert_ts tsubst th in
   let f = ref False in
   let add_action a =
     let indices =
@@ -104,16 +102,7 @@ let timestamp_case th s sk fk =
   Process.iter_csa add_action ;
   sk [Sequent.add_formula !f s] fk
 
-let () =
-  T.register_general "case"
-    ~help:"case T -> when T is a timestamp variable, \
-           introduce a disjunction hypothesis expressing the various \
-           forms that it could take"
-    (function
-       | [Prover.Theory th] -> timestamp_case th
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
-
-let left_split hypothesis_name (s : Sequent.t) sk fk =
+let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
   let s,f = Sequent.select_formula_hypothesis hypothesis_name s ~remove:true in
   let rec disjunction_to_list acc = function
     | Or (f,g) :: l -> disjunction_to_list acc (f::g::l)
@@ -126,13 +115,29 @@ let left_split hypothesis_name (s : Sequent.t) sk fk =
     Tactics.Tactic_Hard_Failure "Can only be applied to a disjunction." ;
   sk (List.rev_map (fun f -> Sequent.add_formula f s ) formulas) fk
 
+let case th s sk fk =
+  (* if the conversion to a timestamp of the variable is successful, we perform
+     a timestamp_case. If it fails, we try with hypothesis case. *)
+    let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+    match Theory.convert_ts tsubst th with
+    | exception _ ->
+      begin
+        match th with
+        | Theory.Var m -> hypothesis_case m s sk fk
+        | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments"
+      end
+    | ts -> timestamp_case ts s sk fk
+
 let () =
-  T.register_general "splitleft"
-    ~help:"split-left H -> split the given disjunction on the left, \
-           creating corresponding subgoals."
+  T.register_general "case"
+    ~help:"case T -> when T is a timestamp variable, \
+           introduce a disjunction hypothesis expressing the various \
+           forms that it could take. \
+           when T is a disjunction name, split the given disjunction \
+           on the left, creating corresponding subgoals."
     (function
-      | [Prover.Theory (Theory.Var h)] -> left_split h
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+       | [Prover.Theory th] -> case th
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 
 (** Introduce disjunction and implication (with conjunction on its left).

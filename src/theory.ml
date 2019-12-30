@@ -338,6 +338,9 @@ let subst_get_index subst x =
     failwith
       (Printf.sprintf "ill-typed or undefined use of %s as index" x)
 
+let mem_ts_subst subst x =
+  List.mem_assoc x (ts_subst subst)
+
 let subst_get_ts subst x =
   try List.assoc x (ts_subst subst)
   with Not_found ->

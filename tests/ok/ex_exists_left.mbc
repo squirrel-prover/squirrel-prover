@@ -9,7 +9,7 @@ goal forall (x:message),
   (exists y:message, x = f(y)) || x=f(x) =>
   (exists y:message, f(y) = x).
 Proof.
-  splitleft H0.
+  case H0.
   existsleft H0.
   exists y.
   exists x.
