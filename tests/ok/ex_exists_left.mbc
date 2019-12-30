@@ -1,0 +1,16 @@
+abstract f : message->message
+abstract a : message
+
+axiom exists y:message, a = f(y)
+
+system null.
+
+goal forall (x:message),
+  (exists y:message, x = f(y)) || x=f(x) =>
+  (exists y:message, f(y) = x).
+Proof.
+  splitleft H0.
+  existsleft H0.
+  exists y.
+  exists x.
+Qed.

@@ -66,14 +66,16 @@ type formula_tag = unit
    (dis)equality corresponding to the given name inside the hypothesis of [s],
    together with a sequent identical to [s] except that the tag of the
    selected hypothesis has been updated using [update]. *)
-val select_message_hypothesis : string -> sequent ->
-  ?pop:bool ->
-  (message_hypothesis_tag -> message_hypothesis_tag) ->
+val select_message_hypothesis :
+  ?remove:bool ->
+  ?update:(message_hypothesis_tag -> message_hypothesis_tag) ->
+  string -> sequent ->
   (sequent * term_atom)
 
-val select_formula_hypothesis : string -> sequent ->
-  ?pop:bool ->
-  (formula_tag -> formula_tag) ->
+val select_formula_hypothesis :
+  ?remove:bool ->
+  ?update:(formula_tag -> formula_tag) ->
+  string -> sequent ->
   (sequent * formula)
 
 (** {2 Automated reasoning} *)

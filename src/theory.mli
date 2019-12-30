@@ -177,5 +177,7 @@ val convert_vars :
   env ->
   tsubst * Vars.var list
 
+val tsubst_of_env : Vars.env -> tsubst
+
 val parse_subst :
   Vars.env -> Vars.var list -> term list -> Term.subst

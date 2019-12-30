@@ -10,9 +10,7 @@ module T = Prover.Prover_tactics
 
 let goal_or_right_1 (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
-  | (Or (lformula, _)) -> sk
-                            [Sequent.set_conclusion (lformula) s]
-                            fk
+  | (Or (lformula, _)) -> sk [Sequent.set_conclusion (lformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 let goal_or_right_2 (s : Sequent.t) sk fk =
@@ -20,13 +18,14 @@ let goal_or_right_2 (s : Sequent.t) sk fk =
   | (Or (_, rformula)) -> sk [Sequent.set_conclusion (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
-let () = T.register "left"
-    ~help:"Reduce a goal with a disjunction conclusion into the goal
-where the conclusion has been replaced with the first disjunct."
-    goal_or_right_1
-let () = T.register "right"
-    ~help:"Reduce a goal with a disjunction conclusion into the goal
-where the conclusion has been replace with the second disjunct."
+let () =
+  T.register "left"
+    ~help:"Reduce a goal with a disjunction conclusion into the goal \
+           where the conclusion has been replaced with the first disjunct."
+    goal_or_right_1 ;
+  T.register "right"
+    ~help:"Reduce a goal with a disjunction conclusion into the goal \
+           where the conclusion has been replace with the second disjunct."
     goal_or_right_2
 
 let goal_true_intro (s : Sequent.t) sk fk =
@@ -34,8 +33,8 @@ let goal_true_intro (s : Sequent.t) sk fk =
   | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
-let () = T.register "true" ~help:"Concludes if the goal is true."
-    goal_true_intro
+let () =
+  T.register "true" ~help:"Concludes if the goal is true." goal_true_intro
 
 let goal_and_right (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
@@ -44,9 +43,9 @@ let goal_and_right (s : Sequent.t) sk fk =
          Sequent.set_conclusion (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
-let () = T.register "split"
-    ~help:"Split a conjunction conclusion,
-creating one subgoal per conjunct."
+let () =
+  T.register "split"
+    ~help:"Split a conjunction conclusion, creating one subgoal per conjunct."
     goal_and_right
 
 (** Compute the goal resulting from the addition of a list of
@@ -78,24 +77,59 @@ let rec left_introductions s = function
   | f :: l -> left_introductions (Sequent.add_formula f s) l
   | [] -> s
 
+let timestamp_case th s sk fk =
+  (* TODO this is currently unsound: we need to check that ts is different
+   *   from epsilon, or add corresponding case in formula. *)
+  let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+  let ts = Theory.convert_ts tsubst th in
+  let f = ref False in
+  let add_action a =
+    let indices =
+      let env = ref @@ Sequent.get_env s in
+      List.map
+        (fun i -> Vars.make_fresh_from_and_update env i)
+        a.Process.indices
+    in
+    let subst =
+      List.map2 (fun i i' -> Index (i,i')) a.Process.indices indices
+    in
+    let name = TName (subst_action subst a.Process.action) in
+    let case =
+      let at = Atom (Constraint (Bformula.Pts (Bformula.Eq,ts,name))) in
+      let at = subst_formula subst at in
+      if indices = [] then at else Exists (indices,at)
+    in
+    f := match !f with False -> case | _ -> Formula.Or (case,!f)
+  in
+  Process.iter_csa add_action ;
+  sk [Sequent.add_formula !f s] fk
+
+let () =
+  T.register_general "case"
+    ~help:"case T -> when T is a timestamp variable, \
+           introduce a disjunction hypothesis expressing the various \
+           forms that it could take"
+    (function
+       | [Prover.Theory th] -> timestamp_case th
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let left_split hypothesis_name (s : Sequent.t) sk fk =
-  let s, at = Sequent.select_formula_hypothesis hypothesis_name s ~pop:true
-      (fun a->a) in
-  let rec disjunction_to_list f =
-    match f with
-    | Atom a -> [Atom a]
-    | Or(Atom a, f) -> Atom a :: disjunction_to_list f
-    | _ ->  raise @@ Tactics.Tactic_Hard_Failure "Can only be applied to a
-disjunction."
+  let s,f = Sequent.select_formula_hypothesis hypothesis_name s ~remove:true in
+  let rec disjunction_to_list acc = function
+    | Or (f,g) :: l -> disjunction_to_list acc (f::g::l)
+    | f :: l -> disjunction_to_list (f::acc) l
+    | [] -> acc
   in
-  let formulas = disjunction_to_list at in
-  sk (List.map (fun f -> Sequent.add_formula f s ) formulas) fk
+  let formulas = disjunction_to_list [] [f] in
+  if List.length formulas = 1 then
+    raise @@
+    Tactics.Tactic_Hard_Failure "Can only be applied to a disjunction." ;
+  sk (List.rev_map (fun f -> Sequent.add_formula f s ) formulas) fk
 
 let () =
   T.register_general "splitleft"
-    ~help:"split-left H -> split the given disjunction on the left,
-creating corresponding subgoals."
+    ~help:"split-left H -> split the given disjunction on the left, \
+           creating corresponding subgoals."
     (function
       | [Prover.Theory (Theory.Var h)] -> left_split h
       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
@@ -134,9 +168,10 @@ let goal_intro (s : Sequent.t) sk fk =
             "Can only introduce implication, universal quantifications
              and disequality conclusions.")
 
-let () = T.register "intro"
-    ~help:"Performs one introduction, either of a forall
-    quantifier or an implication."
+let () =
+  T.register "intro"
+    ~help:"Performs one introduction, either of a forall \
+           quantifier or an implication."
     goal_intro
 
 (** Quantifiers *)
@@ -151,9 +186,10 @@ let goal_exists_intro ths (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "exists"
-    ~help:"Introduces the existentially
-quantified variables in the conclusion of the judgment,
-using the arguments as existential witnesses. Usage : exists t_1, t_2."
+    ~help:"Introduce the existentially \
+           quantified variables in the conclusion of the judgment,
+           using the arguments as existential witnesses. \
+           Usage : exists t_1, t_2."
     (fun l ->
        let ths =
          List.map
@@ -163,6 +199,31 @@ using the arguments as existential witnesses. Usage : exists t_1, t_2."
            l
        in
        goal_exists_intro ths)
+
+(* TODO exists_left without hypothesis name, select any existential
+ * formula on the left *)
+let exists_left hyp_name s sk fk =
+  let s,f = Sequent.select_formula_hypothesis hyp_name s ~remove:true in
+    match f with
+      | Exists (vs,f) ->
+          let env = ref @@ Sequent.get_env s in
+          let vs' =
+            List.map
+              (fun v -> v, Vars.make_fresh_from_and_update env v)
+              vs
+          in
+          let subst = Term.from_varsubst vs' in
+          let f = subst_formula subst f in
+          let s = Sequent.add_formula f (Sequent.set_env !env s) in
+            sk [s] fk
+      | _ -> fk @@ Tactics.Failure "Improper arguments"
+
+let () =
+  T.register_general "existsleft"
+    ~help:"exists-left H -> introduce existential quantifier in hypothesis H"
+    (function
+      | [Prover.Theory (Theory.Var h)] -> exists_left h
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
 let () =
   let open Prover.AST in
@@ -408,7 +469,8 @@ let euf_apply_facts s at =
 let set_euf t = { Sequent.t_euf = true }
 
 let euf_apply hypothesis_name (s : Sequent.t) sk fk =
-  let s, at = Sequent.select_message_hypothesis hypothesis_name s set_euf in
+  let s, at =
+    Sequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
   (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk

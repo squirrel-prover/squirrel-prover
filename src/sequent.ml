@@ -21,9 +21,10 @@ module H : sig
 
   val empty :  ('a, 'b) hypotheses
 
-  val select_and_update : ('a, 'b) hypotheses
-    -> string-> ?pop:bool -> ('a -> 'a)
-    -> ('a, 'b) hypothesis * ('a, 'b) hypotheses
+  val select_and_update :
+    remove:bool -> update:('a -> 'a) ->
+    ('a, 'b) hypotheses -> string ->
+    ('a, 'b) hypothesis * ('a, 'b) hypotheses
 
   val to_list : ('a, 'b) hypotheses -> ('a, 'b) hypothesis list
 
@@ -72,20 +73,20 @@ let get_name_prefix name =
 let get_visible hs =
   List.filter (fun h -> h.visible) hs
 
-let select_and_update hs name ?(pop=false) update =
+let select_and_update ~remove ~update hs name =
   let rec aux id hsacc =
     match hsacc with
     | [] ->  raise Non_existing_hypothesis
     | p::q ->
       let new_p,remainder =
-      if name = (mk_name p id) then
-        let p = { p with tag = update p.tag } in
-        p, q
-      else
-        let res,l = (aux (id+1) q) in
-        res, l
+        if name = (mk_name p id) then
+          let p = { p with tag = update p.tag } in
+          p, q
+        else
+          let res,l = (aux (id+1) q) in
+          res, l
       in
-      if pop then
+      if remove then
         new_p,remainder
       else
         new_p,new_p :: remainder
@@ -181,7 +182,7 @@ let pp ppf s =
   let open Utils in
   pf ppf "@[<v 0>" ;
   if s.env <> Vars.empty_env then
-    pf ppf "Variables: %a@;" Vars.pp_typed_env s.env ;
+    pf ppf "@[Variables: %a@]@;" Vars.pp_typed_env s.env ;
   (* Print happens hypotheses *)
   if s.happens_hypotheses <> [] then
     pf ppf "@[<hov 2>Executed actions:@ %a@]@;"
@@ -225,23 +226,23 @@ let get_hypothesis id s =
         (fun x -> Formula.Constraint x)
         (H.find id s.trace_hypotheses).H.hypothesis
 
-let select_message_hypothesis name s ?(pop=false) update =
+let id = fun x -> x
+
+let select_message_hypothesis ?(remove=false) ?(update=id) name s =
   try
-    let (hypo, hs) = H.select_and_update s.message_hypotheses name ~pop:pop
-        update
+    let (hypo, hs) =
+      H.select_and_update s.message_hypotheses name ~remove ~update
     in
     ({s with message_hypotheses = hs}, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
 
-let select_formula_hypothesis name s ?(pop=false) update =
+let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
   try
-    let (hypo, hs) = H.select_and_update s.formula_hypotheses name ~pop:pop
-        update
+    let (hypo, hs) =
+      H.select_and_update s.formula_hypotheses name ~remove ~update
     in
     ({s with formula_hypotheses = hs}, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
-
-
 
 let add_trace_formula ?(prefix="T") tf s =
   { s with
