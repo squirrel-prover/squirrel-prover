@@ -35,6 +35,9 @@ module H : sig
 
   val find : string -> ('a, 'b) hypotheses -> ('a, 'b) hypothesis
 
+  val map :  ( ('a, 'b) hypothesis ->  ('a, 'b) hypothesis)
+    -> ('a, 'b) hypotheses -> ('a, 'b) hypotheses
+
   val pp : (Format.formatter -> 'a -> unit) -> int ->
     Format.formatter -> ('b, 'a) hypothesis -> unit
 
@@ -129,6 +132,9 @@ let find name hs =
   let name_prefix,_ = get_name_prefix name in
   let hs_list = M.find name_prefix hs in
   aux 0 hs_list
+
+let map f hs =
+  M.map (fun h -> List.map f h) hs
 
 let pp pp_formula id ppf hypo =
   Fmt.pf ppf "%s: %a@;" (mk_name hypo id) pp_formula hypo.hypothesis
@@ -360,6 +366,34 @@ let init (goal : formula) = set_conclusion goal init_sequent
 
 let get_conclusion s = s.conclusion
 
+let apply_subst subst s =
+  let mess_is_triv m =
+    match m with
+    | (Eq,t1,t2) when t1=t2 -> true
+    | _ -> false
+  in
+  let trace_is_triv (m:trace_formula) : bool =
+    match m with
+    | Atom (Pts (Eq,t1,t2)) when t1=t2 -> true
+    | Atom (Pind (Eq,i1,i2)) when i1=i2 -> true
+    | _ -> false
+  in
+  let apply_hyp_subst f is_triv hypo =
+    let new_formula = f hypo.H.hypothesis in
+    {hypo with H.visible = not(is_triv new_formula);
+               H.hypothesis = new_formula}
+  in
+  {s with
+   message_hypotheses = H.map (apply_hyp_subst (Bformula.subst_term_atom subst)
+                                 mess_is_triv) s.message_hypotheses;
+   trace_hypotheses = H.map (apply_hyp_subst
+                               (Bformula.subst_trace_formula subst)
+                                 trace_is_triv) s.trace_hypotheses;
+   formula_hypotheses = H.map (apply_hyp_subst
+                                 (Formula.subst_formula subst)
+                                 (fun _ -> false)) s.formula_hypotheses;
+   conclusion = Formula.subst_formula subst s.conclusion;
+  }
 (* Return the conjunction of all trace hypotheses, together with
  * the possible negation of the conclusion formula if it is a trace
  * atom. *)
@@ -384,6 +418,10 @@ let compute_models s =
     let models = Constr.models trace_hypotheses in
     { s with models = Some models;}
   | Some m -> s
+
+let get_models s =
+  let s = compute_models s in
+  opt_get s.models
 
 let maximal_elems s tss =
   let s = compute_models s in

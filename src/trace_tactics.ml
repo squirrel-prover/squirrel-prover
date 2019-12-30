@@ -400,6 +400,45 @@ let () = T.register "eqtimestamps"
     ~help:"Add terms constraints resulting from timestamp equalities."
     eq_timestamps
 
+let substitute (v1) (v2) (s : Sequent.t) sk fk=
+  let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+  let subst =
+    match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
+    | ts1,ts2 ->
+      let models = Sequent.get_models s in
+      if Constr.query models [(Pts (Eq,ts1,ts2))] then
+        [TS(ts1,ts2)]
+      else
+        raise @@ Tactic_Hard_Failure "Arguments not equals."
+    | exception _ ->
+      match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
+      | m1,m2 ->
+        let s,trs = Sequent.get_trs s in
+        if Completion.check_equalities trs [(m1,m2)] then
+          [Term(m1,m2)]
+      else
+        raise @@ Tactic_Hard_Failure "Arguments not equals."
+      | exception _ ->
+        match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
+        | i1,i2 ->
+          let models = Sequent.get_models s in
+          if Constr.query models [(Pind (Eq,i1,i2))] then
+            [Index(i1,i2)]
+          else
+            raise @@ Tactic_Hard_Failure "Arguments not equals."
+      | exception _ ->  raise @@ Tactic_Hard_Failure "Improper arguments."
+  in
+  sk [Sequent.apply_subst subst s] fk
+
+let () =
+  T.register_general "substitute"
+    ~help:"substitute to i1, i2 -> if i1=i2 is implied by the sequent, replaces \
+           all occurents of i1 by i2 inside the sequent."
+    (function
+       | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+
+
 (** EUF Axioms *)
 
 let euf_param (at : term_atom) = match at with

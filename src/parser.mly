@@ -232,7 +232,6 @@ tac:
                                           ($1,
                                            [Prover.Formula
                                               (Prover.parse_formula f)]) }
-
   | NOSIMPL t=tac                     { Prover.AST.Modifier
                                           ("nosimpl", t) }
   | CYCLE i=INT                       { Prover.AST.Abstract
@@ -255,7 +254,8 @@ tac:
                                            [Prover.String_name i]) }
 
   | EXISTS t=tactic_params            { Prover.AST.Abstract ("exists",t) }
-
+  | ID TO t=tactic_params                { Prover.AST.Abstract
+                                          ($1,t) }
 
 qed:
 | QED                                 { () }
