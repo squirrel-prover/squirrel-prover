@@ -88,6 +88,11 @@ let rec is_ground = function
   | Cvar _ -> false
   | Cxor ts | Cfun (_, ts) -> List.for_all is_ground ts
 
+let rec no_input = function
+  | Ccst (Cst.Cmacro (m,ts)) when m=Term.in_macro -> false
+  | Ccst _ | Cvar _ -> true
+  | Cxor ts | Cfun (_, ts) -> List.for_all no_input ts
+
 let is_cst = function | Ccst _ -> true | _ -> false
 
 let get_cst = function
@@ -899,7 +904,7 @@ let name_indep_cnstrs state l =
       let rec mk_disjunction l =
         let open Formula in
         match l with
-        | [] -> True
+        | [] -> False
         | [p] -> Atom (Message (Eq, term_of_cterm p, term_of_cterm name ))
         | p::q -> Or(Atom (Message (Eq, term_of_cterm p, term_of_cterm name )),
                      mk_disjunction q)
@@ -908,7 +913,7 @@ let name_indep_cnstrs state l =
     | _ -> [] in
 
   x_index_cnstrs state l
-    (function f -> is_ground f)
+    (function f -> is_ground f && no_input f)
     n_cnstr
   |>  List.filter (function Formula.True -> false | _ -> true)
   |>  List.sort_uniq Pervasives.compare
