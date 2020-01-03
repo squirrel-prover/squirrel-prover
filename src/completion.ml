@@ -88,10 +88,10 @@ let rec is_ground = function
   | Cvar _ -> false
   | Cxor ts | Cfun (_, ts) -> List.for_all is_ground ts
 
-let rec no_input = function
-  | Ccst (Cst.Cmacro (m,ts)) when m=Term.in_macro -> false
+let rec no_macros = function
+  | Ccst (Cst.Cmacro _) -> false
   | Ccst _ | Cvar _ -> true
-  | Cxor ts | Cfun (_, ts) -> List.for_all no_input ts
+  | Cxor ts | Cfun (_, ts) -> List.for_all no_macros ts
 
 let is_cst = function | Ccst _ -> true | _ -> false
 
@@ -913,7 +913,7 @@ let name_indep_cnstrs state l =
     | _ -> [] in
 
   x_index_cnstrs state l
-    (function f -> is_ground f && no_input f)
+    (function f -> is_ground f && no_macros f)
     n_cnstr
   |>  List.filter (function Formula.True -> false | _ -> true)
   |>  List.sort_uniq Pervasives.compare
