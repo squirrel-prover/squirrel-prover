@@ -125,14 +125,16 @@ let mk_instance (l : trace_formula_atom list) =
       | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
       ([],[],[]) l in
 
+  let rec subterms acc x = match x.cnt with
+    | UName (_,is) -> x :: is @ acc
+    | UPred y -> subterms (x :: acc) y
+    | UVar _ -> x :: acc in
   let elems =
     List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
-              |> List.fold_left (fun acc x -> match x.cnt with
-                  | UName (_,is) -> x :: is @ acc
-                  | _ -> x :: acc) []
-              |> List.sort_uniq ut_compare
-  in
-  let uf = Uuf.create elems in
+    |> List.fold_left subterms []
+    |> List.sort_uniq ut_compare in
+
+  let uf = Uuf.create elems in  
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
 
 
