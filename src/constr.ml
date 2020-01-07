@@ -89,7 +89,7 @@ let pp_uvar ppf = function
 
 let rec pp_ut_cnt ppf = function
   | UVar uv -> pp_uvar ppf uv
-  | UPred ts -> Fmt.pf ppf "@[<hov>p(%a)@]" pp_ut_cnt ts.cnt
+  | UPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_ut_cnt ts.cnt
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
       pp_action_shape a
@@ -139,10 +139,10 @@ let mk_instance (l : trace_formula_atom list) =
 exception Unify_cycle of Uuf.t
 
 (* [mgu ut uf] applies the mgu represented by [uf] to [ut].
-    Raise [Unify_cycle] if it contains a cycle.
+   Raise [Unify_cycle] if it contains a cycle.
    If [ext_support] is [true], add [ut] to [uf]'s support if necessary. *)
 let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
-
+  
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
@@ -567,7 +567,7 @@ let is_sat constr = m_is_sat @@ models constr
 
 (* Adds [ut] to the model [uf], if necessary, and return its normal form.
    There is no need to modify the rest of the model, since we are not adding
-   and equality, disequality or inequality. *)
+   an equality, disequality or inequality. *)
 let ext_support (model : model) (ut : ut) =
   let uf, ut = mgu ~ext_support:true model.inst.uf ut in
   { model with inst = { model.inst with uf = uf } }, ut
