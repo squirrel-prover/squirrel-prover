@@ -159,96 +159,6 @@ let declare id args proc =
 
 open Action
 
-
-(** An action description features an input, a condition (which sums up
-  * several [Exist] constructs which might have succeeded or not) and subsequent
-  * updates and outputs. The condition binds variables in the updates
-  * and output. An action description may feature free index variables, that are
-  * in a sense bound by the corresponding action. We also include a list of
-  * all used indices, since they are not explicitly declared as part of
-  * the action or current condition (they could be introduced by previous
-  * conditions). *)
-
-type action_descr = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : index list ;
-  condition : index list * Bformula.fact ;
-  updates : (Term.state * Term.term) list ;
-  output : Channel.t * Term.term
-}
-
-let pp_action_descr ppf action_descr =
-  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
-              %a\
-              @[<hv 2>condition:@ @[<hov>%a@]@]@;\
-              %a\
-              @[<hv 2>output:@ @[<hov>%a@]@]@]"
-    pp_action action_descr.action
-    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
-    action_descr.indices
-    pp_fact (snd action_descr.condition)
-    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
-       (Fmt.list
-          ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
-          (fun ppf (s, t) ->
-             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp_term t)))
-    action_descr.updates
-    Term.pp_term (snd action_descr.output)
-
-(** Apply a substitution to an action description.
-  * The domain of the substitution must contain all indices
-  * occurring in the description. *)
-let subst_action_descr subst action_descr =
-  let action = Term.subst_action subst action_descr.action in
-  let input = action_descr.input in
-  let subst_term = Term.subst_term subst in
-  let indices = List.map (Term.subst_index subst) action_descr.indices  in
-  let condition = fst action_descr.condition, Bformula.subst_fact subst (snd action_descr.condition) in
-  let updates =
-    List.map
-      (fun ((ss,is),t) ->
-         ((ss, List.map (Term.subst_index subst) is),
-          subst_term t))
-      action_descr.updates
-  in
-  let output = fst action_descr.output, subst_term (snd action_descr.output) in
-  { action; input; indices; condition; updates; output }
-
-(** Associates a description to each action *)
-let action_to_action_descr : (action_shape, action_descr) Hashtbl.t =
-  Hashtbl.create 97
-
-let iter_csa f =
-  Hashtbl.iter (fun a b -> f b) action_to_action_descr
-
-let get_action_descr a =
-  let action_descr = Hashtbl.find action_to_action_descr (get_shape a) in
-  (* We know that [action_descr.action] and [a] have the same shape,
-   * but run [same_shape] anyway to obtain the substitution from
-   * one to the other. *)
-  match Action.same_shape action_descr.action a with
-  | None -> assert false
-  | Some subst ->
-    subst_action_descr (Term.from_varsubst subst) action_descr
-
-
-module Aliases = struct
-  (** Aliases for actions, for concise display *)
-
-  let name_to_action = Hashtbl.create 97
-  let action_to_name = Hashtbl.create 97
-
-  let decl_action_name name action pos =
-    if Hashtbl.mem name_to_action name then
-      failwith (Fmt.strf "multiple declarations of %s" name)
-    else begin
-      Hashtbl.add name_to_action name (action,pos) ;
-      Hashtbl.add action_to_name action (pos,name)
-    end
-
-end
-
 (** Prepare a process for the generation of actions:
   *
   *  - the resulting process does not feature New and Let constructs,
@@ -366,7 +276,7 @@ let prepare : process -> process =
         (* TODO getting a globally fresh symbol for the name
          * does not prevent conflicts with variables bound in
          * the process (in Repl, Let, In...) *)
-        let n' = Term.Name.declare n (List.length indices) in
+        let n' = Symbols.Name.declare n (List.length indices) in
         let n'_th =
           Theory.Name
             (Symbols.to_string n',
@@ -379,7 +289,7 @@ let prepare : process -> process =
     | Let (x,t,p) ->
         let body = convert subst t in
         let x' =
-          Term.Macro.declare_global x ~inputs:invars
+          Macros.declare_global x ~inputs:invars
             ~indices:(List.rev indices) ~ts:ts_var body
         in
         let x'_th =
@@ -493,10 +403,10 @@ let prepare : process -> process =
  * It also stores the current action. *)
 type p_env = {
   action : Action.action ;
-  p_indices : Action.index list ;
+  p_indices : Index.t list ;
   subst : (string * Term.term) list ;
     (** substitution for input variables *)
-  isubst : (string * Action.index) list
+  isubst : (string * Index.t) list
 }
 
 (** The extraction of actions from the system process
@@ -505,9 +415,10 @@ exception Cannot_parse of process
 
 (** Parse a prepared process to extract its actions. *)
 let parse_proc proc : unit =
-let var_env = ref Vars.empty_env in
-  let conv_term ?(pred=false) env t =
-    let ts = Term.TName (List.rev env.action) in
+  let var_env = ref Vars.empty_env in
+  (** Convert given some environment and the current action symbol a. *)
+  let conv_term ?(pred=false) env a t =
+    let ts = Term.TName (a, List.rev env.p_indices) in
     let ts = if pred then Term.TPred ts else ts in
     let subst =
       List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
@@ -515,8 +426,8 @@ let var_env = ref Vars.empty_env in
     in
     Theory.convert ts subst t
   in
-  let conv_fact env t =
-    let ts = Term.TName (List.rev env.action) in
+  let conv_fact env a t =
+    let ts = Term.TName (a, List.rev env.p_indices) in
     let subst =
       List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
       List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
@@ -532,7 +443,7 @@ let var_env = ref Vars.empty_env in
     * [pos_indices] is the list of accumulated indices
     * for the parallel choice part of the action item.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos ~(pos_indices:index list) = function
+  let rec p_in ~env ~pos ~(pos_indices:Index.t list) = function
     | Apply _ | Let _ | New _ -> assert false
     | Null -> pos
     | Parallel (p, q) ->
@@ -599,7 +510,8 @@ let var_env = ref Vars.empty_env in
   | p ->
       (* We are done processing conditionals, let's prepare
        * for the next step, i.e. updates and output.
-       * At this point we know which action will be used. *)
+       * At this point we know which action will be used,
+       * but we don't have the action symbol yet. *)
       let rec conj = function
         | [] -> Bformula.True
         | [f] -> f
@@ -609,12 +521,9 @@ let var_env = ref Vars.empty_env in
       let action =
         { par_choice ;
           sum_choice = pos, conv_indices env vars } :: env.action in
-      let in_tm =
-        Term.Macro (Term.in_macro, [], Term.TName (List.rev action)) in
       let env =
         { env with
-          action = action ;
-          subst = (snd input,in_tm)::env.subst }
+          action = action }
       in
       p_update
         ~env ~input ~condition
@@ -630,14 +539,14 @@ let var_env = ref Vars.empty_env in
   | Apply _ | Let _ | New _ | Out _ -> assert false
 
   | Set (s, l, t, p) ->
-      let updates = (s, l, t)::updates in
+      let updates = (s,l,t)::updates in
       p_update ~env ~input ~condition ~updates p
 
   | Alias _ | Null as proc ->
       let output,a,p =
         (* Get output data, or dummy value if output is missing. *)
         match proc with
-        | Alias (Out (c,t,p),a) -> (c, conv_term env t),a,p
+        | Alias (Out (c,t,p),a) -> Some (c,t), a, p
         | Alias _ -> assert false
         | Null ->
             (* Generate description anyway, since it may contain important
@@ -645,29 +554,38 @@ let var_env = ref Vars.empty_env in
              * alias setup by the preparation phase.
              * TODO aliases on "interesting" null processes *)
             let a = Action.fresh_symbol "A" in
-            (Channel.dummy, Term.dummy),
+            None,
             Symbols.to_string a,
             proc
         | _ -> assert false
       in
+      (* TODO temporary Obj.magic, I suspect it will disappear
+       *   by merging prepare and parse_proc, which makes sense anyway *)
+      let a = Obj.magic a in
+      let indices = List.rev env.p_indices in
+      let in_tm =
+        Term.Macro (Term.in_macro, [], Term.TName (Obj.magic a,indices)) in
+      let env = { env with subst = (snd input, in_tm) :: env.subst } in
+      let output =
+       match output with
+         | Some (c,t) -> c, conv_term env a t
+         | None -> Channel.dummy, Term.dummy
+      in
       let condition =
         let vars, facts = condition in
         conv_indices env vars,
-        conv_fact env facts
+        conv_fact env a facts
       in
       let updates =
         List.map
           (fun (s,l,t) ->
-             (Term.Macro.of_string s, conv_indices env l), conv_term ~pred:true env t)
+             (Symbols.Macro.of_string s, conv_indices env l),
+             conv_term ~pred:true env a t)
           updates
       in
-      let indices = List.rev env.p_indices in
-      let action = (List.rev env.action) in
-      let action_descr = {action; input; indices; condition; updates; output} in
-      Hashtbl.add action_to_action_descr (get_shape action) action_descr ;
-      (* TODO temporary Obj.magic, I suspect it will disappear
-       *   by merging prepare and parse_proc, which makes sense anyway *)
-      Action.define_symbol (Obj.magic a) indices action ;
+      let action = List.rev env.action in
+      let action_descr = {action;input;indices;condition;updates;output} in
+      Action.register (Obj.magic a) indices action action_descr ;
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
 
   | p ->
@@ -689,38 +607,4 @@ let declare_system proc =
 
 let reset () =
   Hashtbl.clear pdecls ;
-  Hashtbl.clear action_to_action_descr ;
-  Hashtbl.clear Aliases.name_to_action ;
-  Hashtbl.clear Aliases.action_to_name
-
-let debug = false
-
-let pp_actions ppf () =
-  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
-  let comma = ref false in
-  Action.iter
-    (fun symbol indices action ->
-       if !comma then Fmt.pf ppf ",@;" ;
-       comma := true ;
-       if debug then
-         Fmt.pf ppf "%s%a=%a"
-           (Symbols.to_string symbol)
-           Action.pp_indices indices
-           Action.pp_action_structure action
-       else
-         Fmt.pf ppf "%s%a"
-           (Symbols.to_string symbol)
-           Action.pp_indices indices) ;
-  Fmt.pf ppf "@]@]@."
-
-let pp_action_descrs ppf () =
-  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  iter_csa (fun action_descr ->
-      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        pp_action_descr action_descr) ;
-  Fmt.pf ppf "@]%!@."
-
-let pp_proc ppf () =
-  pp_actions ppf () ;
-  Fmt.pf ppf "@." ;
-  if debug then pp_action_descrs ppf ()
+  Action.reset ()

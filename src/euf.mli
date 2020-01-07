@@ -21,7 +21,7 @@ val pp_euf_schema : Format.formatter -> euf_schema -> unit
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { d_key_indices : Action.index list;
+type euf_direct = { d_key_indices : Index.t list;
                     d_message : Term.term }
 
 val pp_euf_direct : Format.formatter -> euf_direct -> unit
@@ -49,4 +49,4 @@ val hash_key_ssc : fname -> name -> term list -> bool
     hash function and key in a process.
     TODO: memoisation *)
 val mk_rule : env:Vars.env -> mess:term -> sign:term ->
-  hash_fn:fname -> key_n:name -> key_is:Action.index list -> euf_rule
+  hash_fn:fname -> key_n:name -> key_is:Index.t list -> euf_rule

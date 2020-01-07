@@ -71,81 +71,10 @@ val check_proc : Theory.env -> process -> unit
 val declare : id -> pkind -> process -> unit
 
 (** Final declaration of the system under consideration,
-  * which triggers the computation of its internal representation. *)
+  * which triggers the computation of its internal representation
+  * as a set of actions. In that process, name creations and let constructs
+  * are compiled away. Other constructs are grouped into action descriptions. *)
 val declare_system : process -> unit
 
 (** Reset all process declarations. *)
 val reset : unit -> unit
-
-(** {2 Internal representation of processes}
-  *
-  * Processes are compiled to an internal representation used by
-  * the meta-logic. Name creations and let constructs are compiled
-  * away and process constructs are grouped to form actions consisting of an
-  * input, followed by a tree of conditionals, with state updates and an output
-  * for each non-empty conditional. From a process we obtain a finite
-  * set of actions consisting of a sequence of choices: at each step
-  * it indicates which component of a parallel composition is chosen
-  * (possibly using newly introduced index variables), and which
-  * outcome of a tree of conditionals is chosen. We associate to each
-  * such action an action description.
-  *
-  * In an execution the system, we will instantiate these symbolic
-  * actions into concrete ones, using a substitution for its
-  * index variables (which actually maps them to other index variables).
-  *
-  * Past choices are used to identify that two actions are in conflict:
-  * they are when they have the same root and their sequence of choices
-  * diverges (i.e. none is a prefix of the other).
-  *
-  * For executing a system given as a set of concrete actions,
-  * take the action description of one concrete action, execute it,
-  * compute the produced actions by adding the description of
-  * the chosen branch.
-  *
-  * For backward analysis, given a set of "concrete actions" (indices
-  * instantiated by index variables, possibly non-injectively) compute
-  * a finite yet complete set of potential past actions: for each
-  * symbolic action, generate index disequality constraints to guarantee
-  * the absence of conflicts with current actions -- we are often
-  * interested in a subset of such actions, obtained e.g. via a predicate
-  * on output messages, and we will often perform this filtering as part
-  * of the construction of the complete set.
-  *
-  * For user-friendliness, actions are described by action symbols.
-  * Actions are unambiguous by design, we build on them to have unique
-  * names for input variables, output terms, etc. Actions are displayed
-  * by default using their identifying symbol. *)
-
-(* Type action_descr *)
-type action_descr = {
-  action : Action.action ;
-  input : Channel.t * string ;
-  indices : Action.index list ;
-  condition : Action.index list * Bformula.fact ;
-  updates : (Term.state * Term.term) list ;
-  output : Channel.t * Term.term
-}
-
-val pp_action_descr : Format.formatter -> action_descr -> unit
-
-(** Iterate over a complete set of action descriptions.
-    Does not instantiate fresh copies of the actions, as it increases
-    unecessarily the variable counters. Can be used for display purposes. *)
-val iter_csa : (action_descr -> unit) -> unit
-
-(** [get_descr a] returns the description corresponding to the action [a].
-    Raise Not_found if no action corresponds to [a]. *)
-val get_action_descr : Action.action -> action_descr
-
-(** Pretty-print actions *)
-val pp_actions : Format.formatter -> unit -> unit
-
-(** Pretty-print action descriptions *)
-val pp_action_descrs : Format.formatter -> unit -> unit
-
-(** Pretty-print actions and action descriptions *)
-val pp_proc : Format.formatter -> unit -> unit
-
-(** Apply a substitution to a description. *)
-val subst_action_descr : Term.subst -> action_descr -> action_descr

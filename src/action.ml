@@ -1,17 +1,3 @@
-type index = Vars.var
-
-let pp_index = Vars.pp
-
-type isubst = (index * index) list
-
-let pp_isubst ppf subst =
-  Fmt.list
-    ~sep:(fun ppf () -> Fmt.pf ppf "@,")
-    (fun ppf (i,j) ->
-       Fmt.pf ppf "%a->%a" pp_index i pp_index j)
-    ppf
-    subst
-
 type 'a item = {
   par_choice : int * 'a ; (** position in parallel compositions *)
   sum_choice : int * 'a   (** position in conditionals *)
@@ -42,7 +28,7 @@ let rec enables a b = match a, b with
 
 type action_shape = int t
 
-type action = (index list) t
+type action = (Index.t list) t
 
 let mk_shape l = l
 
@@ -93,45 +79,30 @@ let rec constr_equal a b = match a,b with
          List.map2 (fun ind ind' -> ind, ind') ls ls' @
          res)
 
-let refresh env a =
-  let rec aux =
-  function
-  | [] -> [],[]
-  | {par_choice=(p,lp);sum_choice=(s,ls)}::l ->
-    let lp' =
-      List.map (fun i ->
-          i, Vars.make_fresh_from_and_update env i
-        ) lp
-    in
-    let ls' =
-      List.map (fun i ->
-          i,  Vars.make_fresh_from_and_update env i
-        ) ls
-    in
-      let newsubst = lp' @ ls' in
-      let action,subst = aux l in
-        { par_choice = p, List.map snd lp' ;
-          sum_choice = s, List.map snd ls' }
-        :: action,
-        newsubst @ subst
-  in
-  aux a
-
 (** Action symbols *)
-
-module Symbol =
-  Symbols.Make (struct
-    type data = index list * action
-  end)
 
 let shape_to_symb = Hashtbl.create 97
 
-let fresh_symbol name = Symbol.reserve name
+type Symbols.data += Data of Index.t list * action
+
+let fresh_symbol name = Symbols.Action.reserve name
 let define_symbol symb args action =
   Hashtbl.add shape_to_symb (get_shape action) symb ;
-  Symbol.define symb (args,action)
-let find_symbol s = Symbol.def_of_string s
-let iter f = Symbol.iter (fun s (l,a) -> f s l a)
+  let data = Data (args,action) in
+  Symbols.Action.define symb ~data (List.length args)
+let find_symbol s =
+  match Symbols.Action.data_of_string s with
+    | Data (x,y) -> x,y
+    | _ -> assert false
+let of_symbol s =
+  match Symbols.Action.get_data s with
+    | Data (x,y) -> x,y
+    | _ -> assert false
+let iter f =
+  Symbols.Action.iter
+    (fun s _ -> function
+       | Data (args,action) -> f s args action
+       | _ -> assert false)
 
 (** Pretty-printing *)
 
@@ -177,14 +148,153 @@ let pp_action_structure ppf a =
 
 let pp_action_shape ppf a = pp_action_f pp_int (0,0) ppf a
 
-let pp_action ppf a =
-  let symb = Hashtbl.find shape_to_symb (get_shape a) in
+let rec subst_action (s : Term.subst) (a : action) =
+  match a with
+  | [] -> []
+  | a :: l ->
+    let p,lp = a.par_choice in
+    let q,lq = a.sum_choice in
+    { par_choice = p, List.map (Term.get_index_subst s) lp ;
+      sum_choice = q, List.map (Term.get_index_subst s) lq }
+    :: subst_action s l
+
+let to_term a =
   let indices = action_indices a in
-  Fmt.styled `Green
-    (fun ppf a ->
-       Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
-    ppf a
+  Term.TName (Hashtbl.find shape_to_symb (get_shape a), indices)
+
+let of_term s l =
+  let l',a = of_symbol s in
+  let subst = List.map2 (fun x y -> Term.Index (x,y)) l' l in
+  subst_action subst a
+
+let rec dummy_action k =
+  if k = 0 then [] else
+    { par_choice = 0,[] ; sum_choice = 0,[] }
+    :: dummy_action (k-1)
+
+let dummy_action k =
+  let a = dummy_action k in
+  let s = get_shape a in
+  let data = Data ([],a) in
+    if not (Hashtbl.mem shape_to_symb (get_shape a)) then
+      Hashtbl.add shape_to_symb s
+        (Symbols.Action.declare "_Dummy" ~data 0) ;
+    a
+
+let pp_action ppf a = Term.pp_timestamp ppf (to_term a)
 
 let pp = pp_action
 
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
+
+(** An action description features an input, a condition (which sums up
+  * several [Exist] constructs which might have succeeded or not) and subsequent
+  * updates and outputs. The condition binds variables in the updates
+  * and output. An action description may feature free index variables, that are
+  * in a sense bound by the corresponding action. We also include a list of
+  * all used indices, since they are not explicitly declared as part of
+  * the action or current condition (they could be introduced by previous
+  * conditions). *)
+
+type action_descr = {
+  action : action ;
+  input : Channel.t * string ;
+  indices : Index.t list ;
+  condition : Index.t list * Bformula.fact ;
+  updates : (Term.state * Term.term) list ;
+  output : Channel.t * Term.term
+}
+
+let pp_action_descr ppf action_descr =
+  Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
+              %a\
+              @[<hv 2>condition:@ @[<hov>%a@]@]@;\
+              %a\
+              @[<hv 2>output:@ @[<hov>%a@]@]@]"
+    pp_action action_descr.action
+    (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
+    action_descr.indices
+    Bformula.pp_fact (snd action_descr.condition)
+    (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
+       (Fmt.list
+          ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
+          (fun ppf (s, t) ->
+             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp_term t)))
+    action_descr.updates
+    Term.pp_term (snd action_descr.output)
+
+(** Apply a substitution to an action description.
+  * The domain of the substitution must contain all indices
+  * occurring in the description. *)
+let subst_action_descr subst action_descr =
+  let action = subst_action subst action_descr.action in
+  let input = action_descr.input in
+  let subst_term = Term.subst_term subst in
+  let indices = List.map (Term.subst_index subst) action_descr.indices  in
+  let condition = fst action_descr.condition, Bformula.subst_fact subst (snd action_descr.condition) in
+  let updates =
+    List.map
+      (fun ((ss,is),t) ->
+         ((ss, List.map (Term.subst_index subst) is),
+          subst_term t))
+      action_descr.updates
+  in
+  let output = fst action_descr.output, subst_term (snd action_descr.output) in
+  { action; input; indices; condition; updates; output }
+
+(** Associates a description to each action.
+  * TODO store this as part of Symbols data ? *)
+let action_to_action_descr : (action_shape, action_descr) Hashtbl.t =
+  Hashtbl.create 97
+
+let reset () =
+  Hashtbl.clear action_to_action_descr
+
+let register symb indices action descr =
+  Hashtbl.add action_to_action_descr (get_shape action) descr ;
+  define_symbol symb indices action
+
+let iter_csa f =
+  Hashtbl.iter (fun a b -> f b) action_to_action_descr
+
+let get_action_descr a =
+  let action_descr = Hashtbl.find action_to_action_descr (get_shape a) in
+  (* We know that [action_descr.action] and [a] have the same shape,
+   * but run [same_shape] anyway to obtain the substitution from
+   * one to the other. *)
+  match same_shape action_descr.action a with
+  | None -> assert false
+  | Some subst ->
+    subst_action_descr (Term.from_varsubst subst) action_descr
+
+let debug = false
+
+let pp_actions ppf () =
+  Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
+  let comma = ref false in
+  iter
+    (fun symbol indices action ->
+       if !comma then Fmt.pf ppf ",@;" ;
+       comma := true ;
+       if debug then
+         Fmt.pf ppf "%s%a=%a"
+           (Symbols.to_string symbol)
+           pp_indices indices
+           pp_action_structure action
+       else
+         Fmt.pf ppf "%s%a"
+           (Symbols.to_string symbol)
+           pp_indices indices) ;
+  Fmt.pf ppf "@]@]@."
+
+let pp_action_descrs ppf () =
+  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
+  iter_csa (fun action_descr ->
+      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
+        pp_action_descr action_descr) ;
+  Fmt.pf ppf "@]%!@."
+
+let pp_proc ppf () =
+  pp_actions ppf () ;
+  Fmt.pf ppf "@." ;
+  if debug then pp_action_descrs ppf ()

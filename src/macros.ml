@@ -1,11 +1,21 @@
+(** Macro definitions *)
+
+type Symbols.data +=
+  Global_data of Vars.var list * Vars.var list * Vars.var * Term.term
+
+let declare_global name ~inputs ~indices ~ts t =
+  let data = Global_data (inputs,indices,ts,t) in
+  let def = Symbols.Global (List.length indices) in
+    Symbols.Macro.declare name ~data def
+
 (** Macro expansions *)
 
 open Term
 
 let is_defined name a =
-  match Macro.get_def name with
-    | Input -> false
-    | Output | State _ ->
+  match Symbols.Macro.get_all name with
+    | Symbols.Input, _ -> false
+    | Symbols.(Output | State _), _ ->
         (* We can expand the definitions of output@A and state@A
          * when A is an action name. We cannot do so for a variable
          * or a predecessor.
@@ -16,45 +26,53 @@ let is_defined name a =
           | TName _ -> true
           | _ -> false
         end
-    | Local _ -> true
-    | Global (inputs,_,_,_) ->
+    | Symbols.Local _, _ -> true
+    | Symbols.Global _, Global_data (inputs,_,_,_) ->
         (* As for outputs and states, we can only expand on a name A,
          * because a global macro m(...)@A refer to inputs of A and
          * its sequential predecessors. *)
         begin match a with
-          | TName l ->
-              (* We could support |inputs| <= |l|,
+          | TName (s,_) ->
+              let action = snd (Action.of_symbol s) in
+              (* We could support |inputs| <= |action|,
                * but it is not clear that we'll ever need it,
                * because a global macro is really meant to be used
                * at a particular action name. *)
-              List.length inputs = List.length l
+              List.length inputs = List.length action
           | _ -> false
         end
+    | Symbols.Global _, _ -> assert false
 
 let get_definition name args a =
-  match Macro.get_def name with
-    | Input -> assert false
-    | Output ->
+  match Symbols.Macro.get_all name with
+    | Symbols.Input, _ -> assert false
+    | Symbols.Output, _ ->
        begin match a with
-         | TName action -> snd Process.((get_action_descr action).output)
+         | TName (symb,indices) ->
+             let action = Action.of_term symb indices in
+             snd Action.((get_action_descr action).output)
          | _ -> assert false
        end
-    | State _ ->
+    | Symbols.State _, _ ->
        begin match a with
-         | TName action ->
-             let descr = Process.get_action_descr action in
+         | TName (symb,indices) ->
+             (* We are looking at name(args)@symb(indices):
+              * see if state name(args) is updated by symb(indices),
+              * otherwise its content is unchanged. *)
+             let action = Action.of_term symb indices in
+             let descr = Action.get_action_descr action in
                begin try
-                 (* TODO rename indices *)
-                 List.assoc (name,args) descr.Process.updates
+                 List.assoc (name,args) descr.Action.updates
                with Not_found ->
                  Term.Macro ((name,args), [], Term.TPred a)
                end
          | _ -> assert false
        end
-
-    | Global (inputs,indices,ts,body) ->
+    | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
-          | TName action when List.length inputs = List.length action ->
+          | TName (tsymb,tidx) ->
+              let action = Action.of_term tsymb tidx in
+              assert (List.length inputs = List.length action) ;
               let idx_subst =
                 List.map2
                   (fun i i' -> Index (i,i'))
@@ -66,8 +84,8 @@ let get_definition name args a =
                 List.fold_left
                   (fun (subst,action) x ->
                      let in_tm =
-                       Macro (in_macro,[],
-                              TName (List.rev action))
+                       Term.Macro (in_macro,[],
+                                   Action.to_term (List.rev action))
                      in
                      Term (MVar x,in_tm) :: subst,
                      List.tl action)
@@ -77,16 +95,12 @@ let get_definition name args a =
               subst_term subst body
           | _ -> assert false
         end
-    | Local _ -> assert false (* TODO *)
+    | Symbols.Global _, _ -> assert false
+    | Symbols.Local _, _ -> failwith "TODO"
 
 let get_dummy_definition mn indices =
-  match Macro.get_def mn with
-    | Global (inputs,indices,ts,term) ->
-        let rec dummy_action k =
-          if k = 0 then [] else
-            { Action.par_choice = 0,[] ; sum_choice = 0,[] }
-            :: dummy_action (k-1)
-        in
-        let dummy_action = dummy_action (List.length inputs) in
-          get_definition mn indices (TName dummy_action)
+  match Symbols.Macro.get_all mn with
+    | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
+        let dummy_action = Action.dummy_action (List.length inputs) in
+        get_definition mn indices (Action.to_term dummy_action)
     | _ -> assert false

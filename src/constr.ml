@@ -22,7 +22,7 @@ let log_constr = Log.log Log.LogConstr
 let log_constr = ignore
 
 module Utv : sig
-  type uvar = Utv of var | Uind of index
+  type uvar = Utv of var | Uind of Index.t
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -30,16 +30,16 @@ module Utv : sig
   and ut_cnt = private
     | UVar of uvar
     | UPred of ut
-    | UName of action_shape * ut list
+    | UName of Symbols.action Symbols.t * ut list
 
   val uvar : var -> ut
-  val uvari : index -> ut
+  val uvari : Index.t -> ut
   val uts : timestamp -> ut
-  val uname : action_shape -> ut list -> ut
+  val uname : Symbols.action Symbols.t -> ut list -> ut
   val upred : ut -> ut
 
 end = struct
-  type uvar = Utv of var | Uind of index
+  type uvar = Utv of var | Uind of Index.t
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -47,7 +47,7 @@ end = struct
   and ut_cnt =
     | UVar of uvar
     | UPred of ut
-    | UName of action_shape * ut list
+    | UName of Symbols.action Symbols.t * ut list
 
   module Ut = struct
     type t = ut
@@ -78,7 +78,7 @@ end = struct
   let rec uts ts = match ts with
     | TVar tv -> uvar tv
     | TPred ts -> upred (uts ts)
-    | TName a -> uname (get_shape a) (List.map uvari (action_indices a))
+    | TName (s,l) -> uname s (List.map uvari l)
 end
 
 open Utv
@@ -92,7 +92,7 @@ let rec pp_ut_cnt ppf = function
   | UPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_ut_cnt ts.cnt
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
-      pp_action_shape a
+      Fmt.string (Symbols.to_string a)
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
 
 let pp_ut ppf ut = pp_ut_cnt ppf ut.cnt
@@ -656,35 +656,35 @@ and tau4 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
 and tau5 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
 and i =  Vars.make_fresh_and_update env Index "i"
 and i' = Vars.make_fresh_and_update env Index "i"
-and a indices = [{ par_choice = 0, indices;
-                   sum_choice = 0,[] }]
+
+let a = Obj.magic "a" (* Avoid declaring outside of Symbols.run_restore *)
 
 let pb_eq1 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a [i])))
-             :: [Pts (Eq,tau'', TName (a [i']))]
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
 and pb_eq2 = [Pts (Eq,tau, TPred tau)]
 and pb_eq3 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
              :: [Pts (Eq,tau'', tau)]
 and pb_eq4 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a [i])))
-             :: [Pts (Eq,tau'', TName (a [i]))]
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i]))]
 and pb_eq5 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a [i'])))
-             :: (Pts (Eq,tau, TName (a [i])))
-             :: (Pts (Eq,tau'', TName (a [i])))
-             :: [Pts (Eq,tau'', TName (a [i']))]
+             :: (Pts (Eq,tau', TName (a,[i'])))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: (Pts (Eq,tau'', TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
 and pb_eq6 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a [i'])))
-             :: (Pts (Eq,tau, TName (a [i])))
-             :: (Pts (Eq,tau3, TName (a [i])))
-             :: [Pts (Eq,tau'', TName (a [i']))]
+             :: (Pts (Eq,tau', TName (a,[i'])))
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: (Pts (Eq,tau3, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
 and pb_eq7 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a [i])))
-             :: [Pts (Eq,tau'', TName (a [i']))]
+             :: (Pts (Eq,tau, TName (a,[i])))
+             :: [Pts (Eq,tau'', TName (a,[i']))]
 and pb_eq8 = (Pts (Eq,tau, TPred tau'))
              :: (Pts (Eq,tau', TPred tau''))
              :: [Pts (Eq,tau'', tau3)];;

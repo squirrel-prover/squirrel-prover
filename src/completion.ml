@@ -930,10 +930,10 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      Symbols.run_restore @@ fun () ->
-       let fi = 0, Abstract_symbol ([],Vars.Message) in
+       let fi = 0, Symbols.Abstract ([],Vars.Message) in
        let ffs, gfs =
-         (Term.Function.declare_exact "f" fi, []),
-         (Term.Function.declare_exact "g" fi, [])
+         (Symbols.Function.declare_exact "f" fi, []),
+         (Symbols.Function.declare_exact "g" fi, [])
        in
        let f a b = Cfun (ffs, [a;b]) in
        let g a b = Cfun (gfs, [a;b]) in

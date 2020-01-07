@@ -1,10 +1,4 @@
-(** Processes are decomposed as structured sets of actions. *)
-
-(** Indices are used to generate arbitrary families of terms, and thus duplicate
-    of actions *)
-type index = Vars.var
-
-val pp_indices : Format.formatter -> index list -> unit
+(** Actions are the basis of our internal semantics for protocols. *)
 
 (** Actions uniquely describe execution points in a process.
   * They consist of a list of items describing a position
@@ -47,32 +41,23 @@ type action_shape = int t
 
 (** An [action] is an [action_shape] inside which all index variables are
     explicits. *)
-type action = (index list) t
+type action = (Index.t list) t
 
 (** [get_shape a] extracts the action_shape of an action *)
 val get_shape : action -> action_shape
 
 (** [action_indices a] gives back all index appearing inside the action *)
-val action_indices : action -> index list
-
-(** Index variable substitutions *)
-type isubst = (index*index) list
-
-val pp_isubst : Format.formatter -> isubst -> unit
+val action_indices : action -> Index.t list
 
 (** [same_shape a b] returns [Some subst] if [a] and [b] have the same action
     shapes. Return [None] otherwise.
     If [a] indices appear at most once in [a], then [subst] is the index
     substitution sending [a] to [b]. *)
-val same_shape : action -> action -> isubst option
+val same_shape : action -> action -> Index.subst option
 
 (** [constr_equal a b] returns the list of index constraints necessary to have
     [a] and [b] equal, if there is one. Return None otherwise. *)
-val constr_equal : action -> action -> isubst option
-
-(** Given an action, generate a fresh instance of it together with
-  * the corresponding substitution for indices. *)
-val refresh : Vars.env ref -> action -> action * isubst
+val constr_equal : action -> action -> Index.subst option
 
 (** Format an action, displayed through its symbol. *)
 val pp_action_structure : Format.formatter -> action -> unit
@@ -89,18 +74,73 @@ val pp_action_shape : Format.formatter -> action_shape -> unit
 (** Formatter for parsed actions. *)
 val pp_parsed_action : Format.formatter -> (string list) item list -> unit
 
-(** Action symbols *)
+val subst_action : Term.subst -> action -> action
+
+(** Convert action to the corresponding [TName] timestamp term. *)
+val to_term : action -> Term.timestamp
+
+(** Convert [TName] parameters to an action. *)
+val of_term : Symbols.action Symbols.t -> Index.t list -> action
+
+(** Get dummy action of some length. Guarantees that a symbol exists for it. *)
+val dummy_action : int -> action
+
+(** {2 Action symbols}
+  *
+  * Action symbols are used to refer to actions in a concise manner. *)
 
 (** Action symbols are associated to a list of indices and an action
   * using these indices, which represents a function from indices to
   * actions. *)
 
-module Symbol : Symbols.Namespace with type data = (index list) * action
-
-val fresh_symbol : string -> Symbol.ns Symbols.t
+val fresh_symbol : string -> Symbols.Action.ns Symbols.t
 val define_symbol :
-  Symbol.ns Symbols.t ->
-  index list -> action -> unit
-val find_symbol : string -> index list * action
-val iter :
-  (Symbol.ns Symbols.t -> index list -> action -> unit) -> unit
+  Symbols.Action.ns Symbols.t ->
+  Index.t list -> action -> unit
+val find_symbol : string -> Index.t list * action
+val of_symbol : Symbols.Action.ns Symbols.t -> Index.t list * action
+
+(** {2 Action descriptions}
+  *
+  * Describe the behavior of an action: it consists of an input, followed by a
+  * condition, then state updates and an output. *)
+
+(** Type action_descr *)
+type action_descr = {
+  action : action ;
+  input : Channel.t * string ;
+  indices : Index.t list ;
+  condition : Index.t list * Bformula.fact ;
+  updates : (Term.state * Term.term) list ;
+  output : Channel.t * Term.term
+}
+
+(** Register a new action symbol, action, and description,
+  * linked together. *)
+val register : Symbols.action Symbols.t -> Index.t list -> action -> action_descr -> unit
+
+(** Reset all action definitions. *)
+val reset : unit -> unit
+
+val pp_action_descr : Format.formatter -> action_descr -> unit
+
+(** Iterate over a complete set of action descriptions.
+    Does not instantiate fresh copies of the actions, as it increases
+    unecessarily the variable counters. Can be used for display purposes. *)
+val iter_csa : (action_descr -> unit) -> unit
+
+(** [get_descr a] returns the description corresponding to the action [a].
+    Raise Not_found if no action corresponds to [a]. *)
+val get_action_descr : action -> action_descr
+
+(** Pretty-print actions *)
+val pp_actions : Format.formatter -> unit -> unit
+
+(** Pretty-print action descriptions *)
+val pp_action_descrs : Format.formatter -> unit -> unit
+
+(** Pretty-print actions and action descriptions *)
+val pp_proc : Format.formatter -> unit -> unit
+
+(** Apply a substitution to a description. *)
+val subst_action_descr : Term.subst -> action_descr -> action_descr

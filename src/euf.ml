@@ -1,6 +1,5 @@
 open Term
 open Bformula
-open Process
 
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
@@ -19,11 +18,11 @@ end
 let euf_key_ssc hash_fn key_n messages =
   let ssc = new check_hash_key hash_fn key_n in
   List.iter ssc#visit_term messages ;
-  Process.iter_csa
+  Action.(iter_csa
     (fun action_descr ->
        ssc#visit_fact (snd action_descr.condition) ;
        ssc#visit_term (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_term t) action_descr.updates)
+       List.iter (fun (_,t) -> ssc#visit_term t) action_descr.updates))
 
 let hash_key_ssc hash_fn key_n messages =
   try
@@ -55,6 +54,7 @@ let rec h_o_term hh kk acc = function
     description output or state updates.
     Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
 let hashes_of_action_descr action_descr hash_fn key_n =
+  let open Action in
   List.fold_left (h_o_term hash_fn key_n)
     [] (snd action_descr.output :: (List.map snd action_descr.updates))
   |> List.sort_uniq Pervasives.compare
@@ -62,19 +62,19 @@ let hashes_of_action_descr action_descr hash_fn key_n =
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
 type euf_schema = { message : Term.term;
-                    action_descr : action_descr;
+                    action_descr : Action.action_descr;
                     env : Vars.env }
 
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Action.pp_action case.action_descr.action
+    Action.pp_action case.action_descr.Action.action
     Term.pp_term case.message
 
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { d_key_indices : Action.index list;
+type euf_direct = { d_key_indices : Index.t list;
                     d_message : Term.term }
 
 
@@ -104,7 +104,7 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
   { hash = hash_fn;
     key = key_n;
     case_schemata =
-      Utils.map_of_iter Process.iter_csa
+      Utils.map_of_iter Action.iter_csa
         (fun action_descr ->
           let env = ref env in
           hashes_of_action_descr action_descr hash_fn key_n
@@ -113,7 +113,9 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
               List.map
                 (fun i ->
                    Term.Index (i, Vars.make_fresh_from_and_update env i))
-                (List.filter (fun x -> not (List.mem x is)) action_descr.indices)
+                (List.filter
+                   (fun x -> not (List.mem x is))
+                   action_descr.Action.indices)
             in
             let subst_is =
               List.map2
@@ -121,7 +123,7 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
                 is key_is
             in
             let subst = subst_fresh@subst_is in
-            let new_action_descr = Process.subst_action_descr subst action_descr in
+            let new_action_descr = Action.subst_action_descr subst action_descr in
             { message = Term.subst_term subst m ;
               action_descr = new_action_descr;
               env = !env })

@@ -78,7 +78,7 @@ val pp_ord : Format.formatter -> ord -> unit
     in [Pind (o,i,i')], [o] must be either [Eq] or [Neq]. *)
 type trace_formula_atom =
   | Pts of timestamp _atom
-  | Pind of Action.index _atom
+  | Pind of Index.t _atom
 
 val trace_formula_atom_vars : trace_formula_atom -> Vars.var list
 

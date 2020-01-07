@@ -166,7 +166,7 @@ let add_xeq od xeq (eqs, leqs, neqs) =
 
 type trace_formula_atom =
   | Pts of timestamp _atom
-  | Pind of Action.index _atom
+  | Pind of Index.t _atom
 
 type trace_formula = trace_formula_atom bformula
 

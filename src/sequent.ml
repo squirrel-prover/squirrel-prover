@@ -296,11 +296,12 @@ let rec add_happens s ts =
     { s with happens_hypotheses = ts :: s.happens_hypotheses }
   in
     match ts with
-      | TName a ->
+      | TName (symb,indices) ->
+          let a = Action.of_term symb indices in
           add_formula ~prefix:"C"
             (Formula.bformula_to_foformula
                (fun x -> Message x)
-               (snd (Process.get_action_descr a).Process.condition))
+               (snd (Action.get_action_descr a).Action.condition))
             s
       | _ -> s
 

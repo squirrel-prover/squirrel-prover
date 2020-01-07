@@ -4,8 +4,55 @@
   * into namespaces, and where each symbol is attached to a definition
   * whose type depends on the namespace. *)
 
+(** Purely abstract type representing unknown namespace. *)
+type unknown
+
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
+
+(** Symbol definitions *)
+
+type kind = Vars.sort
+
+type function_def =
+  | Hash
+  | AEnc
+  | Abstract of kind list * kind
+
+type macro_def =
+  | Input | Output
+  | State of int * kind
+    (** Macro that expands to the content of a state at a given
+      * timestamp. *)
+  | Global of int
+    (** Global macros are used to encapsulate let-definitions.
+      * They are indexed. *)
+  | Local of kind list * kind
+    (** Local macro definitions are explicitly defined by the
+      * user, and may depend on arbitrary terms. *)
+
+type channel
+type name
+type action
+type fname
+type macro
+
+type _ def =
+  | Channel : unit -> channel def
+  | Name : int -> name def
+  | Action : int -> action def
+  | Function : (int * function_def) -> fname def
+  | Macro : macro_def -> macro def
+
+type some_def =
+  | Exists : 'a def -> some_def
+  | Reserved
+
+(** Extensible type for data associated to symbols.
+  * Due to circular dependencies, this is not type-safe, but
+  * at least avoids having multiple hashtables for symbols. *)
+type data = ..
+type data += Empty
 
 exception Multiple_declarations
 exception Unbound_identifier
@@ -17,24 +64,15 @@ val to_string : 'a t -> string
 (** Indicates whether a symbol of that name has been declared. *)
 val exists : string -> bool
 
-(** The type of definitions attached to symbols.
-  * It is extensible, with one case for each namespace. *)
-type def = ..
+(** Get the data associated to a symbol in this namespace. *)
+val get_data : 'a t -> data
 
-(** Get the definition of a symbol. This should be used when the namespace
-  * of the symbol is not known precisely. Otherwise, one should rather use
-  * the more precise namespace-specific functionality. *)
-val get_def : 'a t -> def
+(** [def_of_string s] returns the definition of the symbol named [s].
+  * @raise Unbound_identifier if no such symbol has been defined. *)
+val def_of_string : string -> some_def
 
-(** Purely abstract type for symbols of unknown namespace. *)
-type unknown
-
-(** Get the symbol associated to a string.
-  * @raise Unbound_identifier is no symbol of that name has been declared. *)
-val of_string : string -> unknown t
-
-(** [def_of_string s] is equivalent to [get_def (of_string s)]. *)
-val def_of_string : string -> def
+type wrapped = Wrapped : 'a t * 'a def -> wrapped
+val of_string : string -> wrapped
 
 (** Wrap a function into a new one which runs the previous one but
   * restores the table of symbols to its initial state before
@@ -45,49 +83,54 @@ val run_restore : (unit -> unit) -> (unit -> unit)
 (** Signature for namespaces *)
 module type Namespace = sig
 
-  (** Type of data carried by symbols in this namespace *)
-  type data
-
-  (** Constructor for definitions of this namespace *)
-  type def += C of data
-
-  (** Abstract type representing this namespace *)
+  (** Abstract type representing this namespace. *)
   type ns
+
+  (** Type of values defining the symbols of this namespace. *)
+  type def
 
   (** Reserve a fresh symbol name, resembling the given string. *)
   val reserve : string -> ns t
 
   (** Define a symbol name that has been previously reserved
     * using [fresh]. *)
-  val define : ns t -> data -> unit
+  val define : ns t -> ?data:data -> def -> unit
 
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
-  val declare : string -> data -> ns t
+  val declare : string -> ?data:data -> def -> ns t
 
   (* Like declare, but use the exact string as symbol name.
    * @raise Multiple_declarations if the name is not available. *)
-  val declare_exact : string -> data -> ns t
+  val declare_exact : string -> ?data:data -> def -> ns t
 
   (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
   val of_string : string -> ns t
 
-  (** Get the definition of a symbol in this namespace. *)
-  val get_def : ns t -> data
+  (** Get definition associated to some symbol. *)
+  val get_def : ns t -> def
 
   (** [def_of_string s] is equivalent to [get_def (of_string s)]. *)
-  val def_of_string : string -> data
+  val def_of_string : string -> def
+
+  (** Get data associated to some symbol. *)
+  val get_data : ns t -> data
+
+  (** [data_of_string s] is equivalent to [get_data (of_string s)]. *)
+  val data_of_string : string -> data
+
+  (** Get definition and data at once. *)
+  val get_all : ns t -> def * data
 
   (** Iter on the defined symbols of this namespace *)
-  val iter : (ns t -> data -> unit) -> unit
+  val iter : (ns t -> def -> data -> unit) -> unit
 
 end
 
-module type S = sig
-  type data
-end
-
-(** Create a new namespace
-  * where symbols are defined by values of type [M.data]. *)
-module Make (M:S) : Namespace with type data = M.data
+module Channel : Namespace with type def = unit with type ns = channel
+module Name : Namespace with type def = int with type ns = name
+module Action : Namespace with type def = int with type ns = action
+module Function : Namespace
+  with type def = int * function_def with type ns = fname
+module Macro : Namespace with type def = macro_def with type ns = macro

@@ -112,13 +112,13 @@ val subst_fact : fact -> (string*term) list -> fact
 type atsubst =
   | Term of string * Term.term
   | TS of string * Term.timestamp
-  | Idx of string * Action.index
+  | Idx of string * Index.t
 
 type tsubst = atsubst list
 
 val pp_tsubst : Format.formatter -> tsubst -> unit
 
-val conv_index : tsubst -> term -> Action.index
+val conv_index : tsubst -> term -> Index.t
 
 (** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :

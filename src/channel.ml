@@ -1,4 +1,4 @@
-include Symbols.Make(struct type data = unit end)
+include Symbols.Channel
 
 type channel = ns Symbols.t
 type t = channel
