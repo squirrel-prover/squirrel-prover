@@ -1,5 +1,4 @@
 open Utils
-open Action
 open Term
 open Bformula
 open Formula
@@ -301,7 +300,7 @@ let rec add_happens s ts =
           add_formula ~prefix:"C"
             (Formula.bformula_to_foformula
                (fun x -> Message x)
-               (snd (Action.get_action_descr a).Action.condition))
+               (snd (Action.get_descr a).Action.condition))
             s
       | _ -> s
 

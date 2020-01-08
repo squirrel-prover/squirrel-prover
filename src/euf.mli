@@ -1,6 +1,5 @@
 (** Module for the euf axiom application *)
 
-open Action
 open Process
 open Term
 
@@ -11,7 +10,7 @@ open Term
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = { message : Term.term;
-                    action_descr : action_descr;
+                    action_descr : Action.descr;
                     env : Vars.env }
 
 

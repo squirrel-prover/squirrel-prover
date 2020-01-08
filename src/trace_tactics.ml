@@ -99,7 +99,7 @@ let timestamp_case ts s sk fk =
     in
     f := match !f with False -> case | _ -> Formula.Or (case,!f)
   in
-  Action.iter_csa add_action ;
+  Action.iter_descrs add_action ;
   sk [Sequent.add_formula !f s] fk
 
 let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
@@ -453,12 +453,11 @@ let euf_param (at : term_atom) = match at with
 
 let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let open Euf in
-  let open Action in
   (* We create the term equality *)
   let new_f = Formula.Atom (Message (Eq, case.message, m)) in
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
-  let action_descr_ts = Action.to_term case.action_descr.action in
+  let action_descr_ts = Action.to_term case.action_descr.Action.action in
   (* The action occured before the test H(m,k) = s. *)
   let le_cnstr =
     List.map
@@ -474,7 +473,6 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
 
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
-  let open Action in
   (* We create the term equality *)
   let eq = Formula.Atom (Message (Eq, dcase.d_message, m)) in
   (* Now, we need to add the timestamp constraint between [key_is] and

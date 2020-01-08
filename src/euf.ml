@@ -18,7 +18,7 @@ end
 let euf_key_ssc hash_fn key_n messages =
   let ssc = new check_hash_key hash_fn key_n in
   List.iter ssc#visit_term messages ;
-  Action.(iter_csa
+  Action.(iter_descrs
     (fun action_descr ->
        ssc#visit_fact (snd action_descr.condition) ;
        ssc#visit_term (snd action_descr.output) ;
@@ -54,15 +54,14 @@ let rec h_o_term hh kk acc = function
     description output or state updates.
     Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
 let hashes_of_action_descr action_descr hash_fn key_n =
-  let open Action in
   List.fold_left (h_o_term hash_fn key_n)
-    [] (snd action_descr.output :: (List.map snd action_descr.updates))
+    [] Action.(snd action_descr.output :: (List.map snd action_descr.updates))
   |> List.sort_uniq Pervasives.compare
 
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
 type euf_schema = { message : Term.term;
-                    action_descr : Action.action_descr;
+                    action_descr : Action.descr;
                     env : Vars.env }
 
 let pp_euf_schema ppf case =
@@ -104,7 +103,7 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
   { hash = hash_fn;
     key = key_n;
     case_schemata =
-      Utils.map_of_iter Action.iter_csa
+      Utils.map_of_iter Action.iter_descrs
         (fun action_descr ->
           let env = ref env in
           hashes_of_action_descr action_descr hash_fn key_n
@@ -123,7 +122,7 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
                 is key_is
             in
             let subst = subst_fresh@subst_is in
-            let new_action_descr = Action.subst_action_descr subst action_descr in
+            let new_action_descr = Action.subst_descr subst action_descr in
             { message = Term.subst_term subst m ;
               action_descr = new_action_descr;
               env = !env })

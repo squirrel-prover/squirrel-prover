@@ -50,7 +50,7 @@ let get_definition name args a =
        begin match a with
          | TName (symb,indices) ->
              let action = Action.of_term symb indices in
-             snd Action.((get_action_descr action).output)
+             snd Action.((get_descr action).output)
          | _ -> assert false
        end
     | Symbols.State _, _ ->
@@ -60,7 +60,7 @@ let get_definition name args a =
               * see if state name(args) is updated by symb(indices),
               * otherwise its content is unchanged. *)
              let action = Action.of_term symb indices in
-             let descr = Action.get_action_descr action in
+             let descr = Action.get_descr action in
                begin try
                  List.assoc (name,args) descr.Action.updates
                with Not_found ->

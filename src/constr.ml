@@ -1,5 +1,4 @@
 open Graph
-open Action
 open Vars
 open Term
 open Bformula

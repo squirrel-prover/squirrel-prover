@@ -157,8 +157,6 @@ let declare id args proc =
   check_proc args proc ;
   Hashtbl.add pdecls id (args, proc)
 
-open Action
-
 (** Prepare a process for the generation of actions:
   *
   *  - the resulting process does not feature New and Let constructs,
@@ -518,7 +516,7 @@ let parse_proc proc : unit =
         | f::fs -> Bformula.And (f, conj fs)
       in
       let condition = vars, conj facts in
-      let action =
+      let action = Action.
         { par_choice ;
           sum_choice = pos, conv_indices env vars } :: env.action in
       let env =
@@ -584,7 +582,8 @@ let parse_proc proc : unit =
           updates
       in
       let action = List.rev env.action in
-      let action_descr = {action;input;indices;condition;updates;output} in
+      let action_descr =
+        Action.{ action; input; indices; condition; updates; output } in
       Action.register (Obj.magic a) indices action action_descr ;
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
 
