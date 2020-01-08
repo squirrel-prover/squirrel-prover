@@ -67,13 +67,15 @@ Proof.
        executes because <h(<nR(jj),nT(i,k)>),nR(jj)> = <nR(j),nR(jj)>
        but then we have nR(j)=h(<nR(jj),nT(i,j)>) with j<>jj
        which can only happen with negligible probability. *)
-  assert (nR(j)=h(<nR(jj),nT(i,k)>,key(i))).
-  admit. (* TODO need eqindep cf #41 *)
+assert (nR(j)=h(<nR(jj),nT(i,k)>,key(i))).
+case H0.
 
   (* Now we have R1(j1,i) < R1(jj,i) < R1(j,i)
    * we will appeal to to the induction hypothesis with
    * t = R1(jj,i) and jj = j1. *)
-  apply IH0 to R1(jj,i),i,jj,j1.
+apply IH0 to R1(jj,i),i,jj,j1.
+
+
   apply happens_le to R1(j1,i), R1(jj,i).
 Qed.
 
