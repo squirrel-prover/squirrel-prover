@@ -222,12 +222,13 @@ tac:
   | l=tac PLUS r=tac                  { Prover.AST.OrElse [l;r] }
   | TRY l=tac                         { Prover.AST.Try l }
   | REPEAT t=tac                      { Prover.AST.Repeat t }
-
-  | ID                                { Prover.AST.Abstract ($1,[]) }
   | ID i=INT                          { Prover.AST.Abstract
                                           ($1,[Prover.Int i]) }
-  | ID term                           { Prover.AST.Abstract
-                                          ($1,[Prover.Theory $2]) }
+  | ID t=tactic_params                          { Prover.AST.Abstract
+						    ($1,t) }
+  | EXISTS t=tactic_params            { Prover.AST.Abstract
+                                          ("exists",t) }
+(* the case of EXISTS must be treated separately as EXISTS is used for formulas. *)
   | ID f=formula                      { Prover.AST.Abstract
                                           ($1,
                                            [Prover.Formula
@@ -252,10 +253,6 @@ tac:
   | HELP i=ID                         { Prover.AST.Abstract
                                           ("help",
                                            [Prover.String_name i]) }
-
-  | EXISTS t=tactic_params            { Prover.AST.Abstract ("exists",t) }
-  | ID TO t=tactic_params                { Prover.AST.Abstract
-                                          ($1,t) }
 
 qed:
 | QED                                 { () }
