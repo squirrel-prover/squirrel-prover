@@ -1,16 +1,3 @@
-type ord = Bformula.ord
-
-let pp_par_choice_fg f g ppf (k,str_indices) =
-  if str_indices = [] then
-    Fmt.pf ppf "%d" k
-  else
-    Fmt.pf ppf "%d[%a]" k f (g str_indices)
-
-let pp_par_choice_shape2 =
-  pp_par_choice_fg
-    (Fmt.list (fun ppf s -> Fmt.pf ppf "%s" s))
-    (fun x -> x)
-
 type kind = Vars.sort
 
 (* TODO replace term list by string list when indices are expected ? *)
@@ -32,9 +19,7 @@ type term =
     * depending on the type of the function symbol.
     * The third argument is for the optional timestamp. This is used for
     * the terms appearing in goals.*)
-  | Compare of ord*term*term
-
-let pp_action_shape = Action.pp_parsed_action
+  | Compare of Atom.ord*term*term
 
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
@@ -59,7 +44,7 @@ let rec pp_term ppf = function
       (Utils.pp_list pp_term) terms
       pp_ots ots
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Bformula.pp_ord ord pp_term tr
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Atom.pp_ord ord pp_term tr
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
@@ -71,7 +56,7 @@ let pp_fact = Bformula.pp_bformula pp_term
 
 (** Intermediate formulas *)
 
-type formula = (term, (string * Term.kind) ) Formula.foformula
+type formula = (term, string * kind) Formula.foformula
 
 let pp_formula =
   Formula.pp_foformula
@@ -97,7 +82,7 @@ exception Arity_error of string*int*int
 
 let arity_error s i j = raise (Arity_error (s,i,j))
 
-type env = (string*Term.kind) list
+type env = (string*kind) list
 
 exception Untyped_symbol
 
@@ -482,7 +467,8 @@ let convert_glob subst t =
 
 let convert_atom ts subst atom =
   match atom with
-  | Compare (o, u, v) -> (o, convert ts subst u, convert ts subst v)
+  | Compare (#Atom.ord_eq as o, u, v) ->
+      `Message (o, convert ts subst u, convert ts subst v)
   | _ -> assert false
 
 let convert_bformula conv_atom f =
@@ -511,7 +497,7 @@ let get_kind env t =
       with Type_error -> check_term env t Boolean; Boolean
 
 
-let convert_trace_formula_atom args_kind subst f : Bformula.trace_formula_atom =
+let convert_trace_formula_atom args_kind subst f : Atom.trace_formula_atom =
   let open Vars in
   let open Bformula in
   match f with
@@ -519,13 +505,15 @@ let convert_trace_formula_atom args_kind subst f : Bformula.trace_formula_atom =
     begin
       match get_kind args_kind u, get_kind args_kind v with
       | Index, Index ->
-        Pind ( o,
-               conv_index subst u,
-               conv_index subst v )
+          begin match o with
+            | #Atom.ord_eq as o ->
+                `Index (o, conv_index subst u, conv_index subst v)
+            | _ -> assert false
+          end
       | Timestamp, Timestamp ->
-        Pts ( o,
-              convert_ts subst u,
-              convert_ts subst v )
+        `Timestamp (o,
+                    convert_ts subst u,
+                    convert_ts subst v )
       | _ -> raise Type_error end
   | _ -> assert false
 
@@ -534,9 +522,8 @@ let convert_trace_formula_glob args_kind subst f : Bformula.trace_formula =
 
 let convert_atom_glob subst atom =
   match atom with
-  | Compare (o, u, v) -> (o,
-                        convert_glob subst u,
-                        convert_glob subst v)
+  | Compare (#Atom.ord_eq as o, u, v) ->
+      `Message (o, convert_glob subst u, convert_glob subst v)
   | _ -> assert false
 
 let convert_fact_glob subst f : Bformula.fact =
@@ -568,10 +555,11 @@ let convert_formula_glob args_kind subst f =
         let at = Compare (o,u,v) in
         match get_kind args_kind u with
         | Index | Timestamp ->
-            Atom (Constraint (convert_trace_formula_atom args_kind subst at))
-        | Message | Boolean -> Atom (Message (convert_atom_glob subst at))
+            Atom (convert_trace_formula_atom args_kind subst at :>
+                    Atom.generic_atom)
+        | Message | Boolean -> Atom (convert_atom_glob subst at)
       end
-    | Atom (Fun ("happens",[ts],None)) -> Atom (Happens (convert_ts subst ts))
+    | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
     | Atom _ -> assert false
     | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
     | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)

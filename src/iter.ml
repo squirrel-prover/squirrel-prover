@@ -18,7 +18,7 @@ class iter = object (self)
         self#visit_fact r
     | Not f -> self#visit_fact f
     | True | False -> ()
-    | Atom (_, t, t') ->
+    | Atom (`Message (_, t, t')) ->
         self#visit_term t ;
         self#visit_term t'
 

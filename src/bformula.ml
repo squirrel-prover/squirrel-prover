@@ -1,4 +1,5 @@
 open Term
+open Atom
 
 (** Boolean formulas *)
 type 'a bformula =
@@ -107,85 +108,20 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
   simpl_formula nlit b |> dnf
 
 
-(** Atoms *)
-
-type ord = Eq | Neq | Leq | Geq | Lt | Gt
-
-type 'a _atom = ord * 'a * 'a
-
-type term_atom = term _atom
-
 type fact = term_atom bformula
 
-let atom_vars avars (o,a1,a2) =
-  (avars a1 @ avars a1)
-  |> List.sort_uniq Pervasives.compare
-
-let term_atom_vars = atom_vars term_vars
-
-let pp_ord ppf = function
-  | Eq -> Fmt.pf ppf "="
-  | Neq -> Fmt.pf ppf "<>"
-  | Leq -> Fmt.pf ppf "<="
-  | Geq -> Fmt.pf ppf ">="
-  | Lt -> Fmt.pf ppf "<"
-  | Gt -> Fmt.pf ppf ">"
-
-let not_ord o = match o with
-  | Eq -> Neq
-  | Neq -> Eq
-  | Leq -> Gt
-  | Geq -> Lt
-  | Lt -> Geq
-  | Gt -> Leq
-
-let pp_term_atom ppf (o,tl,tr) =
-  Fmt.pf ppf "@[%a@ %a@ %a@]" pp_term tl pp_ord o pp_term tr
-
 let pp_fact = pp_bformula pp_term_atom
-
-(** Negate the atom *)
-let not_xpred (o,l,r) = (not_ord o, l, r)
-
-let simpl_fact f = simpl_formula not_xpred f
-
-(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
-let norm_xatom (o, l, r) =
-  match o with
-  | Eq | Neq | Leq -> [(o, l, r)]
-  | Geq -> [(Leq, r, l)]
-  | Lt -> (Leq, l, r) :: [(Neq, l, r)]
-  | Gt -> (Leq, r, l) :: [(Neq, r, l)]
-
-let add_xeq od xeq (eqs, leqs, neqs) =
-  match od with
-  | Eq -> (xeq :: eqs, leqs, neqs)
-  | Leq -> (eqs, xeq :: leqs, neqs)
-  | Neq -> (eqs, leqs, xeq :: neqs)
-  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
-
-type trace_formula_atom =
-  | Pts of timestamp _atom
-  | Pind of Index.t _atom
-
 type trace_formula = trace_formula_atom bformula
 
-let pts (o, t, t') = Pts (o, t, t')
-let pind (o, i, i') = Pind (o, i, i')
+let pts (o, t, t') = `Timestamp (o, t, t')
 
-let pp_trace_formula_atom ppf = function
-  | Pts (o,tl,tr) ->
-    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
-  | Pind (o,il,ir) ->
-    Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
-
-let not_tpred = function
-  | Pts (o,t,t') -> Pts (not_xpred (o,t,t'))
-  | Pind (o,i,i') -> Pind (not_xpred (o,i,i'))
+let not_tpred : trace_formula_atom -> trace_formula_atom = function
+  | `Timestamp (o,t,t') -> `Timestamp (not_xpred (o,t,t'))
+  | `Index (o,i,i') -> `Index (not_xpred_eq (o,i,i'))
 
 let norm_tatom = function
-  | Pts (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
-  | Pind _ as x -> [x]
+  | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
+  | `Index _ as x -> [x]
 
 let pp_trace_formula ppf = pp_bformula pp_trace_formula_atom ppf
 
@@ -193,9 +129,6 @@ let trace_formula_dnf (c : trace_formula) =
   bf_dnf not_tpred c
   |> List.map (fun l -> List.map norm_tatom l
                         |> List.flatten)
-
-let subst_term_atom (s : subst) ((ord, a1, a2) : term_atom) =
-  (ord,subst_term s a1, subst_term s a2)
 
 let rec subst_bformula a_subst (s : subst) (f) =
   match f with
@@ -209,28 +142,7 @@ let rec subst_bformula a_subst (s : subst) (f) =
 
 let subst_fact = subst_bformula subst_term_atom
 
-let subst_trace_formula_atom (s:subst) = function
-  | Pts (ord, ts, ts') ->
-    Pts (ord, subst_ts s ts, subst_ts s ts')
-  | Pind (ord, i, i') ->  Pind(ord, get_index_subst s i,get_index_subst s i')
-
 let subst_trace_formula = subst_bformula subst_trace_formula_atom
-
-let trace_formula_atom_vars = function
-  | Pts (_,ts,ts') -> ts_vars ts @ ts_vars ts'
-  | Pind (o,i,i') -> [i;i']
-
-let rec atsts acc = function
-  | [] -> acc
-  | (_, t, t') :: l -> atsts ((term_ts t) @ (term_ts t')@acc) l
-
-let term_atoms_ts at = atsts [] at |> List.sort_uniq Pervasives.compare
-
-
-let rec tatsts acc = function
-  | [] -> acc
-  | (Pind _) :: l -> tatsts acc l
-  | (Pts (_, ts, ts')) :: l -> tatsts (ts :: ts' :: acc) l
 
 let f_fts f_at acc fact =
   let rec fts acc = function

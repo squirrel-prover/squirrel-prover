@@ -1,4 +1,5 @@
 open Tactics
+open Atom
 open Formula
 open Term
 
@@ -93,7 +94,7 @@ let timestamp_case ts s sk fk =
     in
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
     let case =
-      let at = Atom (Constraint (Bformula.Pts (Bformula.Eq,ts,name))) in
+      let at = Atom (`Timestamp (`Eq,ts,name)) in
       let at = subst_formula subst at in
       if indices = [] then at else Exists (indices,at)
     in
@@ -164,8 +165,8 @@ let goal_intro (s : Sequent.t) sk fk =
     sk [s'] fk
   | Not f ->
     sk [Sequent.set_conclusion False s |> Sequent.add_formula f] fk
-  | Atom (Message (Bformula.Neq,u,v)) ->
-    let h = Message (Bformula.Eq,u,v) in
+  | Atom (`Message (`Neq,u,v)) ->
+    let h = `Message (`Eq,u,v) in
     let s' = Sequent.set_conclusion False s |> Sequent.add_formula (Atom h) in
     sk [s'] fk
   | _ ->
@@ -261,7 +262,7 @@ let induction s sk fk =
         let ih =
           ForAll (v''::vs,
             Impl
-              (Atom (Constraint (Bformula.Pts (Bformula.Lt,vv'',vv))),
+              (Atom (`Timestamp (`Lt,vv'',vv) :> generic_atom),
                Formula.subst_formula [TS(vv,vv'')] f))
         in
         let s =
@@ -385,7 +386,7 @@ let eq_timestamps (s : Sequent.t) sk fk =
          if normt = t then
            acc
          else
-           Formula.Atom (Message (Eq, t, normt)) ::acc)
+           Formula.Atom (`Message (`Eq, t, normt)) ::acc)
       [] terms
   in
   let s =
@@ -406,7 +407,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
     match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
     | ts1,ts2 ->
       let models = Sequent.get_models s in
-      if Constr.query models [(Pts (Eq,ts1,ts2))] then
+      if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [TS(ts1,ts2)]
       else
         raise @@ Tactic_Hard_Failure "Arguments not equals."
@@ -422,7 +423,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
         | i1,i2 ->
           let models = Sequent.get_models s in
-          if Constr.query models [(Pind (Eq,i1,i2))] then
+          if Constr.query models [(`Index (`Eq,i1,i2))] then
             [Index(i1,i2)]
           else
             raise @@ Tactic_Hard_Failure "Arguments not equals."
@@ -441,9 +442,9 @@ let () =
 
 (** EUF Axioms *)
 
-let euf_param (at : term_atom) = match at with
-  | (Eq, Fun ((hash, _), [m; Name key]), s)
-  | (Eq, s, Fun ((hash, _), [m; Name key]))->
+let euf_param (`Message at : term_atom) = match at with
+  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+  | (`Eq, s, Fun ((hash, _), [m; Name key]))->
     if Theory.is_hash hash then
       (hash, key, m, s)
     else raise @@ Tactic_Hard_Failure
@@ -454,7 +455,7 @@ let euf_param (at : term_atom) = match at with
 let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let open Euf in
   (* We create the term equality *)
-  let new_f = Formula.Atom (Message (Eq, case.message, m)) in
+  let new_f = Formula.Atom (`Message (`Eq, case.message, m)) in
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts = Action.to_term case.action_descr.Action.action in
@@ -463,9 +464,9 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
     List.map
       (function
          | TPred ts ->
-             Atom (Pts (Lt, action_descr_ts, ts))
+             Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
-             Atom (Pts (Leq, action_descr_ts, ts)))
+             Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
     |> mk_or_cnstr
   in
@@ -474,13 +475,13 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
 let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
   let open Euf in
   (* We create the term equality *)
-  let eq = Formula.Atom (Message (Eq, dcase.d_message, m)) in
+  let eq = Formula.Atom (`Message (`Eq, dcase.d_message, m)) in
   (* Now, we need to add the timestamp constraint between [key_is] and
      [dcase.d_key_indices]. *)
   let eq_cnstr =
-    List.map2 (fun i i' ->
-        Atom (Pind (Eq, i, i'))
-      ) key_is dcase.d_key_indices
+    List.map2
+      (fun i i' -> Atom (`Index (`Eq, i, i')))
+      key_is dcase.d_key_indices
     |> mk_and_cnstr
   in
   (eq, eq_cnstr)
@@ -613,9 +614,10 @@ let collision_resistance (s : Sequent.t) sk fk =
       let new_facts =
         List.fold_left (fun acc (h1,h2) ->
             match h1, h2 with
-            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+            | Fun ((hash, _), [m1; Name key1]),
+              Fun ((hash2, _), [m2; Name key2])
               when hash = hash2 && key1 = key2 ->
-              Formula.Atom (Message (Eq, m1, m2)) :: acc
+              Formula.Atom (`Message (`Eq, m1, m2)) :: acc
             | _ -> acc
           ) [] hash_eqs
       in

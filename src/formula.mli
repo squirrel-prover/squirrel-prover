@@ -2,7 +2,7 @@
 
 open Vars
 open Term
-open Bformula
+open Atom
 
 (** {2 Generic first-order formulas} *)
 
@@ -43,12 +43,6 @@ val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
 
 (** {2 Meta-logic formulas} *)
 
-(** Atoms of the meta-logic are either timestamp or term atoms. *)
-type generic_atom =
-  | Constraint of trace_formula_atom
-  | Message of term_atom
-  | Happens of timestamp
-
 type formula = (generic_atom, var) foformula
 
 val pp_formula : Format.formatter -> formula -> unit
@@ -61,11 +55,11 @@ val formula_vars : formula -> var list
   * quantified inside a formula. *)
 val formula_qvars : formula -> var list
 
-val fact_to_formula : fact -> formula
+val fact_to_formula : Bformula.fact -> formula
 
-val formula_to_fact : formula -> fact
+val formula_to_fact : formula -> Bformula.fact
 
-val formula_to_trace_formula : formula -> trace_formula option
+val formula_to_trace_formula : formula -> Bformula.trace_formula option
 
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]

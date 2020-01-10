@@ -20,7 +20,8 @@ val check_equalities : state -> (term * term) list -> bool
     rewrite relation in [state], and add the corresponding index equalities.
     E.g., if [n[i,j]] and [n[k,l]] are equal, then the returned list
     would contain [i=k] and [j=l]. *)
-val name_index_cnstrs : state -> term list -> trace_formula_atom bformula list
+val name_index_cnstrs :
+  state -> term list -> Bformula.trace_formula list
 
 
 (** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the

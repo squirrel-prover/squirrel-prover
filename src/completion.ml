@@ -881,7 +881,7 @@ let name_index_cnstrs state l =
   let n_cnstr a b = match a,b with
     | Ccst Cst.Cname (n,is), Ccst Cst.Cname (n',is') ->
       if n <> n' then [False]
-      else List.map2 (fun x y -> Atom (Pind (Eq, x, y))) is is'
+      else List.map2 (fun x y -> Atom (`Index (`Eq, x, y))) is is'
     | _ -> assert false in
 
   x_index_cnstrs state l
@@ -905,9 +905,10 @@ let name_indep_cnstrs state l =
         let open Formula in
         match l with
         | [] -> False
-        | [p] -> Atom (Message (Eq, term_of_cterm p, term_of_cterm name ))
-        | p::q -> Or(Atom (Message (Eq, term_of_cterm p, term_of_cterm name )),
-                     mk_disjunction q)
+        | [p] -> Atom (`Message (`Eq, term_of_cterm p, term_of_cterm name))
+        | p::q ->
+            Or(Atom (`Message (`Eq, term_of_cterm p, term_of_cterm name )),
+               mk_disjunction q)
       in
       [mk_disjunction sub_names]
     | _ -> [] in

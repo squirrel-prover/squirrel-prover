@@ -71,12 +71,12 @@ tm_list:
 (* Facts, aka booleans *)
 
 ord:
-| EQ                             { Bformula.Eq }
-| NEQ                            { Bformula.Neq }
-| LEQ                            { Bformula.Leq }
-| LANGLE                         { Bformula.Lt }
-| GEQ                            { Bformula.Geq }
-| RANGLE                         { Bformula.Gt }
+| EQ                             { `Eq }
+| NEQ                            { `Neq }
+| LEQ                            { `Leq }
+| LANGLE                         { `Lt }
+| GEQ                            { `Geq }
+| RANGLE                         { `Gt }
 
 kind:
 | INDEX                          { Vars.Index }

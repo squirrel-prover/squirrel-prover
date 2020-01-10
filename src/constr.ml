@@ -1,6 +1,7 @@
 open Graph
 open Vars
 open Term
+open Atom
 open Bformula
 open Utils
 
@@ -119,11 +120,14 @@ type constr_instance = { eqs : (ut * ut) list;
 (* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
 let mk_instance (l : trace_formula_atom list) =
-  let eqs, leqs, neqs = List.fold_left (fun acc x -> match x with
-      | Pts (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
-      | Pind (od,i1,i2) -> add_xeq od (uvari i1, uvari i2) acc)
-      ([],[],[]) l in
-
+  let eqs, leqs, neqs =
+    List.fold_left
+      (fun acc (x:trace_formula_atom) -> match x with
+         | `Timestamp (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
+         | `Index (od,i1,i2) ->
+             add_xeq (od:>Atom.ord) (uvari i1, uvari i2) acc)
+      ([],[],[])
+      l in
   let rec subterms acc x = match x.cnt with
     | UName (_,is) -> x :: is @ acc
     | UPred y -> subterms (x :: acc) y
@@ -578,9 +582,9 @@ let ts_query (model : model) (ord, ts, ts') : bool =
   let model, u = ext_support model (uts ts) in
   let model, v = ext_support model (uts ts') in
   match ord with
-  | Eq -> ut_equal u v
-  | Leq -> UtG.mem_edge model.tr_graph u v
-  | Neq ->
+  | `Eq -> ut_equal u v
+  | `Leq -> UtG.mem_edge model.tr_graph u v
+  | `Neq ->
     (* In that case, we are very unprecise, as we only check whether
        the inequality already appeared, modulo known equalities. *)
     List.exists (fun (a,b) ->
@@ -592,19 +596,19 @@ let ts_query (model : model) (ord, ts, ts') : bool =
   | _ -> assert false
 
 (** Only Eq and Neq. *)
-let ind_query (model : model) (ord, i, i') : bool =
+let ind_query (model : model) (ord,i,i') : bool =
   let model, u = ext_support model (uvari i) in
   let model, v = ext_support model (uvari i') in
   match ord with
-  | Eq -> ut_equal u v
-  | Leq -> UtG.mem_edge model.tr_graph u v
+  | `Eq -> ut_equal u v
+  | `Leq -> UtG.mem_edge model.tr_graph u v
   | _ -> assert false
 
 let _query (model : model) = function
-  | Pts (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
-  | Pind (o,a,b) -> List.for_all (ind_query model) (norm_xatom (o,a,b))
+  | `Timestamp (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
+  | `Index (o,a,b) -> List.for_all (ind_query model) (norm_xatom ((o:>ord),a,b))
 
-let query (models : models) ats =
+let query (models : models) (ats : trace_formula_atom list) =
   List.for_all (fun model -> List.for_all (_query model) ats) models
 
 (* [max_elems_model model elems] returns the maximal elements of [elems]
@@ -637,11 +641,11 @@ let maximal_elems (models : models) (elems : timestamp list) =
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
-  Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) maxs
+  Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) maxs
   |> List.map List.hd
 
 let get_equalities (models : models) ts =
-  Utils.classes (fun ts ts' -> query models [Pts (Eq,ts,ts')]) ts
+  Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) ts
 
 (****************)
 (* Tests Suites *)
@@ -658,35 +662,35 @@ and i' = Vars.make_fresh_and_update env Index "i"
 
 let a = Obj.magic "a" (* Avoid declaring outside of Symbols.run_restore *)
 
-let pb_eq1 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
-and pb_eq2 = [Pts (Eq,tau, TPred tau)]
-and pb_eq3 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TPred tau''))
-             :: [Pts (Eq,tau'', tau)]
-and pb_eq4 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i]))]
-and pb_eq5 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a,[i'])))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: (Pts (Eq,tau'', TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
-and pb_eq6 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TName (a,[i'])))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: (Pts (Eq,tau3, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
-and pb_eq7 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TPred tau''))
-             :: (Pts (Eq,tau, TName (a,[i])))
-             :: [Pts (Eq,tau'', TName (a,[i']))]
-and pb_eq8 = (Pts (Eq,tau, TPred tau'))
-             :: (Pts (Eq,tau', TPred tau''))
-             :: [Pts (Eq,tau'', tau3)];;
+let pb_eq1 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TPred tau''))
+             :: (`Timestamp (`Eq,tau, TName (a,[i])))
+             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
+and pb_eq2 = [`Timestamp (`Eq,tau, TPred tau)]
+and pb_eq3 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TPred tau''))
+             :: [`Timestamp (`Eq,tau'', tau)]
+and pb_eq4 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TPred tau''))
+             :: (`Timestamp (`Eq,tau, TName (a,[i])))
+             :: [`Timestamp (`Eq,tau'', TName (a,[i]))]
+and pb_eq5 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TName (a,[i'])))
+             :: (`Timestamp (`Eq,tau, TName (a,[i])))
+             :: (`Timestamp (`Eq,tau'', TName (a,[i])))
+             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
+and pb_eq6 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TName (a,[i'])))
+             :: (`Timestamp (`Eq,tau, TName (a,[i])))
+             :: (`Timestamp (`Eq,tau3, TName (a,[i])))
+             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
+and pb_eq7 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TPred tau''))
+             :: (`Timestamp (`Eq,tau, TName (a,[i])))
+             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
+and pb_eq8 = (`Timestamp (`Eq,tau, TPred tau'))
+             :: (`Timestamp (`Eq,tau', TPred tau''))
+             :: [`Timestamp (`Eq,tau'', tau3)];;
 
 (* Printexc.record_backtrace true;; *)
 
@@ -730,28 +734,28 @@ let () =
 
     ("Graph", `Quick,
      fun () ->
-       let successes = [(Pts (Leq, tau, tau'')) :: pb_eq1;
+       let successes = [(`Timestamp (`Leq, tau, tau'')) :: pb_eq1;
 
-                        (Pts (Neq, tau, tau3)) ::
-                        (Pts (Neq, tau3, tau'')) ::
-                        (Pts (Leq, tau, tau3)) ::
-                        (Pts (Leq, tau3, tau'')) ::
+                        (`Timestamp (`Neq, tau, tau3)) ::
+                        (`Timestamp (`Neq, tau3, tau'')) ::
+                        (`Timestamp (`Leq, tau, tau3)) ::
+                        (`Timestamp (`Leq, tau3, tau'')) ::
                         pb_eq1;
 
-                       (Pts (Neq, tau, tau3)) ::
-                       (Pts (Neq, tau4, tau'')) ::
-                       (Pts (Leq, tau, tau3)) ::
-                       (Pts (Leq, tau3, tau4)) ::
-                       (Pts (Leq, tau4, tau'')) ::
+                       (`Timestamp (`Neq, tau, tau3)) ::
+                       (`Timestamp (`Neq, tau4, tau'')) ::
+                       (`Timestamp (`Leq, tau, tau3)) ::
+                       (`Timestamp (`Leq, tau3, tau4)) ::
+                       (`Timestamp (`Leq, tau4, tau'')) ::
                        pb_eq1]
-       and failures = [(Pts (Leq, tau'', tau)) :: pb_eq1;
+       and failures = [(`Timestamp (`Leq, tau'', tau)) :: pb_eq1;
 
-                       (Pts (Neq, tau, tau3)) ::
-                       (Pts (Neq, tau3, tau4)) ::
-                       (Pts (Neq, tau4, tau'')) ::
-                       (Pts (Leq, tau, tau3)) ::
-                       (Pts (Leq, tau3, tau4)) ::
-                       (Pts (Leq, tau4, tau'')) ::
+                       (`Timestamp (`Neq, tau, tau3)) ::
+                       (`Timestamp (`Neq, tau3, tau4)) ::
+                       (`Timestamp (`Neq, tau4, tau'')) ::
+                       (`Timestamp (`Leq, tau, tau3)) ::
+                       (`Timestamp (`Leq, tau3, tau4)) ::
+                       (`Timestamp (`Leq, tau4, tau'')) ::
                        pb_eq1] in
 
        List.iteri (fun i pb ->

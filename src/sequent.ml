@@ -1,5 +1,6 @@
 open Utils
 open Term
+open Atom
 open Bformula
 open Formula
 
@@ -8,11 +9,11 @@ open Formula
 module H : sig
 
   type ('a, 'b) hypothesis = {
-  name_prefix : string;
-  tag :  'a;
-  hypothesis : 'b;
-  visible : bool;
-}
+    name_prefix : string;
+    tag :  'a;
+    hypothesis : 'b;
+    visible : bool;
+  }
 
   exception Non_existing_hypothesis
 
@@ -45,7 +46,7 @@ module H : sig
 
 end = struct
 
-  type ('a, 'b) hypothesis = {
+type ('a, 'b) hypothesis = {
   name_prefix : string;
   tag :  'a;
   hypothesis : 'b;
@@ -218,17 +219,18 @@ let is_hypothesis f s =
   | Some tf -> H.mem tf s.trace_hypotheses
   | None ->
     match f with
-    | Atom (Message at) -> H.mem at s.message_hypotheses
-    | Atom (Happens t) -> List.mem t s.happens_hypotheses
+    | Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
+    | Atom (`Happens t) -> List.mem t s.happens_hypotheses
     | _ ->  H.mem f s.formula_hypotheses
 
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
-      Atom (Message (H.find id s.message_hypotheses).H.hypothesis)
+      Atom ((H.find id s.message_hypotheses).H.hypothesis :>
+               Atom.generic_atom)
     with Not_found ->
       Formula.bformula_to_foformula
-        (fun x -> Formula.Constraint x)
+        (fun x -> (x :> Atom.generic_atom))
         (H.find id s.trace_hypotheses).H.hypothesis
 
 let id = fun x -> x
@@ -272,7 +274,7 @@ let rec add_macro_defs s at =
   let macro_eqs : term_atom list ref = ref [] in
   let iter =
     new iter_macros
-      (fun t t' -> macro_eqs := (Eq,t,t') :: !macro_eqs)
+      (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
     iter#visit_fact (Atom at) ;
     List.fold_left
@@ -299,7 +301,7 @@ let rec add_happens s ts =
           let a = Action.of_term symb indices in
           add_formula ~prefix:"C"
             (Formula.bformula_to_foformula
-               (fun x -> Message x)
+               (fun x -> (x :> Atom.generic_atom))
                (snd (Action.get_descr a).Action.condition))
             s
       | _ -> s
@@ -311,24 +313,21 @@ and add_formula ?prefix f s =
   | Some tf -> add_trace_formula ?prefix tf s
   | None ->
     match f with
-    | Atom (Message at) -> add_message_hypothesis ?prefix s at
-    | Atom (Happens ts) -> add_happens s ts
+    | Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
+    | Atom (`Happens ts) -> add_happens s ts
     | _ ->
         let prefix = match prefix with Some p -> p | None -> "H" in
         { s with formula_hypotheses =
                    H.add true () f prefix s.formula_hypotheses }
 
 let get_eqs_neqs_at_list atl =
-  List.map norm_xatom atl
-  |> List.flatten
-  |> List.fold_left (fun acc (od,a,b) ->
-      add_xeq od (a,b) acc) ([],[],[])
+  List.fold_left
+    (fun acc (`Message (od,a,b)) -> add_xeq_eq od (a,b) acc)
+    ([],[]) atl
 
 let get_eqs_neqs s =
-  let eqs, _, neqs = get_eqs_neqs_at_list
-      (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
-  in
-  eqs,neqs
+  get_eqs_neqs_at_list
+    (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
 
 let update_trs s =
   let eqs,_ = get_eqs_neqs s in
@@ -349,7 +348,7 @@ let message_atoms_valid s =
     List.exists
       (fun eq -> Completion.check_equalities trs [eq])
       (match s.conclusion with
-         | Atom (Message (Eq,u,v)) -> (u,v)::neqs
+         | Atom (`Message (`Eq,u,v)) -> (u,v)::neqs
          | _ -> neqs)
 
 let set_env a s = { s with env = a }
@@ -359,7 +358,7 @@ let get_env s = s.env
 let set_conclusion a s =
   let s = { s with conclusion = a } in
     match a with
-      | Atom (Message at) -> add_macro_defs s at
+      | Atom (#term_atom as at) -> add_macro_defs s at
       | _ -> s
 
 let init (goal : formula) = set_conclusion goal init_sequent
@@ -369,13 +368,13 @@ let get_conclusion s = s.conclusion
 let apply_subst subst s =
   let mess_is_triv m =
     match m with
-    | (Eq,t1,t2) when t1=t2 -> true
+    | `Message (`Eq,t1,t2) when t1=t2 -> true
     | _ -> false
   in
   let trace_is_triv (m:trace_formula) : bool =
     match m with
-    | Atom (Pts (Eq,t1,t2)) when t1=t2 -> true
-    | Atom (Pind (Eq,i1,i2)) when i1=i2 -> true
+    | Atom (`Timestamp (`Eq,t1,t2)) when t1=t2 -> true
+    | Atom (`Index (`Eq,i1,i2)) when i1=i2 -> true
     | _ -> false
   in
   let apply_hyp_subst f is_triv hypo =
@@ -384,7 +383,7 @@ let apply_subst subst s =
                H.hypothesis = new_formula}
   in
   {s with
-   message_hypotheses = H.map (apply_hyp_subst (Bformula.subst_term_atom subst)
+   message_hypotheses = H.map (apply_hyp_subst (Atom.subst_term_atom subst)
                                  mess_is_triv) s.message_hypotheses;
    trace_hypotheses = H.map (apply_hyp_subst
                                (Bformula.subst_trace_formula subst)
@@ -444,7 +443,7 @@ let get_all_terms s =
   in
   let atoms =
     match s.conclusion with
-      | Atom (Message at) -> at::atoms
+      | Atom (#term_atom as at) -> at::atoms
       | _ -> atoms
   in
-  List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
+  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms

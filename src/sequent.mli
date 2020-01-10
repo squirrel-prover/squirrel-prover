@@ -70,7 +70,7 @@ val select_message_hypothesis :
   ?remove:bool ->
   ?update:(message_hypothesis_tag -> message_hypothesis_tag) ->
   string -> sequent ->
-  (sequent * term_atom)
+  (sequent * Atom.term_atom)
 
 val select_formula_hypothesis :
   ?remove:bool ->

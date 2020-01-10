@@ -1,25 +1,5 @@
 open Term
-open Bformula
-
-type generic_atom =
-  | Constraint of trace_formula_atom
-  | Message of term_atom
-  | Happens of timestamp
-
-let subst_generic_atom s = function
-  | Constraint a -> Constraint (subst_trace_formula_atom s a)
-  | Message a -> Message (subst_term_atom s a)
-  | Happens a -> Happens (subst_ts s a)
-
-let pp_generic_atom ppf = function
-  | Constraint a -> pp_trace_formula_atom ppf a
-  | Message a -> pp_term_atom ppf a
-  | Happens a -> Fmt.pf ppf "happens(%a)" pp_timestamp a
-
-let generic_atom_var = function
-  | Constraint a -> trace_formula_atom_vars a
-  | Message a -> term_atom_vars a
-  | Happens a -> ts_vars a
+open Atom
 
 (** First order formulas *)
 type ('a, 'b) foformula =
@@ -63,11 +43,11 @@ let rec bformula_to_foformula fatom = function
 type formula = (generic_atom, Vars.var) foformula
 
 let fact_to_formula =
-  bformula_to_foformula (fun x -> Message x)
+  bformula_to_foformula (fun x -> (x :> generic_atom))
 
 let formula_to_fact f =
   foformula_to_bformula
-    (function Message x -> x | _ -> failwith "not a fact")
+    (function `Message x -> `Message x | _ -> failwith "not a fact")
     f
 
 exception No_trace_formula
@@ -75,7 +55,9 @@ exception No_trace_formula
 let formula_to_trace_formula f =
   try
     Some (foformula_to_bformula
-            (function Constraint x -> x | _ -> raise No_trace_formula)
+            (function
+               | #trace_formula_atom as x -> x
+               | _ -> raise No_trace_formula)
             f)
   with No_trace_formula | Not_a_boolean_formula -> None
 

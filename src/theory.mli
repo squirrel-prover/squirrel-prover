@@ -30,7 +30,7 @@ type term =
         * depending on the type of the function symbol.
         * The third argument is for the optional timestamp. This is used for
         * the terms appearing in goals.*)
-  | Compare of Bformula.ord*term*term
+  | Compare of Atom.ord*term*term
 
 val pp_term : Format.formatter -> term -> unit
 
@@ -103,8 +103,7 @@ val check_fact : env -> fact -> unit
 val is_hash : Term.fname -> bool
 
 (** {2 Conversions}
-    Convert terms inside the theory to to terms of the prover.
-*)
+  * Convert terms inside the theory to terms of the prover. *)
 
 val subst : term -> (string*term) list -> term
 val subst_fact : fact -> (string*term) list -> fact
