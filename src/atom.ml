@@ -61,7 +61,7 @@ let add_xeq_eq od xeq (eqs, neqs) =
   | `Eq -> (xeq :: eqs, neqs)
   | `Neq -> (eqs, xeq :: neqs)
 
-type trace_formula_atom = [
+type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Index.t) _atom
 ]
@@ -76,7 +76,7 @@ type generic_atom = [
 let subst_term_atom (s : subst) (`Message (ord, a1, a2)) =
   `Message (ord, subst_term s a1, subst_term s a2)
 
-let subst_trace_formula_atom (s:subst) = function
+let subst_trace_atom (s:subst) = function
   | `Timestamp (ord, ts, ts') ->
     `Timestamp (ord, subst_ts s ts, subst_ts s ts')
   | `Index (ord, i, i') ->
@@ -85,9 +85,9 @@ let subst_trace_formula_atom (s:subst) = function
 let subst_generic_atom s = function
   | `Happens a -> `Happens (subst_ts s a)
   | #term_atom as a -> (subst_term_atom s a :> generic_atom)
-  | #trace_formula_atom as a -> (subst_trace_formula_atom s a :> generic_atom)
+  | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
-let pp_trace_formula_atom ppf : trace_formula_atom -> unit = function
+let pp_trace_atom ppf : trace_atom -> unit = function
   | `Timestamp (o,tl,tr) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp_timestamp tl pp_ord o pp_timestamp tr
   | `Index (o,il,ir) ->
@@ -96,14 +96,14 @@ let pp_trace_formula_atom ppf : trace_formula_atom -> unit = function
 let pp_generic_atom ppf = function
   | `Happens a -> Fmt.pf ppf "happens(%a)" pp_timestamp a
   | #term_atom as a -> pp_term_atom ppf a
-  | #trace_formula_atom as a -> pp_trace_formula_atom ppf a
+  | #trace_atom as a -> pp_trace_atom ppf a
 
-let trace_formula_atom_vars = function
+let trace_atom_vars = function
   | `Timestamp (_,ts,ts') -> ts_vars ts @ ts_vars ts'
   | `Index (o,i,i') -> [i;i']
 
 let generic_atom_var = function
-  | #trace_formula_atom as a -> trace_formula_atom_vars a
+  | #trace_atom as a -> trace_atom_vars a
   | #term_atom as a -> term_atom_vars a
   | `Happens a -> ts_vars a
 

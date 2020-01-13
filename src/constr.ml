@@ -119,10 +119,10 @@ type constr_instance = { eqs : (ut * ut) list;
 
 (* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
-let mk_instance (l : trace_formula_atom list) =
+let mk_instance (l : trace_atom list) =
   let eqs, leqs, neqs =
     List.fold_left
-      (fun acc (x:trace_formula_atom) -> match x with
+      (fun acc (x:trace_atom) -> match x with
          | `Timestamp (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
          | `Index (od,i1,i2) ->
              add_xeq (od:>Atom.ord) (uvari i1, uvari i2) acc)
@@ -137,7 +137,7 @@ let mk_instance (l : trace_formula_atom list) =
     |> List.fold_left subterms []
     |> List.sort_uniq ut_compare in
 
-  let uf = Uuf.create elems in  
+  let uf = Uuf.create elems in
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
 
 
@@ -147,7 +147,7 @@ exception Unify_cycle of Uuf.t
    Raise [Unify_cycle] if it contains a cycle.
    If [ext_support] is [true], add [ut] to [uf]'s support if necessary. *)
 let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
-  
+
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
@@ -313,7 +313,7 @@ let unify uf eqs elems =
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs (l : trace_formula_atom list) =
+let mgu_eqs (l : trace_atom list) =
   let instance = mk_instance l in
   unify instance.uf instance.eqs instance.elems
 
@@ -556,7 +556,7 @@ type models = model list
 
 (* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : trace_formula_atom list) : models =
+let models_conjunct (l : trace_atom list) : models =
   let instance = mk_instance l in
   split instance
 
@@ -608,7 +608,7 @@ let _query (model : model) = function
   | `Timestamp (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
   | `Index (o,a,b) -> List.for_all (ind_query model) (norm_xatom ((o:>ord),a,b))
 
-let query (models : models) (ats : trace_formula_atom list) =
+let query (models : models) (ats : trace_atom list) =
   List.for_all (fun model -> List.for_all (_query model) ats) models
 
 (* [max_elems_model model elems] returns the maximal elements of [elems]

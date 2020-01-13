@@ -111,11 +111,11 @@ let bf_dnf : ('a -> 'a) -> 'a bformula -> 'a list list = fun nlit b ->
 type fact = term_atom bformula
 
 let pp_fact = pp_bformula pp_term_atom
-type trace_formula = trace_formula_atom bformula
+type trace_formula = trace_atom bformula
 
 let pts (o, t, t') = `Timestamp (o, t, t')
 
-let not_tpred : trace_formula_atom -> trace_formula_atom = function
+let not_tpred : trace_atom -> trace_atom = function
   | `Timestamp (o,t,t') -> `Timestamp (not_xpred (o,t,t'))
   | `Index (o,i,i') -> `Index (not_xpred_eq (o,i,i'))
 
@@ -123,7 +123,7 @@ let norm_tatom = function
   | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
   | `Index _ as x -> [x]
 
-let pp_trace_formula ppf = pp_bformula pp_trace_formula_atom ppf
+let pp_trace_formula ppf = pp_bformula pp_trace_atom ppf
 
 let trace_formula_dnf (c : trace_formula) =
   bf_dnf not_tpred c
@@ -142,7 +142,7 @@ let rec subst_bformula a_subst (s : subst) (f) =
 
 let subst_fact = subst_bformula subst_term_atom
 
-let subst_trace_formula = subst_bformula subst_trace_formula_atom
+let subst_trace_formula = subst_bformula subst_trace_atom
 
 let f_fts f_at acc fact =
   let rec fts acc = function

@@ -56,7 +56,7 @@ let formula_to_trace_formula f =
   try
     Some (foformula_to_bformula
             (function
-               | #trace_formula_atom as x -> x
+               | #trace_atom as x -> x
                | _ -> raise No_trace_formula)
             f)
   with No_trace_formula | Not_a_boolean_formula -> None

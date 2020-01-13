@@ -497,7 +497,7 @@ let get_kind env t =
       with Type_error -> check_term env t Boolean; Boolean
 
 
-let convert_trace_formula_atom args_kind subst f : Atom.trace_formula_atom =
+let convert_trace_atom args_kind subst f : Atom.trace_atom =
   let open Vars in
   let open Bformula in
   match f with
@@ -518,7 +518,7 @@ let convert_trace_formula_atom args_kind subst f : Atom.trace_formula_atom =
   | _ -> assert false
 
 let convert_trace_formula_glob args_kind subst f : Bformula.trace_formula =
-  convert_bformula (convert_trace_formula_atom args_kind subst) f
+  convert_bformula (convert_trace_atom args_kind subst) f
 
 let convert_atom_glob subst atom =
   match atom with
@@ -555,7 +555,7 @@ let convert_formula_glob args_kind subst f =
         let at = Compare (o,u,v) in
         match get_kind args_kind u with
         | Index | Timestamp ->
-            Atom (convert_trace_formula_atom args_kind subst at :>
+            Atom (convert_trace_atom args_kind subst at :>
                     Atom.generic_atom)
         | Message | Boolean -> Atom (convert_atom_glob subst at)
       end

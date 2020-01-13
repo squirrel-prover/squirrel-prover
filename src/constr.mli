@@ -14,7 +14,7 @@ val m_is_sat : models -> bool
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : models -> Atom.trace_formula_atom list -> bool
+val query : models -> Atom.trace_atom list -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].

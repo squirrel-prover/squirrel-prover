@@ -39,12 +39,12 @@ val triv_eval : 'a bformula -> 'a bformula
 
 (** Trace_Formula are boolean formulas over timestamps. *)
 
-type trace_formula = trace_formula_atom bformula
+type trace_formula = trace_atom bformula
 
 val pp_trace_formula : Format.formatter -> trace_formula -> unit
 
 (** Put a trace_formulaaint in DNF using only atoms Eq, Neq and Leq *)
-val trace_formula_dnf : trace_formula -> trace_formula_atom list list
+val trace_formula_dnf : trace_formula -> trace_atom list list
 
 val subst_trace_formula : subst -> trace_formula -> trace_formula
 

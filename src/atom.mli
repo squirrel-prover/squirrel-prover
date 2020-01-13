@@ -11,7 +11,7 @@ type term_atom = [ `Message of ord_eq * Term.term * Term.term ]
 (** Atomic constraints are comparisons over timestamps or indices.
     Indices may only be compared for (dis)equality:
     in [Pind (o,i,i')], [o] must be either [Eq] or [Neq]. *)
-type trace_formula_atom = [
+type trace_atom = [
   | `Timestamp of ord * Term.timestamp * Term.timestamp
   | `Index of ord_eq * Index.t * Index.t
 ]
@@ -19,13 +19,13 @@ type trace_formula_atom = [
 (** Atoms of the meta-logic are either timestamp or term atoms. *)
 type generic_atom = [
   | term_atom
-  | trace_formula_atom
+  | trace_atom
   | `Happens of Term.timestamp
 ]
 
 val atsts : Term.timestamp list -> term_atom list -> Term.timestamp list
 val tatsts :
-  Term.timestamp list -> trace_formula_atom list -> Term.timestamp list
+  Term.timestamp list -> trace_atom list -> Term.timestamp list
 
 val term_atoms_ts : term_atom list -> Term.timestamp list
 
@@ -51,12 +51,12 @@ val add_xeq_eq :
 
 val pp_ord : Format.formatter -> ord -> unit
 
-val trace_formula_atom_vars : trace_formula_atom -> Vars.var list
+val trace_atom_vars : trace_atom -> Vars.var list
 
-val pp_trace_formula_atom : Format.formatter -> trace_formula_atom -> unit
+val pp_trace_atom : Format.formatter -> trace_atom -> unit
 
-val subst_trace_formula_atom :
-  Term.subst -> trace_formula_atom -> trace_formula_atom
+val subst_trace_atom :
+  Term.subst -> trace_atom -> trace_atom
 
 val generic_atom_var : generic_atom -> Vars.var list
 
