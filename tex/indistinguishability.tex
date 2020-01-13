@@ -1,19 +1,187 @@
 \section{Indistinguishability}
 
-Now equipped with a logic to reason about reachability properties, we turn ourself to proving general indistinguishability. We consider the case of bi-processes, where the set of actions available on both side is the same, but the actions may differ inside their terms. Thus, a bi-process is simply a protocol, where each action $\alpha$ has two versions, on for the left and on for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each possible trace $\tr$ of the protocol, there exists then the two versions $\tr^L$ and $\tr^R$.
+\newcommand{\pair}[1]{\langle #1 \rangle}
 
+We now define indistinguishability of processes, and how we could verify it.
+We make a distinction between symbolic and observable traces:
+symbolic ones are sequences of action names as in \cref{def:trace},
+while observable traces are sequences of pairs $\pair{c_i,c_o}$.
+Intuitively, such a pair describes the input and output channels of an 
+action; several actions might have the same input and output channels.
+We write $A : \pair{c_i,c_o}$ when action $A$ inputs on channel $c_i$ and
+outputs on channel $c_o$.
 
-We first define the frame corresponding to a trace.
+For convenience, we talk of processes, though in reality the definitions
+deal with abstract systems described by sets of actions.
+
+\newcommand{\fold}{\mathsf{fold}}
+
 \begin{definition}
-  Given a trace $\tr = \alpha_1,\dots,\alpha_n$, we define its frame $\mouts_\tr = \hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)$ as  the sequence of outputs produced by the trace.
+  Given an observable trace $t$ and a process $P$,
+  we define $\fold(P,t)$ as the frame describing all possible
+  executions of $P$ along $t$:
+  \begin{eqnarray*}
+    \fold(P,\epsilon) &=& \epsilon \\
+    \fold(P,(c_i,c_o).t') &=&
+      \mathsf{if}_{A:(c_i,c_o)}
+      \ldots
+  \end{eqnarray*}
 \end{definition}
 
-We can now define diff-equivalence for bi-processes. Essentialy, for each trace such that it can happen with non negligible probabilities, the left and right frames must be indistinguishable.
+\begin{definition}
+  Two processes $P$ and $Q$ are indistinguishable when,
+  for all observable traces $t$,
+  for all computational model $\M$,
+  we have
+  $\M \models \fold(P,t) \sim \fold(Q,t)$.
+  This itself means that no attacker can distinguish,
+  with non-negligible probability, between the left- and right-hand sides.
+\end{definition}
+
+This notion of equivalence should coincide with the usual computational
+indistinguishability for bounded processes. In the unbounded case, it
+is restrictive to quantify on traces in this way
+and ask for indistinguishability only for each trace.
+
+\subsection{Straightforward diff-equivalence}
+
+\newcommand{\diff}[2]{\mathsf{choice}(#1,#2)}
+
+Two processes may be given as a bi-process, i.e. a system with a single
+set of symbolic actions, each symbolic action describing an execution step
+of both the left and right processes, using $\diff{\_}{\_}$
+terms as usual. In that case, we may define a stronger equivalence,
+relying on a simpler notion of frame which does not contain conditionals,
+because we reason directly on symbolic traces.
+We use $(\_)^L$ and $(\_)^R$ to denote the left and right projections,
+e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side
+conditions for the left side of the bi-process.
 
 \begin{definition}
-  A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol,
-  we have $\M \models \myif (\phi_{\tr^L})^{I_{\tr^L}} \mythen (\mouts_{\tr^L})^{I_{\tr^L}} \sim   \myif (\phi_{\tr^R})^{I_{\tr^R}} \mythen (\mouts_{\tr^R})^{I_{\tr^R}} $.
+  Given a symbolic trace $\tr = \alpha_1\ldots\alpha_n$, we define its frame 
+  $\mouts_\tr = \pair{\hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)}$
+  as the sequence of outputs produced by the trace.
 \end{definition}
+
+Note that this frame is not a sequence of meta-level terms,
+but a sequence of base-level terms featuring
+$\diff{\_}{\_}$ operators.
+We now define the equivalence,
+writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse 
+\mathsf{error}$, with an error constant that is unused elsewhere.
+
+\begin{definition}
+  A bi-process is diff-equivalent when,
+  for any symbolic trace $\tr$ of the protocol and
+  for any computational model $\M$,
+  we have:
+  $$\M \models
+  \myif (\phi_{\tr^L})^{I_{\tr}} \mythen (\mouts_{\tr})^L
+  \sim   
+  \myif (\phi_{\tr^R})^{I_{\tr}} \mythen (\mouts_{\tr})^R$$
+\end{definition}
+
+Note that this equivalence cannot hold if there exists a $\tr$
+whose probability of execution significantly differs between the two
+projections of the bi-process.
+Hence this imposes a form of synchronization on the execution of
+conditionals on the two sides of bi-processes.
+The interest of imposing this artificial constraint is that we
+can stop considering executions where one process goes to $\mythen$
+branch while the other goes to its $\myelse$ branch: this is implicit
+in the fact that we consider here symbolic and not observable traces.
+
+\newcommand{\In}{\mathsf{in}}
+\newcommand{\Out}{\mathsf{out}}
+
+\begin{example}
+  Consider the bi-process
+  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,m)$
+  where $n$ and $m$ are arbitrary, possibly equal names.
+  Its two projections are indistinguishable, but the
+  bi-process is not diff-equivalent.
+  Indeed we have 
+  $\myif g()=0 \mythen \Out(c,n) \not\sim
+   \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
+  $g()=0$ to distinguish the two sides.
+  Our bi-process can however easily be
+  rewritten into a diff-equivalent process, e.g. by pushing the conditional
+  inside the output.
+
+  If we modify our bi-process into
+  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,0)$
+  then the two projections become distinguishable.
+  The attack is obtained with an execution
+  where one process outputs a name while the other outputs $0$. Such
+  desynchronized executions are not taken into account with diff-equivalence,
+  but diff-equivalence still fails due to the desynchronized condition,
+  as before.
+\end{example}
+
+\newcommand{\ok}{\mathsf{ok}}
+
+In the next example, we omit the $\myelse$ branch when it consists of a null 
+process.
+
+\begin{example}
+  Consider the bi-process
+  $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+  It is diff-equivalent, and its projections are
+  indistinguishable as expected.
+  In the bi-process, the condition $x=\diff{n}{m}$ does not pass
+  with the same inputs on the left and right, but it passes with
+  the same negligible probability.
+\end{example}
+
+\begin{example} \label{ex:sync}
+  Consider
+  $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
+  where $(t)_0$ denotes the first bit of $t$.
+  This bi-process is not diff-equivalent because
+  $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$:
+  there is a non-negligible probably that one conditional only passes.
+  The two projections are distinguishable: the attacker sends $0$;
+  on the left he receives with probability $1/2$ a bitstring whose
+  last bit is $0$;
+  with the right process he receive with probably $1/4$
+  a bitstring whose last bit is $1$.
+
+  If we change $\Out(c,n)$ into $\Out(c,\ok)$,
+  we have indistinguishable processes but diff-equivalence still fails.
+\end{example}
+
+\begin{example}
+  Consider $\Out(c,\diff{n}{m}).
+  \In(c,x).
+  \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+  The projections are observationally equivalent -- in fact they are
+  $\alpha$-equivalent.
+  The bi-process is not diff-equivalent for the same reason as in the
+  previous example.
+\end{example}
+
+\emph{TODO: Define a methodology for verifying such diff-equivalences
+using meta-BC. The hope is that we can verify that conditionals are 
+synchronized using reachability judgments $\Gamma \vdash \phi^L 
+\Leftrightarrow \phi^R$, and verify equivalences that are always of
+the form $\Gamma \vdash \Phi^L \sim \Phi^R$ without any conditional
+in the frames? For example in \cref{ex:sync} we would have to prove
+$\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.}
+
+\emph{TODO: Devise a way to talk about inputs on either side of a bi-process
+using input macros and actions: give a meaning to something like
+$\minp^L@A$, or $\minp@A^L$?}
+
+\subsection{Reasoning about equivalences}
+
+Now equipped with a logic to reason about reachability properties, we turn 
+ourself to proving general indistinguishability. We consider the case of 
+bi-processes, where the set of actions available on both side is the same, but 
+the actions may differ inside their terms. Thus, a bi-process is simply a 
+protocol, where each action $\alpha$ has two versions, on for the left and on 
+for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each 
+possible trace $\tr$ of the protocol, there exists then the two versions 
+$\tr^L$ and $\tr^R$.
 
 To reason about those properties, we once again try to define a well-suited logic.
 \begin{definition}
