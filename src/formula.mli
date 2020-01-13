@@ -55,12 +55,6 @@ val formula_vars : formula -> var list
   * quantified inside a formula. *)
 val formula_qvars : formula -> var list
 
-val fact_to_formula : Bformula.fact -> formula
-
-val formula_to_fact : formula -> Bformula.fact
-
-val formula_to_trace_formula : formula -> Bformula.trace_formula option
-
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
     co-domain does not contain any variable that is bound in [f]. *)

@@ -20,10 +20,6 @@ val pp : Format.formatter -> sequent -> unit
    given formula as conclusion. *)
 val init : formula -> sequent
 
-(** [add_trace_formula tf s] returns the sequent [s] with [tf] added to its
-    hypothesis. *)
-val add_trace_formula : ?prefix:string -> trace_formula -> sequent -> sequent
-
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
     hypothesis. The new sequent will be automatically enriched with
     equalities expressing relevant macro definitions, as well as conditions

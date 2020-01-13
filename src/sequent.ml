@@ -155,7 +155,7 @@ type formula_tag = unit
 type message_hypothesis = (message_hypothesis_tag, term_atom) H.hypothesis
 
 type message_hypotheses = (message_hypothesis_tag, term_atom) H.hypotheses
-type trace_hypotheses = (trace_tag, trace_formula) H.hypotheses
+type trace_hypotheses = (trace_tag, trace_atom) H.hypotheses
 type formula_hypotheses = (formula_tag, formula) H.hypotheses
 
 type t = {
@@ -196,7 +196,7 @@ let pp ppf s =
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
   H.pps pp_term_atom ppf s.message_hypotheses ;
-  H.pps pp_trace_formula ppf s.trace_hypotheses ;
+  H.pps pp_trace_atom ppf s.trace_hypotheses ;
   H.pps pp_formula ppf s.formula_hypotheses ;
   (* Print separation between hypotheses and conclusion *)
   styled `Bold ident ppf (String.make 40 '-') ;
@@ -215,13 +215,11 @@ let init_sequent = {
 }
 
 let is_hypothesis f s =
-  match formula_to_trace_formula f with
-  | Some tf -> H.mem tf s.trace_hypotheses
-  | None ->
-    match f with
-    | Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
-    | Atom (`Happens t) -> List.mem t s.happens_hypotheses
-    | _ ->  H.mem f s.formula_hypotheses
+  match f with
+  | Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
+  | Atom (#Atom.trace_atom as at) -> H.mem at s.trace_hypotheses
+  | Atom (`Happens t) -> List.mem t s.happens_hypotheses
+  | _ ->  H.mem f s.formula_hypotheses
 
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
@@ -229,9 +227,8 @@ let get_hypothesis id s =
       Atom ((H.find id s.message_hypotheses).H.hypothesis :>
                Atom.generic_atom)
     with Not_found ->
-      Formula.bformula_to_foformula
-        (fun x -> (x :> Atom.generic_atom))
-        (H.find id s.trace_hypotheses).H.hypothesis
+          Atom ((H.find id s.trace_hypotheses).H.hypothesis :>
+               Atom.generic_atom)
 
 let id = fun x -> x
 
@@ -251,7 +248,7 @@ let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
     ({s with formula_hypotheses = hs}, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
 
-let add_trace_formula ?(prefix="T") tf s =
+let add_trace_hypothesis ?(prefix="T") s tf =
   { s with
     trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;
     models = None }
@@ -309,16 +306,14 @@ let rec add_happens s ts =
 (* Depending on the shape of the formula, we add it to the corresponding set of
    hypotheses. *)
 and add_formula ?prefix f s =
-  match formula_to_trace_formula f with
-  | Some tf -> add_trace_formula ?prefix tf s
-  | None ->
-    match f with
-    | Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
-    | Atom (`Happens ts) -> add_happens s ts
-    | _ ->
-        let prefix = match prefix with Some p -> p | None -> "H" in
-        { s with formula_hypotheses =
-                   H.add true () f prefix s.formula_hypotheses }
+  match f with
+  | Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
+  | Atom (#Atom.trace_atom as at) -> add_trace_hypothesis ?prefix s at
+  | Atom (`Happens ts) -> add_happens s ts
+  | _ ->
+    let prefix = match prefix with Some p -> p | None -> "H" in
+    { s with formula_hypotheses =
+               H.add true () f prefix s.formula_hypotheses }
 
 let get_eqs_neqs_at_list atl =
   List.fold_left
@@ -371,10 +366,10 @@ let apply_subst subst s =
     | `Message (`Eq,t1,t2) when t1=t2 -> true
     | _ -> false
   in
-  let trace_is_triv (m:trace_formula) : bool =
+  let trace_is_triv (m:trace_atom) : bool =
     match m with
-    | Atom (`Timestamp (`Eq,t1,t2)) when t1=t2 -> true
-    | Atom (`Index (`Eq,i1,i2)) when i1=i2 -> true
+    | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
+    | `Index (`Eq,i1,i2) when i1=i2 -> true
     | _ -> false
   in
   let apply_hyp_subst f is_triv hypo =
@@ -385,8 +380,7 @@ let apply_subst subst s =
   {s with
    message_hypotheses = H.map (apply_hyp_subst (Atom.subst_term_atom subst)
                                  mess_is_triv) s.message_hypotheses;
-   trace_hypotheses = H.map (apply_hyp_subst
-                               (Bformula.subst_trace_formula subst)
+   trace_hypotheses = H.map (apply_hyp_subst (Atom.subst_trace_atom subst)
                                  trace_is_triv) s.trace_hypotheses;
    formula_hypotheses = H.map (apply_hyp_subst
                                  (Formula.subst_formula subst)
@@ -396,7 +390,7 @@ let apply_subst subst s =
 (* Return the conjunction of all trace hypotheses, together with
  * the possible negation of the conclusion formula if it is a trace
  * atom. *)
-let make_trace_formula s =
+(* let make_trace_formula s =
  let trace_hypotheses =
    List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
  in
@@ -406,6 +400,16 @@ let make_trace_formula s =
    (match Formula.formula_to_trace_formula s.conclusion with
       | Some f -> (Bformula.Not f) :: trace_hypotheses
       | None -> trace_hypotheses)
+*)
+
+let get_trace_atoms s=
+  let trace_atoms =
+    List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
+  in
+  match s.conclusion with
+  | Atom (#trace_atom as at) -> (Bformula.not_trace_atom at) :: trace_atoms
+  | Not (Atom (#trace_atom as at)) -> at :: trace_atoms
+  | _ -> trace_atoms
 
 (** TODO  This is the only place where the model is computed,
   * and it is only called by functions that drop the sequent where
@@ -413,8 +417,8 @@ let make_trace_formula s =
 let compute_models s =
   match s.models with
   | None ->
-    let trace_hypotheses = make_trace_formula s in
-    let models = Constr.models trace_hypotheses in
+    let trace_atoms = get_trace_atoms s in
+    let models = Constr.models_conjunct trace_atoms in
     { s with models = Some models;}
   | Some m -> s
 
@@ -428,9 +432,7 @@ let maximal_elems s tss =
 
 let get_ts_equalities s =
   let s = compute_models s in
-  let ts = Bformula.trace_formula_ts (make_trace_formula s)
-           |> List.sort_uniq Pervasives.compare
-  in
+  let ts = trace_atoms_ts (get_trace_atoms s) in
   Constr.get_equalities (opt_get (s.models)) ts
 
 let constraints_valid s =

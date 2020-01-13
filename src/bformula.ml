@@ -123,6 +123,8 @@ let norm_tatom = function
   | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
   | `Index _ as x -> [x]
 
+let not_trace_atom a =  (not_tpred a)
+
 let pp_trace_formula ppf = pp_bformula pp_trace_atom ppf
 
 let trace_formula_dnf (c : trace_formula) =

@@ -3,10 +3,13 @@ open Bformula
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models
 
-(** [models l] returns the list of minimal models of a constraint. *)
-val models : trace_formula -> models
 
-val is_sat : trace_formula -> bool
+(** [models_conunct l] returns the list of minimal models of the conjunction of
+    atoms. *)
+val models_conjunct : Atom.trace_atom list -> models
+
+(** [models l] returns the list of minimal models of a constraint. *)
+
 val m_is_sat : models -> bool
 
 (** [query models at] returns [true] if the conjunction of the atoms in [ats]

@@ -144,21 +144,6 @@ val convert_glob :
   term ->
   Term.term
 
-(** Convert [fact] to [Bformula.constr],
-  * for global terms (i.e. with attached timestamps). *)
-val convert_trace_formula_glob :
-  (string * Vars.sort) list ->
-  tsubst ->
-  fact ->
-  Bformula.trace_formula
-
-(** Convert [fact] to [Bformula.fact],
-  * for global terms (i.e. with attached timestamps). *)
-val convert_fact_glob :
-  tsubst ->
-  fact ->
-  Bformula.fact
-
 (** Convert to [formula] to [Formula.formula],
   * for global terms (i.e. with attached timestamps).
   * Requires a typing environment. *)

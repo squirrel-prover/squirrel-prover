@@ -517,9 +517,6 @@ let convert_trace_atom args_kind subst f : Atom.trace_atom =
       | _ -> raise Type_error end
   | _ -> assert false
 
-let convert_trace_formula_glob args_kind subst f : Bformula.trace_formula =
-  convert_bformula (convert_trace_atom args_kind subst) f
-
 let convert_atom_glob subst atom =
   match atom with
   | Compare (#Atom.ord_eq as o, u, v) ->

@@ -282,7 +282,6 @@ let () = T.register "induction"
     induction
 
 (** Reasoning over constraints and messages *)
-
 let constraints (s : Sequent.t) sk fk =
   if Sequent.constraints_valid s then
     sk [] fk
@@ -314,21 +313,21 @@ let () = T.register "assumption"
 (** Utils *)
 
 let mk_or_cnstr l = match l with
-  | [] -> Bformula.False
+  | [] -> Formula.False
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Bformula.Or (x,acc)) l in
+      | x :: l -> mk_c (Formula.Or (x,acc)) l in
     mk_c a l'
 
 let mk_and_cnstr l = match l with
-  | [] -> Bformula.True
+  | [] -> Formula.True
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Bformula.And (x,acc)) l in
+      | x :: l -> mk_c (Formula.And (x,acc)) l in
     mk_c a l'
 
 open Bformula
@@ -356,7 +355,7 @@ let eq_names (s : Sequent.t) sk fk =
   in
   let s =
     List.fold_left (fun judge c ->
-        Sequent.add_trace_formula c s
+        Sequent.add_formula c s
       ) s cnstrs
   in
   sk [s] fk
@@ -464,9 +463,9 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
     List.map
       (function
          | TPred ts ->
-             Atom (`Timestamp (`Lt, action_descr_ts, ts))
+             Formula.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
-             Atom (`Timestamp (`Leq, action_descr_ts, ts)))
+             Formula.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
     |> mk_or_cnstr
   in
@@ -480,7 +479,7 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
      [dcase.d_key_indices]. *)
   let eq_cnstr =
     List.map2
-      (fun i i' -> Atom (`Index (`Eq, i, i')))
+      (fun i i' -> Formula.Atom (`Index (`Eq, i, i')))
       key_is dcase.d_key_indices
     |> mk_and_cnstr
   in
@@ -496,14 +495,14 @@ let euf_apply_facts s at =
     List.map (fun case ->
         let new_f, new_cnstr, new_env = euf_apply_schema s p case in
         Sequent.add_formula new_f s
-        |> Sequent.add_trace_formula new_cnstr
+        |> Sequent.add_formula new_cnstr
         |> Sequent.set_env new_env
       ) rule.Euf.case_schemata
   and direct_premises =
     List.map (fun case ->
         let new_f, new_cnstr = euf_apply_direct s p case in
         Sequent.add_formula new_f s
-        |> Sequent.add_trace_formula new_cnstr
+        |> Sequent.add_formula new_cnstr
       ) rule.Euf.cases_direct
   in
   schemata_premises @ direct_premises

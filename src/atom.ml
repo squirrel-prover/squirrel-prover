@@ -49,12 +49,14 @@ let norm_xatom (o, l, r) =
   | `Lt -> (`Leq, l, r) :: [(`Neq, l, r)]
   | `Gt -> (`Leq, r, l) :: [(`Neq, r, l)]
 
+exception Temp of string
+
 let add_xeq od xeq (eqs, leqs, neqs) =
   match od with
   | `Eq -> (xeq :: eqs, leqs, neqs)
   | `Leq -> (eqs, xeq :: leqs, neqs)
   | `Neq -> (eqs, leqs, xeq :: neqs)
-  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
+  | _ -> raise (Temp ("add_xeq: bad comparison operator"))
 
 let add_xeq_eq od xeq (eqs, neqs) =
   match od with
@@ -117,3 +119,5 @@ let rec tatsts acc = function
   | [] -> acc
   | (`Index _) :: l -> tatsts acc l
   | (`Timestamp (_, ts, ts')) :: l -> tatsts (ts :: ts' :: acc) l
+
+let trace_atoms_ts at = tatsts [] at |> List.sort_uniq Pervasives.compare

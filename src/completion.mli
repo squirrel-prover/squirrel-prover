@@ -21,7 +21,7 @@ val check_equalities : state -> (term * term) list -> bool
     E.g., if [n[i,j]] and [n[k,l]] are equal, then the returned list
     would contain [i=k] and [j=l]. *)
 val name_index_cnstrs :
-  state -> term list -> Bformula.trace_formula list
+  state -> term list -> Formula.formula list
 
 
 (** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the

@@ -50,17 +50,6 @@ let formula_to_fact f =
     (function `Message x -> `Message x | _ -> failwith "not a fact")
     f
 
-exception No_trace_formula
-
-let formula_to_trace_formula f =
-  try
-    Some (foformula_to_bformula
-            (function
-               | #trace_atom as x -> x
-               | _ -> raise No_trace_formula)
-            f)
-  with No_trace_formula | Not_a_boolean_formula -> None
-
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"

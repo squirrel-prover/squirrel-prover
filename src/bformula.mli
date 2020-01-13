@@ -35,18 +35,8 @@ val subst_fact : subst -> fact -> fact
   * when it is constant. *)
 val triv_eval : 'a bformula -> 'a bformula
 
+val not_trace_atom : trace_atom -> trace_atom
+
 (** {2 Unquantified trace formulas} *)
 
 (** Trace_Formula are boolean formulas over timestamps. *)
-
-type trace_formula = trace_atom bformula
-
-val pp_trace_formula : Format.formatter -> trace_formula -> unit
-
-(** Put a trace_formulaaint in DNF using only atoms Eq, Neq and Leq *)
-val trace_formula_dnf : trace_formula -> trace_atom list list
-
-val subst_trace_formula : subst -> trace_formula -> trace_formula
-
-(** [trace_formula_ts c] returns the timestamps appearing in [c] *)
-val trace_formula_ts : trace_formula -> timestamp list

@@ -51,6 +51,8 @@ val add_xeq_eq :
 
 val pp_ord : Format.formatter -> ord -> unit
 
+val trace_atoms_ts : trace_atom list -> Term.timestamp list
+
 val trace_atom_vars : trace_atom -> Vars.var list
 
 val pp_trace_atom : Format.formatter -> trace_atom -> unit
