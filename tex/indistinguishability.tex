@@ -165,12 +165,72 @@ using meta-BC. The hope is that we can verify that conditionals are
 synchronized using reachability judgments $\Gamma \vdash \phi^L 
 \Leftrightarrow \phi^R$, and verify equivalences that are always of
 the form $\Gamma \vdash \Phi^L \sim \Phi^R$ without any conditional
-in the frames? For example in \cref{ex:sync} we would have to prove
+in the frames (i.e. with a single condition $\Gamma$ on both left and
+right executions)? For example in \cref{ex:sync} we would have to prove
 $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.}
 
 \emph{TODO: Devise a way to talk about inputs on either side of a bi-process
 using input macros and actions: give a meaning to something like
 $\minp^L@A$, or $\minp@A^L$?}
+
+\subsection{Refined diff-equivalence}
+
+The Basic-Hash protocol is unlinkable, wrt.\ Solène's definition.
+This has been verified in the symbolic model and we expect that it holds
+in the computational one too.
+
+Formally, modify \texttt{examples/basic-hash.mbc} to consider the
+following bi-process:
+$$(!_k R(j)) \mid (!_i !_j T(\diff{k(i)}{k'(i,j)}))$$
+
+On the left side, we have unboundedly many
+identities represented by keys $k(i)$, and each $k(i)$ is used for
+many sessions $j$.
+On the right, each identity $k'(i,j)$ is used for a single session.
+Note that we cannot simply write $k'(j)$ or $k(j)$, because then the
+same identity $k'(j)$ would appear in the different copies of the
+first $!_i$.
+On either sides, the tag uses a session nonce $n_T(i,j)$.
+
+On both sides we have unboundedly many sessions of the reader,
+with a conditional as follows ($x$ is the first input message):
+$$\mathsf{find} \ i,j \ \mathsf{suchthat} \ \pi_2(x) = 
+h(\pi_1(x),\diff{k(i)}{k'(i,j)})$$
+
+To sum up, we have the following actions:
+\begin{itemize}
+  \item $T(i,j)$ where the tag sends
+    $\pair{n_T(i,j),h(n_T(i,j),\diff{k(i)}{k'(i,j)})}$;
+  \item $R(k,i,j)$ is the only action with a conditional,
+    where reader session $k$ accepts its first message,
+    having found out that it corresponds to identity $k(i)$ (if on
+    the left) or $k'(i,j)$ (on the right).
+\end{itemize}
+
+We cannot hope to have a synchronized execution of $R(k,i,j)$ on the
+left and right: index $j$ is unused on the left!
+However, we can hope to prove that, if $R(k,i,j)$ happens on the left,
+then $R(k,i,j')$ happens on the right for some $j'$: this intuitively
+follows from well-authentication.
+Note that this $j'$ is necessarily unique by definition of the semantics:
+the $\mathsf{tryfind}$ selects the first $j$ for which the condition holds.
+
+Conversely, it is only easier to prove that if $R(k,i,j)$ happens
+on the right, then it happens on the left, for any $j'$.
+
+Having this form of synchronization for the conditionals is intuitively
+enough to conclude the the two processes are indistinguishable,
+provided we have also verified that the produced frames are indistinguishable:
+indeed, for any observable trace, if the trace is executed on one side
+using a symbolic trace $\tr$, then it can be executed on the other side
+(modulo the changes of indices as above) to yield an indistinguishable
+frame. Of course, all this has to be done more carefully, taking into
+account probabilities, etc.
+
+\emph{TODO: Develop this idea into a refined notion of diff-equivalence
+which could be used to prove this kind of unlinkabilities. It would have
+a specific treatment of actions when it is detected that an index is unused
+on one side of the bi-process.}
 
 \subsection{Reasoning about equivalences}
 
