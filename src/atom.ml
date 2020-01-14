@@ -41,6 +41,8 @@ let pp_term_atom ppf (`Message (o,tl,tr)) =
 let not_xpred (o,l,r) = (not_ord o, l, r)
 let not_xpred_eq (o,l,r) = (not_ord_eq o, l, r)
 
+let not_term_atom = function
+  | `Message t -> `Message (not_xpred_eq t)
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o, l, r) =
   match o with
@@ -67,6 +69,10 @@ type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Index.t) _atom
 ]
+
+let not_trace_atom : trace_atom -> trace_atom = function
+  | `Timestamp (o,t,t') -> `Timestamp (not_xpred (o,t,t'))
+  | `Index (o,i,i') -> `Index (not_xpred_eq (o,i,i'))
 
 type generic_atom = [
   | `Message of (ord_eq,term) _atom

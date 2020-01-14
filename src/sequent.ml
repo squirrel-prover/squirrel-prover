@@ -338,13 +338,9 @@ let get_trs s =
 let message_atoms_valid s =
   let _, trs = get_trs s in
   let _, neqs = get_eqs_neqs s in
-    (* The sequent is valid (at least) when equality hypotheses
-     * imply a disequality hypothesis or an equality conclusion. *)
-    List.exists
-      (fun eq -> Completion.check_equalities trs [eq])
-      (match s.conclusion with
-         | Atom (`Message (`Eq,u,v)) -> (u,v)::neqs
-         | _ -> neqs)
+  List.exists
+    (fun eq -> Completion.check_equalities trs [eq])
+    neqs
 
 let set_env a s = { s with env = a }
 
@@ -403,13 +399,7 @@ let apply_subst subst s =
 *)
 
 let get_trace_atoms s=
-  let trace_atoms =
     List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
-  in
-  match s.conclusion with
-  | Atom (#trace_atom as at) -> (Bformula.not_trace_atom at) :: trace_atoms
-  | Not (Atom (#trace_atom as at)) -> at :: trace_atoms
-  | _ -> trace_atoms
 
 (** TODO  This is the only place where the model is computed,
   * and it is only called by functions that drop the sequent where

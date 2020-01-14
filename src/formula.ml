@@ -118,3 +118,11 @@ let fresh_quantifications env f =
     |> from_varsubst
   in
   subst_formula subst f
+
+exception Not_a_disjunction
+
+let rec disjunction_to_atom_list = function
+  | False -> []
+  | Atom at -> [at]
+  | Or (a, b) -> disjunction_to_atom_list a @ disjunction_to_atom_list b
+  | _ -> raise Not_a_disjunction

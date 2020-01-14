@@ -22,6 +22,9 @@ type generic_atom = [
   | trace_atom
   | `Happens of Term.timestamp
 ]
+(** Negates the atoms *)
+val not_term_atom : term_atom -> term_atom
+val not_trace_atom : trace_atom -> trace_atom
 
 val atsts : Term.timestamp list -> term_atom list -> Term.timestamp list
 val tatsts :

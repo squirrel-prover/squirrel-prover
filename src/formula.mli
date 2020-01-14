@@ -65,3 +65,7 @@ val subst_formula : subst -> formula -> formula
   * [!env], and it updates [env] with the declaration of these new
   * variables. *)
 val fresh_quantifications : env ref -> formula -> formula
+
+exception Not_a_disjunction
+
+val disjunction_to_atom_list : formula -> generic_atom list

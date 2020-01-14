@@ -283,11 +283,44 @@ let () = T.register "induction"
 
 (** Reasoning over constraints and messages *)
 let constraints (s : Sequent.t) sk fk =
-  if Sequent.constraints_valid s then
+  let conclusions =
+    try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
+    with Formula.Not_a_disjunction -> []
+  in
+  let trace_conclusions =
+    List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
+        | #trace_atom as a -> (Atom.not_trace_atom a)::acc
+        | _ -> acc)
+      []
+      conclusions
+  in
+  let new_s = List.fold_left (fun s atom -> Sequent.add_formula
+                                 (Formula.Atom (atom :> generic_atom)) s)
+      s
+      trace_conclusions
+  in
+  if Sequent.constraints_valid new_s then
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
 let congruence (s : Sequent.t) sk fk =
+ let conclusions =
+    try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
+    with Formula.Not_a_disjunction -> []
+  in
+  let term_conclusions =
+    List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
+        | #term_atom as a -> (Atom.not_term_atom a)::acc
+        | _ -> acc)
+      []
+      conclusions
+  in
+  let s = List.fold_left (fun s atom -> Sequent.add_formula
+                                 (Formula.Atom (atom :> generic_atom)) s)
+      s
+      term_conclusions
+  in
+  Fmt.pr "%a" Sequent.pp s;
   if Sequent.message_atoms_valid s then
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
