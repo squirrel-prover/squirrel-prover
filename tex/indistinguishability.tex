@@ -123,7 +123,7 @@ in the fact that we consider here symbolic and not observable traces.
 In the next example, we omit the $\myelse$ branch when it consists of a null 
 process.
 
-\begin{example}
+\begin{example} \label{ex:negl}
   Consider the bi-process
   $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
   It is diff-equivalent, and its projections are
@@ -141,10 +141,10 @@ process.
   $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$:
   there is a non-negligible probably that one conditional only passes.
   The two projections are distinguishable: the attacker sends $0$;
-  on the left he receives with probability $1/2$ a bitstring whose
-  last bit is $0$;
-  with the right process he receive with probably $1/4$
-  a bitstring whose last bit is $1$.
+  on the left he receives with probability $1\over 2$ a bitstring whose
+  first bit is $0$;
+  on the right process he receives with probably only $1\over 4$
+  a bitstring whose last bit is $0$.
 
   If we change $\Out(c,n)$ into $\Out(c,\ok)$,
   we have indistinguishable processes but diff-equivalence still fails.
@@ -158,20 +158,46 @@ process.
   $\alpha$-equivalent.
   The bi-process is not diff-equivalent for the same reason as in the
   previous example.
+  \emph{TODO: does it change anything if we replace all occurrences
+  of $n$ and $m$, respectively, by $h(n,k)$ and $h(m,k)$ for a fixed $k$?}
+  \emph{TODO: make sure that this failure of diff-equivalence will not
+  appear in our case studies.}
 \end{example}
 
-\emph{TODO: Define a methodology for verifying such diff-equivalences
-using meta-BC. The hope is that we can verify that conditionals are 
-synchronized using reachability judgments $\Gamma \vdash \phi^L 
-\Leftrightarrow \phi^R$, and verify equivalences that are always of
-the form $\Gamma \vdash \Phi^L \sim \Phi^R$ without any conditional
-in the frames (i.e. with a single condition $\Gamma$ on both left and
-right executions)? For example in \cref{ex:sync} we would have to prove
-$\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.}
+\subsubsection{Formal verification}
 
-\emph{TODO: Devise a way to talk about inputs on either side of a bi-process
-using input macros and actions: give a meaning to something like
-$\minp^L@A$, or $\minp@A^L$?}
+Ultimately we will want to use the meta-logic to avoid enumerating all
+traces, but reason abstractly over them. However, as a first step we
+keep the enumeration.
+
+Given a bi-process $B$, we should be able to give a meaning to its inputs
+and outputs along a trace using macros $\minp^L$, $\minp^R$, $\mout^L$
+and $\mout^R$. For instance, $\minp^L@A$ represents the input term for
+the left at timestamp $A$ in a trace --- the meta-interpretation will
+be such that
+$\hat{\minp}^L(A_n) = g_n(\hat{\mout}^L(A_1),\ldots,\hat{\mout}^L(A_{n-1}))$.
+
+Then, for any symbolic trace $\tr.\alpha$ of $B$, prove the following goals:
+$$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
+The first kind of judgment has been defined above: these are the sequents
+of the meta-logic for reachability. The second kind of judgment is defined
+below: $\Gamma \vdash u \sim v$ stands for $(\myif \Gamma \mythen u) \sim
+(\myif \Gamma \mythen v)$. For these goals we are thus imposing a left-hand
+side condition on right-hand side outputs, but it should not matter because
+the left- and right-hand side conditions have been shown to hold 
+simultaneously (with overwhelming probability).
+
+\emph{TODO: Check that it implies diff-equivalence as previously defined.}
+
+\begin{example}
+  With the bi-process of \cref{ex:negl} we would have to prove
+  $\vdash g() = n \Leftrightarrow g() = m$ and
+  $g()=n, g()=m \vdash \ok \sim \ok$, both of which hold.
+  With the bi-process of \cref{ex:sync} we would have to prove
+  $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
+\end{example}
 
 \subsection{Refined diff-equivalence}
 
@@ -230,7 +256,16 @@ account probabilities, etc.
 \emph{TODO: Develop this idea into a refined notion of diff-equivalence
 which could be used to prove this kind of unlinkabilities. It would have
 a specific treatment of actions when it is detected that an index is unused
-on one side of the bi-process.}
+on one side of the bi-process. We might adapt the verification conditions
+of the previous section as follows, for all symbolic traces $\tr$:}
+$$ \phi^L_\tr, \phi^R_\tr \vdash
+   \phi^L_\alpha \Leftrightarrow (\exists j.~ \phi^R_\alpha) $$
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
+\emph{In the first kind of condition, the existential is here to account
+for the possible change of some index. There is no change in the second
+kind of condition: there we only consider executions where the conditions
+have passed on both sides, restricting indices $j$.}
 
 \subsection{Reasoning about equivalences}
 
