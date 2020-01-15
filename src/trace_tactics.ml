@@ -65,10 +65,10 @@ let rec left_introductions s = function
              let item =
                let open Term in
                match Vars.var_type v with
-                 | Sorts.Index -> ESubst (v,Var v')
-                 | Sorts.Timestamp -> ESubst (v, Var v')
-                 | Sorts.Message -> ESubst (v, Var v')
-                 | Sorts.Boolean -> ESubst (v, Var v')
+                 | Sorts.Index -> ESubst (Var v,Var v')
+                 | Sorts.Timestamp -> ESubst (Var v, Var v')
+                 | Sorts.Message -> ESubst (Var v, Var v')
+                 | Sorts.Boolean -> ESubst (Var v, Var v')
              in
                item::subst, env)
           ([],env)
@@ -91,7 +91,7 @@ let timestamp_case ts s sk fk =
         a.Action.indices
     in
     let subst =
-      List.map2 (fun i i' -> Term.ESubst (i,Term.Var i'))
+      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
         a.Action.indices indices
     in
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
@@ -154,7 +154,8 @@ let goal_intro (s : Sequent.t) sk fk =
     let subst =
       List.map
         (fun (Vars.EVar x) ->
-          Term.ESubst (x, Term.Var (Vars.make_fresh_from_and_update env x)))
+           Term.ESubst (Term.Var x,
+                        Term.Var (Vars.make_fresh_from_and_update env x)))
         vs
     in
     let new_formula = subst_formula subst f in
@@ -218,7 +219,8 @@ let exists_left hyp_name s sk fk =
           let subst =
             List.map
               (fun (Vars.EVar v) ->
-               Term.ESubst  (v, Term.Var (Vars.make_fresh_from_and_update env v))
+                 Term.ESubst  (Term.Var v,
+                               Term.Var (Vars.make_fresh_from_and_update env v))
               )
               vs
           in
@@ -262,15 +264,17 @@ let induction s sk fk =
          let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
          let _,v'' = Vars.make_fresh_from env v in
          (* Introduce v as v'. *)
-         let f' = Formula.subst_formula [Term.ESubst (v,Term.Var v')]
+         let f' = Formula.subst_formula [Term.ESubst (Term.Var v,Term.Var v')]
              (ForAll (vs,f))
          in
          (* Use v'' to form induction hypothesis. *)
          let ih =
            ForAll ((Vars.EVar v'')::vs,
                    Impl
-                     (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v) :> generic_atom),
-                      Formula.subst_formula [Term.ESubst (v,Term.Var v')] f))
+                     (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
+                            :> generic_atom),
+                      Formula.subst_formula
+                        [Term.ESubst (Term.Var v,Term.Var v'')] f))
          in
          let s =
            s
@@ -395,7 +399,7 @@ let eq_timestamps (s : Sequent.t) sk fk =
   let facts =
     List.fold_left
       (fun acc t ->
-         let normt : Term.term = subst_term subst t in
+         let normt : Term.message = Term.subst subst t in
          if normt = t then
            acc
          else
@@ -413,16 +417,15 @@ let eq_timestamps (s : Sequent.t) sk fk =
 let () = T.register "eqtimestamps"
     ~help:"Add terms constraints resulting from timestamp equalities."
     eq_timestamps
-(** TODO : substitute lost, because substitutions are now only from var to terms
-*)
-(*let substitute (v1) (v2) (s : Sequent.t) sk fk=
-  let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+
+let substitute (v1) (v2) (s : Sequent.t) sk fk=
+  let tsubst = Theory.subst_of_env (Sequent.get_env s) in
   let subst =
     match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
     | ts1,ts2 ->
       let models = Sequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
-        [TS(ts1,ts2)]
+        [Term.ESubst (ts1,ts2)]
       else
         raise @@ Tactic_Hard_Failure "Arguments not equals."
     | exception _ ->
@@ -430,7 +433,7 @@ let () = T.register "eqtimestamps"
       | m1,m2 ->
         let s,trs = Sequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
-          [Term(m1,m2)]
+          [Term.ESubst (m1,m2)]
       else
         raise @@ Tactic_Hard_Failure "Arguments not equals."
       | exception _ ->
@@ -438,7 +441,7 @@ let () = T.register "eqtimestamps"
         | i1,i2 ->
           let models = Sequent.get_models s in
           if Constr.query models [(`Index (`Eq,i1,i2))] then
-            [Index(i1,i2)]
+            [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
             raise @@ Tactic_Hard_Failure "Arguments not equals."
       | exception _ ->  raise @@ Tactic_Hard_Failure "Improper arguments."
@@ -453,7 +456,7 @@ let () =
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
        | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-*)
+
 (** EUF Axioms *)
 
 let euf_param (`Message at : term_atom) = match at with

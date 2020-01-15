@@ -273,9 +273,11 @@ let parse_subst j uvars ts : Term.subst =
     List.map2
       (fun t (Vars.EVar u) ->
          match Vars.var_type u with
-           | Sorts.Timestamp -> Term.ESubst (u, Theory.convert_ts u_subst t )
-           | Sorts.Message -> Term.ESubst (u, Theory.convert_glob u_subst t)
-           | Sorts.Index -> Term.ESubst (u, Term.Var
+         | Sorts.Timestamp -> Term.ESubst (Term.Var u,
+                                           Theory.convert_ts u_subst t )
+         | Sorts.Message -> Term.ESubst (Term.Var u,
+                                         Theory.convert_glob u_subst t)
+           | Sorts.Index -> Term.ESubst (Term.Var u, Term.Var
                                            (Theory.conv_index u_subst t))
            | Sorts.Boolean -> assert false)
       ts uvars

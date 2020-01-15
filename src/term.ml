@@ -52,6 +52,15 @@ type 'a t = 'a term
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 
+let term_to_sort : type a. a term -> a Sorts.t =
+  function
+  | Fun _ -> Sorts.Message
+  | Name _ -> Sorts.Message
+  | Macro _ -> Sorts.Message
+  | Var v -> Vars.var_type v
+  | Pred _ -> Sorts.Timestamp
+  | Action _ -> Sorts.Timestamp
+
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
 
@@ -83,19 +92,20 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
            Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
         ppf ()
 
-
-let rec termvars : type a. Vars.evar list -> a term -> Vars.evar list = fun vs t ->
-    match t with
-  | Action (_,indices) -> (List.map (fun x -> Vars.EVar x) indices) @ vs
-  | Var tv -> Vars.EVar tv :: vs
-  | Pred ts -> termvars vs ts
-  | Fun (fs, lt) -> List.fold_left (fun vs t -> termvars vs t) vs lt
-  | Name n -> vs
-  | Macro (_, l, ts) -> termvars
-                          (List.fold_left (fun vs t -> termvars vs t) vs l) ts
-
-let get_vars = termvars []
-
+let get_vars : 'a term -> Vars.evar list =
+  fun term ->
+  let res = ref [] in
+  let rec termvars : type a. a term -> unit =
+    function
+    | Action (_,indices) -> res := ((List.map (fun x -> Vars.EVar x) indices)
+                                    @ !res)
+    | Var tv -> res := Vars.EVar tv :: !res
+    | Pred ts -> termvars ts
+    | Fun (fs, lt) -> List.iter termvars lt
+    | Name n -> ()
+    | Macro (_, l, ts) -> List.iter termvars l; termvars ts
+  in
+  termvars term; !res
 
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
@@ -122,7 +132,7 @@ let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
 
 (** Substitutions *)
 
-type esubst = ESubst : 'a Vars.var * 'a term -> esubst
+type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
 
@@ -135,42 +145,61 @@ let cast : type a b. a Sorts.t -> b Sorts.t -> a term -> b term  =
      | Sorts.Timestamp, Sorts.Timestamp -> t
      | _ -> assert false
 
-let rec assoc (subst:subst) (var:'a Vars.var) =
+exception Uncastable
+
+let cast : type a b. a term -> b term -> a term =
+  fun t1 t2 ->
+  match term_to_sort t1,term_to_sort t2 with
+   | Sorts.Index, Sorts.Index -> t2
+   | Sorts.Message, Sorts.Message -> t2
+   | Sorts.Boolean, Sorts.Boolean -> t2
+   | Sorts.Timestamp, Sorts.Timestamp -> t2
+   | _ -> raise Uncastable
+
+
+let rec assoc : type a. subst -> a term -> a term =
+  fun subst term ->
   match subst with
-  | [] -> Var var
-  | ESubst (v,t)::q when Vars.EVar v = Vars.EVar var->
-    cast (Vars.var_type v) (Vars.var_type var) t
-  | p::q -> assoc q var
+  | [] -> term
+  | ESubst (t1,t2)::q ->
+    try
+      let term2 = cast t1 term in
+      if term2 = t1 then cast term t2 else assoc q term
+    with Uncastable -> assoc q term
 
 exception Substitution_error of string
 
-let pp_esubst ppf (ESubst (v,t)) =
-  Fmt.pf ppf "%a->%a" Vars.pp v pp t
+let pp_esubst ppf (ESubst (t1,t2)) =
+  Fmt.pf ppf "%a->%a" pp t1 pp t2
 
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let rec subst_var (subst:subst) (var:'a Vars.var) =
-  match assoc subst var with
-  | Var var -> var
-  | _ -> raise @@ Substitution_error
-      "Must map the given variable to another variable"
+let rec subst_var : type a. subst -> a Vars.var -> a Vars.var =
+    fun subst var ->
+    match assoc subst (Var var) with
+    | Var var -> var
+    | _ -> raise @@ Substitution_error
+        "Must map the given variable to another variable"
 
 let subst_macro (s:subst) (symb,is) =
   (symb, List.map (subst_var s) is)
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
-  match t with
+  let new_term : a term =
+    match t with
     | Fun ((fs,is), lt) ->
-        Fun ((fs, List.map (subst_var s) is),
-             List.map (subst s) lt)
+      Fun ((fs, List.map (subst_var s) is),
+           List.map (subst s) lt)
     | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
     | Macro (m, l, ts) ->
-        Macro (subst_macro s m, List.map (subst s) l, subst s ts)
-    | Var m -> assoc s m
+      Macro (subst_macro s m, List.map (subst s) l, subst s ts)
+    | Var m -> Var m
     | Pred ts -> Pred (subst s ts)
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+  in
+  assoc s new_term
 
 (** Builtins *)
 

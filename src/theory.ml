@@ -613,9 +613,9 @@ let parse_subst (env : Vars.env) (uvars : Vars.evar list) (ts : term list)
       (fun t (Vars.EVar u) ->
          let open Sorts in
          match Vars.var_type u with
-           | Timestamp -> ESubst (u, convert_ts u_subst t )
-           | Message -> ESubst (u, convert_glob u_subst t)
-           | Index -> ESubst (u, Term.Var (conv_index u_subst t))
+           | Timestamp -> ESubst (Term.Var u, convert_ts u_subst t )
+           | Message -> ESubst (Term.Var u, convert_glob u_subst t)
+           | Index -> ESubst (Term.Var u, Term.Var (conv_index u_subst t))
            | Boolean -> assert false)
       ts uvars
 

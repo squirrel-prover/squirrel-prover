@@ -125,7 +125,7 @@ let fresh_quantifications env f =
   let subst =
     List.map
       (fun (Vars.EVar x) -> Term.ESubst
-          (x, Term.Var (Vars.make_fresh_from_and_update env x)))
+          (Term.Var x, Term.Var (Vars.make_fresh_from_and_update env x)))
       vars
   in
   subst_formula subst f

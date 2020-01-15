@@ -62,13 +62,13 @@ let add_xeq_eq od xeq (eqs, neqs) =
 (* TODO rename to trace *)
 type trace_atom = [
   | `Timestamp of (ord,Term.timestamp) _atom
-  | `Index of (ord_eq,Index.t) _atom
+  | `Index of (ord_eq,Vars.index) _atom
 ]
 
 type generic_atom = [
   | `Message of (ord_eq,Term.message) _atom
   | `Timestamp of (ord,Term.timestamp) _atom
-  | `Index of (ord_eq,Index.t) _atom
+  | `Index of (ord_eq,Vars.index) _atom
   | `Happens of Term.timestamp
 ]
 
@@ -79,7 +79,7 @@ let subst_trace_atom (s:Term.subst) = function
   | `Timestamp (ord, ts, ts') ->
     `Timestamp (ord, Term.subst s ts, Term.subst s ts')
   | `Index (ord, i, i') ->
-    `Index(ord, Term.subst_index s i,Term.subst_index s i')
+    `Index(ord, Term.subst_var s i,Term.subst_var s i')
 
 let subst_generic_atom s = function
   | `Happens a -> `Happens (Term.subst s a)

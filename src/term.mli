@@ -90,11 +90,11 @@ val precise_ts : Sorts.message term -> Sorts.timestamp term list
 (** Substitutions for all purpose, applicable to terms and timestamps.
   * Substitutions are performed bottom to top to avoid loops. *)
 
-type esubst = ESubst : 'a Vars.var * 'a term -> esubst
+type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
 
-val assoc : subst -> 'a var -> 'a term
+val assoc : subst -> 'a term -> 'a term
 
 (** Remove from_varsubst, and always create Term.subst directly *)
 (* val from_varsubst : (evar * evar) list -> subst *)

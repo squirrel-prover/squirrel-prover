@@ -7,11 +7,11 @@
  *     names ?
  *   - The such that should be optional when the precondition
  *     is trivial. *)
- 
+
 system null.
 
 goal test :
-  forall (x:timestamp, x:index, x:message),
+  forall (x:timestamp, y:index, z:message),
   x=x.
 Proof.
 Qed.

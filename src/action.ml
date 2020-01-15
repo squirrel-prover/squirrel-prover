@@ -56,8 +56,8 @@ let same_shape a b : Term.subst option =
     if p = p' && List.length lp = List.length lp' &&
        s = s' && List.length ls = List.length ls'
     then
-      let acc' = List.map2 (fun i i' -> Term.ESubst (i,Term.Var i')) lp lp' in
-      let acc'' = List.map2 (fun i i' -> Term.ESubst (i,Term.Var i')) ls ls' in
+      let acc' = List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) lp lp' in
+      let acc'' = List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) ls ls' in
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
@@ -165,7 +165,7 @@ let to_term a =
 let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action
  =
   let l',a = of_symbol s in
-  let subst = List.map2 (fun x y -> Term.ESubst (x,Term.Var y)) l' l in
+  let subst = List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
   subst_action subst a
 
 let rec dummy_action k =

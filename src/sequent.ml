@@ -1,5 +1,4 @@
 open Utils
-open Term
 open Atom
 open Bformula
 open Formula
@@ -188,11 +187,11 @@ let pp ppf s =
   let open Utils in
   pf ppf "@[<v 0>" ;
   if s.env <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_typed_env s.env ;
+    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
   if s.happens_hypotheses <> [] then
     pf ppf "@[<hov 2>Executed actions:@ %a@]@;"
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp_timestamp)
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp)
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
   H.pps pp_term_atom ppf s.message_hypotheses ;
@@ -260,7 +259,7 @@ class iter_macros f = object (self)
   inherit Iter.iter as super
   method visit_term t =
     match t with
-      | Macro ((m,is),[],a) ->
+      | Term.Macro ((m,is),[],a) ->
           if Macros.is_defined m a then
             let def = Macros.get_definition m is a in
               f t def ;
@@ -297,7 +296,7 @@ let rec add_happens s ts =
     { s with happens_hypotheses = ts :: s.happens_hypotheses }
   in
     match ts with
-      | TName (symb,indices) ->
+      | Term.Action (symb,indices) ->
           let a = Action.of_term symb indices in
           add_formula ~prefix:"C"
             (Formula.bformula_to_foformula

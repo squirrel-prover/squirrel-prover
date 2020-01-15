@@ -18,7 +18,7 @@ val pp : Format.formatter -> 'a var -> unit
 
 val pp_typed : Format.formatter -> 'a var -> unit
 
-val pp_list : Format.formatter -> 'a list -> unit
+val pp_list : Format.formatter -> 'a var list -> unit
 
 val pp_typed_list : Format.formatter -> evar list -> unit
 
