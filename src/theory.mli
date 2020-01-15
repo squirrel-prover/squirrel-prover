@@ -144,6 +144,17 @@ val convert_glob :
   term ->
   Term.term
 
+
+(** Convert to [Formula.formula], for local terms (i.e. with no timestamps). *)
+val convert_formula :
+  env ->
+  Term.timestamp ->
+  tsubst ->
+  formula ->
+  Formula.formula
+
+
+
 (** Convert to [formula] to [Formula.formula],
   * for global terms (i.e. with attached timestamps).
   * Requires a typing environment. *)

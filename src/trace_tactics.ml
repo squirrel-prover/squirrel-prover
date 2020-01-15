@@ -320,7 +320,6 @@ let congruence (s : Sequent.t) sk fk =
       s
       term_conclusions
   in
-  Fmt.pr "%a" Sequent.pp s;
   if Sequent.message_atoms_valid s then
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")

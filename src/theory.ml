@@ -517,6 +517,7 @@ let convert_trace_atom args_kind subst f : Atom.trace_atom =
       | _ -> raise Type_error end
   | _ -> assert false
 
+
 let convert_atom_glob subst atom =
   match atom with
   | Compare (#Atom.ord_eq as o, u, v) ->
@@ -542,6 +543,33 @@ let subst_get_var subst (x,kind) =
           |  _ -> assert false
         end
     | _ -> assert false
+
+let convert_formula env ts subst f =
+  let open Vars in
+  let open Formula in
+  let rec conv = function
+    | Atom (Compare (o,u,v)) ->
+      begin
+        let at = Compare (o,u,v) in
+        match get_kind env u with
+        | Index | Timestamp ->
+            Atom (convert_trace_atom env subst at :>
+                    Atom.generic_atom)
+        | Message | Boolean -> Atom (convert_atom ts subst at
+                                     :> Atom.generic_atom)
+      end
+    | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
+    | Atom _ -> assert false
+    | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
+    | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
+    | And (f, g) -> And (conv f, conv g)
+    | Or (f, g) -> Or (conv f, conv g)
+    | Impl (f, g) -> Impl (conv f, conv g)
+    | Not f -> Not (conv f)
+    | True -> True
+    | False -> False
+  in
+  conv f
 
 let convert_formula_glob args_kind subst f =
   let open Vars in
