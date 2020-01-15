@@ -121,7 +121,9 @@ in the fact that we consider here symbolic and not observable traces.
 \newcommand{\ok}{\mathsf{ok}}
 
 In the next example, we omit the $\myelse$ branch when it consists of a null 
-process.
+process. In these examples, there is a coincidence between diff-equivalence
+and indistinguishability, because observable actions coincide with symbolic 
+actions.
 
 \begin{example} \label{ex:negl}
   Consider the bi-process
@@ -138,45 +140,24 @@ process.
   $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
   where $(t)_0$ denotes the first bit of $t$.
   This bi-process is not diff-equivalent because
-  $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$:
-  there is a non-negligible probably that one conditional only passes.
-  The two projections are distinguishable: the attacker sends $0$;
+  $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$, and
+  the two projections are distinguishable for the same
+  reason: the attacker sends $0$;
   on the left he receives with probability $1\over 2$ a bitstring whose
   first bit is $0$;
   on the right process he receives with probably only $1\over 4$
   a bitstring whose last bit is $0$.
-
   If we change $\Out(c,n)$ into $\Out(c,\ok)$,
-  we have indistinguishable processes but diff-equivalence still fails.
+  we have indistinguishable processes and diff-equivalence holds.
 \end{example}
 
 \begin{example} \label{ex:problem}
   Consider $\Out(c,\diff{n}{m}).
   \In(c,x).
   \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
-  The projections are observationally equivalent -- in fact they are
-  $\alpha$-equivalent.
-  The bi-process is not diff-equivalent for the same reason as in the
-  previous example.
-  \emph{TODO: does it change anything if we replace all occurrences
-  of $n$ and $m$, respectively, by $h(n,k)$ and $h(m,k)$ for a fixed $k$?}
+  The projections are observationally equivalent and diff-equivalence
+  holds -- in fact they are $\alpha$-equivalent.
 \end{example}
-
-\emph{PROBLEM: \cref{ex:problem} actually shows a problem that we will encounter
-on case studies. Taking the Basic-Hash protocol, even if we work around
-the problem described in \cref{sec:refined-diff}, we won't be able to show
-that conditionals are synchronized.  In the simple case of the trace
-$T(i,j).R(k,i,j)$ we have
-on the single-session side
-$$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
- h(\pi_1(g_2(\ldots)),k'(i,j))$$
-and we would like this to imply (in the meta-logic)
-the same equality with $k(i)$ instead of $k'(i,j)$.
-This implication does not hold with overwhelming probability in all
-computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
-projection of $x$ with its first bit changed to $0$; if the hash is PRF,
-there should be a probability of roughly $1 \over 4$ that this leaves
-the hash unchanged with $k'(i,j)$ but not with $k(i)$.}
 
 \subsubsection{Formal verification}
 
@@ -191,7 +172,8 @@ the left at timestamp $A$ in a trace --- the meta-interpretation will
 be such that
 $\hat{\minp}^L(A_n) = g_n(\hat{\mout}^L(A_1),\ldots,\hat{\mout}^L(A_{n-1}))$.
 
-Then, for any symbolic trace $\tr.\alpha$ of $B$, prove the following goals:
+A sufficient condition for diff-equivalence is to prove,
+for any symbolic trace $\tr.\alpha$ of $B$, the following goals:
 $$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
 $$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
    \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
@@ -205,12 +187,34 @@ simultaneously (with overwhelming probability).
 
 \emph{TODO: Check that it implies diff-equivalence as previously defined.}
 
+These conditions are sufficient to ensure diff-equivalence but not necessary.
+The gap comes from the fact that we are requiring conditions to be 
+synchronized for all random samplings.
+
 \begin{example}
   With the bi-process of \cref{ex:negl} we would have to prove
   $\vdash g() = n \Leftrightarrow g() = m$ and
   $g()=n, g()=m \vdash \ok \sim \ok$, both of which hold.
   With the bi-process of \cref{ex:sync} we would have to prove
   $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
+\end{example}
+
+\begin{example} \label{ex:indep}
+  This proof technique does not work for \cref{ex:problem}.
+  The same problem appears with the Basic-Hash protocol, even if we work around
+the problem described in \cref{sec:refined-diff}, we won't be able to show
+that conditionals are synchronized.  In the simple case of the trace
+$T(i,j).R(k,i,j)$ we have
+on the single-session side
+$$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
+ h(\pi_1(g_2(\ldots)),k'(i,j))$$
+and we would like this to imply (in the meta-logic)
+the same equality with $k(i)$ instead of $k'(i,j)$.
+This implication does not hold with overwhelming probability in all
+computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
+projection of $x$ with its first bit changed to $0$; if the hash is PRF,
+there should be a probability of roughly $1 \over 4$ that this leaves
+the hash unchanged with $k'(i,j)$ but not with $k(i)$.
 \end{example}
 
 \subsection{Refined diff-equivalence} \label{sec:refined-diff}
