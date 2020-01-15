@@ -150,7 +150,7 @@ process.
   we have indistinguishable processes but diff-equivalence still fails.
 \end{example}
 
-\begin{example}
+\begin{example} \label{ex:problem}
   Consider $\Out(c,\diff{n}{m}).
   \In(c,x).
   \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
@@ -160,9 +160,23 @@ process.
   previous example.
   \emph{TODO: does it change anything if we replace all occurrences
   of $n$ and $m$, respectively, by $h(n,k)$ and $h(m,k)$ for a fixed $k$?}
-  \emph{TODO: make sure that this failure of diff-equivalence will not
-  appear in our case studies.}
 \end{example}
+
+\emph{PROBLEM: \cref{ex:problem} actually shows a problem that we will encounter
+on case studies. Taking the Basic-Hash protocol, even if we work around
+the problem described in \cref{sec:refined-diff}, we won't be able to show
+that conditionals are synchronized.  In the simple case of the trace
+$T(i,j).R(k,i,j)$ we have
+on the single-session side
+$$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
+ h(\pi_1(g_2(\ldots)),k'(i,j))$$
+and we would like this to imply (in the meta-logic)
+the same equality with $k(i)$ instead of $k'(i,j)$.
+This implication does not hold with overwhelming probability in all
+computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
+projection of $x$ with its first bit changed to $0$; if the hash is PRF,
+there should be a probability of roughly $1 \over 4$ that this leaves
+the hash unchanged with $k'(i,j)$ but not with $k(i)$.}
 
 \subsubsection{Formal verification}
 
@@ -199,7 +213,7 @@ simultaneously (with overwhelming probability).
   $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
 \end{example}
 
-\subsection{Refined diff-equivalence}
+\subsection{Refined diff-equivalence} \label{sec:refined-diff}
 
 The Basic-Hash protocol is unlinkable, wrt.\ Solène's definition.
 This has been verified in the symbolic model and we expect that it holds
