@@ -1,6 +1,5 @@
 open Utils
 open Atom
-open Bformula
 
 (* The generic type for hypothesis, with arbtitry type of formulas and tag. *)
 
@@ -276,7 +275,7 @@ let rec add_macro_defs s at =
     new iter_macros
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
-    iter#visit_fact (Atom at) ;
+    iter#visit_formula (Formula.Atom at) ;
     List.fold_left
       (add_message_hypothesis ~prefix:"D")
       s
@@ -290,7 +289,7 @@ and add_message_hypothesis ?(prefix="M") s at =
           H.add true {t_euf = false} at prefix s.message_hypotheses;
         trs = None }
     in
-    add_macro_defs s at
+    add_macro_defs s (at :> generic_atom)
 
 let rec add_happens s ts =
   let s =
@@ -300,9 +299,7 @@ let rec add_happens s ts =
       | Term.Action (symb,indices) ->
           let a = Action.of_term symb indices in
           add_formula ~prefix:"C"
-            (Formula.bformula_to_foformula
-               (fun x -> (x :> Atom.generic_atom))
-               (snd (Action.get_descr a).Action.condition))
+               (snd (Action.get_descr a).Action.condition)
             s
       | _ -> s
 

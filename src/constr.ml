@@ -1,7 +1,7 @@
 open Graph
 
 open Atom
-open Bformula
+
 open Utils
 
 (* - Huet's unification algorithm using union-find.

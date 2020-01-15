@@ -281,16 +281,7 @@ let get_goal_formula gname =
 let make_goal f  =
   (* In the rest of this function, the lists need to be reversed and appended
      carefully to properly handle variable shadowing.  *)
-  let env = ref Vars.empty_env in
-  let argvars = Theory.formula_vars f in
-  List.iter
-    (fun (s,_) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
-    argvars ;
-  let (subst, _) = Theory.convert_vars env argvars in
-    Theory.convert_formula_glob
-      (List.rev argvars)
-      subst
-      f
+    Theory.convert_formula_glob [] [] f
 
 type parsed_input =
   | ParsedInputDescr

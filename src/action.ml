@@ -197,7 +197,7 @@ type descr = {
   action : action ;
   input : Channel.t * string ;
   indices : Vars.index list ;
-  condition : Vars.index list * Bformula.fact ;
+  condition : Vars.index list * Formula.formula ;
   updates : (Term.state * Term.message) list ;
   output : Channel.t * Term.message
 }
@@ -211,7 +211,7 @@ let pp_descr ppf descr =
     pp_action descr.action
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
-    Bformula.pp_fact (snd descr.condition)
+    Formula.pp_formula (snd descr.condition)
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
@@ -229,7 +229,7 @@ let subst_descr subst descr =
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
-    fst descr.condition, Bformula.subst_fact subst (snd descr.condition) in
+    fst descr.condition, Formula.subst_formula subst (snd descr.condition) in
   let updates =
     List.map
       (fun ((ss,is),t) ->

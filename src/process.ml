@@ -3,8 +3,7 @@ type pkind = (string * Sorts.esort) list
 type id = string
 
 type term = Theory.term
-type fact = Theory.fact
-
+type formula = Theory.formula
 
 (* TODO add parsing positions *)
 type process =
@@ -16,7 +15,7 @@ type process =
   | Parallel of process * process
   | Let of string * term * process
   | Repl of string * process
-  | Exists of string list * fact * process * process
+  | Exists of string list * formula * process * process
   | Apply of id * term list
   | Alias of process * id
 
@@ -85,7 +84,7 @@ let rec pp_process ppf process =
     if ss = [] then
       pf ppf "@[<hov>%a %a %a@;<1 2>%a"
         (styled `Red (styled `Underline ident)) "if"
-        Theory.pp_fact f
+        Theory.pp_formula f
         (styled `Red (styled `Underline ident)) "then"
         pp_process p1
     else
@@ -93,7 +92,7 @@ let rec pp_process ppf process =
         (styled `Red (styled `Underline ident)) "find"
         (list Fmt.string) ss
         (styled `Red (styled `Underline ident)) "such that"
-        Theory.pp_fact f
+        Theory.pp_formula f
         (styled `Red (styled `Underline ident)) "in"
         pp_process p1 ;
     if p2 <> Null then
@@ -136,7 +135,7 @@ let rec check_proc env = function
         (List.map (fun x -> x, Sorts.eindex) vars)
         env
     in
-    Theory.check_fact env test ;
+    Theory.check_formula env test ;
     check_proc env p
   | Apply (id, ts) ->
     begin try
@@ -380,7 +379,7 @@ let prepare : process -> process =
             (fun (i,i') -> i, Theory.Var (Vars.name i'), Term.Var i')
             s
           @ isubst in
-        let f' = Theory.subst_fact f  (to_tsubst isubst@to_tsubst msubst) in
+        let f' = Theory.subst_formula f  (to_tsubst isubst@to_tsubst msubst) in
         let p' = prep ~env ~indices:indices' ~isubst:isubst p in
         let q' = prep q in
           Exists (l',f',p',q')
@@ -428,13 +427,18 @@ let parse_proc proc : unit =
     in
     Theory.convert ts subst t
   in
-  let conv_fact env a t =
+  let conv_formula env a t =
     let ts = Term.Action (a, List.rev env.p_indices) in
     let subst =
       List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
       List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
     in
-    Theory.convert_fact ts subst t
+    let arg_kinds =
+      List.map (fun (x,t) ->  (x, Sorts.emessage)) env.subst @
+      List.map (fun (x,i) ->  (x, Sorts.eindex)) env.isubst
+    in
+    Fmt.pr "%a" Theory.pp_subst subst;
+    Theory.convert_formula arg_kinds ts subst t
   in
   let conv_indices env l =
     List.map (fun x -> List.assoc x env.isubst) l
@@ -488,7 +492,7 @@ let parse_proc proc : unit =
       let facts_p = cond::facts in
       let facts_q =
         if evars = [] then
-          Bformula.Not cond :: facts
+          Formula.Not cond :: facts
         else
           facts
       in
@@ -515,9 +519,9 @@ let parse_proc proc : unit =
        * At this point we know which action will be used,
        * but we don't have the action symbol yet. *)
       let rec conj = function
-        | [] -> Bformula.True
+        | [] -> Formula.True
         | [f] -> f
-        | f::fs -> Bformula.And (f, conj fs)
+        | f::fs -> Formula.And (f, conj fs)
       in
       let condition = vars, conj facts in
       let action = Action.
@@ -576,7 +580,7 @@ let parse_proc proc : unit =
       let condition =
         let vars, facts = condition in
         conv_indices env vars,
-        conv_fact env a facts
+        conv_formula env a facts
       in
       let updates =
         List.map

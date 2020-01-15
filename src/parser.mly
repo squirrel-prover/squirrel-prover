@@ -139,10 +139,10 @@ process:
                                  { Process.Out ($3,$5,$7) }
 | IF f=formula THEN process else_process
                                  { Process.Exists
-                                     ([],Theory.formula_to_fact f,$4,$5) }
+                                     ([],f,$4,$5) }
 | FIND indices SUCHTHAT f=formula IN process else_process
                                  { Process.Exists
-                                     ($2,Theory.formula_to_fact f,$6,$7) }
+                                     ($2,f,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
 | ID term_list ASSIGN term process_cont
                                  { let to_idx = function

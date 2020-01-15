@@ -20,7 +20,8 @@ type id = string
 
 type term = Theory.term
 
-type fact = Theory.fact
+type formula = Theory.formula
+
 
 (** {2 Front-end processes}
   * The computational semantics is action-deterministic
@@ -47,7 +48,7 @@ type process =
   | Repl of string * process
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
-  | Exists of string list * fact * process * process
+  | Exists of string list * formula * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exist [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct

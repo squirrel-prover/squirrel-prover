@@ -5,7 +5,7 @@
     - a conclusion formula;
     - an environment to store all the variables appearing inside the formulas.
 *)
-open Bformula
+
 open Formula
 
 (** {2 Sequent type and basic operations} *)

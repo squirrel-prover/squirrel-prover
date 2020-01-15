@@ -34,13 +34,7 @@ type term =
 
 val pp_term : Format.formatter -> term -> unit
 
-type fact = term Bformula.bformula
-
-val pp_fact : Format.formatter -> fact -> unit
-
 type formula = (term, (string * Sorts.esort) ) Formula.foformula
-
-val formula_to_fact : formula -> fact
 
 val formula_vars : formula -> (string * Sorts.esort) list
 
@@ -98,7 +92,8 @@ exception Arity_error of string*int*int
 type env = (string*Sorts.esort) list
 val check_term : env -> term -> Sorts.esort -> unit
 val check_state : string -> int -> Sorts.esort
-val check_fact : env -> fact -> unit
+
+val check_formula : env -> formula -> unit
 
 val is_hash : Term.fname -> bool
 
@@ -106,7 +101,8 @@ val is_hash : Term.fname -> bool
   * Convert terms inside the theory to terms of the prover. *)
 
 val subst : term -> (string*term) list -> term
-val subst_fact : fact -> (string*term) list -> fact
+
+val subst_formula : formula -> (string*term) list -> formula
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 
@@ -129,13 +125,6 @@ val convert :
   term ->
   Term.message
 
-(** Convert to [Term.fact], for local terms (i.e. with no timestamps). *)
-val convert_fact :
-  Term.timestamp ->
-  subst ->
-  fact ->
-  Bformula.fact
-
 val convert_ts :
   subst ->
   term ->
@@ -154,13 +143,6 @@ val convert_formula :
   subst ->
   formula ->
   Formula.formula
-
-(** Convert [fact] to [Bformula.fact],
-  * for global terms (i.e. with attached timestamps). *)
-val convert_fact_glob :
-  subst ->
-  fact ->
-  Bformula.fact
 
 (** Convert to [formula] to [Formula.formula],
   * for global terms (i.e. with attached timestamps).

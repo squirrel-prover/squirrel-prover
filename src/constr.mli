@@ -1,4 +1,4 @@
-open Bformula
+
 (** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models

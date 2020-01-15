@@ -50,10 +50,6 @@ and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
 and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
-type fact = term Bformula.bformula
-
-let pp_fact = Bformula.pp_bformula pp_term
-
 (** Intermediate formulas *)
 
 type formula = (term, string * kind) Formula.foformula
@@ -69,8 +65,6 @@ let pp_formula =
             l))
 
 let formula_vars = Formula.foformula_vars (fun _ -> [])
-
-let formula_to_fact = Formula.foformula_to_bformula (fun x -> x)
 
 (** Type checking *)
 
@@ -125,7 +119,7 @@ let rec check_term env tm (kind:Sorts.esort) =
     begin try
       if List.assoc x env <> kind then raise Type_error
     with
-      | Not_found -> failwith (Printf.sprintf "unbound variable %S" x)
+    | Not_found -> failwith (Printf.sprintf "unbound variable %S" x)
     end
   | Fun (f, ts, ots) ->
     begin
@@ -172,15 +166,17 @@ let rec check_term env tm (kind:Sorts.esort) =
           check_term env v Sorts.eboolean
     end
 
-let rec check_fact env =
-  let open Bformula in
+let rec check_formula env =
+  let open Formula in
   function
     | And (f,g) | Or (f,g) | Impl (f,g) ->
-      check_fact env f ;
-      check_fact env g
-    | Not f -> check_fact env f
+      check_formula env f ;
+      check_formula env g
+    | Not f -> check_formula env f
     | True | False -> ()
     | Atom t -> check_term env t Sorts.eboolean
+    | ForAll (vs,f) -> check_formula (vs@env) f
+    | Exists (vs,f) -> check_formula (vs@env) f
 
 (** Declaration functions *)
 
@@ -320,6 +316,33 @@ let conv_index subst = function
   | Var x -> subst_var subst x (Sorts.Index)
   | _ -> failwith "ill-formed index"
 
+
+let convert_vars env vars =
+  let open Sorts in
+  let rec conv (vs:env) : subst * Vars.evar list =
+    match vs with
+    | [] -> ([], [])
+    | (a, ESort Index) :: l ->
+      let (vl, acc) = conv l in
+      let a_var = Vars.make_fresh_and_update env Index a in
+      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
+
+    | (a, ESort Timestamp) :: l ->
+      let (vl, acc) = conv l in
+      let a_var = Vars.make_fresh_and_update env Timestamp a in
+      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
+
+    | (a, ESort Message) :: l ->
+      let (vl, acc) = conv l in
+      let a_var = Vars.make_fresh_and_update env Message a in
+      ESubst (a, Term.Var(a_var) )::vl, (Vars.EVar a_var)::acc
+
+    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
+                             and messages in goals"
+  in
+  let (res, acc) =  conv vars in
+  (List.rev res, acc)
+
 let convert ts subst t =
   let rec conv = function
     | Fun (f, l, None) ->
@@ -444,22 +467,19 @@ let convert_atom ts subst atom =
       `Message (o, convert ts subst u, convert ts subst v)
   | _ -> assert false
 
-let convert_bformula conv_atom f =
-  let open Bformula in
+let subst_formula f s =
+  let open Formula in
   let rec conv = function
-    | Atom at -> Atom (conv_atom at)
+    | Atom at -> Atom (subst at s)
     | And (f, g) -> And (conv f, conv g)
     | Or (f, g) -> Or (conv f, conv g)
     | Impl (f, g) -> Impl (conv f, conv g)
     | Not f -> Not (conv f)
+    | ForAll (vs,t) -> ForAll(vs, conv t)
+    | Exists (vs,t) -> Exists(vs, conv t)
     | True -> True
     | False -> False in
   conv f
-
-let subst_fact f s = convert_bformula (fun t -> subst t s) f
-
-let convert_fact ts subst f : Bformula.fact =
-  convert_bformula (convert_atom ts subst) f
 
 (* Not clean at all. *)
 let get_kind env t =
@@ -496,9 +516,6 @@ let convert_atom_glob subst atom =
       `Message (o, convert_glob subst u, convert_glob subst v)
   | _ -> assert false
 
-let convert_fact_glob subst f : Bformula.fact =
-  convert_bformula (convert_atom_glob subst) f
-
 
 let subst_get_var subst (x,kind) =
   let open Sorts in
@@ -508,93 +525,82 @@ let subst_get_var subst (x,kind) =
     | ESort Timestamp -> Vars.EVar (subst_var subst x Timestamp)
     | _ -> assert false
 
-let convert_formula env ts subst f =
-  let open Vars in
+
+let convert_formula arg_kinds ts s f =
+  let open Sorts in
   let open Formula in
-  let rec conv = function
+  let rec conv kinds subst = function
     | Atom (Compare (o,u,v)) ->
       begin
         let at = Compare (o,u,v) in
-        let open Sorts in
-        match get_kind env u with
+        match get_kind kinds u with
+        | ESort Timestamp ->
+            Atom (convert_trace_atom kinds subst at :>
+                    Atom.generic_atom)
         | ESort Index ->
-            Atom (convert_trace_atom env subst at :>
+            Atom (convert_trace_atom kinds subst at :>
                     Atom.generic_atom)
-        | ESort Timestamp -> Atom (convert_trace_atom env subst at :>
-                    Atom.generic_atom)
-        | ESort Message -> Atom (convert_atom ts subst at
-                           :> Atom.generic_atom)
-        | ESort Boolean -> Atom (convert_atom ts subst at
-                           :> Atom.generic_atom)
+        | ESort Message ->  Atom (convert_atom ts subst at)
+        | ESort Boolean -> Atom (convert_atom ts subst at)
       end
     | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
     | Atom _ -> assert false
-    | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
-    | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
-    | And (f, g) -> And (conv f, conv g)
-    | Or (f, g) -> Or (conv f, conv g)
-    | Impl (f, g) -> Impl (conv f, conv g)
-    | Not f -> Not (conv f)
+    | ForAll (vs,f) ->
+      let env = ref Vars.empty_env in
+      let (new_subst, _) = convert_vars env vs in
+      ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+                (new_subst @ subst) f)
+    | Exists (vs,f) ->
+      let env = ref Vars.empty_env in
+      let (new_subst, _) = convert_vars env vs in
+      Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+                (new_subst @ subst) f)
+    | And (f, g) -> And (conv kinds subst f, conv kinds subst g)
+    | Or (f, g) -> Or (conv kinds subst f, conv kinds subst g)
+    | Impl (f, g) -> Impl (conv kinds subst f, conv kinds subst g)
+    | Not f -> Not (conv kinds subst f)
     | True -> True
     | False -> False
   in
-  conv f
+  conv arg_kinds s f
 
-let convert_formula_glob args_kind subst f =
+let convert_formula_glob arg_kinds subst f =
   let open Sorts in
   let open Formula in
-  let rec conv = function
+  let rec conv kinds subst = function
     | Atom (Compare (o,u,v)) ->
       begin
         let at = Compare (o,u,v) in
-        match get_kind args_kind u with
+        match get_kind kinds u with
         | ESort Timestamp ->
-            Atom (convert_trace_atom args_kind subst at :>
+            Atom (convert_trace_atom kinds subst at :>
                     Atom.generic_atom)
         | ESort Index ->
-            Atom (convert_trace_atom args_kind subst at :>
+            Atom (convert_trace_atom kinds subst at :>
                     Atom.generic_atom)
         | ESort Message ->  Atom (convert_atom_glob subst at)
         | ESort Boolean -> Atom (convert_atom_glob subst at)
       end
     | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
     | Atom _ -> assert false
-    | ForAll (vs,f) -> ForAll (List.map (subst_get_var subst) vs, conv f)
-    | Exists (vs,f) -> Exists (List.map (subst_get_var subst) vs, conv f)
-    | And (f, g) -> And (conv f, conv g)
-    | Or (f, g) -> Or (conv f, conv g)
-    | Impl (f, g) -> Impl (conv f, conv g)
-    | Not f -> Not (conv f)
+    | ForAll (vs,f) ->
+      let env = ref Vars.empty_env in
+      let (new_subst, _) = convert_vars env vs in
+      ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+                (new_subst @ subst) f)
+    | Exists (vs,f) ->
+      let env = ref Vars.empty_env in
+      let (new_subst, _) = convert_vars env vs in
+      Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+                (new_subst @ subst) f)
+    | And (f, g) -> And (conv kinds subst f, conv kinds subst g)
+    | Or (f, g) -> Or (conv kinds subst f, conv kinds subst g)
+    | Impl (f, g) -> Impl (conv kinds subst f, conv kinds subst g)
+    | Not f -> Not (conv kinds subst f)
     | True -> True
     | False -> False
   in
-  conv f
-
-let convert_vars env vars =
-  let open Sorts in
-  let rec conv (vs:env) : subst * Vars.evar list =
-    match vs with
-    | [] -> ([], [])
-    | (a, ESort Index) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Index a in
-      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
-
-    | (a, ESort Timestamp) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Timestamp a in
-      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
-
-    | (a, ESort Message) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Message a in
-      ESubst (a, Term.Var(a_var) )::vl, (Vars.EVar a_var)::acc
-
-    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
-                             and messages in goals"
-  in
-  let (res, acc) =  conv vars in
-  (List.rev res, acc)
+  conv arg_kinds subst f
 
 let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =

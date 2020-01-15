@@ -20,7 +20,7 @@ let euf_key_ssc hash_fn key_n messages =
   List.iter ssc#visit_term messages ;
   Action.(iter_descrs
     (fun action_descr ->
-       ssc#visit_fact (snd action_descr.condition) ;
+       ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_term (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_term t) action_descr.updates))
 

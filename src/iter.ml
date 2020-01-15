@@ -1,5 +1,4 @@
 open Term
-open Bformula
 
 (** Iterate on all subfacts and subterms.
   * When a macro is encountered, its expansion is visited as well. *)
@@ -12,16 +11,19 @@ class iter = object (self)
         self#visit_term (Macros.get_definition mn is a)
     | Name _ | Var _ -> ()
 
-  method visit_fact (f:fact) = match f with
+  method visit_formula (f:Formula.formula) =
+    let open Formula in
+    match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#visit_fact l ;
-        self#visit_fact r
-    | Not f -> self#visit_fact f
+        self#visit_formula l ;
+        self#visit_formula r
+    | Not f -> self#visit_formula f
     | True | False -> ()
+    | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
     | Atom (`Message (_, t, t')) ->
         self#visit_term t ;
         self#visit_term t'
-
+    | _ -> ()
 end
 
 (** Iterator that does not visit macro expansions but guarantees

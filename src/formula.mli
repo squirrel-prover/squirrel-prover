@@ -21,18 +21,6 @@ val pp_foformula :
   (Format.formatter -> 'b list -> unit) ->
   Format.formatter -> ('a,'b) foformula -> unit
 
-exception Not_a_boolean_formula
-
-(** [foformula_to_bformula conv f] converts [f] to a [bformula],
-  * using [conv] to convert its atoms at the same time. *)
-val foformula_to_bformula :
-  ('a -> 'b) -> ('a, 'c) foformula -> 'b Bformula.bformula
-
-(** [bformula_to_foformula conv bf] convers [bf] to a [formula],
-  * using [conv] to convert atoms at the same time. *)
-val bformula_to_foformula :
-  ('a -> 'b) -> 'a Bformula.bformula -> ('b, 'c) foformula
-
 (** [foformula_vars fv_atom f] returns a list containing
   * all the variables that appear either bound (quantified) in [f],
   * or free in one of its atoms according to [fv_atom]. *)
