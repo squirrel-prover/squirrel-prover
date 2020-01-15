@@ -1,6 +1,5 @@
 open Graph
-open Vars
-open Term
+
 open Atom
 open Bformula
 open Utils
@@ -22,7 +21,7 @@ let log_constr = Log.log Log.LogConstr
 let log_constr = ignore
 
 module Utv : sig
-  type uvar = Utv of var | Uind of Index.t
+  type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -32,14 +31,13 @@ module Utv : sig
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
 
-  val uvar : var -> ut
-  val uvari : Index.t -> ut
-  val uts : timestamp -> ut
+  val uvari : Vars.index -> ut
+  val uts : Term.timestamp -> ut
   val uname : Symbols.action Symbols.t -> ut list -> ut
   val upred : ut -> ut
 
 end = struct
-  type uvar = Utv of var | Uind of Index.t
+  type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
   type ut = { hash : int;
               cnt : ut_cnt }
@@ -76,9 +74,9 @@ end = struct
   let upred u = UPred u |> make
 
   let rec uts ts = match ts with
-    | TVar tv -> uvar tv
-    | TPred ts -> upred (uts ts)
-    | TName (s,l) -> uname s (List.map uvari l)
+    | Term.Var tv -> uvar tv
+    | Term.Pred ts -> upred (uts ts)
+    | Term.Action (s,l) -> uname s (List.map uvari l)
 end
 
 open Utv
@@ -284,7 +282,7 @@ let merge_eq_class uf =
         | [] -> raise (Failure "merge_eq_class")
         | x :: _ -> Uuf.find uf x) (Uuf.classes uf) in
 
-  let rec aux uf cls = match cls with
+  let aux uf cls = match cls with
     | [] -> uf
     | rcl :: cls' -> List.fold_left (fun uf rcl' ->
         let uf, nrcl = mgu uf rcl in
@@ -354,7 +352,7 @@ let build_graph (uf : Uuf.t) leqs =
 
 (* For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
     x=x_1 /\ ... /\ x = x_n   *)
-let cycle_eqs uf g =
+let cycle_eqs g =
   let sccs = Scc.scc_list g in
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
@@ -367,7 +365,7 @@ let cycle_eqs uf g =
     - unify the new equalities *)
 let rec leq_unify uf leqs elems =
   let uf, g = build_graph uf leqs in
-  let uf' = unify uf (cycle_eqs uf g) elems in
+  let uf' = unify uf (cycle_eqs g) elems in
   if Uuf.union_count uf = Uuf.union_count uf' then uf,g
   else leq_unify uf' leqs elems
 
@@ -375,13 +373,6 @@ let rec leq_unify uf leqs elems =
 (***********************************)
 (* Discrete Order Case Disjunction *)
 (***********************************)
-
-let rec root_var = function
-  | TPred u -> root_var u
-  | TVar _ | TName _ as u -> u
-
-let get_vars elems =
-  List.map root_var elems |> List.sort_uniq Pervasives.compare
 
 (* [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
@@ -464,23 +455,6 @@ let forall_edges f g =
         if not (f v v') then raise Foe else ()) g in
     true
   with Foe -> false
-
-let exist_edge f g =
-  let exception Exist in
-  try
-    let () = UtG.iter_edges (fun v v' ->
-        if f v v' then raise Exist else ()) g in
-    false
-  with Exist -> true
-
-let find_edge f g =
-  let exception Found of ut * ut in
-  try
-    let () = UtG.iter_edges (fun v v' ->
-        if f v v' then raise (Found (v,v')) else ()) g in
-    raise Not_found
-  with Found (v,v') -> (v,v')
-
 
 (* Check that [instance] dis-equalities are satisfied.
     [g] must be transitive. *)
@@ -621,8 +595,8 @@ let max_elems_model (model : model) elems =
     ) (model,[]) elems in
 
   (* We keep elements that are maximal in [model] *)
-  let melems = List.filter (fun (ts,u) ->
-      List.for_all (fun (ts',u') ->
+  let melems = List.filter (fun (_,u) ->
+      List.for_all (fun (_,u') ->
           ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
         ) l ) l
                |> List.map fst
@@ -630,7 +604,7 @@ let max_elems_model (model : model) elems =
 
   model, melems
 
-let maximal_elems (models : models) (elems : timestamp list) =
+let maximal_elems (models : models) (elems : Term.timestamp list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
   let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
       let m, m_maxs = max_elems_model m elems in
@@ -650,46 +624,47 @@ let get_equalities (models : models) ts =
 (****************)
 (* Tests Suites *)
 (****************)
+open Term
+open Sorts
 let env = ref Vars.empty_env
-let tau = TVar (Vars.make_fresh_and_update env Timestamp "tau")
-and tau' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
-and tau'' = TVar (Vars.make_fresh_and_update env Timestamp "tau")
-and tau3 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
-and tau4 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
-and tau5 = TVar (Vars.make_fresh_and_update env Timestamp "tau")
+let tau = Var (Vars.make_fresh_and_update env Timestamp "tau")
+and tau' = Var (Vars.make_fresh_and_update env Timestamp "tau")
+and tau'' = Var (Vars.make_fresh_and_update env Timestamp "tau")
+and tau3 = Var (Vars.make_fresh_and_update env Timestamp "tau")
+and tau4 = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and i =  Vars.make_fresh_and_update env Index "i"
 and i' = Vars.make_fresh_and_update env Index "i"
 
 let a = Obj.magic "a" (* Avoid declaring outside of Symbols.run_restore *)
 
-let pb_eq1 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TPred tau''))
-             :: (`Timestamp (`Eq,tau, TName (a,[i])))
-             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
-and pb_eq2 = [`Timestamp (`Eq,tau, TPred tau)]
-and pb_eq3 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TPred tau''))
+let pb_eq1 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Pred tau''))
+             :: (`Timestamp (`Eq,tau, Action (a,[i])))
+             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
+and pb_eq2 = [`Timestamp (`Eq,tau, Pred tau)]
+and pb_eq3 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Pred tau''))
              :: [`Timestamp (`Eq,tau'', tau)]
-and pb_eq4 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TPred tau''))
-             :: (`Timestamp (`Eq,tau, TName (a,[i])))
-             :: [`Timestamp (`Eq,tau'', TName (a,[i]))]
-and pb_eq5 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TName (a,[i'])))
-             :: (`Timestamp (`Eq,tau, TName (a,[i])))
-             :: (`Timestamp (`Eq,tau'', TName (a,[i])))
-             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
-and pb_eq6 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TName (a,[i'])))
-             :: (`Timestamp (`Eq,tau, TName (a,[i])))
-             :: (`Timestamp (`Eq,tau3, TName (a,[i])))
-             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
-and pb_eq7 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TPred tau''))
-             :: (`Timestamp (`Eq,tau, TName (a,[i])))
-             :: [`Timestamp (`Eq,tau'', TName (a,[i']))]
-and pb_eq8 = (`Timestamp (`Eq,tau, TPred tau'))
-             :: (`Timestamp (`Eq,tau', TPred tau''))
+and pb_eq4 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Pred tau''))
+             :: (`Timestamp (`Eq,tau, Action (a,[i])))
+             :: [`Timestamp (`Eq,tau'', Action (a,[i]))]
+and pb_eq5 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
+             :: (`Timestamp (`Eq,tau, Action (a,[i])))
+             :: (`Timestamp (`Eq,tau'', Action (a,[i])))
+             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
+and pb_eq6 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Action (a,[i'])))
+             :: (`Timestamp (`Eq,tau, Action (a,[i])))
+             :: (`Timestamp (`Eq,tau3, Action (a,[i])))
+             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
+and pb_eq7 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Pred tau''))
+             :: (`Timestamp (`Eq,tau, Action (a,[i])))
+             :: [`Timestamp (`Eq,tau'', Action (a,[i']))]
+and pb_eq8 = (`Timestamp (`Eq,tau, Pred tau'))
+             :: (`Timestamp (`Eq,tau', Pred tau''))
              :: [`Timestamp (`Eq,tau'', tau3)];;
 
 (* Printexc.record_backtrace true;; *)

@@ -1,7 +1,4 @@
 (** Implements first order formulas, with atoms both on terms and timestamps *)
-
-open Vars
-open Term
 open Atom
 
 (** {2 Generic first-order formulas} *)
@@ -43,17 +40,17 @@ val foformula_vars : ('a -> 'b list) -> ('a, 'b) foformula -> 'b list
 
 (** {2 Meta-logic formulas} *)
 
-type formula = (generic_atom, var) foformula
+type formula = (generic_atom, Vars.evar) foformula
 
 val pp_formula : Format.formatter -> formula -> unit
 
 (** Returns a list containing all variables that appear either bound
   * (quantified) or free in the formula. *)
-val formula_vars : formula -> var list
+val formula_vars : formula -> Vars.evar list
 
 (** Returns a list containing all the variables that are
   * quantified inside a formula. *)
-val formula_qvars : formula -> var list
+val formula_qvars : formula -> Vars.evar list
 
 val fact_to_formula : Bformula.fact -> formula
 
@@ -64,10 +61,10 @@ val formula_to_trace_formula : formula -> Bformula.trace_formula option
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
     co-domain does not contain any variable that is bound in [f]. *)
-val subst_formula : subst -> formula -> formula
+val subst_formula : Term.subst -> formula -> formula
 
 (** [fresh_quantifications env f] returns a formula that is alpha-equivalent
   * to [f] but where quantified variables are fresh wrt the original
   * [!env], and it updates [env] with the declaration of these new
   * variables. *)
-val fresh_quantifications : env ref -> formula -> formula
+val fresh_quantifications : Vars.env ref -> formula -> formula

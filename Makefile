@@ -56,6 +56,10 @@ metabc: sanity
 	$(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
 
+module: sanity
+	$(OCB) theory.cmo
+
+
 native: sanity
 	$(OCB) test.native
 

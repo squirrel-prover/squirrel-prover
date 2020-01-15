@@ -1,4 +1,3 @@
-open Term
 open Formula
 
 (** State in proof mode.
@@ -47,7 +46,7 @@ let rec reset_state n =
     subgoals := p.subgoals;
     goals_proved := p.goals_proved;
     p.prover_mode
-  | p::q, n -> proof_states_history := q; reset_state (n-1)
+  | _::q, n -> proof_states_history := q; reset_state (n-1)
 
 (** Tactic expressions and their evaluation *)
 
@@ -65,7 +64,7 @@ let rec reset_state n =
 type tac_arg =
   | String_name of string
   | Formula of Formula.formula
-  | Function_name of fname
+  | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
 
@@ -81,7 +80,7 @@ module rec Prover_tactics : sig
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (formula -> tac) -> unit
-  val register_fname : string -> ?help:string -> (fname -> tac) -> unit
+  val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
   val register_macro : string -> ?help:string -> AST.t -> unit
 
   val get : string -> tac_arg list -> tac
@@ -167,7 +166,7 @@ and AST :
   let pp_arg ppf = function
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
-    | Function_name fname -> pp_fname ppf fname
+    | Function_name fname -> Term.pp_fname ppf fname
     | Formula formula -> pp_formula ppf formula
     | Theory th -> Theory.pp_term ppf th
 
@@ -195,7 +194,7 @@ let get_help tac_name =
 let () =
   Prover_tactics.register "admit"
     ~help:"Closes the current goal."
-    (fun j sk fk -> sk [] fk) ;
+    (fun _ sk fk -> sk [] fk) ;
   Prover_tactics.register_general "help"
     ~help:"Display all available commands."
     (function
@@ -243,14 +242,14 @@ let auto_simp judges =
   |> List.flatten
 
 let tsubst_of_judgment j =
-  List.map
-    (fun v ->
+  let aux : Vars.evar -> Theory.esubst =
+    (fun (Vars.EVar v) ->
        match Vars.var_type v with
-       | Vars.Index -> Theory.Idx (Vars.name v,v)
-       | Vars.Timestamp -> Theory.TS (Vars.name v,TVar v)
-       | Vars.Message -> Theory.Term (Vars.name v,MVar v)
-       | Vars.Boolean -> assert false
-    )
+       | Sorts.Boolean -> assert false
+       | _ -> Theory.ESubst (Vars.name v,Term.Var v)
+      )
+      in
+  List.map aux
     (Vars.to_list (Sequent.get_env j))
 
 let parse_formula fact =
@@ -259,9 +258,9 @@ let parse_formula fact =
     | j::_ ->
         let env =
           List.map
-            (fun v ->
+            (fun (Vars.EVar v) ->
                Vars.name v,
-               Vars.var_type v)
+               Sorts.ESort (Vars.var_type v))
             (Vars.to_list (Sequent.get_env j))
         in
         Theory.convert_formula_glob
@@ -269,20 +268,9 @@ let parse_formula fact =
           (tsubst_of_judgment j)
           fact
 
-let parse_subst j uvars ts : subst =
-  let u_subst = tsubst_of_judgment j in
-    List.map2
-      (fun t u ->
-         match Vars.var_type u with
-           | Vars.Timestamp -> TS (TVar u, Theory.convert_ts u_subst t )
-           | Vars.Message -> Term (MVar u, Theory.convert_glob u_subst t)
-           | Vars.Index -> Index (u, Theory.conv_index u_subst t)
-           | Vars.Boolean -> assert false)
-      ts uvars
-
 let get_goal_formula gname =
   match
-    List.filter (fun (name,g) -> name = gname) !goals_proved
+    List.filter (fun (name,_) -> name = gname) !goals_proved
   with
     | [(_,f)] -> f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure "No proved goal with given name"
@@ -296,9 +284,9 @@ let make_goal f  =
   let env = ref Vars.empty_env in
   let argvars = Theory.formula_vars f in
   List.iter
-    (fun (s,k) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
+    (fun (s,_) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
     argvars ;
-  let (subst, vars) = Theory.convert_vars env argvars in
+  let (subst, _) = Theory.convert_vars env argvars in
     Theory.convert_formula_glob
       (List.rev argvars)
       subst
@@ -315,20 +303,6 @@ type parsed_input =
 let add_new_goal g = goals := g :: !goals
 
 let add_proved_goal g = goals_proved := g :: !goals_proved
-
-let iter_goals f = List.iter f !goals
-
-(** Pretty-print goals. This is currently unused. *)
-let pp_goals ppf () =
-  let cpt = ref 0 in
-  Fmt.pf ppf "@[<v>";
-  iter_goals (fun (gname,goal) ->
-    Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
-      !cpt pp_formula goal ;
-    incr cpt) ;
-  Fmt.pf ppf "@]%!@."
-
-let goals_to_proved () = !goals <> []
 
 let is_proof_completed () = !subgoals = []
 
@@ -358,7 +332,7 @@ let eval_tactic_focus tac = match !subgoals with
   | judge :: ejs' ->
     let new_j = eval_tactic_judge tac judge in
     let new_j = match tac with
-      | AST.Modifier ("nosimpl",t) -> new_j
+      | AST.Modifier ("nosimpl", _) -> new_j
       | _ -> auto_simp new_j
     in
     subgoals := new_j @ ejs';

@@ -66,7 +66,7 @@ let rec main_loop ?(save=true) mode =
           begin match new_mode with
             | ProofMode -> Fmt.pr "%a" pp_goal ()
             | GoalMode -> Action.pp_proc Fmt.stdout ()
-            | _ -> ()
+            | InputDescr | WaitQed -> ()
           end ;
           main_loop new_mode
         with

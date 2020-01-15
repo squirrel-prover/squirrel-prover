@@ -58,16 +58,17 @@ let rec left_introductions s = function
       let env = Sequent.get_env s in
       let subst,env =
         List.fold_left
-          (fun (subst,env) v ->
+          (fun (subst,env) (Vars.EVar v) ->
              let env,v' =
                Vars.make_fresh env (Vars.var_type v) (Vars.name v)
              in
              let item =
+               let open Term in
                match Vars.var_type v with
-                 | Vars.Index -> Term.Index (v,v')
-                 | Vars.Timestamp -> Term.TS (Term.TVar v, Term.TVar v')
-                 | Vars.Message -> Term.Term (Term.MVar v, Term.MVar v')
-                 | Vars.Boolean -> Term.Term (Term.MVar v, Term.MVar v')
+                 | Sorts.Index -> ESubst (Var v,Var v')
+                 | Sorts.Timestamp -> ESubst (Var v, Var v')
+                 | Sorts.Message -> ESubst (Var v, Var v')
+                 | Sorts.Boolean -> ESubst (Var v, Var v')
              in
                item::subst, env)
           ([],env)
@@ -90,13 +91,15 @@ let timestamp_case ts s sk fk =
         a.Action.indices
     in
     let subst =
-      List.map2 (fun i i' -> Index (i,i')) a.Action.indices indices
+      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+        a.Action.indices indices
     in
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
     let case =
       let at = Atom (`Timestamp (`Eq,ts,name)) in
       let at = subst_formula subst at in
-      if indices = [] then at else Exists (indices,at)
+      if indices = [] then at else
+        Exists (List.map (fun x -> Vars.EVar x) indices,at)
     in
     f := match !f with False -> case | _ -> Formula.Or (case,!f)
   in
@@ -119,7 +122,7 @@ let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
 let case th s sk fk =
   (* if the conversion to a timestamp of the variable is successful, we perform
      a timestamp_case. If it fails, we try with hypothesis case. *)
-    let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+    let tsubst = Theory.subst_of_env (Sequent.get_env s) in
     match Theory.convert_ts tsubst th with
     | exception _ ->
       begin
@@ -148,13 +151,13 @@ let goal_intro (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | ForAll (vs,f) ->
     let env = ref (Sequent.get_env s) in
-    let vsubst =
+    let subst =
       List.map
-        (fun x ->
-           (x, Vars.make_fresh_from_and_update env x))
+        (fun (Vars.EVar x) ->
+           Term.ESubst (Term.Var x,
+                        Term.Var (Vars.make_fresh_from_and_update env x)))
         vs
     in
-    let subst = Term.from_varsubst vsubst in
     let new_formula = subst_formula subst f in
     let new_judge = Sequent.set_conclusion new_formula s
                     |> Sequent.set_env (!env)
@@ -171,7 +174,7 @@ let goal_intro (s : Sequent.t) sk fk =
     sk [s'] fk
   | _ ->
       fk (Tactics.Failure
-            "Can only introduce implication, universal quantifications
+            "Can only introduce implication, universal quantifications \
              and disequality conclusions.")
 
 let () =
@@ -193,7 +196,7 @@ let goal_exists_intro ths (s : Sequent.t) sk fk =
 let () =
   T.register_general "exists"
     ~help:"Introduce the existentially \
-           quantified variables in the conclusion of the judgment,
+           quantified variables in the conclusion of the judgment, \
            using the arguments as existential witnesses. \
            Usage : exists t_1, t_2."
     (fun l ->
@@ -213,12 +216,14 @@ let exists_left hyp_name s sk fk =
     match f with
       | Exists (vs,f) ->
           let env = ref @@ Sequent.get_env s in
-          let vs' =
+          let subst =
             List.map
-              (fun v -> v, Vars.make_fresh_from_and_update env v)
+              (fun (Vars.EVar v) ->
+                 Term.ESubst  (Term.Var v,
+                               Term.Var (Vars.make_fresh_from_and_update env v))
+              )
               vs
           in
-          let subst = Term.from_varsubst vs' in
           let f = subst_formula subst f in
           let s = Sequent.add_formula f (Sequent.set_env !env s) in
             sk [s] fk
@@ -250,32 +255,44 @@ let () =
 
 let induction s sk fk =
   match Sequent.get_conclusion s with
-    | ForAll (v::vs,f) when Vars.var_type v = Vars.Timestamp ->
-        (* We need two fresh variables in env,
-         * but one will not be kept in the final environment. *)
-        let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
-        let _,v'' = Vars.make_fresh_from env v in
-        let vv,vv',vv'' = TVar v, TVar v', TVar v'' in
-        (* Introduce v as v'. *)
-        let f' = Formula.subst_formula [TS (vv,vv')] (ForAll (vs,f)) in
-        (* Use v'' to form induction hypothesis. *)
-        let ih =
-          ForAll (v''::vs,
-            Impl
-              (Atom (`Timestamp (`Lt,vv'',vv) :> generic_atom),
-               Formula.subst_formula [TS(vv,vv'')] f))
-        in
-        let s =
-          s
-          |> Sequent.set_env env
-          |> Sequent.set_conclusion f'
-          |> Sequent.add_formula ~prefix:"IH" ih
-        in
-          sk [s] fk
-    | _ ->
-        fk @@ Tactics.Failure
-                "Conclusion must be an \
-                 universal quantification over a timestamp"
+  | ForAll ((Vars.EVar v)::vs,f) ->
+    (match Vars.var_type v with
+       Sorts.Timestamp ->
+       (
+         (* We need two fresh variables in env,
+          * but one will not be kept in the final environment. *)
+         let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
+         let _,v'' = Vars.make_fresh_from env v in
+         (* Introduce v as v'. *)
+         let f' = Formula.subst_formula [Term.ESubst (Term.Var v,Term.Var v')]
+             (ForAll (vs,f))
+         in
+         (* Use v'' to form induction hypothesis. *)
+         let ih =
+           ForAll ((Vars.EVar v'')::vs,
+                   Impl
+                     (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
+                            :> generic_atom),
+                      Formula.subst_formula
+                        [Term.ESubst (Term.Var v,Term.Var v'')] f))
+         in
+         let s =
+           s
+           |> Sequent.set_env env
+           |> Sequent.set_conclusion f'
+           |> Sequent.add_formula ~prefix:"IH" ih
+         in
+         sk [s] fk
+       )
+     | _ ->
+       fk @@ Tactics.Failure
+         "Conclusion must be an \
+          universal quantification over a timestamp"
+    )
+  | _ ->
+    fk @@ Tactics.Failure
+      "Conclusion must be an \
+       universal quantification over a timestamp"
 
 let () = T.register "induction"
     ~help:"Apply the induction scheme to the given formula."
@@ -331,8 +348,6 @@ let mk_and_cnstr l = match l with
       | x :: l -> mk_c (Bformula.And (x,acc)) l in
     mk_c a l'
 
-open Bformula
-
 (** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
@@ -344,7 +359,7 @@ let eq_names (s : Sequent.t) sk fk =
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
-    List.fold_left (fun judge c ->
+    List.fold_left (fun _ c ->
         Sequent.add_formula c s
       ) s new_eqs
   in
@@ -355,14 +370,14 @@ let eq_names (s : Sequent.t) sk fk =
       (Sequent.get_all_terms s)
   in
   let s =
-    List.fold_left (fun judge c ->
+    List.fold_left (fun _ c ->
         Sequent.add_trace_formula c s
       ) s cnstrs
   in
   sk [s] fk
 
 let () = T.register "eqnames"
-    ~help:" Add index constraints resulting from names equalities, modulo the
+    ~help:" Add index constraints resulting from names equalities, modulo the \
 known equalities."
     eq_names
 
@@ -373,7 +388,7 @@ let eq_timestamps (s : Sequent.t) sk fk =
   let subst =
     let rec asubst e = function
         [] -> []
-      | p::q -> TS (p,e) :: (asubst e q)
+      | p::q -> Term.ESubst (p,e) :: (asubst e q)
     in
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
@@ -382,7 +397,7 @@ let eq_timestamps (s : Sequent.t) sk fk =
   let facts =
     List.fold_left
       (fun acc t ->
-         let normt : Term.term = subst_term subst t in
+         let normt : Term.message = Term.subst subst t in
          if normt = t then
            acc
          else
@@ -402,21 +417,21 @@ let () = T.register "eqtimestamps"
     eq_timestamps
 
 let substitute (v1) (v2) (s : Sequent.t) sk fk=
-  let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+  let tsubst = Theory.subst_of_env (Sequent.get_env s) in
   let subst =
     match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
     | ts1,ts2 ->
       let models = Sequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
-        [TS(ts1,ts2)]
+        [Term.ESubst (ts1,ts2)]
       else
         raise @@ Tactic_Hard_Failure "Arguments not equals."
     | exception _ ->
       match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
       | m1,m2 ->
-        let s,trs = Sequent.get_trs s in
+        let _,trs = Sequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
-          [Term(m1,m2)]
+          [Term.ESubst (m1,m2)]
       else
         raise @@ Tactic_Hard_Failure "Arguments not equals."
       | exception _ ->
@@ -424,7 +439,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         | i1,i2 ->
           let models = Sequent.get_models s in
           if Constr.query models [(`Index (`Eq,i1,i2))] then
-            [Index(i1,i2)]
+            [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
             raise @@ Tactic_Hard_Failure "Arguments not equals."
       | exception _ ->  raise @@ Tactic_Hard_Failure "Improper arguments."
@@ -452,7 +467,7 @@ let euf_param (`Message at : term_atom) = match at with
   | _ -> raise @@ Tactic_Hard_Failure
         "Euf can only be applied to hypothesis of the form h(t,k)=m."
 
-let euf_apply_schema sequent (_, (_, key_is), m, s) case =
+let euf_apply_schema sequent (_, (_, _), m, s) case =
   let open Euf in
   (* We create the term equality *)
   let new_f = Formula.Atom (`Message (`Eq, case.message, m)) in
@@ -463,16 +478,16 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let le_cnstr =
     List.map
       (function
-         | TPred ts ->
-             Atom (`Timestamp (`Lt, action_descr_ts, ts))
+         | Pred ts ->
+             Bformula.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
-             Atom (`Timestamp (`Leq, action_descr_ts, ts)))
+             Bformula.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)
 
-let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
+let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
   let open Euf in
   (* We create the term equality *)
   let eq = Formula.Atom (`Message (`Eq, dcase.d_message, m)) in
@@ -480,7 +495,7 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
      [dcase.d_key_indices]. *)
   let eq_cnstr =
     List.map2
-      (fun i i' -> Atom (`Index (`Eq, i, i')))
+      (fun i i' -> Bformula.Atom (`Index (`Eq, i, i')))
       key_is dcase.d_key_indices
     |> mk_and_cnstr
   in
@@ -509,7 +524,7 @@ let euf_apply_facts s at =
   schemata_premises @ direct_premises
 
 
-let set_euf t = { Sequent.t_euf = true }
+let set_euf _ = { Sequent.t_euf = true }
 
 let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   let s, at =
@@ -517,8 +532,8 @@ let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk
-  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not satisfy
-the syntactic side condition")
+  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not \
+satisfy the syntactic side condition")
 
 let () =
   T.register_general "euf"
@@ -557,7 +572,7 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "apply"
-    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its
+    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its \
 universally quantified variables instantied with t1,..."
     (function
       | Prover.String_name id :: th_terms ->
@@ -586,13 +601,13 @@ let collision_resistance (s : Sequent.t) sk fk =
      the syntactic side condition. *)
   let hashes = List.filter
       (fun t -> match t with
-         | Fun ((hash, _), [m; Name (key,ki)]) ->
+         | Fun ((hash, _), [m; Name (key,_)]) ->
            (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
          | _ -> false)
       (Sequent.get_all_terms s)
   in
   if List.length hashes = 0 then
-    fk (Failure "no equality between hashes where the keys satisfiy the
+    fk (Failure "no equality between hashes where the keys satisfiy the \
  syntactic condition has been found")
   else
     begin
@@ -601,7 +616,7 @@ let collision_resistance (s : Sequent.t) sk fk =
         | [] -> []
         | h1::q -> List.fold_left (fun acc h2 ->
             match h1, h2 with
-            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+            | Fun ((hash, _), [_; Name key1]), Fun ((hash2, _), [_; Name key2])
               when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
             | _ -> acc
           ) [] q
@@ -630,6 +645,6 @@ let collision_resistance (s : Sequent.t) sk fk =
     end
 
 let () = T.register "collision"
-    ~help:"Collects all equalities between hashes, and affs the equalities of the
-messages hashed with the same valid key."
+    ~help:"Collects all equalities between hashes, and affs the equalities of \
+the messages hashed with the same valid key."
     collision_resistance

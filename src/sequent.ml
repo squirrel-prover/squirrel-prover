@@ -1,8 +1,6 @@
 open Utils
-open Term
 open Atom
 open Bformula
-open Formula
 
 (* The generic type for hypothesis, with arbtitry type of formulas and tag. *)
 
@@ -70,7 +68,7 @@ let mk_name h id = (h.name_prefix)^(string_of_int id)
 
 let get_name_prefix name =
   match  String.split_on_integer name with
-  | s, None -> raise Not_found
+  | _, None -> raise Not_found
   | s, Some u -> s,u
 
 let get_visible hs =
@@ -114,12 +112,12 @@ let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
   with Not_found -> M.add name_prefix ([v]) hs
 
 let to_list hs =
-  let r1,r2 = M.bindings hs |> List.split in
+  let _,r2 = M.bindings hs |> List.split in
   List.flatten r2
 
 
 let mem f hs =
-  M.exists (fun name hs_list ->
+  M.exists (fun _ hs_list ->
       List.exists (fun hypo -> hypo.hypothesis = f) hs_list)
     hs
 
@@ -140,7 +138,7 @@ let pp pp_formula id ppf hypo =
   Fmt.pf ppf "%s: %a@;" (mk_name hypo id) pp_formula hypo.hypothesis
 
 let pps pp_formula ppf hs =
-  M.iter (fun name hs_list ->
+  M.iter (fun _ hs_list ->
   List.iteri
     (fun i h -> pp pp_formula i ppf h)
     (List.rev (get_visible hs_list))) hs
@@ -156,7 +154,7 @@ type message_hypothesis = (message_hypothesis_tag, term_atom) H.hypothesis
 
 type message_hypotheses = (message_hypothesis_tag, term_atom) H.hypotheses
 type trace_hypotheses = (trace_tag, trace_formula) H.hypotheses
-type formula_hypotheses = (formula_tag, formula) H.hypotheses
+type formula_hypotheses = (formula_tag, Formula.formula) H.hypotheses
 
 type t = {
   env : Vars.env;
@@ -170,7 +168,7 @@ type t = {
     (** Quantifier-free formula over index and timestamp predicates. *)
   formula_hypotheses : formula_hypotheses;
     (** Other hypotheses. *)
-  conclusion : formula;
+  conclusion : Formula.formula;
     (** The conclusion / right-hand side formula of the sequent. *)
   trs : Completion.state option;
     (** Either [None], or the term rewriting system
@@ -185,23 +183,22 @@ type sequent = t
 
 let pp ppf s =
   let open Fmt in
-  let open Utils in
   pf ppf "@[<v 0>" ;
   if s.env <> Vars.empty_env then
-    pf ppf "@[Variables: %a@]@;" Vars.pp_typed_env s.env ;
+    pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
   if s.happens_hypotheses <> [] then
     pf ppf "@[<hov 2>Executed actions:@ %a@]@;"
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp_timestamp)
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp)
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
   H.pps pp_term_atom ppf s.message_hypotheses ;
   H.pps pp_trace_formula ppf s.trace_hypotheses ;
-  H.pps pp_formula ppf s.formula_hypotheses ;
+  H.pps Formula.pp_formula ppf s.formula_hypotheses ;
   (* Print separation between hypotheses and conclusion *)
   styled `Bold ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" pp_formula s.conclusion
+  pf ppf "@;%a@]" Formula.pp_formula s.conclusion
 
 let init_sequent = {
   env = Vars.empty_env;
@@ -215,18 +212,18 @@ let init_sequent = {
 }
 
 let is_hypothesis f s =
-  match formula_to_trace_formula f with
+  match Formula.formula_to_trace_formula f with
   | Some tf -> H.mem tf s.trace_hypotheses
   | None ->
     match f with
-    | Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
-    | Atom (`Happens t) -> List.mem t s.happens_hypotheses
+    | Formula.Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
+    | Formula.Atom (`Happens t) -> List.mem t s.happens_hypotheses
     | _ ->  H.mem f s.formula_hypotheses
 
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
-      Atom ((H.find id s.message_hypotheses).H.hypothesis :>
+      Formula.Atom ((H.find id s.message_hypotheses).H.hypothesis :>
                Atom.generic_atom)
     with Not_found ->
       Formula.bformula_to_foformula
@@ -260,7 +257,7 @@ class iter_macros f = object (self)
   inherit Iter.iter as super
   method visit_term t =
     match t with
-      | Macro ((m,is),[],a) ->
+      | Term.Macro ((m,is),[],a) ->
           if Macros.is_defined m a then
             let def = Macros.get_definition m is a in
               f t def ;
@@ -297,7 +294,7 @@ let rec add_happens s ts =
     { s with happens_hypotheses = ts :: s.happens_hypotheses }
   in
     match ts with
-      | TName (symb,indices) ->
+      | Term.Action (symb,indices) ->
           let a = Action.of_term symb indices in
           add_formula ~prefix:"C"
             (Formula.bformula_to_foformula
@@ -309,12 +306,12 @@ let rec add_happens s ts =
 (* Depending on the shape of the formula, we add it to the corresponding set of
    hypotheses. *)
 and add_formula ?prefix f s =
-  match formula_to_trace_formula f with
+  match Formula.formula_to_trace_formula f with
   | Some tf -> add_trace_formula ?prefix tf s
   | None ->
     match f with
-    | Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
-    | Atom (`Happens ts) -> add_happens s ts
+    | Formula.Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
+    | Formula.Atom (`Happens ts) -> add_happens s ts
     | _ ->
         let prefix = match prefix with Some p -> p | None -> "H" in
         { s with formula_hypotheses =
@@ -348,7 +345,7 @@ let message_atoms_valid s =
     List.exists
       (fun eq -> Completion.check_equalities trs [eq])
       (match s.conclusion with
-         | Atom (`Message (`Eq,u,v)) -> (u,v)::neqs
+         | Formula.Atom (`Message (`Eq,u,v)) -> (u,v)::neqs
          | _ -> neqs)
 
 let set_env a s = { s with env = a }
@@ -358,10 +355,10 @@ let get_env s = s.env
 let set_conclusion a s =
   let s = { s with conclusion = a } in
     match a with
-      | Atom (#term_atom as at) -> add_macro_defs s at
+      | Formula.Atom (#term_atom as at) -> add_macro_defs s at
       | _ -> s
 
-let init (goal : formula) = set_conclusion goal init_sequent
+let init (goal : Formula.formula) = set_conclusion goal init_sequent
 
 let get_conclusion s = s.conclusion
 
@@ -416,7 +413,7 @@ let compute_models s =
     let trace_hypotheses = make_trace_formula s in
     let models = Constr.models trace_hypotheses in
     { s with models = Some models;}
-  | Some m -> s
+  | Some _ -> s
 
 let get_models s =
   let s = compute_models s in
@@ -443,7 +440,7 @@ let get_all_terms s =
   in
   let atoms =
     match s.conclusion with
-      | Atom (#term_atom as at) -> at::atoms
+      | Formula.Atom (#term_atom as at) -> at::atoms
       | _ -> atoms
   in
   List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms

@@ -1,15 +1,15 @@
-open Term
-open Bformula
-
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
 class check_hash_key hash_fn key_n = object (self)
   inherit Iter.iter_approx_macros as super
   method visit_term t = match t with
-    | Fun ((fn,_), [m;Name _]) when fn = hash_fn -> self#visit_term m
-    | Name (n,_) when n = key_n -> raise Bad_ssc
-    | MVar m -> raise Bad_ssc
+    | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn -> self#visit_term m
+    | Term.Name (n,_) when n = key_n -> raise Bad_ssc
+    | Term.Var m ->
+      (match Vars.var_type m with
+      | Sorts.Message-> raise Bad_ssc
+      )
     | _ -> super#visit_term t
 end
 
@@ -31,22 +31,22 @@ let hash_key_ssc hash_fn key_n messages =
   with Bad_ssc -> false
 
 let rec h_o_term hh kk acc = function
-  | Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
-      | Name (key_n',is) ->
+  | Term.Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
+      | Term.Name (key_n',is) ->
         if key_n' = kk then h_o_term hh kk ((is,m) :: acc) m
         else h_o_term hh kk acc m
       | _ -> h_o_term hh kk (h_o_term hh kk acc m) k end
 
-  | Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
-  | Macro ((mn,is),l,a) ->
+  | Term.Fun (_,l) -> List.fold_left (h_o_term hh kk) acc l
+  | Term.Macro ((mn,is),l,a) ->
     if mn = fst Term.in_macro || mn = fst Term.out_macro then acc
     else if Macros.is_defined mn a then
       let acc = List.fold_left (fun acc t -> h_o_term hh kk acc t) acc l in
       Macros.get_definition mn is a
       |> h_o_term hh kk acc
     else raise Bad_ssc
-  | Name (n,_) -> acc
-  | MVar m -> acc
+  | Term.Name (_,_) -> acc
+  | Term.Var _ -> acc
 
 (** [hashes_of_action_descr action_descr hash_fn key_n] return the pairs of
     indices and messages where a hash using occurs in an action description.
@@ -60,7 +60,7 @@ let hashes_of_action_descr action_descr hash_fn key_n =
 
 let hashes_of_term term hash_fn key_n = h_o_term hash_fn key_n [] term
 
-type euf_schema = { message : Term.term;
+type euf_schema = { message : Term.message;
                     action_descr : Action.descr;
                     env : Vars.env }
 
@@ -68,23 +68,23 @@ let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
     Action.pp_action case.action_descr.Action.action
-    Term.pp_term case.message
+    Term.pp case.message
 
 (** Type of a direct euf axiom case.
     [e] of type [euf_case] represents the fact that the message [e.m]
     has been hashed, and the key indices were [e.eindices]. *)
-type euf_direct = { d_key_indices : Index.t list;
-                    d_message : Term.term }
+type euf_direct = { d_key_indices : Vars.index list;
+                    d_message : Term.message }
 
 
 let pp_euf_direct ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
     Vars.pp_list case.d_key_indices
-    Term.pp_term case.d_message
+    Term.pp case.d_message
 
-type euf_rule = { hash : fname;
-                  key : name;
+type euf_rule = { hash : Term.fname;
+                  key : Term.name;
                   case_schemata : euf_schema list;
                   cases_direct : euf_direct list }
 
@@ -111,19 +111,22 @@ let mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
             let subst_fresh =
               List.map
                 (fun i ->
-                   Term.Index (i, Vars.make_fresh_from_and_update env i))
+                   Term.ESubst (Term.Var i,Term.Var
+                                  (Vars.make_fresh_from_and_update env i)
+                               )
+                )
                 (List.filter
                    (fun x -> not (List.mem x is))
                    action_descr.Action.indices)
             in
             let subst_is =
               List.map2
-                (fun i j -> Term.Index (i,j))
+                (fun i j -> Term.ESubst (Term.Var i, Term.Var j))
                 is key_is
             in
             let subst = subst_fresh@subst_is in
             let new_action_descr = Action.subst_descr subst action_descr in
-            { message = Term.subst_term subst m ;
+            { message = Term.subst subst m ;
               action_descr = new_action_descr;
               env = !env })
         )

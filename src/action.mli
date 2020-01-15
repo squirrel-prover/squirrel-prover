@@ -24,7 +24,7 @@ type 'a t = ('a item) list
 
 (** Actions are lists of items where infinite choices are represented
   * by index lists. *)
-type action = (Index.t list) t
+type action = (Vars.index list) t
 
 (** Shapes represent classes of actions differing only in their indices:
   * they are obtained by replacing lists of indices by their lengths. *)
@@ -48,17 +48,17 @@ val get_shape : action -> shape
     shapes. Return [None] otherwise.
     If [a] indices appear at most once in [a], then [subst] is the index
     substitution sending [a] to [b]. *)
-val same_shape : action -> action -> Index.subst option
+val same_shape : action -> action -> Term.subst option
 
 (** [constr_equal a b] returns the list of index equalities necessary to have
   * [a] and [b] equal, if there is one. Return None otherwise. *)
-val constr_equal : action -> action -> (Index.t*Index.t) list option
+val constr_equal : action -> action -> (Vars.index*Vars.index) list option
 
 (** Convert action to the corresponding [TName] timestamp term. *)
 val to_term : action -> Term.timestamp
 
 (** Convert [TName] parameters to an action. *)
-val of_term : Symbols.action Symbols.t -> Index.t list -> action
+val of_term : Symbols.action Symbols.t -> Vars.index list -> action
 
 (** Get dummy action of some length. Guarantees that a symbol exists for it. *)
 val dummy_action : int -> action
@@ -75,9 +75,9 @@ val dummy_action : int -> action
 val fresh_symbol : string -> Symbols.Action.ns Symbols.t
 val define_symbol :
   Symbols.Action.ns Symbols.t ->
-  Index.t list -> action -> unit
-val find_symbol : string -> Index.t list * action
-val of_symbol : Symbols.Action.ns Symbols.t -> Index.t list * action
+  Vars.index list -> action -> unit
+val find_symbol : string -> Vars.index list * action
+val of_symbol : Symbols.Action.ns Symbols.t -> Vars.index list * action
 
 (** {2 Action descriptions}
   *
@@ -88,10 +88,10 @@ val of_symbol : Symbols.Action.ns Symbols.t -> Index.t list * action
 type descr = {
   action : action ;
   input : Channel.t * string ;
-  indices : Index.t list ;
-  condition : Index.t list * Bformula.fact ;
-  updates : (Term.state * Term.term) list ;
-  output : Channel.t * Term.term
+  indices : Vars.index list ;
+  condition : Vars.index list * Bformula.fact ;
+  updates : (Term.state * Term.message) list ;
+  output : Channel.t * Term.message
 }
 
 (** [get_descr a] returns the description corresponding to the action [a].
@@ -109,7 +109,7 @@ val iter_descrs : (descr -> unit) -> unit
   * linked together. The set of registered actions will define
   * the protocol under study. *)
 val register :
-  Symbols.action Symbols.t -> Index.t list -> action -> descr -> unit
+  Symbols.action Symbols.t -> Vars.index list -> action -> descr -> unit
 
 (** Reset all action definitions done through [register]. *)
 val reset : unit -> unit

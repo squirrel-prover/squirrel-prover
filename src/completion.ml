@@ -1,5 +1,4 @@
 open Utils
-open Term
 open Bformula
 
 module Cst = struct
@@ -10,9 +9,9 @@ module Cst = struct
     | Csucc of t
 
     (* Constants appearing in the original terms *)
-    | Cname of nsymb
-    | Cmvar of Vars.var
-    | Cmacro of msymb * timestamp
+    | Cname of Term.nsymb
+    | Cmvar of Vars.message
+    | Cmacro of Term.msymb * Term.timestamp
 
   let cst_cpt = ref 0
 
@@ -23,9 +22,9 @@ module Cst = struct
   let rec print ppf = function
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
-    | Cname n -> pp_nsymb ppf n
+    | Cname n -> Term.pp_nsymb ppf n
     | Cmvar m -> Vars.pp ppf m
-    | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" pp_msymb m pp_timestamp ts
+    | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
 
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
@@ -35,7 +34,7 @@ module Cst = struct
     | _, Csucc _ -> 1
     | _,_ -> Pervasives.compare c c'
 
-  let equal c c' = compare c c' = 0
+  (*  let equal c c' = compare c c' = 0 *)
 
   let hash c = Hashtbl.hash c
 end
@@ -45,7 +44,7 @@ type varname = int
 (* Terms used during the completion and normalization.
     Remark: Cxor never appears during the completion. *)
 type cterm =
-  | Cfun of fsymb * cterm list
+  | Cfun of Term.fsymb * cterm list
   | Ccst of Cst.t
   | Cvar of varname
   | Cxor of cterm list
@@ -57,17 +56,19 @@ let mk_var () =
   Cvar !var_cpt
 
 (** Translation from [term] to [cterm] *)
-let rec cterm_of_term = function
+let rec cterm_of_term =
+  let open Term in function
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
-  | MVar m -> Ccst (Cst.Cmvar m)
+  | Var m -> Ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
                       Ccst (Cst.Cmacro (m,ts))
 
-let rec term_of_cterm = function
+let rec term_of_cterm =
+  let open Term in function
   | Cfun (f,cterms) -> Fun (f, List.map term_of_cterm cterms)
   | Ccst (Cst.Cname n) -> Name n
-  | Ccst (Cst.Cmvar m) -> MVar m
+  | Ccst (Cst.Cmvar m) -> Var m
   | Ccst (Cst.Cmacro (m,ts)) -> Macro (m,[],ts)
   | _ -> assert false
 
@@ -77,7 +78,7 @@ let rec pp_cterm ppf = function
   | Ccst c -> Cst.print ppf c
   | Cfun (f, ts) ->
     Fmt.pf ppf "%a(@[<hov 1>%a@])"
-      pp_fsymb f
+      Term.pp_fsymb f
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
   | Cxor ts ->
     Fmt.pf ppf "++(@[<hov 1>%a@])"
@@ -666,7 +667,7 @@ let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
   aux s sat_rules
 
 let simplify_set t = match t with
-  | Cxor [] -> Cfun (f_zero,[])
+  | Cxor [] -> Cfun (Term.f_zero,[])
   | Cxor [t] -> t
   | _ -> t
 
@@ -811,7 +812,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   |> complete_state
   |> finalize_completion
 
-let complete (l : (term * term) list) : state =
+let complete (l : (Term.message * Term.message) list) : state =
   List.map (fun (u,v) -> ( cterm_of_term u, cterm_of_term v )) l
   |> complete_cterms
 
@@ -931,7 +932,7 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      Symbols.run_restore @@ fun () ->
-       let fi = 0, Symbols.Abstract ([],Vars.Message) in
+       let fi = 0, Symbols.Abstract ([],Sorts.emessage) in
        let ffs, gfs =
          (Symbols.Function.declare_exact "f" fi, []),
          (Symbols.Function.declare_exact "g" fi, [])

@@ -1,6 +1,4 @@
-open Bformula
-
-type pkind = (string * Vars.sort) list
+type pkind = (string * Sorts.esort) list
 
 type id = string
 
@@ -115,27 +113,27 @@ let pkind_of_pname name = Hashtbl.find pdecls name
 (** Type checking for processes *)
 let rec check_proc env = function
   | Null -> ()
-  | New (x, p) -> check_proc ((x, Vars.Message)::env) p
-  | In (c,x,p) -> check_proc ((x, Vars.Message)::env) p
-  | Out (c,m,p) ->
-    Theory.check_term env m Vars.Message ;
+  | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
+  | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
+  | Out (_,m,p) ->
+    Theory.check_term env m Sorts.emessage ;
     check_proc env p
   | Set (s, l, m, p) ->
     let k = Theory.check_state s (List.length l) in
     Theory.check_term env m k ;
     List.iter
-      (fun x -> Theory.check_term env (Theory.Var x) Vars.Index) l ;
+      (fun x -> Theory.check_term env (Theory.Var x) Sorts.eindex) l ;
     check_proc env p
   | Parallel (p, q) -> check_proc env p ; check_proc env q
   | Let (x, t, p) ->
-    Theory.check_term env t Vars.Message ;
-    check_proc ((x, Vars.Message)::env) p
-  | Repl (x, p) -> check_proc ((x, Vars.Index)::env) p
+    Theory.check_term env t Sorts.emessage ;
+    check_proc ((x, Sorts.emessage)::env) p
+  | Repl (x, p) -> check_proc ((x, Sorts.eindex)::env) p
   | Exists (vars, test, p, q) ->
     check_proc env q ;
     let env =
       List.rev_append
-        (List.map (fun x -> x, Vars.Index) vars)
+        (List.map (fun x -> x, Sorts.eindex) vars)
         env
     in
     Theory.check_fact env test ;
@@ -144,7 +142,7 @@ let rec check_proc env = function
     begin try
         let kind,_ = pkind_of_pname id in
         List.iter2
-          (fun (x, k) t -> Theory.check_term env t k)
+          (fun (_, k) t -> Theory.check_term env t k)
           kind ts
       with
       | Not_found -> raise Theory.Type_error
@@ -175,7 +173,7 @@ let prepare : process -> process =
   (* We start with an environment containing a special variable for
    * talking about the current timestamp, which is used in the translation
    * to terms. *)
-  let env,ts_var = Vars.make_fresh Vars.empty_env Vars.Timestamp "ts" in
+  let env,ts_var = Vars.make_fresh Vars.empty_env Sorts.Timestamp "ts" in
 
   (** Transducer recognizing the processes that can be turned
     * into actions, updating at each state the list of
@@ -197,13 +195,13 @@ let prepare : process -> process =
 
     | `Start, (Null | Parallel _ | Repl _) -> `Start, env, invars
     | `Start, In (_,x,_) ->
-        let env,x = Vars.make_fresh env Vars.Message x in
+        let env,x = Vars.make_fresh env Sorts.Message x in
         `Input, env, x::invars
     | `Start, (Exists _ | Set _) ->
-        let env,x = Vars.make_fresh env Vars.Message "_" in
+        let env,x = Vars.make_fresh env Sorts.Message "_" in
         `Input, env, x::invars
     | `Start, Out _ ->
-        let env,x = Vars.make_fresh env Vars.Message "_" in
+        let env,x = Vars.make_fresh env Sorts.Message "_" in
         `Start, env, x::invars
 
     | `Input, Exists _ -> `Input, env, invars
@@ -219,38 +217,45 @@ let prepare : process -> process =
 
   (* Convert a Theory.term to Term.term using the special sort
    * of substitution maintained by the preparation function. *)
-  let convert subst t =
+  let convert isubst msubst t : Term.message =
     let subst =
-      List.map
-        (fun (tag,x,th,tm) ->
-           match tag,tm with
-             | `Index, Term.MVar v -> Theory.Idx (x,v)
-             | `Index, _ -> assert false
-             | `Message, _ -> Theory.Term (x,tm))
-        subst
+      (List.map
+        (fun (x,_,tm) ->
+           match tm with
+             | Term.Var v -> Theory.ESubst (x,Term.Var v)
+             |  _ -> assert false
+         )
+        isubst)
+      @
+      (
+       List.map
+        (fun (x,_,tm) -> Theory.ESubst (x,tm))
+        msubst
+      )
     in
-    Theory.convert (Term.TVar ts_var) subst t
+    Theory.convert (Term.Var ts_var) subst t
   in
 
   let list_assoc v l =
-    let _,_,th,tm = List.find (fun (_,x,_,_) -> x = v) l in
+    let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
     th,tm
   in
-  let to_tsubst subst = List.map (fun (_,x,y,_) -> x,y) subst in
+  let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst in
 
   let rec prep
     (env : Vars.env)
-    (indices : Vars.var list)
-    (subst : ([`Index|`Message]*string*Theory.term*Term.term) list)
-    (invars : Vars.var list)
+    (indices : Vars.index list)
+    (isubst : (string*Theory.term*(Sorts.index Term.term)) list)
+    (msubst : (string*Theory.term*Term.message) list)
+    (invars : Vars.message list)
     prep_state
     (a : string)
     p =
 
   (* TODO re-indent when code is stabilized *)
   let prep_state,env,invars = update prep_state env invars p in
-  let prep ?(env=env) ?(indices=indices) ?(subst=subst) ?(a=a) p =
-    prep env indices subst invars prep_state a p
+  let prep ?(env=env) ?(indices=indices) ?(isubst=isubst) ?(msubst=msubst) ?(a=a) p =
+    prep env indices isubst msubst invars prep_state a p
   in
   match p with
 
@@ -265,10 +270,10 @@ let prepare : process -> process =
         (* make_fresh avoid confusions with other bound variables,
          * TODO we probably also want to avoid conflicts with
          * globally declared symbols *)
-        let env,i' = Vars.make_fresh env Vars.Index i in
-        let subst =
-          (`Index,i, Theory.Var (Vars.name i'), Term.MVar i') :: subst in
-        Repl (Vars.name i', prep ~env ~indices:(i'::indices) ~subst p)
+        let env,i' = Vars.make_fresh env Sorts.Index i in
+        let isubst =
+          (i, Theory.Var (Vars.name i'), Term.Var i') :: isubst in
+        Repl (Vars.name i', prep ~env ~indices:(i'::indices) ~isubst p)
 
     | New (n,p) ->
         (* TODO getting a globally fresh symbol for the name
@@ -280,12 +285,12 @@ let prepare : process -> process =
             (Symbols.to_string n',
              List.rev_map (fun i -> Theory.Var (Vars.name i)) indices)
         in
-        let subst =
-          (`Message,n,n'_th,Term.Name (n',List.rev indices)) :: subst in
-          prep ~subst p
+        let msubst =
+          (n,n'_th,Term.Name (n',List.rev indices)) :: msubst in
+          prep ~msubst p
 
     | Let (x,t,p) ->
-        let body = convert subst t in
+        let body = convert isubst msubst t in
         let x' =
           Macros.declare_global x ~inputs:invars
             ~indices:(List.rev indices) ~ts:ts_var body
@@ -297,21 +302,21 @@ let prepare : process -> process =
              Some (Theory.Var "…"))
         in
         let x'_tm =
-          Term.Macro ((x', List.rev indices), [], Term.TVar ts_var)
+          Term.Macro ((x', List.rev indices), [], Term.Var ts_var)
         in
-        let subst = (`Message,x,x'_th,x'_tm) :: subst in
-          prep ~subst p
+        let msubst = (x,x'_th,x'_tm) :: msubst in
+          prep ~msubst p
 
     | In (c,x,p) ->
         let x' = List.hd invars in
-        let subst =
-          (`Message,x,
+        let msubst =
+          (x,
            Theory.Var (Vars.name x'),
-           Term.MVar x') :: subst in
-        In (c, Vars.name x', prep ~env ~subst p)
+           Term.Var x') :: msubst in
+        In (c, Vars.name x', prep ~env ~msubst p)
 
     | Out (c,t,p) ->
-        let t = Theory.subst t (to_tsubst subst) in
+        let t = Theory.subst t (to_tsubst isubst@to_tsubst msubst) in
         let a' = Action.fresh_symbol a in
           Alias
             (Out (c, t, prep p),
@@ -322,35 +327,34 @@ let prepare : process -> process =
          * otherwise use id as the new alias. *)
         let a = match p with Alias (_,a) -> a | _ -> id in
         let t,p = Hashtbl.find pdecls id in
-        let subst =
+        let isubst, msubst =
           (* TODO avoid or handle conflicts with variables already
            * in domain of subst, i.e. variables bound above the apply *)
-          let tsubst = to_tsubst subst in
-          List.map2
-            (fun (x,k) v ->
+          let tsubst = (to_tsubst isubst@to_tsubst msubst) in
+          List.fold_left2
+            (fun (iacc,macc) (x,k) v ->
                match k,v with
-                 | Vars.Message,_ ->
-                     `Message, x, Theory.subst v tsubst,
-                     convert subst v
-                 | Vars.Index, Theory.Var i ->
-                     let _,i' = list_assoc i subst in
-                     `Index, x, Theory.subst v tsubst, i'
+                 | Sorts.ESort Sorts.Message,_ ->
+                      iacc, (x, Theory.subst v tsubst,
+                     convert isubst msubst v)::macc
+                 | Sorts.ESort Sorts.Index, Theory.Var i ->
+                     let _,i' = list_assoc i isubst in
+                     (x, Theory.subst v tsubst, i')::iacc, macc
                  | _ -> assert false)
-            t args
-          @ subst
+            (isubst,msubst) t args
         in
           (* Even if input variables are not going to be
            * accessed by p, we need to pass them so that
            * the list has the expected length wrt the
            * actions that will eventually be generated. *)
-          prep ~a ~subst p
+          prep ~a ~isubst ~msubst p
 
     | Set (s,l,t,p) ->
-        let t' = Theory.subst t (to_tsubst subst) in
+        let t' = Theory.subst t (to_tsubst isubst@to_tsubst msubst) in
         let l' =
           List.map
             (fun i ->
-               match list_assoc i subst with
+               match list_assoc i isubst with
                  | Theory.Var i',_ -> i'
                  | _ -> assert false)
             l
@@ -361,7 +365,7 @@ let prepare : process -> process =
         let env,s =
           List.fold_left
             (fun (env,s) i ->
-               let env,i' = Vars.make_fresh env Vars.Index i in
+               let env,i' = Vars.make_fresh env Sorts.Index i in
                  env, (i,i')::s)
             (env,[]) l
         in
@@ -371,20 +375,20 @@ let prepare : process -> process =
             (List.map snd s)
             indices
         in
-        let subst' =
+        let isubst =
           List.map
-            (fun (i,i') -> `Index, i, Theory.Var (Vars.name i'), Term.MVar i')
+            (fun (i,i') -> i, Theory.Var (Vars.name i'), Term.Var i')
             s
-          @ subst in
-        let f' = Theory.subst_fact f (to_tsubst subst') in
-        let p' = prep ~env ~indices:indices' ~subst:subst' p in
+          @ isubst in
+        let f' = Theory.subst_fact f  (to_tsubst isubst@to_tsubst msubst) in
+        let p' = prep ~env ~indices:indices' ~isubst:isubst p in
         let q' = prep q in
           Exists (l',f',p',q')
 
     | Alias (p,a) ->
         prep ~a p
 
-  in fun p -> prep env [] [] [] `Start "A" p
+  in fun p -> prep env [] [] [] [] `Start "A" p
 
 (* Environment for parsing the final process, i.e. the system to study,
  * to break it into action descriptions suitable for the analysis.
@@ -401,10 +405,10 @@ let prepare : process -> process =
  * It also stores the current action. *)
 type p_env = {
   action : Action.action ;
-  p_indices : Index.t list ;
-  subst : (string * Term.term) list ;
+  p_indices : Vars.index list ;
+  subst : (string * Term.message) list ;
     (** substitution for input variables *)
-  isubst : (string * Index.t) list
+  isubst : (string * Vars.index) list
 }
 
 (** The extraction of actions from the system process
@@ -416,19 +420,19 @@ let parse_proc proc : unit =
   let var_env = ref Vars.empty_env in
   (** Convert given some environment and the current action symbol a. *)
   let conv_term ?(pred=false) env a t =
-    let ts = Term.TName (a, List.rev env.p_indices) in
-    let ts = if pred then Term.TPred ts else ts in
+    let ts = Term.Action (a, List.rev env.p_indices) in
+    let ts = if pred then Term.Pred ts else ts in
     let subst =
-      List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
-      List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
+      List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
+      List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
     in
     Theory.convert ts subst t
   in
   let conv_fact env a t =
-    let ts = Term.TName (a, List.rev env.p_indices) in
+    let ts = Term.Action (a, List.rev env.p_indices) in
     let subst =
-      List.map (fun (x,t) -> Theory.Term (x,t)) env.subst @
-      List.map (fun (x,i) -> Theory.Idx (x,i)) env.isubst
+      List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
+      List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
     in
     Theory.convert_fact ts subst t
   in
@@ -441,14 +445,14 @@ let parse_proc proc : unit =
     * [pos_indices] is the list of accumulated indices
     * for the parallel choice part of the action item.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos ~(pos_indices:Index.t list) = function
+  let rec p_in ~env ~pos ~(pos_indices:Vars.index list) = function
     | Apply _ | Let _ | New _ -> assert false
     | Null -> pos
     | Parallel (p, q) ->
       let pos = p_in ~env ~pos ~pos_indices p in
       p_in ~env ~pos ~pos_indices q
     | Repl (i, p) ->
-      let i' = Vars.make_fresh_and_update var_env Vars.Index i in
+      let i' = Vars.make_fresh_and_update var_env Sorts.Index i in
       let env =
         { env with
           isubst = (i,i') :: env.isubst ;
@@ -489,7 +493,7 @@ let parse_proc proc : unit =
           facts
       in
       let newsubst = List.map (fun i ->
-          i, Vars.make_fresh_and_update var_env Vars.Index i) evars
+          i, Vars.make_fresh_and_update var_env Sorts.Index i) evars
       in
       let pos =
         p_cond
@@ -562,7 +566,7 @@ let parse_proc proc : unit =
       let a = Obj.magic a in
       let indices = List.rev env.p_indices in
       let in_tm =
-        Term.Macro (Term.in_macro, [], Term.TName (Obj.magic a,indices)) in
+        Term.Macro (Term.in_macro, [], Term.Action (Obj.magic a,indices)) in
       let env = { env with subst = (snd input, in_tm) :: env.subst } in
       let output =
        match output with
