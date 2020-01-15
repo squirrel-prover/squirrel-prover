@@ -1,19 +1,300 @@
 \section{Indistinguishability}
 
-Now equipped with a logic to reason about reachability properties, we turn ourself to proving general indistinguishability. We consider the case of bi-processes, where the set of actions available on both side is the same, but the actions may differ inside their terms. Thus, a bi-process is simply a protocol, where each action $\alpha$ has two versions, on for the left and on for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each possible trace $\tr$ of the protocol, there exists then the two versions $\tr^L$ and $\tr^R$.
+\newcommand{\pair}[1]{\langle #1 \rangle}
 
+We now define indistinguishability of processes, and how we could verify it.
+We make a distinction between symbolic and observable traces:
+symbolic ones are sequences of action names as in \cref{def:trace},
+while observable traces are sequences of pairs $\pair{c_i,c_o}$.
+Intuitively, such a pair describes the input and output channels of an 
+action; several actions might have the same input and output channels.
+We write $A : \pair{c_i,c_o}$ when action $A$ inputs on channel $c_i$ and
+outputs on channel $c_o$.
 
-We first define the frame corresponding to a trace.
+For convenience, we talk of processes, though in reality the definitions
+deal with abstract systems described by sets of actions.
+
+\newcommand{\fold}{\mathsf{fold}}
+
 \begin{definition}
-  Given a trace $\tr = \alpha_1,\dots,\alpha_n$, we define its frame $\mouts_\tr = \hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)$ as  the sequence of outputs produced by the trace.
+  Given an observable trace $t$ and a process $P$,
+  we define $\fold(P,t)$ as the frame describing all possible
+  executions of $P$ along $t$:
+  \begin{eqnarray*}
+    \fold(P,\epsilon) &=& \epsilon \\
+    \fold(P,(c_i,c_o).t') &=&
+      \mathsf{if}_{A:(c_i,c_o)}
+      \ldots
+  \end{eqnarray*}
 \end{definition}
 
-We can now define diff-equivalence for bi-processes. Essentialy, for each trace such that it can happen with non negligible probabilities, the left and right frames must be indistinguishable.
+\begin{definition}
+  Two processes $P$ and $Q$ are indistinguishable when,
+  for all observable traces $t$,
+  for all computational model $\M$,
+  we have
+  $\M \models \fold(P,t) \sim \fold(Q,t)$.
+  This itself means that no attacker can distinguish,
+  with non-negligible probability, between the left- and right-hand sides.
+\end{definition}
+
+This notion of equivalence should coincide with the usual computational
+indistinguishability for bounded processes. In the unbounded case, it
+is restrictive to quantify on traces in this way
+and ask for indistinguishability only for each trace.
+
+\subsection{Straightforward diff-equivalence}
+
+\newcommand{\diff}[2]{\mathsf{choice}(#1,#2)}
+
+Two processes may be given as a bi-process, i.e. a system with a single
+set of symbolic actions, each symbolic action describing an execution step
+of both the left and right processes, using $\diff{\_}{\_}$
+terms as usual. In that case, we may define a stronger equivalence,
+relying on a simpler notion of frame which does not contain conditionals,
+because we reason directly on symbolic traces.
+We use $(\_)^L$ and $(\_)^R$ to denote the left and right projections,
+e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side
+conditions for the left side of the bi-process.
 
 \begin{definition}
-  A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol,
-  we have $\M \models \myif (\phi_{\tr^L})^{I_{\tr^L}} \mythen (\mouts_{\tr^L})^{I_{\tr^L}} \sim   \myif (\phi_{\tr^R})^{I_{\tr^R}} \mythen (\mouts_{\tr^R})^{I_{\tr^R}} $.
+  Given a symbolic trace $\tr = \alpha_1\ldots\alpha_n$, we define its frame 
+  $\mouts_\tr = \pair{\hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)}$
+  as the sequence of outputs produced by the trace.
 \end{definition}
+
+Note that this frame is not a sequence of meta-level terms,
+but a sequence of base-level terms featuring
+$\diff{\_}{\_}$ operators.
+We now define the equivalence,
+writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse 
+\mathsf{error}$, with an error constant that is unused elsewhere.
+
+\begin{definition}
+  A bi-process is diff-equivalent when,
+  for any symbolic trace $\tr$ of the protocol and
+  for any computational model $\M$,
+  we have:
+  $$\M \models
+  \myif (\phi_{\tr^L})^{I_{\tr}} \mythen (\mouts_{\tr})^L
+  \sim   
+  \myif (\phi_{\tr^R})^{I_{\tr}} \mythen (\mouts_{\tr})^R$$
+\end{definition}
+
+Note that this equivalence cannot hold if there exists a $\tr$
+whose probability of execution significantly differs between the two
+projections of the bi-process.
+Hence this imposes a form of synchronization on the execution of
+conditionals on the two sides of bi-processes.
+The interest of imposing this artificial constraint is that we
+can stop considering executions where one process goes to $\mythen$
+branch while the other goes to its $\myelse$ branch: this is implicit
+in the fact that we consider here symbolic and not observable traces.
+
+\newcommand{\In}{\mathsf{in}}
+\newcommand{\Out}{\mathsf{out}}
+
+\begin{example}
+  Consider the bi-process
+  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,m)$
+  where $n$ and $m$ are arbitrary, possibly equal names.
+  Its two projections are indistinguishable, but the
+  bi-process is not diff-equivalent.
+  Indeed we have 
+  $\myif g()=0 \mythen \Out(c,n) \not\sim
+   \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
+  $g()=0$ to distinguish the two sides.
+  Our bi-process can however easily be
+  rewritten into a diff-equivalent process, e.g. by pushing the conditional
+  inside the output.
+
+  If we modify our bi-process into
+  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,0)$
+  then the two projections become distinguishable.
+  The attack is obtained with an execution
+  where one process outputs a name while the other outputs $0$. Such
+  desynchronized executions are not taken into account with diff-equivalence,
+  but diff-equivalence still fails due to the desynchronized condition,
+  as before.
+\end{example}
+
+\newcommand{\ok}{\mathsf{ok}}
+
+In the next example, we omit the $\myelse$ branch when it consists of a null 
+process. In these examples, there is a coincidence between diff-equivalence
+and indistinguishability, because observable actions coincide with symbolic 
+actions.
+
+\begin{example} \label{ex:negl}
+  Consider the bi-process
+  $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+  It is diff-equivalent, and its projections are
+  indistinguishable as expected.
+  In the bi-process, the condition $x=\diff{n}{m}$ does not pass
+  with the same inputs on the left and right, but it passes with
+  the same negligible probability.
+\end{example}
+
+\begin{example} \label{ex:sync}
+  Consider
+  $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
+  where $(t)_0$ denotes the first bit of $t$.
+  This bi-process is not diff-equivalent because
+  $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$, and
+  the two projections are distinguishable for the same
+  reason: the attacker sends $0$;
+  on the left he receives with probability $1\over 2$ a bitstring whose
+  first bit is $0$;
+  on the right process he receives with probably only $1\over 4$
+  a bitstring whose last bit is $0$.
+  If we change $\Out(c,n)$ into $\Out(c,\ok)$,
+  we have indistinguishable processes and diff-equivalence holds.
+\end{example}
+
+\begin{example} \label{ex:problem}
+  Consider $\Out(c,\diff{n}{m}).
+  \In(c,x).
+  \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+  The projections are observationally equivalent and diff-equivalence
+  holds -- in fact they are $\alpha$-equivalent.
+\end{example}
+
+\subsubsection{Formal verification}
+
+Ultimately we will want to use the meta-logic to avoid enumerating all
+traces, but reason abstractly over them. However, as a first step we
+keep the enumeration.
+
+Given a bi-process $B$, we should be able to give a meaning to its inputs
+and outputs along a trace using macros $\minp^L$, $\minp^R$, $\mout^L$
+and $\mout^R$. For instance, $\minp^L@A$ represents the input term for
+the left at timestamp $A$ in a trace --- the meta-interpretation will
+be such that
+$\hat{\minp}^L(A_n) = g_n(\hat{\mout}^L(A_1),\ldots,\hat{\mout}^L(A_{n-1}))$.
+
+A sufficient condition for diff-equivalence is to prove,
+for any symbolic trace $\tr.\alpha$ of $B$, the following goals:
+$$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
+The first kind of judgment has been defined above: these are the sequents
+of the meta-logic for reachability. The second kind of judgment is defined
+below: $\Gamma \vdash u \sim v$ stands for $(\myif \Gamma \mythen u) \sim
+(\myif \Gamma \mythen v)$. For these goals we are thus imposing a left-hand
+side condition on right-hand side outputs, but it should not matter because
+the left- and right-hand side conditions have been shown to hold 
+simultaneously (with overwhelming probability).
+
+\emph{TODO: Check that it implies diff-equivalence as previously defined.}
+
+These conditions are sufficient to ensure diff-equivalence but not necessary.
+The gap comes from the fact that we are requiring conditions to be 
+synchronized for all random samplings.
+
+\begin{example}
+  With the bi-process of \cref{ex:negl} we would have to prove
+  $\vdash g() = n \Leftrightarrow g() = m$ and
+  $g()=n, g()=m \vdash \ok \sim \ok$, both of which hold.
+  With the bi-process of \cref{ex:sync} we would have to prove
+  $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
+\end{example}
+
+\begin{example} \label{ex:indep}
+  This proof technique does not work for \cref{ex:problem}.
+  The same problem appears with the Basic-Hash protocol, even if we work around
+the problem described in \cref{sec:refined-diff}, we won't be able to show
+that conditionals are synchronized.  In the simple case of the trace
+$T(i,j).R(k,i,j)$ we have
+on the single-session side
+$$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
+ h(\pi_1(g_2(\ldots)),k'(i,j))$$
+and we would like this to imply (in the meta-logic)
+the same equality with $k(i)$ instead of $k'(i,j)$.
+This implication does not hold with overwhelming probability in all
+computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
+projection of $x$ with its first bit changed to $0$; if the hash is PRF,
+there should be a probability of roughly $1 \over 4$ that this leaves
+the hash unchanged with $k'(i,j)$ but not with $k(i)$.
+\end{example}
+
+\subsection{Refined diff-equivalence} \label{sec:refined-diff}
+
+The Basic-Hash protocol is unlinkable, wrt.\ Solène's definition.
+This has been verified in the symbolic model and we expect that it holds
+in the computational one too.
+
+Formally, modify \texttt{examples/basic-hash.mbc} to consider the
+following bi-process:
+$$(!_k R(j)) \mid (!_i !_j T(\diff{k(i)}{k'(i,j)}))$$
+
+On the left side, we have unboundedly many
+identities represented by keys $k(i)$, and each $k(i)$ is used for
+many sessions $j$.
+On the right, each identity $k'(i,j)$ is used for a single session.
+Note that we cannot simply write $k'(j)$ or $k(j)$, because then the
+same identity $k'(j)$ would appear in the different copies of the
+first $!_i$.
+On either sides, the tag uses a session nonce $n_T(i,j)$.
+
+On both sides we have unboundedly many sessions of the reader,
+with a conditional as follows ($x$ is the first input message):
+$$\mathsf{find} \ i,j \ \mathsf{suchthat} \ \pi_2(x) = 
+h(\pi_1(x),\diff{k(i)}{k'(i,j)})$$
+
+To sum up, we have the following actions:
+\begin{itemize}
+  \item $T(i,j)$ where the tag sends
+    $\pair{n_T(i,j),h(n_T(i,j),\diff{k(i)}{k'(i,j)})}$;
+  \item $R(k,i,j)$ is the only action with a conditional,
+    where reader session $k$ accepts its first message,
+    having found out that it corresponds to identity $k(i)$ (if on
+    the left) or $k'(i,j)$ (on the right).
+\end{itemize}
+
+We cannot hope to have a synchronized execution of $R(k,i,j)$ on the
+left and right: index $j$ is unused on the left!
+However, we can hope to prove that, if $R(k,i,j)$ happens on the left,
+then $R(k,i,j')$ happens on the right for some $j'$: this intuitively
+follows from well-authentication.
+Note that this $j'$ is necessarily unique by definition of the semantics:
+the $\mathsf{tryfind}$ selects the first $j$ for which the condition holds.
+
+Conversely, it is only easier to prove that if $R(k,i,j)$ happens
+on the right, then it happens on the left, for any $j'$.
+
+Having this form of synchronization for the conditionals is intuitively
+enough to conclude the the two processes are indistinguishable,
+provided we have also verified that the produced frames are indistinguishable:
+indeed, for any observable trace, if the trace is executed on one side
+using a symbolic trace $\tr$, then it can be executed on the other side
+(modulo the changes of indices as above) to yield an indistinguishable
+frame. Of course, all this has to be done more carefully, taking into
+account probabilities, etc.
+
+\emph{TODO: Develop this idea into a refined notion of diff-equivalence
+which could be used to prove this kind of unlinkabilities. It would have
+a specific treatment of actions when it is detected that an index is unused
+on one side of the bi-process. We might adapt the verification conditions
+of the previous section as follows, for all symbolic traces $\tr$:}
+$$ \phi^L_\tr, \phi^R_\tr \vdash
+   \phi^L_\alpha \Leftrightarrow (\exists j.~ \phi^R_\alpha) $$
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
+\emph{In the first kind of condition, the existential is here to account
+for the possible change of some index. There is no change in the second
+kind of condition: there we only consider executions where the conditions
+have passed on both sides, restricting indices $j$.}
+
+\subsection{Reasoning about equivalences}
+
+Now equipped with a logic to reason about reachability properties, we turn 
+ourself to proving general indistinguishability. We consider the case of 
+bi-processes, where the set of actions available on both side is the same, but 
+the actions may differ inside their terms. Thus, a bi-process is simply a 
+protocol, where each action $\alpha$ has two versions, on for the left and on 
+for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each 
+possible trace $\tr$ of the protocol, there exists then the two versions 
+$\tr^L$ and $\tr^R$.
 
 To reason about those properties, we once again try to define a well-suited logic.
 \begin{definition}

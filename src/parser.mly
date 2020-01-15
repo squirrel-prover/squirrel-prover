@@ -79,10 +79,10 @@ ord:
 | RANGLE                         { `Gt }
 
 kind:
-| INDEX                          { Vars.Index }
-| MESSAGE                        { Vars.Message }
-| BOOLEAN                        { Vars.Boolean }
-| TIMESTAMP                      { Vars.Timestamp }
+| INDEX                          { Sorts.eindex }
+| MESSAGE                        { Sorts.emessage }
+| BOOLEAN                        { Sorts.eboolean }
+| TIMESTAMP                      { Sorts.etimestamp }
 
 arg_list:
 |                                { [] }
@@ -183,8 +183,8 @@ name_type:
 | INDEX ARROW name_type          { 1+$3 }
 
 msg_or_bool:
-| MESSAGE                        { Vars.Message }
-| BOOLEAN                        { Vars.Boolean }
+| MESSAGE                        { Sorts.emessage }
+| BOOLEAN                        { Sorts.eboolean }
 
 state_type:
 | msg_or_bool                    { 0, $1 }

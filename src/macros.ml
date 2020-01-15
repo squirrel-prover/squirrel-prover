@@ -1,7 +1,8 @@
 (** Macro definitions *)
 
 type Symbols.data +=
-  Global_data of Vars.var list * Vars.var list * Vars.var * Term.term
+    Global_data of Vars.message list * Vars.index list * Vars.timestamp
+                   * Term.message
 
 let declare_global name ~inputs ~indices ~ts t =
   let data = Global_data (inputs,indices,ts,t) in
@@ -23,7 +24,7 @@ let is_defined name a =
          * when the judgment's constraints tell us that ts=A for some
          * name A. *)
         begin match a with
-          | TName _ -> true
+          | Action _ -> true
           | _ -> false
         end
     | Symbols.Local _, _ -> true
@@ -32,7 +33,7 @@ let is_defined name a =
          * because a global macro m(...)@A refer to inputs of A and
          * its sequential predecessors. *)
         begin match a with
-          | TName (s,_) ->
+          | Action (s,_) ->
               let action = snd (Action.of_symbol s) in
               (* We could support |inputs| <= |action|,
                * but it is not clear that we'll ever need it,
@@ -48,14 +49,14 @@ let get_definition name args a =
     | Symbols.Input, _ -> assert false
     | Symbols.Output, _ ->
        begin match a with
-         | TName (symb,indices) ->
+         | Action (symb,indices) ->
              let action = Action.of_term symb indices in
              snd Action.((get_descr action).output)
          | _ -> assert false
        end
     | Symbols.State _, _ ->
        begin match a with
-         | TName (symb,indices) ->
+         | Action (symb,indices) ->
              (* We are looking at name(args)@symb(indices):
               * see if state name(args) is updated by symb(indices),
               * otherwise its content is unchanged. *)
@@ -64,22 +65,22 @@ let get_definition name args a =
                begin try
                  List.assoc (name,args) descr.Action.updates
                with Not_found ->
-                 Term.Macro ((name,args), [], Term.TPred a)
+                 Term.Macro ((name,args), [], Term.Pred a)
                end
          | _ -> assert false
        end
     | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
-          | TName (tsymb,tidx) ->
+          | Action (tsymb,tidx) ->
               let action = Action.of_term tsymb tidx in
               assert (List.length inputs = List.length action) ;
               let idx_subst =
                 List.map2
-                  (fun i i' -> Index (i,i'))
+                  (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
                   indices
                   args
               in
-              let ts_subst = TS (TVar ts,a) in
+              let ts_subst = Term.ESubst (Term.Var ts, a) in
               let subst,_ =
                 List.fold_left
                   (fun (subst,action) x ->
@@ -87,12 +88,12 @@ let get_definition name args a =
                        Term.Macro (in_macro,[],
                                    Action.to_term (List.rev action))
                      in
-                     Term (MVar x,in_tm) :: subst,
+                     Term.ESubst (Term.Var x,in_tm) :: subst,
                      List.tl action)
                   (ts_subst::idx_subst,List.rev action)
                   inputs
               in
-              subst_term subst body
+              Term.subst subst body
           | _ -> assert false
         end
     | Symbols.Global _, _ -> assert false

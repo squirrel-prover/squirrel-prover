@@ -5,7 +5,6 @@
     - a conclusion formula;
     - an environment to store all the variables appearing inside the formulas.
 *)
-open Term
 open Bformula
 open Formula
 
@@ -77,7 +76,7 @@ val select_formula_hypothesis :
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to all hypotheses. It also set to visible = false, when the
    hypothesis becomes trivial (e.g x=x). *)
-val apply_subst : subst -> sequent -> sequent
+val apply_subst : Term.subst -> sequent -> sequent
 
 (** {2 Automated reasoning} *)
 
@@ -99,14 +98,14 @@ val constraints_valid : sequent -> bool
 
 (** [get_ts_equalities s] return all the equalities between timestamps
        derivable from its hypothesis. *)
-val get_ts_equalities : sequent -> timestamp list list
+val get_ts_equalities : sequent -> Term.timestamp list list
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
    according to their ordering derived from the hypothesis in [s]. *)
-val maximal_elems : sequent -> timestamp list -> timestamp list
+val maximal_elems : sequent -> Term.timestamp list -> Term.timestamp list
 
 (** {2 Misc} *)
 
 (** [get_all_terms s] return all the term appearing inside the messages
    hypothesis of [s]. *)
-val get_all_terms : sequent -> Term.term list
+val get_all_terms : sequent -> Term.message list

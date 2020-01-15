@@ -3,7 +3,6 @@
     It contains the state of the proof and the history as mutable states. *)
 
 open Term
-open Bformula
 open Formula
 
 (** A goal of the prover is simply a name and a formula *)

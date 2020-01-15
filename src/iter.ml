@@ -10,7 +10,7 @@ class iter = object (self)
     | Macro ((mn, is),l,a) ->
         List.iter self#visit_term l ;
         self#visit_term (Macros.get_definition mn is a)
-    | Name _ | MVar _ -> ()
+    | Name _ | Var _ -> ()
 
   method visit_fact (f:fact) = match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->

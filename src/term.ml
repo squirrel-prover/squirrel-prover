@@ -1,36 +1,4 @@
-open Vars
-
-type timestamp =
-  | TVar of var
-  | TPred of timestamp
-  | TName of Symbols.action Symbols.t * Index.t list
-
-let pp_indices ppf l =
-  if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
-
-let rec pp_timestamp ppf = function
-  | TVar tv -> Vars.pp ppf tv
-  | TPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_timestamp ts
-  | TName (symb,indices) ->
-      Fmt.styled `Green
-        (fun ppf () ->
-           Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
-        ppf ()
-
-let rec tsvars vs = function
-  | TVar tv -> tv :: vs
-  | TName (_,indices) -> indices @ vs
-  | TPred ts -> tsvars vs ts
-
-let ts_vars = tsvars []
-
-type mvar = Vars.var
-
-(** Symbols *)
-
-type kind = Vars.sort
-
-type 'a indexed_symbol = 'a Symbols.t * Index.t list
+type 'a indexed_symbol = 'a Symbols.t * Vars.index list
 
 type name = Symbols.name Symbols.t
 type nsymb = Symbols.name indexed_symbol
@@ -43,17 +11,6 @@ type msymb = Symbols.macro indexed_symbol
 
 type state = msymb
 
-(** Type of terms, parameterized by the type of the macro namespace *)
-type term =
-  | Fun of fsymb * term list
-  | Name of nsymb
-  | MVar of var
-  | Macro of msymb * term list * timestamp
-
-(** Declare input and output macros.
-  * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (Symbols.Macro.declare_exact "input" Symbols.Input, [])
-let out_macro = (Symbols.Macro.declare_exact "output" Symbols.Output, [])
 
 (** Pretty printing *)
 
@@ -70,8 +27,6 @@ let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
   | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Vars.pp_list is
 
-let pp_sname ppf s = (Utils.kw `Red) ppf (Symbols.to_string s)
-
 let pp_mname ppf s =
   let open Fmt in
   (styled `Bold (styled `Magenta Utils.ident)) ppf (Symbols.to_string s)
@@ -81,143 +36,159 @@ let pp_msymb ppf (m,is) =
     pp_mname m
     (Utils.pp_ne_list "(%a)" Vars.pp_list) is
 
-let rec pp_term ppf = function
+type _ term =
+  | Fun : fsymb *  Sorts.message term list -> Sorts.message term
+  | Name : nsymb -> Sorts.message term
+  | Macro :  msymb * Sorts.message term list * Sorts.timestamp term
+      -> Sorts.message term
+  | Pred : Sorts.timestamp term -> Sorts.timestamp term
+  | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Var : 'a Vars.var -> 'a term
+
+type 'a t = 'a term
+
+type message = Sorts.message term
+type timestamp = Sorts.timestamp term
+
+let to_sort : type a. a term -> a Sorts.t =
+  function
+  | Fun _ -> Sorts.Message
+  | Name _ -> Sorts.Message
+  | Macro _ -> Sorts.Message
+  | Var v -> Vars.var_type v
+  | Pred _ -> Sorts.Timestamp
+  | Action _ -> Sorts.Timestamp
+
+let pp_indices ppf l =
+  if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
+
+let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
+  | Var m -> Fmt.pf ppf "%a" Vars.pp m
   | Fun ((s,[]),terms) when Symbols.to_string s = "pair" ->
       Fmt.pf ppf "%a"
         (Utils.pp_ne_list
            "<@[<hov>%a@]>"
-           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_term)) terms
+           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
   | Fun (f,terms) ->
       Fmt.pf ppf "%a%a"
         pp_fsymb f
         (Utils.pp_ne_list
            "(@[<hov>%a@])"
-           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_term)) terms
+           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
   | Name n -> pp_nsymb ppf n
   | Macro (m, l, ts) ->
       Fmt.pf ppf "@[%a%a@%a@]"
         pp_msymb m
         (Utils.pp_ne_list
            "(@[<hov>%a@])"
-           (Fmt.list ~sep:Fmt.comma pp_term)) l
-        pp_timestamp ts
-  | MVar m -> Fmt.pf ppf "%a" Vars.pp m
+           (Fmt.list ~sep:Fmt.comma pp)) l
+        pp ts
+  | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
+  | Action (symb,indices) ->
+      Fmt.styled `Green
+        (fun ppf () ->
+           Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
+        ppf ()
 
-let rec tvars acc = function
-  | Fun ((_, is) , lt) -> List.fold_left tvars (is@acc) lt
-  | Name (_, is) ->  is@acc
-  | Macro ((_, is), l, ts) -> List.fold_left tvars (tsvars (is@acc) ts) l
-  | MVar _ ->  []
+let get_vars : 'a term -> Vars.evar list =
+  fun term ->
+  let res = ref [] in
+  let rec termvars : type a. a term -> unit =
+    function
+    | Action (_,indices) -> res := ((List.map (fun x -> Vars.EVar x) indices)
+                                    @ !res)
+    | Var tv -> res := Vars.EVar tv :: !res
+    | Pred ts -> termvars ts
+    | Fun (_, lt) -> List.iter termvars lt
+    | Name _ -> ()
+    | Macro (_, l, ts) -> List.iter termvars l; termvars ts
+  in
+  termvars term; !res
 
-let term_vars t =
-  tvars [] t
-  |> List.sort_uniq Pervasives.compare
+(** Declare input and output macros.
+  * We assume that they are the only symbols bound to Input/Output. *)
+let in_macro = (Symbols.Macro.declare_exact "input" Symbols.Input, [])
+let out_macro = (Symbols.Macro.declare_exact "output" Symbols.Output, [])
 
 let rec tts acc = function
-  | Fun (fs, lt) -> List.fold_left tts acc lt
-  | Name n -> acc
+  | Fun (_, lt) -> List.fold_left tts acc lt
+  | Name _ -> acc
   | Macro (_, l, ts) -> List.fold_left tts (ts :: acc) l
-  | MVar _ -> []
+  | Var _ -> []
 
-let term_ts t = tts [] t |> List.sort_uniq Pervasives.compare
+let get_ts t = tts [] t |> List.sort_uniq Pervasives.compare
 
 let rec pts acc = function
-  | Fun (fs, lt) -> List.fold_left pts acc lt
+  | Fun (_, lt) -> List.fold_left pts acc lt
   | Macro (s, l, ts) ->
-     if s = in_macro then (TPred ts) :: acc else
+     if s = in_macro then (Pred ts) :: acc else
        List.fold_left pts (ts :: acc) l
-  | Name n -> acc
-  | MVar _ -> []
+  | Name _ -> acc
+  | Var _ -> []
 
 let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
 
 (** Substitutions *)
 
-type asubst =
-  | Term of term * term
-  | TS of timestamp * timestamp
-  | Index of Index.t * Index.t
+type esubst = ESubst : 'a term * 'a term -> esubst
 
-type subst = asubst list
+type subst = esubst list
+
+exception Uncastable
+
+let cast: type a b. a Sorts.sort -> b term -> a term =
+  fun kind t ->
+  match kind,to_sort t with
+     | Sorts.Index, Sorts.Index -> t
+     | Sorts.Message, Sorts.Message -> t
+     | Sorts.Boolean, Sorts.Boolean -> t
+     | Sorts.Timestamp, Sorts.Timestamp -> t
+     | _ -> raise Uncastable
+
+
+let rec assoc : type a. subst -> a term -> a term =
+  fun subst term ->
+  match subst with
+  | [] -> term
+  | ESubst (t1,t2)::q ->
+    try
+      let term2 = cast (to_sort t1) term in
+      if term2 = t1 then cast (to_sort term) t2 else assoc q term
+    with Uncastable -> assoc q term
 
 exception Substitution_error of string
 
-let pp_asubst ppf e =
-  let pp_el pp_t (t1,t2) = Fmt.pf ppf "%a->%a" pp_t t1 pp_t t2 in
-  match e with
-  | Term(t1, t2) -> pp_el pp_term (t1, t2)
-  | TS(ts1, ts2) -> pp_el pp_timestamp (ts1, ts2)
-  | Index(i1, i2) -> pp_el Vars.pp (i1, i2)
-
+let pp_esubst ppf (ESubst (t1,t2)) =
+  Fmt.pf ppf "%a->%a" pp t1 pp t2
 
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_asubst) s
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let term_subst (s : subst) =
-  List.fold_left (fun acc asubst ->
-      match asubst with Term(t1, t2) -> (t1, t2)::acc | _ -> acc
-    ) [] s
-
-let ts_subst (s : subst) =
-  List.fold_left (fun acc asubst ->
-      match asubst with TS(t1, t2) -> (t1, t2)::acc | _ -> acc
-    ) [] s
-
-let to_isubst (s : subst) =
-  List.fold_left (fun acc asubst ->
-      match asubst with Index(t1, t2) -> (t1, t2)::acc | _ -> acc
-    ) [] s
-
-let rec from_varsubst l =
-  match l with
-  | [] -> []
-  | (t1, t2)::l when (var_type t1 = Timestamp) &&  (var_type t2 = Timestamp) ->
-    (TS(TVar t1, TVar t2))::(from_varsubst l)
-  | (t1, t2)::l when (var_type t1 = Message) &&  (var_type t2 = Message) ->
-    (Term(MVar t1, MVar t2))::(from_varsubst l)
-  | (t1, t2)::l when (var_type t1 = Index) &&  (var_type t2 = Index) ->
-    (Index(t1, t2))::(from_varsubst l)
-  | _ -> failwith "ill-typed substitution"
-
-let get_term_subst (s : subst) (t : term) =
-  try
-    List.assoc t (term_subst s)
-  with Not_found -> t
-
-let get_ts_subst (s : subst) (ts : timestamp) =
-  try
-    List.assoc ts (ts_subst s)
-  with Not_found -> ts
-
-let get_index_subst (s : subst) (i : Index.t) =
-  try
-    List.assoc i (to_isubst s)
-  with Not_found -> i
-
-let subst_index = get_index_subst
+let subst_var : type a. subst -> a Vars.var -> a Vars.var =
+    fun subst var ->
+    match assoc subst (Var var) with
+    | Var var -> var
+    | _ -> raise @@ Substitution_error
+        "Must map the given variable to another variable"
 
 let subst_macro (s:subst) (symb,is) =
-  (symb, List.map (get_index_subst s) is)
+  (symb, List.map (subst_var s) is)
 
-let rec subst_ts (s : subst) (ts : timestamp) =
-  let newts =
-    (match ts with
-     | TVar _ -> ts
-     | TPred ts' -> TPred (subst_ts s ts')
-     | TName (a,indices) -> TName (a, List.map (subst_index s) indices)
-    ) in
-  get_ts_subst s newts
-
-let rec subst_term (s : subst) (t : term) =
-  match t with
+let rec subst : type a. subst -> a term -> a term = fun s t ->
+  let new_term : a term =
+    match t with
     | Fun ((fs,is), lt) ->
-        Fun ((fs, List.map (subst_index s) is),
-             List.map (subst_term s) lt)
-    | Name (ns,is) -> Name (ns, List.map (subst_index s) is)
+      Fun ((fs, List.map (subst_var s) is),
+           List.map (subst s) lt)
+    | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
     | Macro (m, l, ts) ->
-        Macro (subst_macro s m, List.map (subst_term s) l, subst_ts s ts)
-    | MVar _ -> get_term_subst s t
+      Macro (subst_macro s m, List.map (subst s) l, subst s ts)
+    | Var m -> Var m
+    | Pred ts -> Pred (subst s ts)
+    | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+  in
+  assoc s new_term
 
 (** Builtins *)
 
@@ -226,33 +197,33 @@ let mk_fname ?(indices=0) f k_args k_ret =
   Symbols.Function.declare_exact f info, []
 
 (** Boolean function symbols *)
-
-let f_false = mk_fname "false" [] Boolean
-let f_true = mk_fname "true" [] Boolean
-let f_and = mk_fname "and" [Boolean;Boolean] Boolean
-let f_or = mk_fname "or" [Boolean;Boolean] Boolean
-let f_not = mk_fname "not" [Boolean] Boolean
-let f_ite = mk_fname "if" [Boolean;Message;Message] Message
+open Sorts
+let f_false = mk_fname "false" [] eboolean
+let f_true = mk_fname "true" [] eboolean
+let f_and = mk_fname "and" [eboolean;eboolean] eboolean
+let f_or = mk_fname "or" [eboolean;eboolean] eboolean
+let f_not = mk_fname "not" [eboolean] eboolean
+let f_ite = mk_fname "if" [eboolean;emessage;emessage] emessage
 
 (** Xor and its unit *)
 
-let f_xor = mk_fname "xor" [Message;Message] Message
-let f_zero = mk_fname "zero" [] Message
+let f_xor = mk_fname "xor" [emessage;emessage] emessage
+let f_zero = mk_fname "zero" [] emessage
 
 (** Successor over natural numbers *)
 
-let f_succ = mk_fname "succ" [Message] Message
+let f_succ = mk_fname "succ" [emessage] emessage
 
 (** Operations on timestamps *)
 
-let f_pred = mk_fname "pred" [Timestamp] Timestamp
+let f_pred = mk_fname "pred" [etimestamp] etimestamp
 
 (** Pairing *)
 
-let f_pair = mk_fname "pair" [Message;Message] Message
-let f_fst = mk_fname "fst" [Message] Message
-let f_snd = mk_fname "snd" [Message] Message
+let f_pair = mk_fname "pair" [emessage;emessage] emessage
+let f_fst = mk_fname "fst" [emessage] emessage
+let f_snd = mk_fname "snd" [emessage] emessage
 
 (** Dummy term *)
 
-let dummy = Fun (mk_fname "_" [] Message, [])
+let dummy = Fun (mk_fname "_" [] emessage, [])
