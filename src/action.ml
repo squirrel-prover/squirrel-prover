@@ -28,7 +28,7 @@ let rec enables a b = match a, b with
 
 type shape = int t
 
-type action = (Index.t list) t
+type action = (Vars.index list) t
 
 let mk_shape l = l
 
@@ -46,7 +46,7 @@ let rec indices = function
   | a :: l ->
     snd a.par_choice @ snd a.sum_choice @ indices l
 
-let same_shape a b =
+let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
   | [],[] -> Some acc
   | [], _ | _, [] -> None
@@ -56,8 +56,8 @@ let same_shape a b =
     if p = p' && List.length lp = List.length lp' &&
        s = s' && List.length ls = List.length ls'
     then
-      let acc' = List.map2 (fun i i' -> i,i') lp lp' in
-      let acc'' = List.map2 (fun i i' -> i,i') ls ls' in
+      let acc' = List.map2 (fun i i' -> Term.ESubst (i,Term.Var i')) lp lp' in
+      let acc'' = List.map2 (fun i i' -> Term.ESubst (i,Term.Var i')) ls ls' in
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
@@ -83,7 +83,7 @@ let rec constr_equal a b = match a,b with
 
 let shape_to_symb = Hashtbl.create 97
 
-type Symbols.data += Data of Index.t list * action
+type Symbols.data += Data of Vars.index list * action
 
 let fresh_symbol name = Symbols.Action.reserve name
 let define_symbol symb args action =
@@ -148,23 +148,24 @@ let pp_action_structure ppf a =
 
 let pp_shape ppf a = pp_action_f pp_int (0,0) ppf a
 
-let rec subst_action (s : Term.subst) (a : action) =
+let rec subst_action (s : Term.subst) (a : action) : action =
   match a with
   | [] -> []
   | a :: l ->
     let p,lp = a.par_choice in
     let q,lq = a.sum_choice in
-    { par_choice = p, List.map (Term.get_index_subst s) lp ;
-      sum_choice = q, List.map (Term.get_index_subst s) lq }
+    { par_choice = p, List.map (Term.subst_var s) lp ;
+      sum_choice = q, List.map (Term.subst_var s) lq }
     :: subst_action s l
 
 let to_term a =
   let indices = indices a in
-  Term.TName (Hashtbl.find shape_to_symb (get_shape a), indices)
+  Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
 
-let of_term s l =
+let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action
+ =
   let l',a = of_symbol s in
-  let subst = List.map2 (fun x y -> Term.Index (x,y)) l' l in
+  let subst = List.map2 (fun x y -> Term.ESubst (x,Term.Var y)) l' l in
   subst_action subst a
 
 let rec dummy_action k =
@@ -181,7 +182,7 @@ let dummy_action k =
         (Symbols.Action.declare "_Dummy" ~data 0) ;
     a
 
-let pp_action ppf a = Term.pp_timestamp ppf (to_term a)
+let pp_action ppf a = Term.pp ppf (to_term a)
 
 let pp = pp_action
 
@@ -199,10 +200,10 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 type descr = {
   action : action ;
   input : Channel.t * string ;
-  indices : Index.t list ;
-  condition : Index.t list * Bformula.fact ;
-  updates : (Term.state * Term.term) list ;
-  output : Channel.t * Term.term
+  indices : Vars.index list ;
+  condition : Vars.index list * Bformula.fact ;
+  updates : (Term.state * Term.message) list ;
+  output : Channel.t * Term.message
 }
 
 let pp_descr ppf descr =
@@ -219,9 +220,9 @@ let pp_descr ppf descr =
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
           (fun ppf (s, t) ->
-             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp_term t)))
+             Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp t)))
     descr.updates
-    Term.pp_term (snd descr.output)
+    Term.pp (snd descr.output)
 
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices
@@ -229,14 +230,14 @@ let pp_descr ppf descr =
 let subst_descr subst descr =
   let action = subst_action subst descr.action in
   let input = descr.input in
-  let subst_term = Term.subst_term subst in
-  let indices = List.map (Term.subst_index subst) descr.indices  in
+  let subst_term = Term.subst subst in
+  let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
     fst descr.condition, Bformula.subst_fact subst (snd descr.condition) in
   let updates =
     List.map
       (fun ((ss,is),t) ->
-         ((ss, List.map (Term.subst_index subst) is),
+         ((ss, List.map (Term.subst_var subst) is),
           subst_term t))
       descr.updates
   in
@@ -266,7 +267,7 @@ let get_descr a =
   match same_shape descr.action a with
   | None -> assert false
   | Some subst ->
-    subst_descr (Term.from_varsubst subst) descr
+    subst_descr subst descr
 
 let debug = false
 

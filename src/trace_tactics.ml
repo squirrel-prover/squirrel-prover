@@ -58,16 +58,17 @@ let rec left_introductions s = function
       let env = Sequent.get_env s in
       let subst,env =
         List.fold_left
-          (fun (subst,env) v ->
+          (fun (subst,env) (Vars.EVar v) ->
              let env,v' =
                Vars.make_fresh env (Vars.var_type v) (Vars.name v)
              in
              let item =
+               let open Term in
                match Vars.var_type v with
-                 | Vars.Index -> Term.Index (v,v')
-                 | Vars.Timestamp -> Term.TS (Term.TVar v, Term.TVar v')
-                 | Vars.Message -> Term.Term (Term.MVar v, Term.MVar v')
-                 | Vars.Boolean -> Term.Term (Term.MVar v, Term.MVar v')
+                 | Sorts.Index -> ESubst (v,Var v')
+                 | Sorts.Timestamp -> ESubst (v, Var v')
+                 | Sorts.Message -> ESubst (v, Var v')
+                 | Sorts.Boolean -> ESubst (v, Var v')
              in
                item::subst, env)
           ([],env)
@@ -90,13 +91,15 @@ let timestamp_case ts s sk fk =
         a.Action.indices
     in
     let subst =
-      List.map2 (fun i i' -> Index (i,i')) a.Action.indices indices
+      List.map2 (fun i i' -> Term.ESubst (i,Term.Var i'))
+        a.Action.indices indices
     in
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
     let case =
       let at = Atom (`Timestamp (`Eq,ts,name)) in
       let at = subst_formula subst at in
-      if indices = [] then at else Exists (indices,at)
+      if indices = [] then at else
+        Exists (List.map (fun x -> Vars.EVar x) indices,at)
     in
     f := match !f with False -> case | _ -> Formula.Or (case,!f)
   in
@@ -119,7 +122,7 @@ let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
 let case th s sk fk =
   (* if the conversion to a timestamp of the variable is successful, we perform
      a timestamp_case. If it fails, we try with hypothesis case. *)
-    let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
+    let tsubst = Theory.subst_of_env (Sequent.get_env s) in
     match Theory.convert_ts tsubst th with
     | exception _ ->
       begin
@@ -148,13 +151,12 @@ let goal_intro (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | ForAll (vs,f) ->
     let env = ref (Sequent.get_env s) in
-    let vsubst =
+    let subst =
       List.map
-        (fun x ->
-           (x, Vars.make_fresh_from_and_update env x))
+        (fun (Vars.EVar x) ->
+          Term.ESubst (x, Term.Var (Vars.make_fresh_from_and_update env x)))
         vs
     in
-    let subst = Term.from_varsubst vsubst in
     let new_formula = subst_formula subst f in
     let new_judge = Sequent.set_conclusion new_formula s
                     |> Sequent.set_env (!env)
@@ -213,12 +215,13 @@ let exists_left hyp_name s sk fk =
     match f with
       | Exists (vs,f) ->
           let env = ref @@ Sequent.get_env s in
-          let vs' =
+          let subst =
             List.map
-              (fun v -> v, Vars.make_fresh_from_and_update env v)
+              (fun (Vars.EVar v) ->
+               Term.ESubst  (v, Term.Var (Vars.make_fresh_from_and_update env v))
+              )
               vs
           in
-          let subst = Term.from_varsubst vs' in
           let f = subst_formula subst f in
           let s = Sequent.add_formula f (Sequent.set_env !env s) in
             sk [s] fk
@@ -250,32 +253,42 @@ let () =
 
 let induction s sk fk =
   match Sequent.get_conclusion s with
-    | ForAll (v::vs,f) when Vars.var_type v = Vars.Timestamp ->
-        (* We need two fresh variables in env,
-         * but one will not be kept in the final environment. *)
-        let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
-        let _,v'' = Vars.make_fresh_from env v in
-        let vv,vv',vv'' = TVar v, TVar v', TVar v'' in
-        (* Introduce v as v'. *)
-        let f' = Formula.subst_formula [TS (vv,vv')] (ForAll (vs,f)) in
-        (* Use v'' to form induction hypothesis. *)
-        let ih =
-          ForAll (v''::vs,
-            Impl
-              (Atom (`Timestamp (`Lt,vv'',vv) :> generic_atom),
-               Formula.subst_formula [TS(vv,vv'')] f))
-        in
-        let s =
-          s
-          |> Sequent.set_env env
-          |> Sequent.set_conclusion f'
-          |> Sequent.add_formula ~prefix:"IH" ih
-        in
-          sk [s] fk
-    | _ ->
-        fk @@ Tactics.Failure
-                "Conclusion must be an \
-                 universal quantification over a timestamp"
+  | ForAll ((Vars.EVar v)::vs,f) ->
+    (match Vars.var_type v with
+       Sorts.Timestamp ->
+       (
+         (* We need two fresh variables in env,
+          * but one will not be kept in the final environment. *)
+         let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
+         let _,v'' = Vars.make_fresh_from env v in
+         (* Introduce v as v'. *)
+         let f' = Formula.subst_formula [Term.ESubst (v,Term.Var v')]
+             (ForAll (vs,f))
+         in
+         (* Use v'' to form induction hypothesis. *)
+         let ih =
+           ForAll ((Vars.EVar v'')::vs,
+                   Impl
+                     (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v) :> generic_atom),
+                      Formula.subst_formula [Term.ESubst (v,Term.Var v')] f))
+         in
+         let s =
+           s
+           |> Sequent.set_env env
+           |> Sequent.set_conclusion f'
+           |> Sequent.add_formula ~prefix:"IH" ih
+         in
+         sk [s] fk
+       )
+     | _ ->
+       fk @@ Tactics.Failure
+         "Conclusion must be an \
+          universal quantification over a timestamp"
+    )
+  | _ ->
+    fk @@ Tactics.Failure
+      "Conclusion must be an \
+       universal quantification over a timestamp"
 
 let () = T.register "induction"
     ~help:"Apply the induction scheme to the given formula."
@@ -373,7 +386,7 @@ let eq_timestamps (s : Sequent.t) sk fk =
   let subst =
     let rec asubst e = function
         [] -> []
-      | p::q -> TS (p,e) :: (asubst e q)
+      | p::q -> Term.ESubst (p,e) :: (asubst e q)
     in
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
@@ -400,8 +413,9 @@ let eq_timestamps (s : Sequent.t) sk fk =
 let () = T.register "eqtimestamps"
     ~help:"Add terms constraints resulting from timestamp equalities."
     eq_timestamps
-
-let substitute (v1) (v2) (s : Sequent.t) sk fk=
+(** TODO : substitute lost, because substitutions are now only from var to terms
+*)
+(*let substitute (v1) (v2) (s : Sequent.t) sk fk=
   let tsubst = Theory.tsubst_of_env (Sequent.get_env s) in
   let subst =
     match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
@@ -439,7 +453,7 @@ let () =
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
        | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
 
-
+*)
 (** EUF Axioms *)
 
 let euf_param (`Message at : term_atom) = match at with
@@ -463,7 +477,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let le_cnstr =
     List.map
       (function
-         | TPred ts ->
+         | Pred ts ->
              Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
              Atom (`Timestamp (`Leq, action_descr_ts, ts)))

@@ -11,7 +11,7 @@
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type pkind = (string*Vars.sort) list
+type pkind = (string*Sorts.esort) list
 
 (** Process declarations allow to bind identifiers to processes. *)
 type id = string

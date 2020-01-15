@@ -1,4 +1,3 @@
-open Term
 open Formula
 
 (** State in proof mode.
@@ -65,7 +64,7 @@ let rec reset_state n =
 type tac_arg =
   | String_name of string
   | Formula of Formula.formula
-  | Function_name of fname
+  | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
 
@@ -81,7 +80,7 @@ module rec Prover_tactics : sig
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (formula -> tac) -> unit
-  val register_fname : string -> ?help:string -> (fname -> tac) -> unit
+  val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
   val register_macro : string -> ?help:string -> AST.t -> unit
 
   val get : string -> tac_arg list -> tac
@@ -167,7 +166,7 @@ and AST :
   let pp_arg ppf = function
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
-    | Function_name fname -> pp_fname ppf fname
+    | Function_name fname -> Term.pp_fname ppf fname
     | Formula formula -> pp_formula ppf formula
     | Theory th -> Theory.pp_term ppf th
 
@@ -243,14 +242,14 @@ let auto_simp judges =
   |> List.flatten
 
 let tsubst_of_judgment j =
-  List.map
-    (fun v ->
+  let aux : Vars.evar -> Theory.esubst =
+    (fun (Vars.EVar v) ->
        match Vars.var_type v with
-       | Vars.Index -> Theory.Idx (Vars.name v,v)
-       | Vars.Timestamp -> Theory.TS (Vars.name v,TVar v)
-       | Vars.Message -> Theory.Term (Vars.name v,MVar v)
-       | Vars.Boolean -> assert false
-    )
+       | Sorts.Boolean -> assert false
+       | _ -> Theory.ESubst (Vars.name v,Term.Var v)
+      )
+      in
+  List.map aux
     (Vars.to_list (Sequent.get_env j))
 
 let parse_formula fact =
@@ -259,9 +258,9 @@ let parse_formula fact =
     | j::_ ->
         let env =
           List.map
-            (fun v ->
+            (fun (Vars.EVar v) ->
                Vars.name v,
-               Vars.var_type v)
+               Sorts.ESort (Vars.var_type v))
             (Vars.to_list (Sequent.get_env j))
         in
         Theory.convert_formula_glob
@@ -269,15 +268,16 @@ let parse_formula fact =
           (tsubst_of_judgment j)
           fact
 
-let parse_subst j uvars ts : subst =
+let parse_subst j uvars ts : Term.subst =
   let u_subst = tsubst_of_judgment j in
     List.map2
-      (fun t u ->
+      (fun t (Vars.EVar u) ->
          match Vars.var_type u with
-           | Vars.Timestamp -> TS (TVar u, Theory.convert_ts u_subst t )
-           | Vars.Message -> Term (MVar u, Theory.convert_glob u_subst t)
-           | Vars.Index -> Index (u, Theory.conv_index u_subst t)
-           | Vars.Boolean -> assert false)
+           | Sorts.Timestamp -> Term.ESubst (u, Theory.convert_ts u_subst t )
+           | Sorts.Message -> Term.ESubst (u, Theory.convert_glob u_subst t)
+           | Sorts.Index -> Term.ESubst (u, Term.Var
+                                           (Theory.conv_index u_subst t))
+           | Sorts.Boolean -> assert false)
       ts uvars
 
 let get_goal_formula gname =

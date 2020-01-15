@@ -8,16 +8,40 @@ open Vars
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
+(** Type of indexed symbols in some namespace *)
+type 'a indexed_symbol = 'a Symbols.t * Vars.index list
+
+type name = Symbols.name Symbols.t
+type nsymb = Symbols.name indexed_symbol
+
+type fname = Symbols.fname Symbols.t
+type fsymb = Symbols.fname indexed_symbol
+
+type mname = Symbols.macro Symbols.t
+type msymb = Symbols.macro indexed_symbol
+
+type state = msymb
+
+type _ term =
+  | Fun : fsymb *  Sorts.message term list -> Sorts.message term
+  | Name : nsymb -> Sorts.message term
+  | Macro :  msymb * Sorts.message term list * Sorts.timestamp term
+      -> Sorts.message term
+  | Pred : Sorts.timestamp term -> Sorts.timestamp term
+  | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Var : 'a Vars.var -> 'a term
+
+type 'a t = 'a term
+
+type message = Sorts.message term
+type timestamp = Sorts.timestamp term
+
+val pp : Format.formatter -> 'a term -> unit
+
+val get_vars : 'a term -> Vars.evar list
+
 (** {2 Timestamps} *)
 (** Timestamps represent positions in a trace *)
-type timestamp =
-  | TVar of var
-  | TPred of timestamp
-  | TName of Symbols.action Symbols.t * Index.t list
-
-val pp_timestamp : Format.formatter -> timestamp -> unit
-
-val ts_vars : timestamp -> Vars.var list
 
 (** {2 Symbols}
   *
@@ -31,29 +55,8 @@ val ts_vars : timestamp -> Vars.var list
   * the base logic.
   * TODO merge states into macros *)
 
-(** Type of indexed symbols in some namespace *)
-type 'a indexed_symbol = 'a Symbols.t * Index.t list
-
-type name = Symbols.name Symbols.t
-type nsymb = Symbols.name indexed_symbol
-
-type kind = Vars.sort
-
-type fname = Symbols.fname Symbols.t
-type fsymb = Symbols.fname indexed_symbol
-
-type mname = Symbols.macro Symbols.t
-type msymb = Symbols.macro indexed_symbol
-
-type state = msymb
 
 (** Type of terms *)
-type term =
-  | Fun of fsymb * term list
-  | Name of nsymb
-  | MVar of var
-  | Macro of msymb * term list * timestamp
-
 (** Pretty printing *)
 
 val pp_name : Format.formatter -> name -> unit
@@ -68,11 +71,10 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 (** {2 Terms} *)
 
 (** [term_vars t] returns the variables of [t]*)
-val term_vars : term -> var list
 
 (** [term_ts t] returns the timestamps appearing in [t].
   * The returned list is guaranteed to have no duplicate elements. *)
-val term_ts : term -> timestamp list
+val get_ts : Sorts.message term -> Sorts.timestamp term list
 
 (** [precise_ts t] returns a list [l] of timestamps such that
   * any term that appears in [(t)^I] that is not an attacker
@@ -81,39 +83,38 @@ val term_ts : term -> timestamp list
   * Concretely, this is achieved by taking the timestamps occurring
   * in [t] but only the predecessors of timestamps occurring as
   * input timestamps. *)
-val precise_ts : term -> timestamp list
-
-val pp_term : Format.formatter -> term -> unit
+val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
 (** {2 Substitutions} *)
 
 (** Substitutions for all purpose, applicable to terms and timestamps.
   * Substitutions are performed bottom to top to avoid loops. *)
 
-type asubst =
-  | Term of term * term
-  | TS of timestamp * timestamp
-  | Index of Index.t * Index.t
+type esubst = ESubst : 'a Vars.var * 'a term -> esubst
 
-type subst = asubst list
+type subst = esubst list
 
-val to_isubst : subst ->  (var * var) list
+val assoc : subst -> 'a var -> 'a term
 
-(** From the type of the varibles, creates the corresponding substitution. *)
-val from_varsubst : (var * var) list -> subst
+(** Remove from_varsubst, and always create Term.subst directly *)
+(* val from_varsubst : (evar * evar) list -> subst *)
 
 val pp_subst : Format.formatter -> subst -> unit
 
+(*
 val get_index_subst : subst -> Index.t -> Index.t
 
 val subst_index : subst -> Index.t -> Index.t
 val subst_ts : subst -> timestamp -> timestamp
 val subst_macro : subst -> msymb -> msymb
-val subst_term : subst -> term -> term
+val subst_term : subst -> term -> term *)
+
+val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+val subst : subst -> 'a term -> 'a term
 
 (** {2 Predefined symbols} *)
 
-val dummy : term
+val dummy : Sorts.message term
 
 val in_macro : msymb
 val out_macro : msymb

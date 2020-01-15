@@ -3,7 +3,7 @@ type unknown
 (** Type of symbols *)
 type 'a t = string
 
-type kind = Vars.sort
+type kind = Sorts.esort
 
 type function_def =
   | Hash

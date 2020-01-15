@@ -12,7 +12,7 @@ type 'a t
 
 (** Symbol definitions *)
 
-type kind = Vars.sort
+type kind = Sorts.esort
 
 type function_def =
   | Hash

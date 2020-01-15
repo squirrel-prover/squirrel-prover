@@ -38,11 +38,11 @@ type fact = term Bformula.bformula
 
 val pp_fact : Format.formatter -> fact -> unit
 
-type formula = (term, (string * Vars.sort) ) Formula.foformula
+type formula = (term, (string * Sorts.esort) ) Formula.foformula
 
 val formula_to_fact : formula -> fact
 
-val formula_vars : formula -> (string * Vars.sort) list
+val formula_vars : formula -> (string * Sorts.esort) list
 
 val pp_formula : Format.formatter -> formula -> unit
 
@@ -63,17 +63,17 @@ val declare_name : string -> int -> unit
 
 (** [declare_state n i s] declares a new name of type
   * [index^i -> s] where [s] is either [boolean] or [message]. *)
-val declare_state : string -> int -> Vars.sort -> unit
+val declare_state : string -> int -> Sorts.esort -> unit
 
 (** [declare_abstract n l s] declares a new function symbol
   * of type [l -> s]. *)
-val declare_abstract : string -> Vars.sort list -> Vars.sort -> unit
+val declare_abstract : string -> Sorts.esort list -> Sorts.esort -> unit
 
 (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
   * of type [s1->...->sn->s]
   * such that [s(t1,...,tn)] expands to [t[x1:=t1,...,xn:=tn]]. *)
 val declare_macro :
-  string -> (string*Vars.sort) list -> Vars.sort -> term -> unit
+  string -> (string*Sorts.esort) list -> Sorts.esort -> term -> unit
 
 (** {2 Term builders }
     Given a string [s] and a list of terms [l] build the term [s(l)]
@@ -95,9 +95,9 @@ exception Type_error
   * arity [i] when it actually has arity [j]. *)
 exception Arity_error of string*int*int
 
-type env = (string*Vars.sort) list
-val check_term : env -> term -> Vars.sort -> unit
-val check_state : string -> int -> Vars.sort
+type env = (string*Sorts.esort) list
+val check_term : env -> term -> Sorts.esort -> unit
+val check_state : string -> int -> Sorts.esort
 val check_fact : env -> fact -> unit
 
 val is_hash : Term.fname -> bool
@@ -108,54 +108,51 @@ val is_hash : Term.fname -> bool
 val subst : term -> (string*term) list -> term
 val subst_fact : fact -> (string*term) list -> fact
 
-type atsubst =
-  | Term of string * Term.term
-  | TS of string * Term.timestamp
-  | Idx of string * Index.t
+type esubst = ESubst : string * 'a Term.term -> esubst
 
-type tsubst = atsubst list
+type subst = esubst list
 
-val pp_tsubst : Format.formatter -> tsubst -> unit
+val pp_subst : Format.formatter -> subst -> unit
 
-val conv_index : tsubst -> term -> Index.t
+val conv_index : subst -> term -> Vars.index
 
 (** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
   Term.timestamp ->
-  tsubst ->
+  subst ->
   term ->
-  Term.term
+  Term.message
 
 (** Convert to [Term.fact], for local terms (i.e. with no timestamps). *)
 val convert_fact :
   Term.timestamp ->
-  tsubst ->
+  subst ->
   fact ->
   Bformula.fact
 
 val convert_ts :
-  tsubst ->
+  subst ->
   term ->
   Term.timestamp
 
 (** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
 val convert_glob :
-  tsubst ->
+  subst ->
   term ->
-  Term.term
+  Term.message
 
 (** Convert [fact] to [Bformula.constr],
   * for global terms (i.e. with attached timestamps). *)
 val convert_trace_formula_glob :
-  (string * Vars.sort) list ->
-  tsubst ->
+  (string * Sorts.esort) list ->
+  subst ->
   fact ->
   Bformula.trace_formula
 
 (** Convert [fact] to [Bformula.fact],
   * for global terms (i.e. with attached timestamps). *)
 val convert_fact_glob :
-  tsubst ->
+  subst ->
   fact ->
   Bformula.fact
 
@@ -164,7 +161,7 @@ val convert_fact_glob :
   * Requires a typing environment. *)
 val convert_formula_glob :
   env ->
-  tsubst ->
+  subst ->
   formula ->
   Formula.formula
 
@@ -174,9 +171,9 @@ val convert_formula_glob :
 val convert_vars :
   Vars.env ref ->
   env ->
-  tsubst * Vars.var list
+  subst * Vars.evar list
 
-val tsubst_of_env : Vars.env -> tsubst
+val subst_of_env : Vars.env -> subst
 
 val parse_subst :
-  Vars.env -> Vars.var list -> term list -> Term.subst
+  Vars.env -> Vars.evar list -> term list -> Term.subst

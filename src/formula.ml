@@ -1,4 +1,3 @@
-open Term
 open Atom
 
 (** First order formulas *)
@@ -40,7 +39,7 @@ let rec bformula_to_foformula fatom = function
   | Bformula.True -> True
   | Bformula.False -> False
 
-type formula = (generic_atom, Vars.var) foformula
+type formula = (generic_atom, Vars.evar) foformula
 
 let fact_to_formula =
   bformula_to_foformula (fun x -> (x :> generic_atom))
@@ -94,17 +93,17 @@ let rec foformula_vars atom_var = function
   | Atom a -> atom_var a
   | True | False -> []
 
-let formula_vars f =
+let formula_vars (f:formula) =
   foformula_vars generic_atom_var f
   |> List.sort_uniq Pervasives.compare
 
-let formula_qvars f =
+let formula_qvars f : Vars.evar list =
   foformula_vars (fun a -> []) f
   |> List.sort_uniq Pervasives.compare
 
 let pp_formula = pp_foformula pp_generic_atom Vars.pp_typed_list
 
-let rec subst_foformula a_subst (s : subst) (f) =
+let rec subst_foformula a_subst (s : Term.subst) (f) =
   match f with
   | ForAll (vs,b) -> ForAll (vs, subst_foformula a_subst s b)
   | Exists (vs,b) -> Exists (vs, subst_foformula a_subst s b)
@@ -118,14 +117,15 @@ let rec subst_foformula a_subst (s : subst) (f) =
   | Atom at -> Atom (a_subst s at)
   | True | False -> f
 
-let subst_formula = subst_foformula subst_generic_atom
+let subst_formula : Term.subst -> formula -> formula =
+  subst_foformula subst_generic_atom
 
 let fresh_quantifications env f =
   let vars = formula_qvars f in
   let subst =
     List.map
-      (fun x -> x, Vars.make_fresh_from_and_update env x)
+      (fun (Vars.EVar x) -> Term.ESubst
+          (x, Term.Var (Vars.make_fresh_from_and_update env x)))
       vars
-    |> from_varsubst
   in
   subst_formula subst f

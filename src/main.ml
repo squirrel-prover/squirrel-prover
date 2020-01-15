@@ -181,8 +181,8 @@ let () =
       ignore (parse_process "in(c,x);out(c,<x,x>)")
     end ;
     "Facts", `Quick, begin fun () ->
-      Theory.declare_abstract "p" [] Vars.Boolean ;
-      Theory.declare_abstract "ok" [] Vars.Message ;
+      Theory.declare_abstract "p" [] Sorts.eboolean ;
+      Theory.declare_abstract "ok" [] Sorts.emessage ;
       Channel.declare "c" ;
       ignore (parse_process ~typecheck:true
                 "if p=true && p()=true then out(c,ok)") ;
