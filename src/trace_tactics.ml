@@ -174,7 +174,7 @@ let goal_intro (s : Sequent.t) sk fk =
     sk [s'] fk
   | _ ->
       fk (Tactics.Failure
-            "Can only introduce implication, universal quantifications
+            "Can only introduce implication, universal quantifications \
              and disequality conclusions.")
 
 let () =
@@ -196,7 +196,7 @@ let goal_exists_intro ths (s : Sequent.t) sk fk =
 let () =
   T.register_general "exists"
     ~help:"Introduce the existentially \
-           quantified variables in the conclusion of the judgment,
+           quantified variables in the conclusion of the judgment, \
            using the arguments as existential witnesses. \
            Usage : exists t_1, t_2."
     (fun l ->
@@ -348,8 +348,6 @@ let mk_and_cnstr l = match l with
       | x :: l -> mk_c (Bformula.And (x,acc)) l in
     mk_c a l'
 
-open Bformula
-
 (** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
@@ -361,7 +359,7 @@ let eq_names (s : Sequent.t) sk fk =
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
-    List.fold_left (fun judge c ->
+    List.fold_left (fun _ c ->
         Sequent.add_formula c s
       ) s new_eqs
   in
@@ -372,14 +370,14 @@ let eq_names (s : Sequent.t) sk fk =
       (Sequent.get_all_terms s)
   in
   let s =
-    List.fold_left (fun judge c ->
+    List.fold_left (fun _ c ->
         Sequent.add_trace_formula c s
       ) s cnstrs
   in
   sk [s] fk
 
 let () = T.register "eqnames"
-    ~help:" Add index constraints resulting from names equalities, modulo the
+    ~help:" Add index constraints resulting from names equalities, modulo the \
 known equalities."
     eq_names
 
@@ -431,7 +429,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
     | exception _ ->
       match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
       | m1,m2 ->
-        let s,trs = Sequent.get_trs s in
+        let _,trs = Sequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
       else
@@ -469,7 +467,7 @@ let euf_param (`Message at : term_atom) = match at with
   | _ -> raise @@ Tactic_Hard_Failure
         "Euf can only be applied to hypothesis of the form h(t,k)=m."
 
-let euf_apply_schema sequent (_, (_, key_is), m, s) case =
+let euf_apply_schema sequent (_, (_, _), m, s) case =
   let open Euf in
   (* We create the term equality *)
   let new_f = Formula.Atom (`Message (`Eq, case.message, m)) in
@@ -481,15 +479,15 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
     List.map
       (function
          | Pred ts ->
-             Atom (`Timestamp (`Lt, action_descr_ts, ts))
+             Bformula.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
-             Atom (`Timestamp (`Leq, action_descr_ts, ts)))
+             Bformula.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)
 
-let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
+let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
   let open Euf in
   (* We create the term equality *)
   let eq = Formula.Atom (`Message (`Eq, dcase.d_message, m)) in
@@ -497,7 +495,7 @@ let euf_apply_direct theta (_, (_, key_is), m, _) dcase =
      [dcase.d_key_indices]. *)
   let eq_cnstr =
     List.map2
-      (fun i i' -> Atom (`Index (`Eq, i, i')))
+      (fun i i' -> Bformula.Atom (`Index (`Eq, i, i')))
       key_is dcase.d_key_indices
     |> mk_and_cnstr
   in
@@ -526,7 +524,7 @@ let euf_apply_facts s at =
   schemata_premises @ direct_premises
 
 
-let set_euf t = { Sequent.t_euf = true }
+let set_euf _ = { Sequent.t_euf = true }
 
 let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   let s, at =
@@ -534,8 +532,8 @@ let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk
-  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not satisfy
-the syntactic side condition")
+  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not \
+satisfy the syntactic side condition")
 
 let () =
   T.register_general "euf"
@@ -574,7 +572,7 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "apply"
-    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its
+    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its \
 universally quantified variables instantied with t1,..."
     (function
       | Prover.String_name id :: th_terms ->
@@ -603,13 +601,13 @@ let collision_resistance (s : Sequent.t) sk fk =
      the syntactic side condition. *)
   let hashes = List.filter
       (fun t -> match t with
-         | Fun ((hash, _), [m; Name (key,ki)]) ->
+         | Fun ((hash, _), [m; Name (key,_)]) ->
            (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
          | _ -> false)
       (Sequent.get_all_terms s)
   in
   if List.length hashes = 0 then
-    fk (Failure "no equality between hashes where the keys satisfiy the
+    fk (Failure "no equality between hashes where the keys satisfiy the \
  syntactic condition has been found")
   else
     begin
@@ -618,7 +616,7 @@ let collision_resistance (s : Sequent.t) sk fk =
         | [] -> []
         | h1::q -> List.fold_left (fun acc h2 ->
             match h1, h2 with
-            | Fun ((hash, _), [m1; Name key1]), Fun ((hash2, _), [m2; Name key2])
+            | Fun ((hash, _), [_; Name key1]), Fun ((hash2, _), [_; Name key2])
               when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
             | _ -> acc
           ) [] q
@@ -647,6 +645,6 @@ let collision_resistance (s : Sequent.t) sk fk =
     end
 
 let () = T.register "collision"
-    ~help:"Collects all equalities between hashes, and affs the equalities of the
-messages hashed with the same valid key."
+    ~help:"Collects all equalities between hashes, and affs the equalities of \
+the messages hashed with the same valid key."
     collision_resistance

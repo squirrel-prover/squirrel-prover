@@ -8,12 +8,12 @@ type 'a var =
    name_suffix : int;
    var_type : 'a Sorts.t }
 
-type evar = EVar : 'a var -> evar
-
 type index = Sorts.index var
 type message = Sorts.message var
 type boolean = Sorts.boolean var
 type timestamp = Sorts.timestamp var
+
+type evar = EVar : 'a var -> evar
 
 let name v =
   if v.name_suffix <> 0 then
@@ -65,8 +65,8 @@ exception Variable_Already_Defined
    name_prefix. *)
 type env = (evar M.t * int M.t)
 
-let to_list ((e1,e2):env) =
-  let r1,r2 = M.bindings e1 |> List.split in
+let to_list ((e1,_):env) =
+  let _,r2 = M.bindings e1 |> List.split in
   r2
 
 let pp_env ppf e =
@@ -74,10 +74,10 @@ let pp_env ppf e =
 
 let empty_env : env = (M.empty,M.empty)
 
-let mem (e1,e2) name =
+let mem (e1,_) name =
   M.mem name e1
 
-let get_var (e1,e2) name =
+let get_var (e1,_) name =
   try
     M.find name e1
   with Not_found -> raise Undefined_Variable

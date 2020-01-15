@@ -1,5 +1,4 @@
 (** Completion of equalities and disequalities set *)
-open Bformula
 
 type state
 

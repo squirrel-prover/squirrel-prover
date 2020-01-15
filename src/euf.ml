@@ -1,5 +1,3 @@
-open Bformula
-
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
@@ -47,8 +45,8 @@ let rec h_o_term hh kk acc = function
       Macros.get_definition mn is a
       |> h_o_term hh kk acc
     else raise Bad_ssc
-  | Term.Name (n,_) -> acc
-  | Term.Var m -> acc
+  | Term.Name (_,_) -> acc
+  | Term.Var _ -> acc
 
 (** [hashes_of_action_descr action_descr hash_fn key_n] return the pairs of
     indices and messages where a hash using occurs in an action description.

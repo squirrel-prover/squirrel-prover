@@ -5,6 +5,7 @@ type 'a var
 
 type evar = EVar : 'a var -> evar
 
+(** Vars.x is the type of a variable of type Sorts.x *)
 type index = Sorts.index var
 type message = Sorts.message var
 type boolean = Sorts.boolean var
@@ -42,8 +43,9 @@ val mem : env -> string -> bool
     is the one obtained through [var_name]. *)
 val get_var : env -> string -> evar
 
-(** [make_fresh ?name] creates a fresh variable based on the name [name_prefix]
-    if a variable with the given name already exists inside the environment, a
+(** [make_fresh ?name] creates a fresh variable based on the name [name_prefix],
+    and the given sort.
+    If a variable with the given name already exists inside the environment, a
     variable with the given name concateneted with the smallest possible integer
     is created. The new environment and the variable are returned.*)
 val make_fresh : env -> 'a Sorts.t -> string -> env * 'a var
@@ -51,6 +53,8 @@ val make_fresh : env -> 'a Sorts.t -> string -> env * 'a var
 (** Same as [make_fresh], but updates the mutable env given in input. *)
 val make_fresh_and_update : env ref -> 'a Sorts.t -> string -> 'a var
 
+(** Make a fresh variable, using the same sort and name_prefix as the
+    given variable. *)
 val make_fresh_from : env -> 'a var -> env * 'a var
 
 val make_fresh_from_and_update : env ref -> 'a var -> 'a var

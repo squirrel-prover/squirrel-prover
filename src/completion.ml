@@ -34,7 +34,7 @@ module Cst = struct
     | _, Csucc _ -> 1
     | _,_ -> Pervasives.compare c c'
 
-  let equal c c' = compare c c' = 0
+  (*  let equal c c' = compare c c' = 0 *)
 
   let hash c = Hashtbl.hash c
 end

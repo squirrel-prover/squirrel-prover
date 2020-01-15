@@ -5,7 +5,6 @@
   * would be more useful if it could be seen by the user of the
   * prover. *)
 
-open Bformula
 open Formula
 
 type tac = Sequent.t Tactics.tac

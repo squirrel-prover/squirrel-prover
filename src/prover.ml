@@ -46,7 +46,7 @@ let rec reset_state n =
     subgoals := p.subgoals;
     goals_proved := p.goals_proved;
     p.prover_mode
-  | p::q, n -> proof_states_history := q; reset_state (n-1)
+  | _::q, n -> proof_states_history := q; reset_state (n-1)
 
 (** Tactic expressions and their evaluation *)
 
@@ -194,7 +194,7 @@ let get_help tac_name =
 let () =
   Prover_tactics.register "admit"
     ~help:"Closes the current goal."
-    (fun j sk fk -> sk [] fk) ;
+    (fun _ sk fk -> sk [] fk) ;
   Prover_tactics.register_general "help"
     ~help:"Display all available commands."
     (function
@@ -268,23 +268,9 @@ let parse_formula fact =
           (tsubst_of_judgment j)
           fact
 
-let parse_subst j uvars ts : Term.subst =
-  let u_subst = tsubst_of_judgment j in
-    List.map2
-      (fun t (Vars.EVar u) ->
-         match Vars.var_type u with
-         | Sorts.Timestamp -> Term.ESubst (Term.Var u,
-                                           Theory.convert_ts u_subst t )
-         | Sorts.Message -> Term.ESubst (Term.Var u,
-                                         Theory.convert_glob u_subst t)
-           | Sorts.Index -> Term.ESubst (Term.Var u, Term.Var
-                                           (Theory.conv_index u_subst t))
-           | Sorts.Boolean -> assert false)
-      ts uvars
-
 let get_goal_formula gname =
   match
-    List.filter (fun (name,g) -> name = gname) !goals_proved
+    List.filter (fun (name,_) -> name = gname) !goals_proved
   with
     | [(_,f)] -> f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure "No proved goal with given name"
@@ -298,9 +284,9 @@ let make_goal f  =
   let env = ref Vars.empty_env in
   let argvars = Theory.formula_vars f in
   List.iter
-    (fun (s,k) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
+    (fun (s,_) -> if Symbols.exists s then raise Symbols.Multiple_declarations)
     argvars ;
-  let (subst, vars) = Theory.convert_vars env argvars in
+  let (subst, _) = Theory.convert_vars env argvars in
     Theory.convert_formula_glob
       (List.rev argvars)
       subst
@@ -317,20 +303,6 @@ type parsed_input =
 let add_new_goal g = goals := g :: !goals
 
 let add_proved_goal g = goals_proved := g :: !goals_proved
-
-let iter_goals f = List.iter f !goals
-
-(** Pretty-print goals. This is currently unused. *)
-let pp_goals ppf () =
-  let cpt = ref 0 in
-  Fmt.pf ppf "@[<v>";
-  iter_goals (fun (gname,goal) ->
-    Fmt.pf ppf "@[<v>%d: @[@[%a@]@;@]@]@;"
-      !cpt pp_formula goal ;
-    incr cpt) ;
-  Fmt.pf ppf "@]%!@."
-
-let goals_to_proved () = !goals <> []
 
 let is_proof_completed () = !subgoals = []
 
@@ -360,7 +332,7 @@ let eval_tactic_focus tac = match !subgoals with
   | judge :: ejs' ->
     let new_j = eval_tactic_judge tac judge in
     let new_j = match tac with
-      | AST.Modifier ("nosimpl",t) -> new_j
+      | AST.Modifier ("nosimpl", _) -> new_j
       | _ -> auto_simp new_j
     in
     subgoals := new_j @ ejs';

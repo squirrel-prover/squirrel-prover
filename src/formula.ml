@@ -98,7 +98,7 @@ let formula_vars (f:formula) =
   |> List.sort_uniq Pervasives.compare
 
 let formula_qvars f : Vars.evar list =
-  foformula_vars (fun a -> []) f
+  foformula_vars (fun _ -> []) f
   |> List.sort_uniq Pervasives.compare
 
 let pp_formula = pp_foformula pp_generic_atom Vars.pp_typed_list

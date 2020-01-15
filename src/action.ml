@@ -30,10 +30,6 @@ type shape = int t
 
 type action = (Vars.index list) t
 
-let mk_shape l = l
-
-let mk_action l = l
-
 let rec get_shape = function
   | [] -> []
   | { par_choice = (p,lp) ; sum_choice = (s,ls) } :: l ->
@@ -68,7 +64,7 @@ let same_shape a b : Term.subst option =
 let rec constr_equal a b = match a,b with
   | [],[] -> Some []
   | [], _ | _, [] -> None
-  | i :: l, i' :: l' ->
+  | i :: _, i' :: _ ->
     let _,lp = i.par_choice and _,lp' = i'.par_choice in
     let _,ls = i.sum_choice and _,ls' = i'.sum_choice in
     Utils.opt_map
@@ -257,7 +253,7 @@ let register symb indices action descr =
   define_symbol symb indices action
 
 let iter_descrs f =
-  Hashtbl.iter (fun a b -> f b) action_to_descr
+  Hashtbl.iter (fun _ b -> f b) action_to_descr
 
 let get_descr a =
   let descr = Hashtbl.find action_to_descr (get_shape a) in

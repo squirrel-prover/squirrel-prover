@@ -31,7 +31,6 @@ module Utv : sig
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
 
-  val uvar : Vars.timestamp -> ut
   val uvari : Vars.index -> ut
   val uts : Term.timestamp -> ut
   val uname : Symbols.action Symbols.t -> ut list -> ut
@@ -283,7 +282,7 @@ let merge_eq_class uf =
         | [] -> raise (Failure "merge_eq_class")
         | x :: _ -> Uuf.find uf x) (Uuf.classes uf) in
 
-  let rec aux uf cls = match cls with
+  let aux uf cls = match cls with
     | [] -> uf
     | rcl :: cls' -> List.fold_left (fun uf rcl' ->
         let uf, nrcl = mgu uf rcl in
@@ -353,7 +352,7 @@ let build_graph (uf : Uuf.t) leqs =
 
 (* For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
     x=x_1 /\ ... /\ x = x_n   *)
-let cycle_eqs uf g =
+let cycle_eqs g =
   let sccs = Scc.scc_list g in
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
@@ -366,7 +365,7 @@ let cycle_eqs uf g =
     - unify the new equalities *)
 let rec leq_unify uf leqs elems =
   let uf, g = build_graph uf leqs in
-  let uf' = unify uf (cycle_eqs uf g) elems in
+  let uf' = unify uf (cycle_eqs g) elems in
   if Uuf.union_count uf = Uuf.union_count uf' then uf,g
   else leq_unify uf' leqs elems
 
@@ -374,13 +373,6 @@ let rec leq_unify uf leqs elems =
 (***********************************)
 (* Discrete Order Case Disjunction *)
 (***********************************)
-
-let rec root_var = function
-  | Term.Pred u -> root_var u
-  | Term.Var _ | Term.Action _ as u -> u
-
-let get_vars elems =
-  List.map root_var elems |> List.sort_uniq Pervasives.compare
 
 (* [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
@@ -463,23 +455,6 @@ let forall_edges f g =
         if not (f v v') then raise Foe else ()) g in
     true
   with Foe -> false
-
-let exist_edge f g =
-  let exception Exist in
-  try
-    let () = UtG.iter_edges (fun v v' ->
-        if f v v' then raise Exist else ()) g in
-    false
-  with Exist -> true
-
-let find_edge f g =
-  let exception Found of ut * ut in
-  try
-    let () = UtG.iter_edges (fun v v' ->
-        if f v v' then raise (Found (v,v')) else ()) g in
-    raise Not_found
-  with Found (v,v') -> (v,v')
-
 
 (* Check that [instance] dis-equalities are satisfied.
     [g] must be transitive. *)
@@ -620,8 +595,8 @@ let max_elems_model (model : model) elems =
     ) (model,[]) elems in
 
   (* We keep elements that are maximal in [model] *)
-  let melems = List.filter (fun (ts,u) ->
-      List.for_all (fun (ts',u') ->
+  let melems = List.filter (fun (_,u) ->
+      List.for_all (fun (_,u') ->
           ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
         ) l ) l
                |> List.map fst
@@ -657,7 +632,6 @@ and tau' = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and tau'' = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and tau3 = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and tau4 = Var (Vars.make_fresh_and_update env Timestamp "tau")
-and tau5 = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and i =  Vars.make_fresh_and_update env Index "i"
 and i' = Vars.make_fresh_and_update env Index "i"
 

@@ -27,8 +27,6 @@ let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
   | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Vars.pp_list is
 
-let pp_sname ppf s = (Utils.kw `Red) ppf (Symbols.to_string s)
-
 let pp_mname ppf s =
   let open Fmt in
   (styled `Bold (styled `Magenta Utils.ident)) ppf (Symbols.to_string s)
@@ -52,7 +50,7 @@ type 'a t = 'a term
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 
-let term_to_sort : type a. a term -> a Sorts.t =
+let to_sort : type a. a term -> a Sorts.t =
   function
   | Fun _ -> Sorts.Message
   | Name _ -> Sorts.Message
@@ -101,8 +99,8 @@ let get_vars : 'a term -> Vars.evar list =
                                     @ !res)
     | Var tv -> res := Vars.EVar tv :: !res
     | Pred ts -> termvars ts
-    | Fun (fs, lt) -> List.iter termvars lt
-    | Name n -> ()
+    | Fun (_, lt) -> List.iter termvars lt
+    | Name _ -> ()
     | Macro (_, l, ts) -> List.iter termvars l; termvars ts
   in
   termvars term; !res
@@ -113,19 +111,19 @@ let in_macro = (Symbols.Macro.declare_exact "input" Symbols.Input, [])
 let out_macro = (Symbols.Macro.declare_exact "output" Symbols.Output, [])
 
 let rec tts acc = function
-  | Fun (fs, lt) -> List.fold_left tts acc lt
-  | Name n -> acc
+  | Fun (_, lt) -> List.fold_left tts acc lt
+  | Name _ -> acc
   | Macro (_, l, ts) -> List.fold_left tts (ts :: acc) l
   | Var _ -> []
 
 let get_ts t = tts [] t |> List.sort_uniq Pervasives.compare
 
 let rec pts acc = function
-  | Fun (fs, lt) -> List.fold_left pts acc lt
+  | Fun (_, lt) -> List.fold_left pts acc lt
   | Macro (s, l, ts) ->
      if s = in_macro then (Pred ts) :: acc else
        List.fold_left pts (ts :: acc) l
-  | Name n -> acc
+  | Name _ -> acc
   | Var _ -> []
 
 let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
@@ -136,25 +134,16 @@ type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
 
-let cast : type a b. a Sorts.t -> b Sorts.t -> a term -> b term  =
-  fun v var t ->
-  match v, var with
+exception Uncastable
+
+let cast: type a b. a Sorts.sort -> b term -> a term =
+  fun kind t ->
+  match kind,to_sort t with
      | Sorts.Index, Sorts.Index -> t
      | Sorts.Message, Sorts.Message -> t
      | Sorts.Boolean, Sorts.Boolean -> t
      | Sorts.Timestamp, Sorts.Timestamp -> t
-     | _ -> assert false
-
-exception Uncastable
-
-let cast : type a b. a term -> b term -> a term =
-  fun t1 t2 ->
-  match term_to_sort t1,term_to_sort t2 with
-   | Sorts.Index, Sorts.Index -> t2
-   | Sorts.Message, Sorts.Message -> t2
-   | Sorts.Boolean, Sorts.Boolean -> t2
-   | Sorts.Timestamp, Sorts.Timestamp -> t2
-   | _ -> raise Uncastable
+     | _ -> raise Uncastable
 
 
 let rec assoc : type a. subst -> a term -> a term =
@@ -163,8 +152,8 @@ let rec assoc : type a. subst -> a term -> a term =
   | [] -> term
   | ESubst (t1,t2)::q ->
     try
-      let term2 = cast t1 term in
-      if term2 = t1 then cast term t2 else assoc q term
+      let term2 = cast (to_sort t1) term in
+      if term2 = t1 then cast (to_sort term) t2 else assoc q term
     with Uncastable -> assoc q term
 
 exception Substitution_error of string
@@ -176,7 +165,7 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_esubst) s
 
-let rec subst_var : type a. subst -> a Vars.var -> a Vars.var =
+let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     fun subst var ->
     match assoc subst (Var var) with
     | Var var -> var

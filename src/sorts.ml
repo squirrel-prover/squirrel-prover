@@ -2,6 +2,7 @@
    when outside of the module, knows that they are distinct. Else, some pattern
    matching for GADT built using those types are considered as non
    exhaustive. *)
+
 type message = [`Message]
 type index = [`Index]
 type timestamp = [`Timestamp]

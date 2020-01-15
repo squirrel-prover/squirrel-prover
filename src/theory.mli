@@ -112,6 +112,12 @@ type esubst = ESubst : string * 'a Term.term -> esubst
 
 type subst = esubst list
 
+val subst_of_env : Vars.env -> subst
+
+val parse_subst :
+  Vars.env -> Vars.evar list -> term list -> Term.subst
+
+
 val pp_subst : Format.formatter -> subst -> unit
 
 val conv_index : subst -> term -> Vars.index
@@ -172,8 +178,3 @@ val convert_vars :
   Vars.env ref ->
   env ->
   subst * Vars.evar list
-
-val subst_of_env : Vars.env -> subst
-
-val parse_subst :
-  Vars.env -> Vars.evar list -> term list -> Term.subst

@@ -68,16 +68,13 @@ let pp_formula =
                                  (snd @@ Vars.make_fresh Vars.empty_env t v))
             l))
 
-let formula_vars = Formula.foformula_vars (fun x -> [])
-
-exception Cannot_convert_to_fact
+let formula_vars = Formula.foformula_vars (fun _ -> [])
 
 let formula_to_fact = Formula.foformula_to_bformula (fun x -> x)
 
 (** Type checking *)
 
 exception Type_error
-exception Rebound_identifier
 
 exception Arity_error of string*int*int
 
@@ -88,18 +85,18 @@ type env = (string*kind) list
 exception Untyped_symbol
 
 let function_kind f : kind list * kind =
-  let open Term in
-  let open Vars in
   let open Symbols in
   match def_of_string f with
   | Reserved -> raise Untyped_symbol
   | Exists d ->
     match d with
     | Function (_, Hash) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
-    | Function (_, AEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage], Sorts.emessage
+    | Function (_, AEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage],
+                            Sorts.emessage
     | Function (_, Abstract (args_k, ret_k)) -> args_k, ret_k
     | Macro (Local (targs,k)) -> targs, k
-    | Macro (Global arity) -> Array.to_list (Array.make arity Sorts.eindex), Sorts.emessage
+    | Macro (Global arity) -> Array.to_list (Array.make arity Sorts.eindex),
+                              Sorts.emessage
     | Macro Input -> [], Sorts.emessage
     | Macro Output -> [], Sorts.emessage
     | _ -> raise Untyped_symbol
@@ -118,12 +115,11 @@ let check_name s n =
 
 let check_action s n =
   match Action.find_symbol s with
-    | (l,a) ->
+    | (l, _) ->
         if List.length l <> n then raise Type_error
     | exception Not_found -> assert false
 
 let rec check_term env tm (kind:Sorts.esort) =
-  let open Vars in
   match tm with
   | Var x ->
     begin try
@@ -177,7 +173,6 @@ let rec check_term env tm (kind:Sorts.esort) =
     end
 
 let rec check_fact env =
-  let open Vars in
   let open Bformula in
   function
     | And (f,g) | Or (f,g) | Impl (f,g) ->
@@ -208,11 +203,10 @@ let declare_abstract s arg_types k =
 (** Term builders *)
 
 let make_term ?at_ts s l =
-  let open Symbols in
-  match def_of_string s with
-  | Reserved -> assert false
-  | Exists d -> begin match d with
-    | Function (a,i) ->
+  match Symbols.def_of_string s with
+  | Symbols.Reserved -> assert false
+  | Symbols.Exists d -> begin match d with
+    | Symbols.Function (a,i) ->
         (* We do not support indexed symbols,
          * which would require a distinction between
          * function arguments and function indices. *)
@@ -229,25 +223,25 @@ let make_term ?at_ts s l =
               if List.length args <> List.length l then raise Type_error ;
               Fun (s,l,None)
         end
-    | Name arity ->
+    | Symbols.Name arity ->
         if List.length l <> arity then
           arity_error s (List.length l) arity ;
         Name (s,l)
-    | Macro (State (arity,_)) ->
+    | Symbols.Macro (Symbols.State (arity,_)) ->
         if List.length l <> arity then raise Type_error ;
         Get (s,at_ts,l)
-    | Macro (Global arity) ->
+    | Symbols.Macro (Symbols.Global arity) ->
         if at_ts <> None then raise Type_error ;
         if List.length l <> arity then raise Type_error ;
         Fun (s,l,at_ts)
-    | Macro (Local (targs,_)) ->
+    | Symbols.Macro (Symbols.Local (targs,_)) ->
         if at_ts <> None then raise Type_error ;
         if List.length targs <> List.length l then raise Type_error ;
         Fun (s,l,None)
-    | Macro (Input|Output) ->
+    | Symbols.Macro (Symbols.Input|Symbols.Output) ->
         if at_ts = None || l <> [] then raise Type_error ;
         Fun (s,[],at_ts)
-    | Action arity ->
+    | Symbols.Action arity ->
         if arity <> List.length l then raise Type_error ;
         Taction (s,l)
     | _ ->
@@ -303,38 +297,18 @@ let subst t s =
     | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
   in aux t
 
-exception Uncastable
-
-let cast: type a b. a Sorts.sort -> b Term.term -> a Term.term =
-  fun kind t ->
-  match kind,t with
-  |Sorts.Message, Term.Fun _  -> t
-  |Sorts.Message, Term.Name _  -> t
-  |Sorts.Message, Term.Macro _  -> t
-  |Sorts.Timestamp, Term.Pred _  -> t
-  |Sorts.Timestamp, Term.Action _  -> t
-  | sort, Term.Var v ->
-    (match sort, Vars.var_type v with
-     | Sorts.Index, Sorts.Index -> t
-     | Sorts.Message, Sorts.Message -> t
-     | Sorts.Boolean, Sorts.Boolean -> t
-     | Sorts.Timestamp, Sorts.Timestamp -> t
-     | _ -> raise Uncastable
-    )
-  | _ -> raise Uncastable
-
 let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
 fun subst st kind ->
   match subst with
   | [] -> failwith
       (Printf.sprintf "undefined use of %s" st)
-  | ESubst (v,t)::q when v = st->
+  | ESubst (v,t)::_ when v = st->
     (try
-       cast kind t
-     with Uncastable -> failwith
+       Term.cast kind t
+     with Term.Uncastable -> failwith
                              (Printf.sprintf "ill-typed use of %s" st)
        )
-  | p::q -> assoc q st kind
+  | _::q -> assoc q st kind
 
 let subst_var (subst:subst) (st:string) (kind) =
   match assoc subst st kind with
@@ -387,7 +361,7 @@ let convert ts subst t =
       let i = List.map (conv_index subst) i in
       Term.Name (Symbols.Name.of_string n, i)
     | Var x -> assoc subst x Sorts.Message
-    | Compare (o, u, v) -> assert false (* TODO *)
+    | Compare _ -> assert false (* TODO *)
     | Taction _ -> assert false       (* reserved for constraints *)
     | Fun (f, l, Some _) ->
         (* This special case, corresponding to a not-really-local term
@@ -457,7 +431,7 @@ let convert_glob subst t =
     | Name (n, i) ->
       let i = List.map (conv_index subst) i in
       Term.Name (Symbols.Name.of_string n,i)
-    | Compare (o, u, v) -> assert false (* TODO *)
+    | Compare _ -> assert false (* TODO *)
     | Var x -> assoc subst x Sorts.Message
     | Taction _ -> assert false
     | Get (s, None, _) ->
@@ -498,7 +472,6 @@ let get_kind env t =
 
 let convert_trace_atom args_kind subst f : Atom.trace_atom =
   let open Sorts in
-  let open Bformula in
   match f with
   | Compare (o, u, v) ->
     begin
@@ -567,7 +540,7 @@ let convert_formula_glob args_kind subst f =
   in
   conv f
 
-let rec convert_vars env vars =
+let convert_vars env vars =
   let open Sorts in
   let rec conv (vs:env) : subst * Vars.evar list =
     match vs with
@@ -607,15 +580,14 @@ let subst_of_env (env : Vars.env) =
 
 let parse_subst (env : Vars.env) (uvars : Vars.evar list) (ts : term list)
   : Term.subst =
-  let open Term in
   let u_subst = subst_of_env env in
     List.map2
       (fun t (Vars.EVar u) ->
          let open Sorts in
          match Vars.var_type u with
-           | Timestamp -> ESubst (Term.Var u, convert_ts u_subst t )
-           | Message -> ESubst (Term.Var u, convert_glob u_subst t)
-           | Index -> ESubst (Term.Var u, Term.Var (conv_index u_subst t))
+           | Timestamp -> Term.ESubst (Term.Var u, convert_ts u_subst t )
+           | Message -> Term.ESubst (Term.Var u, convert_glob u_subst t)
+           | Index -> Term.ESubst (Term.Var u, Term.Var (conv_index u_subst t))
            | Boolean -> assert false)
       ts uvars
 

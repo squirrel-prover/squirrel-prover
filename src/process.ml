@@ -1,5 +1,3 @@
-open Bformula
-
 type pkind = (string * Sorts.esort) list
 
 type id = string
@@ -116,8 +114,8 @@ let pkind_of_pname name = Hashtbl.find pdecls name
 let rec check_proc env = function
   | Null -> ()
   | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
-  | In (c,x,p) -> check_proc ((x, Sorts.emessage)::env) p
-  | Out (c,m,p) ->
+  | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
+  | Out (_,m,p) ->
     Theory.check_term env m Sorts.emessage ;
     check_proc env p
   | Set (s, l, m, p) ->
@@ -144,7 +142,7 @@ let rec check_proc env = function
     begin try
         let kind,_ = pkind_of_pname id in
         List.iter2
-          (fun (x, k) t -> Theory.check_term env t k)
+          (fun (_, k) t -> Theory.check_term env t k)
           kind ts
       with
       | Not_found -> raise Theory.Type_error
@@ -222,7 +220,7 @@ let prepare : process -> process =
   let convert isubst msubst t : Term.message =
     let subst =
       (List.map
-        (fun (x,th,tm) ->
+        (fun (x,_,tm) ->
            match tm with
              | Term.Var v -> Theory.ESubst (x,Term.Var v)
              |  _ -> assert false
@@ -231,7 +229,7 @@ let prepare : process -> process =
       @
       (
        List.map
-        (fun (x,th,tm) -> Theory.ESubst (x,tm))
+        (fun (x,_,tm) -> Theory.ESubst (x,tm))
         msubst
       )
     in

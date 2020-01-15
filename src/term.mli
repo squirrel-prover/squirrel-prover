@@ -1,5 +1,3 @@
-open Vars
-
 (** Terms for the Meta-BC logic.
   *
   * This module describes the syntax of the logic. It does not
@@ -7,6 +5,20 @@ open Vars
   * are to be used in automated reasoning, nor does it provide
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
+
+
+
+(** {2 Symbols}
+  *
+  * We have function, name, state and macro symbols. Each symbol
+  * can then be indexed.
+  *
+  * Names represent random values, uniformly sampled by the process.
+  * State symbols represent memory cells.
+  * Macros represent input, outputs, and let definitions:
+  * everything that is expansed when translating the meta-logic to
+  * the base logic.
+  * TODO merge states into macros *)
 
 (** Type of indexed symbols in some namespace *)
 type 'a indexed_symbol = 'a Symbols.t * Vars.index list
@@ -22,6 +34,20 @@ type msymb = Symbols.macro indexed_symbol
 
 type state = msymb
 
+(** Pretty printing *)
+
+val pp_name : Format.formatter -> name -> unit
+val pp_nsymb : Format.formatter -> nsymb -> unit
+
+val pp_fname : Format.formatter -> fname -> unit
+val pp_fsymb : Format.formatter -> fsymb -> unit
+
+val pp_mname :  Format.formatter -> mname -> unit
+val pp_msymb :  Format.formatter -> msymb -> unit
+
+(** {2 Terms} *)
+
+(** General terms contain constructors for either messages or timestamps. *)
 type _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
@@ -38,41 +64,21 @@ type timestamp = Sorts.timestamp term
 
 val pp : Format.formatter -> 'a term -> unit
 
+val to_sort : 'a term -> 'a Sorts.t
+
+exception Uncastable
+
+
+(** [cast kind t] returns t if it is of the given kind,
+    else it raises Uncastable. It is used to cast to the correct type
+    terms that were unwrapped, e.g from a substitution.*)
+val cast : 'a Sorts.sort -> 'b term -> 'a term
+
+(** [get_vars t] returns the variables of [t]*)
 val get_vars : 'a term -> Vars.evar list
 
-(** {2 Timestamps} *)
-(** Timestamps represent positions in a trace *)
 
-(** {2 Symbols}
-  *
-  * We have function, name, state and macro symbols. Each symbol
-  * can then be indexed.
-  *
-  * Names represent random values, uniformly sampled by the process.
-  * State symbols represent memory cells.
-  * Macros represent input, outputs, and let definitions:
-  * everything that is expansed when translating the meta-logic to
-  * the base logic.
-  * TODO merge states into macros *)
-
-
-(** Type of terms *)
-(** Pretty printing *)
-
-val pp_name : Format.formatter -> name -> unit
-val pp_nsymb : Format.formatter -> nsymb -> unit
-
-val pp_fname : Format.formatter -> fname -> unit
-val pp_fsymb : Format.formatter -> fsymb -> unit
-
-val pp_mname :  Format.formatter -> mname -> unit
-val pp_msymb :  Format.formatter -> msymb -> unit
-
-(** {2 Terms} *)
-
-(** [term_vars t] returns the variables of [t]*)
-
-(** [term_ts t] returns the timestamps appearing in [t].
+(** [get_ts t] returns the timestamps appearing in [t].
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_ts : Sorts.message term -> Sorts.timestamp term list
 
@@ -89,28 +95,19 @@ val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
 (** Substitutions for all purpose, applicable to terms and timestamps.
   * Substitutions are performed bottom to top to avoid loops. *)
-
 type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
 
-val assoc : subst -> 'a term -> 'a term
-
-(** Remove from_varsubst, and always create Term.subst directly *)
-(* val from_varsubst : (evar * evar) list -> subst *)
-
 val pp_subst : Format.formatter -> subst -> unit
 
-(*
-val get_index_subst : subst -> Index.t -> Index.t
-
-val subst_index : subst -> Index.t -> Index.t
-val subst_ts : subst -> timestamp -> timestamp
-val subst_macro : subst -> msymb -> msymb
-val subst_term : subst -> term -> term *)
-
-val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+(** [subst s t] applies the given substitution to [t], going from bottom to top
+    to avoir cycles. *)
 val subst : subst -> 'a term -> 'a term
+
+(** [subst_var s v] tries to find in [s] a substition to a variable for [v].
+    Raise an exception if it does not exist.*)
+val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
 (** {2 Predefined symbols} *)
 

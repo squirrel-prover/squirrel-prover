@@ -1,7 +1,5 @@
 (** Module for the euf axiom application *)
 
-open Process
-
 (** Type of an euf axiom case schema.
     [e] of type [euf_schema] represents the fact that the message [e.message]
     has been hashed.
