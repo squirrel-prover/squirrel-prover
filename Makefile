@@ -56,9 +56,8 @@ metabc: sanity
 	$(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
 
-module: sanity
-	$(OCB) theory.cmo
-
+%.cmo: sanity
+	$(OCB) $@
 
 native: sanity
 	$(OCB) test.native
@@ -87,7 +86,7 @@ _build/requirements: Makefile
 	  which menhir ) || ( \
 	  pkg=menhir ; echo $(PLEASE) ; \
 	  false )
-	@for pkg in fmt ocamlgraph alcotest ; do \
+	@for pkg in fmt ocamlgraph alcotest pcre ; do \
 	  (echo -n "Checking for $$pkg... " ; \
 	   ocamlfind query $$pkg ) || ( \
 	   pkg=$$pkg ; echo $(PLEASE) ; \
