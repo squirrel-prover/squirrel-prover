@@ -50,12 +50,12 @@ type 'a t = 'a term
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 
-let to_sort : type a. a term -> a Sorts.t =
+let sort : type a. a term -> a Sorts.t =
   function
   | Fun _ -> Sorts.Message
   | Name _ -> Sorts.Message
   | Macro _ -> Sorts.Message
-  | Var v -> Vars.var_type v
+  | Var v -> Vars.sort v
   | Pred _ -> Sorts.Timestamp
   | Action _ -> Sorts.Timestamp
 
@@ -95,8 +95,10 @@ let get_vars : 'a term -> Vars.evar list =
   let res = ref [] in
   let rec termvars : type a. a term -> unit =
     function
-    | Action (_,indices) -> res := ((List.map (fun x -> Vars.EVar x) indices)
-                                    @ !res)
+    | Action (_,indices) ->
+        res :=
+          List.map (fun x -> Vars.EVar x) indices @
+          !res
     | Var tv -> res := Vars.EVar tv :: !res
     | Pred ts -> termvars ts
     | Fun (_, lt) -> List.iter termvars lt
@@ -138,7 +140,7 @@ exception Uncastable
 
 let cast: type a b. a Sorts.sort -> b term -> a term =
   fun kind t ->
-  match kind,to_sort t with
+  match kind, sort t with
      | Sorts.Index, Sorts.Index -> t
      | Sorts.Message, Sorts.Message -> t
      | Sorts.Boolean, Sorts.Boolean -> t
@@ -152,8 +154,8 @@ let rec assoc : type a. subst -> a term -> a term =
   | [] -> term
   | ESubst (t1,t2)::q ->
     try
-      let term2 = cast (to_sort t1) term in
-      if term2 = t1 then cast (to_sort term) t2 else assoc q term
+      let term2 = cast (sort t1) term in
+      if term2 = t1 then cast (sort term) t2 else assoc q term
     with Uncastable -> assoc q term
 
 exception Substitution_error of string

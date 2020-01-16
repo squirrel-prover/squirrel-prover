@@ -60,11 +60,11 @@ let rec left_introductions s = function
         List.fold_left
           (fun (subst,env) (Vars.EVar v) ->
              let env,v' =
-               Vars.make_fresh env (Vars.var_type v) (Vars.name v)
+               Vars.make_fresh env (Vars.sort v) (Vars.name v)
              in
              let item =
                let open Term in
-               match Vars.var_type v with
+               match Vars.sort v with
                  | Sorts.Index -> ESubst (Var v,Var v')
                  | Sorts.Timestamp -> ESubst (Var v, Var v')
                  | Sorts.Message -> ESubst (Var v, Var v')
@@ -256,7 +256,7 @@ let () =
 let induction s sk fk =
   match Sequent.get_conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
-    (match Vars.var_type v with
+    (match Vars.sort v with
        Sorts.Timestamp ->
        (
          (* We need two fresh variables in env,

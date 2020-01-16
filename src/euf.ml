@@ -7,9 +7,9 @@ class check_hash_key hash_fn key_n = object (self)
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn -> self#visit_term m
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
     | Term.Var m ->
-      (match Vars.var_type m with
-      | Sorts.Message-> raise Bad_ssc
-      )
+      begin match Vars.sort m with
+        | Sorts.Message-> raise Bad_ssc
+      end
     | _ -> super#visit_term t
 end
 

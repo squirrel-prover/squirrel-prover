@@ -21,15 +21,12 @@ let name v =
   else
     Fmt.strf "%s" v.name_prefix
 
-let var_type v = v.var_type
+let sort v = v.var_type
 
 let pp ppf v =
   Fmt.pf ppf "%s" (name v)
 
 let pp_e ppf (EVar v) = pp ppf v
-
-let pp_typed ppf v =
-  Fmt.pf ppf "%a:%a" pp v Sorts.pp v.var_type
 
 let pp_list ppf l =
   Fmt.pf ppf "@[<hov>%a@]"
@@ -56,8 +53,6 @@ let pp_typed_list ppf (vars:evar list) =
 module M = Map.Make(String)
 
 exception Undefined_Variable
-
-exception Variable_Already_Defined
 
 (* An environment is made of two maps. One maps variables names
    (accordingly to [var_name]) to variables, and the second maps

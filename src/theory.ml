@@ -570,7 +570,7 @@ let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =
     fun (Vars.EVar v) ->
     let open Sorts in
-    match Vars.var_type v with
+    match Vars.sort v with
     | Index ->  ESubst (Vars.name v,Term.Var v)
     | Timestamp -> ESubst (Vars.name v,Term.Var v)
     | Message -> ESubst (Vars.name v,Term.Var v)
@@ -584,7 +584,7 @@ let parse_subst (env : Vars.env) (uvars : Vars.evar list) (ts : term list)
     List.map2
       (fun t (Vars.EVar u) ->
          let open Sorts in
-         match Vars.var_type u with
+         match Vars.sort u with
            | Timestamp -> Term.ESubst (Term.Var u, convert_ts u_subst t )
            | Message -> Term.ESubst (Term.Var u, convert_glob u_subst t)
            | Index -> Term.ESubst (Term.Var u, Term.Var (conv_index u_subst t))
@@ -617,7 +617,7 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
     (Symbols.Macro.declare_exact s
        ~data
        (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-            Sorts.ESort (Vars.var_type x)) typed_args,k)))
+            Sorts.ESort (Vars.sort x)) typed_args,k)))
 
 (** Tests *)
 let () =

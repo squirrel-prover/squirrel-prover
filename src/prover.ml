@@ -244,7 +244,7 @@ let auto_simp judges =
 let tsubst_of_judgment j =
   let aux : Vars.evar -> Theory.esubst =
     (fun (Vars.EVar v) ->
-       match Vars.var_type v with
+       match Vars.sort v with
        | Sorts.Boolean -> assert false
        | _ -> Theory.ESubst (Vars.name v,Term.Var v)
       )
@@ -260,7 +260,7 @@ let parse_formula fact =
           List.map
             (fun (Vars.EVar v) ->
                Vars.name v,
-               Sorts.ESort (Vars.var_type v))
+               Sorts.ESort (Vars.sort v))
             (Vars.to_list (Sequent.get_env j))
         in
         Theory.convert_formula_glob

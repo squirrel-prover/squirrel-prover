@@ -10,31 +10,32 @@
 
 (** {2 Symbols}
   *
-  * We have function, name, state and macro symbols. Each symbol
-  * can then be indexed.
-  *
-  * Names represent random values, uniformly sampled by the process.
-  * State symbols represent memory cells.
-  * Macros represent input, outputs, and let definitions:
-  * everything that is expansed when translating the meta-logic to
-  * the base logic.
-  * TODO merge states into macros *)
+  * We have function, name and macro symbols. Each symbol
+  * can then be indexed. *)
 
-(** Type of indexed symbols in some namespace *)
+(** Type of indexed symbols in some namespace. *)
 type 'a indexed_symbol = 'a Symbols.t * Vars.index list
+
+(** Names represent random values of length the security parameter. *)
 
 type name = Symbols.name Symbols.t
 type nsymb = Symbols.name indexed_symbol
 
+(** Function symbols, may represent primitives or abstract functions. *)
+
 type fname = Symbols.fname Symbols.t
 type fsymb = Symbols.fname indexed_symbol
+
+(** Macros are used to represent inputs, outputs, contents of state
+  * variables, and let definitions: everything that is expanded when
+  * translating the meta-logic to the base logic. *)
 
 type mname = Symbols.macro Symbols.t
 type msymb = Symbols.macro indexed_symbol
 
 type state = msymb
 
-(** Pretty printing *)
+(** {3 Pretty printing} *)
 
 val pp_name : Format.formatter -> name -> unit
 val pp_nsymb : Format.formatter -> nsymb -> unit
@@ -47,7 +48,10 @@ val pp_msymb :  Format.formatter -> msymb -> unit
 
 (** {2 Terms} *)
 
-(** General terms contain constructors for either messages or timestamps. *)
+(** ['a term] is the type of terms of sort ['a].
+  * Since index terms and just variables, and booleans are a subtype
+  * of message, we are only interested in sorts [timestamp] and
+  * [message]. *)
 type _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
@@ -64,19 +68,18 @@ type timestamp = Sorts.timestamp term
 
 val pp : Format.formatter -> 'a term -> unit
 
-val to_sort : 'a term -> 'a Sorts.t
+val sort : 'a term -> 'a Sorts.t
 
 exception Uncastable
 
-
-(** [cast kind t] returns t if it is of the given kind,
-    else it raises Uncastable. It is used to cast to the correct type
-    terms that were unwrapped, e.g from a substitution.*)
+(** [cast kind t] returns [t] if it is of the given sort.
+  * It is used to cast terms that have been unwrapped (e.g. from
+  * a substitution) to the correct type.
+  * @raise Uncastable if the term does not have the expected sort. *)
 val cast : 'a Sorts.sort -> 'b term -> 'a term
 
-(** [get_vars t] returns the variables of [t]*)
+(** [get_vars t] returns the message and timestamp variables of [t]. *)
 val get_vars : 'a term -> Vars.evar list
-
 
 (** [get_ts t] returns the timestamps appearing in [t].
   * The returned list is guaranteed to have no duplicate elements. *)
@@ -93,20 +96,18 @@ val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
 (** {2 Substitutions} *)
 
-(** Substitutions for all purpose, applicable to terms and timestamps.
-  * Substitutions are performed bottom to top to avoid loops. *)
+(** Substitutions for all purpose, applicable to terms and timestamps. *)
 type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
 
 val pp_subst : Format.formatter -> subst -> unit
 
-(** [subst s t] applies the given substitution to [t], going from bottom to top
-    to avoir cycles. *)
+(** [subst s t] applies the given substitution to [t]. *)
 val subst : subst -> 'a term -> 'a term
 
-(** [subst_var s v] tries to find in [s] a substition to a variable for [v].
-    Raise an exception if it does not exist.*)
+(** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'].
+  * @raise Substitution_error an exception if no such variable exists.*)
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
 (** {2 Predefined symbols} *)
