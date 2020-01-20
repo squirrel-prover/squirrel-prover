@@ -1,0 +1,4173 @@
+%% MSC Macro Package 5
+%% msc5.sty
+%% Feb 2, 2014
+%%
+%% Copyright 2014 A. Farmadin
+%
+% This derived work may be distributed and/or modified under the
+% conditions of the LaTeX Project Public License, either version 1.3
+% of this license or (at your option) any later version.
+% The latest version of this license is in
+%   http://www.latex-project.org/lppl.txt
+% and version 1.3 or later is part of all distributions of LaTeX
+% version 2005/12/01 or later.
+%
+% This work has the LPPL maintenance status `maintained'.
+% 
+% The Current Maintainer of this work is A. Farmadin.
+%
+% This program consists of the files 
+%   msc.sty
+%   manual.tex
+%   manual.pdf
+%   refman.tex
+%   refman.pdf
+%   biblio.bib
+%   maintenance.tex
+%   maintenance.pdf
+%   README
+%   COPYRIGHT
+%
+
+% Contact address:
+% Adrian Farmadin
+% Masaryk University, Brno
+% Email: a.farmadin@gmail.com
+% Updates via:  http://is.muni.cz/www/374320/msc5.sty
+%
+% Original work: http://satoss.uni.lu/software/mscpackage/
+%
+
+\def\mscdate{2011/05/22}% update this whenever this file changes
+\def\mscversion{1.18}%   update this whenever a new version is ready
+\NeedsTeXFormat{LaTeX2e}% 
+\ProvidesPackage{msc}[\mscdate, v\mscversion]
+\typeout{msc version \mscversion. (\mscdate)}
+\RequirePackage{color,calc,ifthen,tikz,etoolbox}
+\usetikzlibrary{decorations.markings}% to arrow scale
+\usetikzlibrary{calc}%to compute hmsc relations
+%
+% mscunit: the unit of msc lengths
+\def\mscunit{cm}%
+\def\setmscunit#1{\gdef\mscunit{#1}}
+%
+%
+% arrow style
+\tikzstyle{arrowstyle}=[decoration={markings,mark=at position 1 with {\arrow[scale=1]%
+                       {stealth}}},postaction={decorate},shorten >=0.4pt]
+%
+% msc lengths
+% First the customizable lengths:
+
+\newlength{\actionheight}% height of action symbols
+\newlength{\actionwidth}% width of action symbol
+\newlength{\bottomfootdist}% distance between bottom of foot symbol and frame
+\newlength{\msccommentdist}% distance of comment to its instance
+\newlength{\conditionheight}% height of condition symbols
+\newlength{\conditionoverlap}% overlap of condition symbol
+\newlength{\envinstdist}% distance between environments and nearest instance line
+\newlength{\firstlevelheight}% height of level just below head symbols
+\newlength{\gatesymbolradius}% radius of the gate symbol
+\newlength{\msccommentwidth}% width of bmsc comment symbol
+\newlength{\hmscconditionheight}% height of hmsc condition symbol
+\newlength{\hmscconditionwidth}% width of hmsc condition symbol
+\newlength{\hmscconnectionradius}% radius of hmsc connection symbols
+\newlength{\hmscreferenceheight}% height of hmsc reference symbol
+\newlength{\hmscreferencewidth}% width of hmsc reference symbol
+\newlength{\hmsccommentwidth}% width of hmsc comment symbol
+\newlength{\hmsccommentheight}% height of hmsc comment symbol
+\newlength{\mscglobalcommentwidth}% width of hmsc comment symbol
+\newlength{\hmsccommenthem}% size of hmsc comment symbol hem
+\newlength{\hmscstartsymbolwidth}% width of hmsc start symbol
+\newlength{\inlineoverlap}% overlap of inline symbol
+\newlength{\instbarwidth}% default width of vertical instance bars
+\newlength{\instdist}% distance between (vertical) instance lines
+\newlength{\instfootheight}% height of foot symbols
+\newlength{\instheadheight}% height of head symbols
+\newlength{\instwidth}%  width of header and foot symbols
+\newlength{\labeldist}% distance between labels and message lines or head symbol boxes 
+\newlength{\lastlevelheight}% height of level just above foot symbols
+\newlength{\leftnamedist}% distance between left of frame and (top of) msc title 
+\newlength{\levelheight}% height of a level
+\newlength{\lostsymbolradius}% radius of the lost and found symbols
+\newlength{\markdist}% distance between mark and its instance
+\newlength{\measuredist}% user definable length for horizontal measure distance
+\newlength{\measuresymbolwidth}% width of measure symbols
+\newlength{\mscdocreferenceheight}% minimal height of mscdoc reference
+\newlength{\mscdocreferencewidth}% minimal width of mscdoc reference
+\newlength{\referenceoverlap}% overlap of reference symbol
+\newlength{\regionbarwidth}% the width of the coregion start and end symbol
+\newlength{\regionwidth}% the width of the activation, suspension and coregion rectangle
+\newlength{\selfmesswidth}% length of horizontal arms of self messages
+\newlength{\stopwidth}% width of the stop symbol
+\newlength{\timerwidth}% width of the timer symbols
+\newlength{\topheaddist}% distance between top of head symbols and frame
+\newlength{\topnamedist}% distance between top of frame and (top of) msc title 
+%
+% Now the internal lengths
+\newlength{\tmp@X}
+\newlength{\tmp@Y}
+\newlength{\tmp@Xa}
+\newlength{\tmp@Ya}
+\newlength{\tmp@Xb}
+\newlength{\tmp@Yb}
+\newlength{\tmp@Xc}
+\newlength{\tmp@Yc}
+\newlength{\tmp@Xd}
+\newlength{\tmp@Yd}
+\newlength{\msc@currentheight}
+\newlength{\msc@currentwidth}
+\newlength{\msc@totalwidth}
+\newlength{\msc@totalheight}
+\newlength{\msc@commentdist}% distance of comment to its instance
+%
+%
+\newcommand{\msc@incrcounter}[1]{\addtocounter{#1}{1}}%
+%
+% internal box
+\newsavebox{\tmp@box}
+%
+% some internal offsets
+\def\msc@leveloffset{0}% 
+\def\mscscalefactor{1}%
+\newcommand{\setmscscale}[1]{\def\mscscalefactor{#1}}%
+%
+% Command to change the footer color (legal values are black, gray,
+% lightgray, and white)
+\def\setfootcolor#1{\def\msc@footcolor{#1}}
+%
+\def\msc@color{black}%
+% Command to change the elements color
+\newcommand{\mscsetcolor}[1]{
+  \edef\msc@color{#1}%
+  \pgfsetcolor{#1}%
+  \color{#1}%
+}
+%
+% And some internal counters
+\newcounter{mscinstcnt}
+\newcounter{tmpcnt}
+%
+% \messlabelpos defines the position of message labels.
+% The default value is "l" (left) other value(s) are "r" (right)
+\def\timerpos{l}
+%
+% \msc@timerpos is the internal variant of \timerpos
+% This internal variant is used by the actual  drawing commands for self messages
+\def\msc@timerpos{l}
+%
+% \msc@settimerpos sets the internal \mes@timerpos
+\def\msc@settimerpos#1{
+  \ifthenelse{\not\(\equal{#1}{l} \or \equal{#1}{r}\)}{%
+    \msc@unknowntimerposerr{#1}}{% else
+    \def\msc@timerpos{#1}%
+  }%
+}
+%
+% \dummyinst{#1} (\dummyinst*{#1}) declares a dummy msc-instance and does not 
+% draws its head symbol nor its instance axis until an instance create/start is 
+% encountered. The starred version declares a fat instance.
+% #1: nickname that can be used in \mess -like commands
+% 
+\def\dummyinst{\@ifstar{\msc@dummyinststar}{\msc@dummyinstnostar}}
+\def\msc@dummyinstnostar#1{%
+  %normal instance
+  \msc@makedummyinst{\the\instbarwidth}{#1}%
+}
+\def\msc@dummyinststar#1{% 
+  %fat instance
+  \msc@makedummyinst{\the\instwidth}{#1}%
+}
+\def\msc@makedummyinst#1#2{%
+  \@ifundefined{mscinst#2}{%
+    \ifthenelse{\value{mscinstcnt}=2}{% Aha: this is the first msc instance, so, add the
+      \addtolength{\msc@currentwidth}{\envinstdist}% left \envinstdist to \msc@currentwidth
+    }{%not the first instance , so add the instdist to the \mec@currentwidth
+      \addtolength{\msc@currentwidth}{\instdist}%
+    }% and update x-pos of right environment
+    \setlength{\tmp@X}{\msc@currentwidth+\envinstdist}%
+    \msc@setinstxpos{envright}{\the\tmp@X}%
+    % make an instance with empty inside name and empty above name:
+    \msc@declinst{#2}{\relax}{\relax}{#1}%
+    % make y-pos undefined, to make sure that no instance line will be drawn
+    \msc@setinstypos{#2}{undefined}% --added sm
+  }{% else: nickname #2 already defined!
+    \msc@nicknamedefinederr{#2}%
+  }%
+}
+%
+% \declinst[*] declares a new msc-instance and draws its head symbol
+% the starred versions makes a fat instance.
+% #1: instance width
+% #2: nickname that can be used in \mess
+% #3: instance head height
+% #4: name of the instance (above instance head symbol)
+% #5: instance foot height
+% #6: name of the instance (inside instance head symbol)
+%
+%
+\def\declinst{\@ifstar{\msc@declinststar}{\msc@declinstnostar}}
+% 
+%
+% \msc@declinstnostar
+% [#1]: width of instance foot and head symbol
+% {#2}: nickname of instance
+% [#3]: height of instance head symbol
+% [#4]: height of instance foot symbol
+% {#5}: instance above name
+% {#6}: instance inside name
+% Some commands are defined as well (INSTNR is the arabic
+% representation of the instance number):
+%   \instabname#1: `above name' of instance with nickname #1 
+%   \instinname#1: `inside name' of instance with nickname #1 
+%   \instnicknameINSTNR: returns the nickname of instance INSTNR
+%   \instxposINSTNR: returns the x-position of instance with nickname #1
+%   \instyposINSTNR: returns the last y-position of instance with nickname #1
+%   \instlinestyle#1: the line style (dashed or solid) of instance with nickname #1 
+\newcommand{\msc@declinstnostar}[2][\instwidth]{% user command to declare instances
+  \msc@dummyinstnostar{#2}% 
+  \def\instname{#2}%
+  \expandafter\def\csname instwidth#2\endcsname{#1}% `head foot width'
+  \msc@declinstnostarA%
+}
+
+\newcommand{\msc@declinstnostarA}[1][\instheadheight]{
+ \expandafter\def\csname instheadheight\instname\endcsname{#1}% `head height'
+ \msc@declinstnostarB%
+}
+
+\newcommand{\msc@declinstnostarB}[2][\instfootheight]{
+ \def\abovename{#2}%
+ \expandafter\def\csname instfootheight\instname\endcsname{#1}% `foot height'
+ \msc@declinstnostarC%
+}
+
+\newcommand{\msc@declinstnostarC}[2][black]{
+  % define above name and inside name
+  \expandafter\def\csname instabname\instname\endcsname{\abovename}% `above name'
+  \expandafter\def\csname instinname\instname\endcsname{#2}% `inside name'
+  \expandafter\def\csname instcolor\instname\endcsname{#1}% color
+  % draw the instance header symbol
+  \msc@drawinstanceheadsymbol{\instname}{\the\topheaddist}%
+  % redefine the instance's y position
+  \setlength{\tmp@Y}{\topheaddist+\msc@instheadheight{\instname}}%
+  % TvD: This fixes the problem that instheadhight, topheaddist and
+  % firstlevelheight are not taken into account. However, it is not a
+  % pretty solution.
+  \setlength{\msc@currentheight}{\msc@instheadheight{\instname}+\topheaddist+\firstlevelheight}%  
+  \msc@setinstypos{\instname}{\the\tmp@Y}%
+}
+%
+% \msc@declinststar
+% [#1]: width of instance foot and head symbol
+% {#2}: nickname of instance
+% [#3]: height of instance head symbol
+% [#4]: height of instance foot symbol
+% {#5}: instance above name
+% {#6}: instance inside name
+\newcommand{\msc@declinststar}[2][\instwidth]{% user command to declare instances
+  \msc@dummyinststar{#2}%
+  \def\instname{#2}%
+  \expandafter\def\csname instwidth#2\endcsname{#1}% `head foot width'
+  \msc@declinststarA%
+}
+
+\newcommand{\msc@declinststarA}[1][\instheadheight]{
+  \expandafter\def\csname instheadheight\instname\endcsname{#1}% `head height'
+  \msc@declinststarB%
+}
+
+\newcommand{\msc@declinststarB}[2][\instfootheight]{
+  \def\abovename{#2}%
+  \expandafter\def\csname  instfootheight\instname\endcsname{#1}% `foot height'
+  \msc@declinststarC%
+}
+
+\newcommand{\msc@declinststarC}[2][black]{
+  % define above name and inside name
+  \expandafter\def\csname instabname\instname\endcsname{\abovename}% `above name'
+  \expandafter\def\csname instinname\instname\endcsname{#2}% `inside name'
+  \expandafter\def\csname instcolor\instname\endcsname{#1}% color
+  % draw the instance header symbol
+  \msc@drawinstanceheadsymbol{\instname}{\the\topheaddist}%
+  % redefine the instance's y position
+  \setlength{\tmp@Y}{\topheaddist+\msc@instheadheight{\instname}}%
+  % TvD: This fixes the problem that instheadhight, topheaddist and
+  % firstlevelheight are not taken into account. However, it is not a
+  % pretty solution.
+  \setlength{\msc@currentheight}{\msc@instheadheight{\instname}+\topheaddist+\firstlevelheight}%  
+  \msc@setinstypos{\instname}{\the\tmp@Y}%
+}
+%
+% \msc@declinst: internal command to declare instances.
+% Some commands are defined as well (INSTNR is the arabic
+% representation of the instance number):
+%   \instabnameINSTNR: returns the instance above name of #1
+%   \instnicknameINSTNR: returns the nickname of instance #1
+%   \instxposINSTNR: returns the x-position of instance with nickname #1
+%   \instyposINSTNR: returns the last y-position of instance with nickname #1
+%   \instlinestyle#1: the line style (dashed or solid) of instance with nickname #1
+%   \instregionstyle#1: the region style (normal, coregion, suspension, or activation)
+\def\msc@declinst#1#2#3#4{% internal command to declare instances
+  \@ifundefined{mscinst#1}{%
+    \@namedef{mscinst#1}{\relax}%  
+    \expandafter\def\csname instabname#1\endcsname{#2}% `above name'
+    \expandafter\def\csname instinname#1\endcsname{#3}% `inside name'
+    \expandafter\def\csname instbarwidth#1\endcsname{#4}% width of the vertical instance bar
+    % the x position of an instance, \instxpos#1, is stored as a string, not as
+    % a TeX-length, since that would use up too much of TeX limited number of
+    % length-registers.
+    % However, this means we first have to calculate the x-pos, and then
+    % assign the string representation of the result to \instxpos#1:
+    \setlength{\tmp@X}{\msc@currentwidth}%
+    \expandafter\edef\csname instxpos#1\endcsname{\the\tmp@X}%
+    \ifthenelse{\lengthtest{\instbarwidth < #4}}%
+      {%
+       \expandafter\def\csname instisfat#1\endcsname{true}%
+       \setlength{\tmp@Xa}{#4}%
+       \addtolength{\tmp@X}{-.5\tmp@Xa}%
+       \expandafter\edef\csname instlxpos#1\endcsname{\the\tmp@X}%
+       \addtolength{\tmp@X}{\tmp@Xa}%
+       \expandafter\edef\csname instrxpos#1\endcsname{\the\tmp@X}%
+      }%
+      {%
+       \expandafter\def\csname instisfat#1\endcsname{false}%
+       \expandafter\edef\csname instlxpos#1\endcsname{\the\tmp@X}%
+       \expandafter\edef\csname instrxpos#1\endcsname{\the\tmp@X}%
+      }%
+    \expandafter\def\csname instnickname\arabic{mscinstcnt}\endcsname{#1}%
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \expandafter\edef\csname instypos#1\endcsname{\the\tmp@Y}%
+    \expandafter\def\csname instlinestyle#1\endcsname{solid}%
+    \expandafter\def\csname instfootcolor#1\endcsname{\msc@footcolor}%
+    \expandafter\def\csname instregionstyle#1\endcsname{normal}%
+    \msc@incrcounter{mscinstcnt}%    
+  }{% else, #1 already defined
+    \msc@nicknamedefinederr{#1}%
+  }%
+}
+%
+% \msc@instnickname gets the nickname of msc instance with number #1
+% (This macro is used in \msc@drawinstancelevels)
+\def\msc@instnickname#1{%
+  \csname instnickname\arabic{#1}\endcsname%
+}
+%
+% \msc@instabname gets the above name of instance #1
+\def\msc@instabname#1{%
+  \csname instabname#1\endcsname%
+}
+% \msc@instinname gets the inside name of instance #1
+\def\msc@instinname#1{%
+  \csname instinname#1\endcsname%
+}
+%
+% \msc@instxpos gets the x position (i.e., horizontal position) of the
+% msc instance with nickname #1. 
+\def\msc@instxpos#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\csname instxpos#1\endcsname}%
+}
+%
+% \msc@instlxpos gets the x position of left side of instance bar
+\def\msc@instlxpos#1{
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\csname instlxpos#1\endcsname}%
+}
+%
+% \msc@instrxpos gets the x position of right side of instance bar
+\def\msc@instrxpos#1{
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\csname instrxpos#1\endcsname}%
+}
+%
+% \msc@setinstxpos sets the (l/r) x position of instance with nickname #1 to
+% the string  #2
+\def\msc@setinstxpos#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname instxpos#1\endcsname{#2}%
+    \expandafter\edef\csname instlxpos#1\endcsname{#2}%
+    \expandafter\edef\csname instrxpos#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@setinstlxpos sets the left x position of instance with nickname #1 to
+% the string  #2
+\def\msc@setinstlxpos#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname instlxpos#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@setinstrxpos sets the right x position of instance with nickname #1 to
+% the string  #2
+\def\msc@setinstrxpos#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname instrxpos#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@instypos gets the last y position (i.e., vertical position) of the
+% msc instance with nickname #1. 
+\def\msc@instypos#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instypos#1\endcsname}%
+}
+%
+% \msc@setinstypos sets the last y position of instance with nickname #1 to
+% the string #2
+\def\msc@setinstypos#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname instypos#1\endcsname{#2}%
+  }%
+}
+%
+% Change \instlinestyle command of msc instance with nickname #1 into #2
+% #2 should be one of: solid, dashed, or dotted
+\def\msc@setinstlinestyle#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \ifthenelse{\not\(\equal{#2}{solid} \or
+                      \equal{#2}{dashed} \or
+                      \equal{#2}{dotted}\)}{% unknown linestyle
+      \msc@unknownlinestyleerr{#2}}{%
+      \expandafter\def\csname instlinestyle#1\endcsname{#2}%
+    }%
+  }%
+}
+%
+% \msc@instlinestyle returns the linestyle of instance with nickname #1
+\def\msc@instlinestyle#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instlinestyle#1\endcsname}%
+}
+%
+% Change the color of instance with nickname #1 into #2
+\def\msc@setinstcolor#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname instcolor#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@instcolor returns the color of the instance with nicknam #1
+\def\msc@instcolor#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instcolor#1\endcsname}%
+}
+%
+% Change the foot color for instance with nickname #1 into #2
+\def\msc@setinstfootcolor#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname instfootcolor#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@instfootcolor returns the color of the footer of instance with nicknam #1
+\def\msc@instfootcolor#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instfootcolor#1\endcsname}%
+}
+%
+% \msc@instwidth returns width of the head and foot of instance with nicknam #1
+\def\msc@instwidth#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instwidth#1\endcsname}%
+}
+%
+% \msc@setinstwidth set width of the head and foot of instance with nicknam #1
+\def\msc@setinstwidth#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname instwidth#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@instfootheight returns the height of the foot of instance with nicknam #1
+\def\msc@instfootheight#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instfootheight#1\endcsname}%
+}
+%
+% \msc@setinstfootheight set the heigjt of the foot of instance with nicknam #1
+\def\msc@setinstfootheight#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname instfootheight#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@instheadheight returns the height of the head of instance with nicknam #1
+\def\msc@instheadheight#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instheadheight#1\endcsname}%
+}
+%
+% \msc@setinstheadheight set the height of the head of instance with nicknam #1
+\def\msc@setinstheadheight#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname instheadheight#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@regionwidth returns the width of the region of instance with nicknam #1
+\def\msc@regionwidth#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname regionwidth#1\endcsname}%
+}
+%
+% \msc@setregionwidth set the width of the region of instance with nicknam #1
+\def\msc@setregionwidth#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname regionwidth#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@regioncolor returns the color of the region of instance with nicknam #1
+\def\msc@regioncolor#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname regioncolor#1\endcsname}%
+}
+%
+% \msc@setregioncolor set the color of the region of instance with nicknam #1
+\def\msc@setregioncolor#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname regioncolor#1\endcsname{#2}%
+  }%
+}
+%
+% \msc@regionbarwidth returns the width of the regions tail of instance with nicknam #1
+\def\msc@regionbarwidth#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname regionbarwidth#1\endcsname}%
+}
+%
+% \msc@setregionbarwidth set the width of the regions tail of instance with nicknam #1
+\def\msc@setregionbarwidth#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\def\csname regionbarwidth#1\endcsname{#2}%
+  }%
+}
+%
+% Change \instregionstyle command of msc instance with nickname #1 into #2
+% #2 should be one of: normal, coregion, suspension, or activation
+\def\msc@setinstregionstyle#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \ifthenelse{\not\(\equal{#2}{normal} \or
+                      \equal{#2}{coregion} \or
+                      \equal{#2}{suspension} \or
+                      \equal{#2}{activation}\)}
+      {% unknown region style
+       \msc@unknownregionstyleerr{#2}
+      }{%
+       \expandafter\def\csname instregionstyle#1\endcsname{#2}%
+      }%
+    \ifthenelse{\equal{#2}{suspension} \or \equal{#2}{activation} \or \equal{#2}{coregion}}
+      {%
+       \ifthenelse{\equal{\msc@instisfat{#1}}{true}}
+         {\relax}
+         {%
+          \setlength{\tmp@X}{\msc@instxpos{#1}}%
+          \setlength{\tmp@Xa}{\msc@regionwidth{#1}}
+          \addtolength{\tmp@X}{-.5\tmp@Xa}%
+          \msc@setinstlxpos{#1}{\the\tmp@X}%
+          \addtolength{\tmp@X}{\tmp@Xa}%
+          \msc@setinstrxpos{#1}{\the\tmp@X}%
+         }
+      }{% new region style is normal
+       
+       \ifthenelse{\equal{\msc@instisfat{#1}}{true}}%
+         {\relax}%
+         {\msc@setinstbarwidth{#1}{\msc@instbarwidth{#1}}%
+          \msc@setinstlxpos{#1}{\msc@instxpos{#1}}%
+          \msc@setinstrxpos{#1}{\msc@instxpos{#1}}%
+       }%
+     }%
+  }%
+}
+%
+% \msc@instregionstyle returns the region style of instance with nickname #1
+\def\msc@instregionstyle#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instregionstyle#1\endcsname}%
+}
+%
+% \msc@instbarwidth returns the width of the bar of instance with nickname #1
+\def\msc@instbarwidth#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instbarwidth#1\endcsname}%
+}
+%
+% \msc@setinstbarwidth sets the width of the bar  of instance with nickname #1
+% to the string #2
+\def\msc@setinstbarwidth#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname instbarwidth#1\endcsname{#2}%
+    \ifthenelse{\lengthtest{\instbarwidth < #2}}%
+      {\expandafter\def\csname instisfat#1\endcsname{true}}%
+      {\expandafter\def\csname instisfat#1\endcsname{false}}%
+  }%
+}
+%
+%\msc@isfateinst returns one of the strings `true' of `false', indicating if 
+% the instance with nickname #1 is a fat instance.
+\def\msc@instisfat#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \csname instisfat#1\endcsname}%
+}
+%
+%
+% \changeinstbarwidth changes the instance width of instance with nickname #1 to
+% the length #2
+\def\changeinstbarwidth#1#2{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}%
+  {% else, #1 is defined
+    \msc@drawinstanceline{#1}%
+    \setlength{\tmp@X}{\msc@instxpos{#1}}%
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \msc@setinstypos{#1}{\the\tmp@Y}%
+    \setlength{\tmp@Xb}{#2}%
+    \ifthenelse{\lengthtest{\tmp@Xb > \instbarwidth}}%
+      {%
+       \setlength{\tmp@Xb}{0.5\tmp@Xb}%
+       \addtolength{\tmp@Xb}{\tmp@X}}%
+      {%
+       \setlength{\tmp@Xb}{\tmp@X}}%
+    \ifthenelse{\equal{true}{\msc@instisfat{#1}}}
+      {%
+       \setlength{\tmp@Xa}{\msc@instbarwidth{#1}}%
+       \setlength{\tmp@Xa}{0.5\tmp@Xa}%
+       \addtolength{\tmp@Xa}{\tmp@X}%
+      }{%
+       \setlength{\tmp@Xa}{\tmp@X}%
+      }%
+    \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+    \setlength{\tmp@Xb}{#2}%
+    \ifthenelse{\lengthtest{\tmp@Xb > \instbarwidth}}%
+      {%
+       \setlength{\tmp@Xb}{-0.5\tmp@Xb}%
+       \addtolength{\tmp@Xb}{\tmp@X}}%
+      {%
+       \setlength{\tmp@Xb}{\tmp@X}}%
+    \ifthenelse{\equal{true}{\msc@instisfat{#1}}}
+      {%
+       \setlength{\tmp@Xa}{\msc@instbarwidth{#1}}%
+       \setlength{\tmp@Xa}{-0.5\tmp@Xa}%
+       \addtolength{\tmp@Xa}{\tmp@X}%
+      }{%
+       \setlength{\tmp@Xa}{\tmp@X}%
+      }%
+    \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+    \msc@setinstbarwidth{#1}{#2}%
+  }%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% DUMMY INSTANCES (start and stop)
+%
+% Start a dummy inst
+%
+% \inststart[#1]{#2}[#3]{#4}[#5]{#6}
+% #1: width of instance head and foot symbol
+% #2: nickname of stared instance
+% #3: height of instance head symbol
+% #4: name of the instance (above instance head symbol)
+% #5: height of instance foot symbol
+% #6: name of the instance (inside instance head symbol)
+%
+\newcommand{\inststart}[2][\instwidth]{% 
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \def\instname{#2}%
+    \expandafter\def\csname instwidth\instname\endcsname{#1}% `instance head and foot symbol width'
+    \inststart@A
+  }
+}
+
+\newcommand{\inststart@A}[2][\instheadheight]{%
+  \expandafter\def\csname instheadheight\instname\endcsname{#1}% `instance head symbol height'
+  \expandafter\def\csname instabname\instname\endcsname{#2}% `above name'
+  \inststart@B
+}
+
+\newcommand{\inststart@B}[2][\instfootheight]{%
+   \expandafter\def\csname instfootheight\instname\endcsname{#1}% `instance foot symbol height'
+   \expandafter\def\csname instinname\instname\endcsname{#2}% `inside name'    
+    % draw the instance header symbol
+    \msc@drawinstanceheadsymbol{\instname}{\the\msc@currentheight}%
+    % redefine the instance's y position
+    \setlength{\tmp@Y}{\msc@currentheight+\msc@instheadheight{\instname}}%
+    \msc@setinstypos{\instname}{\the\tmp@Y}%
+}
+%
+% \inststop{#1}
+% #1: nick name of instance
+% 
+% Draws the footer of #1 at current level. 
+\def\inststop#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \addtolength{\msc@currentheight}{\lastlevelheight}
+    \msc@drawinstanceline{#1}%
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \msc@drawinstancefootsymbol{#1}{\the\tmp@Y}%
+    \addtolength{\msc@currentheight}{-\lastlevelheight}
+    \msc@setinstypos{#1}{undefined}
+  }
+}
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+%
+% CREATE
+%
+% \create(*) creates a new msc-instance and draws its head symbol
+% {#1}: label above creation message
+% [#2]: label position
+% {#3}: nickname of creating instance
+% [#4]: label placement
+% {#5}: nickname of created instance
+% [#6]: width of created instance head and foot symbol
+% {#7}: name of the instance (above instance head symbol)
+% [#8]: height of created instance head symbol
+% [#9]: height of ceated instance foot symbol
+% {#10}: name of the instance (inside instance head symbol)
+% [#11]: color of instance
+% 
+% Some commands are defined as well (INSTNR is the arabic
+% representation of the instance number):
+%   \instabname#3: `above name' of instance with nickname #3 
+%   \instinname#3: `inside name' of instance with nickname #3 
+%   \instlinestyle#3: the line style (dashed or solid) of instance with nickname #3
+\newcommand{\create}{%
+  \@ifstar%
+  {\def\mess@style{mess}\def\mess@linestyle{dashed}\create@A}{\def\mess@style{mess}\def\mess@linestyle{solid}\create@A}%
+}%
+\newcommand{\create@A}[1]{%
+  \def\mess@labeltext{#1}%
+  \create@B%
+}
+\newcommand{\create@B}[2][t]{%
+  \def\mess@labelposition{#1}%
+  \def\mess@sender{#2}%  
+  \create@C%
+}
+\newcommand{\create@C}[2][0.5]{%
+  \def\mess@labelplacement{#1}%
+  \def\mess@leveloffset{0}%
+  \def\mess@instanceoffset{\msc@instwidth{#2}*\real{0.5}}%
+  \def\mess@receiver{#2}% 
+  \def\instname{#2}%
+  \create@D%
+}
+
+\newcommand{\create@D}[2][\instwidth]{%
+  \expandafter\def\csname instwidth\instname\endcsname{#1}% `instance head and foot symbol width'
+  \expandafter\def\csname instabname\instname\endcsname{#2}% `above name'
+  \create@E%
+}
+
+\newcommand{\create@E}[1][\instheadheight]{%
+  \expandafter\def\csname instheadheight\instname\endcsname{#1}% `instance head symbol height'
+  \create@F%
+}
+
+\newcommand{\create@F}[2][\instfootheight]{%
+   \expandafter\def\csname instfootheight\instname\endcsname{#1}% `instance foot symbol height'
+  \expandafter\def\csname instinname\instname\endcsname{#2}% `inside name'
+  \create@G%
+}
+
+\newcommand{\create@G}[1][black]{%
+%
+  \expandafter\@ifundefined{mscinst\instname}{%
+    \msc@instundefinederr{\instname}}{% else, mess receiver is defined
+    \expandafter\def\csname instcolor\instname\endcsname{#1}% instance color    
+    % draw the instance header symbol
+    \pgfsetcolor{#1}%
+    \color{#1}%
+    \setlength{\tmp@X}{\msc@instxpos{\instname}}% x-center head box
+    \setlength{\tmp@Y}{\msc@currentheight}% y-center head box
+    \setlength{\tmp@Xa}{\tmp@X + \msc@instwidth{\instname}*\real{-0.5}}% x-upperleft head box
+    \setlength{\tmp@Ya}{\msc@currentheight + \msc@instheadheight{\instname}*\real{-0.5}}%
+    \setlength{\tmp@Xb}{\tmp@Xa+\msc@instwidth{\instname}}% x-lowerright head box
+    \setlength{\tmp@Yb}{\tmp@Ya+\msc@instheadheight{\instname}}% y-lowerright head box
+    \draw (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb); 
+    \node at (\tmp@X,-\tmp@Ya + 4pt) {\raisebox{\labeldist}{\makebox[0pt][c]{\msc@instabname{\instname}}}};%
+    \node at (\tmp@X,-\tmp@Y) {\raisebox{-.5ex}{\makebox[0pt][c]{\msc@instinname{\instname}}}};%
+    % redefine the instance's y position
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \addtolength{\tmp@Y}{\msc@instheadheight{\instname}*\real{0.5}}
+    \msc@setinstypos{\instname}{\the\tmp@Y}%
+
+
+    \expandafter\@ifundefined{mscinst\mess@sender}{}{%
+      % draw creation arrow
+      \msc@drawarrow%  
+    }%
+   \pgfsetcolor{\msc@color}%    
+   \color{\msc@color}%   
+  }%
+}%
+%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% INLINE EXPRESSIONS (inlines)
+%
+%
+% \inlinestart creates an inline expression at the current level
+% [#1]: left overlap
+% [#2]: right overlap
+% #3: nickname of the inline
+% #4: text of the inline
+% #5: first instance of the inline
+% #6: final instance of the inline
+\newcommand{\inlinestart}[1][\inlineoverlap]{%
+  \def\msc@leftoverlap{#1}\msc@inlinecont%
+}
+\newcommand{\msc@inlinecont}[5][\msc@leftoverlap]{\msc@declinline{\msc@leftoverlap}{#1}{#2}{#3}{#4}{#5}}%
+%
+% \inlineend draws and ends the inline expression with nickname #1
+% 
+\newcommand{\inlineend}{%
+  \@ifstar{\msc@inlineends}{\msc@inlineend}}
+%
+% \inlineseparator draws a ``separator'' (horizontal dashed line) through 
+% inline expression with nickname #1
+\newcommand{\inlineseparator}[1]{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \draw[style=dashed] (\msc@inlulx{#1},-\tmp@Y) -- (\msc@inllrx{#1},-\tmp@Y);%
+  }%
+}
+%
+% internal commands to implement the inline expressions:
+% #1: left overlap
+% #2: right overlap
+% #3: nickname of the inline
+% #4: text of the inline
+% #5: first instance of the inline
+% #6: final instance of the inline
+%
+\def\msc@declinline#1#2#3#4#5#6{%
+  \@ifundefined{mscinl#3}{%
+    \@ifundefined{mscinst#5}{% #5 is not an instance nickname
+      \msc@instundefinederr{#5}}{%
+      \@ifundefined{mscinst#6}{% #6 is not an instance nickname
+        \msc@instundefinederr{#6}}{%
+        \ifthenelse{\lengthtest{\msc@instxpos{#5}>\msc@instxpos{#6}}}{%
+          \msc@inlfirstlasterror{#3}{#5}{#6}}{%
+          \@namedef{mscinl#3}{\relax}%
+          \expandafter\def\csname inltext#3\endcsname{\raisebox{\depth}[\totalheight][0pt]{#4}}%
+          \ifthenelse{\equal{true}{\msc@instisfat{#5}}}%
+          {%
+            \setlength{\tmp@X}{\msc@instlxpos{#5}-#1}%
+          }%
+          {%
+            \setlength{\tmp@X}{\msc@instxpos{#5}-#1}%
+          }%
+          \expandafter\edef\csname inlulx#3\endcsname{\the\tmp@X}%
+          \expandafter\edef\csname inluly#3\endcsname{\the\msc@currentheight}%
+          \ifthenelse{\equal{true}{\msc@instisfat{#6}}}%
+          {%
+            \setlength{\tmp@X}{\msc@instrxpos{#6}+#2}%
+          }%
+          {%
+            \setlength{\tmp@X}{\msc@instxpos{#6}+#2}%
+          }%
+          \expandafter\edef\csname inllrx#3\endcsname{\the\tmp@X}%
+          \expandafter\edef\csname inllry#3\endcsname{undefined}%
+          % two additional instances are defined
+          \msc@declinst{#3left}{\relax}{\relax}{\the\instbarwidth}% left of inline
+          \msc@setinstxpos{#3left}{\msc@inlulx{#3}}%
+          \msc@setinstlxpos{#3left}{\msc@inlulx{#3}}%
+          \msc@setinstrxpos{#3left}{\msc@inlulx{#3}}%
+          \msc@setinstypos{#3left}{undefined}% no instance line drawing
+          \msc@declinst{#3right}{\relax}{\relax}{\the\instbarwidth}% left of inline
+          \msc@setinstxpos{#3right}{\msc@inllrx{#3}}%
+          \msc@setinstlxpos{#3right}{\msc@inllrx{#3}}%
+          \msc@setinstrxpos{#3right}{\msc@inllrx{#3}}%
+          \msc@setinstypos{#3right}{undefined}% no instance line drawing
+        }%
+      }%
+    }%
+  }{% nickname #3 already defined
+    \msc@nicknamedefinederr{#3}%
+  }%
+}
+%
+% \msc@inlulx gets the upper-left x-position of inline with nickname #1.
+\def\msc@inlulx#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \csname inlulx#1\endcsname%
+  }%
+}
+%
+% \msc@inluly gets the upper-left y-position of inline with nickname #1.
+\def\msc@inluly#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \csname inluly#1\endcsname%
+  }%
+}
+%
+% \msc@inllrx gets the lower-right x-position of inline with nickname #1.
+\def\msc@inllrx#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \csname inllrx#1\endcsname%
+  }%
+}
+%
+% \msc@inllry gets the lower-right y-position of inline with nickname #1.
+\def\msc@inllry#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \csname inllry#1\endcsname%
+  }%
+}
+%
+% \msc@inltext gets the text of inline with nickname #1
+\def\msc@inltext#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \csname inltext#1\endcsname%
+  }%
+}
+%
+% \msc@inlineend completes the inline with nickname #1
+% (the bottom line is solid)
+\def\msc@inlineend#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname inllry#1\endcsname{\the\msc@currentheight}%
+    \setlength{\tmp@Xa}{\msc@inlulx{#1}}%
+    \setlength{\tmp@Ya}{\msc@inluly{#1}}%
+    \setlength{\tmp@Xb}{\msc@inllrx{#1}}%
+    \setlength{\tmp@Yb}{\msc@inllry{#1}}%
+%% Debug info:
+%    \typeout{(\tmp@Xa,-\tmp@Ya)(\tmp@Xb,-\tmp@Yb)}%
+    \draw (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);%
+    \node {\global\sbox{\tmp@box}{\msc@inltext{#1}}};%
+    \setlength{\tmp@X}{\wd\tmp@box}%
+    \setlength{\tmp@X}{1.1\tmp@X+\labeldist}%
+    \setlength{\tmp@Y}{\ht\tmp@box}%
+    \setlength{\tmp@Y}{1.1\tmp@Y+\labeldist}%
+    \setlength{\tmp@Xb}{\tmp@X+\labeldist}%
+    \setlength{\tmp@Yb}{\tmp@Y+\labeldist}%
+      \node[below right, inner sep = \labeldist] at (\tmp@Xa,-\tmp@Ya) {\msc@inltext{#1}};%
+      \draw (\tmp@Xa+0,-\tmp@Ya-\tmp@Yb) -- (\tmp@Xa+\tmp@X,-\tmp@Ya-\tmp@Yb) --%
+            (\tmp@Xa+\tmp@Xb,-\tmp@Ya-\tmp@Y) -- (\tmp@Xa+\tmp@Xb,-\tmp@Ya+0);%
+
+  }%
+}
+%
+% \msc@inlineends completes the inline with nickname #1
+% (the bottom line is dashed)
+\def\msc@inlineends#1{%
+  \expandafter\@ifundefined{mscinl#1}{%
+    \msc@inlundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname inllry#1\endcsname{\the\msc@currentheight}%
+    \setlength{\tmp@Xa}{\msc@inlulx{#1}}%
+    \setlength{\tmp@Ya}{\msc@inluly{#1}}%
+    \setlength{\tmp@Xb}{\msc@inllrx{#1}}%
+    \setlength{\tmp@Yb}{\msc@inllry{#1}}%
+%% Debug info:
+%    \typeout{(\tmp@Xa,-\tmp@Ya)(\tmp@Xb,-\tmp@Yb)}%
+    % first the solid part of the inline expression:
+    \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+    % then the dashed bottom line:
+    \draw[style=dashed] (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Yb);
+    \node {\global\sbox{\tmp@box}{\msc@inltext{#1}}};%
+    \setlength{\tmp@X}{\wd\tmp@box}%
+    \setlength{\tmp@X}{1.1\tmp@X+\labeldist}%
+    \setlength{\tmp@Y}{\ht\tmp@box}%
+    \setlength{\tmp@Y}{1.1\tmp@Y+\labeldist}%
+    \setlength{\tmp@Xb}{\tmp@X+\labeldist}%
+    \setlength{\tmp@Yb}{\tmp@Y+\labeldist}%
+      \node[below right, inner sep = \labeldist] at (\tmp@Xa,-\tmp@Ya) {\msc@inltext{#1}};%
+      \draw (\tmp@Xa+0,-\tmp@Ya-\tmp@Yb) -- (\tmp@Xa+\tmp@X,-\tmp@Ya-\tmp@Yb) --%
+            (\tmp@Xa+\tmp@Xb,-\tmp@Ya-\tmp@Y) -- (\tmp@Xa+\tmp@Xb,-\tmp@Ya+0);%
+  }%
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% REFERENCES
+%
+%
+% \referencestart creates an msc reference at the current level
+% [#1] : left overlap
+% [#2] : right overlap
+% #3: nickname of the reference
+% #4: text of the reference
+% #5: first instance of the reference
+% #6: final instance of the reference
+\newcommand{\referencestart}[1][\referenceoverlap]{%
+  \def\msc@leftoverlap{#1}\msc@referencecont%
+}
+\newcommand{\msc@referencecont}[5][\referenceoverlap]{%
+  \msc@declreference{\msc@leftoverlap}{#1}{#2}{#3}{#4}{#5}%
+  \setcounter{tmpcnt}{0}%
+  \msc@reffindfirst{#2}{\msc@drawtorefaux}%
+}
+%
+% \referenceend draws and ends the reference with nickname #1 
+\newcommand{\referenceend}[1]{%
+  \msc@drawreference{#1}%
+  \setcounter{tmpcnt}{0}%
+  \setlength{\tmp@Y}{\msc@currentheight}%
+  \msc@reffindfirst{#1}{\msc@refresetypos{\the\tmp@Y}}%
+}
+%
+% internal commands to implement references:
+% #1: left overlap
+% #2: right overlap
+% #3: nickname of the reference
+% #4: text of the reference
+% #5: first instance of the reference
+% #6: final instance of the reference
+%
+\def\msc@declreference#1#2#3#4#5#6{%
+  \@ifundefined{mscref#3}{%
+    \@ifundefined{mscinst#5}{% #5 is not an instance nickname
+      \msc@instundefinederr{#5}}{%
+      \@ifundefined{mscinst#6}{% #6 is not an instance nickname
+        \msc@instundefinederr{#6}}{%
+        \ifthenelse{\lengthtest{\msc@instxpos{#5}>\msc@instxpos{#6}}}{%
+          \msc@reffirstlasterror{#3}{#5}{#6}}{%
+          \@namedef{mscref#3}{\relax}%
+          \expandafter\def\csname reftext#3\endcsname{#4}%
+          \ifthenelse{\equal{true}{\msc@instisfat{#5}}}%
+          {%
+            \setlength{\tmp@X}{\msc@instlxpos{#5}-#1}%
+          }%
+          {%
+            \setlength{\tmp@X}{\msc@instxpos{#5}-#1}%
+          }%
+          \expandafter\edef\csname refulx#3\endcsname{\the\tmp@X}%
+          \expandafter\edef\csname refuly#3\endcsname{\the\msc@currentheight}%
+          \ifthenelse{\equal{true}{\msc@instisfat{#6}}}%
+          {%
+            \setlength{\tmp@X}{\msc@instrxpos{#6}+#2}%
+          }%
+          {%
+            \setlength{\tmp@X}{\msc@instxpos{#6}+#2}%
+          }%
+          \expandafter\edef\csname reflrx#3\endcsname{\the\tmp@X}%
+          \expandafter\edef\csname reflry#3\endcsname{undefined}%
+          \expandafter\def\csname reffirst#3\endcsname{#5}%
+          \expandafter\def\csname reffinal#3\endcsname{#6}%
+          % two additional instances are defined
+          \msc@declinst{#3left}{\relax}{\relax}{\the\instbarwidth}% left of reference
+          \msc@setinstxpos{#3left}{\msc@refulx{#3}}%
+          \msc@setinstlxpos{#3left}{\msc@refulx{#3}}%
+          \msc@setinstrxpos{#3left}{\msc@refulx{#3}}%
+          \msc@setinstypos{#3left}{undefined}% no instance line drawing
+          \msc@declinst{#3right}{\relax}{\relax}{\the\instbarwidth}% left of reference
+          \msc@setinstxpos{#3right}{\msc@reflrx{#3}}%
+          \msc@setinstlxpos{#3right}{\msc@reflrx{#3}}%
+          \msc@setinstrxpos{#3right}{\msc@reflrx{#3}}%
+          \msc@setinstypos{#3right}{undefined}% no instance line drawing
+        }%
+      }%
+    }%
+  }{% nickname #3 already defined
+    \msc@nicknamedefinederr{#3}%
+  }%
+}
+%
+% \msc@refulx gets the upper-left x-position of reference with nickname #1.
+\def\msc@refulx#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname refulx#1\endcsname%
+  }%
+}
+%
+% \msc@refuly gets the upper-left y-position of reference with nickname #1.
+\def\msc@refuly#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname refuly#1\endcsname%
+  }%
+}
+%
+% \msc@reflrx gets the lower-right x-position of reference with nickname #1.
+\def\msc@reflrx#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname reflrx#1\endcsname%
+  }%
+}
+%
+% \msc@reflry gets the lower-right y-position of reference with nickname #1.
+\def\msc@reflry#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname reflry#1\endcsname%
+  }%
+}
+%
+% \msc@reftext gets the text of reference with nickname #1
+\def\msc@reftext#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname reftext#1\endcsname%
+  }%
+}
+%
+% \msc@reftext gets the nickname of the first instance of the reference with nickname #1
+\def\msc@reffirst#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname reffirst#1\endcsname%
+  }%
+}
+%
+% \msc@reftext gets the nickname of the final instance of the reference with nickname #1
+\def\msc@reffinal#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \csname reffinal#1\endcsname%
+  }%
+}
+%
+% \msc@drawreference completes the reference with nickname #1
+\def\msc@drawreference#1{%
+  \expandafter\@ifundefined{mscref#1}{%
+    \msc@refundefinederr{#1}}{% else, #1 is defined
+    \expandafter\edef\csname reflry#1\endcsname{\the\msc@currentheight}%
+    \setlength{\tmp@Xa}{\msc@refulx{#1}}%
+    \setlength{\tmp@Ya}{\msc@refuly{#1}}%
+    \setlength{\tmp@Xb}{\msc@reflrx{#1}}%
+    \setlength{\tmp@Yb}{\msc@reflry{#1}}%
+%% Debug info:
+
+    \draw[rounded corners=0.25cm] (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);% note: rounded corners
+    \setlength{\tmp@X}{\tmp@Xb-\tmp@Xa}%
+    \setlength{\tmp@Y}{\tmp@Yb-\tmp@Ya}%
+    \node[inner sep = 0] at (\tmp@Xa + .5\tmp@X, -\tmp@Ya - .5\tmp@Y)%
+                            {\raisebox{-.5ex}{\makebox[0pt][c]{\msc@reftext{#1}}}};%
+  }%
+}
+%
+\def\msc@reffindfirst#1#2{%
+  \ifthenelse{\value{tmpcnt} < \value{mscinstcnt}}{%
+% Debug info:
+%    \typeout{(drawtoref) checking \msc@instnickname{tmpcnt}}%
+    \ifthenelse{\equal{\msc@instnickname{tmpcnt}}{\msc@reffirst{#1}}}{% first instance found
+% Debug info:
+%      \typeout{first found: \msc@instnickname{tmpcnt}}%
+      #2{#1}}{% else, keep on looking
+      \msc@incrcounter{tmpcnt}%
+      \msc@reffindfirst{#1}{#2}}}{% done ! all instances checked
+  }%
+}
+%
+\def\msc@drawtorefaux#1{%
+  \ifthenelse{\value{tmpcnt} < \value{mscinstcnt}}{%
+% Debug info:
+%    \typeout{(drawtorefaux) checking \msc@instnickname{tmpcnt}}%
+   \msc@drawinstanceline{\msc@instnickname{tmpcnt}}%
+   \msc@setinstypos{\msc@instnickname{tmpcnt}}{undefined}%
+   \ifthenelse{\equal{\msc@instnickname{tmpcnt}}{\msc@reffinal{#1}}}{% final instance found
+% Debug info:
+%      \typeout{final found: \msc@instnickname{tmpcnt}}%
+     }{% else, non-final
+      \msc@incrcounter{tmpcnt}%
+      \msc@drawtorefaux{#1}}%
+  }{% done ! all instances checked
+  }%
+}
+%
+\def\msc@refresetypos#1#2{%
+  \ifthenelse{\value{tmpcnt} < \value{mscinstcnt}}{%
+% Debug info:
+%    \typeout{(drawtorefaux) checking \msc@instnickname{tmpcnt}}
+   \msc@setinstypos{\msc@instnickname{tmpcnt}}{#1}%
+   \ifthenelse{\equal{\msc@instnickname{tmpcnt}}{\msc@reffinal{#2}}}{% final instance found
+% Debug info:
+%      \typeout{final found: \msc@instnickname{tmpcnt}}%
+     }{% else, non-final
+      \msc@incrcounter{tmpcnt}%
+      \msc@refresetypos{#1}{#2}}%
+  }{% done ! all instances checked
+  }%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  CO-REGIONS
+%
+% \coregionstart starts a coregion on instance #1 (nickname) in the current level.
+\def\coregionstart#1{\regionstart{coregion}{#1}}
+% \coregionend ends a coregion on instance #1 (nickname) in the current level.
+\def\coregionend#1{\regionend{#1}}%
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% REGIONS (normal, coregion, suspension, and activation)
+%
+%
+% \regionstart{#1}[#2]{#3}[#4][#5]
+% starts a region
+% #1: region style: normal, coregion, suspension, or activation
+% #2: region color
+% #3: nickname: nick name of the instance
+% #4: regionwidth: width of region rectangle
+% #5: regionbarwidth: width of coregion ends
+\def\regionstart#1{%
+  \def\regionstyle{#1}%
+  \regionstart@A%
+}
+
+\newcommand{\regionstart@A}[2][black]{
+  \expandafter\@ifundefined{mscinst#2}{%
+    \msc@instundefinederr{#2}}
+  {% else, #1 is defined
+    \def\instname{#2}%
+    \msc@setregioncolor{\instname}{#1}%
+    \regionstart@B%
+  }
+}
+
+\newcommand{\regionstart@B}[1][\regionwidth]{
+    \msc@setregionwidth{\instname}{#1}%
+    \regionstart@C%
+ }
+
+\newcommand{\regionstart@C}[1][\regionbarwidth]{
+    \msc@setregionbarwidth{\instname}{#1}%
+    \msc@drawinstanceline{\instname}%
+    \ifthenelse{\equal{\regionstyle}{activation}}{\msc@setinstregionstyle{\instname}{activation}}{}
+    \ifthenelse{\equal{\regionstyle}{coregion}}{\msc@setinstregionstyle{\instname}{coregion}}{}
+    \ifthenelse{\equal{\regionstyle}{suspension}}{\msc@setinstregionstyle{\instname}{suspension}}{}
+    \msc@drawregionstart{\instname}%
+}%
+%
+% \regionend{#1}
+% ends the region of instance with nickname #1
+\def\regionend#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    \msc@drawinstanceline{#1}%
+    \msc@drawregionend{#1}%
+    \msc@setinstregionstyle{#1}{normal}%    
+  }%
+}
+%
+%
+\def\msc@drawregionstart#1{%
+  \setlength{\tmp@Y}{\msc@currentheight}%
+  \pgfsetcolor{\msc@regioncolor{#1}}%
+  \ifthenelse{\equal{\msc@instisfat{#1}}{true}}
+    {%
+     \setlength{\tmp@Xa}{\msc@instlxpos{#1}}%
+     \setlength{\tmp@Xb}{\msc@instrxpos{#1}}%
+     \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+    }
+    {%	
+      \ifthenelse{\equal{\msc@instregionstyle{#1}}{coregion}}{
+      \setlength{\tmp@Xa}{-\msc@regionbarwidth{#1} + \msc@regionwidth{#1}*\real{-0.5} +\msc@instxpos{#1}}%
+      \setlength{\tmp@Xb}{\msc@regionbarwidth{#1} + \msc@regionwidth{#1}*\real{0.5} +\msc@instxpos{#1}}%
+     }{
+      \setlength{\tmp@Xa}{\msc@regionwidth{#1}*\real{-0.5} +\msc@instxpos{#1}}%
+      \setlength{\tmp@Xb}{\msc@regionwidth{#1}*\real{0.5} +\msc@instxpos{#1}}%
+     }
+      \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+     }
+  \msc@setinstypos{#1}{\the\tmp@Y}%
+  \pgfsetcolor{\msc@color}%
+}
+%
+%
+\def\msc@drawregionend#1{%
+  \setlength{\tmp@Y}{\msc@currentheight}%
+  \pgfsetcolor{\msc@regioncolor{#1}}%
+  \ifthenelse{\equal{\msc@instisfat{#1}}{true}}
+    {%
+     \setlength{\tmp@Xa}{\msc@instlxpos{#1}}%
+     \setlength{\tmp@Xb}{\msc@instrxpos{#1}}%
+     \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+    }
+    {	
+      \ifthenelse{\equal{\msc@instregionstyle{#1}}{coregion}}{
+      \setlength{\tmp@Xa}{-\msc@regionbarwidth{#1} + \msc@regionwidth{#1}*\real{-0.5} +\msc@instxpos{#1}}%
+      \setlength{\tmp@Xb}{\msc@regionbarwidth{#1} + \msc@regionwidth{#1}*\real{0.5} +\msc@instxpos{#1}}%
+     }{
+      \setlength{\tmp@Xa}{\msc@regionwidth{#1}*\real{-0.5} +\msc@instxpos{#1}}%
+      \setlength{\tmp@Xb}{\msc@regionwidth{#1}*\real{0.5} +\msc@instxpos{#1}}%
+     }
+      \draw (\tmp@Xa,-\tmp@Y) -- (\tmp@Xb,-\tmp@Y);%
+    }
+  \msc@setinstypos{#1}{\the\tmp@Y}%
+  \pgfsetcolor{\msc@color}%
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% MESSAGE ARROWS
+%
+% \messarrowscale sets the arrow scale
+\def\msc@drawarrowend{yes}%
+\def\messarrowscale#1{
+\tikzstyle{arrowstyle}=[decoration={markings,mark=at position 1 with {\arrow[scale=#1]%
+                       {stealth}}},postaction={decorate},shorten >=0.4pt]%
+}%
+%
+% \msc@setleveloffset sets the internal level offset
+\def\msc@setleveloffset#1{%
+  \def\msc@leveloffset{#1}%
+}
+
+% \mess has one optional argument to define the position of
+% the label of a self message.
+% \mess*[#1]{#2}[#3]{#4}[#5]{#6}[#7][#8]
+% *: if star line is dashed, solid otherwise
+% #1: [l/r] self message position
+% #2: message label
+% #3: [t/b] label position
+% #4: sender instance
+% #5: label placement
+% #6: receiver instance
+% #7: level offset
+% #8: instance offset
+\newcommand{\mess}{%
+  \@ifstar%
+  {\def\mess@style{mess}\def\mess@linestyle{dashed}\mess@A}{\def\mess@style{mess}\def\mess@linestyle{solid}\mess@A}%
+}%
+%
+\newcommand{\mess@A}[2][l]{%
+ \def\selfmess@position{#1}%
+ \def\mess@labeltext{#2}%
+ \mess@B%
+}%
+\newcommand{\mess@B}[2][\ifx\mess@sender\mess@receiver \selfmess@position\else t\fi]{%
+  \def\mess@labelposition{#1}%
+  \def\mess@sender{#2}%
+  \mess@C%
+}
+\newcommand{\mess@C}[2][0.5]{%
+  \def\mess@labelplacement{#1}%
+  \def\mess@receiver{#2}%
+  \mess@D%
+}
+\newcommand{\mess@D}[1][\ifx\mess@sender\mess@receiver 1\else 0\fi]{%
+  \edef\mess@leveloffset{#1}%
+  \mess@E%
+}
+
+\newcommand{\mess@E}[1][0\mscunit]{%
+  \edef\mess@instanceoffset{#1}%
+  \msc@drawarrow%
+  \edef\mess@instanceoffset{0\mscunit}%
+}
+\newcommand{\msc@drawarrow}{%
+  \expandafter\@ifundefined{mscinst\mess@sender}{%
+    \msc@instundefinederr{\mess@sender}}{% else, sender is defined
+    \expandafter\@ifundefined{mscinst\mess@receiver}{%
+      \msc@instundefinederr{\mess@receiver}}{% else, receiver is defined
+      \ifx\mess@sender\mess@receiver\msc@drawselfarrow\else\msc@drawnonselfarrow\fi%
+    }%
+  }%
+}
+\newcommand{\msc@drawselfarrow}{%
+  \ifthenelse{\equal{\selfmess@position}{l} \or%
+              \equal{\selfmess@position}{r}%
+  }{%
+    \ifthenelse{\equal{\selfmess@position}{l}}%
+    {%
+      \setlength{\tmp@Xa}{\msc@instlxpos{\mess@sender} - \selfmesswidth}%
+      \setlength{\tmp@Xb}{\tmp@Xa}%
+    }{% ELSE
+      \setlength{\tmp@Xa}{\msc@instrxpos{\mess@sender} + \selfmesswidth }%
+      \setlength{\tmp@Xb}{\tmp@Xa}%
+    }%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \setlength{\tmp@Yb}{\msc@currentheight + (\levelheight * \real{\mess@leveloffset})}%
+    \msc@computelabelcoords%
+    \msc@computelabelspec%
+    \node[\msc@labelrefpoint] at (\tmp@X,-\tmp@Y){\msc@labelbox{\mess@labeltext}};%
+    \ifthenelse{\equal{\selfmess@position}{l}}%
+    {%
+      \setlength{\tmp@Xa}{\msc@instlxpos{\mess@sender} }%
+      \setlength{\tmp@Xc}{\msc@instlxpos{\mess@sender} - \mess@instanceoffset}%
+    }{% ELSE
+      \setlength{\tmp@Xa}{\msc@instrxpos{\mess@sender} }%
+      \setlength{\tmp@Xc}{\msc@instrxpos{\mess@sender} + \mess@instanceoffset}%
+    }%
+    \ifthenelse{\equal{\mess@style}{mess}}%
+    {% THEN message arrow
+      \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb) -- (\tmp@Xc,-\tmp@Yb);%
+    }{% ELSE order arrow
+      \ifthenelse{\equal{\msc@instregionstyle{\mess@sender}}{coregion}}
+      {%        
+       \ifthenelse{\equal{\order@direction}{no}}{
+         \ifthenelse{\equal{\selfmess@position}{l}}%
+         {%
+           \addtolength{\tmp@Xb}{2\selfmesswidth}%
+         }{
+           \addtolength{\tmp@Xb}{-2\selfmesswidth}%
+         }
+         \setlength{\tmp@Yd}{.5\tmp@Yb + .5\tmp@Ya}%
+        \ifthenelse{\equal{\msc@drawarrowend}{yes}}{
+          \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yd);%
+        }{
+         \draw[style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yd);%
+        }
+        \draw[style=\mess@linestyle] (\tmp@Xb,-\tmp@Yd) -- (\tmp@Xb,-\tmp@Yb) -- (\tmp@Xc,-\tmp@Yb);%
+       }{
+         \ifthenelse{\equal{\selfmess@position}{l}}%
+         {%
+           \setlength{\tmp@Xa}{\msc@instlxpos{\mess@sender}}
+           \setlength{\tmp@Xb}{\msc@instrxpos{\mess@sender}}
+           \setlength{\tmp@Xc}{\tmp@Xb - \tmp@Xa}
+           \setlength{\tmp@Xc}{.5\tmp@Xc + \tmp@Xa}
+         }{%
+           \setlength{\tmp@Xa}{\msc@instrxpos{\mess@sender}}
+           \setlength{\tmp@Xb}{\msc@instlxpos{\mess@sender}}
+           \setlength{\tmp@Xc}{\tmp@Xa - \tmp@Xb}
+           \setlength{\tmp@Xc}{-.5\tmp@Xc + \tmp@Xa}
+         }
+        \ifthenelse{\equal{\msc@drawarrowend}{yes}}{
+            \setlength{\tmp@Yc}{\tmp@Yb - \tmp@Ya}
+            \setlength{\tmp@Yc}{.5\tmp@Yc + \tmp@Ya}
+            \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xc,-\tmp@Yc);%
+            \draw[style=\mess@linestyle] (\tmp@Xc,-\tmp@Yc) -- (\tmp@Xb,-\tmp@Yb);%
+         }{
+           \draw[style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+         }
+       }
+      }{
+        \setlength{\tmp@Yd}{.5\tmp@Yb + .5\tmp@Ya}%
+        \ifthenelse{\equal{\msc@drawarrowend}{yes}}{
+          \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yd);%
+        }{
+         \draw[style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yd);%
+        }
+        \draw[style=\mess@linestyle] (\tmp@Xb,-\tmp@Yd) -- (\tmp@Xb,-\tmp@Yb) -- (\tmp@Xc,-\tmp@Yb);%
+      }
+    }%
+  }{% ELSE
+    \msc@illegalselfmesspositionerr{\selfmess@position}%
+  }%
+}
+\newcommand{\msc@drawnonselfarrow}{%
+    \ifthenelse{\lengthtest{\msc@instxpos{\mess@sender} < \msc@instxpos{\mess@receiver}}}%
+               {\setlength{\tmp@Xa}{\msc@instrxpos{\mess@sender}}%
+                 \setlength{\tmp@Xb}{\msc@instlxpos{\mess@receiver}}%
+                 \addtolength{\tmp@Xb}{-\mess@instanceoffset}}%
+               {\setlength{\tmp@Xa}{\msc@instlxpos{\mess@sender}}%
+                 \setlength{\tmp@Xb}{\msc@instrxpos{\mess@receiver}}%
+                 \addtolength{\tmp@Xb}{\mess@instanceoffset}}%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \setlength{\tmp@Yb}{\msc@currentheight + (\levelheight * \real{\mess@leveloffset})}%
+%    \setlength{\tmp@Yb}{\msc@currentheight + (\levelheight * \mess@leveloffset)}%
+
+    \msc@computelabelcoords%
+    \msc@computelabelspec%
+    \ifthenelse{\equal{\mess@style}{mess}}%
+    {% THEN message arrow 
+      \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+    }{%ELSE order arrow
+      \setlength{\tmp@Xd}{.5\tmp@Xb + .5\tmp@Xa}%
+      \setlength{\tmp@Yd}{.5\tmp@Yb + .5\tmp@Ya}%
+      \ifthenelse{\equal{\msc@drawarrowend}{yes}}{
+      \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xd,-\tmp@Yd);%
+      }{
+      \draw[style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xd,-\tmp@Yd);%
+      }
+      \draw[style=\mess@linestyle] (\tmp@Xd,-\tmp@Yd) -- (\tmp@Xb,-\tmp@Yb);%
+    }%
+    \node[\msc@labelrefpoint] at (\tmp@X,-\tmp@Y){\msc@labelbox{\mess@labeltext}};%
+}%
+
+\newcommand{\msc@computelabelcoords}{%
+   \ifthenelse{%\equal{t}{t}%
+               \(\equal{\mess@sender}{\mess@receiver} \and \(\equal{\mess@labelposition}{l} \or%
+                                                             \equal{\mess@labelposition}{r}\)%
+               \)%
+               \or%
+               \(\not\(\equal{\mess@sender}{\mess@receiver}\) \and \(\equal{\mess@labelposition}{t} \or%
+                                                                     \equal{\mess@labelposition}{b}\)%
+               \)%
+   }{% THEN
+     \ifthenelse{\lengthtest{\tmp@Xa<\tmp@Xb}}%
+     {% THEN
+       \ifthenelse{\lengthtest{\tmp@Ya<\tmp@Yb}}%
+       {% THEN
+         \setlength{\tmp@X}{\tmp@Xa + (\tmp@Xb - \tmp@Xa)*\real{\mess@labelplacement}}%
+         \setlength{\tmp@Y}{\tmp@Ya + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}%
+       }{% ELSE
+         \setlength{\tmp@X}{\tmp@Xa + (\tmp@Xb - \tmp@Xa)*\real{\mess@labelplacement}}%
+         \setlength{\tmp@Y}{\tmp@Yb + (\tmp@Ya - \tmp@Yb) + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}%
+       }%
+     }{% ELSE
+       \ifthenelse{\lengthtest{\tmp@Xa>\tmp@Xb}}%
+       {% THEN 
+         \ifthenelse{\lengthtest{\tmp@Ya<\tmp@Yb}}%
+         {% THEN
+           \setlength{\tmp@X}{\tmp@Xb + (\tmp@Xa - \tmp@Xb) + (\tmp@Xb - \tmp@Xa)*\real{\mess@labelplacement}}%
+           \setlength{\tmp@Y}{\tmp@Ya + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}%
+         }{% ELSE
+           \setlength{\tmp@X}{\tmp@Xb + (\tmp@Xa - \tmp@Xb) + (\tmp@Xb - \tmp@Xa)*\real{\mess@labelplacement}}%
+           \setlength{\tmp@Y}{\tmp@Yb + (\tmp@Ya - \tmp@Yb) + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}%
+         }%
+       }{% ELSE \tmpXa = \tmp@Xb (self message)
+        \setlength{\tmp@X}{\tmp@Xa}%
+        \ifthenelse{\lengthtest{\tmp@Ya<\tmp@Yb}}%
+        {%
+          \setlength{\tmp@Y}{\tmp@Ya + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}%
+        }{%
+          \setlength{\tmp@Y}{\tmp@Yb + (\tmp@Ya - \tmp@Yb) + (\tmp@Yb - \tmp@Ya)*\real{\mess@labelplacement}}}%
+       }%
+     }%
+  }{% ELSE
+    \msc@illegalmesslabelpositionerr{\mess@labelposition}%
+  }
+}
+
+\newcommand{\msc@computelabelspec}{%
+  \ifthenelse{\lengthtest{\tmp@Xa < \tmp@Xb}}%
+    {% THEN  W->E
+      \ifthenelse{\lengthtest{\tmp@Ya < \tmp@Yb}}%
+        {% THEN NW->SE
+          \ifthenelse{\equal{\mess@labelposition}{t}}%
+            {\def\msc@labelrefpoint{right}
+             \addtolength{\tmp@X}{\labeldist-4pt}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+            {\def\msc@labelrefpoint{below left}
+             \addtolength{\tmp@X}{-\labeldist+4pt}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+        }{% ELSE
+          \ifthenelse{\lengthtest{\tmp@Ya > \tmp@Yb}}%
+          {% THEN SW -> NE
+            \ifthenelse{\equal{\mess@labelposition}{t}}%
+              {\def\msc@labelrefpoint{left}              
+             \addtolength{\tmp@X}{-\labeldist+4pt}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+              {\def\msc@labelrefpoint{below right}
+             \addtolength{\tmp@X}{\labeldist-4pt}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+          }{% ELSE W->E
+          \ifthenelse{\equal{\mess@labelposition}{t}}%
+            {\def\msc@labelrefpoint{}
+             \addtolength{\tmp@X}{0\labeldist}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+            {\def\msc@labelrefpoint{below}            
+             \addtolength{\tmp@X}{0\labeldist}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+          }%
+        }%
+    }{% ELSE
+      \ifthenelse{\lengthtest{\tmp@Xa > \tmp@Xb}}%
+        {% THEN E -> W
+        \ifthenelse{\lengthtest{\tmp@Ya < \tmp@Yb}}%
+          {% THEN NE -> SW
+          \ifthenelse{\equal{\mess@labelposition}{t}}%
+            {\def\msc@labelrefpoint{left}      
+             \addtolength{\tmp@X}{-\labeldist+4pt}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+            {\def\msc@labelrefpoint{below right}            
+             \addtolength{\tmp@X}{\labeldist-4pt}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+          }{% ELSE
+            \ifthenelse{\lengthtest{\tmp@Ya > \tmp@Yb}}%
+            {% THEN SE -> NW
+              \ifthenelse{\equal{\mess@labelposition}{t}}%
+                {\def\msc@labelrefpoint{right}
+             \addtolength{\tmp@X}{\labeldist-4pt}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+                {\def\msc@labelrefpoint{below left}
+             \addtolength{\tmp@X}{-\labeldist+4pt}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+            }{% ELSE E -> W
+              \ifthenelse{\equal{\mess@labelposition}{t}}%
+                {\def\msc@labelrefpoint{}                
+             \addtolength{\tmp@X}{0\labeldist}%
+             \addtolength{\tmp@Y}{-\labeldist-4pt}%
+            }%
+                {\def\msc@labelrefpoint{below}                
+             \addtolength{\tmp@X}{0\labeldist}%
+             \addtolength{\tmp@Y}{\labeldist-4pt}%
+            }%
+            }
+          }
+        }{% ELSE \tmp@Xa = \tmp@Xb (self message)
+          \ifthenelse{\equal{\mess@labelposition}{l}}%
+            {\def\msc@labelrefpoint{left}
+             \addtolength{\tmp@X}{-\labeldist+4pt}%
+             \addtolength{\tmp@Y}{0\labeldist}%
+            }%
+            {\def\msc@labelrefpoint{right}            
+             \addtolength{\tmp@X}{\labeldist-4pt}%             
+             \addtolength{\tmp@Y}{0\labeldist}%
+            }%
+        }%
+     }%
+}%
+\newcommand{\msc@labelbox}[1]{{#1}}%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Genralized orders
+% \order*[pos][direction]{sender}[isSide]{receiver}[leveloffset][instanceoffset]
+% if star no arrow is drawed
+%
+\newcommand{\order}{%
+  \@ifstar%
+  {\def\msc@drawarrowend{no}\order@A}{\def\msc@drawarrowend{yes}\order@A}%
+}
+\newcommand{\order@A}[1][l]{%
+  \def\mess@style{order}%
+  \def\mess@linestyle{dashed}%
+  \def\selfmess@position{#1}%
+  \order@B%
+}
+
+%direction no(self order)/yes(directed order)
+\newcommand{\order@B}[2][no]{%
+  \def\order@direction{#1}%
+  \def\mess@labelposition{\ifx\mess@sender\mess@receiver l\else t\fi}%
+  \def\mess@labeltext{\relax}%
+  \def\mess@labelplacement{0.5}%
+  \def\mess@sender{#2}%
+  \order@C%
+}
+
+\newcommand{\order@C}[2][no]{%
+  \def\msc@isSideOrder{#1}%
+  \def\mess@receiver{#2}%
+  \order@D%
+}
+
+\newcommand{\order@D}[1][\ifx\mess@sender\mess@receiver 1\else 0\fi]{%
+  \edef\mess@leveloffset{#1}%
+  \order@E%
+}
+\newcommand{\order@E}[1][0pt]{%
+  \def\mess@instanceoffset{#1}%
+  \ifthenelse{\equal{\msc@isSideOrder}{no}}{%
+    \msc@drawarrow%
+  }{%
+    \msc@drawsideorder%
+  }%
+  \def\msc@drawarrowend{yes}
+}
+
+\newcommand{\msc@drawsideorder}{%
+  \ifthenelse{\lengthtest{\msc@instxpos{\mess@sender} < \msc@instxpos{\mess@receiver}}}%
+               {\setlength{\tmp@Xa}{\msc@instrxpos{\mess@sender}}%
+                 \setlength{\tmp@Xb}{\msc@instxpos{\mess@receiver}-\msc@instxpos{\mess@sender}}%
+                 \setlength{\tmp@Xb}{0.5\tmp@Xb}%
+                 \addtolength{\tmp@Xb}{\msc@instxpos{\mess@sender}}%
+                 \setlength{\tmp@Xc}{\msc@instlxpos{\mess@receiver}}%
+                 \addtolength{\tmp@Xc}{-\mess@instanceoffset}}%
+               {\setlength{\tmp@Xa}{\msc@instlxpos{\mess@sender}}%
+                 \setlength{\tmp@Xb}{\msc@instxpos{\mess@sender}-\msc@instxpos{\mess@receiver}}%                 
+                 \setlength{\tmp@Xb}{0.5\tmp@Xb}%
+                 \addtolength{\tmp@Xb}{\msc@instxpos{\mess@receiver}}%
+                 \setlength{\tmp@Xc}{\msc@instrxpos{\mess@receiver}}%
+                 \addtolength{\tmp@Xc}{\mess@instanceoffset}}%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \setlength{\tmp@Yb}{\msc@currentheight + (\levelheight * \real{\mess@leveloffset})*\real{0.5}}%
+    \setlength{\tmp@Yc}{\msc@currentheight + (\levelheight * \real{\mess@leveloffset})}%
+    \ifthenelse{\equal{\selfmess@position}{r}}{
+      \setlength{\tmp@Xd}{\tmp@Xa}
+      \setlength{\tmp@Xa}{\tmp@Xc}
+      \setlength{\tmp@Xc}{\tmp@Xd}
+     }{}
+    \ifthenelse{\equal{\msc@drawarrowend}{yes}}{
+    \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+    \draw[style=\mess@linestyle] (\tmp@Xb,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Yc) -- (\tmp@Xc,-\tmp@Yc);%
+    }{
+    \draw[style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yc) -- (\tmp@Xc,-\tmp@Yc);%
+   }
+}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LOST and FOUND messages
+%
+% \lost*[pos]{label}[labelpos]{gate}[slope]{sender}[placement]
+% \found*[pos]{label}[labelpos]{gate}[slope]{sender}[placement]
+% is star line is dashed
+\newcommand{\lost}{%
+   \@ifstar{\def\mess@linestyle{dashed}\lost@A}{\def\mess@linestyle{solid}\lost@A}%
+}
+\newcommand{\lost@A}[1][l]{
+  \def\lostfound@position{#1}%
+  %\def\msc@arrowdirection{->}%
+  \def\lostfound@type{lost}%
+  \def\msc@circlefillstyle{black}%
+  \lostfound@B%
+}
+\newcommand{\found}{%
+   \@ifstar{\def\mess@linestyle{dashed}\found@A}{\def\mess@linestyle{solid}\found@A}%
+}
+\newcommand{\found@A}[1][l]{%
+  \def\lostfound@position{#1}%
+  %\def\msc@arrowdirection{<-}%
+  \def\lostfound@type{found}%
+  \def\msc@circlefillstyle{white}%
+  \lostfound@B%
+}
+\newcommand{\lostfound@B}[1]{%
+  \def\mess@style{mess}%
+  \def\mess@labeltext{#1}%
+  \lostfound@C%
+}
+\newcommand{\lostfound@C}[2][t]{%
+  \def\mess@labelposition{#1}%
+  \def\mess@gate{#2}%
+  \lostfound@D%
+}
+\newcommand{\lostfound@D}[2][0mm]{%
+  \setlength{\tmp@Yd}{#1}%
+  \def\mess@sender{#2}%
+  \lostfound@E%
+}
+\newcommand{\lostfound@E}[1][0.5]{%
+  \def\mess@labelplacement{#1}%
+  \@lostfound%
+}
+%
+% \@lostfound draws lost and found messages
+\def\@lostfound{%
+  \expandafter\@ifundefined{mscinst\mess@sender}{%
+    \msc@instundefinederr{\mess@sender}}{% else, \mess@sender is defined
+    %\setlength{\tmp@Xa}{\msc@instxpos{\mess@sender}}%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \setlength{\tmp@Yb}{\msc@currentheight}%
+    \ifthenelse{\equal{\lostfound@type}{lost}}%
+    {%
+      \addtolength{\tmp@Yb}{\tmp@Yd}%
+    }{%
+      \addtolength{\tmp@Ya}{\tmp@Yd}%
+    }%
+    \ifthenelse{\equal{\lostfound@position}{l}}
+    {% THEN put lost/found message left
+      \ifthenelse{\equal{\lostfound@type}{lost}}%
+        {% THEN
+          \setlength{\tmp@Xa}% start of arrow
+                    {\msc@instlxpos{\mess@sender}}%
+          \setlength{\tmp@Xb}% end of arrow
+                    {\tmp@Xa-\selfmesswidth}%
+          \setlength{\tmp@X}% label position
+                    {\tmp@Xb + (\tmp@Xa - \tmp@Xb) * \real{\mess@labelplacement}}%
+          \setlength{\tmp@Xc}% circle position
+                    {\tmp@Xb-\lostsymbolradius}%
+        }{% ELSE
+          \setlength{\tmp@Xb}% end of arrow
+                    {\msc@instlxpos{\mess@sender}}%
+          \setlength{\tmp@Xa}% start of arrow
+                    {\tmp@Xb-\selfmesswidth}%
+          \setlength{\tmp@X}% label position
+                    {\tmp@Xa + (\tmp@Xb - \tmp@Xa) * \real{\mess@labelplacement}}%
+          \setlength{\tmp@Xc}% circle position
+                    {\tmp@Xa-\lostsymbolradius}%
+        }%
+        \setlength{\tmp@Xd}% gate position
+                  {\tmp@Xc-\lostsymbolradius-\labeldist+4pt}%                           
+      \def\msc@gaterefpoint{left}%      
+    }{% ELSE, lost/found message right
+      \ifthenelse{\equal{\lostfound@type}{lost}}%
+        {% THEN
+          \setlength{\tmp@Xa}% start of arrow
+                    {\msc@instrxpos{\mess@sender}}%
+          \setlength{\tmp@Xb}% end of arrow
+                    {\tmp@Xa+\selfmesswidth}%
+          \setlength{\tmp@X}% label position
+                    {\tmp@Xa + (\tmp@Xb - \tmp@Xa) * \real{\mess@labelplacement}}%
+          \setlength{\tmp@Xc}% circle position
+                    {\tmp@Xb+\lostsymbolradius}%
+        }{% ELSE
+          \setlength{\tmp@Xb}% end of arrow
+                    {\msc@instrxpos{\mess@sender}}%
+          \setlength{\tmp@Xa}% start of arrow
+                    {\tmp@Xb+\selfmesswidth}%
+          \setlength{\tmp@X}% label position
+                    {\tmp@Xb + (\tmp@Xa - \tmp@Xb) * \real{\mess@labelplacement}}%
+          \setlength{\tmp@Xc}% circle position
+                    {\tmp@Xa+\lostsymbolradius}%
+        }%      
+        \setlength{\tmp@Xd}% gate position
+                  {\tmp@Xc+\lostsymbolradius+\labeldist-4pt}%                  
+        \def\msc@gaterefpoint{right}%        
+    }%
+    \draw[arrowstyle, style=\mess@linestyle] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+    \ifthenelse{\equal{\mess@labelposition}{t}}%
+      {% THEN
+        \ifthenelse{\equal{\lostfound@type}{lost}}%
+        {%      
+          \setlength{\tmp@Y}{\tmp@Yb-\lostsymbolradius-\labeldist-4pt}%
+        }{%
+          \setlength{\tmp@Y}{\tmp@Ya-\lostsymbolradius-\labeldist-4pt}%
+        }%
+        \def\msc@labelrefpoint{}%
+      }{% ELSE
+        \ifthenelse{\equal{\mess@labelposition}{b}}%
+         {% THEN
+          \ifthenelse{\equal{\lostfound@type}{lost}}%
+          {%      
+            \setlength{\tmp@Y}{\tmp@Yb-\lostsymbolradius-\labeldist-4pt}%
+           }{%
+             \setlength{\tmp@Y}{\tmp@Ya-\lostsymbolradius-\labeldist-4pt}%
+           }%
+          \def\msc@labelrefpoint{below}%          
+         }{% ELSE
+          \msc@illegallostfoundlabelpositionerr{\mess@labelposition}%           
+         }%
+      }%
+    \node[\msc@labelrefpoint] at (\tmp@X,-\tmp@Y) {\mess@labeltext};%
+    \edef\msc@scratch{\msc@circlefillstyle}%
+    \addtolength{\tmp@Y}{\lostsymbolradius+\labeldist+4pt}%
+    \draw[fill=\msc@scratch] (\tmp@Xc,-\tmp@Y) circle (\lostsymbolradius);
+    \node[\msc@gaterefpoint] at (\tmp@Xd,-\tmp@Y) {\mess@gate};%
+  }%
+}
+%
+%
+% \settimer has one optional argument to define the position of
+% the label of a self message.
+\newcommand{\settimer}[1][l]{%
+  \msc@settimerpos{#1}%
+  \@timer{set}%
+}
+%
+%
+% \timeout has one optional argument to define the position of
+% the label of a self message.
+\newcommand{\timeout}[1][l]{%
+  \msc@settimerpos{#1}%
+  \@timer{timeout}%
+}
+%
+%
+% \stoptimer has one optional argument to define the position of
+% the label of a self message.
+\newcommand{\stoptimer}[1][l]{%
+  \msc@settimerpos{#1}%
+  \@timer{stop}%
+}
+%
+%
+% \settimeout has one optional argument to define the position of
+% the label of a self message.
+\newcommand{\settimeout}[1][l]{%
+  \msc@settimerpos{#1}%
+  \@timerdispatcher{settimeout}%
+}
+%
+%
+% \setstoptimer has one optional argument to define the position of
+% the label of a self message.
+\newcommand{\setstoptimer}[1][l]{%
+  \msc@settimerpos{#1}%
+  \@timerdispatcher{setstoptimer}%
+}
+\def\@timerdispatcher#1#2#3{%
+  \@ifnextchar[{\@oargtimerdispatcher{#1}{#2}{#3}}{\@nooargtimerdispatcher{#1}{#2}{#3}}}
+%
+\def\@oargtimerdispatcher#1#2#3[#4]{%
+  \msc@setleveloffset{#4}%
+  \@timer{#1}{#2}{#3}%
+}
+%
+\def\@nooargtimerdispatcher#1#2#3{%
+  \msc@setleveloffset{2}% default level-offset value for combined timers
+  \@timer{#1}{#2}{#3}%
+}
+%
+%
+% \@timer draws timers
+% #1: type  of the timer (set/timeout/stop)
+% #2: label
+% #3: nickname of the instance
+\def\@timer#1#2#3{%
+  \expandafter\@ifundefined{mscinst#3}{%
+    \msc@instundefinederr{#3}}{% else, #3 is defined
+    \setlength{\tmp@Xa}{\msc@instxpos{#3}}%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \ifthenelse{\equal{\msc@timerpos}{l}}{% point left of axis
+      \ifthenelse{\equal{\msc@instisfat{#3}}{true}}{%
+        \setlength{\tmp@Xa}{\msc@instlxpos{#3}}%
+      }{%
+        \relax%
+      }%
+      \setlength{\tmp@Xb}{\tmp@Xa-\selfmesswidth}%
+    }{ % else point right of axis
+      \ifthenelse{\equal{\msc@instisfat{#3}}{true}}{%
+        \setlength{\tmp@Xa}{\msc@instrxpos{#3}}%
+      }{%
+        \relax%
+      }%
+      \setlength{\tmp@Xb}{\tmp@Xa+\selfmesswidth}%
+    }%
+    \ifthenelse{\equal{#1}{timeout}}{% draw an arrow
+      \draw[arrowstyle] (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Ya);%
+    }{ % else draw a line without arrow head
+      \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+    }%
+    \setlength{\tmp@X}{\tmp@Xb}% This looks clumsy - sm
+    \setlength{\tmp@Y}{\tmp@Ya}%
+    \msc@drawtimer{#1}{\tmp@X}{\tmp@Y}{\msc@timerpos}{#2}%
+    \ifthenelse{\equal{#1}{settimeout}}{% draw second part of settimeout
+      \setlength{\tmp@Ya}{\tmp@Y+\levelheight*\real{\msc@leveloffset}} %
+      \setlength{\tmp@Y}{\tmp@Y+0.75\timerwidth}%
+      \setlength{\tmp@Xa}{\msc@instxpos{#3}}%
+      \ifthenelse{\equal{\msc@timerpos}{l}}{% point left of axis
+        \ifthenelse{\equal{\msc@instisfat{#3}}{true}}{%
+          \setlength{\tmp@Xa}{\msc@instlxpos{#3}}%
+        }{%
+          \relax%
+        }%
+      }{ % else point right of axis
+        \ifthenelse{\equal{\msc@instisfat{#3}}{true}}{%
+          \setlength{\tmp@Xa}{\msc@instrxpos{#3}}%
+        }{%
+          \relax%
+        }%
+      }
+      \draw[arrowstyle] (\tmp@X,-\tmp@Y) -- (\tmp@X,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Ya);%
+    }{ % else not settimeout
+      \ifthenelse{\equal{#1}{setstoptimer}}{% draw second part of setstoptimer
+        \setlength{\tmp@Ya}{\tmp@Y+\levelheight*\real{\msc@leveloffset}}%
+        \setlength{\tmp@Y}{\tmp@Y+0.75\timerwidth}% 
+        \setlength{\tmp@Xb}{\msc@instxpos{#3}}%
+        \ifthenelse{\equal{\msc@instisfat{#3}}{true}}{%
+          \ifthenelse{\equal{\msc@timerpos}{l}}{% point left of axis
+            \setlength{\tmp@Xb}{\msc@instlxpos{#3}}%
+          }{% point right of axis
+            \setlength{\tmp@Xb}{\msc@instrxpos{#3}}%
+           }%
+        }{% not a fat instance
+          \relax%
+        }
+        \draw (\tmp@X,-\tmp@Y) -- (\tmp@X,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+        \setlength{\tmp@Y}{\tmp@Ya}%
+        \msc@drawtimer{stop}{\tmp@X}{\tmp@Y}{\msc@timerpos}{}%
+      }{ % else no second part needed
+      }%
+    }%
+  }%
+}
+%
+% \msc@drawtimer draws the timer symbols
+% #1: type  of the timer (set/timeout/stop)
+% #2: x-coordinate of center of timer
+% #3: y-coordinate of center of timer
+% #4: place text left (l) or right (r)
+% #5: text added to the timer
+\def\msc@drawtimer#1#2#3#4#5{%
+  \setlength{\tmp@Xa}{#2-0.5\timerwidth}%
+  \setlength{\tmp@Xb}{#2+0.5\timerwidth}%
+  \ifthenelse{\equal{#1}{stop}}{% draw reset symbol
+    \setlength{\tmp@Ya}{-#3+0.5\timerwidth}%
+    \setlength{\tmp@Yb}{-#3-0.5\timerwidth}%
+    \draw (\tmp@Xa,\tmp@Ya) -- (\tmp@Xb,\tmp@Yb);%
+    \draw (\tmp@Xb,\tmp@Ya) -- (\tmp@Xa,\tmp@Yb);%
+  }{% else draw set/timeout symbol
+    \setlength{\tmp@Ya}{-#3+0.75\timerwidth}%
+    \setlength{\tmp@Yb}{-#3-0.75\timerwidth}%
+    \draw (\tmp@Xa,\tmp@Ya) -- (\tmp@Xb,\tmp@Yb) -- (\tmp@Xa,\tmp@Yb) -- (\tmp@Xb,\tmp@Ya) -- (\tmp@Xa,\tmp@Ya);%
+  }%
+  \ifthenelse{\equal{#4}{l}}{% place label left
+    \setlength{\tmp@Xa}{#2-\labeldist-0.3ex}%
+    \setlength{\tmp@Ya}{-#3-0.5ex}%
+    \node[above, inner sep=0] at (\tmp@Xa,\tmp@Ya) {\makebox[0pt][r]{#5}};%
+  }{% else place label right
+    \setlength{\tmp@Xa}{#2+\labeldist+0.3ex}%
+    \setlength{\tmp@Ya}{-#3-0.5ex}%
+    \node[above, inner sep=0] at (\tmp@Xa,\tmp@Ya) {\makebox[0pt][l]{#5}};%
+  }%
+}
+%
+%
+% \msc@drawinstancehead draws the head of the instance
+% #1: nickname of the instance
+\def\msc@drawinstancehead#1{%
+  \setlength{\tmp@Y}{\msc@currentheight}%
+  \msc@drawinstanceheadsymbol{#1}{\the\tmp@Y}%
+}
+%
+% \msc@drawinstanceheadsymbol draw the head symbol of instance #1 at y-pos #2
+\def\msc@drawinstanceheadsymbol#1#2{%
+  \pgfsetcolor{\msc@instcolor{#1}}%
+  \color{\msc@instcolor{#1}}%
+  \setlength{\tmp@X}{\msc@instxpos{#1}}% x-center head box
+  \setlength{\tmp@Y}{#2 + \msc@instheadheight{#1}*\real{0.5}}% center of head symbol
+  \setlength{\tmp@Xa}{\msc@instwidth{#1}*\real{-0.5} + \tmp@X}% x-upperleft head box
+  \setlength{\tmp@Ya}{#2}% y-upperleft head box
+  \setlength{\tmp@Xb}{\tmp@Xa+\msc@instwidth{#1}}% x-lowerright head box
+  \setlength{\tmp@Yb}{#2 + \msc@instheadheight{#1}}% y-lowerright head box
+  \ifthenelse{\equal{\msc@insthead}{yes}}{%
+       \draw[style=solid] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb) -- (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xa,-\tmp@Ya);%
+       \setlength{\tmp@Xb}{\msc@instwidth{#1}*\real{0.8}}%
+       \node [minimum height= \msc@instheadheight{#1}, minimum width = \msc@instwidth{#1}, text width = \tmp@Xb, text centered] at (\tmp@X,-\tmp@Y){\msc@instinname{#1}};%
+  }{% else, no head symbol drawing%
+  }
+  \node [above=-4pt] at (\tmp@X,-\tmp@Ya){\raisebox{\labeldist}{\makebox[0pt][c]{\msc@instabname{#1}}}};%
+  \pgfsetcolor{\msc@color}%
+  \color{\msc@color}%
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\def\msc@drawinstanceline#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+      \ifthenelse{\equal{\msc@instypos{#1}}{undefined}}{% y-pos undefined: no line needed
+      }{% else
+        \pgfsetcolor{\msc@instcolor{#1}}%
+        \setlength{\tmp@Ya}{\msc@instypos{#1}}%
+        \setlength{\tmp@Yb}{\msc@currentheight}%
+        \ifthenelse{\equal{true}{\msc@instisfat{#1}}}%
+          {% fat instance
+           \setlength{\tmp@Xa}{\msc@instlxpos{#1}}%
+           \setlength{\tmp@Xb}{\msc@instrxpos{#1}}%
+           \ifthenelse{\equal{\msc@instregionstyle{#1}}{coregion}}
+           {%
+            \pgfsetcolor{\msc@regioncolor{#1}}
+            \draw[style=dashed] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Yb);
+            \draw[style=dashed] (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);
+           }
+           {
+             \ifthenelse{\equal{\msc@instregionstyle{#1}}{suspension}}
+            {%
+             \draw[style=loosely dashed] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Yb);
+             \draw[style=loosely dashed] (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);
+            }
+            {\ifthenelse{\equal{\msc@instregionstyle{#1}}{activation}}
+             {%
+              \draw[fill=lightgray] (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);
+             }
+             {% normal region:
+              \draw[style=solid] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Yb);%
+              \draw[style=solid] (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+             }
+            }
+           }
+          }
+          {% normal instance (not fat)
+           \setlength{\tmp@X}{\msc@instxpos{#1}}%
+           \ifthenelse{\equal{\msc@instregionstyle{#1}}{suspension} \or \equal{\msc@instregionstyle{#1}}{coregion}}
+            {%
+             \pgfsetcolor{\msc@regioncolor{#1}}
+             \setlength{\tmp@X}{\msc@regionwidth{#1}}
+             \setlength{\tmp@Xa}{\msc@instxpos{#1} - 0.5\tmp@X}%
+             \setlength{\tmp@Xb}{\msc@instxpos{#1} + 0.5\tmp@X}%
+             \draw[style = loosely dashed] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Yb);%
+             \draw[style = loosely dashed] (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+            }
+            {\ifthenelse{\equal{\msc@instregionstyle{#1}}{activation}}
+             {%
+              \pgfsetcolor{\msc@regioncolor{#1}}
+              \setlength{\tmp@X}{\msc@regionwidth{#1}}
+              \setlength{\tmp@Xa}{\msc@instxpos{#1} - 0.5\tmp@X}%
+              \setlength{\tmp@Xb}{\msc@instxpos{#1} + 0.5\tmp@X}%
+              \draw[fill=lightgray] (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);
+             }
+             {% normal region
+              \draw[style=\msc@instlinestyle{#1}] (\tmp@X,-\tmp@Ya) -- (\tmp@X,-\tmp@Yb);
+             }
+            }
+          }%
+          \pgfsetcolor{\msc@color}%
+     }%
+  }%
+}%
+%
+% \msc@drawinstancefoot draws the last level and foot of the instance
+% #1: nickname of the instance
+\def\msc@drawinstancefoot#1{%
+    \setlength{\tmp@Y}{\msc@currentheight}%
+    \pgfsetcolor{\msc@instcolor{#1}}%
+    \msc@drawinstancefootsymbol{#1}{\the\tmp@Y}%
+    \pgfsetcolor{\msc@color}%
+}
+%
+% \msc@drawinstancefootsymbol draws a footer symbol for instance #1 at y-pos #2.
+\def\msc@drawinstancefootsymbol#1#2{%
+  \setlength{\tmp@Xa}{\msc@instwidth{#1}*\real{-0.5} + \msc@instxpos{#1}}%
+  \setlength{\tmp@Ya}{\msc@currentheight}%
+  \setlength{\tmp@Xb}{\tmp@Xa+\msc@instwidth{#1}}%
+  \setlength{\tmp@Yb}{#2 + \msc@instfootheight{#1}}%
+  \ifthenelse{\equal{\msc@instfoot}{yes}}{
+    \edef\msc@scratch{\msc@instfootcolor{#1}}%
+    \draw[fill=\msc@scratch, style=\msc@instlinestyle{#1}] (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);
+  }{% else, no foot symbol drawing%
+  }
+}
+%
+% \nextlevel incresaes \msc@currentheight by #1 * \levelheight
+% (optional) #1: a nonnegative integer number (defaults to 1)
+% 
+\newcommand{\nextlevel}[1][1]{%
+  \addtolength{\msc@currentheight}{#1\levelheight}%
+}
+%
+\def\msc@drawinstancefooters{%
+  \ifthenelse{\value{tmpcnt} < \value{mscinstcnt}}{%
+     % Only draw the instancefoot if the instypos is defined (not ``undefined'')
+     % This signals a previous instance stop.
+     \ifthenelse{\equal{\msc@instypos{\msc@instnickname{tmpcnt}}}{undefined}}{\relax}{%
+      \msc@drawinstanceline{\msc@instnickname{tmpcnt}}%
+      \msc@drawinstancefoot{\msc@instnickname{tmpcnt}}%
+    }%
+    \msc@incrcounter{tmpcnt}%
+    \msc@drawinstancefooters}{% else nothing
+    }%
+}%
+%
+% \action puts an action symbol on the instance with nickname #2.
+% The action symbol will be placed on the current level and the text #1
+% is centered inside the action symbol. The starred version adjusts the width
+% and height of the action symbol
+\def\action{\@ifstar{\msc@actionstar}{\msc@actionnostar}}
+
+\def\msc@actionstar#1#2{
+  \node {\global\sbox{\tmp@box}{#1}};
+  
+  % save values for actionwidth and actionheight
+  \setlength{\tmp@Xd}{\actionwidth}
+  \setlength{\tmp@Yd}{\actionheight}
+
+  \setlength{\tmp@Xc}{\wd\tmp@box+\labeldist}%
+  \setlength{\tmp@Yc}{\ht\tmp@box + \dp\tmp@box +2\labeldist}%
+  
+  % Increase the actionwidth if necessary
+  \ifthenelse{\lengthtest{\actionwidth < \tmp@Xc}}{
+    \setlength{\actionwidth}{\tmp@Xc}
+  }{}
+  % Increase the action height if necessary
+  \ifthenelse{\lengthtest{\actionheight < \tmp@Yc}}{ 
+    \setlength{\actionheight}{\tmp@Yc}
+  }{}
+
+  \msc@actionnostar{\usebox{\tmp@box}}{#2}%
+  
+  % restore values for actionwidth and actionheight
+  \setlength{\actionwidth}{\tmp@Xd}%
+  \setlength{\actionheight}{\tmp@Yd}%
+}
+
+\def\msc@actionnostar#1#2{%
+  \expandafter\@ifundefined{mscinst#2}{%
+    \msc@instundefinederr{#2}}{% else, #2 is defined
+    % first, draw the instance line as far as possible
+    \msc@drawinstanceline{#2}%
+    % then, draw the action symbol
+    % if #2's bar width is greater than the action width, the width of this
+    % action will be the instnce bar width.
+    \ifthenelse{\lengthtest{\msc@instbarwidth{#2}<\actionwidth}}%
+      {\setlength{\tmp@X}{\actionwidth}}%
+      {\setlength{\tmp@X}{\msc@instbarwidth{#2}}}%
+    \setlength{\tmp@Xa}{\msc@instxpos{#2}-0.5\tmp@X}%
+    \setlength{\tmp@Xb}{\tmp@Xa+\tmp@X}%
+    \setlength{\tmp@Ya}{\msc@currentheight}%
+    \setlength{\tmp@Yb}{\tmp@Ya+\actionheight}%
+    \draw (\tmp@Xa,-\tmp@Ya) rectangle (\tmp@Xb,-\tmp@Yb);%
+    \setlength{\tmp@X}{\msc@instxpos{#2}}%
+    \setlength{\tmp@Y}{\tmp@Ya+0.5\actionheight}%
+    \node at (\tmp@X,-\tmp@Y){\raisebox{-.5ex}{\makebox[0pt][c]{#1}}};%
+    % redefine the instance's y position
+    \setlength{\tmp@Y}{\msc@currentheight+\actionheight}%
+    \msc@setinstypos{#2}{\the\tmp@Y}%
+  }%
+}
+
+% \naction offers the same functionality as \action, with the
+% difference that the action symbol is crossed out.
+
+\def\naction{\@ifstar{\msc@nactionstar}{\msc@nactionnostar}}
+
+\def\msc@nactionstar#1#2{
+ \msc@actionstar{#1}{#2}
+ \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+ \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Ya);%
+}
+
+\def\msc@nactionnostar#1#2{
+ \msc@actionnostar{#1}{#2}
+ \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+ \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Ya);%
+}
+
+%
+% \stop ends the instance with nickname #1.
+\def\stop{\@ifstar{\stopstar}{\stopnostar}}
+
+\def\stopstar#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    % first, draw the instance line as far as possible
+    \msc@drawinstanceline{#1}%
+    \setlength{\tmp@Yb}{\msc@currentheight}%
+    % close the instance axis if it is a fat instance
+    \ifthenelse{\equal{true}{\msc@instisfat{#1}}}%
+      {%
+       \setlength{\tmp@Xa}{\msc@instlxpos{#1}}%
+       \setlength{\tmp@Xb}{\msc@instrxpos{#1}}%
+       \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Yb);%
+      }%
+      {% else it is not fat
+      }% 
+    % then, draw instance foot  symbol
+     \msc@drawinstancefoot{#1}%
+    % redefine the instance's y position
+    % ``undefined'' means that the instance axis will not be drawn any further
+    \msc@setinstypos{#1}{undefined}%
+  }%
+}
+
+\def\stopnostar#1{%
+  \expandafter\@ifundefined{mscinst#1}{%
+    \msc@instundefinederr{#1}}{% else, #1 is defined
+    % first, draw the instance line as far as possible
+    \msc@drawinstanceline{#1}%
+    \setlength{\tmp@Yb}{\msc@currentheight}%
+    % close the instance axis if it is a fat instance
+    \ifthenelse{\equal{true}{\msc@instisfat{#1}}}%
+      {%
+       \setlength{\tmp@Xa}{\msc@instlxpos{#1}}%
+       \setlength{\tmp@Xb}{\msc@instrxpos{#1}}%
+       \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Yb);%
+      }%
+      {% else it is not fat
+      }% 
+    % then, draw the stop symbol
+    \setlength{\tmp@X}{\msc@instxpos{#1}}%
+    \setlength{\tmp@Xa}{\tmp@X-0.5\stopwidth}%
+    \setlength{\tmp@Xb}{\tmp@X+0.5\stopwidth}%
+    \setlength{\tmp@Ya}{\tmp@Yb+0.5\stopwidth}%
+    \setlength{\tmp@Yb}{\tmp@Yb-0.5\stopwidth}%
+    \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+    \draw (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xa,-\tmp@Yb);%    
+    % redefine the instance's y position
+    % ``undefined'' means that the instance axis will not be drawn any further
+    \msc@setinstypos{#1}{undefined}%
+  }%
+}
+%
+%
+% \condition puts a condition symbol over the given instances. The
+% starred version adjusts the width and the height of the condition symbol.
+% #1: name to be put inside the condition symbol
+% #2: comma-separated list of instance nicknames, such that:
+%     - The first instance nickname is supposed to be the leftmost 
+%       instance of the condition
+%     - The last instance nickname is supposed to be the rightmost
+%       instance of the condition
+
+\def\condition{\@ifstar{\msc@conditionstar}{\msc@conditionnostar}}
+
+\def\msc@conditionstar#1#2{
+   \node{\global\sbox{\tmp@box}{#1}};
+
+   % Save original values of conditionoverlap and conditionheight
+   \setlength{\tmp@Xc}{\conditionoverlap}%
+   \setlength{\tmp@Yc}{\conditionheight}%
+   
+   % Compute dynamic conditionheight
+   \setlength{\tmp@Yd}{\ht\tmp@box + \dp\tmp@box + 2\labeldist}%
+
+   % Increase condition height if necessary
+   \ifthenelse{\lengthtest{\conditionheight < \tmp@Yd}}{
+     \setlength{\conditionheight}{\tmp@Yd}
+   }{}
+
+   % parse condition statement and compute new lengths
+   \def\msc@conditiontext{#1}%
+   \def\msc@firstconditioninst{undefined}%
+   \def\msc@lastconditioninst{undefined}%
+   \msc@condition{#2}%
+
+   % Compute width of the box
+   \setlength{\tmp@Xa}{\msc@instxpos{\msc@firstconditioninst}}
+   \setlength{\tmp@Xb}{\msc@instxpos{\msc@lastconditioninst}}
+   \setlength{\tmp@Xb}{\tmp@Xb-\tmp@Xa}
+
+   % Compute dynamic conditionoverlap
+   \setlength{\tmp@Xd}{.5\wd\tmp@box-.5\tmp@Xb}
+
+   % Increase condition overlap if necessary
+   \ifthenelse{\lengthtest{\conditionoverlap < \tmp@Xd}}{
+     \setlength{\conditionoverlap}{\tmp@Xd}
+   }{}
+
+   \ifthenelse{\equal{\msc@instisfat{\msc@firstconditioninst}}{true}}{%
+     \setlength{\tmp@Xa}{\msc@instlxpos{\msc@firstconditioninst}-\conditionoverlap}%
+   }{%
+     \setlength{\tmp@Xa}{\msc@instxpos{\msc@firstconditioninst}-\conditionoverlap}%
+   }%
+   \setlength{\tmp@Ya}{\msc@currentheight}%
+   \ifthenelse{\equal{\msc@instisfat{\msc@lastconditioninst}}{true}}{%
+     \setlength{\tmp@Xb}{\msc@instrxpos{\msc@lastconditioninst}+\conditionoverlap}%
+   }{%
+     \setlength{\tmp@Xb}{\msc@instxpos{\msc@lastconditioninst}+\conditionoverlap}%
+   }%
+   \setlength{\tmp@Yb}{\tmp@Ya+\conditionheight}%
+
+   \msc@drawcondition{\usebox{\tmp@box}}{\tmp@Xa}{\tmp@Ya}{\tmp@Xb}{\tmp@Yb}%
+
+   % restore conditionoverlap and conditionheight
+   \setlength{\conditionoverlap}{\tmp@Xd}%
+   \setlength{\conditionheight}{\tmp@Yd}%
+}
+
+\def\msc@conditionnostar#1#2{
+  \def\msc@conditiontext{#1}%
+  \def\msc@firstconditioninst{undefined}%
+  \def\msc@lastconditioninst{undefined}%
+  \msc@condition{#2}%
+% debugging info:
+%  \message{(msc: condition: \msc@firstconditioninst...\msc@lastconditioninst)}%
+  \ifthenelse{\equal{\msc@instisfat{\msc@firstconditioninst}}{true}}{%
+      \setlength{\tmp@Xa}{\msc@instlxpos{\msc@firstconditioninst}-\conditionoverlap}%
+    }{%
+      \setlength{\tmp@Xa}{\msc@instxpos{\msc@firstconditioninst}-\conditionoverlap}%
+    }%
+  \setlength{\tmp@Ya}{\msc@currentheight}%
+  \ifthenelse{\equal{\msc@instisfat{\msc@lastconditioninst}}{true}}{%
+      \setlength{\tmp@Xb}{\msc@instrxpos{\msc@lastconditioninst}+\conditionoverlap}%
+    }{%
+      \setlength{\tmp@Xb}{\msc@instxpos{\msc@lastconditioninst}+\conditionoverlap}%
+    }%
+  \setlength{\tmp@Yb}{\tmp@Ya+\conditionheight}%
+  \msc@drawcondition{#1}{\tmp@Xa}{\tmp@Ya}{\tmp@Xb}{\tmp@Yb}%
+}
+%
+\def\msc@condition#1{%
+  \@for\msccondition@rg:=#1\do{%
+    \expandafter\@ifundefined{mscinst\msccondition@rg}{%
+      \msc@instundefinederr{\msccondition@rg}}{% else, \msccondition@rg is defined
+% debugging info:
+%     \message{(msc: condition instance "\msccondition@rg")}%
+      \ifthenelse{\equal{\msc@firstconditioninst}{undefined}}{%
+        \edef\msc@firstconditioninst{\msccondition@rg}%
+      }{\ifthenelse{\lengthtest{\msc@instxpos{\msc@firstconditioninst} > \msc@instxpos{\msccondition@rg}}}{%
+          \edef\msc@firstconditioninst{\msccondition@rg}}{}%
+      }%
+      \ifthenelse{\equal{\msc@lastconditioninst}{undefined}}{%
+        \edef\msc@lastconditioninst{\msccondition@rg}%
+      }{\ifthenelse{\lengthtest{\msc@instxpos{\msc@lastconditioninst} < \msc@instxpos{\msccondition@rg}}}{%
+          \edef\msc@lastconditioninst{\msccondition@rg}}{}%
+      }
+      % now, draw the instance line as far as possible
+      \msc@drawinstanceline{\msccondition@rg}%
+  %    \setlength{\tmp@X}{\msc@instxpos{\msccondition@rg}}%
+  %    \setlength{\tmp@Ya}{\msc@instypos{\msccondition@rg}}%
+  %    \setlength{\tmp@Yb}{\msc@currentheight+\msc@headoffset}%
+  %    \psline[linestyle=\msc@instlinestyle{\msccondition@rg}](\tmp@X,-\tmp@Ya)(\tmp@X,-\tmp@Yb)%
+      % and redefine the instance's y position
+      \setlength{\tmp@Y}{\msc@currentheight+\conditionheight}%
+      \msc@setinstypos{\msccondition@rg}{\the\tmp@Y}% 
+    }%
+  }%
+}
+%
+% \msc@drawcondition draw the condition symbol
+% #1: condition-text
+\def\msc@drawcondition#1#2#3#4#5{%
+  \setlength{\tmp@Xc}{#4+ .6#5 - .6#3}%
+  \setlength{\tmp@Yc}{.5#3 + .5#5}%
+  \draw (#2,-#3) -- (#4,-#3) -- (\tmp@Xc,-\tmp@Yc) -- (#4,-#5);%
+  \setlength{\tmp@Xc}{#2- .6#5 + .6#3}%
+  \draw (#4,-#5) -- (#2,-#5) -- (\tmp@Xc,-\tmp@Yc) -- (#2,-#3);%
+  \setlength{\tmp@Xc}{.5#2 + .5#4}%
+  \setlength{\tmp@Yc}{.5#3 + .5#5}%
+  \node at (\tmp@Xc,-\tmp@Yc) {\raisebox{-.5ex}{\makebox[0pt][c]{#1}}};%
+}
+
+% \ncondition offers the same functionality as
+% \condition, with the difference that the condition symbol is crossed
+% out.
+
+\def\ncondition{\@ifstar{\msc@nconditionstar}{\msc@nconditionnostar}}
+
+\def\msc@nconditionstar#1#2{
+ \msc@conditionstar{#1}{#2}
+ \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+ \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Ya);%
+}
+
+\def\msc@nconditionnostar#1#2{
+ \msc@conditionnostar{#1}{#2}
+ \draw (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+ \draw (\tmp@Xa,-\tmp@Yb) -- (\tmp@Xb,-\tmp@Ya);%
+}
+
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%   GATES
+% \gate[hpos][vpos]{text}{nickname}[h-offset]
+% \gate*[hpos][vpos]{text}{nickname}[h-offset] 
+%   (starred version puts a dot at the position of the gate on the instance line)
+%
+% hpos: optional horizontal position argument l(eft) or r(ight). default: l
+% vpos: optional vertical position argument t(op), c(enter) or b(ottom). default: t
+% text: text to be placed at the gate
+% nickname: nickname of the instance to which the gate belongs
+% 
+\def\gate{\@ifstar{\def\msc@gatestar{defined}\msc@gateh}{\def\msc@gatestar{undefined}\msc@gateh}}
+\newcommand{\msc@gateh}[1][l]{%
+  \def\msc@gatehpos{#1}%
+  \msc@gatev%
+}
+%
+\newcommand{\msc@gatev}[3][t]{%
+  \msc@gate{#1}{#2}{#3}%
+}
+%
+\def\msc@gate#1#2#3{%
+  \expandafter\@ifundefined{mscinst#3}{%
+    \msc@instundefinederr{#3}}{% else, #3 is defined
+    \ifthenelse{\equal{\msc@instisfat{#3}}{true}}
+      {\ifthenelse{\equal{\msc@gatehpos}{l}}
+        {\setlength{\tmp@X}{\msc@instlxpos{#3}}}
+        {\setlength{\tmp@X}{\msc@instrxpos{#3}}}
+      }%
+      {\setlength{\tmp@X}{\msc@instxpos{#3}}}
+    \ifthenelse{\equal{\msc@gatestar}{defined}}{%
+      \setlength{\tmp@Y}{\msc@currentheight}%
+      \draw[fill] (\tmp@X,-\tmp@Y) circle (\gatesymbolradius);}{}%
+    \ifthenelse{\equal{t}{#1}}{
+      \setlength{\tmp@Y}{\msc@currentheight - \labeldist - 3pt}%
+      \def\msc@gatetext{{#2}}%
+    }{%
+    \ifthenelse{\equal{c}{#1}}{%
+      \setlength{\tmp@Y}{\msc@currentheight}%
+      \def\msc@gatetext{\raisebox{-.5\totalheight}{#2}}%
+    }{%
+      \setlength{\tmp@Y}{\msc@currentheight + \labeldist + 3pt}%
+      \def\msc@gatetext{\raisebox{-\totalheight}{#2}}%
+    }}%
+    \ifthenelse{\equal{l}{\msc@gatehpos}}{%
+      \addtolength{\tmp@X}{-\labeldist}%
+      \node at (\tmp@X,-\tmp@Y) {\makebox[0pt][r]{\msc@gatetext}};}%
+    {%
+      \addtolength{\tmp@X}{\labeldist}%
+      \node at (\tmp@X,-\tmp@Y) {\makebox[0pt][l]{\msc@gatetext}};%
+    }%
+  }
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% MSC COMMENTS
+%
+%
+% \msccomment[#1]{#2}{#3}[#4]
+% #1: position l/r or a distance
+% #2: text
+% #3: instance nick name
+% #4: leveloffset
+\newcommand{\msccomment}{%
+  \msccomment@A%
+}%
+%
+\newcommand{\msccomment@A}[3][l]{%
+  \def\commentA{#1}% position
+  \def\commentB{#2}% text
+  \def\commentC{#3}% instance
+  \msccomment@B%
+}%
+%
+\newcommand{\msccomment@B}[1][0]{%
+   \edef\mess@leveloffset{#1}% leveloffset
+   \expandafter\@ifundefined{mscinst\commentC}{% check if given instance is defined
+     \msc@instundefinederr{\commentC}} % display undefined error
+     {% else, given instance ( \commentC ) is defined
+     \ifthenelse{\equal{\commentA}{l}}% comment is left from instance
+       {\setlength{\msc@commentdist}{-\msccommentdist}}%
+       {\ifthenelse{\equal{\commentA}{r}}% right from instance
+         {\setlength{\msc@commentdist}{\msccommentdist}}%
+         {\setlength{\msc@commentdist}{\commentA}}% instead of l/r was given distance ( in right ) from instance
+       }
+     \setlength{\tmp@Yc}{\msc@currentheight}% y-coordinate on given instance
+     \setlength{\tmp@Yd}{\msc@currentheight + (\levelheight * \real{\mess@leveloffset})}% y-coordinate of the middle of comment
+     \ifthenelse{\lengthtest{\msc@commentdist = 0pt}}% if user sets 0pt we must know on which side of instance draw the comment (default is right)
+	{%
+	  \ifthenelse{\equal{\commentA}{l}}%
+	    {% comment left from instance 
+	      \setlength{\tmp@X}{\msc@instlxpos{\commentC}} % get leftmost point on instance
+	      \setlength{\tmp@Xa}{\tmp@X + \msc@commentdist} % set rightmost point on comment
+                 \ifthenelse{\lengthtest{\msccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = east, align=right] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = east, align=right, text width=\msccommentwidth] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                 \draw[style=dashed] (\tmp@X,-\tmp@Yc) -- (c.east); % attach comment to instance
+                 \draw (c.north west) -- (c.north east) -- (c.south east) -- (c.south west); % draw box around comment body with one side open
+	    }%
+	    {% comment right from instance 
+	      \setlength{\tmp@X}{\msc@instrxpos{\commentC}}
+	      \setlength{\tmp@Xa}{\tmp@X + \msc@commentdist}
+                 \ifthenelse{\lengthtest{\msccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = west, align=left] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = west, align=left, text width=\msccommentwidth] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                 \draw[style=dashed] (\tmp@X,-\tmp@Yc) -- (c.west);
+                 \draw (c.south east) -- (c.south west) -- (c.north west) -- (c.north east); 
+	    }%
+	}%
+	{%
+	  \ifthenelse{\lengthtest{\msc@commentdist < 0pt}}%
+	    {% comment left from instance 
+	      \setlength{\tmp@X}{\msc@instlxpos{\commentC}}
+	      \setlength{\tmp@Xa}{\tmp@X + \msc@commentdist}
+                 \ifthenelse{\lengthtest{\msccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = east, align=right] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = east, align=right, text width=\msccommentwidth] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                 \draw[style=dashed] (\tmp@X,-\tmp@Yc) -- (c.east);
+                 \draw (c.north west) -- (c.north east) -- (c.south east) -- (c.south west); 
+	    }%
+	    {% comment right from instance 
+	      \setlength{\tmp@X}{\msc@instrxpos{\commentC}}
+	      \setlength{\tmp@Xa}{\tmp@X + \msc@commentdist}
+                 \ifthenelse{\lengthtest{\msccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = west, align=left] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = west, align=left, text width=\msccommentwidth] at (\tmp@Xa,-\tmp@Yd) {\commentB}; % create comment body with text
+                   }%
+                 \draw[style=dashed] (\tmp@X,-\tmp@Yc) -- (c.west);
+                 \draw (c.south east) -- (c.south west) -- (c.north west) -- (c.north east); 
+	    }%
+	}%
+      
+    }%
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% MSC MARKS
+%
+% \mark[#1]{#2}{#3}
+% #1: placement: tl,bl,tr,br
+% #2: text
+% #3: instance nick name
+%
+\newcommand{\mscmark}[3][tl]{%
+   \expandafter\@ifundefined{mscinst#3}{%
+     \msc@instundefinederr{#3}}
+     {% else, #3 is defined
+     \node{\global\sbox{\tmp@box}{\raisebox{\depth}[\totalheight][0pt]{#2}}};%
+     \ifthenelse{\equal{#1}{tl}}
+     {%tl:
+       \setlength{\tmp@X}{\msc@instlxpos{#3}}
+       \setlength{\tmp@Xa}{\tmp@X - \selfmesswidth}
+       \setlength{\tmp@Xb}{\tmp@Xa - \wd\tmp@box - 2\labeldist}
+       \setlength{\tmp@Y}{\msc@currentheight}
+       \setlength{\tmp@Ya}{\msc@currentheight - \markdist}
+       \draw[style=dashed] (\tmp@X,-\tmp@Y) -- (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+       \setlength{\tmp@Xb}{\tmp@Xa - \labeldist - .5\wd\tmp@box}
+       \addtolength{\tmp@Ya}{-\labeldist}
+       \node[above, inner sep=0] at (\tmp@Xb,-\tmp@Ya) {\usebox{\tmp@box}};%
+     }{
+     \ifthenelse{\equal{#1}{bl}}
+     {%bl:
+       \setlength{\tmp@X}{\msc@instlxpos{#3}}
+       \setlength{\tmp@Xa}{\tmp@X - \selfmesswidth}
+       \setlength{\tmp@Xb}{\tmp@Xa - \wd\tmp@box - 2\labeldist}
+       \setlength{\tmp@Y}{\msc@currentheight}
+       \setlength{\tmp@Ya}{\msc@currentheight + \markdist}
+       \draw[style=dashed] (\tmp@X,-\tmp@Y) -- (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+       \setlength{\tmp@Xb}{\tmp@Xa - \labeldist - .5\wd\tmp@box}
+       \addtolength{\tmp@Ya}{-\labeldist}
+       \node[above, inner sep=0] at (\tmp@Xb,-\tmp@Ya) {\usebox{\tmp@box}};%
+     }{
+     \ifthenelse{\equal{#1}{tr}}
+     {%tr:
+       \setlength{\tmp@X}{\msc@instrxpos{#3}}
+       \setlength{\tmp@Xa}{\tmp@X + \selfmesswidth}
+       \setlength{\tmp@Xb}{\tmp@Xa + \wd\tmp@box + 2\labeldist}
+       \setlength{\tmp@Y}{\msc@currentheight}
+       \setlength{\tmp@Ya}{\msc@currentheight - \markdist}
+       \draw[style=dashed] (\tmp@X,-\tmp@Y) -- (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+       \setlength{\tmp@Xb}{\tmp@Xa + \labeldist + .5\wd\tmp@box}
+       \addtolength{\tmp@Ya}{-\labeldist}
+       \node[above, inner sep=0] at (\tmp@Xb,-\tmp@Ya) {\usebox{\tmp@box}};%
+     }{
+     \ifthenelse{\equal{#1}{br}}
+     {%br:
+       \setlength{\tmp@X}{\msc@instrxpos{#3}}
+       \setlength{\tmp@Xa}{\tmp@X + \selfmesswidth}
+       \setlength{\tmp@Xb}{\tmp@Xa + \wd\tmp@box + 2\labeldist}
+       \setlength{\tmp@Y}{\msc@currentheight}
+       \setlength{\tmp@Ya}{\msc@currentheight + \markdist}
+       \draw[style=dashed] (\tmp@X,-\tmp@Y) -- (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya);%
+       \setlength{\tmp@Xb}{\tmp@Xa + \labeldist + .5\wd\tmp@box}
+       \addtolength{\tmp@Ya}{-\labeldist}
+       \node[above, inner sep=0] at (\tmp@Xb,-\tmp@Ya) {\usebox{\tmp@box}};%
+     }{
+     \msc@illegalmarkplacement{#1}
+     }}}}}
+}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% MSC MEASURES
+%
+%
+\newlength{\msc@measuredist}% internal length for horizontal measure distance
+% \measure[*][#1]{#2}{#3}[#4]{#5}[#6][#7]
+% *: the starred version puts the top measure mark above and the bottom measure mark
+%    below the measure position.
+% #1: placement: l (left) r (right), or distance (negative or positive) to closest of #3 or #4
+% #2: name
+% #3: instance nick name
+% #4: if is direted
+% #5: instance nick name
+% #6: (vertical) offset
+% #7: instance offset
+\newcommand{\measure}{%
+  \@ifstar{\def\msc@innermeasure{false}\msc@measureargs}
+          {\def\msc@innermeasure{true}\msc@measureargs}% 
+}
+%
+\newcommand{\msc@measureargs}[3][l]{%
+  \def\msc@i{#1}%
+  \def\msc@ii{#2}%
+  \def\msc@iii{#3}%
+  \msc@measuredirected%
+}
+
+\newcommand{\msc@measuredirected}[2][no]{%
+  \def\msc@isDirected{#1}%
+  \def\msc@iv{#2}%
+  \msc@measureoffset%
+}
+
+\newcommand{\msc@measureoffset}[1][1]{%
+  \def\msc@mscv{#1}%
+  \msc@measurepadding%
+}
+
+\newcommand{\msc@measurepadding}[1][0mm]{%
+  \def\mess@instanceoffset{#1}%
+  \ifthenelse{\equal{\msc@isDirected}{no}}%
+  {%normal measure
+    \msc@measure{\msc@i}{\msc@ii}{\msc@iii}{\msc@iv}{\msc@mscv}%
+  }{%directed measure
+    \msc@directedmeasure{\msc@i}{\msc@ii}{\msc@iii}{\msc@iv}{\msc@mscv}%
+  }
+}
+
+\newcommand{\msc@measure}[5]{%
+  \ifthenelse{\equal{#1}{l}}
+    {\setlength{\msc@measuredist}{-\selfmesswidth}}
+    {\ifthenelse{\equal{#1}{r}}
+       {\setlength{\msc@measuredist}{\selfmesswidth}}
+       {\setlength{\msc@measuredist}{#1}}}
+    %
+    \setlength{\tmp@Ya}{\msc@currentheight}
+    \setlength{\tmp@Yb}{\tmp@Ya + #5\levelheight}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \ifthenelse{\lengthtest{\msc@instxpos{#3} < \msc@instxpos{#4}}}
+      {% 
+      \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+        {% left from instances
+          \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instlxpos{#4}-\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xa + \msc@measuredist}
+        }
+        {% right from instances
+          \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instrxpos{#4}+\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xb + \msc@measuredist}
+        }
+      }
+      {% 
+      \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+        {% left from instances
+          \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instlxpos{#4}+\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xb + \msc@measuredist}
+        }
+        {% right from instances
+          \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instrxpos{#4}-\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xa + \msc@measuredist}
+        }
+      }
+    \draw[style=dashed] (\tmp@Xa,-\tmp@Ya)--(\tmp@X,-\tmp@Ya)--(\tmp@X,-\tmp@Yb)--(\tmp@Xb,-\tmp@Yb);%
+    \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+      {% left from instances
+      \addtolength{\tmp@X}{-\labeldist}
+      \node[left, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{\labeldist}
+      }
+      {% right from instances
+      \addtolength{\tmp@X}{\labeldist}
+      \node[right, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{-\labeldist}
+      }
+    \ifthenelse{\equal{\msc@innermeasure}{true}}
+      {%
+       \msc@measuresymbolup{\tmp@X}{\tmp@Ya}
+       \msc@measuresymboldown{\tmp@X}{\tmp@Yb}
+      }
+      {%
+       \msc@measuresymboldown{\tmp@X}{\tmp@Ya}
+       \msc@measuresymbolup{\tmp@X}{\tmp@Yb}
+      }
+}
+
+\newcommand{\msc@directedmeasure}[5]{%
+  \ifthenelse{\equal{#1}{l}}
+    {\setlength{\msc@measuredist}{-\selfmesswidth}}
+    {\ifthenelse{\equal{#1}{r}}
+       {\setlength{\msc@measuredist}{\selfmesswidth}}
+       {\setlength{\msc@measuredist}{#1}}}
+    %
+    \setlength{\tmp@Ya}{\msc@currentheight}
+    \setlength{\tmp@Yb}{\tmp@Ya + #5\levelheight}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \ifthenelse{\lengthtest{\msc@instxpos{#3} < \msc@instxpos{#4}}}
+      {% 
+      \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+        {% left from instances
+          \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instlxpos{#4}-\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xa + \msc@measuredist}
+        }
+        {% right from instances
+          \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instrxpos{#4}+\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xb + \msc@measuredist}
+        }
+      }
+      {% 
+      \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+        {% left from instances
+          \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instlxpos{#4}-\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xb + \msc@measuredist}
+        }
+        {% right from instances
+          \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+          \setlength{\tmp@Xb}{\msc@instrxpos{#4}+\mess@instanceoffset}
+          \setlength{\tmp@X}{\tmp@Xa + \msc@measuredist}
+        }
+      }
+    \draw[style=dashed] (\tmp@Xa,-\tmp@Ya)--(\tmp@X,-\tmp@Ya)--(\tmp@X,-\tmp@Yb)--(\tmp@Xb,-\tmp@Yb);%
+    \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+      {% left from instances
+      \addtolength{\tmp@X}{-\labeldist}
+      \node[left, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{\labeldist}
+      }
+      {% right from instances
+      \addtolength{\tmp@X}{\labeldist}
+      \node[right, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{-\labeldist}
+      }
+      \ifthenelse{\lengthtest{\tmp@Ya > \tmp@Yb}}
+      {
+        \msc@measuresymbolup{\tmp@X}{\tmp@Yb}
+      }{
+        \msc@measuresymboldown{\tmp@X}{\tmp@Yb}
+      }
+}
+%
+%
+% \measurestart[*][#1]{#2}{#3}{#4}
+% *: unstarred/starred version draws downward/upward triangle
+% #1: placement: l (left) r (right), or distance (negative or positive) to  #3
+% #2: name
+% #3: instance nick name
+% #4: gate name
+\newcommand{\measurestart}{%
+  \@ifstar{\def\msc@innermeasure{false}\msc@measurestartargs}
+          {\def\msc@innermeasure{true}\msc@measurestartargs}
+}
+%
+%
+\newcommand{\msc@measurestartargs}[4][l]{%
+  \def\msc@i{#1}%
+  \def\msc@ii{#2}%
+  \def\msc@iii{#3}%
+  \def\msc@iv{#4}%
+  \msc@measurestartoffset%
+}  
+
+\newcommand{\msc@measurestartoffset}[1][2]{%
+  \msc@measurestart{\msc@i}{\msc@ii}{\msc@iii}{\msc@iv}{#1}%
+}
+%
+\newcommand{\msc@measurestart}[5]{%
+  \ifthenelse{\equal{#1}{l}}
+    {\setlength{\msc@measuredist}{-\measuredist}}
+    {\ifthenelse{\equal{#1}{r}}
+       {\setlength{\msc@measuredist}{\measuredist}}
+       {\setlength{\msc@measuredist}{#1}}}
+  \setlength{\tmp@Ya}{\msc@currentheight}
+  \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+    {% left from instance
+    \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+    \setlength{\tmp@Xb}{\tmp@Xa + \msc@measuredist}
+    \setlength{\tmp@Yb}{\tmp@Ya + #5\levelheight}
+    \setlength{\tmp@X}{\tmp@Xb - \labeldist - 0.5\measuresymbolwidth}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \node[left, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+    \setlength{\tmp@Y}{\tmp@Yb + \labeldist}
+    \node[left, inner sep=0] at (\tmp@X,-\tmp@Yb) {\raisebox{\depth}[\totalheight][0pt]{#4}};%
+    }
+    {% right from instance
+    \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+    \setlength{\tmp@Xb}{\tmp@Xa + \msc@measuredist}
+    \setlength{\tmp@Yb}{\tmp@Ya + #5\levelheight}
+    \setlength{\tmp@X}{\tmp@Xb + \labeldist + 0.5\measuresymbolwidth}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \node[right, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+    \setlength{\tmp@Y}{\tmp@Yb + \labeldist}
+    \node[right, inner sep=0] at (\tmp@X,-\tmp@Yb) {\raisebox{\depth}[\totalheight][0pt]{#4}};%
+    }
+   \draw[style=dashed] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+   \ifthenelse{\equal{\msc@innermeasure}{true}}
+     {\msc@measuresymbolup{\tmp@Xb}{\tmp@Ya}}
+     {\msc@measuresymboldown{\tmp@Xb}{\tmp@Ya}}
+   \draw[fill=white] (\tmp@Xb,-\tmp@Yb) circle (.5\measuresymbolwidth);
+ } 
+%
+% \measureend[*][#1]{#2}{#3}{#4}
+% *: unstarred/starred version draws upward/downward triangle
+% #1: placement: l (left) r (right), or distance (negative or positive) to  #3
+% #2: name
+% #3: instance nick name
+% #4: gate name
+\newcommand{\measureend}{%
+  \@ifstar{\def\msc@innermeasure{false}\msc@measureendargs}%
+          {\def\msc@innermeasure{true}\msc@measureendargs}%
+}
+%
+\newcommand{\msc@measureendargs}[4][l]{%
+  \def\msc@i{#1}%
+  \def\msc@ii{#2}%
+  \def\msc@iii{#3}%
+  \def\msc@iv{#4}%
+  \msc@measureendoffset%
+}  
+%
+\newcommand{\msc@measureendoffset}[1][2]{%
+  \msc@measureend{\msc@i}{\msc@ii}{\msc@iii}{\msc@iv}{#1}%
+}
+%
+\newcommand{\msc@measureend}[5]{%
+  \ifthenelse{\equal{#1}{l}}
+    {\setlength{\msc@measuredist}{-\measuredist}}
+    {\ifthenelse{\equal{#1}{r}}
+       {\setlength{\msc@measuredist}{\measuredist}}
+       {\setlength{\msc@measuredist}{#1}}}
+  \setlength{\tmp@Ya}{\msc@currentheight}
+  \ifthenelse{\lengthtest{\msc@measuredist < 0pt}}
+    {% left from instance
+    \setlength{\tmp@Xa}{\msc@instlxpos{#3}}
+    \setlength{\tmp@Xb}{\tmp@Xa + \msc@measuredist}
+    \setlength{\tmp@Yb}{\tmp@Ya - #5\levelheight}
+    \setlength{\tmp@X}{\tmp@Xb - \labeldist - 0.5\measuresymbolwidth}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \node[left, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};
+    \setlength{\tmp@Y}{\tmp@Yb - \labeldist}
+    \node[left, inner sep=0] at (\tmp@X,-\tmp@Yb) {\raisebox{\depth}[\totalheight][0pt]{#4}};
+    }
+    {% right from instance
+    \setlength{\tmp@Xa}{\msc@instrxpos{#3}}
+    \setlength{\tmp@Xb}{\tmp@Xa + \msc@measuredist}
+    \setlength{\tmp@Yb}{\tmp@Ya - #5\levelheight}
+    \setlength{\tmp@X}{\tmp@Xb + \labeldist + 0.5\measuresymbolwidth}
+    \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+    \node[right, inner sep=0] at (\tmp@X,-\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+    \setlength{\tmp@Y}{\tmp@Yb - \labeldist}
+    \node[right, inner sep=0] at (\tmp@X,-\tmp@Yb) {\raisebox{\depth}[\totalheight][0pt]{#4}};%
+    }
+   \draw[style=dashed] (\tmp@Xa,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Ya) -- (\tmp@Xb,-\tmp@Yb);%
+   \ifthenelse{\equal{\msc@innermeasure}{true}}
+     {\msc@measuresymboldown{\tmp@Xb}{\tmp@Ya}}
+     {\msc@measuresymbolup{\tmp@Xb}{\tmp@Ya}}
+   \draw[fill=white] (\tmp@Xb,-\tmp@Yb) circle (.5\measuresymbolwidth);%
+ } 
+%
+% measure symbols
+%
+\def\msc@measuresymbolup#1#2{%
+  % sin(pi/3) =~  0.866025403784
+  % draw an upward triangle with 60-degree (pi/3) angles and base at (#1,#2)
+  \draw[fill=white] (#1, -#2) -- (#1 + .5\measuresymbolwidth, -#2 - .866025403784\measuresymbolwidth) -- (#1 - .5\measuresymbolwidth, -#2 - .866025403784\measuresymbolwidth) -- cycle;%
+}
+%	
+\def\msc@measuresymboldown#1#2{%
+  % sin(pi/3) =~  0.866025403784
+  % draw a downward triangle with 60-degree (pi/3) angles and base at (#1,#2)
+  \draw[fill=white] (#1, -#2) -- (#1 + .5\measuresymbolwidth, -#2 + .866025403784\measuresymbolwidth) -- (#1 - .5\measuresymbolwidth, -#2 + .866025403784\measuresymbolwidth) -- cycle;%
+}
+
+%	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% \drawmscframe draws a frame of the right size around the msc
+% This command also set the value of \msc@totalsizebox
+\def\msc@drawframe{%
+  \ifthenelse{\equal{\msc@frame}{yes}}{%
+    \draw (0,0) rectangle (\msc@currentwidth,-\msc@currentheight);
+  }{% no frame drawing
+  }%
+}
+%
+% \msckeyword is the keyword representation of msc
+\def\msckeyword{msc}
+\def\msckeywordstyle#1{\textbf{#1}}
+%
+% This keyword can be changed by the \setmsckeyword command (or by \renewcommand{\msckeyword}{...}):
+\newcommand{\setmsckeyword}[1]{\def\msckeyword{#1}}
+\newcommand{\setmsckeywordstyle}[1]{\def\msckeywordstyle{#1}}%
+%
+% Commands to switch internal options that control the drawing of header and footer symbols
+\newcommand{\drawinsthead}[1]{\def\msc@insthead{#1}}% 
+\drawinsthead{yes}%
+\newcommand{\drawinstfoot}[1]{\def\msc@instfoot{#1}}% 
+\drawinstfoot{yes}%
+% A similar command to control drawing of the msc-frame
+\newcommand{\drawframe}[1]{\def\msc@frame{#1}}% 
+\drawframe{yes}%
+%
+%
+\def\msc@grid{no}%
+\newcommand{\showgrid}{\def\msc@grid{yes}}
+\newcommand{\nogrid}{\def\msc@grid{no}}
+
+
+\def\msc@settitle{%
+\MSC@settitle{msc}%
+               {0\mscunit}%
+               {-\msc@totalheight}%
+               {\msc@totalwidth}%
+               {0\mscunit}%
+               {\msc@titlejustification}%
+               {\msckeywordstyle{\msckeyword}{} \msc@title}%
+}
+
+%
+% \msc@title stores the title given in \begin{msc}{title}
+\def\msc@title{}%
+%
+% \msc@titlejustification says how the title should be justified
+% Justification is relative to the total width of the msc 
+% l: left (default)
+% c: centered
+% r: right
+%
+\newsavebox{\mscbox}%
+%
+% the msc-environment
+\newenvironment{msc}[2][l]{%
+\message{(\msckeyword: '#2'}%
+\def\msc@titlejustification{#1}%
+\def\msc@title{#2}%
+\setcounter{mscinstcnt}{0}%
+\setlength{\msc@currentheight}{\topheaddist}%
+\addtolength{\msc@currentheight}{\instheadheight}%
+\addtolength{\msc@currentheight}{\firstlevelheight}%
+\setlength{\msc@currentwidth}{0pt}%
+% define the artificial left and right environment instances
+\msc@declinst{envleft}{}{}{\the\instbarwidth}%
+\msc@setinstxpos{envleft}{0pt}%
+\msc@declinst{envright}{}{}{\the\instbarwidth}%
+\msc@setinstxpos{envright}{\envinstdist}%
+\begin{tikzpicture}[transform shape, scale = \mscscalefactor]
+}{%
+ \addtolength{\msc@currentheight}{\lastlevelheight}%
+ \setcounter{tmpcnt}{2}%
+ \msc@drawinstancefooters%
+% If there is at least one instance, the current width is 
+% set to the xpos of the NEXT msc instance. There is at least one instance,
+% if mscinstcnt >= 2. So, in that case, we have to 
+% substract one \instdist from the current width.
+%
+%\ifthenelse{\value{mscinstcnt}<2}{% no user defined instances, so, relax
+%  \relax%
+%}{% mscinstcnt >= 2
+%  \addtolength{\msc@currentwidth}{-\instdist}%
+%}%
+% Now we compute the final current width: one extra \envinstdist:
+\setlength{\msc@currentwidth}{\msc@instxpos{envright}}%
+\addtolength{\msc@currentheight}{\instfootheight+\bottomfootdist}%
+\msc@drawframe%
+\global\msc@totalwidth=\msc@currentwidth%
+\global\msc@totalheight=\msc@currentheight%
+\ifthenelse{\equal{\msc@grid}{yes}}{%
+\draw[style=dotted, step=1cm] (0,-\msc@currentheight) grid (\msc@currentwidth,0);%
+
+% xticks and yticks
+\newcount\tmpcnt%
+
+\tmpcnt = \msc@currentwidth%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \x in {0,...,\tmpcnt} {%
+  \node at (\x, 0) [above right] {\x};
+}%
+
+\tmpcnt = \msc@currentheight%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \y in {0,...,\tmpcnt} {%
+  \node at (0,-\y) [below left] {\y};
+}%
+    
+}{\relax}%
+\msc@settitle%
+\end{tikzpicture}%
+% Debug info:
+%\typeout{msc size: \the\msc@totalwidth x\the\msc@totalheight}%
+% the \mscbox now contains a box of 0x0, however the actual width and
+% height are stored in \msc@total{width,height}. We use these lengths
+% to adjust the width and height of the \mscbox
+\wd\mscbox=\msc@totalwidth%
+\ht\mscbox=\msc@totalheight%
+\dp\mscbox=0pt%
+% Now the \mscbox can be scaled (by \mscscalefactor) and `printed':
+{% DEBUG: use this \fbox stuf to check the bounding box 
+ \setlength{\fboxrule}{0.01pt}%
+ \setlength{\fboxsep}{1pt}%
+}%
+\message{)}%
+}%
+%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\MSC@settitle}[7]{%
+  % #1: diagram type (msc, mscdoc, hmsc)
+  % #2: llx
+  % #3: lly
+  % #4: urx
+  % #5: ury
+  % #6: justification (l, c, r)
+  % #7: typeset title
+  \setlength{\tmp@X}{#4 - #2 - 2\leftnamedist}%
+  \ifthenelse{\equal{#6}{l}}%
+  {%
+   \def\MSC@dosettitle{\parbox[t]{\tmp@X}{\raggedright #7}}%
+  }%
+  {\ifthenelse{\equal{#6}{c}}%
+   {%
+    \def\MSC@dosettitle{\parbox[t]{\tmp@X}{\centering #7}}%
+   }%
+   {\ifthenelse{\equal{#6}{r}}%
+    {%
+     \def\MSC@dosettitle{\parbox[t]{\tmp@X}{\raggedleft #7}}%
+    }%
+    {\msc@illegaltitleplacement{#6}}%
+   }%
+  }%  
+  \setlength{\tmp@Y}{#5 - \topnamedist}%
+  \setlength{\tmp@Xb}{#2 + \leftnamedist}%
+  \node [below right=-4pt] at (\tmp@Xb,\tmp@Y) {\MSC@dosettitle};%
+}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%                           MSC documents
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \mscdockeyword is the keyword representation of msc
+\def\mscdockeyword{mscdoc}
+\def\mscdockeywordstyle#1{\textbf{#1}}
+%
+% This keyword can be changed by the \setmscdockeyword command (or by \renewcommand{\mscdockeyword}{...}):
+\newcommand{\setmscdockeyword}[1]{\def\mscdockeyword{#1}}
+\newcommand{\setmscdockeywordstyle}[1]{\def\mscdockeywordstyle{#1}}%
+
+\newcommand{\mscdoc@settitle}{%
+  \MSC@settitle{mscdoc}%
+               {\mscdoc@llx}%
+               {\mscdoc@lly}%
+               {\mscdoc@urx}%
+               {\mscdoc@ury}%
+               {\mscdoc@titlejustification}%
+               {\mscdockeywordstyle{\mscdockeyword}{} \mscdoc@title}%
+}
+
+\newenvironment{mscdoc}[2][l]%
+{%
+ \message{( \mscdockeyword: '#2'}%
+ \def\mscdoc@titlejustification{#1}%
+ \def\mscdoc@title{#2}%
+ \def\reference##1(##2,##3){%
+  \setlength{\tmp@X}{\mscdocreferencewidth}%
+  \setlength{\tmp@Y}{\mscdocreferenceheight}%
+  \def\txt{\vbox to \tmp@Y{\vss\hbox to \tmp@X{\hss{}##1\hss}\vss}}%
+%  \rput(##2\mscunit,##3\mscunit){\psframebox[%
+%   framearc=0.25,%
+%   framesep=0pt,%
+%   border=0pt%
+%  ]{\txt}}}%
+  \node[draw, inner sep=0, rounded corners=3pt] at (##2\mscunit,##3\mscunit) {\txt};}%
+ \def\separator##1{%
+  \draw[style=dashed] (\mscdoc@llx,##1) -- (\mscdoc@urx,##1);%
+ }%
+ \def\mscdoc@sizespec(##1,##2)(##3,##4)%
+ {%
+  \def\mscdoc@llx{##1\mscunit}%
+  \def\mscdoc@lly{##2\mscunit}%
+  \def\mscdoc@urx{##3\mscunit}%
+  \def\mscdoc@ury{##4\mscunit}%
+\begin{lrbox}{\mscbox}%
+  \begin{tikzpicture}(\mscdoc@llx,\mscdoc@lly)(\mscdoc@urx,\mscdoc@ury)
+    \ifthenelse{\equal{\msc@grid}{yes}}{%
+\draw[style=dotted, step=1cm] (\mscdoc@llx,\mscdoc@lly) grid (\mscdoc@urx,\mscdoc@ury);%
+
+\newlength{\mscdoc@width}%
+\newlength{\mscdoc@height}%
+\setlength{\mscdoc@width}{\mscdoc@urx-\mscdoc@llx}%
+\setlength{\mscdoc@height}{\mscdoc@ury-\mscdoc@lly}%
+
+% xticks and yticks
+\newcount\tmpcnt%
+
+\tmpcnt = \mscdoc@width%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \x in {0,...,\tmpcnt} {%
+  \node at (\x, 0) [below right] {\x};
+}%
+
+\tmpcnt = \mscdoc@height%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \y in {0,...,\tmpcnt} {%
+  \node at (0,\y) [above left] {\y};
+}%
+    }{\relax}%
+    \ifthenelse{\equal{\msc@frame}{yes}}{%
+      \draw (\mscdoc@llx,\mscdoc@lly) rectangle (\mscdoc@urx,\mscdoc@ury);%
+    }{\relax}%
+    \mscdoc@settitle%
+ }%
+ \mscdoc@sizespec%
+}%
+{%
+ \end{tikzpicture}
+\end{lrbox}%
+{% DEBUG: use this \fbox stuf to check the bounding box 
+ \setlength{\fboxrule}{0.01pt}%
+ \setlength{\fboxsep}{1pt}%
+ \color{white}\fbox{%
+  \usebox{\mscbox}%
+  }%
+}%
+ \message{)}%
+}
+
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%                           HMSC
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\newcommand{\hmsckeyword}{hmsc}
+\newcommand{\hmsckeywordstyle}[1]{\textbf{#1}}
+
+% This keyword can be changed by the \sethmsckeyword command (or by \renewcommand{\hmsckeyword}{...}):
+\newcommand{\sethmsckeyword}[1]{\def\hmsckeyword{#1}}
+\newcommand{\sethmsckeywordstyle}[1]{\def\hmsckeywordstyle{#1}}%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newif\if@ncsegline
+
+
+%
+% User command to draw a segmented line between two nodes (buggy).
+%
+% NOTE: this implementation is not complete yet. The optional arrows argument
+%       only makes sense for forward arrows (and even then in a limited way).
+% usage: \ncsegline[settings]{arrows}{#1}[(x0,y0)...(xn,xy)]{#2}
+%  settings (optional): pstricks settings for lines
+%  arrows(optional): pstricks-style arrow defintions
+%  #1: start node
+%  (x0,y0)...(xn,yn) (optional): sequence of intermediate points  
+%  #2: end node 
+\def\ncsegline{%
+  \@ifstar{\def\@nclinecommand{\ncline*}\@ncseglinei}{\def\@nclinecommand{\ncline}\@ncseglinei}%
+}
+
+\def\ncseglinecheck@arrow#1#2{%
+  \ncseglinecheck@@arrow#2-\@nil
+  \if@ncsegline%
+%    \message{(arrow: `#2')}%
+    \edef\@ncseglinearrow{{#2}}%
+    \def\next{#1}%
+  \else%
+%    \message{(no arrow `#2')}%
+    \edef\@ncseglinearrow{{-}}%
+    \def\next{#1{#2}}%
+  \fi%
+  \next%
+}
+
+\def\ncseglinecheck@@arrow#1-#2\@nil{%
+\ifx\@nil#2\@nil\@ncseglinefalse\else\@ncseglinetrue\fi}
+
+\def\@ncseglinei{%
+  \@ifnextchar[{\@ncseglineReadSettings}{\def\@nclinesettings{[]}\ncseglinecheck@arrow{\@ncseglineii}}%]
+}
+
+\def\@ncseglineReadSettings[#1]{%
+  \def\@nclinesettings{[#1]}%
+  \ncseglinecheck@arrow{\@ncseglineii}%
+}
+
+\def\@ncseglineii#1{%
+  \def\@ncsegargA{#1}%
+  \@ifnextchar[{\@ncseglineiii}{\@ncseglineiv}%
+}
+
+\def\@ncseglineiii[#1]#2{%
+  \@ncseglineA#1(\relax,\relax)%
+  \def\@ncsegargB{#2}%
+  \@ncseglinedraw%
+}
+
+\def\@ncseglineiv#1{%
+  \def\@ncsegargB{#1}%
+  \@ncseglinedraw%
+}
+
+\def\@ncseglinedraw{%
+  \edef\@ncseglineattrs{\@nclinesettings\@ncseglinearrow}%
+  \expandafter\@nclinecommand\@ncseglineattrs{\@ncsegargA}{\@ncsegargB}%
+}
+
+\def\@ncseglineA(#1,#2){%
+  \ifx#1\relax%
+    \def\next{\relax}%
+  \else%
+%    \message{(line seg)}%
+    \pnode(#1,#2){#1#2}%
+    \expandafter\@nclinecommand\@nclinesettings{-}{\@ncsegargA}{#1#2}%
+    \edef\@ncsegargA{#1#2}%
+    \def\next{\@ncseglineA}%
+  \fi
+  \next%
+}
+
+% User command to draw hmsc start symbols
+% usage: \hmscstartsymbol{#1}(#2,#3)
+%   #1: nickname
+%   #2: x-coordinate
+%   #3: y-coordinate
+%
+%
+% sin(pi/3) =~ 0.866025403784
+% 
+\def\hmscstartsymbol#1(#2,#3){%
+  %\message{(hmsc start symbol: #1)}%
+  \setlength{\tmp@Xa}{#2\mscunit}%
+  \setlength{\tmp@Ya}{#3\mscunit}%
+  \setlength{\tmp@Xb}{\tmp@Xa}\addtolength{\tmp@Xb}{-.5\hmscstartsymbolwidth}%
+  \setlength{\tmp@Xc}{\tmp@Xa}\addtolength{\tmp@Xc}{.5\hmscstartsymbolwidth}%
+  \setlength{\tmp@Yb}{\tmp@Ya}\addtolength{\tmp@Yb}{0.866025403784\hmscstartsymbolwidth}%
+  \draw (\tmp@Xa,\tmp@Ya) -- (\tmp@Xb,\tmp@Yb) -- (\tmp@Xc,\tmp@Yb) -- cycle;%
+  \node[inner sep=0] (#1) at (#2,#3) {};%
+}
+
+
+% User command to draw hmsc end symbols
+% usage: \hmscendsymbol{#1}(#2,#3)
+%   #1: nickname
+%   #2: x-coordinate
+%   #3: y-coordinate
+%
+%
+% sin(pi/3) =~ 0.866025403784
+% 
+\def\hmscendsymbol#1(#2,#3){%
+  %\message{(hmsc end symbol: #1)}%
+  \setlength{\tmp@Xa}{#2\mscunit}%
+  \setlength{\tmp@Ya}{#3\mscunit}%
+  \setlength{\tmp@Xb}{\tmp@Xa}\addtolength{\tmp@Xb}{-.5\hmscstartsymbolwidth}%
+  \setlength{\tmp@Xc}{\tmp@Xa}\addtolength{\tmp@Xc}{.5\hmscstartsymbolwidth}%
+  \setlength{\tmp@Yb}{\tmp@Ya}\addtolength{\tmp@Yb}{-0.866025403784\hmscstartsymbolwidth}%
+  \draw (\tmp@Xa,\tmp@Ya) -- (\tmp@Xb,\tmp@Yb) -- (\tmp@Xc,\tmp@Yb) -- cycle;%
+  \node[inner sep=0] (#1) at (#2,#3) {};%
+}
+
+% User command to draw a hmsc condition
+% usage: \hmsccondition{#1}{#2}(#3,#4)
+%   #1: nickname
+%   #2: text
+%   #3: x-coordinate
+%   #4: y-coordinate
+\def\hmsccondition#1#2(#3,#4){%
+  \setlength{\tmp@X}{.5\hmscconditionwidth}%
+  \setlength{\tmp@Y}{.5\hmscconditionheight}%
+  \setlength{\tmp@Xa}{\tmp@X}\addtolength{\tmp@Xa}{.6\tmp@Y}%
+  \node[minimum height=\tmp@Y,text centered, text width=2\tmp@X] (#1) at (#3\mscunit,#4\mscunit) {#2};
+  \draw[xshift=#3\mscunit, yshift=#4\mscunit] (#1.north west) -- (#1.north east) -- (\tmp@Xa,0) --%
+                                            (#1.south east) -- (#1.south west) -- (-\tmp@Xa,0) --%
+                                            cycle;%
+  \setlength{\tmp@X}{\hmscconditionwidth}%
+  \setlength{\tmp@Y}{\hmscconditionheight}%
+}
+
+% User command to draw a hmsc reference
+% usage: \hmscreference{#1}{#2}(#3,#4)
+%   #1: nickname
+%   #2: text
+%   #3: x-coordinate
+%   #4: y-coordinate
+\def\hmscreference#1#2(#3,#4){%
+  \setlength{\tmp@X}{\hmscreferencewidth}%
+  \setlength{\tmp@Y}{\hmscreferenceheight}%
+  \def\rtxt{\vbox to \tmp@Y{\vss\hbox to \tmp@X{\hss{}#2\hss}\vss}}%
+  \node[minimum height=\tmp@Y,draw, rounded corners=3pt,text centered, text width=\tmp@X] (#1) at (#3\mscunit,#4\mscunit) {#2};
+}
+
+% User command to draw a hmsc time intervalhmsccommentwidth
+% usage: \hmscmeasure[isDirected]{text}[width]{nodeA}[top/bottom]{nodeB}[top/bottom]
+% #1: if is directed
+% #2: text
+% #3: width
+% #4: nodeA
+% #5: top/bottom
+% #6: nodeB
+% #7: top/bottom
+\newcommand{\hmscmeasure}[2][no]{
+  \def\msc@isDirected{#1}%
+  \def\mess@labeltext{#2}%
+  \hmsctimeinterval@A%
+}
+
+\newcommand{\hmsctimeinterval@A}[2][\msc@measuredist]{%
+  \setlength{\msc@measuredist}{#1}%
+  \def\msc@nodeA{#2}%
+  \hmsctimeinterval@B%
+}
+
+\newcommand{\hmsctimeinterval@B}[2][bottom]{%
+  \def\msc@nodeApos{#1}%
+  \def\msc@nodeB{#2}%
+  \hmsctimeinterval@C%
+}
+
+\newcommand{\hmsctimeinterval@C}[1][\ifx\msc@nodeA\msc@nodeB bottom\else top\fi]{%
+  \hmscdrawtimeinterval{\msc@isDirected}{\mess@labeltext}{\msc@measuredist}{\msc@nodeA}{\msc@nodeApos}{\msc@nodeB}{#1}%
+}
+
+% usage: \hmscdrawtimeintervall{isDirected}{text}{width}{nodeA}{top/bottom}{nodeB}{top/bottom}
+% #1: if is directed
+% #2: text
+% #3: width
+% #4: nodeA
+% #5: top/bottom
+% #6: nodeB
+% #7: top/bottom
+\def\hmscdrawtimeinterval#1#2#3#4#5#6#7{
+  \pgfextractx{\tmp@Xa}{\pgfpointanchor{#4}{center}}%
+  \ifthenelse{\equal{#5}{bottom}}{
+    \pgfextracty{\tmp@Ya}{\pgfpointanchor{#4}{south}}%
+  }{
+    \pgfextracty{\tmp@Ya}{\pgfpointanchor{#4}{north}}%
+  }
+  \setlength{\tmp@X}{\tmp@Xa}%
+  \addtolength{\tmp@X}{#3}%
+  \pgfextractx{\tmp@Xb}{\pgfpointanchor{#6}{center}}%
+  \ifthenelse{\equal{#7}{bottom}}{
+    \pgfextracty{\tmp@Yb}{\pgfpointanchor{#6}{south}}%
+  }{
+    \pgfextracty{\tmp@Yb}{\pgfpointanchor{#6}{north}}%
+  }
+  \draw[style=dashed] (\tmp@Xa,\tmp@Ya)--(\tmp@X,\tmp@Ya)--(\tmp@X,\tmp@Yb)--(\tmp@Xb,\tmp@Yb);%;%
+
+  %label
+  \setlength{\tmp@Y}{.5\tmp@Ya + .5\tmp@Yb}
+  \ifthenelse{\lengthtest{\tmp@X < \tmp@Xa}}
+      {% left from node
+      \addtolength{\tmp@X}{-\labeldist}
+      \node[left, inner sep=0] at (\tmp@X,\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{\labeldist}
+      }
+      {% right from node
+      \addtolength{\tmp@X}{\labeldist}
+      \node[right, inner sep=0] at (\tmp@X,\tmp@Y) {\raisebox{\depth}[\totalheight][0pt]{#2}};%
+      \addtolength{\tmp@X}{-\labeldist}
+      }
+
+  %arrows
+  \ifthenelse{\equal{#1}{no}}{
+    \msc@measuresymbolup{\tmp@X}{-\tmp@Ya}
+    \msc@measuresymboldown{\tmp@X}{-\tmp@Yb}
+   }{
+     \ifthenelse{\lengthtest{ \tmp@Ya > \tmp@Yb } }%
+      {%normal direction
+        \msc@measuresymboldown{\tmp@X}{-\tmp@Yb}%
+      }{%oposite direction
+        \msc@measuresymbolup{\tmp@X}{-\tmp@Yb}%
+      }
+  }
+}
+
+% User command to draw a hmsc absolute time
+% usage: \hmsmark{#1}(#2,#3){#4}
+% #1: text
+% #2: x-coordinate
+% #3: y-coordinate
+% #4: to-nickname
+\def\hmscmark#1(#2,#3)#4{%
+     \pgfextractx{\tmp@X}{\pgfpointanchor{#4}{center}}%get node x-coordinate
+     \setlength{\tmp@Xb}{#2\mscunit}	
+     \node {\global\sbox{\tmp@box}{\raisebox{\depth}[\totalheight][0pt]{#1}}};%
+     \setlength{\tmp@Yd}{#3\mscunit}%y-coordinate of bottom of mark box
+     \setlength{\tmp@Ya}{\tmp@Yd + .5\ht\tmp@box}%comment top
+     \addtolength{\tmp@Ya}{\labeldist}%   
+     \ifthenelse{\lengthtest{ \tmp@Xb < \tmp@X } }%
+	    {% comment left from node
+	      \setlength{\tmp@Xa}{#2\mscunit}%comment box right most side
+	      \draw[style=dashed] (#4) -- (\tmp@Xa,\tmp@Yd);%draw dashed line from node to mark box 
+	      \setlength{\tmp@Xb}{\wd\tmp@box}
+	      \setlength{\tmp@Xb}{\tmp@Xa - \tmp@Xb}
+	      \addtolength{\tmp@Xb}{-\labeldist}
+                 \draw[style=dashed] (\tmp@Xa,\tmp@Yd) -- (\tmp@Xb,\tmp@Yd);%
+                 \addtolength{\tmp@Xa}{-\labeldist}
+	      \node[left=-4pt] at (\tmp@Xa,\tmp@Ya) {\usebox{\tmp@box}};
+	    }%
+	    {% comment right from node
+	      \setlength{\tmp@Xa}{#2\mscunit}
+	      \draw[style=dashed] (#4) -- (\tmp@Xa,\tmp@Yd);%draw dashed line from node to mark box 
+	      \setlength{\tmp@Xb}{\wd\tmp@box}
+	      \setlength{\tmp@Xb}{\tmp@Xa + \tmp@Xb}
+	      \addtolength{\tmp@Xb}{\labeldist}
+                 \draw[style=dashed] (\tmp@Xa,\tmp@Yd) -- (\tmp@Xb,\tmp@Yd);%
+                 \addtolength{\tmp@Xa}{\labeldist}
+	      \node[right=-4pt] at (\tmp@Xa,\tmp@Ya) {\usebox{\tmp@box}};
+	    }%
+	
+}
+
+% User command to draw a hmsc comment
+% usage: \hmsccomment{#1}(#2,#3){#4}
+% #1: text
+% #2: x-coordinate
+% #3: y-coordinate
+% #4: to-nickname
+\def\hmsccomment#1(#2,#3)#4{%
+     \pgfextractx{\tmp@X}{\pgfpointanchor{#4}{center}}% get x-coordinate of node to which attach comment  
+     \setlength{\tmp@Xa}{#2\mscunit} % comment x-coordinate
+     \setlength{\tmp@Ya}{#3\mscunit}% y-coordinate of middle of comment box
+     \ifthenelse{\lengthtest{ \tmp@Xa < \tmp@X } }%
+	    {% comment left from node
+                 \ifthenelse{\lengthtest{\hmsccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = east, align=right] at (\tmp@Xa,\tmp@Ya) {#1}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = east, align=right, text width=\hmsccommentwidth] at (\tmp@Xa,\tmp@Ya) {#1}; % create comment body with text
+                   }%
+	      \draw[style=dashed] (#4) -- (c.east);% draw dashed line from node to comment box 
+	      \draw (c.north west) -- (c.north east) -- (c.south east) -- (c.south west);% draw comment box with one side open
+	    }%
+	    {% comment right from node
+                 \ifthenelse{\lengthtest{\hmsccommentwidth = 0pt}}
+                   {% set comment width automatic
+                     \node (c) [rectangle,anchor = west, align=left] at (\tmp@Xa,\tmp@Ya) {#1}; % create comment body with text
+                   }%
+                   {% comment width is given
+                     \node (c) [rectangle,anchor = west, align=left, text width=\hmsccommentwidth] at (\tmp@Xa,\tmp@Ya) {#1}; % create comment body with text
+                   }%
+	      \draw[style=dashed] (#4) -- (c.west);% draw dashed line from node to comment box 
+	      \draw (c.north east) -- (c.north west) -- (c.south west) -- (c.south east);% draw comment box with one side open
+	    }%	
+}
+
+% User command to draw a global comment
+% usage: \mscglobalcomment{#1}(#2,#3)
+%   #1: text
+%   #2: x-coordinate
+%   #3: y-coordinate
+\def\mscglobalcomment#1(#2,#3){%
+  \setlength{\tmp@X}{\mscglobalcommentwidth}%
+  \setlength{\tmp@Y}{\hmsccommentheight}%
+  %comment text
+  \node (c) [rectangle,anchor = north west, minimum height = \tmp@Y,text width=\tmp@X] at (#2\mscunit,#3\mscunit) {#1};
+    %tmp@Xa = right side X
+  \node (h) [rectangle,anchor = north east, minimum size = \hmsccommenthem] at (c.north east) {};
+  \draw (h.north west) -- (c.north west) -- (c.south west) -- (c.south east) -- (h.south east) -- (h.north west) -- (h.south west) -- (h.south east);
+
+  \setlength{\tmp@Xa}{#2\mscunit}%
+  \addtolength{\tmp@Xa}{\tmp@X}%
+  %tmp@Xb = right upper corner hem point X
+  \setlength{\tmp@Xb}{\tmp@Xa}%
+  \addtolength{\tmp@Xb}{-\hmsccommenthem}%
+  %tmp@Ya = down side Y
+  \setlength{\tmp@Ya}{#3\mscunit}%
+  \addtolength{\tmp@Ya}{-\tmp@Y}%
+  %tmp@Yb = right upper corner hem point Y
+  \setlength{\tmp@Yb}{#3\mscunit}%
+  \addtolength{\tmp@Yb}{-\hmsccommenthem}%
+  %draw hmsccomment box
+  %\draw (#2,#3) --  (\tmp@Xb,#3) -- (\tmp@Xa,\tmp@Yb) -- (\tmp@Xa,\tmp@Ya) -- (#2,\tmp@Ya) -- (#2,#3);%
+  %draw hmsccomment hem
+  %\draw (\tmp@Xb,#3) -- (\tmp@Xb,\tmp@Yb) -- (\tmp@Xa,\tmp@Yb);%
+}
+
+% User command to draw hmsc connections
+% usage: \hmscconnection{#1}(#2,#3)
+%  #1: nickname
+%  #2: x-coordinate
+%  #3: y-coordinate
+\def\hmscconnection#1(#2,#3){%
+  \draw (#2,#3) circle (2\hmscconnectionradius);%
+  \node[inner sep=2\hmscconnectionradius] (#1) at (#2,#3) {};%
+}
+
+% User command to draw hmsc inline expressions
+% usage: \hmscinline[#1]{#2}[#3]{#4}(#5,#6)(#7,#8)
+% #1: list of vertical separators
+% #2: nickname
+% #3: list of horizontal separators
+% #4: text
+% #5: x-start coordinate
+% #6: y-start coordinate
+% #7: x-end coordinate
+% #8: y-end coordinate
+%\def\hmscinline[vertical separators]#1[horizontal separators]#2(#3,#4)(#5,#6){%
+
+\newcount\verticalnodecount
+\newcount\horizontalnodecount
+
+\newcommand{\hmscinline}[2][]{
+  \def\nickname{#2}%
+  \verticalnodecount0
+  \horizontalnodecount0
+  \renewcommand{\do}[1]{\verticalnode ##1}% Update how the list items will be processed
+  \docsvlist{#1}% Process items
+  \hmscinline@A%
+}
+
+\newcommand{\hmscinline@A}[2][]{
+  \renewcommand{\do}[1]{\horizontalnode ##1}% Update how the list items will be processed
+  \docsvlist{#1}% Process items
+  \def\hmscinlinetext{#2}%
+  \hmscinline@B%
+}
+
+\newcommand{\verticalnode}[1]{\advance\verticalnodecount1
+   \expandafter\newcount\csname x\the\verticalnodecount\endcsname%
+   \csname x\the\verticalnodecount\endcsname#1
+  %\expandafter\def\csname x\the\verticalnodecount\endcsname{#1}%
+}
+
+\newcommand{\horizontalnode}[1]{\advance\horizontalnodecount1
+  \expandafter\newcount\csname y\the\horizontalnodecount\endcsname%
+  \csname y\the\horizontalnodecount\endcsname#1
+  %\expandafter\def\csname y\the\horizontalnodecount\endcsname{#1}%
+}
+
+\def\hmscinline@B(#1,#2)(#3,#4){%
+   \def\inktext{\raisebox{\depth}[\totalheight][0pt]{\hmscinlinetext}}
+ % first the solid part of the inline expression:
+    \setlength{\tmp@Xa}{#1\mscunit}%
+    \setlength{\tmp@Ya}{#2\mscunit}%
+    \setlength{\tmp@Xb}{#3\mscunit}%
+    \setlength{\tmp@Yb}{#4\mscunit}%
+    \setlength{\tmp@X}{\tmp@Xb-\tmp@Xa}%
+    \setlength{\tmp@Y}{\tmp@Ya-\tmp@Yb}%
+    \node[draw,anchor=north west,rectangle,minimum width=\tmp@X,minimum height=\tmp@Y] (\nickname) at (\tmp@Xa,\tmp@Ya) {};
+   \ifnum\verticalnodecount>0
+    \loop\ifnum\verticalnodecount>0
+      \draw [dashed] (\the\csname x\the\verticalnodecount\endcsname,\tmp@Ya)  --%
+            (\the\csname x\the\verticalnodecount\endcsname,\tmp@Yb);
+       \advance\verticalnodecount-1 
+    \repeat
+   \fi
+   \ifnum\horizontalnodecount>0
+    \loop\ifnum\horizontalnodecount>0 
+      \draw [dashed] (\tmp@Xa,\the\csname y\the\horizontalnodecount\endcsname)  --%
+            (\tmp@Xb,\the\csname y\the\horizontalnodecount\endcsname);
+       \advance\horizontalnodecount-1 
+    \repeat
+   \fi
+    \node {\global\sbox{\tmp@box}{\inktext}};%
+    \setlength{\tmp@X}{\wd\tmp@box}%
+    \setlength{\tmp@X}{1.1\tmp@X+\labeldist}%
+    \setlength{\tmp@Y}{\ht\tmp@box}%
+    \setlength{\tmp@Y}{1.1\tmp@Y+\labeldist}%
+    \setlength{\tmp@Xb}{\tmp@X+\labeldist}%
+    \setlength{\tmp@Yb}{\tmp@Y+\labeldist}%
+      \node[below right, inner sep = \labeldist] at (\tmp@Xa,\tmp@Ya) {\inktext};%
+      \draw (\tmp@Xa,\tmp@Ya-\tmp@Yb) -- (\tmp@Xa+\tmp@X,\tmp@Ya-\tmp@Yb) --%
+            (\tmp@Xa+\tmp@Xb,\tmp@Ya-\tmp@Y) -- (\tmp@Xa+\tmp@Xb,\tmp@Ya+0);%
+}
+
+% User command to draw arrows between hmsc-objects
+% Usage: \arrow(*){#1}[(x0,y0)...(xn,yn)]{#2}
+%   if * no arrow is drawn
+%   #1: start hmsc object
+%   (x0,y0)...(xn,yn) (optional): sequence of intermediate points
+%   #2: end hmsc object
+
+\newcount\tmpbegin
+\newcount\tmpend
+\newcount\nodecount
+
+\def\arrow{
+  \@ifstar{\def\arrow@style{line}\arrow@A}%
+          {\def\arrow@style{arrow}\arrow@A}%  
+}
+
+\def\arrow@A#1{
+  \def\firstnode{(#1)}%
+  \nodecount0
+  \nextcharA
+}
+
+\def\nextcharA{
+  \futurelet\character\testA
+}
+
+\def\testA{
+  \ifx\character[\let\nxt\removebrackets\else\let\nxt\test\fi\nxt
+}
+
+\def\removebrackets[#1]{
+  \nextchar#1
+} 
+
+\def\nextchar{
+  \futurelet\character\test
+}
+
+\def\test{
+   \ifx\character(\let\nxt\nextnode\else\let\nxt\arrowend\fi\nxt
+}
+
+\def\nextnode(#1,#2){\advance\nodecount1
+  \expandafter\def\csname x\the\nodecount\endcsname{#1}%
+  \expandafter\def\csname y\the\nodecount\endcsname{#2}%
+  \nextchar
+}
+
+\def\arrowend#1{
+  \def\lastnode{(#1)}%
+
+  \ifnum\nodecount=0
+    \ifthenelse{\equal{\arrow@style}{arrow}}
+    {\draw[-stealth] \firstnode -- \lastnode;}
+    {\draw \firstnode -- \lastnode;}
+  \fi
+
+  \ifnum\nodecount>0
+    \tmpbegin0
+    \tmpend1
+    \advance\nodecount-1
+    \draw \firstnode -- (\csname x\the\tmpend\endcsname,\csname y\the\tmpend\endcsname);
+    \loop\ifnum\tmpbegin<\nodecount \advance\tmpbegin1 \advance \tmpend1
+      \draw (\csname x\the\tmpbegin\endcsname,\csname y\the\tmpbegin\endcsname)  --%
+            (\csname x\the\tmpend\endcsname,\csname y\the\tmpend\endcsname); 
+    \repeat
+    \ifthenelse{\equal{\arrow@style}{arrow}}
+    {\draw[-stealth] (\csname x\the\tmpend\endcsname,\csname y\the\tmpend\endcsname) -- \lastnode;}
+    {\draw (\csname x\the\tmpend\endcsname,\csname y\the\tmpend\endcsname) -- \lastnode;}  
+  \fi
+  \unskip
+}
+
+
+% User environment to draw hmsc's
+% Usage: \begin{hmsc}{#1}(llx,lly((urx,ury)...\end{hmsc}
+%
+
+
+\def\hmsc@settitle{%
+  \MSC@settitle{hmsc}%
+               {\hmsc@llx}%
+               {\hmsc@lly}%
+               {\hmsc@urx}%
+               {\hmsc@ury}%
+               {\hmsc@titlejustification}%
+               {\hmsckeywordstyle{\hmsckeyword}{} \hmsc@title}%
+%  \setlength{\tmp@X}{\hmsc@llx + \leftnamedist}%
+%  \setlength{\tmp@Y}{\hmsc@ury - \topnamedist}%
+%  \rput[tl](\tmp@X,\tmp@Y){%
+%    \hmsckeywordstyle{\hmsckeyword}{} \hmsc@title%
+%  }%
+}
+
+\newenvironment{hmsc}[2][l]
+  {\message{( \hmsckeyword: '#2'}%
+   \def\hmsc@titlejustification{#1}%
+   \def\hmsc@title{#2}%
+   \hmsc@startenv}%
+  {%\setlength{\tmp@X}{\hmsc@llx}\addtolength{\tmp@X}{\leftnamedist}%
+   %\setlength{\tmp@Y}{\hmsc@ury}\addtolength{\tmp@Y}{-\topnamedist}%
+   %\rput[tl](\tmp@X,\tmp@Y){\raisebox{\depth}[\totalheight][0pt]{\hmsckeywordstyle{\hmsckeyword} \hmsc@name}}%
+   \hmsc@settitle%
+   \ifthenelse{\equal{\msc@frame}{yes}}{%
+     \draw (\hmsc@llx,\hmsc@lly) rectangle (\hmsc@urx,\hmsc@ury);%
+   }{\relax}%
+   \end{tikzpicture}
+\end{lrbox}%
+{% DEBUG: use this \fbox stuf to check the bounding box 
+ \setlength{\fboxrule}{0.01pt}%
+ \setlength{\fboxsep}{1pt}%
+ \color{white}\fbox{%
+  \usebox{\mscbox}%
+  }%
+}%
+   \message{)}}%
+\def\hmsc@startenv(#1,#2)(#3,#4){%
+  \newcommand{\hmsc@llx}{#1\mscunit}%
+  \newcommand{\hmsc@lly}{#2\mscunit}%
+  \newcommand{\hmsc@urx}{#3\mscunit}%
+  \newcommand{\hmsc@ury}{#4\mscunit}%
+\begin{lrbox}{\mscbox}%
+  \begin{tikzpicture}(\hmsc@llx,\hmsc@lly)(\hmsc@urx,\hmsc@ury)
+    \ifthenelse{\equal{\msc@grid}{yes}}{%
+\draw[style=dotted, step=1cm] (\hmsc@llx,\hmsc@lly) grid (\hmsc@urx,\hmsc@ury);%
+
+\newlength{\hmsc@width}%
+\newlength{\hmsc@height}%
+\setlength{\hmsc@width}{\hmsc@urx-\hmsc@llx}%
+\setlength{\hmsc@height}{\hmsc@ury-\hmsc@lly}%
+
+% xticks and yticks
+\newcount\tmpcnt%
+
+\tmpcnt = \hmsc@width%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \x in {0,...,\tmpcnt} {%
+  \node at (\x, 0) [below right] {\x};
+}%
+
+\tmpcnt = \hmsc@height%
+\divide \tmpcnt by 1864679%from sp to cm
+\foreach \y in {0,...,\tmpcnt} {%
+  \node at (0,\y) [above left] {\y};
+}%
+    }{\relax}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Initialisation of the msc package
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% \set@mscvalueslarge 
+\def\set@mscvalueslarge{%
+  % the lengths
+  \setlength{\actionheight}{0.75\mscunit}
+  \setlength{\actionwidth}{1.25\mscunit}
+  \setlength{\bottomfootdist}{1\mscunit}
+  \setlength{\msccommentdist}{1.5\mscunit}
+  \setlength{\conditionheight}{0.75\mscunit}
+  \setlength{\conditionoverlap}{0.6\mscunit}
+  \setlength{\envinstdist}{2.5\mscunit} 
+  \setlength{\firstlevelheight}{0.75\mscunit} 
+  \setlength{\gatesymbolradius}{.5mm}
+  \setlength{\msccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmscconditionheight}{0.8\mscunit}
+  \setlength{\hmscconditionwidth}{1.6\mscunit}
+  \setlength{\hmscconnectionradius}{0.06\mscunit}
+  \setlength{\hmscreferenceheight}{0.8\mscunit}
+  \setlength{\hmscreferencewidth}{1.6\mscunit}
+  \setlength{\hmsccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmsccommentheight}{0.8\mscunit}
+  \setlength{\mscglobalcommentwidth}{2.4\mscunit}
+  \setlength{\hmsccommenthem}{0.3\mscunit}
+  \setlength{\hmscstartsymbolwidth}{0.85\mscunit}
+  \setlength{\inlineoverlap}{1.5\mscunit}
+  \setlength{\instbarwidth}{0pt}
+  \setlength{\instdist}{3\mscunit} 
+  \setlength{\instfootheight}{0.25\mscunit} 
+  \setlength{\instheadheight}{.6\mscunit} 
+  \setlength{\instwidth}{1.75\mscunit} 
+  \setlength{\labeldist}{1ex}
+  \setlength{\lastlevelheight}{0.5\mscunit} 
+  \setlength{\leftnamedist}{0.3\mscunit}
+  \setlength{\levelheight}{.75\mscunit} 
+  \setlength{\lostsymbolradius}{.15\mscunit}
+  \setlength{\markdist}{0.75\mscunit}
+  \setlength{\measuredist}{0.75\mscunit}
+  \setlength{\measuresymbolwidth}{.15\mscunit}
+  \setlength{\mscdocreferenceheight}{0.8\mscunit}
+  \setlength{\mscdocreferencewidth}{1.6\mscunit}
+  \setlength{\referenceoverlap}{1.5\mscunit}
+  \setlength{\regionbarwidth}{.2\mscunit}
+  \setlength{\regionwidth}{.5\mscunit}
+  \setlength{\selfmesswidth}{.75\mscunit}
+  \setlength{\stopwidth}{0.6\mscunit}
+  \setlength{\timerwidth}{0.4\mscunit}
+  \setlength{\topheaddist}{1.5\mscunit}
+  \setlength{\topnamedist}{.3\mscunit}
+  % some numeric parameters
+  \messarrowscale{2}
+}
+%
+%
+% \set@mscvaluesnormal 
+\def\set@mscvaluesnormal{%
+  % switch to a smaller font
+  \small% 
+  % the lengths
+  \setlength{\actionheight}{0.6\mscunit}
+  \setlength{\actionwidth}{1.25\mscunit}
+  \setlength{\bottomfootdist}{0.7\mscunit}
+  \setlength{\msccommentdist}{1.1\mscunit}
+  \setlength{\conditionheight}{0.6\mscunit}
+  \setlength{\conditionoverlap}{0.5\mscunit}
+  \setlength{\envinstdist}{2\mscunit} 
+  \setlength{\firstlevelheight}{0.6\mscunit} 
+  \setlength{\gatesymbolradius}{.5mm}
+  \setlength{\msccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmscconditionheight}{0.7\mscunit}
+  \setlength{\hmscconditionwidth}{1.4\mscunit}
+  \setlength{\hmscconnectionradius}{0.05\mscunit}
+  \setlength{\hmscreferenceheight}{0.7\mscunit}
+  \setlength{\hmscreferencewidth}{1.4\mscunit}
+  \setlength{\hmsccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmsccommentheight}{0.7\mscunit}
+  \setlength{\mscglobalcommentwidth}{2\mscunit}
+  \setlength{\hmsccommenthem}{0.2\mscunit}
+  \setlength{\hmscstartsymbolwidth}{0.7\mscunit}
+  \setlength{\inlineoverlap}{1\mscunit}
+  \setlength{\instbarwidth}{0pt} 
+  \setlength{\instdist}{2.2\mscunit} 
+  \setlength{\instfootheight}{0.2\mscunit} 
+  \setlength{\instheadheight}{.55\mscunit} 
+  \setlength{\instwidth}{1.6\mscunit} 
+  \setlength{\labeldist}{1ex}
+  \setlength{\lastlevelheight}{0.4\mscunit} 
+  \setlength{\leftnamedist}{0.2\mscunit}
+  \setlength{\levelheight}{.5\mscunit} 
+  \setlength{\lostsymbolradius}{.12\mscunit}
+  \setlength{\markdist}{.5\mscunit}
+  \setlength{\measuredist}{0.6\mscunit}
+  \setlength{\measuresymbolwidth}{.2\mscunit}
+  \setlength{\mscdocreferenceheight}{0.7\mscunit}
+  \setlength{\mscdocreferencewidth}{1.4\mscunit}
+  \setlength{\referenceoverlap}{1\mscunit}
+  \setlength{\regionbarwidth}{.15\mscunit}
+  \setlength{\regionwidth}{.4\mscunit}
+  \setlength{\selfmesswidth}{.6\mscunit}
+  \setlength{\stopwidth}{0.5\mscunit}
+  \setlength{\timerwidth}{0.3\mscunit}
+  \setlength{\topheaddist}{1.3\mscunit}
+  \setlength{\topnamedist}{.2\mscunit}
+  % some numeric parameters
+  \messarrowscale{1.5}
+}
+%
+% \set@mscvaluessmall
+\def\set@mscvaluessmall{%
+  % switch to a smaller font
+  \small% 
+  % the lengths
+  \setlength{\actionheight}{0.5\mscunit}
+  \setlength{\actionwidth}{1.2\mscunit}
+  \setlength{\bottomfootdist}{0.5\mscunit}
+  \setlength{\msccommentdist}{0.75\mscunit}
+  \setlength{\conditionheight}{0.5\mscunit}
+  \setlength{\conditionoverlap}{0.4\mscunit}
+  \setlength{\envinstdist}{1.2\mscunit} 
+  \setlength{\firstlevelheight}{0.4\mscunit} 
+  \setlength{\gatesymbolradius}{.5mm}
+  \setlength{\msccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmscconditionheight}{0.6\mscunit}
+  \setlength{\hmscconditionwidth}{1.2\mscunit}
+  \setlength{\hmscconnectionradius}{0.04\mscunit}
+  \setlength{\hmscreferenceheight}{0.6\mscunit}
+  \setlength{\hmscreferencewidth}{1.2\mscunit}
+  \setlength{\hmsccommentwidth}{0\mscunit} % let comment change size automatic
+  \setlength{\hmsccommentheight}{0.6\mscunit}
+  \setlength{\mscglobalcommentwidth}{1.6\mscunit}
+  \setlength{\hmsccommenthem}{0.1\mscunit}
+  \setlength{\hmscstartsymbolwidth}{0.4\mscunit}
+  \setlength{\inlineoverlap}{.75\mscunit}
+  \setlength{\instbarwidth}{0pt} 
+  \setlength{\instdist}{1.5\mscunit} 
+  \setlength{\instfootheight}{0.15\mscunit} 
+  \setlength{\instheadheight}{0.5\mscunit} 
+  \setlength{\instwidth}{1.2\mscunit} 
+  \setlength{\labeldist}{0.8ex}
+  \setlength{\lastlevelheight}{0.3\mscunit} 
+  \setlength{\leftnamedist}{0.1\mscunit}
+  \setlength{\levelheight}{0.4\mscunit} 
+  \setlength{\lostsymbolradius}{.08\mscunit}
+  \setlength{\markdist}{0.4\mscunit}
+  \setlength{\measuredist}{0.4\mscunit}
+  \setlength{\measuresymbolwidth}{.25\mscunit}
+  \setlength{\mscdocreferenceheight}{0.6\mscunit}
+  \setlength{\mscdocreferencewidth}{1.2\mscunit}
+  \setlength{\referenceoverlap}{.75\mscunit}
+  \setlength{\regionbarwidth}{.1\mscunit}
+  \setlength{\regionwidth}{.2\mscunit}
+  \setlength{\selfmesswidth}{.4\mscunit}
+  \setlength{\stopwidth}{0.3\mscunit}
+  \setlength{\timerwidth}{0.2\mscunit}
+  \setlength{\topheaddist}{1.2\mscunit}
+  \setlength{\topnamedist}{.1\mscunit}
+  % some numeric parameters
+  \messarrowscale{1.2}
+}
+% \setmscvalues assigns compatible values to all msc-parameters 
+% Currently, three sets of values are supported: large, normal
+% and small.
+\def\setmscvalues#1{%
+  \ifthenelse{\equal{#1}{large}}{%
+    \set@mscvalueslarge}{%
+  \ifthenelse{\equal{#1}{normal}}{%
+    \set@mscvaluesnormal}{%
+  \ifthenelse{\equal{#1}{small}}{%
+    \set@mscvaluessmall}{%
+  \ifthenelse{\equal{#1}{measure}}{%
+    \set@mscvaluesmeasure}{%
+  \msc@unknownmscvalueserr{#1}}}}}%
+}
+%
+% initialisation of the msc-parameters
+\setmscvalues{normal}
+\setfootcolor{black}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Error and help messages
+% We use the standard LaTeX2e facilities to generate error and help
+% messages (for more info, see file lterror.dtx of LaTeX2e distribution).
+%
+%
+% nickname already defined
+\gdef\msc@nicknamedefinederr#1{%
+  \PackageError{msc}{% error message
+    nickname #1 already defined}{% help text
+    You tried to use the nickname '#1' for a new\MessageBreak
+    msc object (instance, reference, inline expression, etc.),\MessageBreak
+    but the nickname is already assigned to another msc object.\MessageBreak
+    press <enter> to continue (the new msc object will be ignored).}%
+}
+%
+% no such msc instance error
+\gdef\msc@instundefinederr#1{%
+  \PackageError{msc}{% error message
+    undefined msc instance: #1}{% help text
+    You used '#1' as an msc instance nickname, but\MessageBreak
+    there is no msc instance with that nickname.}%
+}
+%
+% unknown linestyle error
+\gdef\msc@unknownlinestyleerr#1{%
+  \PackageError{msc}{% error message
+    unknown linestyle: #1}{% help text
+    Known msc linestyles are "solid", "dashed", and "dotted".\MessageBreak
+    You used '#1'.}%
+}
+%
+% unknown region style error
+\gdef\msc@unknownregionstyleerr#1{%
+  \PackageError{msc}{% error message
+    unknown region style: #1}{% help text
+    Known msc region styles are "normal", "coregion", "suspension", and "activation".\MessageBreak
+    You used '#1'.}%
+}
+%
+% unknown self message label position error
+\gdef\msc@unknownselfmessposerr#1{%
+  \PackageError{msc}{% error message
+    unknown position for self message: #1}{% help text
+    Known positions are "l" (left), "r" (right).\MessageBreak
+    You used '#1'.}%
+}
+%
+% unknown self message label position error
+\gdef\msc@unknowntimerposerr#1{%
+  \PackageError{msc}{% error message
+    unknown timer position: #1}{% help text
+    Known timer positions are "l" (left), "r" (right).\MessageBreak
+    You used '#1'.}%
+}
+%
+% unknown self message label position error
+\gdef\msc@unknownmscvalueserr#1{%
+  \PackageError{msc}{% error message
+    unknown set of msc-values: #1}{% help text
+    Known sets of msc-values are "normal" and "small".\MessageBreak
+    You used '#1'.}%
+}
+%
+% no such msc reference error
+\gdef\msc@refundefinederr#1{%
+  \PackageError{msc}{% error message
+    undefined reference: #1}{% help text
+    You used '#1' as a reference nickname, but\MessageBreak
+    there is no reference with that nickname.}%
+}
+%
+% no such msc inline error
+\gdef\msc@inlundefinederr#1{%
+  \PackageError{msc}{% error message
+    undefined inline expression: #1}{% help text
+    You used '#1' as a inline expression nickname, but\MessageBreak
+    there is no inline expression with that nickname.}%
+}
+%
+% inline first right from last error
+\gdef\msc@inlfirstlasterror#1#2#3{%
+  \PackageError{msc}{% error message
+    first instance right from final instance\MessageBreak in inline expression #1}{% help text
+    In the definition of inline expression '#1', you probably switched\MessageBreak 
+    the first msc instance, '#2', and the final msc instance, '#3',\MessageBreak
+    since the first is located right from the final.}%
+}
+%
+% reference first rightt from last error
+\gdef\msc@reffirstlasterror#1#2#3{%
+  \PackageError{msc}{% error message
+    first instance right from final instance\MessageBreak in reference #1}{% help text
+    In the definition of msc reference '#1', you probably switched\MessageBreak 
+    the first msc instance, '#2', and the final msc instance, '#3',\MessageBreak
+    since the first is located right from the final.}%
+}
+%
+\gdef\msc@illegalmarkplacement#1{%
+  \PackageError{msc}{%
+    illegal mark placement specifier: #1}{% help text
+    The four mark placement specifiers are:\MessageBreak
+      tl (top-left)\MessageBreak
+      bl (bottom-left)\MessageBreak
+      tr (top-right)\MessageBreak
+      br (bottom-right)}
+}
+\gdef\msc@illegalmesslabelpositionerr#1{%
+  \PackageError{msc}{%
+    illegal label position specifier: #1}{% help text
+    Valid label position specifiers are:\MessageBreak
+      t (top)\MessageBreak
+      b (bottom)}
+}
+\gdef\msc@illegalselfmesspositionerr#1{%
+  \PackageError{msc}{%
+    illegal label position: #1}{% help text
+    Valid label positions are:\MessageBreak
+      t (top)\MessageBreak
+      b (bottom)\MessageBreak
+      l (left)\MessageBreak
+      r (right)}
+}
+\gdef\msc@illegallostfoundlabelpositionerr#1{%
+  \PackageError{msc}{%
+    in lost/found message: illegal label position: #1}{% help text
+    Valid label position are:\MessageBreak
+      t (top)\MessageBreak
+      b (bottom)}
+}
+%################################################################################
+%
+\gdef\msc@illegaltitleplacement#1{%
+  \PackageError{msc}{%
+    illegal title placement specifier: #1}{% help text
+    Valid title placement specifiers are:\MessageBreak
+      l (left)\MessageBreak
+      c (center)\MessageBreak
+      r (right)}
+}
+%################################################################################
+\gdef\hmsc@nicknamedefinederr#1{%
+  \PackageError{msc}{% error message
+    nickname #1 already defined}{% help text
+    You tried to use the nickname '#1' for a new\MessageBreak
+    hmsc object (startsymbol, endsymbol, reference, etc.),\MessageBreak
+    but the nickname is already assigned to another hmsc object.\MessageBreak
+    press <enter> to continue (the new hmsc object will be ignored).}%
+}
+% no such msc hmsc object error
+\gdef\hmsc@objectundefinederr#1{%
+  \PackageError{msc}{% error message
+    undefined hmsc object: #1}{% help text
+    You used '#1' as an hmsc object nickname, but\MessageBreak
+    there is no hmsc object with that nickname.}%
+}%
+% hmsc unknown connection type
+\gdef\hmsc@unknownconnectiontypeerror#1{%
+  \PackageError{msc}{% error message
+    Unknown HMSC connection type: #1}{% help text
+    Known HMSC connection types are straight, rounded, and curved.}%
+}
+%
+% hmsc missing y coordinate in arrow specification
+\gdef\hmsc@missingycoord#1#2{%
+  \PackageError{msc}{% error message
+  Missing Y coordinate in arrow specification. You typed:\MessageBreak
+  [#2]\MessageBreak
+  which is parsed as the incomplete list of points:\MessageBreak
+  #1\MessageBreak
+  Remove the final X coordinate or add an Y coordinate}{%
+  The points specifying an HMSC arrow should be given as a comma separated\MessageBreak
+  list of X, Y coordinates. Furthermore, each X coordinate should\MessageBreak
+  be followed by a Y coordinate.}%
+} 
+% remarks
+% 
+% Issuing pstricks drawing-commands inside a TeX-group in a pspicture environment
+% can result in ill-positioned objects.
+%
+% messages from/to the right environment should be defined after the last
+% instance is declared with \declinst
+

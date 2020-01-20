@@ -6,7 +6,7 @@ We now define indistinguishability of processes, and how we could verify it.
 We make a distinction between symbolic and observable traces:
 symbolic ones are sequences of action names as in \cref{def:trace},
 while observable traces are sequences of pairs $\pair{c_i,c_o}$.
-Intuitively, such a pair describes the input and output channels of an 
+Intuitively, such a pair describes the input and output channels of an
 action; several actions might have the same input and output channels.
 We write $A : \pair{c_i,c_o}$ when action $A$ inputs on channel $c_i$ and
 outputs on channel $c_o$.
@@ -58,7 +58,7 @@ e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side
 conditions for the left side of the bi-process.
 
 \begin{definition}
-  Given a symbolic trace $\tr = \alpha_1\ldots\alpha_n$, we define its frame 
+  Given a symbolic trace $\tr = \alpha_1\ldots\alpha_n$, we define its frame
   $\mouts_\tr = \pair{\hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)}$
   as the sequence of outputs produced by the trace.
 \end{definition}
@@ -67,7 +67,7 @@ Note that this frame is not a sequence of meta-level terms,
 but a sequence of base-level terms featuring
 $\diff{\_}{\_}$ operators.
 We now define the equivalence,
-writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse 
+writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse
 \mathsf{error}$, with an error constant that is unused elsewhere.
 
 \begin{definition}
@@ -77,7 +77,7 @@ writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse
   we have:
   $$\M \models
   \myif (\phi_{\tr^L})^{I_{\tr}} \mythen (\mouts_{\tr})^L
-  \sim   
+  \sim
   \myif (\phi_{\tr^R})^{I_{\tr}} \mythen (\mouts_{\tr})^R$$
 \end{definition}
 
@@ -100,7 +100,7 @@ in the fact that we consider here symbolic and not observable traces.
   where $n$ and $m$ are arbitrary, possibly equal names.
   Its two projections are indistinguishable, but the
   bi-process is not diff-equivalent.
-  Indeed we have 
+  Indeed we have
   $\myif g()=0 \mythen \Out(c,n) \not\sim
    \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
   $g()=0$ to distinguish the two sides.
@@ -120,9 +120,9 @@ in the fact that we consider here symbolic and not observable traces.
 
 \newcommand{\ok}{\mathsf{ok}}
 
-In the next example, we omit the $\myelse$ branch when it consists of a null 
+In the next example, we omit the $\myelse$ branch when it consists of a null
 process. In these examples, there is a coincidence between diff-equivalence
-and indistinguishability, because observable actions coincide with symbolic 
+and indistinguishability, because observable actions coincide with symbolic
 actions.
 
 \begin{example} \label{ex:negl}
@@ -175,20 +175,20 @@ $\hat{\minp}^L(A_n) = g_n(\hat{\mout}^L(A_1),\ldots,\hat{\mout}^L(A_{n-1}))$.
 A sufficient condition for diff-equivalence is to prove,
 for any symbolic trace $\tr.\alpha$ of $B$, the following goals:
 $$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
-$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash
    \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
 The first kind of judgment has been defined above: these are the sequents
 of the meta-logic for reachability. The second kind of judgment is defined
 below: $\Gamma \vdash u \sim v$ stands for $(\myif \Gamma \mythen u) \sim
 (\myif \Gamma \mythen v)$. For these goals we are thus imposing a left-hand
 side condition on right-hand side outputs, but it should not matter because
-the left- and right-hand side conditions have been shown to hold 
+the left- and right-hand side conditions have been shown to hold
 simultaneously (with overwhelming probability).
 
 \emph{TODO: Check that it implies diff-equivalence as previously defined.}
 
 These conditions are sufficient to ensure diff-equivalence but not necessary.
-The gap comes from the fact that we are requiring conditions to be 
+The gap comes from the fact that we are requiring conditions to be
 synchronized for all random samplings.
 
 \begin{example}
@@ -238,7 +238,7 @@ On either sides, the tag uses a session nonce $n_T(i,j)$.
 
 On both sides we have unboundedly many sessions of the reader,
 with a conditional as follows ($x$ is the first input message):
-$$\mathsf{find} \ i,j \ \mathsf{suchthat} \ \pi_2(x) = 
+$$\mathsf{find} \ i,j \ \mathsf{suchthat} \ \pi_2(x) =
 h(\pi_1(x),\diff{k(i)}{k'(i,j)})$$
 
 To sum up, we have the following actions:
@@ -278,7 +278,7 @@ on one side of the bi-process. We might adapt the verification conditions
 of the previous section as follows, for all symbolic traces $\tr$:}
 $$ \phi^L_\tr, \phi^R_\tr \vdash
    \phi^L_\alpha \Leftrightarrow (\exists j.~ \phi^R_\alpha) $$
-$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash 
+$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash
    \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
 \emph{In the first kind of condition, the existential is here to account
 for the possible change of some index. There is no change in the second
@@ -287,13 +287,13 @@ have passed on both sides, restricting indices $j$.}
 
 \subsection{Reasoning about equivalences}
 
-Now equipped with a logic to reason about reachability properties, we turn 
-ourself to proving general indistinguishability. We consider the case of 
-bi-processes, where the set of actions available on both side is the same, but 
-the actions may differ inside their terms. Thus, a bi-process is simply a 
-protocol, where each action $\alpha$ has two versions, on for the left and on 
-for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each 
-possible trace $\tr$ of the protocol, there exists then the two versions 
+Now equipped with a logic to reason about reachability properties, we turn
+ourself to proving general indistinguishability. We consider the case of
+bi-processes, where the set of actions available on both side is the same, but
+the actions may differ inside their terms. Thus, a bi-process is simply a
+protocol, where each action $\alpha$ has two versions, on for the left and on
+for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each
+possible trace $\tr$ of the protocol, there exists then the two versions
 $\tr^L$ and $\tr^R$.
 
 To reason about those properties, we once again try to define a well-suited logic.
@@ -371,7 +371,7 @@ n,m \not \in \Gamma
    \label{fig:lk-ind}
 \end{figure}
 \begin{lemma}
-The rules presented in
+The rules presented in Figure~\ref{fig:lk-ind} are sound.
 
 
 \end{lemma}
@@ -381,13 +381,123 @@ We also give a small Lemma, which allows to reason on the traces in an increment
 
 \begin{lemma}
   A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol, and any available action $\alpha$,
-\[\phi_{\tr^L} \vDash
+  \[
+\begin{array}{l}
+  \phi_{\tr^L},  \mouts_\tr^L \sim \mouts_{\tr}^R  \vDash
 \begin{array}[t]{l}
-    \myif (\phi_{\alpha^L})^{I_{\tr^L \cdot \alpha^L}} \mythen (\mouts_{\tr^L\cdot \alpha^L})^{I_{\tr^L\cdot \alpha^L}}
+    \myif \phi_{\alpha}^L \mythen \mouts_{\tr\cdot \alpha}^{L}
     \\ \qquad
-    \sim  \myif (\phi_{\alpha^R})^{I_{\tr^L \cdot \alpha^R}} \mythen (\mouts_{\tr^L\cdot \alpha^R})^{I_{\tr^L\cdot \alpha^R}} \end{array}\]
+    \sim  \myif \phi_{\alpha}^{R} \mythen \mouts_{\tr\cdot \alpha}^{R} \end{array}\end{array}\]
 
 \end{lemma}
+
+\section{An example : a signed DDH key exchange}
+\charlie{abus de notations dans cette partie}
+
+We brieffly show how one can prove the security of a signed DDH key exchange. The protocol in pi-calculus is provided in Figure~\ref{fig:signed_ddh} and the run of an honnest execution in Figure~\ref{fig:dh_ke}. This example is a simplified instance of classical key-exchange security. Notably, we assume that identities are already fixed.
+
+\begin{figure}
+    % \setlength{\belowcaptionskip}{-15pt}
+    \setmsckeyword{} \drawframe{no}
+    \setmscscale{0.9}
+    \begin{center}
+    \begin{msc}{}
+        \setlength{\instwidth}{0\mscunit}
+        \setlength{\instdist}{7cm}
+        \setlength{\topheaddist}{0cm}
+        \declinst{initiator}{
+            \begin{tabular}[c]{c}
+                \textsc{A} \\
+                \colorbox{gray}{{\;\; $sk_A,a_i$\;\;}}
+        \end{tabular}}{}
+
+        \declinst{receiver}{
+            \begin{tabular}[c]{c}
+                \textsc{B} \\
+                \colorbox{gray}{{\;\;  $sk_B,b_i$ \;\;}}
+        \end{tabular}}{}
+
+        \nextlevel[-1]
+        \mess{$\mysign(g^{a_i},sk_A)$}{initiator}{receiver}
+        \nextlevel[1.5]
+        \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_B)$}{receiver}{initiator}
+         \nextlevel[1.5]
+         \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_A)$}{initiator}{receiver}
+
+
+
+
+       \end{msc}
+       \end{center}
+    \caption{Diffie Hellman key exchange}\label{fig:dh_ke}
+\end{figure}
+
+\begin{figure}
+\[
+  \begin{array}{cc}
+\begin{array}[t]{l@{~}l}
+  A_i := & \myout{\mysign(g^{a_i},sk_A)} : \alpha_1; \\
+         &\myin{x}; \\
+         & \myif \mycsign(x,pk(sk_B)) \\
+  & ~ \wedge \pi_1(\mygetmess(x))=g^{a_i}  \mythen \\
+         & \quad \myout{\mysign(\mygetmess(x),sk_A) } : \alpha_2; \\
+         & \quad \myfind j \mysuchthat g^{b_j} = \pi_2(\mygetmess(x)) \\
+           & \qquad \myout{\diff{\pi_2(\mygetmess(x))^{a_i}}{k_{i,j}}} : \alpha_3\\
+         & \quad \myelse \\
+         & \qquad \myout{\diff{\pi_2(\mygetmess(x))^{a_i}}{\bot}}  : \alpha_4 \\
+         & \myelse \\
+           & \bot
+\end{array}
+&
+\begin{array}[t]{l@{~}l}
+  B_i := &\myin{x}; \\
+         & \myif \mycsign(x,pk(sk_A)) \mythen \\
+         & \quad \myout{\mysign(<\mygetmess(x), g^{b_i}>,sk_B)} : \beta_1; \\
+         & \quad \myin{y}; \\
+         & \quad \myif \mycsign(y,pk(sk_A))\\
+  & \quad ~ \wedge \mygetmess(y) = <\mygetmess(x), g^{b_i}> \mythen \\
+         & \quad \quad \myfind j \mysuchthat g^{a_j} = \mygetmess(x) \\
+           & \quad \qquad \myout{\diff{\mygetmess(x)^{b_i}}{k_{j,i}}} : \beta_2 \\
+         & \quad \quad \myelse \\
+         & \quad \qquad \myout{\diff{\mygetmess(x)^{b_i}}{\bot}} : \beta_3 \\
+         & \quad \myelse \\
+           & \quad \bot \\
+         & \myelse \\
+           & \bot
+\end{array}
+\end{array}
+\]
+\label{fig:signed_ddh}
+\caption{A signed DDH key exchange}
+\end{figure}
+
+We outline the proof of the fact that $!_i A_i \| B_i$ is diff-equivalent. There are four actions with choices in the output, thus, we have to show that, for all trace $\tr$, for all $i,j$:
+\begin{enumerate}
+\item $\begin{array}[t]{l}
+         \phi_\tr,  \mycsign(x,pk(sk_B)), \mygetmess(x)=<g^{a_i}, g^{b_j}>, \mouts_\tr^L \sim \mouts_\tr^R,  \\
+         \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, k_{i,j}
+\end{array}
+         $ ($\alpha_3$)
+
+       \item $\begin{array}[t]{l}
+                \phi_\tr,  \mycsign(x,pk(sk_B)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L \\
+                \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, \bot
+                \end{array} $ ($\alpha_4$)
+              \item $\begin{array}[t]{l}
+                       \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)), \mygetmess(y)=<g^{a_j}, g^{b_i}>,  \mouts_\tr^R \sim \mouts_\tr^L \\ \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, k_{j,i}
+                     \end{array}$ ($\beta_2$)
+              \item $\begin{array}[t]{l}
+                       \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L\\
+ \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, \bot
+                       \end{array}$ ($\beta_3$)
+\end{enumerate}
+
+Regarding goal $(2)$ and $(4)$, we remark that it is a case where $\Gamma \vdash \false$. Indeed, for $(2)$ applying EUFCMA yields that there exists $j$ such that $x = \mysign(<g^{a_i},g^{b_j}>,sk_B)$ which is in contradiction with  $\not \exists j. \pi_2(mygetmess(x))= g^{b_j}$.
+
+Regarding goals $(1)$ and $(3)$, we mainly use DDH. To this end, we first use EUFMCA, to ensure that we have a matching conversation between the two sessions, and then use DDH. \charlie{je détail pas, ça prend du temps de formaliser proprement DDH vis à vis des actions, et je pense pas que ce soit l'objectif actuel}
+
+
+
 
 %%% Local Variables:
 %%% mode: latex
