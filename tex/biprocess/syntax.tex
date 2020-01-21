@@ -1,0 +1,127 @@
+\section{Syntax}
+
+\begin{itemize}
+  \item $\N$ names with index arity
+  \item $\X$ variables
+  \item $\I$ index variables
+  \item $\F$ function symbols with usual arity
+  \item $\G$ attacker's function symbols with usual arity
+  \item $\A$ action symbols with index arity
+  \item $\C$ channel names
+\end{itemize}
+
+\begin{figure}[h]
+  \[
+    \begin{array}{rcll}
+      t & := & \sfn(i_1 \dots i_n) \mid x \mid \sff(t_1,\dots,t_n) \mid \sfg(t_1,\dots,t_n) & \text{term}
+      \\
+      tt & := & t \mid \choice(t_1,t_2) \mid \sff(tt_1,\dots,tt_n) \mid \sfg(tt_1,\dots,tt_n) & \text{bi-term}
+      \\
+      \atom & := & t_1,\dots,t_n \sim_n t'_1,\dots,t'_n & \text{atomic formula}
+      \\
+      \phi & := & \atom \mid \true \mid \false \mid \phi \wedge \phi' \mid \phi \vee \phi' \mid \phi \Rightarrow \phi'\mid \neg \phi \mid \forall x.\phi \mid \exists x.\phi & \text{formula}
+    \end{array}
+  \]
+  \caption{Syntax}
+  \label{fig:syntax}
+\end{figure}
+
+Two sorts: $\msg$ and $\bool$.
+
+We define, for every $n \in \mathbb{N}$, a predicate symbol $\sim_n$ of arity $2n$ representing the equivalence between two vectors of terms of length $n$.
+
+We assume that $\F$ contains at least the function symbols: $\mathsf{0}_{/0}, \true_{/0}, \false_{/0}, \eq_{/2}, \funif_{/3}$ of sorts $\msg, \bool, \bool, \bool, \bool$.
+
+\begin{definition}
+An \emph{action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \A$ and $i_1,\dots,i_n \in \I$, is defined by:
+\begin{itemize}
+  \item a bi-term of sort $\bool$: $\phi_{\alpha}$ (intuitively, the condition of this action)
+  \item a bi-term of sort $\msg$: $\mout_{\alpha}$ (intuitively, the output of this action)
+  \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
+\end{itemize}
+where the only variable appearing in $\phi_{\alpha}$ and $\mout_{\alpha}$ is $x_{\alpha}$ (intuitively, the input of this action).
+\end{definition}
+
+\begin{definition}
+  A \emph{bi-process} is a (possibly infinite) set of actions.
+\end{definition}
+
+\begin{example}[Basic Hash]
+  \label{ex:basic-hash-bi-process}
+  We introduce the bi-process $B$ defined by the following set of actions: $$\{\T(i,j),\R_1(ii,jj),\R_2(ii,jj) \mid i,j,ii,jj \in \I\}$$
+  \begin{itemize}
+    \item action $\T(i,j)$
+      \begin{itemize}
+        \item $\phi_{\alpha_1} := \true$
+        \item $\mout_{\alpha_1} := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle$
+      \end{itemize}
+    \item action $\R_1(ii,jj)$
+      \begin{itemize}
+        \item $\phi_{\alpha_2} := \snd(\g(x_{\alpha_2})) = \h(\choice(k(ii),k'(ii)),\fst(\g(x_{\alpha_2}))$
+        \item $\mout_{\alpha_2} := \ok$
+      \end{itemize}
+    \item action $\R_2(ii,jj)$
+      \begin{itemize}
+        \item $\phi_{\alpha_3} := \neg (\snd(\g(x_{\alpha_3})) = \h(\choice(k(ii),k'(ii)),\fst(\g(x_{\alpha_3})))$
+        \item $\mout_{\alpha_3} := \error$
+      \end{itemize}
+  \end{itemize}
+\end{example}
+
+\begin{definition}
+  Given a bi-process $B$ defined by a set $\{\alpha_i\}_i$, a \emph{trace} is a sequence $\alpha_1 \dots \alpha_n$ made of actions from the set $\{\alpha_i\}_i$.
+\end{definition}
+
+\begin{definition}
+  Given a symbolic trace $\tr = \alpha_1 \dots \alpha_n$, we define recursively the \emph{frame} $\mouts(\tr)$ of this trace:
+  \begin{itemize}
+    \item $\mouts(\alpha_1) := \{ \mout_{\alpha_1}\{x_{\alpha_1} \mapsto \varnothing\} \}$
+    \item $\forall i, 2 \leq i \leq n, \mouts(\alpha_1 \dots \alpha_i) := \mouts(\alpha_1 \dots \alpha_{i-1}) \cup \{ \mout_{\alpha_{i-1}}\{x_{\alpha_{i-1}} \mapsto \mouts(\alpha_1 \dots \alpha_{i-1})\} \}$
+  \end{itemize}
+\end{definition}
+
+\begin{definition}
+  Given a symbolic trace $\tr = \alpha_1 \dots \alpha_n$, we define $\phi_\tr := \bigwedge_{\alpha_i\in\tr} \phi_{\alpha_i}\{x_{\alpha_i}\mapsto\mouts(\alpha_1 \dots \alpha_{i-1})\}$.
+\end{definition}
+
+\begin{example}
+  \label{ex:basic-hash-trace}
+  We note $\alpha_1 := \T(i,j)$ and $\alpha_2 := \R_1(ii,jj)$.
+  The sequence $\alpha_1.\alpha_2$ is a symbolic trace of the bi-process defined in \Cref{ex:basic-hash-bi-process}.
+  \begin{itemize}
+    \item $\mouts(\alpha_1) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle$
+    \item $\mouts(\alpha_1.\alpha_2) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle, \ok$
+    \item $\phi_\tr := \true \land \snd(\g(\mouts(\alpha_1))) = \h(\choice(k(i),k'(i)),\fst(\g(\mouts(\alpha_1)))$
+  \end{itemize}
+  Other symbolic traces:
+  \begin{itemize}
+    \item $\T(i,j).\R_1(ii,jj).\T(i,j').\R_1(ii,jj')$
+    \item $\T(i,j).\R_1(ii,jj).\T(i',j').\R_1(ii',jj')$
+  \end{itemize}
+\end{example}
+
+\begin{example}
+  Toy example.
+  \begin{itemize}
+    \item bi-process $B := \{ \sfa(i) \mid i \in \I \}$
+      \begin{itemize}
+        \item $\phi_{\sfa(i)} := \g(x_{\sfa(i)}) = \choice(n(i),m(i))$
+        \item $\mout_{\sfa(i)} := \ok$
+      \end{itemize}
+    \item $\tr := \sfa(i).\sfa(i')$
+    \begin{itemize}
+      \item $\mouts(\tr) := \{\ok,\ok\}$
+      \item $\phi_\tr := (\g() = \choice(n(i),m(i))) \land (\g(\{\ok\}) = \choice(n(i'),m(i')))$
+    \end{itemize}
+  \end{itemize}
+\end{example}
+
+\bigskip
+\noindent
+We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right projections, for example:
+\begin{itemize}
+  \item $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$
+  \item $(\mout_{\alpha})^L$ and $(\mout_{\alpha})^R$
+  \item $(\phi_{\tr})^L$ and $(\phi_{\tr})^R$
+  \item $(\mouts_{\tr})^L$ and $(\mouts_{\tr})^R$
+\end{itemize}
