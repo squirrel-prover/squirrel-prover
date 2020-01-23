@@ -62,15 +62,8 @@ let rec left_introductions s = function
              let env,v' =
                Vars.make_fresh env (Vars.sort v) (Vars.name v)
              in
-             let item =
-               let open Term in
-               match Vars.sort v with
-                 | Sorts.Index -> ESubst (Var v,Var v')
-                 | Sorts.Timestamp -> ESubst (Var v, Var v')
-                 | Sorts.Message -> ESubst (Var v, Var v')
-                 | Sorts.Boolean -> ESubst (Var v, Var v')
-             in
-               item::subst, env)
+             let item = Term.ESubst (Var v, Var v') in
+             item::subst, env)
           ([],env)
           vars
       in
@@ -375,8 +368,8 @@ let eq_names (s : Sequent.t) sk fk =
   sk [s] fk
 
 let () = T.register "eqnames"
-    ~help:" Add index constraints resulting from names equalities, modulo the \
-known equalities."
+    ~help:"Add index constraints resulting from names equalities, modulo the \
+           known equalities."
     eq_names
 
 let eq_timestamps (s : Sequent.t) sk fk =
@@ -446,8 +439,8 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
 
 let () =
   T.register_general "substitute"
-    ~help:"substitute to i1, i2 -> if i1=i2 is implied by the sequent, replaces \
-           all occurents of i1 by i2 inside the sequent."
+    ~help:"substitute to i1, i2 -> if i1=i2 is implied by the sequent, \
+           replaces all occurences of i1 by i2 inside the sequent."
     (function
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
        | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
@@ -530,8 +523,9 @@ let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk
-  with Euf.Bad_ssc -> fk (Tactics.Failure "The key of the hash does not \
-satisfy the syntactic side condition")
+  with Euf.Bad_ssc -> fk (Tactics.Failure
+                            "The hashing key does not \
+                             satisfy the syntactic side condition")
 
 let () =
   T.register_general "euf"
@@ -570,8 +564,8 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "apply"
-    ~help:" apply gname to t_1,t_2 -> applies the axiom gname with its \
-universally quantified variables instantied with t1,..."
+    ~help:"apply gname to t_1,t_2 -> applies the axiom gname with its \
+           universally quantified variables instantied with t1,..."
     (function
       | Prover.String_name id :: th_terms ->
           let th_terms =
@@ -606,7 +600,7 @@ let collision_resistance (s : Sequent.t) sk fk =
   in
   if List.length hashes = 0 then
     fk (Failure "no equality between hashes where the keys satisfiy the \
- syntactic condition has been found")
+                 syntactic condition has been found")
   else
     begin
       let rec make_eq hash_list =
@@ -644,5 +638,5 @@ let collision_resistance (s : Sequent.t) sk fk =
 
 let () = T.register "collision"
     ~help:"Collects all equalities between hashes, and affs the equalities of \
-the messages hashed with the same valid key."
+           the messages hashed with the same valid key."
     collision_resistance
