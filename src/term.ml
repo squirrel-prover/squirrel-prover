@@ -43,6 +43,7 @@ type _ term =
       -> Sorts.message term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Init : Sorts.timestamp term
   | Var : 'a Vars.var -> 'a term
 
 type 'a t = 'a term
@@ -58,6 +59,7 @@ let sort : type a. a term -> a Sorts.t =
   | Var v -> Vars.sort v
   | Pred _ -> Sorts.Timestamp
   | Action _ -> Sorts.Timestamp
+  | Init -> Sorts.Timestamp
 
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
@@ -89,6 +91,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         (fun ppf () ->
            Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
         ppf ()
+  | Init -> Fmt.styled `Green (fun ppf () -> Fmt.pf ppf "init") ppf ()
 
 let get_vars : 'a term -> Vars.evar list =
   fun term ->
@@ -102,8 +105,9 @@ let get_vars : 'a term -> Vars.evar list =
     | Var tv -> res := Vars.EVar tv :: !res
     | Pred ts -> termvars ts
     | Fun (_, lt) -> List.iter termvars lt
-    | Name _ -> ()
     | Macro (_, l, ts) -> List.iter termvars l; termvars ts
+    | Name _ -> ()
+    | Init -> ()
   in
   termvars term; !res
 
@@ -189,6 +193,7 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Var m -> Var m
     | Pred ts -> Pred (subst s ts)
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+    | Init -> Init
   in
   assoc s new_term
 

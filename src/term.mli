@@ -59,6 +59,7 @@ type _ term =
       -> Sorts.message term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Init : Sorts.timestamp term
   | Var : 'a Vars.var -> 'a term
 
 type 'a t = 'a term

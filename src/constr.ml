@@ -30,11 +30,13 @@ module Utv : sig
     | UVar of uvar
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
+    | UInit
 
   val uvari : Vars.index -> ut
   val uts : Term.timestamp -> ut
   val uname : Symbols.action Symbols.t -> ut list -> ut
   val upred : ut -> ut
+  val uinit : ut
 
 end = struct
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
@@ -46,6 +48,7 @@ end = struct
     | UVar of uvar
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
+    | UInit
 
   module Ut = struct
     type t = ut
@@ -73,10 +76,13 @@ end = struct
 
   let upred u = UPred u |> make
 
+  let uinit = UInit |> make
+
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
     | Term.Pred ts -> upred (uts ts)
     | Term.Action (s,l) -> uname s (List.map uvari l)
+    | Term.Init -> uinit
 end
 
 open Utv
@@ -92,6 +98,7 @@ let rec pp_ut_cnt ppf = function
     Fmt.pf ppf "@[%a[%a]@]"
       Fmt.string (Symbols.to_string a)
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
+  | UInit -> Fmt.pf ppf "init"
 
 let pp_ut ppf ut = pp_ut_cnt ppf ut.cnt
 
@@ -129,7 +136,7 @@ let mk_instance (l : trace_atom list) =
   let rec subterms acc x = match x.cnt with
     | UName (_,is) -> x :: is @ acc
     | UPred y -> subterms (x :: acc) y
-    | UVar _ -> x :: acc in
+    | UVar _ | UInit -> x :: acc in
   let elems =
     List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
     |> List.fold_left subterms []
@@ -175,6 +182,11 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
           (uf, uname a (List.rev nis_rev))
 
         else mgu_ uf rut (ut :: lv)
+
+      | UInit ->
+        let uf = if ext_support then Uuf.extend uf ut else uf in
+        let rut = Uuf.find uf ut in
+        if ut_equal rut ut then uf, uinit else mgu_ uf rut (ut :: lv)
 
       | UPred ut' ->
         let uf, nut' = mgu_ uf ut' lv in

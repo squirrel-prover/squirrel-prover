@@ -80,9 +80,7 @@ let rec left_introductions s = function
   | [] -> s
 
 let timestamp_case ts s sk fk =
-  (* TODO this is currently unsound: we need to check that ts is different
-   *   from epsilon, or add corresponding case in formula. *)
-  let f = ref False in
+  let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
   let add_action a =
     let indices =
       let env = ref @@ Sequent.get_env s in
@@ -101,7 +99,7 @@ let timestamp_case ts s sk fk =
       if indices = [] then at else
         Exists (List.map (fun x -> Vars.EVar x) indices,at)
     in
-    f := match !f with False -> case | _ -> Formula.Or (case,!f)
+    f := Formula.Or (case,!f)
   in
   Action.iter_descrs add_action ;
   sk [Sequent.add_formula !f s] fk

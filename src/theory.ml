@@ -5,6 +5,7 @@ type kind = Sorts.esort
 type term =
   | Var of string
   | Taction of string * term list
+  | Tinit
   | Name of string * term list
   (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -27,6 +28,7 @@ let rec pp_term ppf = function
     Fmt.pf ppf "%s%a"
       a
       (Utils.pp_list pp_term) l
+  | Tinit -> Fmt.pf ppf "init"
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s%a%a"
       f
@@ -161,6 +163,7 @@ let rec check_term env tm (kind:Sorts.esort) =
     List.iter
       (fun t -> check_term env t Sorts.eindex)
       l
+  | Tinit -> if kind <> Sorts.etimestamp then raise Type_error
   | Compare (_, u, v) ->
     if kind <> Sorts.eboolean then raise Type_error ;
     begin try
@@ -251,7 +254,7 @@ let make_term ?at_ts s l =
   | exception Symbols.Unbound_identifier ->
       (* By default we interpret s as a variable,
        * but this is only possible if it is not indexed.
-       * If that is not the case, the use probably meant
+       * If that is not the case, the user probably meant
        * for this symbol to not be a variable, hence
        * we raise Unbound_identifier. We could also
        * raise Type_error because a variable is never of
@@ -290,6 +293,7 @@ let subst t s =
           | Not_found -> Var x
         end
     | Taction (a,l) -> Taction (a, List.map aux l)
+    | Tinit -> Tinit
     | Name (n,l) -> Name (n, List.map aux l)
     | Get (s,None,l) -> Get (s, None, List.map aux l)
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
@@ -362,7 +366,7 @@ let convert ts subst t =
       Term.Name (Symbols.Name.of_string n, i)
     | Var x -> assoc subst x Sorts.Message
     | Compare _ -> assert false (* TODO *)
-    | Taction _ -> assert false       (* reserved for constraints *)
+    | Taction _ | Tinit -> assert false (* reserved for constraints *)
     | Fun (f, l, Some _) ->
         (* This special case, corresponding to a not-really-local term
          * resulting from the input process preparation, can only
@@ -379,6 +383,7 @@ let convert_ts subst t =
     | Fun (f, [t'], None) when f = Symbols.to_string (fst Term.f_pred) ->
         Term.Pred (conv t')
     | Var x -> assoc subst x Sorts.Timestamp
+    | Tinit -> Term.Init
     | Taction (a,l) ->
         begin match Symbols.Action.of_string a with
           | s ->
@@ -433,7 +438,7 @@ let convert_glob subst t =
       Term.Name (Symbols.Name.of_string n,i)
     | Compare _ -> assert false (* TODO *)
     | Var x -> assoc subst x Sorts.Message
-    | Taction _ -> assert false
+    | Taction _ | Tinit -> assert false
     | Get (s, None, _) ->
       raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s) in
   conv t

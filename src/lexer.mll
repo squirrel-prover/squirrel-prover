@@ -68,6 +68,7 @@ rule token = parse
 | "system"            { SYSTEM }
 | "hash"              { HASH }
 | "aenc"              { AENC }
+| "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
 | "channel"           { CHANNEL }

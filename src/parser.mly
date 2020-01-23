@@ -10,7 +10,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
-%token INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
+%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL DARROW AXIOM
 %token DOT
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP
@@ -50,6 +50,7 @@
 
 timestamp:
 | ID term_list                   { Theory.make_term $1 $2 }
+| INIT                           { Theory.Tinit }
 
 term:
 | LPAREN term RPAREN             { $2 }
@@ -58,6 +59,7 @@ term:
                                    Theory.make_term ~at_ts:ts $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | term XOR term                  { Theory.make_term "xor" [$1;$3] }
+| INIT                           { Theory.Tinit }
 
 term_list:
 |                                { [] }

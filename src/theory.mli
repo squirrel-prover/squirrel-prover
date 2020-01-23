@@ -16,6 +16,7 @@
 type term =
   | Var of string
   | Taction of string * term list
+  | Tinit
   | Name of string * term list
       (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
