@@ -2,19 +2,19 @@
 
 \begin{definition}
   A bi-process is \emph{diff-equivalent} when, for any trace $\tr$ of this bi-process and for any computational model $\M$, we have:
-  $$\M \models \myif (\phi_{\tr})^L \mythen (\mouts_{\tr})^L \sim \myif (\phi_{\tr})^R \mythen (\mouts_{\tr})^R$$
+  $$\M \models \myif (\mtests_{\tr})^L \mythen (\mouts_{\tr})^L \sim \myif (\mtests_{\tr})^R \mythen (\mouts_{\tr})^R$$
 \end{definition}
 
 \begin{example}
   For example, for the bi-process introduced in \Cref{ex:basic-hash-bi-process} and the trace introduced in \Cref{ex:basic-hash-trace}, we would like to verify that the following equivalence holds (amongst many others):
 
-  $$\forall \M, \M \models \myif (\phi_{\tr})^L \mythen (\mouts_{\tr})^L \sim \myif (\phi_{\tr})^R \mythen (\mouts_{\tr})^R$$
+  $$\forall \M, \M \models \myif (\mtests_{\tr})^L \mythen (\mouts_{\tr})^L \sim \myif (\mtests_{\tr})^R \mythen (\mouts_{\tr})^R$$
 
   with:
   \begin{itemize}
-    \item $(\phi_{\tr})^L := \true \land \snd(\g(\langle n(i,j), \h(k(i),n(i,j)) \rangle)) = \h( k(i), \fst( \g( \langle n(i,j), \h(k(i),n(i,j)) \rangle ))) $
-    \item $(\mouts_{\tr})^L := \langle n(i,j), \h(k(i),n(i,j) \rangle, \ok$
-    \item $(\phi_{\tr})^R := \true \land \snd(\g(\langle n(i,j), \h(k'(i),n(i,j)) \rangle)) = \h( k'(i), \fst( \g( \langle n(i,j), \h(k'(i),n(i,j)) \rangle ))) $
-    \item $(\mouts_{\tr})^R := \langle n(i,j), \h(k'(i),n(i,j) \rangle, \ok$
+    \item $(\mtests_{\tr})^L := \mand(\true, \eq(\snd(\g(\langle n(i,j), \h(k(i),n(i,j)) \rangle)), \h( k(i), \fst( \g( \langle n(i,j), \h(k(i),n(i,j)) \rangle )))))$
+    \item $(\mouts_{\tr})^L := \{ \langle n(i,j), \h(k(i),n(i,j) \rangle, \ok \}$
+    \item $(\mtests_{\tr})^R := \mand(\true, \eq(\snd(\g(\langle n(i,j), \h(k'(i),n(i,j)) \rangle)), \h( k'(i), \fst( \g( \langle n(i,j), \h(k'(i),n(i,j)) \rangle )))))$
+    \item $(\mouts_{\tr})^R := \{ \langle n(i,j), \h(k'(i),n(i,j) \rangle, \ok \}$
   \end{itemize}
 \end{example}
