@@ -68,8 +68,6 @@ type tac_arg =
   | Int of int
   | Theory of Theory.term
 
-exception Tactic_Soft_Failure of string
-
 (** In the future this will have to be made generic since we will
   * want the same declaration system for indistinguishability tactics. *)
 module rec Prover_tactics : sig
@@ -113,32 +111,32 @@ end = struct
     register_general id ~help:help
       (fun args j sk fk ->
          if args = [] then f j sk fk else
-           raise @@
-           Tactics.Tactic_Hard_Failure "this tactic does not take arguments")
+           raise @@ Tactics.Tactic_Hard_Failure
+             (Tactics.Failure "this tactic does not take arguments"))
 
   let register_int id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Int x] -> f x j sk fk
          | _ ->
-             raise @@
-             Tactics.Tactic_Hard_Failure "int argument expected")
+             raise @@ Tactics.Tactic_Hard_Failure
+               (Tactics.Failure "int argument expected"))
 
   let register_formula id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Formula x] -> f x j sk fk
          | _ ->
-             raise @@
-             Tactics.Tactic_Hard_Failure "formula argument expected")
+             raise @@ Tactics.Tactic_Hard_Failure
+               (Tactics.Failure "formula argument expected"))
 
   let register_fname id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Function_name x] -> f x j sk fk
          | _ ->
-             raise @@
-             Tactics.Tactic_Hard_Failure "function name argument expected")
+             raise @@ Tactics.Tactic_Hard_Failure
+               (Tactics.Failure "function name argument expected"))
 
   let register_macro id ?(help="") m = Prover_tactics.register
       id ~help:help (AST.eval m)
@@ -186,9 +184,9 @@ end)
 
 let get_help tac_name =
   if tac_name = "" then
-    Fmt.pr "@[[result> @. %a @.@]@." Prover_tactics.pps ()
+    Printer.prt `Result "%a" Prover_tactics.pps ()
   else
-    Fmt.pr "@[[result> @. %a @.@]@." Prover_tactics.pp tac_name;
+    Printer.prt `Result "%a." Prover_tactics.pp tac_name;
   Tactics.id
 
 let () =
@@ -200,7 +198,8 @@ let () =
     (function
       | [] -> get_help ""
       | [String_name tac_name]-> get_help tac_name
-      | _ ->  raise @@ Tactics.Tactic_Hard_Failure "improper arguments" ) ;
+      | _ ->  raise @@ Tactics.Tactic_Hard_Failure
+          (Tactics.Failure"improper arguments")) ;
   Prover_tactics.register "id" ~help:"Identity." Tactics.id
 
 exception Return of Sequent.t list
@@ -218,8 +217,7 @@ let eval_tactic_judge ast j =
   (* The failure should raise the soft failure,
    * according to [pp_tac_error]. *)
   let fk tac_error =
-    raise @@
-    Tactic_Soft_Failure (Fmt.strf "%a" Tactics.pp_tac_error tac_error)
+    raise @@ Tactics.Tactic_Soft_Failure tac_error
   in
   let sk l _ = raise (Return l) in
   try ignore (tac j sk fk) ; assert false with Return l -> l
@@ -273,7 +271,8 @@ let get_goal_formula gname =
     List.filter (fun (name,_) -> name = gname) !goals_proved
   with
     | [(_,f)] -> f
-    | [] -> raise @@ Tactics.Tactic_Hard_Failure "No proved goal with given name"
+    | [] -> raise @@ Tactics.Tactic_Hard_Failure
+        (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
 
 (** Declare Goals And Proofs *)
@@ -304,8 +303,9 @@ let complete_proof () =
     current_goal := None;
     subgoals := []
   with Not_found ->
-    raise @@ Tactics.Tactic_Hard_Failure "Cannot complete proof \
-               with empty current goal"
+    raise @@ Tactics.Tactic_Hard_Failure
+      (Tactics.Failure "Cannot complete proof \
+               with empty current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -331,7 +331,8 @@ let eval_tactic_focus tac = match !subgoals with
 
 let cycle i l =
   let rec cyc acc i = function
-    | [] -> raise @@ Tactics.Tactic_Hard_Failure "Cycle error."
+    | [] -> raise @@ Tactics.Tactic_Hard_Failure
+        (Tactics.Failure "Cycle error.")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in

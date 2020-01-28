@@ -608,7 +608,7 @@ let parse_proc proc : unit =
 let declare_system proc =
   check_proc [] proc ;
   let proc = prepare proc in
-  Fmt.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
+  Printer.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   parse_proc proc
 
 let reset () =

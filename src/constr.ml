@@ -449,7 +449,7 @@ let add_disj uf g u x =
                         |> mgus uf in
 
             log_constr (fun () ->
-                Fmt.epr "@[<v 2>Disjunction:@;\
+                Printer.prt `Error "@[<v 2>Disjunction:@;\
                          to_split:%a@;\
                          minj:%d@;\
                          maxj:%d@;\
@@ -517,7 +517,8 @@ let rec split instance : model list =
         [ { inst = instance; tr_graph = g } ]
       with Found (uf, new_eqs) ->
         List.map (fun eq ->
-            log_constr (fun () -> Fmt.epr "@[<v 2>Adding equality:@;%a@;@]@."
+            log_constr (fun () -> Printer.prt `Error
+                           "@[<v 2>Adding equality:@;%a@;@]@."
                            (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
                               pp_ut pp_ut) eq);
             split { instance with uf = uf;
@@ -527,12 +528,12 @@ let rec split instance : model list =
         |> List.flatten end
   with
   | Unify_cycle uf ->
-    log_constr (fun () -> Fmt.epr "@[<v 2>Unify cycle:@;%a@;@]@."
+    log_constr (fun () -> Printer.prt `Error "@[<v 2>Unify cycle:@;%a@;@]@."
                    Uuf.print uf);
     []
 
   | No_mgu ->
-    log_constr (fun () -> Fmt.epr "@[<v 2>No_mgu:@;@]@.");
+    log_constr (fun () -> Printer.prt `Error "@[<v 2>No_mgu:@;@]@.");
     []
 
 (* The minimal models a of constraint.

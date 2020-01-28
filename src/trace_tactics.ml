@@ -107,7 +107,8 @@ let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
   let formulas = disjunction_to_list [] [f] in
   if List.length formulas = 1 then
     raise @@
-    Tactics.Tactic_Hard_Failure "Can only be applied to a disjunction." ;
+    Tactics.Tactic_Hard_Failure
+      (Tactics.Failure "Can only be applied to a disjunction.") ;
   sk (List.rev_map (fun f -> Sequent.add_formula f s ) formulas) fk
 
 let case th s sk fk =
@@ -119,7 +120,8 @@ let case th s sk fk =
       begin
         match th with
         | Theory.Var m -> hypothesis_case m s sk fk
-        | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments"
+        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+            (Tactics.Failure "improper arguments")
       end
     | ts -> timestamp_case ts s sk fk
 
@@ -132,7 +134,8 @@ let () =
            on the left, creating corresponding subgoals."
     (function
        | [Prover.Theory th] -> case th
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "improper arguments"))
 
 
 (** Introduce disjunction and implication (with conjunction on its left).
@@ -195,7 +198,8 @@ let () =
          List.map
            (function
               | Prover.Theory tm -> tm
-              | _ -> raise @@ Tactic_Hard_Failure "Improper arguments")
+              | _ -> raise @@ Tactic_Hard_Failure
+                  (Tactics.Failure "Improper arguments"))
            l
        in
        goal_exists_intro ths)
@@ -225,7 +229,8 @@ let () =
     ~help:"exists-left H -> introduce existential quantifier in hypothesis H"
     (function
       | [Prover.Theory (Theory.Var h)] -> exists_left h
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+          (Tactics.Failure "improper arguments"))
 
 let () =
   let open Prover.AST in
@@ -448,7 +453,8 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
-        raise @@ Tactic_Hard_Failure "Arguments not equals."
+        raise @@ Tactic_Hard_Failure
+          (Tactics.NotEqualArguments)
     | exception _ ->
       match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
       | m1,m2 ->
@@ -456,7 +462,8 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
       else
-        raise @@ Tactic_Hard_Failure "Arguments not equals."
+        raise @@ Tactic_Hard_Failure
+          (Tactics.NotEqualArguments)
       | exception _ ->
         match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
         | i1,i2 ->
@@ -464,8 +471,10 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
           if Constr.query models [(`Index (`Eq,i1,i2))] then
             [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
-            raise @@ Tactic_Hard_Failure "Arguments not equals."
-      | exception _ ->  raise @@ Tactic_Hard_Failure "Improper arguments."
+            raise @@ Tactic_Hard_Failure
+              (Tactics.NotEqualArguments)
+        | exception _ ->  raise @@ Tactic_Hard_Failure
+            (Tactics.Failure "Improper arguments.")
   in
   sk [Sequent.apply_subst subst s] fk
 
@@ -475,7 +484,8 @@ let () =
            replaces all occurences of i1 by i2 inside the sequent."
     (function
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "improper arguments"))
 
 
 (** EUF Axioms *)
@@ -486,9 +496,10 @@ let euf_param (`Message at : term_atom) = match at with
     if Theory.is_hash hash then
       (hash, key, m, s)
     else raise @@ Tactic_Hard_Failure
-        "The function symbol is not a hash function."
+        (Tactics.Failure "The function symbol is not a hash function.")
   | _ -> raise @@ Tactic_Hard_Failure
-        "Euf can only be applied to hypothesis of the form h(t,k)=m."
+      (Tactics.Failure
+         "Euf can only be applied to hypothesis of the form h(t,k)=m.")
 
 let euf_apply_schema sequent (_, (_, _), m, s) case =
   let open Euf in
@@ -564,7 +575,8 @@ let () =
     ~help:"euf H -> applies the euf axiom to the given hypothesis name."
     (function
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+          (Tactics.Failure "improper arguments"))
 
 let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   (* Get formula to apply *)
@@ -604,11 +616,13 @@ let () =
             List.map
               (function
                  | Prover.Theory th -> th
-                 | _ -> raise @@ Tactic_Hard_Failure "improper arguments")
+                 | _ -> raise @@ Tactic_Hard_Failure
+                     (Tactics.Failure "improper arguments"))
               th_terms
           in
           apply id th_terms
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure "improper arguments")
+      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+          (Tactics.Failure "improper arguments"))
 
 let tac_assert f s sk fk =
   let s1 = Sequent.set_conclusion f s in

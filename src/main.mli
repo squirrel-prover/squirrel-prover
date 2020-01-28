@@ -10,13 +10,13 @@ val parse_next : (Lexing.lexbuf -> string -> 'a) -> 'a
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-val main_loop : ?save:bool -> Prover.prover_mode -> 'a
+val main_loop : ?test:bool -> ?save:bool -> Prover.prover_mode -> unit
 
 (** Launches the interactive_prover mode. *)
 val interactive_prover : unit -> unit
 
 (** Run the prover on an input file *)
-val run : string -> 'a
+val run : ?test:bool -> string -> unit
 
 (** Executable entry point. Parses arguments and behaves accordingly. *)
 val main : unit -> unit

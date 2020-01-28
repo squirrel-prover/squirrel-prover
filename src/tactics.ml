@@ -1,9 +1,7 @@
-
-exception Tactic_Hard_Failure of string
-
 type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
+  | NotEqualArguments
 
 let rec pp_tac_error ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
@@ -12,6 +10,11 @@ let rec pp_tac_error ppf = function
         "An application of the second tactic to one \
          of the subgoal failed with error : %a"
         pp_tac_error t
+  | NotEqualArguments -> Fmt.pf ppf "Arguments not equals."
+
+exception Tactic_Soft_Failure of tac_error
+
+exception Tactic_Hard_Failure of tac_error
 
 type a
 
@@ -54,7 +57,7 @@ let andthen tac1 tac2 judge sk fk =
     fk
 
 let rec andthen_list = function
-  | [] -> raise (Tactic_Hard_Failure "empty anthen_list")
+  | [] -> raise (Tactic_Hard_Failure (Failure "empty anthen_list"))
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 

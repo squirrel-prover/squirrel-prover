@@ -28,8 +28,11 @@
 type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
+  | NotEqualArguments
 
-exception Tactic_Hard_Failure of string
+exception Tactic_Hard_Failure of tac_error
+
+exception Tactic_Soft_Failure of tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
 

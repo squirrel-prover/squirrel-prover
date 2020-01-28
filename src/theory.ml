@@ -244,7 +244,7 @@ let make_term ?at_ts s l =
         if arity <> List.length l then raise Type_error ;
         Taction (s,l)
     | _ ->
-        Fmt.pr "incorrect %s@." s ;
+        Printer.prt `Error "incorrect %s@." s ;
         raise Symbols.Incorrect_namespace
     end
   | exception Symbols.Unbound_identifier ->

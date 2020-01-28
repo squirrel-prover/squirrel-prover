@@ -52,9 +52,6 @@ type tac_arg =
 module AST : Tactics.AST_sig
   with type arg = tac_arg and type judgment = Sequent.t
 
-(** TODO documentation *)
-exception Tactic_Soft_Failure of string
-
 (** Placeholder for tactics on judgments *)
 module Prover_tactics : sig
   type tac = Sequent.t Tactics.tac
