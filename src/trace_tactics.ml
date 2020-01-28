@@ -182,9 +182,14 @@ let () =
 let goal_exists_intro ths (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
-    let nu = Theory.parse_subst (Sequent.get_env s) vs ths in
-    let new_formula = subst_formula nu f in
-    sk [Sequent.set_conclusion new_formula s] fk
+    begin
+    try
+      let nu = Theory.parse_subst (Sequent.get_env s) vs ths in
+      let new_formula = subst_formula nu f in
+      sk [Sequent.set_conclusion new_formula s] fk
+    with Theory.Undefined x -> raise @@ Tactics.Tactic_Hard_Failure
+        (Tactics.Undefined x)
+  end
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
 
 let () =
@@ -566,9 +571,7 @@ let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk
-  with Euf.Bad_ssc -> fk (Tactics.Failure
-                            "The hashing key does not \
-                             satisfy the syntactic side condition")
+  with Euf.Bad_ssc -> fk Tactics.NoSSC
 
 let () =
   T.register_general "euf"
@@ -645,8 +648,7 @@ let collision_resistance (s : Sequent.t) sk fk =
       (Sequent.get_all_terms s)
   in
   if List.length hashes = 0 then
-    fk (Failure "no equality between hashes where the keys satisfiy the \
-                 syntactic condition has been found")
+    fk (NoSSC)
   else
     begin
       let rec make_eq hash_list =

@@ -46,7 +46,8 @@ let rec main_loop ?(test=false) ?(save=true) mode =
    * concerning definitions of functions, names, ... symbols;
    * it should not matter if we do not undo the initial definitions *)
   if mode = InputDescr then begin
-    Process.reset ()
+    Process.reset ();
+    Prover.reset ()
   end else
     (* Otherwise save the state if instructed to do so.
      * In practice we save except after errors. *)
@@ -141,9 +142,10 @@ let rec main_loop ?(test=false) ?(save=true) mode =
           main_loop ~test GoalMode
       end
     | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if test then () else exit 0
+    | _, ParsedQed -> if test then raise @@ Failure "unfinished"
+      else error ~test mode "Unexpected command."
     | _, _ -> error ~test mode "Unexpected command."
   with
-  | Failure s -> error ~test mode s
   | Parserbuf.Error s -> error ~test mode s
 
 and error ?(test=false) mode s =
@@ -185,5 +187,35 @@ let () =
       Alcotest.check_raises "fails"
         (Tactic_Hard_Failure Tactics.NotEqualArguments)
         (fun () -> run ~test "tests/alcotest/substitution.mbc")
-      end ;
+    end ;
+    "Collision", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Soft_Failure Tactics.NoSSC)
+        (fun () -> run ~test "tests/alcotest/collisions.mbc")
+    end ;
+    "Exists Intro", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Hard_Failure (Tactics.Undefined "a1"))
+        (fun () -> run ~test "tests/alcotest/existsintro_fail.mbc")
+    end ;
+    "Vars not eq", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/vars_not_eq.mbc")
+    end ;
+    "TS not leq", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.mbc")
+    end ;
+    "Euf Mvar", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Soft_Failure NoSSC)
+        (fun () -> run ~test "tests/alcotest/euf_mvar.mbc")
+    end ;
+    "Euf NoSSC", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Soft_Failure NoSSC)
+        (fun () -> run ~test "tests/alcotest/eufnull.mbc")
+    end ;
   ];;

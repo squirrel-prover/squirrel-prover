@@ -29,6 +29,8 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | NotEqualArguments
+  | NoSSC
+  | Undefined of string
 
 exception Tactic_Hard_Failure of tac_error
 

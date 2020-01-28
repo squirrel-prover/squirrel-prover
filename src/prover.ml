@@ -28,6 +28,13 @@ type proof_state = { goals : named_goal list;
 
 let proof_states_history : proof_state list ref = ref []
 
+let reset () =
+    proof_states_history := [];
+    goals := [];
+    current_goal := None;
+    subgoals := [];
+    goals_proved := []
+
 let save_state mode =
   proof_states_history :=
     {goals = !goals;

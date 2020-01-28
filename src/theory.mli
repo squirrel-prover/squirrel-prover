@@ -119,6 +119,9 @@ val pp_subst : Format.formatter -> subst -> unit
 
 val conv_index : subst -> term -> Vars.index
 
+exception Undefined of string
+exception TypeError of string
+
 (** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
   Term.timestamp ->

@@ -32,6 +32,9 @@ exception Cannot_undo
 
 type proof_state
 
+(** Set the proof_state to its initial state. *)
+val reset : unit -> unit
+
 (** Save the current prover state. The prover mode is the only external
     information required. *)
 val save_state : prover_mode -> unit

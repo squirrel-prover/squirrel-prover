@@ -5,5 +5,5 @@ system null.
 goal shouldntpass :
   h(k,k) = k => False.
 Proof.
-  euf 0.
+  euf M0.
 Qed.

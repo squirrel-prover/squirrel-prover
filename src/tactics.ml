@@ -2,6 +2,8 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | NotEqualArguments
+  | NoSSC
+  | Undefined of string
 
 let rec pp_tac_error ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
@@ -11,6 +13,9 @@ let rec pp_tac_error ppf = function
          of the subgoal failed with error : %a"
         pp_tac_error t
   | NotEqualArguments -> Fmt.pf ppf "Arguments not equals."
+  | NoSSC -> Fmt.pf ppf "No equality involving a key which satisfies \
+                 the syntactic condition has been found"
+  | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
 
 exception Tactic_Soft_Failure of tac_error
 

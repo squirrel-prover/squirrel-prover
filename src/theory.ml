@@ -297,16 +297,17 @@ let subst t s =
     | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
   in aux t
 
+exception Undefined of string
+exception TypeError of string
+
 let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
 fun subst st kind ->
   match subst with
-  | [] -> failwith
-      (Printf.sprintf "undefined use of %s" st)
+  | [] -> raise @@ Undefined st
   | ESubst (v,t)::_ when v = st->
     (try
        Term.cast kind t
-     with Term.Uncastable -> failwith
-                             (Printf.sprintf "ill-typed use of %s" st)
+     with Term.Uncastable -> raise @@ TypeError st
        )
   | _::q -> assoc q st kind
 
@@ -318,7 +319,7 @@ let subst_var (subst:subst) (st:string) (kind) =
 
 let conv_index subst = function
   | Var x -> subst_var subst x (Sorts.Index)
-  | _ -> failwith "ill-formed index"
+  | _ -> raise @@ TypeError "index"
 
 
 let convert_vars env vars =

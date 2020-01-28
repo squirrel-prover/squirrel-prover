@@ -7,9 +7,7 @@ all: metabc test
 
 PROVER_OK_TESTS = $(wildcard tests/ok/*)
 
-PROVER_FAIL_TESTS = $(wildcard tests/fail/*)
-
-test: alcotest ok_test fail_test examples_test
+test: alcotest ok_test examples_test
 
 alcotest: sanity
 	$(OCB) test.byte
@@ -36,17 +34,6 @@ ok_test: sanity
 	done ; \
 	echo "Total: $$tests tests, $$failures failures." ; \
 	test $$failures -eq 0
-
-fail_test: sanity
-	@echo "\n --- Running tests that must fail --- \n"
-	@tests=0 ; failures=0 ; for f in $(PROVER_FAIL_TESTS) ; do \
-	  echo -n "Running prover on $$f... " ; \
-	  tests=$$((tests+1)) ; \
-	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
-	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
-	done ; \
-	echo "Total: $$tests tests, $$failures failures." ; \
-	test $$failures -eq $$tests
 
 clean:
 	$(OCB) -clean

@@ -6,12 +6,12 @@ system null.
 
 goal test :
   forall (x:message, y:message),
-  n = m => false.
+  n = m => False.
 Proof.
 Qed.
 
 goal test :
   forall (x:message, y:message),
-  f(n) = g(m) => false.
+  f(n) = g(m) => False.
 Proof.
 Qed.
