@@ -12,53 +12,7 @@ type ('a, 'b) foformula =
   | True
   | False
 
-exception Not_a_boolean_formula
-
-let rec foformula_to_bformula fatom = function
-  | And (a, b) ->
-    Bformula.And(foformula_to_bformula fatom a, foformula_to_bformula fatom b)
-  | Or (a, b) ->
-    Bformula.Or(foformula_to_bformula fatom a, foformula_to_bformula fatom b)
-  | Not a -> Bformula.Not(foformula_to_bformula fatom a)
-  | Impl (a, b) ->
-    Bformula.Impl(foformula_to_bformula fatom a, foformula_to_bformula fatom b)
-  | Atom a -> Bformula.Atom(fatom a)
-  | True -> Bformula.True
-  | False -> Bformula.False
-  | _ -> raise Not_a_boolean_formula
-
-let rec bformula_to_foformula fatom = function
-  | Bformula.And(a,b) ->
-    And(bformula_to_foformula fatom a, bformula_to_foformula fatom b)
-  | Bformula.Or (a, b) ->
-    Or(bformula_to_foformula fatom a, bformula_to_foformula fatom b)
-  | Bformula.Not a -> Not(bformula_to_foformula fatom a)
-  | Bformula.Impl (a, b) ->
-    Impl(bformula_to_foformula fatom a, bformula_to_foformula fatom b)
-  | Bformula.Atom a -> Atom(fatom a)
-  | Bformula.True -> True
-  | Bformula.False -> False
-
 type formula = (generic_atom, Vars.evar) foformula
-
-let fact_to_formula =
-  bformula_to_foformula (fun x -> (x :> generic_atom))
-
-let formula_to_fact f =
-  foformula_to_bformula
-    (function `Message x -> `Message x | _ -> failwith "not a fact")
-    f
-
-exception No_trace_formula
-
-let formula_to_trace_formula f =
-  try
-    Some (foformula_to_bformula
-            (function
-               | #trace_atom as x -> x
-               | _ -> raise No_trace_formula)
-            f)
-  with No_trace_formula | Not_a_boolean_formula -> None
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->
@@ -129,3 +83,11 @@ let fresh_quantifications env f =
       vars
   in
   subst_formula subst f
+
+exception Not_a_disjunction
+
+let rec disjunction_to_atom_list = function
+  | False -> []
+  | Atom at -> [at]
+  | Or (a, b) -> disjunction_to_atom_list a @ disjunction_to_atom_list b
+  | _ -> raise Not_a_disjunction

@@ -21,18 +21,6 @@ val pp_foformula :
   (Format.formatter -> 'b list -> unit) ->
   Format.formatter -> ('a,'b) foformula -> unit
 
-exception Not_a_boolean_formula
-
-(** [foformula_to_bformula conv f] converts [f] to a [bformula],
-  * using [conv] to convert its atoms at the same time. *)
-val foformula_to_bformula :
-  ('a -> 'b) -> ('a, 'c) foformula -> 'b Bformula.bformula
-
-(** [bformula_to_foformula conv bf] convers [bf] to a [formula],
-  * using [conv] to convert atoms at the same time. *)
-val bformula_to_foformula :
-  ('a -> 'b) -> 'a Bformula.bformula -> ('b, 'c) foformula
-
 (** [foformula_vars fv_atom f] returns a list containing
   * all the variables that appear either bound (quantified) in [f],
   * or free in one of its atoms according to [fv_atom]. *)
@@ -52,12 +40,6 @@ val formula_vars : formula -> Vars.evar list
   * quantified inside a formula. *)
 val formula_qvars : formula -> Vars.evar list
 
-val fact_to_formula : Bformula.fact -> formula
-
-val formula_to_fact : formula -> Bformula.fact
-
-val formula_to_trace_formula : formula -> Bformula.trace_formula option
-
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
     co-domain does not contain any variable that is bound in [f]. *)
@@ -67,4 +49,9 @@ val subst_formula : Term.subst -> formula -> formula
   * to [f] but where quantified variables are fresh wrt the original
   * [!env], and it updates [env] with the declaration of these new
   * variables. *)
+
 val fresh_quantifications : Vars.env ref -> formula -> formula
+
+exception Not_a_disjunction
+
+val disjunction_to_atom_list : formula -> generic_atom list

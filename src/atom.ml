@@ -40,6 +40,8 @@ let pp_term_atom ppf (`Message (o,tl,tr)) =
 let not_xpred (o,l,r) = (not_ord o, l, r)
 let not_xpred_eq (o,l,r) = (not_ord_eq o, l, r)
 
+let not_term_atom = function
+  | `Message t -> `Message (not_xpred_eq t)
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o, l, r) =
   match o with
@@ -48,12 +50,14 @@ let norm_xatom (o, l, r) =
   | `Lt -> (`Leq, l, r) :: [(`Neq, l, r)]
   | `Gt -> (`Leq, r, l) :: [(`Neq, r, l)]
 
+exception Temp of string
+
 let add_xeq od xeq (eqs, leqs, neqs) =
   match od with
   | `Eq -> (xeq :: eqs, leqs, neqs)
   | `Leq -> (eqs, xeq :: leqs, neqs)
   | `Neq -> (eqs, leqs, xeq :: neqs)
-  | _ -> raise (Failure ("add_xeq: bad comparison operator"))
+  | _ -> raise (Temp ("add_xeq: bad comparison operator"))
 
 let add_xeq_eq od xeq (eqs, neqs) =
   match od with
@@ -64,6 +68,10 @@ type trace_atom = [
   | `Timestamp of (ord,Term.timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
 ]
+
+let not_trace_atom : trace_atom -> trace_atom = function
+  | `Timestamp (o,t,t') -> `Timestamp (not_xpred (o,t,t'))
+  | `Index (o,i,i') -> `Index (not_xpred_eq (o,i,i'))
 
 type generic_atom = [
   | `Message of (ord_eq,Term.message) _atom
@@ -116,3 +124,5 @@ let rec tatsts acc = function
   | [] -> acc
   | (`Index _) :: l -> tatsts acc l
   | (`Timestamp (_, ts, ts')) :: l -> tatsts (ts :: ts' :: acc) l
+
+let trace_atoms_ts at = tatsts [] at |> List.sort_uniq Pervasives.compare

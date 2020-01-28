@@ -1,7 +1,7 @@
 open Graph
 
 open Atom
-open Bformula
+
 open Utils
 
 (* - Huet's unification algorithm using union-find.
@@ -515,7 +515,6 @@ let rec split instance : model list =
           ) g in
         let instance = { instance with uf = uf } in
         [ { inst = instance; tr_graph = g } ]
-
       with Found (uf, new_eqs) ->
         List.map (fun eq ->
             log_constr (fun () -> Fmt.epr "@[<v 2>Adding equality:@;%a@;@]@."
@@ -540,21 +539,21 @@ let rec split instance : model list =
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
 
+let pts (o, t, t') = `Timestamp (o, t, t')
+
+let norm_tatom = function
+  | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
+  | `Index _ as x -> [x]
+
 (* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
 let models_conjunct (l : trace_atom list) : models =
+  let l = List.map norm_tatom l |> List.flatten in
   let instance = mk_instance l in
   split instance
 
-(* [models l] returns the list of minimal models of a constraint. *)
-let models constr =
-  trace_formula_dnf constr
-  |> List.map models_conjunct
-  |> List.flatten
-
 let m_is_sat models = models <> []
 
-let is_sat constr = m_is_sat @@ models constr
 
 (* Adds [ut] to the model [uf], if necessary, and return its normal form.
    There is no need to modify the rest of the model, since we are not adding

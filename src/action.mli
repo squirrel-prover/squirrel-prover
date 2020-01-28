@@ -89,7 +89,7 @@ type descr = {
   action : action ;
   input : Channel.t * string ;
   indices : Vars.index list ;
-  condition : Vars.index list * Bformula.fact ;
+  condition : Vars.index list * Formula.formula ;
   updates : (Term.state * Term.message) list ;
   output : Channel.t * Term.message
 }

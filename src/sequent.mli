@@ -5,7 +5,7 @@
     - a conclusion formula;
     - an environment to store all the variables appearing inside the formulas.
 *)
-open Bformula
+
 open Formula
 
 (** {2 Sequent type and basic operations} *)
@@ -18,10 +18,6 @@ val pp : Format.formatter -> sequent -> unit
 (** [init formula] returns a sequent with an empty set of hypotheses, and the
    given formula as conclusion. *)
 val init : formula -> sequent
-
-(** [add_trace_formula tf s] returns the sequent [s] with [tf] added to its
-    hypothesis. *)
-val add_trace_formula : ?prefix:string -> trace_formula -> sequent -> sequent
 
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
     hypothesis. The new sequent will be automatically enriched with

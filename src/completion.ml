@@ -1,5 +1,6 @@
 open Utils
-open Bformula
+open Term
+open Formula
 
 module Cst = struct
   type t =
