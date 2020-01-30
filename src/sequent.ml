@@ -223,6 +223,16 @@ let is_hypothesis f s =
   | _ ->  H.mem f s.formula_hypotheses
 
 
+
+let get_trace_atoms s=
+    List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
+
+let get_message_atoms s=
+    List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses)
+
+let get_generic_formulas s=
+    List.map (fun h -> h.H.hypothesis) (H.to_list s.formula_hypotheses)
+
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
@@ -231,6 +241,12 @@ let get_hypothesis id s =
     with Not_found ->
           Formula.Atom ((H.find id s.trace_hypotheses).H.hypothesis :>
                Atom.generic_atom)
+
+let get_hypothesis_list s =
+  List.map (fun x ->Formula.Atom (x :> Atom.generic_atom)) (get_trace_atoms s)
+  @ List.map
+    (fun x ->Formula.Atom (x :> Atom.generic_atom)) (get_message_atoms s)
+  @ get_generic_formulas s
 
 let id = fun x -> x
 
@@ -397,9 +413,6 @@ let apply_subst subst s =
       | Some f -> (Bformula.Not f) :: trace_hypotheses
       | None -> trace_hypotheses)
 *)
-
-let get_trace_atoms s=
-    List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
 
 (** TODO  This is the only place where the model is computed,
   * and it is only called by functions that drop the sequent where

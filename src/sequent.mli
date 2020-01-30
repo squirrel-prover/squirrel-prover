@@ -49,6 +49,9 @@ val is_hypothesis : formula -> sequent -> bool
   * @raise Not_found if there is no such hypothesis. *)
 val get_hypothesis : string -> sequent -> formula
 
+(** [get_hypothesis_list s] returns the list of all hypothesis. *)
+val get_hypothesis_list : sequent -> formula list
+
 (** Tags attached to message hypotheses. *)
 type message_hypothesis_tag = {
   t_euf : bool
