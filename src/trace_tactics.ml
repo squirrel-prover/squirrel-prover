@@ -137,6 +137,27 @@ let () =
        | _ -> raise @@ Tactics.Tactic_Hard_Failure
            (Tactics.Failure "improper arguments"))
 
+let goal_atom_intro (s : Sequent.t) sk fk =
+  match Sequent.get_conclusion s with
+  | Atom (`Message u) -> sk [Sequent.set_conclusion False s
+                             |> Sequent.add_formula
+                               (Atom (Atom.not_term_atom (`Message u)
+                                      :> Atom.generic_atom))] fk
+  | Atom (`Timestamp u) -> sk [Sequent.set_conclusion False s
+                             |> Sequent.add_formula
+                               (Atom (Atom.not_trace_atom (`Timestamp u)
+                                      :> Atom.generic_atom))] fk
+  | Atom (`Index u) -> sk [Sequent.set_conclusion False s
+                             |> Sequent.add_formula
+                               (Atom (Atom.not_trace_atom (`Index u)
+                                      :> Atom.generic_atom))] fk
+  | _ -> fk (Tactics.Failure
+               "Can only introduce trace or term atoms.")
+let () =
+  T.register "atomintro"
+    ~help:"Performs the introduction of a trace or term atom."
+    goal_atom_intro
+
 
 (** Introduce disjunction and implication (with conjunction on its left).
   * TODO this is a bit arbitrary, and it will be surprising for
