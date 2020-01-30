@@ -39,7 +39,6 @@ process reader(j:index) =
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
 
 goal no_confusion :
-  False || (* TODO cf. tests/ok/induction.mbc *)
   forall (t:timestamp,i:index,j:index,jj:index),
   t = R1(j,i) =>
   happens(R1(jj,i)) => happens(R1(j,i)) => R1(jj,i)<R1(j,i) =>
@@ -49,7 +48,6 @@ goal no_confusion :
  * - if we write k(i) we get an uninformative unbound-identifier error
  * - with R(j,i), we get an uninformative type-error *)
 Proof.
-  nosimpl(right).
   nosimpl(induction).
   nosimpl(intros).
   (* TODO without these nosimpl some message equalities are introduced;
@@ -87,6 +85,7 @@ goal wa :
   fst(input@R1(j,i)) = nT(ii,k) &&
   input@T(ii,k) = nR(j).
 Proof.
+  simpl.
   euf C0.
   admit. (* TODO invoke no_confusion, get rid of False || .. *)
   exists i,k.

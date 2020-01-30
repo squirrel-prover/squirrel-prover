@@ -13,13 +13,10 @@ axiom happens_le :
 
 system !_i in(c,x); if fst(x)=h(snd(x),k) then out(c,h(ok,k)).
 
-(* This False || ... is just to avoid the automatic simplification
- * of the initial goal formula. TODO *)
-goal False ||
+goal
   forall (t:timestamp,i:index),
   t = A(i) => not(happens(t)).
 Proof.
-  nosimpl(right).
   induction.
   assert(happens(A(i))).
   apply happens_le to A(i), t.

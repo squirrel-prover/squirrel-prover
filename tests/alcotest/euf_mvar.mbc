@@ -18,5 +18,6 @@ goal cheat :
   forall (m1: message, m2:message, m3:message),
   h(m3,k) = m1 => m3 <> m2  .
 Proof.
+  simpl.
   euf M0.
 Qed.

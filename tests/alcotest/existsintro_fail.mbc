@@ -24,6 +24,7 @@ goal unforgeable :
   forall (tau : timestamp, tau2:timestamp, b:index),
   input@A3=h(input@A,k) => exists (a:index), (input@A2 = na(a)).
   Proof.
-    euf M0.
-    exists a1.
+  simpl.
+  euf M0.
+  exists a1.
 Qed.

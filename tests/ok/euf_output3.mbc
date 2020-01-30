@@ -17,7 +17,6 @@ goal unforgeable :
   h(n(b),k) <> h(n(a),k).
 
 Proof.
-
+  simpl.
   euf M0.
-
 Qed.

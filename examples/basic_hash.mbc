@@ -28,6 +28,7 @@ goal wa :
   T(ii,k) <= R(j,i) &&
   fst(input@R(j,i)) = nT(ii,k).
 Proof.
+ simpl.
  euf C0.
  exists i, k.
 Qed.

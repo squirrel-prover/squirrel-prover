@@ -42,6 +42,7 @@ goal wa :
   fst(input@R1(j,i)) = fst(output@T(ii,k)) &&
   snd(input@R1(j,i)) = snd(output@T(ii,k)).
 Proof.
+  simpl.
   euf C0.
   apply tags_neq.
   exists i,k.

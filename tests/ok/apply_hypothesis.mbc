@@ -3,5 +3,6 @@ system null.
 goal forall (x:message,y:message,z:message),
   (x = y => y = z) => x = y => y = z.
 Proof.
+  simpl.
   apply H0.
 Qed.

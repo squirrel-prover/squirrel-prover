@@ -3,11 +3,13 @@ system null.
 goal forall (t:timestamp),
   xor(output@t,output@t) = zero.
 Proof.
+ simpl.
 Qed.
 
 goal forall (m:message,t:timestamp),
   xor(output@t,xor(m,output@t)) = m.
 Proof.
+ simpl.
 Qed.
 
 goal forall (m:message,n:message,x:message),
@@ -15,4 +17,5 @@ goal forall (m:message,n:message,x:message),
   snd(xor(x,m)) = m =>
   m = n.
 Proof.
+ simpl.
 Qed.

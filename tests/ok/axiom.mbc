@@ -16,5 +16,6 @@ forall (ma : message),
 ma=k.
 
 Proof.
-apply dummy_false_axiom to ma.
+ simpl.
+ apply dummy_false_axiom to ma.
 Qed.

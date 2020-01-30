@@ -20,7 +20,8 @@ goal dummy :
   forall (tau1 : timestamp, tau2 : timestamp, a : index, b: message),
   tau1 = tau2 =>
   output@tau1= output@tau2.
-Proof.
+ Proof.
+ simpl.
 Qed.
 
 goal unforgeable_1 :
@@ -38,7 +39,8 @@ goal unforgeable_2 :
   forall (a : index, b : index),
   output@B(b) <> h(na(a),k).
 
-Proof.
+ Proof.
+ simpl.
  nosimpl(collision).
 eqnames.
 Qed.
@@ -48,7 +50,8 @@ goal unforgeable_3 :
   forall (a : index, b : index),
   output@C(b) <> h(na(a),k).
 
-Proof.
+ Proof.
+ simpl.
  collision.
  case H0.
 Qed.

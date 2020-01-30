@@ -36,6 +36,7 @@ goal
   fst(input@R1(r,i)) = nt(i,t) &&
   input@T(i,t) = nr(r).
 Proof.
+  simpl.
   euf C0.
   apply tags_neq.
   exists t.

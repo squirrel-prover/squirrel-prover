@@ -21,6 +21,7 @@ goal unforgeable_1 :
   output@A(b) <> h(na(c),k).
 
  Proof.
+ simpl.
  substitute a, c.
  collision.
 Qed.

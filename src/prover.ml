@@ -246,6 +246,11 @@ let auto_simp judges =
   |> List.map (eval_tactic_judge simpl)
   |> List.flatten
 
+let () =
+  Prover_tactics.register "simpl"
+    ~help:"Apply the automatic simplification tactic."
+    (fun j sk fk -> sk (eval_tactic_judge simpl j) fk)
+
 let tsubst_of_judgment j =
   let aux : Vars.evar -> Theory.esubst =
     (fun (Vars.EVar v) ->
@@ -355,7 +360,7 @@ let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    subgoals := auto_simp [Sequent.init goal];
+    subgoals := [Sequent.init goal];
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."

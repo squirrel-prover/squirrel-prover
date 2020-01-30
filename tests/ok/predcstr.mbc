@@ -4,12 +4,15 @@ system ((A:out(c,ok))|(B: !_i out(c,ok))).
 
 goal forall (t:timestamp,tau:timestamp), t <= pred(tau) => t < tau.
 Proof.
+ simpl.
 Qed.
 
 goal forall (t:timestamp), t <= pred(A) => t < A.
 Proof.
+ simpl.
 Qed.
 
 goal forall (i:index), A <= pred(B(i)) => A < B(i).
 Proof.
+ simpl.
 Qed.
