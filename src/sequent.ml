@@ -149,9 +149,9 @@ type trace_tag = unit
 
 type formula_tag = unit
 
-type message_hypothesis = (message_hypothesis_tag, term_atom) H.hypothesis
+type message_hypothesis = (message_hypothesis_tag, message_atom) H.hypothesis
 
-type message_hypotheses = (message_hypothesis_tag, term_atom) H.hypotheses
+type message_hypotheses = (message_hypothesis_tag, message_atom) H.hypotheses
 
 type trace_hypotheses = (trace_tag, trace_atom) H.hypotheses
 
@@ -194,7 +194,7 @@ let pp ppf s =
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") Term.pp)
       s.happens_hypotheses ;
   (* Print message, trace and general hypotheses *)
-  H.pps pp_term_atom ppf s.message_hypotheses ;
+  H.pps pp_message_atom ppf s.message_hypotheses ;
 
   H.pps pp_trace_atom ppf s.trace_hypotheses ;
   H.pps Formula.pp_formula ppf s.formula_hypotheses ;
@@ -217,7 +217,7 @@ let init_sequent = {
 
 let is_hypothesis f s =
   match f with
-  | Formula.Atom (#Atom.term_atom as at) -> H.mem at s.message_hypotheses
+  | Formula.Atom (#Atom.message_atom as at) -> H.mem at s.message_hypotheses
   | Formula.Atom (#Atom.trace_atom as at) -> H.mem at s.trace_hypotheses
   | Formula.Atom (`Happens t) -> List.mem t s.happens_hypotheses
   | _ ->  H.mem f s.formula_hypotheses
@@ -286,7 +286,7 @@ end
 (** Add to [s] equalities corresponding to the expansions of all macros
   * occurring in [at]. *)
 let rec add_macro_defs s at =
-  let macro_eqs : term_atom list ref = ref [] in
+  let macro_eqs : message_atom list ref = ref [] in
   let iter =
     new iter_macros
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
@@ -323,7 +323,7 @@ let rec add_happens s ts =
    hypotheses. *)
 and add_formula ?prefix f s =
   match f with
-  | Formula.Atom (#Atom.term_atom as at) -> add_message_hypothesis ?prefix s at
+  | Formula.Atom (#Atom.message_atom as at) -> add_message_hypothesis ?prefix s at
   | Formula.Atom (#Atom.trace_atom as at) -> add_trace_hypothesis ?prefix s at
   | Formula.Atom (`Happens ts) -> add_happens s ts
   | _ ->
@@ -365,7 +365,7 @@ let get_env s = s.env
 let set_conclusion a s =
   let s = { s with conclusion = a } in
     match a with
-      | Formula.Atom (#term_atom as at) -> add_macro_defs s at
+      | Formula.Atom (#message_atom as at) -> add_macro_defs s at
       | _ -> s
 
 let init (goal : Formula.formula) = set_conclusion goal init_sequent
@@ -390,7 +390,7 @@ let apply_subst subst s =
                H.hypothesis = new_formula}
   in
   {s with
-   message_hypotheses = H.map (apply_hyp_subst (Atom.subst_term_atom subst)
+   message_hypotheses = H.map (apply_hyp_subst (Atom.subst_message_atom subst)
                                  mess_is_triv) s.message_hypotheses;
    trace_hypotheses = H.map (apply_hyp_subst (Atom.subst_trace_atom subst)
                                  trace_is_triv) s.trace_hypotheses;
@@ -399,20 +399,6 @@ let apply_subst subst s =
                                  (fun _ -> false)) s.formula_hypotheses;
    conclusion = Formula.subst_formula subst s.conclusion;
   }
-(* Return the conjunction of all trace hypotheses, together with
- * the possible negation of the conclusion formula if it is a trace
- * atom. *)
-(* let make_trace_formula s =
- let trace_hypotheses =
-   List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
- in
- List.fold_left
-   (fun acc h -> Bformula.And (h,acc))
-   Bformula.True
-   (match Formula.formula_to_trace_formula s.conclusion with
-      | Some f -> (Bformula.Not f) :: trace_hypotheses
-      | None -> trace_hypotheses)
-*)
 
 let compute_models s =
   match s.models with
@@ -424,11 +410,11 @@ let compute_models s =
 
 let get_models s =
   let s = compute_models s in
-  opt_get s.models
+  s, opt_get s.models
 
 let maximal_elems s tss =
   let s = compute_models s in
-  Constr.maximal_elems (opt_get s.models) tss
+  s, Constr.maximal_elems (opt_get s.models) tss
 
 let get_ts_equalities s =
   let s = compute_models s in
@@ -450,7 +436,7 @@ let get_all_terms s =
   in
   let atoms =
     match s.conclusion with
-      | Formula.Atom (#term_atom as at) -> at::atoms
+      | Formula.Atom (#message_atom as at) -> at::atoms
       | _ -> atoms
   in
   List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms

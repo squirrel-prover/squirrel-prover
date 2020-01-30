@@ -68,7 +68,7 @@ val select_message_hypothesis :
   ?remove:bool ->
   ?update:(message_hypothesis_tag -> message_hypothesis_tag) ->
   string -> sequent ->
-  (sequent * Atom.term_atom)
+  (sequent * Atom.message_atom)
 
 val select_formula_hypothesis :
   ?remove:bool ->
@@ -88,7 +88,7 @@ val apply_subst : Term.subst -> sequent -> sequent
    implied by the set of messages hypotheses. *)
 val get_trs : sequent -> sequent * Completion.state
 
-val get_models : sequent -> Constr.models
+val get_models : sequent -> sequent * Constr.models
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
   * messages on both sides of the sequents make the sequent valid. *)
@@ -109,7 +109,8 @@ val get_ind_equalities : sequent -> sequent * Vars.index list list
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
    according to their ordering derived from the hypothesis in [s]. *)
-val maximal_elems : sequent -> Term.timestamp list -> Term.timestamp list
+val maximal_elems : sequent -> Term.timestamp list ->
+  sequent * Term.timestamp list
 
 (** {2 Misc} *)
 

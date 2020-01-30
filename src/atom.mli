@@ -5,8 +5,8 @@ type ord_eq = [ `Eq | `Neq ]
 
 (** {2 Term formulas} *)
 
-(** Atoms based on terms *)
-type term_atom = [ `Message of ord_eq * Term.message
+(** Atoms based on messages *)
+type message_atom = [ `Message of ord_eq * Term.message
                                * Term.message ]
 
 (** Atomic constraints are comparisons over timestamps or indices.
@@ -19,25 +19,25 @@ type trace_atom = [
 
 (** Atoms of the meta-logic are either timestamp or term atoms. *)
 type generic_atom = [
-  | term_atom
+  | message_atom
   | trace_atom
   | `Happens of Term.timestamp
 ]
 (** Negates the atoms *)
-val not_term_atom : term_atom -> term_atom
+val not_message_atom : message_atom -> message_atom
 val not_trace_atom : trace_atom -> trace_atom
 
-val atsts : Term.timestamp list -> term_atom list -> Term.timestamp list
+val atsts : Term.timestamp list -> message_atom list -> Term.timestamp list
 val tatsts :
   Term.timestamp list -> trace_atom list -> Term.timestamp list
 
-val term_atoms_ts : term_atom list -> Term.timestamp list
+val message_atoms_ts : message_atom list -> Term.timestamp list
 
-val term_atom_vars : term_atom -> Vars.evar list
+val message_atom_vars : message_atom -> Vars.evar list
 
-val pp_term_atom : Format.formatter -> term_atom -> unit
+val pp_message_atom : Format.formatter -> message_atom -> unit
 
-val subst_term_atom : Term.subst -> term_atom -> term_atom
+val subst_message_atom : Term.subst -> message_atom -> message_atom
 
 (** Replace an atom by an equivalent list of atoms using only
   * [Eq], [Neq] and [Leq]. *)

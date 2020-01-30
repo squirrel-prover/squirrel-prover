@@ -5,14 +5,13 @@ type ord_eq = [ `Eq | `Neq ]
 
 type ('a,'b) _atom = 'a * 'b * 'b
 
-(* TODO : rename to message *)
-type term_atom = [ `Message of (ord_eq,Term.message) _atom ]
+type message_atom = [ `Message of (ord_eq,Term.message) _atom ]
 
 let atom_vars avars (`Message (o,a1,a2)) =
   (avars a1 @ avars a1)
   |> List.sort_uniq Pervasives.compare
 
-let term_atom_vars = atom_vars Term.get_vars
+let message_atom_vars = atom_vars Term.get_vars
 
 let pp_ord ppf = function
   | `Eq -> Fmt.pf ppf "="
@@ -33,14 +32,14 @@ let not_ord_eq : ord_eq -> ord_eq = function
   | `Eq -> `Neq
   | `Neq -> `Eq
 
-let pp_term_atom ppf (`Message (o,tl,tr)) =
+let pp_message_atom ppf (`Message (o,tl,tr)) =
   Fmt.pf ppf "@[%a@ %a@ %a@]" Term.pp tl pp_ord o Term.pp tr
 
 (** Negate the atom *)
 let not_xpred (o,l,r) = (not_ord o, l, r)
 let not_xpred_eq (o,l,r) = (not_ord_eq o, l, r)
 
-let not_term_atom = function
+let not_message_atom = function
   | `Message t -> `Message (not_xpred_eq t)
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o, l, r) =
@@ -63,7 +62,7 @@ let add_xeq_eq od xeq (eqs, neqs) =
   match od with
   | `Eq -> (xeq :: eqs, neqs)
   | `Neq -> (eqs, xeq :: neqs)
-(* TODO rename to trace *)
+
 type trace_atom = [
   | `Timestamp of (ord,Term.timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
@@ -80,7 +79,7 @@ type generic_atom = [
   | `Happens of Term.timestamp
 ]
 
-let subst_term_atom (s : Term.subst) (`Message (ord, a1, a2)) =
+let subst_message_atom (s : Term.subst) (`Message (ord, a1, a2)) =
   `Message (ord, Term.subst s a1, Term.subst s a2)
 
 let subst_trace_atom (s:Term.subst) = function
@@ -91,7 +90,7 @@ let subst_trace_atom (s:Term.subst) = function
 
 let subst_generic_atom s = function
   | `Happens a -> `Happens (Term.subst s a)
-  | #term_atom as a -> (subst_term_atom s a :> generic_atom)
+  | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
 let pp_trace_atom ppf : trace_atom -> unit = function
@@ -102,7 +101,7 @@ let pp_trace_atom ppf : trace_atom -> unit = function
 
 let pp_generic_atom ppf = function
   | `Happens a -> Fmt.pf ppf "happens(%a)" Term.pp a
-  | #term_atom as a -> pp_term_atom ppf a
+  | #message_atom as a -> pp_message_atom ppf a
   | #trace_atom as a -> pp_trace_atom ppf a
 
 let trace_atom_vars = function
@@ -111,14 +110,14 @@ let trace_atom_vars = function
 
 let generic_atom_var = function
   | #trace_atom as a -> trace_atom_vars a
-  | #term_atom as a -> term_atom_vars a
+  | #message_atom as a -> message_atom_vars a
   | `Happens a -> Term.get_vars a
 
 let rec atsts acc = function
   | [] -> acc
   | `Message (_, t, t') :: l -> atsts (Term.get_ts t @ Term.get_ts t' @ acc) l
 
-let term_atoms_ts at = atsts [] at |> List.sort_uniq Pervasives.compare
+let message_atoms_ts at = atsts [] at |> List.sort_uniq Pervasives.compare
 
 let rec tatsts acc = function
   | [] -> acc

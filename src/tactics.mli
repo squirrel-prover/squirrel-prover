@@ -25,6 +25,8 @@
   *
   * We allow tactics to not make progress and not fail. *)
 
+(** The multiple types of tactics error. Specific ones are defined so that they
+    may be caught for unit testing. *)
 type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
@@ -32,8 +34,11 @@ type tac_error =
   | NoSSC
   | Undefined of string
 
+(** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_Hard_Failure of tac_error
 
+(** This tactic should be raised by the evaluation of a tactic, based on the
+    tac_error returned by its failure. *)
 exception Tactic_Soft_Failure of tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit

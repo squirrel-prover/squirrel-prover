@@ -9,11 +9,15 @@ module T = Prover.Prover_tactics
 
 (** Propositional connectives *)
 
+(** Reduce a goal with a disjunction conclusion into the goal
+  * where the conclusion has been replace with the first disjunct. *)
 let goal_or_right_1 (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | (Or (lformula, _)) -> sk [Sequent.set_conclusion (lformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
+(** Reduce a goal with a disjunction conclusion into the goal
+  * where the conclusion has been replace with the second disjunct. *)
 let goal_or_right_2 (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | (Or (_, rformula)) -> sk [Sequent.set_conclusion (rformula) s] fk
@@ -37,6 +41,8 @@ let goal_true_intro (s : Sequent.t) sk fk =
 let () =
   T.register "true" ~help:"Concludes if the goal is true." goal_true_intro
 
+(** Split a conjunction conclusion,
+  * creating one subgoal per conjunct. *)
 let goal_and_right (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | And (lformula, rformula) ->
@@ -139,18 +145,20 @@ let () =
 
 let goal_atom_intro (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
-  | Atom (`Message u) -> sk [Sequent.set_conclusion False s
+  | Atom(a) ->
+    begin
+      match a with
+      | #message_atom as a -> sk [Sequent.set_conclusion False s
+                               |> Sequent.add_formula
+                                 (Atom (Atom.not_message_atom a
+                                        :> Atom.generic_atom))] fk
+      | #trace_atom as a -> sk [Sequent.set_conclusion False s
                              |> Sequent.add_formula
-                               (Atom (Atom.not_term_atom (`Message u)
+                               (Atom (Atom.not_trace_atom a
                                       :> Atom.generic_atom))] fk
-  | Atom (`Timestamp u) -> sk [Sequent.set_conclusion False s
-                             |> Sequent.add_formula
-                               (Atom (Atom.not_trace_atom (`Timestamp u)
-                                      :> Atom.generic_atom))] fk
-  | Atom (`Index u) -> sk [Sequent.set_conclusion False s
-                             |> Sequent.add_formula
-                               (Atom (Atom.not_trace_atom (`Index u)
-                                      :> Atom.generic_atom))] fk
+      | _ -> fk (Tactics.Failure
+               "Cannot introduce happens.")
+      end
   | _ -> fk (Tactics.Failure
                "Can only introduce trace or term atoms.")
 let () =
@@ -159,9 +167,8 @@ let () =
     goal_atom_intro
 
 
-(** Introduce disjunction and implication (with conjunction on its left).
-  * TODO this is a bit arbitrary, and it will be surprising for
-  * users that "intro" does not introduce universal quantifiers. *)
+(** [goal_intro judge sk fk] perform one introduction, either of a forall
+    quantifier or an implication. Else, it returns [fk] *)
 let goal_intro (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | ForAll (vs,f) ->
@@ -200,6 +207,9 @@ let () =
 
 (** Quantifiers *)
 
+(** [goal_exists_intro judge ths] introduces the existentially
+    quantified variables in the conclusion of the judgment,
+    using [ths] as existential witnesses. *)
 let goal_exists_intro ths (s : Sequent.t) sk fk =
   match Sequent.get_conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
@@ -320,7 +330,8 @@ let () = T.register "induction"
     ~help:"Apply the induction scheme to the given formula."
     induction
 
-(** Reasoning over constraints and messages *)
+(** [constraints judge sk fk] proves the sequent using its trace
+  * formulas. *)
 let constraints (s : Sequent.t) sk fk =
   let conclusions =
     try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
@@ -342,6 +353,8 @@ let constraints (s : Sequent.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
+(** [congruence judge sk fk] try to close the goal using congruence, else
+    calls [fk] *)
 let congruence (s : Sequent.t) sk fk =
  let conclusions =
     try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
@@ -349,7 +362,7 @@ let congruence (s : Sequent.t) sk fk =
   in
   let term_conclusions =
     List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
-        | #term_atom as a -> (Atom.not_term_atom a)::acc
+        | #message_atom as a -> (Atom.not_message_atom a)::acc
         | _ -> acc)
       []
       conclusions
@@ -371,6 +384,7 @@ let () = T.register "constraints"
     ~help:"Tries to derive false from the trace formulas."
     constraints
 
+(** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : Sequent.t) sk fk =
   if Sequent.is_hypothesis (Sequent.get_conclusion s) s then
       sk [] fk
@@ -405,6 +419,8 @@ let mk_and_cnstr l = match l with
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
 
+(** Add index constraints resulting from names equalities, modulo the TRS.
+    The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : Sequent.t) sk fk =
   let s,trs = Sequent.get_trs s in
   let terms = Sequent.get_all_terms s in
@@ -435,6 +451,7 @@ let () = T.register "eqnames"
            known equalities."
     eq_names
 
+(** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : Sequent.t) sk fk =
   let s, ts_classes = Sequent.get_ts_equalities s in
   let ts_classes = List.map (List.sort_uniq Pervasives.compare) ts_classes in
@@ -484,7 +501,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
   let subst =
     match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
     | ts1,ts2 ->
-      let models = Sequent.get_models s in
+      let s, models = Sequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -493,7 +510,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
     | exception _ ->
       match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
       | m1,m2 ->
-        let _,trs = Sequent.get_trs s in
+        let s,trs = Sequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
       else
@@ -502,7 +519,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
       | exception _ ->
         match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
         | i1,i2 ->
-          let models = Sequent.get_models s in
+          let s, models = Sequent.get_models s in
           if Constr.query models [(`Index (`Eq,i1,i2))] then
             [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
@@ -525,7 +542,7 @@ let () =
 
 (** EUF Axioms *)
 
-let euf_param (`Message at : term_atom) = match at with
+let euf_param (`Message at : message_atom) = match at with
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
   | (`Eq, s, Fun ((hash, _), [m; Name key]))->
     if Theory.is_hash hash then
@@ -551,7 +568,7 @@ let euf_apply_schema sequent (_, (_, _), m, s) case =
              Formula.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
              Formula.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
-      (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m))
+      (snd (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)
@@ -570,7 +587,6 @@ let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
   in
   (eq, eq_cnstr)
 
-(* TODO : make error reporting for euf more informative *)
 let euf_apply_facts s at =
   let p = euf_param at in
   let env = Sequent.get_env s in
@@ -595,10 +611,12 @@ let euf_apply_facts s at =
 
 let set_euf _ = { Sequent.t_euf = true }
 
+(** [euf_apply f_select judge sk fk] selects an atom of the judgement according
+   to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
+   it calls [fk]*)
 let euf_apply hypothesis_name (s : Sequent.t) sk fk =
   let s, at =
     Sequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
-  (* TODO: need to handle failure somewhere. *)
   try
     sk (euf_apply_facts s at) fk
   with Euf.Bad_ssc -> fk Tactics.NoSSC
@@ -611,6 +629,10 @@ let () =
       | _ -> raise @@ Tactics.Tactic_Hard_Failure
           (Tactics.Failure "improper arguments"))
 
+(** [apply gp ths judge sk fk] applies the axiom [gp] with its universally
+    quantified variables instantied with [ths], adding to [judge] its
+    postconditions, and creating new subgoals from [judge] for the
+    preconditions. *)
 let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   (* Get formula to apply *)
   let f =
@@ -657,6 +679,8 @@ let () =
       | _ -> raise @@ Tactics.Tactic_Hard_Failure
           (Tactics.Failure "improper arguments"))
 
+(** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
+  * to be proved, and the other where [f] is assumed. *)
 let tac_assert f s sk fk =
   let s1 = Sequent.set_conclusion f s in
   let s2 = Sequent.add_formula f s in
@@ -664,9 +688,12 @@ let tac_assert f s sk fk =
 
 let () =
   T.register_formula "assert"
-    ~help:"Add an assumption to the set of hypothesis."
+    ~help:"Add an assumption to the set of hypothesis, and produce the goal for\
+           the proof of the hypothesis."
     tac_assert
 
+(** [collision_resistance judge sk fk] collects all equalities between hashes,
+    and adds the equalities of the messages hashed with the same key. *)
 let collision_resistance (s : Sequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)

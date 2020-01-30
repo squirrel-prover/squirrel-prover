@@ -216,9 +216,7 @@ exception Return of Sequent.t list
   * [Tactic_Soft_Failure] exception.
   * A hard failure inside Tactic_hard_failure. Those exceptions are caught
   * inside the interactive loop.
-  *
-  * TODO update and clarify this, the soft failure does not belong to
-  * Tactics *)
+*)
 let eval_tactic_judge ast j =
   let tac = AST.eval ast in
   (* The failure should raise the soft failure,
