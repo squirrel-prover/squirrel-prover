@@ -66,6 +66,12 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
+let not_branching tac j sk fk =
+  tac j
+    (fun l fk -> if List.length l <= 1 then sk l fk else
+        fk (Failure "Branching tactic under non branching instruction."))
+    fk
+
 let id j sk fk = sk [j] fk
 
 let try_tac t = orelse t id
@@ -107,6 +113,7 @@ module type AST_sig = sig
     | AndThen : t list -> t
     | OrElse : t list -> t
     | Try : t -> t
+    | NotBranching : t -> t
     | Repeat : t -> t
     | Ident : t
     | Modifier : string * t -> t
@@ -128,6 +135,7 @@ module AST (M:S) = struct
     | AndThen : t list -> t
     | OrElse : t list -> t
     | Try : t -> t
+    | NotBranching : t -> t
     | Repeat : t -> t
     | Ident : t
     | Modifier : string * t -> t
@@ -140,6 +148,7 @@ module AST (M:S) = struct
     | AndThen tl -> andthen_list (List.map eval tl)
     | OrElse tl -> orelse_list (List.map eval tl)
     | Try t -> try_tac (eval t)
+    | NotBranching t -> not_branching (eval t)
     | Repeat t -> repeat (eval t)
     | Ident -> id
     | Modifier (id,t) -> eval t
@@ -165,7 +174,9 @@ module AST (M:S) = struct
     | AndThen _ | OrElse _ -> assert false (* TODO *)
     | Ident -> Fmt.pf ppf "id"
     | Try t ->
-        Fmt.pf ppf "try @[%a@]" pp t
+      Fmt.pf ppf "try @[%a@]" pp t
+    | NotBranching t ->
+      Fmt.pf ppf "notbranching @[%a@]" pp t
     | Repeat t ->
         Fmt.pf ppf "repeat @[%a@]" pp t
 

@@ -231,15 +231,42 @@ let eval_tactic_judge ast j =
 
 (** Automatic simplification of generated subgoals *)
 
-let simpl =
+(* This automation part tries to close the goal, deriving false from the
+   current atomic hypothesis. *)
+let simple_base =
   AST.(
-    AndThen [
-      Repeat (Abstract ("anyintro",[])) ;
-      Abstract ("eqnames",[]) ;
+    [ Abstract ("eqnames",[]) ;
       Abstract ("eqtimestamps",[]) ;
       Try (Abstract ("congruence",[])) ;
       Try (Abstract ("constraints",[])) ;
-      Try (Abstract ("assumption",[])) ])
+      Try (Abstract ("assumption",[])) ]
+  )
+
+(* This automation part tries all possible non branching introductions, and then
+   close. *)
+let simpl_nobranching =
+  AST.(
+    AndThen
+      (Abstract ("intros",[])
+       :: simple_base)
+  )
+
+(* This automation part tries all possible introductions, and then
+   close. *)
+let simpl_branching =
+  AST.(
+    AndThen
+      (Repeat (Abstract ("anyintro",[]))
+       :: simple_base)
+  )
+
+(* Final automation tactic. We allow branching introduction, only if the extra
+   goals are automatically closed. *)
+let simpl =
+  AST.(
+    OrElse [NotBranching(simpl_branching); simpl_nobranching]
+    )
+
 
 let auto_simp judges =
   judges

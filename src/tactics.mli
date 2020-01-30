@@ -102,6 +102,7 @@ module type AST_sig = sig
     | AndThen : t list -> t
     | OrElse : t list -> t
     | Try : t -> t
+    | NotBranching : t -> t
     | Repeat : t -> t
     | Ident : t
     | Modifier : string * t -> t

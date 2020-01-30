@@ -73,8 +73,9 @@ case H0.
    * t = R1(jj,i) and jj = j1. *)
 apply IH0 to R1(jj,i),i,jj,j1.
 
+help.
+apply happens_le to R1(j1,i), R1(jj,i).
 
-  apply happens_le to R1(j1,i), R1(jj,i).
 Qed.
 
 goal wa :

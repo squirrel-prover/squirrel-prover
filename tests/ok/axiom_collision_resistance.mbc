@@ -21,5 +21,5 @@ Proof.
 simpl.
 apply collision_resistance to
     n(b),
-    n(a).
+   n(a).
 Qed.
