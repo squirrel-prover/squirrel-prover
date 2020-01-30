@@ -85,10 +85,10 @@ let rec pp_cterm ppf = function
     Fmt.pf ppf "++(@[<hov 1>%a@])"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
 
-let rec is_ground = function
+let rec is_ground_cterm = function
   | Ccst _ -> true
   | Cvar _ -> false
-  | Cxor ts | Cfun (_, ts) -> List.for_all is_ground ts
+  | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_cterm ts
 
 let rec no_macros = function
   | Ccst (Cst.Cmacro _) -> false
@@ -585,7 +585,7 @@ end = struct
               | Ccst c ->
                 (* Using the subterm property, we know that if [la_sigma] is
                    ground, then so is [r_sigma] *)
-                assert (is_ground r_sigma);
+                assert (is_ground_cterm r_sigma);
                 ( add_grnd_rule state r_sigma c, acc)
 
               | _ -> ( state, (la_sigma,r_sigma) :: acc ) in
@@ -822,17 +822,35 @@ let complete (l : (Term.message * Term.message) list) : state =
 (****************)
 (* Dis-equality *)
 (****************)
+(* returns true if the cterm corresponds to a ground term, e.g without macros
+   and vars. *)
+let rec is_ground_term = function
+  | Ccst (Cst.Cmvar _) -> false
+  | Ccst (Cst.Cmacro _) -> false
+  | Ccst _ -> true
+  | Cvar _ -> false
+  | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_term ts
 
-(* [check_disequality_cterm state (u,v)]
-     Precondition: [u] and [v] must be ground *)
-let check_disequality_cterm state (u,v) =
+let check_disequality_cterm state neqs (u,v) =
   assert (state.completed);
-  normalize state u <> normalize state v
+  (* we normalize all inequalities *)
+  let neqs =
+    List.map (fun (x, y) -> normalize state x, normalize state y) neqs
+  in
+  let u, v = normalize state u,normalize state v in
+  (* if the given pair appears in the normalized disequality, we conclude *)
+  List.mem (u, v) neqs
+  || List.mem (v, u) neqs
+  (* if the term are grounds and have different normal form, return disequal *)
+  || (is_ground_term u && is_ground_term v && (u <> v))
 
-let check_disequality state (u,v) =
-  check_disequality_cterm state (cterm_of_term u, cterm_of_term v)
+let check_disequality state neqs (u,v) =
+  check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
 
-let check_disequalities state l = List.for_all (check_disequality state) l
+let check_disequalities state neqs l =
+  let neqs = List.map (fun (x, y) ->
+         cterm_of_term x, cterm_of_term y) neqs in
+  List.for_all (check_disequality state neqs) l
 
 (** [check_equality_cterm state (u,v)]
      Precondition: [u] and [v] must be ground *)
@@ -916,7 +934,7 @@ let name_indep_cnstrs state l =
     | _ -> [] in
 
   x_index_cnstrs state l
-    (function f -> is_ground f && no_macros f)
+    (function f -> is_ground_cterm f && no_macros f)
     n_cnstr
   |>  List.filter (function Formula.True -> false | _ -> true)
   |>  List.sort_uniq Pervasives.compare
@@ -944,28 +962,32 @@ let () =
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in
 
-
-       let state0 = complete_cterms [(a,b); (b,c); (b,d); (e,e')] in
+       let v = Ccst (Cst.Cmvar (snd (
+           Vars.make_fresh Vars.empty_env (Sorts.Message) "v")))
+       in
+       let state0 = complete_cterms [(a,b); (b,c); (b,d); (e,e'); (v,v)] in
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (c,e')) true;
+         (check_disequality_cterm state0 [] (c,e')) true;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (c,d)) false;
+         (check_disequality_cterm state0 [] (c,d)) false;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (a,c)) false;
+         (check_disequality_cterm state0 [] (v,d)) false;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (f c d, f a b)) false;
+         (check_disequality_cterm state0 [] (a,c)) false;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (f c d, f a e')) true;
+         (check_disequality_cterm state0 [] (f c d, f a b)) false;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 (f a a, g a a)) true;
+         (check_disequality_cterm state0 [] (f c d, f a e')) true;
+       Alcotest.(check bool) "simple"
+         (check_disequality_cterm state0 [] (f a a, g a a)) true;
 
        let state1 = complete_cterms [(a,e'); (a ++ b, c); (e' ++ d, e)] in
        Alcotest.(check bool) "xor"
-         (check_disequality_cterm state1 (b ++ c ++ d, e)) false;
+         (check_disequality_cterm state1 [] (b ++ c ++ d, e)) false;
        Alcotest.(check bool) "xor"
-         (check_disequality_cterm state1 (a ++ b ++ d, e)) true;
+         (check_disequality_cterm state1 [] (a ++ b ++ d, e)) true;
        Alcotest.(check bool) "xor"
-         (check_disequality_cterm state1 ( f (b ++ d) a, f (c ++ e) a)) false;
+         (check_disequality_cterm state1 [] ( f (b ++ d) a, f (c ++ e) a)) false;
        Alcotest.(check bool) "xor"
-         (check_disequality_cterm state1 ( f (b ++ d) a, f (a) a)) true;
+         (check_disequality_cterm state1 [] ( f (b ++ d) a, f (a) a)) true;
     )]

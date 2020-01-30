@@ -6,9 +6,10 @@ type state
     equations inside l *)
 val complete : (Term.message * Term.message) list -> state
 
-(** [check_disequalities s l] checks that all disequalities inside [l] hold
-    w.r.t [s] *)
-val check_disequalities : state -> (Term.message * Term.message) list -> bool
+(** [check_disequalities s neqs l] checks that all disequalities inside [l] are
+    implied by inequalities inside neqs, w.r.t [s]. *)
+val check_disequalities : state ->  (Term.message * Term.message) list
+  -> (Term.message * Term.message) list -> bool
 
 (** [check_equalities s l] checks that all equalities inside [l] hold
     w.r.t [s] *)
