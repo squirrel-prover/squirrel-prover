@@ -57,6 +57,8 @@ val pp_ord : Format.formatter -> ord -> unit
 
 val trace_atoms_ts : trace_atom list -> Term.timestamp list
 
+val trace_atoms_ind : trace_atom list -> Vars.index list
+
 val trace_atom_vars : trace_atom -> Vars.evar list
 
 val pp_trace_atom : Format.formatter -> trace_atom -> unit

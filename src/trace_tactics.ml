@@ -435,11 +435,10 @@ let () = T.register "eqnames"
            known equalities."
     eq_names
 
-let eq_timestamps (s : Sequent.t) sk fk =
-  let ts_classes = Sequent.get_ts_equalities s
-                   |> List.map (List.sort_uniq Pervasives.compare)
-  in
-  let subst =
+let eq_trace (s : Sequent.t) sk fk =
+  let s, ts_classes = Sequent.get_ts_equalities s in
+  let ts_classes = List.map (List.sort_uniq Pervasives.compare) ts_classes in
+  let ts_subst =
     let rec asubst e = function
         [] -> []
       | p::q -> Term.ESubst (p,e) :: (asubst e q)
@@ -447,11 +446,21 @@ let eq_timestamps (s : Sequent.t) sk fk =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
+  let s, ind_classes = Sequent.get_ind_equalities s in
+  let ind_classes = List.map (List.sort_uniq Pervasives.compare) ind_classes in
+  let ind_subst =
+    let rec asubst e = function
+        [] -> []
+      | p::q -> Term.ESubst (Term.Var p,Term.Var e) :: (asubst e q)
+    in
+    (List.map (function [] -> [] | p::q -> asubst p q) ind_classes)
+    |> List.flatten
+  in
   let terms = Sequent.get_all_terms s in
   let facts =
     List.fold_left
       (fun acc t ->
-         let normt : Term.message = Term.subst subst t in
+         let normt : Term.message = Term.subst (ts_subst @ ind_subst) t in
          if normt = t then
            acc
          else
@@ -466,9 +475,9 @@ let eq_timestamps (s : Sequent.t) sk fk =
   in
   sk [s] fk
 
-let () = T.register "eqtimestamps"
-    ~help:"Add terms constraints resulting from timestamp equalities."
-    eq_timestamps
+let () = T.register "eqtrace"
+    ~help:"Add terms constraints resulting from timestamp and index equalities."
+    eq_trace
 
 let substitute (v1) (v2) (s : Sequent.t) sk fk=
   let tsubst = Theory.subst_of_env (Sequent.get_env s) in

@@ -630,8 +630,11 @@ let maximal_elems (models : models) (elems : Term.timestamp list) =
   Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) maxs
   |> List.map List.hd
 
-let get_equalities (models : models) ts =
+let get_ts_equalities (models : models) ts =
   Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) ts
+
+let get_ind_equalities (models : models) inds =
+  Utils.classes (fun i j -> query models [`Index (`Eq,i,j)]) inds
 
 (****************)
 (* Tests Suites *)

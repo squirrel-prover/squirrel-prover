@@ -414,9 +414,6 @@ let apply_subst subst s =
       | None -> trace_hypotheses)
 *)
 
-(** TODO  This is the only place where the model is computed,
-  * and it is only called by functions that drop the sequent where
-  * the model is cached, hence caching is useless. *)
 let compute_models s =
   match s.models with
   | None ->
@@ -436,7 +433,12 @@ let maximal_elems s tss =
 let get_ts_equalities s =
   let s = compute_models s in
   let ts = trace_atoms_ts (get_trace_atoms s) in
-  Constr.get_equalities (opt_get (s.models)) ts
+  s, Constr.get_ts_equalities (opt_get (s.models)) ts
+
+let get_ind_equalities s =
+  let s = compute_models s in
+  let inds = trace_atoms_ind (get_trace_atoms s) in
+  s, Constr.get_ind_equalities (opt_get (s.models)) inds
 
 let constraints_valid s =
   let s = compute_models s in

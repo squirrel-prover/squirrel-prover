@@ -236,7 +236,7 @@ let eval_tactic_judge ast j =
 let simple_base =
   AST.(
     [ Abstract ("eqnames",[]) ;
-      Abstract ("eqtimestamps",[]) ;
+      Abstract ("eqtrace",[]) ;
       Try (Abstract ("congruence",[])) ;
       Try (Abstract ("constraints",[])) ;
       Try (Abstract ("assumption",[])) ]

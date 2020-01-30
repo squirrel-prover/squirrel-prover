@@ -126,3 +126,10 @@ let rec tatsts acc = function
   | (`Timestamp (_, ts, ts')) :: l -> tatsts (ts :: ts' :: acc) l
 
 let trace_atoms_ts at = tatsts [] at |> List.sort_uniq Pervasives.compare
+
+let rec tatsind acc = function
+  | [] -> acc
+  | (`Index (_,i,j)) :: l -> tatsind (i :: j :: acc) l
+  | (`Timestamp (_, ts, ts')) :: l -> tatsind acc l
+
+let trace_atoms_ind at = tatsind [] at |> List.sort_uniq Pervasives.compare

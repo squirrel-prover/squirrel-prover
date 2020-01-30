@@ -47,8 +47,8 @@ val constraints : tac
     The judgment must have been completed before calling [eq_names]. *)
 val eq_names : tac
 
-(** Add terms constraints resulting from timestamp equalities. *)
-val eq_timestamps : tac
+(** Add terms constraints resulting from timestamp and index equalities. *)
+val eq_trace : tac
 
 (** {2 Advanced tactics} *)
 

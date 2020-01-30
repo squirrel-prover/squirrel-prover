@@ -11,5 +11,4 @@ goal function :
   m1(i) = m1(j).
 Proof.
  simpl.
- atomintro.
 Qed.

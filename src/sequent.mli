@@ -101,7 +101,11 @@ val constraints_valid : sequent -> bool
 
 (** [get_ts_equalities s] return all the equalities between timestamps
        derivable from its hypothesis. *)
-val get_ts_equalities : sequent -> Term.timestamp list list
+val get_ts_equalities : sequent -> sequent * Term.timestamp list list
+
+(** [get_ind_equalities s] return all the equalities between indexes
+       derivable from its hypothesis. *)
+val get_ind_equalities : sequent -> sequent * Vars.index list list
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
    according to their ordering derived from the hypothesis in [s]. *)
