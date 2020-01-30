@@ -115,17 +115,17 @@ let rec check_proc env = function
   | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
   | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
   | Out (_,m,p) ->
-    Theory.check_term env m Sorts.emessage ;
+    Theory.check_term ~local:true env m Sorts.emessage ;
     check_proc env p
   | Set (s, l, m, p) ->
     let k = Theory.check_state s (List.length l) in
-    Theory.check_term env m k ;
+    Theory.check_term ~local:true env m k ;
     List.iter
-      (fun x -> Theory.check_term env (Theory.Var x) Sorts.eindex) l ;
+      (fun x -> Theory.check_term ~local:true env (Theory.Var x) Sorts.eindex) l ;
     check_proc env p
   | Parallel (p, q) -> check_proc env p ; check_proc env q
   | Let (x, t, p) ->
-    Theory.check_term env t Sorts.emessage ;
+    Theory.check_term ~local:true env t Sorts.emessage ;
     check_proc ((x, Sorts.emessage)::env) p
   | Repl (x, p) -> check_proc ((x, Sorts.eindex)::env) p
   | Exists (vars, test, p, q) ->
@@ -141,7 +141,7 @@ let rec check_proc env = function
     begin try
         let kind,_ = pkind_of_pname id in
         List.iter2
-          (fun (_, k) t -> Theory.check_term env t k)
+          (fun (_, k) t -> Theory.check_term ~local:true env t k)
           kind ts
       with
       | Not_found -> raise Theory.Type_error
@@ -298,7 +298,7 @@ let prepare : process -> process =
           Theory.Fun
             (Symbols.to_string x',
              List.rev_map (fun i -> Theory.Var (Vars.name i)) indices,
-             Some (Theory.Var "…"))
+             None)
         in
         let x'_tm =
           Term.Macro ((x', List.rev indices), [], Term.Var ts_var)
@@ -606,6 +606,7 @@ let parse_proc proc : unit =
   ()
 
 let declare_system proc =
+  Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc [] proc ;
   let proc = prepare proc in
   Printer.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@.@." pp_process proc ;

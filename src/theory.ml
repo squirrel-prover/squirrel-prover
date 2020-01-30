@@ -72,6 +72,8 @@ let formula_vars = Formula.foformula_vars (fun _ -> [])
 
 exception Type_error
 
+exception Not_local_term
+
 exception Arity_error of string*int*int
 
 let arity_error s i j = raise (Arity_error (s,i,j))
@@ -126,47 +128,49 @@ let rec check_term ?(local=false) env tm (kind:Sorts.esort) =
   | Fun (f, ts, ots) ->
     begin
       match ots with
-      | Some ts -> if not local then check_term env ts Sorts.etimestamp
+      | Some ts -> (if not local then check_term ~local env ts Sorts.etimestamp
+          else raise Not_local_term)
       | None -> ()
     end;
     let ks, f_k = function_kind f in
     if f_k <> kind then raise Type_error ;
     if List.length ts <> List.length ks then raise Type_error ;
     List.iter2
-      (fun t k -> check_term env t k)
+      (fun t k -> check_term ~local env t k)
       ts ks
   | Get (s, opt_ts, ts) ->
     let k = check_state s (List.length ts) in
     if k <> kind then raise Type_error ;
     List.iter
-      (fun t -> check_term env t Sorts.eindex)
+      (fun t -> check_term ~local env t Sorts.eindex)
       ts;
     begin match opt_ts with
-      | Some ts -> check_term env ts Sorts.etimestamp
+      | Some ts -> (if not local then check_term ~local env ts Sorts.etimestamp
+                    else raise Not_local_term)
       | None -> () end;
 
   | Name (s, ts) ->
     check_name s (List.length ts) ;
     if Sorts.emessage <> kind then raise Type_error ;
     List.iter
-      (fun t -> check_term env t Sorts.eindex)
+      (fun t -> check_term ~local env t Sorts.eindex)
       ts
   | Taction (a,l) ->
     check_action a (List.length l) ;
     if kind <> Sorts.etimestamp then raise Type_error ;
     List.iter
-      (fun t -> check_term env t Sorts.eindex)
+      (fun t -> check_term ~local env t Sorts.eindex)
       l
   | Tinit -> if kind <> Sorts.etimestamp then raise Type_error
   | Compare (_, u, v) ->
     if kind <> Sorts.eboolean then raise Type_error ;
     begin try
-      check_term env u Sorts.emessage ;
-      check_term env v Sorts.emessage
+      check_term ~local env u Sorts.emessage ;
+      check_term ~local env v Sorts.emessage
     with
       | Type_error ->
-          check_term env u Sorts.eboolean ;
-          check_term env v Sorts.eboolean
+          check_term ~local env u Sorts.eboolean ;
+          check_term ~local env v Sorts.eboolean
     end
 
 let rec check_formula env =
@@ -223,6 +227,7 @@ let make_term ?at_ts s l =
               Fun (s,l,None)
         end
     | Symbols.Name arity ->
+        if at_ts <> None then raise Type_error ;
         if List.length l <> arity then
           arity_error s (List.length l) arity ;
         Name (s,l)
@@ -539,7 +544,7 @@ let convert_formula arg_kinds ts s f =
     | Atom (Compare (o,u,v)) ->
       begin
         let at = Compare (o,u,v) in
-        match get_kind ~local:true kinds u with
+        match get_kind kinds u with
         | ESort Timestamp ->
             Atom (convert_trace_atom kinds subst at :>
                     Atom.generic_atom)

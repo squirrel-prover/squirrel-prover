@@ -245,7 +245,9 @@ let () =
        * to not be re-initialized. *)
       parse_theory_test ~test "tests/alcotest/lak.mbc"
     end ;
-    (* "Simple goal", `Quick, begin fun () ->
-     *   parse_theory_test ~test "tests/alcotest/simple_goal.mbc"
-     * end ; *)
+    "Local Process", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        Theory.Type_error
+        (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.mbc")
+    end ;
   ];;

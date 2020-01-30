@@ -18,7 +18,7 @@ process tag(i:index) =
   let m2 = h(<<nR,nT>,tag1>,key(i)) in
   out(cT,<nT,m2>);
   in(cR,m3);
-  if m3@nT = h(<<m2,nR>,tag2>,key(i)) then
+  if m3 = h(<<m2,nR>,tag2>,key(i)) then
     out(cT,ok)
   else
     out(cT,ko)
