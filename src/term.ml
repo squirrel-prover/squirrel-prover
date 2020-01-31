@@ -4,7 +4,8 @@ type name = Symbols.name Symbols.t
 type nsymb = Symbols.name indexed_symbol
 
 type fname = Symbols.fname Symbols.t
-type fsymb = Symbols.fname indexed_symbol
+type unsupported_index = Vars.index
+type fsymb = Symbols.fname Symbols.t * unsupported_index list
 
 type mname = Symbols.macro Symbols.t
 type msymb = Symbols.macro indexed_symbol

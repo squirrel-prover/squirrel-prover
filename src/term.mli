@@ -21,10 +21,16 @@ type 'a indexed_symbol = 'a Symbols.t * Vars.index list
 type name = Symbols.name Symbols.t
 type nsymb = Symbols.name indexed_symbol
 
-(** Function symbols, may represent primitives or abstract functions. *)
+(** Function symbols, may represent primitives or abstract functions.
+  *
+  * In the theory, functions symbols are indexed, and we want to support
+  * them in the future. At the moment many functions of the code ignore
+  * indices of functions, hence the abstract type [unsupported_index].
+  * It should eventually be removed after a global update of the code. *)
 
 type fname = Symbols.fname Symbols.t
-type fsymb = Symbols.fname indexed_symbol
+type unsupported_index
+type fsymb = Symbols.fname Symbols.t * unsupported_index list
 
 (** Macros are used to represent inputs, outputs, contents of state
   * variables, and let definitions: everything that is expanded when
@@ -79,7 +85,7 @@ exception Uncastable
   * @raise Uncastable if the term does not have the expected sort. *)
 val cast : 'a Sorts.sort -> 'b term -> 'a term
 
-(** [get_vars t] returns the message and timestamp variables of [t]. *)
+(** [get_vars t] returns all variables occurring in [t]. *)
 val get_vars : 'a term -> Vars.evar list
 
 (** [get_ts t] returns the timestamps appearing in [t].
