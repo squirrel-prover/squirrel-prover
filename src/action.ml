@@ -291,8 +291,3 @@ let pp_descrs ppf () =
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
         pp_descr descr) ;
   Fmt.pf ppf "@]%!@."
-
-let pp_proc ppf () =
-  pp_actions ppf () ;
-  Fmt.pf ppf "@." ;
-  if debug then pp_descrs ppf ()

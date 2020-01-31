@@ -141,9 +141,6 @@ val pp_actions : Format.formatter -> unit -> unit
 (** Pretty-print all action descriptions. *)
 val pp_descrs : Format.formatter -> unit -> unit
 
-(** Pretty-print all actions and action descriptions *)
-val pp_proc : Format.formatter -> unit -> unit
-
 
 (** {2 Substitution} *)
 

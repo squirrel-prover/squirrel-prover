@@ -66,7 +66,7 @@ let rec main_loop ?(test=false) ?(save=true) mode =
           let new_mode = reset_state nb_undo in
           begin match new_mode with
             | ProofMode -> Printer.pr "%a" pp_goal ()
-            | GoalMode -> Printer.pr "%a" Action.pp_proc ()
+            | GoalMode -> Printer.pr "%a" Action.pp_actions ()
             | InputDescr | WaitQed -> ()
           end ;
           main_loop ~test new_mode
@@ -75,7 +75,7 @@ let rec main_loop ?(test=false) ?(save=true) mode =
           error ~test mode "Cannot undo, no proof state to go back to."
       end
     | InputDescr, ParsedInputDescr ->
-      Printer.pr "%a" Action.pp_proc ();
+      Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
     | ProofMode, ParsedTactic utac ->
       begin
