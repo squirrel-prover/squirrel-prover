@@ -15,3 +15,5 @@ output.tex
 metabc*
 sanity
 /tex/auto/*.el
+*.fdb_latexmk
+*.fls
