@@ -1,8 +1,23 @@
 \section{Meta-logic}
 
+\paragraph{Syntax, semantics}
+
 \begin{itemize}
-  \item timestamp = action ?
-  \item order $\leq$ on timestamps
-  \item define happens(action)
-  \item define induction
+  \item two new sorts: index and timestamp
+  \item interpretation of meta-logic is trace-dependant (vs interpretation of logic is protocol-dependant)
+  \item interpretation of index variables in $\mathbb{N}$ (the ones appearing in the trace)
+  \item interpretation of timestamps by actions appearing in the trace
+  \item atom formulas of the meta-logic
+  \begin{itemize}
+    \item order $\leq$ on timestamps
+    \item define happens(action)
+  \end{itemize}
+\end{itemize}
+
+\paragraph{Axioms}
+
+\begin{itemize}
+  \item Adrien's axioms are in the logic (not the meta-logic)
+  \item which supplementary axioms do we need in the meta-logic?
+  \item induction expressed with an axiom in the meta-logic (in order to have variables that will be interpreted in the logic)?
 \end{itemize}

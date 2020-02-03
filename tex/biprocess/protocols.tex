@@ -35,7 +35,7 @@ An \emph{action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \A$ and $i_1,\d
   \item a bi-term of sort $\msg$: $\mout_{\alpha}$ (intuitively, the output of this action)
   \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
 \end{itemize}
-where the only variable appearing in $\mtest_{\alpha}$ and $\mout_{\alpha}$ is $x_{\alpha}$ (intuitively, the input of this action).
+where the only variable appearing in $\mtest_{\alpha}$ and $\mout_{\alpha}$ is $x_{\alpha}$ (intuitively, the input of this action).\footnote{TODO - Traiter le cas des variables d'index libres dans $\mtest_{\alpha}$ (try find).}
 \end{definition}
 
 \begin{definition}
@@ -140,5 +140,5 @@ See Adrien's thesis, section 2.3:
   \item term interpertation
   \item computational model
   \item we extend $\sigma$ to a valuation from $\X \cup \I$ to the appropriate domain ($\D_\msg$, $\D_\bool$ or $\D_\idx$.)
-  \item the domain $\D_\idx$ is interpreted in $\mathbb{N}$
+  \item the domain $\D_\idx$ is interpreted in a finite subset of $\mathbb{N}$
 \end{itemize}
