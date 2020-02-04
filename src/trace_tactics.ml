@@ -143,30 +143,6 @@ let () =
        | _ -> raise @@ Tactics.Tactic_Hard_Failure
            (Tactics.Failure "improper arguments"))
 
-let goal_atom_intro (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
-  | Atom(a) ->
-    begin
-      match a with
-      | #message_atom as a -> sk [Sequent.set_conclusion False s
-                               |> Sequent.add_formula
-                                 (Atom (Atom.not_message_atom a
-                                        :> Atom.generic_atom))] fk
-      | #trace_atom as a -> sk [Sequent.set_conclusion False s
-                             |> Sequent.add_formula
-                               (Atom (Atom.not_trace_atom a
-                                      :> Atom.generic_atom))] fk
-      | _ -> fk (Tactics.Failure
-               "Cannot introduce happens.")
-      end
-  | _ -> fk (Tactics.Failure
-               "Can only introduce trace or term atoms.")
-let () =
-  T.register "atomintro"
-    ~help:"Performs the introduction of a trace or term atom."
-    goal_atom_intro
-
-
 (** [goal_intro judge sk fk] perform one introduction, either of a forall
     quantifier or an implication. Else, it returns [fk] *)
 let goal_intro (s : Sequent.t) sk fk =

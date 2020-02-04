@@ -48,7 +48,7 @@ metabc: sanity
 makecoverage: sanity
 	BISECT_COVERAGE=YES $(OCB) test.native
 	./test.native
-	BISECT_COVERAGE=YES $(OCB) metabc.byte 
+	BISECT_COVERAGE=YES $(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
 
 coverage: makecoverage ok_test
@@ -79,7 +79,7 @@ doc: metabc
 sanity: _build/requirements
 
 # check that requirements are installed
-PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"." 
+PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
 _build/requirements: Makefile
 	@(echo -n "Checking for menhir... " ; \
 	  which menhir ) || ( \

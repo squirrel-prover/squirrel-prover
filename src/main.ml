@@ -120,17 +120,7 @@ let rec main_loop ?(test=false) ?(save=true) mode =
             match start_proof () with
             | None ->
               Printer.pr "%a" pp_goal ();
-              if is_proof_completed () then
-                begin
-                  Printer.prt `Goal "Goal %s is proved"
-                  (match Prover.current_goal () with
-                   | Some (i, _) -> i
-                   | None -> assert false) ;
-                complete_proof ();
-                main_loop ~test WaitQed
-              end
-              else
-                main_loop ~test ProofMode
+              main_loop ~test ProofMode
             | Some es -> error ~test GoalMode es
           end
 

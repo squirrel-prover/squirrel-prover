@@ -37,8 +37,6 @@ val pp_term : Format.formatter -> term -> unit
 
 type formula = (term, (string * Sorts.esort) ) Formula.foformula
 
-val formula_vars : formula -> (string * Sorts.esort) list
-
 val pp_formula : Format.formatter -> formula -> unit
 
 (** {2 Declaration of new symbols} *)

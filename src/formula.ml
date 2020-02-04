@@ -39,22 +39,6 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
   | True -> Fmt.pf ppf "True"
   | False -> Fmt.pf ppf "False"
 
-let rec foformula_vars atom_var = function
-  | ForAll (vs,b) | Exists (vs,b) -> vs @ (foformula_vars atom_var b)
-  | And (a,b) | Or (a,b) | Impl (a,b) ->
-    foformula_vars atom_var a @ foformula_vars atom_var b
-  | Not s -> foformula_vars atom_var s
-  | Atom a -> atom_var a
-  | True | False -> []
-
-let formula_vars (f:formula) =
-  foformula_vars generic_atom_var f
-  |> List.sort_uniq Pervasives.compare
-
-let formula_qvars f : Vars.evar list =
-  foformula_vars (fun _ -> []) f
-  |> List.sort_uniq Pervasives.compare
-
 let pp_formula = pp_foformula pp_generic_atom Vars.pp_typed_list
 
 let rec subst_foformula a_subst (s : Term.subst) (f) =
@@ -73,16 +57,6 @@ let rec subst_foformula a_subst (s : Term.subst) (f) =
 
 let subst_formula : Term.subst -> formula -> formula =
   subst_foformula subst_generic_atom
-
-let fresh_quantifications env f =
-  let vars = formula_qvars f in
-  let subst =
-    List.map
-      (fun (Vars.EVar x) -> Term.ESubst
-          (Term.Var x, Term.Var (Vars.make_fresh_from_and_update env x)))
-      vars
-  in
-  subst_formula subst f
 
 exception Not_a_disjunction
 

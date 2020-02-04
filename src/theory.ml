@@ -66,8 +66,6 @@ let pp_formula =
                                  (snd @@ Vars.make_fresh Vars.empty_env t v))
             l))
 
-let formula_vars = Formula.foformula_vars (fun _ -> [])
-
 (** Type checking *)
 
 exception Type_error

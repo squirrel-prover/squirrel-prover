@@ -27,13 +27,8 @@ type generic_atom = [
 val not_message_atom : message_atom -> message_atom
 val not_trace_atom : trace_atom -> trace_atom
 
-val atsts : Term.timestamp list -> message_atom list -> Term.timestamp list
 val tatsts :
   Term.timestamp list -> trace_atom list -> Term.timestamp list
-
-val message_atoms_ts : message_atom list -> Term.timestamp list
-
-val message_atom_vars : message_atom -> Vars.evar list
 
 val pp_message_atom : Format.formatter -> message_atom -> unit
 
@@ -59,14 +54,10 @@ val trace_atoms_ts : trace_atom list -> Term.timestamp list
 
 val trace_atoms_ind : trace_atom list -> Vars.index list
 
-val trace_atom_vars : trace_atom -> Vars.evar list
-
 val pp_trace_atom : Format.formatter -> trace_atom -> unit
 
 val subst_trace_atom :
   Term.subst -> trace_atom -> trace_atom
-
-val generic_atom_var : generic_atom -> Vars.evar list
 
 val pp_generic_atom : Format.formatter -> generic_atom -> unit
 

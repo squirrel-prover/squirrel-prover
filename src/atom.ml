@@ -7,12 +7,6 @@ type ('a,'b) _atom = 'a * 'b * 'b
 
 type message_atom = [ `Message of (ord_eq,Term.message) _atom ]
 
-let atom_vars avars (`Message (o,a1,a2)) =
-  (avars a1 @ avars a1)
-  |> List.sort_uniq Pervasives.compare
-
-let message_atom_vars = atom_vars Term.get_vars
-
 let pp_ord ppf = function
   | `Eq -> Fmt.pf ppf "="
   | `Neq -> Fmt.pf ppf "<>"
@@ -103,21 +97,6 @@ let pp_generic_atom ppf = function
   | `Happens a -> Fmt.pf ppf "happens(%a)" Term.pp a
   | #message_atom as a -> pp_message_atom ppf a
   | #trace_atom as a -> pp_trace_atom ppf a
-
-let trace_atom_vars = function
-  | `Timestamp (_,ts,ts') -> Term.get_vars ts @ Term.get_vars ts'
-  | `Index (o,i,i') -> [Vars.EVar i;Vars.EVar i']
-
-let generic_atom_var = function
-  | #trace_atom as a -> trace_atom_vars a
-  | #message_atom as a -> message_atom_vars a
-  | `Happens a -> Term.get_vars a
-
-let rec atsts acc = function
-  | [] -> acc
-  | `Message (_, t, t') :: l -> atsts (Term.get_ts t @ Term.get_ts t' @ acc) l
-
-let message_atoms_ts at = atsts [] at |> List.sort_uniq Pervasives.compare
 
 let rec tatsts acc = function
   | [] -> acc
