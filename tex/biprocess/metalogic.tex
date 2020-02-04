@@ -1,23 +1,43 @@
 \section{Meta-logic}
 
-\paragraph{Syntax, semantics}
+\subsection{Syntax}
 
-\begin{itemize}
-  \item two new sorts: index and timestamp
-  \item interpretation of meta-logic is trace-dependant (vs interpretation of logic is protocol-dependant)
-  \item interpretation of index variables in $\mathbb{N}$ (the ones appearing in the trace)
-  \item interpretation of timestamps by actions appearing in the trace
-  \item atom formulas of the meta-logic
-  \begin{itemize}
-    \item order $\leq$ on timestamps
-    \item define happens(action)
-  \end{itemize}
-\end{itemize}
+See section 1.2 (with simplifications)
 
-\paragraph{Axioms}
+\subsection{Semantics}
 
-\begin{itemize}
-  \item Adrien's axioms are in the logic (not the meta-logic)
-  \item which supplementary axioms do we need in the meta-logic?
-  \item induction expressed with an axiom in the meta-logic (in order to have variables that will be interpreted in the logic)?
-\end{itemize}
+Meta-interpretation for a given trace
+
+\subsection{Axioms}
+
+Valid axioms wrt a protocol
+
+% See Adrien's thesis, section 2.3:
+% \begin{itemize}
+%   \item term interpertation
+%   \item computational model
+%   \item we extend $\sigma$ to a valuation from $\X \cup \I$ to the appropriate domain ($\D_\msg$, $\D_\bool$ or $\D_\idx$.)
+%   \item the domain $\D_\idx$ is interpreted in a finite subset of $\mathbb{N}$
+% \end{itemize}
+%
+% \paragraph{Syntax, semantics}
+%
+% \begin{itemize}
+%   \item two new sorts: index and timestamp
+%   \item interpretation of meta-logic is trace-dependant (vs interpretation of logic is protocol-dependant)
+%   \item interpretation of index variables in $\mathbb{N}$ (the ones appearing in the trace)
+%   \item interpretation of timestamps by actions appearing in the trace
+%   \item atom formulas of the meta-logic
+%   \begin{itemize}
+%     \item order $\leq$ on timestamps
+%     \item define happens(action)
+%   \end{itemize}
+% \end{itemize}
+%
+% \paragraph{Axioms}
+%
+% \begin{itemize}
+%   \item Adrien's axioms are in the logic (not the meta-logic)
+%   \item which supplementary axioms do we need in the meta-logic?
+%   \item induction expressed with an axiom in the meta-logic (in order to have variables that will be interpreted in the logic)?
+% \end{itemize}

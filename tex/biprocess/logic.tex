@@ -1,37 +1,40 @@
 \section{Logic}
 
+Bana and Comon logic, see Adrien's thesis
+
 \subsection{Syntax}
 
-We define, for every $n \in \mathbb{N}$, a predicate symbol $\sim_n$ of arity $2n$ representing the equivalence between two vectors of terms of length $n$.
 
-\begin{figure}[h]
-  \[
-    \begin{array}{rcll}
-      t & := & \sfn(i_1 \dots i_n) \mid x \mid \sff(t_1,\dots,t_n) \mid \sfg(t_1,\dots,t_n) & \text{term}
-      \\
-      \atom & := & t_1,\dots,t_n \sim_n t'_1,\dots,t'_n & \text{atomic formula}
-      \\
-      \phi & := & \atom \mid \top \mid \bot \mid \phi \wedge \phi' \mid \phi \vee \phi' \mid \phi \Rightarrow \phi'\mid \neg \phi & \text{formula}
-    \end{array}
-  \]
-  \caption{Syntax for formulas}
-  \label{fig:syntax-formula}
-\end{figure}
-
-\begin{example}
-  Assuming $\F$ contains $\eq, \ok, \error, \funif$ we can build the following formulas.
-  \begin{itemize}
-    \item $\phi_1 := \myif g() \mythen n_0(i) \myelse n_1(i) \sim_1 n(i)$
-    \item $\phi_2 := \myif \eq(g(),n(i)) \mythen \ok \myelse \error \sim_1 \myif \eq(g(),m(i)) \mythen \ok \myelse \error$
-    \item $\phi_3 := \phi_1 \land \phi_2$
-  \end{itemize}
-\end{example}
+% We define, for every $n \in \mathbb{N}$, a predicate symbol $\sim_n$ of arity $2n$ representing the equivalence between two vectors of terms of length $n$.
+%
+% \begin{figure}[h]
+%   \[
+%     \begin{array}{rcll}
+%       t & := & \sfn(i_1 \dots i_n) \mid x \mid \sff(t_1,\dots,t_n) \mid \sfg(t_1,\dots,t_n) & \text{term}
+%       \\
+%       \atom & := & t_1,\dots,t_n \sim_n t'_1,\dots,t'_n & \text{atomic formula}
+%       \\
+%       \phi & := & \atom \mid \top \mid \bot \mid \phi \wedge \phi' \mid \phi \vee \phi' \mid \phi \Rightarrow \phi'\mid \neg \phi & \text{formula}
+%     \end{array}
+%   \]
+%   \caption{Syntax for formulas}
+%   \label{fig:syntax-formula}
+% \end{figure}
+%
+% \begin{example}
+%   Assuming $\F$ contains $\eq, \ok, \error, \funif$ we can build the following formulas.
+%   \begin{itemize}
+%     \item $\phi_1 := \myif g() \mythen n_0(i) \myelse n_1(i) \sim_1 n(i)$
+%     \item $\phi_2 := \myif \eq(g(),n(i)) \mythen \ok \myelse \error \sim_1 \myif \eq(g(),m(i)) \mythen \ok \myelse \error$
+%     \item $\phi_3 := \phi_1 \land \phi_2$
+%   \end{itemize}
+% \end{example}
 
 \subsection{Semantics}
 
-See Adrien's thesis, section 2.3:
-\begin{itemize}
-  \item formula interpertation
-  \item computational model
-  \item we note $\M \models \phi$ if and only if for every valuation $\sigma$, $\llbracket \phi \rrbracket_\M^\sigma = \True$
-\end{itemize}
+% See Adrien's thesis, section 2.3:
+% \begin{itemize}
+%   \item formula interpertation
+%   \item computational model
+%   \item we note $\M \models \phi$ if and only if for every valuation $\sigma$, $\llbracket \phi \rrbracket_\M^\sigma = \True$
+% \end{itemize}

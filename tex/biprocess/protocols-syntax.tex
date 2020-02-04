@@ -1,0 +1,126 @@
+\section{Syntax for protocols}
+
+\begin{itemize}
+  \item $\N$ names with index arity
+  \item $\X$ variables
+  \item $\I$ index variables
+  \item $\F$ function symbols with usual arity
+  % \item $\G$ attacker's function symbols with usual arity
+  \item $\A$ action symbols with index arity
+  \item $\C$ channel names
+\end{itemize}
+
+\begin{figure}[h]
+  \[
+    \begin{array}{rcll}
+      t & := & \sfn(i_1 \dots i_n) \mid x \mid \sff(t_1,\dots,t_n) & \text{term}
+      \\
+      tt & := & t \mid \choice(t_1,t_2) \mid \sff(tt_1,\dots,tt_n) & \text{bi-term}
+    \end{array}
+  \]
+  \caption{Syntax for bi-processes}
+  \label{fig:syntax-bi-process}
+\end{figure}
+
+% Three sorts: $\idx$, $\msg$ and $\bool$.
+
+% We assume that $\F$ contains at least the function symbols (of sort $\bool$): $\true$ and $\false$ (of arity 0) and $\eq$ (of arity 2).
+
+\begin{definition}
+A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \A$ and $i_1,\dots,i_n \in \I$, is defined by:
+\begin{itemize}
+  \item a bi-term $\mtest_{\alpha}$ (intuitively, the condition of this action)
+  \item a bi-term $\mout_{\alpha}$ (intuitively, the output of this action)
+  \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
+\end{itemize}
+where the only variable appearing in $\mtest_{\alpha}$ and $\mout_{\alpha}$ is $x_{\alpha}$ (intuitively, the input of this action).\footnote{TODO - Traiter le cas des variables d'index libres dans $\mtest_{\alpha}$ (try find).}
+Names appearing in $\mtest_{\alpha}$ and $\mout_{\alpha}$ are of the form $\sfn(i_1,\dots,i_k)$ with $k \leq n$.
+\end{definition}
+
+\begin{definition}
+A \emph{concrete action} is an instanciation of a \emph{symbolic action} by giving integer values to index variables.
+\end{definition}
+
+\begin{definition}
+  \label{def:proto}
+  A \emph{protocol} is defined by:
+  \begin{itemize}
+    \item a set of index variables $i_1,\dots,i_n$,
+    \item a finite set of \emph{symbolic actions} with distinct action symbols featuring only index variables from $i_1,\dots,i_n$,
+    \item a transitive \emph{sequential dependency} relation $\before$ on \emph{concrete actions},
+    \item a \emph{conflict} relation $\conflict$ on \emph{concrete actions}.
+  \end{itemize}
+  Intuitively, $\sfa_1(1)\before\sfa_2(1,2)$ means that $\sfa_1(1)$ must happen before $\sfa_2(1,2)$ in any execution
+  and $\sfa_1(1,2)\conflict\sfa_2(1,2)$ means that $\sfa_1(1,2)$ and $\sfa_2(1,2)$ cannot both occur in any execution.
+\end{definition}
+
+\begin{example}[Basic Hash]
+  \label{ex:basic-hash-bi-process}
+  We introduce the protocol $P_{BH}$ defined by:
+  \begin{itemize}
+    \item the set of index variables $\{i,j,ii,jj\}$,
+    \item the set of symbolic actions $\{\T(i,j),\R_1(ii,jj),\R_2(ii,jj)\}$ where,
+    \begin{itemize}
+      \item action $\alpha_1 := \T(i,j)$
+        \begin{itemize}
+          \item $\mtest_{\alpha_1} := \true$
+          \item $\mout_{\alpha_1} := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle$
+        \end{itemize}
+      \item action $\alpha_2 := \R_1(ii,jj)$
+        \begin{itemize}
+          \item $\mtest_{\alpha_2} := \eq(\snd(\g(x_{\alpha_2})),  \h(\choice(k(ii),k'(ii)),\fst(\g(x_{\alpha_2})))$
+          \item $\mout_{\alpha_2} := \ok$
+        \end{itemize}
+      \item action $\alpha_3 := \R_2(ii,jj)$
+        \begin{itemize}
+          \item $\mtest_{\alpha_3} := \noteq (\snd(\g(x_{\alpha_3})),  \h(\choice(k(ii),k'(ii)),\fst(\g(x_{\alpha_3}))))$
+          \item $\mout_{\alpha_3} := \error$
+        \end{itemize}
+    \end{itemize}
+    \item a conflict relation $\conflict$ such that $\forall p,q \in \mathbb{N}, \R_1(p,q)\conflict\R_2(p,q)$.
+  \end{itemize}
+\end{example}
+
+\begin{definition}
+  Given a protocol $P$ according to \Cref{def:proto}, a \emph{trace} is a sequence $\sfa_1(\vect {i_1}) \dots \sfa_n(\vect {i_n})$ made of concrete actions such that:
+  \begin{itemize}
+    \item for all $1 \leq i,j \leq n$, if $\sfa_i = \sfa_j$ then $\vect {i_i} \neq \vect {i_j}$;
+    \item for all $1 \leq i < j \leq n$, it is not the case that $\sfa_i(\vect {i_i}) \conflict \sfa_j(\vect {i_j})$;
+    \item for all $1 \leq i \leq n$, for all $\sfa_k(\vect {i_k}) \before \sfa_i(\vect {i_i})$, there exists $1 \leq j < i$ such that $\sfa_k(\vect {i_k}) = \sfa_j(\vect {i_j})$;
+    \item we cannot have in the trace $\sfa_i(\vect {i_{i_1}}.\vect {i_{i_2}}.\vect {i_{i_3}})$ and $\sfa_j(\vect {i_{j_1}}.\vect {i_{j_2}}.\vect {i_{j_3}})$
+    with $\vect {i_{i_1}} \neq \vect {i_{j_1}}$ and $\vect {i_{i_2}} = \vect {i_{j_2}}$.
+  \end{itemize}
+\end{definition}
+
+\begin{example}
+  \label{ex:basic-hash-trace}
+  Some traces for the protocol defined in \Cref{ex:basic-hash-bi-process}.
+  % The sequence $\T(1,1),\R_1(1,1)$ is a possible trace of the protocol defined in \Cref{ex:basic-hash-bi-process}.
+  % \begin{itemize}
+  %   \item $\mouts(\alpha_1) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle$
+  %   \item $\mouts(\alpha_1.\alpha_2) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle, \ok$
+  %   \item $\mtests_\tr := \mand(\true, \eq(\snd(\g(\mouts(\alpha_1))), \h(\choice(k(i),k'(i)),\fst(\g(\mouts(\alpha_1)))))$
+  % \end{itemize}
+  % Other symbolic traces:
+  \begin{itemize}
+    \item $\T(1,1),\R_1(1,1)$
+    \item $\T(1,1).\R_1(1,1).\T(1,2).\R_1(1,2)$
+    \item $\T(1,1).\R_1(1,1).\T(2,1).\R_1(2,1)$
+  \end{itemize}
+\end{example}
+
+% \begin{example}
+%   Toy example.
+%   \begin{itemize}
+%     \item bi-process $B := \{ \sfa(i) \mid i \in \I \}$ (no conflict nor sequential dependency)
+%       \begin{itemize}
+%         \item $\mtest_{\sfa(i)} := \eq(\g(x_{\sfa(i)}), \choice(n(i),m(i)))$
+%         \item $\mout_{\sfa(i)} := \ok$
+%       \end{itemize}
+%     \item $\tr := \sfa(i).\sfa(i')$
+%     \begin{itemize}
+%       \item $\mouts(\tr) := \{\ok,\ok\}$
+%       \item $\mtests_\tr := \mand(\eq(\g(), \choice(n(i),m(i))), \eq(\g(\{\ok\}), \choice(n(i'),m(i'))))$
+%     \end{itemize}
+%   \end{itemize}
+% \end{example}
