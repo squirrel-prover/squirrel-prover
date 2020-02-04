@@ -1,5 +1,5 @@
 OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
-			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre
+			-pkgs fmt,fmt.tty,alcotest,ocamlgraph,pcre \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 
@@ -38,10 +38,22 @@ ok_test: sanity
 clean:
 	$(OCB) -clean
 	@rm -f metabc
+	rm -f *.coverage
+	rm -rf _coverage
 
 metabc: sanity
 	$(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
+
+makecoverage: sanity
+	BISECT_COVERAGE=YES $(OCB) test.native
+	./test.native
+	BISECT_COVERAGE=YES $(OCB) metabc.byte 
+	@ln -s -f metabc.byte metabc
+
+coverage: makecoverage ok_test
+	bisect-ppx-report html -I _build/
+	rm -f *.coverage
 
 %.cmo: sanity
 	$(OCB) $@

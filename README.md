@@ -6,9 +6,9 @@
 You need OCaml. Developers use versions 4.05 and 4.06. The software
 should build with versions up to 4.08, but with deprecation warnings.
 You need the following tools and libraries, to be installed e.g.
-with opam:
+with opam.
 ```
-$ opam install menhir fmt ocamlgraph alcotest pcre
+$ opam install . -y --deps-only
 ```
 
 You should then be able to build the software. The default target
@@ -21,7 +21,6 @@ You can also just build the prover with `make metabc`, test with
 `make test`.
 
 The documentation for developers may be built with `make doc`.
-
 
 ## Use
 
@@ -91,3 +90,21 @@ system <process>.
 ### Lemmas
 
 TODO: axioms, goals, proofs, available tactics
+
+## Developper details
+ 
+# Documentation
+
+It can be generated through:
+```
+$ make doc
+```
+The documentation can then be browsed through `metabc.docdic/index.html`.
+
+# Coverage
+It can be generated through:
+```
+$ make coverage
+```
+The documentation can then be browsed through `_coverage/index.html`.
+

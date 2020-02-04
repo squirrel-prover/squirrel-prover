@@ -17,3 +17,5 @@ sanity
 /tex/auto/*.el
 *.fdb_latexmk
 *.fls
+_coverage/
+*.coverage
