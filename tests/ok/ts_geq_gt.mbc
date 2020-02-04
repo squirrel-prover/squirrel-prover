@@ -9,5 +9,7 @@ Qed.
 
 goal A > B => A >= B.
 Proof.
- simpl.
+simpl.
+undo 1.
+simpl.
 Qed.

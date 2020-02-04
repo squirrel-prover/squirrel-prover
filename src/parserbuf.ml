@@ -200,6 +200,12 @@ let () =
     "Simple model", `Quick, begin fun () ->
       parse_theory_test ~test "tests/alcotest/process.mbc"
     end ;
+    "Proc arg", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/process_arg.mbc"
+    end ;
+    "Proc par", `Quick, begin fun () ->
+      parse_theory_test ~test "tests/alcotest/process_par.mbc"
+    end ;
     "Name declaration", `Quick, begin fun () ->
       parse_theory_test ~test "tests/alcotest/name.mbc"
     end ;
@@ -249,5 +255,20 @@ let () =
       Alcotest.check_raises "fails"
         Theory.Type_error
         (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.mbc")
+    end ;
+    "Apply Proc", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        Theory.Type_error
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_type.mbc")
+    end ;
+    "Apply Proc", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        Theory.Type_error
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.mbc")
+    end ;
+    "Apply Proc", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        Symbols.Multiple_declarations
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.mbc")
     end ;
   ];;
