@@ -43,14 +43,13 @@ let norm_xatom (o, l, r) =
   | `Lt -> (`Leq, l, r) :: [(`Neq, l, r)]
   | `Gt -> (`Leq, r, l) :: [(`Neq, r, l)]
 
-exception Temp of string
-
+(** Precondition : must only be called on Eq | Leq | Neq atoms *)
 let add_xeq od xeq (eqs, leqs, neqs) =
   match od with
   | `Eq -> (xeq :: eqs, leqs, neqs)
   | `Leq -> (eqs, xeq :: leqs, neqs)
   | `Neq -> (eqs, leqs, xeq :: neqs)
-  | _ -> raise (Temp ("add_xeq: bad comparison operator"))
+  | _ -> assert false
 
 let add_xeq_eq od xeq (eqs, neqs) =
   match od with
