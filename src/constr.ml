@@ -217,6 +217,7 @@ let swap x y = match x.cnt, y.cnt with
 let no_mgu x y = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
     if a <> a' then raise No_mgu else ()
+  | UName _, UInit _ -> raise No_mgu
   | _ -> ()
 
 
