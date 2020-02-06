@@ -81,6 +81,7 @@ goal wa :
 Proof.
   intros.
   euf C0.
-  admit. (* TODO invoke no_confusion, get rid of False || .. *)
+  apply no_confusion to R1(j,i),i,j,j1.
+  apply happens_le to R1(j1,i), R1(j,i).
   exists i,k.
 Qed.
