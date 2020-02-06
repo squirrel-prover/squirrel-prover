@@ -292,13 +292,14 @@ let induction s sk fk =
              (ForAll (vs,f))
          in
          (* Use v'' to form induction hypothesis. *)
+         let (-->) a b = Impl (a,b) in
          let ih =
            ForAll ((Vars.EVar v'')::vs,
-                   Impl
-                     (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
-                            :> generic_atom),
-                      Formula.subst_formula
-                        [Term.ESubst (Term.Var v,Term.Var v'')] f))
+                   Atom (`Timestamp (`Neq,Term.Var v,Term.Init)) -->
+                   (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
+                            :> generic_atom) -->
+                    Formula.subst_formula
+                      [Term.ESubst (Term.Var v,Term.Var v'')] f))
          in
          let s =
            s
