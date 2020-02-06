@@ -1,40 +1,35 @@
 \section{Logic}
 
-Bana and Comon logic, see Adrien's thesis
+The base logic is that of Bana and Comon (CCS'14). It is first-order logic
+with a distinguished kind of constant for representing names (written
+$\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
+and featuring a single predicate noted $\sim$ (or rather, a family
+of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
+The terms are all of the same sort: they are meant to represent
+messages\footnote{
+  \david{I hope/believe that the distinction between booleans and messages
+  can be ignored for the theory.}
+}.
 
-\subsection{Syntax}
+In practice, the logic will be considered with function symbols for
+representing cryptographic primitives as well as attacker computations, and
+boolean constants and connectives.
 
+The formulas of the base logic are intended to be interpreted in
+\emph{computational models}, where:
+\begin{itemize}
+  \item terms are interpreted as PPT Turing machines which,
+    given infinite random tapes and a security parameter output a bitstring;
+  \item $\sim$ is interpreted as indistinguishability;
+  \item names are independent random samplings;
+  \item function symbols correspond to deterministic machines.
+\end{itemize}
 
-% We define, for every $n \in \mathbb{N}$, a predicate symbol $\sim_n$ of arity $2n$ representing the equivalence between two vectors of terms of length $n$.
-%
-% \begin{figure}[h]
-%   \[
-%     \begin{array}{rcll}
-%       t & := & \sfn(i_1 \dots i_n) \mid x \mid \sff(t_1,\dots,t_n) \mid \sfg(t_1,\dots,t_n) & \text{term}
-%       \\
-%       \atom & := & t_1,\dots,t_n \sim_n t'_1,\dots,t'_n & \text{atomic formula}
-%       \\
-%       \phi & := & \atom \mid \top \mid \bot \mid \phi \wedge \phi' \mid \phi \vee \phi' \mid \phi \Rightarrow \phi'\mid \neg \phi & \text{formula}
-%     \end{array}
-%   \]
-%   \caption{Syntax for formulas}
-%   \label{fig:syntax-formula}
-% \end{figure}
-%
-% \begin{example}
-%   Assuming $\F$ contains $\eq, \ok, \error, \funif$ we can build the following formulas.
-%   \begin{itemize}
-%     \item $\phi_1 := \myif g() \mythen n_0(i) \myelse n_1(i) \sim_1 n(i)$
-%     \item $\phi_2 := \myif \eq(g(),n(i)) \mythen \ok \myelse \error \sim_1 \myif \eq(g(),m(i)) \mythen \ok \myelse \error$
-%     \item $\phi_3 := \phi_1 \land \phi_2$
-%   \end{itemize}
-% \end{example}
+In particular, function symbols corresponding to cryptographic primitives
+are interpreted as implementations of the primitives, subject to some
+assumptions.
 
-\subsection{Semantics}
-
-% See Adrien's thesis, section 2.3:
-% \begin{itemize}
-%   \item formula interpertation
-%   \item computational model
-%   \item we note $\M \models \phi$ if and only if for every valuation $\sigma$, $\llbracket \phi \rrbracket_\M^\sigma = \True$
-% \end{itemize}
+For example, if $\mathsf{n}$ and $\mathsf{m}$ are distinct names,
+the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and
+$\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
+are valid.

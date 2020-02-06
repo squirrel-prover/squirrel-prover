@@ -1,11 +1,10 @@
-\section{Syntax for protocols}
+\section{Protocols}
 
 \begin{itemize}
   \item $\N$ names with index arity
   \item $\X$ variables
   \item $\I$ index variables
   \item $\F$ function symbols with usual arity
-  % \item $\G$ attacker's function symbols with usual arity
   \item $\A$ action symbols with index arity
   \item $\C$ channel names
 \end{itemize}
@@ -21,10 +20,6 @@
   \caption{Syntax for bi-processes}
   \label{fig:syntax-bi-process}
 \end{figure}
-
-% Three sorts: $\idx$, $\msg$ and $\bool$.
-
-% We assume that $\F$ contains at least the function symbols (of sort $\bool$): $\true$ and $\false$ (of arity 0) and $\eq$ (of arity 2).
 
 \begin{definition}
 A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \A$ and $i_1,\dots,i_n \in \I$, is defined by:
@@ -95,13 +90,6 @@ A \emph{concrete action} is an instanciation of a \emph{symbolic action} by givi
 \begin{example}
   \label{ex:basic-hash-trace}
   Some traces for the protocol defined in \Cref{ex:basic-hash-bi-process}.
-  % The sequence $\T(1,1),\R_1(1,1)$ is a possible trace of the protocol defined in \Cref{ex:basic-hash-bi-process}.
-  % \begin{itemize}
-  %   \item $\mouts(\alpha_1) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle$
-  %   \item $\mouts(\alpha_1.\alpha_2) := \langle n(i,j), \h(\choice(k(i),k'(i)),n(i,j) \rangle, \ok$
-  %   \item $\mtests_\tr := \mand(\true, \eq(\snd(\g(\mouts(\alpha_1))), \h(\choice(k(i),k'(i)),\fst(\g(\mouts(\alpha_1)))))$
-  % \end{itemize}
-  % Other symbolic traces:
   \begin{itemize}
     \item $\T(1,1),\R_1(1,1)$
     \item $\T(1,1).\R_1(1,1).\T(1,2).\R_1(1,2)$
@@ -109,18 +97,25 @@ A \emph{concrete action} is an instanciation of a \emph{symbolic action} by givi
   \end{itemize}
 \end{example}
 
-% \begin{example}
-%   Toy example.
-%   \begin{itemize}
-%     \item bi-process $B := \{ \sfa(i) \mid i \in \I \}$ (no conflict nor sequential dependency)
-%       \begin{itemize}
-%         \item $\mtest_{\sfa(i)} := \eq(\g(x_{\sfa(i)}), \choice(n(i),m(i)))$
-%         \item $\mout_{\sfa(i)} := \ok$
-%       \end{itemize}
-%     \item $\tr := \sfa(i).\sfa(i')$
-%     \begin{itemize}
-%       \item $\mouts(\tr) := \{\ok,\ok\}$
-%       \item $\mtests_\tr := \mand(\eq(\g(), \choice(n(i),m(i))), \eq(\g(\{\ok\}), \choice(n(i'),m(i'))))$
-%     \end{itemize}
-%   \end{itemize}
-% \end{example}
+\begin{definition}
+  Given a trace $\tr = \alpha_1 \dots \alpha_n$, we define recursively the \emph{frame} $\mouts(\tr)$ of this trace:
+  \begin{itemize}
+    \item $\mouts(\alpha_1) := \{ \mout_{\alpha_1}\{x_{\alpha_1} \mapsto \varnothing\} \}$
+    \item $\forall i, 2 \leq i \leq n, \mouts(\alpha_1 \dots \alpha_i) := \mouts(\alpha_1 \dots \alpha_{i-1}) \cup \{ \mout_{\alpha_{i-1}}\{x_{\alpha_{i-1}} \mapsto \mouts(\alpha_1 \dots \alpha_{i-1})\} \}$
+  \end{itemize}
+\end{definition}
+
+\begin{definition}
+  Given a trace $\tr = \alpha_1 \dots \alpha_n$, we define:
+  $$\mtests_\tr := \mand(\{ \mtest_{\alpha_i}\{x_{\alpha_i}\mapsto\mouts(\alpha_1 \dots \alpha_{i-1})\} \}_{1 \leq i \leq n})$$
+\end{definition}
+
+\bigskip
+\noindent
+We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right projections (defined as usual), for example:
+\begin{itemize}
+  \item $(\mtest_{\alpha})^L$ and $(\mtest_{\alpha})^R$
+  \item $(\mout_{\alpha})^L$ and $(\mout_{\alpha})^R$
+  \item $(\mtests_{\tr})^L$ and $(\mtests_{\tr})^R$
+  \item $(\mouts_{\tr})^L$ and $(\mouts_{\tr})^R$
+\end{itemize}
