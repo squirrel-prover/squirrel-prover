@@ -605,10 +605,9 @@ let () =
       | _ -> raise @@ Tactics.Tactic_Hard_Failure
           (Tactics.Failure "improper arguments"))
 
-(** [apply gp ths judge sk fk] applies the axiom [gp] with its universally
-    quantified variables instantied with [ths], adding to [judge] its
-    postconditions, and creating new subgoals from [judge] for the
-    preconditions. *)
+(** [apply gp ths judge sk fk] applies the formula named [gp],
+  * eliminating its universally quantified variables using [ths],
+  * and eliminating implications (and negations) underneath. *)
 let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   (* Get formula to apply *)
   let f =
@@ -639,8 +638,8 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
 
 let () =
   T.register_general "apply"
-    ~help:"apply gname to t_1,t_2 -> applies the axiom gname with its \
-           universally quantified variables instantied with t1,..."
+    ~help:"apply gname to t_1,t_2,... -> applies gname with its \
+           universally quantified variables instantiated with t1,t2,..."
     (function
       | Prover.String_name id :: th_terms ->
           let th_terms =

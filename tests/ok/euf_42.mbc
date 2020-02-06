@@ -3,10 +3,6 @@ name k : message
 hash h
 channel c
 
-axiom pair_neq_snd :
-  forall (x:message, y:message),
-  <x,y> <> y
-
 system in(c,x);out(c,h(x,k)).
 
 goal foo :

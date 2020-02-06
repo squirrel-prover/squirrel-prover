@@ -208,7 +208,7 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM f=formula		         { Prover.add_proved_goal
+| AXIOM f=formula                { Prover.add_proved_goal
                                      ("unnamed_goal", Prover.make_goal f) }
 | AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
                                      (i, Prover.make_goal f) }
@@ -227,7 +227,7 @@ tac:
   | ID i=INT                          { Prover.AST.Abstract
                                           ($1,[Prover.Int i]) }
   | ID t=tactic_params                          { Prover.AST.Abstract
-						    ($1,t) }
+                                                    ($1,t) }
   | EXISTS t=tactic_params            { Prover.AST.Abstract
                                           ("exists",t) }
 (* the case of EXISTS must be treated separately as EXISTS is used for formulas. *)

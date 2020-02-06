@@ -8,13 +8,10 @@ name key : index->message
 channel cT
 channel cR
 
-(* This axiom is incorrect, due to the special minimal element
- * in timestamp domains of meta-interpretations, but we cannot
- * write it with A(i) instead of t because A is not yet
- * created. TODO *)
+(* This should be builtin and automatic: TODO. *)
 axiom happens_le :
   forall (t:timestamp,tt:timestamp),
-  t <= tt && happens(tt) => happens(t)
+  t <= tt && t <> init && happens(tt) => happens(t)
 
 process tag(i:index) =
   new nT;
@@ -44,9 +41,6 @@ goal no_confusion :
   happens(R1(jj,i)) => happens(R1(j,i)) => R1(jj,i)<R1(j,i) =>
   <nR(j),fst(input@R1(j,i))> = <snd(input@R1(jj,i)),nR(jj)> =>
   False.
-(* TODO
- * - if we write k(i) we get an uninformative unbound-identifier error
- * - with R(j,i), we get an uninformative type-error *)
 Proof.
   nosimpl(induction).
   nosimpl(intros).
@@ -65,16 +59,15 @@ Proof.
        executes because <h(<nR(jj),nT(i,k)>),nR(jj)> = <nR(j),nR(jj)>
        but then we have nR(j)=h(<nR(jj),nT(i,j)>) with j<>jj
        which can only happen with negligible probability. *)
-assert (nR(j)=h(<nR(jj),nT(i,k)>,key(i))).
-case H0.
+  assert (nR(j)=h(<nR(jj),nT(i,k)>,key(i))).
+  case H0.
 
   (* Now we have R1(j1,i) < R1(jj,i) < R1(j,i)
    * we will appeal to to the induction hypothesis with
    * t = R1(jj,i) and jj = j1. *)
-apply IH0 to R1(jj,i),i,jj,j1.
+  apply IH0 to R1(jj,i),i,jj,j1.
 
-help.
-apply happens_le to R1(j1,i), R1(jj,i).
+  apply happens_le to R1(j1,i), R1(jj,i).
 
 Qed.
 
@@ -86,7 +79,7 @@ goal wa :
   fst(input@R1(j,i)) = nT(ii,k) &&
   input@T(ii,k) = nR(j).
 Proof.
-  simpl.
+  intros.
   euf C0.
   admit. (* TODO invoke no_confusion, get rid of False || .. *)
   exists i,k.
