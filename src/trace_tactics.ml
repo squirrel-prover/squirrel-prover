@@ -143,6 +143,22 @@ let () =
        | _ -> raise @@ Tactics.Tactic_Hard_Failure
            (Tactics.Failure "improper arguments"))
 
+let false_left s sk fk =
+  try
+    let _ =
+      Sequent.find_formula_hypothesis (function False -> true | _ -> false) s
+    in
+    sk [] fk
+  with Not_found -> fk @@ Tactics.Failure "no False assumption"
+
+let () =
+  T.register_general "false_left"
+    ~help:"false_left -> close a goal when False is among its assumptions"
+    (function
+       | [] -> false_left
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+                         (Tactics.Failure "no argument allowed"))
+
 (** [goal_intro judge sk fk] perform one introduction, either of a forall
     quantifier or an implication. Else, it returns [fk] *)
 let goal_intro (s : Sequent.t) sk fk =

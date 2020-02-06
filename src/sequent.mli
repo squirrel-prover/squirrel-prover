@@ -76,6 +76,16 @@ val select_formula_hypothesis :
   string -> sequent ->
   (sequent * formula)
 
+(** Find the first formula satisfying a predicate. *)
+val find_formula_hypothesis :
+  (formula -> bool) -> sequent -> formula
+
+(** Find the first formula satisfying a predicate,
+  * return it together with the sequent from which the formula
+  * has been removed. *)
+val remove_formula_hypothesis :
+  (formula -> bool) -> sequent -> formula * sequent
+
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to all hypotheses. It also set to visible = false, when the
    hypothesis becomes trivial (e.g x=x). *)

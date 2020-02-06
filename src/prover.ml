@@ -245,8 +245,9 @@ let simple_base =
 let simpl_nobranching =
   AST.(
     AndThen
-      (Abstract ("intros",[])
-       :: simple_base)
+      (Abstract ("intros",[]) ::
+       Try (Abstract ("false_left",[])) ::
+       simple_base)
   )
 
 (* This automation part tries all possible introductions, and then
@@ -254,8 +255,9 @@ let simpl_nobranching =
 let simpl_branching =
   AST.(
     AndThen
-      (Repeat (Abstract ("anyintro",[]))
-       :: simple_base)
+      (Repeat (Abstract ("anyintro",[])) ::
+       Try (Abstract ("false_left",[])) ::
+       simple_base)
   )
 
 (* Final automation tactic. We allow branching introduction, only if the extra

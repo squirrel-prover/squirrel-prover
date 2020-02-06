@@ -23,6 +23,16 @@ module H : sig
     ('a, 'b) hypotheses -> string ->
     ('a, 'b) hypothesis * ('a, 'b) hypotheses
 
+  val find_such_that :
+    ('a, 'b) hypotheses ->
+    (('a, 'b) hypothesis -> bool) ->
+    ('a, 'b) hypothesis
+
+  val remove_such_that :
+    ('a, 'b) hypotheses ->
+    (('a, 'b) hypothesis -> bool) ->
+    ('a, 'b) hypothesis * ('a, 'b) hypotheses
+
   val to_list : ('a, 'b) hypotheses -> ('a, 'b) hypothesis list
 
   val add : bool ->
@@ -63,7 +73,7 @@ type ('a, 'b) hypotheses = (('a,'b) hypothesis list) M.t
 
 let empty =  M.empty
 
-let mk_name h id = (h.name_prefix)^(string_of_int id)
+let mk_name h id = h.name_prefix ^ string_of_int id
 
 let get_name_prefix name =
   match  String.split_on_integer name with
@@ -79,12 +89,11 @@ let select_and_update ~remove ~update hs name =
     | [] ->  raise Non_existing_hypothesis
     | p::q ->
       let new_p,remainder =
-        if name = (mk_name p id) then
+        if name = mk_name p id then
           let p = { p with tag = update p.tag } in
           p, q
         else
-          let res,l = (aux (id+1) q) in
-          res, l
+          aux (id+1) q
       in
       if remove then
         new_p,remainder
@@ -95,6 +104,37 @@ let select_and_update ~remove ~update hs name =
   let hs_list = M.find name_prefix hs in
   let res,new_hs_list = aux 0 (List.rev (get_visible hs_list)) in
   (res, M.add name_prefix new_hs_list hs)
+
+let find_such_that :
+    type a b. (a,b) hypotheses -> ((a,b) hypothesis -> bool) -> (a,b) hypothesis =
+  fun hs test ->
+  let exception Found of (a,b) hypothesis in
+  try
+    M.iter
+      (fun _ l -> try raise (Found (List.find test l)) with Not_found -> ())
+      hs ;
+    raise Not_found
+  with Found h -> h
+
+let remove_such_that :
+    type a b. (a,b) hypotheses ->
+              ((a,b) hypothesis -> bool) ->
+              (a,b) hypothesis * (a,b) hypotheses =
+  fun hs test ->
+  let found = ref None in
+  let f x =
+    if !found = None && test x then begin
+      found := Some x ;
+      false
+    end else
+      true
+  in
+  let hs' = M.map (List.filter f) hs in
+  match !found with
+    | None -> raise Not_found
+    | Some h -> h,hs'
+
+let select = M.iter
 
 let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
   let v = { name_prefix = name_prefix;
@@ -265,6 +305,16 @@ let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
     in
     ({s with formula_hypotheses = hs}, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
+
+let find_formula_hypothesis pred s =
+  let pred h = pred h.H.hypothesis in
+  let hypo = H.find_such_that s.formula_hypotheses pred in
+    hypo.H.hypothesis
+
+let remove_formula_hypothesis pred s =
+  let pred h = pred h.H.hypothesis in
+  let hypo,hs = H.remove_such_that s.formula_hypotheses pred in
+    hypo.H.hypothesis, { s with formula_hypotheses = hs }
 
 let add_trace_hypothesis ?(prefix="T") s tf =
   { s with
