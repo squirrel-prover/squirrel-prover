@@ -1,0 +1,51 @@
+(* Variant model for the Basic Hash protocol,
+   corresponding to the multiple-session side of the unlinkability
+   biprocess. Compared to basic_hash.mbc model, there is a single
+   action R(k) where the process accepts some tag, instead of
+   several actions R(k,i) where the reader accepts tag i. *)
+
+hash h
+
+abstract ok:message
+abstract ko:message
+
+name key : index->message
+
+channel cT
+channel cR
+
+process tag(i:index) =
+  new nT;
+  out(cT, <nT, h(nT,key(i))>)
+
+process reader(j:index) =
+  in(cT,x);
+  if (exists i:index, snd(x) = h(fst(x),key(i))) then
+    out(cR,ok)
+  else
+    out(cR,ko)
+
+system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
+
+goal wa :
+  forall (k:index),
+  (exists i:index, snd(input@R(k)) = h(fst(input@R(k)),key(i))) =>
+  exists (i:index,j:index),
+  T(i,j) <= R(k) &&
+  fst(input@R(k)) = fst(output@T(i,j)) &&
+  snd(input@R(k)) = snd(output@T(i,j)).
+Proof.
+ simpl.
+ euf M0.
+ exists i, k1.
+Qed.
+
+goal honest :
+  forall (i:index,j:index,k:index),
+  fst(input@R(k)) = fst(output@T(i,j)) =>
+  snd(input@R(k)) = snd(output@T(i,j)) =>
+  exists i:index, snd(input@R(k)) = h(fst(input@R(k)),key(i)).
+Proof.
+  intros.
+  exists i.
+Qed.
