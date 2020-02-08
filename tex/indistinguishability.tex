@@ -47,38 +47,54 @@ and ask for indistinguishability only for each trace.
 
 \newcommand{\diff}[2]{\mathsf{choice}(#1,#2)}
 
-Two processes may be given as a bi-process, i.e. a system with a single
-set of symbolic actions, each symbolic action describing an execution step
-of both the left and right processes, using $\diff{\_}{\_}$
-terms as usual. In that case, we may define a stronger equivalence,
-relying on a simpler notion of frame which does not contain conditionals,
-because we reason directly on symbolic traces.
-We use $(\_)^L$ and $(\_)^R$ to denote the left and right projections,
-e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side
-conditions for the left side of the bi-process.
+Two processes may be given as a bi-process, i.e. a system with a single set of
+symbolic actions, each symbolic action describing an execution step of both the
+left and right processes, using $\diff{\_}{\_}$ terms as usual. In that case, we
+may define a stronger equivalence, where processes have the same set of possible
+actions, and may only differ on some terms, inside actions outputs or
+conditions. Diff-equivalence then ask that for any sequence of such symbolic
+actions, the observable traces are indistinguishable.
+
+We
+use $(\_)^L$ and $(\_)^R$ to denote the left and right projections,
+e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side conditions for
+the left side of the bi-process.  We can the use the notations $\minp^L$, $\minp^R$, $\mout^L$
+and $\mout^R$, where for instance, $\minp^L@A$ represents the input term for
+the left at timestamp $A$ in a trace.
+
+For concision, we write $\myif \phi \mythen t$ for
+$\myif \phi \mythen t \myelse \mathsf{error}$, with an error constant that is
+unused elsewhere.
 
 \begin{definition}
-  Given a symbolic trace $\tr = \alpha_1\ldots\alpha_n$, we define its frame
-  $\mouts_\tr = \pair{\hat{\mout}(\alpha_1),\dots,\hat{\mout}(\alpha_n)}$
+  We define inductively the frame of a trace, where for any action $\alpha$ and any trace $\tr$,
+  \[\begin{array}{l}
+     \mouts_{\alpha} = \myif \phi_{\alpha} \mythen \mout(\alpha) \\
+     \mouts_{\tr . \alpha} = \pair{\mouts_\alpha,\dots, \myif \phi_{\tr . \alpha} \mythen \mout(\alpha)}
+     \end{array}\]
   as the sequence of outputs produced by the trace.
 \end{definition}
 
-Note that this frame is not a sequence of meta-level terms,
-but a sequence of base-level terms featuring
-$\diff{\_}{\_}$ operators.
+The definition of the meta interpretation $I_\tr$ of a trace is similar to previously, with only a change for inputs:
+\[\hat{\minp}^L(A_n) = g_n( (\mouts_{A_1\cdots A_{n-1}})^{\I_\tr})\]
+
+  Remark that for reachability, we assume that the trace can occur, and thus,
+  that all conditionals $\phi_{\tr . \alpha}$ are true. Then,
+  $\mouts_{A_1\cdots A_{n-1}}$ is syntactically equal to
+    $\mout(A_1),\cdot,\mout(A_{n-1})$, as we can remove the true
+    conditionals. For indistinguishability, we need to verify that the
+    conditionals are synchronized on both sides, and we must keep them inside
+    the terms.
+
 We now define the equivalence,
-writing $\myif \phi \mythen t$ for $\myif \phi \mythen t \myelse
-\mathsf{error}$, with an error constant that is unused elsewhere.
+
 
 \begin{definition}
   A bi-process is diff-equivalent when,
   for any symbolic trace $\tr$ of the protocol and
   for any computational model $\M$,
   we have:
-  $$\M \models
-  \myif (\phi_{\tr^L})^{I_{\tr}} \mythen (\mouts_{\tr})^L
-  \sim
-  \myif (\phi_{\tr^R})^{I_{\tr}} \mythen (\mouts_{\tr})^R$$
+  \[\M \models (\mouts_{\tr}^L)^{I_\tr}  \sim (\mouts_{\tr}^R)^{I_\tr}\]
 \end{definition}
 
 Note that this equivalence cannot hold if there exists a $\tr$
@@ -159,35 +175,160 @@ actions.
   holds -- in fact they are $\alpha$-equivalent.
 \end{example}
 
-\subsubsection{Formal verification}
 
-Ultimately we will want to use the meta-logic to avoid enumerating all
-traces, but reason abstractly over them. However, as a first step we
-keep the enumeration.
+\subsection{Reasoning about equivalences}
 
+We leverage the meta-logic, to reason abstractly on all possible traces.
 Given a bi-process $B$, we should be able to give a meaning to its inputs
 and outputs along a trace using macros $\minp^L$, $\minp^R$, $\mout^L$
 and $\mout^R$. For instance, $\minp^L@A$ represents the input term for
 the left at timestamp $A$ in a trace --- the meta-interpretation will
 be such that
-$\hat{\minp}^L(A_n) = g_n(\hat{\mout}^L(A_1),\ldots,\hat{\mout}^L(A_{n-1}))$.
+$\hat{\minp}^L(A_n) = g_n( \mouts_{A_1\cdots A_{n-1}})$.
 
-A sufficient condition for diff-equivalence is to prove,
-for any symbolic trace $\tr.\alpha$ of $B$, the following goals:
+We extend the sequent calculus, to also reason about diff-equivalence.
+
+\begin{definition}
+  A sequent $\Gamma \vdash t_L \sim t_R $ is composed of a set of indistinguishability $\Gamma$, and sequences of terms $t_L,t_R$.
+  It is valid when, for any meta-interpretation $I$, for any evaluation of the free variables in $t_L,t_R$ to well typed elements in $I$ and computational model $\M$, $\M \models (\wedge \Gamma)^I \Rightarrow (t_L)^I \sim  (t_R)^I $
+\end{definition}
+
+To reason abstractly on all possible traces, we define the macros $\mouts^X@A$, which given a trace $\tr = \tr_1 . A . \tr_2$, are interpreted by:
+$$\hat{\mouts}^X(A) = (\mouts_{\tr_1.A}^X)^{I_\tr} $$
+
+We will write for concision $\happens(A)$ for $\happens(A) \sim \true$.
+\begin{lemma}
+  A bi-process is diff-equivalent if,
+  \[ \happens(\tau)\vdash  \mouts^L@\tau \sim \mouts^R@\tau\]
+  Equivalently, is it diff-equivalent if:
+  \[\mouts^L@\pre(\tau) \sim \mouts^R@\pre(\tau) \wedge \happens(\tau) \vdash \mouts^L@\tau \sim \mouts^R@\tau\]
+\end{lemma}
+\begin{proof}We prove the first implication, which is essentially an unfolding of definitions.
+
+  Let $\M$ be a computational model and $\tr = A_1 \cdots A_n$ a symbolic trace of a bi-process.
+  We assume that  $ \happens (\tau)  \vdash \mouts^L@\tau \sim \mouts^R@\tau$, i.e that for any-meta interpretation $I$ and model $\M'$, $\M' \models (\happens(\tau))^I \rightarrow (\mouts^L@\tau \sim \mouts^R@\tau)^I$. We instantiate $\M'$ with $\M$ , and $I$ with the meta interpretation $\I_\tr$ such that $\tau \mapsto A_n$. Then, as $\happens(A_n)^I = \true$, we conclude that $\M' \models  (\mouts^L@A_n \sim \mouts^R@A_n)^I$.\\
+
+  The second implication is a direct induction on the length of the traces.
+  \end{proof}
+
+We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
+
+\begin{figure}
+  \begin{mathpar}
+    \inferrule[Expand]{\Gamma \vdash t_L \sim t_R
+\quad
+    }{\Gamma \cup \phi \vdash t_L \sim t_R}
+    \quad\quad
+    \inferrule[Cut]{
+      \Gamma \vdash t_L \sim t_R
+      \quad
+      \Gamma \vdash t_R \sim t_S
+    }{\Gamma \vdash t_L \sim t_S}
+  \end{mathpar}
+  \begin{mathpar}
+  \inferrule[\myif-explicit]{
+\Gamma \vdash \myif \phi \mythen t_L \sim \myif \psi \mythen t_R
+  }{
+ \Gamma  \vdash \phi, \myif \phi \mythen t_L \sim \psi, \myif \psi \mythen t_R
+  }
+  \quad\quad
+  \inferrule[\myif-weak]{
+ \Gamma \vdash \phi, t_L \sim \phi, t_R
+  }{
+\Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
+  }
+\end{mathpar}
+
+  \begin{mathpar}
+  \inferrule[\myif-reach]{
+\phi \vdash \false
+  }{
+ \Gamma  \vdash \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
+  }
+  \quad\quad
+  \inferrule[\myif-equiv]{
+ \phi \vdash \psi \Leftrightarrow \psi'
+  }{
+\Gamma \vdash \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
+  }
+  \end{mathpar}
+  \begin{mathpar}
+    \inferrule[${\lnot}$-R]{
+      \Gamma \vdash \false \sim \true
+    }{
+      \Gamma \vdash t^L \sim t^R
+    }
+    \quad\quad
+    \inferrule[fresh]{
+n,m \not \in \Gamma
+    }{
+      \Gamma \vdash n \sim m
+    }
+    \quad\quad
+    \inferrule[Subst]{
+      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \}  \vdash t^L \sim t^R
+    }{
+      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \} \vdash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
+    }
+  \end{mathpar}
+  \begin{mathpar}
+  \inferrule[F-Cut]{
+    \Gamma \vdash \phi
+    \quad
+    \Gamma \cup \phi \vdash t^L \sim t^R
+  }{
+ \Gamma \vdash t^L \sim t^R
+  }
+  \quad\quad
+  \inferrule[Dup]{
+ \Gamma \vdash t^L,u \sim t^R,v
+  }{
+ \Gamma \vdash t^L,u,u \sim t^R,v,v
+  }
+  \end{mathpar}
+
+
+   \caption{Generic inference rules for indistinguishability}
+   \label{fig:lk-ind}
+\end{figure}
+\begin{lemma}
+The rules presented in Figure~\ref{fig:lk-ind} are sound.
+
+
+\end{lemma}
+\begin{proof}
+  \begin{itemize}
+    \item $\textsc{\myif-explicit}$
+      We assume that we have a model and an interpretation such that
+      $\M,\Gamma \not \models  \phi^I, (\myif  \phi \mythen t_L)^I \sim \psi^I, (\myif \phi \mythen t_R)^I $.
+      It means we have a distinguisher $\B$ against this equivalence.
+      We define $\B'$, which on input $x$:
+      \begin{enumerate}
+      \item if $x = \mathsf{error}$, sets a variable $y$ to $\false$, else to $\true$;
+      \item simulates $\B$ with input $y,x$ and returns its result.
+      \end{enumerate}
+      When $x$ is equal to $(\myif \phi \mythen t_L)^I $ (resp. $(\myif \phi \mythen t_R)^I$ ), the computed $y$ has exactly the same distribution as the interpretation of $\phi^I$ (resp. $\psi^I)$) in $\M$.
+      Thus $\B'$ is a distinguisher which shows that:
+    $\M,\Gamma \not \models (\myif  \phi \mythen t_L)^I \sim  (\myif \phi \mythen t_R)^I $.
+      It concludes that $\Gamma \not \vdash \myif  \phi \mythen t_L \sim \myif  \phi \mythen t_R$.
+
+    \end{itemize}
+\end{proof}
+
+
+We can then use those rules to prove diff-equivalence of a bi-process, by defining a well chosen set of axioms. We can reuse most of the trace axioms defined previously, the only one which is not pertinent anymore is, for any $\alpha$:
+\[   (\happens(\alpha) \Rightarrow
+  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta) \sim \true\]
+Indeed, this version is useful and sound for reachability, but is not sound for indistinguishability, where we need to shows that conditionals are synchronized on both sides, which becomes trivial if we assume them to be equal to $\true$.
+
+\subsection{A proof technique}
+To prove diff-equivalence, it can be interesting to prove that:
 $$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
-$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash
-   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
-The first kind of judgment has been defined above: these are the sequents
-of the meta-logic for reachability. The second kind of judgment is defined
-below: $\Gamma \vdash u \sim v$ stands for $(\myif \Gamma \mythen u) \sim
-(\myif \Gamma \mythen v)$. For these goals we are thus imposing a left-hand
-side condition on right-hand side outputs, but it should not matter because
-the left- and right-hand side conditions have been shown to hold
-simultaneously (with overwhelming probability).
 
-\emph{TODO: Check that it implies diff-equivalence as previously defined.}
+Then, in the induction step, we can directly replace the previous conditions by the same one.
 
-These conditions are sufficient to ensure diff-equivalence but not necessary.
+
+This condition is only used to help for proving diff-equivalence, it is not necessary.
 The gap comes from the fact that we are requiring conditions to be
 synchronized for all random samplings.
 
@@ -216,6 +357,8 @@ projection of $x$ with its first bit changed to $0$; if the hash is PRF,
 there should be a probability of roughly $1 \over 4$ that this leaves
 the hash unchanged with $k'(i,j)$ but not with $k(i)$.
 \end{example}
+
+\section{Not up to date}
 
 \subsection{Refined diff-equivalence} \label{sec:refined-diff}
 
@@ -284,112 +427,6 @@ $$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash
 for the possible change of some index. There is no change in the second
 kind of condition: there we only consider executions where the conditions
 have passed on both sides, restricting indices $j$.}
-
-\subsection{Reasoning about equivalences}
-
-Now equipped with a logic to reason about reachability properties, we turn
-ourself to proving general indistinguishability. We consider the case of
-bi-processes, where the set of actions available on both side is the same, but
-the actions may differ inside their terms. Thus, a bi-process is simply a
-protocol, where each action $\alpha$ has two versions, on for the left and on
-for the right process, which we denote $\alpha^L$ and $\alpha^R$. For each
-possible trace $\tr$ of the protocol, there exists then the two versions
-$\tr^L$ and $\tr^R$.
-
-To reason about those properties, we once again try to define a well-suited logic.
-\begin{definition}
-  A sequent $\Delta, \Gamma \vDash t^L \sim t^R $ is composed of a set of meta-logic formulas
-  $\Gamma$, a set of indistinguishability $\Delta$, and sequences of terms $t^L,t^R$.
-  It is valid when, for any meta-interpretation $I$ and computational model $\M$, $\M, \Delta \models \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^L \sim  \myif \bigwedge_{\phi \in \Gamma} (\phi)^I \mythen t^R $
-\end{definition}
-
-
-We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
-
-\begin{figure}
-  \begin{mathpar}
-    \inferrule[Expand]{\Gamma \vDash t^L \sim t^R
-\quad
-    }{\Gamma \cup \phi \vDash t^L \sim t^R}
-    \quad\quad
-    \inferrule[Cut]{
-      \Gamma \vDash t^L \sim t^R
-      \quad
-      \Gamma \vDash t^R \sim t^S
-    }{\Gamma \vDash t^L \sim t^S}
-  \end{mathpar}
-  \begin{mathpar}
-  \inferrule[\myif-R]{
-\Gamma \vDash \myif \phi \mythen t^L \sim \myif \phi \mythen t^R
-  }{
- \Gamma \cup \phi \vDash t^L \sim t^R
-  }
-  \quad\quad
-  \inferrule[\myif-L]{
- \Gamma \cup \phi \vDash t^L \sim t^R
-  }{
-\Gamma \vDash \myif \phi \mythen t^L \sim \myif \phi \mythen t^R
-  }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule[${\lnot}$-R]{
-      \Gamma \vdash \bot
-    }{
-      \Gamma \vDash t^L \sim t^R
-    }
-    \quad\quad
-    \inferrule[fresh]{
-n,m \not \in \Gamma
-    }{
-      \Gamma \vDash n \sim m
-    }
-    \quad\quad
-    \inferrule[Subst]{
-      \Gamma \cup \{\EQ(t_1,t_2) \}  \vDash t^L \sim t^R
-    }{
-      \Gamma \cup \{\EQ(t_1,t_2) \} \vDash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
-    }
-  \end{mathpar}
-  \begin{mathpar}
-  \inferrule[F-Cut]{
-    \Gamma \vdash \phi
-    \quad
-    \Gamma \cup \phi \vDash t^L \sim t^R
-  }{
- \Gamma \vDash t^L \sim t^R
-  }
-  \quad\quad
-  \inferrule[Dup]{
- \Gamma \vDash t^L,u \sim t^R,v
-  }{
- \Gamma \vDash t^L,u,u \sim t^R,v,v
-  }
-  \end{mathpar}
-
-
-   \caption{Generic inference rules for indistinguishability}
-   \label{fig:lk-ind}
-\end{figure}
-\begin{lemma}
-The rules presented in Figure~\ref{fig:lk-ind} are sound.
-
-
-\end{lemma}
-
-
-We also give a small Lemma, which allows to reason on the traces in an incremental way.
-
-\begin{lemma}
-  A bi-process is diff-equivalent if for any symbolic trace $\tr$ of the protocol, and any available action $\alpha$,
-  \[
-\begin{array}{l}
-  \phi_{\tr^L},  \mouts_\tr^L \sim \mouts_{\tr}^R  \vDash
-\begin{array}[t]{l}
-    \myif \phi_{\alpha}^L \mythen \mouts_{\tr\cdot \alpha}^{L}
-    \\ \qquad
-    \sim  \myif \phi_{\alpha}^{R} \mythen \mouts_{\tr\cdot \alpha}^{R} \end{array}\end{array}\]
-
-\end{lemma}
 
 \section{An example : a signed DDH key exchange}
 \charlie{abus de notations dans cette partie}
