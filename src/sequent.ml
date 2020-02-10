@@ -250,16 +250,16 @@ let init_sequent = {
   message_hypotheses = H.empty;
   trace_hypotheses =  H.empty ;
   formula_hypotheses = H.empty;
-  conclusion = Formula.True;
+  conclusion = Term.True;
   trs = None;
   models = None;
 }
 
 let is_hypothesis f s =
   match f with
-  | Formula.Atom (#Atom.message_atom as at) -> H.mem at s.message_hypotheses
-  | Formula.Atom (#Atom.trace_atom as at) -> H.mem at s.trace_hypotheses
-  | Formula.Atom (`Happens t) -> List.mem t s.happens_hypotheses
+  | Term.Atom (#Atom.message_atom as at) -> H.mem at s.message_hypotheses
+  | Term.Atom (#Atom.trace_atom as at) -> H.mem at s.trace_hypotheses
+  | Term.Atom (`Happens t) -> List.mem t s.happens_hypotheses
   | _ ->  H.mem f s.formula_hypotheses
 
 
@@ -276,16 +276,16 @@ let get_generic_formulas s=
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
-      Formula.Atom ((H.find id s.message_hypotheses).H.hypothesis :>
+      Term.Atom ((H.find id s.message_hypotheses).H.hypothesis :>
                Atom.generic_atom)
     with Not_found ->
-          Formula.Atom ((H.find id s.trace_hypotheses).H.hypothesis :>
+          Term.Atom ((H.find id s.trace_hypotheses).H.hypothesis :>
                Atom.generic_atom)
 
 let get_hypothesis_list s =
-  List.map (fun x ->Formula.Atom (x :> Atom.generic_atom)) (get_trace_atoms s)
+  List.map (fun x ->Term.Atom (x :> Atom.generic_atom)) (get_trace_atoms s)
   @ List.map
-    (fun x ->Formula.Atom (x :> Atom.generic_atom)) (get_message_atoms s)
+    (fun x ->Term.Atom (x :> Atom.generic_atom)) (get_message_atoms s)
   @ get_generic_formulas s
 
 let id = fun x -> x
@@ -341,7 +341,7 @@ let rec add_macro_defs s at =
     new iter_macros
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
-    iter#visit_formula (Formula.Atom at) ;
+    iter#visit_formula (Term.Atom at) ;
     List.fold_left
       (add_message_hypothesis ~prefix:"D")
       s
@@ -373,9 +373,9 @@ let rec add_happens s ts =
    hypotheses. *)
 and add_formula ?prefix f s =
   match f with
-  | Formula.Atom (#Atom.message_atom as at) -> add_message_hypothesis ?prefix s at
-  | Formula.Atom (#Atom.trace_atom as at) -> add_trace_hypothesis ?prefix s at
-  | Formula.Atom (`Happens ts) -> add_happens s ts
+  | Term.Atom (#Atom.message_atom as at) -> add_message_hypothesis ?prefix s at
+  | Term.Atom (#Atom.trace_atom as at) -> add_trace_hypothesis ?prefix s at
+  | Term.Atom (`Happens ts) -> add_happens s ts
   | _ ->
     let prefix = match prefix with Some p -> p | None -> "H" in
     { s with formula_hypotheses =
@@ -415,10 +415,10 @@ let get_env s = s.env
 let set_conclusion a s =
   let s = { s with conclusion = a } in
     match a with
-      | Formula.Atom (#message_atom as at) -> add_macro_defs s at
+      | Term.Atom (#message_atom as at) -> add_macro_defs s at
       | _ -> s
 
-let init (goal : Formula.formula) = set_conclusion goal init_sequent
+let init (goal : Term.formula) = set_conclusion goal init_sequent
 
 let get_conclusion s = s.conclusion
 
@@ -486,7 +486,7 @@ let get_all_terms s =
   in
   let atoms =
     match s.conclusion with
-      | Formula.Atom (#message_atom as at) -> at::atoms
+      | Term.Atom (#message_atom as at) -> at::atoms
       | _ -> atoms
   in
   List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms

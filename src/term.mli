@@ -58,7 +58,19 @@ val pp_msymb :  Format.formatter -> msymb -> unit
   * Since index terms and just variables, and booleans are a subtype
   * of message, we are only interested in sorts [timestamp] and
   * [message]. *)
-type _ term =
+
+type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+type ord_eq = [ `Eq | `Neq ]
+
+type ('a,'b) _atom = 'a * 'b * 'b
+
+type generic_atom = [
+  | `Message of (ord_eq,Sorts.message term) _atom
+  | `Timestamp of (ord,Sorts.timestamp term) _atom
+  | `Index of (ord_eq,Vars.index) _atom
+  | `Happens of Sorts.timestamp term
+]
+and _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
   | Macro :  msymb * Sorts.message term list * Sorts.timestamp term
@@ -68,10 +80,32 @@ type _ term =
   | Init : Sorts.timestamp term
   | Var : 'a Vars.var -> 'a term
 
+  | Diff : 'a term * 'a term -> 'a term
+
+  | Atom : generic_atom -> Sorts.boolean term
+
+
+  | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
+  | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
+  | And : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Or : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Not : Sorts.boolean term  -> Sorts.boolean term
+  | Impl : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | True : Sorts.boolean term
+  | False : Sorts.boolean term
+
 type 'a t = 'a term
 
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
+type formula = Sorts.boolean term
+
+type message_atom = [ `Message of ord_eq * message
+                               * message ]
+type trace_atom = [
+  | `Timestamp of (ord,timestamp) _atom
+  | `Index of (ord_eq,Vars.index) _atom
+]
 
 val pp : Format.formatter -> 'a term -> unit
 

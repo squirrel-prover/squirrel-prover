@@ -64,6 +64,7 @@ let rec cterm_of_term =
   | Var m -> Ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
                       Ccst (Cst.Cmacro (m,ts))
+  | Formula _ -> assert false
 
 let rec term_of_cterm =
   let open Term in function
@@ -936,7 +937,7 @@ let name_indep_cnstrs state l =
   x_index_cnstrs state l
     (function f -> is_ground_cterm f && no_macros f)
     n_cnstr
-  |>  List.filter (function Formula.True -> false | _ -> true)
+  |>  List.filter (function Term.True -> false | _ -> true)
   |>  List.sort_uniq Pervasives.compare
 
 (****************)

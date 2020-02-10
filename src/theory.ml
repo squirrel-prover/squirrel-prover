@@ -2,6 +2,20 @@ type kind = Sorts.esort
 
 (* TODO replace term list by string list when indices are expected ? *)
 
+
+type term =
+  | Fun of string * term list * term option
+  | Name of string * term list
+  | Tinit
+  | Taction of string * term list
+  | Get of string * term option * term list
+
+  | Var of string
+  | ForAll of (string * kind) * term
+  | Eq : 'a term * 'a term -> Sorts.boolean term
+  | Neq : 'a term * 'a term -> Sorts.boolean term
+  | Leq : Sorts.timestamp term * Sorts.timestamp term -> Sorts.boolean term
+
 type term =
   | Var of string
   | Taction of string * term list
@@ -54,7 +68,7 @@ and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
 (** Intermediate formulas *)
 
-type formula = (term, string * kind) Formula.foformula
+type formula = (term, string * kind) Term.foformula
 
 let pp_formula =
   Formula.pp_foformula
@@ -172,7 +186,7 @@ let rec check_term ?(local=false) env tm (kind:Sorts.esort) =
     end
 
 let rec check_formula env =
-  let open Formula in
+  let open Term in
   function
     | And (f,g) | Or (f,g) | Impl (f,g) ->
       check_formula env f ;
@@ -477,17 +491,16 @@ let convert_atom ts subst atom =
   | _ -> assert false
 
 let subst_formula f s =
-  let open Formula in
   let rec conv = function
-    | Atom at -> Atom (subst at s)
-    | And (f, g) -> And (conv f, conv g)
-    | Or (f, g) -> Or (conv f, conv g)
-    | Impl (f, g) -> Impl (conv f, conv g)
-    | Not f -> Not (conv f)
-    | ForAll (vs,t) -> ForAll(vs, conv t)
-    | Exists (vs,t) -> Exists(vs, conv t)
-    | True -> True
-    | False -> False in
+    | Term.Atom at -> Term.Atom (subst at s)
+    | Term.And (f, g) -> Term.And (conv f, conv g)
+    | Term.Or (f, g) -> Term.Or (conv f, conv g)
+    | Term.Impl (f, g) -> Term.Impl (conv f, conv g)
+    | Term.Not f -> Term.Not (conv f)
+    | Term.ForAll (vs,t) -> Term.ForAll(vs, conv t)
+    | Term.Exists (vs,t) -> Term.Exists(vs, conv t)
+    | Term.True -> Term.True
+    | Term.False -> Term.False in
   conv f
 
 (* Not clean at all. *)
@@ -537,7 +550,7 @@ let subst_get_var subst (x,kind) =
 
 let convert_formula arg_kinds ts s f =
   let open Sorts in
-  let open Formula in
+  let open Term in
   let rec conv kinds subst = function
     | Atom (Compare (o,u,v)) ->
       begin
@@ -573,41 +586,40 @@ let convert_formula arg_kinds ts s f =
   in
   conv arg_kinds s f
 
-let convert_formula_glob arg_kinds subst f =
+let convert_formula_glob arg_kinds (subst : esubst list) f =
   let open Sorts in
-  let open Formula in
-  let rec conv kinds subst = function
-    | Atom (Compare (o,u,v)) ->
+  let rec conv kinds (subst : esubst list) = function
+    | Term.Atom (Compare (o,u,v)) ->
       begin
         let at = Compare (o,u,v) in
         match get_kind kinds u with
         | ESort Timestamp ->
-            Atom (convert_trace_atom kinds subst at :>
-                    Atom.generic_atom)
+            Term.Atom (convert_trace_atom kinds subst at :>
+                    Term.generic_atom)
         | ESort Index ->
-            Atom (convert_trace_atom kinds subst at :>
-                    Atom.generic_atom)
-        | ESort Message ->  Atom (convert_atom_glob subst at)
-        | ESort Boolean -> Atom (convert_atom_glob subst at)
+            Term.Atom (convert_trace_atom kinds subst at :>
+                    Term.generic_atom)
+        | ESort Message ->  Term.Atom (convert_atom_glob subst at)
+        | ESort Boolean -> Term.Atom (convert_atom_glob subst at)
       end
-    | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
-    | Atom _ -> assert false
-    | ForAll (vs,f) ->
+    | Term.Atom (Fun ("happens",[ts],None)) -> Term.Atom (`Happens (convert_ts subst ts))
+    | Term.Atom _ -> assert false
+    | Term.ForAll (vs,f) ->
       let env = ref Vars.empty_env in
       let (new_subst, _) = convert_vars env vs in
-      ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+      Term.ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
                 (new_subst @ subst) f)
-    | Exists (vs,f) ->
+    | Term.Exists (vs,f) ->
       let env = ref Vars.empty_env in
       let (new_subst, _) = convert_vars env vs in
-      Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
+      Term.Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
                 (new_subst @ subst) f)
-    | And (f, g) -> And (conv kinds subst f, conv kinds subst g)
-    | Or (f, g) -> Or (conv kinds subst f, conv kinds subst g)
-    | Impl (f, g) -> Impl (conv kinds subst f, conv kinds subst g)
-    | Not f -> Not (conv kinds subst f)
-    | True -> True
-    | False -> False
+    | Term.And (f, g) -> Term.And (conv kinds subst f, conv kinds subst g)
+    | Term.Or (f, g) -> Term.Or (conv kinds subst f, conv kinds subst g)
+    | Term.Impl (f, g) -> Term.Impl (conv kinds subst f, conv kinds subst g)
+    | Term.Not f -> Term.Not (conv kinds subst f)
+    | Term.True -> Term.True
+    | Term.False -> Term.False
   in
   conv arg_kinds subst f
 

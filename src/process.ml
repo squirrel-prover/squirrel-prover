@@ -491,7 +491,7 @@ let parse_proc proc : unit =
       let facts_p = cond::facts in
       let facts_q =
         if evars = [] then
-          Formula.Not cond :: facts
+          Term.Not cond :: facts
         else
           facts
       in
@@ -518,9 +518,9 @@ let parse_proc proc : unit =
        * At this point we know which action will be used,
        * but we don't have the action symbol yet. *)
       let rec conj = function
-        | [] -> Formula.True
+        | [] -> Term.True
         | [f] -> f
-        | f::fs -> Formula.And (f, conj fs)
+        | f::fs -> Term.And (f, conj fs)
       in
       let condition = vars, conj facts in
       let action = Action.

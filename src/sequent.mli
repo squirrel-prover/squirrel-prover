@@ -6,7 +6,7 @@
     - an environment to store all the variables appearing inside the formulas.
 *)
 
-open Formula
+open Term
 
 (** {2 Sequent type and basic operations} *)
 

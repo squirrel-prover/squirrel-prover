@@ -35,7 +35,7 @@ type term =
 
 val pp_term : Format.formatter -> term -> unit
 
-type formula = (term, (string * Sorts.esort) ) Formula.foformula
+type formula = (term, (string * Sorts.esort) ) Term.foformula
 
 val pp_formula : Format.formatter -> formula -> unit
 

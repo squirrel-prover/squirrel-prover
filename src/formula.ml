@@ -1,18 +1,9 @@
 open Atom
-
+open Term
 (** First order formulas *)
-type ('a, 'b) foformula =
-  | ForAll of ('b list) * ('a, 'b) foformula
-  | Exists of ('b list) * ('a, 'b) foformula
-  | And of ('a, 'b) foformula * ('a, 'b) foformula
-  | Or of ('a, 'b) foformula * ('a, 'b) foformula
-  | Not of ('a, 'b) foformula
-  | Impl of ('a, 'b) foformula * ('a, 'b) foformula
-  | Atom of 'a
-  | True
-  | False
 
-type formula = (generic_atom, Vars.evar) foformula
+type formula = Term.formula
+
 
 let rec pp_foformula pp_atom pp_var_list ppf = function
   | ForAll (vs, b) ->

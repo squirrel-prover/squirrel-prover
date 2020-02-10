@@ -100,25 +100,25 @@ top_formula:
 
 formula:
 | LPAREN formula RPAREN          { $2 }
-| formula AND formula            { Formula.And ($1,$3) }
-| formula OR formula             { Formula.Or ($1,$3) }
-| formula DARROW formula         { Formula.Impl ($1,$3) }
-| NOT formula                    { Formula.Not ($2) }
-| FALSE                          { Formula.False }
-| TRUE                           { Formula.True }
-| term ord term                  { Formula.Atom (Theory.Compare ($2,$1,$3)) }
-| PID term_list                  { Formula.Atom (Theory.make_term $1 $2) }
+| formula AND formula            { Term.And ($1,$3) }
+| formula OR formula             { Term.Or ($1,$3) }
+| formula DARROW formula         { Term.Impl ($1,$3) }
+| NOT formula                    { Term.Not ($2) }
+| FALSE                          { Term.False }
+| TRUE                           { Term.True }
+| term ord term                  { Term.Atom (Theory.Compare ($2,$1,$3)) }
+| PID term_list                  { Term.Atom (Theory.make_term $1 $2) }
 | HAPPENS LPAREN timestamp RPAREN
-                                 { Formula.Atom
+                                 { Term.Atom
                                      (Theory.Fun ("happens",[$3],None)) }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Formula.Exists (vs,f)  }
+                                 { Term.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Formula.ForAll (vs,f)  }
+                                 { Term.ForAll (vs,f)  }
 | EXISTS ID COLON kind sep f=formula %prec QUANTIF
-                                 { Formula.Exists ([$2,$4],f)  }
+                                 { Term.Exists ([$2,$4],f)  }
 | FORALL ID COLON kind sep f=formula %prec QUANTIF
-                                 { Formula.ForAll ([$2,$4],f)  }
+                                 { Term.ForAll ([$2,$4],f)  }
 
 sep:
 |       {()}

@@ -1,11 +1,14 @@
 (** Atoms *)
 
-type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
-type ord_eq = [ `Eq | `Neq ]
+type ord = Term.ord
+type ord_eq = Term.ord_eq
 
-type ('a,'b) _atom = 'a * 'b * 'b
+type ('a,'b) _atom  = ('a,'b) Term._atom
 
-type message_atom = [ `Message of (ord_eq,Term.message) _atom ]
+type generic_atom = Term.generic_atom
+
+type message_atom = [ `Message of ord_eq * Term.message
+                               * Term.message ]
 
 let pp_ord ppf = function
   | `Eq -> Fmt.pf ppf "="
@@ -65,12 +68,6 @@ let not_trace_atom : trace_atom -> trace_atom = function
   | `Timestamp (o,t,t') -> `Timestamp (not_xpred (o,t,t'))
   | `Index (o,i,i') -> `Index (not_xpred_eq (o,i,i'))
 
-type generic_atom = [
-  | `Message of (ord_eq,Term.message) _atom
-  | `Timestamp of (ord,Term.timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
-  | `Happens of Term.timestamp
-]
 
 let subst_message_atom (s : Term.subst) (`Message (ord, a1, a2)) =
   `Message (ord, Term.subst s a1, Term.subst s a2)

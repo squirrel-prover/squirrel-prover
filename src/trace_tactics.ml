@@ -59,8 +59,8 @@ let () =
   * formulas as hypotheses,
   * followed by the left intro of existentials and conjunctions. *)
 let rec left_introductions s = function
-  | Formula.And (f,g) :: l -> left_introductions s (f::g::l)
-  | Formula.Exists (vars,f) :: l ->
+  | Term.And (f,g) :: l -> left_introductions s (f::g::l)
+  | Term.Exists (vars,f) :: l ->
       let env = Sequent.get_env s in
       let subst,env =
         List.fold_left
@@ -93,12 +93,12 @@ let timestamp_case ts s sk fk =
     in
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
     let case =
-      let at = Atom (`Timestamp (`Eq,ts,name)) in
-      let at = subst_formula subst at in
+      let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
+      let at = Formula.subst_formula subst at in
       if indices = [] then at else
         Exists (List.map (fun x -> Vars.EVar x) indices,at)
     in
-    f := Formula.Or (case,!f)
+    f := Term.Or (case,!f)
   in
   Action.iter_descrs add_action ;
   sk [Sequent.add_formula !f s] fk
@@ -338,7 +338,7 @@ let constraints (s : Sequent.t) sk fk =
       conclusions
   in
   let new_s = List.fold_left (fun s atom -> Sequent.add_formula
-                                 (Formula.Atom (atom :> generic_atom)) s)
+                                 (Term.Atom (atom :> generic_atom)) s)
       s
       trace_conclusions
   in
@@ -361,7 +361,7 @@ let congruence (s : Sequent.t) sk fk =
       conclusions
   in
   let s = List.fold_left (fun s atom -> Sequent.add_formula
-                                 (Formula.Atom (atom :> generic_atom)) s)
+                                 (Term.Atom (atom :> generic_atom)) s)
       s
       term_conclusions
   in
@@ -391,21 +391,21 @@ let () = T.register "assumption"
 (** Utils *)
 
 let mk_or_cnstr l = match l with
-  | [] -> Formula.False
+  | [] -> Term.False
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Formula.Or (x,acc)) l in
+      | x :: l -> mk_c (Term.Or (x,acc)) l in
     mk_c a l'
 
 let mk_and_cnstr l = match l with
-  | [] -> Formula.True
+  | [] -> Term.True
   | [a] -> a
   | a :: l' ->
     let rec mk_c acc = function
       | [] -> acc
-      | x :: l -> mk_c (Formula.And (x,acc)) l in
+      | x :: l -> mk_c (Term.And (x,acc)) l in
     mk_c a l'
 
 (** Eq-Indep Axioms *)
@@ -474,7 +474,7 @@ let eq_trace (s : Sequent.t) sk fk =
          if normt = t then
            acc
          else
-           Formula.Atom (`Message (`Eq, t, normt)) ::acc)
+           Term.Atom (`Message (`Eq, t, normt)) ::acc)
       [] terms
   in
   let s =
@@ -549,7 +549,7 @@ let euf_param (`Message at : message_atom) = match at with
 let euf_apply_schema sequent (_, (_, _), m, s) case =
   let open Euf in
   (* We create the term equality *)
-  let new_f = Formula.Atom (`Message (`Eq, case.message, m)) in
+  let new_f = Term.Atom (`Message (`Eq, case.message, m)) in
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts = Action.to_term case.action_descr.Action.action in
@@ -558,9 +558,9 @@ let euf_apply_schema sequent (_, (_, _), m, s) case =
     List.map
       (function
          | Pred ts ->
-             Formula.Atom (`Timestamp (`Lt, action_descr_ts, ts))
+             Term.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
-             Formula.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
+             Term.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (snd (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
     |> mk_or_cnstr
   in
@@ -569,12 +569,12 @@ let euf_apply_schema sequent (_, (_, _), m, s) case =
 let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
   let open Euf in
   (* We create the term equality *)
-  let eq = Formula.Atom (`Message (`Eq, dcase.d_message, m)) in
+  let eq = Term.Atom (`Message (`Eq, dcase.d_message, m)) in
   (* Now, we need to add the timestamp constraint between [key_is] and
      [dcase.d_key_indices]. *)
   let eq_cnstr =
     List.map2
-      (fun i i' -> Formula.Atom (`Index (`Eq, i, i')))
+      (fun i i' -> Term.Atom (`Index (`Eq, i, i')))
       key_is dcase.d_key_indices
     |> mk_and_cnstr
   in
@@ -640,10 +640,10 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   let f = subst_formula subst f in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
-    | Formula.Impl (h,c) ->
+    | Term.Impl (h,c) ->
         let s' = Sequent.set_conclusion h s in
         aux (s'::subgoals) c
-    | Formula.Not h ->
+    | Term.Not h ->
         let s' = Sequent.set_conclusion h s in
         sk (List.rev (s'::subgoals)) fk
     | f ->
@@ -721,7 +721,7 @@ let collision_resistance (s : Sequent.t) sk fk =
             | Fun ((hash, _), [m1; Name key1]),
               Fun ((hash2, _), [m2; Name key2])
               when hash = hash2 && key1 = key2 ->
-              Formula.Atom (`Message (`Eq, m1, m2)) :: acc
+              Term.Atom (`Message (`Eq, m1, m2)) :: acc
             | _ -> acc
           ) [] hash_eqs
       in
