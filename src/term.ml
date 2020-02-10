@@ -114,8 +114,8 @@ let get_vars : 'a term -> Vars.evar list =
 
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (Symbols.Macro.declare_exact "input" Symbols.Input, [])
-let out_macro = (Symbols.Macro.declare_exact "output" Symbols.Output, [])
+let in_macro = (Symbols.Macro.declare_exact "input" ~builtin:true Symbols.Input, [])
+let out_macro = (Symbols.Macro.declare_exact "output" ~builtin:true Symbols.Output, [])
 
 let rec tts acc = function
   | Fun (_, lt) -> List.fold_left tts acc lt
@@ -202,7 +202,7 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
 
 let mk_fname ?(indices=0) f k_args k_ret =
   let info = indices, Symbols.Abstract (k_args,k_ret) in
-  Symbols.Function.declare_exact f info, []
+  Symbols.Function.declare_exact f ~builtin:true info, []
 
 (** Boolean function symbols *)
 open Sorts

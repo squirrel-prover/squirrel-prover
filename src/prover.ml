@@ -16,9 +16,6 @@ type gm_input =
   | Gm_goal of string * formula
   | Gm_proof
 
-
-exception Cannot_undo
-
 type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
                      subgoals : Sequent.t list;
@@ -45,7 +42,7 @@ let save_state mode =
 
 let rec reset_state n =
   match (!proof_states_history,n) with
-  | [],_ -> raise Cannot_undo
+  | [],_ -> InputDescr
   | p::q,0 ->
     proof_states_history := q;
     goals := p.goals;

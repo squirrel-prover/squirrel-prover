@@ -80,6 +80,10 @@ val of_string : string -> wrapped
   * This is mainly for testing purposes. *)
 val run_restore : (unit -> unit) -> (unit -> unit)
 
+(** Clear the symbol table, and restore all symbols declared with the builtin
+    flag. *)
+val restore_builtin : unit -> unit
+
 (** Signature for namespaces *)
 module type Namespace = sig
 
@@ -98,11 +102,11 @@ module type Namespace = sig
 
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
-  val declare : string -> ?data:data -> def -> ns t
+  val declare : string -> ?builtin:bool -> ?data:data -> def -> ns t
 
   (* Like declare, but use the exact string as symbol name.
    * @raise Multiple_declarations if the name is not available. *)
-  val declare_exact : string -> ?data:data -> def -> ns t
+  val declare_exact : string -> ?builtin:bool -> ?data:data -> def -> ns t
 
   (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)

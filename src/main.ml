@@ -47,7 +47,8 @@ let rec main_loop ?(test=false) ?(save=true) mode =
    * it should not matter if we do not undo the initial definitions *)
   if mode = InputDescr then begin
     Process.reset ();
-    Prover.reset ()
+    Prover.reset ();
+    Symbols.restore_builtin ()
   end else
     (* Otherwise save the state if instructed to do so.
      * In practice we save except after errors. *)
@@ -62,17 +63,14 @@ let rec main_loop ?(test=false) ?(save=true) mode =
     (* if the command is an undo, we catch it only if we are not waiting for a
         system description. *)
     | mode, ParsedUndo nb_undo when mode <> InputDescr ->
-      begin try
-          let new_mode = reset_state nb_undo in
-          begin match new_mode with
-            | ProofMode -> Printer.pr "%a" pp_goal ()
-            | GoalMode -> Printer.pr "%a" Action.pp_actions ()
-            | InputDescr | WaitQed -> ()
-          end ;
-          main_loop ~test new_mode
-        with
-        | Cannot_undo ->
-          error ~test mode "Cannot undo, no proof state to go back to."
+      begin
+        let new_mode = reset_state nb_undo in
+        begin match new_mode with
+          | ProofMode -> Printer.pr "%a" pp_goal ()
+          | GoalMode -> Printer.pr "%a" Action.pp_actions ()
+          | InputDescr | WaitQed -> ()
+        end ;
+        main_loop ~test new_mode
       end
     | InputDescr, ParsedInputDescr ->
       Printer.pr "%a" Action.pp_actions ();

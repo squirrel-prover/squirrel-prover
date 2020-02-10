@@ -40,7 +40,19 @@ let to_string s = s
 
 let table : (string,some_def*data) Hashtbl.t = Hashtbl.create 97
 
+let builtins_table : (string,some_def*data) Hashtbl.t = Hashtbl.create 97
+
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+
+let hashtbl_add ?(builtin=false) table name d =
+  if builtin then Hashtbl.add builtins_table name d;
+  Hashtbl.add table name d
+
+let restore_builtin () =
+  Hashtbl.clear table ;
+  Hashtbl.iter
+    (fun k v -> Hashtbl.replace table k v)
+    builtins_table
 
 let fresh prefix =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
@@ -85,10 +97,10 @@ let run_restore f () =
 module type Namespace = sig
   type ns
   type def
-  val reserve : string -> data t
+  val reserve : string ->  data t
   val define : data t -> ?data:data -> def -> unit
-  val declare : string -> ?data:data -> def -> ns t
-  val declare_exact : string -> ?data:data -> def -> ns t
+  val declare : string -> ?builtin:bool -> ?data:data -> def -> ns t
+  val declare_exact : string -> ?builtin:bool -> ?data:data -> def -> ns t
   val of_string : string -> ns t
   val get_def : ns t -> def
   val def_of_string : string -> def
@@ -119,14 +131,14 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
     assert (fst (Hashtbl.find table symb) = Reserved) ;
     Hashtbl.replace table symb (Exists (M.construct value), data)
 
-  let declare name ?(data=Empty) value =
+  let declare name ?(builtin=false) ?(data=Empty) value =
     let symb = fresh name in
-      Hashtbl.add table symb (Exists (M.construct value), data) ;
+      hashtbl_add ~builtin table symb (Exists (M.construct value), data) ;
       symb
 
-  let declare_exact name ?(data=Empty) value =
+  let declare_exact name ?(builtin=false) ?(data=Empty) value =
     if Hashtbl.mem table name then raise Multiple_declarations ;
-    Hashtbl.add table name (Exists (M.construct value), data) ;
+    hashtbl_add ~builtin table name (Exists (M.construct value), data) ;
     name
 
   let get_all (name:ns t) =

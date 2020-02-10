@@ -28,7 +28,6 @@ type gm_input = Gm_goal of string * formula | Gm_proof
 
 
 (** History management. *)
-exception Cannot_undo
 
 type proof_state
 
