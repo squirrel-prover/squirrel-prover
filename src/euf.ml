@@ -10,7 +10,7 @@ class check_hash_key hash_fn key_n = object (self)
       begin match Vars.sort m with
         | Sorts.Message-> raise Bad_ssc
       end
-    | _ -> super#visit_term t
+    | _ -> super#visit_message t
 end
 
 (* Check the key syntactic side-condition:
@@ -47,6 +47,7 @@ let rec h_o_term hh kk acc = function
     else raise Bad_ssc
   | Term.Name (_,_) -> acc
   | Term.Var _ -> acc
+  | _ -> failwith "Not implemented"
 
 (** [hashes_of_action_descr action_descr hash_fn key_n] return the pairs of
     indices and messages where a hash using occurs in an action description.

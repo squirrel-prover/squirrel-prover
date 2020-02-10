@@ -83,6 +83,7 @@ end = struct
     | Term.Pred ts -> upred (uts ts)
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | Term.Init -> uinit
+    | _ -> failwith "Not implemented"
 end
 
 open Utv
@@ -217,7 +218,7 @@ let swap x y = match x.cnt, y.cnt with
 let no_mgu x y = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
     if a <> a' then raise No_mgu else ()
-  | UName _, UInit _ -> raise No_mgu
+  | UName _, UInit -> raise No_mgu
   | _ -> ()
 
 

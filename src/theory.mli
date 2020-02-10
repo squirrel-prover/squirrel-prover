@@ -12,30 +12,31 @@
   * Although function symbols are known when a term is parsed, we use
   * here a very permissive [Fun] constructor which will be used to represent
   * both function applications and macros. *)
+type kind = Sorts.esort
 
 type term =
   | Var of string
   | Taction of string * term list
   | Tinit
   | Name of string * term list
-      (** A name, whose arguments will always be indices. *)
+  (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
-      (** [Get (s,ots,terms)] reads the contents of memory cell
-        * [(s,terms)] where [terms] are evaluated as indices.
-        * The second argument [ots] is for the optional timestamp at which the
-        * memory read is performed. This is used for the terms appearing in
-        * goals. *)
+  (** [Get (s,ots,terms)] reads the contents of memory cell
+    * [(s,terms)] where [terms] are evaluated as indices.
+    * The second argument [ots] is for the optional timestamp at which the
+    * memory read is performed. This is used for the terms appearing in
+    * goals. *)
   | Fun of string * term list * term option
-      (** Function symbol application,
-        * where terms will be evaluated as indices or messages
-        * depending on the type of the function symbol.
-        * The third argument is for the optional timestamp. This is used for
-        * the terms appearing in goals.*)
+  (** Function symbol application,
+    * where terms will be evaluated as indices or messages
+    * depending on the type of the function symbol.
+    * The third argument is for the optional timestamp. This is used for
+    * the terms appearing in goals.*)
   | Compare of Atom.ord*term*term
 
-val pp_term : Format.formatter -> term -> unit
+type formula
 
-type formula = (term, (string * Sorts.esort) ) Term.foformula
+val pp_term : Format.formatter -> term -> unit
 
 val pp_formula : Format.formatter -> formula -> unit
 
@@ -144,7 +145,7 @@ val convert_formula :
   Term.timestamp ->
   subst ->
   formula ->
-  Formula.formula
+  Term.formula
 
 (** Convert to [formula] to [Formula.formula],
   * for global terms (i.e. with attached timestamps).
@@ -153,7 +154,7 @@ val convert_formula_glob :
   env ->
   subst ->
   formula ->
-  Formula.formula
+  Term.formula
 
 (** [convert_vars vars] Returns the timestamp and index variables substitution,
     in reverse order of declaration. By consequence, List.assoc properly handles

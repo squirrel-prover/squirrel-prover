@@ -3,7 +3,6 @@
     It contains the state of the proof and the history as mutable states. *)
 
 open Term
-open Formula
 
 module Goal : sig
   type t = Trace of Sequent.t | Equiv of EquivSequent.t
@@ -52,7 +51,7 @@ val reset_state : int -> prover_mode
 
 type tac_arg =
   | String_name of string
-  | Formula of Formula.formula
+  | Formula of Term.formula
   | Function_name of fname
   | Int of int
   | Theory of Theory.term

@@ -89,25 +89,30 @@ type descr = {
   action : action ;
   input : Channel.t * string ;
   indices : Vars.index list ;
-  condition : Vars.index list * Formula.formula ;
+  condition : Vars.index list * Term.formula ;
   updates : (Term.state * Term.message) list ;
   output : Channel.t * Term.message
 }
 
+(** Currently the user can only specify one bi-system,
+  * hence system identifiers coincide with [Term.projection],
+  * but (unlike [Term.projection]) they may be generalized in the future. *)
+type system_id = Term.projection
+
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)
-val get_descr : action -> descr
+val get_descr : ?system_id:system_id -> action -> descr
 
 (** Iterate over all action descriptions.
   * Only one representative of each action shape will be passed
   * to the function, with indices that are not guaranteed to be fresh. *)
-val iter_descrs : (descr -> unit) -> unit
+val iter_descrs : ?system_id:system_id -> (descr -> unit) -> unit
 
 (** {2 Registration of actions} *)
 
 (** Register a new action symbol, action, and description,
   * linked together. The set of registered actions will define
-  * the protocol under study. *)
+  * the protocol under study. TODO system_id *)
 val register :
   Symbols.action Symbols.t -> Vars.index list -> action -> descr -> unit
 

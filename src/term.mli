@@ -81,6 +81,11 @@ and _ term =
   | Var : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
+  | Left : 'a term -> 'a term
+  | Right : 'a term -> 'a term
+
+  | ITE: Sorts.boolean term * 'a term * 'a term-> 'a term
+  | Find : Vars.index list * Sorts.boolean term * 'a term * 'a term -> 'a term
 
   | Atom : generic_atom -> Sorts.boolean term
 
@@ -106,6 +111,11 @@ type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
 ]
+
+exception Not_a_disjunction
+
+val disjunction_to_atom_list : formula -> generic_atom list
+
 
 val pp : Format.formatter -> 'a term -> unit
 
@@ -137,7 +147,9 @@ val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
 (** {2 Substitutions} *)
 
-(** Substitutions for all purpose, applicable to terms and timestamps. *)
+(** Substitutions for all purpose, applicable to terms and timestamps.
+  * TODO unusually, we map terms to terms and not just variables to terms;
+  * this is used somewhere... but I forgot where *)
 type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
@@ -165,7 +177,6 @@ val f_or : fsymb
 val f_not : fsymb
 val f_ite : fsymb
 
-val f_pred : fsymb
 val f_succ : fsymb
 
 val f_xor : fsymb
@@ -174,3 +185,11 @@ val f_zero : fsymb
 val f_pair : fsymb
 val f_fst : fsymb
 val f_snd : fsymb
+
+(** Convert from bi-terms to terms
+  *
+  * TODO stronger typing could be used here *)
+
+type projection = Left | Right
+
+val pi_term : projection -> 'a term -> 'a term

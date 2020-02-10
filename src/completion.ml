@@ -64,7 +64,7 @@ let rec cterm_of_term =
   | Var m -> Ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
                       Ccst (Cst.Cmacro (m,ts))
-  | Formula _ -> assert false
+  | _ -> failwith "Not implemented"
 
 let rec term_of_cterm =
   let open Term in function

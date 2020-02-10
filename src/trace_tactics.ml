@@ -1,6 +1,6 @@
 open Tactics
 open Atom
-open Formula
+
 open Term
 
 type tac = Sequent.t Tactics.tac
@@ -73,7 +73,7 @@ let rec left_introductions s = function
           ([],env)
           vars
       in
-      let f = Formula.subst_formula subst f in
+      let f = Term.subst subst f in
         left_introductions (Sequent.set_env env s) (f::l)
   | f :: l -> left_introductions (Sequent.add_formula f s) l
   | [] -> s
@@ -94,7 +94,7 @@ let timestamp_case ts s sk fk =
     let name = Action.to_term (Action.subst_action subst a.Action.action) in
     let case =
       let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
-      let at = Formula.subst_formula subst at in
+      let at = Term.subst subst at in
       if indices = [] then at else
         Exists (List.map (fun x -> Vars.EVar x) indices,at)
     in
@@ -172,7 +172,7 @@ let goal_intro (s : Sequent.t) sk fk =
                         Term.Var (Vars.make_fresh_from_and_update env x)))
         vs
     in
-    let new_formula = subst_formula subst f in
+    let new_formula = Term.subst subst f in
     let new_judge = Sequent.set_conclusion new_formula s
                     |> Sequent.set_env (!env)
     in
@@ -208,7 +208,7 @@ let goal_exists_intro ths (s : Sequent.t) sk fk =
     begin
     try
       let nu = Theory.parse_subst (Sequent.get_env s) vs ths in
-      let new_formula = subst_formula nu f in
+      let new_formula = Term.subst nu f in
       sk [Sequent.set_conclusion new_formula s] fk
     with Theory.Undefined x -> raise @@ Tactics.Tactic_Hard_Failure
         (Tactics.Undefined x)
@@ -247,7 +247,7 @@ let exists_left hyp_name s sk fk =
               )
               vs
           in
-          let f = subst_formula subst f in
+          let f = Term.subst subst f in
           let s = Sequent.add_formula f (Sequent.set_env !env s) in
             sk [s] fk
       | _ -> fk @@ Tactics.Failure "Improper arguments"
@@ -288,7 +288,7 @@ let induction s sk fk =
          let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
          let _,v'' = Vars.make_fresh_from env v in
          (* Introduce v as v'. *)
-         let f' = Formula.subst_formula [Term.ESubst (Term.Var v,Term.Var v')]
+         let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')]
              (ForAll (vs,f))
          in
          (* Use v'' to form induction hypothesis. *)
@@ -298,7 +298,7 @@ let induction s sk fk =
                    Atom (`Timestamp (`Neq,Term.Var v,Term.Init)) -->
                    (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
                             :> generic_atom) -->
-                    Formula.subst_formula
+                    Term.subst
                       [Term.ESubst (Term.Var v,Term.Var v'')] f))
          in
          let s =
@@ -327,8 +327,8 @@ let () = T.register "induction"
   * formulas. *)
 let constraints (s : Sequent.t) sk fk =
   let conclusions =
-    try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
-    with Formula.Not_a_disjunction -> []
+    try Term.disjunction_to_atom_list (Sequent.get_conclusion s)
+    with Term.Not_a_disjunction -> []
   in
   let trace_conclusions =
     List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
@@ -350,8 +350,8 @@ let constraints (s : Sequent.t) sk fk =
     calls [fk] *)
 let congruence (s : Sequent.t) sk fk =
  let conclusions =
-    try Formula.disjunction_to_atom_list (Sequent.get_conclusion s)
-    with Formula.Not_a_disjunction -> []
+    try Term.disjunction_to_atom_list (Sequent.get_conclusion s)
+    with Term.Not_a_disjunction -> []
   in
   let term_conclusions =
     List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
@@ -637,7 +637,7 @@ let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
   in
   let subst = Theory.parse_subst (Sequent.get_env s) uvars ths in
   (* Formula with universal quantifications introduced *)
-  let f = subst_formula subst f in
+  let f = Term.subst subst f in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Term.Impl (h,c) ->

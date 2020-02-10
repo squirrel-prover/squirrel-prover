@@ -4,15 +4,20 @@ open Term
   * When a macro is encountered, its expansion is visited as well. *)
 class iter = object (self)
 
-  method visit_term t = match t with
-    | Fun (_, l) -> List.iter self#visit_term l
+  method visit_message t = match t with
+    | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn, is),l,a) ->
-        List.iter self#visit_term l ;
-        self#visit_term (Macros.get_definition mn is a)
+        List.iter self#visit_message l ;
+        self#visit_message (Macros.get_definition mn is a)
     | Name _ | Var _ -> ()
+    | Diff(a, b) -> self#visit_message a; self#visit_message b
+    | Left a -> self#visit_message a
+    | Right a -> self#visit_message a
+    | ITE (a, b, c) -> self#visit_formula a;
+      self#visit_message b; self#visit_message c
+    | Find (a, b, c) -> self#visit_formula b; self#visit_message c
 
-  method visit_formula (f:Formula.formula) =
-    let open Formula in
+  method visit_formula (f:Term.formula) =
     match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
         self#visit_formula l ;
@@ -21,8 +26,8 @@ class iter = object (self)
     | True | False -> ()
     | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
     | Atom (`Message (_, t, t')) ->
-        self#visit_term t ;
-        self#visit_term t'
+        self#visit_message t ;
+        self#visit_message t'
     | _ -> ()
 end
 
@@ -36,13 +41,13 @@ class iter_approx_macros = object (self)
 
   val mutable checked_macros = [fst Term.in_macro;fst Term.out_macro]
 
-  method visit_term t = match t with
+  method visit_message t = match t with
     | Macro ((mn,is),l,_) ->
-        List.iter self#visit_term l ;
+        List.iter self#visit_message l ;
         if not (List.mem mn checked_macros) then begin
           checked_macros <- mn :: checked_macros ;
-          self#visit_term (Macros.get_dummy_definition mn is)
+          self#visit_message (Macros.get_dummy_definition mn is)
         end
-    | _ -> super#visit_term t
+    | _ -> super#visit_message t
 
 end

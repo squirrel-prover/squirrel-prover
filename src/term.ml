@@ -60,6 +60,11 @@ and _ term =
   | Var : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
+  | Left : 'a term -> 'a term
+  | Right : 'a term -> 'a term
+
+  | ITE: Sorts.boolean term * 'a term * 'a term-> 'a term
+  | Find : Vars.index list * Sorts.boolean term * 'a term * 'a term -> 'a term
 
   | Atom : generic_atom -> Sorts.boolean term
 
@@ -96,6 +101,10 @@ let rec sort : type a. a term -> a Sorts.t =
   | Action _ -> Sorts.Timestamp
   | Init -> Sorts.Timestamp
   | Diff (a, b) -> sort a
+  | Left a -> sort a
+  | Right a -> sort a
+  | ITE (a, b, c) -> sort b
+  | Find (a, b, c, d) -> sort c
   | Atom _ -> Sorts.Boolean
   | ForAll _ -> Sorts.Boolean
   | Exists _ -> Sorts.Boolean
@@ -105,6 +114,14 @@ let rec sort : type a. a term -> a Sorts.t =
   | Impl _ -> Sorts.Boolean
   | True -> Sorts.Boolean
   | False -> Sorts.Boolean
+
+exception Not_a_disjunction
+
+let rec disjunction_to_atom_list = function
+  | False -> []
+  | Atom at -> [at]
+  | Or (a, b) -> disjunction_to_atom_list a @ disjunction_to_atom_list b
+  | _ -> raise Not_a_disjunction
 
 
 let pp_indices ppf l =
@@ -149,6 +166,18 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>(diff(%a, %a))@]"
       pp bl pp br
+  | Left b->
+    Fmt.pf ppf "@[<1>(left(%a))@]"
+      pp b
+  | Right b ->
+    Fmt.pf ppf "@[<1>(right(%a))@]"
+      pp b
+  | ITE (b, c, d) ->
+    Fmt.pf ppf "@[<1>(if %a then %a else %a)@]"
+      pp b pp c pp d
+  | Find (b, c, d, e) ->
+    Fmt.pf ppf "@[<1>(try find %a such that %a in %a else %a)@]"
+      Vars.pp_typed_list (List.map (fun t -> Vars.EVar t) b) pp c pp d pp e
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
@@ -286,6 +315,9 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
     | Init -> Init
     | Diff (a, b) -> Diff (subst s a, subst s b)
+    | Left a -> Left (subst s a)
+    | Right a -> Right (subst s a)
+    | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
     | Atom a-> Atom (subst_generic_atom s a)
     | And (a, b) -> And (subst s a, subst s b)
     | Or (a, b) -> Or (subst s a, subst s b)
@@ -297,6 +329,8 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
        check. Cf #71. *)
     | ForAll (a, b) -> ForAll (a, subst s b)
     | Exists (a, b) -> Exists (a, subst s b)
+    | Find (a, b, c, d) ->
+        Find ((List.map (subst_var s) a), subst s b, subst s c, subst s d)
   in
   assoc s new_term
 
@@ -339,10 +373,6 @@ let f_zero = mk_fname "zero" [] emessage
 
 let f_succ = mk_fname "succ" [emessage] emessage
 
-(** Operations on timestamps *)
-
-let f_pred = mk_fname "pred" [etimestamp] etimestamp
-
 (** Pairing *)
 
 let f_pair = mk_fname "pair" [emessage;emessage] emessage
@@ -356,3 +386,42 @@ let f_diff = mk_fname "diff" [emessage;emessage] emessage
 (** Dummy term *)
 
 let dummy = Fun (mk_fname "_" [] emessage, [])
+
+type projection = Left | Right
+
+let rec pi_term : type a. projection -> a term -> a term =
+  fun s t ->
+  match t with
+  | Fun (f,terms) -> Fun (f, List.map (pi_term s) terms)
+  | Name n -> Name n
+  | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, (pi_term s ts))
+  | Pred t -> Pred (pi_term s t)
+  | Action (a, b) -> Action (a, b)
+  | Init -> Init
+  | Var a -> Var a
+  | Diff (a, b) ->
+    begin
+      match s with
+      | Left -> pi_term s a
+      | Right -> pi_term s b
+    end
+  | Left a -> pi_term Left a
+  | Right a -> pi_term Right a
+  | ITE (a, b, c) -> ITE (pi_term s a, pi_term s b, pi_term s c)
+  | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
+  | ForAll (vs, b) -> ForAll (vs, pi_term s b)
+  | Exists (vs, b) -> Exists (vs, pi_term s b)
+  | And (a, b) -> And (pi_term s a, pi_term s b)
+  | Or (a, b) -> Or (pi_term s a, pi_term s b)
+  | Not a -> Not (pi_term s a)
+  | Impl (a, b) -> Impl (pi_term s a, pi_term s b)
+  | True -> True
+  | False -> False
+  | Atom a -> Atom (pi_generic_atom s a)
+
+and pi_generic_atom s =
+  function
+   | `Message  (o,t1,t2) -> `Message (o, pi_term s t1, pi_term s t2)
+   | `Timestamp (o, ts1, ts2) -> `Timestamp (o, pi_term s ts1, pi_term s ts2)
+   | `Index (o, i1, i2) as r -> r
+   | `Happens t -> `Happens (pi_term s t)

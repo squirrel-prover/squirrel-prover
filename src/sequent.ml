@@ -195,7 +195,7 @@ type message_hypotheses = (message_hypothesis_tag, message_atom) H.hypotheses
 
 type trace_hypotheses = (trace_tag, trace_atom) H.hypotheses
 
-type formula_hypotheses = (formula_tag, Formula.formula) H.hypotheses
+type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
 
 type t = {
@@ -210,7 +210,7 @@ type t = {
     (** Quantifier-free formula over index and timestamp predicates. *)
   formula_hypotheses : formula_hypotheses;
     (** Other hypotheses. *)
-  conclusion : Formula.formula;
+  conclusion : Term.formula;
     (** The conclusion / right-hand side formula of the sequent. *)
   trs : Completion.state option;
     (** Either [None], or the term rewriting system
@@ -237,12 +237,12 @@ let pp ppf s =
   H.pps pp_message_atom ppf s.message_hypotheses ;
 
   H.pps pp_trace_atom ppf s.trace_hypotheses ;
-  H.pps Formula.pp_formula ppf s.formula_hypotheses ;
+  H.pps Term.pp ppf s.formula_hypotheses ;
 
   (* Print separation between hypotheses and conclusion *)
   styled `Bold ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
-  pf ppf "@;%a@]" Formula.pp_formula s.conclusion
+  pf ppf "@;%a@]" Term.pp s.conclusion
 
 let init_sequent = {
   env = Vars.empty_env;
@@ -323,14 +323,14 @@ let add_trace_hypothesis ?(prefix="T") s tf =
 
 class iter_macros f = object (self)
   inherit Iter.iter as super
-  method visit_term t =
+  method visit_message t =
     match t with
       | Term.Macro ((m,is),[],a) ->
           if Macros.is_defined m a then
             let def = Macros.get_definition m is a in
               f t def ;
-              self#visit_term def
-      | t -> super#visit_term t
+              self#visit_message def
+      | t -> super#visit_message t
 end
 
 (** Add to [s] equalities corresponding to the expansions of all macros
@@ -445,9 +445,9 @@ let apply_subst subst s =
    trace_hypotheses = H.map (apply_hyp_subst (Atom.subst_trace_atom subst)
                                  trace_is_triv) s.trace_hypotheses;
    formula_hypotheses = H.map (apply_hyp_subst
-                                 (Formula.subst_formula subst)
+                                 (Term.subst subst)
                                  (fun _ -> false)) s.formula_hypotheses;
-   conclusion = Formula.subst_formula subst s.conclusion;
+   conclusion = Term.subst subst s.conclusion;
   }
 
 let compute_models s =

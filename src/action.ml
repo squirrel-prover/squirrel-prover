@@ -197,7 +197,7 @@ type descr = {
   action : action ;
   input : Channel.t * string ;
   indices : Vars.index list ;
-  condition : Vars.index list * Formula.formula ;
+  condition : Vars.index list * Term.formula ;
   updates : (Term.state * Term.message) list ;
   output : Channel.t * Term.message
 }
@@ -211,7 +211,7 @@ let pp_descr ppf descr =
     pp_action descr.action
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
-    Formula.pp_formula (snd descr.condition)
+    Term.pp (snd descr.condition)
     (Utils.pp_ne_list "@[<hv 2>updates:@ @[<hov>%a@]@]@;"
        (Fmt.list
           ~sep:(fun ppf () -> Fmt.pf ppf ";@ ")
@@ -219,6 +219,15 @@ let pp_descr ppf descr =
              Fmt.pf ppf "%a :=@ %a" Term.pp_msymb s Term.pp t)))
     descr.updates
     Term.pp (snd descr.output)
+
+let pi_descr s d =
+  {d with
+   condition = (let is,t = d.condition in is, Term.pi_term s t);
+   updates = List.map
+               (fun (st, m) -> st, Term.pi_term s m)
+               d.updates;
+   output = (let c,m = d.output in c, Term.pi_term s m)
+  }
 
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices
@@ -229,7 +238,7 @@ let subst_descr subst descr =
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
-    fst descr.condition, Formula.subst_formula subst (snd descr.condition) in
+    fst descr.condition, Term.subst subst (snd descr.condition) in
   let updates =
     List.map
       (fun ((ss,is),t) ->
@@ -248,14 +257,16 @@ let action_to_descr : (shape, descr) Hashtbl.t =
 let reset () =
   Hashtbl.clear action_to_descr
 
+type system_id = Term.projection
+
 let register symb indices action descr =
   Hashtbl.add action_to_descr (get_shape action) descr ;
   define_symbol symb indices action
 
-let iter_descrs f =
-  Hashtbl.iter (fun _ b -> f b) action_to_descr
+let iter_descrs ?(system_id=Term.Left) f =
+  Hashtbl.iter (fun _ b -> f (pi_descr system_id b)) action_to_descr
 
-let get_descr a =
+let get_descr ?(system_id=Term.Left) a =
   let descr = Hashtbl.find action_to_descr (get_shape a) in
   (* We know that [descr.action] and [a] have the same shape,
    * but run [same_shape] anyway to obtain the substitution from
@@ -264,6 +275,7 @@ let get_descr a =
   | None -> assert false
   | Some subst ->
     subst_descr subst descr
+    |> pi_descr system_id
 
 let debug = false
 

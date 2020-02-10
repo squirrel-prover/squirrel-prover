@@ -1,5 +1,3 @@
-open Formula
-
 (** State in proof mode.
   * TODO goals do not belong here *)
 
@@ -14,7 +12,7 @@ module Goal = struct
   let pp_init ch = function
     | Trace j ->
         assert (Sequent.get_env j = Vars.empty_env) ;
-        Formula.pp ch (Sequent.get_conclusion j)
+        Term.pp ch (Sequent.get_conclusion j)
     | Equiv j -> EquivSequent.pp ch j
 end
 
@@ -82,7 +80,7 @@ let rec reset_state n =
  * of terms and let the tactic process it. *)
 type tac_arg =
   | String_name of string
-  | Formula of Formula.formula
+  | Formula of Term.formula
   | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
@@ -101,7 +99,7 @@ module Make_AST
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
     | Function_name fname -> Term.pp_fname ppf fname
-    | Formula formula -> pp_formula ppf formula
+    | Formula formula -> Term.pp ppf formula
     | Theory th -> Theory.pp_term ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
@@ -126,7 +124,7 @@ module type Tactics_sig = sig
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
-  val register_formula : string -> ?help:string -> (formula -> tac) -> unit
+  val register_formula : string -> ?help:string -> (Term.formula -> tac) -> unit
   val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
   val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
 
@@ -329,7 +327,7 @@ let get_goal_formula gname =
   match
     List.filter (fun (name,_) -> name = gname) !goals_proved
   with
-    | [(_,Trace f)] ->
+    | [(_,Goal.Trace f)] ->
         assert (Sequent.get_env f = Vars.empty_env) ;
         Sequent.get_conclusion f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure

@@ -6,23 +6,16 @@ type ord_eq = [ `Eq | `Neq ]
 (** {2 Term formulas} *)
 
 (** Atoms based on messages *)
-type message_atom = [ `Message of ord_eq * Term.message
-                               * Term.message ]
+type message_atom = Term.message_atom
 
 (** Atomic constraints are comparisons over timestamps or indices.
     Indices may only be compared for (dis)equality:
     in [Pind (o,i,i')], [o] must be either [Eq] or [Neq]. *)
-type trace_atom = [
-  | `Timestamp of ord * Term.timestamp * Term.timestamp
-  | `Index of ord_eq * Vars.index * Vars.index
-]
+type trace_atom = Term.trace_atom
 
 (** Atoms of the meta-logic are either timestamp or term atoms. *)
-type generic_atom = [
-  | message_atom
-  | trace_atom
-  | `Happens of Term.timestamp
-]
+type generic_atom = Term.generic_atom
+
 (** Negates the atoms *)
 val not_message_atom : message_atom -> message_atom
 val not_trace_atom : trace_atom -> trace_atom
