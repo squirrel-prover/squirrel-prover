@@ -3,22 +3,37 @@ open Formula
 (** State in proof mode.
   * TODO goals do not belong here *)
 
-type named_goal = string * formula
+module Goal = struct
+  type t = Trace of Sequent.t | Equiv of EquivSequent.t
+  let get_env = function
+    | Trace j -> Sequent.get_env j
+    | Equiv j -> EquivSequent.get_env j
+  let pp ch = function
+    | Trace j -> Sequent.pp ch j
+    | Equiv j -> EquivSequent.pp ch j
+  let pp_init ch = function
+    | Trace j ->
+        assert (Sequent.get_env j = Vars.empty_env) ;
+        Formula.pp ch (Sequent.get_conclusion j)
+    | Equiv j -> EquivSequent.pp ch j
+end
+
+type named_goal = string * Goal.t
 
 let goals : named_goal list ref = ref []
 let current_goal : named_goal option ref = ref None
-let subgoals : Sequent.t list ref = ref []
+let subgoals : Goal.t list ref = ref []
 let goals_proved = ref []
 
 type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 
 type gm_input =
-  | Gm_goal of string * formula
+  | Gm_goal of string * Goal.t
   | Gm_proof
 
 type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
-                     subgoals : Sequent.t list;
+                     subgoals : Goal.t list;
                      goals_proved : named_goal list;
                      prover_mode : prover_mode;
                    }
@@ -72,27 +87,66 @@ type tac_arg =
   | Int of int
   | Theory of Theory.term
 
-(** In the future this will have to be made generic since we will
-  * want the same declaration system for indistinguishability tactics. *)
-module rec Prover_tactics : sig
+(** Functor build AST evaluators for our judgment types *)
+module Make_AST
+  (T : sig type judgment val get : string -> tac_arg list -> judgment Tactics.tac end) :
+  (Tactics.AST_sig with type arg = tac_arg with type judgment = T.judgment)
+= Tactics.AST(struct
 
-  type tac = Sequent.t Tactics.tac
+  type arg = tac_arg
+
+  type judgment = T.judgment
+
+  let pp_arg ppf = function
+    | Int i -> Fmt.int ppf i
+    | String_name s -> Fmt.string ppf s
+    | Function_name fname -> Term.pp_fname ppf fname
+    | Formula formula -> pp_formula ppf formula
+    | Theory th -> Theory.pp_term ppf th
+
+  let eval_abstract id args : judgment Tactics.tac =
+    T.get id args
+
+  let pp_abstract ~pp_args s args ppf =
+    match s,args with
+      | "apply",[String_name id] ->
+          Fmt.pf ppf "apply %s" id
+      | "apply", String_name id :: l ->
+          let l = List.map (function Theory t -> t | _ -> assert false) l in
+          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp_term) l
+      | _ -> raise Not_found
+
+end)
+
+module type Tactics_sig = sig
+
+  type judgment
+  type tac = judgment Tactics.tac
 
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (formula -> tac) -> unit
   val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
-  val register_macro : string -> ?help:string -> AST.t -> unit
+  val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
 
   val get : string -> tac_arg list -> tac
 
   val pp : Format.formatter -> string -> unit
   val pps : Format.formatter -> unit -> unit
-end = struct
 
+end
 
-  type tac = Sequent.t Tactics.tac
+(** In the future this will have to be made generic since we will
+  * want the same declaration system for indistinguishability tactics. *)
+module Prover_tactics
+  (M : sig type judgment end)
+  (AST : Tactics.AST_sig with type judgment = M.judgment with type arg = tac_arg) :
+  Tactics_sig with type judgment = M.judgment =
+struct
+
+  type judgment = M.judgment
+  type tac = judgment Tactics.tac
 
   type tac_infos = {
     maker : tac_arg list -> tac;
@@ -142,8 +196,8 @@ end = struct
              raise @@ Tactics.Tactic_Hard_Failure
                (Tactics.Failure "function name argument expected"))
 
-  let register_macro id ?(help="") m = Prover_tactics.register
-      id ~help:help (AST.eval m)
+  let register_macro id ?(help="") m =
+    register id ~help:help (AST.eval m)
 
   let pp fmt id =
     let help_text =
@@ -155,81 +209,51 @@ end = struct
   let pps fmt () =
     Hashtbl.iter (fun name tac -> Fmt.pf fmt "@.@[<v 0>- %s - @. %s@]@."
                      name tac.help) table
+
 end
 
-and AST :
-  Tactics.AST_sig with type arg = tac_arg with type judgment = Sequent.t
-= Tactics.AST(struct
+module rec TraceTactics : Tactics_sig with type judgment = Sequent.t =
+  Prover_tactics(struct type judgment = Sequent.t end)(TraceAST)
+and TraceAST : Tactics.AST_sig
+                 with type judgment = Sequent.t
+                 with type arg = tac_arg =
+  Make_AST(TraceTactics)
 
-  type arg = tac_arg
+module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
+  Prover_tactics(struct type judgment = Goal.t end)(EquivAST)
+and EquivAST : Tactics.AST_sig
+                 with type judgment = Goal.t
+                 with type arg = tac_arg =
+  Make_AST(EquivTactics)
 
-  type judgment = Sequent.t
-
-  let pp_arg ppf = function
-    | Int i -> Fmt.int ppf i
-    | String_name s -> Fmt.string ppf s
-    | Function_name fname -> Term.pp_fname ppf fname
-    | Formula formula -> pp_formula ppf formula
-    | Theory th -> Theory.pp_term ppf th
-
-  let eval_abstract id args : judgment Tactics.tac =
-    Prover_tactics.get id args
-
-  let pp_abstract ~pp_args s args ppf =
-    match s,args with
-      | "apply",[String_name id] ->
-          Fmt.pf ppf "apply %s" id
-      | "apply", String_name id :: l ->
-          let l = List.map (function Theory t -> t | _ -> assert false) l in
-          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp_term) l
-      | _ -> raise Not_found
-
-end)
+let pp_ast fmt t = TraceAST.pp fmt t
 
 let get_help tac_name =
   if tac_name = "" then
-    Printer.prt `Result "%a" Prover_tactics.pps ()
+    Printer.prt `Result "%a" TraceTactics.pps ()
   else
-    Printer.prt `Result "%a." Prover_tactics.pp tac_name;
+    Printer.prt `Result "%a." TraceTactics.pp tac_name;
   Tactics.id
 
 let () =
-  Prover_tactics.register "admit"
+  TraceTactics.register "admit"
     ~help:"Closes the current goal."
     (fun _ sk fk -> sk [] fk) ;
-  Prover_tactics.register_general "help"
+  TraceTactics.register_general "help"
     ~help:"Display all available commands."
     (function
       | [] -> get_help ""
       | [String_name tac_name]-> get_help tac_name
       | _ ->  raise @@ Tactics.Tactic_Hard_Failure
           (Tactics.Failure"improper arguments")) ;
-  Prover_tactics.register "id" ~help:"Identity." Tactics.id
-
-exception Return of Sequent.t list
-
-(** The evaluation of a tactic, may either raise a soft failure or a hard
-  * failure (cf tactics.ml). A soft failure should be formatted inside the
-  * [Tactic_Soft_Failure] exception.
-  * A hard failure inside Tactic_hard_failure. Those exceptions are caught
-  * inside the interactive loop.
-*)
-let eval_tactic_judge ast j =
-  let tac = AST.eval ast in
-  (* The failure should raise the soft failure,
-   * according to [pp_tac_error]. *)
-  let fk tac_error =
-    raise @@ Tactics.Tactic_Soft_Failure tac_error
-  in
-  let sk l _ = raise (Return l) in
-  try ignore (tac j sk fk) ; assert false with Return l -> l
+  TraceTactics.register "id" ~help:"Identity." Tactics.id
 
 (** Automatic simplification of generated subgoals *)
 
 (* This automation part tries to close the goal, deriving false from the
    current atomic hypothesis. *)
 let simple_base =
-  AST.(
+  Tactics.(
     [ Abstract ("eqnames",[]) ;
       Abstract ("eqtrace",[]) ;
       Try (Abstract ("congruence",[])) ;
@@ -240,7 +264,7 @@ let simple_base =
 (* This automation part tries all possible non branching introductions, and then
    close. *)
 let simpl_nobranching =
-  AST.(
+  Tactics.(
     AndThen
       (Abstract ("intros",[]) ::
        Try (Abstract ("false_left",[])) ::
@@ -250,7 +274,7 @@ let simpl_nobranching =
 (* This automation part tries all possible introductions, and then
    close. *)
 let simpl_branching =
-  AST.(
+  Tactics.(
     AndThen
       (Repeat (Abstract ("anyintro",[])) ::
        Try (Abstract ("false_left",[])) ::
@@ -260,22 +284,21 @@ let simpl_branching =
 (* Final automation tactic. We allow branching introduction, only if the extra
    goals are automatically closed. *)
 let simpl =
-  AST.(
+  Tactics.(
     OrElse [NotBranching(simpl_branching); simpl_nobranching]
     )
 
-
-let auto_simp judges =
+let trace_auto_simp judges =
   judges
-  |> List.map (eval_tactic_judge simpl)
+  |> List.map (TraceAST.eval_judgment simpl)
   |> List.flatten
 
 let () =
-  Prover_tactics.register "simpl"
+  TraceTactics.register "simpl"
     ~help:"Apply the automatic simplification tactic."
-    (fun j sk fk -> sk (eval_tactic_judge simpl j) fk)
+    (fun j sk fk -> sk (TraceAST.eval_judgment simpl j) fk)
 
-let tsubst_of_judgment j =
+let tsubst_of_goal j =
   let aux : Vars.evar -> Theory.esubst =
     (fun (Vars.EVar v) ->
        match Vars.sort v with
@@ -284,44 +307,44 @@ let tsubst_of_judgment j =
       )
       in
   List.map aux
-    (Vars.to_list (Sequent.get_env j))
+    (Vars.to_list (Goal.get_env j))
 
 let parse_formula fact =
   match !subgoals with
     | [] -> failwith "Cannot parse fact without a goal"
-    | j::_ ->
+    | j :: _ ->
         let env =
           List.map
             (fun (Vars.EVar v) ->
                Vars.name v,
                Sorts.ESort (Vars.sort v))
-            (Vars.to_list (Sequent.get_env j))
+            (Vars.to_list (Goal.get_env j))
         in
         Theory.convert_formula_glob
           env
-          (tsubst_of_judgment j)
+          (tsubst_of_goal j)
           fact
 
 let get_goal_formula gname =
   match
     List.filter (fun (name,_) -> name = gname) !goals_proved
   with
-    | [(_,f)] -> f
+    | [(_,Trace f)] ->
+        assert (Sequent.get_env f = Vars.empty_env) ;
+        Sequent.get_conclusion f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
 
 (** Declare Goals And Proofs *)
 
-let make_goal f  =
-  (* In the rest of this function, the lists need to be reversed and appended
-     carefully to properly handle variable shadowing.  *)
-    Theory.convert_formula_glob [] [] f
+let make_trace_goal f  =
+  Goal.Trace (Sequent.init (Theory.convert_formula_glob [] [] f))
 
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of AST.t
+  | ParsedTactic of tac_arg Tactics.ast
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -349,19 +372,23 @@ let pp_goal ppf () = match !current_goal, !subgoals with
   | Some _, j :: _ ->
     Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]"
       (List.length !subgoals)
-      Sequent.pp j
+      Goal.pp j
   | _ -> assert false
 
 (** [eval_tactic_focus tac] applies [tac] to the focused goal.
   * @return [true] if there are no subgoals remaining. *)
 let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
-  | judge :: ejs' ->
-    let new_j = eval_tactic_judge tac judge in
+  | Goal.Trace judge :: ejs' ->
+    let new_j = TraceAST.eval_judgment tac judge in
     let new_j = match tac with
-      | AST.Modifier ("nosimpl", _) -> new_j
-      | _ -> auto_simp new_j
+      | Tactics.Modifier ("nosimpl", _) -> new_j
+      | _ -> trace_auto_simp new_j
     in
+    subgoals := List.map (fun j -> Goal.Trace j) new_j @ ejs';
+    is_proof_completed ()
+  | Goal.Equiv judge :: ejs' ->
+    let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
     subgoals := new_j @ ejs';
     is_proof_completed ()
 
@@ -377,14 +404,14 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | AST.Abstract ("cycle",[Int i]) -> subgoals := cycle i !subgoals; false
+  | Tactics.Abstract ("cycle",[Int i]) -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
 let start_proof () = match !current_goal, !goals with
   | None, (gname,goal) :: _ ->
     assert (!subgoals = []);
     current_goal := Some (gname,goal);
-    subgoals := [Sequent.init goal];
+    subgoals := [goal];
     None
   | Some _,_ ->
     Some "Cannot start a new proof (current proof is not done)."

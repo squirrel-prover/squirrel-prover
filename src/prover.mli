@@ -5,8 +5,15 @@
 open Term
 open Formula
 
+module Goal : sig
+  type t = Trace of Sequent.t | Equiv of EquivSequent.t
+  val pp : Format.formatter -> t -> unit
+  val pp_init : Format.formatter -> t -> unit
+  val get_env : t -> Vars.env
+end
+
 (** A goal of the prover is simply a name and a formula *)
-type named_goal = string * formula
+type named_goal = string * Goal.t
 
 (** [current_goal] returns the current (sub)goal of the prover,
   * if any. *)
@@ -23,8 +30,7 @@ type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof] : start a proof. *)
-type gm_input = Gm_goal of string * formula | Gm_proof
-
+type gm_input = Gm_goal of string * Goal.t | Gm_proof
 
 
 (** History management. *)
@@ -51,20 +57,28 @@ type tac_arg =
   | Int of int
   | Theory of Theory.term
 
-module AST : Tactics.AST_sig
-  with type arg = tac_arg and type judgment = Sequent.t
+(* TODO module AST : Tactics.AST_sig
+  with type arg = tac_arg and type judgment = Sequent.t *)
 
-(** Placeholder for tactics on judgments *)
-module Prover_tactics : sig
-  type tac = Sequent.t Tactics.tac
-
+(** Registry for tactics on some kind of judgment *)
+module type Tactics_sig = sig
+  type judgment
+  type tac = judgment Tactics.tac
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (formula -> tac) -> unit
   val register_fname : string -> ?help:string -> (fname -> tac) -> unit
-  val register_macro : string -> ?help:string -> AST.t -> unit
+  val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
+  val get : string -> tac_arg list -> tac
+  val pp : Format.formatter -> string -> unit
+  val pps : Format.formatter -> unit -> unit
 end
+
+val pp_ast : Format.formatter -> tac_arg Tactics.ast -> unit
+
+module TraceTactics : Tactics_sig with type judgment = Sequent.t
+module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (** {2 Utilities for parsing} *)
 
@@ -73,12 +87,12 @@ val parse_formula : Theory.formula -> formula
 val get_goal_formula : string -> formula
 
 (** Produces a goal formula given parsing informations. *)
-val make_goal : Theory.formula -> formula
+val make_trace_goal : Theory.formula -> Goal.t
 
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of AST.t
+  | ParsedTactic of tac_arg Tactics.ast
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -98,7 +112,7 @@ val complete_proof : unit -> unit
 
 (** [eval_tactic utac] applies the tactic [utac].
     Return [true] if there are no subgoals remaining. *)
-val eval_tactic : AST.t -> bool
+val eval_tactic : tac_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
 val start_proof : unit -> string option

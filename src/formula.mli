@@ -27,6 +27,8 @@ type formula = (generic_atom, Vars.evar) foformula
 
 val pp_formula : Format.formatter -> formula -> unit
 
+val pp : Format.formatter -> formula -> unit
+
 (** Substitution in a formula.
     Pre-condition: [formula subst f] require that [subst]
     co-domain does not contain any variable that is bound in [f]. *)

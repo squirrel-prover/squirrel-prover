@@ -5,7 +5,7 @@ open Term
 
 type tac = Sequent.t Tactics.tac
 
-module T = Prover.Prover_tactics
+module T = Prover.TraceTactics
 
 (** Propositional connectives *)
 
@@ -261,7 +261,7 @@ let () =
           (Tactics.Failure "improper arguments"))
 
 let () =
-  let open Prover.AST in
+  let open Tactics in
   let non_branching_intro =
     [ Abstract ("intro",[]) ;
       Abstract ("exists",[]) ;

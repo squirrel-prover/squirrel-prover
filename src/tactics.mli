@@ -92,27 +92,30 @@ module type S = sig
 
 end
 
+(** AST for tactics, with abstract leaves corresponding to prover-specific
+  * tactics, with prover-specific arguments. Modifiers have no internal
+  * semantics: they are printed, but ignored during evaluation -- they
+  * can only be used for cheap tricks now, but may be used to guide tactic
+  * evaluation in richer ways in the future. *)
+type 'a ast =
+  | Abstract of string * 'a list
+  | AndThen : 'a ast list -> 'a ast
+  | OrElse : 'a ast list -> 'a ast
+  | Try : 'a ast -> 'a ast
+  | NotBranching : 'a ast -> 'a ast
+  | Repeat : 'a ast -> 'a ast
+  | Ident : 'a ast
+  | Modifier : string * 'a ast -> 'a ast
+
 module type AST_sig = sig
 
   type arg
   type judgment
-
-  (** AST for tactics, with abstract leaves corresponding to prover-specific
-    * tactics, with prover-specific arguments. Modifiers have no internal
-    * semantics: they are printed, but ignored during evaluation -- they
-    * can only be used for cheap tricks now, but may be used to guide tactic
-    * evaluation in richer ways in the future. *)
-  type t =
-    | Abstract of string * arg list
-    | AndThen : t list -> t
-    | OrElse : t list -> t
-    | Try : t -> t
-    | NotBranching : t -> t
-    | Repeat : t -> t
-    | Ident : t
-    | Modifier : string * t -> t
+  type t = arg ast
 
   val eval : t -> judgment tac
+
+  val eval_judgment : t -> judgment -> judgment list
 
   val pp : Format.formatter -> t -> unit
 

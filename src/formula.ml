@@ -40,6 +40,7 @@ let rec pp_foformula pp_atom pp_var_list ppf = function
   | False -> Fmt.pf ppf "False"
 
 let pp_formula = pp_foformula pp_generic_atom Vars.pp_typed_list
+let pp = pp_formula
 
 let rec subst_foformula a_subst (s : Term.subst) (f) =
   match f with

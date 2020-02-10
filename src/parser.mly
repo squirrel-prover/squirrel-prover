@@ -209,9 +209,9 @@ declaration:
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
 | AXIOM f=formula                { Prover.add_proved_goal
-                                     ("unnamed_goal", Prover.make_goal f) }
+                                     ("unnamed_goal", Prover.make_trace_goal f) }
 | AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
-                                     (i, Prover.make_goal f) }
+                                     (i, Prover.make_trace_goal f) }
 
 tactic_params:
 |                               { [] }
@@ -220,39 +220,39 @@ tactic_params:
 
 tac:
   | LPAREN t=tac RPAREN               { t }
-  | l=tac SEMICOLON r=tac             { Prover.AST.AndThen [l;r] }
-  | l=tac PLUS r=tac                  { Prover.AST.OrElse [l;r] }
-  | TRY l=tac                         { Prover.AST.Try l }
-  | REPEAT t=tac                      { Prover.AST.Repeat t }
-  | ID i=INT                          { Prover.AST.Abstract
+  | l=tac SEMICOLON r=tac             { Tactics.AndThen [l;r] }
+  | l=tac PLUS r=tac                  { Tactics.OrElse [l;r] }
+  | TRY l=tac                         { Tactics.Try l }
+  | REPEAT t=tac                      { Tactics.Repeat t }
+  | ID i=INT                          { Tactics.Abstract
                                           ($1,[Prover.Int i]) }
-  | ID t=tactic_params                          { Prover.AST.Abstract
+  | ID t=tactic_params                          { Tactics.Abstract
                                                     ($1,t) }
-  | EXISTS t=tactic_params            { Prover.AST.Abstract
+  | EXISTS t=tactic_params            { Tactics.Abstract
                                           ("exists",t) }
 (* the case of EXISTS must be treated separately as EXISTS is used for formulas. *)
-  | ID f=formula                      { Prover.AST.Abstract
+  | ID f=formula                      { Tactics.Abstract
                                           ($1,
                                            [Prover.Formula
                                               (Prover.parse_formula f)]) }
-  | NOSIMPL t=tac                     { Prover.AST.Modifier
+  | NOSIMPL t=tac                     { Tactics.Modifier
                                           ("nosimpl", t) }
-  | CYCLE i=INT                       { Prover.AST.Abstract
+  | CYCLE i=INT                       { Tactics.Abstract
                                          ("cycle",[Prover.Int i]) }
-  | CYCLE MINUS i=INT                 { Prover.AST.Abstract
+  | CYCLE MINUS i=INT                 { Tactics.Abstract
                                          ("cycle",[Prover.Int (-i)]) }
 
-  | APPLY i=ID                        { Prover.AST.Abstract
+  | APPLY i=ID                        { Tactics.Abstract
                                           ("apply",
                                            [Prover.String_name i]) }
-  | APPLY i=ID TO t=tactic_params     { Prover.AST.Abstract
+  | APPLY i=ID TO t=tactic_params     { Tactics.Abstract
                                           ("apply",
                                            Prover.String_name i :: t) }
-  | HELP                              { Prover.AST.Abstract
+  | HELP                              { Tactics.Abstract
                                           ("help",
                                            []) }
 
-  | HELP i=ID                         { Prover.AST.Abstract
+  | HELP i=ID                         { Tactics.Abstract
                                           ("help",
                                            [Prover.String_name i]) }
 
@@ -266,9 +266,9 @@ tactic:
 | t=tac DOT                           { t }
 
 goal:
-| GOAL i=ID COLON f=formula DOT   { Prover.Gm_goal (i, Prover.make_goal f) }
+| GOAL i=ID COLON f=formula DOT   { Prover.Gm_goal (i, Prover.make_trace_goal f) }
 | GOAL f=formula DOT              { Prover.Gm_goal ("unnamed_goal",
-                                                    Prover.make_goal f) }
+                                                    Prover.make_trace_goal f) }
 | PROOF                           { Prover.Gm_proof }
 
 theory:

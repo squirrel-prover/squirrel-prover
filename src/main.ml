@@ -78,8 +78,8 @@ let rec main_loop ?(test=false) ?(save=true) mode =
     | ProofMode, ParsedTactic utac ->
       begin
         try
-          if not !interactive then Printer.prt `Prompt "%a"
-              Prover.AST.pp utac ;
+          if not !interactive then
+            Printer.prt `Prompt "%a" Prover.pp_ast utac ;
           if eval_tactic utac then begin
             Printer.prt `Goal "Goal %s is proved"
               (match Prover.current_goal () with
@@ -126,7 +126,7 @@ let rec main_loop ?(test=false) ?(save=true) mode =
           add_new_goal (i,f);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
-            Formula.pp_formula f;
+            Prover.Goal.pp_init f;
           main_loop ~test GoalMode
       end
     | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if test then () else exit 0
