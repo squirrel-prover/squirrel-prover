@@ -100,7 +100,8 @@ let timestamp_case ts s sk fk =
     in
     f := Term.Or (case,!f)
   in
-  Action.iter_descrs add_action ;
+  let system_id = Sequent.system_id s in
+  Action.iter_descrs ~system_id add_action ;
   sk [Sequent.add_formula !f s] fk
 
 let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
@@ -590,7 +591,8 @@ let euf_apply_facts s at =
   let p = euf_param at in
   let env = Sequent.get_env s in
   let (hash_fn, (key_n, key_is), mess, sign) = p in
-  let rule = Euf.mk_rule ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let system_id = Sequent.system_id s in
+  let rule = Euf.mk_rule ~system_id ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case ->
         let new_f, new_cnstr, new_env = euf_apply_schema s p case in
@@ -698,7 +700,8 @@ let collision_resistance (s : Sequent.t) sk fk =
   let hashes = List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-           (Theory.is_hash hash) && (Euf.hash_key_ssc hash key [m])
+             let system_id = Sequent.system_id s in
+             Theory.is_hash hash && Euf.hash_key_ssc ~system_id hash key [m]
          | _ -> false)
       (Sequent.get_all_terms s)
   in

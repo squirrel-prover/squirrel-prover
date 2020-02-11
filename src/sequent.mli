@@ -25,6 +25,9 @@ val init : formula -> sequent
     of all named actions that are assumed to happen. *)
 val add_formula : ?prefix:string -> formula -> sequent -> sequent
 
+(** Get the identifier of the system which the sequent is reasoning about. *)
+val system_id : sequent -> Action.system_id
+
 (** [set_env e s] returns a new sequent with
   * the environment set to [e]. *)
 val set_env : Vars.env -> sequent -> sequent

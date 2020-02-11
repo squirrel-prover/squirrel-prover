@@ -2,13 +2,13 @@ open Term
 
 (** Iterate on all subfacts and subterms.
   * When a macro is encountered, its expansion is visited as well. *)
-class iter = object (self)
+class iter ~system_id = object (self)
 
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn, is),l,a) ->
         List.iter self#visit_message l ;
-        self#visit_message (Macros.get_definition mn is a)
+        self#visit_message (Macros.get_definition ~system_id mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
@@ -37,9 +37,9 @@ end
   * that whenever a macro [m(...)@..] occurs where [m] is not an input/output,
   * a specific expansion of [m] will have been visited, without
   * any guarantee on the indices and action used for that expansion. *)
-class iter_approx_macros = object (self)
+class iter_approx_macros ~system_id = object (self)
 
-  inherit iter as super
+  inherit iter ~system_id as super
 
   val mutable checked_macros = [fst Term.in_macro;fst Term.out_macro]
 
@@ -48,7 +48,7 @@ class iter_approx_macros = object (self)
         List.iter self#visit_message l ;
         if not (List.mem mn checked_macros) then begin
           checked_macros <- mn :: checked_macros ;
-          self#visit_message (Macros.get_dummy_definition mn is)
+          self#visit_message (Macros.get_dummy_definition ~system_id mn is)
         end
     | _ -> super#visit_message t
 

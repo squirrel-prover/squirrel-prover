@@ -199,6 +199,7 @@ type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
 
 type t = {
+  system_id : Action.system_id ;
   env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
@@ -221,6 +222,7 @@ type t = {
       * trace hypotheses.
       * Must be set to [None] if trace hypotheses change. *)
 }
+
 type sequent = t
 
 let pp ppf s =
@@ -245,6 +247,7 @@ let pp ppf s =
   pf ppf "@;%a@]" Term.pp s.conclusion
 
 let init_sequent = {
+  system_id = Term.Left ;
   env = Vars.empty_env;
   happens_hypotheses = [];
   message_hypotheses = H.empty;
@@ -261,8 +264,6 @@ let is_hypothesis f s =
   | Term.Atom (#Atom.trace_atom as at) -> H.mem at s.trace_hypotheses
   | Term.Atom (`Happens t) -> List.mem t s.happens_hypotheses
   | _ ->  H.mem f s.formula_hypotheses
-
-
 
 let get_trace_atoms s=
     List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
@@ -321,13 +322,13 @@ let add_trace_hypothesis ?(prefix="T") s tf =
     trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;
     models = None }
 
-class iter_macros f = object (self)
-  inherit Iter.iter as super
+class iter_macros ~system_id f = object (self)
+  inherit Iter.iter ~system_id as super
   method visit_message t =
     match t with
       | Term.Macro ((m,is),[],a) ->
           if Macros.is_defined m a then
-            let def = Macros.get_definition m is a in
+            let def = Macros.get_definition ~system_id m is a in
               f t def ;
               self#visit_message def
       | t -> super#visit_message t
@@ -339,6 +340,7 @@ let rec add_macro_defs s at =
   let macro_eqs : message_atom list ref = ref [] in
   let iter =
     new iter_macros
+      ~system_id:s.system_id
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
     iter#visit_formula (Term.Atom at) ;
@@ -364,8 +366,9 @@ let rec add_happens s ts =
     match ts with
       | Term.Action (symb,indices) ->
           let a = Action.of_term symb indices in
+          let system_id = s.system_id in
           add_formula ~prefix:"C"
-               (snd (Action.get_descr a).Action.condition)
+               (snd (Action.get_descr ~system_id a).Action.condition)
             s
       | _ -> s
 
@@ -411,6 +414,8 @@ let message_atoms_valid s =
 let set_env a s = { s with env = a }
 
 let get_env s = s.env
+
+let system_id s = s.system_id
 
 let set_conclusion a s =
   let s = { s with conclusion = a } in

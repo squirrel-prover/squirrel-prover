@@ -44,14 +44,14 @@ let is_defined name a =
         end
     | Symbols.Global _, _ -> assert false
 
-let get_definition name args a =
+let get_definition ~system_id name args a =
   match Symbols.Macro.get_all name with
     | Symbols.Input, _ -> assert false
     | Symbols.Output, _ ->
        begin match a with
          | Action (symb,indices) ->
              let action = Action.of_term symb indices in
-             snd Action.((get_descr action).output)
+             snd Action.((get_descr ~system_id action).output)
          | _ -> assert false
        end
     | Symbols.State _, _ ->
@@ -61,7 +61,7 @@ let get_definition name args a =
               * see if state name(args) is updated by symb(indices),
               * otherwise its content is unchanged. *)
              let action = Action.of_term symb indices in
-             let descr = Action.get_descr action in
+             let descr = Action.get_descr ~system_id action in
                begin try
                  List.assoc (name,args) descr.Action.updates
                with Not_found ->
@@ -99,9 +99,9 @@ let get_definition name args a =
     | Symbols.Global _, _ -> assert false
     | Symbols.Local _, _ -> failwith "TODO"
 
-let get_dummy_definition mn indices =
+let get_dummy_definition ~system_id mn indices =
   match Symbols.Macro.get_all mn with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
         let dummy_action = Action.dummy_action (List.length inputs) in
-        get_definition mn indices (Action.to_term dummy_action)
+        get_definition ~system_id mn indices (Action.to_term dummy_action)
     | _ -> assert false
