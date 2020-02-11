@@ -1,3 +1,5 @@
+(** Symbols *)
+
 type 'a indexed_symbol = 'a Symbols.t * Vars.index list
 
 type name = Symbols.name Symbols.t
@@ -11,9 +13,6 @@ type mname = Symbols.macro Symbols.t
 type msymb = Symbols.macro indexed_symbol
 
 type state = msymb
-
-
-(** Pretty printing *)
 
 let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
 
@@ -37,6 +36,7 @@ let pp_msymb ppf (m,is) =
     pp_mname m
     (Utils.pp_ne_list "(%a)" Vars.pp_list) is
 
+(** Atoms and terms *)
 
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
@@ -52,10 +52,13 @@ type generic_atom = [
 and _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
-  | Macro :  msymb * Sorts.message term list * Sorts.timestamp term
-      -> Sorts.message term
+  | Macro :
+      msymb * Sorts.message term list * Sorts.timestamp term ->
+      Sorts.message term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
-  | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Action :
+      Symbols.action Symbols.t * Vars.index list ->
+      Sorts.timestamp term
   | Init : Sorts.timestamp term
   | Var : 'a Vars.var -> 'a term
 

@@ -120,7 +120,8 @@ exception Not_local_term
 
 exception Arity_error of string*int*int
 
-let arity_error s i j = raise (Arity_error (s,i,j))
+let check_arity s actual expected =
+  if actual <> expected then raise (Arity_error (s,actual,expected))
 
 type env = (string*kind) list
 
@@ -146,7 +147,7 @@ let function_kind f : kind list * kind =
 let check_state s n =
   match Symbols.def_of_string s with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
-        if arity <> n then raise (Arity_error (s,n,arity)) ;
+        check_arity s n arity ;
         kind
     | _ -> failwith "can only assign a state"
 
@@ -222,17 +223,44 @@ let rec convert :
 
   | Var x -> assoc subst x sort
 
+  (* In [Term.term], function symbols deal with the message sort,
+   * and comparisons are over message, indices or timestamps.
+   *
+   * In most of the code below, we restrict function types to match
+   * this constraint. But we start with a few exceptions to enable
+   * basic usage of boolean terms.
+   *
+   * In older version of the code this was more flexible:
+   * Theory.terms of type Boolean were converted to Term.message,
+   * but we lost this subtyping ability when unifying conversions
+   * and typing them more strongly. We may or may not want to
+   * recover some of that flexibility. *)
+
+  | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_true) ->
+      begin match sort with
+        | Sorts.Boolean -> Term.True
+        | _ -> raise Type_error
+      end
+
+  | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_false) ->
+      begin match sort with
+        | Sorts.Boolean -> Term.False
+        | _ -> raise Type_error
+      end
+
+  | Compare (`Eq, u, Fun (f,[],None))
+      when f = Symbols.to_string (fst Term.f_true) ->
+      begin match sort with
+        | Sorts.Boolean -> conv sort u
+        | _ -> raise Type_error
+      end
+
+  (* End of special cases. *)
+
   | Fun (f,l,None) ->
       let ks, f_k = function_kind f in
-      (* TODO In older versions of the code it seemed possible to support
-       * functions and macros returning booleans, but this has become more
-       * rigid with the introduction of boolean terms (aka formulas);
-       * hence the following assert which will fail if such functions
-       * are used. *)
-      assert (List.for_all (fun k -> k = Sorts.emessage) ks) ;
       assert (f_k = Sorts.emessage) ;
-      if List.length ks <> List.length l then
-        raise (Arity_error (f,List.length l,List.length ks)) ;
+      check_arity f (List.length l) (List.length ks) ;
       begin match sort with
         | Sorts.Message ->
             let open Symbols in
@@ -243,9 +271,14 @@ let rec convert :
                   let indices = List.map conv_index l in
                   Term.Macro ((s,indices),[],get_at ())
               | Wrapped (s, Macro (Local (targs,_))) ->
-                  (* TODO fix or remove this... we need to know what we want for
-                   * local macros *)
-                  assert false
+                  if List.for_all (fun s -> s = Sorts.eindex) ks then
+                    let indices = List.map conv_index l in
+                    Term.Macro ((s,indices),[],get_at ())
+                  else begin
+                    assert (List.for_all (fun s -> s = Sorts.emessage) ks) ;
+                    let l = List.map (conv Sorts.Message) l in
+                    Term.Macro ((s,[]),l,get_at ())
+                  end
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)" f)
             end
         | _ -> raise Type_error
@@ -255,19 +288,22 @@ let rec convert :
       if at <> None then raise Not_local_term ;
       let open Symbols in
       let open Symbols in
-      begin match sort, of_string f with
-        | Sorts.Message, Wrapped (s, Macro (Input|Output)) ->
-            if l <> [] then raise (Arity_error ("input",List.length l,0)) ;
-            Term.Macro ((s,[]),[],conv Sorts.Timestamp ts)
-        | Sorts.Message, Wrapped (s, Macro (Global arity)) ->
-            if List.length l <> arity then
-              raise (Arity_error (f,List.length l,arity)) ;
-            let l = List.map conv_index l in
-            Term.Macro ((s, l),[],conv Sorts.Timestamp ts)
-        | Sorts.Message, Wrapped (s, Macro (Local (targs,_))) ->
-            (* TODO as above *)
-            assert false
-        | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+      begin match sort with
+        | Sorts.Message ->
+            begin match of_string f with
+              | Wrapped (s, Macro (Input|Output)) ->
+                  check_arity "input" (List.length l) 0 ;
+                  Term.Macro ((s,[]),[],conv Sorts.Timestamp ts)
+              | Wrapped (s, Macro (Global arity)) ->
+                  check_arity f (List.length l) arity ;
+                  let l = List.map conv_index l in
+                  Term.Macro ((s, l),[],conv Sorts.Timestamp ts)
+              | Wrapped (s, Macro (Local (targs,_))) ->
+                  (* TODO as above *)
+                  assert false
+              | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+            end
+        | _ -> raise (TypeError f)
       end
 
   | Get (s,opt_ts,is) ->
@@ -351,14 +387,19 @@ let rec convert :
       begin match sort with
         | Sorts.Boolean ->
             begin try
-              Term.Atom (`Timestamp (o,conv Sorts.Timestamp u, conv Sorts.Timestamp v))
-            with Type_error ->
+              Term.Atom
+                (`Timestamp (o,
+                             conv Sorts.Timestamp u,
+                             conv Sorts.Timestamp v))
+            with TypeError _ | Type_error ->
               match o with
                 | #Atom.ord_eq as o ->
                     begin try
-                      Term.Atom (`Index (o,conv_index u, conv_index v))
-                    with Type_error ->
-                      Term.Atom (`Message (o,conv Sorts.Message u, conv Sorts.Message v))
+                      Term.Atom (`Index (o, conv_index u, conv_index v))
+                    with TypeError _ | Type_error ->
+                      Term.Atom (`Message (o,
+                                           conv Sorts.Message u,
+                                           conv Sorts.Message v))
                     end
                 | _ -> raise Type_error
             end
@@ -453,11 +494,10 @@ let make_term ?at_ts s l =
         end
     | Symbols.Name arity ->
         if at_ts <> None then raise Type_error ;
-        if List.length l <> arity then
-          arity_error s (List.length l) arity ;
+        check_arity s (List.length l) arity ;
         Name (s,l)
     | Symbols.Macro (Symbols.State (arity,_)) ->
-        if List.length l <> arity then raise Type_error ;
+        check_arity s (List.length l) arity ;
         Get (s,at_ts,l)
     | Symbols.Macro (Symbols.Global arity) ->
         if at_ts <> None then raise Type_error ;
@@ -485,7 +525,10 @@ let make_term ?at_ts s l =
        * we raise Unbound_identifier. We could also
        * raise Type_error because a variable is never of
        * a sort that can be applied to indices. *)
-      if l <> [] then raise Symbols.Unbound_identifier ;
+      if l <> [] then begin
+        Printer.prt `Error "incorrect %s@." s ;
+        raise Symbols.Unbound_identifier
+      end ;
       Var s
 
 (** Build the term representing the pair of two messages. *)
@@ -498,8 +541,9 @@ let is_hash s =
     | exception Not_found -> failwith "symbol not found"
 
 (** Apply a partial substitution to a term.
-  * This is meant for local terms in processes,
-  * and does not support optional timestamps. *)
+  * This is meant for formulas and local terms in processes,
+  * and does not support optional timestamps.
+  * TODO substitution does not avoid capture cf. #71 *)
 let subst t s =
   let rec aux = function
     | Var x ->
@@ -513,6 +557,13 @@ let subst t s =
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
     | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
     | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
+    | True | False as t -> t
+    | And (l,r) -> And (aux l, aux r)
+    | Or (l,r) -> Or (aux l, aux r)
+    | Impl (l,r) -> Impl (aux l, aux r)
+    | Not t -> Not (aux t)
+    | ForAll (vs,f) -> ForAll (vs, aux f)
+    | Exists (vs,f) -> Exists (vs, aux f)
     | _ -> assert false
   in aux t
 

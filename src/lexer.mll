@@ -75,6 +75,7 @@ rule token = parse
 | "boolean"           { BOOLEAN }
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
+| "pred"              { PRED }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "goal"              { GOAL }

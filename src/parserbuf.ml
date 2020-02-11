@@ -180,6 +180,28 @@ let () =
       Channel.declare "c" ;
       ignore (parse_process "in(c,x);out(c,<x,x>)")
     end ;
+    "If", `Quick, begin fun () ->
+      Channel.declare "c" ;
+      Theory.declare_abstract "error" [] Sorts.emessage ;
+      ignore (parse_process "in(c,x); out(c, if x=x then x else error)")
+    end ;
+    "Try", `Quick, begin fun () ->
+      Channel.declare "c" ;
+      Theory.declare_state "s" 1 Sorts.emessage ;
+      Theory.declare_state "ss" 2 Sorts.emessage ;
+      Theory.declare_abstract "error" [] Sorts.emessage ;
+      ignore (parse_process "in(c,x); \
+                             try find i such that s(i) = x in \
+                               out(c,ss(i,i))
+                             else out(c,error)") ;
+      ignore (parse_process "in(c,x); \
+                             out(c, try find i such that s(i) = x in ss(i,i) \
+                                    else error)")
+    end
+    (* Lost when strongly typing Theory.convert: we do not convert
+     * Theory.terms to Term.message, and thus cannot represent constants
+     * of type boolean. This should not be too constraining.
+
     "Facts", `Quick, begin fun () ->
       Theory.declare_abstract "p" [] Sorts.eboolean ;
       Theory.declare_abstract "ok" [] Sorts.emessage ;
@@ -189,6 +211,8 @@ let () =
       ignore (parse_process ~typecheck:true
                 "if p() = p then out(c,ok)")
     end
+
+     *)
   ];;
 
 let () =

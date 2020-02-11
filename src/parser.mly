@@ -2,7 +2,7 @@
 %token <string> ID   /* general purpose identifier */
 %token <string> PID  /* predicate identifier */
 %token <string> BANG
-%token AT
+%token AT PRED
 %token LPAREN RPAREN
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
@@ -50,6 +50,7 @@
 
 timestamp:
 | ID term_list                   { Theory.make_term $1 $2 }
+| PRED LPAREN timestamp RPAREN   { Theory.Tpred $3 }
 | INIT                           { Theory.Tinit }
 
 term:
@@ -60,6 +61,10 @@ term:
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | term XOR term                  { Theory.make_term "xor" [$1;$3] }
 | INIT                           { Theory.Tinit }
+| IF formula THEN term ELSE term { Theory.ITE ($2,$4,$6) }
+| FIND indices SUCHTHAT formula IN term ELSE term
+                                 { Theory.Find ($2,$4,$6,$8) }
+| PRED LPAREN term RPAREN        { Theory.Tpred $3 }
 
 term_list:
 |                                { [] }
@@ -100,25 +105,24 @@ top_formula:
 
 formula:
 | LPAREN formula RPAREN          { $2 }
-| formula AND formula            { Term.And ($1,$3) }
-| formula OR formula             { Term.Or ($1,$3) }
-| formula DARROW formula         { Term.Impl ($1,$3) }
-| NOT formula                    { Term.Not ($2) }
-| FALSE                          { Term.False }
-| TRUE                           { Term.True }
-| term ord term                  { Term.Atom (Theory.Compare ($2,$1,$3)) }
-| PID term_list                  { Term.Atom (Theory.make_term $1 $2) }
+| formula AND formula            { Theory.And ($1,$3) }
+| formula OR formula             { Theory.Or ($1,$3) }
+| formula DARROW formula         { Theory.Impl ($1,$3) }
+| NOT formula                    { Theory.Not ($2) }
+| FALSE                          { Theory.False }
+| TRUE                           { Theory.True }
+| term ord term                  { Theory.Compare ($2,$1,$3) }
+| PID term_list                  { Theory.make_term $1 $2 }
 | HAPPENS LPAREN timestamp RPAREN
-                                 { Term.Atom
-                                     (Theory.Fun ("happens",[$3],None)) }
+                                 { Theory.Happens $3 }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Term.Exists (vs,f)  }
+                                 { Theory.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Term.ForAll (vs,f)  }
+                                 { Theory.ForAll (vs,f)  }
 | EXISTS ID COLON kind sep f=formula %prec QUANTIF
-                                 { Term.Exists ([$2,$4],f)  }
+                                 { Theory.Exists ([$2,$4],f)  }
 | FORALL ID COLON kind sep f=formula %prec QUANTIF
-                                 { Term.ForAll ([$2,$4],f)  }
+                                 { Theory.ForAll ([$2,$4],f)  }
 
 sep:
 |       {()}

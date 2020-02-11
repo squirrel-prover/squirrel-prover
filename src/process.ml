@@ -136,7 +136,7 @@ let rec check_proc env = function
         (List.map (fun x -> x, Sorts.eindex) vars)
         env
     in
-    Theory.check env test Sorts.eboolean ;
+    Theory.check ~local:true env test Sorts.eboolean ;
     check_proc env p
   | Apply (id, ts) ->
     begin try
