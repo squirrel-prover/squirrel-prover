@@ -1,0 +1,57 @@
+hash h
+
+abstract exp : message -> message -> message
+abstract g : message
+
+abstract ok : message
+
+name kP : message
+name kS : message
+
+mutable keyS : index -> message
+mutable keyP : index -> message
+
+channel cP
+channel cS
+
+name a : index -> message
+name b : index -> message
+
+process P(i:index) =
+  let share = exp(g,a(i)) in
+  out(cP, share);
+  in(cP, t);
+  let sS = fst(t) in
+  let hash_share = snd(t) in
+  if h(<exp(g,a(i)),fst(t)>,kS) = snd(t) then
+    (keyP(i) := <share,fst(t)>;
+    out(cP, h(<share,fst(t)>,kP)))
+  else
+     null
+
+process S(i:index) =
+  let share = exp(g,b(i)) in
+  in(cS, sP);
+  out(cS, < <sP,share>, h(<sP,share>,kS)>);
+  in(cS, hash_shares);
+  if hash_shares = h(<sP,share>,kP) then
+    (keyS(i) := <sP,share>;
+     out(cS,ok))
+   else null
+
+
+system (!_i P(i) | !_j S(j)).
+
+goal wa :
+forall (i:index),
+happens(S1(i) )
+ =>
+  exists (j:index),
+P1(j) <= S1(i) &&
+keyP(j)@P1(j) = keyS(i)@S1(i).
+Proof.
+simpl.
+euf C0.
+
+
+Qed.
