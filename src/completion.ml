@@ -1,6 +1,5 @@
 open Utils
 open Term
-open Formula
 
 module Cst = struct
   type t =
@@ -923,7 +922,6 @@ let name_indep_cnstrs state l =
                       |> List.sort_uniq Pervasives.compare
       in
       let rec mk_disjunction l =
-        let open Formula in
         match l with
         | [] -> False
         | [p] -> Atom (`Message (`Eq, term_of_cterm p, term_of_cterm name))

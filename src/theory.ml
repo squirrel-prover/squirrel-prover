@@ -1,25 +1,15 @@
 type kind = Sorts.esort
 
-(* TODO replace term list by string list when indices are expected ? *)
-
-
-type term =
-  | Fun of string * term list * term option
-  | Name of string * term list
-  | Tinit
-  | Taction of string * term list
-  | Get of string * term option * term list
-
-  | Var of string
-  | ForAll of (string * kind) * term
-  | Eq : 'a term * 'a term -> Sorts.boolean term
-  | Neq : 'a term * 'a term -> Sorts.boolean term
-  | Leq : Sorts.timestamp term * Sorts.timestamp term -> Sorts.boolean term
-
 type term =
   | Var of string
   | Taction of string * term list
   | Tinit
+  | Tpred of term
+  | Diff of term*term
+  | Left of term
+  | Right of term
+  | ITE of term*term*term
+  | Find of string list * term * term * term
   | Name of string * term list
   (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -35,8 +25,24 @@ type term =
     * The third argument is for the optional timestamp. This is used for
     * the terms appearing in goals.*)
   | Compare of Atom.ord*term*term
-  | Formula of formula
-and formula = (term, string * kind) Term.foformula
+  | Happens of term
+  | ForAll of (string * kind) list * term
+  | Exists of (string * kind) list * term
+  | And of term * term
+  | Or of term * term
+  | Impl of term * term
+  | Not of term
+  | True
+  | False
+
+type formula = term
+
+let pp_var_list fmt l =
+  Vars.pp_typed_list fmt
+    (List.map
+       (function (v,Sorts.ESort t) ->
+         Vars.EVar (snd @@ Vars.make_fresh Vars.empty_env t v))
+       l)
 
 let rec pp_term ppf = function
   | Var s -> Fmt.pf ppf "%s" s
@@ -45,6 +51,22 @@ let rec pp_term ppf = function
       a
       (Utils.pp_list pp_term) l
   | Tinit -> Fmt.pf ppf "init"
+  | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
+  | ITE (i,t,e) ->
+      Fmt.pf ppf
+        "@[if@ %a@ then@ %a@ else@ %a@]"
+        pp_term i pp_term t pp_term e
+  | Find (vs,c,t,e) ->
+      Fmt.pf ppf
+        "@[try find@ %a@ such that@ %a@ in@ %a@ else@ %a@]"
+        (Utils.pp_list Fmt.string) vs
+        pp_term c pp_term t pp_term e
+  | Diff (l,r) ->
+      Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
+  | Left t ->
+      Fmt.pf ppf "left(%a)" pp_term t
+  | Right t ->
+      Fmt.pf ppf "right(%a)" pp_term t
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s%a%a"
       f
@@ -63,23 +85,32 @@ let rec pp_term ppf = function
       pp_ots ots
   | Compare (ord,tl,tr) ->
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Atom.pp_ord ord pp_term tr
-  | Formula _ -> failwith "Recursive call.."
+  | Happens t -> Fmt.pf ppf "happens(%a)" pp_term t
+  | ForAll (vs, b) ->
+    Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
+      pp_var_list vs pp_term b
+  | Exists (vs, b) ->
+    Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
+      pp_var_list vs pp_term b
+  | And (bl, br) ->
+    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
+      pp_term bl pp_term br
+  | Or (bl, br) ->
+    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
+      pp_term bl pp_term br
+  | Impl (bl, br) ->
+    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
+      pp_term bl pp_term br
+  | Not b ->
+    Fmt.pf ppf "not(@[%a@])" pp_term b
+  | True -> Fmt.pf ppf "True"
+  | False -> Fmt.pf ppf "False"
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
 and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
-(** Intermediate formulas *)
-
-let pp_formula =
-  Formula.pp_foformula
-    pp_term
-    (fun fmt l ->
-       Vars.pp_typed_list fmt
-         (List.map
-            (function (v,Sorts.ESort t) -> Vars.EVar
-                                 (snd @@ Vars.make_fresh Vars.empty_env t v))
-            l))
+let pp = pp_term
 
 (** Type checking *)
 
@@ -115,7 +146,7 @@ let function_kind f : kind list * kind =
 let check_state s n =
   match Symbols.def_of_string s with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
-        if arity <> n then raise Type_error ;
+        if arity <> n then raise (Arity_error (s,n,arity)) ;
         kind
     | _ -> failwith "can only assign a state"
 
@@ -130,73 +161,254 @@ let check_action s n =
         if List.length l <> n then raise Type_error
     | exception Not_found -> assert false
 
-let rec check_term ?(local=false) env tm (kind:Sorts.esort) =
-  match tm with
-  | Var x ->
-    begin try
-      if List.assoc x env <> kind then raise Type_error
-    with
-    | Not_found -> failwith (Printf.sprintf "unbound variable %S" x)
-    end
-  | Fun (f, ts, ots) ->
-    begin
-      match ots with
-      | Some ts -> (if not local then check_term ~local env ts Sorts.etimestamp
-          else raise Not_local_term)
-      | None -> ()
-    end;
-    let ks, f_k = function_kind f in
-    if f_k <> kind then raise Type_error ;
-    if List.length ts <> List.length ks then raise Type_error ;
-    List.iter2
-      (fun t k -> check_term ~local env t k)
-      ts ks
-  | Get (s, opt_ts, ts) ->
-    let k = check_state s (List.length ts) in
-    if k <> kind then raise Type_error ;
-    List.iter
-      (fun t -> check_term ~local env t Sorts.eindex)
-      ts;
-    begin match opt_ts with
-      | Some ts -> (if not local then check_term ~local env ts Sorts.etimestamp
-                    else raise Not_local_term)
-      | None -> () end;
+(* Conversion *)
+type esubst = ESubst : string * 'a Term.term -> esubst
 
-  | Name (s, ts) ->
-    check_name s (List.length ts) ;
-    if Sorts.emessage <> kind then raise Type_error ;
-    List.iter
-      (fun t -> check_term ~local env t Sorts.eindex)
-      ts
-  | Taction (a,l) ->
-    check_action a (List.length l) ;
-    if kind <> Sorts.etimestamp then raise Type_error ;
-    List.iter
-      (fun t -> check_term ~local env t Sorts.eindex)
-      l
-  | Tinit -> if kind <> Sorts.etimestamp then raise Type_error
-  | Compare (_, u, v) ->
-    if kind <> Sorts.eboolean then raise Type_error ;
-    begin try
-      check_term ~local env u Sorts.emessage ;
-      check_term ~local env v Sorts.emessage
-    with
-      | Type_error ->
-          check_term ~local env u Sorts.eboolean ;
-          check_term ~local env v Sorts.eboolean
-    end
-  | Formula u -> check_formula env u
-and check_formula env =
-  let open Term in
-  function
-    | And (f,g) | Or (f,g) | Impl (f,g) ->
-      check_formula env f ;
-      check_formula env g
-    | Not f -> check_formula env f
-    | True | False -> ()
-    | Atom t -> check_term env t Sorts.eboolean
-    | ForAll (vs,f) -> check_formula (vs@env) f
-    | Exists (vs,f) -> check_formula (vs@env) f
+type subst = esubst list
+
+let pp_esubst ppf (ESubst (t1,t2)) =
+  Fmt.pf ppf "%s->%a" t1 Term.pp t2
+
+let pp_subst ppf s =
+  Fmt.pf ppf "@[<hv 0>%a@]"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
+
+exception Undefined of string
+exception TypeError of string
+
+let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
+fun subst st kind ->
+  match subst with
+  | [] -> raise @@ Undefined st
+  | ESubst (v,t)::_ when v = st ->
+      begin try
+        Term.cast kind t
+      with
+        | Term.Uncastable -> raise @@ TypeError st
+      end
+  | _::q -> assoc q st kind
+
+(** Helper for converting constructs with binders.
+  * Given a list of variables, returns a substitution (in the same order
+  * so that shadowing works as expected).
+  *
+  * As was the case before with convert_formula/convert_vars, we work around
+  * Vars using an empty environment to keep the same variable names.
+  *
+  * TODO this may cause unintended variable captures wrt subst. *)
+let subst_of_bvars vars =
+  let make (v, Sorts.ESort s) =
+    ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
+  in
+  List.map make vars
+
+let rec convert :
+  type s.
+  ?at:Term.timestamp -> subst ->
+  term -> s Sorts.sort -> s Term.term
+= fun ?at subst tm sort ->
+
+  let conv ?(subst=subst) s t = convert ?at subst t s in
+  let conv_index i =
+    let open Term in
+    match conv Sorts.Index i with
+      | Var x -> x
+      | _ -> failwith "index terms must be restricted to variables"
+  in
+
+  let get_at () = match at with None -> raise Not_local_term | Some ts -> ts in
+
+  match tm with
+
+  | Var x -> assoc subst x sort
+
+  | Fun (f,l,None) ->
+      let ks, f_k = function_kind f in
+      (* TODO In older versions of the code it seemed possible to support
+       * functions and macros returning booleans, but this has become more
+       * rigid with the introduction of boolean terms (aka formulas);
+       * hence the following assert which will fail if such functions
+       * are used. *)
+      assert (List.for_all (fun k -> k = Sorts.emessage) ks) ;
+      assert (f_k = Sorts.emessage) ;
+      if List.length ks <> List.length l then
+        raise (Arity_error (f,List.length l,List.length ks)) ;
+      begin match sort with
+        | Sorts.Message ->
+            let open Symbols in
+            begin match of_string f with
+              | Wrapped (s, Function (_,(Hash|AEnc|Abstract _))) ->
+                  Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
+              | Wrapped (s, Macro (Global _)) ->
+                  let indices = List.map conv_index l in
+                  Term.Macro ((s,indices),[],get_at ())
+              | Wrapped (s, Macro (Local (targs,_))) ->
+                  (* TODO fix or remove this... we need to know what we want for
+                   * local macros *)
+                  assert false
+              | _ -> failwith (Printf.sprintf "cannot convert %s(..)" f)
+            end
+        | _ -> raise Type_error
+      end
+
+  | Fun (f, l, Some ts) ->
+      if at <> None then raise Not_local_term ;
+      let open Symbols in
+      let open Symbols in
+      begin match sort, of_string f with
+        | Sorts.Message, Wrapped (s, Macro (Input|Output)) ->
+            if l <> [] then raise (Arity_error ("input",List.length l,0)) ;
+            Term.Macro ((s,[]),[],conv Sorts.Timestamp ts)
+        | Sorts.Message, Wrapped (s, Macro (Global arity)) ->
+            if List.length l <> arity then
+              raise (Arity_error (f,List.length l,arity)) ;
+            let l = List.map conv_index l in
+            Term.Macro ((s, l),[],conv Sorts.Timestamp ts)
+        | Sorts.Message, Wrapped (s, Macro (Local (targs,_))) ->
+            (* TODO as above *)
+            assert false
+        | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+      end
+
+  | Get (s,opt_ts,is) ->
+      let k = check_state s (List.length is) in
+      assert (k = Sorts.emessage) ;
+      let is = List.map conv_index is in
+      let s = Symbols.Macro.of_string s, is in
+      let ts =
+        match opt_ts,at with
+          | None, Some ts -> ts
+          | Some ts, None -> conv Sorts.Timestamp ts
+          | Some _, Some _ -> raise Not_local_term
+          | None, None -> failwith "ill-formed state lookup without timestamp"
+      in
+      begin match sort with
+        | Sorts.Message -> Term.Macro (s,[],ts)
+        | _ -> raise Type_error
+      end
+
+  | Name (s, is) ->
+      check_name s (List.length is) ;
+      begin match sort with
+        | Sorts.Message ->
+            Term.Name (Symbols.Name.of_string s, List.map conv_index is)
+        | _ -> raise Type_error
+      end
+
+  | Taction (a,is) ->
+      check_action a (List.length is) ;
+      begin match sort with
+        | Sorts.Timestamp ->
+            Term.Action (Symbols.Action.of_string a, List.map conv_index is)
+        | _ -> raise Type_error
+      end
+
+  | Tinit ->
+      begin match sort with
+        | Sorts.Timestamp -> Term.Init
+        | _ -> raise Type_error
+      end
+
+  | Tpred t ->
+      begin match sort with
+        | Sorts.Timestamp -> Term.Pred (conv Sorts.Timestamp t)
+        | _ -> raise Type_error
+      end
+
+  | Diff (l,r) -> Term.Diff (conv sort l, conv sort r)
+  | Left t -> Term.Left (conv sort t)
+  | Right t -> Term.Right (conv sort t)
+
+  | ITE (i,t,e) -> Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
+
+  | And (l,r) ->
+      begin match sort with
+        | Sorts.Boolean -> Term.And (conv sort l, conv sort r)
+        | _ -> raise Type_error
+      end
+  | Or (l,r) ->
+      begin match sort with
+        | Sorts.Boolean -> Term.Or (conv sort l, conv sort r)
+        | _ -> raise Type_error
+      end
+  | Impl (l,r) ->
+      begin match sort with
+        | Sorts.Boolean -> Term.Impl (conv sort l, conv sort r)
+        | _ -> raise Type_error
+      end
+  | Not t ->
+      begin match sort with
+        | Sorts.Boolean -> Term.Not (conv sort t)
+        | _ -> raise Type_error
+      end
+  | True | False ->
+      begin match sort with
+        | Sorts.Boolean -> if tm = True then Term.True else Term.False
+        | _ -> raise Type_error
+      end
+
+  | Compare (o,u,v) ->
+      begin match sort with
+        | Sorts.Boolean ->
+            begin try
+              Term.Atom (`Timestamp (o,conv Sorts.Timestamp u, conv Sorts.Timestamp v))
+            with Type_error ->
+              match o with
+                | #Atom.ord_eq as o ->
+                    begin try
+                      Term.Atom (`Index (o,conv_index u, conv_index v))
+                    with Type_error ->
+                      Term.Atom (`Message (o,conv Sorts.Message u, conv Sorts.Message v))
+                    end
+                | _ -> raise Type_error
+            end
+        | _ -> raise Type_error
+      end
+
+  | Happens t ->
+      begin match sort with
+        | Sorts.Boolean -> Term.Atom (`Happens (conv Sorts.Timestamp t))
+        | _ -> raise Type_error
+      end
+
+  | Find (vs,c,t,e) ->
+      let new_subst = subst_of_bvars (List.map (fun x -> x,Sorts.eindex) vs) in
+      let is =
+        let f : esubst -> Vars.index = function
+          | ESubst (_,Term.Var v) ->
+              begin match Vars.sort v with
+                | Sorts.Index -> v
+                | _ -> raise Type_error
+              end
+          | _ -> assert false
+        in
+        List.map f new_subst
+      in
+      let c = conv ~subst:(new_subst@subst) Sorts.Boolean c in
+      let t = conv ~subst:(new_subst@subst) sort t in
+      let e = conv sort e in
+      Term.Find (is,c,t,e)
+
+  | ForAll (vs,f) | Exists (vs,f) ->
+      let new_subst = subst_of_bvars vs in
+      let f = conv ~subst:(new_subst@subst) Sorts.Boolean f in
+      let vs =
+        let f : esubst -> Vars.evar = function
+          | ESubst (_, Term.Var v) -> Vars.EVar v
+          | _ -> assert false
+        in
+        List.map f new_subst
+      in
+      begin match sort,tm with
+        | Sorts.Boolean, ForAll _ -> Term.ForAll (vs,f)
+        | Sorts.Boolean, Exists _ -> Term.Exists (vs,f)
+        | _ -> raise Type_error
+      end
+
+let conv_index subst t =
+  match convert subst t Sorts.Index with
+    | Term.Var x -> x
+    | _ -> failwith "index terms must be restricted to variables"
 
 (** Declaration functions *)
 
@@ -285,18 +497,6 @@ let is_hash s =
     | _ -> false
     | exception Not_found -> failwith "symbol not found"
 
-(* Conversion *)
-type esubst = ESubst : string * 'a Term.term -> esubst
-
-type subst = esubst list
-
-let pp_esubst ppf (ESubst (t1,t2)) =
-  Fmt.pf ppf "%s->%a" t1 Term.pp t2
-
-let pp_subst ppf s =
-  Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
-
 (** Apply a partial substitution to a term.
   * This is meant for local terms in processes,
   * and does not support optional timestamps. *)
@@ -313,319 +513,16 @@ let subst t s =
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
     | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
     | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
-    | Formula _ -> failwith "Recursive call.."
+    | _ -> assert false
   in aux t
 
-exception Undefined of string
-exception TypeError of string
-
-let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
-fun subst st kind ->
-  match subst with
-  | [] -> raise @@ Undefined st
-  | ESubst (v,t)::_ when v = st->
-    (try
-       Term.cast kind t
-     with Term.Uncastable -> raise @@ TypeError st
-       )
-  | _::q -> assoc q st kind
-
-let subst_var (subst:subst) (st:string) (kind) =
-  match assoc subst st kind with
-  | Term.Var var -> var
-  | _ ->  failwith
-      "Must map the given variable to another variable"
-
-
-
-(* Not clean at all. *)
-let get_kind ?(local=false) env t =
-  let open Sorts in
-  try check_term ~local:local env t eindex; eindex
-  with Type_error -> try check_term ~local:local env t etimestamp; etimestamp
-    with Type_error -> try check_term ~local:local env t emessage; emessage
-      with Type_error -> check_term ~local:local env t eboolean; eboolean
-
-
-let conv_index subst = function
-  | Var x -> subst_var subst x (Sorts.Index)
-  | _ -> raise @@ TypeError "index"
-
-
-let convert_vars env vars =
-  let open Sorts in
-  let rec conv (vs:env) : subst * Vars.evar list =
-    match vs with
-    | [] -> ([], [])
-    | (a, ESort Index) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Index a in
-      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
-
-    | (a, ESort Timestamp) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Timestamp a in
-      ESubst (a, Term.Var a_var)::vl, (Vars.EVar a_var)::acc
-
-    | (a, ESort Message) :: l ->
-      let (vl, acc) = conv l in
-      let a_var = Vars.make_fresh_and_update env Message a in
-      ESubst (a, Term.Var(a_var) )::vl, (Vars.EVar a_var)::acc
-
-    | _ -> raise @@ Failure "can only quantify on indices and timestamps \
-                             and messages in goals"
+let check ?(local=false) (env:env) t (Sorts.ESort s) : unit =
+  let dummy_var s =
+    Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
   in
-  let (res, acc) =  conv vars in
-  (List.rev res, acc)
-
-let convert_ts subst t =
-  let rec conv = function
-    | Fun (f, [t'], None) when f = Symbols.to_string (fst Term.f_pred) ->
-        Term.Pred (conv t')
-    | Var x -> assoc subst x Sorts.Timestamp
-    | Tinit -> Term.Init
-    | Taction (a,l) ->
-        begin match Symbols.Action.of_string a with
-          | s ->
-              let l =
-                List.map
-                  (function Var y -> subst_var subst y Sorts.Index | _ -> assert false)
-                  l
-              in
-              Term.Action (s, l)
-          | exception Not_found -> assert false
-        end
-    | Fun _ | Get _ | Name _ | Compare _ | Formula _ ->
-      raise @@ Failure ("not a timestamp") in
-  conv t
-
-
-let convert_trace_atom args_kind subst f : Atom.trace_atom =
-  let open Sorts in
-  match f with
-  | Compare (o, u, v) ->
-    begin
-      match get_kind args_kind u, get_kind args_kind v with
-      | ESort Index,  ESort Index ->
-          begin match o with
-            | #Atom.ord_eq as o ->
-                `Index (o, conv_index subst u, conv_index subst v)
-            | _ -> assert false
-          end
-      | ESort Timestamp, ESort Timestamp ->
-        `Timestamp (o,
-                    convert_ts subst u,
-                    convert_ts subst v )
-      | _ -> raise Type_error end
-  | _ -> assert false
-
-
-
-let subst_get_var subst (x,kind) =
-  let open Sorts in
-  match kind with
-    | ESort Index -> Vars.EVar (subst_var subst x Index)
-    | ESort Message -> Vars.EVar (subst_var subst x Message)
-    | ESort Timestamp -> Vars.EVar (subst_var subst x Timestamp)
-    | _ -> assert false
-
-
-let rec convert ts subst t =
-  let rec conv = function
-    | Fun (f, l, None) ->
-      begin
-        let open Symbols in
-        match of_string f with
-        | Wrapped (s, Function (_,(Hash|AEnc))) ->
-            Term.Fun ((s,[]), List.map conv l)
-        | Wrapped (s, Function (_, Abstract (args, _))) ->
-            assert (List.for_all (fun k -> k = Sorts.emessage) args) ;
-            Term.Fun ((s,[]), List.map conv l)
-        | Wrapped (_, Macro Input) when l = [] ->
-            Term.Macro (Term.in_macro,[],ts)
-        | Wrapped (_, Macro Output) when l = [] ->
-            Term.Macro (Term.out_macro,[],ts)
-        | Wrapped (s, Macro (Global _)) ->
-            let indices = List.map (conv_index subst) l in
-            Term.Macro ((s,indices),[],ts)
-        | Wrapped (s, Macro (Local (targs,_))) ->
-            let indices,terms =
-              List.fold_left2
-                (fun (indices,terms) x v ->
-                   if x = Sorts.eindex then
-                     conv_index subst v :: indices, terms
-                   else
-                     indices, conv v :: terms)
-                ([],[]) targs l
-            in
-            let indices = List.rev indices in
-            let terms = List.rev terms in
-            Term.Macro ((s,indices),terms,ts)
-        | _ -> failwith (Printf.sprintf "cannot convert %s(...)" f)
-      end
-    | Get (s, None, i) ->
-      let i = List.map (conv_index subst) i in
-      let s = Symbols.Macro.of_string s, i in
-      Term.Macro (s,[],ts)
-    | Name (n, i) ->
-      let i = List.map (conv_index subst) i in
-      Term.Name (Symbols.Name.of_string n, i)
-    | Var x -> assoc subst x Sorts.Message
-    | Compare _ -> assert false (* TODO *)
-    | Taction _ | Tinit -> assert false (* reserved for constraints *)
-    | Fun (f, l, Some _) ->
-        (* This special case, corresponding to a not-really-local term
-         * resulting from the input process preparation, can only
-         * happen when f is a global macro. *)
-        let f = Symbols.Macro.of_string f in
-        let l = List.map (conv_index subst) l in
-        Term.Macro ((f,l),[],ts)
-    | Get (_, Some _, _) ->
-      assert false (* reserved for global terms *)
-    | Formula f -> Term.Formula (convert_formula [] ts subst f)
-  in conv t
-and convert_atom ts subst atom =
-  match atom with
-  | Compare (#Atom.ord_eq as o, u, v) ->
-      `Message (o, convert ts subst u, convert ts subst v)
-  | _ -> assert false
-and convert_formula arg_kinds ts s f =
-  let open Sorts in
-  let open Term in
-  let rec conv kinds subst = function
-    | Atom (Compare (o,u,v)) ->
-      begin
-        let at = Compare (o,u,v) in
-        match get_kind kinds u with
-        | ESort Timestamp ->
-            Atom (convert_trace_atom kinds subst at :>
-                    Atom.generic_atom)
-        | ESort Index ->
-            Atom (convert_trace_atom kinds subst at :>
-                    Atom.generic_atom)
-        | ESort Message ->  Atom (convert_atom ts subst at)
-        | ESort Boolean -> Atom (convert_atom ts subst at)
-      end
-    | Atom (Fun ("happens",[ts],None)) -> Atom (`Happens (convert_ts subst ts))
-    | Atom _ -> assert false
-    | ForAll (vs,f) ->
-      let env = ref Vars.empty_env in
-      let (new_subst, _) = convert_vars env vs in
-      ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
-                (new_subst @ subst) f)
-    | Exists (vs,f) ->
-      let env = ref Vars.empty_env in
-      let (new_subst, _) = convert_vars env vs in
-      Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
-                (new_subst @ subst) f)
-    | And (f, g) -> And (conv kinds subst f, conv kinds subst g)
-    | Or (f, g) -> Or (conv kinds subst f, conv kinds subst g)
-    | Impl (f, g) -> Impl (conv kinds subst f, conv kinds subst g)
-    | Not f -> Not (conv kinds subst f)
-    | True -> True
-    | False -> False
-  in
-  conv arg_kinds s f
-
-
-let subst_formula f s =
-  let rec conv = function
-    | Term.Atom at -> Term.Atom (subst at s)
-    | Term.And (f, g) -> Term.And (conv f, conv g)
-    | Term.Or (f, g) -> Term.Or (conv f, conv g)
-    | Term.Impl (f, g) -> Term.Impl (conv f, conv g)
-    | Term.Not f -> Term.Not (conv f)
-    | Term.ForAll (vs,t) -> Term.ForAll(vs, conv t)
-    | Term.Exists (vs,t) -> Term.Exists(vs, conv t)
-    | Term.True -> Term.True
-    | Term.False -> Term.False in
-  conv f
-
-(** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
-let rec convert_glob subst t =
-  let rec conv = function
-    | Fun (f, l, None) ->
-      begin
-        let open Symbols in
-        match of_string f with
-        | Wrapped (s, Function (0,(Hash|AEnc))) ->
-            Term.Fun ((s,[]), List.map conv l)
-        | Wrapped (s, Function (0,Abstract (args, _))) ->
-            assert (List.for_all (fun k -> k = Sorts.emessage) args) ;
-            Term.Fun ((s,[]), List.map conv l)
-        | _ -> failwith "ill-formed function application without timestamp"
-      end
-    | Fun (f, l, Some ts) ->
-        let open Symbols in
-        begin match of_string f with
-          | Wrapped (s, Macro (Input|Output)) ->
-              assert (l = []) ;
-              Term.Macro ((s,[]),[],convert_ts subst ts)
-          | Wrapped (s, Macro (Global arity)) ->
-              assert (arity = List.length l) ;
-              let l = List.map (conv_index subst) l in
-              Term.Macro ((s, l),[],convert_ts subst ts)
-          | Wrapped (s, Macro (Local (targs,_))) ->
-              assert (List.length targs = List.length l) ;
-              let l = List.map conv l in
-              Term.Macro ((s, []), l, convert_ts subst ts)
-          | _ -> failwith "ill-formed function application at timestamp"
-        end
-    | Get (s, Some ts, i) ->
-      let s = Symbols.Macro.of_string s in
-      let i = List.map (conv_index subst) i in
-      Term.Macro ((s,i),[],convert_ts subst ts)
-    | Name (n, i) ->
-      let i = List.map (conv_index subst) i in
-      Term.Name (Symbols.Name.of_string n,i)
-    | Compare _ -> assert false (* TODO *)
-    | Var x -> assoc subst x Sorts.Message
-    | Taction _ | Tinit -> assert false
-    | Get (s, None, _) ->
-      raise @@ Failure (Printf.sprintf "%s lacks a timestamp" s)
-    |Formula f -> Term.Formula (convert_formula_glob [] subst f) in
-  conv t
-and convert_atom_glob subst atom =
-  match atom with
-  | Compare (#Atom.ord_eq as o, u, v) ->
-      `Message (o, convert_glob subst u, convert_glob subst v)
-  | _ -> assert false
-and convert_formula_glob arg_kinds (subst : esubst list) f =
-  let open Sorts in
-  let rec conv kinds (subst : esubst list) = function
-    | Term.Atom (Compare (o,u,v)) ->
-      begin
-        let at = Compare (o,u,v) in
-        match get_kind kinds u with
-        | ESort Timestamp ->
-            Term.Atom (convert_trace_atom kinds subst at :>
-                    Term.generic_atom)
-        | ESort Index ->
-            Term.Atom (convert_trace_atom kinds subst at :>
-                    Term.generic_atom)
-        | ESort Message ->  Term.Atom (convert_atom_glob subst at)
-        | ESort Boolean -> Term.Atom (convert_atom_glob subst at)
-      end
-    | Term.Atom (Fun ("happens",[ts],None)) -> Term.Atom (`Happens (convert_ts subst ts))
-    | Term.Atom _ -> assert false
-    | Term.ForAll (vs,f) ->
-      let env = ref Vars.empty_env in
-      let (new_subst, _) = convert_vars env vs in
-      Term.ForAll (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
-                (new_subst @ subst) f)
-    | Term.Exists (vs,f) ->
-      let env = ref Vars.empty_env in
-      let (new_subst, _) = convert_vars env vs in
-      Term.Exists (List.map (subst_get_var new_subst) vs, conv (vs@kinds)
-                (new_subst @ subst) f)
-    | Term.And (f, g) -> Term.And (conv kinds subst f, conv kinds subst g)
-    | Term.Or (f, g) -> Term.Or (conv kinds subst f, conv kinds subst g)
-    | Term.Impl (f, g) -> Term.Impl (conv kinds subst f, conv kinds subst g)
-    | Term.Not f -> Term.Not (conv kinds subst f)
-    | Term.True -> Term.True
-    | Term.False -> Term.False
-  in
-  conv arg_kinds subst f
+  let at = if local then Some (dummy_var Sorts.Timestamp) else None in
+  let subst = List.map (fun (v, Sorts.ESort s) -> ESubst (v, dummy_var s)) env in
+  ignore (convert ?at subst t s)
 
 let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =
@@ -639,24 +536,17 @@ let subst_of_env (env : Vars.env) =
     in
   List.map to_subst (Vars.to_list env)
 
-let parse_subst (env : Vars.env) (uvars : Vars.evar list) (ts : term list)
-  : Term.subst =
+let parse_subst env (uvars : Vars.evar list) (ts : term list) : Term.subst =
   let u_subst = subst_of_env env in
-    List.map2
-      (fun t (Vars.EVar u) ->
-         let open Sorts in
-         match Vars.sort u with
-           | Timestamp -> Term.ESubst (Term.Var u, convert_ts u_subst t )
-           | Message -> Term.ESubst (Term.Var u, convert_glob u_subst t)
-           | Index -> Term.ESubst (Term.Var u, Term.Var (conv_index u_subst t))
-           | Boolean -> assert false)
-      ts uvars
+  let f : term -> Vars.evar -> Term.esubst =
+    fun t (Vars.EVar u) -> Term.ESubst (Term.Var u, convert u_subst t (Vars.sort u))
+  in
+  List.map2 f ts uvars
 
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 
 let declare_macro s (typed_args : (string * Sorts.esort) list)
     (k : Sorts.esort) t =
-  check_term typed_args t k ;
   let env,typed_args,tsubst =
     List.fold_left
       (fun (env,vars,tsubst) (x,Sorts.ESort k) ->
@@ -672,7 +562,7 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
       typed_args
   in
   let _,ts_var = Vars.make_fresh env Sorts.Timestamp "ts" in
-  let t = convert (Term.Var ts_var) tsubst t in
+  let t = convert ~at:(Term.Var ts_var) tsubst t Sorts.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
   ignore
     (Symbols.Macro.declare_exact s
@@ -718,10 +608,10 @@ let () =
       let y = Var "y" in
       let t = make_term "e" [make_term "h" [x;y];x;y] in
       let env = ["x",Sorts.emessage;"y",Sorts.emessage] in
-      check_term env t Sorts.emessage ;
+      check env t Sorts.emessage ;
       Alcotest.check_raises
         "message is not a boolean"
         Type_error
-        (fun () -> check_term env t Sorts.eboolean)
+        (fun () -> check env t Sorts.eboolean)
     end
   ]

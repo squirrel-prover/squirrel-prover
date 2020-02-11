@@ -100,7 +100,7 @@ module Make_AST
     | String_name s -> Fmt.string ppf s
     | Function_name fname -> Term.pp_fname ppf fname
     | Formula formula -> Term.pp ppf formula
-    | Theory th -> Theory.pp_term ppf th
+    | Theory th -> Theory.pp ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
     T.get id args
@@ -111,7 +111,7 @@ module Make_AST
           Fmt.pf ppf "apply %s" id
       | "apply", String_name id :: l ->
           let l = List.map (function Theory t -> t | _ -> assert false) l in
-          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp_term) l
+          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
 end)
@@ -311,17 +311,10 @@ let parse_formula fact =
   match !subgoals with
     | [] -> failwith "Cannot parse fact without a goal"
     | j :: _ ->
-        let env =
-          List.map
-            (fun (Vars.EVar v) ->
-               Vars.name v,
-               Sorts.ESort (Vars.sort v))
-            (Vars.to_list (Goal.get_env j))
-        in
-        Theory.convert_formula_glob
-          env
+        Theory.convert
           (tsubst_of_goal j)
           fact
+          Sorts.Boolean
 
 let get_goal_formula gname =
   match
@@ -337,7 +330,7 @@ let get_goal_formula gname =
 (** Declare Goals And Proofs *)
 
 let make_trace_goal f  =
-  Goal.Trace (Sequent.init (Theory.convert_formula_glob [] [] f))
+  Goal.Trace (Sequent.init (Theory.convert [] f Sorts.Boolean))
 
 type parsed_input =
   | ParsedInputDescr

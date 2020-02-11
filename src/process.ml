@@ -28,7 +28,7 @@ let rec pp_process ppf process =
   | Apply (s,l) ->
       pf ppf "@[<hov>%a@ %a@]"
         (styled `Bold (styled `Blue ident)) s
-        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp_term) l
+        (Fmt.list ~sep:(fun ppf () -> pf ppf "@ ") Theory.pp) l
 
   | Alias (p,a) ->
       pf ppf "@[%s:@ %a@]"
@@ -44,7 +44,7 @@ let rec pp_process ppf process =
       s
       (Utils.pp_list Fmt.string) indices
       (kw `Bold) ":="
-      Theory.pp_term t
+      Theory.pp t
       pp_process p
 
   | New (s, p) ->
@@ -64,7 +64,7 @@ let rec pp_process ppf process =
     pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
       (kw `Bold) "out"
       Channel.pp_channel c
-      Theory.pp_term t
+      Theory.pp t
       pp_process p
 
   | Parallel (p1, p2) ->
@@ -76,7 +76,7 @@ let rec pp_process ppf process =
     pf ppf "@[<v>@[<2>%a %a =@ @[%a@] %a@]@ %a@]"
       (kw `Bold) "let"
       (styled `Magenta (styled `Bold ident)) s
-      Theory.pp_term t
+      Theory.pp t
       (styled `Bold ident) "in"
       pp_process p
 
@@ -84,7 +84,7 @@ let rec pp_process ppf process =
     if ss = [] then
       pf ppf "@[<hov>%a %a %a@;<1 2>%a"
         (styled `Red (styled `Underline ident)) "if"
-        Theory.pp_formula f
+        Theory.pp f
         (styled `Red (styled `Underline ident)) "then"
         pp_process p1
     else
@@ -92,7 +92,7 @@ let rec pp_process ppf process =
         (styled `Red (styled `Underline ident)) "find"
         (list Fmt.string) ss
         (styled `Red (styled `Underline ident)) "such that"
-        Theory.pp_formula f
+        Theory.pp f
         (styled `Red (styled `Underline ident)) "in"
         pp_process p1 ;
     if p2 <> Null then
@@ -115,17 +115,18 @@ let rec check_proc env = function
   | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
   | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
   | Out (_,m,p) ->
-    Theory.check_term ~local:true env m Sorts.emessage ;
+    Theory.check ~local:true env m Sorts.emessage ;
     check_proc env p
   | Set (s, l, m, p) ->
     let k = Theory.check_state s (List.length l) in
-    Theory.check_term ~local:true env m k ;
+    Theory.check ~local:true env m k ;
     List.iter
-      (fun x -> Theory.check_term ~local:true env (Theory.Var x) Sorts.eindex) l ;
+      (fun x ->
+         Theory.check ~local:true env (Theory.Var x) Sorts.eindex) l ;
     check_proc env p
   | Parallel (p, q) -> check_proc env p ; check_proc env q
   | Let (x, t, p) ->
-    Theory.check_term ~local:true env t Sorts.emessage ;
+    Theory.check ~local:true env t Sorts.emessage ;
     check_proc ((x, Sorts.emessage)::env) p
   | Repl (x, p) -> check_proc ((x, Sorts.eindex)::env) p
   | Exists (vars, test, p, q) ->
@@ -135,13 +136,13 @@ let rec check_proc env = function
         (List.map (fun x -> x, Sorts.eindex) vars)
         env
     in
-    Theory.check_formula env test ;
+    Theory.check env test Sorts.eboolean ;
     check_proc env p
   | Apply (id, ts) ->
     begin try
         let kind,_ = pkind_of_pname id in
         List.iter2
-          (fun (_, k) t -> Theory.check_term ~local:true env t k)
+          (fun (_, k) t -> Theory.check ~local:true env t k)
           kind ts
       with
       | Not_found -> raise Theory.Type_error
@@ -232,7 +233,7 @@ let prepare : process -> process =
         msubst
       )
     in
-    Theory.convert (Term.Var ts_var) subst t
+    Theory.convert ~at:(Term.Var ts_var) subst t Sorts.Message
   in
 
   let list_assoc v l =
@@ -379,7 +380,7 @@ let prepare : process -> process =
             (fun (i,i') -> i, Theory.Var (Vars.name i'), Term.Var i')
             s
           @ isubst in
-        let f' = Theory.subst_formula f  (to_tsubst isubst@to_tsubst msubst) in
+        let f' = Theory.subst f (to_tsubst isubst @ to_tsubst msubst) in
         let p' = prep ~env ~indices:indices' ~isubst:isubst p in
         let q' = prep q in
           Exists (l',f',p',q')
@@ -425,7 +426,7 @@ let parse_proc proc : unit =
       List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
       List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
     in
-    Theory.convert ts subst t
+    Theory.convert ~at:ts subst t Sorts.Message
   in
   let conv_formula env a t =
     let ts = Term.Action (a, List.rev env.p_indices) in
@@ -433,11 +434,7 @@ let parse_proc proc : unit =
       List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
       List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
     in
-    let arg_kinds =
-      List.map (fun (x,t) ->  (x, Sorts.emessage)) env.subst @
-      List.map (fun (x,i) ->  (x, Sorts.eindex)) env.isubst
-    in
-    Theory.convert_formula arg_kinds ts subst t
+    Theory.convert ~at:ts subst t Sorts.Boolean
   in
   let conv_indices env l =
     List.map (fun x -> List.assoc x env.isubst) l
@@ -491,7 +488,7 @@ let parse_proc proc : unit =
       let facts_p = cond::facts in
       let facts_q =
         if evars = [] then
-          Term.Not cond :: facts
+          Theory.Not cond :: facts
         else
           facts
       in
@@ -518,9 +515,9 @@ let parse_proc proc : unit =
        * At this point we know which action will be used,
        * but we don't have the action symbol yet. *)
       let rec conj = function
-        | [] -> Term.True
+        | [] -> Theory.True
         | [f] -> f
-        | f::fs -> Term.And (f, conj fs)
+        | f::fs -> Theory.And (f, conj fs)
       in
       let condition = vars, conj facts in
       let action = Action.

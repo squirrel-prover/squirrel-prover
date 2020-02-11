@@ -18,8 +18,8 @@ type t =
 
     frame : elem list;
 
-    id_left : Term.system_id;
-    id_right : Term.system_id;
+    id_left : Action.system_id;
+    id_right : Action.system_id;
   }
 
 type sequent = t

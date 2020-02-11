@@ -121,7 +121,7 @@ let case th s sk fk =
   (* if the conversion to a timestamp of the variable is successful, we perform
      a timestamp_case. If it fails, we try with hypothesis case. *)
     let tsubst = Theory.subst_of_env (Sequent.get_env s) in
-    match Theory.convert_ts tsubst th with
+    match Theory.convert tsubst th Sorts.Timestamp with
     | exception _ ->
       begin
         match th with
@@ -492,7 +492,10 @@ let () = T.register "eqtrace"
 let substitute (v1) (v2) (s : Sequent.t) sk fk=
   let tsubst = Theory.subst_of_env (Sequent.get_env s) in
   let subst =
-    match Theory.convert_ts tsubst v1, Theory.convert_ts tsubst v2 with
+    match
+      Theory.convert tsubst v1 Sorts.Timestamp,
+      Theory.convert tsubst v2 Sorts.Timestamp
+    with
     | ts1,ts2 ->
       let s, models = Sequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
@@ -501,7 +504,10 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         raise @@ Tactic_Hard_Failure
           (Tactics.NotEqualArguments)
     | exception _ ->
-      match Theory.convert_glob tsubst v1, Theory.convert_glob tsubst v2 with
+      match
+        Theory.convert tsubst v1 Sorts.Message,
+        Theory.convert tsubst v2 Sorts.Message
+      with
       | m1,m2 ->
         let s,trs = Sequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then

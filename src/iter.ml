@@ -15,7 +15,8 @@ class iter = object (self)
     | Right a -> self#visit_message a
     | ITE (a, b, c) -> self#visit_formula a;
       self#visit_message b; self#visit_message c
-    | Find (a, b, c) -> self#visit_formula b; self#visit_message c
+    | Find (a, b, c, d) ->
+        self#visit_formula b; self#visit_message c; self#visit_message d
 
   method visit_formula (f:Term.formula) =
     match f with
@@ -28,7 +29,8 @@ class iter = object (self)
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
-    | _ -> ()
+    | _ -> failwith "unsupported"
+
 end
 
 (** Iterator that does not visit macro expansions but guarantees

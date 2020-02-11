@@ -124,7 +124,7 @@ let add_suite_restore name suite =
 let () =
   let check s =
     Alcotest.(check string) "round-trip" s
-      (Format.asprintf "%a" Theory.pp_formula (parse_formula s))
+      (Format.asprintf "%a" Theory.pp (parse_formula s))
   in
   let eqf s ss =
     let f = parse_formula s in

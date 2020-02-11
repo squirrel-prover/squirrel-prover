@@ -18,6 +18,12 @@ type term =
   | Var of string
   | Taction of string * term list
   | Tinit
+  | Tpred of term
+  | Diff of term*term
+  | Left of term
+  | Right of term
+  | ITE of term*term*term
+  | Find of string list * term * term * term
   | Name of string * term list
   (** A name, whose arguments will always be indices. *)
   | Get of string * term option * term list
@@ -33,12 +39,19 @@ type term =
     * The third argument is for the optional timestamp. This is used for
     * the terms appearing in goals.*)
   | Compare of Atom.ord*term*term
+  | Happens of term
+  | ForAll of (string * kind) list * term
+  | Exists of (string * kind) list * term
+  | And of term * term
+  | Or of term * term
+  | Impl of term * term
+  | Not of term
+  | True
+  | False
 
-type formula
+type formula = term
 
-val pp_term : Format.formatter -> term -> unit
-
-val pp_formula : Format.formatter -> formula -> unit
+val pp : Format.formatter -> term -> unit
 
 (** {2 Declaration of new symbols} *)
 
@@ -90,10 +103,9 @@ exception Type_error
 exception Arity_error of string*int*int
 
 type env = (string*Sorts.esort) list
-val check_term : ?local:bool -> env -> term -> Sorts.esort -> unit
-val check_state : string -> int -> Sorts.esort
 
-val check_formula : env -> formula -> unit
+val check : ?local:bool -> env -> term -> Sorts.esort -> unit
+val check_state : string -> int -> Sorts.esort
 
 val is_hash : Term.fname -> bool
 
@@ -101,8 +113,6 @@ val is_hash : Term.fname -> bool
   * Convert terms inside the theory to terms of the prover. *)
 
 val subst : term -> (string*term) list -> term
-
-val subst_formula : formula -> (string*term) list -> formula
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 
@@ -113,7 +123,6 @@ val subst_of_env : Vars.env -> subst
 val parse_subst :
   Vars.env -> Vars.evar list -> term list -> Term.subst
 
-
 val pp_subst : Format.formatter -> subst -> unit
 
 val conv_index : subst -> term -> Vars.index
@@ -121,45 +130,9 @@ val conv_index : subst -> term -> Vars.index
 exception Undefined of string
 exception TypeError of string
 
-(** Convert to [Term.term], for local terms (i.e. with no timestamps). *)
 val convert :
-  Term.timestamp ->
+  ?at:Term.timestamp ->
   subst ->
   term ->
-  Term.message
-
-val convert_ts :
-  subst ->
-  term ->
-  Term.timestamp
-
-(** Convert to [Term.term], for global terms (i.e. with attached timestamps). *)
-val convert_glob :
-  subst ->
-  term ->
-  Term.message
-
-(** Convert to [Formula.formula], for local terms (i.e. with no timestamps). *)
-val convert_formula :
-  env ->
-  Term.timestamp ->
-  subst ->
-  formula ->
-  Term.formula
-
-(** Convert to [formula] to [Formula.formula],
-  * for global terms (i.e. with attached timestamps).
-  * Requires a typing environment. *)
-val convert_formula_glob :
-  env ->
-  subst ->
-  formula ->
-  Term.formula
-
-(** [convert_vars vars] Returns the timestamp and index variables substitution,
-    in reverse order of declaration. By consequence, List.assoc properly handles
-    the shadowing. *)
-val convert_vars :
-  Vars.env ref ->
-  env ->
-  subst * Vars.evar list
+  'a Sorts.sort ->
+  'a Term.term
