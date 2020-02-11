@@ -552,6 +552,8 @@ let subst t s =
         end
     | Taction (a,l) -> Taction (a, List.map aux l)
     | Tinit -> Tinit
+    | Tpred t -> Tpred (aux t)
+    | Happens t -> Happens (aux t)
     | Name (n,l) -> Name (n, List.map aux l)
     | Get (s,None,l) -> Get (s, None, List.map aux l)
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
@@ -564,7 +566,11 @@ let subst t s =
     | Not t -> Not (aux t)
     | ForAll (vs,f) -> ForAll (vs, aux f)
     | Exists (vs,f) -> Exists (vs, aux f)
-    | _ -> assert false
+    | Diff (l,r) -> Diff (aux l, aux r)
+    | Left t -> Left (aux t)
+    | Right t -> Right (aux t)
+    | ITE (i,t,e) -> ITE (aux i, aux t, aux e)
+    | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
   in aux t
 
 let check ?(local=false) (env:env) t (Sorts.ESort s) : unit =

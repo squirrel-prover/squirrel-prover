@@ -76,6 +76,9 @@ rule token = parse
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "pred"              { PRED }
+| "diff"              { DIFF }
+| "left"              { LEFT }
+| "right"             { RIGHT }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "goal"              { GOAL }

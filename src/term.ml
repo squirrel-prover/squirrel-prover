@@ -382,10 +382,6 @@ let f_pair = mk_fname "pair" [emessage;emessage] emessage
 let f_fst = mk_fname "fst" [emessage] emessage
 let f_snd = mk_fname "snd" [emessage] emessage
 
-(** Diff-equivalence *)
-
-let f_diff = mk_fname "diff" [emessage;emessage] emessage
-
 (** Dummy term *)
 
 let dummy = Fun (mk_fname "_" [] emessage, [])

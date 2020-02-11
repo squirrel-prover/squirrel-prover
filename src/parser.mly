@@ -8,6 +8,7 @@
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
+%token DIFF LEFT RIGHT
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
@@ -65,6 +66,9 @@ term:
 | FIND indices SUCHTHAT formula IN term ELSE term
                                  { Theory.Find ($2,$4,$6,$8) }
 | PRED LPAREN term RPAREN        { Theory.Tpred $3 }
+| DIFF LPAREN term COMMA term RPAREN { Theory.Diff ($3,$5) }
+| LEFT LPAREN term RPAREN        { Theory.Left $3 }
+| RIGHT LPAREN term RPAREN       { Theory.Right $3 }
 
 term_list:
 |                                { [] }
@@ -232,9 +236,12 @@ tac:
                                           ($1,[Prover.Int i]) }
   | ID t=tactic_params                          { Tactics.Abstract
                                                     ($1,t) }
+  (* A few special cases for tactics whose names are not parsed as ID
+   * because they are reserved. *)
+  | LEFT                              { Tactics.Abstract ("left",[]) }
+  | RIGHT                             { Tactics.Abstract ("right",[]) }
   | EXISTS t=tactic_params            { Tactics.Abstract
                                           ("exists",t) }
-(* the case of EXISTS must be treated separately as EXISTS is used for formulas. *)
   | ID f=formula                      { Tactics.Abstract
                                           ($1,
                                            [Prover.Formula
@@ -259,6 +266,11 @@ tac:
   | HELP i=ID                         { Tactics.Abstract
                                           ("help",
                                            [Prover.String_name i]) }
+  (* A few special cases for tactics whose names are not parsed as ID
+   * because they are reserved. *)
+  | HELP LEFT   { Tactics.Abstract ("help",[Prover.String_name "left"]) }
+  | HELP RIGHT  { Tactics.Abstract ("help",[Prover.String_name "right"]) }
+  | HELP EXISTS { Tactics.Abstract ("help",[Prover.String_name "exists"]) }
 
 qed:
 | QED                                 { () }
