@@ -85,8 +85,14 @@ val parse_formula : Theory.formula -> formula
 
 val get_goal_formula : string -> formula
 
-(** Produces a goal formula given parsing informations. *)
+(** Produces a trace goal from a parsed formula. *)
 val make_trace_goal : Theory.formula -> Goal.t
+
+(** Produces an equivalence goal from a sequence of parsed bi-terms. *)
+val make_equiv_goal :
+  Theory.env ->
+  [ `Message of Theory.term | `Formula of Theory.formula ] list ->
+  Goal.t
 
 type parsed_input =
   | ParsedInputDescr

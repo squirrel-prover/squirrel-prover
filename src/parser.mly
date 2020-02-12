@@ -12,7 +12,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL QUANTIF GOAL DARROW AXIOM
+%token EXISTS FORALL QUANTIF GOAL EQUIV DARROW AXIOM
 %token DOT
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP
 %token PROOF QED UNDO
@@ -62,9 +62,9 @@ term:
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | term XOR term                  { Theory.make_term "xor" [$1;$3] }
 | INIT                           { Theory.Tinit }
-| IF formula THEN term ELSE term { Theory.ITE ($2,$4,$6) }
-| FIND indices SUCHTHAT formula IN term ELSE term
-                                 { Theory.Find ($2,$4,$6,$8) }
+| IF formula THEN term else_term { Theory.ITE ($2,$4,$5) }
+| FIND indices SUCHTHAT formula IN term else_term
+                                 { Theory.Find ($2,$4,$6,$7) }
 | PRED LPAREN term RPAREN        { Theory.Tpred $3 }
 | DIFF LPAREN term COMMA term RPAREN { Theory.Diff ($3,$5) }
 | LEFT LPAREN term RPAREN        { Theory.Left $3 }
@@ -78,6 +78,10 @@ term_list:
 tm_list:
 |                                { [] }
 | COMMA term tm_list             { $2::$3 }
+
+else_term:
+| %prec EMPTY_ELSE               { Theory.make_term "zero" [] }
+| ELSE term                      { $2 }
 
 (* Facts, aka booleans *)
 
@@ -281,11 +285,26 @@ undo:
 tactic:
 | t=tac DOT                           { t }
 
+equiv_item:
+| term           { `Message $1 }
+| formula        { `Formula $1 }
+
+equiv:
+| equiv_item                { [$1] }
+| equiv_item COMMA equiv    { $1::$3 }
+
+equiv_env:
+|                           { [] }
+| LPAREN vs=arg_list RPAREN { vs }
+
 goal:
-| GOAL i=ID COLON f=formula DOT   { Prover.Gm_goal (i, Prover.make_trace_goal f) }
-| GOAL f=formula DOT              { Prover.Gm_goal ("unnamed_goal",
-                                                    Prover.make_trace_goal f) }
-| PROOF                           { Prover.Gm_proof }
+| GOAL i=ID COLON f=formula DOT
+                 { Prover.Gm_goal (i, Prover.make_trace_goal f) }
+| GOAL f=formula DOT
+                 { Prover.Gm_goal ("unnamed_goal", Prover.make_trace_goal f) }
+| EQUIV n=ID env=equiv_env COLON l=equiv DOT
+                 { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+| PROOF          { Prover.Gm_proof }
 
 theory:
 | declaration theory             { () }

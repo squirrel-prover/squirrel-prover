@@ -5,7 +5,11 @@ type elem =
 type t
 type sequent = t
 
+val init : Vars.env -> elem list -> t
+
 val pp : Format.formatter -> t -> unit
+
+val pp_init : Format.formatter -> t -> unit
 
 val get_env : t -> Vars.env
 

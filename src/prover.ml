@@ -13,7 +13,7 @@ module Goal = struct
     | Trace j ->
         assert (Sequent.get_env j = Vars.empty_env) ;
         Term.pp ch (Sequent.get_conclusion j)
-    | Equiv j -> EquivSequent.pp ch j
+    | Equiv j -> EquivSequent.pp_init ch j
 end
 
 type named_goal = string * Goal.t
@@ -331,6 +331,23 @@ let get_goal_formula gname =
 
 let make_trace_goal f  =
   Goal.Trace (Sequent.init (Theory.convert [] f Sorts.Boolean))
+
+let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
+  let env =
+    List.fold_left
+      (fun env (x, Sorts.ESort s) ->
+         assert (not (Vars.mem env x)) ;
+         fst (Vars.make_fresh env s x))
+      Vars.empty_env env
+  in
+  let subst = Theory.subst_of_env env in
+  let convert = function
+    | `Formula f ->
+        EquivSequent.Formula (Theory.convert subst f Sorts.Boolean)
+    | `Message m ->
+        EquivSequent.Message (Theory.convert subst m Sorts.Message)
+  in
+    Goal.Equiv (EquivSequent.init env (List.map convert l))
 
 type parsed_input =
   | ParsedInputDescr

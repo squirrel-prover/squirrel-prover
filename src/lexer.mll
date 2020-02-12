@@ -82,6 +82,7 @@ rule token = parse
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "goal"              { GOAL }
+| "equiv"             { EQUIV }
 | "axiom"             { AXIOM }
 | "Proof."            { PROOF }
 | "Qed."              { QED }
