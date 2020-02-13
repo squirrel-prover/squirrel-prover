@@ -424,3 +424,47 @@ and pi_generic_atom s =
    | `Timestamp (o, ts1, ts2) -> `Timestamp (o, pi_term s ts1, pi_term s ts2)
    | `Index (o, i1, i2) as r -> r
    | `Happens t -> `Happens (pi_term s t)
+
+let rec head_pi_term : type a. projection -> a term -> a term =
+  fun s t ->
+  match t with
+  | Diff (a, b) ->
+    begin
+      match s with
+      | Left -> head_pi_term s a
+      | Right -> head_pi_term s b
+    end
+  | Left t -> head_pi_term Left t
+  | Right t -> head_pi_term Right t
+  |  _ -> t
+
+let diff a b = Diff (a,b)
+
+(* We ignore the possibility of diff operators on indices and timestamps. *)
+let head_normal_biterm : type a. a term -> a term = fun t ->
+  match head_pi_term Left t, head_pi_term Right t with
+  | Fun (f,l), Fun (f',l') when f=f' -> Fun (f, List.map2 diff l l')
+  | Name n, Name n' when n=n' -> Name n
+  | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
+      Macro (m, List.map2 diff l l', ts)
+  | Pred t, Pred t' -> Pred (Diff (t,t'))
+  | Action (a,is), Action (a',is') when a=a' && is=is' -> Action (a,is)
+  | Init, Init -> Init
+  | Var x, Var x' when x=x' -> Var x
+  | ITE (i,t,e), ITE (i',t',e') -> ITE (Diff (i,i'), Diff (t,t'), Diff (e,e'))
+  | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->
+      Find (is,Diff (c,c'), Diff (t,t'), Diff (e,e'))
+  | Atom a, Atom a' when a=a' -> Atom a
+  | Atom (`Message (o,u,v)), Atom (`Message (o',u',v')) when o=o' ->
+      Atom (`Message (o, Diff (u,u'), Diff (v,v')))
+  | ForAll (vs,f), ForAll (vs',f') when vs=vs' ->
+      ForAll (vs,Diff (f,f'))
+  | Exists (vs,f), Exists (vs',f') when vs=vs' ->
+      Exists (vs,Diff (f,f'))
+  | And (f,g), And (f',g') -> And (Diff (f,g), Diff (f',g'))
+  | Or (f,g), Or (f',g') -> Or (Diff (f,g), Diff (f',g'))
+  | Impl (f,g), Impl (f',g') -> Impl (Diff (f,g), Diff (f',g'))
+  | Not f, Not f' -> Not (Diff (f,f'))
+  | True, True -> True
+  | False, False -> False
+  | t1,t2 -> Diff (t1,t2)

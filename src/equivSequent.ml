@@ -50,6 +50,18 @@ let pp_init ppf j =
 
 let get_env j = j.env
 
-let get_left_frame j = List.map (pi_elem j.id_left) j.frame
+let get_biframe j = j.frame
+
+let set_biframe j f = { j with frame = f }
+
+let get_frame proj j =
+  (* TODO the current pi_elem won't be enough when we want full
+   * support of macros and left(_) and right(_) operators.
+   *
+   * For example, with the bi-term diff(right(output@A),left(output@A))
+   * the left projection should be right(output@A) which should be
+   * interpreted (e.g. during macro expansion) as the output of action
+   * A in the right system. *)
+  List.map (pi_elem proj) j.frame
 
 let get_right_frame j = List.map (pi_elem j.id_right) j.frame

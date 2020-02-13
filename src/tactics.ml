@@ -191,3 +191,6 @@ module AST (M:S) = struct
     try ignore (tac j sk fk) ; assert false with Return l -> l
 
 end
+
+let soft_failure e = raise (Tactic_Soft_Failure e)
+let hard_failure e = raise (Tactic_Hard_Failure e)

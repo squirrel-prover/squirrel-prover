@@ -124,3 +124,11 @@ end
 module AST (M:S) : AST_sig
   with type arg = M.arg
   with type judgment = M.judgment
+
+(** {2 Utilities} *)
+
+(** Raise a soft failure. *)
+val soft_failure : tac_error -> 'a
+
+(** Raise a hard failure. *)
+val hard_failure : tac_error -> 'a

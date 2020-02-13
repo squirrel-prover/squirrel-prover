@@ -188,8 +188,27 @@ val f_snd : fsymb
 
 (** Convert from bi-terms to terms
   *
-  * TODO stronger typing could be used here *)
+  * TODO Could we use a strong typing of [term] to make a static
+  * distinction between biterms (general terms) and terms (terms
+  * without diff operators)? *)
 
 type projection = Left | Right
 
+(** Evaluate all diff operators wrt a projection.
+  * The returned term does not feature diff operators (including left/right)
+  * though this might be abusive in the case of macros
+  * (TODO cf EquivSequent). *)
 val pi_term : projection -> 'a term -> 'a term
+
+(** Evaluate topmost diff operators (including left/right)
+  * for a given projection of a biterm.
+  * For example [head_pi_term Left (diff(f(diff(a,b)),c))]
+  * would be [f(diff(a,b))]. *)
+val pi_term : projection -> 'a term -> 'a term
+
+(** Push topmost diff-operators just enough to expose the common
+  * topmost constructor of the two projections of a biterm.
+  * If the returned biterm starts with a diff, then its immediate
+  * subterms have topmost different constructors, and they do not
+  * start with diffs themselves. *)
+val head_normal_biterm : 'a term -> 'a term
