@@ -29,7 +29,7 @@ type t = {
 
 let init env l = {
   env = env ; frame = l ;
-  id_left = Left ; id_right = Right
+  id_left = Term.Left ; id_right = Term.Right
 }
 
 type sequent = t

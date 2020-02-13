@@ -299,7 +299,7 @@ let pp_actions ppf () =
 
 let pp_descrs ppf () =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  iter_descrs ~system_id:Left (fun descr ->
+  iter_descrs ~system_id:Term.Left (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
         pp_descr descr) ;
   Fmt.pf ppf "@]%!@."

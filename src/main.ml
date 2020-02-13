@@ -5,6 +5,7 @@ module Initialization = struct
   (* Opening these modules is only useful for their side effects,
    * e.g. registering tactics. *)
   open Trace_tactics
+  open Equiv_tactics
 end
 
 let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
@@ -206,4 +207,11 @@ let () =
         (Tactic_Soft_Failure NoSSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
-  ];;
+  ] ;
+  Parserbuf.add_suite_restore "Equivalence" [
+    "Refl", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Soft_Failure (Tactics.Failure "Frames not identical"))
+        (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
+    end ;
+  ]

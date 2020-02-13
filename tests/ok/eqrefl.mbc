@@ -1,0 +1,24 @@
+abstract ok : message
+abstract ko : message
+
+system null.
+
+equiv e : ok, ok.
+Proof.
+  refl.
+Qed.
+
+equiv e : ok.
+Proof.
+  refl.
+Qed.
+
+equiv e : diff(ok,ok).
+Proof.
+  refl.
+Qed.
+
+equiv e : diff(diff(ok,ko),ok).
+Proof.
+  refl.
+Qed.

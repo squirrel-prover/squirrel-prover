@@ -237,6 +237,9 @@ let () =
   TraceTactics.register "admit"
     ~help:"Closes the current goal."
     (fun _ sk fk -> sk [] fk) ;
+  EquivTactics.register "admit"
+    ~help:"Closes the current goal."
+    (fun _ sk fk -> sk [] fk) ;
   TraceTactics.register_general "help"
     ~help:"Display all available commands."
     (function
