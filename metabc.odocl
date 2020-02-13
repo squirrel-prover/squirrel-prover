@@ -4,7 +4,6 @@ Checks
 Completion
 Constr
 Euf
-Formula
 Log
 Main
 Metabc
@@ -13,6 +12,7 @@ Process
 Prover
 Puf
 Sequent
+EquivSequent
 Sorts
 Tactics
 Term
