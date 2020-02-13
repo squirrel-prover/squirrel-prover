@@ -355,7 +355,12 @@ let rec convert :
   | Left t -> Term.Left (conv sort t)
   | Right t -> Term.Right (conv sort t)
 
-  | ITE (i,t,e) -> Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
+  | ITE (i,t,e) ->
+      begin match sort with
+        | Sorts.Message ->
+            Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
+        | _ -> raise Type_error
+      end
 
   | And (l,r) ->
       begin match sort with
@@ -425,10 +430,14 @@ let rec convert :
         in
         List.map f new_subst
       in
-      let c = conv ~subst:(new_subst@subst) Sorts.Boolean c in
-      let t = conv ~subst:(new_subst@subst) sort t in
-      let e = conv sort e in
-      Term.Find (is,c,t,e)
+      begin match sort with
+        | Sorts.Message ->
+            let c = conv ~subst:(new_subst@subst) Sorts.Boolean c in
+            let t = conv ~subst:(new_subst@subst) sort t in
+            let e = conv sort e in
+            Term.Find (is,c,t,e)
+        | _ -> raise Type_error
+      end
 
   | ForAll (vs,f) | Exists (vs,f) ->
       let new_subst = subst_of_bvars vs in

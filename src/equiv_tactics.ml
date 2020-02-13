@@ -55,6 +55,8 @@ let fa i s sk fk =
   let expand : type a. a Term.term -> EquivSequent.elem list = function
     | Fun (f,l) ->
         List.map (fun m -> EquivSequent.Message m) l
+    | ITE (c,t,e) ->
+        EquivSequent.[ Formula c ; Message t ; Message e ]
     | Diff _ ->
         Tactics.soft_failure
           (Tactics.Failure "No common construct")

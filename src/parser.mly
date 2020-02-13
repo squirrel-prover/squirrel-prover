@@ -131,6 +131,7 @@ formula:
                                  { Theory.Exists ([$2,$4],f)  }
 | FORALL ID COLON kind sep f=formula %prec QUANTIF
                                  { Theory.ForAll ([$2,$4],f)  }
+| DIFF LPAREN f=formula COMMA g=formula RPAREN   { Theory.Diff (f,g) }
 
 sep:
 |       {()}

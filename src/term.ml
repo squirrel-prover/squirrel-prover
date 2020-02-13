@@ -66,8 +66,13 @@ and _ term =
   | Left : 'a term -> 'a term
   | Right : 'a term -> 'a term
 
-  | ITE: Sorts.boolean term * 'a term * 'a term-> 'a term
-  | Find : Vars.index list * Sorts.boolean term * 'a term * 'a term -> 'a term
+  | ITE :
+      Sorts.boolean term * Sorts.message term * Sorts.message term ->
+      Sorts.message term
+  | Find :
+      Vars.index list * Sorts.boolean term *
+      Sorts.message term * Sorts.message term ->
+      Sorts.message term
 
   | Atom : generic_atom -> Sorts.boolean term
 
@@ -106,8 +111,8 @@ let rec sort : type a. a term -> a Sorts.t =
   | Diff (a, b) -> sort a
   | Left a -> sort a
   | Right a -> sort a
-  | ITE (a, b, c) -> sort b
-  | Find (a, b, c, d) -> sort c
+  | ITE (a, b, c) -> Sorts.Message
+  | Find (a, b, c, d) -> Sorts.Message
   | Atom _ -> Sorts.Boolean
   | ForAll _ -> Sorts.Boolean
   | Exists _ -> Sorts.Boolean

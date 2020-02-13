@@ -10,3 +10,9 @@ Proof.
   fa 0.
   admit.
 Qed.
+
+equiv e : if diff(True,False) then diff(a,b).
+Proof.
+  fa 0.
+  admit.
+Qed.

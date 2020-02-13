@@ -84,8 +84,13 @@ and _ term =
   | Left : 'a term -> 'a term
   | Right : 'a term -> 'a term
 
-  | ITE: Sorts.boolean term * 'a term * 'a term-> 'a term
-  | Find : Vars.index list * Sorts.boolean term * 'a term * 'a term -> 'a term
+  | ITE :
+      Sorts.boolean term * Sorts.message term * Sorts.message term ->
+      Sorts.message term
+  | Find :
+      Vars.index list * Sorts.boolean term *
+      Sorts.message term * Sorts.message term ->
+      Sorts.message term
 
   | Atom : generic_atom -> Sorts.boolean term
 
