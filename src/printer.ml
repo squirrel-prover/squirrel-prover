@@ -39,9 +39,9 @@ let pp ty s =
   | `Goal -> pr "@[[goal> %s@.@]@." s
   | `Default -> pr "%s" s
 
-let prt ty fmt = Fmt.kstr (pp ty) fmt
+let prt ty fmt = Fmt.kstrf (pp ty) fmt
 
-let pr fmt = Fmt.kstr (pp `Default) fmt
+let pr fmt = Fmt.kstrf (pp `Default) fmt
 
 
 let set_style_renderer =
