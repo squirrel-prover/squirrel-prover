@@ -209,10 +209,16 @@ val pi_term : projection -> 'a term -> 'a term
   * for a given projection of a biterm.
   * For example [head_pi_term Left (diff(f(diff(a,b)),c))]
   * would be [f(diff(a,b))]. *)
-val pi_term : projection -> 'a term -> 'a term
+val head_pi_term : projection -> 'a term -> 'a term
 
 (** Push topmost diff-operators just enough to expose the common
   * topmost constructor of the two projections of a biterm.
+  *
+  * Macros with different timestamps do not count as a common
+  * constructor: [head_normal_biterm (Diff(Macro(m,l,ts),Macro(m,l,ts')))]
+  * will be [Diff(Macro(m,l,ts),Macro(m,l,ts'))] and not
+  * [Macro(m,l,Diff(ts,ts'))].
+  *
   * If the returned biterm starts with a diff, then its immediate
   * subterms have topmost different constructors, and they do not
   * start with diffs themselves. *)

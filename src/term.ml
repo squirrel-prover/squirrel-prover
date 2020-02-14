@@ -364,7 +364,9 @@ let mk_fname ?(indices=0) f k_args k_ret =
   Symbols.Function.declare_exact f ~builtin:true info, []
 
 (** Boolean function symbols *)
-open Sorts
+
+let eboolean,emessage = Sorts.eboolean,Sorts.emessage
+
 let f_false = mk_fname "false" [] eboolean
 let f_true = mk_fname "true" [] eboolean
 let f_and = mk_fname "and" [eboolean;eboolean] eboolean
@@ -398,7 +400,7 @@ let rec pi_term : type a. projection -> a term -> a term =
   match t with
   | Fun (f,terms) -> Fun (f, List.map (pi_term s) terms)
   | Name n -> Name n
-  | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, (pi_term s ts))
+  | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, pi_term s ts)
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
   | Init -> Init
@@ -432,44 +434,76 @@ and pi_generic_atom s =
 
 let rec head_pi_term : type a. projection -> a term -> a term =
   fun s t ->
-  match t with
-  | Diff (a, b) ->
-    begin
-      match s with
-      | Left -> head_pi_term s a
-      | Right -> head_pi_term s b
-    end
-  | Left t -> head_pi_term Left t
-  | Right t -> head_pi_term Right t
+  match t,s with
+  | Diff (t,_), Left
+  | Diff (_,t), Right -> head_pi_term s t
+  | Left t, _ -> head_pi_term Left t
+  | Right t, _ -> head_pi_term Right t
   |  _ -> t
 
-let diff a b = Diff (a,b)
+let diff a b =
+  let a = match a with Diff (a,_) | Left a | a -> a in
+  let b = match b with Diff (_,b) | Right b | b -> b in
+  if a = b then a else Diff (a,b)
 
-(* We ignore the possibility of diff operators on indices and timestamps. *)
 let head_normal_biterm : type a. a term -> a term = fun t ->
   match head_pi_term Left t, head_pi_term Right t with
   | Fun (f,l), Fun (f',l') when f=f' -> Fun (f, List.map2 diff l l')
   | Name n, Name n' when n=n' -> Name n
   | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
       Macro (m, List.map2 diff l l', ts)
-  | Pred t, Pred t' -> Pred (Diff (t,t'))
+  | Pred t, Pred t' -> Pred (diff t t')
   | Action (a,is), Action (a',is') when a=a' && is=is' -> Action (a,is)
   | Init, Init -> Init
   | Var x, Var x' when x=x' -> Var x
-  | ITE (i,t,e), ITE (i',t',e') -> ITE (Diff (i,i'), Diff (t,t'), Diff (e,e'))
+  | ITE (i,t,e), ITE (i',t',e') -> ITE (diff i i', diff t t', diff e e')
   | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->
-      Find (is,Diff (c,c'), Diff (t,t'), Diff (e,e'))
+      Find (is, diff c c', diff t t', diff e e')
   | Atom a, Atom a' when a=a' -> Atom a
   | Atom (`Message (o,u,v)), Atom (`Message (o',u',v')) when o=o' ->
-      Atom (`Message (o, Diff (u,u'), Diff (v,v')))
-  | ForAll (vs,f), ForAll (vs',f') when vs=vs' ->
-      ForAll (vs,Diff (f,f'))
-  | Exists (vs,f), Exists (vs',f') when vs=vs' ->
-      Exists (vs,Diff (f,f'))
-  | And (f,g), And (f',g') -> And (Diff (f,g), Diff (f',g'))
-  | Or (f,g), Or (f',g') -> Or (Diff (f,g), Diff (f',g'))
-  | Impl (f,g), Impl (f',g') -> Impl (Diff (f,g), Diff (f',g'))
-  | Not f, Not f' -> Not (Diff (f,f'))
+      Atom (`Message (o, diff u u', diff v v'))
+  | ForAll (vs,f), ForAll (vs',f') when vs=vs' -> ForAll (vs, diff f f')
+  | Exists (vs,f), Exists (vs',f') when vs=vs' -> Exists (vs, diff f f')
+  | And  (f,g), And  (f',g') -> And  (diff f f', diff g g')
+  | Or   (f,g), Or   (f',g') -> Or   (diff f f', diff g g')
+  | Impl (f,g), Impl (f',g') -> Impl (diff f f', diff g g')
+  | Not f, Not f' -> Not (diff f f')
   | True, True -> True
   | False, False -> False
-  | t1,t2 -> Diff (t1,t2)
+  | t,t' -> diff t t'
+
+let () =
+  let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in
+  Checks.add_suite "Head normalization" [
+    "Macro, different ts", `Quick, begin fun () ->
+      let ts = mkvar "ts" Sorts.Timestamp in
+      let ts' = mkvar "ts'" Sorts.Timestamp in
+      let m = in_macro in
+      let t = Diff (Macro (m,[],ts), Macro (m,[],ts')) in
+      let r = head_normal_biterm t in
+      assert (r = t)
+    end ;
+    "Boolean operator", `Quick, begin fun () ->
+      let f = mkvar "f" Sorts.Boolean in
+      let g = mkvar "g" Sorts.Boolean in
+      let f' = mkvar "f'" Sorts.Boolean in
+      let g' = mkvar "g'" Sorts.Boolean in
+      let t = Diff (And (f,g), And (f',g')) in
+        assert (head_normal_biterm t = And (Diff (f,f'), Diff (g,g')))
+    end ;
+  ] ;
+  Checks.add_suite "Projection" [
+    "Simple example", `Quick, Symbols.run_restore @@ begin fun () ->
+      let a = mkvar "a" Sorts.Message in
+      let b = mkvar "b" Sorts.Message in
+      let c = mkvar "c" Sorts.Message in
+      let def =
+        Symbols.Abstract ([Sorts.emessage;Sorts.emessage],Sorts.emessage) in
+      let f = Symbols.Function.declare_exact "f" (0,def) in
+      let f x = Fun ((f,[]),[x]) in
+      let t = Diff (f (Diff(a,b)), c) in
+      let r = head_pi_term Left t in
+        assert (pi_term Left t = f a) ;
+        assert (r = f (Diff (a,b)))
+    end ;
+  ]
