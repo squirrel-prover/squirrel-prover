@@ -17,7 +17,7 @@ val pp : Format.formatter -> sequent -> unit
 
 (** [init formula] returns a sequent with an empty set of hypotheses, and the
    given formula as conclusion. *)
-val init : formula -> sequent
+val init : system:Action.system_id -> formula -> sequent
 
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
     hypothesis. The new sequent will be automatically enriched with

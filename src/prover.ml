@@ -332,8 +332,8 @@ let get_goal_formula gname =
 
 (** Declare Goals And Proofs *)
 
-let make_trace_goal f  =
-  Goal.Trace (Sequent.init (Theory.convert [] f Sorts.Boolean))
+let make_trace_goal ~system f  =
+  Goal.Trace (Sequent.init ~system (Theory.convert [] f Sorts.Boolean))
 
 let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =

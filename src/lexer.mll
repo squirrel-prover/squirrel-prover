@@ -33,6 +33,8 @@ rule token = parse
 | "False"             { FALSE }
 | '<'                 { LANGLE }
 | '>'                 { RANGLE }
+| '['                 { LBRACKET }
+| ']'                 { RBRACKET }
 | ','                 { COMMA }
 | '.'                 { DOT }
 | ':'                 { COLON }

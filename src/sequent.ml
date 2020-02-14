@@ -246,8 +246,8 @@ let pp ppf s =
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 
-let init_sequent = {
-  system_id = Term.Left ;
+let init_sequent system = {
+  system_id = system ;
   env = Vars.empty_env;
   happens_hypotheses = [];
   message_hypotheses = H.empty;
@@ -423,7 +423,8 @@ let set_conclusion a s =
       | Term.Atom (#message_atom as at) -> add_macro_defs s at
       | _ -> s
 
-let init (goal : Term.formula) = set_conclusion goal init_sequent
+let init ~system (goal : Term.formula) =
+  set_conclusion goal (init_sequent system)
 
 let get_conclusion s = s.conclusion
 

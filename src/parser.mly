@@ -4,6 +4,7 @@
 %token <string> BANG
 %token AT PRED
 %token LPAREN RPAREN
+%token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
@@ -221,10 +222,12 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM f=formula                { Prover.add_proved_goal
-                                     ("unnamed_goal", Prover.make_trace_goal f) }
-| AXIOM i=ID COLON f=formula     { Prover.add_proved_goal
-                                     (i, Prover.make_trace_goal f) }
+| AXIOM s=system f=formula       { Prover.add_proved_goal
+                                     ("unnamed_goal",
+                                      Prover.make_trace_goal s f) }
+| AXIOM s=system i=ID COLON f=formula
+                                 { Prover.add_proved_goal
+                                     (i, Prover.make_trace_goal s f) }
 
 tactic_params:
 |                               { [] }
@@ -298,11 +301,17 @@ equiv_env:
 |                           { [] }
 | LPAREN vs=arg_list RPAREN { vs }
 
+system:
+|                         { Term.Left }
+| LBRACKET LEFT RBRACKET  { Term.Left }
+| LBRACKET RIGHT RBRACKET { Term.Right }
+
 goal:
-| GOAL i=ID COLON f=formula DOT
-                 { Prover.Gm_goal (i, Prover.make_trace_goal f) }
-| GOAL f=formula DOT
-                 { Prover.Gm_goal ("unnamed_goal", Prover.make_trace_goal f) }
+| GOAL s=system i=ID COLON f=formula DOT
+                 { Prover.Gm_goal (i, Prover.make_trace_goal s f) }
+| GOAL s=system f=formula DOT
+                 { Prover.Gm_goal ("unnamed_goal",
+                                   Prover.make_trace_goal s f) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
                  { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
 | PROOF          { Prover.Gm_proof }

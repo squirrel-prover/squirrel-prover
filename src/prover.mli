@@ -85,8 +85,9 @@ val parse_formula : Theory.formula -> formula
 
 val get_goal_formula : string -> formula
 
-(** Produces a trace goal from a parsed formula. *)
-val make_trace_goal : Theory.formula -> Goal.t
+(** Produces a trace goal from a parsed formula,
+  * for reasoning on the traces of the given system. *)
+val make_trace_goal : system:Action.system_id -> Theory.formula -> Goal.t
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
