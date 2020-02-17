@@ -635,10 +635,12 @@ let () =
   * and eliminating implications (and negations) underneath. *)
 let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
   (* Get formula to apply *)
-  let f =
-    try TraceSequent.get_hypothesis id s with
+  let f,system =
+    try TraceSequent.get_hypothesis id s, TraceSequent.system_id s with
       | Not_found -> Prover.get_goal_formula id
   in
+  if system <> TraceSequent.system_id s then
+    raise @@ Tactics.Tactic_Hard_Failure Tactics.NoAssumpSystem;
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f

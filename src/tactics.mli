@@ -32,6 +32,7 @@ type tac_error =
   | AndThen_Failure of tac_error
   | NotEqualArguments
   | NoSSC
+  | NoAssumpSystem
   | Undefined of string
 
 (** Tactics should raise this exception if they are ill-formed. *)

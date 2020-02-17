@@ -207,6 +207,11 @@ let () =
         (Tactic_Soft_Failure NoSSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
+    "Systems", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_Hard_Failure NoAssumpSystem)
+        (fun () -> run ~test "tests/alcotest/biproc.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->

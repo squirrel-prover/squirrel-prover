@@ -325,7 +325,7 @@ let get_goal_formula gname =
   with
     | [(_,Goal.Trace f)] ->
         assert (TraceSequent.get_env f = Vars.empty_env) ;
-        TraceSequent.get_conclusion f
+        TraceSequent.get_conclusion f, TraceSequent.system_id f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false

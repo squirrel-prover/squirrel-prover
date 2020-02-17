@@ -83,7 +83,7 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 val parse_formula : Theory.formula -> formula
 
-val get_goal_formula : string -> formula
+val get_goal_formula : string -> formula * Action.system_id
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)

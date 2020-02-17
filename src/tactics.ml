@@ -3,6 +3,7 @@ type tac_error =
   | AndThen_Failure of tac_error
   | NotEqualArguments
   | NoSSC
+  | NoAssumpSystem
   | Undefined of string
 
 let rec pp_tac_error ppf = function
@@ -16,6 +17,8 @@ let rec pp_tac_error ppf = function
   | NoSSC -> Fmt.pf ppf "No equality involving a key which satisfies \
                  the syntactic condition has been found"
   | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
+  | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
+                                  current system"
 
 exception Tactic_Soft_Failure of tac_error
 
