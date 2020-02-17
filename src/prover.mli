@@ -5,7 +5,7 @@
 open Term
 
 module Goal : sig
-  type t = Trace of Sequent.t | Equiv of EquivSequent.t
+  type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   val pp : Format.formatter -> t -> unit
   val pp_init : Format.formatter -> t -> unit
   val get_env : t -> Vars.env
@@ -76,7 +76,7 @@ end
 
 val pp_ast : Format.formatter -> tac_arg Tactics.ast -> unit
 
-module TraceTactics : Tactics_sig with type judgment = Sequent.t
+module TraceTactics : Tactics_sig with type judgment = TraceSequent.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (** {2 Utilities for parsing} *)

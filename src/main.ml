@@ -4,8 +4,8 @@ open Utils
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
    * e.g. registering tactics. *)
-  open Trace_tactics
-  open Equiv_tactics
+  open TraceTactics
+  open EquivTactics
 end
 
 let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))

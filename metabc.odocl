@@ -11,7 +11,7 @@ Parserbuf
 Process
 Prover
 Puf
-Sequent
+TraceSequent
 EquivSequent
 Sorts
 Tactics

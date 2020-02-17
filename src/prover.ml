@@ -2,17 +2,17 @@
   * TODO goals do not belong here *)
 
 module Goal = struct
-  type t = Trace of Sequent.t | Equiv of EquivSequent.t
+  type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   let get_env = function
-    | Trace j -> Sequent.get_env j
+    | Trace j -> TraceSequent.get_env j
     | Equiv j -> EquivSequent.get_env j
   let pp ch = function
-    | Trace j -> Sequent.pp ch j
+    | Trace j -> TraceSequent.pp ch j
     | Equiv j -> EquivSequent.pp ch j
   let pp_init ch = function
     | Trace j ->
-        assert (Sequent.get_env j = Vars.empty_env) ;
-        Term.pp ch (Sequent.get_conclusion j)
+        assert (TraceSequent.get_env j = Vars.empty_env) ;
+        Term.pp ch (TraceSequent.get_conclusion j)
     | Equiv j -> EquivSequent.pp_init ch j
 end
 
@@ -210,10 +210,10 @@ struct
 
 end
 
-module rec TraceTactics : Tactics_sig with type judgment = Sequent.t =
-  Prover_tactics(struct type judgment = Sequent.t end)(TraceAST)
+module rec TraceTactics : Tactics_sig with type judgment = TraceSequent.t =
+  Prover_tactics(struct type judgment = TraceSequent.t end)(TraceAST)
 and TraceAST : Tactics.AST_sig
-                 with type judgment = Sequent.t
+                 with type judgment = TraceSequent.t
                  with type arg = tac_arg =
   Make_AST(TraceTactics)
 
@@ -324,8 +324,8 @@ let get_goal_formula gname =
     List.filter (fun (name,_) -> name = gname) !goals_proved
   with
     | [(_,Goal.Trace f)] ->
-        assert (Sequent.get_env f = Vars.empty_env) ;
-        Sequent.get_conclusion f
+        assert (TraceSequent.get_env f = Vars.empty_env) ;
+        TraceSequent.get_conclusion f
     | [] -> raise @@ Tactics.Tactic_Hard_Failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
@@ -333,7 +333,7 @@ let get_goal_formula gname =
 (** Declare Goals And Proofs *)
 
 let make_trace_goal ~system f  =
-  Goal.Trace (Sequent.init ~system (Theory.convert [] f Sorts.Boolean))
+  Goal.Trace (TraceSequent.init ~system (Theory.convert [] f Sorts.Boolean))
 
 let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =

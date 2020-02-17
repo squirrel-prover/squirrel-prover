@@ -3,7 +3,7 @@ open Atom
 
 open Term
 
-type tac = Sequent.t Tactics.tac
+type tac = TraceSequent.t Tactics.tac
 
 module T = Prover.TraceTactics
 
@@ -11,16 +11,16 @@ module T = Prover.TraceTactics
 
 (** Reduce a goal with a disjunction conclusion into the goal
   * where the conclusion has been replace with the first disjunct. *)
-let goal_or_right_1 (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
-  | (Or (lformula, _)) -> sk [Sequent.set_conclusion (lformula) s] fk
+let goal_or_right_1 (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
+  | (Or (lformula, _)) -> sk [TraceSequent.set_conclusion (lformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 (** Reduce a goal with a disjunction conclusion into the goal
   * where the conclusion has been replace with the second disjunct. *)
-let goal_or_right_2 (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
-  | (Or (_, rformula)) -> sk [Sequent.set_conclusion (rformula) s] fk
+let goal_or_right_2 (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
+  | (Or (_, rformula)) -> sk [TraceSequent.set_conclusion (rformula) s] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
 
 let () =
@@ -33,8 +33,8 @@ let () =
            where the conclusion has been replace with the second disjunct."
     goal_or_right_2
 
-let goal_true_intro (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
+let goal_true_intro (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
   | True -> sk [] fk
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
@@ -43,11 +43,11 @@ let () =
 
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
-let goal_and_right (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
+let goal_and_right (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
   | And (lformula, rformula) ->
-    sk [ Sequent.set_conclusion (lformula) s;
-         Sequent.set_conclusion (rformula) s ] fk
+    sk [ TraceSequent.set_conclusion (lformula) s;
+         TraceSequent.set_conclusion (rformula) s ] fk
   | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
 
 let () =
@@ -61,7 +61,7 @@ let () =
 let rec left_introductions s = function
   | Term.And (f,g) :: l -> left_introductions s (f::g::l)
   | Term.Exists (vars,f) :: l ->
-      let env = Sequent.get_env s in
+      let env = TraceSequent.get_env s in
       let subst,env =
         List.fold_left
           (fun (subst,env) (Vars.EVar v) ->
@@ -74,15 +74,15 @@ let rec left_introductions s = function
           vars
       in
       let f = Term.subst subst f in
-        left_introductions (Sequent.set_env env s) (f::l)
-  | f :: l -> left_introductions (Sequent.add_formula f s) l
+        left_introductions (TraceSequent.set_env env s) (f::l)
+  | f :: l -> left_introductions (TraceSequent.add_formula f s) l
   | [] -> s
 
 let timestamp_case ts s sk fk =
   let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
   let add_action a =
     let indices =
-      let env = ref @@ Sequent.get_env s in
+      let env = ref @@ TraceSequent.get_env s in
       List.map
         (fun i -> Vars.make_fresh_from_and_update env i)
         a.Action.indices
@@ -100,12 +100,12 @@ let timestamp_case ts s sk fk =
     in
     f := Term.Or (case,!f)
   in
-  let system_id = Sequent.system_id s in
+  let system_id = TraceSequent.system_id s in
   Action.iter_descrs ~system_id add_action ;
-  sk [Sequent.add_formula !f s] fk
+  sk [TraceSequent.add_formula !f s] fk
 
-let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
-  let s,f = Sequent.select_formula_hypothesis hypothesis_name s ~remove:true in
+let hypothesis_case hypothesis_name (s : TraceSequent.t) sk fk =
+  let s,f = TraceSequent.select_formula_hypothesis hypothesis_name s ~remove:true in
   let rec disjunction_to_list acc = function
     | Or (f,g) :: l -> disjunction_to_list acc (f::g::l)
     | f :: l -> disjunction_to_list (f::acc) l
@@ -116,12 +116,12 @@ let hypothesis_case hypothesis_name (s : Sequent.t) sk fk =
     raise @@
     Tactics.Tactic_Hard_Failure
       (Tactics.Failure "Can only be applied to a disjunction.") ;
-  sk (List.rev_map (fun f -> Sequent.add_formula f s ) formulas) fk
+  sk (List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas) fk
 
 let case th s sk fk =
   (* if the conversion to a timestamp of the variable is successful, we perform
      a timestamp_case. If it fails, we try with hypothesis case. *)
-    let tsubst = Theory.subst_of_env (Sequent.get_env s) in
+    let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
     match Theory.convert tsubst th Sorts.Timestamp with
     | exception _ ->
       begin
@@ -147,7 +147,7 @@ let () =
 let false_left s sk fk =
   try
     let _ =
-      Sequent.find_formula_hypothesis (function False -> true | _ -> false) s
+      TraceSequent.find_formula_hypothesis (function False -> true | _ -> false) s
     in
     sk [] fk
   with Not_found -> fk @@ Tactics.Failure "no False assumption"
@@ -162,10 +162,10 @@ let () =
 
 (** [goal_intro judge sk fk] perform one introduction, either of a forall
     quantifier or an implication. Else, it returns [fk] *)
-let goal_intro (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
+let goal_intro (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
   | ForAll (vs,f) ->
-    let env = ref (Sequent.get_env s) in
+    let env = ref (TraceSequent.get_env s) in
     let subst =
       List.map
         (fun (Vars.EVar x) ->
@@ -174,18 +174,18 @@ let goal_intro (s : Sequent.t) sk fk =
         vs
     in
     let new_formula = Term.subst subst f in
-    let new_judge = Sequent.set_conclusion new_formula s
-                    |> Sequent.set_env (!env)
+    let new_judge = TraceSequent.set_conclusion new_formula s
+                    |> TraceSequent.set_env (!env)
     in
     sk [new_judge] fk
   | Impl(lhs,rhs)->
-    let s' = left_introductions (Sequent.set_conclusion rhs s) [lhs] in
+    let s' = left_introductions (TraceSequent.set_conclusion rhs s) [lhs] in
     sk [s'] fk
   | Not f ->
-    sk [Sequent.set_conclusion False s |> Sequent.add_formula f] fk
+    sk [TraceSequent.set_conclusion False s |> TraceSequent.add_formula f] fk
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
-    let s' = Sequent.set_conclusion False s |> Sequent.add_formula (Atom h) in
+    let s' = TraceSequent.set_conclusion False s |> TraceSequent.add_formula (Atom h) in
     sk [s'] fk
   | _ ->
       fk (Tactics.Failure
@@ -203,14 +203,14 @@ let () =
 (** [goal_exists_intro judge ths] introduces the existentially
     quantified variables in the conclusion of the judgment,
     using [ths] as existential witnesses. *)
-let goal_exists_intro ths (s : Sequent.t) sk fk =
-  match Sequent.get_conclusion s with
+let goal_exists_intro ths (s : TraceSequent.t) sk fk =
+  match TraceSequent.get_conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
     begin
     try
-      let nu = Theory.parse_subst (Sequent.get_env s) vs ths in
+      let nu = Theory.parse_subst (TraceSequent.get_env s) vs ths in
       let new_formula = Term.subst nu f in
-      sk [Sequent.set_conclusion new_formula s] fk
+      sk [TraceSequent.set_conclusion new_formula s] fk
     with Theory.Undefined x -> raise @@ Tactics.Tactic_Hard_Failure
         (Tactics.Undefined x)
   end
@@ -236,10 +236,10 @@ let () =
 (* TODO exists_left without hypothesis name, select any existential
  * formula on the left *)
 let exists_left hyp_name s sk fk =
-  let s,f = Sequent.select_formula_hypothesis hyp_name s ~remove:true in
+  let s,f = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
     match f with
       | Exists (vs,f) ->
-          let env = ref @@ Sequent.get_env s in
+          let env = ref @@ TraceSequent.get_env s in
           let subst =
             List.map
               (fun (Vars.EVar v) ->
@@ -249,7 +249,7 @@ let exists_left hyp_name s sk fk =
               vs
           in
           let f = Term.subst subst f in
-          let s = Sequent.add_formula f (Sequent.set_env !env s) in
+          let s = TraceSequent.add_formula f (TraceSequent.set_env !env s) in
             sk [s] fk
       | _ -> fk @@ Tactics.Failure "Improper arguments"
 
@@ -279,14 +279,14 @@ let () =
 (** Induction *)
 
 let induction s sk fk =
-  match Sequent.get_conclusion s with
+  match TraceSequent.get_conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
     (match Vars.sort v with
        Sorts.Timestamp ->
        (
          (* We need two fresh variables in env,
           * but one will not be kept in the final environment. *)
-         let env,v' = Vars.make_fresh_from (Sequent.get_env s) v in
+         let env,v' = Vars.make_fresh_from (TraceSequent.get_env s) v in
          let _,v'' = Vars.make_fresh_from env v in
          (* Introduce v as v'. *)
          let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')]
@@ -304,9 +304,9 @@ let induction s sk fk =
          in
          let s =
            s
-           |> Sequent.set_env env
-           |> Sequent.set_conclusion f'
-           |> Sequent.add_formula ~prefix:"IH" ih
+           |> TraceSequent.set_env env
+           |> TraceSequent.set_conclusion f'
+           |> TraceSequent.add_formula ~prefix:"IH" ih
          in
          sk [s] fk
        )
@@ -326,9 +326,9 @@ let () = T.register "induction"
 
 (** [constraints judge sk fk] proves the sequent using its trace
   * formulas. *)
-let constraints (s : Sequent.t) sk fk =
+let constraints (s : TraceSequent.t) sk fk =
   let conclusions =
-    try Term.disjunction_to_atom_list (Sequent.get_conclusion s)
+    try Term.disjunction_to_atom_list (TraceSequent.get_conclusion s)
     with Term.Not_a_disjunction -> []
   in
   let trace_conclusions =
@@ -338,20 +338,20 @@ let constraints (s : Sequent.t) sk fk =
       []
       conclusions
   in
-  let new_s = List.fold_left (fun s atom -> Sequent.add_formula
+  let new_s = List.fold_left (fun s atom -> TraceSequent.add_formula
                                  (Term.Atom (atom :> generic_atom)) s)
       s
       trace_conclusions
   in
-  if Sequent.constraints_valid new_s then
+  if TraceSequent.constraints_valid new_s then
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
-let congruence (s : Sequent.t) sk fk =
+let congruence (s : TraceSequent.t) sk fk =
  let conclusions =
-    try Term.disjunction_to_atom_list (Sequent.get_conclusion s)
+    try Term.disjunction_to_atom_list (TraceSequent.get_conclusion s)
     with Term.Not_a_disjunction -> []
   in
   let term_conclusions =
@@ -361,12 +361,12 @@ let congruence (s : Sequent.t) sk fk =
       []
       conclusions
   in
-  let s = List.fold_left (fun s atom -> Sequent.add_formula
+  let s = List.fold_left (fun s atom -> TraceSequent.add_formula
                                  (Term.Atom (atom :> generic_atom)) s)
       s
       term_conclusions
   in
-  if Sequent.message_atoms_valid s then
+  if TraceSequent.message_atoms_valid s then
     sk [] fk
   else fk (Tactics.Failure "Equations satisfiable")
 
@@ -379,8 +379,8 @@ let () = T.register "constraints"
     constraints
 
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
-let assumption (s : Sequent.t) sk fk =
-  if Sequent.is_hypothesis (Sequent.get_conclusion s) s then
+let assumption (s : TraceSequent.t) sk fk =
+  if TraceSequent.is_hypothesis (TraceSequent.get_conclusion s) s then
       sk [] fk
   else
     fk (Tactics.Failure "Conclusion is not an hypothesis")
@@ -415,26 +415,26 @@ let mk_and_cnstr l = match l with
 
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
-let eq_names (s : Sequent.t) sk fk =
-  let s,trs = Sequent.get_trs s in
-  let terms = Sequent.get_all_terms s in
+let eq_names (s : TraceSequent.t) sk fk =
+  let s,trs = TraceSequent.get_trs s in
+  let terms = TraceSequent.get_all_terms s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
     List.fold_left (fun _ c ->
-        Sequent.add_formula c s
+        TraceSequent.add_formula c s
       ) s new_eqs
   in
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let s,trs = Sequent.get_trs s in
+  let s,trs = TraceSequent.get_trs s in
   let cnstrs = Completion.name_index_cnstrs trs
-      (Sequent.get_all_terms s)
+      (TraceSequent.get_all_terms s)
   in
   let s =
     List.fold_left (fun _ c ->
-        Sequent.add_formula c s
+        TraceSequent.add_formula c s
 
       ) s cnstrs
   in
@@ -446,8 +446,8 @@ let () = T.register "eqnames"
     eq_names
 
 (** Add terms constraints resulting from timestamp and index equalities. *)
-let eq_trace (s : Sequent.t) sk fk =
-  let s, ts_classes = Sequent.get_ts_equalities s in
+let eq_trace (s : TraceSequent.t) sk fk =
+  let s, ts_classes = TraceSequent.get_ts_equalities s in
   let ts_classes = List.map (List.sort_uniq Pervasives.compare) ts_classes in
   let ts_subst =
     let rec asubst e = function
@@ -457,7 +457,7 @@ let eq_trace (s : Sequent.t) sk fk =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let s, ind_classes = Sequent.get_ind_equalities s in
+  let s, ind_classes = TraceSequent.get_ind_equalities s in
   let ind_classes = List.map (List.sort_uniq Pervasives.compare) ind_classes in
   let ind_subst =
     let rec asubst e = function
@@ -467,7 +467,7 @@ let eq_trace (s : Sequent.t) sk fk =
     (List.map (function [] -> [] | p::q -> asubst p q) ind_classes)
     |> List.flatten
   in
-  let terms = Sequent.get_all_terms s in
+  let terms = TraceSequent.get_all_terms s in
   let facts =
     List.fold_left
       (fun acc t ->
@@ -481,7 +481,7 @@ let eq_trace (s : Sequent.t) sk fk =
   let s =
     List.fold_left
       (fun s c ->
-         Sequent.add_formula c s)
+         TraceSequent.add_formula c s)
       s facts
   in
   sk [s] fk
@@ -490,15 +490,15 @@ let () = T.register "eqtrace"
     ~help:"Add terms constraints resulting from timestamp and index equalities."
     eq_trace
 
-let substitute (v1) (v2) (s : Sequent.t) sk fk=
-  let tsubst = Theory.subst_of_env (Sequent.get_env s) in
+let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
   let subst =
     match
       Theory.convert tsubst v1 Sorts.Timestamp,
       Theory.convert tsubst v2 Sorts.Timestamp
     with
     | ts1,ts2 ->
-      let s, models = Sequent.get_models s in
+      let s, models = TraceSequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -510,7 +510,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         Theory.convert tsubst v2 Sorts.Message
       with
       | m1,m2 ->
-        let s,trs = Sequent.get_trs s in
+        let s,trs = TraceSequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
       else
@@ -519,7 +519,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
       | exception _ ->
         match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
         | i1,i2 ->
-          let s, models = Sequent.get_models s in
+          let s, models = TraceSequent.get_models s in
           if Constr.query models [(`Index (`Eq,i1,i2))] then
             [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
@@ -528,7 +528,7 @@ let substitute (v1) (v2) (s : Sequent.t) sk fk=
         | exception _ ->  raise @@ Tactic_Hard_Failure
             (Tactics.Failure "Improper arguments.")
   in
-  sk [Sequent.apply_subst subst s] fk
+  sk [TraceSequent.apply_subst subst s] fk
 
 let () =
   T.register_general "substitute"
@@ -568,7 +568,7 @@ let euf_apply_schema sequent (_, (_, _), m, s) case =
              Term.Atom (`Timestamp (`Lt, action_descr_ts, ts))
          | ts ->
              Term.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
-      (snd (Sequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
+      (snd (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
     |> mk_or_cnstr
   in
   (new_f, le_cnstr, case.env)
@@ -589,35 +589,35 @@ let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
 
 let euf_apply_facts s at =
   let p = euf_param at in
-  let env = Sequent.get_env s in
+  let env = TraceSequent.get_env s in
   let (hash_fn, (key_n, key_is), mess, sign) = p in
-  let system_id = Sequent.system_id s in
+  let system_id = TraceSequent.system_id s in
   let rule = Euf.mk_rule ~system_id ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case ->
         let new_f, new_cnstr, new_env = euf_apply_schema s p case in
-        Sequent.add_formula new_f s
-        |> Sequent.add_formula new_cnstr
-        |> Sequent.set_env new_env
+        TraceSequent.add_formula new_f s
+        |> TraceSequent.add_formula new_cnstr
+        |> TraceSequent.set_env new_env
       ) rule.Euf.case_schemata
   and direct_premises =
     List.map (fun case ->
         let new_f, new_cnstr = euf_apply_direct s p case in
-        Sequent.add_formula new_f s
-        |> Sequent.add_formula new_cnstr
+        TraceSequent.add_formula new_f s
+        |> TraceSequent.add_formula new_cnstr
       ) rule.Euf.cases_direct
   in
   schemata_premises @ direct_premises
 
 
-let set_euf _ = { Sequent.t_euf = true }
+let set_euf _ = { TraceSequent.t_euf = true }
 
 (** [euf_apply f_select judge sk fk] selects an atom of the judgement according
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
-let euf_apply hypothesis_name (s : Sequent.t) sk fk =
+let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
   let s, at =
-    Sequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
+    TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
   try
     sk (euf_apply_facts s at) fk
   with Euf.Bad_ssc -> fk Tactics.NoSSC
@@ -633,26 +633,26 @@ let () =
 (** [apply gp ths judge sk fk] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath. *)
-let apply id (ths:Theory.term list) (s : Sequent.t) sk fk =
+let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
   (* Get formula to apply *)
   let f =
-    try Sequent.get_hypothesis id s with
+    try TraceSequent.get_hypothesis id s with
       | Not_found -> Prover.get_goal_formula id
   in
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f
   in
-  let subst = Theory.parse_subst (Sequent.get_env s) uvars ths in
+  let subst = Theory.parse_subst (TraceSequent.get_env s) uvars ths in
   (* Formula with universal quantifications introduced *)
   let f = Term.subst subst f in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Term.Impl (h,c) ->
-        let s' = Sequent.set_conclusion h s in
+        let s' = TraceSequent.set_conclusion h s in
         aux (s'::subgoals) c
     | Term.Not h ->
-        let s' = Sequent.set_conclusion h s in
+        let s' = TraceSequent.set_conclusion h s in
         sk (List.rev (s'::subgoals)) fk
     | f ->
         left_introductions s [f] ::
@@ -682,8 +682,8 @@ let () =
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
 let tac_assert f s sk fk =
-  let s1 = Sequent.set_conclusion f s in
-  let s2 = Sequent.add_formula f s in
+  let s1 = TraceSequent.set_conclusion f s in
+  let s2 = TraceSequent.add_formula f s in
   sk [s1 ;s2] fk
 
 let () =
@@ -694,16 +694,16 @@ let () =
 
 (** [collision_resistance judge sk fk] collects all equalities between hashes,
     and adds the equalities of the messages hashed with the same key. *)
-let collision_resistance (s : Sequent.t) sk fk =
+let collision_resistance (s : TraceSequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
   let hashes = List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-             let system_id = Sequent.system_id s in
+             let system_id = TraceSequent.system_id s in
              Theory.is_hash hash && Euf.hash_key_ssc ~system_id hash key [m]
          | _ -> false)
-      (Sequent.get_all_terms s)
+      (TraceSequent.get_all_terms s)
   in
   if List.length hashes = 0 then
     fk (NoSSC)
@@ -719,7 +719,7 @@ let collision_resistance (s : Sequent.t) sk fk =
             | _ -> acc
           ) [] q
       in
-      let s,trs = Sequent.get_trs s in
+      let s,trs = TraceSequent.get_trs s in
       let hash_eqs = make_eq hashes
                      |> List.filter (fun eq -> Completion.check_equalities
                                         (trs) [eq])
@@ -736,7 +736,7 @@ let collision_resistance (s : Sequent.t) sk fk =
       in
       let s =
         List.fold_left (fun s f ->
-            Sequent.add_formula f s
+            TraceSequent.add_formula f s
           ) s new_facts
       in
       sk [s] fk
