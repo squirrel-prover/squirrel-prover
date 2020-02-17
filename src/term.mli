@@ -14,12 +14,12 @@
   * can then be indexed. *)
 
 (** Type of indexed symbols in some namespace. *)
-type 'a indexed_symbol = 'a Symbols.t * Vars.index list
+type 'a indexed_symbol = 'a * Vars.index list
 
 (** Names represent random values of length the security parameter. *)
 
 type name = Symbols.name Symbols.t
-type nsymb = Symbols.name indexed_symbol
+type nsymb = name indexed_symbol
 
 (** Function symbols, may represent primitives or abstract functions.
   *
@@ -37,9 +37,9 @@ type fsymb = Symbols.fname Symbols.t * unsupported_index list
   * translating the meta-logic to the base logic. *)
 
 type mname = Symbols.macro Symbols.t
-type msymb = Symbols.macro indexed_symbol
+type 'a msymb = mname * 'a Sorts.sort * Vars.index list
 
-type state = msymb
+type state = Sorts.message msymb
 
 (** {3 Pretty printing} *)
 
@@ -50,7 +50,7 @@ val pp_fname : Format.formatter -> fname -> unit
 val pp_fsymb : Format.formatter -> fsymb -> unit
 
 val pp_mname :  Format.formatter -> mname -> unit
-val pp_msymb :  Format.formatter -> msymb -> unit
+val pp_msymb :  Format.formatter -> 'a msymb -> unit
 
 (** {2 Terms} *)
 
@@ -73,8 +73,8 @@ type generic_atom = [
 and _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
-  | Macro :  msymb * Sorts.message term list * Sorts.timestamp term
-      -> Sorts.message term
+  | Macro :  'a msymb * Sorts.message term list * Sorts.timestamp term
+      -> 'a term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
   | Init : Sorts.timestamp term
@@ -172,8 +172,8 @@ val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
 val dummy : Sorts.message term
 
-val in_macro : msymb
-val out_macro : msymb
+val in_macro : Sorts.message msymb
+val out_macro : Sorts.message msymb
 
 val f_true : fsymb
 val f_false : fsymb

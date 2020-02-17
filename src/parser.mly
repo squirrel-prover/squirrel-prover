@@ -122,6 +122,8 @@ formula:
 | TRUE                           { Theory.True }
 | term ord term                  { Theory.Compare ($2,$1,$3) }
 | PID term_list                  { Theory.make_term $1 $2 }
+| ID term_list AT timestamp      { let ts = $4 in
+                                   Theory.make_term ~at_ts:ts $1 $2 }
 | HAPPENS LPAREN timestamp RPAREN
                                  { Theory.Happens $3 }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF

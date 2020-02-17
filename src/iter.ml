@@ -6,9 +6,9 @@ class iter ~system_id = object (self)
 
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
-    | Macro ((mn, is),l,a) ->
+    | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
-        self#visit_message (Macros.get_definition ~system_id mn is a)
+        self#visit_message (Macros.get_definition ~system_id sort mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
@@ -41,14 +41,15 @@ class iter_approx_macros ~system_id = object (self)
 
   inherit iter ~system_id as super
 
-  val mutable checked_macros = [fst Term.in_macro;fst Term.out_macro]
+  val mutable checked_macros = [Utils.fst3 Term.in_macro;
+                                Utils.fst3 Term.out_macro]
 
   method visit_message t = match t with
-    | Macro ((mn,is),l,_) ->
+    | Macro ((mn,sort,is),l,_) ->
         List.iter self#visit_message l ;
         if not (List.mem mn checked_macros) then begin
           checked_macros <- mn :: checked_macros ;
-          self#visit_message (Macros.get_dummy_definition ~system_id mn is)
+          self#visit_message (Macros.get_dummy_definition ~system_id sort mn is)
         end
     | _ -> super#visit_message t
 

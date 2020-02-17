@@ -39,11 +39,11 @@ let h_o_term ~system_id hh kk acc t =
       | _ -> aux (aux acc m) k end
 
   | Term.Fun (_,l) -> List.fold_left aux acc l
-  | Term.Macro ((mn,is),l,a) ->
-    if mn = fst Term.in_macro || mn = fst Term.out_macro then acc
+  | Term.Macro ((mn,sort,is),l,a) ->
+    if mn = Utils.fst3 Term.in_macro || mn = Utils.fst3 Term.out_macro then acc
     else if Macros.is_defined mn a then
       let acc = List.fold_left (fun acc t -> aux acc t) acc l in
-      Macros.get_definition ~system_id mn is a
+      Macros.get_definition ~system_id sort mn is a
       |> aux acc
     else raise Bad_ssc
   | Term.Name (_,_) -> acc

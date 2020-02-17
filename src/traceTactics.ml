@@ -347,6 +347,44 @@ let constraints (s : TraceSequent.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
+let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
+    sk fk =
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+  let s,f = TraceSequent.select_formula_hypothesis hypothesis_name s
+      ~remove:true
+  in
+  let system_id = TraceSequent.system_id s in
+  let prefix = hypothesis_name in
+  let subst = match Theory.convert tsubst term Sorts.Boolean with
+    | Macro ((mn, sort, is),l,a) ->
+      [Term.ESubst (Macro ((mn, sort, is),l,a),
+                    Macros.get_definition ~system_id sort mn is a)
+      ]
+    | exception Theory.Type_error ->
+      begin
+        match Theory.convert tsubst term Sorts.Message with
+        | Macro ((mn, sort, is),l,a) ->
+          [Term.ESubst (Macro ((mn, sort, is),l,a),
+                        Macros.get_definition ~system_id sort mn is a)
+          ]
+        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+            (Tactics.Failure "Can only expand macros")
+      end
+    | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "Can only expand macros")
+  in
+
+  sk [TraceSequent.add_formula ~prefix (Term.subst subst f) s] fk
+
+let () = T.register_general "expand"
+    ~help:"expand macro hypothesis -> expand all occurences of the given macro \
+           inside the hypothesis."
+    (function
+       | [Prover.Theory v1; Prover.Theory (Theory.Var v2)] -> expand v1 v2
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "improper arguments"))
+
+
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) sk fk =

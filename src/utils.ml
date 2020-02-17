@@ -268,3 +268,6 @@ let pp_list pp_item ppf l =
   if l <> [] then
     Fmt.pf ppf "(@[<hov 1>%a@])"
       (Fmt.list ~sep pp_item) l
+
+
+let fst3 (a, b, c) = a

@@ -90,3 +90,5 @@ val pp_list :
   Format.formatter -> 'a list -> unit
 
 val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list
+
+val fst3 : 'a * 'b * 'c -> 'a

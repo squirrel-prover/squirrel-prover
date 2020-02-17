@@ -1,0 +1,19 @@
+hash h
+name k:message
+name cst:message
+
+channel ch
+
+name n : index -> message
+
+system O:
+ in(ch,x); if x=k then out(ch,x).
+
+
+goal dummy :
+cond@O =>
+  output@O = k.
+ Proof.
+simpl.
+expand cond@O, H0.
+Qed.

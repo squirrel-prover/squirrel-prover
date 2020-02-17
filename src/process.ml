@@ -302,7 +302,8 @@ let prepare : process -> process =
              None)
         in
         let x'_tm =
-          Term.Macro ((x', List.rev indices), [], Term.Var ts_var)
+          Term.Macro ((x', Sorts.Message, List.rev indices), [],
+                      Term.Var ts_var)
         in
         let msubst = (x,x'_th,x'_tm) :: msubst in
           prep ~msubst p
@@ -581,7 +582,7 @@ let parse_proc proc : unit =
       let updates =
         List.map
           (fun (s,l,t) ->
-             (Symbols.Macro.of_string s, conv_indices env l),
+             (Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
              conv_term ~pred:true env a t)
           updates
       in

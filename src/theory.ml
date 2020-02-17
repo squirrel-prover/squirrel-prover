@@ -269,15 +269,15 @@ let rec convert :
                   Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in
-                  Term.Macro ((s,indices),[],get_at ())
+                  Term.Macro ((s,sort,indices),[],get_at ())
               | Wrapped (s, Macro (Local (targs,_))) ->
                   if List.for_all (fun s -> s = Sorts.eindex) ks then
                     let indices = List.map conv_index l in
-                    Term.Macro ((s,indices),[],get_at ())
+                    Term.Macro ((s,sort,indices),[],get_at ())
                   else begin
                     assert (List.for_all (fun s -> s = Sorts.emessage) ks) ;
                     let l = List.map (conv Sorts.Message) l in
-                    Term.Macro ((s,[]),l,get_at ())
+                    Term.Macro ((s,sort,[]),l,get_at ())
                   end
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)" f)
             end
@@ -293,14 +293,21 @@ let rec convert :
             begin match of_string f with
               | Wrapped (s, Macro (Input|Output)) ->
                   check_arity "input" (List.length l) 0 ;
-                  Term.Macro ((s,[]),[],conv Sorts.Timestamp ts)
+                  Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | Wrapped (s, Macro (Global arity)) ->
                   check_arity f (List.length l) arity ;
                   let l = List.map conv_index l in
-                  Term.Macro ((s, l),[],conv Sorts.Timestamp ts)
+                  Term.Macro ((s,sort, l),[],conv Sorts.Timestamp ts)
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
                   assert false
+              | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+            end
+        | Sorts.Boolean ->
+            begin match of_string f with
+              | Wrapped (s, Macro (Cond)) ->
+                  check_arity "cond" (List.length l) 0 ;
+                  Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
             end
         | _ -> raise (TypeError f)
@@ -310,7 +317,7 @@ let rec convert :
       let k = check_state s (List.length is) in
       assert (k = Sorts.emessage) ;
       let is = List.map conv_index is in
-      let s = Symbols.Macro.of_string s, is in
+      let s = Symbols.Macro.of_string s in
       let ts =
         match opt_ts,at with
           | None, Some ts -> ts
@@ -319,7 +326,7 @@ let rec convert :
           | None, None -> failwith "ill-formed state lookup without timestamp"
       in
       begin match sort with
-        | Sorts.Message -> Term.Macro (s,[],ts)
+        | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
         | _ -> raise Type_error
       end
 
@@ -516,7 +523,7 @@ let make_term ?at_ts s l =
         if at_ts <> None then raise Type_error ;
         if List.length targs <> List.length l then raise Type_error ;
         Fun (s,l,None)
-    | Symbols.Macro (Symbols.Input|Symbols.Output) ->
+    | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond) ->
         if at_ts = None || l <> [] then raise Type_error ;
         Fun (s,[],at_ts)
     | Symbols.Action arity ->

@@ -11,7 +11,7 @@ module Cst = struct
     (* Constants appearing in the original terms *)
     | Cname of Term.nsymb
     | Cmvar of Vars.message
-    | Cmacro of Term.msymb * Term.timestamp
+    | Cmacro of (Sorts.message Term.msymb) * Term.timestamp
 
   let cst_cpt = ref 0
 

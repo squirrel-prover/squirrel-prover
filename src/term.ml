@@ -1,18 +1,18 @@
 (** Symbols *)
 
-type 'a indexed_symbol = 'a Symbols.t * Vars.index list
+type 'a indexed_symbol = 'a * Vars.index list
 
 type name = Symbols.name Symbols.t
-type nsymb = Symbols.name indexed_symbol
+type nsymb = name indexed_symbol
 
 type fname = Symbols.fname Symbols.t
 type unsupported_index = Vars.index
-type fsymb = Symbols.fname Symbols.t * unsupported_index list
+type fsymb = fname * unsupported_index list
 
 type mname = Symbols.macro Symbols.t
-type msymb = Symbols.macro indexed_symbol
+type 'a msymb = mname * 'a Sorts.sort * Vars.index list
 
-type state = msymb
+type state = Sorts.message msymb
 
 let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
 
@@ -31,7 +31,7 @@ let pp_mname ppf s =
   let open Fmt in
   (styled `Bold (styled `Magenta Utils.ident)) ppf (Symbols.to_string s)
 
-let pp_msymb ppf (m,is) =
+let pp_msymb ppf (m,s,is) =
   Fmt.pf ppf "%a%a"
     pp_mname m
     (Utils.pp_ne_list "(%a)" Vars.pp_list) is
@@ -53,8 +53,8 @@ and _ term =
   | Fun : fsymb *  Sorts.message term list -> Sorts.message term
   | Name : nsymb -> Sorts.message term
   | Macro :
-      msymb * Sorts.message term list * Sorts.timestamp term ->
-      Sorts.message term
+      'a msymb * Sorts.message term list * Sorts.timestamp term ->
+      'a term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
@@ -103,7 +103,7 @@ let rec sort : type a. a term -> a Sorts.t =
   function
   | Fun _ -> Sorts.Message
   | Name _ -> Sorts.Message
-  | Macro _ -> Sorts.Message
+  | Macro ((_,s,_),_,_) -> s
   | Var v -> Vars.sort v
   | Pred _ -> Sorts.Timestamp
   | Action _ -> Sorts.Timestamp
@@ -239,8 +239,19 @@ let get_vars : 'a term -> Vars.evar list =
 
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (Symbols.Macro.declare_exact "input" ~builtin:true Symbols.Input, [])
-let out_macro = (Symbols.Macro.declare_exact "output" ~builtin:true Symbols.Output, [])
+let in_macro = (Symbols.Macro.declare_exact "input" ~builtin:true
+                  Symbols.Input,
+                Sorts.Message,
+                [])
+let out_macro = (Symbols.Macro.declare_exact "output" ~builtin:true
+                   Symbols.Output,
+                 Sorts.Message,
+                 [])
+
+let cond_macro = (Symbols.Macro.declare_exact "cond" ~builtin:true
+                   Symbols.Cond,
+                 Sorts.Boolean,
+                 [])
 
 let rec tts acc = function
   | Fun (_, lt) -> List.fold_left tts acc lt
@@ -306,8 +317,8 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
-let subst_macro (s:subst) (symb,is) =
-  (symb, List.map (subst_var s) is)
+let subst_macro (s:subst) (symb, sort, is) =
+  (symb, sort, List.map (subst_var s) is)
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
   let new_term : a term =

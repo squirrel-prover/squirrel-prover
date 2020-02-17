@@ -326,9 +326,9 @@ class iter_macros ~system_id f = object (self)
   inherit Iter.iter ~system_id as super
   method visit_message t =
     match t with
-      | Term.Macro ((m,is),[],a) ->
+      | Term.Macro ((m,sort,is),[],a) ->
           if Macros.is_defined m a then
-            let def = Macros.get_definition ~system_id m is a in
+            let def = Macros.get_definition ~system_id sort m is a in
               f t def ;
               self#visit_message def
       | t -> super#visit_message t
