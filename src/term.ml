@@ -253,6 +253,11 @@ let cond_macro = (Symbols.Macro.declare_exact "cond" ~builtin:true
                  Sorts.Boolean,
                  [])
 
+let exec_macro = (Symbols.Macro.declare_exact "exec" ~builtin:true
+                   Symbols.Exec,
+                 Sorts.Boolean,
+                 [])
+
 let rec tts acc = function
   | Fun (_, lt) -> List.fold_left tts acc lt
   | Name _ -> acc

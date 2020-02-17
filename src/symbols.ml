@@ -11,7 +11,7 @@ type function_def =
   | Abstract of kind list * kind
 
 type macro_def =
-  | Input | Output | Cond
+  | Input | Output | Cond | Exec
   | State of int * kind
   | Global of int
   | Local of kind list * kind

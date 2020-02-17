@@ -19,6 +19,11 @@ val pp : Format.formatter -> sequent -> unit
    given formula as conclusion. *)
 val init : system:Action.system_id -> formula -> sequent
 
+(** [get_name_prefix s] hypthesis names can be built given a prefix. This
+   function allows to obtain the prefix of a formula. It can be used to create a
+   new hypothesis from an old one. *)
+val get_name_prefix : string -> string * int
+
 (** [add_trace_formula f s] returns the sequent [s] with [f] added to its
     hypothesis. The new sequent will be automatically enriched with
     equalities expressing relevant macro definitions, as well as conditions

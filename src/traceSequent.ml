@@ -18,6 +18,8 @@ module H : sig
 
   val empty :  ('a, 'b) hypotheses
 
+  val get_name_prefix : string -> string * int
+
   val select_and_update :
     remove:bool -> update:('a -> 'a) ->
     ('a, 'b) hypotheses -> string ->
@@ -182,6 +184,8 @@ let pps pp_formula ppf hs =
     (fun i h -> pp pp_formula i ppf h)
     (List.rev (get_visible hs_list))) hs
 end
+
+let get_name_prefix = H.get_name_prefix
 
 type message_hypothesis_tag = { t_euf : bool}
 
@@ -379,6 +383,7 @@ and add_formula ?prefix f s =
   | Term.Atom (#Atom.message_atom as at) -> add_message_hypothesis ?prefix s at
   | Term.Atom (#Atom.trace_atom as at) -> add_trace_hypothesis ?prefix s at
   | Term.Atom (`Happens ts) -> add_happens s ts
+  | Term.And(a, b) -> let s = add_formula ?prefix a s in add_formula ?prefix b s
   | _ ->
     let prefix = match prefix with Some p -> p | None -> "H" in
     { s with formula_hypotheses =

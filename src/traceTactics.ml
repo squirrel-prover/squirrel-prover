@@ -354,7 +354,7 @@ let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
       ~remove:true
   in
   let system_id = TraceSequent.system_id s in
-  let prefix = hypothesis_name in
+  let prefix = fst (TraceSequent.get_name_prefix hypothesis_name) in
   let subst = match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -373,7 +373,6 @@ let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
     | _ -> raise @@ Tactics.Tactic_Hard_Failure
            (Tactics.Failure "Can only expand macros")
   in
-
   sk [TraceSequent.add_formula ~prefix (Term.subst subst f) s] fk
 
 let () = T.register_general "expand"

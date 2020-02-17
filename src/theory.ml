@@ -305,7 +305,7 @@ let rec convert :
             end
         | Sorts.Boolean ->
             begin match of_string f with
-              | Wrapped (s, Macro (Cond)) ->
+              | Wrapped (s, Macro (Cond|Exec)) ->
                   check_arity "cond" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
@@ -523,7 +523,7 @@ let make_term ?at_ts s l =
         if at_ts <> None then raise Type_error ;
         if List.length targs <> List.length l then raise Type_error ;
         Fun (s,l,None)
-    | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond) ->
+    | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec) ->
         if at_ts = None || l <> [] then raise Type_error ;
         Fun (s,[],at_ts)
     | Symbols.Action arity ->

@@ -11,9 +11,11 @@ system O:
 
 
 goal dummy :
-cond@O =>
+exec@O =>
   output@O = k.
  Proof.
 simpl.
-expand cond@O, H0.
+
+expand exec@O, H0.
+expand cond@O, H1.
 Qed.
