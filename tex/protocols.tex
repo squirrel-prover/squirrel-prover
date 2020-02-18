@@ -1,82 +1,148 @@
-\section{Protocols and trace logic}
+\section{Protocols}
 
-Without entering into the details of the protocol semantics, we can already
-restrict the set of meta-interpretations of interest, to justify some of the
-rules that we use. We would alternatively impose these conditions from the
-beginning in the definition of meta-interpretations.
+% Without entering into the details of the protocol semantics, we can already
+% restrict the set of meta-interpretations of interest, to justify some of the
+% rules that we use. We would alternatively impose these conditions from the
+% beginning in the definition of meta-interpretations.
 
-There exists a natural translation from applied pi-calculus to this notion of 
-actions, reminescent of the translation inside Horn Clauses performed by 
-Proverif, or the translation inside Multi Set Rewritting rules performed by 
+There exists a natural translation from applied pi-calculus to this notion of
+actions, reminescent of the translation inside Horn Clauses performed by
+Proverif, or the translation inside Multi Set Rewritting rules performed by
 Sapic (a Tamarin extension).
 
-\emph{[David] I have not carefully worked through what follows, and it
-probably needs (at least) to be updated following the changes in the previous
-section.}
-
-\subsection{Protocols}
+\bigskip
 
 We  model a protocol as a set of possible actions available to the
 attacker. An action models a basic step of the protocol, where
 the attacker provides some input, some condition is checked, some
 state updates are performed, and finally an output is emitted.
 
-In this section we assume a fixed set of action symbols $\Actions$.
+In this section we assume a fixed set of action symbols $\Actions$,
+as well as a fixed set of channel names $\C$.
 We assume that macro symbols include $\minp$ and $\mout$,
 both of index and term arities zero.
 We also assume that all other macro symbols are of term arities zero.
 We call them \emph{state macros} as they will be used to model memory cells.
 
 \begin{definition}
-  An \emph{action} $a(\ov{n})$ is the application of
-  an action symbol $a\in\Actions$ of index arity $k$ to
-  some concrete indices $\ov{n}\in\mathbb{N}^k$.
-  Actions will be noted $\alpha$, $\beta$, $\gamma$.
+  \label{def:action}
+A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \Actions$ and $i_1,\dots,i_n \in \I$, is defined by:
+\begin{itemize}
+  \item a meta-logic formula $\phi_{\alpha}$ (intuitively, the condition of this action)
+  \item a meta-logic term $o_{\alpha}$ (intuitively, the output of this action)
+  \item for each state macro symbol $\sfs$, a meta-logic term $u_{\alpha}^{\sfs}$ (intuitively, the update of $\sfs$ for this action)
+  \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
+\end{itemize}
+where $\phi_{\alpha}$, $u_{\alpha}^{\sfs}$ and $o_{\alpha}$ must not contain any
+macro term and the only free variables that can occur in them are
+$x_\alpha$ (intuitively, the input of this action)
+and $x_\sfs$ where $\sfs$ is a state macro symbol.
+% ???
+% Names appearing in $\phi_{\alpha}$ and $o_{\alpha}$ are of the form $\sfn(i_1,\dots,i_k)$ with $k \leq n$.
+\end{definition}
 
-  We assume a transitive \emph{sequential dependency} relation
-  $\alpha\before\beta$ on actions, which intuitively means that
-  $\alpha$ must happen before $\beta$ in any execution,
-  and a \emph{conflict} relation $\alpha\conflict\beta$, 
-  which intuitively means $\alpha$ and $\beta$ cannot both occur in
-  any execution.
-  We say that an action $\alpha$ is \emph{enabled} after some (possibly empty)
-  sequence of actions $\alpha_1\ldots\alpha_n$ when, for all 
-  $\beta\before\alpha$ there exists $i\in[1;n]$ such that $\beta=\alpha_i$.
+\begin{definition}
+A \emph{concrete action} is an instanciation of a \emph{symbolic action} by giving integer values to index variables.
+\end{definition}
 
-  To each action $\alpha$ we associate:
-  a meta-logic formula $\phi_\alpha$ called the \emph{condition}
-  of $\alpha$;
-  for each state macro symbol $s$, a term $u^s_\alpha$ called
-  the \emph{update} of $s$ by $\alpha$;
-  a message term $o_\alpha$ called the \emph{output} of $\alpha$.
-  The condition, output and updates of an action $\alpha$ must not contain any
-  macro term and the only free variables that can occur in them are
-  $x_\alpha$, $x_\beta$ for $\beta\before\alpha$, and $x_s$ where $s$ a
-  state macro symbol.
+\begin{definition}
+  \label{def:proto}
+  A \emph{protocol} is defined by:
+  \begin{itemize}
+    \item a finite set of \emph{symbolic actions} with distinct action symbols,
+    \item a transitive \emph{sequential dependency} relation $\before$ on \emph{symbolic actions},
+    \item a \emph{conflict} relation $\conflict$ on \emph{symbolic actions}.
+  \end{itemize}
+  Intuitively, $\sfa_1(i)\before\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i)$ must happen before $\sfa_2(n_i,n_j)$ in any execution
+  and $\sfa_1(i,j)\conflict\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i,n_j)$ and $\sfa_2(n_i,n_j)$ cannot both occur in any execution.
 \end{definition}
 
 In our tool, actions are compiled from an applied pi-calculus process.
-Sequential dependencies are induced by the syntactic sequences in that 
+Sequential dependencies are induced by the syntactic sequences in that
 process, and conflicts are induced by conditionals.
 
-\medskip
-
-We now give a notion of symbolic trace, which intuitively represents
-a possible scheduling of the protocol, when ignoring messages.
-
-\begin{definition} \label{def:trace}
-  A symbolic trace $\tr$ is a sequence $\alpha_1\ldots\alpha_n$ of actions
-  such that:
+\begin{definition}
+  \label{def:trace}
+  Given a protocol $P$ according to \Cref{def:proto}, an \emph{abstract trace}\footnote{Abstract in the sense that we do not know if the trace is executable.} is a sequence $\sfa_1(\vect {i_1}) \dots \sfa_n(\vect {i_n})$ made of concrete actions such that:
   \begin{itemize}
-    \item for all $1 \leq i < j \leq n$,
-      $\alpha_i \neq \alpha_j$ and it is not the case
-      that $\alpha_i \conflict \alpha_j$;
-    \item for all $1 \leq i \leq n$,
-      for all $\beta \before \alpha_i$,
-      there exists $1 \leq j < i$ such that $\beta = \alpha_j$;
+    \item for all $1 \leq i,j \leq n$, if $\sfa_i = \sfa_j$ then $\vect {i_i} \neq \vect {i_j}$;
+    \item for all $1 \leq i < j \leq n$, it is not the case that $\sfa_i(\vect {i_i}) \conflict \sfa_j(\vect {i_j})$;
+    \item for all $1 \leq i \leq n$, for all concrete action $\beta$ such that $\beta \before \sfa_i(\vect {i_i})$, there exists $1 \leq j < i$ such that $\beta = \sfa_j(\vect {i_j})$.
   \end{itemize}
 \end{definition}
 
+\paragraph{Bi-processes}
+
+When reasoning on indistinguishability of a protocol, we may look at equivalences
+between two processes given as a bi-process, i.e. a system with a single set of
+symbolic actions, each symbolic action describing an execution step of both the
+left and right processes, using $\diff{\_}{\_}$ terms as usual.
+
+In that case, the definition of a symbolic action differs from \Cref{def:action}
+in the following way:
+\begin{itemize}
+  \item $\phi_{\alpha}$ is a meta-logic \emph{bi-formula}
+  \item $o_{\alpha}$ and $u_{\alpha}^{\sfs}$ are meta-logic \emph{bi-terms}
+\end{itemize}
+
+We define in \Cref{fig:bi-terms} how we extend the syntax in \Cref{fig:terms}
+to define meta-logic bi-terms.
+Bi-formulas are obtained from the syntax in \Cref{fig:formulas} by allowing
+atomic propositions over bi-terms.
+
+\begin{figure}[h]
+  \[
+  \begin{array}{rcll}
+    tt & := & t &\text{term} \\
+    & \mid & \diff{t_1}{t_2} &\text{bi-term}\\
+    & \mid & F(tt_1,\dots,tt_n) &\text{function application over bi-terms}\\
+    & \mid & M(tt_1,\ldots,tt_n)@T &\text{macro application over bi-terms}\\
+  \end{array}
+  \]
+  \caption{Syntax of meta-logic bi-terms}\label{fig:bi-terms}
+\end{figure}
+
+We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right projections
+(defined as usual), for example: $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$,
+$(o_{\alpha})^L$ and $(o_{\alpha})^R$.
+
+
+\begin{example}[Basic Hash]
+  \label{ex:basic-hash-bi-process}
+  We introduce the bi-process $P_{BH}$ defined by:
+  \begin{itemize}
+    \item the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k,i,j)\}$ where,
+    \begin{itemize}
+      \item action $\alpha_1 := \T(i,j)$
+        \begin{itemize}
+          \item $\phi_{\alpha_1} := \true$
+          \item $o_{\alpha_1} := \langle n(i,j), \h(\diff{k(i)}{k'(i,j)},n(i,j) \rangle$
+        \end{itemize}
+      \item action $\alpha_2 := \R_1(k,i,j)$
+        \begin{itemize}
+          \item $\phi_{\alpha_2} := \exists i,j, \snd(\g(x_{\alpha_2})) =  \h(\diff{k(i)}{k'(i,j)},\fst(\g(x_{\alpha_2}))$
+          \item $o_{\alpha_2} := \ok$
+        \end{itemize}
+      \item action $\alpha_3 := \R_2(k,i,j)$
+        \begin{itemize}
+          \item $\phi_{\alpha_3} := \neg (\exists i,j, \snd(\g(x_{\alpha_2})) =  \h(\diff{k(i)}{k'(i,j)},\fst(\g(x_{\alpha_2})))$
+          \item $o_{\alpha_3} := \error$
+        \end{itemize}
+    \end{itemize}
+    \item a conflict relation $\conflict$ such that $\R_1(k,i,j)\conflict\R_2(k,i,j)$.
+  \end{itemize}
+
+\noindent
+Some traces for this bi-process are:
+  \begin{itemize}
+    \item $\T(1,1),\R_1(1,1,1)$
+    \item $\T(1,1).\R_1(1,1,1).\T(1,2).\R_1(2,1,2)$
+    \item $\T(1,1).\R_1(1,1,1).\T(2,1).\R_1(2,2,1)$
+  \end{itemize}
+\end{example}
+
+\bigskip
+\noindent
 \begin{remark}
   We could get rid of the conflict relationship and still be able to
   model conditionals: we would have more symbolic traces but, when conditions
@@ -89,103 +155,6 @@ a possible scheduling of the protocol, when ignoring messages.
 \begin{remark}
   The structure that we have assumed on actions is restrictive and
   does not allow to model e.g. phases. It does not matter because we can
-  impose other conditions on traces later on as axioms (similar to the 
+  impose other conditions on traces later on as axioms (similar to the
   restrictions of Tamarin).
 \end{remark}
-
-\subsection{Meta-interpretation of a trace}
-
-As in the \BC model, we model arbitrary messages produced by the attacker 
-using free function symbols $\G = \{g_i | i \in \mathbb{N}\}$. We assume
-from now on that our signature contains such symbols.
-
-We construct, for each symbolic trace, a meta-interpretation representing
-the trace. Some details of this definition will be understood in the next
-section, where we identify some axioms that hold in all such 
-meta-interpretations.
-
-\begin{definition}
-  Given a symbolic execution $\tr = \alpha_1\ldots\alpha_n$,
-  we define the meta-interpretation $I_\tr$ as follows
-  (\emph{TODO define the substitution for $x_s$ variables,
-  as well as $\hat{s}$\ldots)}):
-  \begin{itemize}
-    \item $\D_\I$ is the set of indices that occur in $\tr$;
-    \item $\D_\XT = \{ t_0 \} \uplus \{ a(\ov{n}) : a\in\Actions_k, 
-      \ov{n}\in\D_\I^k \}$;
-    \item the order $\leq$ is such that $\epsilon\leq t$ for all $t\in\D_\XT$,
-      and $\alpha\leq\beta$ if $\alpha$ occurs before $\beta$ in $\tr$;
-    \item the predecessor function $p$ maps $t_0$ to itself and all
-      other timestamps to their predecessor according to $\leq$;
-    \item $H_\XT$ is the set of actions that occur in $\tr$,
-      i.e.\ $H_\XT=\{\alpha_i : i\in[1;n]\}$;
-    \item $\sigma_\I$ and $\sigma_\XT$ are arbitrary;
-    \item for each $a\in\Actions_k$, $\hat{a}(\ov{n}) = a(\ov{n})$;
-    \item $\hat{\minp}$ and $\hat{\mout}$ have arbitrary values on
-      $t_0$ and otherwise are uniquely defined by the following
-      conditions, for all $i\in[1;n]$:
-      $$\hat{\minp}(\alpha_i) = 
-      g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))
-      \text{ and }
-      \hat{\mout}(\alpha_i) =
-      o_{\alpha_i}\{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j<i}.$$
-  \end{itemize}
-\end{definition}
-
-We can now formally define when a protocol satisfies some trace property 
-$\phi$:
-we require that the property holds in all traces that are actually executable
---- more precisely, we require that $\phi_\tr \Rightarrow \phi$ is almost
-always true, where $\phi_\tr$ expresses that the trace is executable.
-
-\begin{definition}
-  Given a trace $\tr$, its executability formula
-  is $\phi_\tr = \bigwedge_{\alpha\in\tr} 
-  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}$.
-\end{definition}
-
-\begin{definition}
-  A meta-logic formula $\phi$ is valid wrt.\ our protocol when,
-  for any symbolic trace $\tr$ of the protocol,
-  we have $I_\tr \models \phi_\tr \Rightarrow \phi$.
-\end{definition}
-
-In other words, we require that, for any $\tr$ and
-for any computational model,
-we have $\M \models (\phi_\tr\Rightarrow\phi)^{I_\tr} \sim \true$.
-
-In practice, we do not want to consider all computational models, but
-restrict to the ones satisfying some cryptographic assumption: reformulate
-what's above so that it's more natural.
-
-\subsection{Trace axioms}
-
-We now identify some valid formulas, which can thus be used as axioms
-when trying to derive a trace property.
-
-\begin{proposition}
-  The following formulas are valid wrt.\ the protocol:
-  \begin{itemize}
-    \item for any $\alpha \before \beta$,
-      $\happens(\beta) \Rightarrow \happens(\alpha) \wedge \alpha < \beta$;
-    \item for any $\alpha \conflict \beta$,
-      $\happens(\alpha)\wedge\happens(\beta) \Rightarrow \bot$;
-    \item for any $\alpha$,
-      $\happens(\alpha) \Rightarrow 
-      \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta$.
-    \item
-      $\forall \tau,\tau',\tau'', \happens(\tau)\wedge\happens(\tau'')\wedge
-      \tau\leq\tau'\wedge\tau'\leq\tau''\Rightarrow\happens(\tau')$;
-    \item
-      $\forall \tau, \happens(\tau) \Rightarrow \pre(\tau)<\tau \wedge
-      \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
-      \tau'=\pre(\tau)$;
-    \item for any $a\neq b\in\Actions$,
-      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$;
-    \item for any $a\in\Actions$,
-      $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
-  \end{itemize}
-\end{proposition}
-
-Note that obvious axioms such as the predecessor or injectivity axioms
-would not hold for simpler constructions of $I_\tr$.

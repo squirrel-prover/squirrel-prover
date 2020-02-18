@@ -45,8 +45,6 @@ and ask for indistinguishability only for each trace.
 
 \subsection{Straightforward diff-equivalence}
 
-\newcommand{\diff}[2]{\mathsf{choice}(#1,#2)}
-
 Two processes may be given as a bi-process, i.e. a system with a single set of
 symbolic actions, each symbolic action describing an execution step of both the
 left and right processes, using $\diff{\_}{\_}$ terms as usual. In that case, we
@@ -133,8 +131,6 @@ in the fact that we consider here symbolic and not observable traces.
   but diff-equivalence still fails due to the desynchronized condition,
   as before.
 \end{example}
-
-\newcommand{\ok}{\mathsf{ok}}
 
 In the next example, we omit the $\myelse$ branch when it consists of a null
 process. In these examples, there is a coincidence between diff-equivalence

@@ -1,0 +1,229 @@
+\section{Trace properties}
+
+We want to verify that a formula $\phi$ (the security property)
+holds for all executions of some protocol, in all computational models
+satisfying some cryptographic assumptions.
+This can be guaranteed if we have $Ax\models\phi$
+where $Ax$ is a (recursive) set of axioms that are sound
+wrt.\ the intended class of meta-interpretations and computational models.
+We might be able to formulate such a set $Ax$ (which would consist of
+two parts, first the usual BC axioms, second some meta-logic axioms
+constraining the meta-interpretations to correspond to protocol executions).
+However, we will go for an easier task: designing a set of inference
+rules that allow to derive meta-logic formulas (rather, sequents)
+that are valid in all intended models.
+
+
+We can now formally define when a protocol satisfies some trace property
+$\phi$:
+we require that the property holds in all traces that are actually executable
+--- more precisely, we require that $\phi_\tr \Rightarrow \phi$ is almost
+always true, where $\phi_\tr$ expresses that the trace is executable.
+
+\begin{definition}
+  Given a trace $\tr$, its executability formula
+  is $\phi_\tr = \bigwedge_{\alpha\in\tr}
+  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}$.
+\end{definition}
+
+\begin{definition}
+  A meta-logic formula $\phi$ is valid wrt.\ our protocol when,
+  for any symbolic trace $\tr$ of the protocol,
+  we have $I_\tr \models \phi_\tr \Rightarrow \phi$.
+\end{definition}
+
+In other words, we require that, for any $\tr$ and
+for any computational model,
+we have $\M \models (\phi_\tr\Rightarrow\phi)^{I_\tr} \sim \true$.
+
+In practice, we do not want to consider all computational models, but
+restrict to the ones satisfying some cryptographic assumption: reformulate
+what's above so that it's more natural.
+
+\subsection{Sequent calculus}
+
+In the tool, sequents come with an environment which explicitly
+declares all the variables that might occur free in the sequent's formulas.
+For simplicity, we do not include them here. We shall write $\vdash t:T$
+when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
+
+\begin{definition}
+  A sequent $\Gamma \vdash \phi$ is composed of a set of meta-logic formulas
+  $\Gamma$ and a meta-logic formula $\phi$.
+  It is valid when the meta-logic formula
+  $(\wedge\Gamma) \Rightarrow \phi$ is valid.
+\end{definition}
+
+\begin{proposition}
+  The rules of \cref{fig:lk,fig:names} are sound: if the premisses are valid,
+  then so is the conclusion.
+\end{proposition}
+
+\begin{figure}
+  \begin{mathpar}
+    \inferrule[Axiom]{~}{\Gamma,\phi\vdash\phi}
+    \quad\quad
+    \inferrule[Cut]{
+      \Gamma \vdash \phi
+      \quad
+      \Gamma,\phi \vdash \psi
+    }{
+      \Gamma \vdash \psi
+    }
+  \end{mathpar}
+  \begin{mathpar}
+  \inferrule[${\wedge}$-L]{
+    \Gamma,\phi,\phi'\vdash\psi
+  }{
+    \Gamma,\phi\wedge\phi'\vdash\psi
+  }
+  \quad\quad
+  \inferrule[${\wedge}$-R]{
+    \Gamma \vdash \phi
+    \quad
+    \Gamma \vdash \phi'
+  }{
+    \Gamma \vdash \phi\wedge\phi'
+  }
+  \end{mathpar}
+  \begin{mathpar}
+    \inferrule[${\lnot}$-R]{
+      \Gamma, \phi \vdash \bot
+    }{
+      \Gamma \vdash \lnot\phi
+    }
+    \quad\quad
+    \inferrule[${\lnot}$-L]{
+      \Gamma \vdash \phi
+    }{
+      \Gamma,\lnot\phi \vdash \psi
+    }
+    \quad\quad
+    \inferrule[Raa]{
+      \Gamma, \lnot\phi \vdash \bot
+    }{
+      \Gamma \vdash \phi
+    }
+  \end{mathpar}
+  \begin{center}
+  \emph{other propositional rules of classical sequent calculus}
+  \end{center}
+  \begin{mathpar}
+      \inferrule[${=}$-R]{~}{\Gamma \vdash t=t} \quad\quad
+      \inferrule[${=}$-L]{
+        (\Gamma\vdash\phi)\{x\mapsto t',x'\mapsto t\}
+      }{
+        t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash
+        \phi\{x\mapsto t,x'\mapsto t'\}
+      }
+  \end{mathpar}
+  \begin{mathpar}
+     \inferrule[$\forall$-L]{
+       \Gamma,\phi\{x\mapsto t\} \vdash \psi
+       \quad
+       \vdash t:\T
+     }{
+       \Gamma,\forall x:\T.\phi \vdash \psi}
+     \quad\quad
+     \inferrule[$\forall$-R]{
+       \Gamma \vdash \phi}{\Gamma \vdash \forall x:\T:\phi}
+  \end{mathpar}
+   \caption{Generic inference rules. These are the rules of classical
+   first-order sequent calculus. In \textsc{$\forall$-R} we require that
+   $x$ does not appear free in $\Gamma$.}
+   \label{fig:lk}
+\end{figure}
+
+\begin{figure}
+  \begin{mathpar}
+  \inferrule{
+    \mathsf{n}\neq\mathsf{m}
+  }{
+    \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash \phi
+  }
+  \quad\quad
+  \inferrule{
+    \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash \phi
+  }{
+    \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
+  }
+  \end{mathpar}
+  \begin{mathpar}
+    \inferrule{~}{
+      \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
+    }
+  \end{mathpar}
+  \caption{Inference rules for equalities on names.
+  The last rule only applies when, for any meta-interpretation $I$,
+  the term $(t)^I$ does not contain any message variable and does
+  not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
+  --- this condition will be over-approximated in our implementation.}
+  \label{fig:names}
+\end{figure}
+
+\begin{proposition}
+  The rules of \cref{fig:xor} are sound wrt.\ computational models
+  where $\oplus$ is interpreted as exclusive or:
+  if the premisses are valid in all such computational models,
+  then so is the conclusion.
+  \emph{Do we need to impose a condition on message lengths?}
+\end{proposition}
+
+\begin{figure}
+  \begin{mathpar}
+    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
+    \quad\quad
+    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
+    \quad\quad
+    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
+  \end{mathpar}
+  \begin{mathpar}
+    \inferrule{
+      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
+    }{
+      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
+    }
+  \end{mathpar}
+  \caption{Inference rules for exclusive or.
+  The tool does not follow these rules closely, but uses a more high-level
+  congruence closure algorithm modulo xor. The last rule is not implementated
+  at all and is here mostly for illustration purposes, and is subject to
+  the condition that, for any meta-interpretation $I$,
+  $(\Gamma\vdash\phi)^I$ does not contain instances of the names
+  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
+  This condition would be over-approximated in an implementation.}
+  \label{fig:xor}
+\end{figure}
+
+
+\subsection{Trace axioms}
+
+We now identify some valid formulas, which can thus be used as axioms
+when trying to derive a trace property.
+
+\begin{proposition}
+  The following formulas are valid wrt.\ the protocol:
+  \begin{itemize}
+    \item for any $\alpha \before \beta$,
+      $\happens(\beta) \Rightarrow \happens(\alpha) \wedge \alpha < \beta$;
+    \item for any $\alpha \conflict \beta$,
+      $\happens(\alpha)\wedge\happens(\beta) \Rightarrow \bot$;
+    \item for any $\alpha$,
+      $\happens(\alpha) \Rightarrow
+      \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta$.
+    \item
+      $\forall \tau,\tau',\tau'', \happens(\tau)\wedge\happens(\tau'')\wedge
+      \tau\leq\tau'\wedge\tau'\leq\tau''\Rightarrow\happens(\tau')$;
+    \item
+      $\forall \tau, \happens(\tau) \Rightarrow \pre(\tau)<\tau \wedge
+      \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
+      \tau'=\pre(\tau)$;
+    \item for any $a\neq b\in\Actions$,
+      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$;
+    \item for any $a\in\Actions$,
+      $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
+  \end{itemize}
+\end{proposition}
+
+Note that obvious axioms such as the predecessor or injectivity axioms
+would not hold for simpler constructions of $I_\tr$.

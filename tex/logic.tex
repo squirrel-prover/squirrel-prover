@@ -14,8 +14,8 @@ and featuring a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
 The terms are all of the same sort: they are meant to represent
 messages\footnote{
-  David: I hope/believe that the distinction between booleans and messages
-  can be ignored for the theory.
+  \david{I hope/believe that the distinction between booleans and messages
+  can be ignored for the theory.}
 }.
 
 In practice, the logic will be considered with function symbols for
@@ -41,7 +41,7 @@ the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and
 $\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
 are valid.
 
-\subsection{Terms}
+\subsection{Meta-logic}
 
 Terms of the meta-logic are of three possible sorts: index, timestamps
 or message. Formulas of the meta-logic may feature predicates over each sort.
@@ -52,7 +52,7 @@ and predicates over them, will have disappeared. The validity of the
 meta-logic formula $\phi$ will be defined as the validity of the base logic
 $(\phi)^{I,T}\sim\mathsf{true}$.
 
-\medskip
+\paragraph{Terms}
 
 We assume three infinite sets of variables:
 $\X$ (whose elements are noted $x$, $y$, $z$) for message variables;
@@ -68,7 +68,7 @@ $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
 
 We assume a set $\N$ of indexed names symbols,
 (used to model random samplings)
-and a sets of indexed constants $\Actions$
+and a set of indexed constants $\Actions$
 (used to model specific timestamps).
 These indexed symbols only have an index arity: they
 cannot be applied to terms.
@@ -85,7 +85,7 @@ at a particular point of an execution.
 We shall write $\F_k$ (resp.\ $\N_k$ or $\M_k$) for the set of function
 symbols (resp.\ name or macro symbols) of index arity $k$.
 
-\begin{figure}
+\begin{figure}[h]
 \[
   \begin{array}{rcll}
     n &:=& \mathsf{n}[i_1,\ldots,i_n] & (\mathsf{n}\in\N_k)
@@ -110,7 +110,7 @@ symbols (resp.\ name or macro symbols) of index arity $k$.
     & \mid & M(t_1,\ldots,t_n)@T &\text{macro application}\\
        \end{array}
      \]
-     \caption{Meta-logic terms}\label{fig:terms}
+     \caption{Syntax of meta-logic terms}\label{fig:terms}
 \end{figure}
 
 \begin{definition}
@@ -123,115 +123,16 @@ symbols (resp.\ name or macro symbols) of index arity $k$.
   The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
 \end{definition}
 
-We can now define a meta-interpretation as the structure needed to
-give a meaning to index and timestamp terms. A meta-interpretation
-also induces a translation from a meta-logic signature $\Sigma$
-to some base logic signature $\Sigma^I$. For example, if
-$\Sigma$ contains a name $\mathsf{n}$ with index arity $1$, and
-the meta-interpretation interprets indices in a domain $D_\I = \{
-  17, 22 \}$, the base logic signature will feature
-two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
 
-\begin{definition}
-  A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }}
-  for $\Sigma = (\F,\M,\N,\Actions)$ consists in:
-  \begin{itemize}
-    \item two finite sets $D_\I$ and $D_\XT$ called the index and timestamp
-      domains of the interpretation;
-    \item mappings $\sigma_\I : \I \to D_\I$
-      and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
-      timestamp variables as elements of their respective domains;
-    \item a total ordering $\leq$ over $D_\XT$,
-      a function $p : D_\XT \to D_\XT$ (for interpreting the
-      predecessor\footnote{
-        It does not matter that the predecessor means anything
-        wrt.\ the ordering. We will impose later that it behaves
-        well enough.
-      })
-      and a subset $H_\XT\subseteq D_\XT$ (for identifying timestamps
-      that actuallly happen in an execution\footnote{
-        We cannot identify timestamps freely in the meta-interpretation
-        because we want to be able to use axioms such as
-        $\forall i\neq j.~ a[i] \neq a[j]$ without restricting
-        them to timestamps that really happen.
-        \adrien{I think there are more fundamental reason for that. Considering the way for formulate things, for any $a \in \bbA$ (of arity 1) and $i \in D_\I$, $a[i]$ has an interpretation. But the protocol may not allow for it (because of restrictions). By consequence we need to be able to interpret $a[i]$ without it being valid.}
-      });
-    \item for each constant $a \in \Actions$ of index arity $k$,
-      an interpretation $\hat{a} : D_\I^k \to D_\XT$;
-    \item for each macro symbol $m \in \M$ of index
-      arity $k$ and arity $n$, an interpretation
-      $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_\XT \to \Msg^I_\Sigma$,
-      where $\Msg^I_\Sigma$ is the set of terms of the base
-      logic for the (base logic) signature
-      $(\F^I,\N^I)$ with
-      \[
-        \F^I =
-        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_\I \}
-        \text{ and }
-        \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
-        e_1,\ldots,e_k\in D_\I \}.
-      \]
-      \adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}
-  \end{itemize}
-\end{definition}
+\paragraph{Formulas}
 
-Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
-D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^I$.
-\adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
-
-Given a meta-interpratation $I$, we define the interpretation in $I$ of terms of the meta-logic has terms of the base logic.
-\begin{definition}
-  Given a meta-interpretation $I$
-  we define $(T)^{I} \in D_\XT$ and $(t)^{I} \in \Msg^I_\Sigma$ as follows:
-  \begin{eqnarray*}
-    (\tau)^{I} &=& \sigma_\XT(\tau) \\
-    (\pre(T))^{I} &=& p((T)^{I}) \\
-    (a[i_1,\ldots,i_k])^{I} &=& \hat{a}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
-  \end{eqnarray*}
-  \begin{eqnarray*}
-    (\mathsf{n}[i_1,\ldots,i_k])^{I} &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
-    \\
-    (x)^{I} &=& x
-    \\
-    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I} &=&
-    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
-      (t_1)^{I},\ldots,(t_n)^{I}
-    \bigr)
-    \\
-    (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I} &=&
-    \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
-      (t_1)^{I},\ldots,(t_n)^{I},
-      (T)^{I})
-  \end{eqnarray*}
-\end{definition}
-
-\begin{example}
-  Consider the meta-logic term $t := \mathsf{h}(\mout@a[i],\mathsf{k}[i])$
-  and an interpretation $I$ with $D_T = [1;10]$ and $D_I = [1;3]$
-  (which might be relevant if we are considering traces of ten actions
-  with three agents) such that $\sigma_I(i)=2$ and $\hat{a}(2)=10$
-  and $\hat{\mout}(10)=\mathsf{ok}$ (the message outputted at step 10
-  is $\mathsf{ok}$ \adrien{I don't like this. It seems that macro can be interperted as the term we want at any timestamp.}).
-  We then have $(t)^I = \mathsf{h}(\mathsf{ok},\mathsf{k}_2)$.
-\end{example}
-
-The reason why macros take only one timestamp argument is purely practical:
-we have no use for more. At this point one might wonder why we separate
-indices and actions given that they are interpreted similarly: it is again
-purely practical, we will use them for different purposes, and we will need
-less structure on indices than on actions, making reasoning easier on them
-(one can simply compare indices, there is no ordering and no predecessor
-operation on them).
-
-\subsection{Formulas}
-
-The syntax of the meta-logic formulas is given in \cref{fig:syntax}.
+The syntax of the meta-logic formulas is given in \cref{fig:formulas}.
 We could have included more generally a notion of predicate macro that
 would have to be expanded when translating a formula from the meta-logic
 to the base logic. Instead we opted to list the few atoms that we
 will use in practice.
 
-\begin{figure}
+\begin{figure}[h]
   \[
   \begin{array}{c}
    \begin{array}{rcll}
@@ -254,238 +155,5 @@ will use in practice.
 
 \end{array}
     \]
-    \caption{Syntax of first order formulas.}\label{fig:syntax}
+    \caption{Syntax of meta-logic formulas}\label{fig:formulas}
 \end{figure}
-
-\begin{definition}
-  If $I$ is a meta-interpretation and $e\in D_\I$,
-  $I[i\mapsto e]$ is the interpretation where $\sigma_\I$ is
-  modified so that $\sigma_{\I}(i)=e$.
-  We define the translation of a meta-logic formula $\phi$
-  into the base logic \emph{term} $(\phi)^I$
-  as follows:
-  \begin{eqnarray*}
-    (\phi\wedge\phi')^I &=& (\phi)^I \stackrel{.}{\wedge} (\phi')^I
-    \quad \text{and similarly for other boolean connectives} \\
-    (\forall i:\idx. \phi)^I &=&
-    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
-    (\forall \tau:\timestamp. \phi)^I &=&
-    \stackrel{.}{\wedge}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
-    (\exists i:\idx. \phi)^I &=&
-    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
-    (\exists \tau:\timestamp. \phi)^I &=&
-    \stackrel{.}{\vee}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
-    (i=i')^I &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right. \\
-    (T = T')^I &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } (T)^I = (T')^I \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right.
-    \quad\text{ and similarly for $\leq$} \\
-    (\happens(T))^I &=& \mathsf{true}
-    \text{ if } (T)^I \in H_\XT
-    \text{ and } \mathsf{false} \text{ otherwise}
-    \\
-    (t=t')^I &=& (t)^I \stackrel{.}{=} (t')^I
-  \end{eqnarray*}
-\end{definition}
-
-\begin{definition}
-  A formula $\phi$ of the meta-logic is said to be valid when,
-  for any meta-interpretation $I$, the base logic formula
-  $(\phi)^I \sim \mathsf{true}$ is valid.
-  (In other words, we have $\M,\sigma\models(\phi)^I\sim\mathsf{true}$
-  i.e. the boolean term $(\phi)^I$ is true with overwhelming
-  probability in any computational model $\M$ and for any interpretation
-  $\sigma$ of the free message variables.\footnote{
-    In the tool, we only allow universal quantification over messages, and
-  only allow it at toplevel. The validity of such formulas is the same as
-  when the variables are left free.})
-\end{definition}
-
-\begin{definition}
-  A meta-logic formula $\phi$ is a
-  logical consequence of a set $S$ of meta-logic formulas
-  (noted $S \models \phi$)
-  when
-  $\M\models(\phi)^I\sim\mathsf{true}$ holds for any $\M$ and $I$ such that
-  $\M\models(\psi)^I\sim\mathsf{true}$ holds for all $\psi\in S$.
-  \adrien{This definition seems not necessary. We interpret meta-formula as (schemas of) first-order formulas. Hence entailment is exactly first-order logic entailment.}
-\end{definition}
-
-We want to verify that a formula $\phi$ (the security property)
-holds for all executions of some protocol, in all computational models
-satisfying some cryptographic assumptions.
-This can be guaranteed if we have $Ax\models\phi$
-where $Ax$ is a (recursive) set of axioms that are sound
-wrt.\ the intended class of meta-interpretations and computational models.
-We might be able to formulate such a set $Ax$ (which would consist of
-two parts, first the usual BC axioms, second some meta-logic axioms
-constraining the meta-interpretations to correspond to protocol executions).
-However, we will go for an easier task: designing a set of inference
-rules that allow to derive meta-logic formulas (rather, sequents)
-that are valid in all intended models.
-
-\subsection{Sequent calculus}
-
-In the tool, sequents come with an environment which explicitly
-declares all the variables that might occur free in the sequent's formulas.
-For simplicity, we do not include them here. We shall write $\vdash t:T$
-when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
-
-\begin{definition}
-  A sequent $\Gamma \vdash \phi$ is composed of a set of meta-logic formulas
-  $\Gamma$ and a meta-logic formula $\phi$.
-  It is valid when the meta-logic formula
-  $(\wedge\Gamma) \Rightarrow \phi$ is valid.
-\end{definition}
-
-\begin{proposition}
-  The rules of \cref{fig:lk,fig:names} are sound: if the premisses are valid,
-  then so is the conclusion.
-\end{proposition}
-
-\begin{figure}
-  \begin{mathpar}
-    \inferrule[Axiom]{~}{\Gamma,\phi\vdash\phi}
-    \quad\quad
-    \inferrule[Cut]{
-      \Gamma \vdash \phi
-      \quad
-      \Gamma,\phi \vdash \psi
-    }{
-      \Gamma \vdash \psi
-    }
-  \end{mathpar}
-  \begin{mathpar}
-  \inferrule[${\wedge}$-L]{
-    \Gamma,\phi,\phi'\vdash\psi
-  }{
-    \Gamma,\phi\wedge\phi'\vdash\psi
-  }
-  \quad\quad
-  \inferrule[${\wedge}$-R]{
-    \Gamma \vdash \phi
-    \quad
-    \Gamma \vdash \phi'
-  }{
-    \Gamma \vdash \phi\wedge\phi'
-  }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule[${\lnot}$-R]{
-      \Gamma, \phi \vdash \bot
-    }{
-      \Gamma \vdash \lnot\phi
-    }
-    \quad\quad
-    \inferrule[${\lnot}$-L]{
-      \Gamma \vdash \phi
-    }{
-      \Gamma,\lnot\phi \vdash \psi
-    }
-    \quad\quad
-    \inferrule[Raa]{
-      \Gamma, \lnot\phi \vdash \bot
-    }{
-      \Gamma \vdash \phi
-    }
-  \end{mathpar}
-  \begin{center}
-  \emph{other propositional rules of classical sequent calculus}
-  \end{center}
-  \begin{mathpar}
-      \inferrule[${=}$-R]{~}{\Gamma \vdash t=t} \quad\quad
-      \inferrule[${=}$-L]{
-        (\Gamma\vdash\phi)\{x\mapsto t',x'\mapsto t\}
-      }{
-        t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash
-        \phi\{x\mapsto t,x'\mapsto t'\}
-      }
-  \end{mathpar}
-  \begin{mathpar}
-     \inferrule[$\forall$-L]{
-       \Gamma,\phi\{x\mapsto t\} \vdash \psi
-       \quad
-       \vdash t:\T
-     }{
-       \Gamma,\forall x:\T.\phi \vdash \psi}
-     \quad\quad
-     \inferrule[$\forall$-R]{
-       \Gamma \vdash \phi}{\Gamma \vdash \forall x:\T:\phi}
-  \end{mathpar}
-   \caption{Generic inference rules. These are the rules of classical
-   first-order sequent calculus. In \textsc{$\forall$-R} we require that
-   $x$ does not appear free in $\Gamma$.}
-   \label{fig:lk}
-\end{figure}
-
-\begin{figure}
-  \begin{mathpar}
-  \inferrule{
-    \mathsf{n}\neq\mathsf{m}
-  }{
-    \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash \phi
-  }
-  \quad\quad
-  \inferrule{
-    \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash \phi
-  }{
-    \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
-  }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule{~}{
-      \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
-    }
-  \end{mathpar}
-  \caption{Inference rules for equalities on names.
-  The last rule only applies when, for any meta-interpretation $I$,
-  the term $(t)^I$ does not contain any message variable and does
-  not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
-  --- this condition will be over-approximated in our implementation.}
-  \label{fig:names}
-\end{figure}
-
-\begin{proposition}
-  The rules of \cref{fig:xor} are sound wrt.\ computational models
-  where $\oplus$ is interpreted as exclusive or:
-  if the premisses are valid in all such computational models,
-  then so is the conclusion.
-  \emph{Do we need to impose a condition on message lengths?}
-\end{proposition}
-
-\begin{figure}
-  \begin{mathpar}
-    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
-    \quad\quad
-    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
-    \quad\quad
-    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule{
-      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
-    }{
-      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
-    }
-  \end{mathpar}
-  \caption{Inference rules for exclusive or.
-  The tool does not follow these rules closely, but uses a more high-level
-  congruence closure algorithm modulo xor. The last rule is not implementated
-  at all and is here mostly for illustration purposes, and is subject to
-  the condition that, for any meta-interpretation $I$,
-  $(\Gamma\vdash\phi)^I$ does not contain instances of the names
-  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
-  This condition would be over-approximated in an implementation.}
-  \label{fig:xor}
-\end{figure}
-
-%%% Local Variables:
-%%% mode: latex
-%%% TeX-master: "main"
-%%% End:
