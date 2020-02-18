@@ -315,7 +315,9 @@ goal:
                  { Prover.Gm_goal ("unnamed_goal",
                                    Prover.make_trace_goal s f) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
-                 { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+    { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+| EQUIV s1=system s2=system n=ID DOT
+                 { Prover.Gm_goal (n, Prover.make_equiv_goal_process s1 s2) }
 | PROOF          { Prover.Gm_proof }
 
 theory:

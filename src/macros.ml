@@ -45,9 +45,9 @@ let is_defined name a =
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  system_id:Action.system_id -> a Sorts.sort ->
+  type a.  ?system_id:Action.system_id -> a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> a Term.term =
-  fun ~system_id sort name args a ->
+  fun ?(system_id=Term.None) sort name args a ->
   match sort with
   | Sorts.Message ->
     begin

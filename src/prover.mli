@@ -95,6 +95,9 @@ val make_equiv_goal :
   [ `Message of Theory.term | `Formula of Theory.formula ] list ->
   Goal.t
 
+(* Produces an equivalence goal based on the process and the two system ids. *)
+val make_equiv_goal_process : Action.system_id -> Action.system_id -> Goal.t
+
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed

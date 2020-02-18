@@ -200,7 +200,7 @@ val f_snd : fsymb
   * distinction between biterms (general terms) and terms (terms
   * without diff operators)? *)
 
-type projection = Left | Right
+type projection = Left | Right | None
 
 (** Evaluate all diff operators wrt a projection.
   * The returned term does not feature diff operators (including left/right)

@@ -352,6 +352,39 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   in
     Goal.Equiv (EquivSequent.init env (List.map convert l))
 
+
+(* TODO, this function creates a goal corresponding to a diff-equivalence of a
+   process. Because currently we do not have the basic tactics, I filter here
+   all the actions that do not contain a diff.
+*)
+let make_equiv_goal_process system_1 system_2 =
+  let goals = ref [] in
+  let add_action a =
+    let a_1, a_2 = Action.pi_descr system_1 a, Action.pi_descr system_2 a in
+    if a_1 <> a_2 then
+      begin
+        let env = ref Vars.empty_env in
+        let indices =
+          List.map
+            (fun i -> Vars.make_fresh_from_and_update env i)
+            a.Action.indices
+        in
+        let subst =
+          List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+            a.Action.indices indices
+        in
+        let name = Action.to_term (Action.subst_action subst a.Action.action) in
+        let term = Term.Macro(Term.frame_macro,[],name) in
+        goals := (Goal.Equiv (EquivSequent.init !env
+                                [(EquivSequent.Message term)]))::!goals
+      end
+  in
+  Action.iter_descrs add_action;
+  match !goals with
+  | [] -> failwith "error"
+  | [a] -> a
+  | p::q -> failwith "not supported yet"
+
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed

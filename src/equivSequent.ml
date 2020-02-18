@@ -50,6 +50,8 @@ let pp_init ppf j =
 
 let get_env j = j.env
 
+let get_systems j = j.id_left, j.id_right
+
 let get_biframe j = j.frame
 
 let set_biframe j f = { j with frame = f }

@@ -85,3 +85,72 @@ let () =
     (function
        | [Prover.Int i] -> pure_equiv (fa i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+
+let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
+  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let subst = match Theory.convert tsubst term Sorts.Boolean with
+    | Macro ((mn, sort, is),l,a) ->
+      [Term.ESubst (Macro ((mn, sort, is),l,a),
+                    Macros.get_definition sort mn is a)
+      ]
+    | exception _ ->
+      begin
+        match Theory.convert tsubst term Sorts.Message with
+        | Macro ((mn, sort, is),l,a) ->
+          [Term.ESubst (Macro ((mn, sort, is),l,a),
+                        Macros.get_definition sort mn is a)
+          ]
+        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+            (Tactics.Failure "Can only expand macros")
+      end
+    | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "Can only expand macros")
+  in
+  let apply_subst = function
+    | EquivSequent.Message e ->  EquivSequent.Message (Term.subst subst e)
+    | EquivSequent.Formula e ->  EquivSequent.Formula (Term.subst subst e)
+  in
+  sk [EquivSequent.set_biframe s
+        (List.map apply_subst (EquivSequent.get_biframe s))] fk
+
+let () = T.register_general "expand"
+    ~help:"expand macro hypothesis -> expand all occurences of the given macro."
+    (function
+       | [Prover.Theory v] -> pure_equiv (expand v)
+       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+           (Tactics.Failure "improper arguments"))
+
+let no_if i s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+    | before, e, after ->
+      begin try
+          let cond, positive_branch =
+            match e with
+            | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
+            | _ -> raise @@ Tactics.Tactic_Hard_Failure
+                (Tactics.Failure "improper arguments")
+          in
+          let biframe = List.rev_append before (positive_branch :: after) in
+          let left, right = EquivSequent.get_systems s in
+          let trace_sequent_left = TraceSequent.init ~system:left
+              (Term.Impl(cond,False))
+           in
+          let trace_sequent_right = TraceSequent.init ~system:right
+              (Term.Impl(cond,False))
+           in
+           sk [Prover.Goal.Trace trace_sequent_left;
+               Prover.Goal.Trace trace_sequent_right;
+               Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
+        with
+          | Tactics.Tactic_Soft_Failure err -> fk err
+        end
+    | exception Out_of_range ->
+        fk (Tactics.Failure "Out of range position")
+let () =
+  T.register_general "noif"
+    ~help:"Try to prove diff equivalence by proving that the condition implies \
+           False."
+    (function
+       | [Prover.Int i] -> only_equiv (no_if i)
+       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))

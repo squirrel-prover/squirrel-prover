@@ -1,0 +1,16 @@
+channel c
+system A: in(c,x);out(c,x);
+       B: in(c,y); if False then out(c,diff(x,y)) else out(c,zero).
+
+equiv [left] [right] test_left_bis.
+
+Proof.
+expand frame@B.
+fa 0.
+expand exec@B.
+expand cond@B.
+noif 1.
+simpl.
+simpl.
+refl.
+Qed.

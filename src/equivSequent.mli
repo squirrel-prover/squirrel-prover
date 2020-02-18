@@ -13,6 +13,8 @@ val pp_init : Format.formatter -> t -> unit
 
 val get_env : t -> Vars.env
 
+val get_systems : t -> Term.projection * Term.projection
+
 (** Get the list of biterms describing the two frames. *)
 val get_biframe : t -> elem list
 

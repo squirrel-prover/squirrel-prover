@@ -99,14 +99,20 @@ type descr = {
   * but (unlike [Term.projection]) they may be generalized in the future. *)
 type system_id = Term.projection
 
+
+
+(** [pi_descr s a] returns the projection of the description. *)
+val pi_descr : system_id -> descr -> descr
+
+
 (** [get_descr a] returns the description corresponding to the action [a].
     Raise Not_found if no action corresponds to [a]. *)
-val get_descr : system_id:system_id -> action -> descr
+val get_descr : ?system_id:system_id -> action -> descr
 
 (** Iterate over all action descriptions.
   * Only one representative of each action shape will be passed
   * to the function, with indices that are not guaranteed to be fresh. *)
-val iter_descrs : system_id:system_id -> (descr -> unit) -> unit
+val iter_descrs : ?system_id:system_id -> (descr -> unit) -> unit
 
 (** {2 Registration of actions} *)
 

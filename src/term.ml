@@ -416,7 +416,7 @@ let f_snd = mk_fname "snd" [emessage] emessage
 
 let dummy = Fun (mk_fname "_" [] emessage, [])
 
-type projection = Left | Right
+type projection = Left | Right | None
 
 let rec pi_term : type a. projection -> a term -> a term =
   fun s t ->
@@ -433,6 +433,7 @@ let rec pi_term : type a. projection -> a term -> a term =
       match s with
       | Left -> pi_term s a
       | Right -> pi_term s b
+      | None -> Diff(a, b)
     end
   | Left a -> pi_term Left a
   | Right a -> pi_term Right a

@@ -20,7 +20,7 @@ val is_defined : Symbols.macro Symbols.t -> Term.timestamp -> bool
 (** Return the term corresponding to the declared macro,
   * if the macro can be expanded. *)
 val get_definition :
-  system_id:Action.system_id -> 'a Sorts.sort ->
+  ?system_id:Action.system_id -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> 'a Term.term
 
 (** When [m] is a global macro symbol,

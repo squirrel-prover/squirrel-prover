@@ -263,10 +263,10 @@ let register symb indices action descr =
   Hashtbl.add action_to_descr (get_shape action) descr ;
   define_symbol symb indices action
 
-let iter_descrs ~system_id f =
+let iter_descrs ?(system_id=Term.None) f =
   Hashtbl.iter (fun _ b -> f (pi_descr system_id b)) action_to_descr
 
-let get_descr ~system_id a =
+let get_descr ?(system_id=Term.None) a =
   let descr = Hashtbl.find action_to_descr (get_shape a) in
   (* We know that [descr.action] and [a] have the same shape,
    * but run [same_shape] anyway to obtain the substitution from
