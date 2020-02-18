@@ -21,9 +21,9 @@ we require that the property holds in all traces that are actually executable
 always true, where $\phi_\tr$ expresses that the trace is executable.
 
 \begin{definition}
-  Given a trace $\tr$, its executability formula
-  is $\phi_\tr = \bigwedge_{\alpha\in\tr}
-  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}$.
+  Given a trace $\tr$, its executability formula is
+  $$\phi_\tr = \bigwedge_{\alpha\in\tr}
+  \phi_\alpha\{x_\alpha\mapsto\minp@\alpha,x^s_\alpha\mapsto s@\alpha\}$$.
 \end{definition}
 
 \begin{definition}

@@ -39,22 +39,46 @@ meta-interpretations.
     \item for each constant $a \in \Actions$ of index arity $k$,
     an interpretation $\hat{a} : D_\I^k \to D_\XT$ such that
     $\hat{a}(\ov{n}) = a(\ov{n})$;
-    \item for each macro symbol $m \in \M$, an interpretation $\hat{m}$:
+    \item for each macro symbol $m \in \M$ of index
+      arity $k$ and arity $n$, an interpretation
+      $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_\XT \to \Msg^{I_\tr}_\Sigma$,
+      where $\Msg^{I_\tr}_\Sigma$ is the set of terms of the base
+      logic for the (base logic) signature
+      $(\F^{I_\tr},\N^{I_\tr})$ with
+      $$\F^{I_\tr} =
+        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_\I \}
+        \text{ and }
+        \N^{I_\tr} = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
+        e_1,\ldots,e_k\in D_\I \}.$$
+      \footnote{\adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}}
     \begin{itemize}
-      \item $\hat{\minp}$ and $\hat{\mout}$ have arbitrary values on
-      $t_0$ and otherwise are uniquely defined by the following
+      \item $\hat{\minp}$ and $\hat{\mout}$ have arbitrary values on $t_0$
+      \item \solene{$\hat{s}(t_0) =$ ???
+      ---
+      I do not know what should I write here, because the value we give to
+      $\hat{s}(t_0)$ must be a term of the base logic for the (base logic)
+      signature $(\F^{I_\tr},\N^{I_\tr})$.
+      But the signature $(\F^{I_\tr},\N^{I_\tr})$ is not known at the time
+      we define a protocol (which seems the appropriate place to give the
+      initialisation parameters of each memory cells).}
+      \item otherwise, $\hat{\minp}$, $\hat{\mout}$ and $\hat{s}$
+      are uniquely defined by the following
       conditions, for all $i\in[1;n]$:
       $$\hat{\minp}(\alpha_i) =
-      g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))
-      \text{ and }
-      \hat{\mout}(\alpha_i) =
-      o_{\alpha_i}\{x_{\alpha_i}\mapsto\hat{\minp}(\alpha_i)\}.$$
-      \item \emph{TODO define the substitution for $x_s$ variables,
-      as well as $\hat{s}$\ldots}
+      g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))$$
+      $$\hat{\mout}(\alpha_i) =
+      o_{\alpha_i}\{x_{\alpha_i}\mapsto\hat{\minp}(\alpha_i),
+      x^s_{\alpha_i}\mapsto\hat{s}(\alpha_i)\}$$
+      $$\hat{s}(\alpha_i) = u_{\alpha_{i-1}}^{s}
+      \{x_{\alpha_{i-1}}\mapsto\hat{\minp}(\alpha_{i-1}),
+      x^s_{\alpha_{i-1}}\mapsto\hat{s}(\alpha_{i-1})\}$$
     \end{itemize}
   \end{itemize}
 \end{definition}
 
+Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
+D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^{I_\tr}$.
+\adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
 
 % \begin{definition}
 %   A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }}
@@ -98,17 +122,16 @@ meta-interpretations.
 %       \adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}
 %   \end{itemize}
 % \end{definition}
-%
-% Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
-% D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^I$.
-% \adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
+
+
+\paragraph{Meta-interpretation of terms and formulas with relation to a trace}
 
 Given a meta-interpretation $I_\tr$ for a given trace, we define the
 interpretation in $I_\tr$ of terms of the meta-logic as terms of the base logic.
 
 \begin{definition}
   Given a meta-interpretation $I_\tr$
-  we define $(T)^{I_\tr} \in D_\XT$ and $(t)^{I_\tr} \in \Msg^I_\Sigma$ as follows:
+  we define $(T)^{I_\tr} \in D_\XT$ and $(t)^{I_\tr} \in \Msg^{I_\tr}_\Sigma$ as follows:
   \begin{eqnarray*}
     (\tau)^{I_\tr} &=& \sigma_\XT(\tau) \\
     (\pre(T))^{I_\tr} &=& p((T)^{I_\tr}) \\
@@ -126,8 +149,8 @@ interpretation in $I_\tr$ of terms of the meta-logic as terms of the base logic.
     \\
     (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I_\tr} &=&
     \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
-      (t_1)^{I_\tr},\ldots,(t_n)^{I},
-      (T)^{I})
+      (t_1)^{I_\tr},\ldots,(t_n)^{I_\tr},
+      (T)^{I_\tr})
   \end{eqnarray*}
 \end{definition}
 

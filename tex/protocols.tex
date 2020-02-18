@@ -30,13 +30,14 @@ A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \Action
 \begin{itemize}
   \item a meta-logic formula $\phi_{\alpha}$ (intuitively, the condition of this action)
   \item a meta-logic term $o_{\alpha}$ (intuitively, the output of this action)
-  \item for each state macro symbol $\sfs$, a meta-logic term $u_{\alpha}^{\sfs}$ (intuitively, the update of $\sfs$ for this action)
+  \item for each state macro symbol $s$, a meta-logic term $u_{\alpha}^{s}$ (intuitively, the update of the memory cell $s$ for this action)
   \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
 \end{itemize}
-where $\phi_{\alpha}$, $u_{\alpha}^{\sfs}$ and $o_{\alpha}$ must not contain any
+where $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ must not contain any
 macro term and the only free variables that can occur in them are
 $x_\alpha$ (intuitively, the input of this action)
-and $x_\sfs$ where $\sfs$ is a state macro symbol.
+and $x^s_\alpha$ where $s$ is a state macro symbol (intuitively, the value
+of the memory cell at the time of this action).
 % ???
 % Names appearing in $\phi_{\alpha}$ and $o_{\alpha}$ are of the form $\sfn(i_1,\dots,i_k)$ with $k \leq n$.
 \end{definition}
