@@ -174,7 +174,7 @@ val dummy : Sorts.message term
 
 val in_macro : Sorts.message msymb
 val out_macro : Sorts.message msymb
-
+val frame_macro : Sorts.message msymb
 val cond_macro : Sorts.boolean msymb
 val exec_macro : Sorts.boolean msymb
 

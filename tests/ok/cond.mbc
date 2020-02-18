@@ -19,3 +19,9 @@ simpl.
 expand exec@O, H0.
 expand cond@O, H1.
 Qed.
+
+goal dummybis :
+ frame@O = <frame@pred(O),if exec@O then output@O else zero>.
+Proof.
+simpl.
+Qed.

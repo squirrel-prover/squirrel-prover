@@ -142,6 +142,9 @@ let function_kind f : kind list * kind =
                               Sorts.emessage
     | Macro Input -> [], Sorts.emessage
     | Macro Output -> [], Sorts.emessage
+    | Macro Frame -> [], Sorts.emessage
+    | Macro Cond -> [], Sorts.eboolean
+    | Macro Exec -> [], Sorts.eboolean
     | _ -> raise Untyped_symbol
 
 let check_state s n =
@@ -291,7 +294,7 @@ let rec convert :
       begin match sort with
         | Sorts.Message ->
             begin match of_string f with
-              | Wrapped (s, Macro (Input|Output)) ->
+              | Wrapped (s, Macro (Input|Output|Frame)) ->
                   check_arity "input" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | Wrapped (s, Macro (Global arity)) ->
@@ -523,7 +526,8 @@ let make_term ?at_ts s l =
         if at_ts <> None then raise Type_error ;
         if List.length targs <> List.length l then raise Type_error ;
         Fun (s,l,None)
-    | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec) ->
+    | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
+                    |Symbols.Frame) ->
         if at_ts = None || l <> [] then raise Type_error ;
         Fun (s,[],at_ts)
     | Symbols.Action arity ->

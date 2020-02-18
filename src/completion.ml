@@ -2,6 +2,9 @@ open Utils
 open Term
 
 module Cst = struct
+  type msym = Message of (Sorts.message Term.msymb)
+            | Bool of (Sorts.boolean Term.msymb)
+
   type t =
     (* Constant introduced when flattening *)
     | Cflat of int
@@ -11,7 +14,7 @@ module Cst = struct
     (* Constants appearing in the original terms *)
     | Cname of Term.nsymb
     | Cmvar of Vars.message
-    | Cmacro of (Sorts.message Term.msymb) * Term.timestamp
+    | Cmacro of (msym) * Term.timestamp
 
   let cst_cpt = ref 0
 
@@ -24,8 +27,8 @@ module Cst = struct
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> Term.pp_nsymb ppf n
     | Cmvar m -> Vars.pp ppf m
-    | Cmacro (m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
-
+    | Cmacro (Message m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
+    | Cmacro (Bool m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -56,21 +59,30 @@ let mk_var () =
   Cvar !var_cpt
 
 (** Translation from [term] to [cterm] *)
-let rec cterm_of_term =
-  let open Term in function
+let rec cterm_of_term c=
+  let open Term in
+  match c with
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
   | Name n -> Ccst (Cst.Cname n)
   | Var m -> Ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
-                      Ccst (Cst.Cmacro (m,ts))
-  | _ -> failwith "Not implemented"
+    Ccst (Cst.Cmacro (Cst.Message m,ts))
+  | ITE(b,c,d) -> Cfun( Term.f_ite, [cterm_of_bterm b; cterm_of_term c; cterm_of_term d])
+  | _ -> Fmt.pr "%a" Term.pp c; failwith "Not implemented"
+and
+  cterm_of_bterm c=
+  let open Term in
+  match c with
+  | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
+    Ccst (Cst.Cmacro (Cst.Bool m,ts))
+  | _ -> Fmt.pr "%a" Term.pp c; failwith "Not implemented"
 
 let rec term_of_cterm =
   let open Term in function
   | Cfun (f,cterms) -> Fun (f, List.map term_of_cterm cterms)
   | Ccst (Cst.Cname n) -> Name n
   | Ccst (Cst.Cmvar m) -> Var m
-  | Ccst (Cst.Cmacro (m,ts)) -> Macro (m,[],ts)
+  | Ccst (Cst.Cmacro (Cst.Message m,ts)) -> Macro (m,[],ts)
   | _ -> assert false
 
 

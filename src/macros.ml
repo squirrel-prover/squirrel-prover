@@ -16,7 +16,7 @@ open Term
 let is_defined name a =
   match Symbols.Macro.get_all name with
     | Symbols.Input, _ -> false
-    | Symbols.(Output | Cond | Exec | State _), _ ->
+    | Symbols.(Output | Cond | Exec | Frame | State _), _ ->
         (* We can expand the definitions of output@A and state@A
          * when A is an action name. We cannot do so for a variable
          * or a predecessor.
@@ -60,6 +60,12 @@ let get_definition :
             snd Action.((get_descr ~system_id action).output)
           | _ -> assert false
         end
+      | Symbols.Frame, _ ->
+        Term.Fun(Term.f_pair, [Term.Macro ((name,sort,args), [], Term.Pred a);
+                               Term.ITE( Term.Macro (Term.exec_macro, [], a),
+                                       Term.Macro (Term.out_macro, [], a),
+                                        Term.Fun( Term.f_zero,[]))
+                            ])
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->

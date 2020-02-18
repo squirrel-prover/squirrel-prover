@@ -29,6 +29,10 @@ class iter ~system_id = object (self)
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
+    | Macro ((mn, Sorts.Boolean, is),[],a) ->
+      (* TODO : if we visit the subterm here, we have a recursive infinite loop
+         due to exec. *)
+      ()
     | _ -> failwith "unsupported"
 
 end

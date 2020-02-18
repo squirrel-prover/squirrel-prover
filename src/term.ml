@@ -1,3 +1,4 @@
+
 (** Symbols *)
 
 type 'a indexed_symbol = 'a * Vars.index list
@@ -257,6 +258,12 @@ let exec_macro = (Symbols.Macro.declare_exact "exec" ~builtin:true
                    Symbols.Exec,
                  Sorts.Boolean,
                  [])
+
+let frame_macro = (Symbols.Macro.declare_exact "frame" ~builtin:true
+                   Symbols.Frame,
+                 Sorts.Message,
+                 [])
+
 
 let rec tts acc = function
   | Fun (_, lt) -> List.fold_left tts acc lt
