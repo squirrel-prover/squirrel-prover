@@ -653,11 +653,13 @@ let set_euf _ = { TraceSequent.t_euf = true }
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
 let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
-  let s, at =
-    TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
   try
+    let s, at =
+      TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
     sk (euf_apply_facts s at) fk
   with Euf.Bad_ssc -> fk Tactics.NoSSC
+     | Not_found -> raise @@ Tactics.Tactic_hard_failure
+         (Tactics.Failure "no hypothesis with the given name")
 
 let () =
   T.register_general "euf"

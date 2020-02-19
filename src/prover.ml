@@ -157,7 +157,8 @@ struct
 
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> failwith (Printf.sprintf "unknown tactic %S" id)
+      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let register_general id ?(help="") f =
     assert (not (Hashtbl.mem table id)) ;
@@ -200,7 +201,8 @@ struct
   let pp fmt id =
     let help_text =
       try (Hashtbl.find table id).help with
-      | Not_found -> failwith (Printf.sprintf "unknown tactic %S" id)
+      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
     in
     Fmt.pf fmt "@[<v 0>- %s - @. %s@]@." id help_text
 
