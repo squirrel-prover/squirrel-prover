@@ -14,7 +14,7 @@ let rec pp_tac_error ppf = function
          of the subgoal failed with error : %a"
         pp_tac_error t
   | NotEqualArguments -> Fmt.pf ppf "Arguments not equals."
-  | NoSSC -> Fmt.pf ppf "No equality involving a key which satisfies \
+  | NoSSC -> Fmt.pf ppf "No key which satisfies \
                  the syntactic condition has been found"
   | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
   | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
