@@ -65,24 +65,24 @@ let fresh prefix =
   in
   find i0
 
-exception Unbound_identifier
+exception Unbound_identifier of string
 exception Incorrect_namespace
-exception Multiple_declarations
+exception Multiple_declarations of string
 
 let exists s = Hashtbl.mem table s
 
 let get_data s = snd (Hashtbl.find table s)
 
 let def_of_string s =
-  try fst (Hashtbl.find table s) with Not_found -> raise Unbound_identifier
+  try fst (Hashtbl.find table s) with Not_found -> raise @@ Unbound_identifier s
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 let of_string s =
   try match Hashtbl.find table s with
     | Exists d, _ -> Wrapped (s,d)
-    | Reserved, _ -> raise Unbound_identifier
-  with Not_found -> raise Unbound_identifier
+    | Reserved, _ -> raise @@ Unbound_identifier s
+  with Not_found -> raise @@ Unbound_identifier s
 
 let run_restore f () =
   let copy = Hashtbl.copy table in
@@ -137,7 +137,7 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
       symb
 
   let declare_exact name ?(builtin=false) ?(data=Empty) value =
-    if Hashtbl.mem table name then raise Multiple_declarations ;
+    if Hashtbl.mem table name then raise @@ Multiple_declarations name;
     hashtbl_add ~builtin table name (Exists (M.construct value), data) ;
     name
 
@@ -153,12 +153,12 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
     try
       ignore (M.deconstruct (fst (Hashtbl.find table name))) ;
       name
-    with Not_found -> raise Unbound_identifier
+    with Not_found -> raise @@ Unbound_identifier name
 
   let def_of_string s =
     try
       M.deconstruct (fst (Hashtbl.find table s))
-    with Not_found -> raise Unbound_identifier
+    with Not_found -> raise @@ Unbound_identifier s
 
   let data_of_string s =
     try
@@ -167,13 +167,13 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
          * before returning the associated data. *)
         ignore (M.deconstruct def) ;
         data
-    with Not_found -> raise Unbound_identifier
+    with Not_found -> raise @@ Unbound_identifier s
 
   let iter f =
     Hashtbl.iter
       (fun s (def,data) ->
          try f s (M.deconstruct def) data with
-           | Unbound_identifier -> ())
+           | Incorrect_namespace -> ())
       table
 
 end
@@ -182,9 +182,9 @@ module Action = Make (struct
   type ns = action
   type local_def = int
   let construct d = Action d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Action d) -> d
-    | _ -> raise Unbound_identifier
+    | _ -> raise Incorrect_namespace
 end)
 
 module Name = Make (struct
@@ -193,7 +193,7 @@ module Name = Make (struct
   let construct d = Name d
   let deconstruct = function
     | Exists (Name d) -> d
-    | _ -> raise Unbound_identifier
+    | _ -> raise Incorrect_namespace
 end)
 
 module Channel = Make (struct
@@ -202,7 +202,7 @@ module Channel = Make (struct
   let construct d = Channel d
   let deconstruct = function
     | Exists (Channel d) -> d
-    | _ -> raise Unbound_identifier
+    | _ -> raise Incorrect_namespace
 end)
 
 module Function = Make (struct
@@ -211,7 +211,7 @@ module Function = Make (struct
   let construct d = Function d
   let deconstruct = function
     | Exists (Function d) -> d
-    | _ -> raise Unbound_identifier
+    | _ -> raise Incorrect_namespace
 end)
 
 module Macro = Make (struct
@@ -220,5 +220,5 @@ module Macro = Make (struct
   let construct d = Macro d
   let deconstruct = function
     | Exists (Macro d) -> d
-    | _ -> raise Unbound_identifier
+    | _ -> raise Incorrect_namespace
 end)

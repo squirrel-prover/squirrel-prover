@@ -92,15 +92,15 @@ let rec main_loop ?(test=false) ?(save=true) mode =
             Printer.pr "%a" pp_goal ();
             main_loop ~test ProofMode end
         with
-        | Tactic_Soft_Failure s ->
-          if test then raise @@ Tactic_Soft_Failure s
+        | Tactic_soft_failure s ->
+          if test then raise @@ Tactic_soft_failure s
           else
             begin
               let s = Printer.strf "%a" Tactics.pp_tac_error s in
               error ~test ProofMode ("Tactic failed: " ^ s ^ ".")
             end
-        | Tactic_Hard_Failure s ->
-          if test then raise @@ Tactic_Hard_Failure s
+        | Tactic_hard_failure s ->
+          if test then raise @@ Tactic_hard_failure s
           else
             begin
               let s = Printer.strf "%a" Tactics.pp_tac_error s in
@@ -174,17 +174,17 @@ let () =
   Parserbuf.add_suite_restore "Tactics" [
     "Substitution", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Hard_Failure Tactics.NotEqualArguments)
+        (Tactic_hard_failure Tactics.NotEqualArguments)
         (fun () -> run ~test "tests/alcotest/substitution.mbc")
     end ;
     "Collision", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Soft_Failure Tactics.NoSSC)
+        (Tactic_soft_failure Tactics.NoSSC)
         (fun () -> run ~test "tests/alcotest/collisions.mbc")
     end ;
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Hard_Failure (Tactics.Undefined "a1"))
+        (Tactic_hard_failure (Tactics.Undefined "a1"))
         (fun () -> run ~test "tests/alcotest/existsintro_fail.mbc")
     end ;
     "Vars not eq", `Quick, begin fun () ->
@@ -199,24 +199,24 @@ let () =
     end ;
     "Euf Mvar", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Soft_Failure NoSSC)
+        (Tactic_soft_failure NoSSC)
         (fun () -> run ~test "tests/alcotest/euf_mvar.mbc")
     end ;
     "Euf NoSSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Soft_Failure NoSSC)
+        (Tactic_soft_failure NoSSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Hard_Failure NoAssumpSystem)
+        (Tactic_hard_failure NoAssumpSystem)
         (fun () -> run ~test "tests/alcotest/biproc.mbc")
     end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_Soft_Failure (Tactics.Failure "Frames not identical"))
+        (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
         (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
     end ;
   ]

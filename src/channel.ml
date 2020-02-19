@@ -18,18 +18,19 @@ let () =
     Symbols.run_restore @@ fun () ->
       declare "a";
       Alcotest.check_raises "fails"
-        Symbols.Unbound_identifier
+        (Symbols.Unbound_identifier "c")
         (fun () -> ignore (of_string "c" [@coverage off])) ;
       Alcotest.check_raises "fails"
-        Symbols.Unbound_identifier
+        (Symbols.Unbound_identifier "d")
         (fun () -> ignore (of_string "d" [@coverage off])) ;
       declare "c" ;
       Alcotest.check_raises "fails"
-        Symbols.Unbound_identifier
+        (Symbols.Unbound_identifier "d")
         (fun () -> ignore (of_string "d" [@coverage off])) ;
       ignore (of_string "c") ;
       Alcotest.check_raises "fails"
-        Symbols.Multiple_declarations (fun () -> declare "c") ;
+        (Symbols.Multiple_declarations "c")
+        (fun () -> declare "c") ;
       declare "d" ;
       Alcotest.(check bool) "same channels"
         (of_string "c" = of_string "c")

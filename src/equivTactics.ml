@@ -74,7 +74,7 @@ let fa i s sk fk =
           let biframe = List.rev_append before (expand e @ after) in
           sk [EquivSequent.set_biframe s biframe] fk
         with
-          | Tactics.Tactic_Soft_Failure err -> fk err
+          | Tactics.Tactic_soft_failure err -> fk err
         end
     | exception Out_of_range ->
         fk (Tactics.Failure "Out of range position")
@@ -101,10 +101,10 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
           [Term.ESubst (Macro ((mn, sort, is),l,a),
                         Macros.get_definition sort mn is a)
           ]
-        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+        | _ -> raise @@ Tactics.Tactic_hard_failure
             (Tactics.Failure "Can only expand macros")
       end
-    | _ -> raise @@ Tactics.Tactic_Hard_Failure
+    | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "Can only expand macros")
   in
   let apply_subst = function
@@ -118,7 +118,7 @@ let () = T.register_general "expand"
     ~help:"expand macro hypothesis -> expand all occurences of the given macro."
     (function
        | [Prover.Theory v] -> pure_equiv (expand v)
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+       | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
 let no_if i s sk fk =
@@ -128,7 +128,7 @@ let no_if i s sk fk =
           let cond, positive_branch =
             match e with
             | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
-            | _ -> raise @@ Tactics.Tactic_Hard_Failure
+            | _ -> raise @@ Tactics.Tactic_hard_failure
                 (Tactics.Failure "improper arguments")
           in
           let biframe = List.rev_append before (positive_branch :: after) in
@@ -143,7 +143,7 @@ let no_if i s sk fk =
                Prover.Goal.Trace trace_sequent_right;
                Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
         with
-          | Tactics.Tactic_Soft_Failure err -> fk err
+          | Tactics.Tactic_soft_failure err -> fk err
         end
     | exception Out_of_range ->
         fk (Tactics.Failure "Out of range position")

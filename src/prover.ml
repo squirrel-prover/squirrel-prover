@@ -167,7 +167,7 @@ struct
     register_general id ~help:help
       (fun args j sk fk ->
          if args = [] then f j sk fk else
-           raise @@ Tactics.Tactic_Hard_Failure
+           raise @@ Tactics.Tactic_hard_failure
              (Tactics.Failure "this tactic does not take arguments"))
 
   let register_int id ?(help="") f =
@@ -175,7 +175,7 @@ struct
       (fun args j sk fk -> match args with
          | [Int x] -> f x j sk fk
          | _ ->
-             raise @@ Tactics.Tactic_Hard_Failure
+             raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "int argument expected"))
 
   let register_formula id ?(help="") f =
@@ -183,7 +183,7 @@ struct
       (fun args j sk fk -> match args with
          | [Formula x] -> f x j sk fk
          | _ ->
-             raise @@ Tactics.Tactic_Hard_Failure
+             raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "formula argument expected"))
 
   let register_fname id ?(help="") f =
@@ -191,7 +191,7 @@ struct
       (fun args j sk fk -> match args with
          | [Function_name x] -> f x j sk fk
          | _ ->
-             raise @@ Tactics.Tactic_Hard_Failure
+             raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "function name argument expected"))
 
   let register_macro id ?(help="") m =
@@ -245,7 +245,7 @@ let () =
     (function
       | [] -> get_help ""
       | [String_name tac_name]-> get_help tac_name
-      | _ ->  raise @@ Tactics.Tactic_Hard_Failure
+      | _ ->  raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure"improper arguments")) ;
   TraceTactics.register "id" ~help:"Identity." Tactics.id
 
@@ -326,7 +326,7 @@ let get_goal_formula gname =
     | [(_,Goal.Trace f)] ->
         assert (TraceSequent.get_env f = Vars.empty_env) ;
         TraceSequent.get_conclusion f, TraceSequent.system_id f
-    | [] -> raise @@ Tactics.Tactic_Hard_Failure
+    | [] -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
 
@@ -406,7 +406,7 @@ let complete_proof () =
     current_goal := None;
     subgoals := []
   with Not_found ->
-    raise @@ Tactics.Tactic_Hard_Failure
+    raise @@ Tactics.Tactic_hard_failure
       (Tactics.Failure "Cannot complete proof \
                with empty current goal")
 
@@ -438,7 +438,7 @@ let eval_tactic_focus tac = match !subgoals with
 
 let cycle i l =
   let rec cyc acc i = function
-    | [] -> raise @@ Tactics.Tactic_Hard_Failure
+    | [] -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "Cycle error.")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))

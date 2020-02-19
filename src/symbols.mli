@@ -54,8 +54,8 @@ type some_def =
 type data = ..
 type data += Empty
 
-exception Multiple_declarations
-exception Unbound_identifier
+exception Multiple_declarations of string
+exception Unbound_identifier of string
 exception Incorrect_namespace
 
 (** Converts a symbol to a string, for printing purposes. *)

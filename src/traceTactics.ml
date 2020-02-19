@@ -114,7 +114,7 @@ let hypothesis_case hypothesis_name (s : TraceSequent.t) sk fk =
   let formulas = disjunction_to_list [] [f] in
   if List.length formulas = 1 then
     raise @@
-    Tactics.Tactic_Hard_Failure
+    Tactics.Tactic_hard_failure
       (Tactics.Failure "Can only be applied to a disjunction.") ;
   sk (List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas) fk
 
@@ -127,7 +127,7 @@ let case th s sk fk =
       begin
         match th with
         | Theory.Var m -> hypothesis_case m s sk fk
-        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+        | _ -> raise @@ Tactics.Tactic_hard_failure
             (Tactics.Failure "improper arguments")
       end
     | ts -> timestamp_case ts s sk fk
@@ -141,7 +141,7 @@ let () =
            on the left, creating corresponding subgoals."
     (function
        | [Prover.Theory th] -> case th
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+       | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
 let false_left s sk fk =
@@ -157,7 +157,7 @@ let () =
     ~help:"false_left -> close a goal when False is among its assumptions"
     (function
        | [] -> false_left
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+       | _ -> raise @@ Tactics.Tactic_hard_failure
                          (Tactics.Failure "no argument allowed"))
 
 (** [goal_intro judge sk fk] perform one introduction, either of a forall
@@ -211,7 +211,7 @@ let goal_exists_intro ths (s : TraceSequent.t) sk fk =
       let nu = Theory.parse_subst (TraceSequent.get_env s) vs ths in
       let new_formula = Term.subst nu f in
       sk [TraceSequent.set_conclusion new_formula s] fk
-    with Theory.Undefined x -> raise @@ Tactics.Tactic_Hard_Failure
+    with Theory.(Conv (Undefined x)) -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Undefined x)
   end
   | _ -> fk (Tactics.Failure "Cannot introduce an exists")
@@ -227,7 +227,7 @@ let () =
          List.map
            (function
               | Prover.Theory tm -> tm
-              | _ -> raise @@ Tactic_Hard_Failure
+              | _ -> raise @@ Tactic_hard_failure
                   (Tactics.Failure "Improper arguments"))
            l
        in
@@ -258,7 +258,7 @@ let () =
     ~help:"exists-left H -> introduce existential quantifier in hypothesis H"
     (function
       | [Prover.Theory (Theory.Var h)] -> exists_left h
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+      | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
 let () =
@@ -360,17 +360,17 @@ let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
       [Term.ESubst (Macro ((mn, sort, is),l,a),
                     Macros.get_definition ~system_id sort mn is a)
       ]
-    | exception Theory.Type_error ->
+    | exception Theory.Conv (Theory.Type_error _)->
       begin
         match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           [Term.ESubst (Macro ((mn, sort, is),l,a),
                         Macros.get_definition ~system_id sort mn is a)
           ]
-        | _ -> raise @@ Tactics.Tactic_Hard_Failure
+        | _ -> raise @@ Tactics.Tactic_hard_failure
             (Tactics.Failure "Can only expand macros")
       end
-    | _ -> raise @@ Tactics.Tactic_Hard_Failure
+    | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "Can only expand macros")
   in
   sk [TraceSequent.add_formula ~prefix (Term.subst subst f) s] fk
@@ -380,7 +380,7 @@ let () = T.register_general "expand"
            inside the hypothesis."
     (function
        | [Prover.Theory v1; Prover.Theory (Theory.Var v2)] -> expand v1 v2
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+       | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
 
@@ -539,7 +539,7 @@ let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
-        raise @@ Tactic_Hard_Failure
+        raise @@ Tactic_hard_failure
           (Tactics.NotEqualArguments)
     | exception _ ->
       match
@@ -551,7 +551,7 @@ let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
       else
-        raise @@ Tactic_Hard_Failure
+        raise @@ Tactic_hard_failure
           (Tactics.NotEqualArguments)
       | exception _ ->
         match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
@@ -560,9 +560,9 @@ let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
           if Constr.query models [(`Index (`Eq,i1,i2))] then
             [Term.ESubst (Term.Var i1,Term.Var i2)]
           else
-            raise @@ Tactic_Hard_Failure
+            raise @@ Tactic_hard_failure
               (Tactics.NotEqualArguments)
-        | exception _ ->  raise @@ Tactic_Hard_Failure
+        | exception _ ->  raise @@ Tactic_hard_failure
             (Tactics.Failure "Improper arguments.")
   in
   sk [TraceSequent.apply_subst subst s] fk
@@ -573,7 +573,7 @@ let () =
            replaces all occurences of i1 by i2 inside the sequent."
     (function
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
-       | _ -> raise @@ Tactics.Tactic_Hard_Failure
+       | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
 
@@ -584,9 +584,9 @@ let euf_param (`Message at : message_atom) = match at with
   | (`Eq, s, Fun ((hash, _), [m; Name key]))->
     if Theory.is_hash hash then
       (hash, key, m, s)
-    else raise @@ Tactic_Hard_Failure
+    else raise @@ Tactic_hard_failure
         (Tactics.Failure "The function symbol is not a hash function.")
-  | _ -> raise @@ Tactic_Hard_Failure
+  | _ -> raise @@ Tactic_hard_failure
       (Tactics.Failure
          "Euf can only be applied to hypothesis of the form h(t,k)=m.")
 
@@ -664,7 +664,7 @@ let () =
     ~help:"euf H -> applies the euf axiom to the given hypothesis name."
     (function
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+      | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
 (** [apply gp ths judge sk fk] applies the formula named [gp],
@@ -677,7 +677,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
       | Not_found -> Prover.get_goal_formula id
   in
   if system <> TraceSequent.system_id s then
-    raise @@ Tactics.Tactic_Hard_Failure Tactics.NoAssumpSystem;
+    raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f
@@ -710,12 +710,12 @@ let () =
             List.map
               (function
                  | Prover.Theory th -> th
-                 | _ -> raise @@ Tactic_Hard_Failure
+                 | _ -> raise @@ Tactic_hard_failure
                      (Tactics.Failure "improper arguments"))
               th_terms
           in
           apply id th_terms
-      | _ -> raise @@ Tactics.Tactic_Hard_Failure
+      | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs

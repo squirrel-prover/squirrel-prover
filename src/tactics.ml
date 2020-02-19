@@ -20,9 +20,9 @@ let rec pp_tac_error ppf = function
   | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
                                   current system"
 
-exception Tactic_Soft_Failure of tac_error
+exception Tactic_soft_failure of tac_error
 
-exception Tactic_Hard_Failure of tac_error
+exception Tactic_hard_failure of tac_error
 
 type a
 
@@ -65,7 +65,7 @@ let andthen tac1 tac2 judge sk fk =
     fk
 
 let rec andthen_list = function
-  | [] -> raise (Tactic_Hard_Failure (Failure "empty anthen_list"))
+  | [] -> raise (Tactic_hard_failure (Failure "empty anthen_list"))
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
@@ -189,11 +189,11 @@ module AST (M:S) = struct
     let tac = eval ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
-    let fk tac_error = raise @@ Tactic_Soft_Failure tac_error in
+    let fk tac_error = raise @@ Tactic_soft_failure tac_error in
     let sk l _ = raise (Return l) in
     try ignore (tac j sk fk) ; assert false with Return l -> l
 
 end
 
-let soft_failure e = raise (Tactic_Soft_Failure e)
-let hard_failure e = raise (Tactic_Hard_Failure e)
+let soft_failure e = raise (Tactic_soft_failure e)
+let hard_failure e = raise (Tactic_hard_failure e)

@@ -10,10 +10,10 @@
     in
       lexbuf.Lexing.lex_curr_p <- q
 
-  exception LexicalError of string
+  exception Lexical_error of string
 
   let unterminated_comment () =
-    raise (LexicalError "unterminated comment")
+    raise (Lexical_error "unterminated comment")
 
 
 }

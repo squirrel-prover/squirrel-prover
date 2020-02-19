@@ -26,29 +26,24 @@ let pp_error pp_loc e = match e with
                 "@[Error %a: @,%s.@]@."
                 pp_loc ()
                 s)
-  | Theory.Type_error ->
+  | Symbols.Unbound_identifier s->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Type error %a.@]@."
-                pp_loc ())
-  | Symbols.Unbound_identifier ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[Unbound identifier %a.@]@."
-                pp_loc ())
-  | Symbols.Multiple_declarations ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[Multiple declarations %a.@]@."
-                pp_loc ())
-  | Theory.Arity_error (s,i,j) ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[Arity error %a: @,\
-                   %s is passed %d arguments @,\
-                   but has arity %d.@]@."
+                "@[Unbound identifier %a : %s.@]@."
                 pp_loc ()
-                s i j)
+                s)
+  | Symbols.Multiple_declarations s ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Multiple declarations %a : %s.@]@."
+                pp_loc ()
+                s)
+  | Theory.Conv err ->
+      Some (fun ppf () ->
+              Fmt.pf ppf
+                "@[Error %a: %a.@]@."
+                pp_loc ()
+                Theory.pp_error err)
   | _ -> None
 
 (** Pretty-printer for parsing locations. *)
@@ -241,7 +236,7 @@ let () =
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Symbols.Multiple_declarations
+        (Symbols.Multiple_declarations "c")
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
     end ;
     "Action creation", `Quick, begin fun () ->
@@ -277,22 +272,22 @@ let () =
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.Type_error
+        Theory.(Conv (Timestamp_unexpected (Var "n")))
         (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.mbc")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.Type_error
+                 Theory.(Conv (Arity_error ("C",1,0)))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_type.mbc")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.Type_error
+                 Theory.(Conv (Undefined "D"))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.mbc")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Symbols.Multiple_declarations
+        (Symbols.Multiple_declarations "C")
       (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.mbc")
     end ;
   ];;

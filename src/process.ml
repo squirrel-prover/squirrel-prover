@@ -139,19 +139,22 @@ let rec check_proc env = function
     Theory.check ~local:true env test Sorts.eboolean ;
     check_proc env p
   | Apply (id, ts) ->
-    begin try
+    begin
+      try
         let kind,_ = pkind_of_pname id in
+        if List.length kind <> List.length ts then
+          raise @@
+          Theory.(Conv (Arity_error (id, List.length ts, List.length kind)));
         List.iter2
           (fun (_, k) t -> Theory.check ~local:true env t k)
           kind ts
       with
-      | Not_found -> raise Theory.Type_error
-      | Invalid_argument _ -> raise Theory.Type_error
+      | Not_found -> raise @@ Theory.(Conv (Undefined id))
     end
   | Alias (p,_) -> check_proc env p
 
 let declare id args proc =
-  if Hashtbl.mem pdecls id then raise Symbols.Multiple_declarations ;
+  if Hashtbl.mem pdecls id then raise @@ Symbols.Multiple_declarations id;
   check_proc args proc ;
   Hashtbl.add pdecls id (args, proc)
 

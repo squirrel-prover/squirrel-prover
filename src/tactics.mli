@@ -36,11 +36,11 @@ type tac_error =
   | Undefined of string
 
 (** Tactics should raise this exception if they are ill-formed. *)
-exception Tactic_Hard_Failure of tac_error
+exception Tactic_hard_failure of tac_error
 
 (** This tactic should be raised by the evaluation of a tactic, based on the
     tac_error returned by its failure. *)
-exception Tactic_Soft_Failure of tac_error
+exception Tactic_soft_failure of tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
 

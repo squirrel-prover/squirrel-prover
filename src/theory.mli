@@ -96,11 +96,18 @@ val make_pair : term -> term -> term
 
 (** {2 Type-checking} *)
 
-exception Type_error
+type conversion_error =
+  | Arity_error of string*int*int
+  | Untyped_symbol of string
+  | Index_error of string*int*int
+  | Undefined of string
+  | Type_error of term * Sorts.esort
+  | Timestamp_expected of term
+  | Timestamp_unexpected of term
 
-(** [Arity_error (s,i,j)] means that symbol [s] is used with
-  * arity [i] when it actually has arity [j]. *)
-exception Arity_error of string*int*int
+exception Conv of conversion_error
+
+val pp_error : Format.formatter -> conversion_error -> unit
 
 type env = (string*Sorts.esort) list
 
@@ -126,9 +133,6 @@ val parse_subst :
 val pp_subst : Format.formatter -> subst -> unit
 
 val conv_index : subst -> term -> Vars.index
-
-exception Undefined of string
-exception TypeError of string
 
 val convert :
   ?at:Term.timestamp ->

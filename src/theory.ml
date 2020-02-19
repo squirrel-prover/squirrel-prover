@@ -23,7 +23,7 @@ type term =
     * where terms will be evaluated as indices or messages
     * depending on the type of the function symbol.
     * The third argument is for the optional timestamp. This is used for
-    * the terms appearing in goals.*)
+    * the terms appearing in gols.*)
   | Compare of Atom.ord*term*term
   | Happens of term
   | ForAll of (string * kind) list * term
@@ -114,23 +114,44 @@ let pp = pp_term
 
 (** Type checking *)
 
-exception Type_error
+type conversion_error =
+  | Arity_error of string*int*int
+  | Untyped_symbol of string
+  | Index_error of string*int*int
+  | Undefined of string
+  | Type_error of term * Sorts.esort
+  | Timestamp_expected of term
+  | Timestamp_unexpected of term
 
-exception Not_local_term
+exception Conv of conversion_error
 
-exception Arity_error of string*int*int
+let pp_error ppf = function
+  | Arity_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with arity %i, but \
+                                      defined with arity %i" s i j
+  | Untyped_symbol s -> Fmt.pf ppf "Symbol %s is not typed" s
+  | Index_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with %i indexes, but \
+                                       defined with %i indexes" s i j
+  | Undefined s -> Fmt.pf ppf "Symbol %s is undefined" s
+  | Type_error (s, sort) -> Fmt.pf ppf "Term %a is not of type %a"
+                              pp s
+                              Sorts.pp_e sort
+  | Timestamp_expected t -> Fmt.pf ppf
+                              "The term %a must be given a timestamp." pp t
+  | Timestamp_unexpected t -> Fmt.pf ppf
+                              "The term %a must not be given a timestamp." pp t
 
 let check_arity s actual expected =
-  if actual <> expected then raise (Arity_error (s,actual,expected))
+  if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
 
 type env = (string*kind) list
 
-exception Untyped_symbol
+
 
 let function_kind f : kind list * kind =
   let open Symbols in
   match def_of_string f with
-  | Reserved -> raise Untyped_symbol
+  | Reserved -> assert false (* we should never encounter a situation where we
+                                try to type a reserved symbol. *)
   | Exists d ->
     match d with
     | Function (_, Hash) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
@@ -145,7 +166,7 @@ let function_kind f : kind list * kind =
     | Macro Frame -> [], Sorts.emessage
     | Macro Cond -> [], Sorts.eboolean
     | Macro Exec -> [], Sorts.eboolean
-    | _ -> raise Untyped_symbol
+    | _ -> raise @@ Conv (Untyped_symbol f)
 
 let check_state s n =
   match Symbols.def_of_string s with
@@ -156,14 +177,16 @@ let check_state s n =
 
 let check_name s n =
   try
-    if Symbols.Name.def_of_string s <> n then raise Type_error
-  with Symbols.Unbound_identifier -> assert false
+    let arity = Symbols.Name.def_of_string s in
+    if arity <> n then raise @@ Conv (Index_error (s,n,arity))
+  with Symbols.Unbound_identifier _ -> assert false
 
 let check_action s n =
   match Action.find_symbol s with
-    | (l, _) ->
-        if List.length l <> n then raise Type_error
-    | exception Not_found -> assert false
+  | (l, _) ->
+    let arity = List.length l in
+    if arity <> n then raise @@ Conv (Index_error (s,n,arity))
+  | exception Not_found -> assert false
 
 (* Conversion *)
 type esubst = ESubst : string * 'a Term.term -> esubst
@@ -177,18 +200,16 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
 
-exception Undefined of string
-exception TypeError of string
-
 let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
 fun subst st kind ->
   match subst with
-  | [] -> raise @@ Undefined st
+  | [] -> raise @@ Conv (Undefined st)
   | ESubst (v,t)::_ when v = st ->
       begin try
         Term.cast kind t
       with
-        | Term.Uncastable -> raise @@ TypeError st
+      | Term.Uncastable -> raise @@ Conv (Type_error (Var st,
+                                                      Sorts.ESort kind))
       end
   | _::q -> assoc q st kind
 
@@ -220,8 +241,11 @@ let rec convert :
       | _ -> failwith "index terms must be restricted to variables"
   in
 
-  let get_at () = match at with None -> raise Not_local_term | Some ts -> ts in
-
+  let get_at () =
+    match at with None -> raise @@ Conv (Timestamp_expected tm)
+                              | Some ts -> ts
+  in
+  let type_error = Conv (Type_error (tm, Sorts.ESort sort)) in
   match tm with
 
   | Var x -> assoc subst x sort
@@ -242,20 +266,20 @@ let rec convert :
   | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_true) ->
       begin match sort with
         | Sorts.Boolean -> Term.True
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_false) ->
       begin match sort with
         | Sorts.Boolean -> Term.False
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Compare (`Eq, u, Fun (f,[],None))
       when f = Symbols.to_string (fst Term.f_true) ->
       begin match sort with
         | Sorts.Boolean -> conv sort u
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   (* End of special cases. *)
@@ -284,11 +308,11 @@ let rec convert :
                   end
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)" f)
             end
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Fun (f, l, Some ts) ->
-      if at <> None then raise Not_local_term ;
+      if at <> None then raise @@ Conv (Timestamp_unexpected tm) ;
       let open Symbols in
       let open Symbols in
       begin match sort with
@@ -313,7 +337,7 @@ let rec convert :
                   Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
             end
-        | _ -> raise (TypeError f)
+        | _ -> raise type_error
       end
 
   | Get (s,opt_ts,is) ->
@@ -325,12 +349,12 @@ let rec convert :
         match opt_ts,at with
           | None, Some ts -> ts
           | Some ts, None -> conv Sorts.Timestamp ts
-          | Some _, Some _ -> raise Not_local_term
-          | None, None -> failwith "ill-formed state lookup without timestamp"
+          | Some _, Some _ -> raise @@ Conv (Timestamp_unexpected tm)
+          | None, None -> raise @@ Conv (Timestamp_expected tm)
       in
       begin match sort with
         | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Name (s, is) ->
@@ -338,7 +362,7 @@ let rec convert :
       begin match sort with
         | Sorts.Message ->
             Term.Name (Symbols.Name.of_string s, List.map conv_index is)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Taction (a,is) ->
@@ -346,19 +370,19 @@ let rec convert :
       begin match sort with
         | Sorts.Timestamp ->
             Term.Action (Symbols.Action.of_string a, List.map conv_index is)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Tinit ->
       begin match sort with
         | Sorts.Timestamp -> Term.Init
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Tpred t ->
       begin match sort with
         | Sorts.Timestamp -> Term.Pred (conv Sorts.Timestamp t)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Diff (l,r) -> Term.Diff (conv sort l, conv sort r)
@@ -369,33 +393,33 @@ let rec convert :
       begin match sort with
         | Sorts.Message ->
             Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | And (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.And (conv sort l, conv sort r)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
   | Or (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.Or (conv sort l, conv sort r)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
   | Impl (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.Impl (conv sort l, conv sort r)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
   | Not t ->
       begin match sort with
         | Sorts.Boolean -> Term.Not (conv sort t)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
   | True | False ->
       begin match sort with
         | Sorts.Boolean -> if tm = True then Term.True else Term.False
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Compare (o,u,v) ->
@@ -406,25 +430,25 @@ let rec convert :
                 (`Timestamp (o,
                              conv Sorts.Timestamp u,
                              conv Sorts.Timestamp v))
-            with TypeError _ | Type_error ->
+            with Conv _ ->
               match o with
                 | #Atom.ord_eq as o ->
                     begin try
                       Term.Atom (`Index (o, conv_index u, conv_index v))
-                    with TypeError _ | Type_error ->
+                    with Conv _ ->
                       Term.Atom (`Message (o,
                                            conv Sorts.Message u,
                                            conv Sorts.Message v))
                     end
-                | _ -> raise Type_error
+                | _ -> raise type_error
             end
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Happens t ->
       begin match sort with
         | Sorts.Boolean -> Term.Atom (`Happens (conv Sorts.Timestamp t))
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | Find (vs,c,t,e) ->
@@ -434,7 +458,7 @@ let rec convert :
           | ESubst (_,Term.Var v) ->
               begin match Vars.sort v with
                 | Sorts.Index -> v
-                | _ -> raise Type_error
+                | _ -> raise type_error
               end
           | _ -> assert false
         in
@@ -446,7 +470,7 @@ let rec convert :
             let t = conv ~subst:(new_subst@subst) sort t in
             let e = conv sort e in
             Term.Find (is,c,t,e)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
   | ForAll (vs,f) | Exists (vs,f) ->
@@ -462,7 +486,7 @@ let rec convert :
       begin match sort,tm with
         | Sorts.Boolean, ForAll _ -> Term.ForAll (vs,f)
         | Sorts.Boolean, Exists _ -> Term.Exists (vs,f)
-        | _ -> raise Type_error
+        | _ -> raise type_error
       end
 
 let conv_index subst t =
@@ -491,6 +515,8 @@ let declare_abstract s arg_types k =
 (** Term builders *)
 
 let make_term ?at_ts s l =
+  let arity_error i = Conv (Arity_error (s, List.length l, i)) in
+  let ts_unexpected = Conv (Timestamp_unexpected (Var s)) in
   match Symbols.def_of_string s with
   | Symbols.Reserved -> assert false
   | Symbols.Exists d -> begin match d with
@@ -498,46 +524,50 @@ let make_term ?at_ts s l =
         (* We do not support indexed symbols,
          * which would require a distinction between
          * function arguments and function indices. *)
-        if a <> 0 then raise Type_error ;
-        if at_ts <> None then raise Type_error ;
+      if a <> 0 then raise @@ Conv (Index_error (s,a,0));
+        if at_ts <> None then raise ts_unexpected;
         begin match i with
           | Symbols.Hash ->
-              if List.length l <> 2 then raise Type_error ;
+              if List.length l <> 2 then raise @@ arity_error 2 ;
               Fun (s,l,None)
           | Symbols.AEnc ->
-              if List.length l <> 3 then raise Type_error ;
+              if List.length l <> 3 then raise @@ arity_error 3 ;
               Fun (s,l,None)
           | Symbols.Abstract (args,_) ->
-              if List.length args <> List.length l then raise Type_error ;
+            if List.length args <> List.length l then
+              raise @@ arity_error (List.length args);
               Fun (s,l,None)
         end
     | Symbols.Name arity ->
-        if at_ts <> None then raise Type_error ;
+        if at_ts <> None then raise ts_unexpected;
         check_arity s (List.length l) arity ;
         Name (s,l)
     | Symbols.Macro (Symbols.State (arity,_)) ->
         check_arity s (List.length l) arity ;
         Get (s,at_ts,l)
     | Symbols.Macro (Symbols.Global arity) ->
-        if at_ts <> None then raise Type_error ;
-        if List.length l <> arity then raise Type_error ;
+        if at_ts <> None then raise ts_unexpected;
+        if List.length l <> arity then raise @@ arity_error arity;
         Fun (s,l,at_ts)
     | Symbols.Macro (Symbols.Local (targs,_)) ->
-        if at_ts <> None then raise Type_error ;
-        if List.length targs <> List.length l then raise Type_error ;
+        if at_ts <> None then raise ts_unexpected;
+        if List.length targs <> List.length l then
+          raise @@ arity_error (List.length targs) ;
         Fun (s,l,None)
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
-        if at_ts = None || l <> [] then raise Type_error ;
+      if at_ts = None then
+        raise @@ Conv (Timestamp_expected (Var s));
+      if l <> [] then raise @@ arity_error 0;
         Fun (s,[],at_ts)
     | Symbols.Action arity ->
-        if arity <> List.length l then raise Type_error ;
+        if arity <> List.length l then raise @@ arity_error arity ;
         Taction (s,l)
     | _ ->
         Printer.prt `Error "incorrect %s@." s ;
         raise Symbols.Incorrect_namespace
     end
-  | exception Symbols.Unbound_identifier ->
+  | exception Symbols.Unbound_identifier s ->
       (* By default we interpret s as a variable,
        * but this is only possible if it is not indexed.
        * If that is not the case, the user probably meant
@@ -547,7 +577,7 @@ let make_term ?at_ts s l =
        * a sort that can be applied to indices. *)
       if l <> [] then begin
         Printer.prt `Error "incorrect %s@." s ;
-        raise Symbols.Unbound_identifier
+        raise @@ Symbols.Unbound_identifier s
       end ;
       Var s
 
@@ -656,11 +686,11 @@ let () =
       declare_hash "h" ;
       Alcotest.check_raises
         "h cannot be defined twice"
-        Symbols.Multiple_declarations
+        (Symbols.Multiple_declarations "h")
         (fun () -> declare_hash "h") ;
       Alcotest.check_raises
         "h cannot be defined twice"
-        Symbols.Multiple_declarations
+        (Symbols.Multiple_declarations "h")
         (fun () -> declare_aenc "h")
     end in
     let g = Symbols.run_restore @@ fun () -> declare_hash "h" in
@@ -672,7 +702,7 @@ let () =
       ignore (make_term "x" []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
-        Type_error
+        (Conv (Arity_error ("h",1,2)))
         (fun () ->
            ignore (make_term "h" [make_term "x" []])) ;
       ignore (make_term "h" [make_term "x" []; make_term "y" []])
@@ -688,7 +718,7 @@ let () =
       check env t Sorts.emessage ;
       Alcotest.check_raises
         "message is not a boolean"
-        Type_error
+        (Conv (Type_error (t, Sorts.eboolean)))
         (fun () -> check env t Sorts.eboolean)
     end
   ]
