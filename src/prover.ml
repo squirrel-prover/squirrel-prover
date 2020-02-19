@@ -204,14 +204,16 @@ struct
       | Not_found -> raise @@ Tactics.Tactic_hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
     in
-    Fmt.pf fmt "@[<v 0>- %s - @. %s@]@." id help_text
+    Fmt.pf fmt  "@.@[<v 0>- %a - @[ %s @]@]@."
+                  Fmt.(styled `Bold (styled `Magenta Utils.ident))
+                  id help_text
 
   let pps fmt () =
     let helps =
       Hashtbl.fold (fun name tac acc -> (name, tac.help)::acc) table []
     |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
     in
-    List.iter (fun (name, help) -> Fmt.pf fmt "@.@[<v 0>- %a - @. %s@]@."
+    List.iter (fun (name, help) -> Fmt.pf fmt "@.@[<v 0>- %a - @[ %s @]@]@."
                   Fmt.(styled `Bold (styled `Magenta Utils.ident))
                   name
                   help) helps
@@ -234,28 +236,47 @@ and EquivAST : Tactics.AST_sig
 
 let pp_ast fmt t = TraceAST.pp fmt t
 
-let get_help tac_name =
+let get_trace_help tac_name =
   if tac_name = "" then
     Printer.prt `Result "%a" TraceTactics.pps ()
   else
     Printer.prt `Result "%a." TraceTactics.pp tac_name;
   Tactics.id
 
+let get_equiv_help tac_name =
+  if tac_name = "" then
+    Printer.prt `Result "%a" EquivTactics.pps ()
+  else
+    Printer.prt `Result "%a." EquivTactics.pp tac_name;
+  Tactics.id
+
+
 let () =
   TraceTactics.register "admit"
-    ~help:"Closes the current goal."
+    ~help:"Closes the current goal.\
+           \n Usage: admit."
     (fun _ sk fk -> sk [] fk) ;
   EquivTactics.register "admit"
-    ~help:"Closes the current goal."
+    ~help:"Closes the current goal.\
+           \n Usage: admit."
     (fun _ sk fk -> sk [] fk) ;
   TraceTactics.register_general "help"
-    ~help:"Display all available commands."
+    ~help:"Display all available commands.\n Usage: help."
     (function
-      | [] -> get_help ""
-      | [String_name tac_name]-> get_help tac_name
+      | [] -> get_trace_help ""
+      | [String_name tac_name]-> get_trace_help tac_name
       | _ ->  raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure"improper arguments")) ;
-  TraceTactics.register "id" ~help:"Identity." Tactics.id
+
+  EquivTactics.register_general "help"
+    ~help:"Display all available commands.\n Usage: help."
+    (function
+      | [] -> get_equiv_help ""
+      | [String_name tac_name]-> get_equiv_help tac_name
+      | _ ->  raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure"improper arguments")) ;
+
+  TraceTactics.register "id" ~help:"Identity.\n Usage: identity." Tactics.id
 
 (** Automatic simplification of generated subgoals *)
 
@@ -304,7 +325,7 @@ let trace_auto_simp judges =
 
 let () =
   TraceTactics.register "simpl"
-    ~help:"Apply the automatic simplification tactic."
+    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
     (fun j sk fk -> sk (TraceAST.eval_judgment simpl j) fk)
 
 let tsubst_of_goal j =

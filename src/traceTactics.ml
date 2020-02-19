@@ -25,12 +25,14 @@ let goal_or_right_2 (s : TraceSequent.t) sk fk =
 
 let () =
   T.register "left"
-    ~help:"Reduce a goal with a disjunction conclusion into the goal \
-           where the conclusion has been replaced with the first disjunct."
+    ~help:"Reduce a goal with a disjunction conclusion into the goal where the \
+       \n conclusion has been replaced with the first disjunct.\
+           \n Usage: left."
     goal_or_right_1 ;
   T.register "right"
-    ~help:"Reduce a goal with a disjunction conclusion into the goal \
-           where the conclusion has been replace with the second disjunct."
+    ~help:"Reduce a goal with a disjunction conclusion into the goal where the \
+           \n conclusion has been replace with the second disjunct.\
+           \n Usage: right."
     goal_or_right_2
 
 let goal_true_intro (s : TraceSequent.t) sk fk =
@@ -39,7 +41,8 @@ let goal_true_intro (s : TraceSequent.t) sk fk =
   | _ -> fk (Tactics.Failure "Cannot introduce true")
 
 let () =
-  T.register "true" ~help:"Concludes if the goal is true." goal_true_intro
+  T.register "true" ~help:"Concludes if the goal is true.\n Usage: true."
+    goal_true_intro
 
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
@@ -52,7 +55,8 @@ let goal_and_right (s : TraceSequent.t) sk fk =
 
 let () =
   T.register "split"
-    ~help:"Split a conjunction conclusion, creating one subgoal per conjunct."
+    ~help:"Split a conjunction conclusion, creating one subgoal per conjunct.\
+           \n Usage: split."
     goal_and_right
 
 (** Compute the goal resulting from the addition of a list of
@@ -134,11 +138,11 @@ let case th s sk fk =
 
 let () =
   T.register_general "case"
-    ~help:"case T -> when T is a timestamp variable, \
-           introduce a disjunction hypothesis expressing the various \
-           forms that it could take. \
-           when T is a disjunction name, split the given disjunction \
-           on the left, creating corresponding subgoals."
+    ~help:"When T is a timestamp variable, introduce a disjunction \
+           \n hypothesis expressing the various forms that it could take. \
+           \n when T is a disjunction name, split the given disjunction on the \
+           \n left, creating corresponding subgoals.\
+           \n Usage: case T."
     (function
        | [Prover.Theory th] -> case th
        | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -154,7 +158,8 @@ let false_left s sk fk =
 
 let () =
   T.register_general "false_left"
-    ~help:"false_left -> close a goal when False is among its assumptions"
+    ~help:"Closes a goal when False is among its assumptions.\
+           \n Usage: false_left."
     (function
        | [] -> false_left
        | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -190,12 +195,13 @@ let goal_intro (s : TraceSequent.t) sk fk =
   | _ ->
       fk (Tactics.Failure
             "Can only introduce implication, universal quantifications \
-             and disequality conclusions.")
+             \n and disequality conclusions.")
 
 let () =
   T.register "intro"
-    ~help:"Performs one introduction, either of a forall \
-           quantifier or an implication."
+    ~help:"Perform one introduction, either of a forall quantifier or an \
+           \n implication.\
+           \n Usage: intro."
     goal_intro
 
 (** Quantifiers *)
@@ -218,10 +224,9 @@ let goal_exists_intro ths (s : TraceSequent.t) sk fk =
 
 let () =
   T.register_general "exists"
-    ~help:"Introduce the existentially \
-           quantified variables in the conclusion of the judgment, \
-           using the arguments as existential witnesses. \
-           Usage : exists t_1, t_2."
+    ~help:"Introduce the existentially quantified variables in the conclusion \
+           \n of the judgment, using the arguments as existential witnesses. \
+           \n Usage: exists t_1, t_2."
     (fun l ->
        let ths =
          List.map
@@ -255,7 +260,8 @@ let exists_left hyp_name s sk fk =
 
 let () =
   T.register_general "existsleft"
-    ~help:"exists-left H -> introduce existential quantifier in hypothesis H"
+    ~help:"Introduce existential quantifier in hypothesis H.\
+           \n Usage: existsleft H."
     (function
       | [Prover.Theory (Theory.Var h)] -> exists_left h
       | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -269,10 +275,10 @@ let () =
       Abstract ("true",[]) ]
   in
   T.register_macro "intros"
-    ~help:"Repeat intro."
+    ~help:"Repeat intro.\n Usage: intros."
     (Repeat (OrElse non_branching_intro)) ;
   T.register_macro "anyintro"
-    ~help:"Try any possible introduction."
+    ~help:"Try any possible introduction.\n Usage: anyintro."
     (OrElse
        (Abstract ("split",[]) :: non_branching_intro))
 
@@ -321,7 +327,8 @@ let induction s sk fk =
        universal quantification over a timestamp"
 
 let () = T.register "induction"
-    ~help:"Apply the induction scheme to the given formula."
+    ~help:"Apply the induction scheme to the conclusion.\
+           \n Usage: induction."
     induction
 
 (** [constraints judge sk fk] proves the sequent using its trace
@@ -376,8 +383,8 @@ let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
   sk [TraceSequent.add_formula ~prefix (Term.subst subst f) s] fk
 
 let () = T.register_general "expand"
-    ~help:"expand macro hypothesis -> expand all occurences of the given macro \
-           inside the hypothesis."
+    ~help:"Expand all occurences of the given macro inside the hypothesis.\
+           \n Usage: expand macro H."
     (function
        | [Prover.Theory v1; Prover.Theory (Theory.Var v2)] -> expand v1 v2
        | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -408,11 +415,13 @@ let congruence (s : TraceSequent.t) sk fk =
   else fk (Tactics.Failure "Equations satisfiable")
 
 let () = T.register "congruence"
-    ~help:"Tries to derive false from the messages equalities."
+    ~help:"Tries to derive false from the messages equalities.\
+           \n Usage: congruence."
     congruence
 
 let () = T.register "constraints"
-    ~help:"Tries to derive false from the trace formulas."
+    ~help:"Tries to derive false from the trace formulas.\
+           \n Usage: constraints."
     constraints
 
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
@@ -423,7 +432,8 @@ let assumption (s : TraceSequent.t) sk fk =
     fk (Tactics.Failure "Conclusion is not an hypothesis")
 
 let () = T.register "assumption"
-    ~help:"Search for the conclusion inside the Hypothesis."
+    ~help:"Search for the conclusion inside the hypothesis.\
+           \n Usage: assumption."
     assumption
 
 (** Utils *)
@@ -479,7 +489,8 @@ let eq_names (s : TraceSequent.t) sk fk =
 
 let () = T.register "eqnames"
     ~help:"Add index constraints resulting from names equalities, modulo the \
-           known equalities."
+           \n known equalities.\
+           \n Usage: eqnames."
     eq_names
 
 (** Add terms constraints resulting from timestamp and index equalities. *)
@@ -524,7 +535,8 @@ let eq_trace (s : TraceSequent.t) sk fk =
   sk [s] fk
 
 let () = T.register "eqtrace"
-    ~help:"Add terms constraints resulting from timestamp and index equalities."
+    ~help:"Add terms constraints resulting from timestamp and index equalities.\
+           \n Usage: eqtrace."
     eq_trace
 
 let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
@@ -569,8 +581,9 @@ let substitute (v1) (v2) (s : TraceSequent.t) sk fk=
 
 let () =
   T.register_general "substitute"
-    ~help:"substitute to i1, i2 -> if i1=i2 is implied by the sequent, \
-           replaces all occurences of i1 by i2 inside the sequent."
+    ~help:"If the seuqnet implies that the arguments i1, i2 are equals,\
+           \n replaces all occurences of i1 by i2 inside the sequent.\
+           \n Usage: substitute i1 i2."
     (function
        | [Prover.Theory v1; Prover.Theory v2] -> substitute v1 v2
        | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -663,7 +676,8 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
 
 let () =
   T.register_general "euf"
-    ~help:"euf H -> applies the euf axiom to the given hypothesis name."
+    ~help:"Apply the euf axiom to the given hypothesis name.\
+           \n Usage: euf H."
     (function
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -704,8 +718,9 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
 
 let () =
   T.register_general "apply"
-    ~help:"apply gname to t_1,t_2,... -> applies gname with its \
-           universally quantified variables instantiated with t1,t2,..."
+    ~help:"Apply an hypothesis with its universally quantified variables \
+           \n instantiated with the arguments.\
+           \n Usage: apply H to i1, i2, ..."
     (function
       | Prover.String_name id :: th_terms ->
           let th_terms =
@@ -730,7 +745,8 @@ let tac_assert f s sk fk =
 let () =
   T.register_formula "assert"
     ~help:"Add an assumption to the set of hypothesis, and produce the goal for\
-           the proof of the hypothesis."
+           \n the proof of the assumption.\
+           \n Usage: assert f."
     tac_assert
 
 (** [collision_resistance judge sk fk] collects all equalities between hashes,
@@ -785,5 +801,6 @@ let collision_resistance (s : TraceSequent.t) sk fk =
 
 let () = T.register "collision"
     ~help:"Collects all equalities between hashes, and affs the equalities of \
-           the messages hashed with the same valid key."
+           \n the messages hashed with the same valid key.\
+           \n Usage: collision."
     collision_resistance

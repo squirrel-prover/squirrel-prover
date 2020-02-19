@@ -47,7 +47,7 @@ let refl (s : EquivSequent.t) sk fk =
 
 let () =
   T.register "refl"
-    ~help:"Closes a reflexive goal."
+    ~help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
 (** Function application *)
@@ -81,7 +81,8 @@ let fa i s sk fk =
 
 let () =
   T.register_general "fa"
-    ~help:"Break function applications."
+    ~help:"Break function applications on the nth term of the sequence.\
+           \n Usage: fa i."
     (function
        | [Prover.Int i] -> pure_equiv (fa i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
@@ -115,7 +116,8 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
         (List.map apply_subst (EquivSequent.get_biframe s))] fk
 
 let () = T.register_general "expand"
-    ~help:"expand macro hypothesis -> expand all occurences of the given macro."
+    ~help:"Expand all occurences of the given macro in the given hypothesis.\
+           \n Usage: expand macro H."
     (function
        | [Prover.Theory v] -> pure_equiv (expand v)
        | _ -> raise @@ Tactics.Tactic_hard_failure
@@ -149,8 +151,9 @@ let no_if i s sk fk =
         fk (Tactics.Failure "Out of range position")
 let () =
   T.register_general "noif"
-    ~help:"Try to prove diff equivalence by proving that the condition implies \
-           False."
+    ~help:"Try to prove diff equivalence by proving that the condition at the \
+           \n i-th position implies False.\
+           \n Usage: noif i."
     (function
        | [Prover.Int i] -> only_equiv (no_if i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
