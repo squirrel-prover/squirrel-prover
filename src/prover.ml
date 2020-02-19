@@ -207,8 +207,14 @@ struct
     Fmt.pf fmt "@[<v 0>- %s - @. %s@]@." id help_text
 
   let pps fmt () =
-    Hashtbl.iter (fun name tac -> Fmt.pf fmt "@.@[<v 0>- %s - @. %s@]@."
-                     name tac.help) table
+    let helps =
+      Hashtbl.fold (fun name tac acc -> (name, tac.help)::acc) table []
+    |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
+    in
+    List.iter (fun (name, help) -> Fmt.pf fmt "@.@[<v 0>- %a - @. %s@]@."
+                  Fmt.(styled `Bold (styled `Magenta Utils.ident))
+                  name
+                  help) helps
 
 end
 
