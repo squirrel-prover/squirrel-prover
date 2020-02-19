@@ -3,7 +3,7 @@
     Depending on the running mode and the kind of printed information,
     it implements the printing functions.
 *)
-include Fmt
+open Fmt
 
 type printer_mode =
   | Test
@@ -12,15 +12,19 @@ type printer_mode =
 
 let printer_mode = ref File
 
+let strf = Fmt.strf
+
 let dummy_fmt =  Format.make_formatter
       (fun _ _ _ -> ())
       (fun () -> ())
 
-let pr =
+let std =
   match !printer_mode with
-  | File -> Fmt.pr
-  | Interactive -> Fmt.pr
-  | Test -> Fmt.pf dummy_fmt
+  | File -> Fmt.stdout
+  | Interactive -> Fmt.stdout
+  | Test -> dummy_fmt
+
+let pr = Fmt.pf std
 
 type pp =
   [ `Prompt
@@ -30,18 +34,28 @@ type pp =
   | `Goal
   | `Default]
 
-let pp ty s =
+let pp_pref ty =
   match ty with
-  | `Prompt -> pr "@[[> %s@.@]@." s
-  | `Start -> pr "@[[start> %s@.@]@." s
-  | `Result -> pr "@[[result> %s@.@]@." s
-  | `Error -> pr "@[[error> %s@.@]@." s
-  | `Goal -> pr "@[[goal> %s@.@]@." s
-  | `Default -> pr "%s" s
+  | `Prompt -> pr "@[[> "
+  | `Start -> pr "@[[start> "
+  | `Result -> pr "@[[result> "
+  | `Error -> pr "@[[error> "
+  | `Goal -> pr "@[[goal> "
+  | `Default -> ()
 
-let prt ty fmt = Fmt.kstrf (pp ty) fmt
+let pp_suf ty =
+  match ty with
+  | `Prompt -> pr "@.@]@."
+  | `Start -> pr "@.@]@."
+  | `Result -> pr "@.@]@."
+  | `Error -> pr "@.@]@."
+  | `Goal -> pr "@.@]@."
+  | `Default -> ()
 
-let pr fmt = Fmt.kstrf (pp `Default) fmt
+
+let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) std fmt
+
+let pr fmt = prt `Default fmt
 
 
 let set_style_renderer =
