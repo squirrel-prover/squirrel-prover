@@ -90,23 +90,20 @@ let select_and_update ~remove ~update hs name =
     match hsacc with
     | [] ->  raise Non_existing_hypothesis
     | p::q ->
-      let new_p,remainder =
-        if name = mk_name p id then
-          let p = { p with tag = update p.tag } in
+      if name = mk_name p id then
+        let p = { p with tag = update p.tag } in
+        if remove then
           p, q
         else
-          let res, new_hs = aux (id+1) q in
-          res, p::new_hs
-      in
-      if remove then
-        new_p,remainder
+          p, p::q
       else
-        new_p,new_p :: remainder
+        let res, new_hs = aux (id+1) q in
+        res, p::new_hs
   in
   let name_prefix,_ = get_name_prefix name in
   let hs_list = M.find name_prefix hs in
   let res,new_hs_list = aux 0 (List.rev (get_visible hs_list)) in
-  (res, M.add name_prefix new_hs_list hs)
+  (res, M.add name_prefix (List.rev new_hs_list) hs)
 
 let find_such_that :
     type a b. (a,b) hypotheses -> ((a,b) hypothesis -> bool) -> (a,b) hypothesis =
@@ -171,7 +168,7 @@ let find name hs =
   in
   let name_prefix,_ = get_name_prefix name in
   let hs_list = M.find name_prefix hs in
-  aux 0 hs_list
+  aux 0 (List.rev (get_visible hs_list))
 
 let map f hs =
   M.map (fun h -> List.map f h) hs
