@@ -95,7 +95,8 @@ let select_and_update ~remove ~update hs name =
           let p = { p with tag = update p.tag } in
           p, q
         else
-          aux (id+1) q
+          let res, new_hs = aux (id+1) q in
+          res, p::new_hs
       in
       if remove then
         new_p,remainder
