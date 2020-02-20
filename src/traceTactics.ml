@@ -620,6 +620,36 @@ let () =
            (Tactics.Failure "improper arguments"))
 
 
+let exec a s sk fk =
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+  let a =
+    try
+      Theory.convert tsubst a Sorts.Timestamp
+    with
+    _ ->  raise @@ Tactics.Tactic_hard_failure
+      (Tactics.Failure "improper arguments")
+  in
+  let var = snd Vars.(make_fresh empty_env Sorts.Timestamp "t") in
+  let formula =
+    ForAll (
+      [Vars.EVar (var)],
+      Impl(Atom (`Timestamp (`Leq,Var var,a)),
+           Macro(Term.cond_macro,[],Var var)
+          )
+    )
+  in
+  sk [TraceSequent.add_formula formula s] fk
+
+let () =
+  T.register_general "executable"
+    ~help:"Specify that the macro exec implis cond for all previous timestamps.\
+           \n Usage: executable t."
+    (function
+       | [Prover.Theory v] -> exec v
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
+
 (** EUF Axioms *)
 
 let euf_param (`Message at : message_atom) = match at with
