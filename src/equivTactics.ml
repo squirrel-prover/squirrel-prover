@@ -87,6 +87,94 @@ let () =
        | [Prover.Int i] -> pure_equiv (fa i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
+(** Fresh *)
+
+exception Bad_fresh_ssc
+
+class check_fresh ~system_id name = object (self)
+
+  method visit_term t = match t with
+    | EquivSequent.Message e -> self#visit_message e
+    | EquivSequent.Formula e -> self#visit_formula e
+
+  method visit_message t = match t with
+    | Fun (_, l) -> List.iter self#visit_message l
+    | Macro ((mn, sort, is),l,a) ->
+        List.iter self#visit_message l ;
+        self#visit_message (Macros.get_definition ~system_id sort mn is a)
+    | Name (n,_) when n = name -> raise Bad_fresh_ssc
+    | Var _ -> ()
+    | Diff(a, b) -> self#visit_message a; self#visit_message b
+    | Left a -> self#visit_message a
+    | Right a -> self#visit_message a
+    | ITE (a, b, c) -> self#visit_formula a;
+      self#visit_message b; self#visit_message c
+    | Find (a, b, c, d) ->
+        self#visit_formula b; self#visit_message c; self#visit_message d
+
+  method visit_formula (f:Term.formula) =
+    match f with
+    | And (l,r) | Or (l,r) | Impl (l,r) ->
+        self#visit_formula l ;
+        self#visit_formula r
+    | Not f -> self#visit_formula f
+    | True | False -> ()
+    | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
+    | Atom (`Message (_, t, t')) ->
+        self#visit_message t ;
+        self#visit_message t'
+    | Macro ((mn, Sorts.Boolean, is),[],a) ->
+      (* TODO : if we visit the subterm here, we have a recursive infinite loop
+         due to exec. *)
+      ()
+    | _ -> failwith "unsupported"
+
+end
+
+(* Check the key syntactic side-condition:
+    name must not appear in elems. *)
+let fresh_name_ssc ~system_id name elems =
+  try
+    let ssc = new check_fresh ~system_id name in
+    List.iter ssc#visit_term elems;
+    true
+  with Bad_fresh_ssc -> false
+
+let fresh i s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+    | before, e, after ->
+        begin try
+          let name =
+            match e with
+            | EquivSequent.Message Name (n,_) -> n
+            | _ -> raise @@ Tactics.Tactic_hard_failure
+                    (Tactics.Failure "Can only apply fresh on names")
+          in
+          let biframe = (List.rev_append before after) in
+          let system_id = EquivSequent.id_left s in
+          if fresh_name_ssc ~system_id name biframe
+          then
+            let system_id = EquivSequent.id_right s in
+            if fresh_name_ssc ~system_id name biframe
+            then sk [EquivSequent.set_biframe s biframe] fk
+            else raise @@ Tactics.Tactic_hard_failure
+              (Tactics.Failure "Name not fresh in the left system")
+          else
+            raise @@ Tactics.Tactic_hard_failure
+              (Tactics.Failure "Name not fresh in the right system")
+        with
+        | Tactics.Tactic_hard_failure err -> fk err
+        end
+    | exception Out_of_range ->
+        fk (Tactics.Failure "Out of range position")
+
+let () =
+  T.register_general "fresh"
+    ~help:"Removes a name if fresh.\n Usage: fresh i."
+    (function
+       | [Prover.Int i] -> pure_equiv (fresh i)
+       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
 
 let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in

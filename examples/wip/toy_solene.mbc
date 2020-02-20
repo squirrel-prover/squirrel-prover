@@ -1,0 +1,22 @@
+abstract ok : message
+abstract ko : message
+
+abstract f : message->message
+
+name n : message
+name m : message
+name k : message
+
+hash h
+
+channel c
+
+system !_i new a; out(c,a).
+
+equiv test : diff(f(ok),f(ok)),n.
+
+Proof.
+  fresh 1.
+  fa 0.
+  refl.
+Qed.

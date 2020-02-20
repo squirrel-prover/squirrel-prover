@@ -11,6 +11,9 @@ val pp : Format.formatter -> t -> unit
 
 val pp_init : Format.formatter -> t -> unit
 
+val id_left : sequent -> Action.system_id
+val id_right : sequent -> Action.system_id
+
 val get_env : t -> Vars.env
 
 val get_systems : t -> Term.projection * Term.projection

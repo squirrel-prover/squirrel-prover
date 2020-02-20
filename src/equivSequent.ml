@@ -48,6 +48,9 @@ let pp_init ppf j =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     j.frame
 
+let id_left j = j.id_left
+let id_right j = j.id_right
+
 let get_env j = j.env
 
 let get_systems j = j.id_left, j.id_right
