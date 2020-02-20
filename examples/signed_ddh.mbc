@@ -1,0 +1,141 @@
+hash h
+
+abstract exp : message -> message -> message
+abstract g : message
+
+abstract ok : message
+abstract ko : message
+
+name kP : message
+name kS : message
+
+mutable keyS : index -> message
+mutable keyP : index -> message
+
+channel cP
+channel cS
+
+name a : index -> message
+name b : index -> message
+
+process P(i:index) =
+  out(cP, exp(g,a(i)));
+  in(cP, t);
+  let sS = fst(t) in
+  let hash_share = snd(t) in
+  if h(<exp(g,a(i)),fst(t)>,kS) = snd(t) then
+    (keyP(i) := <exp(g,a(i)),fst(t)>;
+     out(cP, h(<exp(g,a(i)),fst(t)>,kP))
+      )
+  else
+     null
+
+process S(i:index) =
+  in(cS, sP);
+  out(cS, < <sP,exp(g,b(i))>, h(<sP,exp(g,b(i))>,kS)>);
+  in(cS, hash_shares);
+  if hash_shares = h(<sP,exp(g,b(i))>,kP) then
+    (keyS(i) := <sP,exp(g,b(i))>;
+     out(cS,ok);
+     in(cP, challenge);
+     try find j such that sP = exp(g,a(j)) in
+     out(cP, ok)
+     else
+     out(cP, diff(ok,ko))
+      )
+   else null
+
+
+system (!_i P(i) | !_j S(j)).
+
+goal [left] wa_left :
+forall (i:index),
+cond@S1(i)
+ =>
+  exists (j:index),
+P1(j) <= S1(i) &&
+keyP(j)@P1(j) = keyS(i)@S1(i).
+Proof.
+  simpl.
+  expand cond@S1(i), H0.
+  euf H0.
+  case H0.
+  exists i1.
+  depends S(i), S1(i).
+  exists i1.
+Qed.
+
+goal [right] wa_right :
+forall (i:index),
+cond@S1(i)
+ =>
+  exists (j:index),
+P1(j) <= S1(i) &&
+keyP(j)@P1(j) = keyS(i)@S1(i).
+Proof.
+  simpl.
+  expand cond@S1(i), H0.
+  euf H0.
+  case H0.
+  exists i1.
+  depends S(i), S1(i).
+  exists i1.
+Qed.
+
+
+
+goal [left] unreach_left :
+forall (r:index),
+cond@S1(r) =>
+   exists (s:index),
+   input@S(r) = exp(g,a(s)).
+Proof.
+  simpl.
+  expand cond@S1(r), H0.
+  euf H0.
+  case H0.
+  exists i.
+  exists i.
+Qed.
+
+goal [right] unreach_right :
+forall (r:index),
+cond@S1(r) =>
+   exists (s:index),
+   input@S(r) = exp(g,a(s)).
+Proof.
+  simpl.
+  expand cond@S1(r), H0.
+  euf H0.
+  case H0.
+  exists i.
+  exists i.
+Qed.
+
+equiv [left] [right] unreach.
+Proof.
+   expand frame@S3(j).
+   expand exec@S3(j).
+   fa 0.
+   noif 1.
+
+   (* unreachability of the left system *)
+   simpl.
+   expand cond@S3(j), H1.
+   executable pred(S3(j)).
+   depends S1(j), S3(j).
+   apply H2 to S1(j).
+   apply unreach_left to j.
+   apply H1 to s.
+
+   (* unreachability of the right system *)
+   simpl.
+   expand cond@S3(j), H1.
+   executable pred(S3(j)).
+   depends S1(j), S3(j).
+   apply H2 to S1(j).
+   apply unreach_right to j.
+   apply H1 to s.
+
+   refl.
+Qed.
