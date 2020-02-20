@@ -148,6 +148,36 @@ let () =
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+
+let depends t1 t2 s sk fk =
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+  let a1, a2 =
+    try
+      Theory.convert tsubst t1 Sorts.Timestamp,
+      Theory.convert tsubst t2 Sorts.Timestamp
+    with _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "arguments must be timestamps")
+  in
+  match a1, a2 with
+  | Term.Action( n1, is1), Term.Action (n2, is2) ->
+    if Action.(depends (of_term n1 is1) (of_term n2 is2)) then
+      let atom = (Atom (`Timestamp (`Lt,a1,a2))) in
+      sk [TraceSequent.add_formula atom s] fk
+    else
+      fk (Tactics.Failure "the second action does not depend on the first one")
+  | _ -> raise @@ Tactics.Tactic_hard_failure
+      (Tactics.Failure "arguments must be actions.")
+
+let () =
+  T.register_general "depends"
+    ~help:"If the second action given as argument depends on the first action,\
+           \n add the corresponding timestamp inequality.\
+           \n Usage: depends a1 a2."
+    (function
+       | [Prover.Theory t1; Prover.Theory t2] -> depends t1 t2
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
 let false_left s sk fk =
   try
     let _ =
