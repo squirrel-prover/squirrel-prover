@@ -135,11 +135,14 @@ let no_if i s sk fk =
           in
           let biframe = List.rev_append before (positive_branch :: after) in
           let left, right = EquivSequent.get_systems s in
+          let env = EquivSequent.get_env s in
           let trace_sequent_left = TraceSequent.init ~system:left
               (Term.Impl(cond,False))
+                                   |> TraceSequent.set_env env
            in
           let trace_sequent_right = TraceSequent.init ~system:right
               (Term.Impl(cond,False))
+                                    |> TraceSequent.set_env env
            in
            sk [Prover.Goal.Trace trace_sequent_left;
                Prover.Goal.Trace trace_sequent_right;
