@@ -490,21 +490,22 @@ let parse_proc proc : unit =
   | Apply _ | Let _ | New _ -> assert false
   | Exists (evars, cond, p, q) ->
       let facts_p = cond::facts in
-      let facts_q =
-        if evars = [] then
-          Theory.Not cond :: facts
-        else
-          facts
-      in
       let newsubst = List.map (fun i ->
           i, Vars.make_fresh_and_update var_env Sorts.Index i) evars
       in
+      let facts_q =
+          let qvars = List.map (fun x -> x, Sorts.eindex) evars in
+          Theory.ForAll(qvars, Theory.Not cond) :: facts
+      in
+      let new_env =
+        { env with
+          isubst = List.rev_append newsubst env.isubst ;
+          p_indices =
+            List.rev_append (List.map snd newsubst) env.p_indices }
+      in
       let pos =
         p_cond
-          ~env:{ env with
-                 isubst = List.rev_append newsubst env.isubst ;
-                 p_indices =
-                   List.rev_append (List.map snd newsubst) env.p_indices }
+          ~env:new_env
           ~par_choice ~input
           ~pos ~vars:(List.rev_append evars vars) ~facts:facts_p
           p
