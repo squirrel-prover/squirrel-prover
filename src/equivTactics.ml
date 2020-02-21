@@ -158,10 +158,10 @@ let fresh i s sk fk =
             if fresh_name_ssc ~system_id name biframe
             then sk [EquivSequent.set_biframe s biframe] fk
             else raise @@ Tactics.Tactic_hard_failure
-              (Tactics.Failure "Name not fresh in the left system")
+              (Tactics.Failure "Name not fresh in the right system")
           else
             raise @@ Tactics.Tactic_hard_failure
-              (Tactics.Failure "Name not fresh in the right system")
+              (Tactics.Failure "Name not fresh in the left system")
         with
         | Tactics.Tactic_hard_failure err -> fk err
         end
@@ -173,6 +173,25 @@ let () =
     ~help:"Removes a name if fresh.\n Usage: fresh i."
     (function
        | [Prover.Int i] -> pure_equiv (fresh i)
+       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+let dup i s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+    | before, e, after ->
+        if List.mem e before || List.mem e after
+        then
+          let biframe = List.rev_append before after in
+          sk [EquivSequent.set_biframe s biframe] fk
+        else
+          fk (Tactics.Failure "Dup tactic not applicable")
+    | exception Out_of_range ->
+        fk (Tactics.Failure "Out of range position")
+
+let () =
+  T.register_general "dup"
+    ~help:"Removes a duplicated term.\n Usage: dup i."
+    (function
+       | [Prover.Int i] -> pure_equiv (dup i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
