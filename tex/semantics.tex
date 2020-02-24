@@ -66,11 +66,11 @@ meta-interpretations.
       conditions, for all $i\in[1;n]$:
       $$\hat{\minp}(\alpha_i) =
       g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))$$
-      $$\hat{\mout}(\alpha_i) =
-      o_{\alpha_i}\{x_{\alpha_i}\mapsto\hat{\minp}(\alpha_i),
-      x^s_{\alpha_i}\mapsto\hat{s}(\alpha_i)\}$$
+      $$\hat{\mout}(\alpha_i) = o_{\alpha_i}
+      \{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j \leq i}
+      \{x^s_{\alpha_i}\mapsto\hat{s}(\alpha_i)\}$$
       $$\hat{s}(\alpha_i) = u_{\alpha_{i-1}}^{s}
-      \{x_{\alpha_{i-1}}\mapsto\hat{\minp}(\alpha_{i-1}),
+      \{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j \leq i-1}\{
       x^s_{\alpha_{i-1}}\mapsto\hat{s}(\alpha_{i-1})\}$$
     \end{itemize}
   \end{itemize}

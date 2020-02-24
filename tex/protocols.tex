@@ -93,11 +93,10 @@ atomic propositions over bi-terms.
 
 \begin{figure}[h]
   \[
-  \begin{array}{rcll}
-    tt & := & t &\text{term} \\
-    & \mid & \diff{t_1}{t_2} &\text{bi-term}\\
-    & \mid & F(tt_1,\dots,tt_n) &\text{function application over bi-terms}\\
-    & \mid & M(tt_1,\ldots,tt_n)@T &\text{macro application over bi-terms}\\
+  \begin{array}{rclll}
+    tt  & := & t &\text{term} & \\
+        & \mid & \diff{t_1}{t_2} &\text{bi-term} & \\
+        & \mid & f[i_1,\ldots,i_k](tt_1,\dots,tt_n) &\text{function application over bi-terms} & (f\in\F_k)\\
   \end{array}
   \]
   \caption{Syntax of meta-logic bi-terms}\label{fig:bi-terms}
@@ -117,16 +116,16 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$.
       \item action $\alpha_1 := \T(i,j)$
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
-          \item $o_{\alpha_1} := \langle n(i,j), \h(\diff{k(i)}{k'(i,j)},n(i,j) \rangle$
+          \item $o_{\alpha_1} := \langle n[i,j], \h(\diff{\key[i]}{\key'[i,j]},n[i,j] \rangle$
         \end{itemize}
       \item action $\alpha_2 := \R_1(k,i,j)$
         \begin{itemize}
-          \item $\phi_{\alpha_2} := \exists i,j, \snd(\g(x_{\alpha_2})) =  \h(\diff{k(i)}{k'(i,j)},\fst(\g(x_{\alpha_2}))$
+          \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =  \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2})$
           \item $o_{\alpha_2} := \ok$
         \end{itemize}
       \item action $\alpha_3 := \R_2(k,i,j)$
         \begin{itemize}
-          \item $\phi_{\alpha_3} := \neg (\exists i,j, \snd(\g(x_{\alpha_2})) =  \h(\diff{k(i)}{k'(i,j)},\fst(\g(x_{\alpha_2})))$
+          \item $\phi_{\alpha_3} := \neg (\exists i,j, \snd(x_{\alpha_2}) =  \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_3} := \error$
         \end{itemize}
     \end{itemize}

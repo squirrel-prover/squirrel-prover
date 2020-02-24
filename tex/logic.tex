@@ -47,7 +47,7 @@ Terms of the meta-logic are of three possible sorts: index, timestamps
 or message. Formulas of the meta-logic may feature predicates over each sort.
 Given interpretation $I$ and $T$ of index and timestamp variables
 into two finite sets, a formula $\phi$ of the meta-logic will be translated
-into a term $(\phi)^{I,T}$ of the base logic in which index and action terms,
+into a term $(\phi)^{I,T}$ of the base logic in which index and timestamps,
 and predicates over them, will have disappeared. The validity of the
 meta-logic formula $\phi$ will be defined as the validity of the base logic
 $(\phi)^{I,T}\sim\mathsf{true}$.
@@ -74,43 +74,30 @@ These indexed symbols only have an index arity: they
 cannot be applied to terms.
 
 We finally assume a set $\M$ of indexed macro symbols
-equipped with an arity and index arity, like function symbols.
+equipped with an index arity.
 An indexed macro symbol will be applied to the specified number of
-indices, variables, and also to a single timestamp.
+indices and also to a single timestamp.
 This timestamp gives the instant at which the macro is evaluated.
-We will typically assume macro symbols $\mout$ and $\minp$
-(with index arity $0$) for representing messages inputted and outputted
-at a particular point of an execution.
 
 We shall write $\F_k$ (resp.\ $\N_k$ or $\M_k$) for the set of function
 symbols (resp.\ name or macro symbols) of index arity $k$.
 
 \begin{figure}[h]
 \[
-  \begin{array}{rcll}
-    n &:=& \mathsf{n}[i_1,\ldots,i_n] & (\mathsf{n}\in\N_k)
+  \begin{array}{rclll}
+    i &:=& i & \text{index variable} & \\
     \\
-    F &:=& f[i_1,\ldots,i_k] & (f\in\F_k)
+    T &:=& \tau & \text{timestamp variable} & \\
+      &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\mathbb{A}) \\
+      &\mid & \pre(T) & \text{predecessor} & \\
     \\
-    M &:=& m[i_1,\ldots,i_k] & (m\in\M_k)
+    t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
+      & \mid & x  & \text{message variable} & (x\in\X) \\
+      & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} & (f\in\F_k)\\
+      & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\M_k)\\
   \end{array}
 \]
-\[
-  \begin{array}{rcll}
-    T &:=& \tau & \text{timestamp variable} \\
-      &\mid& a[i_1,\ldots,i_k] & \text{constant (for $a\in\mathbb{A}$)} \\
-      &\mid & \pre(T) & \text{predecessor}
-\end{array}
-   \]
-\[
-     \begin{array}{rcll}
-    t & := & n &\text{name} \\
-    & \mid & x  & \text{message variable $x\in\X$} \\
-    & \mid & F(t_1,\dots,t_n) &\text{function application}\\
-    & \mid & M(t_1,\ldots,t_n)@T &\text{macro application}\\
-       \end{array}
-     \]
-     \caption{Syntax of meta-logic terms}\label{fig:terms}
+\caption{Syntax of meta-logic terms}\label{fig:terms}
 \end{figure}
 
 \begin{definition}
@@ -122,6 +109,18 @@ symbols (resp.\ name or macro symbols) of index arity $k$.
   The only terms of sort index are index variables.
   The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
 \end{definition}
+
+\begin{remark}
+  Function symbols representing cryptographic primitives will have a usual
+  arity k and as index arity $0$.
+  Functions symbols representing identities (for example, a constant value
+  associated to each tag) will have $0$ as usual arity and $1$ as index arity.
+  Macro symbols will typically include $\mout$ and $\minp$
+  (with index arity $0$) for representing messages inputted and
+  outputted at a particular point of an execution.
+  Macro symbols will also be used to represent states (memory cells, database)
+  with index arity $1$.
+\end{remark}
 
 
 \paragraph{Formulas}
