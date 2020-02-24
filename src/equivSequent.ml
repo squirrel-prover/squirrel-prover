@@ -53,6 +53,8 @@ let id_right j = j.id_right
 
 let get_env j = j.env
 
+let set_env e j = {j with env = e}
+
 let get_systems j = j.id_left, j.id_right
 
 let get_biframe j = j.frame
@@ -70,3 +72,9 @@ let get_frame proj j =
   List.map (pi_elem proj) j.frame
 
 let get_right_frame j = List.map (pi_elem j.id_right) j.frame
+
+let apply_subst subst s =
+  {s with frame =
+            List.map (function Formula f -> Formula (Term.subst subst f)
+                             | Message t ->Message (Term.subst subst t)) s.frame
+  }

@@ -45,18 +45,72 @@ let refl (s : EquivSequent.t) sk fk =
   else
     fk (Tactics.Failure "Frames not identical")
 
+
 let () =
   T.register "refl"
     ~help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
+(** TODO : dummy induc tactic, for testings,
+before implementing true induction tactic. *)
+let induc s sk fk =
+  match   EquivSequent.get_frame Term.None s with
+  | [] -> assert false
+  | [EquivSequent.Message (
+      Term.Macro (s ,_,Term.Pred _)
+    )] when s  = Term.frame_macro -> sk [] fk
+  | _ ->  fk (Tactics.Failure "Can only close dummy inductive goals.")
+
+let () =
+  T.register "induc"
+    ~help:"Closes an inductive goal.\n Usage: induc."
+    (only_equiv induc)
+
+let timestamp_case ts s sk fk =
+  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let ts = Theory.convert tsubst ts Sorts.Timestamp in
+  let goals = ref [] in
+  let add_action a =
+    let env = ref @@ EquivSequent.get_env s in
+    let indices =
+      List.map
+        (fun i -> Vars.make_fresh_from_and_update env i)
+        a.Action.indices
+    in
+    let subst =
+      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+        a.Action.indices indices
+    in
+    let name = Action.to_term (Action.subst_action subst a.Action.action) in
+    let ts_subst = [Term.ESubst(ts,name)] in
+    goals := (EquivSequent.apply_subst ts_subst s
+             |> EquivSequent.set_env !env)
+             ::!goals
+
+  in
+  let system_id = None in
+  Action.iter_descrs ~system_id add_action ;
+  sk !goals fk
+
+let () =
+  T.register_general "case"
+    ~help:"Introduce all the possible goals when instantiating T with all \
+           \n possible actions.
+           \n Usage: case T."
+    (function
+       | [Prover.Theory th] -> pure_equiv (timestamp_case th)
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
 (** Function application *)
 let fa i s sk fk =
   let expand : type a. a Term.term -> EquivSequent.elem list = function
     | Fun (f,l) ->
-        List.map (fun m -> EquivSequent.Message m) l
+      List.map (fun m -> EquivSequent.Message m) l
+    | ITE (c,t,e) when t = e ->
+        EquivSequent.[ Message t ]
     | ITE (c,t,e) ->
-        EquivSequent.[ Formula c ; Message t ; Message e ]
+      EquivSequent.[ Formula c ; Message t ; Message e ]
     | Diff _ ->
         Tactics.soft_failure
           (Tactics.Failure "No common construct")
@@ -246,16 +300,11 @@ let no_if i s sk fk =
           let biframe = List.rev_append before (negative_branch :: after) in
           let left, right = EquivSequent.get_systems s in
           let env = EquivSequent.get_env s in
-          let trace_sequent_left = TraceSequent.init ~system:left
+          let trace_sequent = TraceSequent.init ~system:None
               (Term.Impl(cond,False))
                                    |> TraceSequent.set_env env
            in
-          let trace_sequent_right = TraceSequent.init ~system:right
-              (Term.Impl(cond,False))
-                                    |> TraceSequent.set_env env
-           in
-           sk [Prover.Goal.Trace trace_sequent_left;
-               Prover.Goal.Trace trace_sequent_right;
+           sk [Prover.Goal.Trace trace_sequent;
                Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
         with
           | Tactics.Tactic_soft_failure err -> fk err

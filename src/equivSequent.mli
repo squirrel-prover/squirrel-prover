@@ -15,6 +15,7 @@ val id_left : sequent -> Action.system_id
 val id_right : sequent -> Action.system_id
 
 val get_env : t -> Vars.env
+val set_env : Vars.env -> t -> t
 
 val get_systems : t -> Term.projection * Term.projection
 
@@ -30,3 +31,7 @@ val set_biframe : t -> elem list -> t
 val get_frame : Term.projection -> t -> elem list
 
 val pi_elem : Term.projection -> elem -> elem
+
+(** [apply_subst subst s] returns the sequent [s] where the substitution has
+   been applied to all terms. *)
+val apply_subst : Term.subst -> t -> t

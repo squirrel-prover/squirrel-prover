@@ -3,7 +3,7 @@ abstract ok : message
 abstract ko : message
 system A: out(c,diff(ok,ko)); B: out(c,right(diff(ko,ok))).
 
-goal output@A = ok.
+goal [left] output@A = ok.
 Proof.
   simpl.
 Qed.

@@ -184,6 +184,9 @@ val f_and : fsymb
 val f_or : fsymb
 val f_not : fsymb
 val f_ite : fsymb
+val f_diff : fsymb
+val f_left : fsymb
+val f_right : fsymb
 
 val f_succ : fsymb
 
@@ -193,6 +196,8 @@ val f_zero : fsymb
 val f_pair : fsymb
 val f_fst : fsymb
 val f_snd : fsymb
+
+
 
 (** Convert from bi-terms to terms
   *

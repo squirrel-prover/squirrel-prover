@@ -48,6 +48,8 @@ let h_o_term ~system_id hh kk acc t =
     else raise Bad_ssc
   | Term.Name (_,_) -> acc
   | Term.Var _ -> acc
+  | Term.Left m | Term.Right m -> aux acc m
+  | Term.Diff (a, b) -> aux (aux acc a) b
   | _ -> failwith "Not implemented"
   in aux acc t
 

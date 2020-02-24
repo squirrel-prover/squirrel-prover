@@ -48,24 +48,7 @@ process S(i:index) =
 
 system (!_i P(i) | !_j S(j)).
 
-goal [left] wa_left :
-forall (i:index),
-cond@S1(i)
- =>
-  exists (j:index),
-P1(j) <= S1(i) &&
-keyP(j)@P1(j) = keyS(i)@S1(i).
-Proof.
-  simpl.
-  expand cond@S1(i), H0.
-  euf H0.
-  case H0.
-  exists i1.
-  depends S(i), S1(i).
-  exists i1.
-Qed.
-
-goal [right] wa_right :
+goal wa :
 forall (i:index),
 cond@S1(i)
  =>
@@ -83,22 +66,7 @@ Proof.
 Qed.
 
 
-
-goal [left] unreach_left :
-forall (r:index),
-cond@S1(r) =>
-   exists (s:index),
-   input@S(r) = exp(g,a(s)).
-Proof.
-  simpl.
-  expand cond@S1(r), H0.
-  euf H0.
-  case H0.
-  exists i.
-  exists i.
-Qed.
-
-goal [right] unreach_right :
+goal unreach :
 forall (r:index),
 cond@S1(r) =>
    exists (s:index),
@@ -114,6 +82,9 @@ Qed.
 
 equiv [left] [right] unreach.
 Proof.
+   case t.
+   cycle 4.
+
    expand frame@S3(j).
    expand exec@S3(j).
    fa 0.
@@ -125,17 +96,10 @@ Proof.
    executable pred(S3(j)).
    depends S1(j), S3(j).
    apply H2 to S1(j).
-   apply unreach_left to j.
+   apply unreach to j.
    apply H1 to s.
+       fa 1.
+   induc.
 
-   (* unreachability of the right system *)
-   simpl.
-   expand cond@S3(j), H1.
-   executable pred(S3(j)).
-   depends S1(j), S3(j).
-   apply H2 to S1(j).
-   apply unreach_right to j.
-   apply H1 to s.
-
-   refl.
+   admit. admit. admit. admit. admit. admit. admit.
 Qed.

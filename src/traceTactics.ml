@@ -752,7 +752,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
     try TraceSequent.get_hypothesis id s, TraceSequent.system_id s with
       | Not_found -> Prover.get_goal_formula id
   in
-  if system <> TraceSequent.system_id s then
+  if system <> TraceSequent.system_id s && system <> Term.None then
     raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f

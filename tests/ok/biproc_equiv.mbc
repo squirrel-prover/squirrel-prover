@@ -1,16 +1,29 @@
 channel c
-system A: in(c,x);out(c,x);
+system A: in(c,x);out(c,zero);
        B: in(c,y); if False then out(c,diff(x,y)) else out(c,zero).
 
 equiv [left] [right] test_left_bis.
 
 Proof.
+case t.
 expand frame@B.
 fa 0.
 expand exec@B.
 expand cond@B.
 noif 1.
 simpl.
-simpl.
-refl.
+fa 1.
+induc.
+
+expand frame@B1.
+fa 0.
+expand output@B1.
+fa 1.
+fa 1.
+induc.
+
+expand frame@A.
+expand output@A.
+fa 0. fa 1. fa 1.
+induc.
 Qed.

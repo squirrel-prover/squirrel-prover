@@ -304,7 +304,7 @@ equiv_env:
 | LPAREN vs=arg_list RPAREN { vs }
 
 system:
-|                         { Term.Left }
+|                         { Term.None }
 | LBRACKET LEFT RBRACKET  { Term.Left }
 | LBRACKET RIGHT RBRACKET { Term.Right }
 

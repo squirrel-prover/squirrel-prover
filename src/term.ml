@@ -396,6 +396,9 @@ let f_and = mk_fname "and" [eboolean;eboolean] eboolean
 let f_or = mk_fname "or" [eboolean;eboolean] eboolean
 let f_not = mk_fname "not" [eboolean] eboolean
 let f_ite = mk_fname "if" [eboolean;emessage;emessage] emessage
+let f_diff = mk_fname "diff" [emessage;emessage] emessage
+let f_left = mk_fname "left" [emessage] emessage
+let f_right = mk_fname "right" [emessage] emessage
 
 (** Xor and its unit *)
 
@@ -423,7 +426,14 @@ let rec pi_term : type a. projection -> a term -> a term =
   match t with
   | Fun (f,terms) -> Fun (f, List.map (pi_term s) terms)
   | Name n -> Name n
-  | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, pi_term s ts)
+  | Macro (m, terms, ts) ->
+    let mac = Macro(m, List.map (pi_term s) terms, pi_term s ts) in
+    begin
+      match s with
+      | Left -> Left (mac)
+      | Right -> Right(mac)
+      | None -> mac
+    end
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
   | Init -> Init
