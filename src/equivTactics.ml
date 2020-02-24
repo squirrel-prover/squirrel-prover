@@ -237,13 +237,13 @@ let no_if i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
       begin try
-          let cond, positive_branch =
+          let cond, negative_branch =
             match e with
-            | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
+            | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message e)
             | _ -> raise @@ Tactics.Tactic_hard_failure
                 (Tactics.Failure "improper arguments")
           in
-          let biframe = List.rev_append before (positive_branch :: after) in
+          let biframe = List.rev_append before (negative_branch :: after) in
           let left, right = EquivSequent.get_systems s in
           let env = EquivSequent.get_env s in
           let trace_sequent_left = TraceSequent.init ~system:left
