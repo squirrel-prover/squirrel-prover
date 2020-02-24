@@ -28,3 +28,5 @@ val set_biframe : t -> elem list -> t
   * as a list of terms where diff operators have been fully
   * eliminated. *)
 val get_frame : Term.projection -> t -> elem list
+
+val pi_elem : Term.projection -> elem -> elem

@@ -102,7 +102,7 @@ class check_fresh ~system_id name = object (self)
     | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
         self#visit_message (Macros.get_definition ~system_id sort mn is a)
-    | Name (n,_) when n = name -> raise Bad_fresh_ssc
+    | Name (n,_) -> if n = name then raise Bad_fresh_ssc
     | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
@@ -144,18 +144,21 @@ let fresh i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
         begin try
-          let name =
+          let (n_left, n_right) =
             match e with
-            | EquivSequent.Message Name (n,_) -> n
+            | EquivSequent.Message Name (n,_) -> (n,n)
+            | EquivSequent.Message Diff (Name (nl,_),Name (nr,_)) -> (nl,nr)
             | _ -> raise @@ Tactics.Tactic_hard_failure
                     (Tactics.Failure "Can only apply fresh on names")
           in
           let biframe = (List.rev_append before after) in
+          let frame_left = (List.map (EquivSequent.pi_elem Term.Left) biframe) in
+          let frame_right = (List.map (EquivSequent.pi_elem Term.Right) biframe) in
           let system_id = EquivSequent.id_left s in
-          if fresh_name_ssc ~system_id name biframe
+          if fresh_name_ssc ~system_id n_left frame_left
           then
             let system_id = EquivSequent.id_right s in
-            if fresh_name_ssc ~system_id name biframe
+            if fresh_name_ssc ~system_id n_right frame_right
             then sk [EquivSequent.set_biframe s biframe] fk
             else raise @@ Tactics.Tactic_hard_failure
               (Tactics.Failure "Name not fresh in the right system")
