@@ -23,9 +23,9 @@ process P(i:index) =
   in(cP, t);
   let sS = fst(t) in
   let hash_share = snd(t) in
-  if h(<exp(g,a(i)),fst(t)>,kS) = snd(t) then
-    (keyP(i) := <exp(g,a(i)),fst(t)>;
-     out(cP, h(<exp(g,a(i)),fst(t)>,kP))
+  if h(<exp(g,a(i)),snd(fst(t))>,kS) = snd(t) then
+    (keyP(i) := <exp(g,a(i)),snd(fst(t))>;
+     out(cP, h(<exp(g,a(i)),snd(fst(t))>,kP))
       )
   else
      null
@@ -48,25 +48,8 @@ process S(i:index) =
 
 system (!_i P(i) | !_j S(j)).
 
-goal wa :
-forall (i:index),
-cond@S1(i)
- =>
-  exists (j:index),
-P1(j) <= S1(i) &&
-keyP(j)@P1(j) = keyS(i)@S1(i).
-Proof.
-  simpl.
-  expand cond@S1(i), H0.
-  euf H0.
-  case H0.
-  exists i1.
-  depends S(i), S1(i).
-  exists i1.
-Qed.
-
-
-goal unreach :
+(* goal used to prove that S1 is never executed, no diff *)
+goal unreachS1 :
 forall (r:index),
 cond@S1(r) =>
    exists (s:index),
@@ -80,6 +63,46 @@ Proof.
   exists i.
 Qed.
 
+(* Prove that the condition of A does not give any information to the attacker,
+by proving that it is equivalent to a trivial formula that the attacker can
+compute. It is a bit troublesome, because the formula depends on ks, which needs
+to disapear. If we used classical assymetric signature scheme, the issue wowould
+disappear.
+*)
+goal A_cond_useless1 :
+ forall (i:index),
+       (cond@A(i)  =>
+           (
+
+	    not(exists (j:index), input@S(j) = output@P(i) && snd(input@A(i)) = snd(output@S(j))
+&& snd(fst(input@A(i))) = exp(g,b(j))
+	       )
+	     ))
+	      &&
+	 (
+   (forall (j1:index), input@S(j1) <> output@P(i)
+ ||snd(input@A(i)) <> snd(output@S(j1))
+ || snd(fst(input@A(i))) <> exp(g,b(j1))
+     )
+ =>   not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i)))
+	   )
+	      .
+	    Proof.
+	intro.
+split.
+
+simpl.
+expand cond@A(i), H0.
+apply H1.
+apply H0.
+
+simpl.
+euf M0.
+apply H0 to j.
+case H1.
+Qed.
+
+
 equiv [left] [right] unreach.
 Proof.
    case t.
@@ -90,16 +113,22 @@ Proof.
    fa 0.
    noif 1.
 
-   (* unreachability of the left system *)
+   (* unreachability of the left system - using unreach *)
    simpl.
    expand cond@S3(j), H1.
    executable pred(S3(j)).
    depends S1(j), S3(j).
    apply H2 to S1(j).
-   apply unreach to j.
+   apply unreachS1 to j.
    apply H1 to s.
        fa 1.
    induc.
+
+   expand frame@A(i).
+   expand output@A(i).
+   expand exec@A(i).
+       expand cond@A(i).
+       fa 0. fa 1. fa 2. fa 2.
 
    admit. admit. admit. admit. admit. admit. admit.
 Qed.
