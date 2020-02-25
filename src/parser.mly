@@ -236,6 +236,14 @@ tactic_params:
 | t=term                        { [Prover.Theory t] }
 | t=term COMMA ts=tactic_params { Prover.Theory t :: ts }
 
+tactic_formula_params:
+|                               { [] }
+| t=formula                        { [Prover.Formula
+                                              (Prover.parse_formula t)] }
+| t=formula COMMA ts=tactic_formula_params { Prover.Formula
+                                              (Prover.parse_formula t) :: ts }
+
+
 tac:
   | LPAREN t=tac RPAREN               { t }
   | l=tac SEMICOLON r=tac             { Tactics.AndThen [l;r] }
@@ -252,10 +260,8 @@ tac:
   | RIGHT                             { Tactics.Abstract ("right",[]) }
   | EXISTS t=tactic_params            { Tactics.Abstract
                                           ("exists",t) }
-  | ID f=formula                      { Tactics.Abstract
-                                          ($1,
-                                           [Prover.Formula
-                                              (Prover.parse_formula f)]) }
+  | ID t=tactic_formula_params        { Tactics.Abstract
+                                          ($1,t) }
   | NOSIMPL t=tac                     { Tactics.Modifier
                                           ("nosimpl", t) }
   | CYCLE i=INT                       { Tactics.Abstract

@@ -287,6 +287,27 @@ let () = T.register_general "expand"
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+let equiv (t1 : Term.formula) (t2 : Term.formula) (s : EquivSequent.t) sk fk =
+  let env  = EquivSequent.get_env s in
+  let trace_sequent = TraceSequent.init ~system:None
+              (Term.And(Term.Impl(t1, t2), Term.Impl(t2, t1)))
+               |> TraceSequent.set_env env
+  in
+  sk [ Prover.Goal.Trace trace_sequent;
+       Prover.Goal.Equiv (EquivSequent.apply_subst [Term.ESubst(t1, t2)] s);
+     ]
+    fk
+
+let () = T.register_general "equivalent"
+    ~help:"Replace all occurences of a formula by another, and ask to prove \
+           \n that they are equivalent.
+           \n Usage: equiv t1, t2."
+    (function
+       | [Prover.Formula v1; Prover.Formula v2] -> only_equiv (equiv v1 v2)
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
+
 let no_if i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
@@ -298,7 +319,6 @@ let no_if i s sk fk =
                 (Tactics.Failure "improper arguments")
           in
           let biframe = List.rev_append before (negative_branch :: after) in
-          let left, right = EquivSequent.get_systems s in
           let env = EquivSequent.get_env s in
           let trace_sequent = TraceSequent.init ~system:None
               (Term.Impl(cond,False))

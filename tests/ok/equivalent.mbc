@@ -1,0 +1,23 @@
+channel c
+abstract ok:message
+
+system in(c,x); if x=ok && x<>ok then out(c,x).
+
+equiv [left] [right] test.
+Proof.
+case t.
+expand frame@A.
+expand exec@A.
+expand cond@A.
+
+equivalent  (input@A = ok && input@A <> ok), False.
+simpl.
+
+fa 0.
+noif 1.
+simpl.
+
+fa 1. induc.
+
+admit.
+Qed.

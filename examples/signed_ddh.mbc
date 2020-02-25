@@ -125,10 +125,74 @@ Proof.
    induc.
 
    expand frame@A(i).
-   expand output@A(i).
-   expand exec@A(i).
-       expand cond@A(i).
-       fa 0. fa 1. fa 2. fa 2.
+	    expand output@A(i).
+	    help.
 
-   admit. admit. admit. admit. admit. admit. admit.
-Qed.
+   expand exec@A(i).
+	    expand cond@A(i).
+
+   equivalent forall (),
+      not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i))),
+	   (forall (j1:index), input@S(j1) <> output@P(i)
+ ||snd(input@A(i)) <> snd(output@S(j1))
+ || snd(fst(input@A(i))) <> exp(g,b(j1))
+     ).
+
+      simpl.
+  split.
+      apply A_cond_useless1 to i.
+
+  apply H0.
+      (* We need a way to handle the not in H3. *)
+      admit.
+      apply A_cond_useless1 to i.
+apply H2.
+apply H0 to j1.
+
+      fa 0. fa 1. fa 2. fa 2.
+
+(* We should be able to close this using some magical dup/fa* tactic.. *)
+
+      admit. admit.
+
+
+   expand frame@P(i).
+	    expand output@P(i).
+   expand exec@P(i).
+	    expand cond@P(i).
+
+   (* We should be able to close this with fresh a(i), fa, and induction (containing exec@predP(i)) *)
+      admit.
+ expand frame@S(j).
+	    expand output@S(j).
+   expand exec@S(j).
+	    expand cond@S(j).
+   (* We should be able to close this with fresh b(j), fa, and induction (containing exec@predP(i)) *)
+
+      admit.
+
+
+   expand frame@P1(i).
+	    expand output@P1(i).
+   expand exec@P1(i).
+	    expand cond@P1(i).
+
+   equivalent forall (),
+      not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i))),
+	   (forall (j1:index), input@S(j1) <> output@P(i)
+ ||snd(input@A(i)) <> snd(output@S(j1))
+ || snd(fst(input@A(i))) <> exp(g,b(j1))
+     ).
+
+(* converse of A *)
+
+      admit. admit.
+ expand frame@S1(j).
+	    expand output@S1(j).
+   expand exec@S1(j).
+	    expand cond@S1(j).
+   (* Symmetric case of A, to handle similarly. *)
+admit.
+admit.
+
+      Qed.
