@@ -494,8 +494,9 @@ let parse_proc proc : unit =
           i, Vars.make_fresh_and_update var_env Sorts.Index i) evars
       in
       let facts_q =
-          let qvars = List.map (fun x -> x, Sorts.eindex) evars in
-          Theory.ForAll(qvars, Theory.Not cond) :: facts
+        match List.map (fun x -> x, Sorts.eindex) evars with
+        | [] -> Theory.Not cond :: facts
+        | qvars ->  Theory.ForAll(qvars, Theory.Not cond) :: facts
       in
       let new_env =
         { env with
