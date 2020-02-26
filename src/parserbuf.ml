@@ -108,7 +108,7 @@ let parse_process ?(typecheck=false) str =
     if typecheck then Process.check_proc [] p ;
     p
 
-let parse_formula = parse Parser.top_formula "formula"
+let parse_formula = parse Parser.top_term "formula"
 
 let add_suite_restore name suite =
   Checks.add_suite name

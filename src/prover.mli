@@ -51,7 +51,6 @@ val reset_state : int -> prover_mode
 
 type tac_arg =
   | String_name of string
-  | Formula of Term.formula
   | Function_name of fname
   | Int of int
   | Theory of Theory.term
@@ -66,7 +65,6 @@ module type Tactics_sig = sig
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
-  val register_formula : string -> ?help:string -> (formula -> tac) -> unit
   val register_fname : string -> ?help:string -> (fname -> tac) -> unit
   val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
   val get : string -> tac_arg list -> tac
@@ -92,7 +90,7 @@ val make_trace_goal : system:Action.system_id -> Theory.formula -> Goal.t
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
   Theory.env ->
-  [ `Message of Theory.term | `Formula of Theory.formula ] list ->
+  Theory.term list ->
   Goal.t
 
 (* Produces an equivalence goal based on the process and the two system ids. *)
