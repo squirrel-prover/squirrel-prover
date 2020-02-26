@@ -38,6 +38,9 @@ macro term and the only free variables that can occur in them are
 $x_\alpha$ (intuitively, the input of this action)
 and $x^s_\alpha$ where $s$ is a state macro symbol (intuitively, the value
 of the memory cell at the time of this action).
+\solene{The sequential dependency is defined only later (in the definition of a
+protocol) but we would like to allow as free variables also $x_\beta$ for every
+action $\beta$ that must happen before $\alpha$ in an execution.}
 % ???
 % Names appearing in $\phi_{\alpha}$ and $o_{\alpha}$ are of the form $\sfn(i_1,\dots,i_k)$ with $k \leq n$.
 \end{definition}
