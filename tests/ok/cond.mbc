@@ -14,7 +14,7 @@ goal dummy :
 cond@A => input@A <>k.
 Proof.
 simpl.
-expand cond@A, H0.
+expand cond@A.
 notleft H0.
 Qed.
 
@@ -24,8 +24,9 @@ exec@O =>
  Proof.
 simpl.
 
-expand exec@O, H0.
-expand cond@O, H1.
+expand exec@O.
+expand cond@O.
+introsleft H0.
 Qed.
 
 goal dummy :

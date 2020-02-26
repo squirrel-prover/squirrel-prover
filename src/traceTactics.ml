@@ -82,6 +82,20 @@ let rec left_introductions s = function
   | f :: l -> left_introductions (TraceSequent.add_formula f s) l
   | [] -> s
 
+let left_intros hyp_name s sk fk =
+  let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
+  sk [left_introductions s [formula]] fk
+
+let () =
+  T.register_general "introsleft"
+    ~help:"Simply conjonctions and implications on the left side.\
+           \n Usage: notleft H."
+    (function
+      | [Prover.Theory (Theory.Var h)] -> left_intros h
+      | _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "improper arguments"))
+
+
 let left_not_intro hyp_name s sk fk =
   let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
   let rec not_f = function
@@ -414,14 +428,11 @@ let constraints (s : TraceSequent.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
-let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
+let expand (term : Theory.term) (s : TraceSequent.t)
     sk fk =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let s,f = TraceSequent.select_formula_hypothesis hypothesis_name s
-      ~remove:true
-  in
   let system_id = TraceSequent.system_id s in
-  let prefix = fst (TraceSequent.get_name_prefix hypothesis_name) in
+
   let subst = match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -440,13 +451,13 @@ let expand (term : Theory.term) (hypothesis_name : string) (s : TraceSequent.t)
     | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "Can only expand macros")
   in
-  sk [TraceSequent.add_formula ~prefix (Term.subst subst f) s] fk
+  sk [TraceSequent.apply_subst subst s] fk
 
 let () = T.register_general "expand"
-    ~help:"Expand all occurences of the given macro inside the hypothesis.\
-           \n Usage: expand macro H."
+    ~help:"Expand all occurences of the given macro inside the goal.\
+           \n Usage: expand macro."
     (function
-       | [Prover.Theory v1; Prover.Theory (Theory.Var v2)] -> expand v1 v2
+       | [Prover.Theory v1] -> expand v1
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 

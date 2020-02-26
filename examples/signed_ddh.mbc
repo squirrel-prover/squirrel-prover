@@ -18,6 +18,8 @@ channel cS
 name a : index -> message
 name b : index -> message
 
+term test : boolean = zero
+
 process P(i:index) =
   out(cP, exp(g,a(i)));
   in(cP, t);
@@ -56,8 +58,10 @@ cond@S1(r) =>
    input@S(r) = exp(g,a(s)).
 Proof.
   simpl.
-  expand cond@S1(r), H0.
-  euf H0.
+       expand cond@S1(r).
+       simpl.
+   introsleft H0.
+  euf M0.
   case H0.
   exists i.
   exists i.
@@ -69,37 +73,85 @@ compute. It is a bit troublesome, because the formula depends on ks, which needs
 to disapear. If we used classical assymetric signature scheme, the issue wowould
 disappear.
 *)
-goal A_cond_useless1 :
+goal A_cond_useless :
  forall (i:index),
        (cond@A(i)  =>
            (
 
-	    not(exists (j:index), input@S(j) = output@P(i) && snd(input@A(i)) = snd(output@S(j))
-&& snd(fst(input@A(i))) = exp(g,b(j))
+	     (forall (j1:index), input@S(j1) <> output@P(i)
+	      ||snd(input@A(i)) <> snd(output@S(j1))
+	      || snd(fst(input@A(i))) <> exp(g,b(j1))
 	       )
-	     ))
+	     )
+	 )
 	      &&
 	 (
-   (forall (j1:index), input@S(j1) <> output@P(i)
- ||snd(input@A(i)) <> snd(output@S(j1))
- || snd(fst(input@A(i))) <> exp(g,b(j1))
-     )
- =>   not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i)))
-	   )
+	   (forall (j1:index), input@S(j1) <> output@P(i)
+	    ||snd(input@A(i)) <> snd(output@S(j1))
+	    || snd(fst(input@A(i))) <> exp(g,b(j1))
+	    )
+	     =>
+	     cond@A(i)
+
+	  )
 	      .
-	    Proof.
-	intro.
+ Proof.
+intro.
 split.
 
-simpl.
-expand cond@A(i), H0.
-apply H1.
-apply H0.
 
-simpl.
+expand cond@A(i).
+notleft H0.
+
+expand cond@A(i).
+
 euf M0.
 apply H0 to j.
 case H1.
+Qed.
+
+
+(* Prove that the condition of P1 does not give any information to the attacker,
+by proving that it is equivalent to a trivial formula that the attacker can
+compute. It is a bit troublesome, because the formula depends on ks, which needs
+to disapear. If we used classical assymetric signature scheme, the issue wowould
+disappear.
+*)
+goal P1_cond_useless :
+ forall (i:index),
+       (cond@P1(i)  =>
+           not(
+
+	     (forall (j1:index), input@S(j1) <> output@P(i)
+	      ||snd(input@P1(i)) <> snd(output@S(j1))
+	      || snd(fst(input@P1(i))) <> exp(g,b(j1))
+	       )
+	     )
+	 )
+	      &&
+	 (
+	   not(forall (j1:index), input@S(j1) <> output@P(i)
+	    ||snd(input@P1(i)) <> snd(output@S(j1))
+	    || snd(fst(input@P1(i))) <> exp(g,b(j1))
+	    )
+	     =>
+	     cond@P1(i)
+
+	  )
+	      .
+ Proof.
+intro.
+split.
+
+
+expand cond@P1(i).
+introsleft H0.
+euf M0.
+apply H0 to j.
+case H1.
+
+notleft H0.
+expand cond@P1(i).
 Qed.
 
 
@@ -115,13 +167,13 @@ Proof.
 
    (* unreachability of the left system - using unreach *)
    simpl.
-   expand cond@S3(j), H1.
+   expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
    apply H2 to S1(j).
    apply unreachS1 to j.
    apply H1 to s.
-       fa 1.
+   fa 1.
    induc.
 
    expand frame@A(i).
@@ -131,25 +183,20 @@ Proof.
    expand exec@A(i).
 	    expand cond@A(i).
 
-   equivalent forall (),
-      not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i))),
+   equivalent
+      cond@A(i),
 	   (forall (j1:index), input@S(j1) <> output@P(i)
  ||snd(input@A(i)) <> snd(output@S(j1))
  || snd(fst(input@A(i))) <> exp(g,b(j1))
      ).
 
-      simpl.
-  split.
-      apply A_cond_useless1 to i.
+     simpl.
+     nosimpl(apply A_cond_useless to i).
+     nosimpl(split).
+     assumption.
+     assumption.
 
-  apply H0.
-      (* We need a way to handle the not in H3. *)
-      admit.
-      apply A_cond_useless1 to i.
-apply H2.
-apply H0 to j1.
-
-      fa 0. fa 1. fa 2. fa 2.
+     fa 0. fa 1. fa 2. fa 2.
 
 (* We should be able to close this using some magical dup/fa* tactic.. *)
 
@@ -173,20 +220,28 @@ apply H0 to j1.
 
 
    expand frame@P1(i).
-	    expand output@P1(i).
-   expand exec@P1(i).
-	    expand cond@P1(i).
 
-   equivalent forall (),
-      not(h(<exp(g,a(i)),snd(fst(input@A(i)))>,kS) = snd(input@A(i))),
-	   (forall (j1:index), input@S(j1) <> output@P(i)
- ||snd(input@A(i)) <> snd(output@S(j1))
- || snd(fst(input@A(i))) <> exp(g,b(j1))
+   expand exec@P1(i).
+
+
+   equivalent
+      cond@P1(i),
+	   not(forall (j1:index), input@S(j1) <> output@P(i)
+ ||snd(input@P1(i)) <> snd(output@S(j1))
+ || snd(fst(input@P1(i))) <> exp(g,b(j1))
      ).
 
-(* converse of A *)
+      simpl.
+     nosimpl(apply P1_cond_useless to i).
+     nosimpl(split).
+     assumption.
+     assumption.
 
-      admit. admit.
+      fa 0. fa 1.
+  expand output@P1(i).
+(* PRF ? *)
+
+      admit.
  expand frame@S1(j).
 	    expand output@S1(j).
    expand exec@S1(j).
