@@ -82,6 +82,36 @@ let rec left_introductions s = function
   | f :: l -> left_introductions (TraceSequent.add_formula f s) l
   | [] -> s
 
+let left_not_intro hyp_name s sk fk =
+  let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
+  let rec not_f = function
+    | Exists (vs, f) -> ForAll(vs, not_f f)
+    | ForAll (vs, f) -> Exists(vs, not_f f)
+    | And (a, b) -> Or (not_f a, not_f b)
+    | Or (a, b) -> And (not_f a, not_f b)
+    | Impl (a, b) -> And(a, not_f b)
+    | True -> False
+    | False -> True
+    | Not f -> f
+    | Atom (#message_atom as a) -> Atom (Atom.not_message_atom a :> generic_atom)
+    | Atom (#trace_atom as a) -> Atom (Atom.not_trace_atom a :> generic_atom)
+    | m -> Not m
+  in
+  match formula with
+  | Not f ->  sk [left_introductions s [not_f f]] fk
+  | _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "Can only be applied to a negation formula.")
+
+let () =
+  T.register_general "notleft"
+    ~help:"Push a negation inside a formula.\
+           \n Usage: notleft H."
+    (function
+      | [Prover.Theory (Theory.Var h)] -> left_not_intro h
+      | _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "improper arguments"))
+
+
 let timestamp_case ts s sk fk =
   let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
   let add_action a =

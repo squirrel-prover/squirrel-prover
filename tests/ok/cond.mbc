@@ -11,6 +11,14 @@ system O:
 
 
 goal dummy :
+cond@A => input@A <>k.
+Proof.
+simpl.
+expand cond@A, H0.
+notleft H0.
+Qed.
+
+goal dummy :
 exec@O =>
   output@O = k.
  Proof.
