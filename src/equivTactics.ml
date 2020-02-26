@@ -232,6 +232,51 @@ let () =
        | [Prover.Int i] -> pure_equiv (fresh i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
+let xor i s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+    | before, e, after ->
+        begin try
+          let (name,xor_terms_left,xor_terms_right) =
+            match e with
+            | EquivSequent.Message Diff
+                (Fun (fl,Term.Name (nl,_)::ll), Fun (fr,Term.Name (nr,_)::lr))
+                when (fl = Term.f_xor && fr = Term.f_xor && nl=nr) -> (nl,ll,lr)
+            | _ -> raise @@ Tactics.Tactic_hard_failure
+                    (Tactics.Failure "Can only apply xor tactic on terms of the form (t1 xor t2)")
+          in
+          (* the biframe to consider in case of success *)
+          let biframe = List.rev_append before after in
+          (* the two frames to use for the freshness condition *)
+          let frame_left =
+            EquivSequent.Message (Fun (Term.f_xor,xor_terms_left))
+            ::List.map (EquivSequent.pi_elem Term.Left) biframe in
+          let frame_right =
+            EquivSequent.Message (Fun (Term.f_xor,xor_terms_right))
+            ::List.map (EquivSequent.pi_elem Term.Right) biframe in
+          let system_id = EquivSequent.id_left s in
+          if fresh_name_ssc ~system_id name frame_left
+          then
+            let system_id = EquivSequent.id_right s in
+            if fresh_name_ssc ~system_id name frame_right
+            then sk [EquivSequent.set_biframe s biframe] fk
+            else raise @@ Tactics.Tactic_hard_failure
+              (Tactics.Failure "Name not fresh in the right system")
+          else
+            raise @@ Tactics.Tactic_hard_failure
+              (Tactics.Failure "Name not fresh in the left system")
+        with
+        | Tactics.Tactic_hard_failure err -> fk err
+        end
+    | exception Out_of_range ->
+        fk (Tactics.Failure "Out of range position")
+
+let () =
+  T.register_general "xor"
+    ~help:"Removes diff(n XOR u,n XOR v) if n is fresh.\n Usage: xor i."
+    (function
+       | [Prover.Int i] -> pure_equiv (xor i)
+       | _ -> Tactics.hard_failure (Tactics.Failure "Improper arguments"))
+
 let dup i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->

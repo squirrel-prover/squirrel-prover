@@ -13,7 +13,7 @@ channel c
 
 system A : !_i new a; out(c,a).
 
-equiv testFresh : diff(f(ok),f(ok)),diff(n,m),m.
+equiv testFresh : diff(f(ok),f(ok)),diff(n,m),k.
 
 Proof.
   fresh 2.
@@ -22,7 +22,6 @@ Proof.
   refl.
 Qed.
 
-(*
 equiv testDup : diff(f(ok),f(ok)),diff(f(ok),f(ok)).
 
 Proof.
@@ -32,6 +31,7 @@ Proof.
 Qed.
 
 
+(*
 equiv test (i1,i2,j:index) : output@A(j),diff(output@A(i1),output@A(i2)).
 
 Proof.
@@ -41,3 +41,11 @@ Proof.
   fresh 0.
 Qed.
 *)
+
+equiv testXor : diff(f(ok),f(ok)),diff(n XOR ok,n XOR ko).
+
+Proof.
+  xor 1.
+  fa 0.
+  refl.
+Qed.
