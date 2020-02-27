@@ -112,36 +112,56 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$.
 
 \begin{example}[Basic Hash]
   \label{ex:basic-hash-bi-process}
-  We introduce the bi-process $P_{BH}$ defined by:
+  We introduce the bi-protocol $P_{BH}$ defined by:
   \begin{itemize}
-    \item the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k,i,j)\}$ where,
+    \item the set of symbolic actions $\{\T(i,j),\R_1(k),\R_2(k)\}$ where,
     \begin{itemize}
       \item action $\alpha_1 := \T(i,j)$
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
           \item $o_{\alpha_1} := \langle n[i,j], \h(\diff{\key[i]}{\key'[i,j]},n[i,j] \rangle$
         \end{itemize}
-      \item action $\alpha_2 := \R_1(k,i,j)$
+      \item action $\alpha_2 := \R_1(k)$
         \begin{itemize}
-          \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =  \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2})$
+          \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =  
+            \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_2} := \ok$
         \end{itemize}
-      \item action $\alpha_3 := \R_2(k,i,j)$
+      \item action $\alpha_3 := \R_2(k)$
         \begin{itemize}
           \item $\phi_{\alpha_3} := \neg (\exists i,j, \snd(x_{\alpha_2}) =  \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_3} := \error$
         \end{itemize}
     \end{itemize}
-    \item a conflict relation $\conflict$ such that $\R_1(k,i,j)\conflict\R_2(k,i,j)$.
+    \item a conflict relation $\conflict$ such that $\R_1(k)\conflict\R_2(k)$.
   \end{itemize}
-
-\noindent
-Some traces for this bi-process are:
+  It is obtained from the following bi-process:
+  $$\bigl(!_i !_j \myout{c,\langle  n[i,j]} \rangle\bigr) \mid
+   \bigl(!_k \myin{c,x}.~ \myif \exists i,j.~ \snd{x} = \ldots \mythen
+    out(c,\ok) \myelse out(c,\error)\bigr)$$
+  Some traces for this bi-process are:
   \begin{itemize}
-    \item $\T(1,1),\R_1(1,1,1)$
-    \item $\T(1,1).\R_1(1,1,1).\T(1,2).\R_1(2,1,2)$
-    \item $\T(1,1).\R_1(1,1,1).\T(2,1).\R_1(2,2,1)$
+    \item $\T(1,1),\R_1(1)$
+    \item $\T(1,1).\R_1(1).\T(1,2).\R_1(2)$
+    \item $\T(1,1).\R_1(1).\T(2,1).\R_1(2)$
   \end{itemize}
+\end{example}
+
+\begin{example}
+  If in the previous example we change the reader part of the bi-process into
+  $$\myin{c,x}.~ \myfind i,j \mysuchthat \snd(x) = \ldots \mythen
+  \myout{c,\ok} \myelse \myout{c,\error}\bigr)$$
+  then action $R_1(k)$ would be replaced by $\alpha_2 := R_1(k,i,j)$
+  with:
+  \begin{itemize}
+    \item $\phi_{\alpha_2} := \snd(x_{\alpha_2}) =  
+      \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
+    \item $o_{\alpha_2} := \ok$
+  \end{itemize}
+  In protocols where the output message would depend on the indices $i,j$
+  that make the condition pass, we would use $\myfind$ to in the
+  output message to retrieve these indices (more precisely, we would retrieve
+  the first such indices).
 \end{example}
 
 \bigskip
