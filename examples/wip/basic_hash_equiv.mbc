@@ -1,0 +1,68 @@
+hash h
+
+abstract ok:message
+abstract ko:message
+
+name key : index->message
+name key' : index->index->message
+
+channel cT
+channel cR
+
+process tag(i:index,k:index) =
+  new nT;
+  out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>)
+
+process reader(j:index) =
+  in(cT,x);
+  if exists (i,k:index), snd(x) = h(fst(x),diff(key(i),key'(i,k))) then
+    out(cR,ok)
+  else
+    out(cR,ko)
+
+system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+
+equiv [left] [right] foo.
+Proof.
+  case t.
+
+  expand frame@init. refl.
+
+  expand frame@R1(j); expand exec@R1(j);
+    expand cond@R1(j); expand output@R1(j).
+  fa 0. repeat (fa 1). repeat (fa 2). repeat (fa 3).
+  (* TODO equivalent
+    (exists (i,k:index), snd(input@R1(j)=h(fst(input@R1(j)),key(i)))),
+    (exists (i,k:index), T(i,k)<R1(j) && output@T(i,k)=input@R1(j)). *)
+  admit.
+
+  expand frame@T(i,k); expand exec@T(i,k);
+    expand cond@T(i,k); expand output@T(i,k).
+  fa 0. repeat (fa 1). repeat (fa 2). fa 4.
+  (* TODO PRF + Fresh *)
+  admit.
+
+  expand frame@R(j); expand exec@R(j);
+    expand cond@R(j); expand output@R(j).
+  fa 0. repeat (fa 1). repeat (fa 3).
+  (* TODO equivalent, as above *)
+  admit.
+
+Qed.
+
+(* If no system is specified, euf is not applicable because the hash
+   key is a biterm, which is fair.
+   If [left] is specified, the projections introduce explicit left(_)
+   constructs on macros, which break things and do not make sense in
+   the context of a single system. *)
+goal [left] wa :
+  forall (j:index),
+  happens(R(j)) =>
+  exists (i:index,k:index),
+  T(i,k) <= R(j) &&
+  fst(input@R(j)) = nT(i,k).
+Proof.
+ simpl.
+ euf C0.
+ exists i, k.
+Qed.

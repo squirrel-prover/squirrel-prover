@@ -106,11 +106,20 @@ let () =
 let fa i s sk fk =
   let expand : type a. a Term.term -> EquivSequent.elem list = function
     | Fun (f,l) ->
-      List.map (fun m -> EquivSequent.Message m) l
+        List.map (fun m -> EquivSequent.Message m) l
     | ITE (c,t,e) when t = e ->
         EquivSequent.[ Message t ]
     | ITE (c,t,e) ->
-      EquivSequent.[ Formula c ; Message t ; Message e ]
+        EquivSequent.[ Formula c ; Message t ; Message e ]
+    | And (f,g) ->
+        EquivSequent.[ Formula f ; Formula g ]
+    | Or (f,g) ->
+        EquivSequent.[ Formula f ; Formula g ]
+    | Impl (f,g) ->
+        EquivSequent.[ Formula f ; Formula g ]
+    | Not f -> EquivSequent.[ Formula f ]
+    | True -> []
+    | False -> []
     | Diff _ ->
         Tactics.soft_failure
           (Tactics.Failure "No common construct")
