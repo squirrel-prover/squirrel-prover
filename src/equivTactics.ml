@@ -86,10 +86,10 @@ let timestamp_case ts s sk fk =
     goals := (EquivSequent.apply_subst ts_subst s
              |> EquivSequent.set_env !env)
              ::!goals
-
   in
   let system_id = None in
   Action.iter_descrs ~system_id add_action ;
+  goals := EquivSequent.apply_subst [Term.ESubst(ts,Term.Init)] s :: !goals ;
   sk !goals fk
 
 let () =

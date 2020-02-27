@@ -6,6 +6,10 @@ system in(c,x); if x=ok && x<>ok then out(c,x).
 equiv [left] [right] test.
 Proof.
 case t.
+
+expand frame@init.
+refl.
+
 expand frame@A.
 expand exec@A.
 expand cond@A.
@@ -20,4 +24,5 @@ simpl.
 fa 1. induc.
 
 admit.
+
 Qed.

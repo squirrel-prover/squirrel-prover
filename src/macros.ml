@@ -16,7 +16,7 @@ open Term
 let is_defined name a =
   match Symbols.Macro.get_all name with
     | Symbols.Input, _ -> false
-    | Symbols.(Output | Cond | Exec | Frame | State _), _ ->
+    | Symbols.(Output | Cond | State _), _ ->
         (* We can expand the definitions of output@A and state@A
          * when A is an action name. We cannot do so for a variable
          * or a predecessor.
@@ -25,6 +25,11 @@ let is_defined name a =
          * name A. *)
         begin match a with
           | Action _ -> true
+          | _ -> false
+        end
+    | Symbols.(Exec | Frame), _ ->
+        begin match a with
+          | Action _ | Init -> true
           | _ -> false
         end
     | Symbols.Local _, _ -> true
@@ -61,11 +66,17 @@ let get_definition :
           | _ -> assert false
         end
       | Symbols.Frame, _ ->
-        Term.Fun(Term.f_pair, [Term.Macro ((name,sort,args), [], Term.Pred a);
-                               Term.ITE( Term.Macro (Term.exec_macro, [], a),
-                                       Term.Macro (Term.out_macro, [], a),
-                                        Term.Fun( Term.f_zero,[]))
-                            ])
+          begin match a with
+            | Term.Init -> Term.Fun (f_zero,[])
+            | Term.Action _ ->
+                Term.Fun(Term.f_pair,
+                         [Term.Macro ((name,sort,args), [], Term.Pred a);
+                          (* TODO add exec or cond here *)
+                          Term.ITE(Term.Macro (Term.exec_macro, [], a),
+                                   Term.Macro (Term.out_macro, [], a),
+                                   Term.Fun(Term.f_zero,[]))])
+            | _ -> assert false
+          end
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->

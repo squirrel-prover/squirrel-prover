@@ -158,6 +158,10 @@ Qed.
 equiv [left] [right] unreach.
 Proof.
    case t.
+
+   expand frame@init.
+   refl.
+
    cycle 4.
 
    expand frame@S3(j).

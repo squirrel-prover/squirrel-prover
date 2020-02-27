@@ -6,6 +6,10 @@ equiv [left] [right] test_left_bis.
 
 Proof.
 case t.
+
+expand frame@init.
+refl.
+
 expand frame@B.
 fa 0.
 expand exec@B.
@@ -26,4 +30,5 @@ expand frame@A.
 expand output@A.
 fa 0. fa 1. fa 1.
 induc.
+
 Qed.
