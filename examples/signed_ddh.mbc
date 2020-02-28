@@ -26,98 +26,76 @@ process P(i:index) =
   let sS = fst(t) in
   let hash_share = snd(t) in
   if h(<exp(g,a(i)),snd(fst(t))>,kS) = snd(t) then
-    (keyP(i) := <exp(g,a(i)),snd(fst(t))>;
-     out(cP, h(<exp(g,a(i)),snd(fst(t))>,kP))
-      )
-  else
-     null
+    keyP(i) := <exp(g,a(i)),snd(fst(t))>;
+    out(cP, h(<exp(g,a(i)),snd(fst(t))>,kP))
+  else null
 
 process S(i:index) =
   in(cS, sP);
   out(cS, < <sP,exp(g,b(i))>, h(<sP,exp(g,b(i))>,kS)>);
   in(cS, hash_shares);
   if hash_shares = h(<sP,exp(g,b(i))>,kP) then
-    (keyS(i) := <sP,exp(g,b(i))>;
-     out(cS,ok);
-     in(cP, challenge);
-     try find j such that sP = exp(g,a(j)) in
-     out(cP, ok)
-     else
-     out(cP, diff(ok,ko))
-      )
-   else null
-
+    keyS(i) := <sP,exp(g,b(i))>;
+    out(cS,ok);
+    in(cP, challenge);
+    try find j such that sP = exp(g,a(j)) in
+      out(cP, ok)
+    else
+      out(cP, diff(ok,ko))
+  else null
 
 system (!_i P(i) | !_j S(j)).
 
-(* goal used to prove that S1 is never executed, no diff *)
-goal unreachS1 :
-forall (r:index),
-cond@S1(r) =>
-   exists (s:index),
-   input@S(r) = exp(g,a(s)).
+(* We prove several lemmas, characterizing when a action's conditions passes.
+   The characterization is expressed as a property of the trace that the attacker
+   already has, showing that the condition does not bring him extra knowledge.
+
+   Prove that the condition of A does not give any information to the attacker,
+   by proving that it is equivalent to a trivial formula that the attacker can
+   compute. It is a bit troublesome, because the formula depends on ks, which needs
+   to disappear. We would not have this issue if we used a classical asymmetric
+   signature scheme. TODO I don't understand this comment: what is ks ? *)
+
+(* Correspondence property for S1, proved directly on both sides. *)
+goal S1_charac :
+  forall (r:index),
+  cond@S1(r) =>
+  exists (s:index),
+  input@S(r) = exp(g,a(s)).
 Proof.
   simpl.
-       expand cond@S1(r).
-       simpl.
-   introsleft H0.
+  expand cond@S1(r).
+  introsleft H0. (* TODO should be done as part of expansion *)
   euf M0.
-  case H0.
-  exists i.
   exists i.
 Qed.
 
-(* Prove that the condition of A does not give any information to the attacker,
-by proving that it is equivalent to a trivial formula that the attacker can
-compute. It is a bit troublesome, because the formula depends on ks, which needs
-to disapear. If we used classical assymetric signature scheme, the issue wowould
-disappear.
-*)
-goal A_cond_useless :
+goal A_charac :
  forall (i:index),
-       (cond@A(i)  =>
-           (
+ (* TODO add _ <=> _ syntax for equivalences *)
+ (cond@A(i) =>
+   (forall (j1:index),
+    input@S(j1) <> output@P(i) ||
+    snd(input@A(i)) <> snd(output@S(j1)) ||
+    snd(fst(input@A(i))) <> exp(g,b(j1))))
+ &&
+ ((forall (j1:index),
+   input@S(j1) <> output@P(i) ||
+   snd(input@A(i)) <> snd(output@S(j1)) ||
+   snd(fst(input@A(i))) <> exp(g,b(j1)))
+  =>
+  cond@A(i)).
+Proof.
+  intro; expand cond@A(i); split.
 
-	     (forall (j1:index), input@S(j1) <> output@P(i)
-	      ||snd(input@A(i)) <> snd(output@S(j1))
-	      || snd(fst(input@A(i))) <> exp(g,b(j1))
-	       )
-	     )
-	 )
-	      &&
-	 (
-	   (forall (j1:index), input@S(j1) <> output@P(i)
-	    ||snd(input@A(i)) <> snd(output@S(j1))
-	    || snd(fst(input@A(i))) <> exp(g,b(j1))
-	    )
-	     =>
-	     cond@A(i)
+  notleft H0. (* TODO rename to elim (Coq-style) or absurd ? *)
 
-	  )
-	      .
- Proof.
-intro.
-split.
-
-
-expand cond@A(i).
-notleft H0.
-
-expand cond@A(i).
-
-euf M0.
-apply H0 to j.
-case H1.
+  euf M0.
+  apply H0 to j. (* TODO this does not look like apply to me: rename ? *)
+  case H1.
 Qed.
 
-
-(* Prove that the condition of P1 does not give any information to the attacker,
-by proving that it is equivalent to a trivial formula that the attacker can
-compute. It is a bit troublesome, because the formula depends on ks, which needs
-to disapear. If we used classical assymetric signature scheme, the issue wowould
-disappear.
-*)
-goal P1_cond_useless :
+goal P1_charac :
  forall (i:index),
        (cond@P1(i)  =>
            not(
@@ -154,7 +132,6 @@ notleft H0.
 expand cond@P1(i).
 Qed.
 
-
 equiv [left] [right] unreach.
 Proof.
    case t.
@@ -169,89 +146,74 @@ Proof.
    fa 0.
    noif 1.
 
-   (* unreachability of the left system - using unreach *)
+   (* Unreachability of S3 in the left system TODO why left ? *)
    simpl.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
    apply H2 to S1(j).
-   apply unreachS1 to j.
+   apply S1_charac to j.
    apply H1 to s.
+
    fa 1.
    induc.
 
-   expand frame@A(i).
-	    expand output@A(i).
-	    help.
-
-   expand exec@A(i).
-	    expand cond@A(i).
-
+   expand frame@A(i); expand output@A(i); expand exec@A(i).
    equivalent
-      cond@A(i),
-	   (forall (j1:index), input@S(j1) <> output@P(i)
- ||snd(input@A(i)) <> snd(output@S(j1))
- || snd(fst(input@A(i))) <> exp(g,b(j1))
-     ).
+     cond@A(i),
+     (forall (j1:index),
+      input@S(j1) <> output@P(i) ||
+      snd(input@A(i)) <> snd(output@S(j1)) ||
+      snd(fst(input@A(i))) <> exp(g,b(j1))).
 
-     simpl.
-     nosimpl(apply A_cond_useless to i).
-     nosimpl(split).
-     assumption.
-     assumption.
+     nosimpl(apply A_charac to i).
+     split; assumption. (* TODO auto simpl after split should do the assumption *)
+   fa 0. fa 1. fa 2. fa 2.
+   (* We should be able to close this using some magical dup/fa* tactic..
+      TODO to justify this we need j1<A(i). *)
+   admit.
 
-     fa 0. fa 1. fa 2. fa 2.
-
-(* We should be able to close this using some magical dup/fa* tactic.. *)
-
-      admit. admit.
-
+   admit.
 
    expand frame@P(i).
-	    expand output@P(i).
+   expand output@P(i).
    expand exec@P(i).
-	    expand cond@P(i).
+   expand cond@P(i).
+   (* We should be able to close this with fresh a(i), fa, dup on exec@predP(i). *)
+   admit.
 
-   (* We should be able to close this with fresh a(i), fa, and induction (containing exec@predP(i)) *)
-      admit.
- expand frame@S(j).
-	    expand output@S(j).
+   expand frame@S(j).
+   expand output@S(j).
    expand exec@S(j).
-	    expand cond@S(j).
+   expand cond@S(j).
    (* We should be able to close this with fresh b(j), fa, and induction (containing exec@predP(i)) *)
-
-      admit.
+   admit.
 
 
    expand frame@P1(i).
-
    expand exec@P1(i).
-
-
    equivalent
-      cond@P1(i),
-	   not(forall (j1:index), input@S(j1) <> output@P(i)
- ||snd(input@P1(i)) <> snd(output@S(j1))
- || snd(fst(input@P1(i))) <> exp(g,b(j1))
-     ).
-
-      simpl.
-     nosimpl(apply P1_cond_useless to i).
+     cond@P1(i),
+     not(forall (j1:index), input@S(j1) <> output@P(i) ||
+     snd(input@P1(i)) <> snd(output@S(j1)) ||
+     snd(fst(input@P1(i))) <> exp(g,b(j1))).
+     simpl.
+     nosimpl(apply P1_charac to i).
      nosimpl(split).
      assumption.
      assumption.
-
-      fa 0. fa 1.
+  fa 0. fa 1.
   expand output@P1(i).
-(* PRF ? *)
+  (* PRF ? *)
+  admit.
+    
+  expand frame@S1(j).
+  expand output@S1(j).
+  expand exec@S1(j).
+  expand cond@S1(j).
+  (* Symmetric case of A, to handle similarly. *)
+  admit.
 
-      admit.
- expand frame@S1(j).
-	    expand output@S1(j).
-   expand exec@S1(j).
-	    expand cond@S1(j).
-   (* Symmetric case of A, to handle similarly. *)
-admit.
-admit.
+  admit.
 
-      Qed.
+Qed.

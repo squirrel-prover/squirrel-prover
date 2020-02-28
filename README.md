@@ -33,8 +33,8 @@ $ ./metabc examples/euf.mbc
 
 ### With proof general
 
-The required `.el` files are inside the `utils` folder. The `metabc.el` file contains headers
-detailing the installation of metabc for ProofGeneral.
+The required `.el` files are inside the `utils` folder. The `metabc.el` file
+contains comments detailing the installation of metabc for ProofGeneral.
 We recommend installing ProofGeneral from the git repository.
 
 ## Quick guide

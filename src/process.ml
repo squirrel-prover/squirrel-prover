@@ -40,7 +40,7 @@ let rec pp_process ppf process =
       s pp_process p
 
   | Set (s, indices, t, p) ->
-    pf ppf "@[<hov 2>%s%a %a@ %a.@;@[%a@]@]"
+    pf ppf "@[<hov>%s%a %a@ %a;@ @[%a@]@]"
       s
       (Utils.pp_list Fmt.string) indices
       (kw `Bold) ":="
