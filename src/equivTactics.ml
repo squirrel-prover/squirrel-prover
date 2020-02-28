@@ -71,7 +71,9 @@ let () =
 
 
 let assumption s sk fk =
-  if EquivSequent.get_hypothesis_biframe s = EquivSequent.get_biframe s then
+  let hypothesis = EquivSequent.get_hypothesis_biframe s in
+  if List.for_all (fun elem -> List.mem elem hypothesis)
+      (EquivSequent.get_biframe s) then
     sk [] fk
   else
      fk (Tactics.Failure "Conclusion different from hypothesis.")
