@@ -69,20 +69,42 @@ let () =
     ~help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
-(** TODO : dummy induc tactic, for testings,
-before implementing true induction tactic. *)
-let induc s sk fk =
-  match   EquivSequent.get_frame Term.None s with
-  | [] -> assert false
-  | [EquivSequent.Message (
-      Term.Macro (s ,_,Term.Pred _)
-    )] when s  = Term.frame_macro -> sk [] fk
-  | _ ->  fk (Tactics.Failure "Can only close dummy inductive goals.")
+
+let assumption s sk fk =
+  if EquivSequent.get_hypothesis_biframe s = EquivSequent.get_biframe s then
+    sk [] fk
+  else
+     fk (Tactics.Failure "Conclusion different from hypothesis.")
 
 let () =
-  T.register "induc"
-    ~help:"Closes an inductive goal.\n Usage: induc."
-    (only_equiv induc)
+  T.register "assumption"
+    ~help:"Close a goal contained in its hypothesis.\n Usage: assump."
+    (only_equiv assumption)
+
+let induction ts s sk fk =
+  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let ts = Theory.convert tsubst ts Sorts.Timestamp in
+  let subst = [Term.ESubst(ts,Pred(ts))] in
+  let goal = EquivSequent.get_biframe s in
+  let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
+  let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
+  let init_goal =
+    EquivSequent.(set_biframe
+      s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
+  in
+  sk [induc_goal;init_goal] fk
+
+let () =
+  T.register_general "induction"
+    ~help:"Apply the induction scheme to the given timestamp.\
+           \n Usage: induction t."
+    (function
+       | [Prover.Theory th] -> pure_equiv (induction th)
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
+
+
 
 let timestamp_case ts s sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in

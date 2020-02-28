@@ -122,6 +122,7 @@ Qed.
 
 equiv [left] [right] unreach.
 Proof.
+   induction t.
    case t.
 
    expand frame@init.
@@ -144,7 +145,7 @@ Proof.
    apply H1 to s.
 
    fa 1.
-   induc.
+   assumption.
 
    expand frame@A(i); expand output@A(i); expand exec@A(i).
    equivalent
@@ -160,7 +161,7 @@ Proof.
    (* We should be able to close this using some magical dup/fa* tactic..
       TODO to justify this we need j1<A(i). *)
    admit 1.
-   induc.
+   assumption.
 
    admit.
 
@@ -172,8 +173,11 @@ Proof.
    fa 0. fa 1. fa 3.
    admit 1.
    fa 1. fa 1. admit 1.
-   induc.
-    
+   assumption.
+
+   expand frame@init.
+   refl.
+
    expand frame@S(j).
    expand output@S(j).
    expand exec@S(j).
@@ -185,8 +189,8 @@ Proof.
    admit 1.
    fa 2.
    admit 1.
-   induc.
-    
+   assumption.
+
    expand frame@P1(i).
    expand exec@P1(i).
    equivalent
@@ -203,7 +207,7 @@ Proof.
   expand output@P1(i).
   (* PRF ? *)
   admit.
-    
+
   expand frame@S1(j).
   expand output@S1(j).
   expand exec@S1(j).

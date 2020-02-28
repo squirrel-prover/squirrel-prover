@@ -5,6 +5,7 @@ system in(c,x); if x=ok && x<>ok then out(c,x).
 
 equiv [left] [right] test.
 Proof.
+induction t.
 case t.
 
 expand frame@init.
@@ -21,8 +22,20 @@ fa 0.
 noif 1.
 simpl.
 
-fa 1. induc.
+fa 1.
+assumption.
 
+expand frame@A1.
+expand exec@A1.
+expand cond@A1.
+
+equivalent  (input@A1 = ok && input@A1 <> ok), False.
+simpl.
+
+(* TODO : requires a trueif. *)
 admit.
+
+expand frame@init.
+refl.
 
 Qed.

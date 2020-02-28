@@ -5,6 +5,7 @@ system A: in(c,x);out(c,zero);
 equiv [left] [right] test_left_bis.
 
 Proof.
+induction t.
 case t.
 
 expand frame@init.
@@ -17,18 +18,20 @@ expand cond@B.
 noif 1.
 simpl.
 fa 1.
-induc.
+assumption.
 
 expand frame@B1.
 fa 0.
 expand output@B1.
 fa 1.
 fa 1.
-induc.
+assumption.
 
 expand frame@A.
 expand output@A.
-fa 0. fa 1. fa 1.
-induc.
+fa 0; fa 1; fa 1.
+assumption.
 
+expand frame@init.
+refl.
 Qed.

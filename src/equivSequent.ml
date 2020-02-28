@@ -12,6 +12,17 @@ let pi_elem = fun s t ->
   | Formula t -> Formula (Term.pi_term s t)
   | Message t -> Message (Term.pi_term s t)
 
+let pp_frame ppf (l:elem list) =
+  Fmt.pf ppf "%a"
+    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
+    l
+
+
+let apply_subst_frame subst f =
+List.map (function Formula f -> Formula (Term.subst subst f)
+                 | Message t ->Message (Term.subst subst t)) f
+
+
 (** An equivalence sequent features:
   * - two frames given as a single [frame] containing bi-terms
   *   of sort boolean or message;
@@ -22,24 +33,27 @@ let pi_elem = fun s t ->
   * respectively. *)
 type t = {
   env : Vars.env;
+  hypothesis_frame : elem list;
   frame : elem list;
   id_left : Action.system_id;
   id_right : Action.system_id;
 }
 
 let init env l = {
-  env = env ; frame = l ;
+  env = env ; frame = l ; hypothesis_frame = [];
   id_left = Term.Left ; id_right = Term.Right
 }
 
 type sequent = t
 
+
+
 let pp ppf j =
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
-  Fmt.pf ppf "%a"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
-    j.frame
+  if j.hypothesis_frame <> [] then
+    Fmt.pf ppf "@[Hypothesis: %a@]@;" pp_frame j.hypothesis_frame ;
+  Fmt.pf ppf "%a" pp_frame j.frame
 
 let pp_init ppf j =
   if j.env <> Vars.empty_env then
@@ -59,6 +73,10 @@ let get_systems j = j.id_left, j.id_right
 
 let get_biframe j = j.frame
 
+let get_hypothesis_biframe j = j.hypothesis_frame
+
+let set_hypothesis_biframe j f = { j with hypothesis_frame = f}
+
 let set_biframe j f = { j with frame = f }
 
 let get_frame proj j =
@@ -74,7 +92,6 @@ let get_frame proj j =
 let get_right_frame j = List.map (pi_elem j.id_right) j.frame
 
 let apply_subst subst s =
-  {s with frame =
-            List.map (function Formula f -> Formula (Term.subst subst f)
-                             | Message t ->Message (Term.subst subst t)) s.frame
+  {s with frame = apply_subst_frame subst s.frame;
+          hypothesis_frame = apply_subst_frame subst s.hypothesis_frame
   }
