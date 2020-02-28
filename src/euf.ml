@@ -1,28 +1,28 @@
 (* Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
+(** Iterate on terms, raise Bad_ssc if the hash key occurs other than
+  * in key position or if a message variable is used. *)
 class check_hash_key ~system_id hash_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~system_id as super
-  method visit_term t = match t with
-    | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn -> self#visit_term m
+  method visit_message t = match t with
+    | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
+        self#visit_message m
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
-    | Term.Var m ->
-      begin match Vars.sort m with
-        | Sorts.Message-> raise Bad_ssc
-      end
+    | Term.Var m -> raise Bad_ssc
     | _ -> super#visit_message t
 end
 
 (* Check the key syntactic side-condition:
-    The key [key_n] must appear only in key position of the hash [hash_fn]. *)
+   The key [key_n] must appear only in key position of the hash [hash_fn]. *)
 let euf_key_ssc ~system_id hash_fn key_n messages =
   let ssc = new check_hash_key ~system_id hash_fn key_n in
-  List.iter ssc#visit_term messages ;
+  List.iter ssc#visit_message messages ;
   Action.(iter_descrs ~system_id
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
-       ssc#visit_term (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_term t) action_descr.updates))
+       ssc#visit_message (snd action_descr.output) ;
+       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
 let hash_key_ssc ~system_id hash_fn key_n messages =
   try
@@ -40,12 +40,18 @@ let h_o_term ~system_id hh kk acc t =
 
   | Term.Fun (_,l) -> List.fold_left aux acc l
   | Term.Macro ((mn,sort,is),l,a) ->
-    if mn = Utils.fst3 Term.in_macro || mn = Utils.fst3 Term.out_macro then acc
-    else if Macros.is_defined mn a then
-      let acc = List.fold_left (fun acc t -> aux acc t) acc l in
-      Macros.get_definition ~system_id sort mn is a
-      |> aux acc
-    else raise Bad_ssc
+    (* TODO factorize with Iter's code;
+     * the treatment of only is_defined macros is suspiciously
+     * different from the get_dummy_definition used there *)
+    begin match Symbols.Macro.get_def mn with
+      | Symbols.(Input | Output | State _ | Cond | Exec) -> acc
+      | Symbols.(Frame | Local _) -> assert false (* TODO *)
+      | Symbols.Global _ ->
+          if not (Macros.is_defined mn a) then raise Bad_ssc ;
+          let acc = List.fold_left (fun acc t -> aux acc t) acc l in
+          Macros.get_definition ~system_id sort mn is a
+          |> aux acc
+    end
   | Term.Name (_,_) -> acc
   | Term.Var _ -> acc
   | Term.Left m | Term.Right m -> aux acc m
@@ -57,7 +63,9 @@ let h_o_term ~system_id hh kk acc t =
     indices and messages where a hash using occurs in an action description.
     I.e. we have a pair (is,m) iff hash_fn(m,key_n(is)) occurs in the action
     description output or state updates.
-    Remark: we do not need to look in the condition (C.f. axiom P-EUF-MAC). *)
+    TODO in presence of exec and cond macros, it is unsound to not include
+    hashes from these formulas; this does not seem to lead to unsoundness
+    so far, only because ITE and Find are not supported here *)
 let hashes_of_action_descr ~system_id action_descr hash_fn key_n =
   List.fold_left (h_o_term ~system_id hash_fn key_n)
     [] Action.(snd action_descr.output :: (List.map snd action_descr.updates))

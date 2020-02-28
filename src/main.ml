@@ -207,6 +207,16 @@ let () =
         (Tactic_soft_failure NoSSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
+    "Euf NoSSC", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure NoSSC)
+        (fun () -> run ~test "tests/alcotest/euf_deep.mbc")
+    end ;
+    "Euf NoSSC", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure NoSSC)
+        (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
+    end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)

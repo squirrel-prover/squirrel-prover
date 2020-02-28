@@ -13,8 +13,8 @@ class iter ~system_id = object (self)
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
     | Right a -> self#visit_message a
-    | ITE (a, b, c) -> self#visit_formula a;
-      self#visit_message b; self#visit_message c
+    | ITE (a, b, c) ->
+        self#visit_formula a; self#visit_message b; self#visit_message c
     | Find (a, b, c, d) ->
         self#visit_formula b; self#visit_message c; self#visit_message d
 
@@ -30,15 +30,14 @@ class iter ~system_id = object (self)
         self#visit_message t ;
         self#visit_message t'
     | Macro ((mn, Sorts.Boolean, is),[],a) ->
-      (* TODO : if we visit the subterm here, we have a recursive infinite loop
-         due to exec. *)
-      ()
+        self#visit_formula
+          (Macros.get_definition ~system_id Sorts.Boolean mn is a)
     | _ -> failwith "unsupported"
 
 end
 
 (** Iterator that does not visit macro expansions but guarantees that,
-  * for macro symbols [m] other that input, output and states,
+  * for macro symbols [m] other that input, output, cond, exec and states,
   * if [m(...)@..] occurs in the visited terms then
   * a specific expansion of [m] will have been visited, without
   * any guarantee on the indices and action used for that expansion. *)
@@ -48,23 +47,23 @@ class iter_approx_macros ~system_id = object (self)
 
   val mutable checked_macros = []
 
-  method visit_message (t : Term.message) = match t with
-    | Macro ((mn,sort,is),l,_) ->
-        begin match Symbols.Macro.get_def mn with
-          | Symbols.(Input | Output | State _) -> ()
-          | Symbols.Global _ ->
-              List.iter self#visit_message l ;
-              if not (List.mem mn checked_macros) then begin
-                checked_macros <- mn :: checked_macros ;
-                self#visit_message
-                  (Macros.get_dummy_definition ~system_id sort mn is)
-              end
-          | Symbols.(Frame | Local _) -> assert false (* TODO *)
-          | Symbols.(Cond | Exec) ->
-              (* These symbols do not make sense in messages.
-               * TODO they could be ruled out using stronger typing. *)
-              assert false
-        end
-    | _ -> super#visit_message t
+  method visit_macro mn is =
+    match Symbols.Macro.get_def mn with
+      | Symbols.(Input | Output | State _ | Cond | Exec) -> ()
+      | Symbols.Global _ ->
+          if not (List.mem mn checked_macros) then begin
+            checked_macros <- mn :: checked_macros ;
+            self#visit_message
+              (Macros.get_dummy_definition ~system_id Sorts.Message mn is)
+          end
+      | Symbols.(Frame | Local _) -> assert false (* TODO *)
+
+  method visit_message = function
+    | Macro ((mn,sort,is),[],_) -> self#visit_macro mn is
+    | m -> super#visit_message m
+
+  method visit_formula = function
+    | Macro ((mn,sort,is),[],_) -> self#visit_macro mn is
+    | f -> super#visit_formula f
 
 end

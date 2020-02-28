@@ -334,6 +334,14 @@ class iter_macros ~system_id f = object (self)
               f t def ;
               self#visit_message def
       | t -> super#visit_message t
+  method visit_formula f =
+    (* Do not visit macros. When a macro formula is defined we could add
+     * an hypothesis stating the equivalence between the macro and its
+     * expansion. But we'll probably take care of that later as part of a
+     * larger redesign of the macro expansion system. *)
+    match f with
+      | Term.Macro ((m,sort,is),[],a) -> ()
+      | t -> super#visit_formula t
 end
 
 (** Add to [s] equalities corresponding to the expansions of all macros

@@ -134,8 +134,13 @@ let get_definition :
           | _ -> assert false
         end
       | Symbols.Exec, _ ->
-        Term.And( Macro ((name, sort, args),[], Term.Pred a),
-                  Macro (Term.cond_macro,[], a))
+        begin match a with
+          | Term.Init -> Term.True
+          | Term.Action _ ->
+            Term.And (Macro ((name, sort, args),[], Term.Pred a),
+                      Macro (Term.cond_macro, [], a))
+          | _ -> assert false
+        end
       | _ -> assert false
     end
   | _ -> assert false
