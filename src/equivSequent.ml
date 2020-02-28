@@ -17,6 +17,16 @@ let pp_frame ppf (l:elem list) =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     l
 
+let pp_frame_numbered ppf (l:elem list) =
+  let max_i = List.length l - 1 in
+  List.iteri (fun i elem ->
+      if i < max_i then
+        Fmt.pf ppf "%i: %a,@ " i pp_elem elem
+      else
+        Fmt.pf ppf "%i: %a" i pp_elem elem
+    )
+    l
+
 
 let apply_subst_frame subst f =
 List.map (function Formula f -> Formula (Term.subst subst f)
@@ -53,7 +63,7 @@ let pp ppf j =
     Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
   if j.hypothesis_frame <> [] then
     Fmt.pf ppf "@[Hypothesis: %a@]@;" pp_frame j.hypothesis_frame ;
-  Fmt.pf ppf "%a" pp_frame j.frame
+  Fmt.pf ppf "%a" pp_frame_numbered j.frame
 
 let pp_init ppf j =
   if j.env <> Vars.empty_env then
