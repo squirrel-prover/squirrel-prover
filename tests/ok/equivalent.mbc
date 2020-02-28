@@ -9,33 +9,38 @@ induction t.
 case t.
 
 expand frame@init.
+expand exec@init.
 refl.
 
 expand frame@A.
 expand exec@A.
+equivalent  cond@A, False.
 expand cond@A.
 
-equivalent  (input@A = ok && input@A <> ok), False.
-simpl.
-
-fa 0.
-noif 1.
-simpl.
-
 fa 1.
+noif 2.
+simpl.
+
+fa 2.
+fa 0; fa 1.
 assumption.
 
 expand frame@A1.
+expand output@A1.
+fa 1.
+fa 2.
+dup 2.
 expand exec@A1.
+fa 2 ; fa 2.
 expand cond@A1.
+fa 0.
+fa 1; fa 1.
 
-equivalent  (input@A1 = ok && input@A1 <> ok), False.
-simpl.
-
-(* TODO : requires a trueif. *)
+(* TODO : requires a smart dup. *)
 admit.
 
 expand frame@init.
+expand exec@init.
 refl.
 
 Qed.

@@ -126,25 +126,27 @@ Proof.
    case t.
 
    expand frame@init.
+   expand exec@init.
    refl.
 
    cycle 4.
 
    expand frame@S3(j).
    expand exec@S3(j).
-   fa 0.
-   noif 1.
 
-   (* Unreachability of S3 in the left system TODO why left ? *)
-   simpl.
+   (* Unreachability of S3  *)
+   equivalent cond@S3(j), False.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
-   apply H2 to S1(j).
+   apply H1 to S1(j).
    apply S1_charac to j.
-   apply H1 to s.
+   apply H0 to s.
 
    fa 1.
+   noif 2. simpl.
+
+   fa 0;fa 1; fa 2.
    assumption.
 
    expand frame@A(i); expand output@A(i); expand exec@A(i).
@@ -157,8 +159,10 @@ Proof.
 
      nosimpl(apply A_charac to i).
      split; assumption. (* TODO auto simpl after split should do the assumption *)
-   fa 0. fa 1. fa 2. fa 2.
-   (* We should be able to close this using some magical dup/fa* tactic..
+     fa 1; fa 2; fa 3; fa 3.
+     dup 2.
+     fa 0.
+      (* We should be able to close this using some magical dup/fa* tactic..
       TODO to justify this we need j1<A(i). *)
    admit 1.
    assumption.
@@ -169,26 +173,28 @@ Proof.
    expand output@P(i).
    expand exec@P(i).
    expand cond@P(i).
-   (* We should be able to close this with fresh a(i), fa, dup on exec@predP(i). *)
-   fa 0. fa 1. fa 3.
-   admit 1.
-   fa 1. fa 1. admit 1.
+   fa 1; fa 2; fa 4.
+   dup 2.
+   fa 0; fa 1.
+   (* We should be able to close this with fresh a(i)*)
+   admit 2.
    assumption.
 
    expand frame@init.
+   expand exec@init.
    refl.
 
    expand frame@S(j).
    expand output@S(j).
    expand exec@S(j).
    expand cond@S(j).
-   (* We should be able to close this with fresh b(j), fa, and induction (containing exec@predP(i)) *)
-   fa 0. fa 1. repeat (fa 2).
-   admit 1. admit 1.
-   fa 1. fa 1.
-   admit 1.
-   fa 2.
-   admit 1.
+
+   fa 1; fa 2; dup 2; repeat (fa 2).
+   fa 0; fa 1.
+   admit 2. admit 2.
+   admit 2.
+   admit 2.
+   (* We should be able to close this with fresh b(j). *)
    assumption.
 
    expand frame@P1(i).
@@ -203,7 +209,8 @@ Proof.
      nosimpl(split).
      assumption.
      assumption.
-  fa 0. fa 1.
+  fa 1. fa 2. dup 2.
+
   expand output@P1(i).
   (* PRF ? *)
   admit.

@@ -1,0 +1,51 @@
+hash h
+channel c
+
+name k : message
+
+name ok : message
+
+
+system
+!_i (if False then out(c,h(ok,k))).
+
+equiv [left] [right] simp.
+Proof.
+ enrich h(ok,k).
+ induction t.
+ case t.
+
+ expand frame@init.
+ expand exec@init.
+ refl.
+
+ cycle 1.
+ expand frame@A(i).
+ expand output@A(i).
+ expand exec@A(i).
+ fa 2.
+ equivalent cond@A(i), False.
+ simpl.
+ expand cond@A(i).
+
+ noif 3.
+ simpl.
+ fa 1.
+ fa 2. fa 3.
+ assumption.
+
+ expand exec@init;expand frame@init;refl.
+
+
+ expand frame@A1(i).
+ expand output@A1(i).
+ expand exec@A1(i).
+ fa 2. fa 3.
+ dup 3.
+ fa 1.
+ expand cond@A1(i).
+ fa 2. fa 2.
+ fa 3.
+ fa 3.
+ assumption.
+Qed.

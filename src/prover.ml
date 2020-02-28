@@ -365,16 +365,13 @@ let make_equiv_goal env (l : Theory.term list) =
     Goal.Equiv (EquivSequent.init env (List.map convert l))
 
 
-(* TODO, this function creates a goal corresponding to a diff-equivalence of a
-   process. Because currently we do not have the basic tactics, I filter here
-   all the actions that do not contain a diff.
-*)
 let make_equiv_goal_process system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
+  let formula = Term.Macro(Term.exec_macro,[],Term.Var ts) in
   Goal.Equiv (EquivSequent.init !env
-                [(EquivSequent.Message term)])
+                [(EquivSequent.Formula formula); (EquivSequent.Message term)])
 
 type parsed_input =
   | ParsedInputDescr
