@@ -103,7 +103,28 @@ let () =
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+let enrich (t : Theory.term) s sk fk =
+  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let elem = match Theory.convert tsubst t Sorts.Boolean with
+    | f -> EquivSequent.Formula f
+    | exception _ ->
+      begin
+        match Theory.convert tsubst t Sorts.Message with
+        | m -> EquivSequent.Message m
+        | exception _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments")
+      end
+  in
+  sk [EquivSequent.set_biframe s
+        (elem :: EquivSequent.get_biframe s)] fk
 
+let () = T.register_general "enrich"
+    ~help:"Enrich the goal with the given term.\
+           \n Usage: enrich t."
+    (function
+       | [Prover.Theory v] -> pure_equiv (enrich v)
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
 
 
 let timestamp_case ts s sk fk =
