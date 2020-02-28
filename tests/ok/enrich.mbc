@@ -17,7 +17,6 @@ Proof.
 
  expand frame@init.
  expand exec@init.
- refl.
 
  cycle 1.
  expand frame@A(i).
@@ -31,7 +30,6 @@ Proof.
  noif 3.
  simpl.
  fa 1.
- fa 2. fa 3.
  assumption.
 
  expand exec@init;expand frame@init;refl.
@@ -44,8 +42,5 @@ Proof.
  dup 3.
  fa 1.
  expand cond@A1(i).
- fa 2. fa 2.
- fa 3.
- fa 3.
  assumption.
 Qed.

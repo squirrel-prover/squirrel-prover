@@ -127,7 +127,6 @@ Proof.
 
    expand frame@init.
    expand exec@init.
-   refl.
 
    cycle 4.
 
@@ -145,8 +144,7 @@ Proof.
 
    fa 1.
    noif 2. simpl.
-
-   fa 0;fa 1; fa 2.
+   fa 0.
    assumption.
 
    expand frame@A(i); expand output@A(i); expand exec@A(i).
@@ -182,7 +180,7 @@ Proof.
 
    expand frame@init.
    expand exec@init.
-   refl.
+
 
    expand frame@S(j).
    expand output@S(j).
@@ -192,7 +190,6 @@ Proof.
    fa 1; fa 2; dup 2; repeat (fa 2).
    fa 0; fa 1.
    admit 2. admit 2.
-   admit 2.
    admit 2.
    (* We should be able to close this with fresh b(j). *)
    assumption.

@@ -165,6 +165,30 @@ let () =
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+let const s sk fk =
+  let frame = EquivSequent.get_biframe s in
+  let rec is_const : type a. a Term.term -> bool = function
+    | True -> true
+    | False -> true
+    | Fun (f,l) -> List.for_all is_const l
+    | And (f, g) -> (is_const f) && (is_const g)
+    | Or (f, g) -> (is_const f) && (is_const g)
+    | Impl (f, g) -> (is_const f) && (is_const g)
+    | Not f -> (is_const f)
+    | _ -> false
+  in
+  let is_const =  function
+    | EquivSequent.Message e -> is_const e
+    | EquivSequent.Formula e -> is_const e
+  in
+  sk [EquivSequent.set_biframe s
+        (List.filter (fun e -> not (is_const e)) frame)] fk
+
+let () =
+  T.register "const"
+    ~help:"Remove all constants from the frame.
+           \n Usage: const." (pure_equiv const)
+
 (** Function application *)
 let fa i s sk fk =
   let expand : type a. a Term.term -> EquivSequent.elem list = function

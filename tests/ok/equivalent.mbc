@@ -10,7 +10,6 @@ case t.
 
 expand frame@init.
 expand exec@init.
-refl.
 
 expand frame@A.
 expand exec@A.
@@ -21,8 +20,7 @@ fa 1.
 noif 2.
 simpl.
 
-fa 2.
-fa 0; fa 1.
+fa 0.
 assumption.
 
 expand frame@A1.
@@ -31,7 +29,6 @@ fa 1.
 fa 2.
 dup 2.
 expand exec@A1.
-fa 2 ; fa 2.
 expand cond@A1.
 fa 0.
 fa 1; fa 1.
@@ -41,6 +38,6 @@ admit.
 
 expand frame@init.
 expand exec@init.
-refl.
+
 
 Qed.

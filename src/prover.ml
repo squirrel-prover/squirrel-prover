@@ -313,6 +313,28 @@ let () =
     ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
     (fun j sk fk -> sk (TraceAST.eval_judgment simpl j) fk)
 
+let esimpl =
+  Tactics.(
+    AndThen
+      (Abstract ("const",[]) ::
+      [Try (Abstract ("refl",[]))])
+  )
+
+
+let equiv_auto_simp judges =
+  judges
+  |> List.map (fun x -> match x with
+      | Goal.Equiv _ ->  EquivAST.eval_judgment esimpl x
+      | Goal.Trace _ -> [x]
+    )
+  |> List.flatten
+
+let () =
+  EquivTactics.register "simpl"
+    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
+    (fun j sk fk -> sk (EquivAST.eval_judgment esimpl j) fk)
+
+
 let tsubst_of_goal j =
   let aux : Vars.evar -> Theory.esubst =
     (fun (Vars.EVar v) ->
@@ -421,6 +443,10 @@ let eval_tactic_focus tac = match !subgoals with
     is_proof_completed ()
   | Goal.Equiv judge :: ejs' ->
     let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
+    let new_j = match tac with
+      | Tactics.Modifier ("nosimpl", _) -> new_j
+      | _ -> equiv_auto_simp new_j
+    in
     subgoals := new_j @ ejs';
     is_proof_completed ()
 
