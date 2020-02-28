@@ -37,23 +37,33 @@ class iter ~system_id = object (self)
 
 end
 
-(** Iterator that does not visit macro expansions but guarantees
-  * that whenever a macro [m(...)@..] occurs where [m] is not an input/output,
+(** Iterator that does not visit macro expansions but guarantees that,
+  * for macro symbols [m] other that input, output and states,
+  * if [m(...)@..] occurs in the visited terms then
   * a specific expansion of [m] will have been visited, without
   * any guarantee on the indices and action used for that expansion. *)
 class iter_approx_macros ~system_id = object (self)
 
   inherit iter ~system_id as super
 
-  val mutable checked_macros = [Utils.fst3 Term.in_macro;
-                                Utils.fst3 Term.out_macro]
+  val mutable checked_macros = []
 
-  method visit_message t = match t with
+  method visit_message (t : Term.message) = match t with
     | Macro ((mn,sort,is),l,_) ->
-        List.iter self#visit_message l ;
-        if not (List.mem mn checked_macros) then begin
-          checked_macros <- mn :: checked_macros ;
-          self#visit_message (Macros.get_dummy_definition ~system_id sort mn is)
+        begin match Symbols.Macro.get_def mn with
+          | Symbols.(Input | Output | State _) -> ()
+          | Symbols.Global _ ->
+              List.iter self#visit_message l ;
+              if not (List.mem mn checked_macros) then begin
+                checked_macros <- mn :: checked_macros ;
+                self#visit_message
+                  (Macros.get_dummy_definition ~system_id sort mn is)
+              end
+          | Symbols.(Frame | Local _) -> assert false (* TODO *)
+          | Symbols.(Cond | Exec) ->
+              (* These symbols do not make sense in messages.
+               * TODO they could be ruled out using stronger typing. *)
+              assert false
         end
     | _ -> super#visit_message t
 
