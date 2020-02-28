@@ -40,18 +40,24 @@ end
   * for macro symbols [m] other that input, output, cond, exec and states,
   * if [m(...)@..] occurs in the visited terms then
   * a specific expansion of [m] will have been visited, without
-  * any guarantee on the indices and action used for that expansion. *)
-class iter_approx_macros ~system_id = object (self)
+  * any guarantee on the indices and action used for that expansion,
+  * because [get_dummy_definition] is used -- this behaviour is disabled
+  * with [exact], in which case all macros will be expanded and must
+  * thus be defined. *)
+class iter_approx_macros ~exact ~system_id = object (self)
 
   inherit iter ~system_id as super
 
   val mutable checked_macros = []
 
-  method visit_macro mn is =
+  method visit_macro mn is a =
     match Symbols.Macro.get_def mn with
       | Symbols.(Input | Output | State _ | Cond | Exec) -> ()
       | Symbols.Global _ ->
-          if not (List.mem mn checked_macros) then begin
+          if exact then
+            self#visit_message
+              (Macros.get_definition ~system_id Sorts.Message mn is a)
+          else if not (List.mem mn checked_macros) then begin
             checked_macros <- mn :: checked_macros ;
             self#visit_message
               (Macros.get_dummy_definition ~system_id Sorts.Message mn is)
@@ -59,11 +65,13 @@ class iter_approx_macros ~system_id = object (self)
       | Symbols.(Frame | Local _) -> assert false (* TODO *)
 
   method visit_message = function
-    | Macro ((mn,sort,is),[],_) -> self#visit_macro mn is
+    | Macro ((mn,sort,is),[],a) -> self#visit_macro mn is a
     | m -> super#visit_message m
 
   method visit_formula = function
-    | Macro ((mn,sort,is),[],_) -> self#visit_macro mn is
+    | Macro ((mn,sort,is),[],a) -> self#visit_macro mn is a
     | f -> super#visit_formula f
+
+  method has_visited_macro mn = List.mem mn checked_macros
 
 end

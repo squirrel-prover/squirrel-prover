@@ -2,9 +2,14 @@
 exception Bad_ssc
 
 (** Iterate on terms, raise Bad_ssc if the hash key occurs other than
-  * in key position or if a message variable is used. *)
+  * in key position or if a message variable is used.
+  *
+  * We use the inexact version of [iter_approx_macros]: it allows
+  * some macros to be undefined, though such instaces will not be
+  * supported when collecting hashes; more importantly, it avoids
+  * inspecting each of the multiple expansions of a same macro. *)
 class check_hash_key ~system_id hash_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~system_id as super
+  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
         self#visit_message m
@@ -13,8 +18,41 @@ class check_hash_key ~system_id hash_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
-(* Check the key syntactic side-condition:
-   The key [key_n] must appear only in key position of the hash [hash_fn]. *)
+(** Collect hashes for a given hash function and key.
+  * We use the exact version of [iter_approx_macros], otherwise
+  * we might obtain meaningless terms provided by [get_dummy_definition]. *)
+class get_hashed_messages ~system_id hash_fn key_n acc = object (self)
+  inherit Iter.iter_approx_macros ~exact:true ~system_id as super
+  val mutable hashes : (Vars.index list * Term.message) list = acc
+  method get_hashes = hashes
+  method visit_message = function
+    | Term.Fun ((hash_fn',_), [m;k]) when hash_fn' = hash_fn ->
+        begin match k with
+          | Term.Name (key_n',is) ->
+              if key_n' = key_n then hashes <- (is,m) :: hashes
+          | _ -> ()
+        end ;
+        self#visit_message m ; self#visit_message k
+    | Term.Var m -> raise Bad_ssc
+    | m -> super#visit_message m
+end
+
+exception Found
+
+(** Iterator that raises [Found] when a boolean macro is visited.
+  * It relies on the inexact version of [iter_approx_macros] to avoid
+  * expanding the same macro several times. *)
+class no_cond ~system_id = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
+  method visit_formula = function
+    | Term.Macro _ -> raise Found
+    | f -> super#visit_formula f
+end
+
+(** Check the key syntactic side-condition in the given list of messages
+  * and in the outputs, conditions and updates of all system actions:
+  * [key_n] must appear only in key position of [hash_fn].
+  * Return unit on success, raise [Bad_ssc] otherwise. *)
 let euf_key_ssc ~system_id hash_fn key_n messages =
   let ssc = new check_hash_key ~system_id hash_fn key_n in
   List.iter ssc#visit_message messages ;
@@ -24,52 +62,56 @@ let euf_key_ssc ~system_id hash_fn key_n messages =
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
+(** Check that [cond] and [exec] macros do not appear in messages
+  * and in the outputs and updates of all system actions. *)
+let no_cond ~system_id messages =
+  let iter = new no_cond ~system_id in
+  try
+    List.iter iter#visit_message messages ;
+    Action.(iter_descrs ~system_id
+      (fun action_descr ->
+         iter#visit_message (snd action_descr.output) ;
+         List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates)) ;
+    true
+  with Found -> false
+
+(** Same as [euf_key_ssc] but returning a boolean.
+  * This is used in the collision tactic, which looks for all h(_,k)
+  * such that k satisfies the SSC. *)
 let hash_key_ssc ~system_id hash_fn key_n messages =
   try
     euf_key_ssc ~system_id hash_fn key_n messages;
     true
   with Bad_ssc -> false
 
-let h_o_term ~system_id hh kk acc t =
-  let rec aux acc = function
-  | Term.Fun ((fn,_), [m;k]) when fn = hh -> begin match k with
-      | Term.Name (key_n',is) ->
-        if key_n' = kk then aux ((is,m) :: acc) m
-        else aux acc m
-      | _ -> aux (aux acc m) k end
+(** [h_o_term hash_fn key_n acc t] adds to [acc] all pairs [is,m] such that
+  * [hash_fn(m,key_n(is))] occurs in [t]. *)
+let h_o_term ~system_id hash_fn key_n acc t =
+  let iter = new get_hashed_messages ~system_id hash_fn key_n acc in
+  iter#visit_message t ;
+  iter#get_hashes
 
-  | Term.Fun (_,l) -> List.fold_left aux acc l
-  | Term.Macro ((mn,sort,is),l,a) ->
-    (* TODO factorize with Iter's code;
-     * the treatment of only is_defined macros is suspiciously
-     * different from the get_dummy_definition used there *)
-    begin match Symbols.Macro.get_def mn with
-      | Symbols.(Input | Output | State _ | Cond | Exec) -> acc
-      | Symbols.(Frame | Local _) -> assert false (* TODO *)
-      | Symbols.Global _ ->
-          if not (Macros.is_defined mn a) then raise Bad_ssc ;
-          let acc = List.fold_left (fun acc t -> aux acc t) acc l in
-          Macros.get_definition ~system_id sort mn is a
-          |> aux acc
-    end
-  | Term.Name (_,_) -> acc
-  | Term.Var _ -> acc
-  | Term.Left m | Term.Right m -> aux acc m
-  | Term.Diff (a, b) -> aux (aux acc a) b
-  | _ -> failwith "Not implemented"
-  in aux acc t
+let h_o_formula ~system_id hash_fn key_n acc f =
+  let iter = new get_hashed_messages ~system_id hash_fn key_n acc in
+  iter#visit_formula f ;
+  iter#get_hashes
 
-(** [hashes_of_action_descr action_descr hash_fn key_n] return the pairs of
-    indices and messages where a hash using occurs in an action description.
-    I.e. we have a pair (is,m) iff hash_fn(m,key_n(is)) occurs in the action
-    description output or state updates.
-    TODO in presence of exec and cond macros, it is unsound to not include
-    hashes from these formulas; this does not seem to lead to unsoundness
-    so far, only because ITE and Find are not supported here *)
-let hashes_of_action_descr ~system_id action_descr hash_fn key_n =
-  List.fold_left (h_o_term ~system_id hash_fn key_n)
-    [] Action.(snd action_descr.output :: (List.map snd action_descr.updates))
-  |> List.sort_uniq Pervasives.compare
+(** [hashes_of_action_descr ~system_id ~cond action_descr hash_fn key_n]
+    returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs
+    in an action description. The conditions of action descriptions are
+    only considered if [cond]. *)
+let hashes_of_action_descr ~system_id ~cond action_descr hash_fn key_n =
+  let open Action in
+  let hashes =
+    List.fold_left (h_o_term ~system_id hash_fn key_n)
+      [] (snd action_descr.output :: (List.map snd action_descr.updates))
+  in
+  let hashes =
+    if cond then
+      h_o_formula ~system_id hash_fn key_n hashes (snd action_descr.condition)
+    else hashes
+  in
+  List.sort_uniq Pervasives.compare hashes
 
 let hashes_of_term ~system_id term hash_fn key_n =
   h_o_term ~system_id hash_fn key_n [] term
@@ -114,13 +156,14 @@ let pp_euf_rule ppf rule =
 
 let mk_rule ~system_id ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
   euf_key_ssc ~system_id hash_fn key_n [mess;sign];
+  let cond = not (no_cond ~system_id [mess;sign]) in
   { hash = hash_fn;
     key = key_n;
     case_schemata =
       Utils.map_of_iter (Action.iter_descrs ~system_id)
         (fun action_descr ->
           let env = ref env in
-          hashes_of_action_descr ~system_id action_descr hash_fn key_n
+          hashes_of_action_descr ~system_id ~cond action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
             let subst_fresh =
               List.map

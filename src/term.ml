@@ -274,14 +274,15 @@ let rec tts acc = function
 
 let get_ts t = tts [] t |> List.sort_uniq Pervasives.compare
 
-let rec pts acc = function
+let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt
   | Macro (s, l, ts) ->
-     if s = in_macro then (Pred ts) :: acc else
+     if Obj.magic s = in_macro then (Pred ts) :: acc else
        List.fold_left pts (ts :: acc) l
   | Name _ -> acc
   | Var _ -> []
-  |  _ -> failwith "Not implemented"
+  | ITE (f,t,e) -> List.fold_left pts (pts acc f) [t;e]
+  | _ -> failwith "Not implemented"
 
 let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
 
