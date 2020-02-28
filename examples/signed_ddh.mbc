@@ -96,40 +96,28 @@ Proof.
 Qed.
 
 goal P1_charac :
- forall (i:index),
-       (cond@P1(i)  =>
-           not(
+  forall (i:index),
+  ((cond@P1(i) =>
+    not (forall (j1:index),
+         input@S(j1) <> output@P(i) ||
+         snd(input@P1(i)) <> snd(output@S(j1)) ||
+         snd(fst(input@P1(i))) <> exp(g,b(j1))))
+   &&
+   (not (forall (j1:index),
+         input@S(j1) <> output@P(i) ||
+         snd(input@P1(i)) <> snd(output@S(j1)) ||
+         snd(fst(input@P1(i))) <> exp(g,b(j1)))
+    =>
+    cond@P1(i))).
+Proof.
+  intro; expand cond@P1(i); split.
 
-	     (forall (j1:index), input@S(j1) <> output@P(i)
-	      ||snd(input@P1(i)) <> snd(output@S(j1))
-	      || snd(fst(input@P1(i))) <> exp(g,b(j1))
-	       )
-	     )
-	 )
-	      &&
-	 (
-	   not(forall (j1:index), input@S(j1) <> output@P(i)
-	    ||snd(input@P1(i)) <> snd(output@S(j1))
-	    || snd(fst(input@P1(i))) <> exp(g,b(j1))
-	    )
-	     =>
-	     cond@P1(i)
+  introsleft H0.
+  euf M0.
+  apply H0 to j.
+  case H1.
 
-	  )
-	      .
- Proof.
-intro.
-split.
-
-
-expand cond@P1(i).
-introsleft H0.
-euf M0.
-apply H0 to j.
-case H1.
-
-notleft H0.
-expand cond@P1(i).
+  notleft H0.
 Qed.
 
 equiv [left] [right] unreach.
@@ -171,7 +159,8 @@ Proof.
    fa 0. fa 1. fa 2. fa 2.
    (* We should be able to close this using some magical dup/fa* tactic..
       TODO to justify this we need j1<A(i). *)
-   admit.
+   admit 1.
+   induc.
 
    admit.
 
@@ -180,16 +169,24 @@ Proof.
    expand exec@P(i).
    expand cond@P(i).
    (* We should be able to close this with fresh a(i), fa, dup on exec@predP(i). *)
-   admit.
-
+   fa 0. fa 1. fa 3.
+   admit 1.
+   fa 1. fa 1. admit 1.
+   induc.
+    
    expand frame@S(j).
    expand output@S(j).
    expand exec@S(j).
    expand cond@S(j).
    (* We should be able to close this with fresh b(j), fa, and induction (containing exec@predP(i)) *)
-   admit.
-
-
+   fa 0. fa 1. repeat (fa 2).
+   admit 1. admit 1.
+   fa 1. fa 1.
+   admit 1.
+   fa 2.
+   admit 1.
+   induc.
+    
    expand frame@P1(i).
    expand exec@P1(i).
    equivalent

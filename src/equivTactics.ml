@@ -36,6 +36,24 @@ let pure_equiv t s sk fk =
   in
   only_equiv t' s sk fk
 
+(* Admit tactic *)
+let () =
+  T.register_general "admit"
+    ~help:"Closes the current goal, or frop a bi-frame element.\
+           \n Usage: admit [pos]."
+    (function
+       | [] -> only_equiv (fun _ sk fk -> sk [] fk)
+       | [Prover.Int i] ->
+           pure_equiv begin fun s sk fk ->
+             let before,_,after = nth i (EquivSequent.get_biframe s) in
+             let s =
+               EquivSequent.set_biframe s (List.rev_append before after)
+             in
+               sk [s] fk
+           end
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+                         (Tactics.Failure "improper arguments"))
+
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl (s : EquivSequent.t) sk fk =
