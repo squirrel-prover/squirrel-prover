@@ -217,6 +217,11 @@ let () =
         (Tactic_soft_failure NoSSC)
         (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
     end ;
+    "Euf collect in key position", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/euf_deepkey.mbc")
+    end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
