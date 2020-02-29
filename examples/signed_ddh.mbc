@@ -156,7 +156,8 @@ Proof.
       snd(fst(input@A(i))) <> exp(g,b(j1))).
 
      nosimpl(apply A_charac to i).
-     split; assumption. (* TODO auto simpl after split should do the assumption *)
+     split.
+
      fa 1; fa 2; fa 3; fa 3.
      dup 2.
      fa 0.
