@@ -20,9 +20,9 @@ state updates are performed, and finally an output is emitted.
 In this section we assume a fixed set of action symbols $\Actions$,
 as well as a fixed set of channel names $\C$.
 We assume that macro symbols include $\minp$ and $\mout$,
-both of index and term arities zero.
-We also assume that all other macro symbols are of term arities zero.
-We call them \emph{state macros} as they will be used to model memory cells.
+both of index arity zero.
+We also use \emph{state macros} to model memory cells
+(with index arity usually not equal to zero).
 
 \begin{definition}
   \label{def:action}
@@ -30,14 +30,20 @@ A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \Action
 \begin{itemize}
   \item a meta-logic formula $\phi_{\alpha}$ (intuitively, the condition of this action)
   \item a meta-logic term $o_{\alpha}$ (intuitively, the output of this action)
-  \item for each state macro symbol $s$, a meta-logic term $u_{\alpha}^{s}$ (intuitively, the update of the memory cell $s$ for this action)
+  \item some meta-logic terms $u_{\alpha}^{s[j_1,\ldots,j_k]}$ where $s$ is a
+  state macro symbol of arity $k$ (intuitively, updates performed by this action
+  on the memory cells $s[j_1,\ldots,j_k]$, assuming that all other memory cells
+  are not updated by the action)
   \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
 \end{itemize}
 where $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ must not contain any
 macro term and the only free variables that can occur in them are
 $x_\alpha$ (intuitively, the input of this action)
-and $x^s_\alpha$ where $s$ is a state macro symbol (intuitively, the value
-of the memory cell at the time of this action).
+and $x^{s[j_1,\ldots,j_k]}_\alpha$ where $s$ is a state macro symbol
+(intuitively, the value
+of the memory cell $s[j_1,\ldots,j_k]$ at the time of this action).
+We require that index variables $\{j_1,\ldots,j_k\}$ are a subset of $\{i_1,\dots,i_n\}$.
+
 \solene{The sequential dependency is defined only later (in the definition of a
 protocol) but we would like to allow as free variables also $x_\beta$ for every
 action $\beta$ that must happen before $\alpha$ in an execution.}
@@ -55,7 +61,8 @@ A \emph{concrete action} is an instanciation of a \emph{symbolic action} by givi
   \begin{itemize}
     \item a finite set of \emph{symbolic actions} with distinct action symbols,
     \item a transitive \emph{sequential dependency} relation $\before$ on \emph{symbolic actions},
-    \item a \emph{conflict} relation $\conflict$ on \emph{symbolic actions}.
+    \item a \emph{conflict} relation $\conflict$ on \emph{symbolic actions},
+    \item \solene{TODO. initial value for states}
   \end{itemize}
   Intuitively, $\sfa_1(i)\before\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i)$ must happen before $\sfa_2(n_i,n_j)$ in any execution
   and $\sfa_1(i,j)\conflict\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i,n_j)$ and $\sfa_2(n_i,n_j)$ cannot both occur in any execution.
@@ -86,7 +93,7 @@ In that case, the definition of a symbolic action differs from \Cref{def:action}
 in the following way:
 \begin{itemize}
   \item $\phi_{\alpha}$ is a meta-logic \emph{bi-formula}
-  \item $o_{\alpha}$ and $u_{\alpha}^{\sfs}$ are meta-logic \emph{bi-terms}
+  \item $o_{\alpha}$ is a meta-logic \emph{bi-term}
 \end{itemize}
 
 We define in \Cref{fig:bi-terms} how we extend the syntax in \Cref{fig:terms}
@@ -123,7 +130,7 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$.
         \end{itemize}
       \item action $\alpha_2 := \R_1(k)$
         \begin{itemize}
-          \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =  
+          \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =
             \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_2} := \ok$
         \end{itemize}
@@ -148,20 +155,65 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$.
 \end{example}
 
 \begin{example}
-  If in the previous example we change the reader part of the bi-process into
+  If in the previous example, if we change the reader part of the bi-process into
   $$\myin{c,x}.~ \myfind i,j \mysuchthat \snd(x) = \ldots \mythen
   \myout{c,\ok} \myelse \myout{c,\error}\bigr)$$
   then action $R_1(k)$ would be replaced by $\alpha_2 := R_1(k,i,j)$
   with:
   \begin{itemize}
-    \item $\phi_{\alpha_2} := \snd(x_{\alpha_2}) =  
+    \item $\phi_{\alpha_2} := \snd(x_{\alpha_2}) =
       \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
     \item $o_{\alpha_2} := \ok$
   \end{itemize}
   In protocols where the output message would depend on the indices $i,j$
-  that make the condition pass, we would use $\myfind$ to in the
+  that make the condition pass, we would also use $\myfind$ in the
   output message to retrieve these indices (more precisely, we would retrieve
   the first such indices).
+\end{example}
+
+\begin{example}[OSK]
+  \label{ex:osk-bi-process}
+  We introduce the bi-protocol $P_{OSK}$ defined by:
+  \begin{itemize}
+    \item the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k)\}$ where,
+    \begin{itemize}
+      \item action $\alpha_1 := \T(i,j)$
+        \begin{itemize}
+          \item $\phi_{\alpha_1} := \true$
+          \item $o_{\alpha_1} := \diff{g(x_{\alpha_1}^{s_T[i]})}{g(x_{\alpha_1}^{s'_T[i,j]})}$
+          \item $u_{\alpha_1}^{s_T[i]} := h(x_{\alpha_1}^{s_T[i]})$
+          \item $u_{\alpha_1}^{s'_T[i,j]} := h(x_{\alpha_1}^{s'_T[i,j]})$
+        \end{itemize}
+      \item action $\alpha_2 := \R_1(k,i,j)$
+        \begin{itemize}
+          \item $\phi_{\alpha_2} := x_{\alpha_2} = \diff{g(x_{\alpha_2}^{s_R[i]})}{g(x_{\alpha_2}^{s'_R[i,j]})}$
+          \item $o_{\alpha_2} := \ok$
+          \item $u_{\alpha_2}^{s_R[i]} := h(x_{\alpha_2}^{s_R[i]})$
+          \item $u_{\alpha_2}^{s'_R[i,j]} := h(x_{\alpha_2}^{s'_R[i,j]})$
+        \end{itemize}
+      \item action $\alpha_3 := \R_2(k)$
+        \begin{itemize}
+          \item $\phi_{\alpha_3} := \forall i,j, x_{\alpha_3} \neq \diff{g(x_{\alpha_3}^{s_R[i]})}{g(x_{\alpha_3}^{s_R[i]})}$
+          \item $o_{\alpha_3} := \error$
+        \end{itemize}
+    \end{itemize}
+    \item a conflict relation $\conflict$ such that $\R_1(k,i,j)\conflict\R_2(k)$
+    \item \solene{TODO. initial values are $k[i]$ or $k'[i,j]$}
+  \end{itemize}
+  It is obtained from the following bi-process:
+  \[
+  \begin{array}{lll}
+  & \bigl(!_i !_j & \myout{c,\diff{g(s_T[i])}{g(s_{T'}[i,j])}}. \\
+  && \diff{s_T[i] := h(s_T[i])}{s_{T'}[i,j] := h(s_{T'}[i,j])} \\
+  & \bigr) & \\
+  \mid & \\
+  & \bigl(!_k & \myin{c,x}. \\
+  && \myfind i,j \mysuchthat x = \diff{g(s_R[i])}{g(s_{R'}[i,j])} \\
+  && \mythen \diff{s_R[i] := h(s_R[i])}{s_{R'}[i,j] := h(s_{R'}[i,j])} .~\myout{c,\ok} \\
+  && \myelse \myout{c,\error} \\
+  & \bigr) & \\
+  \end{array}
+  \]
 \end{example}
 
 \bigskip
