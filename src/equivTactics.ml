@@ -431,16 +431,24 @@ let () = T.register_general "expand"
 let equiv t1 t2 (s : EquivSequent.t) sk fk =
   let env  = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
-  let t1 = Theory.convert tsubst t1 Sorts.Boolean in
-  let t2 = Theory.convert tsubst t2 Sorts.Boolean in
-  let trace_sequent = TraceSequent.init ~system:None
-              (Term.And(Term.Impl(t1, t2), Term.Impl(t2, t1)))
-               |> TraceSequent.set_env env
-  in
-  sk [ Prover.Goal.Trace trace_sequent;
-       Prover.Goal.Equiv (EquivSequent.apply_subst [Term.ESubst(t1, t2)] s);
-     ]
-    fk
+  match Theory.convert tsubst t1 Sorts.Boolean,
+        Theory.convert tsubst t2 Sorts.Boolean with
+  | t1,t2 ->
+      let trace_sequent =
+        TraceSequent.init ~system:None
+          (Term.And(Term.Impl(t1, t2), Term.Impl(t2, t1)))
+          |> TraceSequent.set_env env
+      in
+      let subgoals =
+        [ Prover.Goal.Trace trace_sequent;
+          Prover.Goal.Equiv
+            (EquivSequent.apply_subst [Term.ESubst(t1, t2)] s) ]
+      in
+      sk subgoals fk
+  | exception (Theory.Conv e) ->
+      Tactics.soft_failure
+        (Tactics.Failure
+           (Fmt.str "%a" Theory.pp_error e))
 
 let () = T.register_general "equivalent"
     ~help:"Replace all occurences of a formula by another, and ask to prove \
