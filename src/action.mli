@@ -128,10 +128,10 @@ val reset : unit -> unit
 
 (** {2 Pretty-printing} *)
 
-(** Format an action, displayed through its symbol. *)
+(** Format an action, displayed through its structure. *)
 val pp_action_structure : Format.formatter -> action -> unit
 
-(** Format an action, displayed through its structure. *)
+(** Format an action, displayed through its symbol. *)
 val pp_action : Format.formatter -> action -> unit
 
 (** Alias for [pp_action]. *)

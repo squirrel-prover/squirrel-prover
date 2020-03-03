@@ -194,21 +194,20 @@ let prepare : process -> process =
     * [parse_proc], e.g. Exists (Update (Exists (Update _))) TODO. *)
   let update (state:[`Start|`Input]) env invars p = match state,p with
 
-    | _, (Apply _ | Let _ | New _ | Alias _) -> state, env, invars
+    | _, (Apply _ | New _ | Alias _) -> state, env, invars
 
     | `Start, (Null | Parallel _ | Repl _) -> `Start, env, invars
     | `Start, In (_,x,_) ->
         let env,x = Vars.make_fresh env Sorts.Message x in
         `Input, env, x::invars
-    | `Start, (Exists _ | Set _) ->
+    | `Start, (Exists _ | Set _ | Let _) ->
         let env,x = Vars.make_fresh env Sorts.Message "_" in
         `Input, env, x::invars
     | `Start, Out _ ->
         let env,x = Vars.make_fresh env Sorts.Message "_" in
         `Start, env, x::invars
 
-    | `Input, Exists _ -> `Input, env, invars
-    | `Input, Set _ -> `Input, env, invars
+    | `Input, (Exists _ | Set _ | Let _) -> `Input, env, invars
 
     | `Input, Out _ -> `Start, env, invars
     | `Input, Null -> `Start, env, invars
