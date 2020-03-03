@@ -54,15 +54,18 @@ let rec main_loop ?(test=false) ?(save=true) mode =
     (* Otherwise save the state if instructed to do so.
      * In practice we save except after errors. *)
   if save then save_state mode ;
-  try
+  match
     let parse_buf =
       Parserbuf.parse_from_buf
         ~test ~interactive:!interactive
-        Parser.interactive in
-    let new_command = parse_next parse_buf in
-    match mode, new_command with
-    (* if the command is an undo, we catch it only if we are not waiting for a
-        system description. *)
+        Parser.interactive
+    in
+    mode, parse_next parse_buf
+  with
+    | exception (Parserbuf.Error s) -> error ~test mode s
+
+    (* If the command is an undo, we catch it only if we are not waiting for
+       a system description. *)
     | mode, ParsedUndo nb_undo when mode <> InputDescr ->
       begin
         let new_mode = reset_state nb_undo in
@@ -73,44 +76,38 @@ let rec main_loop ?(test=false) ?(save=true) mode =
         end ;
         main_loop ~test new_mode
       end
+
     | InputDescr, ParsedInputDescr ->
       Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
+
     | ProofMode, ParsedTactic utac ->
-      begin
-        try
-          if not !interactive then
-            Printer.prt `Prompt "%a" Prover.pp_ast utac ;
-          if eval_tactic utac then begin
-            Printer.prt `Goal "Goal %s is proved"
-              (match Prover.current_goal () with
+      if not !interactive then
+        Printer.prt `Prompt "%a" Prover.pp_ast utac ;
+      begin match eval_tactic utac with
+      | true ->
+          Printer.prt `Goal "Goal %s is proved"
+            (match Prover.current_goal () with
                | Some (i, _) -> i
-               | None -> assert false) ;
-            complete_proof ();
-            main_loop ~test WaitQed end
-          else begin
-            Printer.pr "%a" pp_goal ();
-            main_loop ~test ProofMode end
-        with
-        | Tactic_soft_failure s ->
-          if test then raise @@ Tactic_soft_failure s
-          else
-            begin
-              let s = Printer.strf "%a" Tactics.pp_tac_error s in
-              error ~test ProofMode ("Tactic failed: " ^ s ^ ".")
-            end
-        | Tactic_hard_failure s ->
-          if test then raise @@ Tactic_hard_failure s
-          else
-            begin
-              let s = Printer.strf "%a" Tactics.pp_tac_error s in
-              error ~test ProofMode
-                ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
-            end
+               | None -> assert false);
+          complete_proof ();
+          main_loop ~test WaitQed
+      | false ->
+          Printer.pr "%a" pp_goal ();
+          main_loop ~test ProofMode
+      | exception (Tactic_soft_failure s) when not test ->
+          let s = Printer.strf "%a" Tactics.pp_tac_error s in
+          error ~test ProofMode ("Tactic failed: " ^ s ^ ".")
+      | exception (Tactic_hard_failure s) when not test ->
+          let s = Printer.strf "%a" Tactics.pp_tac_error s in
+          error ~test ProofMode
+            ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
       end
+
     | WaitQed, ParsedQed ->
       Printer.prt `Result "Exiting proof mode.@.";
       main_loop ~test GoalMode
+
     | GoalMode, ParsedGoal goal ->
       begin
         match goal with
@@ -122,7 +119,6 @@ let rec main_loop ?(test=false) ?(save=true) mode =
               main_loop ~test ProofMode
             | Some es -> error ~test GoalMode es
           end
-
         | Prover.Gm_goal (i,f) ->
           add_new_goal (i,f);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
@@ -130,12 +126,14 @@ let rec main_loop ?(test=false) ?(save=true) mode =
             Prover.Goal.pp_init f;
           main_loop ~test GoalMode
       end
+
     | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if test then () else exit 0
-    | _, ParsedQed -> if test then raise @@ Failure "unfinished"
-      else error ~test mode "Unexpected command."
+
+    | _, ParsedQed ->
+        if test then raise @@ Failure "unfinished" else
+          error ~test mode "Unexpected command."
+
     | _, _ -> error ~test mode "Unexpected command."
-  with
-  | Parserbuf.Error s -> error ~test mode s
 
 and error ?(test=false) mode s =
   Printer.prt `Error "%s" s;
