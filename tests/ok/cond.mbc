@@ -29,15 +29,8 @@ expand cond@O.
 introsleft H0.
 Qed.
 
-goal dummy :
-False =>
-  exec@O.
-Proof.
-simpl.
-Qed.
-
 goal dummybis :
- frame@O = <frame@pred(O), (if exec@O then output@O else zero)>.
+ frame@O = <frame@pred(O),if exec@O then output@O else zero>.
 Proof.
 simpl.
 Qed.

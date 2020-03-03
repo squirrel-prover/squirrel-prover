@@ -80,6 +80,7 @@ let rec reset_state n =
  * of terms and let the tactic process it. *)
 type tac_arg =
   | String_name of string
+  | Formula of Term.formula
   | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
@@ -98,6 +99,7 @@ module Make_AST
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
     | Function_name fname -> Term.pp_fname ppf fname
+    | Formula formula -> Term.pp ppf formula
     | Theory th -> Theory.pp ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
@@ -122,6 +124,7 @@ module type Tactics_sig = sig
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
   val register_int : string -> ?help:string -> (int -> tac) -> unit
+  val register_formula : string -> ?help:string -> (Term.formula -> tac) -> unit
   val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
   val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
 
@@ -175,6 +178,14 @@ struct
          | _ ->
              raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "int argument expected"))
+
+  let register_formula id ?(help="") f =
+    register_general id ~help:help
+      (fun args j sk fk -> match args with
+         | [Formula x] -> f x j sk fk
+         | _ ->
+             raise @@ Tactics.Tactic_hard_failure
+               (Tactics.Failure "formula argument expected"))
 
   let register_fname id ?(help="") f =
     register_general id ~help:help
@@ -370,7 +381,7 @@ let get_goal_formula gname =
 let make_trace_goal ~system f  =
   Goal.Trace (TraceSequent.init ~system (Theory.convert [] f Sorts.Boolean))
 
-let make_equiv_goal env (l : Theory.term list) =
+let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =
     List.fold_left
       (fun env (x, Sorts.ESort s) ->
@@ -379,9 +390,11 @@ let make_equiv_goal env (l : Theory.term list) =
       Vars.empty_env env
   in
   let subst = Theory.subst_of_env env in
-  let convert m =
-    try EquivSequent.Message (Theory.convert subst m Sorts.Message)
-    with _ ->  EquivSequent.Formula (Theory.convert subst m Sorts.Boolean)
+  let convert = function
+    | `Formula f ->
+        EquivSequent.Formula (Theory.convert subst f Sorts.Boolean)
+    | `Message m ->
+        EquivSequent.Message (Theory.convert subst m Sorts.Message)
   in
     Goal.Equiv (EquivSequent.init env (List.map convert l))
 

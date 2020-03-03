@@ -870,21 +870,16 @@ let () =
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
 let tac_assert f s sk fk =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let f = Theory.convert tsubst f Sorts.Boolean in
   let s1 = TraceSequent.set_conclusion f s in
   let s2 = TraceSequent.add_formula f s in
   sk [s1 ;s2] fk
 
 let () =
-  T.register_general "assert"
+  T.register_formula "assert"
     ~help:"Add an assumption to the set of hypothesis, and produce the goal for\
            \n the proof of the assumption.\
            \n Usage: assert f."
-    (function
-      | [Prover.Theory t] -> tac_assert t
-      | _ -> raise @@ Tactics.Tactic_hard_failure
-          (Tactics.Failure "improper arguments"))
+    tac_assert
 
 (** [collision_resistance judge sk fk] collects all equalities between hashes,
     and adds the equalities of the messages hashed with the same key. *)

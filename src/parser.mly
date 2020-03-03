@@ -7,8 +7,7 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ
-%token COMMA SEMICOLON COLON PLUS MINUS XOR
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT
 %token NEW OUT PARALLEL NULL
@@ -22,22 +21,15 @@
 
 %token EMPTY_ELSE
 
-
+%left XOR
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
-%left QUANTIF
+%nonassoc QUANTIF
 %right DARROW
 %left OR
 %left AND
-%nonassoc EQ LEQ GEQ NEQ
-%left RANGLE LANGLE
-%left XOR
 %nonassoc NOT
-
-
-
-
 
 %left PLUS
 %nonassoc REPEAT
@@ -46,11 +38,11 @@
 %nonassoc NOSIMPL
 
 %start theory
-%start top_term
+%start top_formula
 %start top_process
 %start interactive
 %type <unit> theory
-%type <Theory.term> top_term
+%type <Theory.formula> top_formula
 %type <Process.process> top_process
 %type <Prover.parsed_input> interactive
 
@@ -67,38 +59,17 @@ term:
 | LPAREN term RPAREN             { $2 }
 | ID term_list                   { Theory.make_term $1 $2 }
 | ID term_list AT timestamp      { let ts = $4 in
-                                   Theory.make_term ~at_ts:ts $1 $2}
+                                   Theory.make_term ~at_ts:ts $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | term XOR term                  { Theory.make_term "xor" [$1;$3] }
 | INIT                           { Theory.Tinit }
-| IF term THEN term else_term  { Theory.ITE ($2,$4,$5) }
-| FIND indices SUCHTHAT term IN term else_term
+| IF formula THEN term else_term { Theory.ITE ($2,$4,$5) }
+| FIND indices SUCHTHAT formula IN term else_term
                                  { Theory.Find ($2,$4,$6,$7) }
 | PRED LPAREN term RPAREN        { Theory.Tpred $3 }
 | DIFF LPAREN term COMMA term RPAREN { Theory.Diff ($3,$5) }
 | LEFT LPAREN term RPAREN        { Theory.Left $3 }
 | RIGHT LPAREN term RPAREN       { Theory.Right $3 }
-| term ord term       %prec EQ   { Theory.Compare ($2,$1,$3) }
-
-| term AND term            { Theory.And ($1,$3) }
-| term OR term             { Theory.Or ($1,$3) }
-| term DARROW term         { Theory.Impl ($1,$3) }
-| NOT term              %prec NOT  { Theory.Not ($2) }
-| FALSE                          { Theory.False }
-| TRUE                           { Theory.True }
-
-| PID term_list                  { Theory.make_term $1 $2 }
-| HAPPENS LPAREN timestamp RPAREN
-                                 { Theory.Happens $3 }
-| EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.Exists (vs,f)  }
-| FORALL LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
-                                 { Theory.ForAll (vs,f)  }
-| EXISTS ID COLON kind sep f=term %prec QUANTIF
-                                 { Theory.Exists ([$2,$4],f)  }
-| FORALL ID COLON kind sep f=term %prec QUANTIF
-                                 { Theory.ForAll ([$2,$4],f)  }
-
 
 term_list:
 |                                { [] }
@@ -138,9 +109,32 @@ ids:
 | ID                             { [$1] }
 | ID COMMA ids                   { $1::$3 }
 
-top_term:
-| term EOF                    { $1 }
+top_formula:
+| formula EOF                    { $1 }
 
+formula:
+| LPAREN formula RPAREN          { $2 }
+| formula AND formula            { Theory.And ($1,$3) }
+| formula OR formula             { Theory.Or ($1,$3) }
+| formula DARROW formula         { Theory.Impl ($1,$3) }
+| NOT formula                    { Theory.Not ($2) }
+| FALSE                          { Theory.False }
+| TRUE                           { Theory.True }
+| term ord term                  { Theory.Compare ($2,$1,$3) }
+| PID term_list                  { Theory.make_term $1 $2 }
+| ID term_list AT timestamp      { let ts = $4 in
+                                   Theory.make_term ~at_ts:ts $1 $2 }
+| HAPPENS LPAREN timestamp RPAREN
+                                 { Theory.Happens $3 }
+| EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
+                                 { Theory.Exists (vs,f)  }
+| FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
+                                 { Theory.ForAll (vs,f)  }
+| EXISTS ID COLON kind sep f=formula %prec QUANTIF
+                                 { Theory.Exists ([$2,$4],f)  }
+| FORALL ID COLON kind sep f=formula %prec QUANTIF
+                                 { Theory.ForAll ([$2,$4],f)  }
+| DIFF LPAREN f=formula COMMA g=formula RPAREN   { Theory.Diff (f,g) }
 
 sep:
 |       {()}
@@ -161,10 +155,10 @@ process:
                                  { Process.In ($3,$5,$7) }
 | OUT LPAREN channel COMMA term RPAREN process_cont
                                  { Process.Out ($3,$5,$7) }
-| IF f=term THEN process else_process
+| IF f=formula THEN process else_process
                                  { Process.Exists
                                      ([],f,$4,$5) }
-| FIND indices SUCHTHAT f=term IN process else_process
+| FIND indices SUCHTHAT f=formula IN process else_process
                                  { Process.Exists
                                      ($2,f,$6,$7) }
 | LET ID EQ term IN process      { Process.Let ($2,$4,$6) }
@@ -230,10 +224,10 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM s=system f=term       { Prover.add_proved_goal
+| AXIOM s=system f=formula       { Prover.add_proved_goal
                                      ("unnamed_goal",
                                       Prover.make_trace_goal s f) }
-| AXIOM s=system i=ID COLON f=term
+| AXIOM s=system i=ID COLON f=formula
                                  { Prover.add_proved_goal
                                      (i, Prover.make_trace_goal s f) }
 
@@ -241,6 +235,14 @@ tactic_params:
 |                               { [] }
 | t=term                        { [Prover.Theory t] }
 | t=term COMMA ts=tactic_params { Prover.Theory t :: ts }
+
+tactic_formula_params:
+|                               { [] }
+| t=formula                        { [Prover.Formula
+                                              (Prover.parse_formula t)] }
+| t=formula COMMA ts=tactic_formula_params { Prover.Formula
+                                              (Prover.parse_formula t) :: ts }
+
 
 tac:
   | LPAREN t=tac RPAREN               { t }
@@ -258,6 +260,8 @@ tac:
   | RIGHT                             { Tactics.Abstract ("right",[]) }
   | EXISTS t=tactic_params            { Tactics.Abstract
                                           ("exists",t) }
+  | ID t=tactic_formula_params        { Tactics.Abstract
+                                          ($1,t) }
   | NOSIMPL t=tac                     { Tactics.Modifier
                                           ("nosimpl", t) }
   | CYCLE i=INT                       { Tactics.Abstract
@@ -294,7 +298,8 @@ tactic:
 | t=tac DOT                           { t }
 
 equiv_item:
-| term           { $1 }
+| term           { `Message $1 }
+| formula        { `Formula $1 }
 
 equiv:
 | equiv_item                { [$1] }
@@ -310,9 +315,9 @@ system:
 | LBRACKET RIGHT RBRACKET { Term.Right }
 
 goal:
-| GOAL s=system i=ID COLON f=term DOT
+| GOAL s=system i=ID COLON f=formula DOT
                  { Prover.Gm_goal (i, Prover.make_trace_goal s f) }
-| GOAL s=system f=term DOT
+| GOAL s=system f=formula DOT
                  { Prover.Gm_goal ("unnamed_goal",
                                    Prover.make_trace_goal s f) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT

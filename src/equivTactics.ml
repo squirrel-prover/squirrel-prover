@@ -429,7 +429,7 @@ let () = T.register_general "expand"
            (Tactics.Failure "improper arguments"))
 
 let equiv t1 t2 (s : EquivSequent.t) sk fk =
-  let env  = EquivSequent.get_env s in
+  let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
   match Theory.convert tsubst t1 Sorts.Boolean,
         Theory.convert tsubst t2 Sorts.Boolean with
