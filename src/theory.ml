@@ -524,7 +524,7 @@ let make_term ?at_ts s l =
         (* We do not support indexed symbols,
          * which would require a distinction between
          * function arguments and function indices. *)
-      if a <> 0 then raise @@ Conv (Index_error (s,a,0));
+        if a <> 0 then raise @@ Conv (Index_error (s,a,0));
         if at_ts <> None then raise ts_unexpected;
         begin match i with
           | Symbols.Hash ->
@@ -546,7 +546,6 @@ let make_term ?at_ts s l =
         check_arity s (List.length l) arity ;
         Get (s,at_ts,l)
     | Symbols.Macro (Symbols.Global arity) ->
-        if at_ts <> None then raise ts_unexpected;
         if List.length l <> arity then raise @@ arity_error arity;
         Fun (s,l,at_ts)
     | Symbols.Macro (Symbols.Local (targs,_)) ->
@@ -556,9 +555,9 @@ let make_term ?at_ts s l =
         Fun (s,l,None)
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
-      if at_ts = None then
-        raise @@ Conv (Timestamp_expected (Var s));
-      if l <> [] then raise @@ arity_error 0;
+        if at_ts = None then
+          raise @@ Conv (Timestamp_expected (Var s));
+        if l <> [] then raise @@ arity_error 0;
         Fun (s,[],at_ts)
     | Symbols.Action arity ->
         if arity <> List.length l then raise @@ arity_error arity ;
