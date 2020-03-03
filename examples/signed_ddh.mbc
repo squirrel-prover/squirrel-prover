@@ -120,7 +120,7 @@ Proof.
   notleft H0.
 Qed.
 
-equiv [left] [right] unreach.
+equiv unreach.
 Proof.
    induction t.
    case t.

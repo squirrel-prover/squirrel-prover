@@ -122,7 +122,7 @@ formula:
 | TRUE                           { Theory.True }
 | term ord term                  { Theory.Compare ($2,$1,$3) }
 | PID term_list                  { Theory.make_term $1 $2 }
-| ID term_list AT timestamp      { let ts = $4 in
+| PID term_list AT timestamp     { let ts = $4 in
                                    Theory.make_term ~at_ts:ts $1 $2 }
 | HAPPENS LPAREN timestamp RPAREN
                                  { Theory.Happens $3 }
@@ -231,18 +231,14 @@ declaration:
                                  { Prover.add_proved_goal
                                      (i, Prover.make_trace_goal s f) }
 
+tactic_param:
+| t=term    { Prover.Theory t }
+| f=formula { Prover.Theory f }
+
 tactic_params:
-|                               { [] }
-| t=term                        { [Prover.Theory t] }
-| t=term COMMA ts=tactic_params { Prover.Theory t :: ts }
-
-tactic_formula_params:
-|                               { [] }
-| t=formula                        { [Prover.Formula
-                                              (Prover.parse_formula t)] }
-| t=formula COMMA ts=tactic_formula_params { Prover.Formula
-                                              (Prover.parse_formula t) :: ts }
-
+|                                       { [] }
+| t=tactic_param                        { [t] }
+| t=tactic_param COMMA ts=tactic_params { t::ts }
 
 tac:
   | LPAREN t=tac RPAREN               { t }
@@ -260,8 +256,6 @@ tac:
   | RIGHT                             { Tactics.Abstract ("right",[]) }
   | EXISTS t=tactic_params            { Tactics.Abstract
                                           ("exists",t) }
-  | ID t=tactic_formula_params        { Tactics.Abstract
-                                          ($1,t) }
   | NOSIMPL t=tac                     { Tactics.Modifier
                                           ("nosimpl", t) }
   | CYCLE i=INT                       { Tactics.Abstract
@@ -321,9 +315,10 @@ goal:
                  { Prover.Gm_goal ("unnamed_goal",
                                    Prover.make_trace_goal s f) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
-    { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
-| EQUIV s1=system s2=system n=ID DOT
-                 { Prover.Gm_goal (n, Prover.make_equiv_goal_process s1 s2) }
+                 { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+| EQUIV n=ID DOT
+                 { Prover.Gm_goal
+                     (n, Prover.make_equiv_goal_process Term.Left Term.Right) }
 | PROOF          { Prover.Gm_proof }
 
 theory:

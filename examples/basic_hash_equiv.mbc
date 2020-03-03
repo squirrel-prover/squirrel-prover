@@ -58,7 +58,7 @@ Qed.
 
 (* Diff-equivalence of the system bi-process. *)
 
-equiv [left] [right] foo.
+equiv foo.
 Proof.
   induction t.
 

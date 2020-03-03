@@ -9,7 +9,7 @@ name ok : message
 system
 !_i (if False then out(c,h(ok,k))).
 
-equiv [left] [right] simp.
+equiv simp.
 Proof.
  enrich h(ok,k).
  induction t.

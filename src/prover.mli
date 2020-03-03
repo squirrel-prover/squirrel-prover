@@ -51,7 +51,6 @@ val reset_state : int -> prover_mode
 
 type tac_arg =
   | String_name of string
-  | Formula of Term.formula
   | Function_name of fname
   | Int of int
   | Theory of Theory.term

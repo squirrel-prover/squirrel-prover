@@ -97,7 +97,8 @@ rule token = parse
 | "repeat"            { REPEAT }
 | "nosimpl"           { NOSIMPL }
 | '+'                 { PLUS }
-| name as n           { ID (n) }
+| ("cond"|"exec") as n { PID n }
+| name as n           { ID n }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }
 

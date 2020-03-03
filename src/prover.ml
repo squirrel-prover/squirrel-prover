@@ -67,6 +67,26 @@ let rec reset_state n =
 
 (** Tactic expressions and their evaluation *)
 
+let tsubst_of_goal j =
+  let aux : Vars.evar -> Theory.esubst =
+    (fun (Vars.EVar v) ->
+       match Vars.sort v with
+       | Sorts.Boolean -> assert false
+       | _ -> Theory.ESubst (Vars.name v,Term.Var v)
+      )
+      in
+  List.map aux
+    (Vars.to_list (Goal.get_env j))
+
+let parse_formula fact =
+  match !subgoals with
+    | [] -> failwith "Cannot parse fact without a goal"
+    | j :: _ ->
+        Theory.convert
+          (tsubst_of_goal j)
+          fact
+          Sorts.Boolean
+
 (* TODO some of this (generalized) should go to Tactics
  *   type 'a tac for tactic expressions with atoms of type 'a
  *   type string tac could be printed
@@ -80,7 +100,6 @@ let rec reset_state n =
  * of terms and let the tactic process it. *)
 type tac_arg =
   | String_name of string
-  | Formula of Term.formula
   | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
@@ -99,7 +118,6 @@ module Make_AST
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
     | Function_name fname -> Term.pp_fname ppf fname
-    | Formula formula -> Term.pp ppf formula
     | Theory th -> Theory.pp ppf th
 
   let eval_abstract id args : judgment Tactics.tac =
@@ -182,7 +200,7 @@ struct
   let register_formula id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
-         | [Formula x] -> f x j sk fk
+         | [Theory x] -> f (parse_formula x) j sk fk
          | _ ->
              raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "formula argument expected"))
@@ -343,27 +361,6 @@ let () =
   EquivTactics.register "simpl"
     ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
     (fun j sk fk -> sk (EquivAST.eval_judgment esimpl j) fk)
-
-
-let tsubst_of_goal j =
-  let aux : Vars.evar -> Theory.esubst =
-    (fun (Vars.EVar v) ->
-       match Vars.sort v with
-       | Sorts.Boolean -> assert false
-       | _ -> Theory.ESubst (Vars.name v,Term.Var v)
-      )
-      in
-  List.map aux
-    (Vars.to_list (Goal.get_env j))
-
-let parse_formula fact =
-  match !subgoals with
-    | [] -> failwith "Cannot parse fact without a goal"
-    | j :: _ ->
-        Theory.convert
-          (tsubst_of_goal j)
-          fact
-          Sorts.Boolean
 
 let get_goal_formula gname =
   match

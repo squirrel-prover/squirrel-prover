@@ -3,7 +3,7 @@ abstract ok:message
 
 system in(c,x); if x=ok && x<>ok then out(c,x).
 
-equiv [left] [right] test.
+equiv test.
 Proof.
 induction t.
 case t.
@@ -13,7 +13,7 @@ expand exec@init.
 
 expand frame@A.
 expand exec@A.
-equivalent  cond@A, False.
+equivalent cond@A, False.
 expand cond@A.
 
 fa 1.
