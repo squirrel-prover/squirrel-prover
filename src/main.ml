@@ -31,9 +31,7 @@ let setup_lexbuf fname =
     mode, depending on what is the type of the next expected input. *)
 let parse_next parser_fun =
   if !interactive then
-    (* Requires input to be one-line long. *)
-    let lexbuf =  Lexing.from_channel stdin in
-    parser_fun lexbuf "new input"
+    parser_fun (Lexing.from_channel stdin) "new input"
   else
     parser_fun (Utils.opt_get !lexbuf) !filename
 

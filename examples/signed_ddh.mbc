@@ -91,7 +91,7 @@ Proof.
   notleft H0. (* TODO rename to elim (Coq-style) or absurd ? *)
 
   euf M0.
-  apply H0 to j. (* TODO this does not look like apply to me: rename ? *)
+  apply H0 to j.
   case H1.
 Qed.
 
@@ -181,7 +181,6 @@ Proof.
 
    expand frame@init.
    expand exec@init.
-
 
    expand frame@S(j).
    expand output@S(j).
