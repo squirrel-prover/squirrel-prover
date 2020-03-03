@@ -104,6 +104,7 @@ type conversion_error =
   | Type_error of term * Sorts.esort
   | Timestamp_expected of term
   | Timestamp_unexpected of term
+  | Untypable_equality of term
 
 exception Conv of conversion_error
 

@@ -122,6 +122,7 @@ type conversion_error =
   | Type_error of term * Sorts.esort
   | Timestamp_expected of term
   | Timestamp_unexpected of term
+  | Untypable_equality of term
 
 exception Conv of conversion_error
 
@@ -139,6 +140,12 @@ let pp_error ppf = function
                               "The term %a must be given a timestamp." pp t
   | Timestamp_unexpected t -> Fmt.pf ppf
                               "The term %a must not be given a timestamp." pp t
+  | Untypable_equality t ->
+      Fmt.pf ppf
+        "Comparison %a cannot be typed@ \
+         (operands do not have the same type,@ \
+         or do not have a type@ for which the comparison is allowed)"
+        pp t
 
 let check_arity s actual expected =
   if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
@@ -390,8 +397,10 @@ let rec convert :
   | Right t -> Term.Right (conv sort t)
 
   | ITE (i,t,e) ->
+      Fmt.pr "ITE %a@." Sorts.pp sort ;
       begin match sort with
         | Sorts.Message ->
+            Fmt.pr "ITE ok@." ;
             Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
         | _ -> raise type_error
       end
@@ -423,6 +432,7 @@ let rec convert :
       end
 
   | Compare (o,u,v) ->
+      Fmt.pr "Conv compare@." ;
       begin match sort with
         | Sorts.Boolean ->
             begin try
@@ -436,11 +446,13 @@ let rec convert :
                     begin try
                       Term.Atom (`Index (o, conv_index u, conv_index v))
                     with Conv _ ->
-                      Term.Atom (`Message (o,
-                                           conv Sorts.Message u,
-                                           conv Sorts.Message v))
+                      try
+                        Term.Atom (`Message (o,
+                                             conv Sorts.Message u,
+                                             conv Sorts.Message v))
+                      with Conv _ -> raise (Conv (Untypable_equality tm))
                     end
-                | _ -> raise type_error
+                | _ -> raise (Conv (Untypable_equality tm))
             end
         | _ -> raise type_error
       end
