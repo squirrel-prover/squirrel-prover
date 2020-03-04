@@ -85,5 +85,5 @@ Proof.
  simpl.
  introsleft C0.
  euf M0.
- exists i, k.
+ exists i, k1. (* TODO should be k *)
 Qed.
