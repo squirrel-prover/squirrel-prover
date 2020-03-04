@@ -36,12 +36,12 @@ val set_hypothesis_biframe : t -> elem list -> t
   * eliminated. *)
 val get_frame : Term.projection -> t -> elem list
 
+(** Project a biterm of the frame to one side. *)
 val pi_elem : Term.projection -> elem -> elem
 
 (** [apply_subst_frame subst f] returns the frame [f] where the substitution has
    been applied to all terms. *)
 val apply_subst_frame : Term.subst -> elem list -> elem list
-
 
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to its conclusion and hypothesis. *)

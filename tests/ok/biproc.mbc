@@ -2,12 +2,17 @@ channel c
 system A: in(c,x);out(c,x);
        B: in(c,y);out(c,diff(x,y)).
 
-goal [left] test_left_bis : output@B = left(input@A).
+goal test : output@B = diff(input@A,input@B).
 Proof.
   intros.
 Qed.
 
-goal [right] test_right : output@B = right(input@B).
+goal [left] test_left : output@B = input@A.
+Proof.
+  intros.
+Qed.
+
+goal [right] test_right : output@B = input@B.
 Proof.
   intros.
 Qed.

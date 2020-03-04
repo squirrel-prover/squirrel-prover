@@ -221,13 +221,11 @@ let pp_descr ppf descr =
     Term.pp (snd descr.output)
 
 let pi_descr s d =
-  {d with
-   condition = (let is,t = d.condition in is, Term.pi_term s t);
-   updates = List.map
-               (fun (st, m) -> st, Term.pi_term s m)
-               d.updates;
-   output = (let c,m = d.output in c, Term.pi_term s m)
-  }
+  let pi_term t = Term.pi_term ~bimacros:false ~projection:s t in
+  { d with
+    condition = (let is,t = d.condition in is, pi_term t);
+    updates = List.map (fun (st, m) -> st, pi_term m) d.updates;
+    output = (let c,m = d.output in c, pi_term m) }
 
 (** Apply a substitution to an action description.
   * The domain of the substitution must contain all indices

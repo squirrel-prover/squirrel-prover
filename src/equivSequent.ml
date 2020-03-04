@@ -7,10 +7,11 @@ let pp_elem ppf = function
   | Formula t -> Term.pp ppf t
   | Message t -> Term.pp ppf t
 
-let pi_elem = fun s t ->
-  match t with
-  | Formula t -> Formula (Term.pi_term s t)
-  | Message t -> Message (Term.pi_term s t)
+let pi_term projection tm = Term.pi_term ~bimacros:true ~projection tm
+
+let pi_elem s = function
+  | Formula t -> Formula (pi_term s t)
+  | Message t -> Message (pi_term s t)
 
 let pp_frame ppf (l:elem list) =
   Fmt.pf ppf "%a"
@@ -89,19 +90,10 @@ let set_hypothesis_biframe j f = { j with hypothesis_frame = f}
 
 let set_biframe j f = { j with frame = f }
 
-let get_frame proj j =
-  (* TODO the current pi_elem won't be enough when we want full
-   * support of macros and left(_) and right(_) operators.
-   *
-   * For example, with the bi-term diff(right(output@A),left(output@A))
-   * the left projection should be right(output@A) which should be
-   * interpreted (e.g. during macro expansion) as the output of action
-   * A in the right system. *)
-  List.map (pi_elem proj) j.frame
+let get_frame proj j = List.map (pi_elem proj) j.frame
 
 let get_right_frame j = List.map (pi_elem j.id_right) j.frame
 
 let apply_subst subst s =
-  {s with frame = apply_subst_frame subst s.frame;
-          hypothesis_frame = apply_subst_frame subst s.hypothesis_frame
-  }
+  { s with frame = apply_subst_frame subst s.frame;
+           hypothesis_frame = apply_subst_frame subst s.hypothesis_frame }

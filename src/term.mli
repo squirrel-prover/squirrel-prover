@@ -208,15 +208,19 @@ val f_snd : fsymb
 type projection = Left | Right | None
 
 (** Evaluate all diff operators wrt a projection.
-  * The returned term does not feature diff operators (including left/right)
-  * though this might be abusive in the case of macros
-  * (TODO cf EquivSequent). *)
-val pi_term : projection -> 'a term -> 'a term
+  * If the projection is [None], the input term is returned unchanged.
+  * Otherwise all diff operators are evaluated to the given
+  * side and the returned term does not feature diff operators (including
+  * left/right) except possibly on macros: left/right projections are
+  * left on macros when they are meant to expand to biterms, as indicated
+  * by [bimacros]. *)
+val pi_term : bimacros:bool -> projection:projection -> 'a term -> 'a term
 
 (** Evaluate topmost diff operators (including left/right)
   * for a given projection of a biterm.
   * For example [head_pi_term Left (diff(f(diff(a,b)),c))]
-  * would be [f(diff(a,b))]. *)
+  * would be [f(diff(a,b))].
+  * Macros are returned without suspended projections over them. *)
 val head_pi_term : projection -> 'a term -> 'a term
 
 (** Push topmost diff-operators just enough to expose the common

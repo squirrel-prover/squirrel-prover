@@ -422,19 +422,20 @@ let dummy = Fun (mk_fname "_" [] emessage, [])
 
 type projection = Left | Right | None
 
-let rec pi_term : type a. projection -> a term -> a term =
-  fun s t ->
+let pi_term ~bimacros ~projection term =
+
+  let rec pi_term : type a. projection -> a term -> a term = fun s t ->
   match t with
   | Fun (f,terms) -> Fun (f, List.map (pi_term s) terms)
   | Name n -> Name n
   | Macro (m, terms, ts) ->
     let mac = Macro(m, List.map (pi_term s) terms, pi_term s ts) in
-    begin
+    if bimacros then begin
       match s with
-      | Left -> Left (mac)
-      | Right -> Right(mac)
+      | Left -> Left mac
+      | Right -> Right mac
       | None -> mac
-    end
+    end else mac
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
   | Init -> Init
@@ -444,7 +445,7 @@ let rec pi_term : type a. projection -> a term -> a term =
       match s with
       | Left -> pi_term s a
       | Right -> pi_term s b
-      | None -> Diff(a, b)
+      | None -> Diff (a, b)
     end
   | Left a -> pi_term Left a
   | Right a -> pi_term Right a
@@ -460,12 +461,13 @@ let rec pi_term : type a. projection -> a term -> a term =
   | False -> False
   | Atom a -> Atom (pi_generic_atom s a)
 
-and pi_generic_atom s =
-  function
+  and pi_generic_atom s = function
    | `Message  (o,t1,t2) -> `Message (o, pi_term s t1, pi_term s t2)
    | `Timestamp (o, ts1, ts2) -> `Timestamp (o, pi_term s ts1, pi_term s ts2)
    | `Index (o, i1, i2) as r -> r
    | `Happens t -> `Happens (pi_term s t)
+
+  in pi_term projection term
 
 let rec head_pi_term : type a. projection -> a term -> a term =
   fun s t ->
@@ -474,7 +476,7 @@ let rec head_pi_term : type a. projection -> a term -> a term =
   | Diff (_,t), Right -> head_pi_term s t
   | Left t, _ -> head_pi_term Left t
   | Right t, _ -> head_pi_term Right t
-  |  _ -> t
+  | _ -> t
 
 let diff a b =
   let a = match a with Diff (a,_) | Left a | a -> a in
@@ -538,7 +540,7 @@ let () =
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term Left t in
-        assert (pi_term Left t = f a) ;
+        assert (pi_term ~bimacros:true ~projection:Left t = f a) ;
         assert (r = f (Diff (a,b)))
     end ;
   ]
