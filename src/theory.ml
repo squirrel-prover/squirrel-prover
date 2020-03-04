@@ -397,10 +397,8 @@ let rec convert :
   | Right t -> Term.Right (conv sort t)
 
   | ITE (i,t,e) ->
-      Fmt.pr "ITE %a@." Sorts.pp sort ;
       begin match sort with
         | Sorts.Message ->
-            Fmt.pr "ITE ok@." ;
             Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
         | _ -> raise type_error
       end
@@ -432,7 +430,6 @@ let rec convert :
       end
 
   | Compare (o,u,v) ->
-      Fmt.pr "Conv compare@." ;
       begin match sort with
         | Sorts.Boolean ->
             begin try
