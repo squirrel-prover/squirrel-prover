@@ -22,6 +22,42 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+(* Preliminary trace properties: well-authentication
+ *
+ * This needs to be proved separately for each projection of the biprocess,
+ * because the euf tactic requires atomic keys.
+ *
+ * These goals are here for testing/illustration purposes: in the final
+ * diff-equivalence proof we do not explicitly invoke them but reprove
+ * them as well as variants (e.g. for action R1 rather than R). *)
+
+goal [left] wa_R_left :
+  forall (j:index),
+  exec@R(j) =>
+  exists (i:index,k:index),
+  T(i,k) < R(j) &&
+  fst(input@R(j)) = nT(i,k).
+Proof.
+  intros.
+  expand exec@R(j); expand cond@R(j).
+  euf M0.
+  exists i, k1. (* TODO should be k *)
+Qed.
+
+goal [right] wa_R_right :
+  forall (j:index),
+  happens(R(j)) =>
+  exists (i:index,k:index),
+  T(i,k) < R(j) &&
+  fst(input@R(j)) = nT(i,k).
+Proof.
+ intros.
+ euf M0.
+ exists i, k.
+Qed.
+
+(* Diff-equivalence of the system bi-process. *)
+
 equiv [left] [right] foo.
 Proof.
   induction t.
@@ -40,10 +76,16 @@ Proof.
   equivalent
     (exists (i,k:index),
        snd(input@R1(j))=h(fst(input@R1(j)),diff(key(i),key'(i,k)))),
-    (exists (i,k:index), T(i,k)<R1(j) && output@T(i,k)=input@R1(j)).
+    (exists (i,k:index),
+       T(i,k)<R1(j) &&
+       fst(output@T(i,k))=fst(input@R1(j)) &&
+       snd(output@T(i,k))=snd(input@R1(j))).
   split; intros.
-  admit. (* TODO left/right projections *)
-  exists i, k.
+  project.
+  euf M0.
+  exists i,k1.
+  euf M0.
+  exists i,k.
   admit 2. (* TODO fa/dup *)
   assumption.
 
@@ -61,29 +103,14 @@ Proof.
   dup 1. dup 2.
   equivalent
     (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
-    (exists (i,k:index), T(i,k)<R(j) && output@T(i,k)=input@R(j)).
+    (exists (i,k:index), T(i,k)<R(j) &&
+       fst(output@T(i,k))=fst(input@R(j)) &&
+       snd(output@T(i,k))=snd(input@R(j))).
   split; intros.
-  admit. (* TODO left/right projections *)
-  exists i, k.
+  project; euf M0.
+  exists i,k1.
+  exists i,k.
   admit 2. (* TODO fa/dup *)
   assumption.
 
-Qed.
-
-(* If no system is specified, euf is not applicable because the hash
-   key is a biterm, which is fair.
-   If [left] is specified, the projections introduce explicit left(_)
-   constructs on macros, which break things and do not make sense in
-   the context of a single system. *)
-goal [left] wa :
-  forall (j:index),
-  happens(R(j)) =>
-  exists (i:index,k:index),
-  T(i,k) <= R(j) &&
-  fst(input@R(j)) = nT(i,k).
-Proof.
- simpl.
- introsleft C0.
- euf M0.
- exists i, k1. (* TODO should be k *)
 Qed.

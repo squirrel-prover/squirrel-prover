@@ -33,6 +33,14 @@ val add_formula : ?prefix:string -> formula -> sequent -> sequent
 (** Get the identifier of the system which the sequent is reasoning about. *)
 val system_id : sequent -> Action.system_id
 
+(** Change the system ID of a sequent. *)
+val set_system_id : Action.system_id -> sequent -> sequent
+
+(** Project diff-operators occurring in a sequent;
+  * only makes sense when a sequent for a bi-system has just
+  * been narrowed to a projected system. *)
+val pi : Term.projection -> sequent -> sequent
+
 (** [set_env e s] returns a new sequent with
   * the environment set to [e]. *)
 val set_env : Vars.env -> sequent -> sequent

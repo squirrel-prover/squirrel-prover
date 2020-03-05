@@ -232,6 +232,11 @@ type sequent = t
 let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
+  pf ppf "@[System: %s@]@;"
+    Term.(match s.system_id with
+            | Left -> "left"
+            | Right -> "right"
+            | None -> "both") ;
   if s.env <> Vars.empty_env then
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
@@ -429,6 +434,26 @@ let set_env a s = { s with env = a }
 let get_env s = s.env
 
 let system_id s = s.system_id
+
+let set_system_id id s = { s with system_id = id }
+
+let pi projection s =
+  let pi_term t = Term.pi_term ~bimacros:false ~projection t in
+    { s with
+      trs = None ; models = None ;
+      conclusion = pi_term s.conclusion ;
+      message_hypotheses =
+        H.map
+          (function
+             | { H.hypothesis = `Message (o,s,t) } as h ->
+                 { h with H.hypothesis = `Message (o, pi_term s, pi_term t) })
+          s.message_hypotheses ;
+      formula_hypotheses =
+        H.map
+          (function
+             | { H.hypothesis = f } as h ->
+                 { h with H.hypothesis = pi_term f })
+          s.formula_hypotheses }
 
 let set_conclusion a s =
   let s = { s with conclusion = a } in

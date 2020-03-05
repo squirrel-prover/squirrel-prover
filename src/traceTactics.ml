@@ -941,3 +941,21 @@ let () = T.register "collision"
            \n the messages hashed with the same valid key.\
            \n Usage: collision."
     collision_resistance
+
+(** Projecting a goal on a bi-system
+  * to distinct goals for each projected system. *)
+
+let project s sk fk =
+  if TraceSequent.system_id s <> None then
+    fk (Tactics.Failure "goal already deals with a single process")
+  else
+    let s1 = TraceSequent.set_system_id Left s in
+    let s2 = TraceSequent.set_system_id Right s in
+    let s1 = TraceSequent.pi Left s1 in
+    let s2 = TraceSequent.pi Left s2 in
+    sk [s1;s2] fk
+
+let () =
+  T.register "project"
+    ~help:"Project a goal on a bi-system into goals on its projections."
+    project
