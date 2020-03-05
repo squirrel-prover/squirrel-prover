@@ -8,10 +8,12 @@ goal test :
   forall (x:message, y:message),
   n = m => False.
 Proof.
+  intros.
 Qed.
 
 goal test :
   forall (x:message, y:message),
   f(n) = g(m) => False.
 Proof.
+  intros.
 Qed.

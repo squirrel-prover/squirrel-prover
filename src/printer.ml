@@ -1,8 +1,7 @@
 (** Module instantiating the printing interface of MetaBC.
-    It is the basis of a clean API for the tool.
-    Depending on the running mode and the kind of printed information,
-    it implements the printing functions.
-*)
+  * It provides printing functions that behave accordingly with
+  * the running mode and the kind of printed information. *)
+
 open Fmt
 
 type printer_mode =
@@ -14,9 +13,7 @@ let printer_mode = ref File
 
 let strf = Fmt.strf
 
-let dummy_fmt =  Format.make_formatter
-      (fun _ _ _ -> ())
-      (fun () -> ())
+let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
 let std =
   match !printer_mode with
@@ -56,7 +53,6 @@ let pp_suf ty =
 let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) std fmt
 
 let pr fmt = prt `Default fmt
-
 
 let set_style_renderer =
     match !printer_mode with

@@ -1,3 +1,5 @@
+(* Testing that EUF considers hashed messages inside conditions. *)
+
 hash h
 name k : message
 abstract ok : message
@@ -9,4 +11,5 @@ goal forall tau:timestamp,
 Proof.
   intros.
   euf M0.
+  (* There should be exactly one goal. *)
 Qed.

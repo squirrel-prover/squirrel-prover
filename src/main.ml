@@ -38,7 +38,7 @@ let parse_next parser_fun =
 open Prover
 open Tactics
 
-let rec main_loop ?(test=false) ?(save=true) mode =
+let rec main_loop ~test ?(save=true) mode =
   if !interactive then Printer.prt `Prompt "";
   (* Initialize definitions before parsing system description.
    * TODO this is not doable anymore (with refactoring this code)
@@ -125,7 +125,7 @@ let rec main_loop ?(test=false) ?(save=true) mode =
           main_loop ~test GoalMode
       end
 
-    | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if test then () else exit 0
+    | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
     | _, ParsedQed ->
         if test then raise @@ Failure "unfinished" else
@@ -133,10 +133,12 @@ let rec main_loop ?(test=false) ?(save=true) mode =
 
     | _, _ -> error ~test mode "Unexpected command."
 
-and error ?(test=false) mode s =
+and error ~test mode s =
   Printer.prt `Error "%s" s;
-  if !interactive then main_loop ~test ~save:false mode
-  else if test then () else exit 1
+  if !interactive then main_loop ~test ~save:false mode else
+  if not test then exit 1
+
+let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
 
 let interactive_prover () =
   Printer.prt `Start "MetaBC interactive mode.";
