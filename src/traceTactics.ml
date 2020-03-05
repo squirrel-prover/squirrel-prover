@@ -312,8 +312,6 @@ let () =
        in
        goal_exists_intro ths)
 
-(* TODO exists_left without hypothesis name, select any existential
- * formula on the left *)
 let exists_left hyp_name s sk fk =
   let s,f = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
     match f with
@@ -340,6 +338,39 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> exists_left h
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
+
+let simpl_left s sk fk =
+  match
+    TraceSequent.remove_formula_hypothesis
+      (function
+         | False | And _ | Exists _ -> true
+         | _ -> false)
+      s
+  with
+    | False, s' -> sk [] fk
+    | And (f,g), s' ->
+        sk
+          [TraceSequent.add_formula f (TraceSequent.add_formula g s')]
+          fk
+    | Exists (vs,f), s' ->
+        let env = ref @@ TraceSequent.get_env s in
+        let subst =
+          List.map
+            (fun (Vars.EVar v) ->
+               Term.ESubst  (Term.Var v,
+                             Term.Var (Vars.make_fresh_from_and_update env v)))
+            vs
+        in
+        let f = Term.subst subst f in
+        let s = TraceSequent.add_formula f (TraceSequent.set_env !env s') in
+          sk [s] fk
+    | _ -> assert false
+    | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
+
+let () =
+  T.register "simpl_left"
+    ~help:"Introduce all conjunctions, existentials and false hypotheses."
+    simpl_left
 
 let () =
   let open Tactics in

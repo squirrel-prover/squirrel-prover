@@ -10,7 +10,6 @@ Proof.
   case t.
   case H0.
   (* t = A(i) *)
-  existsleft H0.
   apply IH0 to pred(A(i)).
   (* t = init *) 
   apply init_ok.

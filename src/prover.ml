@@ -285,6 +285,7 @@ let simpl_nobranching =
     AndThen
       (Try (Abstract ("assumption",[])) ::
        Abstract ("intros",[]) ::
+       Repeat (Abstract ("simpl_left",[])) ::
        simple_base)
 
 (* Same as above but including branching introductions. *)
@@ -292,7 +293,8 @@ let simpl_branching =
   let open Tactics in
     AndThen
       (Repeat (AndThen [Try (Abstract ("assumption",[]));
-                        Abstract ("anyintro",[])]) ::
+                        OrElse [Abstract ("anyintro",[]);
+                                Abstract ("simpl_left",[])]]) ::
        simple_base)
 
 (* Final automation tactic. We allow branching introduction, only if the extra
