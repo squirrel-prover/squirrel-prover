@@ -110,8 +110,7 @@ type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
-type message_atom = [ `Message of ord_eq * message
-                               * message ]
+type message_atom = [ `Message of ord_eq * message * message ]
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom

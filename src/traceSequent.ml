@@ -191,9 +191,11 @@ type trace_tag = unit
 
 type formula_tag = unit
 
-type message_hypothesis = (message_hypothesis_tag, message_atom) H.hypothesis
+type message_hypothesis =
+  (message_hypothesis_tag, message_atom) H.hypothesis
 
-type message_hypotheses = (message_hypothesis_tag, message_atom) H.hypotheses
+type message_hypotheses =
+  (message_hypothesis_tag, message_atom) H.hypotheses
 
 type trace_hypotheses = (trace_tag, trace_atom) H.hypotheses
 

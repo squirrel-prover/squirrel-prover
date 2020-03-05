@@ -83,18 +83,18 @@ let rec left_introductions s = function
   | [] -> s
 
 let left_intros hyp_name s sk fk =
-  let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
-  sk [left_introductions s [formula]] fk
+  match TraceSequent.select_formula_hypothesis hyp_name s ~remove:true with
+    | s,formula -> sk [left_introductions s [formula]] fk
+    | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
 
 let () =
   T.register_general "introsleft"
-    ~help:"Simply conjonctions and implications on the left side.\
+    ~help:"Simplify conjonctions and existentials in an hypothesis.\
            \n Usage: notleft H."
     (function
       | [Prover.Theory (Theory.Var h)] -> left_intros h
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
-
 
 let left_not_intro hyp_name s sk fk =
   let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
