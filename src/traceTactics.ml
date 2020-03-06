@@ -460,30 +460,27 @@ let constraints (s : TraceSequent.t) sk fk =
     sk [] fk
   else fk (Tactics.Failure "Constraints satisfiable")
 
-let expand (term : Theory.term) (s : TraceSequent.t)
-    sk fk =
+let expand (term : Theory.term) (s : TraceSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
   let system_id = TraceSequent.system_id s in
 
-  let subst = match Theory.convert tsubst term Sorts.Boolean with
+  let succ subst = sk [TraceSequent.apply_subst subst s] fk in
+
+  match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
-      [Term.ESubst (Macro ((mn, sort, is),l,a),
-                    Macros.get_definition ~system_id sort mn is a)
-      ]
-    | exception Theory.Conv (Theory.Type_error _)->
-      begin
-        match Theory.convert tsubst term Sorts.Message with
+      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                         Macros.get_definition ~system_id sort mn is a)]
+    | _ ->
+      Tactics.hard_failure (Tactics.Failure "Can only expand macros")
+    | exception _ ->
+      match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
-          [Term.ESubst (Macro ((mn, sort, is),l,a),
-                        Macros.get_definition ~system_id sort mn is a)
-          ]
-        | _ -> raise @@ Tactics.Tactic_hard_failure
-            (Tactics.Failure "Can only expand macros")
-      end
-    | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "Can only expand macros")
-  in
-  sk [TraceSequent.apply_subst subst s] fk
+          succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                             Macros.get_definition ~system_id sort mn is a)]
+        | exception _ ->
+          fk (Tactics.Failure "Cannot convert argument to message or formula")
+        | _ ->
+          Tactics.hard_failure (Tactics.Failure "Can only expand macros")
 
 let () = T.register_general "expand"
     ~help:"Expand all occurences of the given macro inside the goal.\

@@ -395,30 +395,29 @@ let () =
 
 let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
-  let subst = match Theory.convert tsubst term Sorts.Boolean with
+  let succ subst =
+    let apply_subst = function
+      | EquivSequent.Message e -> EquivSequent.Message (Term.subst subst e)
+      | EquivSequent.Formula e -> EquivSequent.Formula (Term.subst subst e)
+    in
+    sk [EquivSequent.set_biframe s
+          (List.map apply_subst (EquivSequent.get_biframe s))] fk
+  in
+  match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
-      [Term.ESubst (Macro ((mn, sort, is),l,a),
-                    Macros.get_definition sort mn is a)
-      ]
+      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                         Macros.get_definition sort mn is a)]
+    | _ ->
+      Tactics.hard_failure (Tactics.Failure "Can only expand macros")
     | exception _ ->
-      begin
-        match Theory.convert tsubst term Sorts.Message with
+      match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
-          [Term.ESubst (Macro ((mn, sort, is),l,a),
-                        Macros.get_definition sort mn is a)
-          ]
-        | _ -> raise @@ Tactics.Tactic_hard_failure
-            (Tactics.Failure "Can only expand macros")
-      end
-    | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "Can only expand macros")
-  in
-  let apply_subst = function
-    | EquivSequent.Message e ->  EquivSequent.Message (Term.subst subst e)
-    | EquivSequent.Formula e ->  EquivSequent.Formula (Term.subst subst e)
-  in
-  sk [EquivSequent.set_biframe s
-        (List.map apply_subst (EquivSequent.get_biframe s))] fk
+          succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                             Macros.get_definition sort mn is a)]
+        | exception _ ->
+          fk (Tactics.Failure "Cannot parse argument as message or formula")
+        | _ ->
+          Tactics.hard_failure (Tactics.Failure "Can only expand macros")
 
 let () = T.register_general "expand"
     ~help:"Expand all occurences of the given macro in the given hypothesis.\
