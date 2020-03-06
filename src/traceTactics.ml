@@ -571,9 +571,10 @@ let eq_names (s : TraceSequent.t) sk fk =
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
-    List.fold_left (fun _ c ->
-        TraceSequent.add_formula c s
-      ) s new_eqs
+    List.fold_left
+      (fun s c ->
+         TraceSequent.add_formula c s)
+      s new_eqs
   in
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
@@ -582,10 +583,10 @@ let eq_names (s : TraceSequent.t) sk fk =
       (TraceSequent.get_all_terms s)
   in
   let s =
-    List.fold_left (fun _ c ->
-        TraceSequent.add_formula c s
-
-      ) s cnstrs
+    List.fold_left
+      (fun s c ->
+         TraceSequent.add_formula c s)
+      s cnstrs
   in
   sk [s] fk
 
