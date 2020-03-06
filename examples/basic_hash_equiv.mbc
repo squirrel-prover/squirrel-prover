@@ -41,7 +41,7 @@ Proof.
   intros.
   expand exec@R(j); expand cond@R(j).
   euf M0.
-  exists i, k1. (* TODO should be k *)
+  exists i, k1.
 Qed.
 
 goal [right] wa_R_right :

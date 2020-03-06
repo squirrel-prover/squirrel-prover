@@ -54,9 +54,9 @@ system (!_i P(i) | !_j S(j)).
    by proving that it is equivalent to a trivial formula that the attacker can
    compute. It is a bit troublesome, because the formula depends on ks, which needs
    to disappear. We would not have this issue if we used a classical asymmetric
-   signature scheme. TODO I don't understand this comment: what is ks ? *)
+   signature scheme. *)
 
-(* Correspondence property for S1, proved directly on both sides. *)
+(* Show that condition S1 implies the next one. *)
 goal S1_charac :
   forall (r:index),
   cond@S1(r) =>
