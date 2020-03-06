@@ -112,7 +112,7 @@ let left_not_intro hyp_name s sk fk =
     | m -> Not m
   in
   match formula with
-  | Not f ->  sk [left_introductions s [not_f f]] fk
+  | Not f -> sk [TraceSequent.add_formula (not_f f) s] fk
   | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "Can only be applied to a negation formula.")
 
@@ -258,7 +258,8 @@ let goal_intro (s : TraceSequent.t) sk fk =
     in
     sk [new_judge] fk
   | Impl(lhs,rhs)->
-    let s' = left_introductions (TraceSequent.set_conclusion rhs s) [lhs] in
+    let s' =
+      TraceSequent.add_formula lhs (TraceSequent.set_conclusion rhs s) in
     sk [s'] fk
   | Not f ->
     sk [TraceSequent.set_conclusion False s |> TraceSequent.add_formula f] fk
@@ -843,7 +844,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
         let s' = TraceSequent.set_conclusion h s in
         sk (List.rev (s'::subgoals)) fk
     | f ->
-        left_introductions s [f] ::
+        TraceSequent.add_formula f s ::
         List.rev subgoals
         |> fun subgoals -> sk subgoals fk
   in
