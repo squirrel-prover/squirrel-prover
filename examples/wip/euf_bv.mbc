@@ -1,0 +1,15 @@
+hash h
+name k : index->message
+name n : index->index->message
+abstract ok : message
+
+system if (forall (i,j:index), h(n(i,j),k(i))=h(n(i,j),k(i))) then null.
+
+goal forall (tau:timestamp, j,j1,j2:index),
+  (if cond@tau then ok else ok) = h(n(j1,j2),k(j)) => j1=j2.
+Proof.
+  intros.
+  euf M0.
+  (* This should not complete the proof. *)
+  (* Bonus question: why do we get two identical subgoals? *)
+Qed. 
