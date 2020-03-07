@@ -433,7 +433,7 @@ let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
   | Some _, [] -> Fmt.pf ppf "@[<v 0>[goal> No subgoals remaining.@]@."
   | Some _, j :: _ ->
-    Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]"
+    Fmt.pf ppf "@[<v 0>[goal> Focused goal (1/%d):@;%a@;@]@."
       (List.length !subgoals)
       Goal.pp j
   | _ -> assert false
