@@ -77,6 +77,17 @@ let get_var (e1,_) name =
     M.find name e1
   with Not_found -> raise Undefined_Variable
 
+let rm_var (e1,e2) v =
+   let name_suffix =
+    try
+      (M.find v.name_prefix e2)
+    with Not_found -> 0
+   in
+   let new_suffix =
+     if name_suffix = v.name_suffix then name_suffix -1 else name_suffix
+   in
+  M.remove (name v) e1, M.add v.name_prefix new_suffix e2
+
 let make_fresh ((e1,e2):env) var_type name_prefix =
   let name_suffix =
     try

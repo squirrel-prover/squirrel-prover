@@ -84,7 +84,8 @@ let () =
     (only_equiv assumption)
 
 let induction ts s sk fk =
-  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let env = EquivSequent.get_env s in
+  let tsubst = Theory.subst_of_env env in
   let ts = Theory.convert tsubst ts Sorts.Timestamp in
   match ts with
   | Var t ->
@@ -97,6 +98,7 @@ let induction ts s sk fk =
         (EquivSequent.get_hypothesis_biframe s) then
       raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "Variable should not occur in the premise");
+    let s = EquivSequent.set_env (Vars.rm_var env t) s in
     let subst = [Term.ESubst(ts,Pred(ts))] in
     let goal = EquivSequent.get_biframe s in
     let hypothesis = EquivSequent.(apply_subst_frame subst goal) in

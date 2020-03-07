@@ -54,6 +54,11 @@ exception Undefined_Variable
   * @raise Undefined_Variable if no variable is found. *)
 val get_var : env -> string -> evar
 
+(** [rm_var env v] returns [env] minus the variable [v].
+  * returns the same [env] if no variable is found. *)
+val rm_var : env -> 'a var -> env
+
+
 (** [make_fresh env sort prefix]
   * creates a variable of sort [sort] with a name that is not
   * already present in [env].
