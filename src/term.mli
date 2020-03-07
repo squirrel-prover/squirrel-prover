@@ -137,6 +137,10 @@ val cast : 'a Sorts.sort -> 'b term -> 'a term
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_ts : Sorts.message term -> Sorts.timestamp term list
 
+(** [get_vars t] returns the free variables of [t].
+  * The returned list is guaranteed to have no duplicate elements. *)
+val get_vars : 'a term -> Vars.evar list
+
 (** [precise_ts t] returns a list [l] of timestamps such that
   * any term that appears in [(t)^I] that is not an attacker
   * symbol or a frame must appear in a macro applied to a timestamp

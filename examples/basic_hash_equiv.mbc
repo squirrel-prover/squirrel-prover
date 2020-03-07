@@ -62,11 +62,6 @@ equiv foo.
 Proof.
   induction t.
 
-  cycle 1.
-  expand frame@init; expand exec@init.
-
-  case t.
-
   expand frame@init; expand exec@init.
 
   expand frame@R1(j); expand exec@R1(j);

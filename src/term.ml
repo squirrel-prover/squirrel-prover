@@ -324,7 +324,7 @@ module S =
       compare (Vars.name a) (Vars.name b)
   end)
 
-let get_vars : 'a term -> S.t =
+let get_set_vars : 'a term -> S.t =
   fun term ->
 
   let rec termvars : type a. a term -> S.t -> S.t =
@@ -375,13 +375,14 @@ let get_vars : 'a term -> S.t =
   in
   termvars term S.empty
 
+let get_vars t = get_set_vars t |> S.elements
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
   let filter_subst (vars:Vars.evar list) (s:subst) =
     List.fold_left (fun acc (ESubst (x, y)) ->
         if S.is_empty (S.inter
                          (S.of_list vars)
-                         (S.union (get_vars x) (get_vars y)))
+                         (S.union (get_set_vars x) (get_set_vars y)))
         then
           (ESubst (x, y))::acc
         else

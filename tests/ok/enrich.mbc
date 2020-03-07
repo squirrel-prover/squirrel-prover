@@ -13,7 +13,6 @@ equiv simp.
 Proof.
  enrich h(ok,k).
  induction t.
- case t.
 
  expand frame@init.
  expand exec@init.
@@ -31,9 +30,6 @@ Proof.
  simpl.
  fa 1.
  assumption.
-
- expand exec@init;expand frame@init;refl.
-
 
  expand frame@A1(i).
  expand output@A1(i).

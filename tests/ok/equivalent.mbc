@@ -6,7 +6,6 @@ system in(c,x); if x=ok && x<>ok then out(c,x).
 equiv test.
 Proof.
 induction t.
-case t.
 
 expand frame@init.
 expand exec@init.
@@ -35,9 +34,5 @@ fa 1; fa 1.
 
 (* TODO : requires a smart dup. *)
 admit.
-
-expand frame@init.
-expand exec@init.
-
 
 Qed.

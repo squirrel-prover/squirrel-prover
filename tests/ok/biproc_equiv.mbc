@@ -6,7 +6,6 @@ equiv test_left_bis.
 
 Proof.
 induction t.
-case t.
 
 expand frame@init.
 expand exec@init.
@@ -38,8 +37,5 @@ fa 1; fa 2.
 expand exec@A; expand cond@A.
 fa 0.
 assumption.
-
-expand frame@init.
-expand exec@init.
 
 Qed.

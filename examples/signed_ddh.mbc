@@ -123,7 +123,6 @@ Qed.
 equiv unreach.
 Proof.
    induction t.
-   case t.
 
    expand frame@init.
    expand exec@init.

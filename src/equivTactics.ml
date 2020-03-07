@@ -86,15 +86,48 @@ let () =
 let induction ts s sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
   let ts = Theory.convert tsubst ts Sorts.Timestamp in
-  let subst = [Term.ESubst(ts,Pred(ts))] in
-  let goal = EquivSequent.get_biframe s in
-  let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
-  let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
-  let init_goal =
-    EquivSequent.(set_biframe
-      s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
-  in
-  sk [induc_goal;init_goal] fk
+  match ts with
+  | Var t ->
+    if List.exists (function
+        | EquivSequent.Message m -> List.mem (Vars.EVar t)
+                                      (Term.get_vars m)
+        | EquivSequent.Formula m -> List.mem (Vars.EVar t)
+                                      (Term.get_vars m)
+      )
+        (EquivSequent.get_hypothesis_biframe s) then
+      raise @@ Tactics.Tactic_hard_failure
+        (Tactics.Failure "Variable should not occur in the premise");
+    let subst = [Term.ESubst(ts,Pred(ts))] in
+    let goal = EquivSequent.get_biframe s in
+    let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
+    let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
+    let init_goal =
+      EquivSequent.(set_biframe
+                      s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
+    in
+    let goals = ref [] in
+    let add_action a =
+      let env = ref @@ EquivSequent.get_env induc_goal in
+      let indices =
+        List.map
+          (fun i -> Vars.make_fresh_from_and_update env i)
+          a.Action.indices
+      in
+      let subst =
+        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+          a.Action.indices indices
+      in
+      let name = Action.to_term (Action.subst_action subst a.Action.action) in
+      let ts_subst = [Term.ESubst(ts,name)] in
+      goals := (EquivSequent.apply_subst ts_subst induc_goal
+                |> EquivSequent.set_env !env)
+               ::!goals
+    in
+  let system_id = None in
+  Action.iter_descrs ~system_id add_action ;
+    sk (init_goal::!goals) fk
+  | _ ->  raise @@ Tactics.Tactic_hard_failure
+      (Tactics.Failure "Induction is only possible over a variable")
 
 let () =
   T.register_general "induction"
