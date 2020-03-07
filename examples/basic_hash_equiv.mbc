@@ -81,7 +81,8 @@ Proof.
   exists i,k1.
   euf M0.
   exists i,k.
-  admit 2. (* TODO fa/dup *)
+  exists i,k.
+     admit 2. (* TODO fa/dup *)
   assumption.
 
   expand frame@T(i,k); expand exec@T(i,k);
@@ -104,6 +105,7 @@ Proof.
   split; intros.
   project; euf M0.
   exists i,k1.
+  exists i,k.
   exists i,k.
   admit 2. (* TODO fa/dup *)
   assumption.

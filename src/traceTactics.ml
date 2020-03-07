@@ -946,7 +946,7 @@ let project s sk fk =
     let s1 = TraceSequent.set_system_id Left s in
     let s2 = TraceSequent.set_system_id Right s in
     let s1 = TraceSequent.pi Left s1 in
-    let s2 = TraceSequent.pi Left s2 in
+    let s2 = TraceSequent.pi Right s2 in
     sk [s1;s2] fk
 
 let () =
