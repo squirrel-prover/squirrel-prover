@@ -15,13 +15,24 @@ let strf = Fmt.strf
 
 let dummy_fmt = Format.make_formatter (fun _ _ _ -> ()) (fun () -> ())
 
-let std =
+(* while not currently used, this part provides support for multiple kind
+   of outputs *)
+let get_std () =
   match !printer_mode with
   | File -> Fmt.stdout
   | Interactive -> Fmt.stdout
-  | Test -> dummy_fmt
+  | Test -> Fmt.stdout
 
-let pr = Fmt.pf std
+let set_style_renderer x =
+    match !printer_mode with
+  | File -> Fmt.set_style_renderer x
+  | Interactive -> Fmt.set_style_renderer x
+  (* in testing, we disable ansi sequences which are not stored proprely by
+     alcotest. *)
+  | Test -> fun _  -> ()
+
+
+let pr x = Fmt.pf (get_std ()) x
 
 type pp =
   [ `Prompt
@@ -50,12 +61,6 @@ let pp_suf ty =
   | `Default -> ()
 
 
-let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) std fmt
+let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) (get_std ()) fmt
 
 let pr fmt = prt `Default fmt
-
-let set_style_renderer =
-    match !printer_mode with
-  | File -> Fmt.set_style_renderer
-  | Interactive -> Fmt.set_style_renderer
-  | Test -> fun _ _  -> ()
