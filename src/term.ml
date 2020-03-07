@@ -219,24 +219,6 @@ and pp_generic_atom ppf = function
   | #message_atom as a -> pp_message_atom ppf a
   | #trace_atom as a -> pp_trace_atom ppf a
 
-let get_vars : 'a term -> Vars.evar list =
-  fun term ->
-  let res = ref [] in
-  let rec termvars : type a. a term -> unit =
-    function
-    | Action (_,indices) ->
-        res :=
-          List.map (fun x -> Vars.EVar x) indices @
-          !res
-    | Var tv -> res := Vars.EVar tv :: !res
-    | Pred ts -> termvars ts
-    | Fun (_, lt) -> List.iter termvars lt
-    | Macro (_, l, ts) -> List.iter termvars l; termvars ts
-    | Name _ -> ()
-    | Init -> ()
-    |  _ -> failwith "Not implemented"
-  in
-  termvars term; !res
 
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
@@ -333,7 +315,79 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
 let subst_macro (s:subst) (symb, sort, is) =
   (symb, sort, List.map (subst_var s) is)
 
+
+module S =
+  Set.Make(
+  struct
+    type t = Vars.evar
+    let compare (Vars.EVar a) (Vars.EVar b) =
+      compare (Vars.name a) (Vars.name b)
+  end)
+
+let get_vars : 'a term -> S.t =
+  fun term ->
+
+  let rec termvars : type a. a term -> S.t -> S.t =
+    begin
+    fun t vars -> match t with
+    | Action (_,indices) ->
+          List.fold_left (fun vars x -> S.add (Vars.EVar x) vars) vars indices
+    | Var tv -> S.add (Vars.EVar tv) vars
+    | Pred ts -> termvars ts vars
+    | Fun (_, lt) ->  List.fold_left (fun vars x -> termvars x vars) vars lt
+
+    | Macro (_, l, ts) ->
+      termvars ts (List.fold_left (fun vars x -> termvars x vars) vars l)
+    | Name _ -> vars
+    | Init -> vars
+    | Diff (a, b) -> termvars a (termvars b vars)
+    | Left a -> termvars a vars
+    | Right a -> termvars a vars
+    | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
+    | Find (a, b, c, d) ->
+      let a  = List.map (fun x-> Vars.EVar x) a |> S.of_list in
+      S.diff (termvars b (termvars c (termvars d vars))) a
+    | Atom a -> generic_atom_vars a vars
+    | ForAll (a, b) -> S.diff (termvars b vars) (S.of_list a)
+    | Exists (a, b) -> S.diff (termvars b vars) (S.of_list a)
+    | And (a, b) ->  termvars a (termvars b vars)
+    | Or (a, b) ->  termvars a (termvars b vars)
+    | Not a -> termvars a vars
+    | Impl (a, b) ->  termvars a (termvars b vars)
+    | True -> vars
+    | False -> vars
+  end
+  and message_atom_vars (`Message (ord, a1, a2)) vars =
+   termvars a1 (termvars a2 vars)
+
+  and trace_atom_vars at vars = match at with
+    | `Timestamp (ord, ts, ts') ->
+      termvars ts (termvars ts' vars)
+    | `Index (ord, i, i') ->
+      termvars (Var i) (termvars (Var i') vars)
+
+  and generic_atom_vars t vars = match t with
+    | `Happens a -> termvars a vars
+    | #message_atom as a -> message_atom_vars a vars
+    | #trace_atom as a -> trace_atom_vars a vars
+
+
+  in
+  termvars term S.empty
+
+
 let rec subst : type a. subst -> a term -> a term = fun s t ->
+  let filter_subst (vars:Vars.evar list) (s:subst) =
+    List.fold_left (fun acc (ESubst (x, y)) ->
+        if S.is_empty (S.inter
+                         (S.of_list vars)
+                         (S.union (get_vars x) (get_vars y)))
+        then
+          (ESubst (x, y))::acc
+        else
+          acc)
+      [] s
+  in
   let new_term : a term =
     match t with
     | Fun ((fs,is), lt) ->
@@ -359,10 +413,15 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | False -> False
     (** Warning - TODO - the substititution is currently propagated without any
        check. Cf #71. *)
-    | ForAll (a, b) -> ForAll (a, subst s b)
-    | Exists (a, b) -> Exists (a, subst s b)
+    | ForAll (a, b) ->
+      let s = filter_subst a s in
+      ForAll (a, subst s b)
+    | Exists (a, b) ->
+      let s = filter_subst a s in
+      Exists (a, subst s b)
     | Find (a, b, c, d) ->
-        Find ((List.map (subst_var s) a), subst s b, subst s c, subst s d)
+      let s = filter_subst (List.map (fun x -> Vars.EVar x) a) s in
+      Find (a, subst s b, subst s c, subst s d)
   in
   assoc s new_term
 

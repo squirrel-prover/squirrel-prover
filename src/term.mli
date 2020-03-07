@@ -133,9 +133,6 @@ exception Uncastable
   * @raise Uncastable if the term does not have the expected sort. *)
 val cast : 'a Sorts.sort -> 'b term -> 'a term
 
-(** [get_vars t] returns all variables occurring in [t]. *)
-val get_vars : 'a term -> Vars.evar list
-
 (** [get_ts t] returns the timestamps appearing in [t].
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_ts : Sorts.message term -> Sorts.timestamp term list

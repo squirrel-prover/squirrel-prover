@@ -230,6 +230,11 @@ let () =
         (Tactic_hard_failure NoAssumpSystem)
         (fun () -> run ~test "tests/alcotest/biproc.mbc")
     end ;
+    "Substitution no capture", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/capture.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
