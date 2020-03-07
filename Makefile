@@ -16,7 +16,7 @@ alcotest: sanity
 examples_test: sanity
 	@echo "\n --- Running examples/*.mbc --- \n"
 	@tests=0 ; failures=0 ; for f in $(wildcard examples/*.mbc) ; do \
-	  echo -n "Running prover on $$f... " ; \
+	  echo -n "Running prover on $$f ... " ; \
 	  tests=$$((tests+1)) ; \
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
 	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
@@ -27,7 +27,7 @@ examples_test: sanity
 ok_test: sanity
 	@echo "\n --- Running tests that must succeed --- \n"
 	@tests=0 ; failures=0 ; for f in $(PROVER_OK_TESTS) ; do \
-	  echo -n "Running prover on $$f... " ; \
+	  echo -n "Running prover on $$f ... " ; \
 	  tests=$$((tests+1)) ; \
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
 	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
@@ -51,7 +51,7 @@ makecoverage: sanity
 	BISECT_COVERAGE=YES $(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
 
-coverage: makecoverage ok_test
+coverage: makecoverage ok_test examples_test
 	bisect-ppx-report html -I _build/
 	rm -f *.coverage
 
