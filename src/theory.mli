@@ -22,6 +22,7 @@ type term =
   | Diff of term*term
   | Left of term
   | Right of term
+  | Seq of string list * term
   | ITE of term*term*term
   | Find of string list * term * term * term
   | Name of string * term list

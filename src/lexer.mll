@@ -78,6 +78,7 @@ rule token = parse
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "pred"              { PRED }
+| "seq"              { SEQ }
 | "diff"              { DIFF }
 | "left"              { LEFT }
 | "right"             { RIGHT }

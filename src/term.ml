@@ -56,6 +56,7 @@ and _ term =
   | Macro :
       'a msymb * Sorts.message term list * Sorts.timestamp term ->
       'a term
+  | Seq : Vars.index list * Sorts.message term -> Sorts.message term
   | Pred : Sorts.timestamp term -> Sorts.timestamp term
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
@@ -105,6 +106,7 @@ let rec sort : type a. a term -> a Sorts.t =
   | Fun _ -> Sorts.Message
   | Name _ -> Sorts.Message
   | Macro ((_,s,_),_,_) -> s
+  | Seq _ -> Sorts.Message
   | Var v -> Vars.sort v
   | Pred _ -> Sorts.Timestamp
   | Action _ -> Sorts.Timestamp
@@ -165,6 +167,9 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
            "(@[<hov>%a@])"
            (Fmt.list ~sep:Fmt.comma pp)) l
         pp ts
+  | Seq (vs, b) ->
+    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
+      Vars.pp_list vs pp b
   | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
   | Action (symb,indices) ->
       Fmt.styled `Green
@@ -338,6 +343,8 @@ let get_set_vars : 'a term -> S.t =
 
     | Macro (_, l, ts) ->
       termvars ts (List.fold_left (fun vars x -> termvars x vars) vars l)
+    | Seq (a, b) -> S.diff (termvars b vars)
+                      (S.of_list (List.map (fun x-> Vars.EVar x) a))
     | Name _ -> vars
     | Init -> vars
     | Diff (a, b) -> termvars a (termvars b vars)
@@ -397,6 +404,9 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
     | Macro (m, l, ts) ->
       Macro (subst_macro s m, List.map (subst s) l, subst s ts)
+    | Seq (a, b) ->
+      let s = filter_subst (List.map (fun x -> Vars.EVar x) a) s in
+      Seq (a, subst s b)
     | Var m -> Var m
     | Pred ts -> Pred (subst s ts)
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
@@ -496,6 +506,7 @@ let pi_term ~bimacros ~projection term =
       | Right -> Right mac
       | None -> mac
     end else mac
+  | Seq (a, b) -> Seq (a, pi_term s b)
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
   | Init -> Init

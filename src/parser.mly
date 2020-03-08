@@ -9,7 +9,7 @@
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT
+%token DIFF LEFT RIGHT SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
@@ -70,6 +70,7 @@ term:
 | DIFF LPAREN term COMMA term RPAREN { Theory.Diff ($3,$5) }
 | LEFT LPAREN term RPAREN        { Theory.Left $3 }
 | RIGHT LPAREN term RPAREN       { Theory.Right $3 }
+| SEQ LPAREN i=ids ARROW t=term RPAREN { Theory.Seq (i,t) }
 
 term_list:
 |                                { [] }

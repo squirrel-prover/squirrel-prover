@@ -287,6 +287,8 @@ class check_fresh ~system_id name = object (self)
     | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
         self#visit_message (Macros.get_definition ~system_id sort mn is a)
+    (* TODO currently manage the quantifications *)
+    | Seq (a, b) -> self#visit_message b
     | Name (n,_) -> if n = name then raise Bad_fresh_ssc
     | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
@@ -304,6 +306,7 @@ class check_fresh ~system_id name = object (self)
         self#visit_formula r
     | Not f -> self#visit_formula f
     | True | False -> ()
+    (* TODO currently manage the quantifications *)
     | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
@@ -428,6 +431,35 @@ let () =
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
+
+let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
+    sk fk =
+  let env = EquivSequent.get_env s in
+  let tsubst = Theory.subst_of_env env in
+  match Theory.convert tsubst term Sorts.Message with
+  | Seq ( vs, t) ->
+    let vs = List.map (fun x -> Vars.EVar x) vs in
+    let subst = Theory.parse_subst env vs ths in
+    let new_t = EquivSequent.Message (Term.subst subst t) in
+    let biframe =
+      let old_biframe = EquivSequent.get_biframe s in
+      if List.mem new_t old_biframe then old_biframe else new_t :: old_biframe
+    in
+    let hypo_biframe =
+      let old_hyp_biframe = EquivSequent.get_hypothesis_biframe s in
+      if List.mem new_t old_hyp_biframe then old_hyp_biframe
+      else new_t :: old_hyp_biframe
+    in
+    sk [ EquivSequent.set_biframe
+           (EquivSequent.set_hypothesis_biframe s hypo_biframe)
+           biframe] fk
+  | exception _ ->
+    fk (Tactics.Failure "Cannot parse argument as message")
+  | _ ->
+    Tactics.hard_failure
+      (Tactics.Failure "Can only expand with sequences with parameters")
+
+
 let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
   let succ subst =
@@ -455,10 +487,21 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
           Tactics.hard_failure (Tactics.Failure "Can only expand macros")
 
 let () = T.register_general "expand"
-    ~help:"Expand all occurences of the given macro in the given hypothesis.\
-           \n Usage: expand macro H."
+    ~help:"Expand all occurences of the given macro, or expand the given \
+           sequence using the given indices.\
+           \n Usage: expand macro. expand seq(i,k...->t(i,k,...),i1,k1,..."
     (function
-       | [Prover.Theory v] -> pure_equiv (expand v)
+      | [Prover.Theory v] -> pure_equiv (expand v)
+      | (Prover.Theory v)::ids ->
+          let ids =
+            List.map
+              (function
+                 | Prover.Theory th -> th
+                 | _ -> raise @@ Tactics.hard_failure
+                     (Tactics.Failure "improper arguments"))
+              ids
+          in
+        pure_equiv (expand_seq v ids)
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 

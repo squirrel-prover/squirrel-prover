@@ -9,6 +9,8 @@ class iter ~system_id = object (self)
     | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
         self#visit_message (Macros.get_definition ~system_id sort mn is a)
+    (* TODO currently manage the quantifications *)
+    | Seq (a, b) -> self#visit_message b
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
@@ -25,6 +27,7 @@ class iter ~system_id = object (self)
         self#visit_formula r
     | Not f -> self#visit_formula f
     | True | False -> ()
+    (* TODO currently manage the quantifications *)
     | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;

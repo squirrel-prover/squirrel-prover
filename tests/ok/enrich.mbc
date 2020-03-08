@@ -1,17 +1,18 @@
 hash h
 channel c
 
-name k : message
+name k : index -> message
 
 name ok : message
-
+name ko : message
 
 system
-!_i (if False then out(c,h(ok,k))).
+!_i (if False then out(c,diff(ok,ko)) else out(c,h(ok,k(i)))).
 
 equiv simp.
 Proof.
- enrich h(ok,k).
+enrich seq(i->h(ok,k(i))).
+
  induction t.
 
  expand frame@init.
@@ -38,5 +39,6 @@ Proof.
  dup 3.
  fa 1.
  expand cond@A1(i).
+ expand seq(i->h(ok,k(i))),i.
  assumption.
 Qed.

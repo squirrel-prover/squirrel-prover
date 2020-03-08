@@ -8,6 +8,7 @@ type term =
   | Diff of term*term
   | Left of term
   | Right of term
+  | Seq of string list * term
   | ITE of term*term*term
   | Find of string list * term * term * term
   | Name of string * term list
@@ -66,7 +67,10 @@ let rec pp_term ppf = function
   | Left t ->
       Fmt.pf ppf "left(%a)" pp_term t
   | Right t ->
-      Fmt.pf ppf "right(%a)" pp_term t
+    Fmt.pf ppf "right(%a)" pp_term t
+  | Seq (vs, b) ->
+    Fmt.pf ppf "@[seq(@[%a->%a@])@]"
+     (Utils.pp_list Fmt.string) vs pp_term b
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s%a%a"
       f
@@ -497,6 +501,25 @@ let rec convert :
         | Sorts.Boolean, Exists _ -> Term.Exists (vs,f)
         | _ -> raise type_error
       end
+  | Seq (vs,t) ->
+      let new_subst = subst_of_bvars (List.map (fun x -> x, Sorts.eindex) vs) in
+      let t = conv ~subst:(new_subst@subst) Sorts.Message t in
+      let vs =
+        let f : esubst -> Vars.index = function
+          | ESubst (_, Term.Var v) ->
+            begin match Vars.sort v with
+              | Sorts.Index -> v
+                | _ -> raise type_error
+              end
+          | _ -> assert false
+        in
+        List.map f new_subst
+      in
+      begin match sort with
+        | Sorts.Message -> Term.Seq (vs, t)
+        | _ -> raise type_error
+      end
+
 
 let conv_index subst t =
   match convert subst t Sorts.Index with
@@ -615,6 +638,7 @@ let subst t s =
     | Name (n,l) -> Name (n, List.map aux l)
     | Get (s,None,l) -> Get (s, None, List.map aux l)
     | Fun (s,l,None) -> Fun (s, List.map aux l, None)
+    | Seq (vs,t) -> Seq (vs, aux t)
     | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
     | Fun (_,_,Some _) | Get (_,Some _,_) -> assert false
     | True | False as t -> t
