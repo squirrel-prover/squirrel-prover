@@ -121,8 +121,10 @@ Proof.
 Qed.
 
 equiv unreach.
-Proof.
-   induction t.
+    Proof.
+   enrich kP; enrich kS; enrich seq(i->exp(g,a(i)));enrich seq(i->exp(g,b(i))).
+
+    induction t.
 
    expand frame@init.
    expand exec@init.
@@ -131,6 +133,7 @@ Proof.
 
    expand frame@S3(j).
    expand exec@S3(j).
+
 
    (* Unreachability of S3  *)
    equivalent cond@S3(j), False.
@@ -141,83 +144,67 @@ Proof.
    apply S1_charac to j.
    apply H0 to s.
 
-   fa 1.
-   noif 2. simpl.
-   fa 0.
+   fa 5.
+   noif 6. simpl.
+   fa 4.
    assumption.
 
-   expand frame@A(i); expand output@A(i); expand exec@A(i).
-   equivalent
-     cond@A(i),
-     (forall (j1:index),
-      input@S(j1) <> output@P(i) ||
-      snd(input@A(i)) <> snd(output@S(j1)) ||
-      snd(fst(input@A(i))) <> exp(g,b(j1))).
+   expand frame@A(i); expand output@A(i); expand exec@A(i); expand cond@A(i).
+    fa 5.  fa 6. fa 6.  fa 4. dup 5. fa 7;fa 7; fa 7; fa 7.
+    fa 8 ; fa 8.
+    fa 10.
+    dup 10.
+    dup 6.
+    expand  seq(i->exp(g,a(i))), i.
+    dup 8; dup 7.
+    assumption.
 
-     nosimpl(apply A_charac to i).
-     split.
+   expand frame@A1(j); expand output@A1(j); expand exec@A1(j); expand cond@A1(j).
 
-     fa 1; fa 2; fa 3; fa 3.
-     dup 2.
-     fa 0.
-      (* We should be able to close this using some magical dup/fa* tactic..
-      TODO to justify this we need j1<A(i). *)
-   admit 1.
+    fa 5; fa 6; dup 6. fa 4;fa 5; fa 5; fa 6; fa 6. dup 5. dup 5.
+    expand  seq(i->exp(g,b(i))), j.
    assumption.
 
-   admit.
+   expand frame@P(i); expand output@P(i); expand exec@P(i); expand cond@P(i).
 
-   expand frame@P(i).
-   expand output@P(i).
-   expand exec@P(i).
-   expand cond@P(i).
-   fa 1; fa 2; fa 4.
-   dup 2.
-   fa 0; fa 1.
-   (* We should be able to close this with fresh a(i)*)
-   admit 2.
-   assumption.
+    fa 5; fa 6; fa 4. fa 6.
+    expand  seq(i->exp(g,a(i))), i.
+    assumption.
 
-   expand frame@init.
-   expand exec@init.
+   expand frame@S(j); expand output@S(j); expand exec@S(j); expand cond@S(j).
 
-   expand frame@S(j).
-   expand output@S(j).
-   expand exec@S(j).
-   expand cond@S(j).
+   fa 4;fa 5; fa 5; fa 6; fa 6; fa 7. fa 7. fa 7. fa 9. fa 9.
+    dup 7. dup 8.
+    expand  seq(i->exp(g,b(i))), j.
 
-   fa 1; fa 2; dup 2; repeat (fa 2).
-   fa 0; fa 1.
-   admit 2. admit 2.
-   admit 2.
-   (* We should be able to close this with fresh b(j). *)
-   assumption.
+    assumption.
 
-   expand frame@P1(i).
-   expand exec@P1(i).
-   equivalent
-     cond@P1(i),
-     not(forall (j1:index), input@S(j1) <> output@P(i) ||
-     snd(input@P1(i)) <> snd(output@S(j1)) ||
-     snd(fst(input@P1(i))) <> exp(g,b(j1))).
-     simpl.
-     nosimpl(apply P1_charac to i).
-     nosimpl(split).
-     assumption.
-     assumption.
-  fa 1. fa 2. dup 2.
-
-  expand output@P1(i).
-  (* PRF ? *)
-  admit.
+   expand frame@P1(i); expand exec@P1(i); expand output@P1(i); expand cond@P1(i).
+    fa 5; fa 4. fa 7; fa 7. dup 8. fa 5. fa 6. dup 6.
+    fa 5. fa 9. dup 5. fa 8. fa 9; fa 9. dup 9.
+    expand  seq(i->exp(g,a(i))), i.
+    assumption.
 
   expand frame@S1(j).
   expand output@S1(j).
   expand exec@S1(j).
   expand cond@S1(j).
-  (* Symmetric case of A, to handle similarly. *)
-  admit.
-
-  admit.
+  fa 4.
+  fa 5. fa 7.
+  dup 5. fa 7. fa 7.
+  fa 8.
+  dup 7.  dup 8.
+  fa 5.
+  fa 5.
+  expand  seq(i->exp(g,b(i))), j.
+  dup 9. dup 5.
+  assumption.
+  expand frame@S2(j,j1).
+  expand output@S2(j,j1).
+  expand exec@S2(j,j1).
+  expand cond@S2(j,j1).
+  fa 4; fa 5. fa 7. fa 8. fa 8. fa 9. dup 9; dup 5.
+  expand  seq(i->exp(g,a(i))), j1.
+  assumption.
 
 Qed.
