@@ -279,46 +279,16 @@ let () =
 exception Bad_fresh_ssc
 
 class check_fresh ~system_id name = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
 
   method visit_term t = match t with
     | EquivSequent.Message e -> self#visit_message e
     | EquivSequent.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
-    | Fun (_, l) -> List.iter self#visit_message l
-    | Macro ((mn, sort, is),l,a) ->
-        List.iter self#visit_message l ;
-        self#visit_message (Macros.get_definition ~system_id sort mn is a)
-    (* TODO currently manage the quantifications *)
-    | Seq (a, b) -> self#visit_message b
-    | Name (n,_) -> if n = name then raise Bad_fresh_ssc
-    | Var _ -> ()
-    | Diff(a, b) -> self#visit_message a; self#visit_message b
-    | Left a -> self#visit_message a
-    | Right a -> self#visit_message a
-    | ITE (a, b, c) -> self#visit_formula a;
-      self#visit_message b; self#visit_message c
-    | Find (a, b, c, d) ->
-        self#visit_formula b; self#visit_message c; self#visit_message d
-
-  method visit_formula (f:Term.formula) =
-    match f with
-    | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#visit_formula l ;
-        self#visit_formula r
-    | Not f -> self#visit_formula f
-    | True | False -> ()
-    (* TODO currently manage the quantifications *)
-    | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
-    | Atom (`Message (_, t, t')) ->
-        self#visit_message t ;
-        self#visit_message t'
-    | Macro ((mn, Sorts.Boolean, is),[],a) ->
-      (* TODO : if we visit the subterm here, we have a recursive infinite loop
-         due to exec. *)
-      ()
-    | _ -> failwith "unsupported"
-
+    | Term.Name (n,_) when n = name -> raise Bad_fresh_ssc
+    | Term.Var m -> raise Bad_fresh_ssc
+    | _ -> super#visit_message t
 end
 
 (* Check the key syntactic side-condition:
