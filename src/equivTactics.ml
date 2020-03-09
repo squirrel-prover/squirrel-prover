@@ -481,11 +481,11 @@ let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
     sk [ EquivSequent.set_biframe
            (EquivSequent.set_hypothesis_biframe s hypo_biframe)
            biframe] fk
-  | exception _ ->
-    fk (Tactics.Failure "Cannot parse argument as message")
   | _ ->
     Tactics.hard_failure
       (Tactics.Failure "Can only expand with sequences with parameters")
+  | exception Theory.(Conv e) ->
+      fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
 
 let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
@@ -504,15 +504,19 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
                          Macros.get_definition sort mn is a)]
     | _ ->
       Tactics.hard_failure (Tactics.Failure "Can only expand macros")
-    | exception _ ->
-      match Theory.convert tsubst term Sorts.Message with
+    | exception Theory.(Conv (Type_error _)) ->
+      begin
+        match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                              Macros.get_definition sort mn is a)]
-        | exception _ ->
-          fk (Tactics.Failure "Cannot parse argument as message or formula")
         | _ ->
           Tactics.hard_failure (Tactics.Failure "Can only expand macros")
+        | exception Theory.(Conv e) ->
+          fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
+      end
+    | exception Theory.(Conv e) ->
+          fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
 let () = T.register_general "expand"
     ~help:"Expand all occurences of the given macro, or expand the given \

@@ -338,7 +338,8 @@ let rec convert :
                   Term.Macro ((s,sort, l),[],conv Sorts.Timestamp ts)
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
-                  assert false
+                assert false
+              | Wrapped (s, Macro (Cond|Exec)) -> raise type_error
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
             end
         | Sorts.Boolean ->
@@ -346,6 +347,7 @@ let rec convert :
               | Wrapped (s, Macro (Cond|Exec)) ->
                   check_arity "cond" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
+              | Wrapped (s, Macro (Input|Output|Frame)) -> raise type_error
               | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
             end
         | _ -> raise type_error
@@ -441,17 +443,17 @@ let rec convert :
                 (`Timestamp (o,
                              conv Sorts.Timestamp u,
                              conv Sorts.Timestamp v))
-            with Conv _ ->
+            with Conv (Type_error _ ) ->
               match o with
                 | #Atom.ord_eq as o ->
                     begin try
                       Term.Atom (`Index (o, conv_index u, conv_index v))
-                    with Conv _ ->
+                    with Conv (Type_error _ ) ->
                       try
                         Term.Atom (`Message (o,
                                              conv Sorts.Message u,
                                              conv Sorts.Message v))
-                      with Conv _ -> raise (Conv (Untypable_equality tm))
+                      with Conv (Type_error _ ) -> raise (Conv (Untypable_equality tm))
                     end
                 | _ -> raise (Conv (Untypable_equality tm))
             end

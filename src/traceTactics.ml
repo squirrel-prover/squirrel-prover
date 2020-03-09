@@ -472,15 +472,19 @@ let expand (term : Theory.term) (s : TraceSequent.t) sk fk =
                          Macros.get_definition ~system_id sort mn is a)]
     | _ ->
       Tactics.hard_failure (Tactics.Failure "Can only expand macros")
-    | exception _ ->
+    | exception Theory.(Conv (Type_error _)) ->
+      begin
       match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                              Macros.get_definition ~system_id sort mn is a)]
-        | exception _ ->
-          fk (Tactics.Failure "Cannot convert argument to message or formula")
+        | exception Theory.(Conv e) ->
+          fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
         | _ ->
           Tactics.hard_failure (Tactics.Failure "Can only expand macros")
+    end
+    | exception Theory.(Conv e) ->
+      fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
 let () = T.register_general "expand"
     ~help:"Expand all occurences of the given macro inside the goal.\
