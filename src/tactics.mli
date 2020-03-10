@@ -33,6 +33,7 @@ type tac_error =
   | NotEqualArguments
   | NoSSC
   | NoAssumpSystem
+  | NotDepends of string * string
   | Undefined of string
 
 (** Tactics should raise this exception if they are ill-formed. *)

@@ -235,6 +235,11 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/capture.mbc")
     end ;
+    "Not Depends", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.NotDepends ("A1(i)","A1(i)")))
+        (fun () -> run ~test "tests/alcotest/depends.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->

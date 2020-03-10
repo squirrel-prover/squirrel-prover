@@ -12,12 +12,15 @@ let rec conflict a b = match a, b with
      conflict tla tlb)
   | _ -> false
 
-let rec depends a b = match a, b with
-  | [], _ -> true
-  | hda::tla, hdb::tlb ->
-    hda = hdb &&
-    depends tla tlb
-  | _ -> false
+let depends a b =
+  let rec aux a b = match a, b with
+    | [], _ -> true
+    | hda::tla, hdb::tlb ->
+      hda = hdb &&
+      aux tla tlb
+    | _ -> false
+  in
+  if a =b then false else aux a b
 
 let rec enables a b = match a, b with
   | [], [_] -> true

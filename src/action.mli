@@ -35,7 +35,7 @@ val conflict : 'a t -> 'a t -> bool
 
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
-    take messages into account. *)
+    take messages into account. It is not reflexive. *)
 val depends : 'a t -> 'a t -> bool
 
 (** [enables a b] tests whether action [a] enables [b]. *)

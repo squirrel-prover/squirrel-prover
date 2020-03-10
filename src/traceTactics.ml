@@ -208,7 +208,8 @@ let depends t1 t2 s sk fk =
       let atom = (Atom (`Timestamp (`Lt,a1,a2))) in
       sk [TraceSequent.add_formula atom s] fk
     else
-      fk (Tactics.Failure "the second action does not depend on the first one")
+      fk (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
+                              Fmt.strf "%a" Term.pp a2))
   | _ -> raise @@ Tactics.Tactic_hard_failure
       (Tactics.Failure "arguments must be actions.")
 

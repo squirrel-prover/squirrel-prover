@@ -4,6 +4,7 @@ type tac_error =
   | NotEqualArguments
   | NoSSC
   | NoAssumpSystem
+  | NotDepends of string * string
   | Undefined of string
 
 let rec pp_tac_error ppf = function
@@ -17,8 +18,11 @@ let rec pp_tac_error ppf = function
   | NoSSC -> Fmt.pf ppf "No key which satisfies \
                  the syntactic condition has been found"
   | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
+  | NotDepends (a, b) -> Fmt.pf ppf "Action %s does not depend on action %s"
+                           a b
   | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
                                   current system"
+
 
 exception Tactic_soft_failure of tac_error
 
