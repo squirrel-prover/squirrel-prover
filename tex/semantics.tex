@@ -1,142 +1,123 @@
 \section{Semantics}
 
-We can now define a meta-interpretation as the structure needed to
-give a meaning to index and timestamp terms. A meta-interpretation
-also induces a translation from a meta-logic signature $\Sigma$
-to some base logic signature $\Sigma^I$. For example, if
+We now define meta-interpretations, which are the structures needed to
+give a meaning to indices and timestamps. More generally, a trace model
+also allows to translate any meta-logic formula $\phi$
+(over some meta-logic signature $\Sigma$)
+to a base logic $\phi^I$ (over some base logic signature $\Sigma^I$).
+For example, if
 $\Sigma$ contains a name $\mathsf{n}$ with index arity $1$, and
-the meta-interpretation interprets indices in a domain $D_\I = \{
-  17, 22 \}$, the base logic signature will feature
+the meta-interpretation interprets indices in a domain
+$D_\I = \{ 17, 22 \}$, the base logic signature will feature
 two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
 
-As in the \BC model, we model arbitrary messages produced by the attacker
-using free function symbols $\G = \{g_i | i \in \mathbb{N}\}$. We assume
-from now on that our signature contains such symbols.
+\david{I like Adrien's suggestion to rename meta-interpretations to trace
+model, but I'm lazy to rename all meta-interpretations $I$ to $T$. Also,
+both $T$ and $\T$ have a meaning at this point. Shall we move to trace models
+$\mathbb{T}$ and computational models $\mathbb{M}$ (which would avoid the
+confusion with the set $\M$ of macro symbols ?}
 
-\paragraph{Meta-interpretation of a trace}
+\medskip
 
-We construct, for each symbolic trace, a meta-interpretation representing
-the trace. Some details of this definition will be understood in the next
-section, where we identify some axioms that hold in all such
-meta-interpretations.
+From now on, we assume a protocol $P$ providing some set of action
+symbols $\A$, using function and name symbols from $\F$ and $\N$,
+as well as memory cell symbols from $\States$.
+We consider meta-logic terms and formulas over $\Sigma = (\F,\N,\M,\A)$
+where $\M = \{ \minp, \mout, \mframe \} \cup \States$.
 
 \begin{definition}
-  Given an abstract trace $\tr = \alpha_1\ldots\alpha_n$,
-  we define a meta-interpretation $I_\tr$ for this trace as follows:
+  Given a finite set of integers $D$ we define the base logic
+  signature $\Sigma^D$ containing exactly:
   \begin{itemize}
-    \item an index domain $\D_\I$, which is the set of indices that occur in $\tr$;
-    \item a timestamp domain $\D_\XT = \{ t_0 \} \uplus \{ a(\ov{n}) : a\in\Actions_k,
-      \ov{n}\in\D_\I^k \}$;
-    \item arbitrary mappings $\sigma_\I : \I \to D_\I$
-      and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
-      timestamp variables as elements of their respective domains;
-    \item a total ordering $\leq$, such that $t_0\leq t$ for all $t\in\D_\XT$,
-      and $\alpha\leq\beta$ if $\alpha$ occurs before $\beta$ in $\tr$;
-    \item a predecessor function $p$ mapping $t_0$ to itself and all
-      other timestamps to their predecessor according to $\leq$;
-    \item a subset $H_\XT\subseteq D_\XT$  of actions that occur in $\tr$,
-      i.e.\ $H_\XT=\{\alpha_i : i\in[1;n]\}$;
-    \item for each constant $a \in \Actions$ of index arity $k$,
-    an interpretation $\hat{a} : D_\I^k \to D_\XT$ such that
-    $\hat{a}(\ov{n}) = a(\ov{n})$;
-    \item for each macro symbol $m \in \M$ of index
-      arity $k$ and arity $n$, an interpretation
-      $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_\XT \to \Msg^{I_\tr}_\Sigma$,
-      where $\Msg^{I_\tr}_\Sigma$ is the set of terms of the base
-      logic for the (base logic) signature
-      $(\F^{I_\tr},\N^{I_\tr})$ with
-      $$\F^{I_\tr} =
-        \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_\I \}
-        \text{ and }
-        \N^{I_\tr} = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
-        e_1,\ldots,e_k\in D_\I \}.$$
-      \footnote{\adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}}
-    \begin{itemize}
-      \item $\hat{\minp}$ and $\hat{\mout}$ have arbitrary values on $t_0$
-      \item \solene{$\hat{s}[j_1,\ldots,j_k](t_0) = ???$
-      ---
-      I do not know what should I write here, because the value we give to
-      $\hat{s}(t_0)$ must be a term of the base logic for the (base logic)
-      signature $(\F^{I_\tr},\N^{I_\tr})$.
-      But the signature $(\F^{I_\tr},\N^{I_\tr})$ is not known at the time
-      we define a protocol (which seems the appropriate place to give the
-      initialisation parameters of each memory cells).}
-      \item otherwise, $\hat{\minp}$, $\hat{\mout}$ and $\hat{s}$
-      are uniquely defined by the following
-      conditions, for all $i\in[1;n]$:
-      $$\hat{\minp}(\alpha_i) =
-      g_{i}(\hat{\mout}(\alpha_1),\ldots,\hat{\mout}(\alpha_{i-1}))$$
-      $$\hat{\mout}(\alpha_i) = o_{\alpha_i}
-      \{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j \leq i}
-      \{x^s_{\alpha_i}\mapsto\hat{s}(\alpha_i)\}$$
-      $$\hat{s}(\alpha_i) = u_{\alpha_{i-1}}^{s}
-      \{x_{\alpha_j}\mapsto\hat{\minp}(\alpha_j)\}_{j \leq i-1}\{
-      x^s_{\alpha_{i-1}}\mapsto\hat{s}(\alpha_{i-1})\}$$
-    \end{itemize}
+    \item a name symbol $n_{e_1,\ldots,e_k}$ for every $n \in \N_k$
+       and $e_1,\ldots,e_k \in D$;
+    \item a function symbol $f_{e_1,\ldots,e_k}$ of arity $n$ for every
+      $f \in \F_k^n$ and $e_1,\ldots,e_k \in D$;
+    \item a function $g_n$ of arity $n$ for every $n\in\mathbb{N}$.
   \end{itemize}
+  The latter kind of function symbol will be used, as usual in the BC 
+  approach, to model attacker computations.
 \end{definition}
 
 Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
 D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^{I_\tr}$.
 \adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
 
-% \begin{definition}
-%   A meta-interpretation $I$\footnote{\adrien{I don't like the name meta-interpretation. Meta-model would be better. Or something like trace-model. }}
-%   for $\Sigma = (\F,\M,\N,\Actions)$ consists in:
-%   \begin{itemize}
-%     \item two finite sets $D_\I$ and $D_\XT$ called the index and timestamp
-%       domains of the interpretation;
-%     \item mappings $\sigma_\I : \I \to D_\I$
-%       and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
-%       timestamp variables as elements of their respective domains;
-%     \item a total ordering $\leq$ over $D_\XT$,
-%       a function $p : D_\XT \to D_\XT$ (for interpreting the
-%       predecessor\footnote{
-%         It does not matter that the predecessor means anything
-%         wrt.\ the ordering. We will impose later that it behaves
-%         well enough.
-%       })
-%       and a subset $H_\XT\subseteq D_\XT$ (for identifying timestamps
-%       that actuallly happen in an execution\footnote{
-%         We cannot identify timestamps freely in the meta-interpretation
-%         because we want to be able to use axioms such as
-%         $\forall i\neq j.~ a[i] \neq a[j]$ without restricting
-%         them to timestamps that really happen.
-%         \adrien{I think there are more fundamental reason for that. Considering the way for formulate things, for any $a \in \bbA$ (of arity 1) and $i \in D_\I$, $a[i]$ has an interpretation. But the protocol may not allow for it (because of restrictions). By consequence we need to be able to interpret $a[i]$ without it being valid.}
-%       });
-%     \item for each constant $a \in \Actions$ of index arity $k$,
-%       an interpretation $\hat{a} : D_\I^k \to D_\XT$;
-%     \item for each macro symbol $m \in \M$ of index
-%       arity $k$ and arity $n$, an interpretation
-%       $\hat{m} : D_\I^k \times \Msg_\Sigma^n \times D_\XT \to \Msg^I_\Sigma$,
-%       where $\Msg^I_\Sigma$ is the set of terms of the base
-%       logic for the (base logic) signature
-%       $(\F^I,\N^I)$ with
-%       \[
-%         \F^I =
-%         \{ f_{e_1,\ldots,e_k} : f \in \F_k, e_1,\ldots,e_k \in D_\I \}
-%         \text{ and }
-%         \N^I = \{ \mathsf{n}_{e_1,\ldots,e_k} : \mathsf{n}\in\N_k,
-%         e_1,\ldots,e_k\in D_\I \}.
-%       \]
-%       \adrien{The interpretation of macros can depend on the precise element of $\D_\T$ it is interpreted at. In the tool, this is more restricted. E.g.\ $\hat{m}@a[i]$ can only depend on $a$, not on $i$  (except to re-use $i$ in the term). Instead, we could interpret macro symbol as terms of the meta-logic (with restrictions to have termination).}
-%   \end{itemize}
-% \end{definition}
+\begin{definition}
+  A meta-interpretation (relative to $P$) is given by:
+  \begin{itemize}
+    \item a finite index domain $\D_\I \subseteq \mathbb{N}$;
+    \item a total ordering $\leq_\XT$ on
+      $\D_\XT = \{ \tinit \} \uplus \{ a(\ov{n}) : a\in\Actions_k,
+      \ov{n}\in\D_\I^k \}$ which refines the dependency ordering
+      $\leq$ on concrete actions and such that $\tinit$ is minimal;
+    \item mappings $\sigma_\I : \I \to D_\I$
+      and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
+      timestamp variables as elements of their respective domains;
+  \end{itemize}
+\end{definition}
 
+\newcommand{\interp}[1]{(#1)}
 
-\paragraph{Meta-interpretation of terms and formulas with relation to a trace}
+Given a meta-interpretation $I$ of domains $D_\I$ and $D_\XT$
+we define the interpretation of index and timestamp terms as
+follows:
+\begin{itemize}
+  \item $\interp{i}^I = \sigma_\I(i)$ and $\interp{\tau}^I = \sigma_\XT(\tau)$;
+  \item $\interp{\tinit}^I = \tinit$ and
+    $\interp{\sfa(i_1,\ldots,i_k)}^I =
+     \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_n))$
+    for all $\sfa\in\Actions_k$ and $e_1,\ldots,e_k\in D_\I$;
+  \item $\interp{\tpred{T}}^I$ is the predecessor of $\interp{T}^I$
+    according to ${\leq}_\XT$, or $\tinit$ if $\interp{T}^I = \tinit$.
+\end{itemize}
 
-Given a meta-interpretation $I_\tr$ for a given trace, we define the
-interpretation in $I_\tr$ of terms of the meta-logic as terms of the base logic.
+We can then define, for each macro symbol $m\in\M_k$,
+its interpretation $m^I : D_\I^k \times D_\XT \to T_\Sigma^{D_I}$.
+More precisely we define $m^I(e_1,\ldots,e_k,t)$ by induction on $t$,
+as follows. Let $(\alpha'_i)_i$ be the enumeration of the elements
+of $D_\XT$ wrt $\leq$ (in particular, $\alpha'_0 = \tinit$), and let
+$\alpha_i$ be a symbolic action of which $\alpha'_i$ is an instance:
+\begin{itemize}
+  \item $\mout^I(\tinit) = \min^I(\tinit) = \mframe^I(\tinit) = 0$;
+  \item $s(e_1,\ldots,e_k,\tinit) = 0$ for all $s \in \States_k$ and
+    $e_1,\ldots,e_k \in D_\I$;
+  \item we then set, for timestamps other than $\tinit$,
+    $$
+    \minp^I(\alpha'_{i+1}) =
+    g_{i}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_i))
+    $$
+    $$s^I(f_1,\ldots,f_p,\alpha'_{i+1}) =
+    \interp{
+      u_{\alpha_{i}}^{s}
+    }^{I\{\vec{i}\mapsto\vec{e},\vec{j}\mapsto\vec{f}\}}
+    $$
+    $$
+    \mout^I(\alpha'_i) =
+      \interp{
+        o_{\alpha_i}
+        \{x_{\beta_j}\mapsto\mout@\alpha_j\}_{j\leq i}
+        \{x_{\alpha_i}^{s[j_1,\ldots,j_p]}\mapsto 
+          s[j_1,\ldots,j_p]@\alpha_i\}_s
+        }^{I\{\vec{i}\mapsto\vec{e}\}}
+    $$
+    The interpretation of input macros is the simplest:
+    it uses an arbitrary function $g_i$ to model the attacker's
+    computation based on previous outputs.
+    For the other macros, the interpretation at some concrete
+    action $\alpha'_i$ is obtained from the symbolic semantics of
+    $\alpha_i$ by applying the relevant substitutions (directly
+    on terms of the meta-logic when possible\footnote{
+      \david{What I wrote implicitly assumes that there is no dependency
+      such as e.g.\ $b(i,j) \leq a(i)$ where the dependency introduces
+      a new index.}
+    }, otherwise by updating the meta-interpretation).
+  \end{itemize}
+  \david{All this requires to interpret terms, and thus formulas: everything 
+  has to be done simultaneously!}
 
 \begin{definition}
-  Given a meta-interpretation $I_\tr$
-  we define $(T)^{I_\tr} \in D_\XT$ and $(t)^{I_\tr} \in \Msg^{I_\tr}_\Sigma$ as follows:
-  \begin{eqnarray*}
-    (\tau)^{I_\tr} &=& \sigma_\XT(\tau) \\
-    (\pre(T))^{I_\tr} &=& p((T)^{I_\tr}) \\
-    (a[i_1,\ldots,i_k])^{I_\tr} &=& \hat{a}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
-  \end{eqnarray*}
+  We define $(T)^{I_\tr} \in D_\XT$ and $(t)^{I_\tr} \in \Msg^{I_\tr}_\Sigma$ as follows:
   \begin{eqnarray*}
     (\mathsf{n}[i_1,\ldots,i_k])^{I_\tr} &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
     \\

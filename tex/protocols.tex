@@ -27,8 +27,9 @@ as well as index memory cell symbols from $\States$.
     $A \leq A'$ implies $A\theta \leq A'\theta$.
   }.
   Finally, each action $\sfa \in \Actions_k$ must come with
-  a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$ and
-  the following elements describing its semantics:
+  a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$
+  with distinct indices,
+  and the following elements describing its semantics:
   \begin{itemize}
     \item a meta-logic formula $\phi_{\alpha}$
       (intuitively, the execution condition of this action);
@@ -37,6 +38,7 @@ as well as index memory cell symbols from $\States$.
     \item for each memory cell symbol $s \in \States$ of index arity $p$,
       a meta-logic term $u_{\alpha}^{s[j_1,\ldots,j_p]}$
       for some index variables $j_1,\ldots,j_p$
+      that are distinct and disjoint from $\vec{i}$
       (intuitively, this term describes how the action updates the memory
       cell, depending on the indices $\vec{i}$ and $\vec{j}$);
     \item two channel names $\cin_\alpha$ and $\cout_\alpha$
@@ -58,7 +60,30 @@ as well as index memory cell symbols from $\States$.
   and the content of memory when they execute.
 \end{definition}
 
-From now on we assume a fixed protocol.
+The semantics of each action $\sfa$ is given via an arbitrary
+choice of indices in $\alpha = \sfa(i_1,\ldots,i_k)$.
+We then extended naturally this semantics to all symbolic actions,
+rendering the choice of indices irrelevant:
+for an arbitrary symbolic action $\alpha' =
+\sfa(i'_1,\ldots,i'_k)$ we define
+$o_{\alpha'} = o_\alpha\{i_n\mapsto i'_n\}_{1\leq n \leq k}$
+and similarly for $\phi_{\alpha'}$;
+further, if the update term of $\alpha$ for state $s$ is given
+with indices $j_1,\ldots,j'_p$ we extend it as follows:
+$$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
+   u_\alpha^{s[j_1,\ldots,j'_p]}\{i_n\mapsto i'_n\}_{1 \leq n \leq k} 
+                                \{j_m\mapsto j'_m\}_{1 \leq m \leq p}.$$
+
+\begin{remark}
+  We will fix the initial values of all memory cells to be $0$.
+  This is not restrictive since we can have an action that initializes
+  all memory cells at once (giving them values that can depend on their
+  indices) and we can force this action to happen before any other.
+  In the tool, we use a different (and incompatible) approach:
+  the user simpler has to postulate axioms to specify initial values
+  --- but of course we do not have rules to derive the fact that initial
+  values are $0$ as specified here, so we cannot obtain a contradiction.
+\end{remark}
 
 \begin{definition}
   A \emph{concrete action} is an instantiation of a \emph{symbolic action}
