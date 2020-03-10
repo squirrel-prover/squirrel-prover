@@ -323,28 +323,29 @@ Indeed, this version is useful and sound for reachability, but is not sound for 
 We use the following notations:
 \begin{itemize}
   \item $\Gamma \vdash u$ stands for $\Gamma^L \sim \Gamma^R \vdash u^L \sim u^R$
-  \item $A(\vec k) \in S$ stands for every action in the system (or protocol)
-  \item $A(\vec k)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$
-  \item $k \sqsubseteq_{\h(\_,\cdot)} u,C$ means that $k$ appears only in key positions in $u,C$
+  \item $A \in S$ stands for every action in the system (or protocol)
+  \item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
+  \item $k \sqsubseteq_{\h(\_,\cdot)} u$ means that $k$ appears only in key positions in $u$
+  \item indices $\vec i$ are chosen fresh related to the appropriate environment ($u, C, \vec {j_L}, \vec {j_R}$ for Fresh and $u, C, t, k$ for PRF)
 \end{itemize}
 
 \begin{figure}[h]
   \begin{mathpar}
   \inferrule[Fresh]{
-    \Gamma \vdash u, \myif \phi_L \wedge \phi_R \mythen 0 \myelse \diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}
+    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse \diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}]
   }{
-    \Gamma \vdash u, \diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}
+    \Gamma \vdash u, C[\diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}]
   }
   \end{mathpar}
   \begin{mathpar}
-    \phi_L = \big( \displaystyle\bigwedge_{n_L(\vec j) \in u^L} j \neq j_L \big)
+    \phi_L = \big( \displaystyle\bigwedge_{n_L(\vec j) \in u^L,C^L} \vec j \neq \vec {j_L} \big)
     \wedge
     \big(
-      \displaystyle\bigwedge_{A(\vec k) \in S}
-      \forall \vec k \
-      \big(\displaystyle\bigvee_{\tau \in u,L} A(\vec k) \leq \tau \big)
+      \displaystyle\bigwedge_{A \in S}
+      \forall \vec i \
+      \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec i) \leq \tau \big)
       \Rightarrow
-      \big(\displaystyle\bigwedge_{n_L(\vec j) \in A(\vec k)^L} j \neq j_L \big)
+      \big(\displaystyle\bigwedge_{n_L(\vec j) \in A(\vec i)^L} \vec j \neq \vec {j_L} \big)
     \big)
   \end{mathpar}
   \begin{mathpar}
@@ -359,20 +360,20 @@ We use the following notations:
   \inferrule[PRF]{
     \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k)]
     \quad \quad
-    k \sqsubseteq_{\h(\_,\cdot)} u,C
+    k \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
   }{
     \Gamma \vdash u, C[\h(t,k)]
   }
   \end{mathpar}
   \begin{mathpar}
-  \phi_L = \big( \displaystyle\bigwedge_{\h(m,k) \in u^L,C^L} t \neq m \big)
+  \phi_L = \big( \displaystyle\bigwedge_{\h(m,k) \in u^L,C^L,t^L} t^L \neq m \big)
   \wedge
   \big(
-    \displaystyle\bigwedge_{A(\vec k) \in S}
-    \forall \vec k \
-    \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec k) < \tau \big)
+    \displaystyle\bigwedge_{A \in S}
+    \forall \vec i \
+    \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) < \tau \big)
     \Rightarrow
-    \big(\displaystyle\bigwedge_{\h(m,k) \in A(\vec k)^L} t \neq m \big)
+    \big(\displaystyle\bigwedge_{\h(m,k) \in A(\vec i)^L} t^L \neq m \big)
   \big)
   \end{mathpar}
   \begin{mathpar}
