@@ -33,16 +33,17 @@
 \newcommand{\Y}{\mathcal{Y}}
 \newcommand{\Z}{\mathcal{Z}}
 
-
 \newcommand{\XT}{\mathcal{T}}
 \newcommand{\States}{\mathcal{S}}
-\newcommand{\Actions}{\mathbb{A}}
+\newcommand{\Actions}{\mathcal{A}}
 \newcommand{\Timestamps}{\mathbb{T}}
 \newcommand{\Msg}{\mathsf{Msg}}
 
+\newcommand{\fv}[1]{\mathsf{fv}(#1)}
+
 \newcommand{\sem}[1]{[\![#1]\!]}
 
-\newcommand{\diff}[2]{\mathsf{choice}(#1,#2)}
+\newcommand{\diff}[2]{\mathsf{diff}(#1,#2)}
 
 \newcommand{\g}{\mathsf{g}}
 \newcommand{\h}{\mathsf{h}}
@@ -54,6 +55,9 @@
 
 \newcommand{\mout}{\textsf{output}}
 \newcommand{\minp}{\textsf{input}}
+\newcommand{\mexec}{\textsf{exec}}
+\newcommand{\mcond}{\textsf{cond}}
+\newcommand{\mframe}{\textsf{frame}}
 \newcommand{\atom}{\textsf{atom}}
 \newcommand{\happens}{\textsf{happens}}
 \newcommand{\suc}{\textsf{succ}}
@@ -69,21 +73,24 @@
 \newcommand{\noteq}{\mathsf{neq}}
 \newcommand{\mand}{\mathsf{and}}
 
-\newcommand{\myif}{\textsf{if}\;}
-\newcommand{\mythen}{\;\textsf{then}\;}
-\newcommand{\myelse}{\;\textsf{else}\;}
-\newcommand{\myin}[1]{\textsf{in}(#1)}
-\newcommand{\myout}[1]{\textsf{out}(#1)}
+% Primitives
 \newcommand{\mysign}{\textsf{sign}}
 \newcommand{\mypk}{\textsf{pk}}
 \newcommand{\mycsign}{\textsf{checksign}}
 \newcommand{\mygetmess}{\textsf{getmess}}
+
+% Actions
+\newcommand{\ain}[1]{\mathsf{in}(#1)}
+\newcommand{\aout}[1]{\mathsf{out}(#1)}
+
+% Keywords
+\newcommand{\myif}{\textsf{if}\;}
+\newcommand{\mythen}{\;\textsf{then}\;}
+\newcommand{\myelse}{\;\textsf{else}\;}
+\newcommand{\myin}{\;\textsf{in}\;}
 \newcommand{\myfind}{\textsf{find}\;}
 \newcommand{\mysuchthat}{\;\textsf{suchthat}\;}
-\newcommand{\mouts}{\textsf{outputs}}
-\newcommand{\mcond}{\textsf{cond}}
-\newcommand{\mupdate}{\textsf{update}}
-\newcommand{\mtests}{\textsf{tests}}
+\newcommand{\mouts}{\mframe} % TODO remove alias
 
 \newcommand{\EQ}{\textsf{EQ}}
 

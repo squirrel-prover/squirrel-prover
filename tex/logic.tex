@@ -1,26 +1,16 @@
-\section{Abstract meta-logic}
-
-As a first step we define a meta-logic that is abstract, in that it does
-not explicitly refer to the protocol under study. It has all the ingredients
-for reasoning about protocols (mainly indexed symbols and macro symbols)
-but their interpretation is, for now, arbitrary.
-
-\subsection{Base logic}
-
-The base logic is that of Bana and Comon (CCS'14). It is first-order logic
-with a distinguished kind of constant for representing names (written
-$\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
+We call \emph{base logic} the system of Bana and Comon (CCS'14).
+It is first-order logic with a distinguished kind of constant for representing 
+names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
 and featuring a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
 The terms are all of the same sort: they are meant to represent
-messages\footnote{
-  \david{I hope/believe that the distinction between booleans and messages
-  can be ignored for the theory.}
-}.
+messages.
 
 In practice, the logic will be considered with function symbols for
-representing cryptographic primitives as well as attacker computations, and
-boolean constants and connectives.
+representing cryptographic primitives as well as attacker computations.
+We will also assume some standard boolean constants and operations, with
+a fixed semantics (for instance, $\_ \stackrel{.}{=} \_$ or
+$\mathsf{if \_ then \_ else \_}$).
 
 The formulas of the base logic are intended to be interpreted in
 \emph{computational models}, where:
@@ -41,18 +31,23 @@ the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and
 $\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
 are valid.
 
-\subsection{Meta-logic}
+\section{Syntax of terms and formulas}
+
+We recall next the syntax and semantics of base logic, which deals with 
+messages and indistinguishability.
+We then define the syntax of our meta-logic, which will allow to reason about 
+protocols. The semantics of the meta-logic will only be defined relative to a 
+protocol, a notion that is introduced in the next section.
 
 Terms of the meta-logic are of three possible sorts: index, timestamps
 or message. Formulas of the meta-logic may feature predicates over each sort.
-Given interpretation $I$ and $T$ of index and timestamp variables
-into two finite sets, a formula $\phi$ of the meta-logic will be translated
-into a term $(\phi)^{I,T}$ of the base logic in which index and timestamps,
-and predicates over them, will have disappeared. The validity of the
-meta-logic formula $\phi$ will be defined as the validity of the base logic
-$(\phi)^{I,T}\sim\mathsf{true}$.
+Given some interpretation $I$ of indices and timestamp variables in some finite
+sets, a meta-logic formula $\phi$ will be translated to a term $(\phi)^I$
+of the base logic.
+The validity of the meta-logic formula will be defined as the validity of the 
+base logic formula $(\phi)^I \sim \mathsf{true}$.
 
-\paragraph{Terms}
+\medskip
 
 We assume three infinite sets of variables:
 $\X$ (whose elements are noted $x$, $y$, $z$) for message variables;
@@ -61,77 +56,63 @@ $\XT$ (whose elements are noted $\tau$) for timestamp variables.
 
 We assume a set $\F$ of indexed function symbols
 (used to model encryptions, pairs,\dots).
-Each of these symbols comes with an index arity as well as an usual arity:
-if $f\in\F$ has index arity $k$ and arity $n$,
+Each of these symbols comes with an index arity as well as a message arity:
+if $f\in\F$ has index arity $k$ and message arity $n$,
 then for all index variables $i_1,\ldots,i_k$ and terms $t_1,\ldots,t_n$,
 $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
 
-We assume a set $\N$ of indexed names symbols,
+\begin{example}
+  Function symbols representing cryptographic primitives will have index
+  arity $0$, and a message arity depending on the kind of primitive:
+  two for a hash, three for a randomized encryption, etc.
+  Functions symbols representing identities (for example, a constant value
+  associated to each tag) will have $0$ as message arity and $1$ as index arity.
+\end{example}
+
+We assume a set $\N$ of indexed names symbols
 (used to model random samplings)
-and a set of indexed constants $\Actions$
+and a set of indexed action symbols $\Actions$
 (used to model specific timestamps).
 These indexed symbols only have an index arity: they
 cannot be applied to terms.
 
-We finally assume a set $\M$ of indexed macro symbols
-equipped with an index arity.
+We finally assume a set $\M$ of indexed macro symbols.
 An indexed macro symbol will be applied to the specified number of
 indices and also to a single timestamp.
 This timestamp gives the instant at which the macro is evaluated.
+In practice, macro symbols will be used to describe the inputs and outputs
+of the protocol, but also the execution conditions as well as the value of
+mutable memory cells.
 
-We shall write $\F_k$ (resp.\ $\N_k$ or $\M_k$) for the set of function
+We shall write $\A_k$ (resp.\ $\N_k$ or $\M_k$) for the set of action
 symbols (resp.\ name or macro symbols) of index arity $k$.
+We write $\F_k^n$ for function symbols of index arity $k$ and message
+arity $n$.
 
-\begin{figure}[h]
+\begin{figure}[t]
 \[
   \begin{array}{rclll}
     i &:=& i & \text{index variable} & \\
     \\
     T &:=& \tau & \text{timestamp variable} & \\
-      &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\mathbb{A}) \\
+      &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\Actions_k) \\
       &\mid & \pre(T) & \text{predecessor} & \\
     \\
     t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
       & \mid & x  & \text{message variable} & (x\in\X) \\
-      & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} & (f\in\F_k)\\
+      & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} & 
+      (f\in\F_k^n)\\
       & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\M_k)\\
+      & \mid & \myif \phi \mythen t \myelse t'
+        &\text{conditional} \\
+      & \mid & \myfind \vec{i} \mysuchthat \phi \myin t \myelse t'
+        &\text{lookup}
   \end{array}
 \]
 \caption{Syntax of meta-logic terms}\label{fig:terms}
 \end{figure}
 
-\begin{definition}
-  Given a (meta logic) signature $\Sigma = (\F,\N,\M,\Actions)$
-  and some sets of variables
-  $\X$, $\I$ and $\XT$,
-  \cref{fig:terms} defines the syntax of (meta-logic) terms
-  of sort message (noted $t$) and timestamp (noted $T$).
-  The only terms of sort index are index variables.
-  The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
-\end{definition}
-
-\begin{remark}
-  Function symbols representing cryptographic primitives will have a usual
-  arity k and as index arity $0$.
-  Functions symbols representing identities (for example, a constant value
-  associated to each tag) will have $0$ as usual arity and $1$ as index arity.
-  Macro symbols will typically include $\mout$ and $\minp$
-  (with index arity $0$) for representing messages inputted and
-  outputted at a particular point of an execution.
-  Macro symbols will also be used to represent states (memory cells, database),
-  usually with index arity superior or equal to $1$.
-\end{remark}
-
-
-\paragraph{Formulas}
-
-The syntax of the meta-logic formulas is given in \cref{fig:formulas}.
-We could have included more generally a notion of predicate macro that
-would have to be expanded when translating a formula from the meta-logic
-to the base logic. Instead we opted to list the few atoms that we
-will use in practice.
-
-\begin{figure}[h]
+\begin{figure}[t]
   \[
   \begin{array}{c}
    \begin{array}{rcll}
@@ -139,7 +120,7 @@ will use in practice.
     \\[2ex]
    \atom & := & t=t'
  & \text{atomic proposition over messages } \\
-  &\mid & T=T' \mid T \leq T' \mid \happens(T) &  \text{atomic proposition
+  &\mid & T=T' \mid T \leq T' \mid \mcond@T \mid \mexec@T &  \text{atomic proposition
   over timestamps } \\
   &\mid & i=i'  &  \text{atomic proposition
     over indices } \\
@@ -156,3 +137,16 @@ will use in practice.
     \]
     \caption{Syntax of meta-logic formulas}\label{fig:formulas}
 \end{figure}
+
+\begin{definition}
+  Given a (meta logic) signature $\Sigma = (\F,\N,\M,\Actions)$
+  and some sets of variables
+  $\X$, $\I$ and $\XT$,
+  \cref{fig:terms} defines the syntax of (meta-logic) terms
+  of sort message (noted $t$) and timestamp (noted $T$),
+  and \cref{fig:formulas} defines the syntax of formulas (noted $\phi$).
+  Note that terms and formula are mutually inductive, due to the presence
+  of conditionals and lookups in terms.
+  The only terms of sort index are index variables.
+  The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
+\end{definition}

@@ -385,6 +385,13 @@ We use the following notations:
 
 
 \subsection{A proof technique}
+
+Diff-equivalence is usually proved by induction and case analysis on
+the timestamp. Even cases where the left and right actions are locally
+identical are not trivial: it may be e.g.\ that the same name is outputted
+by the action on both sides, but that each side has previously released
+different information on that name.
+
 To prove diff-equivalence, it can be interesting to prove that:
 $$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
 
@@ -421,77 +428,7 @@ there should be a probability of roughly $1 \over 4$ that this leaves
 the hash unchanged with $k'(i,j)$ but not with $k(i)$.
 \end{example}
 
-\section{Not up to date}
-
-\subsection{Refined diff-equivalence} \label{sec:refined-diff}
-
-The Basic-Hash protocol is unlinkable, wrt.\ Solène's definition.
-This has been verified in the symbolic model and we expect that it holds
-in the computational one too.
-
-Formally, modify \texttt{examples/basic-hash.mbc} to consider the
-following bi-process:
-$$(!_k R(j)) \mid (!_i !_j T(\diff{k(i)}{k'(i,j)}))$$
-
-On the left side, we have unboundedly many
-identities represented by keys $k(i)$, and each $k(i)$ is used for
-many sessions $j$.
-On the right, each identity $k'(i,j)$ is used for a single session.
-Note that we cannot simply write $k'(j)$ or $k(j)$, because then the
-same identity $k'(j)$ would appear in the different copies of the
-first $!_i$.
-On either sides, the tag uses a session nonce $n_T(i,j)$.
-
-On both sides we have unboundedly many sessions of the reader,
-with a conditional as follows ($x$ is the first input message):
-$$\mathsf{find} \ i,j \ \mathsf{suchthat} \ \pi_2(x) =
-h(\pi_1(x),\diff{k(i)}{k'(i,j)})$$
-
-To sum up, we have the following actions:
-\begin{itemize}
-  \item $T(i,j)$ where the tag sends
-    $\pair{n_T(i,j),h(n_T(i,j),\diff{k(i)}{k'(i,j)})}$;
-  \item $R(k,i,j)$ is the only action with a conditional,
-    where reader session $k$ accepts its first message,
-    having found out that it corresponds to identity $k(i)$ (if on
-    the left) or $k'(i,j)$ (on the right).
-\end{itemize}
-
-We cannot hope to have a synchronized execution of $R(k,i,j)$ on the
-left and right: index $j$ is unused on the left!
-However, we can hope to prove that, if $R(k,i,j)$ happens on the left,
-then $R(k,i,j')$ happens on the right for some $j'$: this intuitively
-follows from well-authentication.
-Note that this $j'$ is necessarily unique by definition of the semantics:
-the $\mathsf{tryfind}$ selects the first $j$ for which the condition holds.
-
-Conversely, it is only easier to prove that if $R(k,i,j)$ happens
-on the right, then it happens on the left, for any $j'$.
-
-Having this form of synchronization for the conditionals is intuitively
-enough to conclude the the two processes are indistinguishable,
-provided we have also verified that the produced frames are indistinguishable:
-indeed, for any observable trace, if the trace is executed on one side
-using a symbolic trace $\tr$, then it can be executed on the other side
-(modulo the changes of indices as above) to yield an indistinguishable
-frame. Of course, all this has to be done more carefully, taking into
-account probabilities, etc.
-
-\emph{TODO: Develop this idea into a refined notion of diff-equivalence
-which could be used to prove this kind of unlinkabilities. It would have
-a specific treatment of actions when it is detected that an index is unused
-on one side of the bi-process. We might adapt the verification conditions
-of the previous section as follows, for all symbolic traces $\tr$:}
-$$ \phi^L_\tr, \phi^R_\tr \vdash
-   \phi^L_\alpha \Leftrightarrow (\exists j.~ \phi^R_\alpha) $$
-$$ \phi^L_{\tr.\alpha}, \phi^R_{\tr.\alpha} \vdash
-   \mouts_{\tr.\alpha}^L \sim \mouts_{\tr.\alpha}^R $$
-\emph{In the first kind of condition, the existential is here to account
-for the possible change of some index. There is no change in the second
-kind of condition: there we only consider executions where the conditions
-have passed on both sides, restricting indices $j$.}
-
-\section{An example : a signed DDH key exchange}
+\section{Outdated example : a signed DDH key exchange}
 \charlie{abus de notations dans cette partie}
 
 We brieffly show how one can prove the security of a signed DDH key exchange. The protocol in pi-calculus is provided in Figure~\ref{fig:signed_ddh} and the run of an honnest execution in Figure~\ref{fig:dh_ke}. This example is a simplified instance of classical key-exchange security. Notably, we assume that identities are already fixed.
@@ -536,30 +473,30 @@ We brieffly show how one can prove the security of a signed DDH key exchange. Th
 \[
   \begin{array}{cc}
 \begin{array}[t]{l@{~}l}
-  A_i := & \myout{\mysign(g^{a_i},sk_A)} : \alpha_1; \\
-         &\myin{x}; \\
+  A_i := & \aout{\mysign(g^{a_i},sk_A)} : \alpha_1; \\
+         &\ain{x}; \\
          & \myif \mycsign(x,pk(sk_B)) \\
   & ~ \wedge \pi_1(\mygetmess(x))=g^{a_i}  \mythen \\
-         & \quad \myout{\mysign(\mygetmess(x),sk_A) } : \alpha_2; \\
+         & \quad \aout{\mysign(\mygetmess(x),sk_A) } : \alpha_2; \\
          & \quad \myfind j \mysuchthat g^{b_j} = \pi_2(\mygetmess(x)) \\
-           & \qquad \myout{\diff{\pi_2(\mygetmess(x))^{a_i}}{k_{i,j}}} : \alpha_3\\
+           & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{k_{i,j}}} : \alpha_3\\
          & \quad \myelse \\
-         & \qquad \myout{\diff{\pi_2(\mygetmess(x))^{a_i}}{\bot}}  : \alpha_4 \\
+         & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{\bot}}  : \alpha_4 \\
          & \myelse \\
            & \bot
 \end{array}
 &
 \begin{array}[t]{l@{~}l}
-  B_i := &\myin{x}; \\
+  B_i := &\ain{x}; \\
          & \myif \mycsign(x,pk(sk_A)) \mythen \\
-         & \quad \myout{\mysign(<\mygetmess(x), g^{b_i}>,sk_B)} : \beta_1; \\
-         & \quad \myin{y}; \\
+         & \quad \aout{\mysign(<\mygetmess(x), g^{b_i}>,sk_B)} : \beta_1; \\
+         & \quad \ain{y}; \\
          & \quad \myif \mycsign(y,pk(sk_A))\\
   & \quad ~ \wedge \mygetmess(y) = <\mygetmess(x), g^{b_i}> \mythen \\
          & \quad \quad \myfind j \mysuchthat g^{a_j} = \mygetmess(x) \\
-           & \quad \qquad \myout{\diff{\mygetmess(x)^{b_i}}{k_{j,i}}} : \beta_2 \\
+           & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{k_{j,i}}} : \beta_2 \\
          & \quad \quad \myelse \\
-         & \quad \qquad \myout{\diff{\mygetmess(x)^{b_i}}{\bot}} : \beta_3 \\
+         & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{\bot}} : \beta_3 \\
          & \quad \myelse \\
            & \quad \bot \\
          & \myelse \\

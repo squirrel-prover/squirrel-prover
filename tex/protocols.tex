@@ -1,163 +1,196 @@
 \section{Protocols}
 
-% Without entering into the details of the protocol semantics, we can already
-% restrict the set of meta-interpretations of interest, to justify some of the
-% rules that we use. We would alternatively impose these conditions from the
-% beginning in the definition of meta-interpretations.
-
-There exists a natural translation from applied pi-calculus to this notion of
-actions, reminescent of the translation inside Horn Clauses performed by
-Proverif, or the translation inside Multi Set Rewritting rules performed by
-Sapic (a Tamarin extension).
-
-\bigskip
-
-We  model a protocol as a set of possible actions available to the
+We shall model a protocol as a set of \emph{actions} available to the
 attacker. An action models a basic step of the protocol, where
 the attacker provides some input, some condition is checked, some
 state updates are performed, and finally an output is emitted.
+There exists a natural translation from the applied pi-calculus to this
+protocols as sets of actions, reminescent of Proverif's translation to Horn 
+Clauses or Tamarin's translation to multiset rewriting. However, we leave out 
+the details of this translation.
 
-In this section we assume a fixed set of action symbols $\Actions$,
-as well as a fixed set of channel names $\C$.
-We assume that macro symbols include $\minp$ and $\mout$,
-both of index arity zero.
-We also use \emph{state macros} to model memory cells
-(with index arity usually not equal to zero).
+In order to be able to define a protocol, we assume a set of function
+symbols $\F$, name symbols $\N$.
+Additionally, we will make use of channel names from some set $\C$,
+as well as index memory cell symbols from $\States$.
 
-\begin{definition}
-  \label{def:action}
-A \emph{symbolic action} $\alpha = \sfa(i_1,\dots,i_n)$, where $\sfa \in \Actions$ and $i_1,\dots,i_n \in \I$, is defined by:
-\begin{itemize}
-  \item a meta-logic formula $\phi_{\alpha}$ (intuitively, the condition of this action)
-  \item a meta-logic term $o_{\alpha}$ (intuitively, the output of this action)
-  \item some meta-logic terms $u_{\alpha}^{s[j_1,\ldots,j_k]}$ where $s$ is a
-  state macro symbol of arity $k$ (intuitively, updates performed by this action
-  on the memory cells $s[j_1,\ldots,j_k]$, assuming that all other memory cells
-  are not updated by the action)
-  \item two channel names $\cin_\alpha$ and $\cout_\alpha$ (intuitively, the channels used for the input and the output of this action)
-\end{itemize}
-where $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ must not contain any
-macro term and the only free variables that can occur in them are
-$x_\alpha$ (intuitively, the input of this action)
-and $x^{s[j_1,\ldots,j_k]}_\alpha$ where $s$ is a state macro symbol
-(intuitively, the value
-of the memory cell $s[j_1,\ldots,j_k]$ at the time of this action).
-We require that index variables $\{j_1,\ldots,j_k\}$ are a subset of $\{i_1,\dots,i_n\}$.
-
-\solene{The sequential dependency is defined only later (in the definition of a
-protocol) but we would like to allow as free variables also $x_\beta$ for every
-action $\beta$ that must happen before $\alpha$ in an execution.}
-% ???
-% Names appearing in $\phi_{\alpha}$ and $o_{\alpha}$ are of the form $\sfn(i_1,\dots,i_k)$ with $k \leq n$.
-\end{definition}
-
-\begin{definition}
-A \emph{concrete action} is an instanciation of a \emph{symbolic action} by giving integer values to index variables.
-\end{definition}
-
-\begin{definition}
-  \label{def:proto}
-  A \emph{protocol} is defined by:
+\begin{definition} \label{def:action} \label{def:proto}
+  A protocol is given by a finite set of action symbols $\Actions$.
+  A \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$
+  is the application of an action symbol $\sfa \in \Actions_k$
+  to the expected  number of indices.
+  We assume a partial order on symbolic actions,
+  noted $\beta \leq \alpha$ and expressing that $\alpha$ depends on $\beta$,
+  which should be compatible with substitution\footnote{
+    When $A$ and $A'$ are symbolic actions and $\theta : \I \to \I$
+    is a substitution of indices,
+    $A \leq A'$ implies $A\theta \leq A'\theta$.
+  }.
+  Finally, each action $\sfa \in \Actions_k$ must come with
+  a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$ and
+  the following elements describing its semantics:
   \begin{itemize}
-    \item a finite set of \emph{symbolic actions} with distinct action symbols,
-    \item a transitive \emph{sequential dependency} relation $\before$ on \emph{symbolic actions},
-    \item a \emph{conflict} relation $\conflict$ on \emph{symbolic actions},
-    \item \solene{TODO. initial value for states}
+    \item a meta-logic formula $\phi_{\alpha}$
+      (intuitively, the execution condition of this action);
+    \item a meta-logic term $o_{\alpha}$
+      (intuitively, the output of this action);
+    \item for each memory cell symbol $s \in \States$ of index arity $p$,
+      a meta-logic term $u_{\alpha}^{s[j_1,\ldots,j_p]}$
+      for some index variables $j_1,\ldots,j_p$
+      (intuitively, this term describes how the action updates the memory
+      cell, depending on the indices $\vec{i}$ and $\vec{j}$);
+    \item two channel names $\cin_\alpha$ and $\cout_\alpha$
+      (intuitively, the input and output channels of this action).
   \end{itemize}
-  Intuitively, $\sfa_1(i)\before\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i)$ must happen before $\sfa_2(n_i,n_j)$ in any execution
-  and $\sfa_1(i,j)\conflict\sfa_2(i,j)$ means that, for all $n_i,n_j \in \mathbb{N}$, $\sfa_1(n_i,n_j)$ and $\sfa_2(n_i,n_j)$ cannot both occur in any execution.
+  We require that
+  $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ do not contain any
+  timestamp term (and thus, no macro term) and require that
+  free variables occurring in these terms and formulas are
+  of one of the following forms:
+  \begin{itemize}
+    \item $x_{\sfa'(i_1,\ldots,i'_l)}$
+      with $\sfa'(i_1,\ldots,i'_l)\leq \alpha$ or
+    \item $x^{s[j_1,\ldots,j_p]}_\alpha$
+      for some $\sfa' \in \A_l$ and $s \in \States_p$.
+  \end{itemize}
+  Intuitively, actions do not have access to arbitrary data but can only
+  see the inputs of actions on which they depend
+  and the content of memory when they execute.
 \end{definition}
 
-In our tool, actions are compiled from an applied pi-calculus process.
-Sequential dependencies are induced by the syntactic sequences in that
-process, and conflicts are induced by conditionals.
+From now on we assume a fixed protocol.
+
+\begin{definition}
+  A \emph{concrete action} is an instantiation of a \emph{symbolic action}
+  with integer variables for index variables. The partial order on symbolic
+  actions is lifted naturally to a partial order on concrete actions, noted
+  in the same way.
+\end{definition}
 
 \begin{definition}
   \label{def:trace}
-  Given a protocol $P$ according to \Cref{def:proto}, an \emph{abstract trace}\footnote{Abstract in the sense that we do not know if the trace is executable.} is a sequence $\sfa_1(\vect {i_1}) \dots \sfa_n(\vect {i_n})$ made of concrete actions such that:
-  \begin{itemize}
-    \item for all $1 \leq i,j \leq n$, if $\sfa_i = \sfa_j$ then $\vect {i_i} \neq \vect {i_j}$;
-    \item for all $1 \leq i < j \leq n$, it is not the case that $\sfa_i(\vect {i_i}) \conflict \sfa_j(\vect {i_j})$;
-    \item for all $1 \leq i \leq n$, for all concrete action $\beta$ such that $\beta \before \sfa_i(\vect {i_i})$, there exists $1 \leq j < i$ such that $\beta = \sfa_j(\vect {i_j})$.
-  \end{itemize}
+  Given a protocol $P$ according to \Cref{def:proto},
+  an \emph{abstract trace}\footnote{
+    It is abstract in the sense that we do not know if the trace
+    is executable.} is a sequence of concrete actions
+  $\alpha_1 \dots \alpha_n$
+  in which no action occurs twice, and such that,
+  for all $1 \leq i \leq n$,
+  for all concrete actions $\beta$ such that $\beta \leq \alpha_i$,
+  there exists $1 \leq j \leq i$ such that $\beta = \alpha_j$.
 \end{definition}
 
-\paragraph{Bi-processes}
+\begin{remark}
+  The structure that we have assumed on actions is restrictive and
+  does not allow to model e.g.\ phases. It does not matter because we can
+  impose other conditions on traces later on as axioms (similar to the
+  restrictions of Tamarin).
+\end{remark}
 
-When reasoning on indistinguishability of a protocol, we may look at equivalences
-between two processes given as a bi-process, i.e. a system with a single set of
-symbolic actions, each symbolic action describing an execution step of both the
-left and right processes, using $\diff{\_}{\_}$ terms as usual.
+\begin{remark}
+  Our notion of protocol does not allow to specify a conflict relation
+  over actions. Such conflicts might be useful to specify e.g.\ that
+  actions corresponding to different branches of a conditional cannot
+  be present together in a trace. This is not limiting, since the
+  mutually exclusive conditions of such actions have the same effect.
+  Conflicts could in principle be useful to model the fact that there is only 
+  one way to enter the $\mathsf{in}$ branch of a $\mathsf{find}$. However,
+  our experience so far is that such details are not necessary to reason
+  over protocols.
+\end{remark}
 
-In that case, the definition of a symbolic action differs from \Cref{def:action}
-in the following way:
-\begin{itemize}
-  \item $\phi_{\alpha}$ is a meta-logic \emph{bi-formula}
-  \item $o_{\alpha}$ is a meta-logic \emph{bi-term}
-\end{itemize}
+\subsection{Bi-protocols}
 
-We define in \Cref{fig:bi-terms} how we extend the syntax in \Cref{fig:terms}
-to define meta-logic bi-terms.
-Bi-formulas are obtained from the syntax in \Cref{fig:formulas} by allowing
-atomic propositions over bi-terms.
+In order to model the indistinguishability of two protocols, we will
+consider pairs of processes given as a bi-process, i.e.\ a system with
+a single set of symbolic actions, but where each symbolic action describes
+an execution step of both the left and right processes,
+using $\diff{\_}{\_}$ terms as usual.
 
-\begin{figure}[h]
-  \[
-  \begin{array}{rclll}
-    tt  & := & t &\text{term} & \\
-        & \mid & \diff{t_1}{t_2} &\text{bi-term} & \\
-        & \mid & f[i_1,\ldots,i_k](tt_1,\dots,tt_n) &\text{function application over bi-terms} & (f\in\F_k)\\
-  \end{array}
-  \]
-  \caption{Syntax of meta-logic bi-terms}\label{fig:bi-terms}
-\end{figure}
+A bi-protocol is thus a protocol given over a set of function symbols
+$\F$ containing the binary symbol $\mathsf{diff}$,
+which will be interpreted in a particular way.
+We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right 
+projections of a bi-protocol, bi-term, etc. defined as usual.
+For example, $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$ will denote
+the left and right execution conditions of $\alpha$, and
+$(o_{\alpha})^L$ and $(o_{\alpha})^R$ will denote their respective
+output messages.
 
-We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right projections
-(defined as usual), for example: $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$,
-$(o_{\alpha})^L$ and $(o_{\alpha})^R$.
+\subsection{Examples}
 
+We give here a few representative examples of (bi)protocols.
+
+\begin{example}
+  The process $!_i 
+  \ain{c,x};\aout{c,h(x,\key[i])};\ain{c,y};\aout{c,h(x,\key[i])}$
+  is translated into a protocol with two action symbols $A$ and $B$,
+  a partial order generated by $A(j) \leq B(j)$, and the following
+  semantics:
+  \begin{itemize}
+    \item $\alpha := A(i)$ with
+      \begin{itemize}
+        \item $\phi_\alpha := \mathsf{true}$
+        \item $o_\alpha := h(x_\alpha,\key[i])$
+        \item $u_\alpha^{s[j_1,\ldots,j_p]} = x_\alpha^{s[j_1,\ldots,j_p]}$
+          for all $s\in\States_p$
+      \end{itemize}
+    \item $\beta := B(i)$ with
+      \begin{itemize}
+        \item $\phi_\beta := \mathsf{true}$
+        \item $o_\beta := h(x_\alpha,\key[i])$
+        \item $u_\beta^{s[j_1,\ldots,j_p]} = x_\beta^{s[j_1,\ldots,j_p]}$
+          for all $s\in\States_p$
+      \end{itemize}
+  \end{itemize}
+  In the next examples, we will not specify update terms 
+  $u_\alpha^{s[j_1,\ldots,j_p}$ when they are trivial, as is the case
+  here.
+\end{example}
 
 \begin{example}[Basic Hash]
   \label{ex:basic-hash-bi-process}
-  We introduce the bi-protocol $P_{BH}$ defined by:
-  \begin{itemize}
-    \item the set of symbolic actions $\{\T(i,j),\R_1(k),\R_2(k)\}$ where,
+  The bi-protocol $P_{BH}$ is defined by the symbolic actions
+  $\{\T(i,j),\R_1(k),\R_2(k)\}$, with a trivial dependency relation,
+  and the following semantics:
     \begin{itemize}
-      \item action $\alpha_1 := \T(i,j)$
+      \item action $\alpha_1 := \T(i,j)$ represents the only
+        action of an tag session $i,j$ with
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
           \item $o_{\alpha_1} := \langle n[i,j], \h(\diff{\key[i]}{\key'[i,j]},n[i,j] \rangle$
         \end{itemize}
-      \item action $\alpha_2 := \R_1(k)$
+      \item action $\alpha_2 := \R_1(k)$ represents the action
+        of the reader's session $k$ accepting a tag, with
         \begin{itemize}
           \item $\phi_{\alpha_2} := \exists i,j, \snd(x_{\alpha_2}) =
             \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_2} := \ok$
         \end{itemize}
-      \item action $\alpha_3 := \R_2(k)$
+      \item action $\alpha_3 := \R_2(k)$ represents the situation
+        where the reader does not accept its input, with
         \begin{itemize}
           \item $\phi_{\alpha_3} := \neg (\exists i,j, \snd(x_{\alpha_2}) =  \h(\diff{\key[i]}{\key'[i,j]},\fst(x_{\alpha_2}))$
           \item $o_{\alpha_3} := \error$
         \end{itemize}
     \end{itemize}
-    \item a conflict relation $\conflict$ such that $\R_1(k)\conflict\R_2(k)$.
-  \end{itemize}
-  It is obtained from the following bi-process:
-  $$\bigl(!_i !_j \myout{c,\langle  n[i,j]} \rangle\bigr) \mid
-   \bigl(!_k \myin{c,x}.~ \myif \exists i,j.~ \snd{x} = \ldots \mythen
-    out(c,\ok) \myelse out(c,\error)\bigr)$$
-  Some traces for this bi-process are:
+  Some abstract traces for this bi-protocol are:
   \begin{itemize}
-    \item $\T(1,1),\R_1(1)$
-    \item $\T(1,1).\R_1(1).\T(1,2).\R_1(2)$
-    \item $\T(1,1).\R_1(1).\T(2,1).\R_1(2)$
+    \item $\T(1,1),\R_1(3)$
+    \item $\T(1,1).\R_1(3).\T(1,2).\R_1(2)$
+    \item $\T(1,1).\R_1(3).\T(2,1).\R_1(2)$
   \end{itemize}
+  This protocol is actually obtained in our tool from the following
+  bi-process:
+  $$\bigl(!_i !_j \aout{c,\langle  n[i,j]} \rangle\bigr) \mid
+   \bigl(!_k \ain{c,x}.~ \myif \exists i,j.~ \snd(x) = \ldots \mythen
+    out(c,\ok) \myelse out(c,\error)\bigr)$$
 \end{example}
 
 \begin{example}
-  If in the previous example, if we change the reader part of the bi-process into
-  $$\myin{c,x}.~ \myfind i,j \mysuchthat \snd(x) = \ldots \mythen
-  \myout{c,\ok} \myelse \myout{c,\error}\bigr)$$
+  In the previous example, if we change the reader part of the bi-process into
+  $$\ain{c,x}.~ \myfind i,j \mysuchthat \snd(x) = \ldots \mythen
+  \aout{c,\ok} \myelse \aout{c,\error}$$
   then action $R_1(k)$ would be replaced by $\alpha_2 := R_1(k,i,j)$
   with:
   \begin{itemize}
@@ -166,70 +199,88 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$.
     \item $o_{\alpha_2} := \ok$
   \end{itemize}
   In protocols where the output message would depend on the indices $i,j$
-  that make the condition pass, we would also use $\myfind$ in the
+  bound by the $\mathsf{find}$ construct, we would also use $\myfind$ in the
   output message to retrieve these indices (more precisely, we would retrieve
   the first such indices).
 \end{example}
 
 \begin{example}[OSK]
   \label{ex:osk-bi-process}
-  We introduce the bi-protocol $P_{OSK}$ defined by:
+  In order to model a simple (and linkable) version of the OSK protocol,
+  we consider:
   \begin{itemize}
-    \item the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k)\}$ where,
+    \item Two hash functions modelled using unary function symbols 
+      $f$ and $g$ --- these should in principle be keyed, but that is
+      not relevant for the example.
+    \item Four memory cell symbols:
+      $s_R$ and $s'_R$ of respective index arities 1 and 2 for representing
+      an entry in the reader database in the multiple and single session 
+      scenarios;
+      $s_T$ and $s'_T$ of respective index arities 1 and 2 for representing
+      the tag's memory in multiple and single session scenarios.
+    \item Name symbols $k$ and $k'$ of respective index arities 1 and 2.
+  \end{itemize}
+  The bi-protocol $P_{OSK}$ is then defined by
+  the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k)\}$ where:
     \begin{itemize}
       \item action $\alpha_1 := \T(i,j)$
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
           \item $o_{\alpha_1} := \diff{g(x_{\alpha_1}^{s_T[i]})}{g(x_{\alpha_1}^{s'_T[i,j]})}$
-          \item $u_{\alpha_1}^{s_T[i]} := h(x_{\alpha_1}^{s_T[i]})$
-          \item $u_{\alpha_1}^{s'_T[i,j]} := h(x_{\alpha_1}^{s'_T[i,j]})$
+          \item $u_{\alpha_1}^{s_T[i']} :=
+              \myif i=i' \mythen h(x_{\alpha_1}^{s_T[i]})
+              \myelse x_{\alpha_1}^{s_T[i']}
+            \bigr)$
+          \item $u_{\alpha_1}^{s'_T[i',j']} :=
+              \myif \langle i,j \rangle = \langle i',j' \rangle
+              \mythen h(x_{\alpha_1}^{s'_T[i,j]})
+              \myelse x_{\alpha_1}^{s'_T[i',j']}$
         \end{itemize}
       \item action $\alpha_2 := \R_1(k,i,j)$
         \begin{itemize}
           \item $\phi_{\alpha_2} := x_{\alpha_2} = \diff{g(x_{\alpha_2}^{s_R[i]})}{g(x_{\alpha_2}^{s'_R[i,j]})}$
           \item $o_{\alpha_2} := \ok$
-          \item $u_{\alpha_2}^{s_R[i]} := h(x_{\alpha_2}^{s_R[i]})$
-          \item $u_{\alpha_2}^{s'_R[i,j]} := h(x_{\alpha_2}^{s'_R[i,j]})$
+          \item $u_{\alpha_2}^{s_R[i']} :=
+            \myif i=i' \mythen
+            h(x_{\alpha_2}^{s_R[i]})
+            \myelse x_{\alpha_2}^{s_R[i']}$
+          \item $u_{\alpha_2}^{s'_R[i',j']} :=
+            \myif\langle i,j\rangle=\langle i',j'\rangle \mythen
+            h(x_{\alpha_2}^{s'_R[i,j]})
+            \myelse x_{\alpha_2}^{s'_R[i',j']}$
         \end{itemize}
       \item action $\alpha_3 := \R_2(k)$
         \begin{itemize}
-          \item $\phi_{\alpha_3} := \forall i,j, x_{\alpha_3} \neq \diff{g(x_{\alpha_3}^{s_R[i]})}{g(x_{\alpha_3}^{s_R[i]})}$
+          \item $\phi_{\alpha_3} :=
+            \forall i,j.~
+            x_{\alpha_3} \neq
+            \diff{g(x_{\alpha_3}^{s_R[i]})}{g(x_{\alpha_3}^{s_R[i]})}$
           \item $o_{\alpha_3} := \error$
         \end{itemize}
     \end{itemize}
-    \item a conflict relation $\conflict$ such that $\R_1(k,i,j)\conflict\R_2(k)$
-    \item \solene{TODO. initial values are $k[i]$ or $k'[i,j]$}
-  \end{itemize}
-  It is obtained from the following bi-process:
+    The initial values of $s_T[i]$ and $s_R[i]$ are $k[i]$ for
+    some indexed name symbol $k$; the initial values of
+    $s'_T[i,j]$ and $s'_R[i,j]$ are $k'[i,j]$ for some
+    indexed name symbol $k'$.
+
+    Note that this semantics means that the left process updates not only
+    the values of $s_T[i]$ and $s_R[i]$ but also those of
+    $s'_T[i,j]$ and $s'_R[i,j]$, which are unusued in its tests and outputs.
+    This imprecision does not have an impact on security properties,
+    or indistinguishability.
+    It would be possible to write more precise updates using $\mathsf{diff}$
+    operators, as would be the case in the protocol resulting from the actual
+    translation of the following bi-process:
   \[
   \begin{array}{lll}
-  & \bigl(!_i !_j & \myout{c,\diff{g(s_T[i])}{g(s_{T'}[i,j])}}. \\
+  & !_i !_j & \aout{c,\diff{g(s_T[i])}{g(s_{T'}[i,j])}}. \\
   && \diff{s_T[i] := h(s_T[i])}{s_{T'}[i,j] := h(s_{T'}[i,j])} \\
-  & \bigr) & \\
-  \mid & \\
-  & \bigl(!_k & \myin{c,x}. \\
+  \mid
+  & !_k & \ain{c,x}. \\
   && \myfind i,j \mysuchthat x = \diff{g(s_R[i])}{g(s_{R'}[i,j])} \\
-  && \mythen \diff{s_R[i] := h(s_R[i])}{s_{R'}[i,j] := h(s_{R'}[i,j])} .~\myout{c,\ok} \\
-  && \myelse \myout{c,\error} \\
-  & \bigr) & \\
+  && \mythen \diff{s_R[i] := h(s_R[i])}{s_{R'}[i,j] := h(s_{R'}[i,j])} .~\aout{c,\ok} \\
+  && \myelse \aout{c,\error} \\
+  &  & \\
   \end{array}
   \]
 \end{example}
-
-\bigskip
-\noindent
-\begin{remark}
-  We could get rid of the conflict relationship and still be able to
-  model conditionals: we would have more symbolic traces but, when conditions
-  are taken into account, the incompatible conditions of actions corresponding
-  to different branches of a conditional would allow to discard
-  the unwanted branches. For that reason, we should not need a tactic
-  relying on the conflict relationship in the prover.
-\end{remark}
-
-\begin{remark}
-  The structure that we have assumed on actions is restrictive and
-  does not allow to model e.g. phases. It does not matter because we can
-  impose other conditions on traces later on as axioms (similar to the
-  restrictions of Tamarin).
-\end{remark}
