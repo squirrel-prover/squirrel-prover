@@ -161,6 +161,7 @@ let to_term a =
   let indices = indices a in
   Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
 
+
 let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action
  =
   let l',a = of_symbol s in
@@ -169,16 +170,14 @@ let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action
 
 let rec dummy_action k =
   if k = 0 then [] else
-    { par_choice = 0,[] ; sum_choice = 0,[] }
-    :: dummy_action (k-1)
-
-let dummy_action k =
-  let a = dummy_action k in
-  let s = get_shape a in
-  let data = Data ([],a) in
-    if not (Hashtbl.mem shape_to_symb (get_shape a)) then
-      Hashtbl.add shape_to_symb s
-        (Symbols.Action.declare "_Dummy" ~data 0) ;
+    let a = { par_choice = 0,[] ; sum_choice = 0,[] }
+            :: dummy_action (k-1)
+    in
+    let s = get_shape a in
+    let data = Data ([],a) in
+    if not (Hashtbl.mem shape_to_symb s) then
+       Hashtbl.add shape_to_symb s
+         (Symbols.Action.declare "_Dummy" ~data 0);
     a
 
 let pp_action ppf a = Term.pp ppf (to_term a)
