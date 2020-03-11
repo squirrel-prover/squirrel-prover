@@ -77,6 +77,15 @@ let get_var (e1,_) name =
     M.find name e1
   with Not_found -> raise Undefined_Variable
 
+let of_list l =
+  let rec aux (e1, e2) (l : evar list) =
+    match l with
+    | [] -> (e1, e2)
+    | (EVar v)::q -> aux (M.add (name v) (EVar v) e1,
+                          M.add v.name_prefix v.name_suffix e2) q
+  in
+  aux empty_env l
+
 let rm_var (e1,e2) v =
    let name_suffix =
     try

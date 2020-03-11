@@ -45,6 +45,8 @@ val empty_env : env
 
 val to_list : env -> evar list
 
+val of_list : evar list -> env
+
 val mem : env -> string -> bool
 
 exception Undefined_Variable

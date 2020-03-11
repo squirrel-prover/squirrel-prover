@@ -385,6 +385,8 @@ let get_set_vars : 'a term -> S.t =
 let get_vars t = get_set_vars t |> S.elements
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
+  (* given a variable list and a subst s, remove from subst all
+     substitution x->v where x is in the variable list. *)
   let filter_subst (vars:Vars.evar list) (s:subst) =
     List.fold_left (fun acc (ESubst (x, y)) ->
         if S.is_empty (S.inter
@@ -395,6 +397,31 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
         else
           acc)
       [] s
+  in
+  (* given a list of variables vars, a substitution s, and a formula f, if some
+     var in vars appears in the right hand side of the variables s, we refresh
+     the variable and refresh the formula with the new variables. *)
+  let refresh_formula vars s f =
+    let right_vars = List.fold_left
+        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars y))  S.empty s
+    in
+    let all_vars = List.fold_left
+        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars x))  right_vars s
+    in
+    let env = Vars.of_list (S.elements all_vars) in
+    let v, f = List.fold_left
+     (fun  (nvars,f) (Vars.EVar v) ->
+            if S.mem (Vars.EVar v) right_vars then
+              let new_v = snd (Vars.make_fresh_from env v) in
+              ((Vars.EVar new_v)::nvars, subst [ESubst (Var v,Var new_v)] f)
+            else
+              ((Vars.EVar v)::nvars,f)
+     )
+
+      ([],f)
+      vars
+    in
+    List.rev v, f
   in
   let new_term : a term =
     match t with
@@ -422,17 +449,28 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Impl (a, b) -> Impl (subst s a, subst s b)
     | True -> True
     | False -> False
-    (** Warning - TODO - the substititution is currently propagated without any
-       check. Cf #71. *)
     | ForAll (a, b) ->
-      let s = filter_subst a s in
-      ForAll (a, subst s b)
+      let filtered_s = filter_subst a s in
+      let new_a, new_b = refresh_formula a filtered_s b in
+      ForAll (new_a, subst filtered_s new_b)
     | Exists (a, b) ->
-      let s = filter_subst a s in
-      Exists (a, subst s b)
+      let filtered_s = filter_subst a s in
+      let new_a, new_b = refresh_formula a filtered_s b in
+      Exists (new_a, subst filtered_s new_b)
     | Find (a, b, c, d) ->
-      let s = filter_subst (List.map (fun x -> Vars.EVar x) a) s in
-      Find (a, subst s b, subst s c, subst s d)
+      let ea = List.map (fun x -> Vars.EVar x) a in
+      let filtered_s = filter_subst ea s in
+      let new_ea, new_b = refresh_formula ea filtered_s b in
+      let new_ea, new_c = refresh_formula ea filtered_s c in
+      let new_ea, new_d = refresh_formula ea filtered_s d in
+      let final_a = List.map (fun (Vars.EVar x) ->
+          match Vars.sort x  with
+          | Sorts.Index -> (x :> Vars.index)
+          | _ -> assert false
+        )
+         new_ea in
+      Find (final_a, subst filtered_s new_b, subst filtered_s new_c,
+            subst filtered_s new_d)
   in
   assoc s new_term
 

@@ -626,7 +626,7 @@ let is_hash s =
 (** Apply a partial substitution to a term.
   * This is meant for formulas and local terms in processes,
   * and does not support optional timestamps.
-  * TODO substitution does not avoid capture cf. #71 *)
+  * TODO substitution does not avoid capture. *)
 let subst t s =
   let rec aux = function
     | Var x ->
