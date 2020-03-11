@@ -5,11 +5,6 @@ give a meaning to indices and timestamps. More generally, a trace model
 also allows to translate any meta-logic formula $\phi$
 (over some meta-logic signature $\Sigma$)
 to a base logic $\phi^I$ (over some base logic signature $\Sigma^I$).
-For example, if
-$\Sigma$ contains a name $\mathsf{n}$ with index arity $1$, and
-the meta-interpretation interprets indices in a domain
-$D_\I = \{ 17, 22 \}$, the base logic signature will feature
-two names $\mathsf{n}_{17}$ and $\mathsf{n}_{22}$.
 
 \david{I like Adrien's suggestion to rename meta-interpretations to trace
 model, but I'm lazy to rename all meta-interpretations $I$ to $T$. Also,
@@ -33,22 +28,39 @@ where $\M = \{ \minp, \mout, \mframe \} \cup \States$.
        and $e_1,\ldots,e_k \in D$;
     \item a function symbol $f_{e_1,\ldots,e_k}$ of arity $n$ for every
       $f \in \F_k^n$ and $e_1,\ldots,e_k \in D$;
-    \item a function $g_n$ of arity $n$ for every $n\in\mathbb{N}$.
+    \item a function $g_n$ of arity $n$ for every $n\in\mathbb{N}$;
+    \item a binary function symbol $\mathsf{pair}$;
+    \item binary function symbols
+      $\stackrel{.}{\wedge}$, $\stackrel{.}{\vee}$ and
+      $\stackrel{.}{\Rightarrow}$;
+    \item a ternary function symbol $\mathsf{if}$;
+    \item nullary function symbols $\mathsf{true}$ and $\mathsf{false}$.
   \end{itemize}
-  The latter kind of function symbol will be used, as usual in the BC 
+  Function symbol $g_n$ will be used, as usual in the BC 
   approach, to model attacker computations.
+  We will use the usual notations for boolean symbols and pairs,
+  and we will use the notation $\myif c \mythen t \myelse e$
+  for $\mathsf{if}(c,t,e)$ as for meta-logic terms.
 \end{definition}
 
-Note that, for each name $\mathsf{n}\in \N$ and indices $n_1,\ldots,n_k \in
-D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^{I_\tr}$.
-\adrien{The same is true for function symbols. The thing to remark here is that in a BC computational model, different names will always be interpreted by i.i.d.\ uniform random samplings. This is not true for function symbols ($\ne$ function symbols may have the same interpretation).}
+For example, if $f \in \F_1$ (resp. $k \in \N_1$) and we have two distinct
+integers $n$ and $m$ in $D$, then $f_n$ and $f_m$ (resp. $k_n$ and $k_m$)
+are distinct function (resp. name) symbols in $\Sigma^D$.
+A computational model may give the same interpretation for $f_n$ and $f_m$
+but $k_n$ and $k_m$ will necessarily be mapped to two independent uniform
+samplings.
+
+\subsection{Meta-interpretations}
+
+We define the structure which will allow us to interpret meta-logic
+terms and formulas.
 
 \begin{definition}
-  A meta-interpretation (relative to $P$) is given by:
+  A meta-interpretation is given by:
   \begin{itemize}
     \item a finite index domain $\D_\I \subseteq \mathbb{N}$;
     \item a total ordering $\leq_\XT$ on
-      $\D_\XT = \{ \tinit \} \uplus \{ a(\ov{n}) : a\in\Actions_k,
+      $\D_\XT := \{ \tinit \} \uplus \{ a(\ov{n}) : a\in\Actions_k,
       \ov{n}\in\D_\I^k \}$ which refines the dependency ordering
       $\leq$ on concrete actions and such that $\tinit$ is minimal;
     \item mappings $\sigma_\I : \I \to D_\I$
@@ -57,53 +69,200 @@ D_\I$, $\mathsf{n}_{n_1,\ldots,n_k}$ refers to a distinct name in $\N^{I_\tr}$.
   \end{itemize}
 \end{definition}
 
+The total ordering $\leq_\XT$ yields a predecessor function
+$\mathsf{pred}_\XT : \D_\XT\to\D_\XT$ which,
+by convention, maps $\tinit$ to itself,
+and all other elements $v \in \D_\XT$ to the largest $v' \in \D_\XT$ such that
+$v' < v$.
+
+When $I$ is a meta-interpretation and $e$ is an element of its index domain,
+$I\{i\mapsto e\}$ is the meta-interpretation identical to $I$ except for
+$\sigma_\I$ which is updated to map $i$ to $e$. We similarly define
+$I\{\tau\mapsto v\}$ when $v$ is an element of the timestamp domain of $I$.
+
+\subsection{Interpretation of terms and formulas}
+
 \newcommand{\interp}[1]{(#1)}
 
-Given a meta-interpretation $I$ of domains $D_\I$ and $D_\XT$
-we define the interpretation of index and timestamp terms as
-follows:
-\begin{itemize}
-  \item $\interp{i}^I = \sigma_\I(i)$ and $\interp{\tau}^I = \sigma_\XT(\tau)$;
-  \item $\interp{\tinit}^I = \tinit$ and
-    $\interp{\sfa(i_1,\ldots,i_k)}^I =
-     \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_n))$
-    for all $\sfa\in\Actions_k$ and $e_1,\ldots,e_k\in D_\I$;
-  \item $\interp{\tpred{T}}^I$ is the predecessor of $\interp{T}^I$
-    according to ${\leq}_\XT$, or $\tinit$ if $\interp{T}^I = \tinit$.
-\end{itemize}
+We define next the interpretation of terms and formulas when they are
+macro-free, i.e.\ when terms contain no occurrence of $m[\vec{i}]@T$
+and formulas contain no occurrence of $m@T$. This will be used to
+define the interpretation of macros and, finally, of all terms
+and formulas.
 
-We can then define, for each macro symbol $m\in\M_k$,
-its interpretation $m^I : D_\I^k \times D_\XT \to T_\Sigma^{D_I}$.
-More precisely we define $m^I(e_1,\ldots,e_k,t)$ by induction on $t$,
-as follows. Let $(\alpha'_i)_i$ be the enumeration of the elements
-of $D_\XT$ wrt $\leq$ (in particular, $\alpha'_0 = \tinit$), and let
-$\alpha_i$ be a symbolic action of which $\alpha'_i$ is an instance:
-\begin{itemize}
-  \item $\mout^I(\tinit) = \min^I(\tinit) = \mframe^I(\tinit) = 0$;
-  \item $s(e_1,\ldots,e_k,\tinit) = 0$ for all $s \in \States_k$ and
-    $e_1,\ldots,e_k \in D_\I$;
-  \item we then set, for timestamps other than $\tinit$,
-    $$
-    \minp^I(\alpha'_{i+1}) =
-    g_{i}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_i))
-    $$
-    $$s^I(f_1,\ldots,f_p,\alpha'_{i+1}) =
+\begin{definition}
+  The interpretation of macro-free terms and formulas of the meta-logic in 
+  some meta-interpretation $I$, noted $\interp{t}^I$ and $\interp{\phi}^I$ 
+  respectively, is given by the clauses of \cref{fig:interpt,fig:interpf}.
+  In the interpretation of a term built using the $\mathsf{find}$
+  construct, the $\vec{e}_1, \ldots, \vec{e}_{k^{|\D_\I|}}$ are a complete
+  enumeration of all vectors of $\D_\I^k$, in lexicographic order.
+\end{definition}
+
+\begin{figure}[t]
+  \begin{eqnarray*}
+    % Indices
+    \interp{i}^I &=& \sigma_\I(i)
+    \\
+    % Timestamps
+    \interp{\tau}^I &=& \sigma_\XT(\tau) \\
+    \interp{\tinit}^I &=& \tinit \\
+    \interp{\sfa(i_1,\ldots,i_k)}^I &=&
+      \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_n))
+      \text{ for all }
+      \sfa\in\Actions_k \text{ and } e_1,\ldots,e_k\in D_\I \\
+    \interp{\tpred{T}}^I &=&
+      \mathsf{pred}_\XT(\interp{T}^I)
+    \\
+    % Messages
+    (\mathsf{n}[i_1,\ldots,i_k])^I &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
+    \\
+    (x)^{I} &=& x
+    \\
+    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I} &=&
+    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
+      (t_1)^{I},\ldots,(t_n)^{I}
+    \bigr)
+    \\
+    \interp{\myif \phi \mythen t \myelse t'}^I &=&
+    \myif \interp{\phi}^I \mythen \interp{t}^I \myelse \interp{t'}^I
+    \\
+    \interp{\myfind \vec{i} \mysuchthat \phi \myin t \myelse t'}^I &=&
+    \myif \interp{\phi}^{I\{\vec{i}\mapsto\vec{e}_1\}}
+    \mythen \interp{t}^{I\{\vec{i}\mapsto\vec{e}_1\}}
+    \myelse \\ & &
+    \myif \interp{\phi}^{I\{\vec{i}\mapsto\vec{e}_2\}}
+    \mythen \interp{t}^{I\{\vec{i}\mapsto\vec{e}_2\}}
+    \myelse \\ & & \ldots \\ & &
+    \myif \interp{\phi}^{I\{\vec{i}\mapsto\vec{e}_{k^{|\D_\I|}}\}}
+    \mythen \interp{t}^{I\{\vec{i}\mapsto\vec{e}_{k^{|\D_\I|}}\}}
+    \myelse \interp{t'}^I
+%     \\
+%     (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I} &=&
+%     \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
+%       (t_1)^{I},\ldots,(t_n)^{I},
+%       (T)^{I})
+  \end{eqnarray*}
+  \caption{Interpretation of macro-free terms of the meta-logic}
+  \label{fig:interpt}
+\end{figure}
+
+\begin{figure}
+  \begin{eqnarray*}
+    (\phi\wedge\phi')^{I} &=& (\phi)^{I} \stackrel{.}{\wedge} (\phi')^{I}
+    \quad \text{and similarly for other boolean connectives} \\
+    (\forall i:\idx.~ \phi)^{I} &=&
+    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
+    (\exists i:\idx.~ \phi)^{I} &=&
+    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
+    (\forall \tau:\timestamp.~ \phi)^{I} &=&
+    \stackrel{.}{\wedge}_{v\in D_\XT} (\phi)^{I[\tau\mapsto v]} \\
+    (\exists \tau:\timestamp.~ \phi)^{I} &=&
+    \stackrel{.}{\vee}_{v\in D_\XT} (\phi)^{I[\tau\mapsto v]} \\
+    (i=i')^{I} &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right. \\
+    (T = T')^{I} &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } (T)^{I} = (T')^{I} \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right.
+    \quad\text{ and similarly for $\leq$} \\
+    (t=t')^{I} &=& (t)^{I} \stackrel{.}{=} (t')^{I}
+  \end{eqnarray*}
+  \caption{Interpretation of macro-free formulas of the meta-logic}
+  \label{fig:interpf}
+\end{figure}
+
+\begin{example}
+  The formula
+  $\exists i:\idx.~ \tau = \sfa(i)$
+  is translated to the disjunction of base logic terms
+  $\interp{\tau = \sfa(i)}^{I\{i\mapsto e\}}$ for all $e \in \D_\I$.
+  Each disjunct is either $\mathsf{true}$ or $\mathsf{false}$ depending on
+  whether $\sigma_\XT(\tau)$ and $\sfa(e)$ are equal.
+\end{example}
+
+\subsection{Macros}
+
+Let $(\alpha'_i)_{0 \leq i < |\D_\XT|}$ be the enumeration of the elements
+of $D_\XT$ wrt $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
+For each $k$, let $\alpha_k$ be the representative symbolic action
+such that $\alpha'_k = \alpha_k\{\vec{i}_k\mapsto\vec{e}_k\}$.
+
+We define a function $\mcond^I$ from $\D_\XT$
+to base logic formulas, as follows:
+\begin{eqnarray*}
+  \mcond^I(\tinit) &=& \true \\
+  \mcond^I(\alpha'_{k+1}) &=&
+    \interp{\phi_{\alpha_{k+1}}}^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
+\end{eqnarray*}
+In other words, $\mcond^I(\alpha'_{k+1})$ is obtained by taking the
+(macro-free) condition $\phi_{\alpha_{k+1}}$ of the symbolic action, and 
+interpreting it using $I$, mapping indices $\vec{i}_{k+1}$ to their
+desired concretization.
+The semantics $\mexec^I$ of the executability macro is then simply defined as 
+the conjunction of consecutive conditions:
+\begin{eqnarray*}
+  \mexec^I(\tinit) &=& \true \\
+  \mexec^I(\alpha'_{k+1}) &=&
+    \mcond^I(\alpha'_{k+1})
+    \stackrel{.}{\wedge}
+    \mexec^I(\alpha'_k)
+\end{eqnarray*}
+
+We then define, for each macro symbol $m\in\M_k$,
+its interpretation $m^I : D_\I^k \times \D_\XT \to T_\Sigma^{D_I}$.
+More precisely, we define $m^I(\ldots,v)$ by induction on its timestamp 
+argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
+$$
+    \minp^I(\tinit) = \mframe^I(\tinit) = s^I(\vec{f},\tinit)
+    = \mout^I(\tinit) = 0
+$$
+$$\begin{array}{rll}
+    \minp^I(\alpha'_{k+1}) &=&
+    g_{k}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_k))
+  \\
+    \mframe^I(\alpha'_{k+1}) &=&
+    \langle \mframe^I(\alpha'_k),
+    \myif \mexec^I(\alpha'_{k+1}) \mythen \mout^I(\alpha'_{k+1}) \myelse 0
+    \rangle
+  \\
+    s^I(\vec{f},\alpha'_{k+1}) &=&
     \interp{
-      u_{\alpha_{i}}^{s}
-    }^{I\{\vec{i}\mapsto\vec{e},\vec{j}\mapsto\vec{f}\}}
-    $$
-    $$
-    \mout^I(\alpha'_i) =
+      u_{\alpha_{k}}^{s[\vec{j}]}
+    }^{
+      I\{\vec{i}_k\mapsto\vec{e}_k,\vec{j}\mapsto\vec{f}\}}
+  \\
+    \mout^I(\alpha'_{k+1}) &=&
       \interp{
         o_{\alpha_i}
-        \{x_{\beta_j}\mapsto\mout@\alpha_j\}_{j\leq i}
-        \{x_{\alpha_i}^{s[j_1,\ldots,j_p]}\mapsto 
-          s[j_1,\ldots,j_p]@\alpha_i\}_s
+        \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_k}
+        \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto 
+          s[\vec{j}]@\alpha_{k+1}\}_s
         }^{I\{\vec{i}\mapsto\vec{e}\}}
-    $$
-    The interpretation of input macros is the simplest:
-    it uses an arbitrary function $g_i$ to model the attacker's
-    computation based on previous outputs.
+\end{array}$$
+
+The interpretation of input macros is the simplest:
+it uses function symbols $g_i$ to model the arbitrary attacker's
+computation based on previous outputs.
+Frames are defined as nested pairs, starting from $0$ and
+providing, for each action, the output of the action if it is executable,
+and $0$ otherwise.
+
+The definition of $s^I(\vec{f},\alpha'_{k+1})$ gives the content of memory
+cell $s[\vec{f}]$ just before the execution of $\alpha'_{k+1}$:
+it is obtained by interpreting the update term $u_{\alpha_k}^{s[\vec{j}]}$
+of the associated symbolic action $\alpha_{k+1}$ mapping $\vec{i}$
+and $\vec{j}$ to their expected concretizations.
+The semantics of outputs is defined similarly, using a term-level
+substitution for the message variables $x_\beta$ and 
+$x_{\alpha_k}^{s[\vec{j}]}$.
+
+
+
     For the other macros, the interpretation at some concrete
     action $\alpha'_i$ is obtained from the symbolic semantics of
     $\alpha_i$ by applying the relevant substitutions (directly
@@ -112,106 +271,46 @@ $\alpha_i$ be a symbolic action of which $\alpha'_i$ is an instance:
       such as e.g.\ $b(i,j) \leq a(i)$ where the dependency introduces
       a new index.}
     }, otherwise by updating the meta-interpretation).
-  \end{itemize}
-  \david{All this requires to interpret terms, and thus formulas: everything 
-  has to be done simultaneously!}
 
-\begin{definition}
-  We define $(T)^{I_\tr} \in D_\XT$ and $(t)^{I_\tr} \in \Msg^{I_\tr}_\Sigma$ as follows:
-  \begin{eqnarray*}
-    (\mathsf{n}[i_1,\ldots,i_k])^{I_\tr} &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
-    \\
-    (x)^{I_\tr} &=& x
-    \\
-    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^{I_\tr} &=&
-    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
-      (t_1)^{I_\tr},\ldots,(t_n)^{I_\tr}
-    \bigr)
-    \\
-    (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^{I_\tr} &=&
-    \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
-      (t_1)^{I_\tr},\ldots,(t_n)^{I_\tr},
-      (T)^{I_\tr})
-  \end{eqnarray*}
-\end{definition}
+\david{
+  I have defined $s@T$ to be the content of memory cell $s$
+  just before the execution of $T$, and not after it.
+  This will have to be fixed one way or another.
+}
 
-\begin{example}
-  Consider the meta-logic term $t := \mathsf{h}(\mout@a[i],\mathsf{k}[i])$
-  and an interpretation $I_\tr$ with $D_\XT = [1;10]$ and $D_\I = [1;3]$
-  (which might be relevant if we are considering traces of ten actions
-  with three agents) such that $\sigma_\I(i)=2$ and $\hat{a}(2)=10$
-  and $\hat{\mout}(10)=\mathsf{ok}$ (the message outputted at step 10
-  is $\mathsf{ok}$ \adrien{I don't like this. It seems that macro can be interperted as the term we want at any timestamp.}).
-  We then have $(t)^{I_\tr} = \mathsf{h}(\mathsf{ok},\mathsf{k}_2)$.
-\end{example}
+\subsection{Validity and logical consequence}
 
-The reason why macros take only one timestamp argument is purely practical:
-we have no use for more. At this point one might wonder why we separate
-indices and actions given that they are interpreted similarly: it is again
-purely practical, we will use them for different purposes, and we will need
-less structure on indices than on actions, making reasoning easier on them
-(one can simply compare indices, there is no ordering and no predecessor
-operation on them).
-
-
-\begin{definition}
-  If $I_\tr$ is a meta-interpretation and $e\in D_\I$,
-  $I_\tr[i\mapsto e]$ is the interpretation where $\sigma_\I$ is
-  modified so that $\sigma_{\I}(i)=e$.
-  We define the translation of a meta-logic formula $\phi$
-  into the base logic \emph{term} $(\phi)^{I_\tr}$
-  as follows:
-  \begin{eqnarray*}
-    (\phi\wedge\phi')^{I_\tr} &=& (\phi)^{I_\tr} \stackrel{.}{\wedge} (\phi')^{I_\tr}
-    \quad \text{and similarly for other boolean connectives} \\
-    (\forall i:\idx. \phi)^{I_\tr} &=&
-    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
-    (\forall \tau:\timestamp. \phi)^{I_\tr} &=&
-    \stackrel{.}{\wedge}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
-    (\exists i:\idx. \phi)^{I_\tr} &=&
-    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{I[i\mapsto e]} \\
-    (\exists \tau:\timestamp. \phi)^{I_\tr} &=&
-    \stackrel{.}{\vee}_{e\in D_\XT} (\phi)^{I[\tau\mapsto e]} \\
-    (i=i')^{I_\tr} &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right. \\
-    (T = T')^{I_\tr} &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } (T)^{I_\tr} = (T')^{I_\tr} \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right.
-    \quad\text{ and similarly for $\leq$} \\
-    (\happens(T))^{I_\tr} &=& \mathsf{true}
-    \text{ if } (T)^{I_\tr} \in H_\XT
-    \text{ and } \mathsf{false} \text{ otherwise}
-    \\
-    (t=t')^{I_\tr} &=& (t)^{I_\tr} \stackrel{.}{=} (t')^{I_\tr}
-  \end{eqnarray*}
-\end{definition}
+We have defined a translation from any meta-logic formula $\phi$
+to a base logic boolean term $\interp{\phi}^I$. Intuitively, the
+meta-logic formula is true when the associated term is true with
+overwhelming probability. This is made formal in the following
+definitions.
 
 \begin{definition}
   A formula $\phi$ of the meta-logic is said to be valid when,
-  for any meta-interpretation $I_\tr$, the base logic formula
-  $(\phi)^{I_\tr} \sim \mathsf{true}$ is valid.
+  for any meta-interpretation $I$, the base logic formula
+  $(\phi)^{I} \sim \true$ is valid.
 
-  In other words, we have $\M,\sigma\models(\phi)^I\sim\mathsf{true}$
-  i.e. the boolean term $(\phi)^{I_\tr}$ is true with overwhelming
-  probability in any computational model $\M$ and for any interpretation
-  $\sigma$ of the free message variables.\footnote{
+  More generally, a meta-logic formula $\phi$ is a
+  logical consequence of a set $S$ of base logic formulas
+  (which might themselves be of the form $\interp{\psi}^I \sim \true$)
+  when, for all $I$, $\M$ and $\sigma$ such that
+  $\M,\sigma \models \psi$ for all $\psi\in S$,
+  we have
+  $\M,\sigma \models(\phi)^{I}\sim\mathsf{true}$.
+\end{definition}
+
+\begin{remark}
   In the tool, we only allow universal quantification over messages, and
   only allow it at toplevel. The validity of such formulas is the same as
-  when the variables are left free.}
-\end{definition}
+  when the variables are left free.
+\end{remark}
 
-
-\begin{definition}
-  A meta-logic formula $\phi$ is a
-  logical consequence of a set $S$ of meta-logic formulas
-  (noted $S \models \phi$)
-  when
-  $\M\models(\phi)^{I_\tr}\sim\mathsf{true}$ holds for any $\M$ and ${I_\tr}$ such that
-  $\M\models(\psi)^{I_\tr}\sim\mathsf{true}$ holds for all $\psi\in S$.
-  \adrien{This definition seems not necessary. We interpret meta-formula as (schemas of) first-order formulas. Hence entailment is exactly first-order logic entailment.}
-\end{definition}
+In practice, we want to verify that a security property expressed as a
+meta-logic formula $\phi$ is satisfied in a class of meta-interpretations
+$I$ and computational models $\M$: we will typically restrict computational
+models so that cryptographic primitives satisfy some security assumption,
+but we may also restrict meta-interpretations e.g.\ to force a condition on
+abstract traces. In order to verify security in such a class of models,
+we will identify axioms that hold in these models, and verify that our
+security property is a logical consequence of these axioms.
