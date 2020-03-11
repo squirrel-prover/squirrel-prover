@@ -286,7 +286,7 @@ let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
   Hashtbl.create 97
 
 let reset () =
-  Hashtbl.clear action_to_descr; Hashtbl.clear systems
+  Hashtbl.clear action_to_descr; Hashtbl.clear systems; Hashtbl.clear shape_to_symb
 
 let make_trace_system (bs:base_system) =
  { projection = Term.Left;
@@ -302,7 +302,17 @@ let register system_name symb indices action descr =
   let s = get_shape action in
   Hashtbl.add action_to_descr (s,system_name) descr ;
   Hashtbl.add systems system_name s;
-  define_symbol symb indices action
+  match to_term action with
+  | Term.Action (s, is) -> if indices <> is then
+      failwith "Cannot register a shape twice with distinct indexes."
+    else
+      ()
+  | _ -> define_symbol symb indices action
+  | exception Not_found -> define_symbol symb indices action
+
+
+
+
 
 let make_bi_descr d1 d2 =
   if d1.input <> d2.input || d1.indices <> d2.indices then
@@ -361,7 +371,6 @@ let get_descr system a =
 
 
 let iter_descrs system f =
-
   let aux (system:base_system) f =
     let shapes = Hashtbl.find_all systems system.id in
   List.iter
@@ -404,7 +413,7 @@ let pp_actions ppf () =
            pp_indices indices) ;
   Fmt.pf ppf "@]@]@."
 
-let pp_descrs ppf  system () =
+let pp_descrs ppf system () =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs system (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"

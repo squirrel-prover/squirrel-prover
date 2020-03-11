@@ -26,7 +26,7 @@ Proof.
   intros.
 Qed.
 
-goal [none, toto] test : output@B1 = diff(ko,koo).
+goal [none, toto] test : output@B = diff(ko,koo).
 Proof.
   intros.
 Qed.
