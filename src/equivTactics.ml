@@ -276,7 +276,8 @@ let () =
 
 (** Fresh *)
 
-exception Bad_fresh_ssc
+exception Name_found
+exception Var_found
 
 class check_fresh ~system_id name = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~system_id as super
@@ -286,45 +287,93 @@ class check_fresh ~system_id name = object (self)
     | EquivSequent.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
-    | Term.Name (n,_) when n = name -> raise Bad_fresh_ssc
-    | Term.Var m -> raise Bad_fresh_ssc
+    | Term.Name (n,_) -> if n = name then raise Name_found
+    | Term.Var m -> raise Var_found
     | _ -> super#visit_message t
 end
 
-(* Check the key syntactic side-condition:
-    name must not appear in elems. *)
-let fresh_name_ssc ~system_id name elems =
-  try
-    let ssc = new check_fresh ~system_id name in
-    List.iter ssc#visit_term elems;
-    true
-  with Bad_fresh_ssc -> false
+class get_name_indices ~system_id name acc = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
+
+  val mutable indices : (Vars.index list) list = acc
+  method get_indices = indices
+
+  method visit_term t = match t with
+    | EquivSequent.Message e -> self#visit_message e
+    | EquivSequent.Formula e -> self#visit_formula e
+
+  method visit_message t = match t with
+    | Term.Name (n,is) -> if n = name then indices <- is::indices
+    | Term.Var m -> raise Var_found
+    | _ -> super#visit_message t
+end
+
+let indices_of_name ~system_id name acc elems =
+  let iter = new get_name_indices ~system_id name acc in
+  iter#visit_term elems ;
+  iter#get_indices
+
+let rec mk_inequalities l0 l =
+  match l0,l with
+  | [hd0],[hd] -> Term.Atom (`Index (`Neq, hd0, hd))
+  | hd0::tl0,hd::tl -> Term.And(Term.Atom (`Index (`Neq, hd0, hd)), mk_inequalities tl0 tl)
+  | _ -> Term.True
+
+let mk_fresh_cond ~system_id name indices proj biframe =
+  begin try
+    let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
+    match indices with
+    | [] -> let iter = new check_fresh ~system_id name in
+            List.iter iter#visit_term proj_frame;
+            Term.True
+    | _  -> let list_of_indices =
+              List.fold_left (indices_of_name ~system_id name) [] proj_frame in
+            let list_of_inequalities =
+              List.map (mk_inequalities indices) list_of_indices in
+            List.fold_left
+              (fun acc eq -> Term.And(acc,eq))
+              (List.hd list_of_inequalities)
+              (List.tl list_of_inequalities)
+  with
+  | Name_found -> raise @@ Tactics.Tactic_hard_failure
+                  (Tactics.Failure "Name not fresh")
+  | Var_found -> raise @@ Tactics.Tactic_hard_failure
+                 (Tactics.Failure "Variable found, unsound to apply fresh")
+  end
+
+let mk_if_term phi_left phi_right n_left ind_left n_right ind_right =
+  let then_branch = Term.Fun (Term.f_zero,[]) in
+  let else_branch = Term.Diff
+    (Term.Name (n_left, ind_left), Term.Name (n_right, ind_right)) in
+  match phi_left, phi_right with
+  | Term.True, Term.True -> EquivSequent.Message then_branch
+  | Term.True, _ ->
+      EquivSequent.Message (Term.ITE(phi_right, then_branch, else_branch))
+  | _, Term.True ->
+      EquivSequent.Message (Term.ITE(phi_left, then_branch, else_branch))
+  | _, _ ->
+      EquivSequent.Message (Term.ITE(Term.And(phi_left,phi_right),
+                            then_branch, else_branch))
 
 let fresh i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
         begin try
-          let (n_left, n_right) =
-            match e with
-            | EquivSequent.Message Name (n,_) -> (n,n)
-            | EquivSequent.Message Diff (Name (nl,_),Name (nr,_)) -> (nl,nr)
+          let (n_left, ind_left, n_right, ind_right) =
+            match EquivSequent.pi_elem Term.Left e, EquivSequent.pi_elem Term.Right e with
+            | (EquivSequent.Message Name (nl,isl),
+              EquivSequent.Message Name (nr,isr)) -> (nl,isl,nr,isr)
             | _ -> raise @@ Tactics.Tactic_hard_failure
                     (Tactics.Failure "Can only apply fresh on names")
           in
-          let biframe = (List.rev_append before after) in
-          let frame_left = (List.map (EquivSequent.pi_elem Term.Left) biframe) in
-          let frame_right = (List.map (EquivSequent.pi_elem Term.Right) biframe) in
+          let biframe = List.rev_append before after in
           let system_id = EquivSequent.id_left s in
-          if fresh_name_ssc ~system_id n_left frame_left
-          then
-            let system_id = EquivSequent.id_right s in
-            if fresh_name_ssc ~system_id n_right frame_right
-            then sk [EquivSequent.set_biframe s biframe] fk
-            else raise @@ Tactics.Tactic_hard_failure
-              (Tactics.Failure "Name not fresh in the right system")
-          else
-            raise @@ Tactics.Tactic_hard_failure
-              (Tactics.Failure "Name not fresh in the left system")
+          let phi_left = mk_fresh_cond ~system_id n_left ind_left Term.Left biframe in
+          let system_id = EquivSequent.id_right s in
+          let phi_right = mk_fresh_cond ~system_id n_right ind_right Term.Right biframe in
+          let if_term = mk_if_term phi_left phi_right n_left ind_left n_right ind_right in
+          let biframe = (List.rev_append before (if_term::after)) in
+          sk [EquivSequent.set_biframe s biframe] fk
         with
         | Tactics.Tactic_hard_failure err -> fk err
         end
@@ -337,6 +386,15 @@ let () =
     (function
        | [Prover.Int i] -> pure_equiv (fresh i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+let fresh_name_ssc ~system_id name elems =
+  begin try
+    let iter = new check_fresh ~system_id name in
+    List.iter iter#visit_term elems ;
+    true
+  with
+  | Name_found | Var_found -> false
+  end
 
 let xor i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
