@@ -368,7 +368,7 @@ let get_goal_formula gname =
   with
     | [(_,Goal.Trace f)] ->
         assert (TraceSequent.get_env f = Vars.empty_env) ;
-        TraceSequent.get_conclusion f, TraceSequent.system_id f
+        TraceSequent.get_conclusion f, TraceSequent.system f
     | [] -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
@@ -393,7 +393,9 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
     | `Message m ->
         EquivSequent.Message (Theory.convert subst m Sorts.Message)
   in
-    Goal.Equiv (EquivSequent.init env (List.map convert l))
+  Goal.Equiv (EquivSequent.init
+                (Action.make_default_system Term.None Action.default_system_name)
+                env (List.map convert l))
 
 
 let make_equiv_goal_process system_1 system_2 =
@@ -401,7 +403,8 @@ let make_equiv_goal_process system_1 system_2 =
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
   let formula = Term.Macro(Term.exec_macro,[],Term.Var ts) in
-  Goal.Equiv (EquivSequent.init !env
+  let system = Action.{projection=Term.None; left = system_1; right = system_2} in
+  Goal.Equiv (EquivSequent.init system !env
                 [(EquivSequent.Formula formula); (EquivSequent.Message term)])
 
 type parsed_input =

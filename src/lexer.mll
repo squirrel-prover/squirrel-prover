@@ -82,6 +82,7 @@ rule token = parse
 | "diff"              { DIFF }
 | "left"              { LEFT }
 | "right"             { RIGHT }
+| "none"              { NONE }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "goal"              { GOAL }

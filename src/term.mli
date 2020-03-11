@@ -236,3 +236,5 @@ val head_pi_term : projection -> 'a term -> 'a term
   * subterms have topmost different constructors, and they do not
   * start with diffs themselves. *)
 val head_normal_biterm : 'a term -> 'a term
+
+val make_bi_term : 'a term -> 'a term -> 'a term

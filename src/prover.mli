@@ -82,11 +82,11 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 val parse_formula : Theory.formula -> formula
 
-val get_goal_formula : string -> formula * Action.system_id
+val get_goal_formula : string -> formula * Action.system
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)
-val make_trace_goal : system:Action.system_id -> Theory.formula -> Goal.t
+val make_trace_goal : system:Action.system -> Theory.formula -> Goal.t
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
@@ -95,7 +95,7 @@ val make_equiv_goal :
   Goal.t
 
 (* Produces an equivalence goal based on the process and the two system ids. *)
-val make_equiv_goal_process : Action.system_id -> Action.system_id -> Goal.t
+val make_equiv_goal_process : Action.base_system -> Action.base_system -> Goal.t
 
 type parsed_input =
   | ParsedInputDescr

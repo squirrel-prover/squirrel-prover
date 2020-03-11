@@ -125,8 +125,7 @@ let induction ts s sk fk =
                 |> EquivSequent.set_env !env)
                ::!goals
     in
-  let system_id = None in
-  Action.iter_descrs ~system_id add_action ;
+  Action.iter_descrs (EquivSequent.get_system s) add_action ;
     sk (init_goal::!goals) fk
   | _ ->  raise @@ Tactics.Tactic_hard_failure
       (Tactics.Failure "Induction is only possible over a variable")
@@ -185,8 +184,7 @@ let timestamp_case ts s sk fk =
              |> EquivSequent.set_env !env)
              ::!goals
   in
-  let system_id = None in
-  Action.iter_descrs ~system_id add_action ;
+  Action.iter_descrs (EquivSequent.get_system s) add_action ;
   goals := EquivSequent.apply_subst [Term.ESubst(ts,Term.Init)] s :: !goals ;
   sk !goals fk
 
@@ -279,8 +277,9 @@ let () =
 exception Name_found
 exception Var_found
 
-class check_fresh ~system_id name = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
+
+class check_fresh ~(system:Action.system) name = object (self)
+ inherit Iter.iter_approx_macros ~exact:false ~system as super
 
   method visit_term t = match t with
     | EquivSequent.Message e -> self#visit_message e
@@ -292,8 +291,8 @@ class check_fresh ~system_id name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~system_id name acc = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system_id as super
+class get_name_indices ~system name acc = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system as super
 
   val mutable indices : (Vars.index list) list = acc
   method get_indices = indices
@@ -308,8 +307,8 @@ class get_name_indices ~system_id name acc = object (self)
     | _ -> super#visit_message t
 end
 
-let indices_of_name ~system_id name acc elems =
-  let iter = new get_name_indices ~system_id name acc in
+let indices_of_name ~system name acc elems =
+  let iter = new get_name_indices ~system name acc in
   iter#visit_term elems ;
   iter#get_indices
 
@@ -319,15 +318,15 @@ let rec mk_inequalities l0 l =
   | hd0::tl0,hd::tl -> Term.And(Term.Atom (`Index (`Neq, hd0, hd)), mk_inequalities tl0 tl)
   | _ -> Term.True
 
-let mk_fresh_cond ~system_id name indices proj biframe =
+let mk_fresh_cond ~system name indices proj biframe =
   begin try
     let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
     match indices with
-    | [] -> let iter = new check_fresh ~system_id name in
+    | [] -> let iter = new check_fresh ~system name in
             List.iter iter#visit_term proj_frame;
             Term.True
     | _  -> let list_of_indices =
-              List.fold_left (indices_of_name ~system_id name) [] proj_frame in
+              List.fold_left (indices_of_name ~system name) [] proj_frame in
             let list_of_inequalities =
               List.map (mk_inequalities indices) list_of_indices in
             List.fold_left
@@ -367,10 +366,11 @@ let fresh i s sk fk =
                     (Tactics.Failure "Can only apply fresh on names")
           in
           let biframe = List.rev_append before after in
-          let system_id = EquivSequent.id_left s in
-          let phi_left = mk_fresh_cond ~system_id n_left ind_left Term.Left biframe in
-          let system_id = EquivSequent.id_right s in
-          let phi_right = mk_fresh_cond ~system_id n_right ind_right Term.Right biframe in
+          let system = (EquivSequent.get_system s) in
+          let system_left = (Action.make_trace_system system.left) in
+          let phi_left = mk_fresh_cond system_left n_left ind_left Term.Left biframe in
+          let system_right = (Action.make_trace_system system.right) in
+          let phi_right = mk_fresh_cond system_right n_right ind_right Term.Right biframe in
           let if_term = mk_if_term phi_left phi_right n_left ind_left n_right ind_right in
           let biframe = (List.rev_append before (if_term::after)) in
           sk [EquivSequent.set_biframe s biframe] fk
@@ -387,9 +387,9 @@ let () =
        | [Prover.Int i] -> pure_equiv (fresh i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
-let fresh_name_ssc ~system_id name elems =
+let fresh_name_ssc ~system name elems =
   begin try
-    let iter = new check_fresh ~system_id name in
+    let iter = new check_fresh ~system name in
     List.iter iter#visit_term elems ;
     true
   with
@@ -417,11 +417,10 @@ let xor i s sk fk =
           let frame_right =
             EquivSequent.Message (Fun (Term.f_xor,xor_terms_right))
             ::List.map (EquivSequent.pi_elem Term.Right) biframe in
-          let system_id = EquivSequent.id_left s in
-          if fresh_name_ssc ~system_id name frame_left
+          let bisystem = EquivSequent.get_system s in
+          if fresh_name_ssc (Action.make_trace_system bisystem.left) name frame_left
           then
-            let system_id = EquivSequent.id_right s in
-            if fresh_name_ssc ~system_id name frame_right
+            if fresh_name_ssc (Action.make_trace_system bisystem.right) name frame_right
             then sk [EquivSequent.set_biframe s biframe] fk
             else raise @@ Tactics.Tactic_hard_failure
               (Tactics.Failure "Name not fresh in the right system")
@@ -529,7 +528,8 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition sort mn is a)]
+                         Macros.get_definition
+                           (EquivSequent.get_system s) sort mn is a)]
     | _ ->
       Tactics.hard_failure (Tactics.Failure "Can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
@@ -537,7 +537,8 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
         match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                             Macros.get_definition sort mn is a)]
+                             Macros.get_definition
+                               (EquivSequent.get_system s) sort mn is a)]
         | _ ->
           Tactics.hard_failure (Tactics.Failure "Can only expand macros")
         | exception Theory.(Conv e) ->
@@ -567,12 +568,13 @@ let () = T.register_general "expand"
 
 let equiv t1 t2 (s : EquivSequent.t) sk fk =
   let env = EquivSequent.get_env s in
+  let system = EquivSequent.get_system s in
   let tsubst = Theory.subst_of_env env in
   match Theory.convert tsubst t1 Sorts.Boolean,
         Theory.convert tsubst t2 Sorts.Boolean with
   | t1,t2 ->
-      let trace_sequent =
-        TraceSequent.init ~system:None
+    let trace_sequent =
+        TraceSequent.init ~system
           (Term.And(Term.Impl(t1, t2), Term.Impl(t2, t1)))
           |> TraceSequent.set_env env
       in
@@ -609,7 +611,8 @@ let no_if i s sk fk =
           in
           let biframe = List.rev_append before (negative_branch :: after) in
           let env = EquivSequent.get_env s in
-          let trace_sequent = TraceSequent.init ~system:None
+          let system = EquivSequent.get_system s in
+          let trace_sequent = TraceSequent.init ~system
               (Term.Impl(cond,False))
                                    |> TraceSequent.set_env env
            in

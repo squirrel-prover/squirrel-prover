@@ -64,6 +64,24 @@ Proof.
 
   expand frame@init; expand exec@init.
 
+  expand frame@R(j); expand exec@R(j);
+    expand cond@R(j); expand output@R(j).
+  fa 0. fa 2. repeat (fa 3).
+  dup 1. dup 2.
+  equivalent
+    (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
+    (exists (i,k:index), T(i,k)<R(j) &&
+       fst(output@T(i,k))=fst(input@R(j)) &&
+       snd(output@T(i,k))=snd(input@R(j))).
+  split; intros.
+  project; euf M0.
+  exists i,k1.
+  exists i,k.
+  exists i,k.
+  admit 2. (* TODO fa/dup *)
+  assumption.
+
+
   expand frame@R1(j); expand exec@R1(j);
     expand cond@R1(j); expand output@R1(j).
   fa 0. fa 1. fa 2. repeat (fa 3). fa 4.
@@ -91,23 +109,6 @@ Proof.
   dup 2.
   admit 2. (* TODO fresh *)
   admit 2. (* TODO PRF (+fresh?) *)
-  assumption.
-
-  expand frame@R(j); expand exec@R(j);
-    expand cond@R(j); expand output@R(j).
-  fa 0. fa 2. repeat (fa 3).
-  dup 1. dup 2.
-  equivalent
-    (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
-    (exists (i,k:index), T(i,k)<R(j) &&
-       fst(output@T(i,k))=fst(input@R(j)) &&
-       snd(output@T(i,k))=snd(input@R(j))).
-  split; intros.
-  project; euf M0.
-  exists i,k1.
-  exists i,k.
-  exists i,k.
-  admit 2. (* TODO fa/dup *)
   assumption.
 
 Qed.

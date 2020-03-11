@@ -50,9 +50,9 @@ let is_defined name a =
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  ?system_id:Action.system_id -> a Sorts.sort ->
+  type a.  Action.system -> a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> a Term.term =
-  fun ?(system_id=Term.None) sort name args a ->
+  fun system sort name args a ->
   match sort with
   | Sorts.Message ->
     begin
@@ -62,7 +62,7 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices in
-            snd Action.((get_descr ~system_id action).output)
+            snd Action.((get_descr system action).output)
           | _ -> assert false
         end
       | Symbols.Frame, _ ->
@@ -84,7 +84,7 @@ let get_definition :
              * see if state name(args) is updated by symb(indices),
              * otherwise its content is unchanged. *)
             let action = Action.of_term symb indices in
-            let descr = Action.get_descr ~system_id action in
+            let descr = Action.get_descr system action in
             begin try
                 List.assoc (name,sort,args) descr.Action.updates
               with Not_found ->
@@ -130,7 +130,7 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices in
-            snd Action.((get_descr ~system_id action).condition)
+            snd Action.((get_descr system action).condition)
           | _ -> assert false
         end
       | Symbols.Exec, _ ->
@@ -146,11 +146,11 @@ let get_definition :
   | _ -> assert false
 
 let get_dummy_definition :
-  type a. system_id:Action.system_id -> a Sorts.sort ->
+  type a. Action.system -> a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> a Term.term =
-  fun ~system_id sort mn indices ->
+  fun system sort mn indices ->
   match Symbols.Macro.get_all mn with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
         let dummy_action = Action.dummy_action (List.length inputs) in
-        get_definition ~system_id sort mn indices (Action.to_term dummy_action)
+        get_definition system sort mn indices (Action.to_term dummy_action)
     | _ -> assert false

@@ -18,7 +18,6 @@ enrich seq(i->h(ok,k(i))).
  expand frame@init.
  expand exec@init.
 
- cycle 1.
  expand frame@A(i).
  expand output@A(i).
  expand exec@A(i).

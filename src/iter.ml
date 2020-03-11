@@ -2,13 +2,13 @@ open Term
 
 (** Iterate on all subfacts and subterms.
   * When a macro is encountered, its expansion is visited as well. *)
-class iter ~system_id = object (self)
+class iter ~system = object (self)
 
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
-        self#visit_message (Macros.get_definition ~system_id sort mn is a)
+        self#visit_message (Macros.get_definition system sort mn is a)
     (* TODO currently manage the quantifications *)
     | Seq (a, b) -> self#visit_message b
     | Name _ | Var _ -> ()
@@ -34,7 +34,7 @@ class iter ~system_id = object (self)
         self#visit_message t'
     | Macro ((mn, Sorts.Boolean, is),[],a) ->
         self#visit_formula
-          (Macros.get_definition ~system_id Sorts.Boolean mn is a)
+          (Macros.get_definition system Sorts.Boolean mn is a)
     | _ -> failwith "unsupported"
 
 end
@@ -47,9 +47,9 @@ end
   * because [get_dummy_definition] is used -- this behaviour is disabled
   * with [exact], in which case all macros will be expanded and must
   * thus be defined. *)
-class iter_approx_macros ~exact ~system_id = object (self)
+class iter_approx_macros ~exact ~system = object (self)
 
-  inherit iter ~system_id as super
+  inherit iter ~system as super
 
   val mutable checked_macros = []
 
@@ -59,11 +59,11 @@ class iter_approx_macros ~exact ~system_id = object (self)
       | Symbols.Global _ ->
           if exact then
             self#visit_message
-              (Macros.get_definition ~system_id Sorts.Message mn is a)
+              (Macros.get_definition system Sorts.Message mn is a)
           else if not (List.mem mn checked_macros) then begin
             checked_macros <- mn :: checked_macros ;
             self#visit_message
-              (Macros.get_dummy_definition ~system_id Sorts.Message mn is)
+              (Macros.get_dummy_definition system Sorts.Message mn is)
           end
       | Symbols.(Frame | Local _) -> assert false (* TODO *)
 

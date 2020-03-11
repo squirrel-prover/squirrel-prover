@@ -20,7 +20,7 @@ val is_defined : Symbols.macro Symbols.t -> Term.timestamp -> bool
 (** Return the term corresponding to the declared macro,
   * if the macro can be expanded. *)
 val get_definition :
-  ?system_id:Action.system_id -> 'a Sorts.sort ->
+  Action.system -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> 'a Term.term
 
 (** When [m] is a global macro symbol,
@@ -28,5 +28,5 @@ val get_definition :
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  system_id:Action.system_id -> 'a Sorts.sort ->
+  Action.system -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> 'a Term.term

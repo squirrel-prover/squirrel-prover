@@ -46,18 +46,15 @@ type t = {
   env : Vars.env;
   hypothesis_frame : elem list;
   frame : elem list;
-  id_left : Action.system_id;
-  id_right : Action.system_id;
+  system : Action.system;
 }
 
-let init env l = {
+let init system env l = {
   env = env ; frame = l ; hypothesis_frame = [];
-  id_left = Term.Left ; id_right = Term.Right
+  system = system;
 }
 
 type sequent = t
-
-
 
 let pp ppf j =
   if j.env <> Vars.empty_env then
@@ -73,14 +70,14 @@ let pp_init ppf j =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     j.frame
 
-let id_left j = j.id_left
-let id_right j = j.id_right
+let id_left j = j.system.left.id
+let id_right j = j.system.right.id
 
 let get_env j = j.env
 
 let set_env e j = {j with env = e}
 
-let get_systems j = j.id_left, j.id_right
+let get_system j = j.system
 
 let get_biframe j = j.frame
 
@@ -91,8 +88,6 @@ let set_hypothesis_biframe j f = { j with hypothesis_frame = f}
 let set_biframe j f = { j with frame = f }
 
 let get_frame proj j = List.map (pi_elem proj) j.frame
-
-let get_right_frame j = List.map (pi_elem j.id_right) j.frame
 
 let apply_subst subst s =
   { s with frame = apply_subst_frame subst s.frame;

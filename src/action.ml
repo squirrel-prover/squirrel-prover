@@ -247,27 +247,110 @@ let subst_descr subst descr =
       descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  { action; input; indices; condition; updates; output }
+  {action; input; indices; condition; updates; output }
 
 (** Associates a description to each action.
   * TODO store this as part of Symbols data ? *)
-let action_to_descr : (shape, descr) Hashtbl.t =
+
+type system_name = string
+
+let default_system_name = "default"
+
+type base_system =
+  { projection : Term.projection;
+    id : system_name
+  }
+
+let make_base_system projection id =
+  {projection; id}
+
+(** This table maps system names to action shape. It will allow to get all
+   shapes corresponding to some system. *)
+let systems  : (system_name, shape) Hashtbl.t =
+  Hashtbl.create 97
+
+type system =
+  {
+    projection : Term.projection;
+    left  : base_system;
+    right : base_system;
+  }
+
+let make_default_system projection id =
+  {projection;
+   left = {projection = Term.Left; id};
+   right = {projection = Term.Right; id};
+  }
+
+let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
   Hashtbl.create 97
 
 let reset () =
-  Hashtbl.clear action_to_descr
+  Hashtbl.clear action_to_descr; Hashtbl.clear systems
 
-type system_id = Term.projection
+let make_trace_system (bs:base_system) =
+ { projection = Term.Left;
+    left = bs;
+    right =  {projection = Term.Right; id= default_system_name};
+ }
 
-let register symb indices action descr =
-  Hashtbl.add action_to_descr (get_shape action) descr ;
+let is_fresh system_name =
+  not(Hashtbl.mem systems system_name)
+
+
+let register system_name symb indices action descr =
+  let s = get_shape action in
+  Hashtbl.add action_to_descr (s,system_name) descr ;
+  Hashtbl.add systems system_name s;
   define_symbol symb indices action
 
-let iter_descrs ?(system_id=Term.None) f =
-  Hashtbl.iter (fun _ b -> f (pi_descr system_id b)) action_to_descr
+let make_bi_descr d1 d2 =
+  if d1.input <> d2.input || d1.indices <> d2.indices then
+    failwith "cannot merge two actions with disctinct \
+              inputs or indexes";
+  { d1 with
+    condition = (let is1,t1 = d1.condition and is2,t2 = d2.condition in
+                 if is1 <> is2 then
+                   failwith "cannot merge two actions with disctinct \
+                             condtion indexes";
+                 is1, Term.make_bi_term t1 t2);
+    updates = List.map2 (fun (st1, m1) (st2, m2) ->
+          if st1 <> st2 then
+                   failwith "cannot merge two actions with disctinct \
+                             condtion indexes";
+        st1,Term.make_bi_term m1 m2)
+        d1.updates d2.updates;
+    output = (let c1,m1 = d1.output and c2,m2 = d2.output in
+                        if c1 <> c2 then
+                   failwith "cannot merge two actions with disctinct \
+                             ouput channels";
+                        c1, Term.make_bi_term m1 m2) }
 
-let get_descr ?(system_id=Term.None) a =
-  let descr = Hashtbl.find action_to_descr (get_shape a) in
+
+let get_descr_of_shape system shape =
+  match system.projection with
+  | Term.None ->
+    (* if the system is not projeted, we need to get both the left and the right
+       shape. *)
+    let left_a = Hashtbl.find action_to_descr (shape, system.left.id) in
+    let right_a = Hashtbl.find action_to_descr (shape, system.right.id) in
+    if system.left.id = system.right.id
+    && system.left.projection = Term.Left
+    && system.right.projection = Term.Right then
+      (* if the system corresponds to a bi-process direclty defined as is, we
+         simply output the action without projecting it. *)
+      pi_descr Term.None left_a
+    else
+      (* else, we combine both actions together. *)
+      make_bi_descr (pi_descr system.left.projection left_a)
+        (pi_descr system.right.projection right_a)
+  | Term.Right -> pi_descr system.right.projection
+                    (Hashtbl.find action_to_descr (shape, system.right.id))
+  | Term.Left -> pi_descr system.left.projection
+                   (Hashtbl.find action_to_descr (shape, system.left.id))
+
+let get_descr system a =
+  let descr = get_descr_of_shape system (get_shape a) in
   (* We know that [descr.action] and [a] have the same shape,
    * but run [same_shape] anyway to obtain the substitution from
    * one to the other. *)
@@ -275,9 +358,33 @@ let get_descr ?(system_id=Term.None) a =
   | None -> assert false
   | Some subst ->
     subst_descr subst descr
-    |> pi_descr system_id
+
+
+let iter_descrs system f =
+
+  let aux (system:base_system) f =
+    let shapes = Hashtbl.find_all systems system.id in
+  List.iter
+    ( fun shape -> f (pi_descr system.projection
+                        (Hashtbl.find action_to_descr (shape,system.id))))
+    shapes
+  in
+  match system.projection with
+  |Term.None ->
+    let left_shapes = Hashtbl.find_all systems system.left.id in
+    let right_shapes = Hashtbl.find_all systems system.right.id in
+    if not(Utils.List.inclusion left_shapes right_shapes
+           && Utils.List.inclusion right_shapes left_shapes) then
+      failwith "Cannot iter over a bisytem with distinct control flow";
+    List.iter
+      (fun shape -> f (get_descr_of_shape system shape))
+      left_shapes
+  | Term.Left -> aux system.left f
+  | Term.Right -> aux system.right f
+
 
 let debug = false
+
 
 let pp_actions ppf () =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
@@ -297,9 +404,9 @@ let pp_actions ppf () =
            pp_indices indices) ;
   Fmt.pf ppf "@]@]@."
 
-let pp_descrs ppf () =
+let pp_descrs ppf  system () =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  iter_descrs ~system_id:Term.Left (fun descr ->
+  iter_descrs system (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
         pp_descr descr) ;
   Fmt.pf ppf "@]%!@."

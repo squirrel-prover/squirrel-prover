@@ -148,8 +148,8 @@ let timestamp_case ts s sk fk =
     in
     f := Term.Or (case,!f)
   in
-  let system_id = TraceSequent.system_id s in
-  Action.iter_descrs ~system_id add_action ;
+  let system = TraceSequent.system s in
+  Action.iter_descrs system add_action ;
   sk [TraceSequent.add_formula !f s] fk
 
 let hypothesis_case hypothesis_name (s : TraceSequent.t) sk fk =
@@ -463,14 +463,13 @@ let constraints (s : TraceSequent.t) sk fk =
 
 let expand (term : Theory.term) (s : TraceSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let system_id = TraceSequent.system_id s in
-
+  let system = TraceSequent.system s in
   let succ subst = sk [TraceSequent.apply_subst subst s] fk in
 
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition ~system_id sort mn is a)]
+                         Macros.get_definition system sort mn is a)]
     | _ ->
       Tactics.hard_failure (Tactics.Failure "Can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
@@ -478,7 +477,7 @@ let expand (term : Theory.term) (s : TraceSequent.t) sk fk =
       match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                             Macros.get_definition ~system_id sort mn is a)]
+                             Macros.get_definition system sort mn is a)]
         | exception Theory.(Conv e) ->
           fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
         | _ ->
@@ -777,8 +776,8 @@ let euf_apply_facts s at =
   let p = euf_param at in
   let env = TraceSequent.get_env s in
   let (hash_fn, (key_n, key_is), mess, sign) = p in
-  let system_id = TraceSequent.system_id s in
-  let rule = Euf.mk_rule ~system_id ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let system = TraceSequent.system s in
+  let rule = Euf.mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case ->
         let new_f, new_cnstr, new_env = euf_apply_schema s p case in
@@ -825,10 +824,10 @@ let () =
 let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
   (* Get formula to apply *)
   let f,system =
-    try TraceSequent.get_hypothesis id s, TraceSequent.system_id s with
+    try TraceSequent.get_hypothesis id s, TraceSequent.system s with
       | Not_found -> Prover.get_goal_formula id
   in
-  if system <> TraceSequent.system_id s && system <> Term.None then
+  if system <> TraceSequent.system s then
     raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
@@ -893,8 +892,8 @@ let collision_resistance (s : TraceSequent.t) sk fk =
   let hashes = List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-             let system_id = TraceSequent.system_id s in
-             Theory.is_hash hash && Euf.hash_key_ssc ~system_id hash key [m]
+             let system = TraceSequent.system s in
+             Theory.is_hash hash && Euf.hash_key_ssc system hash key [m]
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
@@ -945,11 +944,12 @@ let () = T.register "collision"
   * to distinct goals for each projected system. *)
 
 let project s sk fk =
-  if TraceSequent.system_id s <> None then
+  let system = TraceSequent.system s in
+  if system.projection <> None then
     fk (Tactics.Failure "goal already deals with a single process")
   else
-    let s1 = TraceSequent.set_system_id Left s in
-    let s2 = TraceSequent.set_system_id Right s in
+    let s1 = TraceSequent.set_system {system with projection = Left} s in
+    let s2 = TraceSequent.set_system {system with projection = Right} s in
     let s1 = TraceSequent.pi Left s1 in
     let s2 = TraceSequent.pi Right s2 in
     sk [s1;s2] fk

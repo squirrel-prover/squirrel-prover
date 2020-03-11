@@ -75,7 +75,7 @@ val declare : id -> pkind -> process -> unit
   * which triggers the computation of its internal representation
   * as a set of actions. In that process, name creations and let constructs
   * are compiled away. Other constructs are grouped into action descriptions. *)
-val declare_system : process -> unit
+val declare_system : Action.system_name -> process -> unit
 
 (** Reset all process declarations. *)
 val reset : unit -> unit

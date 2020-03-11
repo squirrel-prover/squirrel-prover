@@ -84,6 +84,7 @@ val of_symbol : Symbols.Action.ns Symbols.t -> Vars.index list * action
   * Describe the behavior of an action: it consists of an input, followed by a
   * condition, then state updates and an output. *)
 
+
 (** Type of action descriptions. *)
 type descr = {
   action : action ;
@@ -97,26 +98,57 @@ type descr = {
 (** Currently the user can only specify one bi-system,
   * hence system identifiers coincide with [Term.projection],
   * but (unlike [Term.projection]) they may be generalized in the future. *)
-type system_id = Term.projection
+
+
+(** Given a set of actions and a projection, one can consider a specific
+   bi-process or process, called a base system. *)
+type system_name = string
+
+val default_system_name : string
+
+type base_system =
+  { projection : Term.projection;
+    id : system_name
+  }
+
+val make_base_system : Term.projection -> system_name -> base_system
+
+
+(** Given two base systems, one can define the resulting bi-process,
+    which can also be projected. This is our generic notion of system. *)
+
+type system =
+  {
+    projection : Term.projection;
+    left  : base_system;
+    right : base_system;
+  }
+
+val make_default_system : Term.projection -> system_name -> system
+
+val make_trace_system : base_system -> system
 
 (** [pi_descr s a] returns the projection of the description. *)
-val pi_descr : system_id -> descr -> descr
+val pi_descr : Term.projection -> descr -> descr
 
-(** [get_descr a] returns the description corresponding to the action [a].
-    Raise Not_found if no action corresponds to [a]. *)
-val get_descr : ?system_id:system_id -> action -> descr
+(** [get_descr a] returns the description corresponding to the action [a] in the
+   [system].  Raise Not_found if no action corresponds to [a]. *)
+val get_descr : system -> action -> descr
 
-(** Iterate over all action descriptions.
+(** Iterate over all action descriptions in [system].
   * Only one representative of each action shape will be passed
   * to the function, with indices that are not guaranteed to be fresh. *)
-val iter_descrs : ?system_id:system_id -> (descr -> unit) -> unit
+val iter_descrs : system -> (descr -> unit) -> unit
 
 (** {2 Registration of actions} *)
 
-(** Register a new action symbol, action, and description,
-  * linked together. The set of registered actions will define
-  * the protocol under study. TODO system_id *)
-val register :
+(** Specify if a given system name is not already in use. *)
+val is_fresh : system_name -> bool
+
+(** Register a new action symbol, action, and description, linked together. The
+   set of registered actions for this system name will define the protocol under
+   study. *)
+val register : system_name ->
   Symbols.action Symbols.t -> Vars.index list -> action -> descr -> unit
 
 (** Reset all action definitions done through [register]. *)
@@ -147,8 +179,7 @@ val pp_parsed_action : Format.formatter -> (string list) item list -> unit
 val pp_actions : Format.formatter -> unit -> unit
 
 (** Pretty-print all action descriptions. *)
-val pp_descrs : Format.formatter -> unit -> unit
-
+val pp_descrs : Format.formatter -> system -> unit -> unit
 
 (** {2 Substitution} *)
 

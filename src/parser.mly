@@ -9,7 +9,7 @@
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT SEQ
+%token DIFF LEFT RIGHT NONE SEQ
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
@@ -305,9 +305,18 @@ equiv_env:
 | LPAREN vs=arg_list RPAREN { vs }
 
 system:
-|                         { Term.None }
-| LBRACKET LEFT RBRACKET  { Term.Left }
-| LBRACKET RIGHT RBRACKET { Term.Right }
+|                         { Action.make_default_system Term.None Action.default_system_name }
+| LBRACKET LEFT RBRACKET  { Action.make_default_system Term.Left Action.default_system_name }
+| LBRACKET RIGHT RBRACKET { Action.make_default_system Term.Right Action.default_system_name }
+| LBRACKET NONE COMMA i=ID RBRACKET  { Action.make_default_system Term.None i }
+| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.make_default_system Term.Left i }
+| LBRACKET RIGHT COMMA i=ID RBRACKET { Action.make_default_system Term.Right i }
+
+base_system:
+| LBRACKET LEFT RBRACKET  { Action.make_base_system Term.Left Action.default_system_name }
+| LBRACKET RIGHT RBRACKET { Action.make_base_system Term.Right Action.default_system_name }
+| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.make_base_system Term.Left i }
+| LBRACKET RIGHT COMMA i=ID RBRACKET  { Action.make_base_system Term.Right i }
 
 goal:
 | GOAL s=system i=ID COLON f=formula DOT
@@ -319,12 +328,19 @@ goal:
                  { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
 | EQUIV n=ID DOT
                  { Prover.Gm_goal
-                     (n, Prover.make_equiv_goal_process Term.Left Term.Right) }
+                     (n, Prover.make_equiv_goal_process
+			   (Action.make_base_system Term.Left Action.default_system_name)
+			   (Action.make_base_system Term.Right Action.default_system_name)) }
+| EQUIV b1=base_system b2=base_system n=ID DOT
+                 { Prover.Gm_goal
+                     (n, Prover.make_equiv_goal_process b1 b2)}
+
 | PROOF          { Prover.Gm_proof }
 
 theory:
 | declaration theory             { () }
-| SYSTEM process DOT             { Process.declare_system $2 }
+| SYSTEM process DOT             { Process.declare_system Action.default_system_name $2 }
+| SYSTEM LBRACKET i=ID RBRACKET p=process DOT             { Process.declare_system i p }
 
 interactive :
 | theory                          { Prover.ParsedInputDescr }

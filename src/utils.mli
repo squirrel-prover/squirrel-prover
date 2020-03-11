@@ -20,6 +20,8 @@ module List : sig
       the list of elements where [f] does not hold, while respecting the
       ordering in [l]. *)
   val split_pred : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  val inclusion : 'a list -> 'a list -> bool
 end
 
 module String : sig

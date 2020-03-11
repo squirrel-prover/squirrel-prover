@@ -419,7 +419,7 @@ type p_env = {
 exception Cannot_parse of process
 
 (** Parse a prepared process to extract its actions. *)
-let parse_proc proc : unit =
+let parse_proc system_name proc : unit =
   let var_env = ref Vars.empty_env in
   (** Convert given some environment and the current action symbol a. *)
   let conv_term ?(pred=false) env a t =
@@ -593,7 +593,7 @@ let parse_proc proc : unit =
       let action = List.rev env.action in
       let action_descr =
         Action.{ action; input; indices; condition; updates; output } in
-      Action.register (Obj.magic a) indices action action_descr ;
+      Action.register system_name (Obj.magic a) indices action action_descr ;
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
 
   | p ->
@@ -607,12 +607,14 @@ let parse_proc proc : unit =
   let _ : int = p_in ~pos:0 ~env ~pos_indices:[] proc in
   ()
 
-let declare_system proc =
+let declare_system (system_name:Action.system_name) proc =
+  if not(Action.is_fresh system_name) then
+    failwith "System %s already defined";
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc [] proc ;
   let proc = prepare proc in
   Printer.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
-  parse_proc proc
+  parse_proc system_name proc
 
 let reset () =
   Hashtbl.clear pdecls ;

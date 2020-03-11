@@ -106,6 +106,11 @@ let rec main_loop ~test ?(save=true) mode =
       Printer.prt `Result "Exiting proof mode.@.";
       main_loop ~test GoalMode
 
+    | GoalMode, ParsedInputDescr ->
+      Printer.pr "%a" Action.pp_actions ();
+      main_loop ~test GoalMode
+
+
     | GoalMode, ParsedGoal goal ->
       begin
         match goal with

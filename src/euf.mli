@@ -40,13 +40,13 @@ exception Bad_ssc
 (** Returns true if the syntactic side condition of the key is met inside the
     protocol and the messages. *)
 val hash_key_ssc :
-  system_id:Action.system_id ->
+  system:Action.system ->
   Term.fname -> Term.name -> Term.message list -> bool
 
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)
 val mk_rule :
-  system_id:Action.system_id ->
+  system:Action.system ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->
   hash_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule

@@ -203,7 +203,7 @@ type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
 
 type t = {
-  system_id : Action.system_id ;
+  system : Action.system ;
   env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
@@ -233,7 +233,7 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %s@]@;"
-    Term.(match s.system_id with
+    Term.(match s.system.projection with
             | Left -> "left"
             | Right -> "right"
             | None -> "both") ;
@@ -256,7 +256,7 @@ let pp ppf s =
   pf ppf "@;%a@]" Term.pp s.conclusion
 
 let init_sequent system = {
-  system_id = system ;
+  system = system ;
   env = Vars.empty_env;
   happens_hypotheses = [];
   message_hypotheses = H.empty;
@@ -331,13 +331,13 @@ let add_trace_hypothesis ?(prefix="T") s tf =
     trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;
     models = None }
 
-class iter_macros ~system_id f = object (self)
-  inherit Iter.iter ~system_id as super
+class iter_macros ~system f = object (self)
+  inherit Iter.iter ~system as super
   method visit_message t =
     match t with
       | Term.Macro ((m,sort,is),[],a) ->
           if Macros.is_defined m a then
-            let def = Macros.get_definition ~system_id sort m is a in
+            let def = Macros.get_definition system sort m is a in
               f t def ;
               self#visit_message def
       | t -> super#visit_message t
@@ -357,7 +357,7 @@ let rec add_macro_defs s at =
   let macro_eqs : message_atom list ref = ref [] in
   let iter =
     new iter_macros
-      ~system_id:s.system_id
+      ~system:s.system
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
     iter#visit_formula (Term.Atom at) ;
@@ -383,9 +383,9 @@ let rec add_happens s ts =
     match ts with
       | Term.Action (symb,indices) ->
           let a = Action.of_term symb indices in
-          let system_id = s.system_id in
+          let system = s.system in
           add_formula ~prefix:"C"
-               (snd (Action.get_descr ~system_id a).Action.condition)
+               (snd (Action.get_descr system a).Action.condition)
             s
       | _ -> s
 
@@ -433,9 +433,9 @@ let set_env a s = { s with env = a }
 
 let get_env s = s.env
 
-let system_id s = s.system_id
+let system s = s.system
 
-let set_system_id id s = { s with system_id = id }
+let set_system system s = { s with system }
 
 let pi projection s =
   let pi_term t = Term.pi_term ~bimacros:false ~projection t in

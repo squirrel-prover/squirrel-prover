@@ -1,18 +1,42 @@
+abstract ok : message
+abstract ko : message
+abstract koo : message
+
 channel c
-system A: in(c,x);out(c,x);
-       B: in(c,y);out(c,diff(x,y)).
 
-goal test : output@B = diff(input@A,input@B).
+process A(res:message) =  in(c,x);out(c,x); B: in(c,y); if y=ok then out(c,res)
+
+system A(diff(ok,ko)).
+
+system [toto] A(diff(ko,koo)).
+
+
+goal test : output@B = diff(ok,ko).
 Proof.
   intros.
 Qed.
 
-goal [left] test_left : output@B = input@A.
+goal [left] test_left : cond@B => output@B = input@B.
+Proof.
+expand cond@B.
+Qed.
+
+goal [right] test_right : output@B = ko.
 Proof.
   intros.
 Qed.
 
-goal [right] test_right : output@B = input@B.
+goal [none, toto] test : output@B1 = diff(ko,koo).
+Proof.
+  intros.
+Qed.
+
+goal [left, toto] test_left : cond@B => output@B = ko.
+Proof.
+expand cond@B.
+Qed.
+
+goal [right, toto] test_right : output@B = koo.
 Proof.
   intros.
 Qed.

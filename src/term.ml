@@ -580,6 +580,9 @@ let head_normal_biterm : type a. a term -> a term = fun t ->
   | False, False -> False
   | t,t' -> diff t t'
 
+let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
+  head_normal_biterm (Diff (t1, t2))
+
 let () =
   let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in
   Checks.add_suite "Head normalization" [
