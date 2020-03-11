@@ -276,11 +276,17 @@ type system =
     right : base_system;
   }
 
+let make_equiv_system left right =
+  {projection = Term.None; left; right;}
+
 let make_default_system projection id =
   {projection;
    left = {projection = Term.Left; id};
    right = {projection = Term.Right; id};
   }
+
+let set_projection proj s =
+  {s with projection = proj}
 
 let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
   Hashtbl.create 97

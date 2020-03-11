@@ -403,7 +403,7 @@ let make_equiv_goal_process system_1 system_2 =
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
   let formula = Term.Macro(Term.exec_macro,[],Term.Var ts) in
-  let system = Action.{projection=Term.None; left = system_1; right = system_2} in
+  let system = Action.make_equiv_system system_1 system_2 in
   Goal.Equiv (EquivSequent.init system !env
                 [(EquivSequent.Formula formula); (EquivSequent.Message term)])
 

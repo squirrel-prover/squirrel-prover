@@ -117,12 +117,16 @@ val make_base_system : Term.projection -> system_name -> base_system
 (** Given two base systems, one can define the resulting bi-process,
     which can also be projected. This is our generic notion of system. *)
 
-type system =
+type system = private
   {
     projection : Term.projection;
     left  : base_system;
     right : base_system;
   }
+
+val set_projection : Term.projection -> system -> system
+
+val make_equiv_system : base_system -> base_system -> system
 
 val make_default_system : Term.projection -> system_name -> system
 
