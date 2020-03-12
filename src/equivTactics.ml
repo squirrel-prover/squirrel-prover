@@ -446,38 +446,38 @@ let dup i s sk fk =
   | before, e, after ->
     let biframe = List.rev_append before after in
     let s = EquivSequent.set_biframe s biframe in
-        if List.mem e before || List.mem e after
-        then
+    if List.mem e before || List.mem e after
+    then
+      sk [s] fk
+    else begin
+      match e with
+      | EquivSequent.Message (Term.Macro (input_macro,[],l)) ->
+        let test_dup els =
+          List.exists
+            (function
+              | EquivSequent.Message
+                  (Term.Macro (frame_macro,[],
+                               Term.Pred (Term.Action(n,is))))
+              | EquivSequent.Message
+                  (Term.Macro (frame_macro,[],Term.Action(n,is))) ->
+                begin
+                  match l with
+                  | Term.Action (n2,is2) ->
+                    l = Term.Action (n,is) ||
+                    Action.(depends (of_term n2 is2) (of_term n is))
+                  | _ -> false
+                end
+              | _ -> false)
+            els
+        in
+        if test_dup before || test_dup after then
           sk [s] fk
         else
-          match e with
-          | Message (Term.Macro (input_macro,[],l)) ->
-            let test_dup els =
-              List.exists
-                (function
-                  | EquivSequent.Message
-                      (Term.Macro (frame_macro,[],
-                                   Term.Pred ( Term.Action( n, is))))
-                  | EquivSequent.Message
-                      (Term.Macro (frame_macro,[],  Term.Action( n, is))) ->
-                    begin
-                      match l with
-                      | Term.Action (n2, is2) ->
-                        l = Term.Action( n, is) ||
-                        Action.(depends (of_term n2 is2) (of_term n is))
-                      | _ -> false
-                    end
-                    | _ -> false
-                )
-                els
-            in
-            if test_dup before || test_dup after then
-              sk [s] fk
-            else
-              fk (Tactics.Failure "Dup tactic not applicable")
-          | _ -> fk (Tactics.Failure "Dup tactic not applicable")
-    | exception Out_of_range ->
-        fk (Tactics.Failure "Out of range position")
+          fk (Tactics.Failure "Dup tactic not applicable")
+      | _ -> fk (Tactics.Failure "Dup tactic not applicable")
+    end
+  | exception Out_of_range ->
+    fk (Tactics.Failure "Out of range position")
 
 let () =
   T.register_general "dup"
