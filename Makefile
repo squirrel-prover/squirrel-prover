@@ -9,24 +9,28 @@ PROVER_OK_TESTS = $(wildcard tests/ok/*)
 
 test: alcotest ok_test examples_test
 
+.PHONY: ok_test
+ok_test:
+	@$(MAKE) -j8 $(PROVER_OK_TESTS:.mbc=.ok)
+	@rm -f tests/ok/test_prologue.ok
+	@if test -f tests/ok/tests.ko ; then \
+	  echo Some tests failed: ; \
+	  cat tests/ok/tests.ko ; rm -f tests/ok/tests.ko ; exit 1 ; \
+	 else echo All 'tests/ok/*.mbc' passed successfully. ; fi
+tests/ok/test_prologue.ok:
+	@echo "\n --- Running tests/*/.mbc --- \n"
+	@touch $@
+%.ok: tests/ok/test_prologue.ok %.mbc
+	@if ./metabc $(@:.ok=.mbc) > /dev/null 2> /dev/null ; then echo -n . ; \
+	 else echo "[FAIL] $(@:.ok=.mbc)" >> tests/ok/tests.ko ; echo -n '!' ; fi
+
 alcotest: sanity
 	$(OCB) test.byte
 	./test.byte
 
-examples_test: sanity
+examples_test:
 	@echo "\n --- Running examples/*.mbc --- \n"
 	@tests=0 ; failures=0 ; for f in $(wildcard examples/*.mbc) ; do \
-	  echo -n "Running prover on $$f ... " ; \
-	  tests=$$((tests+1)) ; \
-	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
-	  failures=$$((failures+1)) ; echo FAIL ; fi ; \
-	done ; \
-	echo "Total: $$tests tests, $$failures failures." ; \
-	test $$failures -eq 0
-
-ok_test: sanity
-	@echo "\n --- Running tests that must succeed --- \n"
-	@tests=0 ; failures=0 ; for f in $(PROVER_OK_TESTS) ; do \
 	  echo -n "Running prover on $$f ... " ; \
 	  tests=$$((tests+1)) ; \
 	  if ./metabc $$f > /dev/null 2> /dev/null ; then echo OK ; else \
