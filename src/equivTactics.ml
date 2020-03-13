@@ -367,9 +367,9 @@ let fresh i s sk fk =
           in
           let biframe = List.rev_append before after in
           let system = (EquivSequent.get_system s) in
-          let system_left = (Action.make_trace_system system.left) in
+          let system_left = Action.(make_trace_system system.left) in
           let phi_left = mk_fresh_cond system_left n_left ind_left Term.Left biframe in
-          let system_right = (Action.make_trace_system system.right) in
+          let system_right = Action.(make_trace_system system.right) in
           let phi_right = mk_fresh_cond system_right n_right ind_right Term.Right biframe in
           let if_term = mk_if_term phi_left phi_right n_left ind_left n_right ind_right in
           let biframe = (List.rev_append before (if_term::after)) in
@@ -418,9 +418,11 @@ let xor i s sk fk =
             EquivSequent.Message (Fun (Term.f_xor,xor_terms_right))
             ::List.map (EquivSequent.pi_elem Term.Right) biframe in
           let bisystem = EquivSequent.get_system s in
-          if fresh_name_ssc (Action.make_trace_system bisystem.left) name frame_left
+          if fresh_name_ssc
+               Action.(make_trace_system bisystem.left) name frame_left
           then
-            if fresh_name_ssc (Action.make_trace_system bisystem.right) name frame_right
+            if fresh_name_ssc
+                 Action.(make_trace_system bisystem.right) name frame_right
             then sk [EquivSequent.set_biframe s biframe] fk
             else raise @@ Tactics.Tactic_hard_failure
               (Tactics.Failure "Name not fresh in the right system")

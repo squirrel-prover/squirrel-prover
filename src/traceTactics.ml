@@ -945,7 +945,7 @@ let () = T.register "collision"
 
 let project s sk fk =
   let system = TraceSequent.system s in
-  if system.projection <> None then
+  if system.Action.projection <> None then
     fk (Tactics.Failure "goal already deals with a single process")
   else
     let s1 = TraceSequent.set_system (Action.set_projection Left system) s in
