@@ -11,15 +11,16 @@ hash h
 
 channel c
 
-system A : !_i !_j new a; out(c,n).
+system A : !_i !_j new a; out(c,a).
 
-equiv test (i1,i2,j1,j2,i,j:index) : n,diff(output@A(i1,j1),output@A(i2,j2)).
+equiv test (i1,i2,j1,j2,i,j:index) : output@A(i,j),diff(output@A(i1,j1),output@A(i2,j2)).
 
 Proof.
+  expand output@A(i,j).
   nosimpl(fresh 0).
   admit.
 Qed.
-
+(*
 equiv testFresh : diff(f(ok),f(ok)),diff(n,m),k.
 
 Proof.
@@ -38,3 +39,4 @@ equiv testXor : diff(f(ok),f(ok)),diff(n XOR ok,n XOR ko).
 Proof.
   xor 1.
 Qed.
+*)
