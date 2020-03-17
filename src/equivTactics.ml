@@ -354,7 +354,6 @@ let mk_phi_proj system env name indices proj biframe =
       (fun acc f -> Term.And(acc,f))
       Term.True
       (List.map (fun j -> mk_indices_ineq indices j) list_of_indices_from_frame)
-  (* TODO forall quantification on new indices, fix bug related to env  *)
   and phi_actions =
     Seq.fold_left
       (fun acc f -> Term.And(acc,f))
@@ -362,8 +361,9 @@ let mk_phi_proj system env name indices proj biframe =
       (Seq.map
         (fun a ->
           let new_indices =
+          (* FIXME index variables generated here are not fresh  *)
             List.map
-              (fun i -> Vars.make_fresh_from_and_update env i)
+              (fun i -> snd (Vars.make_fresh_from env i))
               a.Action.indices
           in
           let subst =
@@ -383,7 +383,8 @@ let mk_phi_proj system env name indices proj biframe =
               (List.map (fun j -> mk_indices_ineq new_indices j)
                         (Hashtbl.find tbl_of_action_indices a))
           in
-          Term.Impl(disj,conj))
+          let forall_var = List.map (fun i -> Vars.EVar i) new_indices in
+          Term.ForAll(forall_var,Term.Impl(disj,conj)))
         (Hashtbl.to_seq_keys tbl_of_action_indices))
   in
   Term.And(phi_frame,phi_actions)
@@ -418,6 +419,7 @@ let rec clean_formula f = match f with
   | Term.Or(f1,f2) -> Term.Or(clean_formula f1, clean_formula f2)
   | Term.Not f -> Term.Not (clean_formula f)
   | Term.Impl(f1,f2) -> Term.Impl (clean_formula f1, clean_formula f2)
+  | Term.ForAll(v,f) -> Term.ForAll (v, clean_formula f)
   | _ -> f
 
 let mk_if_term system env n_left ind_left n_right ind_right biframe =
@@ -445,7 +447,8 @@ let fresh i s sk fk =
           in
           let biframe = List.rev_append before after in
           let system = (EquivSequent.get_system s) in
-          let env = ref @@ EquivSequent.get_env s in
+          let env = EquivSequent.get_env s in
+          Printf.printf "env length %n \n" (List.length (Vars.to_list env));
           let if_term = mk_if_term system env n_left ind_left n_right ind_right biframe in
           let biframe = (List.rev_append before (if_term::after)) in
           sk [EquivSequent.set_biframe s biframe] fk

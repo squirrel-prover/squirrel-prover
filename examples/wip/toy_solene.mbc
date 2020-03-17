@@ -20,13 +20,15 @@ Proof.
   nosimpl(fresh 0).
   admit.
 Qed.
-(*
+
 equiv testFresh : diff(f(ok),f(ok)),diff(n,m),k.
 
 Proof.
   fresh 2.
   fresh 1.
 Qed.
+
+(******************
 
 equiv testDup : diff(f(ok),f(ok)),diff(f(ok),f(ok)).
 
@@ -39,4 +41,5 @@ equiv testXor : diff(f(ok),f(ok)),diff(n XOR ok,n XOR ko).
 Proof.
   xor 1.
 Qed.
-*)
+
+*******************)
