@@ -45,7 +45,7 @@ makecoverage: sanity
 	BISECT_COVERAGE=YES $(OCB) metabc.byte
 	@ln -s -f metabc.byte metabc
 
-coverage: makecoverage ok_test examples_test
+coverage: makecoverage ok_test
 	bisect-ppx-report html -I _build/
 	rm -f *.coverage
 
