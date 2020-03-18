@@ -165,8 +165,9 @@ val pp_subst : Format.formatter -> subst -> unit
 (** [subst s t] applies the given substitution to [t]. *)
 val subst : subst -> 'a term -> 'a term
 
-(** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'].
-  * @raise Substitution_error an exception if no such variable exists.*)
+(** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
+  * and [v] if the variable is not in the domain of the substitution.
+  * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
 (** {2 Predefined symbols} *)
@@ -198,6 +199,8 @@ val f_pair : fsymb
 val f_fst : fsymb
 val f_snd : fsymb
 
+val mk_and : formula -> formula -> formula
+val mk_or : formula -> formula -> formula
 
 
 (** Convert from bi-terms to terms

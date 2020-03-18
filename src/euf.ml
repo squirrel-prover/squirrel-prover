@@ -21,9 +21,9 @@ end
 (** Collect hashes for a given hash function and key.
   * We use the exact version of [iter_approx_macros], otherwise
   * we might obtain meaningless terms provided by [get_dummy_definition]. *)
-class get_hashed_messages ~system hash_fn key_n acc = object (self)
+class get_hashed_messages ~system hash_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:true ~system as super
-  val mutable hashes : (Vars.index list * Term.message) list = acc
+  val mutable hashes : (Vars.index list * Term.message) list = []
   method get_hashes = hashes
   method visit_message = function
     | Term.Fun ((hash_fn',_), [m;k]) when hash_fn' = hash_fn ->
@@ -84,39 +84,19 @@ let hash_key_ssc ~system hash_fn key_n messages =
     true
   with Bad_ssc -> false
 
-(** [h_o_term hash_fn key_n acc t] adds to [acc] all pairs [is,m] such that
-  * [hash_fn(m,key_n(is))] occurs in [t]. *)
-let h_o_term ~system hash_fn key_n acc t =
-  let iter = new get_hashed_messages ~system hash_fn key_n acc in
-  iter#visit_message t ;
-  iter#get_hashes
-
-let h_o_formula ~system hash_fn key_n acc f =
-  let iter = new get_hashed_messages ~system hash_fn key_n acc in
-  iter#visit_formula f ;
-  iter#get_hashes
-
 (** [hashes_of_action_descr ~system ~cond action_descr hash_fn key_n]
     returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs
     in an action description. The conditions of action descriptions are
     only considered if [cond]. *)
 let hashes_of_action_descr ~system ~cond action_descr hash_fn key_n =
-  let open Action in
-  let hashes =
-    List.fold_left (h_o_term ~system hash_fn key_n)
-      [] (snd action_descr.output :: (List.map snd action_descr.updates))
-  in
-  let hashes =
-    if cond then
-      h_o_formula ~system hash_fn key_n hashes (snd action_descr.condition)
-    else hashes
-  in
-  List.sort_uniq Pervasives.compare hashes
-
-let hashes_of_term ~system term hash_fn key_n =
-  h_o_term ~system hash_fn key_n [] term
+  let iter = new get_hashed_messages ~system hash_fn key_n in
+  iter#visit_message (snd action_descr.Action.output) ;
+  List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
+  if cond then iter#visit_formula (snd action_descr.Action.condition) ;
+  List.sort_uniq Pervasives.compare iter#get_hashes
 
 type euf_schema = { message : Term.message;
+                    key_indices : Vars.index list;
                     action_descr : Action.descr;
                     env : Vars.env }
 
@@ -131,7 +111,6 @@ let pp_euf_schema ppf case =
     has been hashed, and the key indices were [e.eindices]. *)
 type euf_direct = { d_key_indices : Vars.index list;
                     d_message : Term.message }
-
 
 let pp_euf_direct ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*key indices:@ @[<hov>%a@]@]@;\
@@ -165,33 +144,72 @@ let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
           let env = ref env in
           hashes_of_action_descr ~system ~cond action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
-            (* Replace key indices in hash by their value in goal. *)
-            let subst_is =
-              List.map2
-                (fun i j -> Term.(ESubst (Var i, Var j)))
+            (* Indices [key_is] from [env] must correspond to [is],
+             * which contains indices from [action_descr.indices]
+             * but also bound variables.
+             *
+             * Rather than refreshing all action indices, and generating
+             * new variable names for bound variables, we avoid it in
+             * simple cases: if a variable only occurs once in
+             * [is] then the only equality constraint on it is that
+             * it must be equal to the corresponding variable of [key_is],
+             * hence we can replace it by that variable rather
+             * than creating a new variable and an equality constraint.
+             * This is not sound with multiple occurrences in [is] since
+             * they induce equalities on the indices that pre-exist in
+             * [key_is].
+             *
+             * We compute next the list [safe_is] of simple cases,
+             * and the substitution for them. *)
+            let safe_is,subst_is =
+              let multiple i =
+                let n = List.length (List.filter ((=) i) is) in
+                  assert (n > 0) ;
+                  n > 1
+              in
+              List.fold_left2
+                (fun (safe_is,subst) i j ->
+                   if multiple i then safe_is,subst else
+                     i::safe_is,
+                     Term.(ESubst (Var i, Var j))::subst)
+                ([],[])
                 is key_is
             in
-            (* Refresh action indices other than key indices. *)
+            (* Refresh action indices other than [safe_is] indices. *)
             let subst_fresh =
               List.map
                 (fun i ->
                    Term.(ESubst (Var i,
                                  Var (Vars.make_fresh_from_and_update env i))))
                 (List.filter
-                   (fun x -> not (List.mem x is))
+                   (fun x -> not (List.mem x safe_is))
                    action_descr.Action.indices)
             in
-            (* Generate new variables for remaining variables in hash,
-             * which can come from internal bindings e.g. in universal
-             * quantifications. *)
+            (* Refresh bound variables from m and is, except those already
+             * handled above. *)
             let subst_bv =
+              (* Compute variables from m, add those from is
+               * while preserving unique occurrences in the list. *)
+              let vars = Term.get_vars m in
+              let vars =
+                List.fold_left
+                  (fun vars i ->
+                     if List.mem (Vars.EVar i) vars then vars else
+                       Vars.EVar i :: vars)
+                  vars
+                  is
+              in
+              (* Remove already handled variables, create substitution. *)
+              let index_not_seen i =
+                not (List.mem i safe_is) &&
+                not (List.mem i action_descr.Action.indices)
+              in
               let not_seen = function
                 | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-                    not (List.mem i is) &&
-                    not (List.mem i action_descr.Action.indices)
+                    index_not_seen i
                 | _ -> true
               in
-              let vars = List.filter not_seen (Term.get_vars m) in
+              let vars = List.filter not_seen vars in
               List.map
                 (function Vars.EVar v ->
                    Term.(ESubst (Var v,
@@ -201,15 +219,18 @@ let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
             let subst = subst_fresh @ subst_is @ subst_bv in
             let new_action_descr = Action.subst_descr subst action_descr in
             { message = Term.subst subst m ;
+              key_indices = List.map (Term.subst_var subst) is ;
               action_descr = new_action_descr;
               env = !env }))
       |> List.flatten;
 
     cases_direct =
-      List.map (fun term ->
-          hashes_of_term ~system term hash_fn key_n
-          |> List.map (fun (is,m) ->
-              { d_key_indices = is;
-                d_message = m })
-        ) [mess;sign]
-      |> List.flatten }
+      let hashes =
+        let iter = new get_hashed_messages ~system hash_fn key_n in
+        iter#visit_message mess ;
+        iter#visit_message sign ;
+        iter#get_hashes
+      in
+      List.map
+        (fun (d_key_indices,d_message) -> {d_key_indices;d_message})
+        hashes }

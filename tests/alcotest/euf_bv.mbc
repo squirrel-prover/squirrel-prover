@@ -10,6 +10,10 @@ goal forall (tau:timestamp, j,j1,j2:index),
 Proof.
   intros.
   euf M0.
-  (* This should not complete the proof. *)
-  (* Bonus question: why do we get two identical subgoals? *)
+  (* There should be two goals, for A1 and A, corresponding
+   * to the two branches of the system's conditional featuring
+   * relevant hashes.
+   * The goals should not be provable, as was the case in previous
+   * versions of the tactic where the bound variables were confused
+   * with the initial goal's variables. *)
 Qed. 

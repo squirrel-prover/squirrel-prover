@@ -230,10 +230,15 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/euf_deepkey.mbc")
     end ;
-    "Euf collect under forall", `Quick, begin fun () ->
+    "Euf collect indirect bound variables", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/euf_bv.mbc")
+    end ;
+    "Euf collect direct bound variables", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/euf_bv_direct.mbc")
     end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"

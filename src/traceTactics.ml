@@ -540,26 +540,6 @@ let () = T.register "assumption"
            \n Usage: assumption."
     assumption
 
-(** Utils *)
-
-let mk_or_cnstr l = match l with
-  | [] -> Term.False
-  | [a] -> a
-  | a :: l' ->
-    let rec mk_c acc = function
-      | [] -> acc
-      | x :: l -> mk_c (Term.Or (x,acc)) l in
-    mk_c a l'
-
-let mk_and_cnstr l = match l with
-  | [] -> Term.True
-  | [a] -> a
-  | a :: l' ->
-    let rec mk_c acc = function
-      | [] -> acc
-      | x :: l -> mk_c (Term.And (x,acc)) l in
-    mk_c a l'
-
 (** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)
@@ -738,10 +718,21 @@ let euf_param (`Message at : message_atom) = match at with
       (Tactics.Failure
          "Euf can only be applied to hypothesis of the form h(t,k)=m.")
 
-let euf_apply_schema sequent (_, (_, _), m, s) case =
+let euf_apply_schema sequent (_, (_, key_is), m, s) case =
   let open Euf in
-  (* We create the term equality *)
+
+  (* Equality between hashed messages *)
   let new_f = Term.Atom (`Message (`Eq, case.message, m)) in
+
+  (* Equalities between key indices *)
+  let eq_indices =
+    List.fold_left2
+      (fun cnstr i i' ->
+         Term.mk_and cnstr (Term.Atom (`Index (`Eq, i, i'))))
+      Term.True
+      key_is case.key_indices
+  in
+
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts = Action.to_term case.action_descr.Action.action in
@@ -754,23 +745,53 @@ let euf_apply_schema sequent (_, (_, _), m, s) case =
          | ts ->
              Term.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
       (snd (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
-    |> mk_or_cnstr
   in
-  (new_f, le_cnstr, case.env)
+  let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
 
-let euf_apply_direct _ (_, (_, key_is), m, _) dcase =
-  let open Euf in
-  (* We create the term equality *)
-  let eq = Term.Atom (`Message (`Eq, dcase.d_message, m)) in
-  (* Now, we need to add the timestamp constraint between [key_is] and
-     [dcase.d_key_indices]. *)
-  let eq_cnstr =
-    List.map2
-      (fun i i' -> Term.Atom (`Index (`Eq, i, i')))
-      key_is dcase.d_key_indices
-    |> mk_and_cnstr
+  let sequent = TraceSequent.set_env case.env sequent in
+  let sequent =
+    if eq_indices = Term.True then sequent else
+      TraceSequent.add_formula eq_indices sequent
   in
-  (eq, eq_cnstr)
+    TraceSequent.add_formula new_f
+      (TraceSequent.add_formula le_cnstr sequent)
+
+let euf_apply_direct s (_, (_, key_is), m, _) Euf.{d_key_indices;d_message} =
+  (* The components of the direct case may feature variables that are
+   * not in the current environment: this happens when the case is extracted
+   * from under a binder, e.g. a Seq or ForAll construct. We need to add
+   * such variables to the environment. *)
+  let init_env = TraceSequent.get_env s in
+  let subst,env =
+    List.fold_left
+      (fun (subst,env) (Vars.EVar v) ->
+         if Vars.mem init_env (Vars.name v) then subst,env else
+         let env,v' = Vars.make_fresh_from env v in
+         let subst = Term.(ESubst (Var v, Var v')) :: subst in
+         subst,env)
+      ([],init_env)
+      (List.sort_uniq Pervasives.compare
+         (List.map (fun i -> Vars.EVar i) d_key_indices @
+          Term.get_vars d_message))
+  in
+  let s = TraceSequent.set_env env s in
+  let d_message = Term.subst subst d_message in
+
+  (* Equality between hashed messages. *)
+  let eq_hashes = Term.Atom (`Message (`Eq, d_message, m)) in
+
+  (* Equality between key indices. *)
+  let eq_indices =
+    List.fold_left2
+      (fun cnstr i i' ->
+         let i' = Term.subst_var subst i' in
+         Term.mk_and cnstr (Term.Atom (`Index (`Eq, i, i'))))
+      Term.True
+      key_is d_key_indices
+  in
+
+  TraceSequent.add_formula eq_hashes s
+  |> TraceSequent.add_formula eq_indices
 
 let euf_apply_facts s at =
   let p = euf_param at in
@@ -779,18 +800,9 @@ let euf_apply_facts s at =
   let system = TraceSequent.system s in
   let rule = Euf.mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
-    List.map (fun case ->
-        let new_f, new_cnstr, new_env = euf_apply_schema s p case in
-        TraceSequent.add_formula new_f s
-        |> TraceSequent.add_formula new_cnstr
-        |> TraceSequent.set_env new_env
-      ) rule.Euf.case_schemata
+    List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =
-    List.map (fun case ->
-        let new_f, new_cnstr = euf_apply_direct s p case in
-        TraceSequent.add_formula new_f s
-        |> TraceSequent.add_formula new_cnstr
-      ) rule.Euf.cases_direct
+    List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
   schemata_premises @ direct_premises
 

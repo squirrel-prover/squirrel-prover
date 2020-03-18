@@ -7,6 +7,7 @@
     with fresh indices where relevant (i.e. for indices other than the
     key's indices).  *)
 type euf_schema = { message : Term.message;
+                    key_indices : Vars.index list;
                     action_descr : Action.descr;
                     env : Vars.env }
 

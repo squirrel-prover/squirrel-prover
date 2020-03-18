@@ -515,6 +515,14 @@ let f_diff = mk_fname "diff" [emessage;emessage] emessage
 let f_left = mk_fname "left" [emessage] emessage
 let f_right = mk_fname "right" [emessage] emessage
 
+let mk_and t1 t2 = match t1,t2 with
+  | True, t | t, True -> t
+  | t1,t2 -> And (t1,t2)
+
+let mk_or t1 t2 = match t1,t2 with
+  | False, t | t, False -> t
+  | t1,t2 -> And (t1,t2)
+
 (** Xor and its unit *)
 
 let f_xor = mk_fname "xor" [emessage;emessage] emessage
