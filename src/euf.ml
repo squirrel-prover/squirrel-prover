@@ -165,28 +165,44 @@ let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
           let env = ref env in
           hashes_of_action_descr ~system ~cond action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
+            (* Replace key indices in hash by their value in goal. *)
+            let subst_is =
+              List.map2
+                (fun i j -> Term.(ESubst (Var i, Var j)))
+                is key_is
+            in
+            (* Refresh action indices other than key indices. *)
             let subst_fresh =
               List.map
                 (fun i ->
-                   Term.ESubst (Term.Var i,Term.Var
-                                  (Vars.make_fresh_from_and_update env i)
-                               )
-                )
+                   Term.(ESubst (Var i,
+                                 Var (Vars.make_fresh_from_and_update env i))))
                 (List.filter
                    (fun x -> not (List.mem x is))
                    action_descr.Action.indices)
             in
-            let subst_is =
-              List.map2
-                (fun i j -> Term.ESubst (Term.Var i, Term.Var j))
-                is key_is
+            (* Generate new variables for remaining variables in hash,
+             * which can come from internal bindings e.g. in universal
+             * quantifications. *)
+            let subst_bv =
+              let not_seen = function
+                | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+                    not (List.mem i is) &&
+                    not (List.mem i action_descr.Action.indices)
+                | _ -> true
+              in
+              let vars = List.filter not_seen (Term.get_vars m) in
+              List.map
+                (function Vars.EVar v ->
+                   Term.(ESubst (Var v,
+                                 Var (Vars.make_fresh_from_and_update env v))))
+                vars
             in
-            let subst = subst_fresh@subst_is in
+            let subst = subst_fresh @ subst_is @ subst_bv in
             let new_action_descr = Action.subst_descr subst action_descr in
             { message = Term.subst subst m ;
               action_descr = new_action_descr;
-              env = !env })
-        )
+              env = !env }))
       |> List.flatten;
 
     cases_direct =

@@ -321,39 +321,45 @@ let subst_macro (s:subst) (symb, sort, is) =
   (symb, sort, List.map (subst_var s) is)
 
 
-module S =
-  Set.Make(
+module S = struct
+  include Set.Make(
   struct
     type t = Vars.evar
     let compare (Vars.EVar a) (Vars.EVar b) =
       compare (Vars.name a) (Vars.name b)
   end)
+  let add_list vars indices =
+    List.fold_left (fun vars i -> add (Vars.EVar i) vars) vars indices
+end
 
 let get_set_vars : 'a term -> S.t =
   fun term ->
 
-  let rec termvars : type a. a term -> S.t -> S.t =
-    begin
-    fun t vars -> match t with
-    | Action (_,indices) ->
-          List.fold_left (fun vars x -> S.add (Vars.EVar x) vars) vars indices
+  let rec termvars : type a. a term -> S.t -> S.t = fun t vars -> match t with
+    | Action (_,indices) -> S.add_list vars indices
     | Var tv -> S.add (Vars.EVar tv) vars
     | Pred ts -> termvars ts vars
-    | Fun (_, lt) ->  List.fold_left (fun vars x -> termvars x vars) vars lt
+    | Fun ((_,indices), lt) ->
+        let vars = S.add_list vars indices in
+        List.fold_left (fun vars x -> termvars x vars) vars lt
 
-    | Macro (_, l, ts) ->
+    | Macro ((_,_,indices), l, ts) ->
+      let vars = S.add_list vars indices in
       termvars ts (List.fold_left (fun vars x -> termvars x vars) vars l)
-    | Seq (a, b) -> S.diff (termvars b vars)
-                      (S.of_list (List.map (fun x-> Vars.EVar x) a))
-    | Name _ -> vars
+    | Seq (a, b) ->
+      S.diff
+        (termvars b vars)
+        (S.of_list (List.map (fun x -> Vars.EVar x) a))
+    | Name (_,indices) -> S.add_list vars indices
     | Init -> vars
     | Diff (a, b) -> termvars a (termvars b vars)
     | Left a -> termvars a vars
     | Right a -> termvars a vars
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
-      let a  = List.map (fun x-> Vars.EVar x) a |> S.of_list in
-      S.diff (termvars b (termvars c (termvars d vars))) a
+      S.diff
+        (termvars b (termvars c (termvars d vars)))
+        (S.of_list (List.map (fun x -> Vars.EVar x) a))
     | Atom a -> generic_atom_vars a vars
     | ForAll (a, b) -> S.diff (termvars b vars) (S.of_list a)
     | Exists (a, b) -> S.diff (termvars b vars) (S.of_list a)
@@ -363,7 +369,7 @@ let get_set_vars : 'a term -> S.t =
     | Impl (a, b) ->  termvars a (termvars b vars)
     | True -> vars
     | False -> vars
-  end
+
   and message_atom_vars (`Message (ord, a1, a2)) vars =
    termvars a1 (termvars a2 vars)
 

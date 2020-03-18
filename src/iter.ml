@@ -1,6 +1,7 @@
 open Term
 
 (** Iterate on all subfacts and subterms.
+  * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~system = object (self)
 
@@ -9,15 +10,31 @@ class iter ~system = object (self)
     | Macro ((mn, sort, is),l,a) ->
         List.iter self#visit_message l ;
         self#visit_message (Macros.get_definition system sort mn is a)
-    (* TODO currently manage the quantifications *)
-    | Seq (a, b) -> self#visit_message b
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | Left a -> self#visit_message a
     | Right a -> self#visit_message a
     | ITE (a, b, c) ->
         self#visit_formula a; self#visit_message b; self#visit_message c
+    | Seq (a, b) ->
+        let subst =
+          List.map
+            (fun v -> ESubst (Var v,
+                              Var (Vars.make_new_from v)))
+            a
+        in
+        let b = Term.subst subst b in
+        self#visit_message b
     | Find (a, b, c, d) ->
+        let subst =
+          List.map
+            (fun v -> ESubst (Var v,
+                              Var (Vars.make_new_from v)))
+            a
+        in
+        let b = Term.subst subst b in
+        let c = Term.subst subst c in
+        let d = Term.subst subst d in
         self#visit_formula b; self#visit_message c; self#visit_message d
 
   method visit_formula (f:Term.formula) =
@@ -27,8 +44,16 @@ class iter ~system = object (self)
         self#visit_formula r
     | Not f -> self#visit_formula f
     | True | False -> ()
-    (* TODO currently manage the quantifications *)
-    | ForAll (vs,l) | Exists (vs,l) -> self#visit_formula l
+    | ForAll (vs,l) | Exists (vs,l) ->
+        let subst =
+          List.map
+            (function
+               | Vars.EVar v ->
+                   ESubst (Var v, Var (Vars.make_new_from v)))
+            vs
+        in
+        let l = Term.subst subst l in
+        self#visit_formula l
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'

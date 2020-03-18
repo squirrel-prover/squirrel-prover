@@ -4,9 +4,9 @@
    simplest possible fresh variable, by incrementing the name_suffix. *)
 
 type 'a var =
-  {name_prefix : string;
-   name_suffix : int;
-   var_type : 'a Sorts.t }
+  { name_prefix : string;
+    name_suffix : int;
+    var_type : 'a Sorts.t }
 
 type index = Sorts.index var
 type message = Sorts.message var
@@ -49,6 +49,12 @@ let pp_typed_list ppf (vars:evar list) =
           | EVar v::vs -> aux [EVar v] (Sorts.ESort v.var_type) vs
   in
   aux [] Sorts.(ESort Message) vars
+
+let new_counter = ref 0
+let make_new_from v =
+  let name_prefix = "_" ^ v.name_prefix in
+  incr new_counter ;
+  { name_prefix ; name_suffix = !new_counter ; var_type = v.var_type }
 
 module M = Map.Make(String)
 
@@ -97,7 +103,7 @@ let rm_var (e1,e2) v =
    in
   M.remove (name v) e1, M.add v.name_prefix new_suffix e2
 
-let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+let prefix_count_regexp = Pcre.regexp "_*([^0-9]*)([0-9]*)"
 
 let make_fresh ((e1,e2):env) var_type name_prefix =
   let name_prefix,name_suffix =

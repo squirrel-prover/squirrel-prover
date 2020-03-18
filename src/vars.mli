@@ -4,7 +4,8 @@
 (** {2 Variables} *)
 
 (** Type of variables of sort ['a]. *)
-type 'a var
+type 'a var = private
+  { name_prefix : string ; name_suffix : int ; var_type : 'a Sorts.t }
 
 (** An [evar] is a variable of some sort. *)
 type evar = EVar : 'a var -> evar
@@ -32,6 +33,18 @@ val pp_list : Format.formatter -> 'a var list -> unit
 
 (** Print a list of variables, showing their names and sorts. *)
 val pp_typed_list : Format.formatter -> evar list -> unit
+
+(** [make_new_from v] generates a new variable of the same sort as
+  * [s] and whose prefix is the same as [s] but starting with ["_"];
+  * such special prefixes are forbidden in other ways to create
+  * variables.
+  * The variable is guaranteed to not appear anywhere else so far.
+  *
+  * The variables generated in this way are not meant to be seen by
+  * the user as they will feature arbitrarily large numerical suffixes;
+  * if needed they should be translated to more nicely named variables
+  * using the following API based on environments. *)
+val make_new_from : 'a var -> 'a var
 
 (** {2 Environments} *)
 
