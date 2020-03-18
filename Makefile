@@ -20,14 +20,14 @@ ok_test_end: $(PROVER_OK_TESTS:.mbc=.ok)
 	  cat tests/ok/tests.ko ; rm -f tests/ok/tests.ko ; exit 1 ; \
 	 else echo All tests passed successfully. ; fi
 tests/ok/test_prologue.ok:
-	@echo -n "Running tests/ok/*.mbc and examples/*.mbc "
+	@echo "Running tests/ok/*.mbc and examples/*.mbc."
 %.ok: tests/ok/test_prologue.ok %.mbc
 	@if ./metabc $(@:.ok=.mbc) > /dev/null 2> /dev/null ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.mbc)" >> tests/ok/tests.ko ; echo -n '!' ; fi
 
 alcotest: sanity
 	$(OCB) test.byte
-	./test.byte
+	./test.byte --compact
 
 clean:
 	$(OCB) -clean
