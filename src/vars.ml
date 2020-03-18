@@ -97,11 +97,21 @@ let rm_var (e1,e2) v =
    in
   M.remove (name v) e1, M.add v.name_prefix new_suffix e2
 
+let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+
 let make_fresh ((e1,e2):env) var_type name_prefix =
+  let name_prefix,name_suffix =
+    let substrings = Pcre.exec ~rex:prefix_count_regexp name_prefix in
+    let prefix = Pcre.get_substring substrings 1 in
+    let i0 = Pcre.get_substring substrings 2 in
+    let i0 = if i0 = "" then -1 else int_of_string i0 in
+    prefix, i0
+  in
   let name_suffix =
-    try
-      (M.find name_prefix e2) + 1
-    with Not_found -> 0
+    max name_suffix
+      (try
+         (M.find name_prefix e2) + 1
+       with Not_found -> 0)
   in
   let v = { name_prefix = name_prefix;
             name_suffix = name_suffix;
@@ -120,3 +130,53 @@ let make_fresh_from env v =
 
 let make_fresh_from_and_update env v =
   make_fresh_and_update env v.var_type v.name_prefix
+
+let () =
+  Checks.add_suite "Vars" [
+    "Prefix extension", `Quick, begin fun () ->
+      (* It should never be the case that v.name_prefix is
+       * a strict prefix of v'.name_prefix. Otherwise we can
+       * have different variables with the same name. *)
+      let env = empty_env in
+      let env,i = make_fresh env Sorts.Index "i" in
+      let env,i1 = make_fresh env Sorts.Index "i" in
+      let env,i2 = make_fresh env Sorts.Index "i1" in
+      Alcotest.(check string)
+        "proper name for i"
+        (name i) "i" ;
+      Alcotest.(check string)
+        "proper name for i1"
+        (name i1) "i1" ;
+      Alcotest.(check string)
+        "proper name for i2"
+        (name i2) "i2" ;
+      Alcotest.(check string)
+        "same prefixes"
+        i1.name_prefix i.name_prefix ;
+      Alcotest.(check string)
+        "same prefixes"
+        i1.name_prefix i2.name_prefix
+    end ;
+    "Prefix extension bis", `Quick, begin fun () ->
+      (* For backward compatibility, and to avoid refreshing
+       * user-provided variable names, we bump the suffix when
+       * the user provides a variable name that contains a
+       * numerical suffix. *)
+      let env = empty_env in
+      let env,i1 = make_fresh env Sorts.Index "i1" in
+      let _,i2 = make_fresh env Sorts.Index "i" in
+      let _,i2' = make_fresh env Sorts.Index "i1" in
+      let _,i2'' = make_fresh env Sorts.Index "i2" in
+      Alcotest.(check string)
+        "proper name for i1"
+        (name i1) "i1" ;
+      Alcotest.(check string)
+        "proper name for i2"
+        (name i2) "i2" ;
+      Alcotest.(check string)
+        "proper name for i2'"
+        (name i2') "i2" ;
+      Alcotest.(check string)
+        "proper name for i2''"
+        (name i2'') "i2"
+    end ]

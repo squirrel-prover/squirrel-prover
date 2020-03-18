@@ -13,7 +13,7 @@ channel c
 
 system A : !_i !_j new a; out(c,a).
 
-equiv test (i1,i2,j1,j2,i,j:index) : output@A(i,j),diff(output@A(i1,j1),output@A(i2,j2)).
+equiv test (i,j,i1,i2,j1,j2:index) : output@A(i,j),diff(output@A(i1,j1),output@A(i2,j2)).
 
 Proof.
   expand output@A(i,j).
