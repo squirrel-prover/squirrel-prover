@@ -58,8 +58,10 @@ let mk_var () =
   let () = incr var_cpt in
   Cvar !var_cpt
 
+exception Unsupported_conversion
+
 (** Translation from [term] to [cterm] *)
-let rec cterm_of_term c=
+let rec cterm_of_term c =
   let open Term in
   match c with
   | Fun (f,terms) -> Cfun (f, List.map cterm_of_term terms)
@@ -71,14 +73,18 @@ let rec cterm_of_term c=
   | Diff(c,d) -> Cfun( Term.f_diff, [cterm_of_term c; cterm_of_term d])
   | Left(m) -> Cfun( Term.f_left, [cterm_of_term m])
   | Right(m) -> Cfun( Term.f_right, [cterm_of_term m])
-  | _ -> Fmt.pr "%a" Term.pp c; failwith "Not implemented"
+  | _ ->
+    Fmt.pr "Unsupported term in completion: %a.@." Term.pp c ;
+    raise Unsupported_conversion
 and
   cterm_of_bterm c=
   let open Term in
   match c with
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
     Ccst (Cst.Cmacro (Cst.Bool m,ts))
-  | _ -> Fmt.pr "%a" Term.pp c; failwith "Not implemented"
+  | _ ->
+    Fmt.pr "Unsupported term in completion: %a.@." Term.pp c ;
+    raise Unsupported_conversion
 
 let rec term_of_cterm =
   let open Term in function
@@ -829,9 +835,15 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   |> finalize_completion
 
 let complete (l : (Term.message * Term.message) list) : state =
-  List.map (fun (u,v) -> ( cterm_of_term u, cterm_of_term v )) l
-  |> complete_cterms
-
+  let l =
+    List.fold_left
+      (fun l (u,v) ->
+         try (cterm_of_term u, cterm_of_term v) :: l with
+           | Unsupported_conversion -> l)
+      []
+      l
+  in
+  complete_cterms l
 
 
 (****************)
@@ -898,7 +910,9 @@ let star_apply f = function
     star [] l
 
 let x_index_cnstrs state l select f_cnstr =
-  List.map cterm_of_term l
+  List.fold_left
+    (fun l t -> try cterm_of_term t :: l with Unsupported_conversion -> l)
+    [] l
   |> subterms
   |> List.filter select
   |> List.sort_uniq Pervasives.compare
