@@ -325,6 +325,8 @@ class get_actions ~(system:Action.system) exact acc = object (self)
     | _ -> super#visit_formula f
 end
 
+(** Returns a formula expressing that vectors of indices vect_i and vect_j
+  * are different (at least one component differs). *)
 let mk_indices_ineq vect_i vect_j =
   List.fold_left
     (fun acc e -> Term.Or(acc,e))
@@ -332,66 +334,8 @@ let mk_indices_ineq vect_i vect_j =
     (List.map2 (fun i j -> Term.Atom (`Index (`Neq, i, j))) vect_i vect_j)
 
 let mk_phi_proj system env name indices proj biframe =
-  let list_of_indices_from_frame =
-    let iter = new get_name_indices ~system false name [] in
-    List.iter iter#visit_term biframe ;
-    iter#get_indices
-  and list_of_actions_from_frame =
-    let iter = new get_actions ~system false [] in
-    List.iter iter#visit_term biframe ;
-    iter#get_actions
-  and tbl_of_action_indices = Hashtbl.create 10 in
-  let iter = new get_name_indices ~system false name [] in
-  Action.(iter_descrs system
-    (fun action_descr ->
-       let descr_proj = Action.pi_descr proj action_descr in
-       iter#visit_formula (snd descr_proj.condition) ;
-       iter#visit_message (snd descr_proj.output) ;
-       List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
-       Hashtbl.add tbl_of_action_indices descr_proj iter#get_indices));
-  let phi_frame =
-    List.fold_left
-      (fun acc f -> Term.And(acc,f))
-      Term.True
-      (List.map (fun j -> mk_indices_ineq indices j) list_of_indices_from_frame)
-  and phi_actions =
-    Seq.fold_left
-      (fun acc f -> Term.And(acc,f))
-      Term.True
-      (Seq.map
-        (fun a ->
-          let new_indices =
-          (* FIXME index variables generated here are not fresh  *)
-            List.map
-              (fun i -> snd (Vars.make_fresh_from env i))
-              a.Action.indices
-          in
-          let subst =
-            List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-              a.Action.indices new_indices
-          in
-          let new_name = Action.to_term (Action.subst_action subst a.Action.action) in
-          let disj =
-            List.fold_left
-              (fun acc f -> Term.Or(acc,f))
-              Term.False
-              (List.map (fun t -> Term.Atom (`Timestamp (`Leq, new_name, t))) list_of_actions_from_frame)
-          and conj =
-            List.fold_left
-              (fun acc f -> Term.And(acc,f))
-              Term.True
-              (List.map (fun j -> mk_indices_ineq new_indices j)
-                        (Hashtbl.find tbl_of_action_indices a))
-          in
-          let forall_var = List.map (fun i -> Vars.EVar i) new_indices in
-          Term.ForAll(forall_var,Term.Impl(disj,conj)))
-        (Hashtbl.to_seq_keys tbl_of_action_indices))
-  in
-  Term.And(phi_frame,phi_actions)
-
-let mk_fresh_cond system env name indices proj biframe =
+  let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
   begin try
-    let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
     match indices with
     | [] -> let iter_frame = new find_name ~system false name in
             List.iter iter_frame#visit_term proj_frame;
@@ -400,9 +344,75 @@ let mk_fresh_cond system env name indices proj biframe =
               (fun action_descr ->
                  iter_actions#visit_formula (snd action_descr.condition) ;
                  iter_actions#visit_message (snd action_descr.output) ;
-                 List.iter (fun (_,t) -> iter_actions#visit_message t) action_descr.updates));
+                 List.iter (fun (_,t) -> iter_actions#visit_message t)
+                  action_descr.updates));
             Term.True
-    | _  -> mk_phi_proj system env name indices proj proj_frame
+    | _  -> let list_of_indices_from_frame =
+              let iter = new get_name_indices ~system false name [] in
+              List.iter iter#visit_term biframe ;
+              iter#get_indices
+            and list_of_actions_from_frame =
+              let iter = new get_actions ~system false [] in
+              List.iter iter#visit_term biframe ;
+              iter#get_actions
+            and tbl_of_action_indices = Hashtbl.create 10 in
+            let iter = new get_name_indices ~system false name [] in
+            Action.(iter_descrs system
+              (fun action_descr ->
+                 let descr_proj = Action.pi_descr proj action_descr in
+                 iter#visit_formula (snd descr_proj.condition) ;
+                 iter#visit_message (snd descr_proj.output) ;
+                 List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
+                 (* we add only actions in which name occurs *)
+                 let action_indices = iter#get_indices in
+                 if List.length action_indices > 0 then
+                  Hashtbl.add tbl_of_action_indices descr_proj action_indices));
+            (* direct cases (for explicit occurences of name in the frame) *)
+            let phi_frame =
+              List.fold_left
+                (fun acc f -> Term.And(acc,f))
+                Term.True
+                (List.map (fun j -> mk_indices_ineq indices j) list_of_indices_from_frame)
+            (* undirect cases (for occurences of name in actions of the system) *)
+            and phi_actions =
+              Seq.fold_left
+                (fun acc f -> Term.And(acc,f))
+                Term.True
+                (Seq.map
+                  (* for each action in which name occurs *)
+                  (fun a ->
+                    let new_action_indices =
+                      List.map
+                        (fun i -> Vars.make_fresh_from_and_update env i)
+                        a.Action.indices
+                    in
+                    let subst =
+                      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+                        a.Action.indices new_action_indices
+                    in
+                    let new_action = Action.to_term (Action.subst_action subst a.Action.action) in
+                    let new_name_indices = List.map (Term.subst_var subst) indices in
+                    (* if action a occurs before an action of the frame *)
+                    let disj =
+                      List.fold_left
+                        (fun acc f -> Term.Or(acc,f))
+                        Term.False
+                        (List.map
+                          (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                          list_of_actions_from_frame)
+                    (* then indices of action a and of name differ *)
+                    and conj =
+                      List.fold_left
+                        (fun acc f -> Term.And(acc,f))
+                        Term.True
+                        (List.map (fun j -> mk_indices_ineq new_name_indices j)
+                                  (Hashtbl.find tbl_of_action_indices a))
+                    in
+                    let forall_var = List.map (fun i -> Vars.EVar i) new_action_indices in
+                    Term.ForAll(forall_var,Term.Impl(disj,conj)))
+                  (Hashtbl.to_seq_keys tbl_of_action_indices))
+            in
+            Term.And(phi_frame,phi_actions)
   with
   | Name_found -> raise @@ Tactics.Tactic_hard_failure
                   (Tactics.Failure "Name not fresh")
@@ -413,43 +423,63 @@ let mk_fresh_cond system env name indices proj biframe =
 let rec clean_formula f = match f with
   | Term.And(f1,Term.True) -> clean_formula f1
   | Term.And(Term.True,f2) -> clean_formula f2
+  | Term.And(f1,f2) ->
+      let cf1,cf2 = clean_formula f1, clean_formula f2 in
+      if cf1 = f1 && cf2 = f2 then Term.And(f1,f2)
+      else clean_formula (Term.And(cf1,cf2))
   | Term.Or(f1,Term.False) -> clean_formula f1
   | Term.Or(Term.False,f2) -> clean_formula f2
-  | Term.And(f1,f2) -> Term.And(clean_formula f1, clean_formula f2)
-  | Term.Or(f1,f2) -> Term.Or(clean_formula f1, clean_formula f2)
-  | Term.Not f -> Term.Not (clean_formula f)
-  | Term.Impl(f1,f2) -> Term.Impl (clean_formula f1, clean_formula f2)
-  | Term.ForAll(v,f) -> Term.ForAll (v, clean_formula f)
+  | Term.Or(f1,f2) ->
+      let cf1,cf2 = clean_formula f1, clean_formula f2 in
+      if cf1 = f1 && cf2 = f2 then Term.Or(f1,f2)
+      else clean_formula (Term.Or(cf1,cf2))
+  | Term.Impl(Term.False,_) -> Term.True
+  | Term.Impl(f1,f2) ->
+      let cf1,cf2 = clean_formula f1, clean_formula f2 in
+      if cf1 = f1 && cf2 = f2 then Term.Impl(f1,f2)
+      else clean_formula (Term.Impl(cf1,cf2))
+  | Term.ForAll(_,Term.True) -> Term.True
+  | Term.ForAll(_,Term.False) -> Term.False
+  | Term.ForAll(v,f) ->
+      let cf = clean_formula f in
+      if cf = f then Term.ForAll(v,f)
+      else clean_formula (Term.ForAll(v,cf))
   | _ -> f
 
-let mk_if_term system env n_left ind_left n_right ind_right biframe =
-  let system_left = Action.(make_trace_system system.left) in
-  let phi_left = mk_fresh_cond system_left env n_left ind_left Term.Left biframe in
-  let system_right = Action.(make_trace_system system.right) in
-  let phi_right = mk_fresh_cond system_right env n_right ind_right Term.Right biframe in
-  let then_branch = Term.Fun (Term.f_zero,[]) in
-  let else_branch =
-    Term.Diff (Term.Name (n_left, ind_left),Term.Name (n_right, ind_right)) in
-  match clean_formula (Term.And(phi_left,phi_right)) with
-  | Term.True -> EquivSequent.Message then_branch
-  | phi -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
+(** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
+let mk_if_term system env e biframe =
+  let not_name_failure = Tactics.Tactic_hard_failure
+    (Tactics.Failure "Can only apply fresh tactic on names") in
+  match e with
+  | EquivSequent.Message t ->
+      begin
+      let (n_left, ind_left, n_right, ind_right) =
+        match Term.pi_term true Term.Left t, Term.pi_term true Term.Right t with
+        | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
+        | _ -> raise @@ not_name_failure
+      in
+      let env_local = ref env in
+      let system_left = Action.(make_trace_system system.left) in
+      let phi_left = mk_phi_proj system_left env_local n_left ind_left Term.Left biframe in
+      let system_right = Action.(make_trace_system system.right) in
+      let phi_right = mk_phi_proj system_right env_local n_right ind_right Term.Right biframe in
+      let then_branch = Term.Fun (Term.f_zero,[]) in
+      let else_branch = t in
+      match clean_formula (Term.And(phi_left,phi_right)) with
+      | Term.True -> EquivSequent.Message then_branch
+      | phi -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
+      end
+  | EquivSequent.Formula f -> raise @@ not_name_failure
 
 let fresh i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
         begin try
-          let (n_left, ind_left, n_right, ind_right) =
-            match EquivSequent.pi_elem Term.Left e, EquivSequent.pi_elem Term.Right e with
-            | (EquivSequent.Message Name (nl,isl),
-              EquivSequent.Message Name (nr,isr)) -> (nl,isl,nr,isr)
-            | _ -> raise @@ Tactics.Tactic_hard_failure
-                    (Tactics.Failure "Can only apply fresh on names")
-          in
+          (* the biframe to consider when checking the freshness *)
           let biframe = List.rev_append before after in
           let system = (EquivSequent.get_system s) in
           let env = EquivSequent.get_env s in
-          Printf.printf "env length %n \n" (List.length (Vars.to_list env));
-          let if_term = mk_if_term system env n_left ind_left n_right ind_right biframe in
+          let if_term = mk_if_term system env e biframe in
           let biframe = (List.rev_append before (if_term::after)) in
           sk [EquivSequent.set_biframe s biframe] fk
         with
