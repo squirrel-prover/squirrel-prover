@@ -9,7 +9,8 @@ PROVER_OK_TESTS = $(wildcard tests/ok/*.mbc) $(wildcard examples/*.mbc)
 
 test: alcotest ok_test
 
-.PHONY: ok_test
+.PHONY: ok_test ok_test_end alcotest
+
 ok_test:
 	@$(MAKE) -j8 ok_test_end
 ok_test_end: $(PROVER_OK_TESTS:.mbc=.ok)
@@ -27,7 +28,9 @@ tests/ok/test_prologue.ok:
 
 alcotest: sanity
 	$(OCB) test.byte
-	./test.byte --compact
+	@mkdir -p ./_build/_tests
+	@rm -f ./_build/_tests/MetaBC ./_build/_tests/latest
+	./test.byte --compact -o ./_build/_tests
 
 clean:
 	$(OCB) -clean
