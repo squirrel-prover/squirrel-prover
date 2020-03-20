@@ -98,6 +98,9 @@ let rec pp_term ppf = function
   | Exists (vs, b) ->
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
+  | And (Impl (bl1,br1), Impl(br2,bl2)) when bl1=bl2 && br1=br2 ->
+    Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
+            pp_term bl1 pp_term br1
   | And (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       pp_term bl pp_term br

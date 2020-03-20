@@ -48,6 +48,7 @@ rule token = parse
 | '|'                 { PARALLEL }
 | "->"                { ARROW }
 | "=>"                { DARROW }
+| "<=>"               { DEQUIVARROW }
 | ":="                { ASSIGN }
 | "-"                 { MINUS }
 | "@"                 { AT }

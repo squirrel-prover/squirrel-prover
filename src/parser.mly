@@ -13,7 +13,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
-%token EXISTS FORALL QUANTIF GOAL EQUIV DARROW AXIOM
+%token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP
 %token PROOF QED UNDO
@@ -28,6 +28,7 @@
 %nonassoc ELSE
 %nonassoc QUANTIF
 %right DARROW
+%right DEQUIVARROW
 %left OR
 %left AND
 %nonassoc NOT
@@ -121,6 +122,7 @@ formula:
 | formula AND formula            { Theory.And ($1,$3) }
 | formula OR formula             { Theory.Or ($1,$3) }
 | formula DARROW formula         { Theory.Impl ($1,$3) }
+| formula DEQUIVARROW formula    { Theory.And (Theory.Impl ($1,$3), Theory.Impl ($3,$1)) }
 | NOT formula                    { Theory.Not ($2) }
 | FALSE                          { Theory.False }
 | TRUE                           { Theory.True }
