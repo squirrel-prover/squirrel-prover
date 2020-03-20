@@ -44,6 +44,9 @@ class iter ~system = object (self)
         self#visit_formula r
     | Not f -> self#visit_formula f
     | True | False -> ()
+    | Diff(a, b) -> self#visit_formula a; self#visit_formula b
+    | Left a -> self#visit_formula a
+    | Right a -> self#visit_formula a
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst =
           List.map

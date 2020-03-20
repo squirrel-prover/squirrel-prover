@@ -35,6 +35,7 @@ type tac_error =
   | NoAssumpSystem
   | NotDepends of string * string
   | Undefined of string
+  | NotDDHContext
 
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error

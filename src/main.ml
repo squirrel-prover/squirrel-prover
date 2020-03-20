@@ -262,4 +262,14 @@ let () =
         (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
         (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
     end ;
+    "DDH", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Tactics.NotDDHContext)
+        (fun () -> run ~test "tests/alcotest/ddh.mbc")
+    end ;
+    "DDH2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Tactics.NotDDHContext)
+        (fun () -> run ~test "tests/alcotest/ddh.mbc")
+    end ;
   ]

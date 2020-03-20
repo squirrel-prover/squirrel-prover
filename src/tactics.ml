@@ -6,6 +6,7 @@ type tac_error =
   | NoAssumpSystem
   | NotDepends of string * string
   | Undefined of string
+  | NotDDHContext
 
 let rec pp_tac_error ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
@@ -22,7 +23,8 @@ let rec pp_tac_error ppf = function
                            a b
   | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
                                   current system"
-
+  | NotDDHContext -> Fmt.pf ppf "the current system cannot be seen as a context \
+                              of the given ddh shares"
 
 exception Tactic_soft_failure of tac_error
 

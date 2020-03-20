@@ -1,0 +1,20 @@
+name a : index -> message
+name b : index -> message
+name k : index -> message
+
+channel c
+
+system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
+
+
+equiv ddh.
+Proof.
+induction t.
+expand frame@init; expand exec@init.
+
+ddh a(i), b(i), k(i).
+
+expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
+
+fa 0. fa 1. fa 2.  fa 2. assumption.
+Qed.
