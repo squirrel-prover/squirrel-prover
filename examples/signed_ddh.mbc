@@ -14,17 +14,21 @@ channel cS
 
 name a : index -> message
 name b : index -> message
+name k : index -> index -> message
 
 term test : boolean = zero
 
 process P(i:index) =
   out(cP, g^a(i));
   in(cP, t);
-  let sS = fst(t) in
   let hash_share = snd(t) in
   if h(<g^a(i),snd(fst(t))>,kS) = snd(t) then
-    keyP(i) := <g^a(i),snd(fst(t))>;
-    out(cP, h(<g^a(i),snd(fst(t))>,kP))
+    out(cP, h(<g^a(i),snd(fst(t))>,kP));
+    in(cP, challenge);
+    try find j such that snd(fst(t)) = g^b(j) in
+      out(cP, diff(g^a(i)^b(j),g^k(i,j)))
+    else
+      out(cP, diff(ok,ko))
   else null
 
 process S(i:index) =
@@ -32,13 +36,12 @@ process S(i:index) =
   out(cS, < <sP,g^b(i)>, h(<sP,g^b(i)>,kS)>);
   in(cS, hash_shares);
   if hash_shares = h(<sP,g^b(i)>,kP) then
-    keyS(i) := <sP,g^b(i)>;
     out(cS,ok);
-    in(cP, challenge);
-    try find j such that sP = g^a(j) in
-      out(cP, ok)
+    in(cS, challenge);
+    try find l such that sP = g^a(l) in
+      out(cS, diff(g^a(l)^b(i),g^k(l,i)))
     else
-      out(cP, diff(ok,ko))
+      out(cS, diff(ok,ko))
   else null
 
 system (!_i P(i) | !_j S(j)).
@@ -67,9 +70,23 @@ Proof.
   exists i.
 Qed.
 
+(* Show that condition S1 implies the next one. *)
+goal P1_charac :
+  forall (r:index),
+cond@P1(r) =>
+  exists (s:index),
+  snd(fst(input@P1(r))) = g^b(s).
+Proof.
+  simpl.
+  expand cond@P1(r).
+  introsleft H0. (* TODO should be done as part of expansion *)
+  euf M0.
+  exists j.
+Qed.
+
 equiv unreach.
     Proof.
-   enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)).
+   enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->g^a(i)^b(j)).
 
     induction t.
 
@@ -77,33 +94,50 @@ equiv unreach.
    expand exec@init.
 
    expand frame@P(i); expand output@P(i); expand exec@P(i); expand cond@P(i).
-    fa 5; fa 6; fa 4. fa 6.
+    fa 6; fa 7; fa 5. fa 7.
     expand  seq(i->g^a(i)), i.
     assumption.
 
    expand frame@P1(i); expand exec@P1(i); expand output@P1(i); expand cond@P1(i).
-    fa 5; fa 4. fa 7; fa 7. dup 8. fa 5. fa 6. dup 6.
-    fa 5. fa 9. dup 5. fa 8. fa 9; fa 9. dup 9.
+    fa 6; fa 5. fa 8; fa 8. dup 9. fa 6. fa 7. dup 7.
+    fa 6. fa 10. dup 6. fa 9. fa 10; fa 10. dup 10.
     expand  seq(i->g^a(i)), i.
     assumption.
 
 
+   expand frame@P2(i,j); expand exec@P2(i,j); expand output@P2(i,j); expand cond@P2(i,j).
+   fa 6; fa 7. dup 5. fa 6; fa 7; fa 7; fa 7; dup 7.
+   expand seq(i->g^b(i)), j. ddh a(i), b(j), k(i,j).  assumption.
+
+
+   expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
+   equivalent cond@P3(i), False.
+   expand cond@P3(i).
+   executable pred(P3(i)).
+
+   depends P1(i), P3(i).
+   apply H1 to P1(i).
+   apply P1_charac to i.
+   apply H0 to s.
+
+   fa 6.  noif 7. simpl. fa 5.  assumption.
+
    expand frame@A(i); expand output@A(i); expand exec@A(i); expand cond@A(i).
-    fa 5.  fa 6. fa 6.  fa 4. dup 5. fa 7;fa 7; fa 7; fa 7.
-    fa 8 ; fa 8.
-    fa 10.
-    dup 10.
-    dup 6.
+    fa 6.  fa 7. fa 7.  fa 5. dup 6. fa 8;fa 8; fa 8; fa 8.
+    fa 9; fa 9.
+    fa 11.
+    dup 11.
+    dup 7.
     expand  seq(i->g^a(i)), i.
-    dup 8; dup 7.
+    dup 9; dup 8.
     assumption.
 
 
 
    expand frame@S(j); expand output@S(j); expand exec@S(j); expand cond@S(j).
 
-   fa 4;fa 5; fa 5; fa 6; fa 6; fa 7. fa 7. fa 7. fa 9. fa 9.
-    dup 7. dup 8.
+   fa 5;fa 6; fa 6; fa 7; fa 7; fa 8. fa 8. fa 8. fa 10. fa 10.
+    dup 8. dup 9.
     expand  seq(i->g^b(i)), j.
 
     assumption.
@@ -113,22 +147,24 @@ equiv unreach.
   expand output@S1(j).
   expand exec@S1(j).
   expand cond@S1(j).
-  fa 4.
-  fa 5. fa 7.
-  dup 5. fa 7. fa 7.
-  fa 8.
-  dup 7.  dup 8.
   fa 5.
-  fa 5.
+  fa 6. fa 8.
+  dup 6. fa 8. fa 8.
+  fa 9.
+  dup 8.  dup 9.
+  fa 6.
+  fa 6.
   expand  seq(i->g^b(i)), j.
-  dup 9. dup 5.
+  dup 10. dup 6.
   assumption.
-  expand frame@S2(j,j1).
-  expand output@S2(j,j1).
-  expand exec@S2(j,j1).
-  expand cond@S2(j,j1).
-  fa 4; fa 5. fa 7. fa 8. fa 8. fa 9. dup 9; dup 5.
-  expand  seq(i->g^a(i)), j1.
+  expand frame@S2(j,l).
+  expand output@S2(j,l).
+  expand exec@S2(j,l).
+  expand cond@S2(j,l).
+  fa 5; fa 6. fa 8. fa 9. fa 9. fa 10. dup 10; dup 6.
+  expand  seq(i->g^a(i)), l.
+  ddh a(l), b(j), k(l,j).
+
   assumption.
 
 
@@ -145,15 +181,15 @@ equiv unreach.
    apply S1_charac to j.
    apply H0 to s.
 
+   fa 6.
+   noif 7. simpl.
    fa 5.
-   noif 6. simpl.
-   fa 4.
    assumption.
 
 
    expand frame@A1(j); expand output@A1(j); expand exec@A1(j); expand cond@A1(j).
 
-    fa 5; fa 6; dup 6. fa 4;fa 5; fa 5; fa 6; fa 6. dup 5. dup 5.
+    fa 6; fa 7; dup 7. fa 5;fa 6; fa 6; fa 7; fa 7. dup 6. dup 6.
     expand  seq(i->g^b(i)), j.
    assumption.
 
