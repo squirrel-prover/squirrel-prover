@@ -346,7 +346,7 @@ end
   * are different (at least one component differs). *)
 let mk_indices_ineq vect_i vect_j =
   List.fold_left
-    (fun acc e -> Term.Or(acc,e))
+    (fun acc e -> Term.mk_or acc e)
     Term.False
     (List.map2 (fun i j -> Term.Atom (`Index (`Neq, i, j))) vect_i vect_j)
 
@@ -387,13 +387,13 @@ let mk_phi_proj system env name indices proj biframe =
             (* direct cases (for explicit occurences of name in the frame) *)
             let phi_frame =
               List.fold_left
-                (fun acc f -> Term.And(acc,f))
+                (fun acc f -> Term.mk_and acc f)
                 Term.True
                 (List.map (fun j -> mk_indices_ineq indices j) list_of_indices_from_frame)
             (* undirect cases (for occurences of name in actions of the system) *)
             and phi_actions =
               Seq.fold_left
-                (fun acc f -> Term.And(acc,f))
+                (fun acc f -> Term.mk_and acc f)
                 Term.True
                 (Seq.map
                   (* for each action in which name occurs *)
@@ -417,7 +417,7 @@ let mk_phi_proj system env name indices proj biframe =
                     (* if new_action occurs before an action of the frame *)
                     let disj =
                       List.fold_left
-                        (fun acc f -> Term.Or(acc,f))
+                        (fun acc f -> Term.mk_or acc f)
                         Term.False
                         (List.map
                           (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
@@ -425,7 +425,7 @@ let mk_phi_proj system env name indices proj biframe =
                     (* then indices of name in new_action and of name differ *)
                     and conj =
                       List.fold_left
-                        (fun acc f -> Term.And(acc,f))
+                        (fun acc f -> Term.mk_and acc f)
                         Term.True
                         (List.map (fun j -> mk_indices_ineq new_name_indices j)
                                   (Hashtbl.find tbl_of_action_indices a))
@@ -434,39 +434,13 @@ let mk_phi_proj system env name indices proj biframe =
                     Term.ForAll(forall_var,Term.Impl(disj,conj)))
                   (Hashtbl.to_seq_keys tbl_of_action_indices))
             in
-            Term.And(phi_frame,phi_actions)
+            (Term.mk_and phi_frame phi_actions)
   with
   | Name_found -> raise @@ Tactics.Tactic_hard_failure
                   (Tactics.Failure "Name not fresh")
   | Var_found -> raise @@ Tactics.Tactic_hard_failure
                  (Tactics.Failure "Variable found, unsound to apply fresh")
   end
-
-let rec clean_formula f = match f with
-  | Term.And(f1,Term.True) -> clean_formula f1
-  | Term.And(Term.True,f2) -> clean_formula f2
-  | Term.And(f1,f2) ->
-      let cf1,cf2 = clean_formula f1, clean_formula f2 in
-      if cf1 = f1 && cf2 = f2 then Term.And(f1,f2)
-      else clean_formula (Term.And(cf1,cf2))
-  | Term.Or(f1,Term.False) -> clean_formula f1
-  | Term.Or(Term.False,f2) -> clean_formula f2
-  | Term.Or(f1,f2) ->
-      let cf1,cf2 = clean_formula f1, clean_formula f2 in
-      if cf1 = f1 && cf2 = f2 then Term.Or(f1,f2)
-      else clean_formula (Term.Or(cf1,cf2))
-  | Term.Impl(Term.False,_) -> Term.True
-  | Term.Impl(f1,f2) ->
-      let cf1,cf2 = clean_formula f1, clean_formula f2 in
-      if cf1 = f1 && cf2 = f2 then Term.Impl(f1,f2)
-      else clean_formula (Term.Impl(cf1,cf2))
-  | Term.ForAll(_,Term.True) -> Term.True
-  | Term.ForAll(_,Term.False) -> Term.False
-  | Term.ForAll(v,f) ->
-      let cf = clean_formula f in
-      if cf = f then Term.ForAll(v,f)
-      else clean_formula (Term.ForAll(v,cf))
-  | _ -> f
 
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
 let mk_if_term system env e biframe =
@@ -487,7 +461,7 @@ let mk_if_term system env e biframe =
       let phi_right = mk_phi_proj system_right env_local n_right ind_right Term.Right biframe in
       let then_branch = Term.Fun (Term.f_zero,[]) in
       let else_branch = t in
-      match clean_formula (Term.And(phi_left,phi_right)) with
+      match (Term.mk_and phi_left phi_right) with
       | Term.True -> EquivSequent.Message then_branch
       | phi -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
       end
