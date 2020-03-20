@@ -770,12 +770,11 @@ let yes_if i s sk fk =
          let biframe = List.rev_append before (positive_branch :: after) in
          let env = EquivSequent.get_env s in
          let system = EquivSequent.get_system s in
-         let trace_sequent = TraceSequent.init ~system
-             (Term.Impl(cond,True))
+         let trace_sequent = TraceSequent.init ~system cond
                                   |> TraceSequent.set_env env
-          in
-          sk [Prover.Goal.Trace trace_sequent;
-              Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
+         in
+         sk [Prover.Goal.Trace trace_sequent;
+             Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
        with
          | Tactics.Tactic_soft_failure err -> fk err
        end

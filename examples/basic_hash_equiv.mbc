@@ -110,7 +110,7 @@ Proof.
   admit 3. (* TODO PRF (+fresh?) *)
   fresh 2.
   yesif 2.
-  intros.
+  split.
+  admit. admit. (* TODO *)
   assumption.
-
 Qed.
