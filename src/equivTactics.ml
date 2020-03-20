@@ -63,13 +63,13 @@ let refl (s : EquivSequent.t) sk fk =
   else
     fk (Tactics.Failure "Frames not identical")
 
-
 let () =
   T.register "refl"
     ~help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
-
+(** For each element of the biframe, checks that it is a member of the list of
+   hypotesis. If so, close the goal. *)
 let assumption s sk fk =
   let hypothesis = EquivSequent.get_hypothesis_biframe s in
   if List.for_all (fun elem -> List.mem elem hypothesis)
@@ -83,12 +83,19 @@ let () =
     ~help:"Close a goal contained in its hypothesis.\n Usage: assump."
     (only_equiv assumption)
 
+
+(** Given a timestamp [ts] wich does not occur inside the hypothesis, from a
+   judgement [s] of the form H => E, where H is the hypothesis set and E the
+   frame, produces the judgments H=>E{ts -> init} and H /\ E{ts->pred ts} =>
+   E. The second one is then direclty simplified by a case on all possible
+   values of ts, producing a judgement for each. *)
 let induction ts s sk fk =
   let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
   let ts = Theory.convert tsubst ts Sorts.Timestamp in
   match ts with
   | Var t ->
+    (* we check that variable does not occur in the premise *)
     if List.exists (function
         | EquivSequent.Message m -> List.mem (Vars.EVar t)
                                       (Term.get_vars m)
@@ -98,6 +105,7 @@ let induction ts s sk fk =
         (EquivSequent.get_hypothesis_biframe s) then
       raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "Variable should not occur in the premise");
+    (* we remove ts from the sequent, as it becomes unused *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
     let subst = [Term.ESubst(ts,Pred(ts))] in
     let goal = EquivSequent.get_biframe s in
@@ -108,6 +116,8 @@ let induction ts s sk fk =
                       s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
     in
     let goals = ref [] in
+    (* add_action a adds to goals the goal corresponding to the case where t is
+       instantiated by a. *)
     let add_action a =
       let env = ref @@ EquivSequent.get_env induc_goal in
       let indices =
@@ -139,8 +149,10 @@ let () =
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+(* Enrich adds the term [t] to the judgement [s]. *)
 let enrich (t : Theory.term) s sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  (* we try to convert the Theory.term as either boolean or message *)
   let elem = match Theory.convert tsubst t Sorts.Boolean with
     | f -> EquivSequent.Formula f
     | exception _ ->
@@ -162,11 +174,14 @@ let () = T.register_general "enrich"
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
-
+(* Splits [s] into subgoals, replacing [ts] by all the possible
+   actions. *)
 let timestamp_case ts s sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
   let ts = Theory.convert tsubst ts Sorts.Timestamp in
   let goals = ref [] in
+  (* add_action a adds to goals the goal corresponding to s where t as been
+     instantiated with the action a *)
   let add_action a =
     let env = ref @@ EquivSequent.get_env s in
     let indices =
@@ -198,11 +213,13 @@ let () =
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+(* Removes all the constant elements from the frame of [s] *)
 let const s sk fk =
   let frame = EquivSequent.get_biframe s in
   let rec is_const : type a. a Term.term -> bool = function
     | True -> true
     | False -> true
+    (* a symbol function with arity 0, or applied to constants, is a constant *)
     | Fun (f,l) -> List.for_all is_const l
     | And (f, g) -> (is_const f) && (is_const g)
     | Or (f, g) -> (is_const f) && (is_const g)
@@ -550,17 +567,22 @@ let () =
        | [Prover.Int i] -> pure_equiv (xor i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Improper arguments"))
 
+(** Removes from the frame its [i]-th element if it is duplicated
+   somewhere. Takes into account inputs that are contained inside a frame@t. *)
 let dup i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
     let s = EquivSequent.set_biframe s biframe in
+    (* if the duplicate is trivially a duplicated term, we remove it *)
     if List.mem e before || List.mem e after
     then
       sk [s] fk
     else begin
       match e with
       | EquivSequent.Message (Term.Macro (input_macro,[],l)) ->
+        (* if the macro is an input, we check if its timestamp is lower than
+           some t where frame@t of frame@pred(t) appears inside the frame *)
         let test_dup els =
           List.exists
             (function
@@ -596,16 +618,21 @@ let () =
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
-
+(* Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
     sk fk =
   let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
   match Theory.convert tsubst term Sorts.Message with
+  (* we expect term to be a sequence *)
   | Seq ( vs, t) ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
+    (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst env vs ths in
+    (* new_t is the term of the sequence instantiated with the subst *)
     let new_t = EquivSequent.Message (Term.subst subst t) in
+    (* we add the new term to the frame and the hypothesis if it does not yet
+       belongs to it *)
     let biframe =
       let old_biframe = EquivSequent.get_biframe s in
       if List.mem new_t old_biframe then old_biframe else new_t :: old_biframe
@@ -624,9 +651,10 @@ let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
   | exception Theory.(Conv e) ->
       fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
-
-let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
+(* Expand all occurences of the given macro [term] inside [s] *)
+let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  (* final function once the subtitustion has been computed *)
   let succ subst =
     let apply_subst = function
       | EquivSequent.Message e -> EquivSequent.Message (Term.subst subst e)
@@ -635,6 +663,7 @@ let expand (term : Theory.term)(s : EquivSequent.t) sk fk =
     sk [EquivSequent.set_biframe s
           (List.map apply_subst (EquivSequent.get_biframe s))] fk
   in
+  (* computes the substitution dependeing on the sort of term *)
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -676,22 +705,25 @@ let () = T.register_general "expand"
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
+(* Replace all occurrences of [t1] by [t2] inside of [s], and asks to prove that
+   t1 <=> t2. *)
 let equiv t1 t2 (s : EquivSequent.t) sk fk =
   let env = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
   let tsubst = Theory.subst_of_env env in
   match Theory.convert tsubst t1 Sorts.Boolean,
         Theory.convert tsubst t2 Sorts.Boolean with
-  | t1,t2 ->
+  | f1,f2 ->
+    (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
         TraceSequent.init ~system
-          (Term.And(Term.Impl(t1, t2), Term.Impl(t2, t1)))
+          (Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)))
           |> TraceSequent.set_env env
       in
       let subgoals =
         [ Prover.Goal.Trace trace_sequent;
           Prover.Goal.Equiv
-            (EquivSequent.apply_subst [Term.ESubst(t1, t2)] s) ]
+            (EquivSequent.apply_subst [Term.ESubst(f1, f2)] s) ]
       in
       sk subgoals fk
   | exception (Theory.Conv e) ->
@@ -708,7 +740,8 @@ let () = T.register_general "equivalent"
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
-
+(* Reduces a conditional to its else branch, and asks to prove that its
+   condition implies false. *)
 let no_if i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
@@ -719,9 +752,11 @@ let no_if i s sk fk =
             | _ -> raise @@ Tactics.Tactic_hard_failure
                 (Tactics.Failure "improper arguments")
           in
+          (* replace in the biframe the ite by its negative branch *)
           let biframe = List.rev_append before (negative_branch :: after) in
           let env = EquivSequent.get_env s in
           let system = EquivSequent.get_system s in
+          (* ask to prove that the cond of the ite implies False *)
           let trace_sequent = TraceSequent.init ~system
               (Term.Impl(cond,False))
                                    |> TraceSequent.set_env env
