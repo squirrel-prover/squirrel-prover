@@ -17,7 +17,7 @@ equiv test (ii,i,i1,i2,j,j1,j2:index) :
   output@A(i),
   output@A1(i,j),
   diff(output@A1(i1,j1),output@A1(i2,j2)),
-  output@A(ii).
+  diff(output@A(ii),output@A(i)).
 
 Proof.
   expand output@A(ii).

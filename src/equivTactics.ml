@@ -311,7 +311,7 @@ class get_name_indices ~(system:Action.system) exact name acc = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
   val mutable indices : (Vars.index list) list = acc
-  method get_indices = indices
+  method get_indices = List.sort_uniq Pervasives.compare indices
 
   method visit_term t = match t with
     | EquivSequent.Message e -> self#visit_message e
@@ -327,7 +327,7 @@ class get_actions ~(system:Action.system) exact acc = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
   val mutable actions : Term.timestamp list = acc
-  method get_actions = actions
+  method get_actions = List.sort_uniq Pervasives.compare actions
 
   method visit_term t = match t with
     | EquivSequent.Message e -> self#visit_message e
@@ -366,23 +366,23 @@ let mk_phi_proj system env name indices proj biframe =
             Term.True
     | _  -> let list_of_indices_from_frame =
               let iter = new get_name_indices ~system false name [] in
-              List.iter iter#visit_term biframe ;
+              List.iter iter#visit_term proj_frame ;
               iter#get_indices
             and list_of_actions_from_frame =
               let iter = new get_actions ~system false [] in
-              List.iter iter#visit_term biframe ;
+              List.iter iter#visit_term proj_frame ;
               iter#get_actions
             and tbl_of_action_indices = Hashtbl.create 10 in
-            let iter = new get_name_indices ~system false name [] in
             Action.(iter_descrs system
               (fun action_descr ->
-                 let descr_proj = Action.pi_descr proj action_descr in
-                 iter#visit_formula (snd descr_proj.condition) ;
-                 iter#visit_message (snd descr_proj.output) ;
-                 List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
-                 (* we add only actions in which name occurs *)
-                 let action_indices = iter#get_indices in
-                 if List.length action_indices > 0 then
+                let iter = new get_name_indices ~system false name [] in
+                let descr_proj = Action.pi_descr proj action_descr in
+                iter#visit_formula (snd descr_proj.condition) ;
+                iter#visit_message (snd descr_proj.output) ;
+                List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
+                (* we add only actions in which name occurs *)
+                let action_indices = iter#get_indices in
+                if List.length action_indices > 0 then
                   Hashtbl.add tbl_of_action_indices descr_proj action_indices));
             (* direct cases (for explicit occurences of name in the frame) *)
             let phi_frame =
@@ -408,8 +408,13 @@ let mk_phi_proj system env name indices proj biframe =
                         a.Action.indices new_action_indices
                     in
                     let new_action = Action.to_term (Action.subst_action subst a.Action.action) in
-                    let new_name_indices = List.map (Term.subst_var subst) indices in
-                    (* if action a occurs before an action of the frame *)
+                    (* we now apply the same substitution to the subset of
+                    indices corresponding to name in the action *)
+                    let new_name_indices =
+                      List.map
+                        (Term.subst_var subst)
+                        (List.hd (Hashtbl.find tbl_of_action_indices a)) in
+                    (* if new_action occurs before an action of the frame *)
                     let disj =
                       List.fold_left
                         (fun acc f -> Term.Or(acc,f))
@@ -417,7 +422,7 @@ let mk_phi_proj system env name indices proj biframe =
                         (List.map
                           (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                           list_of_actions_from_frame)
-                    (* then indices of action a and of name differ *)
+                    (* then indices of name in new_action and of name differ *)
                     and conj =
                       List.fold_left
                         (fun acc f -> Term.And(acc,f))
@@ -768,6 +773,7 @@ let no_if i s sk fk =
         end
     | exception Out_of_range ->
         fk (Tactics.Failure "Out of range position")
+
 let () =
   T.register_general "noif"
     ~help:"Try to prove diff equivalence by proving that the condition at the \
@@ -777,6 +783,39 @@ let () =
        | [Prover.Int i] -> only_equiv (no_if i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
+let yes_if i s sk fk =
+ match nth i (EquivSequent.get_biframe s) with
+   | before, e, after ->
+     begin try
+         let cond, positive_branch =
+           match e with
+           | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
+           | _ -> raise @@ Tactics.Tactic_hard_failure
+               (Tactics.Failure "improper arguments")
+         in
+         let biframe = List.rev_append before (positive_branch :: after) in
+         let env = EquivSequent.get_env s in
+         let system = EquivSequent.get_system s in
+         let trace_sequent = TraceSequent.init ~system
+             (Term.Impl(cond,True))
+                                  |> TraceSequent.set_env env
+          in
+          sk [Prover.Goal.Trace trace_sequent;
+              Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
+       with
+         | Tactics.Tactic_soft_failure err -> fk err
+       end
+   | exception Out_of_range ->
+       fk (Tactics.Failure "Out of range position")
+
+let () =
+ T.register_general "yesif"
+   ~help:"Try to prove diff equivalence by proving that the condition at the \
+          \n i-th position implies True.\
+          \n Usage: yesif i."
+   (function
+      | [Prover.Int i] -> only_equiv (yes_if i)
+      | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 exception Not_context
 

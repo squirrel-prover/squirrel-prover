@@ -107,8 +107,10 @@ Proof.
     expand cond@T(i,k); expand output@T(i,k).
   fa 0. fa 1. repeat (fa 2). fa 3.
   dup 2.
-  admit 2. (* TODO fresh *)
-  admit 2. (* TODO PRF (+fresh?) *)
+  admit 3. (* TODO PRF (+fresh?) *)
+  fresh 2.
+  yesif 2.
+  intros.
   assumption.
 
 Qed.

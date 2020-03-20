@@ -60,6 +60,7 @@ class iter ~system = object (self)
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
+    | Atom (`Index _) | Atom (`Timestamp _)-> ()
     | Macro ((mn, Sorts.Boolean, is),[],a) ->
         self#visit_formula
           (Macros.get_definition system Sorts.Boolean mn is a)
@@ -68,8 +69,8 @@ class iter ~system = object (self)
 end
 
 (** Iterator that does not visit macro expansions but guarantees that,
-  * for macro symbols [m] other that input, output, cond, exec and states,
-  * if [m(...)@..] occurs in the visited terms then
+  * for macro symbols [m] other that input, output, cond, exec, frame
+  * and states, if [m(...)@..] occurs in the visited terms then
   * a specific expansion of [m] will have been visited, without
   * any guarantee on the indices and action used for that expansion,
   * because [get_dummy_definition] is used -- this behaviour is disabled
@@ -83,7 +84,7 @@ class iter_approx_macros ~exact ~system = object (self)
 
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn with
-      | Symbols.(Input | Output | State _ | Cond | Exec) -> ()
+      | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
             self#visit_message
@@ -93,7 +94,7 @@ class iter_approx_macros ~exact ~system = object (self)
             self#visit_message
               (Macros.get_dummy_definition system Sorts.Message mn is)
           end
-      | Symbols.(Frame | Local _) -> assert false (* TODO *)
+      | Symbols.Local _ -> assert false (* TODO *)
 
   method visit_message = function
     | Macro ((mn,sort,is),[],a) -> self#visit_macro mn is a
