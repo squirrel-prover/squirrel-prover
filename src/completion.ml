@@ -980,12 +980,12 @@ let () =
     ("Basic", `Quick,
      Symbols.run_restore @@ fun () ->
        let fi = 0, Symbols.Abstract ([],Sorts.emessage) in
-       let ffs, gfs =
+       let ffs, hfs =
          (Symbols.Function.declare_exact "f" fi, []),
-         (Symbols.Function.declare_exact "g" fi, [])
+         (Symbols.Function.declare_exact "h" fi, [])
        in
        let f a b = Cfun (ffs, [a;b]) in
-       let g a b = Cfun (gfs, [a;b]) in
+       let h a b = Cfun (hfs, [a;b]) in
 
        let e', e, d, c, b, a = mk_cst (), mk_cst (), mk_cst (),
                               mk_cst (), mk_cst (), mk_cst () in
@@ -1007,7 +1007,7 @@ let () =
        Alcotest.(check bool) "simple"
          (check_disequality_cterm state0 [] (f c d, f a e')) true;
        Alcotest.(check bool) "simple"
-         (check_disequality_cterm state0 [] (f a a, g a a)) true;
+         (check_disequality_cterm state0 [] (f a a, h a a)) true;
 
        let state1 = complete_cterms [(a,e'); (a ++ b, c); (e' ++ d, e)] in
        Alcotest.(check bool) "xor"

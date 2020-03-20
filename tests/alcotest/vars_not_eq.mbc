@@ -1,7 +1,7 @@
 name n : message
 name m : message
 abstract f : message->message
-abstract g : message->message
+abstract h : message->message
 system null.
 
 goal test :
@@ -13,7 +13,7 @@ Qed.
 
 goal test :
   forall (x:message, y:message),
-  f(n) = g(m) => False.
+  f(n) = h(m) => False.
 Proof.
   intros.
 Qed.

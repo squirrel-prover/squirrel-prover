@@ -9,7 +9,7 @@
 %token AND OR NOT TRUE FALSE HAPPENS
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT NONE SEQ
+%token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
@@ -22,6 +22,7 @@
 %token EMPTY_ELSE
 
 %left XOR
+%left EXP
 
 %nonassoc EMPTY_ELSE
 %nonassoc ELSE
@@ -62,6 +63,7 @@ term:
                                    Theory.make_term ~at_ts:ts $1 $2 }
 | LANGLE term COMMA term RANGLE  { Theory.make_pair $2 $4 }
 | term XOR term                  { Theory.make_term "xor" [$1;$3] }
+| term EXP term                  { Theory.make_term "exp" [$1;$3]}
 | INIT                           { Theory.Tinit }
 | IF formula THEN term else_term { Theory.ITE ($2,$4,$5) }
 | FIND indices SUCHTHAT formula IN term else_term
@@ -71,6 +73,7 @@ term:
 | LEFT LPAREN term RPAREN        { Theory.Left $3 }
 | RIGHT LPAREN term RPAREN       { Theory.Right $3 }
 | SEQ LPAREN i=ids ARROW t=term RPAREN { Theory.Seq (i,t) }
+
 
 term_list:
 |                                { [] }

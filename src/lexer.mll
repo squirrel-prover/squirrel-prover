@@ -81,6 +81,7 @@ rule token = parse
 | "seq"              { SEQ }
 | "diff"              { DIFF }
 | "left"              { LEFT }
+| "^"                 { EXP }
 | "right"             { RIGHT }
 | "none"              { NONE }
 | "forall"            { FORALL }

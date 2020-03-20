@@ -153,6 +153,8 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         (Utils.pp_ne_list
            "<@[<hov>%a@]>"
            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+  | Fun ((s,[]),[t1;t2]) when Symbols.to_string s = "exp" ->
+    Fmt.pf ppf "%a^%a" pp t1 pp t2
   | Fun (f,terms) ->
       Fmt.pf ppf "%a%a"
         pp_fsymb f
@@ -537,6 +539,11 @@ let f_succ = mk_fname "succ" [emessage] emessage
 let f_pair = mk_fname "pair" [emessage;emessage] emessage
 let f_fst = mk_fname "fst" [emessage] emessage
 let f_snd = mk_fname "snd" [emessage] emessage
+
+(** Exp **)
+
+let f_exp = mk_fname "exp" [emessage;emessage] emessage
+let f_g = mk_fname "g" [] emessage
 
 (** Dummy term *)
 

@@ -70,7 +70,9 @@ let rec pp_term ppf = function
     Fmt.pf ppf "right(%a)" pp_term t
   | Seq (vs, b) ->
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
-     (Utils.pp_list Fmt.string) vs pp_term b
+      (Utils.pp_list Fmt.string) vs pp_term b
+  | Fun (f,[t1;t2],ots) when f="exp"->
+    Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
   | Fun (f,terms,ots) ->
     Fmt.pf ppf "%s%a%a"
       f
