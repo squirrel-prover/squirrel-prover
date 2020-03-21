@@ -1,0 +1,107 @@
+hash h
+
+abstract ok : message
+abstract ko : message
+
+name kP : message
+name kS : message
+
+mutable keyS : index -> message
+mutable keyP : index -> message
+
+channel cP
+channel cS
+
+
+name a1 : message
+name b1 : message
+name k11 : message
+name a : index -> message
+name b : index -> message
+name k : index -> index -> message
+
+axiom TeufkPa : forall (m:message,sk:message)
+ sk <> kP || exists (i:index, x:message) m=<g^a(i),x>
+
+axiom TeufkSb : forall (m:message,sk:message)
+ sk <> kS || exists (i:index, x:message) m=<x,g^b(i)>
+
+process P =
+  out(cP, g^a1);
+  in(cP, t);
+  if h(<g^a1,snd(fst(t))>,kS) = snd(t) then
+    out(cP, h(<g^a1,snd(fst(t))>,kP));
+    in(cP, challenge);
+    if snd(fst(t)) = g^b1 then
+      out(cP, diff(g^a1^b1,g^k11))
+    else
+      (try find j such that snd(fst(t)) = g^b(j) in
+        out(cP, ok)
+      else
+       out(cP, diff(ok,ko))
+       )
+  else null
+
+process S =
+  in(cS, sP);
+  out(cS, < <sP,g^b1>, h(<sP,g^b1>,kS)>);
+  in(cS, hash_shares);
+  if hash_shares = h(<sP,g^b1>,kP) then
+    out(cS,ok);
+    in(cS, challenge);
+    if sP = g^a1 then
+	out(cS, diff(g^a1^b1,g^k11))
+    else
+      (try find l such that sP = g^a(l) in
+        out(cS, ok)
+      else
+       out(cS, diff(ok,ko))
+       )
+  else null
+
+system ( P | S).
+
+(* We prove several lemmas, characterizing when a action's conditions passes.
+   The characterization is expressed as a property of the trace that the attacker
+   already has, showing that the condition does not bring him extra knowledge.
+
+   Prove that the condition of A does not give any information to the attacker,
+   by proving that it is equivalent to a trivial formula that the attacker can
+   compute. It is a bit troublesome, because the formula depends on ks, which needs
+   to disappear. We would not have this issue if we used a classical asymmetric
+   signature scheme. *)
+
+(* Show that condition S1 implies the next one. *)
+goal S1_charac :
+  cond@S1 => input@S = g^a1
+    ||
+        exists (s:index),
+	input@S = g^a(s).
+Proof.
+  simpl.
+  expand cond@S1.
+  introsleft H0. (* TODO should be done as part of expansion *)
+  tageuf M0, TeufkPa.
+  case H0.
+  right.
+  exists i.
+  left.
+Qed.
+
+(* Show that condition S1 implies the next one. *)
+goal P1_charac :
+   cond@P1 =>
+	snd(fst(input@P1)) = g^b1
+    ||
+	exists (s:index),
+	snd(fst(input@P1)) = g^b(s).
+Proof.
+  simpl.
+  expand cond@P1.
+  introsleft H0. (* TODO should be done as part of expansion *)
+  tageuf M0, TeufkSb.
+  case H0.
+  right.
+  exists i.
+  left.
+Qed.
