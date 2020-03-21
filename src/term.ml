@@ -202,7 +202,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
       Vars.pp_typed_list vs pp b
   | And (Impl (bl1,br1), Impl(br2,bl2)) when bl1=bl2 && br1=br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
-            pp bl1 pp br1
+      pp bl1 pp br1
   | And (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       pp bl pp br
