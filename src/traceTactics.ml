@@ -830,6 +830,64 @@ let () =
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
+
+(** Tag EUFCMA - for composition results *)
+let tag_euf_apply hypothesis_name formula_id (s : TraceSequent.t) sk fk =
+  let s, at =
+    try
+      TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
+    with Not_found -> raise @@ Tactics.Tactic_hard_failure
+        (Tactics.Failure "no hypothesis with the given name")
+  in
+  let honnest_s =
+    (* we create the honnest sources using the classical eufcma tactic *)
+    try
+      euf_apply_facts s at
+    with Euf.Bad_ssc ->  raise @@ Tactics.Tactic_hard_failure
+        (Tactics.NoSSC)
+  in
+  let tag_s =
+    let (_, key, m, _) = euf_param at in
+      let f,system =
+        Prover.get_goal_formula formula_id
+      in
+      if system <> TraceSequent.system s then
+        raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
+      let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
+        | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+        | _ -> raise @@ Tactics.Tactic_hard_failure
+        (Tactics.Failure "The tag axiom must be a universal quantification on\
+                          two messages variable.")
+      in
+      match Vars.sort uvarm,Vars.sort uvarkey with
+      | Sorts.(Message, Message) -> let f = Term.subst [
+          ESubst (Term.Var uvarm,m);
+          ESubst (Term.Var uvarkey,Term.Name key);] f in
+        TraceSequent.add_formula f s
+      | _ -> raise @@ Tactics.Tactic_hard_failure
+        (Tactics.Failure "The tag axiom must be a universal quantification on\
+                          two messages variable.")
+
+  in
+  sk (tag_s::honnest_s) fk
+
+let () =
+  T.register_general "tageuf"
+    ~help:"Apply the tagged euf axiom to the given hypothesis name, with the\
+           \n given tag. Tagged eufcma, with a tag T, says that, under the\
+           \n syntactic side condition, a hashed message either satisfies\
+           \n the tag T, or was honnestly produced. \
+           \n The tag T must refer to a previously defined axiom f(mess,sk), of\
+           \n the form forall (m:message,sk:message).
+           \n Usage: tageuf H t."
+    (function
+      | [Prover.Theory (Theory.Var h); Prover.Theory (Theory.Var f)] -> tag_euf_apply h f
+      | _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "improper arguments"))
+
+
+
+
 (** [apply gp ths judge sk fk] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath. *)
