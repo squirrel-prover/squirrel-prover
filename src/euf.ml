@@ -145,7 +145,6 @@ let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
     case_schemata =
       Utils.map_of_iter (Action.iter_descrs system)
         (fun action_descr ->
-          let env = ref env in
           hashes_of_action_descr ~system ~cond action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
             (* Indices [key_is] from [env] must correspond to [is],
@@ -165,6 +164,7 @@ let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
              *
              * We compute next the list [safe_is] of simple cases,
              * and the substitution for them. *)
+            let env = ref env in
             let safe_is,subst_is =
               let multiple i =
                 let n = List.length (List.filter ((=) i) is) in

@@ -240,6 +240,11 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/euf_bv_direct.mbc")
     end ;
+    "Euf environment", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        Theory.(Conv (Undefined "i1"))
+        (fun () -> run ~test "tests/alcotest/euf_env.mbc")
+    end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
