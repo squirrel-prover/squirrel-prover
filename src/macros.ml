@@ -40,11 +40,7 @@ let is_defined name a =
         begin match a with
           | Action (s,_) ->
               let action = snd (Action.of_symbol s) in
-              (* We could support |inputs| <= |action|,
-               * but it is not clear that we'll ever need it,
-               * because a global macro is really meant to be used
-               * at a particular action name. *)
-              List.length inputs = List.length action
+              List.length inputs <= List.length action
           | _ -> false
         end
     | Symbols.Global _, _ -> assert false
@@ -96,7 +92,7 @@ let get_definition :
         begin match a with
           | Action (tsymb,tidx) ->
             let action = Action.of_term tsymb tidx in
-            assert (List.length inputs = List.length action) ;
+            assert (List.length inputs <= List.length action) ;
             let idx_subst =
               List.map2
                 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
@@ -104,6 +100,12 @@ let get_definition :
                 args
             in
             let ts_subst = Term.ESubst (Term.Var ts, a) in
+            (* Compute the relevant part of the action, i.e. the
+             * prefix of length [length inputs], reversed. *)
+            let rev_action =
+              let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
+              drop (List.length action - List.length inputs) (List.rev action)
+            in
             let subst,_ =
               List.fold_left
                 (fun (subst,action) x ->
@@ -113,7 +115,7 @@ let get_definition :
                    in
                    Term.ESubst (Term.Var x,in_tm) :: subst,
                    List.tl action)
-                (ts_subst::idx_subst,List.rev action)
+                (ts_subst::idx_subst,rev_action)
                 inputs
             in
             Term.subst subst body
