@@ -44,6 +44,10 @@ exception Found
   * expanding the same macro several times. *)
 class no_cond ~system = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~system as super
+  method visit_message = function
+    | Term.Macro ((mn,sort,is),[],a)
+      when Symbols.Macro.get_def mn = Symbols.Frame -> raise Found
+    | m -> super#visit_message m
   method visit_formula = function
     | Term.Macro _ -> raise Found
     | f -> super#visit_formula f
