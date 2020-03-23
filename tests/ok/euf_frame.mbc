@@ -13,12 +13,13 @@ abstract u : message
 
 system in(c,x); if x=h(n,k) then out(c,x).
 
-goal forall tau:timestamp, frame@tau = h(u,k) => u = n.
+goal forall tau:timestamp, frame@tau = h(u,k) => False.
 Proof.
   intros.
   (* EUF should create two subgoals because h(n,k) occurs
    * in the actions of both branches of the conditional.
-   * Each case immediately yields u=n. *)
+   * In each case we have u=n, thus False because n does
+   * not occur in u. *)
   nosimpl(euf M0).
   simpl.
   simpl.
