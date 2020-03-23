@@ -423,13 +423,7 @@ let mk_phi_proj system env name indices proj biframe =
                           (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                           list_of_actions_from_frame)
                     (* then indices of name in new_action and of name differ *)
-                    and conj =
-                      List.fold_left
-                        (fun acc f -> Term.mk_and acc f)
-                        Term.True
-                        (List.map (fun j -> mk_indices_ineq new_name_indices j)
-                                  (Hashtbl.find tbl_of_action_indices a))
-                    in
+                    and conj = mk_indices_ineq new_name_indices indices in
                     let forall_var = List.map (fun i -> Vars.EVar i) new_action_indices in
                     Term.ForAll(forall_var,Term.Impl(disj,conj)))
                   (Hashtbl.to_seq_keys tbl_of_action_indices))

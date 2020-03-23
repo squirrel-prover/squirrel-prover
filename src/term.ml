@@ -526,7 +526,7 @@ let mk_and t1 t2 = match t1,t2 with
 
 let mk_or t1 t2 = match t1,t2 with
   | False, t | t, False -> t
-  | t1,t2 -> And (t1,t2)
+  | t1,t2 -> Or (t1,t2)
 
 (** Xor and its unit *)
 

@@ -111,6 +111,5 @@ Proof.
   fresh 2.
   yesif 2.
   split.
-  admit. admit. (* TODO *)
   assumption.
 Qed.
