@@ -22,23 +22,24 @@ process P(i:index) =
   out(cP, g^a(i));
   in(cP, t);
   let hash_share = snd(t) in
-  if h(<g^a(i),snd(fst(t))>,kS) = snd(t) then
-    out(cP, h(<g^a(i),snd(fst(t))>,kP));
+  let gb = snd(fst(t)) in
+  if h(<g^a(i),gb>,kS) = snd(t) then
+    out(cP, h(<g^a(i),gb>,kP));
     in(cP, challenge);
-    try find j such that snd(fst(t)) = g^b(j) in
+    try find j such that gb = g^b(j) in
       out(cP, diff(g^a(i)^b(j),g^k(i,j)))
     else
       out(cP, diff(ok,ko))
   else null
 
 process S(i:index) =
-  in(cS, sP);
-  out(cS, < <sP,g^b(i)>, h(<sP,g^b(i)>,kS)>);
+  in(cS, ga);
+  out(cS, < <ga,g^b(i)>, h(<ga,g^b(i)>,kS)>);
   in(cS, hash_shares);
-  if hash_shares = h(<sP,g^b(i)>,kP) then
+  if hash_shares = h(<ga,g^b(i)>,kP) then
     out(cS,ok);
     in(cS, challenge);
-    try find l such that sP = g^a(l) in
+    try find l such that ga = g^a(l) in
       out(cS, diff(g^a(l)^b(i),g^k(l,i)))
     else
       out(cS, diff(ok,ko))
@@ -100,13 +101,13 @@ equiv unreach.
 
    expand frame@P1(i); expand exec@P1(i); expand output@P1(i); expand cond@P1(i).
     fa 6; fa 5. fa 8; fa 8. dup 9. fa 6. fa 7. dup 7.
-    fa 6. fa 10. dup 6. fa 9. fa 10; fa 10. dup 10.
+    fa 6. fa 10. dup 6. fa 9. expand gb(i)@P1(i). fa 10; fa 10. dup 10.
     expand  seq(i->g^a(i)), i.
     assumption.
 
 
    expand frame@P2(i,j); expand exec@P2(i,j); expand output@P2(i,j); expand cond@P2(i,j).
-   fa 6; fa 7. dup 5. fa 6; fa 7; fa 7; fa 7; dup 7.
+   fa 6; fa 7. dup 5. expand gb(i)@P2(i,j). fa 6; fa 7; fa 7; fa 7; dup 7.
    expand seq(i->g^b(i)), j. ddh a(i), b(j), k(i,j).  assumption.
 
 
@@ -120,10 +121,11 @@ equiv unreach.
    apply P1_charac to i.
    apply H0 to s.
 
-   fa 6.  noif 7. simpl. fa 5.  assumption.
+   expand gb(i)@P3(i). fa 6.  noif 7. simpl. fa 5.  assumption.
 
    expand frame@A(i); expand output@A(i); expand exec@A(i); expand cond@A(i).
     fa 6.  fa 7. fa 7.  fa 5. dup 6. fa 8;fa 8; fa 8; fa 8.
+  expand gb(i)@A(i).
     fa 9; fa 9.
     fa 11.
     dup 11.
