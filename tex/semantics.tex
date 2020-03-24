@@ -28,16 +28,15 @@ where $\M = \{ \minp, \mout, \mframe \} \cup \States$.
        and $e_1,\ldots,e_k \in D$;
     \item a function symbol $f_{e_1,\ldots,e_k}$ of arity $n$ for every
       $f \in \F_k^n$ and $e_1,\ldots,e_k \in D$;
-    \item a function $g_n$ of arity $n$ for every $n\in\mathbb{N}$;
-    \item a binary function symbol $\mathsf{pair}$;
+    \item a function $\att_n$ of arity $n$ for every $n\in\mathbb{N}$;
+    \item a binary function symbol $\langle \cdot , \cdot \rangle$;
     \item binary function symbols
       $\stackrel{.}{\wedge}$, $\stackrel{.}{\vee}$ and
       $\stackrel{.}{\Rightarrow}$;
     \item a ternary function symbol $\mathsf{if}$;
     \item nullary function symbols $\mathsf{true}$ and $\mathsf{false}$.
   \end{itemize}
-  Function symbol $g_n$ will be used, as usual in the BC 
-  approach, to model attacker computations.
+  Function symbol $\att_n$ will be used to model attacker computations.
   We will use the usual notations for boolean symbols and pairs,
   and we will use the notation $\myif c \mythen t \myelse e$
   for $\mathsf{if}(c,t,e)$ as for meta-logic terms.
@@ -91,8 +90,8 @@ define the interpretation of macros and, finally, of all terms
 and formulas.
 
 \begin{definition}
-  The interpretation of macro-free terms and formulas of the meta-logic in 
-  some meta-interpretation $I$, noted $\interp{t}^I$ and $\interp{\phi}^I$ 
+  The interpretation of macro-free terms and formulas of the meta-logic in
+  some meta-interpretation $I$, noted $\interp{t}^I$ and $\interp{\phi}^I$
   respectively, is given by the clauses of \cref{fig:interpt,fig:interpf}.
   In the interpretation of a term built using the $\mathsf{find}$
   construct, the $\vec{e}_1, \ldots, \vec{e}_{k^{|\D_\I|}}$ are a complete
@@ -108,9 +107,9 @@ and formulas.
     \interp{\tau}^I &=& \sigma_\XT(\tau) \\
     \interp{\tinit}^I &=& \tinit \\
     \interp{\sfa(i_1,\ldots,i_k)}^I &=&
-      \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_n))
+      \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
       \text{ for all }
-      \sfa\in\Actions_k \text{ and } e_1,\ldots,e_k\in D_\I \\
+      \sfa\in\Actions_k \text{ and } i_1,\ldots,i_k\in \I \\
     \interp{\tpred{T}}^I &=&
       \mathsf{pred}_\XT(\interp{T}^I)
     \\
@@ -197,13 +196,17 @@ to base logic formulas, as follows:
 \begin{eqnarray*}
   \mcond^I(\tinit) &=& \true \\
   \mcond^I(\alpha'_{k+1}) &=&
-    \interp{\phi_{\alpha_{k+1}}}^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
+    \interp{\phi_{\alpha_{k+1}}
+    \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
+    \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto
+      s[\vec{j}]@\alpha_{k+1}\}_s
+    }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
 \end{eqnarray*}
 In other words, $\mcond^I(\alpha'_{k+1})$ is obtained by taking the
-(macro-free) condition $\phi_{\alpha_{k+1}}$ of the symbolic action, and 
+(macro-free) condition $\phi_{\alpha_{k+1}}$ of the symbolic action, and
 interpreting it using $I$, mapping indices $\vec{i}_{k+1}$ to their
 desired concretization.
-The semantics $\mexec^I$ of the executability macro is then simply defined as 
+The semantics $\mexec^I$ of the executability macro is then simply defined as
 the conjunction of consecutive conditions:
 \begin{eqnarray*}
   \mexec^I(\tinit) &=& \true \\
@@ -215,7 +218,7 @@ the conjunction of consecutive conditions:
 
 We then define, for each macro symbol $m\in\M_k$,
 its interpretation $m^I : D_\I^k \times \D_\XT \to T_\Sigma^{D_I}$.
-More precisely, we define $m^I(\ldots,v)$ by induction on its timestamp 
+More precisely, we define $m^I(\ldots,v)$ by induction on its timestamp
 argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
 $$
     \minp^I(\tinit) = \mframe^I(\tinit) = s^I(\vec{f},\tinit)
@@ -223,7 +226,7 @@ $$
 $$
 $$\begin{array}{rll}
     \minp^I(\alpha'_{k+1}) &=&
-    g_{k}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_k))
+    \att_{k}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_k))
   \\
     \mframe^I(\alpha'_{k+1}) &=&
     \langle \mframe^I(\alpha'_k),
@@ -233,20 +236,23 @@ $$\begin{array}{rll}
     s^I(\vec{f},\alpha'_{k+1}) &=&
     \interp{
       u_{\alpha_{k}}^{s[\vec{j}]}
+      \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k}}
+      \{x_{\alpha_{k}}^{s[\vec{j}]}\mapsto
+        s[\vec{j}]@\alpha_{k}\}_s
     }^{
       I\{\vec{i}_k\mapsto\vec{e}_k,\vec{j}\mapsto\vec{f}\}}
   \\
     \mout^I(\alpha'_{k+1}) &=&
       \interp{
-        o_{\alpha_i}
-        \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_k}
-        \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto 
+        o_{\alpha_{k+1}}
+        \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
+        \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto
           s[\vec{j}]@\alpha_{k+1}\}_s
-        }^{I\{\vec{i}\mapsto\vec{e}\}}
+        }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
 \end{array}$$
 
 The interpretation of input macros is the simplest:
-it uses function symbols $g_i$ to model the arbitrary attacker's
+it uses function symbols $\att_i$ to model the arbitrary attacker's
 computation based on previous outputs.
 Frames are defined as nested pairs, starting from $0$ and
 providing, for each action, the output of the action if it is executable,
@@ -257,9 +263,12 @@ cell $s[\vec{f}]$ just before the execution of $\alpha'_{k+1}$:
 it is obtained by interpreting the update term $u_{\alpha_k}^{s[\vec{j}]}$
 of the associated symbolic action $\alpha_{k+1}$ mapping $\vec{i}$
 and $\vec{j}$ to their expected concretizations.
-The semantics of outputs is defined similarly, using a term-level
-substitution for the message variables $x_\beta$ and 
-$x_{\alpha_k}^{s[\vec{j}]}$.
+The semantics of outputs is defined similarly.
+
+Since meta-logic terms and formulas $o_{\alpha}$, $u_{\alpha}$ and
+$\phi_{\alpha}$ may include occurences of message variables
+$x_\beta$ and $x_{\alpha}^{s[\vec{j}]}$,
+we use a term-level substitution for these variables.
 
 
 

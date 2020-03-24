@@ -1,5 +1,5 @@
 We call \emph{base logic} the system of Bana and Comon (CCS'14).
-It is first-order logic with a distinguished kind of constant for representing 
+It is first-order logic with a distinguished kind of constant for representing
 names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
 and featuring a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
@@ -33,10 +33,10 @@ are valid.
 
 \section{Syntax of terms and formulas}
 
-We recall next the syntax and semantics of base logic, which deals with 
+We recall next the syntax and semantics of base logic, which deals with
 messages and indistinguishability.
-We then define the syntax of our meta-logic, which will allow to reason about 
-protocols. The semantics of the meta-logic will only be defined relative to a 
+We then define the syntax of our meta-logic, which will allow to reason about
+protocols. The semantics of the meta-logic will only be defined relative to a
 protocol, a notion that is introduced in the next section.
 
 Terms of the meta-logic are of three possible sorts: index, timestamps
@@ -44,7 +44,7 @@ or message. Formulas of the meta-logic may feature predicates over each sort.
 Given some interpretation $I$ of indices and timestamp variables in some finite
 sets, a meta-logic formula $\phi$ will be translated to a term $(\phi)^I$
 of the base logic.
-The validity of the meta-logic formula will be defined as the validity of the 
+The validity of the meta-logic formula will be defined as the validity of the
 base logic formula $(\phi)^I \sim \mathsf{true}$.
 
 \medskip
@@ -64,7 +64,7 @@ $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
 \begin{example}
   Function symbols representing cryptographic primitives will have index
   arity $0$, and a message arity depending on the kind of primitive:
-  two for a hash, three for a randomized encryption, etc.
+  two for a keyed hash, three for a randomized encryption, etc.
   Functions symbols representing identities (for example, a constant value
   associated to each tag) will have $0$ as message arity and $1$ as index arity.
 \end{example}
@@ -101,7 +101,7 @@ arity $n$.
     \\
     t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
       & \mid & x  & \text{message variable} & (x\in\X) \\
-      & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} & 
+      & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} &
       (f\in\F_k^n)\\
       & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\M_k)\\
       & \mid & \myif \phi \mythen t \myelse t'
