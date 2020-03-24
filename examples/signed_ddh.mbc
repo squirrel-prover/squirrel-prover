@@ -87,12 +87,13 @@ Qed.
 
 equiv unreach.
     Proof.
-   enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->g^a(i)^b(j)).
+   enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
 
     induction t.
 
    expand frame@init.
    expand exec@init.
+   ddh a, b, k.
 
    expand frame@P(i); expand output@P(i); expand exec@P(i); expand cond@P(i).
    expand  seq(i->g^a(i)), i.
@@ -106,7 +107,9 @@ equiv unreach.
 
     expand frame@P2(i,j); expand exec@P2(i,j); expand output@P2(i,j); expand cond@P2(i,j).
     expand gb(i)@P2(i,j).
-   expand seq(i->g^b(i)), j. ddh a(i), b(j), k(i,j).  assumption.
+    expand seq(i->g^b(i)), j.
+    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
+    assumption.
 
 
    expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
@@ -140,7 +143,7 @@ equiv unreach.
 
   expand frame@S2(j,l); expand output@S2(j,l); expand exec@S2(j,l); expand cond@S2(j,l).
   expand  seq(i->g^a(i)), l.
-  ddh a(l), b(j), k(l,j).
+  expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
   assumption.
 
 

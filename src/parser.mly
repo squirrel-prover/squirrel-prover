@@ -15,7 +15,7 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH
 %token PROOF QED UNDO
 %token EOF
 
@@ -282,6 +282,12 @@ tac:
   | HELP i=ID                         { Tactics.Abstract
                                           ("help",
                                            [Prover.String_name i]) }
+  | DDH i1=ID COMMA i2=ID COMMA i3=ID { Tactics.Abstract
+                                          ("ddh",
+                                           [Prover.String_name i1;
+					    Prover.String_name i2;
+					    Prover.String_name i3;
+				      ]) }
   (* A few special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
   | HELP LEFT   { Tactics.Abstract ("help",[Prover.String_name "left"]) }

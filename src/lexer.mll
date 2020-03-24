@@ -99,6 +99,7 @@ rule token = parse
 | "undo"              { UNDO }
 | "try"               { TRY }
 | "repeat"            { REPEAT }
+| "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | '+'                 { PLUS }
 | ("cond"|"exec") as n { PID n }

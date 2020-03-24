@@ -846,7 +846,8 @@ class ddh_context ~(system:Action.system) exact a b c = object (self)
     match Symbols.Macro.get_def mn with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | _ -> super#visit_macro mn is a
-
+  (* we check if the only diff are over g^ab and g^c, and that a, b and c
+     appears only as g^a, g^b and g^c. *)
   method visit_message t =
     let g = Term.(Fun (f_g,[])) in
     let exp = Term.f_exp in
@@ -854,21 +855,24 @@ class ddh_context ~(system:Action.system) exact a b c = object (self)
     (* any name n can occur as g^n *)
     | Term.Fun (f, [g1; Name (n,_)]) when f = exp && g1 = g-> ()
     (* any names a b can occur as g^a^b *)
-    | Term.(Fun (f1,[(Fun (f2,[g1; Name (n1,_)]));
+    | Term.(Diff(Term.(Fun (f1,[(Fun (f2,[g1; Name (n1,_)]));
                      Name (n2,_)
-                    ]))
-      when f1 = exp && f2 = exp && g1 = g &&
+                               ])),
+                 Term.Fun (f, [g3; Name (n3,_)])))
+      when f1 = exp && f2 = exp && g1 = g && g3=g && n3=c &&
            ((n1 = a && n2 = b) || (n1 = b && n2 = a))
       -> ()
     (* if a name a, b, c appear anywhere else, fail *)
     | Term.Name (n,_) when List.mem n [a; b; c] -> raise Not_context
+    (* if a diff is not over a valid ddh diff, we fail  *)
+    | Term.Diff _ -> raise Not_context
     | _ -> super#visit_message t
 
 end
 
-(* TODO -> factorize this code with some iterator of fresh or another one.
-   Needed for the moment for the frame macro management. *)
-class find_ddh_name ~(system:Action.system) exact name = object (self)
+exception Macro_found
+
+class find_macros ~(system:Action.system) exact  = object (self)
  inherit Iter.iter_approx_macros ~exact ~system as super
 
   method visit_term t = match t with
@@ -877,12 +881,9 @@ class find_ddh_name ~(system:Action.system) exact name = object (self)
 
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn with
-      | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
-      | _ -> super#visit_macro mn is a
-
-  method visit_message t = match t with
-    | Term.Name (n,_) -> if n = name then raise Name_found
-    | _ -> super#visit_message t
+    | Symbols.(Input | Output | State _ | Cond | Exec | Frame) ->
+      raise Macro_found
+    | _ -> self#visit_macro mn is a
 end
 
 
@@ -890,65 +891,43 @@ end
    all the names appearing inside the terms are only used inside those, returns
    true. *)
 let is_ddh_context system a b c elem_list =
+  let a,b,c = Symbols.Name.of_string a, Symbols.Name.of_string b, Symbols.Name.of_string c in
   let iter = new ddh_context ~system false a b c in
-  let iter2 = new find_ddh_name ~system false c in
+  let iterfm = new find_macros ~system false in
+  let exists_macro =
+    try
+      List.iter iterfm#visit_term elem_list; false
+    with Macro_found -> true
+  in
   try
-    (* we check that a b and c only occur in the correct form *)
+    (* we check that a b and c only occur in the correct form inside the system,
+       if the elements contain some macro based on the system.*)
+   if exists_macro then
     Action.iter_descrs system (
       fun d ->
         iter#visit_formula (snd d.condition) ;
-       iter#visit_message (snd d.output) ;
-       List.iter (fun (_,t) -> iter#visit_message t) d.updates;
+        iter#visit_message (snd d.output) ;
+        List.iter (fun (_,t) -> iter#visit_message t) d.updates;
     );
+   (* we then check inside the frame *)
     List.iter iter#visit_term elem_list;
-    (* we check that c does not occur in the left system *)
-    Action.iter_descrs Action.(make_trace_system system.left) (
-      fun d ->
-        iter2#visit_formula (snd d.condition) ;
-       iter2#visit_message (snd d.output) ;
-       List.iter (fun (_,t) -> iter2#visit_message t) d.updates;
-    );
-    List.iter iter2#visit_term
-      (List.map (EquivSequent.pi_elem Term.Left) elem_list);
-
     true
   with Not_context | Name_found -> false
 
-let ddh a b c s sk fk =
-  let env = EquivSequent.get_env s in
+let ddh na nb nc s sk fk =
   let system = EquivSequent.get_system s in
-  let tsubst = Theory.subst_of_env env in
-  match Theory.convert tsubst a Sorts.Message,
-        Theory.convert tsubst b Sorts.Message,
-        Theory.convert tsubst c Sorts.Message with
-  | ( (Term.Name (na,_) as a),
-      (Term.Name (nb,_) as b),
-      (Term.Name (nc,_) as c)) ->
-    if is_ddh_context system na nb nc
-        (EquivSequent.get_biframe s) then
-      let exp g1 g2 = Term.(Fun (f_exp,[g1; g2])) in
-      let g = Term.(Fun (f_g,[])) in
-      let ga = exp g a and gb = exp g b and gc = exp g c in
-      let gab = exp ga b and gba = exp gb a in
-      let s =
-        EquivSequent.set_hypothesis_biframe s
-          (
-            (EquivSequent.Message (Term.Diff(gab,gc) ))::
-            (EquivSequent.Message (Term.Diff(gba,gc) ))::
-            (EquivSequent.get_hypothesis_biframe s)
-          )
-      in
-      sk [s] fk
+  if is_ddh_context system na nb nc
+      (EquivSequent.get_biframe s) then
+      sk [] fk
     else
       fk Tactics.NotDDHContext
-  | _ -> fk (Tactics.Failure "DDH can only be applied to names")
 
 let () = T.register_general "ddh"
-    ~help:"Add the the hypothesis the ddh axiom applied with the given shares,\
-           \n e.g. diff(g^a^b,g^c). \
+    ~help:"Closes the current system, if it is an instance of a context of ddh.\
            \n Usage: ddh a, b, c."
     (function
-      | [Prover.Theory v1; Prover.Theory v2; Prover.Theory v3] ->
+      | [Prover.String_name v1; Prover.String_name v2;
+         Prover.String_name v3] ->
         pure_equiv (ddh v1 v2 v3)
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))

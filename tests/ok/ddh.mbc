@@ -7,13 +7,10 @@ channel c
 system !_i ( out(c, diff((g^a(i))^b(i),g^k(i)))).
 
 
-equiv ddh.
+equiv ddh_goal.
 Proof.
 induction t.
 expand frame@init; expand exec@init.
 
-ddh a(i), b(i), k(i).
-
-expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
-assumption.
+ddh a, b, k.
 Qed.
