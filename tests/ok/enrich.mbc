@@ -28,16 +28,12 @@ enrich seq(i->h(ok,k(i))).
 
  noif 3.
  simpl.
- fa 1.
  assumption.
 
  expand frame@A1(i).
  expand output@A1(i).
  expand exec@A1(i).
- fa 2. fa 3.
- dup 3.
- fa 1.
- expand cond@A1(i).
  expand seq(i->h(ok,k(i))),i.
+ expand cond@A1(i).
  assumption.
 Qed.

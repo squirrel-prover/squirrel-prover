@@ -344,7 +344,7 @@ let () =
 let esimpl =
   Tactics.(
     AndThen
-      (Abstract ("const",[]) ::
+      (Abstract ("fadup",[]) ::
       [Try (Abstract ("refl",[]))])
   )
 

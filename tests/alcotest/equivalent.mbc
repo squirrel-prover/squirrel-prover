@@ -15,14 +15,6 @@ expand exec@A.
 equivalent cond@A, False.
 expand cond@A.
 
-fa 1.
-noif 2.
-simpl.
-assumption.
+(* fadup must not be able to close this goal, because of the output@A *)
 
-expand frame@A1.
-expand output@A1.
-expand exec@A1.
-expand cond@A1.
-assumption.
 Qed.

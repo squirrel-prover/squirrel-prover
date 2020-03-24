@@ -95,19 +95,17 @@ equiv unreach.
    expand exec@init.
 
    expand frame@P(i); expand output@P(i); expand exec@P(i); expand cond@P(i).
-    fa 6; fa 7; fa 5. fa 7.
+   expand  seq(i->g^a(i)), i.
+   assumption.
+
+    expand frame@P1(i); expand exec@P1(i); expand output@P1(i); expand cond@P1(i).
     expand  seq(i->g^a(i)), i.
+    expand gb(i)@P1(i).
+    fa 7.
     assumption.
 
-   expand frame@P1(i); expand exec@P1(i); expand output@P1(i); expand cond@P1(i).
-    fa 6; fa 5. fa 8; fa 8. dup 9. fa 6. fa 7. dup 7.
-    fa 6. fa 10. dup 6. fa 9. expand gb(i)@P1(i). fa 10; fa 10. dup 10.
-    expand  seq(i->g^a(i)), i.
-    assumption.
-
-
-   expand frame@P2(i,j); expand exec@P2(i,j); expand output@P2(i,j); expand cond@P2(i,j).
-   fa 6; fa 7. dup 5. expand gb(i)@P2(i,j). fa 6; fa 7; fa 7; fa 7; dup 7.
+    expand frame@P2(i,j); expand exec@P2(i,j); expand output@P2(i,j); expand cond@P2(i,j).
+    expand gb(i)@P2(i,j).
    expand seq(i->g^b(i)), j. ddh a(i), b(j), k(i,j).  assumption.
 
 
@@ -121,59 +119,32 @@ equiv unreach.
    apply P1_charac to i.
    apply H0 to s.
 
-   expand gb(i)@P3(i). fa 6.  noif 7. simpl. fa 5.  assumption.
+   expand gb(i)@P3(i). fa 6.  noif 7. simpl. assumption.
 
    expand frame@A(i); expand output@A(i); expand exec@A(i); expand cond@A(i).
-    fa 6.  fa 7. fa 7.  fa 5. dup 6. fa 8;fa 8; fa 8; fa 8.
-  expand gb(i)@A(i).
-    fa 9; fa 9.
-    fa 11.
-    dup 11.
-    dup 7.
-    expand  seq(i->g^a(i)), i.
-    dup 9; dup 8.
-    assumption.
+   expand gb(i)@A(i).
+   expand  seq(i->g^a(i)), i.
+   assumption.
 
 
 
    expand frame@S(j); expand output@S(j); expand exec@S(j); expand cond@S(j).
-
-   fa 5;fa 6; fa 6; fa 7; fa 7; fa 8. fa 8. fa 8. fa 10. fa 10.
-    dup 8. dup 9.
-    expand  seq(i->g^b(i)), j.
-
-    assumption.
+   expand  seq(i->g^b(i)), j.
+   fa 7.
+   assumption.
 
 
-  expand frame@S1(j).
-  expand output@S1(j).
-  expand exec@S1(j).
-  expand cond@S1(j).
-  fa 5.
-  fa 6. fa 8.
-  dup 6. fa 8. fa 8.
-  fa 9.
-  dup 8.  dup 9.
-  fa 6.
-  fa 6.
+  expand frame@S1(j); expand output@S1(j); expand exec@S1(j); expand cond@S1(j).
   expand  seq(i->g^b(i)), j.
-  dup 10. dup 6.
   assumption.
-  expand frame@S2(j,l).
-  expand output@S2(j,l).
-  expand exec@S2(j,l).
-  expand cond@S2(j,l).
-  fa 5; fa 6. fa 8. fa 9. fa 9. fa 10. dup 10; dup 6.
+
+  expand frame@S2(j,l); expand output@S2(j,l); expand exec@S2(j,l); expand cond@S2(j,l).
   expand  seq(i->g^a(i)), l.
   ddh a(l), b(j), k(l,j).
-
   assumption.
 
 
-   expand frame@S3(j).
-   expand exec@S3(j).
-
-
+   expand frame@S3(j); expand exec@S3(j).
    (* Unreachability of S3  *)
    equivalent cond@S3(j), False.
    expand cond@S3(j).
@@ -185,13 +156,10 @@ equiv unreach.
 
    fa 6.
    noif 7. simpl.
-   fa 5.
    assumption.
 
 
    expand frame@A1(j); expand output@A1(j); expand exec@A1(j); expand cond@A1(j).
-
-    fa 6; fa 7; dup 7. fa 5;fa 6; fa 6; fa 7; fa 7. dup 6. dup 6.
     expand  seq(i->g^b(i)), j.
    assumption.
 

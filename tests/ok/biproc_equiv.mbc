@@ -19,9 +19,7 @@ expand exec@init.
 
 expand frame@A.
 expand output@A.
-fa 1; fa 2.
 expand exec@A; expand cond@A.
-fa 0.
 assumption.
 
 expand frame@B.
@@ -29,19 +27,16 @@ fa 1.
 expand exec@B.
 equivalent cond@B, False.
 apply trivial_if.
-
 noif 2.
 simpl.
-fa 0.
 assumption.
 
 expand frame@B1.
 fa 1.
 expand output@B1.
-fa 2.
+
 expand exec@B1.
 expand cond@B1.
-fa 0.
 assumption.
 
 Qed.

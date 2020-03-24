@@ -239,44 +239,50 @@ let () =
     ~help:"Remove all constants from the frame.
            \n Usage: const." (pure_equiv const)
 
-(** Function application *)
-let fa i s sk fk =
-  let expand : type a. a Term.term -> EquivSequent.elem list = function
+
+exception No_common_head
+exception No_FA
+let fa_expand t =
+  let aux : type a. a Term.term -> EquivSequent.elem list =
+    function
     | Fun (f,l) ->
-        List.map (fun m -> EquivSequent.Message m) l
+      List.map (fun m -> EquivSequent.Message m) l
     | ITE (c,t,e) when t = e ->
-        EquivSequent.[ Message t ]
+      EquivSequent.[ Message t ]
     | ITE (c,t,e) ->
-        EquivSequent.[ Formula c ; Message t ; Message e ]
+      EquivSequent.[ Formula c ; Message t ; Message e ]
     | And (f,g) ->
-        EquivSequent.[ Formula f ; Formula g ]
+      EquivSequent.[ Formula f ; Formula g ]
     | Or (f,g) ->
       EquivSequent.[ Formula f ; Formula g ]
     | Atom (`Message (_,f,g)) ->
-        EquivSequent.[ Message f ; Message g ]
+      EquivSequent.[ Message f ; Message g ]
     | Impl (f,g) ->
-        EquivSequent.[ Formula f ; Formula g ]
+      EquivSequent.[ Formula f ; Formula g ]
     | Not f -> EquivSequent.[ Formula f ]
     | True -> []
     | False -> []
-    | Diff _ ->
-        Tactics.soft_failure
-          (Tactics.Failure "No common construct")
-    | _ ->
-        Tactics.soft_failure
-          (Tactics.Failure "Unsupported: TODO")
+    | Diff _ -> raise No_common_head
+    | _ -> raise No_FA
   in
-  let expand = function
-    | EquivSequent.Message e -> expand (Term.head_normal_biterm e)
-    | EquivSequent.Formula e -> expand (Term.head_normal_biterm e)
-  in
+  match t with
+  | EquivSequent.Message e -> aux (Term.head_normal_biterm e)
+  | EquivSequent.Formula e -> aux (Term.head_normal_biterm e)
+
+  (*| _ ->
+    Tactics.soft_failure
+      (Tactics.Failure "Unsupported: TODO") *)
+
+(** Function application *)
+let fa i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
         begin try
-          let biframe = List.rev_append before (expand e @ after) in
+          let biframe = List.rev_append before (fa_expand e @ after) in
           sk [EquivSequent.set_biframe s biframe] fk
-        with
-          | Tactics.Tactic_soft_failure err -> fk err
+          with
+          | No_common_head -> fk (Tactics.Failure "No common construct")
+          | No_FA -> fk (Tactics.Failure "FA not applicable")
         end
     | exception Out_of_range ->
         fk (Tactics.Failure "Out of range position")
@@ -288,6 +294,98 @@ let () =
     (function
        | [Prover.Int i] -> pure_equiv (fa i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+
+let is_dup elem elems =
+    if List.mem elem elems then
+      true
+    else
+      begin
+        match elem with
+        (* TODO : this is unsound ! *)
+        (* The matching bellow should be
+        | EquivSequent.Message (
+            Term.ITE(b,
+            Term.Macro (im,[],l),Term.Fun(z,[]))
+
+          ) when im = Term.in_macro && z = Term.f_zero ->
+           But this raises other issues, cf #90.
+        *)
+        | EquivSequent.Message (Term.Macro (im,[],l))
+           when im = Term.in_macro ->
+          (* if the macro is an input, we check if its timestamp is lower than
+             some t where frame@t of frame@pred(t) appears inside the frame *)
+          let test_dup els =
+            List.exists
+              (function
+                | EquivSequent.Message
+                    (Term.Macro (fm,[],
+                                 Term.Pred (Term.Action(n,is))))
+                | EquivSequent.Message
+                    (Term.Macro (fm,[],Term.Action(n,is)))
+                  when fm = Term.frame_macro ->
+                  begin
+                    match l with
+                    | Term.Action (n2,is2) ->
+                      l = Term.Action (n,is) ||
+                      Action.(depends (of_term n2 is2) (of_term n is))
+                    | _ -> false
+                  end
+                | _ -> false)
+              els
+          in
+          (test_dup elems)
+        | _ -> false
+      end
+
+(** This function goes over all elements inside elems.  All elements that can be
+   seen as duplicates, or context of duplicates, are removed. All elements that
+   can be seen as context of duplicates and assumptions are removed, but
+   replaced by the assumptions that appear as there subterms. *)
+let rec filter_fa_dup res assump elems =
+  let rec is_fa_dup acc elems e =
+  (* if an element is a duplicate appearing in elems, we remove it directly *)
+  if is_dup e elems then
+    (true,[])
+    (* if an elemnt is an assumption, we succeed, but do not remove it *)
+  else if List.mem e assump then
+    (true, [e])
+  else
+    (* else, we go recursively inside the sub-terms produced by function
+       application*)
+    try
+      let new_els = fa_expand e in
+      List.fold_left (fun (aux1,aux2) e ->
+          let (fa_succ,fa_rem)= is_fa_dup acc elems e in
+          fa_succ && aux1, fa_rem @ aux2
+        ) (true,[]) new_els
+    with No_FA | No_common_head -> (false,[])
+  in
+  match elems with
+  | [] -> res
+  | e :: els ->
+    let (fa_succ,fa_rem) =  is_fa_dup [] (res@els) e in
+    if fa_succ then filter_fa_dup (fa_rem@res) assump els
+    else filter_fa_dup (e::res) assump els
+
+(** This tactic filter the biframe thourgh filter_fa_dup, passing the set of
+   hypothesis to it.  This is applied automatically, and essentially leaves only
+   assumptions, or elements that contain a sub term which is neither a duplicate
+   or an assumption.  *)
+let fa_dup s sk fk =
+  let biframe = EquivSequent.get_biframe s
+                |> List.rev
+                |> filter_fa_dup [] (EquivSequent.get_hypothesis_biframe s)
+  in
+  sk [EquivSequent.set_biframe s biframe] fk
+
+let () =
+  T.register_general "fadup"
+    ~help:"Removes all terms that are duplicates, or context of duplicates. \
+           \n Usage: fadup."
+    (function
+       | [] -> pure_equiv (fa_dup)
+       | _ -> Tactics.hard_failure (Tactics.Failure "No parameter expected"))
 
 (** Fresh *)
 
@@ -540,55 +638,6 @@ let () =
        | [Prover.Int i] -> pure_equiv (xor i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Improper arguments"))
 
-(** Removes from the frame its [i]-th element if it is duplicated
-   somewhere. Takes into account inputs that are contained inside a frame@t. *)
-let dup i s sk fk =
-  match nth i (EquivSequent.get_biframe s) with
-  | before, e, after ->
-    let biframe = List.rev_append before after in
-    let s = EquivSequent.set_biframe s biframe in
-    (* if the duplicate is trivially a duplicated term, we remove it *)
-    if List.mem e before || List.mem e after
-    then
-      sk [s] fk
-    else begin
-      match e with
-      | EquivSequent.Message (Term.Macro (input_macro,[],l)) ->
-        (* if the macro is an input, we check if its timestamp is lower than
-           some t where frame@t of frame@pred(t) appears inside the frame *)
-        let test_dup els =
-          List.exists
-            (function
-              | EquivSequent.Message
-                  (Term.Macro (frame_macro,[],
-                               Term.Pred (Term.Action(n,is))))
-              | EquivSequent.Message
-                  (Term.Macro (frame_macro,[],Term.Action(n,is))) ->
-                begin
-                  match l with
-                  | Term.Action (n2,is2) ->
-                    l = Term.Action (n,is) ||
-                    Action.(depends (of_term n2 is2) (of_term n is))
-                  | _ -> false
-                end
-              | _ -> false)
-            els
-        in
-        if test_dup before || test_dup after then
-          sk [s] fk
-        else
-          fk (Tactics.Failure "Dup tactic not applicable")
-      | _ -> fk (Tactics.Failure "Dup tactic not applicable")
-    end
-  | exception Out_of_range ->
-    fk (Tactics.Failure "Out of range position")
-
-let () =
-  T.register_general "dup"
-    ~help:"Removes a duplicated term.\n Usage: dup i."
-    (function
-       | [Prover.Int i] -> pure_equiv (dup i)
-       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
 (* Sequence expansion of the sequence [term] for the given parameters [ths]. *)

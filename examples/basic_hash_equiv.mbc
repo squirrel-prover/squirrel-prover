@@ -66,8 +66,7 @@ Proof.
 
   expand frame@R(j); expand exec@R(j);
     expand cond@R(j); expand output@R(j).
-  fa 0. fa 2. repeat (fa 3).
-  dup 1. dup 2.
+  fa 0.
   equivalent
     (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
     (exists (i,k:index), T(i,k)<R(j) &&
@@ -78,14 +77,13 @@ Proof.
   exists i,k1.
   exists i,k.
   exists i,k.
-  admit 2. (* TODO fa/dup *)
+  admit 1. (* TODO fa/dup *)
   assumption.
 
 
   expand frame@R1(j); expand exec@R1(j);
     expand cond@R1(j); expand output@R1(j).
-  fa 0. fa 1. fa 2. repeat (fa 3). fa 4.
-  dup 1. dup 2.
+  fa 0.
   equivalent
     (exists (i,k:index),
        snd(input@R1(j))=h(fst(input@R1(j)),diff(key(i),key'(i,k)))),
@@ -100,13 +98,12 @@ Proof.
   euf M0.
   exists i,k.
   exists i,k.
-     admit 2. (* TODO fa/dup *)
+     admit 1. (* TODO fa/dup *)
   assumption.
 
   expand frame@T(i,k); expand exec@T(i,k);
-    expand cond@T(i,k); expand output@T(i,k).
-  fa 0. fa 1. repeat (fa 2). fa 3.
-  dup 2.
+     expand cond@T(i,k); expand output@T(i,k).
+   fa 1. fa 2. fa 2.
   admit 3. (* TODO PRF (+fresh?) *)
   fresh 2.
   yesif 2.
