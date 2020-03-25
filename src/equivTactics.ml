@@ -39,7 +39,7 @@ let pure_equiv t s sk fk =
 (* Admit tactic *)
 let () =
   T.register_general "admit"
-    ~help:"Closes the current goal, or frop a bi-frame element.\
+    ~help:"Closes the current goal, or drop a bi-frame element.\
            \n Usage: admit [pos]."
     (function
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
@@ -51,8 +51,7 @@ let () =
              in
                sk [s] fk
            end
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-                         (Tactics.Failure "improper arguments"))
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
@@ -107,7 +106,7 @@ let induction ts s =
                 List.mem (Vars.EVar t) (Term.get_vars m))
          (EquivSequent.get_hypothesis_biframe s)
     then
-      raise @@ Tactics.Tactic_soft_failure
+      Tactics.soft_failure
         (Tactics.Failure "Variable should not occur in the premise");
     (* Remove ts from the sequent, as it will become unused. *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
@@ -140,10 +139,10 @@ let induction ts s =
     Action.iter_descrs (EquivSequent.get_system s) add_action ;
     init_goal::!goals
   | _  ->
-    raise @@ Tactics.Tactic_soft_failure
+    Tactics.soft_failure
       (Tactics.Failure "expected a timestamp variable")
   | exception (Theory.Conv _) ->
-    raise @@ Tactics.Tactic_soft_failure
+    Tactics.soft_failure
       (Tactics.Failure "cannot convert argument")
 
 let () =
@@ -156,7 +155,7 @@ let () =
              (fun s sk fk -> match induction th s with
                 | subgoals -> sk subgoals fk
                 | exception (Tactics.Tactic_soft_failure e) -> fk e)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
+       | _ -> Tactics.hard_failure
            (Tactics.Failure "improper arguments"))
 
 
@@ -181,8 +180,7 @@ let () = T.register_general "enrich"
            \n Usage: enrich t."
     (function
        | [Prover.Theory v] -> pure_equiv (enrich v)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments"))
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 
 (* Removes all the constant elements from the frame of [s]. *)
@@ -364,7 +362,7 @@ exception Name_found
 exception Var_found
 
 class find_name ~(system:Action.system) exact name = object (self)
- inherit Iter.iter_approx_macros ~exact ~system as super
+  inherit Iter.iter_approx_macros ~exact ~system as super
 
   method visit_term t = match t with
     | EquivSequent.Message e -> self#visit_message e
@@ -423,86 +421,93 @@ let mk_phi_proj system env name indices proj biframe =
   let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
   begin try
     match indices with
-    | [] -> let iter_frame = new find_name ~system false name in
-            List.iter iter_frame#visit_term proj_frame;
-            let iter_actions = new find_name ~system false name in
-            Action.(iter_descrs system
-              (fun action_descr ->
-                 iter_actions#visit_formula (snd action_descr.condition) ;
-                 iter_actions#visit_message (snd action_descr.output) ;
-                 List.iter (fun (_,t) -> iter_actions#visit_message t)
-                  action_descr.updates));
+    | [] ->
+        let iter_frame = new find_name ~system false name in
+        List.iter iter_frame#visit_term proj_frame;
+        let iter_actions = new find_name ~system false name in
+        Action.(iter_descrs system
+          (fun action_descr ->
+             iter_actions#visit_formula (snd action_descr.condition) ;
+             iter_actions#visit_message (snd action_descr.output) ;
+             List.iter (fun (_,t) -> iter_actions#visit_message t)
+              action_descr.updates));
+        Term.True
+    | _  ->
+        let list_of_indices_from_frame =
+          let iter = new get_name_indices ~system false name [] in
+            List.iter iter#visit_term proj_frame ;
+            iter#get_indices
+        and list_of_actions_from_frame =
+          let iter = new get_actions ~system false [] in
+          List.iter iter#visit_term proj_frame ;
+          iter#get_actions
+        and tbl_of_action_indices = Hashtbl.create 10 in
+        Action.(iter_descrs system
+          (fun action_descr ->
+            let iter = new get_name_indices ~system false name [] in
+            let descr_proj = Action.pi_descr proj action_descr in
+            iter#visit_formula (snd descr_proj.condition) ;
+            iter#visit_message (snd descr_proj.output) ;
+            List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
+            (* we add only actions in which name occurs *)
+            let action_indices = iter#get_indices in
+            if List.length action_indices > 0 then
+              Hashtbl.add tbl_of_action_indices descr_proj action_indices));
+        (* direct cases (for explicit occurrences of [name] in the frame) *)
+        let phi_frame =
+          List.fold_left
+            (fun acc f -> Term.mk_and acc f)
             Term.True
-    | _  -> let list_of_indices_from_frame =
-              let iter = new get_name_indices ~system false name [] in
-              List.iter iter#visit_term proj_frame ;
-              iter#get_indices
-            and list_of_actions_from_frame =
-              let iter = new get_actions ~system false [] in
-              List.iter iter#visit_term proj_frame ;
-              iter#get_actions
-            and tbl_of_action_indices = Hashtbl.create 10 in
-            Action.(iter_descrs system
-              (fun action_descr ->
-                let iter = new get_name_indices ~system false name [] in
-                let descr_proj = Action.pi_descr proj action_descr in
-                iter#visit_formula (snd descr_proj.condition) ;
-                iter#visit_message (snd descr_proj.output) ;
-                List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
-                (* we add only actions in which name occurs *)
-                let action_indices = iter#get_indices in
-                if List.length action_indices > 0 then
-                  Hashtbl.add tbl_of_action_indices descr_proj action_indices));
-            (* direct cases (for explicit occurences of name in the frame) *)
-            let phi_frame =
-              List.fold_left
-                (fun acc f -> Term.mk_and acc f)
-                Term.True
-                (List.map (fun j -> mk_indices_ineq indices j) list_of_indices_from_frame)
-            (* undirect cases (for occurences of name in actions of the system) *)
-            and phi_actions =
-              Seq.fold_left
-                (fun acc f -> Term.mk_and acc f)
-                Term.True
-                (Seq.map
-                  (* for each action in which name occurs *)
-                  (fun a ->
-                    let new_action_indices =
-                      List.map
-                        (fun i -> Vars.make_fresh_from_and_update env i)
-                        a.Action.indices
-                    in
-                    let subst =
-                      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-                        a.Action.indices new_action_indices
-                    in
-                    let new_action = Action.to_term (Action.subst_action subst a.Action.action) in
-                    (* we now apply the same substitution to the subset of
-                    indices corresponding to name in the action *)
-                    let new_name_indices =
-                      List.map
-                        (Term.subst_var subst)
-                        (List.hd (Hashtbl.find tbl_of_action_indices a)) in
-                    (* if new_action occurs before an action of the frame *)
-                    let disj =
-                      List.fold_left
-                        (fun acc f -> Term.mk_or acc f)
-                        Term.False
-                        (List.map
-                          (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
-                          list_of_actions_from_frame)
-                    (* then indices of name in new_action and of name differ *)
-                    and conj = mk_indices_ineq new_name_indices indices in
-                    let forall_var = List.map (fun i -> Vars.EVar i) new_action_indices in
-                    Term.ForAll(forall_var,Term.Impl(disj,conj)))
-                  (Hashtbl.to_seq_keys tbl_of_action_indices))
-            in
-            (Term.mk_and phi_frame phi_actions)
+            (List.map
+               (fun j -> mk_indices_ineq indices j)
+               list_of_indices_from_frame)
+        (* indirect cases (occurrences of [name] in actions of the system) *)
+        and phi_actions =
+          Seq.fold_left
+            (fun acc f -> Term.mk_and acc f)
+            Term.True
+            (Seq.map
+              (* for each action in which [name] occurs *)
+              (fun a ->
+                let new_action_indices =
+                  List.map
+                    (fun i -> Vars.make_fresh_from_and_update env i)
+                    a.Action.indices
+                in
+                let subst =
+                  List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+                    a.Action.indices new_action_indices
+                in
+                let new_action =
+                  Action.to_term (Action.subst_action subst a.Action.action) in
+                (* we now apply the same substitution to the subset of
+                   indices corresponding to [name] in the action *)
+                let new_name_indices =
+                  List.map
+                    (Term.subst_var subst)
+                    (List.hd (Hashtbl.find tbl_of_action_indices a)) in
+                (* if new_action occurs before an action of the frame *)
+                let disj =
+                  List.fold_left
+                    (fun acc f -> Term.mk_or acc f)
+                    Term.False
+                    (List.map
+                      (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                      list_of_actions_from_frame)
+                (* then indices of name in new_action and of [name] differ *)
+                and conj = mk_indices_ineq new_name_indices indices in
+                let forall_var =
+                  List.map (fun i -> Vars.EVar i) new_action_indices in
+                Term.ForAll(forall_var,Term.Impl(disj,conj)))
+              (Hashtbl.to_seq_keys tbl_of_action_indices))
+        in
+        Term.mk_and phi_frame phi_actions
   with
-  | Name_found -> raise @@ Tactics.Tactic_hard_failure
-                  (Tactics.Failure "Name not fresh")
-  | Var_found -> raise @@ Tactics.Tactic_hard_failure
-                 (Tactics.Failure "Variable found, unsound to apply fresh")
+  | Name_found ->
+      Tactics.hard_failure (Tactics.Failure "Name not fresh")
+  | Var_found ->
+      Tactics.hard_failure
+        (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
@@ -511,22 +516,27 @@ let mk_if_term system env e biframe =
     (Tactics.Failure "Can only apply fresh tactic on names") in
   match e with
   | EquivSequent.Message t ->
-      begin
       let (n_left, ind_left, n_right, ind_right) =
-        match Term.pi_term true Term.Left t, Term.pi_term true Term.Right t with
+        match
+          Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+        with
         | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
         | _ -> raise @@ not_name_failure
       in
       let env_local = ref env in
       let system_left = Action.(make_trace_system system.left) in
-      let phi_left = mk_phi_proj system_left env_local n_left ind_left Term.Left biframe in
+      let phi_left =
+        mk_phi_proj system_left env_local n_left ind_left Term.Left biframe
+      in
       let system_right = Action.(make_trace_system system.right) in
-      let phi_right = mk_phi_proj system_right env_local n_right ind_right Term.Right biframe in
+      let phi_right =
+        mk_phi_proj system_right env_local n_right ind_right Term.Right biframe
+      in
       let then_branch = Term.Fun (Term.f_zero,[]) in
       let else_branch = t in
-      match (Term.mk_and phi_left phi_right) with
+      begin match (Term.mk_and phi_left phi_right) with
       | Term.True -> EquivSequent.Message then_branch
-      | phi -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
+      | phi -> EquivSequent.Message (Term.ITE (phi, then_branch, else_branch))
       end
   | EquivSequent.Formula f -> raise @@ not_name_failure
 
@@ -573,8 +583,10 @@ let xor i s sk fk =
             | EquivSequent.Message Diff
                 (Fun (fl,Term.Name (nl,_)::ll), Fun (fr,Term.Name (nr,_)::lr))
                 when (fl = Term.f_xor && fr = Term.f_xor && nl=nr) -> (nl,ll,lr)
-            | _ -> raise @@ Tactics.Tactic_hard_failure
-                    (Tactics.Failure "Can only apply xor tactic on terms of the form (t1 xor t2)")
+            | _ ->
+                Tactics.hard_failure
+                  (Tactics.Failure "Can only apply xor tactic \
+                                    on terms of the form (t1 xor t2)")
           in
           (* the biframe to consider in case of success *)
           let biframe = List.rev_append before after in
@@ -592,10 +604,10 @@ let xor i s sk fk =
             if fresh_name_ssc
                  Action.(make_trace_system bisystem.right) name frame_right
             then sk [EquivSequent.set_biframe s biframe] fk
-            else raise @@ Tactics.Tactic_hard_failure
-              (Tactics.Failure "Name not fresh in the right system")
+            else Tactics.hard_failure
+                   (Tactics.Failure "Name not fresh in the right system")
           else
-            raise @@ Tactics.Tactic_hard_failure
+            Tactics.hard_failure
               (Tactics.Failure "Name not fresh in the left system")
         with
         | Tactics.Tactic_hard_failure err -> fk err
@@ -647,7 +659,7 @@ let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
 
 
 
-(* Expand all occurences of the given macro [term] inside [s] *)
+(* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
   (* final function once the subtitustion has been computed *)
@@ -683,27 +695,28 @@ let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
           fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
 let () = T.register_general "expand"
-    ~help:"Expand all occurences of the given macro, or expand the given \
-           sequence using the given indices.\
-           \n Usage: expand macro. expand seq(i,k...->t(i,k,...),i1,k1,..."
-    (function
-      | [Prover.Theory v] -> pure_equiv (expand v)
-      | (Prover.Theory v)::ids ->
-          let ids =
-            List.map
-              (function
-                 | Prover.Theory th -> th
-                 | _ -> raise @@ Tactics.hard_failure
-                     (Tactics.Failure "improper arguments"))
-              ids
-          in
+  ~help:"Expand all occurrences of the given macro, or expand the given \
+         sequence using the given indices.\
+         \n Usage: expand macro. expand seq(i,k...->t(i,k,...),i1,k1,..."
+  (function
+    | [Prover.Theory v] -> pure_equiv (expand v)
+    | (Prover.Theory v)::ids ->
+        let ids =
+          List.map
+            (function
+               | Prover.Theory th -> th
+               | _ -> Tactics.hard_failure
+                        (Tactics.Failure "improper arguments"))
+            ids
+        in
         pure_equiv (expand_seq v ids)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
+     | _ ->
+         Tactics.hard_failure
            (Tactics.Failure "improper arguments"))
 
-(** Expands all macro occurences inside the biframe, if the macro is not at some
-   pred(A) but about at a concrete action. Acts recursively, also expanding the
-   macros inside macro definition. *)
+(** Expands all macro occurrences inside the biframe, if the macro is not at
+  * some pred(A) but about at a concrete action.
+  * Acts recursively, also expanding the macros inside macro definition. *)
 let expand_all s sk fk =
   let expand_all_macros t system =
     let rec aux : type a. a term -> a term = function
@@ -752,16 +765,15 @@ let expand_all s sk fk =
   sk [EquivSequent.set_biframe s biframe] fk
 
 let () = T.register_general "expandall"
-    ~help:"Expand all occurences of macros that are about explicit actions.
+    ~help:"Expand all occurrences of macros that are about explicit actions.
            \n Usage: expandall."
     (function
-      | [] -> pure_equiv (expand_all)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments"))
+       | [] -> pure_equiv (expand_all)
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 
-(* Replace all occurrences of [t1] by [t2] inside of [s], and asks to prove that
-   t1 <=> t2. *)
+(** Replace all occurrences of [t1] by [t2] inside of [s],
+  * and add a subgoal to prove that [t1 <=> t2]. *)
 let equiv t1 t2 (s : EquivSequent.t) sk fk =
   let env = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
@@ -771,29 +783,28 @@ let equiv t1 t2 (s : EquivSequent.t) sk fk =
   | f1,f2 ->
     (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
-        TraceSequent.init ~system
-          (Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)))
-          |> TraceSequent.set_env env
-      in
-      let subgoals =
-        [ Prover.Goal.Trace trace_sequent;
-          Prover.Goal.Equiv
-            (EquivSequent.apply_subst [Term.ESubst(f1, f2)] s) ]
-      in
-      sk subgoals fk
+      TraceSequent.init ~system
+        (Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)))
+      |> TraceSequent.set_env env
+    in
+    let subgoals =
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv
+          (EquivSequent.apply_subst [Term.ESubst (f1,f2)] s) ]
+    in
+    sk subgoals fk
   | exception (Theory.Conv e) ->
-      Tactics.soft_failure
-        (Tactics.Failure
-           (Fmt.str "%a" Theory.pp_error e))
+    Tactics.soft_failure
+      (Tactics.Failure
+         (Fmt.str "%a" Theory.pp_error e))
 
 let () = T.register_general "equivalent"
-    ~help:"Replace all occurences of a formula by another, and ask to prove \
-           \n that they are equivalent.
-           \n Usage: equiv t1, t2."
-    (function
-       | [Prover.Theory v1; Prover.Theory v2] -> only_equiv (equiv v1 v2)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments"))
+  ~help:"Replace all occurrences of a formula by another, and ask to prove \
+         \n that they are equivalent.
+         \n Usage: equiv t1, t2."
+  (function
+     | [Prover.Theory v1; Prover.Theory v2] -> only_equiv (equiv v1 v2)
+     | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 (* Reduces a conditional to its else branch, and asks to prove that its
    condition implies false. *)
@@ -804,8 +815,7 @@ let no_if i s sk fk =
           let cond, negative_branch =
             match e with
             | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message e)
-            | _ -> raise @@ Tactics.Tactic_hard_failure
-                (Tactics.Failure "improper arguments")
+            | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
           in
           (* replace in the biframe the ite by its negative branch *)
           let biframe = List.rev_append before (negative_branch :: after) in
@@ -840,8 +850,7 @@ let yes_if i s sk fk =
          let cond, positive_branch =
            match e with
            | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
-           | _ -> raise @@ Tactics.Tactic_hard_failure
-               (Tactics.Failure "improper arguments")
+           | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
          in
          let biframe = List.rev_append before (positive_branch :: after) in
          let env = EquivSequent.get_env s in
@@ -959,8 +968,8 @@ let () = T.register_general "ddh"
     ~help:"Closes the current system, if it is an instance of a context of ddh.\
            \n Usage: ddh a, b, c."
     (function
-      | [Prover.String_name v1; Prover.String_name v2;
-         Prover.String_name v3] ->
-        pure_equiv (ddh v1 v2 v3)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments"))
+       | [Prover.String_name v1;
+          Prover.String_name v2;
+          Prover.String_name v3] ->
+         pure_equiv (ddh v1 v2 v3)
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
