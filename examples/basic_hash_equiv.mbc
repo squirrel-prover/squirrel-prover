@@ -62,7 +62,6 @@ equiv foo.
 Proof.
   induction t.
 
-  expand frame@init; expand exec@init.
 
   expand frame@R(j); expand exec@R(j);
     expand cond@R(j); expand output@R(j).
@@ -78,7 +77,7 @@ Proof.
   exists i,k.
   exists i,k.
   admit 1. (* TODO fa/dup *)
-  assumption.
+
 
 
   expand frame@R1(j); expand exec@R1(j);
@@ -99,7 +98,7 @@ Proof.
   exists i,k.
   exists i,k.
      admit 1. (* TODO fa/dup *)
-  assumption.
+
 
   expand frame@T(i,k); expand exec@T(i,k);
      expand cond@T(i,k); expand output@T(i,k).
@@ -108,5 +107,5 @@ Proof.
   fresh 2.
   yesif 2.
   split.
-  assumption.
+
 Qed.

@@ -11,11 +11,17 @@ system (!_i ( out(c, diff((g^a(i))^b(i),g^k(i))))
 
 
 equiv ddh_goal.
-Proof.
-induction t.
-expand frame@init; expand exec@init.
+	Proof.
+nosimpl(
+	induction t).
+fadup; expandall; refl + assumption.
+    fadup; try (expandall; refl + assumption).
+    fadup; try (expandall; refl + assumption).
+	cycle 1.
+    expand exec@A1(j).
+	nosimpl(expandall).
 
-expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
+    fadup; try (expandall; refl + assumption).
 
 	fa 1. fa 2.
 ddh a, b, k.

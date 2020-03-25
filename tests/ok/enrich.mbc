@@ -15,9 +15,6 @@ enrich seq(i->h(ok,k(i))).
 
  induction t.
 
- expand frame@init.
- expand exec@init.
-
  expand frame@A(i).
  expand output@A(i).
  expand exec@A(i).
@@ -28,12 +25,6 @@ enrich seq(i->h(ok,k(i))).
 
  noif 3.
  simpl.
- assumption.
 
- expand frame@A1(i).
- expand output@A1(i).
- expand exec@A1(i).
  expand seq(i->h(ok,k(i))),i.
- expand cond@A1(i).
- assumption.
 Qed.

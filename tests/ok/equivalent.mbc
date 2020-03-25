@@ -7,22 +7,11 @@ equiv test.
 Proof.
 induction t.
 
-expand frame@init.
-expand exec@init.
-
 expand frame@A.
 expand exec@A.
 equivalent cond@A, False.
 expand cond@A.
 
 fa 1.
-noif 2.
-simpl.
-assumption.
 
-expand frame@A1.
-expand output@A1.
-expand exec@A1.
-expand cond@A1.
-assumption.
 Qed.

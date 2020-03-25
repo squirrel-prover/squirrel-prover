@@ -345,7 +345,14 @@ let esimpl =
   Tactics.(
     AndThen
       (Abstract ("fadup",[]) ::
-      [Try (Abstract ("refl",[]))])
+       [Try(
+           AndThen [(AndThen [Abstract ("expandall",[]); (Abstract ("fadup",[]))]);
+                    (
+                      OrElse [Abstract ("refl",[]);
+                              Abstract ("assumption",[])]
+                    )]
+         )
+       ])
   )
 
 

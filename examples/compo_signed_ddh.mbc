@@ -157,79 +157,25 @@ Proof.
    enrich seq(i-> g^b(i)).    enrich seq(i-> g^a(i)).
    induction t.
 
-   expand exec@init; expand frame@init.
+   expandall.
+   fa 8.
 
-    expand frame@P; expand exec@P; expand cond@P.
-       expand output@P.
-       assumption.
-
-
-
-
-    expand frame@P1; expand exec@P1; expand cond@P1.
-       expand output@P1. expand gS@P1.
-      fa 8. expand pkS@P1.
-       assumption.
-
-
-    expand frame@P2; expand exec@P2; expand cond@P2.
-       expand output@P2. expand pkS@P2.
-       assumption.
-
-
-    expand frame@P3(j); expand exec@P3(j); expand cond@P3(j).
-       expand output@P3(j). expand pkS@P3(j).
    expand seq(i->g^b(i)),j.
-       assumption.
 
        expand frame@P4; expand exec@P4.
        fa 8.  equivalent cond@P4,False.
        simpl.
        executable pred(P4). depends P1, P4. apply H1 to P1. apply P1_charac.
        noif 9. simpl.
-       assumption.
 
-      expand frame@A; expand exec@A; expand cond@A.
-       expand output@A. expand pkS@A.
+    expandall.
+    fa 8.
 
-       assumption.
-
-    expand frame@A1; expand exec@A1; expand cond@A1.
-       expand output@A1. expand pkS@A1. expand gS@A1.
-
-       assumption.
-
-    expand frame@S; expand exec@S; expand cond@S.
-       expand output@S. expand pkP@S. expand gP@S.
-fa 8. assumption.
-
-    expand frame@S1; expand exec@S1; expand cond@S1.
-       expand output@S1. expand pkP@S1. expand gP@S1.
- assumption.
-
-       expand frame@S2; expand exec@S2; expand cond@S2.
-       expand output@S2. expand pkP@S2. expand gP@S2.
-   assumption.
-
-       expand frame@S3(l); expand exec@S3(l); expand cond@S3(l).
-       expand output@S3(l). expand pkP@S3(l). expand gP@S3(l).
-     expand seq(i->g^a(i)),l .
-    assumption.
+        expand seq(i->g^a(i)),l.
 
        expand frame@S4; expand exec@S4.
-  equivalent cond@S4,False.
+       equivalent cond@S4,False.
        simpl.
        executable pred(S4). depends S1, S4. apply H1 to S1. apply S1_charac.
-fa 8.   noif 9. simpl.
- assumption.
-
-
-    expand frame@A2; expand exec@A2; expand cond@A2.
-       expand output@A2. expand pkP@A2. expand gP@A2.
- assumption.
-
-
-    expand frame@A3; expand exec@A3; expand cond@A3.
-       expand output@A3. expand pkP@A3. expand gP@A3.
-       assumption.
+       fa 8.   noif 9. simpl.
 Qed.

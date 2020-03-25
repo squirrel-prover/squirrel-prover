@@ -14,14 +14,6 @@ equiv test_left_bis.
 Proof.
 induction t.
 
-expand frame@init.
-expand exec@init.
-
-expand frame@A.
-expand output@A.
-expand exec@A; expand cond@A.
-assumption.
-
 expand frame@B.
 fa 1.
 expand exec@B.
@@ -29,14 +21,5 @@ equivalent cond@B, False.
 apply trivial_if.
 noif 2.
 simpl.
-assumption.
-
-expand frame@B1.
-fa 1.
-expand output@B1.
-
-expand exec@B1.
-expand cond@B1.
-assumption.
 
 Qed.

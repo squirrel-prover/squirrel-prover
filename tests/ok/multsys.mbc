@@ -14,23 +14,17 @@ equiv test.
 Proof.
 
 induction t.
-expandall.
-
-expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
-fa 1. noif 2. simpl. assumption.
 
 expandall.
-assumption.
+fa 1. noif 2. simpl.
+
 Qed.
 
 equiv [left,toto] [right,toto] test.
 Proof.
 induction t.
-expand exec@init; expand frame@init.
+
 
 expandall.
-fa 1. noif 2. simpl. assumption.
-
-expandall.
-assumption.
+fa 1. noif 2. simpl.
 Qed.
