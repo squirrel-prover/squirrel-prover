@@ -39,8 +39,10 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 exception Bad_ssc
 
 (** Returns true if the syntactic side condition of the key is met inside the
-    protocol and the messages. *)
+   protocol and the messages. All occurences of the key must either be inside
+   the hash function, or under some public key function.*)
 val hash_key_ssc :
+  ?pk:(Term.fname option) ->
   system:Action.system ->
   Term.fname -> Term.name -> Term.message list -> bool
 
@@ -48,6 +50,7 @@ val hash_key_ssc :
     hash function and key in a process.
     TODO: memoisation *)
 val mk_rule :
+  pk:(Term.fname option) ->
   system:Action.system ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->
   hash_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule

@@ -245,6 +245,11 @@ let () =
         Theory.(Conv (Undefined "i1"))
         (fun () -> run ~test "tests/alcotest/euf_env.mbc")
     end ;
+    "Sign NoSSC", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure NoSSC)
+        (fun () -> run ~test "tests/alcotest/sign.mbc")
+    end ;
     "Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)

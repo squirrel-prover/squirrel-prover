@@ -11,7 +11,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC NAME ABSTRACT MUTABLE SYSTEM
+%token CHANNEL TERM PROCESS HASH AENC SIGNATURE NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
@@ -221,6 +221,8 @@ abs_type:
 declaration:
 | HASH ID                        { Theory.declare_hash $2 }
 | AENC ID                        { Theory.declare_aenc $2 }
+| SIGNATURE s=ID COMMA c=ID COMMA p=ID
+                                 { Theory.declare_signature s c p }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
 | ABSTRACT ID COLON abs_type     { let l,r = $4 in
                                    Theory.declare_abstract $2 l r }

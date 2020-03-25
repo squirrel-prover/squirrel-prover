@@ -8,11 +8,16 @@ exception Bad_ssc
   * some macros to be undefined, though such instaces will not be
   * supported when collecting hashes; more importantly, it avoids
   * inspecting each of the multiple expansions of a same macro. *)
-class check_hash_key ~system hash_fn key_n = object (self)
+class check_hash_key ~pk ~system hash_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~system as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
-        self#visit_message m
+      self#visit_message m
+    | Term.Fun ((fn,_), [Term.Name l]) ->
+      (match pk with
+       | None -> self#visit_message (Term.Name l)
+       | Some pk -> if fn = pk then () else self#visit_message (Term.Name l)
+      )
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
     | Term.Var m -> raise Bad_ssc
     | _ -> super#visit_message t
@@ -57,8 +62,8 @@ end
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [hash_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
-let euf_key_ssc ~system hash_fn key_n messages =
-  let ssc = new check_hash_key ~system hash_fn key_n in
+let euf_key_ssc ~pk ~system hash_fn key_n messages =
+  let ssc = new check_hash_key ~pk ~system hash_fn key_n in
   List.iter ssc#visit_message messages ;
   Action.(iter_descrs system
     (fun action_descr ->
@@ -82,9 +87,9 @@ let no_cond ~system messages =
 (** Same as [euf_key_ssc] but returning a boolean.
   * This is used in the collision tactic, which looks for all h(_,k)
   * such that k satisfies the SSC. *)
-let hash_key_ssc ~system hash_fn key_n messages =
+let hash_key_ssc ?(pk=None) ~system hash_fn key_n messages =
   try
-    euf_key_ssc ~system hash_fn key_n messages;
+    euf_key_ssc ~pk ~system hash_fn key_n messages;
     true
   with Bad_ssc -> false
 
@@ -137,8 +142,8 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
-  euf_key_ssc ~system hash_fn key_n [mess;sign];
+let mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
+  euf_key_ssc ~pk ~system hash_fn key_n [mess;sign];
   let cond = not (no_cond ~system [mess;sign]) in
   { hash = hash_fn;
     key = key_n;

@@ -8,6 +8,9 @@ type kind = Sorts.esort
 type function_def =
   | Hash
   | AEnc
+  | Sign
+  | CheckSign
+  | PublicKey
   | Abstract of kind list * kind
 
 type macro_def =
@@ -35,6 +38,7 @@ type some_def =
 
 type data = ..
 type data += Empty
+type data += AssociatedFunctions of (fname t) list
 
 let to_string s = s
 

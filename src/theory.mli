@@ -65,6 +65,10 @@ val declare_hash : string -> unit
   * message->message->message->message. *)
 val declare_aenc : string -> unit
 
+(** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
+   It satisfies EUF. *)
+val declare_signature : string -> string -> string -> unit
+
 (** [declare_name n i] declares a new name of type
   * [index^i -> message]. *)
 val declare_name : string -> int -> unit
@@ -117,6 +121,12 @@ val check : ?local:bool -> env -> term -> Sorts.esort -> unit
 val check_state : string -> int -> Sorts.esort
 
 val is_hash : Term.fname -> bool
+
+(* Returns true if the given function names corresponds to some associated
+   checksign and pk functions, returns Some sign, where sign is the
+   corresponding signature. Else, returnes None. *)
+
+val check_signature : Term.fname -> Term.fname -> Term.fname option
 
 (** {2 Conversions}
   * Convert terms inside the theory to terms of the prover. *)

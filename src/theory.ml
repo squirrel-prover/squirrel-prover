@@ -173,6 +173,9 @@ let function_kind f : kind list * kind =
     | Function (_, Hash) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, AEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage],
                             Sorts.emessage
+    | Function (_, Sign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
+    | Function (_, CheckSign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
+    | Function (_, PublicKey) -> [Sorts.emessage], Sorts.emessage
     | Function (_, Abstract (args_k, ret_k)) -> args_k, ret_k
     | Macro (Local (targs,k)) -> targs, k
     | Macro (Global arity) -> Array.to_list (Array.make arity Sorts.eindex),
@@ -308,7 +311,7 @@ let rec convert :
         | Sorts.Message ->
             let open Symbols in
             begin match of_string f with
-              | Wrapped (s, Function (_,(Hash|AEnc|Abstract _))) ->
+              | Wrapped (s, Function (_,(Hash|AEnc|Sign|CheckSign|PublicKey|Abstract _))) ->
                   Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in
@@ -542,6 +545,34 @@ let declare_symbol name info =
 let declare_hash s = declare_symbol s Symbols.Hash
 let declare_aenc s = declare_symbol s Symbols.AEnc
 
+let is_hash s =
+  match Symbols.Function.get_def s with
+    | _,Symbols.Hash -> true
+    | _ -> false
+    | exception Not_found -> failwith "symbol not found"
+
+
+let declare_signature sign checksign pk =
+  let sign = Symbols.Function.declare_exact sign (0,Symbols.Sign) in
+  let pk = Symbols.Function.declare_exact pk (0,Symbols.PublicKey) in
+  let data = Symbols.AssociatedFunctions [sign; pk] in
+  ignore (Symbols.Function.declare_exact checksign ~data (0,Symbols.CheckSign))
+
+let check_signature checksign pk =
+  let def = Symbols.Function.get_def in
+  let correct_type = match def checksign, def pk  with
+    | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
+    | _ -> false
+    | exception Not_found -> failwith "symbol not found"
+  in
+  if correct_type then
+    (
+      match Symbols.Function.get_data checksign with
+      | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk-> Some sign
+      | _ -> None
+    )
+  else None
+
 let declare_state s arity kind =
   let info = Symbols.State (arity,kind) in
   ignore (Symbols.Macro.declare_exact s info)
@@ -572,6 +603,15 @@ let make_term ?at_ts s l =
               Fun (s,l,None)
           | Symbols.AEnc ->
               if List.length l <> 3 then raise @@ arity_error 3 ;
+              Fun (s,l,None)
+          | Symbols.Sign ->
+              if List.length l <> 2 then raise @@ arity_error 2 ;
+              Fun (s,l,None)
+          | Symbols.CheckSign ->
+              if List.length l <> 2 then raise @@ arity_error 2 ;
+              Fun (s,l,None)
+          | Symbols.PublicKey ->
+              if List.length l <> 1 then raise @@ arity_error 1 ;
               Fun (s,l,None)
           | Symbols.Abstract (args,_) ->
             if List.length args <> List.length l then
@@ -622,12 +662,6 @@ let make_term ?at_ts s l =
 
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair", [u; v], None)
-
-let is_hash s =
-  match Symbols.Function.get_def s with
-    | _,Symbols.Hash -> true
-    | _ -> false
-    | exception Not_found -> failwith "symbol not found"
 
 (** Apply a partial substitution to a term.
   * This is meant for formulas and local terms in processes,

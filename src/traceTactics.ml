@@ -708,17 +708,34 @@ let () =
 (** EUF Axioms *)
 
 let euf_param (`Message at : message_atom) = match at with
+  | (`Eq, Fun ((checksign, _),
+               [s;
+               Fun ((pk,_), [Name key])
+               ]), m)
+  |  (`Eq, m, Fun ((checksign, _),
+               [s;
+               Fun ((pk,_), [Name key])
+               ])) ->
+    (
+      match Theory.check_signature checksign pk with
+      | None ->  raise @@ Tactic_hard_failure
+        (Tactics.Failure "The message does not correspond to a signature check \
+                          with the associated pk.")
+      | Some sign -> (sign, key, m, s, Some pk)
+    )
+
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
   | (`Eq, s, Fun ((hash, _), [m; Name key]))->
     if Theory.is_hash hash then
-      (hash, key, m, s)
+      (hash, key, m, s, None)
     else raise @@ Tactic_hard_failure
         (Tactics.Failure "The function symbol is not a hash function.")
+
   | _ -> raise @@ Tactic_hard_failure
       (Tactics.Failure
          "Euf can only be applied to hypothesis of the form h(t,k)=m.")
 
-let euf_apply_schema sequent (_, (_, key_is), m, s) case =
+let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   let open Euf in
 
   (* Equality between hashed messages *)
@@ -756,7 +773,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s) case =
     TraceSequent.add_formula new_f
       (TraceSequent.add_formula le_cnstr sequent)
 
-let euf_apply_direct s (_, (_, key_is), m, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, (_, key_is), m, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
@@ -796,9 +813,9 @@ let euf_apply_direct s (_, (_, key_is), m, _) Euf.{d_key_indices;d_message} =
 let euf_apply_facts s at =
   let p = euf_param at in
   let env = TraceSequent.get_env s in
-  let (hash_fn, (key_n, key_is), mess, sign) = p in
+  let (hash_fn, (key_n, key_is), mess, sign, pk) = p in
   let system = TraceSequent.system s in
-  let rule = Euf.mk_rule ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let rule = Euf.mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =
@@ -847,7 +864,7 @@ let tag_euf_apply hypothesis_name formula_id (s : TraceSequent.t) sk fk =
         (Tactics.NoSSC)
   in
   let tag_s =
-    let (_, key, m, _) = euf_param at in
+    let (_, key, m, _,_) = euf_param at in
       let f,system =
         Prover.get_goal_formula formula_id
       in
@@ -962,7 +979,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
   let hashes = List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-             let system = TraceSequent.system s in
+           let system = TraceSequent.system s in
              Theory.is_hash hash && Euf.hash_key_ssc system hash key [m]
          | _ -> false)
       (TraceSequent.get_all_terms s)

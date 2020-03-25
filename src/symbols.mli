@@ -17,6 +17,9 @@ type kind = Sorts.esort
 type function_def =
   | Hash
   | AEnc
+  | Sign
+  | CheckSign
+  | PublicKey
   | Abstract of kind list * kind
 
 type macro_def =
@@ -53,6 +56,7 @@ type some_def =
   * at least avoids having multiple hashtables for symbols. *)
 type data = ..
 type data += Empty
+type data += AssociatedFunctions of (fname t) list
 
 exception Multiple_declarations of string
 exception Unbound_identifier of string
