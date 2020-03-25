@@ -185,7 +185,7 @@ and formulas.
 \end{example}
 
 \subsection{Macros}
-
+\charlie{In what follows, unless I'm mistaken, the semantics $(\mout@\alpha)^I$ is never given (and similary for all macros actually). I would guess that we are missing the line $ (m[\vec{i}]@\alpha)^I = m^I(\vec{i},\alpha )  $. If this is correct, I don't see why we bother with adding this level, and don't directly give for instance $(\mcond@\tinit)^I = \true$, rather than $\mcond^I(\tinit) = \true$.}
 Let $(\alpha'_i)_{0 \leq i < |\D_\XT|}$ be the enumeration of the elements
 of $D_\XT$ wrt $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
 For each $k$, let $\alpha_k$ be the representative symbolic action
@@ -220,11 +220,16 @@ We then define, for each macro symbol $m\in\M_k$,
 its interpretation $m^I : D_\I^k \times \D_\XT \to T_\Sigma^{D_I}$.
 More precisely, we define $m^I(\ldots,v)$ by induction on its timestamp
 argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
-$$
+\[
     \minp^I(\tinit) = \mframe^I(\tinit) = s^I(\vec{f},\tinit)
-    = \mout^I(\tinit) = 0
-$$
-$$\begin{array}{rll}
+    = \mout^I(\tinit) = 0\]
+
+\charlie{I believe that the semantics for inputs are wrong. At least, in order to define some interesting notion of equivalence, we need that $    \minp^I(\alpha'_{k+1}) =
+    \att_{k}(    \mframe^I(\alpha'_{k}) )$. In other terms, we must not give to the attacker symbols the outputs, if the condition of the action is not satisfied.
+    Let us consider the stupid protocol "if false then A: out(k) ||  in(x). if x=k then B: out(diff(ok,ko)".  Intuitively, this is diff equivalent. Indeed A can never be executed, and then with a fresh, x=k is going to be false with overwhelming probability, and B never occurs. However, let us consider the trace A;B. If I interpret
+    $\minp@B$ as $\att_k(output@A)$, I get that at this step, the attackers knows $k$ ($k=output@A$), and then, I can build a distinguisher, because the attacker can produce $k$. Thus, with this interpretation, I can construct a model which violates indinstinguishability.
+  }
+\[\begin{array}{rll}
     \minp^I(\alpha'_{k+1}) &=&
     \att_{k}(\mout^I(\alpha'_1),\ldots,\mout^I(\alpha'_k))
   \\
@@ -249,7 +254,7 @@ $$\begin{array}{rll}
         \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto
           s[\vec{j}]@\alpha_{k+1}\}_s
         }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
-\end{array}$$
+\end{array}\]
 
 The interpretation of input macros is the simplest:
 it uses function symbols $\att_i$ to model the arbitrary attacker's
@@ -263,6 +268,8 @@ cell $s[\vec{f}]$ just before the execution of $\alpha'_{k+1}$:
 it is obtained by interpreting the update term $u_{\alpha_k}^{s[\vec{j}]}$
 of the associated symbolic action $\alpha_{k+1}$ mapping $\vec{i}$
 and $\vec{j}$ to their expected concretizations.
+\charlie{Linked to my previous comment inside the definition of the protocols, I would have expected actions to only be able to touch states that depends on their indices. Given an action $A(\vec{i})$, We could define its upates as a mapping $S_A$ from $s[\vec{j}]$ to terms for some states $s$ and $\vec{j}$ a subset of $\vec{i}$. Then, the semantics of $s(\vec{i})@\alpha_k$ would be that either $s$ is in the interpreted domain of $S_{\alpha_{k-1}}$, and we thus interpret the corresponding term, or it is identity, and we search recursively.}
+
 The semantics of outputs is defined similarly.
 
 Since meta-logic terms and formulas $o_{\alpha}$, $u_{\alpha}$ and
@@ -323,3 +330,8 @@ but we may also restrict meta-interpretations e.g.\ to force a condition on
 abstract traces. In order to verify security in such a class of models,
 we will identify axioms that hold in these models, and verify that our
 security property is a logical consequence of these axioms.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

@@ -11,7 +11,7 @@ the details of this translation.
 
 In order to be able to define a protocol, we assume a set of function
 symbols $\F$, name symbols $\N$.
-Additionally, we will make use of channel names from some set $\C$,
+Additionally, we will make use of channel names from a set of constants $\C$ (known to the attacker),
 as well as index memory cell symbols from $\States$.
 
 \begin{definition} \label{def:action} \label{def:proto}
@@ -41,6 +41,13 @@ as well as index memory cell symbols from $\States$.
       that are distinct and disjoint from $\vec{i}$
       (intuitively, this term describes how the action updates the memory
       cell, depending on the indices $\vec{i}$ and $\vec{j}$);
+      \charlie{The management of states seems highly complicated. I guess you had some discussions about them, but I think I missed them so I feel a bit lost...
+        \begin{itemize}
+        \item  How can we have some $\vec{j}$ which are free index variables w.r.t. the indices of the action ? If I understand what follows, inside action $R(i)$, I can update some state $s(j)$, where $i$ and $j$ are interpreted in distinct way by the interpretation $I$. In term of real life implementations, this seems a bit weird.
+        \item Why do we ask for an update of each memory cells ? In the rest, we most of the time make them perform an identity.
+        \end{itemize}
+I guess I can see why having an explicit update for each action makes it easier to interpret states, as we can always define inductively the value of a state at time t w.r.t to the update at time t-1, but I feel like this can be quite confusing for the reader. It might be simpler to give only some updates, and say that it is by default the identity if undefined.
+      }
     \item two channel names $\cin_\alpha$ and $\cout_\alpha$
       (intuitively, the input and output channels of this action).
   \end{itemize}
@@ -85,7 +92,7 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
   all memory cells at once (giving them values that can depend on their
   indices) and we can force this action to happen before any other.
   In the tool, we use a different (and incompatible) approach:
-  the user simpler has to postulate axioms to specify initial values
+  the user has to postulate axioms to specify initial values
   --- but of course we do not have rules to derive the fact that initial
   values are $0$ as specified here, so we cannot obtain a contradiction.
 \end{remark}
