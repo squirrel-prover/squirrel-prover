@@ -5,6 +5,10 @@ open Term
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~system = object (self)
 
+  method visit_term t = match t with
+    | EquivSequent.Message e -> self#visit_message e
+    | EquivSequent.Formula e -> self#visit_formula e
+
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn, sort, is),l,a) ->

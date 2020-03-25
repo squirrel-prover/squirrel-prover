@@ -364,25 +364,17 @@ exception Var_found
 class find_name ~(system:Action.system) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
-  method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
-
   method visit_message t = match t with
     | Term.Name (n,_) -> if n = name then raise Name_found
     | Term.Var m -> raise Var_found
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~(system:Action.system) exact name acc = object (self)
+class get_name_indices ~(system:Action.system) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
-  val mutable indices : (Vars.index list) list = acc
+  val mutable indices : (Vars.index list) list = []
   method get_indices = List.sort_uniq Pervasives.compare indices
-
-  method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
     | Term.Name (n,is) -> if n = name then indices <- is::indices
@@ -390,15 +382,11 @@ class get_name_indices ~(system:Action.system) exact name acc = object (self)
     | _ -> super#visit_message t
 end
 
-class get_actions ~(system:Action.system) exact acc = object (self)
+class get_actions ~(system:Action.system) exact = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
-  val mutable actions : Term.timestamp list = acc
+  val mutable actions : Term.timestamp list = []
   method get_actions = List.sort_uniq Pervasives.compare actions
-
-  method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
     | Term.Macro (_,_,a) -> actions <- a::actions
@@ -434,17 +422,17 @@ let mk_phi_proj system env name indices proj biframe =
         Term.True
     | _  ->
         let list_of_indices_from_frame =
-          let iter = new get_name_indices ~system false name [] in
+          let iter = new get_name_indices ~system false name in
             List.iter iter#visit_term proj_frame ;
             iter#get_indices
         and list_of_actions_from_frame =
-          let iter = new get_actions ~system false [] in
+          let iter = new get_actions ~system false in
           List.iter iter#visit_term proj_frame ;
           iter#get_actions
         and tbl_of_action_indices = Hashtbl.create 10 in
         Action.(iter_descrs system
           (fun action_descr ->
-            let iter = new get_name_indices ~system false name [] in
+            let iter = new get_name_indices ~system false name in
             let descr_proj = Action.pi_descr proj action_descr in
             iter#visit_formula (snd descr_proj.condition) ;
             iter#visit_message (snd descr_proj.output) ;
@@ -880,10 +868,6 @@ exception Not_context
 class ddh_context ~(system:Action.system) exact a b c = object (self)
  inherit Iter.iter_approx_macros ~exact ~system as super
 
-  method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
-
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
@@ -916,10 +900,6 @@ exception Macro_found
 
 class find_macros ~(system:Action.system) exact  = object (self)
  inherit Iter.iter_approx_macros ~exact ~system as super
-
-  method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
 
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn with
