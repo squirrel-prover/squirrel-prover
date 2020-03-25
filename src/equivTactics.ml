@@ -707,6 +707,8 @@ let () = T.register_general "expand"
 let expand_all s sk fk =
   let expand_all_macros t system =
     let rec aux : type a. a term -> a term = function
+      | Macro ((mn, Message, is),l,_) as m
+        when (mn,Sorts.Message,is) = Term.in_macro-> m
       | Macro ((mn, sort, is),l,(Action _ as a)) ->
         aux (Macros.get_definition system sort mn is a)
       | Macro ((mn, sort, is),l,(Init as a)) ->
