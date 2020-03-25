@@ -68,8 +68,9 @@ let () =
     ~help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
-(** For each element of the biframe, checks that it is a member of the list of
-   hypotesis. If so, close the goal. *)
+
+(** For each element of the biframe, checks that it is a member of the
+  * hypothesis biframe. If so, close the goal. *)
 let assumption s sk fk =
   let hypothesis = EquivSequent.get_hypothesis_biframe s in
   if List.for_all (fun elem -> List.mem elem hypothesis)
@@ -84,30 +85,33 @@ let () =
     (only_equiv assumption)
 
 
-(** Given a timestamp [ts] wich does not occur inside the hypothesis, from a
-   judgement [s] of the form H => E, where H is the hypothesis set and E the
-   frame, produces the judgments H=>E{ts -> init} and H /\ E{ts->pred ts} =>
-   E. The second one is then direclty simplified by a case on all possible
-   values of ts, producing a judgement for each. *)
-let induction ts s sk fk =
+(** Given a judgement [s] of the form H0 => E, where E is the conclusion
+   biframe, and a timestamp [ts] wich does not occur inside the hypothesis
+   H0, produce the judgments H0 => E{ts -> init} and E{ts->pred ts} => E.
+   The second one is then direclty simplified by a case on all possible
+   values of ts, producing a judgement for each one.
+   It would be sound to keep the initial hypothesis H0 in all produced
+   subgoals, but equivalence sequents currently support at most one
+   hypothesis. *)
+let induction ts s =
   let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
-  let ts = Theory.convert tsubst ts Sorts.Timestamp in
-  match ts with
-  | Var t ->
-    (* we check that variable does not occur in the premise *)
-    if List.exists (function
-        | EquivSequent.Message m -> List.mem (Vars.EVar t)
-                                      (Term.get_vars m)
-        | EquivSequent.Formula m -> List.mem (Vars.EVar t)
-                                      (Term.get_vars m)
-      )
-        (EquivSequent.get_hypothesis_biframe s) then
-      raise @@ Tactics.Tactic_hard_failure
+  match Theory.convert tsubst ts Sorts.Timestamp with
+  | Var t as ts ->
+    (* Check that variable does not occur in the premise. *)
+    if List.exists
+         (function
+            | EquivSequent.Message m ->
+                List.mem (Vars.EVar t) (Term.get_vars m)
+            | EquivSequent.Formula m ->
+                List.mem (Vars.EVar t) (Term.get_vars m))
+         (EquivSequent.get_hypothesis_biframe s)
+    then
+      raise @@ Tactics.Tactic_soft_failure
         (Tactics.Failure "Variable should not occur in the premise");
-    (* we remove ts from the sequent, as it becomes unused *)
+    (* Remove ts from the sequent, as it will become unused. *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
-    let subst = [Term.ESubst(ts,Pred(ts))] in
+    let subst = [Term.ESubst (ts, Pred ts)] in
     let goal = EquivSequent.get_biframe s in
     let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
     let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
@@ -116,18 +120,16 @@ let induction ts s sk fk =
                       s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
     in
     let goals = ref [] in
-    (* add_action a adds to goals the goal corresponding to the case where t is
-       instantiated by a. *)
+    (* [add_action a] adds to goals the goal corresponding to the case
+     * where [t] is instantiated by [a]. *)
     let add_action a =
       let env = ref @@ EquivSequent.get_env induc_goal in
-      let indices =
-        List.map
-          (fun i -> Vars.make_fresh_from_and_update env i)
-          a.Action.indices
-      in
       let subst =
-        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-          a.Action.indices indices
+        List.map
+          (fun i ->
+             let i' = Vars.make_fresh_from_and_update env i in
+             Term.ESubst (Term.Var i, Term.Var i'))
+          a.Action.indices
       in
       let name = Action.to_term (Action.subst_action subst a.Action.action) in
       let ts_subst = [Term.ESubst(ts,name)] in
@@ -135,36 +137,44 @@ let induction ts s sk fk =
                 |> EquivSequent.set_env !env)
                ::!goals
     in
-  Action.iter_descrs (EquivSequent.get_system s) add_action ;
-    sk (init_goal::!goals) fk
-  | _ ->  raise @@ Tactics.Tactic_hard_failure
-      (Tactics.Failure "Induction is only possible over a variable")
+    Action.iter_descrs (EquivSequent.get_system s) add_action ;
+    init_goal::!goals
+  | _  ->
+    raise @@ Tactics.Tactic_soft_failure
+      (Tactics.Failure "expected a timestamp variable")
+  | exception (Theory.Conv _) ->
+    raise @@ Tactics.Tactic_soft_failure
+      (Tactics.Failure "cannot convert argument")
 
 let () =
   T.register_general "induction"
     ~help:"Apply the induction scheme to the given timestamp.\
            \n Usage: induction t."
     (function
-       | [Prover.Theory th] -> pure_equiv (induction th)
+       | [Prover.Theory th] ->
+           pure_equiv
+             (fun s sk fk -> match induction th s with
+                | subgoals -> sk subgoals fk
+                | exception (Tactics.Tactic_soft_failure e) -> fk e)
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
+
 
 (* Enrich adds the term [t] to the judgement [s]. *)
 let enrich (t : Theory.term) s sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
-  (* we try to convert the Theory.term as either boolean or message *)
-  let elem = match Theory.convert tsubst t Sorts.Boolean with
+  let elem () =
+    (* Try to convert the Theory.term as either boolean or message. *)
+    match Theory.convert tsubst t Sorts.Boolean with
     | f -> EquivSequent.Formula f
     | exception _ ->
-      begin
-        match Theory.convert tsubst t Sorts.Message with
-        | m -> EquivSequent.Message m
-        | exception _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments")
-      end
+      EquivSequent.Message (Theory.convert tsubst t Sorts.Message)
   in
-  sk [EquivSequent.set_biframe s
-        (elem :: EquivSequent.get_biframe s)] fk
+  match elem () with
+    | elem ->
+      sk [EquivSequent.set_biframe s (elem :: EquivSequent.get_biframe s)] fk
+    | exception _ ->
+      fk Tactics.(Failure "cannot convert argument")
 
 let () = T.register_general "enrich"
     ~help:"Enrich the goal with the given term.\
@@ -174,60 +184,21 @@ let () = T.register_general "enrich"
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
 
-(* Splits [s] into subgoals, replacing [ts] by all the possible
-   actions. *)
-let timestamp_case ts s sk fk =
-  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
-  let ts = Theory.convert tsubst ts Sorts.Timestamp in
-  let goals = ref [] in
-  (* add_action a adds to goals the goal corresponding to s where t as been
-     instantiated with the action a *)
-  let add_action a =
-    let env = ref @@ EquivSequent.get_env s in
-    let indices =
-      List.map
-        (fun i -> Vars.make_fresh_from_and_update env i)
-        a.Action.indices
-    in
-    let subst =
-      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-        a.Action.indices indices
-    in
-    let name = Action.to_term (Action.subst_action subst a.Action.action) in
-    let ts_subst = [Term.ESubst(ts,name)] in
-    goals := (EquivSequent.apply_subst ts_subst s
-             |> EquivSequent.set_env !env)
-             ::!goals
-  in
-  Action.iter_descrs (EquivSequent.get_system s) add_action ;
-  goals := EquivSequent.apply_subst [Term.ESubst(ts,Term.Init)] s :: !goals ;
-  sk !goals fk
 
-let () =
-  T.register_general "case"
-    ~help:"Introduce all the possible goals when instantiating T with all \
-           \n possible actions.
-           \n Usage: case T."
-    (function
-       | [Prover.Theory th] -> pure_equiv (timestamp_case th)
-       | _ -> raise @@ Tactics.Tactic_hard_failure
-           (Tactics.Failure "improper arguments"))
-
-(* Removes all the constant elements from the frame of [s] *)
+(* Removes all the constant elements from the frame of [s]. *)
 let const s sk fk =
   let frame = EquivSequent.get_biframe s in
   let rec is_const : type a. a Term.term -> bool = function
     | True -> true
     | False -> true
-    (* a symbol function with arity 0, or applied to constants, is a constant *)
     | Fun (f,l) -> List.for_all is_const l
-    | And (f, g) -> (is_const f) && (is_const g)
-    | Or (f, g) -> (is_const f) && (is_const g)
-    | Impl (f, g) -> (is_const f) && (is_const g)
-    | Not f -> (is_const f)
+    | And (f,g) -> is_const f && is_const g
+    | Or (f,g) -> is_const f && is_const g
+    | Impl (f,g) -> is_const f && is_const g
+    | Not f -> is_const f
     | _ -> false
   in
-  let is_const =  function
+  let is_const = function
     | EquivSequent.Message e -> is_const e
     | EquivSequent.Formula e -> is_const e
   in
@@ -592,6 +563,7 @@ let fresh_name_ssc ~system name elems =
   | Name_found | Var_found -> false
   end
 
+(** XOR *)
 let xor i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
