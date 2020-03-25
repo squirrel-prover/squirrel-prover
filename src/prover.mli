@@ -111,6 +111,15 @@ val add_new_goal : named_goal -> unit
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
 
+(** Allows to define the tag formula corresponding to some hash. Defining a hash
+   with such a tag, is equivalent to giving to the attacker a backdoor, allowing
+   to hash all messages that satisfy the tag. *)
+val define_hash_tag_formula : string -> Theory.formula -> unit
+
+(** From the name of the hash, returns the corresponding formula. If no tag
+   formula was defined, returns False. *)
+val get_hash_tag_formula : string -> Term.formula
+
 val pp_goal : Format.formatter -> unit -> unit
 
 val is_proof_completed : unit -> bool

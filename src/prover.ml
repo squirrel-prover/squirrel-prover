@@ -419,6 +419,37 @@ let add_new_goal g = goals := g :: !goals
 
 let add_proved_goal g = goals_proved := g :: !goals_proved
 
+let tag_formula_name_of_hash h = "%s"^h^"formula"
+
+let define_hash_tag_formula h f =
+  let gformula = make_trace_goal
+      (Action.make_default_system Term.None Action.default_system_name) f
+  in
+  match gformula with
+  | Trace f ->
+    (match TraceSequent.get_conclusion f with
+     |  ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
+       (
+         match Vars.sort uvarm,Vars.sort uvarkey with
+         | Sorts.(Message, Message) -> add_proved_goal
+                                         (tag_formula_name_of_hash h, gformula)
+         | _ -> failwith "The tag formula must be of \
+                           the form forall (m:message,sk:message)"
+       )
+     | _ -> failwith "The tag formula must be of \
+                           the form forall (m:message,sk:message)"
+    )
+    | _ -> assert false
+
+let get_hash_tag_formula h =
+  match
+    List.filter (fun (name,_) -> name = tag_formula_name_of_hash h) !goals_proved
+  with
+    | [(_,Goal.Trace f)] ->
+      TraceSequent.get_conclusion f
+    | [] -> Term.False
+    | _ -> assert false
+
 let is_proof_completed () = !subgoals = []
 
 let complete_proof () =

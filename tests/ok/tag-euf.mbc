@@ -1,5 +1,3 @@
-hash h
-
 abstract okSess0 : message
 abstract okSessi : message
 abstract ko : message
@@ -14,11 +12,9 @@ channel cS
 name a0 :message
 name a : index -> message
 
+hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) m=g^a(i))
 
 term test : boolean = zero
-
-axiom TeufkPa : forall (m:message,sk:message)
- sk <> kP || exists (i:index) m=g^a(i)
 
 process P =
   out(cP, <g^a0, h(g^a0,kP)>)
@@ -48,7 +44,7 @@ Proof.
  apply H1 to S.
  expand exec@S3; expand cond@S;  expand cond@S3.
  introsleft H1. (* TODO should be done as part of expansion *)
- tageuf M0, TeufkPa.
+ euf M0.
  (* we prove the goal where the message satisfies the tag *)
  case H4.
  apply H1 to i.

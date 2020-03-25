@@ -543,6 +543,7 @@ let declare_symbol name info =
   ignore (Symbols.Function.declare_exact name (0,info))
 
 let declare_hash s = declare_symbol s Symbols.Hash
+
 let declare_aenc s = declare_symbol s Symbols.AEnc
 
 let is_hash s =

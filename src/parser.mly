@@ -15,6 +15,7 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
+%token WITH ORACLE
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH
 %token PROOF QED UNDO
 %token EOF
@@ -220,9 +221,14 @@ abs_type:
 
 declaration:
 | HASH ID                        { Theory.declare_hash $2 }
+| HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2; Prover.define_hash_tag_formula $2 f }
 | AENC ID                        { Theory.declare_aenc $2 }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
+| SIGNATURE s=ID COMMA c=ID COMMA p=ID
+  WITH ORACLE f=formula
+                                 { Theory.declare_signature s c p;
+                                   Prover.define_hash_tag_formula s f }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
 | ABSTRACT ID COLON abs_type     { let l,r = $4 in
                                    Theory.declare_abstract $2 l r }

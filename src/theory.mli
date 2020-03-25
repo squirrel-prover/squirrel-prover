@@ -57,8 +57,8 @@ val pp : Format.formatter -> term -> unit
 (** {2 Declaration of new symbols} *)
 
 
-(** Declare a new function symbol of type message->message->message,
-  * which satisfies PRF, and thus collision-resistance and EUF. *)
+(** Declare a new function symbol of type message->message->message, * which
+   satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash : string -> unit
 
 (** Asymmetric encryption function symbols are of type

@@ -1,5 +1,3 @@
-hash h
-
 abstract ok : message
 abstract ko : message
 
@@ -20,11 +18,11 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-axiom TeufkPa : forall (m:message,sk:message)
- sk <> kP || exists (i:index, x:message) m=<g^a(i),x>
+hash h with oracle forall (m:message,sk:message)
+ (sk <> kP || exists (i:index, x:message) m=<g^a(i),x> )
+  &&
+ (sk <> kS || exists (i:index, x:message) m=<x,g^b(i)>)
 
-axiom TeufkSb : forall (m:message,sk:message)
- sk <> kS || exists (i:index, x:message) m=<x,g^b(i)>
 
 process P =
   out(cP, g^a1);
@@ -81,7 +79,7 @@ Proof.
   simpl.
   expand cond@S1.
   introsleft H0. (* TODO should be done as part of expansion *)
-  tageuf M0, TeufkPa.
+  euf M0.
   case H0.
   right.
   exists i.
@@ -99,8 +97,8 @@ Proof.
   simpl.
   expand cond@P1.
   introsleft H0. (* TODO should be done as part of expansion *)
-  tageuf M0, TeufkSb.
-  case H0.
+  euf M0.
+  case H1.
   right.
   exists i.
   left.

@@ -826,6 +826,7 @@ let euf_apply_facts s at =
 
 let set_euf _ = { TraceSequent.t_euf = true }
 
+(*
 (** [euf_apply f_select judge sk fk] selects an atom of the judgement according
    to [f_selct] and then try to applly euf to it. If it fails, or f_select fails
    it calls [fk]*)
@@ -847,50 +848,52 @@ let () =
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
+*)
 
 (** Tag EUFCMA - for composition results *)
-let tag_euf_apply hypothesis_name formula_id (s : TraceSequent.t) sk fk =
+let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
   let s, at =
     try
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
     with Not_found -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
-  let honnest_s =
-    (* we create the honnest sources using the classical eufcma tactic *)
-    try
-      euf_apply_facts s at
-    with Euf.Bad_ssc ->  raise @@ Tactics.Tactic_hard_failure
-        (Tactics.NoSSC)
-  in
   let tag_s =
-    let (_, key, m, _,_) = euf_param at in
-      let f,system =
-        Prover.get_goal_formula formula_id
-      in
-      if system <> TraceSequent.system s then
-        raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
+    let (h, key, m, _,_) = euf_param at in
+    let f =
+      Prover.get_hash_tag_formula (Symbols.to_string h)
+    in
+    (* if the hash is not tagged, the formula is False, and we don't create
+       another goal. *)
+    if f = Term.False  then
+      []
+    else
+      (* else, we create a goal where m,sk satisfy the axiom *)
+      (
       let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
-        | _ -> raise @@ Tactics.Tactic_hard_failure
-        (Tactics.Failure "The tag axiom must be a universal quantification on\
-                          two messages variable.")
+        | _ -> assert false
       in
       match Vars.sort uvarm,Vars.sort uvarkey with
       | Sorts.(Message, Message) -> let f = Term.subst [
           ESubst (Term.Var uvarm,m);
           ESubst (Term.Var uvarkey,Term.Name key);] f in
-        TraceSequent.add_formula f s
-      | _ -> raise @@ Tactics.Tactic_hard_failure
-        (Tactics.Failure "The tag axiom must be a universal quantification on\
-                          two messages variable.")
-
+        [TraceSequent.add_formula f s]
+      | _ -> assert false
+    )
   in
-  sk (tag_s::honnest_s) fk
+    (* we create the honnest sources using the classical eufcma tactic *)
+    try
+      let honnest_s = euf_apply_facts s at in
+      sk (tag_s@honnest_s) fk
+    with Euf.Bad_ssc ->  fk (Tactics.NoSSC)
+
+
 
 let () =
-  T.register_general "tageuf"
-    ~help:"Apply the tagged euf axiom to the given hypothesis name, with the\
+  T.register_general "euf"
+    ~help:"Apply the euf axiom to the given hypothesis name. If the hash has\
+           \n been declared with a tag formula, applies the tagged version.\
            \n given tag. Tagged eufcma, with a tag T, says that, under the\
            \n syntactic side condition, a hashed message either satisfies\
            \n the tag T, or was honnestly produced. \
@@ -898,7 +901,7 @@ let () =
            \n the form forall (m:message,sk:message).
            \n Usage: tageuf H t."
     (function
-      | [Prover.Theory (Theory.Var h); Prover.Theory (Theory.Var f)] -> tag_euf_apply h f
+      | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 

@@ -80,7 +80,9 @@ rule token = parse
 | "timestamp"         { TIMESTAMP }
 | "null"              { NULL }
 | "pred"              { PRED }
-| "seq"              { SEQ }
+| "seq"               { SEQ }
+| "oracle"            { ORACLE }
+| "with"              { WITH }
 | "diff"              { DIFF }
 | "left"              { LEFT }
 | "^"                 { EXP }
