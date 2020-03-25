@@ -1,3 +1,5 @@
+(** Example of signed DDH key exchange. It corresponds to the  ISO 9798-3 protocol. **)
+
 abstract ok : message
 abstract ko : message
 
@@ -18,46 +20,88 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-hash h with oracle forall (m:message,sk:message)
- (sk <> kP || exists (i:index, x:message) m=<g^a(i),x> )
-  &&
- (sk <> kS || exists (i:index, x:message) m=<x,g^b(i)>)
+axiom DDHgroup : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 
+signature sign,checksign,pk with oracle forall (m:message,sk:message)
+ (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
+  &&
+ (sk <> kS || exists (i:index, x1:message, x2:message) m=<<x1,g^b(i)>,x2>)
+
+hash h
 
 process P =
-  out(cP, g^a1);
+  out(cP, <pk(kP),g^a1>);
   in(cP, t);
-  if h(<g^a1,snd(fst(t))>,kS) = snd(t) then
-    out(cP, h(<g^a1,snd(fst(t))>,kP));
+  let gS = snd(fst(t)) in
+  let pkS = fst(fst(t)) in
+  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
+    out(cP,sign(<<gS,g^a1>,pkS>,kP));
     in(cP, challenge);
-    if snd(fst(t)) = g^b1 then
-      out(cP, diff(g^a1^b1,g^k11))
-    else
+    if pkS= pk(kS) then
+      if snd(fst(t)) = g^b1 then
+        out(cP, g^a1^b1)
+      else
       (try find j such that snd(fst(t)) = g^b(j) in
         out(cP, ok)
       else
        out(cP, diff(ok,ko))
        )
-  else null
+
 
 process S =
   in(cS, sP);
-  out(cS, < <sP,g^b1>, h(<sP,g^b1>,kS)>);
-  in(cS, hash_shares);
-  if hash_shares = h(<sP,g^b1>,kP) then
+  let gP = snd(sP) in
+  let pkP = fst(sP) in
+  out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
+  in(cS, signed);
+  if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
     out(cS,ok);
     in(cS, challenge);
-    if sP = g^a1 then
-	out(cS, diff(g^a1^b1,g^k11))
-    else
-      (try find l such that sP = g^a(l) in
-        out(cS, ok)
+    if pkP=pk(kP) then
+     (if gP = g^a1 then
+      out(cS, g^a1^b1)
       else
-       out(cS, diff(ok,ko))
-       )
-  else null
+       (try find l such that gP = g^a(l) in
+        out(cS, ok)
+	else
+	out(cS, diff(ok,ko))
+	 )
+      )
+	  else null
 
-system ( P | S).
+system [auth] ( P | S).
+
+
+process P2 =
+  out(cP, <pk(kP),g^a1>);
+  in(cP, t);
+  let gS = snd(fst(t)) in
+  let pkS = fst(fst(t)) in
+
+  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
+    out(cP,sign(<<gS,g^a1>,pkS>,kP));
+
+  in(cP, challenge);
+  if pkS= pk(kS) then
+    if snd(fst(t)) = g^b1 then
+      out(cP, diff(g^a1^b1,g^k11))
+
+process S2 =
+	in(cS, sP);
+	let gP = snd(sP) in
+	let pkP = fst(sP) in
+	out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
+	in(cS, signed);
+        if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
+	out(cS,ok);
+	in(cS, challenge);
+	if pkP=pk(kP) then
+
+     if gP = g^a1 then
+      out(cS, diff(g^a1^b1,g^k11))
+
+system [secret] ( P2 | S2).
+
 
 (* We prove several lemmas, characterizing when a action's conditions passes.
    The characterization is expressed as a property of the trace that the attacker
@@ -69,37 +113,123 @@ system ( P | S).
    to disappear. We would not have this issue if we used a classical asymmetric
    signature scheme. *)
 
-(* Show that condition S1 implies the next one. *)
-goal S1_charac :
-  cond@S1 => input@S = g^a1
-    ||
-        exists (s:index),
-	input@S = g^a(s).
+(* Show that conditio *)
+goal [none, auth] S1_charac :
+  cond@S1 => (cond@S4 => False) .
 Proof.
   simpl.
-  expand cond@S1.
-  introsleft H0. (* TODO should be done as part of expansion *)
-  euf M0.
-  case H0.
-  right.
-  exists i.
-  left.
+  expand cond@S1; expand cond@S4.
+  expand pkP@S1.
+  substitute fst(input@S), pk(kP).
+  introsleft H0.
+  euf M1.
+
+  case H2.
+  apply H1 to i.
+
+  notleft H0.
 Qed.
 
 (* Show that condition S1 implies the next one. *)
-goal P1_charac :
-   cond@P1 =>
-	snd(fst(input@P1)) = g^b1
-    ||
-	exists (s:index),
-	snd(fst(input@P1)) = g^b(s).
+goal [none, auth] P1_charac :
+   cond@P1 => (cond@P4 => False).
 Proof.
   simpl.
-  expand cond@P1.
-  introsleft H0. (* TODO should be done as part of expansion *)
-  euf M0.
-  case H1.
-  right.
-  exists i.
-  left.
+  expand cond@P1; expand cond@P4.
+  introsleft H0.
+  substitute pkS@P1,pk(kS).
+  euf M1.
+
+  case H3.
+  apply H1 to i.
+
+  notleft H0.
+Qed.
+
+equiv [left,secret] [right,secret] secret.
+Proof.
+   ddh a1, b1, k11.
+Qed.
+
+equiv [left, auth] [right, auth] auth.
+Proof.
+       enrich kP; enrich g^a1; enrich g^b1; enrich kS; enrich g^a1^b1.
+   enrich seq(i-> g^b(i)).    enrich seq(i-> g^a(i)).
+   induction t.
+
+   expand exec@init; expand frame@init.
+
+    expand frame@P; expand exec@P; expand cond@P.
+       expand output@P.
+       assumption.
+
+
+
+
+    expand frame@P1; expand exec@P1; expand cond@P1.
+       expand output@P1. expand gS@P1.
+      fa 8. expand pkS@P1.
+       assumption.
+
+
+    expand frame@P2; expand exec@P2; expand cond@P2.
+       expand output@P2. expand pkS@P2.
+       assumption.
+
+
+    expand frame@P3(j); expand exec@P3(j); expand cond@P3(j).
+       expand output@P3(j). expand pkS@P3(j).
+   expand seq(i->g^b(i)),j.
+       assumption.
+
+       expand frame@P4; expand exec@P4.
+       fa 8.  equivalent cond@P4,False.
+       simpl.
+       executable pred(P4). depends P1, P4. apply H1 to P1. apply P1_charac.
+       noif 9. simpl.
+       assumption.
+
+      expand frame@A; expand exec@A; expand cond@A.
+       expand output@A. expand pkS@A.
+
+       assumption.
+
+    expand frame@A1; expand exec@A1; expand cond@A1.
+       expand output@A1. expand pkS@A1. expand gS@A1.
+
+       assumption.
+
+    expand frame@S; expand exec@S; expand cond@S.
+       expand output@S. expand pkP@S. expand gP@S.
+fa 8. assumption.
+
+    expand frame@S1; expand exec@S1; expand cond@S1.
+       expand output@S1. expand pkP@S1. expand gP@S1.
+ assumption.
+
+       expand frame@S2; expand exec@S2; expand cond@S2.
+       expand output@S2. expand pkP@S2. expand gP@S2.
+   assumption.
+
+       expand frame@S3(l); expand exec@S3(l); expand cond@S3(l).
+       expand output@S3(l). expand pkP@S3(l). expand gP@S3(l).
+     expand seq(i->g^a(i)),l .
+    assumption.
+
+       expand frame@S4; expand exec@S4.
+  equivalent cond@S4,False.
+       simpl.
+       executable pred(S4). depends S1, S4. apply H1 to S1. apply S1_charac.
+fa 8.   noif 9. simpl.
+ assumption.
+
+
+    expand frame@A2; expand exec@A2; expand cond@A2.
+       expand output@A2. expand pkP@A2. expand gP@A2.
+ assumption.
+
+
+    expand frame@A3; expand exec@A3; expand cond@A3.
+       expand output@A3. expand pkP@A3. expand gP@A3.
+       assumption.
 Qed.
