@@ -12,13 +12,14 @@ system [toto] !_i A(diff(ko,koo)).
 
 equiv test.
 Proof.
+
 induction t.
-expand exec@init; expand frame@init.
+expandall.
 
 expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
 fa 1. noif 2. simpl. assumption.
 
-expand frame@A1(i); expand exec@A1(i); expand cond@A1(i); expand output@A1(i).
+expandall.
 assumption.
 Qed.
 
@@ -27,9 +28,9 @@ Proof.
 induction t.
 expand exec@init; expand frame@init.
 
-expand frame@A(i); expand exec@A(i); expand cond@A(i); expand output@A(i).
+expandall.
 fa 1. noif 2. simpl. assumption.
 
-expand frame@A1(i); expand exec@A1(i); expand cond@A1(i); expand output@A1(i).
+expandall.
 assumption.
 Qed.

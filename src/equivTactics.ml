@@ -645,6 +645,8 @@ let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
   | exception Theory.(Conv e) ->
       fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
 
+
+
 (* Expand all occurences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
@@ -698,6 +700,63 @@ let () = T.register_general "expand"
         pure_equiv (expand_seq v ids)
        | _ -> raise @@ Tactics.Tactic_hard_failure
            (Tactics.Failure "improper arguments"))
+
+(** Expands all macro occurences inside the biframe, if the macro is not at some
+   pred(A) but about at a concrete action. Acts recursively, also expanding the
+   macros inside macro definition. *)
+let expand_all s sk fk =
+  let expand_all_macros t system =
+    let rec aux : type a. a term -> a term = function
+      | Macro ((mn, sort, is),l,(Action _ as a)) ->
+        aux (Macros.get_definition system sort mn is a)
+      | Macro ((mn, sort, is),l,(Init as a)) ->
+        aux (Macros.get_definition system sort mn is a)
+      | Macro ((mn, sort, is),l,_) as m -> m
+      | Fun (f, l) -> Fun (f, List.map aux l)
+      | Name n as a-> a
+      | Var x as a -> a
+      | Diff(a, b) -> Diff(aux a, aux b)
+      | Left a -> Left (aux a)
+      | Right a -> Left (aux a)
+      | ITE (a, b, c) -> ITE(aux a, aux b, aux c)
+      | Seq (a, b) -> Seq(a, aux b)
+      | Find (a, b, c, d) -> Find(a, aux b, aux c, aux d)
+      | And (l,r) -> And (aux l, aux r)
+      | Or (l,r) -> Or (aux l, aux r)
+      | Impl (l,r) -> Impl (aux l, aux r)
+      | Not f -> Not (aux f)
+      | True -> True
+      | False -> False
+      | ForAll (vs,l) -> ForAll (vs, aux l)
+      | Exists (vs,l) -> Exists (vs, aux l)
+      | Atom (`Message (o, t, t')) -> Atom (`Message (o, aux t, aux t'))
+      | Atom (`Index _) as a-> a
+      | Atom (`Timestamp _) as a->  a
+      | Atom (`Happens _) as a->  a
+      | Init -> Init
+      | Pred _ as a -> a
+      | Action _ as a -> a
+    in
+    aux t
+  in
+  let system = EquivSequent.get_system s in
+  let expand_all_macros = function
+    | EquivSequent.Message e -> EquivSequent.Message (expand_all_macros e system)
+    | EquivSequent.Formula e -> EquivSequent.Formula (expand_all_macros e system)
+  in
+  let biframe = EquivSequent.get_biframe s
+                |> List.map (expand_all_macros)
+  in
+  sk [EquivSequent.set_biframe s biframe] fk
+
+let () = T.register_general "expandall"
+    ~help:"Expand all occurences of macros that are about explicit actions.
+           \n Usage: expandall."
+    (function
+      | [] -> pure_equiv (expand_all)
+       | _ -> raise @@ Tactics.Tactic_hard_failure
+           (Tactics.Failure "improper arguments"))
+
 
 (* Replace all occurrences of [t1] by [t2] inside of [s], and asks to prove that
    t1 <=> t2. *)
