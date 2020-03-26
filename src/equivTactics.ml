@@ -370,14 +370,6 @@ class get_actions ~(system:Action.system) exact = object (self)
     | _ -> super#visit_formula f
 end
 
-(** Returns a formula expressing that vectors of indices vect_i and vect_j
-  * are different (at least one component differs). *)
-let mk_indices_ineq vect_i vect_j =
-  List.fold_left
-    (fun acc e -> Term.mk_or acc e)
-    Term.False
-    (List.map2 (fun i j -> Term.Atom (`Index (`Neq, i, j))) vect_i vect_j)
-
 let mk_phi_proj system env name indices proj biframe =
   let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
   begin try
@@ -420,7 +412,7 @@ let mk_phi_proj system env name indices proj biframe =
             (fun acc f -> Term.mk_and acc f)
             Term.True
             (List.map
-               (fun j -> mk_indices_ineq indices j)
+               (fun j -> Term.mk_indices_neq indices j)
                list_of_indices_from_frame)
         (* indirect cases (occurrences of [name] in actions of the system) *)
         and phi_actions =
@@ -456,7 +448,7 @@ let mk_phi_proj system env name indices proj biframe =
                       (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                       list_of_actions_from_frame)
                 (* then indices of name in new_action and of [name] differ *)
-                and conj = mk_indices_ineq new_name_indices indices in
+                and conj = Term.mk_indices_neq new_name_indices indices in
                 let forall_var =
                   List.map (fun i -> Vars.EVar i) new_action_indices in
                 Term.ForAll(forall_var,Term.Impl(disj,conj)))
@@ -524,6 +516,174 @@ let () =
     (function
        | [Prover.Int i] -> pure_equiv (fresh i)
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+(* PRF axiom *)
+
+let mk_prf_phi_proj system env param proj biframe =
+  begin try
+  let (hash_fn,t,key_n,key_is) = param in
+  let frame =
+    (EquivSequent.Message t) ::
+    (List.map (EquivSequent.pi_elem proj) biframe) in
+  (* check syntactic side condition *)
+  Euf.prf_key_ssc ~pk:None ~system hash_fn key_n frame;
+  let list_of_hashes_from_frame =
+    Euf.hashes_of_frame ~system frame hash_fn key_n
+  and list_of_actions_from_frame =
+    let iter = new get_actions ~system false in
+    List.iter iter#visit_term frame ;
+    iter#get_actions
+  and tbl_of_action_hashes = Hashtbl.create 10 in
+  Action.(iter_descrs system
+    (fun action_descr ->
+      (* we add only actions in which hash occurs *)
+      let descr_proj = Action.pi_descr proj action_descr in
+      let action_hashes =
+        Euf.hashes_of_action_descr ~system ~cond:true
+          descr_proj hash_fn key_n in
+      if List.length action_hashes > 0 then
+        Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
+  (* direct cases (for explicit occurences of hashes in the frame) *)
+  let phi_frame =
+    List.fold_left
+      (fun acc f -> Term.mk_and acc f)
+      Term.True
+      (List.map
+        (fun (is,m) ->
+          Term.mk_impl
+            (Term.mk_indices_eq key_is is)
+            (Term.Atom (`Message (`Neq, t, m))))
+        list_of_hashes_from_frame)
+  (* undirect cases (for occurences of hashes in actions of the system) *)
+  and phi_actions =
+    Seq.fold_left
+      (fun acc f -> Term.mk_and acc f)
+      Term.True
+      (Seq.map
+        (* for each action in which a hash occurs *)
+        (fun a ->
+          let new_action_indices =
+            List.map
+              (fun i -> Vars.make_fresh_from_and_update env i)
+              a.Action.indices
+          in
+          let subst =
+            List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+              a.Action.indices new_action_indices
+          in
+          let new_action = Action.to_term (Action.subst_action subst a.Action.action) in
+          (* we now apply the same substitution to the subset of
+          indices corresponding to key and hashed message in the action *)
+          let (is,m) = List.hd (Hashtbl.find tbl_of_action_hashes a) in
+          let new_is = List.map (Term.subst_var subst) is in
+          let new_m = Term.subst subst m in
+          (* if new_action occurs before an action of the frame *)
+          let disj =
+            List.fold_left
+              (fun acc f -> Term.mk_or acc f)
+              Term.False
+              (List.map
+                (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                list_of_actions_from_frame)
+          (* then indices of name in new_action and of name differ *)
+          and conj =
+            List.fold_left
+              (fun acc f -> Term.mk_and acc f)
+              Term.True
+              (List.map
+                (fun (is,m) ->
+                  Term.mk_impl
+                    (Term.mk_indices_eq key_is new_is)
+                    (Term.Atom (`Message (`Neq, t, new_m))))
+                (Hashtbl.find tbl_of_action_hashes a)) in
+          let forall_var = List.map (fun i -> Vars.EVar i) new_action_indices in
+          Term.ForAll(forall_var,Term.Impl(disj,conj)))
+        (Hashtbl.to_seq_keys tbl_of_action_hashes))
+  in
+  (Term.mk_and phi_frame phi_actions)
+  with
+  | Euf.Bad_ssc -> raise @@ Tactics.Tactic_hard_failure
+    (Tactics.Failure "Key syntactic side condition not checked")
+  end
+
+let mk_prf_if_term system env e biframe =
+  let not_hash_failure = Tactics.Tactic_hard_failure
+    (Tactics.Failure "PRF can only be applied on a term of the form h(t,k)") in
+  let env_local = ref env in
+  match e with
+  | EquivSequent.Message m ->
+      let system_left = Action.(make_trace_system system.left) in
+      let system_right = Action.(make_trace_system system.right) in
+      let phi =
+        match (Term.pi_term true Term.Left m, Term.pi_term true Term.Right m) with
+        | (Term.Fun
+            ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
+          Term.Fun
+            ((hash_fn_right, _), [t_right; Name (key_n_right,key_is_right)]))
+          ->  if (Theory.is_hash hash_fn_left && Theory.is_hash hash_fn_right)
+              (* FIXME handle the case diff(h(t,k),f(t1,t2)) ??? *)
+              then
+                let param_left =
+                  (hash_fn_left,t_left,key_n_left,key_is_left) in
+                let param_right =
+                  (hash_fn_right,t_right,key_n_right,key_is_right) in
+                Term.mk_and
+                  (mk_prf_phi_proj
+                    system_left env_local param_left Term.Left biframe)
+                  (mk_prf_phi_proj
+                    system_right env_local param_right Term.Right biframe)
+              else raise @@ not_hash_failure
+        | (_,
+          Term.Fun
+            ((hash_fn_right, _), [t_right; Name (key_n_right,key_is_right)])) ->
+            if Theory.is_hash hash_fn_right then
+              let param_right =
+                (hash_fn_right,t_right,key_n_right,key_is_right) in
+              (mk_prf_phi_proj
+                system_right env_local param_right Term.Right biframe)
+            else raise @@ not_hash_failure
+        | (Term.Fun
+            ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
+          _) ->
+            if Theory.is_hash hash_fn_left then
+              let param_left =
+                (hash_fn_left,t_left,key_n_left,key_is_left) in
+              (mk_prf_phi_proj
+                system_left env_local param_left Term.Left biframe)
+            else raise @@ not_hash_failure
+        | _ -> raise @@ not_hash_failure
+      in
+      let then_branch = Term.Fun (Term.f_zero,[]) in (* TODO generate fresh name *)
+      let else_branch = m in
+      begin
+      match phi with
+      | Term.True -> EquivSequent.Message then_branch
+      | _ -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
+      end
+  | EquivSequent.Formula f -> raise @@ not_hash_failure
+
+let prf i s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+    | before, e, after ->
+        begin try
+          let biframe = List.rev_append before after in
+          let system = (EquivSequent.get_system s) in
+          let env = EquivSequent.get_env s in
+          let if_term = mk_prf_if_term system env e biframe in
+          let biframe = (List.rev_append before (if_term::after)) in
+          sk [EquivSequent.set_biframe s biframe] fk
+        with
+        | Tactics.Tactic_hard_failure err -> fk err
+        end
+    | exception Out_of_range ->
+        fk (Tactics.Failure "Out of range position")
+
+let () =
+ T.register_general "prf"
+   ~help:"Apply the PRF axiom.\n Usage: prf i."
+   (function
+      | [Prover.Int i] -> pure_equiv (prf i)
+      | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 let fresh_name_ssc ~system name elems =
   begin try

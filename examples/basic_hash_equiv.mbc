@@ -103,7 +103,9 @@ Proof.
   expand frame@T(i,k); expand exec@T(i,k);
      expand cond@T(i,k); expand output@T(i,k).
    fa 1. fa 2. fa 2.
-  admit 3. (* TODO PRF (+fresh?) *)
+  prf 3.
+  yesif 3.
+  admit. (*TODO*)
   fresh 2.
   yesif 2.
   split.

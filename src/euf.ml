@@ -70,6 +70,16 @@ let euf_key_ssc ~pk ~system hash_fn key_n messages =
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
+(* FIXME - Use a unique function for checking key ssc on list of messages
+and on list of terms *)
+let prf_key_ssc ~pk ~system hash_fn key_n frame =
+  let ssc = new check_hash_key ~pk ~system hash_fn key_n in
+  List.iter ssc#visit_term frame ;
+  Action.(iter_descrs system
+    (fun action_descr ->
+      ssc#visit_formula (snd action_descr.condition) ;
+      ssc#visit_message (snd action_descr.output) ;
+      List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
 (** Check that [cond] and [exec] macros do not appear in messages
   * and in the outputs and updates of all system actions. *)
@@ -92,6 +102,14 @@ let hash_key_ssc ?(pk=None) ~system hash_fn key_n messages =
     euf_key_ssc ~pk ~system hash_fn key_n messages;
     true
   with Bad_ssc -> false
+
+(** [hashes_of_frame ~system frame hash_fn key_n]
+    returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs
+    in a frame. Does not explore macros. *)
+let hashes_of_frame ~system frame hash_fn key_n =
+  let iter = new get_hashed_messages ~system hash_fn key_n in
+  List.iter iter#visit_term frame;
+  List.sort_uniq Pervasives.compare iter#get_hashes
 
 (** [hashes_of_action_descr ~system ~cond action_descr hash_fn key_n]
     returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs

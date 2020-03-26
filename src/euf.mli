@@ -38,6 +38,11 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
+val prf_key_ssc :
+  pk:(Term.fname option) ->
+  system:Action.system ->
+  Term.fname -> Term.name -> EquivSequent.elem list -> unit
+
 (** Returns true if the syntactic side condition of the key is met inside the
    protocol and the messages. All occurences of the key must either be inside
    the hash function, or under some public key function.*)
@@ -45,6 +50,17 @@ val hash_key_ssc :
   ?pk:(Term.fname option) ->
   system:Action.system ->
   Term.fname -> Term.name -> Term.message list -> bool
+
+val hashes_of_frame :
+  system:Action.system ->
+  EquivSequent.elem list -> Term.fname -> Term.name ->
+  (Vars.index list * Term.message) list
+
+val hashes_of_action_descr :
+  system:Action.system ->
+  cond:bool ->
+  Action.descr -> Term.fname -> Term.name ->
+  (Vars.index list * Term.message) list
 
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.

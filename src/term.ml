@@ -528,6 +528,23 @@ let mk_or t1 t2 = match t1,t2 with
   | False, t | t, False -> t
   | t1,t2 -> Or (t1,t2)
 
+let mk_impl t1 t2 = match t1,t2 with
+  | False, _ -> True
+  | True, t -> t
+  | t1,t2 -> Impl (t1,t2)
+
+(** Operations on vectors of indices of the same length. *)
+let mk_indices_neq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_or acc e)
+    False
+    (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+let mk_indices_eq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_and acc e)
+    True
+    (List.map2 (fun i j -> Atom (`Index (`Eq, i, j))) vect_i vect_j)
+
 (** Xor and its unit *)
 
 let f_xor = mk_fname "xor" [emessage;emessage] emessage
