@@ -370,22 +370,29 @@ class get_actions ~(system:Action.system) exact = object (self)
     | _ -> super#visit_formula f
 end
 
+(** Construct the formula expressing freshness for some projection. *)
 let mk_phi_proj system env name indices proj biframe =
   let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
   begin try
     match indices with
     | [] ->
-        let iter_frame = new find_name ~system false name in
-        List.iter iter_frame#visit_term proj_frame;
-        let iter_actions = new find_name ~system false name in
+        (* When the name is not indexed, we only need to check that there
+         * is no occurrence of the name in the frame and system.
+         * TODO this is too restrictive, cf examples/wip/fresh_noidx.mbc *)
+        let iter = new find_name ~system false name in
+        List.iter iter#visit_term proj_frame;
         Action.(iter_descrs system
           (fun action_descr ->
-             iter_actions#visit_formula (snd action_descr.condition) ;
-             iter_actions#visit_message (snd action_descr.output) ;
-             List.iter (fun (_,t) -> iter_actions#visit_message t)
-              action_descr.updates));
+             iter#visit_formula (snd action_descr.condition) ;
+             iter#visit_message (snd action_descr.output) ;
+             List.iter
+               (fun (_,t) -> iter#visit_message t)
+               action_descr.updates));
         Term.True
     | _  ->
+        (* When the name is indexed, we collect the indices of its possible
+         * occurrences and require that they are different from the
+         * actual indices of [name]. *)
         let list_of_indices_from_frame =
           let iter = new get_name_indices ~system false name in
             List.iter iter#visit_term proj_frame ;
@@ -499,10 +506,10 @@ let fresh i s sk fk =
         begin try
           (* the biframe to consider when checking the freshness *)
           let biframe = List.rev_append before after in
-          let system = (EquivSequent.get_system s) in
+          let system = EquivSequent.get_system s in
           let env = EquivSequent.get_env s in
           let if_term = mk_if_term system env e biframe in
-          let biframe = (List.rev_append before (if_term::after)) in
+          let biframe = List.rev_append before (if_term::after) in
           sk [EquivSequent.set_biframe s biframe] fk
         with
         | Tactics.Tactic_hard_failure err -> fk err

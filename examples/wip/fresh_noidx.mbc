@@ -1,0 +1,17 @@
+(* This example works with !_i in front of the system,
+ * it should also work without it (ideally with no modification)
+ * but currently fresh is too imprecise for unindexed names. *)
+
+channel c
+
+system new n; out(c,n).
+
+equiv test.
+Proof.
+  induction t.
+  expandall.
+  fa 1; fa 2.
+  fresh 2.
+  yesif 2.
+  split.
+Qed.
