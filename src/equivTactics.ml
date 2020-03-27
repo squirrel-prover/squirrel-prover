@@ -422,9 +422,10 @@ let mk_phi_proj system env name indices proj biframe =
                    * to quantify universally over them *)
                   let bv =
                     List.filter
-                      (fun i -> not (Vars.mem !env (Vars.name i)))
+                      (fun i -> not (Vars.mem env (Vars.name i)))
                       j
                   in
+                  let env = ref env in
                   let bv' =
                     List.map (Vars.make_fresh_from_and_update env) bv in
                   let subst =
@@ -443,6 +444,7 @@ let mk_phi_proj system env name indices proj biframe =
             (fun a indices_a formula ->
                 (* for each action [a] in which [name] occurs
                  * with indices from [indices_a] *)
+                let env = ref env in
                 let new_action_indices =
                   List.map
                     (fun i -> Vars.make_fresh_from_and_update env i)
@@ -516,14 +518,13 @@ let mk_if_term system env e biframe =
         | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
         | _ -> raise @@ not_name_failure
       in
-      let env_local = ref env in
       let system_left = Action.(make_trace_system system.left) in
       let phi_left =
-        mk_phi_proj system_left env_local n_left ind_left Term.Left biframe
+        mk_phi_proj system_left env n_left ind_left Term.Left biframe
       in
       let system_right = Action.(make_trace_system system.right) in
       let phi_right =
-        mk_phi_proj system_right env_local n_right ind_right Term.Right biframe
+        mk_phi_proj system_right env n_right ind_right Term.Right biframe
       in
       let then_branch = Term.Fun (Term.f_zero,[]) in
       let else_branch = t in
