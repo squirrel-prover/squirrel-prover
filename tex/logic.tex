@@ -13,7 +13,7 @@ a fixed semantics (for instance, $\_ \stackrel{.}{=} \_$ or
 $\mathsf{if \_ then \_ else \_}$).
 
 The formulas of the base logic are intended to be interpreted in
-\emph{computational models}, where:
+\emph{computational models}, denoted $\Mo$, where:
 \begin{itemize}
   \item terms are interpreted as PPT Turing machines which,
     given infinite random tapes and a security parameter output a bitstring;
@@ -71,12 +71,12 @@ $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
 
 We assume a set $\N$ of indexed names symbols
 (used to model random samplings)
-and a set of indexed action symbols $\Actions$
+and a set of indexed action symbols $\Act$
 (used to model specific timestamps).
 These indexed symbols only have an index arity: they
 cannot be applied to terms.
 
-We finally assume a set $\M$ of indexed macro symbols.
+We finally assume a set $\Mac$ of indexed macro symbols.
 An indexed macro symbol will be applied to the specified number of
 indices and also to a single timestamp.
 This timestamp gives the instant at which the macro is evaluated.
@@ -84,7 +84,7 @@ In practice, macro symbols will be used to describe the inputs and outputs
 of the protocol, but also the execution conditions as well as the value of
 mutable memory cells.
 
-We shall write $\A_k$ (resp.\ $\N_k$ or $\M_k$) for the set of action
+We shall write $\Act_k$ (resp.\ $\N_k$ or $\Mac_k$) for the set of action
 symbols (resp.\ name or macro symbols) of index arity $k$.
 We write $\F_k^n$ for function symbols of index arity $k$ and message
 arity $n$.
@@ -96,14 +96,14 @@ arity $n$.
     \\
     T &:=& \tau & \text{timestamp variable} & \\
       &\mid& \tinit & \text{initial timestamp} & \\
-      &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\Actions_k) \\
+      &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\Act_k) \\
       &\mid & \pre(T) & \text{predecessor} & \\
     \\
     t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
       & \mid & x  & \text{message variable} & (x\in\X) \\
       & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} &
       (f\in\F_k^n)\\
-      & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\M_k)\\
+      & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\Mac_k)\\
       & \mid & \myif \phi \mythen t \myelse t'
         &\text{conditional} \\
       & \mid & \myfind \vec{i} \mysuchthat \phi \myin t \myelse t'
@@ -117,7 +117,7 @@ arity $n$.
   \[
   \begin{array}{c}
    \begin{array}{rcll}
-    \T &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
+    \Sort &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
     \\[2ex]
    \atom & := & t=t'
  & \text{atomic proposition over messages } \\
@@ -131,7 +131,7 @@ arity $n$.
      \begin{array}{rcll}
     \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi
     \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
-    \forall x : \T.\ \phi \mid \exists x:\T.\ \phi \mid \atom &
+    \forall x : \Sort.\ \phi \mid \exists x:\Sort.\ \phi \mid \atom &
     \end{array}
 
 \end{array}
@@ -140,7 +140,7 @@ arity $n$.
 \end{figure}
 
 \begin{definition}
-  Given a (meta logic) signature $\Sigma = (\F,\N,\M,\Actions)$
+  Given a (meta logic) signature $\Sigma = (\F,\N,\Mac,\Act)$
   and some sets of variables
   $\X$, $\I$ and $\XT$,
   \cref{fig:terms} defines the syntax of (meta-logic) terms
@@ -151,7 +151,7 @@ arity $n$.
   The only terms of sort index are index variables.
   The set of message terms of the meta-logic is noted $\Msg_\Sigma$.
 \end{definition}
-\charlie{ We have $\XT$, $T$, $t$ and $\T$. This will probably be a bit confusing... }
+
 %%% Local Variables:
 %%% mode: latex
 %%% TeX-master: "main"

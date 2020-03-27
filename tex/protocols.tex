@@ -15,9 +15,9 @@ Additionally, we will make use of channel names from a set of constants $\C$ (kn
 as well as index memory cell symbols from $\States$.
 
 \begin{definition} \label{def:action} \label{def:proto}
-  A protocol is given by a finite set of action symbols $\Actions$.
+  A protocol is given by a finite set of action symbols $\Act$.
   A \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$
-  is the application of an action symbol $\sfa \in \Actions_k$
+  is the application of an action symbol $\sfa \in \Act_k$
   to the expected  number of indices.
   We assume a partial order on symbolic actions,
   noted $\beta \leq \alpha$ and expressing that $\alpha$ depends on $\beta$,
@@ -26,7 +26,7 @@ as well as index memory cell symbols from $\States$.
     is a substitution of indices,
     $A \leq A'$ implies $A\theta \leq A'\theta$.
   }.
-  Finally, each action $\sfa \in \Actions_k$ must come with
+  Finally, each action $\sfa \in \Act_k$ must come with
   a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$
   with distinct indices,
   and the following elements describing its semantics:
@@ -41,13 +41,6 @@ as well as index memory cell symbols from $\States$.
       that are distinct and disjoint from $\vec{i}$
       (intuitively, this term describes how the action updates the memory
       cell, depending on the indices $\vec{i}$ and $\vec{j}$);
-      \charlie{The management of states seems highly complicated. I guess you had some discussions about them, but I think I missed them so I feel a bit lost...
-        \begin{itemize}
-        \item  How can we have some $\vec{j}$ which are free index variables w.r.t. the indices of the action ? If I understand what follows, inside action $R(i)$, I can update some state $s(j)$, where $i$ and $j$ are interpreted in distinct way by the interpretation $I$. In term of real life implementations, this seems a bit weird.
-        \item Why do we ask for an update of each memory cells ? In the rest, we most of the time make them perform an identity.
-        \end{itemize}
-I guess I can see why having an explicit update for each action makes it easier to interpret states, as we can always define inductively the value of a state at time t w.r.t to the update at time t-1, but I feel like this can be quite confusing for the reader. It might be simpler to give only some updates, and say that it is by default the identity if undefined.
-      }
     \item two channel names $\cin_\alpha$ and $\cout_\alpha$
       (intuitively, the input and output channels of this action).
   \end{itemize}
@@ -59,7 +52,7 @@ I guess I can see why having an explicit update for each action makes it easier 
   \begin{itemize}
     \item $x_{\sfa'(i_1,\ldots,i'_l)}$
       with $\sfa'(i_1,\ldots,i'_l)\leq \alpha$ or
-    \item $x^{s[j_1,\ldots,j_p]}_\alpha$
+    \item $x^{s[j_1,\ldots,j_p]}$
       for some $\sfa' \in \A_l$ and $s \in \States_p$.
   \end{itemize}
   Intuitively, actions do not have access to arbitrary data but can only
@@ -67,10 +60,6 @@ I guess I can see why having an explicit update for each action makes it easier 
   and the content of memory when they execute.
 \end{definition}
 
-\david{
-  We could simplify $x_\alpha^s$ into just $x^s$:
-  anyway the action can only see the current contents of $s$.
-}
 
 The semantics of each action $\sfa$ is given via an arbitrary
 choice of indices in $\alpha = \sfa(i_1,\ldots,i_k)$.
@@ -87,6 +76,13 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
                                 \{j_m\mapsto j'_m\}_{1 \leq m \leq p}.$$
 
 \begin{remark}
+  We expect actions to provide an explicit update for each memory cell. This
+  allows to easily interpret the value of a memory cell at any given point.
+
+  We allow actions to update memory cells that depend on some free indices.  As
+  it will be illustrated later on, this is required to express protocols with
+  actions that are conditioned by existential formulas over indices.
+
   We will fix the initial values of all memory cells to be $0$.
   This is not restrictive since we can have an action that initializes
   all memory cells at once (giving them values that can depend on their
@@ -100,7 +96,7 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
 \begin{definition}
   A \emph{concrete action} is an instantiation of a \emph{symbolic action}
   with integer variables for index variables. The partial order on symbolic
-  actions is lifted naturally to a partial order on concrete actions, noted
+  actions is lifted naturally to a partial order on concrete actions, denoted
   in the same way.
 \end{definition}
 
@@ -169,14 +165,14 @@ We give here a few representative examples of (bi)protocols.
       \begin{itemize}
         \item $\phi_\alpha := \mathsf{true}$
         \item $o_\alpha := h(x_\alpha,\key[i])$
-        \item $u_\alpha^{s[j_1,\ldots,j_p]} = x_\alpha^{s[j_1,\ldots,j_p]}$
+        \item $u_\alpha^{s[j_1,\ldots,j_p]} = x^{s[j_1,\ldots,j_p]}$
           for all $s\in\States_p$
       \end{itemize}
     \item $\beta := B(i)$ with
       \begin{itemize}
         \item $\phi_\beta := \mathsf{true}$
         \item $o_\beta := h(x_\alpha,\key[i])$
-        \item $u_\beta^{s[j_1,\ldots,j_p]} = x_\beta^{s[j_1,\ldots,j_p]}$
+        \item $u_\beta^{s[j_1,\ldots,j_p]} = x^{s[j_1,\ldots,j_p]}$
           for all $s\in\States_p$
       \end{itemize}
   \end{itemize}
@@ -188,10 +184,10 @@ We give here a few representative examples of (bi)protocols.
 \begin{example}[Basic Hash]
   \label{ex:basic-hash-bi-process}
   The bi-protocol $P_{BH}$ is defined by the symbolic actions
-  $\{\T(i,j),\R_1(k),\R_2(k)\}$, with a trivial dependency relation,
+  $\{\Sort(i,j),\R_1(k),\R_2(k)\}$, with a trivial dependency relation,
   and the following semantics:
     \begin{itemize}
-      \item action $\alpha_1 := \T(i,j)$ represents the only
+      \item action $\alpha_1 := \Sort(i,j)$ represents the only
         action of an tag session $i,j$ with
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
@@ -213,9 +209,9 @@ We give here a few representative examples of (bi)protocols.
     \end{itemize}
   Some abstract traces for this bi-protocol are:
   \begin{itemize}
-    \item $\T(1,1),\R_1(3)$
-    \item $\T(1,1).\R_1(3).\T(1,2).\R_1(2)$
-    \item $\T(1,1).\R_1(3).\T(2,1).\R_1(2)$
+    \item $\Sort(1,1),\R_1(3)$
+    \item $\Sort(1,1).\R_1(3).\Sort(1,2).\R_1(2)$
+    \item $\Sort(1,1).\R_1(3).\Sort(2,1).\R_1(2)$
   \end{itemize}
   This protocol is actually obtained in our tool from the following
   bi-process:
@@ -258,40 +254,40 @@ We give here a few representative examples of (bi)protocols.
     \item Name symbols $k$ and $k'$ of respective index arities 1 and 2.
   \end{itemize}
   The bi-protocol $P_{OSK}$ is then defined by
-  the set of symbolic actions $\{\T(i,j),\R_1(k,i,j),\R_2(k)\}$ where:
+  the set of symbolic actions $\{\Sort(i,j),\R_1(k,i,j),\R_2(k)\}$ where:
     \begin{itemize}
-      \item action $\alpha_1 := \T(i,j)$
+      \item action $\alpha_1 := \Sort(i,j)$
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
-          \item $o_{\alpha_1} := \diff{g(x_{\alpha_1}^{s_T[i]})}{g(x_{\alpha_1}^{s'_T[i,j]})}$
+          \item $o_{\alpha_1} := \diff{g(x^{s_T[i]})}{g(x^{s'_T[i,j]})}$
           \item $u_{\alpha_1}^{s_T[i']} :=
-              \myif i=i' \mythen h(x_{\alpha_1}^{s_T[i]})
-              \myelse x_{\alpha_1}^{s_T[i']}
+              \myif i=i' \mythen h(x^{s_T[i]})
+              \myelse x^{s_T[i']}
             \bigr)$
           \item $u_{\alpha_1}^{s'_T[i',j']} :=
               \myif \langle i,j \rangle = \langle i',j' \rangle
-              \mythen h(x_{\alpha_1}^{s'_T[i,j]})
-              \myelse x_{\alpha_1}^{s'_T[i',j']}$
+              \mythen h(x^{s'_T[i,j]})
+              \myelse x^{s'_T[i',j']}$
         \end{itemize}
       \item action $\alpha_2 := \R_1(k,i,j)$
         \begin{itemize}
-          \item $\phi_{\alpha_2} := x_{\alpha_2} = \diff{g(x_{\alpha_2}^{s_R[i]})}{g(x_{\alpha_2}^{s'_R[i,j]})}$
+          \item $\phi_{\alpha_2} := x_{\alpha_2} = \diff{g(x^{s_R[i]})}{g(x^{s'_R[i,j]})}$
           \item $o_{\alpha_2} := \ok$
           \item $u_{\alpha_2}^{s_R[i']} :=
             \myif i=i' \mythen
-            h(x_{\alpha_2}^{s_R[i]})
-            \myelse x_{\alpha_2}^{s_R[i']}$
+            h(x^{s_R[i]})
+            \myelse x^{s_R[i']}$
           \item $u_{\alpha_2}^{s'_R[i',j']} :=
             \myif\langle i,j\rangle=\langle i',j'\rangle \mythen
-            h(x_{\alpha_2}^{s'_R[i,j]})
-            \myelse x_{\alpha_2}^{s'_R[i',j']}$
+            h(x^{s'_R[i,j]})
+            \myelse x^{s'_R[i',j']}$
         \end{itemize}
       \item action $\alpha_3 := \R_2(k)$
         \begin{itemize}
           \item $\phi_{\alpha_3} :=
             \forall i,j.~
             x_{\alpha_3} \neq
-            \diff{g(x_{\alpha_3}^{s_R[i]})}{g(x_{\alpha_3}^{s'_R[i,j]})}$
+            \diff{g(x^{s_R[i]})}{g(x^{s'_R[i,j]})}$
           \item $o_{\alpha_3} := \error$
         \end{itemize}
     \end{itemize}
@@ -321,3 +317,8 @@ We give here a few representative examples of (bi)protocols.
   \end{array}
   \]
 \end{example}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

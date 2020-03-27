@@ -1,5 +1,5 @@
 \section{Indistinguishability}
-
+\charlie{not up to date}
 \newcommand{\pair}[1]{\langle #1 \rangle}
 
 We now define indistinguishability of processes, and how we could verify it.
@@ -31,9 +31,9 @@ deal with abstract systems described by sets of actions.
 \begin{definition}
   Two processes $P$ and $Q$ are indistinguishable when,
   for all observable traces $t$,
-  for all computational model $\M$,
+  for all computational model $\Mo$,
   we have
-  $\M \models \fold(P,t) \sim \fold(Q,t)$.
+  $\Mo \models \fold(P,t) \sim \fold(Q,t)$.
   This itself means that no attacker can distinguish,
   with non-negligible probability, between the left- and right-hand sides.
 \end{definition}
@@ -90,9 +90,9 @@ We now define the equivalence,
 \begin{definition}
   A bi-process is diff-equivalent when,
   for any symbolic trace $\tr$ of the protocol and
-  for any computational model $\M$,
+  for any computational model $\Mo$,
   we have:
-  \[\M \models (\mouts_{\tr}^L)^{I_\tr}  \sim (\mouts_{\tr}^R)^{I_\tr}\]
+  \[\Mo \models (\mouts_{\tr}^L)^{I_\tr}  \sim (\mouts_{\tr}^R)^{I_\tr}\]
 \end{definition}
 
 Note that this equivalence cannot hold if there exists a $\tr$
@@ -186,7 +186,7 @@ We extend the sequent calculus, to also reason about diff-equivalence.
 
 \begin{definition}
   A sequent $\Gamma \vdash t_L \sim t_R $ is composed of a set of indistinguishability $\Gamma$, and sequences of terms $t_L,t_R$.
-  It is valid when, for any meta-interpretation $I$, for any evaluation of the free variables in $t_L,t_R$ to well typed elements in $I$ and computational model $\M$, $\M \models (\wedge \Gamma)^I \Rightarrow (t_L)^I \sim  (t_R)^I $
+  It is valid when, for any meta-interpretation $I$, for any evaluation of the free variables in $t_L,t_R$ to well typed elements in $I$ and computational model $\Mo$, $\Mo \models (\wedge \Gamma)^I \Rightarrow (t_L)^I \sim  (t_R)^I $
 \end{definition}
 
 To reason abstractly on all possible traces, we define the macros $\mouts^X@A$, which given a trace $\tr = \tr_1 . A . \tr_2$, are interpreted by:
@@ -201,8 +201,8 @@ We will write for concision $\happens(A)$ for $\happens(A) \sim \true$.
 \end{lemma}
 \begin{proof}We prove the first implication, which is essentially an unfolding of definitions.
 
-  Let $\M$ be a computational model and $\tr = A_1 \cdots A_n$ a symbolic trace of a bi-process.
-  We assume that  $ \happens (\tau)  \vdash \mouts^L@\tau \sim \mouts^R@\tau$, i.e that for any-meta interpretation $I$ and model $\M'$, $\M' \models (\happens(\tau))^I \rightarrow (\mouts^L@\tau \sim \mouts^R@\tau)^I$. We instantiate $\M'$ with $\M$ , and $I$ with the meta interpretation $\I_\tr$ such that $\tau \mapsto A_n$. Then, as $\happens(A_n)^I = \true$, we conclude that $\M' \models  (\mouts^L@A_n \sim \mouts^R@A_n)^I$.\\
+  Let $\Mo$ be a computational model and $\tr = A_1 \cdots A_n$ a symbolic trace of a bi-process.
+  We assume that  $ \happens (\tau)  \vdash \mouts^L@\tau \sim \mouts^R@\tau$, i.e that for any-meta interpretation $I$ and model $\Mo'$, $\Mo' \models (\happens(\tau))^I \rightarrow (\mouts^L@\tau \sim \mouts^R@\tau)^I$. We instantiate $\Mo'$ with $\Mo$ , and $I$ with the meta interpretation $\I_\tr$ such that $\tau \mapsto A_n$. Then, as $\happens(A_n)^I = \true$, we conclude that $\Mo' \models  (\mouts^L@A_n \sim \mouts^R@A_n)^I$.\\
 
   The second implication is a direct induction on the length of the traces.
   \end{proof}
@@ -296,16 +296,16 @@ The rules presented in Figure~\ref{fig:lk-ind} are sound.
   \begin{itemize}
     \item $\textsc{\myif-explicit}$
       We assume that we have a model and an interpretation such that
-      $\M,\Gamma \not \models  \phi^I, (\myif  \phi \mythen t_L)^I \sim \psi^I, (\myif \phi \mythen t_R)^I $.
+      $\Mo,\Gamma \not \models  \phi^I, (\myif  \phi \mythen t_L)^I \sim \psi^I, (\myif \phi \mythen t_R)^I $.
       It means we have a distinguisher $\B$ against this equivalence.
       We define $\B'$, which on input $x$:
       \begin{enumerate}
       \item if $x = \mathsf{error}$, sets a variable $y$ to $\false$, else to $\true$;
       \item simulates $\B$ with input $y,x$ and returns its result.
       \end{enumerate}
-      When $x$ is equal to $(\myif \phi \mythen t_L)^I $ (resp. $(\myif \phi \mythen t_R)^I$ ), the computed $y$ has exactly the same distribution as the interpretation of $\phi^I$ (resp. $\psi^I)$) in $\M$.
+      When $x$ is equal to $(\myif \phi \mythen t_L)^I $ (resp. $(\myif \phi \mythen t_R)^I$ ), the computed $y$ has exactly the same distribution as the interpretation of $\phi^I$ (resp. $\psi^I)$) in $\Mo$.
       Thus $\B'$ is a distinguisher which shows that:
-    $\M,\Gamma \not \models (\myif  \phi \mythen t_L)^I \sim  (\myif \phi \mythen t_R)^I $.
+    $\Mo,\Gamma \not \models (\myif  \phi \mythen t_L)^I \sim  (\myif \phi \mythen t_R)^I $.
       It concludes that $\Gamma \not \vdash \myif  \phi \mythen t_L \sim \myif  \phi \mythen t_R$.
 
     \end{itemize}

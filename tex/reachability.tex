@@ -1,51 +1,53 @@
 \section{Trace properties}
 
-We want to verify that a formula $\phi$ (the security property)
-holds for all executions of some protocol, in all computational models
-satisfying some cryptographic assumptions.
-This can be guaranteed if we have $Ax\models\phi$
-where $Ax$ is a (recursive) set of axioms that are sound
-wrt.\ the intended class of meta-interpretations and computational models.
-We might be able to formulate such a set $Ax$ (which would consist of
-two parts, first the usual BC axioms, second some meta-logic axioms
-constraining the meta-interpretations to correspond to protocol executions).
-However, we will go for an easier task: designing a set of inference
-rules that allow to derive meta-logic formulas (rather, sequents)
-that are valid in all intended models.
+\subsection{Validity and logical consequence}
 
+We have defined a translation from any meta-logic formula $\phi$ to a base logic
+boolean term $\interp{\phi}^\TM$. We can now formally define when a protocol
+satisfies some trace property $\phi$.  Intuitively, the meta-logic formula is
+true when the associated term is true with overwhelming probability. This is
+made formal in the following definitions.
 
-We can now formally define when a protocol satisfies some trace property
-$\phi$:
-we require that the property holds in all traces that are actually executable
---- more precisely, we require that $\phi_\tr \Rightarrow \phi$ is almost
-always true, where $\phi_\tr$ expresses that the trace is executable.
 
 \begin{definition}
-  Given a trace $\tr$, its executability formula is
-  $$\phi_\tr = \bigwedge_{\alpha\in\tr}
-  \phi_\alpha\{x_\alpha\mapsto\minp@\alpha,x^s_\alpha\mapsto s@\alpha\}$$.
+  Given a protocol $P$, a formula $\phi$ of the meta-logic is said to be valid
+  when, for any trace model $\TM$, the base logic formula
+  $(\phi)^\TM \sim \true$ is valid.
+
+  More generally, a meta-logic formula $\phi$ is a
+  logical consequence of a set $S$ of base logic formulas
+  (which might themselves be of the form $\interp{\psi}^\TM \sim \true$)
+  when, for all $\TM$, $\Mo$ and $\sigma$ such that
+  $\Mo,\sigma \models \psi$ for all $\psi\in S$,
+  we have
+  $\Mo,\sigma \models(\phi)^\TM\sim\mathsf{true}$.
 \end{definition}
 
-\begin{definition}
-  A meta-logic formula $\phi$ is valid wrt.\ our protocol when,
-  for any symbolic trace $\tr$ of the protocol,
-  we have $I_\tr \models \phi_\tr \Rightarrow \phi$.
-\end{definition}
+\begin{remark}
+  In the tool, we only allow universal quantification over messages, and
+  only allow it at toplevel. The validity of such formulas is the same as
+  when the variables are left free.
+\end{remark}
 
-In other words, we require that, for any $\tr$ and
-for any computational model,
-we have $\M \models (\phi_\tr\Rightarrow\phi)^{I_\tr} \sim \true$.
+In practice, we want to verify that a security property expressed as a
+meta-logic formula $\phi$ is satisfied in a class of trace models
+$\TM$ and computational models $\Mo$: we will typically restrict computational
+models so that cryptographic primitives satisfy some security assumption,
+but we may also restrict trace models e.g.\ to force a condition on
+abstract traces. In order to verify security in such a class of models,
+we will identify axioms that hold in these models, and verify that our
+security property is a logical consequence of these axioms.
 
-In practice, we do not want to consider all computational models, but
-restrict to the ones satisfying some cryptographic assumption: reformulate
-what's above so that it's more natural.
+\begin{remark}
+  We have defined a notion of validity that implies that a formula must hold for all abstract traces. Abstract traces can contain actions that are not executable, and we can thus write formulas about outputs that may never be performed. In practice, we will often prove the validity of formulas of the form $\mexec@T \Rightarrow \phi$. This implies that the trace is executable, and allows us to reason over the conditions of the actions.
+\end{remark}
 
 \subsection{Sequent calculus}
 
 In the tool, sequents come with an environment which explicitly
 declares all the variables that might occur free in the sequent's formulas.
-For simplicity, we do not include them here. We shall write $\vdash t:T$
-when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
+For simplicity, we do not include them here. We shall write $\vdash t:\Sort$
+when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
 
 \begin{definition}
   A sequent $\Gamma \vdash \phi$ is composed of a set of meta-logic formulas
@@ -121,12 +123,12 @@ when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
      \inferrule[$\forall$-L]{
        \Gamma,\phi\{x\mapsto t\} \vdash \psi
        \quad
-       \vdash t:\T
+       \vdash t:\Sort
      }{
-       \Gamma,\forall x:\T.\phi \vdash \psi}
+       \Gamma,\forall x:\Sort.\phi \vdash \psi}
      \quad\quad
      \inferrule[$\forall$-R]{
-       \Gamma \vdash \phi}{\Gamma \vdash \forall x:\T:\phi}
+       \Gamma \vdash \phi}{\Gamma \vdash \forall x:\Sort:\phi}
   \end{mathpar}
    \caption{Generic inference rules. These are the rules of classical
    first-order sequent calculus. In \textsc{$\forall$-R} we require that
@@ -154,8 +156,8 @@ when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
     }
   \end{mathpar}
   \caption{Inference rules for equalities on names.
-  The last rule only applies when, for any meta-interpretation $I$,
-  the term $(t)^I$ does not contain any message variable and does
+  The last rule only applies when, for any trace model $\TM$,
+  the term $\interp{t}^\TM$ does not contain any message variable and does
   not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
   --- this condition will be over-approximated in our implementation.}
   \label{fig:names}
@@ -188,8 +190,8 @@ when $t$ is a term of sort $\T$ (which might be $\idx$ or $\timestamp$).
   The tool does not follow these rules closely, but uses a more high-level
   congruence closure algorithm modulo xor. The last rule is not implementated
   at all and is here mostly for illustration purposes, and is subject to
-  the condition that, for any meta-interpretation $I$,
-  $(\Gamma\vdash\phi)^I$ does not contain instances of the names
+  the condition that, for any trace model $\TM$,
+  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
   $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
   This condition would be over-approximated in an implementation.}
   \label{fig:xor}
@@ -202,28 +204,27 @@ We now identify some valid formulas, which can thus be used as axioms
 when trying to derive a trace property.
 
 \begin{proposition}
-  The following formulas are valid wrt.\ the protocol:
+  The following formulas are valid w.r.t.\ the protocol:
   \begin{itemize}
-    \item for any $\alpha \before \beta$,
-      $\happens(\beta) \Rightarrow \happens(\alpha) \wedge \alpha < \beta$;
-    \item for any $\alpha \conflict \beta$,
-      $\happens(\alpha)\wedge\happens(\beta) \Rightarrow \bot$;
-    \item for any $\alpha$,
-      $\happens(\alpha) \Rightarrow
-      \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta$.
+    \item for any $\alpha \leq \beta$ (partial ordering of the symbolic actions imposed by the protocol), $\alpha \leq \beta$.
+
     \item
-      $\forall \tau,\tau',\tau'', \happens(\tau)\wedge\happens(\tau'')\wedge
-      \tau\leq\tau'\wedge\tau'\leq\tau''\Rightarrow\happens(\tau')$;
-    \item
-      $\forall \tau, \happens(\tau) \Rightarrow \pre(\tau)<\tau \wedge
+      $\forall \tau.~ \pre(\tau)<\tau \wedge
       \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
       \tau'=\pre(\tau)$;
-    \item for any $a\neq b\in\Actions$,
+    \item for any $a\neq b\in\Act$,
       $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$;
-    \item for any $a\in\Actions$,
+    \item for any $a\in\Act$,
       $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
+      \item $\forall \tau.~ \mexec@\tau \Rightarrow \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau$
   \end{itemize}
 \end{proposition}
 
-Note that obvious axioms such as the predecessor or injectivity axioms
-would not hold for simpler constructions of $I_\tr$.
+
+The first axiom holds because for any trace model, we asks that $\leq_\XT$ is compatible with the ordering $\leq$ over symbolic actions.
+As $\pre$ is always interpreted as the natural notion of predecessor over some discrete sequence, the second axiom is natural. The next two axioms hold for all trace models, because we ask that the ordered sequence of concrete actions produced by $\leq_\XT$ represent an abstract trace of the protocol. This yields the injectivity axiom. The last axiom holds naturally by the definition of $\mexec$.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
