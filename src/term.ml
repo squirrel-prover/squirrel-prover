@@ -533,6 +533,13 @@ let mk_impl t1 t2 = match t1,t2 with
   | True, t -> t
   | t1,t2 -> Impl (t1,t2)
 
+let mk_ite c t e = match c with
+  | True -> t
+  | False -> e
+  | _ -> ITE (c,t,e)
+
+let mk_forall l f = if l = [] then f else ForAll (l,f)
+
 (** Operations on vectors of indices of the same length. *)
 let mk_indices_neq vect_i vect_j =
   List.fold_left

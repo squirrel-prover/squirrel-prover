@@ -205,6 +205,8 @@ val f_g : fsymb
 val mk_and : formula -> formula -> formula
 val mk_or : formula -> formula -> formula
 val mk_impl : formula -> formula -> formula
+val mk_ite : formula -> message -> message -> message
+val mk_forall : Vars.evar list -> formula -> formula
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
 val mk_indices_eq : Vars.index list -> Vars.index list -> formula

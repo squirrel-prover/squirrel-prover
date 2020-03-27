@@ -415,17 +415,31 @@ let mk_phi_proj system env name indices proj biframe =
               Hashtbl.add tbl_of_action_indices descr_proj action_indices));
         (* direct cases (for explicit occurrences of [name] in the frame) *)
         let phi_frame =
-          List.fold_left
-            (fun acc f -> Term.mk_and acc f)
-            Term.True
+          List.fold_left Term.mk_and Term.True
             (List.map
-               (fun j -> Term.mk_indices_neq indices j)
+               (fun j ->
+                  (* select bound variables,
+                   * to quantify universally over them *)
+                  let bv =
+                    List.filter
+                      (fun i -> not (Vars.mem !env (Vars.name i)))
+                      j
+                  in
+                  let bv' =
+                    List.map (Vars.make_fresh_from_and_update env) bv in
+                  let subst =
+                    List.map2
+                      (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                      bv bv'
+                  in
+                  let j = List.map (Term.subst_var subst) j in
+                  Term.mk_forall
+                    (List.map (fun i -> Vars.EVar i) bv')
+                    (Term.mk_indices_neq indices j))
                list_of_indices_from_frame)
         (* indirect cases (occurrences of [name] in actions of the system) *)
         and phi_actions =
-          Seq.fold_left
-            (fun acc f -> Term.mk_and acc f)
-            Term.True
+          Seq.fold_left Term.mk_and Term.True
             (Seq.map
               (* for each action in which [name] occurs *)
               (fun a ->
@@ -494,10 +508,8 @@ let mk_if_term system env e biframe =
       in
       let then_branch = Term.Fun (Term.f_zero,[]) in
       let else_branch = t in
-      begin match (Term.mk_and phi_left phi_right) with
-      | Term.True -> EquivSequent.Message then_branch
-      | phi -> EquivSequent.Message (Term.ITE (phi, then_branch, else_branch))
-      end
+      EquivSequent.Message
+        Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
   | EquivSequent.Formula f -> raise @@ not_name_failure
 
 let fresh i s sk fk =
