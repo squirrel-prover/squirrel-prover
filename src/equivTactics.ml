@@ -448,23 +448,35 @@ let mk_phi_proj system env name indices proj biframe =
                     (fun i -> Vars.make_fresh_from_and_update env i)
                     a.Action.indices
                 in
-                let subst =
-                  List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-                    a.Action.indices new_action_indices
+                let bv =
+                  List.filter
+                    (fun i -> not (List.mem i a.Action.indices))
+                    (List.sort_uniq Pervasives.compare (List.concat indices_a))
                 in
+                let bv' =
+                  List.map
+                    (fun i -> Vars.make_fresh_from_and_update env i)
+                    bv
+                in
+                let subst =
+                  List.map2
+                    (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                    a.Action.indices new_action_indices @
+                  List.map2
+                    (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                    bv bv'
+                in
+                (* apply [subst] to the action and to the list of
+                 * indices of our name's occurrences *)
                 let new_action =
                   Action.to_term (Action.subst_action subst a.Action.action) in
-                (* we now apply the same substitution to the subset of
-                   indices corresponding to [name] in the action *)
                 let indices_a =
                   List.map
                     (List.map (Term.subst_var subst))
                     indices_a in
                 (* if new_action occurs before an action of the frame *)
                 let disj =
-                  List.fold_left
-                    (fun acc f -> Term.mk_or acc f)
-                    Term.False
+                  List.fold_left Term.mk_or Term.False
                     (List.map
                       (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                       list_of_actions_from_frame)
@@ -476,7 +488,7 @@ let mk_phi_proj system env name indices proj biframe =
                        indices_a)
                 in
                 let forall_var =
-                  List.map (fun i -> Vars.EVar i) new_action_indices in
+                  List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
                 Term.mk_and formula
                   (Term.mk_forall forall_var (Term.mk_impl disj conj)))
             tbl_of_action_indices
