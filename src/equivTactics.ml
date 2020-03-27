@@ -439,10 +439,10 @@ let mk_phi_proj system env name indices proj biframe =
                list_of_indices_from_frame)
         (* indirect cases (occurrences of [name] in actions of the system) *)
         and phi_actions =
-          Seq.fold_left Term.mk_and Term.True
-            (Seq.map
-              (* for each action in which [name] occurs *)
-              (fun a ->
+          Hashtbl.fold
+            (fun a indices_a formula ->
+                (* for each action [a] in which [name] occurs
+                 * with indices from [indices_a] *)
                 let new_action_indices =
                   List.map
                     (fun i -> Vars.make_fresh_from_and_update env i)
@@ -456,10 +456,10 @@ let mk_phi_proj system env name indices proj biframe =
                   Action.to_term (Action.subst_action subst a.Action.action) in
                 (* we now apply the same substitution to the subset of
                    indices corresponding to [name] in the action *)
-                let new_name_indices =
+                let indices_a =
                   List.map
-                    (Term.subst_var subst)
-                    (List.hd (Hashtbl.find tbl_of_action_indices a)) in
+                    (List.map (Term.subst_var subst))
+                    indices_a in
                 (* if new_action occurs before an action of the frame *)
                 let disj =
                   List.fold_left
@@ -469,11 +469,18 @@ let mk_phi_proj system env name indices proj biframe =
                       (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                       list_of_actions_from_frame)
                 (* then indices of name in new_action and of [name] differ *)
-                and conj = Term.mk_indices_neq new_name_indices indices in
+                and conj =
+                  List.fold_left Term.mk_and True
+                    (List.map
+                       (fun is -> Term.mk_indices_neq is indices)
+                       indices_a)
+                in
                 let forall_var =
                   List.map (fun i -> Vars.EVar i) new_action_indices in
-                Term.ForAll(forall_var,Term.Impl(disj,conj)))
-              (Hashtbl.to_seq_keys tbl_of_action_indices))
+                Term.mk_and formula
+                  (Term.mk_forall forall_var (Term.mk_impl disj conj)))
+            tbl_of_action_indices
+            Term.True
         in
         Term.mk_and phi_frame phi_actions
   with
