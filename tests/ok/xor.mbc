@@ -1,3 +1,8 @@
+name n1 : message
+
+abstract ok : message
+abstract ko : message
+
 system null.
 
 goal forall (t:timestamp),
@@ -18,4 +23,10 @@ goal forall (m:message,n:message,x:message),
   m = n.
 Proof.
  simpl.
+Qed.
+
+
+equiv test : diff(xor(n1,ok),xor(n1,ko)).
+Proof.
+xor 0.
 Qed.

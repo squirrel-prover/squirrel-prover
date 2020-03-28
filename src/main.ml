@@ -297,4 +297,9 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/equivalent.mbc")
     end ;
+    "XOR", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/xor.mbc")
+    end ;
   ]

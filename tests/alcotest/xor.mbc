@@ -1,0 +1,18 @@
+name n1 : message
+
+abstract ok : message
+abstract ko : message
+
+channel c
+
+system out(c,<n1,diff(xor(n1,ok),xor(n1,ko))>).
+
+equiv test.
+Proof.
+induction t.
+expandall.
+fa 1.
+fa 2.
+fa 2.
+try (xor 3).
+Qed.
