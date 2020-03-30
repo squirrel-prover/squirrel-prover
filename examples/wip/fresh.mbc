@@ -13,5 +13,12 @@ expandall.
 fa 1.
 fa 2.
 fresh 2.
+(* A possible way of concluding the proof.*)
+yesif 2.
+depends A,A1.
+expandall.
+fa 1.
+fa 2.
+xor 2.
 
 Qed.
