@@ -1,0 +1,26 @@
+abstract f : message->message
+abstract ff : message->message->message
+system null.
+
+goal forall (x,y,z:message),
+  x = xor(y,z) => xor(y,x) = z.
+Proof.
+intros.
+Qed.
+
+goal forall (a,x,y,z:message),
+  a = xor(x, f(ff(snd(y),f(z))))
+  =>
+  xor(a,x) = f(ff(snd(y),f(z))).
+Proof.
+intros.
+Qed.
+
+goal forall (a,x,y,z:message),
+  a = xor(x, f(xor(snd(y),f(z))))
+  =>
+  xor(a,x) = f(xor(snd(y),f(z))).
+Proof.
+intros.
+(* Does not work! *)
+Qed.
