@@ -118,7 +118,9 @@ let get_definition :
                 (ts_subst::idx_subst,rev_action)
                 inputs
             in
-            Term.subst subst body
+            let t = Term.subst subst body in
+            let bimacros = false in (* TODO ??? *)
+            Term.pi_term ~bimacros ~projection:system.projection t
           | _ -> assert false
         end
       | Symbols.Local _, _ -> failwith "TODO"
