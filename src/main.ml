@@ -202,22 +202,22 @@ let () =
     end ;
     "Euf Mvar", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure NoSSC)
+        (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_mvar.mbc")
     end ;
-    "Euf NoSSC", `Quick, begin fun () ->
+    "Euf Bad SSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure NoSSC)
+        (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
-    "Euf NoSSC", `Quick, begin fun () ->
+    "Euf Bad SSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure NoSSC)
+        (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_deep.mbc")
     end ;
-    "Euf NoSSC", `Quick, begin fun () ->
+    "Euf Bad SSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure NoSSC)
+        (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
     end ;
     "Euf collect in cond", `Quick, begin fun () ->
@@ -245,9 +245,9 @@ let () =
         Theory.(Conv (Undefined "i1"))
         (fun () -> run ~test "tests/alcotest/euf_env.mbc")
     end ;
-    "Sign NoSSC", `Quick, begin fun () ->
+    "Sign Bad SSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure NoSSC)
+        (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/sign.mbc")
     end ;
     "Systems", `Quick, begin fun () ->

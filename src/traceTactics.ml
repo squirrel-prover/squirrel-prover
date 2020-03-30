@@ -714,7 +714,8 @@ let exec a s sk fk =
 
 let () =
   T.register_general "executable"
-    ~help:"Specify that the macro exec implis cond for all previous timestamps.\
+    ~help:"Assert that exec@_ implies cond@_ for all \
+           previous timestamps.\
            \n Usage: executable t."
     (function
        | [Prover.Theory v] -> exec v
@@ -729,17 +730,16 @@ let euf_param (`Message at : message_atom) = match at with
                [s;
                Fun ((pk,_), [Name key])
                ]), m)
-  |  (`Eq, m, Fun ((checksign, _),
+  | (`Eq, m, Fun ((checksign, _),
                [s;
                Fun ((pk,_), [Name key])
                ])) ->
-    (
-      match Theory.check_signature checksign pk with
-      | None ->  raise @@ Tactic_hard_failure
+      begin match Theory.check_signature checksign pk with
+      | None -> raise @@ Tactic_hard_failure
         (Tactics.Failure "The message does not correspond to a signature check \
                           with the associated pk.")
       | Some sign -> (sign, key, m, s, Some pk)
-    )
+      end
 
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
   | (`Eq, s, Fun ((hash, _), [m; Name key]))->
@@ -852,7 +852,7 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
     let s, at =
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf in
     sk (euf_apply_facts s at) fk
-  with Euf.Bad_ssc -> fk Tactics.NoSSC
+  with Euf.Bad_ssc -> fk Tactics.Bad_SSC
      | Not_found -> raise @@ Tactics.Tactic_hard_failure
          (Tactics.Failure "no hypothesis with the given name")
 
@@ -872,11 +872,12 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
   let s, at =
     try
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
-    with Not_found -> raise @@ Tactics.Tactic_hard_failure
+    with Not_found ->
+      Tactics.hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
   let tag_s =
-    let (h, key, m, _,_) = euf_param at in
+    let (h,key,m,_,_) = euf_param at in
     let f =
       Prover.get_hash_tag_formula (Symbols.to_string h)
     in
@@ -886,7 +887,6 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
       []
     else
       (* else, we create a goal where m,sk satisfy the axiom *)
-      (
       let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
@@ -897,15 +897,12 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
           ESubst (Term.Var uvarkey,Term.Name key);] f in
         [TraceSequent.add_formula f s]
       | _ -> assert false
-    )
   in
     (* we create the honnest sources using the classical eufcma tactic *)
     try
-      let honnest_s = euf_apply_facts s at in
-      sk (tag_s@honnest_s) fk
-    with Euf.Bad_ssc ->  fk (Tactics.NoSSC)
-
-
+      let honest_s = euf_apply_facts s at in
+      sk (tag_s @ honest_s) fk
+    with Euf.Bad_ssc ->  fk Tactics.Bad_SSC
 
 let () =
   T.register_general "euf"
@@ -1005,7 +1002,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
       (TraceSequent.get_all_terms s)
   in
   if List.length hashes = 0 then
-    fk (NoSSC)
+    fk NoSSC
   else
     begin
       let rec make_eq hash_list =

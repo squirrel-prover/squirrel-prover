@@ -2,6 +2,7 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | NotEqualArguments
+  | Bad_SSC
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
@@ -12,19 +13,22 @@ let rec pp_tac_error ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
   | AndThen_Failure t ->
       Fmt.pf ppf
-        "An application of the second tactic to one \
-         of the subgoal failed with error : %a"
+        "A sequence of tactic applications eventually failed \
+         with the following error: %a"
         pp_tac_error t
   | NotEqualArguments -> Fmt.pf ppf "Arguments not equals."
-  | NoSSC -> Fmt.pf ppf "No key which satisfies \
-                 the syntactic condition has been found"
+  | Bad_SSC -> Fmt.pf ppf "Key does not satisfy the syntactic side condition"
+  | NoSSC ->
+      Fmt.pf ppf
+        "No key which satisfies the syntactic condition has been found"
   | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
-  | NotDepends (a, b) -> Fmt.pf ppf "Action %s does not depend on action %s"
-                           a b
-  | NoAssumpSystem -> Fmt.pf ppf "No assumption with given name for the \
-                                  current system"
-  | NotDDHContext -> Fmt.pf ppf "the current system cannot be seen as a context \
-                              of the given ddh shares"
+  | NotDepends (a, b) ->
+      Fmt.pf ppf "Action %s does not depend on action %s" a b
+  | NoAssumpSystem ->
+      Fmt.pf ppf "No assumption with given name for the current system"
+  | NotDDHContext ->
+      Fmt.pf ppf "The current system cannot be seen as a context \
+                  of the given DDH shares"
 
 exception Tactic_soft_failure of tac_error
 

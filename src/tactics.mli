@@ -31,6 +31,7 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | NotEqualArguments
+  | Bad_SSC
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string

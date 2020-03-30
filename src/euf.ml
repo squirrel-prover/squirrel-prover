@@ -13,11 +13,7 @@ class check_hash_key ~pk ~system hash_fn key_n = object (self)
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
       self#visit_message m
-    | Term.Fun ((fn,_), [Term.Name l]) ->
-      (match pk with
-       | None -> self#visit_message (Term.Name l)
-       | Some pk -> if fn = pk then () else self#visit_message (Term.Name l)
-      )
+    | Term.Fun ((fn,_), [Term.Name _]) when pk = Some fn -> ()
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
     | Term.Var m -> raise Bad_ssc
     | _ -> super#visit_message t
@@ -70,6 +66,7 @@ let euf_key_ssc ~pk ~system hash_fn key_n messages =
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
+
 (* FIXME - Use a unique function for checking key ssc on list of messages
 and on list of terms *)
 let prf_key_ssc ~pk ~system hash_fn key_n frame =
