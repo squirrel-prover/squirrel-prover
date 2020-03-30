@@ -17,7 +17,6 @@ goal forall tau:timestamp, cond@A1 => False.
 Proof.
   intros.
   expand cond@A1.
-  introsleft H0.
   nosimpl(euf M0).
   simpl.
 Qed.

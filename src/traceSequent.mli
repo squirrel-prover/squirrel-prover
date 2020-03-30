@@ -65,10 +65,9 @@ val is_hypothesis : formula -> sequent -> bool
   * @raise Not_found if there is no such hypothesis. *)
 val get_hypothesis : string -> sequent -> formula
 
-(** [get_hypothesis_list s] returns the list of all hypothesis.  Not used
-   currently. Enables tactics to automatically perform actions over all
-   hypothesis.  *)
-val get_hypothesis_list : sequent -> formula list
+(** [pop_formula_list s] returns the list of formula hypothesis of [s], and [s]
+   with an empty set of formula hypothesis. *)
+val pop_generic_formulas : sequent -> sequent * (formula * string) list
 
 (** Tags attached to message hypotheses. *)
 type message_hypothesis_tag = {

@@ -29,7 +29,7 @@ goal wa :
   fst(input@R(j,i)) = nT(i,k).
 Proof.
  simpl.
- expand cond@R(j,i); introsleft H0. (* TODO this should be automatic *)
+ expand cond@R(j,i).
  euf M0.
  exists k.
 Qed.

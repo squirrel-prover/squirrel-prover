@@ -279,7 +279,8 @@ let () =
 (* Attempt to closing the goal. *)
 let simple_base =
   let open Tactics in
-    [ Try (Abstract ("false_left",[])) ;
+  [ Try (Abstract ("false_left",[])) ;
+      Abstract ("allintrosleft",[]) ;
       Abstract ("eqnames",[]) ;
       Abstract ("eqtrace",[]) ;
       Try (Abstract ("congruence",[])) ;

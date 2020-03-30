@@ -26,7 +26,6 @@ simpl.
 
 expand exec@O.
 expand cond@O.
-introsleft H0.
 Qed.
 
 goal dummybis :

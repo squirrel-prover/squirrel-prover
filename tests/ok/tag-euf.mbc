@@ -43,7 +43,6 @@ Proof.
  depends S, S3.
  apply H1 to S.
  expand exec@S3; expand cond@S;  expand cond@S3.
- introsleft H1. (* TODO should be done as part of expansion *)
  euf M0.
  (* we prove the goal where the message satisfies the tag *)
  case H4.

@@ -66,7 +66,6 @@ goal S1_charac :
 Proof.
   simpl.
   expand cond@S1(r).
-  introsleft H0. (* TODO should be done as part of expansion *)
   euf M0.
   exists i.
 Qed.
@@ -80,7 +79,6 @@ cond@P1(r) =>
 Proof.
   simpl.
   expand cond@P1(r).
-  introsleft H0. (* TODO should be done as part of expansion *)
   euf M0.
   exists j.
 Qed.

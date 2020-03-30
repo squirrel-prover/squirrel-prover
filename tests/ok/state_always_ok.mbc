@@ -11,6 +11,6 @@ Proof.
   case H0.
   (* t = A(i) *)
   apply IH0 to pred(A(i)).
-  (* t = init *) 
+  (* t = init *)
   apply init_ok.
 Qed.

@@ -281,7 +281,11 @@ let get_message_atoms s=
     List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses)
 
 let get_generic_formulas s=
-    List.map (fun h -> h.H.hypothesis) (H.to_list s.formula_hypotheses)
+  List.map (fun h -> (h.H.hypothesis, h.H.name_prefix))
+               (H.to_list s.formula_hypotheses)
+
+let pop_generic_formulas s =
+  ({s with formula_hypotheses = H.empty}, get_generic_formulas s)
 
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
@@ -291,12 +295,6 @@ let get_hypothesis id s =
     with Not_found ->
           Term.Atom ((H.find id s.trace_hypotheses).H.hypothesis :>
                Atom.generic_atom)
-
-let get_hypothesis_list s =
-  List.map (fun x ->Term.Atom (x :> Atom.generic_atom)) (get_trace_atoms s)
-  @ List.map
-    (fun x ->Term.Atom (x :> Atom.generic_atom)) (get_message_atoms s)
-  @ get_generic_formulas s
 
 let id = fun x -> x
 
@@ -367,6 +365,9 @@ let rec add_macro_defs s at =
       !macro_eqs
 
 and add_message_hypothesis ?(prefix="M") s at =
+  (* if we are reinserting a previously introduced formula, we change the
+     prefix. *)
+  let prefix = if prefix = "H" then "M" else prefix in
   if H.mem at s.message_hypotheses then s else
     let s =
       { s with

@@ -63,8 +63,9 @@ let () =
   * formulas as hypotheses,
   * followed by the left intro of existentials and conjunctions. *)
 let rec left_introductions s = function
-  | Term.And (f,g) :: l -> left_introductions s (f::g::l)
-  | Term.Exists (vars,f) :: l ->
+  | (Term.And (f,g),prefix) :: l -> left_introductions s
+                                      ((f,prefix)::(g,prefix)::l)
+  | (Term.Exists (vars,f),prefix) :: l ->
       let env = TraceSequent.get_env s in
       let subst,env =
         List.fold_left
@@ -78,23 +79,40 @@ let rec left_introductions s = function
           vars
       in
       let f = Term.subst subst f in
-        left_introductions (TraceSequent.set_env env s) (f::l)
-  | f :: l -> left_introductions (TraceSequent.add_formula f s) l
+        left_introductions (TraceSequent.set_env env s) ((f,prefix)::l)
+  | (f, "") :: l -> left_introductions
+                      (TraceSequent.add_formula f s) l
+  | (f, prefix) :: l -> left_introductions
+                          (TraceSequent.add_formula ~prefix f s) l
   | [] -> s
 
 let left_intros hyp_name s sk fk =
   match TraceSequent.select_formula_hypothesis hyp_name s ~remove:true with
-    | s,formula -> sk [left_introductions s [formula]] fk
+    | s,formula -> sk [left_introductions s [(formula,"")]] fk
     | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
 
 let () =
   T.register_general "introsleft"
     ~help:"Simplify conjonctions and existentials in an hypothesis.\
-           \n Usage: notleft H."
+           \n Usage: introsleft H."
     (function
       | [Prover.Theory (Theory.Var h)] -> left_intros h
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
+
+let all_left_intros s sk fk =
+  let s, formulas = TraceSequent.pop_generic_formulas s in
+  sk [left_introductions s (List.rev formulas)] fk
+
+let () =
+  T.register_general "allintrosleft"
+    ~help:"Perform introsleft over all hypothesis of the goal.
+           \n Usage: allintrosleft."
+    (function
+      | [] -> all_left_intros
+      | _ -> raise @@ Tactics.Tactic_hard_failure
+          (Tactics.Failure "improper arguments"))
+
 
 let left_not_intro hyp_name s sk fk =
   let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
@@ -465,7 +483,6 @@ let expand (term : Theory.term) (s : TraceSequent.t) sk fk =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
   let system = TraceSequent.system s in
   let succ subst = sk [TraceSequent.apply_subst subst s] fk in
-
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),

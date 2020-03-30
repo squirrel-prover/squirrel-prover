@@ -47,7 +47,6 @@ goal [left] wa_left :
 Proof.
 simpl.
 expand cond@R1(j,i,k).
-introsleft H0.
 euf M0.
 apply tags_neq.
 nosimpl(exists i,k).

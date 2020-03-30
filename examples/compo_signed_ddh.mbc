@@ -122,7 +122,6 @@ Proof.
   expand cond@S1; expand cond@S4.
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
-  introsleft H0.
   euf M1.
 
   case H2.
@@ -137,7 +136,6 @@ goal [none, auth] P1_charac :
 Proof.
   simpl.
   expand cond@P1; expand cond@P4.
-  introsleft H0.
   substitute pkS@P1,pk(kS).
   euf M1.
 
