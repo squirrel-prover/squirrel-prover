@@ -114,6 +114,8 @@ type system = private
     right : base_system;
   }
 
+val pp_system : Format.formatter -> system -> unit
+
 val set_projection : Term.projection -> system -> system
 
 val make_equiv_system : base_system -> base_system -> system

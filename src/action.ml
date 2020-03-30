@@ -254,6 +254,24 @@ let make_default_system projection id =
    right = {projection = Term.Right; id};
   }
 
+let pp_base fmt = function
+  | {projection=Term.Left;id} -> Fmt.pf fmt "%s/left" id
+  | {projection=Term.Right;id} -> Fmt.pf fmt "%s/right" id
+  | {projection=Term.None;id} -> Fmt.pf fmt "%s" id
+
+let pp_system fmt {projection;left;right} =
+  if left = right then
+    if projection = Term.None then pp_base fmt left else
+      Fmt.pf fmt "%s(%a)"
+        (if projection = Term.Left then "left" else "right")
+        pp_base left
+  else begin
+    match projection with
+      | Term.None -> Fmt.pf fmt "%a|%a" pp_base left pp_base right
+      | Term.Left -> pp_base fmt left
+      | Term.Right -> pp_base fmt right
+  end
+
 let set_projection proj s =
   {s with projection = proj}
 
@@ -315,19 +333,20 @@ let make_bi_descr d1 d2 =
 let get_descr_of_shape system shape =
   match system.projection with
   | Term.None ->
-    (* if the system is not projeted, we need to get both the left and the right
-       shape. *)
+    (* if the system is not projected,
+     * we need to get both the left and the right shape. *)
     let left_a = Hashtbl.find action_to_descr (shape, system.left.id) in
     let right_a = Hashtbl.find action_to_descr (shape, system.right.id) in
     if system.left.id = system.right.id
     && system.left.projection = Term.Left
     && system.right.projection = Term.Right then
-      (* if the system corresponds to a bi-process direclty defined as is, we
+      (* if the system corresponds to a bi-process directly defined as is, we
          simply output the action without projecting it. *)
       pi_descr Term.None left_a
     else
       (* else, we combine both actions together. *)
-      make_bi_descr (pi_descr system.left.projection left_a)
+      make_bi_descr
+        (pi_descr system.left.projection left_a)
         (pi_descr system.right.projection right_a)
   | Term.Right -> pi_descr system.right.projection
                     (Hashtbl.find action_to_descr (shape, system.right.id))
