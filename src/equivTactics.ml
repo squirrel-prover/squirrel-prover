@@ -374,129 +374,110 @@ end
 let mk_phi_proj system env name indices proj biframe =
   let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
   begin try
-    match indices with
-    | [] ->
-        (* When the name is not indexed, we only need to check that there
-         * is no occurrence of the name in the frame and system.
-         * TODO this is too restrictive, cf examples/wip/fresh_noidx.mbc *)
-        let iter = new find_name ~system false name in
-        List.iter iter#visit_term proj_frame;
-        Action.(iter_descrs system
-          (fun action_descr ->
-             iter#visit_formula (snd action_descr.condition) ;
-             iter#visit_message (snd action_descr.output) ;
-             List.iter
-               (fun (_,t) -> iter#visit_message t)
-               action_descr.updates));
+    let list_of_indices_from_frame =
+      let iter = new get_name_indices ~system false name in
+        List.iter iter#visit_term proj_frame ;
+        iter#get_indices
+    and list_of_actions_from_frame =
+      let iter = new get_actions ~system false in
+      List.iter iter#visit_term proj_frame ;
+      iter#get_actions
+    and tbl_of_action_indices = Hashtbl.create 10 in
+    Action.(iter_descrs system
+      (fun action_descr ->
+        let iter = new get_name_indices ~system false name in
+        let descr_proj = Action.pi_descr proj action_descr in
+        iter#visit_formula (snd descr_proj.condition) ;
+        iter#visit_message (snd descr_proj.output) ;
+        List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
+        (* we add only actions in which name occurs *)
+        let action_indices = iter#get_indices in
+        if List.length action_indices > 0 then
+          Hashtbl.add tbl_of_action_indices descr_proj action_indices));
+    (* direct cases (for explicit occurrences of [name] in the frame) *)
+    let phi_frame =
+      List.fold_left Term.mk_and Term.True
+        (List.map
+           (fun j ->
+              (* select bound variables,
+               * to quantify universally over them *)
+              let bv =
+                List.filter
+                  (fun i -> not (Vars.mem env (Vars.name i)))
+                  j
+              in
+              let env = ref env in
+              let bv' =
+                List.map (Vars.make_fresh_from_and_update env) bv in
+              let subst =
+                List.map2
+                  (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                  bv bv'
+              in
+              let j = List.map (Term.subst_var subst) j in
+              Term.mk_forall
+                (List.map (fun i -> Vars.EVar i) bv')
+                (Term.mk_indices_neq indices j))
+           list_of_indices_from_frame)
+    (* indirect cases (occurrences of [name] in actions of the system) *)
+    and phi_actions =
+      Hashtbl.fold
+        (fun a indices_a formula ->
+            (* for each action [a] in which [name] occurs
+             * with indices from [indices_a] *)
+            let env = ref env in
+            let new_action_indices =
+              List.map
+                (fun i -> Vars.make_fresh_from_and_update env i)
+                a.Action.indices
+            in
+            let bv =
+              List.filter
+                (fun i -> not (List.mem i a.Action.indices))
+                (List.sort_uniq Pervasives.compare (List.concat indices_a))
+            in
+            let bv' =
+              List.map
+                (fun i -> Vars.make_fresh_from_and_update env i)
+                bv
+            in
+            let subst =
+              List.map2
+                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                a.Action.indices new_action_indices @
+              List.map2
+                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                bv bv'
+            in
+            (* apply [subst] to the action and to the list of
+             * indices of our name's occurrences *)
+            let new_action =
+              Action.to_term (Action.subst_action subst a.Action.action) in
+            let indices_a =
+              List.map
+                (List.map (Term.subst_var subst))
+                indices_a in
+            (* if new_action occurs before an action of the frame *)
+            let disj =
+              List.fold_left Term.mk_or Term.False
+                (List.map
+                  (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                  list_of_actions_from_frame)
+            (* then indices of name in new_action and of [name] differ *)
+            and conj =
+              List.fold_left Term.mk_and True
+                (List.map
+                   (fun is -> Term.mk_indices_neq is indices)
+                   indices_a)
+            in
+            let forall_var =
+              List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
+            Term.mk_and formula
+              (Term.mk_forall forall_var (Term.mk_impl disj conj)))
+        tbl_of_action_indices
         Term.True
-    | _  ->
-        (* When the name is indexed, we collect the indices of its possible
-         * occurrences and require that they are different from the
-         * actual indices of [name]. *)
-        let list_of_indices_from_frame =
-          let iter = new get_name_indices ~system false name in
-            List.iter iter#visit_term proj_frame ;
-            iter#get_indices
-        and list_of_actions_from_frame =
-          let iter = new get_actions ~system false in
-          List.iter iter#visit_term proj_frame ;
-          iter#get_actions
-        and tbl_of_action_indices = Hashtbl.create 10 in
-        Action.(iter_descrs system
-          (fun action_descr ->
-            let iter = new get_name_indices ~system false name in
-            let descr_proj = Action.pi_descr proj action_descr in
-            iter#visit_formula (snd descr_proj.condition) ;
-            iter#visit_message (snd descr_proj.output) ;
-            List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
-            (* we add only actions in which name occurs *)
-            let action_indices = iter#get_indices in
-            if List.length action_indices > 0 then
-              Hashtbl.add tbl_of_action_indices descr_proj action_indices));
-        (* direct cases (for explicit occurrences of [name] in the frame) *)
-        let phi_frame =
-          List.fold_left Term.mk_and Term.True
-            (List.map
-               (fun j ->
-                  (* select bound variables,
-                   * to quantify universally over them *)
-                  let bv =
-                    List.filter
-                      (fun i -> not (Vars.mem env (Vars.name i)))
-                      j
-                  in
-                  let env = ref env in
-                  let bv' =
-                    List.map (Vars.make_fresh_from_and_update env) bv in
-                  let subst =
-                    List.map2
-                      (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-                      bv bv'
-                  in
-                  let j = List.map (Term.subst_var subst) j in
-                  Term.mk_forall
-                    (List.map (fun i -> Vars.EVar i) bv')
-                    (Term.mk_indices_neq indices j))
-               list_of_indices_from_frame)
-        (* indirect cases (occurrences of [name] in actions of the system) *)
-        and phi_actions =
-          Hashtbl.fold
-            (fun a indices_a formula ->
-                (* for each action [a] in which [name] occurs
-                 * with indices from [indices_a] *)
-                let env = ref env in
-                let new_action_indices =
-                  List.map
-                    (fun i -> Vars.make_fresh_from_and_update env i)
-                    a.Action.indices
-                in
-                let bv =
-                  List.filter
-                    (fun i -> not (List.mem i a.Action.indices))
-                    (List.sort_uniq Pervasives.compare (List.concat indices_a))
-                in
-                let bv' =
-                  List.map
-                    (fun i -> Vars.make_fresh_from_and_update env i)
-                    bv
-                in
-                let subst =
-                  List.map2
-                    (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                    a.Action.indices new_action_indices @
-                  List.map2
-                    (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                    bv bv'
-                in
-                (* apply [subst] to the action and to the list of
-                 * indices of our name's occurrences *)
-                let new_action =
-                  Action.to_term (Action.subst_action subst a.Action.action) in
-                let indices_a =
-                  List.map
-                    (List.map (Term.subst_var subst))
-                    indices_a in
-                (* if new_action occurs before an action of the frame *)
-                let disj =
-                  List.fold_left Term.mk_or Term.False
-                    (List.map
-                      (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
-                      list_of_actions_from_frame)
-                (* then indices of name in new_action and of [name] differ *)
-                and conj =
-                  List.fold_left Term.mk_and True
-                    (List.map
-                       (fun is -> Term.mk_indices_neq is indices)
-                       indices_a)
-                in
-                let forall_var =
-                  List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-                Term.mk_and formula
-                  (Term.mk_forall forall_var (Term.mk_impl disj conj)))
-            tbl_of_action_indices
-            Term.True
-        in
-        Term.mk_and phi_frame phi_actions
+    in
+    Term.mk_and phi_frame phi_actions
   with
   | Name_found ->
       Tactics.hard_failure (Tactics.Failure "Name not fresh")

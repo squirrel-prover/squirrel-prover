@@ -274,12 +274,12 @@ let () =
     end ;
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure "Name not fresh"))
+        (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/fresh_frame.mbc")
     end ;
     "Fresh System", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure "Name not fresh"))
+        (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/fresh_system.mbc")
     end ;
     "DDH", `Quick, begin fun () ->
