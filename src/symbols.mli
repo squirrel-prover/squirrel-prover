@@ -65,12 +65,6 @@ exception Incorrect_namespace
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string
 
-(** Indicates whether a symbol of that name has been declared. *)
-val exists : string -> bool
-
-(** Get the data associated to a symbol in this namespace. *)
-val get_data : 'a t -> data
-
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val def_of_string : string -> some_def

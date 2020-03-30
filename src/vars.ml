@@ -78,11 +78,6 @@ let empty_env : env = (M.empty,M.empty)
 let mem (e1,_) name =
   M.mem name e1
 
-let get_var (e1,_) name =
-  try
-    M.find name e1
-  with Not_found -> raise Undefined_Variable
-
 let of_list l =
   let rec aux (e1, e2) (l : evar list) =
     match l with

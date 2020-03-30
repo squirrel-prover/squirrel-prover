@@ -141,9 +141,7 @@ module type Tactics_sig = sig
 
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
-  val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (Term.formula -> tac) -> unit
-  val register_fname : string -> ?help:string -> (Term.fname -> tac) -> unit
   val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
 
   val get : string -> tac_arg list -> tac
@@ -189,14 +187,6 @@ struct
            raise @@ Tactics.Tactic_hard_failure
              (Tactics.Failure "this tactic does not take arguments"))
 
-  let register_int id ?(help="") f =
-    register_general id ~help:help
-      (fun args j sk fk -> match args with
-         | [Int x] -> f x j sk fk
-         | _ ->
-             raise @@ Tactics.Tactic_hard_failure
-               (Tactics.Failure "int argument expected"))
-
   let register_formula id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
@@ -204,14 +194,6 @@ struct
          | _ ->
              raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "formula argument expected"))
-
-  let register_fname id ?(help="") f =
-    register_general id ~help:help
-      (fun args j sk fk -> match args with
-         | [Function_name x] -> f x j sk fk
-         | _ ->
-             raise @@ Tactics.Tactic_hard_failure
-               (Tactics.Failure "function name argument expected"))
 
   let register_macro id ?(help="") m =
     register id ~help:help (AST.eval m)

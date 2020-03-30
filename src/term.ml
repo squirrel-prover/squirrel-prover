@@ -256,16 +256,6 @@ let frame_macro = (Symbols.Macro.declare_exact "frame" ~builtin:true
                  Sorts.Message,
                  [])
 
-
-let rec tts acc = function
-  | Fun (_, lt) -> List.fold_left tts acc lt
-  | Name _ -> acc
-  | Macro (_, l, ts) -> List.fold_left tts (ts :: acc) l
-  | Var _ -> []
-  |  _ -> failwith "Not implemented"
-
-let get_ts t = tts [] t |> List.sort_uniq Pervasives.compare
-
 let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt
   | Macro (s, l, ts) ->

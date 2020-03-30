@@ -64,9 +64,7 @@ module type Tactics_sig = sig
   type tac = judgment Tactics.tac
   val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
-  val register_int : string -> ?help:string -> (int -> tac) -> unit
   val register_formula : string -> ?help:string -> (formula -> tac) -> unit
-  val register_fname : string -> ?help:string -> (fname -> tac) -> unit
   val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
   val get : string -> tac_arg list -> tac
   val pp : Format.formatter -> string -> unit

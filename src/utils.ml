@@ -7,12 +7,6 @@ module List = struct
       let rec ini i = if i = n then [] else (f i) :: ini (i + 1) in
       ini 0
 
-  let rec map3 f l1 l2 l3 =
-    match (l1, l2, l3) with
-    |  ([], [], []) -> []
-    | (a1::l1, a2::l2, a3::l3) -> let r = f a1 a2 a3 in r :: map3 f l1 l2 l3
-    | (_, _, _) -> invalid_arg "Utils.List.map3"
-
   let merge_uniq cmp l1 l2 =
     match l1, l2 with
     | [], l2 -> l2
@@ -43,12 +37,6 @@ end
 
 module String = struct
   include String
-
-  let is_prefix p s =
-    let l = String.length p in
-    try
-      (String.sub s 0 l) = p
-    with _ -> false
 
   let get_integer s =
     try

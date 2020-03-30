@@ -70,9 +70,6 @@ let pp_init ppf j =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     j.frame
 
-let id_left j = let open Action in j.system.left.id
-let id_right j = let open Action in j.system.right.id
-
 let get_env j = j.env
 
 let set_env e j = {j with env = e}

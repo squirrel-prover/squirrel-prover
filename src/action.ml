@@ -5,13 +5,6 @@ type 'a item = {
 
 type 'a t = 'a item list
 
-let rec conflict a b = match a, b with
-  | hda::tla, hdb::tlb ->
-    hda.par_choice = hdb.par_choice &&
-    (hda.sum_choice <> hdb.sum_choice ||
-     conflict tla tlb)
-  | _ -> false
-
 let depends a b =
   let rec aux a b = match a, b with
     | [], _ -> true
@@ -21,13 +14,6 @@ let depends a b =
     | _ -> false
   in
   if a =b then false else aux a b
-
-let rec enables a b = match a, b with
-  | [], [_] -> true
-  | hda::tla, hdb::tlb ->
-    hda = hdb &&
-    enables tla tlb
-  | _ -> false
 
 type shape = int t
 
@@ -60,23 +46,6 @@ let same_shape a b : Term.subst option =
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
-
-(** [constr_equal a b] returns the list of index constraints necessary to have
-  * [a] and [b] equal, if there is one.
-  * @return [None] otherwise. *)
-let rec constr_equal a b = match a,b with
-  | [],[] -> Some []
-  | [], _ | _, [] -> None
-  | i :: _, i' :: _ ->
-    let _,lp = i.par_choice and _,lp' = i'.par_choice in
-    let _,ls = i.sum_choice and _,ls' = i'.sum_choice in
-    Utils.opt_map
-      (constr_equal a b)
-      (fun res ->
-         Utils.some @@
-         List.map2 (fun ind ind' -> ind, ind') lp lp' @
-         List.map2 (fun ind ind' -> ind, ind') ls ls' @
-         res)
 
 (** Action symbols *)
 

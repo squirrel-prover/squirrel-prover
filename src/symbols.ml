@@ -73,10 +73,6 @@ exception Unbound_identifier of string
 exception Incorrect_namespace
 exception Multiple_declarations of string
 
-let exists s = Hashtbl.mem table s
-
-let get_data s = snd (Hashtbl.find table s)
-
 let def_of_string s =
   try fst (Hashtbl.find table s) with Not_found -> raise @@ Unbound_identifier s
 

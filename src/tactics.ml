@@ -42,10 +42,6 @@ type 'a tac = 'a -> 'a list sk -> fk -> a
 
 let fail sk fk = fk (Failure "fail")
 
-let wrap f v sk fk = sk (f v) fk
-
-let return a v = a v (fun r fk' -> r) (fun _ -> raise @@ Failure "return")
-
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
 let map t l sk fk =

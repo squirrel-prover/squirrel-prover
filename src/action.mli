@@ -30,16 +30,10 @@ type action = (Vars.index list) t
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
-(** [conflict a b] checks whether two actions [a] and [b] are in conflict. *)
-val conflict : 'a t -> 'a t -> bool
-
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
     take messages into account. It is not reflexive. *)
 val depends : 'a t -> 'a t -> bool
-
-(** [enables a b] tests whether action [a] enables [b]. *)
-val enables : 'a t -> 'a t -> bool
 
 (** [get_shape a] extracts the shape of an action *)
 val get_shape : action -> shape
@@ -49,10 +43,6 @@ val get_shape : action -> shape
     If [a] indices appear at most once in [a], then [subst] is the index
     substitution sending [a] to [b]. *)
 val same_shape : action -> action -> Term.subst option
-
-(** [constr_equal a b] returns the list of index equalities necessary to have
-  * [a] and [b] equal, if there is one. Return None otherwise. *)
-val constr_equal : action -> action -> (Vars.index*Vars.index) list option
 
 (** Convert action to the corresponding [TName] timestamp term. *)
 val to_term : action -> Term.timestamp

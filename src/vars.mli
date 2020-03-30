@@ -64,11 +64,6 @@ val mem : env -> string -> bool
 
 exception Undefined_Variable
 
-(** [get_var env n] returns the variable [v] in [env]
-  * such that [name v = n].
-  * @raise Undefined_Variable if no variable is found. *)
-val get_var : env -> string -> evar
-
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
 val rm_var : env -> 'a var -> env
