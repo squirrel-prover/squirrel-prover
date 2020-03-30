@@ -565,60 +565,91 @@ let mk_prf_phi_proj system env param proj biframe =
         Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
   (* direct cases (for explicit occurences of hashes in the frame) *)
   let phi_frame =
-    List.fold_left
-      (fun acc f -> Term.mk_and acc f)
-      Term.True
+    List.fold_left Term.mk_and Term.True
       (List.map
         (fun (is,m) ->
-          Term.mk_impl
-            (Term.mk_indices_eq key_is is)
-            (Term.Atom (`Message (`Neq, t, m))))
+           (* select bound variables,
+            * to quantify universally over them *)
+           let bv =
+             List.filter
+               (fun i -> not (Vars.mem env (Vars.name i)))
+               is
+           in
+           let env = ref env in
+           let bv' =
+             List.map (Vars.make_fresh_from_and_update env) bv in
+           let subst =
+             List.map2
+               (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+               bv bv'
+           in
+           let is = List.map (Term.subst_var subst) is in
+           Term.mk_forall
+             (List.map (fun i -> Vars.EVar i) bv')
+             (Term.mk_impl
+               (Term.mk_indices_eq key_is is)
+               (Term.Atom (`Message (`Neq, t, m)))))
         list_of_hashes_from_frame)
   (* undirect cases (for occurences of hashes in actions of the system) *)
   and phi_actions =
-    Seq.fold_left
-      (fun acc f -> Term.mk_and acc f)
-      Term.True
-      (Seq.map
+    Hashtbl.fold
+      (fun a list_of_is_m formula ->
         (* for each action in which a hash occurs *)
-        (fun a ->
+          let env = ref env in
           let new_action_indices =
             List.map
               (fun i -> Vars.make_fresh_from_and_update env i)
               a.Action.indices
           in
-          let subst =
-            List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-              a.Action.indices new_action_indices
+          let bv =
+            List.filter
+              (fun i -> not (List.mem i a.Action.indices))
+              (List.sort_uniq Pervasives.compare
+                (List.concat (List.map fst list_of_is_m)))
           in
-          let new_action = Action.to_term (Action.subst_action subst a.Action.action) in
-          (* we now apply the same substitution to the subset of
-          indices corresponding to key and hashed message in the action *)
-          let (is,m) = List.hd (Hashtbl.find tbl_of_action_hashes a) in
-          let new_is = List.map (Term.subst_var subst) is in
-          let new_m = Term.subst subst m in
+          let bv' =
+            List.map
+              (fun i -> Vars.make_fresh_from_and_update env i)
+              bv
+          in
+          let subst =
+            List.map2
+              (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+              a.Action.indices new_action_indices @
+            List.map2
+              (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+              bv bv'
+          in
+          (* apply [subst] to the action and to the list of
+           * indices of our name's occurrences *)
+          let new_action =
+            Action.to_term (Action.subst_action subst a.Action.action) in
+          let list_of_is_m =
+            List.map
+              (fun (is,m) ->
+                (List.map (Term.subst_var subst) is,Term.subst subst m))
+              list_of_is_m in
           (* if new_action occurs before an action of the frame *)
           let disj =
-            List.fold_left
-              (fun acc f -> Term.mk_or acc f)
-              Term.False
+            List.fold_left Term.mk_or Term.False
               (List.map
                 (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                 list_of_actions_from_frame)
-          (* then indices of name in new_action and of name differ *)
+          (* then indices of name in new_action and of [name] differ *)
           and conj =
-            List.fold_left
-              (fun acc f -> Term.mk_and acc f)
-              Term.True
+            List.fold_left Term.mk_and True
               (List.map
-                (fun (is,m) ->
-                  Term.mk_impl
-                    (Term.mk_indices_eq key_is new_is)
-                    (Term.Atom (`Message (`Neq, t, new_m))))
-                (Hashtbl.find tbl_of_action_hashes a)) in
-          let forall_var = List.map (fun i -> Vars.EVar i) new_action_indices in
-          Term.ForAll(forall_var,Term.Impl(disj,conj)))
-        (Hashtbl.to_seq_keys tbl_of_action_hashes))
+                 (fun (is,m) -> Term.mk_impl
+                   (Term.mk_indices_eq key_is is)
+                   (Term.Atom (`Message (`Neq, t, m))))
+                 list_of_is_m)
+          in
+          let forall_var =
+            List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
+          Term.mk_and formula
+            (Term.mk_forall forall_var (Term.mk_impl disj conj)))
+      tbl_of_action_hashes
+      Term.True
   in
   (Term.mk_and phi_frame phi_actions)
   with
@@ -629,7 +660,6 @@ let mk_prf_phi_proj system env param proj biframe =
 let mk_prf_if_term system env e biframe =
   let not_hash_failure = Tactics.Tactic_hard_failure
     (Tactics.Failure "PRF can only be applied on a term of the form h(t,k)") in
-  let env_local = ref env in
   match e with
   | EquivSequent.Message m ->
       let system_left = Action.(make_trace_system system.left) in
@@ -649,9 +679,9 @@ let mk_prf_if_term system env e biframe =
                   (hash_fn_right,t_right,key_n_right,key_is_right) in
                 Term.mk_and
                   (mk_prf_phi_proj
-                    system_left env_local param_left Term.Left biframe)
+                    system_left env param_left Term.Left biframe)
                   (mk_prf_phi_proj
-                    system_right env_local param_right Term.Right biframe)
+                    system_right env param_right Term.Right biframe)
               else raise @@ not_hash_failure
         | (_,
           Term.Fun
@@ -660,7 +690,7 @@ let mk_prf_if_term system env e biframe =
               let param_right =
                 (hash_fn_right,t_right,key_n_right,key_is_right) in
               (mk_prf_phi_proj
-                system_right env_local param_right Term.Right biframe)
+                system_right env param_right Term.Right biframe)
             else raise @@ not_hash_failure
         | (Term.Fun
             ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
@@ -669,7 +699,7 @@ let mk_prf_if_term system env e biframe =
               let param_left =
                 (hash_fn_left,t_left,key_n_left,key_is_left) in
               (mk_prf_phi_proj
-                system_left env_local param_left Term.Left biframe)
+                system_left env param_left Term.Left biframe)
             else raise @@ not_hash_failure
         | _ -> raise @@ not_hash_failure
       in
