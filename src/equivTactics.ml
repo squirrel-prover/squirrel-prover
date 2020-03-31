@@ -480,15 +480,15 @@ let mk_phi_proj system env name indices proj biframe =
     Term.mk_and phi_frame phi_actions
   with
   | Name_found ->
-      Tactics.hard_failure (Tactics.Failure "Name not fresh")
+      Tactics.soft_failure (Tactics.Failure "Name not fresh")
   | Var_found ->
-      Tactics.hard_failure
+      Tactics.soft_failure
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
 let mk_if_term system env e biframe =
-  let not_name_failure = Tactics.Tactic_hard_failure
+  let not_name_failure = Tactics.Tactic_soft_failure
     (Tactics.Failure "Can only apply fresh tactic on names") in
   match e with
   | EquivSequent.Message t ->
@@ -513,29 +513,29 @@ let mk_if_term system env e biframe =
         Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
   | EquivSequent.Formula f -> raise @@ not_name_failure
 
-let fresh i s sk fk =
+let fresh i s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
-        begin try
-          (* the biframe to consider when checking the freshness *)
-          let biframe = List.rev_append before after in
-          let system = EquivSequent.get_system s in
-          let env = EquivSequent.get_env s in
-          let if_term = mk_if_term system env e biframe in
-          let biframe = List.rev_append before (if_term::after) in
-          sk [EquivSequent.set_biframe s biframe] fk
-        with
-        | Tactics.Tactic_hard_failure err -> fk err
-        end
+        (* the biframe to consider when checking the freshness *)
+        let biframe = List.rev_append before after in
+        let system = EquivSequent.get_system s in
+        let env = EquivSequent.get_env s in
+        let if_term = mk_if_term system env e biframe in
+        let biframe = List.rev_append before (if_term::after) in
+        [EquivSequent.set_biframe s biframe]
     | exception Out_of_range ->
-        fk (Tactics.Failure "Out of range position")
+        Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () =
   T.register_general "fresh"
     ~help:"Removes a name if fresh.\n Usage: fresh i."
     (function
-       | [Prover.Int i] -> pure_equiv (fresh i)
-       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+    | [Prover.Int i] ->
+        pure_equiv
+          (fun s sk fk -> match fresh i s with
+             | subgoals -> sk subgoals fk
+             | exception (Tactics.Tactic_soft_failure e) -> fk e)
+    | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 (* PRF axiom *)
 
@@ -653,12 +653,12 @@ let mk_prf_phi_proj system env param proj biframe =
   in
   (Term.mk_and phi_frame phi_actions)
   with
-  | Euf.Bad_ssc -> raise @@ Tactics.Tactic_hard_failure
+  | Euf.Bad_ssc -> raise @@ Tactics.Tactic_soft_failure
     (Tactics.Failure "Key syntactic side condition not checked")
   end
 
 let mk_prf_if_term system env e biframe =
-  let not_hash_failure = Tactics.Tactic_hard_failure
+  let not_hash_failure = Tactics.Tactic_soft_failure
     (Tactics.Failure "PRF can only be applied on a term of the form h(t,k)") in
   match e with
   | EquivSequent.Message m ->
@@ -712,28 +712,28 @@ let mk_prf_if_term system env e biframe =
       end
   | EquivSequent.Formula f -> raise @@ not_hash_failure
 
-let prf i s sk fk =
+let prf i s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
-        begin try
-          let biframe = List.rev_append before after in
-          let system = (EquivSequent.get_system s) in
-          let env = EquivSequent.get_env s in
-          let if_term = mk_prf_if_term system env e biframe in
-          let biframe = (List.rev_append before (if_term::after)) in
-          sk [EquivSequent.set_biframe s biframe] fk
-        with
-        | Tactics.Tactic_hard_failure err -> fk err
-        end
+        let biframe = List.rev_append before after in
+        let system = (EquivSequent.get_system s) in
+        let env = EquivSequent.get_env s in
+        let if_term = mk_prf_if_term system env e biframe in
+        let biframe = (List.rev_append before (if_term::after)) in
+        [EquivSequent.set_biframe s biframe]
     | exception Out_of_range ->
-        fk (Tactics.Failure "Out of range position")
+        Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () =
  T.register_general "prf"
    ~help:"Apply the PRF axiom.\n Usage: prf i."
    (function
-      | [Prover.Int i] -> pure_equiv (prf i)
-      | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+   | [Prover.Int i] ->
+       pure_equiv
+         (fun s sk fk -> match prf i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 let fresh_name_ssc ~system name elems =
   begin try
