@@ -85,13 +85,11 @@ type descr = {
   output : Channel.t * Term.message
 }
 
-(** Currently the user can only specify one bi-system,
-  * hence system identifiers coincide with [Term.projection],
-  * but (unlike [Term.projection]) they may be generalized in the future. *)
-
-
 (** Given a set of actions and a projection, one can consider a specific
-   bi-process or process, called a base system. *)
+   bi-process or process, called a base system.  During parsing, actions are
+   declared with a given system_name.  One can then use a base system to either
+   refer to the bi-process corresponding to the set of actions with the same
+   name, or consider one of its two projections.  *)
 type system_name = string
 
 val default_system_name : string
@@ -104,9 +102,25 @@ type base_system =
 val make_base_system : Term.projection -> system_name -> base_system
 
 
-(** Given two base systems, one can define the resulting bi-process,
-    which can also be projected. This is our generic notion of system. *)
+(** Given the system with name A and the system with name B, we may want to
+   study the equivalence between the left projection of A and the right
+   projection of B for instance. To enable this, the sytem types allow to take
+   two base_system, and provide with a projection.
 
+    A system associated to an equivalence sequent will always have None as a
+   projection, and contain two projected base_system. The natural
+   diff-equivalence system associated to a system name A, is the projeciton
+   None, and the left projection of A as left base_system, and the right
+   prohection of A as right base_system.
+
+   The description of an action can only be obtained w.r.t. some system, either
+   through get_descr or iter_descrs. For systems without projection and where
+   the left and right base system correspond to the the system, one can simply
+   return the Diff description of the action that was declared for this system
+   name. When the two system names do not coincide, we merge the two distinct
+   projected actions descriptions inside a new diff term.
+
+ *)
 type system = private
   {
     projection : Term.projection;
@@ -124,7 +138,11 @@ val make_default_system : Term.projection -> system_name -> system
 
 val make_trace_system : base_system -> system
 
-(** [pi_descr s a] returns the projection of the description. *)
+(** [pi_descr s a] returns the projection of the description. As descriptions
+   are only obtained for a system, one can when this system is without
+   projection, validly project to obtain the left or the right descriptions,
+   that in fact corresponds to the left or the right base_sytem projection of
+   the action.  *)
 val pi_descr : Term.projection -> descr -> descr
 
 (** [get_descr a] returns the description corresponding to the action [a] in the
