@@ -973,74 +973,59 @@ let () = T.register_general "equivalent"
      | [Prover.Theory v1; Prover.Theory v2] -> only_equiv (equiv v1 v2)
      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
-(* Reduces a conditional to its else branch, and asks to prove that its
-   condition implies false. *)
-let no_if i s sk fk =
+let simplify_ite b i s =
   match nth i (EquivSequent.get_biframe s) with
-    | before, e, after ->
-      begin try
-          let cond, negative_branch =
-            match e with
-            | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message e)
-            | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
-          in
-          (* replace in the biframe the ite by its negative branch *)
-          let biframe = List.rev_append before (negative_branch :: after) in
-          let env = EquivSequent.get_env s in
-          let system = EquivSequent.get_system s in
-          (* ask to prove that the cond of the ite implies False *)
-          let trace_sequent = TraceSequent.init ~system
-              (Term.Impl(cond,False))
-                                   |> TraceSequent.set_env env
-           in
-           sk [Prover.Goal.Trace trace_sequent;
-               Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
-        with
-          | Tactics.Tactic_soft_failure err -> fk err
-        end
-    | exception Out_of_range ->
-        fk (Tactics.Failure "Out of range position")
+  | before, e, after ->
+    let cond, positive_branch, negative_branch =
+      match e with
+      | EquivSequent.Message ITE (c,t,e) ->
+        (c, EquivSequent.Message t, EquivSequent.Message e)
+      | _ -> Tactics.soft_failure (Tactics.Failure "Improper arguments")
+    in
+    let env = EquivSequent.get_env s in
+    let system = EquivSequent.get_system s in
+    if b then
+      (* replace in the biframe the ite by its positive branch *)
+      let biframe = List.rev_append before (positive_branch :: after) in
+      (* ask to prove that the cond of the ite is True *)
+      let trace_sequent = TraceSequent.init ~system cond
+        |> TraceSequent.set_env env
+      in
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    else
+      (* replace in the biframe the ite by its negative branch *)
+      let biframe = List.rev_append before (negative_branch :: after) in
+      (* ask to prove that the cond of the ite implies False *)
+      let trace_sequent = TraceSequent.init ~system (Term.Impl(cond,False))
+        |> TraceSequent.set_env env
+      in
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+  | exception Out_of_range ->
+     Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+let yes_no_if b args = match args with
+  | [Prover.Int i] ->
+     only_equiv
+       (fun s sk fk -> match simplify_ite b i s with
+         | subgoals -> sk subgoals fk
+         | exception (Tactics.Tactic_soft_failure e) -> fk e)
+  | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected")
 
 let () =
-  T.register_general "noif"
-    ~help:"Try to prove diff equivalence by proving that the condition at the \
-           \n i-th position implies False.\
-           \n Usage: noif i."
-    (function
-       | [Prover.Int i] -> only_equiv (no_if i)
-       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
-
-let yes_if i s sk fk =
- match nth i (EquivSequent.get_biframe s) with
-   | before, e, after ->
-     begin try
-         let cond, positive_branch =
-           match e with
-           | EquivSequent.Message ITE (c,t,e) -> (c, EquivSequent.Message t)
-           | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
-         in
-         let biframe = List.rev_append before (positive_branch :: after) in
-         let env = EquivSequent.get_env s in
-         let system = EquivSequent.get_system s in
-         let trace_sequent = TraceSequent.init ~system cond
-                                  |> TraceSequent.set_env env
-         in
-         sk [Prover.Goal.Trace trace_sequent;
-             Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)] fk
-       with
-         | Tactics.Tactic_soft_failure err -> fk err
-       end
-   | exception Out_of_range ->
-       fk (Tactics.Failure "Out of range position")
+ T.register_general "noif"
+   ~help:"Try to prove diff equivalence by proving that the condition at the \
+          \n i-th position implies False.\
+          \n Usage: noif i."
+   (yes_no_if false)
 
 let () =
  T.register_general "yesif"
    ~help:"Try to prove diff equivalence by proving that the condition at the \
-          \n i-th position implies True.\
+          \n i-th position is True.\
           \n Usage: yesif i."
-   (function
-      | [Prover.Int i] -> only_equiv (yes_if i)
-      | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+   (yes_no_if true)
 
 exception Not_context
 
