@@ -1,0 +1,15 @@
+channel c
+
+abstract ok : message
+
+system new n; out(c,n XOR ok).
+
+equiv test.
+Proof.
+  induction t.
+  expandall.
+  fa 1; fa 2.
+  xor 2.
+  yesif 2.
+  split.
+Qed.
