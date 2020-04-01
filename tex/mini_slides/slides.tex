@@ -1,0 +1,166 @@
+\documentclass[table,svgnames]{beamer}
+\usetheme{metropolis}           % Use metropolis theme
+%\usetheme[numbering=fraction,block=fill,background=dark]{metropolis}
+
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{fontawesome}
+\usepackage{pifont}
+\usepackage{multicol}
+\definecolor{Background}{HTML}{FAFAFA}
+\definecolor{Orange}{HTML}{ED923A}
+\definecolor{Red}{HTML}{CB2C2C}
+%\usepackage{pgfpages}
+\newcommand<>{\red}[1]{\textcolor#2{Red}{#1}}
+\newcommand<>{\orange}[1]{\textcolor#2{Orange}{#1}}
+\newcommand<>{\blue}[1]{\textcolor#2{blue}{#1}}
+
+\newcommand<>{\barre}[1]{
+  \alt#2{\beameroriginal{\sout}{#1}}{#1}
+}
+
+
+
+\input{header}
+
+\usetikzlibrary{tikzmark,positioning}
+
+\newcommand*{\yellowemph}[1]{%
+\tikz[baseline]\node[rectangle, fill=yellow, rounded corners, inner sep=0.3mm,anchor=base]{#1};%
+}
+
+\usepackage{tkz-graph}
+\GraphInit[vstyle = Empty]
+\tikzset{
+  LabelStyle/.style = {
+                        minimum width = 2em, fill = Background,
+                        text = Orange, },
+  VertexStyle/.append style = { fill=Background,   text=black,
+                                font = \fontsize{1.5cm}{5cm}},
+  EdgeStyle/.append style = {->, bend left=15} }
+
+
+\usepackage[absolute,overlay]{textpos}
+%\usepackage{msc5}
+\addtobeamertemplate{footnote}{}{\vspace{2ex}}
+
+
+
+
+\title{Squirell Prover}
+
+
+\begin{document}
+
+%\begin{frame}
+%   \tikz [remember picture,overlay]
+%    \node at
+%        ([yshift=-2cm]current page.north)
+%        %or: (current page.center)
+%        {\includegraphics[width=\textwidth]{bck.png}};
+%
+%        \phantom{$$ toto $$}
+%   \titlepage
+%\end{frame}
+
+
+
+ \maketitle
+
+ \begin{frame}{The BC model in 30 secondes}
+   \begin{block}{BC}
+     A logic built over terms and a predicate $\sim$, where
+\begin{itemize}
+  \item terms are interpreted as PPT Turing machines which,
+    given infinite random tapes and a security parameter output a bitstring;
+  \item $\sim$ is interpreted as computational indistinguishability;
+  \item names are independent random samplings;
+  \item function symbols correspond to deterministic machines.
+\end{itemize}
+
+
+\end{block}
+
+\begin{block}{Example}
+  \begin{itemize}
+  \item    with name $n,n'$, $n \sim n'$, and $ (n \stackrel{.}{=}n') \sim \textsf{false}$
+  \item with a function symbol $h$, and any term $t_1,t_2$, $(t_1 \sim t_2 \Rightarrow h(t_1) \sim h(t_2))$
+  \end{itemize}
+\end{block}
+
+\end{frame}
+
+
+\begin{frame}
+
+  \begin{alertblock}{Squirell Prover}
+    Design a tool, allowing to prove properties (reachability and equivalence) about protocols that may contain an arbitrary number of replications.
+  \end{alertblock}
+\pause
+\centering
+ What does a protocol look like ? (cf. demo)
+
+\end{frame}
+
+
+\begin{frame}{The meta logic}
+  We have a classical syntax, extended with
+  \begin{itemize}
+  \item name $n(i_1,....i_k)$ parameterized by indices inside a set $\mathcal{I}$;
+  \item timestamps variables $\tau$, to quantify over all possible instants of a trace;
+  \item macros $\textsf{cond}@\tau,\textsf{input}@\tau,\textsf{ouput}@\tau$ to talk about the condition, input and ouput of the action at instant $\tau$.
+  \end{itemize}
+
+  The logic allows for quantifications over timestamps and indices.
+  \pause
+\centering
+ What kind of formula we want to prove ?(cf. demo)
+
+\end{frame}
+
+
+\begin{frame}{Trace models}
+  \begin{block}{}
+
+  To interpret formulas that contain quantifications over timestamps and index, we define trace models based on a protocol, that extends the BC computational models by providing:
+  \begin{itemize}
+  \item a finite index domain $\mathcal{D}_{\mathcal{I}} \subseteq \mathbb{N}$;
+    \item an interpretation of index variables $\sigma_{\mathcal{I}} :\mathcal{I} \mapsto \mathcal{D}_{\mathcal{I}} $;
+    \item a domain for timestamps $\mathcal{D}_{\mathcal{T}}$, inside concrete actions of the protocol, and with a total ordering on the domain.
+    \item an interpretation of index variables $\sigma_{\mathcal{T}} :\mathcal{T} \mapsto \mathcal{D}_{\mathcal{T}} $;
+  \end{itemize}
+
+    \end{block}
+\end{frame}
+
+
+\begin{frame}{Going to BC}
+  \begin{block}{}
+
+Then, given a trace model $T$, we can define an interpretation $()^T$going from the meta logic to a formula inside BC, with for instance
+\begin{itemize}
+\item $(\forall \tau. \phi)^T := (\bigwedge_{t\in \mathcal{D}_{\mathcal{T}}} \phi)^{T[\tau \mapsto t]}$
+\item $(\exists \tau. \phi)^T := (\bigvee_{t\in \mathcal{D}_{\mathcal{T}}} \phi)^{T[\tau \mapsto t]}$
+  \item \ldots
+\end{itemize}
+\end{block}
+
+\pause
+A formula $\phi$ is true for a trace model $T$, denoted $T \models \phi$, if $M \models \phi^I \sim true$.\\ \pause
+A formula $\phi$ is true for a given protocol, if it holds for all trace models of the protocol.
+\end{frame}
+
+\begin{frame}{What's left}
+  \begin{block}{}
+We design a sequent calculus allowing to reason about the validity of a formula w.r.t. a protocol.
+\pause
+Each rule of the sequent can become a tactic of the tool.
+\end{block}
+\end{frame}
+
+\end{document}
+
+
+%%% Local Variables:
+%%% TeX-master: "slides"
+%%% End:

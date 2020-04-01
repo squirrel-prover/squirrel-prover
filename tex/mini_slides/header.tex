@@ -1,0 +1,329 @@
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+%\usepackage{a4wide}
+%\usepackage{lmodern}
+\PassOptionsToPackage{normalem}{ulem}
+\usepackage{ulem}
+\usepackage[english]{babel}
+\usepackage{amsmath}
+\usepackage{stmaryrd}
+%\usepackage{msc5}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathtools}
+\usepackage{mathpartir}
+%%\usepackage{proof}
+\usepackage{thmtools, thm-restate}
+\usepackage{todonotes}
+\usepackage{mathtools}
+\usepackage{listings}
+
+
+\usepackage{color,soul}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{wasysym}
+\usepackage{xspace}
+
+\usepackage[backend=bibtex,natbib=true]{biblatex}
+\usepackage{listings}% http://ctan.org/pkg/listings
+\lstset{
+  basicstyle=\ttfamily,
+  mathescape
+}
+%% Comments
+\newenvironment{comment}{\color{red}}{}
+\newcommand{\margincomment}[1]{\marginpar{\scriptsize\textcolor{red}{#1}}}
+
+
+
+%%Formatting stuff
+\newcommand{\ov}[1]{\overline{#1}}
+
+%%Tools/languages names
+\newcommand{\Sapic}{\textsc{Sapic}\xspace}
+\newcommand{\Slapic}{\textsc{Slapic}\xspace}
+\newcommand{\Tamarin}{\textsc{Tamarin}\xspace}
+
+%%Languages constructs
+\DeclareMathOperator{\inp}{in}
+\DeclareMathOperator{\outp}{out}
+
+
+%%Function symbols and constants
+\newcommand{\checkreport}{\mathsf{check}}
+\newcommand{\report}{\mathsf{report}}
+\newcommand{\sk}{\mathsf{sk}}
+\newcommand{\sign}{\mathsf{sign}}
+\newcommand{\Locs}{\mathcal{L}}
+\newcommand{\HLoc}{\mathsf{HLoc}}
+\newcommand{\Fq}{\mathbb{F}_q}
+\newcommand{\K}{\mathbb{K}}
+
+%%Operators on languages
+\DeclareMathOperator{\tr}{tr}
+
+%%Rewriting stuff
+\newcommand{\nf}{\!\downarrow}
+
+
+
+% Logic
+\newcommand{\se}[2]{ \textsf{[}\;#1 : #2 \;\textsf{]}}
+\newcommand{\ju}[3][p]{ \textsf{[}\;#2 \;\textsf{]}:_{#1} #3}
+\newcommand{\rname}[1]{{\text{\ensuremath{#1}}}}
+\newcommand{\rcond}[1]{{\text{\fbox{#1}}}}
+\newcommand{\rcondbig}[3]{{\text{\fbox{\hspace{-1ex}\begin{minipage}{#1}%
+   \vspace{#2} \hspace{-2ex}%
+  \begin{displaymath}%
+  \begin{array}{l}%
+  #3%
+  \end{array}%
+  \end{displaymath}%
+  \end{minipage}}}}}
+\newcommand{\EAx}{\mathcal{E}}
+\newcommand{\eqE}[2]{#1 =_\EAx #2}
+\newcommand{\eqEA}[3]{#1 \models #2 =_{\EAx} #3}
+\newcommand{\dedE}[2]{#1 \vdash_{\EAx} #2}
+\newcommand{\dedEwith}[3]{#1 \vdash_{\EAx}^{#2} #3}
+\newcommand{\dedEA}[3]{#1 \models #2 \vdash_{\EAx} #3}
+\newcommand{\dedEAwith}[4]{#1 \models #2 \vdash_{\EAx}^{#3} #4}
+\newcommand{\compE}[2]{#1 \mathbin{\simeq_{\EAx}} #2}
+\newcommand{\compEA}[3]{ #1 \models #2 \mathbin{\simeq_{\EAx}} #3}
+\newcommand{\spcomp}{\mathit{sp}}
+\newcommand{\conseq}{\mathit{conseq}}
+\newcommand{\noquant}{\mathit{nquant}}
+\renewcommand{\sp}[2]{\mathit{sp}_{#2}(#1)}
+\newcommand{\pleq}{\preceq}
+\newcommand{\peq}{\doteq}
+\newcommand{\peql}{\leqq} % peq or pleq
+
+\newcommand{\Pre}[3]{\mathop{\textsf{[}\;#2 : #3 \;\textsf{]}}\nolimits_{#1}}
+\newcommand{\Pres}[2]{\mathop{\textsf{[}\;#2\;\textsf{]}}\nolimits_{#1}}
+\newcommand{\PreSym}[1]{\mathop{\Pr\nolimits_{#1}}}
+\newcommand{\tsucc}{\textsf{succ}}
+\newcommand{\tadv}{\textsf{adv}}
+\newcommand{\PrSucc}[2]{\Pre{\tsucc}{#1}{#2}}
+\newcommand{\PrAdv}[2]{\Pre{\tadv}{#1}{#2}}
+\newcommand{\PrDist}[4]{\Pre{\se{#1\;}{\;#2}}{#3}{#4}}
+
+
+% rules
+\newcommand{\ruleM}[1]{\textsc{#1}}
+\newcommand{\Unfold}{\ruleM{Unfold}}
+\newcommand{\Insert}{\ruleM{Add}}
+\newcommand{\Subst}{\ruleM{Subst}}
+\newcommand{\Swap}{\ruleM{Swap}}
+\newcommand{\Oswap}{\ruleM{OSwap}}
+\newcommand{\EvCtx}{\ruleM{EvCtx}}
+\newcommand{\Assert}{\ruleM{Assert}}
+
+\newcommand{\DistSym}{\ruleM{Sym}}
+\newcommand{\DistRefl}{\ruleM{Refl}}
+\newcommand{\Trans}{\ruleM{Trans}}
+\newcommand{\DistEq}{\ruleM{Deq}}
+
+\newcommand{\Rnd}{\ruleM{Rnd}}
+\newcommand{\RndStar}{\ruleM{Rnd}^{\star}}
+\newcommand{\Simp}{\ruleM{Simp}}
+%\newcommand{\IfEq}{\ruleM{IfEq}}
+\newcommand{\Except}{\ruleM{Except}}
+
+\newcommand{\CaseEv}{\ruleM{CaseEv}}
+\newcommand{\FalseEv}{\ruleM{FalseEv}}
+\newcommand{\LeqEq}{\ruleM{LeqEq}}
+
+\newcommand{\AbsorbAdv}{\ruleM{AbsorbAdv}}
+\newcommand{\AbsorbAdvO}{\ruleM{AbsorbAdv}_O}
+\newcommand{\CallAdv}{\ruleM{CallAdv}}
+
+\newcommand{\Upto}{\ruleM{Upto}}
+\newcommand{\Hybrid}{\ruleM{Hybrid}}
+
+\newcommand{\Abstract}{\ruleM{Abstract}}
+\newcommand{\Guess}{\ruleM{Guess}}
+\newcommand{\Find}{\ruleM{Find}}
+\newcommand{\Indep}{\ruleM{Indep}}
+
+\newcommand{\ifte}[3]{#1 ? #2 \mathop{:} #3}
+
+
+%% logical operations
+\newcommand{\cchoose}[3]{#1\,?\,#2:#3}
+\newcommand{\cfalse}{\textsf{false}}
+\newcommand{\ctrue}{\textsf{true}}
+
+
+% commands in games
+\newcommand{\samp}[2]{#1 \leftarrow\!\!\!\!\!^{\$}\  #2} %FIXME
+\newcommand{\ass}[2]{#1 \leftarrow #2}
+\newcommand{\Aasym}{\ensuremath{\textsf{A}}}
+\newcommand{\Basym}{\ensuremath{\textsf{B}}}
+\newcommand{\osym}{\ensuremath{\textsf{o}}}
+\newcommand{\boundfun}{\delta}
+\newcommand{\boundsym}[1]{\ensuremath{\textsf{n}_{#1}}}
+
+\newcommand{\Adv}{\ensuremath{\mathcal{A}}}
+\newcommand{\Bdv}{\ensuremath{\mathcal{B}}}
+\newcommand{\Advs}{\mathbf{A}}
+\newcommand{\Ora}{\mathcal{O}}
+\newcommand{\clet}[2]{\textsf{let } #1 \mathop{\textsf{=}} #2}
+\newcommand{\clets}[2]{#1 = #2}
+\newcommand{\cif}{\textsf{if }}
+\newcommand{\celif}{\textsf{elif }}
+\newcommand{\oless}{\textsf{bif}^{<}}
+\newcommand{\oeq}{\textsf{bif}^{=}}
+\newcommand{\ogreater}{\textsf{bif}^{>}}
+\newcommand{\cwith}{\textsf{with }}
+\newcommand{\cthen}{\textsf{then }}
+\newcommand{\celse}{\textsf{else }}
+\newcommand{\creturn}{\textsf{return }}
+\newcommand{\cskip}{\textsf{skip }}
+\newcommand{\cguard}{\textsf{guard}}
+\newcommand{\cassert}{\textsf{assert}}
+\newcommand{\cvar}[2]{\textsf{var }#1\;:\;#2}
+\newcommand{\crvar}[2]{\textsf{rvar }#1\;:\;#2}
+\newcommand{\chash}[2]{\textsf{hash }#1\;:\;#2}
+\newcommand{\chashpriv}[2]{\textsf{phash }#1\;:\;#2}
+\newcommand{\cperm}[2]{\textsf{perm }#1\;:\;#2}
+\newcommand{\csync}[3]{\textsf{sync}^{#1}_{#2}(#3)}
+\newcommand{\Prob}[2]{\Pr_{#1}[\;#2\;]}
+%\newcommand{\cdo}{\textsf{do }}
+%\newcommand{\cguard}{\textsf{guard}}
+\newcommand{\lcomp}{[\;}
+\newcommand{\rcomp}{\;]}
+\newcommand{\compmid}{\mid}
+\newcommand{\csep}{;\;}
+\newcommand{\lsep}{,\;}
+\newcommand{\bound}[1]{\delta_{#1}}
+\newcommand{\counter}[1]{c_{#1}}
+\newcommand{\queries}[1]{Q_{#1}}
+
+
+% contexts and positions
+\newcommand{\hole}{\Box}
+\newcommand{\subst}[2]{#1 \{ #2 \}}
+% \newcommand{\plug}[2]{\subst{#1}{\hole \mapsto #2}}
+\newcommand{\plug}[2]{#1\{#2\}}
+\newcommand{\setpos}[3]{#1\{ #2 \}_{#3}}
+\newcommand{\getpos}[2]{#1 |_{#2}}
+
+\newcommand{\pwhile}{\textsc{PWhile}}
+
+% math
+\newcommand{\dom}{\textsf{dom}}
+\newcommand{\var}{\mathit{var}}
+%\newcommand{\st}[1][]{\mathit{st}_{#1}}
+\newcommand{\dunion}{\uplus}
+\newcommand{\Dunion}{\biguplus}
+% functor application
+\newcommand{\fapp}[2]{#1[#2]}
+
+
+% functions
+\newcommand{\concl}{\mathit{conc}}
+\newcommand{\probsem}[1]{\mathit{prob}_{#1}}
+\newcommand{\rng}{\mathit{rng}}
+\newcommand{\card}{\mathit{card}}
+\newcommand{\asyms}{\mathit{asym}}
+\newcommand{\osyms}{\mathit{osym}}
+\newcommand{\vars}{\mathit{var}}
+\newcommand{\poly}{\mathit{poly}}
+\newcommand{\valid}{\mathit{valid}}
+\newcommand{\splitExists}{\mathit{splitExists}}
+
+% unsorted
+\newcommand{\emap}{\hat{e}}
+\newcommand{\autogp}{\textsf{AutoG\&P}\xspace}
+
+
+\newcommand{\mal}{\mathcal{M}}
+\newcommand{\ro}{\mathcal{RO}}
+\newcommand{\rw}{\mathcal{RW}}
+\newcommand{\chan}[1]{{\sf #1}}
+\newcommand{\mali}[2]{$\mal^{\chan{#1}}_{{\sf in:}#2}$}
+\newcommand{\malo}[2]{$\mal^{\chan{#1}}_{{\sf out:}#2}$}
+\newcommand{\malio}[3]{$\mal^{\chan{#1}}_{{\sf in:}#2,out:#3}$}
+\newcommand{\maliom}[2]{$\mal^{\chan{#1}}_{{\sf io:}#2}$}
+%Scenario display
+\newcommand{\PH}{\textsc{PH}}
+\newcommand{\FS}{\textsc{FS}}
+\newcommand{\NC}{\textsc{NC}}
+
+
+%%Languages constructs
+\newcommand{\myif}{\textbf{if}\;}
+\newcommand{\mythen}{\;\textbf{then}\;}
+\newcommand{\myelse}{\;\textbf{else}\;}
+\newcommand{\myevent}{\textbf{event}\;}
+\newcommand{\new}{\textbf{new}}
+\newcommand{\cin}{\textbf{in}}
+\newcommand{\cout}{\textbf{out}}
+\newcommand{\mylet}{\textbf{let}\;}
+\newcommand{\myin}{\textbf{in}\;}
+
+\newcommand{\gStep}{\textit{Google 2-step}\xspace}
+\newcommand{\fido}{\textit{FIDO's U2F}\xspace}
+\newcommand{\su}{\textit{Silent-U2F}\xspace}
+
+   %% short version
+\newcommand{\prot}[1]{\textsc{#1}\xspace}
+
+
+\newcommand{\gV}{\prot{g2V}}
+\newcommand{\gVD}{\prot{g2V$^{\sf dis}$}}
+\newcommand{\gVFPR}{\prot{g2V$^{\sf fpr}$}}
+
+\newcommand{\gST}{\prot{g2OT}}
+\newcommand{\gSTFPR}{\prot{g2OT$^{\sf fpr}$}}
+\newcommand{\gSTD}{\prot{g2OT$^{\sf dis}$}}
+
+
+\newcommand{\gDTFPR}{\prot{g2DT$^{\sf fpr}$}}
+\newcommand{\gDTD}{\prot{g2DT$^{\sf dis}$}}
+
+\newcommand{\uF}{\prot{U2F}}
+\newcommand{\tb}{\prot{TokenBinding}}
+
+\newcommand{\tbu}{\prot{U2F$_{\sf tb}$}}
+\newcommand{\tbg}{\prot{g2DT$^{\sf dis}_{\sf tb}$}}
+
+
+% \newcommand{\gV}{\prot{g2V}}
+% \newcommand{\gVD}{\prot{g2V$^{\sf dis}$}}
+% \newcommand{\gST}{\prot{g2ST}}
+% \newcommand{\gSTD}{\prot{g2ST$^{\sf dis}$}}
+% \newcommand{\gDTD}{\prot{g2DT$^{\sf dis}$}}
+% \newcommand{\uF}{\prot{U2F}}
+% \newcommand{\SuF}{\prot{SoftU2F}}
+
+\newcommand{\sku}{\prot{U2F$_{\sf su}$}}
+\newcommand{\skg}{\prot{g2DT$^{\sf dis}_{\sf su}$}}
+
+%%Results display
+\newcommand{\cmark}{\textcolor{Lime}{\ding{51}}}
+\newcommand{\bigcmark}{\textcolor{Lime}{\ding{52}}}
+\newcommand{\greycmark}{\textcolor{Grey}{\ding{51}}}
+\newcommand{\bigbluecmark}{\textcolor{Blue}{\ding{52}}}
+\newcommand{\biggreycmark}{\textcolor{Grey}{\ding{52}}}
+\newcommand{\bluecmark}{\textcolor{Blue}{\ding{51}}}
+\newcommand{\qmark}{\textcolor{Grey}{\ding{51}}}
+\newcommand{\xmark}{\textcolor{Red}{\ding{55}}}
+\newcommand{\bigxmark}{\textcolor{Red}{\ding{54}}}
+\newcommand{\greyxmark}{\textcolor{Grey}{\ding{55}}}
+\newcommand{\biggreyxmark}{\textcolor{Grey}{\ding{54}}}
+\newcommand{\cannot}{?}
+
+
+\newcommand{\mysig}{\;\texttt{sign}}
+\newcommand{\myenc}{\;\texttt{enc}}
+\newcommand{\checksign}{\;\texttt{checksign}}
+\newcommand{\getmess}{\;\texttt{getmess}}
+\newcommand{\St}{\;\texttt{St}}
+\newcommand{\mypref}{\;\texttt{pref}}
+\newcommand{\Or}{\mathcal{O}}
+\newcommand{\ind}[1]{\cong_{#1}}
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "symbolic-iee"
+%%% End: 
