@@ -96,51 +96,32 @@ type system_name = string
 
 val default_system_name : string
 
-(** A base system is given by the name of a (bi)system and a projection.
-  * If the projection is [Left] or [Right], it refers to the projected system.
-  * Otherwise, it refers to the bisystem. *)
-type base_system =
-  { projection : Term.projection;
-    id : system_name
-  }
+(** A single system, that is a system without diff, is given by the name of a
+   (bi)system , and either Left or Right. *)
 
-val make_base_system : Term.projection -> system_name -> base_system
+type single_system =
+  | Left of system_name
+  | Right of system_name
 
-(** Given the system with name A and the system with name B, we may want to
-   study the equivalence between the left projection of A and the right
-   projection of B for instance. To enable this, the sytem types allow to take
-   two base_system, and provide with a projection.
-
-   A system associated to an equivalence sequent will always have None as a
-   projection, and contain two projected base_system. The natural
-   diff-equivalence system associated to a system name A, is the projection
-   None, and the left projection of A as left base_system, and the right
-   prohection of A as right base_system.
-
-   The description of an action can only be obtained w.r.t. some system, either
-   through get_descr or iter_descrs. For systems without projection and where
-   the left and right base system correspond to the same system, one can simply
-   return the Diff description of the action that was declared for this system
-   name. When the two system names do not coincide, we merge the two distinct
-   projected actions descriptions inside a new diff term.
-
- *)
-type system = private
-  {
-    projection : Term.projection;
-    left  : base_system;
-    right : base_system;
-  }
+(* A system defines either a system without diff, or a system with diff.  It can
+   be obtained from:
+    - a single system;
+    - a system obtained from a system name,
+   as it was declared, considered with its diff terms;
+    - a system obtained by
+   combinaison of two single system, one for the left and one for the right. *)
+type system =
+  | Single of single_system
+  | SimplePair of system_name
+  | Pair of single_system * single_system
 
 val pp_system : Format.formatter -> system -> unit
 
-val set_projection : Term.projection -> system -> system
 
-val make_equiv_system : base_system -> base_system -> system
-
-val make_default_system : Term.projection -> system_name -> system
-
-val make_trace_system : base_system -> system
+(** Prject a system according to the given projection.  The pojection must not
+   be None, and the system must be a bi system, i.e either SimplePair or Pair.
+   *)
+val project_system : Term.projection -> system -> system
 
 (** {2 Action descriptions}
   *

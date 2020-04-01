@@ -232,11 +232,8 @@ type sequent = t
 let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
-  pf ppf "@[System: %s@]@;"
-    Term.(match s.system.Action.projection with
-            | Left -> "left"
-            | Right -> "right"
-            | None -> "both") ;
+  pf ppf "@[System: %a@]@;"
+    Action.pp_system s.system;
   if s.env <> Vars.empty_env then
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)

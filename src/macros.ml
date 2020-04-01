@@ -120,7 +120,15 @@ let get_definition :
             in
             let t = Term.subst subst body in
             let bimacros = false in (* TODO ??? *)
-            Term.pi_term ~bimacros ~projection:system.projection t
+            (** TODO, this is unsound. cf *)
+            begin
+              match system with
+              | Single (Left _) ->
+                Term.pi_term ~bimacros ~projection:Left t
+              | Single (Right _) ->
+                Term.pi_term ~bimacros ~projection:Right t
+              | _ -> Term.pi_term ~bimacros ~projection:None t
+            end
           | _ -> assert false
         end
       | Symbols.Local _, _ -> failwith "TODO"

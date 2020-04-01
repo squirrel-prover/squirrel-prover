@@ -383,8 +383,7 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
     | `Message m ->
         EquivSequent.Message (Theory.convert subst m Sorts.Message)
   in
-  Goal.Equiv (EquivSequent.init
-                (Action.make_default_system Term.None Action.default_system_name)
+  Goal.Equiv (EquivSequent.init Action.(SimplePair default_system_name)
                 env (List.map convert l))
 
 
@@ -393,7 +392,12 @@ let make_equiv_goal_process system_1 system_2 =
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
   let formula = Term.Macro(Term.exec_macro,[],Term.Var ts) in
-  let system = Action.make_equiv_system system_1 system_2 in
+  let system =
+    match system_1, system_2 with
+    | Action.Left id1, Action.Right id2 when id1 = id2 ->
+      Action.SimplePair id1
+    | _ -> Action.Pair (system_1, system_2)
+  in
   Goal.Equiv (EquivSequent.init system !env
                 [(EquivSequent.Formula formula); (EquivSequent.Message term)])
 
@@ -413,7 +417,7 @@ let tag_formula_name_of_hash h = "%s"^h^"formula"
 
 let define_hash_tag_formula h f =
   let gformula = make_trace_goal
-      (Action.make_default_system Term.None Action.default_system_name) f
+      Action.(SimplePair default_system_name) f
   in
   match gformula with
   | Trace f ->

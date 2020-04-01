@@ -324,18 +324,18 @@ equiv_env:
 | LPAREN vs=arg_list RPAREN { vs }
 
 system:
-|                         { Action.make_default_system Term.None Action.default_system_name }
-| LBRACKET LEFT RBRACKET  { Action.make_default_system Term.Left Action.default_system_name }
-| LBRACKET RIGHT RBRACKET { Action.make_default_system Term.Right Action.default_system_name }
-| LBRACKET NONE COMMA i=ID RBRACKET  { Action.make_default_system Term.None i }
-| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.make_default_system Term.Left i }
-| LBRACKET RIGHT COMMA i=ID RBRACKET { Action.make_default_system Term.Right i }
+|                         { Action.(SimplePair default_system_name) }
+| LBRACKET LEFT RBRACKET  { Action.(Single (Left default_system_name)) }
+| LBRACKET RIGHT RBRACKET { Action.(Single (Right default_system_name)) }
+| LBRACKET NONE COMMA i=ID RBRACKET  { Action.(SimplePair i) }
+| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.(Single (Left i)) }
+| LBRACKET RIGHT COMMA i=ID RBRACKET { Action.(Single (Right i)) }
 
-base_system:
-| LBRACKET LEFT RBRACKET  { Action.make_base_system Term.Left Action.default_system_name }
-| LBRACKET RIGHT RBRACKET { Action.make_base_system Term.Right Action.default_system_name }
-| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.make_base_system Term.Left i }
-| LBRACKET RIGHT COMMA i=ID RBRACKET  { Action.make_base_system Term.Right i }
+single_system:
+| LBRACKET LEFT RBRACKET  { Action.(Left default_system_name)}
+| LBRACKET RIGHT RBRACKET { Action.(Right default_system_name)}
+| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.(Left i) }
+| LBRACKET RIGHT COMMA i=ID RBRACKET  { Action.(Right i)}
 
 goal:
 | GOAL s=system i=ID COLON f=formula DOT
@@ -348,9 +348,9 @@ goal:
 | EQUIV n=ID DOT
                  { Prover.Gm_goal
                      (n, Prover.make_equiv_goal_process
-			   (Action.make_base_system Term.Left Action.default_system_name)
-			   (Action.make_base_system Term.Right Action.default_system_name)) }
-| EQUIV b1=base_system b2=base_system n=ID DOT
+			    Action.(Left default_system_name)
+			    Action.(Right default_system_name)) }
+| EQUIV b1=single_system b2=single_system n=ID DOT
                  { Prover.Gm_goal
                      (n, Prover.make_equiv_goal_process b1 b2)}
 

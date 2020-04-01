@@ -93,7 +93,7 @@ val make_equiv_goal :
   Goal.t
 
 (* Produces an equivalence goal based on the process and the two system ids. *)
-val make_equiv_goal_process : Action.base_system -> Action.base_system -> Goal.t
+val make_equiv_goal_process : Action.single_system -> Action.single_system -> Goal.t
 
 type parsed_input =
   | ParsedInputDescr

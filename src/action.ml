@@ -225,67 +225,60 @@ type system_name = string
 
 let default_system_name = "default"
 
-type base_system =
-  { projection : Term.projection;
-    id : system_name
-  }
+type single_system =
+  | Left of system_name
+  | Right of system_name
 
-let make_base_system projection id =
-  {projection; id}
+let get_proj = function
+  | Left _ -> Term.Left
+  | Right _ -> Term.Right
+
+let get_id = function
+  | Left id | Right id -> id
 
 (** This table maps system names to action shape. It will allow to get all
    shapes corresponding to some system. *)
 let systems  : (system_name, shape) Hashtbl.t =
   Hashtbl.create 97
 
+
 type system =
-  {
-    projection : Term.projection;
-    left  : base_system;
-    right : base_system;
-  }
+  | Single of single_system
+  | SimplePair of system_name
+  | Pair of single_system * single_system
 
-let make_equiv_system left right =
-  {projection = Term.None; left; right;}
 
-let make_default_system projection id =
-  {projection;
-   left = {projection = Term.Left; id};
-   right = {projection = Term.Right; id};
-  }
+let pp_single fmt = function
+  | Left id -> Fmt.pf fmt "%s/left" id
+  | Right id -> Fmt.pf fmt "%s/right" id
 
-let pp_base fmt = function
-  | {projection=Term.Left;id} -> Fmt.pf fmt "%s/left" id
-  | {projection=Term.Right;id} -> Fmt.pf fmt "%s/right" id
-  | {projection=Term.None;id} -> Fmt.pf fmt "%s" id
+let pp_system fmt = function
+  | Single s -> Fmt.pf fmt "%a" pp_single s
+  | SimplePair id -> Fmt.pf fmt "%s/both" id
+  | Pair (s1, s2) ->  Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
 
-let pp_system fmt {projection;left;right} =
-  if left = right then
-    if projection = Term.None then pp_base fmt left else
-      Fmt.pf fmt "%s(%a)"
-        (if projection = Term.Left then "left" else "right")
-        pp_base left
-  else begin
-    match projection with
-      | Term.None -> Fmt.pf fmt "%a|%a" pp_base left pp_base right
-      | Term.Left -> pp_base fmt left
-      | Term.Right -> pp_base fmt right
-  end
-
-let set_projection proj s =
-  {s with projection = proj}
+let project_system proj = function
+  | Single s -> failwith "cannot project system which is not a bi-process"
+  | SimplePair id ->
+    begin
+      match proj with
+      | Term.Left -> Single (Left id)
+      | Term.Right -> Single (Right id)
+      | Term.None ->  failwith "cannot project a system with None"
+    end
+  | Pair (s1, s2) ->
+    begin
+      match proj with
+      | Term.Left -> Single s1
+      | Term.Right -> Single s2
+      | Term.None ->  failwith "cannot project a system with None"
+    end
 
 let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
   Hashtbl.create 97
 
 let reset () =
   Hashtbl.clear action_to_descr; Hashtbl.clear systems; Hashtbl.clear shape_to_symb
-
-let make_trace_system (bs:base_system) =
- { projection = Term.Left;
-    left = bs;
-    right =  {projection = Term.Right; id= default_system_name};
- }
 
 let is_fresh system_name =
   not(Hashtbl.mem systems system_name)
@@ -302,9 +295,6 @@ let register system_name symb indices action descr =
       ()
   | _ -> define_symbol symb indices action
   | exception Not_found -> define_symbol symb indices action
-
-
-
 
 
 let make_bi_descr d1 d2 =
@@ -329,29 +319,22 @@ let make_bi_descr d1 d2 =
                              ouput channels";
                         c1, Term.make_bi_term m1 m2) }
 
-
 let get_descr_of_shape system shape =
-  match system.projection with
-  | Term.None ->
-    (* if the system is not projected,
-     * we need to get both the left and the right shape. *)
-    let left_a = Hashtbl.find action_to_descr (shape, system.left.id) in
-    let right_a = Hashtbl.find action_to_descr (shape, system.right.id) in
-    if system.left.id = system.right.id
-    && system.left.projection = Term.Left
-    && system.right.projection = Term.Right then
-      (* if the system corresponds to a bi-process directly defined as is, we
-         simply output the action without projecting it. *)
-      pi_descr Term.None left_a
-    else
+  match system with
+  (* we simply project he description according to the projection *)
+  | Single s ->  pi_descr (get_proj s)
+                           (Hashtbl.find action_to_descr (shape, get_id s))
+  | SimplePair id ->       pi_descr Term.None
+                             (Hashtbl.find action_to_descr (shape, id))
+  (* else we need to obtain the two corresponding set of shapes, project them
+     correctly, and combine them into a single term. *)
+  | Pair (s1, s2) ->
+    let left_a = Hashtbl.find action_to_descr (shape, get_id s1) in
+    let right_a = Hashtbl.find action_to_descr (shape, get_id s2) in
       (* else, we combine both actions together. *)
       make_bi_descr
-        (pi_descr system.left.projection left_a)
-        (pi_descr system.right.projection right_a)
-  | Term.Right -> pi_descr system.right.projection
-                    (Hashtbl.find action_to_descr (shape, system.right.id))
-  | Term.Left -> pi_descr system.left.projection
-                   (Hashtbl.find action_to_descr (shape, system.left.id))
+        (pi_descr (get_proj s1) left_a)
+        (pi_descr (get_proj s2) right_a)
 
 let get_descr system a =
   let descr = get_descr_of_shape system (get_shape a) in
@@ -363,28 +346,30 @@ let get_descr system a =
   | Some subst ->
     subst_descr subst descr
 
-
 let iter_descrs system f =
-  let aux (system:base_system) f =
-    let shapes = Hashtbl.find_all systems system.id in
-  List.iter
-    ( fun shape -> f (pi_descr system.projection
-                        (Hashtbl.find action_to_descr (shape,system.id))))
-    shapes
-  in
-  match system.projection with
-  |Term.None ->
-    let left_shapes = Hashtbl.find_all systems system.left.id in
-    let right_shapes = Hashtbl.find_all systems system.right.id in
+  match system with
+  | Pair (s1, s2) ->
+    (* we must check that the two systems have the same set of shapes *)
+    let left_shapes = Hashtbl.find_all systems (get_id s1) in
+    let right_shapes = Hashtbl.find_all systems (get_id s2) in
     if not(Utils.List.inclusion left_shapes right_shapes
            && Utils.List.inclusion right_shapes left_shapes) then
       failwith "Cannot iter over a bisytem with distinct control flow";
     List.iter
       (fun shape -> f (get_descr_of_shape system shape))
       left_shapes
-  | Term.Left -> aux system.left f
-  | Term.Right -> aux system.right f
-
+  | SimplePair id ->
+    let shapes = Hashtbl.find_all systems id in
+    List.iter
+      (fun shape -> f (get_descr_of_shape system shape))
+      shapes
+  | Single s ->
+    (* we must projet before iterating *)
+    let shapes = Hashtbl.find_all systems (get_id s) in
+    List.iter
+      ( fun shape -> f (pi_descr (get_proj s)
+                          (Hashtbl.find action_to_descr (shape,get_id s))))
+      shapes
 
 let debug = false
 

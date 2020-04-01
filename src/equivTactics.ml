@@ -499,11 +499,11 @@ let mk_if_term system env e biframe =
         | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
         | _ -> raise @@ not_name_failure
       in
-      let system_left = Action.(make_trace_system system.left) in
+      let system_left = Action.(project_system Term.Left system) in
       let phi_left =
         mk_phi_proj system_left env n_left ind_left Term.Left biframe
       in
-      let system_right = Action.(make_trace_system system.right) in
+      let system_right = Action.(project_system Term.Right system) in
       let phi_right =
         mk_phi_proj system_right env n_right ind_right Term.Right biframe
       in
@@ -662,8 +662,8 @@ let mk_prf_if_term system env e biframe =
     (Tactics.Failure "PRF can only be applied on a term of the form h(t,k)") in
   match e with
   | EquivSequent.Message m ->
-      let system_left = Action.(make_trace_system system.left) in
-      let system_right = Action.(make_trace_system system.right) in
+      let system_left = Action.(project_system Term.Left system) in
+      let system_right = Action.(project_system Term.Right system) in
       let phi =
         match (Term.pi_term true Term.Left m, Term.pi_term true Term.Right m) with
         | (Term.Fun
@@ -770,10 +770,10 @@ let xor i s sk fk =
             ::List.map (EquivSequent.pi_elem Term.Right) biframe in
           let bisystem = EquivSequent.get_system s in
           if fresh_name_ssc
-               Action.(make_trace_system bisystem.left) name frame_left
+               Action.(project_system Term.Left bisystem) name frame_left
           then
             if fresh_name_ssc
-                 Action.(make_trace_system bisystem.right) name frame_right
+                Action.(project_system Term.Right bisystem) name frame_right
             then sk [EquivSequent.set_biframe s biframe] fk
             else Tactics.hard_failure
                    (Tactics.Failure "Name not fresh in the right system")

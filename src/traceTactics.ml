@@ -1049,11 +1049,11 @@ let () = T.register "collision"
 
 let project s sk fk =
   let system = TraceSequent.system s in
-  if system.Action.projection <> None then
-    fk (Tactics.Failure "goal already deals with a single process")
-  else
-    let s1 = TraceSequent.set_system (Action.set_projection Left system) s in
-    let s2 = TraceSequent.set_system (Action.set_projection Right system) s in
+  match system with
+  | Single _ -> fk (Tactics.Failure "goal already deals with a single process")
+  | _ ->
+    let s1 = TraceSequent.set_system Action.(project_system Term.Left system) s in
+    let s2 = TraceSequent.set_system Action.(project_system Term.Right system) s in
     let s1 = TraceSequent.pi Left s1 in
     let s2 = TraceSequent.pi Right s2 in
     sk [s1;s2] fk
