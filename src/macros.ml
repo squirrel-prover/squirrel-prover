@@ -119,15 +119,16 @@ let get_definition :
                 inputs
             in
             let t = Term.subst subst body in
-            let bimacros = false in (* TODO ??? *)
-            (** TODO, this is unsound. cf *)
             begin
               match system with
+              (* the body of the macro is expanded by projecting
+                 accoridng to the projection of the system. *)
               | Single (Left _) ->
-                Term.pi_term ~bimacros ~projection:Left t
+                Term.pi_term ~bimacros:false ~projection:Left t
               | Single (Right _) ->
-                Term.pi_term ~bimacros ~projection:Right t
-              | _ -> Term.pi_term ~bimacros ~projection:None t
+                Term.pi_term ~bimacros:false ~projection:Right t
+              (* for diff cases, we expand the term as a diff-term. *)
+              | _ -> Term.pi_term ~bimacros:false ~projection:None t
             end
           | _ -> assert false
         end

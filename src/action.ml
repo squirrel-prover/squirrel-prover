@@ -286,15 +286,17 @@ let is_fresh system_name =
 
 let register system_name symb indices action descr =
   let s = get_shape action in
-  Hashtbl.add action_to_descr (s,system_name) descr ;
   Hashtbl.add systems system_name s;
   match to_term action with
-  | Term.Action (s, is) -> if indices <> is then
+  | Term.Action (symb2, is) when indices <> is ->
       failwith "Cannot register a shape twice with distinct indexes."
-    else
-      ()
-  | _ -> define_symbol symb indices action
-  | exception Not_found -> define_symbol symb indices action
+  | Term.Action (symb2, is) ->
+    let subst = Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
+    let descr = subst_descr [subst] descr in
+    Hashtbl.add action_to_descr (s,system_name) descr
+  | _ -> assert false
+  | exception Not_found ->   Hashtbl.add action_to_descr (s,system_name) descr ;
+define_symbol symb indices action
 
 
 let make_bi_descr d1 d2 =

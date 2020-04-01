@@ -1,0 +1,16 @@
+channel c
+
+abstract ok : message
+
+system [s1] in(c,x); let S=diff(ok,x) in  out(c,S).
+
+system [s2] in(c,x); let St=diff(x,ok) in  out(c,St).
+
+equiv [left,s1] [right,s2] test.
+Proof.
+nosimpl(induction t).
+expandall.
+nosimpl(expandall).
+
+simpl.
+Qed.
