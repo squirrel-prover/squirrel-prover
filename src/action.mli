@@ -1,6 +1,22 @@
-(** Actions are the basis of our internal semantics for protocols. *)
+(** Actions are the basis of our internal semantics for protocols.
+  * In the theory, an action is an indexed symbol with a semantics,
+  * (given through conditional, update and output terms) and
+  * actions are equipped with a sequential dependency relation
+  * (and perhaps a conflict relation). Things are a bit different
+  * in the implementation:
+  *  - Type [action] below refers to execution points, which yield
+  *    dependency and conflict relations.
+  *  - We associate to each such action an "action description"
+  *    (type [descr]) which carries the semantics of the action.
+  *  - Finally, we have action symbols (type [Symbols.Action.ns Symbols.t]).
+  *
+  * Our prover allows to declare and reason about several systems.
+  * Actions and symbols exist independently of a system, but descriptions
+  * are given relative to a (bi)system. *)
 
-(** Actions uniquely describe execution points in a protocol.
+(** {2 Execution points}
+  *
+  * Actions uniquely describe execution points in a protocol.
   * They consist of a list of items describing a position
   * among a (possibly infinite) parallel composition, followed
   * by a choice in a (possibly infinite) branching conditional.
@@ -56,44 +72,33 @@ val dummy_action : int -> action
 
 (** {2 Action symbols}
   *
-  * Action symbols are used to refer to actions in a concise manner. *)
+  * Action symbols are used to refer to actions in a concise manner.
+  * They are indexed and are associated to an action using the argument
+  * indices. *)
 
-(** Action symbols are associated to a list of indices and an action
-  * using these indices, which represents a function from indices to
-  * actions. *)
-
+(** Get a fresh symbol whose name starts with the given prefix. *)
 val fresh_symbol : string -> Symbols.Action.ns Symbols.t
+
 val define_symbol :
   Symbols.Action.ns Symbols.t ->
   Vars.index list -> action -> unit
+
 val find_symbol : string -> Vars.index list * action
+
 val of_symbol : Symbols.Action.ns Symbols.t -> Vars.index list * action
 
-(** {2 Action descriptions}
-  *
-  * Describe the behavior of an action: it consists of an input, followed by a
-  * condition, then state updates and an output. *)
+(** {2 Systems} *)
 
+(** The user specifies one or more (bi)systems, identified using names.
+  * Each (bi)system is a set of (bi)actions, obtained from a (bi)process. *)
 
-(** Type of action descriptions. *)
-type descr = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : Vars.index list ;
-  condition : Vars.index list * Term.formula ;
-  updates : (Term.state * Term.message) list ;
-  output : Channel.t * Term.message
-}
-
-(** Given a set of actions and a projection, one can consider a specific
-   bi-process or process, called a base system.  During parsing, actions are
-   declared with a given system_name.  One can then use a base system to either
-   refer to the bi-process corresponding to the set of actions with the same
-   name, or consider one of its two projections.  *)
 type system_name = string
 
 val default_system_name : string
 
+(** A base system is given by the name of a (bi)system and a projection.
+  * If the projection is [Left] or [Right], it refers to the projected system.
+  * Otherwise, it refers to the bisystem. *)
 type base_system =
   { projection : Term.projection;
     id : system_name
@@ -101,21 +106,20 @@ type base_system =
 
 val make_base_system : Term.projection -> system_name -> base_system
 
-
 (** Given the system with name A and the system with name B, we may want to
    study the equivalence between the left projection of A and the right
    projection of B for instance. To enable this, the sytem types allow to take
    two base_system, and provide with a projection.
 
-    A system associated to an equivalence sequent will always have None as a
+   A system associated to an equivalence sequent will always have None as a
    projection, and contain two projected base_system. The natural
-   diff-equivalence system associated to a system name A, is the projeciton
+   diff-equivalence system associated to a system name A, is the projection
    None, and the left projection of A as left base_system, and the right
    prohection of A as right base_system.
 
    The description of an action can only be obtained w.r.t. some system, either
    through get_descr or iter_descrs. For systems without projection and where
-   the left and right base system correspond to the the system, one can simply
+   the left and right base system correspond to the same system, one can simply
    return the Diff description of the action that was declared for this system
    name. When the two system names do not coincide, we merge the two distinct
    projected actions descriptions inside a new diff term.
@@ -137,6 +141,21 @@ val make_equiv_system : base_system -> base_system -> system
 val make_default_system : Term.projection -> system_name -> system
 
 val make_trace_system : base_system -> system
+
+(** {2 Action descriptions}
+  *
+  * Describe the behavior of an action: it consists of an input, followed by a
+  * condition, then state updates and an output. *)
+
+(** Type of action descriptions. *)
+type descr = {
+  action : action ;
+  input : Channel.t * string ;
+  indices : Vars.index list ;
+  condition : Vars.index list * Term.formula ;
+  updates : (Term.state * Term.message) list ;
+  output : Channel.t * Term.message
+}
 
 (** [pi_descr s a] returns the projection of the description. As descriptions
    are only obtained for a system, one can when this system is without
