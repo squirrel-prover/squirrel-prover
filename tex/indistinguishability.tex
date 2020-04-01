@@ -319,68 +319,94 @@ Indeed, this version is useful and sound for reachability, but is not sound for 
 
 \paragraph{Other rules.}
 
-\Cref{fig:fresh,fig:prf} presents the rules for Fresh and PRF tactics.
+\Cref{fig:fresh,fig:prf,fig:xor} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
   \item $\Gamma \vdash u$ stands for $\Gamma^L \sim \Gamma^R \vdash u^L \sim u^R$
   \item $A \in S$ stands for every action in the system (or protocol)
   \item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
-  \item $k \sqsubseteq_{\h(\_,\cdot)} u$ means that $k$ appears only in key positions in $u$
-  \item indices $\vec i$ are chosen fresh related to the appropriate environment ($u, C, \vec {j_L}, \vec {j_R}$ for Fresh and $u, C, t, k$ for PRF)
+  \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
+  \item indices $\vec i$ in $A(\vec i)$ are chosen fresh with relation to the appropriate environment (\ie indices appearing in $u, C, t, k, \vec {j_0}$)
 \end{itemize}
 
 \begin{figure}[h]
   \begin{mathpar}
   \inferrule[Fresh]{
-    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse \diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}]
+    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
   }{
-    \Gamma \vdash u, C[\diff{n_L(\vec {j_L})}{n_R(\vec {j_R})}]
+    \Gamma \vdash u, C[n(\vec {j_0})]
   }
   \end{mathpar}
   \begin{mathpar}
-    \phi_L = \big( \displaystyle\bigwedge_{n_L(\vec j) \in u^L,C^L} \vec j \neq \vec {j_L} \big)
+    \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec {j}) \in u^L,C^L} \vec {j} \neq {\vec {j_0}^L} \big)
     \wedge
     \big(
       \displaystyle\bigwedge_{A \in S}
       \forall \vec i \
       \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec i) \leq \tau \big)
       \Rightarrow
-      \big(\displaystyle\bigwedge_{n_L(\vec j) \in A(\vec i)^L} \vec j \neq \vec {j_L} \big)
+      \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}^L} \big)
     \big)
   \end{mathpar}
   \begin{mathpar}
   \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
   \end{mathpar}
-\caption{Fresh rule.}
+\caption{Fresh rule.\solene{Not yet implemented with the context $C$.}}
 \label{fig:fresh}
 \end{figure}
 
 \begin{figure}[h]
   \begin{mathpar}
   \inferrule[PRF]{
-    \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k)]
+    \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
     \quad \quad
-    k \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
+    k(\_) \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
   }{
-    \Gamma \vdash u, C[\h(t,k)]
+    \Gamma \vdash u, C[\h(t,k(\vec {j_0}))]
   }
   \end{mathpar}
   \begin{mathpar}
-  \phi_L = \big( \displaystyle\bigwedge_{\h(m,k) \in u^L,C^L,t^L} t^L \neq m \big)
+  \phi_L = \big( \displaystyle\bigwedge_{\h(m,k(\vec j)) \in u^L,C^L,t^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
   \wedge
   \big(
     \displaystyle\bigwedge_{A \in S}
     \forall \vec i \
     \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) < \tau \big)
     \Rightarrow
-    \big(\displaystyle\bigwedge_{\h(m,k) \in A(\vec i)^L} t^L \neq m \big)
+    \big(\displaystyle\bigwedge_{\h(m,k(\vec j)) \in A(\vec i)^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
   \big)
   \end{mathpar}
   \begin{mathpar}
   \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
   \end{mathpar}
-\caption{PRF rule.}
+\caption{PRF rule.\solene{Not yet implemented with the context $C$.}}
 \label{fig:prf}
+\end{figure}
+
+\begin{figure}[h]
+  \begin{mathpar}
+  \inferrule[XOR-ind]{
+    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse t \oplus n(\vec {j_0})]
+  }{
+    \Gamma \vdash u, C[t \oplus n(\vec {j_0})]
+  }
+  \end{mathpar}
+  \begin{mathpar}
+    \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec j) \in u^L,C^L,t^L} \vec j \neq {\vec {j_0}}^L \big)
+    \wedge
+    \big(
+      \displaystyle\bigwedge_{A \in S}
+      \forall \vec i \
+      \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) \leq \tau \big)
+      \Rightarrow
+      \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}}^L \big)
+    \big)
+  \end{mathpar}
+  \begin{mathpar}
+  \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
+  \end{mathpar}
+\caption{XOR-ind rule.\solene{Not yet implemented with the context $C$.}}
+\label{fig:xor}
 \end{figure}
 
 
