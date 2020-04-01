@@ -47,10 +47,29 @@ goal [left] wa_left :
 Proof.
 simpl.
 expand cond@R1(j,i,k).
-euf M0.
-apply tags_neq.
-nosimpl(exists i,k).
+nosimpl(euf M0).
+admit.
+nosimpl(exists i,k1).
+nosimpl(split).
 nosimpl(split).
 simpl.
 simpl.
+simpl.
+Qed.
+
+
+
+goal [right] wa_right:
+  forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) &&
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+euf M0.
+admit.
+exists i,k.
 Qed.
