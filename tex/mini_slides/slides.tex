@@ -130,7 +130,7 @@ With a function symbol $h$, and any terms $t_1,t_2$,
 \begin{frame}{Trace models}
   \begin{block}{}
 
-  To interpret formulas that contain quantifications over timestamps and 
+  To interpret formulas that contain quantifications over timestamps and
   indices, we define trace models based on a protocol, that extends the BC computational models by providing:
   % DAVID je ne dirais pas "extends", c'est une notion supplémentaire
   % dans notre théorie
@@ -173,6 +173,44 @@ And that's all folks !
 \pause
 Let's try to prove things...
 \end{block}
+\end{frame}
+
+\begin{frame}{Details}
+  \begin{block}{Names}
+We assume that the set of names $\mathcal{N}$ is such that for each name $n \in \mathcal{N}$, we also have an infinite set of names ${n_i}_{i \in \mathbb{N}} \subset \mathcal{N}$.
+\[(n_i)^I = n_{i\sigma_{\mathcal{I}}}\]
+
+\end{block}
+\end{frame}
+\begin{frame}{Details}
+  \begin{block}{Macros}
+We assume that the set of names $\mathcal{N}$ is such that for each name $n \in \mathcal{N}$, we also have an infinite set of names ${n_i}_{i \in \mathbb{N}} \subset \mathcal{N}$.
+
+  \begin{eqnarray*}
+  \mexec^\TM(\tinit) &=& \true \\
+  \mexec^\TM(\alpha'_{k+1}) &=&
+    \mcond^\TM(\alpha'_{k+1})
+    \stackrel{.}{\wedge}
+    \mexec^\TM(\alpha'_k)
+\end{eqnarray*}
+
+
+\[\begin{array}{rll}
+    \mframe^\TM(\alpha'_{k+1}) &=&
+                                   \begin{array}{l@{~}l}
+    \langle &\mframe^\TM(\alpha'_k),\\
+   & \myif \mexec^\TM(\alpha'_{k+1}) \mythen \mout^\TM(\alpha'_{k+1}) \myelse 0
+                                     \rangle
+                                     \end{array}
+    \\
+    \minp^\TM(\alpha'_{k+1}) &=&
+    g_{k}(\mframe^\TM(\alpha'_k))
+  \\
+
+\end{array}\]
+
+\end{block}
+
 \end{frame}
 
 \end{document}
