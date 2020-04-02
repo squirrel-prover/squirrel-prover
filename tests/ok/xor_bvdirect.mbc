@@ -9,9 +9,10 @@ abstract ko : message
 system null.
 
 (* The main test, with a non-empty list of bound variables. *)
-equiv nonempty (i:index) : seq(i->n(i)), diff(n(i) XOR (ok XOR ko),m(i) XOR (ko XOR ok)).
+equiv nonempty (i:index) :
+  seq(i->n(i)), diff(ok XOR ko XOR n(i),ko XOR ok XOR m(i)).
 Proof.
-  xor 1.
+  xor 1, diff(n(i),m(i)).
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   equivalent

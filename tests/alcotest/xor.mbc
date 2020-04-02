@@ -14,5 +14,7 @@ expandall.
 fa 1.
 fa 2.
 fa 2.
-try (xor 3).
+xor 3.
+noif 3.
+simpl.
 Qed.

@@ -738,47 +738,86 @@ let () =
 
 (** XOR *)
 
-let mk_xor_if_term system env e biframe =
- let not_xor_failure = Tactics.Tactic_soft_failure
-   (Tactics.Failure
-     "Can only apply fresh tactic on terms of the form u XOR v") in
- match e with
- | EquivSequent.Message t ->
-     let (n_left, is_left, l_left, n_right, is_right, l_right) =
-       match
-         Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
-       with
-       | (Fun (fl,Term.Name (nl,isl)::ll),Fun (fr,Term.Name (nr,isr)::lr))
-          when (fl = Term.f_xor && fr = Term.f_xor)
-          -> (nl,isl,ll,nr,isr,lr)
-       | _ -> raise @@ not_xor_failure
-     in
-     let extended_biframe =
-      (EquivSequent.Message
-        (Term.Diff (Fun (Term.f_xor,l_left), Fun (Term.f_xor,l_right))))
-      :: biframe in
-     let system_left = Action.(project_system Term.Left system) in
-     let phi_left =
-       mk_phi_proj system_left env n_left is_left Term.Left biframe
-     in
-     let system_right = Action.(project_system Term.Right system) in
-     let phi_right =
-       mk_phi_proj system_right env n_right is_right Term.Right biframe
-     in
-     let then_branch = Term.Fun (Term.f_zero,[]) in
-     let else_branch = t in
-     EquivSequent.Message
-       Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
- | EquivSequent.Formula f -> raise @@ not_xor_failure
+(* Removes the first occurence of Name (n,is) in the list l. *)
+let rec remove_name_occ n is l = match l with
+| [] -> []
+| Name (name,indices) :: tl when (name = n && indices = is) -> tl
+| hd :: tl -> hd :: (remove_name_occ n is tl)
 
-let xor i s =
+let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
+  let not_xor_failure = Tactics.Tactic_soft_failure
+    (Tactics.Failure
+      "Can only apply fresh tactic on terms of the form u XOR v") in
+  let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
+    begin match opt_n with
+    | None ->
+      begin match e with
+      | EquivSequent.Message t ->
+        begin match
+          Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+        with
+        | (Fun (fl,Term.Name (nl,isl)::ll),Fun (fr,Term.Name (nr,isr)::lr))
+           when (fl = Term.f_xor && fr = Term.f_xor)
+           -> (nl,isl,ll,nr,isr,lr,t)
+        | _ -> raise @@ not_xor_failure
+        end
+      | EquivSequent.Formula f -> raise @@ not_xor_failure
+      end
+    | Some name ->
+      let tsubst = Theory.subst_of_env env in
+      begin match Theory.convert tsubst name Sorts.Message with
+      | n ->
+        begin match
+          Term.pi_term true Term.Left n, Term.pi_term true Term.Right n
+        with
+        | Name (nl,isl), Name (nr,isr) ->
+          begin match e with
+          | EquivSequent.Message t ->
+            begin match
+              Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+            with
+            | (Fun (fl,ll),Fun (fr,lr))
+              when (fl = Term.f_xor && fr = Term.f_xor)
+              -> (nl,isl,remove_name_occ nl isl ll,
+                  nr,isr,remove_name_occ nr isr lr,
+                  t)
+            | _ -> raise @@ not_xor_failure
+            end
+          | EquivSequent.Formula f -> raise @@ not_xor_failure
+          end
+        | _ -> Tactics.soft_failure (Tactics.Failure "Expected a name")
+        end
+      | exception (Theory.Conv _) ->
+        Tactics.soft_failure
+          (Tactics.Failure "Cannot convert argument")
+      end
+    end
+  in
+  let biframe =
+   (EquivSequent.Message
+     (Term.Diff (Fun (Term.f_xor,l_left), Fun (Term.f_xor,l_right))))
+   :: biframe in
+  let system_left = Action.(project_system Term.Left system) in
+  let phi_left =
+    mk_phi_proj system_left env n_left is_left Term.Left biframe
+  in
+  let system_right = Action.(project_system Term.Right system) in
+  let phi_right =
+    mk_phi_proj system_right env n_right is_right Term.Right biframe
+  in
+  let then_branch = Term.Fun (Term.f_zero,[]) in
+  let else_branch = term in
+  EquivSequent.Message
+    Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
+
+let xor i (opt_n : Theory.term option) s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
     (* the biframe to consider when checking the freshness *)
     let biframe = List.rev_append before after in
     let system = EquivSequent.get_system s in
     let env = EquivSequent.get_env s in
-    let if_term = mk_xor_if_term system env e biframe in
+    let if_term = mk_xor_if_term system env e opt_n biframe in
     let biframe = List.rev_append before (if_term::after) in
     [EquivSequent.set_biframe s biframe]
   | exception Out_of_range ->
@@ -786,22 +825,21 @@ let xor i s =
 
 let () =
  T.register_general "xor"
-   ~help:"Removes biterm (n(i0,...,ik) XOR t) if n is fresh.
-          \n Usage without specifying the fresh name (should be xor's first
+   ~help:"Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is fresh.
+          \n Usage without giving the fresh name (should be xor's first
           argument): xor i.
-          \n Usage with specifying the fresh name: xor i, n(i0,...,ik)."
+          \n Usage giving the fresh name: xor i, n(i0,...,ik)."
    (function
    | [Prover.Int i] ->
        pure_equiv
-         (fun s sk fk -> match xor i s with
+         (fun s sk fk -> match xor i None s with
             | subgoals -> sk subgoals fk
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
-   | [Prover.Int i; Prover.Theory v] ->
-       Tactics.hard_failure (Tactics.Failure "TODO")
-       (* pure_equiv
-         (fun s sk fk -> match xor i s with
+   | [Prover.Int i; Prover.Theory n] ->
+       pure_equiv
+         (fun s sk fk -> match xor i (Some n) s with
             | subgoals -> sk subgoals fk
-            | exception (Tactics.Tactic_soft_failure e) -> fk e) *)
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
    | _ -> Tactics.hard_failure (Tactics.Failure "Improper arguments"))
 
 

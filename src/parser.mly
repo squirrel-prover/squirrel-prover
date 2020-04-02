@@ -262,8 +262,10 @@ tac:
   | REPEAT t=tac                      { Tactics.Repeat t }
   | ID i=INT                          { Tactics.Abstract
                                           ($1,[Prover.Int i]) }
-  | ID t=tactic_params                          { Tactics.Abstract
-                                                    ($1,t) }
+  | ID t=tactic_params                { Tactics.Abstract
+                                          ($1,t) }
+  | ID i=INT COMMA t=tactic_params    { Tactics.Abstract
+                                          ($1,Prover.Int i::t) }
   (* A few special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
   | LEFT                              { Tactics.Abstract ("left",[]) }

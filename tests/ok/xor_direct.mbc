@@ -9,8 +9,14 @@ name k : message
 
 system null.
 
-equiv testFresh : diff(f(ok),f(ok)),diff(n,m) XOR k.
+equiv testXorOneArg : diff(f(ok),f(ok)),diff(n,m) XOR k.
 
 Proof.
   xor 1.
+Qed.
+
+equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
+
+Proof.
+  xor 1, k.
 Qed.
