@@ -19,8 +19,8 @@ process tag(i:index) =
   new nT;
   out(cT, <nT, h(nT,key(i))>)
 
-(* The reader expect to receive a message where the second component is a hash
-of the first component with a valid key. *)
+(* The reader expects a message whose second component is
+   a hash of the first component with a valid key. *)
 process reader(j:index) =
   in(cT,x);
   try find i such that snd(x) = h(fst(x),key(i)) in
@@ -30,4 +30,6 @@ process reader(j:index) =
 
 system ((!_j reader(j)) | (!_i !_k tag(i))).
 
-(* There should be some authentication property : if the reader outputs ok, some tag produced the corresponding message. *)
+(* There should be some authentication property :
+   if the reader outputs ok,
+   some tag produced the corresponding message. *)

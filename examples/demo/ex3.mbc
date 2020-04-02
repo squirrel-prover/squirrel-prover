@@ -42,7 +42,7 @@ process S(i:index) =
 
 system (!_i P(i) | !_j S(j)).
 
-(* We prove several lemmas, characterizing when a action's conditions passes.
+(* We prove several lemmas, characterizing when an action's condition passes.
    The characterization is expressed as a property of the trace that the attacker
    already has, showing that the condition does not bring him extra knowledge.
 
