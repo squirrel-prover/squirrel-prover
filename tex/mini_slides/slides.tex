@@ -47,7 +47,7 @@
 
 
 
-\title{Squirell Prover}
+\title{Squirrel Prover}
 
 
 \begin{document}
@@ -71,8 +71,9 @@
    \begin{block}{BC}
      A logic built over terms and a predicate $\sim$, where
 \begin{itemize}
-  \item terms are interpreted as PPT Turing machines which,
-    given infinite random tapes and a security parameter output a bitstring;
+  \item terms are interpreted as PPT Turing machines which, \\
+    given infinite random tapes and a security parameter, \\
+    output a bitstring;
   \item $\sim$ is interpreted as computational indistinguishability;
   \item names are independent random samplings;
   \item function symbols correspond to deterministic machines.
@@ -81,7 +82,7 @@
 
 \end{block}
 \end{frame}
- \begin{frame}{The BC model in 30 secondes}
+ \begin{frame}{The BC model in 30 seconds}
 \begin{block}{Examples}
   Let $n,n'$ be names, then
   \begin{itemize}
@@ -91,7 +92,7 @@
   \item $ (n \stackrel{.}{=}n') \sim \textsf{false}$
   \end{itemize}
 \pause
-With a function symbol $h$, and any term $t_1,t_2$,
+With a function symbol $h$, and any terms $t_1,t_2$,
 \[(t_1 \sim t_2 \Rightarrow h(t_1) \sim h(t_2))\]
 \end{block}
 
@@ -100,7 +101,7 @@ With a function symbol $h$, and any term $t_1,t_2$,
 
 \begin{frame}{The tool}
 
-  \begin{alertblock}{Squirell Prover}
+  \begin{alertblock}{Squirrel Prover}
     Design a tool, allowing to prove properties (reachability and equivalence) about protocols that may contain an arbitrary number of replications.
   \end{alertblock}
 \pause
@@ -113,7 +114,7 @@ With a function symbol $h$, and any term $t_1,t_2$,
 \begin{frame}{The meta logic}
   We have a classical syntax, extended with
   \begin{itemize}
-  \item name $n(i_1,....i_k)$ parameterized by indices inside a set $\mathcal{I}$;
+  \item names $n(i_1,....i_k)$ parameterized by indices inside a set $\mathcal{I}$;
   \item timestamps variables $\tau$, to quantify over all possible instants of a trace;
   \item macros $\textsf{cond}@\tau,\textsf{input}@\tau,\textsf{ouput}@\tau$ to talk about the condition, input and ouput of the action at instant $\tau$.
   \end{itemize}
@@ -121,7 +122,7 @@ With a function symbol $h$, and any term $t_1,t_2$,
   The logic allows for quantifications over timestamps and indices.
   \pause
 \centering
- What kind of formula we want to prove ?(cf. demo)
+ What kind of formula do we want to prove ?(cf. demo)
 
 \end{frame}
 
@@ -129,11 +130,15 @@ With a function symbol $h$, and any term $t_1,t_2$,
 \begin{frame}{Trace models}
   \begin{block}{}
 
-  To interpret formulas that contain quantifications over timestamps and index, we define trace models based on a protocol, that extends the BC computational models by providing:
+  To interpret formulas that contain quantifications over timestamps and 
+  indices, we define trace models based on a protocol, that extends the BC computational models by providing:
+  % DAVID je ne dirais pas "extends", c'est une notion supplémentaire
+  % dans notre théorie
   \begin{itemize}
   \item a finite index domain $\mathcal{D}_{\mathcal{I}} \subseteq \mathbb{N}$;
     \item an interpretation of index variables $\sigma_{\mathcal{I}} :\mathcal{I} \mapsto \mathcal{D}_{\mathcal{I}} $;
     \item a domain for timestamps $\mathcal{D}_{\mathcal{T}}$, inside concrete actions of the protocol, and with a total ordering on the domain;
+      % DAVID "inside" ?
     \item an interpretation of index variables $\sigma_{\mathcal{T}} :\mathcal{T} \mapsto \mathcal{D}_{\mathcal{T}} $.
   \end{itemize}
 
@@ -143,7 +148,8 @@ With a function symbol $h$, and any term $t_1,t_2$,
 
 \begin{frame}{Going to BC}
   \begin{block}{}
-Then, given a trace model $T$, we can define an interpretation $()^T$going from the meta logic to a formula inside BC, with for instance
+Then, given a trace model $T$, we can define an interpretation $()^T$going
+    from a formula of the meta logic to term of BC, with for instance
 \begin{itemize}
 \item $(\forall \tau. \phi)^T := (\bigwedge_{t\in \mathcal{D}_{\mathcal{T}}} \phi)^{T[\tau \mapsto t]}$
 \item $(\exists \tau. \phi)^T := (\bigvee_{t\in \mathcal{D}_{\mathcal{T}}} \phi)^{T[\tau \mapsto t]}$
@@ -153,6 +159,7 @@ Then, given a trace model $T$, we can define an interpretation $()^T$going from 
 
 \pause
 A formula $\phi$ is true for a trace model $T$, denoted $T \models \phi$, if \[M \models \phi^I \sim true\]\\ \pause
+% DAVID qui est M ?
 A formula $\phi$ is true for a given protocol, if it holds for all trace models of the protocol.
 \end{frame}
 
