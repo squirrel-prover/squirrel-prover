@@ -333,6 +333,7 @@ let () =
 
 exception Name_found
 exception Var_found
+exception Not_name
 
 class find_name ~(system:Action.system) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
@@ -488,8 +489,6 @@ let mk_phi_proj system env name indices proj biframe =
 
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
 let mk_if_term system env e biframe =
-  let not_name_failure = Tactics.Tactic_soft_failure
-    (Tactics.Failure "Can only apply fresh tactic on names") in
   match e with
   | EquivSequent.Message t ->
       let (n_left, ind_left, n_right, ind_right) =
@@ -497,7 +496,7 @@ let mk_if_term system env e biframe =
           Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
         with
         | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
-        | _ -> raise @@ not_name_failure
+        | _ -> raise Not_name
       in
       let system_left = Action.(project_system Term.Left system) in
       let phi_left =
@@ -511,7 +510,7 @@ let mk_if_term system env e biframe =
       let else_branch = t in
       EquivSequent.Message
         Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
-  | EquivSequent.Formula f -> raise @@ not_name_failure
+  | EquivSequent.Formula f -> raise Not_name
 
 let fresh i s =
   match nth i (EquivSequent.get_biframe s) with
@@ -520,9 +519,14 @@ let fresh i s =
         let biframe = List.rev_append before after in
         let system = EquivSequent.get_system s in
         let env = EquivSequent.get_env s in
-        let if_term = mk_if_term system env e biframe in
-        let biframe = List.rev_append before (if_term::after) in
-        [EquivSequent.set_biframe s biframe]
+        begin match mk_if_term system env e biframe with
+        | if_term ->
+          let biframe = List.rev_append before (if_term::after) in
+          [EquivSequent.set_biframe s biframe]
+        | exception Not_name ->
+          Tactics.soft_failure
+            (Tactics.Failure "Can only apply fresh tactic on names")
+        end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
 
@@ -538,6 +542,8 @@ let () =
     | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 (* PRF axiom *)
+
+exception Not_hash
 
 let mk_prf_phi_proj system env param proj biframe =
   begin try
@@ -653,13 +659,11 @@ let mk_prf_phi_proj system env param proj biframe =
   in
   (Term.mk_and phi_frame phi_actions)
   with
-  | Euf.Bad_ssc -> raise @@ Tactics.Tactic_soft_failure
+  | Euf.Bad_ssc -> Tactics.soft_failure
     (Tactics.Failure "Key syntactic side condition not checked")
   end
 
 let mk_prf_if_term system env e biframe =
-  let not_hash_failure = Tactics.Tactic_soft_failure
-    (Tactics.Failure "PRF can only be applied on a term of the form h(t,k)") in
   match e with
   | EquivSequent.Message m ->
       let system_left = Action.(project_system Term.Left system) in
@@ -682,7 +686,7 @@ let mk_prf_if_term system env e biframe =
                     system_left env param_left Term.Left biframe)
                   (mk_prf_phi_proj
                     system_right env param_right Term.Right biframe)
-              else raise @@ not_hash_failure
+              else raise Not_hash
         | (_,
           Term.Fun
             ((hash_fn_right, _), [t_right; Name (key_n_right,key_is_right)])) ->
@@ -691,7 +695,7 @@ let mk_prf_if_term system env e biframe =
                 (hash_fn_right,t_right,key_n_right,key_is_right) in
               (mk_prf_phi_proj
                 system_right env param_right Term.Right biframe)
-            else raise @@ not_hash_failure
+            else raise Not_hash
         | (Term.Fun
             ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
           _) ->
@@ -700,8 +704,8 @@ let mk_prf_if_term system env e biframe =
                 (hash_fn_left,t_left,key_n_left,key_is_left) in
               (mk_prf_phi_proj
                 system_left env param_left Term.Left biframe)
-            else raise @@ not_hash_failure
-        | _ -> raise @@ not_hash_failure
+            else raise Not_hash
+        | _ -> raise Not_hash
       in
       let then_branch = Term.Fun (Term.f_zero,[]) in (* TODO generate fresh name *)
       let else_branch = m in
@@ -710,7 +714,7 @@ let mk_prf_if_term system env e biframe =
       | Term.True -> EquivSequent.Message then_branch
       | _ -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
       end
-  | EquivSequent.Formula f -> raise @@ not_hash_failure
+  | EquivSequent.Formula f -> raise Not_hash
 
 let prf i s =
   match nth i (EquivSequent.get_biframe s) with
@@ -718,9 +722,15 @@ let prf i s =
         let biframe = List.rev_append before after in
         let system = (EquivSequent.get_system s) in
         let env = EquivSequent.get_env s in
-        let if_term = mk_prf_if_term system env e biframe in
-        let biframe = (List.rev_append before (if_term::after)) in
-        [EquivSequent.set_biframe s biframe]
+        begin match mk_prf_if_term system env e biframe with
+        | if_term ->
+          let biframe = (List.rev_append before (if_term::after)) in
+          [EquivSequent.set_biframe s biframe]
+        | exception Not_hash ->
+          Tactics.soft_failure
+            (Tactics.Failure
+              "PRF can only be applied on a term of the form h(t,k)")
+        end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
 
@@ -738,6 +748,8 @@ let () =
 
 (** XOR *)
 
+exception Not_xor
+
 (* Removes the first occurence of Name (n,is) in the list l. *)
 let rec remove_name_occ n is l = match l with
 | [] -> []
@@ -745,9 +757,6 @@ let rec remove_name_occ n is l = match l with
 | hd :: tl -> hd :: (remove_name_occ n is tl)
 
 let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
-  let not_xor_failure = Tactics.Tactic_soft_failure
-    (Tactics.Failure
-      "Can only apply fresh tactic on terms of the form u XOR v") in
   let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
     begin match opt_n with
     | None ->
@@ -759,9 +768,9 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
         | (Fun (fl,Term.Name (nl,isl)::ll),Fun (fr,Term.Name (nr,isr)::lr))
            when (fl = Term.f_xor && fr = Term.f_xor)
            -> (nl,isl,ll,nr,isr,lr,t)
-        | _ -> raise @@ not_xor_failure
+        | _ -> raise Not_xor
         end
-      | EquivSequent.Formula f -> raise @@ not_xor_failure
+      | EquivSequent.Formula f -> raise Not_xor
       end
     | Some name ->
       let tsubst = Theory.subst_of_env env in
@@ -781,9 +790,9 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
               -> (nl,isl,remove_name_occ nl isl ll,
                   nr,isr,remove_name_occ nr isr lr,
                   t)
-            | _ -> raise @@ not_xor_failure
+            | _ -> raise Not_xor
             end
-          | EquivSequent.Formula f -> raise @@ not_xor_failure
+          | EquivSequent.Formula f -> raise Not_xor
           end
         | _ -> Tactics.soft_failure (Tactics.Failure "Expected a name")
         end
@@ -817,9 +826,14 @@ let xor i (opt_n : Theory.term option) s =
     let biframe = List.rev_append before after in
     let system = EquivSequent.get_system s in
     let env = EquivSequent.get_env s in
-    let if_term = mk_xor_if_term system env e opt_n biframe in
-    let biframe = List.rev_append before (if_term::after) in
-    [EquivSequent.set_biframe s biframe]
+    begin match mk_xor_if_term system env e opt_n biframe with
+    | if_term ->
+      let biframe = List.rev_append before (if_term::after) in
+      [EquivSequent.set_biframe s biframe]
+    | exception Not_xor -> Tactics.soft_failure
+      (Tactics.Failure
+        "Can only apply fresh tactic on terms of the form u XOR v")
+    end
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
 
