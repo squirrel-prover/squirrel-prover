@@ -627,7 +627,7 @@ let mk_prf_phi_proj system env param proj biframe =
               bv bv'
           in
           (* apply [subst] to the action and to the list of
-           * indices of our name's occurrences *)
+           * key indices with the hashed message *)
           let new_action =
             Action.to_term (Action.subst_action subst a.Action.action) in
           let list_of_is_m =
@@ -641,7 +641,7 @@ let mk_prf_phi_proj system env param proj biframe =
               (List.map
                 (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
                 list_of_actions_from_frame)
-          (* then indices of name in new_action and of [name] differ *)
+          (* then if key indices are equal then hashed messages differ *)
           and conj =
             List.fold_left Term.mk_and True
               (List.map
@@ -707,7 +707,12 @@ let mk_prf_if_term system env e biframe =
             else raise Not_hash
         | _ -> raise Not_hash
       in
-      let then_branch = Term.Fun (Term.f_zero,[]) in (* TODO generate fresh name *)
+      let then_branch = Term.Fun (Term.f_zero,[]) in
+      (* TODO in the future, we will have to generate a fresh name
+       * when we will apply PRF inside a context (for now, it is only applied
+       * at top-lovel so would systematically apply fresh on the generated
+       * fresh name so we can directly use the constant function zero)
+       * cf https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
       let else_branch = m in
       begin
       match phi with
