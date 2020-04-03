@@ -462,7 +462,7 @@ let mk_phi_proj system env name indices proj biframe =
             let disj =
               List.fold_left Term.mk_or Term.False
                 (List.map
-                  (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                  (fun t -> Term.Atom (Term.mk_timestamp_leq new_action t))
                   list_of_actions_from_frame)
             (* then indices of name in new_action and of [name] differ *)
             and conj =
@@ -639,7 +639,7 @@ let mk_prf_phi_proj system env param proj biframe =
           let disj =
             List.fold_left Term.mk_or Term.False
               (List.map
-                (fun t -> Term.Atom (`Timestamp (`Leq, new_action, t)))
+                (fun t -> Term.Atom (Term.mk_timestamp_leq new_action t))
                 list_of_actions_from_frame)
           (* then if key indices are equal then hashed messages differ *)
           and conj =

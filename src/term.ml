@@ -530,6 +530,10 @@ let mk_ite c t e = match c with
 
 let mk_forall l f = if l = [] then f else ForAll (l,f)
 
+let mk_timestamp_leq t1 t2 = match t1,t2 with
+  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
+  | _ -> `Timestamp (`Leq, t1, t2)
+
 (** Operations on vectors of indices of the same length. *)
 let mk_indices_neq vect_i vect_j =
   List.fold_left

@@ -705,7 +705,7 @@ let exec a s sk fk =
   let formula =
     ForAll (
       [Vars.EVar (var)],
-      Impl(Atom (`Timestamp (`Leq,Var var,a)),
+      Impl(Atom (Term.mk_timestamp_leq (Var var) a),
            Macro(Term.cond_macro,[],Var var)
           )
     )
@@ -773,11 +773,8 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   (* The action occured before the test H(m,k) = s. *)
   let le_cnstr =
     List.map
-      (function
-         | Pred ts ->
-             Term.Atom (`Timestamp (`Lt, action_descr_ts, ts))
-         | ts ->
-             Term.Atom (`Timestamp (`Leq, action_descr_ts, ts)))
+      (function ts ->
+        Term.Atom (Term.mk_timestamp_leq action_descr_ts ts))
       (snd (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
   in
   let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
