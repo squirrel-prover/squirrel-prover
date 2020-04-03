@@ -15,12 +15,10 @@ channel cR
 process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
-  (* let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in *)
-  (* out(cT,<nT,m2>); *)
-  out(cT,<nT,h(<<nR,nT>,tag1>,diff(key(i),key'(i,k)))>);
+  let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in
+  out(cT,<nT,m2>);
   in(cR,m3);
-  (* if m3 = h(<<m2,nR>,tag2>,diff(key(i),key'(i,k))) then *)
-  if m3 = h(<<h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))),nR>,tag2>,diff(key(i),key'(i,k))) then
+  if m3 = h(<<m2,nR>,tag2>,diff(key(i),key'(i,k))) then
     out(cT,ok)
   else
     out(cT,ko)
@@ -92,9 +90,10 @@ fa 1.
 help.
 fa 2.
 fa 2.
-(* expand m2(i,k)@T(i,k). *)
+expand m2(i,k)@T(i,k).
 prf 3.
 yesif 3.
+(* nosimpl((repeat split); simpl). *)
 (* split. *) (* HELP 1: il me fait bugger l'outil *)
 admit.
 
@@ -140,7 +139,7 @@ intros.
 simpl.
 
 
-    expand cond@R(j); 
+    expand cond@R(j);
 expand output@R(j).
   fa 0.
   equivalent

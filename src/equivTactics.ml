@@ -386,7 +386,7 @@ let mk_phi_proj system env name indices proj biframe =
     and tbl_of_action_indices = Hashtbl.create 10 in
     Action.(iter_descrs system
       (fun action_descr ->
-        let iter = new get_name_indices ~system false name in
+        let iter = new get_name_indices ~system true name in
         let descr_proj = Action.pi_descr proj action_descr in
         iter#visit_formula (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
