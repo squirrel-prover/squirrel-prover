@@ -5,7 +5,7 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom tags_neq : tag1 <> tag2
+axiom [right] tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message
@@ -34,8 +34,184 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
+(*
+goal [right] wa_right:
+  forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) &&
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+euf M0.
+apply tags_neq.
+exists i,k.
+Qed.
+*)
 
 
+equiv foo.
+Proof.
+induction t.
+(* Case R: OK *)
+expand frame@R(j).
+expand exec@R(j).
+expand cond@R(j).
+expand output@R(j).
+fa 1.
+fa 2.
+fresh 2.
+help.
+yesif 2.
+split.
+split.
+nosimpl(depends R(j1), R2(j1)).
+simpl.
+depends R(j1), R1(j1,k,i).
+split.
+depends R(j1), R2(j1).
+depends R(j1), R1(j1,k,i).
+
+(* Case R1 *)
+admit.
+
+(* Case R2 *)
+admit.
+
+
+(* Case T *)
+expand frame@T(i,k).
+expand exec@T(i,k).
+expand cond@T(i,k).
+expand output@T(i,k).
+fa 1.
+help.
+fa 2.
+fa 2.
+expand m2(i,k)@T(i,k).
+prf 3.
+yesif 3.
+(* split. *) (* HELP 1: il me fait bugger l'outil *)
+admit.
+
+(* first occurrence of nT(i,k) --> fresh *)
+fresh 2.
+(* HELP 2: La grosse formule en 2 me semble etrange. i2, k2 n'apparaissent pas tellement dans les macros et la formule semble  etre de la forme a1 && a2 && a2 && a1 && a2 && a3. Pourquoi ces foublons ?? *)
+
+admit.
+
+(* Case T1 *)
+admit.
+(* Case T2 *)
+admit.
+Qed.
+
+
+
+
+
+(*
+apply T0.
+help.
+admit.
+expand frame@R1(j,k,i).
+fa 1.
+expand exec@R1(j,k,i).
+help.
+expand output@R1(j,k,i).
+help.
+noif 2.
+intros.
+expand cond@R1(j,k,i).
+help.
+prf M0.
+
+euf M0.
+fresh 2.
+
+assumption.
+
+intros.
+
+simpl.
+
+
+    expand cond@R(j); 
+expand output@R(j).
+  fa 0.
+  equivalent
+    (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
+    (exists (i,k:index), T(i,k)<R(j) &&
+       fst(output@T(i,k))=fst(input@R(j)) &&
+       snd(output@T(i,k))=snd(input@R(j))).
+  split; intros.
+  project; euf M0.
+  exists i,k1.
+  exists i,k.
+  exists i,k.
+  admit 1. (* TODO fa/dup *)
+
+
+
+  expand frame@R1(j); expand exec@R1(j);
+    expand cond@R1(j); expand output@R1(j).
+  fa 0.
+  equivalent
+    (exists (i,k:index),
+       snd(input@R1(j))=h(fst(input@R1(j)),diff(key(i),key'(i,k)))),
+    (exists (i,k:index),
+       T(i,k)<R1(j) &&
+       fst(output@T(i,k))=fst(input@R1(j)) &&
+       snd(output@T(i,k))=snd(input@R1(j))).
+  split; intros.
+  project.
+  euf M0.
+  exists i,k1.
+  euf M0.
+  exists i,k.
+  exists i,k.
+     admit 1. (* TODO fa/dup *)
+
+
+  expand frame@T(i,k); expand exec@T(i,k);
+  expand cond@T(i,k); expand output@T(i,k).
+  fa 1. fa 2. fa 2.
+
+  prf 3.
+  yesif 3.
+  split.
+
+  (* Left. *)
+  (* nT(i,k) is fresh for each tag session so input@R(j) cannot contain
+  nT(i,k) if R(j) happens before T(i,k).  *)
+  split.
+  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
+  admit.
+  apply H0 to i,j,k.
+  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
+  admit.
+  apply H0 to i,j,k.
+
+  (* Right. *)
+  (* Same remark. *)
+  split.
+  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
+  admit.
+  apply H0 to i,j,k.
+  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
+  admit.
+  apply H0 to i,j,k.
+
+  fresh 2.
+  yesif 2.
+  split.
+
+Qed.
+
+
+*)
 
 goal [left] wa_left :
   forall (i:index, j:index, k:index),
@@ -48,28 +224,11 @@ Proof.
 simpl.
 expand cond@R1(j,i,k).
 nosimpl(euf M0).
-admit.
+apply tags_neq.
 nosimpl(exists i,k1).
 nosimpl(split).
 nosimpl(split).
 simpl.
 simpl.
 simpl.
-Qed.
-
-
-
-goal [right] wa_right:
-  forall (i:index, j:index, k:index),
-  cond@R1(j,i,k) =>
-  exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) &&
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
-Proof.
-simpl.
-expand cond@R1(j,i,k).
-euf M0.
-admit.
-exists i,k.
 Qed.
