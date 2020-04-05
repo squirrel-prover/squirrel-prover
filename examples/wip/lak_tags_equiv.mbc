@@ -5,7 +5,7 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom [right] tags_neq : tag1 <> tag2
+axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message
@@ -52,10 +52,13 @@ Qed.
 *)
 
 
+
 equiv foo.
 Proof.
 induction t.
 (* Case R: OK *)
+admit.
+(*
 expand frame@R(j).
 expand exec@R(j).
 expand cond@R(j).
@@ -73,6 +76,7 @@ depends R(j1), R1(j1,k,i).
 split.
 depends R(j1), R2(j1).
 depends R(j1), R1(j1,k,i).
+*)
 
 (* Case R1 *)
 admit.
@@ -87,20 +91,45 @@ expand exec@T(i,k).
 expand cond@T(i,k).
 expand output@T(i,k).
 fa 1.
-help.
 fa 2.
 fa 2.
 expand m2(i,k)@T(i,k).
 prf 3.
 yesif 3.
-(* nosimpl((repeat split); simpl). *)
-(* split. *) (* HELP 1: il me fait bugger l'outil *)
+repeat split.
+admit. (* impossible - je pense que ce cas ne devrait pas exister en tous les cas je ne vais pas pouvoir le prouver *)
+split.
+depends T(i1,k1), T1(i1,k1).
+admit. (* facile *)
+apply tags_neq.
+admit.
+admit.
+split.
+depends T(i1,k1), T2(i1,k1).
+admit. (* facile *)
+apply tags_neq.
+depends T(i1,k1), T1(i1,k1).
+admit. (* facile *)
+split.
+depends T(i1,k1), T1(i1,k1).
+admit.
+depends T(i1,k1), T1(i1,k1).
 admit.
 
-(* first occurrence of nT(i,k) --> fresh *)
-fresh 2.
-(* HELP 2: La grosse formule en 2 me semble etrange. i2, k2 n'apparaissent pas tellement dans les macros et la formule semble  etre de la forme a1 && a2 && a2 && a1 && a2 && a3. Pourquoi ces foublons ?? *)
+admit. (* a voir *)
+admit. (* a voir *)
+split.
+depends T(i1,k1), T2(i1,k1).
+admit. (* facile *)
+apply tags_neq.
 
+fresh 2.
+yesif 2.
+split.
+split.
+help.
+admit.
+admit.
 admit.
 
 (* Case T1 *)
