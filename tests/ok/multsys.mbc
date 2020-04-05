@@ -12,7 +12,7 @@ system [toto] !_i A(diff(ko,koo)).
 
 equiv test.
 Proof.
-
+help.
 induction t.
 
 expandall.

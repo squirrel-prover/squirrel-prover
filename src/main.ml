@@ -287,6 +287,11 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/fresh_system.mbc")
     end ;
+    "Make biterm", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/fresh_system.mbc")
+    end ;
     "DDH", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NotDDHContext)
