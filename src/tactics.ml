@@ -77,7 +77,7 @@ let rec andthen_list = function
 
 let not_branching tac j sk fk =
   tac j
-    (fun l fk -> if List.length l <= 1 then sk l fk else
+    (fun l _ -> if List.length l <= 1 then sk l fk else
         fk (Failure "Branching tactic under non branching instruction."))
     fk
 
