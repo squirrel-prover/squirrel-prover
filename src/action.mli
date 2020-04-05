@@ -103,6 +103,9 @@ type single_system =
   | Left of system_name
   | Right of system_name
 
+
+val get_proj : single_system -> Term.projection
+
 (* A system defines either a system without diff, or a system with diff.  It can
    be obtained from:
     - a single system;

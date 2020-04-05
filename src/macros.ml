@@ -120,15 +120,22 @@ let get_definition :
             in
             let t = Term.subst subst body in
             begin
+              let proj_t proj = Term.pi_term ~bimacros:false ~projection:proj t in
+              (* The expansion of the body of the macro only depends on the
+                 projections, not on the system names. *)
               match system with
               (* the body of the macro is expanded by projecting
-                 accoridng to the projection of the system. *)
-              | Single (Left _) ->
-                Term.pi_term ~bimacros:false ~projection:Left t
-              | Single (Right _) ->
-                Term.pi_term ~bimacros:false ~projection:Right t
-              (* for diff cases, we expand the term as a diff-term. *)
-              | _ -> Term.pi_term ~bimacros:false ~projection:None t
+                 according to the projection in case of single systems. *)
+              | Single (s) -> proj_t (Action.get_proj s)
+              (* For diff cases, if the system corresponds to a left and a right
+                 projection of systems we can simply project the macro as is. *)
+              | SimplePair _
+              | Pair (Left _, Right _) -> proj_t None
+              (* If we do not have a left and right projection, we must
+                 reconsrtruct the body of the macros to have the correct
+                 definition on each side. *)
+              | Pair (s1, s2)  -> Term.Diff (proj_t (Action.get_proj s1),
+                                             proj_t (Action.get_proj s2))
             end
           | _ -> assert false
         end
