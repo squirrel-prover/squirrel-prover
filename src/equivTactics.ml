@@ -1094,6 +1094,52 @@ let () =
           \n Usage: yesif i."
    (yes_no_if true)
 
+(* allows to replace inside the positive branch of an if then else a term by
+   another, if the condition implies there equality. *)
+let ifeq i t1 t2 s sk fk =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let cond, positive_branch, negative_branch =
+      match e with
+      | EquivSequent.Message ITE (c,t,e) ->
+        (c, t, e)
+      | _ -> Tactics.soft_failure
+               (Tactics.Failure "Can only be applied to a conditional.")
+    in
+    let env = EquivSequent.get_env s in
+    let system = EquivSequent.get_system s in
+    let tsubst = Theory.subst_of_env env in
+    begin
+    match Theory.convert tsubst t1 Sorts.Message,
+          Theory.convert tsubst t2 Sorts.Message with
+    | t1, t2 ->
+      let new_elem =
+        EquivSequent.Message (ITE (cond,
+                                   Term.subst [Term.ESubst (t1,t2)] positive_branch,
+                                   negative_branch))
+      in
+      let biframe = List.rev_append before (new_elem :: after) in
+      let trace_sequent = TraceSequent.init ~system
+          Term.(Impl(cond, Atom (`Message (`Eq,t1,t2))))
+                          |> TraceSequent.set_env env in
+      sk [ Prover.Goal.Trace trace_sequent;
+           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ] fk
+    | exception Theory.(Conv e) -> fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
+  end
+  | exception Out_of_range ->
+     Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+let () = T.register_general "ifeq"
+    ~help:"If the given conditional implies the equality of the two given terms,\
+           substitute the first one by the second one inside the positive branch\
+           of the conditional.
+           \n Usage: ifeq i,t1,t2."
+    (function
+      | [Prover.Int i; Prover.Theory t1; Prover.Theory t2] ->
+        only_equiv (ifeq i t1 t2)
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
+
 exception Not_context
 
 class ddh_context ~(system:Action.system) exact a b c = object (self)
