@@ -191,8 +191,8 @@ let pp_descr ppf descr =
     descr.updates
     Term.pp (snd descr.output)
 
-let pi_descr s d =
-  let pi_term t = Term.pi_term ~bimacros:false ~projection:s t in
+let pi_descr ?(bimacros=false) s d =
+  let pi_term t = Term.pi_term ~bimacros ~projection:s t in
   { d with
     condition = (let is,t = d.condition in is, pi_term t);
     updates = List.map (fun (st, m) -> st, pi_term m) d.updates;

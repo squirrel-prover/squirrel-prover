@@ -142,8 +142,8 @@ type descr = {
    are only obtained for a system, one can when this system is without
    projection, validly project to obtain the left or the right descriptions,
    that in fact corresponds to the left or the right base_sytem projection of
-   the action.  *)
-val pi_descr : Term.projection -> descr -> descr
+   the action. The bimacro parameter is the one of [Term.pi_term].  *)
+val pi_descr : ?bimacros:bool -> Term.projection -> descr -> descr
 
 (** [get_descr a] returns the description corresponding to the action [a] in the
    [system].  Raise Not_found if no action corresponds to [a]. *)
