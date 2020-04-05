@@ -100,20 +100,6 @@ let () =
       | _ -> raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure "improper arguments"))
 
-let all_left_intros s sk fk =
-  let s, formulas = TraceSequent.pop_generic_formulas s in
-  sk [left_introductions s (List.rev formulas)] fk
-
-let () =
-  T.register_general "allintrosleft"
-    ~help:"Perform introsleft over all hypothesis of the goal.
-           \n Usage: allintrosleft."
-    (function
-      | [] -> all_left_intros
-      | _ -> raise @@ Tactics.Tactic_hard_failure
-          (Tactics.Failure "improper arguments"))
-
-
 let left_not_intro hyp_name s sk fk =
   let s,formula = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
   let rec not_f = function
@@ -363,7 +349,7 @@ let simpl_left s sk fk =
   match
     TraceSequent.remove_formula_hypothesis
       (function
-         | False | And _ | Exists _ -> true
+         | False | And _ | Exists _ | Atom _ -> true
          | _ -> false)
       s
   with
@@ -383,13 +369,16 @@ let simpl_left s sk fk =
         in
         let f = Term.subst subst f in
         let s = TraceSequent.add_formula f (TraceSequent.set_env !env s') in
-          sk [s] fk
+        sk [s] fk
+    | Atom _ as f, s' -> let s = TraceSequent.add_formula f s' in
+        sk [s] fk
     | _ -> assert false
     | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
 
 let () =
   T.register "simpl_left"
-    ~help:"Introduce all conjunctions, existentials and false hypotheses."
+    ~help:"Introduce all conjunctions, existentials and false hypotheses. \
+           Reintroduces formulas that are now atoms."
     simpl_left
 
 let () =

@@ -274,16 +274,6 @@ let is_hypothesis f s =
 let get_trace_atoms s=
     List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
 
-let get_message_atoms s=
-    List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses)
-
-let get_generic_formulas s=
-  List.map (fun h -> (h.H.hypothesis, h.H.name_prefix))
-               (H.to_list s.formula_hypotheses)
-
-let pop_generic_formulas s =
-  ({s with formula_hypotheses = H.empty}, get_generic_formulas s)
-
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->
     try
