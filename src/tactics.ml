@@ -168,21 +168,22 @@ module AST (M:S) = struct
           pp_abstract ~pp_args i args ppf
         with _ ->
           if args = [] then Fmt.string ppf i else
-            Fmt.pf ppf "@[%s@ %a@]" i pp_args args
+            Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
         end
-    | Modifier (i,t) -> Fmt.pf ppf "%s(%a)" i pp t
-    | AndThen [t;t'] ->
-        Fmt.pf ppf "@[%a@]; @,@[%a@]" pp t pp t'
-    | OrElse [t;t'] ->
-        Fmt.pf ppf "@[%a@] + @,@[%a@]" pp t pp t'
-    | AndThen _ | OrElse _ -> assert false (* TODO *)
+    | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
+    | AndThen ts ->
+      Fmt.pf ppf "@[(%a)@]"
+        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
+    | OrElse ts ->
+      Fmt.pf ppf "@[(%a)@]"
+        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
     | Ident -> Fmt.pf ppf "id"
     | Try t ->
-      Fmt.pf ppf "try @[%a@]" pp t
+      Fmt.pf ppf "(try @[%a@])" pp t
     | NotBranching t ->
-      Fmt.pf ppf "notbranching @[%a@]" pp t
+      Fmt.pf ppf "(nobranch @[%a@])" pp t
     | Repeat t ->
-        Fmt.pf ppf "repeat @[%a@]" pp t
+        Fmt.pf ppf "(repeat @[%a@])" pp t
 
   exception Return of M.judgment list
 

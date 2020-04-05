@@ -16,7 +16,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH
 %token PROOF QED UNDO
 %token EOF
 
@@ -39,6 +39,7 @@
 %left SEMICOLON
 %nonassoc TRY
 %nonassoc NOSIMPL
+%nonassoc NOBRANCH
 
 %start theory
 %start top_formula
@@ -274,6 +275,7 @@ tac:
                                           ("exists",t) }
   | NOSIMPL t=tac                     { Tactics.Modifier
                                           ("nosimpl", t) }
+  | NOBRANCH t=tac                     { Tactics.NotBranching (t) }
   | CYCLE i=INT                       { Tactics.Abstract
                                          ("cycle",[Prover.Int i]) }
   | CYCLE MINUS i=INT                 { Tactics.Abstract
