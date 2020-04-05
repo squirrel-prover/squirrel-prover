@@ -240,7 +240,7 @@ declaration:
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
 | AXIOM s=system f=formula       { Prover.add_proved_goal
-                                     ("unnamed_goal",
+                                     (Prover.unnamed_goal (),
                                       Prover.make_trace_goal s f) }
 | AXIOM s=system i=ID COLON f=formula
                                  { Prover.add_proved_goal
@@ -345,7 +345,7 @@ goal:
 | GOAL s=system i=ID COLON f=formula DOT
                  { Prover.Gm_goal (i, Prover.make_trace_goal s f) }
 | GOAL s=system f=formula DOT
-                 { Prover.Gm_goal ("unnamed_goal",
+                 { Prover.Gm_goal (Prover.unnamed_goal (),
                                    Prover.make_trace_goal s f) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
                  { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }

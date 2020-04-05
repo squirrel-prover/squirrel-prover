@@ -20,7 +20,7 @@ fa 1. noif 2. simpl.
 
 Qed.
 
-equiv [left,toto] [right,toto] test.
+equiv [left,toto] [right,toto] test2.
 Proof.
 induction t.
 

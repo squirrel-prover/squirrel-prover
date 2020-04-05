@@ -78,6 +78,8 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 (** {2 Utilities for parsing} *)
 
+exception ParseError of string
+
 val parse_formula : Theory.formula -> formula
 
 val get_goal_formula : string -> formula * Action.system
@@ -117,6 +119,9 @@ val define_hash_tag_formula : string -> Theory.formula -> unit
 (** From the name of the hash, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
 val get_hash_tag_formula : string -> Term.formula
+
+(** Produce a fresh name for a unamed goal *)
+val unnamed_goal : unit -> string
 
 val pp_goal : Format.formatter -> unit -> unit
 

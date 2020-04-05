@@ -27,7 +27,7 @@ Proof.
 Qed.
 
 (* The same test, but giving the fresh name as argument to the xor tactic. *)
-equiv nonempty (tau:timestamp,i:index) :
+equiv nonempty2 (tau:timestamp,i:index) :
   output@tau, ko XOR diff(ok,m(i)) XOR n(i).
 Proof.
   xor 1, n(i).

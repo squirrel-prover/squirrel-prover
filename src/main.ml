@@ -61,7 +61,7 @@ let rec main_loop ~test ?(save=true) mode =
     mode, parse_next parse_buf
   with
     | exception (Parserbuf.Error s) -> error ~test mode s
-
+    | exception (Prover.ParseError s) -> error ~test mode s
     (* If the command is an undo, we catch it only if we are not waiting for
        a system description. *)
     | mode, ParsedUndo nb_undo when mode <> InputDescr ->

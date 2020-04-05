@@ -8,17 +8,17 @@ Proof.
   refl.
 Qed.
 
-equiv e : ok.
+equiv e1 : ok.
 Proof.
   refl.
 Qed.
 
-equiv e : diff(ok,ok).
+equiv e2 : diff(ok,ok).
 Proof.
   refl.
 Qed.
 
-equiv e : diff(diff(ok,ko),ok).
+equiv e3 : diff(diff(ok,ko),ok).
 Proof.
   refl.
 Qed.

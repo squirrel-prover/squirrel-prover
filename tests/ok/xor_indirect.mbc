@@ -17,7 +17,7 @@ Proof.
   admit. (* Induction hypothesis.*)
 Qed.
 
-equiv test (i,j,ii,jj:index) :
+equiv test2 (i,j,ii,jj:index) :
   diff(output@pred(A(i,j)),output@pred(A(ii,jj))),
   ok XOR diff(output@A(i,j),output@A(ii,jj)).
 

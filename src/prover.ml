@@ -78,9 +78,11 @@ let tsubst_of_goal j =
   List.map aux
     (Vars.to_list (Goal.get_env j))
 
+exception ParseError of string
+
 let parse_formula fact =
   match !subgoals with
-    | [] -> failwith "Cannot parse fact without a goal"
+    | [] -> raise @@ ParseError "Cannot parse fact without a goal"
     | j :: _ ->
         Theory.convert
           (tsubst_of_goal j)
@@ -411,7 +413,13 @@ type parsed_input =
 
 let add_new_goal g = goals := g :: !goals
 
-let add_proved_goal g = goals_proved := g :: !goals_proved
+let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
+
+let add_proved_goal (gname,j) =
+  if List.exists (fun (name,_) -> name = gname) !goals_proved then
+    raise @@ ParseError "A formula with this name alread exists"
+  else
+    goals_proved := (gname,j) :: !goals_proved
 
 let tag_formula_name_of_hash h = "%s"^h^"formula"
 
@@ -427,10 +435,10 @@ let define_hash_tag_formula h f =
          match Vars.sort uvarm,Vars.sort uvarkey with
          | Sorts.(Message, Message) -> add_proved_goal
                                          (tag_formula_name_of_hash h, gformula)
-         | _ -> failwith "The tag formula must be of \
+         | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
        )
-     | _ -> failwith "The tag formula must be of \
+     | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
     )
     | _ -> assert false

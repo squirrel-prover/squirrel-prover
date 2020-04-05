@@ -20,7 +20,7 @@ Proof.
  apply dummy_false_axiom to ma.
 Qed.
 
-goal [right] dummy :
+goal [right]
 forall (ma : message),
 ma=k.
 
@@ -29,7 +29,7 @@ Proof.
  apply dummy_false_axiom to ma.
 Qed.
 
-goal dummy :
+goal
 forall (ma : message),
 ma=k.
 

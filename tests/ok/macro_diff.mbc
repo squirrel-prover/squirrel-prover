@@ -21,7 +21,7 @@ nosimpl(fadup).
 expandall; fa 0; fa 1; assumption.
 Qed.
 
-equiv [left,s1] [left,s1] test.
+equiv [left,s1] [left,s1] test2.
 Proof.
 induction t.
 expandall.
@@ -30,7 +30,7 @@ nosimpl(fa 1; fa 2; fa 2; fa 3).
 fadup.
 Qed.
 
-equiv [right,s2] [left,s1] test.
+equiv [right,s2] [left,s1] test3.
 Proof.
 induction t; expandall.
 nosimpl(fa 1; fa 2; fa 2; fa 3; fa 4).
@@ -38,7 +38,7 @@ nosimpl(fa 1; fa 2; fa 2; fa 3; fa 4).
 fadup.
 Qed.
 
-equiv [right,s1] [right,s1] test.
+equiv [right,s1] [right,s1] test4.
 Proof.
 induction t.
 expandall.
