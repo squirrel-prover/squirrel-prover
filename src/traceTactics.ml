@@ -928,8 +928,13 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
     try TraceSequent.get_hypothesis id s, TraceSequent.system s with
       | Not_found -> Prover.get_goal_formula id
   in
-  if system <> TraceSequent.system s then
-    raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem;
+  begin
+    match TraceSequent.system s, system with
+    | s1, s2  when s1 = s2 -> ()
+    | Single(Left s1), Action.SimplePair s2  when s1 = s2 -> ()
+    | Single(Right s1), Action.SimplePair s2  when s1 = s2 -> ()
+    | _ -> raise @@ Tactics.Tactic_hard_failure Tactics.NoAssumpSystem
+  end ;
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f

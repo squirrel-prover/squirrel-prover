@@ -250,10 +250,15 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/sign.mbc")
     end ;
-    "Systems", `Quick, begin fun () ->
+    "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
-        (fun () -> run ~test "tests/alcotest/biproc.mbc")
+        (fun () -> run ~test "tests/alcotest/axiom1.mbc")
+    end ;
+    "Axiom Systems", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_hard_failure NoAssumpSystem)
+        (fun () -> run ~test "tests/alcotest/axiom2.mbc")
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails"

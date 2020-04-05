@@ -11,6 +11,24 @@ exists (m:message), m=k && ma=k
 
 system  null.
 
+goal [left] dummy :
+forall (ma : message),
+ma=k.
+
+Proof.
+ simpl.
+ apply dummy_false_axiom to ma.
+Qed.
+
+goal [right] dummy :
+forall (ma : message),
+ma=k.
+
+Proof.
+ simpl.
+ apply dummy_false_axiom to ma.
+Qed.
+
 goal dummy :
 forall (ma : message),
 ma=k.
