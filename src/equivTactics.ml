@@ -359,16 +359,18 @@ end
 class get_actions ~(system:Action.system) exact = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
-  val mutable actions : Term.timestamp list = []
+  (* The boolean is set to true only for input macros.
+   * In that case, when building phi_proj we require a strict inequality on
+   * timestamps because we have to consider only actions occurring before
+   * the input.*)
+  val mutable actions : (Term.timestamp * bool) list = []
   method get_actions = List.sort_uniq Pervasives.compare actions
 
-  method visit_message t = match t with
-    | Term.Macro (_,_,a) -> actions <- a::actions
-    | _ -> super#visit_message t
-
-  method visit_formula f = match f with
-    | Term.Macro (_,_,a) -> actions <- a::actions
-    | _ -> super#visit_formula f
+  method visit_macro mn is a = match Symbols.Macro.get_def mn with
+    | Symbols.Input -> actions <- (a,true)::actions
+    | Symbols.(Output | State _ | Cond | Exec | Frame) ->
+      actions <- (a,false)::actions
+    | _ -> (actions <- (a, false)::actions; self#visit_macro mn is a)
 end
 
 (** Construct the formula expressing freshness for some projection. *)
@@ -462,7 +464,10 @@ let mk_phi_proj system env name indices proj biframe =
             let disj =
               List.fold_left Term.mk_or Term.False
                 (List.map
-                  (fun t -> Term.Atom (Term.mk_timestamp_leq new_action t))
+                  (fun (t,strict) ->
+                    if strict
+                    then Term.Atom (`Timestamp (`Lt, new_action, t))
+                    else Term.Atom (Term.mk_timestamp_leq new_action t))
                   list_of_actions_from_frame)
             (* then indices of name in new_action and of [name] differ *)
             and conj =
@@ -639,7 +644,10 @@ let mk_prf_phi_proj system env param proj biframe =
           let disj =
             List.fold_left Term.mk_or Term.False
               (List.map
-                (fun t -> Term.Atom (Term.mk_timestamp_leq new_action t))
+                (fun (t,strict) ->
+                  if strict
+                  then Term.Atom (`Timestamp (`Lt, new_action, t))
+                  else Term.Atom (Term.mk_timestamp_leq new_action t))
                 list_of_actions_from_frame)
           (* then if key indices are equal then hashed messages differ *)
           and conj =
