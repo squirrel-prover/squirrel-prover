@@ -112,20 +112,20 @@ Proof.
   (* nT(i,k) is fresh for each tag session so input@R(j) cannot contain
   nT(i,k) if R(j) happens before T(i,k).  *)
   split.
-  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
+  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(left(input@R(j))) <> nT(i,k)).
   admit.
   apply H0 to i,j,k.
-  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
+  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(left(input@R1(j))) <> nT(i,k)).
   admit.
   apply H0 to i,j,k.
 
   (* Right. *)
   (* Same remark. *)
   split.
-  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
+  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(right(input@R(j))) <> nT(i,k)).
   admit.
   apply H0 to i,j,k.
-  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
+  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(right(input@R1(j))) <> nT(i,k)).
   admit.
   apply H0 to i,j,k.
 

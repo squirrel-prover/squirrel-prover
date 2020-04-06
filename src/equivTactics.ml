@@ -387,7 +387,7 @@ let mk_phi_proj system env name indices proj biframe =
     Action.(iter_descrs system
       (fun action_descr ->
         let iter = new get_name_indices ~system true name in
-        let descr_proj = Action.pi_descr proj action_descr in
+        let descr_proj = Action.pi_descr proj ~bimacros:true action_descr in
         iter#visit_formula (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
         List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
@@ -563,7 +563,7 @@ let mk_prf_phi_proj system env param proj biframe =
   Action.(iter_descrs system
     (fun action_descr ->
       (* we add only actions in which hash occurs *)
-      let descr_proj = Action.pi_descr proj action_descr in
+      let descr_proj = Action.pi_descr proj ~bimacros:true action_descr in
       let action_hashes =
         Euf.hashes_of_action_descr ~system ~cond:true
           descr_proj hash_fn key_n in
