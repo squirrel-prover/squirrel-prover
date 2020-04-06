@@ -599,7 +599,7 @@ let mk_prf_phi_proj system env param proj biframe =
              (List.map (fun i -> Vars.EVar i) bv')
              (Term.mk_impl
                (Term.mk_indices_eq key_is is)
-               (Term.Atom (`Message (`Neq, t, m)))))
+               (Term.Atom (`Message (`Neq, t, Term.pi_term true proj m)))))
         list_of_hashes_from_frame)
   (* undirect cases (for occurences of hashes in actions of the system) *)
   and phi_actions =
@@ -655,7 +655,7 @@ let mk_prf_phi_proj system env param proj biframe =
               (List.map
                  (fun (is,m) -> Term.mk_impl
                    (Term.mk_indices_eq key_is is)
-                   (Term.Atom (`Message (`Neq, t, m))))
+                   (Term.Atom (`Message (`Neq, t, Term.pi_term true proj m))))
                  list_of_is_m)
           in
           let forall_var =
