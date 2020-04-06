@@ -96,41 +96,29 @@ fa 2.
 expand m2(i,k)@T(i,k).
 prf 3.
 yesif 3.
+apply tags_neq.
 repeat split.
-admit. (* impossible - je pense que ce cas ne devrait pas exister en tous les cas je ne vais pas pouvoir le prouver *)
-split.
-depends T(i1,k1), T1(i1,k1).
-admit. (* facile *)
-apply tags_neq.
+case H0.
+depends T(i1,k1), T1(i1,k1); case H0.
+assert (nT(i,k) = fst(left(input@R2(j)))).
+admit. (* TODO fresh M2 *)
 admit.
 admit.
-split.
-depends T(i1,k1), T2(i1,k1).
-admit. (* facile *)
-apply tags_neq.
-depends T(i1,k1), T1(i1,k1).
-admit. (* facile *)
-split.
-depends T(i1,k1), T1(i1,k1).
-admit.
-depends T(i1,k1), T1(i1,k1).
-admit.
-
-admit. (* a voir *)
-admit. (* a voir *)
-split.
-depends T(i1,k1), T2(i1,k1).
-admit. (* facile *)
-apply tags_neq.
+case H0.
+depends T(i1,k1),T1(i1,k1); case H0.
+admit. (* TODO fresh ? *)
+admit. (* TODO fresh ? *)
+depends T(i1,k1), T2(i1,k1); case H0.
 
 fresh 2.
 yesif 2.
 split.
 split.
-help.
-admit.
-admit.
-admit.
+depends T(i1,k1),T1(i1,k1).
+depends T(i1,k1),T2(i1,k1).
+split.
+depends T(i1,k1),T1(i1,k1).
+depends T(i1,k1),T2(i1,k1).
 
 (* Case T1 *)
 admit.
