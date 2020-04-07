@@ -556,9 +556,8 @@ let mk_prf_phi_proj system env param proj biframe =
   let frame =
     (EquivSequent.Message t) ::
     (List.map (EquivSequent.pi_elem proj) biframe) in
-  (* check syntactic side condition, in the corresponding projected system *)
-  Euf.prf_key_ssc ~pk:None ~system:(Action.project_system proj system)
-    hash_fn key_n frame;
+  (* check syntactic side condition *)
+  Euf.prf_key_ssc ~pk:None ~system hash_fn key_n frame;
   let list_of_hashes_from_frame =
     Euf.hashes_of_frame ~system frame hash_fn key_n
   and list_of_actions_from_frame =
@@ -656,7 +655,7 @@ let mk_prf_phi_proj system env param proj biframe =
               (List.map
                  (fun (is,m) -> Term.mk_impl
                    (Term.mk_indices_eq key_is is)
-                   (Term.Atom (`Message (`Neq, t, m))))
+                   (Term.Atom (`Message (`Neq, t, Term.pi_term true proj m))))
                  list_of_is_m)
           in
           let forall_var =
@@ -675,6 +674,8 @@ let mk_prf_phi_proj system env param proj biframe =
 let mk_prf_if_term system env e biframe =
   match e with
   | EquivSequent.Message m ->
+      let system_left = Action.(project_system Term.Left system) in
+      let system_right = Action.(project_system Term.Right system) in
       let phi =
         match (Term.pi_term true Term.Left m, Term.pi_term true Term.Right m) with
         | (Term.Fun
@@ -690,9 +691,9 @@ let mk_prf_if_term system env e biframe =
                   (hash_fn_right,t_right,key_n_right,key_is_right) in
                 Term.mk_and
                   (mk_prf_phi_proj
-                    system env param_left Term.Left biframe)
+                    system_left env param_left Term.Left biframe)
                   (mk_prf_phi_proj
-                    system env param_right Term.Right biframe)
+                    system_right env param_right Term.Right biframe)
               else raise Not_hash
         | (_,
           Term.Fun
@@ -700,7 +701,8 @@ let mk_prf_if_term system env e biframe =
             if Theory.is_hash hash_fn_right then
               let param_right =
                 (hash_fn_right,t_right,key_n_right,key_is_right) in
-              (mk_prf_phi_proj system env param_right Term.Right biframe)
+              (mk_prf_phi_proj
+                system_right env param_right Term.Right biframe)
             else raise Not_hash
         | (Term.Fun
             ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
@@ -708,7 +710,8 @@ let mk_prf_if_term system env e biframe =
             if Theory.is_hash hash_fn_left then
               let param_left =
                 (hash_fn_left,t_left,key_n_left,key_is_left) in
-              (mk_prf_phi_proj system env param_left Term.Left biframe)
+              (mk_prf_phi_proj
+                system_left env param_left Term.Left biframe)
             else raise Not_hash
         | _ -> raise Not_hash
       in
