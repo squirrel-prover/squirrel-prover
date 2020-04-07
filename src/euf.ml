@@ -58,25 +58,15 @@ end
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [hash_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
-let euf_key_ssc ~pk ~system hash_fn key_n messages =
+let hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
   let ssc = new check_hash_key ~pk ~system hash_fn key_n in
   List.iter ssc#visit_message messages ;
+  List.iter ssc#visit_term elems ;
   Action.(iter_descrs system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
-
-(* FIXME - Use a unique function for checking key ssc on list of messages
-and on list of terms *)
-let prf_key_ssc ~pk ~system hash_fn key_n frame =
-  let ssc = new check_hash_key ~pk ~system hash_fn key_n in
-  List.iter ssc#visit_term frame ;
-  Action.(iter_descrs system
-    (fun action_descr ->
-      ssc#visit_formula (snd action_descr.condition) ;
-      ssc#visit_message (snd action_descr.output) ;
-      List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
 (** Check that [cond] and [exec] macros do not appear in messages
   * and in the outputs and updates of all system actions. *)
@@ -91,12 +81,12 @@ let no_cond ~system messages =
     true
   with Found -> false
 
-(** Same as [euf_key_ssc] but returning a boolean.
+(** Same as [hash_key_ssc] but returning a boolean.
   * This is used in the collision tactic, which looks for all h(_,k)
   * such that k satisfies the SSC. *)
-let hash_key_ssc ?(pk=None) ~system hash_fn key_n messages =
+let check_hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
   try
-    euf_key_ssc ~pk ~system hash_fn key_n messages;
+    hash_key_ssc ~messages ~elems ~pk ~system hash_fn key_n ;
     true
   with Bad_ssc -> false
 
@@ -158,7 +148,7 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_direct) rule.cases_direct
 
 let mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
-  euf_key_ssc ~pk ~system hash_fn key_n [mess;sign];
+  hash_key_ssc ~messages:[mess;sign] ~pk ~system hash_fn key_n;
   let cond = not (no_cond ~system [mess;sign]) in
   { hash = hash_fn;
     key = key_n;

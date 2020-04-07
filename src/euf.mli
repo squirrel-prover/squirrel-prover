@@ -38,18 +38,22 @@ val pp_euf_rule : Format.formatter -> euf_rule -> unit
 (** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
-val prf_key_ssc :
+
+(** Raises Bad_ssc if the syntactic side condition of the key is not met inside
+the protocol and the messages. All occurences of the key must either be inside
+the hash function, or under some public key function.*)
+val hash_key_ssc :
+  ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
   pk:(Term.fname option) ->
   system:Action.system ->
-  Term.fname -> Term.name -> EquivSequent.elem list -> unit
+  Term.fname -> Term.name -> unit
 
-(** Returns true if the syntactic side condition of the key is met inside the
-   protocol and the messages. All occurences of the key must either be inside
-   the hash function, or under some public key function.*)
-val hash_key_ssc :
-  ?pk:(Term.fname option) ->
+(** Same as [hash_key_ssc] but returns a boolean. *)
+val check_hash_key_ssc :
+  ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
+  pk:(Term.fname option) ->
   system:Action.system ->
-  Term.fname -> Term.name -> Term.message list -> bool
+  Term.fname -> Term.name -> bool
 
 val hashes_of_frame :
   system:Action.system ->

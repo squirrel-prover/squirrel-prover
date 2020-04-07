@@ -988,7 +988,8 @@ let collision_resistance (s : TraceSequent.t) sk fk =
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
-             Theory.is_hash hash && Euf.hash_key_ssc system hash key [m]
+             Theory.is_hash hash
+              && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
