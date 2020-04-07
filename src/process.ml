@@ -90,7 +90,7 @@ let rec pp_process ppf process =
     else
       pf ppf "@[<hov>%a %a %a %a %a@;<1 2>%a"
         (styled `Red (styled `Underline ident)) "find"
-        (list Fmt.string) ss
+        (Utils.pp_list Fmt.string) ss
         (styled `Red (styled `Underline ident)) "such that"
         Theory.pp f
         (styled `Red (styled `Underline ident)) "in"
@@ -370,7 +370,7 @@ let prepare : process -> process =
             (fun (env,s) i ->
                let env,i' = Vars.make_fresh env Sorts.Index i in
                  env, (i,i')::s)
-            (env,[]) l
+            (env,[]) (List.rev l)
         in
         let l' = List.map (fun (_,x) -> Vars.name x) s in
         let indices' =
@@ -524,6 +524,7 @@ let parse_proc system_name proc : unit =
         | [f] -> f
         | f::fs -> Theory.And (f, conj fs)
       in
+      let vars = List.rev vars in
       let condition = vars, conj facts in
       let action = Action.
         { par_choice ;
