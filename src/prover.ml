@@ -102,7 +102,6 @@ let parse_formula fact =
  * of terms and let the tactic process it. *)
 type tac_arg =
   | String_name of string
-  | Function_name of Term.fname
   | Int of int
   | Theory of Theory.term
 
@@ -119,7 +118,6 @@ module Make_AST
   let pp_arg ppf = function
     | Int i -> Fmt.int ppf i
     | String_name s -> Fmt.string ppf s
-    | Function_name fname -> Term.pp_fname ppf fname
     | Theory th -> Theory.pp ppf th
 
   let eval_abstract id args : judgment Tactics.tac =

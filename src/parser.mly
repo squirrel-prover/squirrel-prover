@@ -249,6 +249,7 @@ declaration:
 tactic_param:
 | t=term    { Prover.Theory t }
 | f=formula { Prover.Theory f }
+| i=INT     { Prover.Int i }
 
 tactic_params:
 |                                       { [] }
@@ -261,12 +262,7 @@ tac:
   | l=tac PLUS r=tac                  { Tactics.OrElse [l;r] }
   | TRY l=tac                         { Tactics.Try l }
   | REPEAT t=tac                      { Tactics.Repeat t }
-  | ID i=INT                          { Tactics.Abstract
-                                          ($1,[Prover.Int i]) }
-  | ID t=tactic_params                { Tactics.Abstract
-                                          ($1,t) }
-  | ID i=INT COMMA t=tactic_params    { Tactics.Abstract
-                                          ($1,Prover.Int i::t) }
+  | ID t=tactic_params                { Tactics.Abstract ($1,t) }
   (* A few special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
   | LEFT                              { Tactics.Abstract ("left",[]) }
