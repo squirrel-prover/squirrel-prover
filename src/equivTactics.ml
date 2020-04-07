@@ -557,7 +557,7 @@ let mk_prf_phi_proj system env param proj biframe =
     (EquivSequent.Message t) ::
     (List.map (EquivSequent.pi_elem proj) biframe) in
   (* check syntactic side condition *)
-  Euf.prf_key_ssc ~pk:None ~system hash_fn key_n frame;
+  Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
   (* we compute the list of hashes from the frame. They already contain left or
      right operators above the macro, because pi_elem enables the bimacros
      parameter. *)
