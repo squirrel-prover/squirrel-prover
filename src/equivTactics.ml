@@ -558,6 +558,9 @@ let mk_prf_phi_proj system env param proj biframe =
     (List.map (EquivSequent.pi_elem proj) biframe) in
   (* check syntactic side condition *)
   Euf.prf_key_ssc ~pk:None ~system hash_fn key_n frame;
+  (* we compute the list of hashes from the frame. They already contain left or
+     right operators above the macro, because pi_elem enables the bimacros
+     parameter. *)
   let list_of_hashes_from_frame =
     Euf.hashes_of_frame ~system frame hash_fn key_n
   and list_of_actions_from_frame =
@@ -565,6 +568,10 @@ let mk_prf_phi_proj system env param proj biframe =
     List.iter iter#visit_term frame ;
     iter#get_actions
   and tbl_of_action_hashes = Hashtbl.create 10 in
+  (* We iterate over all the actions of the (single) system. Here, the messages
+     won't have the left or right operators, as we are working on the single
+     system. Working on the single system allows us to effectively obtain all
+     the required hashes. We will need to reproject the hashes message later on. *)
   Action.(iter_descrs system
     (fun action_descr ->
       (* we add only actions in which hash occurs *)
@@ -654,8 +661,12 @@ let mk_prf_phi_proj system env param proj biframe =
             List.fold_left Term.mk_and True
               (List.map
                  (fun (is,m) -> Term.mk_impl
-                   (Term.mk_indices_eq key_is is)
-                   (Term.Atom (`Message (`Neq, t, m))))
+                     (Term.mk_indices_eq key_is is)
+                     (* Here, t is the current hash we are considering. It
+                        should have been projected using bimacros. However, m is
+                        the hash obtained inside the single sytem, we must
+                        project it with the bimacors parameter. *)
+                   (Term.Atom (`Message (`Neq, t, Term.pi_term true proj m))))
                  list_of_is_m)
           in
           let forall_var =
