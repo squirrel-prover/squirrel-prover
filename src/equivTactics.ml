@@ -682,61 +682,35 @@ let mk_prf_phi_proj system env param proj biframe =
     (Tactics.Failure "Key syntactic side condition not checked")
   end
 
-let mk_prf_if_term system env e biframe =
+let mk_prf_if_term_proj system env biframe m proj =
+  let system_proj = Action.(project_system proj system) in
+  let m_proj = Term.pi_term true proj m in
+  match m_proj with
+  | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
+      if Theory.is_hash hash_fn then
+        let param = (hash_fn,t,key_n,key_is) in
+        (true, Term.ITE
+                (mk_prf_phi_proj system_proj env param proj biframe,
+                Term.Fun (Term.f_zero,[]),
+(* FIXME unsound, we have to generate a fresh name instead of constant zero
+ * cf https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
+                m_proj))
+      else (false, m_proj)
+  | _ -> (false, m_proj)
+
+let apply_prf system env e biframe =
   match e with
   | EquivSequent.Message m ->
-      let system_left = Action.(project_system Term.Left system) in
-      let system_right = Action.(project_system Term.Right system) in
-      let phi =
-        match (Term.pi_term true Term.Left m, Term.pi_term true Term.Right m) with
-        | (Term.Fun
-            ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
-          Term.Fun
-            ((hash_fn_right, _), [t_right; Name (key_n_right,key_is_right)]))
-          ->  if (Theory.is_hash hash_fn_left && Theory.is_hash hash_fn_right)
-              (* FIXME handle the case diff(h(t,k),f(t1,t2)) ??? *)
-              then
-                let param_left =
-                  (hash_fn_left,t_left,key_n_left,key_is_left) in
-                let param_right =
-                  (hash_fn_right,t_right,key_n_right,key_is_right) in
-                Term.mk_and
-                  (mk_prf_phi_proj
-                    system_left env param_left Term.Left biframe)
-                  (mk_prf_phi_proj
-                    system_right env param_right Term.Right biframe)
-              else raise Not_hash
-        | (_,
-          Term.Fun
-            ((hash_fn_right, _), [t_right; Name (key_n_right,key_is_right)])) ->
-            if Theory.is_hash hash_fn_right then
-              let param_right =
-                (hash_fn_right,t_right,key_n_right,key_is_right) in
-              (mk_prf_phi_proj
-                system_right env param_right Term.Right biframe)
-            else raise Not_hash
-        | (Term.Fun
-            ((hash_fn_left, _), [t_left; Name (key_n_left,key_is_left)]),
-          _) ->
-            if Theory.is_hash hash_fn_left then
-              let param_left =
-                (hash_fn_left,t_left,key_n_left,key_is_left) in
-              (mk_prf_phi_proj
-                system_left env param_left Term.Left biframe)
-            else raise Not_hash
-        | _ -> raise Not_hash
-      in
-      let then_branch = Term.Fun (Term.f_zero,[]) in
-      (* TODO in the future, we will have to generate a fresh name
-       * when we will apply PRF inside a context (for now, it is only applied
-       * at top-lovel so would systematically apply fresh on the generated
-       * fresh name so we can directly use the constant function zero)
-       * cf https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
-      let else_branch = m in
-      begin
-      match phi with
-      | Term.True -> EquivSequent.Message then_branch
-      | _ -> EquivSequent.Message (Term.ITE(phi, then_branch, else_branch))
+      let opt_if_left = mk_prf_if_term_proj system env biframe m Term.Left in
+      let opt_if_right = mk_prf_if_term_proj system env biframe m Term.Right in
+      begin match (opt_if_left,opt_if_right) with
+      | (true,if_left), (true,if_right) ->
+          EquivSequent.Message (Term.Diff (if_left,if_right))
+      | (true,if_left), (false,m_right) ->
+          EquivSequent.Message (Term.Diff (if_left,m_right))
+      | (false,m_left), (true,if_right) ->
+          EquivSequent.Message (Term.Diff (m_left,if_right))
+      | (false,_), (false,_) -> raise Not_hash
       end
   | EquivSequent.Formula f -> raise Not_hash
 
@@ -746,9 +720,9 @@ let prf i s =
         let biframe = List.rev_append before after in
         let system = (EquivSequent.get_system s) in
         let env = EquivSequent.get_env s in
-        begin match mk_prf_if_term system env e biframe with
-        | if_term ->
-          let biframe = (List.rev_append before (if_term::after)) in
+        begin match apply_prf system env e biframe with
+        | new_elem ->
+          let biframe = (List.rev_append before (new_elem::after)) in
           [EquivSequent.set_biframe s biframe]
         | exception Not_hash ->
           Tactics.soft_failure
@@ -1059,42 +1033,58 @@ let () = T.register_general "equivalent"
      | [Prover.Theory v1; Prover.Theory v2] -> only_equiv (equiv v1 v2)
      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
-let simplify_ite b i s =
+let simplify_ite b env system cond positive_branch negative_branch =
+  if b then
+    (* replace in the biframe the ite by its positive branch *)
+    (* ask to prove that the cond of the ite is True *)
+    let trace_sequent = TraceSequent.init ~system cond
+      |> TraceSequent.set_env env
+    in
+    (positive_branch, Prover.Goal.Trace trace_sequent)
+  else
+    (* replace in the biframe the ite by its negative branch *)
+    (* ask to prove that the cond of the ite implies False *)
+    let trace_sequent = TraceSequent.init ~system (Term.Impl(cond,False))
+      |> TraceSequent.set_env env
+    in
+    (negative_branch, Prover.Goal.Trace trace_sequent)
+
+let apply_yes_no_if b i s =
+  let env = EquivSequent.get_env s in
+  let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
-    let cond, positive_branch, negative_branch =
-      match e with
+      begin match e with
       | EquivSequent.Message ITE (c,t,e) ->
-        (c, EquivSequent.Message t, EquivSequent.Message e)
+        let branch, trace_goal =
+          simplify_ite b env system c t e in
+        let new_elem = EquivSequent.Message branch in
+        let biframe = List.rev_append before (new_elem :: after) in
+        [ trace_goal;
+          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+      | EquivSequent.Message Diff (ITE (cl,tl,el), ITE (cr,tr,er)) ->
+        let branch_left, trace_goal_left =
+          simplify_ite b env system cl tl el in
+        let branch_right, trace_goal_right =
+          simplify_ite b env system cr tr er in
+        let new_elem =
+          if branch_left = branch_right
+          then EquivSequent.Message branch_left
+          else EquivSequent.Message (Term.Diff (branch_left, branch_right))
+        in
+        let biframe = List.rev_append before (new_elem :: after) in
+        [ trace_goal_left;
+          trace_goal_right;
+          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
       | _ -> Tactics.soft_failure (Tactics.Failure "Improper arguments")
-    in
-    let env = EquivSequent.get_env s in
-    let system = EquivSequent.get_system s in
-    if b then
-      (* replace in the biframe the ite by its positive branch *)
-      let biframe = List.rev_append before (positive_branch :: after) in
-      (* ask to prove that the cond of the ite is True *)
-      let trace_sequent = TraceSequent.init ~system cond
-        |> TraceSequent.set_env env
-      in
-      [ Prover.Goal.Trace trace_sequent;
-        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
-    else
-      (* replace in the biframe the ite by its negative branch *)
-      let biframe = List.rev_append before (negative_branch :: after) in
-      (* ask to prove that the cond of the ite implies False *)
-      let trace_sequent = TraceSequent.init ~system (Term.Impl(cond,False))
-        |> TraceSequent.set_env env
-      in
-      [ Prover.Goal.Trace trace_sequent;
-        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+      end
   | exception Out_of_range ->
      Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let yes_no_if b args = match args with
   | [Prover.Int i] ->
      only_equiv
-       (fun s sk fk -> match simplify_ite b i s with
+       (fun s sk fk -> match apply_yes_no_if b i s with
          | subgoals -> sk subgoals fk
          | exception (Tactics.Tactic_soft_failure e) -> fk e)
   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected")
