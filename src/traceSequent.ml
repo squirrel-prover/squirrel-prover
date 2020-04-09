@@ -426,7 +426,7 @@ let system s = s.system
 let set_system system s = { s with system }
 
 let pi projection s =
-  let pi_term t = Term.pi_term ~bimacros:false ~projection t in
+  let pi_term t = Term.pi_term ~projection t in
     { s with
       trs = None ; models = None ;
       conclusion = pi_term s.conclusion ;

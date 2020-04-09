@@ -6,8 +6,6 @@ type term =
   | Tinit
   | Tpred of term
   | Diff of term*term
-  | Left of term
-  | Right of term
   | Seq of string list * term
   | ITE of term*term*term
   | Find of string list * term * term * term
@@ -64,10 +62,6 @@ let rec pp_term ppf = function
         pp_term c pp_term t pp_term e
   | Diff (l,r) ->
       Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
-  | Left t ->
-      Fmt.pf ppf "left(%a)" pp_term t
-  | Right t ->
-    Fmt.pf ppf "right(%a)" pp_term t
   | Seq (vs, b) ->
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
       (Utils.pp_list Fmt.string) vs pp_term b
@@ -408,9 +402,6 @@ let rec convert :
       end
 
   | Diff (l,r) -> Term.Diff (conv sort l, conv sort r)
-  | Left t -> Term.Left (conv sort t)
-  | Right t -> Term.Right (conv sort t)
-
   | ITE (i,t,e) ->
       begin match sort with
         | Sorts.Message ->
@@ -692,8 +683,6 @@ let subst t s =
     | ForAll (vs,f) -> ForAll (vs, aux f)
     | Exists (vs,f) -> Exists (vs, aux f)
     | Diff (l,r) -> Diff (aux l, aux r)
-    | Left t -> Left (aux t)
-    | Right t -> Right (aux t)
     | ITE (i,t,e) -> ITE (aux i, aux t, aux e)
     | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
   in aux t

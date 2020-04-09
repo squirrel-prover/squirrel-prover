@@ -3,7 +3,7 @@ name k : message
 
 system null.
 
-goal left(diff(k,k)) = h(zero,k) => False.
+goal k = h(zero,k) => False.
 Proof.
   nosimpl(intro).
   nosimpl(euf M0).

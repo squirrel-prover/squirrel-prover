@@ -16,8 +16,6 @@ class iter ~system = object (self)
         self#visit_message (Macros.get_definition system sort mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
-    | Left a -> self#visit_message a
-    | Right a -> self#visit_message a
     | ITE (a, b, c) ->
         self#visit_formula a; self#visit_message b; self#visit_message c
     | Seq (a, b) ->
@@ -49,8 +47,6 @@ class iter ~system = object (self)
     | Not f -> self#visit_formula f
     | True | False -> ()
     | Diff(a, b) -> self#visit_formula a; self#visit_formula b
-    | Left a -> self#visit_formula a
-    | Right a -> self#visit_formula a
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst =
           List.map

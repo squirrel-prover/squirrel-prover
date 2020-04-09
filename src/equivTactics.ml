@@ -53,14 +53,37 @@ let () =
            end
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
+
+exception NoRefl
+
+class exist_macros ~(system:Action.system) exact = object (self)
+  inherit Iter.iter_approx_macros ~exact ~system as super
+
+  method visit_message t = match t with
+    | Term.Macro _ -> raise NoRefl
+    | _ -> super#visit_message t
+
+  method visit_elem = function
+    | EquivSequent.Message m -> self#visit_message m
+    | EquivSequent.Formula m -> self#visit_formula m
+end
+
+
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl (s : EquivSequent.t) sk fk =
-  if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
-  then
-    sk [] fk
-  else
-    fk (Tactics.Failure "Frames not identical")
+  let iter = new exist_macros ~system:(EquivSequent.get_system s) false in
+  try
+    (* we check that the frame does not contain macro *)
+    List.iter iter#visit_elem (EquivSequent.get_biframe s);
+    if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
+    then
+      sk [] fk
+    else
+      fk (Tactics.Failure "Frames not identical")
+  with
+  | NoRefl -> fk (Tactics.Failure "Frames contain macros that may not be \
+                                   diff equivalent")
 
 let () =
   T.register "refl"
@@ -373,6 +396,12 @@ class get_actions ~(system:Action.system) exact = object (self)
     | _ -> (actions <- (a, false)::actions; self#visit_macro mn is a)
 end
 
+let rec mk_ands = function
+  | [] -> Term.True
+  | [a] -> a
+  | [a; b] -> Term.And(a, b)
+  | p::q -> Term.And(p, mk_ands q)
+
 (** Construct the formula expressing freshness for some projection. *)
 let mk_phi_proj system env name indices proj biframe =
   let proj_frame = List.map (EquivSequent.pi_elem proj) biframe in
@@ -389,7 +418,7 @@ let mk_phi_proj system env name indices proj biframe =
     Action.(iter_descrs system
       (fun action_descr ->
         let iter = new get_name_indices ~system true name in
-        let descr_proj = Action.pi_descr proj ~bimacros:true action_descr in
+        let descr_proj = Action.pi_descr proj action_descr in
         iter#visit_formula (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
         List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
@@ -399,7 +428,6 @@ let mk_phi_proj system env name indices proj biframe =
           Hashtbl.add tbl_of_action_indices descr_proj action_indices));
     (* direct cases (for explicit occurrences of [name] in the frame) *)
     let phi_frame =
-      List.fold_left Term.mk_and Term.True
         (List.map
            (fun j ->
               (* select bound variables,
@@ -425,7 +453,7 @@ let mk_phi_proj system env name indices proj biframe =
     (* indirect cases (occurrences of [name] in actions of the system) *)
     and phi_actions =
       Hashtbl.fold
-        (fun a indices_a formula ->
+        (fun a indices_a formulas ->
             (* for each action [a] in which [name] occurs
              * with indices from [indices_a] *)
             let env = ref env in
@@ -478,12 +506,15 @@ let mk_phi_proj system env name indices proj biframe =
             in
             let forall_var =
               List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-            Term.mk_and formula
-              (Term.mk_forall forall_var (Term.mk_impl disj conj)))
+            (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
         tbl_of_action_indices
-        Term.True
+        []
     in
-    Term.mk_and phi_frame phi_actions
+    mk_ands
+      (* remove duplicates, and then concatenate *)
+      ((List.filter (fun x -> not(List.mem x phi_actions)) phi_frame)
+      @
+      phi_actions)
   with
   | Name_found ->
       Tactics.soft_failure (Tactics.Failure "Name not fresh")
@@ -498,7 +529,7 @@ let mk_if_term system env e biframe =
   | EquivSequent.Message t ->
       let (n_left, ind_left, n_right, ind_right) =
         match
-          Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+          Term.pi_term Term.Left t, Term.pi_term Term.Right t
         with
         | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
         | _ -> raise Not_name
@@ -558,9 +589,7 @@ let mk_prf_phi_proj system env param proj biframe =
     (List.map (EquivSequent.pi_elem proj) biframe) in
   (* check syntactic side condition *)
   Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
-  (* we compute the list of hashes from the frame. They already contain left or
-     right operators above the macro, because pi_elem enables the bimacros
-     parameter. *)
+  (* we compute the list of hashes from the frame *)
   let list_of_hashes_from_frame =
     Euf.hashes_of_frame ~system frame hash_fn key_n
   and list_of_actions_from_frame =
@@ -568,14 +597,11 @@ let mk_prf_phi_proj system env param proj biframe =
     List.iter iter#visit_term frame ;
     iter#get_actions
   and tbl_of_action_hashes = Hashtbl.create 10 in
-  (* We iterate over all the actions of the (single) system. Here, the messages
-     won't have the left or right operators, as we are working on the single
-     system. Working on the single system allows us to effectively obtain all
-     the required hashes. We will need to reproject the hashes message later on. *)
+  (* We iterate over all the actions of the (single) system *)
   Action.(iter_descrs system
     (fun action_descr ->
       (* we add only actions in which hash occurs *)
-      let descr_proj = Action.pi_descr proj ~bimacros:true action_descr in
+      let descr_proj = Action.pi_descr proj action_descr in
       let action_hashes =
         Euf.hashes_of_action_descr ~system ~cond:true
           descr_proj hash_fn key_n in
@@ -583,7 +609,6 @@ let mk_prf_phi_proj system env param proj biframe =
         Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
   (* direct cases (for explicit occurences of hashes in the frame) *)
   let phi_frame =
-    List.fold_left Term.mk_and Term.True
       (List.map
         (fun (is,m) ->
            (* select bound variables,
@@ -611,7 +636,7 @@ let mk_prf_phi_proj system env param proj biframe =
   (* undirect cases (for occurences of hashes in actions of the system) *)
   and phi_actions =
     Hashtbl.fold
-      (fun a list_of_is_m formula ->
+      (fun a list_of_is_m formulas ->
         (* for each action in which a hash occurs *)
           let env = ref env in
           let new_action_indices =
@@ -666,17 +691,16 @@ let mk_prf_phi_proj system env param proj biframe =
                         should have been projected using bimacros. However, m is
                         the hash obtained inside the single sytem, we must
                         project it with the bimacors parameter. *)
-                   (Term.Atom (`Message (`Neq, t, Term.pi_term true proj m))))
+                   (Term.Atom (`Message (`Neq, t, m))))
                  list_of_is_m)
           in
           let forall_var =
             List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-          Term.mk_and formula
-            (Term.mk_forall forall_var (Term.mk_impl disj conj)))
+            (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
       tbl_of_action_hashes
-      Term.True
+      []
   in
-  (Term.mk_and phi_frame phi_actions)
+  mk_ands (phi_frame @ phi_actions)
   with
   | Euf.Bad_ssc -> Tactics.soft_failure
     (Tactics.Failure "Key syntactic side condition not checked")
@@ -684,7 +708,7 @@ let mk_prf_phi_proj system env param proj biframe =
 
 let mk_prf_if_term_proj system env biframe m proj =
   let system_proj = Action.(project_system proj system) in
-  let m_proj = Term.pi_term true proj m in
+  let m_proj = Term.pi_term  proj m in
   match m_proj with
   | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
       if Theory.is_hash hash_fn then
@@ -698,19 +722,51 @@ let mk_prf_if_term_proj system env biframe m proj =
       else (false, m_proj)
   | _ -> (false, m_proj)
 
+(* from two conjonction formula p and q, produce its minimal diff(p, q), of the
+   form (p inter q) && diff (p minus q, q minus p) *)
+let combine_conj_formulas p q =
+  let rec to_list = function
+    | True  -> []
+    | Term.And (a, b) -> to_list a @ to_list b
+    | a -> [a]
+  in
+  (* we turn the conjonctions into list *)
+  let p, q= to_list p, to_list q in
+  let aux_q = ref q in
+  let (common, new_p) = List.fold_left (fun (common, r_p) p ->
+      (* if an element of p is inside aux_q, we remove it from aux_q and add it
+         to common, else add it to r_p *)
+      if List.mem p !aux_q then
+        (aux_q := List.filter (fun e -> e <> p) !aux_q; (p::common, r_p))
+      else
+        (common, p::r_p))
+          ([], []) p
+  in
+  (* common is the intersection of p and q, aux_q is the remainder of q and
+     new_p the remainder of p *)
+  if common <> [] then
+    Term.And (mk_ands common, Term.Diff(mk_ands new_p, mk_ands !aux_q))
+  else
+    Term.Diff(mk_ands new_p, mk_ands !aux_q)
+
 let apply_prf system env e biframe =
   match e with
   | EquivSequent.Message m ->
       let opt_if_left = mk_prf_if_term_proj system env biframe m Term.Left in
       let opt_if_right = mk_prf_if_term_proj system env biframe m Term.Right in
       begin match (opt_if_left,opt_if_right) with
-      | (true,if_left), (true,if_right) ->
-          EquivSequent.Message (Term.Diff (if_left,if_right))
-      | (true,if_left), (false,m_right) ->
+        (* when the two terms are if then else, we push the diff under the
+           conditions, so that we may apply yesif or noif on it. *)
+        | (_, Term.ITE (c1,n1,p1)), (_, Term.ITE (c2, n2, p2)) ->
+          let n = if n1  = n2 then n1 else Diff(n1, n2) in
+          let p = if p1  = p2 then p1 else Diff(p1, p2) in
+          EquivSequent.Message ( Term.ITE (combine_conj_formulas c1 c2, n, p))
+        | (true, if_left), (true, if_right) -> assert false
+        | (true,if_left), (false,m_right) ->
           EquivSequent.Message (Term.Diff (if_left,m_right))
-      | (false,m_left), (true,if_right) ->
+        | (false,m_left), (true,if_right) ->
           EquivSequent.Message (Term.Diff (m_left,if_right))
-      | (false,_), (false,_) -> raise Not_hash
+        | (false,_), (false,_) -> raise Not_hash
       end
   | EquivSequent.Formula f -> raise Not_hash
 
@@ -761,7 +817,7 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
       begin match e with
       | EquivSequent.Message t ->
         begin match
-          Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+          Term.pi_term Term.Left t, Term.pi_term Term.Right t
         with
         | (Fun (fl,Term.Name (nl,isl)::ll),Fun (fr,Term.Name (nr,isr)::lr))
            when (fl = Term.f_xor && fr = Term.f_xor)
@@ -775,13 +831,13 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
       begin match Theory.convert tsubst name Sorts.Message with
       | n ->
         begin match
-          Term.pi_term true Term.Left n, Term.pi_term true Term.Right n
+          Term.pi_term Term.Left n, Term.pi_term Term.Right n
         with
         | Name (nl,isl), Name (nr,isr) ->
           begin match e with
           | EquivSequent.Message t ->
             begin match
-              Term.pi_term true Term.Left t, Term.pi_term true Term.Right t
+              Term.pi_term Term.Left t, Term.pi_term Term.Right t
             with
             | (Fun (fl,ll),Fun (fr,lr))
               when (fl = Term.f_xor && fr = Term.f_xor)
@@ -958,8 +1014,6 @@ let expand_all s sk fk =
       | Name n as a-> a
       | Var x as a -> a
       | Diff(a, b) -> Diff(aux a, aux b)
-      | Left a -> Left (aux a)
-      | Right a -> Left (aux a)
       | ITE (a, b, c) -> ITE(aux a, aux b, aux c)
       | Seq (a, b) -> Seq(a, aux b)
       | Find (a, b, c, d) -> Find(a, aux b, aux c, aux d)
@@ -1062,6 +1116,10 @@ let apply_yes_no_if b i s =
         let biframe = List.rev_append before (new_elem :: after) in
         [ trace_goal;
           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+      (* TODO - Charlie -> I think there is a missing projection here. Is it a
+         case we want to be able to handle ? Do we want a tactic to push the
+         diff under the ite ? *)
+      (*
       | EquivSequent.Message Diff (ITE (cl,tl,el), ITE (cr,tr,er)) ->
         let branch_left, trace_goal_left =
           simplify_ite b env system cl tl el in
@@ -1075,7 +1133,7 @@ let apply_yes_no_if b i s =
         let biframe = List.rev_append before (new_elem :: after) in
         [ trace_goal_left;
           trace_goal_right;
-          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ] *)
       | _ -> Tactics.soft_failure (Tactics.Failure "Improper arguments")
       end
   | exception Out_of_range ->

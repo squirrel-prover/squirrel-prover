@@ -71,8 +71,6 @@ let rec cterm_of_term c =
     Ccst (Cst.Cmacro (Cst.Message m,ts))
   | ITE(b,c,d) -> Cfun( Term.f_ite, [cterm_of_bterm b; cterm_of_term c; cterm_of_term d])
   | Diff(c,d) -> Cfun( Term.f_diff, [cterm_of_term c; cterm_of_term d])
-  | Left(m) -> Cfun( Term.f_left, [cterm_of_term m])
-  | Right(m) -> Cfun( Term.f_right, [cterm_of_term m])
   | _ ->
     Fmt.pr "Unsupported term in completion: %a.@." Term.pp c ;
     raise Unsupported_conversion

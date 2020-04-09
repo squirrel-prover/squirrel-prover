@@ -1,7 +1,7 @@
 channel c
 abstract ok : message
 abstract ko : message
-system A: out(c,diff(ok,ko)); B: out(c,right(diff(ko,ok))).
+system A: out(c,diff(ok,ko)); B: out(c,ok).
 
 goal [left] output@A = ok.
 Proof.

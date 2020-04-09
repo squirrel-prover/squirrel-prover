@@ -65,8 +65,6 @@ and _ term =
   | Var : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
-  | Left : 'a term -> 'a term
-  | Right : 'a term -> 'a term
 
   | ITE :
       Sorts.boolean term * Sorts.message term * Sorts.message term ->
@@ -112,8 +110,6 @@ let rec sort : type a. a term -> a Sorts.t =
   | Action _ -> Sorts.Timestamp
   | Init -> Sorts.Timestamp
   | Diff (a, b) -> sort a
-  | Left a -> sort a
-  | Right a -> sort a
   | ITE (a, b, c) -> Sorts.Message
   | Find (a, b, c, d) -> Sorts.Message
   | Atom _ -> Sorts.Boolean
@@ -182,12 +178,6 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>(diff(%a, %a))@]"
       pp bl pp br
-  | Left b->
-    Fmt.pf ppf "@[<1>(left(%a))@]"
-      pp b
-  | Right b ->
-    Fmt.pf ppf "@[<1>(right(%a))@]"
-      pp b
   | ITE (b, c, d) ->
     Fmt.pf ppf "@[<1>(if %a then %a else %a)@]"
       pp b pp c pp d
@@ -348,8 +338,6 @@ let get_set_vars : 'a term -> S.t =
     | Name (_,indices) -> S.add_list vars indices
     | Init -> vars
     | Diff (a, b) -> termvars a (termvars b vars)
-    | Left a -> termvars a vars
-    | Right a -> termvars a vars
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
       S.diff
@@ -440,8 +428,6 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
     | Init -> Init
     | Diff (a, b) -> Diff (subst s a, subst s b)
-    | Left a -> Left (subst s a)
-    | Right a -> Right (subst s a)
     | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
     | Atom a-> Atom (subst_generic_atom s a)
     | And (a, b) -> And (subst s a, subst s b)
@@ -572,20 +558,13 @@ let dummy = Fun (mk_fname "_" [] emessage, [])
 
 type projection = Left | Right | None
 
-let pi_term ~bimacros ~projection term =
+let pi_term ~projection term =
 
   let rec pi_term : type a. projection -> a term -> a term = fun s t ->
   match t with
   | Fun (f,terms) -> Fun (f, List.map (pi_term s) terms)
   | Name n -> Name n
-  | Macro (m, terms, ts) ->
-    let mac = Macro(m, List.map (pi_term s) terms, pi_term s ts) in
-    if bimacros then begin
-      match s with
-      | Left -> Left mac
-      | Right -> Right mac
-      | None -> mac
-    end else mac
+  | Macro (m, terms, ts) -> Macro(m, List.map (pi_term s) terms, pi_term s ts)
   | Seq (a, b) -> Seq (a, pi_term s b)
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
@@ -598,8 +577,6 @@ let pi_term ~bimacros ~projection term =
       | Right -> pi_term s b
       | None -> Diff (a, b)
     end
-  | Left a -> pi_term Left a
-  | Right a -> pi_term Right a
   | ITE (a, b, c) -> ITE (pi_term s a, pi_term s b, pi_term s c)
   | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
   | ForAll (vs, b) -> ForAll (vs, pi_term s b)
@@ -625,13 +602,11 @@ let rec head_pi_term : type a. projection -> a term -> a term =
   match t,s with
   | Diff (t,_), Left
   | Diff (_,t), Right -> head_pi_term s t
-  | Left t, _ -> head_pi_term Left t
-  | Right t, _ -> head_pi_term Right t
   | _ -> t
 
 let diff a b =
-  let a = match a with Diff (a,_) | Left a | a -> a in
-  let b = match b with Diff (_,b) | Right b | b -> b in
+  let a = match a with Diff (a,_) | a -> a in
+  let b = match b with Diff (_,b) | b -> b in
   if a = b then a else Diff (a,b)
 
 let head_normal_biterm : type a. a term -> a term = fun t ->
@@ -694,7 +669,7 @@ let () =
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term Left t in
-        assert (pi_term ~bimacros:true ~projection:Left t = f a) ;
+        assert (pi_term  ~projection:Left t = f a) ;
         assert (r = f (Diff (a,b)))
     end ;
   ]

@@ -20,8 +20,6 @@ type term =
   | Tinit
   | Tpred of term
   | Diff of term*term
-  | Left of term
-  | Right of term
   | Seq of string list * term
   | ITE of term*term*term
   | Find of string list * term * term * term

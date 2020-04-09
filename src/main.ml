@@ -205,17 +205,17 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_mvar.mbc")
     end ;
-    "Euf Bad SSC", `Quick, begin fun () ->
+    "Euf Bad SSC 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/eufnull.mbc")
     end ;
-    "Euf Bad SSC", `Quick, begin fun () ->
+    "Euf Bad SSC 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_deep.mbc")
     end ;
-    "Euf Bad SSC", `Quick, begin fun () ->
+    "Euf Bad SSC 3", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_cond.mbc")

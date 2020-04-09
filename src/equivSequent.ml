@@ -7,7 +7,7 @@ let pp_elem ppf = function
   | Formula t -> Term.pp ppf t
   | Message t -> Term.pp ppf t
 
-let pi_term projection tm = Term.pi_term ~bimacros:true ~projection tm
+let pi_term projection tm = Term.pi_term ~projection tm
 
 let pi_elem s = function
   | Formula t -> Formula (pi_term s t)

@@ -57,10 +57,10 @@ depends R(j1), R1(j1,k,i).
 (* Case R1 *)
 expand frame@R1(j,i,k).
 expand exec@R1(j,i,k).
-(*expand cond@R1(j,i,k).*) 
+(*expand cond@R1(j,i,k).*)
 (* HELP je trouve le changement d'indice k et i dans key perturbant *)
 expand output@R1(j,i,k).
-enrich cond@R1(j,i,k).
+expand cond@R1(j,i,k).
 
 fa 2.
 fa 3.

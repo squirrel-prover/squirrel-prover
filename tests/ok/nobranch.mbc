@@ -46,85 +46,85 @@ forall (i,k:index),
 (((((forall (i1,k1:index),
      ((T(i1,k1) < T(i,k) || T(i1,k1) <= T(i,k)) =>
       (i = i1 =>
-       <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+       <<((input@T(i,k))),nT(i,k)>,tag1> <>
        <<input@T(i1,k1),nT(i1,k1)>,tag1>))
      &&
      forall (i1,k1:index),
      ((T1(i1,k1) < T(i,k) || T1(i1,k1) <= T(i,k)) =>
       ((i = i1 =>
-        <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+        <<((input@T(i,k))),nT(i,k)>,tag1> <>
         <<input@T(i1,k1),nT(i1,k1)>,tag1>)
        &&
        (i = i1 =>
-        <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+        <<((input@T(i,k))),nT(i,k)>,tag1> <>
         <<m2(i1,k1)@T1(i1,k1),input@T(i1,k1)>,tag2>))))
     &&
     forall (j,i1:index),
     ((R2(j) < T(i,k) || R2(j) <= T(i,k)) =>
      (i = i1 =>
-      <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<nR(j),fst(input@R2(j))>,tag1>)))
    &&
    forall (j,i1,k1:index),
    ((R1(j,k1,i1) < T(i,k) || R1(j,k1,i1) <= T(i,k)) =>
     ((i = i1 =>
-      <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<snd(input@R1(j,i1,k1)),nR(j)>,tag2>)
      &&
      (i = i1 =>
-      <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<nR(j),fst(input@R1(j,i1,k1))>,tag1>))))
   &&
   forall (i1,k1:index),
   ((T2(i1,k1) < T(i,k) || T2(i1,k1) <= T(i,k)) =>
    ((i = i1 =>
-     <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+     <<((input@T(i,k))),nT(i,k)>,tag1> <>
      <<input@T(i1,k1),nT(i1,k1)>,tag1>)
     &&
     (i = i1 =>
-     <<(left(input@T(i,k))),nT(i,k)>,tag1> <>
+     <<((input@T(i,k))),nT(i,k)>,tag1> <>
      <<m2(i1,k1)@T2(i1,k1),input@T(i1,k1)>,tag2>))))
  &&
  ((((forall (i1,k1:index),
      ((T(i1,k1) < T(i,k) || T(i1,k1) <= T(i,k)) =>
       ((i = i1 && k = k1) =>
-       <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+       <<((input@T(i,k))),nT(i,k)>,tag1> <>
        <<input@T(i1,k1),nT(i1,k1)>,tag1>))
      &&
      forall (i1,k1:index),
      ((T1(i1,k1) < T(i,k) || T1(i1,k1) <= T(i,k)) =>
       (((i = i1 && k = k1) =>
-        <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+        <<((input@T(i,k))),nT(i,k)>,tag1> <>
         <<input@T(i1,k1),nT(i1,k1)>,tag1>)
        &&
        ((i = i1 && k = k1) =>
-        <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+        <<((input@T(i,k))),nT(i,k)>,tag1> <>
         <<m2(i1,k1)@T1(i1,k1),input@T(i1,k1)>,tag2>))))
     &&
     forall (j,i1,k1:index),
     ((R2(j) < T(i,k) || R2(j) <= T(i,k)) =>
      ((i = i1 && k = k1) =>
-      <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<nR(j),fst(input@R2(j))>,tag1>)))
    &&
    forall (j,i1,k1:index),
    ((R1(j,k1,i1) < T(i,k) || R1(j,k1,i1) <= T(i,k)) =>
     (((i = i1 && k = k1) =>
-      <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<snd(input@R1(j,i1,k1)),nR(j)>,tag2>)
      &&
      ((i = i1 && k = k1) =>
-      <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+      <<((input@T(i,k))),nT(i,k)>,tag1> <>
       <<nR(j),fst(input@R1(j,i1,k1))>,tag1>))))
   &&
   forall (i1,k1:index),
   ((T2(i1,k1) < T(i,k) || T2(i1,k1) <= T(i,k)) =>
    (((i = i1 && k = k1) =>
-     <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+     <<((input@T(i,k))),nT(i,k)>,tag1> <>
      <<input@T(i1,k1),nT(i1,k1)>,tag1>)
     &&
     ((i = i1 && k = k1) =>
-     <<(right(input@T(i,k))),nT(i,k)>,tag1> <>
+     <<((input@T(i,k))),nT(i,k)>,tag1> <>
      <<m2(i1,k1)@T2(i1,k1),input@T(i1,k1)>,tag2>)))))
 ).
 Proof.

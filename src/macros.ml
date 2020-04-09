@@ -120,7 +120,7 @@ let get_definition :
             in
             let t = Term.subst subst body in
             begin
-              let proj_t proj = Term.pi_term ~bimacros:false ~projection:proj t in
+              let proj_t proj = Term.pi_term ~projection:proj t in
               (* The expansion of the body of the macro only depends on the
                  projections, not on the system names. *)
               match system with

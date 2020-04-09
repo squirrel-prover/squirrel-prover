@@ -73,8 +73,6 @@ term:
                                  { Theory.Find ($2,$4,$6,$7) }
 | PRED LPAREN term RPAREN        { Theory.Tpred $3 }
 | DIFF LPAREN term COMMA term RPAREN { Theory.Diff ($3,$5) }
-| LEFT LPAREN term RPAREN        { Theory.Left $3 }
-| RIGHT LPAREN term RPAREN       { Theory.Right $3 }
 | SEQ LPAREN i=ids ARROW t=term RPAREN { Theory.Seq (i,t) }
 
 

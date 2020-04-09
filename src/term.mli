@@ -6,8 +6,6 @@
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
-
-
 (** {2 Symbols}
   *
   * We have function, name and macro symbols. Each symbol
@@ -82,8 +80,6 @@ and _ term =
   | Var : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
-  | Left : 'a term -> 'a term
-  | Right : 'a term -> 'a term
 
   | ITE :
       Sorts.boolean term * Sorts.message term * Sorts.message term ->
@@ -220,13 +216,14 @@ type projection = Left | Right | None
 (** Evaluate all diff operators wrt a projection.
   * If the projection is [None], the input term is returned unchanged.
   * Otherwise all diff operators are evaluated to the given
-  * side and the returned term does not feature diff operators (including
-  * left/right) except possibly on macros: left/right projections are
-  * left on macros when they are meant to expand to biterms, as indicated
-  * by [bimacros]. *)
-val pi_term : bimacros:bool -> projection:projection -> 'a term -> 'a term
+  * side and the returned term does not feature diff operators.
+  * If the bi-term contains macros, and come from a bi-system, its
+  * projection is only correctly interpreted if it is used inside
+  * the projected system.
+  * *)
+val pi_term :  projection:projection -> 'a term -> 'a term
 
-(** Evaluate topmost diff operators (including left/right)
+(** Evaluate topmost diff operators
   * for a given projection of a biterm.
   * For example [head_pi_term Left (diff(f(diff(a,b)),c))]
   * would be [f(diff(a,b))].
