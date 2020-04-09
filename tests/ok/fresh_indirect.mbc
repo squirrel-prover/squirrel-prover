@@ -11,6 +11,5 @@ Proof.
   expand output@A(ii,jj).
   fresh 1.
   yesif 1.
-  split.
   admit. (* Induction hypothesis.*)
 Qed.

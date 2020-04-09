@@ -10,7 +10,8 @@ Proof.
 induction t.
 expandall.
 fa 1.
-ifeq 2,input@A,ok.
-
+nosimpl(ifeq 2,input@A,ok).
 simpl.
+nosimpl(fadup).
+assumption.
 Qed.

@@ -15,8 +15,9 @@ Proof.
     (forall i1:index, i<>i1),
     True.
   admit.
-  yesif 1.
+  nosimpl(yesif 1).
   true.
+  refl.
 Qed.
 
 (* Secondary test, without any bound variable, just to check

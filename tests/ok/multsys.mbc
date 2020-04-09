@@ -16,7 +16,7 @@ help.
 induction t.
 
 expandall.
-fa 1. noif 2. simpl.
+fa 1. noif 2.
 
 Qed.
 
@@ -26,5 +26,5 @@ induction t.
 
 
 expandall.
-fa 1. noif 2. simpl.
+fa 1. noif 2.
 Qed.

@@ -26,8 +26,6 @@ induction t.
 nosimpl(expandall).
 
 equivalent ok=ok, True.
-simpl.
 expandall.
 equivalent ok=ok, True.
-simpl.
 Qed.

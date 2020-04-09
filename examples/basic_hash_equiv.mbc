@@ -128,8 +128,6 @@ Proof.
   admit.
   apply H0 to i,j,k.
 
-  fresh 2.
-  yesif 2.
-  split.
+  fresh 2; yesif 2.
 
 Qed.

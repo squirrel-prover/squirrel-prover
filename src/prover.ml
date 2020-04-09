@@ -346,8 +346,9 @@ let esimpl =
 let equiv_auto_simp judges =
   judges
   |> List.map (fun x -> match x with
-      | Goal.Equiv _ ->  EquivAST.eval_judgment esimpl x
-      | Goal.Trace _ -> [x]
+      | Goal.Equiv _ -> EquivAST.eval_judgment esimpl x
+      | Goal.Trace t ->
+          List.map (fun t -> Goal.Trace t) (TraceAST.eval_judgment simpl t)
     )
   |> List.flatten
 

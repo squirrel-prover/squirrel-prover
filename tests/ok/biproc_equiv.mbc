@@ -4,7 +4,7 @@ system A: in(c,x);out(c,zero);
 
 
 
-goal trivial_if : cond@B <=> False.
+goal trivial_if : cond@B => False.
 Proof.
 simpl.
 expand cond@B.
@@ -20,6 +20,5 @@ expand exec@B.
 equivalent cond@B, False.
 apply trivial_if.
 noif 2.
-simpl.
 
 Qed.

@@ -9,5 +9,4 @@ Proof.
   fa 1; fa 2.
   fresh 2.
   yesif 2.
-  split.
 Qed.

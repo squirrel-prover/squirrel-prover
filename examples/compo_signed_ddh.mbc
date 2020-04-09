@@ -187,5 +187,5 @@ Proof.
    simpl.
    executable pred(S4). depends S1, S4. apply H1 to S1. apply S1_charac.
 
-   fa 7. noif 8. simpl.
+   fa 7. noif 8.
 Qed.

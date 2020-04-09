@@ -11,5 +11,4 @@ Proof.
   fa 1; fa 2.
   xor 2.
   yesif 2.
-  split.
 Qed.

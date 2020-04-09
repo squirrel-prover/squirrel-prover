@@ -12,8 +12,8 @@ Proof.
   expand output@A(i,j).
   expand output@A(ii,jj).
   xor 1.
-  yesif 1.
-  split.
+  nosimpl(yesif 1).
+  simpl.
   admit. (* Induction hypothesis.*)
 Qed.
 
@@ -26,6 +26,5 @@ Proof.
   expand output@A(ii,jj).
   xor 1, diff(b(i,j),b(ii,jj)).
   yesif 1.
-  split.
   admit. (* Induction hypothesis.*)
 Qed.
