@@ -190,7 +190,12 @@ struct
   let register_formula id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
-         | [Theory x] -> f (parse_formula x) j sk fk
+         | [Theory x] ->
+             begin match parse_formula x with
+               | x -> f x j sk fk
+               | exception Theory.Conv e ->
+                   fk (Tactics.Cannot_convert e)
+             end
          | _ ->
              raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "formula argument expected"))

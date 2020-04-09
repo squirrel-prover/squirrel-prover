@@ -177,7 +177,7 @@ let () =
   Parserbuf.add_suite_restore "Tactics" [
     "Substitution", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_hard_failure Tactics.NotEqualArguments)
+        (Tactic_soft_failure Tactics.NotEqualArguments)
         (fun () -> run ~test "tests/alcotest/substitution.mbc")
     end ;
     "Collision", `Quick, begin fun () ->
@@ -187,7 +187,7 @@ let () =
     end ;
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_hard_failure (Tactics.Undefined "a1"))
+        (Tactic_soft_failure (Tactics.Undefined "a1"))
         (fun () -> run ~test "tests/alcotest/existsintro_fail.mbc")
     end ;
     "Vars not eq", `Quick, begin fun () ->
@@ -242,7 +242,8 @@ let () =
     end ;
     "Euf environment", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.(Conv (Undefined "i1"))
+        (Tactics.(Tactic_soft_failure
+                    (Cannot_convert (Theory.(Undefined "i1")))))
         (fun () -> run ~test "tests/alcotest/euf_env.mbc")
     end ;
     "Sign Bad SSC", `Quick, begin fun () ->

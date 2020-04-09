@@ -1,6 +1,7 @@
 type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
+  | Cannot_convert of Theory.conversion_error
   | NotEqualArguments
   | Bad_SSC
   | NoSSC
@@ -29,6 +30,7 @@ let rec pp_tac_error ppf = function
   | NotDDHContext ->
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
+  | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
 
 exception Tactic_soft_failure of tac_error
 
