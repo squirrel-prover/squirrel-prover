@@ -510,11 +510,7 @@ let mk_phi_proj system env name indices proj biframe =
         tbl_of_action_indices
         []
     in
-    mk_ands
-      (* remove duplicates, and then concatenate *)
-      ((List.filter (fun x -> not(List.mem x phi_actions)) phi_frame)
-      @
-      phi_actions)
+    phi_frame @ phi_actions
   with
   | Name_found ->
       Tactics.soft_failure (Tactics.Failure "Name not fresh")
@@ -542,10 +538,16 @@ let mk_if_term system env e biframe =
       let phi_right =
         mk_phi_proj system_right env n_right ind_right Term.Right biframe
       in
+      let phi =
+        mk_ands
+          (* remove duplicates, and then concatenate *)
+          ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
+          @
+          phi_right)
+      in
       let then_branch = Term.Fun (Term.f_zero,[]) in
       let else_branch = t in
-      EquivSequent.Message
-        Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
+      EquivSequent.Message Term.(mk_ite phi then_branch else_branch)
   | EquivSequent.Formula f -> raise Not_name
 
 let fresh i s =
@@ -687,10 +689,6 @@ let mk_prf_phi_proj system env param proj biframe =
               (List.map
                  (fun (is,m) -> Term.mk_impl
                      (Term.mk_indices_eq key_is is)
-                     (* Here, t is the current hash we are considering. It
-                        should have been projected using bimacros. However, m is
-                        the hash obtained inside the single sytem, we must
-                        project it with the bimacors parameter. *)
                    (Term.Atom (`Message (`Neq, t, m))))
                  list_of_is_m)
           in
@@ -868,10 +866,16 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
   let phi_right =
     mk_phi_proj system_right env n_right is_right Term.Right biframe
   in
+  let phi =
+    mk_ands
+      (* remove duplicates, and then concatenate *)
+      ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
+      @
+      phi_right)
+  in
   let then_branch = Term.Fun (Term.f_zero,[]) in
   let else_branch = term in
-  EquivSequent.Message
-    Term.(mk_ite (mk_and phi_left phi_right) then_branch else_branch)
+  EquivSequent.Message Term.(mk_ite phi then_branch else_branch)
 
 let xor i (opt_n : Theory.term option) s =
   match nth i (EquivSequent.get_biframe s) with
