@@ -1,4 +1,5 @@
 type tac_error =
+  | More
   | Failure of string
   | AndThen_Failure of tac_error
   | Cannot_convert of Theory.conversion_error
@@ -11,6 +12,7 @@ type tac_error =
   | NotDDHContext
 
 let rec pp_tac_error ppf = function
+  | More -> Fmt.string ppf "More results required"
   | Failure s -> Fmt.pf ppf "%s" s
   | AndThen_Failure t ->
       Fmt.pf ppf
@@ -51,16 +53,16 @@ let fail sk fk = fk (Failure "fail")
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
 let map t l sk fk =
-  let rec aux acc l sk fk = match l with
+  let rec aux acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
         t e
           (fun r fk ->
-             aux (List.rev_append r acc) l sk fk)
+             aux (List.rev_append r acc) l fk)
           fk
-  in aux [] l sk fk
+  in aux [] l fk
 
-let orelse_nojudgment a b sk fk = a sk (fun tac_error -> b sk fk)
+let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
 
 let orelse a b j sk fk = orelse_nojudgment (a j) (b j) sk fk
 
@@ -93,6 +95,44 @@ let repeat t j sk fk =
       (fun l fk -> map aux l sk fk)
       (fun e -> sk [j] fk)
   in aux j sk fk
+
+let eval_all (t : 'a tac) x =
+  let l = ref [] in
+  let exception End in
+  try
+    let sk r fk = l := r :: !l ; fk More in
+    let fk _ = raise End in
+    ignore (t x sk fk) ;
+    assert false
+  with End -> List.rev !l
+
+let () =
+  Checks.add_suite "Tacticals" [
+    "OrElse", `Quick, begin fun () ->
+      let t1 = fun x sk fk -> sk [x] fk in
+      let t2 = fun _ sk fk -> sk [(1,1)] fk in
+      assert (eval_all (orelse_list [t1;t2]) (0,0) = [[(0,0)];[(1,1)]]) ;
+      assert (eval_all (orelse t2 t1) (0,0) = [[(1,1)];[(0,0)]])
+    end ;
+    "AndThen", `Quick, begin fun () ->
+      let t1 = fun _ sk fk -> sk [(0,0);(0,1)] (fun _ -> sk [(1,0)] fk) in
+
+      let t2 = fun (x,y) sk fk -> sk [(-x,-y);(-2*x,-2*y)] fk in
+      let expected = [ [0,0; 0,0; 0,-1; 0,-2]; [-1,0; -2,0] ] in
+      assert (eval_all (andthen_list [t1;t2]) (11,12) = expected) ;
+      assert (eval_all (andthen t1 t2) (11,12) = expected) ;
+
+      let t3 = fun (x,y) sk fk -> if x+y = 1 then sk [] fk else sk [x,y] fk in
+      let expected = [ [0,0] ; [] ] in
+      assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
+      assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+
+      let t3 = fun (x,y) sk fk -> if x+y = 0 then fk More else sk [y,x] fk in
+      let expected = [ [0,1] ] in
+      assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
+      assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+    end
+  ]
 
 (** Generic tactic syntax trees *)
 

@@ -28,6 +28,7 @@
 (** The multiple types of tactics error. Specific ones are defined so that they
     may be caught for unit testing. *)
 type tac_error =
+  | More
   | Failure of string
   | AndThen_Failure of tac_error
   | Cannot_convert of Theory.conversion_error
