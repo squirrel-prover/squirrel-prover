@@ -36,11 +36,12 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 
 
+
 goal [left] wa_left :
   forall (i:index, j:index, k:index),
   cond@R1(j,i,k) =>
   exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) &&
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
   fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
   snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
 Proof.
@@ -55,7 +56,7 @@ goal [right] wa_right:
   forall (i:index, j:index, k:index),
   cond@R1(j,i,k) =>
   exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) &&
+  T(ii,kk) <= R1(j,i,k) && i = ii && k = kk &&
   fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
   snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
 Proof.
@@ -65,6 +66,41 @@ apply tags_neq.
 euf M0.
 exists i,k.
 Qed.
+
+goal wa_both:
+ forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+apply tags_neq.
+project.
+euf M0.
+exists i, k1.
+euf M0.
+exists i, k.
+Qed.
+
+goal wa_inv:
+ forall (i:index, j:index, k:index),
+( exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))) => cond@R1(j,i,k).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+project.
+substitute ii, i.
+expand output@T(i,kk).
+euf D0.
+simpl.
+case H0.
+substitute k1, kk.
 
 
 equiv foo.
@@ -82,15 +118,84 @@ depends R(j1), R1(j1,i,k).
 depends R(j1), R2(j1).
 
 (* Case R1 *)
-admit.
+expand frame@R1(j,i,k); expand exec@R1(j,i,k).
+(*expand cond@R1(j,i,k);*) 
+expand output@R1(j,i,k).
 
-(*expand frame@R1(j,i,k); expand exec@R1(j,i,k).
-expand cond@R1(j,i,k); expand output@R1(j,i,k).
 fa 0.
 fa 2.
 fa 3.
+
+equivalent   cond@R1(j,i,k),
+  (exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i = ii &&
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))).
+split.
+intros.
+project.
+expand cond@R1(j,i,k).
+apply tags_neq.
+euf M0.
+exists i, k1.
+expand cond@R1(j,i,k).
+apply tags_neq.
+exists i,k.
+split.
+split.
+euf M0.
+euf M0.
+euf M0.
+simpl.
+substitute ii,i.
+expand output@T(i,kk).
+expand m2(i,kk)@T(i,kk).
+expand cond@R1(j,i,k).
+assert(k=kk).
+admit.
+substitute kk, k.
+project.
+help.
+assert (input@T(i,k) = nR(j)).
+admit.
+assert (input@T(i,k) = nR(j)).
+admit.
 prf 3.
 yesif 3.
+apply tags_neq.
+project.
+repeat split.
+
+apply M1.
+simpl M0.
+
+dup D2.
+project.
+refl M2.
+expand cond@R1(k,i,k).
+
+intro.
+expand cond@R1(k,i,k).
+
+
+exists i,k.
+project.
+expand cond@R1(j,i,k).
+expand output@T(ii,kk).
+expand m2(ii,kk)@T(ii,kk).
+
+intro.
+admit.
+
+prf 3.
+yesif 3.
+apply tags_neq.
+
+
+project.
+repeat split.
+case H0.
+
 intro.
 
 help.
@@ -128,30 +233,48 @@ expand m2(i,k)@T(i,k).
 prf 3.
 yesif 3.
 apply tags_neq.
-help.
 project.
 
 repeat split.
 case H0.
-assert (nT(i,k) = fst(left(input@R2(j)))).
+case H0.
+depends T(i1,k1),T1(i1,k1).
+depends T(i1,k1),T1(i1,k1).
+case H0.
+depends T(i1,k1),T2(i1,k1).
+depends T(i1,k1),T2(i1,k1).
+assert (nT(i,k) = fst(input@R2(j))).
+case H0.
 admit. (* TODO fresh M2 *)
-admit.
-admit.
+admit. (* TODO fresh M2 *)
+assert (nT(i,k) = fst(input@R1(j,i1,k1))).
+case H0.
+admit.  (* TODO fresh M3 *)
+admit. (* TODO fresh M3 *)
+
+repeat split.
+assert (nT(i,k) = fst(input@R1(j,i1,k1))).
+case H0.
+admit. (* TODO fresh ? *)
+admit. 
+assert (nT(i,k) = fst(input@R2(j))).
 case H0.
 admit. (* TODO fresh ? *)
 admit. (* TODO fresh ? *)
+depends T(i1,k1), T2(i1,k1).
 case H0.
-admit.
-admit.
+depends T(i1,k1), T1(i1,k1).
+case H0.
+depends T(i1,k1), T1(i1,k1).
+case H0.
 fresh 2.
 yesif 2.
-split.
-split.
-depends T(i1,k1),T1(i1,k1).
-depends T(i1,k1),T2(i1,k1).
-split.
-depends T(i1,k1),T1(i1,k1).
-depends T(i1,k1),T2(i1,k1).
+repeat split.
+depends T(i1,k1), T2(i1,k1).
+depends T(i1,k1), T1(i1,k1).
+depends T(i1,k1), T2(i1,k1).
+depends T(i1,k1), T1(i1,k1).
+
 
 (* Case T1 *)
 admit.
