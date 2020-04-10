@@ -37,72 +37,6 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 
 
-goal [left] wa_left :
-  forall (i:index, j:index, k:index),
-  cond@R1(j,i,k) =>
-  exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) && i =ii && 
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
-Proof.
-simpl.
-expand cond@R1(j,i,k).
-apply tags_neq.
-euf M0.
-exists i,k1.
-Qed.
-
-goal [right] wa_right:
-  forall (i:index, j:index, k:index),
-  cond@R1(j,i,k) =>
-  exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) && i = ii && k = kk &&
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
-Proof.
-simpl.
-expand cond@R1(j,i,k).
-apply tags_neq.
-euf M0.
-exists i,k.
-Qed.
-
-goal wa_both:
- forall (i:index, j:index, k:index),
-  cond@R1(j,i,k) =>
-  exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) && i =ii && 
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
-Proof.
-simpl.
-expand cond@R1(j,i,k).
-apply tags_neq.
-project.
-euf M0.
-exists i, k1.
-euf M0.
-exists i, k.
-Qed.
-
-goal wa_inv:
- forall (i:index, j:index, k:index),
-( exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) && i =ii && 
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))) => cond@R1(j,i,k).
-Proof.
-simpl.
-expand cond@R1(j,i,k).
-project.
-substitute ii, i.
-expand output@T(i,kk).
-euf D0.
-simpl.
-case H0.
-substitute k1, kk.
-
-
 equiv foo.
 Proof.
 induction t.
@@ -116,19 +50,68 @@ depends R(j1), R1(j1,i,k).
 depends R(j1), R2(j1).
 
 (* Case R1 *)
-expand frame@R1(j,i,k); expand exec@R1(j,i,k).
-(*expand cond@R1(j,i,k);*) 
-expand output@R1(j,i,k).
+admit.
+
+(* Case R2 *)
+
+expand frame@R2(j); expand exec@R2(j).
+expand cond@R2(j).
+nosimpl(expand output@R2(j)).
+fa 1.
+fa 0.
 
 fa 0.
+
+equivalent  
+( forall (i,k:index),
+ not(snd(input@R2(j)) = h(<<nR(j),fst(input@R2(j))>,tag1>,diff(key(i),key'(i,k))))),
+( forall (i,k:index),
+  not(T(i,k) <= R2(j)) || 
+  not(fst(input@R2(j)) = fst(output@T(i,k))) ||
+  not(snd(input@R2(j)) = snd(output@T(i,k)))).
+admit.
+fa 1.
+
+
 fa 2.
 fa 3.
 
-equivalent   cond@R1(j,i,k),
-  (exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) && i = ii &&
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))).
+equivalent  
+( 
+ snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,diff(key(i),key'(i,k)))),
+(
+  T(i,k) <= R1(j,i,k) && 
+  fst(input@R1(j,i,k)) = fst(output@T(i,k)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(i,k))).
+
+admit.
+fa 1.
+fa 1.
+prf 5.
+yesif 5.
+project.
+repeat split.
+substitute i1, i.
+case H0.
+depends T(i,k1), T1(i,k1).
+
+simpl.
+
+prf 3.
+
+yesif 3.
+apply tags_neq.
+
+project.
+repeat split.
+substitute i1, i.
+expand m2(i,k1)@T1(i,k1).
+assert(snd(input@R1(j,i,k))= input@T(i,k1)).
+admit.
+
+assert(nR(j) = input@T(i,k1)).
+*)
+(*
 split.
 intros.
 project.
@@ -385,3 +368,69 @@ Qed.
 
 *)
 
+
+
+goal [left] wa_left :
+  forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+apply tags_neq.
+euf M0.
+exists i,k1.
+Qed.
+
+goal [right] wa_right:
+  forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i = ii && k = kk &&
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+apply tags_neq.
+euf M0.
+exists i,k.
+Qed.
+
+goal wa_both:
+ forall (i:index, j:index, k:index),
+  cond@R1(j,i,k) =>
+  exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk)).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+apply tags_neq.
+project.
+euf M0.
+exists i, k1.
+euf M0.
+exists i, k.
+Qed.
+
+goal wa_inv:
+ forall (i:index, j:index, k:index),
+( exists (ii:index,kk:index),
+  T(ii,kk) <= R1(j,i,k) && i =ii && 
+  fst(input@R1(j,i,k)) = fst(output@T(ii,kk)) &&
+  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))) => cond@R1(j,i,k).
+Proof.
+simpl.
+expand cond@R1(j,i,k).
+project.
+substitute ii, i.
+expand output@T(i,kk).
+euf D0.
+simpl.
+case H0.
+substitute k1, kk.
