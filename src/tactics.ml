@@ -69,10 +69,14 @@ let orelse a b j sk fk = orelse_nojudgment (a j) (b j) sk fk
 let orelse_list l j =
   List.fold_right (fun t t' -> orelse_nojudgment (t j) t') l fail
 
-let andthen tac1 tac2 judge sk fk =
-  tac1 judge
-    (fun l fk -> map tac2 l sk fk)
-    fk
+let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
+  let sk =
+    if cut then
+      fun l fk' -> map tac2 l sk fk
+    else
+      fun l fk' -> map tac2 l sk fk'
+  in
+  tac1 judge sk fk
 
 let rec andthen_list = function
   | [] -> raise (Tactic_hard_failure (Failure "empty anthen_list"))
@@ -82,12 +86,16 @@ let rec andthen_list = function
 let not_branching tac j sk fk =
   tac j
     (fun l _ -> if List.length l <= 1 then sk l fk else
-        fk (Failure "Branching tactic under non branching instruction."))
+        fk (Failure "branching tactic under non branching instruction"))
     fk
 
 let id j sk fk = sk [j] fk
 
-let try_tac t = orelse t id
+let try_tac t j sk fk =
+  let succeeded = ref false in
+  let sk l fk = succeeded := true ; sk l fk in
+  let fk e = if !succeeded then fk e else sk [j] fk in
+  t j sk fk
 
 let repeat t j sk fk =
   let rec aux j sk fk =
@@ -131,6 +139,11 @@ let () =
       let expected = [ [0,1] ] in
       assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
       assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+    end ;
+    "Try", `Quick, begin fun () ->
+      let t = fun _ sk fk -> sk [1] (fun _ -> sk [] fk) in
+      assert (eval_all (try_tac (fun _ -> fail)) 0 = [[0]]) ;
+      assert (eval_all (try_tac t) 0 = [[1];[]])
     end
   ]
 

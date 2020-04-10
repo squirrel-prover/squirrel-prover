@@ -73,7 +73,7 @@ val repeat : 'a tac -> 'a tac
 
 (** [andthen t1 t2] applies [t1] and then applies [t2] to each newly
   * created subgoal. *)
-val andthen : 'a tac -> 'a tac -> 'a tac
+val andthen : ?cut:bool -> 'a tac -> 'a tac -> 'a tac
 
 (** n-ary variant of [orelse]. *)
 val orelse_list : 'a tac list -> 'a tac

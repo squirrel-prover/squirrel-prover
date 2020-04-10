@@ -284,12 +284,11 @@ let () =
 (* Attempt to closing the goal. *)
 let simple_base =
   let open Tactics in
-  [ Try (Abstract ("false_left",[])) ;
-      Abstract ("eqnames",[]) ;
-      Abstract ("eqtrace",[]) ;
-      Try (Abstract ("congruence",[])) ;
-      Try (Abstract ("constraints",[])) ;
-      Try (Abstract ("assumption",[])) ]
+  [ Abstract ("eqnames",[]) ;
+    Abstract ("eqtrace",[]) ;
+    Try (Abstract ("congruence",[])) ;
+    Try (Abstract ("constraints",[])) ;
+    Try (Abstract ("assumption",[])) ]
 
 (* Try all possible non branching introductions, then try to close.
  * We also try assumption first, because intros can loose the
@@ -315,7 +314,9 @@ let simpl_branching =
 
 (* Final automation tactic. We allow branching introduction, only if the extra
  * goals are automatically closed. *)
+let newsimpl = true
 let simpl =
+  if newsimpl then Tactics.Abstract ("newsimpl",[]) else
   Tactics.(OrElse [NotBranching(simpl_branching); simpl_nobranching])
 
 let trace_auto_simp judges =
@@ -326,7 +327,7 @@ let trace_auto_simp judges =
 let () =
   TraceTactics.register "simpl"
     ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
-    (fun j sk fk -> sk (TraceAST.eval_judgment simpl j) fk)
+    (fun s sk fk -> TraceAST.eval simpl s sk fk)
 
 let esimpl =
   Tactics.(

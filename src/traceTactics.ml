@@ -56,9 +56,9 @@ let () =
 let goal_and_right (s : TraceSequent.t) sk fk =
   match TraceSequent.get_conclusion s with
   | And (lformula, rformula) ->
-    sk [ TraceSequent.set_conclusion (lformula) s;
-         TraceSequent.set_conclusion (rformula) s ] fk
-  | _ -> fk (Tactics.Failure "Cannot introduce a conjonction")
+    sk [ TraceSequent.set_conclusion lformula s ;
+         TraceSequent.set_conclusion rformula s ] fk
+  | _ -> fk (Tactics.Failure "Cannot introduce a conjunction")
 
 let () =
   T.register "split"
@@ -100,7 +100,7 @@ let left_intros hyp_name s sk fk =
 
 let () =
   T.register_general "introsleft"
-    ~help:"Simplify conjonctions and existentials in an hypothesis.\
+    ~help:"Simplify conjunctions and existentials in an hypothesis.\
            \n Usage: introsleft H."
     (function
       | [Prover.Theory (Theory.Var h)] -> left_intros h
@@ -268,8 +268,9 @@ let () =
            end
        | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-(** [goal_intro judge sk fk] perform one introduction, either of a forall
-    quantifier or an implication. Else, it returns [fk] *)
+(** [goal_intro judge] perform introduces the topmost connective
+  * of the conclusion formula, when this can be done in an invertible
+  * and non-branching manner. *)
 let goal_intro (s : TraceSequent.t) sk fk =
   match TraceSequent.get_conclusion s with
   | ForAll (vs,f) ->
@@ -286,12 +287,16 @@ let goal_intro (s : TraceSequent.t) sk fk =
                     |> TraceSequent.set_env (!env)
     in
     sk [new_judge] fk
+  | Exists ([],f) ->
+    sk [TraceSequent.set_conclusion f s] fk
   | Impl(lhs,rhs)->
     let s' =
       TraceSequent.add_formula lhs (TraceSequent.set_conclusion rhs s) in
     sk [s'] fk
   | Not f ->
     sk [TraceSequent.set_conclusion False s |> TraceSequent.add_formula f] fk
+  | True ->
+    sk [] fk
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
     let s' = TraceSequent.set_conclusion False s |> TraceSequent.add_formula (Atom h) in
@@ -303,8 +308,8 @@ let goal_intro (s : TraceSequent.t) sk fk =
 
 let () =
   T.register "intro"
-    ~help:"Perform one introduction, either of a forall quantifier or an \
-           \n implication.\
+    ~help:"Introduce topmost connective of conclusion formula, when \
+           \n it can be done in an invertible, non-branching fashion.\
            \n Usage: intro."
     goal_intro
 
@@ -407,18 +412,14 @@ let () =
 
 let () =
   let open Tactics in
-  let non_branching_intro =
-    [ Abstract ("intro",[]) ;
-      Abstract ("exists",[]) ;
-      Abstract ("true",[]) ]
-  in
   T.register_macro "intros"
     ~help:"Repeat intro.\n Usage: intros."
-    (Repeat (OrElse non_branching_intro)) ;
+    (Repeat (Abstract ("intro",[]))) ;
   T.register_macro "anyintro"
-    ~help:"Try any possible introduction.\n Usage: anyintro."
+    ~help:"Introduce topmost connective of goal formula, when invertible. \
+           \n Usage: anyintro."
     (OrElse
-       (Abstract ("split",[]) :: non_branching_intro))
+       [ Abstract ("split",[]) ; Abstract ("intro",[]) ])
 
 (** Induction *)
 
@@ -1037,6 +1038,59 @@ let () = T.register "collision"
            \n the messages hashed with the same valid key.\
            \n Usage: collision."
     collision_resistance
+
+(** Automated goal simplification *)
+
+let () =
+  let open Tactics in
+  (* Simplify goal. We will never backtrack on these applications. *)
+  let simplify =
+    andthen_list [
+      (* Try assumption first to avoid loosing the possibility
+       * of doing it after introductions. *)
+      try_tac assumption ;
+      repeat goal_intro ;
+      repeat simpl_left ;
+      eq_names ;
+      eq_trace
+    ]
+  in
+  (* Attempt to close a goal. *)
+  let conclude =
+    orelse_list [congruence;constraints;assumption]
+  in
+  let (>>) = andthen ~cut:true in
+  (* If [close] then automatically prove the goal,
+   * otherwise it may also be reduced to a single subgoal. *)
+  let rec simpl close : TraceSequent.t tac =
+    simplify >> try_tac conclude >>
+      fun g sk fk ->
+        (* If we still have a goal, we can try to split a conjunction
+         * and prove the remaining subgoals, or return this goal,
+         * but we must respect [close]. *)
+        let fk =
+          if close then
+            fun _ -> fk (Failure "cannot automatically prove goal")
+          else
+            fun _ -> sk [g] fk
+        in
+        goal_and_right g
+          (fun l _ -> match l with
+             | [g1;g2] ->
+                 simpl close g1
+                   (fun l' _ ->
+                      if l'=[] then
+                        simpl close g2 sk fk
+                      else
+                        simpl true g2
+                          (fun l'' fk -> assert (l'' = []) ; sk l' fk)
+                          fk)
+                   fk
+             | _ -> assert false)
+          fk
+  in
+  T.register "newsimpl" (simpl false) ;
+  T.register "auto" (simpl true)
 
 (** Projecting a goal on a bi-system
   * to distinct goals for each projected system. *)
