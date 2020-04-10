@@ -114,8 +114,6 @@ fresh 2; yesif 2.
 repeat split.
 depends R(j1), R1(j1,i,k).
 depends R(j1), R2(j1).
-depends R(j1), R1(j1,i,k).
-depends R(j1), R2(j1).
 
 (* Case R1 *)
 expand frame@R1(j,i,k); expand exec@R1(j,i,k).

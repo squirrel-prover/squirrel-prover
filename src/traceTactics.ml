@@ -43,6 +43,14 @@ let () =
   T.register "true" ~help:"Concludes if the goal is true.\n Usage: true."
     goal_true_intro
 
+let print (s : TraceSequent.t) sk fk =
+  Printer.prt `Result "@.%a@." Action.pp_descrs (TraceSequent.system s);
+   sk [s] fk
+
+let () =
+  T.register "print" ~help:"Shows the current system.\n Usage: print."
+    print
+
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
 let goal_and_right (s : TraceSequent.t) sk fk =
@@ -230,7 +238,7 @@ let () =
   T.register_general "depends"
     ~help:"If the second action given as argument depends on the first action,\
            \n add the corresponding timestamp inequality.\
-           \n Usage: depends a1 a2."
+           \n Usage: depends a1, a2."
     (function
        | [Prover.Theory t1; Prover.Theory t2] ->
            fun s sk fk -> begin match depends t1 t2 s with
@@ -490,15 +498,19 @@ let expand (term : Theory.term) (s : TraceSequent.t) =
   let succ subst = [TraceSequent.apply_subst subst s] in
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
-      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition system sort mn is a)]
+      if Macros.is_defined mn a then
+        succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                           Macros.get_definition system sort mn is a)]
+      else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
       begin match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
-          succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+          if Macros.is_defined mn a then
+            succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                              Macros.get_definition system sort mn is a)]
+          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | exception Theory.(Conv e) ->
           Tactics.soft_failure (Tactics.Cannot_convert e)
         | _ ->
@@ -688,7 +700,7 @@ let () =
   T.register_general "substitute"
     ~help:"If the seuqnet implies that the arguments i1, i2 are equals,\
            \n replaces all occurences of i1 by i2 inside the sequent.\
-           \n Usage: substitute i1 i2."
+           \n Usage: substitute i1, i2."
     (function
        | [Prover.Theory v1; Prover.Theory v2] ->
            fun s sk fk -> begin match substitute v1 v2 s with
