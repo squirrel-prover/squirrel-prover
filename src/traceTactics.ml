@@ -238,7 +238,7 @@ let () =
   T.register_general "depends"
     ~help:"If the second action given as argument depends on the first action,\
            \n add the corresponding timestamp inequality.\
-           \n Usage: depends a1 a2."
+           \n Usage: depends a1, a2."
     (function
        | [Prover.Theory t1; Prover.Theory t2] ->
            fun s sk fk -> begin match depends t1 t2 s with
@@ -696,7 +696,7 @@ let () =
   T.register_general "substitute"
     ~help:"If the seuqnet implies that the arguments i1, i2 are equals,\
            \n replaces all occurences of i1 by i2 inside the sequent.\
-           \n Usage: substitute i1 i2."
+           \n Usage: substitute i1, i2."
     (function
        | [Prover.Theory v1; Prover.Theory v2] ->
            fun s sk fk -> begin match substitute v1 v2 s with

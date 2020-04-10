@@ -990,7 +990,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
 let () = T.register_general "expand"
   ~help:"Expand all occurrences of the given macro, or expand the given \
          sequence using the given indices.\
-         \n Usage: expand macro. expand seq(i,k...->t(i,k,...),i1,k1,..."
+         \n Usage: expand macro. expand seq(i,k...->t(i,k,...)),i1,k1,..."
   (function
     | [Prover.Theory v] -> pure_equiv (expand v)
     | (Prover.Theory v)::ids ->
