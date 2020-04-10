@@ -498,15 +498,19 @@ let expand (term : Theory.term) (s : TraceSequent.t) =
   let succ subst = [TraceSequent.apply_subst subst s] in
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
-      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition system sort mn is a)]
+      if Macros.is_defined mn a then
+        succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                           Macros.get_definition system sort mn is a)]
+      else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
       begin match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
-          succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+          if Macros.is_defined mn a then
+            succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                              Macros.get_definition system sort mn is a)]
+          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | exception Theory.(Conv e) ->
           Tactics.soft_failure (Tactics.Cannot_convert e)
         | _ ->

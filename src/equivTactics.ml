@@ -918,8 +918,7 @@ let () =
 
 
 (* Sequence expansion of the sequence [term] for the given parameters [ths]. *)
-let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
-    sk fk =
+let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
   match Theory.convert tsubst term Sorts.Message with
@@ -941,19 +940,17 @@ let expand_seq (term : Theory.term) (ths:Theory.term list) (s : EquivSequent.t)
       if List.mem new_t old_hyp_biframe then old_hyp_biframe
       else new_t :: old_hyp_biframe
     in
-    sk [ EquivSequent.set_biframe
-           (EquivSequent.set_hypothesis_biframe s hypo_biframe)
-           biframe] fk
+    [ EquivSequent.set_biframe
+        (EquivSequent.set_hypothesis_biframe s hypo_biframe)
+        biframe]
   | _ ->
-    Tactics.hard_failure
-      (Tactics.Failure "Can only expand with sequences with parameters")
+    Tactics.soft_failure
+      (Tactics.Failure "can only expand with sequences with parameters")
   | exception Theory.(Conv e) ->
-      fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
-
-
+    Tactics.soft_failure (Cannot_convert e)
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
-let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
+let expand (term : Theory.term) (s : EquivSequent.t) =
   let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
   (* final function once the subtitustion has been computed *)
   let succ subst =
@@ -961,38 +958,46 @@ let expand (term : Theory.term) (s : EquivSequent.t) sk fk =
       | EquivSequent.Message e -> EquivSequent.Message (Term.subst subst e)
       | EquivSequent.Formula e -> EquivSequent.Formula (Term.subst subst e)
     in
-    sk [EquivSequent.set_biframe s
-          (List.map apply_subst (EquivSequent.get_biframe s))] fk
+    [EquivSequent.set_biframe s
+      (List.map apply_subst (EquivSequent.get_biframe s))]
   in
   (* computes the substitution dependeing on the sort of term *)
   match Theory.convert tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
-      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition
-                           (EquivSequent.get_system s) sort mn is a)]
+      if Macros.is_defined mn a then
+        succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                           Macros.get_definition
+                             (EquivSequent.get_system s) sort mn is a)]
+      else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
-      Tactics.hard_failure (Tactics.Failure "Can only expand macros")
+      Tactics.soft_failure (Tactics.Failure "can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
       begin
         match Theory.convert tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
-          succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                             Macros.get_definition
-                               (EquivSequent.get_system s) sort mn is a)]
+          if Macros.is_defined mn a then
+            succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                               Macros.get_definition
+                                 (EquivSequent.get_system s) sort mn is a)]
+          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | _ ->
-          Tactics.hard_failure (Tactics.Failure "Can only expand macros")
+          Tactics.soft_failure (Tactics.Failure "can only expand macros")
         | exception Theory.(Conv e) ->
-          fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
+          Tactics.soft_failure (Cannot_convert e)
       end
     | exception Theory.(Conv e) ->
-          fk (Tactics.Failure  (Fmt.str "%a" Theory.pp_error e))
+      Tactics.soft_failure (Cannot_convert e)
 
 let () = T.register_general "expand"
   ~help:"Expand all occurrences of the given macro, or expand the given \
          sequence using the given indices.\
          \n Usage: expand macro. expand seq(i,k...->t(i,k,...)),i1,k1,..."
   (function
-    | [Prover.Theory v] -> pure_equiv (expand v)
+    | [Prover.Theory v] ->
+        pure_equiv
+          (fun s sk fk -> match expand v s with
+             | subgoals -> sk subgoals fk
+             | exception (Tactics.Tactic_soft_failure e) -> fk e)
     | (Prover.Theory v)::ids ->
         let ids =
           List.map
@@ -1002,7 +1007,10 @@ let () = T.register_general "expand"
                         (Tactics.Failure "improper arguments"))
             ids
         in
-        pure_equiv (expand_seq v ids)
+        pure_equiv
+          (fun s sk fk -> match expand_seq v ids s with
+             | subgoals -> sk subgoals fk
+             | exception (Tactics.Tactic_soft_failure e) -> fk e)
      | _ ->
          Tactics.hard_failure
            (Tactics.Failure "improper arguments"))
