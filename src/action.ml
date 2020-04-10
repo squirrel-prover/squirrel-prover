@@ -394,7 +394,7 @@ let pp_actions ppf () =
            pp_indices indices) ;
   Fmt.pf ppf "@]@]@."
 
-let pp_descrs ppf system () =
+let pp_descrs ppf system =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
   iter_descrs system (fun descr ->
       Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"

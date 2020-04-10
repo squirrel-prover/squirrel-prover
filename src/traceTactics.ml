@@ -43,6 +43,14 @@ let () =
   T.register "true" ~help:"Concludes if the goal is true.\n Usage: true."
     goal_true_intro
 
+let print (s : TraceSequent.t) sk fk =
+  Printer.prt `Result "@.%a@." Action.pp_descrs (TraceSequent.system s);
+   sk [s] fk
+
+let () =
+  T.register "print" ~help:"Shows the current system.\n Usage: print."
+    print
+
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
 let goal_and_right (s : TraceSequent.t) sk fk =

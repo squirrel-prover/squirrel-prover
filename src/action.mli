@@ -196,7 +196,7 @@ val pp_parsed_action : Format.formatter -> (string list) item list -> unit
 val pp_actions : Format.formatter -> unit -> unit
 
 (** Pretty-print all action descriptions. *)
-val pp_descrs : Format.formatter -> system -> unit -> unit
+val pp_descrs : Format.formatter -> system -> unit
 
 (** {2 Substitution} *)
 
