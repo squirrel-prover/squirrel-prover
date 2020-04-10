@@ -31,8 +31,6 @@ fa 1. fa 2. prf 2.
 (* easy case, it is the firt produced hash. *)
 yesif 2.
 project.
-case H0.
-case H0.
 
 expandall.
 

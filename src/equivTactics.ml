@@ -491,12 +491,13 @@ let mk_phi_proj system env name indices proj biframe =
             (* if new_action occurs before an action of the frame *)
             let disj =
               List.fold_left Term.mk_or Term.False
-                (List.map
-                  (fun (t,strict) ->
-                    if strict
-                    then Term.Atom (`Timestamp (`Lt, new_action, t))
-                    else Term.Atom (Term.mk_timestamp_leq new_action t))
-                  list_of_actions_from_frame)
+                (List.sort_uniq Pervasives.compare
+                  (List.map
+                    (fun (t,strict) ->
+                      if strict
+                      then Term.Atom (`Timestamp (`Lt, new_action, t))
+                      else Term.Atom (Term.mk_timestamp_leq new_action t))
+                    list_of_actions_from_frame))
             (* then indices of name in new_action and of [name] differ *)
             and conj =
               List.fold_left Term.mk_and True
@@ -677,12 +678,13 @@ let mk_prf_phi_proj system env param proj biframe =
           (* if new_action occurs before an action of the frame *)
           let disj =
             List.fold_left Term.mk_or Term.False
-              (List.map
-                (fun (t,strict) ->
-                  if strict
-                  then Term.Atom (`Timestamp (`Lt, new_action, t))
-                  else Term.Atom (Term.mk_timestamp_leq new_action t))
-                list_of_actions_from_frame)
+              (List.sort_uniq Pervasives.compare
+                (List.map
+                  (fun (t,strict) ->
+                    if strict
+                    then Term.Atom (`Timestamp (`Lt, new_action, t))
+                    else Term.Atom (Term.mk_timestamp_leq new_action t))
+                  list_of_actions_from_frame))
           (* then if key indices are equal then hashed messages differ *)
           and conj =
             List.fold_left Term.mk_and True
