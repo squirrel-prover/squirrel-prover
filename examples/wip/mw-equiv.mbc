@@ -1,0 +1,99 @@
+hash H
+
+(* TODO abstract would be more natural but index->message not allowed *)
+name id : index->message
+name id':index -> index ->message
+
+name key : index->message
+name key':index -> index -> message
+
+abstract error : message
+abstract tag0 : message
+abstract tag1 : message
+axiom tags_neq : tag0 <> tag1
+
+channel c
+
+process tag(i:index, t:index)=
+  in(c,x);
+  new nt;
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>)
+
+process reader =
+  new nr;
+  out(c,nr);
+  in(c,m);
+  try find i,t such that xor(id(i),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
+    out(c,xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
+  else
+    out(c,error)
+
+system (!_r R: reader | !_i !_t T: tag(i,t)).
+
+
+equiv foo.
+Proof.
+induction t.
+(* Case R *)
+expand frame@R(r); expand exec@R(r).
+expand cond@R(r);expand output@R(r).
+fa 1.
+fa 2.
+fresh 2.
+yesif 2.
+repeat split.
+depends R(r1), R2(r1).
+depends R(r1), R1(r1,i,t).
+
+(* Case R1 *)
+expand frame@R1(r,i,t); expand exec@R1(r,i,t).
+expand cond@R1(r,i,t); expand output@R1(r,i,t).
+
+admit.
+
+(* Case R2 *)
+admit.
+
+(* Case T *)
+expand frame@T(i,t); expand exec@T(i,t).
+expand cond@T(i,t);expand output@T(i,t).
+fa 1.
+fa 2.
+fa 2.
+fa 3.
+prf 4.
+yesif 4.
+apply tags_neq.
+project.
+repeat split.
+assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
+admit. (* fresh - T(i,t) generates nt(i,t) which is needed to fill input R1(r,i1,t1) and that action has to occur before - impossible *)
+assert (fst(input@R2(r))=nt(i,t)).
+admit. (* fresh *)
+repeat split.
+assert (fst(input@R2(r))=nt(i,t)).
+admit. (* fresh *)
+assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
+admit. (* fresh *)
+fresh 2.
+yesif 2.
+
+admit. (* c'est perdu - il me fallait un prf sous un context pour appliquer xor.*)
+Qed.
+
+
+
+goal wa:
+  forall (r:index,i:index),
+  cond@R1(r,i) =>
+  exists (t:index),
+  T(i,t) <= R1(r,i) &&
+  fst(input@R1(r,i)) = nt(i,t) &&
+  input@T(i,t) = nr(r).
+Proof.
+  simpl.
+  expand cond@R1(r,i).
+  euf M0.
+  apply tags_neq.
+  exists t.
+Qed.

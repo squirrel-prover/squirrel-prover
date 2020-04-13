@@ -50,145 +50,45 @@ depends R(j1), R1(j1,i,k).
 depends R(j1), R2(j1).
 
 (* Case R1 *)
-admit.
 
-(* Case R2 *)
+expand frame@R1(j,i,k).
+expand exec@R1(j,i,k).
+expand cond@R1(j,i,k).
+expand output@R1(j,i,k).
 
-expand frame@R2(j); expand exec@R2(j).
-expand cond@R2(j).
-nosimpl(expand output@R2(j)).
-fa 1.
-fa 0.
 
 fa 0.
-
-equivalent  
-( forall (i,k:index),
- not(snd(input@R2(j)) = h(<<nR(j),fst(input@R2(j))>,tag1>,diff(key(i),key'(i,k))))),
-( forall (i,k:index),
-  not(T(i,k) <= R2(j)) || 
-  not(fst(input@R2(j)) = fst(output@T(i,k))) ||
-  not(snd(input@R2(j)) = snd(output@T(i,k)))).
-admit.
-fa 1.
-
-
 fa 2.
-fa 3.
+nosimpl(fa 3).
+simpl.
+
 
 equivalent  
-( 
- snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,diff(key(i),key'(i,k)))),
-(
-  T(i,k) <= R1(j,i,k) && 
+( snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,diff(key(i),key'(i,k)))),
+(  T(i,k) <= R1(j,i,k) && 
   fst(input@R1(j,i,k)) = fst(output@T(i,k)) &&
-  snd(input@R1(j,i,k)) = snd(output@T(i,k))).
-
+ snd(input@R1(j,i,k)) = snd(output@T(i,k))).
 admit.
 fa 1.
 fa 1.
 prf 5.
 yesif 5.
+
+apply tags_neq.
 project.
 repeat split.
 substitute i1, i.
+assert(k=k1).
+admit.
+substitute k1, k.
 case H0.
-depends T(i,k1), T1(i,k1).
+expand m2(i,k)@T1(i,k).
 
-simpl.
-
-prf 3.
-
-yesif 3.
+euf 1.
 apply tags_neq.
-
-project.
-repeat split.
-substitute i1, i.
-expand m2(i,k1)@T1(i,k1).
-assert(snd(input@R1(j,i,k))= input@T(i,k1)).
-admit.
-
-assert(nR(j) = input@T(i,k1)).
 *)
-(*
-split.
-intros.
-project.
-expand cond@R1(j,i,k).
-apply tags_neq.
-euf M0.
-exists i, k1.
-expand cond@R1(j,i,k).
-apply tags_neq.
-exists i,k.
-split.
-split.
-euf M0.
-euf M0.
-euf M0.
-simpl.
-substitute ii,i.
-expand output@T(i,kk).
-expand m2(i,kk)@T(i,kk).
-expand cond@R1(j,i,k).
-assert(k=kk).
-admit.
-substitute kk, k.
-project.
-help.
-assert (input@T(i,k) = nR(j)).
-admit.
-assert (input@T(i,k) = nR(j)).
-admit.
-prf 3.
-yesif 3.
-apply tags_neq.
-project.
-repeat split.
-
-apply M1.
-simpl M0.
-
-dup D2.
-project.
-refl M2.
-expand cond@R1(k,i,k).
-
-intro.
-expand cond@R1(k,i,k).
-
-
-exists i,k.
-project.
-expand cond@R1(j,i,k).
-expand output@T(ii,kk).
-expand m2(ii,kk)@T(ii,kk).
-
-intro.
 admit.
 
-prf 3.
-yesif 3.
-apply tags_neq.
-
-
-project.
-repeat split.
-case H0.
-
-intro.
-
-help.
-intro.
-*)
-(*
-assert( forall (i,j,k:index),  (cond@R1(j,i,k)) =>
-  (exists (ii:index,kk:index),
-  T(ii,kk) <= R1(j,i,k) &&
-  fst(input@R1(j,i,k)) = fst(output@T(ii,kk))) &&
-  snd(input@R1(j,i,k)) = snd(output@T(ii,kk))).
-*)
 
 (* Case R2 *)
 admit.
@@ -216,49 +116,52 @@ yesif 3.
 apply tags_neq.
 project.
 
+(* left *)
 repeat split.
-case H0.
-case H0.
 depends T(i1,k1),T1(i1,k1).
-depends T(i1,k1),T1(i1,k1).
-case H0.
-depends T(i1,k1),T2(i1,k1).
 depends T(i1,k1),T2(i1,k1).
 assert (nT(i,k) = fst(input@R2(j))).
-case H0.
-admit. (* TODO fresh M2 *)
 admit. (* TODO fresh M2 *)
 assert (nT(i,k) = fst(input@R1(j,i1,k1))).
-case H0.
-admit.  (* TODO fresh M3 *)
-admit. (* TODO fresh M3 *)
+admit. (* TODO fresh M2 *)
 
+(* right *)
 repeat split.
 assert (nT(i,k) = fst(input@R1(j,i1,k1))).
-case H0.
-admit. (* TODO fresh ? *)
-admit. 
+admit. (* TODO fresh M2 *)
 assert (nT(i,k) = fst(input@R2(j))).
-case H0.
-admit. (* TODO fresh ? *)
-admit. (* TODO fresh ? *)
-depends T(i1,k1), T2(i1,k1).
-case H0.
-depends T(i1,k1), T1(i1,k1).
-case H0.
-depends T(i1,k1), T1(i1,k1).
-case H0.
+admit. (* TODO fresh M2 *)
+depends T(i1,k1),T2(i1,k1).
+depends T(i1,k1),T1(i1,k1).
+
 fresh 2.
 yesif 2.
 repeat split.
-depends T(i1,k1), T2(i1,k1).
-depends T(i1,k1), T1(i1,k1).
-depends T(i1,k1), T2(i1,k1).
-depends T(i1,k1), T1(i1,k1).
+depends T(i1,k1),T2(i1,k1).
+depends T(i1,k1),T1(i1,k1).
 
 
 (* Case T1 *)
+expand frame@T1(i,k).
+expand exec@T1(i,k).
+expand cond@T1(i,k).
+expand output@T1(i,k).
+fa 0.
+
+expand m2(i,k)@T1(i,k).
+
+equivalent   
+(input@T1(i,k) =
+   h(<<h(<<input@T(i,k),nT(i,k)>,tag1>,(diff(key(i), key'(i,k)))),
+       input@T(i,k)>,tag2>,(diff(key(i), key'(i,k)))))
+,
+( exists (j:index), (R1(j,i,k) < T1(i,k) && 
+  input@T1(i,k) = output@R1(j,i,k))).
+split.
+
 admit.
+admit (*fadup*).
+
 (* Case T2 *)
 admit.
 Qed.
