@@ -31,17 +31,18 @@ abstract dec : message -> message -> message
 
 axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) =x1
 
-hash h
-name kh : message
+abstract h : message -> message
+
+axiom [none,auth] collres : forall (x1,x2:message), h(x1) = h(x2) => x1 = x2
 
 axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
- (sk <> kP || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>,kh) )
+ (sk <> kP || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>) )
   &&
- (sk <> kS || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>,kh))
+ (sk <> kS || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>))
 
 
 (** We first present the general ssh process. *)
@@ -55,11 +56,10 @@ process P =
  (* begin P1 *)
 
   in(cP,t);
-  let sid = h(<<g^a1,gB>,gB^a1>,kh) in
+  let sidP = h(<<g^a1,gB>,gB^a1>) in
   let pkS = fst(t) in
-  let sidS = snd(t) in
-  if checksign(snd(t),pkS) = h(sid,kh) then
-     out(cP, enc(sign(sid,kP),gB^a1))
+  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+    Pok : out(cP, enc(sign(sidP,kP),gB^a1))
 
 
 process S =
@@ -70,11 +70,11 @@ process S =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sid = h(<<gP,g^b1>,gP^b1>,kh) in
-  out(cS, <<pk(kS),g^b1>,sign(sid, kS)>);
+  let sidS = h(<<gP,g^b1>,gP^b1>) in
+  out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = h(sid,kh) then
-     out(cS,ok)
+  if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
+    Sok : out(cS,ok)
 
 system [fullSSH] ( P | S).
 
@@ -118,16 +118,15 @@ process Pauth =
  (* begin P1 *)
 
   in(cP,t);
-  let sid = h(<<g^a1,gB>,gB^a1>,kh) in
+  let sidP = h(<<g^a1,gB>,gB^a1>) in
   let pkS = fst(t) in
-  let sidS = snd(t) in
-  if checksign(snd(t),pkS) = h(sid,kh) then
-     out(cP, enc(sign(sid,kP),gB^a1));
+  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+     out(cP, enc(sign(sidP,kP),gB^a1));
      in(cP,challenge);
      try find i such that gB = g^b(i) || gB = g^b1 in
          out(cP,ok)
      else
-         out(cP,diff(ok,ko))
+        Pfail : out(cP,diff(ok,ko))
 
 process Sauth =
  (* begin S0 *)
@@ -137,59 +136,60 @@ process Sauth =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sid = h(<<gP,g^b1>,gP^b1>,kh) in
-  out(cS, <<pk(kS),g^b1>,sign(sid, kS)>);
+  let sidS = h(<<gP,g^b1>,gP^b1>) in
+  out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = h(sid,kh) then
+  if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
       out(cS,ok);
      in(cS,challenge);
      try find i such that gP = g^a(i) || gP = g^a1 in
          out(cS,ok)
      else
-         out(cS,diff(ok,ko))
+       Sfail :  out(cS,diff(ok,ko))
 
-system [auth] ( P | S).
+system [auth] ( Pauth | Sauth).
 
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [none, auth] S1_charac :
-  cond@S1 => (cond@A2 => False) .
+goal [none, auth] P_charac :
+  cond@Pok => (cond@Pfail => False) .
   Proof.
- print.
   simpl.
-  expand cond@S1.
-  expand cond@A2.
-  expand pkP@S1.
-  substitute fst(input@S), pk(kP).
-  euf M1.
-
+  expand cond@Pok.
+  expand cond@Pfail.
+  expand pkS@Pok.
+  substitute fst(input@Pok), pk(kS).
+  euf M0.
+  expand sidP@Pok.
   case H2.
-  apply H1 to i.
+ apply collres to <<g^a1,input@P1>,input@P1^a1>, <<x,g^b(i)>,x1>.
+  apply H0 to i.
 
-  notleft H0.
+  apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
+
+  freshindex l.
+  apply H0 to l.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [none, auth] P1_charac :
-   cond@P1 => (cond@P4 => False).
+goal [none, auth] S_charac :
+   cond@Sok => (cond@Sfail => False).
 Proof.
   simpl.
-  expand cond@P1; expand cond@P4.
-  substitute pkS@P1,pk(kS).
-  euf M1.
+  expand cond@Sok; expand cond@Sfail.
+  euf M0.
 
-  case H3.
-  apply H1 to i.
+  case H1.
+  apply H0 to i.
 
-  notleft H0.
+  apply collres to <<g^a(i),x>,x1>,<<input@S,g^b1>,input@S^b1>.
+
+  apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
+  freshindex l.
+  apply H0 to l.
 Qed.
 
-(** The strong secrecy is directly obtained through ddh. *)
-equiv [left,secret] [right,secret] secret.
-Proof.
-   ddh a1, b1, k11.
-Qed.
 
 (** The equivalence for authentication is obtained by using the unreachability
 proofs over the two actions. The rest of the protocol can be handled through
@@ -197,35 +197,39 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich kP; enrich g^a1; enrich g^b1; enrich kS.
-   enrich seq(i-> g^b(i)).    enrich seq(i-> g^a(i)).
+   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS.
 
    induction t.
 
    expandall.
    fa 7.
 
-   expand seq(i->g^b(i)),j.
+   expand seq(i->g^b(i)),i.
+   expand frame@Pfail.
 
-   expand frame@P4; expand exec@P4.
-   fa 7.
-
-   equivalent cond@P4,False.
-   simpl.
-   executable pred(P4). depends P1, P4. apply H1 to P1. apply P1_charac.
-
-   noif 8. simpl.
+   equivalent exec@Pfail, False.
+   expand exec@Pfail.
+   executable pred(Pfail).
+   depends Pok, Pfail.
+   apply H2 to Pok.
+   apply P_charac.
+   fa 6.
+   noif 7.
 
    expandall.
    fa 7.
 
-   expand seq(i->g^a(i)),l.
+   expand seq(i->g^a(i)),i.
 
-   expand frame@S4; expand exec@S4.
+   expand frame@Sfail.
 
-   equivalent cond@S4,False.
-   simpl.
-   executable pred(S4). depends S1, S4. apply H1 to S1. apply S1_charac.
+   equivalent exec@Sfail, False.
+   expand exec@Sfail.
+   executable pred(Sfail).
+   depends Sok, Sfail.
+   apply H2 to Sok.
+   apply S_charac.
+   fa 6.
+   noif 7.
 
-   fa 7. noif 8.
 Qed.
