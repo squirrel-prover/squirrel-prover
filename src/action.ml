@@ -293,10 +293,10 @@ let register system_name symb indices action descr =
   | Term.Action (symb2, is) ->
     let subst = Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
     let descr = subst_descr [subst] descr in
-    Hashtbl.add action_to_descr (s,system_name) descr
+    Hashtbl.add action_to_descr (s,system_name) descr; symb2
   | _ -> assert false
   | exception Not_found ->   Hashtbl.add action_to_descr (s,system_name) descr ;
-define_symbol symb indices action
+define_symbol symb indices action; symb
 
 
 let make_bi_descr d1 d2 =
