@@ -594,7 +594,15 @@ let parse_proc system_name proc : unit =
       let action = List.rev env.action in
       let action_descr =
         Action.{ action; input; indices; condition; updates; output } in
-      Action.register system_name (Obj.magic a) indices action action_descr ;
+      let new_a = Action.register system_name (Obj.magic a) indices action action_descr in
+      (* Action.register gives back the actual name corresponding to the
+         action. It is not equal to a, if some action with the same shape was
+         previsouly defined. We thus redefine the environment with the correct
+         name. *)
+      let in_tm =
+        Term.Macro (Term.in_macro, [], Term.Action (new_a,indices)) in
+      let env = { env with subst = (snd input, in_tm) :: env.subst } in
+
       ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
 
   | p ->

@@ -166,7 +166,7 @@ val is_fresh : system_name -> bool
    set of registered actions for this system name will define the protocol under
    study. *)
 val register : system_name ->
-  Symbols.action Symbols.t -> Vars.index list -> action -> descr -> unit
+  Symbols.action Symbols.t -> Vars.index list -> action -> descr ->  Symbols.action Symbols.t
 
 (** Reset all action definitions done through [register]. *)
 val reset : unit -> unit
