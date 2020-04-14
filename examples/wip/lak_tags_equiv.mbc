@@ -1,5 +1,6 @@
 hash h
 
+
 abstract ok:message
 abstract ko:message
 
@@ -27,9 +28,9 @@ process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-  try find i,k such that snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) in
-    out(cR,h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
-  else
+  if exists (i,k:index), snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) then
+    out(cR, ** )
+ else
     out(cR,ko)
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
