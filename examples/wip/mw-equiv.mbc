@@ -60,6 +60,8 @@ expand cond@T(i,t);expand output@T(i,t).
 fa 1.
 fa 2.
 fa 2.
+xor 3.
+
 fa 3.
 prf 4.
 yesif 4.
