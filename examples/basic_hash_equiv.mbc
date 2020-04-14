@@ -65,7 +65,6 @@ Proof.
 
   expand frame@R(j); expand exec@R(j);
     expand cond@R(j); expand output@R(j).
-  fa 0.
   equivalent
     (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
     (exists (i,k:index), T(i,k)<R(j) &&
@@ -76,12 +75,16 @@ Proof.
   exists i,k1.
   exists i,k.
   exists i,k.
+  (* TODO fa/dup should be able to to remove the right part
+   * of the conjunction, leaving only the exec part -- however,
+   * without the "exec && ..." part it seems hard to justify the
+   * erasure of outputs. *)
+  fa 0.
   admit 1. (* TODO fa/dup *)
 
 
   expand frame@R1(j); expand exec@R1(j);
     expand cond@R1(j); expand output@R1(j).
-  fa 0.
   equivalent
     (exists (i,k:index),
        snd(input@R1(j))=h(fst(input@R1(j)),diff(key(i),key'(i,k)))),
@@ -96,7 +99,9 @@ Proof.
   euf M0.
   exists i,k.
   exists i,k.
-  admit 1. (* TODO fa/dup *)
+  (* TODO fa/dup as above *)
+  fa 0.
+  admit 1.
 
 
   expand frame@T(i,k); expand exec@T(i,k);
