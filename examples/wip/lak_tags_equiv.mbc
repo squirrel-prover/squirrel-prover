@@ -29,7 +29,7 @@ process reader(j:index) =
   out(cR,nR);
   in(cT,x);
   if exists (i,k:index), snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) then
-    out(cR, ** )
+       try find i,k such that snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) in out(cR,h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
  else
     out(cR,ko)
 
@@ -41,7 +41,17 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 equiv foo.
 Proof.
 induction t.
+admit.
+admit.
+admit.
+nosimpl(expand frame@A(j)).
+nosimpl(expand output@A(j)).
+
+admit.
+
+
 (* Case R: OK *)
+
 expand frame@R(j); expand exec@R(j).
 expand cond@R(j); expand output@R(j).
 fa 1; fa 2.
