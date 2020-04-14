@@ -41,13 +41,6 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 equiv foo.
 Proof.
 induction t.
-admit.
-admit.
-admit.
-nosimpl(expand frame@A(j)).
-nosimpl(expand output@A(j)).
-
-admit.
 
 
 (* Case R: OK *)
@@ -58,6 +51,7 @@ fa 1; fa 2.
 fresh 2; yesif 2.
 repeat split.
 depends R(j1), R1(j1,i,k).
+depends R(j1), A(j1).
 depends R(j1), R2(j1).
 
 (* Case R1 *)
@@ -66,9 +60,29 @@ expand frame@R1(j,i,k).
 expand exec@R1(j,i,k).
 expand cond@R1(j,i,k).
 expand output@R1(j,i,k).
-
-
 fa 0.
+
+
+
+equivalent 
+(exists (i,k:index), snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,(diff(key(i), key'(i,k))))),
+(exists (i,k:index), (T(i,k) < R1(j,i,k) &&
+snd(output@T(i,k)) = snd(input@R1(j,i,k)) &&
+ fst(output@T(i,k)) = fst(input@R1(j,i,k)) &&  input@T(i,k) = output@R(j)
+&&  (input@T(i,k) = output@R(j) => R(j) < T(i,k)))
+  ).
+
+split.
+project.
+apply tags_neq.
+
+euf M0.
+
+exists i1,k1.
+
+euf M0.
+
+
 fa 2.
 nosimpl(fa 3).
 simpl.
