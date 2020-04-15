@@ -112,18 +112,22 @@ project.
 (* left *)
 repeat (split+intro).
 depends T(i,k),T2(i,k).
-admit. (* fresh nT *)
-admit. (* fresh nT *)
-depends T(i,k),T1(i,k).
-admit. (* fresh nT *)
+assert fst(input@R1(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k).
+assert fst(input@R1(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k). depends T(i,k),T1(i,k).
+assert fst(input@R2(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k).
 
 (* right *)
 repeat (split+intro).
-admit. (* fresh *)
-depends T(i,k),T1(i,k).
-admit. (* fresh *)
-admit. (* fresh *)
 depends T(i,k),T2(i,k).
+assert fst(input@R2(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k). depends T(i,k),T1(i,k).
+assert fst(input@R1(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k).
+assert fst(input@R1(j))=nT(i,k). fresh M2.
+case H0. depends T(i,k),T1(i,k). depends T(i,k),T2(i,k). depends T(i,k),T2(i,k).
 
 fresh 2.
 yesif 2.
