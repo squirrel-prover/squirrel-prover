@@ -1,6 +1,7 @@
 (* Second part of the proof of ssh with a modified agent forwarding. It
 corresponds to the security a the forwarded SSH key exchange, but with oracles
-that allow to simulate all other forwarded SSH login and previous SSH logins.
+that allow to simulate all other forwarded SSH login and previous non forwarded
+SSH logins.
 *)
 
 abstract ok : message
@@ -32,33 +33,40 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-signature enc,checkdec,pke
-abstract dec : message -> message -> message
+(* we only use the fact that a indcca encryption is unforgeable. Due to
+limitation of the tool, we model the symmetric encryption as an asymetric
+encryption. Remark that the symmetric encryption must be euf even when a hash
+containing the key is given. In other terms, the hash function h should be
+PRF. *)
+signature enc,checkdec,pke abstract dec : message -> message -> message
 
-axiom [none,auth] encdec : forall (x1:message), dec(enc(x1,k11),pke(k11)) =x1
+axiom [none,auth] encdec : forall (m1:message), dec(enc(m1,k11),pke(k11)) =m1
 
 abstract h : message -> message
 
-axiom [none,auth] collres : forall (x1,x2:message), h(x1) = h(x2) => x1 = x2
-axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1) <> <forwarded,x2>
+axiom [none,auth] collres : forall (m1,m2:message), h(m1) = h(m2) => m1 = m2
+axiom [none,auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m) => fst(m1) <> m2
 
-
-axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
-axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
+axiom DDHinj : forall (m1,m2:message), m1 <> m2 => g^m1 <> g^m2
+axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
- || exists (i:index, x1:message, x2:message) m=<forwarded, h(<<g^a(i),x1>,x2>)> (* O_FPS *)
- || exists (i:index, x1:message, x2:message) m=h(<<g^ake1(i),x1>,x2>) (* O_KE1 *)
+ || exists (i:index, m1:message, m2:message) m=<forwarded, h(<<g^a(i),m1>,m2>)> (* O_FPS *)
+ || exists (i:index, m1:message, m2:message) m=h(<<g^ake1(i),m1>,m2>) (* O_KE1 *)
  )
   &&
 (sk <> kS
- || exists (i:index, x1:message, x2:message) m=<forwarded, h(<<x1,g^b(i)>,x2>)> (* O_FPS *)
- || exists (i:index, x1:message, x2:message) m=h(<<x1,g^bke1(i)>,x2>) (* O_KE1 *)
+ || exists (i:index, m1:message, m2:message) m=<forwarded, h(<<m1,g^b(i)>,m2>)> (* O_FPS *)
+ || exists (i:index, m1:message, m2:message) m=h(<<m1,g^bke1(i)>,m2>) (* O_KE1 *)
 )
 
+axiom [none,auth] signnotpair : forall (m1,m2,m3:message), fst(sign(m1,m2)) <> m3
 
+axiom [none,auth] difftags : anssign <> forwarded && forwarded <> reqsign && reqsign <> anssign
+
+axiom [none, auth] fstpair : forall (m1,m2,m3:message), <m2,m3> = m1 => fst(m1) = m2
 (** We first present the general ssh process. *)
 
  process P1FA =
@@ -198,10 +206,10 @@ Qed.
   out(cP,ok);
  (* begin P1 *)
   in(cP,t);
-  let sidPa = h(<<g^ake11,gB>,pke(k11)>) in
-  let pkSa = fst(t) in
-  if pkSa = pk(kS) && checksign(snd(t),pkS) = sidPa then
-       out(cP, enc(sign(sidPa,kP),k11));
+  let sidPaF = h(<<g^ake11,gB>,pke(k11)>) in
+  let pkSaF = fst(t) in
+  if pkSaF = pk(kS) && checksign(snd(t),pkS) = sidPaF then
+       out(cP, enc(sign(sidPaF,kP),k11));
            (* end P1 *)
 
            (* begin FA *)
@@ -244,7 +252,7 @@ process PDISauth =
       	      if fst(ya) = anssign then
                  out(cP, enc(snd(ya),gB^a1));
                  in(cP,challenge);
-                 try find i such that gB = g^b(i) || gB = g^b1 in
+                try find i such that gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11 in
                    out(cP,ok)
                  else
 		    Pfail : out(cP,diff(ok,ko))
@@ -273,7 +281,144 @@ system [auth] ( P1FAauth | SDISauth | PDISauth).
 
 
 goal [none, auth] P_charac :
-  cond@Pok => (cond@Pfail => False) .
+  exec@PDIS5 => (cond@Pfail => False) .
   Proof.
-  expand cond@Pok; expand cond@Pfail.
-  euf M1.
+   expand exec@PDIS5.
+  expand cond@PDIS5; expand cond@Pfail.
+  substitute pkSa@PDIS5,pk(kS).
+  euf M0.
+
+
+  (* oracle case *)
+  case H3.
+  case H3.
+   apply hashnotpair to sidPa@PDIS5, forwarded.
+   apply H3 to <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+		apply signnotpair to sidPa@P2, kP, anssign.
+   apply H1 to i1.
+  left; right.
+  apply collres  to <<m2,g^bke1(i1)>,m3> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
+
+  (* honnest case SDIS *)
+  apply collres  to <<input@SDIS,g^b1>,input@SDIS^b1> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  freshindex l.
+  apply H1 to l.
+
+  freshindex l.
+  apply H1 to l.
+  right.
+  apply collres  to <<input@PDIS,g^bke11>,pke(k11)>,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
+
+Qed.
+
+
+(* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
+goal [none, auth] S_charac :
+   exec@Sok =>(cond@Sfail => False).
+Proof.
+expand exec@Sok; expand cond@Sok; expand cond@Sfail.
+
+euf M0.
+
+(* oracle clase *)
+
+case H2.
+case H3.
+(* sub case with wrong tag *)
+apply H1 to i.
+apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a(i),m>,m1>.
+
+apply hashnotpair to  h(<<g^ake1(i1),m2>,m3>), forwarded.
+(* Here, I do weird stuff, else we have an assert false in completion.ml. TODO *)
+nosimpl(apply H3 to <<g^ake1(i1),m2>,m3>).
+nosimpl(apply fstpair to h(<<g^ake1(i1),m2>,m3>), forwarded,sidSa@Sok).
+simpl.
+assumption.
+simpl.
+
+(* else, it comes from P2, and is not well tagged *)
+apply hashnotpair to  sidPaF@P2, forwarded.
+apply H3 to (<<g^ake11,input@P1>,pke(k11)>).
+
+(* honnest case of signature produced by Fa. We need to prove that the sign req received by FA comes from PDIS. *)
+
+executable Sok.
+assert P3(i) <= Sok.
+case H2.
+depends SDIS, Sok.
+apply H3 to P3(i).
+expand exec@P3(i).
+expand cond@P3(i).
+
+(*we have that x3 is a message encrypted with the secret key, we use the euf of encryption *)
+euf M2.
+
+(* ill tagged cases *)
+apply signnotpair to sidPaF@P2,kP,reqsign.
+apply difftags.
+
+(* honnest case *)
+assert PDIS5 <= Sok.
+case H5.
+apply H3 to PDIS5.
+expand exec@PDIS5.
+expand cond@PDIS5.
+apply H1 to i.
+right.
+apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+Qed.
+
+(** The equivalence for authentication is obtained by using the unreachability
+proofs over the two actions. The rest of the protocol can be handled through
+some simple enriching of the induction hypothesis, and then dup applications. *)
+
+equiv [left, auth] [right, auth] auth.
+Proof.
+   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS;
+   enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11.
+
+induction t.
+
+ expandall.
+ fa 12.
+
+ expandall.
+  fa 12.
+
+expandall.
+ fa 12.
+
+expand seq(i -> a(i)),i.
+
+expand frame@Sfail.
+equivalent exec@Sfail, false.
+
+apply S_charac.
+depends Sok, Sfail.
+executable Sfail.
+apply H1 to Sok.
+expand exec@Sfail.
+
+fa 11. noif 12.
+
+
+expandall. fa 12.
+
+expandall. fa 12.
+
+expandall. fa 12.
+
+expand seq(i -> b(i)),i. expand seq(i -> bke1(i)),i.
+
+expand frame@Pfail.
+equivalent exec@Pfail, false.
+
+apply P_charac.
+depends PDIS5, Pfail.
+executable Pfail.
+apply H1 to PDIS5.
+expand exec@Pfail.
+
+fa 11. noif 12.
+
+Qed.
