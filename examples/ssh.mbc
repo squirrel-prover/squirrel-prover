@@ -1,14 +1,12 @@
-(** Example of signed DDH key exchange. It corresponds to the ISO 9798-3
-protocol.  We leverage the composition result, to prove a single session in the
-presence of an adversary with access to a "backdoor" about the signature
-function, which allows him to about signatures of some specific messages.
-
-The proof is split into two systems, one modelling the authentication property,
-and the other the strong secrecy. Put together, they allow to derive very simply
-the actual assumption needed to apply the composition theorem.  **)
+(* First part of the proof of ssh with a modified agent forwarding. It
+corresponds to the security a the basic SSH key exchange, but with oracles that
+allow to simulate all forwarded SSH login.
+*)
 
 abstract ok : message
 abstract ko : message
+abstract forwarded : message
+
 
 name kP : message
 name kS : message
@@ -34,15 +32,21 @@ axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) =x1
 abstract h : message -> message
 
 axiom [none,auth] collres : forall (x1,x2:message), h(x1) = h(x2) => x1 = x2
+axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1) <> <forwarded,x2>
+
 
 axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
- (sk <> kP || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>) )
+(sk <> kP
+ || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>) (* O_PS *)
+ || exists (x:message) m=<forwarded,x> )  (* O_forward *)
   &&
- (sk <> kS || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>))
+(sk <> kS
+ || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>) (* O_PS *)
+ || exists (x:message) m=<forwarded,x> ) (* O_forward) *)
 
 
 (** We first present the general ssh process. *)
@@ -163,8 +167,11 @@ goal [none, auth] P_charac :
   euf M0.
   expand sidP@Pok.
   case H2.
- apply collres to <<g^a1,input@P1>,input@P1^a1>, <<x,g^b(i)>,x1>.
+  case H2.
+  apply collres to <<g^a1,input@P1>,input@P1^a1>, <<x,g^b(i)>,x1>.
   apply H0 to i.
+
+  apply hashnotfor to <<g^a1,input@P1>,input@P1^a1>, x2.
 
   apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
 
@@ -181,9 +188,11 @@ Proof.
   euf M0.
 
   case H1.
+  case H2.
   apply H0 to i.
-
   apply collres to <<g^a(i),x>,x1>,<<input@S,g^b1>,input@S^b1>.
+
+  apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
 
   apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
   freshindex l.
