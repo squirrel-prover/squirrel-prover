@@ -225,7 +225,27 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   \label{fig:xor}
 \end{figure}
 
-
+\newcommand{\eufcma}{\textsc{EUF-CMA}}
+\begin{proposition}
+Let $P$ be a protocol.  In any computational model where $h$ is interpreted as a $\eufcma$ keyed hash-function, the following rule is valid for all term $t,m$ and name $sk$ such that all ocurences of $sk$ in $t$ or $P$ are of the form $h(\_,sk)$:
+  \begin{mathpar}
+    \inferrule{
+      (\Gamma,
+      \big(\bigvee_{h(x,sk) \in t} m=x \big)
+    }{
+      (\Gamma, t=h(m,sk) \vdash \phi)
+    }
+  \end{mathpar}
+    \begin{mathpar}
+    \inferrule{
+      (\Gamma,
+      \big(\bigvee_{A(\vec{i}) \in S} \bigvee_{h(x,sk) \in o_{A(\vec{i})} } m=x \wedge A(\vec{i}) \leq \tau\big)
+      ,\vdash \phi)
+    }{
+      (\Gamma, \minp@\tau=h(m,sk) \vdash \phi)
+    }
+    \end{mathpar}
+  \end{proposition}
 \subsection{Trace axioms}
 
 We now identify some valid formulas, which can thus be used as axioms

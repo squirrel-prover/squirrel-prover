@@ -1,109 +1,77 @@
 \section{Indistinguishability}
-\charlie{not up to date}
-\newcommand{\pair}[1]{\langle #1 \rangle}
 
-We now define indistinguishability of processes, and how we could verify it.
-We make a distinction between symbolic and observable traces:
-symbolic ones are sequences of action names as in \cref{def:trace},
-while observable traces are sequences of pairs $\pair{c_i,c_o}$.
-Intuitively, such a pair describes the input and output channels of an
-action; several actions might have the same input and output channels.
-We write $A : \pair{c_i,c_o}$ when action $A$ inputs on channel $c_i$ and
-outputs on channel $c_o$.
+ \newcommand{\pair}[1]{\langle #1 \rangle}
 
-For convenience, we talk of processes, though in reality the definitions
-deal with abstract systems described by sets of actions.
+% We now define indistinguishability of processes, and how we could verify it.
+% We make a distinction between symbolic and observable traces:
+% symbolic ones are sequences of action names as in \cref{def:trace},
+% while observable traces are sequences of pairs $\pair{c_i,c_o}$.
+% Intuitively, such a pair describes the input and output channels of an
+% action; several actions might have the same input and output channels.
+% We write $A : \pair{c_i,c_o}$ when action $A$ inputs on channel $c_i$ and
+% outputs on channel $c_o$.
 
-\newcommand{\fold}{\mathsf{fold}}
+% For convenience, we talk of processes, though in reality the definitions
+% deal with abstract systems described by sets of actions.
 
-\begin{definition}
-  Given an observable trace $t$ and a process $P$,
-  we define $\fold(P,t)$ as the frame describing all possible
-  executions of $P$ along $t$:
-  \begin{eqnarray*}
-    \fold(P,\epsilon) &=& \epsilon \\
-    \fold(P,(c_i,c_o).t') &=&
-      \mathsf{if}_{A:(c_i,c_o)}
-      \ldots
-  \end{eqnarray*}
-\end{definition}
+ \newcommand{\fold}{\mathsf{fold}}
 
-\begin{definition}
-  Two processes $P$ and $Q$ are indistinguishable when,
-  for all observable traces $t$,
-  for all computational model $\Mo$,
-  we have
-  $\Mo \models \fold(P,t) \sim \fold(Q,t)$.
-  This itself means that no attacker can distinguish,
-  with non-negligible probability, between the left- and right-hand sides.
-\end{definition}
+% \begin{definition}
+%   Given an observable trace $t$ and a process $P$,
+%   we define $\fold(P,t)$ as the frame describing all possible
+%   executions of $P$ along $t$:
+%   \begin{eqnarray*}
+%     \fold(P,\epsilon) &=& \epsilon \\
+%     \fold(P,(c_i,c_o).t') &=&
+%       \mathsf{if}_{A:(c_i,c_o)}
+%       \ldots
+%   \end{eqnarray*}
+% \end{definition}
 
-This notion of equivalence should coincide with the usual computational
-indistinguishability for bounded processes. In the unbounded case, it
-is restrictive to quantify on traces in this way
-and ask for indistinguishability only for each trace.
+% \begin{definition}
+%   Two processes $P$ and $Q$ are indistinguishable when,
+%   for all observable traces $t$,
+%   for all computational model $\Mo$,
+%   we have
+%   $\Mo \models \fold(P,t) \sim \fold(Q,t)$.
+%   This itself means that no attacker can distinguish,
+%   with non-negligible probability, between the left- and right-hand sides.
+% \end{definition}
+
+% This notion of equivalence should coincide with the usual computational
+% indistinguishability for bounded processes. In the unbounded case, it
+% is restrictive to quantify on traces in this way
+% and ask for indistinguishability only for each trace.
 
 \subsection{Straightforward diff-equivalence}
 
-Two processes may be given as a bi-process, i.e. a system with a single set of
-symbolic actions, each symbolic action describing an execution step of both the
-left and right processes, using $\diff{\_}{\_}$ terms as usual. In that case, we
-may define a stronger equivalence, where processes have the same set of possible
-actions, and may only differ on some terms, inside actions outputs or
-conditions. Diff-equivalence then ask that for any sequence of such symbolic
-actions, the observable traces are indistinguishable.
-
-We
-use $(\_)^L$ and $(\_)^R$ to denote the left and right projections,
-e.g. $\phi_\tr^L$ is the conjunction of all the left-hand side conditions for
-the left side of the bi-process.  We can the use the notations $\minp^L$, $\minp^R$, $\mout^L$
-and $\mout^R$, where for instance, $\minp^L@A$ represents the input term for
-the left at timestamp $A$ in a trace.
-
-For concision, we write $\myif \phi \mythen t$ for
-$\myif \phi \mythen t \myelse \mathsf{error}$, with an error constant that is
-unused elsewhere.
+We define the diff-equivalence of a process, by asking the equivalence of the projected frames for all possible traces.
 
 \begin{definition}
-  We define inductively the frame of a trace, where for any action $\alpha$ and any trace $\tr$,
-  \[\begin{array}{l}
-     \mouts_{\alpha} = \myif \phi_{\alpha} \mythen \mout(\alpha) \\
-     \mouts_{\tr . \alpha} = \pair{\mouts_\alpha,\dots, \myif \phi_{\tr . \alpha} \mythen \mout(\alpha)}
-     \end{array}\]
-  as the sequence of outputs produced by the trace.
+  A bi-process $P$ is diff-equivalent when,
+  for any trace model $\TM$, the formula
+
+  \[\stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\]
+  is valid.
 \end{definition}
-
-The definition of the meta interpretation $I_\tr$ of a trace is similar to previously, with only a change for inputs:
-\[\hat{\minp}^L(A_n) = g_n( (\mouts_{A_1\cdots A_{n-1}})^{\I_\tr})\]
-
-  Remark that for reachability, we assume that the trace can occur, and thus,
-  that all conditionals $\phi_{\tr . \alpha}$ are true. Then,
-  $\mouts_{A_1\cdots A_{n-1}}$ is syntactically equal to
-    $\mout(A_1),\cdot,\mout(A_{n-1})$, as we can remove the true
-    conditionals. For indistinguishability, we need to verify that the
-    conditionals are synchronized on both sides, and we must keep them inside
-    the terms.
-
-We now define the equivalence,
-
-
-\begin{definition}
-  A bi-process is diff-equivalent when,
-  for any symbolic trace $\tr$ of the protocol and
-  for any computational model $\Mo$,
-  we have:
-  \[\Mo \models (\mouts_{\tr}^L)^{I_\tr}  \sim (\mouts_{\tr}^R)^{I_\tr}\]
-\end{definition}
-
-Note that this equivalence cannot hold if there exists a $\tr$
+\charlie{Notice that we could also extend $\phi^\TM$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
+Note that this equivalence cannot hold if there exists a trace
 whose probability of execution significantly differs between the two
 projections of the bi-process.
 Hence this imposes a form of synchronization on the execution of
 conditionals on the two sides of bi-processes.
 The interest of imposing this artificial constraint is that we
 can stop considering executions where one process goes to $\mythen$
-branch while the other goes to its $\myelse$ branch: this is implicit
-in the fact that we consider here symbolic and not observable traces.
+branch while the other goes to its $\myelse$ branch.
+\begin{lemma}
+  A bi-process $P$ is diff-equivalent if,
+  for any trace model $\TM$, the formula
+
+  \[\stackrel{.}{\wedge}_{v\in D_\XT} (\pair{\mframe@\tau^L,\mexec@\tau^L})^{\TM[\tau\mapsto v]} \sim (\pair{\mframe@\tau^R, \mexec@\tau^R} )^{\TM[\tau \mapsto v]}\]
+  is valid.
+
+
+\end{lemma}
 
 \newcommand{\In}{\mathsf{in}}
 \newcommand{\Out}{\mathsf{out}}
@@ -174,39 +142,40 @@ actions.
 
 \subsection{Reasoning about equivalences}
 
-We leverage the meta-logic, to reason abstractly on all possible traces.
-Given a bi-process $B$, we should be able to give a meaning to its inputs
-and outputs along a trace using macros $\minp^L$, $\minp^R$, $\mout^L$
-and $\mout^R$. For instance, $\minp^L@A$ represents the input term for
-the left at timestamp $A$ in a trace --- the meta-interpretation will
-be such that
-$\hat{\minp}^L(A_n) = g_n( \mouts_{A_1\cdots A_{n-1}})$.
-
 We extend the sequent calculus, to also reason about diff-equivalence.
 
 \begin{definition}
   A sequent $\Gamma \vdash t_L \sim t_R $ is composed of a set of indistinguishability $\Gamma$, and sequences of terms $t_L,t_R$.
-  It is valid when, for any meta-interpretation $I$, for any evaluation of the free variables in $t_L,t_R$ to well typed elements in $I$ and computational model $\Mo$, $\Mo \models (\wedge \Gamma)^I \Rightarrow (t_L)^I \sim  (t_R)^I $
+  It is valid when, for any trace model $\TM$, for any evaluations $\sigma_\XT',\sigma_I'$ of the free variables in $t_L,t_R$ to well typed elements in $\TM$, the formula $ (\wedge \Gamma)^{\TM'} \Rightarrow (t_L)^{\TM'} \sim  (t_R)^{\TM'}$, where $\TM'=\TM \cup \sigma_\XT'\cup \sigma_I'$.
 \end{definition}
 
-To reason abstractly on all possible traces, we define the macros $\mouts^X@A$, which given a trace $\tr = \tr_1 . A . \tr_2$, are interpreted by:
-$$\hat{\mouts}^X(A) = (\mouts_{\tr_1.A}^X)^{I_\tr} $$
-
-We will write for concision $\happens(A)$ for $\happens(A) \sim \true$.
+This definition of sequent calculus can of course be used to reason about diff-equivalence.
 \begin{lemma}
-  A bi-process is diff-equivalent if,
-  \[ \happens(\tau)\vdash  \mouts^L@\tau \sim \mouts^R@\tau\]
-  Equivalently, is it diff-equivalent if:
-  \[\mouts^L@\pre(\tau) \sim \mouts^R@\pre(\tau) \wedge \happens(\tau) \vdash \mouts^L@\tau \sim \mouts^R@\tau\]
+  A bi-process is diff-equivalent if and only if,
+  \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\]
+  Equivalently, is it diff-equivalent if and only if:
+  \[\mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau) \vdash \mframe^L@\tau \sim \mframe^R@\tau\]
 \end{lemma}
-\begin{proof}We prove the first implication, which is essentially an unfolding of definitions.
+\begin{proof}We prove the first equivalence, which is essentially an unfolding of definitions.
 
-  Let $\Mo$ be a computational model and $\tr = A_1 \cdots A_n$ a symbolic trace of a bi-process.
-  We assume that  $ \happens (\tau)  \vdash \mouts^L@\tau \sim \mouts^R@\tau$, i.e that for any-meta interpretation $I$ and model $\Mo'$, $\Mo' \models (\happens(\tau))^I \rightarrow (\mouts^L@\tau \sim \mouts^R@\tau)^I$. We instantiate $\Mo'$ with $\Mo$ , and $I$ with the meta interpretation $\I_\tr$ such that $\tau \mapsto A_n$. Then, as $\happens(A_n)^I = \true$, we conclude that $\Mo' \models  (\mouts^L@A_n \sim \mouts^R@A_n)^I$.\\
+    \[
+    \begin{array}{l@{~}l}
+      $P$\text{ is diff-equivalent} & \Leftrightarrow \text{for all } \TM,\ \stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+                                    & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+      & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ \true \stackrel{.}{\Rightarrow} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+      & \Leftrightarrow  \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\text{ is valid}\\
 
-  The second implication is a direct induction on the length of the traces.
+    \end{array}
+    \]
+
+  The second equivalence is a direct induction on the length of the traces.
   \end{proof}
 
+Adding the execution condition to the sequent is also a valid proof technique.
+\begin{lemma}
+  A bi-process is diff-equivalent if,
+  \[ \emptyset \vdash  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
+\end{lemma}
 We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
 
 \begin{figure}
@@ -222,17 +191,12 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
     }{\Gamma \vdash t_L \sim t_S}
   \end{mathpar}
   \begin{mathpar}
-  \inferrule[\myif-explicit]{
-\Gamma \vdash \myif \phi \mythen t_L \sim \myif \psi \mythen t_R
-  }{
- \Gamma  \vdash \phi, \myif \phi \mythen t_L \sim \psi, \myif \psi \mythen t_R
-  }
-  \quad\quad
-  \inferrule[\myif-weak]{
- \Gamma \vdash \phi, t_L \sim \phi, t_R
-  }{
-\Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
-  }
+    \inferrule[Subst]{
+      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \}  \vdash t^L \sim t^R
+    }{
+      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \} \vdash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
+    }
+
 \end{mathpar}
 
   \begin{mathpar}
@@ -261,11 +225,11 @@ n,m \not \in \Gamma
       \Gamma \vdash n \sim m
     }
     \quad\quad
-    \inferrule[Subst]{
-      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \}  \vdash t^L \sim t^R
-    }{
-      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \} \vdash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
-    }
+  \inferrule[\myif-weak]{
+ \Gamma \vdash \phi, t_L \sim \phi, t_R
+  }{
+\Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
+  }
   \end{mathpar}
   \begin{mathpar}
   \inferrule[F-Cut]{
@@ -292,30 +256,6 @@ The rules presented in Figure~\ref{fig:lk-ind} are sound.
 
 
 \end{lemma}
-\begin{proof}
-  \begin{itemize}
-    \item $\textsc{\myif-explicit}$
-      We assume that we have a model and an interpretation such that
-      $\Mo,\Gamma \not \models  \phi^I, (\myif  \phi \mythen t_L)^I \sim \psi^I, (\myif \phi \mythen t_R)^I $.
-      It means we have a distinguisher $\B$ against this equivalence.
-      We define $\B'$, which on input $x$:
-      \begin{enumerate}
-      \item if $x = \mathsf{error}$, sets a variable $y$ to $\false$, else to $\true$;
-      \item simulates $\B$ with input $y,x$ and returns its result.
-      \end{enumerate}
-      When $x$ is equal to $(\myif \phi \mythen t_L)^I $ (resp. $(\myif \phi \mythen t_R)^I$ ), the computed $y$ has exactly the same distribution as the interpretation of $\phi^I$ (resp. $\psi^I)$) in $\Mo$.
-      Thus $\B'$ is a distinguisher which shows that:
-    $\Mo,\Gamma \not \models (\myif  \phi \mythen t_L)^I \sim  (\myif \phi \mythen t_R)^I $.
-      It concludes that $\Gamma \not \vdash \myif  \phi \mythen t_L \sim \myif  \phi \mythen t_R$.
-
-    \end{itemize}
-\end{proof}
-
-
-We can then use those rules to prove diff-equivalence of a bi-process, by defining a well chosen set of axioms. We can reuse most of the trace axioms defined previously, the only one which is not pertinent anymore is, for any $\alpha$:
-\[   (\happens(\alpha) \Rightarrow
-  \phi_\alpha\{x_\beta\mapsto\minp@\beta\}_\beta) \sim \true\]
-Indeed, this version is useful and sound for reachability, but is not sound for indistinguishability, where we need to shows that conditionals are synchronized on both sides, which becomes trivial if we assume them to be equal to $\true$.
 
 \paragraph{Other rules.}
 
@@ -409,7 +349,7 @@ We use the following notations:
 \label{fig:xor}
 \end{figure}
 
-
+\section{Archives}
 \subsection{A proof technique}
 
 Diff-equivalence is usually proved by induction and case analysis on
