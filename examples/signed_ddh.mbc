@@ -112,6 +112,7 @@ expandall.
 
    depends P1(i), P3(i).
    apply H1 to P1(i).
+   expand exec@P1(i).
    apply P1_charac to i.
    apply H0 to s.
 
@@ -137,6 +138,7 @@ expandall.
    executable pred(S3(j)).
    depends S1(j), S3(j).
    apply H1 to S1(j).
+   expand exec@S1(j).
    apply S1_charac to j.
    apply H0 to s.
 

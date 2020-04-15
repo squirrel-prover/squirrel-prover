@@ -858,7 +858,7 @@ let exec a s =
     ForAll (
       [Vars.EVar (var)],
       Impl(Atom (Term.mk_timestamp_leq (Var var) a),
-           Macro(Term.cond_macro,[],Var var)
+           Macro(Term.exec_macro,[],Var var)
           )
     )
   in
@@ -866,7 +866,7 @@ let exec a s =
 
 let () =
   T.register_general "executable"
-    ~help:"Assert that exec@_ implies cond@_ for all \
+    ~help:"Assert that exec@_ implies exec@_ for all \
            previous timestamps.\
            \n Usage: executable t."
     (function

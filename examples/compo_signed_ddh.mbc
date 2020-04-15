@@ -172,7 +172,7 @@ Proof.
 
    equivalent cond@P4,False.
    simpl.
-   executable pred(P4). depends P1, P4. apply H1 to P1. apply P1_charac.
+   executable pred(P4). depends P1, P4. apply H1 to P1. expand exec@P1. apply P1_charac.
 
    noif 8. simpl.
 
@@ -185,7 +185,7 @@ Proof.
 
    equivalent cond@S4,False.
    simpl.
-   executable pred(S4). depends S1, S4. apply H1 to S1. apply S1_charac.
+   executable pred(S4). depends S1, S4. apply H1 to S1. expand exec@S1. apply S1_charac.
 
    fa 7. noif 8.
 Qed.

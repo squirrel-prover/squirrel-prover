@@ -42,13 +42,13 @@ Proof.
  executable S3.
  depends S, S3.
  apply H1 to S.
- expand exec@S3; expand cond@S;  expand cond@S3.
+ expand exec@S.
+expand exec@S3; expand cond@S;  expand cond@S3.
  euf M0.
  (* we prove the goal where the message satisfies the tag *)
- case H4.
- apply H1 to i.
- help.
- nosimpl(notleft H2).
+ case H5.
+ apply H2 to i.
+ nosimpl(notleft H3).
 (* the honnestlly produced hash case is direclty in contradiciton with the condition of S *)
  simpl.
 Qed.
