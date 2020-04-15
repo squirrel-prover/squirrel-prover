@@ -8,6 +8,9 @@ abstract tag1:message
 abstract tag2:message
 axiom tags_neq : tag1 <> tag2
 
+(* Constant used in conditional branches that should never be reached. *)
+abstract absurd:message
+
 name key : index->message
 name key': index->index->message
 channel cT
@@ -29,13 +32,13 @@ process reader(j:index) =
   out(cR,nR);
   in(cT,x);
   if exists (i,k:index), snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) then
-       try find i,k such that snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) in out(cR,h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
- else
+    out(cR, try find i,k such that snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k))) in
+              h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k)))
+            else absurd)
+  else
     out(cR,ko)
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
-
-
 
 
 equiv foo.
@@ -50,70 +53,35 @@ expand cond@R(j); expand output@R(j).
 fa 1; fa 2.
 fresh 2; yesif 2.
 repeat split.
-depends R(j1), R1(j1,i,k).
-depends R(j1), A(j1).
-depends R(j1), R2(j1).
+depends R(j),R2(j).
+depends R(j),R1(j).
 
 (* Case R1 *)
 
-expand frame@R1(j,i,k).
-expand exec@R1(j,i,k).
-expand cond@R1(j,i,k).
-expand output@R1(j,i,k).
-fa 0.
+expand frame@R1(j).
+expand exec@R1(j).
 
-
-
-equivalent 
-(exists (i,k:index), snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,(diff(key(i), key'(i,k))))),
-(exists (i,k:index), (T(i,k) < R1(j,i,k) &&
-snd(output@T(i,k)) = snd(input@R1(j,i,k)) &&
- fst(output@T(i,k)) = fst(input@R1(j,i,k)) &&  input@T(i,k) = output@R(j)
-&&  (input@T(i,k) = output@R(j) => R(j) < T(i,k)))
-  ).
-
+equivalent cond@R1(j),
+  (exists (i,k:index),
+   T(i,k) < R1(j) &&
+   snd(output@T(i,k)) = snd(input@R1(j)) &&
+   fst(output@T(i,k)) = fst(input@R1(j)) &&
+   input@T(i,k) = output@R(j)).
+expand cond@R1(j).
 split.
-project.
-apply tags_neq.
-
+(* cond => honest *) 
+apply tags_neq; project.
 euf M0.
-
-exists i1,k1.
-
+exists i,k1.
 euf M0.
+exists i,k.
+(* honest => cond *)
+exists i,k.
 
-
-fa 2.
-nosimpl(fa 3).
-simpl.
-
-
-equivalent  
-( snd(input@R1(j,i,k)) = h(<<nR(j),fst(input@R1(j,i,k))>,tag1>,diff(key(i),key'(i,k)))),
-(  T(i,k) <= R1(j,i,k) && 
-  fst(input@R1(j,i,k)) = fst(output@T(i,k)) &&
- snd(input@R1(j,i,k)) = snd(output@T(i,k))).
-admit.
-fa 1.
-fa 1.
-prf 5.
-yesif 5.
-
-apply tags_neq.
-project.
-repeat split.
-substitute i1, i.
-assert(k=k1).
-admit.
-substitute k1, k.
-case H0.
-expand m2(i,k)@T1(i,k).
-
-euf 1.
-apply tags_neq.
-*)
-admit.
-
+fa 1. fa 2.
+fa 0; admit 1. (* TODO fa/dup *)
+expand output@R1(j).
+admit 2. (* TODO PRF under try-find ? *)
 
 (* Case R2 *)
 admit.
@@ -142,29 +110,26 @@ apply tags_neq.
 project.
 
 (* left *)
-repeat split.
-depends T(i1,k1),T1(i1,k1).
-depends T(i1,k1),T2(i1,k1).
-assert (nT(i,k) = fst(input@R2(j))).
-admit. (* TODO fresh M2 *)
-assert (nT(i,k) = fst(input@R1(j,i1,k1))).
-admit. (* TODO fresh M2 *)
+repeat (split+intro).
+depends T(i,k),T2(i,k).
+admit. (* fresh nT *)
+admit. (* fresh nT *)
+depends T(i,k),T1(i,k).
+admit. (* fresh nT *)
 
 (* right *)
-repeat split.
-assert (nT(i,k) = fst(input@R1(j,i1,k1))).
-admit. (* TODO fresh M2 *)
-assert (nT(i,k) = fst(input@R2(j))).
-admit. (* TODO fresh M2 *)
-depends T(i1,k1),T2(i1,k1).
-depends T(i1,k1),T1(i1,k1).
+repeat (split+intro).
+admit. (* fresh *)
+depends T(i,k),T1(i,k).
+admit. (* fresh *)
+admit. (* fresh *)
+depends T(i,k),T2(i,k).
 
 fresh 2.
 yesif 2.
 repeat split.
-depends T(i1,k1),T2(i1,k1).
 depends T(i1,k1),T1(i1,k1).
-
+depends T(i1,k1),T2(i1,k1).
 
 (* Case T1 *)
 expand frame@T1(i,k).
@@ -180,12 +145,13 @@ equivalent
    h(<<h(<<input@T(i,k),nT(i,k)>,tag1>,(diff(key(i), key'(i,k)))),
        input@T(i,k)>,tag2>,(diff(key(i), key'(i,k)))))
 ,
-( exists (j:index), (R1(j,i,k) < T1(i,k) && 
-  input@T1(i,k) = output@R1(j,i,k))).
+( exists (j:index), (R1(j) < T1(i,k) && 
+  input@T1(i,k) = output@R1(j))).
 split.
 
 admit.
 admit (*fadup*).
+admit.
 
 (* Case T2 *)
 admit.
