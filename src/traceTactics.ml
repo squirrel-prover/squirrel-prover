@@ -675,6 +675,127 @@ let () = T.register "eqtrace"
            \n Usage: eqtrace."
     eq_trace
 
+let fresh_param m1 m2 = match m1,m2 with
+  | Name (n,is), _ -> (n,is,m2)
+  | _, Name (n,is) -> (n,is,m1)
+  | _ -> Tactics.soft_failure
+          (Tactics.Failure "can only be applied on hypothesis of the form t=n or n=t")
+
+(* Direct cases - names appearing in the term [t] *)
+let mk_fresh_direct system n is t =
+  (* iterate over [t] to search subterms of [t] equal to a name *)
+  let names =
+    let iter = new EquivTactics.get_names ~system false in
+    iter#visit_message t ;
+    iter#get_names
+  in
+  (* build the disjunction expressing that there exists a name subterm of [t]
+   * equal to the name ([n],[is]) *)
+  List.fold_left
+    Term.mk_or Term.False
+    (List.sort_uniq Pervasives.compare
+    (List.map
+      (fun (n',is') ->
+        Term.Atom (`Message (`Eq, Term.Name (n,is), Term.Name (n',is'))))
+      names))
+
+(* Undirect cases - names ([n],[is']) appearing in actions of the system *)
+let mk_fresh_indirect system env n is t =
+  let list_of_actions_from_term =
+    let iter = new EquivTactics.get_actions ~system false in
+    iter#visit_message t ;
+    iter#get_actions
+  and tbl_of_action_names = Hashtbl.create 10 in
+  Action.(iter_descrs system
+    (fun action_descr ->
+      let iter = new EquivTactics.get_name_indices ~system true n in
+      iter#visit_formula (snd action_descr.condition) ;
+      iter#visit_message (snd action_descr.output) ;
+      List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
+      (* we add only actions in which name [n] occurs *)
+      let action_indices = iter#get_indices in
+      if List.length action_indices > 0 then
+        Hashtbl.add tbl_of_action_names action_descr action_indices));
+  Hashtbl.fold
+    (fun a indices_a formulas ->
+      (* for each action [a] in which [n] occurs
+       * with indices from [indices_a] *)
+      let env = ref env in
+      (* we identify indices of the action [a] that do not occur in [indices_a]
+       * (ie that do not occur in the list of indices of occurrences of [n] in
+       * the actions of the system) *)
+      let not_name_indices =
+        List.filter
+          (fun i ->
+            not (List.mem i
+              (List.sort_uniq Pervasives.compare (List.concat indices_a))))
+          a.Action.indices
+      in
+      (* we refresh wrt [env] these indices *)
+      let not_name_indices' =
+        List.map
+          (fun i -> Vars.make_fresh_from_and_update env i)
+          not_name_indices
+      in
+      let subst =
+        List.map2
+          (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+          not_name_indices not_name_indices'
+      in
+      (* we apply [subst] to the action [a] *)
+      let new_action =
+        Action.to_term (Action.subst_action subst a.Action.action) in
+      let disj =
+        List.fold_left Term.mk_or Term.False
+          (List.sort_uniq Pervasives.compare
+            (List.map
+              (fun (action_from_term,strict) ->
+                if strict
+                (* [strict] is true if [action_from_term] refers to an input *)
+                then Term.Atom (`Timestamp (`Lt, new_action, action_from_term))
+                else Term.Atom (Term.mk_timestamp_leq new_action action_from_term))
+              list_of_actions_from_term))
+        in Term.mk_or disj formulas)
+    tbl_of_action_names
+    Term.False
+
+let fresh th s =
+  match th with
+  | Theory.Var m ->
+    begin try
+      let s,hyp =
+        TraceSequent.select_message_hypothesis m s ~remove:false in
+      begin match hyp with
+      | `Message (`Eq,m1,m2) ->
+        let (n,is,t) = fresh_param m1 m2 in
+        let env = TraceSequent.get_env s in
+        let system = TraceSequent.system s in
+        let phi_direct = mk_fresh_direct system n is t in
+        let phi_indirect = mk_fresh_indirect system env n is t in
+        let new_hyp = Term.mk_or phi_direct phi_indirect in
+        [TraceSequent.add_formula new_hyp s]
+      | _ -> Tactics.soft_failure
+              (Tactics.Failure "can only be applied on message hypothesis")
+      end
+    with
+    | Not_found -> Tactics.(soft_failure (Undefined m))
+    | EquivTactics.Var_found -> Tactics.soft_failure
+                    (Tactics.Failure "can only be applied on ground terms")
+    end
+  | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
+
+let () =
+  T.register_general "fresh"
+    ~help:"Given a message equality M of the form t=n, add an hypothesis expressing that n is a subterm of t.\
+           \n Usage: fresh M."
+    (function
+       | [Prover.Theory th] ->
+          begin fun s sk fk -> match fresh th s with
+            | subgoals -> sk subgoals fk
+            | exception Tactics.Tactic_soft_failure e -> fk e
+          end
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
 let substitute (v1) (v2) (s : TraceSequent.t) =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
   let subst =

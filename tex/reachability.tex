@@ -163,6 +163,34 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   \label{fig:names}
 \end{figure}
 
+\begin{figure}
+  \begin{mathpar}
+    \inferrule{
+      \Gamma,t=\mathsf{n}[\vec {j_0}],
+      \big(
+        \bigvee_{\mathsf{m}[\vec j] \in t}
+          \mathsf{m}[\vec j] = \mathsf{n}[\vec {j_0}]
+      \big)
+      \vee
+      \big(
+        \bigvee_{\tau \in t}
+          \big(
+            \bigvee_{A(\vec i) \in S, \mathsf{n}[\vec j] \in A(\vec i)}
+              A(\vec i\{\vec j \mapsto \vec {j_0}\}) \leq \tau
+          \big)
+      \big)
+      \vdash \phi
+    }{
+      \Gamma,t=\mathsf{n}[\vec {j_0}] \vdash \phi
+    }
+  \end{mathpar}
+  \caption{Another inference rule for equalities on names.
+  This rule only applies when, for any trace model $\TM$,
+  the term $\interp{t}^\TM$ does not contain any message variable.
+  If $\tau$ refers to an input macro, then the inequality over timestamps
+  is strict.}
+\end{figure}
+
 \begin{proposition}
   The rules of \cref{fig:xor} are sound wrt.\ computational models
   where $\oplus$ is interpreted as exclusive or:
