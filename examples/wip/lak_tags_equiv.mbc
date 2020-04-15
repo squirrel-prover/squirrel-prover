@@ -48,6 +48,9 @@ induction t.
 
 (* Case R: OK *)
 
+admit.
+
+(* 
 expand frame@R(j); expand exec@R(j).
 expand cond@R(j); expand output@R(j).
 fa 1; fa 2.
@@ -55,9 +58,13 @@ fresh 2; yesif 2.
 repeat split.
 depends R(j),R2(j).
 depends R(j),R1(j).
+*)
 
 (* Case R1 *)
 
+admit.
+
+(*
 expand frame@R1(j).
 expand exec@R1(j).
 
@@ -68,6 +75,7 @@ equivalent cond@R1(j),
    fst(output@T(i,k)) = fst(input@R1(j)) &&
    input@T(i,k) = output@R(j)).
 expand cond@R1(j).
+
 split.
 (* cond => honest *) 
 apply tags_neq; project.
@@ -83,19 +91,16 @@ fa 0; admit 1. (* TODO fa/dup *)
 expand output@R1(j).
 admit 2. (* TODO PRF under try-find ? *)
 
-(* Case R2 *)
-admit.
-
-(*expand frame@R2(j).
-expand exec@R2(j).
-expand cond@R2(j).
-expand output@R2(j).
-prf 0.
-
-admit.
 *)
 
-(* Case T *)
+(* Case R2 *)
+
+admit.
+
+(* Case T OK *)
+admit.
+
+(*
 expand frame@T(i,k).
 expand exec@T(i,k).
 expand cond@T(i,k).
@@ -135,27 +140,28 @@ repeat split.
 depends T(i1,k1),T1(i1,k1).
 depends T(i1,k1),T2(i1,k1).
 
+*)
+
+
 (* Case T1 *)
 expand frame@T1(i,k).
 expand exec@T1(i,k).
-expand cond@T1(i,k).
-expand output@T1(i,k).
-fa 0.
 
-expand m2(i,k)@T1(i,k).
 
-equivalent   
-(input@T1(i,k) =
-   h(<<h(<<input@T(i,k),nT(i,k)>,tag1>,(diff(key(i), key'(i,k)))),
-       input@T(i,k)>,tag2>,(diff(key(i), key'(i,k)))))
-,
+equivalent cond@T1(i,k),
 ( exists (j:index), (R1(j) < T1(i,k) && 
   input@T1(i,k) = output@R1(j))).
-split.
 
-admit.
-admit (*fadup*).
-admit.
+expand cond@T1(i,k).
+split.
+(* cond => honest *) 
+apply tags_neq; project.
+euf M0.
+nosimpl(exists j). (** BUG ** unsupported term in completion **)
+nosimpl(split).
+case H0.
+depends T(i,k), T1(i,k).
+expand output@R1(j). (** METABC n'aime pas trop - il crashe **)
 
 (* Case T2 *)
 admit.
@@ -163,108 +169,6 @@ Qed.
 
 
 
-
-
-(*
-apply T0.
-help.
-admit.
-expand frame@R1(j,k,i).
-fa 1.
-expand exec@R1(j,k,i).
-help.
-expand output@R1(j,k,i).
-help.
-noif 2.
-intros.
-expand cond@R1(j,k,i).
-help.
-prf M0.
-
-euf M0.
-fresh 2.
-
-assumption.
-
-intros.
-
-simpl.
-
-
-    expand cond@R(j);
-expand output@R(j).
-  fa 0.
-  equivalent
-    (exists (i,k:index), snd(input@R(j))=h(fst(input@R(j)),diff(key(i),key'(i,k)))),
-    (exists (i,k:index), T(i,k)<R(j) &&
-       fst(output@T(i,k))=fst(input@R(j)) &&
-       snd(output@T(i,k))=snd(input@R(j))).
-  split; intros.
-  project; euf M0.
-  exists i,k1.
-  exists i,k.
-  exists i,k.
-  admit 1. (* TODO fa/dup *)
-
-
-
-  expand frame@R1(j); expand exec@R1(j);
-    expand cond@R1(j); expand output@R1(j).
-  fa 0.
-  equivalent
-    (exists (i,k:index),
-       snd(input@R1(j))=h(fst(input@R1(j)),diff(key(i),key'(i,k)))),
-    (exists (i,k:index),
-       T(i,k)<R1(j) &&
-       fst(output@T(i,k))=fst(input@R1(j)) &&
-       snd(output@T(i,k))=snd(input@R1(j))).
-  split; intros.
-  project.
-  euf M0.
-  exists i,k1.
-  euf M0.
-  exists i,k.
-  exists i,k.
-     admit 1. (* TODO fa/dup *)
-
-
-  expand frame@T(i,k); expand exec@T(i,k);
-  expand cond@T(i,k); expand output@T(i,k).
-  fa 1. fa 2. fa 2.
-
-  prf 3.
-  yesif 3.
-  split.
-
-  (* Left. *)
-  (* nT(i,k) is fresh for each tag session so input@R(j) cannot contain
-  nT(i,k) if R(j) happens before T(i,k).  *)
-  split.
-  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
-  admit.
-  apply H0 to i,j,k.
-  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
-  admit.
-  apply H0 to i,j,k.
-
-  (* Right. *)
-  (* Same remark. *)
-  split.
-  assert (forall (i,j,k:index), R(j) <= pred(T(i,k)) => fst(input@R(j)) <> nT(i,k)).
-  admit.
-  apply H0 to i,j,k.
-  assert (forall (i,j,k:index), R1(j) <= pred(T(i,k)) => fst(input@R1(j)) <> nT(i,k)).
-  admit.
-  apply H0 to i,j,k.
-
-  fresh 2.
-  yesif 2.
-  split.
-
-Qed.
-
-
-*)
 
 
 

@@ -62,11 +62,16 @@ project.
 euf M0.
 exists i, k1.
 assert (input@T(i,k1) = nR(j)).
-admit. (* fresh reach *)
+fresh M3.
+case H0.
+depends R(j), R2(j).
+
 euf M0.
 exists i,k.
 assert (input@T(i,k) = nR(j)).
-admit. (* fresh reach *)
+fresh M3.
+case H0.
+depends R(j), R2(j).
 exists i,k.
 
 admit. (* fadup *)
@@ -98,11 +103,15 @@ project.
 euf M0.
 exists i, k1.
 assert (input@T(i,k1) = nR(j)).
-admit. (* fresh reach *)
+fresh M3.
+case H0.
+depends R(j), R1(j).
 euf M0.
 exists i,k.
 assert (input@T(i,k) = nR(j)).
-admit. (* fresh reach *)
+fresh M3.
+case H0.
+depends R(j), R1(j).
 exists i,k.
 
 admit. (* fadup *)
@@ -124,16 +133,16 @@ project.
 (* left *)
 repeat split.
 assert (nT(i,k) = fst(input@R1(j))).
-admit. (* TODO fresh *)
+fresh M1.
 assert (nT(i,k) = fst(input@R2(j))).
-admit. (* TODO fresh *)
+fresh M1.
 
 (* right *)
 repeat split.
 assert (nT(i,k) = fst(input@R2(j))).
-admit. (* TODO fresh *)
+fresh M1.
 assert (nT(i,k) = fst(input@R1(j))).
-admit. (* TODO fresh *)
+fresh M1.
 
 fresh 2.
 yesif 2.
