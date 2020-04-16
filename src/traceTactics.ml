@@ -718,9 +718,6 @@ let mk_fresh_indirect system env n is t =
         Hashtbl.add tbl_of_action_names action_descr action_indices));
   Hashtbl.fold
     (fun a indices_a formulas ->
-      (* for each action [a] in which [n] occurs
-       * with indices from [indices_a] *)
-      let env = ref env in
       (* we identify indices of the action [a] that do not occur in [indices_a]
        * (ie that do not occur in the list of indices of occurrences of [n] in
        * the actions of the system) *)
@@ -768,12 +765,12 @@ let fresh th s =
       begin match hyp with
       | `Message (`Eq,m1,m2) ->
         let (n,is,t) = fresh_param m1 m2 in
-        let env = TraceSequent.get_env s in
+        let env = ref (TraceSequent.get_env s) in
         let system = TraceSequent.system s in
         let phi_direct = mk_fresh_direct system n is t in
         let phi_indirect = mk_fresh_indirect system env n is t in
         let new_hyp = Term.mk_or phi_direct phi_indirect in
-        [TraceSequent.add_formula new_hyp s]
+        [TraceSequent.set_env !env (TraceSequent.add_formula new_hyp s)]
       | _ -> Tactics.soft_failure
               (Tactics.Failure "can only be applied on message hypothesis")
       end
