@@ -502,6 +502,12 @@ module Unify = struct
 
   let empty_subst = Imap.empty
 
+  let pp_subst fmt s =
+    (Fmt.list ~sep:Fmt.comma
+      (fun fmt (i,c) ->
+        Fmt.pf fmt "%d -> %a" i pp_cterm c))
+      fmt (Imap.bindings s)
+  
   exception Unify_cycle
 
   (** [subst_apply t sigma] applies [sigma] to [t], checking for cycles. *)
@@ -748,7 +754,7 @@ let rec term_e_normalize state u = match u with
 
   | Cfun (fn, ts) ->
     let nts = List.map (term_e_normalize state) ts in
-    let u' = Cfun (fn, nts) in
+    let u = Cfun (fn, nts) in
 
     let exception Find_unif_fail in
     let rec find_unif = function
@@ -759,9 +765,10 @@ let rec term_e_normalize state u = match u with
         | Unify.Mgu sigma -> l, r, sigma in
     try
       let l,r,sigma = find_unif state.e_rules in
-      assert (Unify.subst_apply l sigma = u);
+      assert (term_uf_normalize state (Unify.subst_apply l sigma)
+              = term_uf_normalize state u);
       Unify.subst_apply r sigma
-    with Find_unif_fail -> u'
+    with Find_unif_fail -> u
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
