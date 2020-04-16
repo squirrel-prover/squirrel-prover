@@ -762,7 +762,7 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
     let u' = cfun fn nts in
     
     (* Optimisation: storing rules by head function symbols would help here. *)
-    if List.for_all is_cst nts then
+    if List.for_all (fun c -> not (is_cfun c)) nts then
       try
         let _, a = List.find (fun (l,_) -> l = u') state.grnd_rules in
         ccst a

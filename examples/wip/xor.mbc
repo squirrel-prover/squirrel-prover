@@ -22,5 +22,4 @@ goal forall (a,x,y,z:message),
   xor(a,x) = f(xor(snd(y),f(z))).
 Proof.
 intros.
-(* Does not work! *)
 Qed.
