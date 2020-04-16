@@ -718,6 +718,14 @@ let mk_prf_phi_proj system env param proj biframe =
     (Tactics.Failure "Key syntactic side condition not checked")
   end
 
+(* FIXME We have to generate a fresh name instead of constant zero
+* in the then branch. Since PRF can only be applied, for now,
+* at top level on a term of the form h(t,k) or diff(h1(t1,k1),h2(t2,k2)),
+* we would apply the fresh tactic afterwards to get rid of the fresh name,
+* after having proved that the PRF condition is true.
+* This is the reason why having the constant zero in the then branch is still
+* sound in this specific use case.
+* https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
 let mk_prf_if_term_proj system env biframe m proj =
   let system_proj = Action.(project_system proj system) in
   let m_proj = Term.pi_term  proj m in
@@ -725,14 +733,12 @@ let mk_prf_if_term_proj system env biframe m proj =
   | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
       if Theory.is_hash hash_fn then
         let param = (hash_fn,t,key_n,key_is) in
-        (true, Term.ITE
-                (mk_prf_phi_proj system_proj env param proj biframe,
-                Term.Fun (Term.f_zero,[]),
-(* FIXME unsound, we have to generate a fresh name instead of constant zero
- * cf https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
-                m_proj))
-      else (false, m_proj)
-  | _ -> (false, m_proj)
+        Term.ITE
+          (mk_prf_phi_proj system_proj env param proj biframe,
+          Term.Fun (Term.f_zero,[]),
+          m_proj)
+      else raise Not_hash
+  | _ -> raise Not_hash
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
    form (p inter q) && diff (p minus q, q minus p) *)
@@ -761,41 +767,31 @@ let combine_conj_formulas p q =
   else
     Term.Diff(mk_ands new_p, mk_ands !aux_q)
 
-let apply_prf system env e biframe =
-  match e with
-  | EquivSequent.Message m ->
-      let opt_if_left = mk_prf_if_term_proj system env biframe m Term.Left in
-      let opt_if_right = mk_prf_if_term_proj system env biframe m Term.Right in
-      begin match (opt_if_left,opt_if_right) with
-        (* when the two terms are if then else, we push the diff under the
-           conditions, so that we may apply yesif or noif on it. *)
-        | (_, Term.ITE (c1,n1,p1)), (_, Term.ITE (c2, n2, p2)) ->
-          let n = if n1  = n2 then n1 else Diff(n1, n2) in
-          let p = if p1  = p2 then p1 else Diff(p1, p2) in
-          EquivSequent.Message ( Term.ITE (combine_conj_formulas c1 c2, n, p))
-        | (true, if_left), (true, if_right) -> assert false
-        | (true,if_left), (false,m_right) ->
-          EquivSequent.Message (Term.Diff (if_left,m_right))
-        | (false,m_left), (true,if_right) ->
-          EquivSequent.Message (Term.Diff (m_left,if_right))
-        | (false,_), (false,_) -> raise Not_hash
-      end
-  | EquivSequent.Formula f -> raise Not_hash
-
 let prf i s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
-        let biframe = List.rev_append before after in
-        let system = (EquivSequent.get_system s) in
-        let env = EquivSequent.get_env s in
-        begin match apply_prf system env e biframe with
-        | new_elem ->
-          let biframe = (List.rev_append before (new_elem::after)) in
-          [EquivSequent.set_biframe s biframe]
-        | exception Not_hash ->
+        begin try
+          let biframe = List.rev_append before after in
+          let system = (EquivSequent.get_system s) in
+          let env = EquivSequent.get_env s in
+          begin match e with
+          | EquivSequent.Message m ->
+              let new_elem =
+                EquivSequent.Message (Term.head_normal_biterm
+                  (Term.Diff
+                    (mk_prf_if_term_proj system env biframe m Term.Left,
+                     mk_prf_if_term_proj system env biframe m Term.Right)))
+              in
+              let biframe = (List.rev_append before (new_elem::after)) in
+              [EquivSequent.set_biframe s biframe]
+          | EquivSequent.Formula f -> raise Not_hash
+          end
+        with
+        | Not_hash ->
           Tactics.soft_failure
             (Tactics.Failure
-              "PRF can only be applied on a term of the form h(t,k)")
+              "PRF can only be applied on a term of the form\
+              h(t,k) or diff(h1(t1,k1),h2(t2,k2))")
         end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
