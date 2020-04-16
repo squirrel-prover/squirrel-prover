@@ -330,11 +330,7 @@ apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a(i),m>,m1>.
 
 apply hashnotpair to  h(<<g^ake1(i1),m2>,m3>), forwarded.
 (* Here, I do weird stuff, else we have an assert false in completion.ml. TODO *)
-nosimpl(apply H3 to <<g^ake1(i1),m2>,m3>).
-nosimpl(apply fstpair to h(<<g^ake1(i1),m2>,m3>), forwarded,sidSa@Sok).
-simpl.
-assumption.
-simpl.
+apply H3 to <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
 apply hashnotpair to  sidPaF@P2, forwarded.
