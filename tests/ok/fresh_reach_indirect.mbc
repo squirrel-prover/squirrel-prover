@@ -1,0 +1,21 @@
+hash h
+name k : message
+
+name n : index -> index -> message
+
+channel c
+
+system !_i !_ii if forall j:index, n(i,j)=n(i,j) then out(c,n(i,i)).
+
+goal test :
+ forall (i:index,ii:index,j:index),
+  i <> j =>
+  h(fst(output@A(i,ii)),k) <> n(i,j).
+Proof.
+ nosimpl(intros).
+ nosimpl(fresh M0).
+ case H0.
+ (* we assert the negation of the generated hypothesis to conclude *)
+ assert A(i,ii2) > A(i,ii). admit.
+ assert A1(i,ii1) > A(i,ii). admit.
+Qed.

@@ -271,6 +271,12 @@ let () =
         (Tactic_soft_failure (Tactics.NotDepends ("A1(i)","A1(i)")))
         (fun () -> run ~test "tests/alcotest/depends.mbc")
     end ;
+    "Fresh Not Ground", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure
+          (Tactics.Failure "can only be applied on ground terms"))
+        (fun () -> run ~test "tests/alcotest/fresh_reach_var.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
