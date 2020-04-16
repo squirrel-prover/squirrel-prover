@@ -1131,35 +1131,22 @@ let apply_yes_no_if b i s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
       begin match e with
-      | EquivSequent.Message ITE (c,t,e) ->
-        let branch, trace_goal =
-          simplify_ite b env system c t e in
-        let new_elem = EquivSequent.Message branch in
-        let biframe = List.rev_append before (new_elem :: after) in
-        [ trace_goal;
-          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
-      (* TODO - Charlie -> I think there is a missing projection here. Is it a
-         case we want to be able to handle ? Do we want a tactic to push the
-         diff under the ite ? *)
-      (*
-      | EquivSequent.Message Diff (ITE (cl,tl,el), ITE (cr,tr,er)) ->
-        let branch_left, trace_goal_left =
-          simplify_ite b env system cl tl el in
-        let branch_right, trace_goal_right =
-          simplify_ite b env system cr tr er in
-        let new_elem =
-          if branch_left = branch_right
-          then EquivSequent.Message branch_left
-          else EquivSequent.Message (Term.Diff (branch_left, branch_right))
-        in
-        let biframe = List.rev_append before (new_elem :: after) in
-        [ trace_goal_left;
-          trace_goal_right;
-          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ] *)
-      | _ -> Tactics.soft_failure (Tactics.Failure "Improper arguments")
+      | EquivSequent.Message m ->
+        begin match Term.head_normal_biterm m with
+        | ITE (c,t,e) ->
+          let branch, trace_goal =
+            simplify_ite b env system c t e in
+          let new_elem = EquivSequent.Message branch in
+          let biframe = List.rev_append before (new_elem :: after) in
+          [ trace_goal;
+            Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+        | _ -> Tactics.soft_failure
+                (Tactics.Failure "can only be applied on if then else term")
+        end
+      | _ -> Tactics.soft_failure (Tactics.Failure "improper arguments")
       end
   | exception Out_of_range ->
-     Tactics.soft_failure (Tactics.Failure "Out of range position")
+     Tactics.soft_failure (Tactics.Failure "out of range position")
 
 let yes_no_if b args = match args with
   | [Prover.Int i] ->
@@ -1167,7 +1154,7 @@ let yes_no_if b args = match args with
        (fun s sk fk -> match apply_yes_no_if b i s with
          | subgoals -> sk subgoals fk
          | exception (Tactics.Tactic_soft_failure e) -> fk e)
-  | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected")
+  | _ -> Tactics.hard_failure (Tactics.Failure "integer expected")
 
 let () =
  T.register_general "noif"
