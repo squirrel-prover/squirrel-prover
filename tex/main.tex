@@ -33,6 +33,7 @@
 
 \setlength{\ULdepth}{0.15em}
 
+
 \usetikzlibrary{backgrounds}
 \usetikzlibrary{intersections}
 \usetikzlibrary{scopes}
@@ -65,6 +66,15 @@
 \newcommand{\adrien}[1]{\textcolor{blue}{(\textbf{Adrien:} #1)}}
 \newcommand{\charlie}[1]{\textcolor{cyan}{(\textbf{Charlie:} #1)}}
 
+% Hyperref customization
+\hypersetup{
+  colorlinks,
+  linkcolor={red!70!black},
+  citecolor={blue!70!black},
+  urlcolor={blue!80!black}
+}
+
+
 \input{macros.tex}
 
 \begin{document}
@@ -87,22 +97,27 @@ to formulate security properties in the computational model as first-order
 logic formulas. Roughly, they translate a security property (for a finite set
 of traces) as a first-order formula, then they seek to show that this formula
 is valid in all \emph{computational models} where attacker computations
-are unspecified and primitives satisfy some cryptographic assumptions. The
-way this is done is by showing that the formula is a logical consequence of
+are unspecified and primitives satisfy some cryptographic assumptions. This is
+done is by showing that the formula is a logical consequence of
 some axioms, which are sound w.r.t.\ the considered class of computational
 models.
 
 We introduce here a \emph{meta-logic} whose formulas correspond to schemas
 of formulas in the \emph{base logic}
---- which we might call the CCSA or BC logic.
+--- which we might call the CCSA or BC logic. 
 We present inference rules which are sound in the same way as before,
 i.e.\ any instance of the schema is a formula that is valid in all
 computational models subject to the relevant cryptographic assumptions.
+These inference rules simultaneously reason about many execution
+traces of the same protocol, allowing us to prove the security of a
+protocol for any number of sessions independent from the security
+parameter\footnote{In some cases, it is actually possible to get security for a number of a polynomial number of sessions, using a self-composition result. We discuss this later in the paper.}, which is not possible in the base logic.
 
-We define next the meta-logic which abstractly allows to reason about
+\paragraph{Outline}
+We first define the meta-logic which allows to  abstractly reason about
 executions of a protocol. The precise definition of protocols and their
 semantics is not needed for that first step, and is defined only in a
-second part.
+second part. We then give the semantics of the meta-logic, and present the reachability and indistinguishability inference rules.
 
 \include{logic}
 
@@ -113,6 +128,9 @@ second part.
 \include{reachability}
 
 \include{indistinguishability}
+
+\bibliographystyle{alpha}       %apalike, alpha, abbrv
+\bibliography{biblio}
 
 \end{document}
 

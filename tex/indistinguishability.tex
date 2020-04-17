@@ -48,11 +48,13 @@
 We define the diff-equivalence of a process, by asking the equivalence of the projected frames for all possible traces.
 
 \begin{definition}
+  \label{def:process-equiv}
   A bi-process $P$ is diff-equivalent when,
   for any trace model $\TM$, the formula
 
   \[\stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\]
   is valid.
+  \adrien{Why not just take the last action?}
 \end{definition}
 \charlie{Notice that we could also extend $\phi^\TM$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
 Note that this equivalence cannot hold if there exists a trace
@@ -62,15 +64,14 @@ Hence this imposes a form of synchronization on the execution of
 conditionals on the two sides of bi-processes.
 The interest of imposing this artificial constraint is that we
 can stop considering executions where one process goes to $\mythen$
-branch while the other goes to its $\myelse$ branch.
+branch while the other goes to its $\myelse$ branch. \adrien{The constraint is not artificial. Indeed, since the actions are visible, the adversary sees whether the process is going right or left. There is no loss of generality there.}
 \begin{lemma}
   A bi-process $P$ is diff-equivalent if,
   for any trace model $\TM$, the formula
 
   \[\stackrel{.}{\wedge}_{v\in D_\XT} (\pair{\mframe@\tau^L,\mexec@\tau^L})^{\TM[\tau\mapsto v]} \sim (\pair{\mframe@\tau^R, \mexec@\tau^R} )^{\TM[\tau \mapsto v]}\]
   is valid.
-
-
+  \adrien{This just complicated to show than what Definition~\ref{def:process-equiv} requires. Maybe there is a typo?}
 \end{lemma}
 
 \newcommand{\In}{\mathsf{in}}
@@ -82,6 +83,7 @@ branch while the other goes to its $\myelse$ branch.
   where $n$ and $m$ are arbitrary, possibly equal names.
   Its two projections are indistinguishable, but the
   bi-process is not diff-equivalent.
+    \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
   Indeed we have
   $\myif g()=0 \mythen \Out(c,n) \not\sim
    \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
@@ -152,7 +154,7 @@ We extend the sequent calculus, to also reason about diff-equivalence.
 This definition of sequent calculus can of course be used to reason about diff-equivalence.
 \begin{lemma}
   A bi-process is diff-equivalent if and only if,
-  \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\]
+  \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau\]
   Equivalently, is it diff-equivalent if and only if:
   \[\mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau) \vdash \mframe^L@\tau \sim \mframe^R@\tau\]
 \end{lemma}
@@ -168,13 +170,14 @@ This definition of sequent calculus can of course be used to reason about diff-e
     \end{array}
     \]
 
-  The second equivalence is a direct induction on the length of the traces.
+    The second equivalence is a direct induction on the length of the traces.
   \end{proof}
 
 Adding the execution condition to the sequent is also a valid proof technique.
 \begin{lemma}
   A bi-process is diff-equivalent if,
   \[ \emptyset \vdash  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
+  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
 \end{lemma}
 We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
 
@@ -349,6 +352,7 @@ We use the following notations:
 \label{fig:xor}
 \end{figure}
 
+\clearpage
 \section{Archives}
 \subsection{A proof technique}
 

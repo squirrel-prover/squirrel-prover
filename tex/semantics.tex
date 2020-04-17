@@ -30,6 +30,7 @@ where $\Mac = \{ \minp, \mout, \mframe \} \cup \States$.
     \item a ternary function symbol $\mathsf{if}$;
     \item nullary function symbols $\mathsf{true}$ and $\mathsf{false}$.
   \end{itemize}
+  \adrien{Could we remove pairs, and, etc ... from here, and assume that they belong to the inial signature? This would be more compact. }
   Function symbol $\att_n$ will be used to model attacker computations.
   We will use the usual notations for boolean symbols and pairs,
   and we will use the notation $\myif c \mythen t \myelse e$
@@ -78,6 +79,8 @@ $\TM\{\tau\mapsto v\}$ when $v$ is an element of the timestamp domain of $\TM$.
 
 \newcommand{\interp}[1]{(#1)}
 
+\adrien{We should give an example in the introduction, and explain that we interpret $\exists$ and $\forall$ by, respectively, $\vee$ and $\wedge$}.
+
 We define next the interpretation of terms and formulas when they are
 macro-free, i.e.\ when terms contain no occurrence of $m[\vec{i}]@T$
 and formulas contain no occurrence of $m@T$. This will be used to
@@ -88,9 +91,6 @@ and formulas.
   The interpretation of macro-free terms and formulas of the meta-logic in
   some trace model $\TM$, noted $\interp{t}^\TM$ and $\interp{\phi}^\TM$
   respectively, is given by the clauses of \cref{fig:interpt,fig:interpf}.
-  In the interpretation of a term built using the $\mathsf{find}$
-  construct, the $\vec{e}_1, \ldots, \vec{e}_{k^{|\D_\I|}}$ are a complete
-  enumeration of all vectors of $\D_\I^k$, in lexicographic order.
 \end{definition}
 
 \begin{figure}[t]
@@ -128,8 +128,8 @@ and formulas.
     \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
     \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
     \myelse \\ & & \ldots \\ & &
-    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_{k^{|\D_\I|}}\}}
-    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_{k^{|\D_\I|}}\}}
+    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
+    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
     \myelse \interp{t'}^\TM
 %     \\
 %     (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^\TM &=&
@@ -137,6 +137,8 @@ and formulas.
 %       (t_1)^\TM,\ldots,(t_n)^\TM,
 %       (T)^\TM)
   \end{eqnarray*}
+  where $\vec{e}_1, \ldots, \vec{e}_{n}$ is a complete enumeration
+  of $\D_\I^{|\vec{i}|}$ (in lexicographic order).
   \caption{Interpretation of macro-free terms of the meta-logic}
   \label{fig:interpt}
 \end{figure}
@@ -181,7 +183,7 @@ and formulas.
 
 \subsection{Macros}
 Let $(\alpha'_i)_{0 \leq i < |\D_\XT|}$ be the enumeration of the elements
-of $D_\XT$ wrt $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
+of $D_\XT$ w.r.t.\ $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
 For each $k$, let $\alpha_k$ be the representative symbolic action
 such that $\alpha'_k = \alpha_k\{\vec{i}_k\mapsto\vec{e}_k\}$.
 

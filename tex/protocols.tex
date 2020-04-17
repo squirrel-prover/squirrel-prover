@@ -1,29 +1,25 @@
 \section{Protocols}
 
-We shall model a protocol as a set of \emph{actions} available to the
-attacker. An action models a basic step of the protocol, where
-the attacker provides some input, some condition is checked, some
-state updates are performed, and finally an output is emitted.
-There exists a natural translation from the applied pi-calculus to this
-protocol as sets of actions, reminescent of Proverif's translation to Horn
-Clauses or Tamarin's translation to multiset rewriting. However, we leave out
-the details of this translation.
+We shall model a protocol as a finite set of \emph{actions} available to the
+attacker. An action represents a basic step of the protocol where
+the attacker provides an input, a condition is checked, 
+state updates are performed (optionally), and finally an output is emitted.
+There exists a natural translation from the applied pi-calculus to a representation using a finite set of actions, reminescent of Proverif's translation to Horn
+Clauses or Tamarin's translation to multiset rewriting. We omit the details.
 
 In order to be able to define a protocol, we assume a set of function
-symbols $\F$, name symbols $\N$.
-Additionally, we will make use of channel names from a set of constants $\C$ (known to the attacker),
-as well as index memory cell symbols from $\States$.
+symbols $\F$ and a set of name symbols $\N$.
+Additionally, we will use channel names from a set of constants $\C$ (known to the attacker),
+as well as indexed memory cell symbols from $\States$.
 
 \begin{definition} \label{def:action} \label{def:proto}
-  A protocol is given by a finite set of action symbols $\Act$.
+  A protocol is a finite set of action symbols $\Act$.
   A \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$
   is the application of an action symbol $\sfa \in \Act_k$
-  to the expected  number of indices.
+  to $k$ indices.
   We assume a partial order on symbolic actions,
-  noted $\beta \leq \alpha$ and expressing that $\alpha$ depends on $\beta$,
-  which should be compatible with substitution\footnote{
-    When $A$ and $A'$ are symbolic actions and $\theta : \I \to \I$
-    is a substitution of indices,
+  noted $\beta \leq \alpha$, expressing that $\alpha$ depends on $\beta$ (i.e.\ $\alpha$ must occurs before $\beta$). We require that $\leq$ is stable by substitution\footnote{
+    For any symbolic actions $A$, $A'$ and index substitution $\theta : \I \to \I$,
     $A \leq A'$ implies $A\theta \leq A'\theta$.
   }.
   Finally, each action $\sfa \in \Act_k$ must come with
@@ -32,17 +28,17 @@ as well as index memory cell symbols from $\States$.
   and the following elements describing its semantics:
   \begin{itemize}
     \item a meta-logic formula $\phi_{\alpha}$
-      (intuitively, the execution condition of this action);
+      (the execution condition of this action);
     \item a meta-logic term $o_{\alpha}$
-      (intuitively, the output of this action);
+      (the output of this action);
     \item for each memory cell symbol $s \in \States$ of index arity $p$,
       a meta-logic term $u_{\alpha}^{s[j_1,\ldots,j_p]}$
       for some index variables $j_1,\ldots,j_p$
       that are distinct and disjoint from $\vec{i}$
-      (intuitively, this term describes how the action updates the memory
+      (this term describes how the action updates the memory
       cell, depending on the indices $\vec{i}$ and $\vec{j}$);
     \item two channel names $\cin_\alpha$ and $\cout_\alpha$
-      (intuitively, the input and output channels of this action).
+      (the input and output channels of this action).
   \end{itemize}
   We require that
   $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ do not contain any
@@ -54,13 +50,12 @@ as well as index memory cell symbols from $\States$.
       with $\sfa'(i_1,\ldots,i'_l)\leq \alpha$ or
     \item $x^{s[j_1,\ldots,j_p]}$
       for some $\sfa' \in \A_l$ and $s \in \States_p$.
-  \end{itemize}
-  Intuitively, actions do not have access to arbitrary data but can only
-  see the inputs of actions on which they depend
-  and the content of memory when they execute.
+  \end{itemize}  
+  Intuitively, the action's behavior depends only on previous inputs of actions, and on the memory.
+  \adrien{I think we also want to say that index variables are only $i_1,\dots,i_k$, plus the index variables of memory updates. We should probably use binders there.}
 \end{definition}
 
-
+\adrien{This looks more complicated than it is. I feel like this would be better if actions had index binders.}
 The semantics of each action $\sfa$ is given via an arbitrary
 choice of indices in $\alpha = \sfa(i_1,\ldots,i_k)$.
 We then extended naturally this semantics to all symbolic actions,
@@ -76,21 +71,18 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
                                 \{j_m\mapsto j'_m\}_{1 \leq m \leq p}.$$
 
 \begin{remark}
-  We expect actions to provide an explicit update for each memory cell. This
-  allows to easily interpret the value of a memory cell at any given point.
+  Actions provide an explicit update for each memory cell. This
+  allows to easily obtain the value of a memory cell at any given point.
 
   We allow actions to update memory cells that depend on some free indices.  As
   it will be illustrated later on, this is required to express protocols with
   actions that are conditioned by existential formulas over indices.
 
-  We will fix the initial values of all memory cells to be $0$.
-  This is not restrictive since we can have an action that initializes
-  all memory cells at once (giving them values that can depend on their
-  indices) and we can force this action to happen before any other.
-  In the tool, we use a different (and incompatible) approach:
-  the user has to postulate axioms to specify initial values
-  --- but of course we do not have rules to derive the fact that initial
-  values are $0$ as specified here, so we cannot obtain a contradiction.
+  All memory cells are initialized to $0$. If we want a different value, we can use a action to initialize all memory cells (with values that depend on the cells'
+  indices), and we can force this action to happen before any other.
+  In the tool, we use a different approach, and let the user provide axioms to specify the initial values of the memory.
+  % --- but of course we do not have rules to derive the fact that initial
+  % values are $0$ as specified here, so we cannot obtain a contradiction.
 \end{remark}
 
 \begin{definition}
@@ -111,13 +103,14 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
   for all $1 \leq i \leq n$,
   for all concrete actions $\beta$ such that $\beta \leq \alpha_i$,
   there exists $1 \leq j \leq i$ such that $\beta = \alpha_j$.
+  \adrien{Calling it abstract trace seems \emph{very} confusing to me. It should be called concrete trace. Then, if it is executable, just say \emph{executable concrete trace}.}
 \end{definition}
 
 \begin{remark}
   The structure that we have assumed on actions is restrictive and
   does not allow to model e.g.\ phases. It does not matter because we can
   impose other conditions on traces later on as axioms (similar to the
-  restrictions of Tamarin).
+  restrictions of Tamarin). \adrien{Why having an order on actions, and then restrict it further later? Why not do both at the same time?}
 \end{remark}
 
 \begin{remark}
@@ -129,20 +122,17 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
   Conflicts could in principle be useful to model the fact that there is only
   one way to enter the $\mathsf{in}$ branch of a $\mathsf{find}$. However,
   our experience so far is that such details are not necessary to reason
-  over protocols.
+  over protocols. 
 \end{remark}
 
 \subsection{Bi-protocols}
 
 In order to model the indistinguishability of two protocols, we will
-consider pairs of processes given as a bi-process, i.e.\ a system with
-a single set of symbolic actions, but where each symbolic action describes
-an execution step of both the left and right processes,
-using $\diff{\_}{\_}$ terms as usual.
-
-A bi-protocol is thus a protocol given over a set of function symbols
-$\F$ containing the binary symbol $\mathsf{diff}$,
-which will be interpreted in a particular way.
+consider pairs of processes described through a bi-process, i.e.\ a system with
+a single set of symbolic actions where each symbolic action describes
+simultaneously the left and right processes, using $\diff{\_}{\_}$ terms.
+We assume that $\mathsf{diff} \in \F$,
+which will be interpreted in a particular way. \adrien{I believe that we do not give a semantics to $\mathsf{diff}$. Instead, we first project to get rid of it, and then interpret}
 We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right
 projections of a bi-protocol, bi-term, etc. defined as usual.
 For example, $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$ will denote

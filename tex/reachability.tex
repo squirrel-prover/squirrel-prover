@@ -5,22 +5,24 @@
 We have defined a translation from any meta-logic formula $\phi$ to a base logic
 boolean term $\interp{\phi}^\TM$. We can now formally define when a protocol
 satisfies some trace property $\phi$.  Intuitively, the meta-logic formula is
-true when the associated term is true with overwhelming probability. This is
-made formal in the following definitions.
-
-
+true when the associated term is true with overwhelming probability in any trace model. % This is made formal in the following definitions.
 \begin{definition}
-  Given a protocol $P$, a formula $\phi$ of the meta-logic is said to be valid
-  when, for any trace model $\TM$, the base logic formula
-  $(\phi)^\TM \sim \true$ is valid.
+  % Given a protocol $P$, a formula $\phi$ of the meta-logic is said to be valid
+  % when, for any trace model $\TM$, the base logic formula
+  % $(\phi)^\TM \sim \true$ is valid. \adrien{$P$ is not used in this sentence.}
+  % A formula $\phi$ of the meta-logic is valid if for any trace model $\TM$, the base logic formula $(\phi)^\TM \sim \true$ is valid.
+  %
+  % More generally, a meta-logic formula $\phi$ is a
+  % logical consequence of a set $S$ of base logic formulas
+  % % (which might themselves be of the form $\interp{\psi}^\TM \sim \true$)
+  % when, for all $\TM$, $\Mo$ and $\sigma$ such that
+  % $\Mo,\sigma \models \psi$ for all $\psi\in S$,
+  % we have
+  % $\Mo,\sigma \models(\phi)^\TM\sim\mathsf{true}$.
+  Let $\phi$ be a meta-formula. Then for every trace model $\TM$, computational model $\Mo$ and interpretation $\sigma$, $\TM, \Mo, \sigma \models \phi$ if $\Mo, \sigma \models (\phi)^{\TM} \sim \true$.
 
-  More generally, a meta-logic formula $\phi$ is a
-  logical consequence of a set $S$ of base logic formulas
-  (which might themselves be of the form $\interp{\psi}^\TM \sim \true$)
-  when, for all $\TM$, $\Mo$ and $\sigma$ such that
-  $\Mo,\sigma \models \psi$ for all $\psi\in S$,
-  we have
-  $\Mo,\sigma \models(\phi)^\TM\sim\mathsf{true}$.
+  We say that $\phi$ is valid if $\TM, \Mo, \sigma \models \phi$ for every $\TM$, $\Mo$, $\sigma$, and for any set of meta-formulas $S$, $S \models \phi$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models S$, we have $\TM, \Mo, \sigma \models \phi$.
+  % we omit $\sigma$ when it is empty (i.e.\ when $\phi$ has no free message variables).
 \end{definition}
 
 \begin{remark}
@@ -52,8 +54,9 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
 \begin{definition}
   A sequent $\Gamma \vdash \phi$ is composed of a set of meta-logic formulas
   $\Gamma$ and a meta-logic formula $\phi$.
-  It is valid when the meta-logic formula
-  $(\wedge\Gamma) \Rightarrow \phi$ is valid.
+  % It is valid when the meta-logic formula
+  % $(\wedge\Gamma) \Rightarrow \phi$ is valid.
+  The sequent $\Gamma \vdash \phi$ is valid if $\Gamma \models \phi$.
 \end{definition}
 
 \begin{proposition}
@@ -189,14 +192,16 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   the term $\interp{t}^\TM$ does not contain any message variable.
   If $\tau$ refers to an input macro, then the inequality over timestamps
   is strict.}
+\adrien{What is $S$ in the rule? The condition \textit{If $\tau$ refers to an input macro [...]} is not very nice.}
 \end{figure}
 
 \begin{proposition}
-  The rules of \cref{fig:xor} are sound wrt.\ computational models
+  The rules of \cref{fig:xor-reach} are sound w.r.t.\ computational models
   where $\oplus$ is interpreted as exclusive or:
   if the premisses are valid in all such computational models,
   then so is the conclusion.
-  \emph{Do we need to impose a condition on message lengths?}
+  % \emph{Do we need to impose a condition on message lengths?}
+  % Adrien: no we dont, except for the last rule. 
 \end{proposition}
 
 \begin{figure}
@@ -221,8 +226,8 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   the condition that, for any trace model $\TM$,
   $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
   $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
-  This condition would be over-approximated in an implementation.}
-  \label{fig:xor}
+  This condition would be over-approximated in an implementation. \adrien{There is another condition: $t$ must be of the same length than names.}}
+  \label{fig:xor-reach}
 \end{figure}
 
 \newcommand{\eufcma}{\textsc{EUF-CMA}}
@@ -249,7 +254,7 @@ Let $P$ be a protocol.  In any computational model where $h$ is interpreted as a
 \subsection{Trace axioms}
 
 We now identify some valid formulas, which can thus be used as axioms
-when trying to derive a trace property.
+when trying to derive a trace property. \adrien{Why don't we present these rules as axioms then?}
 
 \begin{proposition}
   The following formulas are valid w.r.t.\ the protocol:
@@ -259,11 +264,12 @@ when trying to derive a trace property.
     \item
       $\forall \tau.~ \pre(\tau)<\tau \wedge
       \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
-      \tau'=\pre(\tau)$;
+      \tau'=\pre(\tau)$; \adrien{this is not true for init}
     \item for any $a\neq b\in\Act$,
-      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$;
+      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$; \adrien{we already have an axiom for this one}
     \item for any $a\in\Act$,
       $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
+      \adrien{idem}
       \item $\forall \tau.~ \mexec@\tau \Rightarrow \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau$
   \end{itemize}
 \end{proposition}

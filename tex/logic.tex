@@ -1,13 +1,9 @@
-We call \emph{base logic} the system of Bana and Comon (CCS'14).
-It is first-order logic with a distinguished kind of constant for representing
-names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.)
-and featuring a single predicate noted $\sim$ (or rather, a family
+We call \emph{base logic} the logic introduced by Bana and Comon in~\cite{Bana:2014:CCS:2660267.2660276}.
+It is first-order logic with a distinguished kind of constant called names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.) which are used to represent random samplings. It uses a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
-The terms are all of the same sort: they are meant to represent
-messages.
+The terms are all of the same sort, and represent protocol messages.
 
-In practice, the logic will be considered with function symbols for
-representing cryptographic primitives as well as attacker computations.
+The logic uses function symbols to represent the protocol functions and cryptographic primitives, as well as attacker computations.
 We will also assume some standard boolean constants and operations, with
 a fixed semantics (for instance, $\_ \stackrel{.}{=} \_$ or
 $\mathsf{if \_ then \_ else \_}$).
@@ -17,9 +13,9 @@ The formulas of the base logic are intended to be interpreted in
 \begin{itemize}
   \item terms are interpreted as PPT Turing machines which,
     given infinite random tapes and a security parameter output a bitstring;
-  \item $\sim$ is interpreted as indistinguishability;
-  \item names are independent random samplings;
-  \item function symbols correspond to deterministic machines.
+  \item $\sim$ is interpreted as computational indistinguishability;
+  \item names are independent random samplings of length $\eta$ (the security parameter);
+  \item function symbols correspond to deterministic machines (probabilistic functions are encoded using explicit randomness).
 \end{itemize}
 
 In particular, function symbols corresponding to cryptographic primitives
@@ -69,10 +65,10 @@ $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
   associated to each tag) will have $0$ as message arity and $1$ as index arity.
 \end{example}
 
-We assume a set $\N$ of indexed names symbols
-(used to model random samplings)
+We assume a set $\N$ of indexed name symbols
+(modeling random samplings)
 and a set of indexed action symbols $\Act$
-(used to model specific timestamps).
+(modeling specific timestamps).
 These indexed symbols only have an index arity: they
 cannot be applied to terms.
 
@@ -90,62 +86,51 @@ We write $\F_k^n$ for function symbols of index arity $k$ and message
 arity $n$.
 
 \begin{figure}[t]
-\[
-  \begin{array}{rclll}
-    i &:=& i & \text{index variable} & \\
-    \\
-    T &:=& \tau & \text{timestamp variable} & \\
+  \begin{gather*}
+    \begin{array}{rclll}
+      i &:=& i & \text{index variable} & \\
+      \\
+      T &:=& \tau & \text{timestamp variable} & \\
       &\mid& \tinit & \text{initial timestamp} & \\
       &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\Act_k) \\
       &\mid & \pre(T) & \text{predecessor} & \\
-    \\
-    t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
+      \\
+      t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
       & \mid & x  & \text{message variable} & (x\in\X) \\
       & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} &
       (f\in\F_k^n)\\
       & \mid & m[i_1,\ldots,i_k]@T &\text{macro application} & (m\in\Mac_k)\\
       & \mid & \myif \phi \mythen t \myelse t'
-        &\text{conditional} \\
+      &\text{conditional} \\
       & \mid & \myfind \vec{i} \mysuchthat \phi \myin t \myelse t'
-        &\text{lookup}
-  \end{array}
-\]
-\caption{Syntax of meta-logic terms}\label{fig:terms}
-\end{figure}
-
-\begin{figure}[t]
-  \[
-  \begin{array}{c}
-   \begin{array}{rcll}
-    \Sort &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
-    \\[2ex]
-   \atom & := & t=t'
- & \text{atomic proposition over messages } \\
-  &\mid & T=T' \mid T \leq T' \mid \mcond@T \mid \mexec@T &  \text{atomic proposition
-  over timestamps } \\
-  &\mid & i=i'  &  \text{atomic proposition
-    over indices } \\
+      &\text{lookup}
+      \\[2ex]
+      \Sort &  := & \timestamp \mid \idx & \text{(meta logic sorts)} \\
+      \\[2ex]
+      \atom & := & t=t'
+      & \text{atomic proposition over messages } \\
+      &\mid & T=T' \mid T \leq T' \mid \mcond@T \mid \mexec@T &  \text{atomic proposition
+        over timestamps } \\
+      &\mid & i=i'  &  \text{atomic proposition
+        over indices }
+      \\[2ex]
+      \phi & ::= &  \lefteqn{\true \mid \false \mid \phi \wedge \phi' \mid  \phi
+      \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
+      \forall x : \Sort.\ \phi \mid \exists x:\Sort.\ \phi \mid \atom }
     \end{array}
-\\
-\\
-     \begin{array}{rcll}
-    \phi & ::= &  \true \mid \false \mid \phi \wedge \phi' \mid  \phi
-    \vee \phi' \mid   \phi \Rightarrow \phi'\mid \neg \phi \mid
-    \forall x : \Sort.\ \phi \mid \exists x:\Sort.\ \phi \mid \atom &
-    \end{array}
-
-\end{array}
-    \]
-    \caption{Syntax of meta-logic formulas}\label{fig:formulas}
+  \end{gather*}
+  \caption{Syntax of meta-logic terms and formulas}
+  \label{fig:terms-form}
 \end{figure}
 
 \begin{definition}
   Given a (meta logic) signature $\Sigma = (\F,\N,\Mac,\Act)$
   and some sets of variables
   $\X$, $\I$ and $\XT$,
-  \cref{fig:terms} defines the syntax of (meta-logic) terms
+  we give in \cref{fig:terms-form} the syntax of (meta-logic) terms
   of sort message (noted $t$) and timestamp (noted $T$),
-  and \cref{fig:formulas} defines the syntax of formulas (noted $\phi$).
+  and the syntax of formulas (noted $\phi$).  
+  
   Note that terms and formula are mutually inductive, due to the presence
   of conditionals and lookups in terms.
   The only terms of sort index are index variables.
