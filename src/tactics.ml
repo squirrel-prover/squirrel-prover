@@ -156,7 +156,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string -> arg list -> judgment tac
+  val eval_abstract : string list -> string -> arg list -> judgment tac
   val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
     string -> arg list -> Format.formatter -> unit
 
@@ -183,7 +183,7 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : t -> judgment tac
+  val eval : string list -> t -> judgment tac
 
   val eval_judgment : t -> judgment -> judgment list
 
@@ -202,15 +202,15 @@ module AST (M:S) = struct
   type arg = M.arg
   type judgment = M.judgment
 
-  let rec eval = function
-    | Abstract (id,args) -> eval_abstract id args
-    | AndThen tl -> andthen_list (List.map eval tl)
-    | OrElse tl -> orelse_list (List.map eval tl)
-    | Try t -> try_tac (eval t)
-    | NotBranching t -> not_branching (eval t)
-    | Repeat t -> repeat (eval t)
+  let rec eval modifiers = function
+    | Abstract (id,args) -> eval_abstract modifiers id args
+    | AndThen tl -> andthen_list (List.map (eval modifiers) tl)
+    | OrElse tl -> orelse_list (List.map (eval modifiers) tl)
+    | Try t -> try_tac (eval modifiers t)
+    | NotBranching t -> not_branching (eval modifiers t)
+    | Repeat t -> repeat (eval modifiers t)
     | Ident -> id
-    | Modifier (id,t) -> eval t
+    | Modifier (id,t) -> eval (id::modifiers) t
 
   let pp_args fmt l =
     Fmt.list
@@ -248,7 +248,7 @@ module AST (M:S) = struct
     * A hard failure inside Tactic_hard_failure. Those exceptions are caught
     * inside the interactive loop. *)
   let eval_judgment ast j =
-    let tac = eval ast in
+    let tac = eval [] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
     let fk tac_error = raise @@ Tactic_soft_failure tac_error in

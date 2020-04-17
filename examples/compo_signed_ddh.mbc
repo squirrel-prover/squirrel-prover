@@ -119,7 +119,7 @@ goal [none, auth] S1_charac :
   cond@S1 => (cond@S4 => False) .
 Proof.
   simpl.
-  expand cond@S1; expand cond@S4.
+  nosimpl(expand cond@S1; expand cond@S4; simpl).
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
   euf M1.
@@ -135,7 +135,7 @@ goal [none, auth] P1_charac :
    cond@P1 => (cond@P4 => False).
 Proof.
   simpl.
-  expand cond@P1; expand cond@P4.
+  nosimpl(expand cond@P1; expand cond@P4; simpl).
   substitute pkS@P1,pk(kS).
   euf M1.
 

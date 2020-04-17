@@ -89,25 +89,57 @@ let parse_formula fact =
           fact
           Sorts.Boolean
 
-(* TODO some of this (generalized) should go to Tactics
- *   type 'a tac for tactic expressions with atoms of type 'a
- *   type string tac could be printed
- *   type ('a Tactics.tac) tac could be evaluated
- *   problem: apply (and other tactics with arguments) make the
- *   general treatment difficult
- *   solution: a general notion of tactic args and associated syntax ? *)
+(** Prover tactics, and tables for storing them. *)
 
-(* Tactic arguments. The presence of substitution is a bit ad-hoc,
- * as visible in the parser: TODO we should probably just take a list
- * of terms and let the tactic process it. *)
 type tac_arg =
   | String_name of string
   | Int of int
   | Theory of Theory.term
 
-(** Functor build AST evaluators for our judgment types *)
-module Make_AST
-  (T : sig type judgment val get : string -> tac_arg list -> judgment Tactics.tac end) :
+type 'a tac_infos = {
+  maker : tac_arg list -> 'a Tactics.tac ;
+  help : string
+}
+
+type 'a table = (string, 'a tac_infos) Hashtbl.t
+
+(** Basic tactic tables, without registration *)
+
+module type Table_sig = sig
+  type judgment
+  val table : judgment table
+  val get : string -> tac_arg list -> judgment Tactics.tac
+  val to_goal : judgment -> Goal.t
+  val from_trace : TraceSequent.t -> judgment
+  val from_equiv : Goal.t -> judgment
+end
+
+module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
+  type judgment = TraceSequent.t
+  let table = Hashtbl.create 97
+  let get id =
+    try (Hashtbl.find table id).maker with
+      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
+  let to_goal j = Goal.Trace j
+  let from_trace j = j
+  let from_equiv e = assert false
+end
+
+module EquivTable : Table_sig with type judgment = Goal.t = struct
+  type judgment = Goal.t
+  let table = Hashtbl.create 97
+  let get id =
+    try (Hashtbl.find table id).maker with
+      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
+  let to_goal j = j
+  let from_trace j = Goal.Trace j
+  let from_equiv j = j
+end
+
+(** Functor building AST evaluators for our judgment types. *)
+module Make_AST (T : Table_sig) :
   (Tactics.AST_sig with type arg = tac_arg with type judgment = T.judgment)
 = Tactics.AST(struct
 
@@ -120,8 +152,25 @@ module Make_AST
     | String_name s -> Fmt.string ppf s
     | Theory th -> Theory.pp ppf th
 
-  let eval_abstract id args : judgment Tactics.tac =
-    T.get id args
+  let simpl () =
+    let tsimpl = TraceTable.get "simpl" [] in
+    let esimpl = EquivTable.get "simpl" [] in
+      fun s sk fk ->
+        match T.to_goal s with
+          | Goal.Trace t ->
+              let sk l fk = sk (List.map T.from_trace l) fk in
+              tsimpl t sk fk
+          | Goal.Equiv e ->
+              let sk l fk = sk (List.map T.from_equiv l) fk in
+              esimpl (Goal.Equiv e) sk fk
+
+  let simpl = Lazy.from_fun simpl
+
+  let eval_abstract mods id args : judgment Tactics.tac =
+    match mods with
+      | "nosimpl"::_ -> T.get id args
+      | [] -> Tactics.andthen (T.get id args) (Lazy.force simpl)
+      | _ -> assert false
 
   let pp_abstract ~pp_args s args ppf =
     match s,args with
@@ -134,15 +183,27 @@ module Make_AST
 
 end)
 
+module TraceAST = Make_AST(TraceTable)
+
+module EquivAST = Make_AST(EquivTable)
+
+(** Signature for tactic table with registration capabilities.
+  * Registering macros relies on previous AST modules,
+  * hence the definition in multiple steps. *)
 module type Tactics_sig = sig
 
   type judgment
+
   type tac = judgment Tactics.tac
 
-  val register_general : string -> ?help:string -> (tac_arg list -> tac) -> unit
+  val register_general :
+    string -> ?help:string -> (tac_arg list -> tac) -> unit
   val register : string -> ?help:string -> tac -> unit
-  val register_formula : string -> ?help:string -> (Term.formula -> tac) -> unit
-  val register_macro : string -> ?help:string -> tac_arg Tactics.ast -> unit
+  val register_formula :
+    string -> ?help:string -> (Term.formula -> tac) -> unit
+  val register_macro :
+    string -> ?modifiers:string list -> ?help:string ->
+    tac_arg Tactics.ast -> unit
 
   val get : string -> tac_arg list -> tac
 
@@ -151,30 +212,17 @@ module type Tactics_sig = sig
 
 end
 
-(** In the future this will have to be made generic since we will
-  * want the same declaration system for indistinguishability tactics. *)
 module Prover_tactics
-  (M : sig type judgment end)
-  (AST : Tactics.AST_sig with type judgment = M.judgment with type arg = tac_arg) :
+  (M : Table_sig)
+  (AST : Tactics.AST_sig
+           with type judgment = M.judgment
+           with type arg = tac_arg) :
   Tactics_sig with type judgment = M.judgment =
 struct
 
-  type judgment = M.judgment
+  include M
+
   type tac = judgment Tactics.tac
-
-  type tac_infos = {
-    maker : tac_arg list -> tac;
-    help : string
-  }
-
-  let table :
-    (string, tac_infos) Hashtbl.t =
-    Hashtbl.create 97
-
-  let get id =
-    try (Hashtbl.find table id).maker with
-      | Not_found -> raise @@ Tactics.Tactic_hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
 
   let register_general id ?(help="") f =
     assert (not (Hashtbl.mem table id)) ;
@@ -200,8 +248,8 @@ struct
              raise @@ Tactics.Tactic_hard_failure
                (Tactics.Failure "formula argument expected"))
 
-  let register_macro id ?(help="") m =
-    register id ~help:help (AST.eval m)
+  let register_macro id ?(modifiers=["nosimpl"]) ?(help="") m =
+    register id ~help:help (fun s sk fk -> AST.eval modifiers m s sk fk)
 
   let pp fmt id =
     let help_text =
@@ -226,18 +274,10 @@ struct
 end
 
 module rec TraceTactics : Tactics_sig with type judgment = TraceSequent.t =
-  Prover_tactics(struct type judgment = TraceSequent.t end)(TraceAST)
-and TraceAST : Tactics.AST_sig
-                 with type judgment = TraceSequent.t
-                 with type arg = tac_arg =
-  Make_AST(TraceTactics)
+  Prover_tactics(TraceTable)(TraceAST)
 
 module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
-  Prover_tactics(struct type judgment = Goal.t end)(EquivAST)
-and EquivAST : Tactics.AST_sig
-                 with type judgment = Goal.t
-                 with type arg = tac_arg =
-  Make_AST(EquivTactics)
+  Prover_tactics(EquivTable)(EquivAST)
 
 let pp_ast fmt t = TraceAST.pp fmt t
 
@@ -255,12 +295,13 @@ let get_equiv_help tac_name =
     Printer.prt `Result "%a." EquivTactics.pp tac_name;
   Tactics.id
 
-
 let () =
+
   TraceTactics.register "admit"
     ~help:"Closes the current goal.\
            \n Usage: admit."
     (fun _ sk fk -> sk [] fk) ;
+
   TraceTactics.register_general "help"
     ~help:"Display all available commands.\n Usage: help."
     (function
@@ -278,38 +319,6 @@ let () =
           (Tactics.Failure"improper arguments")) ;
 
   TraceTactics.register "id" ~help:"Identity.\n Usage: identity." Tactics.id
-
-(** Automatic simplification of generated subgoals *)
-
-let simpl = Tactics.Abstract ("simpl",[])
-
-let trace_auto_simp judges =
-  judges
-  |> List.map (TraceAST.eval_judgment simpl)
-  |> List.flatten
-
-let esimpl =
-  Tactics.(
-    AndThen
-      (Abstract ("fadup",[]) ::
-       [Try(
-         AndThen [Abstract ("expandall",[]);
-                  Abstract ("fadup",[]);
-                  OrElse [Abstract ("refl",[]);
-                          Abstract ("assumption",[])]])]))
-
-let equiv_auto_simp judges =
-  judges
-  |> List.map (fun x -> match x with
-      | Goal.Equiv _ -> EquivAST.eval_judgment esimpl x
-      | Goal.Trace t ->
-          List.map (fun t -> Goal.Trace t) (TraceAST.eval_judgment simpl t))
-  |> List.flatten
-
-let () =
-  EquivTactics.register "simpl"
-    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
-    (fun j sk fk -> sk (EquivAST.eval_judgment esimpl j) fk)
 
 let get_goal_formula gname =
   match
@@ -437,18 +446,10 @@ let eval_tactic_focus tac = match !subgoals with
   | [] -> assert false
   | Goal.Trace judge :: ejs' ->
     let new_j = TraceAST.eval_judgment tac judge in
-    let new_j = match tac with
-      | Tactics.Modifier ("nosimpl", _) -> new_j
-      | _ -> trace_auto_simp new_j
-    in
     subgoals := List.map (fun j -> Goal.Trace j) new_j @ ejs';
     is_proof_completed ()
   | Goal.Equiv judge :: ejs' ->
     let new_j = EquivAST.eval_judgment tac (Goal.Equiv judge) in
-    let new_j = match tac with
-      | Tactics.Modifier ("nosimpl", _) -> new_j
-      | _ -> equiv_auto_simp new_j
-    in
     subgoals := new_j @ ejs';
     is_proof_completed ()
 

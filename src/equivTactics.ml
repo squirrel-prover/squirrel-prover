@@ -53,6 +53,21 @@ let () =
            end
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
+(** Automatic simplification *)
+let simpl =
+  Tactics.(
+    AndThen
+      (Abstract ("fadup",[]) ::
+       [Try(
+         AndThen [Abstract ("expandall",[]);
+                  Abstract ("fadup",[]);
+                  OrElse [Abstract ("refl",[]);
+                          Abstract ("assumption",[])]])]))
+
+let () =
+  T.register_macro "simpl"
+    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
+    simpl
 
 exception NoRefl
 

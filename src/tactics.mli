@@ -92,7 +92,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string -> arg list -> judgment tac
+  val eval_abstract : string list -> string -> arg list -> judgment tac
   val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
     string -> arg list -> Format.formatter -> unit
 
@@ -119,7 +119,7 @@ module type AST_sig = sig
   type judgment
   type t = arg ast
 
-  val eval : t -> judgment tac
+  val eval : string list -> t -> judgment tac
 
   val eval_judgment : t -> judgment -> judgment list
 
