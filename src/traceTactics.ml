@@ -1221,7 +1221,7 @@ let () =
              | _ -> assert false)
           fk
   in
-  T.register "newsimpl" (simpl false) ;
+  T.register "simpl" (simpl false) ;
   T.register "auto" (simpl true)
 
 (** Projecting a goal on a bi-system

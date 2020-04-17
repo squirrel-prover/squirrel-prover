@@ -281,76 +281,29 @@ let () =
 
 (** Automatic simplification of generated subgoals *)
 
-(* Attempt to closing the goal. *)
-let simple_base =
-  let open Tactics in
-  [ Abstract ("eqnames",[]) ;
-    Abstract ("eqtrace",[]) ;
-    Try (Abstract ("congruence",[])) ;
-    Try (Abstract ("constraints",[])) ;
-    Try (Abstract ("assumption",[])) ]
-
-(* Try all possible non branching introductions, then try to close.
- * We also try assumption first, because intros can loose the
- * possibility to do it later (in fact we should try assumption
- * before each introduction step, but that is not convenient
- * since intros is not repeat(intro)). *)
-let simpl_nobranching =
-  let open Tactics in
-    AndThen
-      (Try (Abstract ("assumption",[])) ::
-       Abstract ("intros",[]) ::
-       Repeat (Abstract ("simpl_left",[])) ::
-       simple_base)
-
-(* Same as above but including branching introductions. *)
-let simpl_branching =
-  let open Tactics in
-    AndThen
-      (Repeat (AndThen [Try (Abstract ("assumption",[]));
-                        OrElse [Abstract ("anyintro",[]);
-                                Abstract ("simpl_left",[])]]) ::
-       simple_base)
-
-(* Final automation tactic. We allow branching introduction, only if the extra
- * goals are automatically closed. *)
-let newsimpl = true
-let simpl =
-  if newsimpl then Tactics.Abstract ("newsimpl",[]) else
-  Tactics.(OrElse [NotBranching(simpl_branching); simpl_nobranching])
+let simpl = Tactics.Abstract ("simpl",[])
 
 let trace_auto_simp judges =
   judges
   |> List.map (TraceAST.eval_judgment simpl)
   |> List.flatten
 
-let () =
-  TraceTactics.register "simpl"
-    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
-    (fun s sk fk -> TraceAST.eval simpl s sk fk)
-
 let esimpl =
   Tactics.(
     AndThen
       (Abstract ("fadup",[]) ::
        [Try(
-           AndThen [(AndThen [Abstract ("expandall",[]); (Abstract ("fadup",[]))]);
-                    (
-                      OrElse [Abstract ("refl",[]);
-                              Abstract ("assumption",[])]
-                    )]
-         )
-       ])
-  )
-
+         AndThen [Abstract ("expandall",[]);
+                  Abstract ("fadup",[]);
+                  OrElse [Abstract ("refl",[]);
+                          Abstract ("assumption",[])]])]))
 
 let equiv_auto_simp judges =
   judges
   |> List.map (fun x -> match x with
       | Goal.Equiv _ -> EquivAST.eval_judgment esimpl x
       | Goal.Trace t ->
-          List.map (fun t -> Goal.Trace t) (TraceAST.eval_judgment simpl t)
-    )
+          List.map (fun t -> Goal.Trace t) (TraceAST.eval_judgment simpl t))
   |> List.flatten
 
 let () =
