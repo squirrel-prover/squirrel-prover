@@ -905,7 +905,7 @@ let check_disequality_cterm state neqs (u,v) =
 let check_disequality state neqs (u,v) =
   try check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
   with
-  | Unsupported_conversion -> true
+  | Unsupported_conversion -> false
 
 let check_disequalities state neqs l =
   let neqs = List.map (fun (x, y) ->
@@ -921,7 +921,7 @@ let check_equality_cterm state (u,v) =
 let check_equality state (u,v) =
   try check_equality_cterm state (cterm_of_term u, cterm_of_term v)
   with
-  | Unsupported_conversion -> true
+  | Unsupported_conversion -> false
 
 let check_equalities state l = List.for_all (check_equality state) l
 

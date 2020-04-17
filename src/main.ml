@@ -277,6 +277,11 @@ let () =
           (Tactics.Failure "can only be applied on ground terms"))
         (fun () -> run ~test "tests/alcotest/fresh_reach_var.mbc")
     end ;
+    "Check equalities false if unsupported terms", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/completion_unsupported_term.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
