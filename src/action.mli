@@ -77,11 +77,8 @@ val dummy_action : int -> action
   * indices. *)
 
 (** Get a fresh symbol whose name starts with the given prefix. *)
-val fresh_symbol : string -> Symbols.Action.ns Symbols.t
-
-val define_symbol :
-  Symbols.Action.ns Symbols.t ->
-  Vars.index list -> action -> unit
+val fresh_symbol :
+  Symbols.table -> string -> Symbols.table * Symbols.Action.ns Symbols.t
 
 val find_symbol : string -> Vars.index list * action
 
@@ -162,11 +159,17 @@ val iter_descrs : system -> (descr -> unit) -> unit
 (** Specify if a given system name is not already in use. *)
 val is_fresh : system_name -> bool
 
-(** Register a new action symbol, action, and description, linked together. The
-   set of registered actions for this system name will define the protocol under
-   study. *)
-val register : system_name ->
-  Symbols.action Symbols.t -> Vars.index list -> action -> descr ->  Symbols.action Symbols.t
+(** Register an action symbol in a system,
+  * associating it with an action description.
+  * The set of registered actions for this system name will define
+  * the protocol under study.
+  * Returns the updated table and the actual action symbol used
+  * (currently the proposed symbol may not be used for technical
+  * reasons that will eventually disappear TODO). *)
+val register :
+  Symbols.table -> system_name ->
+  Symbols.action Symbols.t -> Vars.index list ->
+  action -> descr -> Symbols.table * Symbols.action Symbols.t
 
 (** Reset all action definitions done through [register]. *)
 val reset : unit -> unit

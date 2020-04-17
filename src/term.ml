@@ -221,30 +221,36 @@ and pp_generic_atom ppf = function
 
 
 (** Declare input and output macros.
+  * TODO this should be moved to the builtin symbol table in Symbols.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (Symbols.Macro.declare_exact "input" ~builtin:true
-                  Symbols.Input,
+let in_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
+                       "input" ~builtin:true
+                       Symbols.Input),
                 Sorts.Message,
                 [])
-let out_macro = (Symbols.Macro.declare_exact "output" ~builtin:true
-                   Symbols.Output,
+let out_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
+                        "output" ~builtin:true
+                        Symbols.Output),
                  Sorts.Message,
                  [])
 
-let cond_macro = (Symbols.Macro.declare_exact "cond" ~builtin:true
-                   Symbols.Cond,
+let cond_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
+                         "cond" ~builtin:true
+                         Symbols.Cond),
                  Sorts.Boolean,
                  [])
 
-let exec_macro = (Symbols.Macro.declare_exact "exec" ~builtin:true
-                   Symbols.Exec,
+let exec_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
+                         "exec" ~builtin:true
+                         Symbols.Exec),
                  Sorts.Boolean,
                  [])
 
-let frame_macro = (Symbols.Macro.declare_exact "frame" ~builtin:true
-                   Symbols.Frame,
-                 Sorts.Message,
-                 [])
+let frame_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
+                          "frame" ~builtin:true
+                          Symbols.Frame),
+                   Sorts.Message,
+                   [])
 
 let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt
@@ -480,7 +486,9 @@ and subst_generic_atom s = function
 
 let mk_fname ?(indices=0) f k_args k_ret =
   let info = indices, Symbols.Abstract (k_args,k_ret) in
-  Symbols.Function.declare_exact f ~builtin:true info, []
+  snd
+    (Symbols.Function.declare_exact Symbols.dummy_table f ~builtin:true info),
+  []
 
 (** Boolean function symbols *)
 
@@ -665,7 +673,8 @@ let () =
       let c = mkvar "c" Sorts.Message in
       let def =
         Symbols.Abstract ([Sorts.emessage;Sorts.emessage],Sorts.emessage) in
-      let f = Symbols.Function.declare_exact "f" (0,def) in
+      let _,f =
+        Symbols.Function.declare_exact Symbols.empty_table "f" (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term Left t in

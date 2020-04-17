@@ -4,10 +4,10 @@ type Symbols.data +=
     Global_data of Vars.message list * Vars.index list * Vars.timestamp
                    * Term.message
 
-let declare_global name ~inputs ~indices ~ts t =
+let declare_global table name ~inputs ~indices ~ts t =
   let data = Global_data (inputs,indices,ts,t) in
   let def = Symbols.Global (List.length indices) in
-    Symbols.Macro.declare name ~data def
+    Symbols.Macro.declare table name ~data def
 
 (** Macro expansions *)
 

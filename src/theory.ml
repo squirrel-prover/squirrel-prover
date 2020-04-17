@@ -531,7 +531,7 @@ let conv_index subst t =
 (** Declaration functions *)
 
 let declare_symbol name info =
-  ignore (Symbols.Function.declare_exact name (0,info))
+  ignore (Symbols.Function.declare_exact Symbols.dummy_table name (0,info))
 
 let declare_hash s = declare_symbol s Symbols.Hash
 
@@ -543,12 +543,12 @@ let is_hash s =
     | _ -> false
     | exception Not_found -> failwith "symbol not found"
 
-
 let declare_signature sign checksign pk =
-  let sign = Symbols.Function.declare_exact sign (0,Symbols.Sign) in
-  let pk = Symbols.Function.declare_exact pk (0,Symbols.PublicKey) in
+  let t = Symbols.dummy_table in
+  let _,sign = Symbols.Function.declare_exact t sign (0,Symbols.Sign) in
+  let _,pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
   let data = Symbols.AssociatedFunctions [sign; pk] in
-  ignore (Symbols.Function.declare_exact checksign ~data (0,Symbols.CheckSign))
+  ignore (Symbols.Function.declare_exact t checksign ~data (0,Symbols.CheckSign))
 
 let check_signature checksign pk =
   let def = Symbols.Function.get_def in
@@ -558,22 +558,21 @@ let check_signature checksign pk =
     | exception Not_found -> failwith "symbol not found"
   in
   if correct_type then
-    (
-      match Symbols.Function.get_data checksign with
+    match Symbols.Function.get_data checksign with
       | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk-> Some sign
       | _ -> None
-    )
   else None
 
 let declare_state s arity kind =
   let info = Symbols.State (arity,kind) in
-  ignore (Symbols.Macro.declare_exact s info)
+  ignore (Symbols.Macro.declare_exact Symbols.dummy_table s info)
 
-let declare_name s arity = ignore (Symbols.Name.declare_exact s arity)
+let declare_name s arity =
+  ignore (Symbols.Name.declare_exact Symbols.dummy_table s arity)
 
 let declare_abstract s arg_types k =
   let info = Symbols.Abstract (arg_types,k) in
-  ignore (Symbols.Function.declare_exact s (0,info))
+  ignore (Symbols.Function.declare_exact Symbols.dummy_table s (0,info))
 
 (** Term builders *)
 
@@ -736,7 +735,8 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
   let t = convert ~at:(Term.Var ts_var) tsubst t Sorts.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
   ignore
-    (Symbols.Macro.declare_exact s
+    (Symbols.Macro.declare_exact Symbols.dummy_table
+       s
        ~data
        (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
             Sorts.ESort (Vars.sort x)) typed_args,k)))

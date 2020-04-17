@@ -65,17 +65,15 @@ val pp_process : Format.formatter -> process -> unit
 (** Check that a process is well-typed in some environment. *)
 val check_proc : Theory.env -> process -> unit
 
-(** When declaring a process, the body of the definition is type-checked,
-  * process invocations are inlined, and unique name, state, and
-  * action identifiers are obtained, as part of a conversion to
-  * a big-step internal process representation. *)
+(** Declare a named process. The body of the definition is type-checked. *)
 val declare : id -> pkind -> process -> unit
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
   * as a set of actions. In that process, name creations and let constructs
   * are compiled away. Other constructs are grouped into action descriptions. *)
-val declare_system : Action.system_name -> process -> unit
+val declare_system :
+  Symbols.table -> Action.system_name -> process -> Symbols.table
 
 (** Reset all process declarations. *)
 val reset : unit -> unit

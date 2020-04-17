@@ -3,6 +3,10 @@ type unknown
 (** Type of symbols *)
 type 'a t = string
 
+type table = unit
+let dummy_table = ()
+let empty_table = ()
+
 type kind = Sorts.esort
 
 type function_def =
@@ -97,10 +101,12 @@ let run_restore f () =
 module type Namespace = sig
   type ns
   type def
-  val reserve : string ->  data t
-  val define : data t -> ?data:data -> def -> unit
-  val declare : string -> ?builtin:bool -> ?data:data -> def -> ns t
-  val declare_exact : string -> ?builtin:bool -> ?data:data -> def -> ns t
+  val reserve : table -> string -> table * data t
+  val define : table -> data t -> ?data:data -> def -> table
+  val declare :
+    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+  val declare_exact :
+    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
   val of_string : string -> ns t
   val get_def : ns t -> def
   val def_of_string : string -> def
@@ -122,24 +128,24 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
   type ns = M.ns
   type def = M.local_def
 
-  let reserve name =
+  let reserve () name =
     let symb = fresh name in
       Hashtbl.add table symb (Reserved,Empty) ;
-      symb
+      (),symb
 
-  let define symb ?(data=Empty) value =
+  let define () symb ?(data=Empty) value =
     assert (fst (Hashtbl.find table symb) = Reserved) ;
     Hashtbl.replace table symb (Exists (M.construct value), data)
 
-  let declare name ?(builtin=false) ?(data=Empty) value =
+  let declare () name ?(builtin=false) ?(data=Empty) value =
     let symb = fresh name in
       hashtbl_add ~builtin table symb (Exists (M.construct value), data) ;
-      symb
+      (), symb
 
-  let declare_exact name ?(builtin=false) ?(data=Empty) value =
+  let declare_exact () name ?(builtin=false) ?(data=Empty) value =
     if Hashtbl.mem table name then raise @@ Multiple_declarations name;
     hashtbl_add ~builtin table name (Exists (M.construct value), data) ;
-    name
+    (), name
 
   let get_all (name:ns t) =
     (* We know that [name] is bound in [table]. *)

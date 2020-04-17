@@ -53,11 +53,11 @@ let shape_to_symb = Hashtbl.create 97
 
 type Symbols.data += Data of Vars.index list * action
 
-let fresh_symbol name = Symbols.Action.reserve name
-let define_symbol symb args action =
+let fresh_symbol table name = Symbols.Action.reserve table name
+let define_symbol table symb args action =
   Hashtbl.add shape_to_symb (get_shape action) symb ;
   let data = Data (args,action) in
-  Symbols.Action.define symb ~data (List.length args)
+  Symbols.Action.define table symb ~data (List.length args)
 let find_symbol s =
   match Symbols.Action.data_of_string s with
     | Data (x,y) -> x,y
@@ -146,7 +146,8 @@ let rec dummy_action k =
     let data = Data ([],a) in
     if not (Hashtbl.mem shape_to_symb s) then
        Hashtbl.add shape_to_symb s
-         (Symbols.Action.declare "_Dummy" ~data 0);
+         (snd
+            (Symbols.Action.declare Symbols.dummy_table "_Dummy" ~data 0)) ;
     a
 
 let pp_action ppf a = Term.pp ppf (to_term a)
@@ -278,25 +279,30 @@ let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
   Hashtbl.create 97
 
 let reset () =
-  Hashtbl.clear action_to_descr; Hashtbl.clear systems; Hashtbl.clear shape_to_symb
+  Hashtbl.clear action_to_descr;
+  Hashtbl.clear systems;
+  Hashtbl.clear shape_to_symb
 
 let is_fresh system_name =
-  not(Hashtbl.mem systems system_name)
+  not (Hashtbl.mem systems system_name)
 
-
-let register system_name symb indices action descr =
+let register table system_name symb indices action descr =
   let s = get_shape action in
   Hashtbl.add systems system_name s;
   match to_term action with
   | Term.Action (symb2, is) when indices <> is ->
-      failwith "Cannot register a shape twice with distinct indexes."
+      failwith "Cannot register a shape twice with distinct indices."
   | Term.Action (symb2, is) ->
-    let subst = Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
-    let descr = subst_descr [subst] descr in
-    Hashtbl.add action_to_descr (s,system_name) descr; symb2
+      let subst =
+        Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
+      let descr = subst_descr [subst] descr in
+      Hashtbl.add action_to_descr (s,system_name) descr;
+      table, symb2
   | _ -> assert false
-  | exception Not_found ->   Hashtbl.add action_to_descr (s,system_name) descr ;
-define_symbol symb indices action; symb
+  | exception Not_found ->
+      Hashtbl.add action_to_descr (s,system_name) descr ;
+      let table = define_symbol table symb indices action in
+      table, symb
 
 
 let make_bi_descr d1 d2 =

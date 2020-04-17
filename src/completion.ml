@@ -1015,10 +1015,11 @@ let () =
     ("Basic", `Quick,
      Symbols.run_restore @@ fun () ->
        let fi = 0, Symbols.Abstract ([],Sorts.emessage) in
-       let ffs, hfs =
-         (Symbols.Function.declare_exact "f" fi, []),
-         (Symbols.Function.declare_exact "h" fi, [])
-       in
+       let table,ffs =
+         Symbols.Function.declare_exact Symbols.empty_table "f" fi in
+       let _,hfs =
+         Symbols.Function.declare_exact table "h" fi in
+       let ffs,hfs = (ffs,[]), (hfs,[]) in
        let f a b = cfun ffs [a;b] in
        let h a b = cfun hfs [a;b] in
 

@@ -5,11 +5,13 @@
   * and some timestamp.
   * A fresh name is generated for the macro if needed. *)
 val declare_global :
+  Symbols.table ->
   string ->
   inputs:Vars.message list ->
   indices:Vars.index list ->
   ts:Vars.timestamp ->
-  Term.message -> Symbols.macro Symbols.t
+  Term.message ->
+  Symbols.table * Symbols.macro Symbols.t
 
 (** {2 Macro expansions} *)
 

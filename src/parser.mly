@@ -220,7 +220,8 @@ abs_type:
 
 declaration:
 | HASH ID                        { Theory.declare_hash $2 }
-| HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2; Prover.define_hash_tag_formula $2 f }
+| HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
+                                   Prover.define_hash_tag_formula $2 f }
 | AENC ID                        { Theory.declare_aenc $2 }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
@@ -356,8 +357,13 @@ goal:
 
 theory:
 | declaration theory             { () }
-| SYSTEM process DOT             { Process.declare_system Action.default_system_name $2 }
-| SYSTEM LBRACKET i=ID RBRACKET p=process DOT             { Process.declare_system i p }
+| SYSTEM process DOT             { ignore (Process.declare_system
+                                     Symbols.dummy_table
+                                     Action.default_system_name $2) }
+| SYSTEM LBRACKET i=ID RBRACKET p=process DOT
+                                 { ignore (Process.declare_system
+                                     Symbols.dummy_table
+                                     i p) }
 
 interactive :
 | theory                          { Prover.ParsedInputDescr }

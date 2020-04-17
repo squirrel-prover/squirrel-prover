@@ -10,6 +10,16 @@ type unknown
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
 
+(** Type of tables of persistent symbol definitions.
+  * It is currently ineffective. *)
+type table
+
+(* Dummy table, for transition only. It will eventually disappear. *)
+val dummy_table : table
+
+(** Empty symbol table, for testing. *)
+val empty_table : table
+
 (** Symbol definitions *)
 
 type kind = Sorts.esort
@@ -92,19 +102,21 @@ module type Namespace = sig
   type def
 
   (** Reserve a fresh symbol name, resembling the given string. *)
-  val reserve : string -> ns t
+  val reserve : table -> string -> table * ns t
 
   (** Define a symbol name that has been previously reserved
     * using [fresh]. *)
-  val define : ns t -> ?data:data -> def -> unit
+  val define : table -> ns t -> ?data:data -> def -> table
 
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
-  val declare : string -> ?builtin:bool -> ?data:data -> def -> ns t
+  val declare :
+    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
 
   (* Like declare, but use the exact string as symbol name.
    * @raise Multiple_declarations if the name is not available. *)
-  val declare_exact : string -> ?builtin:bool -> ?data:data -> def -> ns t
+  val declare_exact :
+    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
 
   (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)

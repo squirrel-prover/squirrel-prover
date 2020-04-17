@@ -281,7 +281,8 @@ let prepare : process -> process =
         (* TODO getting a globally fresh symbol for the name
          * does not prevent conflicts with variables bound in
          * the process (in Repl, Let, In...) *)
-        let n' = Symbols.Name.declare n (List.length indices) in
+        let _,n' =
+          Symbols.Name.declare Symbols.dummy_table n (List.length indices) in
         let n'_th =
           Theory.Name
             (Symbols.to_string n',
@@ -293,8 +294,8 @@ let prepare : process -> process =
 
     | Let (x,t,p) ->
         let body = convert isubst msubst t in
-        let x' =
-          Macros.declare_global x ~inputs:invars
+        let _,x' =
+          Macros.declare_global Symbols.dummy_table x ~inputs:invars
             ~indices:(List.rev indices) ~ts:ts_var body
         in
         let x'_th =
@@ -320,7 +321,7 @@ let prepare : process -> process =
 
     | Out (c,t,p) ->
         let t = Theory.subst t (to_tsubst isubst@to_tsubst msubst) in
-        let a' = Action.fresh_symbol a in
+        let _,a' = Action.fresh_symbol Symbols.dummy_table a in
           Alias
             (Out (c, t, prep p),
              Symbols.to_string a')
@@ -419,7 +420,7 @@ type p_env = {
 exception Cannot_parse of process
 
 (** Parse a prepared process to extract its actions. *)
-let parse_proc system_name proc : unit =
+let parse_proc system_name proc =
   let var_env = ref Vars.empty_env in
   (** Convert given some environment and the current action symbol a. *)
   let conv_term ?(pred=false) env a t =
@@ -495,7 +496,7 @@ let parse_proc system_name proc : unit =
       let facts_q =
         match List.map (fun x -> x, Sorts.eindex) evars with
         | [] -> Theory.Not cond :: facts
-        | qvars ->  Theory.ForAll(qvars, Theory.Not cond) :: facts
+        | qvars -> Theory.ForAll(qvars, Theory.Not cond) :: facts
       in
       let new_env =
         { env with
@@ -561,7 +562,7 @@ let parse_proc system_name proc : unit =
              * state updates. The problem is that we don't have an
              * alias setup by the preparation phase.
              * TODO aliases on "interesting" null processes *)
-            let a = Action.fresh_symbol "A" in
+            let _,a = Action.fresh_symbol Symbols.dummy_table "A" in
             None,
             Symbols.to_string a,
             proc
@@ -594,7 +595,11 @@ let parse_proc system_name proc : unit =
       let action = List.rev env.action in
       let action_descr =
         Action.{ action; input; indices; condition; updates; output } in
-      let new_a = Action.register system_name (Obj.magic a) indices action action_descr in
+      let _,new_a =
+        Action.register
+          Symbols.dummy_table
+          system_name (Obj.magic a) indices action action_descr
+      in
       (* Action.register gives back the actual name corresponding to the
          action. It is not equal to a, if some action with the same shape was
          previsouly defined. We thus redefine the environment with the correct
@@ -614,9 +619,9 @@ let parse_proc system_name proc : unit =
       subst = [] ; isubst = [] }
   in
   let _ : int = p_in ~pos:0 ~env ~pos_indices:[] proc in
-  ()
+  Symbols.dummy_table
 
-let declare_system (system_name:Action.system_name) proc =
+let declare_system table (system_name:Action.system_name) proc =
   if not(Action.is_fresh system_name) then
     failwith "System %s already defined";
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
