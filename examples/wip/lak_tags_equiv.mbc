@@ -47,7 +47,6 @@ induction t.
 
 
 (* Case R: OK *)
-
 admit.
 
 (* 
@@ -60,11 +59,8 @@ depends R(j),R2(j).
 depends R(j),R1(j).
 *)
 
-(* Case R1 *)
+(* Case R1: WIP *)
 
-admit.
-
-(*
 expand frame@R1(j).
 expand exec@R1(j).
 
@@ -89,13 +85,47 @@ exists i,k.
 fa 1. fa 2.
 fa 0; admit 1. (* TODO fa/dup *)
 expand output@R1(j).
-admit 2. (* TODO PRF under try-find ? *)
+admit 2. (* TODO PRF under try-find et TODO try-find va marcher car =cond@R1(j) *)
 
-*)
+
 
 (* Case R2 *)
 
 admit.
+
+(*
+expand frame@R2(j).
+expand exec@R2(j).
+
+
+equivalent cond@R2(j),
+  (forall (i,k:index),
+   not(T(i,k) < R2(j)) ||
+   not(snd(output@T(i,k)) = snd(input@R2(j))) ||  
+   not(fst(output@T(i,k)) = fst(input@R2(j))) || 
+    not(output@R(j) = input@T(i,k))).
+
+
+split.
+
+(* cond => honest *)
+apply tags_neq.
+expand cond@R2(j).
+expand output@T(i,k).
+project.
+expand m2(i,k)@T(i,k).
+notleft H0.
+apply H0 to i,k.
+help.
+left.
+right.
+assert (fst(input@R2(j)) = nT(i,k)).
+
+right.
+
+euf M1.
+
+*)
 
 (* Case T OK *)
 admit.
@@ -150,18 +180,27 @@ expand exec@T1(i,k).
 
 equivalent cond@T1(i,k),
 ( exists (j:index), (R1(j) < T1(i,k) && 
-  input@T1(i,k) = output@R1(j))).
+  input@T1(i,k) = output@R1(j) && input@R1(j) = output@T(i,k)) && input@T(i,k) = output@R(j)).
 
 expand cond@T1(i,k).
 split.
 (* cond => honest *) 
 apply tags_neq; project.
 euf M0.
-nosimpl(exists j). (** BUG ** unsupported term in completion **)
-nosimpl(split).
+exists j. 
+split.
 case H0.
 depends T(i,k), T1(i,k).
-expand output@R1(j). (** METABC n'aime pas trop - il crashe **)
+expand output@R1(j).
+expand m2(i,k)@T1(i,k).
+assert (input@T(i,k) = nR(j)).
+simpl.
+assert (snd(input@R1(j)) = h(<<nR(j),nT(i,k)>,tag1>,key(i))).
+assert (fst(input@R1(j)) = nT(i,k)).
+fa M2.
+euf M2.
+
+yestry.
 
 (* Case T2 *)
 admit.
