@@ -4,26 +4,26 @@ abstract ok:message
 abstract ko:message
 
 
-name key': index->index->message
+name key: index->message
 channel cT
 channel cR
 
 
-process tag(i:index,k:index) =
+process tag(i:index) =
   new nT;
   in(cR,nR);
-  out(cT,<nT,h(<nR,nT>,key'(i,k))>)
+  out(cT,<nT,h(<nR,nT>,key(i))>)
 
 process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-   if exists (i,k:index), snd(x) = h(<nR,fst(x)>,key'(i,k)) then 
+   if exists (i:index), snd(x) = h(<nR,fst(x)>,key(i)) then 
     out(cR,ok)
    else 
     out(cR,ko) 
 
-system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
+system ((!_j R:reader(j)) | (!_i !_k T: tag(i))).
 
 goal wa:
 forall (j:index), cond@R1(j) => (exists (i,k:index), T(i,k) < R1(j) && 
