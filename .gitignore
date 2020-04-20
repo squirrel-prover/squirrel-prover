@@ -5,6 +5,8 @@ todo
 *.byte
 output.tex
 *.aux
+*.bbl
+*.blg
 *.log
 *.pdf
 *.snm

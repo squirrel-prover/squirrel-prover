@@ -352,6 +352,41 @@ We use the following notations:
 \label{fig:xor}
 \end{figure}
 
+\begin{figure}[h]
+  \begin{mathpar}
+  \inferrule[FA-DUP]{
+    \inferrule{
+      \Gamma \vdash u,
+      \mframe @ \pre(\tau),
+      \mexec @ \pre(\tau)
+    }{
+      \Gamma \vdash u,
+      \mframe @ \pre(\tau),
+      \myif \mexec @ \pre(\tau) \mythen \phi_{h} \myelse \bot
+    }
+  }{
+    \Gamma \vdash u,
+    \mframe @ \pre(\tau),
+    \mexec @ \pre(\tau) \wedge \phi_{h}
+  }
+  \end{mathpar}
+\caption{FA-DUP rule.
+  This rule applies only if $\phi_{h}$ is of the form
+  $$\forall \tau_0, \tau_0 \leq \tau \Rightarrow \phi(\tau_0,\tau)
+  \;\; \text{or} \;\;
+  \exists \tau_0, \tau_0 \leq \tau \wedge \phi(\tau_0,\tau)$$
+  with $\phi(\tau_0,\tau)$ that contains only:
+  function symbols,
+  $\minp @ \tau$,
+  $\mout @ \tau'$ with $\tau' \leq \pre(\tau)$.
+  If $\phi(\tau_0,\tau)$ contains a term
+  $\myif \mexec @ \tau' \mythen [...] \myelse [...]$
+  with $\tau' \leq \pre(\tau)$
+  we can replace it by the then branch.
+}
+\label{fig:fadup}
+\end{figure}
+
 \clearpage
 \section{Archives}
 \subsection{A proof technique}
