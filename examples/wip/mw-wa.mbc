@@ -1,0 +1,101 @@
+(* Protocol MW                          *)
+(* R -> T: nr                           *)
+(* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
+(* R -> T: id + H(<c1, nr, nt>,k)       *)
+
+
+hash H
+
+
+(* TODO abstract would be more natural but index->message not allowed *)
+name id':index -> index ->message
+
+name key':index -> index -> message
+
+
+abstract error : message
+abstract ok: message
+abstract ko: message
+abstract tag0 : message
+abstract tag1 : message
+axiom tags_neq : tag0 <> tag1
+
+channel c
+
+process tag(i:index, t:index)=
+  in(c,x);
+  new nt;
+  out(c,<nt,xor(id'(i,t),H(<tag0,<x,nt>>,key'(i,t)))>);
+  in(c,y);
+  if y = H(<tag1, <x,nt>>,key'(i,t)) then out(c,ok)
+  else out(c,ko)
+
+process reader =
+  new nr;
+  out(c,nr);
+  in(c,m);
+  try find i,t such that xor(id'(i,t),snd(m)) = H(<tag0,<nr,fst(m)>>,key'(i,t)) in
+ (*   out(c,xor(id'(i,t),H(<tag1,<nr,fst(m)>>,key'(i,t)))) *)
+   out(c,H(<tag1,<nr,fst(m)>>,key'(i,t)))
+  
+ else
+    out(c,error) 
+
+system (!_r R: reader | !_i !_t T: tag(i,t)).
+
+
+
+goal wa_R:
+  forall (r,i,t:index),
+  cond@R1(r,i,t) =>
+  T(i,t) < R1(r,i,t) &&
+  fst(input@R1(r,i,t)) = nt(i,t) &&
+  input@T(i,t) = nr(r).
+ 
+Proof.
+  simpl.
+  expand cond@R1(r,i,t).
+  euf M0.
+Qed.
+
+goal wa_T:
+ forall (i,t:index),
+ cond@T1(i,t) => ( exists (r:index), 
+      R1(r,i,t) < T1(i,t) &&  output@R1(r,i,t) = input@T1(i,t) &&
+      T(i,t) < R1(r,i,t) && fst(output@T(i,t)) = fst(input@R1(r,i,t)) && 
+              snd(output@T(i,t)) = snd(input@R1(r,i,t)) &&
+     R(r) < T(i,t) &&  output@R(r) = input@T(i,t)). 
+
+Proof.
+simpl.
+expand cond@T1(i,t).
+apply tags_neq.
+euf M0.
+exists r.
+repeat split.
+case H0.
+depends T(i,t), T1(i,t).
+case H0.
+assert (fst(input@R1(r,i,t)) = nt(i,t)).
+fresh M3.
+case H0.
+
+
+fresh M3.
+
+prf M0.
+
+fresh M0.
+
+help.
+
+euf M0.
+
+fa M0.
+
+xor M0.
+
+Qed.
+
+
+
