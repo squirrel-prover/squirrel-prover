@@ -1,0 +1,147 @@
+hash h
+
+abstract ok:message
+abstract ko:message
+
+
+name key : index->message
+name key': index->index->message
+channel cT
+channel cR
+
+
+process tag(i:index,k:index) =
+  new nT;
+  in(cR,nR);
+  out(cT,<nT,h(<nR,nT>,diff(key(i),key'(i,k)))>)
+
+process reader(j:index) =
+  new nR;
+  out(cR,nR);
+  in(cT,x);
+   if exists (i,k:index), snd(x) = h(<nR,fst(x)>,diff(key(i),key'(i,k))) then 
+    out(cR,ok)
+   else 
+    out(cR,ko) 
+
+system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
+
+
+equiv unlinkability.
+Proof.
+induction t.
+(* Case R *)
+expand frame@R(j);  expand exec@R(j). 
+expand cond@R(j); expand output@R(j). 
+fa 1; fa 2.
+fresh 2;  yesif 2.
+repeat split.
+depends R(j1), R2(j1).
+depends R(j1), R1(j1).
+
+
+(* Case R1 *)
+expand frame@R1(j);expand exec@R1(j).
+expand cond@R1(j);expand output@R1(j).
+
+fa 0.
+
+equivalent 
+(exists (i,k:index), snd(input@R1(j)) = h(<nR(j),fst(input@R1(j))>,(diff(key(i), key'(i,k))))),
+(exists (i,k:index), T(i,k) < R1(j) && 
+ snd(output@T(i,k)) = snd(input@R1(j)) &&
+ fst(output@T(i,k)) = fst(input@R1(j)) &&  
+ input@T(i,k) = output@R(j) &&   R(j) < T(i,k)).
+
+split.
+(* proof of lemma: Cond => WA *)
+project.
+(* left *)
+euf M0.
+exists i, k1.
+assert (input@T(i,k1) = nR(j)).
+fresh M2.
+case H0.
+depends R(j), R2(j).
+(* right *)
+euf M0.
+exists i,k.
+assert (input@T(i,k) = nR(j)).
+fresh M2.
+case H0.
+depends R(j), R2(j).
+
+(* WA ==> Cond *)
+exists i,k.
+
+admit. (* fadup *)
+
+
+(* Case R2 *)
+
+expand frame@R2(j);expand exec@R2(j).
+expand cond@R2(j);expand output@R2(j).
+fa 0.
+
+
+equivalent 
+(exists  (i,k:index), snd(input@R2(j)) =
+   h(<nR(j),fst(input@R2(j))>,(diff(key(i), key'(i,k))))),
+(exists (i,k:index), T(i,k) < R2(j) &&
+snd(output@T(i,k)) = snd(input@R2(j)) &&
+ fst(output@T(i,k)) = fst(input@R2(j)) &&  input@T(i,k) = output@R(j)
+&& R(j) < T(i,k)).
+
+
+split.
+
+
+(* proof of lemma Cond ==> WA *)
+project.
+(* left *)
+euf M0.
+exists i, k1.
+assert (input@T(i,k1) = nR(j)).
+fresh M2.
+case H0.
+depends R(j), R1(j).
+(* right *)
+euf M0.
+exists i,k.
+assert (input@T(i,k) = nR(j)).
+fresh M2.
+case H0.
+depends R(j), R1(j).
+
+(* WA ==> Cond *)
+exists i,k.
+
+admit. (* fadup *)
+
+
+(* Case T *)
+expand frame@T(i,k);expand exec@T(i,k).
+expand cond@T(i,k);expand output@T(i,k).
+fa 1; fa 2; fa 2.
+prf 3. 
+yesif 3.
+project.
+
+(* left *)
+repeat split.
+assert (nT(i,k) = fst(input@R2(j))).
+fresh M1.
+assert (nT(i,k) = fst(input@R1(j))).
+fresh M1.
+
+(* right *)
+repeat split.
+assert (nT(i,k) = fst(input@R2(j))).
+fresh M1.
+assert (nT(i,k) = fst(input@R1(j))).
+fresh M1.
+
+fresh 2.
+yesif 2.
+Qed.
+
