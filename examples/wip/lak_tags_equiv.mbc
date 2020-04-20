@@ -83,8 +83,10 @@ exists i,k.
 exists i,k.
 
 fa 1. fa 2.
-fa 0; admit 1. (* TODO fa/dup *)
+fa 0.
+ admit 1. (* TODO fa/dup *)
 expand output@R1(j).
+
 admit 2. (* TODO PRF under try-find et TODO try-find va marcher car =cond@R1(j) *)
 
 
@@ -197,7 +199,6 @@ assert (input@T(i,k) = nR(j)).
 simpl.
 assert (snd(input@R1(j)) = h(<<nR(j),nT(i,k)>,tag1>,key(i))).
 assert (fst(input@R1(j)) = nT(i,k)).
-fa M2.
 euf M2.
 
 yestry.
