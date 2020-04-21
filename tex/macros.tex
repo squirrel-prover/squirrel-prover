@@ -87,8 +87,22 @@
 % Primitives
 \newcommand{\mysign}{\textsf{sign}}
 \newcommand{\mypk}{\textsf{pk}}
+\newcommand{\mylen}{\textsf{len}}
+\newcommand{\myenc}[3]{ \{#1\}^{#2}_{\mypk(#3)} }
+\newcommand{\mydec}{\textsf{dec}}
 \newcommand{\mycsign}{\textsf{checksign}}
 \newcommand{\mygetmess}{\textsf{getmess}}
+
+% Axioms
+
+\newcommand{\CCA}{\textsc{CCA}_1}
+\newcommand{\CCAtwo}{\textsc{CCA}_2}
+\newcommand{\NM}{\textsc{NM}_2}
+
+% Probabilities
+
+\newcommand{\prob}[2]{\mathbb{P}_{#1}\{#2\}}
+\DeclareMathOperator{\Adv}{Adv}
 
 % Actions
 \newcommand{\ain}[1]{\mathsf{in}(#1)}

@@ -1,0 +1,118 @@
+\section{Encryption}
+
+
+Reusing the classical CCA1 axiom from the $\BC$ model, we can instantly derive a new rule for the sequent calculus.
+
+For any name $sk$, any sequences $\vec{u},\vec{v}$ and term $t$ such that $sk$ only appears in key position, and fresh names $r,r'$:
+
+\begin{mathpar}
+  \inferrule[$\CCA$]{
+   \Gamma \vdash  \mypk(sk), \vec{u}, \mylen(s) \sim  \mypk(sk), \vec{v}, \mylen(t)
+  }{
+    \Gamma \vdash \mypk(sk), \vec{u}, \myenc{s}{r}{sk} \sim  \mypk(sk), \vec{v}, \myenc{t}{r'}{sk}
+  }
+\end{mathpar}
+
+
+
+Managing decryption is a difficulty, notably when encryption is used to provide authentication, such as in the NSL or the Wide Mouth Frog protocol. We choose to provide a tactic based on the Non-Malleability axiom ($\NM$), which is equivalent to the $\CCAtwo$ axiom.
+
+
+We consider the NM game of \url{https://web.cs.ucdavis.edu/~rogaway/papers/relations.pdf}, presented in \cref{fig:nm}. The attacker must provide a distribution of messages $M$. Two messages $x_0,x_1$ are sampled from $M$, and the attacker is always given the encryption $y$ of $x_1$. In the right side $(b=1)$, the attacker is asked to provide a sequence of cyphertexts $\vec{y}$ and a relation $R$, such that the original $y$ does not appear in $\vec{y}$, all elements of $\vec{y}$ are valid encryptions, the attacker did not query the decryption oracle over $y$, and the relation $R$ holds between $x_1$ and the cyphertexts $\vec{x}$ provided by the attacker. In the right side, the attacker is thus supposed to compute cyphertexts such that their clear texts satisfy a non trivial relation with a given cyphertext. Now, the left side is the same, except that the relation $R$ must hold between $x_0$ and $\vec{x}$. Remark however that the attacker view is independent from $x_0$, so he has essentially very little chance to provide such a $R$. $\NM$ asks that the probability of returning 1 on both sides is negligible:
+
+\[\Adv^{\mathcal{E},\A}_{\NM} = \mid \prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1} -  \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1} \mid \]
+
+\begin{figure}[h!]
+  \vspace{-1em}
+  \centering
+
+        \underline{\textbf{Game}
+        $\NM^{\mathcal{E},\A,b}(seed)$}: \\
+        \begin{tabular}{l}
+          $(\textsf{pk},\textsf{sk}) \leftarrow \mathcal{E}_{gen}(seed),\; (M,s) \leftarrow \A_1^{\mathcal{O}_{enc}}(\textsf{pk}),\; x_0,x_1 \leftarrow M, \; y\leftarrow \mathcal{E}_{pk}(x_1)$\\
+          $(R,\vec{y}) \leftarrow \A_1^{\mathcal{O}_{dec}}(M,s,y),\; \vec{x} \leftarrow \mathcal{D}_{sk}(\vec{y})$ \\
+$\text{If } y \notin \vec{y} \wedge \bot \notin \vec{x} \wedge y \notin \text{Queries}(\mathcal{O}_{dec}) \wedge R(x_b,\vec{x}) \text{ then Return } 1 \text{ else Return } 0$
+
+        \end{tabular}
+  \caption{Game for $\NM$}
+  \label{fig:nm}
+\end{figure}
+
+
+
+Now, first notice that in the proof that $\NM$ implies $\CCAtwo$ (Theorem 3.1), the message space $M$ used in the reduction is of size two. We can thus without loss of generality consider that $M$ is only a sampling space over two messages.
+Assume $M$ must be of the form $M=(m_0,m_1)$, we have that the advantage is also equal to:
+\[
+  \begin{array}{rl}
+    \Adv^{\mathcal{E},\A}_{\NM} = & \mid \prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1 \mid x_0 = m_0 \wedge x_1 = m_1} -  \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1  \mid x_0 = m_0 \wedge x_1 = m_1}  \\
+                                  & + \prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1 \mid x_0 = m_0 \wedge x_1 = m_0} -  \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1  \mid x_0 = m_0 \wedge x_1 = m_0}  \\
+                                  & + \prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1 \mid x_0 = m_1 \wedge x_1 = m_1} -  \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1  \mid x_0 = m_1 \wedge x_1 = m_1}  \\
+     & + \prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1 \mid x_0 = m_1 \wedge x_1 = m_0} -  \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1  \mid x_0 = m_0 \wedge x_1 = m_0} \mid \\
+
+  \end{array} \]
+
+However, remark that by equality of the two sides when $x_0=x_1$:
+\[\prob{}{\NM^{\mathcal{E},\A,1}(seed) = 1 \mid x_0 = m_b \wedge x_1 = m_b} = \prob{}{\NM^{\mathcal{E},\A,0}(seed) = 1  \mid x_0 = m_b \wedge x_1 = m_b}   \]
+
+We can thus assume w.l.g that $x_0 <> x_1$ inside the game.
+
+Furthermore, it is well known that $\CCAtwo$ can also be considered in a version where the attacker can query multiple times with distinct pairs $(m_1,m_0)$ the left-right oracle is equivalent (cf. Theorem 11.4 of \url{https://web.cs.ucdavis.edu/~rogaway/classes/227/spring05/book/main.pdf}). We thus provide an equivalent definition of the $\NM$ game in \cref{fig:nmbis}. In this game, we replace $\vec{x_0}$ by $\vec{m_{\neg b'}}$ and $\vec{x_1}$ by $\vec{m_{b'}}$. Thus $\vec{x_b} = \vec{m_{1+b+b'}}$
+
+
+\begin{figure}[h!]
+  \vspace{-1em}
+  \centering
+
+        \underline{\textbf{Game}
+        $\NM'^{\mathcal{E},\A,b}(seed)$}: \\
+        \begin{tabular}{l}
+          $(\textsf{pk},\textsf{sk}) \leftarrow \mathcal{E}_{gen}(seed),\; ((\vec{m}_0,\vec{m}_1),s) \leftarrow \A_1^{\mathcal{O}_{enc}}(\textsf{pk}),\; b'\leftarrow \{0,1\},\;
+  \; \vec{y}_h \leftarrow \mathcal{E}_{pk}(\vec{m}_{b'})$\\
+          $(R,\vec{y}) \leftarrow \A_1^{\mathcal{O}_{dec}}(M,s,\vec{y}_h),\; \vec{x} \leftarrow \mathcal{D}_{sk}(\vec{y})$ \\
+          $\text{If } \vec{y}_h \cap \vec{y} = \emptyset \wedge \bot \notin \vec{x} \wedge \vec{y}_h \not \subset \text{Queries}(\mathcal{O}_{dec}) \wedge R(\vec{m}_{1+b+b'},\vec{x}) \text{ then Return } 1 \text{ else Return } 0$
+        \end{tabular}
+  \caption{Game for $\NM$}
+  \label{fig:nmbis}
+\end{figure}
+
+To cast this game inside the $\BC$ model, the $b'$ is a difficulty. To avoid having to define boolean random samplings functions and their axiomatizations, we instead restrict the domain of messages that the attacker can sample. We ask for $M$ to be of the form $\lambda n -> t(n)$, where we then sample two names $n,n'$ instead of a boolean $b'$. In effect, this is equal to the previous game, where the attacker would have chosen $M= ( t(n),t(n'))$. This yield a slightly specialized version of the $\NM'$ game,  provided in \cref{fig:nmfinal}.
+
+
+\begin{figure}[h!]
+  \vspace{-1em}
+  \centering
+
+        \underline{\textbf{Game}
+        $\NM''^{\mathcal{E},\A,b}(seed)$}: \\
+        \begin{tabular}{l}
+          $(\textsf{pk},\textsf{sk}) \leftarrow \mathcal{E}_{gen}(seed),\; ((\lambda n. \vec{t}(n)),s) \leftarrow \A_1^{\mathcal{O}_{enc}}(\textsf{pk}),\; n,n'\leftarrow \{0,1\}^\eta,\;
+  \; \vec{y}_h \leftarrow \mathcal{E}_{pk}(\vec{t}(n'))$\\
+          $(R,\vec{y}) \leftarrow \A_1^{\mathcal{O}_{dec}}(M,s,\vec{y}_h),\; \vec{x} \leftarrow \mathcal{D}_{sk}(\vec{y})$ \\
+          $\text{If } \vec{y}_h \cap \vec{y} = \emptyset \wedge \bot \notin \vec{x} \wedge \vec{y}_h \not \subset \text{Queries}(\mathcal{O}_{dec}) \wedge R( \begin{cases} \vec{t}(n) \text{ if } b=0 \\  \vec{t}(n')\\ \end{cases},\vec{x}) \text{ then Return } 1 \text{ else Return } 0$
+        \end{tabular}
+  \caption{Game for $\NM$}
+  \label{fig:nmfinal}
+\end{figure}
+
+This game can directly be translated into a $\BC$ axiom, where we fix the length of $\vec{y}$ to one for simplicity. For any sequence of contexts $\vec{t}=t_1(\_),\ldots,t_k(\_)$ such that $ Eq(\vec{t}(n),\vec{t}(n')) \sim false$, for any names $n, n'$, for any $R$,$C$ without $n,n'$ and such that $sk$ is only used at key position,
+
+\[
+  \begin{array}{l}
+
+
+ \bigwedge_{1 \leq i \leq k}( C[\myenc{t_1(n)}{r_1}{sk},\ldots,\myenc{t_k(n)}{r_k}{sk}] \not = \myenc{t_i(n)}{r_i}{sk} )      \\
+ \bigwedge_{ dec(x,sk) \in St(C) }  \bigwedge_{1 \leq i \leq k} x \not = \myenc{t_i(n)}{r_i}{sk} \\
+\wedge R( \mydec(C[\myenc{t_1(n)}{r_1}{sk},\ldots,\myenc{t_k(n)}{r_k}{sk}],sk),\vec{t}(n)) \\
+\multicolumn{1}{c}{\sim}\\
+
+ \bigwedge_{1 \leq i \leq k}( C[\myenc{t_1(n)}{r_1}{sk},\ldots,\myenc{t_k(n)}{r_k}{sk}] \not = \myenc{t_i(n)}{r_i}{sk} )      \\
+ \bigwedge_{ dec(x,sk) \in St(C) }  \bigwedge_{1 \leq i \leq k} x \not = \myenc{t_i(n)}{r_i}{sk} \\
+\wedge R( \mydec(C[\myenc{t_1(n)}{r_1}{sk},\ldots,\myenc{t_k(n)}{r_k}{sk}],sk),\vec{t}(n')) \\
+  \end{array}
+
+  \]
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
