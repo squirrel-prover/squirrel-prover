@@ -16,7 +16,6 @@ fresh 1.
 
 prf 0.
 yesif 0.
-fresh 0.
 Qed.
 
 

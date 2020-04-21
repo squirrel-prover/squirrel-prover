@@ -19,6 +19,20 @@ class check_hash_key ~pk ~system hash_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
+(** Collect all hashes. *)
+class get_hashes ~system = object (self)
+  inherit Iter.iter_approx_macros ~exact:true ~system as super
+  val mutable hashes : Term.message list = []
+  method get_hashes = hashes
+  method visit_message = function
+    | Term.Fun ((hash_fn,_), [m;k]) as hash ->
+        if Theory.is_hash hash_fn
+        then hashes <- hash::hashes ;
+        self#visit_message m ; self#visit_message k
+    | Term.Var m -> raise Bad_ssc
+    | m -> super#visit_message m
+end
+
 (** Collect hashes for a given hash function and key.
   * We use the exact version of [iter_approx_macros], otherwise
   * we might obtain meaningless terms provided by [get_dummy_definition]. *)
@@ -89,6 +103,13 @@ let check_hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
     hash_key_ssc ~messages ~elems ~pk ~system hash_fn key_n ;
     true
   with Bad_ssc -> false
+
+(** [hashes ~system elems] returns the list of hashes occurring in a frame.
+    Does not explore macros. *)
+let hashes ~system elems =
+  let iter = new get_hashes ~system in
+  List.iter iter#visit_term elems;
+  List.sort_uniq Pervasives.compare iter#get_hashes
 
 (** [hashes_of_frame ~system frame hash_fn key_n]
     returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs

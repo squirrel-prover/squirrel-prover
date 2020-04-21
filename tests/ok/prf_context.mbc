@@ -1,0 +1,18 @@
+channel c
+
+hash h
+name k : message
+
+system new n; new m; out(c,m XOR h(n,k)).
+
+equiv test.
+Proof.
+  induction t.
+  expandall.
+  fa 1; fa 2.
+  prf 2.
+  fa 2.
+  yesif 3.
+  fresh 3.
+  fresh 2; yesif 2.
+Qed.

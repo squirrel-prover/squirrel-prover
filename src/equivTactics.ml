@@ -611,143 +611,143 @@ let () =
 
 exception Not_hash
 
-let mk_prf_phi_proj system env param proj biframe =
+let prf_param hash =
+  match hash with
+  | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
+      (hash_fn,t,key_n,key_is)
+  | _ -> raise Not_hash
+
+let mk_prf_phi_proj proj system env biframe e hash =
   begin try
-  let (hash_fn,t,key_n,key_is) = param in
-  let frame =
-    (EquivSequent.Message t) ::
-    (List.map (EquivSequent.pi_elem proj) biframe) in
-  (* check syntactic side condition *)
-  Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
-  (* we compute the list of hashes from the frame *)
-  let list_of_hashes_from_frame =
-    Euf.hashes_of_frame ~system frame hash_fn key_n
-  and list_of_actions_from_frame =
-    let iter = new get_actions ~system false in
-    List.iter iter#visit_term frame ;
-    iter#get_actions
-  and tbl_of_action_hashes = Hashtbl.create 10 in
-  (* We iterate over all the actions of the (single) system *)
-  Action.(iter_descrs system
-    (fun action_descr ->
-      (* we add only actions in which hash occurs *)
-      let descr_proj = Action.pi_descr proj action_descr in
-      let action_hashes =
-        Euf.hashes_of_action_descr ~system ~cond:true
-          descr_proj hash_fn key_n in
-      if List.length action_hashes > 0 then
-        Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
-  (* direct cases (for explicit occurences of hashes in the frame) *)
-  let phi_frame =
-      (List.map
-        (fun (is,m) ->
-           (* select bound variables,
-            * to quantify universally over them *)
-           let bv =
-             List.filter
-               (fun i -> not (Vars.mem env (Vars.name i)))
-               is
-           in
-           let env = ref env in
-           let bv' =
-             List.map (Vars.make_fresh_from_and_update env) bv in
-           let subst =
-             List.map2
-               (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-               bv bv'
-           in
-           let is = List.map (Term.subst_var subst) is in
-           Term.mk_forall
-             (List.map (fun i -> Vars.EVar i) bv')
-             (Term.mk_impl
-               (Term.mk_indices_eq key_is is)
-               (Term.Atom (`Message (`Neq, t, m)))))
-        list_of_hashes_from_frame)
-  (* undirect cases (for occurences of hashes in actions of the system) *)
-  and phi_actions =
-    Hashtbl.fold
-      (fun a list_of_is_m formulas ->
-        (* for each action in which a hash occurs *)
-          let env = ref env in
-          let new_action_indices =
-            List.map
-              (fun i -> Vars.make_fresh_from_and_update env i)
-              a.Action.indices
-          in
-          let bv =
-            List.filter
-              (fun i -> not (List.mem i a.Action.indices))
-              (List.sort_uniq Pervasives.compare
-                (List.concat (List.map fst list_of_is_m)))
-          in
-          let bv' =
-            List.map
-              (fun i -> Vars.make_fresh_from_and_update env i)
-              bv
-          in
-          let subst =
-            List.map2
-              (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-              a.Action.indices new_action_indices @
-            List.map2
-              (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-              bv bv'
-          in
-          (* apply [subst] to the action and to the list of
-           * key indices with the hashed message *)
-          let new_action =
-            Action.to_term (Action.subst_action subst a.Action.action) in
-          let list_of_is_m =
-            List.map
-              (fun (is,m) ->
-                (List.map (Term.subst_var subst) is,Term.subst subst m))
-              list_of_is_m in
-          (* if new_action occurs before an action of the frame *)
-          let disj =
-            List.fold_left Term.mk_or Term.False
-              (List.sort_uniq Pervasives.compare
+    let system = Action.(project_system proj system) in
+    let (hash_fn,t,key_n,key_is) = prf_param (Term.pi_term proj hash) in
+    (* create the frame on which we will iterate to compute phi_proj
+        - e_without_hash is the context where all occurrences of [hash] have
+          been replaced by zero
+        - we also add the hashed message [t] *)
+    let e_without_hash =
+      EquivSequent.apply_subst_frame
+        [Term.ESubst (hash,Term.Fun (Term.f_zero,[]))]
+        [e]
+    in
+    let frame =
+      (EquivSequent.Message t) ::
+      (List.map (EquivSequent.pi_elem proj) (e_without_hash @ biframe)) in
+    (* check syntactic side condition *)
+    Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
+    (* we compute the list of hashes from the frame *)
+    let list_of_hashes_from_frame =
+      Euf.hashes_of_frame ~system frame hash_fn key_n
+    and list_of_actions_from_frame =
+      let iter = new get_actions ~system false in
+      List.iter iter#visit_term frame ;
+      iter#get_actions
+    and tbl_of_action_hashes = Hashtbl.create 10 in
+    (* we iterate over all the actions of the (single) system *)
+    Action.(iter_descrs system
+      (fun action_descr ->
+        (* we add only actions in which a hash occurs *)
+        let descr_proj = Action.pi_descr proj action_descr in
+        let action_hashes =
+          Euf.hashes_of_action_descr ~system ~cond:true
+            descr_proj hash_fn key_n in
+        if List.length action_hashes > 0 then
+          Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
+    (* direct cases (for explicit occurences of hashes in the frame) *)
+    let phi_frame =
+        (List.map
+          (fun (is,m) ->
+             (* select bound variables, to quantify universally over them *)
+             let bv =
+               List.filter
+                 (fun i -> not (Vars.mem env (Vars.name i)))
+                 is
+             in
+             let env = ref env in
+             let bv' =
+               List.map (Vars.make_fresh_from_and_update env) bv in
+             let subst =
+               List.map2
+                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                 bv bv'
+             in
+             let is = List.map (Term.subst_var subst) is in
+             Term.mk_forall
+               (List.map (fun i -> Vars.EVar i) bv')
+               (Term.mk_impl
+                 (Term.mk_indices_eq key_is is)
+                 (Term.Atom (`Message (`Neq, t, m)))))
+          list_of_hashes_from_frame)
+    (* undirect cases (for occurences of hashes in actions of the system) *)
+    and phi_actions =
+      Hashtbl.fold
+        (fun a list_of_is_m formulas ->
+          (* for each action in which a hash occurs *)
+            let env = ref env in
+            let new_action_indices =
+              List.map
+                (fun i -> Vars.make_fresh_from_and_update env i)
+                a.Action.indices
+            in
+            let bv =
+              List.filter
+                (fun i -> not (List.mem i a.Action.indices))
+                (List.sort_uniq Pervasives.compare
+                  (List.concat (List.map fst list_of_is_m)))
+            in
+            let bv' =
+              List.map
+                (fun i -> Vars.make_fresh_from_and_update env i)
+                bv
+            in
+            let subst =
+              List.map2
+                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                a.Action.indices new_action_indices @
+              List.map2
+                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                bv bv'
+            in
+            (* apply [subst] to the action and to the list of
+             * key indices with the hashed message *)
+            let new_action =
+              Action.to_term (Action.subst_action subst a.Action.action) in
+            let list_of_is_m =
+              List.map
+                (fun (is,m) ->
+                  (List.map (Term.subst_var subst) is,Term.subst subst m))
+                list_of_is_m in
+            (* if new_action occurs before an action of the frame *)
+            let disj =
+              List.fold_left Term.mk_or Term.False
+                (List.sort_uniq Pervasives.compare
+                  (List.map
+                    (fun (t,strict) ->
+                      if strict
+                      then Term.Atom (`Timestamp (`Lt, new_action, t))
+                      else Term.Atom (Term.mk_timestamp_leq new_action t))
+                    list_of_actions_from_frame))
+            (* then if key indices are equal then hashed messages differ *)
+            and conj =
+              List.fold_left Term.mk_and True
                 (List.map
-                  (fun (t,strict) ->
-                    if strict
-                    then Term.Atom (`Timestamp (`Lt, new_action, t))
-                    else Term.Atom (Term.mk_timestamp_leq new_action t))
-                  list_of_actions_from_frame))
-          (* then if key indices are equal then hashed messages differ *)
-          and conj =
-            List.fold_left Term.mk_and True
-              (List.map
-                 (fun (is,m) -> Term.mk_impl
-                     (Term.mk_indices_eq key_is is)
-                   (Term.Atom (`Message (`Neq, t, m))))
-                 list_of_is_m)
-          in
-          let forall_var =
-            List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-            (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
-      tbl_of_action_hashes
-      []
-  in
-  mk_ands (phi_frame @ phi_actions)
+                   (fun (is,m) -> Term.mk_impl
+                       (Term.mk_indices_eq key_is is)
+                     (Term.Atom (`Message (`Neq, t, m))))
+                   list_of_is_m)
+            in
+            let forall_var =
+              List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
+              (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
+        tbl_of_action_hashes
+        []
+    in
+    mk_ands (phi_frame @ phi_actions)
   with
+  | Not_hash -> Term.True
   | Euf.Bad_ssc -> Tactics.soft_failure
     (Tactics.Failure "Key syntactic side condition not checked")
   end
-
-let mk_prf_if_term_proj system env biframe m proj =
-  let system_proj = Action.(project_system proj system) in
-  let m_proj = Term.pi_term  proj m in
-  match m_proj with
-  | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
-      if Theory.is_hash hash_fn then
-        let param = (hash_fn,t,key_n,key_is) in
-        let _,n =
-          Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
-        Term.ITE
-          (mk_prf_phi_proj system_proj env param proj biframe,
-          Term.Name (n, []),
-          m_proj)
-      else raise Not_hash
-  | _ -> raise Not_hash
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
    form (p inter q) && diff (p minus q, q minus p) *)
@@ -771,37 +771,43 @@ let combine_conj_formulas p q =
   in
   (* common is the intersection of p and q, aux_q is the remainder of q and
      new_p the remainder of p *)
-  if common <> [] then
-    Term.And (mk_ands common, Term.Diff(mk_ands new_p, mk_ands !aux_q))
-  else
-    Term.Diff(mk_ands new_p, mk_ands !aux_q)
+  Term.mk_and
+    (mk_ands common)
+    (Term.head_normal_biterm (Term.Diff(mk_ands new_p, mk_ands !aux_q)))
 
 let prf i s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
-        begin try
-          let biframe = List.rev_append before after in
-          let system = (EquivSequent.get_system s) in
-          let env = EquivSequent.get_env s in
-          begin match e with
-          | EquivSequent.Message m ->
-              let new_elem =
-                EquivSequent.Message (Term.head_normal_biterm
-                  (Term.Diff
-                    (mk_prf_if_term_proj system env biframe m Term.Left,
-                     mk_prf_if_term_proj system env biframe m Term.Right)))
-              in
-              let biframe = (List.rev_append before (new_elem::after)) in
-              [EquivSequent.set_biframe s biframe]
-          | EquivSequent.Formula f -> raise Not_hash
-          end
-        with
-        | Not_hash ->
-          Tactics.soft_failure
-            (Tactics.Failure
-              "PRF can only be applied on a term of the form\
-              h(t,k) or diff(h1(t1,k1),h2(t2,k2))")
-        end
+      let biframe = List.rev_append before after in
+      let system = (EquivSequent.get_system s) in
+      let env = EquivSequent.get_env s in
+      let e = match e with
+        | EquivSequent.Message m ->
+          EquivSequent.Message (Term.head_normal_biterm m)
+        | EquivSequent.Formula f ->
+          EquivSequent.Formula (Term.head_normal_biterm f)
+      in
+      (* search for the first occurrence of a hash in [e] *)
+      begin match (Euf.hashes ~system [e]) with
+      | [] ->
+        Tactics.soft_failure
+          (Tactics.Failure
+            "PRF can only be applied on a term with at least one occurrence
+            of a hash term h(t,k)")
+      | hash::_ ->
+        let phi_left = mk_prf_phi_proj Term.Left system env biframe e hash in
+        let phi_right = mk_prf_phi_proj Term.Right system env biframe e hash in
+        let _,n = Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
+        let if_term =
+          Term.ITE
+            (combine_conj_formulas phi_left phi_right,
+            Term.Name (n,[]),
+            hash) in
+        let new_elem =
+          EquivSequent.apply_subst_frame [Term.ESubst (hash,if_term)] [e] in
+        let biframe = (List.rev_append before (new_elem @ after)) in
+        [EquivSequent.set_biframe s biframe]
+      end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
 

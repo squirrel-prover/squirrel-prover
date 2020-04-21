@@ -55,6 +55,11 @@ val check_hash_key_ssc :
   system:Action.system ->
   Term.fname -> Term.name -> bool
 
+val hashes :
+  system:Action.system ->
+  EquivSequent.elem list ->
+  Term.message list
+
 val hashes_of_frame :
   system:Action.system ->
   EquivSequent.elem list -> Term.fname -> Term.name ->
