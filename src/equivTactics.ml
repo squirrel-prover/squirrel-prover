@@ -733,14 +733,6 @@ let mk_prf_phi_proj system env param proj biframe =
     (Tactics.Failure "Key syntactic side condition not checked")
   end
 
-(* FIXME We have to generate a fresh name instead of constant zero
-* in the then branch. Since PRF can only be applied, for now,
-* at top level on a term of the form h(t,k) or diff(h1(t1,k1),h2(t2,k2)),
-* we would apply the fresh tactic afterwards to get rid of the fresh name,
-* after having proved that the PRF condition is true.
-* This is the reason why having the constant zero in the then branch is still
-* sound in this specific use case.
-* https://gitlab.inria.fr/smoreau/squirrel-prover/issues/95 *)
 let mk_prf_if_term_proj system env biframe m proj =
   let system_proj = Action.(project_system proj system) in
   let m_proj = Term.pi_term  proj m in
@@ -748,9 +740,11 @@ let mk_prf_if_term_proj system env biframe m proj =
   | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
       if Theory.is_hash hash_fn then
         let param = (hash_fn,t,key_n,key_is) in
+        let _,n =
+          Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
         Term.ITE
           (mk_prf_phi_proj system_proj env param proj biframe,
-          Term.Fun (Term.f_zero,[]),
+          Term.Name (n, []),
           m_proj)
       else raise Not_hash
   | _ -> raise Not_hash
