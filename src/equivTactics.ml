@@ -655,29 +655,50 @@ let mk_prf_phi_proj proj system env biframe e hash =
           Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
     (* direct cases (for explicit occurences of hashes in the frame) *)
     let phi_frame =
-        (List.map
-          (fun (is,m) ->
-             (* select bound variables, to quantify universally over them *)
-             let bv =
-               List.filter
-                 (fun i -> not (Vars.mem env (Vars.name i)))
-                 is
-             in
-             let env = ref env in
-             let bv' =
-               List.map (Vars.make_fresh_from_and_update env) bv in
-             let subst =
-               List.map2
-                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-                 bv bv'
-             in
-             let is = List.map (Term.subst_var subst) is in
-             Term.mk_forall
-               (List.map (fun i -> Vars.EVar i) bv')
-               (Term.mk_impl
-                 (Term.mk_indices_eq key_is is)
-                 (Term.Atom (`Message (`Neq, t, m)))))
-          list_of_hashes_from_frame)
+      (List.map
+        (fun (is,m) ->
+          (* select bound variables in key indices [is] and in message [m]
+          * to quantify universally over them *)
+          let env = ref env in
+          let vars = Term.get_vars m in
+          (* we add variables from [is] while preserving unique occurrences *)
+          let vars =
+            List.fold_left
+              (fun vars i ->
+                if List.mem (Vars.EVar i) vars
+                then vars
+                else Vars.EVar i :: vars)
+              vars
+              is
+          in
+          (* we remove from [vars] free variables, ie already in [env] *)
+          let not_in_env  = function
+            | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+              not (Vars.mem !env (Vars.name i))
+            | _ -> true
+          in
+          let vars = List.filter not_in_env vars in
+          let subst =
+            List.map
+              (function Vars.EVar v ->
+                Term.(ESubst (Var v,
+                              Var (Vars.make_fresh_from_and_update env v))))
+              vars
+          in
+          let forall_vars =
+            List.map
+              (function Vars.EVar v ->
+                Vars.EVar (Term.subst_var subst v))
+              vars
+          in
+          let is = List.map (Term.subst_var subst) is in
+          let m = Term.subst subst m in
+          Term.mk_forall
+            forall_vars
+            (Term.mk_impl
+              (Term.mk_indices_eq key_is is)
+              (Term.Atom (`Message (`Neq, t, m)))))
+        list_of_hashes_from_frame)
     (* undirect cases (for occurences of hashes in actions of the system) *)
     and phi_actions =
       Hashtbl.fold
@@ -689,27 +710,55 @@ let mk_prf_phi_proj proj system env biframe e hash =
                 (fun i -> Vars.make_fresh_from_and_update env i)
                 a.Action.indices
             in
-            let bv =
-              List.filter
-                (fun i -> not (List.mem i a.Action.indices))
-                (List.sort_uniq Pervasives.compare
-                  (List.concat (List.map fst list_of_is_m)))
+            let is =
+              List.sort_uniq Pervasives.compare
+                (List.concat (List.map fst list_of_is_m))
             in
-            let bv' =
-              List.map
-                (fun i -> Vars.make_fresh_from_and_update env i)
-                bv
+            let vars = List.sort_uniq Pervasives.compare
+              (List.concat
+                (List.map
+                  (fun (_,m) -> Term.get_vars m)
+                  list_of_is_m))
             in
+            (* we add variables from [is] while preserving unique occurrences *)
+            let vars =
+              List.fold_left
+                (fun vars i ->
+                  if List.mem (Vars.EVar i) vars
+                  then vars
+                  else Vars.EVar i :: vars)
+                vars
+                is
+            in
+            (* we remove from [vars] free variables,
+             * ie already in [a.Action.indices] *)
+            let not_in_action_indices  = function
+              | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+                not (List.mem i a.Action.indices)
+              | _ -> true
+            in
+            let vars = List.filter not_in_action_indices vars in
             let subst =
               List.map2
                 (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                a.Action.indices new_action_indices @
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                bv bv'
+                a.Action.indices new_action_indices
+              @
+              List.map
+                (function Vars.EVar v ->
+                  Term.(ESubst (Var v,
+                                Var (Vars.make_fresh_from_and_update env v))))
+                vars
+            in
+            let forall_vars =
+              List.map (fun i -> Vars.EVar i) new_action_indices
+              @
+              List.map
+                (function Vars.EVar v ->
+                  Vars.EVar (Term.subst_var subst v))
+                vars
             in
             (* apply [subst] to the action and to the list of
-             * key indices with the hashed message *)
+             * key indices with the hashed messages *)
             let new_action =
               Action.to_term (Action.subst_action subst a.Action.action) in
             let list_of_is_m =
@@ -736,9 +785,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
                      (Term.Atom (`Message (`Neq, t, m))))
                    list_of_is_m)
             in
-            let forall_var =
-              List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-              (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
+            (Term.mk_forall forall_vars (Term.mk_impl disj conj))::formulas)
         tbl_of_action_hashes
         []
     in
