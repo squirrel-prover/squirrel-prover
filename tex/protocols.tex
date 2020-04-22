@@ -46,11 +46,11 @@ as well as indexed memory cell symbols from $\States$.
   free variables occurring in these terms and formulas are
   of one of the following forms:
   \begin{itemize}
-    \item $x_{\sfa'(i_1,\ldots,i'_l)}$
-      with $\sfa'(i_1,\ldots,i'_l)\leq \alpha$ or
+    \item $x_{\sfa'(i'_1,\ldots,i'_l)}$
+      with $\sfa'(i'_1,\ldots,i'_l)\leq \alpha$ or
     \item $x^{s[j_1,\ldots,j_p]}$
-      for some $\sfa' \in \A_l$ and $s \in \States_p$.
-  \end{itemize}  
+      for some $s \in \States_p$.
+  \end{itemize}
   Intuitively, the action's behavior depends only on previous inputs of actions, and on the memory.
   \adrien{I think we also want to say that index variables are only $i_1,\dots,i_k$, plus the index variables of memory updates. We should probably use binders there.}
 \end{definition}
@@ -78,7 +78,7 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
   it will be illustrated later on, this is required to express protocols with
   actions that are conditioned by existential formulas over indices.
 
-  All memory cells are initialized to $0$. If we want a different value, we can use a action to initialize all memory cells (with values that depend on the cells'
+  All memory cells are initialized to $0$. If we want a different value, we can use an action to initialize all memory cells (with values that depend on the cells'
   indices), and we can force this action to happen before any other.
   In the tool, we use a different approach, and let the user provide axioms to specify the initial values of the memory.
   % --- but of course we do not have rules to derive the fact that initial
@@ -134,7 +134,7 @@ simultaneously the left and right processes, using $\diff{\_}{\_}$ terms.
 We assume that $\mathsf{diff} \in \F$,
 which will be interpreted in a particular way. \adrien{I believe that we do not give a semantics to $\mathsf{diff}$. Instead, we first project to get rid of it, and then interpret}
 We use the notation $(\_)^L$ and $(\_)^R$ to denote the left and right
-projections of a bi-protocol, bi-term, etc. defined as usual.
+projections of a bi-protocol, bi-term, etc (defined as usual).
 For example, $(\phi_{\alpha})^L$ and $(\phi_{\alpha})^R$ will denote
 the left and right execution conditions of $\alpha$, and
 $(o_{\alpha})^L$ and $(o_{\alpha})^R$ will denote their respective
@@ -178,7 +178,7 @@ We give here a few representative examples of (bi)protocols.
   and the following semantics:
     \begin{itemize}
       \item action $\alpha_1 := \Sort(i,j)$ represents the only
-        action of an tag session $i,j$ with
+        action of a tag's session $i,j$ with
         \begin{itemize}
           \item $\phi_{\alpha_1} := \true$
           \item $o_{\alpha_1} := \langle n[i,j], \h(n[i,j],\diff{\key[i]}{\key'[i,j]}) \rangle$

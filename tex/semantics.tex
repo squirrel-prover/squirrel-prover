@@ -194,7 +194,7 @@ to base logic formulas, as follows:
   \mcond^\TM(\alpha'_{k+1}) &=&
     \interp{\phi_{\alpha_{k+1}}
     \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
-    \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto
+    \{x^{s[\vec{j}]}\mapsto
       s[\vec{j}]@\alpha_{k+1}\}_s
     }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
 \end{eqnarray*}
@@ -243,7 +243,7 @@ argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
       \interp{
         o_{\alpha_{k+1}}
         \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
-        \{x_{\alpha_{k+1}}^{s[\vec{j}]}\mapsto
+        \{x^{s[\vec{j}]}\mapsto
           s[\vec{j}]@\alpha_{k+1}\}_s
         }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
 \end{array}\]
@@ -262,7 +262,7 @@ and $\vec{j}$ to their expected concretizations.
 The semantics of outputs is defined similarly.
 
 Since meta-logic terms and formulas $o_{\alpha}$, $u_{\alpha}$ and
-$\phi_{\alpha}$ may include occurences of message variables
+$\phi_{\alpha}$ may include occurrences of message variables
 $x_\beta$ and $x^{s[\vec{j}]}$,
 we use a term-level substitution for these variables.
 

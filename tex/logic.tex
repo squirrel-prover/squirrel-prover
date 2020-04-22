@@ -1,7 +1,7 @@
 We call \emph{base logic} the logic introduced by Bana and Comon in~\cite{Bana:2014:CCS:2660267.2660276}.
-It is first-order logic with a distinguished kind of constant called names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.) which are used to represent random samplings. It uses a single predicate noted $\sim$ (or rather, a family
+It is a first-order logic with a distinguished kind of constant called names (written $\mathsf{n}$, $\mathsf{m}$, $\mathsf{k}$, etc.) which are used to represent random samplings. It uses a single predicate noted $\sim$ (or rather, a family
 of predicates $\sim_k$ of arity $2 k$ for all $k\in\mathbb{N}$).
-The terms are all of the same sort, and represent protocol messages.
+The terms are all of the same sort and represent protocol messages.
 
 The logic uses function symbols to represent the protocol functions and cryptographic primitives, as well as attacker computations.
 We will also assume some standard boolean constants and operations, with
@@ -12,7 +12,7 @@ The formulas of the base logic are intended to be interpreted in
 \emph{computational models}, denoted $\Mo$, where:
 \begin{itemize}
   \item terms are interpreted as PPT Turing machines which,
-    given infinite random tapes and a security parameter output a bitstring;
+    given infinite random tapes and a security parameter, output a bitstring;
   \item $\sim$ is interpreted as computational indistinguishability;
   \item names are independent random samplings of length $\eta$ (the security parameter);
   \item function symbols correspond to deterministic machines (probabilistic functions are encoded using explicit randomness).
@@ -32,7 +32,7 @@ are valid.
 We recall next the syntax and semantics of the base logic, which deals with
 messages and indistinguishability.
 We then define the syntax of our meta-logic, which will allow to reason about
-protocols. The semantics of the meta-logic will only be defined relative to a
+protocols. The semantics of the meta-logic will only be defined relatively to a
 protocol, a notion that is introduced in the next section.
 
 Terms of the meta-logic are of three possible sorts: index, timestamps
@@ -61,7 +61,7 @@ $f[i_1,\ldots,i_k](t_1,\ldots,t_n)$ is a term.
   Function symbols representing cryptographic primitives will have index
   arity $0$, and a message arity depending on the kind of primitive:
   two for a keyed hash, three for a randomized encryption, etc.
-  Functions symbols representing identities (for example, a constant value
+  Function symbols representing identities (for example, a constant value
   associated to each tag) will have $0$ as message arity and $1$ as index arity.
 \end{example}
 
@@ -95,7 +95,7 @@ arity $n$.
       &\mid& a[i_1,\ldots,i_k] & \text{constant} & (a\in\Act_k) \\
       &\mid & \pre(T) & \text{predecessor} & \\
       \\
-      t & := & \mathsf{n}[i_1,\ldots,i_n] &\text{name} & (\mathsf{n}\in\N_k) \\
+      t & := & \mathsf{n}[i_1,\ldots,i_k] &\text{name} & (\mathsf{n}\in\N_k) \\
       & \mid & x  & \text{message variable} & (x\in\X) \\
       & \mid & f[i_1,\ldots,i_k](t_1,\dots,t_n) &\text{function application} &
       (f\in\F_k^n)\\
