@@ -835,13 +835,13 @@ let prf i s =
           EquivSequent.Formula (Term.head_normal_biterm f)
       in
       (* search for the first occurrence of a hash in [e] *)
-      begin match (Euf.hashes ~system [e]) with
-      | [] ->
+      begin match (Euf.get_hash ~system e) with
+      | None ->
         Tactics.soft_failure
           (Tactics.Failure
             "PRF can only be applied on a term with at least one occurrence
             of a hash term h(t,k)")
-      | hash::_ ->
+      | Some hash ->
         let phi_left = mk_prf_phi_proj Term.Left system env biframe e hash in
         let phi_right = mk_prf_phi_proj Term.Right system env biframe e hash in
         let _,n = Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
@@ -1187,26 +1187,47 @@ let simplify_ite b env system cond positive_branch negative_branch =
     in
     (negative_branch, Prover.Goal.Trace trace_sequent)
 
+class get_ite_term ~system = object (self)
+  inherit Iter.iter_approx_macros ~exact:true ~system as super
+  val mutable ite : (Term.formula * Term.message * Term.message) option = None
+  method get_ite = ite
+  method visit_message = function
+    | Term.ITE (c,t,e) ->
+        ite <- Some (c,t,e)
+    | m -> super#visit_message m
+end
+(** [get_ite ~system elem] returns None if there is no ITE term in [elem],
+    Some ite otherwise, where [ite] is the first ITE term encountered.
+    Does not explore macros. *)
+let get_ite ~system elem =
+  let iter = new get_ite_term ~system in
+  List.iter iter#visit_term [elem];
+  iter#get_ite
+
 let apply_yes_no_if b i s =
   let env = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
-  | before, e, after ->
-      begin match e with
-      | EquivSequent.Message m ->
-        begin match Term.head_normal_biterm m with
-        | ITE (c,t,e) ->
-          let branch, trace_goal =
-            simplify_ite b env system c t e in
-          let new_elem = EquivSequent.Message branch in
-          let biframe = List.rev_append before (new_elem :: after) in
-          [ trace_goal;
-            Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
-        | _ -> Tactics.soft_failure
-                (Tactics.Failure "can only be applied on if then else term")
-        end
-      | _ -> Tactics.soft_failure (Tactics.Failure "improper arguments")
-      end
+  | before, elem, after ->
+    (* search for the first occurrence of a hash in [e] *)
+    begin match (get_ite ~system elem) with
+    | None ->
+      Tactics.soft_failure
+        (Tactics.Failure
+          "can only be applied on a term with at least one occurrence
+          of an if then else term")
+    | Some (c,t,e) ->
+      let branch, trace_goal =
+        simplify_ite b env system c t e in
+      let new_elem =
+        EquivSequent.apply_subst_frame
+          [Term.ESubst (Term.ITE (c,t,e),branch)]
+          [elem]
+      in
+      let biframe = List.rev_append before (new_elem @ after) in
+      [ trace_goal;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    end
   | exception Out_of_range ->
      Tactics.soft_failure (Tactics.Failure "out of range position")
 

@@ -11,8 +11,6 @@ Proof.
   expandall.
   fa 1; fa 2.
   prf 2.
-  fa 2.
-  yesif 3.
-  fresh 3.
-  fresh 2; yesif 2.
+  yesif 2.
+  xor 2,n_PRF.
 Qed.
