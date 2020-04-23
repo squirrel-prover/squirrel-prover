@@ -60,11 +60,9 @@ expand cond@T(i,t);expand output@T(i,t).
 fa 1.
 fa 2.
 fa 2.
-xor 3.
 
-fa 3.
-prf 4.
-yesif 4.
+prf 3. (* we apply PRF inside XOR to be able to use XOR tactic later on *)
+yesif 3.
 apply tags_neq.
 project.
 repeat split.
@@ -77,10 +75,9 @@ assert (fst(input@R2(r))=nt(i,t)).
 admit. (* fresh *)
 assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
 admit. (* fresh *)
-fresh 2.
-yesif 2.
 
-admit. (* c'est perdu - il me fallait un prf sous un context pour appliquer xor.*)
+xor 3,n_PRF1. (* we now have a fresh name instead of a hash in the XOR biterm *)
+fresh 2. yesif 2.
 Qed.
 
 
