@@ -27,7 +27,7 @@ process tag(i:index, t:index)=
   new nt;
   out(c,<nt,xor(id'(i,t),H(<tag0,<x,nt>>,key'(i,t)))>);
   in(c,y);
-  if y = H(<tag1, <x,nt>>,key'(i,t)) then out(c,ok)
+  if y = xor(id'(i,t),H(<tag1, <x,nt>>,key'(i,t))) then out(c,ok)
   else out(c,ko)
 
 process reader =
@@ -35,8 +35,7 @@ process reader =
   out(c,nr);
   in(c,m);
   try find i,t such that xor(id'(i,t),snd(m)) = H(<tag0,<nr,fst(m)>>,key'(i,t)) in
- (*   out(c,xor(id'(i,t),H(<tag1,<nr,fst(m)>>,key'(i,t)))) *)
-   out(c,H(<tag1,<nr,fst(m)>>,key'(i,t)))
+   out(c,xor(id'(i,t),H(<tag1,<nr,fst(m)>>,key'(i,t))))
   
  else
     out(c,error) 
@@ -49,14 +48,22 @@ goal wa_R:
   forall (r,i,t:index),
   cond@R1(r,i,t) =>
   T(i,t) < R1(r,i,t) &&
-  fst(input@R1(r,i,t)) = nt(i,t) &&
-  input@T(i,t) = nr(r).
+  fst(input@R1(r,i,t)) = fst(output@T(i,t)) &&
+  snd(input@R1(r,i,t)) = snd(output@T(i,t)) &&
+  R(r) < T(i,t) && 
+  input@T(i,t) = output@R(r).
  
 Proof.
   simpl.
   expand cond@R1(r,i,t).
   euf M0.
+  assert(input@T(i,t) = nr(r)).
+  fresh M2.
+  case H0. (* S.D.: je susi etonnee de voir la disjonction apparaitre ici. pour moi le fresh aurait du me permettre de conclure. *)
+  admit.
+  admit.
 Qed.
+
 
 goal wa_T:
  forall (i,t:index),
@@ -70,31 +77,22 @@ Proof.
 simpl.
 expand cond@T1(i,t).
 apply tags_neq.
-euf M0.
+assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key'(i,t)) = xor(input@T1(i,t),id'(i,t))).
+euf M2.
 exists r.
 repeat split.
 case H0.
 depends T(i,t), T1(i,t).
+
 case H0.
-assert (fst(input@R1(r,i,t)) = nt(i,t)).
-fresh M3.
-case H0.
+admit. (* je me retrouve ici dans une situation. Je dois prouver un truc qui semble etre faux  - contraire de T2. *) 
 
+assert (nt(i,t) = fst(input@R1(r,i,t))).
+fresh M4. (* Encore un fresh bizarre *)
 
-fresh M3.
-
-prf M0.
-
-fresh M0.
-
-help.
-
-euf M0.
-
-fa M0.
-
-xor M0.
-
+admit.
+admit.
+admit.
 Qed.
 
 
