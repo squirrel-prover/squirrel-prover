@@ -59,9 +59,9 @@ Proof.
   euf M0.
   assert(input@T(i,t) = nr(r)).
   fresh M2.
-  case H0. (* S.D.: je susi etonnee de voir la disjonction apparaitre ici. pour moi le fresh aurait du me permettre de conclure. *)
-depends R(r), R2(r). 
-depends R(r), R1(r,i1,t1).
+  case H0. 
+  depends R(r), R2(r). 
+  depends R(r), R1(r,i1,t1).
 Qed.
 
 
@@ -69,8 +69,8 @@ goal wa_T:
  forall (i,t:index),
  cond@T1(i,t) => ( exists (r:index), 
       R1(r,i,t) < T1(i,t) &&  output@R1(r,i,t) = input@T1(i,t) &&
-      T(i,t) < R1(r,i,t) && fst(output@T(i,t)) = fst(input@R1(r,i,t)) && 
-              snd(output@T(i,t)) = snd(input@R1(r,i,t)) &&
+fst(output@T(i,t)) = fst(input@R1(r,i,t)) && 
+              snd(output@T(i,t)) = snd(input@R1(r,i,t)) &&       T(i,t) < R1(r,i,t) && 
      R(r) < T(i,t) &&  output@R(r) = input@T(i,t)). 
 
 Proof.
@@ -80,15 +80,47 @@ apply tags_neq.
 assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key'(i,t)) = xor(input@T1(i,t),id'(i,t))).
 euf M2.
 exists r.
-repeat split.
 case H0.
-depends T(i,t), T1(i,t).
 
-case H0.
+
+
+nosimpl(repeat split).
+simpl.
+simpl.
+simpl.
+
+admit. (* clairement pour passer dans R1 -et non R2-, la condition du try find doit s'evaluer a vrai, et donc en exploitant ce fait on va pouvoir montrer l'egalite demandee- Commen dire cela a metabc *)
+
 assert (nt(i,t) = fst(input@R1(r,i,t))).
-fresh M4. (* probleme d'indice ici je pense *)
+fresh M4.
+case H0.
+depends T(i,t), T2(i,t).
 
 
+assert (nr(r) = input@T(i,t)).
+fresh M4. 
+case H0.
+depends R(r), R2(r).
+substitute r1, r.
+depends R(r), R1(r,i1,t1).
+
+
+
+nosimpl(repeat split).
+depends T(i,t), T1(i,t).
+simpl.
+simpl.
+admit. (* meme probleme que le admit precedent *)
+assert (nt(i,t) = fst(input@R1(r,i,t))).
+fresh M4.
+case H0.
+substitute i2, i.
+substitute t2,t.
+depends T(i,t), T1(i,t).
+substitute i1, i.
+substitute t1,t.
+depends T(i,t), T2(i,t).
+depends R(r), R1(r,i,t).
 Qed.
 
 
