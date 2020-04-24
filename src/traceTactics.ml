@@ -894,16 +894,15 @@ let euf_param (`Message at : message_atom) = match at with
       | Some sign -> (sign, key, m, s, Some pk)
       end
 
-  | (`Eq, Fun ((hash, _), [m; Name key]), s)
-  | (`Eq, s, Fun ((hash, _), [m; Name key]))->
-    if Theory.is_hash hash then
-      (hash, key, m, s, None)
-    else Tactics.soft_failure
-           (Tactics.Failure "the function symbol is not a hash function")
+  | (`Eq, Fun ((hash, _), [m; Name key]), s) when Theory.is_hash hash ->
+    (hash, key, m, s, None)
+  | (`Eq, s, Fun ((hash, _), [m; Name key])) when Theory.is_hash hash ->
+    (hash, key, m, s, None)
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
-              "euf can only be applied to hypothesis of the form h(t,k)=m")
+              "euf can only be applied to hypothesis of the form h(t,k)=m
+              or m=h(t,k) with h a hash function symbol")
 
 let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   let open Euf in
