@@ -75,7 +75,7 @@ Furthermore, it is well known that $\CCAtwo$ can also be considered in a version
   \label{fig:nmbis}
 \end{figure}
 
-To cast this game inside the $\BC$ model, the $b'$ is a difficulty. To avoid having to define boolean random samplings functions and their axiomatizations, we instead restrict the domain of messages that the attacker can sample. We ask for $M$ to be of the form $\lambda n -> t(n)$, where we then sample two names $n,n'$ instead of a boolean $b'$. In effect, this is equal to the previous game, where the attacker would have chosen $M= ( t(n),t(n'))$. This yield a slightly specialized version of the $\NM'$ game,  provided in \cref{fig:nmfinal}.
+To cast this game inside the $\BC$ model, the $b'$ is a difficulty. To avoid having to define boolean random samplings functions and their axiomatizations, we instead restrict the domain of messages that the attacker can sample. We ask for $M$ to be of the form $\lambda n \mapsto t(n)$, where we then sample two names $n_0,n_1$ instead of a boolean $b'$. In effect, this is equal to the previous game, where the attacker would have chosen $M= ( t(n_0),t(n_1))$. This yield a slightly specialized version of the $\NM'$ game,  provided in \cref{fig:nmfinal}.
 
 
 \begin{figure}[h!]
@@ -85,10 +85,10 @@ To cast this game inside the $\BC$ model, the $b'$ is a difficulty. To avoid hav
         \underline{\textbf{Game}
         $\NM''^{\mathcal{E},\A,b}(seed)$}: \\
         \begin{tabular}{l}
-          $(\textsf{pk},\textsf{sk}) \leftarrow \mathcal{E}_{gen}(seed),\; ((\lambda n. \vec{t}(n)),s) \leftarrow \A_1^{\mathcal{O}_{enc}}(\textsf{pk}),\; n,n'\leftarrow \{0,1\}^\eta,\;
-  \; \vec{y}_h \leftarrow \mathcal{E}_{pk}(\vec{t}(n'))$\\
+          $(\textsf{pk},\textsf{sk}) \leftarrow \mathcal{E}_{gen}(seed),\; ((\lambda n. \vec{t}(n)),s) \leftarrow \A_1^{\mathcal{O}_{enc}}(\textsf{pk}),\; n_0,n_1\leftarrow \{0,1\}^\eta,\;
+  \; \vec{y}_h \leftarrow \mathcal{E}_{pk}(\vec{t}(n_1))$\\
           $(R,\vec{y}) \leftarrow \A_1^{\mathcal{O}_{dec}}(M,s,\vec{y}_h),\; \vec{x} \leftarrow \mathcal{D}_{sk}(\vec{y})$ \\
-          $\text{If } \vec{y}_h \cap \vec{y} = \emptyset \wedge \bot \notin \vec{x} \wedge \vec{y}_h \not \subset \text{Queries}(\mathcal{O}_{dec}) \wedge R( \begin{cases} \vec{t}(n) \text{ if } b=0 \\  \vec{t}(n')\\ \end{cases},\vec{x}) \text{ then Return } 1 \text{ else Return } 0$
+          $\text{If } \vec{t}(n_1) <> \vec{t}(n_0) \wedge \vec{y}_h \cap \vec{y} = \emptyset \wedge \bot \notin \vec{x} \wedge \vec{y}_h \not \subset \text{Queries}(\mathcal{O}_{dec}) \wedge R(\vec{t}(n_b),\vec{x}) \text{ then Return } 1 \text{ else Return } 0$
         \end{tabular}
   \caption{Game for $\NM$}
   \label{fig:nmfinal}
@@ -110,6 +110,35 @@ This game can directly be translated into a $\BC$ axiom, where we fix the length
 \wedge R( \mydec(C[\myenc{t_1(n)}{r_1}{sk},\ldots,\myenc{t_k(n)}{r_k}{sk}],sk),\vec{t}(n')) \\
   \end{array}
   \]
+
+
+
+  From this rule, we then derive a rule for our reachability sequent calculus, for any name $n,sk$ and name $n'$, for any $\Gamma$, term $s$ and one hole contexts $C$ and $t$ such that $n$ only occurs under encryptions with keys that only appears at key position and $n'$ does not occur, we have:
+
+
+  \begin{mathpar}
+    \inferrule{
+   H,\Gamma,C(dec(s,sk)) = t(n') \vdash false \quad \emptyset \vdash t(n) \not = t(n')
+    }{
+     H, \Gamma,C(dec(s,sk)) = t(n) \vdash false
+    }
+  \end{mathpar}
+
+  Where $H  =       \bigwedge_{\myenc{m}{r_1}{sk} \in t}  \bigwedge_{dec(x,sk) \in t} (s \not = \myenc{m}{r_1}{sk}) \wedge  (x \not = \myenc{m}{r_1}{sk})$.
+
+  By directly integrating a case study over $H$, we obtain:
+
+  \begin{mathpar}
+    \inferrule{
+   H,\Gamma,C(dec(s,sk)) = t(n') \vdash false
+      \qquad  \emptyset \vdash t(n) <> t(n') \qquad
+       \neg H,   \Gamma,C(dec(s,sk)) = t(n) \vdash false
+    }{
+      \Gamma,C(dec(t,sk)) = t(n) \vdash false
+    }
+  \end{mathpar}
+
+$H$ essentially captures the dishonnest cases, where the attacker built a fresh encryption. Then, he cannot provide a message that has a meaningful relation with $t(n)$, and we can thus replace $t(n)$ by $t(n')$. Essentially, when inside protocols we check that a cyphertext is non trivially linked to some name that only occurs under encryptions,we can either consider the honest cases where an honest cypher was forwarded, and the dishonnest case where the cyphertext does not depend anymore on the name.
 
 %%% Local Variables:
 %%% mode: latex
