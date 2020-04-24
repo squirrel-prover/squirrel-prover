@@ -14,8 +14,12 @@ goal test :
 Proof.
  nosimpl(intros).
  nosimpl(fresh M0).
- case H0.
+ nosimpl(case H0).
+ (* Case A *)
+ nosimpl(case H0).
  (* we assert the negation of the generated hypothesis to conclude *)
  assert A(i,ii2) > A(i,ii). admit.
+ constraints.
+ (* Case A1 *)
  assert A1(i,ii1) > A(i,ii). admit.
 Qed.

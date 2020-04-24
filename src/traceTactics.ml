@@ -689,17 +689,25 @@ let mk_fresh_direct system n is t =
     iter#visit_message t ;
     iter#get_names
   in
+  let names =
+    List.fold_left
+      (fun names (n',is') -> if n = n' then is'::names else names)
+      [] names
+  in
   (* build the disjunction expressing that there exists a name subterm of [t]
    * equal to the name ([n],[is]) *)
   List.fold_left
     Term.mk_or Term.False
     (List.sort_uniq Pervasives.compare
     (List.map
-      (fun (n',is') ->
-        Term.Atom (`Message (`Eq, Term.Name (n,is), Term.Name (n',is'))))
-      names))
+      (fun is' ->
+         List.fold_left Term.mk_and Term.True
+           (List.map2
+              (fun i i' -> Term.Atom (`Index (`Eq, i, i')))
+              is is'))
+       names))
 
-(* Undirect cases - names ([n],[is']) appearing in actions of the system *)
+(* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect system env n is t =
   let list_of_actions_from_term =
     let iter = new EquivTactics.get_actions ~system false in
@@ -718,31 +726,22 @@ let mk_fresh_indirect system env n is t =
         Hashtbl.add tbl_of_action_names action_descr action_indices));
   Hashtbl.fold
     (fun a indices_a formulas ->
-      (* we identify indices of the action [a] that do not occur in [indices_a]
-       * (ie that do not occur in the list of indices of occurrences of [n] in
-       * the actions of the system) *)
-      let not_name_indices =
-        List.filter
-          (fun i ->
-            not (List.mem i
-              (List.sort_uniq Pervasives.compare (List.concat indices_a))))
-          a.Action.indices
-      in
-      (* we refresh wrt [env] these indices *)
-      let not_name_indices' =
-        List.map
-          (fun i -> Vars.make_fresh_from_and_update env i)
-          not_name_indices
-      in
+      (* All indices occurring in [a] and [indices_a]. *)
+      let indices =
+        List.sort_uniq Pervasives.compare
+          (List.concat (a.Action.indices::indices_a)) in
       let subst =
-        List.map2
-          (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-          not_name_indices not_name_indices'
+        List.map
+          (fun i ->
+             let i' = Vars.make_fresh_from_and_update env i in
+             Term.ESubst (Term.Var i, Term.Var i'))
+          indices
       in
-      (* we apply [subst] to the action [a] *)
+      (* we apply [subst] to the action [a] and to [indices_a] *)
       let new_action =
         Action.to_term (Action.subst_action subst a.Action.action) in
-      let disj =
+      let indices_a = List.map (List.map (Term.subst_var subst)) indices_a in
+      let timestamp_inequalities =
         List.fold_left Term.mk_or Term.False
           (List.sort_uniq Pervasives.compare
             (List.map
@@ -752,7 +751,19 @@ let mk_fresh_indirect system env n is t =
                 then Term.Atom (`Timestamp (`Lt, new_action, action_from_term))
                 else Term.Atom (Term.mk_timestamp_leq new_action action_from_term))
               list_of_actions_from_term))
-        in Term.mk_or disj formulas)
+      in
+      let index_equalities =
+        List.fold_left Term.mk_or Term.False
+          (List.map
+             (fun is' ->
+                List.fold_left Term.mk_and Term.True
+                  (List.map2
+                     (fun i i' -> Term.Atom (`Index (`Eq,i,i')))
+                     is is'))
+             indices_a)
+      in
+      let phi_a = Term.mk_and index_equalities timestamp_inequalities in
+      Term.mk_or phi_a formulas)
     tbl_of_action_names
     Term.False
 
@@ -783,7 +794,8 @@ let fresh th s =
 
 let () =
   T.register_general "fresh"
-    ~help:"Given a message equality M of the form t=n, add an hypothesis expressing that n is a subterm of t.\
+    ~help:"Given a message equality M of the form t=n, \
+           add an hypothesis expressing that n is a subterm of t.\
            \n Usage: fresh M."
     (function
        | [Prover.Theory th] ->
@@ -793,7 +805,7 @@ let () =
           end
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
-let substitute (v1) (v2) (s : TraceSequent.t) =
+let substitute v1 v2 s =
   let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
   let subst =
     match
@@ -831,7 +843,7 @@ let substitute (v1) (v2) (s : TraceSequent.t) =
 
 let () =
   T.register_general "substitute"
-    ~help:"If the seuqnet implies that the arguments i1, i2 are equals,\
+    ~help:"If the sequent implies that the arguments i1, i2 are equals,\
            \n replaces all occurences of i1 by i2 inside the sequent.\
            \n Usage: substitute i1, i2."
     (function

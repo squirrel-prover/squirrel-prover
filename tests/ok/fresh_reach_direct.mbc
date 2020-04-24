@@ -10,5 +10,5 @@ goal test :
 Proof.
  nosimpl(intros).
  nosimpl(fresh M0).
- case H0.
+ simpl.
 Qed.
