@@ -129,9 +129,9 @@ project.
 
 (* left *)
 repeat split.
-assert (nT(i,k) = fst(input@R2(j))).
-fresh M1.
 assert (nT(i,k) = fst(input@R1(j))).
+fresh M1.
+assert (nT(i,k) = fst(input@R2(j))).
 fresh M1.
 
 (* right *)
@@ -143,5 +143,6 @@ fresh M1.
 
 fresh 2.
 yesif 2.
+fresh 2.
 Qed.
 
