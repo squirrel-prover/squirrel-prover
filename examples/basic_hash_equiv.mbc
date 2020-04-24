@@ -75,12 +75,7 @@ Proof.
   exists i,k1.
   exists i,k.
   exists i,k.
-  (* TODO fa/dup should be able to to remove the right part
-   * of the conjunction, leaving only the exec part -- however,
-   * without the "exec && ..." part it seems hard to justify the
-   * erasure of outputs. *)
-  fa 0.
-  admit 1. (* TODO fa/dup *)
+  myfadup 0.
 
 
   expand frame@R1(j); expand exec@R1(j);
@@ -99,9 +94,7 @@ Proof.
   euf M0.
   exists i,k.
   exists i,k.
-  (* TODO fa/dup as above *)
-  fa 0.
-  admit 1.
+  myfadup 0.
 
 
   expand frame@T(i,k); expand exec@T(i,k);

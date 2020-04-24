@@ -367,6 +367,115 @@ let () =
        | [] -> pure_equiv (fa_dup)
        | _ -> Tactics.hard_failure (Tactics.Failure "No parameter expected"))
 
+exception Fail_FADUP
+
+class iter_fadup ~(system:Action.system) exact tau leq_pred_tau = object (self)
+  inherit Iter.iter_approx_macros ~exact ~system as super
+
+  method visit_message t = match t with
+    | Macro (ms,[],a)
+      when ((ms = Term.in_macro && a = tau) ||
+            (ms = Term.out_macro && (List.mem a leq_pred_tau))) -> ()
+    | Macro _ -> raise Fail_FADUP
+    | Name _ | Var _ -> raise Fail_FADUP
+    | Diff _ -> raise Fail_FADUP
+    | ITE (Macro (ms,[],a), then_branch, _)
+      when (ms = Term.exec_macro && (List.mem a leq_pred_tau)) ->
+      super#visit_message then_branch
+    | ITE (a, b, c) -> raise Fail_FADUP
+    | Seq (a, b) -> raise Fail_FADUP
+    | Find (a, b, c, d) -> raise Fail_FADUP
+    | _ -> super#visit_message t
+
+  method visit_formula (f:Term.formula) =
+    match f with
+    | Diff(a, b) -> raise Fail_FADUP
+    | ForAll (vs,l) | Exists (vs,l) -> raise Fail_FADUP
+    | Atom (`Index _) | Atom (`Timestamp _) -> ()
+    | Macro _ -> raise Fail_FADUP
+    | _ -> super#visit_formula f
+
+end
+
+(* Get all tau' such that tau'<tau or tau'<=pred(tau) is in formula f *)
+let rec get_timestamps_leq_pred_tau f tau =
+  match f with
+  | Term.Atom (`Timestamp (`Leq,tau_1,tau_2))
+    when tau_2 = Term.Pred tau
+    -> [tau_1]
+  | Term.Atom (`Timestamp (`Lt,tau_1,tau_2))
+    when tau_2 = tau
+    -> [tau_1]
+  | Term.And (f1,f2) ->
+    (get_timestamps_leq_pred_tau f1 tau) @ (get_timestamps_leq_pred_tau f2 tau)
+  | _ -> [] (* ??? *)
+
+let myfadup i s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+      let biframe_without_e = List.rev_append before after in
+      let system = EquivSequent.get_system s in
+      begin try
+        (* we expect that e is of the form exec@pred(tau) && phi_honest *)
+        let (tau,phi_honest) =
+          match e with
+          | EquivSequent.Formula (Term.And (f,g)) ->
+            begin match f,g with
+            | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
+              -> (tau,phi)
+            | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
+              -> (tau,phi)
+            | _ -> raise Fail_FADUP
+            end
+          | _ -> raise Fail_FADUP
+        in
+        let frame_at_pred_tau =
+          EquivSequent.Message (Term.Macro (Term.frame_macro,[],Term.Pred tau))
+        in
+        (* we first check that frame@pred(tau) is in the biframe *)
+        if List.mem frame_at_pred_tau biframe_without_e then
+          (* we expect that phi_honest is of the form
+           * - forall vars, phi_tau => phi
+           * - exists vars, phi*)
+          let (phi_tau,phi) =
+            match phi_honest with
+            | Term.ForAll (vars, Term.Impl (f,g))
+            | Term.Not (Term.ForAll (vars, Term.Impl (f,g))) -> (f,g)
+            | Term.Exists (vars, f)
+            | Term.Not (Term.Exists (vars, f)) -> (f,f)
+            | _ -> raise Fail_FADUP
+          in
+          (* we search for timestamps that are <= pred(tau) in phi_tau *)
+          let leq_pred_tau = get_timestamps_leq_pred_tau phi_tau tau in
+          (* we iterate over the formula phi to check if it contains only
+           * allowed subterms *)
+          let iter = new iter_fadup ~system false tau leq_pred_tau in
+          List.iter iter#visit_formula [phi] ;
+          (* on success, we keep only exec@pred(tau) *)
+          let new_elem =
+            EquivSequent.Formula
+              (Term.Macro (Term.exec_macro,[],Term.Pred tau))
+          in
+          [EquivSequent.set_biframe s (List.rev_append before (new_elem::after))]
+        else raise Fail_FADUP
+      with
+      (* we keep the sequent unchanged if the rule does not apply *)
+      | Fail_FADUP -> [s]
+      end
+  | exception Out_of_range ->
+      Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+let () =
+ T.register_general "myfadup"
+   ~help:"TODO. myfadup i."
+   (function
+   | [Prover.Int i] ->
+       pure_equiv
+         (fun s sk fk -> match myfadup i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
 (** Fresh *)
 
 exception Name_found
