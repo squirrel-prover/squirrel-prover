@@ -175,6 +175,16 @@ val register :
 val reset : unit -> unit
 
 
+type esubst_descr =
+  | Condition of Term.formula * action
+  | Output of Term.message * action
+
+type subst_descr = esubst_descr list
+
+exception SystemNotFresh
+
+val clone_system_subst : system -> system_name -> subst_descr -> unit
+
 (** {2 Pretty-printing} *)
 
 (** Format an action, displayed through its structure. *)

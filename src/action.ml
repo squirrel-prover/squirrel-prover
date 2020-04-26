@@ -354,7 +354,7 @@ let get_descr system a =
   | Some subst ->
     subst_descr subst descr
 
-let iter_descrs system f =
+let get_descrs system =
   match system with
   | Pair (s1, s2) ->
     (* we must check that the two systems have the same set of shapes *)
@@ -363,24 +363,75 @@ let iter_descrs system f =
     if not(Utils.List.inclusion left_shapes right_shapes
            && Utils.List.inclusion right_shapes left_shapes) then
       failwith "Cannot iter over a bisytem with distinct control flow";
-    List.iter
-      (fun shape -> f (get_descr_of_shape system shape))
+    List.map
+      (fun shape -> (get_descr_of_shape system shape))
       left_shapes
   | SimplePair id ->
     let shapes = Hashtbl.find_all systems id in
-    List.iter
-      (fun shape -> f (get_descr_of_shape system shape))
+    List.map
+      (fun shape -> (get_descr_of_shape system shape))
       shapes
   | Single s ->
     (* we must projet before iterating *)
     let shapes = Hashtbl.find_all systems (get_id s) in
-    List.iter
-      ( fun shape -> f (pi_descr (get_proj s)
+    List.map
+      ( fun shape -> (pi_descr (get_proj s)
                           (Hashtbl.find action_to_descr (shape,get_id s))))
       shapes
 
-let debug = false
+let iter_descrs system f =
+  List.iter f (get_descrs system)
 
+(* A substition over a description is allows to either substitute the condition
+   or the output of the descr, for a given shape. *)
+type esubst_descr =
+  | Condition of Term.formula * action
+  | Output of Term.message * action
+
+type subst_descr = esubst_descr list
+
+let rec subst s d =
+  match s with
+  | [] -> d
+  | Condition (f,a) :: q ->
+    begin
+      match same_shape a d.action with
+      | None ->  subst q d
+      | Some s ->       subst q {d with condition = (fst(d.condition), Term.subst s f)}
+    end
+  | Output (t,a) :: q ->
+    begin
+      match same_shape a d.action with
+      | None ->  subst q d
+      | Some s ->       subst q {d with output = (fst(d.output), Term.subst s t)}
+    end
+
+
+exception SystemNotFresh
+
+(* Given an original system and a descr substitution, register the new simple
+   system obtained from the susbtition. *)
+let clone_system_subst original_system new_system substd =
+  let odescrs = get_descrs original_system in
+  let ndescrs = List.map (subst substd) odescrs in
+  if (Hashtbl.mem systems new_system) then
+    let cdescrs =  get_descrs (SimplePair new_system) in
+    if not(Utils.List.inclusion ndescrs cdescrs
+           && Utils.List.inclusion cdescrs ndescrs) then
+      raise SystemNotFresh
+    else
+      ()
+  else
+    List.iter
+      (function d ->
+         let s = get_shape d.action in
+         Hashtbl.add systems new_system s;
+         Hashtbl.add action_to_descr (s,new_system) d;
+      )
+  ndescrs
+
+
+let debug = false
 
 let pp_actions ppf () =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
