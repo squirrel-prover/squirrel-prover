@@ -47,6 +47,8 @@ abstract h : message -> message
 axiom [none,auth] collres : forall (m1,m2:message), h(m1) = h(m2) => m1 = m2
 axiom [none,auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m) => fst(m1) <> m2
 
+axiom [none,auth] freshindex : exists (l:index), True
+
 axiom DDHinj : forall (m1,m2:message), m1 <> m2 => g^m1 <> g^m2
 axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
 
@@ -301,10 +303,10 @@ goal [none, auth] P_charac :
 
   (* honnest case SDIS *)
   apply collres  to <<input@SDIS,g^b1>,input@SDIS^b1> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
-  freshindex l.
+  apply freshindex.
   apply H1 to l.
 
-  freshindex l.
+  apply freshindex.
   apply H1 to l.
   right.
   apply collres  to <<input@PDIS,g^bke11>,pke(k11)>,<<g^a1,input@PDIS4>,input@PDIS4^a1>.

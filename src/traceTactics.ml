@@ -106,20 +106,6 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> left_intros h
       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
-let fresh_index_var varname s sk fk =
-  let env = TraceSequent.get_env s in
-  let (new_env,_) = Vars.make_fresh env Sorts.Index varname in
-  sk [TraceSequent.set_env new_env s] fk
-
-let () =
-  T.register_general "freshindex"
-    ~help:"Introduce a fresh index variable to the sequent.\
-           \n Usage: freshindex v."
-    (function
-      | [Prover.Theory (Theory.Var h)] -> fresh_index_var h
-      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
-
-
 let left_not_intro hyp_name s =
   let s,formula =
     TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in

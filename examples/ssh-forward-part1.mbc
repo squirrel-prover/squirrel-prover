@@ -34,6 +34,8 @@ abstract h : message -> message
 axiom [none,auth] collres : forall (x1,x2:message), h(x1) = h(x2) => x1 = x2
 axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1) <> <forwarded,x2>
 
+axiom [none,auth] freshindex : exists (l:index), True
+
 
 axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
@@ -175,7 +177,7 @@ goal [none, auth] P_charac :
 
   apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
 
-  freshindex l.
+  apply freshindex.
   apply H0 to l.
 Qed.
 
@@ -195,7 +197,7 @@ Proof.
   apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
 
   apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
-  freshindex l.
+  apply freshindex.
   apply H0 to l.
 Qed.
 
