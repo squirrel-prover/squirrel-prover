@@ -382,6 +382,37 @@ We use the following notations:
   $\myif \mexec @ \tau' \mythen [...] \myelse [...]$
   with $\tau' \leq \pre(\tau)$
   we can replace it by the then branch.
+
+  We ask that $\phi_h \in H_{\{\pre(\tau)\}}$ where, for any set of
+  timestamps $T$, $H_T$ is the least set of formulas and messages
+  closed under function application, boolean connectives, and the
+  following rules:
+  $$ \inferrule{
+    \tau' \in T 
+    \quad
+    \phi \in H_{T\cup\{\tau\}}
+  }{
+    (\forall \tau.~ \tau\leq \tau' \Rightarrow \phi) \in H_T
+  }
+  \quad\quad
+  \inferrule{
+    \tau' \in T 
+    \quad
+    \phi \in H_{T\cup\{\tau\}}
+  }{
+    (\exists \tau.~ \tau\leq \tau' \wedge \phi) \in H_T
+  }
+  $$
+  $$\inferrule{\tau \in T}{
+    \minp @ \tau \in H_T
+  }\quad\quad
+  \inferrule{\tau \in T}{
+    \mout @ \tau \in H_T
+  }$$
+  $$
+  \inferrule{\phi \in H_T \quad \tau \in T}{
+    (\myif \mexec @ \tau \mythen \phi \myelse \psi) \in H_T}
+  $$
 \caption{FA-DUP rule.
 }
 \label{fig:fadup}
