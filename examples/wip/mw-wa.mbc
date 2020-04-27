@@ -54,12 +54,12 @@ goal wa_R:
   input@T(i,t) = output@R(r).
  
 Proof.
-  simpl.
+  intros.
   expand cond@R1(r,i,t).
   euf M0.
   assert(input@T(i,t) = nr(r)).
   fresh M2.
-  case H0. 
+  case H0.
   depends R(r), R2(r). 
   depends R(r), R1(r,i1,t1).
 Qed.
@@ -67,53 +67,57 @@ Qed.
 
 goal wa_T:
  forall (i,t:index),
- cond@T1(i,t) => ( exists (r:index), 
+ exec@T1(i,t) => ( exists (r:index), 
       R1(r,i,t) < T1(i,t) &&  output@R1(r,i,t) = input@T1(i,t) &&
-fst(output@T(i,t)) = fst(input@R1(r,i,t)) && 
+ fst(output@T(i,t)) = fst(input@R1(r,i,t)) && 
               snd(output@T(i,t)) = snd(input@R1(r,i,t)) &&       T(i,t) < R1(r,i,t) && 
      R(r) < T(i,t) &&  output@R(r) = input@T(i,t)). 
 
 Proof.
-simpl.
+intros.
+assert cond@T1(i,t).
+expand exec@T1(i,t).
 expand cond@T1(i,t).
 apply tags_neq.
 assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key'(i,t)) = xor(input@T1(i,t),id'(i,t))).
 euf M2.
 exists r.
-case H0.
+case H1.
+nosimpl(repeat split); simpl.
 
-
-
-nosimpl(repeat split).
-simpl.
-simpl.
-simpl.
-
-admit. (* clairement pour passer dans R1 -et non R2-, la condition du try find doit s'evaluer a vrai, et donc en exploitant ce fait on va pouvoir montrer l'egalite demandee- Commen dire cela a metabc *)
+assert cond@R1(r,i,t).
+ assert exec@R1(r,i,t).
+ executable T1(i,t).
+ apply H1 to R1(r,i,t).
+ expand exec@R1(r,i,t).
+expand cond@R1(r,i,t).
 
 assert (nt(i,t) = fst(input@R1(r,i,t))).
 fresh M4.
-case H0.
+case H1.
 depends T(i,t), T2(i,t).
-
 
 assert (nr(r) = input@T(i,t)).
 fresh M4. 
-case H0.
+case H1.
 depends R(r), R2(r).
 substitute r1, r.
 depends R(r), R1(r,i1,t1).
 
+nosimpl(repeat split); simpl.
 
-
-nosimpl(repeat split).
 depends T(i,t), T1(i,t).
-simpl.
-simpl.
-admit. (* meme probleme que le admit precedent *)
+
+assert exec@R1(r,i,t).
+executable T(i,t).
+apply H1 to R1(r,i,t).
+assert cond@R1(r,i,t).
+expand exec@R1(r,i,t).
+expand cond@R1(r,i,t).
+
 assert (nt(i,t) = fst(input@R1(r,i,t))).
 fresh M4.
-case H0.
+case H1.
 substitute i2, i.
 substitute t2,t.
 depends T(i,t), T1(i,t).
