@@ -329,7 +329,7 @@ We use the following notations:
 \begin{figure}[h]
   \begin{mathpar}
   \inferrule[XOR-ind]{
-    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse t \oplus n(\vec {j_0})]
+    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
   }{
     \Gamma \vdash u, C[t \oplus n(\vec {j_0})]
   }
@@ -388,7 +388,7 @@ We use the following notations:
   closed under function application, boolean connectives, and the
   following rules:
   $$ \inferrule{
-    \tau' \in T 
+    \tau' \in T
     \quad
     \phi \in H_{T\cup\{\tau\}}
   }{
@@ -396,7 +396,7 @@ We use the following notations:
   }
   \quad\quad
   \inferrule{
-    \tau' \in T 
+    \tau' \in T
     \quad
     \phi \in H_{T\cup\{\tau\}}
   }{
