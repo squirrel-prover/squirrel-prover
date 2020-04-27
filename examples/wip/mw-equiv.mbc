@@ -76,7 +76,7 @@ admit. (* fresh *)
 assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
 admit. (* fresh *)
 
-xor 3,n_PRF1. (* we now have a fresh name instead of a hash in the XOR biterm *)
+xor 3, n_PRF. (* we now have a fresh name instead of a hash in the XOR biterm *)
 fresh 2. yesif 2.
 Qed.
 
