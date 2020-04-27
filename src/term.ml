@@ -523,6 +523,7 @@ let mk_ite c t e = match c with
   | _ -> ITE (c,t,e)
 
 let mk_forall l f = if l = [] then f else ForAll (l,f)
+let mk_exists l f = if l = [] then f else Exists (l,f)
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Pred t2' -> `Timestamp (`Lt, t1, t2')

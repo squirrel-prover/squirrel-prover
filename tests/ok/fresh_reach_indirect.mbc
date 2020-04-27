@@ -18,8 +18,8 @@ Proof.
  (* Case A *)
  nosimpl(case H0).
  (* we assert the negation of the generated hypothesis to conclude *)
- assert A(i,ii2) > A(i,ii). admit.
+ assert A(i2,ii2) > A(i,ii). admit.
  constraints.
  (* Case A1 *)
- assert A1(i,ii1) > A(i,ii). admit.
+ assert A1(i1,ii1) > A(i,ii). admit.
 Qed.

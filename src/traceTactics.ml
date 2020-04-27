@@ -668,30 +668,39 @@ let fresh_param m1 m2 = match m1,m2 with
           (Tactics.Failure "can only be applied on hypothesis of the form t=n or n=t")
 
 (* Direct cases - names appearing in the term [t] *)
-let mk_fresh_direct system n is t =
+let mk_fresh_direct system env n is t =
   (* iterate over [t] to search subterms of [t] equal to a name *)
-  let names =
-    let iter = new EquivTactics.get_names ~system false in
+  let list_of_indices =
+    let iter = new EquivTactics.get_name_indices ~system false n in
     iter#visit_message t ;
-    iter#get_names
-  in
-  let names =
-    List.fold_left
-      (fun names (n',is') -> if n = n' then is'::names else names)
-      [] names
+    iter#get_indices
   in
   (* build the disjunction expressing that there exists a name subterm of [t]
-   * equal to the name ([n],[is]) *)
+  * equal to the name ([n],[is]) *)
   List.fold_left
     Term.mk_or Term.False
     (List.sort_uniq Pervasives.compare
-    (List.map
-      (fun is' ->
-         List.fold_left Term.mk_and Term.True
-           (List.map2
-              (fun i i' -> Term.Atom (`Index (`Eq, i, i')))
-              is is'))
-       names))
+      (List.map
+       (fun j ->
+          (* select bound variables, to quantify universally over them *)
+          let bv =
+            List.filter
+              (fun i -> not (Vars.mem env (Vars.name i)))
+              j
+          in
+          let env_local = ref env in
+          let bv' =
+            List.map (Vars.make_fresh_from_and_update env_local) bv in
+          let subst =
+            List.map2
+              (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+              bv bv'
+          in
+          let j = List.map (Term.subst_var subst) j in
+          Term.mk_exists
+            (List.map (fun i -> Vars.EVar i) bv')
+            (Term.mk_indices_eq is j))
+       list_of_indices))
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect system env n is t =
@@ -764,7 +773,7 @@ let fresh th s =
         let (n,is,t) = fresh_param m1 m2 in
         let env = ref (TraceSequent.get_env s) in
         let system = TraceSequent.system s in
-        let phi_direct = mk_fresh_direct system n is t in
+        let phi_direct = mk_fresh_direct system !env n is t in
         let phi_indirect = mk_fresh_indirect system env n is t in
         let new_hyp = Term.mk_or phi_direct phi_indirect in
         [TraceSequent.set_env !env (TraceSequent.add_formula new_hyp s)]

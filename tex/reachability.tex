@@ -171,22 +171,25 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
     \inferrule{
       \Gamma,t=\mathsf{n}[\vec {j_0}],
       \big(
-        \bigvee_{\mathsf{m}[\vec j] \in t}
-          \mathsf{m}[\vec j] = \mathsf{n}[\vec {j_0}]
+        \bigvee_{\mathsf{n}[\vec j] \in t}
+          \exists \vec j_b, \vec j = \vec {j_0}
       \big)
       \vee
       \big(
         \bigvee_{\tau \in t}
-          \big(
             \bigvee_{A(\vec i) \in S, \mathsf{n}[\vec j] \in A(\vec i)}
-              A(\vec i\{\vec j \mapsto \vec {j_0}\}) \leq \tau
-          \big)
+              \big(
+                \exists \vec i, A(\vec i) \leq \tau \wedge \vec j = \vec {j_0}
+              \big)
       \big)
       \vdash \phi
     }{
       \Gamma,t=\mathsf{n}[\vec {j_0}] \vdash \phi
     }
   \end{mathpar}
+  \center{
+    where $\vec j_b$ represents indices from $\vec j$ that are bound in $t$
+  }
   \caption{Another inference rule for equalities on names.
   This rule only applies when, for any trace model $\TM$,
   the term $\interp{t}^\TM$ does not contain any message variable.

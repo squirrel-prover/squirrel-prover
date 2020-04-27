@@ -482,18 +482,6 @@ exception Name_found
 exception Var_found
 exception Not_name
 
-class get_names ~(system:Action.system) exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system as super
-
-  val mutable names : (Term.name * Vars.index list) list = []
-  method get_names = List.sort_uniq Pervasives.compare names
-
-  method visit_message t = match t with
-    | Term.Name (n,is) -> names <- (n,is)::names
-    | Term.Var m -> raise Var_found
-    | _ -> super#visit_message t
-end
-
 class find_name ~(system:Action.system) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
