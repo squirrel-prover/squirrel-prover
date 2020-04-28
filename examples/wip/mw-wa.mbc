@@ -60,8 +60,8 @@ Proof.
   assert(input@T(i,t) = nr(r)).
   fresh M2.
   case H0.
-  depends R(r), R2(r). 
   depends R(r), R1(r,i1,t1).
+  depends R(r), R2(r). 
 Qed.
 
 
@@ -100,9 +100,9 @@ depends T(i,t), T2(i,t).
 assert (nr(r) = input@T(i,t)).
 fresh M4. 
 case H1.
-depends R(r), R2(r).
 substitute r1, r.
 depends R(r), R1(r,i1,t1).
+depends R(r), R2(r).
 
 nosimpl(repeat split); simpl.
 
@@ -118,12 +118,10 @@ expand cond@R1(r,i,t).
 assert (nt(i,t) = fst(input@R1(r,i,t))).
 fresh M4.
 case H1.
-substitute i2, i.
-substitute t2,t.
-depends T(i,t), T1(i,t).
 substitute i1, i.
 substitute t1,t.
 depends T(i,t), T2(i,t).
+depends T(i,t), T1(i,t).
 depends R(r), R1(r,i,t).
 Qed.
 
