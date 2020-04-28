@@ -44,7 +44,7 @@ depends R(j1), R1(j1).
 expand frame@R1(j);expand exec@R1(j).
 expand cond@R1(j);expand output@R1(j).
 
-fa 0.
+
 
 equivalent 
 (exists (i,k:index), snd(input@R1(j)) = h(<nR(j),fst(input@R1(j))>,(diff(key(i), key'(i,k))))),
@@ -74,8 +74,8 @@ depends R(j), R2(j).
 (* WA ==> Cond *)
 exists i,k.
 
-admit. (* fadup *)
-
+myfadup 0.
+admit.
 
 (* Case R2 *)
 
@@ -115,7 +115,6 @@ depends R(j), R1(j).
 
 (* WA ==> Cond *)
 exists i,k.
-
 admit. (* fadup *)
 
 
