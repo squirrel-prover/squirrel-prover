@@ -176,11 +176,16 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
       \big)
       \vee
       \big(
-        \bigvee_{\tau \in t}
-            \bigvee_{A(\vec i) \in S, \mathsf{n}[\vec j] \in A(\vec i)}
-              \big(
-                \exists \vec i, A(\vec i) \leq \tau \wedge \vec j = \vec {j_0}
+        \bigvee_{A(\vec i) \in S}
+          \big(
+            \bigvee_{\mathsf{n}[\vec j] \in A(\vec i)}
+              \exists \vec i, \vec j_b,
+              \big( \bigvee_{\tau \in t}
+                A(\vec i) \leq \tau
               \big)
+              \wedge
+              \big( \vec j = \vec {j_0} \big)
+          \big)
       \big)
       \vdash \phi
     }{
@@ -188,7 +193,8 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
     }
   \end{mathpar}
   \center{
-    where $\vec j_b$ represents indices from $\vec j$ that are bound in $t$
+    where $\vec j_b$ represents indices from $\vec j$ that are bound
+    (in $t$ for direct cases, in the action for indirect cases)
   }
   \caption{Another inference rule for equalities on names.
   This rule only applies when, for any trace model $\TM$,
@@ -204,7 +210,7 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   if the premisses are valid in all such computational models,
   then so is the conclusion.
   % \emph{Do we need to impose a condition on message lengths?}
-  % Adrien: no we dont, except for the last rule. 
+  % Adrien: no we dont, except for the last rule.
 \end{proposition}
 
 \begin{figure}

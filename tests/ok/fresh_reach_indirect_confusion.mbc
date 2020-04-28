@@ -6,5 +6,8 @@ goal forall (i:index,t:timestamp) n(i) = input@t => exists k:index, A(k,i) < t.
 Proof.
   nosimpl(intros).
   nosimpl(fresh M0).
-  nosimpl(exists i1; substitute i,j; assumption).
+  nosimpl(existsleft H0).
+  nosimpl(exists i1).
+  nosimpl(substitute i,j).
+  nosimpl(assumption).
 Qed.

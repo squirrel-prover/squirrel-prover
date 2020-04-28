@@ -708,7 +708,7 @@ let mk_fresh_indirect system env n is t =
     let iter = new EquivTactics.get_actions ~system false in
     iter#visit_message t ;
     iter#get_actions
-  and tbl_of_action_names = Hashtbl.create 10 in
+  and tbl_of_action_indices = Hashtbl.create 10 in
   Action.(iter_descrs system
     (fun action_descr ->
       let iter = new EquivTactics.get_name_indices ~system true n in
@@ -718,48 +718,48 @@ let mk_fresh_indirect system env n is t =
       (* we add only actions in which name [n] occurs *)
       let action_indices = iter#get_indices in
       if List.length action_indices > 0 then
-        Hashtbl.add tbl_of_action_names action_descr action_indices));
+        Hashtbl.add tbl_of_action_indices action_descr action_indices));
   Hashtbl.fold
     (fun a indices_a formulas ->
-      (* All indices occurring in [a] and [indices_a]. *)
-      let indices =
-        List.sort_uniq Pervasives.compare
-          (List.concat (a.Action.indices::indices_a)) in
-      let subst =
-        List.map
-          (fun i ->
-             let i' = Vars.make_fresh_from_and_update env i in
-             Term.ESubst (Term.Var i, Term.Var i'))
-          indices
-      in
-      (* we apply [subst] to the action [a] and to [indices_a] *)
-      let new_action =
-        Action.to_term (Action.subst_action subst a.Action.action) in
-      let indices_a = List.map (List.map (Term.subst_var subst)) indices_a in
-      let timestamp_inequalities =
-        List.fold_left Term.mk_or Term.False
-          (List.sort_uniq Pervasives.compare
-            (List.map
-              (fun (action_from_term,strict) ->
-                if strict
-                (* [strict] is true if [action_from_term] refers to an input *)
-                then Term.Atom (`Timestamp (`Lt, new_action, action_from_term))
-                else Term.Atom (Term.mk_timestamp_leq new_action action_from_term))
-              list_of_actions_from_term))
-      in
-      let index_equalities =
-        List.fold_left Term.mk_or Term.False
-          (List.map
-             (fun is' ->
-                List.fold_left Term.mk_and Term.True
-                  (List.map2
-                     (fun i i' -> Term.Atom (`Index (`Eq,i,i')))
-                     is is'))
-             indices_a)
-      in
-      let phi_a = Term.mk_and index_equalities timestamp_inequalities in
-      Term.mk_or phi_a formulas)
-    tbl_of_action_names
+      List.fold_left
+        Term.mk_or formulas
+        (List.map
+          (fun is_a ->
+            let env_local = ref env in
+            (* All indices occurring in [a] and [indices_a]. *)
+            let indices =
+              List.sort_uniq Pervasives.compare
+                (a.Action.indices @ is_a) in
+            let indices' =
+              List.map (Vars.make_fresh_from_and_update env_local) indices in
+            let subst =
+              List.map2
+                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                indices indices'
+            in
+            (* we apply [subst] to the action [a] and to [indices_a] *)
+            let new_action =
+              Action.to_term (Action.subst_action subst a.Action.action) in
+            let is_a = List.map (Term.subst_var subst) is_a in
+            let timestamp_inequalities =
+              List.fold_left Term.mk_or Term.False
+                (List.sort_uniq Pervasives.compare
+                  (List.map
+                    (fun (action_from_term,strict) ->
+                      if strict
+                      (* [strict] is true if [action_from_term] refers to an input *)
+                      then Term.Atom (`Timestamp (`Lt, new_action, action_from_term))
+                      else Term.Atom (Term.mk_timestamp_leq new_action action_from_term))
+                    list_of_actions_from_term))
+            in
+            let index_equalities =
+              Term.mk_indices_eq is is_a
+            in
+            Term.mk_exists
+              (List.map (fun i -> Vars.EVar i) indices')
+              (Term.mk_and timestamp_inequalities index_equalities))
+          indices_a))
+    tbl_of_action_indices
     Term.False
 
 let fresh th s =
@@ -771,12 +771,12 @@ let fresh th s =
       begin match hyp with
       | `Message (`Eq,m1,m2) ->
         let (n,is,t) = fresh_param m1 m2 in
-        let env = ref (TraceSequent.get_env s) in
+        let env = TraceSequent.get_env s in
         let system = TraceSequent.system s in
-        let phi_direct = mk_fresh_direct system !env n is t in
+        let phi_direct = mk_fresh_direct system env n is t in
         let phi_indirect = mk_fresh_indirect system env n is t in
         let new_hyp = Term.mk_or phi_direct phi_indirect in
-        [TraceSequent.set_env !env (TraceSequent.add_formula new_hyp s)]
+        [TraceSequent.add_formula new_hyp s]
       | _ -> Tactics.soft_failure
               (Tactics.Failure "can only be applied on message hypothesis")
       end
