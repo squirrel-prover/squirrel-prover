@@ -169,7 +169,7 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
 \begin{figure}
   \begin{mathpar}
     \inferrule{
-      \Gamma,t=\mathsf{n}[\vec {j_0}],
+      \Gamma,% t=\mathsf{n}[\vec {j_0}],
       \big(
         \bigvee_{\mathsf{n}[\vec j] \in t}
           \exists \vec j_b, \vec j = \vec {j_0}
@@ -241,25 +241,31 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
 
 \newcommand{\eufcma}{\textsc{EUF-CMA}}
 \begin{proposition}
-Let $P$ be a protocol.  In any computational model where $h$ is interpreted as a $\eufcma$ keyed hash-function, the following rule is valid for all term $t,m$ and name $sk$ such that all ocurences of $sk$ in $t$ or $P$ are of the form $h(\_,sk)$:
-  \begin{mathpar}
+  Let $\calp = (\calp_{\sfa}, \le)$ be a protocol.  In any computational model where $h$ is interpreted as a $\eufcma$ keyed hash-function, the following rule is valid for all term $t,m$ and name $sk$ such that all ocurences of $sk$ in $t$ or $\calp$ are of the form $h(\_,sk)$:
+  \begin{gather*}
     \inferrule{
-      (\Gamma,
-      \big(\bigvee_{h(x,sk) \in t} m=x \big)
+      \textstyle
+      \Gamma,
+      \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash \phi
     }{
-      (\Gamma, t=h(m,sk) \vdash \phi)
+      \Gamma, t=h(m,sk) \vdash \phi
     }
-  \end{mathpar}
-    \begin{mathpar}
+    \tag{if $t$ contains no macros}\\
     \inferrule{
-      (\Gamma,
-      \big(\bigvee_{A(\vec{i}) \in S} \bigvee_{h(x,sk) \in o_{A(\vec{i})} } m=x \wedge A(\vec{i}) \leq \tau\big)
-      ,\vdash \phi)
+      \textstyle
+      \Gamma,
+      \bigvee_{\sfa \in \calp_{\sfA}, \vec{i} \text{ fresh}}
+      \bigvee_{h(x,sk) \in o_{\sfa}[\pvec{i}] }
+      \big(
+      m=x \wedge \sfa(\vec{i}) < \tau\big)
+      \vdash \phi
     }{
-      (\Gamma, \minp@\tau=h(m,sk) \vdash \phi)
+      \Gamma, \minp@\tau=h(m,sk) \vdash \phi
     }
-    \end{mathpar}
-  \end{proposition}
+    \tag{macros case}
+  \end{gather*}
+\end{proposition}
+
 \subsection{Trace axioms}
 
 We now identify some valid formulas, which can thus be used as axioms
