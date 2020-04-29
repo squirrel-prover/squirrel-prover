@@ -12,63 +12,104 @@ symbols $\F$ and a set of name symbols $\N$.
 Additionally, we will use channel names from a set of constants $\C$ (known to the attacker),
 as well as indexed memory cell symbols from $\States$.
 
-\begin{definition} \label{def:action} \label{def:proto}
-  A protocol is a finite set of action symbols $\Act$.
-  A \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$
-  is the application of an action symbol $\sfa \in \Act_k$
-  to $k$ indices.
-  We assume a partial order on symbolic actions,
-  noted $\beta \leq \alpha$, expressing that $\alpha$ depends on $\beta$ (i.e.\ $\alpha$ must occurs before $\beta$). We require that $\leq$ is stable by substitution\footnote{
-    For any symbolic actions $A$, $A'$ and index substitution $\theta : \I \to \I$,
-    $A \leq A'$ implies $A\theta \leq A'\theta$.
-  }.
-  Finally, each action $\sfa \in \Act_k$ must come with
-  a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$
-  with distinct indices,
-  and the following elements describing its semantics:
+% \begin{definition} \label{def:action} \label{def:proto}
+%   A protocol is a finite set of action symbols $\Act$.
+%   A \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$
+%   is the application of an action symbol $\sfa \in \Act_k$
+%   to $k$ indices.
+%   We assume a partial order on symbolic actions,
+%   noted $\beta \leq \alpha$, expressing that $\alpha$ depends on $\beta$ (i.e.\ $\alpha$ must occurs before $\beta$). We require that $\leq$ is stable by substitution\footnote{
+%     For any symbolic actions $A$, $A'$ and index substitution $\theta : \I \to \I$,
+%     $A \leq A'$ implies $A\theta \leq A'\theta$.
+%   }.
+%   Finally, each action $\sfa \in \Act_k$ must come with
+%   a representative symbolic action $\alpha = \sfa(i_1,\ldots,i_k)$
+%   with distinct indices,
+%   and the following elements describing its semantics:
+%   \begin{itemize}
+%     \item a meta-logic formula $\phi_{\alpha}$
+%       (the execution condition of this action);
+%     \item a meta-logic term $o_{\alpha}$
+%       (the output of this action);
+%     \item for each memory cell symbol $s \in \States$ of index arity $p$,
+%       a meta-logic term $u_{\alpha}^{s[j_1,\ldots,j_p]}$
+%       for some index variables $j_1,\ldots,j_p$
+%       that are distinct and disjoint from $\vec{i}$
+%       (this term describes how the action updates the memory
+%       cell, depending on the indices $\vec{i}$ and $\vec{j}$);
+%     \item two channel names $\cin_\alpha$ and $\cout_\alpha$
+%       (the input and output channels of this action).
+%   \end{itemize}
+%   We require that
+%   $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ do not contain any
+%   timestamp term (and thus, no macro term) and require that
+%   free variables occurring in these terms and formulas are
+%   of one of the following forms:
+%   \begin{itemize}
+%     \item $x_{\sfa'(i'_1,\ldots,i'_l)}$
+%       with $\sfa'(i'_1,\ldots,i'_l)\leq \alpha$ or
+%     \item $x^{s[j_1,\ldots,j_p]}$
+%       for some $s \in \States_p$.
+%   \end{itemize}
+%   Intuitively, the action's behavior depends only on previous inputs of actions, and on the memory.
+%   \adrien{I think we also want to say that index variables are only $i_1,\dots,i_k$, plus the index variables of memory updates. We should probably use binders there.}
+% \end{definition}
+
+% \adrien{This looks more complicated than it is. I feel like this would be better if actions had index binders.}
+% The semantics of each action $\sfa$ is given via an arbitrary
+% choice of indices in $\alpha = \sfa(i_1,\ldots,i_k)$.
+% We then extended naturally this semantics to all symbolic actions,
+% rendering the choice of indices irrelevant:
+% for an arbitrary symbolic action $\alpha' =
+% \sfa(i'_1,\ldots,i'_k)$ we define
+% $o_{\alpha'} = o_\alpha\{i_n\mapsto i'_n\}_{1\leq n \leq k}$
+% and similarly for $\phi_{\alpha'}$;
+% further, if the update term of $\alpha$ for state $s$ is given
+% with indices $j'_1,\ldots,j'_p$ we extend it as follows:
+% $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
+%    u_\alpha^{s[j_1,\ldots,j_p]}\{i_n\mapsto i'_n\}_{1 \leq n \leq k}
+%                                 \{j_m\mapsto j'_m\}_{1 \leq m \leq p}.$$
+
+\begin{definition} \label{def:action}
+  A action is an element of the form:
+    % \begin{minipage}{.4\linewidth}
+    \[
+      \begin{aligned}
+        &\lefteqn{\textsf{action } \sfa(i_1, \dots, i_k) =}\\
+        &\quad&&\textsf{condition: } \phi\\
+        &     &&\textsf{input on: } \cin\\
+        &     &&\textsf{output: } o \textsf{ on } \cout\\
+        &     &&\textsf{update: for every $s_{|p} \in \States$}\\
+        &     &&\qquad s[j_1,\dots,j_p] \leftarrow u^{s}
+      \end{aligned}
+    \]
+    % \end{minipage}
+  where $\sfa$ is the name of the action, $(i_1,\ldots,i_k)$ are distinct indices, $\tau$ is an time-stamp variable and:
   \begin{itemize}
-    \item a meta-logic formula $\phi_{\alpha}$
-      (the execution condition of this action);
-    \item a meta-logic term $o_{\alpha}$
-      (the output of this action);
-    \item for each memory cell symbol $s \in \States$ of index arity $p$,
-      a meta-logic term $u_{\alpha}^{s[j_1,\ldots,j_p]}$
-      for some index variables $j_1,\ldots,j_p$
-      that are distinct and disjoint from $\vec{i}$
-      (this term describes how the action updates the memory
-      cell, depending on the indices $\vec{i}$ and $\vec{j}$);
-    \item two channel names $\cin_\alpha$ and $\cout_\alpha$
-      (the input and output channels of this action).
+  \item the meta-logic formula $\phi$ is the execution condition of the action, with $\fv{\phi} \subseteq \{i_1,\dots, i_k\}$. % and $\tfv{\phi} \subseteq \{\tau\}$.
+  \item the channel $\cin$ is the action's input channel
+  \item the meta-logic term $o$ is the the output of this action, on channel $\cout$, with $\fv{o} \subseteq \{i_1,\dots, i_k\}$. % and $\tfv{o} \subseteq \{\tau\}$.
+  \item for each memory cell symbol $s \in \States$ of index arity $p$, and distinct index variables $j_1,\ldots,j_p$ (disjoint from $i_1,\dots, i_k$), the memory update $s[j_1,\dots,j_p] \leftarrow u^{s}$, with $\fv{u^s} \subseteq \{i_1,\dots, i_k, j_1, \dots, j_p\}$. % and $\tfv{u^{s}} \subseteq \{\tau\}$.
   \end{itemize}
-  We require that
-  $\phi_{\alpha}$, $u_{\alpha}^{s}$ and $o_{\alpha}$ do not contain any
-  timestamp term (and thus, no macro term) and require that
-  free variables occurring in these terms and formulas are
-  of one of the following forms:
-  \begin{itemize}
-    \item $x_{\sfa'(i'_1,\ldots,i'_l)}$
-      with $\sfa'(i'_1,\ldots,i'_l)\leq \alpha$ or
-    \item $x^{s[j_1,\ldots,j_p]}$
-      for some $s \in \States_p$.
-  \end{itemize}
-  Intuitively, the action's behavior depends only on previous inputs of actions, and on the memory.
-  \adrien{I think we also want to say that index variables are only $i_1,\dots,i_k$, plus the index variables of memory updates. We should probably use binders there.}
+  % Furthermore, we require that $\tau$ is the only possible sub-term of $\phi$, $o$ and $\{u^{s} \mid s \in \States\}$ of sort $\timestamp$. Therefore, all macros are taken at time $\tau$.
+  We let $\Act$ be the set of actions, and $\Act_k$ be the set of actions with exactly $k$ indices. We assume that all actions have disjoint names, so that we can refer to an action by its name $\sfa$. Given an action $\sfa$, we let $\phi_\sfa$, $o_\sfa$ and $\{s[j_1,\dots, j_p] \leftarrow u_\sfa^{s} \mid s \in \States_{p}\}$ denote the meta-logic terms and state update in the definition above. 
+  Finally, we use the following short representation for an action:
+  \[
+    \sfa(i_1,\dots,i_k).(\phi, \cin, o, \cout,
+    \{s[j_1,\dots, j_p] \leftarrow u^{s} \mid s \in \States_{p}\})
+  \]
 \end{definition}
 
-\adrien{This looks more complicated than it is. I feel like this would be better if actions had index binders.}
-The semantics of each action $\sfa$ is given via an arbitrary
-choice of indices in $\alpha = \sfa(i_1,\ldots,i_k)$.
-We then extended naturally this semantics to all symbolic actions,
-rendering the choice of indices irrelevant:
-for an arbitrary symbolic action $\alpha' =
-\sfa(i'_1,\ldots,i'_k)$ we define
-$o_{\alpha'} = o_\alpha\{i_n\mapsto i'_n\}_{1\leq n \leq k}$
-and similarly for $\phi_{\alpha'}$;
-further, if the update term of $\alpha$ for state $s$ is given
-with indices $j'_1,\ldots,j'_p$ we extend it as follows:
-$$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
-   u_\alpha^{s[j_1,\ldots,j_p]}\{i_n\mapsto i'_n\}_{1 \leq n \leq k}
-                                \{j_m\mapsto j'_m\}_{1 \leq m \leq p}.$$
+\begin{definition} \label{def:proto}
+  A protocol $\calp = (\calp_\sfA, \leq)$ is a finite set of action $\calp_\sfA \subseteq \Act$, equiped with a partial order $\leq$ on action names in $\calp_\sfA$, where $\sfa \leq \sfa'$ states that $\sfa'$ must occurs before $\sfa$. % We lift $\leq$ to symbolic actions built upon $\calp_{\sfA}$, by comparing action names.
+  We require that every action in $\calp_\sfA$ uses only actions that occur strictly before it, i.e.\ for every
+  \[
+     \sfa(i_1,\dots,i_k).(\phi, \cin, o, \cout,
+     \{s[j_1,\dots, j_p] \leftarrow u^{s} \mid s \in \States_{p}\})
+     \in \calp_{\sfA}
+  \]
+  for every $\sfa' \in \st(\phi, o, \{u^{s}\mid s\})$, $\sfa' \leq \sfa$.
+\end{definition}
 
 \begin{remark}
   Actions provide an explicit update for each memory cell. This
@@ -86,31 +127,31 @@ $$ u_{\alpha'}^{s[j'_1,\ldots,j'_p]} :=
 \end{remark}
 
 \begin{definition}
-  A \emph{concrete action} is an instantiation of a \emph{symbolic action}
-  with integer variables for index variables. The partial order on symbolic
-  actions is lifted naturally to a partial order on concrete actions, denoted
-  in the same way.
+  Given a protocol $\calp = (\calp_\sfA, \leq)$, a \emph{symbolic action} $\alpha = \sfa(i_1,\ldots,i_k)$ is the application of an action name (corresponding to an action $\sfA \in \Act_k \cap \calp_\sfA$) to $k$ indices.
+\end{definition}
+
+\begin{definition}
+  Given a protocol $\calp = (\calp_\sfA, \leq)$, a \emph{concrete action} of $\calp$ is an instantiation of a \emph{symbolic action} of $\calp$ with integer variables for index variables. We lift the partial order $\leq$ to concrete actions, by comparing action names.
 \end{definition}
 
 \begin{definition}
   \label{def:trace}
-  Given a protocol $P$ according to \Cref{def:proto},
+  Given a protocol $\calp = (\calp_\sfA, \leq)$,
   an \emph{abstract trace}\footnote{
     It is abstract in the sense that we do not know if the trace
-    is executable.} is a sequence of concrete actions
+    is executable. \adrien{I believe people will be confused when you tell them that an abstract trace is a sequence of concrete actions. I think it should be called concrete trace.}} is a sequence of concrete actions
   $\alpha_1 \dots \alpha_n$
   in which no action occurs twice, and such that,
-  for all $1 \leq i \leq n$,
-  for all concrete actions $\beta$ such that $\beta \leq \alpha_i$,
+  for every $1 \leq i \leq n$,
+  for every concrete action $\beta$ such that $\beta \leq \alpha_i$,
   there exists $1 \leq j \leq i$ such that $\beta = \alpha_j$.
-  \adrien{Calling it abstract trace seems \emph{very} confusing to me. It should be called concrete trace. Then, if it is executable, just say \emph{executable concrete trace}.}
 \end{definition}
 
 \begin{remark}
   The structure that we have assumed on actions is restrictive and
   does not allow to model e.g.\ phases. It does not matter because we can
   impose other conditions on traces later on as axioms (similar to the
-  restrictions of Tamarin). \adrien{Why having an order on actions, and then restrict it further later? Why not do both at the same time?}
+  restrictions of Tamarin).
 \end{remark}
 
 \begin{remark}
@@ -141,6 +182,7 @@ $(o_{\alpha})^L$ and $(o_{\alpha})^R$ will denote their respective
 output messages.
 
 \subsection{Examples}
+\adrien{I will update the examples to fit the new syntax}
 
 We give here a few representative examples of (bi)protocols.
 
@@ -148,7 +190,7 @@ We give here a few representative examples of (bi)protocols.
   The process $!_i
   \ain{c,x};\aout{c,h(x,\key[i])};\ain{c,y};\aout{c,h(x,\key[i])}$
   is translated into a protocol with two action symbols $A$ and $B$,
-  a partial order generated by $A(j) \leq B(j)$, and the following
+  a partial order generated $A(j) \leq B(j)$, and the following
   semantics:
   \begin{itemize}
     \item $\alpha := A(i)$ with

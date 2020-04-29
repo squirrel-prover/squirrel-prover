@@ -4,7 +4,7 @@ We now define trace models, denoted $\TM$, which are the structures needed to
 give a meaning to indices and timestamps. More generally, a trace model
 also allows to translate any meta-logic formula $\phi$
 (over some meta-logic signature $\Sigma$)
-to a base logic $\phi^\TM$ (over some base logic signature $\Sigma^\TM$).
+to a base logic $\phi^\TM$ (over some base logic signature~$\Sigma^\TM$).
 
 \medskip
 
@@ -12,29 +12,27 @@ From now on, we assume a protocol $P$ providing some set of action
 symbols $\Act$, using function and name symbols from $\F$ and $\N$,
 as well as memory cell symbols from $\States$.
 We consider meta-logic terms and formulas over $\Sigma = (\F,\N,\Mac,\Act)$
-where $\Mac = \{ \minp, \mout, \mframe \} \cup \States$.
+where $\Mac = \{ \minp, \mout, \mframe \} \cup \States$. We require that $\Sigma$ contains the following function symbols, of index arity $0$:
+\begin{itemize}
+\item a function $\att_n$ of arity $n$ for every $n\in\mathbb{N}$, which models attacker computations. 
+\item a binary function symbol $\langle \cdot , \cdot \rangle$ for pairs;
+\item binary function symbols
+  $\stackrel{.}{\wedge}$, $\stackrel{.}{\vee}$ and
+  $\stackrel{.}{\Rightarrow}$ for boolean operations;
+\item a ternary function symbol $\mathsf{if}$;
+\item nullary function symbols $\mathsf{true}$ and $\mathsf{false}$.
+\end{itemize}
+We use the usual notations for boolean symbols (infix), $\mathsf{if}$ and for pairs (e.g.\ $\langle t_1,t_2 \rangle$).
 
 \begin{definition}
-  Given a finite set of integers $D$ we define the base logic
-  signature $\Sigma^D$ containing exactly:
+  Given a finite set of integers $D$, the base logic
+  signature $\Sigma^D$ is contains exactly:
   \begin{itemize}
     \item a name symbol $n_{e_1,\ldots,e_k}$ for every $n \in \N_k$
        and $e_1,\ldots,e_k \in D$;
     \item a function symbol $f_{e_1,\ldots,e_k}$ of arity $n$ for every
       $f \in \F_k^n$ and $e_1,\ldots,e_k \in D$;
-    \item a function $\att_n$ of arity $n$ for every $n\in\mathbb{N}$;
-    \item a binary function symbol $\langle \cdot , \cdot \rangle$;
-    \item binary function symbols
-      $\stackrel{.}{\wedge}$, $\stackrel{.}{\vee}$ and
-      $\stackrel{.}{\Rightarrow}$;
-    \item a ternary function symbol $\mathsf{if}$;
-    \item nullary function symbols $\mathsf{true}$ and $\mathsf{false}$.
   \end{itemize}
-  \adrien{Could we remove pairs, and, etc ... from here, and assume that they belong to the inial signature? This would be more compact. }
-  Function symbol $\att_n$ will be used to model attacker computations.
-  We will use the usual notations for boolean symbols and pairs,
-  and we will use the notation $\myif c \mythen t \myelse e$
-  for $\mathsf{if}(c,t,e)$ as for meta-logic terms.
 \end{definition}
 
 For example, if $f \in \F_1$ (resp. $k \in \N_1$) and we have two distinct
@@ -50,14 +48,15 @@ We define the structure which will allow us to interpret meta-logic
 terms and formulas.
 
 \begin{definition}
-  A trace model is given by:
+  Let $\calp = (\calp_\sfA, \leq)$ be a protocol. 
+  A $\calp$-trace model is given by:
   \begin{itemize}
     \item a finite index domain $\D_\I \subseteq \mathbb{N}$;
     \item a total ordering $\leq_\XT$ on
       $\D_\XT := \{ \tinit \} \uplus \{ a(\ov{n}) : a\in\Act_k, \ov{n}\in\D_\I^k
       \}$ which refines the dependency ordering $\leq$ on concrete actions such
-      that $\tinit$ is minimal, and such that its ordered sequence yields an
-      abstract trace of $P$;
+      that $\tinit$ is minimal, and such that the sequence of elements of $\D_\XT$ ordered by $\leq$ is an
+      abstract trace of $\calp$;
     \item mappings $\sigma_\I : \I \to D_\I$
       and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
       timestamp variables as elements of their respective domains;
@@ -189,6 +188,7 @@ such that $\alpha'_k = \alpha_k\{\vec{i}_k\mapsto\vec{e}_k\}$.
 
 We define the interpretation $\mcond^\TM$ from $\D_\XT$
 to base logic formulas, as follows:
+\adrien{We do not interpret as a base logic formula, as there are macros}
 \begin{eqnarray*}
   \mcond^\TM(\tinit) &=& \true \\
   \mcond^\TM(\alpha'_{k+1}) &=&
@@ -247,6 +247,7 @@ argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
           s[\vec{j}]@\alpha_{k+1}\}_s
         }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
 \end{array}\]
+\adrien{1) We cannot use $\minp$ in $o$? 2) There are still macros after interpreting $o$}
 
 Frames are defined as nested pairs, starting from $0$ and
 providing, for each action, the output of the action if it is executable,
