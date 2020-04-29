@@ -359,65 +359,73 @@ let fa_dup s sk fk =
   in
   sk [EquivSequent.set_biframe s biframe] fk
 
-let () =
-  T.register_general "fadup"
-    ~help:"Removes all terms that are duplicates, or context of duplicates. \
-           \n Usage: fadup."
-    (function
-       | [] -> pure_equiv (fa_dup)
-       | _ -> Tactics.hard_failure (Tactics.Failure "No parameter expected"))
+exception Not_FADUP_formula
+exception Not_FADUP_iter
 
-exception Fail_FADUP
-
-class iter_fadup ~(system:Action.system) exact tau leq_pred_tau = object (self)
+class iter_fadup ~(system:Action.system) exact tau = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
+
+  val mutable timestamps : Term.timestamp list = [Term.Pred tau]
+
+  method update_timestamps exact phi =
+    (* We retrieve all timestamps atoms occurring in [f].
+     * If [exact] is true, then [f] must be a conjunction of timestamp atoms,
+     * otherwise [f] can contain other subterms. *)
+    let rec get_timestamps_atoms f = match f with
+      | Atom (`Timestamp _) as at -> [at]
+      | And (f1,f2) -> (get_timestamps_atoms f1) @ (get_timestamps_atoms f2)
+      | _ -> if exact then raise Not_FADUP_iter else []
+    in
+    timestamps <-
+      List.fold_left
+        (fun acc at -> match at with
+          | Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+            if List.mem tau_2 acc
+            then tau_1::acc
+            else acc
+          | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+            if (List.mem (Term.Pred tau_2) acc || List.mem tau_2 acc)
+            then tau_1::acc
+            else acc
+          | _ -> raise Not_FADUP_iter)
+        timestamps
+        (get_timestamps_atoms phi)
 
   method visit_message t = match t with
     | Macro (ms,[],a)
-      when ((ms = Term.in_macro && a = tau) ||
-            (ms = Term.out_macro && (List.mem a leq_pred_tau))) -> ()
-    | Macro _ -> raise Fail_FADUP
-    | Name _ | Var _ -> raise Fail_FADUP
-    | Diff _ -> raise Fail_FADUP
+      when ((ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
+            (ms = Term.out_macro && List.mem a timestamps))
+      -> ()
     | ITE (Macro (ms,[],a), then_branch, _)
-      when (ms = Term.exec_macro && (List.mem a leq_pred_tau)) ->
-      super#visit_message then_branch
-    | ITE (a, b, c) -> raise Fail_FADUP
-    | Seq (a, b) -> raise Fail_FADUP
-    | Find (a, b, c, d) -> raise Fail_FADUP
+      when (ms = Term.exec_macro && (List.mem a timestamps))
+      -> super#visit_message then_branch
+    | Macro _ | Name _ | Var _ | Diff _ | ITE _ | Seq _ | Find _
+      -> raise Not_FADUP_iter
     | _ -> super#visit_message t
 
   method visit_formula (f:Term.formula) =
     match f with
-    | Diff(a, b) -> raise Fail_FADUP
-    | ForAll (vs,l) | Exists (vs,l) -> raise Fail_FADUP
     | Atom (`Index _) | Atom (`Timestamp _) -> ()
-    | Macro _ -> raise Fail_FADUP
+    | ForAll (_, Impl (phi_1,phi_2)) ->
+      (* [phi_1] must be a conjunction of timestamp atoms. *)
+      self#update_timestamps true phi_1 ;
+      super#visit_formula phi_2
+    | Exists (_, phi) ->
+      self#update_timestamps false phi ;
+      super#visit_formula phi
+    | Diff _ | Macro _ -> raise Not_FADUP_iter
     | _ -> super#visit_formula f
 
 end
 
-(* Get all tau' such that tau'<tau or tau'<=pred(tau) is in formula f *)
-let rec get_timestamps_leq_pred_tau f tau =
-  match f with
-  | Term.Atom (`Timestamp (`Leq,tau_1,tau_2))
-    when tau_2 = Term.Pred tau
-    -> [tau_1]
-  | Term.Atom (`Timestamp (`Lt,tau_1,tau_2))
-    when tau_2 = tau
-    -> [tau_1]
-  | Term.And (f1,f2) ->
-    (get_timestamps_leq_pred_tau f1 tau) @ (get_timestamps_leq_pred_tau f2 tau)
-  | _ -> [] (* ??? *)
-
-let myfadup i s =
+let fadup i s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
       let biframe_without_e = List.rev_append before after in
       let system = EquivSequent.get_system s in
       begin try
-        (* we expect that e is of the form exec@pred(tau) && phi_honest *)
-        let (tau,phi_honest) =
+        (* we expect that e is of the form exec@pred(tau) && phi *)
+        let (tau,phi) =
           match e with
           | EquivSequent.Formula (Term.And (f,g)) ->
             begin match f,g with
@@ -425,31 +433,18 @@ let myfadup i s =
               -> (tau,phi)
             | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
               -> (tau,phi)
-            | _ -> raise Fail_FADUP
+            | _ -> raise Not_FADUP_formula
             end
-          | _ -> raise Fail_FADUP
+          | _ -> raise Not_FADUP_formula
         in
         let frame_at_pred_tau =
           EquivSequent.Message (Term.Macro (Term.frame_macro,[],Term.Pred tau))
         in
         (* we first check that frame@pred(tau) is in the biframe *)
         if List.mem frame_at_pred_tau biframe_without_e then
-          (* we expect that phi_honest is of the form
-           * - forall vars, phi_tau => phi
-           * - exists vars, phi*)
-          let (phi_tau,phi) =
-            match phi_honest with
-            | Term.ForAll (vars, Term.Impl (f,g))
-            | Term.Not (Term.ForAll (vars, Term.Impl (f,g))) -> (f,g)
-            | Term.Exists (vars, f)
-            | Term.Not (Term.Exists (vars, f)) -> (f,f)
-            | _ -> raise Fail_FADUP
-          in
-          (* we search for timestamps that are <= pred(tau) in phi_tau *)
-          let leq_pred_tau = get_timestamps_leq_pred_tau phi_tau tau in
           (* we iterate over the formula phi to check if it contains only
            * allowed subterms *)
-          let iter = new iter_fadup ~system false tau leq_pred_tau in
+          let iter = new iter_fadup ~system false tau in
           List.iter iter#visit_formula [phi] ;
           (* on success, we keep only exec@pred(tau) *)
           let new_elem =
@@ -457,24 +452,35 @@ let myfadup i s =
               (Term.Macro (Term.exec_macro,[],Term.Pred tau))
           in
           [EquivSequent.set_biframe s (List.rev_append before (new_elem::after))]
-        else raise Fail_FADUP
+        else raise Not_FADUP_formula
       with
-      (* we keep the sequent unchanged if the rule does not apply *)
-      | Fail_FADUP -> [s]
+      | Not_FADUP_formula ->
+          Tactics.soft_failure (Tactics.Failure "can only apply the tactic on \
+          a formula of the form (exec@pred(tau) && phi) with frame@pred(tau)\
+          in the biframe")
+      | Not_FADUP_iter ->
+          Tactics.soft_failure (Tactics.Failure "the formula contains subterms \
+          that are not handled by the FADUP rule")
       end
   | exception Out_of_range ->
-      Tactics.soft_failure (Tactics.Failure "Out of range position")
+      Tactics.soft_failure (Tactics.Failure "out of range position")
 
 let () =
- T.register_general "myfadup"
-   ~help:"TODO. myfadup i."
+ T.register_general "fadup"
+   ~help:"When applied without argument, tries to remove all terms that are \
+          duplicates, or context of duplicates. \
+          \n When applied on a formula of the form (exec@pred(tau) && phi), \
+          with frame@pred(tau) in the biframe, tries to remove phi if it  \
+          contains only subterms allowed by the FA-DUP rule.\
+          \n Usages: fadup. fadup i."
    (function
-   | [Prover.Int i] ->
-       pure_equiv
-         (fun s sk fk -> match myfadup i s with
-            | subgoals -> sk subgoals fk
-            | exception (Tactics.Tactic_soft_failure e) -> fk e)
-   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+     | [] -> pure_equiv (fa_dup)
+     | [Prover.Int i] ->
+         pure_equiv
+           (fun s sk fk -> match fadup i s with
+              | subgoals -> sk subgoals fk
+              | exception (Tactics.Tactic_soft_failure e) -> fk e)
+     | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 (** Fresh *)
 

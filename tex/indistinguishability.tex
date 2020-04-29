@@ -357,61 +357,52 @@ We use the following notations:
   \inferrule[FA-DUP]{
     \inferrule{
       \Gamma \vdash u,
-      \mframe @ \pre(\tau),
-      \mexec @ \pre(\tau)
+      \mframe @ \pre(A(\vec i)),
+      \mexec @ \pre(A(\vec i))
     }{
       \Gamma \vdash u,
-      \mframe @ \pre(\tau),
-      \myif \mexec @ \pre(\tau) \mythen \phi_{h} \myelse \bot
+      \mframe @ \pre(A(\vec i)),
+      \myif \mexec @ \pre(A(\vec i)) \mythen \phi_{h} \myelse \bot
     }
   }{
     \Gamma \vdash u,
-    \mframe @ \pre(\tau),
-    \mexec @ \pre(\tau) \wedge \phi_{h}
+    \mframe @ \pre(A(\vec i)),
+    \mexec @ \pre(A(\vec i)) \wedge \phi_{h}
   }
   \end{mathpar}
-  This rule applies only if $\phi_{h}$ is of the form
-  $$\forall \tau_0, \tau_0 \leq \pre(\tau) \Rightarrow \phi(\tau_0,\tau)
-  \;\; \text{or} \;\;
-  \exists \tau_0, \tau_0 \leq \pre(\tau) \wedge \phi(\tau_0,\tau)$$
-  with $\phi(\tau_0,\tau)$ that contains only:
-  function symbols,
-  $\minp @ \tau$,
-  $\mout @ \tau'$ with $\tau' \leq \pre(\tau)$.
-  If $\phi(\tau_0,\tau)$ contains a term
-  $\myif \mexec @ \tau' \mythen [...] \myelse [...]$
-  with $\tau' \leq \pre(\tau)$
-  we can replace it by the then branch.
 
-  We ask that $\phi_h \in H_{\{\pre(\tau)\}}$ where, for any set of
+  We ask that $\phi_h \in H_{\{\pre(A(\vec i))\}}$ where, for any set of
   timestamps $T$, $H_T$ is the least set of formulas and messages
   closed under function application, boolean connectives, and the
   following rules:
   $$ \inferrule{
-    \tau' \in T
+    B(\vec j) \in T
     \quad
-    \phi \in H_{T\cup\{\tau\}}
+    \phi \in H_{T\cup\{C(\vec {k})\}}
   }{
-    (\forall \tau.~ \tau\leq \tau' \Rightarrow \phi) \in H_T
+    (\forall \vec k.~ C(\vec k)\leq B(\vec j) \Rightarrow \phi) \in H_T
   }
   \quad\quad
   \inferrule{
-    \tau' \in T
+    B(\vec j) \in T
     \quad
-    \phi \in H_{T\cup\{\tau\}}
+    \phi \in H_{T\cup\{C(\vec k)\}}
   }{
-    (\exists \tau.~ \tau\leq \tau' \wedge \phi) \in H_T
+    (\exists \vec k.~ C(\vec k)\leq B(\vec j) \wedge \phi) \in H_T
   }
   $$
-  $$\inferrule{\tau \in T}{
-    \minp @ \tau \in H_T
+  $$\inferrule{B(\vec j) \in T}{
+    \minp @ B(\vec j) \in H_T
   }\quad\quad
-  \inferrule{\tau \in T}{
-    \mout @ \tau \in H_T
+  \inferrule{ }{
+    \minp @ A(\vec i) \in H_T
+  }\quad\quad
+  \inferrule{B(\vec j) \in T}{
+    \mout @ B(\vec j) \in H_T
   }$$
   $$
-  \inferrule{\phi \in H_T \quad \tau \in T}{
-    (\myif \mexec @ \tau \mythen \phi \myelse \psi) \in H_T}
+  \inferrule{\phi \in H_T \quad B(\vec j) \in T}{
+    (\myif \mexec @ B(\vec j) \mythen \phi \myelse \psi) \in H_T}
   $$
 \caption{FA-DUP rule.
 }

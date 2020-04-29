@@ -75,7 +75,7 @@ Proof.
   exists i,k1.
   exists i,k.
   exists i,k.
-  myfadup 0.
+  fadup 0.
 
 
   expand frame@R1(j); expand exec@R1(j);
@@ -94,7 +94,7 @@ Proof.
   euf M0.
   exists i,k.
   exists i,k.
-  myfadup 0.
+  fadup 0.
 
 
   expand frame@T(i,k); expand exec@T(i,k);
