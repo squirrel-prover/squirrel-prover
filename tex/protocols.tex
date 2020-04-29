@@ -104,12 +104,14 @@ as well as indexed memory cell symbols from $\States$.
   A protocol $\calp = (\calp_\sfA, \leq)$ is a finite set of action $\calp_\sfA \subseteq \Act$, equiped with a partial order $\leq$ on action names in $\calp_\sfA$, where $\sfa \leq \sfa'$ states that $\sfa'$ must occurs before $\sfa$. % We lift $\leq$ to symbolic actions built upon $\calp_{\sfA}$, by comparing action names.
   We require that every action in $\calp_\sfA$ uses only actions that occur strictly before it, i.e.\ for every
   \[
-     \sfa(i_1,\dots,i_k).(\phi, \cin, o, \cout,
-     \{s[j_1,\dots, j_p] \leftarrow u^{s} \mid s \in \States_{p}\})
-     \in \calp_{\sfA}
+    \sfa(i_1,\dots,i_k).(\phi, \cin, o, \cout,
+    \{s[j_1,\dots, j_p] \leftarrow u^{s} \mid s \in \States_{p}\})
+    \in \calp_{\sfA}
   \]
-  for every $\sfa' \in \st(\phi, o, \{u^{s}\mid s\})$, $\sfa' \leq \sfa$.
+  the only subterms of $\phi, o, \{u^{s}\mid s\}$ of sort $\timestamp$ are of the form: i) $\sfa'[\pvec{l}]$, where $\sfa' < \sfa$; ii) $\tpred(\sfa[i_1,\dots,i_k])$; or iii) $\sfa[i_1,\dots,i_k]$ if it occurs in the term $\minp@(\sfa[i_1,\dots,i_k])$.
 \end{definition}
+
+\adrien{I an not sure we use the channels in an action description. }
 
 \begin{remark}
   Actions provide an explicit update for each memory cell. This

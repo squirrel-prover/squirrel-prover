@@ -1,0 +1,146 @@
+
+\begin{figure}[t]
+  \begin{eqnarray*}
+    % Indices
+    \interp{i}^\TM &=& \sigma_\I(i)
+    \\
+    % Timestamps
+    \interp{\tau}^\TM &=& \sigma_\XT(\tau) \\
+    \interp{\tinit}^\TM &=& \tinit \\
+    \interp{\sfa(i_1,\ldots,i_k)}^\TM &=&
+      \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
+      \text{ for all }
+      \sfa\in\Act_k \text{ and } i_1,\ldots,i_k\in \I \\
+    \interp{\tpred{T}}^\TM &=&
+      \mathsf{pred}_\XT(\interp{T}^\TM)
+    \\
+    % Messages
+    (\mathsf{n}[i_1,\ldots,i_k])^\TM &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
+    \\
+    \interp{x}^\TM &=& x
+    \\
+    \interp{f[i_1,\ldots,i_k](t_1,\ldots,t_n)}^\TM &=&
+    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
+      (t_1)^\TM,\ldots,(t_n)^\TM
+    \bigr)
+    \\
+    \interp{m(i_1,\dots,i_k)@T}^\TM &=&
+    m^\TM(\interp{i_1}^\TM,\dots,\interp{i_k}^\TM,\interp{T}^\TM)
+    \\
+    \interp{\myif \phi \mythen t \myelse t'}^\TM &=&
+    \myif \interp{\phi}^\TM \mythen \interp{t}^\TM \myelse \interp{t'}^\TM
+    \\
+    \interp{\myfind \vec{i} \mysuchthat \phi \myin t \myelse t'}^\TM &=&
+    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_1\}}
+    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_1\}}
+    \myelse \\ & &
+    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
+    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
+    \myelse \\ & & \ldots \\ & &
+    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
+    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
+    \myelse \interp{t'}^\TM
+%     \\
+%     (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^\TM &=&
+%     \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
+%       (t_1)^\TM,\ldots,(t_n)^\TM,
+%       (T)^\TM)
+  \end{eqnarray*}
+  where $\vec{e}_1, \ldots, \vec{e}_{n}$ is a complete enumeration
+  of $\D_\I^{|\vec{i}|}$ (in lexicographic order).
+  \caption{Interpretation of % macro-free
+    terms of the meta-logic}
+  \label{fig:interpt}
+\end{figure}
+
+\begin{figure}[t]
+  \begin{eqnarray*}
+    (\phi\wedge\phi')^\TM &=& (\phi)^\TM \stackrel{.}{\wedge} (\phi')^\TM
+    \quad \text{and similarly for other boolean connectives} \\
+    (\forall i:\idx.~ \phi)^\TM &=&
+    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{\TM[i\mapsto e]} \\
+    (\exists i:\idx.~ \phi)^\TM &=&
+    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{\TM[i\mapsto e]} \\
+    (\forall \tau:\timestamp.~ \phi)^\TM &=&
+    \stackrel{.}{\wedge}_{v\in D_\XT} (\phi)^{\TM[\tau\mapsto v]} \\
+    (\exists \tau:\timestamp.~ \phi)^\TM &=&
+    \stackrel{.}{\vee}_{v\in D_\XT} (\phi)^{\TM[\tau\mapsto v]} \\
+    (i=i')^\TM &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right. \\
+    (T = T')^\TM &=&
+    \left\{\begin{array}{ll}
+      \mathsf{true} & \text{if } (T)^\TM = (T')^\TM \\
+      \mathsf{false} & \text{otherwise}
+    \end{array}\right.
+    \quad\text{ and similarly for $\leq$} \\
+    (t=t')^\TM &=& (t)^\TM \stackrel{.}{=} (t')^\TM
+  \end{eqnarray*}
+  \caption{Interpretation of % macro-free
+    formulas of the meta-logic}
+  \label{fig:interpf}
+\end{figure}
+
+\begin{figure}[t]
+  % For every action of the protocol:
+  % \[
+  %   \sfa(\vec{i}).(\phi, \cin, o, \cout,
+  %   \{s[\vec{j}] \leftarrow u^{s} \mid s \in \States\})
+  %   \in \calp_{\sfA}
+  % \]
+  % we define the interpretation of the macros, for any $\sfa[\pvec{e}]$ in the index domain of $\TM$:
+  \begin{alignat*}{2}
+    &\mcond^\TM(\tinit) &\;\;=\;\;& \true
+    \\
+    &\mcond^\TM(\sfa[\pvec{e}]) &\;\;=\;\;&
+    \interp{\phi_{\sfa}
+    }^{\TM\{\pvec{i} \mapsto \pvec{e}\}}
+    \\
+    &\mexec^\TM(\tinit) &\;\;=\;\;& \true
+    \\
+    &\mexec^\TM(\sfa[\pvec{e}]) &\;\;=\;\;&
+    \mcond^\TM(\sfa[\pvec{e}])
+    \stackrel{.}{\wedge}
+    \mexec^\TM(\tpred{\sfa[\pvec{e}]})
+    \\
+    &\minp^\TM(\tinit) &\;\;=\;\;& \mframe^\TM(\tinit) = s^\TM(\pvec{f},\tinit)
+    = \mout^\TM(\tinit) = 0
+    \tag{for every $\vec{f} \in D_\I^p$}
+    \\
+    &\mframe^\TM(\sfa[\pvec{e}]) &\;\;=\;\;&
+    \langle \mframe^\TM(\tpred{\sfa[\pvec{e}]}),
+    \myif \mexec^\TM(\sfa[\pvec{e}]) \mythen \mout^\TM(\sfa[\pvec{e}]) \myelse 0
+    \rangle
+    \\
+    &\minp^\TM(\sfa[\pvec{e}]) &\;\;=\;\;&
+    \att(\mframe^\TM(\tpred{\sfa[\pvec{e}]}))
+    \\
+    &\mout^\TM(\sfa[\pvec{e}]) &\;\;=\;\;&
+    \interp{
+      o_{\sfa}
+    }^{\TM\{\pvec{i}\mapsto\pvec{e}\}}
+    \\
+    &s^\TM(\pvec{f},\sfa[\pvec{e}]) &\;\;=\;\;&
+    \interp{
+      u_{\sfa}^{s}
+    }^{
+      \TM\{\pvec{i}\mapsto\pvec{e},\pvec{j}\mapsto\pvec{f}\}}
+    \tag{for every $\vec{f} \in D_\I^p$ and $s[\vec{j}] \leftarrow u^{s} \in \sfA$}
+  \end{alignat*}
+  \textbf{Where:} $\TM = (\D_\I, \D_\XT, \leq_\XT, \sigma_\I, \sigma_\XT)$, $\sfa[\pvec{e}] \in \D_\XT$, and
+  \(
+    \sfA = \sfa(\vec{i}).(\phi, \cin, o, \cout,
+    \{s[\vec{j}] \leftarrow u^{s} \mid s\})
+    \in \calp_{\sfA}
+  \)
+  \caption{Interpretation of macros.}
+  \label{fig:inter-macros}
+\end{figure}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

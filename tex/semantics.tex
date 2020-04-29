@@ -48,17 +48,19 @@ We define the structure which will allow us to interpret meta-logic
 terms and formulas.
 
 \begin{definition}
-  Let $\calp = (\calp_\sfA, \leq)$ be a protocol. 
-  A $\calp$-trace model is given by:
+  For every protocol $\calp = (\calp_\sfA, \leq)$, a $\calp$-trace model $\TM$ is a tuple
+  \(
+    (\D_\I, \D_\XT, \leq_\XT, \sigma_\I, \sigma_\XT)
+  \) such that:
   \begin{itemize}
-    \item a finite index domain $\D_\I \subseteq \mathbb{N}$;
-    \item a total ordering $\leq_\XT$ on
+    \item $\D_\I \subseteq \mathbb{N}$ is a finite index domain;
+    \item $\leq_\XT$ is a a total ordering on
       $\D_\XT := \{ \tinit \} \uplus \{ a(\ov{n}) : a\in\Act_k, \ov{n}\in\D_\I^k
       \}$ which refines the dependency ordering $\leq$ on concrete actions such
       that $\tinit$ is minimal, and such that the sequence of elements of $\D_\XT$ ordered by $\leq$ is an
       abstract trace of $\calp$;
-    \item mappings $\sigma_\I : \I \to D_\I$
-      and $\sigma_\XT : \XT \to D_\XT$ that interpret index and
+    \item $\sigma_\I : \I \to D_\I$
+      and $\sigma_\XT : \XT \to D_\XT$ are mappings that interpret index and
       timestamp variables as elements of their respective domains;
   \end{itemize}
 \end{definition}
@@ -80,96 +82,25 @@ $\TM\{\tau\mapsto v\}$ when $v$ is an element of the timestamp domain of $\TM$.
 
 \adrien{We should give an example in the introduction, and explain that we interpret $\exists$ and $\forall$ by, respectively, $\vee$ and $\wedge$}.
 
-We define next the interpretation of terms and formulas when they are
-macro-free, i.e.\ when terms contain no occurrence of $m[\vec{i}]@T$
-and formulas contain no occurrence of $m@T$. This will be used to
-define the interpretation of macros and, finally, of all terms
-and formulas.
+We define next the interpretation of terms and formulas. %  when they are
+% macro-free, i.e.\ when terms contain no occurrence of $m[\vec{i}]@T$
+% and formulas contain no occurrence of $m@T$. This will be used to
+% define the interpretation of macros and, finally, of all terms
+% and formulas.
 
 \begin{definition}
-  The interpretation of macro-free terms and formulas of the meta-logic in
+  The interpretation % of macro-free
+  terms and formulas of the meta-logic in
   some trace model $\TM$, noted $\interp{t}^\TM$ and $\interp{\phi}^\TM$
-  respectively, is given by the clauses of \cref{fig:interpt,fig:interpf}.
+  respectively, is given by the clauses of \cref{fig:interpt,fig:interpf,fig:inter-macros}.
 \end{definition}
 
-\begin{figure}[t]
-  \begin{eqnarray*}
-    % Indices
-    \interp{i}^\TM &=& \sigma_\I(i)
-    \\
-    % Timestamps
-    \interp{\tau}^\TM &=& \sigma_\XT(\tau) \\
-    \interp{\tinit}^\TM &=& \tinit \\
-    \interp{\sfa(i_1,\ldots,i_k)}^\TM &=&
-      \sfa(\sigma_\I(i_1),\ldots,\sigma_\I(i_k))
-      \text{ for all }
-      \sfa\in\Act_k \text{ and } i_1,\ldots,i_k\in \I \\
-    \interp{\tpred{T}}^\TM &=&
-      \mathsf{pred}_\XT(\interp{T}^\TM)
-    \\
-    % Messages
-    (\mathsf{n}[i_1,\ldots,i_k])^\TM &=& \mathsf{n}_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}
-    \\
-    (x)^\TM &=& x
-    \\
-    (f[i_1,\ldots,i_k](t_1,\ldots,t_n))^\TM &=&
-    f_{\sigma_\I(i_1),\ldots,\sigma_\I(i_k)}\bigl(
-      (t_1)^\TM,\ldots,(t_n)^\TM
-    \bigr)
-    \\
-    \interp{\myif \phi \mythen t \myelse t'}^\TM &=&
-    \myif \interp{\phi}^\TM \mythen \interp{t}^\TM \myelse \interp{t'}^\TM
-    \\
-    \interp{\myfind \vec{i} \mysuchthat \phi \myin t \myelse t'}^\TM &=&
-    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_1\}}
-    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_1\}}
-    \myelse \\ & &
-    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
-    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_2\}}
-    \myelse \\ & & \ldots \\ & &
-    \myif \interp{\phi}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
-    \mythen \interp{t}^{\TM\{\vec{i}\mapsto\vec{e}_{n}\}}
-    \myelse \interp{t'}^\TM
-%     \\
-%     (m[i_1,\ldots,i_k](t_1,\ldots,t_n)@T)^\TM &=&
-%     \hat{m}(\sigma_\I(i_1),\ldots,\sigma_\I(i_k),
-%       (t_1)^\TM,\ldots,(t_n)^\TM,
-%       (T)^\TM)
-  \end{eqnarray*}
-  where $\vec{e}_1, \ldots, \vec{e}_{n}$ is a complete enumeration
-  of $\D_\I^{|\vec{i}|}$ (in lexicographic order).
-  \caption{Interpretation of macro-free terms of the meta-logic}
-  \label{fig:interpt}
-\end{figure}
+Basically, frames are defined as nested pairs, starting from $0$ and
+providing, for each action, the output of the action if it is executable,
+and $0$ otherwise. The interpretation of input macros uses function symbols $\att$ to models the arbitrary attacker's computation based on the previous frame, which models its current knowledge. The definition of $s^\TM(\vec{f},\sfa[\pvec{e}])$ gives the content of memory cell $s[\vec{f}]$ just after the execution of $\sfa[\pvec{e}]$:
+it is obtained by interpreting the update term $u_{\sfa}^{s}$. The semantics of outputs is defined similarly. 
 
-\begin{figure}
-  \begin{eqnarray*}
-    (\phi\wedge\phi')^\TM &=& (\phi)^\TM \stackrel{.}{\wedge} (\phi')^\TM
-    \quad \text{and similarly for other boolean connectives} \\
-    (\forall i:\idx.~ \phi)^\TM &=&
-    \stackrel{.}{\wedge}_{e\in D_\I} (\phi)^{\TM[i\mapsto e]} \\
-    (\exists i:\idx.~ \phi)^\TM &=&
-    \stackrel{.}{\vee}_{e\in D_\I} (\phi)^{\TM[i\mapsto e]} \\
-    (\forall \tau:\timestamp.~ \phi)^\TM &=&
-    \stackrel{.}{\wedge}_{v\in D_\XT} (\phi)^{\TM[\tau\mapsto v]} \\
-    (\exists \tau:\timestamp.~ \phi)^\TM &=&
-    \stackrel{.}{\vee}_{v\in D_\XT} (\phi)^{\TM[\tau\mapsto v]} \\
-    (i=i')^\TM &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } \sigma_\I(i)=\sigma_\I(i') \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right. \\
-    (T = T')^\TM &=&
-    \left\{\begin{array}{ll}
-      \mathsf{true} & \text{if } (T)^\TM = (T')^\TM \\
-      \mathsf{false} & \text{otherwise}
-    \end{array}\right.
-    \quad\text{ and similarly for $\leq$} \\
-    (t=t')^\TM &=& (t)^\TM \stackrel{.}{=} (t')^\TM
-  \end{eqnarray*}
-  \caption{Interpretation of macro-free formulas of the meta-logic}
-  \label{fig:interpf}
-\end{figure}
+\input{figs-semantics}
 
 \begin{example}
   The formula
@@ -180,106 +111,114 @@ and formulas.
   whether $\sigma_\XT(\tau)$ and $\sfa(e)$ are equal.
 \end{example}
 
-\subsection{Macros}
-Let $(\alpha'_i)_{0 \leq i < |\D_\XT|}$ be the enumeration of the elements
-of $D_\XT$ w.r.t.\ $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
-For each $k$, let $\alpha_k$ be the representative symbolic action
-such that $\alpha'_k = \alpha_k\{\vec{i}_k\mapsto\vec{e}_k\}$.
+\begin{proposition}
+  For any protocol $\calp$ and $\calp$-trace model $\TM$, for any the interpretation $(\cdot)^\TM$ of terms and formulas of the meta-logic is well-defined.
+\end{proposition}
 
-We define the interpretation $\mcond^\TM$ from $\D_\XT$
-to base logic formulas, as follows:
-\adrien{We do not interpret as a base logic formula, as there are macros}
-\begin{eqnarray*}
-  \mcond^\TM(\tinit) &=& \true \\
-  \mcond^\TM(\alpha'_{k+1}) &=&
-    \interp{\phi_{\alpha_{k+1}}
-    \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
-    \{x^{s[\vec{j}]}\mapsto
-      s[\vec{j}]@\alpha_{k+1}\}_s
-    }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
-\end{eqnarray*}
-In other words, $\mcond^\TM(\alpha'_{k+1})$ is obtained by taking the
-(macro-free) condition $\phi_{\alpha_{k+1}}$ of the symbolic action, and
-interpreting it using $I$, mapping indices $\vec{i}_{k+1}$ to their
-desired concretization.
-The semantics $\mexec^\TM$ of the executability macro is then simply defined as
-the conjunction of consecutive conditions:
-\begin{eqnarray*}
-  \mexec^\TM(\tinit) &=& \true \\
-  \mexec^\TM(\alpha'_{k+1}) &=&
-    \mcond^\TM(\alpha'_{k+1})
-    \stackrel{.}{\wedge}
-    \mexec^\TM(\alpha'_k)
-\end{eqnarray*}
+\begin{proof}
+  We only need to prove that the inductive definition of $(\cdot)^\TM$ given in \cref{fig:interpt,fig:interpf,fig:inter-macros} terminates. All cases are trivial, as $(t)^\TM$ (resp.\ $(\phi)^\TM$) are defined using $(\cdot)^\TM$ on strict subterms of $t$ (resp.\ $\phi$), except for the macros case, where termination follows from the well-founded conditions on actions of a protocol.
+\end{proof}
 
-We then define, for each macro symbol $m\in\Mac_k$,
-its interpretation $m^\TM : D_\I^k \times \D_\XT \to T_\Sigma^{D_I}$.
-More precisely, we define $m^\TM(\ldots,v)$ by induction on its timestamp
-argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
-\[
-    \minp^\TM(\tinit) = \mframe^\TM(\tinit) = s^\TM(\vec{f},\tinit)
-    = \mout^\TM(\tinit) = 0\]
+% \subsection{Macros}
+% Let $(\alpha'_i)_{0 \leq i < |\D_\XT|}$ be the enumeration of the elements
+% of $D_\XT$ w.r.t.\ $\leq_\XT$ (in particular, $\alpha'_0 = \tinit$).
+% For each $k$, let $\alpha_k$ be the representative symbolic action
+% such that $\alpha'_k = \alpha_k\{\vec{i}_k\mapsto\vec{e}_k\}$.
 
+% We define the interpretation $\mcond^\TM$ from $\D_\XT$
+% to base logic formulas, as follows:
+% \adrien{We do not interpret as a base logic formula, as there are macros}
+% \begin{eqnarray*}
+%   \mcond^\TM(\tinit) &=& \true \\
+%   \mcond^\TM(\alpha'_{k+1}) &=&
+%     \interp{\phi_{\alpha_{k+1}}
+%     \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
+%     \{x^{s[\vec{j}]}\mapsto
+%       s[\vec{j}]@\alpha_{k+1}\}_s
+%     }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
+% \end{eqnarray*}
+% In other words, $\mcond^\TM(\alpha'_{k+1})$ is obtained by taking the
+% (macro-free) condition $\phi_{\alpha_{k+1}}$ of the symbolic action, and
+% interpreting it using $I$, mapping indices $\vec{i}_{k+1}$ to their
+% desired concretization.
+% The semantics $\mexec^\TM$ of the executability macro is then simply defined as
+% the conjunction of consecutive conditions:
+% \begin{eqnarray*}
+%   \mexec^\TM(\tinit) &=& \true \\
+%   \mexec^\TM(\alpha'_{k+1}) &=&
+%     \mcond^\TM(\alpha'_{k+1})
+%     \stackrel{.}{\wedge}
+%     \mexec^\TM(\alpha'_k)
+% \end{eqnarray*}
 
-\[\begin{array}{rll}
-    \mframe^\TM(\alpha'_{k+1}) &=&
-    \langle \mframe^\TM(\alpha'_k),
-    \myif \mexec^\TM(\alpha'_{k+1}) \mythen \mout^\TM(\alpha'_{k+1}) \myelse 0
-    \rangle
-    \\
-    \minp^\TM(\alpha'_{k+1}) &=&
-    \att_{k}(\mframe^\TM(\alpha'_k))
-  \\
-    s^\TM(\vec{f},\alpha'_{k+1}) &=&
-    \interp{
-      u_{\alpha_{k+1}}^{s[\vec{j}]}
-      \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
-      \{x^{s[\vec{j}]}\mapsto
-        s[\vec{j}]@\alpha_{k+1}\}_s
-    }^{
-      I\{\vec{i}_k\mapsto\vec{e}_k,\vec{j}\mapsto\vec{f}\}}
-  \\
-    \mout^\TM(\alpha'_{k+1}) &=&
-      \interp{
-        o_{\alpha_{k+1}}
-        \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
-        \{x^{s[\vec{j}]}\mapsto
-          s[\vec{j}]@\alpha_{k+1}\}_s
-        }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
-\end{array}\]
-\adrien{1) We cannot use $\minp$ in $o$? 2) There are still macros after interpreting $o$}
-
-Frames are defined as nested pairs, starting from $0$ and
-providing, for each action, the output of the action if it is executable,
-and $0$ otherwise. The interpretation of input macros uses function symbols $\att_i$ to model the arbitrary attacker's
-computation based on the previous frame, which models its current knowledge.
-
-The definition of $s^\TM(\vec{f},\alpha'_{k+1})$ gives the content of memory
-cell $s[\vec{f}]$ just after the execution of $\alpha'_{k+1}$:
-it is obtained by interpreting the update term $u_{\alpha_{k+1}}^{s[\vec{j}]}$
-of the associated symbolic action $\alpha_{k+1}$ mapping $\vec{i}$
-and $\vec{j}$ to their expected concretizations.
-
-The semantics of outputs is defined similarly.
-
-Since meta-logic terms and formulas $o_{\alpha}$, $u_{\alpha}$ and
-$\phi_{\alpha}$ may include occurrences of message variables
-$x_\beta$ and $x^{s[\vec{j}]}$,
-we use a term-level substitution for these variables.
+% We then define, for each macro symbol $m\in\Mac_k$,
+% its interpretation $m^\TM : D_\I^k \times \D_\XT \to T_\Sigma^{D_I}$.
+% More precisely, we define $m^\TM(\ldots,v)$ by induction on its timestamp
+% argument $v$ as follows, for all $s \in \States_p$ and $\vec{f} \in D_\I^p$:
+% \[
+%     \minp^\TM(\tinit) = \mframe^\TM(\tinit) = s^\TM(\vec{f},\tinit)
+%     = \mout^\TM(\tinit) = 0\]
 
 
+% \[\begin{array}{rll}
+%     \mframe^\TM(\alpha'_{k+1}) &=&
+%     \langle \mframe^\TM(\alpha'_k),
+%     \myif \mexec^\TM(\alpha'_{k+1}) \mythen \mout^\TM(\alpha'_{k+1}) \myelse 0
+%     \rangle
+%     \\
+%     \minp^\TM(\alpha'_{k+1}) &=&
+%     \att_{k}(\mframe^\TM(\alpha'_k))
+%   \\
+%     s^\TM(\vec{f},\alpha'_{k+1}) &=&
+%     \interp{
+%       u_{\alpha_{k+1}}^{s[\vec{j}]}
+%       \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
+%       \{x^{s[\vec{j}]}\mapsto
+%         s[\vec{j}]@\alpha_{k+1}\}_s
+%     }^{
+%       I\{\vec{i}_k\mapsto\vec{e}_k,\vec{j}\mapsto\vec{f}\}}
+%   \\
+%     \mout^\TM(\alpha'_{k+1}) &=&
+%       \interp{
+%         o_{\alpha_{k+1}}
+%         \{x_\beta\mapsto\mout@\beta\}_{\beta\leq \alpha_{k+1}}
+%         \{x^{s[\vec{j}]}\mapsto
+%           s[\vec{j}]@\alpha_{k+1}\}_s
+%         }^{I\{\vec{i}_{k+1}\mapsto\vec{e}_{k+1}\}}
+% \end{array}\]
+% \adrien{1) We cannot use $\minp$ in $o$? 2) There are still macros after interpreting $o$}
 
-    For the other macros, the interpretation at some concrete
-    action $\alpha'_i$ is obtained from the symbolic semantics of
-    $\alpha_i$ by applying the relevant substitutions (directly
-    on terms of the meta-logic when possible\footnote{
-      \david{What I wrote implicitly assumes that there is no dependency
-      such as e.g.\ $b(i,j) \leq a(i)$ where the dependency introduces
-      a new index.}
-    }, otherwise by updating the trace model).
+% Frames are defined as nested pairs, starting from $0$ and
+% providing, for each action, the output of the action if it is executable,
+% and $0$ otherwise. The interpretation of input macros uses function symbols $\att_i$ to model the arbitrary attacker's
+% computation based on the previous frame, which models its current knowledge.
 
-Given for all macros $m \in \Mac_k$ the corresponding interpretation function $m^\TM$, we lift the interpretation of macro-free terms and formulas to terms and formulas with:
-    \[ \interp{m(i_1,\dots,i_k)@T}^\TM = m^\TM(\interp{i_1}^\TM,\dots,\interp{i_k}^\TM,\interp{T}^\TM) \]
+% The definition of $s^\TM(\vec{f},\alpha'_{k+1})$ gives the content of memory
+% cell $s[\vec{f}]$ just after the execution of $\alpha'_{k+1}$:
+% it is obtained by interpreting the update term $u_{\alpha_{k+1}}^{s[\vec{j}]}$
+% of the associated symbolic action $\alpha_{k+1}$ mapping $\vec{i}$
+% and $\vec{j}$ to their expected concretizations.
+
+% The semantics of outputs is defined similarly.
+
+% Since meta-logic terms and formulas $o_{\alpha}$, $u_{\alpha}$ and
+% $\phi_{\alpha}$ may include occurrences of message variables
+% $x_\beta$ and $x^{s[\vec{j}]}$,
+% we use a term-level substitution for these variables.
+
+
+
+    % For the other macros, the interpretation at some concrete
+    % action $\alpha'_i$ is obtained from the symbolic semantics of
+    % $\alpha_i$ by applying the relevant substitutions (directly
+    % on terms of the meta-logic when possible\footnote{
+    %   \david{What I wrote implicitly assumes that there is no dependency
+    %   such as e.g.\ $b(i,j) \leq a(i)$ where the dependency introduces
+    %   a new index.}
+    % }, otherwise by updating the trace model).
+
+% Given for all macros $m \in \Mac_k$ the corresponding interpretation function $m^\TM$, we lift the interpretation of macro-free terms and formulas to terms and formulas with:
+%     \[ \interp{m(i_1,\dots,i_k)@T}^\TM = m^\TM(\interp{i_1}^\TM,\dots,\interp{i_k}^\TM,\interp{T}^\TM) \]
 
 
 
