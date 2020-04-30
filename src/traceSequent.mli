@@ -96,8 +96,15 @@ val find_formula_hypothesis :
 (** Find the first formula satisfying a predicate,
   * return it together with the sequent from which the formula
   * has been removed. *)
+
 val remove_formula_hypothesis :
   (formula -> bool) -> sequent -> formula * sequent
+
+val remove_trace_hypothesis :
+  (Atom.trace_atom -> bool) -> sequent -> Atom.trace_atom * sequent
+
+val remove_message_hypothesis :
+  (Atom.message_atom -> bool) -> sequent -> Atom.message_atom * sequent
 
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to all hypotheses. It also set to visible = false, when the

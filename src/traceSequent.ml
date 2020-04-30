@@ -311,6 +311,16 @@ let remove_formula_hypothesis pred s =
   let hypo,hs = H.remove_such_that s.formula_hypotheses pred in
     hypo.H.hypothesis, { s with formula_hypotheses = hs }
 
+let remove_trace_hypothesis pred s =
+  let pred h = pred h.H.hypothesis in
+  let hypo,hs = H.remove_such_that s.trace_hypotheses pred in
+    hypo.H.hypothesis, { s with trace_hypotheses = hs }
+
+let remove_message_hypothesis pred s =
+  let pred h = pred h.H.hypothesis in
+  let hypo,hs = H.remove_such_that s.message_hypotheses pred in
+    hypo.H.hypothesis, { s with message_hypotheses = hs }
+
 let add_trace_hypothesis ?(prefix="T") s tf =
   { s with
     trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;

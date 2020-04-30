@@ -20,8 +20,8 @@ goal unforgeable_1 :
   b <> a && c=a=>
   output@A(b) <> h(na(c),k).
 
- Proof.
- simpl.
+Proof.
+ nosimpl(intros).
  substitute a, b.
  collision.
 Qed.

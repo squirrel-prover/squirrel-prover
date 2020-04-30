@@ -834,7 +834,46 @@ let substitute v1 v2 s =
             Tactics.soft_failure Tactics.NotEqualArguments
         | exception _ -> Tactics.(soft_failure (Failure "cannot convert"))
   in
+  let s =
+    match subst with
+      | Term.ESubst (Term.Var v, t) :: _ when
+        not (List.mem (Vars.EVar v) (Term.get_vars t)) ->
+          TraceSequent.set_env (Vars.rm_var (TraceSequent.get_env s) v) s
+      | _ -> s
+  in
   [TraceSequent.apply_subst subst s]
+
+let autosubst s =
+  let eq,s =
+    try
+      TraceSequent.remove_trace_hypothesis
+        (function
+           | `Timestamp (`Eq, Term.Var x, Term.Var y) when x <> y -> true
+           | `Index (`Eq, x, y) when x <> y -> true
+           | _ -> false)
+        s
+    with
+      | Not_found -> Tactics.(soft_failure (Failure "no equality found"))
+  in
+  let process : type a. a Vars.var -> a Vars.var -> TraceSequent.t =
+    fun x y ->
+      let x,y =
+        if x.Vars.name_suffix <= y.Vars.name_suffix then y,x else x,y
+      in
+      let s =
+        TraceSequent.set_env (Vars.rm_var (TraceSequent.get_env s) x) s
+      in
+        TraceSequent.apply_subst [Term.ESubst (Term.Var x, Term.Var y)] s
+  in
+    match eq with
+      | `Timestamp (`Eq, Term.Var x, Term.Var y) -> process x y
+      | `Index (`Eq, x, y) -> process x y
+      | _ -> assert false
+
+let autosubst s sk fk =
+  match autosubst s with
+    | subgoal -> sk [subgoal] fk
+    | exception Tactics.Tactic_soft_failure e -> fk e
 
 let () =
   T.register_general "substitute"
@@ -847,6 +886,7 @@ let () =
              | subgoals -> sk subgoals fk
              | exception Tactics.Tactic_soft_failure e -> fk e
            end
+       | [] -> autosubst
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 
@@ -1317,6 +1357,7 @@ let () =
       try_tac assumption ;
       repeat goal_intro ;
       repeat simpl_left ;
+      repeat autosubst ;
       eq_names ;
       eq_trace
     ]
