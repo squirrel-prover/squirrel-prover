@@ -59,10 +59,99 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   The sequent $\Gamma \vdash \phi$ is valid if $\Gamma \models \phi$.
 \end{definition}
 
+
+\paragraph{Base Logic Subterms of all Instantiations of a Meta-Term}
+We recall the base logic \textsc{euf-cma} rule from~\cite{DBLP:conf/eurosp/Koutsos19}. Before starting, we introduce a notation we use to give syntax side-conditions of rules.
+\begin{definition}
+  \label{def:occ-sc}
+  Let $C$ be a base logic many-holed context with one distinguished hole variable $\cdot$ that occurs exactly once in $C$. Let $u$ be a \textbf{ground} base logic term. For every term $s$, we let $s \tpos_{C} u$ holds whenever $s$ appears in $u$ only in subterms of the form $C[\pvec{w},s]$.
+  % \[
+  %   \forall p \in \pos(u), u_{|p} = s \ra
+  %   \exists \pvec{w},
+  %   \exists q \in \pos(u) \text{ s.t. }
+  %   q \le p \wedge
+  %   u_{|q} \equiv C[\pvec{w},s]
+  % \]
+\end{definition}
+
+\begin{example}
+  We give two examples:
+  \begin{itemize}
+  \item $\mathsf{n} \tpos_{\mypk(\cdot)} u$ states that the name $\mathsf{n}$ appears only in terms of the form $\mypk(\mathsf{n})$ in $u$.
+  \item $\mysk(\mathsf{n}) \tpos_{\mydec(\_,\cdot)} u$ states that the secret key $\mysk(\mathsf{n})$ appears only in decryption position in $u$.
+  \end{itemize}
+\end{example}
+
+We can now give the rule:
+\begin{definition}
+  For any ground base terms $s,u,m$ and name $sk$, we let \textsc{euf-cma} be the rule:
+  \[
+    \begin{gathered}[c]
+      \inferrule% [\textsc{euf-cma}]
+      {~}{
+        s \deq h(m,sk) \dimpl
+        \bigvee_{u \in S} s \deq u
+      }
+    \end{gathered}
+    \quad\text{ when }
+    \begin{cases}
+      sk \tpos_{h(\_,\cdot)} s,m\\
+      S = \{u \mid h(u,sk) \in \st(s,m)\}
+    \end{cases}
+  \]
+\end{definition}
+
+To lift the above rule to the meta-logic, we first lift the occurence side-condition $\tpos_{h(\_,\cdot)}$ of \cref{def:occ-sc} to terms of the meta-logic:
+
+\begin{definition}
+  \label{def:occ-sc-meta}
+  Let $\calp$ be a protocol, $C$ be a macros-free context, and $u$ a term of the meta-logic with \textbf{no message variables}. For every term $s$, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
+  % Let $\calp$ be a protocol, and $C$ be a macros-free many-holed context with one distinguished hole variable $\cdot$ that occurs exactly once in $C$. Let $u$ be a term of the meta-logic with \textbf{no message variables}. For every macros-free term $s$ of the meta-logic, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
+\end{definition}
+
+The base-logic side-condition $\tpos_{C}$ is fully syntactic, and can easily be implemented. This is no longer the case with $s \tpos^{\calp}_{C} u$, as it requires to check a property on all occurrences of $s$ in all interpretations $u$, in any $\calp$-trace model. Therefore, instead of checking directly whether $s \tpos^{\calp}_{C} u$, we are going to check the property on the direct occurrences of $s$ in $u$ (i.e.\ $s \tpos_{C} u$), and on the occurrences of $s$ in any action of the protocol. The idea is that this must over-approximate all occurrences of $s$ in any interpretation of $u$ in a $\calp$-trace model $\TM$. Actually, this is not true for any context $C$, because $C$ can be matched in $\interp{u}^\TM$ accross several macros unrolling. But this is true for well-behaved context $C$. 
+
+\begin{definition}
+  Let $\calp$ be a protocol. A context $C$ is $\calp$-well behaved if:
+  \begin{itemize}
+  \item $C$ has no subterms of sort $\idx$ or $\timestamp$;
+  \item $C$ does not contain the function symbols $0$, $\true$, $\dand$, $\mathsf{if}$, $\att(\_)$ or $\langle \_,\_\rangle$;
+  \item the function symbols appearing in $C$ (except for $C$ head symbol) do not appear in head position of any of the terms in $\{\phi_a,o_a,u^s_a \mid a \in \calp_{\sfA}, s \in\States\}$;
+  \end{itemize}
+\end{definition}
+
+\begin{definition}
+  Let $\calp$ be a protocol, and $C$ a $\calp$-well behaved context. For every $s$, we let $s \tpos_{C} \calp$ hold whenever $s \tpos_{C} \{\phi_a,o_a,u^s_a \mid a \in \calp_{\sfA}, s \in\States\}$.
+\end{definition}
+
+The following proposition gives a sufficient condition to check $s \tpos^{\calp}_{C} u$ for a $\calp$-well behaved context $C$.
+
+\begin{proposition}
+  Let $\calp$ be a protocol, and $C$ a $\calp$-well behaved context. Then for every $s,u$, if $s \tpos_{C} u$ and $s \tpos_{C} \calp_{\sfA}$ then $s \tpos^{\calp}_{C} u$.
+\end{proposition}
+
+\begin{proof}
+  \adrien{If we keep the proposition, I will do the proof. }
+\end{proof}
+
+\begin{remark}
+  This is not a necessary condition. For example, take a protocol $\calp = (\calp_\sfA,\le)$ that never leaks a key $sk$, except for some action $a$. Because of $a$, we do not have $sk \tpos_{\cdot} \calp$. But if the term $u$ uses only actions that must occur before $a$ (w.r.t. $\le$), then $sk \tpos^\calp_{\cdot} u$. In practice, we never had this problem, and the approximation above was always sufficient. If necessary, it can be made finer by considering only actions that can occur before $u$.
+\end{remark}
+
+Then, we need to characterize the set of all occurences of a term in a meta-logic term.
+
+\adrien{TODO}
+
+
+\paragraph{Sequent Calculus}
+We can now give the rules of our meta-logic sequent calculus, and prove their soundness.
 \begin{proposition}
   The rules of \cref{fig:lk,fig:names} are sound: if the premisses are valid,
   then so is the conclusion.
 \end{proposition}
+
+% TO BE REMOVED
+\clearpage
 
 \begin{figure}
   \begin{mathpar}
