@@ -18,9 +18,8 @@ goal test :
 Proof.
  nosimpl(intros).
  nosimpl(fresh M0).
- nosimpl(case H0).
- nosimpl(existsleft H0 ; constraints).
- nosimpl(existsleft H0 ; constraints).
- nosimpl(existsleft H0 ; constraints).
- nosimpl(existsleft H0 ; constraints).
+ nosimpl(constraints).
+ nosimpl(constraints).
+ nosimpl(constraints).
+ nosimpl(constraints).
 Qed.

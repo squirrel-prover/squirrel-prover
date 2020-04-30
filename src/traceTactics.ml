@@ -66,12 +66,17 @@ let () =
            \n Usage: split."
     goal_and_right
 
-(** Compute the goal resulting from the addition of a list of
+(** Compute the goals resulting from the addition of a list of
   * formulas as hypotheses,
-  * followed by the left intro of existentials and conjunctions. *)
-let rec left_introductions s = function
+  * followed by the left intro of existentials, conjunctions
+  * and disjunctions (if branching flag is set). *)
+let left_introductions ~branching s l =
+  let rec left_introductions s = function
   | (Term.And (f,g),prefix) :: l -> left_introductions s
                                       ((f,prefix)::(g,prefix)::l)
+  | (Term.Or (f,g),prefix) :: l when branching ->
+      left_introductions s ((f,prefix)::l) @
+      left_introductions s ((g,prefix)::l)
   | (Term.Exists (vars,f),prefix) :: l ->
       let env = TraceSequent.get_env s in
       let subst,env =
@@ -91,7 +96,15 @@ let rec left_introductions s = function
                       (TraceSequent.add_formula f s) l
   | (f, prefix) :: l -> left_introductions
                           (TraceSequent.add_formula ~prefix f s) l
-  | [] -> s
+  | [] -> [s]
+  in left_introductions s l
+
+let all_left_introductions s l = left_introductions ~branching:true s l
+
+let left_introductions s l =
+  match left_introductions ~branching:false s l with
+    | [s] -> s
+    | _ -> assert false
 
 let left_intros hyp_name s sk fk =
   match TraceSequent.select_formula_hypothesis hyp_name s ~remove:true with
@@ -776,7 +789,7 @@ let fresh th s =
         let phi_direct = mk_fresh_direct system env n is t in
         let phi_indirect = mk_fresh_indirect system env n is t in
         let new_hyp = Term.mk_or phi_direct phi_indirect in
-        [TraceSequent.add_formula new_hyp s]
+        all_left_introductions s [new_hyp,""]
       | _ -> Tactics.soft_failure
               (Tactics.Failure "can only be applied on message hypothesis")
       end

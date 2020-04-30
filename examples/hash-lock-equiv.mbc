@@ -61,14 +61,12 @@ euf M0.
 exists i, k1.
 assert (input@T(i,k1) = nR(j)).
 fresh M2.
-case H0.
 depends R(j), R2(j).
 (* right *)
 euf M0.
 exists i,k.
 assert (input@T(i,k) = nR(j)).
 fresh M2.
-case H0.
 depends R(j), R2(j).
 
 (* WA ==> Cond *)
@@ -101,14 +99,12 @@ euf M0.
 exists i, k1.
 assert (input@T(i,k1) = nR(j)).
 fresh M2.
-case H0.
 depends R(j), R1(j).
 (* right *)
 euf M0.
 exists i,k.
 assert (input@T(i,k) = nR(j)).
 fresh M2.
-case H0.
 depends R(j), R1(j).
 
 (* WA ==> Cond *)
