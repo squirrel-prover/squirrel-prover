@@ -107,3 +107,25 @@ class iter_approx_macros ~exact ~system = object (self)
   method has_visited_macro mn = List.mem mn checked_macros
 
 end
+
+(** Get the first term of given type. *)
+class get_ftype_term ~system symtype = object (self)
+  inherit iter_approx_macros ~exact:true ~system as super
+  val mutable func : Term.message option = None
+  method get_func = func
+  method visit_message = function
+    | Term.Fun ((fn,_), l) as fn_term ->
+        if  Symbols.is_ftype fn symtype
+        then func <- Some fn_term
+        else List.iter self#visit_message l
+    | m -> super#visit_message m
+end
+
+(** [get_ftype ~system elem ftype] returns None if there is no term in [elem]
+   with a function symbol head of the fiven ftype, Some fun otherwise, where
+   [fun] is the first term of the given type encountered. Does not explore
+   macros. *)
+let get_ftype ~system elem stype =
+  let iter = new get_ftype_term ~system stype in
+  List.iter iter#visit_term [elem];
+  iter#get_func

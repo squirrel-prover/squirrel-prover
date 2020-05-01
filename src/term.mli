@@ -194,6 +194,8 @@ val f_snd : fsymb
 val f_exp : fsymb
 val f_g : fsymb
 
+val f_len : fsymb
+
 val mk_and : formula -> formula -> formula
 val mk_or : formula -> formula -> formula
 val mk_impl : formula -> formula -> formula

@@ -167,6 +167,8 @@ let function_kind f : kind list * kind =
     | Function (_, Hash) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, AEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage],
                             Sorts.emessage
+    | Function (_, ADec) -> [Sorts.emessage; Sorts.emessage],
+                            Sorts.emessage
     | Function (_, Sign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, CheckSign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, PublicKey) -> [Sorts.emessage], Sorts.emessage
@@ -522,7 +524,6 @@ let rec convert :
         | _ -> raise type_error
       end
 
-
 let conv_index subst t =
   match convert subst t Sorts.Index with
     | Term.Var x -> x
@@ -537,11 +538,12 @@ let declare_hash s = declare_symbol s Symbols.Hash
 
 let declare_aenc s = declare_symbol s Symbols.AEnc
 
-let is_hash s =
-  match Symbols.Function.get_def s with
-    | _,Symbols.Hash -> true
-    | _ -> false
-    | exception Not_found -> failwith "symbol not found"
+let declare_aenc enc dec pk =
+  let t = Symbols.dummy_table in
+  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.ADec) in
+  let _, pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
+  let data = Symbols.AssociatedFunctions [dec; pk] in
+  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.AEnc))
 
 let declare_signature sign checksign pk =
   let t = Symbols.dummy_table in
@@ -594,6 +596,9 @@ let make_term ?at_ts s l =
               Fun (s,l,None)
           | Symbols.AEnc ->
               if List.length l <> 3 then raise @@ arity_error 3 ;
+              Fun (s,l,None)
+          | Symbols.ADec ->
+              if List.length l <> 2 then raise @@ arity_error 2 ;
               Fun (s,l,None)
           | Symbols.Sign ->
               if List.length l <> 2 then raise @@ arity_error 2 ;
@@ -755,7 +760,7 @@ let () =
       Alcotest.check_raises
         "h cannot be defined twice"
         (Symbols.Multiple_declarations "h")
-        (fun () -> declare_aenc "h")
+        (fun () -> declare_aenc "h" "dec" "pk")
     end in
     let g = Symbols.run_restore @@ fun () -> declare_hash "h" in
     fun () -> f () ; g ()
@@ -773,7 +778,7 @@ let () =
     end ;
     "Type checking", `Quick,
     Symbols.run_restore @@ begin fun () ->
-      declare_aenc "e" ;
+      declare_aenc "e" "dec" "pk" ;
       declare_hash "h" ;
       let x = make_term "x" [] in
       let y = Var "y" in

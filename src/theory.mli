@@ -59,9 +59,10 @@ val pp : Format.formatter -> term -> unit
    satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash : string -> unit
 
-(** Asymmetric encryption function symbols are of type
-  * message->message->message->message. *)
-val declare_aenc : string -> unit
+(** Asymmetric encryption function symbols are defined by the triplet
+    (enc,dec,pk).
+    It satisfies CCA2. *)
+val declare_aenc : string -> string -> string -> unit
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
    It satisfies EUF. *)
@@ -117,8 +118,6 @@ type env = (string*Sorts.esort) list
 
 val check : ?local:bool -> env -> term -> Sorts.esort -> unit
 val check_state : string -> int -> Sorts.esort
-
-val is_hash : Term.fname -> bool
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the

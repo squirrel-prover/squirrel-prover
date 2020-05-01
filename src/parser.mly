@@ -222,7 +222,8 @@ declaration:
 | HASH ID                        { Theory.declare_hash $2 }
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
                                    Prover.define_hash_tag_formula $2 f }
-| AENC ID                        { Theory.declare_aenc $2 }
+| AENC e=ID COMMA d=ID COMMA p=ID
+                                 { Theory.declare_aenc e d p }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID

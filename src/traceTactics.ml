@@ -1082,9 +1082,9 @@ let euf_param (`Message at : message_atom) = match at with
       | Some sign -> (sign, key, m, s, Some pk)
       end
 
-  | (`Eq, Fun ((hash, _), [m; Name key]), s) when Theory.is_hash hash ->
+  | (`Eq, Fun ((hash, _), [m; Name key]), s) when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
-  | (`Eq, s, Fun ((hash, _), [m; Name key])) when Theory.is_hash hash ->
+  | (`Eq, s, Fun ((hash, _), [m; Name key])) when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
 
   | _ -> Tactics.soft_failure
@@ -1310,7 +1310,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
-             Theory.is_hash hash
+            Symbols.is_ftype hash Symbols.Hash
               && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)

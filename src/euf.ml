@@ -19,18 +19,6 @@ class check_hash_key ~pk ~system hash_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
-(** Get the first hash term. *)
-class get_hash_term ~system = object (self)
-  inherit Iter.iter_approx_macros ~exact:true ~system as super
-  val mutable hash : Term.message option = None
-  method get_hash = hash
-  method visit_message = function
-    | Term.Fun ((hash_fn,_), l) as hash_term ->
-        if Theory.is_hash hash_fn
-        then hash <- Some hash_term
-        else List.iter self#visit_message l
-    | m -> super#visit_message m
-end
 
 (** Collect hashes for a given hash function and key.
   * We use the exact version of [iter_approx_macros], otherwise
@@ -102,14 +90,6 @@ let check_hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
     hash_key_ssc ~messages ~elems ~pk ~system hash_fn key_n ;
     true
   with Bad_ssc -> false
-
-(** [get_hash ~system elem] returns None if there is no hash term in [elem],
-    Some hash otherwise, where [hash] is the first hash term encountered.
-    Does not explore macros. *)
-let get_hash ~system elem =
-  let iter = new get_hash_term ~system in
-  List.iter iter#visit_term [elem];
-  iter#get_hash
 
 (** [hashes_of_frame ~system frame hash_fn key_n]
     returns the pairs [is,m] such that [hash_fn(m,key_n[is])] occurs

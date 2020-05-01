@@ -12,6 +12,7 @@ type kind = Sorts.esort
 type function_def =
   | Hash
   | AEnc
+  | ADec
   | Sign
   | CheckSign
   | PublicKey
@@ -219,6 +220,13 @@ module Function = Make (struct
     | Exists (Function d) -> d
     | _ -> raise Incorrect_namespace
 end)
+
+let is_ftype s ftype =
+  match Function.get_def s with
+    | _,t when t = ftype-> true
+    | _ -> false
+    | exception Not_found -> failwith "symbol not found"
+
 
 module Macro = Make (struct
   type ns = macro

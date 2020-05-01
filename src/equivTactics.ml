@@ -650,35 +650,36 @@ let mk_phi_proj system env name indices proj biframe =
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
+let fresh_cond system env t biframe =
+  let (n_left, ind_left, n_right, ind_right) =
+    match
+      Term.pi_term Term.Left t, Term.pi_term Term.Right t
+    with
+    | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
+    | _ -> raise Not_name
+  in
+  let system_left = Action.(project_system Term.Left system) in
+  let phi_left =
+    mk_phi_proj system_left env n_left ind_left Term.Left biframe
+  in
+  let system_right = Action.(project_system Term.Right system) in
+  let phi_right =
+    mk_phi_proj system_right env n_right ind_right Term.Right biframe
+  in
+  mk_ands
+    (* remove duplicates, and then concatenate *)
+    ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
+     @
+     phi_right)
+
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
 let mk_if_term system env e biframe =
   match e with
   | EquivSequent.Message t ->
-      let (n_left, ind_left, n_right, ind_right) =
-        match
-          Term.pi_term Term.Left t, Term.pi_term Term.Right t
-        with
-        | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
-        | _ -> raise Not_name
-      in
-      let system_left = Action.(project_system Term.Left system) in
-      let phi_left =
-        mk_phi_proj system_left env n_left ind_left Term.Left biframe
-      in
-      let system_right = Action.(project_system Term.Right system) in
-      let phi_right =
-        mk_phi_proj system_right env n_right ind_right Term.Right biframe
-      in
-      let phi =
-        mk_ands
-          (* remove duplicates, and then concatenate *)
-          ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
-          @
-          phi_right)
-      in
-      let then_branch = Term.Fun (Term.f_zero,[]) in
-      let else_branch = t in
-      EquivSequent.Message Term.(mk_ite phi then_branch else_branch)
+    let phi = fresh_cond system env t biframe in
+    let then_branch = Term.Fun (Term.f_zero,[]) in
+    let else_branch = t in
+    EquivSequent.Message Term.(mk_ite phi then_branch else_branch)
   | EquivSequent.Formula f -> raise Not_name
 
 let fresh i s =
@@ -938,7 +939,7 @@ let prf i s =
           EquivSequent.Formula (Term.head_normal_biterm f)
       in
       (* search for the first occurrence of a hash in [e] *)
-      begin match (Euf.get_hash ~system e) with
+      begin match (Iter.get_ftype ~system e Symbols.Hash) with
       | None ->
         Tactics.soft_failure
           (Tactics.Failure
@@ -971,6 +972,90 @@ let () =
             | subgoals -> sk subgoals fk
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
    | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+
+(** CCA1 **)
+
+let cca1 i s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let biframe = List.rev_append before after in
+    let system = (EquivSequent.get_system s) in
+    let env = EquivSequent.get_env s in
+    let e = match e with
+      | EquivSequent.Message m ->
+        EquivSequent.Message (Term.head_normal_biterm m)
+      | EquivSequent.Formula f ->
+        EquivSequent.Formula (Term.head_normal_biterm f)
+    in
+    (* search for the first occurrence of a hash in [e] *)
+    begin match (Iter.get_ftype ~system e Symbols.AEnc) with
+      | Some (Term.Fun ((fnenc,_), [m; Term.Name r;
+                                    Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
+              as enc) when Symbols.is_ftype fnpk Symbols.PublicKey
+        ->
+        begin
+          match Symbols.Function.get_data fnenc with
+          (* we check that the encryption function is used with the associated
+             public key *)
+          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
+            (* to check that the encryption is not under a dec, we replace the
+               enc by zero and check that dec does not occur inside the new
+               term. *)
+            if Euf.hashes_of_frame ~system
+                (EquivSequent.apply_subst_frame
+                   [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+                fndec sk
+               <> [] then
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbols occurs under a decryption.");
+            (* we now check that the random is fresh, and the key satisfy the
+               side condition. *)
+            begin
+              try
+                Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
+                (* we create the fresh cond reachability goal *)
+                let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+                let fresh_goal = Prover.Goal.Trace
+                                   (TraceSequent.init ~system random_fresh_cond)
+                in
+                let new_elem =
+                  EquivSequent.apply_subst_frame
+                    [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
+                                                              )] [e] in
+                let biframe = (List.rev_append before (new_elem @ after)) in
+                [fresh_goal;
+                 Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+            end
+          | _ ->
+            Tactics.soft_failure
+              (Tactics.Failure
+                 "The first encryption symbol is not used with the correct public \
+                  key function.")
+        end
+      | _ ->
+        Tactics.soft_failure
+          (Tactics.Failure
+             "CCA1 can only be applied on a term with at least one occurrence
+            of an encryption term enc(t,r,pk(k))")
+    end
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+
+let () =
+ T.register_general "cca1"
+   ~help:"Apply the cca1 axiom.\n Usage: cca1 i."
+   (function
+   | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match cca1 i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
 
 
 (** XOR *)

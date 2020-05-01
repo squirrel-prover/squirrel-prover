@@ -27,6 +27,7 @@ type kind = Sorts.esort
 type function_def =
   | Hash
   | AEnc
+  | ADec
   | Sign
   | CheckSign
   | PublicKey
@@ -147,4 +148,7 @@ module Name : Namespace with type def = int with type ns = name
 module Action : Namespace with type def = int with type ns = action
 module Function : Namespace
   with type def = int * function_def with type ns = fname
+
+val is_ftype : fname t -> function_def -> bool
+
 module Macro : Namespace with type def = macro_def with type ns = macro

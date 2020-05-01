@@ -565,6 +565,10 @@ let f_g = mk_fname "g" [] emessage
 
 let dummy = Fun (mk_fname "_" [] emessage, [])
 
+(** Length *)
+
+let f_len = mk_fname "len" [emessage] emessage
+
 type projection = Left | Right | None
 
 let pi_term ~projection term =
