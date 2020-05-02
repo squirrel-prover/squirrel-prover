@@ -4,9 +4,12 @@
 
 
 (* Attention !! j'ai simplifie les raisonnement en ajoutant nt dans le dernier message *)
-(* S.D.: je n'ai pas encore bien compris pourquoi ca m'aide mais sans cet ajout, je me retrouve avec nt(i,k) et aussi nt(i,k1) car pour deduire que 2 hash egaux ont leur composantes egales, je n'ai pas d'autres choix que euf, et du coup cela ne me permet pas dedure facilement l'egalite que j'ai ici *)
+(* S.D.: je n'ai pas encore bien compris pourquoi ca m'aide mais sans cet ajout, *)
+(* je me retrouve avec nt(i,k) et aussi nt(i,k1) car pour deduire que 2 hash egaux ont *)
+(* leur composantes egales, je n'ai pas d'autres choix que euf, et du coup cela ne me *)
+(* permet pas dedure facilement l'egalite que j'ai ici *)
 
-Hash h
+hash h
 
 abstract ok:message
 abstract ko:message
@@ -41,7 +44,7 @@ process reader(j:index) =
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
-(*
+
 goal wa_R:
   forall (j:index, i:index),
   cond@R1(j,i) =>
@@ -60,7 +63,7 @@ fresh M2.
 depends R(j), R2(j).
 depends R(j), R1(j,i1).
 Qed.
-*)
+
 
 
 goal wa_T:
