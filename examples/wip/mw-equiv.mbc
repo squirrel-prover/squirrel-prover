@@ -1,3 +1,9 @@
+(* Protocol MW                          *)
+(* R -> T: nr                           *)
+(* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
+(* R -> T: id + H(<c1, nr, nt>,k)       *)
+(* TODO: the last check done by T is not modelled *)
+
 hash H
 
 (* TODO abstract would be more natural but index->message not allowed *)
@@ -14,6 +20,7 @@ axiom tags_neq : tag0 <> tag1
 
 channel c
 
+
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
@@ -23,18 +30,21 @@ process reader =
   new nr;
   out(c,nr);
   in(c,m);
-  try find i,t such that xor(id(i),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
-    out(c,xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
+  if exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(m)) 
+               = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) then
+    out(c, try find i,t such that 
+           xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in 
+          xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
     out(c,error)
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 
-equiv foo.
+equiv unlinkability.
 Proof.
 induction t.
-(* Case R *)
+(* Case R - Done *)
 expand frame@R(r); expand exec@R(r).
 expand cond@R(r);expand output@R(r).
 fa 1.
@@ -43,18 +53,85 @@ fresh 2.
 yesif 2.
 repeat split.
 depends R(r1), R2(r1).
-depends R(r1), R1(r1,i,t).
+depends R(r1), R1(r1).
 
-(* Case R1 *)
-expand frame@R1(r,i,t); expand exec@R1(r,i,t).
-expand cond@R1(r,i,t); expand output@R1(r,i,t).
+(* Case R1  WIP *)
+expand frame@R1(r); expand exec@R1(r).
+expand cond@R1(r); expand output@R1(r).
 
+equivalent
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
+                 H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
+(exists (i,t:index), T(i,t) < R1(r) && 
+ snd(output@T(i,t)) = snd(input@R1(r)) &&
+ fst(output@T(i,t)) = fst(input@R1(r)) &&  
+ input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+
+apply tags_neq.
+split.
+(* proof of lemma: Cond => WA *)
+project.
+(* left *)
+euf M1.
+exists i,t1.
+assert (input@T(i,t1) = nr(r)).
+fresh M3.
+depends R(r), R2(r).
+(* right *)
+euf M1.
+exists i,t.
+assert (input@T(i,t) = nr(r)).
+fresh M3.
+depends R(r), R2(r).
+
+(* proof of lemma: WA => Cond *)
+exists i,t.
+
+(* STILL TO DO: j'aimerais faire fadup sur 0 mais pas le droit ! *)
+(* je crois qu'il ne faut d'abord travailler sur 1 et faire un prf sous le try find *)
 admit.
 
-(* Case R2 *)
-admit.
+(* Case R2  - WIP *)
+expand frame@R2(r); expand exec@R2(r).
+expand cond@R2(r); expand output@R2(r).
 
-(* Case T *)
+
+equivalent
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) = 
+                 H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
+(exists (i,t:index), T(i,t) < R2(r) && 
+ snd(output@T(i,t)) = snd(input@R2(r)) &&
+ fst(output@T(i,t)) = fst(input@R2(r)) &&  
+ input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+
+
+apply tags_neq.
+split.
+(* proof of lemma: Cond => WA *)
+project.
+(* left *)
+euf M1.
+substitute r1, r.
+admit. (* R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
+exists i,t1.
+assert (nr(r) = input@T(i,t1)).
+fresh M3.
+depends R(r), R1(r).
+(* right *)
+euf M1.
+substitute r1, r.
+admit. (*  R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
+exists i,t.
+assert (nr(r) = input@T(i,t)).
+fresh M3.
+depends R(r), R1(r).
+
+(* proof of lemma: WA => Cond *)
+exists i,t.
+fadup 0.
+
+
+(* Case T - DONE *)
 expand frame@T(i,t); expand exec@T(i,t).
 expand cond@T(i,t);expand output@T(i,t).
 fa 1.
@@ -66,33 +143,20 @@ yesif 3.
 apply tags_neq.
 project.
 repeat split.
-assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
-admit. (* fresh - T(i,t) generates nt(i,t) which is needed to fill input R1(r,i1,t1) and that action has to occur before - impossible *)
-assert (fst(input@R2(r))=nt(i,t)).
-admit. (* fresh *)
+assert (fst(input@R1(r)) = nt(i,t)).
+fresh M2.
+assert (fst(input@R1(r)) = nt(i,t)).
+fresh M2.
+assert (fst(input@R2(r)) = nt(i,t)).
+fresh M2.
 repeat split.
-assert (fst(input@R2(r))=nt(i,t)).
-admit. (* fresh *)
-assert (fst(input@R1(r,i1,t1)) = nt(i,t)).
-admit. (* fresh *)
-
+assert (fst(input@R2(r)) = nt(i,t)).
+fresh M2.
+assert (fst(input@R1(r)) = nt(i,t)).
+fresh M2.
+assert (fst(input@R1(r)) = nt(i,t)).
+fresh M2.
 xor 3, n_PRF. (* we now have a fresh name instead of a hash in the XOR biterm *)
 fresh 2. yesif 2.
 Qed.
 
-
-
-goal wa:
-  forall (r:index,i:index),
-  cond@R1(r,i) =>
-  exists (t:index),
-  T(i,t) <= R1(r,i) &&
-  fst(input@R1(r,i)) = nt(i,t) &&
-  input@T(i,t) = nr(r).
-Proof.
-  simpl.
-  expand cond@R1(r,i).
-  euf M0.
-  apply tags_neq.
-  exists t.
-Qed.
