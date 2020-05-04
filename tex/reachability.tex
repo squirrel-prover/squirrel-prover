@@ -136,13 +136,13 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
   \end{mathpar}
   % 
   \medskip
-  \textbf{Inference rules for equalities on names.}
-  The last rule only applies when, for any trace model $\TM$,
-  the term $\interp{t}^\TM$ does not contain any message variable and does
-  not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
-  --- this condition will be over-approximated in our implementation.
-  \adrien{Considering how I re-organized the section, this last rule should be given later.}
-  % \label{fig:names}   
+  \textbf{Some inference rules for equalities on names.}
+  % The last rule only applies when, for any trace model $\TM$,
+  % the term $\interp{t}^\TM$ does not contain any message variable and does
+  % not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
+  % --- this condition will be over-approximated in our implementation.
+  % \adrien{Considering how I re-organized the section, this last rule should be given later.}
+  % \label{fig:names}  
   \begin{mathpar}
     \inferrule{
       \mathsf{n}\neq\mathsf{m}
@@ -155,10 +155,10 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
     }{
       \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
     }
-    
-    \inferrule{~}{
-      \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
-    }
+    %
+    % \inferrule{~}{
+    %   \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
+    % }
   \end{mathpar}
 
   \textbf{Trace inference rules.}
@@ -205,15 +205,15 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
   % `
   \medskip
   \textbf{Inference rules for exclusive or.}
-  % The tool does not follow these rules closely, but uses a more high-level
-  % congruence closure algorithm modulo xor. The last rule is not implementated
-  % at all and is here mostly for illustration purposes, and is subject to
-  % the condition that,
-  In the last rule, for any trace model $\TM$,
-  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
-  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
-  This condition would be over-approximated in an implementation. \adrien{and $t$ must be of the same length than names.}
-  \adrien{Again, the last rule should be given in the next sub-section.}
+  % % The tool does not follow these rules closely, but uses a more high-level
+  % % congruence closure algorithm modulo xor. The last rule is not implementated
+  % % at all and is here mostly for illustration purposes, and is subject to
+  % % the condition that,
+  % In the last rule, for any trace model $\TM$,
+  % $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
+  % $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
+  % This condition would be over-approximated in an implementation. \adrien{and $t$ must be of the same length than names.}
+  % \adrien{Again, the last rule should be given in the next sub-section.}
   % \label{fig:xor-reach}
   \begin{mathpar}
     \inferrule{~}{\Gamma \vdash t\oplus t = 0}
@@ -222,37 +222,12 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
 
     \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
 
-    \inferrule{
-      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
-    }{
-      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
-    }
+    % \inferrule{
+    %   (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
+    % }{
+    %   (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
+    % }
   \end{mathpar}
-
-  \textbf{Inference rules for exclusive or.}
-  The tool does not follow these rules closely, but uses a more high-level
-  congruence closure algorithm modulo xor. The last rule is not implementated
-  at all and is here mostly for illustration purposes, and is subject to
-  the condition that, for any trace model $\TM$,
-  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
-  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
-  This condition would be over-approximated in an implementation. \adrien{There is another condition: $t$ must be of the same length than names.}
-  \adrien{Again, the last rule should be given in the next sub-section.}
-  % \label{fig:xor-reach}
-  \begin{mathpar}
-    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
-
-    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
-
-    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
-
-    \inferrule{
-      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
-    }{
-      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
-    }
-  \end{mathpar}
-
   \caption{Sequent Calculus for Reachability}
   \label{fig:seq-reach}
 \end{figure}
@@ -304,20 +279,20 @@ We recall the base logic \textsc{euf-cma} rule from~\cite{DBLP:conf/eurosp/Kouts
 
 We can now give the rule:
 \begin{definition}
+  \label{def:euf-base}
   For any ground base terms $s,u,m$ and name $sk$, we let \textsc{euf-cma} be the rule:
   \[
     \begin{gathered}[c]
       \inferrule% [\textsc{euf-cma}]
-      {~}{
-        s \deq h(m,sk) \dimpl
-        \bigvee_{u \in S} m \deq u
+      {
+        \textstyle
+        \Gamma, \bigvee_{h(u,sk) \in \st(s,m)} m \deq u \vdash \phi
+      }{
+        \Gamma, s \deq h(m,sk) \vdash \phi
       }
     \end{gathered}
     \quad\text{ when }
-    \begin{cases}
-      sk \tpos_{h(\_,\cdot)} s,m\\
-      S = \{u \mid h(u,sk) \in \st(s,m)\}
-    \end{cases}
+      sk \tpos_{h(\_,\cdot)} s,m
   \]
 \end{definition}
 
@@ -393,94 +368,111 @@ There are two issue there: the set $S$ can be infinite, and we must be able to c
     \left\{
       (t, \vec{i}, \sfa[\vec{i}] \lehb u) \mid
       t \in \st\big(\{\phi_{\alpha},o_{\alpha},u^s_{\alpha} \mid s \in\States\},
-      \alpha = \sfa[\vec{i}],
-      \vec{i} \text{ fresh in } u 
+      \alpha = \sfa[\vec{i}]
       \big)
     \right\}
   \end{alignat*}
+  Where, for every entry, $\vec{i}$ is a vector of index variables, assumed fresh in $u$, and all disjoint.
 \end{definition}
 
 $\ost_{\calp}(u)$ is a set of triples $(t,\vec{i},c)$ such that, for any $\calp$-trace model $\TM$, the interpretation in $\TM$ of the terms of $\ost_{\calp}(u)$ such that $c$ holds in $\TM$ contains all the subterms of~$\interp{u}^\TM$. Moreover, $\vec{i}$ is the set of new (index) variables in $t$ and $c$: $\fv{t,c} \subseteq \fv{u} \cup \{\pvec{i}\}$.
 \begin{proposition}
-  For any protocol $\calp$, term $u$ and $\calp$-trace model $\TM$ \adrien{clarify the role of $\vec{i}$}:
+  \label{prop:ost-sound}
+  For any protocol $\calp$ and term $u$ of the meta-logic, the set $\ost_{\calp}(u)$ is finite. Moreover, for any $\calp$-trace model $\TM = (\D_\I, \D_\XT, \leq_\XT, \sigma_\I, \sigma_\XT)$:
   \[
     \st(\interp{u}^\TM) \subseteq
     \left\{
-      \interp{t}^\TM \mid (t,\vec{i},c) \in \ost_{\calp}(u) \text{ s.t. }
-      \interp{c}^\TM \models \true
+      \interp{t}^{\TM'}
+      \mid
+      \pvec{e} \subseteq \D_\I,\;
+      \TM' = \TM[\pvec{i}\mapsto\pvec{e}],\;
+      (t,\pvec{i},c) \in \ost_{\calp}(u),\;
+      \TM' \models \interp{c}^{\TM'}
     \right\}
   \]
 \end{proposition}
 
 \begin{proof}
-  \adrien{If we keep the proposition, I will do the proof. }
+  The finiteness property is immediate. The second point is harder.   \adrien{If we keep the proposition, I will do the proof. }
 \end{proof}
 
 
-\begin{figure}
-  \begin{mathpar}
-    \inferrule{
-      \Gamma,% t=\mathsf{n}[\vec {j_0}],
-      \big(
-        \bigvee_{\mathsf{n}[\vec j] \in t}
-          \exists \vec j_b, \vec j = \vec {j_0}
-      \big)
-      \vee
-      \big(
-        \bigvee_{A(\vec i) \in S}
-          \big(
-            \bigvee_{\mathsf{n}[\vec j] \in A(\vec i)}
-              \exists \vec i, \vec j_b,
-              \big( \bigvee_{\tau \in t}
-                A(\vec i) \leq \tau
-              \big)
-              \wedge
-              \big( \vec j = \vec {j_0} \big)
-          \big)
-      \big)
-      \vdash \phi
-    }{
-      \Gamma,t=\mathsf{n}[\vec {j_0}] \vdash \phi
-    }
-  \end{mathpar}
-  \center{
-    where $\vec j_b$ represents indices from $\vec j$ that are bound
-    (in $t$ for direct cases, in the action for indirect cases)
-  }
-  \caption{Another inference rule for equalities on names.
-  This rule only applies when, for any trace model $\TM$,
-  the term $\interp{t}^\TM$ does not contain any message variable.
-  If $\tau$ refers to an input macro, then the inequality over timestamps
-  is strict.}
-\end{figure}
-
-
 \newcommand{\eufcma}{\textsc{EUF-CMA}}
+
+We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-base}.
 \begin{proposition}
-  Let $\calp = (\calp_{\sfa}, \le)$ be a protocol.  In any computational model where $h$ is interpreted as a $\eufcma$ keyed hash-function, the following rule is valid for all term $t,m$ and name $sk$ such that all ocurences of $sk$ in $t$ or $\calp$ are of the form $h(\_,sk)$:
-  \begin{gather*}
+  Let $\calp = (\calp_{\sfa}, \le)$ be a protocol.  In any computational model where $h$ is interpreted as a $\eufcma$ keyed hash-function, the following rule is valid: % for all term $t,m$ and name $sk$ such that all ocurences of $sk$ in $t$ or $\calp$ are of the form $h(\_,sk)$:
+  \[
     \inferrule{
       \textstyle
       \Gamma,
-      \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash \phi
+      \bigvee_{(h(u,sk),\vec{i},c) \in \ost_{\calp}(t,m)}
+      \exists \vec{i},
+      c \rightarrow u = m \vdash \phi
     }{
       \Gamma, t=h(m,sk) \vdash \phi
     }
-    \tag{if $t$ contains no macros}\\
-    \inferrule{
-      \textstyle
-      \Gamma,
-      \bigvee_{\sfa \in \calp_{\sfA}, \vec{i} \text{ fresh}}
-      \bigvee_{h(x,sk) \in o_{\sfa}[\pvec{i}] }
-      \big(
-      m=x \wedge \sfa(\vec{i}) < \tau\big)
-      \vdash \phi
-    }{
-      \Gamma, \minp@\tau=h(m,sk) \vdash \phi
-    }
-    \tag{macros case}
-  \end{gather*}
+    \quad\text{ when }
+    sk \tpos^{\calp}_{h(\_,\cdot)} s,m
+  \]
+  % \begin{gather*}
+  %   \inferrule{
+  %     \textstyle
+  %     \Gamma,
+  %     \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash \phi
+  %   }{
+  %     \Gamma, t=h(m,sk) \vdash \phi
+  %   }
+  %   \tag{if $t$ contains no macros}\\
+  %   \inferrule{
+  %     \textstyle
+  %     \Gamma,
+  %     \bigvee_{\sfa \in \calp_{\sfA}, \vec{i} \text{ fresh}}
+  %     \bigvee_{h(x,sk) \in o_{\sfa}[\pvec{i}] }
+  %     \big(
+  %     m=x \wedge \sfa(\vec{i}) < \tau\big)
+  %     \vdash \phi
+  %   }{
+  %     \Gamma, \minp@\tau=h(m,sk) \vdash \phi
+  %   }
+  %   \tag{macros case}
+  % \end{gather*}
 \end{proposition}
+
+\begin{proof}
+  \adrien{Todo: reduce the meta-logic rule to the base logic rule using \cref{prop:ost-sound} (plus something similar for the syntactic side-condition).}
+\end{proof}
+
+
+\begin{figure}[t]
+  \[
+    \begin{array}{|l|l|}
+      \hline
+      \text{Base logic Rule} &
+      \text{Meta-logic Rule}\\
+      \hline
+      \inferrule{~}{
+        \Gamma, t = \mathsf{n} \vdash \phi
+      }
+      \text{ when }
+      \mathsf{n} \not \in \st(t)
+      &
+      \inferrule{~\\\\
+        \textstyle
+        \Gamma,
+        \bigvee_{(\mathsf{n}[\vec{j}],\vec{k},c) \in \ost_{\calp}(t)}
+        \exists \vec{k},
+        c \rightarrow \vec{i} = \vec{j} 
+        \vdash \phi
+      }{
+        \Gamma, t = \mathsf{n}[\vec{i}]\vdash \phi
+      }
+      \\\hline
+    \end{array}
+  \]
+  \caption{Base Logic and Corresponding Meta-Logic Rules.}
+
+\end{figure}
 
 %%% Local Variables:
 %%% mode: latex
