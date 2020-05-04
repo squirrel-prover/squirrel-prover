@@ -133,7 +133,8 @@ as well as indexed memory cell symbols from $\States$.
 \end{definition}
 
 \begin{definition}
-  Given a protocol $\calp = (\calp_\sfA, \leq)$, a \emph{concrete action} of $\calp$ is an instantiation of a \emph{symbolic action} of $\calp$ with integer variables for index variables. We lift the partial order $\leq$ to concrete actions, by comparing action names.
+  Given a protocol $\calp = (\calp_\sfA, \leq)$, a \emph{concrete action} of $\calp$ is an instantiation of a \emph{symbolic action} of $\calp$ with integer variables for index variables. We lift the partial order $\leq$ to concrete actions as follows:
+  $\sfa(\vec{i}) \le \sfb(\vec{j})$ if and only if $\vec{i}$ is a prefix of $\vec{j}$, and $\sfa \le \sfb$.
 \end{definition}
 
 \begin{definition}

@@ -59,8 +59,228 @@ when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
   The sequent $\Gamma \vdash \phi$ is valid if $\Gamma \models \phi$.
 \end{definition}
 
+% \paragraph{Sequent Calculus}
+We can now give the basic rules of our meta-logic sequent calculus for reachability, and prove their soundness.
+\begin{proposition}
+  The generic and name inference rules of \cref{fig:seq-reach} are sound: if the premisses are valid,
+  then so is the conclusion.
+\end{proposition}
 
-\paragraph{Base Logic Subterms of all Instantiations of a Meta-Term}
+
+\begin{figure}[tp]
+  \textbf{Generic inference rules.} These are the rules of classical
+  first-order sequent calculus. In \textsc{$\forall$-R} we require that
+  $x$ does not appear free in $\Gamma$.
+  % \label{fig:lk}
+  \begin{mathpar}
+    \inferrule[Axiom]{~}{\Gamma,\phi\vdash\phi}
+
+    \inferrule[Cut]{
+      \Gamma \vdash \phi\\
+      \Gamma,\phi \vdash \psi
+    }{
+      \Gamma \vdash \psi
+    }
+    
+    \inferrule[${\wedge}$-L]{
+      \Gamma,\phi,\phi'\vdash\psi
+    }{
+      \Gamma,\phi\wedge\phi'\vdash\psi
+    }
+
+    \inferrule[${\wedge}$-R]{
+      \Gamma \vdash \phi\\
+      \Gamma \vdash \phi'
+    }{
+      \Gamma \vdash \phi\wedge\phi'
+    }
+
+    \inferrule[${\lnot}$-R]{
+      \Gamma, \phi \vdash \bot
+    }{
+      \Gamma \vdash \lnot\phi
+    }
+
+    \inferrule[${\lnot}$-L]{
+      \Gamma \vdash \phi
+    }{
+      \Gamma,\lnot\phi \vdash \psi
+    }
+
+    \inferrule[Raa]{
+      \Gamma, \lnot\phi \vdash \bot
+    }{
+      \Gamma \vdash \phi
+    }
+  \end{mathpar}
+  \begin{center}
+    \emph{other propositional rules of classical sequent calculus}
+  \end{center}
+  \begin{mathpar}
+    \inferrule[${=}$-R]{~}{\Gamma \vdash t=t} \quad\quad
+    \inferrule[${=}$-L]{
+      (\Gamma\vdash\phi)\{x\mapsto t',x'\mapsto t\}
+    }{
+      t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash
+      \phi\{x\mapsto t,x'\mapsto t'\}
+    }
+
+    \inferrule[$\forall$-L]{
+      \Gamma,\phi\{x\mapsto t\} \vdash \psi\\
+      \vdash t:\Sort
+    }{
+      \Gamma,\forall x:\Sort.\phi \vdash \psi}
+
+    \inferrule[$\forall$-R]{
+      \Gamma \vdash \phi}{\Gamma \vdash \forall x:\Sort:\phi}
+  \end{mathpar}
+  % 
+  \medskip
+  \textbf{Inference rules for equalities on names.}
+  The last rule only applies when, for any trace model $\TM$,
+  the term $\interp{t}^\TM$ does not contain any message variable and does
+  not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
+  --- this condition will be over-approximated in our implementation.
+  \adrien{Considering how I re-organized the section, this last rule should be given later.}
+  % \label{fig:names}   
+  \begin{mathpar}
+    \inferrule{
+      \mathsf{n}\neq\mathsf{m}
+    }{
+      \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash \phi
+    }
+
+    \inferrule{
+      \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash \phi
+    }{
+      \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
+    }
+    
+    \inferrule{~}{
+      \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
+    }
+  \end{mathpar}
+
+  \textbf{Trace inference rules.}
+  % \label{fig:trace-rules}
+  \begin{mathpar}
+    \inferrule{
+      ~
+    }{
+      \Gamma, b[\vec{i}] \leq a[\vec{i}, \vec{j}] \vdash \phi
+    }
+    \quad\text{ when } a \le b
+    
+    \inferrule{
+      ~
+    }{
+      \Gamma, a[\vec{i}] \neq b[\vec{j}] \vdash \phi
+    }
+    \quad\text{ when } a \ne b
+
+    \inferrule{
+      ~
+    }{
+      \Gamma, \tau \ne \tinit \wedge \tau \le \tpred{\tau} \vdash \phi
+    }
+
+    \inferrule{
+      \Gamma, \tau' = \pre(\tau) \vee \tau' = \tau \vdash \phi
+    }{
+      \Gamma, \pre(\tau)\leq\tau'\leq\tau \vdash \phi
+    }
+
+    \inferrule{
+      \Gamma, \pvec{i}=\pvec{j} \vdash \phi
+    }{
+      \Gamma, a(\pvec{i})=a(\pvec{j}) \vdash \phi
+    }
+
+    \inferrule{
+      \Gamma, \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau \vdash \phi
+    }{
+      \Gamma, \mexec@\tau \vdash \phi
+    }
+  \end{mathpar}
+  % `
+  \medskip
+  \textbf{Inference rules for exclusive or.}
+  % The tool does not follow these rules closely, but uses a more high-level
+  % congruence closure algorithm modulo xor. The last rule is not implementated
+  % at all and is here mostly for illustration purposes, and is subject to
+  % the condition that,
+  In the last rule, for any trace model $\TM$,
+  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
+  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
+  This condition would be over-approximated in an implementation. \adrien{and $t$ must be of the same length than names.}
+  \adrien{Again, the last rule should be given in the next sub-section.}
+  % \label{fig:xor-reach}
+  \begin{mathpar}
+    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
+
+    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
+
+    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
+
+    \inferrule{
+      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
+    }{
+      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
+    }
+  \end{mathpar}
+
+  \textbf{Inference rules for exclusive or.}
+  The tool does not follow these rules closely, but uses a more high-level
+  congruence closure algorithm modulo xor. The last rule is not implementated
+  at all and is here mostly for illustration purposes, and is subject to
+  the condition that, for any trace model $\TM$,
+  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
+  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
+  This condition would be over-approximated in an implementation. \adrien{There is another condition: $t$ must be of the same length than names.}
+  \adrien{Again, the last rule should be given in the next sub-section.}
+  % \label{fig:xor-reach}
+  \begin{mathpar}
+    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
+
+    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
+
+    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
+
+    \inferrule{
+      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
+    }{
+      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
+    }
+  \end{mathpar}
+
+  \caption{Sequent Calculus for Reachability}
+  \label{fig:seq-reach}
+\end{figure}
+
+\paragraph{Trace Rules}
+We have rules related to the trace semantics of our protocols.
+
+\begin{proposition}
+  For any protocol $\calp = (\calp_\sfA, \le)$, the trace inference rules in \cref{fig:seq-reach} are sound.
+\end{proposition}
+
+
+The first axiom holds because for any trace model, we asks that $\leq_\XT$ is compatible with the ordering $\leq$ over symbolic actions.
+As $\pre$ is always interpreted as the natural notion of predecessor over some discrete sequence, the second axiom is natural. The next two axioms hold for all trace models, because we ask that the ordered sequence of concrete actions produced by $\leq_\XT$ represent an abstract trace of the protocol. This yields the injectivity axiom. The last axiom holds naturally by the definition of $\mexec$.
+
+\paragraph{Exclusive-Or}
+We handle the exclusive-or operator $\oplus$.
+
+\begin{proposition}
+  The exclusive-or rules of \cref{fig:seq-reach} are sound w.r.t.\ computational models
+  where $\oplus$ is interpreted as exclusive or.
+  % \emph{Do we need to impose a condition on message lengths?}
+  % Adrien: no we dont, except for the last rule.
+\end{proposition}
+
+\subsection{Advanced Rules}
+We now describe more the more advanced rules of our reachability sequent calculus. These rules deal with cryptographic assumptions, and probabilistic independence.
+
 We recall the base logic \textsc{euf-cma} rule from~\cite{DBLP:conf/eurosp/Koutsos19}. Before starting, we introduce a notation we use to give syntax side-conditions of rules.
 \begin{definition}
   \label{def:occ-sc}
@@ -90,7 +310,7 @@ We can now give the rule:
       \inferrule% [\textsc{euf-cma}]
       {~}{
         s \deq h(m,sk) \dimpl
-        \bigvee_{u \in S} s \deq u
+        \bigvee_{u \in S} m \deq u
       }
     \end{gathered}
     \quad\text{ when }
@@ -100,6 +320,8 @@ We can now give the rule:
     \end{cases}
   \]
 \end{definition}
+
+Roughly, it states that if $s$ is a valid hash of $m$, then $m$ must be equal to some honestly hashed message appearing in $s$ or $m$.
 
 To lift the above rule to the meta-logic, we first lift the occurence side-condition $\tpos_{h(\_,\cdot)}$ of \cref{def:occ-sc} to terms of the meta-logic:
 
@@ -138,122 +360,62 @@ The following proposition gives a sufficient condition to check $s \tpos^{\calp}
   This is not a necessary condition. For example, take a protocol $\calp = (\calp_\sfA,\le)$ that never leaks a key $sk$, except for some action $a$. Because of $a$, we do not have $sk \tpos_{\cdot} \calp$. But if the term $u$ uses only actions that must occur before $a$ (w.r.t. $\le$), then $sk \tpos^\calp_{\cdot} u$. In practice, we never had this problem, and the approximation above was always sufficient. If necessary, it can be made finer by considering only actions that can occur before $u$.
 \end{remark}
 
-Then, we need to characterize the set of all occurences of a term in a meta-logic term.
+Then, we need to characterize the set of all honest hashes that can appear in the interpretation of a term $s$ of the meta-logic:
+\[
+  S = \{u \mid h(u,sk) \in \st(\interp{s}^\TM),
+  \TM \text{ a $\calp$-trace model}\}
+\]
+There are two issue there: the set $S$ can be infinite, and we must be able to compute it (or at least an over-approximation of it). As for $\tpos^{\calp}_{C}$, we look for all possible occurrences of $h(u,sk)$ either directly in $s$, or in an action $\sfa$ of $\calp$. In the latter case, we will also need a formula of the logic that characterizes the fact that $\sfa$ happened before the moment where $u$ was computed. This motivates the following definitions.
 
-\adrien{TODO}
+\begin{definition}
+  For every terms $\tau_0$ of sort $\timestamp$ and term $u$ of the meta-logic, we define the happens-before formula of the meta-logic $\tau_0 \lehb u$:
+  \begin{alignat*}{2}
+    \tau_0 \lehb u &\;\;\overset{\text{def}}{=}\;\;&
+    \bigvee_{m[\pvec{i}]@\tau \in \st(u)}
+    \tau_0 \lehb m[\pvec{i}]@\tau\\
+    \text{where }\tau_0 \lehb m[\pvec{i}]@\tau  &\;\;\overset{\text{def}}{=}\;\;&
+    \begin{cases}
+      \tau_0 < \tau &\text{ if } m = \minp\\
+      \tau_0 \le \tau &\text{ otherwise}
+    \end{cases}
+  \end{alignat*} 
+\end{definition}
 
+\begin{definition}
+  For every protocol $\calp$ and term $u$ of the meta-logic, we define:
+  \begin{alignat*}{2}
+    \ost_{\calp}(u) &\;\;=\;\;&&
+    \left\{
+      (t, \emptyset, \true) \mid t \in \st(u)
+    \right\}
+    \cup\\
+    &&&\bigcup_{\sfa \in \calp_{\sfA}}
+    \left\{
+      (t, \vec{i}, \sfa[\vec{i}] \lehb u) \mid
+      t \in \st\big(\{\phi_{\alpha},o_{\alpha},u^s_{\alpha} \mid s \in\States\},
+      \alpha = \sfa[\vec{i}],
+      \vec{i} \text{ fresh in } u 
+      \big)
+    \right\}
+  \end{alignat*}
+\end{definition}
 
-\paragraph{Sequent Calculus}
-We can now give the rules of our meta-logic sequent calculus, and prove their soundness.
+$\ost_{\calp}(u)$ is a set of triples $(t,\vec{i},c)$ such that, for any $\calp$-trace model $\TM$, the interpretation in $\TM$ of the terms of $\ost_{\calp}(u)$ such that $c$ holds in $\TM$ contains all the subterms of~$\interp{u}^\TM$. Moreover, $\vec{i}$ is the set of new (index) variables in $t$ and $c$: $\fv{t,c} \subseteq \fv{u} \cup \{\pvec{i}\}$.
 \begin{proposition}
-  The rules of \cref{fig:lk,fig:names} are sound: if the premisses are valid,
-  then so is the conclusion.
+  For any protocol $\calp$, term $u$ and $\calp$-trace model $\TM$ \adrien{clarify the role of $\vec{i}$}:
+  \[
+    \st(\interp{u}^\TM) \subseteq
+    \left\{
+      \interp{t}^\TM \mid (t,\vec{i},c) \in \ost_{\calp}(u) \text{ s.t. }
+      \interp{c}^\TM \models \true
+    \right\}
+  \]
 \end{proposition}
 
-% TO BE REMOVED
-\clearpage
+\begin{proof}
+  \adrien{If we keep the proposition, I will do the proof. }
+\end{proof}
 
-\begin{figure}
-  \begin{mathpar}
-    \inferrule[Axiom]{~}{\Gamma,\phi\vdash\phi}
-    \quad\quad
-    \inferrule[Cut]{
-      \Gamma \vdash \phi
-      \quad
-      \Gamma,\phi \vdash \psi
-    }{
-      \Gamma \vdash \psi
-    }
-  \end{mathpar}
-  \begin{mathpar}
-  \inferrule[${\wedge}$-L]{
-    \Gamma,\phi,\phi'\vdash\psi
-  }{
-    \Gamma,\phi\wedge\phi'\vdash\psi
-  }
-  \quad\quad
-  \inferrule[${\wedge}$-R]{
-    \Gamma \vdash \phi
-    \quad
-    \Gamma \vdash \phi'
-  }{
-    \Gamma \vdash \phi\wedge\phi'
-  }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule[${\lnot}$-R]{
-      \Gamma, \phi \vdash \bot
-    }{
-      \Gamma \vdash \lnot\phi
-    }
-    \quad\quad
-    \inferrule[${\lnot}$-L]{
-      \Gamma \vdash \phi
-    }{
-      \Gamma,\lnot\phi \vdash \psi
-    }
-    \quad\quad
-    \inferrule[Raa]{
-      \Gamma, \lnot\phi \vdash \bot
-    }{
-      \Gamma \vdash \phi
-    }
-  \end{mathpar}
-  \begin{center}
-  \emph{other propositional rules of classical sequent calculus}
-  \end{center}
-  \begin{mathpar}
-      \inferrule[${=}$-R]{~}{\Gamma \vdash t=t} \quad\quad
-      \inferrule[${=}$-L]{
-        (\Gamma\vdash\phi)\{x\mapsto t',x'\mapsto t\}
-      }{
-        t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash
-        \phi\{x\mapsto t,x'\mapsto t'\}
-      }
-  \end{mathpar}
-  \begin{mathpar}
-     \inferrule[$\forall$-L]{
-       \Gamma,\phi\{x\mapsto t\} \vdash \psi
-       \quad
-       \vdash t:\Sort
-     }{
-       \Gamma,\forall x:\Sort.\phi \vdash \psi}
-     \quad\quad
-     \inferrule[$\forall$-R]{
-       \Gamma \vdash \phi}{\Gamma \vdash \forall x:\Sort:\phi}
-  \end{mathpar}
-   \caption{Generic inference rules. These are the rules of classical
-   first-order sequent calculus. In \textsc{$\forall$-R} we require that
-   $x$ does not appear free in $\Gamma$.}
-   \label{fig:lk}
-\end{figure}
-
-\begin{figure}
-  \begin{mathpar}
-  \inferrule{
-    \mathsf{n}\neq\mathsf{m}
-  }{
-    \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash \phi
-  }
-  \quad\quad
-  \inferrule{
-    \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash \phi
-  }{
-    \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
-  }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule{~}{
-      \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
-    }
-  \end{mathpar}
-  \caption{Inference rules for equalities on names.
-  The last rule only applies when, for any trace model $\TM$,
-  the term $\interp{t}^\TM$ does not contain any message variable and does
-  not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
-  --- this condition will be over-approximated in our implementation.}
-  \label{fig:names}
-\end{figure}
 
 \begin{figure}
   \begin{mathpar}
@@ -290,43 +452,8 @@ We can now give the rules of our meta-logic sequent calculus, and prove their so
   the term $\interp{t}^\TM$ does not contain any message variable.
   If $\tau$ refers to an input macro, then the inequality over timestamps
   is strict.}
-\adrien{What is $S$ in the rule? The condition \textit{If $\tau$ refers to an input macro [...]} is not very nice.}
 \end{figure}
 
-\begin{proposition}
-  The rules of \cref{fig:xor-reach} are sound w.r.t.\ computational models
-  where $\oplus$ is interpreted as exclusive or:
-  if the premisses are valid in all such computational models,
-  then so is the conclusion.
-  % \emph{Do we need to impose a condition on message lengths?}
-  % Adrien: no we dont, except for the last rule.
-\end{proposition}
-
-\begin{figure}
-  \begin{mathpar}
-    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
-    \quad\quad
-    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
-    \quad\quad
-    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule{
-      (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
-    }{
-      (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
-    }
-  \end{mathpar}
-  \caption{Inference rules for exclusive or.
-  The tool does not follow these rules closely, but uses a more high-level
-  congruence closure algorithm modulo xor. The last rule is not implementated
-  at all and is here mostly for illustration purposes, and is subject to
-  the condition that, for any trace model $\TM$,
-  $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
-  $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
-  This condition would be over-approximated in an implementation. \adrien{There is another condition: $t$ must be of the same length than names.}}
-  \label{fig:xor-reach}
-\end{figure}
 
 \newcommand{\eufcma}{\textsc{EUF-CMA}}
 \begin{proposition}
@@ -354,33 +481,6 @@ We can now give the rules of our meta-logic sequent calculus, and prove their so
     \tag{macros case}
   \end{gather*}
 \end{proposition}
-
-\subsection{Trace axioms}
-
-We now identify some valid formulas, which can thus be used as axioms
-when trying to derive a trace property. \adrien{Why don't we present these rules as axioms then?}
-
-\begin{proposition}
-  The following formulas are valid w.r.t.\ the protocol:
-  \begin{itemize}
-    \item for any $\alpha \leq \beta$ (partial ordering of the symbolic actions imposed by the protocol), $\alpha \leq \beta$.
-
-    \item
-      $\forall \tau.~ \pre(\tau)<\tau \wedge
-      \forall \tau'.~ \pre(\tau)\leq\tau'<\tau \Rightarrow
-      \tau'=\pre(\tau)$; \adrien{this is not true for init}
-    \item for any $a\neq b\in\Act$,
-      $\forall \ov{i},\ov{j}, a(\ov{i})\neq b(\ov{j})$; \adrien{we already have an axiom for this one}
-    \item for any $a\in\Act$,
-      $\forall \ov{i},\ov{j}, a(\ov{i})=a(\ov{j}) \Rightarrow \ov{i}=\ov{j}$.
-      \adrien{idem}
-      \item $\forall \tau.~ \mexec@\tau \Rightarrow \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau$
-  \end{itemize}
-\end{proposition}
-
-
-The first axiom holds because for any trace model, we asks that $\leq_\XT$ is compatible with the ordering $\leq$ over symbolic actions.
-As $\pre$ is always interpreted as the natural notion of predecessor over some discrete sequence, the second axiom is natural. The next two axioms hold for all trace models, because we ask that the ordered sequence of concrete actions produced by $\leq_\XT$ represent an abstract trace of the protocol. This yields the injectivity axiom. The last axiom holds naturally by the definition of $\mexec$.
 
 %%% Local Variables:
 %%% mode: latex
