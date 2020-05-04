@@ -36,6 +36,13 @@ let pure_equiv t s sk fk =
   in
   only_equiv t' s sk fk
 
+let () =
+  T.register "addvar"
+    (fun (Equiv s) sk fk ->
+       let env = EquivSequent.get_env s in
+       let env,_ = Vars.make_fresh env Sorts.Index "d" in
+         sk [Equiv (EquivSequent.set_env env s)] fk)
+
 (* Admit tactic *)
 let () =
   T.register_general "admit"

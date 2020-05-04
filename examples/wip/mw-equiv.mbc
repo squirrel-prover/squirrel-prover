@@ -24,7 +24,10 @@ channel c
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>)
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
+  in(c,y);
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) then
+  out(c,zero)
 
 process reader =
   new nr;
@@ -89,6 +92,98 @@ exists i,t.
 
 (* STILL TO DO: j'aimerais faire fadup sur 0 mais pas le droit ! *)
 (* je crois qu'il ne faut d'abord travailler sur 1 et faire un prf sous le try find *)
+ fa 1. fadup 0.
+addvar.
+addvar.
+enrich H(<tag1,<nr(r),fst(input@R1(r))>>,
+ diff(key(d),key'(d,d1))).
+admit 3.
+prf 0.
+ yesif 0.
+ apply tags_neq.
+ project; split.
+
+ admit. (* branche else, similaire then *)
+
+ assert exec@pred(R1(r)).
+ admit.
+ assert cond@T1(d,t).
+ admit.
+ expand cond@T1(d,t).
+ assert (H(<tag1,<input@T(d,t),nt(d,t)>>,key(d)) = xor(input@T1(d,t),id(d))).
+ euf M3.
+ substitute.
+ case H1.
+ depends T(d,t),T1(d,t).
+
+ assert exec@pred(R1(r)).
+ admit.
+ assert cond@T1(d,t).
+ admit.
+ expand cond@T1(d,t).
+ assert (H(<tag1,<input@T(d,t),nt(d,t)>>,key'(d,t)) = xor(input@T1(d,t),id'(d,t))).
+ euf M3.
+ substitute.
+ case H1.
+ depends T(d,t),T1(d,t).
+ admit. (* else *)
+
+ ******
+
+ try find i,t such that xor((diff(id(i), id'(i,t))),snd(
+                                                                   input@R1(
+                                                                   r)))
+                                                               =
+                                                               H(<tag0,
+                                                                  <nr(
+                                                                   r),
+                                                                   fst(
+                                                                   input@R1(
+                                                                   r))>>,
+                                                                 (diff(key(
+                                                                  i), key'(
+                                                                  i,t)))) in
+								  i),
+								  key'(
+							       try find i,t such that xor((diff(id(
+                                                                    i), id'(
+                                                                    i,t))),
+                                                                   snd(
+                                                                   input@R1(
+                                                                   r)))
+                                                               =
+                                                               H(<tag0,
+                                                                  <nr(
+                                                                   r),
+                                                                   fst(
+                                                                   input@R1(
+                                                                   r))>>,
+                                                                 (diff(key(
+                                                                  i), key'(
+                                                                  i,t)))) in
+								  i,
+							      try find i,t such that xor((diff(id(
+                                                                    i), id'(
+                                                                    i,t))),
+                                                                   snd(
+                                                                   input@R1(
+                                                                   r)))
+                                                               =
+                                                               H(<tag0,
+                                                                  <nr(
+                                                                   r),
+                                                                   fst(
+                                                                   input@R1(
+                                                                   r))>>,
+                                                                 (diff(key(
+                                                                  i), key'(
+                                                                  i,t)))) in
+								  t))).
+
+ diff(key(i), key'(i,t))).
+admit 3.
+prf 0.
+yesif 0.
 admit.
 
 (* Case R2  - WIP *)
