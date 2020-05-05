@@ -1093,8 +1093,8 @@ let euf_param (`Message at : message_atom) = match at with
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
-              "euf can only be applied to hypothesis of the form h(t,k)=m
-              or m=h(t,k) with h a hash function symbol")
+              "euf can only be applied to an hypothesis of the form h(t,k)=m \
+               or m=h(t,k) with h a hash function symbol")
 
 let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   let open Euf in

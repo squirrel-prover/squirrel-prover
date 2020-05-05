@@ -721,6 +721,23 @@ let prf_param hash =
       (hash_fn,t,key_n,key_is)
   | _ -> raise Not_hash
 
+(** [occurrences_of_frame ~system frame hash_fn key_n]
+  * returns the list of pairs [is,m] such that [f(m,key_n[is])]
+  * occurs in [frame]. Does not explore macros. *)
+let occurrences_of_frame ~system frame hash_fn key_n =
+  let iter = new Iter.get_f_messages ~system hash_fn key_n in
+  List.iter iter#visit_term frame ;
+  List.sort_uniq Pervasives.compare iter#get_occurrences
+
+(** [occurrences_of_action_descr ~system action_descr hash_fn key_n]
+  * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
+  * occurs in [action_descr]. *)
+let occurrences_of_action_descr ~system action_descr hash_fn key_n =
+  let iter = new Iter.get_f_messages ~system hash_fn key_n in
+  iter#visit_message (snd action_descr.Action.output) ;
+  List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
+  List.sort_uniq Pervasives.compare iter#get_occurrences
+
 let mk_prf_phi_proj proj system env biframe e hash =
   begin try
     let system = Action.(project_system proj system) in
@@ -741,7 +758,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
     Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
     (* we compute the list of hashes from the frame *)
     let list_of_hashes_from_frame =
-      Euf.hashes_of_frame ~system frame hash_fn key_n
+      occurrences_of_frame ~system frame hash_fn key_n
     and list_of_actions_from_frame =
       let iter = new get_actions ~system false in
       List.iter iter#visit_term frame ;
@@ -753,8 +770,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
         (* we add only actions in which a hash occurs *)
         let descr_proj = Action.pi_descr proj action_descr in
         let action_hashes =
-          Euf.hashes_of_action_descr ~system ~cond:true
-            descr_proj hash_fn key_n in
+          occurrences_of_action_descr ~system descr_proj hash_fn key_n in
         if List.length action_hashes > 0 then
           Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
     (* direct cases (for explicit occurences of hashes in the frame) *)
@@ -1003,7 +1019,7 @@ let cca1 i s =
             (* to check that the encryption is not under a dec, we replace the
                enc by zero and check that dec does not occur inside the new
                term. *)
-            if Euf.hashes_of_frame ~system
+            if occurrences_of_frame ~system
                 (EquivSequent.apply_subst_frame
                    [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
                 fndec sk
@@ -1094,7 +1110,7 @@ let enckp i s =
               (* to check that the encryption is not under a dec, we replace the
                  enc by zero and check that dec does not occur inside the new
                  term. *)
-              if Euf.hashes_of_frame ~system
+              if occurrences_of_frame ~system
                   (EquivSequent.apply_subst_frame
                      [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
                   fndec sk

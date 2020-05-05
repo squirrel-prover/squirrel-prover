@@ -55,17 +55,6 @@ val check_hash_key_ssc :
   system:Action.system ->
   Term.fname -> Term.name -> bool
 
-val hashes_of_frame :
-  system:Action.system ->
-  EquivSequent.elem list -> Term.fname -> Term.name ->
-  (Vars.index list * Term.message) list
-
-val hashes_of_action_descr :
-  system:Action.system ->
-  cond:bool ->
-  Action.descr -> Term.fname -> Term.name ->
-  (Vars.index list * Term.message) list
-
 (** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
     hash function and key in a process.
     TODO: memoisation *)

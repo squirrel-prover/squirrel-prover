@@ -220,11 +220,6 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
     end ;
-    "Euf collect in cond", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_condh.mbc")
-    end ;
     "Euf collect in key position", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
