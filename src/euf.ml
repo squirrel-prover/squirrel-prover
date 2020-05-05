@@ -14,6 +14,7 @@ class check_hash_key ~pk ~system hash_fn key_n = object (self)
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
       self#visit_message m
     | Term.Fun ((fn,_), [Term.Name _]) when pk = Some fn -> ()
+    | Term.Fun ((fn,_), [Term.Diff (Term.Name _, Term.Name _)]) when pk = Some fn -> ()
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
     | Term.Var m -> raise Bad_ssc
     | _ -> super#visit_message t

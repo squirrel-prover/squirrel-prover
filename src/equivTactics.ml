@@ -1061,6 +1061,105 @@ let () =
 
 
 
+(** Encryption Key privacy  *)
+
+let enckp i s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let biframe = List.rev_append before after in
+    let system = (EquivSequent.get_system s) in
+    let env = EquivSequent.get_env s in
+    let e = match e with
+      | EquivSequent.Message m ->
+        EquivSequent.Message (Term.head_normal_biterm m)
+      | EquivSequent.Formula f ->
+        EquivSequent.Formula (Term.head_normal_biterm f)
+    in
+    (* search for the first occurrence of a hash in [e] *)
+    let rec find_enc lenc =
+      begin match lenc with
+        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
+                                      Term.Fun ((fnpk,fnpki), [
+                                          Term.Diff(  Term.Name (sk,isk),
+                                                      Term.Name (sk2,isk2))
+                                        ])])
+           as enc) :: q when Symbols.is_ftype fnpk Symbols.PublicKey
+                          && Symbols.is_ftype fnenc Symbols.AEnc
+          ->
+          begin
+            match Symbols.Function.get_data fnenc with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
+              (* to check that the encryption is not under a dec, we replace the
+                 enc by zero and check that dec does not occur inside the new
+                 term. *)
+              if Euf.hashes_of_frame ~system
+                  (EquivSequent.apply_subst_frame
+                     [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+                  fndec sk
+                 <> [] then
+                Tactics.soft_failure
+                  (Tactics.Failure
+                     "The first encryption symbols occurs under a decryption.");
+              (* we now check that the random is fresh, and the key satisfy the
+                 side condition. *)
+              begin
+                try
+                  Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
+                  (* we create the fresh cond reachability goal *)
+                  let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+                  let fresh_goal = Prover.Goal.Trace
+                      (TraceSequent.init ~system random_fresh_cond
+                       |> TraceSequent.set_env env)
+                  in
+                  let new_elem =
+                    EquivSequent.apply_subst_frame
+                      [Term.ESubst (enc,
+                                    Term.Fun ((fnenc,fnenci),
+                                              [m; Term.Name r;
+                                               Term.Fun ((fnpk,fnpki), [
+                                                   Term.Name (sk,isk)
+                                                 ])])
+                                   )] [e] in
+                  let biframe = (List.rev_append before (new_elem @ after)) in
+                  [fresh_goal;
+                   Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+                with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+              end
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct \
+                    public key function.")
+          end
+        | p :: q -> find_enc q
+        | [] ->
+          Tactics.soft_failure
+            (Tactics.Failure
+               "Key Privact can only be applied on a term with at least one \
+                occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
+      end
+    in
+    find_enc (Iter.get_ftypes ~system e Symbols.AEnc)
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+
+let () =
+ T.register_general "enckp"
+   ~help:"Apply the enckp axiom, replacing the first term of the form \
+          enc(t,r,pk(diff(k1,k2))) by enc(t,r,pk(k1)) inside the given \
+          message.\n Usage: enckp i."
+   (function
+   | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match enckp i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+
+
 (** XOR *)
 
 exception Not_xor

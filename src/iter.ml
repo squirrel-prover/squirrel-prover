@@ -108,15 +108,15 @@ class iter_approx_macros ~exact ~system = object (self)
 
 end
 
-(** Get the first term of given type. *)
-class get_ftype_term ~system symtype = object (self)
+(** Get the terms of given type. *)
+class get_ftypes_term ~system symtype = object (self)
   inherit iter_approx_macros ~exact:true ~system as super
-  val mutable func : Term.message option = None
+  val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
     | Term.Fun ((fn,_), l) as fn_term ->
         if  Symbols.is_ftype fn symtype
-        then func <- Some fn_term
+        then func <-  fn_term :: func
         else List.iter self#visit_message l
     | m -> super#visit_message m
 end
@@ -126,6 +126,13 @@ end
    [fun] is the first term of the given type encountered. Does not explore
    macros. *)
 let get_ftype ~system elem stype =
-  let iter = new get_ftype_term ~system stype in
+  let iter = new get_ftypes_term ~system stype in
+  List.iter iter#visit_term [elem];
+  match iter#get_func with
+  | p::q -> Some p
+  | [] -> None
+
+let get_ftypes ~system elem stype =
+  let iter = new get_ftypes_term ~system stype in
   List.iter iter#visit_term [elem];
   iter#get_func
