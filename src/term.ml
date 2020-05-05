@@ -176,14 +176,14 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         ppf ()
   | Init -> Fmt.styled `Green (fun ppf () -> Fmt.pf ppf "init") ppf ()
   | Diff (bl, br) ->
-    Fmt.pf ppf "@[<1>(diff(%a, %a))@]"
+    Fmt.pf ppf "@[<1>(diff(%a,@,%a))@]"
       pp bl pp br
   | ITE (b, c, d) ->
-    Fmt.pf ppf "@[<1>(if %a then %a else %a)@]"
+    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
       pp b pp c pp d
   | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<1>(try find %a such that %a in %a else %a)@]"
-      Vars.pp_typed_list (List.map (fun t -> Vars.EVar t) b) pp c pp d pp e
+    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
+      Vars.pp_list b pp c pp d pp e
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
