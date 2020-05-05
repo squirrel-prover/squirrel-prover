@@ -307,7 +307,7 @@ let rec convert :
         | Sorts.Message ->
             let open Symbols in
             begin match of_string f with
-              | Wrapped (s, Function (_,(Hash|AEnc|Sign|CheckSign|PublicKey|Abstract _))) ->
+              | Wrapped (s, Function (_,(Hash|AEnc|ADec|Sign|CheckSign|PublicKey|Abstract _))) ->
                   Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in

@@ -1,0 +1,45 @@
+channel cA
+channel cB
+
+name kA : message
+name kAbis : message
+name kB : message
+
+aenc enc,dec,pk
+
+name n0 : index -> message
+name r0 : index -> message
+
+name n : index -> message
+name r : index -> message
+
+process A(i:index) =
+  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB)))
+
+process B(i:index) =
+ in(cB, mess);
+ let dmess = dec(mess, kB) in
+out(cB,
+ if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n(i)) then
+   diff(enc(<snd(dmess), n(i)>, r(i), pk(kA)),enc(<snd(dmess), n(i)>, r(i), pk(kAbis)))
+else
+   diff(enc(<n(i), n(i)>, r(i), pk(kA)),enc(<n(i), n(i)>, r(i), pk(kAbis)))
+
+)
+
+
+system (!_i A(i) | !_j B(j)).
+
+
+equiv test.
+Proof.
+
+induction t.
+
+expandall.
+fa 1. fa 2. cca1 2.
+(* length reasonning *)
+admit.
+
+expandall.
+fa 1. fa 2. cca1 2.
