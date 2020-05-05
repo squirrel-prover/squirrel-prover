@@ -1305,8 +1305,9 @@ let () =
            \n Usage: assert f."
     tac_assert
 
-(** [collision_resistance judge sk fk] collects all equalities between hashes,
-    and adds the equalities of the messages hashed with the same key. *)
+(** [collision_resistance judge sk fk] collects all equalities between
+  * hashes that occur at toplevel in message hypotheses,
+  * and adds the equalities of the messages hashed with the same key. *)
 let collision_resistance (s : TraceSequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
@@ -1320,6 +1321,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
+  let hashes = List.sort_uniq Pervasives.compare hashes in
   if List.length hashes = 0 then
     fk Tactics.NoSSC
   else
@@ -1360,8 +1362,9 @@ let collision_resistance (s : TraceSequent.t) sk fk =
     sk [s] fk
 
 let () = T.register "collision"
-    ~help:"Collects all equalities between hashes, and affs the equalities of \
-           \n the messages hashed with the same valid key.\
+    ~help:"Collects all equalities between hashes occurring at toplevel in\
+           \n message hypotheses, and adds the equalities between \
+           \n messages that have the same hash with the same valid key.\
            \n Usage: collision."
     collision_resistance
 

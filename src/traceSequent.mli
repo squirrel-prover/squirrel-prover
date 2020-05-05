@@ -129,11 +129,11 @@ val message_atoms_valid : sequent -> bool
   * constraint conclusion. *)
 val constraints_valid : sequent -> bool
 
-(** [get_ts_equalities s] return all the equalities between timestamps
+(** [get_ts_equalities s] returns all the equalities between timestamps
        derivable from its hypothesis. *)
 val get_ts_equalities : sequent -> sequent * Term.timestamp list list
 
-(** [get_ind_equalities s] return all the equalities between indexes
+(** [get_ind_equalities s] returns all the equalities between indices
        derivable from its hypothesis. *)
 val get_ind_equalities : sequent -> sequent * Vars.index list list
 
@@ -144,6 +144,6 @@ val maximal_elems : sequent -> Term.timestamp list ->
 
 (** {2 Misc} *)
 
-(** [get_all_terms s] return all the term appearing inside the messages
-   hypothesis of [s]. *)
+(** [get_all_terms s] returns all the term appearing at toplevel
+  * in message hypotheses of [s]. *)
 val get_all_terms : sequent -> Term.message list
