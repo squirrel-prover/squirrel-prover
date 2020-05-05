@@ -77,7 +77,6 @@ apply tags_neq.
 euf M0.
 assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))).
 euf M3.
-substitute k1, k.
 case H2.
 case H1.
 

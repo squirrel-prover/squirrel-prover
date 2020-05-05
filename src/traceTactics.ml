@@ -861,8 +861,8 @@ let autosubst s =
     try
       TraceSequent.remove_trace_hypothesis
         (function
-           | `Timestamp (`Eq, Term.Var x, Term.Var y) when x <> y -> true
-           | `Index (`Eq, x, y) when x <> y -> true
+           | `Timestamp (`Eq, Term.Var x, Term.Var y) -> true
+           | `Index (`Eq, x, y) -> true
            | _ -> false)
         s
     with
@@ -870,6 +870,10 @@ let autosubst s =
   in
   let process : type a. a Vars.var -> a Vars.var -> TraceSequent.t =
     fun x y ->
+      (* Just remove the equality if x and y are the same variable. *)
+      if x = y then s else
+      (* Otherwise substitute the newest variable by the oldest one,
+       * and remove it from the environment. *)
       let x,y =
         if x.Vars.name_suffix <= y.Vars.name_suffix then y,x else x,y
       in
@@ -1370,9 +1374,13 @@ let () =
       try_tac assumption ;
       repeat goal_intro ;
       repeat simpl_left ;
-      repeat autosubst ;
+      (* Learn new term equalities from constraints before
+       * learning new index equalities from term equalities,
+       * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
+      eq_trace ;
       eq_names ;
-      eq_trace
+      (* Simplify equalities using substitution. *)
+      repeat autosubst
     ]
   in
   (* Attempt to close a goal. *)
