@@ -1543,6 +1543,51 @@ let () =
           \n Usage: yesif i."
    (yes_no_if true)
 
+
+let trivial_if i s =
+  let env = EquivSequent.get_env s in
+  let system = EquivSequent.get_system s in
+  match nth i (EquivSequent.get_biframe s) with
+  | before, elem, after ->
+    (* search for the first occurrence of a hash in [e] *)
+    begin match (get_ite ~system elem) with
+    | None ->
+      Tactics.soft_failure
+        (Tactics.Failure
+          "can only be applied on a term with at least one occurrence
+          of an if then else term")
+    | Some (c,t,e) ->
+      let trace_goal  = Prover.Goal.Trace
+          (TraceSequent.init ~system (Term.Atom (`Message (`Eq,t,e)))
+           |> TraceSequent.set_env env
+          )
+      in
+      let new_elem =
+        EquivSequent.apply_subst_frame
+          [Term.ESubst (Term.ITE (c,t,e),t)]
+          [elem]
+      in
+      let biframe = List.rev_append before (new_elem @ after) in
+      [ trace_goal;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    end
+  | exception Out_of_range ->
+     Tactics.soft_failure (Tactics.Failure "out of range position")
+
+let () =
+ T.register_general "trivialif"
+   ~help:"Simplify a conditional when the two branches are equal.\
+          \n Usage: trivialif i."
+   (function
+     | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match trivial_if i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+     | _ -> Tactics.hard_failure (Tactics.Failure "integer expected")
+)
+
+
 (* allows to replace inside the positive branch of an if then else a term by
    another, if the condition implies there equality. *)
 let ifeq i t1 t2 s sk fk =
