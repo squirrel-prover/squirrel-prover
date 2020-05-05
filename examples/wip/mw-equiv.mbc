@@ -87,8 +87,8 @@ depends R(r), R2(r).
 (* proof of lemma: WA => Cond *)
 exists i,t.
 
-(* STILL TO DO: j'aimerais faire fadup sur 0 mais pas le droit ! *)
-(* je crois qu'il ne faut d'abord travailler sur 1 et faire un prf sous le try find *)
+fa 1. fadup 0.
+(* TODO PDF under try find *)
 admit.
 
 (* Case R2  - WIP *)
@@ -111,16 +111,12 @@ split.
 project.
 (* left *)
 euf M1.
-substitute r1, r.
-admit. (* R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
 exists i,t1.
 assert (nr(r) = input@T(i,t1)).
 fresh M3.
 depends R(r), R1(r).
 (* right *)
 euf M1.
-substitute r1, r.
-admit. (*  R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
 exists i,t.
 assert (nr(r) = input@T(i,t)).
 fresh M3.
@@ -129,7 +125,6 @@ depends R(r), R1(r).
 (* proof of lemma: WA => Cond *)
 exists i,t.
 fadup 0.
-
 
 (* Case T - DONE *)
 expand frame@T(i,t); expand exec@T(i,t).
@@ -142,16 +137,6 @@ prf 3. (* we apply PRF inside XOR to be able to use XOR tactic later on *)
 yesif 3.
 apply tags_neq.
 project.
-repeat split.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
-assert (fst(input@R2(r)) = nt(i,t)).
-fresh M2.
-repeat split.
-assert (fst(input@R2(r)) = nt(i,t)).
-fresh M2.
 assert (fst(input@R1(r)) = nt(i,t)).
 fresh M2.
 assert (fst(input@R1(r)) = nt(i,t)).
