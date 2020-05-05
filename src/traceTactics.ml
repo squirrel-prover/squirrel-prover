@@ -1310,51 +1310,54 @@ let () =
 let collision_resistance (s : TraceSequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
-  let hashes = List.filter
+  let hashes =
+    List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
             Symbols.is_ftype hash Symbols.Hash
-              && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
+            && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
   if List.length hashes = 0 then
     fk Tactics.NoSSC
   else
-    begin
-      let rec make_eq hash_list =
-        match hash_list with
-        | [] -> []
-        | h1::q -> List.fold_left (fun acc h2 ->
-            match h1, h2 with
-            | Fun ((hash, _), [_; Name key1]), Fun ((hash2, _), [_; Name key2])
-              when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
-            | _ -> acc
-          ) [] q
-      in
-      let s,trs = TraceSequent.get_trs s in
-      let hash_eqs = make_eq hashes
-                     |> List.filter (fun eq -> Completion.check_equalities
-                                        (trs) [eq])
-      in
-      let new_facts =
-        List.fold_left (fun acc (h1,h2) ->
-            match h1, h2 with
-            | Fun ((hash, _), [m1; Name key1]),
-              Fun ((hash2, _), [m2; Name key2])
-              when hash = hash2 && key1 = key2 ->
-              Term.Atom (`Message (`Eq, m1, m2)) :: acc
-            | _ -> acc
-          ) [] hash_eqs
-      in
-      let s =
-        List.fold_left (fun s f ->
-            TraceSequent.add_formula f s
-          ) s new_facts
-      in
-      sk [s] fk
-    end
+    let rec make_eq acc hash_list =
+      match hash_list with
+      | [] -> acc
+      | h1::q ->
+          List.fold_left
+            (fun acc h2 ->
+               match h1, h2 with
+               | Fun ((hash1, _), [_; Name key1]),
+                 Fun ((hash2, _), [_; Name key2])
+                 when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
+               | _ -> acc)
+            (make_eq acc q) q
+    in
+    let s,trs = TraceSequent.get_trs s in
+    let hash_eqs =
+      make_eq [] hashes
+      |> List.filter (fun eq -> Completion.check_equalities trs [eq])
+    in
+    let new_facts =
+      List.fold_left
+        (fun acc (h1,h2) ->
+           match h1, h2 with
+           | Fun ((hash1, _), [m1; Name key1]),
+             Fun ((hash2, _), [m2; Name key2])
+             when hash1 = hash2 && key1 = key2 ->
+             Term.Atom (`Message (`Eq, m1, m2)) :: acc
+           | _ -> acc)
+        [] hash_eqs
+    in
+    let s =
+      List.fold_left
+        (fun s f -> TraceSequent.add_formula f s)
+        s new_facts
+    in
+    sk [s] fk
 
 let () = T.register "collision"
     ~help:"Collects all equalities between hashes, and affs the equalities of \
