@@ -1449,10 +1449,27 @@ let equiv t1 t2 (s : EquivSequent.t) sk fk =
     in
     sk subgoals fk
   | exception (Theory.Conv e) ->
+    begin
+    match Theory.convert tsubst t1 Sorts.Message,
+        Theory.convert tsubst t2 Sorts.Message with
+  | m1,m2 ->
+    (* goal for the equivalence of t1 and t2 *)
+    let trace_sequent =
+      TraceSequent.init ~system
+        (Term.Atom (`Message (`Eq,m1,m2)))
+      |> TraceSequent.set_env env
+    in
+    let subgoals =
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv
+          (EquivSequent.apply_subst [Term.ESubst (m1,m2)] s) ]
+    in
+    sk subgoals fk
+  | exception (Theory.Conv e) ->
     Tactics.soft_failure
       (Tactics.Failure
          (Fmt.str "%a" Theory.pp_error e))
-
+end
 let () = T.register_general "equivalent"
   ~help:"Replace all occurrences of a formula by another, and ask to prove \
          \n that they are equivalent.
