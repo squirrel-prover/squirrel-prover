@@ -953,18 +953,32 @@ let prf i s =
             "PRF can only be applied on a term with at least one occurrence
             of a hash term h(t,k)")
       | Some hash ->
-        let phi_left = mk_prf_phi_proj Term.Left system env biframe e hash in
-        let phi_right = mk_prf_phi_proj Term.Right system env biframe e hash in
-        let _,n = Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
-        let if_term =
-          Term.ITE
-            (combine_conj_formulas phi_left phi_right,
-            Term.Name (n,[]),
-            hash) in
-        let new_elem =
-          EquivSequent.apply_subst_frame [Term.ESubst (hash,if_term)] [e] in
-        let biframe = (List.rev_append before (new_elem @ after)) in
-        [EquivSequent.set_biframe s biframe]
+        (* Context with bound variables (eg try find) are not (yet) supported.
+         * We use the fact that bound variables are renamed in the iterator,
+         * these new fresh names start by "_". *)
+        let vars = Term.get_vars hash in
+        if
+          (List.exists
+            (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
+            vars)
+        then
+          Tactics.soft_failure (Tactics.Failure "application of this tactic \
+            inside a context that bind variables is not supported")
+        else
+          let phi_left =
+            mk_prf_phi_proj Term.Left system env biframe e hash in
+          let phi_right =
+            mk_prf_phi_proj Term.Right system env biframe e hash in
+          let _,n = Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
+          let if_term =
+            Term.ITE
+              (combine_conj_formulas phi_left phi_right,
+              Term.Name (n,[]),
+              hash) in
+          let new_elem =
+            EquivSequent.apply_subst_frame [Term.ESubst (hash,if_term)] [e] in
+          let biframe = (List.rev_append before (new_elem @ after)) in
+          [EquivSequent.set_biframe s biframe]
       end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
@@ -1412,16 +1426,28 @@ let apply_yes_no_if b i s =
           "can only be applied on a term with at least one occurrence
           of an if then else term")
     | Some (c,t,e) ->
-      let branch, trace_goal =
-        simplify_ite b env system c t e in
-      let new_elem =
-        EquivSequent.apply_subst_frame
-          [Term.ESubst (Term.ITE (c,t,e),branch)]
-          [elem]
-      in
-      let biframe = List.rev_append before (new_elem @ after) in
-      [ trace_goal;
-        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+      (* Context with bound variables (eg try find) are not (yet) supported.
+       * We use the fact that bound variables are renamed in the iterator,
+       * these new fresh names start by "_". *)
+      let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
+      if
+        (List.exists
+          (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
+          vars)
+      then
+        Tactics.soft_failure (Tactics.Failure "application of this tactic \
+          inside a context that bind variables is not supported")
+      else
+        let branch, trace_goal =
+          simplify_ite b env system c t e in
+        let new_elem =
+          EquivSequent.apply_subst_frame
+            [Term.ESubst (Term.ITE (c,t,e),branch)]
+            [elem]
+        in
+        let biframe = List.rev_append before (new_elem @ after) in
+        [ trace_goal;
+          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
     end
   | exception Out_of_range ->
      Tactics.soft_failure (Tactics.Failure "out of range position")
