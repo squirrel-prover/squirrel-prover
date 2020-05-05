@@ -1418,7 +1418,7 @@ let apply_yes_no_if b i s =
   let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
-    (* search for the first occurrence of a hash in [e] *)
+    (* search for the first occurrence of a conditional in [e] *)
     begin match (get_ite ~system elem) with
     | None ->
       Tactics.soft_failure
@@ -1473,6 +1473,176 @@ let () =
           \n i-th position is True.\
           \n Usage: yesif i."
    (yes_no_if true)
+
+(* Replace (some) subterms of term by if f then ... else zero.
+ * For conditionals, add f as a logical implication. *)
+let add_formula f term deep =
+  let zero = Term.Fun (Term.f_zero,[]) in
+
+  let rec add_term : type a. a term -> a term = fun t -> match t with
+  | ITE (a, b, c) -> ITE (Term.Impl (f,a), add_term b, add_term c)
+  | Fun _ as func -> ITE (f, func, zero)
+  | Diff (a, b) -> Diff (add_term a, add_term b)
+  | Seq (a, b) -> Seq (a, add_term b)
+  | Find (vs, b, t, e) -> Find (vs, b, add_term t, add_term e)
+  | ForAll (vs, b) -> ForAll (vs, add_term b)
+  | Exists (vs, b) -> Exists (vs, add_term b)
+  | term -> term
+
+  and add_term_deep : type a. a term -> a term = fun t -> match t with
+  | ITE (a, b, c) -> ITE (Term.Impl (f,a), add_term_deep b, add_term_deep c)
+  | Fun (f,terms) when f = Term.f_xor -> Fun (f, List.map add_term_deep terms)
+  | Fun _ as func -> ITE (f, func, zero)
+  | Diff (a, b) -> Diff (add_term_deep a, add_term_deep b)
+  | Seq (a, b) -> Seq (a, add_term_deep b)
+  | Find (vs, b, t, e) -> Find (vs, b, add_term_deep t, add_term_deep e)
+  | ForAll (vs, b) -> ForAll (vs, add_term_deep b)
+  | Exists (vs, b) -> Exists (vs, add_term_deep b)
+  | term -> term
+
+  in
+  if deep then add_term_deep term else add_term term
+
+let ifcond i f deep s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let cond, positive_branch, negative_branch =
+      match e with
+      | EquivSequent.Message ITE (c,t,e) -> (c, t, e)
+      | _ ->  Tactics.soft_failure
+                (Tactics.Failure "can only be applied to a conditional")
+    in
+    let env = EquivSequent.get_env s in
+    let system = EquivSequent.get_system s in
+    let tsubst = Theory.subst_of_env env in
+    begin match Theory.convert tsubst f Sorts.Boolean with
+    | f ->
+      let new_elem =
+        EquivSequent.Message (ITE (cond,
+          add_formula f positive_branch deep,
+          negative_branch))
+      in
+      let biframe = List.rev_append before (new_elem :: after) in
+      let trace_sequent = TraceSequent.init ~system Term.(Impl(cond, f))
+        |> TraceSequent.set_env env in
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    | exception Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
+    end
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "out of range position")
+
+(* This tactic is unused, I keep only in case we might eventually use it.
+ * It is a more specific version of ifcond: we can give the subterm that we
+ * we want to replace by if f then ... else zero. *)
+let ifcondbis i f m s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let cond, positive_branch, negative_branch =
+      match e with
+      | EquivSequent.Message ITE (c,t,e) -> (c, t, e)
+      | _ ->  Tactics.soft_failure
+                (Tactics.Failure "can only be applied to a conditional")
+    in
+    let env = EquivSequent.get_env s in
+    let system = EquivSequent.get_system s in
+    let tsubst = Theory.subst_of_env env in
+    begin match Theory.convert tsubst f Sorts.Boolean,
+                Theory.convert tsubst m Sorts.Message with
+    | f, m ->
+      let ite = Term.ITE (f,m,Term.Fun (Term.f_zero,[])) in
+      let new_elem =
+        EquivSequent.Message (ITE (cond,
+          Term.subst [Term.ESubst (m,ite)] positive_branch,
+          negative_branch))
+      in
+      let biframe = List.rev_append before (new_elem :: after) in
+      let trace_sequent = TraceSequent.init ~system Term.(Impl(cond, f))
+        |> TraceSequent.set_env env in
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    | exception Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
+    end
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "out of range position")
+
+let () =
+  T.register_general "ifcond"
+    ~help: "If the given conditional implies that the given formula f is true \
+            in the then branch, replace subterms inside this then branch by\
+            if f then ... else zero.\
+           \n Usage: ifcond i,f."
+    (function
+      | [Prover.Int i; Prover.Theory f] ->
+        only_equiv
+          (fun s sk fk -> match ifcond i f false s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+      (* | [Prover.Int i; Prover.Theory f; Prover.Theory m] ->
+        only_equiv
+          (fun s sk fk -> match ifcondbis i f m s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e) *)
+       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
+let () =
+ T.register_general "ifcond_deep"
+   ~help: "If the given conditional implies that the given formula f is true \
+           in the then branch, replace subterms inside this then branch by\
+           if f then ... else zero. \
+           This version goes deeper (ie under xor constructs).\
+          \n Usage: ifcond_deep i,f."
+   (function
+     | [Prover.Int i; Prover.Theory f] ->
+       only_equiv
+         (fun s sk fk -> match ifcond i f true s with
+           | subgoals -> sk subgoals fk
+           | exception (Tactics.Tactic_soft_failure e) -> fk e)
+      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
+let fafind i s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let vars, positive_branch, negative_branch =
+      match e with
+      | EquivSequent.Message Find (vs,_,t,e) -> (vs, t, e)
+      | _ ->  Tactics.soft_failure
+      (Tactics.Failure "can only be applied to a try find")
+    in
+    let env = ref (EquivSequent.get_env s) in
+    let system = EquivSequent.get_system s in
+    let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+    let subst =
+      List.map2
+        (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+        vars vars'
+    in
+    let positive_branch' = Term.subst subst positive_branch in
+    let negative_branch' = Term.subst subst negative_branch in
+    let biframe =
+      List.rev_append
+        before
+        (EquivSequent.Message positive_branch' ::
+          (EquivSequent.Message negative_branch' :: after))
+    in
+    [ Prover.Goal.Equiv
+        (EquivSequent.set_env !env (EquivSequent.set_biframe s biframe)) ]
+  | exception Out_of_range ->
+  Tactics.soft_failure (Tactics.Failure "out of range position")
+
+let () =
+ T.register_general "fafind"
+   ~help: "Replaces a try find term by its positive and negative branches\
+           where variables bounded by the find are chosen fresh.\
+          \n Usage: fafind i."
+   (function
+     | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match fafind i s with
+           | subgoals -> sk subgoals fk
+           | exception (Tactics.Tactic_soft_failure e) -> fk e)
+      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
 
 (* allows to replace inside the positive branch of an if then else a term by
    another, if the condition implies there equality. *)

@@ -33,10 +33,10 @@ process reader =
   new nr;
   out(c,nr);
   in(c,m);
-  if exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(m)) 
+  if exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(m))
                = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) then
-    out(c, try find i,t such that 
-           xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in 
+    out(c, try find i,t such that
+           xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
           xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
     out(c,error)
@@ -63,11 +63,11 @@ expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
 
 equivalent
-(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
                  H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-(exists (i,t:index), T(i,t) < R1(r) && 
+(exists (i,t:index), T(i,t) < R1(r) &&
  snd(output@T(i,t)) = snd(input@R1(r)) &&
- fst(output@T(i,t)) = fst(input@R1(r)) &&  
+ fst(output@T(i,t)) = fst(input@R1(r)) &&
  input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
 
 apply tags_neq.
@@ -90,101 +90,48 @@ depends R(r), R2(r).
 (* proof of lemma: WA => Cond *)
 exists i,t.
 
-(* STILL TO DO: j'aimerais faire fadup sur 0 mais pas le droit ! *)
-(* je crois qu'il ne faut d'abord travailler sur 1 et faire un prf sous le try find *)
- fa 1. fadup 0.
-addvar.
-addvar.
-enrich H(<tag1,<nr(r),fst(input@R1(r))>>,
- diff(key(d),key'(d,d1))).
-admit 3.
-prf 0.
- yesif 0.
- apply tags_neq.
- project; split.
+(* BEGIN (tests to work around PRF under context with bounded variables) *)
+fa 1. fadup 0.
 
- admit. (* branche else, similaire then *)
+ifcond 2, exec@pred(R1(r)).
+fa 2.
+fadup 2.
+fafind 2.
+prf 2.
+ifcond_deep 2, exec@pred(R1(r)).
+fa 2.
+yesif 2.
 
- assert exec@pred(R1(r)).
- admit.
- assert cond@T1(d,t).
- admit.
- expand cond@T1(d,t).
- assert (H(<tag1,<input@T(d,t),nt(d,t)>>,key(d)) = xor(input@T1(d,t),id(d))).
- euf M3.
- substitute.
- case H1.
- depends T(d,t),T1(d,t).
+project.
 
- assert exec@pred(R1(r)).
- admit.
- assert cond@T1(d,t).
- admit.
- expand cond@T1(d,t).
- assert (H(<tag1,<input@T(d,t),nt(d,t)>>,key'(d,t)) = xor(input@T1(d,t),id'(d,t))).
- euf M3.
- substitute.
- case H1.
- depends T(d,t),T1(d,t).
- admit. (* else *)
+(* left *)
+apply tags_neq. repeat split.
 
- ******
+admit. (* branche else, similaire then *)
 
- try find i,t such that xor((diff(id(i), id'(i,t))),snd(
-                                                                   input@R1(
-                                                                   r)))
-                                                               =
-                                                               H(<tag0,
-                                                                  <nr(
-                                                                   r),
-                                                                   fst(
-                                                                   input@R1(
-                                                                   r))>>,
-                                                                 (diff(key(
-                                                                  i), key'(
-                                                                  i,t)))) in
-								  i),
-								  key'(
-							       try find i,t such that xor((diff(id(
-                                                                    i), id'(
-                                                                    i,t))),
-                                                                   snd(
-                                                                   input@R1(
-                                                                   r)))
-                                                               =
-                                                               H(<tag0,
-                                                                  <nr(
-                                                                   r),
-                                                                   fst(
-                                                                   input@R1(
-                                                                   r))>>,
-                                                                 (diff(key(
-                                                                  i), key'(
-                                                                  i,t)))) in
-								  i,
-							      try find i,t such that xor((diff(id(
-                                                                    i), id'(
-                                                                    i,t))),
-                                                                   snd(
-                                                                   input@R1(
-                                                                   r)))
-                                                               =
-                                                               H(<tag0,
-                                                                  <nr(
-                                                                   r),
-                                                                   fst(
-                                                                   input@R1(
-                                                                   r))>>,
-                                                                 (diff(key(
-                                                                  i), key'(
-                                                                  i,t)))) in
-								  t))).
+assert cond@T1(i,t1).
+executable pred(R1(r)). apply H1 to T1(i,t1).
+expand exec@T1(i,t1). expand cond@T1(i,t1).
+assert (H(<tag1,<input@T(i,t1),nt(i,t1)>>,key(i)) = xor(input@T1(i,t1),id(i))).
+euf M3.
+substitute. case H1.
+depends T(i,t1), T1(i,t1).
 
- diff(key(i), key'(i,t))).
-admit 3.
-prf 0.
-yesif 0.
-admit.
+(* right *)
+apply tags_neq. repeat split.
+
+assert cond@T1(i,t).
+executable pred(R1(r)). apply H1 to T1(i,t).
+expand exec@T1(i,t). expand cond@T1(i,t).
+assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key'(i,t)) = xor(input@T1(i,t),id'(i,t))).
+euf M3.
+substitute. case H1.
+depends T(i,t), T1(i,t).
+
+admit. (* branche else, similaire then *)
+
+xor 2,n_PRF.
+(* END *)
 
 (* Case R2  - WIP *)
 expand frame@R2(r); expand exec@R2(r).
@@ -192,11 +139,11 @@ expand cond@R2(r); expand output@R2(r).
 
 
 equivalent
-(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) = 
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
                  H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
-(exists (i,t:index), T(i,t) < R2(r) && 
+(exists (i,t:index), T(i,t) < R2(r) &&
  snd(output@T(i,t)) = snd(input@R2(r)) &&
- fst(output@T(i,t)) = fst(input@R2(r)) &&  
+ fst(output@T(i,t)) = fst(input@R2(r)) &&
  input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
 
 
@@ -254,4 +201,3 @@ fresh M2.
 xor 3, n_PRF. (* we now have a fresh name instead of a hash in the XOR biterm *)
 fresh 2. yesif 2.
 Qed.
-
