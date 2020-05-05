@@ -993,6 +993,7 @@ let cca1 i s =
       | Some (Term.Fun ((fnenc,_), [m; Term.Name r;
                                     Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
               as enc) when Symbols.is_ftype fnpk Symbols.PublicKey
+                        && Symbols.is_ftype fnenc Symbols.AEnc
         ->
         begin
           match Symbols.Function.get_data fnenc with
@@ -1018,7 +1019,9 @@ let cca1 i s =
                 (* we create the fresh cond reachability goal *)
                 let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
                 let fresh_goal = Prover.Goal.Trace
-                                   (TraceSequent.init ~system random_fresh_cond)
+                    (TraceSequent.init ~system random_fresh_cond
+                    |> TraceSequent.set_env env
+                    )
                 in
                 let new_elem =
                   EquivSequent.apply_subst_frame
