@@ -28,6 +28,8 @@ type function_def =
   | Hash
   | AEnc
   | ADec
+  | SEnc
+  | SDec
   | Sign
   | CheckSign
   | PublicKey

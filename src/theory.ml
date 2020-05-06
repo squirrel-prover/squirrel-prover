@@ -169,6 +169,11 @@ let function_kind f : kind list * kind =
                             Sorts.emessage
     | Function (_, ADec) -> [Sorts.emessage; Sorts.emessage],
                             Sorts.emessage
+    | Function (_, SEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage],
+                            Sorts.emessage
+    | Function (_, SDec) -> [Sorts.emessage; Sorts.emessage],
+                            Sorts.emessage
+
     | Function (_, Sign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, CheckSign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
     | Function (_, PublicKey) -> [Sorts.emessage], Sorts.emessage
@@ -307,7 +312,8 @@ let rec convert :
         | Sorts.Message ->
             let open Symbols in
             begin match of_string f with
-              | Wrapped (s, Function (_,(Hash|AEnc|ADec|Sign|CheckSign|PublicKey|Abstract _))) ->
+              | Wrapped (s, Function (_,(Hash|AEnc|ADec|SEnc|SDec|Sign|CheckSign|
+                                        PublicKey|Abstract _))) ->
                   Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in
@@ -536,14 +542,19 @@ let declare_symbol name info =
 
 let declare_hash s = declare_symbol s Symbols.Hash
 
-let declare_aenc s = declare_symbol s Symbols.AEnc
-
 let declare_aenc enc dec pk =
   let t = Symbols.dummy_table in
   let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.ADec) in
   let _, pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
   let data = Symbols.AssociatedFunctions [dec; pk] in
   ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.AEnc))
+
+let declare_senc enc dec =
+  let t = Symbols.dummy_table in
+  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [dec] in
+  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+
 
 let declare_signature sign checksign pk =
   let t = Symbols.dummy_table in
@@ -598,6 +609,12 @@ let make_term ?at_ts s l =
               if List.length l <> 3 then raise @@ arity_error 3 ;
               Fun (s,l,None)
           | Symbols.ADec ->
+              if List.length l <> 2 then raise @@ arity_error 2 ;
+              Fun (s,l,None)
+          | Symbols.SEnc ->
+              if List.length l <> 3 then raise @@ arity_error 3 ;
+              Fun (s,l,None)
+          | Symbols.SDec ->
               if List.length l <> 2 then raise @@ arity_error 2 ;
               Fun (s,l,None)
           | Symbols.Sign ->

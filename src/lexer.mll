@@ -71,6 +71,7 @@ rule token = parse
 | "system"            { SYSTEM }
 | "hash"              { HASH }
 | "aenc"              { AENC }
+| "senc"              { SENC }
 | "signature"         { SIGNATURE }
 | "init"              { INIT }
 | "index"             { INDEX }

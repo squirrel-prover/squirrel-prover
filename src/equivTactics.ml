@@ -1000,49 +1000,69 @@ let cca1 i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of an asymmetric encryption in [e] *)
-    begin match Iter.get_ftype ~system e Symbols.AEnc with
-      | Some (Term.Fun ((fnenc,_), [m; Term.Name r;
+    let hide_enc enc fnenc m fnpk sk fndec r =
+            (* to check that the encryption is not under a dec, we replace the
+               enc by zero and check that dec does not occur inside the new
+               term. *)
+      if occurrences_of_frame ~system
+          (EquivSequent.apply_subst_frame
+             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+          fndec sk
+         <> [] then
+        Tactics.soft_failure
+          (Tactics.Failure
+             "The first encryption symbols occurs under a decryption.");
+      (* we now check that the random is fresh, and the key satisfy the
+               side condition. *)
+      begin
+        try
+          Euf.hash_key_ssc ~messages:[enc] ~pk:(fnpk) ~system fndec sk;
+          (* we create the fresh cond reachability goal *)
+          let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+          let fresh_goal = Prover.Goal.Trace
+              (TraceSequent.init ~system random_fresh_cond
+               |> TraceSequent.set_env env
+              )
+          in
+          let new_elem =
+            EquivSequent.apply_subst_frame
+              [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
+                           )] [e] in
+          let biframe = (List.rev_append before (new_elem @ after)) in
+          [fresh_goal;
+           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+      end
+    in
+    (* search for the first occurrence of  an asymmetric encryption in [e] *)
+    begin match (Iter.get_ftypes ~system e Symbols.AEnc)
+                @ (Iter.get_ftypes ~system e Symbols.SEnc)   with
+      | (Term.Fun ((fnenc,_), [m; Term.Name r;
                                     Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
-              as enc) when Symbols.is_ftype fnpk Symbols.PublicKey
-                        && Symbols.is_ftype fnenc Symbols.AEnc
+              as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey
+                                 && Symbols.is_ftype fnenc Symbols.AEnc)
         ->
         begin
           match Symbols.Function.get_data fnenc with
           (* we check that the encryption function is used with the associated
              public key *)
-          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-            (* to check that the encryption is not under a dec, we replace the
-               enc by zero and check that dec does not occur inside the new
-               term. *)
-            if occurrences_of_frame ~system
-                (EquivSequent.apply_subst_frame
-                   [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
-                fndec sk
-               <> [] then
-              Tactics.soft_failure
-                (Tactics.Failure
-                   "The first encryption symbols occurs under a decryption.");
-            (* we now check that the random is fresh, and the key satisfy the
-               side condition. *)
-            begin
-              try
-                Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
-                (* we create the fresh cond reachability goal *)
-                let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
-                let fresh_goal = Prover.Goal.Trace
-                    (TraceSequent.init ~system random_fresh_cond
-                    |> TraceSequent.set_env env
-                    )
-                in
-                let new_elem =
-                  EquivSequent.apply_subst_frame
-                    [Term.ESubst (enc, Term.Fun (Term.f_len, [m]))] [e] in
-                let biframe = (List.rev_append before (new_elem @ after)) in
-                [fresh_goal;
-                 Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-            end
+          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
+            -> hide_enc enc fnenc m (Some fnpk) sk fndec r
+          | _ ->
+            Tactics.soft_failure
+              (Tactics.Failure
+                 "The first encryption symbol is not used with the correct public \
+                  key function.")
+        end
+      | (Term.Fun ((fnenc,_), [m; Term.Name r; Term.Name (sk,isk)])
+              as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc
+        ->
+        begin
+          match Symbols.Function.get_data fnenc with
+          (* we check that the encryption function is used with the associated
+             public key *)
+          | Symbols.AssociatedFunctions [fndec]
+            -> hide_enc enc fnenc m (None) sk fndec r
           | _ ->
             Tactics.soft_failure
               (Tactics.Failure
@@ -1086,7 +1106,50 @@ let enckp i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of an asymmetric encryption *)
+    (* search for the first occurrence of a hash in [e] *)
+    let hide_enc fnenc enc fndec sk fnpk r fnenci fnpki m isk=
+      (* to check that the encryption is not under a dec, we replace the
+         enc by zero and check that dec does not occur inside the new
+         term. *)
+      if occurrences_of_frame ~system
+          (EquivSequent.apply_subst_frame
+             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+          fndec sk
+         <> [] then
+        Tactics.soft_failure
+          (Tactics.Failure
+             "The first encryption symbols occurs under a decryption.");
+      (* we now check that the random is fresh, and the key satisfy the
+         side condition. *)
+      begin
+        try
+          Euf.hash_key_ssc ~messages:[enc] ~pk:fnpk ~system fndec sk;
+          (* we create the fresh cond reachability goal *)
+          let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+          let fresh_goal = Prover.Goal.Trace
+              (TraceSequent.init ~system random_fresh_cond
+               |> TraceSequent.set_env env)
+          in
+          let newenc =
+            match fnpk,fnpki with
+            | Some fnpk, Some fnpki ->
+              Term.Fun ((fnenc,fnenci),
+                        [m; Term.Name r;
+                         Term.Fun ((fnpk,fnpki), [
+                             Term.Name (sk,isk)
+                           ])])
+            | _, _ -> Term.Fun ((fnenc,fnenci),
+                                [m; Term.Name r; Term.Name (sk,isk)])
+          in
+          let new_elem =
+            EquivSequent.apply_subst_frame [Term.ESubst (enc,newenc)] [e]
+          in
+          let biframe = (List.rev_append before (new_elem @ after)) in
+          [fresh_goal;
+           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+      end
+    in
     let rec find_enc lenc =
       match lenc with
         | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
@@ -1100,42 +1163,25 @@ let enckp i s =
             (* we check that the encryption function is used with the associated
                public key *)
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-              (* to check that the encryption is not under a dec, we replace the
-                 enc by zero and check that dec does not occur inside the new
-                 term. *)
-              if occurrences_of_frame ~system
-                  (EquivSequent.apply_subst_frame
-                     [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
-                  fndec sk
-                 <> [] then
-                Tactics.soft_failure
-                  (Tactics.Failure
-                     "The first encryption symbols occurs under a decryption.");
-              (* we now check that the random is fresh,
-                 and the key satisfies the side condition. *)
-              begin
-                try
-                  Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
-                  (* we create the fresh cond reachability goal *)
-                  let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
-                  let fresh_goal = Prover.Goal.Trace
-                      (TraceSequent.init ~system random_fresh_cond
-                       |> TraceSequent.set_env env)
-                  in
-                  let new_elem =
-                    EquivSequent.apply_subst_frame
-                      [Term.ESubst (enc,
-                                    Term.Fun ((fnenc,fnenci),
-                                              [m; Term.Name r;
-                                               Term.Fun ((fnpk,fnpki), [
-                                                   Term.Name (sk,isk)
-                                                 ])])
-                                   )] [e] in
-                  let biframe = (List.rev_append before (new_elem @ after)) in
-                  [fresh_goal;
-                   Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
-                with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-              end
+              hide_enc fnenc enc fndec sk (Some fnpk) r fnenci (Some fnpki) m isk
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct \
+                    public key function.")
+          end
+        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
+                                          Term.Diff(  Term.Name (sk,isk),
+                                                      Term.Name (sk2,isk2))
+                                        ])
+           as enc) :: q when Symbols.is_ftype fnenc Symbols.AEnc
+          ->
+          begin
+            match Symbols.Function.get_data fnenc with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec] ->
+              hide_enc fnenc enc fndec sk None r fnenci None m isk
             | _ ->
               Tactics.soft_failure
                 (Tactics.Failure
@@ -1149,7 +1195,8 @@ let enckp i s =
                "Key Privact can only be applied on a term with at least one \
                 occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
     in
-    find_enc (Iter.get_ftypes ~system e Symbols.AEnc)
+    find_enc ((Iter.get_ftypes ~system e Symbols.AEnc)
+              @ (Iter.get_ftypes ~system e Symbols.SEnc))
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
 

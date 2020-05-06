@@ -11,7 +11,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC SIGNATURE NAME ABSTRACT MUTABLE SYSTEM
+%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
@@ -223,7 +223,9 @@ declaration:
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
                                    Prover.define_hash_tag_formula $2 f }
 | AENC e=ID COMMA d=ID COMMA p=ID
-                                 { Theory.declare_aenc e d p }
+    { Theory.declare_aenc e d p }
+| SENC e=ID COMMA d=ID
+                                 { Theory.declare_senc e d }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID

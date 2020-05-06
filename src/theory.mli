@@ -64,6 +64,12 @@ val declare_hash : string -> unit
     It satisfies CCA2. *)
 val declare_aenc : string -> string -> string -> unit
 
+(** Symmetric encryption function symbols are defined by the couple
+    (enc,dec).
+    It satisfies CCA2. *)
+val declare_senc : string -> string -> unit
+
+
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
    It satisfies EUF. *)
 val declare_signature : string -> string -> string -> unit
