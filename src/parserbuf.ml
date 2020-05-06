@@ -177,14 +177,14 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       Channel.declare "c" ;
-      Theory.declare_abstract "error" [] Sorts.emessage ;
+      Theory.declare_abstract "error" 0 0 ;
       ignore (parse_process "in(c,x); out(c, if x=x then x else error)")
     end ;
     "Try", `Quick, begin fun () ->
       Channel.declare "c" ;
       Theory.declare_state "s" 1 Sorts.emessage ;
       Theory.declare_state "ss" 2 Sorts.emessage ;
-      Theory.declare_abstract "error" [] Sorts.emessage ;
+      Theory.declare_abstract "error" 0 0 ;
       ignore (parse_process "in(c,x); \
                              try find i such that s(i) = x in \
                                out(c,ss(i,i))

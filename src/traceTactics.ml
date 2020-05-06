@@ -1329,8 +1329,8 @@ let collision_resistance (s : TraceSequent.t) sk fk =
           List.fold_left
             (fun acc h2 ->
                match h1, h2 with
-               | Fun ((hash1, _), [_; Name key1]),
-                 Fun ((hash2, _), [_; Name key2])
+               | Fun (hash1, [_; Name key1]),
+                 Fun (hash2, [_; Name key2])
                  when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
                | _ -> acc)
             (make_eq acc q) q

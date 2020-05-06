@@ -19,16 +19,10 @@ type 'a indexed_symbol = 'a * Vars.index list
 type name = Symbols.name Symbols.t
 type nsymb = name indexed_symbol
 
-(** Function symbols, may represent primitives or abstract functions.
-  *
-  * In the theory, functions symbols are indexed, and we want to support
-  * them in the future. At the moment many functions of the code ignore
-  * indices of functions, hence the abstract type [unsupported_index].
-  * It should eventually be removed after a global update of the code. *)
+(** Function symbols, may represent primitives or abstract functions. *)
 
 type fname = Symbols.fname Symbols.t
-type unsupported_index
-type fsymb = Symbols.fname Symbols.t * unsupported_index list
+type fsymb = Symbols.fname Symbols.t * Vars.index list
 
 (** Macros are used to represent inputs, outputs, contents of state
   * variables, and let definitions: everything that is expanded when
@@ -178,9 +172,8 @@ val f_and : fsymb
 val f_or : fsymb
 val f_not : fsymb
 val f_ite : fsymb
+
 val f_diff : fsymb
-val f_left : fsymb
-val f_right : fsymb
 
 val f_succ : fsymb
 

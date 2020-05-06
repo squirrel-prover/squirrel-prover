@@ -1014,7 +1014,7 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      Symbols.run_restore @@ fun () ->
-       let fi = 0, Symbols.Abstract ([],Sorts.emessage) in
+       let fi = 0, Symbols.Abstract 0 in
        let table,ffs =
          Symbols.Function.declare_exact Symbols.empty_table "f" fi in
        let _,hfs =

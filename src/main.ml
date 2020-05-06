@@ -319,4 +319,20 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/xor.mbc")
     end ;
+    "Indexed abstract", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure
+           (Tactics.Failure "cannot automatically prove goal"))
+        (fun () -> run ~test "tests/alcotest/idx_abs.mbc")
+    end ;
+    "Indexed collision", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/idx_collision.mbc")
+    end ;
+    "Indexed EUF", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/idx_euf.mbc")
+    end ;
   ]

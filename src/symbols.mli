@@ -33,7 +33,7 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract of kind list * kind
+  | Abstract of int (** Message arity *)
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame

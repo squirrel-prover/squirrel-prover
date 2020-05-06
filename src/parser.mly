@@ -11,7 +11,8 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT MUTABLE SYSTEM
+%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT
+%token MUTABLE SYSTEM
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
@@ -201,7 +202,6 @@ opt_arg_list:
 | LPAREN arg_list RPAREN         { $2 }
 |                                { [] }
 
-
 name_type:
 | MESSAGE                        { 0 }
 | INDEX ARROW name_type          { 1+$3 }
@@ -214,12 +214,20 @@ state_type:
 | msg_or_bool                    { 0, $1 }
 | INDEX ARROW state_type         { let n,k = $3 in n+1,k }
 
+msg_type:
+| MESSAGE                        { 0 }
+| MESSAGE ARROW msg_type         { 1+$3 }
+
 abs_type:
-| msg_or_bool                    { [],$1 }
-| msg_or_bool ARROW abs_type     { let l,r = $3 in $1::l,r }
+| msg_type                       { 0,$1 }
+| INDEX ARROW abs_type           { let i,m = $3 in i+1,m }
+
+index_arity:
+|                                { 0 }
+| LPAREN INT RPAREN              { $2 }
 
 declaration:
-| HASH ID                        { Theory.declare_hash $2 }
+| HASH ID index_arity            { Theory.declare_hash ~index_arity:$3 $2 }
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
                                    Prover.define_hash_tag_formula $2 f }
 | AENC e=ID COMMA d=ID COMMA p=ID
@@ -233,8 +241,9 @@ declaration:
                                  { Theory.declare_signature s c p;
                                    Prover.define_hash_tag_formula s f }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
-| ABSTRACT ID COLON abs_type     { let l,r = $4 in
-                                   Theory.declare_abstract $2 l r }
+| ABSTRACT ID COLON abs_type     { let index_arity,message_arity = $4 in
+                                   Theory.declare_abstract
+                                     $2 ~index_arity ~message_arity }
 | MUTABLE ID COLON state_type    { Theory.declare_state $2 (fst $4) (snd $4) }
 | CHANNEL ID                     { Channel.declare $2 }
 | TERM ID opt_arg_list COLON msg_or_bool EQ term
