@@ -1,0 +1,40 @@
+channel cR
+channel cT
+
+name kE : message
+name kbE : index-> message
+
+name kH : message
+name kbH : index-> message
+
+hash h
+senc enc,dec
+
+name nr : index -> index -> message
+name nt : index -> index -> message
+
+name rt : index -> index -> message
+name rr : index -> index -> message
+
+axiom pair : forall (m:message), <fst(m),snd(m)> = m
+axiom dec : forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
+
+process Reader(i:index, j:index) =
+  out(cR, nr(i,j));
+  in(cR, mess);
+  let dmess = dec(fst(mess),  diff(kE,kbE(j))) in
+  if fst(dmess) = nr(i,j) && h(fst(mess), diff(kH,kbH(j))) = snd(mess)  then
+   let cypherR = enc(<snd(dmess),nr(i,j)>, rr(i,j), diff(kE,kbE(j))) in
+   out(cR, cypherR)
+
+process Tag(i:index, j:index) =
+  in(cT, nR);
+  let cypher = enc(<nR,nt(i,j)>, rt(i,j), diff(kE,kbE(j))) in
+
+  out(cT, <cypher,h(cypher, diff(kH,kbH(j)) )> )
+
+
+system (!_i  !_j Reader(i,j) | !_i !_j Tag(i,j)).
+
+goal auth : forall (i:index, j:index), (cond@Reader1(i,j) <=>
+  (exists (l,k:index), input@Reader1(i,j) = output@Tag(l,k) && fst( dec(fst( input@Reader1(i,j) ),  diff(kE,kbE(j)))) = nr(i,j) ) ).
