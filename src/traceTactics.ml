@@ -1070,14 +1070,8 @@ let () =
 (** EUF Axioms *)
 
 let euf_param (`Message at : message_atom) = match at with
-  | (`Eq, Fun ((checksign, _),
-               [s;
-               Fun ((pk,_), [Name key])
-               ]), m)
-  | (`Eq, m, Fun ((checksign, _),
-               [s;
-               Fun ((pk,_), [Name key])
-               ])) ->
+  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
+  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
       begin match Theory.check_signature checksign pk with
       | None ->
           Tactics.(soft_failure @@
@@ -1086,15 +1080,18 @@ let euf_param (`Message at : message_atom) = match at with
       | Some sign -> (sign, key, m, s, Some pk)
       end
 
-  | (`Eq, Fun ((hash, _), [m; Name key]), s) when Symbols.is_ftype hash Symbols.Hash ->
+  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+    when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
-  | (`Eq, s, Fun ((hash, _), [m; Name key])) when Symbols.is_ftype hash Symbols.Hash ->
+  | (`Eq, s, Fun ((hash, _), [m; Name key]))
+    when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
               "euf can only be applied to an hypothesis of the form h(t,k)=m \
-               or m=h(t,k) with h a hash function symbol")
+               or checksign(s,pk(k))=m (or symmetrically) \
+               for some hash or signature functions")
 
 let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   let open Euf in

@@ -108,7 +108,7 @@ class iter_approx_macros ~exact ~system = object (self)
 
 end
 
-(** Collect occurrences of [f(_,k(_))] for a function symbol [f] and name [k].
+(** Collect occurrences of [f(_,k(_))] for a function name [f] and name [k].
   * We use the exact version of [iter_approx_macros], otherwise
   * we might obtain meaningless terms provided by [get_dummy_definition]. *)
 class get_f_messages ~system f k = object (self)
@@ -134,14 +134,14 @@ class get_ftypes_term ~system symtype = object (self)
   method get_func = func
   method visit_message = function
     | Term.Fun ((fn,_), l) as fn_term ->
-        if  Symbols.is_ftype fn symtype
+        if Symbols.is_ftype fn symtype
         then func <-  fn_term :: func
         else List.iter self#visit_message l
     | m -> super#visit_message m
 end
 
-(** [get_ftype ~system elem ftype] returns None if there is no term in [elem]
-   with a function symbol head of the fiven ftype, Some fun otherwise, where
+(** [get_ftype ~system elem ftype] returns [None] if there is no term in [elem]
+   with a function symbol head of the fiven ftype, [Some fun] otherwise, where
    [fun] is the first term of the given type encountered. Does not explore
    macros. *)
 let get_ftype ~system elem stype =

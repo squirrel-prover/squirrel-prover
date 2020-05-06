@@ -220,11 +220,12 @@ let () = T.register_general "enrich"
        | [Prover.Theory v] -> pure_equiv (enrich v)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
+(** Function application *)
+
 exception No_common_head
 exception No_FA
 let fa_expand t =
-  let aux : type a. a Term.term -> EquivSequent.elem list =
-    function
+  let aux : type a. a Term.term -> EquivSequent.elem list = function
     | Fun (f,l) ->
       List.map (fun m -> EquivSequent.Message m) l
     | ITE (c,t,e) when t = e ->
@@ -249,11 +250,6 @@ let fa_expand t =
   | EquivSequent.Message e -> aux (Term.head_normal_biterm e)
   | EquivSequent.Formula e -> aux (Term.head_normal_biterm e)
 
-  (*| _ ->
-    Tactics.soft_failure
-      (Tactics.Failure "Unsupported: TODO") *)
-
-(** Function application *)
 let fa i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
@@ -955,7 +951,7 @@ let prf i s =
           EquivSequent.Formula (Term.head_normal_biterm f)
       in
       (* search for the first occurrence of a hash in [e] *)
-      begin match (Iter.get_ftype ~system e Symbols.Hash) with
+      begin match Iter.get_ftype ~system e Symbols.Hash with
       | None ->
         Tactics.soft_failure
           (Tactics.Failure
@@ -1004,8 +1000,8 @@ let cca1 i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of a hash in [e] *)
-    begin match (Iter.get_ftype ~system e Symbols.AEnc) with
+    (* search for the first occurrence of an asymmetric encryption in [e] *)
+    begin match Iter.get_ftype ~system e Symbols.AEnc with
       | Some (Term.Fun ((fnenc,_), [m; Term.Name r;
                                     Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
               as enc) when Symbols.is_ftype fnpk Symbols.PublicKey
@@ -1041,8 +1037,7 @@ let cca1 i s =
                 in
                 let new_elem =
                   EquivSequent.apply_subst_frame
-                    [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
-                                                              )] [e] in
+                    [Term.ESubst (enc, Term.Fun (Term.f_len, [m]))] [e] in
                 let biframe = (List.rev_append before (new_elem @ after)) in
                 [fresh_goal;
                  Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
@@ -1091,19 +1086,17 @@ let enckp i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of a hash in [e] *)
+    (* search for the first occurrence of an asymmetric encryption *)
     let rec find_enc lenc =
-      begin match lenc with
+      match lenc with
         | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
                                       Term.Fun ((fnpk,fnpki), [
-                                          Term.Diff(  Term.Name (sk,isk),
-                                                      Term.Name (sk2,isk2))
-                                        ])])
+                                          Term.Diff(Term.Name (sk,isk),
+                                                    Term.Name (sk2,isk2)) ])])
            as enc) :: q when Symbols.is_ftype fnpk Symbols.PublicKey
                           && Symbols.is_ftype fnenc Symbols.AEnc
           ->
-          begin
-            match Symbols.Function.get_data fnenc with
+          begin match Symbols.Function.get_data fnenc with
             (* we check that the encryption function is used with the associated
                public key *)
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
@@ -1118,8 +1111,8 @@ let enckp i s =
                 Tactics.soft_failure
                   (Tactics.Failure
                      "The first encryption symbols occurs under a decryption.");
-              (* we now check that the random is fresh, and the key satisfy the
-                 side condition. *)
+              (* we now check that the random is fresh,
+                 and the key satisfies the side condition. *)
               begin
                 try
                   Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
@@ -1155,7 +1148,6 @@ let enckp i s =
             (Tactics.Failure
                "Key Privact can only be applied on a term with at least one \
                 occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
-      end
     in
     find_enc (Iter.get_ftypes ~system e Symbols.AEnc)
   | exception Out_of_range ->
@@ -1532,8 +1524,8 @@ let apply_yes_no_if b i s =
   let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
-    (* search for the first occurrence of a hash in [e] *)
-    begin match (get_ite ~system elem) with
+    (* search for the first occurrence of an if-then-else in [elem] *)
+    begin match get_ite ~system elem with
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
@@ -1582,8 +1574,8 @@ let trivial_if i s =
   let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
-    (* search for the first occurrence of a hash in [e] *)
-    begin match (get_ite ~system elem) with
+    (* search for the first occurrence of an if-then-else in [elem] *)
+    begin match get_ite ~system elem with
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
