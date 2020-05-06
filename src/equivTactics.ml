@@ -1626,8 +1626,8 @@ let trivial_if i s =
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
-          "can only be applied on a term with at least one occurrence
-          of an if then else term")
+          "can only be applied on a term with at least one occurrence \
+           of an if then else term")
     | Some (c,t,e) ->
       let trace_goal  = Prover.Goal.Trace
           (TraceSequent.init ~system (Term.Atom (`Message (`Eq,t,e)))

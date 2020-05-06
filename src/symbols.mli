@@ -53,6 +53,8 @@ type action
 type fname
 type macro
 
+(** Information about symbol definitions, depending on the namespace.
+  * Integers refer to the index arity of symbols. *)
 type _ def =
   | Channel : unit -> channel def
   | Name : int -> name def

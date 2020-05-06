@@ -21,8 +21,8 @@ type term =
   (** Function symbol application,
     * where terms will be evaluated as indices or messages
     * depending on the type of the function symbol.
-    * The third argument is for the optional timestamp. This is used for
-    * the terms appearing in gols.*)
+    * The third argument is an optional timestamp, used when
+    * writing meta-logic formulas but not in processes. *)
   | Compare of Atom.ord*term*term
   | Happens of term
   | ForAll of (string * kind) list * term
@@ -312,8 +312,8 @@ let rec convert :
         | Sorts.Message ->
             let open Symbols in
             begin match of_string f with
-              | Wrapped (s, Function (_,(Hash|AEnc|ADec|SEnc|SDec|Sign|CheckSign|
-                                        PublicKey|Abstract _))) ->
+              | Wrapped (s, Function (_,(Hash|AEnc|ADec|SEnc|SDec|Sign|
+                                         CheckSign|PublicKey|Abstract _))) ->
                   Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in

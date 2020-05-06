@@ -481,7 +481,6 @@ and subst_generic_atom s = function
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
 
-
 (** Builtins *)
 
 let mk_fname ?(indices=0) f k_args k_ret =

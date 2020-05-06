@@ -229,7 +229,6 @@ let is_ftype s ftype =
     | _ -> false
     | exception Not_found -> failwith "symbol not found"
 
-
 module Macro = Make (struct
   type ns = macro
   type local_def = macro_def

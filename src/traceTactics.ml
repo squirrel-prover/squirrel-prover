@@ -918,14 +918,14 @@ let rec parse_substd tsubst s =
     begin
       match Theory.convert tsubst mterm Sorts.Boolean,
             Theory.convert tsubst b Sorts.Boolean with
-      |Term.Macro ((mn, sort, is),l,a), ncond ->
+      | Term.Macro ((mn, sort, is),l,a), ncond ->
         begin
           match a with
           | Action (symb,indices) ->
             begin
               let action = Action.of_term symb indices in
-              match Symbols.Macro.get_all mn with
-              | Symbols.Cond, _ -> Action.Condition (ncond, action)
+              match Symbols.Macro.get_def mn with
+              | Symbols.Cond -> Action.Condition (ncond, action)
                                    :: parse_substd tsubst q
               | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
             end
@@ -941,8 +941,8 @@ let rec parse_substd tsubst s =
               | Action (symb,indices) ->
                 begin
                   let action = Action.of_term symb indices in
-                  match Symbols.Macro.get_all mn with
-                  | Symbols.Output, _ -> Action.Output (nout, action)
+                  match Symbols.Macro.get_def mn with
+                  | Symbols.Output -> Action.Output (nout, action)
                                          :: parse_substd tsubst q
                   | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
                 end
