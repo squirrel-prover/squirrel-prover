@@ -299,21 +299,21 @@ let is_dup elem elems =
    replaced by the assumptions that appear as there subterms. *)
 let rec filter_fa_dup res assump elems =
   let rec is_fa_dup acc elems e =
-  (* if an element is a duplicate appearing in elems, we remove it directly *)
-  if is_dup e elems then
-    (true,[])
-    (* if an elemnt is an assumption, we succeed, but do not remove it *)
-  else if List.mem e assump then
-    (true, [e])
-  else
-    (* else, we go recursively inside the sub-terms produced by function
-       application*)
-    try
+    (* if an element is a duplicate wrt. elems, we remove it directly *)
+    if is_dup e elems then
+      (true,[])
+    (* if an element is an assumption, we succeed, but do not remove it *)
+    else if List.mem e assump then
+      (true,[e])
+    (* otherwise, we go recursively inside the sub-terms produced by function
+       application *)
+    else try
       let new_els = fa_expand e in
-      List.fold_left (fun (aux1,aux2) e ->
-          let (fa_succ,fa_rem)= is_fa_dup acc elems e in
-          fa_succ && aux1, fa_rem @ aux2
-        ) (true,[]) new_els
+      List.fold_left
+        (fun (aux1,aux2) e ->
+          let (fa_succ,fa_rem) = is_fa_dup acc elems e in
+          fa_succ && aux1, fa_rem @ aux2)
+        (true,[]) new_els
     with No_FA | No_common_head -> (false,[])
   in
   match elems with
