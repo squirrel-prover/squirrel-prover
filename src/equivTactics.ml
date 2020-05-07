@@ -71,26 +71,24 @@ let () =
 
 exception NoRefl
 
-class exist_macros ~(system:Action.system) exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system as super
-
+class exist_macros ~(system:Action.system) = object (self)
+  inherit Iter.iter ~system as super
   method visit_message t = match t with
     | Term.Macro _ -> raise NoRefl
     | _ -> super#visit_message t
-
-  method visit_elem = function
-    | EquivSequent.Message m -> self#visit_message m
-    | EquivSequent.Formula m -> self#visit_formula m
+  method visit_formula t = match t with
+    | Term.Macro _ -> raise NoRefl
+    | _ -> super#visit_formula t
 end
 
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl (s : EquivSequent.t) sk fk =
-  let iter = new exist_macros ~system:(EquivSequent.get_system s) false in
+  let iter = new exist_macros ~system:(EquivSequent.get_system s) in
   try
     (* we check that the frame does not contain macro *)
-    List.iter iter#visit_elem (EquivSequent.get_biframe s);
+    List.iter iter#visit_term (EquivSequent.get_biframe s);
     if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
     then
       sk [] fk
@@ -98,7 +96,7 @@ let refl (s : EquivSequent.t) sk fk =
       fk (Tactics.Failure "Frames not identical")
   with
   | NoRefl -> fk (Tactics.Failure "Frames contain macros that may not be \
-                                   diff equivalent")
+                                   diff-equivalent")
 
 let () =
   T.register "refl"

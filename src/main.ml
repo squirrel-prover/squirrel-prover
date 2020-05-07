@@ -295,6 +295,18 @@ let () =
         (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
         (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
     end ;
+    "Refl Macro", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure "Frames contain \
+                                macros that may not be diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/neqrefl_macros.mbc")
+    end ;
+    "Refl Boolean Macro", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure "Frames contain \
+                                macros that may not be diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/neqrefl_bmacros.mbc")
+    end ;
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
