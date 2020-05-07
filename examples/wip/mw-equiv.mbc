@@ -6,9 +6,8 @@
 
 hash H
 
-(* TODO abstract would be more natural but index->message not allowed *)
-name id : index->message
-name id':index -> index ->message
+abstract id : index->message
+abstract id':index -> index ->message
 
 name key : index->message
 name key':index -> index -> message

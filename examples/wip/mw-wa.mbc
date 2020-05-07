@@ -3,14 +3,10 @@
 (* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
 (* R -> T: id + H(<c1, nr, nt>,k)       *)
 
-
 hash H
 
-
-(* TODO abstract would be more natural but index->message not allowed *)
-name id: index ->message
-name key:index -> message
-
+abstract id: index ->message
+abstract key:index -> message
 
 abstract error : message
 abstract ok: message
