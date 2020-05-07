@@ -6,7 +6,7 @@
 hash H
 
 abstract id: index ->message
-abstract key:index -> message
+name key:index -> message
 
 abstract error : message
 abstract ok: message
