@@ -337,6 +337,13 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/equivalent.mbc")
     end ;
+    "FA Dup Input", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure
+                                "Frames contain macros that may not be \
+                                 diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/fadup_input.mbc")
+    end ;
     "XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")

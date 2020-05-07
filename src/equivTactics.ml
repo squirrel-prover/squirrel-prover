@@ -270,47 +270,28 @@ let () =
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
+(** Check if an element appears twice in the biframe,
+  * or if it is [input@t] with some [frame@t'] appearing in the frame
+  * with [pred(t) <= t'] guaranteed. *)
 let is_dup elem elems =
-    if List.mem elem elems then
-      true
-    else
-      begin
-        match elem with
-        (* TODO : this is unsound ! *)
-        (* The matching bellow should be
-        | EquivSequent.Message (
-            Term.ITE(b,
-            Term.Macro (im,[],l),Term.Fun(z,[]))
-
-          ) when im = Term.in_macro && z = Term.f_zero ->
-           But this raises other issues, cf #90.
-        *)
-        | EquivSequent.Message (Term.Macro (im,[],l))
-           when im = Term.in_macro ->
-          (* if the macro is an input, we check if its timestamp is lower than
-             some t where frame@t of frame@pred(t) appears inside the frame *)
-          let test_dup els =
-            List.exists
-              (function
-                | EquivSequent.Message
-                    (Term.Macro (fm,[],
-                                 Term.Pred (Term.Action(n,is))))
-                | EquivSequent.Message
-                    (Term.Macro (fm,[],Term.Action(n,is)))
-                  when fm = Term.frame_macro ->
-                  begin
-                    match l with
-                    | Term.Action (n2,is2) ->
-                      l = Term.Action (n,is) ||
-                      Action.(depends (of_term n2 is2) (of_term n is))
-                    | _ -> false
-                  end
-                | _ -> false)
-              els
-          in
-          (test_dup elems)
-        | _ -> false
-      end
+  if List.mem elem elems then true else
+    let rec leq t t' = let open Term in match t,t' with
+      | t,t' when t=t' -> true
+      | Pred t, Pred t'-> leq t t'
+      | Pred t, t' -> leq t t'
+      | Action (n,is), Action (n',is') ->
+          Action.(depends (of_term n is) (of_term n' is'))
+      | _ -> false
+    in
+    match elem with
+      | EquivSequent.Message (Term.Macro (im,[],t)) when im = Term.in_macro ->
+          List.exists
+            (function
+               | EquivSequent.Message (Term.Macro (fm,[],t'))
+                 when fm = Term.frame_macro && leq (Pred t) t' -> true
+               | _ -> false)
+            elems
+      | _ -> false
 
 (** This function goes over all elements inside elems.  All elements that can be
    seen as duplicates, or context of duplicates, are removed. All elements that
@@ -342,10 +323,10 @@ let rec filter_fa_dup res assump elems =
     if fa_succ then filter_fa_dup (fa_rem@res) assump els
     else filter_fa_dup (e::res) assump els
 
-(** This tactic filter the biframe thourgh filter_fa_dup, passing the set of
-   hypothesis to it.  This is applied automatically, and essentially leaves only
-   assumptions, or elements that contain a sub term which is neither a duplicate
-   or an assumption.  *)
+(** This tactic filters the biframe through filter_fa_dup, passing the set of
+   hypotheses to it.  This is applied automatically, and essentially leaves only
+   assumptions, or elements that contain a subterm which is neither a duplicate
+   nor an assumption. *)
 let fa_dup s sk fk =
   let biframe = EquivSequent.get_biframe s
                 |> List.rev
@@ -468,7 +449,7 @@ let () =
           contains only subterms allowed by the FA-DUP rule.\
           \n Usages: fadup. fadup i."
    (function
-     | [] -> pure_equiv (fa_dup)
+     | [] -> pure_equiv fa_dup
      | [Prover.Int i] ->
          pure_equiv
            (fun s sk fk -> match fadup i s with
