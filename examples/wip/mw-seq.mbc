@@ -1,0 +1,142 @@
+(* Protocol MW                          *)
+(* R -> T: nr                           *)
+(* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
+(* R -> T: id + H(<c1, nr, nt>,k)       *)
+(* TODO: the last check done by T is not modelled *)
+
+hash H
+
+abstract id : index->message
+abstract id':index -> index ->message
+
+name key : index->message
+name key':index -> index -> message
+
+abstract error : message
+abstract tag0 : message
+abstract tag1 : message
+axiom tags_neq : tag0 <> tag1
+
+channel c
+
+
+process tag(i:index, t:index)=
+  in(c,x);
+  new nt;
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>)
+
+process reader =
+  new nr;
+  out(c,nr);
+  in(c,m);
+  if exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(m)) 
+               = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) then
+    out(c, try find i,t such that 
+           xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in 
+          xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
+  else
+    out(c,error)
+
+system (!_r R: reader | !_i !_t T: tag(i,t)).
+
+
+equiv unlinkability.
+Proof.
+enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
+                    H(<tag0,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
+                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+induction t.
+(* Init case: see mw-prelim *)
+admit.
+
+(* Case R - Done *)
+admit.
+
+(* Case R1  WIP *)
+expand frame@R1(r); expand exec@R1(r).
+expand cond@R1(r); expand output@R1(r).
+
+equivalent
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
+                 H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
+(exists (i,t:index), T(i,t) < R1(r) && 
+ snd(output@T(i,t)) = snd(input@R1(r)) &&
+ fst(output@T(i,t)) = fst(input@R1(r)) &&  
+ input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+
+apply tags_neq.
+split.
+(* proof of lemma: Cond => WA *)
+project.
+(* left *)
+euf M1.
+exists i,t1.
+assert (input@T(i,t1) = nr(r)).
+fresh M3.
+depends R(r), R2(r).
+(* right *)
+euf M1.
+exists i,t.
+assert (input@T(i,t) = nr(r)).
+fresh M3.
+depends R(r), R2(r).
+
+(* proof of lemma: WA => Cond *)
+exists i,t.
+
+(* TODO here we need to rewrite fst(input@R1(r)) into nt(i,t) thanks to condition *)
+fa 3. fadup 2.
+fa 4. fadup 4.
+
+fafind 4.
+expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
+                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
+       i,r,t.
+admit 5. (* this is a dup, modulo the rewrite above *)
+
+(* Case R2 *)
+expand frame@R2(r); expand exec@R2(r).
+expand cond@R2(r); expand output@R2(r).
+
+equivalent
+(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) = 
+                 H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
+(exists (i,t:index), T(i,t) < R2(r) && 
+ snd(output@T(i,t)) = snd(input@R2(r)) &&
+ fst(output@T(i,t)) = fst(input@R2(r)) &&  
+ input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+
+apply tags_neq.
+split.
+(* proof of lemma: Cond => WA *)
+project.
+(* left *)
+euf M1.
+exists i,t1.
+assert (nr(r) = input@T(i,t1)).
+fresh M3.
+depends R(r), R1(r).
+(* right *)
+euf M1.
+exists i,t.
+assert (nr(r) = input@T(i,t)).
+fresh M3.
+depends R(r), R1(r).
+
+(* proof of lemma: WA => Cond *)
+exists i,t.
+fadup 2.
+
+(* Case T *)
+expand frame@T(i,t); expand exec@T(i,t).
+expand cond@T(i,t);expand output@T(i,t).
+fa 3.
+fa 4.
+fa 4.
+
+admit 5. (* dup wrt seq as above *)
+admit 4. (* TODO add to seq *)
+
+Qed.
+
