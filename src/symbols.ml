@@ -13,10 +13,12 @@ type function_def =
   | Hash
   | AEnc
   | ADec
+  | SEnc
+  | SDec
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract of kind list * kind
+  | Abstract of int
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
@@ -223,10 +225,9 @@ end)
 
 let is_ftype s ftype =
   match Function.get_def s with
-    | _,t when t = ftype-> true
+    | _,t when t = ftype -> true
     | _ -> false
     | exception Not_found -> failwith "symbol not found"
-
 
 module Macro = Make (struct
   type ns = macro

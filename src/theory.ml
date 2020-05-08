@@ -21,8 +21,8 @@ type term =
   (** Function symbol application,
     * where terms will be evaluated as indices or messages
     * depending on the type of the function symbol.
-    * The third argument is for the optional timestamp. This is used for
-    * the terms appearing in gols.*)
+    * The third argument is an optional timestamp, used when
+    * writing meta-logic formulas but not in processes. *)
   | Compare of Atom.ord*term*term
   | Happens of term
   | ForAll of (string * kind) list * term
@@ -133,8 +133,8 @@ let pp_error ppf = function
   | Arity_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with arity %i, but \
                                       defined with arity %i" s i j
   | Untyped_symbol s -> Fmt.pf ppf "Symbol %s is not typed" s
-  | Index_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with %i indexes, but \
-                                       defined with %i indexes" s i j
+  | Index_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with %i indices, but \
+                                       defined with %i indices" s i j
   | Undefined s -> Fmt.pf ppf "Symbol %s is undefined" s
   | Type_error (s, sort) -> Fmt.pf ppf "Term %a is not of type %a"
                               pp s
@@ -155,32 +155,31 @@ let check_arity s actual expected =
 
 type env = (string*kind) list
 
+let message_arity fdef = let open Symbols in match fdef with
+  | PublicKey -> 1
+  | Hash|ADec|SDec|Sign|CheckSign -> 2
+  | AEnc|SEnc -> 3
+  | Abstract a -> a
 
-
+(** Get the kind of a function of macro definition.
+  * In the latter case, the timestamp argument is not accounted for. *)
 let function_kind f : kind list * kind =
   let open Symbols in
   match def_of_string f with
   | Reserved -> assert false (* we should never encounter a situation where we
                                 try to type a reserved symbol. *)
   | Exists d ->
+    let ckind index_arity message_arity =
+      List.init index_arity (fun _ -> Sorts.eindex) @
+      List.init message_arity (fun _ -> Sorts.emessage),
+      Sorts.emessage
+    in
     match d with
-    | Function (_, Hash) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
-    | Function (_, AEnc) -> [Sorts.emessage; Sorts.emessage; Sorts.emessage],
-                            Sorts.emessage
-    | Function (_, ADec) -> [Sorts.emessage; Sorts.emessage],
-                            Sorts.emessage
-    | Function (_, Sign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
-    | Function (_, CheckSign) -> [Sorts.emessage; Sorts.emessage], Sorts.emessage
-    | Function (_, PublicKey) -> [Sorts.emessage], Sorts.emessage
-    | Function (_, Abstract (args_k, ret_k)) -> args_k, ret_k
+    | Function (i, finfo) -> ckind i (message_arity finfo)
     | Macro (Local (targs,k)) -> targs, k
-    | Macro (Global arity) -> Array.to_list (Array.make arity Sorts.eindex),
-                              Sorts.emessage
-    | Macro Input -> [], Sorts.emessage
-    | Macro Output -> [], Sorts.emessage
-    | Macro Frame -> [], Sorts.emessage
-    | Macro Cond -> [], Sorts.eboolean
-    | Macro Exec -> [], Sorts.eboolean
+    | Macro (Global arity) -> ckind arity 0
+    | Macro (Input|Output|Frame) -> [], Sorts.emessage
+    | Macro (Cond|Exec) -> [], Sorts.eboolean
     | _ -> raise @@ Conv (Untyped_symbol f)
 
 let check_state s n =
@@ -307,8 +306,13 @@ let rec convert :
         | Sorts.Message ->
             let open Symbols in
             begin match of_string f with
-              | Wrapped (s, Function (_,(Hash|AEnc|Sign|CheckSign|PublicKey|Abstract _))) ->
-                  Term.Fun ((s,[]), List.map (conv Sorts.Message) l)
+              | Wrapped (symb, Function (i,_)) ->
+                  let indices,messages =
+                    List.init i (fun k -> conv_index (List.nth l k)),
+                    List.init (List.length l - i)
+                      (fun k -> conv Sorts.Message (List.nth l (k+i)))
+                  in
+                  Term.Fun ((symb,indices),messages)
               | Wrapped (s, Macro (Global _)) ->
                   let indices = List.map conv_index l in
                   Term.Macro ((s,sort,indices),[],get_at ())
@@ -531,12 +535,11 @@ let conv_index subst t =
 
 (** Declaration functions *)
 
-let declare_symbol name info =
-  ignore (Symbols.Function.declare_exact Symbols.dummy_table name (0,info))
+let declare_symbol ?(index_arity=0) name info =
+  let def = index_arity,info in
+  ignore (Symbols.Function.declare_exact Symbols.dummy_table name def)
 
-let declare_hash s = declare_symbol s Symbols.Hash
-
-let declare_aenc s = declare_symbol s Symbols.AEnc
+let declare_hash ?index_arity s = declare_symbol ?index_arity s Symbols.Hash
 
 let declare_aenc enc dec pk =
   let t = Symbols.dummy_table in
@@ -545,12 +548,20 @@ let declare_aenc enc dec pk =
   let data = Symbols.AssociatedFunctions [dec; pk] in
   ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.AEnc))
 
+let declare_senc enc dec =
+  let t = Symbols.dummy_table in
+  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [dec] in
+  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+
+
 let declare_signature sign checksign pk =
   let t = Symbols.dummy_table in
   let _,sign = Symbols.Function.declare_exact t sign (0,Symbols.Sign) in
   let _,pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
   let data = Symbols.AssociatedFunctions [sign; pk] in
-  ignore (Symbols.Function.declare_exact t checksign ~data (0,Symbols.CheckSign))
+  ignore
+    (Symbols.Function.declare_exact t checksign ~data (0,Symbols.CheckSign))
 
 let check_signature checksign pk =
   let def = Symbols.Function.get_def in
@@ -561,7 +572,7 @@ let check_signature checksign pk =
   in
   if correct_type then
     match Symbols.Function.get_data checksign with
-      | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk-> Some sign
+      | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk -> Some sign
       | _ -> None
   else None
 
@@ -572,9 +583,9 @@ let declare_state s arity kind =
 let declare_name s arity =
   ignore (Symbols.Name.declare_exact Symbols.dummy_table s arity)
 
-let declare_abstract s arg_types k =
-  let info = Symbols.Abstract (arg_types,k) in
-  ignore (Symbols.Function.declare_exact Symbols.dummy_table s (0,info))
+let declare_abstract s ~index_arity ~message_arity =
+  let def = index_arity, Symbols.Abstract message_arity in
+  ignore (Symbols.Function.declare_exact Symbols.dummy_table s def)
 
 (** Term builders *)
 
@@ -583,37 +594,13 @@ let make_term ?at_ts s l =
   let ts_unexpected = Conv (Timestamp_unexpected (Var s)) in
   match Symbols.def_of_string s with
   | Symbols.Reserved -> assert false
-  | Symbols.Exists d -> begin match d with
-    | Symbols.Function (a,i) ->
-        (* We do not support indexed symbols,
-         * which would require a distinction between
-         * function arguments and function indices. *)
-        if a <> 0 then raise @@ Conv (Index_error (s,a,0));
+  | Symbols.Exists d ->
+    begin match d with
+    | Symbols.Function (a,fdef) ->
         if at_ts <> None then raise ts_unexpected;
-        begin match i with
-          | Symbols.Hash ->
-              if List.length l <> 2 then raise @@ arity_error 2 ;
-              Fun (s,l,None)
-          | Symbols.AEnc ->
-              if List.length l <> 3 then raise @@ arity_error 3 ;
-              Fun (s,l,None)
-          | Symbols.ADec ->
-              if List.length l <> 2 then raise @@ arity_error 2 ;
-              Fun (s,l,None)
-          | Symbols.Sign ->
-              if List.length l <> 2 then raise @@ arity_error 2 ;
-              Fun (s,l,None)
-          | Symbols.CheckSign ->
-              if List.length l <> 2 then raise @@ arity_error 2 ;
-              Fun (s,l,None)
-          | Symbols.PublicKey ->
-              if List.length l <> 1 then raise @@ arity_error 1 ;
-              Fun (s,l,None)
-          | Symbols.Abstract (args,_) ->
-            if List.length args <> List.length l then
-              raise @@ arity_error (List.length args);
-              Fun (s,l,None)
-        end
+        if List.length l <> a + message_arity fdef then
+          raise (arity_error (a + message_arity fdef)) ;
+        Fun (s,l,None)
     | Symbols.Name arity ->
         if at_ts <> None then raise ts_unexpected;
         check_arity s (List.length l) arity ;

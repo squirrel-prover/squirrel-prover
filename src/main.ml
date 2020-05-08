@@ -220,11 +220,6 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
     end ;
-    "Euf collect in cond", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_condh.mbc")
-    end ;
     "Euf collect in key position", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
@@ -282,12 +277,35 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/completion_unsupported_term.mbc")
     end ;
+    "Indexed abstract", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure
+           (Tactics.Failure "cannot automatically prove goal"))
+        (fun () -> run ~test "tests/alcotest/idx_abs.mbc")
+    end ;
+    "Indexed collision", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/idx_collision.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
         (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
+    end ;
+    "Refl Macro", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure "Frames contain \
+                                macros that may not be diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/neqrefl_macros.mbc")
+    end ;
+    "Refl Boolean Macro", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure "Frames contain \
+                                macros that may not be diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/neqrefl_bmacros.mbc")
     end ;
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
@@ -318,6 +336,13 @@ let () =
       Alcotest.check_raises "fails"
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/equivalent.mbc")
+    end ;
+    "FA Dup Input", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Tactics.Failure
+                                "Frames contain macros that may not be \
+                                 diff-equivalent"))
+        (fun () -> run ~test "tests/alcotest/fadup_input.mbc")
     end ;
     "XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails"

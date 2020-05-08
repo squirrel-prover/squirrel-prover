@@ -861,8 +861,8 @@ let autosubst s =
     try
       TraceSequent.remove_trace_hypothesis
         (function
-           | `Timestamp (`Eq, Term.Var x, Term.Var y) when x <> y -> true
-           | `Index (`Eq, x, y) when x <> y -> true
+           | `Timestamp (`Eq, Term.Var x, Term.Var y) -> true
+           | `Index (`Eq, x, y) -> true
            | _ -> false)
         s
     with
@@ -870,6 +870,10 @@ let autosubst s =
   in
   let process : type a. a Vars.var -> a Vars.var -> TraceSequent.t =
     fun x y ->
+      (* Just remove the equality if x and y are the same variable. *)
+      if x = y then s else
+      (* Otherwise substitute the newest variable by the oldest one,
+       * and remove it from the environment. *)
       let x,y =
         if x.Vars.name_suffix <= y.Vars.name_suffix then y,x else x,y
       in
@@ -914,14 +918,14 @@ let rec parse_substd tsubst s =
     begin
       match Theory.convert tsubst mterm Sorts.Boolean,
             Theory.convert tsubst b Sorts.Boolean with
-      |Term.Macro ((mn, sort, is),l,a), ncond ->
+      | Term.Macro ((mn, sort, is),l,a), ncond ->
         begin
           match a with
           | Action (symb,indices) ->
             begin
               let action = Action.of_term symb indices in
-              match Symbols.Macro.get_all mn with
-              | Symbols.Cond, _ -> Action.Condition (ncond, action)
+              match Symbols.Macro.get_def mn with
+              | Symbols.Cond -> Action.Condition (ncond, action)
                                    :: parse_substd tsubst q
               | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
             end
@@ -937,8 +941,8 @@ let rec parse_substd tsubst s =
               | Action (symb,indices) ->
                 begin
                   let action = Action.of_term symb indices in
-                  match Symbols.Macro.get_all mn with
-                  | Symbols.Output, _ -> Action.Output (nout, action)
+                  match Symbols.Macro.get_def mn with
+                  | Symbols.Output -> Action.Output (nout, action)
                                          :: parse_substd tsubst q
                   | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
                 end
@@ -1066,14 +1070,8 @@ let () =
 (** EUF Axioms *)
 
 let euf_param (`Message at : message_atom) = match at with
-  | (`Eq, Fun ((checksign, _),
-               [s;
-               Fun ((pk,_), [Name key])
-               ]), m)
-  | (`Eq, m, Fun ((checksign, _),
-               [s;
-               Fun ((pk,_), [Name key])
-               ])) ->
+  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
+  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
       begin match Theory.check_signature checksign pk with
       | None ->
           Tactics.(soft_failure @@
@@ -1082,15 +1080,18 @@ let euf_param (`Message at : message_atom) = match at with
       | Some sign -> (sign, key, m, s, Some pk)
       end
 
-  | (`Eq, Fun ((hash, _), [m; Name key]), s) when Symbols.is_ftype hash Symbols.Hash ->
+  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+    when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
-  | (`Eq, s, Fun ((hash, _), [m; Name key])) when Symbols.is_ftype hash Symbols.Hash ->
+  | (`Eq, s, Fun ((hash, _), [m; Name key]))
+    when Symbols.is_ftype hash Symbols.Hash ->
     (hash, key, m, s, None)
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
-              "euf can only be applied to hypothesis of the form h(t,k)=m
-              or m=h(t,k) with h a hash function symbol")
+              "euf can only be applied to an hypothesis of the form h(t,k)=m \
+               or checksign(s,pk(k))=m (or symmetrically) \
+               for some hash or signature functions")
 
 let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
   let open Euf in
@@ -1301,60 +1302,66 @@ let () =
            \n Usage: assert f."
     tac_assert
 
-(** [collision_resistance judge sk fk] collects all equalities between hashes,
-    and adds the equalities of the messages hashed with the same key. *)
+(** [collision_resistance judge sk fk] collects all equalities between
+  * hashes that occur at toplevel in message hypotheses,
+  * and adds the equalities of the messages hashed with the same key. *)
 let collision_resistance (s : TraceSequent.t) sk fk =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
-  let hashes = List.filter
+  let hashes =
+    List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
             Symbols.is_ftype hash Symbols.Hash
-              && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
+            && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
+  let hashes = List.sort_uniq Pervasives.compare hashes in
   if List.length hashes = 0 then
     fk Tactics.NoSSC
   else
-    begin
-      let rec make_eq hash_list =
-        match hash_list with
-        | [] -> []
-        | h1::q -> List.fold_left (fun acc h2 ->
-            match h1, h2 with
-            | Fun ((hash, _), [_; Name key1]), Fun ((hash2, _), [_; Name key2])
-              when hash = hash2 && key1 = key2 -> (h1, h2) :: acc
-            | _ -> acc
-          ) [] q
-      in
-      let s,trs = TraceSequent.get_trs s in
-      let hash_eqs = make_eq hashes
-                     |> List.filter (fun eq -> Completion.check_equalities
-                                        (trs) [eq])
-      in
-      let new_facts =
-        List.fold_left (fun acc (h1,h2) ->
-            match h1, h2 with
-            | Fun ((hash, _), [m1; Name key1]),
-              Fun ((hash2, _), [m2; Name key2])
-              when hash = hash2 && key1 = key2 ->
-              Term.Atom (`Message (`Eq, m1, m2)) :: acc
-            | _ -> acc
-          ) [] hash_eqs
-      in
-      let s =
-        List.fold_left (fun s f ->
-            TraceSequent.add_formula f s
-          ) s new_facts
-      in
-      sk [s] fk
-    end
+    let rec make_eq acc hash_list =
+      match hash_list with
+      | [] -> acc
+      | h1::q ->
+          List.fold_left
+            (fun acc h2 ->
+               match h1, h2 with
+               | Fun (hash1, [_; Name key1]),
+                 Fun (hash2, [_; Name key2])
+                 when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
+               | _ -> acc)
+            (make_eq acc q) q
+    in
+    let s,trs = TraceSequent.get_trs s in
+    let hash_eqs =
+      make_eq [] hashes
+      |> List.filter (fun eq -> Completion.check_equalities trs [eq])
+    in
+    let new_facts =
+      List.fold_left
+        (fun acc (h1,h2) ->
+           match h1, h2 with
+           | Fun ((hash1, _), [m1; Name key1]),
+             Fun ((hash2, _), [m2; Name key2])
+             when hash1 = hash2 && key1 = key2 ->
+             Term.Atom (`Message (`Eq, m1, m2)) :: acc
+           | _ -> acc)
+        [] hash_eqs
+    in
+    let s =
+      List.fold_left
+        (fun s f -> TraceSequent.add_formula f s)
+        s new_facts
+    in
+    sk [s] fk
 
 let () = T.register "collision"
-    ~help:"Collects all equalities between hashes, and affs the equalities of \
-           \n the messages hashed with the same valid key.\
+    ~help:"Collects all equalities between hashes occurring at toplevel in\
+           \n message hypotheses, and adds the equalities between \
+           \n messages that have the same hash with the same valid key.\
            \n Usage: collision."
     collision_resistance
 
@@ -1370,9 +1377,13 @@ let () =
       try_tac assumption ;
       repeat goal_intro ;
       repeat simpl_left ;
-      repeat autosubst ;
+      (* Learn new term equalities from constraints before
+       * learning new index equalities from term equalities,
+       * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
+      eq_trace ;
       eq_names ;
-      eq_trace
+      (* Simplify equalities using substitution. *)
+      repeat autosubst
     ]
   in
   (* Attempt to close a goal. *)

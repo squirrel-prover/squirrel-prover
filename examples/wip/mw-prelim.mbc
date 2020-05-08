@@ -1,0 +1,36 @@
+abstract id : index->message
+abstract id': index->index->message
+
+name key : index->message
+name key': index->index->message
+
+name nr : index->message
+name nt : index->index->message
+
+hash H
+
+abstract tag0 : message
+abstract tag1 : message
+axiom tags_neq : tag0 <> tag1
+
+channel c
+
+system
+  !_i !_t !_r out(c,diff(id(i),id'(i,t)) XOR
+                    H(<tag0,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t))));
+              out(c,diff(id(i),id'(i,t)) XOR
+                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+
+equiv e.
+Proof.
+  induction t.
+  (* Case A, i.e. tag0 hashes *)
+  expandall. fa 1. fa 2.
+  prf 2. yesif 2.
+    split; project.
+    depends A(i,t,r),A1(i,t,r).
+    depends A(i,t,r),A1(i,t,r).
+  admit. (* TODO xor tactic should apply *)
+  (* Case A1 will be similar but will use tags_neq *)
+  admit.
+Qed.

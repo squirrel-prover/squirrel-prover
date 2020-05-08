@@ -77,22 +77,19 @@ apply tags_neq.
 euf M0.
 assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))).
 euf M3.
-substitute k1, k.
 case H2.
 case H1.
 
-exists j.
+nosimpl(exists j).
+nosimpl(assert cond@R1(j,i)).
 executable T1(i,k).
 apply H1 to R1(j,i).
 expand exec@R1(j,i).
 nosimpl(expand cond@R1(j,i)).
 
-
 repeat split.
 
-assert (fst(input@R1(j,i)) = nT(i,k)).
-admit. (* comment dire h(u) = h(v) ==> u = v *)
-
+collision. (* M3 and M4 together give a collision that allows to conclude. *)
 
 assert (input@T(i,k) = nR(j)). 
 fresh M5.

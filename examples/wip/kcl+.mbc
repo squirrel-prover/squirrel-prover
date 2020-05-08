@@ -1,9 +1,7 @@
 hash h
 
-(* TODO abstract *)
-name a : index->message
+abstract a : index->message
 name key : index->message
-name m : message
 
 abstract ok : message
 abstract ko : message

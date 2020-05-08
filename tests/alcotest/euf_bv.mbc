@@ -2,8 +2,9 @@ hash h
 name k : index->message
 name n : index->index->message
 abstract ok : message
+channel c
 
-system if (forall (i,j:index), h(n(i,j),k(i))=h(n(i,j),k(i))) then null.
+system out(c,seq(i,j -> h(n(i,j),k(i)))).
 
 goal forall (tau:timestamp, j,j1,j2:index),
   (if cond@tau then ok else ok) = h(n(j1,j2),k(j)) => j1=j2.

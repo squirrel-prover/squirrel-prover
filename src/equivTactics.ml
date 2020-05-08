@@ -78,26 +78,24 @@ let () =
 
 exception NoRefl
 
-class exist_macros ~(system:Action.system) exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system as super
-
+class exist_macros ~(system:Action.system) = object (self)
+  inherit Iter.iter ~system as super
   method visit_message t = match t with
     | Term.Macro _ -> raise NoRefl
     | _ -> super#visit_message t
-
-  method visit_elem = function
-    | EquivSequent.Message m -> self#visit_message m
-    | EquivSequent.Formula m -> self#visit_formula m
+  method visit_formula t = match t with
+    | Term.Macro _ -> raise NoRefl
+    | _ -> super#visit_formula t
 end
 
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl (s : EquivSequent.t) sk fk =
-  let iter = new exist_macros ~system:(EquivSequent.get_system s) false in
+  let iter = new exist_macros ~system:(EquivSequent.get_system s) in
   try
     (* we check that the frame does not contain macro *)
-    List.iter iter#visit_elem (EquivSequent.get_biframe s);
+    List.iter iter#visit_term (EquivSequent.get_biframe s);
     if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
     then
       sk [] fk
@@ -105,7 +103,7 @@ let refl (s : EquivSequent.t) sk fk =
       fk (Tactics.Failure "Frames not identical")
   with
   | NoRefl -> fk (Tactics.Failure "Frames contain macros that may not be \
-                                   diff equivalent")
+                                   diff-equivalent")
 
 let () =
   T.register "refl"
@@ -227,11 +225,12 @@ let () = T.register_general "enrich"
        | [Prover.Theory v] -> pure_equiv (enrich v)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
+(** Function application *)
+
 exception No_common_head
 exception No_FA
 let fa_expand t =
-  let aux : type a. a Term.term -> EquivSequent.elem list =
-    function
+  let aux : type a. a Term.term -> EquivSequent.elem list = function
     | Fun (f,l) ->
       List.map (fun m -> EquivSequent.Message m) l
     | ITE (c,t,e) when t = e ->
@@ -256,11 +255,6 @@ let fa_expand t =
   | EquivSequent.Message e -> aux (Term.head_normal_biterm e)
   | EquivSequent.Formula e -> aux (Term.head_normal_biterm e)
 
-  (*| _ ->
-    Tactics.soft_failure
-      (Tactics.Failure "Unsupported: TODO") *)
-
-(** Function application *)
 let fa i s sk fk =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
@@ -283,47 +277,28 @@ let () =
        | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
+(** Check if an element appears twice in the biframe,
+  * or if it is [input@t] with some [frame@t'] appearing in the frame
+  * with [pred(t) <= t'] guaranteed. *)
 let is_dup elem elems =
-    if List.mem elem elems then
-      true
-    else
-      begin
-        match elem with
-        (* TODO : this is unsound ! *)
-        (* The matching bellow should be
-        | EquivSequent.Message (
-            Term.ITE(b,
-            Term.Macro (im,[],l),Term.Fun(z,[]))
-
-          ) when im = Term.in_macro && z = Term.f_zero ->
-           But this raises other issues, cf #90.
-        *)
-        | EquivSequent.Message (Term.Macro (im,[],l))
-           when im = Term.in_macro ->
-          (* if the macro is an input, we check if its timestamp is lower than
-             some t where frame@t of frame@pred(t) appears inside the frame *)
-          let test_dup els =
-            List.exists
-              (function
-                | EquivSequent.Message
-                    (Term.Macro (fm,[],
-                                 Term.Pred (Term.Action(n,is))))
-                | EquivSequent.Message
-                    (Term.Macro (fm,[],Term.Action(n,is)))
-                  when fm = Term.frame_macro ->
-                  begin
-                    match l with
-                    | Term.Action (n2,is2) ->
-                      l = Term.Action (n,is) ||
-                      Action.(depends (of_term n2 is2) (of_term n is))
-                    | _ -> false
-                  end
-                | _ -> false)
-              els
-          in
-          (test_dup elems)
-        | _ -> false
-      end
+  if List.mem elem elems then true else
+    let rec leq t t' = let open Term in match t,t' with
+      | t,t' when t=t' -> true
+      | Pred t, Pred t'-> leq t t'
+      | Pred t, t' -> leq t t'
+      | Action (n,is), Action (n',is') ->
+          Action.(depends (of_term n is) (of_term n' is'))
+      | _ -> false
+    in
+    match elem with
+      | EquivSequent.Message (Term.Macro (im,[],t)) when im = Term.in_macro ->
+          List.exists
+            (function
+               | EquivSequent.Message (Term.Macro (fm,[],t'))
+                 when fm = Term.frame_macro && leq (Pred t) t' -> true
+               | _ -> false)
+            elems
+      | _ -> false
 
 (** This function goes over all elements inside elems.  All elements that can be
    seen as duplicates, or context of duplicates, are removed. All elements that
@@ -331,21 +306,21 @@ let is_dup elem elems =
    replaced by the assumptions that appear as there subterms. *)
 let rec filter_fa_dup res assump elems =
   let rec is_fa_dup acc elems e =
-  (* if an element is a duplicate appearing in elems, we remove it directly *)
-  if is_dup e elems then
-    (true,[])
-    (* if an elemnt is an assumption, we succeed, but do not remove it *)
-  else if List.mem e assump then
-    (true, [e])
-  else
-    (* else, we go recursively inside the sub-terms produced by function
-       application*)
-    try
+    (* if an element is a duplicate wrt. elems, we remove it directly *)
+    if is_dup e elems then
+      (true,[])
+    (* if an element is an assumption, we succeed, but do not remove it *)
+    else if List.mem e assump then
+      (true,[e])
+    (* otherwise, we go recursively inside the sub-terms produced by function
+       application *)
+    else try
       let new_els = fa_expand e in
-      List.fold_left (fun (aux1,aux2) e ->
-          let (fa_succ,fa_rem)= is_fa_dup acc elems e in
-          fa_succ && aux1, fa_rem @ aux2
-        ) (true,[]) new_els
+      List.fold_left
+        (fun (aux1,aux2) e ->
+          let (fa_succ,fa_rem) = is_fa_dup acc elems e in
+          fa_succ && aux1, fa_rem @ aux2)
+        (true,[]) new_els
     with No_FA | No_common_head -> (false,[])
   in
   match elems with
@@ -355,10 +330,10 @@ let rec filter_fa_dup res assump elems =
     if fa_succ then filter_fa_dup (fa_rem@res) assump els
     else filter_fa_dup (e::res) assump els
 
-(** This tactic filter the biframe thourgh filter_fa_dup, passing the set of
-   hypothesis to it.  This is applied automatically, and essentially leaves only
-   assumptions, or elements that contain a sub term which is neither a duplicate
-   or an assumption.  *)
+(** This tactic filters the biframe through filter_fa_dup, passing the set of
+   hypotheses to it.  This is applied automatically, and essentially leaves only
+   assumptions, or elements that contain a subterm which is neither a duplicate
+   nor an assumption. *)
 let fa_dup s sk fk =
   let biframe = EquivSequent.get_biframe s
                 |> List.rev
@@ -481,7 +456,7 @@ let () =
           contains only subterms allowed by the FA-DUP rule.\
           \n Usages: fadup. fadup i."
    (function
-     | [] -> pure_equiv (fa_dup)
+     | [] -> pure_equiv fa_dup
      | [Prover.Int i] ->
          pure_equiv
            (fun s sk fk -> match fadup i s with
@@ -728,6 +703,23 @@ let prf_param hash =
       (hash_fn,t,key_n,key_is)
   | _ -> raise Not_hash
 
+(** [occurrences_of_frame ~system frame hash_fn key_n]
+  * returns the list of pairs [is,m] such that [f(m,key_n[is])]
+  * occurs in [frame]. Does not explore macros. *)
+let occurrences_of_frame ~system frame hash_fn key_n =
+  let iter = new Iter.get_f_messages ~system hash_fn key_n in
+  List.iter iter#visit_term frame ;
+  List.sort_uniq Pervasives.compare iter#get_occurrences
+
+(** [occurrences_of_action_descr ~system action_descr hash_fn key_n]
+  * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
+  * occurs in [action_descr]. *)
+let occurrences_of_action_descr ~system action_descr hash_fn key_n =
+  let iter = new Iter.get_f_messages ~system hash_fn key_n in
+  iter#visit_message (snd action_descr.Action.output) ;
+  List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
+  List.sort_uniq Pervasives.compare iter#get_occurrences
+
 let mk_prf_phi_proj proj system env biframe e hash =
   begin try
     let system = Action.(project_system proj system) in
@@ -748,7 +740,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
     Euf.hash_key_ssc ~elems:frame ~pk:None ~system hash_fn key_n;
     (* we compute the list of hashes from the frame *)
     let list_of_hashes_from_frame =
-      Euf.hashes_of_frame ~system frame hash_fn key_n
+      occurrences_of_frame ~system frame hash_fn key_n
     and list_of_actions_from_frame =
       let iter = new get_actions ~system false in
       List.iter iter#visit_term frame ;
@@ -760,8 +752,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
         (* we add only actions in which a hash occurs *)
         let descr_proj = Action.pi_descr proj action_descr in
         let action_hashes =
-          Euf.hashes_of_action_descr ~system ~cond:true
-            descr_proj hash_fn key_n in
+          occurrences_of_action_descr ~system descr_proj hash_fn key_n in
         if List.length action_hashes > 0 then
           Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
     (* direct cases (for explicit occurences of hashes in the frame) *)
@@ -946,7 +937,7 @@ let prf i s =
           EquivSequent.Formula (Term.head_normal_biterm f)
       in
       (* search for the first occurrence of a hash in [e] *)
-      begin match (Iter.get_ftype ~system e Symbols.Hash) with
+      begin match Iter.get_ftype ~system e Symbols.Hash with
       | None ->
         Tactics.soft_failure
           (Tactics.Failure
@@ -1009,47 +1000,69 @@ let cca1 i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of a hash in [e] *)
-    begin match (Iter.get_ftype ~system e Symbols.AEnc) with
-      | Some (Term.Fun ((fnenc,_), [m; Term.Name r;
+    let hide_enc enc fnenc m fnpk sk fndec r =
+            (* to check that the encryption is not under a dec, we replace the
+               enc by zero and check that dec does not occur inside the new
+               term. *)
+      if occurrences_of_frame ~system
+          (EquivSequent.apply_subst_frame
+             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+          fndec sk
+         <> [] then
+        Tactics.soft_failure
+          (Tactics.Failure
+             "The first encryption symbols occurs under a decryption.");
+      (* we now check that the random is fresh, and the key satisfy the
+               side condition. *)
+      begin
+        try
+          Euf.hash_key_ssc ~messages:[enc] ~pk:(fnpk) ~system fndec sk;
+          (* we create the fresh cond reachability goal *)
+          let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+          let fresh_goal = Prover.Goal.Trace
+              (TraceSequent.init ~system random_fresh_cond
+               |> TraceSequent.set_env env
+              )
+          in
+          let new_elem =
+            EquivSequent.apply_subst_frame
+              [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
+                           )] [e] in
+          let biframe = (List.rev_append before (new_elem @ after)) in
+          [fresh_goal;
+           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+      end
+    in
+    (* search for the first occurrence of  an asymmetric encryption in [e] *)
+    begin match (Iter.get_ftypes ~system e Symbols.AEnc)
+                @ (Iter.get_ftypes ~system e Symbols.SEnc)   with
+      | (Term.Fun ((fnenc,_), [m; Term.Name r;
                                     Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
-              as enc) when Symbols.is_ftype fnpk Symbols.PublicKey
+              as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey
+                                 && Symbols.is_ftype fnenc Symbols.AEnc)
         ->
         begin
           match Symbols.Function.get_data fnenc with
           (* we check that the encryption function is used with the associated
              public key *)
-          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-            (* to check that the encryption is not under a dec, we replace the
-               enc by zero and check that dec does not occur inside the new
-               term. *)
-            if Euf.hashes_of_frame ~system
-                (EquivSequent.apply_subst_frame
-                   [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
-                fndec sk
-               <> [] then
-              Tactics.soft_failure
-                (Tactics.Failure
-                   "The first encryption symbols occurs under a decryption.");
-            (* we now check that the random is fresh, and the key satisfy the
-               side condition. *)
-            begin
-              try
-                Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
-                (* we create the fresh cond reachability goal *)
-                let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
-                let fresh_goal = Prover.Goal.Trace
-                                   (TraceSequent.init ~system random_fresh_cond)
-                in
-                let new_elem =
-                  EquivSequent.apply_subst_frame
-                    [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
-                                                              )] [e] in
-                let biframe = (List.rev_append before (new_elem @ after)) in
-                [fresh_goal;
-                 Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-            end
+          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
+            -> hide_enc enc fnenc m (Some fnpk) sk fndec r
+          | _ ->
+            Tactics.soft_failure
+              (Tactics.Failure
+                 "The first encryption symbol is not used with the correct public \
+                  key function.")
+        end
+      | (Term.Fun ((fnenc,_), [m; Term.Name r; Term.Name (sk,isk)])
+              as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc
+        ->
+        begin
+          match Symbols.Function.get_data fnenc with
+          (* we check that the encryption function is used with the associated
+             public key *)
+          | Symbols.AssociatedFunctions [fndec]
+            -> hide_enc enc fnenc m (None) sk fndec r
           | _ ->
             Tactics.soft_failure
               (Tactics.Failure
@@ -1077,6 +1090,129 @@ let () =
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
    | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
+
+
+(** Encryption Key privacy  *)
+
+let enckp i s =
+  match nth i (EquivSequent.get_biframe s) with
+  | before, e, after ->
+    let biframe = List.rev_append before after in
+    let system = (EquivSequent.get_system s) in
+    let env = EquivSequent.get_env s in
+    let e = match e with
+      | EquivSequent.Message m ->
+        EquivSequent.Message (Term.head_normal_biterm m)
+      | EquivSequent.Formula f ->
+        EquivSequent.Formula (Term.head_normal_biterm f)
+    in
+    (* search for the first occurrence of a hash in [e] *)
+    let hide_enc fnenc enc fndec sk fnpk r fnenci fnpki m isk=
+      (* to check that the encryption is not under a dec, we replace the
+         enc by zero and check that dec does not occur inside the new
+         term. *)
+      if occurrences_of_frame ~system
+          (EquivSequent.apply_subst_frame
+             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
+          fndec sk
+         <> [] then
+        Tactics.soft_failure
+          (Tactics.Failure
+             "The first encryption symbols occurs under a decryption.");
+      (* we now check that the random is fresh, and the key satisfy the
+         side condition. *)
+      begin
+        try
+          Euf.hash_key_ssc ~messages:[enc] ~pk:fnpk ~system fndec sk;
+          (* we create the fresh cond reachability goal *)
+          let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+          let fresh_goal = Prover.Goal.Trace
+              (TraceSequent.init ~system random_fresh_cond
+               |> TraceSequent.set_env env)
+          in
+          let newenc =
+            match fnpk,fnpki with
+            | Some fnpk, Some fnpki ->
+              Term.Fun ((fnenc,fnenci),
+                        [m; Term.Name r;
+                         Term.Fun ((fnpk,fnpki), [
+                             Term.Name (sk,isk)
+                           ])])
+            | _, _ -> Term.Fun ((fnenc,fnenci),
+                                [m; Term.Name r; Term.Name (sk,isk)])
+          in
+          let new_elem =
+            EquivSequent.apply_subst_frame [Term.ESubst (enc,newenc)] [e]
+          in
+          let biframe = (List.rev_append before (new_elem @ after)) in
+          [fresh_goal;
+           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+      end
+    in
+    let rec find_enc lenc =
+      match lenc with
+        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
+                                      Term.Fun ((fnpk,fnpki), [
+                                          Term.Diff(Term.Name (sk,isk),
+                                                    Term.Name (sk2,isk2)) ])])
+           as enc) :: q when Symbols.is_ftype fnpk Symbols.PublicKey
+                          && Symbols.is_ftype fnenc Symbols.AEnc
+          ->
+          begin match Symbols.Function.get_data fnenc with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
+              hide_enc fnenc enc fndec sk (Some fnpk) r fnenci (Some fnpki) m isk
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct \
+                    public key function.")
+          end
+        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
+                                          Term.Diff(  Term.Name (sk,isk),
+                                                      Term.Name (sk2,isk2))
+                                        ])
+           as enc) :: q when Symbols.is_ftype fnenc Symbols.AEnc
+          ->
+          begin
+            match Symbols.Function.get_data fnenc with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec] ->
+              hide_enc fnenc enc fndec sk None r fnenci None m isk
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct \
+                    public key function.")
+          end
+        | p :: q -> find_enc q
+        | [] ->
+          Tactics.soft_failure
+            (Tactics.Failure
+               "Key Privact can only be applied on a term with at least one \
+                occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
+    in
+    find_enc ((Iter.get_ftypes ~system e Symbols.AEnc)
+              @ (Iter.get_ftypes ~system e Symbols.SEnc))
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "Out of range position")
+
+
+let () =
+ T.register_general "enckp"
+   ~help:"Apply the enckp axiom, replacing the first term of the form \
+          enc(t,r,pk(diff(k1,k2))) by enc(t,r,pk(k1)) inside the given \
+          message.\n Usage: enckp i."
+   (function
+   | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match enckp i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+   | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
 (** XOR *)
@@ -1171,7 +1307,7 @@ let xor i (opt_n : Theory.term option) s =
       [EquivSequent.set_biframe s biframe]
     | exception Not_xor -> Tactics.soft_failure
       (Tactics.Failure
-        "Can only apply fresh tactic on terms of the form u XOR v")
+        "Can only apply xor tactic on terms of the form u XOR v")
     end
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
@@ -1368,10 +1504,27 @@ let equiv t1 t2 (s : EquivSequent.t) sk fk =
     in
     sk subgoals fk
   | exception (Theory.Conv e) ->
+    begin
+    match Theory.convert tsubst t1 Sorts.Message,
+        Theory.convert tsubst t2 Sorts.Message with
+  | m1,m2 ->
+    (* goal for the equivalence of t1 and t2 *)
+    let trace_sequent =
+      TraceSequent.init ~system
+        (Term.Atom (`Message (`Eq,m1,m2)))
+      |> TraceSequent.set_env env
+    in
+    let subgoals =
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv
+          (EquivSequent.apply_subst [Term.ESubst (m1,m2)] s) ]
+    in
+    sk subgoals fk
+  | exception (Theory.Conv e) ->
     Tactics.soft_failure
       (Tactics.Failure
          (Fmt.str "%a" Theory.pp_error e))
-
+end
 let () = T.register_general "equivalent"
   ~help:"Replace all occurrences of a formula by another, and ask to prove \
          \n that they are equivalent.
@@ -1418,8 +1571,8 @@ let apply_yes_no_if b i s =
   let system = EquivSequent.get_system s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
-    (* search for the first occurrence of a conditional in [e] *)
-    begin match (get_ite ~system elem) with
+    (* search for the first occurrence of an if-then-else in [elem] *)
+    begin match get_ite ~system elem with
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
@@ -1642,6 +1795,49 @@ let () =
            | subgoals -> sk subgoals fk
            | exception (Tactics.Tactic_soft_failure e) -> fk e)
       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
+let trivial_if i s =
+  let env = EquivSequent.get_env s in
+  let system = EquivSequent.get_system s in
+  match nth i (EquivSequent.get_biframe s) with
+  | before, elem, after ->
+    (* search for the first occurrence of an if-then-else in [elem] *)
+    begin match get_ite ~system elem with
+    | None ->
+      Tactics.soft_failure
+        (Tactics.Failure
+          "can only be applied on a term with at least one occurrence \
+           of an if then else term")
+    | Some (c,t,e) ->
+      let trace_goal  = Prover.Goal.Trace
+          (TraceSequent.init ~system (Term.Atom (`Message (`Eq,t,e)))
+           |> TraceSequent.set_env env
+          )
+      in
+      let new_elem =
+        EquivSequent.apply_subst_frame
+          [Term.ESubst (Term.ITE (c,t,e),t)]
+          [elem]
+      in
+      let biframe = List.rev_append before (new_elem @ after) in
+      [ trace_goal;
+        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+    end
+  | exception Out_of_range ->
+     Tactics.soft_failure (Tactics.Failure "out of range position")
+
+let () =
+ T.register_general "trivialif"
+   ~help:"Simplify a conditional when the two branches are equal.\
+          \n Usage: trivialif i."
+   (function
+     | [Prover.Int i] ->
+       only_equiv
+         (fun s sk fk -> match trivial_if i s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+     | _ -> Tactics.hard_failure (Tactics.Failure "integer expected")
+)
 
 
 (* allows to replace inside the positive branch of an if then else a term by

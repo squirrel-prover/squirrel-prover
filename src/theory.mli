@@ -57,12 +57,18 @@ val pp : Format.formatter -> term -> unit
 
 (** Declare a new function symbol of type message->message->message, * which
    satisfies PRF, and thus collision-resistance and EUF. *)
-val declare_hash : string -> unit
+val declare_hash : ?index_arity:int -> string -> unit
 
 (** Asymmetric encryption function symbols are defined by the triplet
     (enc,dec,pk).
     It satisfies CCA2. *)
 val declare_aenc : string -> string -> string -> unit
+
+(** Symmetric encryption function symbols are defined by the couple
+    (enc,dec).
+    It satisfies CCA2. *)
+val declare_senc : string -> string -> unit
+
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
    It satisfies EUF. *)
@@ -72,13 +78,13 @@ val declare_signature : string -> string -> string -> unit
   * [index^i -> message]. *)
 val declare_name : string -> int -> unit
 
-(** [declare_state n i s] declares a new name of type
+(** [declare_state n i s] declares a new state symbol of type
   * [index^i -> s] where [s] is either [boolean] or [message]. *)
 val declare_state : string -> int -> Sorts.esort -> unit
 
-(** [declare_abstract n l s] declares a new function symbol
-  * of type [l -> s]. *)
-val declare_abstract : string -> Sorts.esort list -> Sorts.esort -> unit
+(** [declare_abstract n i m] declares a new function symbol
+  * of type [index^i -> message^m -> message]. *)
+val declare_abstract : string -> index_arity:int -> message_arity:int -> unit
 
 (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
   * of type [s1->...->sn->s]

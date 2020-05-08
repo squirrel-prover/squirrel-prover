@@ -7,8 +7,7 @@ type name = Symbols.name Symbols.t
 type nsymb = name indexed_symbol
 
 type fname = Symbols.fname Symbols.t
-type unsupported_index = Vars.index
-type fsymb = fname * unsupported_index list
+type fsymb = fname * Vars.index list
 
 type mname = Symbols.macro Symbols.t
 type 'a msymb = mname * 'a Sorts.sort * Vars.index list
@@ -176,14 +175,14 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         ppf ()
   | Init -> Fmt.styled `Green (fun ppf () -> Fmt.pf ppf "init") ppf ()
   | Diff (bl, br) ->
-    Fmt.pf ppf "@[<1>(diff(%a, %a))@]"
+    Fmt.pf ppf "@[<1>(diff(%a,@,%a))@]"
       pp bl pp br
   | ITE (b, c, d) ->
-    Fmt.pf ppf "@[<1>(if %a then %a else %a)@]"
+    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
       pp b pp c pp d
   | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<1>(try find %a such that %a in %a else %a)@]"
-      Vars.pp_typed_list (List.map (fun t -> Vars.EVar t) b) pp c pp d pp e
+    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
+      Vars.pp_list b pp c pp d pp e
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
@@ -481,28 +480,31 @@ and subst_generic_atom s = function
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
 
-
 (** Builtins *)
 
-let mk_fname ?(indices=0) f k_args k_ret =
-  let info = indices, Symbols.Abstract (k_args,k_ret) in
+let mk_fname f arity =
+  let info = 0, Symbols.Abstract arity in
   snd
     (Symbols.Function.declare_exact Symbols.dummy_table f ~builtin:true info),
   []
 
-(** Boolean function symbols *)
+let f_diff = mk_fname "diff" 2
+
+(** Boolean function symbols. They are not typed precisely (assuming
+  * implicit conversions from bool to message) but are only "used"
+  * in Completion in an untyped fashion anyway (and the corresponding
+  * code is actually not effective at the moment). *)
 
 let eboolean,emessage = Sorts.eboolean,Sorts.emessage
 
-let f_false = mk_fname "false" [] eboolean
-let f_true = mk_fname "true" [] eboolean
-let f_and = mk_fname "and" [eboolean;eboolean] eboolean
-let f_or = mk_fname "or" [eboolean;eboolean] eboolean
-let f_not = mk_fname "not" [eboolean] eboolean
-let f_ite = mk_fname "if" [eboolean;emessage;emessage] emessage
-let f_diff = mk_fname "diff" [emessage;emessage] emessage
-let f_left = mk_fname "left" [emessage] emessage
-let f_right = mk_fname "right" [emessage] emessage
+let f_false = mk_fname "false" 0
+let f_true = mk_fname "true" 0
+let f_and = mk_fname "and" 2
+let f_or = mk_fname "or" 2
+let f_not = mk_fname "not" 1
+let f_ite = mk_fname "if" 3
+
+(** Smart constructors for boolean terms. *)
 
 let mk_and t1 t2 = match t1,t2 with
   | True, t | t, True -> t
@@ -543,31 +545,31 @@ let mk_indices_eq vect_i vect_j =
 
 (** Xor and its unit *)
 
-let f_xor = mk_fname "xor" [emessage;emessage] emessage
-let f_zero = mk_fname "zero" [] emessage
+let f_xor = mk_fname "xor" 2
+let f_zero = mk_fname "zero" 0
 
 (** Successor over natural numbers *)
 
-let f_succ = mk_fname "succ" [emessage] emessage
+let f_succ = mk_fname "succ" 1
 
 (** Pairing *)
 
-let f_pair = mk_fname "pair" [emessage;emessage] emessage
-let f_fst = mk_fname "fst" [emessage] emessage
-let f_snd = mk_fname "snd" [emessage] emessage
+let f_pair = mk_fname "pair" 2
+let f_fst = mk_fname "fst" 1
+let f_snd = mk_fname "snd" 1
 
 (** Exp **)
 
-let f_exp = mk_fname "exp" [emessage;emessage] emessage
-let f_g = mk_fname "g" [] emessage
+let f_exp = mk_fname "exp" 2
+let f_g = mk_fname "g" 0
 
 (** Dummy term *)
 
-let dummy = Fun (mk_fname "_" [] emessage, [])
+let dummy = Fun (mk_fname "_" 0, [])
 
 (** Length *)
 
-let f_len = mk_fname "len" [emessage] emessage
+let f_len = mk_fname "len" 1
 
 type projection = Left | Right | None
 
@@ -676,8 +678,7 @@ let () =
       let a = mkvar "a" Sorts.Message in
       let b = mkvar "b" Sorts.Message in
       let c = mkvar "c" Sorts.Message in
-      let def =
-        Symbols.Abstract ([Sorts.emessage;Sorts.emessage],Sorts.emessage) in
+      let def = Symbols.Abstract 2 in
       let _,f =
         Symbols.Function.declare_exact Symbols.empty_table "f" (0,def) in
       let f x = Fun ((f,[]),[x]) in

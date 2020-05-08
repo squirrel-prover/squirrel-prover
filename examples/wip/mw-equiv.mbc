@@ -6,9 +6,8 @@
 
 hash H
 
-(* TODO abstract would be more natural but index->message not allowed *)
-name id : index->message
-name id':index -> index ->message
+abstract id : index->message
+abstract id':index -> index ->message
 
 name key : index->message
 name key':index -> index -> message
@@ -105,7 +104,9 @@ yesif 2.
 project.
 
 (* left *)
-apply tags_neq. repeat split.
+(* TODO Why don't we need to prove anything here ?
+        I expected the else branch (T1) to be a problem! *)
+apply tags_neq. (* repeat split.
 
 admit. (* branche else, similaire then *)
 
@@ -115,10 +116,10 @@ expand exec@T1(i,t1). expand cond@T1(i,t1).
 assert (H(<tag1,<input@T(i,t1),nt(i,t1)>>,key(i)) = xor(input@T1(i,t1),id(i))).
 euf M3.
 substitute. case H1.
-depends T(i,t1), T1(i,t1).
+depends T(i,t1), T1(i,t1). *)
 
 (* right *)
-apply tags_neq. repeat split.
+apply tags_neq. (* repeat split.
 
 assert cond@T1(i,t).
 executable pred(R1(r)). apply H1 to T1(i,t).
@@ -128,9 +129,9 @@ euf M3.
 substitute. case H1.
 depends T(i,t), T1(i,t).
 
-admit. (* branche else, similaire then *)
+admit. (* branche else, similaire then *) *)
 
-xor 2,n_PRF.
+xor 2,n_PRF. (* TODO I don't understand this use of xor *)
 (* END *)
 
 (* Case R2  - WIP *)
@@ -153,16 +154,12 @@ split.
 project.
 (* left *)
 euf M1.
-substitute r1, r.
-admit. (* R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
 exists i,t1.
 assert (nr(r) = input@T(i,t1)).
 fresh M3.
 depends R(r), R1(r).
 (* right *)
 euf M1.
-substitute r1, r.
-admit. (*  R1(r) < R2(r) en hyp. me semble contradictiore car c'est R1 ou R2 - pas les 2 *)
 exists i,t.
 assert (nr(r) = input@T(i,t)).
 fresh M3.
@@ -171,7 +168,6 @@ depends R(r), R1(r).
 (* proof of lemma: WA => Cond *)
 exists i,t.
 fadup 0.
-
 
 (* Case T - DONE *)
 expand frame@T(i,t); expand exec@T(i,t).
@@ -184,20 +180,14 @@ prf 3. (* we apply PRF inside XOR to be able to use XOR tactic later on *)
 yesif 3.
 apply tags_neq.
 project.
-repeat split.
 assert (fst(input@R1(r)) = nt(i,t)).
 fresh M2.
 assert (fst(input@R1(r)) = nt(i,t)).
 fresh M2.
-assert (fst(input@R2(r)) = nt(i,t)).
-fresh M2.
-repeat split.
-assert (fst(input@R2(r)) = nt(i,t)).
-fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
+admit. (* TODO new cases since merge *)
+admit.
+admit.
+admit.
 xor 3, n_PRF. (* we now have a fresh name instead of a hash in the XOR biterm *)
 fresh 2. yesif 2.
 Qed.

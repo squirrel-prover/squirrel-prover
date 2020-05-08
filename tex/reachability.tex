@@ -169,12 +169,12 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
     }{
       \Gamma, b[\vec{i}] \leq a[\vec{i}, \vec{j}] \vdash \phi
     }
-    \quad\text{ when } a \le b
+    \quad\text{ when } a < b
     
     \inferrule{
       ~
     }{
-      \Gamma, a[\vec{i}] \neq b[\vec{j}] \vdash \phi
+      \Gamma, a[\vec{i}] = b[\vec{j}] \vdash \phi
     }
     \quad\text{ when } a \ne b
 
@@ -302,7 +302,7 @@ To lift the above rule to the meta-logic, we first lift the occurence side-condi
 
 \begin{definition}
   \label{def:occ-sc-meta}
-  Let $\calp$ be a protocol, $C$ be a macros-free context, and $u$ a term of the meta-logic with \textbf{no message variables}. For every term $s$, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
+  Let $\calp$ be a protocol, $C$ be a macros-free context, and $u$ a term of the meta-logic with \textbf{no message variables}. For every term $s$, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
   % Let $\calp$ be a protocol, and $C$ be a macros-free many-holed context with one distinguished hole variable $\cdot$ that occurs exactly once in $C$. Let $u$ be a term of the meta-logic with \textbf{no message variables}. For every macros-free term $s$ of the meta-logic, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
 \end{definition}
 
@@ -316,6 +316,9 @@ The base-logic side-condition $\tpos_{C}$ is fully syntactic, and can easily be 
   \item the function symbols appearing in $C$ (except for $C$ head symbol) do not appear in head position of any of the terms in $\{\phi_a,o_a,u^s_a \mid a \in \calp_{\sfA}, s \in\States\}$;
   \end{itemize}
 \end{definition}
+
+\david{Item 3 might be too restrictive. We need to check that what we're doing
+in the code is sound, and formalize this.}
 
 \begin{definition}
   Let $\calp$ be a protocol, and $C$ a $\calp$-well behaved context. For every $s$, we let $s \tpos_{C} \calp$ hold whenever $s \tpos_{C} \{\phi_a,o_a,u^s_a \mid a \in \calp_{\sfA}, s \in\States\}$.
@@ -376,6 +379,10 @@ There are two issue there: the set $S$ can be infinite, and we must be able to c
 \end{definition}
 
 $\ost_{\calp}(u)$ is a set of triples $(t,\vec{i},c)$ such that, for any $\calp$-trace model $\TM$, the interpretation in $\TM$ of the terms of $\ost_{\calp}(u)$ such that $c$ holds in $\TM$ contains all the subterms of~$\interp{u}^\TM$. Moreover, $\vec{i}$ is the set of new (index) variables in $t$ and $c$: $\fv{t,c} \subseteq \fv{u} \cup \{\pvec{i}\}$.
+\david{Note that $t$ can contain the ``bound indices'' $\vec{i}$ in the
+second case. We are however not trying to formalize the situation where
+occurrences have indices bound by constructs inside the action descriptions.}
+
 \begin{proposition}
   \label{prop:ost-sound}
   For any protocol $\calp$ and term $u$ of the meta-logic, the set $\ost_{\calp}(u)$ is finite. Moreover, for any $\calp$-trace model $\TM = (\D_\I, \D_\XT, \leq_\XT, \sigma_\I, \sigma_\XT)$:
@@ -408,12 +415,12 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
       \Gamma,
       \bigvee_{(h(u,sk),\vec{i},c) \in \ost_{\calp}(t,m)}
       \exists \vec{i},
-      c \rightarrow u = m \vdash \phi
+      c \wedge u = m \vdash \phi
     }{
       \Gamma, t=h(m,sk) \vdash \phi
     }
     \quad\text{ when }
-    sk \tpos^{\calp}_{h(\_,\cdot)} s,m
+    sk \tpos^{\calp}_{h(\_,\cdot)} t,m
   \]
   % \begin{gather*}
   %   \inferrule{
@@ -462,7 +469,7 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
         \Gamma,
         \bigvee_{(\mathsf{n}[\vec{j}],\vec{k},c) \in \ost_{\calp}(t)}
         \exists \vec{k},
-        c \rightarrow \vec{i} = \vec{j} 
+        c \wedge \vec{i} = \vec{j}
         \vdash \phi
       }{
         \Gamma, t = \mathsf{n}[\vec{i}]\vdash \phi

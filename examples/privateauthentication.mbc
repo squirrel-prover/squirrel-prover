@@ -1,0 +1,62 @@
+channel cA
+channel cB
+
+name kA : message
+name kAbis : message
+name kB : message
+
+aenc enc,dec,pk
+
+name n0 : index -> message
+name r0 : index -> message
+
+name n : index -> message
+name r : index -> message
+name r2 : index -> message
+
+abstract plus : message -> message -> message
+
+axiom length : forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2))
+
+process A(i:index) =
+  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB)))
+
+process B(i:index) =
+ in(cB, mess);
+ let dmess = dec(mess, kB) in
+out(cB,
+ if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n(i)) then
+   enc(<snd(dmess), n(i)>, r(i), pk(diff(kA,kAbis)))
+else
+   enc(<n(i), n(i)>, r2(i), pk(diff(kA,kAbis)))
+
+)
+
+
+system (!_i A(i) | !_j B(j)).
+
+
+equiv test.
+Proof.
+  enrich pk(kA).
+  induction t.
+
+  expandall.
+  fa 2. fa 3. cca1 3.
+  fa 3. fa 3. fresh 3. yesif 3.
+
+  expandall.
+  fa 2. fa 3. enckp 3. enckp 3. cca1 3. cca1 3.
+
+  equivalent len(<snd(dec(input@B(j),kB)),n(j)>),  plus(len(snd(dec(input@B(j),kB))),len(n(j))).
+  (* length reasoning *)
+  apply length to snd(dec(input@B(j),kB)),n(j).
+  ifeq 3,    len(snd(dec(input@B(j),kB))), len(n(j)).
+  trivialif 3.
+  apply length to n(j),n(j).
+  (* length reasoing *)
+  fa 3.
+  fa 3.
+  fresh 3.
+  yesif 3.
+Qed.

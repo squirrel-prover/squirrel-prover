@@ -108,24 +108,50 @@ class iter_approx_macros ~exact ~system = object (self)
 
 end
 
-(** Get the first term of given type. *)
-class get_ftype_term ~system symtype = object (self)
+(** Collect occurrences of [f(_,k(_))] for a function name [f] and name [k].
+  * We use the exact version of [iter_approx_macros], otherwise
+  * we might obtain meaningless terms provided by [get_dummy_definition]. *)
+class get_f_messages ~system f k = object (self)
   inherit iter_approx_macros ~exact:true ~system as super
-  val mutable func : Term.message option = None
+  val mutable occurrences : (Vars.index list * Term.message) list = []
+  method get_occurrences = occurrences
+  method visit_message = function
+    | Term.Fun ((f',_), [m;k']) when f' = f ->
+        begin match k' with
+          | Term.Name (k',is) when k' = k ->
+              occurrences <- (is,m) :: occurrences
+          | _ -> ()
+        end ;
+        self#visit_message m ; self#visit_message k'
+    | Term.Var m -> assert false (* SSC must have been checked first *)
+    | m -> super#visit_message m
+end
+
+(** Get the terms of given type. *)
+class get_ftypes_term ~system symtype = object (self)
+  inherit iter_approx_macros ~exact:true ~system as super
+  val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
     | Term.Fun ((fn,_), l) as fn_term ->
-        if  Symbols.is_ftype fn symtype
-        then func <- Some fn_term
+        if Symbols.is_ftype fn symtype
+        then func <-  fn_term :: func
         else List.iter self#visit_message l
     | m -> super#visit_message m
 end
 
-(** [get_ftype ~system elem ftype] returns None if there is no term in [elem]
-   with a function symbol head of the fiven ftype, Some fun otherwise, where
+(** [get_ftype ~system elem ftype] returns [None] if there is no term in [elem]
+   with a function symbol head of the fiven ftype, [Some fun] otherwise, where
    [fun] is the first term of the given type encountered. Does not explore
    macros. *)
 let get_ftype ~system elem stype =
-  let iter = new get_ftype_term ~system stype in
+  let iter = new get_ftypes_term ~system stype in
+  List.iter iter#visit_term [elem];
+  match iter#get_func with
+  | p::q -> Some p
+  | [] -> None
+
+let get_ftypes ~system elem stype =
+  let iter = new get_ftypes_term ~system stype in
   List.iter iter#visit_term [elem];
   iter#get_func
