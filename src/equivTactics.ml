@@ -1286,7 +1286,7 @@ let xor i (opt_n : Theory.term option) s =
       [EquivSequent.set_biframe s biframe]
     | exception Not_xor -> Tactics.soft_failure
       (Tactics.Failure
-        "Can only apply fresh tactic on terms of the form u XOR v")
+        "Can only apply xor tactic on terms of the form u XOR v")
     end
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")

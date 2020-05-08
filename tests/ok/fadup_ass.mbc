@@ -11,5 +11,5 @@ Proof.
   enrich diff(input@pred(A(i)),a).
   nosimpl(admit 1; admit 1).
   nosimpl(fadup).
-  assumption. (* This should not work ! *)
+  assumption.
 Qed.
