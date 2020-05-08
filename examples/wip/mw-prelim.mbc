@@ -15,22 +15,47 @@ axiom tags_neq : tag0 <> tag1
 
 channel c
 
-system
-  !_i !_t !_r out(c,diff(id(i),id'(i,t)) XOR
+system ((!_r out(c,nr(r))) | (!_i !_t out(c,nt(i,t))) |
+             (!_i !_t !_r
+              out(c,diff(id(i),id'(i,t)) XOR
                     H(<tag0,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t))));
               out(c,diff(id(i),id'(i,t)) XOR
-                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
+axiom phase : forall (i,t,r:index), A(r) < A1(i,t)
+system [dummy] null.
+axiom phase2 : forall (i,t,r:index), A1(i,t) < A2(i,t,r)
+system [dummy2] null.
+	  
 equiv e.
 Proof.
   induction t.
-  (* Case A, i.e. tag0 hashes *)
+  (* Nonces *)
+  expandall.
+  fa 1. fa 2.
+  fresh 2.
+  yesif 2.
+  split.
+  apply phase to i,t,r1.
+  apply phase2 to i,t,r1.
+  apply phase to i,t,r1.
+  apply phase2 to i,t,r1.
+  depends A2(i,t,r),A3(i,t,r).
+  expandall.
+  fa 1. fa 2.
+  fresh 2.
+  yesif 2.
+  split.
+  apply phase2 to i1,t,r.
+  apply phase2 to i1,t1,r.
+  depends A2(i,t,r),A3(i,t,r).
+  (* Case of tag0 hashes *)
   expandall. fa 1. fa 2.
   prf 2. yesif 2.
     split; project.
-    depends A(i,t,r),A1(i,t,r).
-    depends A(i,t,r),A1(i,t,r).
+    depends A2(i,t,r),A3(i,t,r).
+    depends A2(i,t,r),A3(i,t,r).
   admit. (* TODO xor tactic should apply *)
-  (* Case A1 will be similar but will use tags_neq *)
+  (* Case of tag1 hashes will be similar but will use tags_neq *)
   admit.
 Qed.
