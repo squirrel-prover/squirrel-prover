@@ -91,13 +91,12 @@ exists i,t.
 
 (* BEGIN (tests to work around PRF under context with bounded variables) *)
 fa 1. fadup 0.
-
 ifcond 2, exec@pred(R1(r)).
 fa 2.
 fadup 2.
 fa 2.
 prf 3.
-ifcond_deep 3, exec@pred(R1(r)).
+ifcond 3, exec@pred(R1(r)).
 fa 3.
 yesif 3.
 
