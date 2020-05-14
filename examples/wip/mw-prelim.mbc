@@ -15,18 +15,23 @@ axiom tags_neq : tag0 <> tag1
 
 channel c
 
-system ((!_r out(c,nr(r))) | (!_i !_t out(c,nt(i,t))) |
-             (!_i !_t !_r
-              out(c,diff(id(i),id'(i,t)) XOR
-                    H(<tag0,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t))));
-              out(c,diff(id(i),id'(i,t)) XOR
-                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
+system ((!_r out(c,nr(r))) |
+        (!_i !_t out(c,nt(i,t))) |
+        (!_i !_t
+           (* Incorrect modeling: x should be input@T(i,t),
+              in particular it can depend on previous tag1 hashes. *)
+           in(c,x);
+           out(c,diff(id(i),id'(i,t)) XOR
+                 H(<tag0,<x,nt(i,t)>>,diff(key(i),key'(i,t))))) |
+        (!_i !_t !_r
+           out(c,diff(id(i),id'(i,t)) XOR
+                 H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
-axiom phase : forall (i,t,r:index), A(r) < A1(i,t)
+axiom phase_A_A1 : forall (i,t,r:index), A(r) < A1(i,t)
+axiom phase_A1_A2 : forall (i,t:index), A1(i,t) < A2(i,t)
+axiom phase_A2_A3 : forall (i,t,r:index), A2(i,t) < A3(i,t,r)
 system [dummy] null.
-axiom phase2 : forall (i,t,r:index), A1(i,t) < A2(i,t,r)
-system [dummy2] null.
-	  
+
 equiv e.
 Proof.
   induction t.
@@ -35,27 +40,27 @@ Proof.
   fa 1. fa 2.
   fresh 2.
   yesif 2.
-  split.
-  apply phase to i,t,r1.
-  apply phase2 to i,t,r1.
-  apply phase to i,t,r1.
-  apply phase2 to i,t,r1.
-  depends A2(i,t,r),A3(i,t,r).
+  apply phase_A_A1 to i,t,r.
+  apply phase_A1_A2 to i,t.
+  apply phase_A2_A3 to i,t,r1.
   expandall.
   fa 1. fa 2.
   fresh 2.
   yesif 2.
   split.
-  apply phase2 to i1,t,r.
-  apply phase2 to i1,t1,r.
-  depends A2(i,t,r),A3(i,t,r).
+  apply phase_A1_A2 to i1,t1.
+  apply phase_A2_A3 to i1,t1,r.
+  apply phase_A1_A2 to i1,t.
   (* Case of tag0 hashes *)
   expandall. fa 1. fa 2.
   prf 2. yesif 2.
     split; project.
-    depends A2(i,t,r),A3(i,t,r).
-    depends A2(i,t,r),A3(i,t,r).
-  admit. (* TODO xor tactic should apply *)
+    apply phase_A2_A3 to i,t,r.
+    apply phase_A2_A3 to i,t,r.
+  xor 2, n_PRF.
   (* Case of tag1 hashes will be similar but will use tags_neq *)
-  admit.
+  expandall. fa 1. fa 2.
+  prf 2. yesif 2.
+    apply tags_neq; split; project.
+  xor 2, n_PRF1.
 Qed.
