@@ -15,8 +15,8 @@ open Utils
    constraints solving, the union-find structure contains an
    *under-approximation* of equality equivalence classes. *)
 
-let log_constr = Log.log Log.LogConstr
-
+let log_constr = Log.log Log.LogConstr;;
+  
 (* Comment this for debugging *)
 let log_constr = ignore
 
@@ -74,9 +74,9 @@ end = struct
 
   let uname a us = UName (a, us) |> make
 
-  let upred u = UPred u |> make
-
   let uinit = UInit |> make
+              
+  let upred u = if u.cnt = UInit then uinit else UPred u |> make
 
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
@@ -101,7 +101,7 @@ let rec pp_ut_cnt ppf = function
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
   | UInit -> Fmt.pf ppf "init"
 
-let pp_ut ppf ut = pp_ut_cnt ppf ut.cnt
+let pp_ut ppf ut = Fmt.pf ppf "%a" pp_ut_cnt ut.cnt
 
 let ut_equal t t' = t.hash = t'.hash
 
@@ -139,28 +139,26 @@ let mk_instance (l : trace_atom list) =
     | UPred y -> subterms (x :: acc) y
     | UVar _ | UInit -> x :: acc in
   let elems =
-    List.fold_left (fun acc (a,b) -> a :: b :: acc) [] (eqs @ leqs @ neqs)
+    List.fold_left (fun acc (a,b) -> a :: b :: acc) [uinit] (eqs @ leqs @ neqs)
     |> List.fold_left subterms []
     |> List.sort_uniq ut_compare in
 
   let uf = Uuf.create elems in
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
-
-
-exception Unify_cycle of Uuf.t
-
+ 
 (* [mgu ut uf] applies the mgu represented by [uf] to [ut].
-   Raise [Unify_cycle] if it contains a cycle.
-   If [ext_support] is [true], add [ut] to [uf]'s support if necessary. *)
+   Return init if it contains a cycle.
+   If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
+   Note that [mgu] normalizes pred(init) into init. *)
 let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
-
+  
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
     (Uuf.union uf ut nut, nut)
 
   and mgu_aux uf ut lv =
-    if List.mem ut lv then raise (Unify_cycle uf)
+    if List.mem ut lv then (uf, uinit)
     else match ut.cnt with
       | UVar _ ->
         let uf = if ext_support then Uuf.extend uf ut else uf in
@@ -187,13 +185,16 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
       | UInit ->
         let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
+        
         if ut_equal rut ut then uf, uinit else mgu_ uf rut (ut :: lv)
 
       | UPred ut' ->
         let uf, nut' = mgu_ uf ut' lv in
-        (uf, upred nut') in
-
+        (* the [upred] smart constructor normalizes pred(init) into init) *)
+        (uf, upred nut') in 
+  
   mgu_ uf ut []
+      
 
 let mgus uf uts =
   let uf, nuts_rev =
@@ -206,19 +207,25 @@ let mgus uf uts =
 
 exception No_mgu
 
-(* [let sx,sy = swap x y] guarantees that if [x] or [y] is a variable, then
-    [sx] is variable. Moreover, if [x] and [y] are not variables but one of
-    them is a name, then [sx] is a name. *)
-let swap x y = match x.cnt, y.cnt with
-  | _, UVar _ -> y,x
-  | UVar _, _ -> x,y
-  | _, UName _ -> y,x
-  | _ -> x,y
-
+ (* Ordering var > name > pred > init *)
+let norm_ut_compare x y = match x.cnt, y.cnt with
+  | UVar _, _    -> true
+  | _, UVar _    -> false
+  | UName _, _   -> true
+  | _, UName _   -> false
+  | UPred _, _   -> true
+  | _, UPred _   -> false
+  | UInit, UInit -> true
+ 
+(* [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
+   ordering [norm_ut_compare]. We use this to choose the representents in
+   the union-find. *)
+let swap x y = if norm_ut_compare x y then x, y else y, x
+                                                     
 let no_mgu x y = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
     if a <> a' then raise No_mgu else ()
-  | UName _, UInit -> raise No_mgu
+  | UInit, UName _ | UName _, UInit -> raise No_mgu
   | _ -> ()
 
 
@@ -251,7 +258,7 @@ let rec unif uf eqs = match eqs with
 (* Names unification *)
 (*********************)
 
-(* Now, it remains to unify UNames equalities that may have been missed. *)
+(* Now, it remains to unify name or init equalities that may have been missed. *)
 let unif_idx uf =
   let aux_names idx_eqs (a1,is1) (a2,is2) =
     if a1 <> a2 then raise No_mgu
@@ -259,9 +266,18 @@ let unif_idx uf =
 
   let rec aux idx_eqs cl = match cl with
     | [] -> idx_eqs
+    | UInit :: cl' ->
+      List.iter (fun ut -> match ut with
+          | UName _ -> raise No_mgu
+          | _ -> ()
+        ) cl';
+
+      aux idx_eqs cl'
+
     | UName (a1,is1) :: cl' ->
       let idx_eqs = List.fold_left (fun idx_eqs ut -> match ut with
           | UName (a2,is2) -> aux_names idx_eqs (a1,is1) (a2,is2)
+          | UInit -> raise No_mgu
           | _ -> idx_eqs
         ) idx_eqs cl' in
 
@@ -344,8 +360,11 @@ module UtG = Persistent.Digraph.Concrete(struct
 module Scc = Components.Make(UtG)
 
 (* Build the inequality graph. There is a edge from S to S' if there exits
-    u in S and v in S' such that u <= v, or if u = P^{k+1}(t) and v = P^k(t).
-    Remark: we use [mgu uf u] as a representant for the class of u *)
+   u in S and v in S' such that:
+   - u <= v
+   - if u = P^{k+1}(t) and v = P^k(t)
+   - or if u = init
+   Remark: we use [mgu uf u] as a representant for the class of u *)
 let build_graph (uf : Uuf.t) leqs =
   let rec bg uf leqs g = match leqs with
     | [] -> uf, g
@@ -355,13 +374,16 @@ let build_graph (uf : Uuf.t) leqs =
       UtG.add_edge g nu nv
       |> bg uf leqs in
 
-  let add_preds g =
-    UtG.fold_vertex (fun v g -> match v.cnt with
-        | UPred u -> UtG.add_edge g v u
-        | _ -> g) g g in
-
+  let add_preds_and_init g =
+    UtG.fold_vertex (fun v g ->
+        let g = match v.cnt with
+          | UPred u -> UtG.add_edge g v u
+          | _ -> g in
+        UtG.add_edge g uinit v
+      ) g g in
+    
   let uf, g = bg uf leqs UtG.empty in
-  (uf, add_preds g)
+  (uf, add_preds_and_init g)
 
 
 (* For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
@@ -395,19 +417,24 @@ let min_pred uf g u x =
   let rec minp uf j cx =
     let uf, ncx = mgu uf cx in
     if UtG.mem_vertex g ncx then
-      if UtG.mem_edge g ncx u then Some (uf,j)
+      if UtG.mem_edge g ncx u || ut_equal ncx uinit then Some (uf,j)
       else minp uf (j+1) (upred ncx)
     else None
   in
   minp uf 0 x
 
 (* [max_pred uf g u x] returns [j] where [j] is the largest integer such
-    that [u <= P^j(x)] in the graph [g], if it exists.
-    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
+   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case 
+   if init occurs.
+   Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
   let rec maxp uf j cx =
     let uf, ncx = mgu uf cx in
-    if (UtG.mem_vertex g ncx) && (UtG.mem_edge g u ncx) then
+    if ut_equal ncx uinit then
+      if UtG.mem_edge g u ncx
+      then Some (uf, j)
+      else Some (uf, j - 1)
+    else if (UtG.mem_vertex g ncx) && (UtG.mem_edge g u ncx) then
       maxp uf (j+1) (upred ncx)
     else
       Some (uf, j - 1)
@@ -429,6 +456,7 @@ let decomp u =
 (* [nu] must be normalized and [x] basic *)
 let no_case_disj uf nu x minj maxj =
   let nu_i, nu_y = decomp nu in
+  ut_equal (snd (mgu uf x)) uinit ||
   (nu_y = snd (mgu uf x)) && (maxj <= nu_i) && (nu_i <= minj)
 
 module UtGOp = Oper.P(UtG)
@@ -462,28 +490,28 @@ let add_disj uf g u x =
         ))
 
 
-let forall_edges f g =
-  let exception Foe in
-  try
-    let () = UtG.iter_edges (fun v v' ->
-        if not (f v v') then raise Foe else ()) g in
-    true
-  with Foe -> false
+let find_all f g =
+  UtG.fold_edges (fun v v' acc ->
+      if f v v' then (v,v') :: acc else acc) g []
 
-(* Check that [instance] dis-equalities are satisfied.
-    [g] must be transitive. *)
+(* Returns the conditions under which [instance] satisfies the dis-equality
+   constraints and the rules:
+   ∀ x, x <= P(x) <=> x = init
+   [None] is unsat.
+   Precondition: [g] must be transitive. *)
 let neq_sat uf g neqs =
-  (* Check dis-equalities in neqs *)
-  List.for_all (fun (u,v) ->
-      not (ut_equal (mgu uf u |> snd) (mgu uf v |> snd))
+  (* All dis-equalities in neqs must hold *)
+  if List.exists (fun (u,v) ->
+      ut_equal (mgu uf u |> snd) (mgu uf v |> snd)
     ) neqs
-
-  (* Check that we never have P^k(u) >= (u) *)
-  && forall_edges (fun v v' -> match decomp v, decomp v' with
-      | (k,y), (k',y') ->
-        not (ut_equal y y') || k >= k'
-    ) g
-
+  then None
+  else
+    (* If we have P^k(u) >= u, then we must have u = init *)
+    Some (find_all (fun v v' -> match decomp v, decomp v' with
+        | (k,y), (k',y') ->
+          ut_equal y y' && k < k'
+      ) g)
+      
 let get_basics uf elems =
   List.map (fun x -> mgu uf x |> snd) elems
   |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
@@ -499,41 +527,54 @@ type model = { inst : constr_instance;
 (* [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split instance : model list =
-  try begin
+  try
     let uf = unify instance.uf instance.eqs instance.elems in
     let uf,g = leq_unify uf instance.leqs instance.elems in
     let g = UtGOp.transitive_closure g in
+    begin match neq_sat uf g instance.neqs with
+      | None -> []
+      | Some [] ->
+        let basics = get_basics uf instance.elems in
+        let exception Found of Uuf.t * (ut * ut) list in
+        begin try
+            let () = UtG.iter_vertex (fun u ->
+                List.iter (fun x -> match add_disj uf g u x with
+                    | None -> ()
+                    | Some (uf, l) -> raise (Found (uf,l))
+                  ) basics
+              ) g in
+            let instance = { instance with uf = uf } in
+            
+            [ { inst = instance; tr_graph = g } ]
+          with Found (uf, new_eqs) ->
+            List.map (fun eq ->
+                log_constr (fun () -> Printer.prt `Error
+                               "@[<v 2>Adding segment equality:@;%a@;@]@."
+                               (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
+                                  pp_ut pp_ut) eq);
+                split { instance with uf = uf;
+                                      eqs = eq :: instance.eqs;
+                                      new_eqs = eq :: instance.new_eqs }
+              ) new_eqs
+            |> List.flatten
+        end
 
-    if not (neq_sat uf g instance.neqs) then []
-    else
-      let basics = get_basics uf instance.elems in
-      let exception Found of Uuf.t * (ut * ut) list in
-      try
-        let () = UtG.iter_vertex (fun u ->
-            List.iter (fun x -> match add_disj uf g u x with
-                | None -> ()
-                | Some (uf, l) -> raise (Found (uf,l))
-              ) basics
-          ) g in
-        let instance = { instance with uf = uf } in
-        [ { inst = instance; tr_graph = g } ]
-      with Found (uf, new_eqs) ->
-        List.map (fun eq ->
-            log_constr (fun () -> Printer.prt `Error
-                           "@[<v 2>Adding equality:@;%a@;@]@."
-                           (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
-                              pp_ut pp_ut) eq);
-            split { instance with uf = uf;
-                                  eqs = eq :: instance.eqs;
-                                  new_eqs = eq :: instance.new_eqs }
-          ) new_eqs
-        |> List.flatten end
+      | Some new_eqs ->
+        assert (List.for_all (fun (v,v') ->
+            not (ut_equal (snd (mgu uf v)) (snd (mgu uf v')))) new_eqs);
+
+        log_constr (fun () ->
+            List.iter (fun eq ->
+                Printer.prt `Error
+                  "@[<v 2>Adding init equality:@;%a@;@]@."
+                  (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
+                     pp_ut pp_ut) eq) new_eqs);
+                          
+        split { instance with uf = uf;
+                              eqs = new_eqs @ instance.eqs;
+                              new_eqs = new_eqs @ instance.new_eqs } end
+
   with
-  | Unify_cycle uf ->
-    log_constr (fun () -> Printer.prt `Error "@[<v 2>Unify cycle:@;%a@;@]@."
-                   Uuf.print uf);
-    []
-
   | No_mgu ->
     log_constr (fun () -> Printer.prt `Error "@[<v 2>No_mgu:@;@]@.");
     []
@@ -694,8 +735,8 @@ let () =
   Checks.add_suite "Unification" [
     ("Cycles", `Quick,
      fun () ->
-       let successes = [pb_eq1; pb_eq6; pb_eq7; pb_eq8]
-       and failures = [pb_eq2; pb_eq3; pb_eq4; pb_eq5] in
+       let successes = [pb_eq1; pb_eq2; pb_eq3; pb_eq6; pb_eq7; pb_eq8;]
+       and failures = [pb_eq4; pb_eq5;] in
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("mgu" ^ string_of_int i) Mgu
@@ -704,23 +745,21 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("no mgu" ^ string_of_int i) No_mgu
-             (fun () -> let _ : Uuf.t =
-                          try mgu_eqs pb with
-                            Unify_cycle _ -> raise No_mgu in () ))
+             (fun () -> let _ : Uuf.t = mgu_eqs pb in ()))
          failures;);
 
     ("Cycles_2", `Quick,
      fun () ->
-       let successes = [pb_eq1; pb_eq6; pb_eq7; pb_eq8]
-       and failures = [pb_eq2; pb_eq3; pb_eq4; pb_eq5] in
+       let successes = [pb_eq1; pb_eq2; pb_eq3; pb_eq6; pb_eq7; pb_eq8]
+       and failures = [pb_eq4; pb_eq5] in
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("mgu" ^ string_of_int i) Sat
+           Alcotest.check_raises ("sat" ^ string_of_int i) Sat
              (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
          successes;
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("no mgu" ^ string_of_int i) Unsat
+           Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
              (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
          failures;);
 
@@ -749,7 +788,7 @@ let () =
                        (`Timestamp (`Leq, tau3, tau4)) ::
                        (`Timestamp (`Leq, tau4, tau'')) ::
                        pb_eq1] in
-
+       
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
              (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
@@ -759,5 +798,4 @@ let () =
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
              (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
          failures;)
-
   ]

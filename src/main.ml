@@ -349,4 +349,14 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/xor.mbc")
     end ;
+    "Pred Init", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/pred.mbc")
+    end ;
+    "Pred not injective", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/pred2.mbc")
+    end ;
   ]
