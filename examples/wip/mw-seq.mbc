@@ -42,16 +42,19 @@ system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 equiv unlinkability.
 Proof.
-enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
-                    H(<tag0,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+enrich seq(r -> nr(r)).
+enrich seq(i,t -> nt(i,t)).
+enrich seq(i,t -> diff(id(i),id'(i,t)) XOR
+                  H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))).
 enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
                     H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
 induction t.
-(* Init case: see mw-prelim *)
-admit.
+
+(* Init case *)
+admit. (* see mw-prelim *)
 
 (* Case R - Done *)
-admit.
+expand seq(r->nr(r)),r.
 
 (* Case R1  WIP *)
 expand frame@R1(r); expand exec@R1(r).
@@ -59,7 +62,7 @@ expand cond@R1(r); expand output@R1(r).
 
 equivalent
 (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
-                 H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
+                     H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
 (exists (i,t:index), T(i,t) < R1(r) && 
  snd(output@T(i,t)) = snd(input@R1(r)) &&
  fst(output@T(i,t)) = fst(input@R1(r)) &&  
@@ -86,14 +89,14 @@ depends R(r), R2(r).
 exists i,t.
 
 (* TODO here we need to rewrite fst(input@R1(r)) into nt(i,t) thanks to condition *)
-fa 3. fadup 2.
-fa 4. fadup 4.
+fa 5. fadup 4.
+fa 6. fadup 6.
 
-fafind 4.
+fafind 6. (* TODO conditions missing *)
 expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
                   H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
-admit 5. (* this is a dup, modulo the rewrite above *)
+admit 7. (* this is a dup, modulo the rewrite above *)
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -126,17 +129,13 @@ depends R(r), R1(r).
 
 (* proof of lemma: WA => Cond *)
 exists i,t.
-fadup 2.
+
+fadup 4.
 
 (* Case T *)
-expand frame@T(i,t); expand exec@T(i,t).
-expand cond@T(i,t);expand output@T(i,t).
-fa 3.
-fa 4.
-fa 4.
-
-admit 5. (* dup wrt seq as above *)
-admit 4. (* TODO add to seq *)
+expand seq(i,t->nt(i,t)),i,t.
+expand seq(i,t->xor((diff(id(i),id'(i,t))),
+                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
 
 Qed.
 
