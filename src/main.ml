@@ -288,6 +288,11 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/idx_collision.mbc")
     end ;
+    "Find equality", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure (Failure "Equations satisfiable"))
+        (fun () -> run ~test "tests/alcotest/try.mbc")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
