@@ -1648,7 +1648,8 @@ let () =
 
 exception Not_ifcond
 
-(* term is sort Message *)
+(* Push the formula [f] in the message [term].
+ * Goes under function symbol, diff, seq and find. *)
 let push_formula f term =
   let f_vars = Term.get_vars f in
   let not_in_f_vars vs =
@@ -1661,7 +1662,9 @@ let push_formula f term =
       vs
   in
   let rec mk_ite m = match m with
+  (* if c then t else e becomes if (f => c) then t else e *)
   | ITE (c,t,e) -> ITE (Term.Impl (f,c), t, e)
+  (* m becomes if f then m else 0 *)
   | _ -> ITE (f, m, Term.Fun (Term.f_zero,[]))
   in
   match term with
