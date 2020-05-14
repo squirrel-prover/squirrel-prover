@@ -36,13 +36,6 @@ let pure_equiv t s sk fk =
   in
   only_equiv t' s sk fk
 
-let () =
-  T.register "addvar"
-    (fun (Equiv s) sk fk ->
-       let env = EquivSequent.get_env s in
-       let env,_ = Vars.make_fresh env Sorts.Index "d" in
-         sk [Equiv (EquivSequent.set_env env s)] fk)
-
 (* Admit tactic *)
 let () =
   T.register_general "admit"
@@ -255,26 +248,52 @@ let fa_expand t =
   | EquivSequent.Message e -> aux (Term.head_normal_biterm e)
   | EquivSequent.Formula e -> aux (Term.head_normal_biterm e)
 
-let fa i s sk fk =
+let fa i s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
         begin try
-          let biframe = List.rev_append before (fa_expand e @ after) in
-          sk [EquivSequent.set_biframe s biframe] fk
+          (* Special case for try find, otherwise we use fa_expand *)
+          match e with
+          | EquivSequent.Message Find (vars,c,t,e) ->
+            let env = ref (EquivSequent.get_env s) in
+            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let subst =
+              List.map2
+                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                vars vars'
+            in
+            let c' = Term.subst subst c in
+            let t' = Term.subst subst t in
+            let e' = Term.subst subst e in
+            let biframe =
+              List.rev_append before
+                (EquivSequent.[ Formula c' ; Message t' ; Message e' ] @ after)
+            in
+            [ EquivSequent.set_env !env (EquivSequent.set_biframe s biframe) ]
+          | _ ->
+            let biframe =
+              List.rev_append before (fa_expand e @ after) in
+              [ EquivSequent.set_biframe s biframe ]
           with
-          | No_common_head -> fk (Tactics.Failure "No common construct")
-          | No_FA -> fk (Tactics.Failure "FA not applicable")
+          | No_common_head ->
+              Tactics.soft_failure (Tactics.Failure "No common construct")
+          | No_FA ->
+              Tactics.soft_failure (Tactics.Failure "FA not applicable")
         end
     | exception Out_of_range ->
-        fk (Tactics.Failure "Out of range position")
+        Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () =
   T.register_general "fa"
     ~help:"Break function applications on the nth term of the sequence.\
            \n Usage: fa i."
-    (function
-       | [Prover.Int i] -> pure_equiv (fa i)
-       | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
+  (function
+    | [Prover.Int i] ->
+      pure_equiv
+        (fun s sk fk -> match fa i s with
+          | subgoals -> sk subgoals fk
+          | exception (Tactics.Tactic_soft_failure e) -> fk e)
+     | _ -> Tactics.hard_failure (Tactics.Failure "integer expected"))
 
 
 (** Check if an element appears twice in the biframe,
@@ -1749,49 +1768,6 @@ let () =
      | [Prover.Int i; Prover.Theory f] ->
        only_equiv
          (fun s sk fk -> match ifcond i f true s with
-           | subgoals -> sk subgoals fk
-           | exception (Tactics.Tactic_soft_failure e) -> fk e)
-      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
-
-let fafind i s =
-  match nth i (EquivSequent.get_biframe s) with
-  | before, e, after ->
-    let vars, positive_branch, negative_branch =
-      match e with
-      | EquivSequent.Message Find (vs,_,t,e) -> (vs, t, e)
-      | _ ->  Tactics.soft_failure
-      (Tactics.Failure "can only be applied to a try find")
-    in
-    let env = ref (EquivSequent.get_env s) in
-    let system = EquivSequent.get_system s in
-    let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
-    let subst =
-      List.map2
-        (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-        vars vars'
-    in
-    let positive_branch' = Term.subst subst positive_branch in
-    let negative_branch' = Term.subst subst negative_branch in
-    let biframe =
-      List.rev_append
-        before
-        (EquivSequent.Message positive_branch' ::
-          (EquivSequent.Message negative_branch' :: after))
-    in
-    [ Prover.Goal.Equiv
-        (EquivSequent.set_env !env (EquivSequent.set_biframe s biframe)) ]
-  | exception Out_of_range ->
-  Tactics.soft_failure (Tactics.Failure "out of range position")
-
-let () =
- T.register_general "fafind"
-   ~help: "Replaces a try find term by its positive and negative branches\
-           where variables bounded by the find are chosen fresh.\
-          \n Usage: fafind i."
-   (function
-     | [Prover.Int i] ->
-       only_equiv
-         (fun s sk fk -> match fafind i s with
            | subgoals -> sk subgoals fk
            | exception (Tactics.Tactic_soft_failure e) -> fk e)
       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))

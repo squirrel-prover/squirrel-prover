@@ -95,11 +95,11 @@ fa 1. fadup 0.
 ifcond 2, exec@pred(R1(r)).
 fa 2.
 fadup 2.
-fafind 2.
-prf 2.
-ifcond_deep 2, exec@pred(R1(r)).
 fa 2.
-yesif 2.
+prf 3.
+ifcond_deep 3, exec@pred(R1(r)).
+fa 3.
+yesif 3.
 
 project.
 
@@ -131,7 +131,9 @@ depends T(i,t), T1(i,t).
 
 admit. (* branche else, similaire then *) *)
 
-xor 2,n_PRF. (* TODO I don't understand this use of xor *)
+xor 3,n_PRF. (* TODO I don't understand this use of xor *)
+
+admit. (* TODO we also need to get rid of the condition of the try find *)
 (* END *)
 
 (* Case R2  - WIP *)

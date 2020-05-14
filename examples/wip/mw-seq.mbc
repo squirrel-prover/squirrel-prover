@@ -92,11 +92,11 @@ exists i,t.
 fa 5. fadup 4.
 fa 6. fadup 6.
 
-fafind 6. (* TODO conditions missing *)
+fa 6. (* TODO conditions missing *)
 expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
                   H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
-admit 7. (* this is a dup, modulo the rewrite above *)
+admit 8. admit 7. (* this is a dup, modulo the rewrite above *)
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
