@@ -52,7 +52,7 @@
 ;; proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
 ;; proof-script-comment-end-regexp	 "\n"      ;; comments
 ;; proof-script-syntax-table-entries '(?\# "<" ?\n ">")
- proof-script-syntax-table-entries 
+ proof-script-syntax-table-entries
  	'(?\* ". 23"
  ?\* ". 23n"
   ?\( "()1"
@@ -99,6 +99,8 @@
  (add-hook 'proof-shell-handle-delayed-output-hook
           'display-ansi-colors)
 
+;; disable electric indent mode
+(add-hook 'metabc-mode-hook (lambda () (electric-indent-mode -1)))
 
 (provide 'metabc)
 ;;; metabc.el ends here

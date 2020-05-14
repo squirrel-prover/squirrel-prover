@@ -10,31 +10,66 @@ name kbH : index-> message
 hash h
 senc enc,dec
 
-name nr : index -> index -> message
+name nr : index  -> message
 name nt : index -> index -> message
 
 name rt : index -> index -> message
-name rr : index -> index -> message
+name rr : index -> message
 
 axiom pair : forall (m:message), <fst(m),snd(m)> = m
 axiom dec : forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
 
-process Reader(i:index, j:index) =
-  out(cR, nr(i,j));
+process Reader(i:index) =
+  out(cR, nr(i));
   in(cR, mess);
+  try find j such that h(fst(mess), diff(kH,kbH(j))) = snd(mess) in
   let dmess = dec(fst(mess),  diff(kE,kbE(j))) in
-  if fst(dmess) = nr(i,j) && h(fst(mess), diff(kH,kbH(j))) = snd(mess)  then
-   let cypherR = enc(<snd(dmess),nr(i,j)>, rr(i,j), diff(kE,kbE(j))) in
+  if fst(dmess) = nr(i) then
+   let cypherR = enc(<snd(dmess),nr(i)>, rr(i), diff(kE,kbE(j))) in
    out(cR, cypherR)
 
 process Tag(i:index, j:index) =
   in(cT, nR);
   let cypher = enc(<nR,nt(i,j)>, rt(i,j), diff(kE,kbE(j))) in
-
   out(cT, <cypher,h(cypher, diff(kH,kbH(j)) )> )
 
 
-system (!_i  !_j Reader(i,j) | !_i !_j Tag(i,j)).
+system (!_i Reader(i) | !_i !_j Tag(i,j)).
 
 goal auth : forall (i:index, j:index), (cond@Reader1(i,j) <=>
-  (exists (l,k:index), input@Reader1(i,j) = output@Tag(l,k) && fst( dec(fst( input@Reader1(i,j) ),  diff(kE,kbE(j)))) = nr(i,j) ) ).
+  (exists (l,k:index), diff(Tag(l,k) < Reader1(i,j),Tag(l,j) < Reader1(i,j))  &&   diff(output@Tag(l,k),output@Tag(l,j)) = <fst(input@Reader1(i,j)),snd(input@Reader1(i,j))> &&  diff(input@Tag(l,k),input@Tag(l,j)) = nr(i) ) ).
+Proof.
+   simpl.
+expand cond@Reader1(i,j).
+   project.
+split.
+
+   euf M1.
+exists i1,j1.
+substitute  fst(input@Reader1(i,j)),  cypher(i1,j1)@Tag(i1,j1).
+apply dec to  <input@Tag(i1,j1),nt(i1,j1)>,rt(i1,j1),kE.
+
+apply dec to  <input@Tag(l,k),nt(l,k)>,rt(l,k),kE.
+
+split.
+   euf M1.
+exists i1,j.
+apply dec to  <input@Tag(i1,j),nt(i1,j)>,rt(i1,j),kbE(j).
+
+apply dec to  <input@Tag(l,j),nt(l,j)>,rt(l,j),kbE(j).
+
+   Qed.
+
+   equiv test.
+   Proof.
+   enrich seq(i->nr(i)). enrich seq(i,j->nt(i,j)).
+   induction t.
+
+   expand seq(i->nr(i)),i.
+
+expand frame@Reader1(i,j).expand exec@Reader1(i,j).
+   equivalent
+   cond@Reader1(i,j),
+ (exists (l,k:index), diff(Tag(l,k) < Reader1(i,j),Tag(l,j) < Reader1(i,j))  &&   diff(output@Tag(l,k),output@Tag(l,j)) = <fst(input@Reader1(i,j)),snd(input@Reader1(i,j))> &&  diff(input@Tag(l,k),input@Tag(l,j)) = nr(i) ).
+apply auth to i,j.
+   expand seq(i->nr(i)),i.

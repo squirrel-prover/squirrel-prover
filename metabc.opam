@@ -14,9 +14,9 @@ depends: [
   "alcotest"
   "menhir"
   "pcre"
-  "bisect_ppx" {dev & >= "2.0.0"}
+  "bisect_ppx" {dev & = "2.4.0"}
 ]
 
 pin-depends: [
-  ["bisect_ppx.git" "git+https://github.com/aantron/bisect_ppx.git"]
+  ["bisect_ppx.2.4.0" "git+https://github.com/aantron/bisect_ppx.git"]
 ]
