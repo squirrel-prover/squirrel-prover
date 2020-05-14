@@ -24,8 +24,8 @@ val init : system:Action.system -> formula -> sequent
    new hypothesis from an old one. *)
 val get_name_prefix : string -> string * int
 
-(** [add_trace_formula f s] returns the sequent [s] with [f] added to its
-    hypothesis. The new sequent will be automatically enriched with
+(** [add_formula f s] returns the sequent [s] with [f] added to its
+    hypotheses. The new sequent will be automatically enriched with
     equalities expressing relevant macro definitions, as well as conditions
     of all named actions that are assumed to happen. *)
 val add_formula : ?prefix:string -> formula -> sequent -> sequent

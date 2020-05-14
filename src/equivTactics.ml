@@ -1240,9 +1240,10 @@ exception Not_xor
 
 (* Removes the first occurence of Name (n,is) in the list l. *)
 let rec remove_name_occ n is l = match l with
-| [] -> []
-| Name (name,indices) :: tl when (name = n && indices = is) -> tl
-| hd :: tl -> hd :: (remove_name_occ n is tl)
+  | [Name (name,indices); t] when name = n && indices = is -> t
+  | [t; Name (name,indices)] when name = n && indices = is -> t
+  | _ ->
+    Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
 let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
   let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
@@ -1253,7 +1254,8 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
         begin match
           Term.pi_term Term.Left t, Term.pi_term Term.Right t
         with
-        | (Fun (fl,Term.Name (nl,isl)::ll),Fun (fr,Term.Name (nr,isr)::lr))
+        | (Fun (fl,[Term.Name (nl,isl);ll]),
+           Fun (fr,[Term.Name (nr,isr);lr]))
            when (fl = Term.f_xor && fr = Term.f_xor)
            -> (nl,isl,ll,nr,isr,lr,t)
         | _ -> raise Not_xor
@@ -1291,9 +1293,7 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
     end
   in
   let biframe =
-   (EquivSequent.Message
-     (Term.Diff (Fun (Term.f_xor,l_left), Fun (Term.f_xor,l_right))))
-   :: biframe in
+    EquivSequent.Message (Term.Diff (l_left, l_right)) :: biframe in
   let system_left = Action.(project_system Term.Left system) in
   let phi_left =
     mk_phi_proj system_left env n_left is_left Term.Left biframe
@@ -1302,12 +1302,22 @@ let mk_xor_if_term system env e (opt_n : Theory.term option) biframe =
   let phi_right =
     mk_phi_proj system_right env n_right is_right Term.Right biframe
   in
+  let len_left =
+    Term.(Atom (`Message (`Eq,
+                          Fun (f_len,[l_left]),
+                          Fun (f_len,[Name (n_left,is_left)])))) in
+  let len_right =
+    Term.(Atom (`Message (`Eq,
+                          Fun (f_len,[l_right]),
+                          Fun (f_len,[Name (n_right,is_right)])))) in
+  let len =
+    if len_left = len_right then [len_left] else [len_left;len_right] in
   let phi =
     mk_ands
       (* remove duplicates, and then concatenate *)
-      ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
-      @
-      phi_right)
+      (len @
+       List.filter (fun x -> not (List.mem x phi_right)) phi_left @
+       phi_right)
   in
   let then_branch = Term.Fun (Term.f_zero,[]) in
   let else_branch = term in

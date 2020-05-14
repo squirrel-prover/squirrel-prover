@@ -349,6 +349,19 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/xor.mbc")
     end ;
+    "XOR2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure
+           (Failure "name is not XORed on both sides"))
+        (fun () -> run ~test "tests/alcotest/xor2.mbc")
+    end ;
+    "Not XOR", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure
+           (Failure
+              "Can only apply xor tactic on terms of the form u XOR v"))
+        (fun () -> run ~test "tests/alcotest/notxor.mbc")
+    end ;
     "Pred Init", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")

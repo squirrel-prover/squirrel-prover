@@ -6,6 +6,11 @@ name m : index->message
 abstract ok : message
 abstract ko : message
 
+axiom len_ok_ko : forall i:index, len(ok XOR ko) = len(n(i))
+axiom len_ko_ok : forall i:index, len(ko XOR ok) = len(m(i))
+axiom len_ok : forall i:index, len(ok) = len(n(i))
+axiom len_ko : forall i:index, len(ko) = len(m(i))
+
 system null.
 
 (* The main test, with a non-empty list of bound variables. *)
@@ -20,7 +25,7 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
-  true.
+  apply len_ok_ko to i; apply len_ko_ok to i.
   refl.
 Qed.
 
@@ -36,6 +41,6 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
-  true.
+  apply len_ok to i; apply len_ko to i.
   refl.
 Qed.

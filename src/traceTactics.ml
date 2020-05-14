@@ -590,6 +590,36 @@ let () = T.register "assumption"
            \n Usage: assumption."
     assumption
 
+(** Length *)
+
+let namelength n m s =
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+  let conv x = Theory.convert tsubst x Sorts.Message in
+  match conv n, conv m with
+    | Name n, Name m ->
+        let f =
+          Term.(Atom (`Message (`Eq,
+                                Fun (f_len,[Name n]),
+                                Fun (f_len,[Name m]))))
+        in
+        [TraceSequent.add_formula f s]
+    | _ ->
+        Tactics.(soft_failure (Failure "expected names"))
+    | exception Theory.Conv e ->
+        Tactics.soft_failure (Cannot_convert e)
+
+let () =
+  T.register_general "namelength"
+    ~help:"Adds an hypothesis expressing that two names have \
+           the same length.\n Usage: namelength <n>,<m>."
+    (function
+       | [Prover.Theory n; Prover.Theory m] ->
+           fun s sk fk -> begin match namelength n m s with
+             | subgoals -> sk subgoals fk
+             | exception Tactics.Tactic_soft_failure e -> fk e
+           end
+       | _ -> Tactics.(hard_failure (Failure "two terms are expected")))
+
 (** Eq-Indep Axioms *)
 
 (* We include here rules that are specialization of the Eq-Indep axiom. *)

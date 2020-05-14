@@ -1,8 +1,10 @@
 channel c
 
 abstract ok : message
+name n : message
+axiom len_ok : len(ok) = len(n)
 
-system new n; out(c,n XOR ok).
+system out(c,n XOR ok).
 
 equiv test.
 Proof.
@@ -11,4 +13,5 @@ Proof.
   fa 1; fa 2.
   xor 2.
   yesif 2.
+  apply len_ok.
 Qed.

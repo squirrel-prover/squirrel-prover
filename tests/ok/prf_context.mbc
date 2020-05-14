@@ -13,4 +13,6 @@ Proof.
   prf 2.
   yesif 2.
   xor 2,n_PRF.
+  yesif 2.
+  namelength m, n_PRF.
 Qed.
