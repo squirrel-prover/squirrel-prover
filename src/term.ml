@@ -489,10 +489,10 @@ let mk_fname f arity =
 
 let f_diff = mk_fname "diff" 2
 
-(** Boolean function symbols. They are not typed precisely (assuming
-  * implicit conversions from bool to message) but are only "used"
-  * in Completion in an untyped fashion anyway (and the corresponding
-  * code is actually not effective at the moment). *)
+(** Boolean function symbols, where booleans are typed as messages.
+  * The true/false constants are used in message_of_formula,
+  * and other symbols are used in an untyped way in Completion
+  * (in some currently unused code). *)
 
 let eboolean,emessage = Sorts.eboolean,Sorts.emessage
 
@@ -525,6 +525,9 @@ let mk_ite c t e = match c with
 
 let mk_forall l f = if l = [] then f else ForAll (l,f)
 let mk_exists l f = if l = [] then f else Exists (l,f)
+
+let message_of_formula f =
+  ITE (f, Fun (f_true,[]), Fun (f_false,[]))
 
 let mk_timestamp_leq t1 t2 = match t1,t2 with
   | _, Pred t2' -> `Timestamp (`Lt, t1, t2')

@@ -280,12 +280,14 @@ let rec convert :
   | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_true) ->
       begin match sort with
         | Sorts.Boolean -> Term.True
+        | Sorts.Message -> Term.(Fun (f_true,[]))
         | _ -> raise type_error
       end
 
   | Fun (f,[],None) when f = Symbols.to_string (fst Term.f_false) ->
       begin match sort with
         | Sorts.Boolean -> Term.False
+        | Sorts.Message -> Term.(Fun (f_false,[]))
         | _ -> raise type_error
       end
 
@@ -700,8 +702,8 @@ let subst_of_env (env : Vars.env) =
 
 let parse_subst env (uvars : Vars.evar list) (ts : term list) : Term.subst =
   let u_subst = subst_of_env env in
-  let f : term -> Vars.evar -> Term.esubst =
-    fun t (Vars.EVar u) -> Term.ESubst (Term.Var u, convert u_subst t (Vars.sort u))
+  let f t (Vars.EVar u) =
+    Term.ESubst (Term.Var u, convert u_subst t (Vars.sort u))
   in
   List.map2 f ts uvars
 

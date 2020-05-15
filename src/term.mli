@@ -195,6 +195,7 @@ val mk_impl : formula -> formula -> formula
 val mk_ite : formula -> message -> message -> message
 val mk_forall : Vars.evar list -> formula -> formula
 val mk_exists : Vars.evar list -> formula -> formula
+val message_of_formula : formula -> message
 
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 

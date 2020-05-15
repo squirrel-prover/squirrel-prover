@@ -262,12 +262,11 @@ let fa i s =
                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
                 vars vars'
             in
-            let c' = Term.subst subst c in
+            let c' = Term.(Seq (vars, message_of_formula c)) in
             let t' = Term.subst subst t in
-            let e' = Term.subst subst e in
             let biframe =
               List.rev_append before
-                (EquivSequent.[ Formula c' ; Message t' ; Message e' ] @ after)
+                (EquivSequent.[ Message c' ; Message t' ; Message e ] @ after)
             in
             [ EquivSequent.set_env !env (EquivSequent.set_biframe s biframe) ]
           | _ ->
