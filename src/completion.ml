@@ -821,13 +821,18 @@ let rec normalize_csts state = function
     is joined by replacing (R2) by:
     f(b + c) -> d *)
 let finalize_completion state =
-  { state with
-    grnd_rules = List.map (fun (t,c) ->
-        (normalize_csts state t, c)
-      ) state.grnd_rules;
-    e_rules = List.map (fun (t,s) ->
+  let grnds =
+    List.map (fun (t,c) -> (normalize_csts state t, c)) state.grnd_rules
+    |> List.sort_uniq Pervasives.compare in
+  let erules =
+    List.map (fun (t,s) ->
         (normalize_csts state t, normalize_csts state s)
-      ) state.e_rules;
+      ) state.e_rules
+    |> List.sort_uniq Pervasives.compare in
+
+  { state with
+    grnd_rules = grnds;
+    e_rules = erules;
     completed = true }
 
 let rec complete_state state =
