@@ -1,6 +1,6 @@
 \section{Indistinguishability}
 
- \newcommand{\pair}[1]{\langle #1 \rangle}
+\newcommand{\pair}[1]{\langle #1 \rangle}
 
 % We now define indistinguishability of processes, and how we could verify it.
 % We make a distinction between symbolic and observable traces:
@@ -14,7 +14,7 @@
 % For convenience, we talk of processes, though in reality the definitions
 % deal with abstract systems described by sets of actions.
 
- \newcommand{\fold}{\mathsf{fold}}
+\newcommand{\fold}{\mathsf{fold}}
 
 % \begin{definition}
 %   Given an observable trace $t$ and a process $P$,
@@ -23,8 +23,8 @@
 %   \begin{eqnarray*}
 %     \fold(P,\epsilon) &=& \epsilon \\
 %     \fold(P,(c_i,c_o).t') &=&
-%       \mathsf{if}_{A:(c_i,c_o)}
-%       \ldots
+%     \mathsf{if}_{A:(c_i,c_o)}
+%     \ldots
 %   \end{eqnarray*}
 % \end{definition}
 
@@ -83,10 +83,10 @@ branch while the other goes to its $\myelse$ branch. \adrien{The constraint is n
   where $n$ and $m$ are arbitrary, possibly equal names.
   Its two projections are indistinguishable, but the
   bi-process is not diff-equivalent.
-    \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
+  \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
   Indeed we have
   $\myif g()=0 \mythen \Out(c,n) \not\sim
-   \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
+  \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
   $g()=0$ to distinguish the two sides.
   Our bi-process can however easily be
   rewritten into a diff-equivalent process, e.g. by pushing the conditional
@@ -160,18 +160,18 @@ This definition of sequent calculus can of course be used to reason about diff-e
 \end{lemma}
 \begin{proof}We prove the first equivalence, which is essentially an unfolding of definitions.
 
-    \[
+  \[
     \begin{array}{l@{~}l}
       $P$\text{ is diff-equivalent} & \Leftrightarrow \text{for all } \TM,\ \stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
-                                    & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+      & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
       & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ \true \stackrel{.}{\Rightarrow} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
       & \Leftrightarrow  \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\text{ is valid}\\
 
     \end{array}
-    \]
+  \]
 
-    The second equivalence is a direct induction on the length of the traces.
-  \end{proof}
+  The second equivalence is a direct induction on the length of the traces.
+\end{proof}
 
 Adding the execution condition to the sequent is also a valid proof technique.
 \begin{lemma}
@@ -184,7 +184,7 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
 \begin{figure}
   \begin{mathpar}
     \inferrule[Expand]{\Gamma \vdash t_L \sim t_R
-\quad
+      \quad
     }{\Gamma \cup \phi \vdash t_L \sim t_R}
     \quad\quad
     \inferrule[Cut]{
@@ -200,20 +200,20 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
       \Gamma \cup \{\EQ(t_1,t_2)\sim \true \} \vdash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
     }
 
-\end{mathpar}
+  \end{mathpar}
 
   \begin{mathpar}
-  \inferrule[\myif-reach]{
-\phi \vdash \false
-  }{
- \Gamma  \vdash \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
-  }
-  \quad\quad
-  \inferrule[\myif-equiv]{
- \phi \vdash \psi \Leftrightarrow \psi'
-  }{
-\Gamma \vdash \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
-  }
+    \inferrule[\myif-reach]{
+      \phi \vdash \false
+    }{
+      \Gamma  \vdash \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
+    }
+    \quad\quad
+    \inferrule[\myif-equiv]{
+      \phi \vdash \psi \Leftrightarrow \psi'
+    }{
+      \Gamma \vdash \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
+    }
   \end{mathpar}
   \begin{mathpar}
     \inferrule[${\lnot}$-R]{
@@ -223,39 +223,39 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
     }
     \quad\quad
     \inferrule[fresh]{
-n,m \not \in \Gamma
+      n,m \not \in \Gamma
     }{
       \Gamma \vdash n \sim m
     }
     \quad\quad
-  \inferrule[\myif-weak]{
- \Gamma \vdash \phi, t_L \sim \phi, t_R
-  }{
-\Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
-  }
+    \inferrule[\myif-weak]{
+      \Gamma \vdash \phi, t_L \sim \phi, t_R
+    }{
+      \Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
+    }
   \end{mathpar}
   \begin{mathpar}
-  \inferrule[F-Cut]{
-    \Gamma \vdash \phi
-    \quad
-    \Gamma \cup \phi \vdash t^L \sim t^R
-  }{
- \Gamma \vdash t^L \sim t^R
-  }
-  \quad\quad
-  \inferrule[Dup]{
- \Gamma \vdash t^L,u \sim t^R,v
-  }{
- \Gamma \vdash t^L,u,u \sim t^R,v,v
-  }
+    \inferrule[F-Cut]{
+      \Gamma \vdash \phi
+      \quad
+      \Gamma \cup \phi \vdash t^L \sim t^R
+    }{
+      \Gamma \vdash t^L \sim t^R
+    }
+    \quad\quad
+    \inferrule[Dup]{
+      \Gamma \vdash t^L,u \sim t^R,v
+    }{
+      \Gamma \vdash t^L,u,u \sim t^R,v,v
+    }
   \end{mathpar}
 
 
-   \caption{Generic inference rules for indistinguishability}
-   \label{fig:lk-ind}
+  \caption{Generic inference rules for indistinguishability}
+  \label{fig:lk-ind}
 \end{figure}
 \begin{lemma}
-The rules presented in Figure~\ref{fig:lk-ind} are sound.
+  The rules presented in Figure~\ref{fig:lk-ind} are sound.
 
 
 \end{lemma}
@@ -265,110 +265,110 @@ The rules presented in Figure~\ref{fig:lk-ind} are sound.
 \Cref{fig:fresh,fig:prf,fig:xor} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
-  \item $\Gamma \vdash u$ stands for $\Gamma^L \sim \Gamma^R \vdash u^L \sim u^R$
-  \item $A \in S$ stands for every action in the system (or protocol)
-  \item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
-  \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
-  \item indices $\vec i$ in $A(\vec i)$ are chosen fresh with relation to the appropriate environment (i.e. indices appearing in $u, C, t, k, \vec {j_0}$)
+\item $\Gamma \vdash u$ stands for $\Gamma^L \sim \Gamma^R \vdash u^L \sim u^R$
+\item $A \in S$ stands for every action in the system (or protocol)
+\item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
+\item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
+\item indices $\vec i$ in $A(\vec i)$ are chosen fresh with relation to the appropriate environment (i.e. indices appearing in $u, C, t, k, \vec {j_0}$)
 \end{itemize}
 
 \begin{figure}[h]
   \begin{mathpar}
-  \inferrule[Fresh]{
-    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
-  }{
-    \Gamma \vdash u, C[n(\vec {j_0})]
-  }
+    \inferrule[Fresh]{
+      \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
+    }{
+      \Gamma \vdash u, C[n(\vec {j_0})]
+    }
   \end{mathpar}
   \begin{mathpar}
     \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec {j}) \in u^L,C^L} \vec {j} \neq {\vec {j_0}^L} \big)
     \wedge
     \big(
-      \displaystyle\bigwedge_{A \in S}
-      \forall \vec i \
-      \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec i) \leq \tau \big)
-      \Rightarrow
-      \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}^L} \big)
+    \displaystyle\bigwedge_{A \in S}
+    \forall \vec i \
+    \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec i) \leq \tau \big)
+    \Rightarrow
+    \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}^L} \big)
     \big)
   \end{mathpar}
   \begin{mathpar}
-  \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
+    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
   \end{mathpar}
-\caption{Fresh rule.\solene{Not yet implemented with the context $C$.}}
-\label{fig:fresh}
+  \caption{Fresh rule.\solene{Not yet implemented with the context $C$.}}
+  \label{fig:fresh}
 \end{figure}
 
 \begin{figure}[h]
   \begin{mathpar}
-  \inferrule[PRF]{
-    \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
-    \quad \quad
-    k(\_) \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
-  }{
-    \Gamma \vdash u, C[\h(t,k(\vec {j_0}))]
-  }
+    \inferrule[PRF]{
+      \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
+      \quad \quad
+      k(\_) \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
+    }{
+      \Gamma \vdash u, C[\h(t,k(\vec {j_0}))]
+    }
   \end{mathpar}
   \begin{mathpar}
-  \phi_L = \big( \displaystyle\bigwedge_{\h(m,k(\vec j)) \in u^L,C^L,t^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
-  \wedge
-  \big(
+    \phi_L = \big( \displaystyle\bigwedge_{\h(m,k(\vec j)) \in u^L,C^L,t^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
+    \wedge
+    \big(
     \displaystyle\bigwedge_{A \in S}
     \forall \vec i \
     \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) < \tau \big)
     \Rightarrow
     \big(\displaystyle\bigwedge_{\h(m,k(\vec j)) \in A(\vec i)^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
-  \big)
+    \big)
   \end{mathpar}
   \begin{mathpar}
-  \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
+    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
   \end{mathpar}
-\caption{PRF rule.\solene{Not yet implemented with the context $C$.}}
-\label{fig:prf}
+  \caption{PRF rule.\solene{Not yet implemented with the context $C$.}}
+  \label{fig:prf}
 \end{figure}
 
 \begin{figure}[h]
   \begin{mathpar}
-  \inferrule[XOR-ind]{
-    \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
-  }{
-    \Gamma \vdash u, C[t \oplus n(\vec {j_0})]
-  }
+    \inferrule[XOR-ind]{
+      \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
+    }{
+      \Gamma \vdash u, C[t \oplus n(\vec {j_0})]
+    }
   \end{mathpar}
   \begin{mathpar}
     \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec j) \in u^L,C^L,t^L} \vec j \neq {\vec {j_0}}^L \big)
     \wedge
     \big(
-      \displaystyle\bigwedge_{A \in S}
-      \forall \vec i \
-      \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) \leq \tau \big)
-      \Rightarrow
-      \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}}^L \big)
+    \displaystyle\bigwedge_{A \in S}
+    \forall \vec i \
+    \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) \leq \tau \big)
+    \Rightarrow
+    \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}}^L \big)
     \big)
   \end{mathpar}
   \begin{mathpar}
-  \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
+    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
   \end{mathpar}
-\caption{XOR-ind rule.\solene{Not yet implemented with the context $C$.}}
-\label{fig:xor}
+  \caption{XOR-ind rule.\solene{Not yet implemented with the context $C$.}}
+  \label{fig:xor}
 \end{figure}
 
 \begin{figure}[h]
   \begin{mathpar}
-  \inferrule[FA-DUP]{
-    \inferrule{
-      \Gamma \vdash u,
-      \mframe @ \pre(A(\vec i)),
-      \mexec @ \pre(A(\vec i))
+    \inferrule[FA-DUP]{
+      \inferrule{
+        \Gamma \vdash u,
+        \mframe @ \pre(A(\vec i)),
+        \mexec @ \pre(A(\vec i))
+      }{
+        \Gamma \vdash u,
+        \mframe @ \pre(A(\vec i)),
+        \myif \mexec @ \pre(A(\vec i)) \mythen \phi_{h} \myelse \bot
+      }
     }{
       \Gamma \vdash u,
       \mframe @ \pre(A(\vec i)),
-      \myif \mexec @ \pre(A(\vec i)) \mythen \phi_{h} \myelse \bot
+      \mexec @ \pre(A(\vec i)) \wedge \phi_{h}
     }
-  }{
-    \Gamma \vdash u,
-    \mframe @ \pre(A(\vec i)),
-    \mexec @ \pre(A(\vec i)) \wedge \phi_{h}
-  }
   \end{mathpar}
 
   We ask that $\phi_h \in H_{\{\pre(A(\vec i))\}}$ where, for any set of
@@ -404,9 +404,9 @@ We use the following notations:
   \inferrule{\phi \in H_T \quad B(\vec j) \in T}{
     (\myif \mexec @ B(\vec j) \mythen \phi \myelse \psi) \in H_T}
   $$
-\caption{FA-DUP rule.
-}
-\label{fig:fadup}
+  \caption{FA-DUP rule.
+  }
+  \label{fig:fadup}
 \end{figure}
 
 \clearpage
@@ -440,19 +440,19 @@ synchronized for all random samplings.
 \begin{example} \label{ex:indep}
   This proof technique does not work for \cref{ex:problem}.
   The same problem appears with the Basic-Hash protocol, even if we work around
-the problem described in \cref{sec:refined-diff}, we won't be able to show
-that conditionals are synchronized.  In the simple case of the trace
-$T(i,j).R(k,i,j)$ we have
-on the single-session side
-$$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
- h(\pi_1(g_2(\ldots)),k'(i,j))$$
-and we would like this to imply (in the meta-logic)
-the same equality with $k(i)$ instead of $k'(i,j)$.
-This implication does not hold with overwhelming probability in all
-computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
-projection of $x$ with its first bit changed to $0$; if the hash is PRF,
-there should be a probability of roughly $1 \over 4$ that this leaves
-the hash unchanged with $k'(i,j)$ but not with $k(i)$.
+  the problem described in \cref{sec:refined-diff}, we won't be able to show
+  that conditionals are synchronized.  In the simple case of the trace
+  $T(i,j).R(k,i,j)$ we have
+  on the single-session side
+  $$\pi_2(g_2(\pair{n_T(i,j),h(n_T(i,j),k'(i,j))})) =
+  h(\pi_1(g_2(\ldots)),k'(i,j))$$
+  and we would like this to imply (in the meta-logic)
+  the same equality with $k(i)$ instead of $k'(i,j)$.
+  This implication does not hold with overwhelming probability in all
+  computational models: as in \cref{ex:problem}, $g_2(x)$ could be the second
+  projection of $x$ with its first bit changed to $0$; if the hash is PRF,
+  there should be a probability of roughly $1 \over 4$ that this leaves
+  the hash unchanged with $k'(i,j)$ but not with $k(i)$.
 \end{example}
 
 \section{Outdated example : a signed DDH key exchange}
@@ -461,99 +461,99 @@ the hash unchanged with $k'(i,j)$ but not with $k(i)$.
 We brieffly show how one can prove the security of a signed DDH key exchange. The protocol in pi-calculus is provided in Figure~\ref{fig:signed_ddh} and the run of an honnest execution in Figure~\ref{fig:dh_ke}. This example is a simplified instance of classical key-exchange security. Notably, we assume that identities are already fixed.
 
 \begin{figure}
-    % \setlength{\belowcaptionskip}{-15pt}
-    \setmsckeyword{} \drawframe{no}
-    \setmscscale{0.9}
-    \begin{center}
+  % \setlength{\belowcaptionskip}{-15pt}
+  \setmsckeyword{} \drawframe{no}
+  \setmscscale{0.9}
+  \begin{center}
     \begin{msc}{}
-        \setlength{\instwidth}{0\mscunit}
-        \setlength{\instdist}{7cm}
-        \setlength{\topheaddist}{0cm}
-        \declinst{initiator}{
-            \begin{tabular}[c]{c}
-                \textsc{A} \\
-                \colorbox{gray}{{\;\; $sk_A,a_i$\;\;}}
+      \setlength{\instwidth}{0\mscunit}
+      \setlength{\instdist}{7cm}
+      \setlength{\topheaddist}{0cm}
+      \declinst{initiator}{
+        \begin{tabular}[c]{c}
+          \textsc{A} \\
+          \colorbox{gray}{{\;\; $sk_A,a_i$\;\;}}
         \end{tabular}}{}
 
-        \declinst{receiver}{
-            \begin{tabular}[c]{c}
-                \textsc{B} \\
-                \colorbox{gray}{{\;\;  $sk_B,b_i$ \;\;}}
+      \declinst{receiver}{
+        \begin{tabular}[c]{c}
+          \textsc{B} \\
+          \colorbox{gray}{{\;\;  $sk_B,b_i$ \;\;}}
         \end{tabular}}{}
 
-        \nextlevel[-1]
-        \mess{$\mysign(g^{a_i},sk_A)$}{initiator}{receiver}
-        \nextlevel[1.5]
-        \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_B)$}{receiver}{initiator}
-         \nextlevel[1.5]
-         \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_A)$}{initiator}{receiver}
+      \nextlevel[-1]
+      \mess{$\mysign(g^{a_i},sk_A)$}{initiator}{receiver}
+      \nextlevel[1.5]
+      \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_B)$}{receiver}{initiator}
+      \nextlevel[1.5]
+      \mess{$\mysign(<g^{a_i},g^{b_i}>,sk_A)$}{initiator}{receiver}
 
 
 
 
-       \end{msc}
-       \end{center}
-    \caption{Diffie Hellman key exchange}\label{fig:dh_ke}
+    \end{msc}
+  \end{center}
+  \caption{Diffie Hellman key exchange}\label{fig:dh_ke}
 \end{figure}
 
 \begin{figure}
-\[
-  \begin{array}{cc}
-\begin{array}[t]{l@{~}l}
-  A_i := & \aout{\mysign(g^{a_i},sk_A)} : \alpha_1; \\
-         &\ain{x}; \\
-         & \myif \mycsign(x,pk(sk_B)) \\
-  & ~ \wedge \pi_1(\mygetmess(x))=g^{a_i}  \mythen \\
-         & \quad \aout{\mysign(\mygetmess(x),sk_A) } : \alpha_2; \\
-         & \quad \myfind j \mysuchthat g^{b_j} = \pi_2(\mygetmess(x)) \\
-           & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{k_{i,j}}} : \alpha_3\\
-         & \quad \myelse \\
-         & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{\bot}}  : \alpha_4 \\
-         & \myelse \\
-           & \bot
-\end{array}
-&
-\begin{array}[t]{l@{~}l}
-  B_i := &\ain{x}; \\
-         & \myif \mycsign(x,pk(sk_A)) \mythen \\
-         & \quad \aout{\mysign(<\mygetmess(x), g^{b_i}>,sk_B)} : \beta_1; \\
-         & \quad \ain{y}; \\
-         & \quad \myif \mycsign(y,pk(sk_A))\\
-  & \quad ~ \wedge \mygetmess(y) = <\mygetmess(x), g^{b_i}> \mythen \\
-         & \quad \quad \myfind j \mysuchthat g^{a_j} = \mygetmess(x) \\
-           & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{k_{j,i}}} : \beta_2 \\
-         & \quad \quad \myelse \\
-         & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{\bot}} : \beta_3 \\
-         & \quad \myelse \\
-           & \quad \bot \\
-         & \myelse \\
-           & \bot
-\end{array}
-\end{array}
-\]
-\label{fig:signed_ddh}
-\caption{A signed DDH key exchange}
+  \[
+    \begin{array}{cc}
+      \begin{array}[t]{l@{~}l}
+        A_i := & \aout{\mysign(g^{a_i},sk_A)} : \alpha_1; \\
+        &\ain{x}; \\
+        & \myif \mycsign(x,pk(sk_B)) \\
+        & ~ \wedge \pi_1(\mygetmess(x))=g^{a_i}  \mythen \\
+        & \quad \aout{\mysign(\mygetmess(x),sk_A) } : \alpha_2; \\
+        & \quad \myfind j \mysuchthat g^{b_j} = \pi_2(\mygetmess(x)) \\
+        & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{k_{i,j}}} : \alpha_3\\
+        & \quad \myelse \\
+        & \qquad \aout{\diff{\pi_2(\mygetmess(x))^{a_i}}{\bot}}  : \alpha_4 \\
+        & \myelse \\
+        & \bot
+      \end{array}
+      &
+      \begin{array}[t]{l@{~}l}
+        B_i := &\ain{x}; \\
+        & \myif \mycsign(x,pk(sk_A)) \mythen \\
+        & \quad \aout{\mysign(<\mygetmess(x), g^{b_i}>,sk_B)} : \beta_1; \\
+        & \quad \ain{y}; \\
+        & \quad \myif \mycsign(y,pk(sk_A))\\
+        & \quad ~ \wedge \mygetmess(y) = <\mygetmess(x), g^{b_i}> \mythen \\
+        & \quad \quad \myfind j \mysuchthat g^{a_j} = \mygetmess(x) \\
+        & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{k_{j,i}}} : \beta_2 \\
+        & \quad \quad \myelse \\
+        & \quad \qquad \aout{\diff{\mygetmess(x)^{b_i}}{\bot}} : \beta_3 \\
+        & \quad \myelse \\
+        & \quad \bot \\
+        & \myelse \\
+        & \bot
+      \end{array}
+    \end{array}
+  \]
+  \label{fig:signed_ddh}
+  \caption{A signed DDH key exchange}
 \end{figure}
 
 We outline the proof of the fact that $!_i A_i \| B_i$ is diff-equivalent. There are four actions with choices in the output, thus, we have to show that, for all trace $\tr$, for all $i,j$:
 \begin{enumerate}
 \item $\begin{array}[t]{l}
-         \phi_\tr,  \mycsign(x,pk(sk_B)), \mygetmess(x)=<g^{a_i}, g^{b_j}>, \mouts_\tr^L \sim \mouts_\tr^R,  \\
-         \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, k_{i,j}
-\end{array}
-         $ ($\alpha_3$)
+    \phi_\tr,  \mycsign(x,pk(sk_B)), \mygetmess(x)=<g^{a_i}, g^{b_j}>, \mouts_\tr^L \sim \mouts_\tr^R,  \\
+    \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, k_{i,j}
+  \end{array}
+  $ ($\alpha_3$)
 
-       \item $\begin{array}[t]{l}
-                \phi_\tr,  \mycsign(x,pk(sk_B)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L \\
-                \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, \bot
-                \end{array} $ ($\alpha_4$)
-              \item $\begin{array}[t]{l}
-                       \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)), \mygetmess(y)=<g^{a_j}, g^{b_i}>,  \mouts_\tr^R \sim \mouts_\tr^L \\ \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, k_{j,i}
-                     \end{array}$ ($\beta_2$)
-              \item $\begin{array}[t]{l}
-                       \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L\\
- \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, \bot
-                       \end{array}$ ($\beta_3$)
+\item $\begin{array}[t]{l}
+    \phi_\tr,  \mycsign(x,pk(sk_B)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L \\
+    \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{a_i} \sim \mouts_\tr^R, \bot
+  \end{array} $ ($\alpha_4$)
+\item $\begin{array}[t]{l}
+    \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)), \mygetmess(y)=<g^{a_j}, g^{b_i}>,  \mouts_\tr^R \sim \mouts_\tr^L \\ \quad \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, k_{j,i}
+  \end{array}$ ($\beta_2$)
+\item $\begin{array}[t]{l}
+    \phi_\tr,  \mycsign(y,pk(sk_A)), \mycsign(x,pk(sk_A)),  \not \exists j. \pi_2(mygetmess(x))= g^{b_j},  \mouts_\tr^R \sim \mouts_\tr^L\\
+    \vDash \mouts_\tr^L, \pi_2(\mygetmess(x))^{b_i} \sim \mouts_\tr^R, \bot
+  \end{array}$ ($\beta_3$)
 \end{enumerate}
 
 Regarding goal $(2)$ and $(4)$, we remark that it is a case where $\Gamma \vdash \false$. Indeed, for $(2)$ applying EUFCMA yields that there exists $j$ such that $x = \mysign(<g^{a_i},g^{b_j}>,sk_B)$ which is in contradiction with  $\not \exists j. \pi_2(mygetmess(x))= g^{b_j}$.
