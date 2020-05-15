@@ -145,6 +145,8 @@ module type Namespace = sig
   (** Iter on the defined symbols of this namespace *)
   val iter : (ns t -> def -> data -> unit) -> unit
 
+  (** Fold on the defined symbols of this namespace *)
+  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
 end
 
 module Channel : Namespace with type def = unit with type ns = channel

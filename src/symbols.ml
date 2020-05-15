@@ -117,6 +117,7 @@ module type Namespace = sig
   val data_of_string : string -> data
   val get_all : ns t -> def * data
   val iter : (ns t -> def -> data -> unit) -> unit
+  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
 end
 
 module type S = sig
@@ -184,6 +185,15 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
          try f s (M.deconstruct def) data with
            | Incorrect_namespace -> ())
       table
+
+  let fold f acc = 
+    Hashtbl.fold
+      (fun s (def,data) acc ->
+         try
+           let def = M.deconstruct def in
+           f s def data acc
+         with Incorrect_namespace -> acc)
+      table acc
 
 end
 
