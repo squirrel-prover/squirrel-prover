@@ -5,7 +5,7 @@ The terms are all of the same sort and represent protocol messages.
 
 The logic uses function symbols to represent the protocol functions and cryptographic primitives, as well as attacker computations.
 We will also assume some standard boolean constants and operations, with
-a fixed semantics (for instance, $\_ \stackrel{.}{=} \_$ or
+a fixed semantics (for instance, $\_ \deq \_$ or
 $\mathsf{if \_ then \_ else \_}$).
 
 The formulas of the base logic are intended to be interpreted in
@@ -24,7 +24,7 @@ assumptions.
 
 For example, if $\mathsf{n}$ and $\mathsf{m}$ are distinct names,
 the (atomic) formulas $\mathsf{n}\sim\mathsf{m}$ and
-$\mathsf{n}\stackrel{.}{=}\mathsf{m}\sim\mathsf{false}$
+$\mathsf{n} \deq \mathsf{m}\sim\mathsf{false}$
 are valid.
 
 \section{Syntax of terms and formulas}

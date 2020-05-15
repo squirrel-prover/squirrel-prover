@@ -43,20 +43,37 @@
 % is restrictive to quantify on traces in this way
 % and ask for indistinguishability only for each trace.
 
+\begin{definition}
+  A meta-logic equivalence formula is an element of the form $\vec{u} \sim \vec{v}$, where $\vec{u}$ and $\vec{v}$ are two vectors of terms of the meta-logic of the same length.
+\end{definition}
+
+
+\begin{definition}
+  Let $\vec{u} \sim \vec{v}$ be a meta-formula equivalence formula. Then for every trace model $\TM$, computational model $\Mo$ and interpretation $\sigma$, $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$ if $\Mo, \sigma \models \interp{\vec{u}}{\TM}{\calp} \sim \interp{\vec{v}}{\TM}{\calp}$.
+
+  We say that $\vec{u} \sim \vec{v}$ is valid if $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$ for every $\TM$, $\Mo$, $\sigma$. Finally, for any set of meta-formulas $S$, $S \models \vec{u} \sim \vec{v}$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models S$, we have $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$.
+\end{definition}
+
 \subsection{Straightforward diff-equivalence}
+\adrien{I am not sure exactly what we want to say in this subsection. I left it as is.}
 
 We define the diff-equivalence of a process, by asking the equivalence of the projected frames for all possible traces.
 
 \begin{definition}
   \label{def:process-equiv}
-  A bi-process $P$ is diff-equivalent when,
-  for any trace model $\TM$, the formula
+  A bi-process $\calp$ is diff-equivalent when,
+  for any $\calp$-trace model $\TM$, the formula
 
-  \[\stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\]
+  \[
+    \dand_{v\in D_\XT}
+    \interp{\mframe@\tau^L}{\TM[\tau\mapsto v]}{\calp}
+    \sim
+    \interp{\mframe@\tau^R}{\TM[\tau \mapsto v]}{\calp}
+  \]
   is valid.
   \adrien{Why not just take the last action?}
 \end{definition}
-\charlie{Notice that we could also extend $\phi^\TM$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
+\charlie{Notice that we could also extend $\interp{\phi}{\TM}{\calp}$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
 Note that this equivalence cannot hold if there exists a trace
 whose probability of execution significantly differs between the two
 projections of the bi-process.
@@ -66,10 +83,15 @@ The interest of imposing this artificial constraint is that we
 can stop considering executions where one process goes to $\mythen$
 branch while the other goes to its $\myelse$ branch. \adrien{The constraint is not artificial. Indeed, since the actions are visible, the adversary sees whether the process is going right or left. There is no loss of generality there.}
 \begin{lemma}
-  A bi-process $P$ is diff-equivalent if,
-  for any trace model $\TM$, the formula
+  A bi-process $\calp$ is diff-equivalent if,
+  for any $\calp$-trace model $\TM$, the formula
 
-  \[\stackrel{.}{\wedge}_{v\in D_\XT} (\pair{\mframe@\tau^L,\mexec@\tau^L})^{\TM[\tau\mapsto v]} \sim (\pair{\mframe@\tau^R, \mexec@\tau^R} )^{\TM[\tau \mapsto v]}\]
+  \[
+    \dand_{v\in D_\XT}
+    \interp{\pair{\mframe@\tau^L,\mexec@\tau^L}}{\TM[\tau\mapsto v]}{\calp}
+    \sim
+    \interp{\pair{\mframe@\tau^R, \mexec@\tau^R}}{\TM[\tau \mapsto v]}{\calp}
+  \]
   is valid.
   \adrien{This just complicated to show than what Definition~\ref{def:process-equiv} requires. Maybe there is a typo?}
 \end{lemma}
@@ -144,112 +166,124 @@ actions.
 
 \subsection{Reasoning about equivalences}
 
-We extend the sequent calculus, to also reason about diff-equivalence.
+We extend our sequent calculus with rules to prove the equivalence formulas of the meta-logic.
 
 \begin{definition}
-  A sequent $\Gamma \vdash t_L \sim t_R $ is composed of a set of indistinguishability $\Gamma$, and sequences of terms $t_L,t_R$.
-  It is valid when, for any trace model $\TM$, for any evaluations $\sigma_\XT',\sigma_I'$ of the free variables in $t_L,t_R$ to well typed elements in $\TM$, the formula $ (\wedge \Gamma)^{\TM'} \Rightarrow (t_L)^{\TM'} \sim  (t_R)^{\TM'}$, where $\TM'=\TM \cup \sigma_\XT'\cup \sigma_I'$.
+  Let $\calp$ be a protocol. An equivalence sequent $\Gamma \vdash_{\calp} \vec{t}_L \sim \vec{t}_R$ comprises a set of hypotheses $\Gamma$ and a goal $\vec{t}_L \sim \vec{t}_R$, where $\Gamma$ and $\vec{t}_L \sim \vec{t}_R$ are all equivalence formulas of the meta-logic.
+
+  The sequent  $\Gamma \vdash_{\calp} \vec{t}_L \sim \vec{t}_R$ is valid whenever $\Gamma \models \vec{t}_L \sim \vec{t}_R$ is valid.
 \end{definition}
 
-This definition of sequent calculus can of course be used to reason about diff-equivalence.
 \begin{lemma}
-  A bi-process is diff-equivalent if and only if,
-  \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau\]
-  Equivalently, is it diff-equivalent if and only if:
-  \[\mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau) \vdash \mframe^L@\tau \sim \mframe^R@\tau\]
-\end{lemma}
-\begin{proof}We prove the first equivalence, which is essentially an unfolding of definitions.
-
+  A bi-process $\calp$ is diff-equivalent if and only if
   \[
-    \begin{array}{l@{~}l}
-      $P$\text{ is diff-equivalent} & \Leftrightarrow \text{for all } \TM,\ \stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
-      & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
-      & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ \true \stackrel{.}{\Rightarrow} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
-      & \Leftrightarrow  \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\text{ is valid}\\
-
-    \end{array}
+    \mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau)
+    \vdash_{\calp}
+    \mframe^L@\tau \sim \mframe^R@\tau
   \]
-
-  The second equivalence is a direct induction on the length of the traces.
+\end{lemma}
+\begin{proof}
+  This is by induction on the length of the traces.
 \end{proof}
+
+% \begin{lemma}
+%   A bi-process is diff-equivalent if and only if,
+%   \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau\]
+%   Equivalently, is it diff-equivalent if and only if:
+%   \[\mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau) \vdash \mframe^L@\tau \sim \mframe^R@\tau\]
+% \end{lemma}
+% \begin{proof}
+%   We prove the first equivalence, which is essentially an unfolding of definitions.
+%   \[
+%     \begin{array}{l@{~}l}
+%       $P$\text{ is diff-equivalent} & \Leftrightarrow \text{for all } \TM,\ \stackrel{.}{\wedge}_{v\in D_\XT} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+%       & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+%       & \Leftrightarrow \text{for all } \TM\text{ and } v\in D_\XT,\ \true \stackrel{.}{\Rightarrow} (\mframe@\tau^L)^{\TM[\tau\mapsto v]} \sim (\mframe@\tau^R)^{\TM[\tau \mapsto v]}\text{ is valid}\\
+%       & \Leftrightarrow  \emptyset \vdash  \mframe^L@\tau \sim \mframe@\tau^R\text{ is valid}\\
+
+%     \end{array}
+%   \]
+
+%   The second equivalence is a direct induction on the length of the traces.
+% \end{proof}
 
 Adding the execution condition to the sequent is also a valid proof technique.
 \begin{lemma}
-  A bi-process is diff-equivalent if,
-  \[ \emptyset \vdash  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
-  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
+  A bi-process $\calp$ is diff-equivalent if,
+  \[ \emptyset \vdash_{\calp}  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
+  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash_{\calp}  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
 \end{lemma}
 We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
 
 \begin{figure}
   \begin{mathpar}
-    \inferrule[Expand]{\Gamma \vdash t_L \sim t_R
-      \quad
-    }{\Gamma \cup \phi \vdash t_L \sim t_R}
-    \quad\quad
-    \inferrule[Cut]{
-      \Gamma \vdash t_L \sim t_R
-      \quad
-      \Gamma \vdash t_R \sim t_S
-    }{\Gamma \vdash t_L \sim t_S}
-  \end{mathpar}
-  \begin{mathpar}
+    \inferrule[Expand]{
+      \Gamma \vdash_{\calp} t_L \sim t_R
+    }{\Gamma \cup \phi \vdash_{\calp} t_L \sim t_R}
+
+    \inferrule[F-Cut]{
+      \Gamma \vdash_{\calp} \phi\\      
+      \Gamma \cup \phi \vdash_{\calp} t^L \sim t^R
+    }{
+      \Gamma \vdash_{\calp} t^L \sim t^R
+    }
+
+    \inferrule[Sym]{
+      \Gamma \vdash_{\calp} t_L \sim t_R
+    }{\Gamma \vdash_{\calp} t_R \sim t_L}
+
+    \inferrule[Refl]{~}
+    { \Gamma \vdash_{\calp} t \sim t }
+
+    \inferrule[Trans]{
+      \Gamma \vdash_{\calp} t_L \sim t_R\\
+      \Gamma \vdash_{\calp} t_R \sim t_S
+    }{\Gamma \vdash_{\calp} t_L \sim t_S}
+
     \inferrule[Subst]{
-      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \}  \vdash t^L \sim t^R
+      \Gamma \cup \{t_1 \deq t_2\sim \true \}  \vdash_{\calp} t^L \sim t^R
     }{
-      \Gamma \cup \{\EQ(t_1,t_2)\sim \true \} \vdash t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
+      \Gamma \cup \{t_1 \deq t_2\sim \true \} \vdash_{\calp}
+      t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
     }
 
-  \end{mathpar}
+    \inferrule[if-reach]{
+      \phi \vdash_{\calp} \false
+    }{
+      \Gamma  \vdash_{\calp} \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
+    }
 
-  \begin{mathpar}
-    \inferrule[\myif-reach]{
-      \phi \vdash \false
+    \inferrule[if-equiv]{
+      \phi \vdash_{\calp} \psi \Leftrightarrow \psi'
     }{
-      \Gamma  \vdash \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
+      \Gamma \vdash_{\calp}
+      \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
     }
-    \quad\quad
-    \inferrule[\myif-equiv]{
-      \phi \vdash \psi \Leftrightarrow \psi'
-    }{
-      \Gamma \vdash \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
-    }
-  \end{mathpar}
-  \begin{mathpar}
+
     \inferrule[${\lnot}$-R]{
-      \Gamma \vdash \false \sim \true
+      \Gamma \vdash_{\calp} \false \sim \true
     }{
-      \Gamma \vdash t^L \sim t^R
+      \Gamma \vdash_{\calp} t^L \sim t^R
     }
-    \quad\quad
+
     \inferrule[fresh]{
       n,m \not \in \Gamma
     }{
-      \Gamma \vdash n \sim m
+      \Gamma \vdash_{\calp} n \sim m
     }
-    \quad\quad
-    \inferrule[\myif-weak]{
-      \Gamma \vdash \phi, t_L \sim \phi, t_R
-    }{
-      \Gamma \vdash \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
-    }
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule[F-Cut]{
-      \Gamma \vdash \phi
-      \quad
-      \Gamma \cup \phi \vdash t^L \sim t^R
-    }{
-      \Gamma \vdash t^L \sim t^R
-    }
-    \quad\quad
-    \inferrule[Dup]{
-      \Gamma \vdash t^L,u \sim t^R,v
-    }{
-      \Gamma \vdash t^L,u,u \sim t^R,v,v
-    }
-  \end{mathpar}
 
+    \inferrule[if-weak]{
+      \Gamma \vdash_{\calp} \phi, t_L \sim \phi, t_R
+    }{
+      \Gamma \vdash_{\calp} \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
+    }
+
+    \inferrule[Dup]{
+      \Gamma \vdash_{\calp} t^L,u \sim t^R,v
+    }{
+      \Gamma \vdash_{\calp} t^L,u,u \sim t^R,v,v
+    }
+  \end{mathpar}
 
   \caption{Generic inference rules for indistinguishability}
   \label{fig:lk-ind}
@@ -265,7 +299,7 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
 \Cref{fig:fresh,fig:prf,fig:xor} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
-\item $\Gamma \vdash u$ stands for $\Gamma^L \sim \Gamma^R \vdash u^L \sim u^R$
+\item $\Gamma \vdash_{\calp} u$ stands for $\Gamma^L \sim \Gamma^R \vdash_{\calp} u^L \sim u^R$
 \item $A \in S$ stands for every action in the system (or protocol)
 \item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
 \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
@@ -275,9 +309,9 @@ We use the following notations:
 \begin{figure}[h]
   \begin{mathpar}
     \inferrule[Fresh]{
-      \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
+      \Gamma \vdash_{\calp} u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
     }{
-      \Gamma \vdash u, C[n(\vec {j_0})]
+      \Gamma \vdash_{\calp} u, C[n(\vec {j_0})]
     }
   \end{mathpar}
   \begin{mathpar}
@@ -301,11 +335,11 @@ We use the following notations:
 \begin{figure}[h]
   \begin{mathpar}
     \inferrule[PRF]{
-      \Gamma \vdash u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
+      \Gamma \vdash_{\calp} u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
       \quad \quad
       k(\_) \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
     }{
-      \Gamma \vdash u, C[\h(t,k(\vec {j_0}))]
+      \Gamma \vdash_{\calp} u, C[\h(t,k(\vec {j_0}))]
     }
   \end{mathpar}
   \begin{mathpar}
@@ -329,9 +363,9 @@ We use the following notations:
 \begin{figure}[h]
   \begin{mathpar}
     \inferrule[XOR-ind]{
-      \Gamma \vdash u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
+      \Gamma \vdash_{\calp} u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
     }{
-      \Gamma \vdash u, C[t \oplus n(\vec {j_0})]
+      \Gamma \vdash_{\calp} u, C[t \oplus n(\vec {j_0})]
     }
   \end{mathpar}
   \begin{mathpar}
@@ -356,16 +390,16 @@ We use the following notations:
   \begin{mathpar}
     \inferrule[FA-DUP]{
       \inferrule{
-        \Gamma \vdash u,
+        \Gamma \vdash_{\calp} u,
         \mframe @ \pre(A(\vec i)),
         \mexec @ \pre(A(\vec i))
       }{
-        \Gamma \vdash u,
+        \Gamma \vdash_{\calp} u,
         \mframe @ \pre(A(\vec i)),
         \myif \mexec @ \pre(A(\vec i)) \mythen \phi_{h} \myelse \bot
       }
     }{
-      \Gamma \vdash u,
+      \Gamma \vdash_{\calp} u,
       \mframe @ \pre(A(\vec i)),
       \mexec @ \pre(A(\vec i)) \wedge \phi_{h}
     }
@@ -420,7 +454,11 @@ by the action on both sides, but that each side has previously released
 different information on that name.
 
 To prove diff-equivalence, it can be interesting to prove that:
-$$ \phi^L_\tr, \phi^R_\tr \vdash \phi^L_\alpha \Leftrightarrow \phi^R_\alpha $$
+\[
+  \phi^L_\tr, \phi^R_\tr
+  \vdash_{\calp}
+  \phi^L_\alpha \Leftrightarrow \phi^R_\alpha
+\]
 
 Then, in the induction step, we can directly replace the previous conditions by the same one.
 
@@ -431,10 +469,10 @@ synchronized for all random samplings.
 
 \begin{example}
   With the bi-process of \cref{ex:negl} we would have to prove
-  $\vdash g() = n \Leftrightarrow g() = m$ and
-  $g()=n, g()=m \vdash \ok \sim \ok$, both of which hold.
+  $\vdash_{\calp} g() = n \Leftrightarrow g() = m$ and
+  $g()=n, g()=m \vdash_{\calp} \ok \sim \ok$, both of which hold.
   With the bi-process of \cref{ex:sync} we would have to prove
-  $\vdash g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
+  $\vdash_{\calp} g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
 \end{example}
 
 \begin{example} \label{ex:indep}
@@ -458,7 +496,7 @@ synchronized for all random samplings.
 \section{Outdated example : a signed DDH key exchange}
 \charlie{abus de notations dans cette partie}
 
-We brieffly show how one can prove the security of a signed DDH key exchange. The protocol in pi-calculus is provided in Figure~\ref{fig:signed_ddh} and the run of an honnest execution in Figure~\ref{fig:dh_ke}. This example is a simplified instance of classical key-exchange security. Notably, we assume that identities are already fixed.
+We briefly show how one can prove the security of a signed DDH key exchange. The protocol in pi-calculus is provided in Figure~\ref{fig:signed_ddh} and the run of an honest execution in Figure~\ref{fig:dh_ke}. This example is a simplified instance of classical key-exchange security. Notably, we assume that identities are already fixed.
 
 \begin{figure}
   % \setlength{\belowcaptionskip}{-15pt}

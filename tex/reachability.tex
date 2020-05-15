@@ -3,26 +3,13 @@
 \subsection{Validity and logical consequence}
 
 We have defined a translation from any meta-logic formula $\phi$ to a base logic
-boolean term $\interp{\phi}^\TM$. We can now formally define when a protocol
-satisfies some trace property $\phi$.  Intuitively, the meta-logic formula is
-true when the associated term is true with overwhelming probability in any trace model. % This is made formal in the following definitions.
+boolean term $\interp{\phi}{\TM}{\calp}$. We can now formally define when a protocol $\calp$ satisfies some trace property $\phi$.  Intuitively, the meta-logic formula is valid when the associated term is true with overwhelming probability in any $\cal$-trace model. 
 \begin{definition}
-  % Given a protocol $P$, a formula $\phi$ of the meta-logic is said to be valid
-  % when, for any trace model $\TM$, the base logic formula
-  % $(\phi)^\TM \sim \true$ is valid. \adrien{$P$ is not used in this sentence.}
-  % A formula $\phi$ of the meta-logic is valid if for any trace model $\TM$, the base logic formula $(\phi)^\TM \sim \true$ is valid.
-  %
-  % More generally, a meta-logic formula $\phi$ is a
-  % logical consequence of a set $S$ of base logic formulas
-  % % (which might themselves be of the form $\interp{\psi}^\TM \sim \true$)
-  % when, for all $\TM$, $\Mo$ and $\sigma$ such that
-  % $\Mo,\sigma \models \psi$ for all $\psi\in S$,
-  % we have
-  % $\Mo,\sigma \models(\phi)^\TM\sim\mathsf{true}$.
-  Let $\phi$ be a meta-formula. Then for every trace model $\TM$, computational model $\Mo$ and interpretation $\sigma$, $\TM, \Mo, \sigma \models \phi$ if $\Mo, \sigma \models (\phi)^{\TM} \sim \true$.
+  Let $\calp$ be a protocol and $\phi$ be a meta-formula. Then for every $\calp$-trace model $\TM$, computational model $\Mo$ and interpretation $\sigma$, $\TM, \Mo, \sigma \models_{\calp} \phi$ if $\Mo, \sigma \models \interp{\phi}{\TM}{\calp} \sim \true$.
 
-  We say that $\phi$ is valid if $\TM, \Mo, \sigma \models \phi$ for every $\TM$, $\Mo$, $\sigma$, and for any set of meta-formulas $S$, $S \models \phi$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models S$, we have $\TM, \Mo, \sigma \models \phi$.
-  % we omit $\sigma$ when it is empty (i.e.\ when $\phi$ has no free message variables).
+  We say that $\phi$ is $\calp$-valid if $\TM, \Mo, \sigma \models_{\calp} \phi$ for every $\TM$, $\Mo$ and $\sigma$.
+
+  Finally, for any set of meta-formulas $S$, $S \models_{\calp} \phi$ if for every $\TM$, $\Mo$ and $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp} S$, we have $\TM, \Mo, \sigma \models_{\calp} \phi$.
 \end{definition}
 
 \begin{remark}
@@ -32,7 +19,7 @@ true when the associated term is true with overwhelming probability in any trace
 \end{remark}
 
 In practice, we want to verify that a security property expressed as a
-meta-logic formula $\phi$ is satisfied in a class of trace models
+meta-logic formula $\phi$ is satisfied in a class of $\calp$-trace models
 $\TM$ and computational models $\Mo$: we will typically restrict computational
 models so that cryptographic primitives satisfy some security assumption,
 but we may also restrict trace models e.g.\ to force a condition on
@@ -52,11 +39,11 @@ For simplicity, we do not include them here. We shall write $\vdash t:\Sort$
 when $t$ is a term of sort $\Sort$ (which might be $\idx$ or $\timestamp$).
 
 \begin{definition}
-  A sequent $\Gamma \vdash \phi$ is composed of a set of meta-logic formulas
-  $\Gamma$ and a meta-logic formula $\phi$.
+  Let $\calp$ be a protocol. A sequent $\Gamma \vdash_{\calp} \phi$ is composed of a set of meta-logic formulas $\Gamma$ and a meta-logic formula $\phi$.
   % It is valid when the meta-logic formula
   % $(\wedge\Gamma) \Rightarrow \phi$ is valid.
-  The sequent $\Gamma \vdash \phi$ is valid if $\Gamma \models \phi$.
+
+  The sequent $\Gamma \vdash_{\calp} \phi$ is valid if and only if $\Gamma \models_{\calp} \phi$.
 \end{definition}
 
 % \paragraph{Sequent Calculus}
@@ -73,72 +60,72 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
   $x$ does not appear free in $\Gamma$.
   % \label{fig:lk}
   \begin{mathpar}
-    \inferrule[Axiom]{~}{\Gamma,\phi\vdash\phi}
+    \inferrule[Axiom]{~}{\Gamma,\phi\vdash_{\calp}\phi}
 
     \inferrule[Cut]{
-      \Gamma \vdash \phi\\
-      \Gamma,\phi \vdash \psi
+      \Gamma \vdash_{\calp} \phi\\
+      \Gamma,\phi \vdash_{\calp} \psi
     }{
-      \Gamma \vdash \psi
+      \Gamma \vdash_{\calp} \psi
     }
     
     \inferrule[${\wedge}$-L]{
-      \Gamma,\phi,\phi'\vdash\psi
+      \Gamma,\phi,\phi'\vdash_{\calp}\psi
     }{
-      \Gamma,\phi\wedge\phi'\vdash\psi
+      \Gamma,\phi\wedge\phi'\vdash_{\calp}\psi
     }
 
     \inferrule[${\wedge}$-R]{
-      \Gamma \vdash \phi\\
-      \Gamma \vdash \phi'
+      \Gamma \vdash_{\calp} \phi\\
+      \Gamma \vdash_{\calp} \phi'
     }{
-      \Gamma \vdash \phi\wedge\phi'
+      \Gamma \vdash_{\calp} \phi\wedge\phi'
     }
 
     \inferrule[${\lnot}$-R]{
-      \Gamma, \phi \vdash \bot
+      \Gamma, \phi \vdash_{\calp} \bot
     }{
-      \Gamma \vdash \lnot\phi
+      \Gamma \vdash_{\calp} \lnot\phi
     }
 
     \inferrule[${\lnot}$-L]{
-      \Gamma \vdash \phi
+      \Gamma \vdash_{\calp} \phi
     }{
-      \Gamma,\lnot\phi \vdash \psi
+      \Gamma,\lnot\phi \vdash_{\calp} \psi
     }
 
     \inferrule[Raa]{
-      \Gamma, \lnot\phi \vdash \bot
+      \Gamma, \lnot\phi \vdash_{\calp} \bot
     }{
-      \Gamma \vdash \phi
+      \Gamma \vdash_{\calp} \phi
     }
   \end{mathpar}
   \begin{center}
     \emph{other propositional rules of classical sequent calculus}
   \end{center}
   \begin{mathpar}
-    \inferrule[${=}$-R]{~}{\Gamma \vdash t=t} \quad\quad
+    \inferrule[${=}$-R]{~}{\Gamma \vdash_{\calp} t=t} \quad\quad
     \inferrule[${=}$-L]{
-      (\Gamma\vdash\phi)\{x\mapsto t',x'\mapsto t\}
+      (\Gamma\vdash_{\calp}\phi)\{x\mapsto t',x'\mapsto t\}
     }{
-      t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash
+      t=t', \Gamma\{x\mapsto t,x'\mapsto t'\} \vdash_{\calp}
       \phi\{x\mapsto t,x'\mapsto t'\}
     }
 
     \inferrule[$\forall$-L]{
-      \Gamma,\phi\{x\mapsto t\} \vdash \psi\\
-      \vdash t:\Sort
+      \Gamma,\phi\{x\mapsto t\} \vdash_{\calp} \psi\\
+      \vdash_{\calp} t:\Sort
     }{
-      \Gamma,\forall x:\Sort.\phi \vdash \psi}
+      \Gamma,\forall x:\Sort.\phi \vdash_{\calp} \psi}
 
     \inferrule[$\forall$-R]{
-      \Gamma \vdash \phi}{\Gamma \vdash \forall x:\Sort:\phi}
+      \Gamma \vdash_{\calp} \phi}{\Gamma \vdash_{\calp} \forall x:\Sort:\phi}
   \end{mathpar}
   % 
   \medskip
   \textbf{Some inference rules for equalities on names.}
   % The last rule only applies when, for any trace model $\TM$,
-  % the term $\interp{t}^\TM$ does not contain any message variable and does
+  % the term $\interp{t}{\TM}{\calp}$ does not contain any message variable and does
   % not contain any occurrence of $\mathsf{n}_{\sigma_\I(\vec i)}$
   % --- this condition will be over-approximated in our implementation.
   % \adrien{Considering how I re-organized the section, this last rule should be given later.}
@@ -147,17 +134,17 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
     \inferrule{
       \mathsf{n}\neq\mathsf{m}
     }{
-      \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash \phi
+      \Gamma,\mathsf{n}[\vec i]=\mathsf{m}[\vec j]\vdash_{\calp} \phi
     }
 
     \inferrule{
-      \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash \phi
+      \Gamma, i_1=j_1, \ldots, i_k=j_k \vdash_{\calp} \phi
     }{
-      \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash \phi
+      \Gamma,\mathsf{n}[i_1,\ldots,i_k]=\mathsf{n}[j_1,\ldots,j_k]\vdash_{\calp} \phi
     }
     %
     % \inferrule{~}{
-    %   \Gamma,t=\mathsf{n}[\vec i] \vdash \phi
+    %   \Gamma,t=\mathsf{n}[\vec i] \vdash_{\calp} \phi
     % }
   \end{mathpar}
 
@@ -167,39 +154,39 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
     \inferrule{
       ~
     }{
-      \Gamma, b[\vec{i}] \leq a[\vec{i}, \vec{j}] \vdash \phi
+      \Gamma, b[\vec{i}] \leq a[\vec{i}, \vec{j}] \vdash_{\calp} \phi
     }
     \quad\text{ when } a < b
     
     \inferrule{
       ~
     }{
-      \Gamma, a[\vec{i}] = b[\vec{j}] \vdash \phi
+      \Gamma, a[\vec{i}] = b[\vec{j}] \vdash_{\calp} \phi
     }
     \quad\text{ when } a \ne b
 
     \inferrule{
       ~
     }{
-      \Gamma, \tau \ne \tinit \wedge \tau \le \tpred{\tau} \vdash \phi
+      \Gamma, \tau \ne \tinit \wedge \tau \le \tpred{\tau} \vdash_{\calp} \phi
     }
 
     \inferrule{
-      \Gamma, \tau' = \pre(\tau) \vee \tau' = \tau \vdash \phi
+      \Gamma, \tau' = \pre(\tau) \vee \tau' = \tau \vdash_{\calp} \phi
     }{
-      \Gamma, \pre(\tau)\leq\tau'\leq\tau \vdash \phi
+      \Gamma, \pre(\tau)\leq\tau'\leq\tau \vdash_{\calp} \phi
     }
 
     \inferrule{
-      \Gamma, \pvec{i}=\pvec{j} \vdash \phi
+      \Gamma, \pvec{i}=\pvec{j} \vdash_{\calp} \phi
     }{
-      \Gamma, a(\pvec{i})=a(\pvec{j}) \vdash \phi
+      \Gamma, a(\pvec{i})=a(\pvec{j}) \vdash_{\calp} \phi
     }
 
     \inferrule{
-      \Gamma, \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau \vdash \phi
+      \Gamma, \forall \tau'.~\tau'\leq \tau \Rightarrow \mcond@\tau \vdash_{\calp} \phi
     }{
-      \Gamma, \mexec@\tau \vdash \phi
+      \Gamma, \mexec@\tau \vdash_{\calp} \phi
     }
   \end{mathpar}
   % `
@@ -210,22 +197,22 @@ We can now give the basic rules of our meta-logic sequent calculus for reachabil
   % % at all and is here mostly for illustration purposes, and is subject to
   % % the condition that,
   % In the last rule, for any trace model $\TM$,
-  % $\interp{\Gamma\vdash\phi}^\TM$ does not contain instances of the names
+  % $\interp{\Gamma\vdash_{\calp}\phi}{\TM}{\calp}$ does not contain instances of the names
   % $\mathsf{n}$ and $\mathsf{m}$ and does not contain message variables.
   % This condition would be over-approximated in an implementation. \adrien{and $t$ must be of the same length than names.}
   % \adrien{Again, the last rule should be given in the next sub-section.}
   % \label{fig:xor-reach}
   \begin{mathpar}
-    \inferrule{~}{\Gamma \vdash t\oplus t = 0}
+    \inferrule{~}{\Gamma \vdash_{\calp} t\oplus t = 0}
 
-    \inferrule{~}{\Gamma \vdash t\oplus t' = t'\oplus t}
+    \inferrule{~}{\Gamma \vdash_{\calp} t\oplus t' = t'\oplus t}
 
-    \inferrule{~}{\Gamma \vdash t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
+    \inferrule{~}{\Gamma \vdash_{\calp} t\oplus (t'\oplus t'') = (t\oplus t')\oplus t''}
 
     % \inferrule{
-    %   (\Gamma \vdash \phi)\{x\mapsto \mathsf{m}[\vec j]\}
+    %   (\Gamma \vdash_{\calp} \phi)\{x\mapsto \mathsf{m}[\vec j]\}
     % }{
-    %   (\Gamma \vdash \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
+    %   (\Gamma \vdash_{\calp} \phi)\{x\mapsto t\oplus\mathsf{n}[\vec i]\}
     % }
   \end{mathpar}
   \caption{Sequent Calculus for Reachability}
@@ -286,9 +273,9 @@ We can now give the rule:
       \inferrule% [\textsc{euf-cma}]
       {
         \textstyle
-        \Gamma, \bigvee_{h(u,sk) \in \st(s,m)} m \deq u \vdash \phi
+        \Gamma, \bigvee_{h(u,sk) \in \st(s,m)} m \deq u \vdash_{\calp} \phi
       }{
-        \Gamma, s \deq h(m,sk) \vdash \phi
+        \Gamma, s \deq h(m,sk) \vdash_{\calp} \phi
       }
     \end{gathered}
     \quad\text{ when }
@@ -302,11 +289,11 @@ To lift the above rule to the meta-logic, we first lift the occurence side-condi
 
 \begin{definition}
   \label{def:occ-sc-meta}
-  Let $\calp$ be a protocol, $C$ be a macros-free context, and $u$ a term of the meta-logic with \textbf{no message variables}. For every term $s$, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
-  % Let $\calp$ be a protocol, and $C$ be a macros-free many-holed context with one distinguished hole variable $\cdot$ that occurs exactly once in $C$. Let $u$ be a term of the meta-logic with \textbf{no message variables}. For every macros-free term $s$ of the meta-logic, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}^\TM$ holds in any $\calp$-trace model $\TM$.
+  Let $\calp$ be a protocol, $C$ be a macros-free context, and $u$ a term of the meta-logic with \textbf{no message variables}. For every term $s$, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos_{C} \interp{u}{\TM}{\calp}$ holds in any $\calp$-trace model $\TM$.
+  % Let $\calp$ be a protocol, and $C$ be a macros-free many-holed context with one distinguished hole variable $\cdot$ that occurs exactly once in $C$. Let $u$ be a term of the meta-logic with \textbf{no message variables}. For every macros-free term $s$ of the meta-logic, we let $s \tpos^{\calp}_{C} u$ holds if and only if $s \tpos^{\calp}_{C} \interp{u}{\TM}{\calp}$ holds in any $\calp$-trace model $\TM$.
 \end{definition}
 
-The base-logic side-condition $\tpos_{C}$ is fully syntactic, and can easily be implemented. This is no longer the case with $s \tpos^{\calp}_{C} u$, as it requires to check a property on all occurrences of $s$ in all interpretations $u$, in any $\calp$-trace model. Therefore, instead of checking directly whether $s \tpos^{\calp}_{C} u$, we are going to check the property on the direct occurrences of $s$ in $u$ (i.e.\ $s \tpos_{C} u$), and on the occurrences of $s$ in any action of the protocol. The idea is that this must over-approximate all occurrences of $s$ in any interpretation of $u$ in a $\calp$-trace model $\TM$. Actually, this is not true for any context $C$, because $C$ can be matched in $\interp{u}^\TM$ accross several macros unrolling. But this is true for well-behaved context $C$. 
+The base-logic side-condition $\tpos_{C}$ is fully syntactic, and can easily be implemented. This is no longer the case with $s \tpos^{\calp}_{C} u$, as it requires to check a property on all occurrences of $s$ in all interpretations $u$, in any $\calp$-trace model. Therefore, instead of checking directly whether $s \tpos^{\calp}_{C} u$, we are going to check the property on the direct occurrences of $s$ in $u$ (i.e.\ $s \tpos_{C} u$), and on the occurrences of $s$ in any action of the protocol. The idea is that this must over-approximate all occurrences of $s$ in any interpretation of $u$ in a $\calp$-trace model $\TM$. Actually, this is not true for any context $C$, because $C$ can be matched in $\interp{u}{\TM}{\calp}$ accross several macros unrolling. But this is true for well-behaved context $C$. 
 
 \begin{definition}
   Let $\calp$ be a protocol. A context $C$ is $\calp$-well behaved if:
@@ -340,7 +327,7 @@ The following proposition gives a sufficient condition to check $s \tpos^{\calp}
 
 Then, we need to characterize the set of all honest hashes that can appear in the interpretation of a term $s$ of the meta-logic:
 \[
-  S = \{u \mid h(u,sk) \in \st(\interp{s}^\TM),
+  S = \{u \mid h(u,sk) \in \st(\interp{s}{\TM}{\calp}),
   \TM \text{ a $\calp$-trace model}\}
 \]
 There are two issue there: the set $S$ can be infinite, and we must be able to compute it (or at least an over-approximation of it). As for $\tpos^{\calp}_{C}$, we look for all possible occurrences of $h(u,sk)$ either directly in $s$, or in an action $\sfa$ of $\calp$. In the latter case, we will also need a formula of the logic that characterizes the fact that $\sfa$ happened before the moment where $u$ was computed. This motivates the following definitions.
@@ -378,7 +365,7 @@ There are two issue there: the set $S$ can be infinite, and we must be able to c
   Where, for every entry, $\vec{i}$ is a vector of index variables, assumed fresh in $u$, and all disjoint.
 \end{definition}
 
-$\ost_{\calp}(u)$ is a set of triples $(t,\vec{i},c)$ such that, for any $\calp$-trace model $\TM$, the interpretation in $\TM$ of the terms of $\ost_{\calp}(u)$ such that $c$ holds in $\TM$ contains all the subterms of~$\interp{u}^\TM$. Moreover, $\vec{i}$ is the set of new (index) variables in $t$ and $c$: $\fv{t,c} \subseteq \fv{u} \cup \{\pvec{i}\}$.
+$\ost_{\calp}(u)$ is a set of triples $(t,\vec{i},c)$ such that, for any $\calp$-trace model $\TM$, the interpretation in $\TM$ of the terms of $\ost_{\calp}(u)$ such that $c$ holds in $\TM$ contains all the subterms of~$\interp{u}{\TM}{\calp}$. Moreover, $\vec{i}$ is the set of new (index) variables in $t$ and $c$: $\fv{t,c} \subseteq \fv{u} \cup \{\pvec{i}\}$.
 \david{Note that $t$ can contain the ``bound indices'' $\vec{i}$ in the
 second case. We are however not trying to formalize the situation where
 occurrences have indices bound by constructs inside the action descriptions.}
@@ -387,14 +374,14 @@ occurrences have indices bound by constructs inside the action descriptions.}
   \label{prop:ost-sound}
   For any protocol $\calp$ and term $u$ of the meta-logic, the set $\ost_{\calp}(u)$ is finite. Moreover, for any $\calp$-trace model $\TM = (\D_\I, \D_\XT, \leq_\XT, \sigma_\I, \sigma_\XT)$:
   \[
-    \st(\interp{u}^\TM) \subseteq
+    \st(\interp{u}{\TM}{\calp}) \subseteq
     \left\{
-      \interp{t}^{\TM'}
+      \interp{t}{\TM'}{\calp}
       \mid
       \pvec{e} \subseteq \D_\I,\;
       \TM' = \TM[\pvec{i}\mapsto\pvec{e}],\;
       (t,\pvec{i},c) \in \ost_{\calp}(u),\;
-      \TM' \models \interp{c}^{\TM'}
+      \TM' \models_{\calp} \interp{c}{\TM'}{\calp}
     \right\}
   \]
 \end{proposition}
@@ -415,9 +402,9 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
       \Gamma,
       \bigvee_{(h(u,sk),\vec{i},c) \in \ost_{\calp}(t,m)}
       \exists \vec{i},
-      c \wedge u = m \vdash \phi
+      c \wedge u = m \vdash_{\calp} \phi
     }{
-      \Gamma, t=h(m,sk) \vdash \phi
+      \Gamma, t=h(m,sk) \vdash_{\calp} \phi
     }
     \quad\text{ when }
     sk \tpos^{\calp}_{h(\_,\cdot)} t,m
@@ -426,9 +413,9 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
   %   \inferrule{
   %     \textstyle
   %     \Gamma,
-  %     \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash \phi
+  %     \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash_{\calp} \phi
   %   }{
-  %     \Gamma, t=h(m,sk) \vdash \phi
+  %     \Gamma, t=h(m,sk) \vdash_{\calp} \phi
   %   }
   %   \tag{if $t$ contains no macros}\\
   %   \inferrule{
@@ -438,9 +425,9 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
   %     \bigvee_{h(x,sk) \in o_{\sfa}[\pvec{i}] }
   %     \big(
   %     m=x \wedge \sfa(\vec{i}) < \tau\big)
-  %     \vdash \phi
+  %     \vdash_{\calp} \phi
   %   }{
-  %     \Gamma, \minp@\tau=h(m,sk) \vdash \phi
+  %     \Gamma, \minp@\tau=h(m,sk) \vdash_{\calp} \phi
   %   }
   %   \tag{macros case}
   % \end{gather*}
@@ -459,7 +446,7 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
       \text{Meta-logic Rule}\\
       \hline
       \inferrule{~}{
-        \Gamma, t = \mathsf{n} \vdash \phi
+        \Gamma, t = \mathsf{n} \vdash_{\calp} \phi
       }
       \text{ when }
       \mathsf{n} \not \in \st(t)
@@ -470,9 +457,9 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
         \bigvee_{(\mathsf{n}[\vec{j}],\vec{k},c) \in \ost_{\calp}(t)}
         \exists \vec{k},
         c \wedge \vec{i} = \vec{j}
-        \vdash \phi
+        \vdash_{\calp} \phi
       }{
-        \Gamma, t = \mathsf{n}[\vec{i}]\vdash \phi
+        \Gamma, t = \mathsf{n}[\vec{i}]\vdash_{\calp} \phi
       }
       \\\hline
     \end{array}
