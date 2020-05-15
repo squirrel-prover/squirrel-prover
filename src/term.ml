@@ -16,7 +16,6 @@ type state = Sorts.message msymb
 
 let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
 
-(* TODO find a better name... pp_name_indices ? *)
 let pp_nsymb ppf (n,is) =
   if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n Vars.pp_list is
   else Fmt.pf ppf "%a" pp_name n
@@ -25,7 +24,7 @@ let pp_fname ppf s = (Utils.kw `Bold) ppf (Symbols.to_string s)
 
 let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
-  | _ -> Fmt.pf ppf "%a[%a]" pp_fname fn Vars.pp_list is
+  | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
 
 let pp_mname ppf s =
   let open Fmt in
@@ -175,7 +174,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         ppf ()
   | Init -> Fmt.styled `Green (fun ppf () -> Fmt.pf ppf "init") ppf ()
   | Diff (bl, br) ->
-    Fmt.pf ppf "@[<1>(diff(%a,@,%a))@]"
+    Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
   | ITE (b, c, d) ->
     Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
