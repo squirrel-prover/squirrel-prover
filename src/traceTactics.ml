@@ -1261,28 +1261,35 @@ let () =
       | [Prover.Theory (Theory.Var h)] -> euf_apply h
       | _ -> Tactics.(hard_failure (Failure "improper arguments")))
 
-(** [apply gp ths judge sk fk] applies the formula named [gp],
+(** [apply gp ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath. *)
-let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
-  (* Get formula to apply *)
+let apply id (ths:Theory.term list) (s : TraceSequent.t) =
+  (* Get formula to apply. *)
   let f,system =
     try TraceSequent.get_hypothesis id s, TraceSequent.system s with
       | Not_found -> Prover.get_goal_formula id
   in
+  (* Verify that it applies to the current system. *)
   begin
     match TraceSequent.system s, system with
-    | s1, s2  when s1 = s2 -> ()
-    | Single(Left s1), Action.SimplePair s2  when s1 = s2 -> ()
-    | Single(Right s1), Action.SimplePair s2  when s1 = s2 -> ()
+    | s1, s2 when s1 = s2 -> ()
+    | Single (Left s1), Action.SimplePair s2 when s1 = s2 -> ()
+    | Single (Right s1), Action.SimplePair s2 when s1 = s2 -> ()
     | _ -> Tactics.hard_failure Tactics.NoAssumpSystem
   end ;
+  (* Get universally quantifier variables, verify that lengths match. *)
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f
   in
-  let subst = Theory.parse_subst (TraceSequent.get_env s) uvars ths in
-  (* Formula with universal quantifications introduced *)
+  if List.length uvars <> List.length ths then
+    Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
+  let subst =
+    try Theory.parse_subst (TraceSequent.get_env s) uvars ths with
+      | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
+  in
+  (* Formula with universal quantifications introduced. *)
   let f = Term.subst subst f in
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
@@ -1291,11 +1298,10 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) sk fk =
         aux (s'::subgoals) c
     | Term.Not h ->
         let s' = TraceSequent.set_conclusion h s in
-        sk (List.rev (s'::subgoals)) fk
+        List.rev (s'::subgoals)
     | f ->
         TraceSequent.add_formula f s ::
         List.rev subgoals
-        |> fun subgoals -> sk subgoals fk
   in
   aux [] f
 
@@ -1314,9 +1320,11 @@ let () =
                           (Tactics.Failure "improper arguments"))
               th_terms
           in
-          apply id th_terms
-      | _ -> Tactics.hard_failure
-               (Tactics.Failure "improper arguments"))
+          fun s sk fk -> begin match apply id th_terms s with
+            | subgoals -> sk subgoals fk
+            | exception Tactics.Tactic_soft_failure e -> fk e
+          end
+      | _ -> Tactics.(hard_failure (Failure "improper arguments")))
 
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
