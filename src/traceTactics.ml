@@ -1357,7 +1357,9 @@ let fa s sk fk =
               [ TraceSequent.set_conclusion (Term.mk_impl c c') s ;
                 TraceSequent.set_conclusion (Term.mk_impl c' c) s ;
                 TraceSequent.set_conclusion
-                  (Term.Atom (`Message (`Eq,t,t'))) s ;
+                  (Term.Atom (`Message (`Eq,t,t'))) s
+                 |> TraceSequent.add_formula c
+                 |> TraceSequent.add_formula c' ;
                 TraceSequent.set_conclusion
                   (Term.Atom (`Message (`Eq,e,e'))) s ]
             in
@@ -1417,7 +1419,7 @@ let fa s sk fk =
             (* Extract unused variables. *)
             let used,unused =
               let occ_vars = Term.get_vars c @ Term.get_vars t in
-              let vars = List.map (fun i -> Vars.EVar i) vars in
+              let vars = List.map (fun i -> Vars.EVar i) vars' in
               List.partition
                 (fun v -> List.mem v occ_vars)
                 vars

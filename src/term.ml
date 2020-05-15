@@ -129,6 +129,58 @@ let rec disjunction_to_atom_list = function
   | _ -> raise Not_a_disjunction
 
 
+(** Builtins *)
+
+let mk_fname f arity =
+  let info = 0, Symbols.Abstract arity in
+  snd
+    (Symbols.Function.declare_exact Symbols.dummy_table f ~builtin:true info),
+  []
+
+let f_diff = mk_fname "diff" 2
+
+(** Boolean function symbols, where booleans are typed as messages.
+  * The true/false constants are used in message_of_formula,
+  * and other symbols are used in an untyped way in Completion
+  * (in some currently unused code). *)
+
+let eboolean,emessage = Sorts.eboolean,Sorts.emessage
+
+let f_false = mk_fname "false" 0
+let f_true = mk_fname "true" 0
+let f_and = mk_fname "and" 2
+let f_or = mk_fname "or" 2
+let f_not = mk_fname "not" 1
+let f_ite = mk_fname "if" 3
+
+(** Xor and its unit *)
+
+let f_xor = mk_fname "xor" 2
+let f_zero = mk_fname "zero" 0
+
+(** Successor over natural numbers *)
+
+let f_succ = mk_fname "succ" 1
+
+(** Pairing *)
+
+let f_pair = mk_fname "pair" 2
+let f_fst = mk_fname "fst" 1
+let f_snd = mk_fname "snd" 1
+
+(** Exp **)
+
+let f_exp = mk_fname "exp" 2
+let f_g = mk_fname "g" 0
+
+(** Dummy term *)
+
+let dummy = Fun (mk_fname "_" 0, [])
+
+(** Length *)
+
+let f_len = mk_fname "len" 1
+
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
 
@@ -177,11 +229,19 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
     Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
   | ITE (b, c, d) ->
-    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
-      pp b pp c pp d
+    if d = Fun (f_zero,[]) then
+      Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
+        pp b pp c
+    else
+      Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
+        pp b pp c pp d
   | Find (b, c, d, e) ->
-    Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
-      Vars.pp_list b pp c pp d pp e
+    if e = Fun (f_zero,[]) then
+      Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a)@]"
+        Vars.pp_list b pp c pp d
+    else
+      Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
+        Vars.pp_list b pp c pp d pp e
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
@@ -478,31 +538,6 @@ and subst_generic_atom s = function
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
-
-(** Builtins *)
-
-let mk_fname f arity =
-  let info = 0, Symbols.Abstract arity in
-  snd
-    (Symbols.Function.declare_exact Symbols.dummy_table f ~builtin:true info),
-  []
-
-let f_diff = mk_fname "diff" 2
-
-(** Boolean function symbols, where booleans are typed as messages.
-  * The true/false constants are used in message_of_formula,
-  * and other symbols are used in an untyped way in Completion
-  * (in some currently unused code). *)
-
-let eboolean,emessage = Sorts.eboolean,Sorts.emessage
-
-let f_false = mk_fname "false" 0
-let f_true = mk_fname "true" 0
-let f_and = mk_fname "and" 2
-let f_or = mk_fname "or" 2
-let f_not = mk_fname "not" 1
-let f_ite = mk_fname "if" 3
-
 (** Smart constructors for boolean terms. *)
 
 let mk_and t1 t2 = match t1,t2 with
@@ -545,33 +580,7 @@ let mk_indices_eq vect_i vect_j =
     True
     (List.map2 (fun i j -> Atom (`Index (`Eq, i, j))) vect_i vect_j)
 
-(** Xor and its unit *)
-
-let f_xor = mk_fname "xor" 2
-let f_zero = mk_fname "zero" 0
-
-(** Successor over natural numbers *)
-
-let f_succ = mk_fname "succ" 1
-
-(** Pairing *)
-
-let f_pair = mk_fname "pair" 2
-let f_fst = mk_fname "fst" 1
-let f_snd = mk_fname "snd" 1
-
-(** Exp **)
-
-let f_exp = mk_fname "exp" 2
-let f_g = mk_fname "g" 0
-
-(** Dummy term *)
-
-let dummy = Fun (mk_fname "_" 0, [])
-
-(** Length *)
-
-let f_len = mk_fname "len" 1
+(** Projection *)
 
 type projection = Left | Right | None
 

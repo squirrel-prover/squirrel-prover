@@ -208,23 +208,29 @@ module Theories = struct
       ) projs
 
   (* Asymmetric encryption.
-      dec(enc(m, pk(k)), sk(k)) -> m *)
-  let mk_aenc enc dec pk sk =
+      dec(enc(m, pk(k)), k) -> m *)
+  let mk_aenc enc dec pk =
     let m, k = mk_var (), mk_var () in
-    let t_pk, t_sk = cfun pk [k], cfun sk [k] in
-    ( cfun dec [cfun enc [m; t_pk]; t_sk], m )
+    let t_pk = cfun pk [k] in
+    ( cfun dec [cfun enc [m; t_pk]; k], m )
 
   (* Symmetric encryption.
-      dec(enc(m, kg(k)), kg(k)) -> m *)
-  let mk_senc enc dec kg =
+      dec(enc(m, k), k) -> m *)
+  let mk_senc enc dec =
     let m, k = mk_var (), mk_var () in
-    let t_k = cfun kg [k] in
-    ( cfun dec [cfun enc [m; t_k]; t_k], m )
+    ( cfun dec [cfun enc [m; k]; k], m )
 
   let t_true = cfun Term.f_true []
   let t_false = cfun Term.f_true []
 
-  (* Simple Boolean rules to allow for some boolean reasonig. *)
+  (* Signature.
+     mcheck(msig(m, k), pk(k)) -> true *)
+  let mk_sig msig mcheck pk =
+    let m, k = mk_var (), mk_var () in
+    let t_pk = cfun pk [k] in
+    ( cfun mcheck [cfun msig [m; k]; t_pk], t_true )
+
+  (* Simple Boolean rules to allow for some boolean reasonnig. *)
   let mk_simpl_bool () =
     let u, v, t = mk_var (), mk_var (), mk_var () in
     let and_rules = [( cfun Term.f_and [t_true; u]), u;
@@ -554,7 +560,7 @@ module Unify = struct
           aux sigma (v :: occurs) (Imap.find v sigma)
         else cvar v in
 
-    aux sigma [] t
+    try aux sigma [] t with Unify_cycle -> assert false
 
   let rec unify_aux eqs sigma = match eqs with
     | [] -> Mgu sigma
@@ -568,9 +574,10 @@ module Unify = struct
 
       | Ccst a, Ccst b -> if a = b then unify_aux eqs' sigma else No_mgu
 
-      | Cvar x, t | t, Cvar x ->
+      | (Cvar x as tx), t | t, (Cvar x as tx) ->
         assert (not (Imap.mem x sigma));
-        unify_aux eqs' (Imap.add x t sigma)
+        let sigma = if t = tx then sigma else Imap.add x t sigma in
+        unify_aux eqs' sigma
 
       | _ ->  No_mgu
 
@@ -596,7 +603,8 @@ end = struct
 
   (* Try to superpose two rules at head position, and add a new equality to get
       local confluence if necessary. *)
-  let head_superpose state (l,r) (l',r') = match Unify.unify state l l' with
+  let head_superpose state (l,r) (l',r') =
+    match Unify.unify state l l' with
     | Unify.No_mgu -> state
     | Unify.Mgu sigma ->
       match Unify.subst_apply r sigma, Unify.subst_apply r' sigma with
@@ -821,13 +829,18 @@ let rec normalize_csts state = function
     is joined by replacing (R2) by:
     f(b + c) -> d *)
 let finalize_completion state =
-  { state with
-    grnd_rules = List.map (fun (t,c) ->
-        (normalize_csts state t, c)
-      ) state.grnd_rules;
-    e_rules = List.map (fun (t,s) ->
+  let grnds =
+    List.map (fun (t,c) -> (normalize_csts state t, c)) state.grnd_rules
+    |> List.sort_uniq Pervasives.compare in
+  let erules =
+    List.map (fun (t,s) ->
         (normalize_csts state t, normalize_csts state s)
-      ) state.e_rules;
+      ) state.e_rules
+    |> List.sort_uniq Pervasives.compare in
+
+  { state with
+    grnd_rules = grnds;
+    e_rules = erules;
     completed = true }
 
 let rec complete_state state =
@@ -847,6 +860,51 @@ let rec complete_state state =
   else state
 
 
+let check_zero_arity fname =
+  assert (fst (Symbols.Function.get_def fname) = 0)
+
+let check_zero_arities fnames =
+  List.iter check_zero_arity fnames
+
+let dec_pk f1 f2 =
+  match Symbols.Function.get_def f1, Symbols.Function.get_def f2 with
+  | (_, Symbols.ADec), (_, Symbols.PublicKey) -> f1, f2
+  | (_, Symbols.PublicKey), (_, Symbols.ADec) -> f2, f1
+  | _ -> assert false
+
+let sig_pk f1 f2 =
+  match Symbols.Function.get_def f1, Symbols.Function.get_def f2 with
+  | (_, Symbols.Sign), (_, Symbols.PublicKey) -> f1, f2
+  | (_, Symbols.PublicKey), (_, Symbols.Sign) -> f2, f1
+  | _ -> assert false
+
+let is_sdec f =
+  assert (snd (Symbols.Function.get_def f) = Symbols.SDec)
+    
+let init_erules () =
+  Symbols.Function.fold (fun fname def data erules -> match def, data with
+      | (_, Symbols.AEnc), Symbols.AssociatedFunctions [f1; f2] ->
+        let dec, pk = dec_pk f1 f2 in
+        (* We only allow an index arity of zero for crypto primitives *)
+        check_zero_arities [fname; dec; pk];
+        (Theories.mk_aenc (fname,[]) (dec,[]) (pk,[])) :: erules
+
+      | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
+        is_sdec sdec;
+        (* We only allow an index arity of zero for crypto primitives *)
+        check_zero_arities [fname; sdec];
+        (Theories.mk_senc (fname,[]) (sdec,[])) :: erules
+
+      | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
+        let msig, pk = sig_pk f1 f2 in
+        (* We only allow an index arity of zero for crypto primitives *)
+        check_zero_arities [fname; msig; pk];
+        (Theories.mk_sig (msig, []) (fname,[]) (pk,[])) :: erules
+
+      | _ -> erules
+    )
+    (Theories.mk_pair 2 Term.f_pair [Term.f_fst;Term.f_snd])
+
 let complete_cterms (l : (cterm * cterm) list) : state =
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
@@ -858,8 +916,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
                 grnd_rules = grnd_rules;
                 xor_rules = xor_rules;
                 sat_xor_rules = None;
-                e_rules =
-                  Theories.mk_pair 2 Term.f_pair [Term.f_fst;Term.f_snd];
+                e_rules = init_erules ();
                 completed = false  } in
   
   complete_state state
@@ -874,7 +931,7 @@ let complete (l : (Term.message * Term.message) list) : state =
       []
       l
   in
-  complete_cterms l
+  complete_cterms l 
 
 
 (****************)

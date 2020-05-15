@@ -93,29 +93,39 @@ Proof.
   expand cond@R1(r,i).
 
   assert (nt(i,t) = fst(input@R1(r,i))).
-  fresh M4.
+  fresh M5.
   depends T(i,t), T2(i,t).
 
-  assert (nr(r) = input@T(i,t)).
-  fresh M4.
-  depends R(r), R1(r,i).
-  depends R(r), R2(r).
-
-  depends R(r), R1(r,i1).
+  (* TODO I do not understand the fixes I had to do next,
+     the proof used to be simpler: investigate and simplify *)
 
   assert exec@R1(r,i).
-  executable T(i,t).
+  executable T1(i,t).
   apply H1 to R1(r,i).
   assert cond@R1(r,i).
   expand exec@R1(r,i).
   expand cond@R1(r,i).
 
+  assert (nr(r) = input@T(i,t)).
+  fresh M4.
+  depends R(r), R2(r).
+  depends R(r), R1(r,i1).
+
   repeat split.
   depends T(i,t), T1(i,t).
   assert (nt(i,t) = fst(input@R1(r,i))).
-  fresh M5.
+  fresh M4.
   depends T(i,t), T2(i,t).
   depends T(i,t), T1(i,t).
+
+  assert exec@R1(r,i).
+  executable T1(i,t).
+  apply H1 to R1(r,i).
+  depends T(i,t),T1(i,t).
+  assert cond@R1(r,i).
+  expand exec@R1(r,i).
+  expand cond@R1(r,i).
+
   depends R(r), R1(r,i).
 Qed.
 
