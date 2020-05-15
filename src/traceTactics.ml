@@ -1340,6 +1340,110 @@ let () =
            \n Usage: assert f."
     tac_assert
 
+(** [fa s] handles some goals whose conclusion formula is of the form
+  * [C(u_1..uN) = C(v_1..v_N)] and reduced them to the subgoals with
+  * conclusions [u_i=v_i]. We only implement it for the constructions
+  * [C] that congruence closure does not support: conditionals,
+  * sequences, etc. *)
+let fa s sk fk =
+  let unsupported () =
+    Tactics.(soft_failure (Failure "equality expected")) in
+  match TraceSequent.get_conclusion s with
+    | Term.Atom (`Message (`Eq,u,v)) ->
+        begin match u,v with
+
+          | Term.ITE (c,t,e), Term.ITE (c',t',e') ->
+            let subgoals =
+              [ TraceSequent.set_conclusion (Term.mk_impl c c') s ;
+                TraceSequent.set_conclusion (Term.mk_impl c' c) s ;
+                TraceSequent.set_conclusion
+                  (Term.Atom (`Message (`Eq,t,t'))) s ;
+                TraceSequent.set_conclusion
+                  (Term.Atom (`Message (`Eq,e,e'))) s ]
+            in
+            sk subgoals fk
+
+          | Term.Seq (vars,t),
+            Term.Seq (vars',t') when vars = vars' ->
+            let env = ref (TraceSequent.get_env s) in
+            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let s = TraceSequent.set_env !env s in
+            let subst =
+              List.map2
+                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                vars vars'
+            in
+            let t = Term.subst subst t in
+            let t' = Term.subst subst t' in
+            let subgoals =
+              [ TraceSequent.set_conclusion
+                  (Term.Atom (`Message (`Eq,t,t'))) s ]
+            in
+            sk subgoals fk
+
+          | Term.Find (vars,c,t,e),
+            Term.Find (vars',c',t',e') when vars = vars' ->
+
+            (* We could simply verify that [e = e'],
+             * and that [t = t'] and [c <=> c'] for fresh index variables.
+             *
+             * We do something more general for the conditions,
+             * which is useful for cases arising from diff-equivalence
+             * where some indices are unused on one side:
+             *
+             * Assume [vars = used@unused]
+             * where [unusued] variables are unused in [c] and [t].
+             *
+             * We verify that [forall used. (c <=> exists unused. c')]:
+             * this ensures that if one find succeeds, the other does
+             * too, and also that the selected indices will match
+             * except for the [unused] indices on the left, which does
+             * not matter since they do not appear in [t]. *)
+
+            (* Refresh bound variables. *)
+            let env = ref (TraceSequent.get_env s) in
+            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let s = TraceSequent.set_env !env s in
+            let subst =
+              List.map2
+                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                vars vars'
+            in
+            let c = Term.subst subst c in
+            let c' = Term.subst subst c' in
+            let t = Term.subst subst t in
+            let t' = Term.subst subst t' in
+
+            (* Extract unused variables. *)
+            let used,unused =
+              let occ_vars = Term.get_vars c @ Term.get_vars t in
+              let vars = List.map (fun i -> Vars.EVar i) vars in
+              List.partition
+                (fun v -> List.mem v occ_vars)
+                vars
+            in
+
+            let subgoals =
+              [ TraceSequent.set_conclusion
+                  (Term.mk_impl c (Term.mk_exists unused c')) s ;
+                TraceSequent.set_conclusion (Term.mk_impl c' c) s ;
+                TraceSequent.set_conclusion
+                  (Term.Atom (`Message (`Eq,t,t'))) s ;
+                TraceSequent.set_conclusion
+                  (Term.Atom (`Message (`Eq,e,e'))) s ]
+            in
+            sk subgoals fk
+
+          | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
+        end
+    | _ -> unsupported ()
+
+let () =
+  T.register "fa"
+    ~help:"Break down some conclusion equalities into the equalities \
+           of their subterms."
+    fa
+
 (** [collision_resistance judge sk fk] collects all equalities between
   * hashes that occur at toplevel in message hypotheses,
   * and adds the equalities of the messages hashed with the same key. *)
