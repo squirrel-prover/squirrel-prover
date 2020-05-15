@@ -7,6 +7,10 @@ name key': index->index->message
 name nr : index->message
 name nt : index->index->message
 
+name dummy : message
+axiom len_id : forall (i:index) len(id(i)) = len(dummy)
+axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
+
 hash H
 
 abstract tag0 : message
@@ -56,9 +60,13 @@ Proof.
   prf 2. yesif 2.
     apply tags_neq; split; project.
   xor 2, n_PRF.
+  yesif 2.
+  apply len_id to i; apply len_id' to i,t; namelength n_PRF,dummy.
   (* Case of tag1 hashes will be similar but will use tags_neq *)
   expandall. fa 1. fa 2.
   prf 2. yesif 2.
     apply tags_neq; split; project.
   xor 2, n_PRF1.
+  yesif 2.
+  apply len_id to i; apply len_id' to i,t; namelength n_PRF1,dummy.
 Qed.
