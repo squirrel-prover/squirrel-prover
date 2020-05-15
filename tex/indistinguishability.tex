@@ -1,3 +1,9 @@
+% Move to macros.tex
+\newcommand{\lreach}[1]{\textsf{l-reach}(#1)}
+\newcommand{\rreach}[1]{\textsf{r-reach}(#1)}
+\newcommand{\phifresh}[3]{\textsf{n-fresh}_{#1}(#2; #3)}
+\newcommand{\phihfresh}[4]{\textsf{h-fresh}_{#1}^{#2}(#3; #4)}
+
 \section{Indistinguishability}
 
 \newcommand{\pair}[1]{\langle #1 \rangle}
@@ -44,24 +50,41 @@
 % and ask for indistinguishability only for each trace.
 
 \begin{definition}
-  A meta-logic equivalence formula is an element of the form $\vec{u} \sim \vec{v}$, where $\vec{u}$ and $\vec{v}$ are two vectors of terms of the meta-logic of the same length.
+  A meta-logic equivalence formula is an element of the form $\pvec{u} \sim \pvec{v}$, where $\pvec{u}$ and $\pvec{v}$ are two vectors of terms of the meta-logic of the same length.
 \end{definition}
-
 
 \begin{definition}
-  Let $\vec{u} \sim \vec{v}$ be a meta-formula equivalence formula. Then for every trace model $\TM$, computational model $\Mo$ and interpretation $\sigma$, $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$ if $\Mo, \sigma \models \interp{\vec{u}}{\TM}{\calp} \sim \interp{\vec{v}}{\TM}{\calp}$.
-
-  We say that $\vec{u} \sim \vec{v}$ is valid if $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$ for every $\TM$, $\Mo$, $\sigma$. Finally, for any set of meta-formulas $S$, $S \models \vec{u} \sim \vec{v}$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models S$, we have $\TM, \Mo, \sigma \models \vec{u} \sim \vec{v}$.
+  Two protocoles $\calp_1$ and $\calp_2$, defined over the same signature, are compatible if \adrien{todo}.
 \end{definition}
 
+\begin{lemma}
+  If $\calp_1$ and $\calp_2$ are compatible then they have the same trace models.
+\end{lemma}
+
+\begin{definition}
+  Let $\calp_1$ and $\calp_2$ be two compatoble protocoles, and $\pvec{u} \sim \pvec{v}$ be a meta-formula equivalence formula. Then, for every $\calp_1$-trace model $\TM$, computational model $\Mo$ and interpretation~$\sigma$:
+  \begin{align*}
+    \TM, \Mo, \sigma \models_{\calp_1,\calp_2}
+    \pvec{u} \sim \pvec{v}
+    &&\text{ iff }&&
+    \Mo, \sigma \models
+    \interp{\pvec{u}}{\TM}{\calp_1} \sim \interp{\pvec{v}}{\TM}{\calp_2}
+  \end{align*}
+  Moreover, we say that $\pvec{u} \sim \pvec{v}$ is $(\calp_1,\calp_2)$-valid if $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ for every $\TM$, $\Mo$, $\sigma$.
+
+  Finally, for any set of meta-formulas $S$, $S \models \pvec{u} \sim \pvec{v}$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} S$, we have $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$.
+\end{definition}
+
+\adrien{explain how we use bi-protocols as syntactic suger for pairs of compatible protocols?}
+
 \subsection{Straightforward diff-equivalence}
-\adrien{I am not sure exactly what we want to say in this subsection. I left it as is.}
+\adrien{I am not sure exactly what we want to say in this subsection. I left it mostly as is.}
 
 We define the diff-equivalence of a process, by asking the equivalence of the projected frames for all possible traces.
 
 \begin{definition}
   \label{def:process-equiv}
-  A bi-process $\calp$ is diff-equivalent when,
+  A bi-protocol $\calp$ is diff-equivalent when,
   for any $\calp$-trace model $\TM$, the formula
 
   \[
@@ -76,14 +99,14 @@ We define the diff-equivalence of a process, by asking the equivalence of the pr
 \charlie{Notice that we could also extend $\interp{\phi}{\TM}{\calp}$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
 Note that this equivalence cannot hold if there exists a trace
 whose probability of execution significantly differs between the two
-projections of the bi-process.
+projections of the bi-protocol.
 Hence this imposes a form of synchronization on the execution of
-conditionals on the two sides of bi-processes.
+conditionals on the two sides of bi-protocoles.
 The interest of imposing this artificial constraint is that we
 can stop considering executions where one process goes to $\mythen$
 branch while the other goes to its $\myelse$ branch. \adrien{The constraint is not artificial. Indeed, since the actions are visible, the adversary sees whether the process is going right or left. There is no loss of generality there.}
 \begin{lemma}
-  A bi-process $\calp$ is diff-equivalent if,
+  A bi-protocol $\calp$ is diff-equivalent if,
   for any $\calp$-trace model $\TM$, the formula
 
   \[
@@ -100,21 +123,21 @@ branch while the other goes to its $\myelse$ branch. \adrien{The constraint is n
 \newcommand{\Out}{\mathsf{out}}
 
 \begin{example}
-  Consider the bi-process
+  Consider the bi-protocol
   $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,m)$
   where $n$ and $m$ are arbitrary, possibly equal names.
   Its two projections are indistinguishable, but the
-  bi-process is not diff-equivalent.
+  bi-protocol is not diff-equivalent.
   \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
   Indeed we have
   $\myif g()=0 \mythen \Out(c,n) \not\sim
   \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
   $g()=0$ to distinguish the two sides.
-  Our bi-process can however easily be
+  Our bi-protocol can however easily be
   rewritten into a diff-equivalent process, e.g. by pushing the conditional
   inside the output.
 
-  If we modify our bi-process into
+  If we modify our bi-protocol into
   $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,0)$
   then the two projections become distinguishable.
   The attack is obtained with an execution
@@ -130,11 +153,11 @@ and indistinguishability, because observable actions coincide with symbolic
 actions.
 
 \begin{example} \label{ex:negl}
-  Consider the bi-process
+  Consider the bi-protocol
   $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
   It is diff-equivalent, and its projections are
   indistinguishable as expected.
-  In the bi-process, the condition $x=\diff{n}{m}$ does not pass
+  In the bi-protocol, the condition $x=\diff{n}{m}$ does not pass
   with the same inputs on the left and right, but it passes with
   the same negligible probability.
 \end{example}
@@ -143,7 +166,7 @@ actions.
   Consider
   $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
   where $(t)_0$ denotes the first bit of $t$.
-  This bi-process is not diff-equivalent because
+  This bi-protocol is not diff-equivalent because
   $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$, and
   the two projections are distinguishable for the same
   reason: the attacker sends $0$;
@@ -169,16 +192,16 @@ actions.
 We extend our sequent calculus with rules to prove the equivalence formulas of the meta-logic.
 
 \begin{definition}
-  Let $\calp$ be a protocol. An equivalence sequent $\Gamma \vdash_{\calp} \vec{t}_L \sim \vec{t}_R$ comprises a set of hypotheses $\Gamma$ and a goal $\vec{t}_L \sim \vec{t}_R$, where $\Gamma$ and $\vec{t}_L \sim \vec{t}_R$ are all equivalence formulas of the meta-logic.
+  Let $\calp_1,\calp_2$ be compatible protocols. An equivalence sequent $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ comprises a set of hypotheses $\Gamma$ and a goal $\pvec{u} \sim \pvec{v}$, where $\Gamma$ and $\pvec{u} \sim \pvec{v}$ are all equivalence formulas of the meta-logic.
 
-  The sequent  $\Gamma \vdash_{\calp} \vec{t}_L \sim \vec{t}_R$ is valid whenever $\Gamma \models \vec{t}_L \sim \vec{t}_R$ is valid.
+  The sequent  $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is valid whenever $\Gamma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is $(\calp_1,\calp_2)$-valid.
 \end{definition}
 
 \begin{lemma}
-  A bi-process $\calp$ is diff-equivalent if and only if
+  A bi-protocol $\calp$ is diff-equivalent if and only if
   \[
     \mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau)
-    \vdash_{\calp}
+    \vdash_{\calp_1,\calp_2}
     \mframe^L@\tau \sim \mframe^R@\tau
   \]
 \end{lemma}
@@ -187,7 +210,7 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 \end{proof}
 
 % \begin{lemma}
-%   A bi-process is diff-equivalent if and only if,
+%   A bi-protocol is diff-equivalent if and only if,
 %   \[ \emptyset \vdash  \mframe^L@\tau \sim \mframe^R@\tau\]
 %   Equivalently, is it diff-equivalent if and only if:
 %   \[\mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau) \vdash \mframe^L@\tau \sim \mframe^R@\tau\]
@@ -209,89 +232,99 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 
 Adding the execution condition to the sequent is also a valid proof technique.
 \begin{lemma}
-  A bi-process $\calp$ is diff-equivalent if,
-  \[ \emptyset \vdash_{\calp}  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
-  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash_{\calp}  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
+  A bi-protocol $\calp$ is diff-equivalent if,
+  \[ \emptyset \vdash_{\calp_1,\calp_2}  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
+  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash_{\calp_1,\calp_2}  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
 \end{lemma}
-We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent calculus.
+
+
+We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These rules are independent of the protocoles $\calp_1,\calp_2$. Note that:
+\begin{itemize}
+\item the rule $\textsc{Sym}$ swaps the two protocols.
+\item the $\textsc{Refl}$ rule checks that the term $t$ is macro-free, which ensures that $\interp{\pvec{t}}{\TM}{\calp_1}$ and $\interp{\pvec{t}}{\TM}{\calp_2}$ are \emph{syntactically} the same (base logic) terms in any $\calp_1$-trace model $\TM$.
+\item the rule $\textsc{Trans}$ introduces an intermediate protocol $\calp_3$ which must be compatible with $\calp_1$ and $\calp_2$.
+\end{itemize}
+
+\adrien{explain that, in the tool, we fix the protocols. Hence $\textsc{Sym}$ and $\textsc{Trans}$ are not implemented.}
+
 
 \begin{figure}
   \begin{mathpar}
     \inferrule[Expand]{
-      \Gamma \vdash_{\calp} t_L \sim t_R
-    }{\Gamma \cup \phi \vdash_{\calp} t_L \sim t_R}
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
+    }{\Gamma \cup \phi \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}}
 
     \inferrule[F-Cut]{
-      \Gamma \vdash_{\calp} \phi\\      
-      \Gamma \cup \phi \vdash_{\calp} t^L \sim t^R
+      \Gamma \vdash_{\calp_1,\calp_2} \phi\\      
+      \Gamma \cup \phi \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }{
-      \Gamma \vdash_{\calp} t^L \sim t^R
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }
 
     \inferrule[Sym]{
-      \Gamma \vdash_{\calp} t_L \sim t_R
-    }{\Gamma \vdash_{\calp} t_R \sim t_L}
+      \Gamma \vdash_{\calp_2,\calp_1} \pvec{u} \sim \pvec{v}
+    }{\Gamma \vdash_{\calp_1,\calp_2} \pvec{v} \sim \pvec{u}}
 
     \inferrule[Refl]{~}
-    { \Gamma \vdash_{\calp} t \sim t }
+    { \Gamma \vdash_{\calp_1,\calp_2} \pvec{t} \sim \pvec{t} }
+    \quad\text{$\pvec{t}$ are macro-free}
 
     \inferrule[Trans]{
-      \Gamma \vdash_{\calp} t_L \sim t_R\\
-      \Gamma \vdash_{\calp} t_R \sim t_S
-    }{\Gamma \vdash_{\calp} t_L \sim t_S}
-
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{t}\\
+      \Gamma \vdash_{\calp_1,\calp_3} \pvec{t} \sim \pvec{v}
+    }{\Gamma \vdash_{\calp_1,\calp_3} \pvec{u} \sim \pvec{v}}
+    \quad\text{$\calp_1,\calp_2,\calp_3$ are compatible}
+    
     \inferrule[Subst]{
-      \Gamma \cup \{t_1 \deq t_2\sim \true \}  \vdash_{\calp} t^L \sim t^R
+      \Gamma \cup \{t_1 \deq t_2\sim \true \}  \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }{
-      \Gamma \cup \{t_1 \deq t_2\sim \true \} \vdash_{\calp}
-      t^L[ t_1 / t_2] \sim  t^R[ t_1 / t_2]
+      \Gamma \cup \{t_1 \deq t_2\sim \true \} \vdash_{\calp_1,\calp_2}
+      \pvec{u}[ t_1 / t_2] \sim  \pvec{v}[ t_1 / t_2]
     }
 
     \inferrule[if-reach]{
-      \phi \vdash_{\calp} \false
+      \phi \vdash_{\calp_1,\calp_2} \false
     }{
-      \Gamma  \vdash_{\calp} \myif \phi \mythen t_L \sim  \myif \phi \mythen t_R
+      \Gamma  \vdash_{\calp_1,\calp_2} \myif \phi \mythen {u} \sim  \myif \phi \mythen {v}
     }
 
     \inferrule[if-equiv]{
-      \phi \vdash_{\calp} \psi \Leftrightarrow \psi'
+      \phi \vdash_{\calp_1,\calp_2} \psi \Leftrightarrow \psi'
     }{
-      \Gamma \vdash_{\calp}
+      \Gamma \vdash_{\calp_1,\calp_2}
       \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
     }
 
     \inferrule[${\lnot}$-R]{
-      \Gamma \vdash_{\calp} \false \sim \true
+      \Gamma \vdash_{\calp_1,\calp_2} \false \sim \true
     }{
-      \Gamma \vdash_{\calp} t^L \sim t^R
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }
 
     \inferrule[fresh]{
       n,m \not \in \Gamma
     }{
-      \Gamma \vdash_{\calp} n \sim m
+      \Gamma \vdash_{\calp_1,\calp_2} n \sim m
     }
 
     \inferrule[if-weak]{
-      \Gamma \vdash_{\calp} \phi, t_L \sim \phi, t_R
+      \Gamma \vdash_{\calp_1,\calp_2} \phi, \pvec{u} \sim \phi, \pvec{v}
     }{
-      \Gamma \vdash_{\calp} \myif  \phi \mythen t_L \sim \myif \phi \mythen t_R
+      \Gamma \vdash_{\calp_1,\calp_2} \myif  \phi \mythen \pvec{u} \sim \myif \phi \mythen \pvec{v}
     }
 
     \inferrule[Dup]{
-      \Gamma \vdash_{\calp} t^L,u \sim t^R,v
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u},s \sim \pvec{v},t
     }{
-      \Gamma \vdash_{\calp} t^L,u,u \sim t^R,v,v
+      \Gamma \vdash_{\calp_1,\calp_2} \pvec{u},s,s \sim \pvec{v},t,t
     }
   \end{mathpar}
-
-  \caption{Generic inference rules for indistinguishability}
+  \caption{Generic inference rules for indistinguishability.}
   \label{fig:lk-ind}
 \end{figure}
+
 \begin{lemma}
   The rules presented in Figure~\ref{fig:lk-ind} are sound.
-
-
 \end{lemma}
 
 \paragraph{Other rules.}
@@ -299,144 +332,257 @@ We provide in \cref{fig:lk-ind} a set of sound rules for this second sequent cal
 \Cref{fig:fresh,fig:prf,fig:xor} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
-\item $\Gamma \vdash_{\calp} u$ stands for $\Gamma^L \sim \Gamma^R \vdash_{\calp} u^L \sim u^R$
+\item $\Gamma \vdash_{\calp_1,\calp_2} u$ stands for $\Gamma^L \sim \Gamma^R \vdash_{\calp_1,\calp_2} u^L \sim u^R$
 \item $A \in S$ stands for every action in the system (or protocol)
-\item $A(\vec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\vec k)$ (outputs, updates and conditions)
+\item $A(\pvec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\pvec k)$ (outputs, updates and conditions)
 \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
-\item indices $\vec i$ in $A(\vec i)$ are chosen fresh with relation to the appropriate environment (i.e. indices appearing in $u, C, t, k, \vec {j_0}$)
+\item indices $\pvec i$ in $A(\pvec i)$ are chosen fresh with relation to the appropriate environment (i.e. indices appearing in $u, C, t, k, \pvec {j_0}$)
 \end{itemize}
 
 \begin{figure}[h]
-  \begin{mathpar}
-    \inferrule[Fresh]{
-      \Gamma \vdash_{\calp} u, C[\myif \phi_L \wedge \phi_R \mythen 0 \myelse n(\vec {j_0})]
-    }{
-      \Gamma \vdash_{\calp} u, C[n(\vec {j_0})]
-    }
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec {j}) \in u^L,C^L} \vec {j} \neq {\vec {j_0}^L} \big)
-    \wedge
-    \big(
-    \displaystyle\bigwedge_{A \in S}
-    \forall \vec i \
-    \big(\displaystyle\bigvee_{\tau \in u^L,C^L} A(\vec i) \leq \tau \big)
-    \Rightarrow
-    \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}^L} \big)
-    \big)
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
-  \end{mathpar}
-  \caption{Fresh rule.\solene{Not yet implemented with the context $C$.}}
-  \label{fig:fresh}
+  \textbf{Fresh rule:}
+  {\small\[\arraycolsep=10pt
+      \begin{array}{|c|c|}
+        \hline
+        \text{Base logic Rule} &
+        \text{Meta-logic Rule}\\
+        \hline
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        % Fresh
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        \inferrule{
+          \Gamma \vdash \pvec{u}, C[0] \sim \pvec{v}, C[0]
+        }{
+          \Gamma \vdash \pvec{u}, C[\mathsf{n}] \sim \pvec{v}, C[\mathsf{n}']
+        }
+        &        
+        \inferrule{
+          \Gamma \vdash_{\calp_1,\calp_2}
+          {\begin{alignedat}[t]{2}
+              &
+              \pvec{u},
+              C\big[
+              \myif \phifresh{\calp_1}{\mathsf{n}[\pvec{i}]}{\pvec{u},C}
+              \mythen 0 \myelse \mathsf{n}[\pvec{i}]
+              \big]\\
+              \sim\;\;&
+              \pvec{v},
+              C\big[
+              \myif \phifresh{\calp_2}{\mathsf{n}'[\pvec{i}']}{\pvec{v},C}
+              \mythen 0 \myelse \mathsf{n}'[\pvec{i}']
+              \big]
+            \end{alignedat}}
+        }{
+          \Gamma \vdash_{\calp_1,\calp_2}
+          \pvec{u}, C[\mathsf{n}[\pvec{i}]] \sim \pvec{v}, C[\mathsf{n}'[\pvec{i}']]
+        }\\[2em]
+        \text{where }
+        \mathsf{n} \not \in \st(\pvec{u},C)
+        \text{ and }
+        \mathsf{n}' \not \in \st(\pvec{v},C)
+        &
+        \text{where }
+        \begin{alignedat}[t]{2}
+          &\phifresh{\calp}{\mathsf{n}[\pvec{i}]}{\pvec{u}}
+          &\;\;\overset{def}{=}\;\;&
+          \quad
+          \bigwedge_{\mathclap{(\mathsf{n}[\pvec{j}],\pvec{j},c) \in \ost_{\calp}(\pvec{u})}}
+          \quad
+          \forall \pvec{j}, c \rightarrow \pvec{i} \ne \pvec{j}
+        \end{alignedat}
+        \\\hline
+      \end{array}
+    \]}
+
+  \textbf{PRF Rule:}
+  {\small\[\arraycolsep=10pt
+      \begin{array}{|c|c|}
+        \hline
+        \text{Base logic Rule} &
+        \text{Meta-logic Rule}\\
+        \hline
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        % PRF
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        \inferrule{
+          \Gamma \vdash
+          \pvec{u},
+          C\Big[\;
+          {\begin{alignedat}[c]{1}
+              \myif \phihfresh{}{\mathsf{k}}{t}{\pvec{u},C,t}
+              &\mythen \mathsf{n}\\[-0.5em] &\myelse h(t,\mathsf{k})
+            \end{alignedat}}
+          \;\Big]
+          \sim
+          \pvec{v}, s
+        }{
+          \Gamma \vdash
+          \pvec{u}, C[h(t,\mathsf{k})] \sim \pvec{v}, s
+        }
+        &
+        \inferrule{
+          \Gamma \vdash_{\calp_1,\calp_2}
+          \pvec{u},
+          C\Big[\;
+          {\begin{alignedat}[c]{1}
+              \myif \phihfresh{\calp_1}{\mathsf{k}[\pvec{i}]}{t}{\pvec{u},C,t}
+              &\mythen \mathsf{n}\\[-0.5em] &\myelse h(t,\mathsf{k}[\pvec{i}])
+            \end{alignedat}}
+          \;\Big]
+          \sim
+          \pvec{v}, s
+        }{
+          \Gamma \vdash_{\calp_1,\calp_2}
+          \pvec{u}, C[h(t,\mathsf{k}[\pvec{i}])] \sim \pvec{v}, s
+        }
+        \\[2em]
+        \text{when }
+        \mathsf{n} \text{ fresh},
+        \mathsf{k} \tpos_{h(\_,\cdot)} \st(\pvec{u},C,t)
+        &
+        \text{when }
+        \mathsf{n} \text{ fresh}, 
+        \mathsf{k} \tpos^{\calp_1}_{h(\_,\cdot)} \st(\pvec{u},C,t)
+        \\[1em]
+        \text{and }
+        \begin{alignedat}[t]{2}
+          &\phihfresh{}{\mathsf{k}}{t}{\pvec{u}}
+          &\;\;\overset{def}{=}\;\;&
+          \quad
+          \bigwedge_{\mathclap{h(m,\mathsf{k}) \in \st(\pvec{u})}}
+          \quad
+          m \ne t
+        \end{alignedat}
+        &
+        \text{and }
+        \begin{alignedat}[t]{2}
+          &\phihfresh{\calp}{\mathsf{k}[\pvec{i}]}{t}{\pvec{u}}
+          &\;\;\overset{def}{=}\;\;&
+          \quad
+          \bigwedge_{\mathclap{(h(m,\mathsf{k}[\pvec{i_0}]),\pvec{j},c) \in \ost_{\calp}(\pvec{u})}}
+          \quad
+          \forall \pvec{j},
+          (c \wedge \pvec{i} = \pvec{i_0})
+          \rightarrow m \ne t
+        \end{alignedat}
+        \\\hline
+      \end{array}
+    \]}
+
+  \textbf{XOR Rule:}
+  {\small
+    \[\arraycolsep=10pt
+      \begin{array}{|c|c|}
+        \hline
+        \text{Base logic Rule} &
+        \text{Meta-logic Rule}\\
+        \hline
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        % XOR
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        \inferrule{
+          \Gamma \vdash \mylen(t) = \mylen(\mathsf{n})\\\\
+          \Gamma \vdash
+          \pvec{u}, C[\mathsf{m}] \sim \pvec{v}, s
+        }{
+          \Gamma \vdash
+          \pvec{u}, C[t \oplus \mathsf{n}[\pvec{j}]] \sim \pvec{v}, s
+        }
+        &
+        \inferrule{
+          \lreach{\Gamma} \vdash_{\calp_1}
+          \mylen(t) = \mylen(\mathsf{n}[\pvec{j}])\\\\
+          \Gamma \vdash_{\calp_1,\calp_2}
+          \pvec{u},
+          C\Big[\;
+          {\begin{alignedat}[c]{1}
+              \myif \phifresh{\calp_1}{\mathsf{n}[\pvec{j}]}{\pvec{u},C,t}
+              &\mythen \mathsf{m}\\[-0.5em] &\myelse t \oplus \mathsf{n}[\pvec{j}]
+            \end{alignedat}}
+          \;\Big]
+          \sim
+          \pvec{v}, s
+        }{
+          \Gamma \vdash_{\calp_1,\calp_2}
+          \pvec{u}, C[t \oplus \mathsf{n}[\pvec{j}]] \sim \pvec{v}, s
+        }   
+        \\[2em]
+        \text{when }
+        \mathsf{m} \text{ fresh and }
+        \mathsf{n} \not \in \st(\pvec{u},C,t)
+        &
+        \text{when }
+        \mathsf{m} \text{ fresh and }
+        \begin{alignedat}[t]{2}
+          &\phifresh{\calp}{\mathsf{n}[\pvec{i}]}{\pvec{u}}
+          &\;\;\overset{def}{=}\;\;&
+          \quad
+          \bigwedge_{\mathclap{(\mathsf{n}[\pvec{j}],\pvec{j},c) \in \ost_{\calp}(\pvec{u})}}
+          \quad
+          \forall \pvec{j}, c \rightarrow \pvec{i} \ne \pvec{j}
+        \end{alignedat}
+        \\\hline
+      \end{array}
+    \]}
+
+  \adrien{I use the function $\lreach{\Gamma}$ in the XOR rule, which extracts from $\Gamma$ the \emph{left} reachability statements. If we keep it, I will add the definition.}
+  
+  \caption{Rules of the base logic, and corresponding meta-logic rules.}
+  \label{fig:rules-corresp-equiv}
 \end{figure}
 
-\begin{figure}[h]
-  \begin{mathpar}
-    \inferrule[PRF]{
-      \Gamma \vdash_{\calp} u, C[\myif \diff{\phi_L}{\phi_R} \mythen n \myelse \h(t,k(\vec {j_0}))]
-      \quad \quad
-      k(\_) \sqsubseteq_{\h(\_,\cdot)} u,C,A(\vec i)
-    }{
-      \Gamma \vdash_{\calp} u, C[\h(t,k(\vec {j_0}))]
-    }
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_L = \big( \displaystyle\bigwedge_{\h(m,k(\vec j)) \in u^L,C^L,t^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
-    \wedge
-    \big(
-    \displaystyle\bigwedge_{A \in S}
-    \forall \vec i \
-    \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) < \tau \big)
-    \Rightarrow
-    \big(\displaystyle\bigwedge_{\h(m,k(\vec j)) \in A(\vec i)^L} (\vec j = {\vec {j_0}}^L \Rightarrow t^L \neq m) \big)
-    \big)
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
-  \end{mathpar}
-  \caption{PRF rule.\solene{Not yet implemented with the context $C$.}}
-  \label{fig:prf}
-\end{figure}
-
-\begin{figure}[h]
-  \begin{mathpar}
-    \inferrule[XOR-ind]{
-      \Gamma \vdash_{\calp} u, C[\myif \phi_L \wedge \phi_R \mythen m \myelse t \oplus n(\vec {j_0})]
-    }{
-      \Gamma \vdash_{\calp} u, C[t \oplus n(\vec {j_0})]
-    }
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_L = \big( \displaystyle\bigwedge_{n^L(\vec j) \in u^L,C^L,t^L} \vec j \neq {\vec {j_0}}^L \big)
-    \wedge
-    \big(
-    \displaystyle\bigwedge_{A \in S}
-    \forall \vec i \
-    \big(\displaystyle\bigvee_{\tau \in u^L,C^L,t^L} A(\vec i) \leq \tau \big)
-    \Rightarrow
-    \big(\displaystyle\bigwedge_{n^L(\vec j) \in A(\vec i)^L} \vec j \neq {\vec {j_0}}^L \big)
-    \big)
-  \end{mathpar}
-  \begin{mathpar}
-    \phi_R = ... \ \text{(similar, replacing $L$ by $R$)}
-  \end{mathpar}
-  \caption{XOR-ind rule.\solene{Not yet implemented with the context $C$.}}
-  \label{fig:xor}
-\end{figure}
 
 \begin{figure}[h]
   \begin{mathpar}
     \inferrule[FA-DUP]{
       \inferrule{
-        \Gamma \vdash_{\calp} u,
-        \mframe @ \pre(A(\vec i)),
-        \mexec @ \pre(A(\vec i))
+        \Gamma \vdash_{\calp_1,\calp_2} u,
+        \mframe @ \pre(A(\pvec i)),
+        \mexec @ \pre(A(\pvec i))
       }{
-        \Gamma \vdash_{\calp} u,
-        \mframe @ \pre(A(\vec i)),
-        \myif \mexec @ \pre(A(\vec i)) \mythen \phi_{h} \myelse \bot
+        \Gamma \vdash_{\calp_1,\calp_2} u,
+        \mframe @ \pre(A(\pvec i)),
+        \myif \mexec @ \pre(A(\pvec i)) \mythen \phi_{h} \myelse \bot
       }
     }{
-      \Gamma \vdash_{\calp} u,
-      \mframe @ \pre(A(\vec i)),
-      \mexec @ \pre(A(\vec i)) \wedge \phi_{h}
+      \Gamma \vdash_{\calp_1,\calp_2} u,
+      \mframe @ \pre(A(\pvec i)),
+      \mexec @ \pre(A(\pvec i)) \wedge \phi_{h}
     }
   \end{mathpar}
 
-  We ask that $\phi_h \in H_{\{\pre(A(\vec i))\}}$ where, for any set of
+  We ask that $\phi_h \in H_{\{\pre(A(\pvec i))\}}$ where, for any set of
   timestamps $T$, $H_T$ is the least set of formulas and messages
   closed under function application, boolean connectives, and the
   following rules:
   $$ \inferrule{
-    B(\vec j) \in T
+    B(\pvec j) \in T
     \quad
-    \phi \in H_{T\cup\{C(\vec {k})\}}
+    \phi \in H_{T\cup\{C(\pvec {k})\}}
   }{
-    (\forall \vec k.~ C(\vec k)\leq B(\vec j) \Rightarrow \phi) \in H_T
+    (\forall \pvec k.~ C(\pvec k)\leq B(\pvec j) \Rightarrow \phi) \in H_T
   }
   \quad\quad
   \inferrule{
-    B(\vec j) \in T
+    B(\pvec j) \in T
     \quad
-    \phi \in H_{T\cup\{C(\vec k)\}}
+    \phi \in H_{T\cup\{C(\pvec k)\}}
   }{
-    (\exists \vec k.~ C(\vec k)\leq B(\vec j) \wedge \phi) \in H_T
+    (\exists \pvec k.~ C(\pvec k)\leq B(\pvec j) \wedge \phi) \in H_T
   }
   $$
-  $$\inferrule{B(\vec j) \in T}{
-    \minp @ B(\vec j) \in H_T
+  $$\inferrule{B(\pvec j) \in T}{
+    \minp @ B(\pvec j) \in H_T
   }\quad\quad
   \inferrule{ }{
-    \minp @ A(\vec i) \in H_T
+    \minp @ A(\pvec i) \in H_T
   }\quad\quad
-  \inferrule{B(\vec j) \in T}{
-    \mout @ B(\vec j) \in H_T
+  \inferrule{B(\pvec j) \in T}{
+    \mout @ B(\pvec j) \in H_T
   }$$
   $$
-  \inferrule{\phi \in H_T \quad B(\vec j) \in T}{
-    (\myif \mexec @ B(\vec j) \mythen \phi \myelse \psi) \in H_T}
+  \inferrule{\phi \in H_T \quad B(\pvec j) \in T}{
+    (\myif \mexec @ B(\pvec j) \mythen \phi \myelse \psi) \in H_T}
   $$
   \caption{FA-DUP rule.
   }
@@ -456,7 +602,7 @@ different information on that name.
 To prove diff-equivalence, it can be interesting to prove that:
 \[
   \phi^L_\tr, \phi^R_\tr
-  \vdash_{\calp}
+  \vdash_{\calp_1,\calp_2}
   \phi^L_\alpha \Leftrightarrow \phi^R_\alpha
 \]
 
@@ -468,11 +614,11 @@ The gap comes from the fact that we are requiring conditions to be
 synchronized for all random samplings.
 
 \begin{example}
-  With the bi-process of \cref{ex:negl} we would have to prove
-  $\vdash_{\calp} g() = n \Leftrightarrow g() = m$ and
-  $g()=n, g()=m \vdash_{\calp} \ok \sim \ok$, both of which hold.
-  With the bi-process of \cref{ex:sync} we would have to prove
-  $\vdash_{\calp} g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
+  With the bi-protocol of \cref{ex:negl} we would have to prove
+  $\vdash_{\calp_1,\calp_2} g() = n \Leftrightarrow g() = m$ and
+  $g()=n, g()=m \vdash_{\calp_1,\calp_2} \ok \sim \ok$, both of which hold.
+  With the bi-protocol of \cref{ex:sync} we would have to prove
+  $\vdash_{\calp_1,\calp_2} g() = (n)_0 \Leftrightarrow g() = (m)_0$ which does not hold.
 \end{example}
 
 \begin{example} \label{ex:indep}

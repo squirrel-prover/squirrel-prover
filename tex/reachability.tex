@@ -400,37 +400,16 @@ We can now state the meta-logic version of the $\eufcma$ rule of \cref{def:euf-b
     \inferrule{
       \textstyle
       \Gamma,
-      \bigvee_{(h(u,sk),\vec{i},c) \in \ost_{\calp}(t,m)}
-      \exists \vec{i},
+      \bigvee_{(h(u,\mathsf{k}[\pvec{j_0}]),\pvec{i},c) \in \ost_{\calp}(t,m)}
+      \exists \pvec{i},
+      \pvec{j_0} = \pvec{j} \wedge
       c \wedge u = m \vdash_{\calp} \phi
     }{
-      \Gamma, t=h(m,sk) \vdash_{\calp} \phi
+      \Gamma, t=h(m,\mathsf{k}[\pvec{j}]) \vdash_{\calp} \phi
     }
     \quad\text{ when }
-    sk \tpos^{\calp}_{h(\_,\cdot)} t,m
+    \mathsf{k} \tpos^{\calp}_{h(\_,\cdot)} t,m
   \]
-  % \begin{gather*}
-  %   \inferrule{
-  %     \textstyle
-  %     \Gamma,
-  %     \bigvee_{h(x,sk) \in \st(t)} m=x  \vdash_{\calp} \phi
-  %   }{
-  %     \Gamma, t=h(m,sk) \vdash_{\calp} \phi
-  %   }
-  %   \tag{if $t$ contains no macros}\\
-  %   \inferrule{
-  %     \textstyle
-  %     \Gamma,
-  %     \bigvee_{\sfa \in \calp_{\sfA}, \vec{i} \text{ fresh}}
-  %     \bigvee_{h(x,sk) \in o_{\sfa}[\pvec{i}] }
-  %     \big(
-  %     m=x \wedge \sfa(\vec{i}) < \tau\big)
-  %     \vdash_{\calp} \phi
-  %   }{
-  %     \Gamma, \minp@\tau=h(m,sk) \vdash_{\calp} \phi
-  %   }
-  %   \tag{macros case}
-  % \end{gather*}
 \end{proposition}
 
 \begin{proof}
