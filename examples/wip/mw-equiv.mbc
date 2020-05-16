@@ -217,10 +217,10 @@ equivalent
    then
    try find i,t such that
       exec@pred(R1(r)) &&
-      T(i,t) < R1(r) &&
-      fst(output@T(i,t)) = fst(input@R1(r)) &&
-      snd(output@T(i,t)) = snd(input@R1(r)) &&
-      R(r) < T(i,t) && output@R(r) = input@T(i,t)
+      (T(i,t) < R1(r) &&
+       fst(output@T(i,t)) = fst(input@R1(r)) &&
+       snd(output@T(i,t)) = snd(input@R1(r)) &&
+       R(r) < T(i,t) && output@R(r) = input@T(i,t))
    in
    if exec@pred(R1(r)) then
       xor(diff(id(i),id'(i,t)),
@@ -249,8 +249,13 @@ admit. (* TODO iftrue *)
 fa 1. fadup 0.
 fa 2. fadup 2.
 fa 2.
-admit 2. (* TODO fadup *)
+fadup 2.
 prf 2.
+(* TODO ifcond does too much here
+   we would perhaps do without it, and improve yesif instead:
+   inform yesif of which if we want to work on (position in parsing)
+   and show that the condition is true assuming the conditions of
+   the surrounding if *)
 ifcond 2, exec@pred(R1(r)).
 equivalent (if exec@pred(R1(r)) then diff(id(i),id'(i,t))), diff(id(i),id'(i,t)).
 admit. (* TODO ifcond *)

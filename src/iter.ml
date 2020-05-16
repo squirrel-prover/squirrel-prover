@@ -1,6 +1,18 @@
 open Term
 
-(** Iterate on all subfacts and subterms.
+let refresh vars =
+  List.map
+    (fun v ->
+       ESubst (Var v, Var (Vars.make_new_from v)))
+    vars
+
+let erefresh evars =
+  List.map
+    (function Vars.EVar v ->
+       ESubst (Var v, Var (Vars.make_new_from v)))
+    evars
+
+(** Iterate over all boolean and message subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~system = object (self)
@@ -11,32 +23,20 @@ class iter ~system = object (self)
 
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
-    | Macro ((mn, sort, is),l,a) ->
-        List.iter self#visit_message l ;
+    | Macro ((mn,sort,is),l,a) ->
+        if l<>[] then failwith "unsupported" ;
         self#visit_message (Macros.get_definition system sort mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | ITE (a, b, c) ->
         self#visit_formula a; self#visit_message b; self#visit_message c
     | Seq (a, b) ->
-        let subst =
-          List.map
-            (fun v -> ESubst (Var v,
-                              Var (Vars.make_new_from v)))
-            a
-        in
-        let b = Term.subst subst b in
+        let b = Term.subst (refresh a) b in
         self#visit_message b
     | Find (a, b, c, d) ->
-        let subst =
-          List.map
-            (fun v -> ESubst (Var v,
-                              Var (Vars.make_new_from v)))
-            a
-        in
+        let subst = refresh a in
         let b = Term.subst subst b in
         let c = Term.subst subst c in
-        let d = Term.subst subst d in
         self#visit_formula b; self#visit_message c; self#visit_message d
 
   method visit_formula (f:Term.formula) =
@@ -48,23 +48,70 @@ class iter ~system = object (self)
     | True | False -> ()
     | Diff(a, b) -> self#visit_formula a; self#visit_formula b
     | ForAll (vs,l) | Exists (vs,l) ->
-        let subst =
-          List.map
-            (function
-               | Vars.EVar v ->
-                   ESubst (Var v, Var (Vars.make_new_from v)))
-            vs
-        in
+        let subst = erefresh vs in
         let l = Term.subst subst l in
         self#visit_formula l
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
-    | Atom (`Index _) | Atom (`Timestamp _)-> ()
-    | Macro ((mn, Sorts.Boolean, is),[],a) ->
+    | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
+    | Macro ((mn,Sorts.Boolean,is),l,a) ->
+        if l<>[] then failwith "unsupported" ;
         self#visit_formula
           (Macros.get_definition system Sorts.Boolean mn is a)
-    | _ -> failwith "unsupported"
+    | Var _ -> ()
+
+end
+
+(** Fold over all boolean and message subterms.
+  * Bound variables are represented as newly generated fresh variables.
+  * When a macro is encountered, its expansion is visited as well.
+  * Note that [iter] could be obtained as a derived class of [fold],
+  * but this would break the way we modify the iteration using inheritance.  *)
+class ['a] fold ~system = object (self)
+
+  method fold_term (x:'a) t = match t with
+    | EquivSequent.Message e -> self#fold_message x e
+    | EquivSequent.Formula e -> self#fold_formula x e
+
+  method fold_message x t = match t with
+    | Fun (_, l) -> List.fold_left self#fold_message x l
+    | Macro ((mn,sort,is),l,a) ->
+        if l<>[] then failwith "unsupported" ;
+        self#fold_message x (Macros.get_definition system sort mn is a)
+    | Name _ | Var _ -> x
+    | Diff (a, b) -> self#fold_message (self#fold_message x a) b
+    | ITE (a, b, c) ->
+        self#fold_message (self#fold_message (self#fold_formula x a) b) c
+    | Seq (a, b) ->
+        let b = Term.subst (refresh a) b in
+        self#fold_message x b
+    | Find (a, b, c, d) ->
+        let subst = refresh a in
+        let b = Term.subst subst b in
+        let c = Term.subst subst c in
+        let d = Term.subst subst d in
+        self#fold_message (self#fold_message (self#fold_formula x b) c) d
+
+  method fold_formula x f =
+    match f with
+    | And (l,r) | Or (l,r) | Impl (l,r) ->
+        self#fold_formula (self#fold_formula x l) r
+    | Not f -> self#fold_formula x f
+    | True | False -> x
+    | Diff(a, b) -> self#fold_formula (self#fold_formula x a) b
+    | ForAll (vs,l) | Exists (vs,l) ->
+        let subst = erefresh vs in
+        let l = Term.subst subst l in
+        self#fold_formula x l
+    | Atom (`Message (_, t, t')) ->
+        self#fold_message (self#fold_message x t) t'
+    | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
+    | Macro ((mn,Sorts.Boolean,is),l,a) ->
+        if l<>[] then failwith "unsupported" ;
+        self#fold_formula x
+          (Macros.get_definition system Sorts.Boolean mn is a)
+    | Var _ -> x
 
 end
 

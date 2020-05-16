@@ -362,59 +362,69 @@ let fa_dup s sk fk =
 exception Not_FADUP_formula
 exception Not_FADUP_iter
 
-class iter_fadup ~(system:Action.system) exact tau = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system as super
+class check_fadup ~(system:Action.system) tau = object (self)
 
-  val mutable timestamps : Term.timestamp list = [Term.Pred tau]
+  inherit [Term.timestamp list] Iter.fold ~system as super
 
-  method update_timestamps exact phi =
-    (* We retrieve all timestamps atoms occurring in [f].
-     * If [exact] is true, then [f] must be a conjunction of timestamp atoms,
-     * otherwise [f] can contain other subterms. *)
-    let rec get_timestamps_atoms f = match f with
-      | Atom (`Timestamp _) as at -> [at]
-      | And (f1,f2) -> (get_timestamps_atoms f1) @ (get_timestamps_atoms f2)
-      | _ -> if exact then raise Not_FADUP_iter else []
+  method check_formula f = ignore (self#fold_formula [Term.Pred tau] f)
+
+  method extract_ts_atoms phi =
+    let rec conjuncts = function
+      | And (f,g) :: l -> conjuncts (f::g::l)
+      | f :: l -> f :: conjuncts l
+      | [] -> []
     in
-    timestamps <-
-      List.fold_left
-        (fun acc at -> match at with
-          | Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
-            if List.mem tau_2 acc
-            then tau_1::acc
-            else acc
-          | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
-            if (List.mem (Term.Pred tau_2) acc || List.mem tau_2 acc)
-            then tau_1::acc
-            else acc
-          | _ -> raise Not_FADUP_iter)
-        timestamps
-        (get_timestamps_atoms phi)
+    List.partition
+      (function Atom (`Timestamp _) -> true | _ -> false)
+      (conjuncts [phi])
 
-  method visit_message t = match t with
+  method add_atoms atoms timestamps =
+    List.fold_left
+      (fun acc at -> match at with
+        | Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+          if List.mem tau_2 acc
+          then tau_1::acc
+          else acc
+        | Atom (`Timestamp (`Lt,tau_1,tau_2)) ->
+          if (List.mem (Term.Pred tau_2) acc || List.mem tau_2 acc)
+          then tau_1::acc
+          else acc
+        | _ -> raise Not_FADUP_iter)
+      timestamps
+      atoms
+
+  method fold_message timestamps t = match t with
     | Macro (ms,[],a)
-      when ((ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
-            (ms = Term.out_macro && List.mem a timestamps))
-      -> ()
+      when (ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
+           (ms = Term.out_macro && List.mem a timestamps)
+      -> timestamps
     | ITE (Macro (ms,[],a), then_branch, _)
-      when (ms = Term.exec_macro && (List.mem a timestamps))
-      -> super#visit_message then_branch
-    | Macro _ | Name _ | Var _ | Diff _ | ITE _ | Seq _ | Find _
-      -> raise Not_FADUP_iter
-    | _ -> super#visit_message t
+      when ms = Term.exec_macro && List.mem a timestamps
+      -> self#fold_message timestamps then_branch
+    | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
+    | Fun _ | Seq _ | ITE _ | Find _ -> super#fold_message timestamps t
 
-  method visit_formula (f:Term.formula) =
+  method fold_formula timestamps (f:Term.formula) =
     match f with
-    | Atom (`Index _) | Atom (`Timestamp _) -> ()
-    | ForAll (_, Impl (phi_1,phi_2)) ->
-      (* [phi_1] must be a conjunction of timestamp atoms. *)
-      self#update_timestamps true phi_1 ;
-      super#visit_formula phi_2
-    | Exists (_, phi) ->
-      self#update_timestamps false phi ;
-      super#visit_formula phi
-    | Diff _ | Macro _ -> raise Not_FADUP_iter
-    | _ -> super#visit_formula f
+    | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
+    | Impl (phi_1,phi_2) ->
+      let atoms,l = self#extract_ts_atoms phi_1 in
+      let ts' = self#add_atoms atoms timestamps in
+      List.iter
+        (fun phi -> ignore (self#fold_formula ts' phi))
+        (phi_2::l) ;
+      timestamps
+    | And _ as phi ->
+      let atoms,l = self#extract_ts_atoms phi in
+      let ts' = self#add_atoms atoms timestamps in
+      List.iter
+        (fun phi -> ignore (self#fold_formula ts' phi))
+        l ;
+      timestamps
+    | Atom (`Happens _) | Var _ | Diff _ | Macro _ -> raise Not_FADUP_iter
+    | Atom (`Message _)
+    | Or _ | Not _ | ForAll _ | Exists _ -> super#fold_formula timestamps f
+    | True | False -> timestamps
 
 end
 
@@ -426,16 +436,26 @@ let fadup i s =
       begin try
         (* we expect that e is of the form exec@pred(tau) && phi *)
         let (tau,phi) =
-          match e with
-          | EquivSequent.Formula (Term.And (f,g)) ->
-            begin match f,g with
+          let f,g = match e with
+            | EquivSequent.Formula Term.And (f,g) -> f,g
+            | EquivSequent.Message Term.(Seq (vars,ITE (And (f,g),tt,ff)))
+              when Term.(tt = Fun (f_true,[]) && ff = Fun (f_false,[])) ->
+              let subst =
+                List.map
+                  (fun v ->
+                     ESubst (Var v, Var (Vars.make_new_from v)))
+                  vars
+              in
+              Term.subst subst f,
+              Term.subst subst g
+            | _ -> raise Not_FADUP_formula
+          in
+          match f,g with
             | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
               -> (tau,phi)
             | (phi, Term.Macro (fm,[], Term.Pred tau)) when fm = Term.exec_macro
               -> (tau,phi)
             | _ -> raise Not_FADUP_formula
-            end
-          | _ -> raise Not_FADUP_formula
         in
         let frame_at_pred_tau =
           EquivSequent.Message (Term.Macro (Term.frame_macro,[],Term.Pred tau))
@@ -444,8 +464,8 @@ let fadup i s =
         if List.mem frame_at_pred_tau biframe_without_e then
           (* we iterate over the formula phi to check if it contains only
            * allowed subterms *)
-          let iter = new iter_fadup ~system false tau in
-          List.iter iter#visit_formula [phi] ;
+          let iter = new check_fadup ~system tau in
+          iter#check_formula phi ;
           (* on success, we keep only exec@pred(tau) *)
           let new_elem =
             EquivSequent.Formula
