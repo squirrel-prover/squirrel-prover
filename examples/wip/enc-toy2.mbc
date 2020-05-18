@@ -1,6 +1,7 @@
 channel cA
 channel cB
 
+abstract cst:  message
 name kA : message
 name kB : message
 
@@ -10,6 +11,8 @@ name n0 : index -> message
 name r0 : index -> message
 name r1 : index -> message
 
+axiom len_n: forall (i:index) len(n0(i)) = cst
+(*axiom forall i len(n0(i)) = cst.*)
 
 process A(i:index) =
   out(cA,  enc(n0(i),r0(i),pk(diff(kA,kB))));
@@ -22,22 +25,25 @@ system !_i A(i).
 
 equiv test.
 Proof.
-(*  enrich pk(kA).
-  enrich pk(kB). *)
+ enrich pk(kA).
+  enrich pk(kB). 
  induction t. 
 
   expandall.
-  fa 1. fa 2. 
-  enckp 2.
-  cca1 2.
-  admit.
+  fa 3. fa 4. 
+  enckp 4.
+  cca1 4.
+  equivalent  len(n0(i)), cst.
+  apply len_n to i.
+
 
   expandall.
  fa 3.
  fa 4.
  enckp 4.
  cca1 4.
- admit.
+  equivalent  len(n0(i)), cst.
+  apply len_n to i.
 Qed.
 
 
