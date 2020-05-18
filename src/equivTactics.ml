@@ -1039,18 +1039,7 @@ let cca1 i s =
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
     let hide_enc enc fnenc m fnpk sk fndec r =
-            (* to check that the encryption is not under a dec, we replace the
-               enc by zero and check that dec does not occur inside the new
-               term. *)
-      if occurrences_of_frame ~system
-          (EquivSequent.apply_subst_frame
-             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
-          fndec sk
-         <> [] then
-        Tactics.soft_failure
-          (Tactics.Failure
-             "The first encryption symbols occurs under a decryption.");
-      (* we now check that the random is fresh, and the key satisfy the
+      (* we check that the random is fresh, and the key satisfy the
                side condition. *)
       begin
         try
@@ -1072,9 +1061,12 @@ let cca1 i s =
         with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
       end
     in
-    (* search for the first occurrence of  an asymmetric encryption in [e] *)
-    begin match (Iter.get_ftypes ~system e Symbols.AEnc)
-                @ (Iter.get_ftypes ~system e Symbols.SEnc)   with
+    (* search for the first occurrence of an asymmetric encryption in [e], that
+       do not occur under a decryption symbol. *)
+    begin match
+        (Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc)
+        @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc)
+      with
       | (Term.Fun ((fnenc,_), [m; Term.Name r;
                                     Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
               as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey
@@ -1146,17 +1138,6 @@ let enckp i s =
     in
     (* search for the first occurrence of a hash in [e] *)
     let hide_enc fnenc enc fndec sk fnpk r fnenci fnpki m isk=
-      (* to check that the encryption is not under a dec, we replace the
-         enc by zero and check that dec does not occur inside the new
-         term. *)
-      if occurrences_of_frame ~system
-          (EquivSequent.apply_subst_frame
-             [Term.ESubst (enc,Term.Fun (Term.f_zero,[]) )] [e])
-          fndec sk
-         <> [] then
-        Tactics.soft_failure
-          (Tactics.Failure
-             "The first encryption symbols occurs under a decryption.");
       (* we now check that the random is fresh, and the key satisfy the
          side condition. *)
       begin
@@ -1233,8 +1214,8 @@ let enckp i s =
                "Key Privact can only be applied on a term with at least one \
                 occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
     in
-    find_enc ((Iter.get_ftypes ~system e Symbols.AEnc)
-              @ (Iter.get_ftypes ~system e Symbols.SEnc))
+    find_enc ((Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc)
+        @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc))
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
 
