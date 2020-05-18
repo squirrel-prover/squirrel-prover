@@ -1,5 +1,6 @@
 channel cA
 channel cB
+channel cK
 
 name kA : message
 name kAbis : message
@@ -18,6 +19,12 @@ abstract plus : message -> message -> message
 
 axiom length : forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2))
 
+process Key =
+  out(cK, pk(kA));
+  out(cK,pk(kAbis));
+  out(cK,pk(kB))
+
+
 process A(i:index) =
   out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB)))
 
@@ -33,30 +40,32 @@ else
 )
 
 
-system (!_i A(i) | !_j B(j)).
+system (!_i A(i) | !_j B(j) | Key).
 
 
 equiv test.
 Proof.
   enrich pk(kA).
-  induction t.
+  enrich pk(kAbis).
+  enrich pk(kB).  
+induction t.
 
   expandall.
-  fa 2. fa 3. cca1 3.
-  fa 3. fa 3. fresh 3. yesif 3.
+  fa 4. fa 5. cca1 5.
+  fa 5. fa 5. fresh 5. yesif 5.
 
   expandall.
-  fa 2. fa 3. enckp 3. enckp 3. cca1 3. cca1 3.
+  fa 4. fa 5. enckp 5. enckp 5. cca1 5. cca1 5.
 
   equivalent len(<snd(dec(input@B(j),kB)),n(j)>),  plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   (* length reasoning *)
   apply length to snd(dec(input@B(j),kB)),n(j).
-  ifeq 3,    len(snd(dec(input@B(j),kB))), len(n(j)).
-  trivialif 3.
+  ifeq 5,    len(snd(dec(input@B(j),kB))), len(n(j)).
+  trivialif 5.
   apply length to n(j),n(j).
   (* length reasoing *)
-  fa 3.
-  fa 3.
-  fresh 3.
-  yesif 3.
+  fa 5.
+  fa 5.
+  fresh 5.
+  yesif 5.
 Qed.
