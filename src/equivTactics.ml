@@ -1659,8 +1659,10 @@ let () =
 exception Not_ifcond
 
 (* Push the formula [f] in the message [term].
- * Goes under function symbol, diff, seq and find. *)
-let push_formula f term =
+ * Goes under function symbol, diff, seq and find. If [j]=Some jj, will push
+ * the formula only in the jth subterm of the then branch (if it exists,
+ * otherwise raise an error). *)
+let push_formula (j: int option) f term =
   let f_vars = Term.get_vars f in
   let not_in_f_vars vs =
     List.fold_left
@@ -1678,8 +1680,24 @@ let push_formula f term =
   | _ -> ITE (f, m, Term.Fun (Term.f_zero,[]))
   in
   match term with
-  | Fun (f,terms) -> Fun (f, List.map mk_ite terms)
-  | Diff (a, b) -> Diff (mk_ite a, mk_ite b)
+  | Fun (f,terms) ->
+    begin match j with
+    | None -> Fun (f, List.map mk_ite terms)
+    | Some jj ->
+      if jj < List.length terms then
+        Fun (f, List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
+      else
+        Tactics.soft_failure
+          (Tactics.Failure "subterm at position j does not exists")
+    end
+  | Diff (a, b) ->
+    begin match j with
+    | None -> Diff (mk_ite a, mk_ite b)
+    | Some 0 -> Diff (mk_ite a, b)
+    | Some 1 -> Diff (a, mk_ite b)
+    | _ ->  Tactics.soft_failure
+              (Tactics.Failure "expected j is 0 or 1 for diff terms")
+    end
   | Seq (vs, t) ->
     if not_in_f_vars vs then Seq (vs, mk_ite t)
     else raise Not_ifcond
@@ -1688,7 +1706,7 @@ let push_formula f term =
     else raise Not_ifcond
   | _ -> mk_ite term
 
-let ifcond i f s =
+let ifcond i j f s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
     let cond, positive_branch, negative_branch =
@@ -1704,7 +1722,7 @@ let ifcond i f s =
     | f ->
       begin try
         let new_elem = EquivSequent.Message
-          (ITE (cond, push_formula f positive_branch, negative_branch))
+          (ITE (cond, push_formula j f positive_branch, negative_branch))
         in
         let biframe = List.rev_append before (new_elem :: after) in
         let trace_sequent = TraceSequent.init ~system Term.(Impl(cond, f))
@@ -1725,12 +1743,20 @@ let ifcond i f s =
 let () =
   T.register_general "ifcond"
     ~help: "If the given conditional implies that the given formula f is true, \
-            push the formula f inside the then branch.\
-           \n Usage: ifcond i,f."
+            push the formula f at top-level in all the subterms of the then \
+            branch. \
+            If the int parameter j is given, will push the formula only in the \
+            jth subterm of the then branch (zero-based). \
+           \n Usage: ifcond i,f. ifcond i,j,f."
     (function
       | [Prover.Int i; Prover.Theory f] ->
         only_equiv
-          (fun s sk fk -> match ifcond i f s with
+          (fun s sk fk -> match ifcond i None f s with
+            | subgoals -> sk subgoals fk
+            | exception (Tactics.Tactic_soft_failure e) -> fk e)
+      | [Prover.Int i; Prover.Int j; Prover.Theory f] ->
+        only_equiv
+          (fun s sk fk -> match ifcond i (Some j) f s with
             | subgoals -> sk subgoals fk
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
