@@ -1585,3 +1585,63 @@ let () =
   T.register "project"
     ~help:"Project a goal on a bi-system into goals on its projections."
     project
+
+
+(** Replacing a conditional by the then branch (resp. the else branch) if the
+ * condition is true (resp. false). *)
+
+let apply_yes_no_if b s =
+  let env = TraceSequent.get_env s in
+  let system = TraceSequent.system s in
+  let conclusion = TraceSequent.get_conclusion s in
+  (* search for the first occurrence of an if-then-else in [elem] *)
+  let iter = new EquivTactics.get_ite_term ~system in
+  List.iter iter#visit_formula [conclusion];
+  match iter#get_ite with
+  | None ->
+    Tactics.soft_failure
+      (Tactics.Failure
+        "can only be applied if the conclusion contains at least one occurrence
+        of an if then else term")
+  | Some (c,t,e) ->
+    (* Context with bound variables (eg try find) are not (yet) supported.
+     * We use the fact that bound variables are renamed in the iterator,
+     * these new fresh names start by "_". *)
+    let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
+    if
+      (List.exists
+        (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
+        vars)
+    then
+      Tactics.soft_failure (Tactics.Failure "application of this tactic \
+        inside a context that bind variables is not supported")
+    else
+      let branch, trace_sequent =
+        if b then (t, TraceSequent.set_conclusion c s)
+        else (e, TraceSequent.set_conclusion (Term.Not c) s)
+      in
+      let subst = [Term.ESubst (Term.ITE (c,t,e),branch)] in
+      [ trace_sequent; TraceSequent.apply_subst subst s ]
+
+let yes_no_if b =
+  (function
+    | [] ->
+      fun s sk fk -> begin match apply_yes_no_if b s with
+        | subgoals -> sk subgoals fk
+        | exception Tactics.Tactic_soft_failure e -> fk e
+      end
+    | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+
+let () =
+  T.register_general "yesif"
+    ~help:"Replaces the first conditional occurring in the conclusion by its \
+           then branch if the condition is true.\
+           \n Usage: yesif."
+    (yes_no_if true)
+
+let () =
+  T.register_general "noif"
+    ~help:"Replaces the first conditional occurring in the conclusion by its \
+           else branch if the condition is false.\
+           \n Usage: noif."
+    (yes_no_if false)

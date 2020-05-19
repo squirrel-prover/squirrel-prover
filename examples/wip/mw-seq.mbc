@@ -2,7 +2,6 @@
 (* R -> T: nr                           *)
 (* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
 (* R -> T: id + H(<c1, nr, nt>,k)       *)
-(* TODO: the last check done by T is not modelled *)
 
 hash H
 
@@ -12,6 +11,8 @@ abstract id':index->index->message
 name key : index->message
 name key':index->index->message
 
+abstract ok : message
+abstract ko : message
 abstract error : message
 abstract tag0 : message
 abstract tag1 : message
@@ -22,17 +23,20 @@ channel c
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>)
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
+  in(c,y);
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1, <x,nt>>,diff(key(i),key'(i,t)))) then out(c,ok)
+  else out(c,ko)
 
 process reader =
   new nr;
   out(c,nr);
   in(c,m);
   if exists (i,t:index),
-     xor(diff(id(i),id'(i,t)),snd(m)) = 
+     xor(diff(id(i),id'(i,t)),snd(m)) =
      H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
   then
-    out(c, try find i,t such that 
+    out(c, try find i,t such that
              xor(diff(id(i),id'(i,t)),snd(m)) =
              H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
            in
@@ -47,13 +51,13 @@ system (!_r R: reader | !_i !_t T: tag(i,t)).
    way with respect to the involved indices. *)
 goal wa_R1 : forall r:index,
   (exists (i,t:index),
-   xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
+   xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
   <=>
   (exists (i,t:index),
-   T(i,t) < R1(r) && 
+   T(i,t) < R1(r) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
-   fst(output@T(i,t)) = fst(input@R1(r)) &&  
+   fst(output@T(i,t)) = fst(input@R1(r)) &&
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
@@ -84,13 +88,13 @@ Qed.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
 goal [left] wa_R1_left : forall (i,r:index),
-  xor(id(i),snd(input@R1(r))) = 
+  xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
   exists t:index,
-  T(i,t) < R1(r) && 
+  T(i,t) < R1(r) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
-  fst(output@T(i,t)) = fst(input@R1(r)) &&  
+  fst(output@T(i,t)) = fst(input@R1(r)) &&
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
@@ -104,10 +108,10 @@ Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [right] wa_R1_right : forall (i,t,r:index),
-  xor(id'(i,t),snd(input@R1(r))) = 
+  xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
-  T(i,t) < R1(r) && 
+  T(i,t) < R1(r) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
   fst(output@T(i,t)) = fst(input@R1(r)) &&
   R(r) < T(i,t) &&
@@ -142,7 +146,7 @@ expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
 
 equivalent
-  (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) = 
+  (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
                        H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
   (exists (i,t:index), T(i,t) < R1(r) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
@@ -152,35 +156,59 @@ equivalent
 apply wa_R1 to r.
 
 fa 5. fadup 4.
-fa 6. fadup 6.
-equivalent
-  try find i,t such that
-    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))
-  in
-    xor(diff(id(i),id'(i,t)),
-        H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-  try find i,t such that
-    T(i,t) < R1(r) && 
-    snd(output@T(i,t)) = snd(input@R1(r)) &&
-    fst(output@T(i,t)) = fst(input@R1(r)) &&  
-    R(r) < T(i,t) &&
-    output@R(r) = input@T(i,t)
-  in
-    xor(diff(id(i),id'(i,t)),
-        H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))).
-(* TODO macro definitions under binders => _variables appear *)
-project.
-  nosimpl(fa); apply wa_R1_left to i,r.
-  nosimpl(fa); apply wa_R1_right to i,t,r.
-(* TODO findeq to rewrite fst(input@R1(r)) into nt(i,t) *)
-fa 6.
-admit 6. (* TODO extend fadup *)
 
+equivalent
+  (if
+      (exec@pred(R1(r)) &&
+       exists (i,t:index),
+       ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
+          fst(output@T(i,t)) = fst(input@R1(r)))
+         && R(r) < T(i,t))
+        && output@R(r) = input@T(i,t)))
+    then
+      (try find i,t such that
+         xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
+         H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
+         xor(diff(id(i),id'(i,t)),
+             H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
+  (if
+      (exec@pred(R1(r)) &&
+       exists (i,t:index),
+       ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
+          fst(output@T(i,t)) = fst(input@R1(r)))
+         && R(r) < T(i,t))
+        && output@R(r) = input@T(i,t)))
+      then
+      (try find i,t such that
+         (exec@pred(R1(r)) &&
+	  (T(i,t) < R1(r) &&
+           snd(output@T(i,t)) = snd(input@R1(r)) &&
+           fst(output@T(i,t)) = fst(input@R1(r)) &&
+           R(r) < T(i,t) &&
+           output@R(r) = input@T(i,t))) in
+         xor(diff(id(i),id'(i,t)),
+             H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))).
+
+(* TODO macro definitions under binders => _variables appear *)
+
+project.
+nosimpl(fa).
+intros. apply wa_R1_left to i,r. exists i,t.
+intros. exists i,t. fa. exists t. admit. (* TODO - should be fixed with fa reach *)
+simpl.
+nosimpl(fa).
+intros. apply wa_R1_right to i,t,r. exists i,t.
+intros. exists i,t. fa.  admit. (* TODO - should be fixed with fa reach *)
+simpl.
+
+fa 6.
+fadup 6.
+fa 6.
 expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
                   H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
-admit 7. (* this is a dup, modulo the rewrite above *)
+admit 8. (* TODO - this is a dup, modulo the rewrite above *)
+fadup 7.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -189,12 +217,12 @@ expand cond@R2(r); expand output@R2(r).
 (* Same as wa_R1 but with @R2 instead of @R1,
    and the equivalence is used under a negation. *)
 equivalent
-(exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) = 
+  (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
                  H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
-(exists (i,t:index), T(i,t) < R2(r) && 
- snd(output@T(i,t)) = snd(input@R2(r)) &&
- fst(output@T(i,t)) = fst(input@R2(r)) &&  
- input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
+  (exists (i,t:index), T(i,t) < R2(r) &&
+    snd(output@T(i,t)) = snd(input@R2(r)) &&
+    fst(output@T(i,t)) = fst(input@R2(r)) &&
+    input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
 
 apply tags_neq.
 split.
@@ -223,5 +251,10 @@ expand seq(i,t->nt(i,t)),i,t.
 expand seq(i,t->xor((diff(id(i),id'(i,t))),
                 H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
 
-Qed.
+(* Case T1 *)
+admit. (* TODO - we will have to add wa lemmas for the tag *)
 
+(* Case T2 *)
+admit. (* TODO - we will have to add wa lemmas for the tag *)
+
+Qed.

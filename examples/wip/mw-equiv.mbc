@@ -240,11 +240,13 @@ fa.
 apply wa_R1_left to i1,r.
 apply H1.
 exists t.
-admit. (* TODO trace tactic iftrue *)
+yesif.
+admit. (* TODO - should be fixed with fa reach *)
 fa.
 apply wa_R1_right to i1,t1,r.
 apply H1.
-admit. (* TODO iftrue *)
+yesif.
+admit. (* TODO - should be fixed with fa reach *)
 
 fa 1. fadup 0.
 fa 2. fadup 2.

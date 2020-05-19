@@ -1569,14 +1569,14 @@ let simplify_ite b env system cond positive_branch negative_branch =
     let trace_sequent = TraceSequent.init ~system cond
       |> TraceSequent.set_env env
     in
-    (positive_branch, Prover.Goal.Trace trace_sequent)
+    (positive_branch, trace_sequent)
   else
     (* replace in the biframe the ite by its negative branch *)
     (* ask to prove that the cond of the ite implies False *)
     let trace_sequent = TraceSequent.init ~system (Term.Impl(cond,False))
       |> TraceSequent.set_env env
     in
-    (negative_branch, Prover.Goal.Trace trace_sequent)
+    (negative_branch, trace_sequent)
 
 class get_ite_term ~system = object (self)
   inherit Iter.iter_approx_macros ~exact:true ~system as super
@@ -1620,7 +1620,7 @@ let apply_yes_no_if b i s =
         Tactics.soft_failure (Tactics.Failure "application of this tactic \
           inside a context that bind variables is not supported")
       else
-        let branch, trace_goal =
+        let branch, trace_sequent =
           simplify_ite b env system c t e in
         let new_elem =
           EquivSequent.apply_subst_frame
@@ -1628,7 +1628,7 @@ let apply_yes_no_if b i s =
             [elem]
         in
         let biframe = List.rev_append before (new_elem @ after) in
-        [ trace_goal;
+        [ Prover.Goal.Trace trace_sequent;
           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
     end
   | exception Out_of_range ->
