@@ -82,51 +82,28 @@ Proof.
   assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key(i)) = xor(input@T1(i,t),id(i))).
   euf M2.
   exists r.
-  case H1.
-
-  (* Case 1: R1 < T1 *)
+  assert R1(r,i)<T1(i,t).
+    case H1.
+    depends T(i,t),T1(i,t).
   nosimpl(repeat split); simpl.
 
-    (* T < R1 *)
-    assert (nt(i,t) = fst(input@R1(r,i))).
-    fresh M4.
-    depends T(i,t), T2(i,t).
+  (* T < R1 *)
+  assert (nt(i,t) = fst(input@R1(r,i))).
+  fresh M4.
+  depends T(i,t), T2(i,t).
 
-    (* snd(input@R1) = snd(output@T) *)
-    assert cond@R1(r,i).
-    assert exec@R1(r,i).
-    executable T1(i,t).
-    apply H1 to R1(r,i).
-    expand exec@R1(r,i).
-    expand cond@R1(r,i).
+  (* snd(input@R1) = snd(output@T) *)
+  assert cond@R1(r,i).
+  assert exec@R1(r,i).
+  executable T1(i,t).
+  apply H2 to R1(r,i).
+  expand exec@R1(r,i).
+  expand cond@R1(r,i).
 
-    (* R < T *)
-    assert (nr(r) = input@T(i,t)).
-    fresh M4.
-    depends R(r), R2(r).
-    depends R(r), R1(r,i1).
+  (* R < T *)
+  assert (nr(r) = input@T(i,t)).
+  fresh M4.
+  depends R(r), R2(r).
+  depends R(r), R1(r,i1).
 
-  (* Case 2: R1 < T *)
-  repeat split.
-
-    (* R1 < T1 *)
-    depends T(i,t), T1(i,t).
-
-    (* T < R1 *)
-    assert (nt(i,t) = fst(input@R1(r,i))).
-    fresh M4.
-    depends T(i,t), T2(i,t).
-    depends T(i,t), T1(i,t).
-
-    (* snd(input@R1) = snd(output@T) *)
-    assert exec@R1(r,i).
-    executable T1(i,t).
-    apply H1 to R1(r,i).
-    depends T(i,t),T1(i,t).
-    assert cond@R1(r,i).
-    expand exec@R1(r,i).
-    expand cond@R1(r,i).
-
-    (* R < T1 *)
-    depends R(r), R1(r,i).
 Qed.
