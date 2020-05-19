@@ -56,6 +56,9 @@ let make_new_from v =
   incr new_counter ;
   { name_prefix ; name_suffix = !new_counter ; var_type = v.var_type }
 
+let is_new v =
+  String.sub (name v) 0 1 = "_"
+
 module M = Map.Make(String)
 
 exception Undefined_Variable

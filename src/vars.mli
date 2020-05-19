@@ -46,6 +46,10 @@ val pp_typed_list : Format.formatter -> evar list -> unit
   * using the following API based on environments. *)
 val make_new_from : 'a var -> 'a var
 
+(** [is_new v] returns [true] iff variable [v] has been created
+  * using [make_new_from]. *)
+val is_new : 'a var -> bool
+
 (** {2 Environments} *)
 
 (** Local environment containg a set of variables of arbitrary sorts. *)

@@ -1591,7 +1591,6 @@ let () =
  * condition is true (resp. false). *)
 
 let apply_yes_no_if b s =
-  let env = TraceSequent.get_env s in
   let system = TraceSequent.system s in
   let conclusion = TraceSequent.get_conclusion s in
   (* search for the first occurrence of an if-then-else in [elem] *)
@@ -1601,24 +1600,20 @@ let apply_yes_no_if b s =
   | None ->
     Tactics.soft_failure
       (Tactics.Failure
-        "can only be applied if the conclusion contains at least one occurrence
-        of an if then else term")
+        "can only be applied if the conclusion contains at least \
+         one occurrence of an if then else term")
   | Some (c,t,e) ->
     (* Context with bound variables (eg try find) are not (yet) supported.
-     * We use the fact that bound variables are renamed in the iterator,
-     * these new fresh names start by "_". *)
+     * This is detected by checking that there is no "new" variable,
+     * which are used by the iterator to represent bound variables. *)
     let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-    if
-      (List.exists
-        (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
-        vars)
-    then
+    if List.exists Vars.(function EVar v -> is_new v) vars then
       Tactics.soft_failure (Tactics.Failure "application of this tactic \
         inside a context that bind variables is not supported")
     else
       let branch, trace_sequent =
         if b then (t, TraceSequent.set_conclusion c s)
-        else (e, TraceSequent.set_conclusion (Term.Not c) s)
+        else (e, TraceSequent.set_conclusion (Term.mk_not c) s)
       in
       let subst = [Term.ESubst (Term.ITE (c,t,e),branch)] in
       [ trace_sequent; TraceSequent.apply_subst subst s ]

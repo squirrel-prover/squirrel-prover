@@ -540,6 +540,10 @@ and subst_generic_atom s = function
 
 (** Smart constructors for boolean terms. *)
 
+let mk_not t1 = match t1 with
+  | Not t -> t
+  | t -> Not t
+
 let mk_and t1 t2 = match t1,t2 with
   | True, t | t, True -> t
   | t1,t2 -> And (t1,t2)

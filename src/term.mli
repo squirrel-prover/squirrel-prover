@@ -189,6 +189,7 @@ val f_g : fsymb
 
 val f_len : fsymb
 
+val mk_not : formula -> formula
 val mk_and : formula -> formula -> formula
 val mk_or : formula -> formula -> formula
 val mk_impl : formula -> formula -> formula

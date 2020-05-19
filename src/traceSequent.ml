@@ -331,7 +331,11 @@ class iter_macros ~system f = object (self)
   method visit_message t =
     match t with
       | Term.Macro ((m,sort,is),[],a) ->
-          if Macros.is_defined m a then
+          if List.for_all
+               Vars.(function EVar v -> not (is_new v))
+               (Term.get_vars t) &&
+             Macros.is_defined m a
+          then
             let def = Macros.get_definition system sort m is a in
               f t def ;
               self#visit_message def
