@@ -1354,14 +1354,13 @@ let fa s sk fk =
 
           | Term.ITE (c,t,e), Term.ITE (c',t',e') ->
             let subgoals =
-              [ TraceSequent.set_conclusion (Term.mk_impl c c') s ;
-                TraceSequent.set_conclusion (Term.mk_impl c' c) s ;
-                TraceSequent.set_conclusion
-                  (Term.Atom (`Message (`Eq,t,t'))) s
-                 |> TraceSequent.add_formula c
-                 |> TraceSequent.add_formula c' ;
-                TraceSequent.set_conclusion
-                  (Term.Atom (`Message (`Eq,e,e'))) s ]
+              let open TraceSequent in
+              [ s |> set_conclusion (Term.mk_impl c c') ;
+                s |> set_conclusion (Term.mk_impl c' c) ;
+                s |> set_conclusion (Term.Atom (`Message (`Eq,t,t')))
+                  |> add_formula c
+                  |> add_formula c' ;
+                s |> set_conclusion (Term.Atom (`Message (`Eq,e,e'))) ]
             in
             sk subgoals fk
 
@@ -1426,13 +1425,14 @@ let fa s sk fk =
             in
 
             let subgoals =
-              [ TraceSequent.set_conclusion
-                  (Term.mk_impl c (Term.mk_exists unused c')) s ;
-                TraceSequent.set_conclusion (Term.mk_impl c' c) s ;
-                TraceSequent.set_conclusion
-                  (Term.Atom (`Message (`Eq,t,t'))) s ;
-                TraceSequent.set_conclusion
-                  (Term.Atom (`Message (`Eq,e,e'))) s ]
+              let open TraceSequent in
+              [ s |> set_conclusion
+                       (Term.mk_impl c (Term.mk_exists unused c')) ;
+                s |> set_conclusion (Term.mk_impl c' c) ;
+                s |> set_conclusion (Term.Atom (`Message (`Eq,t,t')))
+                  |> add_formula c
+                  |> add_formula c' ;
+                s |> set_conclusion (Term.Atom (`Message (`Eq,e,e'))) ]
             in
             sk subgoals fk
 

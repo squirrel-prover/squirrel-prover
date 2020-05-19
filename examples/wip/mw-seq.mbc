@@ -25,7 +25,7 @@ process tag(i:index, t:index)=
   new nt;
   out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H(<tag1, <x,nt>>,diff(key(i),key'(i,t)))) then out(c,ok)
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) then out(c,ok)
   else out(c,ko)
 
 process reader =
@@ -180,26 +180,22 @@ equivalent
         && output@R(r) = input@T(i,t)))
       then
       (try find i,t such that
-         (exec@pred(R1(r)) &&
-	  (T(i,t) < R1(r) &&
-           snd(output@T(i,t)) = snd(input@R1(r)) &&
-           fst(output@T(i,t)) = fst(input@R1(r)) &&
-           R(r) < T(i,t) &&
-           output@R(r) = input@T(i,t))) in
+         exec@pred(R1(r)) &&
+	 (T(i,t) < R1(r) &&
+          snd(output@T(i,t)) = snd(input@R1(r)) &&
+          fst(output@T(i,t)) = fst(input@R1(r)) &&
+          R(r) < T(i,t) &&
+          output@R(r) = input@T(i,t)) in
          xor(diff(id(i),id'(i,t)),
-             H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))).
-
-(* TODO macro definitions under binders => _variables appear *)
+             H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
 project.
-nosimpl(fa).
-intros. apply wa_R1_left to i,r. exists i,t.
-intros. exists i,t. fa. exists t. admit. (* TODO - should be fixed with fa reach *)
-simpl.
-nosimpl(fa).
-intros. apply wa_R1_right to i,t,r. exists i,t.
-intros. exists i,t. fa.  admit. (* TODO - should be fixed with fa reach *)
-simpl.
+  (* Left *)
+  fa; try exists i,t.
+  fa. apply wa_R1_left to i1,r. apply H1. exists t.
+  (* Right *)
+  fa; try exists i,t.
+  fa. apply wa_R1_right to i1,t1,r. apply H1.
 
 fa 6.
 fadup 6.
@@ -207,8 +203,7 @@ fa 6.
 expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
                   H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
-admit 8. (* TODO - this is a dup, modulo the rewrite above *)
-fadup 7.
+fadup 6.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
