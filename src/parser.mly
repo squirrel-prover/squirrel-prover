@@ -20,13 +20,13 @@
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH
 %token PROOF QED UNDO
 %token EOF
-
 %token EMPTY_ELSE
+
+%nonassoc EMPTY_ELSE
 
 %left XOR
 %left EXP
 
-%nonassoc EMPTY_ELSE
 %nonassoc ELSE
 %nonassoc QUANTIF
 %right DARROW
