@@ -17,12 +17,7 @@ process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
   let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in
-  out(cT,<nT,m2>);
-  in(cR,m3);
-  if m3 = h(<<m2,nR>,tag2>,diff(key(i),key'(i,k))) then
-    out(cT,ok)
-  else
-    out(cT,ko)
+  out(cT,<nT,m2>)
 
 process reader(j:index) =
   new nR;
@@ -141,7 +136,7 @@ depends R(j),R2(j).
 Qed.
 
 
-equiv unlinkability.
+equiv unlink.
 Proof.
 induction t.
 
@@ -251,22 +246,10 @@ yesif 3.
 apply tags_neq; project.
 assert fst(input@R1(j))=nT(i,k).
 fresh M2.
-depends T(i,k),T2(i,k).
-depends T(i,k),T1(i,k).
 assert fst(input@R1(j))=nT(i,k).
 fresh M2.
-depends T(i,k),T2(i,k).
-depends T(i,k),T1(i,k).
 fresh 3.
 fresh 2.
 yesif 2.
-repeat split.
-depends T(i,k),T1(i,k).
-depends T(i,k),T2(i,k).
 
-(* Case T1: TODO *)
-admit.
-
-(* Case T2: TODO *)
-admit.
 Qed.
