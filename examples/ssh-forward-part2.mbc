@@ -1,8 +1,7 @@
 (* Second part of the proof of ssh with a modified agent forwarding. It
-corresponds to the security a the forwarded SSH key exchange, but with oracles
-that allow to simulate all other forwarded SSH login and previous non forwarded
-SSH logins.
-*)
+   corresponds to the security a the forwarded SSH key exchange, but with oracles
+   that allow to simulate all other forwarded SSH login and previous non forwarded
+   SSH logins. *)
 
 abstract ok : message
 abstract ko : message
@@ -33,11 +32,11 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-(* we only use the fact that a indcca encryption is unforgeable. Due to
-limitation of the tool, we model the symmetric encryption as an asymetric
-encryption. Remark that the symmetric encryption must be euf even when a hash
-containing the key is given. In other terms, the hash function h should be
-PRF. *)
+(* We only use the fact that a indcca encryption is unforgeable. Due to
+   limitation of the tool, we model the symmetric encryption as an asymetric
+   encryption. Remark that the symmetric encryption must be euf even when a hash
+   containing the key is given. In other terms, the hash function h should be
+   PRF. *)
 signature enc,checkdec,pke abstract dec : message -> message -> message
 
 axiom [none,auth] encdec : forall (m1:message), dec(enc(m1,k11),pke(k11)) =m1
@@ -301,7 +300,7 @@ goal [none, auth] P_charac :
   left; right.
   apply collres  to <<m2,g^bke1(i1)>,m3> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
-  (* honnest case SDIS *)
+  (* honest case SDIS *)
   apply collres  to <<input@SDIS,g^b1>,input@SDIS^b1> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
   apply freshindex.
   apply H1 to l.
@@ -349,14 +348,14 @@ apply H3 to P3(i).
 expand exec@P3(i).
 expand cond@P3(i).
 
-(*we have that x3 is a message encrypted with the secret key, we use the euf of encryption *)
+(* We have that x3 is a message encrypted with the secret key, we use the euf of encryption *)
 euf M2.
 
-(* ill tagged cases *)
+(* Ill-tagged cases *)
 apply signnotpair to sidPaF@P2,kP,reqsign.
 apply difftags.
 
-(* honnest case *)
+(* Honest case *)
 assert PDIS5 <= Sok.
 case H5.
 apply H3 to PDIS5.
@@ -367,9 +366,9 @@ right.
 apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 Qed.
 
-(** The equivalence for authentication is obtained by using the unreachability
-proofs over the two actions. The rest of the protocol can be handled through
-some simple enriching of the induction hypothesis, and then dup applications. *)
+(* The equivalence for authentication is obtained by using the unreachability
+   proofs over the two actions. The rest of the protocol can be handled through
+   some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.

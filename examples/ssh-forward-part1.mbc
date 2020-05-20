@@ -1,7 +1,7 @@
 (* First part of the proof of ssh with a modified agent forwarding. It
-corresponds to the security a the basic SSH key exchange, but with oracles that
-allow to simulate all other honnest logins, and the forwarded SSH logins.
-*)
+   corresponds to the security a the basic SSH key exchange, but with oracles
+   that allow to simulate all other honest logins, and the forwarded SSH
+   logins. *)
 
 abstract ok : message
 abstract ko : message
