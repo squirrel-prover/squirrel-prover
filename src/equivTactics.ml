@@ -1020,6 +1020,35 @@ let () =
    | _ -> Tactics.hard_failure (Tactics.Failure "Integer expected"))
 
 
+
+class check_symenc_key ~system enc_fn dec_fn key_n = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system as super
+  method visit_message t = match t with
+    | Term.Fun ((fn,_), [m;r; Term.Name _]) when fn = enc_fn ->
+      self#visit_message m; self#visit_message r
+    | Term.Fun ((fn,_), [m; Term.Name _]) when fn = dec_fn ->
+      self#visit_message m
+    | Term.Fun ((fn,_), [m;r; Diff(Term.Name _, Term.Name _)]) when fn = enc_fn ->
+      self#visit_message m; self#visit_message r
+    | Term.Fun ((fn,_), [m;  Diff(Term.Name _, Term.Name _)]) when fn = dec_fn ->
+      self#visit_message m
+
+
+    | Term.Name (n,_) when n = key_n -> raise Euf.Bad_ssc
+    | Term.Var m -> raise Euf.Bad_ssc
+    | _ -> super#visit_message t
+end
+
+let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system enc_fn dec_fn key_n =
+  let ssc = new check_symenc_key ~system enc_fn dec_fn key_n in
+  List.iter ssc#visit_message messages ;
+  List.iter ssc#visit_term elems ;
+  Action.(iter_descrs system
+    (fun action_descr ->
+       ssc#visit_formula (snd action_descr.condition) ;
+       ssc#visit_message (snd action_descr.output) ;
+       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
+
 (** CCA1 **)
 
 let cca1 i s =
@@ -1038,8 +1067,7 @@ let cca1 i s =
       (* we check that the random is fresh, and the key satisfy the
                side condition. *)
       begin
-        try
-          Euf.hash_key_ssc ~messages:[enc] ~pk:(fnpk) ~system fndec sk;
+
           (* we create the fresh cond reachability goal *)
           let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
           let fresh_goal = Prover.Goal.Trace
@@ -1054,7 +1082,6 @@ let cca1 i s =
           let biframe = (List.rev_append before (new_elem @ after)) in
           [fresh_goal;
            Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
-        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
       end
     in
     (* search for the first occurrence of an asymmetric encryption in [e], that
@@ -1073,7 +1100,13 @@ let cca1 i s =
           (* we check that the encryption function is used with the associated
              public key *)
           | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
-            -> hide_enc enc fnenc m (Some fnpk) sk fndec r
+            ->
+            begin
+              try
+              Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
+              hide_enc enc fnenc m (Some fnpk) sk fndec r
+              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+            end
           | _ ->
             Tactics.soft_failure
               (Tactics.Failure
@@ -1088,7 +1121,13 @@ let cca1 i s =
           (* we check that the encryption function is used with the associated
              public key *)
           | Symbols.AssociatedFunctions [fndec]
-            -> hide_enc enc fnenc m (None) sk fndec r
+            ->
+            begin
+              try
+              symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk;
+              hide_enc enc fnenc m (None) sk fndec r
+              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+            end
           | _ ->
             Tactics.soft_failure
               (Tactics.Failure
@@ -1118,6 +1157,7 @@ let () =
 
 
 
+
 (** Encryption Key privacy  *)
 
 let enckp i s =
@@ -1138,7 +1178,6 @@ let enckp i s =
          side condition. *)
       begin
         try
-          Euf.hash_key_ssc ~messages:[enc] ~pk:fnpk ~system fndec sk;
           (* we create the fresh cond reachability goal *)
           let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
           let fresh_goal = Prover.Goal.Trace
@@ -1178,6 +1217,8 @@ let enckp i s =
             (* we check that the encryption function is used with the associated
                public key *)
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
+              Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
+              Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk2;
               hide_enc fnenc enc fndec sk (Some fnpk) r fnenci (Some fnpki) m isk
             | _ ->
               Tactics.soft_failure
@@ -1189,13 +1230,15 @@ let enckp i s =
                                           Term.Diff(  Term.Name (sk,isk),
                                                       Term.Name (sk2,isk2))
                                         ])
-           as enc) :: q when Symbols.is_ftype fnenc Symbols.AEnc
+           as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc
           ->
           begin
             match Symbols.Function.get_data fnenc with
             (* we check that the encryption function is used with the associated
                public key *)
             | Symbols.AssociatedFunctions [fndec] ->
+              symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk;
+              symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk2;
               hide_enc fnenc enc fndec sk None r fnenci None m isk
             | _ ->
               Tactics.soft_failure
