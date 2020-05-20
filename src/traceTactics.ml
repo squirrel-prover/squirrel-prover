@@ -196,29 +196,69 @@ let hypothesis_case hypothesis_name (s : TraceSequent.t) =
       (Tactics.Failure "can only be applied to a disjunction") ;
   List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas
 
+(** Case analysis on [orig = Find (vars,c,t,e)] in [s].
+  * This can be used with [vars = []] if orig is an [if-then-else] term. *)
+let case_cond orig vars c t e s =
+  let env = ref (TraceSequent.get_env s) in
+  let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+  let subst =
+    List.map2
+      (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+      vars vars'
+  in
+  let c' = Term.(ForAll (List.map (fun i -> Vars.EVar i) vars, Not c)) in
+  let c = Term.subst subst c in
+  let t = Term.subst subst t in
+  let then_subst = [ Term.ESubst (orig,t) ] in
+  let else_subst = [ Term.ESubst (orig,e) ] in
+  let open TraceSequent in
+  [ s |> set_env !env
+      |> add_formula c
+      |> apply_subst then_subst ;
+    s |> add_formula c'
+      |> apply_subst else_subst ]
+
 let case th s =
-  (* if the conversion to a timestamp of the variable is successful, we perform
-     a timestamp_case. If it fails, we try with hypothesis case. *)
-    let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-    match Theory.convert tsubst th Sorts.Timestamp with
-    | exception _ ->
-      begin
-        match th with
+  (* Try converting to timestamp, message or hypothesis. *)
+  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+  match Theory.convert tsubst th Sorts.Timestamp with
+  | ts -> timestamp_case ts s
+  | exception _ ->
+      begin match th with
         | Theory.Var m ->
             begin try hypothesis_case m s with
               | Not_found -> Tactics.(soft_failure (Undefined m))
             end
-        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
+        | _ ->
+           begin match Theory.convert tsubst th Sorts.Message with
+             | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
+             | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
+             | Term.Macro ((m,Sorts.Message,is),[],ts) as o
+               when Macros.is_defined m ts ->
+                 begin match
+                   Macros.get_definition
+                     (TraceSequent.system s)
+                     Sorts.Message
+                     m is ts
+                 with
+                 | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
+                 | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
+                 | _ -> Tactics.(soft_failure
+                                   (Failure "message is not a conditional"))
+                 end
+             | _ ->
+               Tactics.(soft_failure (Failure "message is not a conditional"))
+             | exception _ ->
+               Tactics.(soft_failure (Failure "improper argument"))
+           end
       end
-    | ts -> timestamp_case ts s
 
 let () =
   T.register_general "case"
-    ~help:"When T is a timestamp variable, introduce a disjunction \
-           \n hypothesis expressing the various forms that it could take. \
-           \n when T is a disjunction name, split the given disjunction on the \
-           \n left, creating corresponding subgoals.\
-           \n Usage: case T."
+    ~help:"Perform case analysis on a timestamp, a message built using a \
+           conditional,\
+           \n or a disjunction hypothesis.\
+           \n Usage: case T, or case H."
     (function
        | [Prover.Theory th] ->
           begin fun s sk fk -> match case th s with

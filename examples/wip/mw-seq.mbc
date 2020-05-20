@@ -252,47 +252,115 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   exec@pred(T1(i,t)) &&
   exists r:index,
   R1(r) < T1(i,t) &&
-  input@T1(i,t) = output@R1(r).
+  input@T1(i,t) = output@R1(r) &&
+  T(i,t) < R1(r) &&
+  fst(input@R1(r)) = fst(output@T(i,t)) &&
+  snd(input@R1(r)) = snd(output@T(i,t)) &&
+  R(r) < T(i,t) &&
+  input@T(i,t) = output@R(r).
 expand cond@T1(i,t); split.
-assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
-       H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
-apply tags_neq; project.
+  (* Cond => Honest *)
+  assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
+         H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
+  apply tags_neq; project.
   (* Left *)
   euf M1.
   assert R1(r) < T1(i,t).
     case H1.
     depends T(i,t),T1(i,t).
   assert cond@R1(r).
-    executable T1(i,t).
+    executable pred(T1(i,t)).
     apply H2 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf M4.
-  exists r.
-  expand output@R1(r).
-  (* Need to check that same i,t are found by find. *)
-  admit.
+  exists r; split.
+  case output@R1(r).
+  euf M6.
+  apply H2 to i,t.
+  assert nr(r) = input@T(i,t).
+  fresh M6.
+  depends R(r),R2(r).
   (* Right *)
   euf M1.
   assert R1(r) < T1(i,t).
     case H1; depends T(i,t),T1(i,t).
   assert cond@R1(r).
-    executable T1(i,t); apply H2 to R1(r); expand exec@R1(r).
+    executable pred(T1(i,t)); apply H2 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf M4.
-  exists r.
-  expand output@R1(r).
-  admit. (* Same as above, need to check that same i,t are found. *)
-(* Here we are missing some info from the too simple honest trace condition
-   above: we need to add that input@T(i,t) = output@R(r) = nr(r)
-   and fst(input@R1(r)) = fst(output@T(i,t)) = nt(i,t).
-   But we'll also need to reason on which indices are obtained in
-   output@R1 = try find i,t, ... *)
-admit.
+  exists r; split.
+  case output@R1(r).
+  euf M6.
+  apply H2 to i,t.
+  assert nr(r) = input@T(i,t).
+  fresh M6.
+  depends R(r),R2(r).
+  (* Honest => Cond *)
+  case output@R1(r).
+  project; euf M4.
+  apply H1 to i,t.
 
 fa 5. fa 6.
 fadup 4.
 
 (* Case T2 *)
-admit. (* TODO - we will have to add wa lemmas for the tag *)
+expand frame@T2(i,t); expand exec@T2(i,t); expand cond@T2(i,t).
+equivalent
+  (exec@pred(T2(i,t)) &&
+   not(input@T2(i,t) =
+       diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))))),
+  exec@pred(T2(i,t)) &&
+  not(exists r:index,
+      R1(r) < T2(i,t) &&
+      input@T2(i,t) = output@R1(r) &&
+      T(i,t) < R1(r) &&
+      fst(input@R1(r)) = fst(output@T(i,t)) &&
+      snd(input@R1(r)) = snd(output@T(i,t)) &&
+      R(r) < T(i,t) &&
+      input@T(i,t) = output@R(r)).
+split; apply H1.
+  (* Honest => Cond *)
+  case output@R1(r).
+  project; euf M4.
+  apply H2 to i,t.
+  (* Cond => Honest *)
+  assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
+         H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
+  apply tags_neq; project.
+  (* Left *)
+  euf M1.
+  assert R1(r) < T2(i,t).
+    case H2.
+    depends T(i,t),T2(i,t).
+  assert cond@R1(r).
+    executable pred(T2(i,t)).
+    apply H3 to R1(r); expand exec@R1(r).
+  expand cond@R1(r).
+  euf M4.
+  exists r; split.
+  case output@R1(r).
+  euf M6.
+  apply H3 to i,t.
+  assert nr(r) = input@T(i,t).
+  fresh M6.
+  depends R(r),R2(r).
+  (* Right *)
+  euf M1.
+  assert R1(r) < T2(i,t).
+    case H2; depends T(i,t),T2(i,t).
+  assert cond@R1(r).
+    executable pred(T2(i,t)); apply H3 to R1(r); expand exec@R1(r).
+  expand cond@R1(r).
+  euf M4.
+  exists r; split.
+  case output@R1(r).
+  euf M6.
+  apply H3 to i,t.
+  assert nr(r) = input@T(i,t).
+  fresh M6.
+  depends R(r),R2(r).
+
+fa 5. fa 6.
+fadup 4.
 
 Qed.
