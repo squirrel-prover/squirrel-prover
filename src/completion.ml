@@ -208,17 +208,17 @@ module Theories = struct
       ) projs
 
   (* Asymmetric encryption.
-      dec(enc(m, pk(k)), k) -> m *)
+      dec(enc(m, r, pk(k)), k) -> m *)
   let mk_aenc enc dec pk =
-    let m, k = mk_var (), mk_var () in
+    let m, r, k = mk_var (), mk_var (), mk_var () in
     let t_pk = cfun pk [k] in
-    ( cfun dec [cfun enc [m; t_pk]; k], m )
+    ( cfun dec [cfun enc [m; r; t_pk]; k], m )
 
   (* Symmetric encryption.
-      dec(enc(m, k), k) -> m *)
+      dec(enc(m, r, k), k) -> m *)
   let mk_senc enc dec =
-    let m, k = mk_var (), mk_var () in
-    ( cfun dec [cfun enc [m; k]; k], m )
+    let m, r, k = mk_var (),  mk_var (), mk_var () in
+    ( cfun dec [cfun enc [m; r; k]; k], m )
 
   let t_true = cfun Term.f_true []
   let t_false = cfun Term.f_true []
