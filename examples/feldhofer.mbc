@@ -1,0 +1,253 @@
+(* Protocol Feldhofer                         *)
+(* R -> T: nr                                 *)
+(* T -> R: enc(<nr,nt>,r,k), H(<nr,nt>,r,k)   *)
+(* R -> T: enc(<nt,nr>,r,k)                   *)
+
+(* We assume here that the encryption used is an encrypt then mac,
+   such that the encryption is AE. *)
+(* This is a "light" model without the last check of T. *)
+
+channel cR
+channel cT
+
+name kE : message
+name kbE : index-> message
+
+name kH : message
+name kbH : index-> message
+
+hash h
+senc enc,dec
+
+name nr : index  -> message
+name nt : index -> index -> message
+
+name rt : index -> index -> message
+name rr : index -> message
+
+axiom pair : forall (m:message), <fst(m),snd(m)> = m
+axiom dec : forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
+
+process Reader(i:index) =
+  out(cR, nr(i));
+  in(cR, mess);
+  if exists (j:index), h(fst(mess), diff(kH,kbH(j))) = snd(mess) && fst(dec(fst(mess),  diff(kE,kbE(j)))) = nr(i) then
+   out(cR,
+  try find l,j such that h(fst(mess), diff(kH,kbH(j))) = snd(mess) && fst(dec(fst(mess),  diff(kE,kbE(j)))) = nr(i) in
+enc(<snd(dec(fst(mess),  diff(kE,kbE(j)))),nr(i)>, rr(i), diff(kE,kbE(j)))
+
+
+
+)
+
+process Tag(i:index, j:index) =
+  in(cT, nR);
+  let cypher = enc(<nR,nt(i,j)>, rt(i,j), diff(kE,kbE(j))) in
+  out(cT, <cypher,h(cypher, diff(kH,kbH(j)) )> )
+
+
+system (!_i Reader(i) | !_i !_j Tag(i,j)).
+
+goal auth : forall (i:index), (cond@Reader1(i) <=>
+  (exists (l,k:index), Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)  &&   output@Tag(l,k) = <fst(input@Reader1(i)),snd(input@Reader1(i))> &&  input@Tag(l,k) = output@Reader(i)) ).
+Proof.
+  simpl.
+
+  expand cond@Reader1(i).
+  expand output@Reader(i).
+  split.
+
+  project.
+
+  euf M0.
+  exists i1,j1.
+  depends Reader(i), Reader1(i).
+
+  euf M0.
+  exists i1,j.
+  depends Reader(i), Reader1(i).
+
+  exists k.
+Qed.
+
+
+goal [right] auth_right :
+ forall (i,j:index), (
+ h(fst(input@Reader1(i)), kbH(j)) = snd(input@Reader1(i)) && fst(dec(fst(input@Reader1(i)),  kbE(j))) = nr(i)
+ <=>
+  exists (l:index), Tag(l,j) < Reader1(i) && Reader(i) < Reader1(i)  &&   output@Tag(l,j) = <fst(input@Reader1(i)),snd(input@Reader1(i))> &&  input@Tag(l,j) = output@Reader(i) ).
+Proof.
+  simpl.
+
+  euf M0.
+  exists i1.
+  depends Reader(i), Reader1(i).
+Qed.
+
+goal [left] auth_left :
+ forall (i:index), (
+ h(fst(input@Reader1(i)), kH) = snd(input@Reader1(i)) && fst(dec(fst(input@Reader1(i)),  kE)) = nr(i)
+ <=>
+  exists (l,j:index), Tag(l,j) < Reader1(i) && Reader(i) < Reader1(i)  &&   output@Tag(l,j) = <fst(input@Reader1(i)),snd(input@Reader1(i))> &&  input@Tag(l,j) = output@Reader(i) ).
+Proof.
+  simpl.
+
+  euf M0.
+  exists i1,j.
+  depends Reader(i), Reader1(i).
+Qed.
+
+
+goal authA : forall (i:index), (cond@A(i) <=>
+  not (exists (l,k:index), Tag(l,k) < A(i) && Reader(i) < A(i)  &&   output@Tag(l,k) = <fst(input@A(i)),snd(input@A(i))> &&  input@Tag(l,k) = output@Reader(i)) ).
+Proof.
+  simpl.
+
+  expand cond@A(i).
+  expand output@Reader(i).
+  split.
+
+  project.
+  notleft H0.
+
+  apply H0 to l.
+  case H1.
+
+  notleft H0.
+  apply H0 to k.
+  case H1.
+
+  notleft H0.
+  project.
+  euf M0.
+  apply H0 to i1,j1.
+  case H1.
+  depends Reader(i), A(i).
+
+  euf M0.
+  apply H0 to i1,j.
+
+  case H1.
+  depends Reader(i), A(i).
+Qed.
+
+
+
+equiv unlinkable.
+Proof.
+
+enrich seq(i->nr(i)). enrich seq(i,j->nt(i,j)).
+induction t.
+
+expand seq(i->nr(i)),i.
+
+expand frame@Reader1(i).expand exec@Reader1(i).
+   equivalent
+   cond@Reader1(i),
+  (exists (l,k:index), Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)  &&   output@Tag(l,k) = <fst(input@Reader1(i)),snd(input@Reader1(i))> &&  input@Tag(l,k) = output@Reader(i)).
+
+apply auth to i.
+fa 3.
+fadup 2.
+
+expand output@Reader1(i).
+
+equivalent (if
+      (exec@pred(Reader1(i)) &&
+       exists (l,k:index),
+       (((Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)) &&
+         output@Tag(l,k) = <fst(input@Reader1(i)),snd(input@Reader1(i))>)
+        && input@Tag(l,k) = output@Reader(i)))
+      then
+      (try find l,j such that
+         (h(fst(input@Reader1(i)),diff(kH,kbH(j))) = snd(input@Reader1(i)) &&
+          fst(dec(fst(input@Reader1(i)),diff(kE,kbE(j)))) = nr(i))
+         in
+         enc(<snd(dec(fst(input@Reader1(i)),diff(kE,kbE(j)))),nr(i)>,rr(
+             i),diff(kE,kbE(j))))),
+(if
+      (exec@pred(Reader1(i)) &&
+       exists (l,k:index),
+       (((Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)) &&
+         output@Tag(l,k) = <fst(input@Reader1(i)),snd(input@Reader1(i))>)
+        && input@Tag(l,k) = output@Reader(i)))
+      then
+      (try find l,j such that
+      (exec@pred(Reader1(i)) &&
+       (((Tag(l,j) < Reader1(i) && Reader(i) < Reader1(i)) &&
+         output@Tag(l,j) = <fst(input@Reader1(i)),snd(input@Reader1(i))>)
+        && input@Tag(l,j) = output@Reader(i)))
+
+
+         in
+         enc(<nt(l,j),nr(i)>,rr(
+             i),diff(kE,kbE(j))))).
+
+project.
+fa.
+
+apply auth to i.
+
+exists l,k.
+exists l,k.
+
+fa.
+exists l,k.
+
+fa.
+exists l,k.
+exists l,k.
+fa.
+
+apply auth_right to i,j.
+apply H1.
+
+exists l2.
+
+fa 4.
+fadup 4.
+fa 4.
+
+fadup 4.
+
+enckp 4.
+cca1 4.
+
+expand seq(i->nr(i)),i.
+expand seq(i,j->nt(i,j)),l,j.
+
+expand frame@A(i).expand exec@A(i).
+equivalent
+   cond@A(i),
+   not (exists (l,k:index), Tag(l,k) < A(i) && Reader(i) < A(i)  &&   output@Tag(l,k) = <fst(input@A(i)),snd(input@A(i))> &&  input@Tag(l,k) = output@Reader(i)) .
+
+apply authA to i.
+
+fa 3.
+fadup 2.
+fa 4.
+fadup 4.
+
+expandall.
+
+fa 3.
+fa 4.
+fa 4.
+prf 5.
+
+yesif 5.
+project.
+assert snd( dec(fst(input@Reader1(i1)),kE)) =nt(i,j).
+fresh M1.
+
+
+assert snd( dec(fst(input@Reader1(i1)),kbE(j))) =nt(i,j).
+fresh M1.
+
+enckp 4.
+cca1 4.
+fa 4.
+fa 4.
+expand seq(i,j->nt(i,j)),i,j.
+fresh 5.
+Qed.
