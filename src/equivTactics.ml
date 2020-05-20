@@ -983,14 +983,10 @@ let prf i s =
             of a hash term h(t,k)")
       | Some hash ->
         (* Context with bound variables (eg try find) are not (yet) supported.
-         * We use the fact that bound variables are renamed in the iterator,
-         * these new fresh names start by "_". *)
+         * This is detected by checking that there is no "new" variable,
+         * which are used by the iterator to represent bound variables. *)
         let vars = Term.get_vars hash in
-        if
-          (List.exists
-            (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
-            vars)
-        then
+        if List.exists Vars.(function EVar v -> is_new v) vars then
           Tactics.soft_failure (Tactics.Failure "application of this tactic \
             inside a context that bind variables is not supported")
         else
@@ -1609,14 +1605,10 @@ let apply_yes_no_if b i s =
           of an if then else term")
     | Some (c,t,e) ->
       (* Context with bound variables (eg try find) are not (yet) supported.
-       * We use the fact that bound variables are renamed in the iterator,
-       * these new fresh names start by "_". *)
+       * This is detected by checking that there is no "new" variable,
+       * which are used by the iterator to represent bound variables. *)
       let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-      if
-        (List.exists
-          (function Vars.EVar v -> String.sub (Vars.name v) 0 1 = "_")
-          vars)
-      then
+      if List.exists Vars.(function EVar v -> is_new v) vars then
         Tactics.soft_failure (Tactics.Failure "application of this tactic \
           inside a context that bind variables is not supported")
       else
