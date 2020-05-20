@@ -338,9 +338,10 @@ apply H3 to <<g^ake1(i1),m2>,m3>.
 apply hashnotpair to  sidPaF@P2, forwarded.
 apply H3 to (<<g^ake11,input@P1>,pke(k11)>).
 
-(* honnest case of signature produced by Fa. We need to prove that the sign req received by FA comes from PDIS. *)
+(* Honest case of signature produced by Fa.
+   We need to prove that the sign req received by FA comes from PDIS. *)
 
-executable Sok.
+executable pred(Sok).
 assert P3(i) <= Sok.
 case H2.
 depends SDIS, Sok.

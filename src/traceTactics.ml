@@ -1072,16 +1072,15 @@ let exec a s =
     with
       | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
   in
-  let var = snd Vars.(make_fresh empty_env Sorts.Timestamp "t") in
+  let _,var = Vars.(make_fresh (TraceSequent.get_env s) Sorts.Timestamp "t") in
   let formula =
-    ForAll (
-      [Vars.EVar (var)],
-      Impl(Atom (Term.mk_timestamp_leq (Var var) a),
-           Macro(Term.exec_macro,[],Var var)
-          )
-    )
+    ForAll
+      ([Vars.EVar var],
+       Impl (Atom (Term.mk_timestamp_leq (Var var) a),
+             Macro(Term.exec_macro,[],Var var)))
   in
-  [TraceSequent.add_formula formula s]
+  [TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
+   TraceSequent.add_formula formula s]
 
 let () =
   T.register_general "executable"

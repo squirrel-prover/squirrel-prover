@@ -105,18 +105,22 @@ expandall.
     expand seq(i->g^b(i)), j;
     expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
 
+   (* Case P3 *)
+
    expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
-   equivalent cond@P3(i), False.
+   equivalent exec@pred(P3(i)) && cond@P3(i), False.
    expand cond@P3(i).
    executable pred(P3(i)).
 
    depends P1(i), P3(i).
-   apply H1 to P1(i).
+   apply H2 to P1(i).
    expand exec@P1(i).
    apply P1_charac to i.
-   apply H0 to s.
+   apply H1 to s.
 
-   expand gb(i)@P3(i). fa 6.  noif 7. simpl.
+   expand gb(i)@P3(i). fa 5. noif 6.
+
+   (* Case A *)
 
    expand gb(i)@A(i);
    expand  seq(i->g^a(i)), i.
@@ -132,19 +136,19 @@ expandall.
 
 
    expand frame@S3(j); expand exec@S3(j).
+
    (* Unreachability of S3  *)
-   equivalent cond@S3(j), False.
+   equivalent exec@pred(S3(j)) && cond@S3(j), False.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
-   apply H1 to S1(j).
+   apply H2 to S1(j).
    expand exec@S1(j).
    apply S1_charac to j.
-   apply H0 to s.
+   apply H1 to s.
 
-   fa 6.
-   noif 7. simpl.
-
+   fa 5.
+   noif 6.
    expand  seq(i->g^b(i)), j.
 
 Qed.

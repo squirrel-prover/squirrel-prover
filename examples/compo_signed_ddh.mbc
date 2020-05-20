@@ -170,11 +170,9 @@ Proof.
    expand frame@P4; expand exec@P4.
    fa 7.
 
-   equivalent cond@P4,False.
-   simpl.
-   executable pred(P4). depends P1, P4. apply H1 to P1. expand exec@P1. apply P1_charac.
-
-   noif 8. simpl.
+   equivalent exec@pred(P4) && cond@P4, False.
+   executable pred(P4). depends P1, P4. apply H2 to P1. expand exec@P1. apply P1_charac.
+   noif 7.
 
    expandall.
    fa 7.
@@ -182,10 +180,8 @@ Proof.
    expand seq(i->g^a(i)),l.
 
    expand frame@S4; expand exec@S4.
+   equivalent exec@pred(S4) && cond@S4, False.
+   executable pred(S4). depends S1, S4. apply H2 to S1. expand exec@S1. apply S1_charac.
 
-   equivalent cond@S4,False.
-   simpl.
-   executable pred(S4). depends S1, S4. apply H1 to S1. expand exec@S1. apply S1_charac.
-
-   fa 7. noif 8.
+   fa 6. noif 7.
 Qed.
