@@ -269,10 +269,40 @@ assert cond@R1(j).
   expand exec@R1(j).
 assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)).
 assert nR(j) = input@T(i,k).
+euf M3. case H3.
+assert R(j)<T(i,k).
+  fresh M4. depends R(j),R2(j).
+(** We now have R(j) < T(i,k) < R1(j) < T1(i,k). *)
+(** Expanding cond@R1(j) does not bring much information:
+    The condition of R1(j) holds for i,k but euf M0 does not provide this information.
+    However the condition may also hold for other values i1,k1: nR(j) could have
+    been sent to any tag, and any resulting output would work. *)
+
+assert output@R1(j) = try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key(i)).
+case try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key(i)).
+
+(* If try-find is successful with i1,k1 we must have i1 = i (???)
+   We know D0: output@R1(j) = h(<snd(input@R1(j)),nR(j)>,key(i1))
+   but the hashed message can only depend *)
+(* TODO euf D0 crashes here... I'm re-using wa_R1_left instead *)
+apply wa_R1_left to i1,j. apply H3.
+(* TODO understand why these "harmless" substitutions break the proof
+substitute fst(output@T(i1,k2)),nT(i1,k2).
+substitute fst(input@R1(j)),nT(i1,k2). *)
+assert h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) = h(<<nR(j),nT(i1,k2)>,tag1>,key(i1)).
+euf M10. (* This is almost a collision-resistance step *)
+
+exists j.
+
+(* If try-find fails, we contradict cond@R1(j).
+   Here we do not care that this condition gives us uselessly new indices. *)
 expand cond@R1(j).
-euf M5.
-(* ??? *)
-admit.
+apply H2 to i1,k1.
+
 (* RIGHT *)
 admit.
 
