@@ -1,3 +1,9 @@
+(** See mw-seq for details.
+    This file models the base case of the unlinkability proof
+    of that file, replacing sequences with traces of some ad-hoc
+    bi-protocol. The proof of equivalence for this bi-protocol
+    corresponds closely to the proof of the base case in mw-seq. *)
+
 abstract id : index->message
 abstract id': index->index->message
 
@@ -19,11 +25,14 @@ axiom tags_neq : tag0 <> tag1
 
 channel c
 
+(** Our bi-system can produce all outputs of the sequences used in mw-seq,
+    with a slight difference: in the third sub-process (corresponding to
+    the third sequence) we use a local input variable instead of input@T(i,t)
+    which is of course unavailable here. However, this does not impact the
+    proof, which only relies on the freshness of nt(i,t). *)
 system ((!_r out(c,nr(r))) |
         (!_i !_t out(c,nt(i,t))) |
         (!_i !_t
-           (* Incorrect modeling: x should be input@T(i,t),
-              at least we allow it to depend on previous tag1 hashes. *)
            in(c,x);
            out(c,diff(id(i),id'(i,t)) XOR
                  H(<tag0,<x,nt(i,t)>>,diff(key(i),key'(i,t))))) |
@@ -31,6 +40,14 @@ system ((!_r out(c,nr(r))) |
            out(c,diff(id(i),id'(i,t)) XOR
                  H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
+(** In order to carry out the proof we impose restrictions (phases)
+    on the scheduling of the system's actions using axioms: the outputs
+    on names should come first so that we can eliminate them using the
+    fresh rule.
+    These axioms do not impact the validity of our model: the system
+    can still produce the desired sequences of messages. Note that
+    we do not impose restrictions on the relative order of the two
+    actions producing hashes. *)
 axiom phase_A_A1 : forall (i,t,r:index), A(r) < A1(i,t)
 axiom phase_A1_A2 : forall (i,t:index), A1(i,t) < A2(i,t)
 axiom phase_A1_A3 : forall (i,t,r:index), A1(i,t) < A3(i,t,r)

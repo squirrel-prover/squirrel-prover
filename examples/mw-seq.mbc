@@ -127,6 +127,32 @@ Qed.
 equiv unlinkability.
 Proof.
 
+(* Before starting the proof by induction we enrich the biframe.
+   The following sequences over-approximate the messages that the
+   attacker may learn during protocol executions. Note that the
+   hashes using tag0 contain an arbitrart input@T(i,t) because
+   no authentication can be guaranteed at this point, while
+   hashes using tag1 contain a fixed message <nr(r),nt(i,t)>
+   since past execution conditions can guarantee that only
+   this content can be hashed.
+
+   Due to the addition of these sequences the cases where tau is
+   some action of the protocol are eased (we can use dup) and some
+   of the difficulty is moved to the base case (tau = init).
+   The biframe in that base case only contains these sequences.
+   We cannot formally prove that it is indistinguishable, because
+   we lack a notion of induction on sequences. However, the essence
+   of the proof is simple:
+   - we can get rid of tag1 hashes using prf and fresh
+     because these hashed messages are distinct from the tag0 messages
+     by tags_neq, and pairwise distinct thanks to the nonces nr(r) and
+     nt(i,t);
+   - we can then get rid of tag0 hashes using prf and fresh
+     because the nonce nt(i,t) guarantees that the hashed messages
+     are pairwise distinct;
+   - we can finally get rid of the nonces nr and nt in the first
+     two sequences using fresh.
+   The essence of this proof is formalized in mw-prelim.mbc. *)
 enrich seq(r -> nr(r)).
 enrich seq(i,t -> nt(i,t)).
 enrich seq(i,t -> diff(id(i),id'(i,t)) XOR
