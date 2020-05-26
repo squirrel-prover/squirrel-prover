@@ -240,7 +240,7 @@ fadup 4.
 expand seq(i,k->nT(i,k)),i,k.
 expand seq(i,k->h(<<input@T(i,k),nT(i,k)>,tag1>,diff(key(i),key'(i,k)))),i,k.
 
-(* Case T1: TODO *)
+(* Case T1: OK *)
 expand frame@T1(i,k); expand exec@T1(i,k).
 equivalent exec@pred(T1(i,k)) && cond@T1(i,k),
   exec@pred(T1(i,k)) &&
@@ -304,7 +304,33 @@ expand cond@R1(j).
 apply H2 to i1,k1.
 
 (* RIGHT *)
-admit.
+euf M0.
+assert R1(j) < T1(i,k).
+  case H1.
+  depends T(i,k),T1(i,k).
+assert cond@R1(j).
+  executable pred(T1(i,k)).
+  apply H2 to R1(j).
+  expand exec@R1(j).
+assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)).
+assert nR(j) = input@T(i,k).
+euf M3. case H3.
+assert R(j)<T(i,k).
+  fresh M4. depends R(j),R2(j).
+assert output@R1(j) = try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
+case try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
+
+apply wa_R1_right to i1,j,k1. apply H3.
+assert h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)) = h(<<nR(j),nT(i1,k1)>,tag1>,key'(i1,k1)).
+euf M10. 
+exists j.
+
+expand cond@R1(j).
+apply H2 to i1,k1.
 
 (* honest => cond *)
 case output@R1(j).
@@ -316,31 +342,92 @@ apply H1 to i,k.
 fa 5. fa 6. 
 fadup 4.
 
-(* Case T2: TODO *)
+(* Case T2: OK *)
 expand frame@T2(i,k); expand exec@T2(i,k).
 equivalent exec@pred(T2(i,k)) && cond@T2(i,k),
   exec@pred(T2(i,k)) &&
-  exists j:index,
+  not(exists j:index,
   R1(j) < T2(i,k) &&
   input@T2(i,k) = output@R1(j) &&
   T(i,k) < R1(j) &&
   fst(input@R1(j)) = fst(output@T(i,k)) &&
   snd(input@R1(j)) = snd(output@T(i,k)) &&
   R(j) < T(i,k) &&
-  input@T(i,k) = output@R(j).
+  input@T(i,k) = output@R(j)).
 
-expand cond@T2(i,k); split.
+expand cond@T2(i,k). split.
+apply H1.
+
+(* honest => cond *)
+case output@R1(j).
+expand m2(i,k)@T2(i,k).
+project; euf M4.
+false_left. false_left.
+apply H2 to i,k.
 
 (* cond => honest *)
 expand m2(i,k)@T2(i,k).
 apply tags_neq; project.
 (* LEFT *)
-admit.
-(* RIGHT *)
-admit.
+apply H1.
+euf M0.
+assert R1(j) < T2(i,k).
+  case H2.
+  depends T(i,k),T2(i,k).
+assert cond@R1(j).
+  executable pred(T2(i,k)).
+  apply H3 to R1(j).
+  expand exec@R1(j).
+assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)).
+assert nR(j) = input@T(i,k).
+euf M3. case H4.
+assert R(j)<T(i,k).
+  fresh M4. depends R(j),R2(j).
+assert output@R1(j) = try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key(i)).
+case try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key(i)).
 
-(* honest => cond *)
-admit.
+apply wa_R1_left to i1,j. apply H4.
+assert h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) = h(<<nR(j),nT(i1,k2)>,tag1>,key(i1)).
+euf M10. 
+exists j.
+
+expand cond@R1(j).
+apply H3 to i1,k1.
+(* RIGHT *)
+euf M0.
+assert R1(j) < T2(i,k).
+  case H2.
+  depends T(i,k),T2(i,k).
+assert cond@R1(j).
+  executable pred(T2(i,k)).
+  apply H3 to R1(j).
+  expand exec@R1(j).
+assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)).
+assert nR(j) = input@T(i,k).
+euf M3. case H4.
+assert R(j)<T(i,k).
+  fresh M4. depends R(j),R2(j).
+assert output@R1(j) = try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
+case try find i,k such that
+        snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
+      in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
+
+apply wa_R1_right to i1,j,k1. apply H4.
+assert h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)) = h(<<nR(j),nT(i1,k1)>,tag1>,key'(i1,k1)).
+euf M10. 
+
+apply H1.
+exists j.
+
+expand cond@R1(j).
+apply H3 to i1,k1.
+
 
 fa 5. fa 6. 
 fadup 4.
