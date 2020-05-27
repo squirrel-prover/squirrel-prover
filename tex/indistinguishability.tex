@@ -54,15 +54,21 @@
 \end{definition}
 
 \begin{definition}
-  Two protocoles $\calp_1$ and $\calp_2$, defined over the same signature, are compatible if \adrien{todo}.
+  Two protocoles $\calp_1 = (\calp_{1,\cala},\leq_1)$ and $\calp_2 = (\calp_{2,\cala}, \leq_2)$, defined over the same signature, are compatible if
+  \begin{itemize}
+  \item   the set of action names of $\calp_{1,\cala}$ is equal to the set of action names of  $\calp_{2,\cala}$;
+    \item  for any action names $\sfa,\sfa'$ in  $\calp_{1,\cala}$, we have that $ \sfa \leq_1 \sfa' \Leftrightarrow \sfa \leq_2 \sfa'$.
+  \end{itemize}
+
 \end{definition}
 
+From this Definition, the following Lemma instantly follows.
 \begin{lemma}
   If $\calp_1$ and $\calp_2$ are compatible then they have the same trace models.
 \end{lemma}
 
 \begin{definition}
-  Let $\calp_1$ and $\calp_2$ be two compatoble protocoles, and $\pvec{u} \sim \pvec{v}$ be a meta-formula equivalence formula. Then, for every $\calp_1$-trace model $\TM$, computational model $\Mo$ and interpretation~$\sigma$:
+  Let $\calp_1$ and $\calp_2$ be two compatible protocoles, and $\pvec{u} \sim \pvec{v}$ be a meta-formula equivalence formula. Then, for every $\calp_1$-trace model $\TM$, computational model $\Mo$ and interpretation~$\sigma$:
   \begin{align*}
     \TM, \Mo, \sigma \models_{\calp_1,\calp_2}
     \pvec{u} \sim \pvec{v}
@@ -75,116 +81,100 @@
   Finally, for any set of meta-formulas $S$, $S \models \pvec{u} \sim \pvec{v}$ if for every $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} S$, we have $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$.
 \end{definition}
 
-\adrien{explain how we use bi-protocols as syntactic suger for pairs of compatible protocols?}
 
-\subsection{Straightforward diff-equivalence}
-\adrien{I am not sure exactly what we want to say in this subsection. I left it mostly as is.}
+Remark that in the Tool, rather than asking the user to input a pair of protocol, he must specify a bi-protocol. From a bi-protocol, it is straightforward to obtain the corresponding pair of protocol through projection, and a bi-protocol is by essence a pair of two compatible protocols.
 
-We define the diff-equivalence of a process, by asking the equivalence of the projected frames for all possible traces.
+
+Now that we can interpret equivalence for pairs of protocol, we can now define the notion of diff-equivalence, such that no attacker can distinguish between the two protocols.
 
 \begin{definition}
   \label{def:process-equiv}
-  A bi-protocol $\calp$ is diff-equivalent when,
-  for any $\calp$-trace model $\TM$, the formula
-
-  \[
-    \dand_{v\in D_\XT}
-    \interp{\mframe@\tau^L}{\TM[\tau\mapsto v]}{\calp}
-    \sim
-    \interp{\mframe@\tau^R}{\TM[\tau \mapsto v]}{\calp}
-  \]
-  is valid.
-  \adrien{Why not just take the last action?}
+  A pair of compatible protocols $\calp_1,\calp_2$ is diff-equivalent when,
+  for any $\calp$-trace model $\TM$, the formula $\mframe@\tau  \sim \mframe@\tau$ is $(\calp_1,\calp_2)$-valid.
 \end{definition}
-\charlie{Notice that we could also extend $\interp{\phi}{\TM}{\calp}$ to formulas containing the $\sim$ symbol, and consider the formula $\forall \tau. \mframe@\tau^L \sim \mframe@\tau^R$.}
-Note that this equivalence cannot hold if there exists a trace
-whose probability of execution significantly differs between the two
-projections of the bi-protocol.
-Hence this imposes a form of synchronization on the execution of
-conditionals on the two sides of bi-protocoles.
-The interest of imposing this artificial constraint is that we
-can stop considering executions where one process goes to $\mythen$
-branch while the other goes to its $\myelse$ branch. \adrien{The constraint is not artificial. Indeed, since the actions are visible, the adversary sees whether the process is going right or left. There is no loss of generality there.}
-\begin{lemma}
-  A bi-protocol $\calp$ is diff-equivalent if,
-  for any $\calp$-trace model $\TM$, the formula
 
-  \[
+As the $\tau$ is not quantified, the previous formula is equivalent to  \[
     \dand_{v\in D_\XT}
-    \interp{\pair{\mframe@\tau^L,\mexec@\tau^L}}{\TM[\tau\mapsto v]}{\calp}
+    \interp{\mframe@\tau}{\TM[\tau\mapsto v]}{\calp_1}
     \sim
-    \interp{\pair{\mframe@\tau^R, \mexec@\tau^R}}{\TM[\tau \mapsto v]}{\calp}
+    \interp{\mframe@\tau}{\TM[\tau \mapsto v]}{\calp_2}
   \]
-  is valid.
-  \adrien{This just complicated to show than what Definition~\ref{def:process-equiv} requires. Maybe there is a typo?}
-\end{lemma}
+  for any trace model. This means that for any possible trace, and any possible timestamp in this trace, the sequence of outputs of the messages and the executability of the trace up to this point must be indistinguishable. Our indistinguishability, as it is interpreted in the CCSA model, is computationally sounds. It thus corresponds to the classical notion of computational indistinguishability.
 
-\newcommand{\In}{\mathsf{in}}
-\newcommand{\Out}{\mathsf{out}}
+Note that this equivalence cannot hold if there exists a trace whose probability
+of execution significantly differs between the two projections of the
+bi-protocol. Hence this imposes a form of synchronization on the execution of
+conditionals on the two sides of bi-protocoles. This stems from the fact that we
+consider protocols as pair of visible actions, where the attacker can know
+whether an action succeeded or failed.
 
-\begin{example}
-  Consider the bi-protocol
-  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,m)$
-  where $n$ and $m$ are arbitrary, possibly equal names.
-  Its two projections are indistinguishable, but the
-  bi-protocol is not diff-equivalent.
-  \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
-  Indeed we have
-  $\myif g()=0 \mythen \Out(c,n) \not\sim
-  \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
-  $g()=0$ to distinguish the two sides.
-  Our bi-protocol can however easily be
-  rewritten into a diff-equivalent process, e.g. by pushing the conditional
-  inside the output.
 
-  If we modify our bi-protocol into
-  $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,0)$
-  then the two projections become distinguishable.
-  The attack is obtained with an execution
-  where one process outputs a name while the other outputs $0$. Such
-  desynchronized executions are not taken into account with diff-equivalence,
-  but diff-equivalence still fails due to the desynchronized condition,
-  as before.
-\end{example}
+% \newcommand{\In}{\mathsf{in}}
+% \newcommand{\Out}{\mathsf{out}}
 
-In the next examples, we omit the $\myelse$ branch when it consists of a null
-process. In these examples, there is a coincidence between diff-equivalence
-and indistinguishability, because observable actions coincide with symbolic
-actions.
+% \begin{example}
+%   Consider the bi-protocol
+%   $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,m)$
+%   where $n$ and $m$ are arbitrary, possibly equal names.
+%   Its two projections are indistinguishable, but the
+%   bi-protocol is not diff-equivalent.
+%   \adrien{I do not agree. If you write the process using actions (as we do), then it is equivalent. When you are translating from the pi-process to an representation using actions, you cannot change the visible actions (or this is not a sound translation).}
+%   Indeed we have
+%   $\myif g()=0 \mythen \Out(c,n) \not\sim
+%   \myif g()=1 \mythen \Out(c,m)$: the attacker can simply choose
+%   $g()=0$ to distinguish the two sides.
+%   Our bi-protocol can however easily be
+%   rewritten into a diff-equivalent process, e.g. by pushing the conditional
+%   inside the output.
 
-\begin{example} \label{ex:negl}
-  Consider the bi-protocol
-  $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
-  It is diff-equivalent, and its projections are
-  indistinguishable as expected.
-  In the bi-protocol, the condition $x=\diff{n}{m}$ does not pass
-  with the same inputs on the left and right, but it passes with
-  the same negligible probability.
-\end{example}
+%   If we modify our bi-protocol into
+%   $\In(c,x).\myif x=\diff{0}{1} \mythen \Out(c,n) \myelse \Out(c,0)$
+%   then the two projections become distinguishable.
+%   The attack is obtained with an execution
+%   where one process outputs a name while the other outputs $0$. Such
+%   desynchronized executions are not taken into account with diff-equivalence,
+%   but diff-equivalence still fails due to the desynchronized condition,
+%   as before.
+% \end{example}
 
-\begin{example} \label{ex:sync}
-  Consider
-  $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
-  where $(t)_0$ denotes the first bit of $t$.
-  This bi-protocol is not diff-equivalent because
-  $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$, and
-  the two projections are distinguishable for the same
-  reason: the attacker sends $0$;
-  on the left he receives with probability $1\over 2$ a bitstring whose
-  first bit is $0$;
-  on the right process he receives with probably only $1\over 4$
-  a bitstring whose last bit is $0$.
-  If we change $\Out(c,n)$ into $\Out(c,\ok)$,
-  we have indistinguishable processes and diff-equivalence holds.
-\end{example}
+% In the next examples, we omit the $\myelse$ branch when it consists of a null
+% process. In these examples, there is a coincidence between diff-equivalence
+% and indistinguishability, because observable actions coincide with symbolic
+% actions.
 
-\begin{example} \label{ex:problem}
-  Consider $\Out(c,\diff{n}{m}).
-  \In(c,x).
-  \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
-  The projections are observationally equivalent and diff-equivalence
-  holds -- in fact they are $\alpha$-equivalent.
-\end{example}
+% \begin{example} \label{ex:negl}
+%   Consider the bi-protocol
+%   $\In(c,x).\myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+%   It is diff-equivalent, and its projections are
+%   indistinguishable as expected.
+%   In the bi-protocol, the condition $x=\diff{n}{m}$ does not pass
+%   with the same inputs on the left and right, but it passes with
+%   the same negligible probability.
+% \end{example}
+
+% \begin{example} \label{ex:sync}
+%   Consider
+%   $\In(c,x).\myif x=(\diff{n}{m})_0 \mythen \Out(c,n)$
+%   where $(t)_0$ denotes the first bit of $t$.
+%   This bi-protocol is not diff-equivalent because
+%   $\myif x=(n)_0 \mythen n \not\sim \myif x=(m)_0 \mythen n$, and
+%   the two projections are distinguishable for the same
+%   reason: the attacker sends $0$;
+%   on the left he receives with probability $1\over 2$ a bitstring whose
+%   first bit is $0$;
+%   on the right process he receives with probably only $1\over 4$
+%   a bitstring whose last bit is $0$.
+%   If we change $\Out(c,n)$ into $\Out(c,\ok)$,
+%   we have indistinguishable processes and diff-equivalence holds.
+% \end{example}
+
+% \begin{example} \label{ex:problem}
+%   Consider $\Out(c,\diff{n}{m}).
+%   \In(c,x).
+%   \myif x=\diff{n}{m} \mythen \Out(c,\ok)$.
+%   The projections are observationally equivalent and diff-equivalence
+%   holds -- in fact they are $\alpha$-equivalent.
+% \end{example}
 
 
 \subsection{Reasoning about equivalences}
@@ -194,15 +184,15 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 \begin{definition}
   Let $\calp_1,\calp_2$ be compatible protocols. An equivalence sequent $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ comprises a set of hypotheses $\Gamma$ and a goal $\pvec{u} \sim \pvec{v}$, where $\Gamma$ and $\pvec{u} \sim \pvec{v}$ are all equivalence formulas of the meta-logic.
 
-  The sequent  $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is valid whenever $\Gamma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is $(\calp_1,\calp_2)$-valid.
+  The sequent  $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is valid whenever $(\Gamma \Rightarrow \pvec{u} \sim \pvec{v})$ is $(\calp_1,\calp_2)$-valid.
 \end{definition}
 
 \begin{lemma}
-  A bi-protocol $\calp$ is diff-equivalent if and only if
+  A pair of compatible protocols $\calp_1,\calp_2$ is diff-equivalent if and only if
   \[
-    \mframe^L@\pre(\tau) \sim \mframe^R@\pre(\tau)
+    \mframe@\pre(\tau) \sim \mframe@\pre(\tau)
     \vdash_{\calp_1,\calp_2}
-    \mframe^L@\tau \sim \mframe^R@\tau
+    \mframe@\tau \sim \mframe@\tau
   \]
 \end{lemma}
 \begin{proof}
@@ -230,22 +220,12 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 %   The second equivalence is a direct induction on the length of the traces.
 % \end{proof}
 
-Adding the execution condition to the sequent is also a valid proof technique.
-\begin{lemma}
-  A bi-protocol $\calp$ is diff-equivalent if,
-  \[ \emptyset \vdash_{\calp_1,\calp_2}  \pair{\mframe^L@\tau,\mexec@\tau^L} \sim \pair{\mframe@\tau^R,\mexec@\tau^R}\]
-  \adrien{It is harder to prove the formula above than to prove $\emptyset \vdash_{\calp_1,\calp_2}  \mframe^L@\tau \sim \mframe^R@\tau$. Maybe there is a typo?}
-\end{lemma}
-
-
 We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These rules are independent of the protocoles $\calp_1,\calp_2$. Note that:
 \begin{itemize}
 \item the rule $\textsc{Sym}$ swaps the two protocols.
 \item the $\textsc{Refl}$ rule checks that the term $t$ is macro-free, which ensures that $\interp{\pvec{t}}{\TM}{\calp_1}$ and $\interp{\pvec{t}}{\TM}{\calp_2}$ are \emph{syntactically} the same (base logic) terms in any $\calp_1$-trace model $\TM$.
 \item the rule $\textsc{Trans}$ introduces an intermediate protocol $\calp_3$ which must be compatible with $\calp_1$ and $\calp_2$.
 \end{itemize}
-
-\adrien{explain that, in the tool, we fix the protocols. Hence $\textsc{Sym}$ and $\textsc{Trans}$ are not implemented.}
 
 
 \begin{figure}
@@ -255,7 +235,7 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
     }{\Gamma \cup \phi \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}}
 
     \inferrule[F-Cut]{
-      \Gamma \vdash_{\calp_1,\calp_2} \phi\\      
+      \Gamma \vdash_{\calp_1,\calp_2} \phi\\
       \Gamma \cup \phi \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }{
       \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
@@ -267,14 +247,14 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
 
     \inferrule[Refl]{~}
     { \Gamma \vdash_{\calp_1,\calp_2} \pvec{t} \sim \pvec{t} }
-    \quad\text{$\pvec{t}$ are macro-free}
+    \quad\text{$\pvec{t}$ is macro-free}
 
     \inferrule[Trans]{
       \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{t}\\
       \Gamma \vdash_{\calp_1,\calp_3} \pvec{t} \sim \pvec{v}
     }{\Gamma \vdash_{\calp_1,\calp_3} \pvec{u} \sim \pvec{v}}
     \quad\text{$\calp_1,\calp_2,\calp_3$ are compatible}
-    
+
     \inferrule[Subst]{
       \Gamma \cup \{t_1 \deq t_2\sim \true \}  \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }{
@@ -327,12 +307,13 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
   The rules presented in Figure~\ref{fig:lk-ind} are sound.
 \end{lemma}
 
+Remark that $\textsc{Subst}$,  $\textsc{if-weak}$ and $\textsc{if-equiv}$ are rules that leverages the reachability prover to obtain proofs of indistinguishability. This is a powerful tool: in an authentication protocol, one may prove in the reachability prover that the condition of an action is equivalent to a formula that expresses the well-authentication of the protocol, and once the condition is replaced inside the indistinguishability goal, the goal may become easy to prove.
+
 \paragraph{Other rules.}
 
-\Cref{fig:fresh,fig:prf,fig:xor} presents the rules for Fresh, PRF and XOR tactics.
+\cref{fig:rules-corresp-equiv} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
-\item $\Gamma \vdash_{\calp_1,\calp_2} u$ stands for $\Gamma^L \sim \Gamma^R \vdash_{\calp_1,\calp_2} u^L \sim u^R$
 \item $A \in S$ stands for every action in the system (or protocol)
 \item $A(\pvec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\pvec k)$ (outputs, updates and conditions)
 \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
@@ -347,15 +328,15 @@ We use the following notations:
         \text{Base logic Rule} &
         \text{Meta-logic Rule}\\
         \hline
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % Fresh
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         \inferrule{
           \Gamma \vdash \pvec{u}, C[0] \sim \pvec{v}, C[0]
         }{
           \Gamma \vdash \pvec{u}, C[\mathsf{n}] \sim \pvec{v}, C[\mathsf{n}']
         }
-        &        
+        &
         \inferrule{
           \Gamma \vdash_{\calp_1,\calp_2}
           {\begin{alignedat}[t]{2}
@@ -401,9 +382,9 @@ We use the following notations:
         \text{Base logic Rule} &
         \text{Meta-logic Rule}\\
         \hline
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % PRF
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         \inferrule{
           \Gamma \vdash
           \pvec{u},
@@ -441,7 +422,7 @@ We use the following notations:
         \mathsf{k} \tpos_{h(\_,\cdot)} \st(\pvec{u},C,t)
         &
         \text{when }
-        \mathsf{n} \text{ fresh}, 
+        \mathsf{n} \text{ fresh},
         \mathsf{k} \tpos^{\calp_1}_{h(\_,\cdot)} \st(\pvec{u},C,t)
         \\[1em]
         \text{and }
@@ -477,9 +458,9 @@ We use the following notations:
         \text{Base logic Rule} &
         \text{Meta-logic Rule}\\
         \hline
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % XOR
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         \inferrule{
           \Gamma \vdash \mylen(t) = \mylen(\mathsf{n})\\\\
           \Gamma \vdash
@@ -505,7 +486,7 @@ We use the following notations:
         }{
           \Gamma \vdash_{\calp_1,\calp_2}
           \pvec{u}, C[t \oplus \mathsf{n}[\pvec{j}]] \sim \pvec{v}, s
-        }   
+        }
         \\[2em]
         \text{when }
         \mathsf{m} \text{ fresh and }
@@ -526,7 +507,7 @@ We use the following notations:
     \]}
 
   \adrien{I use the function $\lreach{\Gamma}$ in the XOR rule, which extracts from $\Gamma$ the \emph{left} reachability statements. If we keep it, I will add the definition.}
-  
+
   \caption{Rules of the base logic, and corresponding meta-logic rules.}
   \label{fig:rules-corresp-equiv}
 \end{figure}
