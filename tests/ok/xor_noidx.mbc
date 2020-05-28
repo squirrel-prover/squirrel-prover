@@ -10,8 +10,8 @@ equiv test.
 Proof.
   induction t.
   expandall.
-  fa 1; fa 2.
-  xor 2.
-  yesif 2.
+  fa 0; fa 1; fa 1.
+  xor 1.
+  yesif 1.
   apply len_ok.
 Qed.

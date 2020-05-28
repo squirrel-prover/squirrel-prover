@@ -18,13 +18,20 @@ enrich seq(i->h(ok,k(i))).
  expand frame@A(i).
  expand output@A(i).
  expand exec@A(i).
+ fa 1.
  fa 2.
  equivalent cond@A(i), False.
- simpl.
  expand cond@A(i).
+ noif 2.
 
- noif 3.
- simpl.
+ expand frame@A1(i).
+ expand output@A1(i).
+ expand exec@A1(i).
+ fa 1.
+ fa 2.
+ equivalent cond@A1(i), True.
+ expand cond@A1(i).
+ fa 2.
 
  expand seq(i->h(ok,k(i))),i.
 Qed.

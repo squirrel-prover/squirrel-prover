@@ -16,7 +16,7 @@ expand S@A; expand St@A.
    equivalently, diff(<input@A,ok>,<input@A,ok>).
    The goal, where input macros expand to bi-terms,
    is correct: dup can be used. *)
-nosimpl(fa 1; fa 2; fa 4).
+nosimpl(fa 0; fa 1; fa 1).
 nosimpl(fadup).
 expandall; fa 0; fa 1; assumption.
 Qed.
@@ -25,7 +25,7 @@ equiv [left,s1] [left,s1] test2.
 Proof.
 induction t.
 expandall.
-nosimpl(fa 1; fa 2; fa 2; fa 3).
+nosimpl(fa 0; fa 1; fa 2; fa 2; fa 3).
 (* The output should be <input@A,ok>. *)
 fadup.
 Qed.
@@ -33,7 +33,7 @@ Qed.
 equiv [right,s2] [left,s1] test3.
 Proof.
 induction t; expandall.
-nosimpl(fa 1; fa 2; fa 2; fa 3; fa 4).
+nosimpl(fa 0; fa 1; fa 2; fa 2; fa 3; fa 4).
 (* The output should be <input@A,ok>. *)
 fadup.
 Qed.
@@ -43,5 +43,5 @@ Proof.
 induction t.
 expandall.
 (* The ouput should reduce to input@A. *)
-fa 1.
+fa 0.
 Qed.
