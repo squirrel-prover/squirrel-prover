@@ -23,6 +23,6 @@ fadup; expandall; refl + assumption.
 
     fadup; try (expandall; refl + assumption).
 
-	fa 1. fa 2.
+	fa 0. fa 1. fa 1.
 ddh a, b, k.
 Qed.

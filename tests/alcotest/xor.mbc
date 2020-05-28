@@ -11,10 +11,11 @@ equiv test.
 Proof.
 induction t.
 expandall.
+fa 0.
 fa 1.
-fa 2.
-fa 2.
-xor 3.
-noif 3.
+fa 1.
+fa 1.
+xor 2.
+noif 2.
 simpl.
 Qed.
