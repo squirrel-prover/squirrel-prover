@@ -69,7 +69,7 @@ From this Definition, the following Lemma instantly follows.
 
 % \begin{definition}
 %   Let $\calp_1$ and $\calp_2$ be two compatible protocols, and
-%   $\pvec{u} \sim \pvec{v}$ be a meta-logic equivalence formula. 
+%   $\pvec{u} \sim \pvec{v}$ be a meta-logic equivalence formula.
 % Then, for every $\calp_1$-trace model $\TM$, computational model $\Mo$ and interpretation~$\sigma$:
 %   \begin{align*}
 %     \TM, \Mo, \sigma \models_{\calp_1,\calp_2}
@@ -98,7 +98,7 @@ $\Mo, \sigma \models
   Finally, for any set of meta-formulas $S$, $S \models \pvec{u} \sim \pvec{v}$ if for any $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} S$, we have $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$.
 \end{definition}
 
-\stef{Est-ce que ce dernier point dans la def est utilisé ? Si oui, 
+\stef{Est-ce que ce dernier point dans la def est utilisé ? Si oui,
   ecrire quelquechose comme when  $\calp_1$ and $\calp_2$ are clear
   from the context. Plus bas, on parle de $S \Rightarrow u \sim
   v$ valid et je me rends compte en fait que cette derniere notion
@@ -121,7 +121,7 @@ As the $\tau$ is not quantified, the previous formula is equivalent to  \[
     \sim
     \interp{\mframe@\tau}{\TM[\tau \mapsto v]}{\calp_2}
   \]
-  for any trace model. 
+  for any trace model.
 \stefcolor{Note that we can not explicitly add the quantification
   since it is not allowed by our notion of meta-logic equivalence formula.}
 This means that for any possible trace, and any possible timestamp in this trace, the sequence of outputs of the messages and the executability of the trace up to this point must be indistinguishable. Our indistinguishability, as it is interpreted in the CCSA model, is computationally sounds. It thus corresponds to the classical notion of computational indistinguishability.
@@ -227,7 +227,7 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 \begin{proof}
   This is by induction on the length of the traces.
 \stef{Ce n'est pas plutot par induction  sur les timestamps en
-  considerant l'ordre induit par $\mpred$ ou quelquechose comme ca.
+  considerant l'ordre induit par $\pre$ ou quelquechose comme ca.
   Quand on parle d'induction sur la longueur de la trace je ne vois
   pas trop de quelle trace on parle en fait.}
 \end{proof}
