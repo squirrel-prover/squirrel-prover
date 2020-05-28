@@ -70,11 +70,11 @@ module CTerm : sig
     val ccst : Cst.t -> cterm
     val cvar : varname -> cterm
     val cxor : cterm list -> cterm
-      
-end = struct 
+
+end = struct
   (* Terms used during the completion and normalization.
       Remark: Cxor never appears during the completion. *)
-  type cterm = 
+  type cterm =
     | Cfun of Term.fsymb * cterm list
     | Ccst of Cst.t
     | Cvar of varname
@@ -87,10 +87,10 @@ end = struct
 
   (* Smart constructors *)
   let ccst c = Ccst c
-      
+
   let cvar v = Cvar v
-      
-  let rec cfun f ts = 
+
+  let rec cfun f ts =
     if f = Term.f_succ
     then begin match ts with
       | [Ccst cst] -> Ccst (Cst.Csucc cst)
@@ -113,7 +113,7 @@ end = struct
 end
 
 open CTerm
-    
+
 let var_cpt = ref 0
 
 let mk_var () =
@@ -134,7 +134,6 @@ let rec cterm_of_term c =
   | ITE(b,c,d) -> cfun Term.f_ite [cterm_of_bterm b; cterm_of_term c; cterm_of_term d]
   | Diff(c,d) -> cfun Term.f_diff [cterm_of_term c; cterm_of_term d]
   | _ ->
-    Fmt.pr "Unsupported term in completion: %a.@." Term.pp c ;
     raise Unsupported_conversion
 
 and
@@ -144,7 +143,6 @@ and
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
     ccst (Cst.Cmacro (Cst.Bool m,ts))
   | _ ->
-    Fmt.pr "Unsupported term in completion: %a.@." Term.pp c ;
     raise Unsupported_conversion
 
 let rec term_of_cterm =
@@ -314,7 +312,7 @@ let rec flatten t = match t with
     ( List.flatten eqss,
       new_rule :: List.flatten xeqss,
       a )
-    
+
   | Cfun (f,ts) ->
     let eqss, xeqss, csts = List.map flatten ts |> List.split3 in
     let a = Cst.mk_flat () in
@@ -545,7 +543,7 @@ module Unify = struct
       (fun fmt (i,c) ->
         Fmt.pf fmt "%d -> %a" i pp_cterm c))
       fmt (Imap.bindings s)
-  
+
   exception Unify_cycle
 
   (** [subst_apply t sigma] applies [sigma] to [t], checking for cycles. *)
@@ -765,10 +763,10 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
 
     cxor (csts_norm @ fterms1)
 
-  | Cfun (fn, ts) ->   
+  | Cfun (fn, ts) ->
     let nts = List.map (term_grnd_normalize state) ts in
     let u' = cfun fn nts in
-    
+
     (* Optimisation: storing rules by head function symbols would help here. *)
     if List.for_all (fun c -> not (is_cfun c)) nts then
       try
@@ -855,7 +853,7 @@ let rec complete_state state =
               |> Xor.deduce_eqs
               |> Ground.deduce_eqs
               |> Erules.deduce_eqs in
-  
+
   if start <> stop_cond state then complete_state state
   else state
 
@@ -880,7 +878,7 @@ let sig_pk f1 f2 =
 
 let is_sdec f =
   assert (snd (Symbols.Function.get_def f) = Symbols.SDec)
-    
+
 let init_erules () =
   Symbols.Function.fold (fun fname def data erules -> match def, data with
       | (_, Symbols.AEnc), Symbols.AssociatedFunctions [f1; f2] ->
@@ -918,10 +916,10 @@ let complete_cterms (l : (cterm * cterm) list) : state =
                 sat_xor_rules = None;
                 e_rules = init_erules ();
                 completed = false  } in
-  
+
   complete_state state
   |> finalize_completion
-  
+
 let complete (l : (Term.message * Term.message) list) : state =
   let l =
     List.fold_left
@@ -931,7 +929,7 @@ let complete (l : (Term.message * Term.message) list) : state =
       []
       l
   in
-  complete_cterms l 
+  complete_cterms l
 
 
 (****************)
@@ -947,7 +945,7 @@ let rec is_ground_term = function
   | Cxor ts | Cfun (_, ts) -> List.for_all is_ground_term ts
 
 let check_disequality_cterm state neqs (u,v) =
-  assert (state.completed);  
+  assert (state.completed);
   (* we normalize all inequalities *)
   let neqs =
     List.map (fun (x, y) -> normalize state x, normalize state y) neqs
