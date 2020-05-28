@@ -92,10 +92,7 @@ From this Definition, the following Lemma instantly follows.
 $\Mo, \sigma \models
     \interp{\pvec{u}}{\TM}{\calp_1} \sim
     \interp{\pvec{v}}{\TM}{\calp_2}$.}
-%
  We say that $\pvec{u} \sim \pvec{v}$ is $(\calp_1,\calp_2)$-valid if $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ for any $\TM$, $\Mo$, $\sigma$.
-
-  Finally, for any set of meta-formulas $S$, $S \models \pvec{u} \sim \pvec{v}$ if for any $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} S$, we have $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$.
 \end{definition}
 
 \stef{Est-ce que ce dernier point dans la def est utilisé ? Si oui,
@@ -115,16 +112,20 @@ Now that we can interpret equivalence for pairs of protocol, we can now define t
   for any $\calp$-trace model $\TM$, the formula $\mframe@\tau  \sim \mframe@\tau$ is $(\calp_1,\calp_2)$-valid.
 \end{definition}
 
-As the $\tau$ is not quantified, the previous formula is equivalent to  \[
+As the $\tau$ is not quantified, the previous formula is equivalent to the fact that \[
     \dand_{v\in D_\XT}
     \interp{\mframe@\tau}{\TM[\tau\mapsto v]}{\calp_1}
     \sim
     \interp{\mframe@\tau}{\TM[\tau \mapsto v]}{\calp_2}
   \]
-  for any trace model.
-\stefcolor{Note that we can not explicitly add the quantification
-  since it is not allowed by our notion of meta-logic equivalence formula.}
-This means that for any possible trace, and any possible timestamp in this trace, the sequence of outputs of the messages and the executability of the trace up to this point must be indistinguishable. Our indistinguishability, as it is interpreted in the CCSA model, is computationally sounds. It thus corresponds to the classical notion of computational indistinguishability.
+  holds for all trace model in the base logic.  for any trace model.  Note that
+  we can not explicitly add the quantification since it is not allowed by our
+  notion of meta-logic equivalence formula.  This means that for any possible
+  trace, and any possible timestamp in this trace, the sequence of outputs of
+  the messages and the executability of the trace up to this point must be
+  indistinguishable. Our indistinguishability, as it is interpreted in the CCSA
+  model, is computationally sounds. It thus corresponds to the classical notion
+  of computational indistinguishability.
 
 Note that this equivalence cannot hold if there exists a trace whose probability
 of execution significantly differs between the two projections of the
@@ -208,13 +209,9 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
 
 \begin{definition}
   Let $\calp_1,\calp_2$ be compatible protocols. An equivalence sequent $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ comprises a set of hypotheses $\Gamma$ and a goal $\pvec{u} \sim \pvec{v}$, where $\Gamma$ and $\pvec{u} \sim \pvec{v}$ are all equivalence formulas of the meta-logic.
-
-  The sequent  $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is valid \stefcolor{whenever $(\Gamma \Rightarrow \pvec{u} \sim \pvec{v})$ is $(\calp_1,\calp_2)$-valid.}
+x
+The sequent  $\Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}$ is valid if for all $\TM$, $\Mo$, $\sigma$ such that $\TM, \Mo, \sigma \models_{\calp_1,\calp_2} \psi$ for all $\psi \in \Gamma$, we have that $\TM,\Mo,\sigma \models_{\calp_1,\calp_2}  \pvec{u} \sim \pvec{v}$.
 \end{definition}
-
-\stef{Comme dit plus haut, cette derniere notion ne me semble pas
-  avoir ete defini. Quelle terminologie preferez-vous garder ? Le
-  valid ou le $S \models u \sim v$ ?}
 
 \begin{lemma}
   A pair of compatible protocols $\calp_1,\calp_2$ is diff-equivalent if and only if
@@ -225,11 +222,13 @@ We extend our sequent calculus with rules to prove the equivalence formulas of t
   \]
 \end{lemma}
 \begin{proof}
-  This is by induction on the length of the traces.
-\stef{Ce n'est pas plutot par induction  sur les timestamps en
-  considerant l'ordre induit par $\pre$ ou quelquechose comme ca.
-  Quand on parle d'induction sur la longueur de la trace je ne vois
-  pas trop de quelle trace on parle en fait.}
+  Let $\TM$ and $\Mo$ be a trace and a computational model. We assume that the sequent is valid, and must prove that for all $v \in D_\XT$, $\TM\{ \tau \mapsto v\} ,\Mo \models_{P_1,P_2}     \mframe@\tau \sim \mframe@\tau$.
+
+  We reason by induction over $v \in D_\XT$, which is a completely ordered set with $\pre$ as a predecessor function, and $\tinit$ as the minimal value.\\
+
+  \underline{Case $v = \tinit$} In this case, $\interp{\mframe@\tau}{\TM\{ \tau \mapsto v\} }{P_1} = \interp{\mframe@\tau}{\TM\{ \tau \mapsto v\} }{P_2} = 0$, and it trivially holds that $\TM\{ \tau \mapsto \tinit\} ,\Mo \models_{P_1,P_2}     \mframe@\tau \sim \mframe@\tau$.\\
+
+  \underline{Case $v \in D_\XT \setminus \{\tinit\}$} By induction hypothesis, we have that $\TM\{ \tau \mapsto \pre(v)\} ,\Mo \models_{P_1,P_2}  \mframe@\tau \sim \mframe@\tau$. Thus, we have that  $\TM\{ \tau \mapsto v\} ,\Mo \models_{P_1,P_2}   \mframe@\pre{\tau} \sim \mframe@\pre{\tau}$ which is the premisse of the sequent. The conclusion of the sequent then holds, i.e.~ $\TM\{ \tau \mapsto v\} ,\Mo \models_{P_1,P_2}   \mframe@\tau \sim \mframe@\tau$. This concludes the proof.
 \end{proof}
 
 % \begin{lemma}
@@ -260,6 +259,7 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
 \item the rule $\textsc{Trans}$ introduces an intermediate protocol $\calp_3$ which must be compatible with $\calp_1$ and $\calp_2$.
 \end{itemize}
 
+%% only two/thrre examples of fig 7 in paper (dup, no-if, and the updated if equiv corresponds to equivalent, phi tese_P1 phi <=> phi' and pi tese_p2 phi <=> phi' and u[\phi -> phi'] \sim v[\phi ->\phi'] =>  u \sim v, and xor rule from fig 8, rest in annexe.
 
 \begin{figure}
   \begin{mathpar}
@@ -288,24 +288,23 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
     }{\Gamma \vdash_{\calp_1,\calp_3} \pvec{u} \sim \pvec{v}}
     \quad\text{$\calp_1,\calp_2,\calp_3$ are compatible}
 
-    \inferrule[Subst]{
-      \Gamma \cup \{t_1 \deq t_2\sim \true \}  \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
-    }{
-      \Gamma \cup \{t_1 \deq t_2\sim \true \} \vdash_{\calp_1,\calp_2}
-      \pvec{u}[ t_1 / t_2] \sim  \pvec{v}[ t_1 / t_2]
-    }
-
     \inferrule[if-reach]{
-      \phi \vdash_{\calp_1,\calp_2} \false
+      \phi \vdash_{\calp_1} \false \quad       \phi \vdash_{\calp_2} \false
     }{
       \Gamma  \vdash_{\calp_1,\calp_2} \myif \phi \mythen {u} \sim  \myif \phi \mythen {v}
     }
 
-    \inferrule[if-equiv]{
-      \phi \vdash_{\calp_1,\calp_2} \psi \Leftrightarrow \psi'
+    \inferrule[equiv]{
+\Gamma \vdash_{\calp_1}  t_1 \deq t_2 \quad    \Gamma \vdash_{\calp_2}  t_1 \deq t_2 \quad     \Gamma  \vdash_{\calp_1,\calp_2}  \pvec{u}[ t_1 / t_2] \sim  \pvec{v}[ t_1 / t_2]
     }{
       \Gamma \vdash_{\calp_1,\calp_2}
-      \myif  \phi \wedge \psi \mythen t \sim \myif \phi \wedge \psi' \mythen t
+      \pvec{u} \sim  \pvec{v}
+    }
+
+    \inferrule[equiv']{
+      \phi \vdash_{\calp_1} \phi \Leftrightarrow \psi  \quad     \phi \vdash_{\calp_2} \phi \Leftrightarrow \psi \quad       \Gamma \vdash_{\calp_1,\calp_2}  \pvec{u}[ \phi / \psi] \sim \pvec{v}[ \phi / \psi]
+    }{
+      \Gamma \vdash_{\calp_1,\calp_2}  \pvec{u} \sim \pvec{v}
     }
 
     \inferrule[${\lnot}$-R]{
@@ -314,11 +313,6 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
       \Gamma \vdash_{\calp_1,\calp_2} \pvec{u} \sim \pvec{v}
     }
 
-    \inferrule[fresh]{
-      n,m \not \in \Gamma
-    }{
-      \Gamma \vdash_{\calp_1,\calp_2} n \sim m
-    }
 
     \inferrule[if-weak]{
       \Gamma \vdash_{\calp_1,\calp_2} \phi, \pvec{u} \sim \phi, \pvec{v}
@@ -337,17 +331,17 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
 \end{figure}
 
 \begin{lemma}
-  The rules presented in Figure~\ref{fig:lk-ind} are sound, \stef{i.e. the
-  conclusion is valid as soon as the premisses are valid.}
+  The rules presented in \cref{fig:lk-ind} are sound.
 \end{lemma}
 
-Remark that $\textsc{Subst}$,  $\textsc{if-weak}$ and $\textsc{if-equiv}$ are rules that leverages the reachability prover to obtain proofs of indistinguishability. This is a powerful tool: in an authentication protocol, one may prove in the reachability prover that the condition of an action is equivalent to a formula that expresses the well-authentication of the protocol, and once the condition is replaced inside the indistinguishability goal, the goal may become easy to prove.
+Remark that $\textsc{equiv}$, $\textsc{equiv'}$ and  $\textsc{if-reach}$  are rules that leverages the reachability prover to obtain proofs of indistinguishability. This is a powerful tool: in an authentication protocol, one may prove in the reachability prover that the condition of an action is equivalent to a formula that expresses the well-authentication of the protocol, and once the condition is replaced inside the indistinguishability goal, the goal may become easy to prove.
 
 \paragraph{Other rules.}
 
 \cref{fig:rules-corresp-equiv} presents the rules for Fresh, PRF and XOR tactics.
 We use the following notations:
 \begin{itemize}
+  \item  $C$ denotes a macro-free context\footnote{If the context is not macro-free, it might be interpreted by distinct values on both sides of a meta-logic rule, and the base-logic axioms do not hold in this case. Notably, the corresponding fresh axiom , $C[0] \sim \pvec{v}, C'[0] \Rightarrow  C[\mathsf{n}] \sim \pvec{v}, C'[\mathsf{n}']$ is not true. This can be witnessed by taking $C[\_]= \myif \_ = 0 \mythen 1 \myelse 0$ and  $C[\_]= \myif \_ = 0 \mythen 1 \myelse 1$, as $C[0]$ and $C'[0]$ are both equal to 1, but with overwhelming probability,  $C[n]$ is equal to 0 and $C'[n']$ to 1.}
 \item $A \in S$ stands for every action in the system (or protocol)
 \item $A(\pvec i)^L$ represents the left projection of meta-logic bi-terms and bi-formulas describing the action $A(\pvec k)$ (outputs, updates and conditions)
 \item $k(\_) \sqsubseteq_{\h(\_,\cdot)} u$ means that the indexed key $k$ appears only in key positions in $u$
@@ -501,7 +495,7 @@ We use the following notations:
           \pvec{u}, C[\mathsf{m}] \sim \pvec{v}, s
         }{
           \Gamma \vdash
-          \pvec{u}, C[t \oplus \stefcolor{\mathsf{n}[\pvec{j}]}] \sim \pvec{v}, s
+          \pvec{u}, C[t \oplus \mathsf{n}] \sim \pvec{v}, s
         }
         &
         \inferrule{
@@ -542,19 +536,13 @@ We use the following notations:
 
   \adrien{I use the function $\lreach{\Gamma}$ in the XOR rule, which extracts from $\Gamma$ the \emph{left} reachability statements. If we keep it, I will add the definition.}
 
-\stef{dans XOR rule base logic ca doit etre une typo. Exact ? Et
-  aussi, c'est peut etre inutile de redefinir le n-fresh pour la regle
-  XOR.
-Pour le
-  reste, j'ai relu et je crois que ca va mais je ne suis pas
-  completement a l'aise avec la condition $c$ du happen before et pour
-  l'instant je n'ai pas assez d'intuition pour me dire que la
-  condition de la meta-logique implique trivialement la condition de
-  la base logique meme si je vois bien un joli parallele.}
+
   \caption{Rules of the base logic, and corresponding meta-logic rules.}
   \label{fig:rules-corresp-equiv}
 \end{figure}
 
+
+\cref{fig:fadup} describes the  $\textsc{FA-DUP}$ rule. TODO
 
 \begin{figure}[h]
   \begin{mathpar}
@@ -612,6 +600,14 @@ Pour le
   }
   \label{fig:fadup}
 \end{figure}
+
+We also provide in the calculus rules that are either direct translation from the base logic, or slight variations of the previous examples.
+\begin{itemize}
+\item We provide a rule for the Decisional Diffie-Hellman assumption, based on the $\BC$ rule presented in~\cite{bana2019verification}.
+\item We provide a rule for the key privacy axioms of encryptions and the $\textsc{CCA}_1$ axiom, based on the $\BC$ rule from~\cite{Bana:2014:CCS:2660267.2660276}.
+
+\end{itemize}
+
 
 \clearpage
 \section{Archives}
