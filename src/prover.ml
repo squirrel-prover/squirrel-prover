@@ -359,15 +359,13 @@ let make_equiv_goal_process system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
-  let formula = Term.Macro(Term.exec_macro,[],Term.Var ts) in
   let system =
     match system_1, system_2 with
     | Action.Left id1, Action.Right id2 when id1 = id2 ->
       Action.SimplePair id1
     | _ -> Action.Pair (system_1, system_2)
   in
-  Goal.Equiv (EquivSequent.init system !env
-                [(EquivSequent.Formula formula); (EquivSequent.Message term)])
+  Goal.Equiv (EquivSequent.init system !env [(EquivSequent.Message term)])
 
 type parsed_input =
   | ParsedInputDescr

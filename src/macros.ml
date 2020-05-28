@@ -66,11 +66,12 @@ let get_definition :
             | Term.Init -> Term.Fun (f_zero,[])
             | Term.Action _ ->
                 Term.Fun(Term.f_pair,
-                         [Term.Macro ((name,sort,args), [], Term.Pred a);
-                          (* TODO add exec or cond here *)
-                          Term.ITE(Term.Macro (Term.exec_macro, [], a),
-                                   Term.Macro (Term.out_macro, [], a),
-                                   Term.Fun(Term.f_zero,[]))])
+                  [Term.Macro ((name,sort,args), [], Term.Pred a);
+                   Term.Fun (Term.f_pair,
+                    [Term.boolToMessage (Term.Macro (Term.exec_macro, [], a));
+                     Term.ITE(Term.Macro (Term.exec_macro, [], a),
+                                          Term.Macro (Term.out_macro, [], a),
+                                          Term.Fun(Term.f_zero,[]))])])
             | _ -> assert false
           end
       | Symbols.State _, _ ->
