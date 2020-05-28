@@ -88,21 +88,21 @@
     &\interp{\mexec}{\TM}{\calp}(\tinit) &\;\;=\;\;& \true
     \\
     &\interp{\mexec}{\TM}{\calp}(\sfa[\pvec{e}]) &\;\;=\;\;&
-    \mcond{\TM}{\calp}(\sfa[\pvec{e}])
+    \interp{\mcond}{\TM}{\calp}(\sfa[\pvec{e}])
     \dand
-    \mexec{\TM}{\calp}(\tpred{\sfa[\pvec{e}]})
+    \interp{\mexec}{\TM}{\calp}(\tpred{\sfa[\pvec{e}]})
     \\
-    &\interp{\minp}{\TM}{\calp}(\tinit) &\;\;=\;\;& \mframe{\TM}{\calp}(\tinit) = s{\TM}{\calp}(\pvec{f},\tinit)
-    = \mout{\TM}{\calp}(\tinit) = 0
+    &\interp{\minp}{\TM}{\calp}(\tinit) &\;\;=\;\;& \interp{\mframe}{\TM}{\calp}(\tinit) = \interp{s}{\TM}{\calp}(\pvec{f},\tinit)
+    = \interp{\mout}{\TM}{\calp}(\tinit) = 0
     \tag{for every $\vec{f} \in D_\I^p$}
     \\
     &\interp{\mframe}{\TM}{\calp}(\sfa[\pvec{e}]) &\;\;=\;\;&
-    \langle \mframe{\TM}{\calp}(\tpred{\sfa[\pvec{e}]}),
-    \myif \mexec{\TM}{\calp}(\sfa[\pvec{e}]) \mythen \mout{\TM}{\calp}(\sfa[\pvec{e}]) \myelse 0
-    \rangle
+    \langle \interp{\mframe}{\TM}{\calp}(\tpred{\sfa[\pvec{e}]}),
+    \langle  \interp{\mexec}{\TM}{\calp}(\sfa[\pvec{e}]) ,   \myif \interp{\mexec}{\TM}{\calp}(\sfa[\pvec{e}]) \mythen \interp{\mout}{\TM}{\calp}(\sfa[\pvec{e}]) \myelse 0
+    \rangle \rangle
     \\
     &\interp{\minp}{\TM}{\calp}(\sfa[\pvec{e}]) &\;\;=\;\;&
-    \att(\mframe{\TM}{\calp}(\tpred{\sfa[\pvec{e}]}))
+    \att(\interp{\mframe}{\TM}{\calp}(\tpred{\sfa[\pvec{e}]}))
     \\
     &\interp{\mout}{\TM}{\calp}(\sfa[\pvec{e}]) &\;\;=\;\;&
     \interp{o_{\sfa}}{\TM\{\pvec{i}\mapsto\pvec{e}\}}{\calp}
