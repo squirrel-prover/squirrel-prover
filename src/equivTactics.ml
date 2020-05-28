@@ -297,7 +297,9 @@ let () =
 
 (** Check if an element appears twice in the biframe,
   * or if it is [input@t] with some [frame@t'] appearing in the frame
-  * with [pred(t) <= t'] guaranteed. *)
+  * with [pred(t) <= t'] guaranteed,
+  * or if it is [exec@t] with some [frame@t'] appearing in the frame
+  * with [t <= t'] guaranteed. *)
 let is_dup elem elems =
   if List.mem elem elems then true else
     let rec leq t t' = let open Term in match t,t' with
@@ -314,6 +316,13 @@ let is_dup elem elems =
             (function
                | EquivSequent.Message (Term.Macro (fm,[],t'))
                  when fm = Term.frame_macro && leq (Pred t) t' -> true
+               | _ -> false)
+            elems
+      | EquivSequent.Formula (Term.Macro (em,[],t)) when em = Term.exec_macro ->
+          List.exists
+            (function
+               | EquivSequent.Message (Term.Macro (fm,[],t'))
+                 when fm = Term.frame_macro && leq t t' -> true
                | _ -> false)
             elems
       | _ -> false
