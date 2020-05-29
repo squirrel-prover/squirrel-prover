@@ -541,65 +541,257 @@ We use the following notations:
   \label{fig:rules-corresp-equiv}
 \end{figure}
 
+\cref{fig:fadup} describes the  $\textsc{FA-DUP}$ rule.
+This rule allows to remove from the frame some meta-formula
+$\phi$ that can already be computed by the attacker
+using the information he obtained from a past execution.
+The rule assumes that $\mframe @ T$ is available
+on both sides of the equivalence. These frames mean that the
+attacker has $\mout @ T'$ for some $T'$, provided that $T' \leq A(\pvec i)$
+and $\mexec @ T'$ holds.
+In order to obtain these conditions, we impose that formulas $\phi$
+occurs in a context where $\mexec @ T$ can be assumed to hold,
+and we impose that $\phi$ belongs to a syntactic fragment $H_{\{T\}}$
+guaranteeing (among other things)
+that its $\minp @ T'$ subterms are for timestamps $T' \leq T$.
 
-\cref{fig:fadup} describes the  $\textsc{FA-DUP}$ rule. TODO
+The rule would also be sound if we replace $\mexec @ T \wedge \phi$
+by $\mexec @ T \Rightarrow \phi$ or
+$\myif \mexec @ T \mythen t \myelse \false$ where $t \in H_{\{T\}}$
+is a honest meta-term.
+The conditions imposed on formulas of $H_{\{T\}}$ are not sensitive
+to the associativity-commutativity of conjunction, and more generally
+to boolean equivalences, which our implementation exploits for more
+flexibility: for instance, we consider that
+$((T_1 \leq T \wedge T_2 \leq T) \Rightarrow \phi') \in H_S$
+when
+$\phi' \in H_{S \cup \{T_1,T_2\}}$ and $T \in S$.
+Our implementation also allows the use of conditionals, lookups and
+sequences in meta-terms.
 
 \begin{figure}[h]
   \begin{mathpar}
     \inferrule[FA-DUP]{
-      \inferrule{
-        \Gamma \vdash_{\calp_1,\calp_2} u,
-        \mframe @ \pre(A(\pvec i)),
-        \mexec @ \pre(A(\pvec i))
-      }{
-        \Gamma \vdash_{\calp_1,\calp_2} u,
-        \mframe @ \pre(A(\pvec i)),
-        \myif \mexec @ \pre(A(\pvec i)) \mythen \phi_{h} \myelse \bot
-      }
+      \Gamma \vdash_{\calp_1,\calp_2}
+      \pvec u, \mframe @ T \sim \pvec v, \mframe @ T
     }{
-      \Gamma \vdash_{\calp_1,\calp_2} u,
-      \mframe @ \pre(A(\pvec i)),
-      \mexec @ \pre(A(\pvec i)) \wedge \phi_{h}
+      \Gamma \vdash_{\calp_1,\calp_2}
+      \pvec u, \mframe @ T, \mexec @ T \wedge \phi
+      \sim
+      \pvec v, \mframe @ T, \mexec @ T \wedge \phi
     }
   \end{mathpar}
-
-  We ask that $\phi_h \in H_{\{\pre(A(\pvec i))\}}$ where, for any set of
-  timestamps $T$, $H_T$ is the least set of formulas and messages
-  closed under function application, boolean connectives, and the
-  following rules:
-  $$ \inferrule{
-    B(\pvec j) \in T
+  We require that $\phi \in H_{\{T\}}$ where, for any set $S$ of
+  timestamps, $H_S$ is the least set of meta-formulas and meta-terms
+  that contains atomic meta-formulas over indices and timestamps,
+  that is closed under function application, boolean connectives,
+  and the following rules,
+  where $\mathcal{Q}$ stands for an arbitrary
+  quantification over timestamp or index variables, and the quantified
+  variable is assumed to be disjoint from the variables occurring in $S$:
+  $$
+  \inferrule{
+    T \in S
     \quad
-    \phi \in H_{T\cup\{C(\pvec {k})\}}
+    \phi \in H_{S\cup\{T'\}}
   }{
-    (\forall \pvec k.~ C(\pvec k)\leq B(\pvec j) \Rightarrow \phi) \in H_T
+    (T' \leq T \Rightarrow \phi) \in H_S
   }
   \quad\quad
   \inferrule{
-    B(\pvec j) \in T
+    T \in S
     \quad
-    \phi \in H_{T\cup\{C(\pvec k)\}}
+    \phi \in H_{S\cup\{T'\}}
   }{
-    (\exists \pvec k.~ C(\pvec k)\leq B(\pvec j) \wedge \phi) \in H_T
+    (T' \leq T \wedge \phi) \in H_S
   }
+  \quad\quad
+  \inferrule{\phi\in H_S}{{\cal Q}.\phi \in H_S}
+  \quad\quad
+  \inferrule{t,t' \in H_S}{(t = t') \in H_S}
   $$
-  $$\inferrule{B(\pvec j) \in T}{
-    \minp @ B(\pvec j) \in H_T
-  }\quad\quad
-  \inferrule{ }{
-    \minp @ A(\pvec i) \in H_T
-  }\quad\quad
-  \inferrule{B(\pvec j) \in T}{
-    \mout @ B(\pvec j) \in H_T
+  $$
+  \inferrule{T \in S \text{ or } \pre(T) \in S}{
+    \minp @ T \in H_S
+  }
+  \quad\quad
+  \inferrule{T \in S}{
+    \mout @ T \in H_S
   }$$
-  $$
-  \inferrule{\phi \in H_T \quad B(\pvec j) \in T}{
-    (\myif \mexec @ B(\pvec j) \mythen \phi \myelse \psi) \in H_T}
-  $$
-  \caption{FA-DUP rule.
-  }
+  % David: je crois qu'on n'utilise pas cette possibilité,
+  % je la cache pour simplifier.
+  % $$
+  % \inferrule{\phi \in H_S \quad B(\pvec j) \in S}{
+  %   (\myif \mexec @ B(\pvec j) \mythen \phi \myelse \psi) \in H_S}
+  % $$
+  \caption{FA-DUP rule.}
   \label{fig:fadup}
 \end{figure}
+
+\begin{proposition}
+  The rule \textsc{FA-DUP} is sound.
+\end{proposition}
+\begin{proof}
+  \emph{For the proof I ignore $\Gamma$ because it is just carried around,
+  and to treat it formally I would need notations that we have not designed
+  yet.}
+  Consider some trace model $\TM$,
+  and assume that
+  $(\pvec u,\mframe @ T)^\TM_{\calp_1} \sim
+   (\pvec v,\mframe @ T)^\TM_{\calp_2}$
+  is a valid base-logic formula.
+  We show that
+  $$
+  \interp{\pvec u}{\TM}{\calp_1},
+  \interp{\mframe @ T}{\TM}{\calp_1},
+  (\mexec @ T \wedge \phi)^\TM_{\calp_1}
+  \sim
+  \interp{\pvec v}{\TM}{\calp_2},
+  \interp{\mframe @ T}{\TM}{\calp_2},
+  (\mexec @ T \wedge \phi)^\TM_{\calp_2}.
+  $$
+  Using equational reasoning on $\dand$, we can replace
+  $\interp{\mexec @ T}{\TM}{\calp_1} \dand \interp{\phi}{\TM}{\calp_1}$ by
+  $$\interp{\mexec @ T}{\TM}{\calp_1} \dand
+  \myif \interp{\mexec @ T}{\TM}{\calp_1}
+  \mythen \interp{\phi}{\TM}{\calp_1} \myelse \false$$
+  and similarly on the other side.
+  Then by \textsc{FA} and \textsc{Dup} on $\mexec @ T$,
+  \marginpar{\david{Technically it's not an immediate duplicate because
+  the exec is in the frame: we change $\mexec$ into
+  $\fst(\fst(\mframe))$ using equational reasoning and then use DUP.}}
+  we reduce our equivalence to proving the one where the last items
+  of frames are replaced by
+  $
+  \myif \interp{\mexec @ T}{\TM}{\calp_i}
+  \mythen \interp{\phi}{\TM}{\calp_i} \myelse \false
+  $.
+
+  We will actually prove more generally that
+  $$
+  \begin{array}{rl}
+    &
+    \pvec U,
+    \interp{\mframe @ T}{\TM}{\calp_1},
+    \myif \interp{\mexec @ T}{\TM}{\calp_1}
+    \mythen \interp{\xi}{\TM'}{\calp_1} \myelse \false
+    \\ \sim &
+    \pvec V,
+    \interp{\mframe @ T}{\TM}{\calp_2},
+    \myif \interp{\mexec @ T}{\TM}{\calp_2}
+    \mythen \interp{\xi}{\TM'}{\calp_2} \myelse \false
+  \end{array}
+  $$
+  for any sequences of base terms $\pvec U$ and $\pvec V$,
+  for any $\TM'$ that only differs from $\TM$ for the semantic
+  assignment of variables that do not occur in $T$,
+  and for any meta-formula or meta-term $\xi$ such that $\xi \in H_S$
+  for some set $S$ containing $T$ and such that\footnote{
+    We do not specify $\calp_1$ or $\calp_2$ here
+    as they are irrelevant to the interpretation of timestamp meta-terms.
+  } $\interp{T'}{\TM'}{}\leq\interp{T}{\TM'}{}$ for all $T'\in S$.
+
+  We proceed by induction on the structure of meta-formulas and meta-terms.
+  \begin{itemize}
+    \item Assume $\phi$ is of the form $\phi_1\wedge\phi_2$ with
+      $\phi_1,\phi_2\in H_S$. By equational reasoning we can replace
+      $\myif \interp{\mexec @ T}{\TM}{\calp_1}
+      \mythen \interp{\phi}{\TM'}{\calp_1} \myelse \false$
+      by
+      $$
+      (\myif \interp{\mexec @ T}{\TM}{\calp_1}
+       \mythen \interp{\phi_1}{\TM'}{\calp_1} \myelse \false)
+      \dand
+      (\myif \interp{\mexec @ T}{\TM}{\calp_1}
+       \mythen \interp{\phi_2}{\TM'}{\calp_1} \myelse \false)$$
+     and similarly on the other side.
+     We conclude by the \textsc{FA} rule on $\dand$ and induction
+     hypotheses on $\phi_1$ and $\phi_2$.
+   \item Assume $\phi$ is of the form $T' \leq T \Rightarrow \phi'$.
+     There are two subcases:
+     \begin{itemize}
+       \item If $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$ then
+         $\interp{T' \leq T \Rightarrow \phi'}{\TM'}{\calp_i} =
+         \true \dimpl \interp{\phi'}{\TM'}{\calp_i}$ for each $i$.
+         By equational reasoning on $\dimpl$ we can thus replace
+         the interpretation of $\phi$ by that of $\phi'$.
+         Moreover, our condition on $S$ extends to $S \cup \{T'\}$.
+         We conclude by induction hypothesis on
+         $\phi' \in H_{S\cup\{T'\}}$.
+       \item Otherwise, each
+         $\interp{T' \leq T \Rightarrow \phi'}{\TM'}{\calp_i}$ can be
+         replaced by $\true$ and we conclude by \textsc{FA}
+         on each $\myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen \true
+         \myelse \false$, followed
+         by \textsc{FA} on $\true$ and $\false$,
+         and \textsc{Dup} on $\mexec @ T$.
+     \end{itemize}
+   \item
+     The case of $T' \leq T \wedge \phi'$ is similar to the
+     second case above.
+     The cases of remaining boolean connectives is similar to the
+     first one above.
+   \item Assume $\phi$ is of the form ${\cal Q}.\phi'$.
+     By definition, $\interp{\phi}{\TM'}{\calp_i}$
+     is a boolean combination
+     of $\interp{\phi'}{\TM''}{\calp_i}$
+     where $\TM''$ only differs from $\TM'$ in its semantic assignment
+     for the quantified variable.
+     Since this variable is assumed to not occur in $S$,
+     the condition on $S$ wrt.\ $\TM'$ also holds wrt.\ $\TM''$,
+     and the condition $\TM'$ wrt.\ $T$ also holds wrt.\ $\TM''$.
+     We proceed as we did in the first case for a simple boolean combination,
+     i.e.\ by pushing the conditional on $\mexec @ T$ underneath boolean
+     connectives, using \textsc{FA} on boolean connectives and concluding
+     by induction hypotheses on $\phi'$ and $\TM''$.
+   \item If $\phi$ is an atom over index or timestamp meta-terms,
+     then $\interp{\phi}{\TM'}{\calp_1} = \interp{\phi}{\TM'}{\calp_1}$
+     and is either $\true$ or $\false$. We can thus conclude
+     by induction hypothesis.
+   \item If $\phi$ is an atom $t = t'$ over meta-terms of sort message,
+     we have $\interp{\phi}{\TM'}{\calp_i} =
+      EQ(\interp{t}{\TM'}{\calp_i},\interp{t'}{\TM'}{\calp_i})$ and
+     we conclude by \textsc{FA} on $EQ$ and induction hypotheses
+     on $t$ and $t'$ since they must belong to $H_S$.
+   \item The case of a meta-term $t$ of the form $f[\pvec i](\pvec t')$
+     is treated, as before, using \textsc{FA} on $f_{\sigma_\I(\pvec i)}$
+     and induction hypotheses on the honest subterms of $\pvec t'$.
+   \item Consider the case of a meta-term $\mout @ T'$ for some $T' \in S$.
+     By hypothesis on $S$ we have $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$.
+     Thus, by definition of $\interp{\mframe @ T}{\TM}{\calp_i}$,
+     there exists some context $C$ using $\fst$ and $\snd$
+     such that \david{TODO interpréter par $\TM$ et $\TM'$}
+     $$EQ(
+     \myif \mexec @ T' \mythen \interp{\mout @ T'}{\TM}{\calp_i}
+     \myelse \false,
+     C[\interp{\mframe @ T}{\TM}{\calp_i}]) \sim \true.$$
+     Next, since $\interp{\mexec @ T}{\TM}{\calp_i}$
+     is a conjunction of
+     $\interp{\mexec @ T'}{\TM}{\calp_i}$ and other terms, we have:
+     $$EQ(
+     \myif \mexec @ T \mythen \interp{\mout @ T'}{\TM}{\calp_i}
+     \myelse \false,
+     \myif \mexec @ T \mythen C[\interp{\mframe @ T}{\TM}{\calp_i}])
+     \sim \true.$$
+     We obtain our equivalence statement
+     by performing the replacement permitted by this equality,
+     and conclude by \textsc{FA} on the conditional, then on the
+     uses of $\fst$ and $\snd$, to finally remove $\mexec @ T$ and
+     $\mframe @ T$ as duplicates.
+   \item Finally, if we have a meta-term $\minp @ T'$ where either $T' \in S$
+     of $\pre(T') \in S$, we have
+     $\interp{\minp @ T'}{\TM}{\calp_i} =
+      \att(\interp{\mframe @ \pre(T')}{\TM}{\calp_i})$.
+     By hypothesis on $T'$ we have
+     $\interp{\pre(T')}{\TM}{} \leq \interp{T}{\TM}{}$.
+     Moreover, the frame at $\pre(T')$ is a subterm of the one at $T$,
+     which can be accessed using a number of applications of $\snd$.
+     We can thus replace
+     $\interp{\minp @ T'}{\TM}{\calp_i}$
+     by $\att(\snd^n(\interp{\mframe @ T}{\TM}{\calp_i}))$.
+     We conclude by using \textsc{FA} and \textsc{Dup}.
+  \end{itemize}
+\end{proof}
 
 We also provide in the calculus rules that are either direct translation from the base logic, or slight variations of the previous examples.
 \begin{itemize}
