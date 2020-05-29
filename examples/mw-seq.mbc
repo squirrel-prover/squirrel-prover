@@ -130,7 +130,7 @@ Proof.
 (* Before starting the proof by induction we enrich the biframe.
    The following sequences over-approximate the messages that the
    attacker may learn during protocol executions. Note that the
-   hashes using tag0 contain an arbitrart input@T(i,t) because
+   hashes using tag0 contain an arbitrary input@T(i,t) because
    no authentication can be guaranteed at this point, while
    hashes using tag1 contain a fixed message <nr(r),nt(i,t)>
    since past execution conditions can guarantee that only
@@ -140,9 +140,10 @@ Proof.
    some action of the protocol are eased (we can use dup) and some
    of the difficulty is moved to the base case (tau = init).
    The biframe in that base case only contains these sequences.
-   We cannot formally prove that it is indistinguishable, because
-   we lack a notion of induction on sequences. However, the essence
-   of the proof is simple:
+
+   We cannot formally prove the indistinguishability of the biframe
+   in that base case, because we lack a notion of induction on sequences.
+   However, the essence of the proof is simple:
    - we can get rid of tag1 hashes using prf and fresh
      because these hashed messages are distinct from the tag0 messages
      by tags_neq, and pairwise distinct thanks to the nonces nr(r) and
@@ -151,8 +152,8 @@ Proof.
      because the nonce nt(i,t) guarantees that the hashed messages
      are pairwise distinct;
    - we can finally get rid of the nonces nr and nt in the first
-     two sequences using fresh.
-   The essence of this proof is formalized in mw-prelim.mbc. *)
+     two sequences using fresh. *)
+
 enrich seq(r -> nr(r)).
 enrich seq(i,t -> nt(i,t)).
 enrich seq(i,t -> diff(id(i),id'(i,t)) XOR
@@ -162,7 +163,7 @@ enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
 induction t.
 
 (* Init case *)
-admit. (* see mw-prelim *)
+admit. (* see comment above *)
 
 (* Case R - Done *)
 expand seq(r->nr(r)), r.
