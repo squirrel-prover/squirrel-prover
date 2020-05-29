@@ -657,15 +657,18 @@ sequences in meta-terms.
   \mythen \interp{\phi}{\TM}{\calp_1} \myelse \false$$
   and similarly on the other side.
   Then by \textsc{FA} and \textsc{Dup} on $\mexec @ T$,
-  \marginpar{\david{Technically it's not an immediate duplicate because
-  the exec is in the frame: we change $\mexec$ into
-  $\fst(\fst(\mframe))$ using equational reasoning and then use DUP.}}
   we reduce our equivalence to proving the one where the last items
   of frames are replaced by
   $
   \myif \interp{\mexec @ T}{\TM}{\calp_i}
   \mythen \interp{\phi}{\TM}{\calp_i} \myelse \false
-  $.
+  $:
+  in more detail, we observe that
+  $\EQ\bigl(\interp{\mexec @ T}{\TM}{\calp_i},
+       \interp{\fst(\fst(\mframe @ T))}{\TM}{\calp_i}\bigr)\sim\true$
+  holds, which allows us to replace the first term by the second,
+  to conclude by removing the applications of $\fst$ using \textsc{FA}
+  and get rid of $\mframe @ T$ using \textsc{Dup}.
 
   We will actually prove more generally that
   $$
@@ -750,8 +753,8 @@ sequences in meta-terms.
      by induction hypothesis.
    \item If $\phi$ is an atom $t = t'$ over meta-terms of sort message,
      we have $\interp{\phi}{\TM'}{\calp_i} =
-      EQ(\interp{t}{\TM'}{\calp_i},\interp{t'}{\TM'}{\calp_i})$ and
-     we conclude by \textsc{FA} on $EQ$ and induction hypotheses
+      \EQ(\interp{t}{\TM'}{\calp_i},\interp{t'}{\TM'}{\calp_i})$ and
+     we conclude by \textsc{FA} on $\EQ$ and induction hypotheses
      on $t$ and $t'$ since they must belong to $H_S$.
    \item The case of a meta-term $t$ of the form $f[\pvec i](\pvec t')$
      is treated, as before, using \textsc{FA} on $f_{\sigma_\I(\pvec i)}$
@@ -760,18 +763,22 @@ sequences in meta-terms.
      By hypothesis on $S$ we have $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$.
      Thus, by definition of $\interp{\mframe @ T}{\TM}{\calp_i}$,
      there exists some context $C$ using $\fst$ and $\snd$
-     such that \david{TODO interpréter par $\TM$ et $\TM'$}
-     $$EQ(
-     \myif \mexec @ T' \mythen \interp{\mout @ T'}{\TM}{\calp_i}
-     \myelse \false,
-     C[\interp{\mframe @ T}{\TM}{\calp_i}]) \sim \true.$$
-     Next, since $\interp{\mexec @ T}{\TM}{\calp_i}$
-     is a conjunction of
-     $\interp{\mexec @ T'}{\TM}{\calp_i}$ and other terms, we have:
-     $$EQ(
-     \myif \mexec @ T \mythen \interp{\mout @ T'}{\TM}{\calp_i}
-     \myelse \false,
-     \myif \mexec @ T \mythen C[\interp{\mframe @ T}{\TM}{\calp_i}])
+     such that
+     $$\EQ\bigl(
+     \interp{
+       \myif \mexec @ T' \mythen \mout @ T'}{\TM}{\calp_i},
+     C[\interp{\mframe @ T}{\TM}{\calp_i}]\bigr) \sim \true.$$
+     Note that we omitted the $\mathsf{else}$ branch for conciseness, and
+     since it does not play a role.
+     Next, since $\interp{\mexec @ T}{\TM}{\calp_i} =
+     \interp{\mexec @ T}{\TM'}{\calp_i}$ and since it is a conjunction of
+     $\interp{\mexec @ T'}{\TM'}{\calp_i}$ and other terms, we have:
+     $$\EQ\bigl(
+     \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
+       \interp{\mout @ T'}{\TM}{\calp_i},
+     \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
+     C[\interp{\mframe @ T}{\TM}{\calp_i}]
+     \bigr)
      \sim \true.$$
      We obtain our equivalence statement
      by performing the replacement permitted by this equality,
@@ -780,16 +787,18 @@ sequences in meta-terms.
      $\mframe @ T$ as duplicates.
    \item Finally, if we have a meta-term $\minp @ T'$ where either $T' \in S$
      of $\pre(T') \in S$, we have
-     $\interp{\minp @ T'}{\TM}{\calp_i} =
-      \att(\interp{\mframe @ \pre(T')}{\TM}{\calp_i})$.
+     $\interp{\minp @ T'}{\TM'}{\calp_i} =
+      \att(\interp{\mframe @ \pre(T')}{\TM'}{\calp_i})$.
      By hypothesis on $T'$ we have
-     $\interp{\pre(T')}{\TM}{} \leq \interp{T}{\TM}{}$.
-     Moreover, the frame at $\pre(T')$ is a subterm of the one at $T$,
+     $\interp{\pre(T')}{\TM'}{} \leq \interp{T}{\TM'}{}$.
+     Moreover, $\interp{\mframe @ \pre(T')}{\TM'}{\calp_i}$
+     is a subterm of $\interp{\mframe @ T}{\TM'}{\calp_i} =
+     \interp{\mframe @ T}{\TM}{\calp_i}$.
      which can be accessed using a number of applications of $\snd$.
      We can thus replace
-     $\interp{\minp @ T'}{\TM}{\calp_i}$
-     by $\att(\snd^n(\interp{\mframe @ T}{\TM}{\calp_i}))$.
-     We conclude by using \textsc{FA} and \textsc{Dup}.
+     $\interp{\minp @ T'}{\TM'}{\calp_i}$
+     by $\att(\snd^n(\interp{\mframe @ T}{\TM}{\calp_i}))$,
+     which allows to conclude using \textsc{FA} and \textsc{Dup}.
   \end{itemize}
 \end{proof}
 
