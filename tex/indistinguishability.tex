@@ -551,25 +551,25 @@ attacker has $\mout @ T'$ for some $T'$, provided that $T' \leq A(\pvec i)$
 and $\mexec @ T'$ holds.
 In order to obtain these conditions, we impose that formulas $\phi$
 occurs in a context where $\mexec @ T$ can be assumed to hold,
-and we impose that $\phi$ belongs to a syntactic fragment $H_{\{T\}}$
+and we impose that $\phi$ belongs to a syntactic fragment $\hfadup_{\{T\}}$
 guaranteeing (among other things)
 that its $\minp @ T'$ subterms are for timestamps $T' \leq T$.
 
 The rule would also be sound if we replace $\mexec @ T \wedge \phi$
 by $\mexec @ T \Rightarrow \phi$ or
-$\myif \mexec @ T \mythen t \myelse \false$ where $t \in H_{\{T\}}$
+$\myif \mexec @ T \mythen t \myelse \false$ where $t \in \hfadup_{\{T\}}$
 is a honest meta-term.
-The conditions imposed on formulas of $H_{\{T\}}$ are not sensitive
+The conditions imposed on formulas of $\hfadup_{\{T\}}$ are not sensitive
 to the associativity-commutativity of conjunction, and more generally
 to boolean equivalences, which our implementation exploits for more
 flexibility: for instance, we consider that
-$((T_1 \leq T \wedge T_2 \leq T) \Rightarrow \phi') \in H_S$
+$((T_1 \leq T \wedge T_2 \leq T) \Rightarrow \phi') \in \hfadup_S$
 when
-$\phi' \in H_{S \cup \{T_1,T_2\}}$ and $T \in S$.
+$\phi' \in \hfadup_{S \cup \{T_1,T_2\}}$ and $T \in S$.
 Our implementation also allows the use of conditionals, lookups and
 sequences in meta-terms.
 
-\begin{figure}[h]
+\begin{figure}[t]
   \begin{mathpar}
     \inferrule[FA-DUP]{
       \Gamma \vdash_{\calp_1,\calp_2}
@@ -580,44 +580,45 @@ sequences in meta-terms.
       \sim
       \pvec v, \mframe @ T, \mexec @ T \wedge \phi
     }
+    \quad \text{ when } \phi \in \hfadup_{\{T\}}
   \end{mathpar}
-  We require that $\phi \in H_{\{T\}}$ where, for any set $S$ of
-  timestamps, $H_S$ is the least set of meta-formulas and meta-terms
+  where, for any set $S$ of
+  timestamps, $\hfadup_S$ is the least set of meta-formulas and meta-terms
   that contains atomic meta-formulas over indices and timestamps,
   that is closed under function application, boolean connectives,
   and the following rules,
   where $\mathcal{Q}$ stands for an arbitrary
   quantification over timestamp or index variables, and the quantified
   variable is assumed to be disjoint from the variables occurring in $S$:
-  $$
-  \inferrule{
-    T \in S
-    \quad
-    \phi \in H_{S\cup\{T'\}}
-  }{
-    (T' \leq T \Rightarrow \phi) \in H_S
-  }
-  \quad\quad
-  \inferrule{
-    T \in S
-    \quad
-    \phi \in H_{S\cup\{T'\}}
-  }{
-    (T' \leq T \wedge \phi) \in H_S
-  }
-  \quad\quad
-  \inferrule{\phi\in H_S}{{\cal Q}.\phi \in H_S}
-  \quad\quad
-  \inferrule{t,t' \in H_S}{(t = t') \in H_S}
-  $$
-  $$
-  \inferrule{T \in S \text{ or } \pre(T) \in S}{
-    \minp @ T \in H_S
-  }
-  \quad\quad
-  \inferrule{T \in S}{
-    \mout @ T \in H_S
-  }$$
+  \begin{mathpar}
+    \inferrule{
+      T \in S\\    
+      \phi \in \hfadup_{S\cup\{T'\}}
+    }{
+      (T' \leq T \Rightarrow \phi) \in \hfadup_S
+    }
+
+    \inferrule{
+      T \in S\\
+      \phi \in \hfadup_{S\cup\{T'\}}
+    }{
+      (T' \leq T \wedge \phi) \in \hfadup_S
+    }
+
+    \inferrule{\phi\in \hfadup_S}{{\cal Q}.\phi \in \hfadup_S}
+
+    \inferrule{t,t' \in \hfadup_S}{(t = t') \in \hfadup_S}
+
+    \inferrule{T \in S \text{ or } \pre(T) \in S}{
+      \minp @ T \in \hfadup_S
+    }
+
+    \inferrule{T \in S}{
+      \mout @ T \in \hfadup_S
+    }
+  \end{mathpar}
+
+  \adrien{J'ai renomé $H$ en $\hfadup$, parce que, si je comprends bien, l'intuition c'est que il contient un ensemble de timestamp qu'on sait être éxécutable en hypotèse. Si ce n'est pas le bon nom, ou si il y a mieux, il suffit de changer la macro que j'ai introduit.}
   % David: je crois qu'on n'utilise pas cette possibilité,
   % je la cache pour simplifier.
   % $$
@@ -671,56 +672,67 @@ sequences in meta-terms.
   and get rid of $\mframe @ T$ using \textsc{Dup}.
 
   We will actually prove more generally that
-  $$
-  \begin{array}{rl}
-    &
-    \pvec U,
-    \interp{\mframe @ T}{\TM}{\calp_1},
-    \myif \interp{\mexec @ T}{\TM}{\calp_1}
-    \mythen \interp{\xi}{\TM'}{\calp_1} \myelse \false
-    \\ \sim &
-    \pvec V,
-    \interp{\mframe @ T}{\TM}{\calp_2},
-    \myif \interp{\mexec @ T}{\TM}{\calp_2}
-    \mythen \interp{\xi}{\TM'}{\calp_2} \myelse \false
-  \end{array}
-  $$
-  for any sequences of base terms $\pvec U$ and $\pvec V$,
-  for any $\TM'$ that only differs from $\TM$ for the semantic
-  assignment of variables that do not occur in $T$,
-  and for any meta-formula or meta-term $\xi$ such that $\xi \in H_S$
+  \begin{alignat*}{2}
+      &&&
+      \pvec U,
+      \interp{\mframe @ T}{\TM}{\calp_1},
+      \big(
+      \myif \interp{\mexec @ T}{\TM}{\calp_1}
+      \mythen \interp{\xi_k}{\TM'_k}{\calp_1} \myelse \false
+      \big)_{k \in K}
+      \\ &\sim\;\; &&
+      \pvec V,
+      \interp{\mframe @ T}{\TM}{\calp_2},
+      \big(
+      \myif \interp{\mexec @ T}{\TM}{\calp_2}
+      \mythen \interp{\xi_k}{\TM'_k}{\calp_2} \myelse \false
+      \big)_{k \in K}
+    \end{alignat*}
+  for any sequences of base terms $\pvec U$ and $\pvec V$ and 
+  for any finite set $K$ such that for every $k \in K$,
+  $\TM'_k$ only differs from $\TM$ for the semantic
+  assignment of index and timestamp variables that do not occur in $T$,
+  and $\xi_k$ is a meta-formula or meta-term such that $\xi_k \in \hfadup_S$
   for some set $S$ containing $T$ and such that\footnote{
     We do not specify $\calp_1$ or $\calp_2$ here
     as they are irrelevant to the interpretation of timestamp meta-terms.
-  } $\interp{T'}{\TM'}{}\leq\interp{T}{\TM'}{}$ for all $T'\in S$.
+  } $\interp{T'}{\TM'_k}{}\leq\interp{T}{\TM'_k}{}$ for all $T'\in S$.
 
-  We proceed by induction on the structure of meta-formulas and meta-terms.
+  We proceed by induction on the set of meta-terms and meta-formulas $(\xi_k)_{k \in K}$, using the multi-set ordering induced by the structural ordering of meta-formulas and meta-terms.
+
+  We take $k_0 \in K$, $\xi = \xi_{k_0}$ and $\TM' = \TM'_{k_0}$.
   \begin{itemize}
-    \item Assume $\phi$ is of the form $\phi_1\wedge\phi_2$ with
-      $\phi_1,\phi_2\in H_S$. By equational reasoning we can replace
+    \item Assume $\xi$ is of the form $\phi_1\wedge\phi_2$ with
+      $\phi_1,\phi_2\in \hfadup_S$. By equational reasoning we can replace
       $\myif \interp{\mexec @ T}{\TM}{\calp_1}
       \mythen \interp{\phi}{\TM'}{\calp_1} \myelse \false$
       by
-      $$
-      (\myif \interp{\mexec @ T}{\TM}{\calp_1}
-       \mythen \interp{\phi_1}{\TM'}{\calp_1} \myelse \false)
-      \dand
-      (\myif \interp{\mexec @ T}{\TM}{\calp_1}
-       \mythen \interp{\phi_2}{\TM'}{\calp_1} \myelse \false)$$
-     and similarly on the other side.
-     We conclude by the \textsc{FA} rule on $\dand$ and induction
-     hypotheses on $\phi_1$ and $\phi_2$.
-   \item Assume $\phi$ is of the form $T' \leq T \Rightarrow \phi'$.
+      \[
+        (\myif \interp{\mexec @ T}{\TM}{\calp_1}
+        \mythen \interp{\phi_1}{\TM'}{\calp_1} \myelse \false)
+        \dand
+        (\myif \interp{\mexec @ T}{\TM}{\calp_1}
+        \mythen \interp{\phi_2}{\TM'}{\calp_1} \myelse \false)
+      \]
+      and similarly on the other side.
+      We conclude by the \textsc{FA} rule on $\dand$ and induction
+      hypotheses on
+      $(\xi_k)_{k \in K \backslash \{k_0\}} \cup \{\phi_1\} \cup \{\phi_2\}$,
+      which is strictly smaller than $(\xi_k)_{k \in K}$ (because $\phi_1$ and $\phi_2$ are strictly smaller than $\xi$).
+
+   \item The other boolean connectives cases (e.g.\ $\vee$), the case $t = t'$ and the case where $\xi$ is a function application are identical to the $\phi_1\wedge\phi_2$ case. \adrien{(j'ai groupé tout les cas qui sont immédiatements $FA + DUP$ comme dans le premier cas)}
+     
+   \item Assume $\xi$ is of the form $T' \leq T \Rightarrow \phi'$.
      There are two subcases:
      \begin{itemize}
        \item If $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$ then
          $\interp{T' \leq T \Rightarrow \phi'}{\TM'}{\calp_i} =
-         \true \dimpl \interp{\phi'}{\TM'}{\calp_i}$ for each $i$.
+         \true \dimpl \interp{\phi'}{\TM'}{\calp_i}$ for $i\in \{1,2\}$.
          By equational reasoning on $\dimpl$ we can thus replace
-         the interpretation of $\phi$ by that of $\phi'$.
+         the interpretation of $\xi$ by that of $\phi'$.
          Moreover, our condition on $S$ extends to $S \cup \{T'\}$.
          We conclude by induction hypothesis on
-         $\phi' \in H_{S\cup\{T'\}}$.
+         $\phi' \in \hfadup_{S\cup\{T'\}}$.
        \item Otherwise, each
          $\interp{T' \leq T \Rightarrow \phi'}{\TM'}{\calp_i}$ can be
          replaced by $\true$ and we conclude by \textsc{FA}
@@ -729,12 +741,14 @@ sequences in meta-terms.
          by \textsc{FA} on $\true$ and $\false$,
          and \textsc{Dup} on $\mexec @ T$.
      \end{itemize}
+
    \item
-     The case of $T' \leq T \wedge \phi'$ is similar to the
+     The case $T' \leq T \wedge \phi'$ is similar to the
      second case above.
-     The cases of remaining boolean connectives is similar to the
-     first one above.
-   \item Assume $\phi$ is of the form ${\cal Q}.\phi'$.
+     % The cases of remaining boolean connectives is similar to the
+     % first one above.
+     
+   \item Assume $\xi$ is of the form ${\cal Q}.\phi'$.
      By definition, $\interp{\phi}{\TM'}{\calp_i}$
      is a boolean combination
      of $\interp{\phi'}{\TM''}{\calp_i}$
@@ -747,58 +761,66 @@ sequences in meta-terms.
      i.e.\ by pushing the conditional on $\mexec @ T$ underneath boolean
      connectives, using \textsc{FA} on boolean connectives and concluding
      by induction hypotheses on $\phi'$ and $\TM''$.
-   \item If $\phi$ is an atom over index or timestamp meta-terms,
-     then $\interp{\phi}{\TM'}{\calp_1} = \interp{\phi}{\TM'}{\calp_1}$
-     and is either $\true$ or $\false$. We can thus conclude
+     
+   \item If $\xi$ is an atom over index or timestamp meta-terms,
+     then the translation of $\xi$ is independent of the protocol, i.e.\ $\interp{\xi}{\TM'}{\calp_1} = \interp{\xi}{\TM'}{\calp_2}$, and is either $\true$ or $\false$. We can thus conclude
      by induction hypothesis.
-   \item If $\phi$ is an atom $t = t'$ over meta-terms of sort message,
-     we have $\interp{\phi}{\TM'}{\calp_i} =
-      \EQ(\interp{t}{\TM'}{\calp_i},\interp{t'}{\TM'}{\calp_i})$ and
-     we conclude by \textsc{FA} on $\EQ$ and induction hypotheses
-     on $t$ and $t'$ since they must belong to $H_S$.
-   \item The case of a meta-term $t$ of the form $f[\pvec i](\pvec t')$
-     is treated, as before, using \textsc{FA} on $f_{\sigma_\I(\pvec i)}$
-     and induction hypotheses on the honest subterms of $\pvec t'$.
+   % \item If $\phi$ is an atom $t = t'$ over meta-terms of sort message,
+   %   we have $\interp{\phi}{\TM'}{\calp_i} =
+   %    \EQ(\interp{t}{\TM'}{\calp_i},\interp{t'}{\TM'}{\calp_i})$ and
+   %   we conclude by \textsc{FA} on $\EQ$ and induction hypotheses
+   %   on $t$ and $t'$ since they must belong to $H_S$.
+     
+   % \item The case of a meta-term $t$ of the form $f[\pvec i](\pvec t')$
+   %   is treated, as before, using \textsc{FA} on $f_{\sigma_\I(\pvec i)}$
+   %   and induction hypotheses on the honest subterms of $\pvec t'$.
+     
    \item Consider the case of a meta-term $\mout @ T'$ for some $T' \in S$.
      By hypothesis on $S$ we have $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$.
-     Thus, by definition of $\interp{\mframe @ T}{\TM}{\calp_i}$,
+     Therefore, we can extract $\interp{\mout @ T'}{\TM'}{\calp_i}$ from $\interp{\mframe @ T}{\TM'}{\calp_i}$:
      there exists some context $C$ using $\fst$ and $\snd$
      such that
-     $$\EQ\bigl(
-     \interp{
-       \myif \mexec @ T' \mythen \mout @ T'}{\TM}{\calp_i},
-     C[\interp{\mframe @ T}{\TM}{\calp_i}]\bigr) \sim \true.$$
-     Note that we omitted the $\mathsf{else}$ branch for conciseness, and
-     since it does not play a role.
-     Next, since $\interp{\mexec @ T}{\TM}{\calp_i} =
-     \interp{\mexec @ T}{\TM'}{\calp_i}$ and since it is a conjunction of
-     $\interp{\mexec @ T'}{\TM'}{\calp_i}$ and other terms, we have:
-     $$\EQ\bigl(
-     \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
+     \[
+       \EQ\bigl(
+       \interp{
+         \myif \mexec @ T' \mythen \mout @ T'}{\TM'}{\calp_i},
+       C[\interp{\mframe @ T}{\TM'}{\calp_i}]\bigr) \sim \true.
+     \]     
+     Note that we omitted the $\mathsf{else}$ branch for conciseness, as it does not play a role.
+     Next, since $\TM$ and $\TM'$ coincide on $T$'s free variables, we know that $\interp{T}{\TM}{\calp_i} = \interp{T}{\TM'}{\calp_i}$. Morever, since they consider the same interleaving, we can check that
+     $\interp{\mexec @ T}{\TM}{\calp_i} =
+     \interp{\mexec @ T}{\TM'}{\calp_i}$ (idem for $\mframe @ T$ and $\mout @ T'$).
+     Moreover, $\interp{\mexec @ T}{\TM'}{\calp_i}$ is of the form $\interp{\mexec @ T'}{\TM'}{\calp_i} \wedge \_$. Therefore $\interp{\mexec @ T'}{\TM'}{\calp_i}$ holds in the $\mythen$ branch of $\interp{\mexec @ T}{\TM}{\calp_i}$. Putting everything together, we get:
+     \[
+       \EQ\bigl(
+       \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
        \interp{\mout @ T'}{\TM}{\calp_i},
-     \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
-     C[\interp{\mframe @ T}{\TM}{\calp_i}]
-     \bigr)
-     \sim \true.$$
+       \myif \interp{\mexec @ T}{\TM}{\calp_i} \mythen
+       C[\interp{\mframe @ T}{\TM}{\calp_i}]
+       \bigr)
+       \sim \true.
+     \]
      We obtain our equivalence statement
      by performing the replacement permitted by this equality,
      and conclude by \textsc{FA} on the conditional, then on the
-     uses of $\fst$ and $\snd$, to finally remove $\mexec @ T$ and
-     $\mframe @ T$ as duplicates.
+     $\fst$ and $\snd$ symbols in $C$. Finally, we remove $\mexec @ T$ and
+     $\mframe @ T$ using \textsc{Dup}. \adrien{j'ai un peu reformulé parce que je ne comprenais pas ce que tu faisais. C'est juste plein d'égalités et de réécritures en fait. J'espère que c'est mieux comme ça.}
+     
    \item Finally, if we have a meta-term $\minp @ T'$ where either $T' \in S$
-     of $\pre(T') \in S$, we have
+     of $\pre(T') \in S$, we proceed roughly as in the previous case. First, we know that
      $\interp{\minp @ T'}{\TM'}{\calp_i} =
       \att(\interp{\mframe @ \pre(T')}{\TM'}{\calp_i})$.
      By hypothesis on $T'$ we have
      $\interp{\pre(T')}{\TM'}{} \leq \interp{T}{\TM'}{}$.
      Moreover, $\interp{\mframe @ \pre(T')}{\TM'}{\calp_i}$
      is a subterm of $\interp{\mframe @ T}{\TM'}{\calp_i} =
-     \interp{\mframe @ T}{\TM}{\calp_i}$.
+     \interp{\mframe @ T}{\TM}{\calp_i}$,
      which can be accessed using a number of applications of $\snd$.
      We can thus replace
      $\interp{\minp @ T'}{\TM'}{\calp_i}$
      by $\att(\snd^n(\interp{\mframe @ T}{\TM}{\calp_i}))$,
      which allows to conclude using \textsc{FA} and \textsc{Dup}.
+     \qedhere
   \end{itemize}
 \end{proof}
 
