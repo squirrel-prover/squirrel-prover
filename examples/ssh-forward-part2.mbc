@@ -44,8 +44,6 @@ name k : index -> index -> message
    PRF. *)
 signature enc,checkdec,pke abstract dec : message -> message -> message
 
-axiom [none,auth] encdec : forall (m1:message), dec(enc(m1,k11),pke(k11)) =m1
-
 hash h
 name hKey : message
 
@@ -69,11 +67,10 @@ signature sign,checksign,pk with oracle forall (m:message,sk:message)
  || exists (i:index, m1:message, m2:message) m=h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
 )
 
-axiom [none,auth] signnotpair : forall (m1,m2,m3:message), fst(sign(m1,m2)) <> m3
+axiom [none,auth] signnottag : forall (m1,m2:message), fst(sign(m1,m2)) <> anssign && fst(sign(m1,m2)) <> reqsign
 
 axiom [none,auth] difftags : anssign <> forwarded && forwarded <> reqsign && reqsign <> anssign
 
-axiom [none, auth] fstpair : forall (m1,m2,m3:message), <m2,m3> = m1 => fst(m1) = m2
 (** We first present the general ssh process. *)
 
  process P1FA =
@@ -295,13 +292,12 @@ Proof.
   substitute pkSa@PDIS5,pk(kS).
   euf M0.
 
-
   (* oracle case *)
   case H3.
   case H3.
   apply hashnotpair to sidPa@PDIS5, forwarded.
   apply H3 to <<g^a1,input@PDIS4>,input@PDIS4^a1>.
-		apply signnotpair to sidPa@P2, kP, anssign.
+  apply signnottag to sidPa@P2, kP.
   apply H1 to i1.
   left; right.
   apply collres  to <<m2,g^bke1(i1)>,m3> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
@@ -358,7 +354,7 @@ Proof.
   euf M2.
 
 (* Ill-tagged cases *)
-  apply signnotpair to sidPaF@P2,kP,reqsign.
+  apply signnottag to sidPaF@P2,kP.
   apply difftags.
 
 (* Honest case *)
