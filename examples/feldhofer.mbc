@@ -135,24 +135,24 @@ Qed.
 
 equiv unlinkable.
 Proof.
+  enrich seq(i->nr(i)). enrich seq(i,j->nt(i,j)).
+  induction t.
 
-enrich seq(i->nr(i)). enrich seq(i,j->nt(i,j)).
-induction t.
+  expand seq(i->nr(i)),i.
+  expandall.
+  fa 3.
 
-expand seq(i->nr(i)),i.
-
-expand frame@Reader1(i).expand exec@Reader1(i).
-   equivalent
+  expand frame@Reader1(i).expand exec@Reader1(i).
+  equivalent
    cond@Reader1(i),
   (exists (l,k:index), Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)  &&   output@Tag(l,k) = <fst(input@Reader1(i)),snd(input@Reader1(i))> &&  input@Tag(l,k) = output@Reader(i)).
 
-apply auth to i.
-fa 3.
-fadup 2.
+  apply auth to i.
+  expand output@Reader1(i).
+  fa 2.
 
-expand output@Reader1(i).
 
-equivalent (if
+  equivalent (if
       (exec@pred(Reader1(i)) &&
        exists (l,k:index),
        (((Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)) &&
@@ -183,71 +183,63 @@ equivalent (if
          enc(<nt(l,j),nr(i)>,rr(
              i),diff(kE,kbE(j))))).
 
-project.
-fa.
+  project.
+  fa.
+  apply auth to i.
+  exists l,k.
+  exists l,k.
+  fa.
+  exists l,k.
+  fa.
+  exists l,k.
+  exists l,k.
+  fa.
+  apply auth_right to i,j.
+  apply H1.
+  exists l2.
+  fa 3.
+  fadup 3.
+  fa 3.
+  fadup 3.
+  fa 3.
+  fadup 3.
+  enckp 3.
+  cca1 3.
 
-apply auth to i.
+  expand seq(i->nr(i)),i.
+  expand seq(i,j->nt(i,j)),l,j.
 
-exists l,k.
-exists l,k.
-
-fa.
-exists l,k.
-
-fa.
-exists l,k.
-exists l,k.
-fa.
-
-apply auth_right to i,j.
-apply H1.
-
-exists l2.
-
-fa 4.
-fadup 4.
-fa 4.
-
-fadup 4.
-
-enckp 4.
-cca1 4.
-
-expand seq(i->nr(i)),i.
-expand seq(i,j->nt(i,j)),l,j.
-
-expand frame@A(i).expand exec@A(i).
-equivalent
+  expand frame@A(i).expand exec@A(i).
+  equivalent
    cond@A(i),
    not (exists (l,k:index), Tag(l,k) < A(i) && Reader(i) < A(i)  &&   output@Tag(l,k) = <fst(input@A(i)),snd(input@A(i))> &&  input@Tag(l,k) = output@Reader(i)) .
 
-apply authA to i.
+  apply authA to i.
 
-fa 3.
-fadup 2.
-fa 4.
-fadup 4.
+  fa 2. fa 3.
+  fadup 3.
+  fa 3.
+  fadup 3.
 
-expandall.
+  expandall.
 
-fa 3.
-fa 4.
-fa 4.
-prf 5.
+  fa 2.
+  fa 3.
+  fa 3.
+  fa 3.
+  prf 4.
 
-yesif 5.
-project.
-assert snd( dec(fst(input@Reader1(i1)),kE)) =nt(i,j).
-fresh M1.
+  yesif 4.
+  project.
+  assert snd( dec(fst(input@Reader1(i1)),kE)) =nt(i,j).
+  fresh M1.
+  assert snd( dec(fst(input@Reader1(i1)),kbE(j))) =nt(i,j).
+  fresh M1.
 
-
-assert snd( dec(fst(input@Reader1(i1)),kbE(j))) =nt(i,j).
-fresh M1.
-
-enckp 4.
-cca1 4.
-fa 4.
-fa 4.
-expand seq(i,j->nt(i,j)),i,j.
-fresh 5.
+  enckp 3.
+  cca1 3.
+  fa 3.
+  fa 3.
+  expand seq(i,j->nt(i,j)),i,j.
+  fresh 4.
 Qed.

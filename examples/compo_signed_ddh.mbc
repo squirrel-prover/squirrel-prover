@@ -1,5 +1,10 @@
-(** Example of signed DDH key exchange. It corresponds to the ISO 9798-3
-protocol.  We leverage the composition result, to prove a single session in the
+(** Example of signed DDH key exchange. ISO 9798-3 protocol. *)
+(* P -> S : g^a                                              *)
+(* S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)                        *)
+(* P -> S : h(<g^a,g^b>,kP)                                  *)
+
+
+(** We leverage the composition result, to prove a single session in the
 presence of an adversary with access to a "backdoor" about the signature
 function, which allows him to about signatures of some specific messages.
 
@@ -163,25 +168,54 @@ Proof.
    induction t.
 
    expandall.
-   fa 7.
+   fa 6.
 
+   expandall.
+   fa 6.
+
+   expandall.
+   fa 6.
+
+   expandall.
    expand seq(i->g^b(i)),j.
+   fa 7.
 
    expand frame@P4; expand exec@P4.
-   fa 7.
+   fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
    executable pred(P4). depends P1, P4. apply H2 to P1. expand exec@P1. apply P1_charac.
+   fa 7.
    noif 7.
 
    expandall.
-   fa 7.
+   fa 6.
 
+   expandall.
+   fa 6.
+
+   expandall.
+   fa 6.
+
+   expandall.
+   fa 6.
+
+   expandall.
+   fa 6.
+
+   expandall.
    expand seq(i->g^a(i)),l.
+   fa 7.
 
    expand frame@S4; expand exec@S4.
    equivalent exec@pred(S4) && cond@S4, False.
    executable pred(S4). depends S1, S4. apply H2 to S1. expand exec@S1. apply S1_charac.
 
-   fa 6. noif 7.
+   fa 6. fa 7. noif 7.
+
+   expandall.
+   fa 6.
+
+   expandall.
+   fa 6.
 Qed.

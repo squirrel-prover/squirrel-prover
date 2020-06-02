@@ -1,12 +1,15 @@
+(* SSH protocol                                         *)
+(* P -> S : g^a                                         *)
+(* S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )      *)
+(* P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)      *)
+
 (* First part of the proof of ssh with a modified agent forwarding. It
-   corresponds to the security a the basic SSH key exchange, but with oracles
-   that allow to simulate all other honest logins, and the forwarded SSH
-   logins. *)
+corresponds to the security a the basic SSH key exchange, but with oracles that
+allow to simulate all other honest logins, and the forwarded SSH logins. *)
 
 abstract ok : message
 abstract ko : message
 abstract forwarded : message
-
 
 name kP : message
 name kS : message
@@ -29,13 +32,14 @@ abstract dec : message -> message -> message
 
 axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) =x1
 
-abstract h : message -> message
+hash h
+name hKey : message
 
-axiom [none,auth] collres : forall (x1,x2:message), h(x1) = h(x2) => x1 = x2
-axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1) <> <forwarded,x2>
+axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+
+axiom [none,auth] collres : forall (x1,x2:message), h(x1,hKey) = h(x2,hKey) => x1=x2
 
 axiom [none,auth] freshindex : exists (l:index), True
-
 
 axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
@@ -43,11 +47,11 @@ axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
- || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>) (* O_PS *)
+ || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>, hKey) (* O_PS *)
  || exists (x:message) m=<forwarded,x> )  (* O_forward *)
   &&
 (sk <> kS
- || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>) (* O_PS *)
+ || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>, hKey) (* O_PS *)
  || exists (x:message) m=<forwarded,x> ) (* O_forward) *)
 
 
@@ -62,7 +66,7 @@ process P =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>) in
+  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
     Pok : out(cP, enc(sign(sidP,kP),gB^a1))
@@ -76,7 +80,7 @@ process S =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>) in
+  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
@@ -124,7 +128,7 @@ process Pauth =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>) in
+  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
      out(cP, enc(sign(sidP,kP),gB^a1));
@@ -142,7 +146,7 @@ process Sauth =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>) in
+  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
@@ -170,6 +174,7 @@ goal [none, auth] P_charac :
   expand sidP@Pok.
   case H2.
   case H2.
+
   apply collres to <<g^a1,input@P1>,input@P1^a1>, <<x,g^b(i)>,x1>.
   apply H0 to i.
 
@@ -208,16 +213,25 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS.
+   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS; enrich hKey.
 
    induction t.
 
    expandall.
    fa 7.
 
-   expand seq(i->g^b(i)),i.
-   expand frame@Pfail.
+   expandall.
+   fa 7.
 
+   expandall.
+   fa 7.
+
+   expandall.
+   fa 7.
+   expand seq(i->g^b(i)),i.
+
+
+   expand frame@Pfail.
    equivalent exec@Pfail, False.
    expand exec@Pfail.
    executable pred(Pfail).
@@ -225,16 +239,26 @@ Proof.
    apply H2 to Pok.
    expand exec@Pok.
    apply P_charac.
-   fa 6.
-   noif 7.
+   fa 7. fa 8.
+   noif 8.
 
    expandall.
    fa 7.
 
+   expandall.
+   fa 7.
+
+   expandall.
+   fa 7.
+
+   expandall.
+   fa 7.
+
+   expandall.
+   fa 7.
    expand seq(i->g^a(i)),i.
 
    expand frame@Sfail.
-
    equivalent exec@Sfail, False.
    expand exec@Sfail.
    executable pred(Sfail).
@@ -242,6 +266,9 @@ Proof.
    apply H2 to Sok.
    expand exec@Sok.
    apply S_charac.
-   fa 6.
-   noif 7.
+   fa 7. fa 8.
+   noif 8.
+
+   expandall.
+   fa 7.
 Qed.
