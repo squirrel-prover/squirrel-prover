@@ -24,8 +24,9 @@ equiv [left,t1] [right,t2] test.
 Proof.
 induction t.
 nosimpl(expandall).
-
+fa 0. fa 1.
 equivalent ok=ok, True.
-expandall.
+nosimpl(expandall).
+fa 0. fa 1.
 equivalent ok=ok, True.
 Qed.

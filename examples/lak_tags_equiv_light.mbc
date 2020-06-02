@@ -144,8 +144,8 @@ induction t.
 (* Case R: OK *)
 expand frame@R(j); expand exec@R(j).
 expand cond@R(j); expand output@R(j).
-fa 1; fa 2.
-fresh 2; yesif 2.
+fa 0; fa 1; fa 1.
+fresh 1; yesif 1.
 repeat split.
 depends R(j),R2(j).
 depends R(j),R1(j).
@@ -153,6 +153,7 @@ depends R(j),R1(j).
 (* Case R1: OK *)
 expand frame@R1(j); expand exec@R1(j).
 expand cond@R1(j); expand output@R1(j).
+fa 0; fa 1.
 
 equivalent
   (exists (i,k:index),
@@ -206,19 +207,19 @@ apply wa_R1_right to i1,j,k1.
 apply H1.
 yesif.
 
-fa 1. fadup 0.
-fa 2. fadup 2.
-fa 2. fadup 2.
-prf 2.
-ifcond 2, exec@pred(R1(j)).
-fa 2.
-yesif 2.
+fa 2. fadup 1.
+fa 1. fadup 1.
+prf 1.
+ifcond 1, exec@pred(R1(j)).
+fa 1.
+yesif 1.
 apply tags_neq; project.
-fresh 2.
+fresh 1.
 
 (* Case R2: OK *)
 expand frame@R2(j); expand exec@R2(j).
 expand cond@R2(j); expand output@R2(j).
+fa 0; fa 1.
 
 equivalent
   (exists (i,k:index),
@@ -232,24 +233,25 @@ equivalent
 
 apply wa_R2 to j.
 
-fadup 0.
+fadup 1.
 
 (* Case T: OK *)
 expand frame@T(i,k); expand exec@T(i,k).
 expand cond@T(i,k);expand output@T(i,k).
 expand m2(i,k)@T(i,k).
+fa 0.
 fa 1.
-fa 2.
-fa 2.
-prf 3.
-yesif 3.
+fa 1.
+fa 1.
+prf 2.
+yesif 2.
 apply tags_neq; project.
 assert fst(input@R1(j))=nT(i,k).
 fresh M2.
 assert fst(input@R1(j))=nT(i,k).
 fresh M2.
-fresh 3.
 fresh 2.
-yesif 2.
+fresh 1.
+yesif 1.
 
 Qed.

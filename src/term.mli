@@ -203,6 +203,9 @@ val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
 val mk_indices_eq : Vars.index list -> Vars.index list -> formula
 
+(** Convert a boolean term to a message term, used in frame macro definition **)
+val boolToMessage : formula -> message
+
 (** Convert from bi-terms to terms
   *
   * TODO Could we use a strong typing of [term] to make a static

@@ -1,3 +1,9 @@
+(* Feldhofer Protocol             *)
+(* A -> B : enc(<pkA,n0>,r,pkB)   *)
+(* B -> A : enc(<n0,n0>,r',pkA)   *)
+
+(* This is a "light" model without the last check of A. *)
+
 channel cA
 channel cB
 
@@ -42,21 +48,22 @@ Proof.
   induction t.
 
   expandall.
-  fa 2. fa 3. cca1 3.
-  fa 3. fa 3. fresh 3. yesif 3.
+  fa 1. fa 2. cca1 2.
+  fa 2. fa 2. fa 2. fresh 2. yesif 2.
 
   expandall.
-  fa 2. fa 3. enckp 3. enckp 3. cca1 3. cca1 3.
+  fa 1. fa 2. enckp 2. enckp 2. cca1 2. cca1 2.
 
   equivalent len(<snd(dec(input@B(j),kB)),n(j)>),  plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   (* length reasoning *)
   apply length to snd(dec(input@B(j),kB)),n(j).
-  ifeq 3,    len(snd(dec(input@B(j),kB))), len(n(j)).
-  trivialif 3.
+  fa 2.
+  ifeq 2,    len(snd(dec(input@B(j),kB))), len(n(j)).
+  trivialif 2.
   apply length to n(j),n(j).
   (* length reasoing *)
-  fa 3.
-  fa 3.
-  fresh 3.
-  yesif 3.
+  fa 2.
+  fa 2.
+  fresh 2.
+  yesif 2.
 Qed.

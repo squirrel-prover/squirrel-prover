@@ -6,7 +6,7 @@ equiv test.
 Proof.
   induction t.
   expandall.
-  fa 1; fa 2.
-  fresh 2.
-  yesif 2.
+  fa 0; fa 1; fa 1.
+  fresh 1.
+  yesif 1.
 Qed.

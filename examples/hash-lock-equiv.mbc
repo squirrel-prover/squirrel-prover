@@ -33,8 +33,8 @@ induction t.
 (* Case R *)
 expand frame@R(j);  expand exec@R(j).
 expand cond@R(j); expand output@R(j).
-fa 1; fa 2.
-fresh 2;  yesif 2.
+fa 0. fa 1. fa 1.
+fresh 1;  yesif 1.
 repeat split.
 depends R(j1), R2(j1).
 depends R(j1), R1(j1).
@@ -44,7 +44,7 @@ depends R(j1), R1(j1).
 expand frame@R1(j);expand exec@R1(j).
 expand cond@R1(j);expand output@R1(j).
 
-
+fa 0. fa 1.
 
 equivalent
 (exists (i,k:index), snd(input@R1(j)) = h(<nR(j),fst(input@R1(j))>,(diff(key(i), key'(i,k))))),
@@ -72,13 +72,14 @@ depends R(j), R2(j).
 (* WA ==> Cond *)
 exists i,k.
 
-fadup 0.
+fadup 1.
 
 (* Case R2 *)
 
 expand frame@R2(j);expand exec@R2(j).
 expand cond@R2(j);expand output@R2(j).
 
+fa 0. fa 1. 
 
 equivalent
 (exists  (i,k:index), snd(input@R2(j)) =
@@ -109,18 +110,19 @@ depends R(j), R1(j).
 
 (* WA ==> Cond *)
 exists i,k.
-fadup 0.
+
+fadup 1.
 
 
 (* Case T *)
 expand frame@T(i,k);expand exec@T(i,k).
 expand cond@T(i,k);expand output@T(i,k).
-fa 1; fa 2; fa 2.
-prf 3.
-yesif 3.
+fa 0. fa 1; fa 1; fa 1.
+prf 2.
+yesif 2.
 project.
 
 fresh 2.
-yesif 2.
-fresh 2.
+fresh 1.
+yesif 1.
 Qed.

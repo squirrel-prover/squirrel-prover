@@ -244,9 +244,18 @@ let fa_expand t =
     | Diff _ -> raise No_common_head
     | _ -> raise No_FA
   in
+  (* Remve ITE(b,true,false) coming from expansion of frame macro *)
+  let filterBoolAsMsg =
+    List.map
+      (fun x -> match x with
+        | EquivSequent.Message ITE (c,t,e)
+          when (t = Term.Fun(f_true,[]) && e = Term.Fun(f_false,[]))
+          -> EquivSequent.Formula c
+        | _ -> x)
+  in
   match t with
-  | EquivSequent.Message e -> aux (Term.head_normal_biterm e)
-  | EquivSequent.Formula e -> aux (Term.head_normal_biterm e)
+  | EquivSequent.Message e -> filterBoolAsMsg (aux (Term.head_normal_biterm e))
+  | EquivSequent.Formula e -> filterBoolAsMsg (aux (Term.head_normal_biterm e))
 
 let fa i s =
   match nth i (EquivSequent.get_biframe s) with
@@ -297,9 +306,12 @@ let () =
 
 (** Check if an element appears twice in the biframe,
   * or if it is [input@t] with some [frame@t'] appearing in the frame
-  * with [pred(t) <= t'] guaranteed. *)
+  * with [pred(t) <= t'] guaranteed,
+  * or if it is [exec@t] with some [frame@t'] appearing in the frame
+  * with [t <= t'] guaranteed. *)
 let is_dup elem elems =
-  if List.mem elem elems then true else
+  if List.mem elem elems then true
+  else
     let rec leq t t' = let open Term in match t,t' with
       | t,t' when t=t' -> true
       | Pred t, Pred t'-> leq t t'
@@ -314,6 +326,13 @@ let is_dup elem elems =
             (function
                | EquivSequent.Message (Term.Macro (fm,[],t'))
                  when fm = Term.frame_macro && leq (Pred t) t' -> true
+               | _ -> false)
+            elems
+      | EquivSequent.Formula (Term.Macro (em,[],t)) when em = Term.exec_macro ->
+          List.exists
+            (function
+               | EquivSequent.Message (Term.Macro (fm,[],t'))
+                 when fm = Term.frame_macro && leq t t' -> true
                | _ -> false)
             elems
       | _ -> false

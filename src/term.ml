@@ -181,6 +181,10 @@ let dummy = Fun (mk_fname "_" 0, [])
 
 let f_len = mk_fname "len" 1
 
+(** Convert a boolean term to a message term, used in frame macro definition **)
+
+let boolToMessage b = ITE (b,Fun (f_true,[]),Fun (f_false,[]))
+
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
 
@@ -232,6 +236,8 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
     if d = Fun (f_zero,[]) then
       Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
         pp b pp c
+    else if (c = Fun (f_true,[]) && d = Fun (f_false,[])) then
+      Fmt.pf ppf "%a" pp b
     else
       Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
         pp b pp c pp d

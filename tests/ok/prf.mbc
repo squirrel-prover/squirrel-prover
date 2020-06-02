@@ -26,16 +26,16 @@ Proof.
 
 induction t.
 expandall.
-
-fa 1. fa 2. prf 2.
+fa 0.
+fa 1. fa 1. prf 1.
 (* easy case, it is the firt produced hash. *)
-yesif 2.
+yesif 1.
 project.
-fresh 2.
+fresh 1.
 
 expandall.
-
-fa 1; fa 2. prf 2. yesif 2.
+fa 0.
+fa 1; fa 1. prf 1. yesif 1.
 project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
@@ -46,5 +46,5 @@ depends A, A1.
 case H0.
 depends A, A1.
 
-fresh 2.
+fresh 1.
 Qed.

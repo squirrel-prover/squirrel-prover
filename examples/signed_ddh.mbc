@@ -1,3 +1,8 @@
+(* Signed DDH key-exchange             *)
+(* P -> S : g^a                        *)
+(* S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)  *)
+(* P -> S : h(<g^a,g^b>,kP)            *)
+
 hash h
 
 abstract ok : message
@@ -47,16 +52,6 @@ process S(i:index) =
 
 system (!_i P(i) | !_j S(j)).
 
-(* We prove several lemmas, characterizing when a action's conditions passes.
-   The characterization is expressed as a property of the trace that the attacker
-   already has, showing that the condition does not bring him extra knowledge.
-
-   Prove that the condition of A does not give any information to the attacker,
-   by proving that it is equivalent to a trivial formula that the attacker can
-   compute. It is a bit troublesome, because the formula depends on ks, which needs
-   to disappear. We would not have this issue if we used a classical asymmetric
-   signature scheme. *)
-
 (* Show that condition S1 implies the next one. *)
 goal S1_charac :
   forall (r:index),
@@ -84,26 +79,30 @@ Proof.
 Qed.
 
 equiv unreach.
-    Proof.
-   enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+Proof.
+    enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
 
     induction t.
 
-   expandall.
-   ddh a, b, k.
+    expandall.
+    ddh a, b, k.
 
-   expand  seq(i->g^a(i)), i.
+    expand  seq(i->g^a(i)), i.
 
-expand  seq(i->g^a(i)), i;     expand gb(i)@P1(i).
-expandall.
+    expand  seq(i->g^a(i)), i;     expand gb(i)@P1(i).
+    expandall.
 
+    fa 6.
 
-
-    fa 7.
+    expandall.
+    expand  seq(i->g^a(i)), i.
+    fa 6.
 
     expand gb(i)@P2(i,j);
     expand seq(i->g^b(i)), j;
     expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
+    expandall.
+    fa 7.
 
    (* Case P3 *)
 
@@ -122,18 +121,23 @@ expandall.
 
    (* Case A *)
 
+   expandall.
    expand gb(i)@A(i);
    expand  seq(i->g^a(i)), i.
+   fa 6.
 
    expandall.
    expand  seq(i->g^b(i)), j.
-   fa 7.
+   fa 6.
 
    expand  seq(i->g^b(i)), j.
+   expandall.
+   fa 6.
 
    expand  seq(i->g^a(i)), l;
    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
-
+   expandall.
+   fa 7.
 
    expand frame@S3(j); expand exec@S3(j).
 
@@ -149,6 +153,9 @@ expandall.
 
    fa 5.
    noif 6.
+
+   expandall.
    expand  seq(i->g^b(i)), j.
+   fa 6.
 
 Qed.

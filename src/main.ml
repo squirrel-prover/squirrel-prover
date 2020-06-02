@@ -337,11 +337,6 @@ let () =
         (Tactic_soft_failure Tactics.NotDDHContext)
         (fun () -> run ~test "tests/alcotest/ddh.mbc")
     end ;
-    "FA Dup", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/equivalent.mbc")
-    end ;
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure

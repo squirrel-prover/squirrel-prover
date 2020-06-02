@@ -12,19 +12,22 @@ system [toto] !_i A(diff(ko,koo)).
 
 equiv test.
 Proof.
-help.
 induction t.
 
 expandall.
-fa 1. noif 2.
+fa 0. fa 1. noif 1.
 
+expandall.
+fa 0.
 Qed.
 
 equiv [left,toto] [right,toto] test2.
 Proof.
 induction t.
 
+expandall.
+fa 0. fa 1. noif 1.
 
 expandall.
-fa 1. noif 2.
+fa 0.
 Qed.

@@ -9,10 +9,10 @@ equiv test.
 Proof.
   induction t.
   expandall.
-  fa 1; fa 2.
-  prf 2.
-  yesif 2.
-  xor 2,n_PRF.
-  yesif 2.
+  fa 0. fa 1; fa 1.
+  prf 1.
+  yesif 1.
+  xor 1,n_PRF.
+  yesif 1.
   namelength m, n_PRF.
 Qed.
