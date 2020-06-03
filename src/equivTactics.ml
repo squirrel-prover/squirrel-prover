@@ -1110,7 +1110,7 @@ let cca1 i s =
         @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc)
       with
       | (Term.Fun ((fnenc,_), [m; Term.Name r;
-                                    Term.Fun ((fnpk,_), [Term.Name (sk,isk)])])
+                                    Term.Fun ((fnpk,is), [Term.Name (sk,isk)])])
               as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey
                                  && Symbols.is_ftype fnenc Symbols.AEnc)
         ->
@@ -1122,8 +1122,17 @@ let cca1 i s =
             ->
             begin
               try
-              Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
-              hide_enc enc fnenc m (Some fnpk) sk fndec r
+                Euf.hash_key_ssc ~messages:[enc] ~pk:(Some fnpk) ~system fndec sk;
+                if not (List.mem (EquivSequent.Message
+                                    (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
+                                 ) biframe) then
+                  Tactics.soft_failure
+                    (Tactics.Failure
+                       "The public key must be inside the frame in order to use \
+                        CCA1")
+                  ;
+
+                hide_enc enc fnenc m (Some fnpk) sk fndec r
               with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
             end
           | _ ->

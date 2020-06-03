@@ -39,31 +39,34 @@ else
 )
 
 
-system (!_i A(i) | !_j B(j)).
+system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
 
 equiv test.
 Proof.
-  enrich pk(kA).
+  enrich pk(kA); enrich pk(kB).
   induction t.
 
   expandall.
-  fa 1. fa 2. cca1 2.
-  fa 2. fa 2. fa 2. fresh 2. yesif 2.
+  fa 2.
 
   expandall.
-  fa 1. fa 2. enckp 2. enckp 2. cca1 2. cca1 2.
+  fa 2. fa 3. cca1 3.
+  fa 3. fa 3. fa 3. fresh 3. yesif 3.
+
+  expandall.
+  fa 2. fa 3. enckp 3. enckp 3. cca1 3. cca1 3.
 
   equivalent len(<snd(dec(input@B(j),kB)),n(j)>),  plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   (* length reasoning *)
   apply length to snd(dec(input@B(j),kB)),n(j).
-  fa 2.
-  ifeq 2,    len(snd(dec(input@B(j),kB))), len(n(j)).
-  trivialif 2.
+  fa 3.
+  ifeq 3,    len(snd(dec(input@B(j),kB))), len(n(j)).
+  trivialif 3.
   apply length to n(j),n(j).
   (* length reasoing *)
-  fa 2.
-  fa 2.
-  fresh 2.
-  yesif 2.
+  fa 3.
+  fa 3.
+  fresh 3.
+  yesif 3.
 Qed.
