@@ -1,3 +1,6 @@
+
+(* This is a "light" model without the last check of T. *)
+
 hash h
 
 abstract ok:message
