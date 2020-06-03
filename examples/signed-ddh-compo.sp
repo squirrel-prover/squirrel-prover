@@ -1,16 +1,22 @@
-(** Example of signed DDH key exchange. ISO 9798-3 protocol. *)
-(* P -> S : g^a                                              *)
-(* S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)                        *)
-(* P -> S : h(<g^a,g^b>,kP)                                  *)
+(*******************************************************************************
+SIGNED DDH
 
+[G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
+Part 3: Mechanisms using digital signature techniques.
 
-(** We leverage the composition result, to prove a single session in the
+P -> S : g^a
+S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)
+P -> S : h(<g^a,g^b>,kP)
+
+We leverage the composition result, to prove a single session in the
 presence of an adversary with access to a "backdoor" about the signature
 function, which allows him to about signatures of some specific messages.
 
 The proof is split into two systems, one modelling the authentication property,
 and the other the strong secrecy. Put together, they allow to derive very simply
-the actual assumption needed to apply the composition theorem.  **)
+the actual assumption needed to apply the composition theorem.
+*******************************************************************************)
+
 
 abstract ok : message
 abstract ko : message

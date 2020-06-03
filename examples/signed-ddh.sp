@@ -1,7 +1,13 @@
-(* Signed DDH key-exchange             *)
-(* P -> S : g^a                        *)
-(* S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)  *)
-(* P -> S : h(<g^a,g^b>,kP)            *)
+(*******************************************************************************
+SIGNED DDH
+
+[G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
+Part 3: Mechanisms using digital signature techniques.
+
+P -> S : g^a
+S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)
+P -> S : h(<g^a,g^b>,kP)
+*******************************************************************************)
 
 hash h
 

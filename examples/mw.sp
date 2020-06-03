@@ -1,7 +1,20 @@
-(* Protocol MW                          *)
-(* R -> T: nr                           *)
-(* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
-(* R -> T: id + H(<c1, nr, nt>,k)       *)
+(*******************************************************************************
+MW
+
+[E] David Molnar and David A. Wagner. Privacy and security in library
+RFID: issues, practices, and architectures. In Vijayalakshmi Atluri,
+Birgit Pfitzmann, and Patrick D. McDaniel, editors, Proceedings of the
+11th ACM Conference on Computer and Communications Security, CCS
+2004, Washington, DC, USA, October 25-29, 2004, pages 210–219.
+ACM, 2004.
+
+R --> T: nr
+T --> R: nt, id + H(<c0, nr, nt>,k)
+R --> T: id + H(<c1, nr, nt>,k)
+
+This is a "full" model with the last check of T, but our tool lacks a notion of
+induction over sequences to complete the proof.
+*******************************************************************************)
 
 hash H
 

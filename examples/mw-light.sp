@@ -1,9 +1,19 @@
-(* Protocol MW                          *)
-(* R -> T: nr                           *)
-(* T -> R: nt, id + H(<c0, nr, nt>,k)   *)
-(* R -> T: id + H(<c1, nr, nt>,k)       *)
+(*******************************************************************************
+MW
 
-(* This is a "light" model without the last check of T. *)
+[E] David Molnar and David A. Wagner. Privacy and security in library
+RFID: issues, practices, and architectures. In Vijayalakshmi Atluri,
+Birgit Pfitzmann, and Patrick D. McDaniel, editors, Proceedings of the
+11th ACM Conference on Computer and Communications Security, CCS
+2004, Washington, DC, USA, October 25-29, 2004, pages 210–219.
+ACM, 2004.
+
+R --> T: nr
+T --> R: nt, id + H(<c0, nr, nt>,k)
+R --> T: id + H(<c1, nr, nt>,k)
+
+This is a "light" model without the last check of T.
+*******************************************************************************)
 
 hash H
 
@@ -15,7 +25,7 @@ axiom len_id : forall (i:index) len(id(i)) = len(dummy)
 axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
 
 name key : index->message
-name key':index -> index -> message
+name key': index -> index -> message
 
 abstract error : message
 abstract tag0 : message
@@ -181,8 +191,6 @@ expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
 
 fa 0. fa 1.
-
-(* TODO precedence xor/tryfind *)
 
 equivalent
   (exists (i,t:index),

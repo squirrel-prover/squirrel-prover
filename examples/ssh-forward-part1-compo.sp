@@ -1,11 +1,20 @@
-(* SSH protocol                                         *)
-(* P -> S : g^a                                         *)
-(* S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )      *)
-(* P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)      *)
+(*******************************************************************************
+SSH (WITH FORWARDING AGENT)
 
-(* First part of the proof of ssh with a modified agent forwarding. It
+[H] Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
+tion: a technique for protocol composition with long term shared secrets.
+In Jonathan Katz and Giovanni Vigna, editors, Proceedings of the 27st
+ACM Conference on Computer and Communications Security (CCS’20),
+Orlando, USA, November 2020. ACM Press. To appear
+
+P -> S : g^a
+S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
+P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
+
+First part of the proof of ssh with a modified agent forwarding. It
 corresponds to the security a the basic SSH key exchange, but with oracles that
-allow to simulate all other honest logins, and the forwarded SSH logins. *)
+allow to simulate all other honest logins, and the forwarded SSH logins.
+*******************************************************************************)
 
 abstract ok : message
 abstract ko : message

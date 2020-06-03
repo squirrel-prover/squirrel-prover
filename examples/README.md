@@ -15,10 +15,10 @@ complete. The folder `demo/` contains some basic files that can be used to give
 a live demonstration of the tool.
 
 Case studies that end with the `-light` suffix are simplified models of the
-protocols, that omit the last check. The suffix `-wa` stands for
-well-authentication, and `-equiv` for the equivalence property.
+protocols, that omit the last check.
 
-To find the case studies that use an axiom among `cca1`,`enckp`,`prf`,`euf`,`ddh` can be found with:
+Case studies that use an axiom among `cca1`,`enckp`,`prf`,`euf`,`ddh`
+can be found with:
 ```
 $ grep "AXIOMNAME " *.sp
 ```
@@ -29,34 +29,26 @@ protocol, which may differ from the original specification of the protocol.
 
 ### RFID Based
 
-The Basic Hash protocol [A]:
- - basic-hash-wa.sp
- - basic-hash-equiv.sp
- - basic-hash-merged.sp
+Basic Hash [A]:
+- basic-hash.sp
 
- Feldhofer [B]:
- - feldhofer-light.sp
+Feldhofer [B]:
+- feldhofer-light.sp
 
- Hash Lock [C]:
- - hash-lock-wa.sp
- - hash-lock-equiv.sp
+Hash Lock [C]:
+- hash-lock.sp
 
- Lak Tags [D]:
- - lak-tags.sp
- - lak-tags-equiv-light.sp
- - lak-stateless.sp
- - lak-tags-mini-equiv.sp
+LAK [D]:
+- lak-tags-light.sp
 
- MW [E]:
- - mw-equiv-light.sp
- - mw-prelim.sp
- - mw-seq.sp
- - mw-wa.sp
+MW [E]:
+- mw-light.sp
+- mw.sp
 
 ### Encryption Based
 
 Private Authentication [F]:
- - privateauthentication-light.sp
+ - private-authentication-light.sp
 
 ### DDH Based
 
@@ -64,7 +56,7 @@ Signed DDH key exchange, ISO 9798-3 [G]
  - signed-ddh.sp
  - signed-ddh-compo.sp
 
-The SSH protocol with forwarding agent [H]
+SSH protocol with forwarding agent [H]
  - ssh-forward-part1-compo.sp
  - ssh-forward-part2-compo.sp
 
