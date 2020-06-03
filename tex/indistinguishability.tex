@@ -295,7 +295,7 @@ We provide in \cref{fig:lk-ind} a set of rules for equivalence sequent. These ru
     }
 
     \inferrule[equiv]{
-\Gamma \vdash_{\calp_1}  t_1 \deq t_2 \quad    \Gamma \vdash_{\calp_2}  t_1 \deq t_2 \quad     \Gamma  \vdash_{\calp_1,\calp_2}  \pvec{u}[ t_1 / t_2] \sim  \pvec{v}[ t_1 / t_2]
+\Gamma \vdash_{\calp_1}  t_1 = t_2 \quad    \Gamma \vdash_{\calp_2}  t_1 = t_2 \quad     \Gamma  \vdash_{\calp_1,\calp_2}  \pvec{u}[ t_1 / t_2] \sim  \pvec{v}[ t_1 / t_2]
     }{
       \Gamma \vdash_{\calp_1,\calp_2}
       \pvec{u} \sim  \pvec{v}
@@ -571,7 +571,7 @@ sequences in meta-terms.
 
 \begin{figure}[t]
   \begin{mathpar}
-    \inferrule[FA-DUP]{
+    \inferrule[FA-Dup]{
       \Gamma \vdash_{\calp_1,\calp_2}
       \pvec u, \mframe @ T \sim \pvec v, \mframe @ T
     }{
@@ -617,8 +617,6 @@ sequences in meta-terms.
       \mout @ T \in \hfadup_S
     }
   \end{mathpar}
-
-  \adrien{J'ai renomé $H$ en $\hfadup$, parce que, si je comprends bien, l'intuition c'est que il contient un ensemble de timestamp qu'on sait être éxécutable en hypotèse. Si ce n'est pas le bon nom, ou si il y a mieux, il suffit de changer la macro que j'ai introduit.}
   % David: je crois qu'on n'utilise pas cette possibilité,
   % je la cache pour simplifier.
   % $$
@@ -671,36 +669,33 @@ sequences in meta-terms.
   to conclude by removing the applications of $\fst$ using \textsc{FA}
   and get rid of $\mframe @ T$ using \textsc{Dup}.
 
-  We will actually prove more generally that
+  We will actually prove more generally that, for any sequences
+  of base terms $\pvec U$ and $\pvec V$ such that
+  $\pvec U,
+   \interp{\mframe @ T}{\TM}{\calp_1} \sim
+   \pvec V,
+   \interp{\mframe @ T}{\TM}{\calp_2}$, we have
   \begin{alignat*}{2}
       &&&
       \pvec U,
       \interp{\mframe @ T}{\TM}{\calp_1},
-      \big(
       \myif \interp{\mexec @ T}{\TM}{\calp_1}
-      \mythen \interp{\xi_k}{\TM'_k}{\calp_1} \myelse \false
-      \big)_{k \in K}
+      \mythen \interp{\xi}{\TM'}{\calp_1} \myelse \false
       \\ &\sim\;\; &&
       \pvec V,
       \interp{\mframe @ T}{\TM}{\calp_2},
-      \big(
       \myif \interp{\mexec @ T}{\TM}{\calp_2}
-      \mythen \interp{\xi_k}{\TM'_k}{\calp_2} \myelse \false
-      \big)_{k \in K}
+      \mythen \interp{\xi}{\TM'}{\calp_2} \myelse \false
     \end{alignat*}
-  for any sequences of base terms $\pvec U$ and $\pvec V$ and 
-  for any finite set $K$ such that for every $k \in K$,
-  $\TM'_k$ only differs from $\TM$ for the semantic
+  for any $\TM'$ that only differs from $\TM$ for the semantic
   assignment of index and timestamp variables that do not occur in $T$,
-  and $\xi_k$ is a meta-formula or meta-term such that $\xi_k \in \hfadup_S$
+  and for any meta-term of meta-formula $\xi \in \hfadup_S$
   for some set $S$ containing $T$ and such that\footnote{
     We do not specify $\calp_1$ or $\calp_2$ here
     as they are irrelevant to the interpretation of timestamp meta-terms.
-  } $\interp{T'}{\TM'_k}{}\leq\interp{T}{\TM'_k}{}$ for all $T'\in S$.
+  } $\interp{T'}{\TM'}{}\leq\interp{T}{\TM'}{}$ for all $T'\in S$.
 
-  We proceed by induction on the set of meta-terms and meta-formulas $(\xi_k)_{k \in K}$, using the multi-set ordering induced by the structural ordering of meta-formulas and meta-terms.
-
-  We take $k_0 \in K$, $\xi = \xi_{k_0}$ and $\TM' = \TM'_{k_0}$.
+  We proceed by structural induction on $\xi$.
   \begin{itemize}
     \item Assume $\xi$ is of the form $\phi_1\wedge\phi_2$ with
       $\phi_1,\phi_2\in \hfadup_S$. By equational reasoning we can replace
@@ -716,11 +711,17 @@ sequences in meta-terms.
       \]
       and similarly on the other side.
       We conclude by the \textsc{FA} rule on $\dand$ and induction
-      hypotheses on
-      $(\xi_k)_{k \in K \backslash \{k_0\}} \cup \{\phi_1\} \cup \{\phi_2\}$,
-      which is strictly smaller than $(\xi_k)_{k \in K}$ (because $\phi_1$ and $\phi_2$ are strictly smaller than $\xi$).
+      hypotheses on $\phi_1$ and $\phi_2$:
+      \david{we invoke the induction hypothesis on $\phi_1$ with
+      $\pvec U$ and $\pvec V$, and then use the induction hypothesis
+      on $\phi_2$ with the sequence $\pvec U$ (resp. $\pvec V$)
+      enriched with
+      $\interp{\mframe @ T}{\TM}{\calp_1},
+      \myif \interp{\mexec @ T}{\TM}{\calp_1}
+      \mythen \interp{\xi}{\TM'}{\calp_1} \myelse \false$
+      with $i=1$ (resp. $i=2$).}
 
-   \item The other boolean connectives cases (e.g.\ $\vee$), the case $t = t'$ and the case where $\xi$ is a function application are identical to the $\phi_1\wedge\phi_2$ case. \adrien{(j'ai groupé tout les cas qui sont immédiatements $FA + DUP$ comme dans le premier cas)}
+   \item The other boolean connectives cases (e.g.\ $\vee$), the case $t = t'$ and the case where $\xi$ is a function application are identical to the $\phi_1\wedge\phi_2$ case.
      
    \item Assume $\xi$ is of the form $T' \leq T \Rightarrow \phi'$.
      There are two subcases:
@@ -777,7 +778,7 @@ sequences in meta-terms.
      
    \item Consider the case of a meta-term $\mout @ T'$ for some $T' \in S$.
      By hypothesis on $S$ we have $\interp{T'}{\TM'}{} \leq \interp{T}{\TM'}{}$.
-     Therefore, we can extract $\interp{\mout @ T'}{\TM'}{\calp_i}$ from $\interp{\mframe @ T}{\TM'}{\calp_i}$:
+     Therefore,
      there exists some context $C$ using $\fst$ and $\snd$
      such that
      \[
@@ -787,9 +788,17 @@ sequences in meta-terms.
        C[\interp{\mframe @ T}{\TM'}{\calp_i}]\bigr) \sim \true.
      \]     
      Note that we omitted the $\mathsf{else}$ branch for conciseness, as it does not play a role.
-     Next, since $\TM$ and $\TM'$ coincide on $T$'s free variables, we know that $\interp{T}{\TM}{\calp_i} = \interp{T}{\TM'}{\calp_i}$. Morever, since they consider the same interleaving, we can check that
+     In other words, we have \emph{almost} extracted
+     $\interp{\mout @ T'}{\TM'}{\calp_i}$ from
+     $\interp{\mframe @ T}{\TM'}{\calp_i}$.
+
+     We now bridge the gap between the element in our
+     sequence (i.e.\ an output) and what we can extract from the frame
+     (i.e.\ an output under a conditional).
+     Since $\TM$ and $\TM'$ coincide except for the interpretation
+     of variables that do not occur in $T$, we have
      $\interp{\mexec @ T}{\TM}{\calp_i} =
-     \interp{\mexec @ T}{\TM'}{\calp_i}$ (idem for $\mframe @ T$ and $\mout @ T'$).
+     \interp{\mexec @ T}{\TM'}{\calp_i}$.
      Moreover, $\interp{\mexec @ T}{\TM'}{\calp_i}$ is of the form $\interp{\mexec @ T'}{\TM'}{\calp_i} \wedge \_$. Therefore $\interp{\mexec @ T'}{\TM'}{\calp_i}$ holds in the $\mythen$ branch of $\interp{\mexec @ T}{\TM}{\calp_i}$. Putting everything together, we get:
      \[
        \EQ\bigl(
@@ -804,7 +813,7 @@ sequences in meta-terms.
      by performing the replacement permitted by this equality,
      and conclude by \textsc{FA} on the conditional, then on the
      $\fst$ and $\snd$ symbols in $C$. Finally, we remove $\mexec @ T$ and
-     $\mframe @ T$ using \textsc{Dup}. \adrien{j'ai un peu reformulé parce que je ne comprenais pas ce que tu faisais. C'est juste plein d'égalités et de réécritures en fait. J'espère que c'est mieux comme ça.}
+     $\mframe @ T$ using \textsc{Dup}.
      
    \item Finally, if we have a meta-term $\minp @ T'$ where either $T' \in S$
      of $\pre(T') \in S$, we proceed roughly as in the previous case. First, we know that
