@@ -1,4 +1,4 @@
-(* This test was present as part of the euf.mbc file,
+(* This test was present as part of the euf.sp file,
  * I extracted it for clarity. I'm not sure that it
  * shows wanted features.
  *

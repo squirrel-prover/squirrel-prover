@@ -1,4 +1,4 @@
-(** Module instantiating the printing interface of MetaBC.
+(** Module instantiating the printing interface of Squirrel.
   * It provides printing functions that behave accordingly with
   * the running mode and the kind of printed information. *)
 

@@ -14,7 +14,7 @@ output.tex
 *.toc
 *.synctex.gz
 *.out
-metabc*
+squirrel*
 sanity
 /tex/auto/*.el
 *.fdb_latexmk

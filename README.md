@@ -1,4 +1,4 @@
-# MetaBC prover
+# Squirrel Prover
 
 
 ## Build
@@ -18,7 +18,7 @@ builds the prover and testing binaries and runs tests:
 $ make
 ```
 
-You can also just build the prover with `make metabc`, test with
+You can also just build the prover with `make squirrel`, test with
 `make test`.
 
 The documentation for developers may be built with `make doc`.
@@ -27,20 +27,20 @@ The documentation for developers may be built with `make doc`.
 
 ### Standalone
 
-You can check a proof development by simply passing the file to `metabc`:
+You can check a proof development by simply passing the file to `squirrel`:
 ```
-$ ./metabc examples/euf.mbc
+$ ./squirrel examples/euf.sp
 ```
 
 ### With proof general
 
-The required `.el` files are inside the `utils` folder. The `metabc.el` file
-contains comments detailing the installation of metabc for ProofGeneral.
+The required `.el` files are inside the `utils` folder. The `squirrel.el` file
+contains comments detailing the installation of squirrel for ProofGeneral.
 We recommend installing ProofGeneral from the git repository.
 
 ## Quick guide
 
-MetaBC developments are conventionally written in `.mbc` files. They start
+Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace
 properties.
 
@@ -93,14 +93,14 @@ system <process>.
 TODO: axioms, goals, proofs, available tactics
 
 ## Developper details
- 
+
 # Documentation
 
 It can be generated through:
 ```
 $ make doc
 ```
-The documentation can then be browsed through `metabc.docdic/index.html`.
+The documentation can then be browsed through `squirrel.docdic/index.html`.
 
 # Coverage
 It can be generated through:
@@ -108,4 +108,3 @@ It can be generated through:
 $ make coverage
 ```
 The documentation can then be browsed through `_coverage/index.html`.
-

@@ -4,4 +4,4 @@ true: debug
 
 <src>   : include
 <src/*> : coverage
-<test.native> : coverage
+<test.byte> : coverage

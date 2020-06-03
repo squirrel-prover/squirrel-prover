@@ -5,7 +5,7 @@
 The documentation for developers may be built with `make doc`. The standard ocamldoc syntax should be used for comments.
 Comments for functions should be put inside the `.mli` files.
 
-New modules should be added to `metabc.odocl`.
+New modules should be added to `squirrel.odocl`.
 
 ## Coding conventions
 
@@ -27,7 +27,7 @@ do something
 ```
 * if a let construct spans across multiple line, it should be indented and the `in` should be on a new line at the end:
 
-Good: 
+Good:
 ```
 let x =
   ...

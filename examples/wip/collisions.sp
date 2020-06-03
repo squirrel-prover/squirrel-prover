@@ -1,4 +1,4 @@
-(* This is an extension of tests/ok/collisions.mbc with an extra goal
+(* This is an extension of tests/ok/collisions.sp with an extra goal
  * at the end, that does not work apparently due to a limitation of
  * constraint solving. *)
 
@@ -44,7 +44,7 @@ Proof.
  admit. (* eqnames should work *)
  (* case A *)
  existsleft H0.
- assert (output@tau = output@A(a2)); assert (h(na(a),k)=h(na(a2),k)); 
+ assert (output@tau = output@A(a2)); assert (h(na(a),k)=h(na(a2),k));
  collision.
  admit. (* eqnames should work *)
 Qed.

@@ -214,80 +214,80 @@ let () =
   let test = true in
   add_suite_restore "Models" [
     "Null model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/null.mbc"
+      parse_theory_test ~test "tests/alcotest/null.sp"
     end ;
     "Simple model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process.mbc"
+      parse_theory_test ~test "tests/alcotest/process.sp"
     end ;
     "Proc arg", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process_arg.mbc"
+      parse_theory_test ~test "tests/alcotest/process_arg.sp"
     end ;
     "Proc par", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process_par.mbc"
+      parse_theory_test ~test "tests/alcotest/process_par.sp"
     end ;
     "Name declaration", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/name.mbc"
+      parse_theory_test ~test "tests/alcotest/name.sp"
     end ;
     "Pairs", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/pairs.mbc"
+      parse_theory_test ~test "tests/alcotest/pairs.sp"
     end ;
     "Basic theory", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/theory.mbc"
+      parse_theory_test ~test "tests/alcotest/theory.sp"
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Symbols.Multiple_declarations "c")
-        (fun () -> parse_theory_test ~test "tests/alcotest/multiple.mbc")
+        (fun () -> parse_theory_test ~test "tests/alcotest/multiple.sp")
     end ;
     "Action creation", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/actions.mbc" ;
+      parse_theory_test ~test "tests/alcotest/actions.sp" ;
       ignore (Action.find_symbol "IOIO1") ;
       ignore (Action.find_symbol "IOIO2")
       (* TODO test resulting action structure *)
     end ;
     "Let in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_let.mbc"
+      parse_theory_test ~test "tests/alcotest/action_let.sp"
       (* TODO test resulting action structure *)
     end ;
     "New in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_name.mbc"
+      parse_theory_test ~test "tests/alcotest/action_name.sp"
       (* TODO test resulting action structure *)
     end ;
     "Find in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_find.mbc"
+      parse_theory_test ~test "tests/alcotest/action_find.sp"
       (* TODO test resulting action structure *)
     end ;
     "Updates in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_set.mbc"
+      parse_theory_test ~test "tests/alcotest/action_set.sp"
       (* TODO test resulting action structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/lak.mbc"
+      parse_theory_test ~test "tests/alcotest/lak.sp"
     end ;
     "LAK model, again", `Quick, begin fun () ->
       (* We do this again, on purpose, to check that all definitions
        * from the previous run are gone. The macros from Term used
        * to not be re-initialized. *)
-      parse_theory_test ~test "tests/alcotest/lak.mbc"
+      parse_theory_test ~test "tests/alcotest/lak.sp"
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         Theory.(Conv (Timestamp_unexpected (Var "n")))
-        (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.mbc")
+        (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
                  Theory.(Conv (Arity_error ("C",1,0)))
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_type.mbc")
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_type.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
                  Theory.(Conv (Undefined "D"))
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.mbc")
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Symbols.Multiple_declarations "C")
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.mbc")
+      (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.sp")
     end ;
   ];;

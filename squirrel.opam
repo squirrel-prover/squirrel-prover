@@ -1,6 +1,6 @@
 opam-version: "2.0.4"
-name: "metabc"
-description: "metabc"
+name: "squirrel"
+description: "squirrel"
 version: "0.1"
 build: [
   [make]

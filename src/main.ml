@@ -146,7 +146,7 @@ and error ~test mode s =
 let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
 
 let interactive_prover () =
-  Printer.prt `Start "MetaBC interactive mode.";
+  Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   try main_loop InputDescr
   with End_of_file -> Printer.prt `Error "End of file, exiting."
@@ -178,198 +178,198 @@ let () =
     "Substitution", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NotEqualArguments)
-        (fun () -> run ~test "tests/alcotest/substitution.mbc")
+        (fun () -> run ~test "tests/alcotest/substitution.sp")
     end ;
     "Collision", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NoSSC)
-        (fun () -> run ~test "tests/alcotest/collisions.mbc")
+        (fun () -> run ~test "tests/alcotest/collisions.sp")
     end ;
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Undefined "a1"))
-        (fun () -> run ~test "tests/alcotest/existsintro_fail.mbc")
+        (fun () -> run ~test "tests/alcotest/existsintro_fail.sp")
     end ;
     "Vars not eq", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/vars_not_eq.mbc")
+        (fun () -> run ~test "tests/alcotest/vars_not_eq.sp")
     end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.mbc")
+        (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.sp")
     end ;
     "Euf Mvar", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_mvar.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_mvar.sp")
     end ;
     "Euf Bad SSC 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/eufnull.mbc")
+        (fun () -> run ~test "tests/alcotest/eufnull.sp")
     end ;
     "Euf Bad SSC 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_deep.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_deep.sp")
     end ;
     "Euf Bad SSC 3", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_cond.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_cond.sp")
     end ;
     "Euf collect in key position", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_deepkey.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_deepkey.sp")
     end ;
     "Euf collect indirect bound variables", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_bv.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_bv.sp")
     end ;
     "Euf collect direct bound variables", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_bv_direct.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_bv_direct.sp")
     end ;
     "Euf environment", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactics.(Tactic_soft_failure
                     (Cannot_convert (Theory.(Undefined "i1")))))
-        (fun () -> run ~test "tests/alcotest/euf_env.mbc")
+        (fun () -> run ~test "tests/alcotest/euf_env.sp")
     end ;
     "Sign Bad SSC", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/sign.mbc")
+        (fun () -> run ~test "tests/alcotest/sign.sp")
     end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
-        (fun () -> run ~test "tests/alcotest/axiom1.mbc")
+        (fun () -> run ~test "tests/alcotest/axiom1.sp")
     end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
-        (fun () -> run ~test "tests/alcotest/axiom2.mbc")
+        (fun () -> run ~test "tests/alcotest/axiom2.sp")
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/capture.mbc")
+        (fun () -> run ~test "tests/alcotest/capture.sp")
     end ;
     "Not Depends", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.NotDepends ("A1(i)","A1(i)")))
-        (fun () -> run ~test "tests/alcotest/depends.mbc")
+        (fun () -> run ~test "tests/alcotest/depends.sp")
     end ;
     "Fresh Not Ground", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure
           (Tactics.Failure "can only be applied on ground terms"))
-        (fun () -> run ~test "tests/alcotest/fresh_reach_var.mbc")
+        (fun () -> run ~test "tests/alcotest/fresh_reach_var.sp")
     end ;
     "Check equalities false if unsupported terms", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/completion_unsupported_term.mbc")
+        (fun () -> run ~test "tests/alcotest/completion_unsupported_term.sp")
     end ;
     "Indexed abstract", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure
            (Tactics.Failure "cannot automatically prove goal"))
-        (fun () -> run ~test "tests/alcotest/idx_abs.mbc")
+        (fun () -> run ~test "tests/alcotest/idx_abs.sp")
     end ;
     "Indexed collision", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/idx_collision.mbc")
+        (fun () -> run ~test "tests/alcotest/idx_collision.sp")
     end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Failure "Equations satisfiable"))
-        (fun () -> run ~test "tests/alcotest/try.mbc")
+        (fun () -> run ~test "tests/alcotest/try.sp")
     end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
-        (fun () -> run ~test "tests/alcotest/neqrefl.mbc")
+        (fun () -> run ~test "tests/alcotest/neqrefl.sp")
     end ;
     "Refl Macro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure "Frames contain \
                                 macros that may not be diff-equivalent"))
-        (fun () -> run ~test "tests/alcotest/neqrefl_macros.mbc")
+        (fun () -> run ~test "tests/alcotest/neqrefl_macros.sp")
     end ;
     "Refl Boolean Macro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure "Frames contain \
                                 macros that may not be diff-equivalent"))
-        (fun () -> run ~test "tests/alcotest/neqrefl_bmacros.mbc")
+        (fun () -> run ~test "tests/alcotest/neqrefl_bmacros.sp")
     end ;
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/fresh_frame.mbc")
+        (fun () -> run ~test "tests/alcotest/fresh_frame.sp")
     end ;
     "Fresh System", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/fresh_system.mbc")
+        (fun () -> run ~test "tests/alcotest/fresh_system.sp")
     end ;
     "Make biterm", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/fresh_system.mbc")
+        (fun () -> run ~test "tests/alcotest/fresh_system.sp")
     end ;
     "DDH", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NotDDHContext)
-        (fun () -> run ~test "tests/alcotest/ddh.mbc")
+        (fun () -> run ~test "tests/alcotest/ddh.sp")
     end ;
     "DDH2", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NotDDHContext)
-        (fun () -> run ~test "tests/alcotest/ddh.mbc")
+        (fun () -> run ~test "tests/alcotest/ddh.sp")
     end ;
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Failure
                                 "Frames contain macros that may not be \
                                  diff-equivalent"))
-        (fun () -> run ~test "tests/alcotest/fadup_input.mbc")
+        (fun () -> run ~test "tests/alcotest/fadup_input.sp")
     end ;
     "XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/xor.mbc")
+        (fun () -> run ~test "tests/alcotest/xor.sp")
     end ;
     "XOR2", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure
            (Failure "name is not XORed on both sides"))
-        (fun () -> run ~test "tests/alcotest/xor2.mbc")
+        (fun () -> run ~test "tests/alcotest/xor2.sp")
     end ;
     "Not XOR", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure
            (Failure
               "Can only apply xor tactic on terms of the form u XOR v"))
-        (fun () -> run ~test "tests/alcotest/notxor.mbc")
+        (fun () -> run ~test "tests/alcotest/notxor.sp")
     end ;
     "Pred Init", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/pred.mbc")
+        (fun () -> run ~test "tests/alcotest/pred.sp")
     end ;
     "Pred not injective", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/pred2.mbc")
+        (fun () -> run ~test "tests/alcotest/pred2.sp")
     end ;
   ]

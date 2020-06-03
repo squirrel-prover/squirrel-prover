@@ -3,9 +3,9 @@ OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 
-all: metabc test
+all: squirrel test
 
-PROVER_OK_TESTS = $(wildcard tests/ok/*.mbc) $(wildcard examples/*.mbc)
+PROVER_OK_TESTS = $(wildcard tests/ok/*.sp) $(wildcard examples/*.sp)
 
 test: alcotest ok_test
 
@@ -13,7 +13,7 @@ test: alcotest ok_test
 
 ok_test:
 	@$(MAKE) -j8 ok_test_end
-ok_test_end: $(PROVER_OK_TESTS:.mbc=.ok)
+ok_test_end: $(PROVER_OK_TESTS:.sp=.ok)
 	@echo
 	@rm -f tests/ok/test_prologue.ok
 	@if test -f tests/ok/tests.ko ; then \
@@ -21,35 +21,38 @@ ok_test_end: $(PROVER_OK_TESTS:.mbc=.ok)
 	  cat tests/ok/tests.ko ; rm -f tests/ok/tests.ko ; exit 1 ; \
 	 else echo All tests passed successfully. ; fi
 tests/ok/test_prologue.ok:
-	@echo "Running tests/ok/*.mbc and examples/*.mbc."
-%.ok: tests/ok/test_prologue.ok %.mbc
-	@if ./metabc $(@:.ok=.mbc) > /dev/null 2> /dev/null ; then echo -n . ; \
-	 else echo "[FAIL] $(@:.ok=.mbc)" >> tests/ok/tests.ko ; echo -n '!' ; fi
+	@echo "Running tests/ok/*.sp and examples/*.sp."
+%.ok: tests/ok/test_prologue.ok %.sp
+	@if ./squirrel $(@:.ok=.sp) > /dev/null 2> /dev/null ; then echo -n . ; \
+	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/ok/tests.ko ; echo -n '!' ; fi
 
 alcotest: sanity
 	$(OCB) test.byte
 	@mkdir -p ./_build/_tests
-	@rm -f ./_build/_tests/MetaBC ./_build/_tests/latest
+	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
 	./test.byte --compact -o ./_build/_tests
 
 clean:
 	$(OCB) -clean
-	@rm -f metabc
+	@rm -f squirrel
 	rm -f *.coverage
 	rm -rf _coverage
 
-metabc: sanity
-	$(OCB) metabc.byte
-	@ln -s -f metabc.byte metabc
+squirrel: sanity
+	$(OCB) squirrel.byte
+	@ln -s -f squirrel.byte squirrel
 
 makecoverage: sanity
-	BISECT_COVERAGE=YES $(OCB) test.native
-	./test.native
-	BISECT_COVERAGE=YES $(OCB) metabc.byte
-	@ln -s -f metabc.byte metabc
+	BISECT_COVERAGE=YES $(OCB) test.byte
+	@mkdir -p ./_build/_tests
+	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
+	./test.byte --compact -o ./_build/_tests
+	BISECT_COVERAGE=YES $(OCB) squirrel.byte
+	@ln -s -f squirrel.byte squirrel
 
 coverage: makecoverage ok_test
-	bisect-ppx-report html -I _build/
+	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
+	bisect-ppx-report html --ignore-missing-files
 	rm -f *.coverage
 
 %.cmo: sanity
@@ -67,11 +70,11 @@ profile: sanity
 debug: sanity
 	$(OCB) -tag debug test.byte
 
-install: metabc
-	cp metabc.byte ~/.local/bin/metabc.byte
+install: squirrel
+	cp squirrel.byte ~/.local/bin/squirrel.byte
 
-doc: metabc
-	$(OCB) -ocamldoc "ocamldoc -stars" metabc.docdir/index.html
+doc: squirrel
+	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
 
 sanity: _build/requirements
 

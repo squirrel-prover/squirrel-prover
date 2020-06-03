@@ -1,18 +1,18 @@
-;;; metabc.el --- Proof General for metabc.
+;;; squirrel.el --- Proof General for the Squirrel Prover.
 
 ;; 0. Clone the git repository of proof general inside your ~/.emacs/lisp:
 ;;    # cd ~/.emacs.d/lisp/
 ;;    # git clone https://github.com/ProofGeneral/PG
 
-;; 1. Create a metabc subdirectory:
-;;    # mkdir ~/.emacs.d/lisp/PG/metabc
+;; 1. Create a squirrel subdirectory:
+;;    # mkdir ~/.emacs.d/lisp/PG/squirrel
 
-;; 2. Copy and paste this file, and metabc-syntax.el inside it:
-;;    # cp metabc.el metabc-syntax.el ~/.emacs.d/lisp/PG/metabc
+;; 2. Copy and paste this file, and squirrel-syntax.el inside it:
+;;    # cp squirrel.el squirrel-syntax.el ~/.emacs.d/lisp/PG/squirrel
 
 ;; 3. Moreover, in the file ~/.emacs.d/lisp/PG/generic/proof-site.el,
 ;;    add to the list proof-assistant-table-default the following line:
-;;      (metabc "metabc" "mbc")
+;;      (squirrel "squirrel" "sp")
 ;;    Then erase the outdated compiled version of this file:
 ;;    # rm ~/.emacs.d/lisp/PG/generic/proof-site.elc
 
@@ -21,10 +21,10 @@
 ;;    (require 'ansi-color)
 ;;    (load "~/.emacs.d/lisp/PG/generic/proof-site")
 
-;; 5. Run emacs from the metabc repository on some example file,
-;;    with the metabc repository in the path:
-;;    # export PATH=$PATH:/path/to/metabc
-;;    # emacs examples/<file>.mbc
+;; 5. Run emacs from the squirrel repository on some example file,
+;;    with the squirrel repository in the path:
+;;    # export PATH=$PATH:/path/to/squirrel
+;;    # emacs examples/<file>.sp
 
 (require 'span)
 (require 'proof)
@@ -35,11 +35,11 @@
 
 (require 'proof-easy-config)
 ;;(require 'proof-syntax)
-(require 'metabc-syntax)
+(require 'squirrel-syntax)
 
-(proof-easy-config 'metabc "metabc"
+(proof-easy-config 'squirrel "squirrel"
 
- proof-prog-name		     "metabc.byte -i"  ;; or your program
+ proof-prog-name		     "squirrel.byte -i"  ;; or your program
  proof-terminal-string                 "."        ;; end of commands
  ;; proof-script-command-start-regexp "Proof\\|goal\\|hash[ \n\t\r]"
 
@@ -75,8 +75,8 @@
  proof-shell-start-goals-regexp         "\\[goal>"
  proof-shell-end-goals-regexp           nil  ; up to next prompt
 
-;; proof-shell-font-lock-keywords         metabc-font-lock-keywords
- proof-script-font-lock-keywords         metabc-font-lock-keywords
+;; proof-shell-font-lock-keywords         squirrel-font-lock-keywords
+ proof-script-font-lock-keywords         squirrel-font-lock-keywords
 
  proof-undo-n-times-cmd "undo %s."
  proof-count-undos-fn 'proof-generic-count-undos
@@ -100,7 +100,7 @@
           'display-ansi-colors)
 
 ;; disable electric indent mode
-(add-hook 'metabc-mode-hook (lambda () (electric-indent-mode -1)))
+(add-hook 'squirrel-mode-hook (lambda () (electric-indent-mode -1)))
 
-(provide 'metabc)
-;;; metabc.el ends here
+(provide 'squirrel)
+;;; squirrel.el ends here

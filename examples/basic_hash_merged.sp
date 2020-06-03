@@ -1,6 +1,6 @@
 (* Variant model for the Basic Hash protocol,
    corresponding to the multiple-session side of the unlinkability
-   biprocess. Compared to basic_hash.mbc model, there is a single
+   biprocess. Compared to basic_hash.sp model, there is a single
    action R(k) where the process accepts some tag, instead of
    several actions R(k,i) where the reader accepts tag i. *)
 
