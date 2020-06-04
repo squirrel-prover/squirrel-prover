@@ -36,7 +36,6 @@ name nt : index -> index -> message
 name rt : index -> index -> message
 name rr : index -> message
 
-axiom pair : forall (m:message), <fst(m),snd(m)> = m
 axiom dec :
   forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
 

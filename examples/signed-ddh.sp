@@ -17,9 +17,6 @@ abstract ko : message
 name kP : message
 name kS : message
 
-mutable keyS : index -> message
-mutable keyP : index -> message
-
 channel cP
 channel cS
 

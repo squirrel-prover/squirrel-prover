@@ -29,7 +29,7 @@ The documentation for developers may be built with `make doc`.
 
 You can check a proof development by simply passing the file to `squirrel`:
 ```
-$ ./squirrel examples/euf.sp
+$ ./squirrel examples/basic-hash.sp
 ```
 
 ### With proof general
@@ -64,7 +64,6 @@ e.g. `x:boolean` or `i:index`:
 hash <id>                                          (* keyed hash function *)
 name <id> : index -> .. -> index -> message        (* indexed name *)
 mutable <id> : index -> .. -> index -> <msg_type>  (* indexed memory cell *)
-term <id>(<args>) : <msg_type> = <term>            (* macro definition *)
 ```
 
 #### Processes
@@ -88,9 +87,43 @@ terminates this statement:
 system <process>.
 ```
 
-### Lemmas
+The system can be given an explicit name using the following syntax,
+which is necessary when multiple systems are used in the same file:
+```
+system [NAME] <process>.
+```
 
-TODO: axioms, goals, proofs, available tactics
+### Axioms, lemmas and proofs
+
+Axioms can be declared in the prologue using the "axiom" keyword:
+```
+axiom NAME : <formula>.
+```
+Axioms can be declared for a specific system, rather than the default
+one:
+```
+axiom [SYSTEM_NAME] GOAL_NAME : <formula>.
+```
+
+Reachability goals are noted as follows:
+```
+goal NAME : <formula>.
+```
+
+By default, a goal is expressed simultaneously for the two projections
+of the system. In such cases, it is often the case that, at some point
+in the proof, one needs to use the `project` tactic to handle separately
+the two sides.
+
+Alternatively, goals can be stated wrt a specific side of the system:
+```
+goal [left/right/none,SYSTEM_NAME] GOAL_NAME : <formula>.
+```
+
+Goals are proved using tactic-based proof scripts. Proofs start with
+`Proof` and end with `Qed`. The special tactic `help` can be used to
+obtain a list of all available tactics (for reachability or equivalence
+goals, depending on the context).
 
 ## Developper details
 

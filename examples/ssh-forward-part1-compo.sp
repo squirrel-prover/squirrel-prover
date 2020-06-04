@@ -23,9 +23,6 @@ abstract forwarded : message
 name kP : message
 name kS : message
 
-mutable keyS : index -> message
-mutable keyP : index -> message
-
 channel cP
 channel cS
 
@@ -39,16 +36,18 @@ name k : index -> index -> message
 abstract enc : message -> message -> message
 abstract dec : message -> message -> message
 
-axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) =x1
+axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) = x1
 
 hash h
 name hKey : message
 
-axiom [none,auth] hashnotfor : forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+axiom [auth] hashnotfor :
+  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
 
-axiom [none,auth] collres : forall (x1,x2:message), h(x1,hKey) = h(x2,hKey) => x1=x2
+axiom [auth] collres :
+  forall (x1,x2:message), h(x1,hKey) = h(x2,hKey) => x1=x2
 
-axiom [none,auth] freshindex : exists (l:index), True
+axiom [auth] freshindex : exists (l:index), True
 
 axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
@@ -116,7 +115,7 @@ process SDDH =
      out(cP,diff(g^a1^b1,g^k11))
 
 
-system [secrect] ( PDDH | SDDH).
+system [secret] (PDDH | SDDH).
 
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -173,7 +172,7 @@ system [auth] ( Pauth | Sauth).
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [none, auth] P_charac :
   cond@Pok => (cond@Pfail => False) .
-  Proof.
+Proof.
   simpl.
   expand cond@Pok.
   expand cond@Pfail.
@@ -197,7 +196,7 @@ Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
 goal [none, auth] S_charac :
-   cond@Sok => (cond@Sfail => False).
+  cond@Sok => (cond@Sfail => False).
 Proof.
   simpl.
   expand cond@Sok; expand cond@Sfail.
@@ -222,7 +221,9 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS; enrich hKey.
+   enrich a1; enrich b1;
+   enrich seq(i-> b(i)); enrich seq(i-> a(i));
+   enrich kP; enrich kS; enrich hKey.
 
    induction t.
 
@@ -238,7 +239,6 @@ Proof.
    expandall.
    fa 7.
    expand seq(i->g^b(i)),i.
-
 
    expand frame@Pfail.
    equivalent exec@Pfail, False.

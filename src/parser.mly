@@ -250,10 +250,10 @@ declaration:
                                  { Theory.declare_macro $2 $3 $5 $7 }
 | PROCESS ID opt_arg_list EQ process
                                  { Process.declare $2 $3 $5 }
-| AXIOM s=system f=formula       { Prover.add_proved_goal
+| AXIOM s=bsystem f=formula       { Prover.add_proved_goal
                                      (Prover.unnamed_goal (),
                                       Prover.make_trace_goal s f) }
-| AXIOM s=system i=ID COLON f=formula
+| AXIOM s=bsystem i=ID COLON f=formula
                                  { Prover.add_proved_goal
                                      (i, Prover.make_trace_goal s f) }
 
@@ -341,6 +341,10 @@ system:
 | LBRACKET NONE COMMA i=ID RBRACKET  { Action.(SimplePair i) }
 | LBRACKET LEFT COMMA i=ID RBRACKET  { Action.(Single (Left i)) }
 | LBRACKET RIGHT COMMA i=ID RBRACKET { Action.(Single (Right i)) }
+
+bsystem:
+|                         { Action.(SimplePair default_system_name) }
+| LBRACKET i=ID RBRACKET  { Action.(SimplePair i) }
 
 single_system:
 | LBRACKET LEFT RBRACKET  { Action.(Left default_system_name)}

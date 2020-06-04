@@ -10,7 +10,7 @@ abstract ko:message
 
 abstract tag1:message
 abstract tag2:message
-axiom [right] tags_neq : tag1 <> tag2
+axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message

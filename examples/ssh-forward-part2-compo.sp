@@ -26,9 +26,6 @@ abstract anssign : message
 name kP : message
 name kS : message
 
-mutable keyS : index -> message
-mutable keyP : index -> message
-
 channel cP
 channel cS
 
@@ -38,7 +35,6 @@ name ake11 : message
 name bke11 : message
 name k11 : message
 
-
 name a1 : message
 name b1 : message
 name c11 : message
@@ -46,20 +42,20 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-(* We only use the fact that a indcca encryption is unforgeable. Due to
-   limitation of the tool, we model the symmetric encryption as an asymetric
+(* We only use the fact that an IND-CCA1 encryption is unforgeable. Due to
+   limitation of the tool, we model the symmetric encryption as an asymmetric
    encryption. Remark that the symmetric encryption must be euf even when a hash
-   containing the key is given. In other terms, the hash function h should be
+   containing the key is given. In other words, the hash function h should be
    PRF. *)
 signature enc,checkdec,pke abstract dec : message -> message -> message
 
 hash h
 name hKey : message
 
-axiom [none,auth] collres : forall (m1,m2:message), h(m1, hKey) = h(m2, hKey) => m1 = m2
-axiom [none,auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m, hKey) => fst(m1) <> m2
+axiom [auth] collres : forall (m1,m2:message), h(m1, hKey) = h(m2, hKey) => m1 = m2
+axiom [auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m, hKey) => fst(m1) <> m2
 
-axiom [none,auth] freshindex : exists (l:index), True
+axiom [auth] freshindex : exists (l:index), True
 
 axiom DDHinj : forall (m1,m2:message), m1 <> m2 => g^m1 <> g^m2
 axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
@@ -67,43 +63,52 @@ axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
- || exists (i:index, m1:message, m2:message) m=<forwarded, h(<<g^a(i),m1>,m2>, hKey)> (* O_FPS *)
- || exists (i:index, m1:message, m2:message) m=h(<<g^ake1(i),m1>,m2>, hKey) (* O_KE1 *)
+ || exists (i:index, m1:message, m2:message)
+      m = <forwarded, h(<<g^a(i),m1>,m2>, hKey)> (* O_FPS *)
+ || exists (i:index, m1:message, m2:message)
+      m = h(<<g^ake1(i),m1>,m2>, hKey) (* O_KE1 *)
  )
   &&
 (sk <> kS
- || exists (i:index, m1:message, m2:message) m=<forwarded, h(<<m1,g^b(i)>,m2>, hKey)> (* O_FPS *)
- || exists (i:index, m1:message, m2:message) m=h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
+ || exists (i:index, m1:message, m2:message)
+      m = <forwarded, h(<<m1,g^b(i)>,m2>, hKey)> (* O_FPS *)
+ || exists (i:index, m1:message, m2:message)
+      m = h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
 )
 
-axiom [none,auth] signnottag : forall (m1,m2:message), fst(sign(m1,m2)) <> anssign && fst(sign(m1,m2)) <> reqsign
+axiom [auth] signnottag :
+  forall (m1,m2:message),
+  fst(sign(m1,m2)) <> anssign &&
+  fst(sign(m1,m2)) <> reqsign
 
-axiom [none,auth] difftags : anssign <> forwarded && forwarded <> reqsign && reqsign <> anssign
+axiom [auth] difftags :
+  anssign <> forwarded &&
+  forwarded <> reqsign && reqsign <> anssign
 
-(** We first present the general ssh process. *)
+(** We first present the general SSH process. *)
 
- process P1FA =
+process P1FA =
   in(cP,gB);
   out(cP,ok);
- (* begin P1 *)
+  (* begin P1 *)
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,pke(k11)>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-       out(cP, enc(sign(sidP,kP),pke(k11)));
-           (* end P1 *)
+  out(cP, enc(sign(sidP,kP),pke(k11)));
+  (* end P1 *)
 
-           (* begin FA *)
-           !_i (
-                 in(cP,y);
-                 let x = dec(y,pke(k11)) in
-                 if checkdec(y,pke(k11)) = x then
-                 if fst(x) = reqsign then
-                 out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,pke(k11)))
-               )
+  (* begin FA *)
+  !_i (
+    in(cP,y);
+    let x = dec(y,pke(k11)) in
+    if checkdec(y,pke(k11)) = x then
+    if fst(x) = reqsign then
+    out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,pke(k11)))
+  )
 
 process PDIS =
- (* begin S0 *)
+  (* begin S0 *)
   in(cS, gP0);
   out(cS, g^bke11);
   (* end S0 *)
@@ -115,30 +120,29 @@ process PDIS =
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
       out(cS,ok);
   (* end S1 *)
- (* begin Pdis0 *)
-      out(cP, g^a1);
-      in(cP, gB);
- (* end Pdis0 *)
-      out(cP,ok);
- (* begin Pdis1 *)
-
-      in(cP,t);
-      let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
-      let pkS = fst(t) in
-      if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-          out(cP, enc( <reqsign, sidP>,k11));
-		in(cP, signans);
-  		  let y = dec(signans,pke(k11)) in
-                if checkdec(signans,pke(k11)) = y then
-	          if fst(y) = anssign then
-                 Pok: out(cP, enc(snd(y),gB^a1))
+  (* begin Pdis0 *)
+  out(cP, g^a1);
+  in(cP, gB);
+  (* end Pdis0 *)
+  out(cP,ok);
+  (* begin Pdis1 *)
+  in(cP,t);
+  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let pkS = fst(t) in
+  if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
+    out(cP, enc( <reqsign, sidP>,k11));
+    in(cP, signans);
+    let y = dec(signans,pke(k11)) in
+    if checkdec(signans,pke(k11)) = y then
+    if fst(y) = anssign then
+    Pok: out(cP, enc(snd(y),gB^a1))
 
 
 process SDIS =
- (* begin SDIS0 *)
+  (* begin SDIS0 *)
   in(cS, gP);
   out(cS, g^b1);
- (* end SDIS0 *)
+  (* end SDIS0 *)
 
   (* begin SDIS1 *)
   in(cS,garbage);
@@ -148,32 +152,32 @@ process SDIS =
   if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidS> then
     Sok : out(cS,ok)
 
-system [fullSSH] ( P1FA | SDIS | PDIS).
+system [fullSSH] (P1FA | SDIS | PDIS).
 
 (* Now the process for the secrecy *)
 
- process P1FADDH =
+process P1FADDH =
   in(cP,gB);
   out(cP,ok);
- (* begin P1 *)
+  (* begin P1 *)
   in(cP,t);
   let sidP = h(<<g^ake11,gB>,pke(k11)>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-       out(cP, enc(sign(sidP,kP),k11));
-           (* end P1 *)
+  out(cP, enc(sign(sidP,kP),k11));
+  (* end P1 *)
 
-           (* begin FA *)
-           !_i (
-                in(cP,y);
-                 let x2= dec(y,pke(k11)) in
-                 if checkdec(y,pke(k11)) = x2 then
-                 if fst(x2) = reqsign then
-                 out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,k11))
-               )
+  (* begin FA *)
+  !_i (
+    in(cP,y);
+    let x2= dec(y,pke(k11)) in
+    if checkdec(y,pke(k11)) = x2 then
+    if fst(x2) = reqsign then
+    out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,k11))
+  )
 
 process PDISDDH =
- (* begin S0 *)
+  (* begin S0 *)
   in(cS, gP0);
   out(cS, g^bke11);
   (* end S0 *)
@@ -183,25 +187,25 @@ process PDISDDH =
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
-      out(cS,ok);
+  out(cS,ok);
   (* end S1 *)
- (* begin Pdis0 *)
-      out(cP, g^a1);
-      in(cP, gB);
- (* end Pdis0 *)
-     if gB = g^b1 then
-        out(cP,diff(g^a1^b1,g^c11))
+  (* begin Pdis0 *)
+  out(cP, g^a1);
+  in(cP, gB);
+  (* end Pdis0 *)
+  if gB = g^b1 then
+  out(cP,diff(g^a1^b1,g^c11))
 
 
 process SDISDDH =
- (* begin SDIS0 *)
+  (* begin SDIS0 *)
   in(cS, gP);
   out(cS, g^b1);
- (* end SDIS0 *)
+  (* end SDIS0 *)
 
   (* begin SDIS1 *)
   if gP = g^a1 then
-     out(cP,diff(g^a1^b1,g^c11))
+  out(cP,diff(g^a1^b1,g^c11))
 
 system [secret] ( P1FADDH | SDISDDH | PDISDDH).
 
@@ -222,20 +226,20 @@ Qed.
   let sidPaF = h(<<g^ake11,gB>,pke(k11)>, hKey) in
   let pkSaF = fst(t) in
   if pkSaF = pk(kS) && checksign(snd(t),pkS) = sidPaF then
-       out(cP, enc(sign(sidPaF,kP),k11));
-           (* end P1 *)
+  out(cP, enc(sign(sidPaF,kP),k11));
+  (* end P1 *)
 
-           (* begin FA *)
-           !_i (
-                in(cP,y3);
-                 let x3 = dec(y3,pke(k11)) in
-                 if checkdec(y3,pke(k11)) = x3 then
-                 if fst(x3) = reqsign then
-                 out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,k11))
-               )
+  (* begin FA *)
+  !_i (
+    in(cP,y3);
+    let x3 = dec(y3,pke(k11)) in
+    if checkdec(y3,pke(k11)) = x3 then
+    if fst(x3) = reqsign then
+    out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,k11))
+  )
 
 process PDISauth =
- (* begin S0 *)
+  (* begin S0 *)
   in(cS, gP0);
   out(cS, g^bke11);
   (* end S0 *)
@@ -245,37 +249,37 @@ process PDISauth =
   out(cS, <<pk(kS),g^bke11>,sign(sidS0a, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0a then
-      out(cS,ok);
+  out(cS,ok);
   (* end S1 *)
- (* begin Pdis0 *)
-      out(cP, g^a1);
-      in(cP, gB);
- (* end Pdis0 *)
-      out(cP,ok);
- (* begin Pdis1 *)
+  (* begin Pdis0 *)
+  out(cP, g^a1);
+  in(cP, gB);
+  (* end Pdis0 *)
+  out(cP,ok);
+  (* begin Pdis1 *)
 
-      in(cP,t);
-      let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
-      let pkSa = fst(t) in
-      if pkSa = pk(kS) && checksign(snd(t),pkSa) = sidPa then
-          out(cP, enc( <reqsign, sidPa>,k11));
-         in(cP, signans);
-	 let ya = dec(signans,pke(k11)) in
-          if checkdec(signans,pke(k11)) = ya then
-      	      if fst(ya) = anssign then
-                 out(cP, enc(snd(ya),gB^a1));
-                 in(cP,challenge);
-                try find i such that gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11 in
-                   out(cP,ok)
-                 else
-		    Pfail : out(cP,diff(ok,ko))
+  in(cP,t);
+  let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let pkSa = fst(t) in
+  if pkSa = pk(kS) && checksign(snd(t),pkSa) = sidPa then
+  out(cP, enc( <reqsign, sidPa>,k11));
+  in(cP, signans);
+  let ya = dec(signans,pke(k11)) in
+  if checkdec(signans,pke(k11)) = ya then
+  if fst(ya) = anssign then
+  out(cP, enc(snd(ya),gB^a1));
+  in(cP,challenge);
+  try find i such that
+    gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11
+  in out(cP,ok)
+  else Pfail : out(cP,diff(ok,ko))
 
 
 process SDISauth =
- (* begin SDIS0 *)
+  (* begin SDIS0 *)
   in(cS, gP);
   out(cS, g^b1);
- (* end SDIS0 *)
+  (* end SDIS0 *)
 
   (* begin SDIS1 *)
   in(cS,garbage);
@@ -283,12 +287,12 @@ process SDISauth =
   out(cS, <<pk(kS),g^b1>,sign(sidSa, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidSa> then
-     out(cS,ok);
-     in(cS,challenge);
-     try find i such that gP = g^a(i) || gP = g^a1 in
-         out(cS,ok)
-     else
-       Sfail :  out(cS,diff(ok,ko))
+    out(cS,ok);
+    in(cS,challenge);
+    try find i such that gP = g^a(i) || gP = g^a1 in
+      out(cS,ok)
+    else
+      Sfail :  out(cS,diff(ok,ko))
 
 system [auth] ( P1FAauth | SDISauth | PDISauth).
 

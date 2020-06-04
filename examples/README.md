@@ -64,9 +64,9 @@ SSH protocol with forwarding agent [H]
 ### Composition
 
 The case studies that end with the `-compo` suffix leverage the composition
-result of [H]. They corresponds to proofs that are performed for a single
-session, but that allow to derive thanks to the Theorems of [H] the security for
-an unbounded number of sessions.
+result of [H]. They correspond to proofs that are performed for a single
+session, but that allow to derive thanks to the theorems of [H] a security
+guarantee for an unbounded number of sessions.
 
 ## Bibliography
 
@@ -74,8 +74,8 @@ an unbounded number of sessions.
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
  - [B] Martin Feldhofer, Sandra Dominikus, and Johannes Wolkerstorfer.
 Strong authentication for RFID systems using the AES algorithm. In
-Marc Joye and Jean-Jacques Quisquater, editors, Cryptographic Hard-
-ware and Embedded Systems - CHES 2004: 6th International Workshop
+Marc Joye and Jean-Jacques Quisquater, editors, Cryptographic
+Hardware and Embedded Systems - CHES 2004: 6th International Workshop
 Cambridge, MA, USA, August 11-13, 2004. Proceedings, volume 3156
 of Lecture Notes in Computer Science, pages 357–370. Springer, 2004.
  - [C] Ari Juels and Stephen A. Weis. Defining strong privacy for RFID. ACM
@@ -95,8 +95,8 @@ Computer and Communications Security, CCS ’14, pages 609–620.
 ACM, 2014.
  - [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
- - [H] Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
-tion: a technique for protocol composition with long term shared secrets.
+ - [H] Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle
+simulation: a technique for protocol composition with long term shared secrets.
 In Jonathan Katz and Giovanni Vigna, editors, Proceedings of the 27st
 ACM Conference on Computer and Communications Security (CCS’20),
 Orlando, USA, November 2020. ACM Press. To appear

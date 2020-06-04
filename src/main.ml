@@ -249,11 +249,6 @@ let () =
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
-        (fun () -> run ~test "tests/alcotest/axiom1.sp")
-    end ;
-    "Axiom Systems", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_hard_failure NoAssumpSystem)
         (fun () -> run ~test "tests/alcotest/axiom2.sp")
     end ;
     "Substitution no capture", `Quick, begin fun () ->
