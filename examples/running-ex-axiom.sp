@@ -1,39 +1,35 @@
-hash h
+hash H
 
-abstract ok:message
-abstract error:message
+abstract ok : message
+abstract error : message
+
+name key : index -> message
+
+channel c
 
 axiom pair : forall (x:message) <fst(x), snd(x)> = x
 
-name key : index->message
-
-channel cT
-channel cR
-
 process tag(i:index) =
-  new nT;
-  out(cT, <nT, h(nT,key(i))>)
+  new n; out(c, <n, H(n,key(i))>)
 
 process reader(j:index) =
-  in(cT,x);
-  try find i such that snd(x) = h(fst(x),key(i)) in
-    out(cR,ok)
-  else
-    out(cR,error)
+  in(c,x);
+  try find i such that snd(x) = H(fst(x), key(i))
+  in out(c,ok)
+  else out(c,error)
 
-system ((!_j R: reader(j)) | (!_i !_k T: tag(i))).
+system (!_j R: reader(j) | !_i !_j T: tag(i)).
 
-goal wa :
+goal auth :
   forall (i:index, j:index),
-  cond@R(j,i) => 
-  exists (k:index), (
-  T(i,k) <= R(j,i) &&
-  input@R(j,i) = output@T(i,k)).
+    cond@R(j,i) =>
+    exists (j':index), T(i,j') < R(j,i)
+    && input@R(j,i) = output@T(i,j').
 
 Proof.
  simpl.
  expand cond@R(j,i).
  euf M0.
- exists k.
+ exists j1.
  apply pair to input@R(j,i).
 Qed.
