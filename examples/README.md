@@ -4,18 +4,12 @@ This folder contains the examples and case studies of the Squirrel Prover paper.
 
 ## Running Examples
 
-The two running examples of the paper are `running-ex-auth.sp` and
-`running-ex-axiom.sp`. They are well suited to get a first feel of the tool.
+The running examples of the paper correspond to the files:
+- `running-ex-auth.sp` for the authentication property
+- `basic-hash.sp` for the complete proof of unlinkability
+They are well suited to get a first feel of the tool.
 
 ## Case Studies
-
-All the other `.sp` files correspond to a case study of the paper. The folder
-`wip/` contains some work in progress examples, i.e. examples that are not
-complete. The folder `demo/` contains some basic files that can be used to give
-a live demonstration of the tool.
-
-Case studies that end with the `-light` suffix are simplified models of the
-protocols, that omit the last check.
 
 Case studies that use an axiom among `cca1`,`enckp`,`prf`,`euf`,`ddh`
 can be found with:
@@ -23,7 +17,8 @@ can be found with:
 $ grep "AXIOMNAME " *.sp
 ```
 
-The case studies can be split into multiple categories. We provide the
+The case studies can be split into multiple categories.
+For each protocol, we provide the
 bibliographic reference that contains the description we used to model the
 protocol, which may differ from the original specification of the protocol.
 
@@ -33,22 +28,22 @@ Basic Hash [A]:
 - basic-hash.sp
 
 Feldhofer [B]:
-- feldhofer-light.sp
+- feldhofer.sp
 
 Hash Lock [C]:
 - hash-lock.sp
 
 LAK [D]:
-- lak-tags-light.sp
+- lak-tags.sp
 
 MW [E]:
-- mw-light.sp
 - mw.sp
+- mw-full.sp
 
 ### Encryption Based
 
 Private Authentication [F]:
- - private-authentication-light.sp
+ - private-authentication.sp
 
 ### DDH Based
 

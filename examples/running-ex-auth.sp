@@ -7,7 +7,7 @@ name key : index -> message
 
 channel c
 
-process tag(i:index) =
+process tag(i,j:index) =
   new n; out(c, <n, H(n,key(i))>)
 
 process reader(j:index) =
@@ -16,7 +16,7 @@ process reader(j:index) =
   in out(c,ok)
   else out(c,error)
 
-system (!_j R: reader(j) | !_i !_j T: tag(i)).
+system (!_j R: reader(j) | !_i !_j T: tag(i,j)).
 
 goal auth :
   forall (i:index, j:index),
