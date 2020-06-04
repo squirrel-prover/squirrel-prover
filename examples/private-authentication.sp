@@ -43,7 +43,7 @@ process B(i:index) =
     if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n(i)) then
       enc(<snd(dmess), n(i)>, r(i), pk(diff(kA,kAbis)))
     else
-      enc(<n(i), n(i)>, r2(i), pk(diff(kA,kAbis)))
+      enc(<n(i), n(i)>, r(i), pk(diff(kA,kAbis)))
   )
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
@@ -60,24 +60,28 @@ Proof.
 
   (* Case A1 *)
   expandall.
-  fa 2. fa 3. cca1 3.
-  fa 3. fa 3. fa 3. fresh 3. yesif 3.
+  fa 2. fa 3.  fa 3.
+  cca1 3.
+  fa 3. fa 3. fresh 3. yesif 3.
 
   (* Case B *)
   expandall.
   fa 2. fa 3.
-  enckp 3. enckp 3. 
-  cca1 3. cca1 3.
+  enckp 3. enckp 3.
+  fa 3.
+  cca1 3.
+
   (* length reasoning *)
-  equivalent 
+  equivalent
     len(<snd(dec(input@B(j),kB)),n(j)>),
     plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   apply length to snd(dec(input@B(j),kB)),n(j).
-  fa 3.
+
   ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)).
+
   trivialif 3.
   apply length to n(j),n(j).
-  fa 3.
-  fa 3.
+  fa 3. fa 3. fa 3.
   fresh 3. yesif 3.
+  fresh 3.  yesif 3.
 Qed.

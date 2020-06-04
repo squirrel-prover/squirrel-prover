@@ -1082,7 +1082,7 @@ let cca1 i s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    let hide_enc enc fnenc m fnpk sk fndec r =
+    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis isk  is_top_level=
       (* we check that the random is fresh, and the key satisfy the
                side condition. *)
       begin
@@ -1094,22 +1094,43 @@ let cca1 i s =
                |> TraceSequent.set_env env
               )
           in
-          let new_elem =
-            EquivSequent.apply_subst_frame
-              [Term.ESubst (enc, Term.Fun (Term.f_len, [m])
-                           )] [e] in
-          let biframe = (List.rev_append before (new_elem @ after)) in
-          [fresh_goal;
-           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+          let new_m = Term.Fun (Term.f_len, [m]) in
+          let new_term = match fnpk with
+            | Some fnpk ->     Term.Fun ((fnenc,eis),
+                                      [new_m; Term.Name r;
+                                       Term.Fun (fnpk, [Term.Name (sk,isk)])])
+            | None ->  Term.Fun ((fnenc,eis),
+                                      [new_m; Term.Name r; Term.Name (sk,isk)])
+          in
+          let new_subst =
+            if  is_top_level then
+                Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
+            else
+              Term.ESubst (enc,
+                            new_term
+                           ) in
+          (fresh_goal, new_subst)
       end
+    in
+    (* first, we check if the term is an encryption at top level, in which case
+       we will completely replace the encryption by the length, else we will
+       replace the plain text by the lenght *)
+    let is_top_level = match e with
+   | EquivSequent.Message (Term.Fun ((fnenc,eis), [m; Term.Name r;
+                                    Term.Fun ((fnpk,is), [Term.Name (sk,isk)])]))
+              when (Symbols.is_ftype fnpk Symbols.PublicKey
+                    && Symbols.is_ftype fnenc Symbols.AEnc) -> true
+   | EquivSequent.Message (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)]))
+     when Symbols.is_ftype fnenc Symbols.SEnc  -> true
+   | _ -> false
     in
     (* search for the first occurrence of an asymmetric encryption in [e], that
        do not occur under a decryption symbol. *)
-    begin match
-        (Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc)
-        @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc)
+    let rec hide_all_encs enclist =
+      begin match
+          enclist
       with
-      | (Term.Fun ((fnenc,_), [m; Term.Name r;
+      | (Term.Fun ((fnenc,eis), [m; Term.Name r;
                                     Term.Fun ((fnpk,is), [Term.Name (sk,isk)])])
               as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey
                                  && Symbols.is_ftype fnenc Symbols.AEnc)
@@ -1131,8 +1152,11 @@ let cca1 i s =
                        "The public key must be inside the frame in order to use \
                         CCA1")
                   ;
-
-                hide_enc enc fnenc m (Some fnpk) sk fndec r
+                  let (fgoals, substs) = hide_all_encs q in
+                  let fgoal,subst =
+                    get_subst_hide_enc enc fnenc m (Some (fnpk,is)) sk fndec r eis isk is_top_level
+                  in
+                  (fgoal :: fgoals,subst :: substs)
               with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
             end
           | _ ->
@@ -1141,7 +1165,7 @@ let cca1 i s =
                  "The first encryption symbol is not used with the correct public \
                   key function.")
         end
-      | (Term.Fun ((fnenc,_), [m; Term.Name r; Term.Name (sk,isk)])
+      | (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)])
               as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc
         ->
         begin
@@ -1152,8 +1176,12 @@ let cca1 i s =
             ->
             begin
               try
-              symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk;
-              hide_enc enc fnenc m (None) sk fndec r
+                symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk;
+                  let (fgoals, substs) = hide_all_encs q in
+                  let fgoal,subst =
+                    get_subst_hide_enc enc fnenc m (None) sk fndec r eis isk is_top_level
+                  in
+                  (fgoal :: fgoals,subst :: substs)
               with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
             end
           | _ ->
@@ -1162,19 +1190,37 @@ let cca1 i s =
                  "The first encryption symbol is not used with the correct public \
                   key function.")
         end
+      | [] -> [], []
       | _ ->
         Tactics.soft_failure
           (Tactics.Failure
              "CCA1 can only be applied on a term with at least one occurrence
             of an encryption term enc(t,r,pk(k))")
     end
+    in
+    let fgoals, substs = hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc)
+                                        @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc)) in
+    if substs = [] then
+         Tactics.soft_failure
+          (Tactics.Failure
+             "CCA1 can only be applied on a term with at least one occurrence
+            of an encryption term enc(t,r,pk(k))");
+    let new_elem =    EquivSequent.apply_subst_frame substs [e] in
+    let biframe = (List.rev_append before (new_elem @ after)) in
+     Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) :: fgoals
+
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 
 let () =
  T.register_general "cca1"
-   ~help:"Apply the cca1 axiom.\n Usage: cca1 i."
+   ~help:"Apply the cca1 axiom on all encryptions of the given message. For \
+          encryption at top levels, they are replaced by the length of the \
+          plaintext.
+   When they are not at top level, they are replaced by the encryption of the \
+          length of the plaintexts.
+\n Usage: cca1 i."
    (function
    | [Prover.Int i] ->
        only_equiv

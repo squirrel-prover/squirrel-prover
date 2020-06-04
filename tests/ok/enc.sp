@@ -22,5 +22,6 @@ yesif 1.
 
 expandall.
 fa 2. fa 3. fa 3. fa 3.  cca1 3.
+
 admit 3.
 Qed.
