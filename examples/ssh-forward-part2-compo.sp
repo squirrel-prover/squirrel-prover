@@ -207,7 +207,7 @@ process SDISDDH =
   if gP = g^a1 then
   out(cP,diff(g^a1^b1,g^c11))
 
-system [secret] ( P1FADDH | SDISDDH | PDISDDH).
+system [secret] (P1FADDH | SDISDDH | PDISDDH).
 
 
 equiv [left,secret] [right,secret] secret.
@@ -218,10 +218,10 @@ Qed.
 
 (** And now the authentication process. *)
 
- process P1FAauth =
+process P1FAauth =
   in(cP,gB);
   out(cP,ok);
- (* begin P1 *)
+  (* begin P1 *)
   in(cP,t);
   let sidPaF = h(<<g^ake11,gB>,pke(k11)>, hKey) in
   let pkSaF = fst(t) in

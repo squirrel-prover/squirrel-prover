@@ -65,7 +65,7 @@ Proof.
 
   (* Case B *)
   expandall.
-  fa 2. fa 3. 
+  fa 2. fa 3.
   enckp 3. enckp 3. 
   cca1 3. cca1 3.
   (* length reasoning *)
