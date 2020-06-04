@@ -47,7 +47,8 @@ name k : index -> index -> message
    encryption. Remark that the symmetric encryption must be euf even when a hash
    containing the key is given. In other words, the hash function h should be
    PRF. *)
-signature enc,checkdec,pke abstract dec : message -> message -> message
+signature enc,checkdec,pke
+abstract dec : message -> message -> message
 
 hash h
 name hKey : message

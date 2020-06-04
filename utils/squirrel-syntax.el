@@ -15,9 +15,11 @@
 ))
 
 (defvar squirrel-decl-keywords '(
+  "aenc"
   "axiom"
   "goal"
   "system"
+  "signature"
   "Proof"
   "Qed"
   "hash"
@@ -28,10 +30,8 @@
   "term"
   "equiv"
   "process"
+  "with oracle"
 ))
-
-
-
 
 (defvar squirrel-fun-keywords '(
   "input"
@@ -41,6 +41,8 @@
   "frame"
   "seq"
   "diff"
+  "len"
+  "xor"
   ))
 
 (defvar squirrel-type-keywords '(
@@ -91,7 +93,6 @@
   "substitute"
   "systemsubstitute"
   "true"
-
   "cca1"
   "ddh"
   "enckp"

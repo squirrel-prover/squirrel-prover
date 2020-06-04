@@ -17,14 +17,14 @@ This is a "light" model without the last check of T.
 
 hash H
 
-abstract id : index->message
-abstract id':index -> index ->message
+abstract id : index -> message
+abstract id': index -> index -> message
 
 name dummy : message
 axiom len_id : forall (i:index) len(id(i)) = len(dummy)
 axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
 
-name key : index->message
+name key : index -> message
 name key': index -> index -> message
 
 abstract error : message
