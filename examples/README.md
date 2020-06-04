@@ -4,8 +4,8 @@ This folder contains the examples and case studies of the Squirrel Prover paper.
 
 ## Running Examples
 
-The two running examples of the paper are `running-ex-axiom.sp` and
-`running-ex.sp`. They are well suited to get a first feel of the tool.
+The two running examples of the paper are `running-ex-auth.sp` and
+`running-ex-axiom.sp`. They are well suited to get a first feel of the tool.
 
 ## Case Studies
 
