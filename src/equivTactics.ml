@@ -1094,18 +1094,18 @@ let cca1 i s =
                |> TraceSequent.set_env env
               )
           in
-          let new_m = Term.Fun (Term.f_len, [m]) in
-          let new_term = match fnpk with
-            | Some fnpk ->     Term.Fun ((fnenc,eis),
-                                      [new_m; Term.Name r;
-                                       Term.Fun (fnpk, [Term.Name (sk,isk)])])
-            | None ->  Term.Fun ((fnenc,eis),
-                                      [new_m; Term.Name r; Term.Name (sk,isk)])
-          in
           let new_subst =
             if  is_top_level then
                 Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
             else
+              let new_m = Term.(Fun (f_zeroes, [Fun (f_len, [m])])) in
+              let new_term = match fnpk with
+                | Some fnpk ->     Term.Fun ((fnenc,eis),
+                                             [new_m; Term.Name r;
+                                              Term.Fun (fnpk, [Term.Name (sk,isk)])])
+                | None ->  Term.Fun ((fnenc,eis),
+                                     [new_m; Term.Name r; Term.Name (sk,isk)])
+              in
               Term.ESubst (enc,
                             new_term
                            ) in

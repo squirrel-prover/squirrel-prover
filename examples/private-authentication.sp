@@ -81,7 +81,7 @@ Proof.
 
   trivialif 3.
   apply length to n(j),n(j).
-  fa 3. fa 3. fa 3.
+  fa 3. fa 3. fa 3. fa 3.
   fresh 3. yesif 3.
   fresh 3.  yesif 3.
 Qed.

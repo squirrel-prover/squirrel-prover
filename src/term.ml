@@ -180,6 +180,7 @@ let dummy = Fun (mk_fname "_" 0, [])
 (** Length *)
 
 let f_len = mk_fname "len" 1
+let f_zeroes = mk_fname "zeroes" 1
 
 (** Convert a boolean term to a message term, used in frame macro definition **)
 

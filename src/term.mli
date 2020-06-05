@@ -188,6 +188,7 @@ val f_exp : fsymb
 val f_g : fsymb
 
 val f_len : fsymb
+val f_zeroes : fsymb
 
 val mk_not : formula -> formula
 val mk_and : formula -> formula -> formula
