@@ -51,6 +51,12 @@ type shape = int t
     take messages into account. It is not reflexive. *)
 val depends : 'a t -> 'a t -> bool
 
+(** Distance in control-flow graph:
+  * [Some d] is returned when [a <= b] and they are at distance
+  * [d] from each other in the graph (distance is zero when [a = b]);
+  * [None] is returned when it is not the case that [a <= b]. *)
+val distance : 'a t -> 'a t -> int option
+
 (** [get_shape a] extracts the shape of an action *)
 val get_shape : action -> shape
 

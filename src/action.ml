@@ -5,15 +5,22 @@ type 'a item = {
 
 type 'a t = 'a item list
 
+(** Strict dependency [a < b]. *)
 let depends a b =
   let rec aux a b = match a, b with
-    | [], _ -> true
-    | hda::tla, hdb::tlb ->
-      hda = hdb &&
-      aux tla tlb
+    | [], _::_ -> true
+    | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
     | _ -> false
-  in
-  if a =b then false else aux a b
+  in aux a b
+
+(** Distance in control-flow graph. Return [None] when there is no
+  * dependency, and [Some 0] when the actions are equal. *)
+let distance a b =
+  let rec aux a b = match a, b with
+    | [], _ -> Some (List.length b)
+    | hda::tla, hdb::tlb when hda = hdb -> aux tla tlb
+    | _ -> None
+  in aux a b
 
 type shape = int t
 
