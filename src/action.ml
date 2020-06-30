@@ -48,8 +48,10 @@ let same_shape a b : Term.subst option =
     if p = p' && List.length lp = List.length lp' &&
        s = s' && List.length ls = List.length ls'
     then
-      let acc' = List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) lp lp' in
-      let acc'' = List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) ls ls' in
+      let acc' =
+        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) lp lp' in
+      let acc'' =
+        List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i')) ls ls' in
       same (acc'' @ acc' @ acc) l l'
     else None in
   same [] a b
@@ -138,10 +140,10 @@ let to_term a =
   Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
 
 
-let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action
- =
+let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action =
   let l',a = of_symbol s in
-  let subst = List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
+  let subst =
+    List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
   subst_action subst a
 
 let rec dummy_action k =
@@ -164,9 +166,10 @@ let pp = pp_action
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 
 (** An action description features an input, a condition (which sums up
-  * several [Exist] constructs which might have succeeded or not) and subsequent
-  * updates and outputs. The condition binds variables in the updates
-  * and output. An action description may feature free index variables, that are
+  * several [Exist] constructs which might have succeeded or not) and
+  * subsequent updates and outputs.
+  * The condition binds variables in the updates and output.
+  * An action description may feature free index variables, that are
   * in a sense bound by the corresponding action. We also include a list of
   * all used indices, since they are not explicitly declared as part of
   * the action or current condition (they could be introduced by previous

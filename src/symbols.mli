@@ -1,11 +1,6 @@
-(** Symbols
-  *
-  * A notion of symbol with a global table of symbols, separated
-  * into namespaces, and where each symbol is attached to a definition
-  * whose type depends on the namespace. *)
-
-(** Purely abstract type representing unknown namespace. *)
-type unknown
+(** This module defines a notion of symbol with a global table of symbols,
+  * separated into namespaces, and where each symbol is attached to a
+  * definition whose type depends on the namespace. *)
 
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
@@ -20,9 +15,19 @@ val dummy_table : table
 (** Empty symbol table, for testing. *)
 val empty_table : table
 
-(** Symbol definitions *)
+(** Each possible namespace is represented by an abstract datatype.
+  * Their names are descriptive; [fname] is for function symbols. *)
 
-type kind = Sorts.esort
+type channel
+type name
+type action
+type fname
+type macro
+
+(** {2 Symbol definitions}
+  *
+  * Each symbol is defined by some data,
+  * whose type depends on the namespace. *)
 
 type function_def =
   | Hash
@@ -35,23 +40,21 @@ type function_def =
   | PublicKey
   | Abstract of int (** Message arity *)
 
+(** Indicates if a function symbol has been defined with
+  * the specified definition. *)
+val is_ftype : fname t -> function_def -> bool
+
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * kind
+  | State of int * Sorts.esort
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
   | Global of int
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
-  | Local of kind list * kind
+  | Local of Sorts.esort list * Sorts.esort
     (** Local macro definitions are explicitly defined by the
       * user, and may depend on arbitrary terms. *)
-
-type channel
-type name
-type action
-type fname
-type macro
 
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
@@ -62,9 +65,14 @@ type _ def =
   | Function : (int * function_def) -> fname def
   | Macro : macro_def -> macro def
 
-type some_def =
-  | Exists : 'a def -> some_def
+type edef =
+  | Exists : 'a def -> edef
   | Reserved
+
+(** {2 Data}
+  * In addition to their definition data, some more data can be attached
+  * to symbols. This is used for data that is defined in modules that
+  * depend on this module, through an extensible datatype. *)
 
 (** Extensible type for data associated to symbols.
   * Due to circular dependencies, this is not type-safe, but
@@ -72,6 +80,8 @@ type some_def =
 type data = ..
 type data += Empty
 type data += AssociatedFunctions of (fname t) list
+
+(** {2 Basic namespace-independent operations} *)
 
 exception Multiple_declarations of string
 exception Unbound_identifier of string
@@ -82,10 +92,16 @@ val to_string : 'a t -> string
 
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_string : string -> some_def
+val def_of_string : string -> edef
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
+
+(** [of_string s] returns the symbol associated to [s]
+  * together with its defining data.
+  * @raise Unbound_identifier if no such symbol has been defined. *)
 val of_string : string -> wrapped
+
+(** {2 Testing utilities} *)
 
 (** Wrap a function into a new one which runs the previous one but
   * restores the table of symbols to its initial state before
@@ -97,7 +113,9 @@ val run_restore : (unit -> unit) -> (unit -> unit)
     flag. *)
 val restore_builtin : unit -> unit
 
-(** Signature for namespaces *)
+(** {2 Namespaces} *)
+
+(** Signature for namespaces. *)
 module type Namespace = sig
 
   (** Abstract type representing this namespace. *)
@@ -118,8 +136,8 @@ module type Namespace = sig
   val declare :
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
 
-  (* Like declare, but use the exact string as symbol name.
-   * @raise Multiple_declarations if the name is not available. *)
+  (** Like declare, but use the exact string as symbol name.
+    * @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
 
@@ -142,10 +160,10 @@ module type Namespace = sig
   (** Get definition and data at once. *)
   val get_all : ns t -> def * data
 
-  (** Iter on the defined symbols of this namespace *)
+  (** Iterate on the defined symbols of this namespace. *)
   val iter : (ns t -> def -> data -> unit) -> unit
 
-  (** Fold on the defined symbols of this namespace *)
+  (** Fold over the defined symbols of this namespace. *)
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
 end
 
@@ -154,7 +172,5 @@ module Name : Namespace with type def = int with type ns = name
 module Action : Namespace with type def = int with type ns = action
 module Function : Namespace
   with type def = int * function_def with type ns = fname
-
-val is_ftype : fname t -> function_def -> bool
 
 module Macro : Namespace with type def = macro_def with type ns = macro

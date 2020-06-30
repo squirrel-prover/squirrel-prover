@@ -1,5 +1,3 @@
-type unknown
-
 (** Type of symbols *)
 type 'a t = string
 
@@ -39,8 +37,8 @@ type _ def =
   | Function : (int * function_def) -> fname def
   | Macro : macro_def -> macro def
 
-type some_def =
-  | Exists : 'a def -> some_def
+type edef =
+  | Exists : 'a def -> edef
   | Reserved
 
 type data = ..
@@ -49,9 +47,9 @@ type data += AssociatedFunctions of (fname t) list
 
 let to_string s = s
 
-let table : (string,some_def*data) Hashtbl.t = Hashtbl.create 97
+let table : (string,edef*data) Hashtbl.t = Hashtbl.create 97
 
-let builtins_table : (string,some_def*data) Hashtbl.t = Hashtbl.create 97
+let builtins_table : (string,edef*data) Hashtbl.t = Hashtbl.create 97
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
@@ -124,7 +122,7 @@ module type S = sig
   type ns
   type local_def
   val construct : local_def -> ns def
-  val deconstruct : some_def -> local_def
+  val deconstruct : edef -> local_def
 end
 
 module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = struct

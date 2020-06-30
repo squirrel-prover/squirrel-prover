@@ -1,14 +1,17 @@
 (** Actions are the basis of our internal semantics for protocols.
-  * In the theory, an action is an indexed symbol with a semantics,
+  * In the theory, an action is an indexed symbol with a semantics
   * (given through conditional, update and output terms) and
   * actions are equipped with a sequential dependency relation
   * (and perhaps a conflict relation). Things are a bit different
   * in the implementation:
   *  - Type [action] below refers to execution points, which yield
-  *    dependency and conflict relations.
+  *    dependency and conflict relations. Execution points are one
+  *    possible implementation of our abstract notion of action,
+  *    that is convenient for our translation from the applied
+  *    pi-calculus.
   *  - We associate to each such action an "action description"
   *    (type [descr]) which carries the semantics of the action.
-  *  - Finally, we have action symbols (type [Symbols.Action.ns Symbols.t]).
+  *  - Finally, we have action symbols (type [Symbols.action Symbols.t]).
   *
   * Our prover allows to declare and reason about several systems.
   * Actions and symbols exist independently of a system, but descriptions
@@ -66,10 +69,10 @@ val get_shape : action -> shape
     substitution sending [a] to [b]. *)
 val same_shape : action -> action -> Term.subst option
 
-(** Convert action to the corresponding [TName] timestamp term. *)
+(** Convert action to the corresponding [Action] timestamp term. *)
 val to_term : action -> Term.timestamp
 
-(** Convert [TName] parameters to an action. *)
+(** Convert [Action] parameters to an action. *)
 val of_term : Symbols.action Symbols.t -> Vars.index list -> action
 
 (** Get dummy action of some length. Guarantees that a symbol exists for it. *)
@@ -84,11 +87,11 @@ val dummy_action : int -> action
 
 (** Get a fresh symbol whose name starts with the given prefix. *)
 val fresh_symbol :
-  Symbols.table -> string -> Symbols.table * Symbols.Action.ns Symbols.t
+  Symbols.table -> string -> Symbols.table * Symbols.action Symbols.t
 
 val find_symbol : string -> Vars.index list * action
 
-val of_symbol : Symbols.Action.ns Symbols.t -> Vars.index list * action
+val of_symbol : Symbols.action Symbols.t -> Vars.index list * action
 
 (** {2 Systems} *)
 
