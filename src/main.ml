@@ -368,5 +368,3 @@ let () =
         (fun () -> run ~test "tests/alcotest/pred2.sp")
     end ;
   ]
-
-let () = Smt.test ()
