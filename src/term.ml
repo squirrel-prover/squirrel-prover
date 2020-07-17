@@ -449,9 +449,7 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
      substitution x->v where x is in the variable list. *)
   let filter_subst (vars:Vars.evar list) (s:subst) =
     List.fold_left (fun acc (ESubst (x, y)) ->
-        if S.is_empty (S.inter
-                         (S.of_list vars)
-                         (S.union (get_set_vars x) (get_set_vars y)))
+        if S.is_empty (S.inter (S.of_list vars) (get_set_vars x))
         then
           (ESubst (x, y))::acc
         else
@@ -468,11 +466,11 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     let all_vars = List.fold_left
         (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars x))  right_vars s
     in
-    let env = Vars.of_list (S.elements all_vars) in
+    let env = ref (Vars.of_list (S.elements all_vars)) in
     let v, f = List.fold_left
      (fun  (nvars,f) (Vars.EVar v) ->
             if S.mem (Vars.EVar v) right_vars then
-              let new_v = snd (Vars.make_fresh_from env v) in
+              let new_v = Vars.make_fresh_from_and_update env v in
               ((Vars.EVar new_v)::nvars, subst [ESubst (Var v,Var new_v)] f)
             else
               ((Vars.EVar v)::nvars,f)
