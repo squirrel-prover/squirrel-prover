@@ -125,8 +125,7 @@ apply H0 to pred(T(i',j')).
 apply onlyTagActions to pred(T(i,j)).
 apply onlyTagActions to pred(T(i',j')).
 apply H1 to i1,j1,i2,j2.
-assert kT(i1)@pred(T(i,j)) = kT(i)@pred(T(i,j)). admit. (* TODO *)
-assert kT(i2)@pred(T(i',j')) = kT(i')@pred(T(i',j')). admit. (* TODO *)
+admit. (* TODO *)
 admit. (* TODO BASE CASE *)
 apply notInit to pred(T(i,j)). exists pred(T(i',j')).
 Qed.
