@@ -50,84 +50,103 @@ Proof.
 intros.
 Qed.
 
-goal stateInequality :
-forall (t:timestamp),
-  (forall (t':timestamp), forall (i,j,i',j':index), 
-    t=T(i,j) && t'=T(i',j') && t'<t => kT(i)@t <> kT(i')@t').
+(* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
+goal lastUpdate_ : forall (t:timestamp) forall (i:index)
+  (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
+  (exists j:index,
+   kT(i)@t = kT(i)@T(i,j) &&
+   T(i,j) <= t &&
+   (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
 Proof.
 induction.
-assert hkey(kT(i')@pred(T(i',j')),key(i')) = hkey(kT(i)@pred(T(i,j)),key(i)).
-euf M3.
-
-(* case euf n°1 - exists T(i',j1), kT(i')@pred(T(i',j1)) = kT(i')@pred(T(i',j')) *)
-assert (pred(T(i',j1)) < pred(T(i',j')) || (pred(T(i',j1)) < pred(T(i,j)) && pred(T(i',j1)) > pred(T(i',j')))).
-case H0. left. right. admit.
-case H1.
-(* case H1 - pred(T(i',j1)) < pred(T(i',j')) *)
-assert pred(T(i',j1)) < pred(T(i',j')).
-apply IH0 to pred(T(i',j')).
-apply H1 to pred(T(i',j1)).
-apply onlyTagActions to pred(T(i',j')).
-apply onlyTagActions to pred(T(i',j1)).
-apply H2 to i1,j2,i2,j3.
-assert (i'=i1 || i'<>i1). case H3. assert (i'=i2 || i'<>i2). case H3.
-admit. (* case i' = i1 && i' <> i2 *) 
-admit. (* case i' <> i1 && i' = i2 *) 
-admit. (* TODO BASE CASE *)
-apply notInit to pred(T(i',j')). exists pred(T(i',j1)).
-(* case H1 - pred(T(i',j1)) < pred(T(i,j)) && pred(T(i',j1)) > pred(T(i',j')) *)
-apply IH0 to pred(T(i',j1)).
-apply H1 to pred(T(i',j')).
-apply onlyTagActions to pred(T(i',j1)).
-apply onlyTagActions to pred(T(i',j')).
-apply H2 to i1,j2,i2,j3.
-assert (i'=i1 || i'<>i1). case H3. assert (i'=i2 || i'<>i2). case H3.
-admit. (* case i' = i1 && i' <> i2 *) 
-admit. (* case i' <> i1 && i' = i2 *) 
-admit. (* TODO BASE CASE *)
-apply notInit to pred(T(i',j1)). exists pred(T(i',j')).
-
-(* case euf n°2 - i=i' and kT(i')@pred(T(i',j)) = kT(i')@pred(T(i',j')) *)
-assert pred(T(i',j)) > T(i',j') || pred(T(i',j)) < T(i',j') || pred(T(i',j)) = T(i',j').
+case t.
 case H0.
-(* case H0 - pred(T(i',j)) > T(i',j') *)
-apply IH0 to pred(T(i',j)).
-apply H0 to pred(T(i',j')).
-apply onlyTagActions to pred(T(i',j)).
-apply onlyTagActions to pred(T(i',j')).
-apply H1 to i,j1,i1,j2.
-assert (i'=i1 || i'<>i1). case H2. assert (i'=i || i'<>i). case H2.
-admit. (* case i' = i1 && i' <> i *)
-assert (i'=i || i'<>i). case H2.
-admit. (* case i' <> i1 && i' = i *) 
-admit. (* case i' <> i1 && i' <> i *) 
-admit. (* TODO BASE CASE *)
-apply notInit to pred(T(i',j)). exists T(i',j').
-(* case H0 - pred(T(i',j)) = T(i',j') *)
-apply IH0 to pred(T(i',j)).
-apply H0 to pred(T(i',j')).
-apply onlyTagActions to pred(T(i',j)).
-apply onlyTagActions to pred(T(i',j')).
-apply H1 to i,j1,i1,j2.
-assert (i'=i1 || i'<>i1). case H2. assert (i'=i || i'<>i). case H2.
-assert (i'=i || i'<>i). case H2.
-admit. (* case i' <> i1 && i' = i *) 
-admit. (* TODO BASE CASE *)
+assert (i=i1 || i<>i1).
+case H0.
+
+(* t = T(i,j) *)
+right; exists j.
+
+(* t = T(i1,j) with i<>i1 *)
+assert kT(i)@t = kT(i)@pred(t).
+apply IH0 to pred(T(i1,j)).
+apply H0 to i.
+case H1.
+
+  left.
+  apply H1 to j'.
+
+  right.
+  exists j1.
+  apply H1 to j'.
+  case H2.
+
+(* t = init *)
+left.
+
+Qed.
+
+(* A more convenient version of the lemma, because our apply
+   tactic is too primitive. *)
+goal lastUpdate : forall (t:timestamp,i:index)
+  (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
+  (exists j:index,
+   kT(i)@t = kT(i)@T(i,j) &&
+   T(i,j) <= t &&
+   (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
+Proof.
+  intros.
+  apply lastUpdate_ to t.
+  apply H0 to i.
+Qed.
+
+goal stateInequality :
+  forall (t:timestamp),
+  (forall (t':timestamp), forall (i,j,i':index)
+     t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t').
+Proof.
+induction.
+substitute t, T(i,j).
+assert kT(i')@t' = hkey(kT(i)@pred(T(i,j)),key(i)).
+euf M1.
+
+(* T(i,j1) < T(i,j)
+   kT(i)@pred(T(i,j1)) = kT(i)@pred(T(i,j))
+   in order to apply IH0 we need timestamps of the form T(i,_)
+   but pred(_) has no reason to be of that form...
+   this is where lastUpdate comes into play *)
+
+apply lastUpdate to pred(T(i,j)),i.
+case H1.
+
+(* kT(i)@pred(T(i,j)) = kT(i)@init
+   this can actually happen only if tag i has not played from init to pred(T(i,j))
+   but we know that T(i,j1) < T(i,j): absurd *)
+apply H1 to j1; case H0.
+
+(* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
+   then we should have that T(i,j1) <= T(i,j2) *)
+assert (T(i,j1) <= T(i,j2)).
+apply H1 to j1; case H2; case H0.
+
+apply IH0 to T(i,j2).
+apply H2 to pred(T(i,j1)).
+apply H3 to i,j2,i.
+
 Qed.
 
 goal stateInequalityHelpful :
-(forall (i,j,i',j':index), T(i',j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i')@pred(T(i',j'))).
+(forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
 intros.
-assert pred(T(i',j')) < pred(T(i,j)).
-apply stateInequality to pred(T(i,j)). 
-apply H0 to pred(T(i',j')).
-apply onlyTagActions to pred(T(i,j)).
-apply onlyTagActions to pred(T(i',j')).
-apply H1 to i1,j1,i2,j2.
-admit. (* TODO *)
-admit. (* TODO BASE CASE *)
-apply notInit to pred(T(i,j)). exists pred(T(i',j')).
+apply lastUpdate to pred(T(i,j)),i.
+case H0.
+(* Case init *)
+apply H0 to j'.
+apply stateInequality to T(i,j1).
+apply H1 to pred(T(i,j')).
+apply H2 to i,j1,i.
+apply H0 to j'. case H3.
 Qed.
 
 equiv test.
@@ -139,6 +158,6 @@ fa 0.
 fa 1. fa 1.
 expand output@T(i,j). expand kT(i)@T(i,j).
 prf 1. yesif 1.
-apply stateInequalityHelpful to i,j,i,j1.
+apply stateInequalityHelpful to i,j,j1.
 fresh 1. yesif 1.
 Qed.
