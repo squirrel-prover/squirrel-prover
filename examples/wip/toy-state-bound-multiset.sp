@@ -82,7 +82,8 @@ apply rangeAxiom to xkT,kR(ii)@R(k,ii).
 apply H0.
 
 apply updateReaderAxiom to ii,xkT.
-assert kR(ii)@R(k,ii) = xkT.
+nosimpl(assert kR(ii)@R(k,ii) = xkT).
+simpl. (* S.D.: I did not understand this simplification unless plus(z,z') = z ?? *)
 assert xkT = hState(<seed(i),z>,keyState(i)).
 euf M6.
 (* Error "Tactic failed: Key does not satisfy the syntactic side condition."
