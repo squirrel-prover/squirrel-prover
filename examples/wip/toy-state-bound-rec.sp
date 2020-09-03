@@ -48,7 +48,7 @@ axiom readerTestOk :
   forall (i:index,xkR:message,x:message,delta:message),
   ( readerTest(i,xkR,x,delta) = testOk )
   <=> 
-  ( x = hMsg(hState(xkR,keyState(i)),keyMsg(i))
+  ( x = hMsg(xkR,keyMsg(i))
     || readerTest(i,hState(xkR,keyState(i)),x,myPred(delta)) = testOk )
 
 axiom readerTestNotOk :
@@ -71,20 +71,18 @@ process reader(k:index) =
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
 goal auth_R :
-  forall (k,ii:index,delta:message), 
-    ( readerTest(ii,kR(ii)@R(k,ii),input@R(k,ii),delta) = testOk )
-    => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
+  forall (k,ii:index), 
+    cond@R(k,ii) => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
 Proof.
 intros.
-
+expand cond@R(k,ii).
 apply readerTestOk to ii,kR(ii)@R(k,ii),input@R(k,ii),deltaMax.
 apply H0.
 case H2.
 
   (* case H2 => direct case - sync *)
-  assert kR(ii)@R(k,ii) = hState(kR(ii)@R(k,ii),keyState(ii)).
-  admit.
-  euf M2.
+  euf M1.
+  assert T(ii,j) < R(k,ii). case H2.
   exists ii,j.
 
   (* case H2 => recursive case - desync *)
@@ -93,9 +91,8 @@ case H2.
   case H4.
 
     (* case H4 => direct case - sync *)
-    assert kR(ii)@R(k,ii) = hState(hState(kR(ii)@R(k,ii),keyState(ii)),keyState(ii)).
-    admit.
-    euf M3.
+    euf M2.
+    assert T(ii,j) < R(k,ii). case H4.
     exists ii,j.
 
     (* case H4 => recursive case - desync *)
