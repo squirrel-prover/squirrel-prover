@@ -77,15 +77,31 @@ let get_definition :
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->
-            (* We are looking at name(args)@symb(indices):
-             * see if state name(args) is updated by symb(indices),
-             * otherwise its content is unchanged. *)
             let action = Action.of_term symb indices in
             let descr = Action.get_descr system action in
             begin try
-                List.assoc (name,sort,args) descr.Action.updates
-              with Not_found ->
-                Term.Macro ((name,sort,args), [], Term.Pred a)
+              (* Look for an update of the state macro [name] in the
+              updates of [action] *)
+              let ((n,s,is),msg) = List.find
+                (fun ((n,s,is),_) ->
+                  n = name && s = sort && List.length args = List.length is)
+                descr.Action.updates
+              in
+                (* update found:
+                - if indices [args] of the macro we want
+                to expand are equal to indices [is] corresponding to this macro
+                in the action description, then the macro expanded as defined
+                by the update term
+                - otherwise, we need to take into account the possibility that
+                [arg] and [is] might be equal, and generate a conditional *)
+                if args = is then msg
+                else
+                  Term.mk_ite
+                    (Term.mk_indices_eq args is)
+                    msg
+                    (Term.Macro ((name,sort,args), [], Term.Pred a))
+            with Not_found ->
+              Term.Macro ((name,sort,args), [], Term.Pred a)
             end
           | _ -> assert false
         end
