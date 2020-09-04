@@ -34,7 +34,7 @@ system (!_i !_j T: tag(i,j)).
 goal stateUpdate :
 forall (t:timestamp), (forall (i,j:index), t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
 Proof.
-induction.
+simpl.
 Qed.
 
 goal onlyTagActions :
@@ -65,10 +65,13 @@ assert (i=i1 || i<>i1).
 case H0.
 
 (* t = T(i,j) *)
-right; exists j.
+right. exists j.
 
 (* t = T(i1,j) with i<>i1 *)
-assert kT(i)@t = kT(i)@pred(t).
+substitute t,T(i1,j).
+assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
+expand kT(i)@T(i1,j).
+noif.
 apply IH0 to pred(T(i1,j)).
 apply H0 to i.
 case H1.
@@ -83,7 +86,6 @@ case H1.
 
 (* t = init *)
 left.
-
 Qed.
 
 (* A more convenient version of the lemma, because our apply
@@ -139,14 +141,9 @@ goal stateInequalityHelpful :
 (forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
 intros.
-apply lastUpdate to pred(T(i,j)),i.
-case H0.
-(* Case init *)
-apply H0 to j'.
-apply stateInequality to T(i,j1).
-apply H1 to pred(T(i,j')).
-apply H2 to i,j1,i.
-apply H0 to j'. case H3.
+apply stateInequality to T(i,j).
+apply H0 to T(i,j').
+apply H1 to i,j,i.
 Qed.
 
 equiv test.
