@@ -1,7 +1,7 @@
 (*******************************************************************************
 TOY EXAMPLE WITH STATE
 
-Authentication goals with a toy protocol (bounded, generic reader).
+Authentication goals with a toy protocol.
 
 In this model, the database lookup performed by the reader is modelled with 
 a recursive axiom.
@@ -25,11 +25,8 @@ mutable kR : index->message
 channel cT
 channel cR
 
-abstract deltaZero : message (* representing the integer 0 *)
-abstract deltaMax : message (* representing the bound *)
+abstract deltaInit : message
 abstract myPred : message->message
-
-axiom deltaMaxAxiom : myPred(deltaZero) = deltaZero
 
 axiom stateTagInit : forall (i:index), kT(i)@init = seed(i)
 axiom stateReaderInit : forall (ii:index), kR(ii)@init = seed(ii) 
@@ -51,9 +48,6 @@ axiom readerTestOk :
   ( x = hMsg(xkR,keyMsg(i))
     || readerTest(i,hState(xkR,keyState(i)),x,myPred(delta)) = testOk )
 
-axiom readerTestNotOk :
-  forall (i:index,xkR:message,x:message), readerTest(i,xkR,x,deltaZero) <> testOk
-
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   kT(i) := hState(kT(i),keyState(i));
@@ -62,7 +56,7 @@ process tag(i:index,j:index) =
 (* k = generic reader's session *)
 process reader(k:index) =
   in(cT,x);
-  try find ii such that readerTest(ii,kR(ii),x,deltaMax) = testOk in
+  try find ii such that readerTest(ii,kR(ii),x,deltaInit) = testOk in
     kR(ii) := updateReader(ii,x);
     out(cR,ok)
   else
@@ -76,7 +70,7 @@ goal auth_R :
 Proof.
 intros.
 expand cond@R(k,ii).
-apply readerTestOk to ii,kR(ii)@R(k,ii),input@R(k,ii),deltaMax.
+apply readerTestOk to ii,kR(ii)@R(k,ii),input@R(k,ii),deltaInit.
 apply H0.
 case H2.
 
@@ -86,7 +80,7 @@ case H2.
   exists ii,j.
 
   (* case H2 => recursive case - desync *)
-  apply readerTestOk to ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaMax).
+  apply readerTestOk to ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaInit).
   apply H2.
   case H4.
 
@@ -98,4 +92,5 @@ case H2.
     (* case H4 => recursive case - desync *)
 
 (* ETC *)
+admit.
 Qed.

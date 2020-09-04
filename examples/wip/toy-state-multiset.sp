@@ -1,7 +1,7 @@
 (*******************************************************************************
 TOY EXAMPLE WITH STATE
 
-Authentication goals with a toy protocol (bounded, generic reader).
+Authentication goals with a toy protocol.
 
 In this model, the goal is to use multiset (as in Tamarin) to represent stack of
 successive hashes.
@@ -29,12 +29,12 @@ abstract delta : message (* the constant used in the multiset *)
 abstract plus : message->message->message
 
 abstract rangeOk : message
-abstract range : message->message->message 
-(* range(kT,kR) = rangeOk iif kT=h^n(kR) *)
+abstract range : message->message->message
+(* range(kT,kR) = rangeOk iif there exists n, kT=h^n(kR) *)
 axiom rangeAxiom :
-  forall (xkT,xkR:message), 
+  forall (xkT,xkR:message),
     range(xkT,xkR) = rangeOk
-    <=> ( exists (i:index,z:message,z':message), 
+    <=> ( exists (i:index,z:message,z':message),
             xkT = hState(<seed(i),plus(z,z')>,keyState(i))
             && xkR = hState(<seed(i),z>,keyState(i)) )
 
@@ -47,9 +47,9 @@ abstract updateReader : index->message->message (* should be private *)
 axiom updateReaderAxiom :
   forall (ii:index,x:message), updateReader(ii,hMsg(x,keyMsg(ii))) = x
 
-axiom stateTagInit : 
+axiom stateTagInit :
   forall (i:index), kT(i)@init = hState(<seed(i),delta>,keyState(i))
-axiom stateReaderInit : 
+axiom stateReaderInit :
   forall (i:index), kR(i)@init = hState(<seed(i),delta>,keyState(i))
 
 (* i = tag's identity, j = tag's session for identity i *)
@@ -60,7 +60,7 @@ process tag(i:index,j:index) =
 (* k = generic reader's session *)
 process reader(k:index) =
   in(cT,x);
-  try find ii such that 
+  try find ii such that
     (exists (xkT:message), x = hMsg(xkT,keyMsg(ii)) && range(xkT,kR(ii)) = rangeOk)
   in
     kR(ii) := updateReader(ii,x);
@@ -71,7 +71,7 @@ process reader(k:index) =
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
 goal auth_R :
-  forall (k,ii:index,delta:message), 
+  forall (k,ii:index,delta:message),
     cond@R(k,ii)
     => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
 Proof.
