@@ -35,8 +35,8 @@ axiom stateReaderInit : forall (ii:index), kR(ii)@init = < seed1(ii), seed2(ii) 
 process tag(i:index,j:index) =
   in(cR, xr1);
   out(cT, h(fst(kT(i)) XOR xr1 XOR k(i), key(i)));
-  in(cR, xh1);
-  if xh1 = h(snd(kT(i)), key(i)) then
+  in(cR, xh2);
+  if xh2 = h(snd(kT(i)), key(i)) then
     kT(i) := < fst(kT(i)) XOR h(snd(kT(i)), key(i)),
                snd(kT(i)) XOR h(fst(kT(i)) XOR xr1 XOR k(i), key(i)) >;
     out(cT, ok)
@@ -47,21 +47,12 @@ process tag(i:index,j:index) =
 process reader(jj:index) =
   out(cR, r1(jj));
   in(cT, xh1);
-  try find ii such that xh1 = h(kR(ii) XOR r1(jj) XOR k(ii), key(ii)) in
+  (* in conditional and output terms, we would like kR(ii) before update *)
+  try find ii such that xh1 = h(fst(kR(ii)) XOR r1(jj) XOR k(ii), key(ii)) in
     kR(ii) := < fst(kR(ii)) XOR h(snd(kR(ii)), key(ii)),
                 snd(kR(ii)) XOR h(fst(kR(ii)) XOR r1(jj) XOR k(ii), key(ii)) >;
-    out(cT, ok)
+    out(cT, h(snd(kR(ii),key(ii))
   else
     out(cT, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
-
-goal auth_R :
-  forall (jj,ii:index),
-    cond@R1(jj,ii) =>
-      ( exists (i,j:index), T(i,j) < R1(jj,ii) && output@T(i,j) = input@R1(jj,ii) ).
-Proof.
-intros.
-expand cond@R1(jj,ii).
-(* TODO *) admit.
-Qed.
