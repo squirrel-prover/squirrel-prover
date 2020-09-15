@@ -1,11 +1,19 @@
 (*******************************************************************************
 TOY-COUNTER
 
-V. Cheval, V. Cortier, and M. Turuani, 
-‘A Little More Conversation, a Little Less Action, a Lot More Satisfaction: 
-Global States in ProVerif’, 
-in 2018 IEEE 31st Computer Security Foundations Symposium (CSF), Oxford, 
+V. Cheval, V. Cortier, and M. Turuani,
+‘A Little More Conversation, a Little Less Action, a Lot More Satisfaction:
+Global States in ProVerif’,
+in 2018 IEEE 31st Computer Security Foundations Symposium (CSF), Oxford,
 Jul. 2018, pp. 344–358, doi: 10.1109/CSF.2018.00032.
+
+A = in(d, i : nat); out(c, h(i, s)); out(d, i + 1)
+B = in(d, i : nat); in(c, y);
+    if y = h(i, s) then
+      out(c, s); out(d, i + 1)
+    else out(d, i + 1)
+
+P = ! A | ! B | out(d, 0) | ! in(d, i : nat); out(d, i)
 *******************************************************************************)
 
 hash h
@@ -45,7 +53,7 @@ process B =
 system ((!_i A) | (!_j B)).
 
 goal counterIncrease :
-  forall (t:timestamp), t > init => d@t = mySucc(d@pred(t)). 
+  forall (t:timestamp), t > init => d@t = mySucc(d@pred(t)).
 Proof.
 intros.
 case t. case H0.
