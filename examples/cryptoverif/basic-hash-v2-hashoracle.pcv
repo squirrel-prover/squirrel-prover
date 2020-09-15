@@ -1,0 +1,43 @@
+(* An attempt to encode basic hash *)
+(* Stéphanie Delaune *)
+
+param NT,NR.
+
+type nonce [large,fixed].
+type key [bounded].
+
+
+(* Hash function, random oracle model *)
+type hashmsg [fixed].
+
+expand ROM_hash_large(key, nonce, hashmsg, hash, hashoracle, qH).
+
+
+(* Queries and Events *)
+event acceptR(nonce,hashmsg).
+event startT(nonce,hashmsg).
+
+query xn: nonce, xh:hashmsg; event(acceptR(xn,xh)) ==> event(startT(xn,xh)).
+
+(* Channels and Processes *)
+channel c0, c1, c2, c3, start, finish.
+
+table keys(key).
+
+let processT(kT:key) =
+        in(c0, ());
+        new n: nonce;
+        event startT(n, hash(kT,n));
+	out(c1, (n, hash(kT,n))).
+
+let processR(kR:key) =
+       in(c2,(m1:nonce,m2:hashmsg));
+       if m2 = hash(kR,m1) then event acceptR(m1,m2).
+
+
+process
+	(
+        (in(start, ());  new kT:key; (insert keys(kT);  out(finish, ());  ! iT <= NT processT(kT) | hashoracle(kT)))
+        |
+        (! iR <= NR 		in(start, ());  get keys(xkT) in   out(finish, ()); processR(xkT))
+)
