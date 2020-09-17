@@ -1,0 +1,46 @@
+(* An attempt to encode an authentication property for basic hash *)
+(* Stéphanie Delaune *)
+
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [large,fixed].
+
+
+proba Pprf.
+
+expand PRF(key, nonce, key, hash, Pprf).
+
+
+
+(* Channels and Processes *)
+channel c0, c1, c2, c3, start, finish.
+
+
+table keys(key).
+
+
+let processT(kT:key) =
+        in(c0, ());
+        new n: nonce;
+	out(c1, (n, hash(kT,n))).
+
+let processR(kR:key) =
+       in(c2,(m1:nonce,m2:key));
+       if m2 = hash(kR,m1) then out(c3,()).
+
+
+let processLeft = 
+     ! iK <= NK (in(start, ());  new kT:key; insert keys(kT); out(finish, ());  ! iT <= NT processT(kT)) 
+        |   (! iR <= NR in(start, ());  get keys(xkT) in   out(finish, ()); processR(xkT)).
+
+let processRight =
+    ! iK <= NK (in(start, ());  new kT:key; insert keys(kT); out(finish, ());  processT(kT)) 
+        |   (! iR <= NR in(start, ());  get keys(xkT) in   out(finish, ()); processR(xkT)).
+
+equivalence
+        processLeft
+
+        processRight
+ 
