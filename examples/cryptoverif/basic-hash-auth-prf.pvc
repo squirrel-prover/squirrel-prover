@@ -5,19 +5,19 @@
 param NT, NR, NK.
 
 type nonce [large,fixed].
-type key [large,fixed].
-
+type key [fixed].
+type hashed [large,fixed].
 
 proba Pprf.
 
-expand PRF(key, nonce, key, hash, Pprf).
+expand PRF(key, nonce, hashed, hash, Pprf).
 
 
 (* Queries and Events *)
-event acceptR(nonce,key).
-event startT(nonce,key).
+event acceptR(nonce,hashed).
+event startT(nonce,hashed).
 
-query xn: nonce, xh:key; event(acceptR(xn,xh)) ==> event(startT(xn,xh)).
+query xn: nonce, xh:hashed; event(acceptR(xn,xh)) ==> event(startT(xn,xh)).
 
 (* Channels and Processes *)
 channel c0, c1, c2, c3, start, finish.
@@ -32,9 +32,8 @@ let processT(kT:key) =
 	out(c1, (n, hash(kT,n))).
 
 let processR(kR:key) =
-       in(c2,(m1:nonce,m2:key));
+       in(c2,(m1:nonce,m2:hashed));
        if m2 = hash(kR,m1) then event acceptR(m1,m2).
-
 
 process
          ! iK <= NK (in(start, ());  new kT:key; insert keys(kT); out(finish, ());  ! iT <= NT processT(kT)) 

@@ -1,0 +1,47 @@
+(* An attempt to encode an authentication property for basic hash *)
+(* Stéphanie Delaune and David Baelde *)
+
+param NT, NR, NK.
+
+type key [fixed].
+type nonce [large,fixed].
+type macres.
+
+proba Pmac.
+
+expand SUF_CMA_det_mac(
+  key, nonce, macres,
+  mac, check,
+  Pmac).
+
+(* Queries and Events *)
+event acceptR(nonce,key).
+event startT(nonce,key).
+
+query xn: nonce, xk:key; event(acceptR(xn,xk)) ==> event(startT(xn,xk)).
+
+(* Channels and Processes *)
+channel c0, c1, c2, c3, start, finish.
+
+table keys(key).
+
+let processT(kT:key) =
+        in(c0, ());
+        new n: nonce;
+        event startT(n, kT);
+	out(c1, (n, mac(n,kT))).
+
+let processR(kR:key) =
+       in(c2,(m1:nonce,m2:macres));
+       if mac(m1,kR) = m2 then event acceptR(m1,kR).
+
+process
+         ! iK <= NK (in(start, ());
+                     new kT:key;
+                     insert keys(kT);
+                     out(finish, ());
+                     ! iT <= NT processT(kT)) 
+       | ! iR <= NR (in(start, ());
+                     get keys(xkR) in
+                     out(finish, ());
+                     processR(xkR))

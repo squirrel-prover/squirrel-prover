@@ -1,0 +1,43 @@
+Experiments with Cryptoverif
+
+* Basic Hash
+
+** basic-hash-auth-*.pvc
+
+Assuming PRF, authentication is shown for the multiple session scenario,
+where each new reader performs a probabilistic choice of the key.
+The type of hashed messages must be large for Cryptoverif to conclude.
+
+In basic-hash-auth-keys we use keys rather than hashed messages in events,
+and Cryptoverif fails to conclude.
+
+The PRF assumption is stronger than necessary, EUF should suffice.
+The variant basic-hash-auth-mac uses a SUF_CMA deterministic mac instead
+of the PRF hash, and Cryptoverif concludes. In that case there is no need for 
+a large type of MACs, and events can be based on keys rather than MACs.
+
+** basic-hash-equiv
+
+Failed attempt to prove unlinkability expressed directly, with a probabilistic 
+choice of the key for each new reader.
+
+Cryptoverif attempts to transform both multiple and single-session games,
+but each sequence of transformation preserves the general structure of each
+process wrt. replications: there is no hope to reach a common game.
+In fact the available actions in the two games are not comparable.
+
+The probabilistic choice does not seem to be a problem in itself, since the 
+probability that a honest interaction between a tag and a reader is successful
+is 1/NK in both games.
+
+** basic-hash-v2 and -v2-hashoracle
+
+Experiment with a random-oracle assumption: success without the oracle which 
+is in principle necessary; could not prove with the oracle -- in that case the 
+equivalence rom(hash) even fails to be used.
+
+Note that the nonce that is hashed by the tag is also sent in clear 
+(together with the hash) so oracle hashes may coincide with earlier honest 
+hashes.
+
+Note that the scenario in this file is for a single tag identity.
