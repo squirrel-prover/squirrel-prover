@@ -1,0 +1,58 @@
+(* An attempt to encode an authentication property for basic hash *)
+(* Stéphanie Delaune *)
+
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [large,fixed].
+type hashed [large,fixed].
+
+proba Pprf.
+
+expand PRF(key, nonce, hashed, hash, Pprf).
+
+channel c0, c1, c2, c3, c4, startid, finishid, startsess, finishsess.
+
+let processT(k:key) =
+  in(c0, ());
+  new n: nonce;
+  out(c1, (n, hash(k,n))).
+
+let multiple =
+ ( ! iK <= NK
+   in(startid, ());
+   new kTn:key;
+   let kTm:key = kTn in
+   out(finishid, ());
+   ! iT <= NT
+   in(startsess, ());
+   out(finishsess, ());
+   processT(kTm)
+ )|(
+   ! iR <= NR
+   in(c2,(m1:nonce,m2:hashed));
+   find u = i <= NT, v = j <= NK suchthat
+     defined(kTm[j]) && m2 = hash(kTm[j],m1) then
+   out(c3,()) else out(c4,())
+ ).
+
+let single =
+ ( ! iK <= NK
+   in(startid, ());
+   out(finishid, ());
+   ! iT <= NT
+   in(startsess, ());
+   new kTn:key;
+   let kTs:key = kTn in
+   out(finishsess, ());
+   processT(kTs)
+ )|(
+   ! iR <= NR
+   in(c2,(m1:nonce,m2:hashed));
+   find u = i <= NT, v = j <= NK suchthat
+     defined(kTs[i,j]) && m2 = hash(kTs[i,j],m1) then
+   out(c3,()) else out(c4,())
+ ).
+
+equivalence single multiple

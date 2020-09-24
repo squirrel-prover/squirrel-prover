@@ -30,6 +30,17 @@ The probabilistic choice does not seem to be a problem in itself, since the
 probability that a honest interaction between a tag and a reader is successful
 is 1/NK in both games.
 
+** basic-hash-diff
+
+Failed attempt to prove unlinkability expressed as an equivalence between
+two processes that could be superposed into a bi-process. In that case the
+probabilistic choice seems to be a problem (since there are more keys
+with the single session scenario, the probability of success is lower)
+so we lookup the key against the received hash.
+
+Using find [unique] does not seem to help. Note that the prf equivalence
+is not used in the proof attempt.
+
 ** basic-hash-v2 and -v2-hashoracle
 
 Experiment with a random-oracle assumption: success without the oracle which 
