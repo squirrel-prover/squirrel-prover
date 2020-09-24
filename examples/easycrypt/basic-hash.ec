@@ -134,13 +134,13 @@ module type BasicHashT0 = {
 
 (* Basic Hash, 1 tag, with logs. *)
 module Log (BH : BasicHashT) = {
-  var tag_outputs : ptxt list
-  var reader_accepted : ptxt list
+  var tag_outputs   : ptxt list
+  var reader_forged : ptxt list
 
   proc init () : unit = { 
     BH.init ();
-    Log.tag_outputs <- [];
-    Log.reader_accepted <- [];
+    tag_outputs <- [];
+    reader_forged <- [];
   }
 
   proc tag () : ptxt = {
@@ -153,7 +153,10 @@ module Log (BH : BasicHashT) = {
   proc reader (m : ptxt) : bool = {    
     var b;
     b <- BH.reader(m);
-    if (b){ reader_accepted <- m :: reader_accepted;}
+    (* We log messages accepted by the reader that the tag never send. *)
+    if (b && ! (mem tag_outputs m)){ 
+      reader_forged <- m :: reader_forged;
+    }
     return b;
   }    
 }.
@@ -189,19 +192,18 @@ module AuthGame (Adv : Adv) (BH : BasicHashF) (H : PRF) = {
   proc main () = {
     BH.init ();
     Adv.a();
-    return (exists (x : ptxt),      mem Log.reader_accepted x 
-                               /\ !(mem Log.tag_outputs x    ));
+    return (exists (x : ptxt), mem Log.reader_forged x );
   }
 }.
 
 (*-----------------------------------------------------------------------*)
 (* In our PRF/RF distinguisher, we must use a slightly different log,
    which is identical except that it does not initialize the BasicHash
-   protocol.*)
+   protocol. *)
 module LogB (BH : BasicHashT0) = {
   proc init () : unit = { 
     Log.tag_outputs <- [];
-    Log.reader_accepted <- [];
+    Log.reader_forged <- [];
   }
 
   proc tag () : ptxt = {
@@ -214,7 +216,9 @@ module LogB (BH : BasicHashT0) = {
   proc reader (m : ptxt) : bool = {    
     var b;
     b <- BH.reader(m);
-    if (b){ Log.reader_accepted <- m :: Log.reader_accepted;}
+    if (b && ! (mem Log.tag_outputs m)){ 
+      Log.reader_forged <- m :: Log.reader_forged;
+    }
     return b;
   }    
 }.
@@ -231,9 +235,9 @@ module D (A : Adv) (BH : BasicHashF0) (F : PRF_Oracles) = {
   module A = A (BH)
   
   proc distinguish () = {
+    BH.init();
     A.a();
-    return (exists (x : ptxt),      mem Log.reader_accepted x 
-                               /\ !(mem Log.tag_outputs x    ));    
+    return (exists (x : ptxt), mem Log.reader_forged x ); 
   } 
 }.
 
@@ -262,28 +266,32 @@ module BasicHash0 (H : PRF_Oracles) = {
    where card(nonce) is the cardinal of the support of the nonce 
    space. *)
 
-(* The indistinguishability game against the RF is identical to the
-   authentication game using the RF. *)
-lemma ind_auth (A <: Adv {Log, BasicHash, RF}):
-equiv[IND(RF, D(A, BasicHash0)).main ~ AuthGame(A, BasicHash, RF).main :
-    ={glob A} ==> ={res}].
+(* The probability of winning the indistinguishability game against
+   the RF is identical to the authentication game using the RF. *)
+lemma eq_RF &m (A <: Adv {Log, BasicHash, RF}) : 
+    Pr[AuthGame(A, BasicHash, RF).main() @ &m : res] =
+    Pr[IND(RF, D(A, BasicHash0)).main() @ &m : res].
 proof.
-  proc.
-  inline *.
-  admit.
-  (* TODO *)
+  byequiv; auto; proc; inline *; wp; sim; auto. 
 qed.
 
-(* First game hope: we replace the PRF by a random function.  *)
-lemma auth0 &m (A <: Adv {Log, BasicHash, RF}) : 
-    Pr[AuthGame(A, BasicHash, PRFi.PRF).main() @ &m : res] <= 
-      `|  Pr[IND(PRF, D(A, BasicHash0)).main() @ &m : res] 
-        - Pr[IND(RF, D(A, BasicHash0)).main() @ &m : res] |
-      + Pr[AuthGame(A, BasicHash, RF).main() @ &m : res].
-
+(* Idem with PRF *)
+lemma eq_PRF &m (A <: Adv {Log, BasicHash, PRF}) : 
+    Pr[AuthGame(A, BasicHash, PRF).main() @ &m : res] =
+    Pr[IND(PRF, D(A, BasicHash0)).main() @ &m : res].
 proof.
-  admitted.
-  (* TODO *)
+  byequiv; auto; proc; inline *; wp; sim; auto. 
+qed.
+
+(* First game hope: we replace the PRF by a random function. *)
+lemma auth0 &m (A <: Adv {Log, BasicHash, PRF, RF}) : 
+    Pr[AuthGame(A, BasicHash, PRF).main() @ &m : res] = 
+      (   Pr[IND(PRF, D(A, BasicHash0)).main() @ &m : res] 
+        - Pr[IND(RF, D(A, BasicHash0)).main() @ &m : res] )
+      + Pr[AuthGame(A, BasicHash, RF).main() @ &m : res].
+proof.
+  rewrite (eq_RF &m A) (eq_PRF &m A); by smt ().
+qed.
 
 (*-----------------------------------------------------------------------*)
 (* Finally, we need to bound the probability for the adversary to win
