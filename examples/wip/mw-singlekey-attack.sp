@@ -43,11 +43,11 @@ process reader =
   new nr;
   out(c,nr);
   in(c,m);
-  if exists (i,t:index),
+  if exists (i:index),
      xor(id(i),snd(m)) =
      H(<tag0,<nr,fst(m)>>,key)
   then
-    out(c, try find i,t such that
+    out(c, try find i such that
              xor(id(i),snd(m)) = H(<tag0,<nr,fst(m)>>,key) in
            xor(id(i),H(<tag1,<nr,fst(m)>>,key)))
   else
@@ -91,6 +91,37 @@ Proof.
 (* case i1 = i : honest interaction *)
   left.
   exists t.
+  assert input@T(i,t) = nr(r).
+  fresh M2.
+  depends R(r), R2(r).
+Qed.
+
+
+
+goal not_wa_R1_merge : forall (i,r:index),
+  xor(id(i),snd(input@R1(r))) =
+  H(<tag0,<nr(r),fst(input@R1(r))>>,key)
+  =>
+  (exists (i1,t:index), (* dishonest case *)
+  T(i1,t) < R1(r) &&
+  fst(output@T(i1,t)) = fst(input@R1(r)) &&
+  snd(output@T(i1,t)) XOR id(i) XOR id(i1) = snd(input@R1(r)) &&
+  R(r) < T(i1,t) &&
+  output@R(r) = input@T(i1,t)).
+Proof.
+intros.
+euf M0.
+assert (i1 <> i || i = i1).
+case H0.
+
+(* case i1 <> i : dishonest interaction *)
+  exists i1,t.
+  assert input@T(i1,t) = nr(r).
+  fresh M2.
+  depends R(r), R2(r).
+
+(* case i1 = i : honest interaction *)
+  exists i,t.
   assert input@T(i,t) = nr(r).
   fresh M2.
   depends R(r), R2(r).
