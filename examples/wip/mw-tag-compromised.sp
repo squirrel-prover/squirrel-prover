@@ -13,6 +13,11 @@ T --> R: nt, id + H(<c0, nr, nt>,k)
 R --> T: id + H(<c1, nr, nt>,k)
 
 This is a "light" model without the last check of T.
+
+In this model, we add a compromised tag (id0,key0 for the left process,
+id0',key0' for the right process).
+This compromised tag cannot play (no process tag(i,t) with these credentials)
+but these credentials are in the reader's database.
 *******************************************************************************)
 
 hash H
@@ -33,14 +38,6 @@ abstract tag1 : message
 axiom tags_neq : tag0 <> tag1
 
 channel c
-
-abstract id0 : message
-abstract id0' : message
-abstract key0 : message
-abstract key0' : message
-axiom compromisedCredentials :
-  exists (i0,i0':index), 
-    id(i0) = id0 && key(i0) = key0 && id'(i0,i0') = id0' && key'(i0,i0') = key0'
 
 process tag(i:index, t:index)=
   in(c,x);
@@ -63,15 +60,25 @@ process reader =
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
+abstract id0 : message
+abstract id0' : message
+abstract key0 : message
+abstract key0' : message
+axiom compromisedCredentials :
+  exists (ii,ii':index), 
+    id(ii) = id0 && key(ii) = key0 && id'(ii,ii') = id0' && key'(ii,ii') = key0'
+    && (forall (tau:timestamp), forall (i,t:index), tau = T(i,t) => i <> ii)
+
+system [compromised] null.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
 goal wa_R1 : forall r:index,
-  (exists (i,t:index),
+  (exists (i,t:index), id(i) <> id0 && key(i) <> key0 && id'(i,t) <> id0' && key'(i,t) <> key0' &&
    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
   <=>
-  (exists (i,t:index),
+  (exists (i,t:index), id(i) <> id0 && key(i) <> key0 && id'(i,t) <> id0' && key'(i,t) <> key0' &&
    T(i,t) < R1(r) &&
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
@@ -83,16 +90,18 @@ Proof.
   (* Cond => WA *)
   project.
   (* left *)
-  euf M0.
+  euf M4.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
-  fresh M2.
+  fresh M6.
+  apply compromisedCredentials.
   depends R(r), R2(r).
+  apply compromisedCredentials.
   (* right *)
-  euf M0.
+  euf M4.
   exists i,t.
   assert (input@T(i,t) = nr(r)).
-  fresh M2.
+  fresh M6.
   depends R(r), R2(r).
 
   (* WA => Cond *)
@@ -102,11 +111,11 @@ Qed.
 
 (* Same with R2 *)
 goal wa_R2 : forall r:index,
-  (exists (i,t:index),
+  (exists (i,t:index), id(i) <> id0 && key(i) <> key0 && id'(i,t) <> id0' && key'(i,t) <> key0' &&
    xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
    H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
   <=>
-  (exists (i,t:index),
+  (exists (i,t:index), id(i) <> id0 && key(i) <> key0 && id'(i,t) <> id0' && key'(i,t) <> key0' &&
    T(i,t) < R2(r) &&
    fst(output@T(i,t)) = fst(input@R2(r)) &&
    snd(output@T(i,t)) = snd(input@R2(r)) &&
@@ -119,16 +128,18 @@ Proof.
   (* Cond => WA *)
   project.
   (* left *)
-  euf M1.
+  euf M5.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
-  fresh M3.
+  fresh M7.
+  apply compromisedCredentials.
   depends R(r), R1(r).
+  apply compromisedCredentials.
   (* right *)
-  euf M1.
+  euf M5.
   exists i,t.
   assert (input@T(i,t) = nr(r)).
-  fresh M3.
+  fresh M7.
   depends R(r), R1(r).
 
   (* WA => Cond *)
@@ -140,39 +151,45 @@ Qed.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
 goal [left] wa_R1_left : forall (i,r:index),
-  xor(id(i),snd(input@R1(r))) =
+  (id(i) <> id0 && key(i) <> key0)
+  =>
+  (xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
-  exists t:index,
+  exists t:index, id'(i,t) <> id0' && key'(i,t) <> key0' &&
   T(i,t) < R1(r) &&
   fst(output@T(i,t)) = fst(input@R1(r)) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
   R(r) < T(i,t) &&
-  output@R(r) = input@T(i,t).
+  output@R(r) = input@T(i,t)).
 Proof.
   intros.
-  euf M0.
+  euf M2.
   exists t.
   assert input@T(i,t) = nr(r).
-  fresh M2.
+  fresh M4.
+  apply compromisedCredentials.
   depends R(r), R2(r).
+  apply compromisedCredentials.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [right] wa_R1_right : forall (i,t,r:index),
-  xor(id'(i,t),snd(input@R1(r))) =
+  (id(i) <> id0 && key(i) <> key0 && key'(i,t) <> key0')
+  =>
+  (xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
   T(i,t) < R1(r) &&
   fst(output@T(i,t)) = fst(input@R1(r)) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
   R(r) < T(i,t) &&
-  output@R(r) = input@T(i,t).
+  output@R(r) = input@T(i,t)).
 Proof.
   intros.
-  euf M0.
+  euf M3.
   assert input@T(i,t) = nr(r).
-  fresh M2.
+  fresh M5.
   depends R(r), R2(r).
 Qed.
 
@@ -198,7 +215,6 @@ expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
 
 fa 0. fa 1.
-
 equivalent
   (exists (i,t:index),
    diff(id(i),id'(i,t)) XOR snd(input@R1(r)) =
@@ -208,6 +224,10 @@ equivalent
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
    R(r) < T(i,t) && output@R(r) = input@T(i,t)).
+split.
+apply compromisedCredentials.
+apply wa_R1 to r.
+apply compromisedCredentials.
 apply wa_R1 to r.
 
 (* Perform a similar rewriting in try-find condition,
@@ -255,14 +275,18 @@ nosimpl(intro); split; assumption.
    i1,t1 for the condition. *)
 project.
 fa.
-apply wa_R1_left to i1,r.
+apply compromisedCredentials.
+false_left.
+apply wa_R1_left to i,r.
 apply H1.
-exists t.
 yesif.
+apply compromisedCredentials.
 fa.
-apply wa_R1_right to i1,t1,r.
+apply compromisedCredentials.
+apply wa_R1_right to i,t,r.
 apply H1.
 yesif.
+apply compromisedCredentials.
 
 fa 2. fadup 1.
 fa 1. fadup 1.
@@ -289,7 +313,11 @@ equivalent
      fst(output@T(i,t)) = fst(input@R2(r)) &&
      snd(output@T(i,t)) = snd(input@R2(r)) &&
      R(r) < T(i,t) && output@R(r) = input@T(i,t)).
+split.
+apply compromisedCredentials.
+false_left.
 apply wa_R2 to r.
+exists i,t.
 
 fadup 1.
 
