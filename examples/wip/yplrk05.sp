@@ -64,43 +64,85 @@ process reader(jj:index) =
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
-goal stateIncrease :
-forall (jj,jj',ii:index), R1(jj',ii) < R1(jj,ii) => kR(ii)@R1(jj',ii) <> kR(ii)@R1(jj,ii). 
+(* First attempt at writing a lemma about tag's state value *)
+(* There is actually one case for which it is false *)
+goal updateTag :
+forall (t:timestamp), forall (i,j:index), (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
+Proof.
+induction.
+case t. case H0.
+
+apply IH0 to pred(R(jj)). apply H0 to i,j.
+apply IH0 to pred(R1(jj,ii)). apply H0 to i,j.
+apply IH0 to pred(R2(jj)). apply H0 to i,j.
+
+assert T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j).
+case H0.
+apply IH0 to pred(T(i1,j1)). apply H0 to i,j. 
+
+assert i=i1 || i<>i1. case H0.
+assert j=j1 || j<>j1. case H0.
+apply IH0 to pred(T1(i,j1)). apply H0 to i,j.
+admit. (* lemma false in this case *)
+
+assert kT(i)@T1(i1,j1) = kT(i)@pred(T1(i1,j1)).
+admit. (* missing tactic to reason on the conditional in D1 ? *)
+admit.
+
+apply IH0 to pred(T2(i1,j1)). apply H0 to i,j.
+Qed.
+
+(* Another lemma, seems to hold, but not yet proved *)
+goal lastUpdate : forall (t:timestamp), forall (i:index)
+  (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) 
+  ||
+  (exists j:index,
+   kT(i)@t = kT(i)@T(i,j) &&
+   T(i,j) <= t && t < T1(i,j) &&
+   (forall (j':index), T1(i,j') <= T(i,j) || t < T1(i,j'))).
 Proof.
 admit.
 Qed.
 
-goal auth_R1 :
-forall (jj,ii:index),
-  cond@R1(jj,ii) =>
-  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
+goal auth_R1_induction :
+forall (t:timestamp), forall (jj,ii:index),
+  (t = R1(jj,ii) && exec@t) (* exec@t (not only cond@t) is needed in the proof *)
+  =>
+  (exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t).
 Proof.
-intros.
-expand cond@R1(jj,ii).
+induction.
+substitute t,R1(jj,ii).
+expand exec@R1(jj,ii). expand cond@R1(jj,ii).
 euf M0.
 
-(* case equality with hashed message in update@R1 *)
-assert (R1(jj1,ii) = R1(jj,ii) || R1(jj1,ii) < R1(jj,ii)).
-case H0.
-case H1.
-(* case R1(jj1,ii) = R1(jj,ii) *)
-assert snd(kR(ii)@pred(R1(jj,ii))) = fst(kR(ii)@R1(jj,ii)).
-admit. (* TODO ??? *)
-(* case R1(jj1,ii) < R1(jj,ii) *)
-(* use freshness of r1 and stateIncrease to conclude the equality cannot hold ? *)
-apply stateIncrease to jj,jj1,ii.
-admit. (* TODO ??? *)
+  (* case 1/3: equality with hashed message in update@R1 *)
+  assert (R1(jj1,ii) = R1(jj,ii) || R1(jj1,ii) < R1(jj,ii)).
+  case H1.
+  case H2.
+    (* case R1(jj1,ii) = R1(jj,ii) *)
+    admit. (* ??? *)
+    (* this equality is legitimate, but I don't see how to deal with it for the proof *)
+    (* case R1(jj1,ii) < R1(jj,ii) *)
+    apply IH0 to R1(jj1,ii).
+    executable pred(R1(jj,ii)).
+    apply H3 to R1(jj1,ii).
+    apply H2 to jj1,ii.
+    expand exec@R1(jj1,ii). expand cond@R1(jj1,ii).
+    exists j.
 
-(* case equality with hashed message in output@T *)
-(* honest case *)
-assert T(ii,j) < R1(jj,ii). case H0.
-exists j.
+  (* case 2/3: equality with hashed message in output@T *)
+  (* honest case *)
+  assert T(ii,j) < R1(jj,ii). case H1.
+  exists j.
 
-(* case equality with hashed message in update@T1 *)
-(* if there is an update@T1, then action T happened before *)
-assert T1(ii,j) < R1(jj,ii). case H0.
-assert input@T(ii,j) = r1(jj). admit. (* TODO ??? *)
-assert input@R1(jj,ii) = h1(xor(xor(fst(snd(kT(ii)@T(ii,j))),input@T(ii,j)),k(ii)),key1(ii)). admit. (* TODO ??? *)
-depends T(ii,j),T1(ii,j).
-exists j.
+  (* case 3/3: equality with hashed message in update@T1 *)
+  (* if there is an update@T1, then action T happened before *)
+  assert T1(ii,j) < R1(jj,ii). case H1.
+  (* here, I use updateTag but actually the lemma is not always true *)
+  (* I think I should use lastUpdate instead (or a similar lemma), 
+  but I have not yet managed to do so *)
+  apply updateTag to pred(T1(ii,j)).
+  depends T(ii,j),T1(ii,j).
+  apply H2 to ii,j.
+  exists j.
 Qed.
