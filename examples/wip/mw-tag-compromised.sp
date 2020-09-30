@@ -60,12 +60,18 @@ process reader =
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
+(* Ideally, we would like to write something like "abstract i0 : index"
+to model a compromised tag, but it is not (yet?) allowed by the parser.
+A possible bypass is the following declarations and axiom, but we actually
+write something that is incorrect.
+For example, id(ii) is a name whereas id0 is a message, so there is a
+negligible probability that id(ii) and id0 are equal. *)
 abstract id0 : message
 abstract id0' : message
 abstract key0 : message
 abstract key0' : message
 axiom compromisedCredentials :
-  exists (ii,ii':index), 
+  exists (ii,ii':index),
     id(ii) = id0 && key(ii) = key0 && id'(ii,ii') = id0' && key'(ii,ii') = key0'
     && (forall (tau:timestamp), forall (i,t:index), tau = T(i,t) => i <> ii)
 
