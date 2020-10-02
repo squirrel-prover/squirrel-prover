@@ -2,6 +2,7 @@
 require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require PRF.
+require FelTactic.
 
 (* Key space *)
 type key.
@@ -74,15 +75,14 @@ module BasicHash (H : PRF) = {
     x <- pair n h;
     return x;
   }    
-
+  
   proc reader (m : ptxt) : bool = {    
     var h, b;
     h <@ H.f(fst m);
     b <- snd m = h;
     return b;
-  }    
+  } 
 }.
- 
 
 (* (* Basic Hash protocol, with n+1 tags and one reader. *) *)
 (* module BasicHashN = { *)
@@ -128,8 +128,7 @@ module type BasicHashT = {
 }.
 
 module type BasicHashT0 = {
-  proc tag () : ptxt
-  proc reader (_ : ptxt) : bool
+  include BasicHashT[-init]
 }.
 
 (* Basic Hash, 1 tag, with logs. *)
@@ -179,9 +178,7 @@ module type Adv (BH : BasicHashT0) = {
 }.
 
 module type BasicHashF (H : PRF) = {
-  proc init () : unit
-  proc tag () : ptxt
-  proc reader (_ : ptxt) : bool
+  include BasicHashT
 }.
 
 (* Basic Hash protocol authentication game *)
@@ -224,8 +221,7 @@ module LogB (BH : BasicHashT0) = {
 }.
 
 module type BasicHashF0 (H : PRF_Oracles) = {
-  proc tag () : ptxt
-  proc reader (_ : ptxt) : bool
+  include BasicHashT0
 }.
 
 (* The PRF/RF distinguisher is almost identical to the authentication game,
@@ -296,13 +292,58 @@ qed.
 (*-----------------------------------------------------------------------*)
 (* Finally, we need to bound the probability for the adversary to win
    the authentication game by the collision probability w.r.t. TODO *)
-lemma coll &m (A <: Adv {Log, BasicHash, RF}) : 
-      + Pr[AuthGame(A, BasicHash, RF).main() @ &m : res] <= 1%r. 
-(* replace 1%r by ? *)
+
+(* Bound on the number of calls to the reader by the adversary. *)
+op qreader : int.
+
+(* This changes a Basic Hash implementations by bounding the number of
+   queries forwarded to reader by qreader. *)
+module BHBounder (BH : BasicHashT0) = { 
+  var q0 : int
+
+  proc tag = BH.tag
+
+  proc reader (m : ptxt) = {
+    var x;
+    
+    if (q0 < qreader) {
+      x <@ BH.reader(m);
+      q0 <- q0 + 1;
+    }
+    return x;
+  }
+}.
+
+(* This allows an adversary to call reader at most q times. *)
+module ABounder (A : Adv) (BH : BasicHashT0) = {
+  module BH = BHBounder(BH)
+  module A = A(BH)
+
+  proc a () = {
+    BHBounder.q0 <- 0;
+    A.a();
+  }
+}.
+
+(* TBD *)
+op bnd : real.
+op stepbnd (x : int) : real.
+
+lemma coll (A <: Adv {Log, BasicHash, RF}) : 
+    phoare[AuthGame(ABounder(A), BasicHash, RF).main : true ==> res] <= bnd. 
 proof.
-admitted.
+ proc.
+ fel 0
+   BHBounder.q0 (* counter *)
+   stepbnd (* probability of setting bad when the counter increases. *)
+   qreader (* maximal value of the counter *)
+   (exists (x : ptxt), mem Log.reader_forged x) (* bad event *)
+   [] true (* inv  *).
+ (* the sum of stepbnd, for i in [0; qreader[, is upper-bounded by bnd *)
+ admit.  
 
-
-(*-----------------------------------------------------------------------*)
-(* Then, we just put everything together *)
-(* TODO *)
+ (* If the adversary wins, then bad is true, and the counter is at
+    most qreader. *)
+ simplify; move => &m0 H; split. 
+   + admit.
+   + proc.
