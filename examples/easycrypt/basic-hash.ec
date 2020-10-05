@@ -18,14 +18,6 @@ type ptxt.
 op dnonce: { ptxt distr |    is_lossless dnonce
                           /\ is_uniform dnonce } as dnonce_lluni.
 
-(* Pair, first and second projections *)
-op pair : ptxt -> ptxt -> ptxt.
-op fst  : ptxt -> ptxt.
-op snd  : ptxt -> ptxt.
-
-axiom func_fst x y : fst (pair x y) = x.
-axiom func_snd x y : snd (pair x y) = y.
-
 (*-----------------------------------------------------------------------*)
 (* PRF *)
 op F : key -> ptxt -> ptxt.
@@ -95,17 +87,16 @@ module EUF_RF = {
 
 (* Without initialization *)
 module BasicHash0 (H : PRF_Oracles) = {
-  proc tag () : ptxt = {
-    var n, x, h;
+  proc tag () : ptxt * ptxt = {
+    var n, h;
     n <$ dnonce;
     h <@ H.f(n);
-    x <- pair n h;
-    return x;
+    return (n, h);
   }    
   
-  proc reader (m : ptxt) : bool = {    
+  proc reader (n h : ptxt) : bool = {    
     var b;
-    b <- H.check(fst m, snd m);
+    b <- H.check(n, h);
     return b;
   } 
 }.
@@ -120,47 +111,11 @@ module BasicHash (H : PRF) = {
   }
 }.
 
-(* (* Basic Hash protocol, with n+1 tags and one reader. *) *)
-(* module BasicHashN = { *)
-(*   var ks : key list *)
-
-(*   (* We always have at least one key. *) *)
-(*   proc init (n : int) : unit = { *)
-(*     var i, x; *)
-(*     i <- 0; *)
-(*     while (i <= n){ *)
-(*       x <$ dkey; *)
-(*       ks <- x :: ks; *)
-(*     } *)
-(*   } *)
-
-(*   proc tag (i : int) : ptxt = { *)
-(*     var k, n, x; *)
-(*     n <$ dnonce; *)
-(*     i <- if (size ks <= i) then 0 else i; *)
-(*     k <- nth witness ks i; *)
-(*     x <- pair n (H k n); *)
-(*     return x; *)
-(*   } *)
-
-(*   proc reader (m : ptxt) : bool = { *)
-(*     var i, b, k; *)
-(*     i <- 0; *)
-(*     b <- false; *)
-(*     while (i < size ks){       *)
-(*       k <- nth witness ks i; *)
-(*       b <- b || snd m = H k (fst m); *)
-(*     } *)
-(*     return b; *)
-(*   } *)
-(* }. *)
-
-
 (*-----------------------------------------------------------------------*)
 module type BasicHashT = {
   proc init () : unit
-  proc tag () : ptxt
-  proc reader (_ : ptxt) : bool
+  proc tag () : ptxt * ptxt
+  proc reader (_: ptxt * ptxt) : bool
 }.
 
 module type BasicHashT0 = {
@@ -169,8 +124,8 @@ module type BasicHashT0 = {
 
 (* Basic Hash, 1 tag, with logs. *)
 module Log (BH : BasicHashT) = {
-  var tag_outputs   : ptxt list
-  var reader_forged : ptxt list
+  var tag_outputs   : (ptxt * ptxt) list
+  var reader_forged : (ptxt * ptxt) list
 
   proc init () : unit = { 
     BH.init ();
@@ -178,14 +133,14 @@ module Log (BH : BasicHashT) = {
     reader_forged <- [];
   }
 
-  proc tag () : ptxt = {
+  proc tag () : ptxt * ptxt = {
     var x;
     x <@ BH.tag ();
     tag_outputs <- x :: tag_outputs;
     return x;
   }    
 
-  proc reader (m : ptxt) : bool = {    
+  proc reader (m : ptxt * ptxt) : bool = {    
     var b;
     b <- BH.reader(m);
     (* We log messages accepted by the reader that the tag never send. *)
@@ -213,7 +168,7 @@ module AuthGame (Adv : Adv) (BH : BasicHashF) (H : PRF) = {
   proc main () = {
     BH.init ();
     Adv.a();
-    return (exists (x : ptxt), mem Log.reader_forged x );
+    return (exists x, mem Log.reader_forged x );
   }
 }.
 
@@ -244,14 +199,14 @@ module AuxLog (BH : BasicHashT0) = {
     Log.reader_forged <- [];
   }
 
-  proc tag () : ptxt = {
+  proc tag () : ptxt * ptxt = {
     var x;
     x <@ BH.tag ();
     Log.tag_outputs <- x :: Log.tag_outputs;
     return x;
   }    
 
-  proc reader (m : ptxt) : bool = {    
+  proc reader (m : ptxt * ptxt) : bool = {    
     var b;
     b <- BH.reader(m);
     if (b && ! (mem Log.tag_outputs m)){ 
@@ -274,16 +229,13 @@ module D (A : Adv) (BH : BasicHashF0) (F : PRF_Oracles) = {
   proc distinguish () = {
     BH.init();
     A.a();
-    return (exists (x : ptxt), mem Log.reader_forged x ); 
+    return (exists x, mem Log.reader_forged x ); 
   } 
 }.
 
 (*-----------------------------------------------------------------------*)
-(* Given an adversary A against the Authentication Game, we want to
-   build an adversary B against the PRF H, such that, roughly:
-   Adv_Auth(A) ≤ Adv_PRF(B) + 1/card(nonce) 
-   where card(nonce) is the cardinal of the support of the nonce 
-   space. *)
+(* Given an adversary A against the Authentication Game, we build an
+   an adversary B against the unforgeable PRF H. *)
 
 (* The probability of winning the indistinguishability game against
    the RF is identical to the authentication game using the RF. *)
@@ -302,18 +254,7 @@ proof.
   byequiv; auto; proc; inline *; wp; sim; auto. 
 qed.
 
-(* First game hope: we replace the PRF by a random function. *)
-lemma auth0 &m (A <: Adv {Log, BasicHash, PRF, EUF_RF}) : 
-    Pr[AuthGame(A, BasicHash, PRF).main() @ &m : res] = 
-      (   Pr[EUF_PRF_IND(PRF,    D(A, BasicHash0)).main() @ &m : res] 
-        - Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res] )
-      + Pr[AuthGame(A, BasicHash, EUF_RF).main() @ &m : res].
-proof.
-  rewrite (eq_RF &m A) (eq_PRF &m A); by smt ().
-qed.
-
-(*-----------------------------------------------------------------------*)
-(* Trivially, the adversary cannot win the authentication game instantiated
+(* The adversary cannot win the authentication game instantiated
     with the ideal unforgeable hash function. *)
 lemma res_0 &m (A <: Adv {Log, BasicHash, PRF, EUF_RF}) : 
     Pr[AuthGame(A, BasicHash, EUF_RF).main() @ &m : res] = 0%r.
@@ -321,26 +262,35 @@ proof.
   byphoare; auto. 
   hoare; proc*; inline *; wp; sp. 
   call (_: Log.reader_forged = [] /\ 
-           forall x, x \in Log.tag_outputs{hr} <=> 
-                     (EUF_RF.m.[fst x] <> None && 
-                      oget EUF_RF.m.[fst x] = snd x)); auto.
-  (* tag *)
-  + proc; inline *; auto. seq 2: (#pre /\ x1 = n); wp.
-   - rnd => *; auto. 
-   - move => *. case (x1 \notin EUF_RF.m).
-    * rcondt 1 => //=. wp; rnd; auto. 
-      move => &hr H r H0; split; [ 1 : smt ()]. move => x2; split => *.
-     - case H1. 
-       move => H2; rewrite H2 func_fst func_snd; by smt. 
-       move => H2. admit.
-     - case (x1{hr} = fst x2).
-       move => H2; left. rewrite H2. admit. admit.
+           forall x y, (EUF_RF.m.[x] <> None && oget EUF_RF.m.[x] = y)
+                        => (x, y) \in Log.tag_outputs{hr}); auto.
 
-    * rcondf 1; auto.  move => *; split; [ 1 : smt ()]; move => *.
-      admit.
+  (* tag *)
+  + proc; inline *; auto. seq 2: (#pre /\ x0 = n); wp.
+   - rnd => *; auto.
+   - move => *; case (x0 \notin EUF_RF.m).
+    * rcondt 1 => //=; wp; rnd; auto.
+      move => &hr [[[Hl Hind] Heq] Hin] r H0; split; [ 1 : smt ()]; 
+      move => x y H1.
+     case (x0{hr} = x) => Hx.
+     - left; rewrite Hx; smt ().
+     - right. smt.
+    * rcondf 1; auto; move => &hr [[[Hl Hind] Heq] Hin]; split; [ 1 : smt ()]; 
+      move => x y H1; right; apply Hind; apply H1.
+
   (* reader *)
   + proc; inline *; auto => /=.
-  move => &hr hyp; split => //; by smt ().
+  move => &hr [hyp1 hyp2]; split => //. by smt.
+
   + move => &hr hyp; split => //; split; [ 1 : smt ()]. 
-    move => x; split; by smt.
+    move => x H; by smt.
+qed.
+
+(* We conclude. *)
+lemma auth0 &m (A <: Adv {Log, BasicHash, PRF, EUF_RF}) : 
+    Pr[AuthGame(A, BasicHash, PRF).main() @ &m : res] = 
+      (   Pr[EUF_PRF_IND(PRF,    D(A, BasicHash0)).main() @ &m : res] 
+        - Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res] ).
+proof.
+  rewrite (eq_PRF &m A) -(eq_RF &m A) (res_0 &m A); by smt ().
 qed.
