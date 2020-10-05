@@ -1,4 +1,4 @@
-(* Simple modeling of the Basic Hash protocol. *)
+(* Simple modeling of the Basic Hash protocol, with one tag. *)
 require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require FelTactic.
@@ -80,7 +80,6 @@ module EUF_RF = {
     return (x \in m && oget m.[x] = s);
   }
 }.
-
 
 (*-----------------------------------------------------------------------*)
 (* Basic Hash protocol, with only one tag and one reader. *)
