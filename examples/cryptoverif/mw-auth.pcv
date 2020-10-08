@@ -1,0 +1,67 @@
+(* MW - simplified version without the last check of the tag *)
+(* authentication property *)
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [large,fixed].
+type hash_key [large,fixed].
+type hashed [large,fixed].
+
+const tag0,tag1:nonce.
+
+expand ROM_hash_2(hash_key, key, bitstring, hashed, hash, hashoracle, qH).
+expand Xor(hashed, xor , zero).
+
+(* Queries and Events *)
+event acceptR(nonce,nonce,key).
+event startT(nonce,nonce,key).
+
+query xnR:nonce, xnT:nonce, xk:key;
+  event(acceptR(xnR,xnT,xk)) ==> event(startT(xnR,xnT,xk)).
+
+(* Channels and Processes *)
+channel c0, c1, c2, c3, c4, c5, c6, c_start, start, finish.
+
+table keys(key).
+table ids(hashed).
+
+let processT(idT:hashed, kT:key, hk:hash_key) =
+  in(c2, nR:nonce);
+  new nT: nonce;
+  event startT(nR,nT,kT);
+  out(c3, (nT, xor(idT,hash(hk,kT,(tag0,(nR,nT)))))).
+
+let processR(idR:hashed, kR:key, hk:hash_key) =
+  in(c0,());
+  new nR: nonce;
+  out(c1, nR);
+  in(c4, (nT:nonce,m2:hashed));
+  if xor(m2,hash(hk,kR,(tag0,(nR,nT)))) = idR
+  then
+    ( event acceptR(nR,nT,kR);
+      out(c5, xor(idR,hash(hk,kR,(tag1,(nR,nT)))))
+    )
+  else
+    out(c6, ()).
+
+process
+  in(c_start,());
+  new hk: hash_key;
+  out(c_start,());
+  ( ! iK <= NK
+    ( in(start, ());
+      new kT:key; insert keys(kT);
+      new idT:hashed; insert ids(idT);
+      out(finish, ());
+      ! iT <= NT processT(idT, kT, hk)
+    )
+  |
+  ( ! iR <= NR
+    in(start, ());
+    get keys(xkT) in
+    get ids(xidT) in
+    out(finish, ());
+    processR(xidT, xkT, hk)
+  )
+  | hashoracle(hk))
