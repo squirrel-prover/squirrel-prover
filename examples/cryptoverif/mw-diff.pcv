@@ -8,6 +8,8 @@ proof {
       insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_3[i,j], idTn_1[j], nR_4[i,j], nT_4[i,j]) && (nT_5 = nT_4[i,j]) && (nR_5 = nR_4[i,j]) && (xor(m2_1, idTn_1[j]) = r_3[i,j]) then";
       simplify;
       remove_assign useless;
+      move random;
+      crypto remove_xor(xor) *;
       success
       }
 
