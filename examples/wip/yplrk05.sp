@@ -11,6 +11,8 @@ The reader then replies with h(k2) and both tag and reader update secrets k1 and
 k2.
 *******************************************************************************)
 
+(* Our protocol works under the natural assumptionthatThas a hash function, XOR gate, and the capabil-ity to keep state during a single session. *)
+
 hash h1
 hash h2
 
@@ -92,12 +94,19 @@ apply sequentiality to t. apply H0 to i,j. exists j1.
 (* case i<>i1 *)
 apply IH0 to pred(T1(i1,j1)). apply H0 to i,j.
 assert kT(i)@T1(i1,j1) = kT(i)@pred(T1(i1,j1)).
-admit. (* missing tactic to reason on the conditional in D1 ? *)
+case (if i = i1 then
+       <snd(kT(i1)@pred(T1(i1,j1))),
+        <xor(fst(snd(kT(i1)@pred(T1(i1,j1)))),
+             h2(snd(snd(kT(i1)@pred(T1(i1,j1)))),key2(i1))),
+         xor(snd(snd(kT(i1)@pred(T1(i1,j1)))),
+             h1(xor(xor(fst(snd(kT(i1)@pred(T1(i1,j1)))),input@T(i1,j1)),
+                    k(i1)),key1(i1)))>>
+       else kT(i)@pred(T1(i1,j1))).
 
 apply IH0 to pred(T2(i1,j1)). apply H0 to i,j.
 Qed.
 
-goal auth_R1_induction :
+goal auth_R1_induction_weak :
 forall (t:timestamp), forall (jj,ii:index),
   (t = R1(jj,ii) && exec@t) (* exec@t (not only cond@t) is needed in the proof *)
   =>
@@ -131,3 +140,35 @@ euf M1.
   apply H1 to ii,j.
   exists j.
 Qed.
+
+goal auth_T1_induction_weak :
+forall (t:timestamp), forall (i,j:index),
+  (t = T1(i,j) && exec@t) (* exec@t (not only cond@t) is needed in the proof *)
+  =>
+  (exists (jj:index), 
+   R1(jj,i) < t &&
+   output@R1(jj,i) = input@t).
+Proof.
+induction.
+substitute t,T1(i,j).
+expand exec@T1(i,j). expand cond@T1(i,j).
+assert input@T1(i,j) = h2(snd(snd(kT(i)@pred(T1(i,j)))),key2(i)).
+euf M1.
+
+  (* case 1/3: equality with hashed message in output@R1 *)
+  (* honest case *)
+  exists jj.
+
+  (* case 2/3: equality with hashed message in update@R1 *)
+  (* honest case *)
+  exists jj.
+
+  (* case 3/3: equality with hashed message in update@T1 *)
+  apply IH0 to T1(i,j1).
+  executable pred(T1(i,j)).
+  apply H2 to T1(i,j1).
+  apply H1 to i,j1.
+  expand exec@T1(i,j1). expand cond@T1(i,j1).
+  exists jj.
+Qed.
+

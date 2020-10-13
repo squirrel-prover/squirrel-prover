@@ -28,15 +28,28 @@ mutable d : message
 channel cA
 channel cB
 
+(* initial value for counter *)
 abstract myZero : message
+axiom counterInit : d@init = myZero
+
+(* myPred and mySucc functions for counter *)
 abstract myPred : message->message
 abstract mySucc : message->message
-
-axiom counterInit : d@init = myZero
 axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
 axiom succPred : forall (n:message), mySucc(myPred(n)) = n
-axiom notEqual : forall (n:message), n <> mySucc(n)
 
+(* order relation for counter *)
+abstract orderOk : message
+abstract order : message->message->message
+axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
+axiom orderPred : forall (n:message), order(myPred(n),n) = orderOk
+axiom orderTrans : 
+  forall (n1,n2,n3:message), 
+    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
+    => order(n1,n3) = orderOk
+axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
+
+(* processes *)
 process A =
   d := mySucc(d);
   out(cA, h(<myPred(d),secret>,key))
@@ -53,30 +66,27 @@ process B =
 system ((!_i A) | (!_j B)).
 
 goal counterIncrease :
-  forall (t:timestamp), t > init => d@t = mySucc(d@pred(t)).
+  forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.
 Proof.
 intros.
+apply orderSucc to d@pred(t).
 case t. case H0.
 Qed.
 
 goal counterIncreaseBis :
-  forall (t:timestamp), forall (t':timestamp), t' < t => d@t <> d@t'.
+  forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
 Proof.
 induction.
 apply IH0 to pred(t).
 assert (t' < pred(t) || t' >= pred(t)).
 case H1.
-
-apply counterIncrease to t.
-apply notEqual to d@pred(t).
+(* case t' < pred(t) *)
 apply H0 to t'.
-assert d@pred(t) <> d@t.
-(* TODO *) admit.
-(* axiom notEqual me semble pas suffisant *)
-
+apply counterIncrease to t.
+apply orderTrans to d@t',d@pred(t),d@t.
+(* case t' >= pred(t) *)
 assert t' = pred(t).
 apply counterIncrease to t.
-apply notEqual to d@t'.
 Qed.
 
 goal auth : forall (j:index), cond@B(j) => exists (i:index), A(i)<B(j) && input@B(j) = output@A(i).
@@ -93,17 +103,12 @@ goal secretReach : forall (j:index), cond@B(j) => False.
 Proof.
 intros.
 expand cond@B(j).
-apply predSucc to d@pred(B(j)).
-assert input@B(j) = h(<d@pred(B(j)),secret>,key).
-euf M2.
+euf M0.
 apply predSucc to d@pred(A(i)).
-assert <d@pred(A(i)),secret> = <d@pred(B(j)),secret>.
-assert d@pred(A(i))=d@pred(B(j)).
-assert (A(i)=pred(B(j)) || A(i)<pred(B(j))).
-case H0.
-
-assert d@A(i) = d@pred(A(i)).
-apply notEqual to d@pred(A(i)).
-
-(* TODO *) admit.
+apply predSucc to d@pred(B(j)).
+assert d@pred(A(i)) = d@pred(B(j)).
+assert pred(A(i)) < pred(B(j)). case H0.
+apply counterIncreaseBis to pred(B(j)).
+apply H1 to pred(A(i)).
+apply orderStrict to d@pred(A(i)),d@pred(B(j)).
 Qed.
