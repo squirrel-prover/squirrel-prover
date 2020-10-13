@@ -75,6 +75,14 @@ axiom drf_lluni (i : int) : is_lossless (drf i) /\ is_uniform (drf i).
 lemma drf_ll (i : int) : is_lossless (drf i) by smt (drf_lluni).
 lemma drf_uni (i : int) : is_uniform (drf i) by smt (drf_lluni).
 
+(* The PRFs are all i.i.d. *)
+axiom drf_iid (i j : int) : forall (r : ptxt), mu1 (drf i) r = mu1 (drf j) r.
+
+lemma drf_sup (i j : int) : forall (r : ptxt), r \in drf i <=> r \in drf j 
+by smt (drf_iid).
+
+hint exact random : drf_iid.
+hint exact random : drf_sup.
 hint exact random : drf_ll.
 
 module EUF_RF = {
@@ -397,12 +405,51 @@ proof.
     conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim.
 qed.
 
+lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
+    (forall (BH <: BasicHashT0{A}),
+      islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+    Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] <=
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : res] +
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad].
+proof.
+  move => Hll; byequiv => //.
+  proc.
+  call(_: RF_bad.bad, ={glob Single0, glob EUF_RF}).
+  + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto. 
+    seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#.
+    wp. if {1}. auto => />. 
+    (* search (_.[_ <- _].[_]). *)
+    smt (get_setE). auto; smt (drf_lluni).
+  + by move => &2 Hb; islossless.
+  + move => &2. proc; inline *; auto; sp; if; sp; auto. 
+    by if; auto; smt (drf_ll dnonce_ll). 
+  + by proc; conseq />; sim.
+  + move => &2 Hb; islossless. 
+    while true (n_tag * n_session- i); auto; 2 : by smt ().
+    conseq (:true); 1 : by smt (). 
+    by islossless. 
+  + move => _; proc; conseq />.
+    while true (n_tag * n_session - i); auto; 2 : by smt ().
+    conseq (:true); 1 : by smt (). 
+    by islossless. 
+  + inline *; swap {2} 5 3; wp => /=. 
+    conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim.
+qed.
+
 (*-----------------------------------------------------------------------*)
 (* We bound the probability of bad. *)
 
+(* For the single session protocol, this should be 0. *)
+lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
+    (forall (BH <: BasicHashT0{A}),
+      islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+    Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
+proof.
+admitted.
+
 op pr_bad = 0%r.                (* To be determined *)
 
-lemma coll_bound &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
+lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= pr_bad.
@@ -414,10 +461,32 @@ admitted.
    protocols coincide. *)
 lemma eq_single_mult &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : res] =
-    Pr[Unlink(A, Single, EUF_RF).main() @ &m : res].
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : res].
 proof.
-  byequiv => //.
-  proc; call (_: ={glob EUF_RF, glob Multiple0}). 
-  (* tag *)
-  + proc; inline *; sp; if => //; sp; if => //.
-    seq 1 1 : (#pre /\ ={n}); 1 : by auto; smt (). 
+  byequiv => //; proc; inline *; sp 5 5. 
+  seq 3 3 : (#pre /\ ={Multiple0.s_cpt, i} /\ 
+             forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0).
+  + sp; while (={Multiple0.s_cpt} /\ ={i} /\
+         forall j, (0 <= j < i{2}) => Multiple0.s_cpt.[j]{2} = Some 0);
+    by auto; smt (get_setE).     
+
+  + call (_: ={glob Multiple0} /\
+      EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
+      forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None). 
+
+  (* tag *) 
+  - move => />; 1 : by move => />; auto.
+    proc; inline *; sp; if => //; 2 : by auto; smt(). 
+    sp; if => //; 2 : by auto; smt().
+    seq 1 1 : (#pre /\ ={n}); 1 : by auto => />.
+    wp; sp 3 3; seq 1 1 : (#pre); 1: by auto. 
+    move => />; rnd (fun x => x); auto. 
+    move => &1 &2 *; split; 1 : by smt(drf_sup).
+    by smt (get_setE).
+
+  (* reader *)
+  - proc; inline *; auto => />.
+    admit.
+
+  (* invariant implies the post *)
+  - auto => &1 &2 *. move :H => />. move => H j; smt ().
