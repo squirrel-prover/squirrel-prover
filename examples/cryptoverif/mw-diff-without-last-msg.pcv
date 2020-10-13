@@ -1,0 +1,91 @@
+(* MW - simplified version without the last check of the tag AND without the last output of the reader. No message with tag1*)
+(* unlinkability property *)
+
+proof {
+      auto;
+      start_from_other_end;
+      auto;
+     (* insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_3[i,j], idTn_1[j], nR_4[i,j], nT_4[i,j]) && (nT_5 = nT_4[i,j]) && (nR_5 = nR_4[i,j]) && (xor(m2_1, idTn_1[j]) = r_3[i,j]) then"; *)
+      simplify;
+      remove_assign useless;
+      move random;
+      crypto remove_xor(xor) *; 
+      success
+      }
+
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [large,fixed].
+type message [large,fixed].
+
+const tag0,tag1:nonce.
+
+proba Pprf.
+
+expand PRF_large(key, bitstring, message, hash, Pprf).
+expand Xor(message, xor , zero).
+
+channel c0, c1, c2, c3, c4, c5, c6, startid, finishid, startsess, finishsess.
+
+let processT(idT:message, kT:key) =
+  in(c2, nR:nonce);
+  new nT: nonce;
+  out(c3, (nT, xor(idT,hash(kT,(tag0,(nR,nT)))))).
+
+let multiple =
+ ( ! iK <= NK
+   in(startid, ());
+   new kTn:key;
+   new idTn:message;
+   let kTm:key = kTn in
+   let idTm:message = idTn in
+   out(finishid, ());
+   ! iT <= NT
+   in(startsess, ());
+   out(finishsess, ());
+   processT(idTm,kTm)
+ )|(
+   ! iR <= NR
+    in(c0,());
+    new nR: nonce;
+    out(c1, nR);
+    in(c4, (nT:nonce,m2:message));
+    find u = i <= NT, v = j <= NK suchthat
+      defined(kTm[j],idTm[j]) && xor(m2,hash(kTm[j],(tag0,(nR,nT)))) = idTm[j]
+    then
+    out(c5,())
+(*      out(c5, xor(idTm[v],hash(kTm[v],(tag1,(nR,nT))))) *)
+    else
+      out(c6, ())
+ ).
+
+let single =
+ ( ! iK <= NK
+   in(startid, ());
+   out(finishid, ());
+   ! iT <= NT
+   in(startsess, ());
+   new kTn:key;
+   new idTn:message;
+   let kTs:key = kTn in
+   let idTs:message = idTn in
+   out(finishsess, ());
+   processT(idTs,kTs)
+ )|(
+   ! iR <= NR
+    in(c0,());
+    new nR: nonce;
+    out(c1, nR);
+    in(c4, (nT:nonce,m2:message));
+    find u = i <= NT, v = j <= NK suchthat
+      defined(kTs[i,j],idTs[i,j]) && xor(m2,hash(kTs[i,j],(tag0,(nR,nT)))) = idTs[i,j]
+    then
+    out(c5,())
+     (* out(c5, xor(idTs[u,v],hash(kTs[u,v],(tag1,(nR,nT))))) *)
+    else
+      out(c6, ())
+ ).
+
+equivalence single multiple
