@@ -416,8 +416,13 @@ lemma eq_single_mult &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : res] =
     Pr[Unlink(A, Single, EUF_RF).main() @ &m : res].
 proof.
-  byequiv => //.
+  byequiv => //. proc; inline *; sp. 
+  seq 1 1 : (#pre /\ ={Multiple0.s_cpt} /\ 
+             forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0).
+  while true (n_tag - i).
+  while (* (forall j, (0 <= j < i) => Multiple0.s_cpt.[j]{2} = Some 0) *) true (n_tag - i).
   proc; call (_: ={glob EUF_RF, glob Multiple0}). 
   (* tag *)
   + proc; inline *; sp; if => //; sp; if => //.
-    seq 1 1 : (#pre /\ ={n}); 1 : by auto; smt (). 
+    seq 5 4 : (#pre /\ ={n} /\ ={x}); 1 : by auto; smt (). 
+    if {2} => />. admit.
