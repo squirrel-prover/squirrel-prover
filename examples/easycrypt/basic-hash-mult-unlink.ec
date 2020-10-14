@@ -201,12 +201,17 @@ module Single0 (H : PRFs_Oracles) = {
   }    
   
   proc reader (n h : ptxt) : bool = {    
-    var r, b, i;
+    var r, b, i, j;
     b <- false;
     i <- 0;
-    while (i < n_tag * n_session) {
-      r <- H.check(i, n, h);
-      b <- b || r;
+    j <- 0;
+    while (i < n_tag) {
+      j <- 0;
+      while (j < n_session) {
+        r <- H.check(i * n_session + j, n, h);
+        b <- b || r;
+        j <- j + 1;
+      }
       i <- i + 1;
     }
     return b;
@@ -337,12 +342,13 @@ by byequiv; auto; proc; inline *; wp; sim; auto.
 lemma eq_single_RF &m (A <: Adv {Multiple0, EUF_RF}) : 
     Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] =
     Pr[EUF_PRF_INDb(EUF_RF, D(A, Single0)).main() @ &m : res]
-by byequiv; auto; proc; inline *; wp; sim; auto. 
+by admit.
+(* by byequiv; auto; proc; inline *; wp; sim; auto.  *)
 
 lemma eq_single_PRF &m (A <: Adv {Multiple0, PRFs}) : 
     Pr[Unlink(A, Single, PRFs).main() @ &m : res] =
     Pr[EUF_PRF_INDb(PRFs, D(A, Single0)).main() @ &m : res]
-by byequiv; auto; proc; inline *; wp; sim; auto. 
+by admit. (* by byequiv; auto; proc; inline *; wp; sim; auto.  *)
 
 
 (*-----------------------------------------------------------------------*)
@@ -462,21 +468,24 @@ proof.
   + by move => &2 Hb; islossless.
   + move => &2. proc; inline *; auto; sp; if; sp; auto. 
     by if; auto; smt (drf_ll dnonce_ll). 
-  + proc; inline *. while (#pre /\ ={b,i}); auto => />. 
-    move => &1 &2 Hbad Hind Hle />. 
-    pose j := if EUF_RF.n{2} <= i{2} then 0 else i{2}.
-    rewrite -(Hind (j,n{2})). 
-    case ((j, n{2}) \in EUF_RF.m{1}); 
-    case ((j, n{2}) \in RF_bad.m{2}) 
+  + proc; inline *; while (#pre /\ ={b,j,i}); auto => />. 
+    while (#pre); auto => />. 
+    move => &1 &2 Hbad Hind Hle Hlt />. 
+    pose k := if EUF_RF.n{2} <= i{2} * n_session + j{2} then 0 else i{2} * n_session + j{2}.
+    rewrite -(Hind (k,n{2})). 
+    case ((k, n{2}) \in EUF_RF.m{1}); 
+    case ((k, n{2}) \in RF_bad.m{2}) 
     => Hin1 Hin2 //=; 1 : by rewrite get_some => //=; smt ().
     by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
     by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
   + move => &2 Hb; islossless. 
-    while true (n_tag * n_session - i); auto; 2 : by smt ().
+    while true (n_tag - i); auto; 2 : by smt ().
+    while true (n_session - j); auto; 2 : by smt ().
     conseq (:true); 1 : by smt (). 
     by islossless. 
   + move => _; proc; conseq />.
-    while true (n_tag * n_session - i); auto; 2 : by smt ().
+    while true (n_tag - i); auto; 2 : by smt ().
+    while true (n_session - j); auto; 2 : by smt ().
     conseq (:true); 1 : by smt (). 
     by islossless. 
   + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
@@ -538,12 +547,22 @@ proof.
     (* move => &1 &2 *; split; 1 : by smt(drf_sup). *)
     (* by smt (get_setE). *)
 
-  (* reader *)
-  - proc; inline *; auto => />. 
-    while {1} (b{1} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}).
+  (* reader *) 
+  - proc; inline *; auto => />; sp.
+    (* while {1} (b{1} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}). *)
     while (#pre /\ ={i,b}); 2: by conseq />; auto; smt (n_session_p n_tag_p). 
+    conseq />; wp.
+    while {2} (b{2} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}).
+
+
+
     auto => /> => &1 &2 Hcpt Hm Hle1 Hle2. split. smt
 
   (* invariant implies the post *)
   - auto => &1 &2 *. move :H => />. move => H j; smt ().
 qed.
+
+
+
+    ((i0_L, n{1}) \in RF_bad.m{1}) &&
+    (h{1} \in oget RF_bad.m{1}.[i0_L, n{1}])
