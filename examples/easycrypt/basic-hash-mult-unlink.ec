@@ -411,7 +411,8 @@ proof.
     ={glob Single0, EUF_RF.n} /\
     (* (forall x i, (x,i) \in EUF_RF.m{1} <=> (x,i) \in RF_bad.m{2}) /\ *)
     (forall (x), omap (fun x => [x]) (EUF_RF.m.[(x)]{1}) = RF_bad.m.[(x)]{2})).
-  + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto. 
+  + proc; inline *; sp; if; 1,3 : by auto.
+    sp; if; 1, 3 : by auto. 
     seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#.
     wp; if {1}; 1 : by auto => />; smt(get_setE). 
     by auto; smt (map_support).
@@ -445,29 +446,38 @@ lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Single, RF_bad).main() @ &m : res] +
     Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad].
 proof.
-  (* move => Hll; byequiv => //. *)
-  (* proc. *)
-  (* call(_: RF_bad.bad, ={glob Single0, glob EUF_RF}). *)
-  (* + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto.  *)
-  (*   seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#. *)
-  (*   wp. if {1}. auto => />.  *)
-  (*   (* search (_.[_ <- _].[_]). *) *)
-  (*   smt (get_setE). auto; smt (drf_lluni). *)
-  (* + by move => &2 Hb; islossless. *)
-  (* + move => &2. proc; inline *; auto; sp; if; sp; auto.  *)
-  (*   by if; auto; smt (drf_ll dnonce_ll).  *)
-  (* + by proc; conseq />; sim. *)
-  (* + move => &2 Hb; islossless.  *)
-  (*   while true (n_tag * n_session- i); auto; 2 : by smt (). *)
-  (*   conseq (:true); 1 : by smt ().  *)
-  (*   by islossless.  *)
-  (* + move => _; proc; conseq />. *)
-  (*   while true (n_tag * n_session - i); auto; 2 : by smt (). *)
-  (*   conseq (:true); 1 : by smt ().  *)
-  (*   by islossless.  *)
-  (* + inline *; swap {2} 5 3; wp => /=.  *)
-  (*   conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim. *)
-  admit.
+  move => Hll; byequiv => //.
+  proc.
+  call(_: RF_bad.bad, 
+    ={glob Single0, EUF_RF.n} /\
+    (* (forall x i, (x,i) \in EUF_RF.m{1} <=> (x,i) \in RF_bad.m{2}) /\ *)
+    (forall (x), omap (fun x => [x]) (EUF_RF.m.[(x)]{1}) = RF_bad.m.[(x)]{2})).
+  + proc; inline *; sp; if; 1,3 : by auto. 
+    sp; if; 1, 3 : by auto. 
+    seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /> /#.
+    wp; if {1}; 1 : by auto => />; smt(get_setE). 
+    by auto; smt (map_support).
+  + by move => &2 Hb; islossless.
+  + move => &2. proc; inline *; auto; sp; if; sp; auto. 
+    by if; auto; smt (drf_ll dnonce_ll). 
+  + proc; inline *. while (#pre /\ ={b,i}); auto => />. 
+    move => &1 &2 Hbad Hind Hle />. 
+    pose j := if EUF_RF.n{2} <= i{2} then 0 else i{2}.
+    rewrite -(Hind (j,n{2})). 
+    case ((j, n{2}) \in EUF_RF.m{1}); 
+    case ((j, n{2}) \in RF_bad.m{2}) 
+    => Hin1 Hin2 //=; 1 : by rewrite get_some => //=; smt ().
+    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
+    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
+  + move => &2 Hb; islossless. 
+    while true (n_tag * n_session - i); auto; 2 : by smt ().
+    conseq (:true); 1 : by smt (). 
+    by islossless. 
+  + move => _; proc; conseq />.
+    while true (n_tag * n_session - i); auto; 2 : by smt ().
+    conseq (:true); 1 : by smt (). 
+    by islossless. 
+  + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
 qed.
 
 (*-----------------------------------------------------------------------*)
@@ -498,7 +508,7 @@ lemma eq_single_mult &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Single, RF_bad).main() @ &m : res].
 proof.
   byequiv => //; proc; inline *; sp 5 5. 
-  seq 3 3 : (#pre /\ ={Multiple0.s_cpt, i} /\ 
+  seq 4 4 : (#pre /\ ={Multiple0.s_cpt, i} /\ 
              forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0).
   + sp; while (={Multiple0.s_cpt} /\ ={i} /\
          forall j, (0 <= j < i{2}) => Multiple0.s_cpt.[j]{2} = Some 0);
@@ -523,3 +533,4 @@ proof.
 
   (* invariant implies the post *)
   - auto => &1 &2 *. move :H => />. move => H j; smt ().
+qed.
