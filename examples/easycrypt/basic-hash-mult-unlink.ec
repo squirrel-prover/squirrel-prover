@@ -345,17 +345,22 @@ by byequiv; auto; proc; inline *; wp; sim; auto.
 
 (*-----------------------------------------------------------------------*)
 (* Second game-hope, where we bound the collision probability for all
-   the nonces sample by each tag (multiple sessions setting).  *)
+   the nonces sample by each tag.  *)
 
 (* The EUF_RF module, where we set a boolean bad to true if we hash twice the 
    same value. Since we only hash nonces, this is equivalent to setting bad to
-   true if a tag has a collision between two nonces it samples. *)
+   true if a tag has a collision between two nonces it samples.
+   In case of collision, a message may have several hashes, which we store. *)
+search (oget _ = _).
+
 module RF_bad = {
   var bad : bool
+  var m : (int * ptxt, ptxt list) fmap
 
   proc init(i : int) : unit = {
     EUF_RF.init(i);
     bad <- false;
+    m <- empty;
   }
   
   proc f(i : int, x : ptxt) : ptxt = {
@@ -363,16 +368,35 @@ module RF_bad = {
     i <- if (EUF_RF.n <= i) then 0 else i;
 
     (* If we already hashed [x] under key [i], we set bad to true. *)
-    bad <- bad || (i,x) \in EUF_RF.m;
+    bad <- bad || (i,x) \in m;
 
     r <$ drf i;
-    EUF_RF.m.[(i,x)] <- r;
+    m.[(i,x)] <- r :: odflt [] m.[(i,x)];
     
     return r;
   }
 
-  proc check = EUF_RF.check
+  proc check(i : int, x : ptxt, s : ptxt) = {
+    i <- if (EUF_RF.n <= i) then 0 else i;
+    return ((i,x) \in m && s \in oget m.[(i,x)]);
+  }
 }.
+
+(* lemma map_support ['a, 'b] (m : ('a,'b) fmap) (m' : ('a,'b list) fmap) : *)
+(*     (forall x, m.[x] = omap (head witness) m'.[x]) => *)
+(*     forall x, x \in m <=> x \in m'. *)
+(* proof. *)
+(*   move => H x; case (m.[x] = None) => Hx.  *)
+(*   + by have H' := (H x); rewrite Hx eq_sym none_omap in H'; smt (). *)
+(*   + have H' := (H x).  *)
+(*   case (exists y, m'.[x] = Some y) => Hy; 2 : by smt. *)
+(*   by move :Hy => [y Hy]; smt.  *)
+(* qed. *)
+
+lemma map_support ['a, 'b] (m : ('a,'b) fmap) (m' : ('a,'b list) fmap) :
+    (forall x, omap (transpose (::) []) m.[x] = m'.[x]) =>
+    forall x, x \in m <=> x \in m'
+by move => H x; rewrite 2! domE; smt (). 
 
 lemma coll_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
@@ -383,16 +407,26 @@ lemma coll_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
 proof.
   move => Hll; byequiv => //.
   proc.
-  call(_: RF_bad.bad, ={glob Single0, glob EUF_RF}).
+  call(_: RF_bad.bad, 
+    ={glob Single0, EUF_RF.n} /\
+    (* (forall x i, (x,i) \in EUF_RF.m{1} <=> (x,i) \in RF_bad.m{2}) /\ *)
+    (forall (x), omap (fun x => [x]) (EUF_RF.m.[(x)]{1}) = RF_bad.m.[(x)]{2})).
   + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto. 
     seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#.
-    wp. if {1}. auto => />. 
-    (* search (_.[_ <- _].[_]). *)
-    smt (get_setE). auto; smt (drf_lluni).
+    wp; if {1}; 1 : by auto => />; smt(get_setE). 
+    by auto; smt (map_support).
   + by move => &2 Hb; islossless.
   + move => &2. proc; inline *; auto; sp; if; sp; auto. 
     by if; auto; smt (drf_ll dnonce_ll). 
-  + by proc; conseq />; sim.
+  + proc; inline *. while (#pre /\ ={b,i}); auto => />. 
+    move => &1 &2 Hbad Hind Hle />. 
+    pose j := if EUF_RF.n{2} <= i{2} then 0 else i{2}.
+    rewrite -(Hind (j,n{2})). 
+    case ((j, n{2}) \in EUF_RF.m{1}); 
+    case ((j, n{2}) \in RF_bad.m{2}) 
+    => Hin1 Hin2 //=; 1 : by rewrite get_some => //=; smt ().
+    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
+    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
   + move => &2 Hb; islossless. 
     while true (n_tag - i); auto; 2 : by smt ().
     conseq (:true); 1 : by smt (). 
@@ -401,8 +435,7 @@ proof.
     while true (n_tag - i); auto; 2 : by smt ().
     conseq (:true); 1 : by smt (). 
     by islossless. 
-  + inline *; swap {2} 5 3; wp => /=. 
-    conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim.
+  + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
 qed.
 
 lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
@@ -412,28 +445,29 @@ lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Single, RF_bad).main() @ &m : res] +
     Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad].
 proof.
-  move => Hll; byequiv => //.
-  proc.
-  call(_: RF_bad.bad, ={glob Single0, glob EUF_RF}).
-  + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto. 
-    seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#.
-    wp. if {1}. auto => />. 
-    (* search (_.[_ <- _].[_]). *)
-    smt (get_setE). auto; smt (drf_lluni).
-  + by move => &2 Hb; islossless.
-  + move => &2. proc; inline *; auto; sp; if; sp; auto. 
-    by if; auto; smt (drf_ll dnonce_ll). 
-  + by proc; conseq />; sim.
-  + move => &2 Hb; islossless. 
-    while true (n_tag * n_session- i); auto; 2 : by smt ().
-    conseq (:true); 1 : by smt (). 
-    by islossless. 
-  + move => _; proc; conseq />.
-    while true (n_tag * n_session - i); auto; 2 : by smt ().
-    conseq (:true); 1 : by smt (). 
-    by islossless. 
-  + inline *; swap {2} 5 3; wp => /=. 
-    conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim.
+  (* move => Hll; byequiv => //. *)
+  (* proc. *)
+  (* call(_: RF_bad.bad, ={glob Single0, glob EUF_RF}). *)
+  (* + proc; inline *; sp. if; 1,3 : by auto. sp. if; 1, 3 : by auto.  *)
+  (*   seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#. *)
+  (*   wp. if {1}. auto => />.  *)
+  (*   (* search (_.[_ <- _].[_]). *) *)
+  (*   smt (get_setE). auto; smt (drf_lluni). *)
+  (* + by move => &2 Hb; islossless. *)
+  (* + move => &2. proc; inline *; auto; sp; if; sp; auto.  *)
+  (*   by if; auto; smt (drf_ll dnonce_ll).  *)
+  (* + by proc; conseq />; sim. *)
+  (* + move => &2 Hb; islossless.  *)
+  (*   while true (n_tag * n_session- i); auto; 2 : by smt (). *)
+  (*   conseq (:true); 1 : by smt ().  *)
+  (*   by islossless.  *)
+  (* + move => _; proc; conseq />. *)
+  (*   while true (n_tag * n_session - i); auto; 2 : by smt (). *)
+  (*   conseq (:true); 1 : by smt ().  *)
+  (*   by islossless.  *)
+  (* + inline *; swap {2} 5 3; wp => /=.  *)
+  (*   conseq (: ={EUF_RF.m, EUF_RF.n, Multiple0.s_cpt}); 1 : by smt (). by sim. *)
+  admit.
 qed.
 
 (*-----------------------------------------------------------------------*)
@@ -473,7 +507,6 @@ proof.
   + call (_: ={glob Multiple0} /\
       EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
       forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None). 
-
   (* tag *) 
   - move => />; 1 : by move => />; auto.
     proc; inline *; sp; if => //; 2 : by auto; smt(). 
