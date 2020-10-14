@@ -145,11 +145,12 @@ module Multiple0 (H : PRFs_Oracles) = {
   }    
   
   proc reader (n h : ptxt) : bool = {    
-    var b, i;
+    var r, b, i;
     b <- false;
     i <- 0;
     while (i < n_tag) {
-      b <- H.check(i, n, h);
+      r <- H.check(i, n, h);
+      b <- b || r;
       i <- i + 1;
     }
     return b;
@@ -200,11 +201,12 @@ module Single0 (H : PRFs_Oracles) = {
   }    
   
   proc reader (n h : ptxt) : bool = {    
-    var b, i;
+    var r, b, i;
     b <- false;
     i <- 0;
     while (i < n_tag * n_session) {
-      b <- H.check(i, n, h);
+      r <- H.check(i, n, h);
+      b <- b || r;
       i <- i + 1;
     }
     return b;
@@ -509,27 +511,38 @@ lemma eq_single_mult &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
 proof.
   byequiv => //; proc; inline *; sp 5 5. 
   seq 4 4 : (#pre /\ ={Multiple0.s_cpt, i} /\ 
-             forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0).
-  + sp; while (={Multiple0.s_cpt} /\ ={i} /\
-         forall j, (0 <= j < i{2}) => Multiple0.s_cpt.[j]{2} = Some 0);
-    by auto; smt (get_setE).     
+             (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0) /\
+              forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
+               exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}).
+  + sp; while (={Multiple0.s_cpt, i} /\
+         (forall j, (0 <= j < i{2}) => Multiple0.s_cpt.[j]{2} = Some 0) /\
+          forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
+           exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2});
+    1 : by auto; smt (get_setE).     
+    auto => />; split; 2 : by smt (empty_valE). 
+    by split; smt (empty_valE). 
 
   + call (_: ={glob Multiple0} /\
       EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
-      forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None). 
+      (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None) /\
+      forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
+        exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}). 
   (* tag *) 
   - move => />; 1 : by move => />; auto.
-    proc; inline *; sp; if => //; 2 : by auto; smt(). 
-    sp; if => //; 2 : by auto; smt().
-    seq 1 1 : (#pre /\ ={n}); 1 : by auto => />.
-    wp; sp 3 3; seq 1 1 : (#pre); 1: by auto. 
-    move => />; rnd (fun x => x); auto. 
-    move => &1 &2 *; split; 1 : by smt(drf_sup).
-    by smt (get_setE).
+    admit.
+    (* proc; inline *; sp; if => //; 2 : by auto; smt().  *)
+    (* sp; if => //; 2 : by auto; smt(). *)
+    (* seq 1 1 : (#pre /\ ={n}); 1 : by auto => />. *)
+    (* wp; sp 3 3; seq 1 1 : (#pre); 1: by auto.  *)
+    (* move => />; rnd (fun x => x); auto.  *)
+    (* move => &1 &2 *; split; 1 : by smt(drf_sup). *)
+    (* by smt (get_setE). *)
 
   (* reader *)
-  - proc; inline *; auto => />.
-    admit.
+  - proc; inline *; auto => />. 
+    while {1} (b{1} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}).
+    while (#pre /\ ={i,b}); 2: by conseq />; auto; smt (n_session_p n_tag_p). 
+    auto => /> => &1 &2 Hcpt Hm Hle1 Hle2. split. smt
 
   (* invariant implies the post *)
   - auto => &1 &2 *. move :H => />. move => H j; smt ().
