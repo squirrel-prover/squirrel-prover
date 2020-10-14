@@ -201,17 +201,20 @@ module Single0 (H : PRFs_Oracles) = {
   }    
   
   proc reader (n h : ptxt) : bool = {    
-    var r, b, i, j;
+    var r, b0, b, i, j;
     b <- false;
     i <- 0;
     j <- 0;
+    b0 <- false;
     while (i < n_tag) {
       j <- 0;
+      b0 <- false;
       while (j < n_session) {
         r <- H.check(i * n_session + j, n, h);
-        b <- b || r;
+        b0 <- b0 || r;
         j <- j + 1;
       }
+      b <- b || b0;
       i <- i + 1;
     }
     return b;
@@ -468,7 +471,7 @@ proof.
   + by move => &2 Hb; islossless.
   + move => &2. proc; inline *; auto; sp; if; sp; auto. 
     by if; auto; smt (drf_ll dnonce_ll). 
-  + proc; inline *; while (#pre /\ ={b,j,i}); auto => />. 
+  + proc; inline *; while (#pre /\ ={b,b0,j,i}); auto => />. 
     while (#pre); auto => />. 
     move => &1 &2 Hbad Hind Hle Hlt />. 
     pose k := if EUF_RF.n{2} <= i{2} * n_session + j{2} then 0 else i{2} * n_session + j{2}.
@@ -548,21 +551,38 @@ proof.
     (* by smt (get_setE). *)
 
   (* reader *) 
-  - proc; inline *; auto => />; sp.
-    (* while {1} (b{1} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}). *)
-    while (#pre /\ ={i,b}); 2: by conseq />; auto; smt (n_session_p n_tag_p). 
-    conseq />; wp.
-    while {2} (b{2} <=> exists j, 0 <= j < i{1} /\ (j,x{1}) \in RF_bad.m{1} /\ s{1} \in oget RF_bad.m.[(j,x)]{1}) (n_tag - i{1}).
-
-
-
-    auto => /> => &1 &2 Hcpt Hm Hle1 Hle2. split. smt
+  - proc; inline *; auto => />. 
+    while (#pre /\ 0 <= i{1} /\ ={i,b}); 2: by conseq />; auto; smt (n_session_p n_tag_p). 
+    conseq />; wp. 
+    while {2} 
+        (0 <= j{2} <= n_session /\
+         (b0{2} <=> exists k, 0 <= k < j{2} /\
+           let i2 = i{2} * n_session + k in
+           (h{2} \in odflt [] RF_bad.m{2}.[(if EUF_RF.n{2} <= i2 then 0 else i2, n{2})])))
+      (n_session - j{2}).
+    + auto => /> *; progress; 1,2,5: smt (). 
+      + case H2; 1 : by move => [k H2]; exists k; smt(). 
+        move => *; exists (j{hr}); split; 1 : by smt (). 
+        by move :H3; rewrite /dom; case :(RF_bad.m{hr}.[_]); smt (). 
+      case (k = j{hr}) => [->> |Hk]. 
+      + by right => *; move :H4; rewrite /dom; case :(RF_bad.m{hr}.[_]); smt ().
+      by left; exists k; smt (). 
+    auto => /> *; split; 1 : by smt (n_session_p).
+    move => *; split; 1 : smt (). 
+    move => *; split; 1 : smt (). 
+    congr.
+    have ->> : (j_R = n_session); 1 : smt ().
+    have H6 := (H0 n{2} i{2} h{2}).
+    have -> /= : !(n_tag <= i{2}) by smt ().
+    have <- /= : 
+      (h{2} \in odflt [] RF_bad.m{1}.[i{2}, n{2}]) = 
+      (((i{2}, n{2}) \in RF_bad.m{1}) && (h{2} \in oget RF_bad.m{1}.[i{2}, n{2}])). 
+    + by rewrite /dom; case (RF_bad.m{1}.[i{2}, n{2}]); smt ().
+    rewrite H6. 
+    rewrite Tactics.eq_iff; progress.
+    + exists j0; smt ().
+    exists k; smt ().
 
   (* invariant implies the post *)
-  - auto => &1 &2 *. move :H => />. move => H j; smt ().
+  - auto => &1 &2 *; move :H => />; move => H j; smt ().
 qed.
-
-
-
-    ((i0_L, n{1}) \in RF_bad.m{1}) &&
-    (h{1} \in oget RF_bad.m{1}.[i0_L, n{1}])
