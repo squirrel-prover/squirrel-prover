@@ -1,5 +1,5 @@
 (* Simple modeling of the Basic Hash protocol, multiple tags. *)
-require import AllCore List FSet SmtMap.
+require import AllCore List FSet SmtMap IntDiv.
 require import Distr DBool.
 require FelTactic.
 
@@ -345,13 +345,12 @@ by byequiv; auto; proc; inline *; wp; sim; auto.
 lemma eq_single_RF &m (A <: Adv {Multiple0, EUF_RF}) : 
     Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] =
     Pr[EUF_PRF_INDb(EUF_RF, D(A, Single0)).main() @ &m : res]
-by admit.
-(* by byequiv; auto; proc; inline *; wp; sim; auto.  *)
+by byequiv; auto; proc; inline *; wp; sim.
 
 lemma eq_single_PRF &m (A <: Adv {Multiple0, PRFs}) : 
     Pr[Unlink(A, Single, PRFs).main() @ &m : res] =
     Pr[EUF_PRF_INDb(PRFs, D(A, Single0)).main() @ &m : res]
-by admit. (* by byequiv; auto; proc; inline *; wp; sim; auto.  *)
+by byequiv; auto; proc; inline *; wp; sim.
 
 
 (*-----------------------------------------------------------------------*)
@@ -564,13 +563,13 @@ proof.
         move => /> *; split; 1: smt (get_setE).
         move => /> *; split => *. 
           (* 6 *)
-        + move :H6; case ((iR, n{2}) = (i00, x0)) => [Heq | Hdeq] => H6.
-          + rewrite Heq get_set_eqE /= in H6; 1 : smt (). 
+        + move :H6; case (iR = i00 /\ n{2} = x0) => [[Heq1 Heq2] | Hdeq] => H6.
+          + rewrite Heq1 Heq2 get_set_eqE /= in H6; 1 : smt (). 
             have H7 := (H1 x0 i00 r1); case H6 => [->> | Hrin]. 
             + exists (oget Multiple0.s_cpt{2}.[iR]). 
               split; 1: smt(n_session_p n_tag_p).
               rewrite get_set_eqE //. 
-              by admit.           (* how ? Benjamin ? *)
+              by smt (). 
             case H7 => [H7 _]; have [j H8] := (H7 Hrin); exists j.
             by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
           rewrite get_set_neqE // in H6; 1 : smt ().
@@ -596,9 +595,17 @@ proof.
           by move => H8; right; apply H1; exists j; smt (get_setE).
         move => Hdeq Hdeq2.
         rewrite !get_set_neqE /=; 2 : smt (). 
-        (* the SMT is failing. *)
-        + rewrite negb_and in Hdeq; rewrite !negb_and. (* case Hdeq; smt (). *)
-          admit.
+        (* the SMT is failing on some basic modulo reasoning. 
+           Maybe this is normal. *)
+        + rewrite negb_and in Hdeq; rewrite !negb_and. 
+          case Hdeq; 2 : smt ().
+          move => Hideq; left. 
+          have G: (forall (x : int) y (f : int -> int), f x <> f y => x <> y)
+          by smt ().
+          apply (G _ _ (fun x => x %% n_session)) => /=. rewrite ! modzMDl. 
+          rewrite (modz_small); 1 : smt (n_session_p).
+          rewrite (modz_small); 1 : smt (n_session_p). 
+          by smt ().
         by move => H8; apply H1; exists j; smt (get_setE).        
     auto; move => /> *; split; 1 : smt (). 
     move => *; split; 1 : smt (). 
