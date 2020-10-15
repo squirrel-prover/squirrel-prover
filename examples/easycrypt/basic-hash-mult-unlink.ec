@@ -536,19 +536,50 @@ proof.
 
   + call (_: ={glob Multiple0} /\
       EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
-      (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None) /\
+      (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None
+                                     /\ 0 <= oget Multiple0.s_cpt.[j]{1}) /\
       forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
         exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}). 
   (* tag *) 
   - move => />; 1 : by move => />; auto.
-    admit.
-    (* proc; inline *; sp; if => //; 2 : by auto; smt().  *)
-    (* sp; if => //; 2 : by auto; smt(). *)
-    (* seq 1 1 : (#pre /\ ={n}); 1 : by auto => />. *)
-    (* wp; sp 3 3; seq 1 1 : (#pre); 1: by auto.  *)
-    (* move => />; rnd (fun x => x); auto.  *)
-    (* move => &1 &2 *; split; 1 : by smt(drf_sup). *)
-    (* by smt (get_setE). *)
+    proc; inline *; sp; if => //.
+    (* 4 *)
+    + sp; if => //. 
+      (* 5 *)
+      + seq 1 1 : (#pre /\ ={n}); 1 : by auto => />.
+        wp; sp 3 3; seq 1 1 : (#pre); 1: by auto.
+        move => />; rnd (fun x => x); auto.
+        move => /> &1 &2 i_R; pose iR := (if n_tag <= i_R then 0 else i_R).
+        have -> /= : !(n_tag <= iR) by smt (n_tag_p).
+        move => *.
+        have -> /= : 
+          !(n_tag * n_session <= 
+            iR * n_session + oget Multiple0.s_cpt{2}.[iR]) 
+        by smt (n_tag_p n_session_p).
+        split; 1 : by smt(drf_sup).
+        move => /> *; split; 1: smt (get_setE).
+        move => /> *; split => *. 
+        + move :H5; case ((iR, n{2}) = (i00, x0)) => [Heq | Hdeq] => H5.
+          rewrite Heq get_set_eqE /= in H5; 1 : smt (). 
+          have H6 := (H0 x0 i00 r1); case H5 => [->> | Hrin]. 
+          + exists (oget Multiple0.s_cpt{2}.[iR]).
+            admit.
+            (* split.  *)
+            (* smt(n_session_p n_tag_p). *)
+            (* rewrite get_set_eqE /=. smt (). *)
+        (*   case H5. *)
+        (*   move => //. *)
+        (*   have H6 := (H0 _ _ r1). *)
+        (* rewrite /dom; case :(RF_bad.m{1}.[_]); smt (). *)
+          admit.
+        admit.
+      admit.
+    auto; move => /> *; split; 1 : smt (). 
+    move => *; split; 1 : smt (). 
+    by move => *; rewrite H0; exists j; smt ().
+  auto; move => /> *; split; 1 : smt (). 
+  move => *; split; 1 : smt (). 
+  by move => *; rewrite H0; exists j; smt ().
 
   (* reader *) 
   - proc; inline *; auto => />. 
