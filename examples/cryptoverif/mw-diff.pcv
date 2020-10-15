@@ -1,15 +1,17 @@
 (* MW - simplified version without the last check of the tag *)
-(* unlinkability property *)
+(* unlinkability property
+   by Solene Moreau, Stephanie Delaune, David Baelde
+   proof indications edited by B. Blanchet *)
 
 proof {
       auto;
+      show_game;
       start_from_other_end;
       auto;
-      insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_3[i,j], idTn_1[j], nR_4[i,j], nT_4[i,j]) && (nT_5 = nT_4[i,j]) && (nR_5 = nR_4[i,j]) && (xor(m2_1, idTn_1[j]) = r_3[i,j]) then";
+      show_game;
+      insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_7[i,j], nR_4[i,j], nT_4[i,j]) && (nT_5 = nT_4[i,j]) && (nR_5 = nR_4[i,j]) && (m2_1 = r_7[i,j]) then";
       simplify;
       remove_assign useless;
-      move random;
-      crypto remove_xor(xor) *;
       success
       }
 
@@ -86,3 +88,8 @@ let single =
  ).
 
 equivalence single multiple
+
+(* EXPECTED
+All queries proved.
+0.096s (user 0.080s + system 0.016s), max rss 16844K
+END *)
