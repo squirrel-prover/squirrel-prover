@@ -523,29 +523,32 @@ lemma eq_single_mult &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
 proof.
   byequiv => //; proc; inline *; sp 5 5. 
   seq 4 4 : (#pre /\ ={Multiple0.s_cpt, i} /\ 
+             (forall j, (0 <= j < n_tag) <=> Multiple0.s_cpt.[j]{2} <> None) /\
              (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{2} = Some 0) /\
               forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
-               exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}).
-  + sp; while (={Multiple0.s_cpt, i} /\
+               exists j, 0 <= j < n_session /\ 
+                              r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}).
+  + sp; while (={Multiple0.s_cpt, i} /\ 0 <= i{2} <= n_tag /\
+         (forall j, (0 <= j < i{2}) <=> Multiple0.s_cpt.[j]{2} <> None) /\
          (forall j, (0 <= j < i{2}) => Multiple0.s_cpt.[j]{2} = Some 0) /\
           forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
-           exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2});
-    1 : by auto; smt (get_setE).     
-    auto => />; split; 2 : by smt (empty_valE). 
-    by split; smt (empty_valE). 
-
-  + call (_: ={glob Multiple0} /\
-      EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
-      (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j]{1} <> None
-                                     /\ 0 <= oget Multiple0.s_cpt.[j]{1}) /\
-      forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
-        exists j, 0 <= j < n_session /\ r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}). 
+           exists j, 0 <= j < n_session /\ 
+                          r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}); 
+    1 : by auto; smt (get_setE).
+    by auto => />; smt (empty_valE n_tag_p). 
+  call (_: ={glob Multiple0} /\
+    EUF_RF.n{1} = n_tag /\ EUF_RF.n{2} = n_tag * n_session /\ 
+    (forall j, (0 <= j < n_tag) <=> Multiple0.s_cpt.[j]{2} <> None) /\
+    (forall j, (0 <= j < n_tag) => 0 <= oget Multiple0.s_cpt.[j]{1}) /\
+    forall x i r, r \in odflt [] RF_bad.m.[(i,x)]{1} <=> 
+      exists j, 0 <= j < n_session /\ 
+                     r \in odflt [] RF_bad.m.[(i * n_session + j, x)]{2}). 
   (* tag *) 
   - move => />; 1 : by move => />; auto.
     proc; inline *; sp; if => //.
-    (* 4 *)
+      (* 4 *)
     + sp; if => //. 
-      (* 5 *)
+        (* 5 *)
       + seq 1 1 : (#pre /\ ={n}); 1 : by auto => />.
         wp; sp 3 3; seq 1 1 : (#pre); 1: by auto.
         move => />; rnd (fun x => x); auto.
@@ -558,28 +561,53 @@ proof.
         by smt (n_tag_p n_session_p).
         split; 1 : by smt(drf_sup).
         move => /> *; split; 1: smt (get_setE).
+        move => /> *; split; 1: smt (get_setE).
         move => /> *; split => *. 
-        + move :H5; case ((iR, n{2}) = (i00, x0)) => [Heq | Hdeq] => H5.
-          rewrite Heq get_set_eqE /= in H5; 1 : smt (). 
-          have H6 := (H0 x0 i00 r1); case H5 => [->> | Hrin]. 
-          + exists (oget Multiple0.s_cpt{2}.[iR]).
-            admit.
-            (* split.  *)
-            (* smt(n_session_p n_tag_p). *)
-            (* rewrite get_set_eqE /=. smt (). *)
-        (*   case H5. *)
-        (*   move => //. *)
-        (*   have H6 := (H0 _ _ r1). *)
-        (* rewrite /dom; case :(RF_bad.m{1}.[_]); smt (). *)
+          (* 6 *)
+        + move :H6; case ((iR, n{2}) = (i00, x0)) => [Heq | Hdeq] => H6.
+          + rewrite Heq get_set_eqE /= in H6; 1 : smt (). 
+            have H7 := (H1 x0 i00 r1); case H6 => [->> | Hrin]. 
+            + exists (oget Multiple0.s_cpt{2}.[iR]). 
+              split; 1: smt(n_session_p n_tag_p).
+              rewrite get_set_eqE //. 
+              by admit.           (* how ? Benjamin ? *)
+            case H7 => [H7 _]; have [j H8] := (H7 Hrin); exists j.
+            by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
+          rewrite get_set_neqE // in H6; 1 : smt ().
+          have H7 := (H1 x0 i00 r1).
+          case H7 => [H7 _]; have [j H8] := (H7 H6); exists j.
+          by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
+        move :H8; 
+        case :(oget Multiple0.s_cpt{2}.[iR] = j); 
+        case (iR = i00 /\ n{2} = x0). 
+        + move => [Heq1 Heq2 Heq3]; 
+          rewrite Heq1 Heq2 -Heq3 get_set_eqE /=; 1 : smt (). 
+          rewrite get_set_eqE /=; 1 : smt(). 
+          move => [H8 | H8]; 1 : smt(). 
+          by right; apply H1; exists j; smt (get_setE).
+        + move => Hdeq Heq.
+          rewrite -Heq; rewrite !get_set_neqE /=; 1,2 : smt (). 
+          by move => H8; apply H1; exists j; smt (get_setE).
+        + move => [Heq1 Heq2 Hdeq]; 
+          rewrite Heq1 Heq2 !get_setE /=. 
+          have ->/= : !(i00 * n_session + j = 
+                        i00 * n_session + oget Multiple0.s_cpt{2}.[i00]) 
+          by smt ().
+          by move => H8; right; apply H1; exists j; smt (get_setE).
+        move => Hdeq Hdeq2.
+        rewrite !get_set_neqE /=; 2 : smt (). 
+        (* the SMT is failing. *)
+        + rewrite negb_and in Hdeq; rewrite !negb_and. (* case Hdeq; smt (). *)
           admit.
-        admit.
-      admit.
+        by move => H8; apply H1; exists j; smt (get_setE).        
     auto; move => /> *; split; 1 : smt (). 
     move => *; split; 1 : smt (). 
-    by move => *; rewrite H0; exists j; smt ().
+    move => *; split; 1 : smt (). 
+    by move => *; rewrite H1; exists j; smt ().
   auto; move => /> *; split; 1 : smt (). 
   move => *; split; 1 : smt (). 
-  by move => *; rewrite H0; exists j; smt ().
+  move => *; split; 1 : smt (). 
+  by move => *; rewrite H1; exists j; smt ().
 
   (* reader *) 
   - proc; inline *; auto => />. 
@@ -603,15 +631,15 @@ proof.
     move => *; split; 1 : smt (). 
     congr.
     have ->> : (j_R = n_session); 1 : smt ().
-    have H6 := (H0 n{2} i{2} h{2}).
+    have He := (H1 n{2} i{2} h{2}).
     have -> /= : !(n_tag <= i{2}) by smt ().
     have <- /= : 
       (h{2} \in odflt [] RF_bad.m{1}.[i{2}, n{2}]) = 
       (((i{2}, n{2}) \in RF_bad.m{1}) && (h{2} \in oget RF_bad.m{1}.[i{2}, n{2}])). 
     + by rewrite /dom; case (RF_bad.m{1}.[i{2}, n{2}]); smt ().
-    rewrite H6. 
+    rewrite He. 
     rewrite Tactics.eq_iff; progress.
-    + exists j0; smt ().
+    + by exists j0; smt ().
     exists k; smt ().
 
   (* invariant implies the post *)
