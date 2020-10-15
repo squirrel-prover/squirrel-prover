@@ -503,6 +503,30 @@ lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
 proof.
   move => Hll.
+  fel
+    1   (* initialization phase  *)
+    (0) (* counter *)
+    (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *)
+    n_tag
+    (RF_bad.bad) (* failure event *)
+    [Multiple(RF_bad).tag : (true)] (*  *)
+    (* invariant *)
+    (EUF_RF.n = n_tag /\
+     EUF_RF.m = empty /\ RF_bad.bad = false /\ RF_bad.m = empty /\
+     (forall (j : int), 0 <= j && j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
+     (forall (j : int), 0 <= j && j < n_tag => Multiple0.s_cpt.[j] = Some 0)).     
+  + admit.                      (* rewrite bigi something *)
+  + smt (n_tag_p).
+  + inline *; admit.
+  + admit.
+  + admit.
+  by admit.  
+qed.
+
+(* Old beginning of proof  *)
+(* 
+proof.
+  move => Hll.
   byphoare => //. 
   proc; inline *; sp 6.
   (* Why can't I set 0%r to 1%r ? *)
@@ -515,9 +539,13 @@ proof.
              (forall j, (0 <= j < i) => Multiple0.s_cpt.[j] = Some 0)).
     + by auto; smt (get_setE).
     by auto => />; smt (empty_valE n_tag_p). 
-  admit.
-qed.
-
+  call (_: 
+   (EUF_RF.n = n_tag /\
+    EUF_RF.m = empty /\ RF_bad.bad = false /\ RF_bad.m = empty) /\
+    (forall (j : int), 0 <= j && j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
+    forall (j : int), 0 <= j && j < n_tag => Multiple0.s_cpt.[j] = Some 0
+    ==> RF_bad.bad). bypr => *.
+*)
 
 
 op pr_bad = 0%r.                (* To be determined *)
