@@ -502,7 +502,23 @@ lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
 proof.
-admitted.
+  move => Hll.
+  byphoare => //. 
+  proc; inline *; sp 6.
+  (* Why can't I set 0%r to 1%r ? *)
+  seq 3 : true _ 0%r 0%r _ (#pre /\ 
+             (forall j, (0 <= j < n_tag) <=> Multiple0.s_cpt.[j] <> None) /\
+             (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j] = Some 0));
+  [3 : by hoare; auto | 4 : smt ()].
+  + while (#pre /\ 0 <= i <= n_tag /\
+             (forall j, (0 <= j < i) <=> Multiple0.s_cpt.[j] <> None) /\
+             (forall j, (0 <= j < i) => Multiple0.s_cpt.[j] = Some 0)).
+    + by auto; smt (get_setE).
+    by auto => />; smt (empty_valE n_tag_p). 
+  admit.
+qed.
+
+
 
 op pr_bad = 0%r.                (* To be determined *)
 
@@ -598,7 +614,7 @@ proof.
         (* the SMT is failing on some basic modulo reasoning. 
            Maybe this is normal. *)
         + rewrite negb_and in Hdeq; rewrite !negb_and. 
-          case Hdeq; 2 : smt ().
+          case Hdeq; 2 : smt (). 
           move => Hideq; left. 
           have G: (forall (x : int) y (f : int -> int), f x <> f y => x <> y)
           by smt ().
