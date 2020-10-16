@@ -49,7 +49,7 @@ let processT(idT:message, kT:key) =
   new nT: nonce;
   out(c3, (nT, xor(idT,hash(kT,(tag0,(nR,nT))))));
   in(c7,m3:message);
-  if m3 = hash(kT,(tag1,(nR,nT))) then 
+  if m3 = xor(idT,hash(kT,(tag1,(nR,nT)))) then 
      out(c8,())
   else out(c9,()). 
 
