@@ -393,17 +393,6 @@ module RF_bad = {
   }
 }.
 
-(* lemma map_support ['a, 'b] (m : ('a,'b) fmap) (m' : ('a,'b list) fmap) : *)
-(*     (forall x, m.[x] = omap (head witness) m'.[x]) => *)
-(*     forall x, x \in m <=> x \in m'. *)
-(* proof. *)
-(*   move => H x; case (m.[x] = None) => Hx.  *)
-(*   + by have H' := (H x); rewrite Hx eq_sym none_omap in H'; smt (). *)
-(*   + have H' := (H x).  *)
-(*   case (exists y, m'.[x] = Some y) => Hy; 2 : by smt. *)
-(*   by move :Hy => [y Hy]; smt.  *)
-(* qed. *)
-
 lemma map_support ['a, 'b] (m : ('a,'b) fmap) (m' : ('a,'b list) fmap) :
     (forall x, omap (transpose (::) []) m.[x] = m'.[x]) =>
     forall x, x \in m <=> x \in m'
@@ -596,10 +585,6 @@ qed.
   (*  smt (get_setE).  *)
 
 
-(* TODO: simplify proof below using euclideU*)
-(* by apply negP => -[] /euclideU; smt (get_setE).  *)
-
-
 op pr_bad = 0%r.                (* To be determined *)
 
 lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
@@ -692,17 +677,8 @@ proof.
           by move => H8; right; apply H1; exists j; smt (get_setE).
         move => Hdeq Hdeq2.
         rewrite !get_set_neqE /=; 2 : smt (). 
-        (* the SMT is failing on some basic modulo reasoning. 
-           Maybe this is normal. *)
-        + rewrite negb_and in Hdeq; rewrite !negb_and. 
-          case Hdeq; 2 : smt (). 
-          move => Hideq; left. 
-          have G: (forall (x : int) y (f : int -> int), f x <> f y => x <> y)
-          by smt ().
-          apply (G _ _ (fun x => x %% n_session)) => /=. rewrite ! modzMDl. 
-          rewrite (modz_small); 1 : smt (n_session_p).
-          rewrite (modz_small); 1 : smt (n_session_p). 
-          by smt ().
+        + have := euclideU n_session i00 iR j (oget Multiple0.s_cpt{2}.[iR]).
+          smt().
         by move => H8; apply H1; exists j; smt (get_setE).        
     auto; move => /> *; split; 1 : smt (). 
     move => *; split; 1 : smt (). 
