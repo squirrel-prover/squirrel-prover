@@ -496,11 +496,15 @@ qed.
 (*-----------------------------------------------------------------------*)
 (* We bound the probability of bad. *)
 
+(* Number of plain-texts hashed for tag [i]. *)
+op ptxt_hashed (i : int) (m : (int * ptxt, ptxt list) fmap) : int =
+  List.size (List.filter (fun x => fst x = i) (FSet.elems (SmtMap.fdom m))).
+
 (* For the single session protocol, this should be 0. *)
 lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
-    Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
 proof.
   move => Hll.
   fel
@@ -509,12 +513,18 @@ proof.
     (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *)
     n_tag
     (RF_bad.bad) (* failure event *)
-    [Multiple(RF_bad).tag : (false)] (* pre-condition for the counter increase *)
+    [Single(RF_bad).tag : (false)] (* pre-condition for the counter increase *)
     (* invariant *)
-    (EUF_RF.n = n_tag /\
-     EUF_RF.m = empty /\ RF_bad.bad = false /\ RF_bad.m = empty /\
+    (EUF_RF.n = n_tag * n_session /\
+     RF_bad.bad = false /\
      (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
-     (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j])). 
+     (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j]) /\
+     (forall (j k : int) (x : ptxt), 
+       Multiple0.s_cpt.[j] <> None /\ oget Multiple0.s_cpt.[j] <= k < n_session => 
+         RF_bad.m.[(j * n_session + k,x)] = None) 
+     (* (forall (j k : int), Multiple0.s_cpt.[j] = Some k =>  *)
+     (*                       ptxt_hashed j RF_bad.m = k) *)
+   ). 
   + admit.                      (* rewrite bigi something *)
   + smt (n_tag_p).
   + inline *; sp 6. 
@@ -523,44 +533,34 @@ proof.
      (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0));
     1 : by auto; move => /> *; smt (get_setE). 
     by auto => />; smt (empty_valE n_tag_p). 
-  + by proc; inline *; auto. 
-  + move =>*; proc; inline *; auto. 
-  move =>*; proc; inline *; auto; sp; if; 2 : by auto.
-  sp; if; 2 : by auto.
-  seq 1 :(#pre); 1: by rnd; auto; move => * /#. 
-  sp; seq 1 :(#pre); 1: by rnd; auto; move => * /#. 
-  move => />; auto => *; 1 : smt (). 
-
-  move :H => [bad [H [H1 [H2 [H3 H4]]]]].
-  move :H3 => [H5 [[i H6] H7]].
-  split. split.
-  split. 2 : smt().
-  smt (get_setE).
+  + by auto.
+  + by auto.
+  + move => b _; proc; inline *; auto; sp.
+    if; 2 : by auto; smt ().
+    sp; if; 2 : by auto; smt ().
+    seq 1 :(#pre); 1 : by move => />; auto. 
+    auto.
+    move => /> &hr i1. 
+    pose i2 := (if n_tag <= i1 then 0 else i1).
+    move => *.
+    have -> /= : !(n_tag * n_session <= 
+                   i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]); 
+    1 : smt ().
+   rewrite Tactics.eq_iff /dom => /=. 
+   split.                       (* why is there a issue with '; 1 :' here ? *)
+   + apply H1; smt().
+   split.                       (* why is there a issue with '; 1 :' here ? *)
+   + apply H1; smt().
+   rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE). 
+   have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
+   have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
+   have := (H1 j k) => *.   
+   smt (get_setE). 
 qed.
 
-(* Old beginning of proof  *)
-(* 
-proof.
-  move => Hll.
-  byphoare => //. 
-  proc; inline *; sp 6.
-  (* Why can't I set 0%r to 1%r ? *)
-  seq 3 : true _ 0%r 0%r _ (#pre /\ 
-             (forall j, (0 <= j < n_tag) <=> Multiple0.s_cpt.[j] <> None) /\
-             (forall j, (0 <= j < n_tag) => Multiple0.s_cpt.[j] = Some 0));
-  [3 : by hoare; auto | 4 : smt ()].
-  + while (#pre /\ 0 <= i <= n_tag /\
-             (forall j, (0 <= j < i) <=> Multiple0.s_cpt.[j] <> None) /\
-             (forall j, (0 <= j < i) => Multiple0.s_cpt.[j] = Some 0)).
-    + by auto; smt (get_setE).
-    by auto => />; smt (empty_valE n_tag_p). 
-  call (_: 
-   (EUF_RF.n = n_tag /\
-    EUF_RF.m = empty /\ RF_bad.bad = false /\ RF_bad.m = empty) /\
-    (forall (j : int), 0 <= j && j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
-    forall (j : int), 0 <= j && j < n_tag => Multiple0.s_cpt.[j] = Some 0
-    ==> RF_bad.bad). bypr => *.
-*)
+
+(* TODO: simplify proof below using euclideU*)
+(* by apply negP => -[] /euclideU; smt (get_setE).  *)
 
 
 op pr_bad = 0%r.                (* To be determined *)
@@ -635,7 +635,8 @@ proof.
           have H7 := (H1 x0 i00 r1).
           case H7 => [H7 _]; have [j H8] := (H7 H6); exists j.
           by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
-        move :H8; 
+        move :H8;
+        (* Four almost identical cases. *)
         case :(oget Multiple0.s_cpt{2}.[iR] = j); 
         case (iR = i00 /\ n{2} = x0). 
         + move => [Heq1 Heq2 Heq3]; 
