@@ -1,5 +1,5 @@
 (* Simple modeling of the Basic Hash protocol, multiple tags. *)
-require import AllCore List FSet SmtMap IntDiv.
+require import AllCore Int List FSet SmtMap IntDiv.
 require import Distr DBool.
 require FelTactic.
 
@@ -509,18 +509,33 @@ proof.
     (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *)
     n_tag
     (RF_bad.bad) (* failure event *)
-    [Multiple(RF_bad).tag : (true)] (*  *)
+    [Multiple(RF_bad).tag : (false)] (* pre-condition for the counter increase *)
     (* invariant *)
     (EUF_RF.n = n_tag /\
      EUF_RF.m = empty /\ RF_bad.bad = false /\ RF_bad.m = empty /\
-     (forall (j : int), 0 <= j && j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
-     (forall (j : int), 0 <= j && j < n_tag => Multiple0.s_cpt.[j] = Some 0)).     
+     (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
+     (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j])). 
   + admit.                      (* rewrite bigi something *)
   + smt (n_tag_p).
-  + inline *; admit.
-  + admit.
-  + admit.
-  by admit.  
+  + inline *; sp 6. 
+    while (0 <= i <= n_tag /\
+     (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
+     (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0));
+    1 : by auto; move => /> *; smt (get_setE). 
+    by auto => />; smt (empty_valE n_tag_p). 
+  + by proc; inline *; auto. 
+  + move =>*; proc; inline *; auto. 
+  move =>*; proc; inline *; auto; sp; if; 2 : by auto.
+  sp; if; 2 : by auto.
+  seq 1 :(#pre); 1: by rnd; auto; move => * /#. 
+  sp; seq 1 :(#pre); 1: by rnd; auto; move => * /#. 
+  move => />; auto => *; 1 : smt (). 
+
+  move :H => [bad [H [H1 [H2 [H3 H4]]]]].
+  move :H3 => [H5 [[i H6] H7]].
+  split. split.
+  split. 2 : smt().
+  smt (get_setE).
 qed.
 
 (* Old beginning of proof  *)
