@@ -1,7 +1,6 @@
 (* Simple modeling of the Basic Hash protocol, multiple tags. *)
-require import AllCore Int List FSet SmtMap IntDiv.
-require import Distr DBool.
-
+require import AllCore Int List FSet SmtMap IntDiv StdBigop Distr DBool Mu_mem.
+(*---*) import Bigint Bigreal BRA BIA.
 require FelTactic.
 
 (* Key space *)
@@ -20,6 +19,9 @@ op dnonce: { ptxt distr |    is_lossless dnonce
                           /\ is_uniform dnonce } as dnonce_lluni.
 lemma dnonce_ll (i : int) : is_lossless dnonce by smt (dnonce_lluni).
 lemma dnonce_uni (i : int) : is_uniform dnonce by smt (dnonce_lluni).
+
+op nonce_witness : ptxt.        (* exemple of a nonce in [dnonce] domain. *)
+axiom maxu_dnonce x: mu1 dnonce x <= mu1 dnonce nonce_witness.
 
 hint exact random : dnonce_ll.
 
@@ -483,12 +485,9 @@ proof.
   + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
 qed.
 
-(*-----------------------------------------------------------------------*)
-(* We bound the probability of bad. *)
 
-(* Number of plain-texts hashed for tag [i]. *)
-op ptxt_hashed (i : int) (m : (int * ptxt, ptxt list) fmap) : int =
-  List.size (List.filter (fun x => fst x = i) (FSet.elems (SmtMap.fdom m))).
+(*-----------------------------------------------------------------------*)
+(* We bound the probability of bad in the single sessions setting. *)
 
 (* For the single session protocol, this should be 0. *)
 lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
@@ -517,14 +516,14 @@ proof.
     have -> /= : !(n_tag * n_session <= 
                    i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]); 
     1 : smt ().
-   rewrite Tactics.eq_iff /dom => /=. 
-   split; 1: by apply H1; smt().
-   rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE). 
-   have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
-   have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
-   have := (H1 j k) => *.   
-   smt (get_setE). 
-  + conseq />; auto.
+    rewrite Tactics.eq_iff /dom => /=. 
+    split; 1: by apply H1; smt().
+    rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE). 
+    have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
+    have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
+    have := (H1 j k) => *.   
+    smt (get_setE). 
+  + by conseq />; auto.
   inline *; sp 6. 
   while (0 <= i <= n_tag /\
    (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
@@ -534,65 +533,114 @@ proof.
 qed.
 
 
-  (* fel *)
-  (*   1   (* initialization phase  *) *)
-  (*   (0) (* counter *) *)
-  (*   (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *) *)
-  (*   n_tag *)
-  (*   (RF_bad.bad) (* failure event *) *)
-  (*   [Single(RF_bad).tag : (false)] (* pre-condition for the counter increase *) *)
-  (*   (* invariant *) *)
-  (*   (EUF_RF.n = n_tag * n_session /\ *)
-  (*    RF_bad.bad = false /\ *)
-  (*    (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\ *)
-  (*    (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j]) /\ *)
-  (*    (forall (j k : int) (x : ptxt),  *)
-  (*      Multiple0.s_cpt.[j] <> None => oget Multiple0.s_cpt.[j] <= k < n_session =>  *)
-  (*        RF_bad.m.[(j * n_session + k,x)] = None)  *)
-  (*    (* (forall (j k : int), Multiple0.s_cpt.[j] = Some k =>  *) *)
-  (*    (*                       ptxt_hashed j RF_bad.m = k) *) *)
-  (*  ).  *)
-  (* + by rewrite StdBigop.Bigreal.BRA.big1_eq. *)
-  (* + smt (n_tag_p). *)
-  (* + inline *; sp 6.  *)
-  (*   while (0 <= i <= n_tag /\ *)
-  (*    (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\ *)
-  (*    (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0)); *)
-  (*   1 : by auto; move => /> *; smt (get_setE).  *)
-  (*   by auto => />; smt (empty_valE n_tag_p).  *)
-  (* + by auto. *)
-  (* + by auto. *)
-  (* + move => b _; proc; inline *; auto; sp. *)
-  (*   if; 2 : by auto; smt (). *)
-  (*   sp; if; 2 : by auto; smt (). *)
-  (*   seq 1 :(#pre); 1 : by move => />; auto.  *)
-  (*   auto. *)
-  (*   move => /> &hr i1.  *)
-  (*   pose i2 := (if n_tag <= i1 then 0 else i1). *)
-  (*   move => *. *)
-  (*   have -> /= : !(n_tag * n_session <=  *)
-  (*                  i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]);  *)
-  (*   1 : smt (). *)
-  (*  rewrite Tactics.eq_iff /dom => /=.  *)
-  (*  split.                       (* why is there a issue with '; 1 :' here ? *) *)
-  (*  + by apply H1; smt(). *)
-  (*  split.                       (* why is there a issue with '; 1 :' here ? *) *)
-  (*  + by apply H1; smt(). *)
-  (*  rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE).  *)
-  (*  have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k. *)
-  (*  have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *. *)
-  (*  have := (H1 j k) => *.    *)
-  (*  smt (get_setE).  *)
+(*-----------------------------------------------------------------------*)
+(* We bound the probability of bad in the multiple sessions setting. *)
 
+op pr_bad_step_r : real.
+op pr_bad_step (k : int) = pr_bad_step_r.
+op pr_bad = pr_bad_step_r * (RField.ofint (n_session * n_tag)).
 
-op pr_bad = 0%r.                (* To be determined *)
+(* Number of plain-texts hashed for tag [i]. *)
+op ptxt_hashed_l (i : int) (m : (int * ptxt, ptxt list) fmap) =
+  List.filter (fun x => fst x = i) (FSet.elems (SmtMap.fdom m)).
+
+op ptxt_hashed (i : int) (m : (int * ptxt, ptxt list) fmap)  =
+  List.size (ptxt_hashed_l i m).
+
+lemma ptxt_hashed_supp (i : int) (x : ptxt) (m : (int * ptxt, ptxt list) fmap) :
+    (i,x) \in m <=> (i,x) \in (ptxt_hashed_l i m).
+proof.
+rewrite /ptxt_hashed_l. 
 
 lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
     Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad] <= pr_bad.
 proof.
-admitted.
+  move => Hll.
+  fel
+    1   (* initialization phase  *)
+    (BIA.bigi 
+      predT
+      (fun (k : int) => oget Multiple0.s_cpt.[k]) 
+      0 n_tag) (* counter *)
+    (fun k => pr_bad_step k) (* update to the upper-bound w.r.t. the counter *)
+    (n_tag * n_session) (* upper-bound on the number of steps *)
+    (RF_bad.bad) (* failure event *)
+    [Multiple(RF_bad).tag : 
+      (let j = if (n_tag <= i) then 0 else i in
+       j \in Multiple0.s_cpt /\ 
+       oget Multiple0.s_cpt.[j] < n_session)
+    ] (* pre-condition for the counter increase *)
+    (* invariant *)
+    (EUF_RF.n = n_tag /\
+     RF_bad.bad = false /\
+     (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
+     (forall (j : int), 0 <= j < n_tag => 
+         0 <= oget Multiple0.s_cpt.[j] <= n_session) /\
+     (forall (j : int), Multiple0.s_cpt.[j] <> None =>
+         ptxt_hashed j RF_bad.m = oget Multiple0.s_cpt.[j])
+   ).  
+  + admit. (* by rewrite StdBigop.Bigreal.BRA.big1_eq. *)
+  + smt (n_tag_p n_session_p).
+  + inline *; sp 6.
+    while (0 <= i <= n_tag /\
+     (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
+     (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0));
+    1 : by auto; move => /> *; smt (get_setE).
+    auto => />; split; 1 : smt (empty_valE n_tag_p).
+    move => *; split. 
+    + rewrite (eq_big_int 0 n_tag _ (fun k => 0)); 
+      1 : by move => *; smt (get_setE).
+      by rewrite big1_eq.
+    move => *; split; 1 :  smt (empty_valE n_tag_p).
+    move => *; split; 1 :  smt (empty_valE n_session_p).
+    by move => *; rewrite /ptxt_hashed fdom0 elems_fset0 /#.
+
+  + rewrite /pr_bad_step /=.
+    proc; inline *; 
+    do 2! (sp; if; 2 : by hoare; auto). 
+   seq 5 : (#post) (pr_bad_step_r) 1%r (1%r - pr_bad_step_r) 0%r => //;
+   2 : by hoare; conseq />.
+   wp; rnd; skip => /> &hr i1. 
+   pose i2 := (if n_tag <= i1 then 0 else i1).
+   have -> /= : !(n_tag <= i2) by smt (n_tag_p).
+   move => *.
+   search (mu _ (fun _ => _ List.\in _) <= _ ).
+   print Mu_mem.mu_mem_le_size.
+   print ptxt_hashed.
+   have := Mu_mem.mu_mem_le_size (RF_bad.m{hr}) dnonce (mu1 dnonce maxu_dnonce) _.
+   rewrite /(\in).
+   admit.
+
+  (* if the precondition for [tag] holds, the counter increases. *)
+  + admit.
+  (* if the precondition for [tag] does not holds, the counter does not 
+     increase. *)
+  + move => b _; proc; inline *; auto; sp.
+    if; 2 : by auto; smt ().
+    sp; if; 2 : by auto; smt ().
+    seq 1 :(#pre); 1 : by move => />; auto.
+    auto.
+    move => /> &hr i1.
+    pose i2 := (if n_tag <= i1 then 0 else i1).
+    move => *.
+    have -> /= : !(n_tag * n_session <=
+                   i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]);
+    1 : smt ().
+   rewrite Tactics.eq_iff /dom => /=.
+   split.                       (* why is there a issue with '; 1 :' here ? *)
+   + by apply H1; smt().
+   split.                       (* why is there a issue with '; 1 :' here ? *)
+   + by apply H1; smt().
+   rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE).
+   have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
+   have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
+   have := (H1 j k) => *.
+   smt (get_setE).
+
+
+
 
 (*-----------------------------------------------------------------------*)
 (* Assuming there are no collision, the single and multiple sessions
