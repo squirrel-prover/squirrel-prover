@@ -1,6 +1,7 @@
 (* Simple modeling of the Basic Hash protocol, multiple tags. *)
 require import AllCore Int List FSet SmtMap IntDiv.
 require import Distr DBool.
+
 require FelTactic.
 
 (* Key space *)
@@ -507,35 +508,16 @@ lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
     Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
 proof.
   move => Hll.
-  fel
-    1   (* initialization phase  *)
-    (0) (* counter *)
-    (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *)
-    n_tag
-    (RF_bad.bad) (* failure event *)
-    [Single(RF_bad).tag : (false)] (* pre-condition for the counter increase *)
-    (* invariant *)
-    (EUF_RF.n = n_tag * n_session /\
+  byphoare => //; hoare.
+  proc. 
+  call (_: EUF_RF.n = n_tag * n_session /\
      RF_bad.bad = false /\
      (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
      (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j]) /\
      (forall (j k : int) (x : ptxt), 
-       Multiple0.s_cpt.[j] <> None /\ oget Multiple0.s_cpt.[j] <= k < n_session => 
-         RF_bad.m.[(j * n_session + k,x)] = None) 
-     (* (forall (j k : int), Multiple0.s_cpt.[j] = Some k =>  *)
-     (*                       ptxt_hashed j RF_bad.m = k) *)
-   ). 
-  + admit.                      (* rewrite bigi something *)
-  + smt (n_tag_p).
-  + inline *; sp 6. 
-    while (0 <= i <= n_tag /\
-     (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
-     (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0));
-    1 : by auto; move => /> *; smt (get_setE). 
-    by auto => />; smt (empty_valE n_tag_p). 
-  + by auto.
-  + by auto.
-  + move => b _; proc; inline *; auto; sp.
+       Multiple0.s_cpt.[j] <> None => oget Multiple0.s_cpt.[j] <= k < n_session => 
+         RF_bad.m.[(j * n_session + k,x)] = None)). 
+  + proc; inline *; auto; sp.
     if; 2 : by auto; smt ().
     sp; if; 2 : by auto; smt ().
     seq 1 :(#pre); 1 : by move => />; auto. 
@@ -547,16 +529,71 @@ proof.
                    i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]); 
     1 : smt ().
    rewrite Tactics.eq_iff /dom => /=. 
-   split.                       (* why is there a issue with '; 1 :' here ? *)
-   + apply H1; smt().
-   split.                       (* why is there a issue with '; 1 :' here ? *)
-   + apply H1; smt().
+   split; 1: by apply H1; smt().
    rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE). 
    have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
    have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
    have := (H1 j k) => *.   
    smt (get_setE). 
+  + conseq />; auto.
+  inline *; sp 6. 
+  while (0 <= i <= n_tag /\
+   (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
+   (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0));
+  1 : by auto; move => /> *; smt (get_setE). 
+  by auto => />; smt (empty_valE n_tag_p). 
 qed.
+
+
+  (* fel *)
+  (*   1   (* initialization phase  *) *)
+  (*   (0) (* counter *) *)
+  (*   (fun _ => 0%r) (* update to the upper-bound w.r.t. the counter *) *)
+  (*   n_tag *)
+  (*   (RF_bad.bad) (* failure event *) *)
+  (*   [Single(RF_bad).tag : (false)] (* pre-condition for the counter increase *) *)
+  (*   (* invariant *) *)
+  (*   (EUF_RF.n = n_tag * n_session /\ *)
+  (*    RF_bad.bad = false /\ *)
+  (*    (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\ *)
+  (*    (forall (j : int), 0 <= j < n_tag => 0 <= oget Multiple0.s_cpt.[j]) /\ *)
+  (*    (forall (j k : int) (x : ptxt),  *)
+  (*      Multiple0.s_cpt.[j] <> None => oget Multiple0.s_cpt.[j] <= k < n_session =>  *)
+  (*        RF_bad.m.[(j * n_session + k,x)] = None)  *)
+  (*    (* (forall (j k : int), Multiple0.s_cpt.[j] = Some k =>  *) *)
+  (*    (*                       ptxt_hashed j RF_bad.m = k) *) *)
+  (*  ).  *)
+  (* + by rewrite StdBigop.Bigreal.BRA.big1_eq. *)
+  (* + smt (n_tag_p). *)
+  (* + inline *; sp 6.  *)
+  (*   while (0 <= i <= n_tag /\ *)
+  (*    (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\ *)
+  (*    (forall (j : int), 0 <= j && j < i => Multiple0.s_cpt.[j] = Some 0)); *)
+  (*   1 : by auto; move => /> *; smt (get_setE).  *)
+  (*   by auto => />; smt (empty_valE n_tag_p).  *)
+  (* + by auto. *)
+  (* + by auto. *)
+  (* + move => b _; proc; inline *; auto; sp. *)
+  (*   if; 2 : by auto; smt (). *)
+  (*   sp; if; 2 : by auto; smt (). *)
+  (*   seq 1 :(#pre); 1 : by move => />; auto.  *)
+  (*   auto. *)
+  (*   move => /> &hr i1.  *)
+  (*   pose i2 := (if n_tag <= i1 then 0 else i1). *)
+  (*   move => *. *)
+  (*   have -> /= : !(n_tag * n_session <=  *)
+  (*                  i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]);  *)
+  (*   1 : smt (). *)
+  (*  rewrite Tactics.eq_iff /dom => /=.  *)
+  (*  split.                       (* why is there a issue with '; 1 :' here ? *) *)
+  (*  + by apply H1; smt(). *)
+  (*  split.                       (* why is there a issue with '; 1 :' here ? *) *)
+  (*  + by apply H1; smt(). *)
+  (*  rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE).  *)
+  (*  have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k. *)
+  (*  have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *. *)
+  (*  have := (H1 j k) => *.    *)
+  (*  smt (get_setE).  *)
 
 
 (* TODO: simplify proof below using euclideU*)
