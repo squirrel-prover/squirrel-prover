@@ -1,32 +1,37 @@
 (* MW - simplified version ** with ** the last check of the tag *)
-(* unlinkability property *)
-
-
-(* MW - simplified version without the last check of the tag *)
-(* unlinkability property
+(* unlinkability property 
    by Solene Moreau, Stephanie Delaune, David Baelde
    proof indications edited by B. Blanchet *)
 
 proof {
       auto;
       show_game;
-     start_from_other_end
-    (*  auto;
+      (* Help CV apply remove_xor(xor) one more time *)
+      remove_assign binder X_Oeq;
+      insert before "out(c5" "let m4 = xor(idTn[u,v],r_1) in";
+      use_variable m4;
+      replace at 1 "{[0-9]+}({[0-9]+}xor({[0-9]+}m3, {[0-9]+}idTn) = {[0-9]+}r_1[{[0-9]+}u_4])"
+        "m4[u_4] = m3";
+      crypto remove_xor(xor) r_1;
+
+      start_from_other_end;
+      auto;
       show_game;
-      insert before "find u_1" "find i <= NT, j <= NK suchthat defined(idTn_1[j], r_6[i, j], nR_4[i, j], nT_4[i, j]) && (nT_5 = nT_4[i, j]) && (nR_5 = nR_4[i, j]) && (m2_1 = r_6[i, j]) then";         show_game;
-simplify;
-show_game;
- remove_assign useless;
-show_game *)
-(*      insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_7[i,j], nR_4[i,j], nT_4[i,j]) && (nT_5 = nT_4[i,j]) && (nR_5 = nR_4[i,j]) && (m2_1 = r_7[i,j]) then";
+      (* Help CV apply remove_xor(xor) one more time *)
+      remove_assign binder X_Oeq_2;
+      insert before "out(c5" "let m4_1 = xor(idTn_1[v_1],r_5) in";
+      use_variable m4_1;
+      replace at 1 "{[0-9]+}({[0-9]+}xor({[0-9]+}m3_1, {[0-9]+}idTn_1) = {[0-9]+}r_5[{[0-9]+}u_10])"
+        "m4_1[u_10] = m3_1";
+      crypto remove_xor(xor) r_5;
+      (* Rewrite a find that has one useless index *)      
+      insert before "find u_1" "find i <= NT, j <= NK suchthat defined(r_6[i, j], nR_4[i, j], nT_4[i, j]) && (nT_5 = nT_4[i, j]) && (nR_5 = nR_4[i, j]) && (m2_1 = r_6[i, j]) then";
       show_game;
       simplify;
-       remove_assign useless;
-       success;
-      show_game
-      simplify;
+      show_game;
       remove_assign useless;
-      success *)
+      show_game;
+      success 
       }
 
 param NT, NR, NK.
