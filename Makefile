@@ -30,7 +30,7 @@ alcotest: sanity
 	$(OCB) test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact -o ./_build/_tests
+	./test.byte --compact
 
 clean:
 	$(OCB) -clean
@@ -46,7 +46,7 @@ makecoverage: sanity
 	BISECT_COVERAGE=YES $(OCB) test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
-	./test.byte --compact -o ./_build/_tests
+	./test.byte --compact
 	BISECT_COVERAGE=YES $(OCB) squirrel.byte
 	@ln -s -f squirrel.byte squirrel
 
