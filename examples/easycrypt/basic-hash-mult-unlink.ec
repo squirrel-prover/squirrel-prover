@@ -1,6 +1,7 @@
 (* Simple modeling of the Basic Hash protocol, multiple tags. *)
 require import AllCore Int List FSet SmtMap IntDiv StdBigop Distr DBool Mu_mem.
-(*---*) import Bigint Bigreal BRA BIA.
+require import StdOrder.
+(*---*) import Bigint Bigreal BRA BIA IntOrder RealOrder.
 require FelTactic.
 
 (* Key space *)
@@ -20,8 +21,8 @@ op dnonce: { ptxt distr |    is_lossless dnonce
 lemma dnonce_ll (i : int) : is_lossless dnonce by smt (dnonce_lluni).
 lemma dnonce_uni (i : int) : is_uniform dnonce by smt (dnonce_lluni).
 
-op nonce_witness : ptxt.        (* exemple of a nonce in [dnonce] domain. *)
-axiom maxu_dnonce x: mu1 dnonce x <= mu1 dnonce nonce_witness.
+op max_n : ptxt.        (* exemple of a nonce in [dnonce] domain. *)
+axiom maxu_dnonce x: mu1 dnonce x <= mu1 dnonce max_n.
 
 hint exact random : dnonce_ll.
 
@@ -536,21 +537,57 @@ qed.
 (*-----------------------------------------------------------------------*)
 (* We bound the probability of bad in the multiple sessions setting. *)
 
-op pr_bad_step_r : real.
+op pr_bad_step_r = n_session%r * mu1 dnonce max_n.
 op pr_bad_step (k : int) = pr_bad_step_r.
 op pr_bad = pr_bad_step_r * (RField.ofint (n_session * n_tag)).
 
 (* Number of plain-texts hashed for tag [i]. *)
 op ptxt_hashed_l (i : int) (m : (int * ptxt, ptxt list) fmap) =
-  List.filter (fun x => fst x = i) (FSet.elems (SmtMap.fdom m)).
+  FSet.filter (fun x => fst x = i) (SmtMap.fdom m).
 
 op ptxt_hashed (i : int) (m : (int * ptxt, ptxt list) fmap)  =
-  List.size (ptxt_hashed_l i m).
+  FSet.card (ptxt_hashed_l i m).
 
 lemma ptxt_hashed_supp (i : int) (x : ptxt) (m : (int * ptxt, ptxt list) fmap) :
-    (i,x) \in m <=> (i,x) \in (ptxt_hashed_l i m).
+    (i,x) \in m <=> (i,x) \in (ptxt_hashed_l i m)
+by rewrite /ptxt_hashed_l in_filter mem_fdom //.
+
+lemma ptxt_hashed_i (i j : int) (x : ptxt) (m : (int * ptxt, ptxt list) fmap) :
+    (j,x) \in (ptxt_hashed_l i m) => i = j
+by rewrite /ptxt_hashed_l in_filter mem_fdom //.
+
+lemma ptxt_hashed_eq i m m' :
+    (forall x, (i,x) \in (ptxt_hashed_l i m) <=>
+               (i,x) \in (ptxt_hashed_l i m')) =>
+    (ptxt_hashed i m) = (ptxt_hashed i m').
 proof.
-rewrite /ptxt_hashed_l. 
+ move => H.
+ rewrite /ptxt_hashed; congr.
+ rewrite fsetP => -[j x].
+ case (j = i) => [->|Hdeq]; smt(ptxt_hashed_i).
+qed.
+
+lemma big_if (i a b : int) : a <= i < b =>
+    bigi predT (fun (x : int) => if x = i then 1 else 0) a b = 1.
+proof.
+  move => H; rewrite (range_cat i); 1,2: smt (). 
+  rewrite (range_cat (i + 1) i b); 1,2: smt (). 
+  rewrite !big_cat !big_int.
+  rewrite (BIA.eq_big
+       (fun (i0 : int) => i <= i0 && i0 < i + 1) 
+       (fun (i0 : int) => i <= i0 && i0 < i + 1) 
+       _ (fun x => 1) _) //; 1 : smt ().
+  rewrite (BIA.eq_big
+       (fun (i0 : int) => a <= i0 && i0 < i)
+       (fun (i0 : int) => a <= i0 && i0 < i)
+       _ (fun x => 0) _) //; 1 : smt ().
+  rewrite (BIA.eq_big
+       (fun (i0 : int) => i + 1 <= i0 && i0 < b)
+       (fun (i0 : int) => i + 1 <= i0 && i0 < b)
+       _ (fun x => 0) _) //; 1 : smt ().
+  by rewrite -!big_int !bigi_constz // /#. 
+qed.
+
 
 lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
@@ -574,7 +611,6 @@ proof.
     ] (* pre-condition for the counter increase *)
     (* invariant *)
     (EUF_RF.n = n_tag /\
-     RF_bad.bad = false /\
      (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
      (forall (j : int), 0 <= j < n_tag => 
          0 <= oget Multiple0.s_cpt.[j] <= n_session) /\
@@ -582,7 +618,14 @@ proof.
          ptxt_hashed j RF_bad.m = oget Multiple0.s_cpt.[j])
    ).  
   + admit. (* by rewrite StdBigop.Bigreal.BRA.big1_eq. *)
-  + smt (n_tag_p n_session_p).
+
+  + move => /> &hr H H0 H1 H2.
+    apply (IntOrder.ler_trans 
+      (BIA.bigi predT (fun (k : int) => n_session) 0 n_tag)).
+   + rewrite !big_int.
+     by apply (Bigint.ler_sum _ _ (fun k => n_session) _); smt().
+   by rewrite sumr_const count_predT size_range intmulz; smt (n_tag_p).
+
   + inline *; sp 6.
     while (0 <= i <= n_tag /\
      (forall (j : int), 0 <= j && j < i <=> Multiple0.s_cpt.[j] <> None) /\
@@ -594,8 +637,8 @@ proof.
       1 : by move => *; smt (get_setE).
       by rewrite big1_eq.
     move => *; split; 1 :  smt (empty_valE n_tag_p).
-    move => *; split; 1 :  smt (empty_valE n_session_p).
-    by move => *; rewrite /ptxt_hashed fdom0 elems_fset0 /#.
+    move => *; split; 1 :  smt (empty_valE n_session_p).   
+    move => *; rewrite /ptxt_hashed /ptxt_hashed_l fdom0 filter0 fcards0 /#.  
 
   + rewrite /pr_bad_step /=.
     proc; inline *; 
@@ -605,16 +648,67 @@ proof.
    wp; rnd; skip => /> &hr i1. 
    pose i2 := (if n_tag <= i1 then 0 else i1).
    have -> /= : !(n_tag <= i2) by smt (n_tag_p).
-   move => *.
-   search (mu _ (fun _ => _ List.\in _) <= _ ).
-   print Mu_mem.mu_mem_le_size.
-   print ptxt_hashed.
-   have := Mu_mem.mu_mem_le_size (RF_bad.m{hr}) dnonce (mu1 dnonce maxu_dnonce) _.
-   rewrite /(\in).
-   admit.
+   move => H H1 H2 H3 H4 H5 H6 H7.
+   have -> : (fun (x : ptxt) => (i2, x) \in RF_bad.m{hr}) = 
+             (fun (x : ptxt) => (i2, x) \in (ptxt_hashed_l i2 RF_bad.m{hr}))
+   by apply fun_ext => x; rewrite (ptxt_hashed_supp i2 _ RF_bad.m{hr}) //.   
+   have -> : (fun (x : ptxt) => (i2, x) \in (ptxt_hashed_l i2 RF_bad.m{hr})) =
+     (fun (x : ptxt) => x \in (image snd (ptxt_hashed_l i2 RF_bad.m{hr}))).
+   + apply fun_ext => x /=.
+     by rewrite imageP Tactics.eq_iff /=; split => [Hyp| [y Hyp]];
+     [1 : by exists (i2,x); smt() | 2 : smt (ptxt_hashed_i)].
+   have := Mu_mem.mu_mem_le_size 
+     (map snd (elems (ptxt_hashed_l i2 RF_bad.m{hr}))) 
+     dnonce (mu1 dnonce max_n) _;
+   1 : smt (maxu_dnonce).
+   move => /= Hmu.
+   rewrite /ptxt_hashed in H5. 
+   rewrite size_map -cardE in Hmu => //. 
+   rewrite /pr_bad_step_r. 
+   apply (ler_trans ((oget Multiple0.s_cpt{hr}.[i2])%r * mu1 dnonce max_n) _ _) 
+   => //. 
+   + rewrite H5 in Hmu => //. 
+     rewrite imageE. 
+     have <- :(mem (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr}))) =
+              mem (oflist (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr})))))
+     by apply fun_ext => *; smt(mem_oflist). 
+     smt().
+   by apply ler_wpmul2r; smt (mu_bounded). 
 
   (* if the precondition for [tag] holds, the counter increases. *)
-  + admit.
+  + move => c. 
+   proc; inline *; auto; sp. 
+   if; 2 : by auto; smt ().
+   sp; if; 2 : by auto; smt ().
+   seq 1 :(#pre); 1 : by move => />; auto.   
+   auto => /> &hr i1. 
+   pose i2 := (if n_tag <= i1 then 0 else i1). 
+   have ->:  (if n_tag <= i2 then 0 else i2) = i2 by smt().
+   move => H H0 H1 H2 H3 r H4. 
+   split.
+   + rewrite !big_int.
+     rewrite (eq_bigr _ 
+     (fun (k : int) =>
+       oget Multiple0.s_cpt{hr}.[i2 <- oget Multiple0.s_cpt{hr}.[i2] + 1].[k])
+     (fun (k : int) =>
+       oget Multiple0.s_cpt{hr}.[k] + if k = i2 then 1 else 0)).
+     + by move => j H5 /=; smt (get_setE). 
+     rewrite -sumrD -big_int -big_int big_if; 2 : smt(). 
+     rewrite /dom in H; smt().
+   split; 1 : smt(get_setE).
+   split; 1 : smt(get_setE).
+   move => j. 
+   case (i2 = j) => [->|Hdeq]. 
+   + rewrite !get_set_eqE // /=. print get_set_eqE.
+     rewrite /ptxt_hashed /ptxt_hashed_l. 
+     admit.
+   rewrite !get_set_neqE //; 1 : smt(). 
+   move => H5.
+   rewrite (ptxt_hashed_eq _ _ RF_bad.m{hr}); 2 : smt().
+   move => x.
+   rewrite !/ptxt_hashed_l !in_filter !mem_fdom // /=.
+   smt(get_setE).
+
   (* if the precondition for [tag] does not holds, the counter does not 
      increase. *)
   + move => b _; proc; inline *; auto; sp.
