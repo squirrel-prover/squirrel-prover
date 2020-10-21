@@ -3,6 +3,7 @@ require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require FelTactic.
 
+(*-----------------------------------------------------------------------*)
 (* Key space *)
 type key.
 
@@ -11,12 +12,17 @@ op dkey: { key distr |     is_lossless dkey
                         /\ is_full dkey
                         /\ is_uniform dkey } as dkey_llfuuni.
 
+(*-----------------------------------------------------------------------*)
 (* Ptxt space *)
 type ptxt.
 
 (* Lossless and uniform distribution over ptxts (not full). *)
 op dnonce: { ptxt distr |    is_lossless dnonce
                           /\ is_uniform dnonce } as dnonce_lluni.
+lemma dnonce_ll (i : int) : is_lossless dnonce by smt (dnonce_lluni).
+lemma dnonce_uni (i : int) : is_uniform dnonce by smt (dnonce_lluni).
+
+hint exact random : dnonce_ll.
 
 (*-----------------------------------------------------------------------*)
 (* PRF *)
@@ -240,18 +246,14 @@ module D (A : Adv) (BH : BasicHashF0) (F : PRF_Oracles) = {
    the RF is identical to the authentication game using the RF. *)
 lemma eq_RF &m (A <: Adv {Log, BasicHash, EUF_RF}) : 
     Pr[AuthGame(A, BasicHash, EUF_RF).main() @ &m : res] =
-    Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res].
-proof.
-  byequiv; auto; proc; inline *; wp; sim; auto. 
-qed.
+    Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res]
+by byequiv; auto; proc; inline *; wp; sim; auto. 
 
 (* Idem with PRF *)
 lemma eq_PRF &m (A <: Adv {Log, BasicHash, PRF}) : 
     Pr[AuthGame(A, BasicHash, PRF).main() @ &m : res] =
-    Pr[EUF_PRF_IND(PRF, D(A, BasicHash0)).main() @ &m : res].
-proof.
-  byequiv; auto; proc; inline *; wp; sim; auto. 
-qed.
+    Pr[EUF_PRF_IND(PRF, D(A, BasicHash0)).main() @ &m : res]
+by byequiv; auto; proc; inline *; wp; sim; auto. 
 
 (* The adversary cannot win the authentication game instantiated
     with the ideal unforgeable hash function. *)
@@ -263,26 +265,16 @@ proof.
   call (_: Log.reader_forged = [] /\ 
            forall x y, (EUF_RF.m.[x] <> None && oget EUF_RF.m.[x] = y)
                         => (x, y) \in Log.tag_outputs{hr}); auto.
-
   (* tag *)
-  + proc; inline *; auto. seq 2: (#pre /\ x0 = n); wp.
-   - rnd => *; auto.
-   - move => *; case (x0 \notin EUF_RF.m).
-    * rcondt 1 => //=; wp; rnd; auto.
-      move => &hr [[[Hl Hind] Heq] Hin] r H0; split; [ 1 : smt ()]; 
-      move => x y H1.
-     case (x0{hr} = x) => Hx.
-     - left; rewrite Hx; smt ().
-     - right. smt.
-    * rcondf 1; auto; move => &hr [[[Hl Hind] Heq] Hin]; split; [ 1 : smt ()]; 
-      move => x y H1; right; apply Hind; apply H1.
+  + proc; inline *; auto.
+    seq 2: (#pre /\ x0 = n); wp; 1 : by rnd => *; auto.
+    if; 2 : by auto; smt().
+    by wp; rnd; auto; smt(get_setE).
 
   (* reader *)
-  + proc; inline *; auto => /=.
-  move => &hr [hyp1 hyp2]; split => //. by smt.
+  + by proc; inline *; auto => /#.
 
-  + move => &hr hyp; split => //; split; [ 1 : smt ()]. 
-    move => x H; by smt.
+  + by move => *; smt. 
 qed.
 
 (* We conclude. *)
@@ -291,5 +283,5 @@ lemma auth0 &m (A <: Adv {Log, BasicHash, PRF, EUF_RF}) :
       (   Pr[EUF_PRF_IND(PRF,    D(A, BasicHash0)).main() @ &m : res] 
         - Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res] ).
 proof.
-  rewrite (eq_PRF &m A) -(eq_RF &m A) (res_0 &m A); by smt ().
+  by rewrite (eq_PRF &m A) -(eq_RF &m A) (res_0 &m A); smt ().
 qed.

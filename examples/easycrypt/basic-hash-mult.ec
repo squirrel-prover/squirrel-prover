@@ -3,6 +3,7 @@ require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require FelTactic.
 
+(*-----------------------------------------------------------------------*)
 (* Key space *)
 type key.
 
@@ -11,12 +12,17 @@ op dkey: { key distr |     is_lossless dkey
                         /\ is_full dkey
                         /\ is_uniform dkey } as dkey_llfuuni.
 
+(*-----------------------------------------------------------------------*)
 (* Ptxt space *)
 type ptxt.
 
 (* Lossless and uniform distribution over ptxts (not full). *)
 op dnonce: { ptxt distr |    is_lossless dnonce
                           /\ is_uniform dnonce } as dnonce_lluni.
+lemma dnonce_ll (i : int) : is_lossless dnonce by smt (dnonce_lluni).
+lemma dnonce_uni (i : int) : is_uniform dnonce by smt (dnonce_lluni).
+
+hint exact random : dnonce_ll.
 
 (*-----------------------------------------------------------------------*)
 (* multiple PRF *)
@@ -68,6 +74,8 @@ module PRFs = {
    ii) is a consequence of i) whenever the hash function image set is large. *)
 op drf (i : int) : ptxt distr.
 axiom drf_lluni (i : int) : is_lossless (drf i) /\ is_uniform (drf i).
+lemma drf_ll (i : int) : is_lossless (drf i) by smt (drf_lluni).
+lemma drf_uni (i : int) : is_uniform (drf i) by smt (drf_lluni).
 
 module EUF_RF = {
   var n : int
@@ -102,22 +110,44 @@ module EUF_RF = {
 op n_tag : int.
 axiom n_tag_p : 0 < n_tag.  (* We have at least one tag. *)
 
-(* Without initialization *)
+(* Without initialization, with logs to express the authentication property. *)
 module BasicHash0 (H : PRFs_Oracles) = {
+  var tag_outputs   : (int * ptxt * ptxt) list
+  var reader_forged : (int * ptxt * ptxt) list
+
   proc tag (i : int) : ptxt * ptxt = {
     var n, h;
     i <- if (n_tag <= i) then 0 else i;
     n <$ dnonce;
     h <@ H.f(i,n);
+    (* We log the output message *)
+    tag_outputs <- (i,n,h) :: tag_outputs;
     return (n, h);
   }    
   
-  proc reader (i : int, n h : ptxt) : bool = {    
+  proc reader_i (i : int, n h : ptxt) : bool = {    
     var b;
-    i <- if (n_tag <= i) then 0 else i;
     b <- H.check(i, n, h);
     return b;
   } 
+
+  proc reader (n h : ptxt) : bool = {    
+    var r, b, i;
+    b <- false;
+    i <- 0;
+    while (i < n_tag) {
+      r <- H.check(i, n, h);
+      (* If the message is accepted but was not sent by a honest tag, 
+         we log it. *)
+      if (r && ! (mem tag_outputs (i,n,h))){ 
+        reader_forged <- (i,n,h) :: reader_forged;
+      }
+
+      b <- b || r;
+      i <- i + 1;
+    }
+    return b;
+  }
 }.
 
 (* With initialization *)
@@ -127,6 +157,8 @@ module BasicHash (H : PRFs) = {
 
   proc init () : unit = { 
     H.init(n_tag); 
+    BasicHash0.tag_outputs <- [];
+    BasicHash0.reader_forged <- [];
   }
 }.
 
@@ -134,42 +166,11 @@ module BasicHash (H : PRFs) = {
 module type BasicHashT = {
   proc init () : unit
   proc tag (_ : int) : ptxt * ptxt
-  proc reader (_: int * ptxt * ptxt) : bool
+  proc reader (_: ptxt * ptxt) : bool
 }.
 
 module type BasicHashT0 = {
   include BasicHashT[-init]
-}.
-
-(* Basic Hash, multiple tags, with logs. *)
-module Log (BH : BasicHashT) = {
-  var tag_outputs   : (int * ptxt * ptxt) list
-  var reader_forged : (int * ptxt * ptxt) list
-
-  proc init () : unit = { 
-    BH.init ();
-    tag_outputs <- [];
-    reader_forged <- [];
-  }
-
-  proc tag (i : int) : ptxt * ptxt = {
-    var x, y;
-    (x,y) <@ BH.tag (i);
-    i <- if (n_tag <= i) then 0 else i;
-    tag_outputs <- (i,x,y) :: tag_outputs;
-    return (x,y);
-  }    
-
-  proc reader (i : int, x y : ptxt) : bool = {    
-    var b;
-    b <- BH.reader(i,x,y);
-    (* We log messages accepted by the reader that the tag never send. *)
-    i <- if (n_tag <= i) then 0 else i;
-    if (b && ! (mem tag_outputs (i,x,y))){ 
-      reader_forged <- (i,x,y) :: reader_forged;
-    }
-    return b;
-  }    
 }.
 
 (* Adversary against the Basic Hash protocol authentication *)
@@ -183,13 +184,13 @@ module type BasicHashF (H : PRFs) = {
 
 (* Basic Hash protocol authentication game *)
 module AuthGame (Adv : Adv) (BH : BasicHashF) (H : PRFs) = {
-  module BH = Log(BH(H))
+  module BH = BH(H)
   module Adv = Adv (BH)
 
   proc main () = {
     BH.init ();
     Adv.a();
-    return (exists x, mem Log.reader_forged x );
+    return (exists x, mem BasicHash0.reader_forged x );
   }
 }.
 
@@ -212,35 +213,6 @@ module EUF_PRF_IND (F : PRFs) (D : Distinguisher) = {
 }.
 
 (*-----------------------------------------------------------------------*)
-(* In our PRF/RF distinguisher, we must use a slightly different log,
-   which is identical except that it does not initialize the BasicHash
-   protocol. *)
-module AuxLog (BH : BasicHashT0) = {
-  proc init () : unit = { 
-    Log.tag_outputs <- [];
-    Log.reader_forged <- [];
-  }
-
-  proc tag (i : int) : ptxt * ptxt = {
-    var x, y;
-    (x,y) <@ BH.tag (i);
-    i <- if (n_tag <= i) then 0 else i;
-    Log.tag_outputs <- (i,x,y) :: Log.tag_outputs;
-    return (x,y);
-  }    
-
-  proc reader (i : int, x y : ptxt) : bool = {    
-    var b;
-    b <- BH.reader(i,x,y);
-    (* We log messages accepted by the reader that the tag never send. *)
-    i <- if (n_tag <= i) then 0 else i;
-    if (b && ! (mem Log.tag_outputs (i,x,y))){ 
-      Log.reader_forged <- (i,x,y) :: Log.reader_forged;
-    }
-    return b;
-  }    
-}.
-
 module type BasicHashF0 (H : PRFs_Oracles) = {
   include BasicHashT0
 }.
@@ -248,13 +220,14 @@ module type BasicHashF0 (H : PRFs_Oracles) = {
 (* The PRF/RF distinguisher is almost identical to the authentication game,
    except that it does not initialize the PRF. *)
 module D (A : Adv) (BH : BasicHashF0) (F : PRFs_Oracles) = {
-  module BH = AuxLog(BH(F))
+  module BH = BH(F)
   module A = A (BH)
   
   proc distinguish () = {
-    BH.init();
+    BasicHash0.tag_outputs <- [];
+    BasicHash0.reader_forged <- [];
     A.a();
-    return (exists x, mem Log.reader_forged x ); 
+    return (exists x, mem BasicHash0.reader_forged x ); 
   } 
 }.
 
@@ -264,58 +237,44 @@ module D (A : Adv) (BH : BasicHashF0) (F : PRFs_Oracles) = {
 
 (* The probability of winning the indistinguishability game against
    the RF is identical to the authentication game using the RF. *)
-lemma eq_RF &m (A <: Adv {Log, BasicHash, EUF_RF}) : 
+lemma eq_RF &m (A <: Adv {BasicHash, EUF_RF}) : 
     Pr[AuthGame(A, BasicHash, EUF_RF).main() @ &m : res] =
-    Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res].
-proof.
-  byequiv; auto; proc; inline *; wp; sim; auto. 
-qed.
+    Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res]
+by byequiv; auto; proc; inline *; wp; sim; auto. 
 
 (* Idem with PRF *)
-lemma eq_PRF &m (A <: Adv {Log, BasicHash, PRFs}) : 
+lemma eq_PRF &m (A <: Adv {BasicHash, PRFs}) : 
     Pr[AuthGame(A, BasicHash, PRFs).main() @ &m : res] =
-    Pr[EUF_PRF_IND(PRFs, D(A, BasicHash0)).main() @ &m : res].
-proof.
-  byequiv; auto; proc; inline *; wp; sim; auto. 
-qed.
+    Pr[EUF_PRF_IND(PRFs, D(A, BasicHash0)).main() @ &m : res]
+by byequiv; auto; proc; inline *; wp; sim; auto. 
 
 (* The adversary cannot win the authentication game instantiated
     with the ideal unforgeable hash function. *)
-lemma res_0 &m (A <: Adv {Log, BasicHash, PRFs, EUF_RF}) : 
+lemma res_0 &m (A <: Adv {BasicHash, PRFs, EUF_RF}) : 
     Pr[AuthGame(A, BasicHash, EUF_RF).main() @ &m : res] = 0%r.
 proof.
   byphoare; auto. 
   hoare; proc*; inline *; wp; sp. 
-  call (_: Log.reader_forged = [] /\ EUF_RF.n = n_tag /\
+  call (_: BasicHash0.reader_forged = [] /\ EUF_RF.n = n_tag /\
            forall j x y, (EUF_RF.m.[(j,x)] <> None && oget EUF_RF.m.[(j,x)] = y)
-                          => (j, x, y) \in Log.tag_outputs{hr}); auto.
+                          => (j, x, y) \in BasicHash0.tag_outputs{hr}); auto.
 
   (* tag *)
-  + proc; inline *; auto. 
-  seq 6: (#pre /\ x0 = n /\ i1 = i0 /\ i0 = if n_tag <= i then 0 else i); wp.
-   - by rnd; auto; smt (n_tag_p).
-   - case ((i1, x0) \notin EUF_RF.m).
-    * rcondt 1 => //; wp; rnd; auto.
-     move => &hr [[[Hl Hind] [Heq1 [Heq2 Heq3]]] Hin] r H0; 
-     do 2! (split; [ 1 : smt ()]);
-     move => j x y H1.
-     case (i1{hr} = j /\ x0{hr} = x) => Hx. case: Hx => Hj Hx.
-     - left; split => //=. by rewrite -Hj Heq2 Heq3; auto. by smt ().
-     - right. smt.
-    * rcondf 1; auto; move => &hr [[[Hl [Ht Hind]] Heq] Hin].
-      do 2! (split; [ 1 : smt ()]). 
-      move => j x y H1; right; apply Hind; apply H1.
+  + proc; inline *; auto; sp.
+    seq 1: (#pre); 1  : by conseq />; auto; smt().
+    sp; if; 2: by conseq/>;auto;smt().
+    by auto; smt(get_setE).
 
   (* reader *)
-  + proc; inline *; auto => /=.
-  move => &hr [hyp1 hyp2]; split => //. by smt.
+  + proc; inline *; conseq />.
+    while (0 <= i <= n_tag /\ #pre) => //; 2 : by conseq />; auto; smt(n_tag_p).
+    conseq />; auto => /> *; smt(get_setE).
 
-  + move => &hr hyp; split => //; do 2! (split; [ 1 : smt ()]). 
-    move => Ht x H; by smt.
+  + by move => *; smt.
 qed.
 
 (* We conclude. *)
-lemma auth0 &m (A <: Adv {Log, BasicHash, PRFs, EUF_RF}) : 
+lemma auth0 &m (A <: Adv {BasicHash, PRFs, EUF_RF}) : 
     Pr[AuthGame(A, BasicHash, PRFs).main() @ &m : res] = 
       (   Pr[EUF_PRF_IND(PRFs,   D(A, BasicHash0)).main() @ &m : res] 
         - Pr[EUF_PRF_IND(EUF_RF, D(A, BasicHash0)).main() @ &m : res] ).

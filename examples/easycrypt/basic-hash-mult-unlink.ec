@@ -1,9 +1,16 @@
-(* Simple modeling of the Basic Hash protocol, multiple tags. *)
+(* Unlinkability of the Basic Hash protocol, multiple tags, one reader. *)
+
+(* Easycrypt: 1.0 (fa3853d3029d) *)
+(* Alt-Ergo version 2.3.3 *)
+(* Z3 4.8.4 *)
+(* CVC4 1.5 *)
+
 require import AllCore Int List FSet SmtMap IntDiv StdBigop Distr DBool Mu_mem.
 require import StdOrder.
-(*---*) import Bigint Bigreal BRA BIA IntOrder RealOrder.
-require FelTactic.
+(*---*) import Bigint Bigreal BRA BIA IntOrder RealOrder RField.
+require (*---*) FelTactic.
 
+(*-----------------------------------------------------------------------*)
 (* Key space *)
 type key.
 
@@ -12,6 +19,7 @@ op dkey: { key distr |     is_lossless dkey
                         /\ is_full dkey
                         /\ is_uniform dkey } as dkey_llfuuni.
 
+(*-----------------------------------------------------------------------*)
 (* Ptxt space *)
 type ptxt.
 
@@ -21,7 +29,7 @@ op dnonce: { ptxt distr |    is_lossless dnonce
 lemma dnonce_ll (i : int) : is_lossless dnonce by smt (dnonce_lluni).
 lemma dnonce_uni (i : int) : is_uniform dnonce by smt (dnonce_lluni).
 
-op max_n : ptxt.        (* exemple of a nonce in [dnonce] domain. *)
+op max_n : ptxt.        (* arbitrary nonce in [dnonce] domain. *)
 axiom maxu_dnonce x: mu1 dnonce x <= mu1 dnonce max_n.
 
 hint exact random : dnonce_ll.
@@ -67,13 +75,15 @@ module PRFs = {
   }
 }.
 
+(*-----------------------------------------------------------------------*)
 (* Unforgeable multiple RF *)
 (* We assume that: 
-   i) the hash functions are indistinguishable from a lossless and uniform
-   distributions over ptxts (not full).
-   ii) the hash functions are unforgeable.
+   - i) the hash functions are indistinguishable from a lossless and uniform
+     distributions over ptxts (not full).
+   - ii) the hash functions are unforgeable.
    
-   ii) is a consequence of i) whenever the hash function image set is large. *)
+   ii) is a consequence of i) whenever the hash function image set is
+   large. *)
 op drf (i : int) : ptxt distr.
 axiom drf_lluni (i : int) : is_lossless (drf i) /\ is_uniform (drf i).
 lemma drf_ll (i : int) : is_lossless (drf i) by smt (drf_lluni).
@@ -334,7 +344,8 @@ module D (A : Adv) (BH : BasicHashF0) (F : PRFs_Oracles) = {
 
 
 (*-----------------------------------------------------------------------*)
-(* Game-hope, PRF to RF for the multiple session protocol.  *)
+(* Game-hope, PRF to RF for the multiple and single sessions protocols.  *)
+
 lemma eq_mult_RF &m (A <: Adv {Multiple0, EUF_RF}) : 
     Pr[Unlink(A, Multiple, EUF_RF).main() @ &m : res] =
     Pr[EUF_PRF_IND(EUF_RF, D(A, Multiple0)).main() @ &m : res]
@@ -361,11 +372,14 @@ by byequiv; auto; proc; inline *; wp; sim.
 (* Second game-hope, where we bound the collision probability for all
    the nonces sample by each tag.  *)
 
-(* The EUF_RF module, where we set a boolean bad to true if we hash twice the 
-   same value. Since we only hash nonces, this is equivalent to setting bad to
-   true if a tag has a collision between two nonces it samples.
-   In case of collision, a message may have several hashes, which we store. *)
-search (oget _ = _).
+(* The EUF_RF module, where we set a boolean bad to true if we hash
+   twice the same value. Since we only hash nonces, this is equivalent
+   to setting bad to true if a tag has a collision between two nonces
+   it samples.
+
+   In case of collisions, a message may have several hashes. We store
+   all possible hashes of a nonce, to be able to simulate the "check"
+   oracle procedure. *)
 
 module RF_bad = {
   var bad : bool
@@ -396,11 +410,10 @@ module RF_bad = {
   }
 }.
 
-lemma map_support ['a, 'b] (m : ('a,'b) fmap) (m' : ('a,'b list) fmap) :
-    (forall x, omap (transpose (::) []) m.[x] = m'.[x]) =>
-    forall x, x \in m <=> x \in m'
-by move => H x; rewrite 2! domE; smt (). 
-
+(* The winning probability against the unlinkability game (multiple
+   sessions) instanciated with Random Functions (EUF_RF) is equal to the
+   winning probability when instanciated with the Collision-Free Random
+   Functions (RF_bad), up-to-bad. *)
 lemma coll_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
@@ -418,19 +431,12 @@ proof.
     sp; if; 1, 3 : by auto. 
     seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /#.
     wp; if {1}; 1 : by auto => />; smt(get_setE). 
-    by auto; smt (map_support).
+    by auto; smt ().
   + by move => &2 Hb; islossless.
   + move => &2. proc; inline *; auto; sp; if; sp; auto. 
     by if; auto; smt (drf_ll dnonce_ll). 
   + proc; inline *. while (#pre /\ ={b,i}); auto => />. 
-    move => &1 &2 Hbad Hind Hle />. 
-    pose j := if EUF_RF.n{2} <= i{2} then 0 else i{2}.
-    rewrite -(Hind (j,n{2})). 
-    case ((j, n{2}) \in EUF_RF.m{1}); 
-    case ((j, n{2}) \in RF_bad.m{2}) 
-    => Hin1 Hin2 //=; 1 : by rewrite get_some => //=; smt ().
-    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
-    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
+    move => &1 &2 Hbad Hind Hle /> /#. 
   + move => &2 Hb; islossless. 
     while true (n_tag - i); auto; 2 : by smt ().
     conseq (:true); 1 : by smt (). 
@@ -442,59 +448,103 @@ proof.
   + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
 qed.
 
-lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
+(*-----------------------------------------------------------------------*)
+(* Same than the EUF_RF module, except that we set [bad] to true if we hash 
+   the same value twice.  *)
+module EUF_RF2 = { 
+  var bad : bool
+
+  proc init(i : int) : unit = {
+    EUF_RF.init(i);
+    bad <- false;
+  } 
+
+  proc f(i : int, x : ptxt) : ptxt = {
+    var r : ptxt;
+    i <- if (EUF_RF.n <= i) then 0 else i;
+
+    (* If we already hashed [x] under key [i], we set bad to true. *)
+    bad <- bad || (i,x) \in EUF_RF.m;
+
+    if ((i,x) \notin EUF_RF.m) {
+      r <$ drf i;
+      EUF_RF.m.[(i,x)] <- r;
+    }
+    
+    return oget EUF_RF.m.[(i,x)];
+  }
+
+  proc check = EUF_RF.check
+}.
+
+lemma eq_single_RF2 &m (A <: Adv {Multiple0, EUF_RF}) : 
+    Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] =
+    Pr[Unlink(A, Single, EUF_RF2).main() @ &m : res]
+by byequiv; auto; proc; inline *; wp; sim; auto. 
+
+(* Idem for the single session version of the unlinkability game. *)
+lemma coll_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0, EUF_RF2}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
-    Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] <=
-    Pr[Unlink(A, Single, RF_bad).main() @ &m : res] +
-    Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad].
-proof.
-  move => Hll; byequiv => //.
+    `| Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] -
+       Pr[Unlink(A, Single, RF_bad).main() @ &m : res] | <=
+       Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad].
+proof.  
+  move => Hll. 
+  rewrite (eq_single_RF2 &m A).
+  byequiv (_ : ={glob A} ==> (EUF_RF2.bad{1} = RF_bad.bad{2}) /\ 
+                             (!RF_bad.bad{2} => ={res})) : EUF_RF2.bad => //;
+  2 : smt().
   proc.
   call(_: RF_bad.bad, 
-    ={glob Single0, EUF_RF.n} /\
+    ={glob Single0, EUF_RF.n} /\ (EUF_RF2.bad{1} = RF_bad.bad{2}) /\
     (* (forall x i, (x,i) \in EUF_RF.m{1} <=> (x,i) \in RF_bad.m{2}) /\ *)
-    (forall (x), omap (fun x => [x]) (EUF_RF.m.[(x)]{1}) = RF_bad.m.[(x)]{2})).
+    (forall (x), omap (fun x => [x]) (EUF_RF.m.[(x)]{1}) = RF_bad.m.[(x)]{2}),
+    (EUF_RF2.bad{1} = RF_bad.bad{2})).
   + proc; inline *; sp; if; 1,3 : by auto. 
     sp; if; 1, 3 : by auto. 
     seq 4 4 : (#pre /\ ={n, i0, x}); 1 : by auto => /> /#.
-    wp; if {1}; 1 : by auto => />; smt(get_setE). 
-    by auto; smt (map_support).
-  + by move => &2 Hb; islossless.
+    wp; sp. if {1}; 1 : by auto => />; smt(get_setE). 
+    by auto; smt ().
+  + move => &2 Hb. 
+    proc; inline *; auto; sp.
+    if; 2: by auto; smt().
+    sp; if; 2: by auto; smt().
+    seq 4 : (#pre) => //;
+    1,3 : by move => />; auto; smt(dnonce_ll). 
+    seq 1 : (#post) =>//. 
+    + by auto; smt(). 
+    + by conseq />; islossless. 
+    by hoare; auto; smt(). 
   + move => &2. proc; inline *; auto; sp; if; sp; auto. 
     by if; auto; smt (drf_ll dnonce_ll). 
   + proc; inline *; while (#pre /\ ={b,b0,j,i}); auto => />. 
     while (#pre); auto => />. 
-    move => &1 &2 Hbad Hind Hle Hlt />. 
-    pose k := if EUF_RF.n{2} <= i{2} * n_session + j{2} then 0 else i{2} * n_session + j{2}.
-    rewrite -(Hind (k,n{2})). 
-    case ((k, n{2}) \in EUF_RF.m{1}); 
-    case ((k, n{2}) \in RF_bad.m{2}) 
-    => Hin1 Hin2 //=; 1 : by rewrite get_some => //=; smt ().
-    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
-    by have Hsup := (map_support (EUF_RF.m{1}) (RF_bad.m{2}) Hind); smt ().
-  + move => &2 Hb; islossless. 
+    by move => &1 &2 Hbad Hind Hle Hlt />; smt().
+  + move => &2 Hb. 
+    proc; inline *; conseq />. 
     while true (n_tag - i); auto; 2 : by smt ().
-    while true (n_session - j); auto; 2 : by smt ().
-    conseq (:true); 1 : by smt (). 
-    by islossless. 
-  + move => _; proc; conseq />.
+    while true (n_session - j); auto; 2 : by smt (). 
+    by smt().
+  + move => &1. 
+    proc; inline *; conseq />. 
     while true (n_tag - i); auto; 2 : by smt ().
-    while true (n_session - j); auto; 2 : by smt ().
-    conseq (:true); 1 : by smt (). 
-    by islossless. 
-  + by inline *; sp => />; while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
+    while true (n_session - j); auto; 2 : by smt (). 
+    by smt(). 
+  + inline *; sp => />. 
+    while (={i, Multiple0.s_cpt}); auto; smt (empty_valE).
 qed.
 
 
 (*-----------------------------------------------------------------------*)
-(* We bound the probability of bad in the single sessions setting. *)
+(* The probability of bad in the single sessions setting is 0,
+   since each tag hashes only one message. *)
 
 (* For the single session protocol, this should be 0. *)
 lemma coll_bound_single &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
-    Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad] <= 0%r.
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : RF_bad.bad] = 0%r.
 proof.
   move => Hll.
   byphoare => //; hoare.
@@ -516,13 +566,11 @@ proof.
     move => *.
     have -> /= : !(n_tag * n_session <= 
                    i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]); 
-    1 : smt ().
+    1 : smt (). 
     rewrite Tactics.eq_iff /dom => /=. 
     split; 1: by apply H1; smt().
     rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE). 
     have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
-    have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
-    have := (H1 j k) => *.   
     smt (get_setE). 
   + by conseq />; auto.
   inline *; sp 6. 
@@ -533,13 +581,41 @@ proof.
   by auto => />; smt (empty_valE n_tag_p). 
 qed.
 
+lemma coll_single_eq &m (A <: Adv {EUF_RF, RF_bad, Multiple0, EUF_RF2}) : 
+    (forall (BH <: BasicHashT0{A}),
+      islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+    Pr[Unlink(A, Single, EUF_RF).main() @ &m : res] =
+    Pr[Unlink(A, Single, RF_bad).main() @ &m : res].
+proof.  
+  move => Hll. 
+  have H  := (coll_bound_single &m A Hll).
+  have H' := (coll_single &m A Hll).
+  smt().  
+qed.
 
 (*-----------------------------------------------------------------------*)
-(* We bound the probability of bad in the multiple sessions setting. *)
+(* We bound the probability of bad in the multiple sessions setting by:
+   
+       n_session^2 * n_tag * mu1 dnonce max_n
+
+   Since [dnonce] is uniform, [mu1 dnonce max_n] is 1/N, where [N] is
+   the size of the nonce space. 
+   
+
+   Note that the bound could be improved to: 
+
+       n_session * (n_session + 1) / 2 * n_tag * mu1 dnonce max_n
+
+   But the proof would be much more complicated: the current proof
+   using the failure event lemma, which makes us use the same counter
+   and bad event for all tags, which prevent from correctly tracking
+   the number of already hashed nonces for each tag. Currently, the
+   only way I see to circumvent this is to use the failure event lemma
+   together with a hybrid argument.  *)
 
 op pr_bad_step_r = n_session%r * mu1 dnonce max_n.
 op pr_bad_step (k : int) = pr_bad_step_r.
-op pr_bad = pr_bad_step_r * (RField.ofint (n_session * n_tag)).
+op pr_bad = pr_bad_step_r * (n_session * n_tag)%r.
 
 (* Number of plain-texts hashed for tag [i]. *)
 op ptxt_hashed_l (i : int) (m : (int * ptxt, ptxt list) fmap) =
@@ -588,7 +664,6 @@ proof.
   by rewrite -!big_int !bigi_constz // /#. 
 qed.
 
-
 lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) : 
     (forall (BH <: BasicHashT0{A}),
       islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
@@ -596,28 +671,32 @@ lemma coll_bound_multiple &m (A <: Adv {EUF_RF, RF_bad, Multiple0}) :
 proof.
   move => Hll.
   fel
-    1   (* initialization phase  *)
+    1                        (* initialization phase  *)
     (BIA.bigi 
       predT
       (fun (k : int) => oget Multiple0.s_cpt.[k]) 
-      0 n_tag) (* counter *)
+      0 n_tag)               (* counter *)
     (fun k => pr_bad_step k) (* update to the upper-bound w.r.t. the counter *)
-    (n_tag * n_session) (* upper-bound on the number of steps *)
-    (RF_bad.bad) (* failure event *)
+    (n_tag * n_session)      (* upper-bound on the number of steps *)
+    (RF_bad.bad)             (* failure event *)
+
+                             (* pre-condition for the counter increase *)
     [Multiple(RF_bad).tag : 
       (let j = if (n_tag <= i) then 0 else i in
        j \in Multiple0.s_cpt /\ 
-       oget Multiple0.s_cpt.[j] < n_session)
-    ] (* pre-condition for the counter increase *)
-    (* invariant *)
+       oget Multiple0.s_cpt.[j] < n_session)]
+
+                             (* invariant *)
     (EUF_RF.n = n_tag /\
      (forall (j : int), 0 <= j < n_tag <=> Multiple0.s_cpt.[j] <> None) /\
      (forall (j : int), 0 <= j < n_tag => 
          0 <= oget Multiple0.s_cpt.[j] <= n_session) /\
      (forall (j : int), Multiple0.s_cpt.[j] <> None =>
-         ptxt_hashed j RF_bad.m = oget Multiple0.s_cpt.[j])
+         ptxt_hashed j RF_bad.m <= oget Multiple0.s_cpt.[j])
    ).  
-  + admit. (* by rewrite StdBigop.Bigreal.BRA.big1_eq. *)
+  + rewrite /pr_bad_step sumr_const count_predT size_range /=. 
+    rewrite RField.intmulr /pr_bad /pr_bad_step_r.
+    smt (n_tag_p n_session_p).
 
   + move => /> &hr H H0 H1 H2.
     apply (IntOrder.ler_trans 
@@ -638,7 +717,7 @@ proof.
       by rewrite big1_eq.
     move => *; split; 1 :  smt (empty_valE n_tag_p).
     move => *; split; 1 :  smt (empty_valE n_session_p).   
-    move => *; rewrite /ptxt_hashed /ptxt_hashed_l fdom0 filter0 fcards0 /#.  
+    by move => *; rewrite /ptxt_hashed /ptxt_hashed_l fdom0 filter0 fcards0 /#.  
 
   + rewrite /pr_bad_step /=.
     proc; inline *; 
@@ -665,17 +744,21 @@ proof.
    rewrite /ptxt_hashed in H5. 
    rewrite size_map -cardE in Hmu => //. 
    rewrite /pr_bad_step_r. 
-   apply (ler_trans ((oget Multiple0.s_cpt{hr}.[i2])%r * mu1 dnonce max_n) _ _) 
-   => //. 
-   + rewrite H5 in Hmu => //. 
-     rewrite imageE. 
-     have <- :(mem (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr}))) =
-              mem (oflist (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr})))))
-     by apply fun_ext => *; smt(mem_oflist). 
-     smt().
-   by apply ler_wpmul2r; smt (mu_bounded). 
+   apply (ler_trans 
+       ((oget Multiple0.s_cpt{hr}.[i2])%r * mu1 dnonce max_n) _ _) 
+   => //; 2: by apply ler_wpmul2r; smt (mu_bounded). 
+   apply (ler_trans 
+     ((card (ptxt_hashed_l i2 RF_bad.m{hr}))%r * mu1 dnonce max_n) _ _) 
+   => //; 2: by apply ler_wpmul2r; smt (mu_bounded). 
+   rewrite imageE. 
+   have <- :(mem (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr}))) =
+            mem (oflist (unzip2 (elems (ptxt_hashed_l i2 RF_bad.m{hr})))))
+   by apply fun_ext => *; smt(mem_oflist). 
+   smt().
 
-  (* if the precondition for [tag] holds, the counter increases. *)
+  (* if the precondition for [tag] holds:
+     - the counter increases
+     - the invariant is preserved. *)
   + move => c. 
    proc; inline *; auto; sp. 
    if; 2 : by auto; smt ().
@@ -694,46 +777,34 @@ proof.
        oget Multiple0.s_cpt{hr}.[k] + if k = i2 then 1 else 0)).
      + by move => j H5 /=; smt (get_setE). 
      rewrite -sumrD -big_int -big_int big_if; 2 : smt(). 
-     rewrite /dom in H; smt().
+     by rewrite /dom in H; smt(). 
    split; 1 : smt(get_setE).
    split; 1 : smt(get_setE).
    move => j. 
-   case (i2 = j) => [->|Hdeq]. 
-   + rewrite !get_set_eqE // /=. print get_set_eqE.
-     rewrite /ptxt_hashed /ptxt_hashed_l. 
-     admit.
+   case (i2 = j) => [->>|Hdeq]. 
+   + rewrite !get_set_eqE // /=. 
+     rewrite /ptxt_hashed /ptxt_hashed_l fdom_set filterU fcardU filter1 /=.
+     rewrite fcard1 fsetI1 /=. 
+     rewrite /ptxt_hashed /ptxt_hashed_l in H3.
+     have H3i := (H3 j H). 
+     smt(fcard1 fcards0).
    rewrite !get_set_neqE //; 1 : smt(). 
-   move => H5.
+   move => H5. 
    rewrite (ptxt_hashed_eq _ _ RF_bad.m{hr}); 2 : smt().
    move => x.
    rewrite !/ptxt_hashed_l !in_filter !mem_fdom // /=.
    smt(get_setE).
 
-  (* if the precondition for [tag] does not holds, the counter does not 
-     increase. *)
-  + move => b _; proc; inline *; auto; sp.
-    if; 2 : by auto; smt ().
-    sp; if; 2 : by auto; smt ().
-    seq 1 :(#pre); 1 : by move => />; auto.
-    auto.
-    move => /> &hr i1.
-    pose i2 := (if n_tag <= i1 then 0 else i1).
-    move => *.
-    have -> /= : !(n_tag * n_session <=
-                   i2 * n_session + oget Multiple0.s_cpt{hr}.[i2]);
-    1 : smt ().
-   rewrite Tactics.eq_iff /dom => /=.
-   split.                       (* why is there a issue with '; 1 :' here ? *)
-   + by apply H1; smt().
-   split.                       (* why is there a issue with '; 1 :' here ? *)
-   + by apply H1; smt().
-   rewrite /dom in H2; progress; 1,2,3,4 : smt (get_setE).
-   have := euclideU n_session i2 j (oget Multiple0.s_cpt{hr}.[i2]) k.
-   have := (H1 i2 (oget Multiple0.s_cpt{hr}.[i2])) => *.
-   have := (H1 j k) => *.
-   smt (get_setE).
-
-
+  (* if the precondition for [tag] does not hold:
+     - the counter does not increase
+     - the invariant is preserved
+     - bad is preserved. *)
+  + move => b c. 
+   proc; inline *; auto; sp. 
+   if; 2 : by auto; smt ().
+   sp; if; 2 : by auto; smt ().
+   seq 1 :(#pre); auto => /> /#. 
+qed.
 
 
 (*-----------------------------------------------------------------------*)
@@ -781,89 +852,116 @@ proof.
           !(n_tag * n_session <= 
             iR * n_session + oget Multiple0.s_cpt{2}.[iR]) 
         by smt (n_tag_p n_session_p).
-        split; 1 : by smt(drf_sup).
-        move => /> *; split; 1: smt (get_setE).
-        move => /> *; split; 1: smt (get_setE).
-        move => /> *; split => *. 
-          (* 6 *)
-        + move :H6; case (iR = i00 /\ n{2} = x0) => [[Heq1 Heq2] | Hdeq] => H6.
-          + rewrite Heq1 Heq2 get_set_eqE /= in H6; 1 : smt (). 
-            have H7 := (H1 x0 i00 r1); case H6 => [->> | Hrin]. 
-            + exists (oget Multiple0.s_cpt{2}.[iR]). 
-              split; 1: smt(n_session_p n_tag_p).
-              rewrite get_set_eqE //. 
-              by smt (). 
-            case H7 => [H7 _]; have [j H8] := (H7 Hrin); exists j.
-            by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
-          rewrite get_set_neqE // in H6; 1 : smt ().
-          have H7 := (H1 x0 i00 r1).
-          case H7 => [H7 _]; have [j H8] := (H7 H6); exists j.
-          by case :(oget Multiple0.s_cpt{2}.[iR] = j); smt (get_setE).
-        move :H8;
-        (* Four almost identical cases. *)
-        case :(oget Multiple0.s_cpt{2}.[iR] = j); 
-        case (iR = i00 /\ n{2} = x0). 
-        + move => [Heq1 Heq2 Heq3]; 
-          rewrite Heq1 Heq2 -Heq3 get_set_eqE /=; 1 : smt (). 
-          rewrite get_set_eqE /=; 1 : smt(). 
-          move => [H8 | H8]; 1 : smt(). 
-          by right; apply H1; exists j; smt (get_setE).
-        + move => Hdeq Heq.
-          rewrite -Heq; rewrite !get_set_neqE /=; 1,2 : smt (). 
-          by move => H8; apply H1; exists j; smt (get_setE).
-        + move => [Heq1 Heq2 Hdeq]; 
-          rewrite Heq1 Heq2 !get_setE /=. 
-          have ->/= : !(i00 * n_session + j = 
-                        i00 * n_session + oget Multiple0.s_cpt{2}.[i00]) 
-          by smt ().
-          by move => H8; right; apply H1; exists j; smt (get_setE).
-        move => Hdeq Hdeq2.
-        rewrite !get_set_neqE /=; 2 : smt (). 
-        + have := euclideU n_session i00 iR j (oget Multiple0.s_cpt{2}.[iR]).
-          smt().
-        by move => H8; apply H1; exists j; smt (get_setE).        
-    auto; move => /> *; split; 1 : smt (). 
-    move => *; split; 1 : smt (). 
-    move => *; split; 1 : smt (). 
-    by move => *; rewrite H1; exists j; smt ().
-  auto; move => /> *; split; 1 : smt (). 
-  move => *; split; 1 : smt (). 
-  move => *; split; 1 : smt (). 
-  by move => *; rewrite H1; exists j; smt ().
+        split; 1 : by smt(drf_sup).        
+        move => /> *; smt(euclideU get_setE n_session_p n_tag_p). 
+    auto => /> /#. 
+  auto; move => /> /#. 
 
   (* reader *) 
   - proc; inline *; auto => />. 
-    while (#pre /\ 0 <= i{1} /\ ={i,b}); 2: by conseq />; auto; smt (n_session_p n_tag_p). 
+    while (#pre /\ 0 <= i{1} /\ ={i,b}); 
+    2: by conseq />; auto; smt (n_session_p n_tag_p). 
     conseq />; wp. 
     while {2} 
-        (0 <= j{2} <= n_session /\
-         (b0{2} <=> exists k, 0 <= k < j{2} /\
-           let i2 = i{2} * n_session + k in
-           (h{2} \in odflt [] RF_bad.m{2}.[(if EUF_RF.n{2} <= i2 then 0 else i2, n{2})])))
-      (n_session - j{2}).
-    + auto => /> *; progress; 1,2,5: smt (). 
-      + case H2; 1 : by move => [k H2]; exists k; smt(). 
-        move => *; exists (j{hr}); split; 1 : by smt (). 
-        by move :H3; rewrite /dom; case :(RF_bad.m{hr}.[_]); smt (). 
-      case (k = j{hr}) => [->> |Hk]. 
-      + by right => *; move :H4; rewrite /dom; case :(RF_bad.m{hr}.[_]); smt ().
-      by left; exists k; smt (). 
+      (0 <= j{2} <= n_session /\
+       (b0{2} <=> exists k, 0 <= k < j{2} /\
+        let i2 = i{2} * n_session + k in
+        (h{2} \in 
+         odflt [] RF_bad.m{2}.[(if EUF_RF.n{2} <= i2 then 0 else i2, n{2})])))
+      (n_session - j{2});
+    1 : by auto => /> *; smt(get_setE). 
     auto => /> *; split; 1 : by smt (n_session_p).
     move => *; split; 1 : smt (). 
     move => *; split; 1 : smt (). 
     congr.
-    have ->> : (j_R = n_session); 1 : smt ().
+    have ->> : (j_R = n_session); 1 : smt (). 
     have He := (H1 n{2} i{2} h{2}).
-    have -> /= : !(n_tag <= i{2}) by smt ().
+    have -> /= : !(n_tag <= i{2}) by smt (). 
     have <- /= : 
       (h{2} \in odflt [] RF_bad.m{1}.[i{2}, n{2}]) = 
-      (((i{2}, n{2}) \in RF_bad.m{1}) && (h{2} \in oget RF_bad.m{1}.[i{2}, n{2}])). 
+      (((i{2}, n{2}) \in RF_bad.m{1}) && 
+        (h{2} \in oget RF_bad.m{1}.[i{2}, n{2}])). 
     + by rewrite /dom; case (RF_bad.m{1}.[i{2}, n{2}]); smt ().
     rewrite He. 
-    rewrite Tactics.eq_iff; progress.
+    rewrite Tactics.eq_iff; progress. 
     + by exists j0; smt ().
     exists k; smt ().
 
   (* invariant implies the post *)
-  - auto => &1 &2 *; move :H => />; move => H j; smt ().
+  - auto => /#. 
+qed.
+
+
+(*-----------------------------------------------------------------------*)
+lemma unlink_aux1 &m (A <: Adv {Multiple0, PRFs, EUF_RF, RF_bad}) :
+  (forall (BH <: BasicHashT0{A}),
+    islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+  Pr[Unlink(A, Multiple, PRFs).main() @ &m : res] <=  
+  (  Pr[EUF_PRF_IND (PRFs,   D(A, Multiple0)).main() @ &m : res]
+   - Pr[EUF_PRF_IND (EUF_RF, D(A, Multiple0)).main() @ &m : res]) +
+  ( Pr[Unlink(A, Multiple, RF_bad).main() @ &m : res] +
+    (n_session^2 * n_tag)%r * mu1 dnonce max_n).
+proof.
+  move => Hll.
+  rewrite (eq_mult_PRF &m A).
+  have {1}-> : (  Pr[EUF_PRF_IND(PRFs, D(A, Multiple0)).main() @ &m : res] =
+               (  Pr[EUF_PRF_IND(PRFs, D(A, Multiple0)).main() @ &m : res]
+                - Pr[EUF_PRF_IND(EUF_RF, D(A, Multiple0)).main() @ &m : res])
+               +  Pr[Unlink(A, Multiple, EUF_RF).main() @ &m : res]) 
+  by have _ := eq_mult_RF &m A; smt().
+  apply ler_add2l. 
+  apply (ler_trans (Pr[Unlink(A, Multiple, RF_bad).main() @ &m : res] +
+                    Pr[Unlink(A, Multiple, RF_bad).main() @ &m : RF_bad.bad]));
+  1 : by apply (coll_multiple &m A Hll).
+  apply ler_add2l. 
+  have H := (coll_bound_multiple &m A Hll); rewrite /pr_bad /pr_bad_step_r in H. 
+  rewrite expr2.
+  smt().
+qed.
+
+lemma unlink_aux2 &m (A <: Adv {Multiple0, PRFs, EUF_RF, RF_bad, EUF_RF2}) :
+  (forall (BH <: BasicHashT0{A}),
+    islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+  Pr[Unlink(A, Single, PRFs).main() @ &m : res] =  
+  (  Pr[EUF_PRF_INDb(PRFs,   D(A, Single0)).main() @ &m : res]
+   - Pr[EUF_PRF_INDb(EUF_RF, D(A, Single0)).main() @ &m : res]) +
+  Pr[Unlink(A, Single, RF_bad).main() @ &m : res].
+proof.
+  move => Hll.
+  rewrite (eq_single_PRF &m A) -(eq_single_RF &m A).
+  rewrite (coll_single_eq &m A Hll). 
+  smt().
+qed.
+
+
+(*-----------------------------------------------------------------------*)
+(* Final result. *)
+lemma unlinkability &m (A <: Adv {Multiple0, PRFs, EUF_RF, RF_bad, EUF_RF2}) :
+  (* We assume that the adversary is lossless (i.e. always terminates). *)
+  (forall (BH <: BasicHashT0{A}),
+    islossless BH.tag => islossless BH.reader => islossless A(BH).a) =>
+
+  (* Advantage of A against the unlinkability game. *)
+    Pr[Unlink(A, Multiple, PRFs).main() @ &m : res]
+  - Pr[Unlink(A, Single,   PRFs).main() @ &m : res] <=
+
+  (* Advantage of B=D(A, Multiple0) against PRF/EUF_RF 
+     with [n_tag] keys. *)
+  (  Pr[EUF_PRF_IND (PRFs,   D(A, Multiple0)).main() @ &m : res]
+   - Pr[EUF_PRF_IND (EUF_RF, D(A, Multiple0)).main() @ &m : res]) +
+
+  (* Advantage of B=D(A, Single0) against PRF/EUF_RF 
+     with [n_tag * n_session] keys. *)
+  (  Pr[EUF_PRF_INDb(EUF_RF, D(A, Single0  )).main() @ &m : res]
+   - Pr[EUF_PRF_INDb(PRFs,   D(A, Single0  )).main() @ &m : res]) +
+
+  (* Collision probability between nonces hashed by each tag. *)
+  (n_session^2 * n_tag)%r * mu1 dnonce max_n.
+proof.
+  move => Hll.
+  have H1 := (unlink_aux1 &m A Hll).
+  have H2 := (unlink_aux2 &m A Hll).
+  rewrite (eq_single_mult &m A) in H1.  
+  rewrite (unlink_aux2 &m A Hll). 
+  smt().
 qed.
