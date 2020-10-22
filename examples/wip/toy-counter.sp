@@ -36,15 +36,13 @@ axiom counterInit : d@init = myZero
 abstract myPred : message->message
 abstract mySucc : message->message
 axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
-axiom succPred : forall (n:message), mySucc(myPred(n)) = n
 
 (* order relation for counter *)
 abstract orderOk : message
 abstract order : message->message->message
 axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
-axiom orderPred : forall (n:message), order(myPred(n),n) = orderOk
-axiom orderTrans : 
-  forall (n1,n2,n3:message), 
+axiom orderTrans :
+  forall (n1,n2,n3:message),
     (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
     => order(n1,n3) = orderOk
 axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
@@ -93,10 +91,9 @@ goal auth : forall (j:index), cond@B(j) => exists (i:index), A(i)<B(j) && input@
 Proof.
 intros.
 expand cond@B(j).
-apply predSucc to d@pred(B(j)).
-assert input@B(j) = h(<d@pred(B(j)),secret>,key).
-euf M2.
+euf M0.
 exists i.
+case H0.
 Qed.
 
 goal secretReach : forall (j:index), cond@B(j) => False.
