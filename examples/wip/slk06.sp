@@ -1,15 +1,21 @@
 (*******************************************************************************
 SLK06
 
-T. van Deursen and S. Radomirović, ‘Attacks on RFID Protocols’, 
+T. van Deursen and S. Radomirović, ‘Attacks on RFID Protocols’,
 Cryptology ePrint Archive, vol. 2008, no. 310, pp. 1–56, Aug. 2009.
 
 The protocol assumes that the reader and tag share the secrets k, ID, and PIN.
 While ID and PIN are unique to each tag, k is equal for all tags the reader is
-allowed to authenticate. 
-The tag further stores the timestamp TSlast of the last successful mutual 
+allowed to authenticate.
+The tag further stores the timestamp TSlast of the last successful mutual
 authentication initialized to 0 at the factory.
 *******************************************************************************)
+
+(* WARNING *)
+(* Until the semantics is fixed in the tool, a state macro s@t is interpreted:
+    - by the value AFTER the update for occurrences in output, cond terms,
+    - by the value BEFORE the update for occurrences in update term.
+   This is why we store in the state both old and current values. *)
 
 hash h
 hash h1
@@ -32,8 +38,8 @@ name key3 : index->message
 name idinit : index->message
 name pin : index->message
 
-mutable kT : index->message (* <<ID_old,TSlast_old>,<ID,TSlast>> *) 
-mutable kR : index->message (* <ID_old,ID> *) 
+mutable kT : index->message (* <<ID_old,TSlast_old>,<ID,TSlast>> *)
+mutable kR : index->message (* <ID_old,ID> *)
 mutable TS : message
 
 channel cT
@@ -55,8 +61,8 @@ process tag(i:index,j:index) =
     if x3 = h2(<fst(fst(kT(i))),pin(i)>,key2(i)) then
       kT(i) := <snd(kT(i)), <h3(<<fst(snd(kT(i))),pin(i)>,snd(x1)>,key3(i)), snd(x1)>>;
       out(cT, ok)
-    else 
-      out(cT, error) 
+    else
+      out(cT, error)
   else
     out(cT, error)
 
@@ -65,17 +71,17 @@ process reader(jj:index) =
   TS := TSnext(TS);
   out(cR, <h(TS,k),TS>);
   in(cT, x2);
-  try find ii such that x2 = h1(fst(kR(ii)), key1(ii)) in  
+  try find ii such that x2 = h1(fst(kR(ii)), key1(ii)) in
     kR(ii) := <snd(kR(ii)),h3(<<snd(kR(ii)),pin(ii)>,TS>,key3(ii))>;
     out(cR, h2(<fst(kR(ii)),pin(ii)>,key2(ii)))
-  else 
+  else
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 goal auth_R1 :
 forall (jj,ii:index),
-  cond@R1(jj,ii) 
+  cond@R1(jj,ii)
   =>
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 Proof.

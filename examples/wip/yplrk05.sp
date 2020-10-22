@@ -11,7 +11,11 @@ The reader then replies with h(k2) and both tag and reader update secrets k1 and
 k2.
 *******************************************************************************)
 
-(* Our protocol works under the natural assumptionthatThas a hash function, XOR gate, and the capabil-ity to keep state during a single session. *)
+(* WARNING *)
+(* Until the semantics is fixed in the tool, a state macro s@t is interpreted:
+    - by the value AFTER the update for occurrences in output, cond terms,
+    - by the value BEFORE the update for occurrences in update term.
+   This is why we store in the state both old and current values. *)
 
 hash h1
 hash h2
@@ -145,7 +149,7 @@ goal auth_T1_induction_weak :
 forall (t:timestamp), forall (i,j:index),
   (t = T1(i,j) && exec@t) (* exec@t (not only cond@t) is needed in the proof *)
   =>
-  (exists (jj:index), 
+  (exists (jj:index),
    R1(jj,i) < t &&
    output@R1(jj,i) = input@t).
 Proof.
@@ -171,4 +175,3 @@ euf M1.
   expand exec@T1(i,j1). expand cond@T1(i,j1).
   exists jj.
 Qed.
-
