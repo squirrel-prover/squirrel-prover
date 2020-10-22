@@ -9,6 +9,9 @@ The reader initiates the protocol by challenging the tag with a nonce r1.
 The tag responds with h(k1 XOR r1 XOR k).
 The reader then replies with h(k2) and both tag and reader update secrets k1 and
 k2.
+
+In this model we use 2 different keyed hash functions, instead of a single (not
+keyed) hash function as in the specification.
 *******************************************************************************)
 
 (* WARNING *)
@@ -70,7 +73,7 @@ process reader(jj:index) =
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
-(* Assumption on the sequentiality of the sessions for a given tag's id *)
+(* Minimal sequentiality assumption needed for the proofs *)
 axiom sequentiality :
   forall (t:timestamp), forall (i,j:index),
     T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')
