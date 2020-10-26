@@ -1,0 +1,132 @@
+(*******************************************************************************
+FELDHOFER
+
+[B] Martin Feldhofer, Sandra Dominikus, and Johannes Wolkerstorfer.
+Strong authentication for RFID systems using the AES algorithm. In
+Marc Joye and Jean-Jacques Quisquater, editors, Cryptographic Hard-
+ware and Embedded Systems - CHES 2004: 6th International Workshop
+Cambridge, MA, USA, August 11-13, 2004. Proceedings, volume 3156
+of Lecture Notes in Computer Science, pages 357–370. Springer, 2004.
+
+R --> T : nr
+T --> R : enc(<nr,nt>,k)
+R --> T : enc(<nt,nr>,k)
+
+*******************************************************************************)
+
+proof{
+   auto;
+   SArename xnt_2;
+   insert before "find u " "find i <= NT, j <= NK suchthat defined(xnr[i, j], s_1[i, j]) && (s_1[i, j] = xr) && (nr = xnr[i, j]) then";
+   simplify;
+   remove_assign useless;
+   simplify;
+   insert before "find u_4" "find ri_8 <= NR suchthat defined(s[ri_8], j_2[ri_8], i_2[ri_8]) && (i_2[ri_8] = iT) && (j_2[ri_8] = iK) && (s[ri_8] = xt) then";
+   simplify;
+   remove_assign useless;
+   merge_branches;
+   
+   start_from_other_end;
+   auto;
+   SArename xnt_5;
+   insert before "find u_1 " "find  ri <= NT, j <= NK suchthat defined(xnr_1[ri, j], s_6[ri, j]) && s_6[ri, j] = xr_1 && nr_1 = xnr_1[ri, j] then";
+   simplify;
+   remove_assign useless;
+   simplify;
+   insert before "find u_14" "find ri <= NR suchthat defined(ri_20[ri], s_5[ri], j_4[ri]) && (j_4[ri] = iK_1) && (s_5[ri] = xt_1) && iT_1 = ri_20[ri] then"; 
+   simplify;
+   remove_assign useless;
+   merge_branches;
+   success
+   }
+
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [fixed].
+type cleartext [fixed].
+type ciphertext[large,fixed].
+
+fun concat1(nonce, nonce):cleartext [data].
+
+
+
+(* Shared-key encryption (IND-CPA + INT-CTXT Stream cipher) *)
+
+proba Penc.
+proba Pencctxt.
+
+expand INDdollar_CPA_INT_CTXT_sym_enc(key, cleartext, ciphertext, ciphertext, enc, dec, injbot, Z, enc_len, truncate, Penc, Pencctxt).
+
+const Zconcat1:cleartext.
+equation forall y:nonce,z:nonce; 
+        Z(concat1(y,z)) = Zconcat1.
+
+equation forall s:ciphertext;
+        truncate(s, enc_len(Zconcat1)) = s.
+
+channel c0, c1, c2, c3, c4, c5, c6, c7, cok, cko, startid, finishid, startsess, finishsess.
+
+
+let processT(k:key) = 
+    in(c0, xnr:nonce); 
+    new nt:nonce;
+    let et = enc(concat1(xnr,nt),k) in
+    out(c1, et);
+    in(c2,xt:ciphertext);
+    let injbot(concat1(=nt,=xnr)) = dec(xt,k) in out(cok,()) else out(cko,()).
+
+let multiple = 
+    ( ! iK <= NK
+      in(startid, ());
+      new kTn:key;
+      let kTm:key = kTn in
+      out(finishid, ());
+      ! iT <= NT
+      in(startsess, ());
+      out(finishsess, ());
+      processT(kTm)
+      )| (
+      !iR <= NR
+      in(c3,());
+      new nr: nonce;
+      out(c4, nr);
+      in(c5, xr:ciphertext);
+      find u =i <= NT, v =j <= NK suchthat
+      defined(kTm[j]) && (let injbot(concat1(=nr, xnt:nonce)) = dec(xr, kTm[j]) in true else false) 
+      then
+      (let injbot(concat1(=nr, xnt:nonce)) = dec(xr, kTm[v]) in 
+      let er = enc(concat1(xnt,nr),kTm[v]) in
+      out(c6, er) else out(c7,())) else out(c7,())).
+
+
+let single = 
+    ( ! iK <= NK
+      in(startid, ());
+      out(finishid, ());
+      ! iT <= NT
+      in(startsess, ());
+      new kTn:key;      
+      let kTs:key = kTn  in  
+      out(finishsess, ());
+      processT(kTs)
+      )| (
+      !iR <= NR
+      in(c3,());
+      new nr: nonce;
+      out(c4, nr);
+      in(c5, xr:ciphertext);
+      find u =i <= NT, v =j <= NK suchthat
+      defined(kTs[i,j])  &&  (let injbot(concat1(=nr, xnt:nonce)) = dec(xr, kTs[i,j]) in true else false) 
+      then
+      (let injbot(concat1(=nr,xnt:nonce)) = dec(xr,kTs[u,v]) in
+      let er = enc(concat1(xnt,nr),kTs[u,v]) in
+      out(c6, er) else out(c7,())) else out(c7,())).
+
+equivalence single multiple
+
+(* EXPECTED
+All queries proved.
+0.080s (user 0.080s + system 0.000s), max rss 15876K
+END *)
