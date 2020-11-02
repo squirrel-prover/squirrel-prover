@@ -115,6 +115,7 @@ type conversion_error =
   | Timestamp_expected of term
   | Timestamp_unexpected of term
   | Untypable_equality of term
+  | String_expected of term
 
 exception Conv of conversion_error
 

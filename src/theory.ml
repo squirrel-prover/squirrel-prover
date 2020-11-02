@@ -126,6 +126,7 @@ type conversion_error =
   | Timestamp_expected of term
   | Timestamp_unexpected of term
   | Untypable_equality of term
+  | String_expected of term
 
 exception Conv of conversion_error
 
@@ -148,6 +149,10 @@ let pp_error ppf = function
         "Comparison %a cannot be typed@ \
          (operands do not have the same type,@ \
          or do not have a type@ for which the comparison is allowed)"
+        pp t
+  | String_expected t ->
+          Fmt.pf ppf
+        "The term %a cannot be seen as a string."
         pp t
 
 let check_arity s actual expected =

@@ -89,15 +89,9 @@ let parse_formula fact =
           fact
           Sorts.Boolean
 
-(** Prover tactics, and tables for storing them. *)
-
-type tac_arg =
-  | String_name of string
-  | Int of int
-  | Theory of Theory.term
 
 type 'a tac_infos = {
-  maker : tac_arg list -> 'a Tactics.tac ;
+  maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
   help : string
 }
 
@@ -108,7 +102,7 @@ type 'a table = (string, 'a tac_infos) Hashtbl.t
 module type Table_sig = sig
   type judgment
   val table : judgment table
-  val get : string -> tac_arg list -> judgment Tactics.tac
+  val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
   val to_goal : judgment -> Goal.t
   val from_trace : TraceSequent.t -> judgment
   val from_equiv : Goal.t -> judgment
@@ -140,17 +134,17 @@ end
 
 (** Functor building AST evaluators for our judgment types. *)
 module Make_AST (T : Table_sig) :
-  (Tactics.AST_sig with type arg = tac_arg with type judgment = T.judgment)
+  (Tactics.AST_sig with type arg = TacticsArgs.parser_arg with type judgment = T.judgment)
 = Tactics.AST(struct
 
-  type arg = tac_arg
+  type arg = TacticsArgs.parser_arg
 
   type judgment = T.judgment
 
   let pp_arg ppf = function
-    | Int i -> Fmt.int ppf i
-    | String_name s -> Fmt.string ppf s
-    | Theory th -> Theory.pp ppf th
+    | TacticsArgs.Int i -> Fmt.int ppf i
+    | TacticsArgs.String_name s -> Fmt.string ppf s
+    | TacticsArgs.Theory th -> Theory.pp ppf th
 
   let simpl () =
     let tsimpl = TraceTable.get "simpl" [] in
@@ -174,10 +168,10 @@ module Make_AST (T : Table_sig) :
 
   let pp_abstract ~pp_args s args ppf =
     match s,args with
-      | "apply",[String_name id] ->
+      | "apply",[TacticsArgs.String_name id] ->
           Fmt.pf ppf "apply %s" id
-      | "apply", String_name id :: l ->
-          let l = List.map (function Theory t -> t | _ -> assert false) l in
+      | "apply", TacticsArgs.String_name id :: l ->
+          let l = List.map (function TacticsArgs.Theory t -> t | _ -> assert false) l in
           Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
@@ -197,15 +191,27 @@ module type Tactics_sig = sig
   type tac = judgment Tactics.tac
 
   val register_general :
-    string -> ?help:string -> (tac_arg list -> tac) -> unit
-  val register : string -> ?help:string -> tac -> unit
-  val register_formula :
-    string -> ?help:string -> (Term.formula -> tac) -> unit
+    string -> ?help:string -> (TacticsArgs.parser_arg list -> tac) -> unit
+
   val register_macro :
     string -> ?modifiers:string list -> ?help:string ->
-    tac_arg Tactics.ast -> unit
+    TacticsArgs.parser_arg Tactics.ast -> unit
 
-  val get : string -> tac_arg list -> tac
+
+  val register : string -> ?help:string -> (judgment -> judgment list) -> unit
+
+  val register_one : string -> ?help:string ->
+    ('a TacticsArgs.arg -> judgment -> judgment list) ->
+    'a TacticsArgs.sort  -> unit
+
+  val register_two : string -> ?help:string ->
+    ('a TacticsArgs.arg -> 'b TacticsArgs.arg -> judgment -> judgment list) ->
+    'a TacticsArgs.sort  -> 'b TacticsArgs.sort -> unit
+
+  val register_orelse :
+    string -> ?help:string -> string list -> unit
+
+  val get : string -> TacticsArgs.parser_arg list -> tac
 
   val pp : Format.formatter -> string -> unit
   val pps : Format.formatter -> unit -> unit
@@ -216,7 +222,7 @@ module Prover_tactics
   (M : Table_sig)
   (AST : Tactics.AST_sig
            with type judgment = M.judgment
-           with type arg = tac_arg) :
+           with type arg = TacticsArgs.parser_arg) :
   Tactics_sig with type judgment = M.judgment =
 struct
 
@@ -228,48 +234,143 @@ struct
     assert (not (Hashtbl.mem table id)) ;
     Hashtbl.add table id { maker = f ; help = help}
 
+  let rec convert_argsb parser_args tactic_typess j =
+    let env =
+      match M.to_goal j with
+      | Goal.Trace t -> TraceSequent.get_env t
+      | Goal.Equiv e -> EquivSequent.get_env e
+    in
+    let tsubst = Theory.subst_of_env env in
+    let open TacticsArgs in
+    match parser_args, tactic_typess with
+    | (Theory p::q, Sort Timestamp :: s) ->
+      let aux = convert_argsb q s j in
+      Arg (Timestamp (Theory.convert tsubst p Sorts.Timestamp)) :: aux
+    | (Theory p::q, Sort Message :: s) ->
+      let aux = convert_argsb q s j in
+      Arg (Message (Theory.convert tsubst p Sorts.Message)) :: aux
+    | (Theory p::q, Sort Boolean :: s) ->
+      let aux = convert_argsb q s j in
+      Arg (Boolean (Theory.convert tsubst p Sorts.Boolean)) :: aux
+    | (Theory (Var p)::q, Sort String :: s) ->
+      let aux = convert_argsb q s j in
+      Arg (String p) :: aux
+    | (Theory t::q, Sort String :: s) -> raise Theory.(Conv (String_expected t))
+    | (Theory (Var p)::q, Sort Index :: s) ->
+      let aux = convert_argsb q s j in
+      Arg (Index (Theory.conv_index tsubst (Var p))) :: aux
+    | [], [] -> []
+    | _ -> failwith "not implemented"
+
   let register id ?(help="") f =
     register_general id ~help:help
-      (fun args j sk fk ->
-         if args = [] then f j sk fk else
-           raise @@ Tactics.Tactic_hard_failure
-             (Tactics.Failure "this tactic does not take arguments"))
+      (function
+        | [] ->
+          fun s sk fk -> begin match f s with
+              | subgoals -> sk subgoals fk
+              | exception Tactics.Tactic_soft_failure e -> fk e
+            end
+        | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+
+  let register_one id  ?(help="") f sort =
+    register_general id ~help:help
+      (fun args s sk fk ->
+         match convert_argsb args ([TacticsArgs.Sort sort]) s with
+         | [TacticsArgs.Arg (th)]  ->
+           begin
+             try
+               let th = TacticsArgs.cast sort th in
+               begin
+                 match f (th) s with
+                 | subgoals -> sk subgoals fk
+                 | exception Tactics.Tactic_soft_failure e -> fk e
+               end
+             with TacticsArgs.Uncastable ->
+               Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
+           end
+         | exception Theory.(Conv e) -> fk (Tactics.Cannot_convert e)
+         | _  -> Tactics.hard_failure (Tactics.Failure "improper arguments")
+
+      )
+
+  let register_two id  ?(help="") f sort1 sort2 =
+    register_general id ~help:help
+      (fun args s sk fk ->
+         match convert_argsb args
+                 ([TacticsArgs.Sort sort1; TacticsArgs.Sort sort2]) s
+         with
+         | [TacticsArgs.Arg (th1); TacticsArgs.Arg (th2)]  ->
+           begin
+             try
+               let
+                 th1 = TacticsArgs.cast sort1 th1
+               and
+                 th2 = TacticsArgs.cast sort2 th2
+               in
+               begin
+                 match f th1 th2 s with
+                 | subgoals -> sk subgoals fk
+                 | exception Tactics.Tactic_soft_failure e -> fk e
+               end
+             with TacticsArgs.Uncastable ->
+               Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
+          end
+         | exception Theory.(Conv e) -> fk (Tactics.Cannot_convert e)
+         | _  -> Tactics.hard_failure (Tactics.Failure "improper arguments")
+
+      )
+
+
+  let register_orelse id ?(help="") ids =
+    register_general id
+      ~help:help
+      (fun args s sk fk -> AST.eval ["nosimpl"]
+          (Tactics.OrElse
+             (List.map (fun id -> Tactics.Abstract (id,args) ) ids)
+          )
+          s sk fk)
 
   let register_formula id ?(help="") f =
     register_general id ~help:help
       (fun args j sk fk -> match args with
          | [Theory x] ->
-             begin match parse_formula x with
-               | x -> f x j sk fk
-               | exception Theory.Conv e ->
-                   fk (Tactics.Cannot_convert e)
-             end
+           begin match parse_formula x with
+             | x -> f x j sk fk
+             | exception Theory.Conv e ->
+               fk (Tactics.Cannot_convert e)
+           end
          | _ ->
-             raise @@ Tactics.Tactic_hard_failure
-               (Tactics.Failure "formula argument expected"))
+           raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure "formula argument expected"))
 
   let register_macro id ?(modifiers=["nosimpl"]) ?(help="") m =
-    register id ~help:help (fun s sk fk -> AST.eval modifiers m s sk fk)
+    register_general id ~help:help
+      (fun args s sk fk ->
+         if args = [] then AST.eval modifiers m s sk fk else
+           raise @@ Tactics.Tactic_hard_failure
+             (Tactics.Failure "this tactic does not take arguments"))
 
   let pp fmt id =
     let help_text =
       try (Hashtbl.find table id).help with
       | Not_found -> raise @@ Tactics.Tactic_hard_failure
-             (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
+          (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
     in
     Fmt.pf fmt  "@.@[<v 0>- %a - @[ %s @]@]@."
-                  Fmt.(styled `Bold (styled `Magenta Utils.ident))
-                  id help_text
+      Fmt.(styled `Bold (styled `Magenta Utils.ident))
+      id help_text
 
   let pps fmt () =
     let helps =
       Hashtbl.fold (fun name tac acc -> (name, tac.help)::acc) table []
-    |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
+      |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
     in
-    List.iter (fun (name, help) -> Fmt.pf fmt "@.@[<v 0>- %a - @[ %s @]@]@."
-                  Fmt.(styled `Bold (styled `Magenta Utils.ident))
-                  name
-                  help) helps
+    List.iter (fun (name, help) ->
+        if help <> "" then
+          Fmt.pf fmt "@.@[<v 0>- %a - @[ %s @]@]@."
+            Fmt.(styled `Bold (styled `Magenta Utils.ident))
+            name
+            help) helps
 
 end
 
@@ -297,10 +398,10 @@ let get_equiv_help tac_name =
 
 let () =
 
-  TraceTactics.register "admit"
+  TraceTactics.register_general "admit"
     ~help:"Closes the current goal.\
            \n Usage: admit."
-    (fun _ sk fk -> sk [] fk) ;
+    (fun _ _ sk fk -> sk [] fk) ;
 
   TraceTactics.register_general "help"
     ~help:"Display all available commands.\n Usage: help."
@@ -318,7 +419,7 @@ let () =
       | _ ->  raise @@ Tactics.Tactic_hard_failure
           (Tactics.Failure"improper arguments")) ;
 
-  TraceTactics.register "id" ~help:"Identity.\n Usage: identity." Tactics.id
+  TraceTactics.register_general "id" ~help:"Identity.\n Usage: identity." (fun _ -> Tactics.id)
 
 let get_goal_formula gname =
   match
@@ -370,7 +471,7 @@ let make_equiv_goal_process system_1 system_2 =
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of tac_arg Tactics.ast
+  | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -463,7 +564,7 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | Tactics.Abstract ("cycle",[Int i]) -> subgoals := cycle i !subgoals; false
+  | Tactics.Abstract ("cycle",[TacticsArgs.Int i]) -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
 let start_proof () = match !current_goal, !goals with

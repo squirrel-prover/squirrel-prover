@@ -10,17 +10,17 @@ module T = Prover.TraceTactics
 
 (** Reduce a goal with a disjunction conclusion into the goal
   * where the conclusion has been replace with the first disjunct. *)
-let goal_or_right_1 (s : TraceSequent.t) sk fk =
+let goal_or_right_1 (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
-  | (Or (lformula, _)) -> sk [TraceSequent.set_conclusion (lformula) s] fk
-  | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
+  | (Or (lformula, _)) -> [TraceSequent.set_conclusion (lformula) s]
+  | _ -> Tactics.soft_failure (Tactics.Failure "Cannot introduce a disjunction")
 
 (** Reduce a goal with a disjunction conclusion into the goal
   * where the conclusion has been replace with the second disjunct. *)
-let goal_or_right_2 (s : TraceSequent.t) sk fk =
+let goal_or_right_2 (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
-  | (Or (_, rformula)) -> sk [TraceSequent.set_conclusion (rformula) s] fk
-  | _ -> fk (Tactics.Failure "Cannot introduce a disjunction")
+  | (Or (_, rformula)) -> [TraceSequent.set_conclusion (rformula) s]
+  | _ -> Tactics.soft_failure (Tactics.Failure "Cannot introduce a disjunction")
 
 let () =
   T.register "left"
@@ -34,18 +34,18 @@ let () =
            \n Usage: right."
     goal_or_right_2
 
-let goal_true_intro (s : TraceSequent.t) sk fk =
+let goal_true_intro (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
-  | True -> sk [] fk
-  | _ -> fk (Tactics.Failure "Cannot introduce true")
+  | True -> []
+  | _ -> Tactics.soft_failure (Tactics.Failure "Cannot introduce true")
 
 let () =
   T.register "true" ~help:"Concludes if the goal is true.\n Usage: true."
     goal_true_intro
 
-let print (s : TraceSequent.t) sk fk =
+let print (s : TraceSequent.t) =
   Printer.prt `Result "@.%a@." Action.pp_descrs (TraceSequent.system s);
-   sk [s] fk
+   [s]
 
 let () =
   T.register "print" ~help:"Shows the current system.\n Usage: print."
@@ -53,12 +53,12 @@ let () =
 
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
-let goal_and_right (s : TraceSequent.t) sk fk =
+let goal_and_right (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
   | And (lformula, rformula) ->
-    sk [ TraceSequent.set_conclusion lformula s ;
-         TraceSequent.set_conclusion rformula s ] fk
-  | _ -> fk (Tactics.Failure "Cannot introduce a conjunction")
+    [ TraceSequent.set_conclusion lformula s ;
+      TraceSequent.set_conclusion rformula s ]
+  | _ -> Tactics.soft_failure (Tactics.Failure "Cannot introduce a conjunction")
 
 let () =
   T.register "split"
@@ -106,20 +106,18 @@ let left_introductions s l =
     | [s] -> s
     | _ -> assert false
 
-let left_intros hyp_name s sk fk =
+let left_intros (TacticsArgs.String hyp_name) s =
   match TraceSequent.select_formula_hypothesis hyp_name s ~remove:true with
-    | s,formula -> sk [left_introductions s [(formula,"")]] fk
-    | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
+    | s,formula -> [left_introductions s [(formula,"")]]
+    | exception Not_found -> Tactics.soft_failure (Tactics.Failure "no such hypothesis")
 
 let () =
-  T.register_general "introsleft"
+  T.register_one "introsleft"
     ~help:"Simplify conjunctions and existentials in an hypothesis.\
            \n Usage: introsleft H."
-    (function
-      | [Prover.Theory (Theory.Var h)] -> left_intros h
-      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    left_intros TacticsArgs.String
 
-let left_not_intro hyp_name s =
+let left_not_intro (TacticsArgs.String hyp_name) s =
   let s,formula =
     TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
   let rec not_f = function
@@ -142,20 +140,13 @@ let left_not_intro hyp_name s =
   | _ -> Tactics.soft_failure (Tactics.Failure "cannot introduce negation")
 
 let () =
-  T.register_general "notleft"
+  T.register_one "notleft"
     ~help:"Push a negation inside a formula.\
            \n Usage: notleft H."
-    (function
-      | [Prover.Theory (Theory.Var h)] ->
-          fun s sk fk -> begin match left_not_intro h s with
-            | subgoals -> sk subgoals fk
-            | exception Tactics.Tactic_soft_failure e -> fk e
-          end
-      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
-
+    left_not_intro TacticsArgs.String
 
 (** Case analysis on a timestamp *)
-let timestamp_case ts s =
+let timestamp_case (TacticsArgs.Timestamp ts) s =
   let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
   let add_action a =
     let indices =
@@ -181,8 +172,13 @@ let timestamp_case ts s =
   Action.iter_descrs system add_action ;
   [TraceSequent.add_formula !f s]
 
+
+let () =
+  T.register_one "tscase" timestamp_case TacticsArgs.Timestamp
+
+
 (** Case analysis on a disjunctive hypothesis *)
-let hypothesis_case hypothesis_name (s : TraceSequent.t) =
+let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   let s,f =
     TraceSequent.select_formula_hypothesis hypothesis_name s ~remove:true in
   let rec disjunction_to_list acc = function
@@ -195,6 +191,10 @@ let hypothesis_case hypothesis_name (s : TraceSequent.t) =
     Tactics.soft_failure
       (Tactics.Failure "can only be applied to a disjunction") ;
   List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas
+
+
+let () =
+  T.register_one "hcase" hypothesis_case TacticsArgs.String
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -218,19 +218,8 @@ let case_cond orig vars c t e s =
     s |> add_formula c'
       |> apply_subst else_subst ]
 
-let case th s =
-  (* Try converting to timestamp, message or hypothesis. *)
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  match Theory.convert tsubst th Sorts.Timestamp with
-  | ts -> timestamp_case ts s
-  | exception _ ->
-      begin match th with
-        | Theory.Var m ->
-            begin try hypothesis_case m s with
-              | Not_found -> Tactics.(soft_failure (Undefined m))
-            end
-        | _ ->
-           begin match Theory.convert tsubst th Sorts.Message with
+let message_case (TacticsArgs.Message m) s =
+           begin match m with
              | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
              | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
              | Term.Macro ((m,Sorts.Message,is),[],ts) as o
@@ -251,31 +240,21 @@ let case th s =
              | exception _ ->
                Tactics.(soft_failure (Failure "improper argument"))
            end
-      end
+
 
 let () =
-  T.register_general "case"
+  T.register_one "messcase" message_case TacticsArgs.Message
+
+let () =
+  let open Tactics in
+  T.register_orelse "case"
     ~help:"Perform case analysis on a timestamp, a message built using a \
            conditional,\
            \n or a disjunction hypothesis.\
            \n Usage: case T, or case H."
-    (function
-       | [Prover.Theory th] ->
-          begin fun s sk fk -> match case th s with
-            | subgoals -> sk subgoals fk
-            | exception Tactics.Tactic_soft_failure e -> fk e
-          end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    ["tscase"; "hcase"; "messcase"]
 
-let depends t1 t2 s =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let a1, a2 =
-    try
-      Theory.convert tsubst t1 Sorts.Timestamp,
-      Theory.convert tsubst t2 Sorts.Timestamp
-    with _ -> Tactics.soft_failure
-                (Tactics.Failure "cannot convert arguments to timestamps")
-  in
+let depends (TacticsArgs.Timestamp a1) (TacticsArgs.Timestamp a2) s =
   match a1, a2 with
   | Term.Action( n1, is1), Term.Action (n2, is2) ->
     if Action.(depends (of_term n1 is1) (of_term n2 is2)) then
@@ -288,17 +267,11 @@ let depends t1 t2 s =
   | _ -> Tactics.soft_failure (Tactics.Failure "arguments must be actions")
 
 let () =
-  T.register_general "depends"
+  T.register_two "depends"
     ~help:"If the second action given as argument depends on the first action,\
            \n add the corresponding timestamp inequality.\
            \n Usage: depends a1, a2."
-    (function
-       | [Prover.Theory t1; Prover.Theory t2] ->
-           fun s sk fk -> begin match depends t1 t2 s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    depends TacticsArgs.Timestamp TacticsArgs.Timestamp
 
 let false_left s =
   try
@@ -310,21 +283,15 @@ let false_left s =
   with Not_found -> Tactics.(soft_failure @@ Failure "no False assumption")
 
 let () =
-  T.register_general "false_left"
+  T.register "false_left"
     ~help:"Closes a goal when False is among its assumptions.\
            \n Usage: false_left."
-    (function
-       | [] ->
-           fun s sk fk -> begin match false_left s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+    false_left
 
 (** [goal_intro judge] perform introduces the topmost connective
   * of the conclusion formula, when this can be done in an invertible
   * and non-branching manner. *)
-let goal_intro (s : TraceSequent.t) sk fk =
+let goal_intro (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
   | ForAll (vs,f) ->
     let env = ref (TraceSequent.get_env s) in
@@ -339,23 +306,23 @@ let goal_intro (s : TraceSequent.t) sk fk =
     let new_judge = TraceSequent.set_conclusion new_formula s
                     |> TraceSequent.set_env (!env)
     in
-    sk [new_judge] fk
+    [new_judge]
   | Exists ([],f) ->
-    sk [TraceSequent.set_conclusion f s] fk
+    [TraceSequent.set_conclusion f s]
   | Impl(lhs,rhs)->
     let s' =
       TraceSequent.add_formula lhs (TraceSequent.set_conclusion rhs s) in
-    sk [s'] fk
+    [s']
   | Not f ->
-    sk [TraceSequent.set_conclusion False s |> TraceSequent.add_formula f] fk
+    [TraceSequent.set_conclusion False s |> TraceSequent.add_formula f]
   | True ->
-    sk [] fk
+    []
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
     let s' = TraceSequent.set_conclusion False s |> TraceSequent.add_formula (Atom h) in
-    sk [s'] fk
+    [s']
   | _ ->
-      fk (Tactics.Failure
+      Tactics.soft_failure (Tactics.Failure
             "Can only introduce implication, universal quantifications \
              \n and disequality conclusions.")
 
@@ -393,7 +360,7 @@ let () =
        let ths =
          List.map
            (function
-              | Prover.Theory tm -> tm
+              | TacticsArgs.Theory tm -> tm
               | _ -> Tactics.(hard_failure (Failure "improper arguments")))
            l
        in
@@ -401,7 +368,7 @@ let () =
            | subgoals -> sk subgoals fk
            | exception Tactics.Tactic_soft_failure e -> fk e)
 
-let exists_left hyp_name s sk fk =
+let exists_left (TacticsArgs.String hyp_name) s  =
   let s,f = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
     match f with
       | Exists (vs,f) ->
@@ -416,18 +383,16 @@ let exists_left hyp_name s sk fk =
           in
           let f = Term.subst subst f in
           let s = TraceSequent.add_formula f (TraceSequent.set_env !env s) in
-            sk [s] fk
-      | _ -> fk @@ Tactics.Failure "improper arguments"
+            [s]
+      | _ -> Tactics.soft_failure @@ Tactics.Failure "improper arguments"
 
 let () =
-  T.register_general "existsleft"
+  T.register_one "existsleft"
     ~help:"Introduce existential quantifier in hypothesis H.\
            \n Usage: existsleft H."
-    (function
-      | [Prover.Theory (Theory.Var h)] -> exists_left h
-      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    exists_left TacticsArgs.String
 
-let simpl_left s sk fk =
+let simpl_left s =
   match
     TraceSequent.remove_formula_hypothesis
       (function
@@ -435,11 +400,9 @@ let simpl_left s sk fk =
          | _ -> false)
       s
   with
-    | False, s' -> sk [] fk
+    | False, s' -> []
     | And (f,g), s' ->
-        sk
           [TraceSequent.add_formula f (TraceSequent.add_formula g s')]
-          fk
     | Exists (vs,f), s' ->
         let env = ref @@ TraceSequent.get_env s in
         let subst =
@@ -451,11 +414,11 @@ let simpl_left s sk fk =
         in
         let f = Term.subst subst f in
         let s = TraceSequent.add_formula f (TraceSequent.set_env !env s') in
-        sk [s] fk
+        [s]
     | Atom _ as f, s' -> let s = TraceSequent.add_formula f s' in
-        sk [s] fk
+        [s]
     | _ -> assert false
-    | exception Not_found -> fk (Tactics.Failure "no such hypothesis")
+    | exception Not_found -> Tactics.soft_failure (Tactics.Failure "no such hypothesis")
 
 let () =
   T.register "simpl_left"
@@ -476,7 +439,7 @@ let () =
 
 (** Induction *)
 
-let induction s sk fk =
+let induction s  =
   match TraceSequent.get_conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
     (match Vars.sort v with
@@ -506,15 +469,15 @@ let induction s sk fk =
            |> TraceSequent.set_conclusion f'
            |> TraceSequent.add_formula ~prefix:"IH" ih
          in
-         sk [s] fk
+         [s]
        )
      | _ ->
-       fk @@ Tactics.Failure
+       Tactics.soft_failure @@ Tactics.Failure
          "Conclusion must be an \
           universal quantification over a timestamp"
     )
   | _ ->
-    fk @@ Tactics.Failure
+    Tactics.soft_failure @@ Tactics.Failure
       "Conclusion must be an \
        universal quantification over a timestamp"
 
@@ -525,7 +488,7 @@ let () = T.register "induction"
 
 (** [constraints judge sk fk] proves the sequent using its trace
   * formulas. *)
-let constraints (s : TraceSequent.t) sk fk =
+let constraints (s : TraceSequent.t) =
   let conclusions =
     try Term.disjunction_to_atom_list (TraceSequent.get_conclusion s)
     with Term.Not_a_disjunction -> []
@@ -543,14 +506,13 @@ let constraints (s : TraceSequent.t) sk fk =
       trace_conclusions
   in
   if TraceSequent.constraints_valid new_s then
-    sk [] fk
-  else fk (Tactics.Failure "constraints satisfiable")
+    []
+  else Tactics.soft_failure (Tactics.Failure "constraints satisfiable")
 
-let expand (term : Theory.term) (s : TraceSequent.t) =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
+let expand_bool (TacticsArgs.Boolean t) s =
   let system = TraceSequent.system s in
   let succ subst = [TraceSequent.apply_subst subst s] in
-  match Theory.convert tsubst term Sorts.Boolean with
+  match t with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a then
         succ [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -558,36 +520,33 @@ let expand (term : Theory.term) (s : TraceSequent.t) =
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
-    | exception Theory.(Conv (Type_error _)) ->
-      begin match Theory.convert tsubst term Sorts.Message with
-        | Macro ((mn, sort, is),l,a) ->
-          if Macros.is_defined mn a then
-            succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                             Macros.get_definition system sort mn is a)]
-          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
-        | exception Theory.(Conv e) ->
-          Tactics.soft_failure (Tactics.Cannot_convert e)
-        | _ ->
-          Tactics.soft_failure (Tactics.Failure "can only expand macros")
-      end
-    | exception Theory.(Conv e) ->
-      Tactics.soft_failure (Cannot_convert e)
 
-let () = T.register_general "expand"
+let expand_mess (TacticsArgs.Message t) s =
+  let system = TraceSequent.system s in
+  let succ subst = [TraceSequent.apply_subst subst s] in
+  match t with
+  | Macro ((mn, sort, is),l,a) ->
+    if Macros.is_defined mn a then
+      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+                         Macros.get_definition system sort mn is a)]
+    else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
+  | exception Theory.(Conv e) ->
+    Tactics.soft_failure (Tactics.Cannot_convert e)
+  | _ ->
+    Tactics.soft_failure (Tactics.Failure "can only expand macros")
+
+let () =
+  T.register_one "messexpand" expand_mess TacticsArgs.Message;
+  T.register_one "boolexpand" expand_bool TacticsArgs.Boolean
+
+let () = T.register_orelse "expand"
     ~help:"Expand all occurences of the given macro inside the goal.\
            \n Usage: expand macro."
-    (function
-       | [Prover.Theory v1] ->
-           fun s sk fk -> begin match expand v1 s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
-
+    ["boolexpand"; "messexpand"]
 
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
-let congruence (s : TraceSequent.t) sk fk =
+let congruence (s : TraceSequent.t) =
  let conclusions =
     try Term.disjunction_to_atom_list (TraceSequent.get_conclusion s)
     with Term.Not_a_disjunction -> []
@@ -605,8 +564,8 @@ let congruence (s : TraceSequent.t) sk fk =
       term_conclusions
   in
   if TraceSequent.message_atoms_valid s then
-    sk [] fk
-  else fk (Tactics.Failure "Equations satisfiable")
+    []
+  else Tactics.soft_failure (Tactics.Failure "Equations satisfiable")
 
 let () = T.register "congruence"
     ~help:"Tries to derive false from the messages equalities.\
@@ -619,11 +578,11 @@ let () = T.register "constraints"
     constraints
 
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
-let assumption (s : TraceSequent.t) sk fk =
+let assumption (s : TraceSequent.t) =
   if TraceSequent.is_hypothesis (TraceSequent.get_conclusion s) s then
-      sk [] fk
+      []
   else
-    fk (Tactics.Failure "Conclusion is not an hypothesis")
+    Tactics.soft_failure (Tactics.Failure "Conclusion is not an hypothesis")
 
 let () = T.register "assumption"
     ~help:"Search for the conclusion inside the hypothesis.\
@@ -632,10 +591,8 @@ let () = T.register "assumption"
 
 (** Length *)
 
-let namelength n m s =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let conv x = Theory.convert tsubst x Sorts.Message in
-  match conv n, conv m with
+let namelength (TacticsArgs.Message n) (TacticsArgs.Message m) s =
+  match n, m with
     | Name n, Name m ->
         let f =
           Term.(Atom (`Message (`Eq,
@@ -645,20 +602,12 @@ let namelength n m s =
         [TraceSequent.add_formula f s]
     | _ ->
         Tactics.(soft_failure (Failure "expected names"))
-    | exception Theory.Conv e ->
-        Tactics.soft_failure (Cannot_convert e)
 
 let () =
-  T.register_general "namelength"
+  T.register_two "namelength"
     ~help:"Adds an hypothesis expressing that two names have \
            the same length.\n Usage: namelength <n>,<m>."
-    (function
-       | [Prover.Theory n; Prover.Theory m] ->
-           fun s sk fk -> begin match namelength n m s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> Tactics.(hard_failure (Failure "two terms are expected")))
+    namelength TacticsArgs.Message TacticsArgs.Message
 
 (** Eq-Indep Axioms *)
 
@@ -666,7 +615,7 @@ let () =
 
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
-let eq_names (s : TraceSequent.t) sk fk =
+let eq_names (s : TraceSequent.t) =
   let s,trs = TraceSequent.get_trs s in
   let terms = TraceSequent.get_all_terms s in
   (* we start by collecting equalities between names implied by the indep axiom.
@@ -690,7 +639,7 @@ let eq_names (s : TraceSequent.t) sk fk =
          TraceSequent.add_formula c s)
       s cnstrs
   in
-  sk [s] fk
+  [s]
 
 let () = T.register "eqnames"
     ~help:"Add index constraints resulting from names equalities, modulo the \
@@ -699,7 +648,7 @@ let () = T.register "eqnames"
     eq_names
 
 (** Add terms constraints resulting from timestamp and index equalities. *)
-let eq_trace (s : TraceSequent.t) sk fk =
+let eq_trace (s : TraceSequent.t) =
   let s, ts_classes = TraceSequent.get_ts_equalities s in
   let ts_classes = List.map (List.sort_uniq Pervasives.compare) ts_classes in
   let ts_subst =
@@ -737,7 +686,7 @@ let eq_trace (s : TraceSequent.t) sk fk =
          TraceSequent.add_formula c s)
       s facts
   in
-  sk [s] fk
+  [s]
 
 let () = T.register "eqtrace"
     ~help:"Add terms constraints resulting from timestamp and index equalities.\
@@ -845,13 +794,11 @@ let mk_fresh_indirect system env n is t =
     tbl_of_action_indices
     Term.False
 
-let fresh th s =
-  match th with
-  | Theory.Var m ->
-    begin try
-      let s,hyp =
-        TraceSequent.select_message_hypothesis m s ~remove:false in
-      begin match hyp with
+let fresh (TacticsArgs.String m) s =
+  try
+    let s,hyp =
+      TraceSequent.select_message_hypothesis m s ~remove:false in
+    begin match hyp with
       | `Message (`Eq,m1,m2) ->
         let (n,is,t) = fresh_param m1 m2 in
         let env = TraceSequent.get_env s in
@@ -861,63 +808,23 @@ let fresh th s =
         let new_hyp = Term.mk_or phi_direct phi_indirect in
         all_left_introductions s [new_hyp,""]
       | _ -> Tactics.soft_failure
-              (Tactics.Failure "can only be applied on message hypothesis")
-      end
-    with
-    | Not_found -> Tactics.(soft_failure (Undefined m))
-    | EquivTactics.Var_found -> Tactics.soft_failure
-                    (Tactics.Failure "can only be applied on ground terms")
+               (Tactics.Failure "can only be applied on message hypothesis")
     end
-  | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments")
+  with
+  | Not_found -> Tactics.(soft_failure (Undefined m))
+  | EquivTactics.Var_found -> Tactics.soft_failure
+                                (Tactics.Failure "can only be applied on ground terms")
+
 
 let () =
-  T.register_general "fresh"
+  T.register_one "fresh"
     ~help:"Given a message equality M of the form t=n, \
            add an hypothesis expressing that n is a subterm of t.\
            \n Usage: fresh M."
-    (function
-       | [Prover.Theory th] ->
-          begin fun s sk fk -> match fresh th s with
-            | subgoals -> sk subgoals fk
-            | exception Tactics.Tactic_soft_failure e -> fk e
-          end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    fresh TacticsArgs.String
 
-let substitute v1 v2 s =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let subst =
-    match
-      Theory.convert tsubst v1 Sorts.Timestamp,
-      Theory.convert tsubst v2 Sorts.Timestamp
-    with
-    | ts1,ts2 ->
-      let s, models = TraceSequent.get_models s in
-      if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
-        [Term.ESubst (ts1,ts2)]
-      else
-        Tactics.soft_failure Tactics.NotEqualArguments
-    | exception _ ->
-      match
-        Theory.convert tsubst v1 Sorts.Message,
-        Theory.convert tsubst v2 Sorts.Message
-      with
-      | m1,m2 ->
-        let s,trs = TraceSequent.get_trs s in
-        if Completion.check_equalities trs [(m1,m2)] then
-          [Term.ESubst (m1,m2)]
-        else
-          Tactics.soft_failure Tactics.NotEqualArguments
-      | exception _ ->
-        match Theory.conv_index tsubst v1, Theory.conv_index tsubst v2 with
-        | i1,i2 ->
-          let s, models = TraceSequent.get_models s in
-          if Constr.query models [(`Index (`Eq,i1,i2))] then
-            [Term.ESubst (Term.Var i1,Term.Var i2)]
-          else
-            Tactics.soft_failure Tactics.NotEqualArguments
-        | exception _ -> Tactics.(soft_failure (Failure "cannot convert"))
-  in
-  let s =
+let apply_substitute subst s =
+    let s =
     match subst with
       | Term.ESubst (Term.Var v, t) :: _ when
         not (List.mem (Vars.EVar v) (Term.get_vars t)) ->
@@ -925,6 +832,58 @@ let substitute v1 v2 s =
       | _ -> s
   in
   [TraceSequent.apply_subst subst s]
+
+
+let substitute_mess (TacticsArgs.Message m1) (TacticsArgs.Message m2) s =
+  let subst =
+        let s,trs = TraceSequent.get_trs s in
+        if Completion.check_equalities trs [(m1,m2)] then
+          [Term.ESubst (m1,m2)]
+        else
+          Tactics.soft_failure Tactics.NotEqualArguments
+  in
+  apply_substitute subst s
+
+
+let () =
+  T.register_two "messsubstitute"
+    substitute_mess TacticsArgs.Message TacticsArgs.Message
+
+
+let substitute_ts (TacticsArgs.Timestamp ts1) (TacticsArgs.Timestamp ts2) s =
+  let subst =
+      let s, models = TraceSequent.get_models s in
+      if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
+        [Term.ESubst (ts1,ts2)]
+      else
+        Tactics.soft_failure Tactics.NotEqualArguments
+  in
+  apply_substitute subst s
+
+let () =
+  T.register_two "tssubstitute"
+    substitute_ts TacticsArgs.Timestamp TacticsArgs.Timestamp
+
+let substitute_idx (TacticsArgs.Index i1) (TacticsArgs.Index i2) s =
+  let subst =
+    let s, models = TraceSequent.get_models s in
+    if Constr.query models [(`Index (`Eq,i1,i2))] then
+      [Term.ESubst (Term.Var i1,Term.Var i2)]
+    else
+      Tactics.soft_failure Tactics.NotEqualArguments
+  in
+  apply_substitute subst s
+
+let () =
+  T.register_two "idxsubstitute"
+    substitute_idx TacticsArgs.Index TacticsArgs.Index
+
+let () =
+  T.register_orelse "substitute"
+      ~help:"If the sequent implies that the arguments i1, i2 are equals,\
+ *            \n replaces all occurences of i1 by i2 inside the sequent.\
+             *            \n Usage: substitute i1, i2."
+      ["tssubstitute"; "messsubstitute"; "idxsubstitute"]
 
 let autosubst s =
   let eq,s =
@@ -953,29 +912,9 @@ let autosubst s =
         TraceSequent.apply_subst [Term.ESubst (Term.Var x, Term.Var y)] s
   in
     match eq with
-      | `Timestamp (`Eq, Term.Var x, Term.Var y) -> process x y
-      | `Index (`Eq, x, y) -> process x y
+      | `Timestamp (`Eq, Term.Var x, Term.Var y) -> [process x y]
+      | `Index (`Eq, x, y) -> [process x y]
       | _ -> assert false
-
-let autosubst s sk fk =
-  match autosubst s with
-    | subgoal -> sk [subgoal] fk
-    | exception Tactics.Tactic_soft_failure e -> fk e
-
-let () =
-  T.register_general "substitute"
-    ~help:"If the sequent implies that the arguments i1, i2 are equals,\
-           \n replaces all occurences of i1 by i2 inside the sequent.\
-           \n Usage: substitute i1, i2."
-    (function
-       | [Prover.Theory v1; Prover.Theory v2] ->
-           fun s sk fk -> begin match substitute v1 v2 s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | [] -> autosubst
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
-
 
 (** Expects a list of theory elements of the form cond@T :: formula :: l and
      output@T :: message :: l, and produces from it the corresponding
@@ -984,7 +923,7 @@ let rec parse_substd tsubst s =
   match s with
   | [] -> []
   | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-  | (Prover.Theory mterm)::(Prover.Theory b)::q ->
+  | (TacticsArgs.Theory mterm)::(TacticsArgs.Theory b)::q ->
     begin
       match Theory.convert tsubst mterm Sorts.Boolean,
             Theory.convert tsubst b Sorts.Boolean with
@@ -1030,7 +969,7 @@ let rec parse_substd tsubst s =
 let rec parse_indexes =
   function
   | [] -> ([],[],[])
-  | Prover.Theory (Var i) :: q -> let id,vs,rem = parse_indexes q in
+  | TacticsArgs.Theory (Var i) :: q -> let id,vs,rem = parse_indexes q in
     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
     Theory.ESubst (i, Term.Var var)::id
   , (Vars.EVar var)::vs, rem
@@ -1089,12 +1028,12 @@ let () =
            substitution over some cond@T or output@T has been applied, and \
            produces the subgoals asking that the substitution preserves equality \
            of distributions. \
-           The system produced is named after the given named, and if a previous \
+           The system produced is named after the given name, and if a previous \
            system was already defined in the same way it does not recreate it.
            \n Usage: systemsubstitute new_sytem_name,i1,...,ik,\
            cond@T, newcond, output@T, newoutput, ... ."
     (function
-      | Prover.Theory (Var system_name) :: q  ->
+      | TacticsArgs.Theory (Var system_name) :: q  ->
         let subst_index, vs, subst_descr = parse_indexes q in
         fun s sk fk -> begin
             match system_subst system_name subst_index vs subst_descr s with
@@ -1104,14 +1043,7 @@ let () =
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 
-let exec a s =
-  let tsubst = Theory.subst_of_env (TraceSequent.get_env s) in
-  let a =
-    try
-      Theory.convert tsubst a Sorts.Timestamp
-    with
-      | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
-  in
+let exec (TacticsArgs.Timestamp a) s =
   let _,var = Vars.(make_fresh (TraceSequent.get_env s) Sorts.Timestamp "t") in
   let formula =
     ForAll
@@ -1123,17 +1055,11 @@ let exec a s =
    TraceSequent.add_formula formula s]
 
 let () =
-  T.register_general "executable"
+  T.register_one "executable"
     ~help:"Assert that exec@_ implies exec@_ for all \
            previous timestamps.\
            \n Usage: executable t."
-    (function
-       | [Prover.Theory v] ->
-           fun s sk fk -> begin match exec v s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+    exec TacticsArgs.Timestamp
 
 
 (** EUF Axioms *)
@@ -1250,7 +1176,7 @@ let euf_apply_facts s at =
 let set_euf _ = { TraceSequent.t_euf = true }
 
 (** Tag EUFCMA - for composition results *)
-let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
+let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   let s, at =
     try
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
@@ -1283,11 +1209,11 @@ let euf_apply hypothesis_name (s : TraceSequent.t) sk fk =
     (* we create the honnest sources using the classical eufcma tactic *)
     try
       let honest_s = euf_apply_facts s at in
-      sk (tag_s @ honest_s) fk
-    with Euf.Bad_ssc ->  fk Tactics.Bad_SSC
+      (tag_s @ honest_s)
+    with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
 
 let () =
-  T.register_general "euf"
+  T.register_one "euf"
     ~help:"Apply the euf axiom to the given hypothesis name. If the hash has\
            \n been declared with a tag formula, applies the tagged version.\
            \n given tag. Tagged eufcma, with a tag T, says that, under the\
@@ -1296,10 +1222,7 @@ let () =
            \n The tag T must refer to a previously defined axiom f(mess,sk), of\
            \n the form forall (m:message,sk:message).
            \n Usage: tageuf H t."
-    (function
-      | [Prover.Theory (Theory.Var h)] -> euf_apply h
-      | _ -> Tactics.(hard_failure (Failure "improper arguments")))
-
+    euf_apply TacticsArgs.String
 (** [apply gp ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath. *)
@@ -1350,11 +1273,11 @@ let () =
            \n instantiated with the arguments.\
            \n Usage: apply H to i1, i2, ..."
     (function
-      | Prover.String_name id :: th_terms ->
+      | TacticsArgs.String_name id :: th_terms ->
           let th_terms =
             List.map
               (function
-                 | Prover.Theory th -> th
+                 | TacticsArgs.Theory th -> th
                  | _ -> Tactics.hard_failure
                           (Tactics.Failure "improper arguments"))
               th_terms
@@ -1367,24 +1290,24 @@ let () =
 
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
-let tac_assert f s sk fk =
+let tac_assert (TacticsArgs.Boolean f) s =
   let s1 = TraceSequent.set_conclusion f s in
   let s2 = TraceSequent.add_formula f s in
-  sk [s1 ;s2] fk
+  [s1 ;s2]
 
 let () =
-  T.register_formula "assert"
+  T.register_one "assert"
     ~help:"Add an assumption to the set of hypothesis, and produce the goal for\
            \n the proof of the assumption.\
            \n Usage: assert f."
-    tac_assert
+    tac_assert TacticsArgs.Boolean
 
 (** [fa s] handles some goals whose conclusion formula is of the form
   * [C(u_1..uN) = C(v_1..v_N)] and reduced them to the subgoals with
   * conclusions [u_i=v_i]. We only implement it for the constructions
   * [C] that congruence closure does not support: conditionals,
   * sequences, etc. *)
-let fa s sk fk =
+let fa s =
   let unsupported () =
     Tactics.(soft_failure (Failure "equality expected")) in
   match TraceSequent.get_conclusion s with
@@ -1401,7 +1324,7 @@ let fa s sk fk =
                   |> add_formula c' ;
                 s |> set_conclusion (Term.Atom (`Message (`Eq,e,e'))) ]
             in
-            sk subgoals fk
+            subgoals
 
           | Term.Seq (vars,t),
             Term.Seq (vars',t') when vars = vars' ->
@@ -1419,7 +1342,7 @@ let fa s sk fk =
               [ TraceSequent.set_conclusion
                   (Term.Atom (`Message (`Eq,t,t'))) s ]
             in
-            sk subgoals fk
+            subgoals
 
           | Term.Find (vars,c,t,e),
             Term.Find (vars',c',t',e') when vars = vars' ->
@@ -1473,7 +1396,7 @@ let fa s sk fk =
                   |> add_formula c' ;
                 s |> set_conclusion (Term.Atom (`Message (`Eq,e,e'))) ]
             in
-            sk subgoals fk
+            subgoals
 
           | _ -> Tactics.(soft_failure (Failure "unsupported equality"))
         end
@@ -1488,7 +1411,7 @@ let () =
 (** [collision_resistance judge sk fk] collects all equalities between
   * hashes that occur at toplevel in message hypotheses,
   * and adds the equalities of the messages hashed with the same key. *)
-let collision_resistance (s : TraceSequent.t) sk fk =
+let collision_resistance (s : TraceSequent.t) =
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
   let hashes =
@@ -1503,7 +1426,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
   in
   let hashes = List.sort_uniq Pervasives.compare hashes in
   if List.length hashes = 0 then
-    fk Tactics.NoSSC
+    Tactics.soft_failure Tactics.NoSSC
   else
     let rec make_eq acc hash_list =
       match hash_list with
@@ -1539,7 +1462,7 @@ let collision_resistance (s : TraceSequent.t) sk fk =
         (fun s f -> TraceSequent.add_formula f s)
         s new_facts
     in
-    sk [s] fk
+    [s]
 
 let () = T.register "collision"
     ~help:"Collects all equalities between hashes occurring at toplevel in\
@@ -1551,27 +1474,33 @@ let () = T.register "collision"
 (** Automated goal simplification *)
 
 let () =
+  let wrap f = (fun (s: TraceSequent.t) sk fk ->
+      begin match f s with
+        | subgoals -> sk subgoals fk
+        | exception Tactics.Tactic_soft_failure e -> fk e
+      end)
+  in
   let open Tactics in
   (* Simplify goal. We will never backtrack on these applications. *)
   let simplify =
     andthen_list [
       (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
-      try_tac assumption ;
-      repeat goal_intro ;
-      repeat simpl_left ;
+      try_tac (wrap assumption) ;
+      repeat (wrap goal_intro) ;
+      repeat (wrap simpl_left) ;
       (* Learn new term equalities from constraints before
        * learning new index equalities from term equalities,
        * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
-      eq_trace ;
-      eq_names ;
+      (wrap eq_trace) ;
+      (wrap eq_names) ;
       (* Simplify equalities using substitution. *)
-      repeat autosubst
+      repeat (wrap autosubst)
     ]
   in
   (* Attempt to close a goal. *)
   let conclude =
-    orelse_list [congruence;constraints;assumption]
+    orelse_list [(wrap congruence); (wrap constraints); (wrap assumption)]
   in
   let (>>) = andthen ~cut:true in
   (* If [close] then automatically prove the goal,
@@ -1588,7 +1517,7 @@ let () =
           else
             fun _ -> sk [g] fk
         in
-        goal_and_right g
+        (wrap goal_and_right) g
           (fun l _ -> match l with
              | [g1;g2] ->
                  simpl close g1
@@ -1603,22 +1532,30 @@ let () =
              | _ -> assert false)
           fk
   in
-  T.register "simpl" (simpl false) ;
-  T.register "auto" (simpl true)
+  T.register_general "simpl"
+      (function
+       | [] -> (simpl false)
+       | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+ ;
+ T.register_general "auto"
+   (function
+     | [] -> (simpl true)
+     | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+
 
 (** Projecting a goal on a bi-system
   * to distinct goals for each projected system. *)
 
-let project s sk fk =
+let project s =
   let system = TraceSequent.system s in
   match system with
-  | Single _ -> fk (Tactics.Failure "goal already deals with a single process")
+  | Single _ -> Tactics.soft_failure (Tactics.Failure "goal already deals with a single process")
   | _ ->
     let s1 = TraceSequent.set_system Action.(project_system Term.Left system) s in
     let s2 = TraceSequent.set_system Action.(project_system Term.Right system) s in
     let s1 = TraceSequent.pi Left s1 in
     let s2 = TraceSequent.pi Right s2 in
-    sk [s1;s2] fk
+    [s1;s2]
 
 let () =
   T.register "project"
@@ -1667,15 +1604,15 @@ let yes_no_if b =
     | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
 let () =
-  T.register_general "yesif"
+  T.register "yesif"
     ~help:"Replaces the first conditional occurring in the conclusion by its \
            then branch if the condition is true.\
            \n Usage: yesif."
-    (yes_no_if true)
+    (apply_yes_no_if true)
 
 let () =
-  T.register_general "noif"
+  T.register "noif"
     ~help:"Replaces the first conditional occurring in the conclusion by its \
            else branch if the condition is false.\
            \n Usage: noif."
-    (yes_no_if false)
+    (apply_yes_no_if false)

@@ -23,10 +23,10 @@ let nth i l =
 (** Wrap a tactic expecting an equivalence goal (and returning arbitrary
   * goals) into a tactic expecting a general prover goal (which fails
   * when that goal is not an equivalence). *)
-let only_equiv t (s : Prover.Goal.t) sk fk =
+let only_equiv t (s : Prover.Goal.t) =
   match s with
-  | Prover.Goal.Equiv s -> t s sk fk
-  | _ -> fk (Tactics.Failure "Equivalence goal expected")
+  | Prover.Goal.Equiv s -> t s
+  | _ -> Tactics.soft_failure (Tactics.Failure "Equivalence goal expected")
 
 (** Wrap a tactic expecting and returning equivalence goals
   * into a general prover tactic. *)
@@ -43,7 +43,7 @@ let () =
            \n Usage: admit [pos]."
     (function
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
-       | [Prover.Int i] ->
+       | [TacticsArgs.Int i] ->
            pure_equiv begin fun s sk fk ->
              let before,_,after = nth i (EquivSequent.get_biframe s) in
              let s =
@@ -84,18 +84,18 @@ end
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
-let refl (s : EquivSequent.t) sk fk =
+let refl (s : EquivSequent.t) =
   let iter = new exist_macros ~system:(EquivSequent.get_system s) in
   try
     (* we check that the frame does not contain macro *)
     List.iter iter#visit_term (EquivSequent.get_biframe s);
     if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
     then
-      sk [] fk
+      []
     else
-      fk (Tactics.Failure "Frames not identical")
+      Tactics.soft_failure (Tactics.Failure "Frames not identical")
   with
-  | NoRefl -> fk (Tactics.Failure "Frames contain macros that may not be \
+  | NoRefl -> Tactics.soft_failure (Tactics.Failure "Frames contain macros that may not be \
                                    diff-equivalent")
 
 let () =
@@ -106,13 +106,13 @@ let () =
 
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
-let assumption s sk fk =
+let assumption s =
   let hypothesis = EquivSequent.get_hypothesis_biframe s in
   if List.for_all (fun elem -> List.mem elem hypothesis)
       (EquivSequent.get_biframe s) then
-    sk [] fk
+    []
   else
-     fk (Tactics.Failure "Conclusion different from hypothesis.")
+    Tactics.soft_failure (Tactics.Failure "Conclusion different from hypothesis.")
 
 let () =
   T.register "assumption"
@@ -186,7 +186,7 @@ let () =
     ~help:"Apply the induction scheme to the given timestamp.\
            \n Usage: induction t."
     (function
-       | [Prover.Theory th] ->
+       | [TacticsArgs.Theory th] ->
            pure_equiv
              (fun s sk fk -> match induction th s with
                 | subgoals -> sk subgoals fk
@@ -215,7 +215,7 @@ let () = T.register_general "enrich"
     ~help:"Enrich the goal with the given term.\
            \n Usage: enrich t."
     (function
-       | [Prover.Theory v] -> pure_equiv (enrich v)
+       | [TacticsArgs.Theory v] -> pure_equiv (enrich v)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 (** Function application *)
@@ -296,7 +296,7 @@ let () =
     ~help:"Break function applications on the nth term of the sequence.\
            \n Usage: fa i."
   (function
-    | [Prover.Int i] ->
+    | [TacticsArgs.Int i] ->
       pure_equiv
         (fun s sk fk -> match fa i s with
           | subgoals -> sk subgoals fk
@@ -514,7 +514,7 @@ let () =
           \n Usages: fadup. fadup i."
    (function
      | [] -> pure_equiv fa_dup
-     | [Prover.Int i] ->
+     | [TacticsArgs.Int i] ->
          pure_equiv
            (fun s sk fk -> match fadup i s with
               | subgoals -> sk subgoals fk
@@ -743,7 +743,7 @@ let () =
   T.register_general "fresh"
     ~help:"Removes a name if fresh.\n Usage: fresh i."
     (function
-    | [Prover.Int i] ->
+    | [TacticsArgs.Int i] ->
         pure_equiv
           (fun s sk fk -> match fresh i s with
              | subgoals -> sk subgoals fk
@@ -1031,7 +1031,7 @@ let () =
  T.register_general "prf"
    ~help:"Apply the PRF axiom.\n Usage: prf i."
    (function
-   | [Prover.Int i] ->
+   | [TacticsArgs.Int i] ->
        pure_equiv
          (fun s sk fk -> match prf i s with
             | subgoals -> sk subgoals fk
@@ -1222,7 +1222,7 @@ let () =
           length of the plaintexts.
 \n Usage: cca1 i."
    (function
-   | [Prover.Int i] ->
+   | [TacticsArgs.Int i] ->
        only_equiv
          (fun s sk fk -> match cca1 i s with
             | subgoals -> sk subgoals fk
@@ -1339,7 +1339,7 @@ let () =
           enc(t,r,pk(diff(k1,k2))) by enc(t,r,pk(k1)) inside the given \
           message.\n Usage: enckp i."
    (function
-   | [Prover.Int i] ->
+   | [TacticsArgs.Int i] ->
        only_equiv
          (fun s sk fk -> match enckp i s with
             | subgoals -> sk subgoals fk
@@ -1461,12 +1461,12 @@ let () =
           argument): xor i.
           \n Usage giving the fresh name: xor i, n(i0,...,ik)."
    (function
-   | [Prover.Int i] ->
+   | [TacticsArgs.Int i] ->
        pure_equiv
          (fun s sk fk -> match xor i None s with
             | subgoals -> sk subgoals fk
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
-   | [Prover.Int i; Prover.Theory n] ->
+   | [TacticsArgs.Int i; TacticsArgs.Theory n] ->
        pure_equiv
          (fun s sk fk -> match xor i (Some n) s with
             | subgoals -> sk subgoals fk
@@ -1550,16 +1550,16 @@ let () = T.register_general "expand"
          sequence using the given indices.\
          \n Usage: expand macro. expand seq(i,k...->t(i,k,...)),i1,k1,..."
   (function
-    | [Prover.Theory v] ->
+    | [TacticsArgs.Theory v] ->
         pure_equiv
           (fun s sk fk -> match expand v s with
              | subgoals -> sk subgoals fk
              | exception (Tactics.Tactic_soft_failure e) -> fk e)
-    | (Prover.Theory v)::ids ->
+    | (TacticsArgs.Theory v)::ids ->
         let ids =
           List.map
             (function
-               | Prover.Theory th -> th
+               | TacticsArgs.Theory th -> th
                | _ -> Tactics.hard_failure
                         (Tactics.Failure "improper arguments"))
             ids
@@ -1672,7 +1672,7 @@ let () = T.register_general "equivalent"
          \n that they are equivalent.
          \n Usage: equiv t1, t2."
   (function
-     | [Prover.Theory v1; Prover.Theory v2] -> only_equiv (equiv v1 v2)
+     | [TacticsArgs.Theory v1; TacticsArgs.Theory v2] -> only_equiv (equiv v1 v2)
      | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
 let simplify_ite b env system cond positive_branch negative_branch =
@@ -1744,7 +1744,7 @@ let apply_yes_no_if b i s =
      Tactics.soft_failure (Tactics.Failure "out of range position")
 
 let yes_no_if b args = match args with
-  | [Prover.Int i] ->
+  | [TacticsArgs.Int i] ->
      only_equiv
        (fun s sk fk -> match apply_yes_no_if b i s with
          | subgoals -> sk subgoals fk
@@ -1858,12 +1858,12 @@ let () =
             jth subterm of the then branch (zero-based). \
            \n Usage: ifcond i,f. ifcond i,j,f."
     (function
-      | [Prover.Int i; Prover.Theory f] ->
+      | [TacticsArgs.Int i; TacticsArgs.Theory f] ->
         only_equiv
           (fun s sk fk -> match ifcond i None f s with
             | subgoals -> sk subgoals fk
             | exception (Tactics.Tactic_soft_failure e) -> fk e)
-      | [Prover.Int i; Prover.Int j; Prover.Theory f] ->
+      | [TacticsArgs.Int i; TacticsArgs.Int j; TacticsArgs.Theory f] ->
         only_equiv
           (fun s sk fk -> match ifcond i (Some j) f s with
             | subgoals -> sk subgoals fk
@@ -1905,7 +1905,7 @@ let () =
    ~help:"Simplify a conditional when the two branches are equal.\
           \n Usage: trivialif i."
    (function
-     | [Prover.Int i] ->
+     | [TacticsArgs.Int i] ->
        only_equiv
          (fun s sk fk -> match trivial_if i s with
             | subgoals -> sk subgoals fk
@@ -1955,7 +1955,7 @@ let () = T.register_general "ifeq"
            of the conditional.
            \n Usage: ifeq i,t1,t2."
     (function
-      | [Prover.Int i; Prover.Theory t1; Prover.Theory t2] ->
+      | [TacticsArgs.Int i; TacticsArgs.Theory t1; TacticsArgs.Theory t2] ->
         only_equiv (ifeq i t1 t2)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
@@ -2045,8 +2045,8 @@ let () = T.register_general "ddh"
     ~help:"Closes the current system, if it is an instance of a context of ddh.\
            \n Usage: ddh a, b, c."
     (function
-       | [Prover.String_name v1;
-          Prover.String_name v2;
-          Prover.String_name v3] ->
+       | [TacticsArgs.String_name v1;
+          TacticsArgs.String_name v2;
+          TacticsArgs.String_name v3] ->
          pure_equiv (ddh v1 v2 v3)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
