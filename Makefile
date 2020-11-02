@@ -3,6 +3,8 @@ OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 
+default: squirrel
+
 all: squirrel test
 
 PROVER_OK_TESTS = $(wildcard tests/ok/*.sp) $(wildcard examples/*.sp)
