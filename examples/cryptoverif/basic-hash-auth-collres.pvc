@@ -1,0 +1,50 @@
+(* An attempt to encode an authentication property for basic hash *)
+(* Stéphanie Delaune *)
+
+(* In this file, we assume only collision resistance, which should not be
+enough to prove the authentication goal.*)
+
+(* Expected output *)
+(* RESULT Could not prove event(acceptR(xn, xk)) ==> event(startT(xn, xk)). *)
+
+param NT, NR, NK.
+
+type nonce [large,fixed].
+type key [large,fixed].
+type hashed [large,fixed].
+type hash_key [fixed].
+
+proba Phash.
+
+expand CollisionResistant_hash_2(hash_key, key, nonce, hashed, hash, hashoracle, Phash).
+
+
+(* Queries and Events *)
+event acceptR(nonce,key).
+event startT(nonce,key).
+
+query xn:nonce, xk:key; event(acceptR(xn,xk)) ==> event(startT(xn,xk)).
+
+(* Channels and Processes *)
+channel c_start, c0, c1, c2, c3, start, finish.
+
+
+table keys(key).
+
+let processT(kT:key, hk: hash_key) =
+        in(c0, ());
+        new n: nonce;
+        event startT(n,kT);
+	out(c1, (n, hash(hk,kT,n))).
+
+let processR(kR:key, hk: hash_key) =
+       in(c2,(m1:nonce,m2:hashed));
+       if m2 = hash(hk,kR,m1) then event acceptR(m1,kR).
+
+process
+     in(c_start,());
+     new hk: hash_key;
+     out(c_start,());
+        ( ! iK <= NK (in(start, ());  new kT:key; insert keys(kT); out(finish, ());  ! iT <= NT processT(kT, hk))
+        |   (! iR <= NR in(start, ());  get keys(xkT) in   out(finish, ()); processR(xkT, hk))
+	| hashoracle(hk))
