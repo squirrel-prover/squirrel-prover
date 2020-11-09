@@ -58,7 +58,6 @@ axiom [auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m,
 
 axiom [auth] freshindex : exists (l:index), True
 
-axiom DDHinj : forall (m1,m2:message), m1 <> m2 => g^m1 <> g^m2
 axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
 
 

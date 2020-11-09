@@ -49,7 +49,6 @@ axiom [auth] collres :
 
 axiom [auth] freshindex : exists (l:index), True
 
-axiom DDHinj : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
 
 
