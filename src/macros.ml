@@ -9,6 +9,15 @@ let declare_global table name ~inputs ~indices ~ts t =
   let def = Symbols.Global (List.length indices) in
     Symbols.Macro.declare table name ~data def
 
+let update table name t =
+  let (inputs,indices,ts,t_old) = match Symbols.Macro.get_data name with
+  | Global_data (inputs,indices,ts,t) -> (inputs,indices,ts,t)
+  | _ -> assert false
+  in
+  let data = Global_data (inputs,indices,ts,t) in
+  let def = Symbols.Global (List.length indices) in
+    Symbols.Macro.redefine table name ~data def
+
 (** Macro expansions *)
 
 open Term

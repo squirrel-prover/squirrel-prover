@@ -160,9 +160,9 @@ let declare id args proc =
 
 (** Prepare a process for the generation of actions:
   *
-  *  - the resulting process does not feature New and Let constructs,
+  *  - the resulting process does not feature New constructs,
   *    which have been transformed into global declarations of
-  *    names and macros, properly refreshed;
+  *    names, properly refreshed;
   *
   *  - it satisfies the Barendregt convention for index variables;
   *
@@ -309,7 +309,8 @@ let prepare : process -> process =
                       Term.Var ts_var)
         in
         let msubst = (x,x'_th,x'_tm) :: msubst in
-          prep ~msubst p
+        let t' = Theory.subst t (to_tsubst isubst@to_tsubst msubst) in
+        Let (Symbols.to_string x', t', prep ~msubst p)
 
     | In (c,x,p) ->
         let x' = List.hd invars in
@@ -422,22 +423,21 @@ exception Cannot_parse of process
 (** Parse a prepared process to extract its actions. *)
 let parse_proc system_name proc =
   let var_env = ref Vars.empty_env in
+  let _,ts = Vars.make_fresh Vars.empty_env Sorts.Timestamp "ts" in
+  let create_subst subst isubst  =
+    List.map (fun (x,t) -> Theory.ESubst (x,t)) subst @
+    List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) isubst
+  in
   (** Convert given some environment and the current action symbol a. *)
   let conv_term ?(pred=false) env a t =
     let ts = Term.Action (a, List.rev env.p_indices) in
     let ts = if pred then Term.Pred ts else ts in
-    let subst =
-      List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
-      List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
-    in
+    let subst = create_subst env.subst env.isubst in
     Theory.convert ~at:ts subst t Sorts.Message
   in
   let conv_formula env a t =
     let ts = Term.Action (a, List.rev env.p_indices) in
-    let subst =
-      List.map (fun (x,t) -> Theory.ESubst (x,t)) env.subst @
-      List.map (fun (x,i) -> Theory.ESubst (x,Term.Var i)) env.isubst
-    in
+    let subst = create_subst env.subst env.isubst in
     Theory.convert ~at:ts subst t Sorts.Boolean
   in
   let conv_indices env l =
@@ -449,12 +449,27 @@ let parse_proc system_name proc =
     * [pos_indices] is the list of accumulated indices
     * for the parallel choice part of the action item.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos ~(pos_indices:Vars.index list) = function
-    | Apply _ | Let _ | New _ -> assert false
+  let rec p_in ~env ~pos ~(pos_indices:Vars.index list) ~local_macros = function
+    | Apply _ | New _ -> assert false
+    | Let (x,t,p) ->
+      (* No state update already defined in the action:
+         the macro associated to [x] should refer to pred(ts). *)
+      let subst = create_subst env.subst env.isubst in
+      let body = Theory.convert ~at:(Term.Pred (Term.Var ts)) subst t Sorts.Message in
+      let dep = Theory.find_fun_terms t local_macros in
+      let body =
+        if List.length dep > 0
+        then Term.subst_macros_ts dep (Term.Pred (Term.Var ts)) (Term.Var ts) body
+        else body
+      in
+      let symb = Symbols.Macro.of_string x in
+      let _ = Macros.update Symbols.dummy_table symb body in
+      let local_macros = x::local_macros in
+      p_in ~env ~pos ~pos_indices ~local_macros p
     | Null -> pos
     | Parallel (p, q) ->
-      let pos = p_in ~env ~pos ~pos_indices p in
-      p_in ~env ~pos ~pos_indices q
+      let pos = p_in ~env ~pos ~pos_indices ~local_macros p in
+      p_in ~env ~pos ~pos_indices ~local_macros q
     | Repl (i, p) ->
       let i' = Vars.make_fresh_and_update var_env Sorts.Index i in
       let env =
@@ -463,20 +478,25 @@ let parse_proc system_name proc =
           p_indices = i' :: env.p_indices }
       in
       let pos_indices = i'::pos_indices in
-      p_in ~env ~pos ~pos_indices p
+      p_in ~env ~pos ~pos_indices ~local_macros p
     | In _ | Exists _ | Set _ | Alias _ | Out _ as proc ->
-      let input,p =
+      let env,input,p =
         (* Get the input data,
          * or a dummy value if the input is missing. *)
         match proc with
-        | In (c, x, p) -> (c, x), p
-        | _ -> (Channel.dummy, "_"), proc
+        | In (c, x, p) ->
+          { env with
+            subst = (x,Term.Var (snd (Vars.make_fresh Vars.empty_env Sorts.Message x))) :: env.subst },
+          (c, x),
+          p
+        | _ -> env, (Channel.dummy, "_"), proc
       in
       let par_choice = pos, List.rev pos_indices in
       let _ : int =
         p_cond
           ~env ~par_choice ~input
           ~pos:0 ~vars:[] ~facts:[]
+          ~local_macros
           p
       in
       pos + 1
@@ -486,8 +506,23 @@ let parse_proc system_name proc =
     * the position in existential conditions and the associated
     * bound index variables. We cannot convert facts to Term.fact yet,
     * since we do not know for which action they should be converted. *)
-  and p_cond ~env ~par_choice ~input ~pos ~vars ~facts = function
-  | Apply _ | Let _ | New _ -> assert false
+  and p_cond ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros = function
+  | Apply _ | New _ -> assert false
+  | Let (x,t,p) ->
+      (* No state update already defined in the action:
+         the macro associated to [x] should refer to pred(ts). *)
+      let subst = create_subst env.subst env.isubst in
+      let body = Theory.convert ~at:(Term.Pred (Term.Var ts)) subst t Sorts.Message in
+      let dep = Theory.find_fun_terms t local_macros in
+      let body =
+        if List.length dep > 0
+        then Term.subst_macros_ts dep (Term.Pred (Term.Var ts)) (Term.Var ts) body
+        else body
+      in
+      let symb = Symbols.Macro.of_string x in
+      let _ = Macros.update Symbols.dummy_table symb body in
+      let local_macros = x::local_macros in
+      p_cond ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros p
   | Exists (evars, cond, p, q) ->
       let facts_p = cond::facts in
       let newsubst = List.map (fun i ->
@@ -508,12 +543,12 @@ let parse_proc system_name proc =
         p_cond
           ~env:new_env
           ~par_choice ~input
-          ~pos ~vars:(List.rev_append evars vars) ~facts:facts_p
+          ~pos ~vars:(List.rev_append evars vars) ~facts:facts_p ~local_macros
           p
       in
       p_cond
         ~env ~par_choice ~input
-        ~pos ~vars ~facts:facts_q
+        ~pos ~vars ~facts:facts_q ~local_macros
         q
   | p ->
       (* We are done processing conditionals, let's prepare
@@ -536,7 +571,7 @@ let parse_proc system_name proc =
       in
       p_update
         ~env ~input ~condition
-        ~updates:[]
+        ~updates:[] ~local_macros
         p ;
       pos + 1
 
@@ -544,12 +579,54 @@ let parse_proc system_name proc =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and corresponding description
     * are registered. *)
-  and p_update ~env ~input ~condition ~updates = function
-  | Apply _ | Let _ | New _ | Out _ -> assert false
+  and p_update ~env ~input ~condition ~updates ~local_macros = function
+  | Apply _ | New _ | Out _ -> assert false
+
+  | Let (x,t,p) ->
+      let subst = create_subst env.subst env.isubst in
+      (* We first convert [t] to a Term.term where macros refer to pred(ts). *)
+      let pred_ts = Term.Pred (Term.Var ts) in
+      let new_t = Theory.convert ~at:pred_ts subst t Sorts.Message in
+      (* For each state macro occurring in [t], we store in [dep]
+         the ones that have already been updated, ie that are in the list
+         [states_already_updated]. *)
+      let states_already_updated = (List.map (fun (s,_,_,_) -> s) updates) in
+      let dep = Theory.find_get_terms t states_already_updated in
+      (* [dep] now contains the state macros that need to be applied
+         at timestamp ts (and not pred(ts)). So we substitute before updating
+         the definition of the macro x. *)
+      let new_t =
+        if List.length dep > 0
+        then Term.subst_macros_ts dep (Term.Pred (Term.Var ts)) (Term.Var ts) new_t
+        else new_t
+      in
+      let dep = Theory.find_fun_terms t local_macros in
+      let new_t =
+        if List.length dep > 0
+        then Term.subst_macros_ts dep (Term.Pred (Term.Var ts)) (Term.Var ts) new_t
+        else new_t
+      in
+      let symb = Symbols.Macro.of_string x in
+      let _ = Macros.update Symbols.dummy_table symb new_t in
+      let local_macros = x::local_macros in
+      p_update ~env ~input ~condition ~updates ~local_macros p
 
   | Set (s, l, t, p) ->
-      let updates = (s,l,t)::updates in
-      p_update ~env ~input ~condition ~updates p
+      if List.exists (fun (s',_,_,_) -> s=s') updates
+      then
+        (* Not allowed because a state macro can have only 2 values:
+           - either the value at the end of the current action,
+           - either the value before the current action.
+           There is no in-between value. *)
+        failwith "Cannot update twice the same state in an action"
+      else
+        (* For each state macro occurring in [t], we store in [dep]
+           the ones that have already been updated, ie that are in the list
+           [states_already_updated]. *)
+        let states_already_updated = (List.map (fun (s,_,_,_) -> s) updates) in
+        let dep = Theory.find_get_terms t states_already_updated in
+        let updates = (s,l,t,dep)::updates in
+        p_update ~env ~input ~condition ~updates ~local_macros p
 
   | Alias _ | Null as proc ->
       let output,a,p =
@@ -585,12 +662,20 @@ let parse_proc system_name proc =
         conv_indices env vars,
         conv_formula env a facts
       in
+      (* We perform the same kind of substitution as in the Let case. *)
       let updates =
         List.map
-          (fun (s,l,t) ->
-             (Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
-             conv_term ~pred:true env a t)
-          updates
+          (fun (s,l,t,dep) ->
+            let ts = Term.Action (a, List.rev env.p_indices) in
+            let update_term = conv_term ~pred:true env a t in
+            if List.length dep > 0
+            then
+              ((Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
+              Term.subst_macros_ts dep (Term.Pred ts) ts update_term)
+            else
+              ((Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
+                update_term))
+            updates
       in
       let action = List.rev env.action in
       let action_descr =
@@ -608,7 +693,7 @@ let parse_proc system_name proc =
         Term.Macro (Term.in_macro, [], Term.Action (new_a,indices)) in
       let env = { env with subst = (snd input, in_tm) :: env.subst } in
 
-      ignore (p_in ~env ~pos:0 ~pos_indices:[] p)
+      ignore (p_in ~env ~pos:0 ~pos_indices:[] ~local_macros:[] p)
 
   | p ->
       raise (Cannot_parse p)
@@ -618,7 +703,7 @@ let parse_proc system_name proc =
     { action = [] ; p_indices = [] ;
       subst = [] ; isubst = [] }
   in
-  let _ : int = p_in ~pos:0 ~env ~pos_indices:[] proc in
+  let _ : int = p_in ~pos:0 ~env ~pos_indices:[] ~local_macros:[] proc in
   Symbols.dummy_table
 
 let declare_system table (system_name:Action.system_name) proc =

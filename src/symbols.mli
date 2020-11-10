@@ -131,6 +131,9 @@ module type Namespace = sig
     * using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table
 
+  (** Redefine a symbol name that has been previously defined. *)
+  val redefine : table -> ns t -> ?data:data -> def -> table
+
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
   val declare :

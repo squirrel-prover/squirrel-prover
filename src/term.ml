@@ -543,6 +543,26 @@ and subst_generic_atom s = function
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
+let rec subst_macros_ts : type a. string list -> Sorts.timestamp term -> Sorts.timestamp term -> a term -> a term =
+fun names ts1 ts2 t -> match t with
+  | Macro ((symb,s,ind), terms, ts) ->
+    if (List.mem (Symbols.to_string symb) names && ts=ts1)
+    then Macro((symb,s,ind), List.map (subst_macros_ts names ts1 ts2) terms, ts2)
+    else Macro((symb,s,ind), List.map (subst_macros_ts names ts1 ts2) terms, ts)
+  | Fun (f,terms) -> Fun (f, List.map (subst_macros_ts names ts1 ts2) terms)
+  | Seq (a, b) -> Seq (a, subst_macros_ts names ts1 ts2 b)
+  | Diff (a, b) -> Diff (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
+  | ITE (a, b, c) -> ITE (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b, subst_macros_ts names ts1 ts2 c)
+  | Find (vs, b, t, e) -> Find (vs, subst_macros_ts names ts1 ts2 b, subst_macros_ts names ts1 ts2 t, subst_macros_ts names ts1 ts2 e)
+  | ForAll (vs, b) -> ForAll (vs, subst_macros_ts names ts1 ts2 b)
+  | Exists (vs, b) -> Exists (vs, subst_macros_ts names ts1 ts2 b)
+  | And (a, b) -> And (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
+  | Or (a, b) -> Or (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
+  | Not a -> Not (subst_macros_ts names ts1 ts2 a)
+  | Impl (a, b) -> Impl (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
+  | _ -> t
+
+
 (** Smart constructors for boolean terms. *)
 
 let mk_not t1 = match t1 with

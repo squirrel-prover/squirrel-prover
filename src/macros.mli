@@ -13,6 +13,13 @@ val declare_global :
   Term.message ->
   Symbols.table * Symbols.macro Symbols.t
 
+(** Update the definition of a global (timestamp-dependent) macro. *)
+val update :
+  Symbols.table ->
+  Symbols.macro Symbols.t ->
+  Term.message ->
+  Symbols.table
+
 (** {2 Macro expansions} *)
 
 (** Tells whether a macro symbol can be expanded when applied

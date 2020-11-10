@@ -155,3 +155,10 @@ val convert :
   term ->
   'a Sorts.sort ->
   'a Term.term
+
+(** [find_get_terms t names] returns the sublist of [names] for which there
+  * exists a subterm Theory.Get(name,_,_) in the term [t]. *)
+val find_get_terms : term -> string list -> string list
+(** [find_fun_terms t names] returns the sublist of [names] for which there
+  * exists a subterm Theory.Fun(name,_,_) in the term [t]. *)
+val find_fun_terms : term -> string list -> string list

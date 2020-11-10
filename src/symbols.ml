@@ -104,6 +104,7 @@ module type Namespace = sig
   type def
   val reserve : table -> string -> table * data t
   val define : table -> data t -> ?data:data -> def -> table
+  val redefine : table -> data t -> ?data:data -> def -> table
   val declare :
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
   val declare_exact :
@@ -137,6 +138,10 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
 
   let define () symb ?(data=Empty) value =
     assert (fst (Hashtbl.find table symb) = Reserved) ;
+    Hashtbl.replace table symb (Exists (M.construct value), data)
+
+  let redefine () symb ?(data=Empty) value =
+    assert (Hashtbl.mem table symb) ;
     Hashtbl.replace table symb (Exists (M.construct value), data)
 
   let declare () name ?(builtin=false) ?(data=Empty) value =
@@ -184,7 +189,7 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
            | Incorrect_namespace -> ())
       table
 
-  let fold f acc = 
+  let fold f acc =
     Hashtbl.fold
       (fun s (def,data) acc ->
          try
