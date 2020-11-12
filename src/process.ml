@@ -422,7 +422,6 @@ exception Cannot_parse of process
 
 (** Parse a prepared process to extract its actions. *)
 let parse_proc system_name proc =
-  let var_env = ref Vars.empty_env in
   let _,ts = Vars.make_fresh Vars.empty_env Sorts.Timestamp "ts" in
   let create_subst subst isubst  =
     List.map (fun (x,t) -> Theory.ESubst (x,t)) subst @
@@ -449,7 +448,7 @@ let parse_proc system_name proc =
     * [pos_indices] is the list of accumulated indices
     * for the parallel choice part of the action item.
     * Return the next position in parallel compositions. *)
-  let rec p_in ~env ~pos ~(pos_indices:Vars.index list) ~local_macros = function
+  let rec p_in ~var_env ~env ~pos ~(pos_indices:Vars.index list) ~local_macros = function
     | Apply _ | New _ -> assert false
     | Let (x,t,p) ->
       (* No state update already defined in the action:
@@ -465,11 +464,12 @@ let parse_proc system_name proc =
       let symb = Symbols.Macro.of_string x in
       let _ = Macros.update Symbols.dummy_table symb body in
       let local_macros = x::local_macros in
-      p_in ~env ~pos ~pos_indices ~local_macros p
+      p_in ~var_env ~env ~pos ~pos_indices ~local_macros p
     | Null -> pos
     | Parallel (p, q) ->
-      let pos = p_in ~env ~pos ~pos_indices ~local_macros p in
-      p_in ~env ~pos ~pos_indices ~local_macros q
+      let current_env = !var_env in
+      let pos = p_in ~var_env:(ref current_env) ~env ~pos ~pos_indices ~local_macros p in
+      p_in ~var_env:(ref current_env) ~env ~pos ~pos_indices ~local_macros q
     | Repl (i, p) ->
       let i' = Vars.make_fresh_and_update var_env Sorts.Index i in
       let env =
@@ -478,7 +478,7 @@ let parse_proc system_name proc =
           p_indices = i' :: env.p_indices }
       in
       let pos_indices = i'::pos_indices in
-      p_in ~env ~pos ~pos_indices ~local_macros p
+      p_in ~var_env ~env ~pos ~pos_indices ~local_macros p
     | In _ | Exists _ | Set _ | Alias _ | Out _ as proc ->
       let env,input,p =
         (* Get the input data,
@@ -494,7 +494,7 @@ let parse_proc system_name proc =
       let par_choice = pos, List.rev pos_indices in
       let _ : int =
         p_cond
-          ~env ~par_choice ~input
+          ~var_env ~env ~par_choice ~input
           ~pos:0 ~vars:[] ~facts:[]
           ~local_macros
           p
@@ -506,7 +506,7 @@ let parse_proc system_name proc =
     * the position in existential conditions and the associated
     * bound index variables. We cannot convert facts to Term.fact yet,
     * since we do not know for which action they should be converted. *)
-  and p_cond ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros = function
+  and p_cond ~var_env ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros = function
   | Apply _ | New _ -> assert false
   | Let (x,t,p) ->
       (* No state update already defined in the action:
@@ -522,7 +522,7 @@ let parse_proc system_name proc =
       let symb = Symbols.Macro.of_string x in
       let _ = Macros.update Symbols.dummy_table symb body in
       let local_macros = x::local_macros in
-      p_cond ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros p
+      p_cond ~var_env ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros p
   | Exists (evars, cond, p, q) ->
       let facts_p = cond::facts in
       let newsubst = List.map (fun i ->
@@ -541,13 +541,13 @@ let parse_proc system_name proc =
       in
       let pos =
         p_cond
-          ~env:new_env
+          ~var_env ~env:new_env
           ~par_choice ~input
           ~pos ~vars:(List.rev_append evars vars) ~facts:facts_p ~local_macros
           p
       in
       p_cond
-        ~env ~par_choice ~input
+        ~var_env ~env ~par_choice ~input
         ~pos ~vars ~facts:facts_q ~local_macros
         q
   | p ->
@@ -570,7 +570,7 @@ let parse_proc system_name proc =
           action = action }
       in
       p_update
-        ~env ~input ~condition
+        ~var_env ~env ~input ~condition
         ~updates:[] ~local_macros
         p ;
       pos + 1
@@ -579,7 +579,7 @@ let parse_proc system_name proc =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and corresponding description
     * are registered. *)
-  and p_update ~env ~input ~condition ~updates ~local_macros = function
+  and p_update ~var_env ~env ~input ~condition ~updates ~local_macros = function
   | Apply _ | New _ | Out _ -> assert false
 
   | Let (x,t,p) ->
@@ -609,7 +609,7 @@ let parse_proc system_name proc =
       let symb = Symbols.Macro.of_string x in
       let _ = Macros.update Symbols.dummy_table symb new_t in
       let local_macros = x::local_macros in
-      p_update ~env ~input ~condition ~updates ~local_macros p
+      p_update ~var_env ~env ~input ~condition ~updates ~local_macros p
 
   | Set (s, l, t, p) ->
       if List.exists (fun (s',_,_,_) -> s=s') updates
@@ -626,7 +626,7 @@ let parse_proc system_name proc =
         let states_already_updated = (List.map (fun (s,_,_,_) -> s) updates) in
         let dep = Theory.find_get_terms t states_already_updated in
         let updates = (s,l,t,dep)::updates in
-        p_update ~env ~input ~condition ~updates ~local_macros p
+        p_update ~var_env ~env ~input ~condition ~updates ~local_macros p
 
   | Alias _ | Null as proc ->
       let output,a,p =
@@ -693,7 +693,7 @@ let parse_proc system_name proc =
         Term.Macro (Term.in_macro, [], Term.Action (new_a,indices)) in
       let env = { env with subst = (snd input, in_tm) :: env.subst } in
 
-      ignore (p_in ~env ~pos:0 ~pos_indices:[] ~local_macros:[] p)
+      ignore (p_in ~var_env ~env ~pos:0 ~pos_indices:[] ~local_macros:[] p)
 
   | p ->
       raise (Cannot_parse p)
@@ -703,7 +703,8 @@ let parse_proc system_name proc =
     { action = [] ; p_indices = [] ;
       subst = [] ; isubst = [] }
   in
-  let _ : int = p_in ~pos:0 ~env ~pos_indices:[] ~local_macros:[] proc in
+  let var_env = ref Vars.empty_env in
+  let _ : int = p_in ~var_env ~pos:0 ~env ~pos_indices:[] ~local_macros:[] proc in
   Symbols.dummy_table
 
 let declare_system table (system_name:Action.system_name) proc =
