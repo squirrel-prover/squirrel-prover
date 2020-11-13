@@ -68,7 +68,7 @@ Proof.
   exists i.
 Qed.
 
-(* Show that condition S1 implies the next one. *)
+(* Show that condition P1 implies the next one. *)
 goal P1_charac :
   forall (r:index),
 cond@P1(r) =>
@@ -83,32 +83,35 @@ Qed.
 
 equiv unreach.
 Proof.
-    enrich kP; enrich kS; enrich seq(i->g^a(i));enrich seq(i->g^b(i)); enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+    enrich kP; 
+    enrich kS; 
+    enrich seq(i->g^a(i));
+    enrich seq(i->g^b(i)); 
+    enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
 
     induction t.
 
     expandall.
     ddh a, b, k.
 
-    expand  seq(i->g^a(i)), i.
-
-    expand  seq(i->g^a(i)), i;     expand gb(i)@P1(i).
-    expandall.
-
-    fa 6.
-
+   (* Case P *)
     expandall.
     expand  seq(i->g^a(i)), i.
     fa 6.
 
-    expand gb(i)@P2(i,j);
-    expand seq(i->g^b(i)), j;
-    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
-    expandall.
-    fa 7.
+  (* Case P1 *)
+   expandall.
+   expand  seq(i->g^a(i)), i.
+   fa 6.
+
+  (* Case P2 *)
+   expandall.
+   expand  seq(i->g^a(i)), i.
+   expand seq(i->g^b(i)), j.
+   expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
+   fa 8.
 
    (* Case P3 *)
-
    expand frame@P3(i); expand exec@P3(i); expand output@P3(i).
    equivalent exec@pred(P3(i)) && cond@P3(i), False.
    expand cond@P3(i).
@@ -120,31 +123,32 @@ Proof.
    apply P1_charac to i.
    apply H1 to s.
 
-   expand gb(i)@P3(i). fa 5. noif 6.
+   fa 5. 
+   noif 6.
 
    (* Case A *)
-
    expandall.
-   expand gb(i)@A(i);
    expand  seq(i->g^a(i)), i.
    fa 6.
 
+   (* Case S *)
    expandall.
    expand  seq(i->g^b(i)), j.
    fa 6.
 
-   expand  seq(i->g^b(i)), j.
+   (* Case S1 *)
    expandall.
+   expand  seq(i->g^b(i)), j.
    fa 6.
 
+   (* Case S2 *)
+   expandall.
    expand  seq(i->g^a(i)), l;
    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
-   expandall.
    fa 7.
 
+   (* Case S3 *)
    expand frame@S3(j); expand exec@S3(j).
-
-   (* Unreachability of S3  *)
    equivalent exec@pred(S3(j)) && cond@S3(j), False.
    expand cond@S3(j).
    executable pred(S3(j)).
@@ -157,6 +161,7 @@ Proof.
    fa 5.
    noif 6.
 
+   (* Case A1 *)
    expandall.
    expand  seq(i->g^b(i)), j.
    fa 6.
