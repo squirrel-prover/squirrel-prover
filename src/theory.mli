@@ -116,6 +116,8 @@ type conversion_error =
   | Timestamp_unexpected of term
   | Untypable_equality of term
   | String_expected of term
+  | Int_expected of term
+  | Tactic_type of string
 
 exception Conv of conversion_error
 

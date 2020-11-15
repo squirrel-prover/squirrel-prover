@@ -260,7 +260,7 @@ declaration:
 tactic_param:
 | t=term    { TacticsArgs.Theory t }
 | f=formula { TacticsArgs.Theory f }
-| i=INT     { TacticsArgs.Int i }
+| i=INT     { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -284,9 +284,9 @@ tac:
                                           ("nosimpl", t) }
   | NOBRANCH t=tac                     { Tactics.NotBranching (t) }
   | CYCLE i=INT                       { Tactics.Abstract
-                                         ("cycle",[TacticsArgs.Int i]) }
+                                         ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                 { Tactics.Abstract
-                                         ("cycle",[TacticsArgs.Int (-i)]) }
+                                         ("cycle",[TacticsArgs.Int_parsed (-i)]) }
 
   | APPLY i=ID                        { Tactics.Abstract
                                           ("apply",

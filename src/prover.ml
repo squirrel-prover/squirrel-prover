@@ -142,7 +142,7 @@ module Make_AST (T : Table_sig) :
   type judgment = T.judgment
 
   let pp_arg ppf = function
-    | TacticsArgs.Int i -> Fmt.int ppf i
+    | TacticsArgs.Int_parsed i -> Fmt.int ppf i
     | TacticsArgs.String_name s -> Fmt.string ppf s
     | TacticsArgs.Theory th -> Theory.pp ppf th
 
@@ -200,13 +200,9 @@ module type Tactics_sig = sig
 
   val register : string -> ?help:string -> (judgment -> judgment list) -> unit
 
-  val register_one : string -> ?help:string ->
+  val register_typed : string -> ?help:string ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
-
-  val register_two : string -> ?help:string ->
-    ('a TacticsArgs.arg -> 'b TacticsArgs.arg -> judgment -> judgment list) ->
-    'a TacticsArgs.sort  -> 'b TacticsArgs.sort -> unit
 
   val register_orelse :
     string -> ?help:string -> string list -> unit
@@ -262,6 +258,56 @@ struct
     | [], [] -> []
     | _ -> failwith "not implemented"
 
+
+
+  let rec convert_args parser_args tactic_type j =
+    let env =
+      match M.to_goal j with
+      | Goal.Trace t -> TraceSequent.get_env t
+      | Goal.Equiv e -> EquivSequent.get_env e
+    in
+    let tsubst = Theory.subst_of_env env in
+    let open TacticsArgs in
+    match parser_args, tactic_type with
+    | [Theory p], Sort Timestamp ->
+      Arg (Timestamp (Theory.convert tsubst p Sorts.Timestamp))
+    | [Theory p], Sort Message ->
+      Arg (Message (Theory.convert tsubst p Sorts.Message))
+    | [Theory p], Sort Boolean ->
+      Arg (Boolean (Theory.convert tsubst p Sorts.Boolean))
+    | [Theory (Var p)], Sort String ->
+      Arg (String p)
+    | [Int_parsed i], Sort Int ->
+      Arg (Int i)
+    | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
+    | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
+    | [Theory (Var p)], Sort Index ->
+      Arg (Index (Theory.conv_index tsubst (Var p)))
+    | [th1], Sort (Pair (s1, Opt s2)) ->
+      let Arg arg1 = convert_args [th1] (Sort s1) j in
+      let Arg arg2 = convert_args [] (Sort (Opt s2)) j in
+      Arg (Pair (arg1, arg2))
+    | [th1], Sort (Pair (Opt s1, s2)) ->
+      let Arg arg1 = convert_args [] (Sort (Opt s1)) j in
+      let Arg arg2 = convert_args [th1] (Sort (s2)) j in
+      Arg (Pair (arg1, arg2))
+    | th1::q, Sort (Pair (s1, s2)) ->
+      let Arg arg1 = convert_args [th1] (Sort s1) j in
+      let Arg arg2 = convert_args q (Sort s2) j in
+      Arg (Pair (arg1, arg2))
+    | [], Sort (Opt a) ->
+      Arg (Opt (a, None))
+    | [th], Sort (Opt a) ->
+      let Arg arg = convert_args [th] (Sort a) j in
+      Arg (Opt
+             (a,
+              (Some (cast a arg))
+             )
+          )
+    | [], _ -> raise Theory.(Conv (Tactic_type "more arguments expected"))
+    | p, _ -> raise Theory.(Conv (Tactic_type "too many arguments"))
+
+
   let register id ?(help="") f =
     register_general id ~help:help
       (function
@@ -272,11 +318,11 @@ struct
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-  let register_one id  ?(help="") f sort =
+  let register_typed id  ?(help="") f sort =
     register_general id ~help:help
       (fun args s sk fk ->
-         match convert_argsb args ([TacticsArgs.Sort sort]) s with
-         | [TacticsArgs.Arg (th)]  ->
+         match convert_args args (TacticsArgs.Sort sort) s with
+         | TacticsArgs.Arg (th)  ->
            begin
              try
                let th = TacticsArgs.cast sort th in
@@ -289,37 +335,7 @@ struct
                Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
            end
          | exception Theory.(Conv e) -> fk (Tactics.Cannot_convert e)
-         | _  -> Tactics.hard_failure (Tactics.Failure "improper arguments")
-
       )
-
-  let register_two id  ?(help="") f sort1 sort2 =
-    register_general id ~help:help
-      (fun args s sk fk ->
-         match convert_argsb args
-                 ([TacticsArgs.Sort sort1; TacticsArgs.Sort sort2]) s
-         with
-         | [TacticsArgs.Arg (th1); TacticsArgs.Arg (th2)]  ->
-           begin
-             try
-               let
-                 th1 = TacticsArgs.cast sort1 th1
-               and
-                 th2 = TacticsArgs.cast sort2 th2
-               in
-               begin
-                 match f th1 th2 s with
-                 | subgoals -> sk subgoals fk
-                 | exception Tactics.Tactic_soft_failure e -> fk e
-               end
-             with TacticsArgs.Uncastable ->
-               Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
-          end
-         | exception Theory.(Conv e) -> fk (Tactics.Cannot_convert e)
-         | _  -> Tactics.hard_failure (Tactics.Failure "improper arguments")
-
-      )
-
 
   let register_orelse id ?(help="") ids =
     register_general id
@@ -564,7 +580,7 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | Tactics.Abstract ("cycle",[TacticsArgs.Int i]) -> subgoals := cycle i !subgoals; false
+  | Tactics.Abstract ("cycle",[TacticsArgs.Int_parsed i]) -> subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
 let start_proof () = match !current_goal, !goals with

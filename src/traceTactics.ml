@@ -112,7 +112,7 @@ let left_intros (TacticsArgs.String hyp_name) s =
     | exception Not_found -> Tactics.soft_failure (Tactics.Failure "no such hypothesis")
 
 let () =
-  T.register_one "introsleft"
+  T.register_typed "introsleft"
     ~help:"Simplify conjunctions and existentials in an hypothesis.\
            \n Usage: introsleft H."
     left_intros TacticsArgs.String
@@ -140,7 +140,7 @@ let left_not_intro (TacticsArgs.String hyp_name) s =
   | _ -> Tactics.soft_failure (Tactics.Failure "cannot introduce negation")
 
 let () =
-  T.register_one "notleft"
+  T.register_typed "notleft"
     ~help:"Push a negation inside a formula.\
            \n Usage: notleft H."
     left_not_intro TacticsArgs.String
@@ -174,7 +174,7 @@ let timestamp_case (TacticsArgs.Timestamp ts) s =
 
 
 let () =
-  T.register_one "tscase" timestamp_case TacticsArgs.Timestamp
+  T.register_typed "tscase" timestamp_case TacticsArgs.Timestamp
 
 
 (** Case analysis on a disjunctive hypothesis *)
@@ -194,7 +194,7 @@ let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
 
 
 let () =
-  T.register_one "hcase" hypothesis_case TacticsArgs.String
+  T.register_typed "hcase" hypothesis_case TacticsArgs.String
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -243,7 +243,7 @@ let message_case (TacticsArgs.Message m) s =
 
 
 let () =
-  T.register_one "messcase" message_case TacticsArgs.Message
+  T.register_typed "messcase" message_case TacticsArgs.Message
 
 let () =
   let open Tactics in
@@ -254,7 +254,7 @@ let () =
            \n Usage: case T, or case H."
     ["tscase"; "hcase"; "messcase"]
 
-let depends (TacticsArgs.Timestamp a1) (TacticsArgs.Timestamp a2) s =
+let depends TacticsArgs.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
   | Term.Action( n1, is1), Term.Action (n2, is2) ->
     if Action.(depends (of_term n1 is1) (of_term n2 is2)) then
@@ -267,11 +267,11 @@ let depends (TacticsArgs.Timestamp a1) (TacticsArgs.Timestamp a2) s =
   | _ -> Tactics.soft_failure (Tactics.Failure "arguments must be actions")
 
 let () =
-  T.register_two "depends"
+  T.register_typed "depends"
     ~help:"If the second action given as argument depends on the first action,\
            \n add the corresponding timestamp inequality.\
            \n Usage: depends a1, a2."
-    depends TacticsArgs.Timestamp TacticsArgs.Timestamp
+    depends TacticsArgs.(Pair (Timestamp, Timestamp))
 
 let false_left s =
   try
@@ -338,7 +338,7 @@ let () =
 (** [goal_exists_intro judge ths] introduces the existentially
     quantified variables in the conclusion of the judgment,
     using [ths] as existential witnesses. *)
-let goal_exists_intro ths (s : TraceSequent.t) =
+let goal_exists_intro  ths (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
     begin try
@@ -351,11 +351,12 @@ let goal_exists_intro ths (s : TraceSequent.t) =
   | _ ->
       Tactics.soft_failure (Tactics.Failure "cannot introduce exists")
 
+(* Does not rely on the typed register, as it parses a subt. *)
 let () =
   T.register_general "exists"
     ~help:"Introduce the existentially quantified variables in the conclusion \
            \n of the judgment, using the arguments as existential witnesses. \
-           \n Usage: exists t_1, t_2."
+           \n Usage: exists t_1, t_2, ..."
     (fun l s sk fk ->
        let ths =
          List.map
@@ -387,7 +388,7 @@ let exists_left (TacticsArgs.String hyp_name) s  =
       | _ -> Tactics.soft_failure @@ Tactics.Failure "improper arguments"
 
 let () =
-  T.register_one "existsleft"
+  T.register_typed "existsleft"
     ~help:"Introduce existential quantifier in hypothesis H.\
            \n Usage: existsleft H."
     exists_left TacticsArgs.String
@@ -536,8 +537,8 @@ let expand_mess (TacticsArgs.Message t) s =
     Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
 let () =
-  T.register_one "messexpand" expand_mess TacticsArgs.Message;
-  T.register_one "boolexpand" expand_bool TacticsArgs.Boolean
+  T.register_typed "messexpand" expand_mess TacticsArgs.Message;
+  T.register_typed "boolexpand" expand_bool TacticsArgs.Boolean
 
 let () = T.register_orelse "expand"
     ~help:"Expand all occurences of the given macro inside the goal.\
@@ -591,7 +592,7 @@ let () = T.register "assumption"
 
 (** Length *)
 
-let namelength (TacticsArgs.Message n) (TacticsArgs.Message m) s =
+let namelength TacticsArgs.(Pair (Message n, Message m)) s =
   match n, m with
     | Name n, Name m ->
         let f =
@@ -604,10 +605,10 @@ let namelength (TacticsArgs.Message n) (TacticsArgs.Message m) s =
         Tactics.(soft_failure (Failure "expected names"))
 
 let () =
-  T.register_two "namelength"
+  T.register_typed "namelength"
     ~help:"Adds an hypothesis expressing that two names have \
            the same length.\n Usage: namelength <n>,<m>."
-    namelength TacticsArgs.Message TacticsArgs.Message
+    namelength TacticsArgs.(Pair (Message, Message))
 
 (** Eq-Indep Axioms *)
 
@@ -817,7 +818,7 @@ let fresh (TacticsArgs.String m) s =
 
 
 let () =
-  T.register_one "fresh"
+  T.register_typed "fresh"
     ~help:"Given a message equality M of the form t=n, \
            add an hypothesis expressing that n is a subterm of t.\
            \n Usage: fresh M."
@@ -834,7 +835,7 @@ let apply_substitute subst s =
   [TraceSequent.apply_subst subst s]
 
 
-let substitute_mess (TacticsArgs.Message m1) (TacticsArgs.Message m2) s =
+let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   let subst =
         let s,trs = TraceSequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
@@ -846,11 +847,11 @@ let substitute_mess (TacticsArgs.Message m1) (TacticsArgs.Message m2) s =
 
 
 let () =
-  T.register_two "messsubstitute"
-    substitute_mess TacticsArgs.Message TacticsArgs.Message
+  T.register_typed "messsubstitute"
+    substitute_mess TacticsArgs.(Pair (Message, Message))
 
 
-let substitute_ts (TacticsArgs.Timestamp ts1) (TacticsArgs.Timestamp ts2) s =
+let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   let subst =
       let s, models = TraceSequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
@@ -861,10 +862,10 @@ let substitute_ts (TacticsArgs.Timestamp ts1) (TacticsArgs.Timestamp ts2) s =
   apply_substitute subst s
 
 let () =
-  T.register_two "tssubstitute"
-    substitute_ts TacticsArgs.Timestamp TacticsArgs.Timestamp
+  T.register_typed "tssubstitute"
+    substitute_ts TacticsArgs.(Pair (Timestamp, Timestamp))
 
-let substitute_idx (TacticsArgs.Index i1) (TacticsArgs.Index i2) s =
+let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   let subst =
     let s, models = TraceSequent.get_models s in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
@@ -875,8 +876,8 @@ let substitute_idx (TacticsArgs.Index i1) (TacticsArgs.Index i2) s =
   apply_substitute subst s
 
 let () =
-  T.register_two "idxsubstitute"
-    substitute_idx TacticsArgs.Index TacticsArgs.Index
+  T.register_typed "idxsubstitute"
+    substitute_idx TacticsArgs.(Pair (Index, Index))
 
 let () =
   T.register_orelse "substitute"
@@ -1055,7 +1056,7 @@ let exec (TacticsArgs.Timestamp a) s =
    TraceSequent.add_formula formula s]
 
 let () =
-  T.register_one "executable"
+  T.register_typed "executable"
     ~help:"Assert that exec@_ implies exec@_ for all \
            previous timestamps.\
            \n Usage: executable t."
@@ -1213,7 +1214,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
     with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
 
 let () =
-  T.register_one "euf"
+  T.register_typed "euf"
     ~help:"Apply the euf axiom to the given hypothesis name. If the hash has\
            \n been declared with a tag formula, applies the tagged version.\
            \n given tag. Tagged eufcma, with a tag T, says that, under the\
@@ -1267,6 +1268,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) =
   in
   aux [] f
 
+(* Does not rely on the typed register as it parses a subst *)
 let () =
   T.register_general "apply"
     ~help:"Apply an hypothesis with its universally quantified variables \
@@ -1296,7 +1298,7 @@ let tac_assert (TacticsArgs.Boolean f) s =
   [s1 ;s2]
 
 let () =
-  T.register_one "assert"
+  T.register_typed "assert"
     ~help:"Add an assumption to the set of hypothesis, and produce the goal for\
            \n the proof of the assumption.\
            \n Usage: assert f."

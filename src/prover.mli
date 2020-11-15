@@ -73,12 +73,9 @@ module type Tactics_sig = sig
    give a function over judgments, expecting some arguments of the given
    sort. *)
   val register : string -> ?help:string ->  (judgment -> judgment list) -> unit
-  val register_one : string -> ?help:string ->
+  val register_typed : string -> ?help:string ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
-  val register_two : string -> ?help:string ->
-    ('a TacticsArgs.arg -> 'b TacticsArgs.arg -> judgment -> judgment list) ->
-    'a TacticsArgs.sort  -> 'b TacticsArgs.sort -> unit
 
   (* Allows to register a tactic, which is a specific orelse over other
      predefined tactics. It will try to apply the given tactics in the list, by
