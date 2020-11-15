@@ -48,11 +48,7 @@ val save_state : prover_mode -> unit
 val reset_state : int -> prover_mode
 
 (** {2 Tactics syntax trees} *)
-
-type tac_arg =
-  | String_name of string
-  | Int of int
-  | Theory of Theory.term
+(** Prover tactics, and tables for storing them. *)
 
 (* TODO module AST : Tactics.AST_sig
   with type arg = tac_arg and type judgment = Sequent.t *)
@@ -61,19 +57,43 @@ type tac_arg =
 module type Tactics_sig = sig
   type judgment
   type tac = judgment Tactics.tac
+
+  (* Allows to register a general tactic. Used when the arguments of the tactic
+     are complex. *)
   val register_general :
-    string -> ?help:string -> (tac_arg list -> tac) -> unit
-  val register : string -> ?help:string -> tac -> unit
-  val register_formula : string -> ?help:string -> (formula -> tac) -> unit
+    string -> ?help:string -> (TacticsArgs.parser_arg list -> tac) -> unit
+
+  (* Register a macro, built using the AST. *)
   val register_macro :
     string -> ?modifiers:string list -> ?help:string ->
-    tac_arg Tactics.ast -> unit
-  val get : string -> tac_arg list -> tac
+    TacticsArgs.parser_arg Tactics.ast -> unit
+
+(* The remaining functions allows to easily register a tactic, without having to
+   manage type conversions, or the tail recursvity. It is simply required to
+   give a function over judgments, expecting some arguments of the given
+   sort. *)
+  val register : string -> ?help:string ->  (judgment -> judgment list) -> unit
+  val register_typed : string -> ?help:string ->
+    ('a TacticsArgs.arg -> judgment -> judgment list) ->
+    'a TacticsArgs.sort  -> unit
+
+  (* Allows to register a tactic, which is a specific orelse over other
+     predefined tactics. It will try to apply the given tactics in the list, by
+     giving them the arguments provided to the first tactic. Used to define
+     polymorphic tactics, that will try to apply tactics of distinct types. *)
+  val register_orelse :
+    string -> ?help:string -> string list -> unit
+
+
+  val get : string -> TacticsArgs.parser_arg list -> tac
   val pp : Format.formatter -> string -> unit
+
+  (* Print all tactics with their help. Do not print tactics without help
+     string. *)
   val pps : Format.formatter -> unit -> unit
 end
 
-val pp_ast : Format.formatter -> tac_arg Tactics.ast -> unit
+val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 
 module TraceTactics : Tactics_sig with type judgment = TraceSequent.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
@@ -102,7 +122,7 @@ val make_equiv_goal_process : Action.single_system -> Action.single_system -> Go
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
-  | ParsedTactic of tac_arg Tactics.ast
+  | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo of int
   | ParsedGoal of gm_input
   | EOF
@@ -134,7 +154,7 @@ val complete_proof : unit -> unit
 
 (** [eval_tactic utac] applies the tactic [utac].
     Return [true] if there are no subgoals remaining. *)
-val eval_tactic : tac_arg Tactics.ast -> bool
+val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
-val start_proof : unit -> string option
+     val start_proof : unit -> string option

@@ -22,6 +22,6 @@ goal unforgeable_1 :
 
 Proof.
  nosimpl(intros).
- substitute a, b.
+ idxsubstitute a, b.
  collision.
 Qed.

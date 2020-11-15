@@ -16,6 +16,7 @@ TraceSequent
 EquivSequent
 Sorts
 Tactics
+TacticsArgs
 Term
 Theory
 Utils

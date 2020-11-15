@@ -126,6 +126,9 @@ type conversion_error =
   | Timestamp_expected of term
   | Timestamp_unexpected of term
   | Untypable_equality of term
+  | String_expected of term
+  | Int_expected of term
+  | Tactic_type of string
 
 exception Conv of conversion_error
 
@@ -149,6 +152,16 @@ let pp_error ppf = function
          (operands do not have the same type,@ \
          or do not have a type@ for which the comparison is allowed)"
         pp t
+  | String_expected t ->
+          Fmt.pf ppf
+        "The term %a cannot be seen as a string."
+        pp t
+  | Int_expected t ->
+          Fmt.pf ppf
+        "The term %a cannot be seen as a int."
+        pp t
+  | Tactic_type s -> Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+
 
 let check_arity s actual expected =
   if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
