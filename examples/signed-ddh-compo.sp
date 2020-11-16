@@ -4,9 +4,9 @@ SIGNED DDH
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 
-P -> S : g^a
-S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)
-P -> S : h(<g^a,g^b>,kP)
+P -> S : <pk(kP), g^a>
+S -> P : <pk(kS),g^b>,sign(<<g^a,g^b>,pk(kP)>,kS)
+P -> S : sign(<<g^b,g^a>,pk(kS)>,kP)
 
 We leverage the composition result, to prove a single session in the
 presence of an adversary with access to a "backdoor" about the signature
@@ -58,9 +58,9 @@ process P =
       else
       (try find j such that snd(fst(t)) = g^b(j) in
         out(cP, ok)
-      else
+      else 
        out(cP, diff(ok,ko))
-       )
+       ) 
 
 
 process S =
@@ -73,16 +73,15 @@ process S =
     out(cS,ok);
     in(cS, challenge);
     if pkP=pk(kP) then
-     (if gP = g^a1 then
+     if gP = g^a1 then
       out(cS, ok)
       else
        (try find l such that gP = g^a(l) in
           out(cS, ok)
-	else
+	else 
     	  out(cS, diff(ok,ko))
 	 )
-       )
-     else null
+       
 
 system [auth] ( P | S).
 
@@ -126,11 +125,10 @@ system [secret] ( P2 | S2).
 goal [none, auth] S1_charac :
   cond@S1 => (cond@S4 => False) .
 Proof.
-  simpl.
-  nosimpl(expand cond@S1; expand cond@S4; simpl).
+  expand cond@S1; expand cond@S4.
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
-  euf M1.
+  euf M0.
 
   case H2.
   apply H1 to i.
@@ -142,10 +140,9 @@ Qed.
 goal [none, auth] P1_charac :
    cond@P1 => (cond@P4 => False).
 Proof.
-  simpl.
-  nosimpl(expand cond@P1; expand cond@P4; simpl).
+  expand cond@P1; expand cond@P4.
   substitute pkS@P1,pk(kS).
-  euf M1.
+  euf M0.
 
   case H3.
   apply H1 to i.
@@ -166,59 +163,63 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 equiv [left, auth] [right, auth] auth.
 Proof.
    enrich kP; enrich g^a1; enrich g^b1; enrich kS.
-   enrich seq(i-> g^b(i)).    enrich seq(i-> g^a(i)).
+   enrich seq(i-> g^b(i)); enrich seq(i-> g^a(i)).
 
    induction t.
 
-   expandall.
-   fa 6.
+   (* P *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* P1 *)        
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* P2 *)
+   expandall; fa 6.
 
-   expandall.
+   (* P3 *)
+   expandall; fa 6.
    expand seq(i->g^b(i)),j.
-   fa 7.
 
+   (* P4 *)
    expand frame@P4; expand exec@P4.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
    executable pred(P4). depends P1, P4. apply H2 to P1. expand exec@P1. apply P1_charac.
-   fa 7.
-   noif 7.
 
-   expandall.
-   fa 6.
+   fa 7; noif 7.
 
-   expandall.
-   fa 6.
+   (* A *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* A1 *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* S *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* S1 *)
+   expandall; fa 6.
 
+   (* S2 *)
+   expandall; fa 6.
+
+   (* S3 *)
    expandall.
    expand seq(i->g^a(i)),l.
    fa 7.
 
+   (* S4 *)
    expand frame@S4; expand exec@S4.
+
    equivalent exec@pred(S4) && cond@S4, False.
    executable pred(S4). depends S1, S4. apply H2 to S1. expand exec@S1. apply S1_charac.
 
    fa 6. fa 7. noif 7.
 
-   expandall.
-   fa 6.
+   (* A2 *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* A3 *)
+   expandall; fa 6.
 Qed.
