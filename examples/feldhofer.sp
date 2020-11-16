@@ -36,8 +36,8 @@ name nt : index -> index -> message
 name rt : index -> index -> message
 name rr : index -> message
 
-axiom dec :
-  forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m
+(* axiom dec :
+  forall (m:message, r:message, key:message), dec(enc(m,r,key),key)  = m *)
 
 process Reader(i:index) =
   out(cR, nr(i));
