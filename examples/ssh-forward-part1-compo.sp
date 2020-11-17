@@ -8,7 +8,8 @@ ACM Conference on Computer and Communications Security (CCS’20),
 Orlando, USA, November 2020. ACM Press. To appear
 
 P -> S : g^a
-S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
+S -> P : g^b
+S -> P:  pkS, sign(h(g^a,g^b, g^ab),skS) )
 P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
 
 First part of the proof of ssh with a modified agent forwarding. It
@@ -25,6 +26,7 @@ name kS : message
 
 channel cP
 channel cS
+channel c
 
 name a1 : message
 name b1 : message
@@ -36,20 +38,24 @@ name k : index -> index -> message
 abstract enc : message -> message -> message
 abstract dec : message -> message -> message
 
-axiom encdec : forall (x1,x2:message), dec(enc(x1,x2),x2) = x1
 
+(* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
+(* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
+ 
 hash h
 name hKey : message
 
 axiom [auth] hashnotfor :
   forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
 
+(* The CR axiom built-in in Squirrel assumes a secret key *) 
+(* This is not the case here, and we therefore declare the following axiom *)
+
 axiom [auth] collres :
   forall (x1,x2:message), h(x1,hKey) = h(x2,hKey) => x1=x2
 
+(* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True
-
-axiom DDHcommut : forall (x1,x2:message), g^x1^x2 = g^x2^x1
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
@@ -88,12 +94,12 @@ process S =
   (* begin S1 *)
   in(cS,garbage);
   let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
+  out(cS, <pk(kS),sign(sidS, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
     Sok : out(cS,ok)
 
-system [fullSSH] ( P | S).
+system [fullSSH] K: out(c,hKey);( P | S).
 
 (* The secret is expected to hold at the end of P0 *)
 
@@ -154,7 +160,7 @@ process Sauth =
   (* begin S1 *)
   in(cS,garbage);
   let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
+  out(cS, <pk(kS),sign(sidS, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
       out(cS,ok);
@@ -164,7 +170,7 @@ process Sauth =
      else
        Sfail :  out(cS,diff(ok,ko))
 
-system [auth] ( Pauth | Sauth).
+system [auth]  K: out(c,hKey);(Pauth | Sauth).
 
 
 
@@ -173,9 +179,7 @@ goal [none, auth] P_charac :
   cond@Pok => (cond@Pfail => False) .
 Proof.
   simpl.
-  expand cond@Pok.
-  expand cond@Pfail.
-  expand pkS@Pok.
+  expand cond@Pok;expand cond@Pfail; expand pkS@Pok.
   substitute fst(input@Pok), pk(kS).
   euf M0.
   expand sidP@Pok.
@@ -226,20 +230,20 @@ Proof.
 
    induction t.
 
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
+   (* K *)
+   expandall; fa 7.
+   (* P *)
+   expandall; fa 7.
+   (* P1 *)
+   expandall; fa 7.
+   (* Pok *)
+   expandall; fa 7.
+   (* Pauth3 *)
+   expandall; fa 7.
    expand seq(i->g^b(i)),i.
-
+   (* Pfail *)
    expand frame@Pfail.
+
    equivalent exec@Pfail, False.
    expand exec@Pfail.
    executable pred(Pfail).
@@ -247,26 +251,23 @@ Proof.
    apply H2 to Pok.
    expand exec@Pok.
    apply P_charac.
+
    fa 7. fa 8.
    noif 8.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
-
-   expandall.
-   fa 7.
+   (* A *)
+   expandall; fa 7.
+   (* S *) 
+   expandall; fa 7.
+   (* S1 *)
+   expandall; fa 7.
+   (* Sok *)
+   expandall; fa 7.
+   (* Sauth3 *)
+   expandall; fa 7.
    expand seq(i->g^a(i)),i.
-
+   (* Safil *)
    expand frame@Sfail.
+   
    equivalent exec@Sfail, False.
    expand exec@Sfail.
    executable pred(Sfail).
@@ -274,9 +275,9 @@ Proof.
    apply H2 to Sok.
    expand exec@Sok.
    apply S_charac.
+
    fa 7. fa 8.
    noif 8.
-
-   expandall.
-   fa 7.
+   (* A1 *)
+   expandall; fa 7.
 Qed.
