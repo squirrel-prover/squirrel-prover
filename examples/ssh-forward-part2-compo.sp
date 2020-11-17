@@ -11,6 +11,7 @@ P -> S : g^a
 S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
 P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
 
+
 Second part of the proof of ssh with a modified agent forwarding. It
 corresponds to the security a the forwarded SSH key exchange, but with oracles
 that allow to simulate all other forwarded SSH login and previous non forwarded
@@ -28,6 +29,7 @@ name kS : message
 
 channel cP
 channel cS
+channel c
 
 name ake1 : index -> message
 name bke1 : index -> message
@@ -50,15 +52,24 @@ name k : index -> index -> message
 signature enc,checkdec,pke
 abstract dec : message -> message -> message
 
+
+(* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
+(* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
+ 
+
 hash h
 name hKey : message
 
+
+(* The CR axiom built-in in Squirrel assumes a secret key *) 
+(* This is not the case here, and we therefore declare the following axiom *)
+
 axiom [auth] collres : forall (m1,m2:message), h(m1, hKey) = h(m2, hKey) => m1 = m2
+
 axiom [auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m, hKey) => fst(m1) <> m2
 
 axiom [auth] freshindex : exists (l:index), True
 
-axiom DDHcommut : forall (m1,m2:message), g^m1^m2 = g^m2^m1
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
@@ -152,7 +163,7 @@ process SDIS =
   if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidS> then
     Sok : out(cS,ok)
 
-system [fullSSH] (P1FA | SDIS | PDIS).
+system [fullSSH] K: out(c,hKey);(P1FA | SDIS | PDIS).
 
 (* Now the process for the secrecy *)
 
@@ -207,7 +218,7 @@ process SDISDDH =
   if gP = g^a1 then
   out(cP,diff(g^a1^b1,g^c11))
 
-system [secret] (P1FADDH | SDISDDH | PDISDDH).
+system [secret] K: out(c,hKey);(P1FADDH | SDISDDH | PDISDDH).
 
 
 equiv [left,secret] [right,secret] secret.
@@ -294,7 +305,8 @@ process SDISauth =
     else
       Sfail :  out(cS,diff(ok,ko))
 
-system [auth] ( P1FAauth | SDISauth | PDISauth).
+system [auth] K: out(c,hKey);( P1FAauth | SDISauth | PDISauth).
+
 
 
 goal [none, auth] P_charac :
@@ -391,42 +403,33 @@ Proof.
   enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11; enrich hKey.
 
   induction t.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
+  (* K *)
+  expandall; fa 12.
+  (* P1 *)
+  expandall; fa 12.
+  (* P2 *)
+  expandall; fa 12.
+ (* P3 *)  
+  expandall; fa 12.
+ (* A *) 
+  expandall; fa 12.
+  (* A1 *)
+  expandall; fa 12.
+  (* A 2 *)
+  expandall; fa 12.
+  (* SDIS *)
+  expandall; fa 12.
+  (* SDIS1 *)
+  expandall; fa 12.
+  (* Sok *)
+  expandall; fa 12.
+  (* SDISauth3 *)
+  expandall; fa 12.
   expand seq(i -> a(i)),i.
-
-
+  (* Sfail *)
   expand frame@Sfail.
-  equivalent exec@Sfail, false.
 
+  equivalent exec@Sfail, false.
   apply S_charac.
   depends Sok, Sfail.
   executable Sfail.
@@ -434,38 +437,29 @@ Proof.
   expand exec@Sfail.
 
   fa 12. fa 13. noif 13.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
+  (* A3 *)
+  expandall; fa 12.
+  (* PDIS *)  
+  expandall; fa 12.
+  (* PDIS1 *)
+  expandall; fa 12.
+  (* PDSI2 *)
+  expandall; fa 12.
+  (* PDIS3 *)  
+  expandall; fa 12.
+  (* PDIS4 *)
+  expandall; fa 12.
+  (* PDIS5 *)
+  expandall; fa 12.
+  (* Pok *)
+  expandall; fa 12.
+  (* PDISauth7 *)
+  expandall; fa 12.
   expand seq(i -> b(i)),i. expand seq(i -> bke1(i)),i.
-
+  (* Pfail *)
   expand frame@Pfail.
-  equivalent exec@Pfail, false.
 
+  equivalent exec@Pfail, false.
   apply P_charac.
   depends PDIS5, Pfail.
   executable Pfail.
@@ -473,16 +467,12 @@ Proof.
   expand exec@Pfail.
 
   fa 12. fa 13. noif 13.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
-
-  expandall.
-  fa 12.
+ (* A4 *)
+  expandall; fa 12.
+ (* A5 *)
+  expandall; fa 12.
+ (* A6 *)
+  expandall; fa 12.
+  (* A7 *)
+  expandall; fa 12.
 Qed.
