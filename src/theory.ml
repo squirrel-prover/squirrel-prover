@@ -565,7 +565,16 @@ let declare_aenc enc dec pk =
 
 let declare_senc enc dec =
   let t = Symbols.dummy_table in
-  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc] in
+  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [dec] in
+  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+
+let declare_senc_joint_with_hash enc dec h =
+  let t = Symbols.dummy_table in
+  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc;
+                                          Symbols.Function.of_string h] in
+  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
   let data = Symbols.AssociatedFunctions [dec] in
   ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
 

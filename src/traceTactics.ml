@@ -1065,7 +1065,19 @@ let () =
 
 (** EUF Axioms *)
 
-let euf_param (`Message at : message_atom) = match at with
+let euf_param (`Message at : message_atom) =
+  let param_dec sdec key m s =
+      match Symbols.Function.get_data sdec with
+        | Symbols.AssociatedFunctions [senc] ->
+          (senc, key, m, s,  (fun x -> x = sdec),
+           [ (Term.Atom (`Message (`Eq, m, Fun (f_fail, []))))])
+        | Symbols.AssociatedFunctions [senc; h] ->
+          (senc, key, m, s,  (fun x -> x = sdec || x = h),
+           [ (Term.Atom (`Message (`Eq, m, Fun (f_fail, []))))])
+
+        | _ -> assert false
+  in
+  match at with
   | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
   | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
       begin match Theory.check_signature checksign pk with
@@ -1073,23 +1085,31 @@ let euf_param (`Message at : message_atom) = match at with
           Tactics.(soft_failure @@
                    Failure "the message does not correspond \
                             to a signature check with the associated pk")
-      | Some sign -> (sign, key, m, s, Some pk)
+      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [])
       end
 
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
     when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, None)
+    (hash, key, m, s, (fun x -> false), [])
   | (`Eq, s, Fun ((hash, _), [m; Name key]))
     when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, None)
+    (hash, key, m, s, (fun x -> false), [])
+
+  | (`Eq, Fun ((sdec, _), [s; Name key]), m)
+    when Symbols.is_ftype sdec Symbols.SDec ->
+    param_dec sdec key m s
+  | (`Eq, m, Fun ((sdec, is), [s; Name key]))
+    when Symbols.is_ftype sdec Symbols.SDec ->
+    param_dec sdec key m s
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
               "euf can only be applied to an hypothesis of the form h(t,k)=m \
-               or checksign(s,pk(k))=m (or symmetrically) \
-               for some hash or signature functions")
+               or checksign(s,pk(k))=m \
+               or sdec(s,sk) = m (or symmetrically) \
+               for some hash or signature or decryption functions")
 
-let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
+let euf_apply_schema sequent (_, (_, key_is), m, s, _, _) case =
   let open Euf in
 
   (* Equality between hashed messages *)
@@ -1124,7 +1144,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _) case =
     TraceSequent.add_formula new_f
       (TraceSequent.add_formula le_cnstr sequent)
 
-let euf_apply_direct s (_, (_, key_is), m, _, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, (_, key_is), m, _, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
@@ -1164,9 +1184,9 @@ let euf_apply_direct s (_, (_, key_is), m, _, _) Euf.{d_key_indices;d_message} =
 let euf_apply_facts s at =
   let p = euf_param at in
   let env = TraceSequent.get_env s in
-  let (hash_fn, (key_n, key_is), mess, sign, pk) = p in
+  let (hash_fn, (key_n, key_is), mess, sign, allow_functions, _) = p in
   let system = TraceSequent.system s in
-  let rule = Euf.mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let rule = Euf.mk_rule ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =
@@ -1185,8 +1205,10 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
       Tactics.hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
+  let (h,key,m,_,_,extra_goals) = euf_param at in
+  let extra_goals = List.map (fun x -> TraceSequent.add_formula x s) extra_goals in
   let tag_s =
-    let (h,key,m,_,_) = euf_param at in
+
     let f =
       Prover.get_oracle_tag_formula (Symbols.to_string h)
     in
@@ -1210,7 +1232,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
     (* we create the honnest sources using the classical eufcma tactic *)
     try
       let honest_s = euf_apply_facts s at in
-      (tag_s @ honest_s)
+      (tag_s @ honest_s @ extra_goals)
     with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
 
 let () =
@@ -1422,7 +1444,7 @@ let collision_resistance (s : TraceSequent.t) =
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
             Symbols.is_ftype hash Symbols.Hash
-            && Euf.check_hash_key_ssc ~allow_vars:true ~messages:[m] ~pk:None ~system hash key
+            && Euf.check_hash_key_ssc ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false) ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in

@@ -44,14 +44,11 @@ name a : index -> message
 name b : index -> message
 name k : index -> index -> message
 
-(* We only use the fact that an IND-CCA1 encryption is unforgeable. Due to
-   limitation of the tool, we model the symmetric encryption as an asymmetric
-   encryption. Remark that the symmetric encryption must be euf even when a hash
-   containing the key is given. In other words, the hash function h should be
-   PRF. *)
-signature enc,checkdec,pke
-abstract dec : message -> message -> message
-
+name r : message
+name r2 : index -> message
+name r3 : message
+name r4 : message
+name r5 : message
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
@@ -59,6 +56,8 @@ abstract dec : message -> message -> message
 name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
+(* We assume that the encryption is AE, and notably INT-PTXT. This is assumed to hold even when the key appears under some hash functions. *)
+senc enc,dec with h
 
 (* The CR axiom built-in in Squirrel assumes a secret key *)
 (* This is not the case here, and we therefore declare the following axiom *)
@@ -100,19 +99,19 @@ process P1FA =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidP = h(<<g^ake11,gB>,pke(k11)>, hKey) in
+  let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-  out(cP, enc(sign(sidP,kP),pke(k11)));
+  out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
   (* begin FA *)
   !_i (
     in(cP,y);
-    let x = dec(y,pke(k11)) in
-    if checkdec(y,pke(k11)) = x then
+    let x = dec(y,k11) in
+    if x <> fail then
     if fst(x) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,pke(k11)))
+    out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,r2(i),k11))
   )
 
 process PDIS =
@@ -122,7 +121,7 @@ process PDIS =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP0,g^bke11>,pke(k11)>, hKey) in
+  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
@@ -138,12 +137,12 @@ process PDIS =
   let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-    out(cP, enc( <reqsign, sidP>,k11));
+    out(cP, enc( <reqsign, sidP>,r3,k11));
     in(cP, signans);
-    let y = dec(signans,pke(k11)) in
-    if checkdec(signans,pke(k11)) = y then
+    let y = dec(signans,k11) in
+    if y <> fail then
     if fst(y) = anssign then
-    Pok: out(cP, enc(snd(y),gB^a1))
+    Pok: out(cP, enc(snd(y),r4,gB^a1))
 
 
 process SDIS =
@@ -157,7 +156,8 @@ process SDIS =
   let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidS> then
+  let x = dec(encP,gP^b1) in
+  if checksign(x,pk(kP)) = <forwarded,sidS> then
     Sok : out(cS,ok)
 
 system [fullSSH] K: (P1FA | SDIS | PDIS).
@@ -169,19 +169,19 @@ process P1FADDH =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidP = h(<<g^ake11,gB>,pke(k11)>, hKey) in
+  let sidP = h(<<g^ake11,gB>,k11>, hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-  out(cP, enc(sign(sidP,kP),k11));
+  out(cP, enc(sign(sidP,kP),r,k11));
   (* end P1 *)
 
   (* begin FA *)
   !_i (
     in(cP,y);
-    let x2= dec(y,pke(k11)) in
-    if checkdec(y,pke(k11)) = x2 then
+    let x2= dec(y,k11) in
+    if x2 <> fail then
     if fst(x2) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,k11))
+    out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,r2(i),k11))
   )
 
 process PDISDDH =
@@ -191,7 +191,7 @@ process PDISDDH =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP0,g^bke11>,pke(k11)>, hKey) in
+  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
@@ -231,19 +231,19 @@ process P1FAauth =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidPaF = h(<<g^ake11,gB>,pke(k11)>, hKey) in
+  let sidPaF = h(<<g^ake11,gB>,k11>, hKey) in
   let pkSaF = fst(t) in
   if pkSaF = pk(kS) && checksign(snd(t),pkS) = sidPaF then
-  out(cP, enc(sign(sidPaF,kP),k11));
+  out(cP, enc(sign(sidPaF,kP),r,k11));
   (* end P1 *)
 
   (* begin FA *)
   !_i (
     in(cP,y3);
-    let x3 = dec(y3,pke(k11)) in
-    if checkdec(y3,pke(k11)) = x3 then
+    let x3 = dec(y3,k11) in
+    if x3 <> fail then
     if fst(x3) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,k11))
+    out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,r2(i),k11))
   )
 
 process PDISauth =
@@ -253,7 +253,7 @@ process PDISauth =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0a = h(<<gP0,g^bke11>,pke(k11)>, hKey) in
+  let sidS0a = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0a, kS)>);
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0a then
@@ -270,12 +270,12 @@ process PDISauth =
   let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
   let pkSa = fst(t) in
   if pkSa = pk(kS) && checksign(snd(t),pkSa) = sidPa then
-  out(cP, enc( <reqsign, sidPa>,k11));
+  out(cP, enc( <reqsign, sidPa>,r3,k11));
   in(cP, signans);
-  let ya = dec(signans,pke(k11)) in
-  if checkdec(signans,pke(k11)) = ya then
+  let ya = dec(signans,k11) in
+  if ya <> fail then
   if fst(ya) = anssign then
-  out(cP, enc(snd(ya),gB^a1));
+  out(cP, enc(snd(ya),r4,gB^a1));
   in(cP,challenge);
   try find i such that
     gB = g^b(i) || gB = g^b1 || gB=g^bke1(i) || gB = g^bke11
@@ -294,7 +294,8 @@ process SDISauth =
   let sidSa = h(<<gP,g^b1>,gP^b1>, hKey) in
   out(cS, <<pk(kS),g^b1>,sign(sidSa, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidSa> then
+  let x4 = dec(encP,gP^b1) in
+  if checksign(x4,pk(kP)) = <forwarded,sidSa> then
     out(cS,ok);
     in(cS,challenge);
     try find i such that gP = g^a(i) || gP = g^a1 in
@@ -360,21 +361,20 @@ Proof.
 
 (* else, it comes from P2, and is not well tagged *)
   apply hashnotpair to  sidPaF@P2, forwarded.
-  apply H3 to (<<g^ake11,input@P1>,pke(k11)>).
+  apply H2 to (<<g^ake11,input@P1>,k11>).
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
 
   executable pred(Sok).
-  assert P3(i) <= Sok.
-  case H2.
+
   depends SDIS, Sok.
-  apply H3 to P3(i).
+  apply H2 to P3(i).
   expand exec@P3(i).
   expand cond@P3(i).
 
 (* We have that x3 is a message encrypted with the secret key, we use the euf of encryption *)
-  euf M2.
+  euf D2.
 
 (* Ill-tagged cases *)
   apply signnottag to sidPaF@P2,kP.
@@ -382,8 +382,8 @@ Proof.
 
 (* Honest case *)
   assert PDIS5 <= Sok.
-  case H5.
-  apply H3 to PDIS5.
+  case H4.
+  apply H2 to PDIS5.
   expand exec@PDIS5.
   expand cond@PDIS5.
   apply H1 to i.
@@ -398,30 +398,31 @@ Qed.
 equiv [left, auth] [right, auth] auth.
 Proof.
   enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS;
-  enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11; enrich hKey.
+  enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11; enrich hKey; enrich r; enrich seq(i->r2(i)); enrich r3; enrich r4; enrich r5.
 
   induction t.
 
   (* P1 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* P2 *)
-  expandall; fa 12.
+  expandall; fa 17.
  (* P3 *)
-  expandall; fa 12.
+  expandall; fa 17.
+  expand seq(i -> r2(i)),i.
  (* A *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* A1 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* A 2 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* SDIS *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* SDIS1 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* Sok *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* SDISauth3 *)
-  expandall; fa 12.
+  expandall; fa 17.
   expand seq(i -> a(i)),i.
   (* Sfail *)
   expand frame@Sfail.
@@ -433,25 +434,25 @@ Proof.
   apply H1 to Sok.
   expand exec@Sfail.
 
-  fa 12. fa 13. noif 13.
+  fa 17. fa 18. noif 18.
   (* A3 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDIS *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDIS1 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDSI2 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDIS3 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDIS4 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDIS5 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* Pok *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* PDISauth7 *)
-  expandall; fa 12.
+  expandall; fa 17.
   expand seq(i -> b(i)),i. expand seq(i -> bke1(i)),i.
   (* Pfail *)
   expand frame@Pfail.
@@ -463,13 +464,13 @@ Proof.
   apply H1 to PDIS5.
   expand exec@Pfail.
 
-  fa 12. fa 13. noif 13.
+  fa 17. fa 18. noif 18.
  (* A4 *)
-  expandall; fa 12.
+  expandall; fa 17.
  (* A5 *)
-  expandall; fa 12.
+  expandall; fa 17.
  (* A6 *)
-  expandall; fa 12.
+  expandall; fa 17.
   (* A7 *)
-  expandall; fa 12.
+  expandall; fa 17.
 Qed.
