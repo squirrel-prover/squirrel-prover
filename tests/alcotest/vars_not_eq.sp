@@ -11,7 +11,7 @@ Proof.
   intros.
 Qed.
 
-goal test :
+goal test2 :
   forall (x:message, y:message),
   f(n) = h(m) => False.
 Proof.

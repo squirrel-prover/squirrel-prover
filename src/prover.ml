@@ -523,7 +523,11 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-let add_new_goal g = goals := g :: !goals
+let add_new_goal (gname,g) =
+  if List.exists (fun (name,_) -> name = gname) !goals_proved then
+    raise @@ ParseError "A formula or goal with this name alread exists"
+  else
+    goals :=  (gname,g) :: !goals
 
 let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
 
