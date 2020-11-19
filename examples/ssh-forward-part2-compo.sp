@@ -55,16 +55,13 @@ abstract dec : message -> message -> message
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
- 
 
-hash h
 name hKey : message
+hash h with oracle forall (m:message,sk:message), sk = hKey
 
 
-(* The CR axiom built-in in Squirrel assumes a secret key *) 
+(* The CR axiom built-in in Squirrel assumes a secret key *)
 (* This is not the case here, and we therefore declare the following axiom *)
-
-axiom [auth] collres : forall (m1,m2:message), h(m1, hKey) = h(m2, hKey) => m1 = m2
 
 axiom [auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m, hKey) => fst(m1) <> m2
 
@@ -163,7 +160,7 @@ process SDIS =
   if checksign(dec(encP,gP^b1),pk(kP)) = <forwarded,sidS> then
     Sok : out(cS,ok)
 
-system [fullSSH] K: out(c,hKey);(P1FA | SDIS | PDIS).
+system [fullSSH] K: (P1FA | SDIS | PDIS).
 
 (* Now the process for the secrecy *)
 
@@ -218,7 +215,7 @@ process SDISDDH =
   if gP = g^a1 then
   out(cP,diff(g^a1^b1,g^c11))
 
-system [secret] K: out(c,hKey);(P1FADDH | SDISDDH | PDISDDH).
+system [secret] K: (P1FADDH | SDISDDH | PDISDDH).
 
 
 equiv [left,secret] [right,secret] secret.
@@ -305,7 +302,7 @@ process SDISauth =
     else
       Sfail :  out(cS,diff(ok,ko))
 
-system [auth] K: out(c,hKey);( P1FAauth | SDISauth | PDISauth).
+system [auth] K: ( P1FAauth | SDISauth | PDISauth).
 
 
 
@@ -325,18 +322,17 @@ Proof.
   apply signnottag to sidPa@P2, kP.
   apply H1 to i1.
   left; right.
-  apply collres  to <<m2,g^bke1(i1)>,m3> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  collision.
 
   (* honest case SDIS *)
-  apply collres  to <<input@SDIS,g^b1>,input@SDIS^b1> ,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  collision.
   apply freshindex.
   apply H1 to l.
 
   apply freshindex.
   apply H1 to l.
   right.
-  apply collres  to <<input@PDIS,g^bke11>,pke(k11)>,<<g^a1,input@PDIS4>,input@PDIS4^a1>.
-
+  collision.
 Qed.
 
 
@@ -354,7 +350,9 @@ Proof.
   case H3.
 (* sub case with wrong tag *)
   apply H1 to i.
-  apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a(i),m>,m1>.
+  help.
+  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey).
+  collision.
 
   apply hashnotpair to  h(<<g^ake1(i1),m2>,m3>, hKey), forwarded.
 (* Here, I do weird stuff, else we have an assert false in completion.ml. TODO *)
@@ -390,7 +388,7 @@ Proof.
   expand cond@PDIS5.
   apply H1 to i.
   right.
-  apply collres to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  collision.
 Qed.
 
 (* The equivalence for authentication is obtained by using the unreachability
@@ -403,15 +401,14 @@ Proof.
   enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11; enrich hKey.
 
   induction t.
-  (* K *)
-  expandall; fa 12.
+
   (* P1 *)
   expandall; fa 12.
   (* P2 *)
   expandall; fa 12.
- (* P3 *)  
+ (* P3 *)
   expandall; fa 12.
- (* A *) 
+ (* A *)
   expandall; fa 12.
   (* A1 *)
   expandall; fa 12.
@@ -439,13 +436,13 @@ Proof.
   fa 12. fa 13. noif 13.
   (* A3 *)
   expandall; fa 12.
-  (* PDIS *)  
+  (* PDIS *)
   expandall; fa 12.
   (* PDIS1 *)
   expandall; fa 12.
   (* PDSI2 *)
   expandall; fa 12.
-  (* PDIS3 *)  
+  (* PDIS3 *)
   expandall; fa 12.
   (* PDIS4 *)
   expandall; fa 12.

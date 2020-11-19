@@ -29,10 +29,23 @@ type gm_input =
   | Gm_goal of string * Goal.t
   | Gm_proof
 
+
+
+type option_name =
+  | Oracle_for_symbol of string
+
+type option_val =
+  | Oracle_formula of Term.formula
+
+type option_def = option_name * option_val
+
+let option_defs : option_def list ref= ref []
+
 type proof_state = { goals : named_goal list;
                      current_goal : named_goal option;
                      subgoals : Goal.t list;
                      goals_proved : named_goal list;
+                     option_defs : option_def list;
                      prover_mode : prover_mode;
                    }
 
@@ -43,7 +56,8 @@ let reset () =
     goals := [];
     current_goal := None;
     subgoals := [];
-    goals_proved := []
+    goals_proved := [];
+    option_defs := []
 
 let save_state mode =
   proof_states_history :=
@@ -51,7 +65,8 @@ let save_state mode =
      current_goal = !current_goal;
      subgoals = !subgoals;
      goals_proved = !goals_proved;
-     prover_mode = mode } :: (!proof_states_history)
+     option_defs = !option_defs;
+     prover_mode = mode} :: (!proof_states_history)
 
 let rec reset_state n =
   match (!proof_states_history,n) with
@@ -62,8 +77,24 @@ let rec reset_state n =
     current_goal := p.current_goal;
     subgoals := p.subgoals;
     goals_proved := p.goals_proved;
+    option_defs := p.option_defs;
     p.prover_mode
   | _::q, n -> proof_states_history := q; reset_state (n-1)
+
+
+(** Options Management **)
+
+exception Option_already_defined
+
+let get_option opt_name =
+  try Some (List.assoc opt_name !option_defs)
+  with Not_found -> None
+
+let add_option ((opt_name,opt_val):option_def) =
+  if List.mem_assoc opt_name !option_defs then
+    raise Option_already_defined
+  else
+    option_defs := (opt_name,opt_val) :: (!option_defs)
 
 (** Tactic expressions and their evaluation *)
 
@@ -502,36 +533,26 @@ let add_proved_goal (gname,j) =
   else
     goals_proved := (gname,j) :: !goals_proved
 
-let tag_formula_name_of_hash h = "%s"^h^"formula"
-
-let define_hash_tag_formula h f =
-  let gformula = make_trace_goal
-      Action.(SimplePair default_system_name) f
-  in
-  match gformula with
-  | Trace f ->
-    (match TraceSequent.get_conclusion f with
-     |  ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
+let define_oracle_tag_formula h f =
+  let formula = Theory.convert [] f Sorts.Boolean in
+    (match formula with
+     |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
          match Vars.sort uvarm,Vars.sort uvarkey with
-         | Sorts.(Message, Message) -> add_proved_goal
-                                         (tag_formula_name_of_hash h, gformula)
+         | Sorts.(Message, Message) ->
+           add_option (Oracle_for_symbol h, Oracle_formula formula)
          | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
        )
      | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
     )
-    | _ -> assert false
 
-let get_hash_tag_formula h =
-  match
-    List.filter (fun (name,_) -> name = tag_formula_name_of_hash h) !goals_proved
-  with
-    | [(_,Goal.Trace f)] ->
-      TraceSequent.get_conclusion f
-    | [] -> Term.False
-    | _ -> assert false
+
+let get_oracle_tag_formula h =
+  match get_option (Oracle_for_symbol h) with
+  | Some (Oracle_formula f) -> f
+  | None -> Term.False
 
 let is_proof_completed () = !subgoals = []
 

@@ -229,7 +229,7 @@ index_arity:
 declaration:
 | HASH ID index_arity            { Theory.declare_hash ~index_arity:$3 $2 }
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
-                                   Prover.define_hash_tag_formula $2 f }
+                                   Prover.define_oracle_tag_formula $2 f }
 | AENC e=ID COMMA d=ID COMMA p=ID
     { Theory.declare_aenc e d p }
 | SENC e=ID COMMA d=ID
@@ -239,7 +239,7 @@ declaration:
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
   WITH ORACLE f=formula
                                  { Theory.declare_signature s c p;
-                                   Prover.define_hash_tag_formula s f }
+                                   Prover.define_oracle_tag_formula s f }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
 | ABSTRACT ID COLON abs_type     { let index_arity,message_arity = $4 in
                                    Theory.declare_abstract

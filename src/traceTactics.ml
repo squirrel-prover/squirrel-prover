@@ -1188,7 +1188,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   let tag_s =
     let (h,key,m,_,_) = euf_param at in
     let f =
-      Prover.get_hash_tag_formula (Symbols.to_string h)
+      Prover.get_oracle_tag_formula (Symbols.to_string h)
     in
     (* if the hash is not tagged, the formula is False, and we don't create
        another goal. *)
@@ -1422,7 +1422,7 @@ let collision_resistance (s : TraceSequent.t) =
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
             Symbols.is_ftype hash Symbols.Hash
-            && Euf.check_hash_key_ssc ~messages:[m] ~pk:None ~system hash key
+            && Euf.check_hash_key_ssc ~allow_vars:true ~messages:[m] ~pk:None ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in

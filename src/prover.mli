@@ -47,6 +47,21 @@ val save_state : prover_mode -> unit
   * corresponding prover mode. *)
 val reset_state : int -> prover_mode
 
+(** Option management **)
+type option_name =
+  | Oracle_for_symbol of string
+
+type option_val =
+  | Oracle_formula of Term.formula
+
+type option_def = option_name * option_val
+
+exception Option_already_defined
+
+val get_option : option_name -> option_val option
+
+val add_option : option_def -> unit
+
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
 
@@ -133,14 +148,14 @@ val add_new_goal : named_goal -> unit
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
 
-(** Allows to define the tag formula corresponding to some hash. Defining a hash
+(** Allows to define the tag formula corresponding to some function. Defining a function
    with such a tag, is equivalent to giving to the attacker a backdoor, allowing
-   to hash all messages that satisfy the tag. *)
-val define_hash_tag_formula : string -> Theory.formula -> unit
+   to compute the ouput of the function on all messages that satisfy the tag. *)
+val define_oracle_tag_formula : string -> Theory.formula -> unit
 
-(** From the name of the hash, returns the corresponding formula. If no tag
+(** From the name of the funciton, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
-val get_hash_tag_formula : string -> Term.formula
+val get_oracle_tag_formula : string -> Term.formula
 
 (** Produce a fresh name for a unamed goal *)
 val unnamed_goal : unit -> string

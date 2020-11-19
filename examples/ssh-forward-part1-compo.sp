@@ -40,19 +40,13 @@ abstract dec : message -> message -> message
 
 
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
-(* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
- 
-hash h
+(* Note that hKey has to be a name and not a constant and the attacker can compute h values with the oracle.  *)
+
 name hKey : message
+hash h with oracle forall (m:message,sk:message), sk = hKey
 
 axiom [auth] hashnotfor :
   forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
-
-(* The CR axiom built-in in Squirrel assumes a secret key *) 
-(* This is not the case here, and we therefore declare the following axiom *)
-
-axiom [auth] collres :
-  forall (x1,x2:message), h(x1,hKey) = h(x2,hKey) => x1=x2
 
 (* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True
@@ -99,7 +93,7 @@ process S =
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
     Sok : out(cS,ok)
 
-system [fullSSH] K: out(c,hKey);( P | S).
+system [fullSSH] K: ( P | S).
 
 (* The secret is expected to hold at the end of P0 *)
 
@@ -170,7 +164,7 @@ process Sauth =
      else
        Sfail :  out(cS,diff(ok,ko))
 
-system [auth]  K: out(c,hKey);(Pauth | Sauth).
+system [auth]  K: (Pauth | Sauth).
 
 
 
@@ -186,12 +180,13 @@ Proof.
   case H2.
   case H2.
 
-  apply collres to <<g^a1,input@P1>,input@P1^a1>, <<x,g^b(i)>,x1>.
+  collision.
+
   apply H0 to i.
 
   apply hashnotfor to <<g^a1,input@P1>,input@P1^a1>, x2.
 
-  apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
+  collision.
 
   apply freshindex.
   apply H0 to l.
@@ -208,11 +203,11 @@ Proof.
   case H1.
   case H2.
   apply H0 to i.
-  apply collres to <<g^a(i),x>,x1>,<<input@S,g^b1>,input@S^b1>.
+  collision.
 
   apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
 
-  apply collres to <<g^a1,input@P1>,input@P1^a1>,<<input@S,g^b1>,input@S^b1>.
+  collision.
   apply freshindex.
   apply H0 to l.
 Qed.
@@ -230,8 +225,6 @@ Proof.
 
    induction t.
 
-   (* K *)
-   expandall; fa 7.
    (* P *)
    expandall; fa 7.
    (* P1 *)
@@ -256,7 +249,7 @@ Proof.
    noif 8.
    (* A *)
    expandall; fa 7.
-   (* S *) 
+   (* S *)
    expandall; fa 7.
    (* S1 *)
    expandall; fa 7.
@@ -267,7 +260,7 @@ Proof.
    expand seq(i->g^a(i)),i.
    (* Safil *)
    expand frame@Sfail.
-   
+
    equivalent exec@Sfail, False.
    expand exec@Sfail.
    executable pred(Sfail).

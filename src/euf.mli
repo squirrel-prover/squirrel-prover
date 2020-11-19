@@ -43,6 +43,7 @@ exception Bad_ssc
 the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
 val hash_key_ssc :
+  ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
   pk:(Term.fname option) ->
   system:Action.system ->
@@ -50,6 +51,7 @@ val hash_key_ssc :
 
 (** Same as [hash_key_ssc] but returns a boolean. *)
 val check_hash_key_ssc :
+  ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
   pk:(Term.fname option) ->
   system:Action.system ->

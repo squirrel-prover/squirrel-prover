@@ -993,7 +993,7 @@ let prf TacticsArgs.(Int i) s =
           (Tactics.Failure
             "PRF can only be applied on a term with at least one occurrence
             of a hash term h(t,k)")
-      | Some hash ->
+      | Some ((Term.Fun ((fn,_), [m; key])) as hash) ->
         (* Context with bound variables (eg try find) are not (yet) supported.
          * This is detected by checking that there is no "new" variable,
          * which are used by the iterator to represent bound variables. *)
@@ -1007,15 +1007,31 @@ let prf TacticsArgs.(Int i) s =
           let phi_right =
             mk_prf_phi_proj Term.Right system env biframe e hash in
           let _,n = Symbols.Name.declare Symbols.dummy_table "n_PRF" 0 in
+          let oracle_formula = Prover.get_oracle_tag_formula (Symbols.to_string fn) in
+          let final_if_formula = match oracle_formula with
+            | Term.False -> combine_conj_formulas phi_left phi_right
+            | f ->
+                    let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
+                  | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+                  | _ -> assert false
+                    in
+                    match Vars.sort uvarm,Vars.sort uvarkey with
+                    | Sorts.(Message, Message) -> let f = Term.subst [
+                        ESubst (Term.Var uvarm,m);
+                        ESubst (Term.Var uvarkey,key);] f in
+                      Term.And (Term.Not f,  combine_conj_formulas phi_left phi_right)
+                    | _ -> assert false
+          in
           let if_term =
             Term.ITE
-              (combine_conj_formulas phi_left phi_right,
+              (final_if_formula,
               Term.Name (n,[]),
               hash) in
           let new_elem =
             EquivSequent.apply_subst_frame [Term.ESubst (hash,if_term)] [e] in
           let biframe = (List.rev_append before (new_elem @ after)) in
           [EquivSequent.set_biframe s biframe]
+      | _ -> assert false
       end
     | exception Out_of_range ->
         Tactics.soft_failure (Tactics.Failure "Out of range position")
