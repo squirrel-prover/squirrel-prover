@@ -42,7 +42,7 @@
  proof-prog-name		     "squirrel.byte -i"  ;; or your program
  proof-terminal-string                 "."        ;; end of commands
  ;; proof-script-command-start-regexp "Proof\\|goal\\|hash[ \n\t\r]"
-
+;; proof-script-command-end-regexp       "[^\\.]\\.\\(\\s \\|\n\\|$\\)"
 
 
 ;; cannot get comments to be ignored :(
@@ -51,7 +51,8 @@
  proof-script-comment-end               "*)"
 ;; proof-script-comment-start-regexp	 "\#[ \t\n\f]" ;; recognizing
 ;; proof-script-comment-end-regexp	 "\n"      ;; comments
-;; proof-script-syntax-table-entries '(?\# "<" ?\n ">")
+ ;; proof-script-syntax-table-entries '(?\# "<" ?\n ">")
+ proof-shell-strip-crs-from-input       nil
  proof-script-syntax-table-entries
  	'(?\* ". 23"
  ?\* ". 23n"
@@ -99,8 +100,58 @@
  (add-hook 'proof-shell-handle-delayed-output-hook
           'display-ansi-colors)
 
+
+
 ;; disable electric indent mode
 (add-hook 'squirrel-mode-hook (lambda () (electric-indent-mode -1)))
+
+
+(defun squirrel-get-last-error-location ()
+  "Remove [error] in the error message and extract the position and
+length of the error."
+  (proof-with-current-buffer-if-exists proof-response-buffer
+
+     (goto-char (point-max))
+     (when (re-search-backward "\\[error-\\([0-9]+\\)-\\([0-9]+\\)\\]" nil t)
+        (let* ((inhibit-read-only t)
+               (pos1 (string-to-number (match-string 1)))
+               (pos2 (string-to-number (match-string 2)))
+               (len (- pos2 pos1)))
+
+              (delete-region (match-beginning 0) (match-end 0))
+              (list pos1 len)))))
+
+
+(defun squirrel-advance-until-command ()
+   (while (proof-looking-at "\\s-") (forward-char 1)))
+
+
+(defun squirrel-highlight-error ()
+  "Use ‘squirrel-get-last-error-location’ to know the position of the
+error and then highlight in the script buffer."
+  (proof-with-current-buffer-if-exists proof-script-buffer
+    (let ((mtch (squirrel-get-last-error-location)))
+        (when mtch
+          (let ((pos (car mtch))
+                  (lgth (cadr mtch)))
+          (if (eq (proof-unprocessed-begin) (point-min))
+                (goto-char (proof-unprocessed-begin))
+                (goto-char (+ (proof-unprocessed-begin) 1)))
+            (squirrel-advance-until-command)
+             (goto-char (+ (point) pos))
+             (span-make-self-removing-span
+               (point) (+ (point) lgth)
+               'face 'proof-script-highlight-error-face))))))
+
+(defun squirrel-highlight-error-hook ()
+  (squirrel-highlight-error))
+
+(add-hook 'proof-shell-handle-error-or-interrupt-hook
+          'squirrel-highlight-error-hook t)
+
+ (add-hook'proof-shell-handle-error-or-interrupt-hook
+          'display-ansi-colors)
+
 
 (provide 'squirrel)
 ;;; squirrel.el ends here
