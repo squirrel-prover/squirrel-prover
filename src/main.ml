@@ -123,7 +123,9 @@ let rec main_loop ~test ?(save=true) mode =
             | Some es -> error ~test GoalMode es
           end
         | Prover.Gm_goal (i,f) ->
-          add_new_goal (i,f);
+          (try
+            add_new_goal (i,f)
+          with  (Prover.ParseError s) -> error ~test mode s);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;

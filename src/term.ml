@@ -153,6 +153,8 @@ let f_or = mk_fname "or" 2
 let f_not = mk_fname "not" 1
 let f_ite = mk_fname "if" 3
 
+let f_fail = mk_fname "fail" 0
+
 (** Xor and its unit *)
 
 let f_xor = mk_fname "xor" 2

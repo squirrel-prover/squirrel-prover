@@ -230,10 +230,10 @@ declaration:
 | HASH ID index_arity            { Theory.declare_hash ~index_arity:$3 $2 }
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
                                    Prover.define_oracle_tag_formula $2 f }
-| AENC e=ID COMMA d=ID COMMA p=ID
-    { Theory.declare_aenc e d p }
-| SENC e=ID COMMA d=ID
-                                 { Theory.declare_senc e d }
+| AENC e=ID COMMA d=ID COMMA p=ID  { Theory.declare_aenc e d p }
+| SENC e=ID COMMA d=ID           { Theory.declare_senc e d }
+| SENC e=ID COMMA d=ID WITH h=ID
+                                 { Theory.declare_senc_joint_with_hash e d h }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID

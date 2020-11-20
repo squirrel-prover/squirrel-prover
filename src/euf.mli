@@ -45,7 +45,7 @@ the hash function, or under some public key function.*)
 val hash_key_ssc :
   ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
-  pk:(Term.fname option) ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   Term.fname -> Term.name -> unit
 
@@ -53,7 +53,7 @@ val hash_key_ssc :
 val check_hash_key_ssc :
   ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
-  pk:(Term.fname option) ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   Term.fname -> Term.name -> bool
 
@@ -61,7 +61,7 @@ val check_hash_key_ssc :
     hash function and key in a process.
     TODO: memoisation *)
 val mk_rule :
-  pk:(Term.fname option) ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->
   hash_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule
