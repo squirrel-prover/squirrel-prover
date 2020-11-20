@@ -434,8 +434,9 @@ let parse_proc system_name proc =
     let subst = create_subst env.subst env.isubst in
     Theory.convert ~at:ts subst t Sorts.Message
   in
-  let conv_formula env a t =
+  let conv_formula ?(pred=false) env a t =
     let ts = Term.Action (a, List.rev env.p_indices) in
+    let ts = if pred then Term.Pred ts else ts in
     let subst = create_subst env.subst env.isubst in
     Theory.convert ~at:ts subst t Sorts.Boolean
   in
@@ -524,14 +525,19 @@ let parse_proc system_name proc =
       let local_macros = x::local_macros in
       p_cond ~var_env ~env ~par_choice ~input ~pos ~vars ~facts ~local_macros p
   | Exists (evars, cond, p, q) ->
-      let facts_p = cond::facts in
+      let _ = List.map
+        (fun x -> Printf.printf "[DEBUG] %s \n" x)
+        local_macros
+      in
+      let dep = Theory.find_fun_terms cond local_macros in
+      let facts_p = (cond,dep)::facts in
       let newsubst = List.map (fun i ->
           i, Vars.make_fresh_and_update var_env Sorts.Index i) evars
       in
       let facts_q =
         match List.map (fun x -> x, Sorts.eindex) evars with
-        | [] -> Theory.Not cond :: facts
-        | qvars -> Theory.ForAll(qvars, Theory.Not cond) :: facts
+        | [] -> (Theory.Not cond, dep) :: facts
+        | qvars -> (Theory.ForAll(qvars, Theory.Not cond),dep) :: facts
       in
       let new_env =
         { env with
@@ -555,13 +561,7 @@ let parse_proc system_name proc =
        * for the next step, i.e. updates and output.
        * At this point we know which action will be used,
        * but we don't have the action symbol yet. *)
-      let rec conj = function
-        | [] -> Theory.True
-        | [f] -> f
-        | f::fs -> Theory.And (f, conj fs)
-      in
       let vars = List.rev vars in
-      let condition = vars, conj facts in
       let action = Action.
         { par_choice ;
           sum_choice = pos, conv_indices env vars } :: env.action in
@@ -570,7 +570,7 @@ let parse_proc system_name proc =
           action = action }
       in
       p_update
-        ~var_env ~env ~input ~condition
+        ~var_env ~env ~input ~vars ~facts
         ~updates:[] ~local_macros
         p ;
       pos + 1
@@ -579,7 +579,7 @@ let parse_proc system_name proc =
     * and now accumulating a list of [updates] until an output is reached,
     * at which point the completed action and corresponding description
     * are registered. *)
-  and p_update ~var_env ~env ~input ~condition ~updates ~local_macros = function
+  and p_update ~var_env ~env ~input ~vars ~facts ~updates ~local_macros = function
   | Apply _ | New _ | Out _ -> assert false
 
   | Let (x,t,p) ->
@@ -609,7 +609,7 @@ let parse_proc system_name proc =
       let symb = Symbols.Macro.of_string x in
       let _ = Macros.update Symbols.dummy_table symb new_t in
       let local_macros = x::local_macros in
-      p_update ~var_env ~env ~input ~condition ~updates ~local_macros p
+      p_update ~var_env ~env ~input ~vars ~facts ~updates ~local_macros p
 
   | Set (s, l, t, p) ->
       if List.exists (fun (s',_,_,_) -> s=s') updates
@@ -626,7 +626,7 @@ let parse_proc system_name proc =
         let states_already_updated = (List.map (fun (s,_,_,_) -> s) updates) in
         let dep = Theory.find_get_terms t states_already_updated in
         let updates = (s,l,t,dep)::updates in
-        p_update ~var_env ~env ~input ~condition ~updates ~local_macros p
+        p_update ~var_env ~env ~input ~vars ~facts ~updates ~local_macros p
 
   | Alias _ | Null as proc ->
       let output,a,p =
@@ -658,9 +658,18 @@ let parse_proc system_name proc =
          | None -> Channel.dummy, Term.dummy
       in
       let condition =
-        let vars, facts = condition in
         conv_indices env vars,
-        conv_formula env a facts
+        List.fold_left
+          Term.mk_and
+          Term.True
+          (List.map
+            (fun (f,dep) ->
+              let ts = Term.Action (a, List.rev env.p_indices) in
+              let f' = conv_formula ~pred:true env a f in
+              if List.length dep > 0
+              then Term.subst_macros_ts dep (Term.Pred ts) ts f'
+              else f')
+            facts)
       in
       (* We perform the same kind of substitution as in the Let case. *)
       let updates =

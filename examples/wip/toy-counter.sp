@@ -54,7 +54,7 @@ process A =
 
 process B =
   in(cA,y);
-  if y = h(<myPred(d),secret>,key) then
+  if y = h(<d,secret>,key) then
     d := mySucc(d);
     out(cB,secret)
   else
@@ -102,10 +102,9 @@ intros.
 expand cond@B(j).
 euf M0.
 apply predSucc to d@pred(A(i)).
-apply predSucc to d@pred(B(j)).
-assert d@pred(A(i)) = d@pred(B(j)).
-assert pred(A(i)) < pred(B(j)). case H0.
-apply counterIncreaseBis to pred(B(j)).
+assert d@pred(A(i)) = d@B(j).
+assert pred(A(i)) < B(j). case H0.
+apply counterIncreaseBis to B(j).
 apply H1 to pred(A(i)).
-apply orderStrict to d@pred(A(i)),d@pred(B(j)).
+apply orderStrict to d@pred(A(i)),d@B(j).
 Qed.

@@ -14,12 +14,6 @@ In this model we use 2 different keyed hash functions, instead of a single (not
 keyed) hash function as in the specification.
 *******************************************************************************)
 
-(* WARNING *)
-(* Until the semantics is fixed in the tool, a state macro s@t is interpreted:
-    - by the value AFTER the update for occurrences in output, cond terms,
-    - by the value BEFORE the update for occurrences in update term.
-   This is why we store in the state both old and current values. *)
-
 hash h1
 hash h2
 
@@ -33,28 +27,27 @@ name key2 : index->message
 name k : index->message
 name r1 : index->message
 
-mutable kT : index->message (* <<k1_old,k2_old>,<k1,k2>> *)
-mutable kR : index->message (* <<k1_old,k2_old>,<k1,k2>> *)
+mutable kT : index->message (* <k1,k2> *)
+mutable kR : index->message (* <k1,k2> *)
 
 channel cT
 channel cR
 
 axiom stateTagInit :
   forall (i:index),
-    kT(i)@init = << seed1(i), seed2(i) >, < seed1(i), seed2(i) >>
+    kT(i)@init = < seed1(i), seed2(i) >
 axiom stateReaderInit :
   forall (ii:index),
-    kR(ii)@init = << seed1(ii), seed2(ii) >, < seed1(ii), seed2(ii) >>
+    kR(ii)@init = < seed1(ii), seed2(ii) >
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, xr1);
-  out(cT, h1(fst(snd(kT(i))) XOR xr1 XOR k(i), key1(i)));
+  out(cT, h1(fst(kT(i)) XOR xr1 XOR k(i), key1(i)));
   in(cR, xh2);
-  if xh2 = h2(snd(fst(kT(i))), key2(i)) then
-    kT(i) := < snd(kT(i)),
-               < fst(snd(kT(i))) XOR h2(snd(snd(kT(i))), key2(i)),
-                 snd(snd(kT(i))) XOR h1(fst(snd(kT(i))) XOR xr1 XOR k(i), key1(i)) >>;
+  if xh2 = h2(snd(kT(i)), key2(i)) then
+    kT(i) := < fst(kT(i)) XOR h2(snd(kT(i)), key2(i)),
+               snd(kT(i)) XOR h1(fst(kT(i)) XOR xr1 XOR k(i), key1(i)) >;
     out(cT, ok)
   else
     out(cT, error)
@@ -63,11 +56,11 @@ process tag(i:index,j:index) =
 process reader(jj:index) =
   out(cR, r1(jj));
   in(cT, xh1);
-  try find ii such that xh1 = h1(fst(fst(kR(ii))) XOR r1(jj) XOR k(ii), key1(ii)) in
-    kR(ii) := < snd(kR(ii)),
-                < fst(snd(kR(ii))) XOR h2(snd(snd(kR(ii))), key2(ii)),
-                  snd(snd(kR(ii))) XOR h1(fst(snd(kR(ii))) XOR r1(jj) XOR k(ii), key1(ii)) >>;
-    out(cT, h2(snd(fst(kR(ii))),key2(ii)))
+  try find ii such that xh1 = h1(fst(kR(ii)) XOR r1(jj) XOR k(ii), key1(ii)) in
+    let m = h2(snd(kR(ii)),key2(ii)) in
+    kR(ii) := < fst(kR(ii)) XOR h2(snd(kR(ii)), key2(ii)),
+                snd(kR(ii)) XOR h1(fst(kR(ii)) XOR r1(jj) XOR k(ii), key1(ii)) >;
+    out(cT, m)
   else
     out(cT, error)
 
@@ -102,12 +95,11 @@ apply sequentiality to t. apply H0 to i,j. exists j1.
 apply IH0 to pred(T1(i1,j1)). apply H0 to i,j.
 assert kT(i)@T1(i1,j1) = kT(i)@pred(T1(i1,j1)).
 case (if i = i1 then
-       <snd(kT(i1)@pred(T1(i1,j1))),
-        <xor(fst(snd(kT(i1)@pred(T1(i1,j1)))),
-             h2(snd(snd(kT(i1)@pred(T1(i1,j1)))),key2(i1))),
-         xor(snd(snd(kT(i1)@pred(T1(i1,j1)))),
-             h1(xor(xor(fst(snd(kT(i1)@pred(T1(i1,j1)))),input@T(i1,j1)),
-                    k(i1)),key1(i1)))>>
+       <xor(fst(kT(i1)@pred(T1(i1,j1))),
+            h2(snd(kT(i1)@pred(T1(i1,j1))),key2(i1))),
+        xor(snd(kT(i1)@pred(T1(i1,j1))),
+            h1(xor(xor(fst(kT(i1)@pred(T1(i1,j1))),input@T(i1,j1)),k(i1)),
+               key1(i1)))>
        else kT(i)@pred(T1(i1,j1))).
 
 apply IH0 to pred(T2(i1,j1)). apply H0 to i,j.
@@ -122,11 +114,7 @@ Proof.
 induction.
 substitute t,R1(jj,ii).
 expand exec@R1(jj,ii). expand cond@R1(jj,ii).
-assert input@R1(jj,ii) = h1(xor(xor(fst(snd(kR(ii)@pred(R1(jj,ii)))),r1(jj)),k(ii)),key1(ii)).
-(* M0 and M1 are "equivalent" but it helps the proof to apply euf on M1
-(that contains pred(R1(jj,ii))) and not on M0 (that contains R1(jj,ii))
-because we only have to consider timestamps t < R1(jj,ii) *)
-euf M1.
+euf M0.
 
   (* case 1/3: equality with hashed message in update@R1 *)
   apply IH0 to R1(jj1,ii).
@@ -159,18 +147,13 @@ Proof.
 induction.
 substitute t,T1(i,j).
 expand exec@T1(i,j). expand cond@T1(i,j).
-assert input@T1(i,j) = h2(snd(snd(kT(i)@pred(T1(i,j)))),key2(i)).
-euf M1.
+euf M0.
 
-  (* case 1/3: equality with hashed message in output@R1 *)
+  (* case 1/2: equality with hashed message in output@R1 *)
   (* honest case *)
   exists jj.
 
-  (* case 2/3: equality with hashed message in update@R1 *)
-  (* honest case *)
-  exists jj.
-
-  (* case 3/3: equality with hashed message in update@T1 *)
+  (* case 2/2: equality with hashed message in update@T1 *)
   apply IH0 to T1(i,j1).
   executable pred(T1(i,j)).
   apply H2 to T1(i,j1).
