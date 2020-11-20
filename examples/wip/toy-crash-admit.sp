@@ -61,7 +61,7 @@ admit.
 Qed.
 
 
-goal test: exists (i:index),cond@P1(i).
+goal testbis: exists (i:index),cond@P1(i).
 Proof.
 apply freshindex.
 exists l.
