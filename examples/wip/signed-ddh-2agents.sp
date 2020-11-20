@@ -75,9 +75,6 @@ process Schall(i:index) =
   let gp = snd(sP) in
   let pkp = fst(sP) in
   if fst(sP) = pk(skP) then  
-  (* si je remplace ci-dessus fst(sP) par pkp, j'obtiens une erreur etrange *)
-  (* [error> Error in new input at line 1 char 142  
-   before ")": Symbol pks used with arity 0, but defined with arity 1. *)
   out(cS, < <pk(skS),g^b(i)>, sign(<<gp,g^b(i)>,pkp>,skS)>);
   in(cS, signed);
   if checksign(signed,pkp) = <<g^b(i),gp>,pk(skS)> then
