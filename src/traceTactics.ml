@@ -1070,10 +1070,10 @@ let euf_param (`Message at : message_atom) =
       match Symbols.Function.get_data sdec with
         | Symbols.AssociatedFunctions [senc] ->
           (senc, key, m, s,  (fun x -> x = sdec),
-           [ (Term.Atom (`Message (`Eq, m, Fun (f_fail, []))))])
+           [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false )
         | Symbols.AssociatedFunctions [senc; h] ->
           (senc, key, m, s,  (fun x -> x = sdec || x = h),
-           [ (Term.Atom (`Message (`Eq, m, Fun (f_fail, []))))])
+           [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false)
 
         | _ -> assert false
   in
@@ -1085,31 +1085,39 @@ let euf_param (`Message at : message_atom) =
           Tactics.(soft_failure @@
                    Failure "the message does not correspond \
                             to a signature check with the associated pk")
-      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [])
+      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
       end
 
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
     when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, (fun x -> false), [])
+    (hash, key, m, s, (fun x -> false), [], true)
   | (`Eq, s, Fun ((hash, _), [m; Name key]))
     when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, (fun x -> false), [])
+    (hash, key, m, s, (fun x -> false), [], true)
 
-  | (`Eq, Fun ((sdec, _), [s; Name key]), m)
+  | (`Eq, Fun ((sdec, _), [m; Name key]), s)
     when Symbols.is_ftype sdec Symbols.SDec ->
     param_dec sdec key m s
-  | (`Eq, m, Fun ((sdec, is), [s; Name key]))
+  | (`Eq, s, Fun ((sdec, is), [m; Name key]))
     when Symbols.is_ftype sdec Symbols.SDec ->
+    param_dec sdec key m s
+
+  | (`Neq, (Fun ((sdec, _), [m; Name key]) as s), Fun (fail, _))
+    when Symbols.is_ftype sdec Symbols.SDec && fail = Term.f_fail->
+    param_dec sdec key m s
+  | (`Neq, Fun (fail, _), (Fun ((sdec, is), [m; Name key]) as s))
+    when Symbols.is_ftype sdec Symbols.SDec  && fail = Term.f_fail ->
     param_dec sdec key m s
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
               "euf can only be applied to an hypothesis of the form h(t,k)=m \
                or checksign(s,pk(k))=m \
+               or sdec(s,sk) <> fail \
                or sdec(s,sk) = m (or symmetrically) \
                for some hash or signature or decryption functions")
 
-let euf_apply_schema sequent (_, (_, key_is), m, s, _, _) case =
+let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   let open Euf in
 
   (* Equality between hashed messages *)
@@ -1144,7 +1152,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _) case =
     TraceSequent.add_formula new_f
       (TraceSequent.add_formula le_cnstr sequent)
 
-let euf_apply_direct s (_, (_, key_is), m, _, _, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
@@ -1181,12 +1189,12 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _) Euf.{d_key_indices;d_message
   TraceSequent.add_formula eq_hashes s
   |> TraceSequent.add_formula eq_indices
 
-let euf_apply_facts s at =
+let euf_apply_facts drop_head s at =
   let p = euf_param at in
   let env = TraceSequent.get_env s in
-  let (hash_fn, (key_n, key_is), mess, sign, allow_functions, _) = p in
+  let (hash_fn, (key_n, key_is), mess, sign, allow_functions, _, _) = p in
   let system = TraceSequent.system s in
-  let rule = Euf.mk_rule ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let rule = Euf.mk_rule ~drop_head ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =
@@ -1205,7 +1213,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
       Tactics.hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
-  let (h,key,m,_,_,extra_goals) = euf_param at in
+  let (h,key,m,_,_,extra_goals,drop_head) = euf_param at in
   let extra_goals = List.map (fun x -> TraceSequent.add_formula x s) extra_goals in
   let tag_s =
 
@@ -1231,7 +1239,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   in
     (* we create the honnest sources using the classical eufcma tactic *)
     try
-      let honest_s = euf_apply_facts s at in
+      let honest_s = euf_apply_facts drop_head s at in
       (tag_s @ honest_s @ extra_goals)
     with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
 

@@ -57,10 +57,12 @@ val check_hash_key_ssc :
   system:Action.system ->
   Term.fname -> Term.name -> bool
 
-(** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
-    hash function and key in a process.
-    TODO: memoisation *)
+(** [mk_rule proc hash_fn key_n] create the euf rule associated to an given hash
+   function and key in a process.  If drop_head is true, the message stored do
+   not contain anymore the hash_fn function, else they still do.  TODO:
+   memoisation *)
 val mk_rule :
+  ?drop_head:bool ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->

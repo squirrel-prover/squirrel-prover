@@ -28,8 +28,8 @@ end
 (** Collect hashes for a given hash function and key,
   * as in [Iter.get_hashed_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
-class get_hashed_messages ~system hash_fn key_n = object (self)
-  inherit Iter.get_f_messages ~system hash_fn key_n
+class get_hashed_messages ~drop_head ~system hash_fn key_n = object (self)
+  inherit Iter.get_f_messages ~drop_head ~system hash_fn key_n
   method visit_formula _ = ()
 end
 
@@ -60,8 +60,8 @@ let check_hash_key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_fun
 (** [hashes_of_action_descr ~system action_descr hash_fn key_n]
   * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
-let hashes_of_action_descr ~system action_descr hash_fn key_n =
-  let iter = new get_hashed_messages ~system hash_fn key_n in
+let hashes_of_action_descr ?(drop_head=true) ~system action_descr hash_fn key_n =
+  let iter = new get_hashed_messages ~drop_head ~system hash_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   List.sort_uniq Pervasives.compare iter#get_occurrences
@@ -104,14 +104,14 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
+let mk_rule  ?(drop_head=true) ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
   hash_key_ssc ~messages:[mess;sign] ~allow_functions ~system hash_fn key_n;
   { hash = hash_fn;
     key = key_n;
     case_schemata =
       Utils.map_of_iter (Action.iter_descrs system)
         (fun action_descr ->
-          hashes_of_action_descr ~system action_descr hash_fn key_n
+          hashes_of_action_descr ~drop_head ~system action_descr hash_fn key_n
           |> List.map (fun (is,m) ->
             (* Indices [key_is] from [env] must correspond to [is],
              * which contains indices from [action_descr.indices]
@@ -196,7 +196,7 @@ let mk_rule ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
 
     cases_direct =
       let hashes =
-        let iter = new get_hashed_messages ~system hash_fn key_n in
+        let iter = new get_hashed_messages ~drop_head ~system hash_fn key_n in
         iter#visit_message mess ;
         iter#visit_message sign ;
         iter#get_occurrences
