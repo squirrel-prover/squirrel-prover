@@ -40,12 +40,10 @@ name rr : index -> message
 abstract ok : message
 abstract ko : message
 
- axiom cor_enc :
-  forall (m:message, r:message, key:message, skey:message), (dec(enc(m,r,key),skey) = fail || key=skey)
+axiom cor_enc :
+  forall (m,r,key,skey:message), (dec(enc(m,r,key),skey) = fail || key=skey)
 
- axiom cor_encbis :
-  forall (m:message, r:message, key:message, skey:message), (dec(enc(m,r,key),skey) <> fail || key<>skey)
-
+axiom fail_not_pair : forall (x,y:message), fail <> <x,y>
 
 process Reader(i:index) =
   out(cR, nr(i));
@@ -58,9 +56,8 @@ process Reader(i:index) =
     out(cR,
       try find l,j such that
         dec(mess,  diff(kE,kbE(j)) ) <> fail
-      &&
+        &&
         fst(dec(mess,  diff(kE,kbE(j)))) = nr(i)
-
       in
         enc(<snd(dec(mess, diff(kE,kbE(j)))),nr(i)>, rr(i), diff(kE,kbE(j))))
 
@@ -91,47 +88,47 @@ Proof.
 
   (* First projection. *)
   euf M0.
- (* Here, the reader has actually been given the output produced by a reader... *)
- executable pred(Reader1(i)).
- apply H1 to Reader1(i1).
- expand exec@Reader1(i1).
- expand cond@Reader1(i1).
- (* We use euf once again, to conclude that it is not possible to satisfy then the conditions.*)
- euf M3.
- simpl.
+  (* Here, the reader has actually been given the output produced by a reader... *)
+  executable pred(Reader1(i)).
+  apply H1 to Reader1(i1).
+  expand exec@Reader1(i1).
+  expand cond@Reader1(i1).
+  (* We use euf once again, to conclude that it is not possible to satisfy then the conditions.*)
+  euf M3.
+  simpl.
 
-   (* Here, it is the honnest case, so easy to conclude. *)
+  (* Here, it is the honest case, so easy to conclude. *)
   exists i1, j1.
   depends Reader(i), Reader1(i).
 
   (* Second projection. *)
   euf M0.
- (* Here, the reader has actually been given the output produced by a reader... *)
- executable pred(Reader1(i)).
- apply H1 to Reader1(i1).
- expand exec@Reader1(i1).
- expand cond@Reader1(i1).
+
+  (* Here, the reader has actually been given the output produced by a reader... *)
+  executable pred(Reader1(i)).
+  apply H1 to Reader1(i1).
+  expand exec@Reader1(i1).
+  expand cond@Reader1(i1).
 
 
- (* We use euf once again, to conclude that it is not possible to satisfy then the conditions.*)
- euf M3.
+  (* We use euf once again, to conclude that it is not possible to satisfy XXX then the conditions.*)
+  euf M3.
 
- apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
- case H3.
- assert snd(fail) <> nr(i).
+  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
+  case H3.
+  assert snd(fail) <> nr(i).
 
- apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1), kbE(j1), kbE(j).
- case H3.
- assert snd(fail) <> nr(i).
- simpl.
-
+  apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1), kbE(j1), kbE(j).
+  case H3.
+  assert snd(fail) <> nr(i).
+  simpl.
 
   exists i1,j.
   depends Reader(i), Reader1(i).
 
   exists k.
-  apply cor_encbis to <input@Tag(l,k),nt(l,k)>,rt(l,k),diff(kE,kbE(k)),diff(kE,kbE(k)).
-  case H1.
+  apply fail_not_pair to input@Tag(l,k),nt(l,k).
+
 Qed.
 
 
@@ -154,24 +151,21 @@ Proof.
 
   apply H1 to i.
   case H2.
-  apply cor_encbis to <input@Tag(l,k),nt(l,k)>,rt(l,k),kE,kE.
-  case H2.
+  apply fail_not_pair to input@Tag(l,k), nt(l,k).
 
   apply H1 to k.
   case H2.
-  apply cor_encbis to <input@Tag(l,k),nt(l,k)>,rt(l,k),kbE(k),kbE(k).
-  case H2.
+  apply fail_not_pair to input@Tag(l,k), nt(l,k).
 
   notleft H1.
 
   project.
   euf M0.
 
-   executable pred(A(i)).
- apply H2 to Reader1(i1).
- expand exec@Reader1(i1).
- expand cond@Reader1(i1).
-
+  executable pred(A(i)).
+  apply H2 to Reader1(i1).
+  expand exec@Reader1(i1).
+  expand cond@Reader1(i1).
 
   euf M3.
   apply H2 to Reader1(i).
@@ -179,54 +173,51 @@ Proof.
   expand cond@Reader1(i).
   euf M6.
 
- apply H1 to i1,j1.
- case H2.
+  apply H1 to i1,j1.
+  case H2.
   depends Reader(i), A(i).
 
   euf M0.
 
-   executable pred(A(i)).
- apply H2 to Reader1(i1).
- expand exec@Reader1(i1).
- expand cond@Reader1(i1).
-
+  executable pred(A(i)).
+  apply H2 to Reader1(i1).
+  expand exec@Reader1(i1).
+  expand cond@Reader1(i1).
 
   euf M3.
 
- apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
- case H4.
- assert snd(fail) <> nr(i).
+  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
+  case H4.
+  assert snd(fail) <> nr(i).
   apply H2 to Reader1(i).
   expand exec@Reader1(i).
   expand cond@Reader1(i).
 
- euf M6.
+  euf M6.
 
- apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
- case H5.
+  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
+  case H5.
 
- assert snd(fail) <> nr(i).
+  assert snd(fail) <> nr(i).
 
- apply H1 to i2,j1.
- case H5.
+  apply H1 to i2,j1.
+  case H5.
 
-   depends Reader(i), A(i).
+  depends Reader(i), A(i).
 
   apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1),kbE(j1),kbE(j).
   case H5.
- assert snd(fail) <> nr(i).
+  assert snd(fail) <> nr(i).
 
   apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1),kbE(j1),kbE(j).
 
-
   case H4.
- assert snd(fail) <> nr(i).
+  assert snd(fail) <> nr(i).
 
+  apply H1 to i1,j.
+  case H2.
 
- apply H1 to i1,j.
- case H2.
-
-   depends Reader(i), A(i).
+  depends Reader(i), A(i).
 
 Qed.
 
@@ -251,8 +242,6 @@ Proof.
 
   expand output@Reader1(i).
   fa 2.
-
-
 
   equivalent
   (if
@@ -282,29 +271,22 @@ Proof.
         && input@Tag(l,j) = output@Reader(i))
           in
           enc(<nt(l,j),nr(i)>,rr(i),
-              diff(kE,kbE(j)))))
+              diff(kE,kbE(j))))).
+  fa.
 
-.
-fa.
+  exists l,k.
+  exists l,k.
+  project.
+  fa.
+  exists l,k.
+  apply fail_not_pair to input@Tag(l,j), nt(l,j).
 
+  fa.
+  exists l.
+  apply cor_enc to <input@Tag(l,k),nt(l,k)>,rt(l,k),kbE(k),kbE(j).
+  case H1.
 
-exists l,k.
-exists l,k.
-project.
-fa.
-exists l,k.
-apply cor_encbis to <input@Tag(l,j),nt(l,j)>,rt(l,j),kE,kE.
-case H1.
-
-fa.
-exists l.
-apply cor_enc to <input@Tag(l,k),nt(l,k)>,rt(l,k),kbE(k),kbE(j).
-case H1.
-
-apply cor_encbis to <input@Tag(l1,j),nt(l1,j)>,rt(l1,j),kbE(j),kbE(j).
-case H1.
-
-
+  apply fail_not_pair to input@Tag(l1,j), nt(l1,j).
 
   fa 3.
   fadup 3.
@@ -320,7 +302,6 @@ case H1.
 
   expand frame@A(i).
 
-
   equivalent
     exec@A(i),
     exec@pred(A(i)) &&not (exists (l,k:index),
@@ -328,10 +309,7 @@ case H1.
       output@Tag(l,k) = input@A(i) &&
       input@Tag(l,k) = output@Reader(i)).
 
-
   apply wa_A to i.
-
-
 
   fa 2. fa 3.
   fadup 3.
