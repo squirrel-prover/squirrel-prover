@@ -1,4 +1,4 @@
-(* Simple modeling of the Basic Hash protocol, multiple tags. *)
+(* Authentication of the Basic Hash protocol, multiple tags. *)
 require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require FelTactic.
