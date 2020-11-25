@@ -109,6 +109,7 @@
   "trivialif"
   "xor"
   "yesif"
+  "intctxt"
 ))
 
 (defvar squirrel-tacticals-keywords '(

@@ -1063,9 +1063,38 @@ let () =
     exec TacticsArgs.Timestamp
 
 
-(** EUF Axioms *)
+(** Unforgeability Axioms *)
 
-let euf_param (`Message at : message_atom) =
+type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
+                           * Sorts.message Term.term
+                           * (Symbols.fname Symbols.t -> bool)
+                           * Sorts.boolean Term.term  list * bool
+
+let euf_param (`Message at : message_atom) : unforgeabiliy_param =
+  match at with
+  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
+  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
+      begin match Theory.check_signature checksign pk with
+      | None ->
+          Tactics.(soft_failure @@
+                   Failure "the message does not correspond \
+                            to a signature check with the associated pk")
+      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
+      end
+  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+    when Symbols.is_ftype hash Symbols.Hash ->
+    (hash, key, m, s, (fun x -> false), [], true)
+  | (`Eq, s, Fun ((hash, _), [m; Name key]))
+    when Symbols.is_ftype hash Symbols.Hash ->
+    (hash, key, m, s, (fun x -> false), [], true)
+  | _ -> Tactics.soft_failure
+           (Tactics.Failure
+              "euf can only be applied to an hypothesis of the form h(t,k)=m \
+               or checksign(s,pk(k))=m \
+               for some hash or signature or decryption functions")
+
+
+let intctxt_param (`Message at : message_atom) : unforgeabiliy_param =
   let param_dec sdec key m s =
       match Symbols.Function.get_data sdec with
         | Symbols.AssociatedFunctions [senc] ->
@@ -1078,23 +1107,6 @@ let euf_param (`Message at : message_atom) =
         | _ -> assert false
   in
   match at with
-  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
-  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
-      begin match Theory.check_signature checksign pk with
-      | None ->
-          Tactics.(soft_failure @@
-                   Failure "the message does not correspond \
-                            to a signature check with the associated pk")
-      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
-      end
-
-  | (`Eq, Fun ((hash, _), [m; Name key]), s)
-    when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, (fun x -> false), [], true)
-  | (`Eq, s, Fun ((hash, _), [m; Name key]))
-    when Symbols.is_ftype hash Symbols.Hash ->
-    (hash, key, m, s, (fun x -> false), [], true)
-
   | (`Eq, Fun ((sdec, _), [m; Name key]), s)
     when Symbols.is_ftype sdec Symbols.SDec ->
     param_dec sdec key m s
@@ -1111,11 +1123,11 @@ let euf_param (`Message at : message_atom) =
 
   | _ -> Tactics.soft_failure
            (Tactics.Failure
-              "euf can only be applied to an hypothesis of the form h(t,k)=m \
-               or checksign(s,pk(k))=m \
-               or sdec(s,sk) <> fail \
+              "intctxt can only be applied to an hypothesis of the form \
+               sdec(s,sk) <> fail \
                or sdec(s,sk) = m (or symmetrically) \
                for some hash or signature or decryption functions")
+
 
 let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   let open Euf in
@@ -1189,12 +1201,13 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
   TraceSequent.add_formula eq_hashes s
   |> TraceSequent.add_formula eq_indices
 
-let euf_apply_facts drop_head s at =
-  let p = euf_param at in
+let euf_apply_facts drop_head s
+    ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
   let env = TraceSequent.get_env s in
-  let (hash_fn, (key_n, key_is), mess, sign, allow_functions, _, _) = p in
   let system = TraceSequent.system s in
-  let rule = Euf.mk_rule ~drop_head ~allow_functions ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is in
+  let rule = Euf.mk_rule ~drop_head ~allow_functions ~system ~env ~mess ~sign
+      ~head_fn ~key_n ~key_is
+  in
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =
@@ -1205,7 +1218,7 @@ let euf_apply_facts drop_head s at =
 let set_euf _ = { TraceSequent.t_euf = true }
 
 (** Tag EUFCMA - for composition results *)
-let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
+let euf_apply (get_params : Term.message_atom -> unforgeabiliy_param) (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   let s, at =
     try
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
@@ -1213,10 +1226,9 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
       Tactics.hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
-  let (h,key,m,_,_,extra_goals,drop_head) = euf_param at in
+  let (h,key,m,_,_,extra_goals,drop_head) as p = get_params at in
   let extra_goals = List.map (fun x -> TraceSequent.add_formula x s) extra_goals in
   let tag_s =
-
     let f =
       Prover.get_oracle_tag_formula (Symbols.to_string h)
     in
@@ -1239,7 +1251,7 @@ let euf_apply (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   in
     (* we create the honnest sources using the classical eufcma tactic *)
     try
-      let honest_s = euf_apply_facts drop_head s at in
+      let honest_s = euf_apply_facts drop_head s p in
       (tag_s @ honest_s @ extra_goals)
     with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
 
@@ -1252,8 +1264,15 @@ let () =
            \n the tag T, or was honnestly produced. \
            \n The tag T must refer to a previously defined axiom f(mess,sk), of\
            \n the form forall (m:message,sk:message).
-           \n Usage: tageuf H t."
-    euf_apply TacticsArgs.String
+           \n Usage: euf H t."
+    (euf_apply euf_param) TacticsArgs.String
+
+let () =
+  T.register_typed "intctxt"
+    ~help:"Apply the intctxt axiom to the given hypothesis name.\
+           \n Usage: intctxt H t."
+    (euf_apply intctxt_param) TacticsArgs.String
+
 (** [apply gp ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath. *)
@@ -1452,7 +1471,7 @@ let collision_resistance (s : TraceSequent.t) =
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
             Symbols.is_ftype hash Symbols.Hash
-            && Euf.check_hash_key_ssc ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false) ~system hash key
+            && Euf.check_key_ssc ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false) ~system hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in

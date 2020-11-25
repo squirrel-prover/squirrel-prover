@@ -14,7 +14,7 @@ R --> T : enc(<nt,nr>,r,k)
 
 We assume here that the encryption used is an encrypt then mac,
 such that the encryption is AE. In particular, it is IND-CCA1,
-and IND-CTXT.
+and INT-CTXT.
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
@@ -87,14 +87,14 @@ Proof.
   project.
 
   (* First projection. *)
-  euf M0.
+  intctxt M0.
   (* Here, the reader has actually been given the output produced by a reader... *)
   executable pred(Reader1(i)).
   apply H1 to Reader1(i1).
   expand exec@Reader1(i1).
   expand cond@Reader1(i1).
-  (* We use euf once again, to conclude that it is not possible to satisfy then the conditions.*)
-  euf M3.
+  (* We use intctxt once again, to conclude that it is not possible to satisfy then the conditions.*)
+  intctxt M3.
   simpl.
 
   (* Here, it is the honest case, so easy to conclude. *)
@@ -102,7 +102,7 @@ Proof.
   depends Reader(i), Reader1(i).
 
   (* Second projection. *)
-  euf M0.
+  intctxt M0.
 
   (* Here, the reader has actually been given the output produced by a reader... *)
   executable pred(Reader1(i)).
@@ -111,8 +111,8 @@ Proof.
   expand cond@Reader1(i1).
 
 
-  (* We use euf once again, to conclude that it is not possible to satisfy XXX then the conditions.*)
-  euf M3.
+  (* We use intctxt once again, to conclude that it is not possible to satisfy XXX then the conditions.*)
+  intctxt M3.
 
   apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
   case H3.
@@ -160,31 +160,31 @@ Proof.
   notleft H1.
 
   project.
-  euf M0.
+  intctxt M0.
 
   executable pred(A(i)).
   apply H2 to Reader1(i1).
   expand exec@Reader1(i1).
   expand cond@Reader1(i1).
 
-  euf M3.
+  intctxt M3.
   apply H2 to Reader1(i).
   expand exec@Reader1(i).
   expand cond@Reader1(i).
-  euf M6.
+  intctxt M6.
 
   apply H1 to i1,j1.
   case H2.
   depends Reader(i), A(i).
 
-  euf M0.
+  intctxt M0.
 
   executable pred(A(i)).
   apply H2 to Reader1(i1).
   expand exec@Reader1(i1).
   expand cond@Reader1(i1).
 
-  euf M3.
+  intctxt M3.
 
   apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
   case H4.
@@ -193,7 +193,7 @@ Proof.
   expand exec@Reader1(i).
   expand cond@Reader1(i).
 
-  euf M6.
+  intctxt M6.
 
   apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
   case H5.

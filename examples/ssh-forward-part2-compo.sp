@@ -373,8 +373,8 @@ Proof.
   expand exec@P3(i).
   expand cond@P3(i).
 
-(* We have that x3 is a message encrypted with the secret key, we use the euf of encryption *)
-  euf D2.
+(* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
+  intctxt D2.
 
 (* Ill-tagged cases *)
   apply signnottag to sidPaF@P2,kP.

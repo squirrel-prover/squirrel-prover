@@ -787,7 +787,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
       (EquivSequent.Message t) ::
       (List.map (EquivSequent.pi_elem proj) (e_without_hash @ biframe)) in
     (* check syntactic side condition *)
-    Euf.hash_key_ssc ~elems:frame  ~allow_functions:(fun x -> false) ~system hash_fn key_n;
+    Euf.key_ssc ~elems:frame  ~allow_functions:(fun x -> false) ~system hash_fn key_n;
     (* we compute the list of hashes from the frame *)
     let list_of_hashes_from_frame =
       occurrences_of_frame ~system frame hash_fn key_n
@@ -1145,7 +1145,7 @@ let cca1 TacticsArgs.(Int i) s =
             ->
             begin
               try
-                Euf.hash_key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk) ~system fndec sk;
+                Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk) ~system fndec sk;
                 if not (List.mem (EquivSequent.Message
                                     (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
                                  ) biframe) then
@@ -1284,8 +1284,8 @@ let enckp TacticsArgs.(Int i) s =
             (* we check that the encryption function is used with the associated
                public key *)
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-              Euf.hash_key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk;
-              Euf.hash_key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk2;
+              Euf.key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk;
+              Euf.key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk2;
               hide_enc fnenc enc fndec sk (Some fnpk) r fnenci (Some fnpki) m isk
             | _ ->
               Tactics.soft_failure
