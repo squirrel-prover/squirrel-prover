@@ -8,13 +8,28 @@ P -> S : <pk(kP), g^a>
 S -> P : <pk(kS),g^b>,sign(<<g^a,g^b>,pk(kP)>,kS)
 P -> S : sign(<<g^b,g^a>,pk(kS)>,kP)
 
-We leverage the composition result, to prove a single session in the
-presence of an adversary with access to a "backdoor" about the signature
-function, which allows him to about signatures of some specific messages.
+We leverage the composition result of [1], to prove the security of a single
+session in the presence of an adversary with access to a "backdoor" about the
+signature function, which allows him to about signatures of some specific
+messages.
 
-The proof is split into two systems, one modelling the authentication property,
-and the other the strong secrecy. Put together, they allow to derive very simply
-the actual assumption needed to apply the composition theorem.
+It means that we only consider two session of the agents, P and S, using a1 and
+b1 as DH shares. We consider that the other sessions of P (simulated thanks to
+the oracle), use a(i) as a DH share, and b(i) for the other sessions of S.
+
+The proof is split into two systems:
+
+ - [auth] - which models the authentication property, i.e. that P and S must be
+partnered with an honnest session of the protocol.
+
+ - [secret] - which models the secrecy property. i.e. that if P and S are
+partenered together, the derived key is real-or-random.  Those two properties
+allow to conclude through the result of [1] the multi-session security of DDH.
+
+[1] : Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
+tion: a technique for protocol composition with long term shared secrets.
+In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
+Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
 
@@ -27,15 +42,11 @@ name kS : message
 channel cP
 channel cS
 
-
-name a1 : message
-name b1 : message
-name k11 : message
+name a1 : message (* DH share of P *)
+name b1 : message (* DH share of S *)
+name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
-name k : index -> index -> message
-
-axiom DDHgroup : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
  (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
@@ -58,9 +69,9 @@ process P =
       else
       (try find j such that snd(fst(t)) = g^b(j) in
         out(cP, ok)
-      else 
+      else
        out(cP, diff(ok,ko))
-       ) 
+       )
 
 
 process S =
@@ -78,10 +89,10 @@ process S =
       else
        (try find l such that gP = g^a(l) in
           out(cS, ok)
-	else 
+	else
     	  out(cS, diff(ok,ko))
 	 )
-       
+
 
 system [auth] ( P | S).
 
@@ -170,7 +181,7 @@ Proof.
    (* P *)
    expandall; fa 6.
 
-   (* P1 *)        
+   (* P1 *)
    expandall; fa 6.
 
    (* P2 *)
