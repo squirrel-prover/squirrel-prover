@@ -38,6 +38,10 @@ The required `.el` files are inside the `utils` folder. The `squirrel.el` file
 contains comments detailing the installation of squirrel for ProofGeneral.
 We recommend installing ProofGeneral from the git repository.
 
+## Examples
+Examples of developments in Squirrel can be found in:
+- `examples/`
+
 ## Quick guide
 
 Squirrel developments are conventionally written in `.sp` files. They start

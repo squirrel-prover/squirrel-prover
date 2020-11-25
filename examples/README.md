@@ -9,6 +9,16 @@ The running examples of the paper correspond to the files:
 - `basic-hash.sp` for the complete proof of unlinkability
 They are well suited to get a first feel of the tool.
 
+## Comparison with CryptoVerif and EasyCrypt
+To help comparing Squirrel to existing approaches in the computational model, we conduct the security analysis of the same protocol (Basic Hash) in three different tools: Squirrel, CryptoVerif and EasyCrypt.
+
+The corresponding files can be found in:
+- `basic-hash.sp` authentication and unlinkability, Squirrel
+- `cryptoverif/basic-hash-auth.pcv` authentication, CryptoVerif
+- `cryptoverif/basic-hash-unlink.pcv` unlinkability, CryptoVerif
+- `easycrypt/basic-hash-auth.pcv` authentication, EasyCrypt
+- `easycrypt/basic-hash-unlink.pcv` unlinkability, EasyCrypt
+
 ## Case Studies
 
 Case studies that use an axiom among `cca1`,`enckp`,`prf`,`euf`,`ddh`
@@ -25,35 +35,35 @@ protocol, which may differ from the original specification of the protocol.
 ### RFID Based
 
 Basic Hash [A]:
-- basic-hash.sp
+- `basic-hash.sp`
 
 Feldhofer [B]:
-- feldhofer.sp
+- `feldhofer.sp`
 
 Hash Lock [C]:
-- hash-lock.sp
+- `hash-lock.sp`
 
 LAK [D]:
-- lak-tags.sp
+- `lak-tags.sp`
 
 MW [E]:
-- mw.sp
-- mw-full.sp
+- `mw.sp`
+- `mw-full.sp`
 
 ### Encryption Based
 
 Private Authentication [F]:
- - private-authentication.sp
+ - `private-authentication.sp`
 
 ### DDH Based
 
 Signed DDH key exchange, ISO 9798-3 [G]
- - signed-ddh.sp
- - signed-ddh-compo.sp
+ - `signed-ddh.sp`
+ - `signed-ddh-compo.sp`
 
 SSH protocol with forwarding agent [H]
- - ssh-forward-part1-compo.sp
- - ssh-forward-part2-compo.sp
+ - `ssh-forward-part1-compo.sp`
+ - `ssh-forward-part2-compo.sp`
 
 
 ### Composition
