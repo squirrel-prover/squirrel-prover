@@ -1,21 +1,47 @@
 (*******************************************************************************
 SSH (WITH FORWARDING AGENT)
 
-[H] Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
+We refer to P and S as the two processes of ssh-forward-part1-comp.sp
+
+In this protocol,
+
+ - PFA is a process which first runs P, and then starts a forwarded agent
+process, which accepts to sign queries received on the secure channel
+established through P
+
+ - PDIS is a protocol which first runs S, and then can run P on the distant
+server. When P while require a signature, it will request it on the channel
+established by S, to contact some forwarded agent.
+
+ - SDIS is the server that will communicated with P run by PDIS.
+
+
+PFA <-> PDIS : SSH key exchange, deriving an ideal key k11.
+
+PDIS -> SDIS : g^a
+SDIS-> PDIS : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
+PDIS -> PFA : enc(<"sign request",h(g^a,g^b, g^ab)>,k11 )
+PFA -> PDIS : enc(<"sign answer",sign(h(g^a,g^b, g^ab),skP)>,k11 )
+PDIS -> SDIS : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
+
+
+We prove that one session of the second key exchange is secure, when it is using
+a secure channel with an idealized key k11, and the attacker has access to an
+oracle that allows to simulate either other sessions of the forwarded key
+exchange, or sessions of the original key exchange.
+
+This proof, is split into authentication and secrecy, as in
+ssh-forward-part1-comp.sp.
+
+The security of a forwarded session when using a previously derived key is
+proved in the file ssh-forward-part2-compo.sp. Together with [1], those two
+files prove the security of SSH with one session forwarding for an unbounded
+number of sessions.
+
+[1] : Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
 tion: a technique for protocol composition with long term shared secrets.
-In Jonathan Katz and Giovanni Vigna, editors, Proceedings of the 27st
-ACM Conference on Computer and Communications Security (CCS’20),
-Orlando, USA, November 2020. ACM Press. To appear
-
-P -> S : g^a
-S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
-P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
-
-
-Second part of the proof of ssh with a modified agent forwarding. It
-corresponds to the security a the forwarded SSH key exchange, but with oracles
-that allow to simulate all other forwarded SSH login and previous non forwarded
-SSH logins.
+In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
+Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
 abstract ok : message
@@ -56,16 +82,19 @@ name r5 : message
 name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
-(* We assume that the encryption is AE, and notably INT-PTXT. This is assumed to hold even when the key appears under some hash functions. *)
+(* We assume that the encryption is INT-CTXT. This is assumed to hold even when the key appears under some hash functions. *)
 senc enc,dec with h
 
-(* The CR axiom built-in in Squirrel assumes a secret key *)
-(* This is not the case here, and we therefore declare the following axiom *)
 
-axiom [auth] hashnotpair : forall (m1,m2:message), forall (m:message), m1 = h(m, hKey) => fst(m1) <> m2
+(* Based on a difference between the bitstring lengths, we can assume that it is
+impossible to confuse a hash with the tag forwarded, and another hash. *)
 
+axiom [auth] hashlengthnotpair : forall (m1,m2:message),
+   <forwarded,h(m1,hKey)> <> h(m2, hKey)
+
+(* The following axiom is a modelling trick. We need at some point to apply an
+hypothesis that require to instantiate an index, but this index is not used. *)
 axiom [auth] freshindex : exists (l:index), True
-
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
@@ -318,8 +347,8 @@ Proof.
   (* oracle case *)
   case H3.
   case H3.
-  apply hashnotpair to sidPa@PDIS5, forwarded.
-  apply H3 to <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  apply hashlengthnotpair to <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+
   apply signnottag to sidPa@P2, kP.
   apply H1 to i1.
   left; right.
@@ -355,13 +384,11 @@ Proof.
   assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey).
   collision.
 
-  apply hashnotpair to  h(<<g^ake1(i1),m2>,m3>, hKey), forwarded.
-(* Here, I do weird stuff, else we have an assert false in completion.ml. TODO *)
-  apply H3 to <<g^ake1(i1),m2>,m3>.
+  apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
-  apply hashnotpair to  sidPaF@P2, forwarded.
-  apply H2 to (<<g^ake11,input@P1>,k11>).
+
+  apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)

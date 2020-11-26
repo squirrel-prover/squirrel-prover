@@ -1,20 +1,46 @@
 (*******************************************************************************
-SSH (WITH FORWARDING AGENT)
+SSH
 
-[H] Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
-tion: a technique for protocol composition with long term shared secrets.
-In Jonathan Katz and Giovanni Vigna, editors, Proceedings of the 27st
-ACM Conference on Computer and Communications Security (CCS’20),
-Orlando, USA, November 2020. ACM Press. To appear
+Original version:
+
+P -> S : g^a
+S -> P : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
+P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
+
+This protocol instantiate a key exchange, where the derived key is already used
+inside the key exchange. This corresponds to the so called "key confirmation"
+process. We leverage the composition results of [1] to prove the security of the
+SSH protocol. This is done by proving the security of a single session of SSH,
+while giving access to an oracle to the attacker, that allows him to simulate
+either other honnest sessions of SSH, or other forwarded session.
+
+As this protocol is a confirmation, we have to prove that
+
+ * just after the key is derived, it satisfies the real-or-random property,
+cf. system [secret]
+
+ * if the key confirmation succeeds, two honnest sessions are paired together,
+cf. system [auth].
+
+For the first point, we actually split the first message of S into two messages,
+yielding the protocol:
 
 P -> S : g^a
 S -> P : g^b
 S -> P:  pkS, sign(h(g^a,g^b, g^ab),skS) )
 P -> S : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
 
-First part of the proof of ssh with a modified agent forwarding. It
-corresponds to the security a the basic SSH key exchange, but with oracles that
-allow to simulate all other honest logins, and the forwarded SSH logins.
+
+The security of a forwarded session when using a previously derived key is
+proved in the file ssh-forward-part2-compo.sp. Together with [1], those two
+files prove the security of SSH with one session forwarding for an unbounded
+number of sessions.
+
+
+[1] : Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
+tion: a technique for protocol composition with long term shared secrets.
+In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
+Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
 abstract ok : message
