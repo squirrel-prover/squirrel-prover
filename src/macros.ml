@@ -156,7 +156,7 @@ let get_definition :
             end
           | _ -> assert false
         end
-      | Symbols.Local _, _ -> failwith "TODO"
+      | Symbols.Local _, _ -> failwith "Not implemented"
       |  _ -> assert false
 
     end

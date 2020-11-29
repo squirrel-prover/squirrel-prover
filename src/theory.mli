@@ -122,6 +122,8 @@ type conversion_error =
   | String_expected of term
   | Int_expected of term
   | Tactic_type of string
+  | Index_not_var of term
+  | Assign_no_state of string
 
 exception Conv of conversion_error
 

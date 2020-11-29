@@ -211,7 +211,6 @@ let prepare : process -> process =
 
     | `Input, Out _ -> `Start, env, invars
     | `Input, Null -> `Start, env, invars
-
     | `Input, _ ->
         failwith "cannot prepare system process"
 

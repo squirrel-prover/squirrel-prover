@@ -287,7 +287,7 @@ struct
       let aux = convert_argsb q s j in
       Arg (Index (Theory.conv_index tsubst (Var p))) :: aux
     | [], [] -> []
-    | _ -> failwith "not implemented"
+    | _ -> failwith "Not implemented"
 
 
 

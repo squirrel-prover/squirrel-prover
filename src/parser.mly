@@ -172,7 +172,7 @@ process:
 | ID term_list ASSIGN term process_cont
                                  { let to_idx = function
                                      | Theory.Var x -> x
-                                     | _ -> failwith "index variable expected"
+                                     | t -> raise @@ Theory.Conv (Index_not_var t)
                                    in
                                    let l = List.map to_idx $2 in
                                    Process.Set ($1,l,$4,$5) }
@@ -192,7 +192,7 @@ else_process:
 
 channel:
 | ID                             { try Channel.of_string $1 with Not_found ->
-                                     failwith "unknown channel" }
+                                     raise @@ Theory.Conv (Undefined $1) }
 
 indices:
 | ID                             { [$1] }

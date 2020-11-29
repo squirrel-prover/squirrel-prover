@@ -239,7 +239,7 @@ let is_ftype s ftype =
   match Function.get_def s with
     | _,t when t = ftype -> true
     | _ -> false
-    | exception Not_found -> failwith "symbol not found"
+    | exception Not_found -> raise @@ Unbound_identifier s
 
 module Macro = Make (struct
   type ns = macro
