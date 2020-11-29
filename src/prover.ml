@@ -346,6 +346,8 @@ struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
+              | exception Action.BiSystemError e -> Tactics.hard_failure
+                                                      (Tactics.Failure e)
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
@@ -361,6 +363,8 @@ struct
                  match f (th) s with
                  | subgoals -> sk subgoals fk
                  | exception Tactics.Tactic_soft_failure e -> fk e
+                 | exception Action.BiSystemError e -> Tactics.hard_failure
+                                                         (Tactics.Failure e)
                end
              with TacticsArgs.Uncastable ->
                Tactics.hard_failure (Tactics.Failure "ill-formed arguments")

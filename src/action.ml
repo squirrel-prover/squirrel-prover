@@ -252,6 +252,8 @@ let get_id = function
 let systems  : (system_name, shape) Hashtbl.t =
   Hashtbl.create 97
 
+exception BiSystemError of string
+
 
 type system =
   | Single of single_system
@@ -269,20 +271,20 @@ let pp_system fmt = function
   | Pair (s1, s2) ->  Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
 
 let project_system proj = function
-  | Single s -> failwith "cannot project system which is not a bi-process"
+  | Single s -> raise @@ BiSystemError "cannot project system which is not a bi-process"
   | SimplePair id ->
     begin
       match proj with
       | Term.Left -> Single (Left id)
       | Term.Right -> Single (Right id)
-      | Term.None ->  failwith "cannot project a system with None"
+      | Term.None ->  raise @@ BiSystemError "cannot project a system with None"
     end
   | Pair (s1, s2) ->
     begin
       match proj with
       | Term.Left -> Single s1
       | Term.Right -> Single s2
-      | Term.None ->  failwith "cannot project a system with None"
+      | Term.None ->  raise @@ BiSystemError "cannot project a system with None"
     end
 
 let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
@@ -301,7 +303,7 @@ let register table system_name symb indices action descr =
   Hashtbl.add systems system_name s;
   match to_term action with
   | Term.Action (symb2, is) when indices <> is ->
-      failwith "Cannot register a shape twice with distinct indices."
+      raise @@ BiSystemError "Cannot register a shape twice with distinct indices."
   | Term.Action (symb2, is) ->
       let subst =
         Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
@@ -317,23 +319,23 @@ let register table system_name symb indices action descr =
 
 let make_bi_descr d1 d2 =
   if d1.input <> d2.input || d1.indices <> d2.indices then
-    failwith "cannot merge two actions with disctinct \
+    raise @@ BiSystemError "cannot merge two actions with disctinct \
               inputs or indexes";
   { d1 with
     condition = (let is1,t1 = d1.condition and is2,t2 = d2.condition in
                  if is1 <> is2 then
-                   failwith "cannot merge two actions with disctinct \
+                   raise @@ BiSystemError "cannot merge two actions with disctinct \
                              condtion indexes";
                  is1, Term.make_bi_term t1 t2);
     updates = List.map2 (fun (st1, m1) (st2, m2) ->
           if st1 <> st2 then
-                   failwith "cannot merge two actions with disctinct \
-                             condtion indexes";
+                   raise @@ BiSystemError "cannot merge two actions with disctinct \
+                             states";
         st1,Term.make_bi_term m1 m2)
         d1.updates d2.updates;
     output = (let c1,m1 = d1.output and c2,m2 = d2.output in
                         if c1 <> c2 then
-                   failwith "cannot merge two actions with disctinct \
+                   raise @@ BiSystemError "cannot merge two actions with disctinct \
                              ouput channels";
                         c1, Term.make_bi_term m1 m2) }
 
@@ -372,7 +374,7 @@ let get_descrs system =
     let right_shapes = Hashtbl.find_all systems (get_id s2) in
     if not(Utils.List.inclusion left_shapes right_shapes
            && Utils.List.inclusion right_shapes left_shapes) then
-      failwith "Cannot iter over a bisytem with distinct control flow";
+      raise @@ BiSystemError "Cannot iter over a bisytem with distinct control flow";
     List.map
       (fun shape -> (get_descr_of_shape system shape))
       left_shapes
