@@ -117,8 +117,6 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 exception ParseError of string
 
-val parse_formula : Theory.formula -> formula
-
 val get_goal_formula : string -> formula * Action.system
 
 (** Produces a trace goal from a parsed formula,

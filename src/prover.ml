@@ -98,28 +98,7 @@ let add_option ((opt_name,opt_val):option_def) =
 
 (** Tactic expressions and their evaluation *)
 
-let tsubst_of_goal j =
-  let aux : Vars.evar -> Theory.esubst =
-    (fun (Vars.EVar v) ->
-       match Vars.sort v with
-       | Sorts.Boolean -> assert false
-       | _ -> Theory.ESubst (Vars.name v,Term.Var v)
-      )
-      in
-  List.map aux
-    (Vars.to_list (Goal.get_env j))
-
 exception ParseError of string
-
-let parse_formula fact =
-  match !subgoals with
-    | [] -> raise @@ ParseError "Cannot parse fact without a goal"
-    | j :: _ ->
-        Theory.convert
-          (tsubst_of_goal j)
-          fact
-          Sorts.Boolean
-
 
 type 'a tac_infos = {
   maker : TacticsArgs.parser_arg list -> 'a Tactics.tac ;
@@ -260,36 +239,6 @@ struct
   let register_general id ?(help="") f =
     assert (not (Hashtbl.mem table id)) ;
     Hashtbl.add table id { maker = f ; help = help}
-
-  let rec convert_argsb parser_args tactic_typess j =
-    let env =
-      match M.to_goal j with
-      | Goal.Trace t -> TraceSequent.get_env t
-      | Goal.Equiv e -> EquivSequent.get_env e
-    in
-    let tsubst = Theory.subst_of_env env in
-    let open TacticsArgs in
-    match parser_args, tactic_typess with
-    | (Theory p::q, Sort Timestamp :: s) ->
-      let aux = convert_argsb q s j in
-      Arg (Timestamp (Theory.convert tsubst p Sorts.Timestamp)) :: aux
-    | (Theory p::q, Sort Message :: s) ->
-      let aux = convert_argsb q s j in
-      Arg (Message (Theory.convert tsubst p Sorts.Message)) :: aux
-    | (Theory p::q, Sort Boolean :: s) ->
-      let aux = convert_argsb q s j in
-      Arg (Boolean (Theory.convert tsubst p Sorts.Boolean)) :: aux
-    | (Theory (Var p)::q, Sort String :: s) ->
-      let aux = convert_argsb q s j in
-      Arg (String p) :: aux
-    | (Theory t::q, Sort String :: s) -> raise Theory.(Conv (String_expected t))
-    | (Theory (Var p)::q, Sort Index :: s) ->
-      let aux = convert_argsb q s j in
-      Arg (Index (Theory.conv_index tsubst (Var p))) :: aux
-    | [], [] -> []
-    | _ -> failwith "Not implemented"
-
-
 
   let rec convert_args parser_args tactic_type j =
     let env =
