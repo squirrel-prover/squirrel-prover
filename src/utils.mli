@@ -1,5 +1,6 @@
 (** Utility modules. *)
 
+(*------------------------------------------------------------------*)
 module List : sig
   include module type of struct include List end
 
@@ -22,6 +23,7 @@ module List : sig
   val inclusion : 'a list -> 'a list -> bool
 end
 
+(*------------------------------------------------------------------*)
 module String : sig
     include module type of struct include String end
 
@@ -30,12 +32,14 @@ module String : sig
 
 module Imap : Map.S with type key = int
 
+(*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
   val compare : t -> t -> int
   val print : Format.formatter -> t -> unit
 end
 
+(*------------------------------------------------------------------*)
 (** Create a union-find data-structure over elements of type 'a.
     - [union] and [find] must only be used on elements present at the
     creation, or on elements added afterwards through [extend]. *)
@@ -64,29 +68,40 @@ module Uf (Ord: Ordered) : sig
   val union_count : t -> int
 end
 
+(*------------------------------------------------------------------*)
 val fpt : ('a -> 'a) -> 'a -> 'a
 
+
+(*------------------------------------------------------------------*)
 (* Option type functions *)
+
 val opt_get : 'a option -> 'a
 val some : 'a -> 'a option
 val opt_map : 'a option -> ('a -> 'b option) -> 'b option
 
+(*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],
     assuming [f_eq] is an equivalence relation. *)
 val classes : ('a -> 'a -> bool) -> 'a list -> 'a list list
 
+(*------------------------------------------------------------------*)
 val ident : Format.formatter -> string -> unit
-
 val kw : Fmt.style -> string Fmt.t
-
 val pp_ne_list :
   ('a -> 'b list -> unit, Format.formatter, unit) format ->
   'a -> Format.formatter -> 'b list -> unit
-
 val pp_list :
   (Format.formatter -> 'a -> unit) ->
   Format.formatter -> 'a list -> unit
 
+(*------------------------------------------------------------------*)
 val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list
 
+(*------------------------------------------------------------------*)
 val fst3 : 'a * 'b * 'c -> 'a
+
+(*------------------------------------------------------------------*)
+(** [timeout t f x] executes [f x] for at most [t] seconds.
+    Returns [Some (f x)] if the computation terminated in the imparted
+    time, and [None] otherwise. *)
+val timeout : int -> ('a -> 'b) -> 'a -> 'b option
