@@ -23,7 +23,7 @@ let lexbuf : Lexing.lexbuf option ref = ref None
 let filename = ref "No file opened"
 
 let setup_lexbuf fname =
-  lexbuf := some @@ Lexing.from_channel (Pervasives.open_in fname);
+  lexbuf := some @@ Lexing.from_channel (Stdlib.open_in fname);
   filename := fname;;
 
 (** [parse_next parser_fun] parse the next line of the input (or a filename)

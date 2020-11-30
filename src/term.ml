@@ -329,7 +329,7 @@ let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> fu
   | ITE (f,t,e) -> List.fold_left pts (pts acc f) [t;e]
   | _ -> failwith "Not implemented"
 
-let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
+let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
 
 (** Substitutions *)
 

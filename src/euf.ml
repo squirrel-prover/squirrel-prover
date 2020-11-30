@@ -64,7 +64,7 @@ let hashes_of_action_descr ?(drop_head=true) ~system action_descr head_fn key_n 
   let iter = new get_f_messages ~drop_head ~system head_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  List.sort_uniq Pervasives.compare iter#get_occurrences
+  List.sort_uniq Stdlib.compare iter#get_occurrences
 
 type euf_schema = { message : Term.message;
                     key_indices : Vars.index list;

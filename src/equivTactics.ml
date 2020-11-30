@@ -539,7 +539,7 @@ class get_name_indices ~(system:Action.system) exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system as super
 
   val mutable indices : (Vars.index list) list = []
-  method get_indices = List.sort_uniq Pervasives.compare indices
+  method get_indices = List.sort_uniq Stdlib.compare indices
 
   method visit_message t = match t with
     | Term.Name (n,is) -> if n = name then indices <- is::indices
@@ -555,7 +555,7 @@ class get_actions ~(system:Action.system) exact = object (self)
    * timestamps because we have to consider only actions occurring before
    * the input.*)
   val mutable actions : (Term.timestamp * bool) list = []
-  method get_actions = List.sort_uniq Pervasives.compare actions
+  method get_actions = List.sort_uniq Stdlib.compare actions
 
   method visit_macro mn is a = match Symbols.Macro.get_def mn with
     | Symbols.Input -> actions <- (a,true)::actions
@@ -633,7 +633,7 @@ let mk_phi_proj system env name indices proj biframe =
             let bv =
               List.filter
                 (fun i -> not (List.mem i a.Action.indices))
-                (List.sort_uniq Pervasives.compare (List.concat indices_a))
+                (List.sort_uniq Stdlib.compare (List.concat indices_a))
             in
             let bv' =
               List.map
@@ -659,7 +659,7 @@ let mk_phi_proj system env name indices proj biframe =
             (* if new_action occurs before an action of the frame *)
             let disj =
               List.fold_left Term.mk_or Term.False
-                (List.sort_uniq Pervasives.compare
+                (List.sort_uniq Stdlib.compare
                   (List.map
                     (fun (t,strict) ->
                       if strict
@@ -759,7 +759,7 @@ let prf_param hash =
 let occurrences_of_frame ~system frame hash_fn key_n =
   let iter = new Iter.get_f_messages ~system hash_fn key_n in
   List.iter iter#visit_term frame ;
-  List.sort_uniq Pervasives.compare iter#get_occurrences
+  List.sort_uniq Stdlib.compare iter#get_occurrences
 
 (** [occurrences_of_action_descr ~system action_descr hash_fn key_n]
   * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
@@ -768,7 +768,7 @@ let occurrences_of_action_descr ~system action_descr hash_fn key_n =
   let iter = new Iter.get_f_messages ~system hash_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  List.sort_uniq Pervasives.compare iter#get_occurrences
+  List.sort_uniq Stdlib.compare iter#get_occurrences
 
 let mk_prf_phi_proj proj system env biframe e hash =
   begin try
@@ -863,10 +863,10 @@ let mk_prf_phi_proj proj system env biframe e hash =
                 a.Action.indices
             in
             let is =
-              List.sort_uniq Pervasives.compare
+              List.sort_uniq Stdlib.compare
                 (List.concat (List.map fst list_of_is_m))
             in
-            let vars = List.sort_uniq Pervasives.compare
+            let vars = List.sort_uniq Stdlib.compare
               (List.concat
                 (List.map
                   (fun (_,m) -> Term.get_vars m)
@@ -921,7 +921,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
             (* if new_action occurs before an action of the frame *)
             let disj =
               List.fold_left Term.mk_or Term.False
-                (List.sort_uniq Pervasives.compare
+                (List.sort_uniq Stdlib.compare
                   (List.map
                     (fun (t,strict) ->
                       if strict

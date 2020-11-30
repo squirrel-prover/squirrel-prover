@@ -62,7 +62,7 @@ end
 
 module Imap = Map.Make (struct
     type t = int
-    let compare = Pervasives.compare
+    let compare = Stdlib.compare
   end)
 
 (*------------------------------------------------------------------*)
@@ -140,7 +140,7 @@ module Uf (Ord: Ordered) = struct
 
   let print ppf t =
     let binds = Imap.bindings t.rmap
-                |> List.sort (fun (i, _) (i', _) -> Pervasives.compare i i') in
+                |> List.sort (fun (i, _) (i', _) -> Stdlib.compare i i') in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list (fun ppf (i, u) ->
            let ri = Vuf.find t.puf i in
@@ -195,7 +195,7 @@ module Uf (Ord: Ordered) = struct
 
   let classes t =
     let l = List.init (Imap.cardinal t.rmap) (fun i -> (Vuf.find t.puf i, i))
-            |> List.sort (fun (a, _) (a', _) -> Pervasives.compare a a')
+            |> List.sort (fun (a, _) (a', _) -> Stdlib.compare a a')
     in
     let l_eqc = match l with
       | [] -> []

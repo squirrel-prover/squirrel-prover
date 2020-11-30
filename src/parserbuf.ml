@@ -113,7 +113,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test Parser.theory lexbuf filename
 
 let parse_theory_test ?(test=false) filename =
-  let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
+  let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   parse_theory_buf ~test lexbuf filename
 
 let parse parser parser_name string =

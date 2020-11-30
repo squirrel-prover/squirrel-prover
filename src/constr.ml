@@ -105,7 +105,7 @@ let pp_ut ppf ut = Fmt.pf ppf "%a" pp_ut_cnt ut.cnt
 
 let ut_equal t t' = t.hash = t'.hash
 
-let ut_compare t t' = Pervasives.compare t.hash t'.hash
+let ut_compare t t' = Stdlib.compare t.hash t'.hash
 
 module OrdUt = struct
   type t = ut
@@ -655,7 +655,7 @@ let max_elems_model (model : model) elems =
           ut_equal u u' || not (UtG.mem_edge model.tr_graph u u')
         ) l ) l
                |> List.map fst
-               |> List.sort_uniq Pervasives.compare in
+               |> List.sort_uniq Stdlib.compare in
 
   model, melems
 
@@ -663,7 +663,7 @@ let maximal_elems (models : models) (elems : Term.timestamp list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
   let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
       let m, m_maxs = max_elems_model m elems in
-      (m :: models, List.merge_uniq Pervasives.compare maxs_acc m_maxs)
+      (m :: models, List.merge_uniq Stdlib.compare maxs_acc m_maxs)
     ) ([],[]) models in
   let models = List.rev rmodels in
 

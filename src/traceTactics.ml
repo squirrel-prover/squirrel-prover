@@ -651,7 +651,7 @@ let () = T.register "eqnames"
 (** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : TraceSequent.t) =
   let s, ts_classes = TraceSequent.get_ts_equalities s in
-  let ts_classes = List.map (List.sort_uniq Pervasives.compare) ts_classes in
+  let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
   let ts_subst =
     let rec asubst e = function
         [] -> []
@@ -661,7 +661,7 @@ let eq_trace (s : TraceSequent.t) =
     |> List.flatten
   in
   let s, ind_classes = TraceSequent.get_ind_equalities s in
-  let ind_classes = List.map (List.sort_uniq Pervasives.compare) ind_classes in
+  let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
   let ind_subst =
     let rec asubst e = function
         [] -> []
@@ -712,7 +712,7 @@ let mk_fresh_direct system env n is t =
   * equal to the name ([n],[is]) *)
   List.fold_left
     Term.mk_or Term.False
-    (List.sort_uniq Pervasives.compare
+    (List.sort_uniq Stdlib.compare
       (List.map
        (fun j ->
           (* select bound variables, to quantify universally over them *)
@@ -761,7 +761,7 @@ let mk_fresh_indirect system env n is t =
             let env_local = ref env in
             (* All indices occurring in [a] and [indices_a]. *)
             let indices =
-              List.sort_uniq Pervasives.compare
+              List.sort_uniq Stdlib.compare
                 (a.Action.indices @ is_a) in
             let indices' =
               List.map (Vars.make_fresh_from_and_update env_local) indices in
@@ -776,7 +776,7 @@ let mk_fresh_indirect system env n is t =
             let is_a = List.map (Term.subst_var subst) is_a in
             let timestamp_inequalities =
               List.fold_left Term.mk_or Term.False
-                (List.sort_uniq Pervasives.compare
+                (List.sort_uniq Stdlib.compare
                   (List.map
                     (fun (action_from_term,strict) ->
                       if strict
@@ -1178,7 +1178,7 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
          let subst = Term.(ESubst (Var v, Var v')) :: subst in
          subst,env)
       ([],init_env)
-      (List.sort_uniq Pervasives.compare
+      (List.sort_uniq Stdlib.compare
          (List.map (fun i -> Vars.EVar i) d_key_indices @
           Term.get_vars d_message))
   in
@@ -1475,7 +1475,7 @@ let collision_resistance (s : TraceSequent.t) =
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
-  let hashes = List.sort_uniq Pervasives.compare hashes in
+  let hashes = List.sort_uniq Stdlib.compare hashes in
   if List.length hashes = 0 then
     Tactics.soft_failure Tactics.NoSSC
   else
