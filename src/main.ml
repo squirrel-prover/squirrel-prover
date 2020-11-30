@@ -290,6 +290,11 @@ let () =
         (Tactic_soft_failure (Failure "Equations satisfiable"))
         (fun () -> run ~test "tests/alcotest/try.sp")
     end ;
+    "Undo does not maintain old truth", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/undo.sp")
+    end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
     "Refl", `Quick, begin fun () ->
