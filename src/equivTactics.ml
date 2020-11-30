@@ -81,7 +81,7 @@ let simpl =
 
 let () =
   T.register_macro "simpl"
-    ~help:"Apply the automatic simplification tactic. \n Usage: simpl."
+    ~help:"Automatically simplify the goal.\n Usage: simpl."
     simpl
 
 exception NoRefl
@@ -787,7 +787,7 @@ let mk_prf_phi_proj proj system env biframe e hash =
       (EquivSequent.Message t) ::
       (List.map (EquivSequent.pi_elem proj) (e_without_hash @ biframe)) in
     (* check syntactic side condition *)
-    Euf.key_ssc ~elems:frame  ~allow_functions:(fun x -> false) ~system hash_fn key_n;
+    Euf.key_ssc ~elems:frame ~allow_functions:(fun x -> false) ~system hash_fn key_n;
     (* we compute the list of hashes from the frame *)
     let list_of_hashes_from_frame =
       occurrences_of_frame ~system frame hash_fn key_n
@@ -1041,6 +1041,7 @@ let () =
     ~help:"Apply the PRF axiom.\n Usage: prf i."
     (pure_equiv_typed prf) TacticsArgs.Int
 
+(** Symmetric encryption **)
 
 class check_symenc_key ~system enc_fn dec_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~system as super
@@ -1053,8 +1054,6 @@ class check_symenc_key ~system enc_fn dec_fn key_n = object (self)
       self#visit_message m; self#visit_message r
     | Term.Fun ((fn,_), [m;  Diff(Term.Name _, Term.Name _)]) when fn = dec_fn ->
       self#visit_message m
-
-
     | Term.Name (n,_) when n = key_n -> raise Euf.Bad_ssc
     | Term.Var m -> raise Euf.Bad_ssc
     | _ -> super#visit_message t
@@ -1070,7 +1069,7 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system enc_fn dec_fn key_n =
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
-(** CCA1 **)
+(** CCA1 *)
 
 let cca1 TacticsArgs.(Int i) s =
   match nth i (EquivSequent.get_biframe s) with
@@ -1217,21 +1216,21 @@ let cca1 TacticsArgs.(Int i) s =
 
 let () =
  T.register_typed "cca1"
-   ~help:"Apply the cca1 axiom on all encryptions of the given message. For \
-          encryption at top levels, they are replaced by the length of the \
-          plaintext.
-   When they are not at top level, they are replaced by the encryption of the \
-          length of the plaintexts.
-\n Usage: cca1 i."
+   ~help:"Apply the cca1 axiom on all encryptions of the given message. \
+          Encryption at toplevel are replaced by the length of the \
+          plaintext. \
+          Encryption not at toplevel are replaced by the encryption of the \
+          length of the plaintexts. \
+          \n Usage: cca1 i."
    (only_equiv_typed cca1) TacticsArgs.Int
 
-(** Encryption Key privacy  *)
+(** Encryption key privacy  *)
 
 let enckp TacticsArgs.(Int i) s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let system = (EquivSequent.get_system s) in
+    let system = EquivSequent.get_system s in
     let env = EquivSequent.get_env s in
     let e = match e with
       | EquivSequent.Message m ->
@@ -1239,92 +1238,103 @@ let enckp TacticsArgs.(Int i) s =
       | EquivSequent.Formula f ->
         EquivSequent.Formula (Term.head_normal_biterm f)
     in
-    (* search for the first occurrence of a hash in [e] *)
-    let hide_enc fnenc enc fndec sk fnpk r fnenci fnpki m isk=
-      (* we now check that the random is fresh, and the key satisfy the
-         side condition. *)
-      begin
-        try
-          (* we create the fresh cond reachability goal *)
-          let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
-          let fresh_goal = Prover.Goal.Trace
-              (TraceSequent.init ~system random_fresh_cond
-               |> TraceSequent.set_env env)
-          in
-          let newenc =
-            match fnpk,fnpki with
-            | Some fnpk, Some fnpki ->
-              Term.Fun ((fnenc,fnenci),
-                        [m; Term.Name r;
-                         Term.Fun ((fnpk,fnpki), [
-                             Term.Name (sk,isk)
-                           ])])
-            | _, _ -> Term.Fun ((fnenc,fnenci),
-                                [m; Term.Name r; Term.Name (sk,isk)])
-          in
-          let new_elem =
-            EquivSequent.apply_subst_frame [Term.ESubst (enc,newenc)] [e]
-          in
-          let biframe = (List.rev_append before (new_elem @ after)) in
-          [fresh_goal;
-           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
-        with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-      end
+    (* Complete the tactic application by modifying the key in message [enc].
+     * Other arguments are:
+     *  - [r] is the randomness used in [enc];
+     *  - [ctxt] is the message encrypted in [enc];
+     *  - [new_key] is the new secret key to be used;
+     *  - [fnenc] is the encryption function symbol;
+     *  - [fnpk] is the public key function, if any, [None] otherwise;
+     *  - [indices] are the indices of the above three symbols.
+     * The tactic application generates:
+     *  - a goal expressing the freshness condition on [r];
+     *  - a goal where [enc] is modified to use key [new_key]. *)
+    let hide_enc ~new_key ~r ~ctxt ~fnenc ?fnpk ~indices enc =
+      try
+        (* we create the fresh cond reachability goal *)
+        let random_fresh_cond = fresh_cond system env (Term.Name r) biframe in
+        let fresh_goal =
+          Prover.Goal.Trace
+            (TraceSequent.init ~system random_fresh_cond
+             |> TraceSequent.set_env env)
+        in
+        let new_enc =
+          Term.Fun ((fnenc,indices),
+                    [ctxt;
+                     Term.Name r;
+                     match fnpk with
+                       | None -> new_key
+                       | Some fn -> Term.Fun ((fn,indices),[new_key])])
+        in
+        let new_elem =
+          EquivSequent.apply_subst_frame [Term.ESubst (enc,new_enc)] [e]
+        in
+        let biframe = (List.rev_append before (new_elem @ after)) in
+        [fresh_goal;
+         Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+      with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
     in
+    (* Given a list of terms, apply [hide_enc] on the first relevant term.
+     * Syntactic side conditions are verified on keys. *)
     let rec find_enc lenc =
       match lenc with
-        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
-                                      Term.Fun ((fnpk,fnpki), [
-                                          Term.Diff(Term.Name (sk,isk),
+        | (Term.Fun ((fnenc,indices), [ctxt; Term.Name r;
+                                       Term.Fun ((fnpk,fnpki), [
+                                         Term.Diff(Term.Name (sk,isk),
                                                     Term.Name (sk2,isk2)) ])])
            as enc) :: q when Symbols.is_ftype fnpk Symbols.PublicKey
                           && Symbols.is_ftype fnenc Symbols.AEnc
+                          && fnpki = indices
           ->
+          (* Get the associated decryption and public key symbols.
+           * Check that the public key function is the expected one,
+           * check SSC and proceed. *)
           begin match Symbols.Function.get_data fnenc with
-            (* we check that the encryption function is used with the associated
-               public key *)
             | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk ->
-              Euf.key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk;
-              Euf.key_ssc ~messages:[enc]  ~allow_functions:(fun x -> x = fnpk) ~system fndec sk2;
-              hide_enc fnenc enc fndec sk (Some fnpk) r fnenci (Some fnpki) m isk
+              (* It would suffice to check the key SSC for sk on the left
+               * projection only, and for sk2 on the right projection only. *)
+              Euf.key_ssc ~system ~messages:[enc]
+                ~allow_functions:(fun x -> x = fnpk) fndec sk;
+              Euf.key_ssc ~system ~messages:[enc]
+                ~allow_functions:(fun x -> x = fnpk) fndec sk2;
+              let new_key = Term.Name (sk,isk) in
+              hide_enc ~fnenc ~fnpk ~indices ~ctxt ~r ~new_key enc
             | _ ->
               Tactics.soft_failure
                 (Tactics.Failure
                    "The first encryption symbol is not used with the correct \
                     public key function.")
           end
-        | (Term.Fun ((fnenc,fnenci), [m; Term.Name r;
-                                          Term.Diff(  Term.Name (sk,isk),
-                                                      Term.Name (sk2,isk2))
-                                        ])
+        | (Term.Fun ((fnenc,indices), [ctxt; Term.Name r;
+                                      Term.Diff(Term.Name (sk,isk),
+                                                Term.Name (sk2,isk2))])
            as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc
           ->
-          begin
-            match Symbols.Function.get_data fnenc with
-            (* we check that the encryption function is used with the associated
-               public key *)
+          (* Get the associated decryption, verify SSC and proceed. *)
+          begin match Symbols.Function.get_data fnenc with
             | Symbols.AssociatedFunctions [fndec] ->
               symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk;
               symenc_key_ssc ~messages:[enc] ~system fnenc fndec sk2;
-              hide_enc fnenc enc fndec sk None r fnenci None m isk
+              let new_key = Term.Name (sk,isk) in
+              hide_enc ~fnenc ~indices ~ctxt ~r ~new_key enc
             | _ ->
               Tactics.soft_failure
                 (Tactics.Failure
                    "The first encryption symbol is not used with the correct \
                     public key function.")
           end
-        | p :: q -> find_enc q
+        | _ :: q -> find_enc q
         | [] ->
           Tactics.soft_failure
             (Tactics.Failure
-               "Key Privact can only be applied on a term with at least one \
+               "Key Privacy can only be applied on a term with at least one \
                 occurrence of an encryption term enc(t,r,pk(diff(k1,k2)))")
     in
-    find_enc ((Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc)
-        @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc))
+    find_enc
+      (Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system e Symbols.AEnc @
+       Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system e Symbols.SEnc)
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
-
 
 let () =
  T.register_typed "enckp"

@@ -15,10 +15,11 @@ class check_key ~allow_vars ~allow_functions ~system head_fn key_n = object (sel
       self#visit_message m
     | Term.Fun ((fn,_), [m1;m2;Term.Name _]) when fn = head_fn ->
       self#visit_message m1; self#visit_message m2
-    | Term.Fun ((fn,_), [Term.Name _]) when allow_functions fn -> ()
-    | Term.Fun ((fn,_), [Term.Diff (Term.Name _, Term.Name _)]) when allow_functions fn -> ()
-    | Term.Fun ((fn,_), [m; Term.Name _]) when allow_functions fn -> ()
-    | Term.Fun ((fn,_), [m; Term.Diff (Term.Name _, Term.Name _)]) when allow_functions fn -> ()
+    | Term.Fun ((fn,_), [Term.Name _])
+    | Term.Fun ((fn,_), [Term.Diff (Term.Name _, Term.Name _)])
+    | Term.Fun ((fn,_), [_; Term.Name _])
+    | Term.Fun ((fn,_), [_; Term.Diff (Term.Name _, Term.Name _)])
+      when allow_functions fn -> ()
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
     | Term.Var m -> if not(allow_vars) then raise Bad_ssc
     | _ -> super#visit_message t

@@ -1584,14 +1584,13 @@ let () =
           fk
   in
   T.register_general "simpl"
-      (function
-       | [] -> (simpl false)
+    (function
+       | [] -> simpl false
+       | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed")) ;
+  T.register_general "auto"
+    (function
+       | [] -> simpl true
        | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
- ;
- T.register_general "auto"
-   (function
-     | [] -> (simpl true)
-     | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
 
 (** Projecting a goal on a bi-system
