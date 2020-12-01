@@ -374,4 +374,29 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/pred2.sp")
     end ;
+    "ENC-KP ground", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_ground.sp")
+    end ;
+    "ENC-KP freshness wrt frame", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/enckp_fresh.sp")
+    end ;
+    "ENC-KP freshness wrt context", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/enckp_fresh_ctxt.sp")
+    end ;
+    "ENC-KP key usability wrt frame", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_key.sp")
+    end ;
+    "ENC-KP key usability wrt context", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_key_ctxt.sp")
+    end ;
   ]

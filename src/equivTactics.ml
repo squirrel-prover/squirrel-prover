@@ -1257,14 +1257,16 @@ let enckp
         if Symbols.is_ftype fnenc Symbols.SEnc then
           match Symbols.Function.get_data fnenc with
             | Symbols.AssociatedFunctions [fndec] ->
-                symenc_key_ssc ~system ~messages:[enc] fnenc fndec,
+                symenc_key_ssc
+                  ~system fnenc fndec
+                  ~elems:(EquivSequent.get_biframe s),
                 (fun x -> x),
                 k
             | _ -> assert false
         else
           match Symbols.Function.get_data fnenc with
             | Symbols.AssociatedFunctions [fndec;fnpk] ->
-                Euf.key_ssc ~system ~messages:[enc]
+                Euf.key_ssc ~system ~elems:(EquivSequent.get_biframe s)
                   ~allow_functions:(fun x -> x = fnpk) fndec,
                 (fun x -> Term.Fun ((fnpk,indices),[x])),
                 begin match k with
@@ -1304,7 +1306,10 @@ let enckp
           List.iter ssc
             (List.sort_uniq Stdlib.compare
                (List.map fst [skl;skr;new_skl;new_skr])) ;
-          fresh_cond system env (Term.Name r) biframe
+          let context =
+            EquivSequent.apply_subst_frame [Term.ESubst (enc,Term.dummy)] [e]
+          in
+          fresh_cond system env (Term.Name r) (context@biframe)
         with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
       in
       let fresh_goal =
