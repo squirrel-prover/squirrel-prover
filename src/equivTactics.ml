@@ -1123,7 +1123,6 @@ let check_encryption_randomness system case_schemata cases_direct enc_fn message
                     List.map (fun case -> case.Euf.d_message, []) cases_direct
   in
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
-   Printer.prt `Default "%a" (Fmt.list Term.pp) (List.map fst encryptions);
   let randoms = List.map (function
       | Fun ((_, _), [_; Name (r, is); _]), _-> r
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
