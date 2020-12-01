@@ -1236,12 +1236,6 @@ let enckp
     let biframe = List.rev_append before after in
     let system = EquivSequent.get_system s in
     let env = EquivSequent.get_env s in
-    let e = match e with
-      | EquivSequent.Message m ->
-        EquivSequent.Message (Term.head_normal_biterm m)
-      | EquivSequent.Formula f ->
-        EquivSequent.Formula (Term.head_normal_biterm f)
-    in
 
     (* Apply tactic to replace key(s) in [enc] using [new_key].
      * Precondition:

@@ -49,17 +49,11 @@ Qed.
 
 equiv test_diffsimpl : enc(n,r,pk(diff(k1,k1))).
 Proof.
-  (* It used to be impossible to apply enckp
-   * because the diff is simplified away.
-   * Now it is possible (although not natural)
-   * to apply it by specifying the target. *)
-  enckp 0, enc(n,r,pk(k1)).
+  enckp 0.
 Qed.
 
 equiv test_diffsimpl_ctxt : <enc(n,r,pk(diff(k1,k1))),ok>.
 Proof.
-  (* TODO surprisingly enckp finds a suitable target,
-   * unlike in test_diffsimpl. *)
   nosimpl(enckp 0).
   auto.
   (* Decompose explicitly to make sure the context
