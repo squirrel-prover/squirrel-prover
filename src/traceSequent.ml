@@ -54,133 +54,134 @@ module H : sig
     Format.formatter -> ('b, 'a) hypotheses -> unit
 
 end = struct
-
-type ('a, 'b) hypothesis = {
-  name_prefix : string;
-  tag :  'a;
-  hypothesis : 'b;
-  visible : bool;
-}
-
-
-exception Non_existing_hypothesis
-
-module M = Map.Make(String)
-
-(* A set of hypotheses is made of two maps. One maps hypothesis names
-   (according to [name]) to variables, and the second maps
-   name prefixes to the current largest name_suffix for this
-   name_prefix. *)
-type ('a, 'b) hypotheses = (('a,'b) hypothesis list) M.t
-
-let empty =  M.empty
-
-let mk_name h id = h.name_prefix ^ string_of_int id
-
-let get_name_prefix name =
-  match  String.split_on_integer name with
-  | _, None -> raise Not_found
-  | s, Some u -> s,u
-
-let get_visible hs =
-  List.filter (fun h -> h.visible) hs
-
-let select_and_update ~remove ~update hs name =
-  let rec aux id hsacc =
-    match hsacc with
-    | [] ->  raise Non_existing_hypothesis
-    | p::q ->
-      if name = mk_name p id then
-        let p = { p with tag = update p.tag } in
-        if remove then
-          p, q
+  
+  type ('a, 'b) hypothesis = {
+    name_prefix : string;
+    tag :  'a;
+    hypothesis : 'b;
+    visible : bool;
+  }
+  
+  
+  exception Non_existing_hypothesis
+  
+  module M = Map.Make(String)
+  
+  (* A set of hypotheses is made of two maps. One maps hypothesis names
+     (according to [name]) to variables, and the second maps
+     name prefixes to the current largest name_suffix for this
+     name_prefix. *)
+  type ('a, 'b) hypotheses = (('a,'b) hypothesis list) M.t
+  
+  let empty =  M.empty
+  
+  let mk_name h id = h.name_prefix ^ string_of_int id
+  
+  let get_name_prefix name =
+    match  String.split_on_integer name with
+    | _, None -> raise Not_found
+    | s, Some u -> s,u
+  
+  let get_visible hs =
+    List.filter (fun h -> h.visible) hs
+  
+  let select_and_update ~remove ~update hs name =
+    let rec aux id hsacc =
+      match hsacc with
+      | [] ->  raise Non_existing_hypothesis
+      | p::q ->
+        if name = mk_name p id then
+          let p = { p with tag = update p.tag } in
+          if remove then
+            p, q
+          else
+            p, p::q
         else
-          p, p::q
-      else
-        let res, new_hs = aux (id+1) q in
-        res, p::new_hs
-  in
-  let name_prefix,_ = get_name_prefix name in
-  let hs_list = M.find name_prefix hs in
-  let res,new_hs_list = aux 0 (List.rev (get_visible hs_list)) in
-  (res, M.add name_prefix (List.rev new_hs_list) hs)
-
-let find_such_that :
-    type a b. (a,b) hypotheses -> ((a,b) hypothesis -> bool) -> (a,b) hypothesis =
-  fun hs test ->
-  let exception Found of (a,b) hypothesis in
-  try
-    M.iter
-      (fun _ l -> try raise (Found (List.find test l)) with Not_found -> ())
-      hs ;
-    raise Not_found
-  with Found h -> h
-
-let remove_such_that :
-    type a b. (a,b) hypotheses ->
-              ((a,b) hypothesis -> bool) ->
-              (a,b) hypothesis * (a,b) hypotheses =
-  fun hs test ->
-  let found = ref None in
-  let f x =
-    if !found = None && test x then begin
-      found := Some x ;
-      false
-    end else
-      true
-  in
-  let hs' = M.map (List.filter f) hs in
-  match !found with
-    | None -> raise Not_found
-    | Some h -> h,hs'
-
-let select = M.iter
-
-let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
-  let v = { name_prefix = name_prefix;
-            hypothesis = hypo;
-            tag = tag;
-            visible = visible;
-          }
-  in
-  try
+          let res, new_hs = aux (id+1) q in
+          res, p::new_hs
+    in
+    let name_prefix,_ = get_name_prefix name in
     let hs_list = M.find name_prefix hs in
-    (* we only add the formula if it is a fresh one. *)
-    let res = if List.mem v hs_list then hs_list else v::hs_list in
-    M.add name_prefix res hs
-  with Not_found -> M.add name_prefix ([v]) hs
-
-let to_list hs =
-  let _,r2 = M.bindings hs |> List.split in
-  List.flatten r2
-
-
-let mem f hs =
-  M.exists (fun _ hs_list ->
-      List.exists (fun hypo -> hypo.hypothesis = f) hs_list)
-    hs
-
-let find name hs =
-  let rec aux id hs =
-    match hs with
-    | [] -> raise Not_found
-    | p :: q -> if mk_name p id = name then p else aux (id+1) q
-  in
-  let name_prefix,_ = get_name_prefix name in
-  let hs_list = M.find name_prefix hs in
-  aux 0 (List.rev (get_visible hs_list))
-
-let map f hs =
-  M.map (fun h -> List.map f h) hs
-
-let pp pp_formula id ppf hypo =
-  Fmt.pf ppf "%s: %a@;" (mk_name hypo id) pp_formula hypo.hypothesis
-
-let pps pp_formula ppf hs =
-  M.iter (fun _ hs_list ->
-  List.iteri
-    (fun i h -> pp pp_formula i ppf h)
-    (List.rev (get_visible hs_list))) hs
+    let res,new_hs_list = aux 0 (List.rev (get_visible hs_list)) in
+    (res, M.add name_prefix (List.rev new_hs_list) hs)
+  
+  let find_such_that :
+      type a b. (a,b) hypotheses -> ((a,b) hypothesis -> bool) -> 
+      (a,b) hypothesis =
+    fun hs test ->
+    let exception Found of (a,b) hypothesis in
+    try
+      M.iter
+        (fun _ l -> try raise (Found (List.find test l)) with Not_found -> ())
+        hs ;
+      raise Not_found
+    with Found h -> h
+  
+  let remove_such_that :
+      type a b. (a,b) hypotheses ->
+                ((a,b) hypothesis -> bool) ->
+                (a,b) hypothesis * (a,b) hypotheses =
+    fun hs test ->
+    let found = ref None in
+    let f x =
+      if !found = None && test x then begin
+        found := Some x ;
+        false
+      end else
+        true
+    in
+    let hs' = M.map (List.filter f) hs in
+    match !found with
+      | None -> raise Not_found
+      | Some h -> h,hs'
+  
+  let select = M.iter
+  
+  let add visible tag hypo name_prefix hs : ('a, 'b) hypotheses =
+    let v = { name_prefix = name_prefix;
+              hypothesis = hypo;
+              tag = tag;
+              visible = visible;
+            }
+    in
+    try
+      let hs_list = M.find name_prefix hs in
+      (* we only add the formula if it is a fresh one. *)
+      let res = if List.mem v hs_list then hs_list else v::hs_list in
+      M.add name_prefix res hs
+    with Not_found -> M.add name_prefix ([v]) hs
+  
+  let to_list hs =
+    let _,r2 = M.bindings hs |> List.split in
+    List.flatten r2
+  
+  
+  let mem f hs =
+    M.exists (fun _ hs_list ->
+        List.exists (fun hypo -> hypo.hypothesis = f) hs_list)
+      hs
+  
+  let find name hs =
+    let rec aux id hs =
+      match hs with
+      | [] -> raise Not_found
+      | p :: q -> if mk_name p id = name then p else aux (id+1) q
+    in
+    let name_prefix,_ = get_name_prefix name in
+    let hs_list = M.find name_prefix hs in
+    aux 0 (List.rev (get_visible hs_list))
+  
+  let map f hs =
+    M.map (fun h -> List.map f h) hs
+  
+  let pp pp_formula id ppf hypo =
+    Fmt.pf ppf "%s: %a@;" (mk_name hypo id) pp_formula hypo.hypothesis
+  
+  let pps pp_formula ppf hs =
+    M.iter (fun _ hs_list ->
+    List.iteri
+      (fun i h -> pp pp_formula i ppf h)
+      (List.rev (get_visible hs_list))) hs
 end
 
 let get_name_prefix = H.get_name_prefix
