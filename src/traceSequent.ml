@@ -202,33 +202,132 @@ type trace_hypotheses = (trace_tag, trace_atom) H.hypotheses
 
 type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
-
-type t = {
-  system : Action.system ;
-  env : Vars.env;
+module S : sig
+  type t = private {
+    system : Action.system ;
+    env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
-  happens_hypotheses : Term.timestamp list;
+    happens_hypotheses : Term.timestamp list;
     (** Hypotheses of the form [happens(t)]. *)
-  message_hypotheses : message_hypotheses;
+    message_hypotheses : message_hypotheses;
     (** Equalities and disequalities over messages. *)
-  trace_hypotheses :  trace_hypotheses;
+    trace_hypotheses :  trace_hypotheses;
     (** Quantifier-free formula over index and timestamp predicates. *)
-  formula_hypotheses : formula_hypotheses;
+    formula_hypotheses : formula_hypotheses;
     (** Other hypotheses. *)
-  conclusion : Term.formula;
+    conclusion : Term.formula;
     (** The conclusion / right-hand side formula of the sequent. *)
-  trs : Completion.state option;
+    trs : Completion.state option;
     (** Either [None], or the term rewriting system
       * corresponding to the current message hypotheses.
       * Must be se to [None] if message hypotheses change. *)
-  models : Constr.models option;
+    models : Constr.models option;
     (** Either [None], or the models corresponding to the current
       * trace hypotheses.
       * Must be set to [None] if trace hypotheses change. *)
-}
+  }
 
-type sequent = t
+  val init_sequent : Action.system -> t
+
+  (** Updates a sequent.
+      [keep_trs] must be [true] only if the udates leaves the TRS associated to
+      the sequent unchanged.
+      Idem for [keep_models] and the models.
+      [keep_trs] and [keep_models] default to [false]. *)
+  val update :
+    ?system:Action.system ->
+    ?env:Vars.env ->
+    ?happens_hypotheses:Term.timestamp list ->
+    ?message_hypotheses:message_hypotheses ->
+    ?trace_hypotheses:trace_hypotheses ->
+    ?formula_hypotheses:formula_hypotheses ->
+    ?conclusion:Term.formula ->
+    ?keep_trs:bool ->
+    ?keep_models:bool -> 
+    t -> t
+
+  (** Set the trs of a sequent. 
+      Raise [Invalid_argument ..] if already set. *)
+  val set_trs : t -> Completion.state -> t
+
+  (** Set the models of a sequent. 
+      Raise [Invalid_argument ..] if already set. *)
+  val set_models : t -> Constr.models -> t
+end = struct
+  type t = {
+    system : Action.system ;
+    env : Vars.env;
+    happens_hypotheses : Term.timestamp list;
+    message_hypotheses : message_hypotheses;
+    trace_hypotheses :  trace_hypotheses;
+    formula_hypotheses : formula_hypotheses;
+    conclusion : Term.formula;
+    trs : Completion.state option;
+    models : Constr.models option;
+  }
+
+  let init_sequent system = {
+    system = system ;
+    env = Vars.empty_env;
+    happens_hypotheses = [];
+    message_hypotheses = H.empty;
+    trace_hypotheses =  H.empty ;
+    formula_hypotheses = H.empty;
+    conclusion = Term.True;
+    trs = None;
+    models = None;
+  }
+
+  let update ?system ?env ?happens_hypotheses
+      ?message_hypotheses ?trace_hypotheses ?formula_hypotheses
+      ?conclusion ?(keep_trs=false) ?(keep_models=false) t =
+    let trs = 
+      if keep_trs || message_hypotheses = None 
+      then t.trs 
+      else None 
+    and models =
+      if keep_models || trace_hypotheses = None 
+      then t.models
+      else None 
+    in
+    let system = Utils.opt_dflt t.system system
+    and env    = Utils.opt_dflt t.env env
+    and happens_hypotheses = 
+      Utils.opt_dflt t.happens_hypotheses happens_hypotheses
+    and message_hypotheses = 
+      Utils.opt_dflt t.message_hypotheses message_hypotheses
+    and trace_hypotheses = 
+      Utils.opt_dflt t.trace_hypotheses trace_hypotheses
+    and formula_hypotheses =
+      Utils.opt_dflt t.formula_hypotheses formula_hypotheses
+    and conclusion = 
+      Utils.opt_dflt t.conclusion conclusion
+    in
+    {
+      system = system ;
+      env = env ;
+      happens_hypotheses = happens_hypotheses ;
+      message_hypotheses = message_hypotheses ;
+      trace_hypotheses = trace_hypotheses ;
+      formula_hypotheses = formula_hypotheses ;
+      conclusion = conclusion ;
+      trs = trs ;
+      models = models ;
+    }
+  
+  let set_trs t trs = match t.trs with
+    | None -> { t with trs = Some trs; }
+    | Some _ -> raise (Invalid_argument "traceSequent: trs already set")
+
+  let set_models t models = match t.models with
+    | None -> { t with models = Some models }
+    | Some _ -> raise (Invalid_argument "traceSequent: models already set")
+end
+
+include S
+
+type sequent = S.t
 
 let pp ppf s =
   let open Fmt in
@@ -252,18 +351,6 @@ let pp ppf s =
   styled `Bold ident ppf (String.make 40 '-') ;
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
-
-let init_sequent system = {
-  system = system ;
-  env = Vars.empty_env;
-  happens_hypotheses = [];
-  message_hypotheses = H.empty;
-  trace_hypotheses =  H.empty ;
-  formula_hypotheses = H.empty;
-  conclusion = Term.True;
-  trs = None;
-  models = None;
-}
 
 let is_hypothesis f s =
   match f with
@@ -291,7 +378,7 @@ let select_message_hypothesis ?(remove=false) ?(update=id) name s =
     let (hypo, hs) =
       H.select_and_update s.message_hypotheses name ~remove ~update
     in
-    ({s with message_hypotheses = hs}, hypo.H.hypothesis)
+    (S.update ~message_hypotheses:hs s, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
 
 let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
@@ -299,7 +386,7 @@ let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
     let (hypo, hs) =
       H.select_and_update s.formula_hypotheses name ~remove ~update
     in
-    ({s with formula_hypotheses = hs}, hypo.H.hypothesis)
+    (S.update ~formula_hypotheses:hs s, hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
 
 let find_formula_hypothesis pred s =
@@ -310,22 +397,20 @@ let find_formula_hypothesis pred s =
 let remove_formula_hypothesis pred s =
   let pred h = pred h.H.hypothesis in
   let hypo,hs = H.remove_such_that s.formula_hypotheses pred in
-    hypo.H.hypothesis, { s with formula_hypotheses = hs }
+    (hypo.H.hypothesis, S.update ~formula_hypotheses:hs s)
 
 let remove_trace_hypothesis pred s =
   let pred h = pred h.H.hypothesis in
   let hypo,hs = H.remove_such_that s.trace_hypotheses pred in
-    hypo.H.hypothesis, { s with trace_hypotheses = hs }
+    (hypo.H.hypothesis, S.update ~trace_hypotheses:hs s)
 
 let remove_message_hypothesis pred s =
   let pred h = pred h.H.hypothesis in
   let hypo,hs = H.remove_such_that s.message_hypotheses pred in
-    hypo.H.hypothesis, { s with message_hypotheses = hs }
+    (hypo.H.hypothesis, S.update ~message_hypotheses:hs s)
 
 let add_trace_hypothesis ?(prefix="T") s tf =
-  { s with
-    trace_hypotheses = H.add true () tf prefix s.trace_hypotheses;
-    models = None }
+  S.update ~trace_hypotheses:(H.add true () tf prefix s.trace_hypotheses) s
 
 class iter_macros ~system f = object (self)
   inherit Iter.iter ~system as super
@@ -371,17 +456,13 @@ and add_message_hypothesis ?(prefix="M") s at =
      prefix. *)
   let prefix = if prefix = "H" then "M" else prefix in
   if H.mem at s.message_hypotheses then s else
-    let s =
-      { s with
-        message_hypotheses =
-          H.add true {t_euf = false} at prefix s.message_hypotheses;
-        trs = None }
-    in
+    let mh = H.add true {t_euf = false} at prefix s.message_hypotheses in
+    let s : S.t = S.update ~message_hypotheses:mh s in
     add_macro_defs s (at :> generic_atom)
 
 let rec add_happens s ts =
   let s =
-    { s with happens_hypotheses = ts :: s.happens_hypotheses }
+    S.update ~happens_hypotheses:(ts :: s.happens_hypotheses) s
   in
     match ts with
       | Term.Action (symb,indices) ->
@@ -402,8 +483,7 @@ and add_formula ?prefix f s =
   | Term.And(a, b) -> let s = add_formula ?prefix a s in add_formula ?prefix b s
   | _ ->
     let prefix = match prefix with Some p -> p | None -> "H" in
-    { s with formula_hypotheses =
-               H.add true () f prefix s.formula_hypotheses }
+    S.update ~formula_hypotheses:(H.add true () f prefix s.formula_hypotheses) s
 
 let get_eqs_neqs_at_list atl =
   List.fold_left
@@ -414,12 +494,12 @@ let get_eqs_neqs s =
   get_eqs_neqs_at_list
     (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
 
-let update_trs s =
-  let eqs,_ = get_eqs_neqs s in
-  let trs = Completion.complete eqs in
-  {s with trs = Some trs}
-
 let get_trs s =
+  let update_trs s =
+    let eqs,_ = get_eqs_neqs s in
+    let trs = Completion.complete eqs in
+    S.set_trs s trs
+  in
   match s.trs with
   | None -> let s = update_trs s in (s, opt_get s.trs)
   | Some trs -> (s, trs)
@@ -432,34 +512,36 @@ let message_atoms_valid s =
     (fun eq -> Completion.check_equalities trs [eq])
     neqs
 
-let set_env a s = { s with env = a }
+let set_env a s = S.update ~env:a s
 
 let get_env s = s.env
 
 let system s = s.system
 
-let set_system system s = { s with system }
+let set_system system s = S.update ~system:system s 
 
 let pi projection s =
   let pi_term t = Term.pi_term ~projection t in
-    { s with
-      trs = None ; models = None ;
-      conclusion = pi_term s.conclusion ;
-      message_hypotheses =
-        H.map
-          (function
-             | { H.hypothesis = `Message (o,s,t) } as h ->
-                 { h with H.hypothesis = `Message (o, pi_term s, pi_term t) })
-          s.message_hypotheses ;
-      formula_hypotheses =
-        H.map
-          (function
-             | { H.hypothesis = f } as h ->
-                 { h with H.hypothesis = pi_term f })
-          s.formula_hypotheses }
+  S.update
+    ~conclusion:(pi_term s.conclusion)
+    ~message_hypotheses:(
+      H.map
+        (function
+          | { H.hypothesis = `Message (o,s,t) } as h ->
+            { h with H.hypothesis = `Message (o, pi_term s, pi_term t) })
+        s.message_hypotheses)
+    ~formula_hypotheses:(
+      H.map
+        (function
+          | { H.hypothesis = f } as h ->
+            { h with H.hypothesis = pi_term f })
+        s.formula_hypotheses)
+    ~keep_trs:false
+    ~keep_models:false
+    s
 
 let set_conclusion a s =
-  let s = { s with conclusion = a } in
+  let s = S.update ~conclusion:a s in
     match a with
       | Term.Atom (#message_atom as at) -> add_macro_defs s at
       | _ -> s
@@ -486,46 +568,49 @@ let apply_subst subst s =
     {hypo with H.visible = not(is_triv new_formula);
                H.hypothesis = new_formula}
   in
-  {s with
-   message_hypotheses = H.map (apply_hyp_subst (Atom.subst_message_atom subst)
-                                 mess_is_triv) s.message_hypotheses;
-   trace_hypotheses = H.map (apply_hyp_subst (Atom.subst_trace_atom subst)
-                                 trace_is_triv) s.trace_hypotheses;
-   formula_hypotheses = H.map (apply_hyp_subst
-                                 (Term.subst subst)
-                                 (fun _ -> false)) s.formula_hypotheses;
-   conclusion = Term.subst subst s.conclusion;
-  }
-
-let compute_models s =
-  match s.models with
-  | None ->
-    let trace_atoms = get_trace_atoms s in
-    let models = Constr.models_conjunct trace_atoms in
-    { s with models = Some models;}
-  | Some _ -> s
+  S.update
+   ~message_hypotheses:(
+     H.map (apply_hyp_subst (Atom.subst_message_atom subst)
+              mess_is_triv) s.message_hypotheses)
+   ~trace_hypotheses:(
+     H.map (apply_hyp_subst (Atom.subst_trace_atom subst)
+              trace_is_triv) s.trace_hypotheses)
+   ~formula_hypotheses:(
+     H.map (apply_hyp_subst
+              (Term.subst subst)
+              (fun _ -> false)) s.formula_hypotheses)
+   ~conclusion:(Term.subst subst s.conclusion)
+   s
 
 let get_models s =
-  let s = compute_models s in
+  let update_models s =
+    match s.models with
+    | None ->
+      let trace_atoms = get_trace_atoms s in
+      let models = Constr.models_conjunct trace_atoms in
+      S.set_models s models
+    | Some _ -> s
+  in
+  let s = update_models s in
   s, opt_get s.models
 
 let maximal_elems s tss =
-  let s = compute_models s in
-  s, Constr.maximal_elems (opt_get s.models) tss
+  let s,models = get_models s in
+  s, Constr.maximal_elems models tss
 
 let get_ts_equalities s =
-  let s = compute_models s in
+  let s,models = get_models s in
   let ts = trace_atoms_ts (get_trace_atoms s) in
-  s, Constr.get_ts_equalities (opt_get (s.models)) ts
+  s, Constr.get_ts_equalities models ts
 
 let get_ind_equalities s =
-  let s = compute_models s in
+  let s,models = get_models s in
   let inds = trace_atoms_ind (get_trace_atoms s) in
-  s, Constr.get_ind_equalities (opt_get (s.models)) inds
+  s, Constr.get_ind_equalities models inds
 
 let constraints_valid s =
-  let s = compute_models s in
-  not (Constr.m_is_sat (opt_get s.models))
+  let s,models = get_models s in
+  not (Constr.m_is_sat models)
 
 let get_all_terms s =
   let atoms =

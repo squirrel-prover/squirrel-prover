@@ -225,6 +225,10 @@ let opt_get = function
   | Some u -> u
   | None -> raise Not_found
 
+let opt_dflt dflt = function
+  | Some u -> u
+  | None -> dflt
+
 let some x = Some x
 
 let opt_map a f = match a with

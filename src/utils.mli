@@ -76,6 +76,7 @@ val fpt : ('a -> 'a) -> 'a -> 'a
 (* Option type functions *)
 
 val opt_get : 'a option -> 'a
+val opt_dflt : 'a -> 'a option -> 'a
 val some : 'a -> 'a option
 val opt_map : 'a option -> ('a -> 'b option) -> 'b option
 
