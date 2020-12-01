@@ -155,18 +155,21 @@ let pp_error ppf = function
          or do not have a type@ for which the comparison is allowed)"
         pp t
   | String_expected t ->
-          Fmt.pf ppf
+      Fmt.pf ppf
         "The term %a cannot be seen as a string."
         pp t
   | Int_expected t ->
-          Fmt.pf ppf
+      Fmt.pf ppf
         "The term %a cannot be seen as a int."
         pp t
-  | Tactic_type s -> Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
-  | Index_not_var i -> Fmt.pf ppf "An index must be a variable, the term %a \
-                                   cannot be seen as an index." pp i
-  | Assign_no_state s -> Fmt.pf ppf "Only states can be assigned values, and the \
-                                     function symbols %s is not a state." s
+  | Tactic_type s ->
+      Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+  | Index_not_var i ->
+      Fmt.pf ppf "An index must be a variable, the term %a \
+                  cannot be seen as an index." pp i
+  | Assign_no_state s ->
+      Fmt.pf ppf "Only states can be assigned values, and the \
+                  function symbols %s is not a state." s
 
 
 let check_arity s actual expected =
