@@ -378,7 +378,8 @@ let select_message_hypothesis ?(remove=false) ?(update=id) name s =
     let (hypo, hs) =
       H.select_and_update s.message_hypotheses name ~remove ~update
     in
-    (S.update ~message_hypotheses:hs s, hypo.H.hypothesis)
+    (S.update ~message_hypotheses:hs s ~keep_trs:(not remove), 
+     hypo.H.hypothesis)
   with H.Non_existing_hypothesis -> raise Not_found
 
 let select_formula_hypothesis ?(remove=false) ?(update=id) name s =
