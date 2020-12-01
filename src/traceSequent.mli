@@ -107,7 +107,7 @@ val remove_message_hypothesis :
   (Atom.message_atom -> bool) -> sequent -> Atom.message_atom * sequent
 
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
-   been applied to all hypotheses. It also set to visible = false, when the
+   been applied to all hypotheses. It also set [visible] to [false], when the
    hypothesis becomes trivial (e.g x=x). *)
 val apply_subst : Term.subst -> sequent -> sequent
 
@@ -116,9 +116,12 @@ val apply_subst : Term.subst -> sequent -> sequent
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
    equalities between messages. It can be used to check if an equality is
    implied by the set of messages hypotheses. *)
-val get_trs : sequent -> sequent * Completion.state
+val get_trs : sequent -> Completion.state
 
-val get_models : sequent -> sequent * Constr.models
+(** [get_models s] returns a set of minimal models corresponding to the 
+    trace atoms in the sequent [s]. 
+    See module [Constr]. *)
+val get_models : sequent -> Constr.models
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
   * messages on both sides of the sequents make the sequent valid. *)

@@ -617,7 +617,7 @@ let () =
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
-  let s,trs = TraceSequent.get_trs s in
+  let trs = TraceSequent.get_trs s in
   let terms = TraceSequent.get_all_terms s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
@@ -630,7 +630,7 @@ let eq_names (s : TraceSequent.t) =
   in
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let s,trs = TraceSequent.get_trs s in
+  let trs = TraceSequent.get_trs s in
   let cnstrs = Completion.name_index_cnstrs trs
       (TraceSequent.get_all_terms s)
   in
@@ -837,7 +837,7 @@ let apply_substitute subst s =
 
 let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   let subst =
-        let s,trs = TraceSequent.get_trs s in
+        let trs = TraceSequent.get_trs s in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
@@ -853,7 +853,7 @@ let () =
 
 let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   let subst =
-      let s, models = TraceSequent.get_models s in
+      let models = TraceSequent.get_models s in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -867,7 +867,7 @@ let () =
 
 let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   let subst =
-    let s, models = TraceSequent.get_models s in
+    let models = TraceSequent.get_models s in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
@@ -1492,7 +1492,7 @@ let collision_resistance (s : TraceSequent.t) =
                | _ -> acc)
             (make_eq acc q) q
     in
-    let s,trs = TraceSequent.get_trs s in
+    let trs = TraceSequent.get_trs s in
     let hash_eqs =
       make_eq [] hashes
       |> List.filter (fun eq -> Completion.check_equalities trs [eq])
