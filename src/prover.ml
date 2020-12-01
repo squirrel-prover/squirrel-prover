@@ -263,20 +263,24 @@ struct
     | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
     | [Theory (Var p)], Sort Index ->
       Arg (Index (Theory.conv_index tsubst (Var p)))
-    | [th1], Sort (Pair (s1, Opt s2)) ->
-      let Arg arg1 = convert_args [th1] (Sort s1) j in
-      let Arg arg2 = convert_args [] (Sort (Opt s2)) j in
-      Arg (Pair (arg1, arg2))
-    | [th1], Sort (Pair (Opt s1, s2)) ->
-      let Arg arg1 = convert_args [] (Sort (Opt s1)) j in
-      let Arg arg2 = convert_args [th1] (Sort (s2)) j in
-      Arg (Pair (arg1, arg2))
+    | th1::q, Sort (Pair (Opt s1, s2)) ->
+      begin match convert_args [th1] (Sort (Opt s1)) j with
+        | Arg arg1 ->
+          let Arg arg2 = convert_args q (Sort s2) j in
+          Arg (Pair (arg1, arg2))
+        | exception Theory.(Conv _) ->
+          let Arg arg2 = convert_args (th1::q) (Sort s2) j in
+          Arg (Pair (Opt (s1, None), arg2))
+      end
     | th1::q, Sort (Pair (s1, s2)) ->
       let Arg arg1 = convert_args [th1] (Sort s1) j in
       let Arg arg2 = convert_args q (Sort s2) j in
       Arg (Pair (arg1, arg2))
     | [], Sort (Opt a) ->
       Arg (Opt (a, None))
+    | [], Sort (Pair (Opt a, b)) ->
+      let Arg arg2 = convert_args [] (Sort b) j in
+      Arg (Pair (Opt (a, None), arg2))
     | [th], Sort (Opt a) ->
       let Arg arg = convert_args [th] (Sort a) j in
       Arg (Opt
