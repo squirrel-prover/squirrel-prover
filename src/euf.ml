@@ -25,7 +25,6 @@ class check_key ~allow_vars ~allow_functions ~system head_fn key_n = object (sel
     | _ -> super#visit_message t
 end
 
-
 (** Collect occurences of some function and key,
   * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
@@ -105,8 +104,7 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule  ?(drop_head=true) ~allow_functions ~system ~env ~mess ~sign ~head_fn ~key_n ~key_is =
-  key_ssc ~messages:[mess;sign] ~allow_functions ~system head_fn key_n;
+let mk_rule ?(elems=[]) ?(drop_head=true) ~allow_functions ~system ~env ~mess ~sign ~head_fn ~key_n ~key_is =
   { hash = head_fn;
     key = key_n;
     case_schemata =
@@ -200,6 +198,7 @@ let mk_rule  ?(drop_head=true) ~allow_functions ~system ~env ~mess ~sign ~head_f
         let iter = new get_f_messages ~drop_head ~system head_fn key_n in
         iter#visit_message mess ;
         iter#visit_message sign ;
+        List.iter iter#visit_term elems ;
         iter#get_occurrences
       in
       List.map

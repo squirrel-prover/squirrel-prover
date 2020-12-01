@@ -62,6 +62,7 @@ val check_key_ssc :
    not contain anymore the head_fn function, else they still do.  TODO:
    memoisation *)
 val mk_rule :
+  ?elems:EquivSequent.elem list ->
   ?drop_head:bool ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->

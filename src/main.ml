@@ -248,6 +248,56 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/sign.sp")
     end ;
+    "SEnc Bad SSC - INCTXT 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_nornd.sp")
+    end ;
+    "SEnc Bad SSC - INTCTXT 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncRandomNotFresh)
+        (fun () -> run ~test "tests/alcotest/intctxt_rndnotfresh.sp")
+    end ;
+    "Senc Bad SSC - INTCTXT 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - INTCTXT 4", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_sharedrndind.sp")
+    end ;
+    "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/cca_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - CCA 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/cca_sharedrndframe.sp")
+    end ;
+    "Senc Bad SSC - CCA 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_nornd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_sharedrndframe.sp")
+    end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)

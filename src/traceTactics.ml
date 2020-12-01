@@ -1201,11 +1201,13 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
   TraceSequent.add_formula eq_hashes s
   |> TraceSequent.add_formula eq_indices
 
+
 let euf_apply_facts drop_head s
     ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
   let env = TraceSequent.get_env s in
   let system = TraceSequent.system s in
-  let rule = Euf.mk_rule ~drop_head ~allow_functions ~system ~env ~mess ~sign
+  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~system head_fn key_n;
+  let rule = Euf.mk_rule ~elems:[] ~drop_head ~allow_functions ~system ~env ~mess ~sign
       ~head_fn ~key_n ~key_is
   in
   let schemata_premises =
@@ -1213,6 +1215,8 @@ let euf_apply_facts drop_head s
   and direct_premises =
     List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
+  if Symbols.is_ftype head_fn Symbols.SEnc then
+    EquivTactics.check_encryption_randomness system rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
   schemata_premises @ direct_premises
 
 let set_euf _ = { TraceSequent.t_euf = true }
