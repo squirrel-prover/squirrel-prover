@@ -9,12 +9,12 @@ Cambridge, MA, USA, August 11-13, 2004. Proceedings, volume 3156
 of Lecture Notes in Computer Science, pages 357–370. Springer, 2004.
 
 R --> T : nr
-T --> R : enc(<nr,nt>,r,k)
-R --> T : enc(<nt,nr>,r,k)
+T --> R : enc(<nr,nt>,rt,k)
+R --> T : enc(<nt,nr>,rr,k)
 
-We assume here that the encryption used is an encrypt then mac,
-such that the encryption is AE. In particular, it is IND-CCA1,
-and INT-CTXT.
+We assume here that the encryption is authenticated, e.g. using the
+encrypt-then-mac paradigm. Specifically, we make use of the crypto
+assumptions INT-CTXT and ENC-KP on our symmetric encryption.
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
@@ -25,10 +25,9 @@ channel cT
 name kE : message
 name kbE : index-> message
 
-name kH : message
-name kbH : index-> message
+(** Fresh key used for ENC-KP applications. *)
+name k_fresh : message
 
-hash h
 senc enc,dec
 
 name nr : index  -> message
@@ -294,11 +293,12 @@ Proof.
   fadup 3.
   fa 3.
   fadup 3.
-  enckp 3.
-  cca1 3.
-
+  enckp 3, k_fresh.
   expand seq(i->nr(i)),i.
   expand seq(i,j->nt(i,j)),l,j.
+  fa 5.
+  fresh 6.
+  fresh 5; yesif 5.
 
   expand frame@A(i).
 
@@ -322,9 +322,9 @@ Proof.
   fa 3.
   fa 3.
 
-  enckp 3.
-  cca1 3.
-  fa 3.
-  fa 3.
+  enckp 3, k_fresh.
   expand seq(i,j->nt(i,j)),i,j.
+  fa 4.
+  fresh 5.
+  fresh 4; yesif 4.
 Qed.

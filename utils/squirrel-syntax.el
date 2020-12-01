@@ -23,6 +23,7 @@
   "Proof"
   "Qed"
   "hash"
+  "senc"
   "abstract"
   "name"
   "channel"
