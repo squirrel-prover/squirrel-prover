@@ -48,9 +48,6 @@ name rr : index -> message
 abstract ok : message
 abstract ko : message
 
-axiom cor_enc :
-  forall (m,r,key,skey:message), (dec(enc(m,r,key),skey) = fail || key=skey)
-
 axiom fail_not_pair : forall (x,y:message), fail <> <x,y>
 
 process Reader(k:index) =
@@ -243,17 +240,17 @@ Proof.
 
   fa.
   (* find condA => condB *)
-  apply cor_enc to <tagT,<input@Tag(i,j),nt(i,j)>>,
-                   rt(i,j), kE(i), kE(i1); case H1.
-  exists j.
+  intctxt M2.
+  apply tags_neq.
+  exists j2.
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
   apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa.
   (* find condA => condB *)
-  apply cor_enc to <tagT,<input@Tag(i,j),nt(i,j)>>,
-                   rt(i,j), kbE(i,j), kbE(i1,j1); case H1.
+  intctxt M2.
+  apply tags_neq.
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
   apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
