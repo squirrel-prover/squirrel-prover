@@ -147,8 +147,9 @@ and error ~test mode s =
 
 let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
 
-let interactive_prover () =
+let interactive_prover () =   
   Printer.prt `Start "Squirrel Prover interactive mode.";
+  Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   try main_loop InputDescr
   with End_of_file -> Printer.prt `Error "End of file, exiting."
