@@ -19,6 +19,8 @@ name kA : message
 name kAbis : message
 name kB : message
 
+name k_fresh : message
+
 aenc enc,dec,pk
 
 name n0 : index -> message
@@ -76,9 +78,9 @@ Proof.
   (* Case A1 *)
   expandall.
   fa 2. fa 3.  fa 3.
-  cca1 3.
-  fa 3. fa 3. fresh 3. yesif 3.
-
+  fa 3.
+  fa 3. fresh 3. yesif 3.
+  fresh 3. yesif 3.
   (* Case B *)
   expandall.
   fa 2. fa 3. fa 3.
