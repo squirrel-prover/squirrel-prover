@@ -594,7 +594,7 @@ let norm_tatom = function
 let models_conjunct (l : trace_atom list) : models timeout_r =
   let l = List.map norm_tatom l |> List.flatten in
   let instance = mk_instance l in
-  Utils.timeout !Config.solver_timeout split instance
+  Utils.timeout (Config.solver_timeout ()) split instance
 
 let m_is_sat models = models <> []
 

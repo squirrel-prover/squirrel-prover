@@ -381,35 +381,35 @@ type state = { uf : Cuf.t;
                completed : bool }
 
 
-let pp_xor_rules ppf s =
+let pp_xor_rules ppf xor_rules =
   Fmt.pf ppf "@[<v>%a@]"
     (Fmt.list
        ~sep:(fun ppf () -> Fmt.pf ppf "@;")
        (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
-    ) s.xor_rules
+    ) xor_rules
 
-let pp_sat_xor_rules ppf s = match s.sat_xor_rules with
-  | None ->   Fmt.pf ppf "Not yet saturated"
+let pp_sat_xor_rules ppf sat_xor_rules = match sat_xor_rules with
   | Some (sat,_) ->
     Fmt.pf ppf "@[<v>%a@]"
       (Fmt.list
          ~sep:(fun ppf () -> Fmt.pf ppf "@;")
          (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
       ) sat
-
-let pp_grnd_rules ppf s =
+  | None -> Fmt.pf ppf "Not yet saturated"
+              
+let pp_grnd_rules ppf grnd_rules =
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,a) -> Fmt.pf ppf "%a -> %a" pp_cterm t Cst.print a)
-  ) s.grnd_rules
+  ) grnd_rules
 
-let pp_e_rules ppf s =
+let pp_e_rules ppf e_rules =
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,s) -> Fmt.pf ppf "%a -> %a" pp_cterm t pp_cterm s)
-  ) s.e_rules
+  ) e_rules
 
 let pp_state ppf s =
   Fmt.pf ppf "@[<v 0>\
@@ -420,10 +420,10 @@ let pp_state ppf s =
               @[<v 2>e_rules:@;%a@]@;\
               ;@]%!"
     Cuf.print s.uf
-    pp_xor_rules s
-    pp_sat_xor_rules s
-    pp_grnd_rules s
-    pp_e_rules s
+    pp_xor_rules s.xor_rules
+    pp_sat_xor_rules s.sat_xor_rules
+    pp_grnd_rules s.grnd_rules
+    pp_e_rules s.e_rules
 
 
 let rec term_uf_normalize state t = match t with
@@ -929,8 +929,12 @@ let complete (l : (Term.message * Term.message) list) : state timeout_r=
       []
       l
   in
-  Utils.timeout !Config.solver_timeout complete_cterms l
+  Utils.timeout (Config.solver_timeout ()) complete_cterms l
 
+
+let print_init_trs fmt =
+  Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
+    pp_e_rules (init_erules ())
 
 (****************)
 (* Dis-equality *)

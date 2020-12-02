@@ -27,3 +27,6 @@ val name_index_cnstrs :
     rewrite relation in [state], and adds the fact that the name must be equal
     to one of the name appearing inside the Term.message. *)
 val name_indep_cnstrs : state -> Term.message list -> Term.formula list
+
+(** Print the set of rules in the initial TRS (e.g. dec(enc(x,y,r),y) -> x) *)
+val print_init_trs : Format.formatter -> unit

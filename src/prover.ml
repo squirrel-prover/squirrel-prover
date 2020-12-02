@@ -46,6 +46,7 @@ type proof_state = { goals : named_goal list;
                      subgoals : Goal.t list;
                      goals_proved : named_goal list;
                      option_defs : option_def list;
+                     params : Config.params;
                      prover_mode : prover_mode;
                    }
 
@@ -66,6 +67,7 @@ let save_state mode =
      subgoals = !subgoals;
      goals_proved = !goals_proved;
      option_defs = !option_defs;
+     params = Config.get_params ();
      prover_mode = mode} :: (!proof_states_history)
 
 let rec reset_state n =
@@ -78,6 +80,7 @@ let rec reset_state n =
     subgoals := p.subgoals;
     goals_proved := p.goals_proved;
     option_defs := p.option_defs;
+    Config.set_params p.params;
     p.prover_mode
   | _::q, n -> proof_states_history := q; reset_state (n-1)
 
@@ -458,6 +461,7 @@ let make_equiv_goal_process system_1 system_2 =
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
+  | ParsedSetOption of Config.p_set_param
   | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo of int
   | ParsedGoal of gm_input
