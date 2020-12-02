@@ -9,12 +9,16 @@ Cambridge, MA, USA, August 11-13, 2004. Proceedings, volume 3156
 of Lecture Notes in Computer Science, pages 357–370. Springer, 2004.
 
 R --> T : nr
-T --> R : enc(<nr,nt>,rt,k)
-R --> T : enc(<nt,nr>,rr,k)
+T --> R : enc(<tagT,<nr,nt>>,rt,k)
+R --> T : enc(<tagR,<nt,nr>>,rr,k)
 
 We assume here that the encryption is authenticated, e.g. using the
 encrypt-then-mac paradigm. Specifically, we make use of the crypto
 assumptions INT-CTXT and ENC-KP on our symmetric encryption.
+
+We add tags for simplicity, and conjecture that the results hold
+for the protocol without tags, though at the cost of a proof by
+induction for wa_* goals.
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
@@ -22,13 +26,18 @@ This is a "light" model without the last check of T.
 channel cR
 channel cT
 
-name kE : message
-name kbE : index-> message
+name kE : index -> message
+name kbE : index -> index -> message
 
 (** Fresh key used for ENC-KP applications. *)
 name k_fresh : message
 
 senc enc,dec
+
+abstract tagR : message
+abstract tagT : message
+
+axiom tags_neq : tagR <> tagT
 
 name nr : index  -> message
 name nt : index -> index -> message
@@ -44,287 +53,245 @@ axiom cor_enc :
 
 axiom fail_not_pair : forall (x,y:message), fail <> <x,y>
 
-process Reader(i:index) =
-  out(cR, nr(i));
+process Reader(k:index) =
+  out(cR, nr(k));
   in(cR, mess);
-  if exists (j:index),
-      dec(mess,  diff(kE,kbE(j)) ) <> fail
-      &&
-      fst(dec(mess,  diff(kE,kbE(j)) )) = nr(i)
+  if exists (i,j:index),
+      dec(mess, diff(kE(i),kbE(i,j))) <> fail &&
+      fst(dec(mess, diff(kE(i),kbE(i,j)))) = tagT &&
+      fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
   then
     out(cR,
-      try find l,j such that
-        dec(mess,  diff(kE,kbE(j)) ) <> fail
-        &&
-        fst(dec(mess,  diff(kE,kbE(j)))) = nr(i)
+      try find i,j such that
+        dec(mess, diff(kE(i),kbE(i,j))) <> fail &&
+        fst(dec(mess, diff(kE(i),kbE(i,j)))) = tagT &&
+        fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
       in
-        enc(<snd(dec(mess, diff(kE,kbE(j)))),nr(i)>, rr(i), diff(kE,kbE(j))))
+        enc(<tagR,<snd(snd(dec(mess, diff(kE(i),kbE(i,j))))),nr(k)>>, rr(k),
+            diff(kE(i),kbE(i,j))))
 
 process Tag(i:index, j:index) =
   in(cT, nR);
-  let cypher = enc(<nR,nt(i,j)>, rt(i,j), diff(kE,kbE(j))) in
-  out(cT, cypher )
+  let cypher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
+  out(cT, cypher)
 
-
-system (!_i Reader(i) | !_i !_j Tag(i,j)).
+system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
 goal wa_Reader1 :
-  forall (i:index),
-    exec@Reader1(i)
+  forall (k:index),
+    exec@Reader1(k)
     <=>
-    exec@pred(Reader1(i)) && (exists (l,k:index),
-      Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)  &&
-      output@Tag(l,k) = input@Reader1(i) &&
-      input@Tag(l,k) = output@Reader(i)).
+    exec@pred(Reader1(k)) && (exists (i,j:index),
+      Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
+      output@Tag(i,j) = input@Reader1(k) &&
+      input@Tag(i,j) = output@Reader(k)).
 Proof.
-  simpl.
-  expand exec@Reader1(i).
-  expand cond@Reader1(i).
-  expand output@Reader(i).
+  intros.
+  expand exec@Reader1(k).
+  expand cond@Reader1(k).
+  expand output@Reader(k).
   split.
 
-  project.
+  project; apply tags_neq.
 
   (* First projection. *)
   intctxt M0.
-  (* Here, the reader has actually been given the output produced by a reader... *)
-  executable pred(Reader1(i)).
-  apply H1 to Reader1(i1).
-  expand exec@Reader1(i1).
-  expand cond@Reader1(i1).
-  (* We use intctxt once again, to conclude that it is not possible to satisfy then the conditions.*)
-  intctxt M3.
-  simpl.
-
-  (* Here, it is the honest case, so easy to conclude. *)
-  exists i1, j1.
-  depends Reader(i), Reader1(i).
+  exists i, j1.
+  depends Reader(k), Reader1(k).
 
   (* Second projection. *)
   intctxt M0.
+  exists i,j.
+  depends Reader(k), Reader1(k).
 
-  (* Here, the reader has actually been given the output produced by a reader... *)
-  executable pred(Reader1(i)).
-  apply H1 to Reader1(i1).
-  expand exec@Reader1(i1).
-  expand cond@Reader1(i1).
-
-
-  (* We use intctxt once again, to conclude that it is not possible to satisfy XXX then the conditions.*)
-  intctxt M3.
-
-  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
-  case H3.
-  assert snd(fail) <> nr(i).
-
-  apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1), kbE(j1), kbE(j).
-  case H3.
-  assert snd(fail) <> nr(i).
-  simpl.
-
-  exists i1,j.
-  depends Reader(i), Reader1(i).
-
-  exists k.
-  apply fail_not_pair to input@Tag(l,k),nt(l,k).
+  (* Direction <= *)
+  exists i,j.
+  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
 Qed.
 
-
+(* Action A is the empty else branch of the reader. *)
 goal wa_A :
-  forall (i:index),
-    exec@A(i)
+  forall (k:index),
+    exec@A(k)
     <=>
-    exec@pred(A(i)) && not (exists (l,k:index),
-      Tag(l,k) < A(i) && Reader(i) < A(i)  &&
-      output@Tag(l,k) = input@A(i) &&
-      input@Tag(l,k) = output@Reader(i)).
+    exec@pred(A(k)) && not (exists (i,j:index),
+      Tag(i,j) < A(k) && Reader(k) < A(k)  &&
+      output@Tag(i,j) = input@A(k) &&
+      input@Tag(i,j) = output@Reader(k)).
 Proof.
-  simpl.
-  expand exec@A(i).
-  expand cond@A(i).
-  expand output@Reader(i).
+  intros.
+  expand exec@A(k).
+  expand cond@A(k).
+  expand output@Reader(k).
   split.
-  notleft H1.
-  project.
 
-  apply H1 to i.
-  case H2.
-  apply fail_not_pair to input@Tag(l,k), nt(l,k).
-
-  apply H1 to k.
-  case H2.
-  apply fail_not_pair to input@Tag(l,k), nt(l,k).
+  (* Direction => is the obvious one *)
 
   notleft H1.
+  apply H1 to i,j; case H2.
+  apply fail_not_pair to tagT, <input@Tag(i,j), nt(i,j)>.
 
+  (* Direction <= *)
+
+  notleft H1.
+  apply tags_neq.
   project.
-  intctxt M0.
-
-  executable pred(A(i)).
-  apply H2 to Reader1(i1).
-  expand exec@Reader1(i1).
-  expand cond@Reader1(i1).
-
-  intctxt M3.
-  apply H2 to Reader1(i).
-  expand exec@Reader1(i).
-  expand cond@Reader1(i).
-  intctxt M6.
-
-  apply H1 to i1,j1.
-  case H2.
-  depends Reader(i), A(i).
 
   intctxt M0.
+  apply H1 to i,j1; case H2.
+  depends Reader(k),A(k).
 
-  executable pred(A(i)).
-  apply H2 to Reader1(i1).
-  expand exec@Reader1(i1).
-  expand cond@Reader1(i1).
+  intctxt M0.
+  apply H1 to i,j; case H2.
+  depends Reader(k),A(k).
 
+Qed.
+
+goal lemma : forall (i,j,i1,j1:index),
+  output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
+Proof.
+  intros.
+  project.
+
+  assert dec(output@Tag(i,j),kE(i1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
+  intctxt M1.
+  case H0.
+  assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt M3.
+  case H0.
+  apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
+  apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
-  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
-  case H4.
-  assert snd(fail) <> nr(i).
-  apply H2 to Reader1(i).
-  expand exec@Reader1(i).
-  expand cond@Reader1(i).
-
-  intctxt M6.
-
-  apply cor_enc to <snd(dec(input@Reader1(i2),kbE(j1))),nr(i2)>, rr(i2), kbE(j1), kbE(j).
-  case H5.
-
-  assert snd(fail) <> nr(i).
-
-  apply H1 to i2,j1.
-  case H5.
-
-  depends Reader(i), A(i).
-
-  apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1),kbE(j1),kbE(j).
-  case H5.
-  assert snd(fail) <> nr(i).
-
-  apply cor_enc to <input@Tag(i2,j1),nt(i2,j1)>,rt(i2,j1),kbE(j1),kbE(j).
-
-  case H4.
-  assert snd(fail) <> nr(i).
-
-  apply H1 to i1,j.
-  case H2.
-
-  depends Reader(i), A(i).
+  assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
+  intctxt M1.
+  case H0.
+  assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
+  intctxt M3.
+  case H0.
+  apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
+  apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
 Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(i->nr(i)). enrich seq(i,j->nt(i,j)).
+  enrich seq(k->nr(k)). enrich seq(i,j->nt(i,j)).
 
   induction t.
 
-  expand seq(i->nr(i)),i.
+  (* Action 1/4: Reader *)
+
+  expand seq(k->nr(k)),k.
   expandall.
   fa 3.
 
-  expand frame@Reader1(i).
-  equivalent exec@Reader1(i),
-  exec@pred(Reader1(i)) && (exists (l,k:index),
-      Tag(l,k) < Reader1(i) && Reader(i) < Reader1(i)  &&
-      output@Tag(l,k) = input@Reader1(i) &&
-      input@Tag(l,k) = output@Reader(i)).
+  (* Action 2/4: Reader1 *)
 
-  apply wa_Reader1 to i.
+  expand frame@Reader1(k).
+  equivalent
+    exec@Reader1(k),
+    exec@pred(Reader1(k)) &&
+    exists (i,j:index),
+      Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
+      output@Tag(i,j) = input@Reader1(k) &&
+      input@Tag(i,j) = output@Reader(k).
+  apply wa_Reader1 to k.
 
-  expand output@Reader1(i).
-  fa 2.
+  expand output@Reader1(k).
+  fa 2. fa 3. fadup 3.
 
   equivalent
-  (if
-        exec@pred(Reader1(i)) &&  exists (l,k:index),
-       ((((Tag(l,k) < Reader1(i)) &&
-          Reader(i) < Reader1(i))
-         && output@Tag(l,k) = input@Reader1(i))
-        && input@Tag(l,k) = output@Reader(i))
-       then
-       (try find l,j such that
-          (dec(input@Reader1(i),diff(kE,kbE(j))) <> fail &&
-           fst(dec(input@Reader1(i),diff(kE,kbE(j)))) = nr(i))
-          in
-          enc(<snd(dec(input@Reader1(i),diff(kE,kbE(j)))),nr(i)>,rr(i),
-              diff(kE,kbE(j))))),
-  (if
-      exec@pred(Reader1(i)) &&  exists (l,k:index),
-       ((((Tag(l,k) < Reader1(i)) &&
-          Reader(i) < Reader1(i))
-         && output@Tag(l,k) = input@Reader1(i))
-        && input@Tag(l,k) = output@Reader(i))
-       then
-       (try find l,j such that
-           exec@pred(Reader1(i)) && (((( Tag(l,j) < Reader1(i)) &&
-          Reader(i) < Reader1(i))
-         && output@Tag(l,j) = input@Reader1(i))
-        && input@Tag(l,j) = output@Reader(i))
-          in
-          enc(<nt(l,j),nr(i)>,rr(i),
-              diff(kE,kbE(j))))).
+    (if
+       exec@pred(Reader1(k)) &&
+       (exists (i,j:index),
+         ((Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k)) &&
+          output@Tag(i,j) = input@Reader1(k)) &&
+         input@Tag(i,j) = output@Reader(k))
+     then
+       (try find i,j such that
+          (dec(input@Reader1(k),diff(kE(i),kbE(i,j))) <> fail &&
+           fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT) &&
+          fst(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))) = nr(k)
+        in
+          enc(<tagR,<snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
+                     nr(k)>>,
+              rr(k),
+              diff(kE(i),kbE(i,j))))),
+    (if
+       exec@pred(Reader1(k)) &&
+       (exists (i,j:index),
+         ((Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k)) &&
+          output@Tag(i,j) = input@Reader1(k)) &&
+         input@Tag(i,j) = output@Reader(k))
+     then
+       (try find i,j such that
+          exec@pred(Reader1(k)) &&
+          (Tag(i,j) < Reader1(k) &&
+           Reader(k) < Reader1(k) &&
+           output@Tag(i,j) = input@Reader1(k) &&
+           input@Tag(i,j) = output@Reader(k))
+        in
+          enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
+              diff(kE(i),kbE(i,j))))).
   fa.
-
-  exists l,k.
-  exists l,k.
+  exists i,j.
+  exists i,j.
   project.
-  fa.
-  exists l,k.
-  apply fail_not_pair to input@Tag(l,j), nt(l,j).
 
   fa.
-  exists l.
-  apply cor_enc to <input@Tag(l,k),nt(l,k)>,rt(l,k),kbE(k),kbE(j).
-  case H1.
+  (* find condA => condB *)
+  apply cor_enc to <tagT,<input@Tag(i,j),nt(i,j)>>,
+                   rt(i,j), kE(i), kE(i1); case H1.
+  exists j.
+  (* find condB => condA *)
+  apply lemma to i,j,i1,j1.
+  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
-  apply fail_not_pair to input@Tag(l1,j), nt(l1,j).
+  fa.
+  (* find condA => condB *)
+  apply cor_enc to <tagT,<input@Tag(i,j),nt(i,j)>>,
+                   rt(i,j), kbE(i,j), kbE(i1,j1); case H1.
+  (* find condB => condA *)
+  apply lemma to i,j,i1,j1.
+  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
-  fa 3.
-  fadup 3.
-  fa 3.
-  fadup 3.
-  fa 3.
-  fadup 3.
+  fa 3; fadup 3.
+  fa 3; fadup 3.
   enckp 3, k_fresh.
-  expand seq(i->nr(i)),i.
-  expand seq(i,j->nt(i,j)),l,j.
+  expand seq(k->nr(k)),k.
+  expand seq(i,j->nt(i,j)),i,j.
   fa 5.
   fresh 6.
   fresh 5; yesif 5.
 
-  expand frame@A(i).
+  (* Action 3/4: A *)
+
+  expand frame@A(k).
 
   equivalent
-    exec@A(i),
-    exec@pred(A(i)) &&not (exists (l,k:index),
-      Tag(l,k) < A(i) && Reader(i) < A(i)  &&
-      output@Tag(l,k) = input@A(i) &&
-      input@Tag(l,k) = output@Reader(i)).
-
-  apply wa_A to i.
-
-  fa 2. fa 3.
-  fadup 3.
-  fa 3.
-  fadup 3.
-
-  expandall.
+    exec@A(k),
+    exec@pred(A(k)) && not (exists (i,j:index),
+      Tag(i,j) < A(k) && Reader(k) < A(k)  &&
+      output@Tag(i,j) = input@A(k) &&
+      input@Tag(i,j) = output@Reader(k)).
+  apply wa_A to k.
 
   fa 2.
-  fa 3.
-  fa 3.
+  fa 3; fadup 3.
+  fa 3; fadup 3.
+
+  (* Action 4/4: Tag *)
+
+  expandall.
+  fa 2. fa 3.  fa 3.
 
   enckp 3, k_fresh.
   expand seq(i,j->nt(i,j)),i,j.
   fa 4.
   fresh 5.
   fresh 4; yesif 4.
+
 Qed.
