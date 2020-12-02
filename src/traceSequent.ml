@@ -498,23 +498,27 @@ let get_eqs_neqs s =
   get_eqs_neqs_at_list
     (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
 
-let get_trs s =
-  let update_trs s =
-    let eqs,_ = get_eqs_neqs s in
-    let trs = Completion.complete eqs in
-    S.set_trs s trs
-  in
+let get_trs s : Completion.state timeout_r =
   match !(s.trs) with
-  | None -> let () = update_trs s in opt_get !(s.trs)
-  | Some trs -> trs
+  | Some trs -> Result trs
+  | None ->
+    let eqs,_ = get_eqs_neqs s in
+    match Completion.complete eqs with
+    | Timeout -> Timeout
+    | Result trs ->
+      let () = S.set_trs s trs in
+      Result trs
 
 
 let message_atoms_valid s =
-  let trs = get_trs s in
-  let _, neqs = get_eqs_neqs s in
-  List.exists
-    (fun eq -> Completion.check_equalities trs [eq])
-    neqs
+  match get_trs s with
+  | Timeout -> Timeout
+  | Result trs ->
+    let _, neqs = get_eqs_neqs s in
+    Result (
+      List.exists (fun eq ->
+          Completion.check_equalities trs [eq])
+        neqs)
 
 let set_env a s = S.update ~env:a s
 

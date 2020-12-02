@@ -564,7 +564,7 @@ let congruence (s : TraceSequent.t) =
       s
       term_conclusions
   in
-  if TraceSequent.message_atoms_valid s then
+  if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
     []
   else Tactics.soft_failure (Tactics.Failure "Equations satisfiable")
 
@@ -617,7 +617,7 @@ let () =
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
-  let trs = TraceSequent.get_trs s in
+  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
   let terms = TraceSequent.get_all_terms s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
@@ -630,7 +630,7 @@ let eq_names (s : TraceSequent.t) =
   in
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let trs = TraceSequent.get_trs s in
+  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
   let cnstrs = Completion.name_index_cnstrs trs
       (TraceSequent.get_all_terms s)
   in
@@ -837,7 +837,7 @@ let apply_substitute subst s =
 
 let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   let subst =
-        let trs = TraceSequent.get_trs s in
+        let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
@@ -1496,7 +1496,7 @@ let collision_resistance (s : TraceSequent.t) =
                | _ -> acc)
             (make_eq acc q) q
     in
-    let trs = TraceSequent.get_trs s in
+    let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
     let hash_eqs =
       make_eq [] hashes
       |> List.filter (fun eq -> Completion.check_equalities trs [eq])

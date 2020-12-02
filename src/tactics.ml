@@ -34,7 +34,7 @@ let rec pp_tac_error ppf = function
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
   | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
-  | TacTimeout -> Fmt.pf ppf "Timedout"
+  | TacTimeout -> Fmt.pf ppf "Time-out"
 
 exception Tactic_soft_failure of tac_error
 

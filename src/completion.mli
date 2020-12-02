@@ -3,8 +3,9 @@
 type state
 
 (** [complete l] construct a complete term rewritting system from the set of
-    equations inside l *)
-val complete : (Term.message * Term.message) list -> state
+    equations inside l.
+    May timeout. *)
+val complete : (Term.message * Term.message) list -> state Utils.timeout_r
 
 (** [check_disequalities s neqs l] checks that all disequalities inside [l] are
     implied by inequalities inside neqs, w.r.t [s]. *)

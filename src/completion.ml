@@ -920,7 +920,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   complete_state state
   |> finalize_completion
 
-let complete (l : (Term.message * Term.message) list) : state =
+let complete (l : (Term.message * Term.message) list) : state timeout_r=
   let l =
     List.fold_left
       (fun l (u,v) ->
@@ -929,7 +929,7 @@ let complete (l : (Term.message * Term.message) list) : state =
       []
       l
   in
-  complete_cterms l
+  Utils.timeout !Config.solver_timeout complete_cterms l
 
 
 (****************)

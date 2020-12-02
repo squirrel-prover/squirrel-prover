@@ -114,18 +114,21 @@ val apply_subst : Term.subst -> sequent -> sequent
 (** {2 Automated reasoning} *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
-   equalities between messages. It can be used to check if an equality is
-   implied by the set of messages hypotheses. *)
-val get_trs : sequent -> Completion.state
+    equalities between messages. It can be used to check if an equality is
+    implied by the set of messages hypotheses. 
+    May timeout. *)
+val get_trs : sequent -> Completion.state Utils.timeout_r
 
 (** [get_models s] returns a set of minimal models corresponding to the 
     trace atoms in the sequent [s]. 
-    See module [Constr]. *)
+    See module [Constr]. 
+    May timeout. *)
 val get_models : sequent -> Constr.models Utils.timeout_r
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
-  * messages on both sides of the sequents make the sequent valid. *)
-val message_atoms_valid : sequent -> bool
+  * messages on both sides of the sequents make the sequent valid. 
+  * May timeout. *)
+val message_atoms_valid : sequent -> bool Utils.timeout_r
 
 (** [constraints_valid s] returns true if constraints make the sequent valid,
   * taking into account constraint trace formula hypotheses and atomic
