@@ -28,6 +28,8 @@ Qed.
 goal othergoal: False.
 
 Proof.
- apply mycheck to ok, ok.
+ nosimpl(apply mycheck to ok, ok).
+ congruence.
  (* squirrel part dans les choux *)
 Qed.
+

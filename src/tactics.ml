@@ -10,6 +10,7 @@ type tac_error =
   | NotDepends of string * string
   | Undefined of string
   | NotDDHContext
+  | TacTimeout
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -33,6 +34,7 @@ let rec pp_tac_error ppf = function
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
   | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
+  | TacTimeout -> Fmt.pf ppf "Timedout"
 
 exception Tactic_soft_failure of tac_error
 
@@ -257,5 +259,11 @@ module AST (M:S) = struct
 
 end
 
+
 let soft_failure e = raise (Tactic_soft_failure e)
 let hard_failure e = raise (Tactic_hard_failure e)
+
+let timeout_get = function
+  | Utils.Result a -> a
+  | Utils.Timeout -> soft_failure TacTimeout
+

@@ -506,7 +506,7 @@ let constraints (s : TraceSequent.t) =
       s
       trace_conclusions
   in
-  if TraceSequent.constraints_valid new_s then
+  if Tactics.timeout_get (TraceSequent.constraints_valid new_s) then
     []
   else Tactics.soft_failure (Tactics.Failure "constraints satisfiable")
 
@@ -650,7 +650,7 @@ let () = T.register "eqnames"
 
 (** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : TraceSequent.t) =
-  let s, ts_classes = TraceSequent.get_ts_equalities s in
+  let ts_classes = Tactics.timeout_get (TraceSequent.get_ts_equalities s) in
   let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
   let ts_subst =
     let rec asubst e = function
@@ -660,7 +660,7 @@ let eq_trace (s : TraceSequent.t) =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let s, ind_classes = TraceSequent.get_ind_equalities s in
+  let ind_classes = Tactics.timeout_get (TraceSequent.get_ind_equalities s) in
   let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
   let ind_subst =
     let rec asubst e = function
@@ -853,7 +853,7 @@ let () =
 
 let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   let subst =
-      let models = TraceSequent.get_models s in
+      let models = Tactics.timeout_get (TraceSequent.get_models s) in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -867,7 +867,7 @@ let () =
 
 let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   let subst =
-    let models = TraceSequent.get_models s in
+    let models = Tactics.timeout_get (TraceSequent.get_models s) in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
@@ -1148,11 +1148,15 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts = Action.to_term case.action_descr.Action.action in
   (* The action occured before the test H(m,k) = s. *)
+  let maximal_elems =
+    Tactics.timeout_get
+      (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m))
+  in
   let le_cnstr =
     List.map
       (function ts ->
         Term.Atom (Term.mk_timestamp_leq action_descr_ts ts))
-      (snd (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
+      (maximal_elems)
   in
   let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
 

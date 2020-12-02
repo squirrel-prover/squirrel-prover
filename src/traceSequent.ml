@@ -586,35 +586,40 @@ let apply_subst subst s =
    ~conclusion:(Term.subst subst s.conclusion)
    s
 
-let get_models s =
-  let update_models s =
-    match !(s.models) with
-    | None ->
-      let trace_atoms = get_trace_atoms s in
-      let models = Constr.models_conjunct trace_atoms in
-      S.set_models s models
-    | Some _ -> ()
-  in
-  let () = update_models s in
-  opt_get !(s.models)
+let get_models s : Constr.models timeout_r =
+  match !(s.models) with
+  | Some models -> Result models
+  | None ->
+    let trace_atoms = get_trace_atoms s in
+    match Constr.models_conjunct trace_atoms with
+    | Timeout -> Timeout
+    | Result models ->
+      let () = S.set_models s models in
+      Result models
 
 let maximal_elems s tss =
-  let models = get_models s in
-  s, Constr.maximal_elems models tss
+  match get_models s with
+  | Result models -> Result (Constr.maximal_elems models tss)
+  | Timeout -> Timeout
 
 let get_ts_equalities s =
-  let models = get_models s in
-  let ts = trace_atoms_ts (get_trace_atoms s) in
-  s, Constr.get_ts_equalities models ts
+  match get_models s with
+  | Result models ->
+    let ts = trace_atoms_ts (get_trace_atoms s) in
+    Result (Constr.get_ts_equalities models ts)
+  | Timeout -> Timeout
 
 let get_ind_equalities s =
-  let models = get_models s in
-  let inds = trace_atoms_ind (get_trace_atoms s) in
-  s, Constr.get_ind_equalities models inds
+  match get_models s with
+  | Result models ->
+    let inds = trace_atoms_ind (get_trace_atoms s) in
+    Result (Constr.get_ind_equalities models inds)
+  | Timeout -> Timeout    
 
 let constraints_valid s =
-  let models = get_models s in
-  not (Constr.m_is_sat models)
+  match get_models s with
+  | Result models -> Result (not (Constr.m_is_sat models))
+  | Timeout -> Timeout
 
 let get_all_terms s =
   let atoms =

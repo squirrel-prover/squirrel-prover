@@ -3,10 +3,9 @@
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models
 
-
 (** [models_conunct l] returns the list of minimal models of the conjunction of
     atoms. *)
-val models_conjunct : Atom.trace_atom list -> models
+val models_conjunct : Atom.trace_atom list -> models Utils.timeout_r
 
 (** [models l] returns the list of minimal models of a constraint. *)
 

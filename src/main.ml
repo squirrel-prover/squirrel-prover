@@ -13,9 +13,14 @@ let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 let args  = ref []
 let verbose = ref false
 let interactive = ref false
+let solver_timeout i = Config.solver_timeout := i 
+
 let speclist = [
   ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
   ("-v", Arg.Set verbose, "display more informations");
+  ("--solver-timeout", Arg.Int solver_timeout, 
+   (Format.sprintf "change timeout for the automated solvers (default: %d") 
+     !Config.solver_timeout);
 ]
 
 (** Lexbuf used in non-interactive mode. *)
