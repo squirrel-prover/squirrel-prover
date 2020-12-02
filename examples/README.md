@@ -21,7 +21,7 @@ The corresponding files can be found in:
 
 ## Case Studies
 
-Case studies that use an axiom among `cca1`,`enckp`,`prf`,`euf`,`ddh`
+Case studies that use an axiom among `cca1`, `enckp`, `intctxt`, `prf`, `euf`, `ddh`, `xor`
 can be found with:
 ```
 $ grep "AXIOMNAME " *.sp
