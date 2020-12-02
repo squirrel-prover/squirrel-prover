@@ -12,7 +12,9 @@ R --> T : nr
 T --> R : enc(<tagT,<nr,nt>>,rt,k)
 R --> T : enc(<tagR,<nt,nr>>,rr,k)
 
-We assume here that the encryption is authenticated, e.g. using the
+We replace the AES algorithm of the original protocol by a randomized
+symmetric encryption, the closest primitive currently supported in
+Squirrel. The encryption is assumed to be authenticated, e.g. using the
 encrypt-then-mac paradigm. Specifically, we make use of the crypto
 assumptions INT-CTXT and ENC-KP on our symmetric encryption.
 
