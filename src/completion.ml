@@ -13,22 +13,25 @@ module Cst = struct
 
     (* Constants appearing in the original terms *)
     | Cname of Term.nsymb
+    | Cfuncst of Term.fsymb     (* function symbol of arity zero *)
     | Cmvar of Vars.message
     | Cmacro of (msym) * Term.timestamp
 
   let cst_cpt = ref 0
 
   let mk_flat () =
-    let () = incr cst_cpt in
+    let () = incr cst_cpt in 
     Cflat !cst_cpt
 
   let rec print ppf = function
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> Term.pp_nsymb ppf n
+    | Cfuncst f -> Term.pp_fsymb ppf f
     | Cmvar m -> Vars.pp ppf m
     | Cmacro (Message m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
     | Cmacro (Bool m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
+
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -39,7 +42,7 @@ module Cst = struct
 
   (*  let equal c c' = compare c c' = 0 *)
 
-  let hash c = Hashtbl.hash c
+  (* let hash c = Hashtbl.hash c *)
 end
 
 type varname = int
@@ -97,6 +100,8 @@ end = struct
       | _ -> assert false end
     else if f = Term.f_xor
     then cxor ts
+    else if ts = []
+    then Ccst (Cfuncst f)
     else Cfun (f, ts)
 
   and cxor ts =
@@ -131,7 +136,9 @@ let rec cterm_of_term c =
   | Var m -> ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
     ccst (Cst.Cmacro (Cst.Message m,ts))
-  | ITE(b,c,d) -> cfun Term.f_ite [cterm_of_bterm b; cterm_of_term c; cterm_of_term d]
+  | ITE(b,c,d) -> cfun Term.f_ite [cterm_of_bterm b;
+                                   cterm_of_term c;
+                                   cterm_of_term d]
   | Diff(c,d) -> cfun Term.f_diff [cterm_of_term c; cterm_of_term d]
   | _ ->
     raise Unsupported_conversion
@@ -487,14 +494,17 @@ end = struct
                                             Cuf.union_count state.uf ) } in
 
       (* Then, we keep rules of the form a + b -> 0. *)
-      List.filter (fun xr -> Cset.cardinal xr = 2) sat_xrules
-      |> List.map (fun xr -> match Cset.elements xr with
-          | [a;b] -> (a,b)
-          | _ -> assert false)
+      let new_eqs =
+        List.filter (fun xr -> Cset.cardinal xr = 2) sat_xrules
+        |> List.map (fun xr -> match Cset.elements xr with
+            | [a;b] -> (a,b)
+            | _ -> assert false) in
 
       (* We update the union-find structure with a = b *)
-      |> List.fold_left (fun state (a,b) ->
-          { state with uf = Cuf.union state.uf a b } ) state
+      let uf =
+        List.fold_left (fun uf (a,b) -> Cuf.union uf a b) state.uf new_eqs
+      in
+      { state with uf = uf }          
 end
 
 
@@ -842,6 +852,8 @@ let finalize_completion state =
     completed = true }
 
 let rec complete_state state =
+  Fmt.epr "State: %a@." pp_state state;
+  
   let stop_cond state =
   ( Cuf.union_count state.uf,
     List.length state.grnd_rules,

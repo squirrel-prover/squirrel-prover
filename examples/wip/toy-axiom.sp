@@ -33,7 +33,7 @@ goal othergoal: False.
 Proof.
  print.
  nosimpl(apply mycheck to ok, ok).
- congruence.
- (* squirrel part dans les choux *)
+ try congruence.
+ admit.
 Qed.
 
