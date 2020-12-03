@@ -265,5 +265,5 @@ let hard_failure e = raise (Tactic_hard_failure e)
 
 let timeout_get = function
   | Utils.Result a -> a
-  | Utils.Timeout -> soft_failure TacTimeout
+  | Utils.Timeout -> hard_failure TacTimeout
 
