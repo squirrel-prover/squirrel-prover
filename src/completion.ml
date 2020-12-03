@@ -852,7 +852,7 @@ let finalize_completion state =
     completed = true }
 
 let rec complete_state state =
-  Fmt.epr "State: %a@." pp_state state;
+  (* Fmt.epr "State: %a@." pp_state state; *)
   
   let stop_cond state =
   ( Cuf.union_count state.uf,
