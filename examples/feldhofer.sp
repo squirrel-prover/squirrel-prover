@@ -71,8 +71,8 @@ process Reader(k:index) =
 
 process Tag(i:index, j:index) =
   in(cT, nR);
-  let cypher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
-  out(cT, cypher)
+  let cipher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
+  out(cT, cipher)
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
