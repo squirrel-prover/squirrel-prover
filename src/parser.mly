@@ -374,14 +374,14 @@ goal:
 option_param:
 | TRUE  { Config.Param_bool true  }
 | FALSE { Config.Param_bool false }
-| n=ID  { 
+| n=ID  {
         if n = "true" then (Config.Param_bool true)
         else if n = "false" then (Config.Param_bool false)
         else Config.Param_string n   }
 | i=INT { Config.Param_int i      }
 
 set_option:
-| SET n=ID EQ param=option_param { (n, param) }
+| SET n=ID EQ param=option_param DOT { (n, param) }
 
 theory:
 | declaration theory             { () }
