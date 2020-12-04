@@ -303,6 +303,11 @@ let () =
         (Tactic_soft_failure SEncSharedRandom)
         (fun () -> run ~test "tests/alcotest/enckp_sharedrndframe.sp")
     end ;
+    "Senc Bad SSC - ENCKP 4", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/enckp_dec.sp")
+    end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
