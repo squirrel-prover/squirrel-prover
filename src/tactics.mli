@@ -42,8 +42,8 @@ type tac_error =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
-
-
+  | TacTimeout
+    
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
 
@@ -140,5 +140,9 @@ module AST (M:S) : AST_sig
 (** Raise a soft failure. *)
 val soft_failure : tac_error -> 'a
 
+(** Unwrap the result of a computation that may timeout, or raise a soft 
+    timeout failure. *)
+val timeout_get : 'a Utils.timeout_r -> 'a
+  
 (** Raise a hard failure. *)
 val hard_failure : tac_error -> 'a

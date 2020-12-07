@@ -218,14 +218,18 @@ module S : sig
     (** Other hypotheses. *)
     conclusion : Term.formula;
     (** The conclusion / right-hand side formula of the sequent. *)
-    trs : Completion.state option;
+    trs : Completion.state option ref;
     (** Either [None], or the term rewriting system
       * corresponding to the current message hypotheses.
-      * Must be se to [None] if message hypotheses change. *)
-    models : Constr.models option;
+      * Must be se to [None] if message hypotheses change. 
+      * We use a reference to try to share the TRS accross 
+      * multiple sequents. *)
+    models : Constr.models option ref;
     (** Either [None], or the models corresponding to the current
       * trace hypotheses.
-      * Must be set to [None] if trace hypotheses change. *)
+      * Must be set to [None] if trace hypotheses change. 
+      * We use a reference to try to share the models accross 
+      * multiple sequents. *)
   }
 
   val init_sequent : Action.system -> t
@@ -249,11 +253,11 @@ module S : sig
 
   (** Set the trs of a sequent. 
       Raise [Invalid_argument ..] if already set. *)
-  val set_trs : t -> Completion.state -> t
+  val set_trs : t -> Completion.state -> unit
 
   (** Set the models of a sequent. 
       Raise [Invalid_argument ..] if already set. *)
-  val set_models : t -> Constr.models -> t
+  val set_models : t -> Constr.models -> unit
 end = struct
   type t = {
     system : Action.system ;
@@ -263,8 +267,8 @@ end = struct
     trace_hypotheses :  trace_hypotheses;
     formula_hypotheses : formula_hypotheses;
     conclusion : Term.formula;
-    trs : Completion.state option;
-    models : Constr.models option;
+    trs : Completion.state option ref;
+    models : Constr.models option ref;
   }
 
   let init_sequent system = {
@@ -275,8 +279,8 @@ end = struct
     trace_hypotheses =  H.empty ;
     formula_hypotheses = H.empty;
     conclusion = Term.True;
-    trs = None;
-    models = None;
+    trs = ref None;
+    models = ref None;
   }
 
   let update ?system ?env ?happens_hypotheses
@@ -285,11 +289,11 @@ end = struct
     let trs = 
       if keep_trs || message_hypotheses = None 
       then t.trs 
-      else None 
+      else ref None 
     and models =
       if keep_models || trace_hypotheses = None 
       then t.models
-      else None 
+      else ref None 
     in
     let system = Utils.opt_dflt t.system system
     and env    = Utils.opt_dflt t.env env
@@ -316,12 +320,12 @@ end = struct
       models = models ;
     }
   
-  let set_trs t trs = match t.trs with
-    | None -> { t with trs = Some trs; }
+  let set_trs t trs = match !(t.trs) with
+    | None -> t.trs := Some trs
     | Some _ -> raise (Invalid_argument "traceSequent: trs already set")
 
-  let set_models t models = match t.models with
-    | None -> { t with models = Some models }
+  let set_models t models = match !(t.models) with
+    | None -> t.models := Some models
     | Some _ -> raise (Invalid_argument "traceSequent: models already set")
 end
 
@@ -495,23 +499,27 @@ let get_eqs_neqs s =
   get_eqs_neqs_at_list
     (List.map (fun h -> h.H.hypothesis) (H.to_list s.message_hypotheses))
 
-let get_trs s =
-  let update_trs s =
+let get_trs s : Completion.state timeout_r =
+  match !(s.trs) with
+  | Some trs -> Result trs
+  | None ->
     let eqs,_ = get_eqs_neqs s in
-    let trs = Completion.complete eqs in
-    S.set_trs s trs
-  in
-  match s.trs with
-  | None -> let s = update_trs s in (s, opt_get s.trs)
-  | Some trs -> (s, trs)
+    match Completion.complete eqs with
+    | Timeout -> Timeout
+    | Result trs ->
+      let () = S.set_trs s trs in
+      Result trs
 
 
 let message_atoms_valid s =
-  let _, trs = get_trs s in
-  let _, neqs = get_eqs_neqs s in
-  List.exists
-    (fun eq -> Completion.check_equalities trs [eq])
-    neqs
+  match get_trs s with
+  | Timeout -> Timeout
+  | Result trs ->
+    let _, neqs = get_eqs_neqs s in
+    Result (
+      List.exists (fun eq ->
+          Completion.check_equalities trs [eq])
+        neqs)
 
 let set_env a s = S.update ~env:a s
 
@@ -583,35 +591,40 @@ let apply_subst subst s =
    ~conclusion:(Term.subst subst s.conclusion)
    s
 
-let get_models s =
-  let update_models s =
-    match s.models with
-    | None ->
-      let trace_atoms = get_trace_atoms s in
-      let models = Constr.models_conjunct trace_atoms in
-      S.set_models s models
-    | Some _ -> s
-  in
-  let s = update_models s in
-  s, opt_get s.models
+let get_models s : Constr.models timeout_r =
+  match !(s.models) with
+  | Some models -> Result models
+  | None ->
+    let trace_atoms = get_trace_atoms s in
+    match Constr.models_conjunct trace_atoms with
+    | Timeout -> Timeout
+    | Result models ->
+      let () = S.set_models s models in
+      Result models
 
 let maximal_elems s tss =
-  let s,models = get_models s in
-  s, Constr.maximal_elems models tss
+  match get_models s with
+  | Result models -> Result (Constr.maximal_elems models tss)
+  | Timeout -> Timeout
 
 let get_ts_equalities s =
-  let s,models = get_models s in
-  let ts = trace_atoms_ts (get_trace_atoms s) in
-  s, Constr.get_ts_equalities models ts
+  match get_models s with
+  | Result models ->
+    let ts = trace_atoms_ts (get_trace_atoms s) in
+    Result (Constr.get_ts_equalities models ts)
+  | Timeout -> Timeout
 
 let get_ind_equalities s =
-  let s,models = get_models s in
-  let inds = trace_atoms_ind (get_trace_atoms s) in
-  s, Constr.get_ind_equalities models inds
+  match get_models s with
+  | Result models ->
+    let inds = trace_atoms_ind (get_trace_atoms s) in
+    Result (Constr.get_ind_equalities models inds)
+  | Timeout -> Timeout    
 
 let constraints_valid s =
-  let s,models = get_models s in
-  not (Constr.m_is_sat models)
+  match get_models s with
+  | Result models -> Result (not (Constr.m_is_sat models))
+  | Timeout -> Timeout
 
 let get_all_terms s =
   let atoms =

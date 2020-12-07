@@ -20,14 +20,20 @@ system out(c,ok).
 goal mygoal: False.
 
 Proof.
+ print.
  apply autre to ok.
  admit.
 Qed.
 
+set printTRSEquations=true.
+set timeout=1.
 
 goal othergoal: False.
 
 Proof.
- apply mycheck to ok, ok.
- (* squirrel part dans les choux *)
+ print.
+ nosimpl(apply mycheck to ok, ok).
+ try congruence.
+ admit.
 Qed.
+

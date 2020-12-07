@@ -7,7 +7,7 @@
 *)
 
 open Term
-
+    
 (** {2 Sequent type and basic operations} *)
 
 type t
@@ -107,40 +107,50 @@ val remove_message_hypothesis :
   (Atom.message_atom -> bool) -> sequent -> Atom.message_atom * sequent
 
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
-   been applied to all hypotheses. It also set to visible = false, when the
+   been applied to all hypotheses. It also set [visible] to [false], when the
    hypothesis becomes trivial (e.g x=x). *)
 val apply_subst : Term.subst -> sequent -> sequent
 
 (** {2 Automated reasoning} *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
-   equalities between messages. It can be used to check if an equality is
-   implied by the set of messages hypotheses. *)
-val get_trs : sequent -> sequent * Completion.state
+    equalities between messages. It can be used to check if an equality is
+    implied by the set of messages hypotheses. 
+    May timeout. *)
+val get_trs : sequent -> Completion.state Utils.timeout_r
 
-val get_models : sequent -> sequent * Constr.models
+(** [get_models s] returns a set of minimal models corresponding to the 
+    trace atoms in the sequent [s]. 
+    See module [Constr]. 
+    May timeout. *)
+val get_models : sequent -> Constr.models Utils.timeout_r
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
-  * messages on both sides of the sequents make the sequent valid. *)
-val message_atoms_valid : sequent -> bool
+  * messages on both sides of the sequents make the sequent valid. 
+  * May timeout. *)
+val message_atoms_valid : sequent -> bool Utils.timeout_r
 
 (** [constraints_valid s] returns true if constraints make the sequent valid,
   * taking into account constraint trace formula hypotheses and atomic
-  * constraint conclusion. *)
-val constraints_valid : sequent -> bool
+  * constraint conclusion. 
+  * May timeout. *)
+val constraints_valid : sequent -> bool Utils.timeout_r
 
 (** [get_ts_equalities s] returns all the equalities between timestamps
-       derivable from its hypothesis. *)
-val get_ts_equalities : sequent -> sequent * Term.timestamp list list
+    derivable from its hypothesis. 
+    May timeout. *)
+val get_ts_equalities : sequent -> Term.timestamp list list Utils.timeout_r
 
 (** [get_ind_equalities s] returns all the equalities between indices
-       derivable from its hypothesis. *)
-val get_ind_equalities : sequent -> sequent * Vars.index list list
+    derivable from its hypothesis. 
+    May timeout. *)
+val get_ind_equalities : sequent -> Vars.index list list Utils.timeout_r
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
-   according to their ordering derived from the hypothesis in [s]. *)
+    according to their ordering derived from the hypothesis in [s]. 
+    May timeout. *)
 val maximal_elems : sequent -> Term.timestamp list ->
-  sequent * Term.timestamp list
+  Term.timestamp list Utils.timeout_r
 
 (** {2 Misc} *)
 

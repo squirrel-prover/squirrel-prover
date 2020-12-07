@@ -13,6 +13,7 @@ let usage = Printer.strf "Usage: %s filename" (Filename.basename Sys.argv.(0))
 let args  = ref []
 let verbose = ref false
 let interactive = ref false
+
 let speclist = [
   ("-i", Arg.Set interactive, "interactive mode (e.g, for proof general)");
   ("-v", Arg.Set verbose, "display more informations");
@@ -110,6 +111,9 @@ let rec main_loop ~test ?(save=true) mode =
       Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
 
+    | GoalMode, ParsedSetOption sp ->
+      Config.set_param sp;
+      main_loop ~test GoalMode
 
     | GoalMode, ParsedGoal goal ->
       begin
@@ -147,8 +151,9 @@ and error ~test mode s =
 
 let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
 
-let interactive_prover () =
+let interactive_prover () =   
   Printer.prt `Start "Squirrel Prover interactive mode.";
+  Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   try main_loop InputDescr
   with End_of_file -> Printer.prt `Error "End of file, exiting."

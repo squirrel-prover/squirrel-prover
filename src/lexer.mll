@@ -69,6 +69,7 @@ rule token = parse
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
 | "system"            { SYSTEM }
+| "set"               { SET }
 | "hash"              { HASH }
 | "aenc"              { AENC }
 | "senc"              { SENC }

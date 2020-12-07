@@ -44,7 +44,11 @@ let () =
     goal_true_intro
 
 let print (s : TraceSequent.t) =
-  Printer.prt `Result "@.%a@." Action.pp_descrs (TraceSequent.system s);
+  Printer.prt `Result "@.%a@.%t@."
+    Action.pp_descrs (TraceSequent.system s)
+    (if Config.print_trs_equations ()
+     then Completion.print_init_trs
+     else (fun _fmt -> ()));
    [s]
 
 let () =
@@ -506,7 +510,7 @@ let constraints (s : TraceSequent.t) =
       s
       trace_conclusions
   in
-  if TraceSequent.constraints_valid new_s then
+  if Tactics.timeout_get (TraceSequent.constraints_valid new_s) then
     []
   else Tactics.soft_failure (Tactics.Failure "constraints satisfiable")
 
@@ -564,7 +568,7 @@ let congruence (s : TraceSequent.t) =
       s
       term_conclusions
   in
-  if TraceSequent.message_atoms_valid s then
+  if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
     []
   else Tactics.soft_failure (Tactics.Failure "Equations satisfiable")
 
@@ -617,7 +621,7 @@ let () =
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
-  let s,trs = TraceSequent.get_trs s in
+  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
   let terms = TraceSequent.get_all_terms s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
@@ -630,7 +634,7 @@ let eq_names (s : TraceSequent.t) =
   in
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let s,trs = TraceSequent.get_trs s in
+  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
   let cnstrs = Completion.name_index_cnstrs trs
       (TraceSequent.get_all_terms s)
   in
@@ -650,7 +654,7 @@ let () = T.register "eqnames"
 
 (** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : TraceSequent.t) =
-  let s, ts_classes = TraceSequent.get_ts_equalities s in
+  let ts_classes = Tactics.timeout_get (TraceSequent.get_ts_equalities s) in
   let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
   let ts_subst =
     let rec asubst e = function
@@ -660,7 +664,7 @@ let eq_trace (s : TraceSequent.t) =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let s, ind_classes = TraceSequent.get_ind_equalities s in
+  let ind_classes = Tactics.timeout_get (TraceSequent.get_ind_equalities s) in
   let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
   let ind_subst =
     let rec asubst e = function
@@ -837,7 +841,7 @@ let apply_substitute subst s =
 
 let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   let subst =
-        let s,trs = TraceSequent.get_trs s in
+        let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
         if Completion.check_equalities trs [(m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
@@ -853,7 +857,7 @@ let () =
 
 let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   let subst =
-      let s, models = TraceSequent.get_models s in
+      let models = Tactics.timeout_get (TraceSequent.get_models s) in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -867,7 +871,7 @@ let () =
 
 let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   let subst =
-    let s, models = TraceSequent.get_models s in
+    let models = Tactics.timeout_get (TraceSequent.get_models s) in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
@@ -1148,11 +1152,15 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts = Action.to_term case.action_descr.Action.action in
   (* The action occured before the test H(m,k) = s. *)
+  let maximal_elems =
+    Tactics.timeout_get
+      (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m))
+  in
   let le_cnstr =
     List.map
       (function ts ->
         Term.Atom (Term.mk_timestamp_leq action_descr_ts ts))
-      (snd (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m)))
+      (maximal_elems)
   in
   let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
 
@@ -1496,7 +1504,7 @@ let collision_resistance (s : TraceSequent.t) =
                | _ -> acc)
             (make_eq acc q) q
     in
-    let s,trs = TraceSequent.get_trs s in
+    let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
     let hash_eqs =
       make_eq [] hashes
       |> List.filter (fun eq -> Completion.check_equalities trs [eq])

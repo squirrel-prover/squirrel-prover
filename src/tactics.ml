@@ -13,6 +13,7 @@ type tac_error =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | TacTimeout
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -42,6 +43,7 @@ let rec pp_tac_error ppf = function
     Fmt.string ppf "Two encryptions share the same random"
   | SEncRandomNotFresh ->
     Fmt.string ppf "A random used for an encryption is used elsewhere"
+  | TacTimeout -> Fmt.pf ppf "Time-out"
 
 exception Tactic_soft_failure of tac_error
 
@@ -266,5 +268,11 @@ module AST (M:S) = struct
 
 end
 
+
 let soft_failure e = raise (Tactic_soft_failure e)
 let hard_failure e = raise (Tactic_hard_failure e)
+
+let timeout_get = function
+  | Utils.Result a -> a
+  | Utils.Timeout -> hard_failure TacTimeout
+
