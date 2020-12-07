@@ -156,9 +156,9 @@ val subst : subst -> 'a term -> 'a term
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
-(** [subst_macros_ts names ts1 ts2 t] substitutes [ts1] if applied to a macro
-  * which name is in [names] to [ts2] in the term [t]. *)
-val subst_macros_ts : string list -> Sorts.timestamp term -> Sorts.timestamp term -> 'a term -> 'a term
+(** [subst_macros_ts l ts t] replaces [ts] by [pred(ts)] in the term [t]
+  * if [ts] is applied to a state macro which name is in [l]. *)
+val subst_macros_ts : string list -> Sorts.timestamp term -> 'a term -> 'a term
 
 (** {2 Predefined symbols} *)
 

@@ -545,24 +545,37 @@ and subst_generic_atom s = function
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
-let rec subst_macros_ts : type a. string list -> Sorts.timestamp term -> Sorts.timestamp term -> a term -> a term =
-fun names ts1 ts2 t -> match t with
-  | Macro ((symb,s,ind), terms, ts) ->
-    if (List.mem (Symbols.to_string symb) names && ts=ts1)
-    then Macro((symb,s,ind), List.map (subst_macros_ts names ts1 ts2) terms, ts2)
-    else Macro((symb,s,ind), List.map (subst_macros_ts names ts1 ts2) terms, ts)
-  | Fun (f,terms) -> Fun (f, List.map (subst_macros_ts names ts1 ts2) terms)
-  | Seq (a, b) -> Seq (a, subst_macros_ts names ts1 ts2 b)
-  | Diff (a, b) -> Diff (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
-  | ITE (a, b, c) -> ITE (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b, subst_macros_ts names ts1 ts2 c)
-  | Find (vs, b, t, e) -> Find (vs, subst_macros_ts names ts1 ts2 b, subst_macros_ts names ts1 ts2 t, subst_macros_ts names ts1 ts2 e)
-  | ForAll (vs, b) -> ForAll (vs, subst_macros_ts names ts1 ts2 b)
-  | Exists (vs, b) -> Exists (vs, subst_macros_ts names ts1 ts2 b)
-  | And (a, b) -> And (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
-  | Or (a, b) -> Or (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
-  | Not a -> Not (subst_macros_ts names ts1 ts2 a)
-  | Impl (a, b) -> Impl (subst_macros_ts names ts1 ts2 a, subst_macros_ts names ts1 ts2 b)
-  | _ -> t
+let subst_macros_ts l ts t =
+  let rec subst_term : type a. a term -> a term = fun t -> match t with
+    | Macro ((symb,s,ind), terms, ts') ->
+      let terms' = List.map subst_term terms in
+      begin match Symbols.Macro.get_all symb with
+      | Symbols.State _, _ ->
+        if (List.mem (Symbols.to_string symb) l && ts=ts')
+        then Macro((symb,s,ind), terms', ts')
+        else Macro((symb,s,ind), terms', Pred(ts'))
+      | _ -> Macro((symb,s,ind), terms', ts')
+      end
+    | Fun (f,terms) -> Fun (f, List.map subst_term terms)
+    | Seq (a, b) -> Seq (a, subst_term b)
+    | Diff (a, b) -> Diff (subst_term a, subst_term b)
+    | ITE (a, b, c) -> ITE (subst_term a, subst_term b, subst_term c)
+    | Find (vs, b, t, e) -> Find (vs, subst_term b, subst_term t, subst_term e)
+    | ForAll (vs, b) -> ForAll (vs, subst_term b)
+    | Exists (vs, b) -> Exists (vs, subst_term b)
+    | And (a, b) -> And (subst_term a, subst_term b)
+    | Or (a, b) -> Or (subst_term a, subst_term b)
+    | Not a -> Not (subst_term a)
+    | Impl (a, b) -> Impl (subst_term a, subst_term b)
+    | Atom a -> Atom (subst_generic_atom a)
+    | _ -> t
+  and subst_message_atom (`Message (ord, a1, a2)) =
+    `Message (ord, subst_term a1, subst_term a2)
+  and subst_generic_atom a = match a with
+    | #message_atom as a -> (subst_message_atom a :> generic_atom)
+    | _ -> a
+  in
+  subst_term t
 
 
 (** Smart constructors for boolean terms. *)

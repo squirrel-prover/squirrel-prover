@@ -181,8 +181,6 @@ type p_env = {
     (* list of formulas to create the condition term of the action *)
   updates : (string * string list * Term.message) list ;
     (* list of updates performed in the action *)
-  local_macros : string list
-    (* list of local macros defined in the action *)
 }
 
 let parse_proc system_name proc =
@@ -203,18 +201,9 @@ let parse_proc system_name proc =
       (fun (x,_,tm) -> Theory.ESubst (x,tm))
       msubst)
   in
-  let conv_term ?(pred=true) env dep ts t sort =
+  let conv_term env ts t sort =
     let subst = create_subst env.isubst env.msubst in
-    if pred
-    then
-      let t' = Theory.convert ~at:(Term.Pred ts) subst t sort in
-      if List.length dep > 0
-      then
-        Term.subst_macros_ts dep (Term.Pred ts) ts t'
-      else
-        t'
-    else
-      Theory.convert ~at:ts subst t sort
+    Theory.convert ~at:ts subst t sort
   in
   let conv_indices env l =
     List.map
@@ -239,6 +228,12 @@ let parse_proc system_name proc =
     in
     let indices = List.rev env.indices in
     let action_term = Term.Action (a', indices) in
+    let in_th = Theory.Var (snd input) in
+    let in_tm = Term.Macro (Term.in_macro, [], action_term) in
+    let env =
+      { env with
+        msubst = (snd input, in_th, in_tm) :: env.msubst }
+    in
     let subst_ts = [Term.ESubst (Term.Var ts, action_term)] in
     let condition =
       List.rev env.evars,
@@ -252,7 +247,7 @@ let parse_proc system_name proc =
         env.updates
     in
     let output = match output with
-      | Some (c,t) -> c, conv_term ~pred:false env [] action_term t Sorts.Message
+      | Some (c,t) -> c, conv_term env action_term t Sorts.Message
       | None -> Channel.dummy, Term.dummy
     in
     let action_descr =
@@ -280,11 +275,13 @@ let parse_proc system_name proc =
         (fun (iacc,macc) (x,k) v ->
           match k,v with
           | Sorts.ESort Sorts.Message,_ ->
-            let v' = Theory.subst v tsubst in
-            iacc, (x, v', conv_term env [] (Term.Var ts) v' Sorts.Message)::macc
+            let v'_th = Theory.subst v tsubst in
+            let v'_tm = conv_term env (Term.Var ts) v'_th Sorts.Message in
+            iacc, (x, v'_th, v'_tm)::macc
           | Sorts.ESort Sorts.Index, Theory.Var i ->
-            let _,i' = list_assoc i env.isubst in
-            (x, Theory.subst v tsubst, i')::iacc, macc
+            let _,i'_tm = list_assoc i env.isubst in
+            let i'_th = Theory.subst v tsubst in
+            (x, i'_th, i'_tm)::iacc, macc
           | _ -> assert false)
         (env.isubst,env.msubst) t args
     in
@@ -318,42 +315,19 @@ let parse_proc system_name proc =
 
   in
 
-  let rec p_in ~env ~pos ~pos_indices proc = match proc with
-  | Null -> (Null,pos)
-
-  | Parallel (p,q) ->
-    let current_env = !(env.vars_env) in
-    let env =
-      { env with
-        vars_env = ref current_env }
-    in
-    let p',pos_p = p_in ~env ~pos ~pos_indices p in
-    let q',pos_q = p_in ~env ~pos:pos_p ~pos_indices q in
-    (Parallel (p',q'), pos_q)
-
-  | Repl (i,p) ->
-    let i' = Vars.make_fresh_and_update env.vars_env Sorts.Index i in
-    let env =
-      { env with
-        isubst = (i, Theory.Var (Vars.name i'), i') :: env.isubst ;
-        indices = i' :: env.indices }
-    in
-    let pos_indices = i'::pos_indices in
-    let p',pos' = p_in ~env ~pos ~pos_indices p in
-    (Repl (Vars.name i', p'),pos')
-
-  | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common env proc in
-    p_in ~env ~pos ~pos_indices p
-
-  | New (n,p) ->
-    let env,p = p_common env proc in
-    p_in ~env ~pos ~pos_indices p
+  let p_let ?(search_dep=false) ~env proc = match proc with
 
   | Let (x,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let dep = Theory.find_fun_terms t' env.local_macros in
-    let body = conv_term env dep (Term.Var ts) t' Sorts.Message in
+    let updated_states =
+      if search_dep
+      then Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+      else []
+    in
+    let body =
+      Term.subst_macros_ts updated_states (Term.Var ts)
+        (conv_term env (Term.Var ts) t' Sorts.Message)
+    in
     let invars = List.map snd env.inputs in
     let _,x' =
       Macros.declare_global Symbols.dummy_table x ~inputs:invars
@@ -371,19 +345,61 @@ let parse_proc system_name proc =
     in
     let env =
       { env with
-        msubst = (x,x'_th,x'_tm) :: env.msubst ;
-        local_macros = (Symbols.to_string x')::env.local_macros }
+        msubst = (x,x'_th,x'_tm) :: env.msubst }
     in
+    (x',t',env,p)
+
+  | _ -> assert false
+
+  in
+
+  let rec p_in ~env ~pos ~pos_indices proc = match proc with
+  | Null -> (Null,pos)
+
+  | Parallel (p,q) ->
+    let current_env = !(env.vars_env) in
+    let env =
+      { env with
+        vars_env = ref current_env }
+    in
+    let p',pos_p = p_in ~env ~pos ~pos_indices p in
+    let env =
+      { env with
+        vars_env = ref current_env }
+    in
+    let q',pos_q = p_in ~env ~pos:pos_p ~pos_indices q in
+    (Parallel (p',q'), pos_q)
+
+  | Repl (i,p) ->
+    let i' = Vars.make_fresh_and_update env.vars_env Sorts.Index i in
+    let env =
+      { env with
+        isubst = (i, Theory.Var (Vars.name i'), i') :: env.isubst ;
+        indices = i' :: env.indices }
+    in
+    let pos_indices = i'::pos_indices in
+    let p',pos' = p_in ~env ~pos ~pos_indices p in
+    (Repl (Vars.name i', p'),pos')
+
+  | Apply (id,args) | Alias (Apply (id,args), _) ->
+    let env,p = p_common ~env proc in
+    p_in ~env ~pos ~pos_indices p
+
+  | New (n,p) ->
+    let env,p = p_common ~env proc in
+    p_in ~env ~pos ~pos_indices p
+
+  | Let (x,t,p) ->
+    let x',t',env,p = p_let ~env proc in
     let p',pos' = p_in ~env ~pos ~pos_indices p in
     (Let (Symbols.to_string x', t', p'),pos')
 
   | In (c,x,p) ->
     let x' = Vars.make_fresh_and_update env.vars_env Sorts.Message x in
     let in_th =
-      Theory.Fun (Vars.name x', [], None)
+      Theory.Var (Vars.name x')
     in
-    let in_tm =
-      Term.Macro (Term.in_macro, [], Term.Var ts) in
+    let in_tm = Term.Var x' in
     let env =
       { env with
         inputs = (c,x')::env.inputs ;
@@ -400,37 +416,15 @@ let parse_proc system_name proc =
 
   and p_cond ~env ~pos ~par_choice proc = match proc with
   | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common env proc in
+    let env,p = p_common ~env proc in
     p_cond ~env ~pos ~par_choice p
 
   | New (n,p) ->
-    let env,p = p_common env proc in
+    let env,p = p_common ~env proc in
     p_cond ~env ~pos ~par_choice p
 
   | Let (x,t,p) ->
-    let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let dep = Theory.find_fun_terms t' env.local_macros in
-    let body = conv_term env dep (Term.Var ts) t' Sorts.Message in
-    let invars = List.map snd env.inputs in
-    let _,x' =
-      Macros.declare_global Symbols.dummy_table x ~inputs:invars
-        ~indices:(List.rev env.indices) ~ts:ts body
-    in
-    let x'_th =
-      Theory.Fun
-        (Symbols.to_string x',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices,
-         None)
-    in
-    let x'_tm =
-      Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
-                  Term.Var ts)
-    in
-    let env =
-      { env with
-        msubst = (x,x'_th,x'_tm) :: env.msubst ;
-        local_macros = (Symbols.to_string x')::env.local_macros }
-    in
+    let x',t',env,p = p_let ~env proc in
     let p',pos' = p_cond ~env ~pos ~par_choice p in
     (Let (Symbols.to_string x', t', p'),pos')
 
@@ -450,9 +444,12 @@ let parse_proc system_name proc =
         s
       @ env.isubst
     in
-    let cond' = Theory.subst cond (to_tsubst isubst' @ to_tsubst env.msubst) in
-    let dep = Theory.find_fun_terms cond' env.local_macros in
-    let fact = conv_term env dep (Term.Var ts) cond' Sorts.Boolean in
+    let env =
+      { env with
+        isubst = isubst' }
+    in
+    let cond' = Theory.subst cond (to_tsubst env.isubst @ to_tsubst env.msubst) in
+    let fact = conv_term env (Term.Var ts) cond' Sorts.Boolean in
     let facts_p = fact::env.facts in
     let facts_q =
       match evars' with
@@ -497,41 +494,15 @@ let parse_proc system_name proc =
 
   and p_update ~env proc = match proc with
   | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common env proc in
+    let env,p = p_common ~env proc in
     p_update ~env p
 
   | New (n,p) ->
-    let env,p = p_common env proc in
+    let env,p = p_common ~env proc in
     p_update ~env p
 
   | Let (x,t,p) ->
-    let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let states_already_updated = (List.map (fun (s,_,_) -> s) env.updates) in
-    let dep =
-      (Theory.find_fun_terms t' env.local_macros)
-      @ (Theory.find_get_terms t' states_already_updated)
-    in
-    let body = conv_term env dep (Term.Var ts) t' Sorts.Message in
-    let invars = List.map snd env.inputs in
-    let _,x' =
-      Macros.declare_global Symbols.dummy_table x ~inputs:invars
-        ~indices:(List.rev env.indices) ~ts:ts body
-    in
-    let x'_th =
-      Theory.Fun
-        (Symbols.to_string x',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices,
-         None)
-    in
-    let x'_tm =
-      Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
-                  Term.Var ts)
-    in
-    let env =
-      { env with
-        msubst = (x,x'_th,x'_tm) :: env.msubst ;
-        local_macros = (Symbols.to_string x')::env.local_macros }
-    in
+    let x',t',env,p = p_let ~search_dep:true ~env proc in
     let p',pos' = p_update ~env p in
     (Let (Symbols.to_string x', t', p'),pos')
 
@@ -543,7 +514,6 @@ let parse_proc system_name proc =
          - either the value before the current action.
          There is no in-between value. *)
       failwith "Cannot update twice the same state in an action"
-      (* FIXME handle this in check_proc ? *)
     else
       let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
       let l' =
@@ -554,12 +524,13 @@ let parse_proc system_name proc =
                | _ -> assert false)
           l
       in
-      let states_already_updated = (List.map (fun (s,_,_) -> s) env.updates) in
-      let dep =
-        (Theory.find_fun_terms t' env.local_macros)
-        @ (Theory.find_get_terms t' states_already_updated)
+      let updated_states =
+        Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       in
-      let t'_tm = conv_term env dep (Term.Var ts) t' Sorts.Message in
+      let t'_tm =
+        Term.subst_macros_ts updated_states (Term.Var ts)
+          (conv_term env (Term.Var ts) t' Sorts.Message)
+      in
       let env =
         { env with
           updates = (s,l',t'_tm)::env.updates }
@@ -574,8 +545,7 @@ let parse_proc system_name proc =
       { env with
         evars = [] ;
         facts = [] ;
-        updates = [] ;
-        local_macros = [] }
+        updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] p in
     (Alias (Out (c,t',p'), Symbols.to_string a'), pos')
@@ -587,8 +557,7 @@ let parse_proc system_name proc =
       { env with
         evars = [] ;
         facts = [] ;
-        updates = [] ;
-        local_macros = [] }
+        updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] p in
     (Alias (Out (c,t',p'), Symbols.to_string a'), pos')
@@ -599,8 +568,7 @@ let parse_proc system_name proc =
       { env with
         evars = [] ;
         facts = [] ;
-        updates = [] ;
-        local_macros = [] }
+        updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
     (Null, pos')
@@ -619,8 +587,7 @@ let parse_proc system_name proc =
       evars = [] ;
       action = [] ;
       facts = [] ;
-      updates = [] ;
-      local_macros = [] }
+      updates = [] }
   in
   let proc,_ = p_in ~env ~pos:0 ~pos_indices:[] proc in
   (proc, Symbols.dummy_table)
