@@ -14,55 +14,78 @@ exception Error of string
   *
   * For bad, internal errors that should be
   * reported with a backtrace, return [None]. *)
-let pp_error pp_loc e = match e with
+(** Pretty-printer for parsing locations. *)
+let pp_error pp_loc pp_pref_loc e = match e with
   | Parser.Error ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Syntax error %a.@]@."
+                "@[%aSyntax error %a.@]@."
+                pp_pref_loc ()
                 pp_loc ())
   | Failure s ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Error %a: @,%s.@]@."
+                "@[%aError %a: @,%s.@]@."
+                pp_pref_loc ()
                 pp_loc ()
                 s)
   | Symbols.Unbound_identifier s->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Unbound identifier %a : %s.@]@."
+                "@[%aUnbound identifier %a : %s.@]@."
+                pp_pref_loc ()
                 pp_loc ()
                 s)
   | Symbols.Multiple_declarations s ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Multiple declarations %a : %s.@]@."
+                "@[%aMultiple declarations %a : %s.@]@."
+                pp_pref_loc ()
                 pp_loc ()
                 s)
   | Theory.Conv err ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[Error %a: %a.@]@."
+                "@[%aError %a: %a.@]@."
+                pp_pref_loc ()
                 pp_loc ()
                 Theory.pp_error err)
   | _ -> None
 
-(** Pretty-printer for parsing locations. *)
-let pp_loc filename lexbuf ppf () =
-  Fmt.pf ppf
-    "in %s @,\
-     at line %d char %d @,\
-     before %S"
-    filename
-    lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
-    (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
-     lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
-    (Lexing.lexeme lexbuf)
+let pp_loc interactive filename lexbuf ppf () =
+  if not(interactive) then
+    Fmt.pf ppf
+      " in %s @,\
+       at line %d char %d @,\
+       before %S"
+      filename
+      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+      (Lexing.lexeme lexbuf)
+  else
+    Fmt.pf ppf
+      "at line %d char %d of this input @,\
+       before %S"
+      lexbuf.Lexing.lex_curr_p.Lexing.pos_lnum
+      (lexbuf.Lexing.lex_curr_p.Lexing.pos_cnum -
+       lexbuf.Lexing.lex_curr_p.Lexing.pos_bol)
+      (Lexing.lexeme lexbuf)
+
+let pp_pref_loc interactive lexbuf ppf () =
+  if interactive then
+        Fmt.pf ppf
+      "[error-%d-%d]"
+      (Lexing.lexeme_start_p lexbuf).pos_cnum
+      (Lexing.lexeme_end_p lexbuf).pos_cnum
+
 
 let parse_from_buf
       ?(test=false) ?(interactive=false) parse_fun lexbuf filename =
   try parse_fun Lexer.token lexbuf with e ->
-    let pp_loc = pp_loc filename lexbuf in
-      match pp_error pp_loc e with
+    let pp_loc = pp_loc interactive filename lexbuf in
+    let pp_pref_loc = pp_pref_loc interactive lexbuf in
+      match pp_error pp_loc pp_pref_loc e with
         | Some pp_error ->
             if test then raise e else
             if interactive then
@@ -90,7 +113,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
   parse_from_buf ~test Parser.theory lexbuf filename
 
 let parse_theory_test ?(test=false) filename =
-  let lexbuf = Lexing.from_channel (Pervasives.open_in filename) in
+  let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   parse_theory_buf ~test lexbuf filename
 
 let parse parser parser_name string =

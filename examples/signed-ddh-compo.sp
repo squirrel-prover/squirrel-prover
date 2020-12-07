@@ -4,17 +4,32 @@ SIGNED DDH
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 
-P -> S : g^a
-S -> P : <g^a,g^b>,h(<g^a,g^b>,kS)
-P -> S : h(<g^a,g^b>,kP)
+P -> S : <pk(kP), g^a>
+S -> P : <pk(kS),g^b>,sign(<<g^a,g^b>,pk(kP)>,kS)
+P -> S : sign(<<g^b,g^a>,pk(kS)>,kP)
 
-We leverage the composition result, to prove a single session in the
-presence of an adversary with access to a "backdoor" about the signature
-function, which allows him to about signatures of some specific messages.
+We leverage the composition result of [1], to prove the security of a single
+session in the presence of an adversary with access to a "backdoor" about the
+signature function, which allows him to about signatures of some specific
+messages.
 
-The proof is split into two systems, one modelling the authentication property,
-and the other the strong secrecy. Put together, they allow to derive very simply
-the actual assumption needed to apply the composition theorem.
+It means that we only consider two session of the agents, P and S, using a1 and
+b1 as DH shares. We consider that the other sessions of P (simulated thanks to
+the oracle), use a(i) as a DH share, and b(i) for the other sessions of S.
+
+The proof is split into two systems:
+
+ - [auth] - which models the authentication property, i.e. that P and S must be
+partnered with an honnest session of the protocol.
+
+ - [secret] - which models the secrecy property. i.e. that if P and S are
+partenered together, the derived key is real-or-random.  Those two properties
+allow to conclude through the result of [1] the multi-session security of DDH.
+
+[1] : Hubert Comon, Charlie Jacomme, and Guillaume Scerri. Oracle simula-
+tion: a technique for protocol composition with long term shared secrets.
+In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
+Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
 
@@ -27,15 +42,11 @@ name kS : message
 channel cP
 channel cS
 
-
-name a1 : message
-name b1 : message
-name k11 : message
+name a1 : message (* DH share of P *)
+name b1 : message (* DH share of S *)
+name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
-name k : index -> index -> message
-
-axiom DDHgroup : forall (x1,x2:message), x1 <> x2 => g^x1 <> g^x2
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
  (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
@@ -73,7 +84,7 @@ process S =
     out(cS,ok);
     in(cS, challenge);
     if pkP=pk(kP) then
-     (if gP = g^a1 then
+     if gP = g^a1 then
       out(cS, ok)
       else
        (try find l such that gP = g^a(l) in
@@ -81,8 +92,7 @@ process S =
 	else
     	  out(cS, diff(ok,ko))
 	 )
-       )
-     else null
+
 
 system [auth] ( P | S).
 
@@ -126,11 +136,10 @@ system [secret] ( P2 | S2).
 goal [none, auth] S1_charac :
   cond@S1 => (cond@S4 => False) .
 Proof.
-  simpl.
-  nosimpl(expand cond@S1; expand cond@S4; simpl).
+  expand cond@S1; expand cond@S4.
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
-  euf M1.
+  euf M0.
 
   case H2.
   apply H0 to i.
@@ -142,10 +151,9 @@ Qed.
 goal [none, auth] P1_charac :
    cond@P1 => (cond@P4 => False).
 Proof.
-  simpl.
-  nosimpl(expand cond@P1; expand cond@P4; simpl).
+  expand cond@P1; expand cond@P4.
   substitute pkS@P1,pk(kS).
-  euf M1.
+  euf M0.
 
   case H3.
   apply H0 to i.
@@ -166,59 +174,63 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 equiv [left, auth] [right, auth] auth.
 Proof.
    enrich kP; enrich g^a1; enrich g^b1; enrich kS.
-   enrich seq(i-> g^b(i)).    enrich seq(i-> g^a(i)).
+   enrich seq(i-> g^b(i)); enrich seq(i-> g^a(i)).
 
    induction t.
 
-   expandall.
-   fa 6.
+   (* P *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* P1 *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* P2 *)
+   expandall; fa 6.
 
-   expandall.
+   (* P3 *)
+   expandall; fa 6.
    expand seq(i->g^b(i)),j.
-   fa 7.
 
+   (* P4 *)
    expand frame@P4; expand exec@P4.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
    executable pred(P4). depends P1, P4. apply H2 to P1. expand exec@P1. apply P1_charac.
-   fa 7.
-   noif 7.
 
-   expandall.
-   fa 6.
+   fa 7; noif 7.
 
-   expandall.
-   fa 6.
+   (* A *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* A1 *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* S *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* S1 *)
+   expandall; fa 6.
 
+   (* S2 *)
+   expandall; fa 6.
+
+   (* S3 *)
    expandall.
    expand seq(i->g^a(i)),l.
    fa 7.
 
+   (* S4 *)
    expand frame@S4; expand exec@S4.
+
    equivalent exec@pred(S4) && cond@S4, False.
    executable pred(S4). depends S1, S4. apply H2 to S1. expand exec@S1. apply S1_charac.
 
    fa 6. fa 7. noif 7.
 
-   expandall.
-   fa 6.
+   (* A2 *)
+   expandall; fa 6.
 
-   expandall.
-   fa 6.
+   (* A3 *)
+   expandall; fa 6.
 Qed.

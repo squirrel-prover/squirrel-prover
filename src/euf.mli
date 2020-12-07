@@ -42,24 +42,29 @@ exception Bad_ssc
 (** Raises Bad_ssc if the syntactic side condition of the key is not met inside
 the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
-val hash_key_ssc :
+val key_ssc :
+  ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
-  pk:(Term.fname option) ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   Term.fname -> Term.name -> unit
 
-(** Same as [hash_key_ssc] but returns a boolean. *)
-val check_hash_key_ssc :
+(** Same as [key_ssc] but returns a boolean. *)
+val check_key_ssc :
+  ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
-  pk:(Term.fname option) ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   Term.fname -> Term.name -> bool
 
-(** [mk_rule proc hash_fn key_n] create the euf rule associated to an given
-    hash function and key in a process.
-    TODO: memoisation *)
+(** [mk_rule proc head_fn key_n] create the euf rule associated to an given head
+   function and key in a process.  If drop_head is true, the message stored do
+   not contain anymore the head_fn function, else they still do.  TODO:
+   memoisation *)
 val mk_rule :
-  pk:(Term.fname option) ->
+  ?elems:EquivSequent.elem list ->
+  ?drop_head:bool ->
+  allow_functions:(Symbols.fname Symbols.t -> bool) ->
   system:Action.system ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->
-  hash_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule
+  head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule

@@ -35,7 +35,7 @@ module Cst = struct
     | Csucc a, Csucc a' -> compare a a'
     | Csucc _, _ -> -1
     | _, Csucc _ -> 1
-    | _,_ -> Pervasives.compare c c'
+    | _,_ -> Stdlib.compare c c'
 
   (*  let equal c c' = compare c c' = 0 *)
 
@@ -44,7 +44,7 @@ end
 
 type varname = int
 
-let sort_ts ts = List.sort Pervasives.compare ts
+let sort_ts ts = List.sort Stdlib.compare ts
 
 (* [nilpotence_norm l] normalize [l] using the nilpotence rule x + x -> 0. *)
 let nilpotence_norm l =
@@ -597,7 +597,7 @@ end = struct
     assert (xeqs = []);
     { state with uf = Cuf.union state.uf a b;
                  grnd_rules = eqs @ state.grnd_rules
-                              |> List.sort_uniq Pervasives.compare }
+                              |> List.sort_uniq Stdlib.compare }
 
   (* Try to superpose two rules at head position, and add a new equality to get
       local confluence if necessary. *)
@@ -675,7 +675,7 @@ end = struct
       - r_closed: e_rules already superposed with all other rules.
       - r_open: e_rules to superpose. *)
   let rec deduce_aux state r_open r_closed = match r_open with
-    | [] -> { state with e_rules = List.sort_uniq Pervasives.compare r_closed }
+    | [] -> { state with e_rules = List.sort_uniq Stdlib.compare r_closed }
 
     | rule :: r_open' ->
       let state, r_open' = List.fold_left (fun (state, r_open') rule' ->
@@ -829,12 +829,12 @@ let rec normalize_csts state = function
 let finalize_completion state =
   let grnds =
     List.map (fun (t,c) -> (normalize_csts state t, c)) state.grnd_rules
-    |> List.sort_uniq Pervasives.compare in
+    |> List.sort_uniq Stdlib.compare in
   let erules =
     List.map (fun (t,s) ->
         (normalize_csts state t, normalize_csts state s)
       ) state.e_rules
-    |> List.sort_uniq Pervasives.compare in
+    |> List.sort_uniq Stdlib.compare in
 
   { state with
     grnd_rules = grnds;
@@ -1005,7 +1005,7 @@ let x_index_cnstrs state l select f_cnstr =
     [] l
   |> subterms
   |> List.filter select
-  |> List.sort_uniq Pervasives.compare
+  |> List.sort_uniq Stdlib.compare
   |> List.map (fun x -> x, normalize state x)
   |> Utils.classes (fun (_,x) (_,y) -> x = y)
   |> List.map @@ List.map fst
@@ -1038,7 +1038,7 @@ let name_indep_cnstrs state l =
       let sub_names = subterms [t]
                       |> List.filter (function Ccst Cst.Cname _ -> true
                                              | _ -> false)
-                      |> List.sort_uniq Pervasives.compare
+                      |> List.sort_uniq Stdlib.compare
       in
       let rec mk_disjunction l =
         match l with
@@ -1055,7 +1055,7 @@ let name_indep_cnstrs state l =
     (function f -> is_ground_cterm f && no_macros f)
     n_cnstr
   |>  List.filter (function Term.True -> false | _ -> true)
-  |>  List.sort_uniq Pervasives.compare
+  |>  List.sort_uniq Stdlib.compare
 
 (****************)
 (* Tests Suites *)

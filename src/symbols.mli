@@ -148,6 +148,9 @@ module type Namespace = sig
     * @raise Unbound_identifier otherwise. *)
   val of_string : string -> ns t
 
+  (** [cast_of_string s] always returns [s] as a symbol. *)
+  val cast_of_string : string -> ns t
+
   (** Get definition associated to some symbol. *)
   val get_def : ns t -> def
 

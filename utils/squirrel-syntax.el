@@ -23,6 +23,7 @@
   "Proof"
   "Qed"
   "hash"
+  "senc"
   "abstract"
   "name"
   "channel"
@@ -109,6 +110,7 @@
   "trivialif"
   "xor"
   "yesif"
+  "intctxt"
 ))
 
 (defvar squirrel-tacticals-keywords '(

@@ -35,6 +35,7 @@ module List = struct
     List.for_all (fun x -> List.mem x b)  a
 end
 
+(*------------------------------------------------------------------*)
 module String = struct
   include String
 
@@ -61,16 +62,17 @@ end
 
 module Imap = Map.Make (struct
     type t = int
-    let compare = Pervasives.compare
+    let compare = Stdlib.compare
   end)
 
+(*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
   val compare : t -> t -> int
   val print : Format.formatter -> t -> unit
 end
 
-
+(*------------------------------------------------------------------*)
 (** Variable size persistent union-find data-structure on integers. *)
 module Vuf : sig
   type t
@@ -138,7 +140,7 @@ module Uf (Ord: Ordered) = struct
 
   let print ppf t =
     let binds = Imap.bindings t.rmap
-                |> List.sort (fun (i, _) (i', _) -> Pervasives.compare i i') in
+                |> List.sort (fun (i, _) (i', _) -> Stdlib.compare i i') in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list (fun ppf (i, u) ->
            let ri = Vuf.find t.puf i in
@@ -193,7 +195,7 @@ module Uf (Ord: Ordered) = struct
 
   let classes t =
     let l = List.init (Imap.cardinal t.rmap) (fun i -> (Vuf.find t.puf i, i))
-            |> List.sort (fun (a, _) (a', _) -> Pervasives.compare a a')
+            |> List.sort (fun (a, _) (a', _) -> Stdlib.compare a a')
     in
     let l_eqc = match l with
       | [] -> []
@@ -211,14 +213,21 @@ module Uf (Ord: Ordered) = struct
 end
 
 
+(*------------------------------------------------------------------*)
 let rec fpt f a =
   let b = f a in
   if b = a then b else fpt f b
 
+(*------------------------------------------------------------------*)
 (* Option type functions *)
+
 let opt_get = function
   | Some u -> u
   | None -> raise Not_found
+
+let opt_dflt dflt = function
+  | Some u -> u
+  | None -> dflt
 
 let some x = Some x
 
@@ -226,6 +235,7 @@ let opt_map a f = match a with
   | None -> None
   | Some x -> f x
 
+(*------------------------------------------------------------------*)
 let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
   let rec get_cl cl rem x = function
     | [] -> cl,rem
@@ -241,17 +251,12 @@ let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =
   in
   comp [] l
 
+(*------------------------------------------------------------------*)
 let ident ppf s = Fmt.pf ppf "%s" s
 let kw style = (Fmt.styled style ident)
 
 let pp_ne_list s pp_list ppf l =
   if l = [] then Fmt.pf ppf "" else Fmt.pf ppf s pp_list l
-
-let map_of_iter (iter : ('a -> unit) -> unit) (f : 'a -> 'b) =
-  let l = ref [] in
-  let f_side x = l := (f x) :: !l in
-  iter f_side;
-  !l
 
 let sep ppf () = Fmt.pf ppf ",@,"
 
@@ -260,5 +265,44 @@ let pp_list pp_item ppf l =
     Fmt.pf ppf "(@[<hov 1>%a@])"
       (Fmt.list ~sep pp_item) l
 
+(*------------------------------------------------------------------*)
+let map_of_iter (iter : ('a -> unit) -> unit) (f : 'a -> 'b) =
+  let l = ref [] in
+  let f_side x = l := (f x) :: !l in
+  iter f_side;
+  !l
 
+(*------------------------------------------------------------------*)
 let fst3 (a, b, c) = a
+
+(*------------------------------------------------------------------*)
+(** [timeout t f x] executes [f x] for at most [t] seconds.
+    Returns [Some (f x)] if the computation terminated in the imparted
+    time, and [None] otherwise. *)
+let timeout timeout f x =
+  assert (timeout > 0);
+
+  let exception Timeout in
+
+  (* Set new handler, and store old one. *)
+  let old_handler = Sys.signal Sys.sigalrm
+    (Sys.Signal_handle (fun _ -> raise Timeout)) in
+
+  let finish () =   
+    (* Cancels the alarm:
+     * "If seconds is zero, any pending alarm is canceled."
+     * see: man 2 alarm *)
+    ignore (Unix.alarm 0);
+    (* Restores previous handler. *)
+    ignore (Sys.signal Sys.sigalrm old_handler) in
+
+  try
+    (* Raises [Sys.sigalrm] after [timeout] seconds. *)
+    ignore (Unix.alarm timeout);
+
+    let res = f x in
+    finish ();
+    Some res
+  with
+  | Timeout -> finish (); None
+  | exn     -> finish (); raise exn

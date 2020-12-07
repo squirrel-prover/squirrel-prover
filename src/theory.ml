@@ -126,6 +126,11 @@ type conversion_error =
   | Timestamp_expected of term
   | Timestamp_unexpected of term
   | Untypable_equality of term
+  | String_expected of term
+  | Int_expected of term
+  | Tactic_type of string
+  | Index_not_var of term
+  | Assign_no_state of string
 
 exception Conv of conversion_error
 
@@ -149,6 +154,23 @@ let pp_error ppf = function
          (operands do not have the same type,@ \
          or do not have a type@ for which the comparison is allowed)"
         pp t
+  | String_expected t ->
+      Fmt.pf ppf
+        "The term %a cannot be seen as a string."
+        pp t
+  | Int_expected t ->
+      Fmt.pf ppf
+        "The term %a cannot be seen as a int."
+        pp t
+  | Tactic_type s ->
+      Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+  | Index_not_var i ->
+      Fmt.pf ppf "An index must be a variable, the term %a \
+                  cannot be seen as an index." pp i
+  | Assign_no_state s ->
+      Fmt.pf ppf "Only states can be assigned values, and the \
+                  function symbols %s is not a state." s
+
 
 let check_arity s actual expected =
   if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
@@ -187,7 +209,7 @@ let check_state s n =
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
-    | _ -> failwith "can only assign a state"
+    | _ -> raise @@ Conv (Assign_no_state s)
 
 let check_name s n =
   try
@@ -252,7 +274,7 @@ let rec convert :
     let open Term in
     match conv Sorts.Index i with
       | Var x -> x
-      | _ -> failwith "index terms must be restricted to variables"
+      | _ ->  raise @@ Conv (Index_not_var i)
   in
 
   let get_at () =
@@ -301,6 +323,7 @@ let rec convert :
   (* End of special cases. *)
 
   | Fun (f,l,None) ->
+      let ts_expected = Conv (Timestamp_expected tm) in
       let ks, f_k = function_kind f in
       assert (f_k = Sorts.emessage) ;
       check_arity f (List.length l) (List.length ks) ;
@@ -327,13 +350,17 @@ let rec convert :
                     let l = List.map (conv Sorts.Message) l in
                     Term.Macro ((s,sort,[]),l,get_at ())
                   end
-              | _ -> failwith (Printf.sprintf "cannot convert %s(..)" f)
+              | Wrapped (_, Macro (Input|Output|Cond|Exec|Frame|State (_, _))) -> raise ts_expected
+              | Wrapped (_, Channel _)  -> raise ts_expected
+              | Wrapped (_, Name _)  -> raise ts_expected
+              | Wrapped (_, Action _)  -> raise ts_expected
             end
         | _ -> raise type_error
       end
 
   | Fun (f, l, Some ts) ->
-      if at <> None then raise @@ Conv (Timestamp_unexpected tm) ;
+      let ts_unexpected = Conv (Timestamp_unexpected tm) in
+      if at <> None then raise ts_unexpected;
       let open Symbols in
       let open Symbols in
       begin match sort with
@@ -350,7 +377,12 @@ let rec convert :
                   (* TODO as above *)
                 assert false
               | Wrapped (s, Macro (Cond|Exec)) -> raise type_error
-              | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+
+              | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
+              | Wrapped (_, Channel _)  -> raise ts_unexpected
+              | Wrapped (_, Name _)  ->  raise ts_unexpected
+              | Wrapped (_, Action _)  ->  raise ts_unexpected
+              | Wrapped (_, Function _) -> raise ts_unexpected
             end
         | Sorts.Boolean ->
             begin match of_string f with
@@ -359,7 +391,12 @@ let rec convert :
                   Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
               | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
                 raise type_error
-              | _ -> failwith (Printf.sprintf "cannot convert %s(..)@.." f)
+              | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
+              | Wrapped (_, Channel _)  ->  raise ts_unexpected
+              | Wrapped (_, Name _)  ->  raise ts_unexpected
+              | Wrapped (_, Action _)  -> raise ts_unexpected
+              | Wrapped (_, Function _) -> raise ts_unexpected
+              | Wrapped (_, Macro (Local (_, _))) -> raise ts_unexpected
             end
         | _ -> raise type_error
       end
@@ -533,7 +570,7 @@ let rec convert :
 let conv_index subst t =
   match convert subst t Sorts.Index with
     | Term.Var x -> x
-    | _ -> failwith "index terms must be restricted to variables"
+    | _ -> raise @@ Conv (Index_not_var t)
 
 (** Declaration functions *)
 
@@ -552,7 +589,16 @@ let declare_aenc enc dec pk =
 
 let declare_senc enc dec =
   let t = Symbols.dummy_table in
-  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc] in
+  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
+  let data = Symbols.AssociatedFunctions [dec] in
+  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+
+let declare_senc_joint_with_hash enc dec h =
+  let t = Symbols.dummy_table in
+  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc;
+                                          Symbols.Function.of_string h] in
+  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
   let data = Symbols.AssociatedFunctions [dec] in
   ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
 
@@ -567,10 +613,12 @@ let declare_signature sign checksign pk =
 
 let check_signature checksign pk =
   let def = Symbols.Function.get_def in
+  let to_string = Symbols.to_string in
   let correct_type = match def checksign, def pk  with
     | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
     | _ -> false
-    | exception Not_found -> failwith "symbol not found"
+    | exception Not_found -> raise @@ Conv (Undefined (to_string checksign ^
+                                                       " or " ^ to_string pk))
   in
   if correct_type then
     match Symbols.Function.get_data checksign with

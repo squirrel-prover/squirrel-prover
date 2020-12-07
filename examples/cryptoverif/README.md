@@ -1,27 +1,34 @@
-Experiments with Cryptoverif
+# Experiments with CryptoVerif
 
-* Basic Hash
+## Basic Hash protocol modelling and security
+The CryptoVerif authentication and unlinkability proofs for the Basic
+Hash protocol are in:
+- `basic-hash-auth.pcv`
+- `basic-hash-unkink.pcv`
 
-** basic-hash-auth-*.pvc
+
+## Alternative modelling and failed attempts
+
+### others/basic-hash-auth-*.pvc
 
 Assuming PRF, authentication is shown for the multiple session scenario,
 where each new reader performs a probabilistic choice of the key.
-The type of hashed messages must be large for Cryptoverif to conclude.
+The type of hashed messages must be large for CryptoVerif to conclude.
 
 In basic-hash-auth-keys we use keys rather than hashed messages in events,
-and Cryptoverif fails to conclude.
+and CryptoVerif fails to conclude.
 
 The PRF assumption is stronger than necessary, EUF should suffice.
 The variant basic-hash-auth-mac uses a SUF_CMA deterministic mac instead
-of the PRF hash, and Cryptoverif concludes. In that case there is no need for 
+of the PRF hash, and CryptoVerif concludes. In that case there is no need for 
 a large type of MACs, and events can be based on keys rather than MACs.
 
-** basic-hash-equiv
+### others/basic-hash-equiv
 
 Failed attempt to prove unlinkability expressed directly, with a probabilistic 
 choice of the key for each new reader.
 
-Cryptoverif attempts to transform both multiple and single-session games,
+CryptoVerif attempts to transform both multiple and single-session games,
 but each sequence of transformation preserves the general structure of each
 process wrt. replications: there is no hope to reach a common game.
 In fact the available actions in the two games are not comparable.
@@ -30,7 +37,7 @@ The probabilistic choice does not seem to be a problem in itself, since the
 probability that a honest interaction between a tag and a reader is successful
 is 1/NK in both games.
 
-** basic-hash-diff
+### others/basic-hash-diff
 
 Failed attempt to prove unlinkability expressed as an equivalence between
 two processes that could be superposed into a bi-process. In that case the
@@ -41,7 +48,7 @@ so we lookup the key against the received hash.
 Using find [unique] does not seem to help. Note that the prf equivalence
 is not used in the proof attempt.
 
-** basic-hash-v2 and -v2-hashoracle
+### others/basic-hash-v2 and -v2-hashoracle
 
 Experiment with a random-oracle assumption: success without the oracle which 
 is in principle necessary; could not prove with the oracle -- in that case the 

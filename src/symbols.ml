@@ -110,6 +110,7 @@ module type Namespace = sig
   val declare_exact :
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
   val of_string : string -> ns t
+  val cast_of_string : string -> ns t
   val get_def : ns t -> def
   val def_of_string : string -> def
   val get_data : ns t -> data
@@ -161,6 +162,9 @@ module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = 
 
   let get_def name = fst (get_all name)
   let get_data name = snd (get_all name)
+
+  let cast_of_string name =
+    name
 
   let of_string name =
     try
@@ -240,7 +244,7 @@ let is_ftype s ftype =
   match Function.get_def s with
     | _,t when t = ftype -> true
     | _ -> false
-    | exception Not_found -> failwith "symbol not found"
+    | exception Not_found -> raise @@ Unbound_identifier s
 
 module Macro = Make (struct
   type ns = macro

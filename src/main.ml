@@ -23,7 +23,7 @@ let lexbuf : Lexing.lexbuf option ref = ref None
 let filename = ref "No file opened"
 
 let setup_lexbuf fname =
-  lexbuf := some @@ Lexing.from_channel (Pervasives.open_in fname);
+  lexbuf := some @@ Lexing.from_channel (Stdlib.open_in fname);
   filename := fname;;
 
 (** [parse_next parser_fun] parse the next line of the input (or a filename)
@@ -123,7 +123,9 @@ let rec main_loop ~test ?(save=true) mode =
             | Some es -> error ~test GoalMode es
           end
         | Prover.Gm_goal (i,f) ->
-          add_new_goal (i,f);
+          (try
+            add_new_goal (i,f)
+          with  (Prover.ParseError s) -> error ~test mode s);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;
@@ -246,6 +248,56 @@ let () =
         (Tactic_soft_failure Bad_SSC)
         (fun () -> run ~test "tests/alcotest/sign.sp")
     end ;
+    "SEnc Bad SSC - INCTXT 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_nornd.sp")
+    end ;
+    "SEnc Bad SSC - INTCTXT 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncRandomNotFresh)
+        (fun () -> run ~test "tests/alcotest/intctxt_rndnotfresh.sp")
+    end ;
+    "Senc Bad SSC - INTCTXT 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - INTCTXT 4", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/intctxt_sharedrndind.sp")
+    end ;
+    "Senc Bad SSC - CCA 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/cca_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - CCA 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/cca_sharedrndframe.sp")
+    end ;
+    "Senc Bad SSC - CCA 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncNoRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_nornd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_sharedrnd.sp")
+    end ;
+    "Senc Bad SSC - ENCKP 3", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure SEncSharedRandom)
+        (fun () -> run ~test "tests/alcotest/enckp_sharedrndframe.sp")
+    end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
@@ -287,6 +339,11 @@ let () =
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Failure "Equations satisfiable"))
         (fun () -> run ~test "tests/alcotest/try.sp")
+    end ;
+    "Undo does not maintain old truth", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/undo.sp")
     end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
@@ -366,5 +423,30 @@ let () =
       Alcotest.check_raises "fails"
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/pred2.sp")
+    end ;
+    "ENC-KP ground", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_ground.sp")
+    end ;
+    "ENC-KP freshness wrt frame", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/enckp_fresh.sp")
+    end ;
+    "ENC-KP freshness wrt context", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Failure "unfinished")
+        (fun () -> run ~test "tests/alcotest/enckp_fresh_ctxt.sp")
+    end ;
+    "ENC-KP key usability wrt frame", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_key.sp")
+    end ;
+    "ENC-KP key usability wrt context", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Tactic_soft_failure Bad_SSC)
+        (fun () -> run ~test "tests/alcotest/enckp_key_ctxt.sp")
     end ;
   ]

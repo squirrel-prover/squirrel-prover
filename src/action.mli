@@ -132,6 +132,8 @@ val pp_system : Format.formatter -> system -> unit
    *)
 val project_system : Term.projection -> system -> system
 
+exception BiSystemError of string
+
 (** {2 Action descriptions}
   *
   * Describe the behavior of an action: it consists of an input, followed by a

@@ -24,7 +24,7 @@ class iter ~system = object (self)
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn,sort,is),l,a) ->
-        if l<>[] then failwith "unsupported" ;
+        if l<>[] then failwith "Not implemented" ;
         self#visit_message (Macros.get_definition system sort mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
@@ -56,7 +56,7 @@ class iter ~system = object (self)
         self#visit_message t'
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
     | Macro ((mn,Sorts.Boolean,is),l,a) ->
-        if l<>[] then failwith "unsupported" ;
+        if l<>[] then failwith "Not implemented" ;
         self#visit_formula
           (Macros.get_definition system Sorts.Boolean mn is a)
     | Var _ -> ()
@@ -77,7 +77,7 @@ class ['a] fold ~system = object (self)
   method fold_message x t = match t with
     | Fun (_, l) -> List.fold_left self#fold_message x l
     | Macro ((mn,sort,is),l,a) ->
-        if l<>[] then failwith "unsupported" ;
+        if l<>[] then failwith "Not implemented" ;
         self#fold_message x (Macros.get_definition system sort mn is a)
     | Name _ | Var _ -> x
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
@@ -108,7 +108,7 @@ class ['a] fold ~system = object (self)
         self#fold_message (self#fold_message x t) t'
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
     | Macro ((mn,Sorts.Boolean,is),l,a) ->
-        if l<>[] then failwith "unsupported" ;
+        if l<>[] then failwith "Not implemented" ;
         self#fold_formula x
           (Macros.get_definition system Sorts.Boolean mn is a)
     | Var _ -> x
@@ -155,18 +155,27 @@ class iter_approx_macros ~exact ~system = object (self)
 
 end
 
-(** Collect occurrences of [f(_,k(_))] for a function name [f] and name [k].
-  * We use the exact version of [iter_approx_macros], otherwise
-  * we might obtain meaningless terms provided by [get_dummy_definition]. *)
-class get_f_messages ~system f k = object (self)
+(** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
+   and name [k]. We use the exact version of [iter_approx_macros], otherwise we
+   might obtain meaningless terms provided by [get_dummy_definition]. *)
+class get_f_messages ?(drop_head=true) ~system f k = object (self)
   inherit iter_approx_macros ~exact:true ~system as super
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun ((f',_), [m;k']) when f' = f ->
+    | Term.Fun ((f',_), [m;k']) as m_full when f' = f ->
         begin match k' with
           | Term.Name (k',is) when k' = k ->
-              occurrences <- (is,m) :: occurrences
+              let ret_m = if drop_head then m else m_full in
+              occurrences <- (is,ret_m) :: occurrences
+          | _ -> ()
+        end ;
+        self#visit_message m ; self#visit_message k'
+    | Term.Fun ((f',_), [m;r;k']) as m_full when f' = f ->
+        begin match k' with
+          | Term.Name (k',is) when k' = k ->
+              let ret_m = if drop_head then m else m_full in
+              occurrences <- (is,ret_m) :: occurrences
           | _ -> ()
         end ;
         self#visit_message m ; self#visit_message k'

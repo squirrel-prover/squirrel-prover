@@ -153,6 +153,8 @@ let f_or = mk_fname "or" 2
 let f_not = mk_fname "not" 1
 let f_ite = mk_fname "if" 3
 
+let f_fail = mk_fname "fail" 0
+
 (** Xor and its unit *)
 
 let f_xor = mk_fname "xor" 2
@@ -327,7 +329,7 @@ let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> fu
   | ITE (f,t,e) -> List.fold_left pts (pts acc f) [t;e]
   | _ -> failwith "Not implemented"
 
-let precise_ts t = pts [] t |> List.sort_uniq Pervasives.compare
+let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
 
 (** Substitutions *)
 

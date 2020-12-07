@@ -61,14 +61,18 @@ val declare_hash : ?index_arity:int -> string -> unit
 
 (** Asymmetric encryption function symbols are defined by the triplet
     (enc,dec,pk).
-    It satisfies CCA2. *)
+    It models an authenticated encryption. *)
 val declare_aenc : string -> string -> string -> unit
 
 (** Symmetric encryption function symbols are defined by the couple
     (enc,dec).
-    It satisfies CCA2. *)
+    It models an authenticated encryption. *)
 val declare_senc : string -> string -> unit
 
+(** Symmetric encryption function symbols are defined by the couple
+    (enc,dec).
+    It models an authenticated encryption, jointly secure with hashes of the key.*)
+val declare_senc_joint_with_hash : string -> string -> string -> unit
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
    It satisfies EUF. *)
@@ -115,6 +119,11 @@ type conversion_error =
   | Timestamp_expected of term
   | Timestamp_unexpected of term
   | Untypable_equality of term
+  | String_expected of term
+  | Int_expected of term
+  | Tactic_type of string
+  | Index_not_var of term
+  | Assign_no_state of string
 
 exception Conv of conversion_error
 

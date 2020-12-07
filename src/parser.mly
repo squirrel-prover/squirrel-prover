@@ -172,7 +172,7 @@ process:
 | ID term_list ASSIGN term process_cont
                                  { let to_idx = function
                                      | Theory.Var x -> x
-                                     | _ -> failwith "index variable expected"
+                                     | t -> raise @@ Theory.Conv (Index_not_var t)
                                    in
                                    let l = List.map to_idx $2 in
                                    Process.Set ($1,l,$4,$5) }
@@ -192,7 +192,7 @@ else_process:
 
 channel:
 | ID                             { try Channel.of_string $1 with Not_found ->
-                                     failwith "unknown channel" }
+                                     raise @@ Theory.Conv (Undefined $1) }
 
 indices:
 | ID                             { [$1] }
@@ -229,17 +229,17 @@ index_arity:
 declaration:
 | HASH ID index_arity            { Theory.declare_hash ~index_arity:$3 $2 }
 | HASH ID WITH ORACLE f=formula  { Theory.declare_hash $2;
-                                   Prover.define_hash_tag_formula $2 f }
-| AENC e=ID COMMA d=ID COMMA p=ID
-    { Theory.declare_aenc e d p }
-| SENC e=ID COMMA d=ID
-                                 { Theory.declare_senc e d }
+                                   Prover.define_oracle_tag_formula $2 f }
+| AENC e=ID COMMA d=ID COMMA p=ID  { Theory.declare_aenc e d p }
+| SENC e=ID COMMA d=ID           { Theory.declare_senc e d }
+| SENC e=ID COMMA d=ID WITH h=ID
+                                 { Theory.declare_senc_joint_with_hash e d h }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                                  { Theory.declare_signature s c p }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
   WITH ORACLE f=formula
                                  { Theory.declare_signature s c p;
-                                   Prover.define_hash_tag_formula s f }
+                                   Prover.define_oracle_tag_formula s f }
 | NAME ID COLON name_type        { Theory.declare_name $2 $4 }
 | ABSTRACT ID COLON abs_type     { let index_arity,message_arity = $4 in
                                    Theory.declare_abstract
@@ -258,9 +258,9 @@ declaration:
                                      (i, Prover.make_trace_goal s f) }
 
 tactic_param:
-| t=term    { Prover.Theory t }
-| f=formula { Prover.Theory f }
-| i=INT     { Prover.Int i }
+| t=term    { TacticsArgs.Theory t }
+| f=formula { TacticsArgs.Theory f }
+| i=INT     { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -284,34 +284,34 @@ tac:
                                           ("nosimpl", t) }
   | NOBRANCH t=tac                     { Tactics.NotBranching (t) }
   | CYCLE i=INT                       { Tactics.Abstract
-                                         ("cycle",[Prover.Int i]) }
+                                         ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                 { Tactics.Abstract
-                                         ("cycle",[Prover.Int (-i)]) }
+                                         ("cycle",[TacticsArgs.Int_parsed (-i)]) }
 
   | APPLY i=ID                        { Tactics.Abstract
                                           ("apply",
-                                           [Prover.String_name i]) }
+                                           [TacticsArgs.String_name i]) }
   | APPLY i=ID TO t=tactic_params     { Tactics.Abstract
                                           ("apply",
-                                           Prover.String_name i :: t) }
+                                           TacticsArgs.String_name i :: t) }
   | HELP                              { Tactics.Abstract
                                           ("help",
                                            []) }
 
   | HELP i=ID                         { Tactics.Abstract
                                           ("help",
-                                           [Prover.String_name i]) }
+                                           [TacticsArgs.String_name i]) }
   | DDH i1=ID COMMA i2=ID COMMA i3=ID { Tactics.Abstract
                                           ("ddh",
-                                           [Prover.String_name i1;
-					    Prover.String_name i2;
-					    Prover.String_name i3;
+                                           [TacticsArgs.String_name i1;
+					    TacticsArgs.String_name i2;
+					    TacticsArgs.String_name i3;
 				      ]) }
   (* A few special cases for tactics whose names are not parsed as ID
    * because they are reserved. *)
-  | HELP LEFT   { Tactics.Abstract ("help",[Prover.String_name "left"]) }
-  | HELP RIGHT  { Tactics.Abstract ("help",[Prover.String_name "right"]) }
-  | HELP EXISTS { Tactics.Abstract ("help",[Prover.String_name "exists"]) }
+  | HELP LEFT   { Tactics.Abstract ("help",[TacticsArgs.String_name "left"]) }
+  | HELP RIGHT  { Tactics.Abstract ("help",[TacticsArgs.String_name "right"]) }
+  | HELP EXISTS { Tactics.Abstract ("help",[TacticsArgs.String_name "exists"]) }
 
 qed:
 | QED                                 { () }

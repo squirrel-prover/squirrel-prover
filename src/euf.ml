@@ -8,24 +8,28 @@ exception Bad_ssc
   * some macros to be undefined, though such instaces will not be
   * supported when collecting hashes; more importantly, it avoids
   * inspecting each of the multiple expansions of a same macro. *)
-class check_hash_key ~pk ~system hash_fn key_n = object (self)
+class check_key ~allow_vars ~allow_functions ~system head_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~system as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), [m;Term.Name _]) when fn = hash_fn ->
+    | Term.Fun ((fn,_), [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m
-    | Term.Fun ((fn,_), [Term.Name _]) when pk = Some fn -> ()
-    | Term.Fun ((fn,_), [Term.Diff (Term.Name _, Term.Name _)]) when pk = Some fn -> ()
+    | Term.Fun ((fn,_), [m1;m2;Term.Name _]) when fn = head_fn ->
+      self#visit_message m1; self#visit_message m2
+    | Term.Fun ((fn,_), [Term.Name _])
+    | Term.Fun ((fn,_), [Term.Diff (Term.Name _, Term.Name _)])
+    | Term.Fun ((fn,_), [_; Term.Name _])
+    | Term.Fun ((fn,_), [_; Term.Diff (Term.Name _, Term.Name _)])
+      when allow_functions fn -> ()
     | Term.Name (n,_) when n = key_n -> raise Bad_ssc
-    | Term.Var m -> raise Bad_ssc
+    | Term.Var m -> if not(allow_vars) then raise Bad_ssc
     | _ -> super#visit_message t
 end
 
-
-(** Collect hashes for a given hash function and key,
-  * as in [Iter.get_hashed_messages] but ignoring boolean terms,
+(** Collect occurences of some function and key,
+  * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
-class get_hashed_messages ~system hash_fn key_n = object (self)
-  inherit Iter.get_f_messages ~system hash_fn key_n
+class get_f_messages ~drop_head ~system head_fn key_n = object (self)
+  inherit Iter.get_f_messages ~drop_head ~system head_fn key_n
   method visit_formula _ = ()
 end
 
@@ -33,10 +37,10 @@ exception Found
 
 (** Check the key syntactic side-condition in the given list of messages
   * and in the outputs, conditions and updates of all system actions:
-  * [key_n] must appear only in key position of [hash_fn].
+  * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
-let hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
-  let ssc = new check_hash_key ~pk ~system hash_fn key_n in
+let key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions ~system head_fn key_n =
+  let ssc = new check_key ~allow_vars ~allow_functions ~system head_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
   Action.(iter_descrs system
@@ -48,20 +52,19 @@ let hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
 (** Same as [hash_key_ssc] but returning a boolean.
   * This is used in the collision tactic, which looks for all h(_,k)
   * such that k satisfies the SSC. *)
-let check_hash_key_ssc ?(messages=[]) ?(elems=[]) ~pk ~system hash_fn key_n =
+let check_key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions ~system head_fn key_n =
   try
-    hash_key_ssc ~messages ~elems ~pk ~system hash_fn key_n ;
+    key_ssc ~allow_vars ~messages ~elems ~allow_functions ~system head_fn key_n ;
     true
   with Bad_ssc -> false
-
-(** [hashes_of_action_descr ~system action_descr hash_fn key_n]
-  * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
+(** [hashes_of_action_descr ~system action_descr head_fn key_n]
+  * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
-let hashes_of_action_descr ~system action_descr hash_fn key_n =
-  let iter = new get_hashed_messages ~system hash_fn key_n in
+let hashes_of_action_descr ?(drop_head=true) ~system action_descr head_fn key_n =
+  let iter = new get_f_messages ~drop_head ~system head_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  List.sort_uniq Pervasives.compare iter#get_occurrences
+  List.sort_uniq Stdlib.compare iter#get_occurrences
 
 type euf_schema = { message : Term.message;
                     key_indices : Vars.index list;
@@ -101,14 +104,13 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
 
-let mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
-  hash_key_ssc ~messages:[mess;sign] ~pk ~system hash_fn key_n;
-  { hash = hash_fn;
+let mk_rule ?(elems=[]) ?(drop_head=true) ~allow_functions ~system ~env ~mess ~sign ~head_fn ~key_n ~key_is =
+  { hash = head_fn;
     key = key_n;
     case_schemata =
       Utils.map_of_iter (Action.iter_descrs system)
         (fun action_descr ->
-          hashes_of_action_descr ~system action_descr hash_fn key_n
+          hashes_of_action_descr ~drop_head ~system action_descr head_fn key_n
           |> List.map (fun (is,m) ->
             (* Indices [key_is] from [env] must correspond to [is],
              * which contains indices from [action_descr.indices]
@@ -193,9 +195,10 @@ let mk_rule ~pk ~system ~env ~mess ~sign ~hash_fn ~key_n ~key_is =
 
     cases_direct =
       let hashes =
-        let iter = new get_hashed_messages ~system hash_fn key_n in
+        let iter = new get_f_messages ~drop_head ~system head_fn key_n in
         iter#visit_message mess ;
         iter#visit_message sign ;
+        List.iter iter#visit_term elems ;
         iter#get_occurrences
       in
       List.map

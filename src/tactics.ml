@@ -10,6 +10,9 @@ type tac_error =
   | NotDepends of string * string
   | Undefined of string
   | NotDDHContext
+  | SEncNoRandom
+  | SEncSharedRandom
+  | SEncRandomNotFresh
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -33,6 +36,12 @@ let rec pp_tac_error ppf = function
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
   | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
+  | SEncNoRandom ->
+    Fmt.string ppf "An encryption is performed without a random name"
+  | SEncSharedRandom ->
+    Fmt.string ppf "Two encryptions share the same random"
+  | SEncRandomNotFresh ->
+    Fmt.string ppf "A random used for an encryption is used elsewhere"
 
 exception Tactic_soft_failure of tac_error
 

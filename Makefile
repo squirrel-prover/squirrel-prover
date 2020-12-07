@@ -9,7 +9,7 @@ all: squirrel test
 
 PROVER_OK_TESTS = $(wildcard tests/ok/*.sp) $(wildcard examples/*.sp)
 
-test: alcotest ok_test
+test: squirrel alcotest ok_test
 
 .PHONY: ok_test ok_test_end alcotest
 
