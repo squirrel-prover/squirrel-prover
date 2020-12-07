@@ -158,6 +158,24 @@ let declare id args proc =
 
 exception Cannot_parse of process
 
+let print_isubst isubst =
+  Printer.pr "[DEBUG] %s \n" "will print isubst" ;
+  let _ =
+    List.map
+      (fun (s,th,v) -> Printer.pr "[DEBUG] [%s,%a,%a] \n"
+        s Theory.pp th Vars.pp v)
+      isubst
+  in ()
+
+let print_msubst msubst =
+  Printer.pr "[DEBUG] %s \n" "will print msubst" ;
+  let _ =
+    List.map
+      (fun (s,th,tm) -> Printer.pr "[DEBUG] [%s,%a,%a] \n"
+        s Theory.pp th Term.pp tm)
+    msubst
+  in ()
+
 type p_env = {
   (* RELATED TO THE CURRENT PROCESS *)
   alias : string ;
@@ -174,7 +192,7 @@ type p_env = {
     (* bound input variables *)
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.index list ;
-  (* variables bound by existential quantification *)
+    (* variables bound by existential quantification *)
   action : Action.action ;
     (* the type [Action.action] describes the execution point in the protocol *)
   facts : Term.formula list ;
@@ -230,20 +248,26 @@ let parse_proc system_name proc =
     let action_term = Term.Action (a', indices) in
     let in_th = Theory.Var (snd input) in
     let in_tm = Term.Macro (Term.in_macro, [], action_term) in
+    let subst_ts = [ Term.ESubst (Term.Var ts, action_term) ] in
+    let subst_input =
+      try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
+      with Not_found -> []
+    in
     let env =
       { env with
         msubst = (snd input, in_th, in_tm) :: env.msubst }
     in
-    let subst_ts = [Term.ESubst (Term.Var ts, action_term)] in
+    print_isubst env.isubst ;
+    print_msubst env.msubst ;
     let condition =
       List.rev env.evars,
-      Term.subst subst_ts (List.fold_left Term.mk_and Term.True env.facts)
+      Term.subst (subst_ts@subst_input) (List.fold_left Term.mk_and Term.True env.facts)
     in
     let updates =
       List.map
         (fun (s,l,t) ->
           (Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
-           Term.subst subst_ts t)
+           Term.subst (subst_ts@subst_input) t)
         env.updates
     in
     let output = match output with
@@ -409,7 +433,16 @@ let parse_proc system_name proc =
     let p',_ = p_cond ~env ~pos:0 ~par_choice p in
     (In (c,Vars.name x',p'), pos+1)
 
-  | Exists _ | Set _ | Alias _ | Out _ ->
+  | Alias (p,a) ->
+    (* TODO check freshness of alias ? *)
+    let env =
+    { env with
+      alias = a }
+    in
+    let p',pos' = p_in ~env ~pos ~pos_indices p in
+    (Alias (p',a),pos')
+
+  | Exists _ | Set _ | Out _ ->
     let par_choice = pos, List.rev pos_indices in
     let p',_ = p_cond ~env ~pos:0 ~par_choice proc in
     (p', pos+1)
@@ -448,6 +481,8 @@ let parse_proc system_name proc =
       { env with
         isubst = isubst' }
     in
+    (* print_isubst env.isubst ;
+    print_msubst env.msubst ; *)
     let cond' = Theory.subst cond (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let fact = conv_term env (Term.Var ts) cond' Sorts.Boolean in
     let facts_p = fact::env.facts in
@@ -465,7 +500,6 @@ let parse_proc system_name proc =
     in
     let env_q =
       { env with
-        indices = List.rev_append (List.map snd s) env.indices ;
         isubst = isubst' ;
         facts = facts_q }
     in
