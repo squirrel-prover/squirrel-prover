@@ -327,6 +327,14 @@ let parse_proc system_name proc =
         system_name a' indices action action_descr
     in
     debug "descr = %a@." Action.pp_descr action_descr ;
+    let new_action_term = Term.Action (new_a, indices) in
+    let new_in_tm = Term.Macro (Term.in_macro, [], new_action_term) in
+    let env =
+      { env with
+        (* override previous term substitutions for input variable
+         * to use possibly new action *)
+        msubst = (snd input, in_th, new_in_tm) :: env.msubst }
+    in
     (env, new_a)
   in
 
