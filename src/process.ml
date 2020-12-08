@@ -202,7 +202,18 @@ type p_env = {
 }
 
 let parse_proc system_name proc =
-  let env_ts,ts = Vars.make_fresh Vars.empty_env Sorts.Timestamp "ts" in
+
+  (* Initial env with special variables registered.
+   * The special variables should never be visible to the user,
+   * we prefix their names with $ to avoid conflicts with user names,
+   * and also register special variables in the environment for extra
+   * safety. *)
+  let env_ts,ts,dummy_in =
+    let env = Vars.empty_env in
+    let env,ts = Vars.make_fresh env Sorts.Timestamp "$ts" in
+    let env,dummy_in = Vars.make_fresh env Sorts.Message "$dummy" in
+    env,ts,dummy_in
+  in
 
   (* Convert a Theory.term to Term.term using the special sort
    * of substitution maintained by the parsing function. *)
@@ -241,8 +252,8 @@ let parse_proc system_name proc =
     let _,a' = Action.fresh_symbol Symbols.dummy_table a in
     let action = List.rev env.action in
     let input = match env.inputs with
-    | [] -> (Channel.dummy, "_")
     | (c,v)::_ -> (c,Vars.name v)
+    | _ -> assert false
     in
     let indices = List.rev env.indices in
     let action_term = Term.Action (a', indices) in
@@ -443,6 +454,9 @@ let parse_proc system_name proc =
     (Alias (p',a),pos')
 
   | Exists _ | Set _ | Out _ ->
+    let env =
+      { env with
+        inputs = (Channel.dummy,dummy_in)::env.inputs } in
     let par_choice = pos, List.rev pos_indices in
     let p',_ = p_cond ~env ~pos:0 ~par_choice proc in
     (p', pos+1)
