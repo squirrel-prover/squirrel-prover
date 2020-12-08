@@ -341,7 +341,7 @@ let parse_proc system_name proc =
           match k,v with
           | Sorts.ESort Sorts.Message,_ ->
             let v'_th = Theory.subst v tsubst in
-            let v'_tm = conv_term env (Term.Var ts) v'_th Sorts.Message in
+            let v'_tm = conv_term env (Term.Var ts) v Sorts.Message in
             iacc, (x, v'_th, v'_tm)::macc
           | Sorts.ESort Sorts.Index, Theory.Var i ->
             let _,i'_tm = list_assoc i env.isubst in
@@ -395,7 +395,7 @@ let parse_proc system_name proc =
     in
     let body =
       Term.subst_macros_ts updated_states (Term.Var ts)
-        (conv_term env (Term.Var ts) t' Sorts.Message)
+        (conv_term env (Term.Var ts) t Sorts.Message)
     in
     let invars = List.map snd env.inputs in
     let _,x' =
@@ -595,7 +595,7 @@ let parse_proc system_name proc =
       in
       let t'_tm =
         Term.subst_macros_ts updated_states (Term.Var ts)
-          (conv_term env (Term.Var ts) t' Sorts.Message)
+          (conv_term env (Term.Var ts) t Sorts.Message)
       in
       let env =
         { env with
