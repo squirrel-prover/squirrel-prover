@@ -282,7 +282,10 @@ let parse_proc system_name proc =
         env.updates
     in
     let output = match output with
-      | Some (c,t) -> c, conv_term env action_term t Sorts.Message
+      | Some (c,t) ->
+          c,
+          Term.subst (subst_ts @ subst_input)
+            (conv_term env action_term t Sorts.Message)
       | None -> Channel.dummy, Term.empty
     in
     let action_descr =
@@ -491,14 +494,10 @@ let parse_proc system_name proc =
         s
       @ env.isubst
     in
-    let env =
-      { env with
-        isubst = isubst' }
-    in
-    (* print_isubst env.isubst ;
-    print_msubst env.msubst ; *)
-    let cond' = Theory.subst cond (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let fact = conv_term env (Term.Var ts) cond' Sorts.Boolean in
+    let env = { env with isubst = isubst' } in
+    let cond' =
+      Theory.subst cond (to_tsubst env.isubst @ to_tsubst env.msubst) in
+    let fact = conv_term env (Term.Var ts) cond Sorts.Boolean in
     let facts_p = fact::env.facts in
     let facts_q =
       match evars' with
@@ -588,7 +587,7 @@ let parse_proc system_name proc =
 
   | Alias (Out (c,t,p),a) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let env,a' = register_action a (Some (c,t')) env in
+    let env,a' = register_action a (Some (c,t)) env in
     let env =
       { env with
         evars = [] ;
@@ -600,7 +599,7 @@ let parse_proc system_name proc =
 
   | Out (c,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let env,a' = register_action env.alias (Some (c,t')) env in
+    let env,a' = register_action env.alias (Some (c,t)) env in
     let env =
       { env with
         evars = [] ;

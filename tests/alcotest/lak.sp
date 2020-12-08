@@ -54,8 +54,8 @@ process Reader =
     (* TODO same as above *)
     okm(i) := key(i,j);
     km(i) := nextkey(key(i,j))
-  else try find i',j' such that x2 = h(<nR,x1>,okey(i',j')) in
-    out(cR,h(<x2,nR>,okey(i',j')))
+  else try find i,j such that x2 = h(<nR,x1>,okey(i,j)) in
+    out(cR,h(<x2,nR>,okey(i,j)))
 
 (* Bi-process expressing unlinkability
 
