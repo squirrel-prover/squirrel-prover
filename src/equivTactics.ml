@@ -1158,8 +1158,9 @@ let check_encryption_randomness system case_schemata cases_direct enc_fn message
 
 
 let symenc_rnd_ssc ~system env head_fn key_n key_is elems =
-  let rule = Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
-      ~system ~env ~mess:(Term.dummy) ~sign:(Term.dummy)
+  let rule =
+    Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
+      ~system ~env ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n ~key_is
   in
   check_encryption_randomness system rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems
@@ -1410,7 +1411,7 @@ let enckp
             (List.sort_uniq Stdlib.compare
                [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
           let context =
-            EquivSequent.apply_subst_frame [Term.ESubst (enc,Term.dummy)] [e]
+            EquivSequent.apply_subst_frame [Term.ESubst (enc,Term.empty)] [e]
           in
           fresh_cond system env (Term.Name r) (context@biframe)
         with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC

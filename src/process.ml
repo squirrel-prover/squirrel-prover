@@ -272,7 +272,7 @@ let parse_proc system_name proc =
     in
     let output = match output with
       | Some (c,t) -> c, conv_term env action_term t Sorts.Message
-      | None -> Channel.dummy, Term.dummy
+      | None -> Channel.dummy, Term.empty
     in
     let action_descr =
       Action.{ action; input; indices; condition; updates; output } in
@@ -597,7 +597,7 @@ let parse_proc system_name proc =
     (Alias (Out (c,t',p'), Symbols.to_string a'), pos')
 
   | Null ->
-    let env,a' = register_action "A" None env in
+    let env,a' = register_action env.alias None env in
     let env =
       { env with
         evars = [] ;

@@ -162,7 +162,7 @@ val subst_macros_ts : string list -> Sorts.timestamp term -> 'a term -> 'a term
 
 (** {2 Predefined symbols} *)
 
-val dummy : Sorts.message term
+val empty : Sorts.message term
 
 val in_macro : Sorts.message msymb
 val out_macro : Sorts.message msymb

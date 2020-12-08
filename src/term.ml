@@ -175,9 +175,9 @@ let f_snd = mk_fname "snd" 1
 let f_exp = mk_fname "exp" 2
 let f_g = mk_fname "g" 0
 
-(** Dummy term *)
+(** Empty *)
 
-let dummy = Fun (mk_fname "_" 0, [])
+let empty = Fun (mk_fname "empty" 0, [])
 
 (** Length *)
 
