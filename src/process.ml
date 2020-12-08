@@ -189,7 +189,7 @@ type p_env = {
     (* current alias in the process *)
   indices : Vars.index list ;
     (* bound indices, after refresh *)
-  vars_env : Vars.env ref ;
+  vars_env : Vars.env ;
     (* local variables environment, after refresh *)
   isubst : (string * Theory.term * Vars.index) list ;
     (* substitution for index variables (Repl, Exists, Apply)
@@ -230,6 +230,11 @@ let parse_proc system_name proc =
     let env,ts = Vars.make_fresh env Sorts.Timestamp "$ts" in
     let env,dummy_in = Vars.make_fresh env Sorts.Message "$dummy" in
     env,ts,dummy_in
+  in
+
+  let make_fresh env sort name =
+    let ve',x = Vars.make_fresh env.vars_env sort name in
+    { env with vars_env = ve' },x
   in
 
   (* Convert a Theory.term to Term.term using the special sort
@@ -431,21 +436,12 @@ let parse_proc system_name proc =
   | Null -> (Null,pos)
 
   | Parallel (p,q) ->
-    let current_env = !(env.vars_env) in
-    let env =
-      { env with
-        vars_env = ref current_env }
-    in
     let p',pos_p = p_in ~env ~pos ~pos_indices p in
-    let env =
-      { env with
-        vars_env = ref current_env }
-    in
     let q',pos_q = p_in ~env ~pos:pos_p ~pos_indices q in
     (Parallel (p',q'), pos_q)
 
   | Repl (i,p) ->
-    let i' = Vars.make_fresh_and_update env.vars_env Sorts.Index i in
+    let env,i' = make_fresh env Sorts.Index i in
     let env =
       { env with
         isubst = (i, Theory.Var (Vars.name i'), i') :: env.isubst ;
@@ -465,7 +461,7 @@ let parse_proc system_name proc =
     (Let (Symbols.to_string x', t', p'),pos')
 
   | In (c,x,p) ->
-    let x' = Vars.make_fresh_and_update env.vars_env Sorts.Message x in
+    let env,x' = make_fresh env Sorts.Message x in
     let in_th =
       Theory.Var (Vars.name x')
     in
@@ -502,12 +498,12 @@ let parse_proc system_name proc =
     (Let (Symbols.to_string x', t', p'),pos')
 
   | Exists (evars, cond, p, q) ->
-    let s =
+    let env_p,s =
       List.fold_left
-        (fun s i ->
-          let i' = Vars.make_fresh_and_update env.vars_env Sorts.Index i in
-          (i,i')::s)
-        []
+        (fun (env,s) i ->
+          let env,i' = make_fresh env Sorts.Index i in
+          env,(i,i')::s)
+        (env,[])
         (List.rev evars)
     in
     let evars' = List.map (fun (_,x) -> Vars.EVar x) s in
@@ -515,36 +511,28 @@ let parse_proc system_name proc =
       List.map
         (fun (i,i') -> i, Theory.Var (Vars.name i'), i')
         s
-      @ env.isubst
+      @ env_p.isubst
     in
-    let env = { env with isubst = isubst' } in
+    let env_p = { env_p with isubst = isubst' } in
     let cond' =
-      Theory.subst cond (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let fact = conv_term env (Term.Var ts) cond Sorts.Boolean in
+      Theory.subst cond (to_tsubst env_p.isubst @ to_tsubst env_p.msubst) in
+    let fact = conv_term env_p (Term.Var ts) cond Sorts.Boolean in
     let facts_p = fact::env.facts in
     let facts_q =
       match evars' with
       | [] -> (Term.Not fact) :: env.facts
-      | qvars -> (Term.ForAll(qvars, Term.Not fact)) :: env.facts
+      | qvars -> (Term.ForAll (qvars, Term.Not fact)) :: env.facts
     in
     let env_p =
-      { env with
+      { env_p with
         indices = List.rev_append (List.map snd s) env.indices ;
         isubst = isubst' ;
         evars = List.rev_append (List.map snd s) env.evars ;
         facts = facts_p }
     in
-    let env_q =
-      { env with
-        isubst = isubst' ;
-        facts = facts_q }
-    in
-    let p',pos_p =
-      p_cond ~env:env_p ~pos ~par_choice p
-    in
-    let q',pos_q =
-      p_cond ~env:env_q ~pos:pos_p ~par_choice q
-    in
+    let env_q = { env with facts = facts_q } in
+    let p',pos_p = p_cond ~env:env_p ~pos ~par_choice p in
+    let q',pos_q = p_cond ~env:env_q ~pos:pos_p ~par_choice q in
 
     (Exists (List.map (fun (_,x) -> Vars.name x) s,cond',p',q'), pos_q)
 
@@ -634,7 +622,7 @@ let parse_proc system_name proc =
   let env =
     { alias = "A" ;
       indices = [] ;
-      vars_env = ref env_ts ;
+      vars_env = env_ts ;
       isubst = [] ;
       msubst = [] ;
       inputs = [] ;
