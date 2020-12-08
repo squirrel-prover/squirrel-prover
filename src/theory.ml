@@ -783,7 +783,8 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
        (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
             Sorts.ESort (Vars.sort x)) typed_args,k)))
 
-(* TODO Could be generalized. *)
+(* TODO could be generalized into a generic fold function
+ * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)
 let find_get_terms t names =
   let rec aux t acc name = match t with
   | Get (x',_,_) -> if x'=name then x'::acc else acc
@@ -803,7 +804,9 @@ let find_get_terms t names =
   | Not t' -> aux t' acc name
   | _ -> acc
   in
-  List.sort_uniq Pervasives.compare (List.fold_left (aux t) [] names)
+  List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
+
+(* TODO unused *)
 let find_fun_terms t names =
   let rec aux t acc name = match t with
   | Fun (x',l,_) ->
@@ -824,7 +827,7 @@ let find_fun_terms t names =
   | Not t' -> aux t' acc name
   | _ -> acc
   in
-  List.sort_uniq Pervasives.compare (List.fold_left (aux t) [] names)
+  List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
 
 (** Tests *)
 let () =

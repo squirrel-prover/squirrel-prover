@@ -158,38 +158,54 @@ let declare id args proc =
 
 exception Cannot_parse of process
 
+(* Enable/disable debug messages by setting debug to debug_on/off. *)
+
+let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
+let debug_on fmt =
+  Format.printf "[DEBUG] " ;
+  Format.printf fmt
+let debug = debug_off
+
 let print_isubst isubst =
-  Printer.pr "[DEBUG] %s \n" "will print isubst" ;
-  let _ =
-    List.map
-      (fun (s,th,v) -> Printer.pr "[DEBUG] [%s,%a,%a] \n"
-        s Theory.pp th Vars.pp v)
-      isubst
-  in ()
+  debug "will print isubst@." ;
+  List.iter
+    (fun (s,th,v) -> debug "[%s,%a,%a]@." s Theory.pp th Vars.pp v)
+    isubst
 
 let print_msubst msubst =
-  Printer.pr "[DEBUG] %s \n" "will print msubst" ;
-  let _ =
-    List.map
-      (fun (s,th,tm) -> Printer.pr "[DEBUG] [%s,%a,%a] \n"
-        s Theory.pp th Term.pp tm)
+  debug "will print msubst@." ;
+  List.iter
+    (fun (s,th,tm) -> debug "[%s,%a,%a]@." s Theory.pp th Term.pp tm)
     msubst
-  in ()
 
 type p_env = {
-  (* RELATED TO THE CURRENT PROCESS *)
+
+  (* RELATED TO THE CURRENT PROCESS
+   * As the process is parsed, its bound variables are renamed into
+   * unambiguous "refreshed" variables. For example, !_i !_i P(i)
+   * becomes !_i !_i0 P(i0): in the second binding, i is refreshed into
+   * i0. *)
   alias : string ;
-    (* alias for this process *)
+    (* current alias in the process *)
   indices : Vars.index list ;
-    (* bound indices *)
+    (* bound indices, after refresh *)
   vars_env : Vars.env ref ;
-    (* local variables environment *)
+    (* local variables environment, after refresh *)
   isubst : (string * Theory.term * Vars.index) list ;
-    (* substitution for index variables (Repl, Exists, Apply) *)
+    (* substitution for index variables (Repl, Exists, Apply)
+     * mapping each variable to the associated refreshed variables
+     * as Theory.term and as a Vars.index suitable for use in Term.term
+     * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
+     *      why not keep (i,i') for simplicity? *)
   msubst : (string * Theory.term * Term.message) list ;
-    (* substitution for message variables (New, Let, In, Apply) *)
+    (* Substitution for message variables (New, Let, In, Apply).
+     * Each variable is mapped to the associated refreshed variable
+     * as a Theory.term. The same goes for Term.message, but the
+     * third component can also be used to map input variables to
+     * input macros. *)
   inputs : (Channel.t * Vars.message) list ;
-    (* bound input variables *)
+    (* bound input variables, after refresh *)
+
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.index list ;
     (* variables bound by existential quantification *)
@@ -199,6 +215,7 @@ type p_env = {
     (* list of formulas to create the condition term of the action *)
   updates : (string * string list * Term.message) list ;
     (* list of updates performed in the action *)
+
 }
 
 let parse_proc system_name proc =
@@ -218,17 +235,12 @@ let parse_proc system_name proc =
   (* Convert a Theory.term to Term.term using the special sort
    * of substitution maintained by the parsing function. *)
   let create_subst isubst msubst =
-    (List.map
-      (fun (x,_,tm) ->
-         match tm with
-           | v -> Theory.ESubst (x,Term.Var v)
-           (* |  _ -> assert false *)
-       )
-      isubst)
-    @
-    (List.map
+    List.map
+      (fun (x,_,v) -> Theory.ESubst (x,Term.Var v))
+      isubst @
+    List.map
       (fun (x,_,tm) -> Theory.ESubst (x,tm))
-      msubst)
+      msubst
   in
   let conv_term env ts t sort =
     let subst = create_subst env.isubst env.msubst in
@@ -266,21 +278,33 @@ let parse_proc system_name proc =
     in
     let env =
       { env with
+        (* override previous term substitutions for input variable
+         * to use known action *)
         msubst = (snd input, in_th, in_tm) :: env.msubst }
     in
+    debug "register action %a@." Term.pp action_term ;
+    debug "indices = %a@." Vars.pp_list env.indices ;
+    debug "input variables = %a@." Vars.pp_list (List.map snd env.inputs) ;
     print_isubst env.isubst ;
     print_msubst env.msubst ;
     let condition =
       List.rev env.evars,
-      Term.subst (subst_ts@subst_input) (List.fold_left Term.mk_and Term.True env.facts)
+      Term.subst
+        (subst_ts @ subst_input)
+        (List.fold_left Term.mk_and Term.True env.facts)
     in
     let updates =
       List.map
         (fun (s,l,t) ->
           (Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
-           Term.subst (subst_ts@subst_input) t)
+           Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
+    debug "updates = %a.@."
+      (Utils.pp_list
+         (fun ch (u,v) ->
+            Format.fprintf ch "_ := %a" Term.pp v))
+      updates ;
     let output = match output with
       | Some (c,t) ->
           c,
@@ -288,6 +312,8 @@ let parse_proc system_name proc =
             (conv_term env action_term t Sorts.Message)
       | None -> Channel.dummy, Term.empty
     in
+    debug "output = %a,%a.@."
+      Channel.pp_channel (fst output) Term.pp (snd output) ;
     let action_descr =
       Action.{ action; input; indices; condition; updates; output } in
     let _,new_a =
@@ -295,6 +321,7 @@ let parse_proc system_name proc =
         Symbols.dummy_table
         system_name a' indices action action_descr
     in
+    debug "descr = %a@." Action.pp_descr action_descr ;
     (env, new_a)
   in
 
@@ -349,6 +376,10 @@ let parse_proc system_name proc =
     in
     (env,p)
 
+  | Alias (p,a) ->
+    let env = { env with alias = a } in
+    (env,p)
+
   | _ -> assert false
 
   in
@@ -369,7 +400,7 @@ let parse_proc system_name proc =
     let invars = List.map snd env.inputs in
     let _,x' =
       Macros.declare_global Symbols.dummy_table x ~inputs:invars
-        ~indices:(List.rev env.indices) ~ts:ts body
+        ~indices:(List.rev env.indices) ~ts body
     in
     let x'_th =
       Theory.Fun
@@ -391,6 +422,11 @@ let parse_proc system_name proc =
 
   in
 
+  (** Parse process, looking for an input action.
+    * Maintains the position [pos] in parallel compositions,
+    * together with the indices [pos_indices] associated to replications:
+    * these two components will form the [par_choice] part of an
+    * [Action.item]. *)
   let rec p_in ~env ~pos ~pos_indices proc = match proc with
   | Null -> (Null,pos)
 
@@ -419,11 +455,7 @@ let parse_proc system_name proc =
     let p',pos' = p_in ~env ~pos ~pos_indices p in
     (Repl (Vars.name i', p'),pos')
 
-  | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common ~env proc in
-    p_in ~env ~pos ~pos_indices p
-
-  | New (n,p) ->
+  | Apply _ | Alias _ | New _ ->
     let env,p = p_common ~env proc in
     p_in ~env ~pos ~pos_indices p
 
@@ -447,15 +479,6 @@ let parse_proc system_name proc =
     let p',_ = p_cond ~env ~pos:0 ~par_choice p in
     (In (c,Vars.name x',p'), pos+1)
 
-  | Alias (p,a) ->
-    (* TODO check freshness of alias ? *)
-    let env =
-    { env with
-      alias = a }
-    in
-    let p',pos' = p_in ~env ~pos ~pos_indices p in
-    (Alias (p',a),pos')
-
   | Exists _ | Set _ | Out _ ->
     let env =
       { env with
@@ -464,12 +487,12 @@ let parse_proc system_name proc =
     let p',_ = p_cond ~env ~pos:0 ~par_choice proc in
     (p', pos+1)
 
+  (** Similar to [p_in].
+    * The [par_choice] component of the action under construction
+    * has been determined by [p_in].
+    * The [pos] argument is the position in the tree of conditionals. *)
   and p_cond ~env ~pos ~par_choice proc = match proc with
-  | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common ~env proc in
-    p_cond ~env ~pos ~par_choice p
-
-  | New (n,p) ->
+  | Apply _ | Alias _ | New _ ->
     let env,p = p_common ~env proc in
     p_cond ~env ~pos ~par_choice p
 
@@ -540,11 +563,7 @@ let parse_proc system_name proc =
     (p', pos + 1)
 
   and p_update ~env proc = match proc with
-  | Apply (id,args) | Alias (Apply (id,args), _) ->
-    let env,p = p_common ~env proc in
-    p_update ~env p
-
-  | New (n,p) ->
+  | Apply _ | Alias _ | New _ ->
     let env,p = p_common ~env proc in
     p_update ~env p
 
@@ -585,18 +604,6 @@ let parse_proc system_name proc =
       let p',pos' = p_update ~env p in
       (Set (s,l',t',p'),pos')
 
-  | Alias (Out (c,t,p),a) ->
-    let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let env,a' = register_action a (Some (c,t)) env in
-    let env =
-      { env with
-        evars = [] ;
-        facts = [] ;
-        updates = [] }
-    in
-    let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] p in
-    (Alias (Out (c,t',p'), Symbols.to_string a'), pos')
-
   | Out (c,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let env,a' = register_action env.alias (Some (c,t)) env in
@@ -618,7 +625,7 @@ let parse_proc system_name proc =
         updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
-    (Null, pos')
+    (Alias (Null, Symbols.to_string a'), pos')
 
   | p -> raise (Cannot_parse p)
 
