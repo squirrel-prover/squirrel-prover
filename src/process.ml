@@ -281,10 +281,15 @@ let parse_proc system_name proc =
       try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
       with Not_found -> []
     in
-    let x,_,_ =
-      List.find
-        (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
-        env.msubst
+    let x =
+      try
+        begin match
+          ( List.find (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
+              env.msubst )
+        with
+        | (x,_,_) -> x
+        end
+      with Not_found -> snd input
     in
     let env =
       { env with
