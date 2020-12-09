@@ -70,23 +70,21 @@ goal auth_R :
 Proof.
 intros.
 expand cond@R(k,ii).
-apply readerTestOk to ii,kR(ii)@R(k,ii),input@R(k,ii),deltaInit.
+apply readerTestOk to ii,kR(ii)@pred(R(k,ii)),input@R(k,ii),deltaInit.
 apply H0.
 case H2.
 
   (* case H2 => direct case - sync *)
   euf M1.
-  assert T(ii,j) < R(k,ii). case H2.
   exists ii,j.
 
   (* case H2 => recursive case - desync *)
-  apply readerTestOk to ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaInit).
+  apply readerTestOk to ii,hState(kR(ii)@pred(R(k,ii)),keyState(ii)),input@R(k,ii),myPred(deltaInit).
   apply H2.
   case H4.
 
     (* case H4 => direct case - sync *)
     euf M2.
-    assert T(ii,j) < R(k,ii). case H4.
     exists ii,j.
 
     (* case H4 => recursive case - desync *)

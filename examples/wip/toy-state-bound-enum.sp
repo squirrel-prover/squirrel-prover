@@ -61,7 +61,6 @@ intros.
 expand cond@R(k,i).
 euf M0.
 exists j.
-case H0.
 Qed.
 
 
@@ -75,7 +74,6 @@ intros.
 expand cond@R1(k,i).
 euf M0.
 exists j.
-case H1.
 Qed.
 
 
@@ -88,5 +86,4 @@ intros.
 expand cond@R2(k,i).
 euf M0.
 exists j.
-case H2.
 Qed.

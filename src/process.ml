@@ -164,7 +164,7 @@ let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
 let debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
-let debug = debug_off
+let debug = debug_on
 
 let print_isubst isubst =
   debug "will print isubst@." ;
@@ -523,8 +523,16 @@ let parse_proc system_name proc =
     in
     let env_p = { env_p with isubst = isubst' } in
     let cond' =
-      Theory.subst cond (to_tsubst env_p.isubst @ to_tsubst env_p.msubst) in
-    let fact = conv_term env_p (Term.Var ts) cond Sorts.Boolean in
+      Theory.subst cond (to_tsubst env_p.isubst @ to_tsubst env_p.msubst)
+    in
+    (* No state updates have been done yet in the current
+     * action. We thus have to substitute [ts] by [pred(ts)] for all state
+     * macros appearing in [t]. This is why we call [Term.subst_macros_ts]
+     * with the empty list. *)
+    let fact =
+      Term.subst_macros_ts [] (Term.Var ts)
+        (conv_term env_p (Term.Var ts) cond Sorts.Boolean)
+    in
     let facts_p = fact::env.facts in
     let facts_q =
       match evars' with
