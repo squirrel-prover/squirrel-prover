@@ -281,11 +281,16 @@ let parse_proc system_name proc =
       try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
       with Not_found -> []
     in
+    let x,_,_ =
+      List.find
+        (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
+        env.msubst
+    in
     let env =
       { env with
         (* override previous term substitutions for input variable
          * to use known action *)
-        msubst = (snd input, in_th, in_tm) :: env.msubst }
+        msubst = (x, in_th, in_tm) :: env.msubst }
     in
     debug "register action %a@." Term.pp action_term ;
     debug "indices = %a@." Vars.pp_list env.indices ;
@@ -477,7 +482,7 @@ let parse_proc system_name proc =
     let env =
       { env with
         inputs = (c,x')::env.inputs ;
-        msubst = (Vars.name x', in_th, in_tm) :: env.msubst }
+        msubst = (x, in_th, in_tm) :: env.msubst }
     in
     let par_choice = pos, List.rev pos_indices in
     let p',_ = p_cond ~env ~pos:0 ~par_choice p in
