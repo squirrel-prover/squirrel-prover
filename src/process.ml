@@ -156,8 +156,6 @@ let declare id args proc =
   check_proc args proc ;
   Hashtbl.add pdecls id (args, proc)
 
-exception Cannot_parse of process
-
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
 let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
@@ -632,6 +630,10 @@ let parse_proc system_name proc =
 
   | Null ->
     let env,a' = register_action env.alias None env in
+    (Alias (Null, Symbols.to_string a'), 0)
+
+  | In _ | Parallel _ | Repl _ | Exists _ ->
+    let env,a' = register_action env.alias None env in
     let env =
       { env with
         evars = [] ;
@@ -639,9 +641,7 @@ let parse_proc system_name proc =
         updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
-    (Alias (Null, Symbols.to_string a'), pos')
-
-  | p -> raise (Cannot_parse p)
+    (Alias (Out (Channel.dummy,Theory.empty,p'), Symbols.to_string a'), pos')
 
   in
 

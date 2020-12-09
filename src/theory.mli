@@ -108,6 +108,8 @@ val declare_macro :
 val make_term : ?at_ts:term -> string -> term list -> term
 val make_pair : term -> term -> term
 
+val empty : term
+
 (** {2 Type-checking} *)
 
 type conversion_error =

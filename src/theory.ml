@@ -696,6 +696,10 @@ let make_term ?at_ts s l =
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair", [u; v], None)
 
+(** Empty *)
+
+let empty = Fun ("empty", [], None)
+
 (** Apply a partial substitution to a term.
   * This is meant for formulas and local terms in processes,
   * and does not support optional timestamps.
