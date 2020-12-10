@@ -279,21 +279,21 @@ let parse_proc system_name proc =
       try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
       with Not_found -> []
     in
-    let x =
+    (* override previous term substitutions for input variable
+     * to use known action *)
+    let msubst' =
       try
         begin match
           ( List.find (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
               env.msubst )
         with
-        | (x,_,_) -> x
+        | (x,_,_) -> (x,in_th,in_tm) :: env.msubst
         end
-      with Not_found -> snd input
+      with Not_found -> env.msubst
     in
     let env =
       { env with
-        (* override previous term substitutions for input variable
-         * to use known action *)
-        msubst = (x, in_th, in_tm) :: env.msubst }
+        msubst = msubst' }
     in
     debug "register action %a@." Term.pp action_term ;
     debug "indices = %a@." Vars.pp_list env.indices ;
