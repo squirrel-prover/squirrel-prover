@@ -313,13 +313,6 @@ let rec convert :
         | _ -> raise type_error
       end
 
-  | Compare (`Eq, u, Fun (f,[],None))
-      when f = Symbols.to_string (fst Term.f_true) ->
-      begin match sort with
-        | Sorts.Boolean -> conv sort u
-        | _ -> raise type_error
-      end
-
   (* End of special cases. *)
 
   | Fun (f,l,None) ->
