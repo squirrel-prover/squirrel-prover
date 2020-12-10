@@ -250,11 +250,10 @@ let parse_proc system_name proc =
     Theory.convert ~at:ts subst t sort
   in
   let conv_indices env l =
-    List.map
-      (fun x ->
-        List.assoc x
-          (List.map (fun (x,_,z) -> x,z) env.isubst))
-      l
+    List.map (fun x -> 
+        let _,_,z = List.find (fun (x',_,_) -> x = x') env.isubst in
+        z
+      ) l
   in
 
   let list_assoc v l =
