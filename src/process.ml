@@ -211,8 +211,9 @@ type p_env = {
     (* the type [Action.action] describes the execution point in the protocol *)
   facts : Term.formula list ;
     (* list of formulas to create the condition term of the action *)
-  updates : (string * string list * Term.message) list ;
-    (* list of updates performed in the action *)
+  updates : (string * Vars.index list * Term.message) list ;
+    (* list of updates performed in the action,
+     * indices are after the refresh *)
 
 }
 
@@ -248,12 +249,6 @@ let parse_proc system_name proc =
   let conv_term env ts t sort =
     let subst = create_subst env.isubst env.msubst in
     Theory.convert ~at:ts subst t sort
-  in
-  let conv_indices env l =
-    List.map (fun x -> 
-        let _,_,z = List.find (fun (x',_,_) -> x = x') env.isubst in
-        z
-      ) l
   in
 
   let list_assoc v l =
@@ -308,7 +303,7 @@ let parse_proc system_name proc =
     let updates =
       List.map
         (fun (s,l,t) ->
-          (Symbols.Macro.of_string s, Sorts.Message, conv_indices env l),
+          (Symbols.Macro.of_string s, Sorts.Message, l),
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
@@ -596,9 +591,7 @@ let parse_proc system_name proc =
       let l' =
         List.map
           (fun i ->
-             match list_assoc i env.isubst with
-               | Theory.Var i',_ -> i'
-               | _ -> assert false)
+             snd (list_assoc i env.isubst))
           l
       in
       let updated_states =
@@ -613,7 +606,7 @@ let parse_proc system_name proc =
           updates = (s,l',t'_tm)::env.updates }
       in
       let p',pos' = p_update ~env p in
-      (Set (s,l',t',p'),pos')
+      (Set (s,List.map Vars.name l',t',p'),pos')
 
   | Out (c,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
