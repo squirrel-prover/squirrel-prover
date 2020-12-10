@@ -23,6 +23,7 @@
   "signature"
   "Proof"
   "Qed"
+  "Abort"
   "hash"
   "senc"
   "abstract"
@@ -118,6 +119,8 @@
   "try"
   "orelse"
   "repeat"
+  "nosimpl"
+  "checkfail"
 ))
 
 

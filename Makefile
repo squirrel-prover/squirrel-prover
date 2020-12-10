@@ -9,26 +9,38 @@ default: squirrel
 
 all: squirrel test
 
-PROVER_OK_TESTS = $(wildcard tests/ok/*.sp) $(wildcard examples/*.sp)
+PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp)
 
-test: squirrel alcotest ok_test
+test: squirrel alcotest okfail_test
 
 .PHONY: ok_test ok_test_end alcotest
 
-ok_test:
-	@$(MAKE) -j8 ok_test_end
-ok_test_end: $(PROVER_OK_TESTS:.sp=.ok)
+
+okfail_test:
+	@$(MAKE) -j8 okfail_test_end
+	@$(MAKE) -j8 examples_end
+
+okfail_test_end: $(PROVER_TESTS:.sp=.ok)
 	@echo
-	@rm -f tests/ok/test_prologue.ok
-	@if test -f tests/ok/tests.ko ; then \
+	@if test -f tests/tests.ko ; then \
 	  echo Some tests failed: ; \
-	  cat tests/ok/tests.ko ; rm -f tests/ok/tests.ko ; exit 1 ; \
+	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
 	 else echo All tests passed successfully. ; fi
-tests/ok/test_prologue.ok:
-	@echo "Running tests/ok/*.sp and examples/*.sp."
-%.ok: tests/ok/test_prologue.ok %.sp
+
+examples_end: $(PROVER_EXAMPLES:.sp=.ok)
+	@echo
+	@rm -f tests/test_prologue.ok
+	@if test -f tests/tests.ko ; then \
+	  echo Some tests failed: ; \
+	  cat tests/tests.ko ; rm -f tests/tests.ko ; exit 1 ; \
+	 else echo All tests passed successfully. ; fi
+
+tests/test_prologue.ok:
+	@echo "Running tests/ok/*.sp, tests/fail/*.sp and examples/*.sp."
+%.ok: tests/test_prologue.ok %.sp
 	@if ./squirrel $(@:.ok=.sp) > /dev/null 2> /dev/null ; then echo -n . ; \
-	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/ok/tests.ko ; echo -n '!' ; fi
+	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
 alcotest: version sanity
 	$(OCB) test.byte

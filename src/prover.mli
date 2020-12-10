@@ -135,6 +135,7 @@ val make_equiv_goal_process : Action.single_system -> Action.single_system -> Go
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
+  | ParsedAbort
   | ParsedSetOption of Config.p_set_param
   | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo of int

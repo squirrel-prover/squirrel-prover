@@ -17,8 +17,8 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH
-%token PROOF QED UNDO
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL
+%token PROOF QED UNDO ABORT
 %token EOF
 %token EMPTY_ELSE
 
@@ -267,6 +267,11 @@ tactic_params:
 | t=tactic_param                        { [t] }
 | t=tactic_param COMMA ts=tactic_params { t::ts }
 
+tac_errors:
+|                       { [] }
+| i=ID                  { [i] }
+| i=ID COMMA t=tac_errors     { i::t }
+
 tac:
   | LPAREN t=tac RPAREN               { t }
   | l=tac SEMICOLON r=tac             { Tactics.AndThen [l;r] }
@@ -287,6 +292,8 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                 { Tactics.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
+  | CHECKFAIL t=tac WITH ts=tac_errors { Tactics.CheckFail
+                                         (Tactics.tac_error_of_strings  ts,t) }
 
   | APPLY i=ID                        { Tactics.Abstract
                                           ("apply",
@@ -315,6 +322,10 @@ tac:
 
 qed:
 | QED                                 { () }
+
+abort:
+| ABORT                               { () }
+
 
 undo:
 | UNDO i=INT DOT                      { i }
@@ -399,5 +410,6 @@ interactive :
 | set_option                      { Prover.ParsedSetOption $1 }
 | tactic                          { Prover.ParsedTactic $1 }
 | qed                             { Prover.ParsedQed }
+| abort                           { Prover.ParsedAbort }
 | goal                            { Prover.ParsedGoal $1 }
 | EOF                             { Prover.EOF }

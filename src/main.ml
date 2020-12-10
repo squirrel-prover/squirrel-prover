@@ -138,6 +138,15 @@ let rec main_loop ~test ?(save=true) mode =
 
     | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
+    | WaitQed, ParsedAbort ->
+        if test then raise @@ Failure "Trying to abort a completed proof." else
+          error ~test mode "Trying to abort a completed proof."
+
+    | ProofMode, ParsedAbort ->
+      Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
+      Prover.reset ();
+      main_loop ~test GoalMode
+
     | _, ParsedQed ->
         if test then raise @@ Failure "unfinished" else
           error ~test mode "Unexpected command."
@@ -151,7 +160,7 @@ and error ~test mode s =
 
 let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
 
-let interactive_prover () =   
+let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
@@ -182,16 +191,6 @@ let main () =
 let () =
   let test = true in
   Parserbuf.add_suite_restore "Tactics" [
-    "Substitution", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Tactics.NotEqualArguments)
-        (fun () -> run ~test "tests/alcotest/substitution.sp")
-    end ;
-    "Collision", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Tactics.NoSSC)
-        (fun () -> run ~test "tests/alcotest/collisions.sp")
-    end ;
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Undefined "a1"))
@@ -206,52 +205,6 @@ let () =
       Alcotest.check_raises "fails"
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.sp")
-    end ;
-    "Euf Mvar", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_mvar.sp")
-    end ;
-    "Euf Bad SSC 1", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/eufnull.sp")
-    end ;
-    "Euf Bad SSC 2", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_deep.sp")
-    end ;
-    "Euf Bad SSC 3", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/euf_cond.sp")
-    end ;
-    "Euf collect in key position", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_deepkey.sp")
-    end ;
-    "Euf collect indirect bound variables", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_bv.sp")
-    end ;
-    "Euf collect direct bound variables", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/euf_bv_direct.sp")
-    end ;
-    "Euf environment", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactics.(Tactic_soft_failure
-                    (Cannot_convert (Theory.(Undefined "i1")))))
-        (fun () -> run ~test "tests/alcotest/euf_env.sp")
-    end ;
-    "Sign Bad SSC", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/sign.sp")
     end ;
     "SEnc Bad SSC - INCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"

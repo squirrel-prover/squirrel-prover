@@ -3,6 +3,7 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | Cannot_convert of Theory.conversion_error
+  | CannotConvert
   | NotEqualArguments
   | Bad_SSC
   | NoSSC
@@ -14,6 +15,43 @@ type tac_error =
   | SEncSharedRandom
   | SEncRandomNotFresh
   | TacTimeout
+  | DidNotFail
+  | FailWithUnexpected of tac_error
+
+
+let tac_error_strings =
+  [ (More, "More");
+   (NotEqualArguments, "NotEqualArguments");
+   (Bad_SSC, "BadSSC");
+   (NoSSC, "NoSSC");
+   (NoAssumpSystem, "NoAssumpSystem");
+   (NotDDHContext, "NotDDHContext");
+   (SEncNoRandom, "SEncNoRandom");
+   (SEncSharedRandom, "SEncSharedRandom");
+   (SEncRandomNotFresh, "SEncRandomNotFresh");
+   (TacTimeout, "TacTimeout");
+   (CannotConvert, "CannotConvert");
+   (DidNotFail, "DidNotFail")]
+
+let rec tac_error_to_string = function
+  | Failure s -> "Failure "^s
+  | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
+  | Cannot_convert _ -> "CannotConvert"
+  | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
+  | Undefined s -> "Undefined, "^s
+  | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
+  | More
+  | NotEqualArguments
+  | Bad_SSC
+  | NoSSC
+  | NoAssumpSystem
+  | NotDDHContext
+  | SEncNoRandom
+  | SEncSharedRandom
+  | SEncRandomNotFresh
+  | TacTimeout
+  | CannotConvert
+  | DidNotFail as e -> List.assoc e tac_error_strings
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -23,7 +61,7 @@ let rec pp_tac_error ppf = function
         "A sequence of tactic applications eventually failed \
          with the following error: %a"
         pp_tac_error t
-  | NotEqualArguments -> Fmt.pf ppf "Arguments not equals."
+  | NotEqualArguments -> Fmt.pf ppf "Arguments not equals"
   | Bad_SSC -> Fmt.pf ppf "Key does not satisfy the syntactic side condition"
   | NoSSC ->
       Fmt.pf ppf
@@ -44,6 +82,30 @@ let rec pp_tac_error ppf = function
   | SEncRandomNotFresh ->
     Fmt.string ppf "A random used for an encryption is used elsewhere"
   | TacTimeout -> Fmt.pf ppf "Time-out"
+  | DidNotFail -> Fmt.pf ppf "The tactic did not fail"
+  | CannotConvert -> Fmt.pf ppf "Conversion error"
+  | FailWithUnexpected t -> Fmt.pf ppf "The tactic did not fail with the expected \
+                                      exception, but failed with: %s"
+                            (tac_error_to_string t)
+
+
+let strings_tac_error =
+  let (a,b) = List.split tac_error_strings in
+  List.combine b a
+
+let rec tac_error_of_strings = function
+  | [] -> raise (Failure "exception name expected")
+  | [s] ->
+    (match List.assoc_opt s strings_tac_error with
+      | None -> raise (Failure "exception name unknown")
+      | Some e -> e
+    )
+  | ["Failure"; s2] -> Failure s2
+  | "AndThenFailure"::q -> AndThen_Failure (tac_error_of_strings q)
+  | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
+  | ["Undefined"; s] -> Undefined s
+  | _ ->  raise (Failure "exception name unknown")
+
 
 exception Tactic_soft_failure of tac_error
 
@@ -107,6 +169,15 @@ let try_tac t j sk fk =
   let sk l fk = succeeded := true ; sk l fk in
   let fk e = if !succeeded then fk e else sk [j] fk in
   t j sk fk
+
+let checkfail_tac exc t j sk fk =
+  try
+    let sk l fk = raise (Tactic_soft_failure DidNotFail) in
+    t j sk fk
+  with Tactic_soft_failure e when e = exc -> sk [j] fk
+     | Tactic_soft_failure (Cannot_convert _) when exc=CannotConvert -> sk [j] fk
+     | Tactic_soft_failure e
+     | Tactic_hard_failure e -> raise (Tactic_hard_failure (FailWithUnexpected e))
 
 let repeat t j sk fk =
   let rec aux j sk fk =
@@ -187,6 +258,7 @@ type 'a ast =
   | Repeat : 'a ast -> 'a ast
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
+  | CheckFail : tac_error * 'a ast -> 'a ast
 
 module type AST_sig = sig
 
@@ -222,6 +294,7 @@ module AST (M:S) = struct
     | Repeat t -> repeat (eval modifiers t)
     | Ident -> id
     | Modifier (id,t) -> eval (id::modifiers) t
+    | CheckFail (e,t) -> checkfail_tac e (eval modifiers t)
 
   let pp_args fmt l =
     Fmt.list
@@ -249,7 +322,9 @@ module AST (M:S) = struct
     | NotBranching t ->
       Fmt.pf ppf "(nobranch @[%a@])" pp t
     | Repeat t ->
-        Fmt.pf ppf "(repeat @[%a@])" pp t
+      Fmt.pf ppf "(repeat @[%a@])" pp t
+    | CheckFail (e, t) ->
+        Fmt.pf ppf "(checkfail %s @[%a@])" (tac_error_to_string e) pp t
 
   exception Return of M.judgment list
 
@@ -275,4 +350,3 @@ let hard_failure e = raise (Tactic_hard_failure e)
 let timeout_get = function
   | Utils.Result a -> a
   | Utils.Timeout -> hard_failure TacTimeout
-

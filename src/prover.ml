@@ -465,6 +465,7 @@ let make_equiv_goal_process system_1 system_2 =
 type parsed_input =
   | ParsedInputDescr
   | ParsedQed
+  | ParsedAbort
   | ParsedSetOption of Config.p_set_param
   | ParsedTactic of TacticsArgs.parser_arg Tactics.ast
   | ParsedUndo of int

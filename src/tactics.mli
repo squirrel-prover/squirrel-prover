@@ -32,6 +32,7 @@ type tac_error =
   | Failure of string
   | AndThen_Failure of tac_error
   | Cannot_convert of Theory.conversion_error
+  | CannotConvert
   | NotEqualArguments
   | Bad_SSC
   | NoSSC
@@ -43,7 +44,9 @@ type tac_error =
   | SEncSharedRandom
   | SEncRandomNotFresh
   | TacTimeout
-    
+  | DidNotFail
+  | FailWithUnexpected of tac_error
+
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
 
@@ -52,6 +55,9 @@ exception Tactic_hard_failure of tac_error
 exception Tactic_soft_failure of tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
+
+(** A basic way to parse some expected tactic errors *)
+val tac_error_of_strings : string list -> tac_error
 
 (** Purely abstract type "returned" by continuations and tactics *)
 type a
@@ -87,6 +93,8 @@ val andthen_list : 'a tac list -> 'a tac
 
 val try_tac : 'a tac -> 'a tac
 
+val checkfail_tac : tac_error -> 'a tac -> 'a tac
+
 (** {2 Generic tactic syntax trees} *)
 
 module type S = sig
@@ -116,6 +124,7 @@ type 'a ast =
   | Repeat : 'a ast -> 'a ast
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
+  | CheckFail : tac_error * 'a ast -> 'a ast
 
 module type AST_sig = sig
 
@@ -140,9 +149,9 @@ module AST (M:S) : AST_sig
 (** Raise a soft failure. *)
 val soft_failure : tac_error -> 'a
 
-(** Unwrap the result of a computation that may timeout, or raise a soft 
+(** Unwrap the result of a computation that may timeout, or raise a soft
     timeout failure. *)
 val timeout_get : 'a Utils.timeout_r -> 'a
-  
+
 (** Raise a hard failure. *)
 val hard_failure : tac_error -> 'a

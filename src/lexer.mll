@@ -97,6 +97,7 @@ rule token = parse
 | "axiom"             { AXIOM }
 | "Proof."            { PROOF }
 | "Qed."              { QED }
+| "Abort."            { ABORT }
 | "apply"             { APPLY }
 | "help"              { HELP }
 | "to"                { TO }
@@ -107,6 +108,7 @@ rule token = parse
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "nobranch"          { NOBRANCH }
+| "checkfail"         { CHECKFAIL }
 | '+'                 { PLUS }
 | ("cond"|"exec") as n { PID n }
 | name as n           { ID n }
