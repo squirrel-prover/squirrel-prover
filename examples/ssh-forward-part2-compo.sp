@@ -145,15 +145,15 @@ process P1FA =
 
 process PDIS =
   (* begin S0 *)
-  in(cS, gP1);
+  in(cS, gP0);
   out(cS, g^bke11);
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP1,g^bke11>,k11>, hKey) in
+  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP1^bke11),pk(kP)) = sidS0 then
+  if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
       out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
@@ -215,15 +215,15 @@ process P1FADDH =
 
 process PDISDDH =
   (* begin S0 *)
-  in(cS, gP1);
+  in(cS, gP0);
   out(cS, g^bke11);
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP1,g^bke11>,k11>, hKey) in
+  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
   out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
   in(cS, encP );
-  if checksign(dec(encP,gP1^bke11),pk(kP)) = sidS0 then
+  if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
   out(cS,ok);
   (* end S1 *)
   (* begin Pdis0 *)
