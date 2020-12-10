@@ -26,12 +26,14 @@ system null.
 
 (* k occurs inside the hashed message *)
 
+(** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 goal key_in_mess:
   h(k,k) = k => False.
 Proof.
   simpl.
   checkfail euf M0 with BadSSC.
 Abort.
+(** END TEST **)
 
 goal message_var :
   forall (m1: message, m2:message, m3:message),
@@ -42,7 +44,7 @@ Proof.
 Abort.
 
 (* k occurs inside the condition of an action *)
-
+(** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 system [condSSC] in(c,x); if x=k then out(c,x).
 
 goal [none,condSSC] forall tau:timestamp,
@@ -51,7 +53,7 @@ Proof.
   intros.
   checkfail euf M0 with BadSSC.
 Abort.
-
+(** END TEST **)
 (* k occurs in the context *)
 
 goal (k = h(u,k)) => False.
