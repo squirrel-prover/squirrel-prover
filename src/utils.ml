@@ -276,14 +276,17 @@ let map_of_iter (iter : ('a -> unit) -> unit) (f : 'a -> 'b) =
 let fst3 (a, b, c) = a
 
 (*------------------------------------------------------------------*)
+type 'a timeout_r = 
+  | Result of 'a 
+  | Timeout
+  
 (** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Some (f x)] if the computation terminated in the imparted
-    time, and [None] otherwise. *)
+    Returns [Result (f x)] if the computation terminated in the imparted
+    time, and [Timeout] otherwise. *)
 let timeout timeout f x =
   assert (timeout > 0);
 
   let exception Timeout in
-
   (* Set new handler, and store old one. *)
   let old_handler = Sys.signal Sys.sigalrm
     (Sys.Signal_handle (fun _ -> raise Timeout)) in
@@ -302,7 +305,7 @@ let timeout timeout f x =
 
     let res = f x in
     finish ();
-    Some res
+    Result res
   with
-  | Timeout -> finish (); None
+  | Timeout -> finish (); Timeout
   | exn     -> finish (); raise exn

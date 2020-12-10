@@ -3,6 +3,8 @@ OCB_FLAGS = -use-ocamlfind -use-menhir -I src \
 
 OCB = ocamlbuild $(OCB_FLAGS)
 
+GITHASH := $(shell scripts/git-hash)
+
 default: squirrel
 
 all: squirrel test
@@ -28,7 +30,7 @@ tests/ok/test_prologue.ok:
 	@if ./squirrel $(@:.ok=.sp) > /dev/null 2> /dev/null ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/ok/tests.ko ; echo -n '!' ; fi
 
-alcotest: sanity
+alcotest: version sanity
 	$(OCB) test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
@@ -40,11 +42,11 @@ clean:
 	rm -f *.coverage
 	rm -rf _coverage
 
-squirrel: sanity
+squirrel: version sanity
 	$(OCB) squirrel.byte
 	@ln -s -f squirrel.byte squirrel
 
-makecoverage: sanity
+makecoverage: version sanity
 	BISECT_COVERAGE=YES $(OCB) test.byte
 	@mkdir -p ./_build/_tests
 	@rm -f ./_build/_tests/Squirrel ./_build/_tests/latest
@@ -60,25 +62,29 @@ coverage: makecoverage ok_test
 %.cmo: sanity
 	$(OCB) $@
 
-native: sanity
+native: version sanity
 	$(OCB) test.native
 
-byte: sanity
+byte: version sanity
 	$(OCB) test.byte
 
-profile: sanity
+profile: version sanity
 	$(OCB) -tag profile test.native
 
-debug: sanity
+debug: version sanity
 	$(OCB) -tag debug test.byte
 
-install: squirrel
+install: version squirrel
 	cp squirrel.byte ~/.local/bin/squirrel.byte
 
 doc: squirrel
 	$(OCB) -ocamldoc "ocamldoc -stars" squirrel.docdir/index.html
 
 sanity: _build/requirements
+
+version:
+	rm -f src/commit.ml
+	sed 's/GITHASH/$(GITHASH)/' < src/commit.ml.in > src/commit.ml
 
 # check that requirements are installed
 PLEASE="Please install $$pkg, e.g. using \"opam install $$pkg\"."
@@ -96,4 +102,4 @@ _build/requirements: Makefile
 	mkdir -p _build
 	touch _build/requirements
 
-.PHONY: clean byte native profile debug sanity
+.PHONY: version clean byte native profile debug sanity

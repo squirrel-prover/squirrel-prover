@@ -39,7 +39,7 @@ let pp_error pp_loc pp_pref_loc e = match e with
   | Symbols.Multiple_declarations s ->
       Some (fun ppf () ->
               Fmt.pf ppf
-                "@[%aMultiple declarations %a : %s.@]@."
+                "@[%aMultiple declarations %a of the symbol: %s.@]@."
                 pp_pref_loc ()
                 pp_loc ()
                 s)

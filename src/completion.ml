@@ -13,22 +13,25 @@ module Cst = struct
 
     (* Constants appearing in the original terms *)
     | Cname of Term.nsymb
+    | Cfuncst of Term.fsymb     (* function symbol of arity zero *)
     | Cmvar of Vars.message
     | Cmacro of (msym) * Term.timestamp
 
   let cst_cpt = ref 0
 
   let mk_flat () =
-    let () = incr cst_cpt in
+    let () = incr cst_cpt in 
     Cflat !cst_cpt
 
   let rec print ppf = function
     | Cflat i -> Fmt.pf ppf "_%d" i
     | Csucc c -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cname n -> Term.pp_nsymb ppf n
+    | Cfuncst f -> Term.pp_fsymb ppf f
     | Cmvar m -> Vars.pp ppf m
     | Cmacro (Message m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
     | Cmacro (Bool m,ts) -> Fmt.pf ppf "@[%a@%a@]" Term.pp_msymb m Term.pp ts
+
   (* The successor function symbol is the second smallest in the precedence
       used for the LPO (0 is the smallest element).  *)
   let rec compare c c' = match c,c' with
@@ -39,7 +42,7 @@ module Cst = struct
 
   (*  let equal c c' = compare c c' = 0 *)
 
-  let hash c = Hashtbl.hash c
+  (* let hash c = Hashtbl.hash c *)
 end
 
 type varname = int
@@ -97,6 +100,8 @@ end = struct
       | _ -> assert false end
     else if f = Term.f_xor
     then cxor ts
+    else if ts = []
+    then Ccst (Cfuncst f)
     else Cfun (f, ts)
 
   and cxor ts =
@@ -131,7 +136,9 @@ let rec cterm_of_term c =
   | Var m -> ccst (Cst.Cmvar m)
   | Macro (m,l,ts) -> assert (l = []) ; (* TODO *)
     ccst (Cst.Cmacro (Cst.Message m,ts))
-  | ITE(b,c,d) -> cfun Term.f_ite [cterm_of_bterm b; cterm_of_term c; cterm_of_term d]
+  | ITE(b,c,d) -> cfun Term.f_ite [cterm_of_bterm b;
+                                   cterm_of_term c;
+                                   cterm_of_term d]
   | Diff(c,d) -> cfun Term.f_diff [cterm_of_term c; cterm_of_term d]
   | _ ->
     raise Unsupported_conversion
@@ -381,35 +388,35 @@ type state = { uf : Cuf.t;
                completed : bool }
 
 
-let pp_xor_rules ppf s =
+let pp_xor_rules ppf xor_rules =
   Fmt.pf ppf "@[<v>%a@]"
     (Fmt.list
        ~sep:(fun ppf () -> Fmt.pf ppf "@;")
        (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
-    ) s.xor_rules
+    ) xor_rules
 
-let pp_sat_xor_rules ppf s = match s.sat_xor_rules with
-  | None ->   Fmt.pf ppf "Not yet saturated"
+let pp_sat_xor_rules ppf sat_xor_rules = match sat_xor_rules with
   | Some (sat,_) ->
     Fmt.pf ppf "@[<v>%a@]"
       (Fmt.list
          ~sep:(fun ppf () -> Fmt.pf ppf "@;")
          (fun ppf s -> Fmt.pf ppf "%a -> 0" Cset.print s)
       ) sat
-
-let pp_grnd_rules ppf s =
+  | None -> Fmt.pf ppf "Not yet saturated"
+              
+let pp_grnd_rules ppf grnd_rules =
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,a) -> Fmt.pf ppf "%a -> %a" pp_cterm t Cst.print a)
-  ) s.grnd_rules
+  ) grnd_rules
 
-let pp_e_rules ppf s =
+let pp_e_rules ppf e_rules =
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,s) -> Fmt.pf ppf "%a -> %a" pp_cterm t pp_cterm s)
-  ) s.e_rules
+  ) e_rules
 
 let pp_state ppf s =
   Fmt.pf ppf "@[<v 0>\
@@ -420,10 +427,10 @@ let pp_state ppf s =
               @[<v 2>e_rules:@;%a@]@;\
               ;@]%!"
     Cuf.print s.uf
-    pp_xor_rules s
-    pp_sat_xor_rules s
-    pp_grnd_rules s
-    pp_e_rules s
+    pp_xor_rules s.xor_rules
+    pp_sat_xor_rules s.sat_xor_rules
+    pp_grnd_rules s.grnd_rules
+    pp_e_rules s.e_rules
 
 
 let rec term_uf_normalize state t = match t with
@@ -487,14 +494,17 @@ end = struct
                                             Cuf.union_count state.uf ) } in
 
       (* Then, we keep rules of the form a + b -> 0. *)
-      List.filter (fun xr -> Cset.cardinal xr = 2) sat_xrules
-      |> List.map (fun xr -> match Cset.elements xr with
-          | [a;b] -> (a,b)
-          | _ -> assert false)
+      let new_eqs =
+        List.filter (fun xr -> Cset.cardinal xr = 2) sat_xrules
+        |> List.map (fun xr -> match Cset.elements xr with
+            | [a;b] -> (a,b)
+            | _ -> assert false) in
 
       (* We update the union-find structure with a = b *)
-      |> List.fold_left (fun state (a,b) ->
-          { state with uf = Cuf.union state.uf a b } ) state
+      let uf =
+        List.fold_left (fun uf (a,b) -> Cuf.union uf a b) state.uf new_eqs
+      in
+      { state with uf = uf }          
 end
 
 
@@ -842,6 +852,8 @@ let finalize_completion state =
     completed = true }
 
 let rec complete_state state =
+  (* Fmt.epr "State: %a@." pp_state state; *)
+  
   let stop_cond state =
   ( Cuf.union_count state.uf,
     List.length state.grnd_rules,
@@ -920,7 +932,7 @@ let complete_cterms (l : (cterm * cterm) list) : state =
   complete_state state
   |> finalize_completion
 
-let complete (l : (Term.message * Term.message) list) : state =
+let complete (l : (Term.message * Term.message) list) : state timeout_r=
   let l =
     List.fold_left
       (fun l (u,v) ->
@@ -929,8 +941,12 @@ let complete (l : (Term.message * Term.message) list) : state =
       []
       l
   in
-  complete_cterms l
+  Utils.timeout (Config.solver_timeout ()) complete_cterms l
 
+
+let print_init_trs fmt =
+  Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
+    pp_e_rules (init_erules ())
 
 (****************)
 (* Dis-equality *)

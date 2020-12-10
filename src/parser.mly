@@ -12,7 +12,7 @@
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
 %token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT
-%token MUTABLE SYSTEM
+%token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
@@ -371,6 +371,18 @@ goal:
 
 | PROOF          { Prover.Gm_proof }
 
+option_param:
+| TRUE  { Config.Param_bool true  }
+| FALSE { Config.Param_bool false }
+| n=ID  {
+        if n = "true" then (Config.Param_bool true)
+        else if n = "false" then (Config.Param_bool false)
+        else Config.Param_string n   }
+| i=INT { Config.Param_int i      }
+
+set_option:
+| SET n=ID EQ param=option_param DOT { (n, param) }
+
 theory:
 | declaration theory             { () }
 | SYSTEM process DOT             { ignore (Process.declare_system
@@ -384,6 +396,7 @@ theory:
 interactive :
 | theory                          { Prover.ParsedInputDescr }
 | undo                            { Prover.ParsedUndo $1 }
+| set_option                      { Prover.ParsedSetOption $1 }
 | tactic                          { Prover.ParsedTactic $1 }
 | qed                             { Prover.ParsedQed }
 | goal                            { Prover.ParsedGoal $1 }

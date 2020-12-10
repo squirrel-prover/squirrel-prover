@@ -591,10 +591,10 @@ let norm_tatom = function
 
 (* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : trace_atom list) : models =
+let models_conjunct (l : trace_atom list) : models timeout_r =
   let l = List.map norm_tatom l |> List.flatten in
   let instance = mk_instance l in
-  split instance
+  Utils.timeout (Config.solver_timeout ()) split instance
 
 let m_is_sat models = models <> []
 
@@ -755,12 +755,16 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
+             (fun () -> if models_conjunct pb <> (Result []) 
+               then raise Sat
+               else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
+             (fun () -> if models_conjunct pb <> (Result []) 
+               then () else 
+                 raise Unsat ))
          failures;);
 
     ("Graph", `Quick,
@@ -791,11 +795,17 @@ let () =
        
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> if models_conjunct pb <> [] then raise Sat else ()))
+             (fun () ->
+                if models_conjunct pb <> Result []
+                then raise Sat
+                else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> if models_conjunct pb <> [] then () else raise Unsat ))
+             (fun () ->
+                if models_conjunct pb <> Result []
+                then ()
+                else raise Unsat ))
          failures;)
   ]

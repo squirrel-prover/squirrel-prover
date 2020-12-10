@@ -25,7 +25,7 @@ rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
 | "(*" { comment lexbuf; token lexbuf }
-| "!_" (['a'-'z']* as i)  { BANG i }
+| "!_" (name as i)  { BANG i }
 | "&&"                { AND }
 | "||"                { OR }
 | "not"               { NOT }
@@ -69,6 +69,7 @@ rule token = parse
 | "name"              { NAME }
 | "mutable"           { MUTABLE }
 | "system"            { SYSTEM }
+| "set"               { SET }
 | "hash"              { HASH }
 | "aenc"              { AENC }
 | "senc"              { SENC }

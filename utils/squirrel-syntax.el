@@ -19,6 +19,7 @@
   "axiom"
   "goal"
   "system"
+  "set"
   "signature"
   "Proof"
   "Qed"

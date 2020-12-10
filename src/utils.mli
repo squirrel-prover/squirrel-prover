@@ -102,7 +102,12 @@ val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list
 val fst3 : 'a * 'b * 'c -> 'a
 
 (*------------------------------------------------------------------*)
+type 'a timeout_r = 
+  | Result of 'a 
+  | Timeout
+
+  
 (** [timeout t f x] executes [f x] for at most [t] seconds.
-    Returns [Some (f x)] if the computation terminated in the imparted
-    time, and [None] otherwise. *)
-val timeout : int -> ('a -> 'b) -> 'a -> 'b option
+    Returns [Result (f x)] if the computation terminated in the imparted
+    time, and [Timeout] otherwise. *)
+val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r

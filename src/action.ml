@@ -283,7 +283,7 @@ let project_system proj = function
       match proj with
       | Term.Left -> Single s1
       | Term.Right -> Single s2
-      | Term.None ->  raise @@ BiSystemError "cannot project a system with None"
+      | Term.None -> raise @@ BiSystemError "cannot project a system with None"
     end
 
 let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
@@ -302,7 +302,8 @@ let register table system_name symb indices action descr =
   Hashtbl.add systems system_name s;
   match to_term action with
   | Term.Action (symb2, is) when indices <> is ->
-      raise @@ BiSystemError "Cannot register a shape twice with distinct indices."
+      raise @@
+      BiSystemError "Cannot register a shape twice with distinct indices."
   | Term.Action (symb2, is) ->
       let subst =
         Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
@@ -319,24 +320,26 @@ let register table system_name symb indices action descr =
 let make_bi_descr d1 d2 =
   if d1.input <> d2.input || d1.indices <> d2.indices then
     raise @@ BiSystemError "cannot merge two actions with disctinct \
-              inputs or indexes";
+                            inputs or indexes";
   { d1 with
     condition = (let is1,t1 = d1.condition and is2,t2 = d2.condition in
                  if is1 <> is2 then
-                   raise @@ BiSystemError "cannot merge two actions with disctinct \
-                             condtion indexes";
+                   raise @@
+                   BiSystemError "cannot merge two actions with disctinct \
+                                  condtion indexes";
                  is1, Term.make_bi_term t1 t2);
     updates = List.map2 (fun (st1, m1) (st2, m2) ->
           if st1 <> st2 then
-                   raise @@ BiSystemError "cannot merge two actions with disctinct \
-                             states";
+            raise @@ BiSystemError "cannot merge two actions with disctinct \
+                                    states";
         st1,Term.make_bi_term m1 m2)
         d1.updates d2.updates;
     output = (let c1,m1 = d1.output and c2,m2 = d2.output in
-                        if c1 <> c2 then
-                   raise @@ BiSystemError "cannot merge two actions with disctinct \
-                             ouput channels";
-                        c1, Term.make_bi_term m1 m2) }
+                if c1 <> c2 then
+                  raise @@
+                  BiSystemError "cannot merge two actions with disctinct \
+                                 ouput channels";
+                c1, Term.make_bi_term m1 m2) }
 
 let get_descr_of_shape system shape =
   match system with
@@ -373,7 +376,8 @@ let get_descrs system =
     let right_shapes = Hashtbl.find_all systems (get_id s2) in
     if not(Utils.List.inclusion left_shapes right_shapes
            && Utils.List.inclusion right_shapes left_shapes) then
-      raise @@ BiSystemError "Cannot iter over a bisytem with distinct control flow";
+      raise @@
+      BiSystemError "Cannot iter over a bisytem with distinct control flow";
     List.map
       (fun shape -> (get_descr_of_shape system shape))
       left_shapes
@@ -386,8 +390,8 @@ let get_descrs system =
     (* we must projet before iterating *)
     let shapes = Hashtbl.find_all systems (get_id s) in
     List.map
-      ( fun shape -> (pi_descr (get_proj s)
-                          (Hashtbl.find action_to_descr (shape,get_id s))))
+      (fun shape -> pi_descr (get_proj s)
+                      (Hashtbl.find action_to_descr (shape,get_id s)))
       shapes
 
 let iter_descrs system f =
@@ -407,14 +411,16 @@ let rec subst s d =
   | Condition (f,a) :: q ->
     begin
       match same_shape a d.action with
-      | None ->  subst q d
-      | Some s ->       subst q {d with condition = (fst(d.condition), Term.subst s f)}
+      | None -> subst q d
+      | Some s ->
+          subst q {d with condition = (fst(d.condition), Term.subst s f)}
     end
   | Output (t,a) :: q ->
     begin
       match same_shape a d.action with
-      | None ->  subst q d
-      | Some s ->       subst q {d with output = (fst(d.output), Term.subst s t)}
+      | None -> subst q d
+      | Some s ->
+          subst q {d with output = (fst(d.output), Term.subst s t)}
     end
 
 
