@@ -9,13 +9,14 @@ While ID and PIN are unique to each tag, k is equal for all tags the reader is
 allowed to authenticate.
 The tag further stores the timestamp TSlast of the last successful mutual
 authentication initialized to 0 at the factory.
-*******************************************************************************)
 
-(* WARNING *)
-(* Until the semantics is fixed in the tool, a state macro s@t is interpreted:
-    - by the value AFTER the update for occurrences in output, cond terms,
-    - by the value BEFORE the update for occurrences in update term.
-   This is why we store in the state both old and current values. *)
+R -> T : <h(k,TS),TS>
+T -> R : h(ID)               if TS > TSlast
+         ID := h(ID,PIN,TS)
+         TSlast := TS
+R -> T : h(ID,PIN)
+         ID' := h(ID,PIN,TS)
+*******************************************************************************)
 
 hash h
 hash h1
@@ -38,15 +39,15 @@ name key3 : index->message
 name idinit : index->message
 name pin : index->message
 
-mutable kT : index->message (* <<ID_old,TSlast_old>,<ID,TSlast>> *)
-mutable kR : index->message (* <ID_old,ID> *)
+mutable kT : index->message (* <ID,TSlast> *)
+mutable kR : index->message (* <ID> *)
 mutable TS : message
 
 channel cT
 channel cR
 
-axiom stateTagInit : forall (i:index), kT(i)@init = <<idinit(i),TSinit>,<idinit(i),TSinit>>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = <idinit(ii),idinit(ii)>
+axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
+axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
 axiom stateTSInit : TS@init = TSinit
 
 axiom TSaxiom :
@@ -55,11 +56,11 @@ axiom TSaxiom :
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
-  if fst(x1) = h(snd(x1),k) && TSorder(snd(snd(kT(i))),snd(x1)) = TSorderOk then
-    out(cT, h1(fst(snd(kT(i))),key1(i)));
+  if fst(x1) = h(snd(x1),k) && TSorder(snd(kT(i)),snd(x1)) = TSorderOk then
+    out(cT, h1(fst(kT(i)),key1(i)));
     in(cR, x3);
-    if x3 = h2(<fst(fst(kT(i))),pin(i)>,key2(i)) then
-      kT(i) := <snd(kT(i)), <h3(<<fst(snd(kT(i))),pin(i)>,snd(x1)>,key3(i)), snd(x1)>>;
+    if x3 = h2(<fst(kT(i)),pin(i)>,key2(i)) then
+      kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
       out(cT, ok)
     else
       out(cT, error)
@@ -71,9 +72,10 @@ process reader(jj:index) =
   TS := TSnext(TS);
   out(cR, <h(TS,k),TS>);
   in(cT, x2);
-  try find ii such that x2 = h1(fst(kR(ii)), key1(ii)) in
-    kR(ii) := <snd(kR(ii)),h3(<<snd(kR(ii)),pin(ii)>,TS>,key3(ii))>;
-    out(cR, h2(<fst(kR(ii)),pin(ii)>,key2(ii)))
+  try find ii such that x2 = h1(kR(ii), key1(ii)) in
+    let m = h2(<kR(ii),pin(ii)>,key2(ii)) in
+    kR(ii) := h3(<<kR(ii),pin(ii)>,TS>,key3(ii));
+    out(cR, m)
   else
     out(cR, error)
 
@@ -87,8 +89,7 @@ forall (jj,ii:index),
 Proof.
 intros.
 expand cond@R1(jj,ii).
-assert input@R1(jj,ii) = h1(snd(kR(ii)@pred(R1(jj,ii))),key1(ii)).
-euf M1.
+euf M0.
 exists j.
 Qed.
 
@@ -100,7 +101,6 @@ forall (i,j:index),
 Proof.
 intros.
 expand cond@T1(i,j).
-assert input@T1(i,j) = h2(<fst(snd(kT(i)@pred(T1(i,j)))),pin(i)>,key2(i)).
-euf M1.
+euf M0.
 exists jj.
 Qed.

@@ -11,10 +11,10 @@ system O:
 
 
 goal dummy :
-cond@A => input@A <>k.
+cond@O1 => input@O1 <>k.
 Proof.
 simpl.
-expand cond@A.
+expand cond@O1.
 notleft H0.
 Qed.
 

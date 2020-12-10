@@ -175,9 +175,9 @@ let f_snd = mk_fname "snd" 1
 let f_exp = mk_fname "exp" 2
 let f_g = mk_fname "g" 0
 
-(** Dummy term *)
+(** Empty *)
 
-let dummy = Fun (mk_fname "_" 0, [])
+let empty = Fun (mk_fname "empty" 0, [])
 
 (** Length *)
 
@@ -544,6 +544,39 @@ and subst_generic_atom s = function
   | `Happens a -> `Happens (subst s a)
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
+
+let subst_macros_ts l ts t =
+  let rec subst_term : type a. a term -> a term = fun t -> match t with
+    | Macro ((symb,s,ind), terms, ts') ->
+      let terms' = List.map subst_term terms in
+      begin match Symbols.Macro.get_all symb with
+      | Symbols.State _, _ ->
+        if (List.mem (Symbols.to_string symb) l && ts=ts')
+        then Macro((symb,s,ind), terms', ts')
+        else Macro((symb,s,ind), terms', Pred(ts'))
+      | _ -> Macro((symb,s,ind), terms', ts')
+      end
+    | Fun (f,terms) -> Fun (f, List.map subst_term terms)
+    | Seq (a, b) -> Seq (a, subst_term b)
+    | Diff (a, b) -> Diff (subst_term a, subst_term b)
+    | ITE (a, b, c) -> ITE (subst_term a, subst_term b, subst_term c)
+    | Find (vs, b, t, e) -> Find (vs, subst_term b, subst_term t, subst_term e)
+    | ForAll (vs, b) -> ForAll (vs, subst_term b)
+    | Exists (vs, b) -> Exists (vs, subst_term b)
+    | And (a, b) -> And (subst_term a, subst_term b)
+    | Or (a, b) -> Or (subst_term a, subst_term b)
+    | Not a -> Not (subst_term a)
+    | Impl (a, b) -> Impl (subst_term a, subst_term b)
+    | Atom a -> Atom (subst_generic_atom a)
+    | _ -> t
+  and subst_message_atom (`Message (ord, a1, a2)) =
+    `Message (ord, subst_term a1, subst_term a2)
+  and subst_generic_atom a = match a with
+    | #message_atom as a -> (subst_message_atom a :> generic_atom)
+    | _ -> a
+  in
+  subst_term t
+
 
 (** Smart constructors for boolean terms. *)
 

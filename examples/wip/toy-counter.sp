@@ -16,6 +16,9 @@ B = in(d, i : nat); in(c, y);
 P = ! A | ! B | out(d, 0) | ! in(d, i : nat); out(d, i)
 *******************************************************************************)
 
+(* In this model, we do not use private channels since actions (input/condition/
+   update/output) are atomic. *)
+
 hash h
 
 name secret : message
@@ -49,12 +52,13 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
 
 (* processes *)
 process A =
+  let m = h(<d,secret>,key) in
   d := mySucc(d);
-  out(cA, h(<myPred(d),secret>,key))
+  out(cA, m)
 
 process B =
   in(cA,y);
-  if y = h(<myPred(d),secret>,key) then
+  if y = h(<d,secret>,key) then
     d := mySucc(d);
     out(cB,secret)
   else
@@ -87,25 +91,13 @@ assert t' = pred(t).
 apply counterIncrease to t.
 Qed.
 
-goal auth : forall (j:index), cond@B(j) => exists (i:index), A(i)<B(j) && input@B(j) = output@A(i).
-Proof.
-intros.
-expand cond@B(j).
-euf M0.
-exists i.
-case H0.
-Qed.
-
 goal secretReach : forall (j:index), cond@B(j) => False.
 Proof.
 intros.
 expand cond@B(j).
 euf M0.
-apply predSucc to d@pred(A(i)).
-apply predSucc to d@pred(B(j)).
-assert d@pred(A(i)) = d@pred(B(j)).
-assert pred(A(i)) < pred(B(j)). case H0.
+assert pred(A(i)) < pred(B(j)).
 apply counterIncreaseBis to pred(B(j)).
-apply H1 to pred(A(i)).
+apply H0 to pred(A(i)).
 apply orderStrict to d@pred(A(i)),d@pred(B(j)).
 Qed.

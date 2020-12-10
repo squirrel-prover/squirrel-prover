@@ -48,7 +48,6 @@ intros.
 expand cond@R(k,kk).
 euf M0.
 exists j.
-case H0.
 Qed.
 
 (* avec reader spécifique, on peut imaginer écrire une sorte de condition ND comme celle-ci *)

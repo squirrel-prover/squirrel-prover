@@ -142,9 +142,9 @@ Proof.
   euf M0.
 
   case H2.
-  apply H1 to i.
+  apply H0 to i.
 
-  notleft H0.
+  notleft H1.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
@@ -156,9 +156,9 @@ Proof.
   euf M0.
 
   case H3.
-  apply H1 to i.
+  apply H0 to i.
 
-  notleft H0.
+  notleft H1.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)

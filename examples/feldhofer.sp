@@ -109,19 +109,19 @@ Proof.
 
 Qed.
 
-(* Action A is the empty else branch of the reader. *)
-goal wa_A :
+(* Action Reader2 is the empty else branch of the reader. *)
+goal wa_Reader2 :
   forall (k:index),
-    exec@A(k)
+    exec@Reader2(k)
     <=>
-    exec@pred(A(k)) && not (exists (i,j:index),
-      Tag(i,j) < A(k) && Reader(k) < A(k)  &&
-      output@Tag(i,j) = input@A(k) &&
+    exec@pred(Reader2(k)) && not (exists (i,j:index),
+      Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
+      output@Tag(i,j) = input@Reader2(k) &&
       input@Tag(i,j) = output@Reader(k)).
 Proof.
   intros.
-  expand exec@A(k).
-  expand cond@A(k).
+  expand exec@Reader2(k).
+  expand cond@Reader2(k).
   expand output@Reader(k).
   split.
 
@@ -139,11 +139,11 @@ Proof.
 
   intctxt M0.
   apply H1 to i,j1; case H2.
-  depends Reader(k),A(k).
+  depends Reader(k),Reader2(k).
 
   intctxt M0.
   apply H1 to i,j; case H2.
-  depends Reader(k),A(k).
+  depends Reader(k),Reader2(k).
 
 Qed.
 
@@ -266,17 +266,17 @@ Proof.
   fresh 6.
   fresh 5; yesif 5.
 
-  (* Action 3/4: A *)
+  (* Action 3/4: Reader2 *)
 
-  expand frame@A(k).
+  expand frame@Reader2(k).
 
   equivalent
-    exec@A(k),
-    exec@pred(A(k)) && not (exists (i,j:index),
-      Tag(i,j) < A(k) && Reader(k) < A(k)  &&
-      output@Tag(i,j) = input@A(k) &&
+    exec@Reader2(k),
+    exec@pred(Reader2(k)) && not (exists (i,j:index),
+      Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
+      output@Tag(i,j) = input@Reader2(k) &&
       input@Tag(i,j) = output@Reader(k)).
-  apply wa_A to k.
+  apply wa_Reader2 to k.
 
   fa 2.
   fa 3; fadup 3.

@@ -149,7 +149,7 @@ let get_definition :
               | SimplePair _
               | Pair (Left _, Right _) -> proj_t None
               (* If we do not have a left and right projection, we must
-                 reconsrtruct the body of the macros to have the correct
+                 reconstruct the body of the macros to have the correct
                  definition on each side. *)
               | Pair (s1, s2)  -> Term.Diff (proj_t (Action.get_proj s1),
                                              proj_t (Action.get_proj s2))

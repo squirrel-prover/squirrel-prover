@@ -696,6 +696,10 @@ let make_term ?at_ts s l =
 (** Build the term representing the pair of two messages. *)
 let make_pair u v = Fun ("pair", [u; v], None)
 
+(** Empty *)
+
+let empty = Fun ("empty", [], None)
+
 (** Apply a partial substitution to a term.
   * This is meant for formulas and local terms in processes,
   * and does not support optional timestamps.
@@ -782,6 +786,52 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
        ~data
        (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
             Sorts.ESort (Vars.sort x)) typed_args,k)))
+
+(* TODO could be generalized into a generic fold function
+ * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)
+let find_get_terms t names =
+  let rec aux t acc name = match t with
+  | Get (x',_,_) -> if x'=name then x'::acc else acc
+  | Diff (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Seq (_,t') -> aux t' acc name
+  | ITE (c,t,e) -> aux c (aux t (aux e acc name) name) name
+  | Find (_,c,t,e) -> aux c (aux t (aux e acc name) name) name
+  | Fun (_,l,_) ->
+      List.fold_left (fun accu elem -> aux elem accu name) acc l
+  | Compare (_,t1,t2) -> aux t1 (aux t2 acc name) name
+  | Happens t' -> aux t' acc name
+  | ForAll (_,t') -> aux t' acc name
+  | Exists (_,t') -> aux t' acc name
+  | And (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Or (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Impl (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Not t' -> aux t' acc name
+  | _ -> acc
+  in
+  List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
+
+(* TODO unused *)
+let find_fun_terms t names =
+  let rec aux t acc name = match t with
+  | Fun (x',l,_) ->
+    if x' = name
+    then List.fold_left (fun accu elem -> aux elem accu name) (x'::acc) l
+    else List.fold_left (fun accu elem -> aux elem accu name) acc l
+  | Diff (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Seq (_,t') -> aux t' acc name
+  | ITE (c,t,e) -> aux c (aux t (aux e acc name) name) name
+  | Find (_,c,t,e) -> aux c (aux t (aux e acc name) name) name
+  | Compare (_,t1,t2) -> aux t1 (aux t2 acc name) name
+  | Happens t' -> aux t' acc name
+  | ForAll (_,t') -> aux t' acc name
+  | Exists (_,t') -> aux t' acc name
+  | And (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Or (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Impl (t1,t2) -> aux t1 (aux t2 acc name) name
+  | Not t' -> aux t' acc name
+  | _ -> acc
+  in
+  List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
 
 (** Tests *)
 let () =
