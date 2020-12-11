@@ -392,9 +392,10 @@ option_param:
 | i=INT { Config.Param_int i      }
 
 set_option:
-| SET n=ID EQ param=option_param DOT { (n, param) }
+| SET n=ID EQ param=option_param { (n, param) }
 
 theory:
+| sp=set_option theory           { Config.set_param sp }
 | declaration theory             { () }
 | SYSTEM process DOT             { ignore (Process.declare_system
                                      Symbols.dummy_table
@@ -405,9 +406,9 @@ theory:
                                      i p) }
 
 interactive :
+| set_option DOT                  { Prover.ParsedSetOption $1 }
 | theory                          { Prover.ParsedInputDescr }
 | undo                            { Prover.ParsedUndo $1 }
-| set_option                      { Prover.ParsedSetOption $1 }
 | tactic                          { Prover.ParsedTactic $1 }
 | qed                             { Prover.ParsedQed }
 | abort                           { Prover.ParsedAbort }

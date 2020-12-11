@@ -102,6 +102,7 @@ let rec pp_process ppf process =
     else
       pf ppf "@]"
 
+let is_out = function Out _ -> true | _ -> false
 
 (** Table of declared (bi)processes with their types.
   * TODO use Symbols ? *)
@@ -112,9 +113,15 @@ let rec check_proc env = function
   | Null -> ()
   | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
   | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
-  | Out (_,m,p) ->
-    Theory.check ~local:true env m Sorts.emessage ;
-    check_proc env p
+  | Out (_,m,p) 
+  | Alias (Out (_,m,p), _) as proc ->
+    (* raise an error if we are in strict alias mode *)
+    if is_out proc && (Config.strict_alias_mode ()) 
+    then raise Theory.(Conv StrictAliasError)
+    else
+      let () = Theory.check ~local:true env m Sorts.emessage in
+      check_proc env p
+  | Alias (p,_) -> check_proc env p
   | Set (s, l, m, p) ->
     let k = Theory.check_state s (List.length l) in
     Theory.check ~local:true env m k ;
@@ -149,7 +156,6 @@ let rec check_proc env = function
       with
       | Not_found -> raise @@ Theory.(Conv (Undefined id))
     end
-  | Alias (p,_) -> check_proc env p
 
 let declare id args proc =
   if Hashtbl.mem pdecls id then raise @@ Symbols.Multiple_declarations id;

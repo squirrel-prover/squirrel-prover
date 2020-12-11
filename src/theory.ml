@@ -131,6 +131,7 @@ type conversion_error =
   | Tactic_type of string
   | Index_not_var of term
   | Assign_no_state of string
+  | StrictAliasError
 
 exception Conv of conversion_error
 
@@ -171,6 +172,7 @@ let pp_error ppf = function
       Fmt.pf ppf "Only states can be assigned values, and the \
                   function symbols %s is not a state." s
 
+  | StrictAliasError -> Fmt.pf ppf "Strict alias mode in processus: error" 
 
 let check_arity s actual expected =
   if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
