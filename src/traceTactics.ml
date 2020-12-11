@@ -1261,7 +1261,7 @@ let euf_apply (get_params : Term.message_atom -> unforgeabiliy_param) (TacticsAr
         [TraceSequent.add_formula f s]
       | _ -> assert false
   in
-    (* we create the honnest sources using the classical eufcma tactic *)
+    (* we create the honest sources using the classical eufcma tactic *)
     try
       let honest_s = euf_apply_facts drop_head s p in
       (tag_s @ honest_s @ extra_goals)
@@ -1273,7 +1273,7 @@ let () =
            \n been declared with a tag formula, applies the tagged version.\
            \n given tag. Tagged eufcma, with a tag T, says that, under the\
            \n syntactic side condition, a hashed message either satisfies\
-           \n the tag T, or was honnestly produced. \
+           \n the tag T, or was honestly produced. \
            \n The tag T must refer to a previously defined axiom f(mess,sk), of\
            \n the form forall (m:message,sk:message).
            \n Usage: euf H t."
