@@ -43,6 +43,8 @@ type tac_error =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NoRefl
+  | NoReflMacros
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error

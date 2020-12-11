@@ -84,15 +84,15 @@ let () =
     ~help:"Automatically simplify the goal.\n Usage: simpl."
     simpl
 
-exception NoRefl
+exception NoReflMacros
 
 class exist_macros ~(system:Action.system) = object (self)
   inherit Iter.iter ~system as super
   method visit_message t = match t with
-    | Term.Macro _ -> raise NoRefl
+    | Term.Macro _ -> raise NoReflMacros
     | _ -> super#visit_message t
   method visit_formula t = match t with
-    | Term.Macro _ -> raise NoRefl
+    | Term.Macro _ -> raise NoReflMacros
     | _ -> super#visit_formula t
 end
 
@@ -108,10 +108,9 @@ let refl (s : EquivSequent.t) =
     then
       []
     else
-      Tactics.soft_failure (Tactics.Failure "Frames not identical")
+      Tactics.soft_failure (Tactics.NoRefl)
   with
-  | NoRefl -> Tactics.soft_failure (Tactics.Failure "Frames contain macros that may not be \
-                                   diff-equivalent")
+  | NoReflMacros -> Tactics.soft_failure (Tactics.NoReflMacros)
 
 let () =
   T.register "refl"

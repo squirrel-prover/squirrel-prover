@@ -14,6 +14,8 @@ type tac_error =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NoRefl
+  | NoReflMacros
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
@@ -29,6 +31,8 @@ let tac_error_strings =
    (SEncNoRandom, "SEncNoRandom");
    (SEncSharedRandom, "SEncSharedRandom");
    (SEncRandomNotFresh, "SEncRandomNotFresh");
+   (NoRefl , "NoRefl");
+   (NoReflMacros , "NoReflMacros");
    (TacTimeout, "TacTimeout");
    (CannotConvert, "CannotConvert");
    (DidNotFail, "DidNotFail")]
@@ -49,6 +53,8 @@ let rec tac_error_to_string = function
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NoRefl
+  | NoReflMacros
   | TacTimeout
   | CannotConvert
   | DidNotFail as e -> List.assoc e tac_error_strings
@@ -81,6 +87,10 @@ let rec pp_tac_error ppf = function
     Fmt.string ppf "Two encryptions share the same random"
   | SEncRandomNotFresh ->
     Fmt.string ppf "A random used for an encryption is used elsewhere"
+  | NoRefl  ->
+    Fmt.string ppf "Frames not identical"
+  | NoReflMacros ->
+    Fmt.string ppf "Frames contain macros that may not be diff-equivalent"
   | TacTimeout -> Fmt.pf ppf "Time-out"
   | DidNotFail -> Fmt.pf ppf "The tactic did not fail"
   | CannotConvert -> Fmt.pf ppf "Conversion error"
