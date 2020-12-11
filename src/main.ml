@@ -310,23 +310,6 @@ let () =
     end ;
   ] ;
   Parserbuf.add_suite_restore "Equivalence" [
-    "Refl", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure "Frames not identical"))
-        (fun () -> run ~test "tests/alcotest/neqrefl.sp")
-    end ;
-    "Refl Macro", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure "Frames contain \
-                                macros that may not be diff-equivalent"))
-        (fun () -> run ~test "tests/alcotest/neqrefl_macros.sp")
-    end ;
-    "Refl Boolean Macro", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure "Frames contain \
-                                macros that may not be diff-equivalent"))
-        (fun () -> run ~test "tests/alcotest/neqrefl_bmacros.sp")
-    end ;
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")
@@ -354,9 +337,7 @@ let () =
     end ;
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Tactics.Failure
-                                "Frames contain macros that may not be \
-                                 diff-equivalent"))
+        (Tactic_soft_failure (Tactics.NoReflMacros))
         (fun () -> run ~test "tests/alcotest/fadup_input.sp")
     end ;
     "XOR", `Quick, begin fun () ->
