@@ -65,7 +65,7 @@ Proof.
   try ((yesif; yesif) + (noif; noif)).
 Qed.
 
-equiv secrecy.
+equiv anonymity.
 Proof.
   enrich pk(kA); enrich pk(kB).
 
