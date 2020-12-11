@@ -176,6 +176,8 @@ let print_msubst msubst =
     (fun (s,th,tm) -> debug "[%s,%a,%a]@." s Theory.pp th Term.pp tm)
     msubst
 
+(* Type for data we store while parsing the process, needed to compute
+ * the corresponding set of actions. *)
 type p_env = {
 
   (* RELATED TO THE CURRENT PROCESS
@@ -184,36 +186,41 @@ type p_env = {
    * becomes !_i !_i0 P(i0): in the second binding, i is refreshed into
    * i0. *)
   alias : string ;
-    (* current alias in the process *)
+    (* current alias used for action names in the process *)
   indices : Vars.index list ;
-    (* bound indices, after refresh *)
+    (* current list of bound indices (coming from Repl or Exists constructs),
+     * after refresh *)
   vars_env : Vars.env ;
     (* local variables environment, after refresh *)
   isubst : (string * Theory.term * Vars.index) list ;
     (* substitution for index variables (Repl, Exists, Apply)
-     * mapping each variable to the associated refreshed variables
+     * mapping each variable from the original process (before refresh)
+     * to the associated refreshed variables
      * as Theory.term and as a Vars.index suitable for use in Term.term
      * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
      *      why not keep (i,i') for simplicity? *)
   msubst : (string * Theory.term * Term.message) list ;
-    (* Substitution for message variables (New, Let, In, Apply).
-     * Each variable is mapped to the associated refreshed variable
-     * as a Theory.term. The same goes for Term.message, but the
-     * third component can also be used to map input variables to
-     * input macros. *)
+    (* substitution for message variables (New, Let, In, Apply)
+     * each variable from the original process (before refresh)
+     * is mapped to the associated refreshed variable
+     * as a Theory.term and as a Term.message
+     * (the third component is also used to map input variables to
+     * input macros) *)
   inputs : (Channel.t * Vars.message) list ;
     (* bound input variables, after refresh *)
 
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.index list ;
-    (* variables bound by existential quantification *)
+    (* variables bound by existential quantification, after refresh *)
   action : Action.action ;
     (* the type [Action.action] describes the execution point in the protocol *)
   facts : Term.formula list ;
-    (* list of formulas to create the condition term of the action *)
+    (* list of formulas to create the condition term of the action,
+     * indices and variables are the ones after the refresh *)
   updates : (string * Vars.index list * Term.message) list ;
     (* list of updates performed in the action,
-     * indices are after the refresh *)
+     * indices in the second component, and indices and variables in the
+     * Term.message are the ones after the refresh *)
 
 }
 
@@ -231,13 +238,17 @@ let parse_proc system_name proc =
     env,ts,dummy_in
   in
 
+  (* Update env.vars_env with a new variable of sort [sort] computed from
+   * [name] *)
   let make_fresh env sort name =
     let ve',x = Vars.make_fresh env.vars_env sort name in
     { env with vars_env = ve' },x
   in
 
   (* Convert a Theory.term to Term.term using the special sort
-   * of substitution maintained by the parsing function. *)
+   * of substitution ([isubst] and [msubst]) maintained by the
+   * parsing function.
+   * The special timestamp variable [ts] is used. *)
   let create_subst isubst msubst =
     List.map
       (fun (x,_,v) -> Theory.ESubst (x,Term.Var v))
@@ -251,12 +262,19 @@ let parse_proc system_name proc =
     Theory.convert ~at:ts subst t sort
   in
 
+  (* Used to get the 2nd and 3rd component associated to the string [v] in
+   * the substitutions [isubst] or [msubst]. *)
   let list_assoc v l =
     let _,th,tm = List.find (fun (x,_,_) -> x = v) l in
     th,tm
   in
+
+  (* Transform elements (x,y,z) of substitutions [isubst] or [msubst]
+   * into elements (x,y). *)
   let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst in
 
+  (* Register an action, when we arrive at the end of a block
+   * (input / condition / update / output). *)
   let register_action a output env =
     let _,a' = Action.fresh_symbol Symbols.dummy_table a in
     let action = List.rev env.action in
@@ -268,13 +286,15 @@ let parse_proc system_name proc =
     let action_term = Term.Action (a', indices) in
     let in_th = Theory.Var (snd input) in
     let in_tm = Term.Macro (Term.in_macro, [], action_term) in
+    (* substitute the special timestamp variable [ts], since at this point
+     * we know the action *)
     let subst_ts = [ Term.ESubst (Term.Var ts, action_term) ] in
+    (* override previous term substitution for input variable
+    * to use the known action *)
     let subst_input =
       try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
       with Not_found -> []
     in
-    (* override previous term substitutions for input variable
-     * to use known action *)
     let msubst' =
       try
         begin match
@@ -283,6 +303,8 @@ let parse_proc system_name proc =
         with
         | (x,_,_) -> (x,in_th,in_tm) :: env.msubst
         end
+      (* in case of Not_found, it means it is a dummy input,
+       * which cannot be used in the terms, so we don't need a substitution *)
       with Not_found -> env.msubst
     in
     let env =
@@ -294,6 +316,9 @@ let parse_proc system_name proc =
     debug "input variables = %a@." Vars.pp_list (List.map snd env.inputs) ;
     print_isubst env.isubst ;
     print_msubst env.msubst ;
+    (* compute the condition, the updates, and the output of this action,
+     * using elements we have stored in [env] of type [p_env] while parsing
+     * the process *)
     let condition =
       List.rev env.evars,
       Term.subst
@@ -340,6 +365,7 @@ let parse_proc system_name proc =
     (env, new_a)
   in
 
+  (* common treatment of Apply, Alias and New constructs *)
   let p_common ~env proc = match proc with
 
   | Apply (id,args) | Alias (Apply (id,args), _) ->
@@ -399,6 +425,9 @@ let parse_proc system_name proc =
 
   in
 
+  (* treatment of Let(x,t,p) constructs
+   * the boolean [search_dep] indicates whether we have to search in [t] if
+   * there are some get terms for state macros that have already been updated *)
   let p_let ?(search_dep=false) ~env proc = match proc with
 
   | Let (x,t,p) ->
@@ -652,15 +681,13 @@ let parse_proc system_name proc =
   let proc,_ = p_in ~env ~pos:0 ~pos_indices:[] proc in
   (proc, Symbols.dummy_table)
 
-
-(* FIXME table unused ? cf utilisation de Symbols.dummy_table ? *)
 let declare_system table (system_name:Action.system_name) proc =
   if not(Action.is_fresh system_name) then
     failwith "System %s already defined";
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc [] proc ;
   let proc,table = parse_proc system_name proc in
-  Printer.pr "@[<v 2>Pre-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
+  Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   table
 
 let reset () =

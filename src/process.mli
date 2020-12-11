@@ -50,7 +50,7 @@ type process =
         * for all indices [i]. *)
   | Exists of string list * formula * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
-        * if there exist [indices] such that [test[vars:=indices]]
+        * if there exists [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct
         * subsumes the common conditional construct. *)
   | Apply of id * term list
@@ -70,8 +70,8 @@ val declare : id -> pkind -> process -> unit
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
-  * as a set of actions. In that process, name creations and let constructs
-  * are compiled away. Other constructs are grouped into action descriptions. *)
+  * as a set of actions. In that process, name creations are compiled away. 
+  * Other constructs are grouped into action descriptions. *)
 val declare_system :
   Symbols.table -> Action.system_name -> process -> Symbols.table
 
