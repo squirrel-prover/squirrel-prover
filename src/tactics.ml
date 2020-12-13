@@ -105,12 +105,12 @@ let strings_tac_error =
 
 let rec tac_error_of_strings = function
   | [] -> raise (Failure "exception name expected")
+  | ["Failure"] -> Failure ""
   | [s] ->
     (match List.assoc_opt s strings_tac_error with
       | None -> raise (Failure "exception name unknown")
       | Some e -> e
     )
-  | ["Failure"; s2] -> Failure s2
   | "AndThenFailure"::q -> AndThen_Failure (tac_error_of_strings q)
   | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
   | ["Undefined"; s] -> Undefined s
@@ -186,6 +186,7 @@ let checkfail_tac exc t j sk fk =
     t j sk fk
   with Tactic_soft_failure e when e = exc -> sk [j] fk
      | Tactic_soft_failure (Cannot_convert _) when exc=CannotConvert -> sk [j] fk
+     | Tactic_soft_failure (Failure _) when exc=Failure "" -> sk [j] fk
      | Tactic_soft_failure e
      | Tactic_hard_failure e -> raise (Tactic_hard_failure (FailWithUnexpected e))
 
