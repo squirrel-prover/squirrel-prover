@@ -24,9 +24,10 @@ channel c
 (**************************)
 system null.
 
-(* k occurs inside the hashed message *)
+
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
+(* Failure when the key occurs inside the hashed message. *)
 goal key_in_mess:
   h(k,k) = k => False.
 Proof.
@@ -43,8 +44,8 @@ Proof.
   checkfail euf M0 with BadSSC.
 Abort.
 
-(* k occurs inside the condition of an action *)
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
+(* Failure when the key occurs inside an action condition. *)
 system [condSSC] in(c,x); if x=k then out(c,x).
 
 goal [none,condSSC] forall tau:timestamp,
