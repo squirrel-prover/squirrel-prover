@@ -241,26 +241,6 @@ let () =
         (Tactic_soft_failure SEncNoRandom)
         (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
     end ;
-    "Senc Bad SSC - ENCKP 1", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure SEncNoRandom)
-        (fun () -> run ~test "tests/alcotest/enckp_nornd.sp")
-    end ;
-    "Senc Bad SSC - ENCKP 2", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure SEncSharedRandom)
-        (fun () -> run ~test "tests/alcotest/enckp_sharedrnd.sp")
-    end ;
-    "Senc Bad SSC - ENCKP 3", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure SEncSharedRandom)
-        (fun () -> run ~test "tests/alcotest/enckp_sharedrndframe.sp")
-    end ;
-    "Senc Bad SSC - ENCKP 4", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/enckp_dec.sp")
-    end ;
     "Axiom Systems", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
@@ -367,30 +347,5 @@ let () =
       Alcotest.check_raises "fails"
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/pred2.sp")
-    end ;
-    "ENC-KP ground", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/enckp_ground.sp")
-    end ;
-    "ENC-KP freshness wrt frame", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/enckp_fresh.sp")
-    end ;
-    "ENC-KP freshness wrt context", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/enckp_fresh_ctxt.sp")
-    end ;
-    "ENC-KP key usability wrt frame", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/enckp_key.sp")
-    end ;
-    "ENC-KP key usability wrt context", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Bad_SSC)
-        (fun () -> run ~test "tests/alcotest/enckp_key_ctxt.sp")
     end ;
   ]
