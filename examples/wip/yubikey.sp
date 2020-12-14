@@ -77,44 +77,64 @@ system ((!_i !_j Plug: yubikeyplug(i,j)) | (!_i !_j Press: yubikeypress(i,j)) | 
 
 
 goal counterIncrease:
-forall (t:timestamp), forall (i:index), (t > init && exec@t) => (order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk || SCpt(i)@pred(t) = SCpt(i)@t).
+forall (t:timestamp), forall (i:index), (t > init && exec@t) => ((
+(exists (ii:index), t=S(ii,i) => order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk)) || (SCpt(i)@pred(t) = SCpt(i)@t)).
 Proof.
 intros.
 apply orderSucc to SCpt(i)@pred(t).
 case t.
 case H1.
-assert(SCpt(i)@pred(t) = SCpt(i)@t).
-assert(SCpt(i)@pred(t) = SCpt(i)@t).
-assert(SCpt(i)@pred(t) = SCpt(i)@t).
-assert(SCpt(i)@pred(t) = SCpt(i)@t).
+right.
+right.
+right.
+right.
+(* cas difficile *)
 assert(i = i1 || i<> i1).
 case H1.
-assert(order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk).
+left.
+exists ii.
 substitute t, S(ii,i).
 expand exec@S(ii,i).
 expand cond@S(ii,i).
-assert(SCpt(i)@pred(t) = SCpt(i)@t).
+right.
 substitute t, S(ii,i1).
 expand SCpt(i)@S(ii,i1).
 admit. (* je ne sais pas quoi dire pour conclure mais le raisonnement est a priori ok *)
-substitute t, S1(ii,i1).
-substitute t, S2(ii).
+(* fin cas difficile *)
+right.
+right.
 Qed.
 
+
+(* en chantier *)
 goal counterIncreaseBis:
-forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < t) => (order(SCpt(i)@t', SCpt(i)@t) = orderOk || SCpt(i)@t' = SCpt(i)@t).
+forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < t) => ((
+(exists (ii:index), t=S(ii,i) => order(SCpt(i)@t',SCpt(i)@t) = orderOk)) || (SCpt(i)@t' = SCpt(i)@t)).
 Proof.
 induction.
 apply IH0 to pred(t).
-assert (t' < pred(t) || t' >= pred(t)).
+assert (t' >= pred(t) || t' <pred(t)).
 case H2.
+
+(* case t' >= pred(t) *)
+assert t' = pred(t).
+apply counterIncrease to t.
+apply H2 to i.
+substitute pred(t), t'.
+
 (* case t' < pred(t) *)
-apply H1 to t'.
+apply IH0 to t'.
 apply H2 to i.
 apply counterIncrease to t.
 apply H4 to i.
-case H3.
+case H5.
+case t.
+case H6.
+right.
+
 case H4.
+left.
+
 assert(order(SCpt(i)@t',SCpt(i)@t) = orderOk).
 
 apply orderTrans to SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
