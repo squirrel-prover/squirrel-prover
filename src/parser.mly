@@ -42,11 +42,11 @@
 %nonassoc NOSIMPL
 %nonassoc NOBRANCH
 
-%start theory
+%start declarations
 %start top_formula
 %start top_process
 %start interactive
-%type <unit> theory
+%type <Decl.declarations> declarations
 %type <Theory.formula> top_formula
 %type <Process.process> top_process
 %type <Prover.parsed_input> interactive
@@ -227,35 +227,58 @@ index_arity:
 | LPAREN i=INT RPAREN            { i }
 
 declaration:
-| HASH e=ID a=index_arity          { Theory.declare_hash ~index_arity:a e }
-| HASH e=ID WITH ORACLE f=formula  { Theory.declare_hash e;
-                                     Prover.define_oracle_tag_formula e f }
-| AENC e=ID COMMA d=ID COMMA p=ID  { Theory.declare_aenc e d p }
-| SENC e=ID COMMA d=ID             { Theory.declare_senc e d }
+| HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e) }
+| HASH e=ID WITH ORACLE f=formula  
+                          { let decl = Decl.Decl_hash (None, e) in
+                            let () = Prover.define_oracle_tag_formula e f in
+                            assert false (* TODO *) }
+| AENC e=ID COMMA d=ID COMMA p=ID
+                          { Decl.Decl_aenc (e, d, p) }
+| SENC e=ID COMMA d=ID    { Decl.Decl_senc (e, d) }
 | SENC e=ID COMMA d=ID WITH h=ID
-                                   { Theory.declare_senc_joint_with_hash e d h }
+                          { Decl.Decl_senc_with_join_hash (e, d, h) }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
-                                   { Theory.declare_signature s c p }
+                          { Decl.Decl_sign (s, c, p) }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
-  WITH ORACLE f=formula
-                                   { Theory.declare_signature s c p;
-                                     Prover.define_oracle_tag_formula s f }
-| NAME e=ID COLON t=name_type      { Theory.declare_name e t }
-| ABSTRACT e=ID COLON t=abs_type   { let index_arity,message_arity = t in
-                                     Theory.declare_abstract
-                                       e ~index_arity ~message_arity }
-| MUTABLE e=ID COLON t=state_type  { Theory.declare_state e (fst t) (snd t) }
-| CHANNEL e=ID                     { Channel.declare e }
+  WITH ORACLE f=formula   { let decl = Decl.Decl_sign (s, c, p) in
+                            let () = Prover.define_oracle_tag_formula s f in
+                            assert false (* TODO *) }
+| NAME e=ID COLON t=name_type
+                          { Decl.Decl_name (e, t) }
+| ABSTRACT e=ID COLON t=abs_type
+                          { let index_arity,message_arity = t in
+                            Decl.(Decl_abstract
+                                    { name = e;
+                                      index_arity=index_arity;
+                                      message_arity=message_arity;}) }
+| MUTABLE e=ID COLON t=state_type
+                          { Decl.Decl_state (e, (fst t), (snd t)) }
+| CHANNEL e=ID            { Decl.Decl_channel e }
 | TERM e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
-                                   { Theory.declare_macro e args typ t }
+                          { Decl.Decl_macro (e, args, typ, t) }
 | PROCESS e=ID args=opt_arg_list EQ p=process
-                                   { Process.declare e args p }
-| AXIOM s=bsystem f=formula        { Prover.add_proved_goal
-                                     (Prover.unnamed_goal (),
-                                      Prover.make_trace_goal s f) }
+                          { Decl.Decl_process (e, args, p) }
+| AXIOM s=bsystem f=formula
+                          { Decl.(Decl_axiom { gname = None;
+                                               gsystem = s; 
+                                               gform = f; }) }
 | AXIOM s=bsystem i=ID COLON f=formula
-                                 { Prover.add_proved_goal
-                                     (i, Prover.make_trace_goal s f) }
+                          { Decl.(Decl_axiom { gname = Some i;
+                                               gsystem = s; 
+                                               gform = f; }) }
+| SYSTEM p=process 
+                          { Decl.(Decl_system { sname = None; 
+                                                sprocess = p}) }
+| SYSTEM LBRACKET id=ID RBRACKET p=process 
+                          { Decl.(Decl_system { sname = Some id; 
+                                                sprocess = p}) }
+
+declaration_list:
+| decl=declaration                        { [decl] }
+| decl=declaration decls=declaration_list { decl :: decls }
+
+declarations:
+| decls=declaration_list DOT { decls }
 
 tactic_param:
 | t=term    { TacticsArgs.Theory t }
@@ -394,20 +417,9 @@ option_param:
 set_option:
 | SET n=ID EQ param=option_param { (n, param) }
 
-theory:
-| sp=set_option theory           { Config.set_param sp }
-| declaration theory             { () }
-| SYSTEM p=process DOT           { ignore (Process.declare_system
-                                             Symbols.dummy_table
-                                             Action.default_system_name p) }
-| SYSTEM LBRACKET i=ID RBRACKET p=process DOT
-                                 { ignore (Process.declare_system
-                                             Symbols.dummy_table
-                                             i p) }
-
 interactive :
 | set=set_option DOT { Prover.ParsedSetOption set }
-| theory             { Prover.ParsedInputDescr }
+| decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
 | tac=tactic         { Prover.ParsedTactic tac }
 | qed                { Prover.ParsedQed }

@@ -39,19 +39,15 @@ let parse_next parser_fun =
 open Prover
 open Tactics
 
+(** The main loop of the prover. The mode defines in what state the prover is,
+    e.g is it waiting for a proof script, or a system description, etc.
+    [save] allows to specify is the current state must be saved, so that
+    one can backtrack.
+*)
 let rec main_loop ~test ?(save=true) mode =
   if !interactive then Printer.prt `Prompt "";
-  (* Initialize definitions before parsing system description.
-   * TODO this is not doable anymore (with refactoring this code)
-   * concerning definitions of functions, names, ... symbols;
-   * it should not matter if we do not undo the initial definitions *)
-  if mode = InputDescr then begin
-    Process.reset ();
-    Prover.reset ();
-    Symbols.restore_builtin ()
-  end else
-    (* Otherwise save the state if instructed to do so.
-     * In practice we save except after errors. *)
+  (* Save the state if instructed to do so.
+   * In practice we save except after errors and the first call. *)
   if save then save_state mode ;
   match
     let parse_buf =
@@ -63,20 +59,19 @@ let rec main_loop ~test ?(save=true) mode =
   with
     | exception (Parserbuf.Error s) -> error ~test mode s
     | exception (Prover.ParseError s) -> error ~test mode s
-    (* If the command is an undo, we catch it only if we are not waiting for
-       a system description. *)
-    | mode, ParsedUndo nb_undo when mode <> InputDescr ->
+    | mode, ParsedUndo nb_undo ->
       begin
         let new_mode = reset_state nb_undo in
         begin match new_mode with
           | ProofMode -> Printer.pr "%a" pp_goal ()
           | GoalMode -> Printer.pr "%a" Action.pp_actions ()
-          | InputDescr | WaitQed -> ()
+          | WaitQed -> ()
         end ;
         main_loop ~test new_mode
       end
 
-    | InputDescr, ParsedInputDescr ->
+    | GoalMode, ParsedInputDescr decls ->
+      Decl.declare_list decls;
       Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
 
@@ -105,10 +100,6 @@ let rec main_loop ~test ?(save=true) mode =
 
     | WaitQed, ParsedQed ->
       Printer.prt `Result "Exiting proof mode.@.";
-      main_loop ~test GoalMode
-
-    | GoalMode, ParsedInputDescr ->
-      Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
 
     | GoalMode, ParsedSetOption sp ->
@@ -158,13 +149,21 @@ and error ~test mode s =
   if !interactive then main_loop ~test ~save:false mode else
   if not test then exit 1
 
-let main_loop ?(test=false) ?save mode = main_loop ~test ?save mode
+let start_main_loop ?(test=false) () = 
+  (* Initialize definitions before parsing system description.
+   * TODO this is not doable anymore (with refactoring this code)
+   * concerning definitions of functions, names, ... symbols;
+   * it should not matter if we do not undo the initial definitions *)
+  Process.reset ();
+  Prover.reset ();
+  Symbols.restore_builtin ();
+  main_loop ~test GoalMode
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
   Printer.prt `Start "Git commit: %s" Commit.hash_commit;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
-  try main_loop InputDescr
+  try start_main_loop ()
   with End_of_file -> Printer.prt `Error "End of file, exiting."
 
 let run ?(test=false) filename =
@@ -173,7 +172,7 @@ let run ?(test=false) filename =
   if test then Printer.printer_mode := Printer.Test;
   Printer.set_style_renderer Fmt.stdout Fmt.(`Ansi_tty);
   setup_lexbuf filename;
-  main_loop ~test InputDescr
+  start_main_loop ~test ()
 
 let main () =
   let collect arg = args := !args @ [arg] in

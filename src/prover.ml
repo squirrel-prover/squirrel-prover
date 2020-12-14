@@ -23,7 +23,7 @@ let current_goal : named_goal option ref = ref None
 let subgoals : Goal.t list ref = ref []
 let goals_proved = ref []
 
-type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
+type prover_mode = GoalMode | ProofMode | WaitQed
 
 type gm_input =
   | Gm_goal of string * Goal.t
@@ -72,7 +72,7 @@ let save_state mode =
 
 let rec reset_state n =
   match (!proof_states_history,n) with
-  | [],_ -> InputDescr
+  | [],_ -> GoalMode
   | p::q,0 ->
     proof_states_history := q;
     goals := p.goals;
@@ -463,7 +463,7 @@ let make_equiv_goal_process system_1 system_2 =
   Goal.Equiv (EquivSequent.init system !env [(EquivSequent.Message term)])
 
 type parsed_input =
-  | ParsedInputDescr
+  | ParsedInputDescr of Decl.declarations
   | ParsedQed
   | ParsedAbort
   | ParsedSetOption of Config.p_set_param
