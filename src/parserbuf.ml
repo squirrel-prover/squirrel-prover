@@ -115,7 +115,7 @@ let parse_theory_buf ?(test=false) lexbuf filename =
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Decl.declare_list decls
+  Prover.declare_list decls
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -201,18 +201,18 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       Channel.declare "c" ;
-      Decl.(declare (Decl_abstract { name = "error";
-                                     index_arity = 0;
-                                     message_arity = 0;})) ;
+      Prover.declare Decl.(Decl_abstract { name = "error";
+                                           index_arity = 0;
+                                           message_arity = 0;}) ;
       ignore (parse_process "in(c,x); out(c, if x=x then x else error)")
     end ;
     "Try", `Quick, begin fun () ->
       Channel.declare "c" ;
-      Decl.(declare (Decl_state ("s", 1, Sorts.emessage))) ;
-      Decl.(declare (Decl_state ("ss", 2, Sorts.emessage))) ;
-      Decl.(declare (Decl_abstract { name = "error";
+      Prover.declare Decl.(Decl_state ("s", 1, Sorts.emessage)) ;
+      Prover.declare Decl.(Decl_state ("ss", 2, Sorts.emessage)) ;
+      Prover.declare Decl.(Decl_abstract { name = "error";
                                      index_arity = 0;
-                                     message_arity = 0;})) ;
+                                     message_arity = 0;}) ;
       ignore (parse_process "in(c,x); \
                              try find i such that s(i) = x in \
                                out(c,ss(i,i))

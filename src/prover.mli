@@ -147,13 +147,7 @@ val add_new_goal : named_goal -> unit
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
 
-(** Allows to define the tag formula corresponding to some function.
-    Defining a function with such a tag, is equivalent to giving to the
-    attacker a backdoor, allowing to compute the ouput of the function on
-    all messages that satisfy the tag. *)
-val define_oracle_tag_formula : string -> Theory.formula -> unit
-
-(** From the name of the funciton, returns the corresponding formula. If no tag
+(** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
 val get_oracle_tag_formula : string -> Term.formula
 
@@ -172,4 +166,13 @@ val complete_proof : unit -> unit
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
-     val start_proof : unit -> string option
+val start_proof : unit -> string option
+
+
+(*------------------------------------------------------------------*)
+(** Process a declaration. *)
+val declare      : Decl.declaration  -> unit
+
+(** Process a list of declaration. *)
+val declare_list : Decl.declarations -> unit
+

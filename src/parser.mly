@@ -227,22 +227,18 @@ index_arity:
 | LPAREN i=INT RPAREN            { i }
 
 declaration:
-| HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e) }
+| HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
 | HASH e=ID WITH ORACLE f=formula  
-                          { let decl = Decl.Decl_hash (None, e) in
-                            let () = Prover.define_oracle_tag_formula e f in
-                            assert false (* TODO *) }
+                          { Decl.Decl_hash (None, e, Some f) }
 | AENC e=ID COMMA d=ID COMMA p=ID
                           { Decl.Decl_aenc (e, d, p) }
 | SENC e=ID COMMA d=ID    { Decl.Decl_senc (e, d) }
 | SENC e=ID COMMA d=ID WITH h=ID
-                          { Decl.Decl_senc_with_join_hash (e, d, h) }
+                          { Decl.Decl_senc_w_join_hash (e, d, h) }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
-                          { Decl.Decl_sign (s, c, p) }
+                          { Decl.Decl_sign (s, c, p, None) }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
-  WITH ORACLE f=formula   { let decl = Decl.Decl_sign (s, c, p) in
-                            let () = Prover.define_oracle_tag_formula s f in
-                            assert false (* TODO *) }
+  WITH ORACLE f=formula   { Decl.Decl_sign (s, c, p, Some f) }
 | NAME e=ID COLON t=name_type
                           { Decl.Decl_name (e, t) }
 | ABSTRACT e=ID COLON t=abs_type

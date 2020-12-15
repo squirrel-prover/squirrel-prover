@@ -71,7 +71,7 @@ let rec main_loop ~test ?(save=true) mode =
       end
 
     | GoalMode, ParsedInputDescr decls ->
-      Decl.declare_list decls;
+      Prover.declare_list decls;
       Printer.pr "%a" Action.pp_actions ();
       main_loop ~test GoalMode
 

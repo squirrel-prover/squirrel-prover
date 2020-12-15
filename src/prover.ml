@@ -512,7 +512,7 @@ let is_proof_completed () = !subgoals = []
 let complete_proof () =
   assert (is_proof_completed ());
   try
-    add_proved_goal (Utils.opt_get !current_goal);
+    add_proved_goal (Utils.oget !current_goal);
     current_goal := None;
     subgoals := []
   with Not_found ->
@@ -570,3 +570,48 @@ let start_proof () = match !current_goal, !goals with
     Some "Cannot start a new proof (no goal remaining to prove)."
 
 let current_goal () = !current_goal
+
+
+(*------------------------------------------------------------------*)
+
+let declare = function
+  | Decl.Decl_channel s             -> Channel.declare s
+  | Decl.Decl_process (id,pkind,p)  -> Process.declare id pkind p
+
+  | Decl.Decl_axiom (gdecl) ->
+    let name = match gdecl.gname with 
+      | None -> unnamed_goal ()
+      | Some n -> n
+    in
+    let goal = make_trace_goal gdecl.gsystem gdecl.gform in
+    add_proved_goal (name, goal)
+
+  | Decl.Decl_system (sdecl) ->
+    let name = match sdecl.sname with 
+      | None -> Action.default_system_name
+      | Some n -> n
+    in
+    let new_table = Process.declare_system Symbols.dummy_table name sdecl.sprocess in
+    ignore(new_table)           (* TODO: stateless *)
+
+  | Decl.Decl_hash (a, n, tagi) ->
+    let () = Utils.oiter (define_oracle_tag_formula n) tagi in
+    Theory.declare_hash ?index_arity:a n 
+
+  | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc enc dec pk
+  | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc senc sdec
+  | Decl.Decl_name (s, a)           -> Theory.declare_name s a
+  | Decl.Decl_state (s, a, k)       -> Theory.declare_state s a k
+  | Decl.Decl_macro (s, args, k, t) -> Theory.declare_macro s args k t
+  | Decl.Decl_senc_w_join_hash (senc, sdec, h) -> 
+    Theory.declare_senc_joint_with_hash senc sdec h
+  | Decl.Decl_sign (sign, checksign, pk, tagi) -> 
+    let () = Utils.oiter (define_oracle_tag_formula sign) tagi in
+    Theory.declare_signature sign checksign pk
+  | Decl.Decl_abstract decl -> 
+    Theory.declare_abstract decl.name decl.index_arity decl.message_arity
+
+let declare_list decls = 
+  (* For debugging *)
+  (* Fmt.epr "%a@." Decl.pp_decls decls; *)
+  List.fold_left (fun () d -> declare d) () decls
