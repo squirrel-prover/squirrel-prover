@@ -295,18 +295,18 @@ end = struct
       then t.models
       else ref None 
     in
-    let system = Utils.opt_dflt t.system system
-    and env    = Utils.opt_dflt t.env env
+    let system = Utils.odflt t.system system
+    and env    = Utils.odflt t.env env
     and happens_hypotheses = 
-      Utils.opt_dflt t.happens_hypotheses happens_hypotheses
+      Utils.odflt t.happens_hypotheses happens_hypotheses
     and message_hypotheses = 
-      Utils.opt_dflt t.message_hypotheses message_hypotheses
+      Utils.odflt t.message_hypotheses message_hypotheses
     and trace_hypotheses = 
-      Utils.opt_dflt t.trace_hypotheses trace_hypotheses
+      Utils.odflt t.trace_hypotheses trace_hypotheses
     and formula_hypotheses =
-      Utils.opt_dflt t.formula_hypotheses formula_hypotheses
+      Utils.odflt t.formula_hypotheses formula_hypotheses
     and conclusion = 
-      Utils.opt_dflt t.conclusion conclusion
+      Utils.odflt t.conclusion conclusion
     in
     {
       system = system ;

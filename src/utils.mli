@@ -75,10 +75,13 @@ val fpt : ('a -> 'a) -> 'a -> 'a
 (*------------------------------------------------------------------*)
 (* Option type functions *)
 
-val opt_get : 'a option -> 'a
-val opt_dflt : 'a -> 'a option -> 'a
 val some : 'a -> 'a option
-val opt_map : 'a option -> ('a -> 'b option) -> 'b option
+
+val oget  : 'a option -> 'a
+val odflt : 'a -> 'a option -> 'a
+val obind : ('a -> 'b option) -> 'a option -> 'b option
+val omap  : ('a -> 'b) -> 'a option -> 'b option
+val oiter : ('a -> unit) -> 'a option -> unit
 
 (*------------------------------------------------------------------*)
 (** [classes f_eq l] returns the equivalence classes of [l] modulo [f_eq],

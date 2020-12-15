@@ -34,7 +34,7 @@ let parse_next parser_fun =
   if !interactive then
     parser_fun (Lexing.from_channel stdin) "new input"
   else
-    parser_fun (Utils.opt_get !lexbuf) !filename
+    parser_fun (Utils.oget !lexbuf) !filename
 
 open Prover
 open Tactics
