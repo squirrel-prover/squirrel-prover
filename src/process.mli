@@ -13,6 +13,8 @@
   * the expected kind for that variable. *)
 type pkind = (string*Sorts.esort) list
 
+val pp_pkind : (string * Sorts.esort) list Fmt.t
+
 (** Process declarations allow to bind identifiers to processes. *)
 type id = string
 

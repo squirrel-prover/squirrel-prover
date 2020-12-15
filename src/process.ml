@@ -1,5 +1,9 @@
 type pkind = (string * Sorts.esort) list
 
+let pp_pkind = 
+  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Sorts.pp_e e in
+  (Fmt.list pp_el) 
+
 type id = string
 
 type term = Theory.term
