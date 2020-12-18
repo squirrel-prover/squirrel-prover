@@ -97,7 +97,7 @@ expand cond@S(ii,i).
 intctxt M1.
 exists j.
 Qed.
-
+  
 
 
 (* The counter SCpt(i) strictly increases when t is an action S performed by the the server with tag i. *)
@@ -138,6 +138,7 @@ right.
 Qed.
 
 
+
 (* The counter SCpt(i) increases (not strictly) between t' and t when t' < t *)
 goal counterIncreaseBis:
 forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < t) => 
@@ -175,6 +176,49 @@ apply orderTrans to SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
 case H6.
 Qed.
 
+(* This is an injective version of the authentication property shown before.*)
+goal auth_injective:
+   forall (ii,i:index), exec@S(ii,i) => 
+    (exists (j:index), 
+      Press(i,j) < S(ii,i) 
+      && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))
+      && (forall (ii1:index), 
+           (exec@S(ii1,i) 
+            && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i)))
+            && SCpt(i)@S(ii1,i) = SCpt(i)@S(ii,i))
+           => ii1 = ii)
+    ).
+Proof.
+intros.
+expand exec@S(ii,i).
+expand cond@S(ii,i).
+intctxt M1.
+exists j.
+expand exec@S(ii1,i).
+expand cond@S(ii1,i).
+assert ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ).
+case H2.
+
+assert order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
+assert ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ).
+case H2.
+apply counterIncreaseBis to pred(S(ii1,i)).
+apply H2 to S(ii,i).
+apply H3 to i.
+case H4.
+apply orderTrans to SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
+apply orderStrict to SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+
+assert order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk.
+assert ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ).
+case H2.
+apply counterIncreaseBis to pred(S(ii,i)).
+apply H2 to S(ii1,i).
+apply H3 to i.
+case H4.
+apply orderTrans to SCpt(i)@S(ii1,i),SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i).
+apply orderStrict to SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i).
+Qed.
 
 goal noreplayInv:
   forall (ii, ii1, i:index),    exec@S(ii1,i) && S(ii,i) < S(ii1,i) 
