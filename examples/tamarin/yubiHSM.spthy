@@ -1,0 +1,190 @@
+theory YubikeyHSM
+
+begin
+
+builtins: symmetric-encryption, multiset
+functions:
+        keystream/2,  keystream_kh/1, keystream_n/1,
+        myxor/2, myzero/0,
+        mac/2, demac/2
+equations:
+        keystream_kh(keystream(kh,n))=kh,
+        keystream_n(keystream(n,n))=n,
+/* models the way the key-stream used for encryption is computed */
+         myxor(myxor(a,b),a)=b,
+         myxor(myxor(a,b),b)=a,    
+         myxor(a,a)=myzero, 
+         myxor(myzero,a)=a, 
+         myxor(a,myzero)=a,
+/* incomplete modelling of xor */
+         demac(mac(m,k),k)=m
+/* describes the MAC used inside the AEADs
+using mac, adv might find out *something* about the
+ message, we over-approximate */
+
+
+// Rules for intruder’s control over Server
+
+
+// send messages to the HSM
+rule isendHSM:
+[In(x)] --[ HSMWrite(x) ]-> [InHSM(x)]
+
+rule irecvHSM:
+[ OutHSM( x ) ] --[ HSMRead(x) ]-> [Out(x)]
+
+// write and read the Authentication Server’s database
+rule read_AEAD:
+[ !S_AEAD(pid,aead)  ]
+--[ AEADRead(aead),HSMRead(aead) ]->
+ [Out(aead)]
+
+rule write_AEAD:
+[ In(aead), In(pid) ]
+--[ AEADWrite(aead),HSMWrite(aead) ]->
+[!S_AEAD(pid,aead) ]
+
+
+// Initialisation of HSM and Authentication Server.
+rule HSMInit:
+[Fr(~k), Fr(~kh)] 
+--[MasterKey(~k), OneTime() ]-> [ !HSM(~kh,~k), Out(~kh),
+//!YSM_AEAD_GENERATE(~kh), //uncomment to produce attack
+   !YSM_AEAD_YUBIKEY_OTP_DECODE(~kh)
+]
+
+//HSM commands
+rule YSM_AEAD_RANDOM_GENERATE:
+    let ks=keystream(kh,N)
+aead=<myxor(senc(ks,k),~data),mac(~data,k)>
+in
+    [Fr(~data), InHSM(<N,kh>),!HSM(kh,k),
+          !YSM_AEAD_RANDOM_GENERATE(kh)]
+--[GenerateRandomAEAD(~data) ]-> 
+[OutHSM( aead)]
+
+rule YSM_AEAD_GENERATE:
+    let ks=keystream(kh,N)
+aead=<myxor(senc(ks,k),data),mac(data,k)>
+in
+[InHSM(<N,kh,data>),!HSM(kh,k),!YSM_AEAD_GENERATE(kh)] 
+--[GenerateAEAD(data,aead ) ]->
+[OutHSM(aead)]
+
+ruleYSM_AES_ESC_BLOCK_ENCRYPT: 
+[InHSM(<kh,data>), !HSM(kh,k),
+     !YSM_AES_ESC_BLOCK_ENCRYPT(kh)]
+--[ ]-> [OutHSM(senc(data,k))]
+
+rule YSM_AEAD_YUBIKEY_OTP_DECODE:
+    let ks=keystream(kh,N)
+aead=<myxor(senc(ks,k),<k2,did>),mac(<k2,did>,k)> otp=senc(<did,sc,rand>,k2)
+in
+    [InHSM(<did,kh,aead,otp>), !HSM(kh,k),
+         !YSM_AEAD_YUBIKEY_OTP_DECODE(kh)]
+--[
+OtpDecode(k2,k,<did,sc,rand>,sc, myxor(senc(ks,k),<k2,did>),mac(<k2,did>,k)),
+    OtpDecodeMaster(k2,k)]-> [OutHSM(sc)]
+
+//Yubikey operations
+rule BuyANewYubikey:
+let ks=keystream(kh,~pid)
+aead=<myxor(senc(ks,~k),<~k2,~sid>),mac(<~k2,~sid>,~k)>
+//This rule implicitly uses YSM_AEAD_GENERATE
+in
+    [ Fr(~k2),Fr(~pid),Fr(~sid),
+          //!YSM_AEAD_GENERATE(kh),
+          //Uncomment to require the HSM to have
+          //    YSM_AEAD_GENERATE
+!HSM(kh,~k), In('1') ] --[Init(~pid,~k2) ]->
+[Y_counter(~pid,'1'), !Y_Key(~pid,~k2), !Y_sid(~pid,~sid), S_Counter(~pid,'1'), !S_AEAD(~pid,aead), !S_sid(~pid,~sid), Out(~pid) ]
+
+
+//On plugin, the session counter is increased and the token
+//counter reset
+rule Yubikey_Plugin:
+[Y_counter(pid,sc),In(Ssc) ]
+//The old counter value sc is removed
+--[ Yubi(pid,Ssc),Smaller(sc, Ssc) ]->
+[Y_counter(pid, Ssc)]
+
+//and substituted by a new counter value, larger, Ssc
+rule Yubikey_PressButton: 
+[Y_counter(pid,tc),!Y_Key(pid,k2),!Y_sid(pid,sid),Fr(~pr),Fr(~nonce), In(tc+'1')] 
+--[ YubiPress(pid,tc),YubiPressOtp(pid,<sid,tc,~pr>,tc,k2) ]-> [Y_counter(pid,tc+'1'),Out(<pid,~nonce,senc(<sid,tc,~pr>,k2)>)]
+
+rule Server_ReceiveOTP_NewSession:
+    let ks=keystream(kh,pid)
+aead=<myxor(senc(ks,k),<k2,sid>),mac(<k2,sid>,k)>
+in
+[In(<pid,nonce,senc(<sid,tc,~pr>,k2)>) ,!HSM(kh,k), !S_AEAD(pid,aead), S_Counter(pid,otc), !S_sid(pid,sid) ]
+--[ Login(pid,sid,tc,senc(<sid,tc,~pr>,k2)), LoginCounter(pid,otc,tc), Smaller(otc,tc) ]->
+    [ S_Counter(pid,tc) ]
+
+//model the larger relation using the smaller action and 
+//exclude all traces where the predicate does *not* hold true 
+restriction smaller:
+" All #i a b. Smaller(a,b)@i ==> Ex z. a+z=b"
+
+restriction onetime:" All #t3 #t4 . OneTime()@#t3 & OneTime()@t4 ==> #t3=#t4"
+
+// For sanity: Ensure that a successful login is reachable.
+lemma Login_reachable:
+exists-trace
+" Ex #i pid sid x otp1. Login(pid,sid, x, otp1)@i"
+
+/* Every counter produced by a Yubikey could be computed by * the adversary anyway. (This saves a lot of steps in the * backwards induction of the following lemmas). */
+lemma adv_can_guess_counter[reuse,use_induction]: 
+" All pid sc #t2 . YubiPress(pid,sc)@t2 ==>(Ex #t1.K(sc)@#t1 & #t1<#t2)"
+
+/*Everything that can be learned by using Otp Decode is the * counter of a Yubikey, which can be computed according to * the previous lemma. */
+lemma otp_decode_does_not_help_adv_use_induction[reuse,use_induction]:
+" All #t3 k2 k m sc enc mac . OtpDecode(k2,k,m,sc,enc,mac)@t3 ==> Ex #t1 pid . YubiPress(pid,sc)@#t1 & #t1<#t3"
+
+/* ∀ keys shared between the YubiHSM and the
+* Authentication Server are either *not* known to the * adversary, or the adversary learned the key used to * encrypt said keys in form of AEADs. */
+lemma k2_is_secret_use_induction[use_induction,reuse]: 
+" All #t1 #t2 pid k2 . Init(pid,k2)@t1 & K(k2)@t2 ==>
+(Ex #t3 #t4 k.K(k)@t3 & MasterKey(k)@t4 &#t3<#t2)"
+/* Neither of those kinds of keys are ever learned by the
+adversary */
+lemma neither_k_nor_k2_are_ever_leaked_inv[use_induction,reuse]: 
+"not( Ex #t1 #t2 k . MasterKey(k)@t1 & KU(k)@t2 )
+& not( Ex #t5 #t6 k6 pid . Init(pid,k6)@t5 & KU(k6)@t6 )
+"
+// Each successful login with counter value x was preceded by a
+// button press
+//eventwiththesamecountervalue
+
+lemma one_count_foreach_login[reuse,use_induction]:
+" All  pid sid x otp #t2 . Login(pid,sid,x,otp)@t2 ==>
+( Ex #t1 . YubiPress(pid,x)@#t1 & #t1<#t2 )"
+
+//IfasuccessfulLoginhappensbeforeasecondsuccessful // Login, the counter value of the first is smaller than the // counter value of the second
+lemma slightly_weaker_invariant[reuse, use_induction]:
+"(All pid otc1 tc1 otc2 tc2 #t1 #t2.
+LoginCounter(pid,otc1,tc1)@#t1 & LoginCounter(pid, otc2,tc2)@#t2
+==>( #t1<#t2 & ( Exz.tc2=tc1+z)) | #t2<#t1 | #t1=#t2)
+"
+
+// It is *not* possible to have to distinct logins with the // same counter value
+lemma no_replay:
+"not(Ex #i #j pid sid x otp1 otp2. Login(pid,sid,x,otp1)@i & Login(pid,sid,x,otp2)@j
+& not(#i=#j))"
+
+// Every Login was preceded by exactly one corresponding button
+// press
+
+lemma injective_correspondance:
+" All pid sid x otp #t2 . Login(pid,sid,x,otp)@t2 ==>
+( Ex #t1 . YubiPress(pid,x)@#t1 & #t1<#t2
+∧ All otp2 #t3 . Login(pid,sid,x,otp2)@t3 ==> #t3=#t2
+)"
+ 
+   lemma Login_invalidates_smaller_counters: 
+"All pid otc1 tc1 otc2 tc2 #t1 #t2 z .
+LoginCounter(pid,otc1,tc1)@#t1
+& LoginCounter(pid,otc2,tc2)@#t2
+& tc2=tc1+z ==> #t1<#t2"
+
+end
