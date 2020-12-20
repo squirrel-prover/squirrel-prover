@@ -1,0 +1,76 @@
+theory Yubikey
+
+begin
+
+builtins: symmetric-encryption, multiset
+
+// Initialisation and Setup of a Yubikey
+
+
+ruleBuyANewYubikey: 
+[Fr(~k),Fr(~pid),Fr(~sid)]
+--[Protocol(), Init(~pid,~k),ExtendedInit(~pid,~sid,~k) ]->
+[!Y(~pid,~sid), Y_counter(~pid,'1'), Server(~pid,~sid,'1'), !SharedKey(~pid,~k), Out(~pid)]
+
+
+rule Yubikey_Plugin:
+[Y_counter(pid,otc), In(tc) ]
+--[ Yubi(pid,tc), Smaller(otc,tc) ]-> 
+[Y_counter(pid, tc)]
+
+
+//If the Button is pressed, the token counter is increased
+rule Yubikey_PressButton:
+[!Y(pid,sid), Y_counter(pid,tc),!SharedKey(pid,k), In(tc),Fr(~npr),Fr(~nonce) ] 
+--[ YubiPress(pid,tc) ]-> [Y_counter(pid, tc + '1'), Out(<pid,~nonce,senc(<sid,tc,~npr>,k)>) ]
+
+
+/* 
+Upon receiving an encrypted OTP, the Server compares the * (unencrypted) public id to his data base to identify the * key to decrypt the OTP. 
+            After making sure that the secret * id is correct, the Server verifies that the received counter value is larger than the last one stored. If the
+        Login is successful, i.e., the previous conditions were fulfilled, the counter value on the Server that is
+ associated to the Yubikey is updated.
+    */
+
+rule Server_ReceiveOTP_NewSession:
+[ Server(pid,sid,otc),  In(<pid,nonce,senc(<sid,tc,~pr>,k)>), !SharedKey(pid,k), In(otc) ]
+--[ Login(pid,sid,tc,senc(<sid,tc,~pr>,k)), LoginCounter(pid,otc,tc), Smaller(otc,tc) ]->
+        [ Server(pid,sid,tc) ]
+
+
+
+//model the larger relation using the smaller action and 
+//exclude all traces where the predicate does *not* hold true 
+axiom smaller:
+"All  #i a b. Smaller(a,b)@i ==> Ex z. a+z=b"
+
+
+//Forsanity:Ensurethatasuccessfulloginisreachable.
+lemma Login_reachable:
+exists-trace
+" Ex #i pid sid x otp1. Login(pid,sid,x,otp1)@i"
+
+//If a succesful Login happens before a second sucesfull 
+// Login, the counter value of the first is smaller than the 
+// counter value of the second
+lemma invariant[reuse, use_induction]:
+"(All pid otc1 tc1 otc2 tc2 #t1 #t2. LoginCounter(pid,otc1,tc1)@#t1 &
+LoginCounter(pid,otc2,tc2)@#t2 ==> ( #t1<#t2 ∧ ( Ex z . tc1+z=tc2))
+| #t2<#t1 | #t1=#t2) "
+
+// It is ¬possible to have to distinct logins with the // same counter value
+lemma no_replay:
+"¬(Ex #i #j pid sid x otp1 otp2. Login(pid,sid,x,otp1)@i ∧ Login(pid,sid,x,otp2)@j
+∧ not(#i=#j))"
+
+lemma injective_correspondance:
+" All pid sid x otp #t2 . Login(pid,sid,x,otp)@t2 ==>
+( Ex #t1 . YubiPress(pid,x)@#t1 ∧ #t1<#t2
+∧ All otp2 #t3 . Login(pid,sid,x,otp2)@t3 ==> #t3=#t2
+)"
+
+lemma Login_invalidates_smaller_counters: "All pid otc1 tc1 otc2 tc2 #t1 #t2 #t3 .
+LoginCounter(pid,otc1,tc1)@#t1 & LoginCounter(pid,otc2,tc2)@#t2
+  & Smaller(tc1,tc2)@t3 ==> #t1<#t2"
+  
+ end
