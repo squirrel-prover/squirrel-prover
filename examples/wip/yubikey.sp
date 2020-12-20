@@ -98,6 +98,24 @@ intctxt M1.
 exists j.
 Qed.
   
+(* injectivity version Stephanie *)
+(* Warning: admit which is true in the symbolic setting but we need an hypothesis in the computational model *)
+goal auth_injective_bis:
+   forall (ii,i:index), cond@S(ii,i) => 
+    (exists (j:index), (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))) &&   
+      (forall (j':index), (Press(i,j') < S(ii,i) && snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => j=j')).
+Proof.
+intros.
+expand cond@S(ii,i).
+intctxt M1.
+exists j.
+expand output@Press(i,j').
+assert (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i))).
+assert (npr(i,j) = npr(i,j')).
+help.
+admit.
+Qed.
+  
 
 
 (* The counter SCpt(i) strictly increases when t is an action S performed by the the server with tag i. *)
@@ -176,7 +194,7 @@ apply orderTrans to SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
 case H6.
 Qed.
 
-(* This is an injective version of the authentication property shown before.*)
+(* Solene: This is an injective version of the authentication property shown before.*)
 goal auth_injective:
    forall (ii,i:index), exec@S(ii,i) => 
     (exists (j:index), 
