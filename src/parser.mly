@@ -56,17 +56,17 @@
 (* Terms *)
 
 timestamp:
-| id=ID terms=term_list             { Theory.make_term id terms }
+| id=ID terms=term_list             { Theory.App (id, terms) }
 | PRED LPAREN ts=timestamp RPAREN   { Theory.Tpred ts }
 | INIT                              { Theory.Tinit }
 
 term:
 | LPAREN t=term RPAREN                    { t }
-| id=ID terms=term_list                   { Theory.make_term id terms }
-| id=ID terms=term_list AT ts=timestamp   { Theory.make_term ~at_ts:ts id terms }
-| LANGLE t=term COMMA t2=term RANGLE      { Theory.make_pair t t2 }
-| t=term XOR t0=term                      { Theory.make_term "xor" [t;t0] }
-| t=term EXP t0=term                      { Theory.make_term "exp" [t;t0]}
+| id=ID terms=term_list                   { Theory.App (id, terms) }
+| id=ID terms=term_list AT ts=timestamp   { Theory.AppAt (id,terms,ts) }
+| LANGLE t=term COMMA t0=term RANGLE      { Theory.App ("pair", [t;t0]) }
+| t=term XOR t0=term                      { Theory.App ("xor",  [t;t0]) }
+| t=term EXP t0=term                      { Theory.App ("exp",  [t;t0])}
 | INIT                                    { Theory.Tinit }
 | IF b=formula THEN t=term t0=else_term   { Theory.ITE (b,t,t0) }
 | FIND is=indices SUCHTHAT b=formula IN t=term t0=else_term
@@ -86,7 +86,7 @@ tm_list:
 | COMMA tm=term tms=tm_list { tm::tms }
 
 else_term:
-| %prec EMPTY_ELSE               { Theory.make_term "zero" [] }
+| %prec EMPTY_ELSE               { Theory.App ("zero", []) }
 | ELSE t=term                    { t }
 
 (* Facts, aka booleans *)
@@ -128,8 +128,8 @@ formula:
 | FALSE                                   { Theory.False }
 | TRUE                                    { Theory.True }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
-| pid=PID terms=term_list                 { Theory.make_term pid terms }
-| pid=PID terms=term_list AT ts=timestamp { Theory.make_term ~at_ts:ts pid terms }
+| pid=PID terms=term_list                 { Theory.App (pid, terms) }
+| pid=PID terms=term_list AT ts=timestamp { Theory.AppAt (pid, terms, ts) }
 | HAPPENS LPAREN ts=timestamp RPAREN      { Theory.Happens ts }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Theory.Exists (vs,f)  }

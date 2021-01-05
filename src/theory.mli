@@ -14,29 +14,28 @@
   * both function applications and macros. *)
 type kind = Sorts.esort
 
+
 type term =
   | Var of string
-  | Taction of string * term list
   | Tinit
   | Tpred of term
   | Diff of term*term
   | Seq of string list * term
   | ITE of term*term*term
   | Find of string list * term * term * term
-  | Name of string * term list
-  (** A name, whose arguments will always be indices. *)
-  | Get of string * term option * term list
-  (** [Get (s,ots,terms)] reads the contents of memory cell
-    * [(s,terms)] where [terms] are evaluated as indices.
-    * The second argument [ots] is for the optional timestamp at which the
-    * memory read is performed. This is used for the terms appearing in
-    * goals. *)
-  | Fun of string * term list * term option
-  (** Function symbol application,
-    * where terms will be evaluated as indices or messages
-    * depending on the type of the function symbol.
-    * The third argument is for the optional timestamp. This is used for
-    * the terms appearing in goals.*)
+
+  | App of string * term list 
+  (** An application of a symbol to some arguments which as not been
+      disambiguated yet (it can be a name, a function symbol
+      application, a variable, ...)
+      [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
+
+  | AppAt of string * term list * term 
+  (** An application of a symbol to some arguments, at a given
+      timestamp.  As for [App _], the head function symbol has not been
+      disambiguated yet.
+      [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
+                 
   | Compare of Atom.ord*term*term
   | Happens of term
   | ForAll of (string * kind) list * term
@@ -96,17 +95,7 @@ val declare_abstract : string -> index_arity:int -> message_arity:int -> unit
 val declare_macro :
   string -> (string*Sorts.esort) list -> Sorts.esort -> term -> unit
 
-(** {2 Term builders }
-    Given a string [s] and a list of terms [l] build the term [s(l)]
-  * according to what [s] refers to: if it is a declared primitive,
-  * name or mutable cell, then its arity must be respected; otherwise
-  * it is understood as a variable and [l] must be empty.
-  * Raises [Type_error] if arities are not respected.
-  * This function is intended for parsing, at a time where type
-  * checking cannot be performed due to free variables. *)
-
-val make_term : ?at_ts:term -> string -> term list -> term
-val make_pair : term -> term -> term
+(** {2 Term builders } *)
 
 val empty : term
 
@@ -168,9 +157,7 @@ val convert :
   'a Sorts.sort ->
   'a Term.term
 
-(** [find_get_terms t names] returns the sublist of [names] for which there
-  * exists a subterm Theory.Get(name,_,_) in the term [t]. *)
-val find_get_terms : term -> string list -> string list
-(** [find_fun_terms t names] returns the sublist of [names] for which there
-  * exists a subterm Theory.Fun(name,_,_) in the term [t]. *)
-val find_fun_terms : term -> string list -> string list
+(** [find_app_terms t names] returns the sublist of [names] for which there
+  * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
+  * term [t]. *)
+val find_app_terms : term -> string list -> string list

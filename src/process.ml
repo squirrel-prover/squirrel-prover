@@ -416,7 +416,7 @@ let parse_proc system_name proc =
     let _,n' =
       Symbols.Name.declare Symbols.dummy_table n (List.length env.indices) in
     let n'_th =
-      Theory.Name
+      Theory.App
         (Symbols.to_string n',
          List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices)
     in
@@ -444,7 +444,7 @@ let parse_proc system_name proc =
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
       if search_dep
-      then Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+      then Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       else []
     in
     let body =
@@ -457,10 +457,9 @@ let parse_proc system_name proc =
         ~indices:(List.rev env.indices) ~ts body
     in
     let x'_th =
-      Theory.Fun
+      Theory.App
         (Symbols.to_string x',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices,
-         None)
+         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices)
     in
     let x'_tm =
       Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
@@ -634,7 +633,7 @@ let parse_proc system_name proc =
           l
       in
       let updated_states =
-        Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+        Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       in
       let t'_tm =
         Term.subst_macros_ts updated_states (Term.Var ts)
