@@ -157,9 +157,9 @@ process:
 | id=ID terms=term_list         { Process.Apply (id,terms) }
 | id=ID COLON p=process         { Process.Alias (p,id) }
 | NEW id=ID SEMICOLON p=process { Process.New (id,p) }
-| IN LPAREN c=channel COMMA id=ID RPAREN p=process_cont
+| IN LPAREN c=ID COMMA id=ID RPAREN p=process_cont
                                 { Process.In (c,id,p) }
-| OUT LPAREN c=channel COMMA t=term RPAREN p=process_cont
+| OUT LPAREN c=ID COMMA t=term RPAREN p=process_cont
                                 { Process.Out (c,t,p) }
 | IF f=formula THEN p=process p0=else_process
                                 { Process.Exists
@@ -189,10 +189,6 @@ process_cont:
 else_process:
 | %prec EMPTY_ELSE               { Process.Null }
 | ELSE p=process                 { p }
-
-channel:
-| id=ID                          { try Channel.of_string id with Not_found ->
-                                   raise @@ Theory.Conv (Undefined id) }
 
 indices:
 | id=ID                          { [id] }

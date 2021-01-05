@@ -11,6 +11,7 @@ type t = channel
 
 val pp_channel : Format.formatter -> channel -> unit
 
+val dummy_string : string
 val dummy : channel
 
 (** [of_string s] retrieves the channel previously declared

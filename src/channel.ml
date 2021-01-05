@@ -5,7 +5,8 @@ type t = channel
 
 let declare s = ignore (declare_exact Symbols.dummy_table s ())
 
-let dummy = snd (declare_exact Symbols.dummy_table "ø" ())
+let dummy_string = "ø"
+let dummy = snd (declare_exact Symbols.dummy_table dummy_string ())
 
 let pp_channel ppf c =
   Fmt.pf ppf "%a" (Utils.kw Fmt.(`None)) (Symbols.to_string c)

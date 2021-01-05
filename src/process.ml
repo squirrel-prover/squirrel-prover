@@ -13,8 +13,8 @@ type formula = Theory.formula
 type process =
   | Null
   | New of string * process
-  | In of Channel.t * string * process
-  | Out of Channel.t * term * process
+  | In of string * string * process
+  | Out of string * term * process
   | Set of string * string list * term * process
   | Parallel of process * process
   | Let of string * term * process
@@ -58,16 +58,16 @@ let rec pp_process ppf process =
       pp_process p
 
   | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
       (kw `Bold) "in"
-      Channel.pp_channel c
+      c
       (styled `Magenta (styled `Bold ident)) s
       pp_process p
 
   | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
       (kw `Bold) "out"
-      Channel.pp_channel c
+      c
       Theory.pp t
       pp_process p
 
@@ -233,6 +233,10 @@ type p_env = {
      * Term.message are the ones after the refresh *)
 
 }
+
+let parse_channel c =
+  try Channel.of_string c with
+  | Not_found -> raise @@ Theory.Conv (Undefined c)
 
 let parse_proc system_name proc =
 
@@ -509,6 +513,7 @@ let parse_proc system_name proc =
     (Let (Symbols.to_string x', t', p'),pos')
 
   | In (c,x,p) ->
+    let ch = parse_channel c in
     let env,x' = make_fresh env Sorts.Message x in
     let in_th =
       Theory.Var (Vars.name x')
@@ -516,7 +521,7 @@ let parse_proc system_name proc =
     let in_tm = Term.Var x' in
     let env =
       { env with
-        inputs = (c,x')::env.inputs ;
+        inputs = (ch,x')::env.inputs ;
         msubst = (x, in_th, in_tm) :: env.msubst }
     in
     let par_choice = pos, List.rev pos_indices in
@@ -647,8 +652,9 @@ let parse_proc system_name proc =
       (Set (s,List.map Vars.name l',t',p'),pos')
 
   | Out (c,t,p) ->
+    let ch = parse_channel c in
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let env,a' = register_action env.alias (Some (c,t)) env in
+    let env,a' = register_action env.alias (Some (ch,t)) env in
     let env =
       { env with
         evars = [] ;
@@ -671,7 +677,7 @@ let parse_proc system_name proc =
         updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
-    (Alias (Out (Channel.dummy,Theory.empty,p'), Symbols.to_string a'), pos')
+    (Alias (Out (Channel.dummy_string,Theory.empty,p'), Symbols.to_string a'), pos')
 
   in
 
