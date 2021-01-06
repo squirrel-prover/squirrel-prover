@@ -32,9 +32,9 @@ name key2 : message
 name key3 : message
 
 hash h
-hash h1 with oracle forall (m:message,sk:message), sk = key1
-hash h2 with oracle forall (m:message,sk:message), sk = key2
-hash h3 with oracle forall (m:message,sk:message), sk = key3
+hash h1
+hash h2
+hash h3
 
 name idinit : index->message
 name pin : index->message
@@ -45,6 +45,7 @@ mutable TS : message
 
 channel cT
 channel cR
+channel c
 
 axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
 axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
@@ -79,7 +80,10 @@ process reader(jj:index) =
   else
     out(cR, error)
 
-system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
+system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
+        | !_k (in(c,m); out(c,h1(m,key1)))
+        | !_k (in(c,m); out(c,h2(m,key2)))
+        | !_k (in(c,m); out(c,h3(m,key3)))).
 
 goal lastUpdateTag_ : 
 forall (t:timestamp), forall (i:index),
@@ -180,15 +184,19 @@ left. apply H1 to j'.
 right. exists j1. apply H1 to j'.
 case H2.
 
+admit.
+admit.
+admit.
+
 substitute t,init.
 left.
 Qed.
 
-goal lastUpdateTag :
+goal lastUpdateT :
 forall (i,j:index),
   kT(i)@T(i,j) = kT(i)@init
   || (exists (j':index), kT(i)@T(i,j) =
-       < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3), 
+       < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
          snd(input@T(i,j')) >).
 Proof.
 intros.
@@ -200,14 +208,90 @@ right.
 exists j1.
 Qed.
 
-goal lastUpdateReader :
+goal lastUpdatePredT1 :
+forall (i,j:index),
+  kT(i)@pred(T1(i,j)) = kT(i)@init
+  || (exists (j':index), kT(i)@pred(T1(i,j)) =
+       < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
+         snd(input@T(i,j')) >).
+Proof.
+intros.
+apply lastUpdateTag_ to pred(T1(i,j)).
+apply H0 to i.
+case H1.
+left.
+right.
+exists j1.
+Qed.
+
+goal lastUpdatePredR1 :
 forall (jj,ii:index),
   kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
   || (exists (jj':index),
-       kR(ii)@pred(R1(jj,ii)) = 
+       kR(ii)@pred(R1(jj,ii)) =
          h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3)).
 Proof.
-admit. (* TODO je pense que la preuve est similaire à lastUpdateTag *)
+admit. (* TODO probably very similar to lastUpdateT *)
+Qed.
+
+goal lastUpdateR :
+forall (jj,ii:index),
+  kR(ii)@R(jj) = kR(ii)@init
+  || (exists (jj':index),
+       kR(ii)@R(jj) =
+         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)).
+Proof.
+admit. (* TODO probably very similar to lastUpdatePredT1 *)
+Qed.
+
+equiv secretStateReader (t:timestamp,ii:index) :
+  frame@t, diff(<kT(ii)@t,kR(ii)@t>,<zero,zero>).
+Proof.
+induction t.
+
+(* case init *)
+admit.
+
+(* case R(jj) *)
+expandall. 
+fa 0. fa 1. fa 1.
+prf 1.
+yesif 1.
+assert TS@R(jj) = TSnext(TS@pred(R(jj))).
+assert TS@R(jj) = TS@R(jj1).
+admit. (* ok *)
+fa 1.
+fresh 1.
+fa 1.
+admit.
+
+(* case R1(jj,ii1) *)
+expandall.
+fa 0. fa 1. fa 1.
+fa 2.
+prf 2.
+yesif 2.
+admit.
+fresh 2.
+fa 1.
+admit.
+
+(* case R2(jj) *)
+admit.
+(* case T(i,j) *)
+admit.
+(* case T1(i,j) *)
+admit.
+(* case T2(i,j) *)
+admit.
+(* case T3(i,j) *)
+admit.
+(* case A(k) *)
+admit.
+(* case A1(k) *)
+admit.
+(* case A2(k) *)
+admit.
 Qed.
 
 goal auth_R1 :
@@ -218,17 +302,15 @@ forall (jj,ii:index),
 Proof.
 intros.
 expand cond@R1(jj,ii).
+
 euf M0.
-admit. (* ??? *)
 assert (i=ii || i<>ii).
 case H0.
-
 (* case i=ii - honest case *)
 exists j.
-
 (* case i<>ii - absurd, we derive a contradiction *)
-apply lastUpdateTag to i,j.
-apply lastUpdateReader to jj,ii.
+apply lastUpdateT to i,j.
+apply lastUpdatePredR1 to jj,ii.
 case H0.
 (* init case *)
 apply stateTagInit to i.
@@ -245,6 +327,14 @@ assert
   h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
   h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
 collision.
+
+apply lastUpdatePredR1 to jj,ii.
+case H0.
+(* init case *)
+apply stateReaderInit to ii.
+fresh M3.
+(* general case *)
+admit.
 Qed.
 
 goal auth_T1 :
@@ -256,6 +346,8 @@ Proof.
 intros.
 expand cond@T1(i,j).
 euf M0.
-admit. (* ??? *)
+(* honest case *)
 exists jj.
+(* case coming from the process oracle *)
+admit.
 Qed.
