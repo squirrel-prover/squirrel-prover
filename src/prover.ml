@@ -23,7 +23,7 @@ let current_goal : named_goal option ref = ref None
 let subgoals : Goal.t list ref = ref []
 let goals_proved = ref []
 
-type prover_mode = GoalMode | ProofMode | WaitQed
+type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 type gm_input =
   | Gm_goal of string * Goal.t
@@ -611,7 +611,30 @@ let declare = function
   | Decl.Decl_abstract decl -> 
     Theory.declare_abstract decl.name decl.index_arity decl.message_arity
 
+type decl_error = 
+  | Conv_error of Theory.conversion_error
+  | Multiple_declarations of string 
+
+let pp_decl_error0 fmt = function
+  | Conv_error e -> Theory.pp_error fmt e
+  | Multiple_declarations s ->
+    let pp_loc _fmt = ()        (* TODO: locations *) in
+    Fmt.pf fmt
+      "@[Multiple declarations %t of the symbol: %s.@]@."
+      pp_loc
+      s
+
+let pp_decl_error fmt e = 
+  Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
+
+exception Decl_error of decl_error
+
+let decl_error e = raise (Decl_error e)
+
 let declare_list decls = 
   (* For debugging *)
   (* Fmt.epr "%a@." Decl.pp_decls decls; *)
-   List.fold_left (fun () d -> declare d) () decls 
+
+   try List.fold_left (fun () d -> declare d) () decls with
+     | Theory.Conv e -> decl_error (Conv_error e)
+     | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)

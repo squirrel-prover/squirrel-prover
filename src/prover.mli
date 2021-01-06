@@ -22,8 +22,9 @@ val current_goal : unit -> named_goal option
     - [GoalMode] : waiting for the next goal.
     - [ProofMode] : proof of a goal in progress.
     - [WaitQed] : finished proof, waiting for closure.
+    - [AllDone] : everything is done, waiting to leave the prover.
 *)
-type prover_mode = GoalMode | ProofMode | WaitQed
+type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
@@ -168,6 +169,14 @@ val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 (** Initialize the prover state try to prove the first of the unproved goal. *)
 val start_proof : unit -> string option
 
+(*------------------------------------------------------------------*)
+type decl_error = 
+  | Conv_error of Theory.conversion_error
+  | Multiple_declarations of string 
+
+exception Decl_error of decl_error
+
+val pp_decl_error : Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)
 (** Process a declaration. *)

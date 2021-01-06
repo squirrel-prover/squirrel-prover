@@ -36,19 +36,28 @@ let parse_next parser_fun =
   else
     parser_fun (Utils.oget !lexbuf) !filename
 
+(*------------------------------------------------------------------*)
+type cmd_error = 
+  | Unexpected_command 
+  | StartProofError of string
+  | AbortIncompleteProof
+
+exception Cmd_error of cmd_error
+
+let pp_cmd_error fmt = function
+  | Unexpected_command -> Fmt.pf fmt "Unexpected command."
+  | StartProofError s -> Fmt.pf fmt "%s" s
+  | AbortIncompleteProof -> Fmt.pf fmt "Trying to abort a completed proof."
+
+let cmd_error e = raise (Cmd_error e)
+
+
+(*------------------------------------------------------------------*)
 open Prover
 open Tactics
 
-(** The main loop of the prover. The mode defines in what state the prover is,
-    e.g is it waiting for a proof script, or a system description, etc.
-    [save] allows to specify is the current state must be saved, so that
-    one can backtrack.
-*)
-let rec main_loop ~test ?(save=true) mode =
-  if !interactive then Printer.prt `Prompt "";
-  (* Save the state if instructed to do so.
-   * In practice we save except after errors and the first call. *)
-  if save then save_state mode ;
+(** The main loop body. *)
+let main_loop_body ~test mode =
   match
     let parse_buf =
       Parserbuf.parse_from_buf
@@ -57,30 +66,19 @@ let rec main_loop ~test ?(save=true) mode =
     in
     mode, parse_next parse_buf
   with
-  | exception (Parserbuf.Error s)   -> error ~test mode s
-  | exception (Prover.ParseError s) -> error ~test mode s
     | mode, ParsedUndo nb_undo ->
-      begin
-        let new_mode = reset_state nb_undo in
-        begin match new_mode with
-          | ProofMode -> Printer.pr "%a" pp_goal ()
-          | GoalMode -> Printer.pr "%a" Action.pp_actions ()
-          | WaitQed -> ()
-        end ;
-        main_loop ~test new_mode
-      end
+      let new_mode = reset_state nb_undo in
+      let () = match new_mode with
+        | ProofMode -> Printer.pr "%a" pp_goal ()
+        | GoalMode -> Printer.pr "%a" Action.pp_actions ()
+        | WaitQed -> ()
+        | AllDone -> assert false in
+      new_mode
 
     | GoalMode, ParsedInputDescr decls ->
-      begin 
-        try
-          Prover.declare_list decls;
-          Printer.pr "%a" Action.pp_actions ();
-          main_loop ~test GoalMode 
-        with 
-        | Theory.Conv e ->
-          let s = Printer.strf "%a" Theory.pp_error e in
-          error ~test ProofMode ("Declaration failed: " ^ s ^ ".")
-      end
+      Prover.declare_list decls;
+      Printer.pr "%a" Action.pp_actions ();
+      GoalMode 
 
     | ProofMode, ParsedTactic utac ->
       if not !interactive then
@@ -92,26 +90,19 @@ let rec main_loop ~test ?(save=true) mode =
                | Some (i, _) -> i
                | None -> assert false);
           complete_proof ();
-          main_loop ~test WaitQed
+          WaitQed
       | false ->
           Printer.pr "%a" pp_goal ();
-          main_loop ~test ProofMode
-      | exception (Tactic_soft_failure s) when not test ->
-          let s = Printer.strf "%a" Tactics.pp_tac_error s in
-          error ~test ProofMode ("Tactic failed: " ^ s ^ ".")
-      | exception (Tactic_hard_failure s) when not test ->
-          let s = Printer.strf "%a" Tactics.pp_tac_error s in
-          error ~test ProofMode
-            ("Tactic ill-formed or unapplicable: " ^ s ^ ".")
+          ProofMode
       end
 
     | WaitQed, ParsedQed ->
       Printer.prt `Result "Exiting proof mode.@.";
-      main_loop ~test GoalMode
+      GoalMode
 
     | GoalMode, ParsedSetOption sp ->
       Config.set_param sp;
-      main_loop ~test GoalMode
+      GoalMode
 
     | GoalMode, ParsedGoal goal ->
       begin
@@ -121,40 +112,76 @@ let rec main_loop ~test ?(save=true) mode =
             match start_proof () with
             | None ->
               Printer.pr "%a" pp_goal ();
-              main_loop ~test ProofMode
-            | Some es -> error ~test GoalMode es
+              ProofMode
+            | Some es -> cmd_error (StartProofError es)
           end
         | Prover.Gm_goal (i,f) ->
-          (try
-            add_new_goal (i,f)
-          with (Prover.ParseError s) -> error ~test mode s);
+          add_new_goal (i,f);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;
-          main_loop ~test GoalMode
+          GoalMode
       end
 
-    | GoalMode, EOF -> Printer.pr "Goodbye!@." ; if not test then exit 0
+    | GoalMode, EOF -> AllDone 
 
     | WaitQed, ParsedAbort ->
-        if test then raise @@ Failure "Trying to abort a completed proof." else
-          error ~test mode "Trying to abort a completed proof."
+      if test then raise @@ Failure "Trying to abort a completed proof." else
+        cmd_error AbortIncompleteProof
 
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
       Prover.reset ();
-      main_loop ~test GoalMode
+      GoalMode
 
     | _, ParsedQed ->
-        if test then raise @@ Failure "unfinished" else
-          error ~test mode "Unexpected command."
+      if test then raise @@ Failure "unfinished" else 
+        cmd_error Unexpected_command
 
-    | _, _ -> error ~test mode "Unexpected command."
+    | _, _ -> cmd_error Unexpected_command
 
-and error ~test mode s =
-  Printer.prt `Error "%s" s;
+
+(** The main loop of the prover. The mode defines in what state the prover is,
+    e.g is it waiting for a proof script, or a system description, etc.
+    [save] allows to specify is the current state must be saved, so that
+    one can backtrack.
+*)
+let rec main_loop ~test ?(save=true) mode =
+  if !interactive then Printer.prt `Prompt "";
+  (* Save the state if instructed to do so.
+   * In practice we save except after errors and the first call. *)
+  if save then save_state mode ;
+
+  match main_loop_body ~test mode with
+  (* exit prover *)
+  | AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
+
+  (* loop *)
+  | new_mode -> main_loop ~test new_mode
+
+  (* exception handling *)
+  | exception (Parserbuf.Error s) -> 
+    error ~test mode (fun fmt -> Fmt.string fmt s)
+  | exception (Prover.ParseError s) -> 
+    error ~test mode (fun fmt -> Fmt.string fmt s)
+  | exception (Cmd_error e) ->
+    error ~test mode (fun fmt -> pp_cmd_error fmt e)
+  | exception (Tactic_soft_failure e) when not test ->
+    let pp_e fmt = 
+      Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in
+    error ~test mode pp_e
+  | exception (Tactic_hard_failure e) when not test ->
+    let pp_e fmt = 
+      Fmt.pf fmt "Tactic ill-formed or unapplicable: %a." 
+        Tactics.pp_tac_error e in
+    error ~test mode pp_e
+
+and error ~test mode e =
+  Printer.prt `Error "%t" e;
   if !interactive then main_loop ~test ~save:false mode else
   if not test then exit 1
+
+
 
 let start_main_loop ?(test=false) () = 
   (* Initialize definitions before parsing system description.

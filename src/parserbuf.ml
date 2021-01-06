@@ -36,13 +36,6 @@ let pp_error pp_loc pp_pref_loc e = match e with
                 pp_pref_loc ()
                 pp_loc ()
                 s)
-  | Symbols.Multiple_declarations s ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[%aMultiple declarations %a of the symbol: %s.@]@."
-                pp_pref_loc ()
-                pp_loc ()
-                s)
   | Theory.Conv err ->
       Some (fun ppf () ->
               Fmt.pf ppf
@@ -264,7 +257,7 @@ let () =
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Symbols.Multiple_declarations "c")
+        (Prover.Decl_error (Multiple_declarations "c"))
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.sp")
     end ;
     "Action creation", `Quick, begin fun () ->
@@ -300,22 +293,23 @@ let () =
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.(Conv (Type_error (App ("n",[]),Sorts.etimestamp)))
+        (Prover.Decl_error
+           (Conv_error (Type_error (App ("n",[]),Sorts.etimestamp))))
         (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-                 Theory.(Conv (Arity_error ("C",1,0)))
+        (Prover.Decl_error (Conv_error (Arity_error ("C",1,0))))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_type.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-                 Theory.(Conv (Undefined "D"))
+        (Prover.Decl_error (Conv_error (Undefined "D")))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Symbols.Multiple_declarations "C")
+        (Prover.Decl_error (Multiple_declarations "C"))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.sp")
     end ;
   ];;
