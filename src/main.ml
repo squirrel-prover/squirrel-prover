@@ -164,6 +164,8 @@ let rec main_loop ~test ?(save=true) mode =
     error ~test mode (fun fmt -> Fmt.string fmt s)
   | exception (Prover.ParseError s) -> 
     error ~test mode (fun fmt -> Fmt.string fmt s)
+  | exception (Decl_error e) ->
+    error ~test mode (fun fmt -> pp_decl_error fmt e)
   | exception (Cmd_error e) ->
     error ~test mode (fun fmt -> pp_cmd_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->
