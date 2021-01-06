@@ -81,9 +81,9 @@ process reader(jj:index) =
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
-        | !_k (in(c,m); out(c,h1(m,key1)))
-        | !_k (in(c,m); out(c,h2(m,key2)))
-        | !_k (in(c,m); out(c,h3(m,key3)))).
+        | !_kk (in(c,m); out(c,h1(m,key1)))
+        | !_kk (in(c,m); out(c,h2(m,key2)))
+        | !_kk (in(c,m); out(c,h3(m,key3)))).
 
 goal lastUpdateTag_ : 
 forall (t:timestamp), forall (i:index),
@@ -244,56 +244,6 @@ Proof.
 admit. (* TODO probably very similar to lastUpdatePredT1 *)
 Qed.
 
-equiv secretStateReader (t:timestamp,ii:index) :
-  frame@t, diff(<kT(ii)@t,kR(ii)@t>,<zero,zero>).
-Proof.
-induction t.
-
-(* case init *)
-admit.
-
-(* case R(jj) *)
-expandall. 
-fa 0. fa 1. fa 1.
-prf 1.
-yesif 1.
-assert TS@R(jj) = TSnext(TS@pred(R(jj))).
-assert TS@R(jj) = TS@R(jj1).
-admit. (* ok *)
-fa 1.
-fresh 1.
-fa 1.
-admit.
-
-(* case R1(jj,ii1) *)
-expandall.
-fa 0. fa 1. fa 1.
-fa 2.
-prf 2.
-yesif 2.
-admit.
-fresh 2.
-fa 1.
-admit.
-
-(* case R2(jj) *)
-admit.
-(* case T(i,j) *)
-admit.
-(* case T1(i,j) *)
-admit.
-(* case T2(i,j) *)
-admit.
-(* case T3(i,j) *)
-admit.
-(* case A(k) *)
-admit.
-(* case A1(k) *)
-admit.
-(* case A2(k) *)
-admit.
-Qed.
-
 goal auth_R1 :
 forall (jj,ii:index),
   cond@R1(jj,ii)
@@ -328,13 +278,34 @@ assert
   h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
 collision.
 
-apply lastUpdatePredR1 to jj,ii.
+nosimpl(assert(forall (t:timestamp), forall (kk,ii,jj:index), 
+  (t = A(kk) && t < R1(jj,ii)) 
+  => 
+  (forall (t':timestamp), t'<=t => input@t' <> kR(ii)@pred(R1(jj,ii))))).
+induction.
+apply lastUpdatePredR1 to jj1,ii1.
 case H0.
 (* init case *)
-apply stateReaderInit to ii.
-fresh M3.
+apply stateReaderInit to ii1.
+fresh M4.
 (* general case *)
-admit.
+assert input@t' = h3(<<kR(ii1)@R1(jj',ii1),pin(ii1)>,TS@R1(jj',ii1)>,key3).
+euf M4.
+case H0.
+assert (R1(jj2,ii1) < R1(jj',ii1) || R1(jj2,ii1) = R1(jj',ii1)).
+case H0.
+admit. (* ok *)
+assert kR(ii1)@R1(jj',ii1) = kR(ii1)@pred(R1(jj',ii1)).
+admit. (* ok *)
+admit. (* ok *)
+
+admit. (* ??? *)
+
+admit. (* ??? *)
+
+apply H0 to A(kk).
+apply H1 to kk,ii,jj.
+apply H2 to A(kk).
 Qed.
 
 goal auth_T1 :
