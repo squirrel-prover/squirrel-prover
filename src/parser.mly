@@ -407,10 +407,10 @@ option_param:
 | i=INT { Config.Param_int i      }
 
 set_option:
-| SET n=ID EQ param=option_param { (n, param) }
+| SET n=ID EQ param=option_param DOT { (n, param) }
 
 interactive :
-| set=set_option DOT { Prover.ParsedSetOption set }
+| set=set_option     { Prover.ParsedSetOption set }
 | decls=declarations { Prover.ParsedInputDescr decls }
 | u=undo             { Prover.ParsedUndo u }
 | tac=tactic         { Prover.ParsedTactic tac }
