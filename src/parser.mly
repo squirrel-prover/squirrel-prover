@@ -171,7 +171,7 @@ process:
                                 { Process.Let (id,t,p) }
 | id=ID terms=term_list ASSIGN t=term p=process_cont
                                 { let to_idx = function
-                                     | Theory.Var x -> x
+                                     | Theory.App(x,[]) -> x
                                      | t -> raise @@ Theory.Conv (Index_not_var t)
                                    in
                                    let l = List.map to_idx terms in

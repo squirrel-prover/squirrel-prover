@@ -253,19 +253,19 @@ struct
     let open TacticsArgs in
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert tsubst p Sorts.Timestamp))
+      Arg (Timestamp (Theory.convert InGoal tsubst p Sorts.Timestamp))
     | [Theory p], Sort Message ->
-      Arg (Message (Theory.convert tsubst p Sorts.Message))
+      Arg (Message   (Theory.convert InGoal tsubst p Sorts.Message))
     | [Theory p], Sort Boolean ->
-      Arg (Boolean (Theory.convert tsubst p Sorts.Boolean))
-    | [Theory (Var p)], Sort String ->
+      Arg (Boolean   (Theory.convert InGoal tsubst p Sorts.Boolean))
+    | [Theory (App (p,[]))], Sort String ->
       Arg (String p)
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
     | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
     | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
-    | [Theory (Var p)], Sort Index ->
-      Arg (Index (Theory.conv_index tsubst (Var p)))
+    | [Theory (App (p,[]))], Sort Index ->
+      Arg (Index (Theory.convert_index tsubst (Theory.var p)))
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match convert_args [th1] (Sort (Opt s1)) j with
         | Arg arg1 ->
@@ -429,7 +429,7 @@ let get_goal_formula gname =
 (** Declare Goals And Proofs *)
 
 let make_trace_goal ~system f  =
-  Goal.Trace (TraceSequent.init ~system (Theory.convert [] f Sorts.Boolean))
+  Goal.Trace (TraceSequent.init ~system (Theory.convert InGoal [] f Sorts.Boolean))
 
 let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =
@@ -442,9 +442,9 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let subst = Theory.subst_of_env env in
   let convert = function
     | `Formula f ->
-        EquivSequent.Formula (Theory.convert subst f Sorts.Boolean)
+        EquivSequent.Formula (Theory.convert InGoal subst f Sorts.Boolean)
     | `Message m ->
-        EquivSequent.Message (Theory.convert subst m Sorts.Message)
+        EquivSequent.Message (Theory.convert InGoal subst m Sorts.Message)
   in
   Goal.Equiv (EquivSequent.init Action.(SimplePair default_system_name)
                 env (List.map convert l))
@@ -487,7 +487,7 @@ let add_proved_goal (gname,j) =
     goals_proved := (gname,j) :: !goals_proved
 
 let define_oracle_tag_formula h f =
-  let formula = Theory.convert [] f Sorts.Boolean in
+  let formula = Theory.convert InGoal [] f Sorts.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
@@ -614,4 +614,4 @@ let declare = function
 let declare_list decls = 
   (* For debugging *)
   (* Fmt.epr "%a@." Decl.pp_decls decls; *)
-  List.fold_left (fun () d -> declare d) () decls
+   List.fold_left (fun () d -> declare d) () decls 

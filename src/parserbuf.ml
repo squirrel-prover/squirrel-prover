@@ -300,7 +300,7 @@ let () =
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.(Conv (Timestamp_unexpected (Var "n")))
+        Theory.(Conv (Type_error (App ("n",[]),Sorts.etimestamp)))
         (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->

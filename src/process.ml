@@ -131,7 +131,7 @@ let rec check_proc env = function
     Theory.check ~local:true env m k ;
     List.iter
       (fun x ->
-         Theory.check ~local:true env (Theory.Var x) Sorts.eindex) l ;
+         Theory.check ~local:true env (Theory.var x) Sorts.eindex) l ;
     check_proc env p
   | Parallel (p, q) -> check_proc env p ; check_proc env q
   | Let (x, t, p) ->
@@ -273,7 +273,7 @@ let parse_proc system_name proc =
   in
   let conv_term env ts t sort =
     let subst = create_subst env.isubst env.msubst in
-    Theory.convert ~at:ts subst t sort
+    Theory.convert (InProc ts) subst t sort
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in
@@ -298,7 +298,7 @@ let parse_proc system_name proc =
     in
     let indices = List.rev env.indices in
     let action_term = Term.Action (a', indices) in
-    let in_th = Theory.Var (snd input) in
+    let in_th = Theory.var (snd input) in
     let in_tm = Term.Macro (Term.in_macro, [], action_term) in
     (* substitute the special timestamp variable [ts], since at this point
      * we know the action *)
@@ -312,7 +312,7 @@ let parse_proc system_name proc =
     let msubst' =
       try
         begin match
-          ( List.find (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
+          ( List.find (fun (_,x_th,_) -> x_th = Theory.var (snd input))
               env.msubst )
         with
         | (x,_,_) -> (x,in_th,in_tm) :: env.msubst
@@ -398,7 +398,7 @@ let parse_proc system_name proc =
             let v'_th = Theory.subst v tsubst in
             let v'_tm = conv_term env (Term.Var ts) v Sorts.Message in
             iacc, (x, v'_th, v'_tm)::macc
-          | Sorts.ESort Sorts.Index, Theory.Var i ->
+          | Sorts.ESort Sorts.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc i env.isubst in
             let i'_th = Theory.subst v tsubst in
             (x, i'_th, i'_tm)::iacc, macc
@@ -422,7 +422,7 @@ let parse_proc system_name proc =
     let n'_th =
       Theory.App
         (Symbols.to_string n',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices)
+         List.rev_map (fun i -> Theory.var (Vars.name i)) env.indices)
     in
     let n'_tm = Term.Name (n',List.rev env.indices) in
     let env =
@@ -453,7 +453,7 @@ let parse_proc system_name proc =
     in
     let body =
       Term.subst_macros_ts updated_states (Term.Var ts)
-        (conv_term env (Term.Var ts) t Sorts.Message)
+        (conv_term env (Term.Var ts) t Sorts.Message) 
     in
     let invars = List.map snd env.inputs in
     let _,x' =
@@ -463,7 +463,7 @@ let parse_proc system_name proc =
     let x'_th =
       Theory.App
         (Symbols.to_string x',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices)
+         List.rev_map (fun i -> Theory.var (Vars.name i)) env.indices)
     in
     let x'_tm =
       Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
@@ -496,7 +496,7 @@ let parse_proc system_name proc =
     let env,i' = make_fresh env Sorts.Index i in
     let env =
       { env with
-        isubst = (i, Theory.Var (Vars.name i'), i') :: env.isubst ;
+        isubst = (i, Theory.var (Vars.name i'), i') :: env.isubst ;
         indices = i' :: env.indices }
     in
     let pos_indices = i'::pos_indices in
@@ -516,7 +516,7 @@ let parse_proc system_name proc =
     let ch = parse_channel c in
     let env,x' = make_fresh env Sorts.Message x in
     let in_th =
-      Theory.Var (Vars.name x')
+      Theory.var (Vars.name x')
     in
     let in_tm = Term.Var x' in
     let env =
@@ -562,7 +562,7 @@ let parse_proc system_name proc =
     let evars' = List.map (fun (_,x) -> Vars.EVar x) s in
     let isubst' =
       List.map
-        (fun (i,i') -> i, Theory.Var (Vars.name i'), i')
+        (fun (i,i') -> i, Theory.var (Vars.name i'), i')
         s
       @ env_p.isubst
     in
@@ -654,6 +654,7 @@ let parse_proc system_name proc =
   | Out (c,t,p) ->
     let ch = parse_channel c in
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
+
     let env,a' = register_action env.alias (Some (ch,t)) env in
     let env =
       { env with

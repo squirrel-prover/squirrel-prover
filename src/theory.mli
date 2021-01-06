@@ -16,7 +16,6 @@ type kind = Sorts.esort
 
 
 type term =
-  | Var of string
   | Tinit
   | Tpred of term
   | Diff of term*term
@@ -50,6 +49,9 @@ type term =
 type formula = term
 
 val pp : Format.formatter -> term -> unit
+
+(** [var x] makes the variable [App (x,[])] *)
+val var : string -> term
 
 (** {2 Declaration of new symbols} *)
 
@@ -148,10 +150,19 @@ val parse_subst :
 
 val pp_subst : Format.formatter -> subst -> unit
 
-val conv_index : subst -> term -> Vars.index
+val convert_index : subst -> term -> Vars.index
+
+(** Conversion context.
+  * - [InGoal]: we are converting a term in a goal (or tactic). All
+  *   timestamps must be explicitely given.
+  * - [InProc ts]: we are converting a term in a process at an implicit 
+  *   timestamp [ts]. *)
+type conv_cntxt = 
+  | InProc of Term.timestamp
+  | InGoal
 
 val convert :
-  ?at:Term.timestamp ->
+  conv_cntxt ->
   subst ->
   term ->
   'a Sorts.sort ->

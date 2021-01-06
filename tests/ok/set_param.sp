@@ -1,4 +1,4 @@
-set printTRSEquations=false
+set printTRSEquations=false.
 
 system null.
 

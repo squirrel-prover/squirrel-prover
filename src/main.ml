@@ -57,8 +57,8 @@ let rec main_loop ~test ?(save=true) mode =
     in
     mode, parse_next parse_buf
   with
-    | exception (Parserbuf.Error s) -> error ~test mode s
-    | exception (Prover.ParseError s) -> error ~test mode s
+  | exception (Parserbuf.Error s)   -> error ~test mode s
+  | exception (Prover.ParseError s) -> error ~test mode s
     | mode, ParsedUndo nb_undo ->
       begin
         let new_mode = reset_state nb_undo in
@@ -71,9 +71,16 @@ let rec main_loop ~test ?(save=true) mode =
       end
 
     | GoalMode, ParsedInputDescr decls ->
-      Prover.declare_list decls;
-      Printer.pr "%a" Action.pp_actions ();
-      main_loop ~test GoalMode
+      begin 
+        try
+          Prover.declare_list decls;
+          Printer.pr "%a" Action.pp_actions ();
+          main_loop ~test GoalMode 
+        with 
+        | Theory.Conv e ->
+          let s = Printer.strf "%a" Theory.pp_error e in
+          error ~test ProofMode ("Declaration failed: " ^ s ^ ".")
+      end
 
     | ProofMode, ParsedTactic utac ->
       if not !interactive then
@@ -120,7 +127,7 @@ let rec main_loop ~test ?(save=true) mode =
         | Prover.Gm_goal (i,f) ->
           (try
             add_new_goal (i,f)
-          with  (Prover.ParseError s) -> error ~test mode s);
+          with (Prover.ParseError s) -> error ~test mode s);
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;

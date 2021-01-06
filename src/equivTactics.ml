@@ -1616,7 +1616,7 @@ let () =
 let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let env = EquivSequent.get_env s in
   let tsubst = Theory.subst_of_env env in
-  match Theory.convert tsubst term Sorts.Message with
+  match Theory.convert InGoal tsubst term Sorts.Message with
   (* we expect term to be a sequence *)
   | Seq ( vs, t) ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
@@ -1657,7 +1657,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       (List.map apply_subst (EquivSequent.get_biframe s))]
   in
   (* computes the substitution dependeing on the sort of term *)
-  match Theory.convert tsubst term Sorts.Boolean with
+  match Theory.convert InGoal tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a then
         succ [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -1668,7 +1668,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
     | exception Theory.(Conv (Type_error _)) ->
       begin
-        match Theory.convert tsubst term Sorts.Message with
+        match Theory.convert InGoal tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
           if Macros.is_defined mn a then
             succ [Term.ESubst (Macro ((mn, sort, is),l,a),

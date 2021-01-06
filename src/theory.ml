@@ -1,7 +1,6 @@
 type kind = Sorts.esort
 
 type term =
-  | Var of string
   | Tinit
   | Tpred of term
   | Diff of term*term
@@ -34,6 +33,8 @@ type term =
 
 type formula = term
 
+let var x = App (x,[])
+
 let pp_var_list fmt l =
   Vars.pp_typed_list fmt
     (List.map
@@ -42,7 +43,6 @@ let pp_var_list fmt l =
        l)
 
 let rec pp_term ppf = function
-  | Var s -> Fmt.pf ppf "%s" s
   | Tinit -> Fmt.pf ppf "init"
   | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
   | ITE (i,t,e) ->
@@ -136,9 +136,9 @@ let pp_error ppf = function
                               pp s
                               Sorts.pp_e sort
   | Timestamp_expected t -> Fmt.pf ppf
-                              "The term %a must be given a timestamp." pp t
+                              "The term %a must be given a timestamp" pp t
   | Timestamp_unexpected t -> Fmt.pf ppf
-                              "The term %a must not be given a timestamp." pp t
+                              "The term %a must not be given a timestamp" pp t
   | Untypable_equality t ->
       Fmt.pf ppf
         "Comparison %a cannot be typed@ \
@@ -147,20 +147,20 @@ let pp_error ppf = function
         pp t
   | String_expected t ->
       Fmt.pf ppf
-        "The term %a cannot be seen as a string."
+        "The term %a cannot be seen as a string"
         pp t
   | Int_expected t ->
       Fmt.pf ppf
-        "The term %a cannot be seen as a int."
+        "The term %a cannot be seen as a int"
         pp t
   | Tactic_type s ->
       Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
   | Index_not_var i ->
       Fmt.pf ppf "An index must be a variable, the term %a \
-                  cannot be seen as an index." pp i
+                  cannot be seen as an index" pp i
   | Assign_no_state s ->
       Fmt.pf ppf "Only states can be assigned values, and the \
-                  function symbols %s is not a state." s
+                  function symbols %s is not a state" s
 
   | StrictAliasError -> Fmt.pf ppf "Strict alias mode in processus: error" 
 
@@ -219,18 +219,19 @@ let check_action s n =
 
 (** Applications *)
 
+
 (** Type of an application ([App _] or [AppAt _]) that has been
     dis-ambiguated *)
 type app =
   | Name of string * term list
   (** A name, whose arguments will always be indices. *)
-  | Get of string * term option * term list
+  | Get of string * Term.timestamp option * term list
   (** [Get (s,ots,terms)] reads the contents of memory cell
     * [(s,terms)] where [terms] are evaluated as indices.
     * The second argument [ots] is for the optional timestamp at which the
     * memory read is performed. This is used for the terms appearing in
     * goals. *)
-  | Fun of string * term list * term option
+  | Fun of string * term list * Term.timestamp option
   (** Function symbol application,
     * where terms will be evaluated as indices or messages
     * depending on the type of the function symbol.
@@ -251,7 +252,7 @@ let rec pp_app ppf = function
     Fmt.pf ppf "%s%a%a"
       f
       (Utils.pp_list pp_term) terms
-      pp_ots ots
+      (Fmt.option Term.pp) ots
       
   | Name (n,terms) ->
     Fmt.pf ppf "%a%a"
@@ -264,56 +265,58 @@ let rec pp_app ppf = function
     Fmt.pf ppf "!%s%a%a"
       s
       (Utils.pp_list pp_term) terms
-      pp_ots ots
+      (Fmt.option Term.pp) ots
 
   | AVar s -> Fmt.pf ppf "%s" s
+    
 
-let term_of_app = function
-  | Get (s,Some ts,terms) -> AppAt (s,terms,ts)
-  | Get (s,None,terms)    -> App   (s,terms)
-  | AVar s -> Var s
-  | Name (n,terms) -> App (n,terms)
-  | Fun (f,terms,Some ts) -> AppAt (f,terms,ts)
-  | Fun (f,terms,None)    -> App   (f,terms)
-  | Taction (a,terms) -> App (a,terms)
-                           
-let make_app ?at_ts s l =
+(** Context of a application construction. *)
+type app_cntxt = 
+  | At      of Term.timestamp   (* for explicit timestamp, e.g. [s@ts] *)
+  | MaybeAt of Term.timestamp   (* for potentially implicit timestamp, 
+                                   e.g. [s] in a process parsing. *)
+  | NoTS                        (* when there is no timestamp, even implicit. *)
+
+let is_at = function At _ -> true | _ -> false
+let get_ts = function At ts | MaybeAt ts -> Some ts | _ -> None
+                       
+let make_app cntxt s l =
   let arity_error i = Conv (Arity_error (s, List.length l, i)) in
-  let ts_unexpected = Conv (Timestamp_unexpected (Var s)) in
+  let ts_unexpected = Conv (Timestamp_unexpected (App (s,l))) in
   match Symbols.def_of_string s with
   | Symbols.Reserved -> assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->
-        if at_ts <> None then raise ts_unexpected;
+        if is_at cntxt then raise ts_unexpected;
         if List.length l <> a + message_arity fdef then
           raise (arity_error (a + message_arity fdef)) ;
         Fun (s,l,None)
     | Symbols.Name arity ->
-        if at_ts <> None then raise ts_unexpected;
+        if is_at cntxt then raise ts_unexpected;
         check_arity s (List.length l) arity ;
         Name (s,l)
     | Symbols.Macro (Symbols.State (arity,_)) ->
         check_arity s (List.length l) arity ;
-        Get (s,at_ts,l)
+        Get (s,get_ts cntxt,l)
     | Symbols.Macro (Symbols.Global arity) ->
         if List.length l <> arity then raise @@ arity_error arity;
-        Fun (s,l,at_ts)
+        Fun (s,l,get_ts cntxt)
     | Symbols.Macro (Symbols.Local (targs,_)) ->
-        if at_ts <> None then raise ts_unexpected;
+        if is_at cntxt then raise ts_unexpected;
         if List.length targs <> List.length l then
           raise @@ arity_error (List.length targs) ;
         Fun (s,l,None)
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
-        if at_ts = None then
-          raise @@ Conv (Timestamp_expected (Var s));
+        if cntxt = NoTS then
+          raise @@ Conv (Timestamp_expected (App (s,l)));
         if l <> [] then raise @@ arity_error 0;
-        Fun (s,[],at_ts)
+        Fun (s,[],get_ts cntxt)
     | Symbols.Action arity ->
         if arity <> List.length l then raise @@ arity_error arity ;
         Taction (s,l)
-    | _ ->
+    | Symbols.Channel _ ->
         Printer.prt `Error "incorrect %s@." s ;
         raise Symbols.Incorrect_namespace
     end
@@ -352,10 +355,15 @@ fun subst st kind ->
       begin try
         Term.cast kind t
       with
-      | Term.Uncastable -> raise @@ Conv (Type_error (Var st,
+      | Term.Uncastable -> raise @@ Conv (Type_error (App (st,[]),
                                                       Sorts.ESort kind))
       end
   | _::q -> assoc q st kind
+
+let mem_assoc x sort subst = 
+  try let _ = assoc subst x sort in true 
+  with Conv (Undefined _) -> false
+
 
 (** Helper for converting constructs with binders.
   * Given a list of variables, returns a substitution (in the same order
@@ -373,24 +381,40 @@ let subst_of_bvars vars =
 
 let ty_error tm sort = Conv (Type_error (tm, Sorts.ESort sort))
 
+
+(** Conversion context.
+  * - [InGoal]: we are converting a term in a goal (or tactic). All
+  *   timestamps must be explicitely given.
+  * - [InProc ts]: we are converting a term in a process at an implicit 
+  *   timestamp [ts]. *)
+type conv_cntxt = 
+  | InProc of Term.timestamp
+  | InGoal
+
 let rec convert :
   type s.
-  ?at:Term.timestamp -> subst ->
+  conv_cntxt -> subst ->
   term -> s Sorts.sort -> s Term.term
-= fun ?at subst tm sort ->
+= fun cntxt subst tm sort ->
 
-  let conv ?(subst=subst) s t = convert ?at subst t s in
+  let conv ?(subst=subst) s t = convert cntxt subst t s in
   let type_error = ty_error tm sort in
   
-  match tm with
-
-  | Var x -> assoc subst x sort
-
+  match tm with 
   | App   (f,terms) ->
-    conv_app ~at subst (make_app f terms) sort
+    (* if [f] is a variable name appearing in [subst], then substitute. *)
+    if terms = [] && mem_assoc f sort subst 
+    then assoc subst f sort 
+    (* otherwise build the application and convert it. *)        
+    else
+      let app_cntxt = match cntxt with
+        | InGoal -> NoTS | 
+          InProc ts -> MaybeAt ts in
+      conv_app cntxt app_cntxt subst (tm, make_app app_cntxt f terms) sort
+
   | AppAt (f,terms,ts) ->
-    let at = Some (conv Sorts.Timestamp ts) in
-    conv_app ~at subst (make_app f terms) sort
+    let app_cntxt = At (conv Sorts.Timestamp ts) in
+    conv_app cntxt app_cntxt subst (tm,make_app app_cntxt f terms) sort
  
   | Tinit ->
       begin match sort with
@@ -451,8 +475,8 @@ let rec convert :
                 | #Atom.ord_eq as o ->
                     begin try
                         Term.Atom (`Index (o,
-                                           conv_index subst u, 
-                                           conv_index subst v))
+                                           conv_index cntxt subst u, 
+                                           conv_index cntxt subst v))
                     with Conv (Type_error _ ) ->
                       try
                         Term.Atom (`Message (o,
@@ -527,26 +551,30 @@ let rec convert :
         | _ -> raise type_error
       end
 
-and conv_index subst t =
-  match convert subst t Sorts.Index with
+and conv_index cntxt subst t =
+  match convert cntxt subst t Sorts.Index with
     | Term.Var x -> x
     | _ -> raise @@ Conv (Index_not_var t)
 
 and conv_app :
   type s.
-  at:Term.timestamp option -> subst ->
-  app -> s Sorts.sort -> s Term.term
- = fun ~at subst app sort ->
-  let conv ?(subst=subst) s t = convert ?at subst t s in
+  conv_cntxt -> app_cntxt -> subst ->
+  (term * app) -> s Sorts.sort -> s Term.term
+ = fun cntxt app_cntxt subst (t,app) sort ->
+   (* We should have [make_app app = t].
+      [t] is here to have meaningful exceptions. *)
 
-  let get_at () = match at with
-    | None -> raise @@ Conv (Timestamp_expected (term_of_app app))
+  let conv ?(subst=subst) s t = convert cntxt subst t s in
+
+  let get_at () =
+    match get_ts app_cntxt with
+    | None -> raise @@ Conv (Timestamp_expected t)
     | Some ts -> ts in
   
-  let type_error = ty_error (term_of_app app) sort in
+  let type_error = ty_error t sort in
   
   match app with
-  | AVar s -> conv sort (Var s)
+  | AVar s -> assoc subst s sort 
                 
   (* In [Term.term], function symbols deal with the message sort,
    * and comparisons are over message, indices or timestamps.
@@ -578,7 +606,7 @@ and conv_app :
   (* End of special cases. *)
 
   | Fun (f,l,None) ->
-      let ts_expected = Conv (Timestamp_expected (term_of_app app)) in
+      let ts_expected = Conv (Timestamp_expected t) in
       let ks, f_k = function_kind f in
       assert (f_k = Sorts.emessage) ;
       check_arity f (List.length l) (List.length ks) ;
@@ -587,18 +615,18 @@ and conv_app :
             let open Symbols in
             begin match of_string f with
               | Wrapped (symb, Function (i,_)) ->
-                  let indices,messages =
-                    List.init i (fun k -> conv_index subst (List.nth l k)),
-                    List.init (List.length l - i)
-                      (fun k -> conv Sorts.Message (List.nth l (k+i)))
-                  in
-                  Term.Fun ((symb,indices),messages)
+                let indices,messages =
+                  List.init i (fun k -> conv_index cntxt subst (List.nth l k)),
+                  List.init (List.length l - i)
+                    (fun k -> conv Sorts.Message (List.nth l (k+i)))
+                in
+                Term.Fun ((symb,indices),messages)
               | Wrapped (s, Macro (Global _)) ->
-                  let indices = List.map (conv_index subst) l in
-                  Term.Macro ((s,sort,indices),[],get_at ())
+                let indices = List.map (conv_index cntxt subst) l in
+                Term.Macro ((s,sort,indices),[],get_at ())
               | Wrapped (s, Macro (Local (targs,_))) ->
                   if List.for_all (fun s -> s = Sorts.eindex) ks then
-                    let indices = List.map (conv_index subst) l in
+                    let indices = List.map (conv_index cntxt subst) l in
                     Term.Macro ((s,sort,indices),[],get_at ())
                   else begin
                     assert (List.for_all (fun s -> s = Sorts.emessage) ks) ;
@@ -614,44 +642,42 @@ and conv_app :
         | _ -> raise type_error
       end
 
-  | Fun (f, l, Some ts) ->
-      let ts_unexpected = Conv (Timestamp_unexpected (term_of_app app)) in
-      if at <> None then raise ts_unexpected;
-      let open Symbols in
+  | Fun (f, l, Some ts) -> 
+      let ts_unexpected = Conv (Timestamp_unexpected t) in
       let open Symbols in
       begin match sort with
         | Sorts.Message ->
             begin match of_string f with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                   check_arity "input" (List.length l) 0 ;
-                  Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
+                  Term.Macro ((s,sort,[]),[],ts)
               | Wrapped (s, Macro (Global arity)) ->
                   check_arity f (List.length l) arity ;
-                  let l = List.map (conv_index subst) l in
-                  Term.Macro ((s,sort, l),[],conv Sorts.Timestamp ts)
+                  let l = List.map (conv_index cntxt subst) l in
+                  Term.Macro ((s,sort, l),[],ts)
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
                 assert false
               | Wrapped (s, Macro (Cond|Exec)) -> raise type_error
 
               | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
-              | Wrapped (_, Channel _)  -> raise ts_unexpected
-              | Wrapped (_, Name _)  ->  raise ts_unexpected
-              | Wrapped (_, Action _)  ->  raise ts_unexpected
-              | Wrapped (_, Function _) -> raise ts_unexpected
+              | Wrapped (_, Channel _)            -> raise ts_unexpected
+              | Wrapped (_, Name _)               -> raise ts_unexpected
+              | Wrapped (_, Action _)             -> raise ts_unexpected
+              | Wrapped (_, Function _)           -> raise ts_unexpected
             end
         | Sorts.Boolean ->
             begin match of_string f with
               | Wrapped (s, Macro (Cond|Exec)) ->
                   check_arity "cond" (List.length l) 0 ;
-                  Term.Macro ((s,sort,[]),[],conv Sorts.Timestamp ts)
+                  Term.Macro ((s,sort,[]),[],ts)
               | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
                 raise type_error
               | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
-              | Wrapped (_, Channel _)  ->  raise ts_unexpected
-              | Wrapped (_, Name _)  ->  raise ts_unexpected
-              | Wrapped (_, Action _)  -> raise ts_unexpected
-              | Wrapped (_, Function _) -> raise ts_unexpected
+              | Wrapped (_, Channel _)            -> raise ts_unexpected
+              | Wrapped (_, Name _)               -> raise ts_unexpected
+              | Wrapped (_, Action _)             -> raise ts_unexpected
+              | Wrapped (_, Function _)           -> raise ts_unexpected
               | Wrapped (_, Macro (Local (_, _))) -> raise ts_unexpected
             end
         | _ -> raise type_error
@@ -660,16 +686,13 @@ and conv_app :
   | Get (s,opt_ts,is) ->
       let k = check_state s (List.length is) in
       assert (k = Sorts.emessage) ;
-      let is = List.map (conv_index subst) is in
+      let is = List.map (conv_index cntxt subst) is in
       let s = Symbols.Macro.of_string s in
       let ts =
-        match opt_ts,at with
-          | None, Some ts -> ts
-          | Some ts, None -> conv Sorts.Timestamp ts
-          | Some _, Some _ ->
-            raise @@ Conv (Timestamp_unexpected (term_of_app app))
-          | None, None ->
-            raise @@ Conv (Timestamp_expected (term_of_app app))
+        (* TODO: check this *)
+        match opt_ts with
+          | Some ts -> ts
+          | None -> raise @@ Conv (Timestamp_expected t)
       in
       begin match sort with
         | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
@@ -680,7 +703,8 @@ and conv_app :
       check_name s (List.length is) ;
       begin match sort with
         | Sorts.Message ->
-            Term.Name (Symbols.Name.of_string s, List.map (conv_index subst) is)
+          Term.Name ( Symbols.Name.of_string s, 
+                      List.map (conv_index cntxt subst) is )
         | _ -> raise type_error
       end
 
@@ -688,9 +712,12 @@ and conv_app :
       check_action a (List.length is) ;
       begin match sort with
         | Sorts.Timestamp ->
-            Term.Action (Symbols.Action.of_string a, List.map (conv_index subst) is)
+          Term.Action ( Symbols.Action.of_string a, 
+                        List.map (conv_index cntxt subst) is )
         | _ -> raise type_error
       end
+
+let convert_index = conv_index InGoal
 
 (** Declaration functions *)
 
@@ -767,9 +794,10 @@ let empty = App ("empty", [])
   * TODO substitution does not avoid capture. *)
 let subst t s =
   let rec aux = function
-    | Var x ->
+    (* Variable *)
+    | App (x, []) as t ->
         begin try List.assoc x s with
-          | Not_found -> Var x
+          | Not_found -> t
         end
     | Tinit -> Tinit
     | Tpred t -> Tpred (aux t)
@@ -794,9 +822,9 @@ let check ?(local=false) (env:env) t (Sorts.ESort s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
   in
-  let at = if local then Some (dummy_var Sorts.Timestamp) else None in
+  let cntxt = if local then InProc (dummy_var Sorts.Timestamp) else InGoal in
   let subst = List.map (fun (v, Sorts.ESort s) -> ESubst (v, dummy_var s)) env in
-  ignore (convert ?at subst t s)
+  ignore (convert cntxt subst t s)
 
 let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =
@@ -813,7 +841,7 @@ let subst_of_env (env : Vars.env) =
 let parse_subst env (uvars : Vars.evar list) (ts : term list) : Term.subst =
   let u_subst = subst_of_env env in
   let f t (Vars.EVar u) =
-    Term.ESubst (Term.Var u, convert u_subst t (Vars.sort u))
+    Term.ESubst (Term.Var u, convert InGoal u_subst t (Vars.sort u))
   in
   List.map2 f ts uvars
 
@@ -836,7 +864,7 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
       typed_args
   in
   let _,ts_var = Vars.make_fresh env Sorts.Timestamp "ts" in
-  let t = convert ~at:(Term.Var ts_var) tsubst t Sorts.Message in
+  let t = convert (InProc (Term.Var ts_var)) tsubst t Sorts.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
   ignore
     (Symbols.Macro.declare_exact Symbols.dummy_table
@@ -894,20 +922,20 @@ let () =
     "Term building", `Quick,
     Symbols.run_restore @@ begin fun () ->
       declare_hash "h" ;
-      ignore (make_app "x" []) ;
+      ignore (make_app NoTS "x" []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
         (Conv (Arity_error ("h",1,2)))
         (fun () ->
-           ignore (make_app "h" [Var "x"])) ;
-      ignore (make_app "h" [Var "x"; Var "y"])
+           ignore (make_app NoTS "h" [App ("x",[])])) ;
+      ignore (make_app NoTS "h" [App ("x",[]); App ("y",[])])
     end ;
     "Type checking", `Quick,
     Symbols.run_restore @@ begin fun () ->
       declare_aenc "e" "dec" "pk" ;
       declare_hash "h" ;
       let x = App ("x", []) in
-      let y = Var "y" in
+      let y = App ("y", []) in
       let env = ["x",Sorts.emessage;"y",Sorts.emessage] in
       let t = App ("e", [App ("h", [x;y]);x;y]) in
       check env t Sorts.emessage ;
