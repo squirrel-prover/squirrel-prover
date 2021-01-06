@@ -58,7 +58,8 @@ let reset () =
     current_goal := None;
     subgoals := [];
     goals_proved := [];
-    option_defs := []
+    option_defs := [];
+    Config.reset_params ()
 
 let save_state mode =
   proof_states_history :=
@@ -75,6 +76,7 @@ let rec reset_state n =
   | [],_ -> GoalMode
   | p::q,0 ->
     proof_states_history := q;
+
     goals := p.goals;
     current_goal := p.current_goal;
     subgoals := p.subgoals;

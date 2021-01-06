@@ -16,6 +16,8 @@ type p_set_param = string * p_param_val
 
 type params
 
+val reset_params : unit -> unit 
+
 val get_params : unit -> params 
 
 val set_params : params -> unit

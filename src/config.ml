@@ -75,6 +75,8 @@ let default_params =
 (* reference to the current parameters *)
 let params = ref default_params
 
+let reset_params () = params := default_params
+
 let get_params () = !params
 
 let set_params p = params := p

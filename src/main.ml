@@ -157,7 +157,7 @@ let rec main_loop ~test ?(save=true) mode =
   | AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
   (* loop *)
-  | new_mode -> main_loop ~test new_mode
+  | new_mode -> (main_loop[@tailrec]) ~test new_mode
 
   (* exception handling *)
   | exception (Parserbuf.Error s) -> 
@@ -180,8 +180,9 @@ let rec main_loop ~test ?(save=true) mode =
 
 and error ~test mode e =
   Printer.prt `Error "%t" e;
-  if !interactive then main_loop ~test ~save:false mode else
-  if not test then exit 1
+  if !interactive 
+  then (main_loop[@tailrec]) ~test ~save:false mode 
+  else if not test then exit 1
 
 
 
