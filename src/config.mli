@@ -24,7 +24,7 @@ val set_params : params -> unit
 (* look-up functions *)
 
 (** timeout for the solver (completion.ml and constr.ml), in seconds. *)
-val solver_timeout      : unit -> int
+val solver_timeout : unit -> int
 
 (** Print equations of the TRS system. *)
 val print_trs_equations : unit -> bool
