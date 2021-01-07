@@ -9,9 +9,9 @@
   * to make sure that types make sense, and of the conversion to replace
   * strings by proper sorted variables.
   *
-  * Although function symbols are known when a term is parsed, we use
-  * here a very permissive [Fun] constructor which will be used to represent
-  * both function applications and macros. *)
+  * Symbols cannot be disambiguated at parsing time, hence we use very 
+  * permissives [App] and [AppAt] constructors which represents
+  * function applications, macros, variables, names etc. *)
 type kind = Sorts.esort
 
 
@@ -25,15 +25,15 @@ type term =
 
   | App of string * term list 
   (** An application of a symbol to some arguments which as not been
-      disambiguated yet (it can be a name, a function symbol
-      application, a variable, ...)
-      [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
+    * disambiguated yet (it can be a name, a function symbol
+    * application, a variable, ...)
+    * [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
 
   | AppAt of string * term list * term 
   (** An application of a symbol to some arguments, at a given
-      timestamp.  As for [App _], the head function symbol has not been
-      disambiguated yet.
-      [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
+    * timestamp.  As for [App _], the head function symbol has not been
+    * disambiguated yet.
+    * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
                  
   | Compare of Atom.ord*term*term
   | Happens of term
@@ -50,7 +50,7 @@ type formula = term
 
 val pp : Format.formatter -> term -> unit
 
-(** [var x] makes the variable [App (x,[])] *)
+(** [var x] makes the variable [App (x,\[\])] *)
 val var : string -> term
 
 (** {2 Declaration of new symbols} *)
@@ -93,7 +93,7 @@ val declare_abstract : string -> index_arity:int -> message_arity:int -> unit
 
 (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
   * of type [s1->...->sn->s]
-  * such that [s(t1,...,tn)] expands to [t[x1:=t1,...,xn:=tn]]. *)
+  * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_macro :
   string -> (string*Sorts.esort) list -> Sorts.esort -> term -> unit
 
