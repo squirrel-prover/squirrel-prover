@@ -244,6 +244,85 @@ Proof.
 admit. (* TODO probably very similar to lastUpdatePredT1 *)
 Qed.
 
+goal secretStateReader :
+forall (t:timestamp), forall (jj,ii:index),
+  t < R1(jj,ii) => input@t <> kR(ii)@pred(R1(jj,ii)).
+Proof.
+induction.
+apply lastUpdatePredR1 to jj,ii.
+case H0.
+(* init case *)
+apply stateReaderInit to ii.
+fresh M2.
+(* general case *)
+assert input@t = h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
+euf M2.
+(* case euf 1/3 - R1(jj1,ii) *)
+assert R1(jj',ii) < R1(jj,ii). admit. (* ok *)
+case H0.
+admit. (* ok *)
+admit. (* ok *)
+(* case euf 2/3 - T1(i,j) *)
+admit.
+(* case euf 3/3 - A2(kk) *)
+admit.
+Qed.
+
+goal secretStateTag :
+forall (t:timestamp), forall (i,j:index),
+  t < T1(i,j) => 
+    ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)>
+      && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> ).
+Proof.
+induction.
+split.
+
+(* case split 1/2 *)
+apply lastUpdatePredT1 to i,j.
+case H0.
+(* init case *)
+apply stateTagInit to i.
+assert idinit(i) = fst(kT(i)@init).
+fresh M3.
+(* general case *)
+assert fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+euf M2.
+(* case euf 1/3 - R1(jj,i)  *)
+admit. 
+(* case euf 2/3 - T1(i,j1) *)
+assert T1(i,j') < T1(i,j). admit. (* ok *)
+case H0.
+admit. (* ok *)
+admit. (* ok *)
+(* case euf 3/3 - A2(kk) *)
+apply IH0 to A2(kk).
+apply H1 to i,j'.
+admit.
+admit.
+admit.
+
+(* case split 2/2 *)
+apply lastUpdatePredT1 to i,j.
+case H0.
+(* init case *)
+apply stateTagInit to i.
+assert idinit(i) = fst(kT(i)@init).
+fresh M3.
+(* general case *)
+assert fst(fst(input@t)) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+euf M2.
+admit.
+admit.
+
+apply IH0 to A2(kk).
+apply H1 to i,j'.
+admit.
+admit.
+admit.
+Qed.
+
+
+
 goal auth_R1 :
 forall (jj,ii:index),
   cond@R1(jj,ii)
@@ -254,6 +333,8 @@ intros.
 expand cond@R1(jj,ii).
 
 euf M0.
+
+(* case euf 1/2 - T(i,j) *)
 assert (i=ii || i<>ii).
 case H0.
 (* case i=ii - honest case *)
@@ -278,34 +359,9 @@ assert
   h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
 collision.
 
-nosimpl(assert(forall (t:timestamp), forall (kk,ii,jj:index), 
-  (t = A(kk) && t < R1(jj,ii)) 
-  => 
-  (forall (t':timestamp), t'<=t => input@t' <> kR(ii)@pred(R1(jj,ii))))).
-induction.
-apply lastUpdatePredR1 to jj1,ii1.
-case H0.
-(* init case *)
-apply stateReaderInit to ii1.
-fresh M4.
-(* general case *)
-assert input@t' = h3(<<kR(ii1)@R1(jj',ii1),pin(ii1)>,TS@R1(jj',ii1)>,key3).
-euf M4.
-case H0.
-assert (R1(jj2,ii1) < R1(jj',ii1) || R1(jj2,ii1) = R1(jj',ii1)).
-case H0.
-admit. (* ok *)
-assert kR(ii1)@R1(jj',ii1) = kR(ii1)@pred(R1(jj',ii1)).
-admit. (* ok *)
-admit. (* ok *)
-
-admit. (* ??? *)
-
-admit. (* ??? *)
-
-apply H0 to A(kk).
-apply H1 to kk,ii,jj.
-apply H2 to A(kk).
+(* case euf 2/2 - A(kk) *)
+apply secretStateReader to A(kk).
+apply H0 to jj,ii.
 Qed.
 
 goal auth_T1 :
@@ -317,8 +373,9 @@ Proof.
 intros.
 expand cond@T1(i,j).
 euf M0.
-(* honest case *)
+(* case euf 1/2 - honest case R1(jj,i) *)
 exists jj.
-(* case coming from the process oracle *)
-admit.
+(* case euf 2/2 - A1(kk) coming from the process oracle *)
+apply secretStateTag to A1(kk).
+apply H0 to i,j.
 Qed.
