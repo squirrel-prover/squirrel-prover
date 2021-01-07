@@ -33,7 +33,7 @@ type term =
   (** An application of a symbol to some arguments, at a given
     * timestamp.  As for [App _], the head function symbol has not been
     * disambiguated yet.
-    * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
+    * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)\@tau] *)
                  
   | Compare of Atom.ord*term*term
   | Happens of term
