@@ -13,8 +13,8 @@ let declare_global table name ~inputs ~indices ~ts t =
 
 open Term
 
-let is_defined name a =
-  match Symbols.Macro.get_all name with
+let is_defined name a table =
+  match Symbols.Macro.get_all name table with
     | Symbols.Input, _ -> false
     | Symbols.(Output | Cond | State _), _ ->
         (* We can expand the definitions of output@A and state@A
@@ -46,13 +46,15 @@ let is_defined name a =
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  Action.system -> a Sorts.sort ->
-  Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> a Term.term =
-  fun system sort name args a ->
+  type a.  Action.system ->  Symbols.table -> 
+  a Sorts.sort -> Symbols.macro Symbols.t ->
+  Vars.index list -> Term.timestamp -> 
+  a Term.term =
+  fun system table sort name args a ->
   match sort with
   | Sorts.Message ->
     begin
-      match Symbols.Macro.get_all name with
+      match Symbols.Macro.get_all name table with
       | Symbols.Input, _ -> assert false
       | Symbols.Output, _ ->
         begin match a with
@@ -162,7 +164,7 @@ let get_definition :
     end
   | Sorts.Boolean ->
     begin
-      match Symbols.Macro.get_all name with
+      match Symbols.Macro.get_all name table with
       | Symbols.Cond, _ ->
         begin match a with
           | Action (symb,indices) ->
@@ -183,11 +185,13 @@ let get_definition :
   | _ -> assert false
 
 let get_dummy_definition :
-  type a. Action.system -> a Sorts.sort ->
-  Symbols.macro Symbols.t -> Vars.index list -> a Term.term =
-  fun system sort mn indices ->
-  match Symbols.Macro.get_all mn with
+  type a. Action.system -> Symbols.table -> 
+  a Sorts.sort -> Symbols.macro Symbols.t -> 
+  Vars.index list -> 
+  a Term.term =
+  fun system table sort mn indices ->
+  match Symbols.Macro.get_all mn table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
-        let dummy_action = Action.dummy_action (List.length inputs) in
-        get_definition system sort mn indices (Action.to_term dummy_action)
+      let dummy_action = Action.dummy_action (List.length inputs) in
+      get_definition system table sort mn indices (Action.to_term dummy_action)
     | _ -> assert false

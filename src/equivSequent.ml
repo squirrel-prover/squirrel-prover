@@ -43,14 +43,18 @@ List.map (function Formula f -> Formula (Term.subst subst f)
   * to two frames, interpreting macros wrt the left and right systems
   * respectively. *)
 type t = {
-  env : Vars.env;
+  env   : Vars.env;
+  table : Symbols.table;
   hypothesis_frame : elem list;
-  frame : elem list;
+  frame  : elem list;
   system : Action.system;
 }
 
-let init system env l = {
-  env = env ; frame = l ; hypothesis_frame = [];
+let init system table env l = {
+  env = env ; 
+  table = table ;
+  frame = l ; 
+  hypothesis_frame = [];
   system = system;
 }
 
@@ -75,6 +79,10 @@ let get_env j = j.env
 let set_env e j = {j with env = e}
 
 let get_system j = j.system
+
+let get_table j = j.table
+
+let set_table j table = { j with table = table }
 
 let get_biframe j = j.frame
 

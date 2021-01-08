@@ -60,10 +60,12 @@ module String = struct
     (String.sub s 0 (!l+1), !res)
 end
 
-module Imap = Map.Make (struct
-    type t = int
-    let compare = Stdlib.compare
-  end)
+(*------------------------------------------------------------------*)
+module Mi = Map.Make (Int)
+module Si = Set.Make (Int)
+
+module Ms = Map.Make (String)
+module Ss = Set.Make (String)
 
 (*------------------------------------------------------------------*)
 module type Ordered = sig
@@ -134,25 +136,25 @@ module Uf (Ord: Ordered) = struct
   (** [rmap] is the inverse of map.
       [cpt] counts the number of non-trivial unions *)
   type t = { map : int Vmap.t;
-             rmap : v Imap.t;
+             rmap : v Mi.t;
              puf : Vuf.t;
              cpt : int }
 
   let print ppf t =
-    let binds = Imap.bindings t.rmap
+    let binds = Mi.bindings t.rmap
                 |> List.sort (fun (i, _) (i', _) -> Stdlib.compare i i') in
     Fmt.pf ppf "@[<v 0>%a@]"
       (Fmt.list (fun ppf (i, u) ->
            let ri = Vuf.find t.puf i in
            Fmt.pf ppf "@[%d->%d : @,%a->%a@]"
-             i ri Ord.print u Ord.print (Imap.find ri t.rmap)
+             i ri Ord.print u Ord.print (Mi.find ri t.rmap)
          )) binds
 
   let create l =
     let _,m,rm =
       List.fold_left (fun ( i, m, rm ) a ->
-          ( i+1, Vmap.add a i m, Imap.add i a rm ))
-        ( 0, Vmap.empty, Imap.empty ) l
+          ( i+1, Vmap.add a i m, Mi.add i a rm ))
+        ( 0, Vmap.empty, Mi.empty ) l
     in
     { map = m;
       rmap = rm;
@@ -165,11 +167,11 @@ module Uf (Ord: Ordered) = struct
     else let i, uf = Vuf.extend t.puf in
       { t with puf = uf;
                map = Vmap.add v i t.map;
-               rmap = Imap.add i v t.rmap }
+               rmap = Mi.add i v t.rmap }
 
   let find t u =
     let ru_eqc = Vmap.find u t.map |> Vuf.find t.puf in
-    Imap.find ru_eqc t.rmap
+    Mi.find ru_eqc t.rmap
 
   let swap t u u' =
     let i = Vmap.find u t.map
@@ -177,8 +179,8 @@ module Uf (Ord: Ordered) = struct
 
     { t with map = Vmap.add u i' t.map
                    |> Vmap.add u' i;
-             rmap = Imap.add i u' t.rmap
-                    |> Imap.add i' u }
+             rmap = Mi.add i u' t.rmap
+                    |> Mi.add i' u }
 
   let union t u u' =
     let iu, iu' = Vmap.find u t.map, Vmap.find u' t.map in
@@ -194,7 +196,7 @@ module Uf (Ord: Ordered) = struct
     | l :: t -> (a :: l) :: t
 
   let classes t =
-    let l = List.init (Imap.cardinal t.rmap) (fun i -> (Vuf.find t.puf i, i))
+    let l = List.init (Mi.cardinal t.rmap) (fun i -> (Vuf.find t.puf i, i))
             |> List.sort (fun (a, _) (a', _) -> Stdlib.compare a a')
     in
     let l_eqc = match l with
@@ -206,7 +208,7 @@ module Uf (Ord: Ordered) = struct
           ) ([[]], x) l
         |> fst
     in
-    List.map (List.map (fun x -> Imap.find x t.rmap)) l_eqc
+    List.map (List.map (fun x -> Mi.find x t.rmap)) l_eqc
 
   (** [union_count t] is the number of non-trivial unions done building [t] *)
   let union_count t = t.cpt

@@ -56,29 +56,34 @@ let cmd_error e = raise (Cmd_error e)
 open Prover
 open Tactics
 
+(* State of the main loop.
+   TODO: include everything currently handled statefully in Prover.ml *)
+type loop_state = { mode : Prover.prover_mode;
+                    table : Symbols.table; }
+
 (** The main loop body. *)
-let main_loop_body ~test mode =
+let main_loop_body ~test state =
   match
     let parse_buf =
       Parserbuf.parse_from_buf
         ~test ~interactive:!interactive
         Parser.interactive
     in
-    mode, parse_next parse_buf
+    state.mode, parse_next parse_buf
   with
     | mode, ParsedUndo nb_undo ->
-      let new_mode = reset_state nb_undo in
+      let new_mode, new_table = reset_state nb_undo in
       let () = match new_mode with
         | ProofMode -> Printer.pr "%a" pp_goal ()
-        | GoalMode -> Printer.pr "%a" Action.pp_actions ()
+        | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
         | WaitQed -> ()
         | AllDone -> assert false in
-      new_mode
+      { mode = new_mode; table = new_table; }
 
     | GoalMode, ParsedInputDescr decls ->
-      Prover.declare_list decls;
-      Printer.pr "%a" Action.pp_actions ();
-      GoalMode 
+      let table = Prover.declare_list state.table decls in
+      Printer.pr "%a" Action.pp_actions table;
+      { mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
       if not !interactive then
@@ -90,19 +95,19 @@ let main_loop_body ~test mode =
                | Some (i, _) -> i
                | None -> assert false);
           complete_proof ();
-          WaitQed
+          { state with mode = WaitQed }
       | false ->
           Printer.pr "%a" pp_goal ();
-          ProofMode
+          { state with mode = ProofMode }
       end
 
     | WaitQed, ParsedQed ->
       Printer.prt `Result "Exiting proof mode.@.";
-      GoalMode
+      { state with mode = GoalMode }
 
     | GoalMode, ParsedSetOption sp ->
       Config.set_param sp;
-      GoalMode
+      { state with mode = GoalMode }
 
     | GoalMode, ParsedGoal goal ->
       begin
@@ -112,18 +117,18 @@ let main_loop_body ~test mode =
             match start_proof () with
             | None ->
               Printer.pr "%a" pp_goal ();
-              ProofMode
+              { state with mode = ProofMode }
             | Some es -> cmd_error (StartProofError es)
           end
         | Prover.Gm_goal (i,f) ->
-          add_new_goal (i,f);
+          let i,f = add_new_goal state.table (i,f) in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;
-          GoalMode
+          { state with mode = GoalMode; }
       end
 
-    | GoalMode, EOF -> AllDone 
+    | GoalMode, EOF -> { state with mode = AllDone; }
 
     | WaitQed, ParsedAbort ->
       if test then raise @@ Failure "Trying to abort a completed proof." else
@@ -132,7 +137,7 @@ let main_loop_body ~test mode =
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
       Prover.reset ();
-      GoalMode
+      { state with mode = GoalMode; }
 
     | _, ParsedQed ->
       if test then raise @@ Failure "unfinished" else 
@@ -146,42 +151,43 @@ let main_loop_body ~test mode =
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) mode =
+let rec main_loop ~test ?(save=true) state =
   if !interactive then Printer.prt `Prompt "";
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
-  if save then save_state mode ;
+  if save then save_state state.mode state.table ;
 
-  match main_loop_body ~test mode with
+  let new_state = main_loop_body ~test state in
+  match state.mode with
   (* exit prover *)
   | AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
   (* loop *)
-  | new_mode -> (main_loop[@tailrec]) ~test new_mode
+  | _ -> (main_loop[@tailrec]) ~test new_state
 
   (* exception handling *)
   | exception (Parserbuf.Error s) -> 
-    error ~test mode (fun fmt -> Fmt.string fmt s)
+    error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Prover.ParseError s) -> 
-    error ~test mode (fun fmt -> Fmt.string fmt s)
+    error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Decl_error e) ->
-    error ~test mode (fun fmt -> pp_decl_error fmt e)
+    error ~test state (fun fmt -> pp_decl_error fmt e)
   | exception (Cmd_error e) ->
-    error ~test mode (fun fmt -> pp_cmd_error fmt e)
+    error ~test state (fun fmt -> pp_cmd_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in
-    error ~test mode pp_e
+    error ~test state pp_e
   | exception (Tactic_hard_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic ill-formed or unapplicable: %a." 
         Tactics.pp_tac_error e in
-    error ~test mode pp_e
+    error ~test state pp_e
 
-and error ~test mode e =
+and error ~test state e =
   Printer.prt `Error "%t" e;
   if !interactive 
-  then (main_loop[@tailrec]) ~test ~save:false mode 
+  then (main_loop[@tailrec]) ~test ~save:false state
   else if not test then exit 1
 
 
@@ -193,8 +199,7 @@ let start_main_loop ?(test=false) () =
    * it should not matter if we do not undo the initial definitions *)
   Process.reset ();
   Prover.reset ();
-  Symbols.restore_builtin ();
-  main_loop ~test GoalMode
+  main_loop ~test { mode = GoalMode; table = Symbols.builtins_table; }
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
@@ -226,7 +231,7 @@ let main () =
 
 let () =
   let test = true in
-  Parserbuf.add_suite_restore "Tactics" [
+  Checks.add_suite "Tactics" [
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Undefined "a1"))
@@ -325,7 +330,7 @@ let () =
         (fun () -> run ~test "tests/alcotest/undo.sp")
     end ;
   ] ;
-  Parserbuf.add_suite_restore "Equivalence" [
+  Checks.add_suite "Equivalence" [
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")

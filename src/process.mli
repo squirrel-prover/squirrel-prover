@@ -65,10 +65,10 @@ type process =
 val pp_process : Format.formatter -> process -> unit
 
 (** Check that a process is well-typed in some environment. *)
-val check_proc : Theory.env -> process -> unit
+val check_proc : Symbols.table -> Theory.env -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
-val declare : id -> pkind -> process -> unit
+val declare : Symbols.table -> id -> pkind -> process -> unit
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation

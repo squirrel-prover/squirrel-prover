@@ -113,58 +113,64 @@ let is_out = function Out _ -> true | _ -> false
 let pdecls : (string,pkind*process) Hashtbl.t = Hashtbl.create 97
 
 (** Type checking for processes *)
-let rec check_proc env = function
-  | Null -> ()
-  | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
-  | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
-  | Out (_,m,p) 
-  | Alias (Out (_,m,p), _) as proc ->
-    (* raise an error if we are in strict alias mode *)
-    if is_out proc && (Config.strict_alias_mode ()) 
-    then raise Theory.(Conv StrictAliasError)
-    else
-      let () = Theory.check ~local:true env m Sorts.emessage in
-      check_proc env p
-  | Alias (p,_) -> check_proc env p
-  | Set (s, l, m, p) ->
-    let k = Theory.check_state s (List.length l) in
-    Theory.check ~local:true env m k ;
-    List.iter
-      (fun x ->
-         Theory.check ~local:true env (Theory.var x) Sorts.eindex) l ;
-    check_proc env p
-  | Parallel (p, q) -> check_proc env p ; check_proc env q
-  | Let (x, t, p) ->
-    Theory.check ~local:true env t Sorts.emessage ;
-    check_proc ((x, Sorts.emessage)::env) p
-  | Repl (x, p) -> check_proc ((x, Sorts.eindex)::env) p
-  | Exists (vars, test, p, q) ->
-    check_proc env q ;
-    let env =
-      List.rev_append
-        (List.map (fun x -> x, Sorts.eindex) vars)
-        env
-    in
-    Theory.check ~local:true env test Sorts.eboolean ;
-    check_proc env p
-  | Apply (id, ts) ->
-    begin
-      try
-        let kind,_ = Hashtbl.find pdecls id in
-        if List.length kind <> List.length ts then
-          raise @@
-          Theory.(Conv (Arity_error (id, List.length ts, List.length kind)));
-        List.iter2
-          (fun (_, k) t -> Theory.check ~local:true env t k)
-          kind ts
-      with
-      | Not_found -> raise @@ Theory.(Conv (Undefined id))
-    end
+let check_proc table env p = 
+  let rec check_p env = function
+    | Null -> ()
+    | New (x, p) -> check_p ((x, Sorts.emessage)::env) p
+    | In (_,x,p) -> check_p ((x, Sorts.emessage)::env) p
+    | Out (_,m,p) 
+    | Alias (Out (_,m,p), _) as proc ->
+      (* raise an error if we are in strict alias mode *)
+      if is_out proc && (Config.strict_alias_mode ()) 
+      then raise Theory.(Conv StrictAliasError)
+      else
+        let () = Theory.check table ~local:true env m Sorts.emessage in
+        check_p env p
+    | Alias (p,_) -> check_p env p
+    | Set (s, l, m, p) ->
+      let k = Theory.check_state table s (List.length l) in
+      Theory.check table ~local:true env m k ;
+      List.iter
+        (fun x ->
+           Theory.check table ~local:true env (Theory.var x) Sorts.eindex) l ;
+      check_p env p
+    | Parallel (p, q) -> check_p env p ; check_p env q
+    | Let (x, t, p) ->
+      Theory.check table ~local:true env t Sorts.emessage ;
+      check_p ((x, Sorts.emessage)::env) p
+    | Repl (x, p) -> check_p ((x, Sorts.eindex)::env) p
+    | Exists (vars, test, p, q) ->
+      check_p env q ;
+      let env =
+        List.rev_append
+          (List.map (fun x -> x, Sorts.eindex) vars)
+          env
+      in
+      Theory.check table ~local:true env test Sorts.eboolean ;
+      check_p env p
+    | Apply (id, ts) ->
+      begin
+        try
+          let kind,_ = Hashtbl.find pdecls id in
+          if List.length kind <> List.length ts then
+            raise @@
+            Theory.(Conv (Arity_error (id, List.length ts, List.length kind)));
+          List.iter2
+            (fun (_, k) t -> Theory.check table ~local:true env t k)
+            kind ts
+        with
+        | Not_found -> raise @@ Theory.(Conv (Undefined id))
+      end
+  
+  in
+  check_p env p
 
-let declare id args proc =
+let declare table id args proc =
   if Hashtbl.mem pdecls id then raise @@ Symbols.Multiple_declarations id;
-  check_proc args proc ;
-  Hashtbl.add pdecls id (args, proc)
+  check_proc table args proc ;
+  Hashtbl.add pdecls id (args, proc);
+  (* TODO: add processes in tables ? *)
+  ()
 
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
@@ -189,7 +195,6 @@ let print_msubst msubst =
 (* Type for data we store while parsing the process, needed to compute
  * the corresponding set of actions. *)
 type p_env = {
-
   (* RELATED TO THE CURRENT PROCESS
    * As the process is parsed, its bound variables are renamed into
    * unambiguous "refreshed" variables. For example, !_i !_i P(i)
@@ -238,7 +243,7 @@ let parse_channel c =
   try Channel.of_string c with
   | Not_found -> raise @@ Theory.Conv (Undefined c)
 
-let parse_proc system_name proc =
+let parse_proc system_name init_table proc =
 
   (* Initial env with special variables registered.
    * The special variables should never be visible to the user,
@@ -271,9 +276,9 @@ let parse_proc system_name proc =
       (fun (x,_,tm) -> Theory.ESubst (x,tm))
       msubst
   in
-  let conv_term env ts t sort =
+  let conv_term table env ts t sort =
     let subst = create_subst env.isubst env.msubst in
-    Theory.convert (InProc ts) subst t sort
+    Theory.convert { table = table; cntxt = InProc ts; } subst t sort
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in
@@ -289,8 +294,8 @@ let parse_proc system_name proc =
 
   (* Register an action, when we arrive at the end of a block
    * (input / condition / update / output). *)
-  let register_action a output env =
-    let _,a' = Action.fresh_symbol Symbols.dummy_table a in
+  let register_action a output table env =
+    let table,a' = Action.fresh_symbol table a in
     let action = List.rev env.action in
     let input = match env.inputs with
     | (c,v)::_ -> (c,Vars.name v)
@@ -342,7 +347,7 @@ let parse_proc system_name proc =
     let updates =
       List.map
         (fun (s,l,t) ->
-          (Symbols.Macro.of_string s, Sorts.Message, l),
+          (Symbols.Macro.of_string s table, Sorts.Message, l),
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
@@ -355,16 +360,16 @@ let parse_proc system_name proc =
       | Some (c,t) ->
           c,
           Term.subst (subst_ts @ subst_input)
-            (conv_term env action_term t Sorts.Message)
-      | None -> Channel.dummy, Term.empty
+            (conv_term table env action_term t Sorts.Message)
+      | None -> Symbols.dummy_channel, Term.empty
     in
     debug "output = %a,%a.@."
       Channel.pp_channel (fst output) Term.pp (snd output) ;
     let action_descr =
       Action.{ action; input; indices; condition; updates; output } in
-    let _,new_a =
+    let table,new_a =
       Action.register
-        Symbols.dummy_table
+        table
         system_name a' indices action action_descr
     in
     debug "descr = %a@." Action.pp_descr action_descr ;
@@ -376,11 +381,11 @@ let parse_proc system_name proc =
          * to use possibly new action *)
         msubst = (snd input, in_th, new_in_tm) :: env.msubst }
     in
-    (env, new_a)
+    (table, env, new_a)
   in
 
   (* common treatment of Apply, Alias and New constructs *)
-  let p_common ~env proc = match proc with
+  let p_common ~table ~env proc = match proc with
 
   | Apply (id,args) | Alias (Apply (id,args), _) ->
     (* Keep explicit alias if there is one,
@@ -396,7 +401,7 @@ let parse_proc system_name proc =
           match k,v with
           | Sorts.ESort Sorts.Message,_ ->
             let v'_th = Theory.subst v tsubst in
-            let v'_tm = conv_term env (Term.Var ts) v Sorts.Message in
+            let v'_tm = conv_term table env (Term.Var ts) v Sorts.Message in
             iacc, (x, v'_th, v'_tm)::macc
           | Sorts.ESort Sorts.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc i env.isubst in
@@ -411,14 +416,14 @@ let parse_proc system_name proc =
       isubst = isubst' ;
       msubst = msubst' }
     in
-    (env,p)
+    (table,env,p)
 
   | New (n,p) ->
     (* TODO getting a globally fresh symbol for the name
      * does not prevent conflicts with variables bound in
      * the process (in Repl, Let, In...) *)
-    let _,n' =
-      Symbols.Name.declare Symbols.dummy_table n (List.length env.indices) in
+    let table,n' =
+      Symbols.Name.declare table n (List.length env.indices) in
     let n'_th =
       Theory.App
         (Symbols.to_string n',
@@ -429,11 +434,11 @@ let parse_proc system_name proc =
     { env with
       msubst = (n,n'_th,n'_tm) :: env.msubst }
     in
-    (env,p)
+    (table,env,p)
 
   | Alias (p,a) ->
     let env = { env with alias = a } in
-    (env,p)
+    (table,env,p)
 
   | _ -> assert false
 
@@ -442,7 +447,7 @@ let parse_proc system_name proc =
   (* treatment of Let(x,t,p) constructs
    * the boolean [search_dep] indicates whether we have to search in [t] if
    * there are some get terms for state macros that have already been updated *)
-  let p_let ?(search_dep=false) ~env proc = match proc with
+  let p_let ?(search_dep=false) ~table ~env proc = match proc with
 
   | Let (x,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
@@ -452,12 +457,12 @@ let parse_proc system_name proc =
       else []
     in
     let body =
-      Term.subst_macros_ts updated_states (Term.Var ts)
-        (conv_term env (Term.Var ts) t Sorts.Message) 
+      Term.subst_macros_ts table updated_states (Term.Var ts)
+        (conv_term table env (Term.Var ts) t Sorts.Message) 
     in
     let invars = List.map snd env.inputs in
-    let _,x' =
-      Macros.declare_global Symbols.dummy_table x ~inputs:invars
+    let table,x' =
+      Macros.declare_global table x ~inputs:invars
         ~indices:(List.rev env.indices) ~ts body
     in
     let x'_th =
@@ -473,7 +478,7 @@ let parse_proc system_name proc =
       { env with
         msubst = (x,x'_th,x'_tm) :: env.msubst }
     in
-    (x',t',env,p)
+    (x',t',table,env,p)
 
   | _ -> assert false
 
@@ -484,13 +489,13 @@ let parse_proc system_name proc =
     * together with the indices [pos_indices] associated to replications:
     * these two components will form the [par_choice] part of an
     * [Action.item]. *)
-  let rec p_in ~env ~pos ~pos_indices proc = match proc with
-  | Null -> (Null,pos)
+  let rec p_in ~table ~env ~pos ~pos_indices proc = match proc with
+  | Null -> (Null,pos,table)
 
   | Parallel (p,q) ->
-    let p',pos_p = p_in ~env ~pos ~pos_indices p in
-    let q',pos_q = p_in ~env ~pos:pos_p ~pos_indices q in
-    (Parallel (p',q'), pos_q)
+    let p',pos_p,table = p_in ~table ~env ~pos ~pos_indices p in
+    let q',pos_q,table = p_in ~table ~env ~pos:pos_p ~pos_indices q in
+    (Parallel (p',q'), pos_q, table)
 
   | Repl (i,p) ->
     let env,i' = make_fresh env Sorts.Index i in
@@ -500,20 +505,20 @@ let parse_proc system_name proc =
         indices = i' :: env.indices }
     in
     let pos_indices = i'::pos_indices in
-    let p',pos' = p_in ~env ~pos ~pos_indices p in
-    (Repl (Vars.name i', p'),pos')
+    let p',pos',table = p_in ~table ~env ~pos ~pos_indices p in
+    (Repl (Vars.name i', p'),pos',table)
 
   | Apply _ | Alias _ | New _ ->
-    let env,p = p_common ~env proc in
-    p_in ~env ~pos ~pos_indices p
+    let table,env,p = p_common ~table ~env proc in
+    p_in ~table ~env ~pos ~pos_indices p
 
   | Let (x,t,p) ->
-    let x',t',env,p = p_let ~env proc in
-    let p',pos' = p_in ~env ~pos ~pos_indices p in
-    (Let (Symbols.to_string x', t', p'),pos')
+    let x',t',table,env,p = p_let ~table ~env proc in
+    let p',pos',table = p_in ~table ~env ~pos ~pos_indices p in
+    (Let (Symbols.to_string x', t', p'),pos',table)
 
   | In (c,x,p) ->
-    let ch = parse_channel c in
+    let ch = parse_channel c table in
     let env,x' = make_fresh env Sorts.Message x in
     let in_th =
       Theory.var (Vars.name x')
@@ -525,29 +530,29 @@ let parse_proc system_name proc =
         msubst = (x, in_th, in_tm) :: env.msubst }
     in
     let par_choice = pos, List.rev pos_indices in
-    let p',_ = p_cond ~env ~pos:0 ~par_choice p in
-    (In (c,Vars.name x',p'), pos+1)
+    let p',_ = p_cond ~table ~env ~pos:0 ~par_choice p in
+    (In (c,Vars.name x',p'), pos+1,table)
 
   | Exists _ | Set _ | Out _ ->
     let env =
       { env with
-        inputs = (Channel.dummy,dummy_in)::env.inputs } in
+        inputs = (Symbols.dummy_channel,dummy_in)::env.inputs } in
     let par_choice = pos, List.rev pos_indices in
-    let p',_ = p_cond ~env ~pos:0 ~par_choice proc in
-    (p', pos+1)
+    let p',_ = p_cond ~table ~env ~pos:0 ~par_choice proc in
+    (p', pos+1,table)
 
   (** Similar to [p_in].
     * The [par_choice] component of the action under construction
     * has been determined by [p_in].
     * The [pos] argument is the position in the tree of conditionals. *)
-  and p_cond ~env ~pos ~par_choice proc = match proc with
+  and p_cond ~table ~env ~pos ~par_choice proc = match proc with
   | Apply _ | Alias _ | New _ ->
-    let env,p = p_common ~env proc in
-    p_cond ~env ~pos ~par_choice p
+    let table,env,p = p_common ~table ~env proc in
+    p_cond ~table ~env ~pos ~par_choice p
 
   | Let (x,t,p) ->
-    let x',t',env,p = p_let ~env proc in
-    let p',pos' = p_cond ~env ~pos ~par_choice p in
+    let x',t',table,env,p = p_let ~table ~env proc in
+    let p',pos' = p_cond ~table ~env ~pos ~par_choice p in
     (Let (Symbols.to_string x', t', p'),pos')
 
   | Exists (evars, cond, p, q) ->
@@ -575,8 +580,8 @@ let parse_proc system_name proc =
      * macros appearing in [t]. This is why we call [Term.subst_macros_ts]
      * with the empty list. *)
     let fact =
-      Term.subst_macros_ts [] (Term.Var ts)
-        (conv_term env_p (Term.Var ts) cond Sorts.Boolean)
+      Term.subst_macros_ts table [] (Term.Var ts)
+        (conv_term table env_p (Term.Var ts) cond Sorts.Boolean)
     in
     let facts_p = fact::env.facts in
     let facts_q =
@@ -592,8 +597,8 @@ let parse_proc system_name proc =
         facts = facts_p }
     in
     let env_q = { env with facts = facts_q } in
-    let p',pos_p = p_cond ~env:env_p ~pos ~par_choice p in
-    let q',pos_q = p_cond ~env:env_q ~pos:pos_p ~par_choice q in
+    let p',pos_p = p_cond ~table ~env:env_p ~pos ~par_choice p in
+    let q',pos_q = p_cond ~table ~env:env_q ~pos:pos_p ~par_choice q in
 
     (Exists (List.map (fun (_,x) -> Vars.name x) s,cond',p',q'), pos_q)
 
@@ -608,18 +613,18 @@ let parse_proc system_name proc =
         action = Action.{ par_choice ;
                           sum_choice = pos, vars } :: env.action }
     in
-    let p',_ = p_update ~env p in
+    let p',_,table = p_update ~table ~env p in
     (p', pos + 1)
 
-  and p_update ~env proc = match proc with
+  and p_update ~table ~env proc = match proc with
   | Apply _ | Alias _ | New _ ->
-    let env,p = p_common ~env proc in
-    p_update ~env p
+    let table,env,p = p_common ~table ~env proc in
+    p_update ~table ~env p
 
   | Let (x,t,p) ->
-    let x',t',env,p = p_let ~search_dep:true ~env proc in
-    let p',pos' = p_update ~env p in
-    (Let (Symbols.to_string x', t', p'),pos')
+    let x',t',table,env,p = p_let ~search_dep:true ~table ~env proc in
+    let p',pos',table = p_update ~table ~env p in
+    (Let (Symbols.to_string x', t', p'),pos',table)
 
   | Set (s,l,t,p) ->
     if List.exists (fun (s',_,_) -> s=s') env.updates
@@ -641,44 +646,48 @@ let parse_proc system_name proc =
         Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       in
       let t'_tm =
-        Term.subst_macros_ts updated_states (Term.Var ts)
-          (conv_term env (Term.Var ts) t Sorts.Message)
+        Term.subst_macros_ts table updated_states (Term.Var ts)
+          (conv_term table env (Term.Var ts) t Sorts.Message)
       in
       let env =
         { env with
           updates = (s,l',t'_tm)::env.updates }
       in
-      let p',pos' = p_update ~env p in
-      (Set (s,List.map Vars.name l',t',p'),pos')
+      let p',pos',table = p_update ~table ~env p in
+      (Set (s,List.map Vars.name l',t',p'),pos',table)
 
   | Out (c,t,p) ->
-    let ch = parse_channel c in
+    let ch = parse_channel c table in
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
 
-    let env,a' = register_action env.alias (Some (ch,t)) env in
+    let table,env,a' = register_action env.alias (Some (ch,t)) table env in
     let env =
       { env with
         evars = [] ;
         facts = [] ;
         updates = [] }
     in
-    let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] p in
-    (Alias (Out (c,t',p'), Symbols.to_string a'), pos')
+    let p',pos',table = p_in ~table ~env ~pos:0 ~pos_indices:[] p in
+    (Alias (Out (c,t',p'), Symbols.to_string a'), pos',table)
 
   | Null ->
-    let env,a' = register_action env.alias None env in
-    (Alias (Null, Symbols.to_string a'), 0)
+    let table,env,a' = register_action env.alias None table env in
+    (Alias (Null, Symbols.to_string a'), 0,table)
 
   | In _ | Parallel _ | Repl _ | Exists _ ->
-    let env,a' = register_action env.alias None env in
+    let table,env,a' = register_action env.alias None table env in
     let env =
       { env with
         evars = [] ;
         facts = [] ;
         updates = [] }
     in
-    let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
-    (Alias (Out (Channel.dummy_string,Theory.empty,p'), Symbols.to_string a'), pos')
+    let p',pos',table = p_in ~table ~env ~pos:0 ~pos_indices:[] proc in
+    ( Alias (Out (Symbols.dummy_channel_string,
+                  Theory.empty,p'), 
+             Symbols.to_string a'), 
+      pos',
+      table )
 
   in
 
@@ -694,15 +703,15 @@ let parse_proc system_name proc =
       facts = [] ;
       updates = [] }
   in
-  let proc,_ = p_in ~env ~pos:0 ~pos_indices:[] proc in
-  (proc, Symbols.dummy_table)
+  let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
+  (proc, table)
 
 let declare_system table (system_name:Action.system_name) proc =
   if not(Action.is_fresh system_name) then
     failwith "System %s already defined";
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
-  check_proc [] proc ;
-  let proc,table = parse_proc system_name proc in
+  check_proc table [] proc ;
+  let proc,table = parse_proc system_name table proc in
   Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   table
 

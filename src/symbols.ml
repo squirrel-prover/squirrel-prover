@@ -1,9 +1,7 @@
+open Utils
+
 (** Type of symbols *)
 type 'a t = string
-
-type table = unit
-let dummy_table = ()
-let empty_table = ()
 
 type kind = Sorts.esort
 
@@ -47,30 +45,32 @@ type data += AssociatedFunctions of (fname t) list
 
 let to_string s = s
 
-let table : (string,edef*data) Hashtbl.t = Hashtbl.create 97
+type table = (edef * data) Ms.t
 
-let builtins_table : (string,edef*data) Hashtbl.t = Hashtbl.create 97
+let dummy_table = assert false
+
+let empty_table = Ms.empty
+
+(* TODO: remove the ref *)
+let builtins_table = ref empty_table
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
-let hashtbl_add ?(builtin=false) table name d =
-  if builtin then Hashtbl.add builtins_table name d;
-  Hashtbl.add table name d
+(* TODO: remove the builtin option *)
+let table_add ?(builtin=false) table name d =
+  if builtin then builtins_table := Ms.add name d !builtins_table;
+  Ms.add name d table
 
-let restore_builtin () =
-  Hashtbl.clear table ;
-  Hashtbl.iter
-    (fun k v -> Hashtbl.replace table k v)
-    builtins_table
+let restore_builtin () = !builtins_table
 
-let fresh prefix =
+let fresh prefix table =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
   let prefix = Pcre.get_substring substrings 1 in
   let i0 = Pcre.get_substring substrings 2 in
   let i0 = if i0 = "" then 0 else int_of_string i0 in
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
-    if Hashtbl.mem table s then find (i+1) else s
+    if Ms.mem s table then find (i+1) else s
   in
   find i0
 
@@ -78,26 +78,16 @@ exception Unbound_identifier of string
 exception Incorrect_namespace
 exception Multiple_declarations of string
 
-let def_of_string s =
-  try fst (Hashtbl.find table s) with Not_found -> raise @@ Unbound_identifier s
+let def_of_string s table =
+  try fst (Ms.find s table) with Not_found -> raise @@ Unbound_identifier s
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
-let of_string s =
-  try match Hashtbl.find table s with
+let of_string s table =
+  try match Ms.find s table with
     | Exists d, _ -> Wrapped (s,d)
     | Reserved, _ -> raise @@ Unbound_identifier s
   with Not_found -> raise @@ Unbound_identifier s
-
-let run_restore f () =
-  let copy = Hashtbl.copy table in
-  let restore () =
-    Hashtbl.clear table ;
-    Hashtbl.iter
-      (fun k v -> Hashtbl.replace table k v)
-      copy
-  in
-  try ignore (f ()) ; restore () with e -> restore () ; raise e
 
 module type Namespace = sig
   type ns
@@ -109,15 +99,17 @@ module type Namespace = sig
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
   val declare_exact :
     table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
-  val of_string : string -> ns t
+  val of_string : string -> table -> ns t
   val cast_of_string : string -> ns t
-  val get_def : ns t -> def
-  val def_of_string : string -> def
-  val get_data : ns t -> data
-  val data_of_string : string -> data
-  val get_all : ns t -> def * data
-  val iter : (ns t -> def -> data -> unit) -> unit
-  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
+
+  val get_all        : ns t   -> table -> def * data
+  val get_def        : ns t   -> table -> def
+  val def_of_string  : string -> table -> def
+  val get_data       : ns t   -> table -> data
+  val data_of_string : string -> table -> data
+
+  val iter : (ns t -> def -> data -> unit) -> table -> unit
+  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
 module type S = sig
@@ -127,77 +119,82 @@ module type S = sig
   val deconstruct : edef -> local_def
 end
 
-module Make (M:S) : Namespace with type ns = M.ns with type def = M.local_def = struct
+module Make (N:S) : Namespace 
+  with type ns = N.ns with type def = N.local_def = struct
 
-  type ns = M.ns
-  type def = M.local_def
+  type ns = N.ns
+  type def = N.local_def
 
-  let reserve () name =
-    let symb = fresh name in
-      Hashtbl.add table symb (Reserved,Empty) ;
-      (),symb
+  let reserve table name =
+    let symb = fresh name table in 
+    let table = Ms.add symb (Reserved,Empty) table in
+    table,symb
 
-  let define () symb ?(data=Empty) value =
-    assert (fst (Hashtbl.find table symb) = Reserved) ;
-    Hashtbl.replace table symb (Exists (M.construct value), data)
+  let define table symb ?(data=Empty) value =
+    assert (fst (Ms.find symb table) = Reserved) ;
+    Ms.add symb (Exists (N.construct value), data) table
 
-  let redefine () symb ?(data=Empty) value =
-    assert (Hashtbl.mem table symb) ;
-    Hashtbl.replace table symb (Exists (M.construct value), data)
+  let redefine table symb ?(data=Empty) value =
+    assert (Ms.mem symb table) ;
+    Ms.add symb (Exists (N.construct value), data) table
 
-  let declare () name ?(builtin=false) ?(data=Empty) value =
-    let symb = fresh name in
-      hashtbl_add ~builtin table symb (Exists (M.construct value), data) ;
-      (), symb
+  let declare table name ?(builtin=false) ?(data=Empty) value =
+    let symb = fresh name table in
+    let table = 
+      table_add ~builtin table symb (Exists (N.construct value), data) 
+    in
+    table, symb
 
-  let declare_exact () name ?(builtin=false) ?(data=Empty) value =
-    if Hashtbl.mem table name then raise @@ Multiple_declarations name;
-    hashtbl_add ~builtin table name (Exists (M.construct value), data) ;
-    (), name
+  let declare_exact table name ?(builtin=false) ?(data=Empty) value =
+    if Ms.mem name table then raise @@ Multiple_declarations name;
+    let table = 
+      table_add ~builtin table name (Exists (N.construct value), data) 
+    in
+    table, name
 
-  let get_all (name:ns t) =
+  let get_all (name:ns t) table =
     (* We know that [name] is bound in [table]. *)
-    let def,data = Hashtbl.find table name in
-      M.deconstruct def, data
+    let def,data = Ms.find name table in
+    N.deconstruct def, data
 
-  let get_def name = fst (get_all name)
-  let get_data name = snd (get_all name)
+  let get_def name table = fst (get_all name table)
+  let get_data name table = snd (get_all name table)
 
   let cast_of_string name =
     name
 
-  let of_string name =
+  let of_string name table =
     try
-      ignore (M.deconstruct (fst (Hashtbl.find table name))) ;
+      ignore (N.deconstruct (fst (Ms.find name table))) ;
       name
     with Not_found -> raise @@ Unbound_identifier name
 
-  let def_of_string s =
+  let def_of_string s table =
     try
-      M.deconstruct (fst (Hashtbl.find table s))
+      N.deconstruct (fst (Ms.find s table))
     with Not_found -> raise @@ Unbound_identifier s
 
-  let data_of_string s =
+  let data_of_string s table =
     try
-      let def,data = Hashtbl.find table s in
+      let def,data = Ms.find s table in
         (* Check that we are in the current namespace
          * before returning the associated data. *)
-        ignore (M.deconstruct def) ;
+        ignore (N.deconstruct def) ;
         data
     with Not_found -> raise @@ Unbound_identifier s
 
-  let iter f =
-    Hashtbl.iter
+  let iter f table =
+    Ms.iter
       (fun s (def,data) ->
-         try f s (M.deconstruct def) data with
+         try f s (N.deconstruct def) data with
            | Incorrect_namespace -> ())
       table
 
-  let fold f acc =
-    Hashtbl.fold
+  let fold f acc table =
+    Ms.fold
       (fun s (def,data) acc ->
          try
-           let def = M.deconstruct def in
+           let def = N.deconstruct def in
            f s def data acc
          with Incorrect_namespace -> acc)
       table acc
@@ -240,8 +237,8 @@ module Function = Make (struct
     | _ -> raise Incorrect_namespace
 end)
 
-let is_ftype s ftype =
-  match Function.get_def s with
+let is_ftype s ftype table =
+  match Function.get_def s table with
     | _,t when t = ftype -> true
     | _ -> false
     | exception Not_found -> raise @@ Unbound_identifier s
@@ -254,3 +251,89 @@ module Macro = Make (struct
     | Exists (Macro d) -> d
     | _ -> raise Incorrect_namespace
 end)
+
+(*------------------------------------------------------------------*)
+(** {2 Builtins} *)
+
+
+(* reference used to build the table. Must not be exported in the .mli *)
+let builtin_ref = ref empty_table
+
+(** {3 Macro builtins} *)
+
+let mk_macro m def =
+  let table, m = Macro.declare_exact !builtin_ref m def in
+  builtin_ref := table;
+  m
+
+let inp   = mk_macro "input"  Input
+let out   = mk_macro "output" Output
+let cond  = mk_macro "cond"   Cond
+let exec  = mk_macro "exec"   Exec
+let frame = mk_macro "frame"  Frame
+
+(** {3 Channel builtins} *)
+
+let dummy_channel_string = "ø" 
+let table,dummy_channel = 
+  Channel.declare_exact !builtin_ref dummy_channel_string ()
+let () = builtin_ref := table
+
+(** {3 Function symbols builtins} *)
+
+let mk_fsymb f arity =
+  let info = 0, Abstract arity in
+  let table, f = Function.declare_exact !builtin_ref f info in
+  builtin_ref := table;
+  f
+
+(** Diff *)
+
+let fs_diff  = mk_fsymb "diff" 2
+
+(** Boolean connectives *)
+
+let fs_false  = mk_fsymb "false" 0
+let fs_true   = mk_fsymb "true" 0
+let fs_and    = mk_fsymb "and" 2
+let fs_or     = mk_fsymb "or" 2
+let fs_not    = mk_fsymb "not" 1
+let fs_ite    = mk_fsymb "if" 3
+
+(** Fail *)
+
+let fs_fail   = mk_fsymb "fail" 0
+
+(** Xor and its unit *)
+
+let fs_xor    = mk_fsymb "xor" 2
+let fs_zero   = mk_fsymb "zero" 0
+
+(** Successor over natural numbers *)
+
+let fs_succ   = mk_fsymb "succ" 1
+
+(** Pairing *)
+
+let fs_pair   = mk_fsymb "pair" 2
+let fs_fst    = mk_fsymb "fst" 1
+let fs_snd    = mk_fsymb "snd" 1
+
+(** Exp **)
+
+let fs_exp    = mk_fsymb "exp" 2
+let fs_g      = mk_fsymb "g" 0
+
+(** Empty *)
+
+let fs_empty  = mk_fsymb "empty" 0
+
+(** Length *)
+
+let fs_len    = mk_fsymb "len" 1
+let fs_zeroes = mk_fsymb "zeroes" 1
+
+
+(** {3 Builtins table} *)
+
+let builtins_table = !builtin_ref

@@ -30,7 +30,12 @@ module String : sig
     val split_on_integer : string -> string * int option
   end
 
-module Imap : Map.S with type key = int
+(*------------------------------------------------------------------*)
+module Mi : Map.S with type key = int
+module Si : Set.S with type t = int
+
+module Ms : Map.S with type key = string
+module Ss : Set.S with type t = string
 
 (*------------------------------------------------------------------*)
 module type Ordered = sig

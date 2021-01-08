@@ -59,7 +59,7 @@ let make_new_from v =
 let is_new v =
   String.sub (name v) 0 1 = "_"
 
-module M = Map.Make(String)
+module M = Utils.Ms
 
 exception Undefined_Variable
 

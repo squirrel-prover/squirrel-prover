@@ -9,12 +9,6 @@ type 'a t
   * It is currently ineffective. *)
 type table
 
-(* Dummy table, for transition only. It will eventually disappear. *)
-val dummy_table : table
-
-(** Empty symbol table, for testing. *)
-val empty_table : table
-
 (** Each possible namespace is represented by an abstract datatype.
   * Their names are descriptive; [fname] is for function symbols. *)
 
@@ -42,7 +36,7 @@ type function_def =
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
-val is_ftype : fname t -> function_def -> bool
+val is_ftype : fname t -> function_def -> table -> bool
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
@@ -92,26 +86,20 @@ val to_string : 'a t -> string
 
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_string : string -> edef
+val def_of_string : string -> table -> edef
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 (** [of_string s] returns the symbol associated to [s]
   * together with its defining data.
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val of_string : string -> wrapped
+val of_string : string -> table -> wrapped
 
 (** {2 Testing utilities} *)
 
-(** Wrap a function into a new one which runs the previous one but
-  * restores the table of symbols to its initial state before
-  * terminating (either by returning a value or raising an exception).
-  * This is mainly for testing purposes. *)
-val run_restore : (unit -> unit) -> (unit -> unit)
-
 (** Clear the symbol table, and restore all symbols declared with the builtin
     flag. *)
-val restore_builtin : unit -> unit
+val restore_builtin : unit -> table
 
 (** {2 Namespaces} *)
 
@@ -137,40 +125,40 @@ module type Namespace = sig
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
   val declare :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
 
   (** Like declare, but use the exact string as symbol name.
     * @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
 
   (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
-  val of_string : string -> ns t
+  val of_string : string -> table -> ns t
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
 
   (** Get definition associated to some symbol. *)
-  val get_def : ns t -> def
+  val get_def : ns t -> table -> def
 
   (** [def_of_string s] is equivalent to [get_def (of_string s)]. *)
-  val def_of_string : string -> def
+  val def_of_string : string -> table -> def
 
   (** Get data associated to some symbol. *)
-  val get_data : ns t -> data
+  val get_data : ns t -> table -> data
 
   (** [data_of_string s] is equivalent to [get_data (of_string s)]. *)
-  val data_of_string : string -> data
+  val data_of_string : string -> table -> data
 
   (** Get definition and data at once. *)
-  val get_all : ns t -> def * data
+  val get_all : ns t -> table -> def * data
 
   (** Iterate on the defined symbols of this namespace. *)
-  val iter : (ns t -> def -> data -> unit) -> unit
+  val iter : (ns t -> def -> data -> unit) -> table -> unit
 
   (** Fold over the defined symbols of this namespace. *)
-  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
+  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
 module Channel : Namespace with type def = unit with type ns = channel
@@ -180,3 +168,68 @@ module Function : Namespace
   with type def = int * function_def with type ns = fname
 
 module Macro : Namespace with type def = macro_def with type ns = macro
+
+(*------------------------------------------------------------------*)
+(** {2 Builtins} *)
+
+val builtins_table : table
+
+
+(** {3 Macro builtins} *)
+
+val inp   : macro t
+val out   : macro t
+val cond  : macro t
+val exec  : macro t
+val frame : macro t
+
+(** {3 Channel builtins} *)
+
+val dummy_channel_string : string
+val dummy_channel : channel t
+
+(** {3 Function symbols builtins} *)
+
+val fs_diff   : fname t
+
+(** Boolean connectives *)
+
+val fs_true   : fname t
+val fs_false  : fname t
+val fs_and    : fname t
+val fs_or     : fname t
+val fs_not    : fname t
+val fs_ite    : fname t
+
+(** Successor over natural numbers *)
+
+val fs_succ   : fname t
+
+(** Fail *)
+
+val fs_fail   : fname t
+
+(** Xor and its unit *)
+
+val fs_xor    : fname t
+val fs_zero   : fname t
+
+(** Pairing *)
+
+val fs_pair   : fname t
+val fs_fst    : fname t
+val fs_snd    : fname t
+
+(** Exp **)
+
+val fs_exp    : fname t
+val fs_g      : fname t
+
+(** Empty *)
+
+val fs_empty  : fname t
+
+(** Length *)
+
+val fs_len    : fname t
+val fs_zeroes : fname t

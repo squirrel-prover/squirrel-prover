@@ -8,8 +8,10 @@ exception Bad_ssc
   * some macros to be undefined, though such instaces will not be
   * supported when collecting hashes; more importantly, it avoids
   * inspecting each of the multiple expansions of a same macro. *)
-class check_key ~allow_vars ~allow_functions ~system head_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system as super
+class check_key
+    ~allow_vars ~allow_functions
+    ~system table head_fn key_n = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~system table as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m
@@ -28,8 +30,8 @@ end
 (** Collect occurences of some function and key,
   * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
-class get_f_messages ~drop_head ~system head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~drop_head ~system head_fn key_n
+class get_f_messages ~drop_head ~system table head_fn key_n = object (self)
+  inherit Iter.get_f_messages ~drop_head ~system table head_fn key_n
   method visit_formula _ = ()
 end
 
@@ -39,8 +41,12 @@ exception Found
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [head_fn].
   * Return unit on success, raise [Bad_ssc] otherwise. *)
-let key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions ~system head_fn key_n =
-  let ssc = new check_key ~allow_vars ~allow_functions ~system head_fn key_n in
+let key_ssc
+    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
+    ~system ~table head_fn key_n =
+  let ssc = 
+    new check_key ~allow_vars ~allow_functions ~system table head_fn key_n 
+  in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
   Action.(iter_descrs system
@@ -52,16 +58,21 @@ let key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions ~sys
 (** Same as [hash_key_ssc] but returning a boolean.
   * This is used in the collision tactic, which looks for all h(_,k)
   * such that k satisfies the SSC. *)
-let check_key_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions ~system head_fn key_n =
+let check_key_ssc
+    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions 
+    ~system ~table head_fn key_n =
   try
-    key_ssc ~allow_vars ~messages ~elems ~allow_functions ~system head_fn key_n ;
+    key_ssc
+      ~allow_vars ~messages ~elems ~allow_functions
+      ~system ~table head_fn key_n ;
     true
   with Bad_ssc -> false
 (** [hashes_of_action_descr ~system action_descr head_fn key_n]
   * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
-let hashes_of_action_descr ?(drop_head=true) ~system action_descr head_fn key_n =
-  let iter = new get_f_messages ~drop_head ~system head_fn key_n in
+let hashes_of_action_descr
+    ?(drop_head=true) ~system table action_descr head_fn key_n =
+  let iter = new get_f_messages ~drop_head ~system table head_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
@@ -105,13 +116,14 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_direct) rule.cases_direct
 
 let mk_rule ?(elems=[]) ?(drop_head=true)
-  ~allow_functions ~system ~env ~mess ~sign ~head_fn ~key_n ~key_is =
+  ~allow_functions ~system table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
   { hash = head_fn;
     key = key_n;
     case_schemata =
       Utils.map_of_iter (Action.iter_descrs system)
         (fun action_descr ->
-          hashes_of_action_descr ~drop_head ~system action_descr head_fn key_n
+          hashes_of_action_descr
+            ~drop_head ~system table action_descr head_fn key_n
           |> List.map (fun (is,m) ->
             (* Indices [key_is] from [env] must correspond to [is],
              * which contains indices from [action_descr.indices]
@@ -196,7 +208,9 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
 
     cases_direct =
       let hashes =
-        let iter = new get_f_messages ~drop_head ~system head_fn key_n in
+        let iter = 
+          new get_f_messages ~drop_head ~system table head_fn key_n 
+        in
         iter#visit_message mess ;
         iter#visit_message sign ;
         List.iter iter#visit_term elems ;

@@ -177,9 +177,9 @@ let message_arity fdef = let open Symbols in match fdef with
 
 (** Get the kind of a function of macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
-let function_kind f : kind list * kind =
+let function_kind table f : kind list * kind =
   let open Symbols in
-  match def_of_string f with
+  match def_of_string f table with
   | Reserved -> assert false (* we should never encounter a situation where we
                                 try to type a reserved symbol. *)
   | Exists d ->
@@ -196,21 +196,21 @@ let function_kind f : kind list * kind =
     | Macro (Cond|Exec) -> [], Sorts.eboolean
     | _ -> raise @@ Conv (Untyped_symbol f)
 
-let check_state s n =
-  match Symbols.def_of_string s with
+let check_state table s n =
+  match Symbols.def_of_string s table with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
     | _ -> raise @@ Conv (Assign_no_state s)
 
-let check_name s n =
+let check_name table s n =
   try
-    let arity = Symbols.Name.def_of_string s in
+    let arity = Symbols.Name.def_of_string s table in
     if arity <> n then raise @@ Conv (Index_error (s,n,arity))
   with Symbols.Unbound_identifier _ -> assert false
 
-let check_action s n =
-  match Action.find_symbol s with
+let check_action table s n =
+  match Action.find_symbol s table with
   | (l, _) ->
     let arity = List.length l in
     if arity <> n then raise @@ Conv (Index_error (s,n,arity))
@@ -280,10 +280,10 @@ type app_cntxt =
 let is_at = function At _ -> true | _ -> false
 let get_ts = function At ts | MaybeAt ts -> Some ts | _ -> None
                        
-let make_app cntxt s l =
+let make_app table cntxt s l =
   let arity_error i = Conv (Arity_error (s, List.length l, i)) in
   let ts_unexpected = Conv (Timestamp_unexpected (App (s,l))) in
-  match Symbols.def_of_string s with
+  match Symbols.def_of_string s table with
   | Symbols.Reserved -> assert false
   | Symbols.Exists d ->
     begin match d with
@@ -391,13 +391,16 @@ type conv_cntxt =
   | InProc of Term.timestamp
   | InGoal
 
+type conv_env = { table : Symbols.table;
+                  cntxt : conv_cntxt; }
+
 let rec convert :
   type s.
-  conv_cntxt -> subst ->
+  conv_env -> subst ->
   term -> s Sorts.sort -> s Term.term
-= fun cntxt subst tm sort ->
+= fun env subst tm sort ->
 
-  let conv ?(subst=subst) s t = convert cntxt subst t s in
+  let conv ?(subst=subst) s t = convert env subst t s in
   let type_error = ty_error tm sort in
   
   match tm with 
@@ -407,14 +410,18 @@ let rec convert :
     then assoc subst f sort 
     (* otherwise build the application and convert it. *)        
     else
-      let app_cntxt = match cntxt with
+      let app_cntxt = match env.cntxt with
         | InGoal -> NoTS | 
           InProc ts -> MaybeAt ts in
-      conv_app cntxt app_cntxt subst (tm, make_app app_cntxt f terms) sort
+      conv_app env app_cntxt subst 
+        (tm, make_app env.table app_cntxt f terms) 
+        sort
 
   | AppAt (f,terms,ts) ->
     let app_cntxt = At (conv Sorts.Timestamp ts) in
-    conv_app cntxt app_cntxt subst (tm,make_app app_cntxt f terms) sort
+    conv_app env app_cntxt subst
+      (tm,make_app env.table app_cntxt f terms) 
+      sort
  
   | Tinit ->
       begin match sort with
@@ -475,8 +482,8 @@ let rec convert :
                 | #Atom.ord_eq as o ->
                     begin try
                         Term.Atom (`Index (o,
-                                           conv_index cntxt subst u, 
-                                           conv_index cntxt subst v))
+                                           conv_index env subst u, 
+                                           conv_index env subst v))
                     with Conv (Type_error _ ) ->
                       try
                         Term.Atom (`Message (o,
@@ -551,20 +558,20 @@ let rec convert :
         | _ -> raise type_error
       end
 
-and conv_index cntxt subst t =
-  match convert cntxt subst t Sorts.Index with
+and conv_index env subst t =
+  match convert env subst t Sorts.Index with
     | Term.Var x -> x
     | _ -> raise @@ Conv (Index_not_var t)
 
 and conv_app :
   type s.
-  conv_cntxt -> app_cntxt -> subst ->
+  conv_env -> app_cntxt -> subst ->
   (term * app) -> s Sorts.sort -> s Term.term
- = fun cntxt app_cntxt subst (t,app) sort ->
+ = fun env app_cntxt subst (t,app) sort ->
    (* We should have [make_app app = t].
       [t] is here to have meaningful exceptions. *)
 
-  let conv ?(subst=subst) s t = convert cntxt subst t s in
+  let conv ?(subst=subst) s t = convert env subst t s in
 
   let get_at () =
     match get_ts app_cntxt with
@@ -607,26 +614,26 @@ and conv_app :
 
   | Fun (f,l,None) ->
       let ts_expected = Conv (Timestamp_expected t) in
-      let ks, f_k = function_kind f in
+      let ks, f_k = function_kind env.table f in
       assert (f_k = Sorts.emessage) ;
       check_arity f (List.length l) (List.length ks) ;
       begin match sort with
         | Sorts.Message ->
             let open Symbols in
-            begin match of_string f with
+            begin match of_string f env.table with
               | Wrapped (symb, Function (i,_)) ->
                 let indices,messages =
-                  List.init i (fun k -> conv_index cntxt subst (List.nth l k)),
+                  List.init i (fun k -> conv_index env subst (List.nth l k)),
                   List.init (List.length l - i)
                     (fun k -> conv Sorts.Message (List.nth l (k+i)))
                 in
                 Term.Fun ((symb,indices),messages)
               | Wrapped (s, Macro (Global _)) ->
-                let indices = List.map (conv_index cntxt subst) l in
+                let indices = List.map (conv_index env subst) l in
                 Term.Macro ((s,sort,indices),[],get_at ())
               | Wrapped (s, Macro (Local (targs,_))) ->
                   if List.for_all (fun s -> s = Sorts.eindex) ks then
-                    let indices = List.map (conv_index cntxt subst) l in
+                    let indices = List.map (conv_index env subst) l in
                     Term.Macro ((s,sort,indices),[],get_at ())
                   else begin
                     assert (List.for_all (fun s -> s = Sorts.emessage) ks) ;
@@ -647,13 +654,13 @@ and conv_app :
       let open Symbols in
       begin match sort with
         | Sorts.Message ->
-            begin match of_string f with
+            begin match of_string f env.table with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                   check_arity "input" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],ts)
               | Wrapped (s, Macro (Global arity)) ->
                   check_arity f (List.length l) arity ;
-                  let l = List.map (conv_index cntxt subst) l in
+                  let l = List.map (conv_index env subst) l in
                   Term.Macro ((s,sort, l),[],ts)
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
@@ -667,7 +674,7 @@ and conv_app :
               | Wrapped (_, Function _)           -> raise ts_unexpected
             end
         | Sorts.Boolean ->
-            begin match of_string f with
+            begin match of_string f env.table with
               | Wrapped (s, Macro (Cond|Exec)) ->
                   check_arity "cond" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],ts)
@@ -684,10 +691,10 @@ and conv_app :
       end
 
   | Get (s,opt_ts,is) ->
-      let k = check_state s (List.length is) in
+      let k = check_state env.table s (List.length is) in
       assert (k = Sorts.emessage) ;
-      let is = List.map (conv_index cntxt subst) is in
-      let s = Symbols.Macro.of_string s in
+      let is = List.map (conv_index env subst) is in
+      let s = Symbols.Macro.of_string s env.table in
       let ts =
         (* TODO: check this *)
         match opt_ts with
@@ -700,66 +707,65 @@ and conv_app :
       end
 
   | Name (s, is) ->
-      check_name s (List.length is) ;
+      check_name env.table  s (List.length is) ;
       begin match sort with
         | Sorts.Message ->
-          Term.Name ( Symbols.Name.of_string s, 
-                      List.map (conv_index cntxt subst) is )
+          Term.Name ( Symbols.Name.of_string s env.table , 
+                      List.map (conv_index env subst) is )
         | _ -> raise type_error
       end
 
   | Taction (a,is) ->
-      check_action a (List.length is) ;
+      check_action env.table a (List.length is) ;
       begin match sort with
         | Sorts.Timestamp ->
-          Term.Action ( Symbols.Action.of_string a, 
-                        List.map (conv_index cntxt subst) is )
+          Term.Action ( Symbols.Action.of_string a env.table, 
+                        List.map (conv_index env subst) is )
         | _ -> raise type_error
       end
 
-let convert_index = conv_index InGoal
+let convert_index table = conv_index { table = table; cntxt = InGoal; }
 
 (** Declaration functions *)
 
-let declare_symbol ?(index_arity=0) name info =
+let declare_symbol table ?(index_arity=0) name info =
   let def = index_arity,info in
-  ignore (Symbols.Function.declare_exact Symbols.dummy_table name def)
+  fst (Symbols.Function.declare_exact table name def)
 
-let declare_hash ?index_arity s = declare_symbol ?index_arity s Symbols.Hash
+let declare_hash table ?index_arity s = 
+  declare_symbol table ?index_arity s Symbols.Hash
 
-let declare_aenc enc dec pk =
-  let t = Symbols.dummy_table in
-  let _, dec = Symbols.Function.declare_exact t dec (0,Symbols.ADec) in
-  let _, pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
-  let data = Symbols.AssociatedFunctions [dec; pk] in
-  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.AEnc))
+let declare_aenc table enc dec pk =
+  let open Symbols in
+  let table, dec = Function.declare_exact table dec (0,ADec) in
+  let table, pk = Function.declare_exact table pk (0,PublicKey) in
+  let data = AssociatedFunctions [dec; pk] in
+  fst (Function.declare_exact table enc ~data (0,AEnc))
 
-let declare_senc enc dec =
-  let t = Symbols.dummy_table in
-  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc] in
-  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
-  let data = Symbols.AssociatedFunctions [dec] in
-  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+let declare_senc table enc dec =
+  let open Symbols in
+  let data = AssociatedFunctions [Function.cast_of_string enc] in
+  let table, dec = Function.declare_exact table dec ~data (0,SDec) in
+  let data = AssociatedFunctions [dec] in
+  fst (Function.declare_exact table enc ~data (0,SEnc))
 
-let declare_senc_joint_with_hash enc dec h =
-  let t = Symbols.dummy_table in
-  let data = Symbols.AssociatedFunctions [Symbols.Function.cast_of_string enc;
-                                          Symbols.Function.of_string h] in
-  let _, dec = Symbols.Function.declare_exact t dec ~data (0,Symbols.SDec) in
-  let data = Symbols.AssociatedFunctions [dec] in
-  ignore (Symbols.Function.declare_exact t enc ~data (0,Symbols.SEnc))
+let declare_senc_joint_with_hash table enc dec h =
+  let open Symbols in
+  let data = AssociatedFunctions [Function.cast_of_string enc;
+                                  Function.of_string h table] in
+  let table, dec = Function.declare_exact table dec ~data (0,SDec) in
+  let data = AssociatedFunctions [dec] in
+  fst (Function.declare_exact table enc ~data (0,SEnc))
 
+let declare_signature table sign checksign pk =
+  let open Symbols in
+  let table,sign = Function.declare_exact table sign (0,Sign) in
+  let table,pk = Function.declare_exact table pk (0,PublicKey) in
+  let data = AssociatedFunctions [sign; pk] in
+  fst (Function.declare_exact table checksign ~data (0,CheckSign))
 
-let declare_signature sign checksign pk =
-  let t = Symbols.dummy_table in
-  let _,sign = Symbols.Function.declare_exact t sign (0,Symbols.Sign) in
-  let _,pk = Symbols.Function.declare_exact t pk (0,Symbols.PublicKey) in
-  let data = Symbols.AssociatedFunctions [sign; pk] in
-  ignore
-    (Symbols.Function.declare_exact t checksign ~data (0,Symbols.CheckSign))
-
-let check_signature checksign pk =
-  let def = Symbols.Function.get_def in
+let check_signature table checksign pk =
+  let def x = Symbols.Function.get_def x table in
   let to_string = Symbols.to_string in
   let correct_type = match def checksign, def pk  with
     | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
@@ -768,21 +774,21 @@ let check_signature checksign pk =
                                                        " or " ^ to_string pk))
   in
   if correct_type then
-    match Symbols.Function.get_data checksign with
+    match Symbols.Function.get_data checksign table with
       | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk -> Some sign
       | _ -> None
   else None
 
-let declare_state s arity kind =
+let declare_state table s arity kind =
   let info = Symbols.State (arity,kind) in
-  ignore (Symbols.Macro.declare_exact Symbols.dummy_table s info)
+  fst (Symbols.Macro.declare_exact table s info)
 
-let declare_name s arity =
-  ignore (Symbols.Name.declare_exact Symbols.dummy_table s arity)
+let declare_name table s arity =
+  fst (Symbols.Name.declare_exact table s arity)
 
-let declare_abstract s ~index_arity ~message_arity =
+let declare_abstract table s ~index_arity ~message_arity =
   let def = index_arity, Symbols.Abstract message_arity in
-  ignore (Symbols.Function.declare_exact Symbols.dummy_table s def)
+  fst (Symbols.Function.declare_exact table s def)
 
 (** Empty *)
 
@@ -818,13 +824,14 @@ let subst t s =
     | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
   in aux t
 
-let check ?(local=false) (env:env) t (Sorts.ESort s) : unit =
+let check table ?(local=false) (env:env) t (Sorts.ESort s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
   in
   let cntxt = if local then InProc (dummy_var Sorts.Timestamp) else InGoal in
+  let conv_env = { table = table; cntxt = cntxt; } in
   let subst = List.map (fun (v, Sorts.ESort s) -> ESubst (v, dummy_var s)) env in
-  ignore (convert cntxt subst t s)
+  ignore (convert conv_env subst t s)
 
 let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =
@@ -838,16 +845,17 @@ let subst_of_env (env : Vars.env) =
     in
   List.map to_subst (Vars.to_list env)
 
-let parse_subst env (uvars : Vars.evar list) (ts : term list) : Term.subst =
+let parse_subst table env (uvars : Vars.evar list) (ts : term list) : Term.subst =
   let u_subst = subst_of_env env in
+  let conv_env = { table = table; cntxt = InGoal; } in
   let f t (Vars.EVar u) =
-    Term.ESubst (Term.Var u, convert InGoal u_subst t (Vars.sort u))
+    Term.ESubst (Term.Var u, convert conv_env u_subst t (Vars.sort u))
   in
   List.map2 f ts uvars
 
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 
-let declare_macro s (typed_args : (string * Sorts.esort) list)
+let declare_macro table s (typed_args : (string * Sorts.esort) list)
     (k : Sorts.esort) t =
   let env,typed_args,tsubst =
     List.fold_left
@@ -864,7 +872,8 @@ let declare_macro s (typed_args : (string * Sorts.esort) list)
       typed_args
   in
   let _,ts_var = Vars.make_fresh env Sorts.Timestamp "ts" in
-  let t = convert (InProc (Term.Var ts_var)) tsubst t Sorts.Message in
+  let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
+  let t = convert conv_env tsubst t Sorts.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
   ignore
     (Symbols.Macro.declare_exact Symbols.dummy_table
@@ -904,44 +913,44 @@ let find_app_terms t names =
 let () =
   Checks.add_suite "Theory" [
     "Declarations", `Quick,
-    begin let f =
-    Symbols.run_restore @@ begin fun () ->
-      declare_hash "h" ;
+    begin fun () ->
+      ignore (declare_hash Symbols.builtins_table "h" : Symbols.table);
+      let table = declare_hash Symbols.builtins_table "h" in
       Alcotest.check_raises
         "h cannot be defined twice"
         (Symbols.Multiple_declarations "h")
-        (fun () -> declare_hash "h") ;
+        (fun () -> ignore (declare_hash table "h" : Symbols.table)) ;
+      let table = declare_hash Symbols.builtins_table "h" in
       Alcotest.check_raises
         "h cannot be defined twice"
         (Symbols.Multiple_declarations "h")
-        (fun () -> declare_aenc "h" "dec" "pk")
-    end in
-    let g = Symbols.run_restore @@ fun () -> declare_hash "h" in
-    fun () -> f () ; g ()
-    end ;
+        (fun () -> ignore (declare_aenc table "h" "dec" "pk" : Symbols.table) )
+    end;
+
     "Term building", `Quick,
-    Symbols.run_restore @@ begin fun () ->
-      declare_hash "h" ;
-      ignore (make_app NoTS "x" []) ;
+    begin fun () ->
+      let table = declare_hash Symbols.builtins_table "h" in
+      ignore (make_app table NoTS "x" []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
         (Conv (Arity_error ("h",1,2)))
         (fun () ->
-           ignore (make_app NoTS "h" [App ("x",[])])) ;
-      ignore (make_app NoTS "h" [App ("x",[]); App ("y",[])])
+           ignore (make_app table NoTS "h" [App ("x",[])])) ;
+      ignore (make_app table NoTS "h" [App ("x",[]); App ("y",[])])
     end ;
+
     "Type checking", `Quick,
-    Symbols.run_restore @@ begin fun () ->
-      declare_aenc "e" "dec" "pk" ;
-      declare_hash "h" ;
+    begin fun () ->
+      let table = declare_aenc Symbols.builtins_table "e" "dec" "pk" in
+      let table = declare_hash table "h" in
       let x = App ("x", []) in
       let y = App ("y", []) in
       let env = ["x",Sorts.emessage;"y",Sorts.emessage] in
       let t = App ("e", [App ("h", [x;y]);x;y]) in
-      check env t Sorts.emessage ;
+      check table env t Sorts.emessage ;
       Alcotest.check_raises
         "message is not a boolean"
         (Conv (Type_error (t, Sorts.eboolean)))
-        (fun () -> check env t Sorts.eboolean)
+        (fun () -> check table env t Sorts.eboolean)
     end
   ]

@@ -227,10 +227,11 @@ let message_case (TacticsArgs.Message m) s =
              | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
              | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
              | Term.Macro ((m,Sorts.Message,is),[],ts) as o
-               when Macros.is_defined m ts ->
+               when Macros.is_defined m ts (TraceSequent.table s) ->
                  begin match
                    Macros.get_definition
                      (TraceSequent.system s)
+                     (TraceSequent.table s)
                      Sorts.Message
                      m is ts
                  with
@@ -261,7 +262,8 @@ let () =
 let depends TacticsArgs.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
   | Term.Action( n1, is1), Term.Action (n2, is2) ->
-    if Action.(depends (of_term n1 is1) (of_term n2 is2)) then
+    let table = TraceSequent.table s in
+    if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
       let atom = (Atom (`Timestamp (`Lt,a1,a2))) in
       [TraceSequent.add_formula atom s]
     else
@@ -346,7 +348,8 @@ let goal_exists_intro  ths (s : TraceSequent.t) =
   match TraceSequent.get_conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
     begin try
-      let nu = Theory.parse_subst (TraceSequent.get_env s) vs ths in
+      let table = TraceSequent.table s in
+      let nu = Theory.parse_subst table (TraceSequent.get_env s) vs ths in
       let new_formula = Term.subst nu f in
       [TraceSequent.set_conclusion new_formula s]
     with Theory.(Conv (Undefined x)) ->
@@ -516,24 +519,26 @@ let constraints (s : TraceSequent.t) =
 
 let expand_bool (TacticsArgs.Boolean t) s =
   let system = TraceSequent.system s in
+  let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
   match t with
     | Macro ((mn, sort, is),l,a) ->
-      if Macros.is_defined mn a then
+      if Macros.is_defined mn a table then
         succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                           Macros.get_definition system sort mn is a)]
+                           Macros.get_definition system table sort mn is a)]
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
 let expand_mess (TacticsArgs.Message t) s =
   let system = TraceSequent.system s in
+  let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
   match t with
   | Macro ((mn, sort, is),l,a) ->
-    if Macros.is_defined mn a then
+    if Macros.is_defined mn a table then
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition system sort mn is a)]
+                         Macros.get_definition system table sort mn is a)]
     else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
   | exception Theory.(Conv e) ->
     Tactics.soft_failure (Tactics.Cannot_convert e)
@@ -705,10 +710,10 @@ let fresh_param m1 m2 = match m1,m2 with
           (Tactics.Failure "can only be applied on hypothesis of the form t=n or n=t")
 
 (* Direct cases - names appearing in the term [t] *)
-let mk_fresh_direct system env n is t =
+let mk_fresh_direct system table env n is t =
   (* iterate over [t] to search subterms of [t] equal to a name *)
   let list_of_indices =
-    let iter = new EquivTactics.get_name_indices ~system false n in
+    let iter = new EquivTactics.get_name_indices ~system table false n in
     iter#visit_message t ;
     iter#get_indices
   in
@@ -740,15 +745,15 @@ let mk_fresh_direct system env n is t =
        list_of_indices))
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect system env n is t =
+let mk_fresh_indirect system table env n is t =
   let list_of_actions_from_term =
-    let iter = new EquivTactics.get_actions ~system false in
+    let iter = new EquivTactics.get_actions ~system table false in
     iter#visit_message t ;
     iter#get_actions
   and tbl_of_action_indices = Hashtbl.create 10 in
   Action.(iter_descrs system
     (fun action_descr ->
-      let iter = new EquivTactics.get_name_indices ~system true n in
+      let iter = new EquivTactics.get_name_indices ~system table true n in
       iter#visit_formula (snd action_descr.condition) ;
       iter#visit_message (snd action_descr.output) ;
       List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
@@ -808,8 +813,9 @@ let fresh (TacticsArgs.String m) s =
         let (n,is,t) = fresh_param m1 m2 in
         let env = TraceSequent.get_env s in
         let system = TraceSequent.system s in
-        let phi_direct = mk_fresh_direct system env n is t in
-        let phi_indirect = mk_fresh_indirect system env n is t in
+        let table  = TraceSequent.table s in
+        let phi_direct = mk_fresh_direct system table env n is t in
+        let phi_indirect = mk_fresh_indirect system table env n is t in
         let new_hyp = Term.mk_or phi_direct phi_indirect in
         all_left_introductions s [new_hyp,""]
       | _ -> Tactics.soft_failure
@@ -924,50 +930,57 @@ let autosubst s =
 (** Expects a list of theory elements of the form cond@T :: formula :: l and
      output@T :: message :: l, and produces from it the corresponding
      substitution over Action.descrs. *)
-let rec parse_substd tsubst s =
-  match s with
-  | [] -> []
-  | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-  | (TacticsArgs.Theory mterm)::(TacticsArgs.Theory b)::q ->
-    begin
-      match Theory.convert InGoal tsubst mterm Sorts.Boolean,
-            Theory.convert InGoal tsubst b Sorts.Boolean with
-      | Term.Macro ((mn, sort, is),l,a), ncond ->
-        begin
-          match a with
-          | Action (symb,indices) ->
-            begin
-              let action = Action.of_term symb indices in
-              match Symbols.Macro.get_def mn with
-              | Symbols.Cond -> Action.Condition (ncond, action)
-                                   :: parse_substd tsubst q
-              | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-            end
-          | _ -> assert false
-        end
-      | exception _ ->
-        begin
-          match Theory.convert InGoal tsubst mterm Sorts.Message,
-                Theory.convert InGoal tsubst b Sorts.Message with
-          |Term.Macro ((mn, sort, is),l,a), nout ->
-            begin
-              match a with
-              | Action (symb,indices) ->
-                begin
-                  let action = Action.of_term symb indices in
-                  match Symbols.Macro.get_def mn with
-                  | Symbols.Output -> Action.Output (nout, action)
-                                         :: parse_substd tsubst q
-                  | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-                end
-              | _ -> assert false
-              | exception Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
-            end
-          | _ -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-        end
-      | _ ->  Tactics.(soft_failure (Failure "ill-typed substitution"))
-    end
-  | _ ->  Tactics.(soft_failure (Failure "ill-typed substitution"))
+let parse_substd table tsubst s =
+  let failure () = Tactics.(soft_failure (Failure "ill-typed substitution")) in
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+
+  let rec parse_substd0 s =
+    match s with
+    | [] -> []
+    | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
+    | (TacticsArgs.Theory mterm)::(TacticsArgs.Theory b)::q ->
+      begin
+        match Theory.convert conv_env tsubst mterm Sorts.Boolean,
+              Theory.convert conv_env tsubst b Sorts.Boolean with
+        | Term.Macro ((mn, sort, is),l,a), ncond ->
+          begin
+            match a with
+            | Action (symb,indices) ->
+              begin
+                let action = Action.of_term symb indices table in
+                match Symbols.Macro.get_def mn table with
+                | Symbols.Cond -> Action.Condition (ncond, action)
+                                  :: parse_substd0 q
+                | _ -> failure ()
+              end
+            | _ -> assert false
+          end
+        | exception _ ->
+          begin
+            match Theory.convert conv_env tsubst mterm Sorts.Message,
+                  Theory.convert conv_env tsubst b Sorts.Message with
+            |Term.Macro ((mn, sort, is),l,a), nout ->
+              begin
+                match a with
+                | Action (symb,indices) ->
+                  begin
+                    let action = Action.of_term symb indices table in
+                    match Symbols.Macro.get_def mn table with
+                    | Symbols.Output -> Action.Output (nout, action)
+                                        :: parse_substd0 q
+                    | _ -> failure ()
+                  end
+                | _ -> assert false
+                | exception Theory.Conv e -> 
+                  Tactics.(soft_failure (Cannot_convert e))
+              end
+            | _ -> failure ()
+          end
+        | _ ->  failure ()
+      end
+    | _ ->  failure ()
+  in
+  parse_substd0 s
 
 (* Given a list of index names, and some remainder, instantiates the variables
    and produce the substitution. *)
@@ -1011,9 +1024,11 @@ let equiv_goal_from_subst vs substd =
   Term.ForAll (vs, conj_equiv substd)
 
 let system_subst new_system isubst vs subst s =
-  let substdescr = parse_substd isubst subst in
+  let substdescr = parse_substd (TraceSequent.table s) isubst subst in
   try
-    Action.clone_system_subst (TraceSequent.system s) new_system substdescr;
+    Action.clone_system_subst
+      (TraceSequent.system s)
+      new_system substdescr;
     let new_goal =
       match TraceSequent.system s with
       | Pair _ | SimplePair _ ->
@@ -1023,9 +1038,11 @@ let system_subst new_system isubst vs subst s =
       | Single (Right _) ->
         TraceSequent.set_system (Action.Single (Right new_system)) s
     in
-    TraceSequent.set_conclusion (equiv_goal_from_subst vs substdescr) s :: [new_goal]
+    TraceSequent.set_conclusion
+      (equiv_goal_from_subst vs substdescr) s :: [new_goal]
   with Action.SystemNotFresh ->
-    Tactics.hard_failure (Tactics.Failure "System name already defined for another system.")
+    Tactics.hard_failure 
+      (Tactics.Failure "System name already defined for another system.")
 
 let () =
   T.register_general "systemsubstitute"
@@ -1074,11 +1091,11 @@ type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
                            * (Symbols.fname Symbols.t -> bool)
                            * Sorts.boolean Term.term  list * bool
 
-let euf_param (`Message at : message_atom) : unforgeabiliy_param =
+let euf_param table (`Message at : message_atom) : unforgeabiliy_param =
   match at with
   | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
   | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
-      begin match Theory.check_signature checksign pk with
+      begin match Theory.check_signature table checksign pk with
       | None ->
           Tactics.(soft_failure @@
                    Failure "the message does not correspond \
@@ -1086,10 +1103,10 @@ let euf_param (`Message at : message_atom) : unforgeabiliy_param =
       | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
       end
   | (`Eq, Fun ((hash, _), [m; Name key]), s)
-    when Symbols.is_ftype hash Symbols.Hash ->
+    when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true)
   | (`Eq, s, Fun ((hash, _), [m; Name key]))
-    when Symbols.is_ftype hash Symbols.Hash ->
+    when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true)
   | _ -> Tactics.soft_failure
            (Tactics.Failure
@@ -1098,9 +1115,9 @@ let euf_param (`Message at : message_atom) : unforgeabiliy_param =
                for some hash or signature or decryption functions")
 
 
-let intctxt_param (`Message at : message_atom) : unforgeabiliy_param =
+let intctxt_param table (`Message at : message_atom) : unforgeabiliy_param =
   let param_dec sdec key m s =
-      match Symbols.Function.get_data sdec with
+      match Symbols.Function.get_data sdec table with
         | Symbols.AssociatedFunctions [senc] ->
           (senc, key, m, s,  (fun x -> x = sdec),
            [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false )
@@ -1112,17 +1129,17 @@ let intctxt_param (`Message at : message_atom) : unforgeabiliy_param =
   in
   match at with
   | (`Eq, Fun ((sdec, _), [m; Name key]), s)
-    when Symbols.is_ftype sdec Symbols.SDec ->
+    when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
   | (`Eq, s, Fun ((sdec, is), [m; Name key]))
-    when Symbols.is_ftype sdec Symbols.SDec ->
+    when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
 
   | (`Neq, (Fun ((sdec, _), [m; Name key]) as s), Fun (fail, _))
-    when Symbols.is_ftype sdec Symbols.SDec && fail = Term.f_fail->
+    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
     param_dec sdec key m s
   | (`Neq, Fun (fail, _), (Fun ((sdec, is), [m; Name key]) as s))
-    when Symbols.is_ftype sdec Symbols.SDec  && fail = Term.f_fail ->
+    when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
     param_dec sdec key m s
 
   | _ -> Tactics.soft_failure
@@ -1214,8 +1231,12 @@ let euf_apply_facts drop_head s
     ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
   let env = TraceSequent.get_env s in
   let system = TraceSequent.system s in
-  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~system head_fn key_n;
-  let rule = Euf.mk_rule ~elems:[] ~drop_head ~allow_functions ~system ~env ~mess ~sign
+  let table  = TraceSequent.table s in
+  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~system ~table head_fn key_n;
+  let rule = 
+    Euf.mk_rule
+      ~elems:[] ~drop_head ~allow_functions
+      ~system ~table ~env ~mess ~sign
       ~head_fn ~key_n ~key_is
   in
   let schemata_premises =
@@ -1223,14 +1244,20 @@ let euf_apply_facts drop_head s
   and direct_premises =
     List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
-  if Symbols.is_ftype head_fn Symbols.SEnc then
-    EquivTactics.check_encryption_randomness system rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
+  if Symbols.is_ftype head_fn Symbols.SEnc table then
+    EquivTactics.check_encryption_randomness
+      system table 
+      rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
   schemata_premises @ direct_premises
 
 let set_euf _ = { TraceSequent.t_euf = true }
 
 (** Tag EUFCMA - for composition results *)
-let euf_apply (get_params : Term.message_atom -> unforgeabiliy_param) (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
+let euf_apply
+    (get_params : Symbols.table -> Term.message_atom -> unforgeabiliy_param) 
+    (TacticsArgs.String hypothesis_name) 
+    (s : TraceSequent.t) =
+  let table = TraceSequent.table s in
   let s, at =
     try
       TraceSequent.select_message_hypothesis hypothesis_name s ~update:set_euf
@@ -1238,7 +1265,7 @@ let euf_apply (get_params : Term.message_atom -> unforgeabiliy_param) (TacticsAr
       Tactics.hard_failure
         (Tactics.Failure "no hypothesis with the given name")
   in
-  let (h,key,m,_,_,extra_goals,drop_head) as p = get_params at in
+  let (h,key,m,_,_,extra_goals,drop_head) as p = get_params table at in
   let extra_goals = List.map (fun x -> TraceSequent.add_formula x s) extra_goals in
   let tag_s =
     let f =
@@ -1310,7 +1337,8 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) =
   if List.length uvars <> List.length ths then
     Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
   let subst =
-    try Theory.parse_subst (TraceSequent.get_env s) uvars ths with
+    let table = TraceSequent.table s in
+    try Theory.parse_subst table (TraceSequent.get_env s) uvars ths with
       | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
   in
   (* Formula with universal quantifications introduced. *)
@@ -1482,8 +1510,11 @@ let collision_resistance (s : TraceSequent.t) =
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
            let system = TraceSequent.system s in
-            Symbols.is_ftype hash Symbols.Hash
-            && Euf.check_key_ssc ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false) ~system hash key
+           let table  = TraceSequent.table s in
+            Symbols.is_ftype hash Symbols.Hash table
+            && Euf.check_key_ssc
+              ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false) 
+              ~system ~table hash key
          | _ -> false)
       (TraceSequent.get_all_terms s)
   in
@@ -1630,9 +1661,10 @@ let () =
 
 let apply_yes_no_if b s =
   let system = TraceSequent.system s in
+  let table  = TraceSequent.table s in
   let conclusion = TraceSequent.get_conclusion s in
   (* search for the first occurrence of an if-then-else in [elem] *)
-  let iter = new EquivTactics.get_ite_term ~system in
+  let iter = new EquivTactics.get_ite_term ~system table in
   List.iter iter#visit_formula [conclusion];
   match iter#get_ite with
   | None ->

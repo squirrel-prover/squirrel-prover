@@ -542,17 +542,17 @@ end
 
 (* Simple unification implementation *)
 module Unify = struct
-  type subst = cterm Imap.t
+  type subst = cterm Mi.t
 
   type unif_res = Mgu of subst | No_mgu
 
-  let empty_subst = Imap.empty
+  let empty_subst = Mi.empty
 
   let pp_subst fmt s =
     (Fmt.list ~sep:Fmt.comma
       (fun fmt (i,c) ->
         Fmt.pf fmt "%d -> %a" i pp_cterm c))
-      fmt (Imap.bindings s)
+      fmt (Mi.bindings s)
 
   exception Unify_cycle
 
@@ -564,8 +564,8 @@ module Unify = struct
       | Ccst _ -> t
       | Cvar v ->
         if List.mem v occurs then raise Unify_cycle
-        else if Imap.mem v sigma then
-          aux sigma (v :: occurs) (Imap.find v sigma)
+        else if Mi.mem v sigma then
+          aux sigma (v :: occurs) (Mi.find v sigma)
         else cvar v in
 
     try aux sigma [] t with Unify_cycle -> assert false
@@ -583,8 +583,8 @@ module Unify = struct
       | Ccst a, Ccst b -> if a = b then unify_aux eqs' sigma else No_mgu
 
       | (Cvar x as tx), t | t, (Cvar x as tx) ->
-        assert (not (Imap.mem x sigma));
-        let sigma = if t = tx then sigma else Imap.add x t sigma in
+        assert (not (Mi.mem x sigma));
+        let sigma = if t = tx then sigma else Mi.add x t sigma in
         unify_aux eqs' sigma
 
       | _ ->  No_mgu

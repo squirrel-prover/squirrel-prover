@@ -26,13 +26,26 @@ val current_goal : unit -> named_goal option
 *)
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
+
+(*------------------------------------------------------------------*)
+(** {2 Type of parsed new goal } *)
+
+type p_goal_name = P_unknown | P_named of string
+type p_goal = 
+  | P_trace_goal of Action.system * Theory.formula
+  | P_equiv_goal of 
+      Theory.env * 
+      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+  | P_equiv_goal_process of Action.single_system * Action.single_system
+
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
-    - [Gm_proof] : start a proof. *)
-type gm_input = Gm_goal of string * Goal.t | Gm_proof
+    - [Gm_proof]  : start a proof. *)
+type gm_input = Gm_goal of p_goal_name * p_goal | Gm_proof
 
 
-(** History management. *)
+(*------------------------------------------------------------------*)
+(** {2 History management.} *)
 
 type proof_state
 
@@ -41,11 +54,11 @@ val reset : unit -> unit
 
 (** Save the current prover state. The prover mode is the only external
     information required. *)
-val save_state : prover_mode -> unit
+val save_state : prover_mode -> Symbols.table -> unit
 
 (** Restore the n-th previous prover state and return the
   * corresponding prover mode. *)
-val reset_state : int -> prover_mode
+val reset_state : int -> prover_mode * Symbols.table
 
 (** Option management **)
 type option_name =
@@ -88,7 +101,8 @@ module type Tactics_sig = sig
    give a function over judgments, expecting some arguments of the given
    sort. *)
   val register : string -> ?help:string ->  (judgment -> judgment list) -> unit
-  val register_typed : string -> ?help:string ->
+  val register_typed :     
+    string -> ?help:string ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
@@ -121,16 +135,19 @@ val get_goal_formula : string -> formula * Action.system
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)
-val make_trace_goal : system:Action.system -> Theory.formula -> Goal.t
+val make_trace_goal : 
+  system:Action.system -> table:Symbols.table -> 
+  Theory.formula -> Goal.t
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
-  Theory.env ->
+  table:Symbols.table -> Theory.env ->
   [ `Message of Theory.term | `Formula of Theory.formula ] list ->
   Goal.t
 
 (* Produces an equivalence goal based on the process and the two system ids. *)
-val make_equiv_goal_process : Action.single_system -> Action.single_system -> Goal.t
+val make_equiv_goal_process : 
+  table:Symbols.table -> Action.single_system -> Action.single_system -> Goal.t
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -142,8 +159,8 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-(** Add a new goal to the current goals *)
-val add_new_goal : named_goal -> unit
+(** Add a new goal to the current goals, and returns it *)
+val add_new_goal : Symbols.table -> p_goal_name * p_goal -> named_goal
 
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
@@ -151,9 +168,6 @@ val add_proved_goal : named_goal -> unit
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
 val get_oracle_tag_formula : string -> Term.formula
-
-(** Produce a fresh name for a unamed goal *)
-val unnamed_goal : unit -> string
 
 val pp_goal : Format.formatter -> unit -> unit
 
@@ -180,8 +194,8 @@ val pp_decl_error : Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)
 (** Process a declaration. *)
-val declare      : Decl.declaration  -> unit
+val declare      : Symbols.table -> Decl.declaration  -> Symbols.table
 
 (** Process a list of declaration. *)
-val declare_list : Decl.declarations -> unit
+val declare_list : Symbols.table -> Decl.declarations -> Symbols.table
 

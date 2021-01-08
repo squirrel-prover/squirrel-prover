@@ -67,19 +67,20 @@ let define_symbol table symb args action =
   Hashtbl.add shape_to_symb (get_shape action) symb ;
   let data = Data (args,action) in
   Symbols.Action.define table symb ~data (List.length args)
-let find_symbol s =
-  match Symbols.Action.data_of_string s with
+let find_symbol s table =
+  match Symbols.Action.data_of_string s table with
     | Data (x,y) -> x,y
     | _ -> assert false
-let of_symbol s =
-  match Symbols.Action.get_data s with
+let of_symbol s table =
+  match Symbols.Action.get_data s table with
     | Data (x,y) -> x,y
     | _ -> assert false
-let iter f =
+let iter f table =
   Symbols.Action.iter
     (fun s _ -> function
        | Data (args,action) -> f s args action
        | _ -> assert false)
+    table
 
 (** Pretty-printing *)
 
@@ -139,8 +140,8 @@ let to_term a =
   let indices = indices a in
   Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
 
-let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action =
-  let l',a = of_symbol s in
+let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
+  let l',a = of_symbol s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
   subst_action subst a
@@ -155,7 +156,9 @@ let rec dummy_action k =
   if not (Hashtbl.mem shape_to_symb s) then
     Hashtbl.add shape_to_symb s
       (snd
-         (Symbols.Action.declare Symbols.dummy_table "_Dummy" ~data 0)) ;
+         (Symbols.Action.declare 
+            (assert false) (* TODO: used to be Symbols.dummy_table *)
+            "_Dummy" ~data 0)) ;
   a
 
 let pp_action ppf a = Term.pp ppf (to_term a)
@@ -450,7 +453,7 @@ let clone_system_subst original_system new_system substd =
 
 let debug = false
 
-let pp_actions ppf () =
+let pp_actions ppf table =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
   iter
@@ -465,7 +468,8 @@ let pp_actions ppf () =
        else
          Fmt.pf ppf "%s%a"
            (Symbols.to_string symbol)
-           pp_indices indices) ;
+           pp_indices indices) 
+    table;
   Fmt.pf ppf "@]@]@."
 
 let pp_descrs ppf system =

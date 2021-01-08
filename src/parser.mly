@@ -380,20 +380,19 @@ single_system:
 
 goal:
 | GOAL s=system i=ID COLON f=formula DOT
-                 { Prover.Gm_goal (i, Prover.make_trace_goal s f) }
+                 { Prover.Gm_goal (P_named i, P_trace_goal (s, f)) }
 | GOAL s=system f=formula DOT
-                 { Prover.Gm_goal (Prover.unnamed_goal (),
-                                   Prover.make_trace_goal s f) }
+                 { Prover.Gm_goal (P_unknown, P_trace_goal (s, f)) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
-                 { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+                 { Prover.Gm_goal (P_named n, P_equiv_goal (env, l)) }
 | EQUIV n=ID DOT
                  { Prover.Gm_goal
-                     (n, Prover.make_equiv_goal_process
-                           Action.(Left default_system_name)
-			                     Action.(Right default_system_name)) }
+                     (P_named n, P_equiv_goal_process
+                                   (Action.(Left default_system_name),
+			                              Action.(Right default_system_name))) }
 | EQUIV b1=single_system b2=single_system n=ID DOT
                  { Prover.Gm_goal
-                     (n, Prover.make_equiv_goal_process b1 b2)}
+                     (P_named n, Prover.P_equiv_goal_process (b1, b2))}
 
 | PROOF          { Prover.Gm_proof }
 

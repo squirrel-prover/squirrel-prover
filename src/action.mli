@@ -73,7 +73,10 @@ val same_shape : action -> action -> Term.subst option
 val to_term : action -> Term.timestamp
 
 (** Convert [Action] parameters to an action. *)
-val of_term : Symbols.action Symbols.t -> Vars.index list -> action
+val of_term : 
+  Symbols.action Symbols.t -> Vars.index list -> 
+  Symbols.table -> 
+  action
 
 (** Get dummy action of some length. Guarantees that a symbol exists for it. *)
 val dummy_action : int -> action
@@ -89,9 +92,11 @@ val dummy_action : int -> action
 val fresh_symbol :
   Symbols.table -> string -> Symbols.table * Symbols.action Symbols.t
 
-val find_symbol : string -> Vars.index list * action
+val find_symbol : string -> Symbols.table -> Vars.index list * action
 
-val of_symbol : Symbols.action Symbols.t -> Vars.index list * action
+val of_symbol : 
+  Symbols.action Symbols.t -> Symbols.table -> 
+  Vars.index list * action
 
 (** {2 Systems} *)
 
@@ -217,7 +222,7 @@ val pp_shape : Format.formatter -> shape -> unit
 val pp_parsed_action : Format.formatter -> (string list) item list -> unit
 
 (** Pretty-print all actions. *)
-val pp_actions : Format.formatter -> unit -> unit
+val pp_actions : Format.formatter -> Symbols.table -> unit
 
 (** Pretty-print all action descriptions. *)
 val pp_descrs : Format.formatter -> system -> unit
