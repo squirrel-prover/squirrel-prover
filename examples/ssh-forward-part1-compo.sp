@@ -199,7 +199,7 @@ goal [none, auth] P_charac :
   cond@Pok => (cond@Pfail => False) .
 Proof.
   simpl.
-  expand cond@Pok;expand cond@Pfail; expand pkS@Pok.
+  expand cond@Pok;expand cond@Pfail; expand pkS1@Pok.
   substitute fst(input@Pok), pk(kS).
   euf M0.
   expand sidP@Pok.

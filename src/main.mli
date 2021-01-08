@@ -5,12 +5,8 @@
     mode, depending on what is the type of the next expected input. *)
 val parse_next : (Lexing.lexbuf -> string -> 'a) -> 'a
 
-(** The main loop of the prover. The mode defines in what state the prover is,
-    e.g is it waiting for a proof script, or a systemn description, etc.
-    [save] allows to specify is the current state must be saved, so that
-    one can backtrack.
-*)
-val main_loop : ?test:bool -> ?save:bool -> Prover.prover_mode -> unit
+(** The main loop of the prover. *)
+val start_main_loop : ?test:bool -> unit -> unit
 
 (** Launches the interactive_prover mode. *)
 val interactive_prover : unit -> unit

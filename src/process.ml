@@ -1,5 +1,9 @@
 type pkind = (string * Sorts.esort) list
 
+let pp_pkind = 
+  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Sorts.pp_e e in
+  (Fmt.list pp_el) 
+
 type id = string
 
 type term = Theory.term
@@ -9,8 +13,8 @@ type formula = Theory.formula
 type process =
   | Null
   | New of string * process
-  | In of Channel.t * string * process
-  | Out of Channel.t * term * process
+  | In of string * string * process
+  | Out of string * term * process
   | Set of string * string list * term * process
   | Parallel of process * process
   | Let of string * term * process
@@ -54,16 +58,16 @@ let rec pp_process ppf process =
       pp_process p
 
   | In (c, s, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
       (kw `Bold) "in"
-      Channel.pp_channel c
+      c
       (styled `Magenta (styled `Bold ident)) s
       pp_process p
 
   | Out (c, t, p) ->
-    pf ppf "@[<hov>%a(%a,@,%a);@ %a@]"
+    pf ppf "@[<hov>%a(%s,@,%a);@ %a@]"
       (kw `Bold) "out"
-      Channel.pp_channel c
+      c
       Theory.pp t
       pp_process p
 
@@ -102,6 +106,7 @@ let rec pp_process ppf process =
     else
       pf ppf "@]"
 
+let is_out = function Out _ -> true | _ -> false
 
 (** Table of declared (bi)processes with their types.
   * TODO use Symbols ? *)
@@ -112,15 +117,21 @@ let rec check_proc env = function
   | Null -> ()
   | New (x, p) -> check_proc ((x, Sorts.emessage)::env) p
   | In (_,x,p) -> check_proc ((x, Sorts.emessage)::env) p
-  | Out (_,m,p) ->
-    Theory.check ~local:true env m Sorts.emessage ;
-    check_proc env p
+  | Out (_,m,p) 
+  | Alias (Out (_,m,p), _) as proc ->
+    (* raise an error if we are in strict alias mode *)
+    if is_out proc && (Config.strict_alias_mode ()) 
+    then raise Theory.(Conv StrictAliasError)
+    else
+      let () = Theory.check ~local:true env m Sorts.emessage in
+      check_proc env p
+  | Alias (p,_) -> check_proc env p
   | Set (s, l, m, p) ->
     let k = Theory.check_state s (List.length l) in
     Theory.check ~local:true env m k ;
     List.iter
       (fun x ->
-         Theory.check ~local:true env (Theory.Var x) Sorts.eindex) l ;
+         Theory.check ~local:true env (Theory.var x) Sorts.eindex) l ;
     check_proc env p
   | Parallel (p, q) -> check_proc env p ; check_proc env q
   | Let (x, t, p) ->
@@ -149,7 +160,6 @@ let rec check_proc env = function
       with
       | Not_found -> raise @@ Theory.(Conv (Undefined id))
     end
-  | Alias (p,_) -> check_proc env p
 
 let declare id args proc =
   if Hashtbl.mem pdecls id then raise @@ Symbols.Multiple_declarations id;
@@ -224,6 +234,10 @@ type p_env = {
 
 }
 
+let parse_channel c =
+  try Channel.of_string c with
+  | Not_found -> raise @@ Theory.Conv (Undefined c)
+
 let parse_proc system_name proc =
 
   (* Initial env with special variables registered.
@@ -259,7 +273,7 @@ let parse_proc system_name proc =
   in
   let conv_term env ts t sort =
     let subst = create_subst env.isubst env.msubst in
-    Theory.convert ~at:ts subst t sort
+    Theory.convert (InProc ts) subst t sort
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in
@@ -284,7 +298,7 @@ let parse_proc system_name proc =
     in
     let indices = List.rev env.indices in
     let action_term = Term.Action (a', indices) in
-    let in_th = Theory.Var (snd input) in
+    let in_th = Theory.var (snd input) in
     let in_tm = Term.Macro (Term.in_macro, [], action_term) in
     (* substitute the special timestamp variable [ts], since at this point
      * we know the action *)
@@ -298,7 +312,7 @@ let parse_proc system_name proc =
     let msubst' =
       try
         begin match
-          ( List.find (fun (_,x_th,_) -> x_th = Theory.Var (snd input))
+          ( List.find (fun (_,x_th,_) -> x_th = Theory.var (snd input))
               env.msubst )
         with
         | (x,_,_) -> (x,in_th,in_tm) :: env.msubst
@@ -384,7 +398,7 @@ let parse_proc system_name proc =
             let v'_th = Theory.subst v tsubst in
             let v'_tm = conv_term env (Term.Var ts) v Sorts.Message in
             iacc, (x, v'_th, v'_tm)::macc
-          | Sorts.ESort Sorts.Index, Theory.Var i ->
+          | Sorts.ESort Sorts.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc i env.isubst in
             let i'_th = Theory.subst v tsubst in
             (x, i'_th, i'_tm)::iacc, macc
@@ -406,9 +420,9 @@ let parse_proc system_name proc =
     let _,n' =
       Symbols.Name.declare Symbols.dummy_table n (List.length env.indices) in
     let n'_th =
-      Theory.Name
+      Theory.App
         (Symbols.to_string n',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices)
+         List.rev_map (fun i -> Theory.var (Vars.name i)) env.indices)
     in
     let n'_tm = Term.Name (n',List.rev env.indices) in
     let env =
@@ -434,12 +448,12 @@ let parse_proc system_name proc =
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
       if search_dep
-      then Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+      then Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       else []
     in
     let body =
       Term.subst_macros_ts updated_states (Term.Var ts)
-        (conv_term env (Term.Var ts) t Sorts.Message)
+        (conv_term env (Term.Var ts) t Sorts.Message) 
     in
     let invars = List.map snd env.inputs in
     let _,x' =
@@ -447,10 +461,9 @@ let parse_proc system_name proc =
         ~indices:(List.rev env.indices) ~ts body
     in
     let x'_th =
-      Theory.Fun
+      Theory.App
         (Symbols.to_string x',
-         List.rev_map (fun i -> Theory.Var (Vars.name i)) env.indices,
-         None)
+         List.rev_map (fun i -> Theory.var (Vars.name i)) env.indices)
     in
     let x'_tm =
       Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
@@ -483,7 +496,7 @@ let parse_proc system_name proc =
     let env,i' = make_fresh env Sorts.Index i in
     let env =
       { env with
-        isubst = (i, Theory.Var (Vars.name i'), i') :: env.isubst ;
+        isubst = (i, Theory.var (Vars.name i'), i') :: env.isubst ;
         indices = i' :: env.indices }
     in
     let pos_indices = i'::pos_indices in
@@ -500,14 +513,15 @@ let parse_proc system_name proc =
     (Let (Symbols.to_string x', t', p'),pos')
 
   | In (c,x,p) ->
+    let ch = parse_channel c in
     let env,x' = make_fresh env Sorts.Message x in
     let in_th =
-      Theory.Var (Vars.name x')
+      Theory.var (Vars.name x')
     in
     let in_tm = Term.Var x' in
     let env =
       { env with
-        inputs = (c,x')::env.inputs ;
+        inputs = (ch,x')::env.inputs ;
         msubst = (x, in_th, in_tm) :: env.msubst }
     in
     let par_choice = pos, List.rev pos_indices in
@@ -548,7 +562,7 @@ let parse_proc system_name proc =
     let evars' = List.map (fun (_,x) -> Vars.EVar x) s in
     let isubst' =
       List.map
-        (fun (i,i') -> i, Theory.Var (Vars.name i'), i')
+        (fun (i,i') -> i, Theory.var (Vars.name i'), i')
         s
       @ env_p.isubst
     in
@@ -624,7 +638,7 @@ let parse_proc system_name proc =
           l
       in
       let updated_states =
-        Theory.find_get_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+        Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
       in
       let t'_tm =
         Term.subst_macros_ts updated_states (Term.Var ts)
@@ -638,8 +652,10 @@ let parse_proc system_name proc =
       (Set (s,List.map Vars.name l',t',p'),pos')
 
   | Out (c,t,p) ->
+    let ch = parse_channel c in
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-    let env,a' = register_action env.alias (Some (c,t)) env in
+
+    let env,a' = register_action env.alias (Some (ch,t)) env in
     let env =
       { env with
         evars = [] ;
@@ -662,7 +678,7 @@ let parse_proc system_name proc =
         updates = [] }
     in
     let p',pos' = p_in ~env ~pos:0 ~pos_indices:[] proc in
-    (Alias (Out (Channel.dummy,Theory.empty,p'), Symbols.to_string a'), pos')
+    (Alias (Out (Channel.dummy_string,Theory.empty,p'), Symbols.to_string a'), pos')
 
   in
 

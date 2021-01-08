@@ -469,8 +469,8 @@ let rec kpred x = function
 (* [g] must be transitive and [x] basic *)
 let add_disj uf g u x =
   let uf, nu = mgu uf u in
-  opt_map (min_pred uf g nu x) (fun (uf,minj) ->
-      opt_map (max_pred uf g nu x) (fun (uf,maxj) ->
+  obind (fun (uf,minj) ->
+      obind (fun (uf,maxj) ->
           assert (minj >= maxj);        (* And not the converse ! *)
           if no_case_disj uf u x minj maxj then None
           else
@@ -480,14 +480,15 @@ let add_disj uf g u x =
 
             log_constr (fun () ->
                 Printer.prt `Error "@[<v 2>Disjunction:@;\
-                         to_split:%a@;\
-                         minj:%d@;\
-                         maxj:%d@;\
-                         base:%a@;@]@."
+                                    to_split:%a@;\
+                                    minj:%d@;\
+                                    maxj:%d@;\
+                                    base:%a@;@]@."
                   pp_ut u
                   minj maxj pp_ut x);
             Some (uf, List.map (fun x -> (nu,x)) l)
-        ))
+        ) (max_pred uf g nu x) 
+    ) (min_pred uf g nu x)
 
 
 let find_all f g =

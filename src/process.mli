@@ -13,6 +13,8 @@
   * the expected kind for that variable. *)
 type pkind = (string*Sorts.esort) list
 
+val pp_pkind : (string * Sorts.esort) list Fmt.t
+
 (** Process declarations allow to bind identifiers to processes. *)
 type id = string
 
@@ -37,8 +39,8 @@ type formula = Theory.formula
 type process =
   | Null                                    (** Null process *)
   | New of string * process                 (** Name creation *)
-  | In of Channel.t * string * process      (** Input *)
-  | Out of Channel.t * term * process       (** Output *)
+  | In  of string * string * process        (** Input *)
+  | Out of string * term * process          (** Output *)
   | Set of string * string list * term * process
                                             (** [Set (s,l,t,p)] stores [t]
                                               * in cell [s(l)] and

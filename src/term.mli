@@ -157,7 +157,7 @@ val subst : subst -> 'a term -> 'a term
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
 (** [subst_macros_ts l ts t] replaces [ts] by [pred(ts)] in the term [t]
-  * if [ts] is applied to a state macro which name is NOT in [l]. *)
+  * if [ts] is applied to a state macro whose name is NOT in [l]. *)
 val subst_macros_ts : string list -> Sorts.timestamp term -> 'a term -> 'a term
 
 (** {2 Predefined symbols} *)

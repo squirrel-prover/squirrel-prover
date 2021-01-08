@@ -36,13 +36,6 @@ let pp_error pp_loc pp_pref_loc e = match e with
                 pp_pref_loc ()
                 pp_loc ()
                 s)
-  | Symbols.Multiple_declarations s ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[%aMultiple declarations %a of the symbol: %s.@]@."
-                pp_pref_loc ()
-                pp_loc ()
-                s)
   | Theory.Conv err ->
       Some (fun ppf () ->
               Fmt.pf ppf
@@ -110,11 +103,12 @@ let parse_from_buf
 
 let parse_theory_buf ?(test=false) lexbuf filename =
   Process.reset () ;
-  parse_from_buf ~test Parser.theory lexbuf filename
+  parse_from_buf ~test Parser.declarations lexbuf filename
 
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
-  parse_theory_buf ~test lexbuf filename
+  let decls = parse_theory_buf ~test lexbuf filename in
+  Prover.declare_list decls
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -200,14 +194,18 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       Channel.declare "c" ;
-      Theory.declare_abstract "error" 0 0 ;
+      Prover.declare Decl.(Decl_abstract { name = "error";
+                                           index_arity = 0;
+                                           message_arity = 0;}) ;
       ignore (parse_process "in(c,x); out(c, if x=x then x else error)")
     end ;
     "Try", `Quick, begin fun () ->
       Channel.declare "c" ;
-      Theory.declare_state "s" 1 Sorts.emessage ;
-      Theory.declare_state "ss" 2 Sorts.emessage ;
-      Theory.declare_abstract "error" 0 0 ;
+      Prover.declare Decl.(Decl_state ("s", 1, Sorts.emessage)) ;
+      Prover.declare Decl.(Decl_state ("ss", 2, Sorts.emessage)) ;
+      Prover.declare Decl.(Decl_abstract { name = "error";
+                                     index_arity = 0;
+                                     message_arity = 0;}) ;
       ignore (parse_process "in(c,x); \
                              try find i such that s(i) = x in \
                                out(c,ss(i,i))
@@ -259,7 +257,7 @@ let () =
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Symbols.Multiple_declarations "c")
+        (Prover.Decl_error (Multiple_declarations "c"))
         (fun () -> parse_theory_test ~test "tests/alcotest/multiple.sp")
     end ;
     "Action creation", `Quick, begin fun () ->
@@ -295,22 +293,23 @@ let () =
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        Theory.(Conv (Timestamp_unexpected (Var "n")))
+        (Prover.Decl_error
+           (Conv_error (Type_error (App ("n",[]),Sorts.etimestamp))))
         (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-                 Theory.(Conv (Arity_error ("C",1,0)))
+        (Prover.Decl_error (Conv_error (Arity_error ("C",1,0))))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_type.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-                 Theory.(Conv (Undefined "D"))
+        (Prover.Decl_error (Conv_error (Undefined "D")))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.sp")
     end ;
     "Apply Proc", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Symbols.Multiple_declarations "C")
+        (Prover.Decl_error (Multiple_declarations "C"))
       (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.sp")
     end ;
   ];;

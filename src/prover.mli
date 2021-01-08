@@ -19,12 +19,12 @@ type named_goal = string * Goal.t
 val current_goal : unit -> named_goal option
 
 (** Current mode of the prover:
-    - [InputDescr] : waiting for the process description.
     - [GoalMode] : waiting for the next goal.
     - [ProofMode] : proof of a goal in progress.
     - [WaitQed] : finished proof, waiting for closure.
+    - [AllDone] : everything is done, waiting to leave the prover.
 *)
-type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
+type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
@@ -133,7 +133,7 @@ val make_equiv_goal :
 val make_equiv_goal_process : Action.single_system -> Action.single_system -> Goal.t
 
 type parsed_input =
-  | ParsedInputDescr
+  | ParsedInputDescr of Decl.declarations
   | ParsedQed
   | ParsedAbort
   | ParsedSetOption of Config.p_set_param
@@ -148,12 +148,7 @@ val add_new_goal : named_goal -> unit
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
 
-(** Allows to define the tag formula corresponding to some function. Defining a function
-   with such a tag, is equivalent to giving to the attacker a backdoor, allowing
-   to compute the ouput of the function on all messages that satisfy the tag. *)
-val define_oracle_tag_formula : string -> Theory.formula -> unit
-
-(** From the name of the funciton, returns the corresponding formula. If no tag
+(** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
 val get_oracle_tag_formula : string -> Term.formula
 
@@ -172,4 +167,21 @@ val complete_proof : unit -> unit
 val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 
 (** Initialize the prover state try to prove the first of the unproved goal. *)
-     val start_proof : unit -> string option
+val start_proof : unit -> string option
+
+(*------------------------------------------------------------------*)
+type decl_error = 
+  | Conv_error of Theory.conversion_error
+  | Multiple_declarations of string 
+
+exception Decl_error of decl_error
+
+val pp_decl_error : Format.formatter -> decl_error -> unit
+
+(*------------------------------------------------------------------*)
+(** Process a declaration. *)
+val declare      : Decl.declaration  -> unit
+
+(** Process a list of declaration. *)
+val declare_list : Decl.declarations -> unit
+

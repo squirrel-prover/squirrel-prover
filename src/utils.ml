@@ -221,18 +221,26 @@ let rec fpt f a =
 (*------------------------------------------------------------------*)
 (* Option type functions *)
 
-let opt_get = function
+let some x = Some x
+
+let oget = function
   | Some u -> u
   | None -> raise Not_found
 
-let opt_dflt dflt = function
+let odflt dflt = function
   | Some u -> u
   | None -> dflt
 
-let some x = Some x
-
-let opt_map a f = match a with
+let obind f a = match a with
   | None -> None
+  | Some x -> f x
+
+let omap f a = match a with
+  | None -> None
+  | Some x -> Some (f x)
+
+let oiter f a = match a with
+  | None -> ()
   | Some x -> f x
 
 (*------------------------------------------------------------------*)

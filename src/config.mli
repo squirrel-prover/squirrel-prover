@@ -16,6 +16,8 @@ type p_set_param = string * p_param_val
 
 type params
 
+val reset_params : unit -> unit 
+
 val get_params : unit -> params 
 
 val set_params : params -> unit
@@ -24,10 +26,13 @@ val set_params : params -> unit
 (* look-up functions *)
 
 (** timeout for the solver (completion.ml and constr.ml), in seconds. *)
-val solver_timeout      : unit -> int
+val solver_timeout : unit -> int
 
 (** Print equations of the TRS system. *)
 val print_trs_equations : unit -> bool
+
+(** Strict alias mode for processus. *)
+val strict_alias_mode : unit -> bool
 
 
 (*------------------------------------------------------------------*)

@@ -63,13 +63,19 @@ let check_timeout = function
 let s_print_equ = "printTRSEquations"
 let v_print_equ = Param_bool false
 
+let s_strict_alias_mode = "processStrictAliasMode"
+let v_strict_alias_mode = Param_bool false
 
 let default_params =
   let params = decl s_timeout ~check:check_timeout PInt v_timeout M.empty in
-  decl s_print_equ PBool v_print_equ params
+  let params = decl s_print_equ PBool v_print_equ params in
+  let params = decl s_strict_alias_mode PBool v_strict_alias_mode params in
+  params
 
 (* reference to the current parameters *)
 let params = ref default_params
+
+let reset_params () = params := default_params
 
 let get_params () = !params
 
@@ -81,6 +87,8 @@ let set_params p = params := p
 let solver_timeout () = get_int (M.find s_timeout !params)
 
 let print_trs_equations () = get_bool (M.find s_print_equ !params)
+
+let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 
 (*------------------------------------------------------------------*)
 (* set functions *)

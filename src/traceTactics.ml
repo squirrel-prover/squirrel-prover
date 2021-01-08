@@ -930,8 +930,8 @@ let rec parse_substd tsubst s =
   | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
   | (TacticsArgs.Theory mterm)::(TacticsArgs.Theory b)::q ->
     begin
-      match Theory.convert tsubst mterm Sorts.Boolean,
-            Theory.convert tsubst b Sorts.Boolean with
+      match Theory.convert InGoal tsubst mterm Sorts.Boolean,
+            Theory.convert InGoal tsubst b Sorts.Boolean with
       | Term.Macro ((mn, sort, is),l,a), ncond ->
         begin
           match a with
@@ -947,8 +947,8 @@ let rec parse_substd tsubst s =
         end
       | exception _ ->
         begin
-          match Theory.convert tsubst mterm Sorts.Message,
-                Theory.convert tsubst b Sorts.Message with
+          match Theory.convert InGoal tsubst mterm Sorts.Message,
+                Theory.convert InGoal tsubst b Sorts.Message with
           |Term.Macro ((mn, sort, is),l,a), nout ->
             begin
               match a with
@@ -974,7 +974,7 @@ let rec parse_substd tsubst s =
 let rec parse_indexes =
   function
   | [] -> ([],[],[])
-  | TacticsArgs.Theory (Var i) :: q -> let id,vs,rem = parse_indexes q in
+  | TacticsArgs.Theory (Theory.App (i,[])) :: q -> let id,vs,rem = parse_indexes q in
     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
     Theory.ESubst (i, Term.Var var)::id
   , (Vars.EVar var)::vs, rem
@@ -1038,7 +1038,7 @@ let () =
            \n Usage: systemsubstitute new_sytem_name,i1,...,ik,\
            cond@T, newcond, output@T, newoutput, ... ."
     (function
-      | TacticsArgs.Theory (Var system_name) :: q  ->
+      | TacticsArgs.Theory (App (system_name,[])) :: q  ->
         let subst_index, vs, subst_descr = parse_indexes q in
         fun s sk fk -> begin
             match system_subst system_name subst_index vs subst_descr s with

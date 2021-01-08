@@ -23,7 +23,7 @@ let current_goal : named_goal option ref = ref None
 let subgoals : Goal.t list ref = ref []
 let goals_proved = ref []
 
-type prover_mode = InputDescr | GoalMode | ProofMode | WaitQed
+type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 type gm_input =
   | Gm_goal of string * Goal.t
@@ -58,7 +58,8 @@ let reset () =
     current_goal := None;
     subgoals := [];
     goals_proved := [];
-    option_defs := []
+    option_defs := [];
+    Config.reset_params ()
 
 let save_state mode =
   proof_states_history :=
@@ -72,9 +73,10 @@ let save_state mode =
 
 let rec reset_state n =
   match (!proof_states_history,n) with
-  | [],_ -> InputDescr
+  | [],_ -> GoalMode
   | p::q,0 ->
     proof_states_history := q;
+
     goals := p.goals;
     current_goal := p.current_goal;
     subgoals := p.subgoals;
@@ -253,19 +255,19 @@ struct
     let open TacticsArgs in
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert tsubst p Sorts.Timestamp))
+      Arg (Timestamp (Theory.convert InGoal tsubst p Sorts.Timestamp))
     | [Theory p], Sort Message ->
-      Arg (Message (Theory.convert tsubst p Sorts.Message))
+      Arg (Message   (Theory.convert InGoal tsubst p Sorts.Message))
     | [Theory p], Sort Boolean ->
-      Arg (Boolean (Theory.convert tsubst p Sorts.Boolean))
-    | [Theory (Var p)], Sort String ->
+      Arg (Boolean   (Theory.convert InGoal tsubst p Sorts.Boolean))
+    | [Theory (App (p,[]))], Sort String ->
       Arg (String p)
     | [Int_parsed i], Sort Int ->
       Arg (Int i)
     | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
     | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
-    | [Theory (Var p)], Sort Index ->
-      Arg (Index (Theory.conv_index tsubst (Var p)))
+    | [Theory (App (p,[]))], Sort Index ->
+      Arg (Index (Theory.convert_index tsubst (Theory.var p)))
     | th1::q, Sort (Pair (Opt s1, s2)) ->
       begin match convert_args [th1] (Sort (Opt s1)) j with
         | Arg arg1 ->
@@ -429,7 +431,7 @@ let get_goal_formula gname =
 (** Declare Goals And Proofs *)
 
 let make_trace_goal ~system f  =
-  Goal.Trace (TraceSequent.init ~system (Theory.convert [] f Sorts.Boolean))
+  Goal.Trace (TraceSequent.init ~system (Theory.convert InGoal [] f Sorts.Boolean))
 
 let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =
@@ -442,9 +444,9 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
   let subst = Theory.subst_of_env env in
   let convert = function
     | `Formula f ->
-        EquivSequent.Formula (Theory.convert subst f Sorts.Boolean)
+        EquivSequent.Formula (Theory.convert InGoal subst f Sorts.Boolean)
     | `Message m ->
-        EquivSequent.Message (Theory.convert subst m Sorts.Message)
+        EquivSequent.Message (Theory.convert InGoal subst m Sorts.Message)
   in
   Goal.Equiv (EquivSequent.init Action.(SimplePair default_system_name)
                 env (List.map convert l))
@@ -463,7 +465,7 @@ let make_equiv_goal_process system_1 system_2 =
   Goal.Equiv (EquivSequent.init system !env [(EquivSequent.Message term)])
 
 type parsed_input =
-  | ParsedInputDescr
+  | ParsedInputDescr of Decl.declarations
   | ParsedQed
   | ParsedAbort
   | ParsedSetOption of Config.p_set_param
@@ -487,7 +489,7 @@ let add_proved_goal (gname,j) =
     goals_proved := (gname,j) :: !goals_proved
 
 let define_oracle_tag_formula h f =
-  let formula = Theory.convert [] f Sorts.Boolean in
+  let formula = Theory.convert InGoal [] f Sorts.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
@@ -512,7 +514,7 @@ let is_proof_completed () = !subgoals = []
 let complete_proof () =
   assert (is_proof_completed ());
   try
-    add_proved_goal (Utils.opt_get !current_goal);
+    add_proved_goal (Utils.oget !current_goal);
     current_goal := None;
     subgoals := []
   with Not_found ->
@@ -570,3 +572,71 @@ let start_proof () = match !current_goal, !goals with
     Some "Cannot start a new proof (no goal remaining to prove)."
 
 let current_goal () = !current_goal
+
+
+(*------------------------------------------------------------------*)
+
+let declare = function
+  | Decl.Decl_channel s             -> Channel.declare s
+  | Decl.Decl_process (id,pkind,p)  -> Process.declare id pkind p
+
+  | Decl.Decl_axiom (gdecl) ->
+    let name = match gdecl.gname with 
+      | None -> unnamed_goal ()
+      | Some n -> n
+    in
+    let goal = make_trace_goal gdecl.gsystem gdecl.gform in
+    add_proved_goal (name, goal)
+
+  | Decl.Decl_system (sdecl) ->
+    let name = match sdecl.sname with 
+      | None -> Action.default_system_name
+      | Some n -> n
+    in
+    let new_table = Process.declare_system Symbols.dummy_table name sdecl.sprocess in
+    ignore(new_table)           (* TODO: stateless *)
+
+  | Decl.Decl_hash (a, n, tagi) ->
+    let () = Utils.oiter (define_oracle_tag_formula n) tagi in
+    Theory.declare_hash ?index_arity:a n 
+
+  | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc enc dec pk
+  | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc senc sdec
+  | Decl.Decl_name (s, a)           -> Theory.declare_name s a
+  | Decl.Decl_state (s, a, k)       -> Theory.declare_state s a k
+  | Decl.Decl_macro (s, args, k, t) -> Theory.declare_macro s args k t
+  | Decl.Decl_senc_w_join_hash (senc, sdec, h) -> 
+    Theory.declare_senc_joint_with_hash senc sdec h
+  | Decl.Decl_sign (sign, checksign, pk, tagi) -> 
+    let () = Utils.oiter (define_oracle_tag_formula sign) tagi in
+    Theory.declare_signature sign checksign pk
+  | Decl.Decl_abstract decl -> 
+    Theory.declare_abstract decl.name decl.index_arity decl.message_arity
+
+type decl_error = 
+  | Conv_error of Theory.conversion_error
+  | Multiple_declarations of string 
+
+let pp_decl_error0 fmt = function
+  | Conv_error e -> Theory.pp_error fmt e
+  | Multiple_declarations s ->
+    let pp_loc _fmt = ()        (* TODO: locations *) in
+    Fmt.pf fmt
+      "@[Multiple declarations %t of the symbol: %s.@]@."
+      pp_loc
+      s
+
+let pp_decl_error fmt e = 
+  Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
+
+exception Decl_error of decl_error
+
+let decl_error e = raise (Decl_error e)
+
+let declare_list decls = 
+  (* For debugging *)
+  (* Fmt.epr "%a@." Decl.pp_decls decls; *)
+
+   try List.fold_left (fun () d -> declare d) () decls with
+     | Theory.Conv e -> decl_error (Conv_error e)
+     | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)

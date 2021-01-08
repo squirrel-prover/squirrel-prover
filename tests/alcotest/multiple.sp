@@ -1,2 +1,2 @@
 channel c
-channel c
+channel c.
