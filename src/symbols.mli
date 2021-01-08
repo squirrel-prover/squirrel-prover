@@ -95,12 +95,6 @@ type wrapped = Wrapped : 'a t * 'a def -> wrapped
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val of_string : string -> table -> wrapped
 
-(** {2 Testing utilities} *)
-
-(** Clear the symbol table, and restore all symbols declared with the builtin
-    flag. *)
-val restore_builtin : unit -> table
-
 (** {2 Namespaces} *)
 
 (** Signature for namespaces. *)
@@ -139,6 +133,9 @@ module type Namespace = sig
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
 
+  (** Get definition and data at once. *)
+  val get_all : ns t -> table -> def * data
+
   (** Get definition associated to some symbol. *)
   val get_def : ns t -> table -> def
 
@@ -150,9 +147,6 @@ module type Namespace = sig
 
   (** [data_of_string s] is equivalent to [get_data (of_string s)]. *)
   val data_of_string : string -> table -> data
-
-  (** Get definition and data at once. *)
-  val get_all : ns t -> table -> def * data
 
   (** Iterate on the defined symbols of this namespace. *)
   val iter : (ns t -> def -> data -> unit) -> table -> unit

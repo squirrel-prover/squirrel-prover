@@ -116,7 +116,7 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_direct) rule.cases_direct
 
 let mk_rule ?(elems=[]) ?(drop_head=true)
-  ~allow_functions ~system table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
+  ~allow_functions ~system ~table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
   { hash = head_fn;
     key = key_n;
     case_schemata =

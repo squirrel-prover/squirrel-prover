@@ -32,10 +32,10 @@ module String : sig
 
 (*------------------------------------------------------------------*)
 module Mi : Map.S with type key = int
-module Si : Set.S with type t = int
+module Si : Set.S with type elt = int
 
 module Ms : Map.S with type key = string
-module Ss : Set.S with type t = string
+module Ss : Set.S with type elt = string
 
 (*------------------------------------------------------------------*)
 module type Ordered = sig

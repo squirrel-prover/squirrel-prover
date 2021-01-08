@@ -875,12 +875,13 @@ let declare_macro table s (typed_args : (string * Sorts.esort) list)
   let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
   let t = convert conv_env tsubst t Sorts.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
-  ignore
-    (Symbols.Macro.declare_exact Symbols.dummy_table
-       s
-       ~data
-       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-            Sorts.ESort (Vars.sort x)) typed_args,k)))
+  let table, _ = 
+    Symbols.Macro.declare_exact table
+      s
+      ~data
+      (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
+           Sorts.ESort (Vars.sort x)) typed_args,k)) in
+  table
 
 (* TODO could be generalized into a generic fold function
  * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)

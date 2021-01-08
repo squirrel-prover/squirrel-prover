@@ -47,21 +47,13 @@ let to_string s = s
 
 type table = (edef * data) Ms.t
 
-let dummy_table = assert false
-
 let empty_table = Ms.empty
-
-(* TODO: remove the ref *)
-let builtins_table = ref empty_table
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
 (* TODO: remove the builtin option *)
 let table_add ?(builtin=false) table name d =
-  if builtin then builtins_table := Ms.add name d !builtins_table;
   Ms.add name d table
-
-let restore_builtin () = !builtins_table
 
 let fresh prefix table =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
@@ -96,9 +88,9 @@ module type Namespace = sig
   val define : table -> data t -> ?data:data -> def -> table
   val redefine : table -> data t -> ?data:data -> def -> table
   val declare :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
   val declare_exact :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
   val of_string : string -> table -> ns t
   val cast_of_string : string -> ns t
 
@@ -138,17 +130,17 @@ module Make (N:S) : Namespace
     assert (Ms.mem symb table) ;
     Ms.add symb (Exists (N.construct value), data) table
 
-  let declare table name ?(builtin=false) ?(data=Empty) value =
+  let declare table name ?(data=Empty) value =
     let symb = fresh name table in
     let table = 
-      table_add ~builtin table symb (Exists (N.construct value), data) 
+      table_add table symb (Exists (N.construct value), data) 
     in
     table, symb
 
-  let declare_exact table name ?(builtin=false) ?(data=Empty) value =
+  let declare_exact table name ?(data=Empty) value =
     if Ms.mem name table then raise @@ Multiple_declarations name;
     let table = 
-      table_add ~builtin table name (Exists (N.construct value), data) 
+      table_add table name (Exists (N.construct value), data) 
     in
     table, name
 

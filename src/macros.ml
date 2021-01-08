@@ -39,7 +39,7 @@ let is_defined name a table =
          * its sequential predecessors. *)
         begin match a with
           | Action (s,_) ->
-              let action = snd (Action.of_symbol s) in
+              let action = snd (Action.of_symbol s table) in
               List.length inputs <= List.length action
           | _ -> false
         end
@@ -59,7 +59,7 @@ let get_definition :
       | Symbols.Output, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
+            let action = Action.of_term symb indices table in
             snd Action.((get_descr system action).output)
           | _ -> assert false
         end
@@ -79,7 +79,7 @@ let get_definition :
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
+            let action = Action.of_term symb indices table in
             let descr = Action.get_descr system action in
             begin try
               (* Look for an update of the state macro [name] in the
@@ -110,7 +110,7 @@ let get_definition :
       | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
           | Action (tsymb,tidx) ->
-            let action = Action.of_term tsymb tidx in
+            let action = Action.of_term tsymb tidx table in
             assert (List.length inputs <= List.length action) ;
             let idx_subst =
               List.map2
@@ -168,7 +168,7 @@ let get_definition :
       | Symbols.Cond, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
+            let action = Action.of_term symb indices table in
             snd Action.((get_descr system action).condition)
           | _ -> assert false
         end

@@ -289,22 +289,12 @@ and pp_generic_atom ppf = function
 
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (Symbols.inp,
-                Sorts.Message,
-                [])
-let out_macro = (Symbols.out,
-                 Sorts.Message,
-                 [])
+let in_macro    = (Symbols.inp,   Sorts.Message, [])
+let out_macro   = (Symbols.out,   Sorts.Message, [])
+let frame_macro = (Symbols.frame, Sorts.Message, [])
 
-let cond_macro = (Symbols.cond,
-                 Sorts.Boolean,
-                 [])
-
-let exec_macro = (Symbols.exec,
-                 [])
-
-let frame_macro = (Symbols.frame,
-                   [])
+let cond_macro  = (Symbols.cond, Sorts.Boolean, [])
+let exec_macro  = (Symbols.exec, Sorts.Boolean, [])
 
 let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt

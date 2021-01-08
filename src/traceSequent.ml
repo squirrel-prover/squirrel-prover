@@ -478,11 +478,11 @@ let rec add_happens s ts =
   in
     match ts with
       | Term.Action (symb,indices) ->
-          let a = Action.of_term symb indices in
-          let system = s.system in
-          add_formula ~prefix:"C"
-               (snd (Action.get_descr system a).Action.condition)
-            s
+        let a = Action.of_term symb indices s.table in
+        let system = s.system in
+        add_formula ~prefix:"C"
+          (snd (Action.get_descr system a).Action.condition)
+          s
       | _ -> s
 
 (* Depending on the shape of the formula, we add it to the corresponding set of
@@ -511,7 +511,7 @@ let get_trs s : Completion.state timeout_r =
   | Some trs -> Result trs
   | None ->
     let eqs,_ = get_eqs_neqs s in
-    match Completion.complete eqs with
+    match Completion.complete s.table eqs with
     | Timeout -> Timeout
     | Result trs ->
       let () = S.set_trs s trs in

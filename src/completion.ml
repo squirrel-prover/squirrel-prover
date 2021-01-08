@@ -870,52 +870,53 @@ let rec complete_state state =
   else state
 
 
-let check_zero_arity fname =
-  assert (fst (Symbols.Function.get_def fname) = 0)
+let check_zero_arity table fname =
+  assert (fst (Symbols.Function.get_def fname table) = 0)
 
-let check_zero_arities fnames =
-  List.iter check_zero_arity fnames
+let check_zero_arities table fnames =
+  List.iter (check_zero_arity table) fnames
 
-let dec_pk f1 f2 =
-  match Symbols.Function.get_def f1, Symbols.Function.get_def f2 with
+let dec_pk table f1 f2 =
+  match Symbols.Function.get_def f1 table, Symbols.Function.get_def f2 table with
   | (_, Symbols.ADec), (_, Symbols.PublicKey) -> f1, f2
   | (_, Symbols.PublicKey), (_, Symbols.ADec) -> f2, f1
   | _ -> assert false
 
-let sig_pk f1 f2 =
-  match Symbols.Function.get_def f1, Symbols.Function.get_def f2 with
+let sig_pk table f1 f2 =
+  match Symbols.Function.get_def f1 table, Symbols.Function.get_def f2 table with
   | (_, Symbols.Sign), (_, Symbols.PublicKey) -> f1, f2
   | (_, Symbols.PublicKey), (_, Symbols.Sign) -> f2, f1
   | _ -> assert false
 
-let is_sdec f =
-  assert (snd (Symbols.Function.get_def f) = Symbols.SDec)
+let is_sdec table f =
+  assert (snd (Symbols.Function.get_def f table) = Symbols.SDec)
 
-let init_erules () =
+let init_erules table =
   Symbols.Function.fold (fun fname def data erules -> match def, data with
       | (_, Symbols.AEnc), Symbols.AssociatedFunctions [f1; f2] ->
-        let dec, pk = dec_pk f1 f2 in
+        let dec, pk = dec_pk table f1 f2 in
         (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities [fname; dec; pk];
+        check_zero_arities table [fname; dec; pk];
         (Theories.mk_aenc (fname,[]) (dec,[]) (pk,[])) :: erules
 
       | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
-        is_sdec sdec;
+        is_sdec table sdec;
         (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities [fname; sdec];
+        check_zero_arities table [fname; sdec];
         (Theories.mk_senc (fname,[]) (sdec,[])) :: erules
 
       | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
-        let msig, pk = sig_pk f1 f2 in
+        let msig, pk = sig_pk table f1 f2 in
         (* We only allow an index arity of zero for crypto primitives *)
-        check_zero_arities [fname; msig; pk];
+        check_zero_arities table [fname; msig; pk];
         (Theories.mk_sig (msig, []) (fname,[]) (pk,[])) :: erules
 
       | _ -> erules
-    )
+    ) 
     (Theories.mk_pair 2 Term.f_pair [Term.f_fst;Term.f_snd])
+    table
 
-let complete_cterms (l : (cterm * cterm) list) : state =
+let complete_cterms table (l : (cterm * cterm) list) : state =
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
       and  eqs', xeqs', b = flatten v in
@@ -926,13 +927,14 @@ let complete_cterms (l : (cterm * cterm) list) : state =
                 grnd_rules = grnd_rules;
                 xor_rules = xor_rules;
                 sat_xor_rules = None;
-                e_rules = init_erules ();
+                e_rules = init_erules table;
                 completed = false  } in
 
   complete_state state
   |> finalize_completion
 
-let complete (l : (Term.message * Term.message) list) : state timeout_r=
+let complete table (l : (Term.message * Term.message) list) 
+  : state timeout_r=
   let l =
     List.fold_left
       (fun l (u,v) ->
@@ -941,12 +943,12 @@ let complete (l : (Term.message * Term.message) list) : state timeout_r=
       []
       l
   in
-  Utils.timeout (Config.solver_timeout ()) complete_cterms l
+  Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l
 
 
-let print_init_trs fmt =
+let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
-    pp_e_rules (init_erules ())
+    pp_e_rules (init_erules table)
 
 (****************)
 (* Dis-equality *)
@@ -1084,11 +1086,11 @@ let (++) a b = cfun Term.f_xor [a;b]
 let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
-     Symbols.run_restore @@ fun () ->
+     fun () ->
        let fi = 0, Symbols.Abstract 0 in
        let table,ffs =
-         Symbols.Function.declare_exact Symbols.empty_table "f" fi in
-       let _,hfs =
+         Symbols.Function.declare_exact Symbols.builtins_table "f" fi in
+       let table,hfs =
          Symbols.Function.declare_exact table "h" fi in
        let ffs,hfs = (ffs,[]), (hfs,[]) in
        let f a b = cfun ffs [a;b] in
@@ -1100,7 +1102,9 @@ let () =
        let v = ccst (Cst.Cmvar (snd (
            Vars.make_fresh Vars.empty_env (Sorts.Message) "v")))
        in
-       let state0 = complete_cterms [(a,b); (b,c); (b,d); (e,e'); (v,v)] in
+       let state0 = complete_cterms table [(a,b); (b,c);
+                                           (b,d); (e,e'); 
+                                           (v,v)] in
        Alcotest.(check bool) "simple"
          (check_disequality_cterm state0 [] (c,e')) true;
        Alcotest.(check bool) "simple"
@@ -1116,7 +1120,9 @@ let () =
        Alcotest.(check bool) "simple"
          (check_disequality_cterm state0 [] (f a a, h a a)) true;
 
-       let state1 = complete_cterms [(a,e'); (a ++ b, c); (e' ++ d, e)] in
+       let state1 = complete_cterms table [(a,e'); 
+                                           (a ++ b, c); 
+                                           (e' ++ d, e)] in
        Alcotest.(check bool) "xor"
          (check_disequality_cterm state1 [] (b ++ c ++ d, e)) false;
        Alcotest.(check bool) "xor"

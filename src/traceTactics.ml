@@ -44,11 +44,12 @@ let () =
     goal_true_intro
 
 let print (s : TraceSequent.t) =
-  Printer.prt `Result "@.%a@.%t@."
+  Printer.prt `Result "@.%a@.%a@."
     Action.pp_descrs (TraceSequent.system s)
     (if Config.print_trs_equations ()
-     then Completion.print_init_trs
-     else (fun _fmt -> ()));
+     then Completion.print_init_trs 
+     else (fun _fmt _ -> ())) 
+    (TraceSequent.table s);
    [s]
 
 let () =
