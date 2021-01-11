@@ -58,7 +58,8 @@ let same_shape a b : Term.subst option =
 
 (** Action symbols *)
 
-let shape_to_symb = Hashtbl.create 97
+let shape_to_symb : (shape, Symbols.action Symbols.t) Hashtbl.t = 
+  Hashtbl.create 97
 
 type Symbols.data += Data of Vars.index list * action
 

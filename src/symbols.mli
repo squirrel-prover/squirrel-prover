@@ -155,13 +155,12 @@ module type Namespace = sig
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
-module Channel : Namespace with type def = unit with type ns = channel
-module Name : Namespace with type def = int with type ns = name
-module Action : Namespace with type def = int with type ns = action
+module Channel  : Namespace with type def = unit with type ns = channel
+module Name     : Namespace with type def = int  with type ns = name
+module Action   : Namespace with type def = int  with type ns = action
 module Function : Namespace
   with type def = int * function_def with type ns = fname
-
-module Macro : Namespace with type def = macro_def with type ns = macro
+module Macro    : Namespace with type def = macro_def with type ns = macro
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
