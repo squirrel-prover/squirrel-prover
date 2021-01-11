@@ -530,7 +530,8 @@ let parse_proc system_name init_table proc =
         msubst = (x, in_th, in_tm) :: env.msubst }
     in
     let par_choice = pos, List.rev pos_indices in
-    let p',_ = p_cond ~table ~env ~pos:0 ~par_choice p in
+    let (p',_,table : process * int * Symbols.table) = 
+      p_cond ~table ~env ~pos:0 ~par_choice p in
     (In (c,Vars.name x',p'), pos+1,table)
 
   | Exists _ | Set _ | Out _ ->
@@ -538,7 +539,7 @@ let parse_proc system_name init_table proc =
       { env with
         inputs = (Symbols.dummy_channel,dummy_in)::env.inputs } in
     let par_choice = pos, List.rev pos_indices in
-    let p',_ = p_cond ~table ~env ~pos:0 ~par_choice proc in
+    let p',_,table = p_cond ~table ~env ~pos:0 ~par_choice proc in
     (p', pos+1,table)
 
   (** Similar to [p_in].
@@ -552,8 +553,8 @@ let parse_proc system_name init_table proc =
 
   | Let (x,t,p) ->
     let x',t',table,env,p = p_let ~table ~env proc in
-    let p',pos' = p_cond ~table ~env ~pos ~par_choice p in
-    (Let (Symbols.to_string x', t', p'),pos')
+    let p',pos',table = p_cond ~table ~env ~pos ~par_choice p in
+    (Let (Symbols.to_string x', t', p'),pos',table)
 
   | Exists (evars, cond, p, q) ->
     let env_p,s =
@@ -597,10 +598,10 @@ let parse_proc system_name init_table proc =
         facts = facts_p }
     in
     let env_q = { env with facts = facts_q } in
-    let p',pos_p = p_cond ~table ~env:env_p ~pos ~par_choice p in
-    let q',pos_q = p_cond ~table ~env:env_q ~pos:pos_p ~par_choice q in
+    let p',pos_p,table = p_cond ~table ~env:env_p ~pos ~par_choice p in
+    let q',pos_q,table = p_cond ~table ~env:env_q ~pos:pos_p ~par_choice q in
 
-    (Exists (List.map (fun (_,x) -> Vars.name x) s,cond',p',q'), pos_q)
+    (Exists (List.map (fun (_,x) -> Vars.name x) s,cond',p',q'), pos_q,table)
 
   | p ->
     (* We are done processing conditionals, let's prepare
@@ -614,7 +615,7 @@ let parse_proc system_name init_table proc =
                           sum_choice = pos, vars } :: env.action }
     in
     let p',_,table = p_update ~table ~env p in
-    (p', pos + 1)
+    (p', pos + 1,table)
 
   and p_update ~table ~env proc = match proc with
   | Apply _ | Alias _ | New _ ->
