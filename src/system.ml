@@ -51,30 +51,49 @@ let add_action
     let data = System_data descrs in
     Symbols.System.redefine table s_symb ~data ()
 
+(*------------------------------------------------------------------*)
 let descr_of_shape table (system : Symbols.system Symbols.t) shape = 
   let descrs = descrs table system in
   Msh.find shape descrs 
 
+let shape_bound table (system : Symbols.system Symbols.t) shape =
+  let descrs = descrs table system in
+  Msh.mem shape descrs 
 
 (*------------------------------------------------------------------*)
 let shape_to_symb table system_symb shape = 
   let descr = descr_of_shape table system_symb shape in
-  descr.Action.action
+  descr.Action.name
 
-let to_term (a : action)  =
-  let indices = indices a in
-  Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
+let action_to_term table system_symb (a : Action.action) =
+  let descr = descr_of_shape table system_symb (Action.get_shape a) in
+  let indices = descr.Action.indices in
+  Term.Action (descr.name, indices)
 
-
+let rec dummy_action k = assert false (* TODO *)
+  (* let open Action in
+   * let a =
+   *   if k = 0 then [] else
+   *     { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy_action (k-1)
+   * in
+   * let s = Action.get_shape a in
+   * let data = Data ([],a) in
+   * if not (Hashtbl.mem shape_to_symb s) then
+   *   Hashtbl.add shape_to_symb s
+   *     (snd
+   *        (Symbols.Action.declare 
+   *           (assert false) (* TODO: used to be Symbols.dummy_table *)
+   *           "_Dummy" ~data 0)) ;
+   * a *)
 
 (*------------------------------------------------------------------*)
 exception SystemError of string
 
-let register_action table s_str symb indices action descr =
+let register_action table system_str symb indices action descr =
   let shape = Action.get_shape action in
-  let table, system = get_or_create_system table s_str in
+  let table, system = get_or_create_system table system_str in
 
-  match Action.to_term action with
+  match action_to_term table system action with
   | Term.Action (symb2, is) when indices <> is ->
       raise @@
       SystemError "Cannot register a shape twice with distinct indices."

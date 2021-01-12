@@ -204,7 +204,7 @@ type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
 module S : sig
   type t = private {
-    system : Action.system ;
+    system : SystemExpr.system_expr ;
     table : Symbols.table;
     env : Vars.env;
     (** Must contain all free variables of the sequent,
@@ -233,7 +233,7 @@ module S : sig
       * multiple sequents. *)
   }
 
-  val init_sequent : Action.system -> Symbols.table -> t
+  val init_sequent : SystemExpr.system_expr -> Symbols.table -> t
 
   (** Updates a sequent.
       [keep_trs] must be [true] only if the udates leaves the TRS associated to
@@ -241,7 +241,7 @@ module S : sig
       Idem for [keep_models] and the models.
       [keep_trs] and [keep_models] default to [false]. *)
   val update :
-    ?system:Action.system ->
+    ?system:SystemExpr.system_expr ->
     ?table:Symbols.table ->
     ?env:Vars.env ->
     ?happens_hypotheses:Term.timestamp list ->
@@ -262,29 +262,29 @@ module S : sig
   val set_models : t -> Constr.models -> unit
 end = struct
   type t = {
-    system : Action.system ;
-    table : Symbols.table;
-    env : Vars.env;
+    system             : SystemExpr.system_expr ;
+    table              : Symbols.table;
+    env                : Vars.env;
     happens_hypotheses : Term.timestamp list;
     message_hypotheses : message_hypotheses;
-    trace_hypotheses :  trace_hypotheses;
+    trace_hypotheses   :  trace_hypotheses;
     formula_hypotheses : formula_hypotheses;
-    conclusion : Term.formula;
-    trs : Completion.state option ref;
-    models : Constr.models option ref;
+    conclusion         : Term.formula;
+    trs                : Completion.state option ref;
+    models             : Constr.models option ref;
   }
 
   let init_sequent system table = {
-    system = system ;
-    table = table;
-    env = Vars.empty_env;
+    system             = system ;
+    table              = table;
+    env                = Vars.empty_env;
     happens_hypotheses = [];
     message_hypotheses = H.empty;
-    trace_hypotheses =  H.empty ;
+    trace_hypotheses   =  H.empty ;
     formula_hypotheses = H.empty;
-    conclusion = Term.True;
-    trs = ref None;
-    models = ref None;
+    conclusion         = Term.True;
+    trs                = ref None;
+    models             = ref None;
   }
 
   let update ?system ?table ?env ?happens_hypotheses
@@ -343,7 +343,7 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    Action.pp_system s.system;
+    SystemExpr.pp_system s.system;
   if s.env <> Vars.empty_env then
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
@@ -480,8 +480,9 @@ let rec add_happens s ts =
       | Term.Action (symb,indices) ->
         let a = Action.of_term symb indices s.table in
         let system = s.system in
+        let table  = s.table in
         add_formula ~prefix:"C"
-          (snd (Action.get_descr system a).Action.condition)
+          (snd (SystemExpr.descr_of_action table system a).Action.condition)
           s
       | _ -> s
 
@@ -537,6 +538,8 @@ let system s = s.system
 let table s = s.table
 
 let set_system system s = S.update ~system:system s 
+
+let set_table table s = S.update ~table:table s 
 
 let pi projection s =
   let pi_term t = Term.pi_term ~projection t in

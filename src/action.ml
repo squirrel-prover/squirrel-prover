@@ -33,10 +33,10 @@ let rec get_shape = function
       sum_choice = (s, List.length ls) }
     :: get_shape l
 
-let rec indices = function
+let rec get_indices = function
   | [] -> []
   | a :: l ->
-    snd a.par_choice @ snd a.sum_choice @ indices l
+    snd a.par_choice @ snd a.sum_choice @ get_indices l
 
 let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
@@ -143,25 +143,6 @@ let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
     List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
   subst_action subst a
 
-let rec dummy_action k =
-  let a =
-    if k = 0 then [] else
-      { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy_action (k-1)
-  in
-  let s = get_shape a in
-  let data = Data ([],a) in
-  if not (Hashtbl.mem shape_to_symb s) then
-    Hashtbl.add shape_to_symb s
-      (snd
-         (Symbols.Action.declare 
-            (assert false) (* TODO: used to be Symbols.dummy_table *)
-            "_Dummy" ~data 0)) ;
-  a
-
-let pp_action ppf a = Term.pp ppf (to_term a)
-
-let pp = pp_action
-
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 
 (** An action description features an input, a condition (which sums up
@@ -175,13 +156,18 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
   * conditions). *)
 
 type descr = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : Vars.index list ;
+  name      : Symbols.action Symbols.t ;
+  action    : action ;
+  input     : Channel.t * string ;
+  indices   : Vars.index list ;
   condition : Vars.index list * Term.formula ;
-  updates : (Term.state * Term.message) list ;
-  output : Channel.t * Term.message
+  updates   : (Term.state * Term.message) list ;
+  output    : Channel.t * Term.message
 }
+
+let pp_descr_short ppf descr =
+  let t = Term.Action (descr.name, descr.indices) in
+  Term.pp ppf t
 
 let pp_descr ppf descr =
   Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
@@ -189,7 +175,7 @@ let pp_descr ppf descr =
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
-    pp_action descr.action
+    pp_descr_short descr
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
     Term.pp (snd descr.condition)
@@ -214,6 +200,7 @@ let pi_descr s d =
 let subst_descr subst descr =
   let action = subst_action subst descr.action in
   let input = descr.input in
+  let name = descr.name in
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
@@ -226,7 +213,7 @@ let subst_descr subst descr =
       descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  {action; input; indices; condition; updates; output }
+  {name; action; input; indices; condition; updates; output }
 
 
 (*------------------------------------------------------------------*)

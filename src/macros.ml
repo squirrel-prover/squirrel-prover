@@ -130,7 +130,8 @@ let get_definition :
                 (fun (subst,action) x ->
                    let in_tm =
                      Term.Macro (in_macro,[],
-                                 Action.to_term (List.rev action))
+                                 SystemExpr.action_to_term table se
+                                   (List.rev action))
                    in
                    Term.ESubst (Term.Var x,in_tm) :: subst,
                    List.tl action)
@@ -193,6 +194,7 @@ let get_dummy_definition :
   fun se table sort mn indices ->
   match Symbols.Macro.get_all mn table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
-      let dummy_action = Action.dummy_action (List.length inputs) in
-      get_definition se table sort mn indices (Action.to_term dummy_action)
+      let dummy_action = System.dummy_action (List.length inputs) in
+      let tdummy_action = SystemExpr.action_to_term table se dummy_action in
+      get_definition se table sort mn indices tdummy_action
     | _ -> assert false

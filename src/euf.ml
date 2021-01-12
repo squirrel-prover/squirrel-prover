@@ -85,7 +85,7 @@ type euf_schema = { message : Term.message;
 let pp_euf_schema ppf case =
   Fmt.pf ppf "@[<v>@[<hv 2>*action:@ @[<hov>%a@]@]@;\
               @[<hv 2>*message:@ @[<hov>%a@]@]"
-    Action.pp_action case.action_descr.Action.action
+    Action.pp_descr_short case.action_descr
     Term.pp case.message
 
 (** Type of a direct euf axiom case.

@@ -40,6 +40,9 @@ val table : sequent -> Symbols.table
 (** Change the system of a sequent. *)
 val set_system : SystemExpr.system_expr -> sequent -> sequent
 
+(** Change the table of a sequent. *)
+val set_table : Symbols.table -> sequent -> sequent
+
 (** Project diff-operators occurring in a sequent;
   * only makes sense when a sequent for a bi-system has just
   * been narrowed to a projected system. *)

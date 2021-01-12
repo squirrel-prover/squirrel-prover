@@ -49,6 +49,8 @@ type action = (Vars.index list) t
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
+val get_indices : action -> Vars.index list
+
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
     take messages into account. It is not reflexive. *)
@@ -69,19 +71,11 @@ val get_shape : action -> shape
     substitution sending [a] to [b]. *)
 val same_shape : action -> action -> Term.subst option
 
-(** Convert action to the corresponding [Action] timestamp term. *)
-val to_term : Symbols.table -> system_name -> action -> Term.timestamp
-
 (** Convert [Action] parameters to an action. *)
 val of_term : 
   Symbols.action Symbols.t -> Vars.index list -> 
   Symbols.table -> 
   action
-
-(** Get dummy action of some length. Guarantees that a symbol exists 
-    for it. *)
-val dummy_action : int -> action
-
 
 (*------------------------------------------------------------------*)
 (** {2 Action symbols}
@@ -89,6 +83,8 @@ val dummy_action : int -> action
   * Action symbols are used to refer to actions in a concise manner.
   * They are indexed and are associated to an action using the argument
   * indices. *)
+
+type Symbols.data += Data of Vars.index list * action
 
 (** Get a fresh symbol whose name starts with the given prefix. *)
 val fresh_symbol :
@@ -114,7 +110,7 @@ val of_symbol :
 
 (** Type of action descriptions. *)
 type descr = {
-  (* name      : Symbols.action Symbols.t ; *)
+  name      : Symbols.action Symbols.t ;
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.index list ;
@@ -137,11 +133,8 @@ val pi_descr : Term.projection -> descr -> descr
 (** Format an action, displayed through its structure. *)
 val pp_action_structure : Format.formatter -> action -> unit
 
-(** Format an action, displayed through its symbol. *)
-val pp_action : Format.formatter -> action -> unit
-
-(** Alias for [pp_action]. *)
-val pp : Format.formatter -> action -> unit
+(** Format the action name of an action description. *)
+val pp_descr_short : Format.formatter -> descr -> unit
 
 (** Formatter for descriptions. *)
 val pp_descr : Format.formatter -> descr -> unit

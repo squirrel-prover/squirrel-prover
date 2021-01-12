@@ -40,7 +40,7 @@ let pp_goal_decl fmt decl =
     | Some s -> s
     | None -> "_?" in
   Fmt.pf fmt "@[<hov 2>axiom [%a] %s =@ %a@]"
-    Action.pp_system decl.gsystem
+    SystemExpr.pp_p_system decl.gsystem
     name
     Theory.pp decl.gform
 

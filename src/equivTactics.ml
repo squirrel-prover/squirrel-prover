@@ -162,6 +162,8 @@ let induction TacticsArgs.(Timestamp ts) s =
         (Tactics.Failure "Variable should not occur in the premise");
     (* Remove ts from the sequent, as it will become unused. *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
+    let table  = EquivSequent.get_table s in
+    let system = EquivSequent.get_system s in
     let subst = [Term.ESubst (ts, Pred ts)] in
     let goal = EquivSequent.get_biframe s in
     let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
@@ -182,16 +184,16 @@ let induction TacticsArgs.(Timestamp ts) s =
              Term.ESubst (Term.Var i, Term.Var i'))
           descr.Action.indices
       in
-      let name = Action.to_term (Action.subst_action subst descr.Action.action) in
+      let name = 
+        SystemExpr.action_to_term table system
+          (Action.subst_action subst descr.Action.action) 
+      in
       let ts_subst = [Term.ESubst(ts,name)] in
       goals := (EquivSequent.apply_subst ts_subst induc_goal
                 |> EquivSequent.set_env !env)
                ::!goals
     in    
-    SystemExpr.iter_descrs
-      (EquivSequent.get_table s)
-      (EquivSequent.get_system s)
-      add_action ;
+    SystemExpr.iter_descrs table system add_action ;
     init_goal::!goals
   | _  ->
     Tactics.soft_failure
@@ -658,7 +660,9 @@ let mk_phi_proj system table env name indices proj biframe =
             (* apply [subst] to the action and to the list of
              * indices of our name's occurrences *)
             let new_action =
-              Action.to_term (Action.subst_action subst a.Action.action) in
+              SystemExpr.action_to_term table system
+                (Action.subst_action subst a.Action.action) 
+            in
             let indices_a =
               List.map
                 (List.map (Term.subst_var subst))
@@ -922,7 +926,10 @@ let mk_prf_phi_proj proj system table env biframe e hash =
             (* apply [subst] to the action and to the list of
              * key indices with the hashed messages *)
             let new_action =
-              Action.to_term (Action.subst_action subst a.Action.action) in
+              SystemExpr.action_to_term
+                table system
+                (Action.subst_action subst a.Action.action) 
+            in
             let list_of_is_m =
               List.map
                 (fun (is,m) ->

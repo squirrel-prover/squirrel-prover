@@ -260,7 +260,7 @@ let parse_channel c =
   try Channel.of_string c with
   | Not_found -> raise @@ Theory.Conv (Undefined c)
 
-let parse_proc system_name init_table proc =
+let parse_proc (system_name : string) init_table proc =
 
   (* Initial env with special variables registered.
    * The special variables should never be visible to the user,
@@ -382,10 +382,12 @@ let parse_proc system_name init_table proc =
     in
     debug "output = %a,%a.@."
       Channel.pp_channel (fst output) Term.pp (snd output) ;
-    let action_descr =
-      Action.{ action; input; indices; condition; updates; output } in
+    let action_descr =      
+      Action.{ name = a'; action; input; indices = indices; 
+               condition; updates; output } 
+    in
     let table,new_a =
-      Action.register_action
+      System.register_action
         table
         system_name a' indices action action_descr
     in
@@ -724,8 +726,8 @@ let parse_proc system_name init_table proc =
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
   (proc, table)
 
-let declare_system table (system_name:Action.system_name) proc =
-  if not(Action.is_fresh system_name) then begin
+let declare_system table (system_name:string) proc =
+  if not (System.is_fresh system_name table) then begin
     Fmt.epr "System %s already defined" system_name;
     assert false end;
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;

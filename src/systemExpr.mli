@@ -31,13 +31,19 @@ exception BiSystemError of string
    *)
 val project_system : Term.projection -> system_expr -> system_expr
 
+(** Convert action to the corresponding [Action] timestamp term in
+    a system expression.
+    Remark that this requires both system to declare the action, 
+    with the same name. *)
+val action_to_term : 
+  Symbols.table -> system_expr -> Action.action -> Term.timestamp
 
 (*------------------------------------------------------------------*)
 val descr_of_shape :
   Symbols.table -> system_expr -> Action.shape -> Action.descr
 
-(** [descr_of_action table system_expr a] returns the description corresponding to
-    the action [a] in [system_expr].  
+(** [descr_of_action table system_expr a] returns the description corresponding 
+    to the action [a] in [system_expr].  
     @Raise Not_found if no action corresponds to [a]. *)
 val descr_of_action : 
   Symbols.table -> system_expr -> Action.action -> Action.descr
@@ -73,14 +79,15 @@ type esubst_descr =
 type subst_descr = esubst_descr list
 
 val clone_system_subst : 
-  system_expr -> Symbols.system Symbols.t -> subst_descr -> unit
+  Symbols.table -> system_expr -> string -> subst_descr -> 
+  Symbols.table * Symbols.system Symbols.t
 
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printing } *)
 
 (** Pretty-print all action descriptions. *)
-val pp_descrs : Format.formatter -> system_expr -> unit
+val pp_descrs : Symbols.table -> Format.formatter -> system_expr -> unit
 
 
 (*------------------------------------------------------------------*)
@@ -99,3 +106,5 @@ type p_system_expr =
 
 val parse_single : Symbols.table -> p_single_system -> single_system
 val parse_se     : Symbols.table -> p_system_expr   -> system_expr
+
+val pp_p_system : Format.formatter -> p_system_expr -> unit

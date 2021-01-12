@@ -5,21 +5,34 @@ include module type of Symbols.System
 
 type system_name = Symbols.system Symbols.t
 
+(** Convert action to the corresponding [Action] timestamp term in
+    a bi-system. *)
+val action_to_term : 
+  Symbols.table -> system_name -> Action.action -> Term.timestamp
+
 (** Specify if a given system name is not already in use. *)
-val is_fresh : Symbols.system Symbols.t -> Symbols.table -> bool
+val is_fresh : string -> Symbols.table -> bool
 
 (** @Raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :
   Symbols.table -> Symbols.system Symbols.t -> Action.shape -> 
   Action.descr
 
+(** Get dummy action of some length. Guarantees that a symbol exists 
+    for it. *)
+val dummy_action : int -> Action.action
+
 module Msh : Map.S with type key = Action.shape
 
+type Symbols.data += System_data of Action.descr Msh.t
+
+(** Return all the action descriptions of a given system. *)
 val descrs : 
   Symbols.table ->
   Symbols.system Symbols.t ->
   Action.descr Msh.t
 
+(*------------------------------------------------------------------*)
 (** {2 Registration of actions} *)
 
 exception SystemError of string
@@ -32,7 +45,7 @@ exception SystemError of string
   * (currently the proposed symbol may not be used for technical
   * reasons that will eventually disappear TODO). *)
 val register_action :
-  Symbols.table -> Symbols.system Symbols.t ->
+  Symbols.table -> string ->
   Symbols.action Symbols.t -> Vars.index list ->
   Action.action -> Action.descr -> 
   Symbols.table * Symbols.action Symbols.t
