@@ -108,10 +108,28 @@ let rec pp_process ppf process =
 
 let is_out = function Out _ -> true | _ -> false
 
-(** Table of declared (bi)processes with their types.
-  * TODO use Symbols ? *)
-let pdecls : (string,pkind*process) Hashtbl.t = Hashtbl.create 97
 
+(*------------------------------------------------------------------*)
+(** We extend the symbols data with (bi)-processus descriptions and 
+    their types. *)
+type Symbols.data += Process_data of pkind * process
+
+let declare_nocheck table name kind proc =
+  let data = Process_data (kind,proc) in
+  let def = () in
+  Symbols.Process.declare_exact table name ~data def
+
+let find_process table pname = 
+  match Symbols.Process.get_all pname table with
+  | (), Process_data (kind,proc) -> kind,proc
+  | _ -> assert false
+  (* The data associated to a process must be a [Process_data _]. *)
+
+let find_process0 table name =
+  let pname = Symbols.Process.of_string name table in
+  find_process table pname
+
+(*------------------------------------------------------------------*)
 (** Type checking for processes *)
 let check_proc table env p = 
   let rec check_p env = function
@@ -151,7 +169,7 @@ let check_proc table env p =
     | Apply (id, ts) ->
       begin
         try
-          let kind,_ = Hashtbl.find pdecls id in
+          let kind,_ = find_process0 table id in
           if List.length kind <> List.length ts then
             raise @@
             Theory.(Conv (Arity_error (id, List.length ts, List.length kind)));
@@ -166,11 +184,10 @@ let check_proc table env p =
   check_p env p
 
 let declare table id args proc =
-  if Hashtbl.mem pdecls id then raise @@ Symbols.Multiple_declarations id;
+  (* type-check and declare *)
   check_proc table args proc ;
-  Hashtbl.add pdecls id (args, proc);
-  (* TODO: add processes in tables ? *)
-  ()
+  let table, _ = declare_nocheck table id args proc in
+  table
 
 (* Enable/disable debug messages by setting debug to debug_on/off. *)
 
@@ -368,7 +385,7 @@ let parse_proc system_name init_table proc =
     let action_descr =
       Action.{ action; input; indices; condition; updates; output } in
     let table,new_a =
-      Action.register
+      Action.register_action
         table
         system_name a' indices action action_descr
     in
@@ -391,7 +408,7 @@ let parse_proc system_name init_table proc =
     (* Keep explicit alias if there is one,
      * otherwise use id as the new alias. *)
     let a' = match proc with Alias (_,a) -> a | _ -> id in
-    let t,p = Hashtbl.find pdecls id in
+    let t,p = find_process0 table id in
     let isubst', msubst' =
       (* TODO avoid or handle conflicts with variables already
        * in domain of subst, i.e. variables bound above the apply *)
@@ -708,14 +725,11 @@ let parse_proc system_name init_table proc =
   (proc, table)
 
 let declare_system table (system_name:Action.system_name) proc =
-  if not(Action.is_fresh system_name) then
-    failwith "System %s already defined";
+  if not(Action.is_fresh system_name) then begin
+    Fmt.epr "System %s already defined" system_name;
+    assert false end;
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc table [] proc ;
   let proc,table = parse_proc system_name table proc in
   Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   table
-
-let reset () =
-  Hashtbl.clear pdecls ;
-  Action.reset ()

@@ -31,9 +31,9 @@ let pp_abstract_decl fmt decl =
     Sorts.pp_e Sorts.emessage
 
 (*------------------------------------------------------------------*)
-type goal_decl = { gname   : string option;
-                   gsystem : Action.system;
-                   gform   : Theory.formula; }
+type goal_decl = { gname   : string option ;
+                   gsystem : SystemExpr.p_system_expr ;
+                   gform   : Theory.formula ; }
 
 let pp_goal_decl fmt decl =
   let name = match decl.gname with
@@ -45,7 +45,7 @@ let pp_goal_decl fmt decl =
     Theory.pp decl.gform
 
 (*------------------------------------------------------------------*)
-type system_decl = { sname    : Action.system_name option;
+type system_decl = { sname    : string option;
                      sprocess : Process.process; }
 
 let pp_system_decl fmt sys = 

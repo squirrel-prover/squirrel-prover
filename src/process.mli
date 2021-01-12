@@ -68,14 +68,11 @@ val pp_process : Format.formatter -> process -> unit
 val check_proc : Symbols.table -> Theory.env -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
-val declare : Symbols.table -> id -> pkind -> process -> unit
+val declare : Symbols.table -> id -> pkind -> process -> Symbols.table
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
   * as a set of actions. In that process, name creations are compiled away. 
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> Action.system_name -> process -> Symbols.table
-
-(** Reset all process declarations. *)
-val reset : unit -> unit
+  Symbols.table -> string -> process -> Symbols.table

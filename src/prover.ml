@@ -31,12 +31,14 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 (*------------------------------------------------------------------*)
 type p_goal_name = P_unknown | P_named of string
+
 type p_goal = 
-  | P_trace_goal of Action.system * Theory.formula
+  | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
   | P_equiv_goal of 
       Theory.env * 
       [ `Message of Theory.term | `Formula of Theory.formula ] list 
-  | P_equiv_goal_process of Action.single_system * Action.single_system
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
+                            SystemExpr.p_single_system
 
 type gm_input = Gm_goal of p_goal_name * p_goal | Gm_proof
 
@@ -201,7 +203,9 @@ module Make_AST (T : Table_sig) :
       | "apply",[TacticsArgs.String_name id] ->
           Fmt.pf ppf "apply %s" id
       | "apply", TacticsArgs.String_name id :: l ->
-          let l = List.map (function TacticsArgs.Theory t -> t | _ -> assert false) l in
+          let l = List.map (function
+            | TacticsArgs.Theory t -> t 
+            | _ -> assert false) l in
           Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
@@ -325,8 +329,9 @@ struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
-              | exception Action.BiSystemError e -> Tactics.hard_failure
-                                                      (Tactics.Failure e)
+              | exception System.SystemError e
+              | exception SystemExpr.BiSystemError e -> Tactics.hard_failure
+                                                          (Tactics.Failure e)
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
@@ -343,8 +348,9 @@ struct
                  match f (th) s with
                  | subgoals -> sk subgoals fk
                  | exception Tactics.Tactic_soft_failure e -> fk e
-                 | exception Action.BiSystemError e -> Tactics.hard_failure
-                                                         (Tactics.Failure e)
+                 | exception System.SystemError e
+                 | exception SystemExpr.BiSystemError e -> Tactics.hard_failure
+                                                              (Tactics.Failure e)
                end
              with TacticsArgs.Uncastable ->
                Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
@@ -457,7 +463,9 @@ let make_trace_goal ~system ~table f  =
   let g = Theory.convert conv_env [] f Sorts.Boolean in
   Goal.Trace (TraceSequent.init ~system table g)
 
-let make_equiv_goal ~table env (l : [`Message of 'a | `Formula of 'b] list) =
+let make_equiv_goal
+    ~table (system_name : System.system_name)
+    env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =
     List.fold_left
       (fun env (x, Sorts.ESort s) ->
@@ -473,19 +481,20 @@ let make_equiv_goal ~table env (l : [`Message of 'a | `Formula of 'b] list) =
     | `Message m ->
         EquivSequent.Message (Theory.convert conv_env subst m Sorts.Message)
   in
-  Goal.Equiv (EquivSequent.init Action.(SimplePair default_system_name) table
+  Goal.Equiv (EquivSequent.init Action.(SimplePair system_name) table
                 env (List.map convert l))
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
+  let open SystemExpr in
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let system =
     match system_1, system_2 with
-    | Action.Left id1, Action.Right id2 when id1 = id2 ->
-      Action.SimplePair id1
-    | _ -> Action.Pair (system_1, system_2)
+    | Left id1, Right id2 when id1 = id2 ->
+      SimplePair id1
+    | _ -> Pair (system_1, system_2)
   in
   Goal.Equiv (EquivSequent.init system table !env [(EquivSequent.Message term)])
 
@@ -506,9 +515,19 @@ let add_new_goal table (gname,g) =
     | P_unknown -> unnamed_goal ()
     | P_named s -> s in
   let g = match g with
-    | P_equiv_goal (env,l) -> make_equiv_goal ~table env l
-    | P_equiv_goal_process (a,b) -> make_equiv_goal_process ~table a b
-    | P_trace_goal (s,f) -> make_trace_goal ~system:s ~table f
+    | P_equiv_goal (env,l) -> 
+      let system_symb = 
+        Symbols.System.of_string SystemExpr.default_system_name table
+      in
+      make_equiv_goal ~table system_symb env l
+    | P_equiv_goal_process (a,b) -> 
+      let a = SystemExpr.parse_single table a
+      and b = SystemExpr.parse_single table b in
+      make_equiv_goal_process ~table a b
+
+    | P_trace_goal (s,f) -> 
+      let s = SystemExpr.parse_se table s in
+      make_trace_goal ~system:s ~table f
   in
 
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
@@ -615,20 +634,21 @@ let current_goal () = !current_goal
 
 let declare table = function
   | Decl.Decl_channel s             -> Channel.declare table s 
-  | Decl.Decl_process (id,pkind,p)  -> Process.declare table id pkind p; table
+  | Decl.Decl_process (id,pkind,p)  -> Process.declare table id pkind p
 
   | Decl.Decl_axiom (gdecl) ->
     let name = match gdecl.gname with 
       | None -> unnamed_goal ()
       | Some n -> n
     in
-    let goal = make_trace_goal gdecl.gsystem table gdecl.gform in
+    let se = SystemExpr.parse_se table gdecl.gsystem in
+    let goal = make_trace_goal se table gdecl.gform in
     add_proved_goal (name, goal);
     table
 
   | Decl.Decl_system (sdecl) ->
     let name = match sdecl.sname with 
-      | None -> Action.default_system_name
+      | None -> SystemExpr.default_system_name
       | Some n -> n
     in
     Process.declare_system table name sdecl.sprocess

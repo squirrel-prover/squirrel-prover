@@ -47,7 +47,7 @@ type t = {
   table : Symbols.table;
   hypothesis_frame : elem list;
   frame  : elem list;
-  system : Action.system;
+  system : SystemExpr.system_expr;
 }
 
 let init system table env l = {

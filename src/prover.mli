@@ -31,12 +31,14 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 (** {2 Type of parsed new goal } *)
 
 type p_goal_name = P_unknown | P_named of string
+
 type p_goal = 
-  | P_trace_goal of Action.system * Theory.formula
+  | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
   | P_equiv_goal of 
       Theory.env * 
       [ `Message of Theory.term | `Formula of Theory.formula ] list 
-  | P_equiv_goal_process of Action.single_system * Action.single_system
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
+                            SystemExpr.p_single_system
 
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
@@ -131,23 +133,26 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 exception ParseError of string
 
-val get_goal_formula : string -> formula * Action.system
+val get_goal_formula : string -> formula * SystemExpr.system_expr
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)
 val make_trace_goal : 
-  system:Action.system -> table:Symbols.table -> 
+  system:SystemExpr.system_expr -> table:Symbols.table -> 
   Theory.formula -> Goal.t
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
-  table:Symbols.table -> Theory.env ->
+  table:Symbols.table -> System.system_name -> Theory.env ->
   [ `Message of Theory.term | `Formula of Theory.formula ] list ->
   Goal.t
 
-(* Produces an equivalence goal based on the process and the two system ids. *)
+(** Produces an equivalence goal based on the process and the two 
+    system expressions. *)
 val make_equiv_goal_process : 
-  table:Symbols.table -> Action.single_system -> Action.single_system -> Goal.t
+  table:Symbols.table -> 
+  SystemExpr.single_system -> SystemExpr.single_system -> 
+  Goal.t
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations

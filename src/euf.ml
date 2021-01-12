@@ -49,7 +49,7 @@ let key_ssc
   in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
-  Action.(iter_descrs system
+  SystemExpr.(iter_descrs table system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -120,7 +120,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
   { hash = head_fn;
     key = key_n;
     case_schemata =
-      Utils.map_of_iter (Action.iter_descrs system)
+      SystemExpr.map_descrs table system
         (fun action_descr ->
           hashes_of_action_descr
             ~drop_head ~system table action_descr head_fn key_n

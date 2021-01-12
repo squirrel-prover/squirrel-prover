@@ -102,7 +102,6 @@ let parse_from_buf
 (** Testing *)
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  Process.reset () ;
   parse_from_buf ~test Parser.declarations lexbuf filename
 
 let parse_theory_test ?(test=false) filename =

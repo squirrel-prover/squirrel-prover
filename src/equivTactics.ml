@@ -86,7 +86,7 @@ let () =
 
 exception NoReflMacros
 
-class exist_macros ~(system:Action.system) table = object (self)
+class exist_macros ~(system:SystemExpr.system_expr) table = object (self)
   inherit Iter.iter ~system table as super
   method visit_message t = match t with
     | Term.Macro _ -> raise NoReflMacros
@@ -171,24 +171,27 @@ let induction TacticsArgs.(Timestamp ts) s =
                       s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
     in
     let goals = ref [] in
-    (* [add_action a] adds to goals the goal corresponding to the case
-     * where [t] is instantiated by [a]. *)
-    let add_action a =
+    (** [add_action _action descr] adds to goals the goal corresponding to the 
+      * case where [t] is instantiated by [descr]. *)
+    let add_action descr =
       let env = ref @@ EquivSequent.get_env induc_goal in
       let subst =
         List.map
           (fun i ->
              let i' = Vars.make_fresh_from_and_update env i in
              Term.ESubst (Term.Var i, Term.Var i'))
-          a.Action.indices
+          descr.Action.indices
       in
-      let name = Action.to_term (Action.subst_action subst a.Action.action) in
+      let name = Action.to_term (Action.subst_action subst descr.Action.action) in
       let ts_subst = [Term.ESubst(ts,name)] in
       goals := (EquivSequent.apply_subst ts_subst induc_goal
                 |> EquivSequent.set_env !env)
                ::!goals
-    in
-    Action.iter_descrs (EquivSequent.get_system s) add_action ;
+    in    
+    SystemExpr.iter_descrs
+      (EquivSequent.get_table s)
+      (EquivSequent.get_system s)
+      add_action ;
     init_goal::!goals
   | _  ->
     Tactics.soft_failure
@@ -384,7 +387,7 @@ let fa_dup s =
 exception Not_FADUP_formula
 exception Not_FADUP_iter
 
-class check_fadup ~(system:Action.system) table tau = object (self)
+class check_fadup ~(system:SystemExpr.system_expr) table tau = object (self)
 
   inherit [Term.timestamp list] Iter.fold ~system table as super
 
@@ -530,7 +533,7 @@ exception Name_found
 exception Var_found
 exception Not_name
 
-class find_name ~(system:Action.system) table exact name = object (self)
+class find_name ~(system:SystemExpr.system_expr) table exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system table as super
 
   method visit_message t = match t with
@@ -539,7 +542,7 @@ class find_name ~(system:Action.system) table exact name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~(system:Action.system) table exact name = object (self)
+class get_name_indices ~(system:SystemExpr.system_expr) table exact name = object (self)
   inherit Iter.iter_approx_macros ~exact ~system table as super
 
   val mutable indices : (Vars.index list) list = []
@@ -551,7 +554,7 @@ class get_name_indices ~(system:Action.system) table exact name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_actions ~(system:Action.system) table exact = object (self)
+class get_actions ~(system:SystemExpr.system_expr) table exact = object (self)
   inherit Iter.iter_approx_macros ~exact ~system table as super
 
   (* The boolean is set to true only for input macros.
@@ -587,7 +590,7 @@ let mk_phi_proj system table env name indices proj biframe =
       List.iter iter#visit_term proj_frame ;
       iter#get_actions
     and tbl_of_action_indices = Hashtbl.create 10 in
-    Action.(iter_descrs system
+    SystemExpr.(iter_descrs table system
       (fun action_descr ->
         let iter = new get_name_indices ~system table true name in
         let descr_proj = Action.pi_descr proj action_descr in
@@ -700,11 +703,11 @@ let fresh_cond system table env t biframe =
     | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
     | _ -> raise Not_name
   in
-  let system_left = Action.(project_system Term.Left system) in
+  let system_left = SystemExpr.(project_system Term.Left system) in
   let phi_left =
     mk_phi_proj system_left table env n_left ind_left Term.Left biframe
   in
-  let system_right = Action.(project_system Term.Right system) in
+  let system_right = SystemExpr.(project_system Term.Right system) in
   let phi_right =
     mk_phi_proj system_right table env n_right ind_right Term.Right biframe
   in
@@ -777,7 +780,7 @@ let occurrences_of_action_descr ~system table action_descr hash_fn key_n =
 
 let mk_prf_phi_proj proj system table env biframe e hash =
   begin try
-    let system = Action.(project_system proj system) in
+    let system = SystemExpr.(project_system proj system) in
     let (hash_fn,t,key_n,key_is) = prf_param (Term.pi_term proj hash) in
     (* create the frame on which we will iterate to compute phi_proj
         - e_without_hash is the context where all occurrences of [hash] have
@@ -804,7 +807,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
       iter#get_actions
     and tbl_of_action_hashes = Hashtbl.create 10 in
     (* we iterate over all the actions of the (single) system *)
-    Action.(iter_descrs system
+    SystemExpr.(iter_descrs table system
       (fun action_descr ->
         (* we add only actions in which a hash occurs *)
         let descr_proj = Action.pi_descr proj action_descr in
@@ -1074,7 +1077,7 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system table enc_fn dec_fn key_n 
   let ssc = new check_symenc_key ~system table enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
-  Action.(iter_descrs system
+  SystemExpr.(iter_descrs table system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -1105,7 +1108,7 @@ let random_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~system table enc_
   let ssc = new check_rand ~allow_vars ~system table enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_term elems;
-  Action.(iter_descrs system
+  SystemExpr.(iter_descrs table system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -1420,8 +1423,8 @@ let enckp
         try
           (* For each key we actually only need to verify the SSC
            * wrt. the appropriate projection of the system. *)
-          let sysl =  Action.(project_system Term.Left system) in
-          let sysr =  Action.(project_system Term.Right system) in
+          let sysl = SystemExpr.(project_system Term.Left system) in
+          let sysr = SystemExpr.(project_system Term.Right system) in
           List.iter ssc
             (List.sort_uniq Stdlib.compare
                [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
@@ -1516,11 +1519,11 @@ let mk_xor_if_term_base system table env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term) =
   let biframe =
     EquivSequent.Message (Term.Diff (l_left, l_right)) :: biframe in
-  let system_left = Action.(project_system Term.Left system) in
+  let system_left = SystemExpr.(project_system Term.Left system) in
   let phi_left =
     mk_phi_proj system_left table env n_left is_left Term.Left biframe
   in
-  let system_right = Action.(project_system Term.Right system) in
+  let system_right = SystemExpr.(project_system Term.Right system) in
   let phi_right =
     mk_phi_proj system_right table env n_right is_right Term.Right biframe
   in
@@ -2092,7 +2095,7 @@ let () = T.register_typed "ifeq"
 
 exception Not_context
 
-class ddh_context ~(system:Action.system) table exact a b c = object (self)
+class ddh_context ~(system:SystemExpr.system_expr) table exact a b c = object (self)
  inherit Iter.iter_approx_macros ~exact ~system table as super
 
   method visit_macro mn is a =
@@ -2125,7 +2128,7 @@ end
 
 exception Macro_found
 
-class find_macros ~(system:Action.system) table exact  = object (self)
+class find_macros ~(system:SystemExpr.system_expr) table exact  = object (self)
  inherit Iter.iter_approx_macros ~exact ~system table as super
 
   method visit_macro mn is a =
@@ -2154,7 +2157,7 @@ let is_ddh_context system table a b c elem_list =
     (* we check that a b and c only occur in the correct form inside the system,
        if the elements contain some macro based on the system.*)
    if exists_macro then
-    Action.iter_descrs system (
+    SystemExpr.iter_descrs table system (
       fun d ->
         iter#visit_formula (snd d.condition) ;
         iter#visit_message (snd d.output) ;

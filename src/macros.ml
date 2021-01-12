@@ -46,11 +46,11 @@ let is_defined name a table =
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  Action.system ->  Symbols.table -> 
+  type a.  SystemExpr.system_expr ->  Symbols.table -> 
   a Sorts.sort -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp -> 
   a Term.term =
-  fun system table sort name args a ->
+  fun se table sort name args a ->
   match sort with
   | Sorts.Message ->
     begin
@@ -60,7 +60,7 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            snd Action.((get_descr system action).output)
+            snd SystemExpr.((descr_of_action table se action).Action.output)
           | _ -> assert false
         end
       | Symbols.Frame, _ ->
@@ -80,7 +80,7 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            let descr = Action.get_descr system action in
+            let descr = SystemExpr.descr_of_action table se action in
             begin try
               (* Look for an update of the state macro [name] in the
               updates of [action] *)
@@ -142,10 +142,10 @@ let get_definition :
               let proj_t proj = Term.pi_term ~projection:proj t in
               (* The expansion of the body of the macro only depends on the
                  projections, not on the system names. *)
-              match system with
+              match se with
               (* the body of the macro is expanded by projecting
                  according to the projection in case of single systems. *)
-              | Single (s) -> proj_t (Action.get_proj s)
+              | Single (s) -> proj_t (SystemExpr.get_proj s)
               (* For diff cases, if the system corresponds to a left and a right
                  projection of systems we can simply project the macro as is. *)
               | SimplePair _
@@ -153,8 +153,8 @@ let get_definition :
               (* If we do not have a left and right projection, we must
                  reconstruct the body of the macros to have the correct
                  definition on each side. *)
-              | Pair (s1, s2)  -> Term.Diff (proj_t (Action.get_proj s1),
-                                             proj_t (Action.get_proj s2))
+              | Pair (s1, s2)  -> Term.Diff (proj_t (SystemExpr.get_proj s1),
+                                             proj_t (SystemExpr.get_proj s2))
             end
           | _ -> assert false
         end
@@ -169,7 +169,8 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            snd Action.((get_descr system action).condition)
+            let descr = SystemExpr.descr_of_action table se action in
+            snd Action.(descr.condition)
           | _ -> assert false
         end
       | Symbols.Exec, _ ->
@@ -185,13 +186,13 @@ let get_definition :
   | _ -> assert false
 
 let get_dummy_definition :
-  type a. Action.system -> Symbols.table -> 
+  type a. SystemExpr.system_expr -> Symbols.table -> 
   a Sorts.sort -> Symbols.macro Symbols.t -> 
   Vars.index list -> 
   a Term.term =
-  fun system table sort mn indices ->
+  fun se table sort mn indices ->
   match Symbols.Macro.get_all mn table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
       let dummy_action = Action.dummy_action (List.length inputs) in
-      get_definition system table sort mn indices (Action.to_term dummy_action)
+      get_definition se table sort mn indices (Action.to_term dummy_action)
     | _ -> assert false

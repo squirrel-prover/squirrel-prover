@@ -17,6 +17,8 @@ type name
 type action
 type fname
 type macro
+type system
+type process
 
 (** {2 Symbol definitions}
   *
@@ -53,11 +55,13 @@ type macro_def =
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel : unit -> channel def
-  | Name : int -> name def
-  | Action : int -> action def
-  | Function : (int * function_def) -> fname def
-  | Macro : macro_def -> macro def
+  | Channel  : unit                 -> channel def
+  | Name     : int                  -> name    def
+  | Action   : int                  -> action  def
+  | Function : (int * function_def) -> fname   def
+  | Macro    : macro_def            -> macro   def
+  | System   : unit                 -> system  def
+  | Process  : unit                 -> process def
 
 type edef =
   | Exists : 'a def -> edef
@@ -87,6 +91,8 @@ val to_string : 'a t -> string
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val def_of_string : string -> table -> edef
+
+val is_defined : string -> table -> bool
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
@@ -130,6 +136,10 @@ module type Namespace = sig
     * @raise Unbound_identifier otherwise. *)
   val of_string : string -> table -> ns t
 
+  (** [of_string s] returns [Some s] as a symbol, if it exists in this 
+      namespace, and None otherwise. *) 
+  val of_string_opt : string -> table -> ns t option
+
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
 
@@ -158,6 +168,8 @@ end
 module Channel  : Namespace with type def = unit with type ns = channel
 module Name     : Namespace with type def = int  with type ns = name
 module Action   : Namespace with type def = int  with type ns = action
+module System   : Namespace with type def = unit with type ns = system
+module Process  : Namespace with type def = unit with type ns = process
 module Function : Namespace
   with type def = int * function_def with type ns = fname
 module Macro    : Namespace with type def = macro_def with type ns = macro

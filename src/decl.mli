@@ -17,13 +17,13 @@ val pp_abstract_decl : Format.formatter -> abstract_decl -> unit
 
 (** Information for a goal or axiom declaration *)
 type goal_decl = { gname   : string option;
-                   gsystem : Action.system;
+                   gsystem : SystemExpr.p_system_expr;
                    gform   : Theory.formula; }
 
 val pp_goal_decl : Format.formatter -> goal_decl -> unit
 
 (** Information for a system declaration *)
-type system_decl = { sname    : Action.system_name option;
+type system_decl = { sname    : string option;
                      sprocess : Process.process; }
 
 val pp_system_decl : Format.formatter -> system_decl -> unit

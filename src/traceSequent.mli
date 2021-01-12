@@ -17,7 +17,8 @@ val pp : Format.formatter -> sequent -> unit
 
 (** [init formula table] returns a sequent with an empty set of hypotheses, and 
     the given formula as conclusion. *)
-val init : system:Action.system -> Symbols.table -> formula -> sequent
+val init : 
+  system:SystemExpr.system_expr -> Symbols.table -> formula -> sequent
 
 (** [get_name_prefix s] hypthesis names can be built given a prefix. This
    function allows to obtain the prefix of a formula. It can be used to create a
@@ -30,14 +31,14 @@ val get_name_prefix : string -> string * int
     of all named actions that are assumed to happen. *)
 val add_formula : ?prefix:string -> formula -> sequent -> sequent
 
-(** Get the identifier of the system which the sequent is reasoning about. *)
-val system : sequent -> Action.system
+(** Get the system which the sequent is reasoning about. *)
+val system : sequent -> SystemExpr.system_expr
 
 (** Get the symbol table of the sequent. *)
 val table : sequent -> Symbols.table
 
-(** Change the system ID of a sequent. *)
-val set_system : Action.system -> sequent -> sequent
+(** Change the system of a sequent. *)
+val set_system : SystemExpr.system_expr -> sequent -> sequent
 
 (** Project diff-operators occurring in a sequent;
   * only makes sense when a sequent for a bi-system has just

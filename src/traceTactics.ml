@@ -45,7 +45,7 @@ let () =
 
 let print (s : TraceSequent.t) =
   Printer.prt `Result "@.%a@.%a@."
-    Action.pp_descrs (TraceSequent.system s)
+    SystemExpr.pp_descrs (TraceSequent.system s)
     (if Config.print_trs_equations ()
      then Completion.print_init_trs 
      else (fun _fmt _ -> ())) 
@@ -153,18 +153,18 @@ let () =
 (** Case analysis on a timestamp *)
 let timestamp_case (TacticsArgs.Timestamp ts) s =
   let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
-  let add_action a =
+  let add_action descr =
     let indices =
       let env = ref @@ TraceSequent.get_env s in
       List.map
         (fun i -> Vars.make_fresh_from_and_update env i)
-        a.Action.indices
+        descr.Action.indices
     in
     let subst =
       List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-        a.Action.indices indices
+        descr.Action.indices indices
     in
-    let name = Action.to_term (Action.subst_action subst a.Action.action) in
+    let name = Action.to_term (Action.subst_action subst descr.Action.action) in
     let case =
       let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
       let at = Term.subst subst at in
@@ -174,7 +174,8 @@ let timestamp_case (TacticsArgs.Timestamp ts) s =
     f := Term.Or (case,!f)
   in
   let system = TraceSequent.system s in
-  Action.iter_descrs system add_action ;
+  let table  = TraceSequent.table s in
+  SystemExpr.iter_descrs table system add_action ;
   [TraceSequent.add_formula !f s]
 
 
@@ -752,7 +753,7 @@ let mk_fresh_indirect system table env n is t =
     iter#visit_message t ;
     iter#get_actions
   and tbl_of_action_indices = Hashtbl.create 10 in
-  Action.(iter_descrs system
+  SystemExpr.(iter_descrs table system
     (fun action_descr ->
       let iter = new EquivTactics.get_name_indices ~system table true n in
       iter#visit_formula (snd action_descr.condition) ;
@@ -950,7 +951,7 @@ let parse_substd table tsubst s =
               begin
                 let action = Action.of_term symb indices table in
                 match Symbols.Macro.get_def mn table with
-                | Symbols.Cond -> Action.Condition (ncond, action)
+                | Symbols.Cond -> SystemExpr.Condition (ncond, action)
                                   :: parse_substd0 q
                 | _ -> failure ()
               end
@@ -967,7 +968,7 @@ let parse_substd table tsubst s =
                   begin
                     let action = Action.of_term symb indices table in
                     match Symbols.Macro.get_def mn table with
-                    | Symbols.Output -> Action.Output (nout, action)
+                    | Symbols.Output -> SystemExpr.Output (nout, action)
                                         :: parse_substd0 q
                     | _ -> failure ()
                   end
@@ -1002,7 +1003,7 @@ let equiv_goal_from_subst vs substd =
   let rec conj_equiv =
     function
     | [] -> Term.True
-    | Action.Condition (ncond, action) :: q ->
+    | SystemExpr.Condition (ncond, action) :: q ->
       let new_eq = make_equiv
                   (Term.Macro (Term.cond_macro,[],Action.to_term action))
                   ncond
@@ -1011,7 +1012,7 @@ let equiv_goal_from_subst vs substd =
         Term.And (new_eq, conj_equiv q)
       else
         new_eq
-    | Action.Output (nout, action) :: q ->
+    | SystemExpr.Output (nout, action) :: q ->
       let new_eq = Term.Atom (`Message (`Eq,
                                         nout,
                                         (Term.Macro (Term.out_macro,[],Action.to_term action))
@@ -1027,21 +1028,21 @@ let equiv_goal_from_subst vs substd =
 let system_subst new_system isubst vs subst s =
   let substdescr = parse_substd (TraceSequent.table s) isubst subst in
   try
-    Action.clone_system_subst
+    SystemExpr.clone_system_subst
       (TraceSequent.system s)
       new_system substdescr;
     let new_goal =
       match TraceSequent.system s with
       | Pair _ | SimplePair _ ->
-        TraceSequent.set_system (Action.SimplePair new_system) s
+        TraceSequent.set_system (SystemExpr.SimplePair new_system) s
       | Single (Left _) ->
-        TraceSequent.set_system (Action.Single (Left new_system)) s
+        TraceSequent.set_system (SystemExpr.Single (Left new_system)) s
       | Single (Right _) ->
-        TraceSequent.set_system (Action.Single (Right new_system)) s
+        TraceSequent.set_system (SystemExpr.Single (Right new_system)) s
     in
     TraceSequent.set_conclusion
       (equiv_goal_from_subst vs substdescr) s :: [new_goal]
-  with Action.SystemNotFresh ->
+  with SystemExpr.SystemNotFresh ->
     Tactics.hard_failure 
       (Tactics.Failure "System name already defined for another system.")
 
@@ -1058,8 +1059,18 @@ let () =
     (function
       | TacticsArgs.Theory (App (system_name,[])) :: q  ->
         let subst_index, vs, subst_descr = parse_indexes q in
+
         fun s sk fk -> begin
-            match system_subst system_name subst_index vs subst_descr s with
+            let table = TraceSequent.table s in
+            
+            let system_symb = 
+              try Symbols.System.of_string system_name table with
+              | Symbols.Unbound_identifier _ -> 
+                raise (Tactics.hard_failure
+                         (Tactics.Failure ("Unknow system " ^ system_name))) 
+            in
+            
+            match system_subst system_symb subst_index vs subst_descr s with
              | subgoals -> sk subgoals fk
              | exception Tactics.Tactic_soft_failure e -> fk e
            end
@@ -1326,8 +1337,8 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) =
   begin
     match TraceSequent.system s, system with
     | s1, s2 when s1 = s2 -> ()
-    | Single (Left s1), Action.SimplePair s2 when s1 = s2 -> ()
-    | Single (Right s1), Action.SimplePair s2 when s1 = s2 -> ()
+    | Single (Left s1),  SystemExpr.SimplePair s2 when s1 = s2 -> ()
+    | Single (Right s1), SystemExpr.SimplePair s2 when s1 = s2 -> ()
     | _ -> Tactics.hard_failure Tactics.NoAssumpSystem
   end ;
   (* Get universally quantifier variables, verify that lengths match. *)
@@ -1645,8 +1656,10 @@ let project s =
   match system with
   | Single _ -> Tactics.soft_failure (Tactics.Failure "goal already deals with a single process")
   | _ ->
-    let s1 = TraceSequent.set_system Action.(project_system Term.Left system) s in
-    let s2 = TraceSequent.set_system Action.(project_system Term.Right system) s in
+    let s1 = TraceSequent.set_system 
+        SystemExpr.(project_system Term.Left  system) s in
+    let s2 = TraceSequent.set_system 
+        SystemExpr.(project_system Term.Right system) s in
     let s1 = TraceSequent.pi Left s1 in
     let s2 = TraceSequent.pi Right s2 in
     [s1;s2]

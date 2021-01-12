@@ -27,13 +27,17 @@ type name
 type action
 type fname
 type macro
+type system
+type process
 
 type _ def =
-  | Channel : unit -> channel def
-  | Name : int -> name def
-  | Action : int -> action def
-  | Function : (int * function_def) -> fname def
-  | Macro : macro_def -> macro def
+  | Channel  : unit                 -> channel def
+  | Name     : int                  -> name    def
+  | Action   : int                  -> action  def
+  | Function : (int * function_def) -> fname   def
+  | Macro    : macro_def            -> macro   def
+  | System   : unit                 -> system  def
+  | Process  : unit                 -> process def
 
 type edef =
   | Exists : 'a def -> edef
@@ -52,7 +56,7 @@ let empty_table = Ms.empty
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
 (* TODO: remove the builtin option *)
-let table_add ?(builtin=false) table name d =
+let table_add table name d =
   Ms.add name d table
 
 let fresh prefix table =
@@ -73,6 +77,8 @@ exception Multiple_declarations of string
 let def_of_string s table =
   try fst (Ms.find s table) with Not_found -> raise @@ Unbound_identifier s
 
+let is_defined s table = Ms.mem s table
+
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 let of_string s table =
@@ -80,6 +86,12 @@ let of_string s table =
     | Exists d, _ -> Wrapped (s,d)
     | Reserved, _ -> raise @@ Unbound_identifier s
   with Not_found -> raise @@ Unbound_identifier s
+
+let of_string_opt s table =
+  try match Ms.find s table with
+    | Exists d, _ -> Some (Wrapped (s,d))
+    | Reserved, _ -> None
+  with Not_found -> None
 
 module type Namespace = sig
   type ns
@@ -92,6 +104,7 @@ module type Namespace = sig
   val declare_exact :
     table -> string -> ?data:data -> def -> table * ns t
   val of_string : string -> table -> ns t
+  val of_string_opt : string -> table -> ns t option
   val cast_of_string : string -> ns t
 
   val get_all        : ns t   -> table -> def * data
@@ -161,6 +174,12 @@ module Make (N:S) : Namespace
       name
     with Not_found -> raise @@ Unbound_identifier name
 
+  let of_string_opt name table =
+    try
+      ignore (N.deconstruct (fst (Ms.find name table))) ;
+      Some name
+    with Not_found -> None
+
   let def_of_string s table =
     try
       N.deconstruct (fst (Ms.find s table))
@@ -217,6 +236,24 @@ module Channel = Make (struct
   let construct d = Channel d
   let deconstruct = function
     | Exists (Channel d) -> d
+    | _ -> raise Incorrect_namespace
+end)
+
+module System = Make (struct
+  type ns = system
+  type local_def = unit
+  let construct d = System d
+  let deconstruct = function
+    | Exists (System d) -> d
+    | _ -> raise Incorrect_namespace
+end)
+
+module Process = Make (struct
+  type ns = process
+  type local_def = unit
+  let construct d = Process d
+  let deconstruct = function
+    | Exists (Process d) -> d
     | _ -> raise Incorrect_namespace
 end)
 

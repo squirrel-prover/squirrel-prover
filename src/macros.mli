@@ -23,7 +23,7 @@ val is_defined :
 (** Return the term corresponding to the declared macro,
   * if the macro can be expanded. *)
 val get_definition :
-  Action.system -> Symbols.table -> 'a Sorts.sort ->
+  SystemExpr.system_expr -> Symbols.table -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> 
   Vars.index list -> Term.timestamp -> 
   'a Term.term
@@ -33,6 +33,6 @@ val get_definition :
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Action.system -> Symbols.table -> 'a Sorts.sort ->
+  SystemExpr.system_expr -> Symbols.table -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> 
   'a Term.term

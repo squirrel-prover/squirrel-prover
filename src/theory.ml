@@ -316,7 +316,9 @@ let make_app table cntxt s l =
     | Symbols.Action arity ->
         if arity <> List.length l then raise @@ arity_error arity ;
         Taction (s,l)
-    | Symbols.Channel _ ->
+    | Symbols.Channel _ 
+    | Symbols.Process _ 
+    | Symbols.System  _ ->
         Printer.prt `Error "incorrect %s@." s ;
         raise Symbols.Incorrect_namespace
     end
@@ -642,9 +644,11 @@ and conv_app :
                   end
               | Wrapped (_, Macro (Input|Output|Cond|Exec|Frame|State (_, _))) ->
                 raise ts_expected
-              | Wrapped (_, Channel _)  -> raise ts_expected
-              | Wrapped (_, Name _)  -> raise ts_expected
+              | Wrapped (_, Channel _) -> raise ts_expected
+              | Wrapped (_, Name _)    -> raise ts_expected
               | Wrapped (_, Action _)  -> raise ts_expected
+              | Wrapped (_, Process _) -> raise ts_expected
+              | Wrapped (_, System _)  -> raise ts_expected
             end
         | _ -> raise type_error
       end
@@ -672,6 +676,8 @@ and conv_app :
               | Wrapped (_, Name _)               -> raise ts_unexpected
               | Wrapped (_, Action _)             -> raise ts_unexpected
               | Wrapped (_, Function _)           -> raise ts_unexpected
+              | Wrapped (_, Process _)            -> raise ts_unexpected
+              | Wrapped (_, System _)             -> raise ts_unexpected
             end
         | Sorts.Boolean ->
             begin match of_string f env.table with
@@ -686,6 +692,8 @@ and conv_app :
               | Wrapped (_, Action _)             -> raise ts_unexpected
               | Wrapped (_, Function _)           -> raise ts_unexpected
               | Wrapped (_, Macro (Local (_, _))) -> raise ts_unexpected
+              | Wrapped (_, Process _)            -> raise ts_unexpected
+              | Wrapped (_, System _)             -> raise ts_unexpected
             end
         | _ -> raise type_error
       end

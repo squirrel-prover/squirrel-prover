@@ -197,7 +197,6 @@ let start_main_loop ?(test=false) () =
    * TODO this is not doable anymore (with refactoring this code)
    * concerning definitions of functions, names, ... symbols;
    * it should not matter if we do not undo the initial definitions *)
-  Process.reset ();
   Prover.reset ();
   main_loop ~test { mode = GoalMode; table = Symbols.builtins_table; }
 
