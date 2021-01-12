@@ -329,9 +329,10 @@ struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
-              | exception System.SystemError e
-              | exception SystemExpr.BiSystemError e -> Tactics.hard_failure
-                                                          (Tactics.Failure e)
+              | exception System.SystemError e -> 
+                Tactics.hard_failure (Tactics.SystemError e)
+              | exception SystemExpr.BiSystemError e -> 
+                Tactics.hard_failure (Tactics.SystemExprError e)
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
@@ -348,9 +349,10 @@ struct
                  match f (th) s with
                  | subgoals -> sk subgoals fk
                  | exception Tactics.Tactic_soft_failure e -> fk e
-                 | exception System.SystemError e
-                 | exception SystemExpr.BiSystemError e -> Tactics.hard_failure
-                                                              (Tactics.Failure e)
+                 | exception System.SystemError e ->
+                   Tactics.hard_failure (Tactics.SystemError e)
+                 | exception SystemExpr.BiSystemError e -> 
+                   Tactics.hard_failure (Tactics.SystemExprError e)
                end
              with TacticsArgs.Uncastable ->
                Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
@@ -517,7 +519,7 @@ let add_new_goal table (gname,g) =
   let g = match g with
     | P_equiv_goal (env,l) -> 
       let system_symb = 
-        Symbols.System.of_string SystemExpr.default_system_name table
+        System.of_string SystemExpr.default_system_name table
       in
       make_equiv_goal ~table system_symb env l
     | P_equiv_goal_process (a,b) -> 
@@ -673,6 +675,8 @@ let declare table = function
 type decl_error = 
   | Conv_error of Theory.conversion_error
   | Multiple_declarations of string 
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 let pp_decl_error0 fmt = function
   | Conv_error e -> Theory.pp_error fmt e
@@ -682,6 +686,9 @@ let pp_decl_error0 fmt = function
       "@[Multiple declarations %t of the symbol: %s.@]@."
       pp_loc
       s
+  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
+
+  | SystemError e -> System.pp_system_error fmt e
 
 let pp_decl_error fmt e = 
   Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
@@ -697,3 +704,5 @@ let declare_list table decls =
    try List.fold_left (fun table d -> declare table d) table decls with
      | Theory.Conv e -> decl_error (Conv_error e)
      | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
+     | System.SystemError e -> decl_error (SystemError e)
+     | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)

@@ -29,7 +29,7 @@ val get_definition :
   'a Term.term
 
 (** When [m] is a global macro symbol,
-  * [get_definition m li] return a term which resembles the one that
+  * [get_definition se table m li] return a term which resembles the one that
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :

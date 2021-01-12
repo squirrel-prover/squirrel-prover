@@ -189,15 +189,21 @@ val eval_tactic : TacticsArgs.parser_arg Tactics.ast -> bool
 val start_proof : unit -> string option
 
 (*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
 type decl_error = 
   | Conv_error of Theory.conversion_error
   | Multiple_declarations of string 
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 exception Decl_error of decl_error
 
 val pp_decl_error : Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)
+(** {2 Declaration Processing} *)
+
 (** Process a declaration. *)
 val declare      : Symbols.table -> Decl.declaration  -> Symbols.table
 

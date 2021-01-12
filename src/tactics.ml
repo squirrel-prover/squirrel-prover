@@ -19,7 +19,8 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
-
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 let tac_error_strings =
   [ (More, "More");
@@ -58,6 +59,8 @@ let rec tac_error_to_string = function
   | TacTimeout
   | CannotConvert
   | DidNotFail as e -> List.assoc e tac_error_strings
+  | SystemExprError _ -> "SystemExpr_Error"
+  | SystemError _ -> "System_Error"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -81,6 +84,8 @@ let rec pp_tac_error ppf = function
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
   | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
+  | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
+  | SystemError e -> System.pp_system_error ppf e
   | SEncNoRandom ->
     Fmt.string ppf "An encryption is performed without a random name"
   | SEncSharedRandom ->

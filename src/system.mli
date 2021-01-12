@@ -3,6 +3,24 @@
 
 type system_name = Symbols.system Symbols.t
 
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
+type system_error = 
+  | SE_ShapeError
+  | SE_UnknownSystem of string
+  | SE_SystemAlreadyDefined of string
+
+val pp_system_error : Format.formatter -> system_error -> unit
+
+exception SystemError of system_error
+
+
+(*------------------------------------------------------------------*)
+(** {2 Access functions} *)
+
+val of_string : string -> Symbols.table -> system_name
+
 (** Declare a new system, without any associated actions. *)
 val declare_empty : Symbols.table -> string -> Symbols.table * system_name
 
@@ -35,8 +53,6 @@ val descrs :
 
 (*------------------------------------------------------------------*)
 (** {2 Registration of actions} *)
-
-exception SystemError of string
 
 (** Register an action symbol in a system,
   * associating it with an action description.

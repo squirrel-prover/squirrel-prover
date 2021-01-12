@@ -48,6 +48,8 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error

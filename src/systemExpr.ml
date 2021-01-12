@@ -25,65 +25,94 @@ let pp_system fmt = function
   | Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
 
 (*------------------------------------------------------------------*)
-exception BiSystemError of string
+type ssymb_pair = System.system_name * 
+                  System.system_name
 
-let bisystem_error s = raise (BiSystemError s)
+type system_expr_err = 
+  | SE_NotABiProcess of System.system_name
+  | SE_NoneProject
+  | SE_IncompatibleAction   of ssymb_pair * string
+  | SE_DifferentControlFlow of ssymb_pair
 
+let pp_system_expr_err fmt = function
+  | SE_NotABiProcess s -> 
+    Fmt.pf fmt "cannot project system [%s], which is not a bi-process"
+      (Symbols.to_string s)
+
+  | SE_NoneProject -> 
+    Fmt.pf fmt "cannot project a system with None"
+
+  | SE_IncompatibleAction ((s1,s2),s) ->
+    Fmt.pf fmt "systems [%s] and [%s] are not compatible: %s" 
+      (Symbols.to_string s1) (Symbols.to_string s2) s
+      
+  | SE_DifferentControlFlow (s1,s2) ->
+    Fmt.pf fmt "systems [%s] and [%s] have distinct control flow" 
+      (Symbols.to_string s1) (Symbols.to_string s2) 
+
+exception BiSystemError of system_expr_err
+
+let bisystem_error e = raise (BiSystemError e)
+
+let incompatible_error s1 s2 s = 
+  raise (BiSystemError (SE_IncompatibleAction ((s1,s2),s)))
+
+(*------------------------------------------------------------------*)
 let project_system proj = function
-  | Single s -> bisystem_error "cannot project system which \
-                                is not a bi-process"
+  | Single s -> bisystem_error (SE_NotABiProcess (get_id s))
+
   | SimplePair id ->
     begin
       match proj with
       | Term.Left  -> Single (Left id)
       | Term.Right -> Single (Right id)
-      | Term.None  -> bisystem_error "cannot project a system with None"
+      | Term.None  -> bisystem_error SE_NoneProject
     end
   | Pair (s1, s2) ->
     begin
       match proj with
       | Term.Left  -> Single s1
       | Term.Right -> Single s2
-      | Term.None  -> bisystem_error "cannot project a system with None"
+      | Term.None  -> bisystem_error SE_NoneProject
     end
 
 
 (*------------------------------------------------------------------*)
-let compatible_descr d1 d2 =
-  let open Action in
-  d1.name = d2.name &&
-  d1.input = d2.input &&
-  d1.indices = d2.indices 
+let make_bi_descr s1 s2 d1 d2 =
+  let incompatible s = incompatible_error s1 s2 s in
 
-let make_bi_descr d1 d2 =
   let open Action in
-  if not (compatible_descr d1 d2) then
-    bisystem_error "cannot merge two actions with disctinct \
-                    inputs, indices or names";
+  if not ( d1.name = d2.name &&
+           d1.input = d2.input &&
+           d1.indices = d2.indices ) then
+    incompatible "cannot merge two actions with disctinct \
+                        inputs, indices or names";
 
-  assert (Action.same_shape d1.action d2.action <> None);
+  if Action.same_shape d1.action d2.action <> None then
+    incompatible "cannot merge two actions with different shapes";
+
 
   let condition =
     let is1,t1 = d1.condition 
     and is2,t2 = d2.condition in
     if is1 <> is2 then
-      bisystem_error "cannot merge two actions with disctinct \
-                      condtion indexes";
+      incompatible "cannot merge two actions with disctinct \
+                    condtion indexes";
     is1, Term.make_bi_term t1 t2 in
   
   let updates = 
     List.map2 (fun (st1, m1) (st2, m2) ->
         if st1 <> st2 then
-          bisystem_error "cannot merge two actions with disctinct \
-                          states";
+          incompatible "cannot merge two actions with disctinct \
+                        states";
         st1,Term.make_bi_term m1 m2)
       d1.updates d2.updates in
 
   let output = 
     let c1,m1 = d1.output and c2,m2 = d2.output in
     if c1 <> c2 then
-      bisystem_error "cannot merge two actions with disctinct \
-                      ouput channels";
+      incompatible "cannot merge two actions with disctinct \
+                    ouput channels";
     c1, Term.make_bi_term m1 m2 in
 
   { name = d1.name;
@@ -110,10 +139,12 @@ let descr_of_shape table (se : system_expr) shape =
   (* else we need to obtain the two corresponding set of shapes, project them
      correctly, and combine them into a single term. *)
   | Pair (s1, s2) ->
-    let left_a  = getd (get_id s1) in
-    let right_a = getd (get_id s2) in
+    let sname1 = get_id s1
+    and sname2 = get_id s2 in
+    let left_a  = getd sname1 in
+    let right_a = getd sname2 in
       (* else, we combine both actions together. *)
-      make_bi_descr
+      make_bi_descr sname1 sname2
         (Action.pi_descr (get_proj s1) left_a)
         (Action.pi_descr (get_proj s2) right_a)
 
@@ -140,10 +171,7 @@ let descr_of_action table (system : system_expr) a =
 let descrs table se = 
   let same_shapes descrs1 descrs2 = 
     System.Msh.for_all (fun shape d1 ->
-        System.Msh.mem shape descrs2 &&
-        ( let d2 = System.Msh.find shape descrs2 in
-          compatible_descr d1 d2 )
-      ) descrs1 &&
+        System.Msh.mem shape descrs2) descrs1 &&
     System.Msh.for_all (fun shape _ ->
         System.Msh.mem shape descrs1) descrs2
   in
@@ -152,10 +180,12 @@ let descrs table se =
   match se with
   | Pair (s1, s2) ->
     (* we must check that the two systems have the same set of shapes *)
-    let left_descrs  = System.descrs table (get_id s1) in
-    let right_descrs = System.descrs table (get_id s2) in
+    let sname1 = get_id s1
+    and sname2 = get_id s2 in
+    let left_descrs  = System.descrs table sname1 in
+    let right_descrs = System.descrs table sname2 in
     if not (same_shapes left_descrs right_descrs) then
-      bisystem_error "Cannot iter over a bisytem with distinct control flow";
+      bisystem_error (SE_DifferentControlFlow (sname1,sname2));
     System.Msh.mapi
       (fun shape _ -> descr_of_shape table se shape)
       left_descrs
@@ -231,7 +261,9 @@ let clone_system_subst table original_system new_system substd =
   then raise SystemNotFresh
   else
     let data = System.System_data ndescrs in
-    Symbols.System.declare_exact table new_system ~data ()
+    try Symbols.System.declare_exact table new_system ~data () with
+    | Symbols.Multiple_declarations _ ->
+      raise (System.SystemError (System.SE_SystemAlreadyDefined new_system))
 
 
 let pp_descrs table ppf system =
@@ -266,12 +298,12 @@ let pp_p_system fmt = function
   | P_Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_p_single s1 pp_p_single s2
 
 let parse_single table = function
-  | P_Left a  -> Left  (Symbols.System.of_string a table)
-  | P_Right a -> Right (Symbols.System.of_string a table)
+  | P_Left a  -> Left  (System.of_string a table)
+  | P_Right a -> Right (System.of_string a table)
 
 let parse_se table = function
   | P_Single s       -> Single (parse_single table s)
-  | P_SimplePair str -> SimplePair (Symbols.System.of_string str table)
+  | P_SimplePair str -> SimplePair (System.of_string str table)
   | P_Pair (a,b)     -> Pair ( parse_single table a, 
                                parse_single table b )
 

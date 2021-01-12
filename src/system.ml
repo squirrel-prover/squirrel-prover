@@ -3,6 +3,23 @@ include Symbols.System
 type system_name = Symbols.system Symbols.t
 
 (*------------------------------------------------------------------*)
+type system_error = 
+  | SE_ShapeError
+  | SE_UnknownSystem of string
+  | SE_SystemAlreadyDefined of string
+
+let pp_system_error fmt = function
+  | SE_ShapeError -> 
+    Fmt.pf fmt "cannot register a shape twice with distinct indices." 
+  | SE_UnknownSystem s -> 
+    Fmt.pf fmt "system [%s] unknown" s
+  | SE_SystemAlreadyDefined s -> 
+    Fmt.pf fmt "system [%s] already defined" s
+
+exception SystemError of system_error
+
+let system_err e = raise (SystemError e)
+(*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
   let rec compare (u : t) (v : t) = match u,v with
@@ -19,10 +36,17 @@ module Msh = Map.Make (ShapeCmp)
 
 type Symbols.data += System_data of Action.descr Msh.t
 
+let of_string system_name (table : Symbols.table) =
+  try Symbols.System.of_string system_name table with
+  | Symbols.Unbound_identifier _ -> 
+    system_err (SE_UnknownSystem system_name)
+
 let declare_empty table system_name =
     let def = () in
     let data = System_data Msh.empty in
-    Symbols.System.declare_exact table system_name ~data def
+    try Symbols.System.declare_exact table system_name ~data def with
+    | Symbols.Multiple_declarations _ ->
+      system_err (SE_SystemAlreadyDefined system_name)
 
 (*------------------------------------------------------------------*)
 let is_fresh s_str table =
@@ -65,7 +89,7 @@ let action_to_term table system_symb (a : Action.action) =
   let indices = descr.Action.indices in
   Term.Action (descr.name, indices)
 
-let rec dummy_action k = assert false (* TODO *)
+let rec dummy_action (* system table *) k = assert false (* TODO *)
   (* let open Action in
    * let a =
    *   if k = 0 then [] else
@@ -82,15 +106,13 @@ let rec dummy_action k = assert false (* TODO *)
    * a *)
 
 (*------------------------------------------------------------------*)
-exception SystemError of string
 
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
 
   match action_to_term table system_symb action with
   | Term.Action (symb2, is) when indices <> is ->
-      raise @@
-      SystemError "Cannot register a shape twice with distinct indices."
+      system_err SE_ShapeError
 
   | Term.Action (symb2, is) ->
       let subst =

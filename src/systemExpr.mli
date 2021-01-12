@@ -21,10 +21,28 @@ type system_expr =
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
 
+
 val pp_system : Format.formatter -> system_expr -> unit
 
 (*------------------------------------------------------------------*)
-exception BiSystemError of string
+(** {2 Error handling} *)
+
+(*------------------------------------------------------------------*)
+type ssymb_pair = System.system_name * 
+                  System.system_name
+
+type system_expr_err = 
+  | SE_NotABiProcess of System.system_name
+  | SE_NoneProject
+  | SE_IncompatibleAction   of ssymb_pair * string
+  | SE_DifferentControlFlow of ssymb_pair
+
+val pp_system_expr_err : Format.formatter -> system_expr_err -> unit
+
+exception BiSystemError of system_expr_err
+
+(*------------------------------------------------------------------*)
+(** {2 Projection and action builder} *)
 
 (** Prject a system according to the given projection.  The pojection must not
    be None, and the system must be a bi system, i.e either SimplePair or Pair.
@@ -39,6 +57,8 @@ val action_to_term :
   Symbols.table -> system_expr -> Action.action -> Term.timestamp
 
 (*------------------------------------------------------------------*)
+(** {2 Action descriptions and iterators} *)
+
 val descr_of_shape :
   Symbols.table -> system_expr -> Action.shape -> Action.descr
 
