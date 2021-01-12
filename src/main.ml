@@ -171,10 +171,10 @@ let rec main_loop ~test ?(save=true) state =
     error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Prover.ParseError s) -> 
     error ~test state (fun fmt -> Fmt.string fmt s)
-  | exception (Decl_error e) ->
-    error ~test state (fun fmt -> pp_decl_error fmt e)
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
+  | exception (Decl_error e) when not test ->
+    error ~test state (fun fmt -> pp_decl_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in
@@ -283,9 +283,15 @@ let () =
         (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
     end ;
     "Axiom Systems", `Quick, begin fun () ->
+    "Axiom Systems - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
         (fun () -> run ~test "tests/alcotest/axiom2.sp")
+    end ;
+    "Axiom Systems - 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails"
+        (Prover.Decl_error (SystemError (System.SE_UnknownSystem "test")))
+        (fun () -> run ~test "tests/alcotest/axiom3.sp")
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
