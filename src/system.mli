@@ -1,9 +1,10 @@
 (** The user specifies one or more (bi)systems, identified using names.
   * Each (bi)system is a set of (bi)actions, obtained from a (bi)process. *)
 
-include module type of Symbols.System
-
 type system_name = Symbols.system Symbols.t
+
+(** Declare a new system, without any associated actions. *)
+val declare_empty : Symbols.table -> string -> Symbols.table * system_name
 
 (** Convert action to the corresponding [Action] timestamp term in
     a bi-system. *)
@@ -45,7 +46,7 @@ exception SystemError of string
   * (currently the proposed symbol may not be used for technical
   * reasons that will eventually disappear TODO). *)
 val register_action :
-  Symbols.table -> string ->
+  Symbols.table -> system_name ->
   Symbols.action Symbols.t -> Vars.index list ->
   Action.action -> Action.descr -> 
   Symbols.table * Symbols.action Symbols.t

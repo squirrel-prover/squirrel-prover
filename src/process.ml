@@ -260,7 +260,7 @@ let parse_channel c =
   try Channel.of_string c with
   | Not_found -> raise @@ Theory.Conv (Undefined c)
 
-let parse_proc (system_name : string) init_table proc =
+let parse_proc (system_name : System.system_name) init_table proc =
 
   (* Initial env with special variables registered.
    * The special variables should never be visible to the user,
@@ -732,6 +732,8 @@ let declare_system table (system_name:string) proc =
     assert false end;
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc table [] proc ;
+  let table, system_name = System.declare_empty table system_name in
+
   let proc,table = parse_proc system_name table proc in
   Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   table

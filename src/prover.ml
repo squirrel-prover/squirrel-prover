@@ -633,8 +633,8 @@ let current_goal () = !current_goal
 (*------------------------------------------------------------------*)
 
 let declare table = function
-  | Decl.Decl_channel s             -> Channel.declare table s 
-  | Decl.Decl_process (id,pkind,p)  -> Process.declare table id pkind p
+  | Decl.Decl_channel s            -> Channel.declare table s 
+  | Decl.Decl_process (id,pkind,p) -> Process.declare table id pkind p
 
   | Decl.Decl_axiom (gdecl) ->
     let name = match gdecl.gname with 
@@ -646,7 +646,7 @@ let declare table = function
     add_proved_goal (name, goal);
     table
 
-  | Decl.Decl_system (sdecl) ->
+  | Decl.Decl_system sdecl ->
     let name = match sdecl.sname with 
       | None -> SystemExpr.default_system_name
       | Some n -> n

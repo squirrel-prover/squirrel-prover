@@ -2,7 +2,6 @@ include Symbols.System
 
 type system_name = Symbols.system Symbols.t
 
-
 (*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
@@ -20,19 +19,15 @@ module Msh = Map.Make (ShapeCmp)
 
 type Symbols.data += System_data of Action.descr Msh.t
 
+let declare_empty table system_name =
+    let def = () in
+    let data = System_data Msh.empty in
+    Symbols.System.declare_exact table system_name ~data def
+
+(*------------------------------------------------------------------*)
 let is_fresh s_str table =
   try ignore (Symbols.System.of_string s_str table); false
   with Symbols.Unbound_identifier _ -> true
-
-let get_or_create_system table s_str = 
-  try
-    let s_symb = Symbols.System.of_string s_str table in
-    table, s_symb
-  with
-  | Symbols.Unbound_identifier _ ->
-    let def = () in
-    let data = System_data Msh.empty in
-    Symbols.System.declare_exact table s_str ~data def
 
 let descrs table s_symb = 
   match Symbols.System.get_all s_symb table with
@@ -89,11 +84,10 @@ let rec dummy_action k = assert false (* TODO *)
 (*------------------------------------------------------------------*)
 exception SystemError of string
 
-let register_action table system_str symb indices action descr =
+let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
-  let table, system = get_or_create_system table system_str in
 
-  match action_to_term table system action with
+  match action_to_term table system_symb action with
   | Term.Action (symb2, is) when indices <> is ->
       raise @@
       SystemError "Cannot register a shape twice with distinct indices."
@@ -103,12 +97,12 @@ let register_action table system_str symb indices action descr =
         Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
       let descr = Action.subst_descr [subst] descr in 
       assert (descr.action = action); 
-      let table = add_action table system shape symb2 descr in
+      let table = add_action table system_symb shape symb2 descr in
       table, symb2
 
   | _ -> assert false
 
   | exception Not_found ->    
       let table = Action.define_symbol table symb indices action in
-      let table = add_action table system shape symb descr in
+      let table = add_action table system_symb shape symb descr in
       table, symb

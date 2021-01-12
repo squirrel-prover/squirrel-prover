@@ -317,21 +317,21 @@ let () =
            ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp"
                    : Symbols.table ))
     end ;
-    "Apply Proc", `Quick, begin fun () ->
+    "Apply Proc - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Prover.Decl_error (Conv_error (Arity_error ("C",1,0))))
         (fun () ->
            ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
                    : Symbols.table ))
     end ;
-    "Apply Proc", `Quick, begin fun () ->
+    "Apply Proc - 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Prover.Decl_error (Conv_error (Undefined "D")))
+        (Symbols.Unbound_identifier "D")
         (fun () -> 
            ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                    : Symbols.table ))
     end ;
-    "Apply Proc", `Quick, begin fun () ->
+    "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Prover.Decl_error (Multiple_declarations "C"))
         (fun () -> 

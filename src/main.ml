@@ -157,13 +157,14 @@ let rec main_loop ~test ?(save=true) state =
    * In practice we save except after errors and the first call. *)
   if save then save_state state.mode state.table ;
 
-  let new_state = main_loop_body ~test state in
-  match state.mode with
+  match
+    let new_state = main_loop_body ~test state in
+    new_state, new_state.mode with
   (* exit prover *)
-  | AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
+  | _, AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
   (* loop *)
-  | _ -> (main_loop[@tailrec]) ~test new_state
+  | new_state, _ -> (main_loop[@tailrec]) ~test new_state
 
   (* exception handling *)
   | exception (Parserbuf.Error s) -> 
