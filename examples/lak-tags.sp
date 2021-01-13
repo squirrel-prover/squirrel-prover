@@ -21,7 +21,6 @@ abstract ko : message
 
 abstract tag1 : message
 abstract tag2 : message
-axiom tags_neq : tag1 <> tag2
 
 name key : index->message
 name key': index->index->message
@@ -50,6 +49,8 @@ process reader(j:index) =
     out(cR,ko)
 
 system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
+
+axiom tags_neq : tag1 <> tag2.
 
 goal wa_R1: forall j:index,
   cond@R1(j)
