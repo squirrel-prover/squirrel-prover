@@ -130,6 +130,9 @@ module type Namespace = sig
   (** Reserve a fresh symbol name, resembling the given string. *)
   val reserve : table -> string -> table * ns t
 
+  (** Reserve a fresh symbol name. *)
+  val reserve_exact : table -> string -> table * ns t
+
   (** Define a symbol name that has been previously reserved
     * using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table

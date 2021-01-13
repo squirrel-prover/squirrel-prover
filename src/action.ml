@@ -60,7 +60,10 @@ let same_shape a b : Term.subst option =
 
 type Symbols.data += Data of Vars.index list * action
 
-let fresh_symbol table name = Symbols.Action.reserve table name
+let fresh_symbol table ~exact name = 
+  if exact 
+  then Symbols.Action.reserve_exact table name
+  else Symbols.Action.reserve       table name
 
 let define_symbol table symb args action =
   let data = Data (args,action) in

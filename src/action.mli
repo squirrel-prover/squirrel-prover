@@ -86,9 +86,11 @@ val of_term :
 
 type Symbols.data += Data of Vars.index list * action
 
-(** Get a fresh symbol whose name starts with the given prefix. *)
+(** Get a fresh symbol whose name starts with the given prefix. 
+    If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
-  Symbols.table -> string -> Symbols.table * Symbols.action Symbols.t
+  Symbols.table -> exact:bool -> string -> 
+  Symbols.table * Symbols.action Symbols.t
 
 val define_symbol :
   Symbols.table -> 

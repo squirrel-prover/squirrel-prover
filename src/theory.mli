@@ -134,7 +134,7 @@ type conversion_error =
   | Tactic_type of string
   | Index_not_var of term
   | Assign_no_state of string
-  | StrictAliasError
+  | StrictAliasError of string
   | BadNamespace of string * Symbols.namespace
 
 exception Conv of conversion_error

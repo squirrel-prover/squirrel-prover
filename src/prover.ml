@@ -17,11 +17,8 @@ type decl_error =  L.t * dkind * decl_error_i
 let pp_decl_error_i fmt = function
   | Conv_error e -> Theory.pp_error fmt e
   | Multiple_declarations s ->
-    let pp_loc _fmt = ()        (* TODO: locations *) in
     Fmt.pf fmt
-      "@[Multiple declarations %t of the symbol: %s.@]@."
-      pp_loc
-      s
+      "@[Multiple declarations of the symbol: %s.@]@." s
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e

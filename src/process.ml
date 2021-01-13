@@ -140,7 +140,7 @@ let check_proc table env p =
     | Alias (Out (_,m,p), _) as proc ->
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ()) 
-      then raise Theory.(Conv StrictAliasError)
+      then raise Theory.(Conv (StrictAliasError "missing alias"))
       else
         let () = Theory.check table ~local:true env m Sorts.emessage in
         check_p env p
@@ -312,7 +312,14 @@ let parse_proc (system_name : System.system_name) init_table proc =
   (* Register an action, when we arrive at the end of a block
    * (input / condition / update / output). *)
   let register_action a output table env =
-    let table,a' = Action.fresh_symbol table a in
+    (* In strict alias mode, we require that the alias T is available. *)
+    let exact = Config.strict_alias_mode () in
+    let table,a' = try Action.fresh_symbol table ~exact a with
+      | Symbols.Multiple_declarations s -> 
+        let err = "symbol " ^ a ^ " is already defined" in
+        raise Theory.(Conv (StrictAliasError err))
+    in
+
     let action = List.rev env.action in
     let input = match env.inputs with
     | (c,v)::_ -> (c,Vars.name v)
@@ -322,15 +329,18 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let action_term = Term.Action (a', indices) in
     let in_th = Theory.var (snd input) in
     let in_tm = Term.Macro (Term.in_macro, [], action_term) in
+
     (* substitute the special timestamp variable [ts], since at this point
      * we know the action *)
     let subst_ts = [ Term.ESubst (Term.Var ts, action_term) ] in
+
     (* override previous term substitution for input variable
     * to use the known action *)
     let subst_input =
       try [Term.ESubst (snd (list_assoc (snd input) env.msubst), in_tm)]
       with Not_found -> []
     in
+
     let msubst' =
       try
         begin match
@@ -347,11 +357,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
       { env with
         msubst = msubst' }
     in
+
     debug "register action %a@." Term.pp action_term ;
     debug "indices = %a@." Vars.pp_list env.indices ;
     debug "input variables = %a@." Vars.pp_list (List.map snd env.inputs) ;
     print_isubst env.isubst ;
     print_msubst env.msubst ;
+
     (* compute the condition, the updates, and the output of this action,
      * using elements we have stored in [env] of type [p_env] while parsing
      * the process *)
@@ -361,6 +373,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         (subst_ts @ subst_input)
         (List.fold_left Term.mk_and Term.True env.facts)
     in
+
     let updates =
       List.map
         (fun (s,l,t) ->
@@ -368,11 +381,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
+
     debug "updates = %a.@."
       (Utils.pp_list
          (fun ch (u,v) ->
             Format.fprintf ch "_ := %a" Term.pp v))
       updates ;
+
     let output = match output with
       | Some (c,t) ->
           c,
@@ -380,17 +395,18 @@ let parse_proc (system_name : System.system_name) init_table proc =
             (conv_term table env action_term t Sorts.Message)
       | None -> Symbols.dummy_channel, Term.empty
     in
+
     debug "output = %a,%a.@."
       Channel.pp_channel (fst output) Term.pp (snd output) ;
     let action_descr =      
       Action.{ name = a'; action; input; indices = indices; 
                condition; updates; output } 
     in
-    let table,new_a,action_descr =
-      System.register_action
-        table
-        system_name a' indices action action_descr
+
+    let table, new_a, action_descr =
+      System.register_action table system_name a' indices action action_descr
     in
+
     debug "descr = %a@." Action.pp_descr action_descr ;
     let new_indices = action_descr.indices in
     let new_action_term = Term.Action (new_a, new_indices) in

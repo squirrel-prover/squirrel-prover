@@ -57,9 +57,7 @@ let empty_table = Ms.empty
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
-(* TODO: remove the builtin option *)
-let table_add table name d =
-  Ms.add name d table
+let table_add table name d = Ms.add name d table
 
 let fresh prefix table =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
@@ -139,6 +137,7 @@ module type Namespace = sig
   type ns
   type def
   val reserve : table -> string -> table * data t
+  val reserve_exact : table -> string -> table * ns t
   val define : table -> data t -> ?data:data -> def -> table
   val redefine : table -> data t -> ?data:data -> def -> table
   val declare :
@@ -176,6 +175,11 @@ module Make (N:S) : Namespace
     let symb = fresh name table in 
     let table = Ms.add symb (Reserved,Empty) table in
     table,symb
+
+  let reserve_exact table name =
+    if Ms.mem name table then raise (Multiple_declarations name);
+    let table = Ms.add name (Reserved,Empty) table in
+    table,name
 
   let define table symb ?(data=Empty) value =
     assert (fst (Ms.find symb table) = Reserved) ;

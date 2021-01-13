@@ -123,7 +123,7 @@ type conversion_error =
   | Tactic_type of string
   | Index_not_var of term
   | Assign_no_state of string
-  | StrictAliasError
+  | StrictAliasError of string            (* TODO: move this to process.ml *)
   | BadNamespace of string * Symbols.namespace
 
 exception Conv of conversion_error
@@ -167,7 +167,7 @@ let pp_error ppf = function
       Fmt.pf ppf "Only states can be assigned values, and the \
                   function symbols %s is not a state" s
 
-  | StrictAliasError -> Fmt.pf ppf "Strict alias error in processus" 
+  | StrictAliasError s -> Fmt.pf ppf "Strict alias error: %s" s
 
   | BadNamespace (s,n) -> 
     Fmt.pf ppf "Kind error: %s has kind %a" s 
