@@ -38,7 +38,7 @@ type orcl_tag_info = Theory.formula
 val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 (** Declarations *)
-type declaration =
+type declaration_i =
   | Decl_channel of string
   | Decl_process of Process.id * Process.pkind * Process.process
   | Decl_axiom   of goal_decl
@@ -54,7 +54,15 @@ type declaration =
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
 
+type declaration = declaration_i Location.located
+
 type declarations = declaration list
 
+(*------------------------------------------------------------------*)
+(** {2 Debugging pretty printers}*)
+
+(** Do not print the location information. *)
 val pp_decl  : Format.formatter -> declaration  -> unit
+
+(** Do not print the location information. *)
 val pp_decls : Format.formatter -> declarations -> unit

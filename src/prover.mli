@@ -191,11 +191,13 @@ val start_proof : unit -> string option
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type decl_error = 
+type decl_error_i = 
   | Conv_error of Theory.conversion_error
   | Multiple_declarations of string 
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
+
+type decl_error =  Location.t * decl_error_i
 
 exception Decl_error of decl_error
 
