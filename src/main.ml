@@ -123,7 +123,7 @@ let main_loop_body ~test state =
 
     | GoalMode, ParsedGoal goal ->
       begin
-        match goal with
+        match L.unloc goal with
         | Prover.Gm_proof ->
           begin
             match start_proof () with
@@ -133,7 +133,7 @@ let main_loop_body ~test state =
             | Some es -> cmd_error (StartProofError es)
           end
         | Prover.Gm_goal (i,f) ->
-          let i,f = add_new_goal state.table (i,f) in
+          let i,f = Prover.declare_new_goal state.table (L.loc goal) i f in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;
@@ -306,7 +306,8 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try run ~test "tests/alcotest/axiom3.sp" with
-           | Prover.Decl_error (_, SystemError (System.SE_UnknownSystem "test")) ->
+           | Prover.Decl_error (_, KDecl, 
+                                SystemError (System.SE_UnknownSystem "test")) ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->

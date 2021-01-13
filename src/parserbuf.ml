@@ -278,7 +278,8 @@ let () =
         (fun () -> 
            try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
                        : Symbols.table )
-           with (Prover.Decl_error (_, Multiple_declarations "c")) -> raise Ok)
+           with (Prover.Decl_error (_,Prover.KDecl, 
+                                    Multiple_declarations "c")) -> raise Ok)
     end ;
     "Action creation", `Quick, begin fun () ->
       let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
@@ -323,7 +324,8 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp" 
                        : Symbols.table ) 
            with 
-             Prover.Decl_error (_, Conv_error (
+             Prover.Decl_error (_, Prover.KDecl, 
+                                Conv_error (
                  Type_error (App ("n",[]),Sorts.(ESort Timestamp)))) -> 
              raise Ok)
     end ;
@@ -334,7 +336,8 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
                        : Symbols.table )
            with
-             (Prover.Decl_error (_, Conv_error (Arity_error ("C",1,0)))) -> 
+             (Prover.Decl_error (_, Prover.KDecl, 
+                                 Conv_error (Arity_error ("C",1,0)))) -> 
              raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->
@@ -349,6 +352,7 @@ let () =
         (fun () -> 
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
-           with Prover.Decl_error (_, Multiple_declarations "C") -> raise Ok)
+           with Prover.Decl_error (_, Prover.KDecl, 
+                                   Multiple_declarations "C") -> raise Ok)
     end ;
   ];;

@@ -4,6 +4,50 @@
 module L = Location
 
 (*------------------------------------------------------------------*)
+type decl_error_i = 
+  | Conv_error            of Theory.conversion_error
+  | Multiple_declarations of string 
+  | SystemError           of System.system_error
+  | SystemExprError       of SystemExpr.system_expr_err
+
+type dkind = KDecl | KGoal
+
+type decl_error =  L.t * dkind * decl_error_i
+
+let pp_decl_error_i fmt = function
+  | Conv_error e -> Theory.pp_error fmt e
+  | Multiple_declarations s ->
+    let pp_loc _fmt = ()        (* TODO: locations *) in
+    Fmt.pf fmt
+      "@[Multiple declarations %t of the symbol: %s.@]@."
+      pp_loc
+      s
+  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
+
+  | SystemError e -> System.pp_system_error fmt e
+
+let pp_decl_error pp_loc_err fmt (loc,k,e) = 
+  let pp_k fmt = function
+    | KDecl -> Fmt.pf fmt "Declaration"
+    | KGoal -> Fmt.pf fmt "Goal declaration" in
+  Fmt.pf fmt "%a%a failed: %a."     
+    pp_loc_err loc 
+    pp_k k
+    pp_decl_error_i e
+
+exception Decl_error of decl_error
+
+let decl_error loc k e = raise (Decl_error (loc,k,e))
+
+let error_handler loc k f a =
+  let decl_error = decl_error loc k in
+  try f a with
+  | Theory.Conv e -> decl_error (Conv_error e)
+  | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
+  | System.SystemError e -> decl_error (SystemError e)
+  | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
+
+(*------------------------------------------------------------------*)
 module Goal = struct
   type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   let get_env = function
@@ -43,8 +87,11 @@ type p_goal =
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
-type gm_input = Gm_goal of p_goal_name * p_goal | Gm_proof
+type gm_input_i = 
+  | Gm_goal of p_goal_name * p_goal 
+  | Gm_proof
 
+type gm_input = gm_input_i L.located
 
 (*------------------------------------------------------------------*)
 type option_name =
@@ -515,7 +562,7 @@ type parsed_input =
 
 let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
 
-let add_new_goal table (gname,g) =
+let declare_new_goal_i table (gname,g) =
   let gname = match gname with
     | P_unknown -> unnamed_goal ()
     | P_named s -> s in
@@ -541,6 +588,9 @@ let add_new_goal table (gname,g) =
     goals :=  (gname,g) :: !goals;
 
   (gname,g)
+
+let declare_new_goal table loc n g = 
+  error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal (gname,j) =
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
@@ -634,35 +684,6 @@ let start_proof () = match !current_goal, !goals with
 
 let current_goal () = !current_goal
 
-(*------------------------------------------------------------------*)
-type decl_error_i = 
-  | Conv_error of Theory.conversion_error
-  | Multiple_declarations of string 
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
-
-type decl_error =  L.t * decl_error_i
-
-let pp_decl_error_i fmt = function
-  | Conv_error e -> Theory.pp_error fmt e
-  | Multiple_declarations s ->
-    let pp_loc _fmt = ()        (* TODO: locations *) in
-    Fmt.pf fmt
-      "@[Multiple declarations %t of the symbol: %s.@]@."
-      pp_loc
-      s
-  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
-
-  | SystemError e -> System.pp_system_error fmt e
-
-let pp_decl_error pp_loc_err fmt (loc,e) = 
-  Fmt.pf fmt "%aDeclaration failed: %a." 
-    pp_loc_err loc 
-    pp_decl_error_i e
-
-exception Decl_error of decl_error
-
-let decl_error loc e = raise (Decl_error (loc,e))
 
 (*------------------------------------------------------------------*)
 
@@ -706,13 +727,7 @@ let declare_i table = function
 
 let declare table decl =
   let loc = L.loc decl in
-
-  try declare_i table (L.unloc decl) with
-
-  | Theory.Conv e -> decl_error loc (Conv_error e)
-  | Symbols.Multiple_declarations s -> decl_error loc (Multiple_declarations s)
-  | System.SystemError e -> decl_error loc (SystemError e)
-  | SystemExpr.BiSystemError e -> decl_error loc (SystemExprError e)
+  error_handler loc KDecl (declare_i table) (L.unloc decl)
 
 let declare_list table decls = 
   (* For debugging *)

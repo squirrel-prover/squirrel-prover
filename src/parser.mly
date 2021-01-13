@@ -389,7 +389,7 @@ single_system:
 | LBRACKET LEFT COMMA i=ID RBRACKET  { SystemExpr.(P_Left i) }
 | LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Right i)}
 
-goal:
+goal_i:
 | GOAL s=system i=ID COLON f=formula DOT
                  { Prover.Gm_goal (P_named i, P_trace_goal (s, f)) }
 | GOAL s=system f=formula DOT
@@ -406,6 +406,9 @@ goal:
                      (P_named n, Prover.P_equiv_goal_process (b1, b2))}
 
 | PROOF          { Prover.Gm_proof }
+
+goal: 
+| goal=loc(goal_i) { goal }
 
 option_param:
 | TRUE  { Config.Param_bool true  }

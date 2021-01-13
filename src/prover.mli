@@ -43,7 +43,11 @@ type p_goal =
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof]  : start a proof. *)
-type gm_input = Gm_goal of p_goal_name * p_goal | Gm_proof
+type gm_input_i = 
+  | Gm_goal of p_goal_name * p_goal 
+  | Gm_proof
+
+type gm_input = gm_input_i Location.located
 
 
 (*------------------------------------------------------------------*)
@@ -164,8 +168,11 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-(** Add a new goal to the current goals, and returns it *)
-val add_new_goal : Symbols.table -> p_goal_name * p_goal -> named_goal
+(** Declare a new goal to the current goals, and returns it *)
+val declare_new_goal : 
+  Symbols.table -> 
+  Location.t -> p_goal_name -> p_goal -> 
+  named_goal
 
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit
@@ -192,12 +199,14 @@ val start_proof : unit -> string option
 (** {2 Error handling} *)
 
 type decl_error_i = 
-  | Conv_error of Theory.conversion_error
+  | Conv_error            of Theory.conversion_error
   | Multiple_declarations of string 
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
+  | SystemError           of System.system_error
+  | SystemExprError       of SystemExpr.system_expr_err
 
-type decl_error =  Location.t * decl_error_i
+type dkind = KDecl | KGoal
+
+type decl_error =  Location.t * dkind * decl_error_i
 
 exception Decl_error of decl_error
 
