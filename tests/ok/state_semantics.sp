@@ -1,3 +1,5 @@
+set processStrictAliasMode=true.
+
 hash h
 
 name key : index->message
@@ -7,24 +9,24 @@ mutable k2 : index->message
 
 channel c
 
-process T(i:index,j:index) =
+process Tag(i:index,j:index) =
   k1(i) := h(k1(i),key(i));
-  out(c, <k1(i),k2(i)>);
+  T: out(c, <k1(i),k2(i)>);
 
   k1(i) := h(k1(i),key(i));
   k2(i) := <k1(i),k2(i)>;
-  out(c,  <k1(i),k2(i)>);
+  T1: out(c,  <k1(i),k2(i)>);
 
   k1(i) := h(k1(i),key(i));
   let k3 = <k1(i),k2(i)> in
-  out(c, k3);
+  T2: out(c, k3);
 
   let k4 = <k1(i),k2(i)> in
   k1(i) := h(k1(i),key(i));
   let k5 = <k1(i),k4> in
-  out(c, k5)
+  T3: out(c, k5).
 
-system (!_i !_j T(i,j)).
+system (!_i !_j Tag(i,j)).
 
 goal stateSemantics1:
   forall (i,j:index),

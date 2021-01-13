@@ -1,12 +1,12 @@
+system null.
+
 axiom pair_neq_snd :
   forall (x:message, y:message),
   <x,y> <> y
 
 axiom pair_eq_snd_absurd :
   forall (x:message, y:message),
-  <x,y> = y => False
-
-system null.
+  <x,y> = y => False.
 
 goal forall (x,y:message), <x,y> = y => False.
 Proof.

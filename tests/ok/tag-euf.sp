@@ -1,3 +1,5 @@
+set processStrictAliasMode=true.
+
 abstract okSess0 : message
 abstract okSessi : message
 abstract ko : message
@@ -17,33 +19,33 @@ hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) 
 term test : boolean = zero
 
 process P =
-  out(cP, <g^a0, h(g^a0,kP)>)
+  Pout: out(cP, <g^a0, h(g^a0,kP)>)
 
 process S =
   in(cS, sP);
   if h(fst(sP),kP) = snd(sP) then
-    out(cS,ok);
+    Out : out(cS,ok);
     in(cS, challenge);
     if fst(sP)=g^a0 then
-      out(cS,okSess0)
+      OutIf: out(cS,okSess0)
     else
       try find l such that fst(sP) = g^a(l) in
-        out(cS, okSessi)
+        OutTrue: out(cS, okSessi)
       else
-        out(cS, ko)
-  else null
+       OutFalse: out(cS, ko)
+  else Selse: null
 
 system (P | S).
 
-goal S1_charac :
-  exec@S3 => False.
+goal charac :
+  exec@OutFalse => False.
 Proof.
  simpl.
- executable S3.
- depends S, S3.
- apply H1 to S.
- expand exec@S.
- nosimpl(expand exec@S3; expand cond@S;  expand cond@S3; simpl).
+ executable OutFalse.
+ depends Out, OutFalse.
+ apply H1 to Out.
+ expand exec@Out.
+ nosimpl(expand exec@OutFalse; expand cond@Out;  expand cond@OutFalse; simpl).
  euf M0.
  (* we prove the goal where the message satisfies the tag *)
  case H5.
