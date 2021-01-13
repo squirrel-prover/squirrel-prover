@@ -53,6 +53,14 @@
 
 %%
 
+(* Locations *)
+%inline loc(X):
+| x=X {
+    { Location.pl_desc = x;
+      Location.pl_loc  = Location.make $startpos $endpos;
+    }
+  }
+
 (* Terms *)
 
 timestamp:
@@ -222,7 +230,7 @@ index_arity:
 |                                { 0 }
 | LPAREN i=INT RPAREN            { i }
 
-declaration:
+declaration_i:
 | HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
 | HASH e=ID WITH ORACLE f=formula  
                           { Decl.Decl_hash (None, e, Some f) }
@@ -264,6 +272,9 @@ declaration:
 | SYSTEM LBRACKET id=ID RBRACKET p=process 
                           { Decl.(Decl_system { sname = Some id; 
                                                 sprocess = p}) }
+
+declaration: 
+| ldecl=loc(declaration_i)                  { ldecl }
 
 declaration_list:
 | decl=declaration                        { [decl] }

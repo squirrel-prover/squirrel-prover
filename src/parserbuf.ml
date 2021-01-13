@@ -189,22 +189,29 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       let table = 
-        Prover.declare
-          table Decl.(Decl_abstract { name = "error";
-                                      index_arity = 0;
-                                      message_arity = 0;}) in
+        let decl_i = Decl.Decl_abstract { name = "error";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)" 
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
       let table = 
-        Prover.declare table Decl.(Decl_state ("s", 1, Sorts.emessage)) in
+        let decl_i = Decl.Decl_state ("s", 1, Sorts.emessage) in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
       let table = 
-        Prover.declare table Decl.(Decl_state ("ss", 2, Sorts.emessage)) in
+        let decl_i = Decl.Decl_state ("ss", 2, Sorts.emessage) in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
       let table = 
-        Prover.declare table Decl.(Decl_abstract { name = "error";
-                                                   index_arity = 0;
-                                                   message_arity = 0;}) in
+        let decl_i = Decl.Decl_abstract { name = "error";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
       ignore (parse_process table
                 "in(c,x); \
                  try find i such that s(i) = x in \
@@ -235,6 +242,7 @@ let () =
   ];;
 
 let () =
+  let exception Ok in
   let test = true in
   Checks.add_suite "Models" [
     "Null model", `Quick, begin fun () ->
@@ -266,11 +274,11 @@ let () =
               : Symbols.table )
     end ;
     "Multiple declarations", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Multiple_declarations "c"))
+      Alcotest.check_raises "fails" Ok
         (fun () -> 
-           ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
-                   : Symbols.table ))
+           try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
+                       : Symbols.table )
+           with (Prover.Decl_error (_, Multiple_declarations "c")) -> raise Ok)
     end ;
     "Action creation", `Quick, begin fun () ->
       let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
@@ -310,19 +318,24 @@ let () =
               : Symbols.table )
     end ;
     "Local Process", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error
-           (Conv_error (Type_error (App ("n",[]),Sorts.etimestamp))))
+      Alcotest.check_raises "fails" Ok
         (fun () -> 
-           ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp"
-                   : Symbols.table ))
+           try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp" 
+                       : Symbols.table ) 
+           with 
+             Prover.Decl_error (_, Conv_error (
+                 Type_error (App ("n",[]),Sorts.(ESort Timestamp)))) -> 
+             raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Conv_error (Arity_error ("C",1,0))))
+      Alcotest.check_raises "fails" Ok
+        
         (fun () ->
-           ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
-                   : Symbols.table ))
+           try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
+                       : Symbols.table )
+           with
+             (Prover.Decl_error (_, Conv_error (Arity_error ("C",1,0)))) -> 
+             raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
@@ -332,10 +345,10 @@ let () =
                    : Symbols.table ))
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Multiple_declarations "C"))
+      Alcotest.check_raises "fails" Ok
         (fun () -> 
-           ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
-                   : Symbols.table ))
+           try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
+                       : Symbols.table )
+           with Prover.Decl_error (_, Multiple_declarations "C") -> raise Ok)
     end ;
   ];;

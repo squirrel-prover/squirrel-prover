@@ -229,7 +229,10 @@ let main () =
     let filename = List.hd !args in
     run filename
 
+
+(*------------------------------------------------------------------*)
 let () =
+  let exception Ok in
   let test = true in
   Checks.add_suite "Tactics" [
     "Exists Intro", `Quick, begin fun () ->
@@ -289,9 +292,11 @@ let () =
         (fun () -> run ~test "tests/alcotest/axiom2.sp")
     end ;
     "Axiom Systems - 1", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (SystemError (System.SE_UnknownSystem "test")))
-        (fun () -> run ~test "tests/alcotest/axiom3.sp")
+      Alcotest.check_raises "fails" Ok
+        (fun () -> 
+           try run ~test "tests/alcotest/axiom3.sp" with
+           | Prover.Decl_error (_, SystemError (System.SE_UnknownSystem "test")) ->
+             raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
