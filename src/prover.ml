@@ -533,8 +533,8 @@ let make_equiv_goal
     | `Message m ->
         EquivSequent.Message (Theory.convert conv_env subst m Sorts.Message)
   in
-  Goal.Equiv (EquivSequent.init Action.(SimplePair system_name) table
-                env (List.map convert l))
+  let se = SystemExpr.simple_pair table system_name in
+  Goal.Equiv (EquivSequent.init se table env (List.map convert l))
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
@@ -545,8 +545,8 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let system =
     match system_1, system_2 with
     | Left id1, Right id2 when id1 = id2 ->
-      SimplePair id1
-    | _ -> Pair (system_1, system_2)
+      SystemExpr.simple_pair table id1
+    | _ -> SystemExpr.pair table system_1 system_2
   in
   Goal.Equiv (EquivSequent.init system table !env [(EquivSequent.Message term)])
 

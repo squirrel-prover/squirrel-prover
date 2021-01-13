@@ -1043,11 +1043,11 @@ let system_subst new_system isubst vs subst s =
     let new_system_e =
       match TraceSequent.system s with
       | Pair _ | SimplePair _ ->
-        SystemExpr.SimplePair new_system
+        SystemExpr.simple_pair table new_system
       | Single (Left _) ->
-        SystemExpr.Single (Left new_system)
+        SystemExpr.single table (Left new_system)
       | Single (Right _) ->
-        SystemExpr.Single (Right new_system)
+        SystemExpr.single table (Right new_system)
     in
     let new_goal = TraceSequent.set_table table s 
                    |> TraceSequent.set_system new_system_e in

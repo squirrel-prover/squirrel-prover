@@ -16,11 +16,14 @@ val get_proj : single_system -> Term.projection
       as it was declared, considered with its diff terms;
     - a system obtained by
       combinaison of two single system, one for the left and one for the right. *)
-type system_expr =
+type system_expr = private
   | Single     of single_system
   | SimplePair of Symbols.system Symbols.t
   | Pair       of single_system * single_system
 
+val single      : Symbols.table -> single_system -> system_expr
+val simple_pair : Symbols.table -> Symbols.system Symbols.t -> system_expr
+val pair        : Symbols.table -> single_system -> single_system -> system_expr
 
 val pp_system : Format.formatter -> system_expr -> unit
 

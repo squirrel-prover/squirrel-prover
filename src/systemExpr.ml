@@ -82,11 +82,14 @@ let make_bi_descr s1 s2 d1 d2 =
   let incompatible s = incompatible_error s1 s2 s in
 
   let open Action in
-  if not ( d1.name = d2.name &&
-           d1.input = d2.input &&
-           d1.indices = d2.indices ) then
-    incompatible "cannot merge two actions with disctinct \
-                        inputs, indices or names";
+  if not ( d1.name = d2.name ) then
+    incompatible "cannot merge two actions with disctinct names";
+
+  if not ( d1.input = d2.input ) then
+    incompatible "cannot merge two actions with disctinct inputs";
+
+  if not ( d1.indices = d2.indices ) then
+    incompatible "cannot merge two actions with disctinct indices";
 
   if Action.same_shape d1.action d2.action <> None then
     incompatible "cannot merge two actions with different shapes";
@@ -218,6 +221,27 @@ let map_descrs
   let m = System.Msh.map f (descrs table system) in
   List.map snd (System.Msh.bindings m)
 
+
+(** Check that a system expression is valid. This is not obvious only 
+    in the [Pair _] case, in which case we check that the two single 
+    systems are compatible. *)
+let check_system_expr table se = iter_descrs table se (fun _ -> ())
+(* computing the system description has the side-effect of checking that 
+   the systems are compatible *)
+
+(*------------------------------------------------------------------*)
+(** {2 Smart constructor } *)
+
+let single _table a = Single a
+
+let simple_pair _table s = SimplePair s
+
+(* This is the only case where we have to check that the system are 
+   compatible. *)
+let pair table a b =  
+  let se = Pair(a,b) in
+  check_system_expr table se; se
+
 (*------------------------------------------------------------------*)
 
 (** A substition over a description that allows to either substitute the condition
@@ -297,9 +321,8 @@ let parse_single table = function
   | P_Left a  -> Left  (System.of_string a table)
   | P_Right a -> Right (System.of_string a table)
 
-let parse_se table = function
-  | P_Single s       -> Single (parse_single table s)
-  | P_SimplePair str -> SimplePair (System.of_string str table)
-  | P_Pair (a,b)     -> Pair ( parse_single table a, 
-                               parse_single table b )
-
+let parse_se table p_se = match p_se with
+    | P_Single s       -> single table (parse_single table s)
+    | P_SimplePair str -> simple_pair table (System.of_string str table)
+    | P_Pair (a,b)     -> 
+      pair table (parse_single table a) (parse_single table b) 
