@@ -285,7 +285,6 @@ let () =
         (Tactic_soft_failure SEncNoRandom)
         (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
     end ;
-    "Axiom Systems", `Quick, begin fun () ->
     "Axiom Systems - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
