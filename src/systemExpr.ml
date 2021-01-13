@@ -152,12 +152,6 @@ let shape_to_symb table system shape =
   let descr = descr_of_shape table system shape in
   descr.Action.name
 
-let action_to_term table (se : system_expr) (a : Action.action) =
-  let descr = descr_of_shape table se (Action.get_shape a) in
-  let indices = descr.Action.indices in
-  Term.Action (descr.name, indices)
-
-
 let descr_of_action table (system : system_expr) a =
   let descr = descr_of_shape table system (Action.get_shape a) in
   (* We know that [descr.action] and [a] have the same shape,
@@ -167,6 +161,10 @@ let descr_of_action table (system : system_expr) a =
   | None -> assert false
   | Some subst ->
     Action.subst_descr subst descr
+
+let action_to_term table (se : system_expr) (a : Action.action) =
+  let descr = descr_of_action table se a in
+  Term.Action (descr.name, descr.Action.indices)
 
 let descrs table se = 
   let same_shapes descrs1 descrs2 = 
@@ -192,16 +190,14 @@ let descrs table se =
   | SimplePair id ->
     let fds = System.descrs table id in
     System.Msh.mapi
-      (fun shape _ -> descr_of_shape table se shape)
+      (fun shape descr -> Action.pi_descr Term.None descr)
       fds
   | Single s ->
     (* we must projet before iterating *)
     let sname = get_id s in
     let shapes = System.descrs table sname in
     System.Msh.mapi
-      (fun shape _ -> 
-         Action.pi_descr (get_proj s) (
-           System.descr_of_shape table sname shape ))
+      (fun shape descr -> Action.pi_descr (get_proj s) descr)
       shapes
 
 let iter_descrs 
