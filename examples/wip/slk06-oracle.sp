@@ -18,6 +18,20 @@ R -> T : h(ID,PIN)
          ID' := h(ID,PIN,TS)
 *******************************************************************************)
 
+(*******************************************************************************
+In this model, we add parallel processes to the global system to model the fact
+that the attacker can hash messages.
+In order to prove the authentication goals, we have to prove that an input
+cannot be equal to some values, ie that values stored in states are not
+deducible.
+The corresponding goals secretStateTag and secretStateReader are not yet fully
+proven: 
+  - admit. (* ok *) ==> I think it is possible to conclude using reasonings on
+state values, but it is to be confirmed.
+  - admit. (* TODO *) ==> I have not yet managed to conclude, and/or have not
+really any idea how to proceed.
+*******************************************************************************)
+
 abstract ok : message
 abstract error : message
 
@@ -184,9 +198,9 @@ left. apply H1 to j'.
 right. exists j1. apply H1 to j'.
 case H2.
 
-admit.
-admit.
-admit.
+admit. (* TODO *)
+admit. (* TODO *)
+admit. (* TODO *)
 
 substitute t,init.
 left.
@@ -263,9 +277,9 @@ case H0.
 admit. (* ok *)
 admit. (* ok *)
 (* case euf 2/3 - T1(i,j) *)
-admit.
+admit. (* TODO *)
 (* case euf 3/3 - A2(kk) *)
-admit.
+admit. (* TODO *)
 Qed.
 
 goal secretStateTag :
@@ -294,12 +308,13 @@ assert T1(i,j') < T1(i,j). admit. (* ok *)
 case H0.
 admit. (* ok *)
 admit. (* ok *)
+admit. (* ok *)
 (* case euf 3/3 - A2(kk) *)
 apply IH0 to A2(kk).
 apply H1 to i,j'.
-admit.
-admit.
-admit.
+admit. (* TODO *)
+admit. (* TODO *)
+admit. (* TODO *)
 
 (* case split 2/2 *)
 apply lastUpdatePredT1 to i,j.
@@ -311,14 +326,14 @@ fresh M3.
 (* general case *)
 assert fst(fst(input@t)) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
 euf M2.
-admit.
-admit.
+admit. (* TODO *)
+admit. (* TODO *)
 
 apply IH0 to A2(kk).
 apply H1 to i,j'.
-admit.
-admit.
-admit.
+admit. (* TODO *)
+admit. (* TODO *)
+admit. (* TODO *)
 Qed.
 
 
