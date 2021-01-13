@@ -10,7 +10,7 @@ type system_error =
 
 let pp_system_error fmt = function
   | SE_ShapeError -> 
-    Fmt.pf fmt "cannot register a shape twice with distinct indices." 
+    Fmt.pf fmt "cannot register a shape twice with distinct indices" 
   | SE_UnknownSystem s -> 
     Fmt.pf fmt "system [%s] unknown" s
   | SE_SystemAlreadyDefined s -> 
@@ -129,20 +129,27 @@ let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
 
   match find_shape table shape with
-  | Some (symb2, is) when indices <> is ->
+  | Some (symb2, is) when List.length indices <> List.length is ->
       system_err SE_ShapeError
 
   | Some (symb2, is) ->
-    let subst =
-      Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
+    let subst_action =
+      [Term.ESubst (Term.Action (symb,indices), Term.Action (symb2,is))]
+    in
     (* Careful, the substitution does not substitute the action symbol
-       [symb] by [symb2]. We must do it manually. *)
-    let descr = Action.subst_descr [subst] descr in 
+       [symb] by [symb2], nor the indices. We must do it manually. *)
+    let descr = Action.subst_descr subst_action descr in 
+
+    let subst_is =
+      List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+        indices is
+    in
+    let descr = Action.subst_descr subst_is descr in
     let descr = { descr with name = symb2 } in
     let table = add_action table system_symb shape symb2 descr in
-    table, symb2
+    table, symb2, descr
 
   | None -> 
     let table = Action.define_symbol table symb indices action in
     let table = add_action table system_symb shape symb descr in
-    table, symb
+    table, symb, descr

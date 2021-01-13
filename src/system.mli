@@ -58,11 +58,11 @@ val descrs :
   * associating it with an action description.
   * The set of registered actions for this system name will define
   * the protocol under study.
-  * Returns the updated table and the actual action symbol used
-  * (currently the proposed symbol may not be used for technical
+  * Returns the updated table and the actual action symbol and description
+  * used * (currently the proposed symbol may not be used for technical
   * reasons that will eventually disappear TODO). *)
 val register_action :
   Symbols.table -> system_name ->
   Symbols.action Symbols.t -> Vars.index list ->
   Action.action -> Action.descr -> 
-  Symbols.table * Symbols.action Symbols.t
+  Symbols.table * Symbols.action Symbols.t * Action.descr
