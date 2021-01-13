@@ -4,9 +4,9 @@
 abstract f : message->message
 abstract a : message
 
-axiom exists y:message, a = f(y)
-
 system null.
+
+axiom exists y:message, a = f(y).
 
 goal forall (x:message),
   (exists y:message, x = f(y)) || x=f(x) =>
