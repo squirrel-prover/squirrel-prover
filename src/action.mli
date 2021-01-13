@@ -77,6 +77,9 @@ val of_term :
   Symbols.table -> 
   action
 
+(** Return a dummy action of a given length. *)
+val dummy : int -> action
+
 (*------------------------------------------------------------------*)
 (** {2 Action symbols}
   *

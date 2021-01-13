@@ -241,3 +241,6 @@ let pp_actions ppf table =
     table;
   Fmt.pf ppf "@]@]@."
 
+let rec dummy len =
+  if len = 0 then [] else
+     { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy (len-1)

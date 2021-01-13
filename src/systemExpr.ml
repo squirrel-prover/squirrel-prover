@@ -76,7 +76,6 @@ let project_system proj = function
       | Term.None  -> bisystem_error SE_NoneProject
     end
 
-
 (*------------------------------------------------------------------*)
 let make_bi_descr s1 s2 d1 d2 =
   let incompatible s = incompatible_error s1 s2 s in
@@ -129,8 +128,8 @@ let descr_of_shape table (se : system_expr) shape =
   let getd s_symb = System.descr_of_shape table s_symb shape in
 
   match se with
-  (* we simply project he description according to the projection *)
-  | Single s -> 
+  (* we simply project the description according to the projection *)
+  | Single s ->
     let descr = getd (get_id s) in
     Action.pi_descr (get_proj s) descr
 
@@ -138,21 +137,16 @@ let descr_of_shape table (se : system_expr) shape =
     let descr = getd id in
     Action.pi_descr Term.None descr
 
-  (* else we need to obtain the two corresponding set of shapes, project them
-     correctly, and combine them into a single term. *)
+  (* else we need to obtain the two corresponding sets of shapes,
+     project them correctly, and combine them into a single term. *)
   | Pair (s1, s2) ->
-    let sname1 = get_id s1
-    and sname2 = get_id s2 in
+    let sname1 = get_id s1 in
+    let sname2 = get_id s2 in
     let left_a  = getd sname1 in
     let right_a = getd sname2 in
-      (* else, we combine both actions together. *)
-      make_bi_descr sname1 sname2
-        (Action.pi_descr (get_proj s1) left_a)
-        (Action.pi_descr (get_proj s2) right_a)
-
-let shape_to_symb table system shape = 
-  let descr = descr_of_shape table system shape in
-  descr.Action.name
+    make_bi_descr sname1 sname2
+      (Action.pi_descr (get_proj s1) left_a)
+      (Action.pi_descr (get_proj s2) right_a)
 
 let descr_of_action table (system : system_expr) a =
   let descr = descr_of_shape table system (Action.get_shape a) in
@@ -163,10 +157,6 @@ let descr_of_action table (system : system_expr) a =
   | None -> assert false
   | Some subst ->
     Action.subst_descr subst descr
-
-let action_to_term table (se : system_expr) (a : Action.action) =
-  let descr = descr_of_action table se a in
-  Term.Action (descr.name, descr.Action.indices)
 
 let descrs table se = 
   let same_shapes descrs1 descrs2 = 
@@ -243,6 +233,20 @@ let pair table a b =
 
 (*------------------------------------------------------------------*)
 
+(** Get the action symbols table of a system expression.
+  * We rely on the invariant that the system systems involved in an expression
+  * must have the same such table. *)
+let symbs table = function
+  | SimplePair s | Pair (Left s,_) | Pair (Right s,_)
+  | Single (Left s) | Single (Right s) -> System.symbs table s
+
+let action_to_term table system a =
+  let symbs = symbs table system in
+  let symb = System.Msh.find (Action.get_shape a) symbs in
+    Term.Action (symb, Action.get_indices a)
+
+(*------------------------------------------------------------------*)
+
 (** A substition over a description that allows to either substitute the condition
    or the output of the descr, for a given shape. *)
 type esubst_descr =
@@ -275,14 +279,12 @@ exception SystemNotFresh
    system obtained from the susbtition. *)
 let clone_system_subst table original_system new_system substd =
   let odescrs = descrs table original_system in
+  let symbs = symbs table original_system in
   let ndescrs = System.Msh.map (subst substd) odescrs in
-  if not (System.is_fresh new_system table) 
-  then raise SystemNotFresh
-  else
-    let data = System.System_data ndescrs in
-    try Symbols.System.declare_exact table new_system ~data () with
-    | Symbols.Multiple_declarations _ ->
-      raise (System.SystemError (System.SE_SystemAlreadyDefined new_system))
+  let data = System.System_data (ndescrs,symbs) in
+  try Symbols.System.declare_exact table new_system ~data () with
+  | Symbols.Multiple_declarations _ ->
+    raise (System.SystemError (System.SE_SystemAlreadyDefined new_system))
 
 
 let pp_descrs table ppf system =

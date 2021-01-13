@@ -51,6 +51,8 @@ type data += AssociatedFunctions of (fname t) list
 (*------------------------------------------------------------------*)
 let to_string s = s
 
+let pp = Format.pp_print_string
+
 type table = (edef * data) Ms.t
 
 let empty_table = Ms.empty
@@ -262,7 +264,7 @@ module Action = Make (struct
   type ns = action
   type local_def = int
   let construct d = Action d
-  let deconstruct s = match s with
+  let deconstruct = function
     | Exists (Action d) -> d
     | _ -> raise Incorrect_namespace
 end)

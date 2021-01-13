@@ -3,6 +3,10 @@
 
 type system_name = Symbols.system Symbols.t
 
+val pp_system : Symbols.table -> Format.formatter -> system_name -> unit
+
+val pp_systems : Format.formatter -> Symbols.table -> unit
+
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
@@ -24,11 +28,6 @@ val of_string : string -> Symbols.table -> system_name
 (** Declare a new system, without any associated actions. *)
 val declare_empty : Symbols.table -> string -> Symbols.table * system_name
 
-(** Convert action to the corresponding [Action] timestamp term in
-    a bi-system. *)
-val action_to_term : 
-  Symbols.table -> system_name -> Action.action -> Term.timestamp
-
 (** Specify if a given system name is not already in use. *)
 val is_fresh : string -> Symbols.table -> bool
 
@@ -37,19 +36,22 @@ val descr_of_shape :
   Symbols.table -> Symbols.system Symbols.t -> Action.shape -> 
   Action.descr
 
-(** Get dummy action of some length. Guarantees that a symbol exists 
-    for it. *)
-val dummy_action : int -> Action.action
-
 module Msh : Map.S with type key = Action.shape
 
-type Symbols.data += System_data of Action.descr Msh.t
+type Symbols.data +=
+  System_data of Action.descr Msh.t * Symbols.action Symbols.t Msh.t
 
 (** Return all the action descriptions of a given system. *)
 val descrs : 
   Symbols.table ->
   Symbols.system Symbols.t ->
   Action.descr Msh.t
+
+(** Return all the action symbols (dummies includes) of a system. *)
+val symbs :
+  Symbols.table ->
+  Symbols.system Symbols.t ->
+  Symbols.action Symbols.t Msh.t
 
 (*------------------------------------------------------------------*)
 (** {2 Registration of actions} *)

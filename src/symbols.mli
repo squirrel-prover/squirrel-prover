@@ -103,6 +103,9 @@ exception Multiple_declarations of string
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string
 
+(** Pretty-print a symbol. *)
+val pp : Format.formatter -> 'a t -> unit
+
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val def_of_string : string -> table -> edef

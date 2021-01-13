@@ -39,7 +39,7 @@ let tac_error_strings =
    (DidNotFail, "DidNotFail")]
 
 let rec tac_error_to_string = function
-  | Failure s -> "Failure "^s
+  | Failure s -> Format.sprintf "Failure %S" s
   | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
   | Cannot_convert _ -> "CannotConvert"
   | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
@@ -125,6 +125,17 @@ let rec tac_error_of_strings = function
 exception Tactic_soft_failure of tac_error
 
 exception Tactic_hard_failure of tac_error
+
+let () =
+  Printexc.register_printer
+    (function
+       | Tactic_hard_failure e ->
+           Some
+             (Format.sprintf "Tactic_hard_failure(%s)" (tac_error_to_string e))
+       | Tactic_soft_failure e ->
+           Some
+             (Format.sprintf "Tactic_soft_failure(%s)" (tac_error_to_string e))
+       | _ -> None)
 
 type a
 

@@ -1320,8 +1320,8 @@ let cca1 TacticsArgs.(Int i) s =
       | _ ->
         Tactics.soft_failure
           (Tactics.Failure
-             "CCA1 can only be applied on a term with at least one occurrence
-            of an encryption term enc(t,r,pk(k))")
+             "CCA1 can only be applied on a term with at least one occurrence \
+              of an encryption term enc(t,r,pk(k))")
     end
     in
     let fgoals, substs = hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
@@ -1331,8 +1331,8 @@ let cca1 TacticsArgs.(Int i) s =
     if substs = [] then
          Tactics.soft_failure
           (Tactics.Failure
-             "CCA1 can only be applied on a term with at least one occurrence
-            of an encryption term enc(t,r,pk(k))");
+             "CCA1 can only be applied on a term with at least one occurrence \
+              of an encryption term enc(t,r,pk(k))");
     let new_elem =    EquivSequent.apply_subst_frame substs [e] in
     let biframe = (List.rev_append before (new_elem @ after)) in
      Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) :: fgoals

@@ -94,7 +94,7 @@ let main_loop_body ~test state =
 
     | GoalMode, ParsedInputDescr decls ->
       let table = Prover.declare_list state.table decls in
-      Printer.pr "%a" Action.pp_actions table;
+      Printer.pr "%a" System.pp_systems table;
       { mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
@@ -262,7 +262,7 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.sp")
     end ;
-    "SEnc Bad SSC - INCTXT 1", `Quick, begin fun () ->
+    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure SEncNoRandom)
         (fun () -> run ~test "tests/alcotest/intctxt_nornd.sp")
