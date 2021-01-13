@@ -57,6 +57,12 @@ let add_action
     (table : Symbols.table) (s_symb : Symbols.system Symbols.t) 
     (shape : Action.shape)  (action : Symbols.action Symbols.t) 
     (descr : Action.descr) =
+  (* Sanity checks *)
+  assert (shape = Action.get_shape descr.action);
+  assert (Action.get_indices descr.action = descr.indices);
+  assert (action = descr.name);
+
+  (* We add the action *)
   let descrs = descrs table s_symb in
   if Msh.mem shape descrs 
   then assert false             (* should be impossible *)
@@ -81,7 +87,7 @@ let shape_to_symb table system_symb shape =
 
 let action_to_term table system_symb (a : Action.action) =
   let descr = descr_of_shape table system_symb (Action.get_shape a) in
-  let indices = descr.Action.indices in
+  let indices = Action.get_indices a in
   Term.Action (descr.name, indices)
 
 let rec dummy_action (* system table *) k = assert false (* TODO *)
@@ -102,24 +108,41 @@ let rec dummy_action (* system table *) k = assert false (* TODO *)
 
 (*------------------------------------------------------------------*)
 
+(** We look whether the shape already has a name in another system,
+    with the same number of indices.
+    If that is the case, use the same symbol. *)
+let find_shape table shape =
+  let exception Found of Symbols.action Symbols.t * Vars.index list in
+  try Symbols.System.iter (fun system () data ->
+      let descrs = match data with
+        | System_data descrs -> descrs
+        | _ -> assert false in
+      if Msh.mem shape descrs then 
+        let descr = Msh.find shape descrs in
+        raise (Found (descr.name, descr.indices))
+      else ()
+    ) table; 
+    None
+  with Found (x,y) -> Some (x,y)
+
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
 
-  match action_to_term table system_symb action with
-  | Term.Action (symb2, is) when indices <> is ->
+  match find_shape table shape with
+  | Some (symb2, is) when indices <> is ->
       system_err SE_ShapeError
 
-  | Term.Action (symb2, is) ->
-      let subst =
-        Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
-      let descr = Action.subst_descr [subst] descr in 
-      assert (descr.action = action); 
-      let table = add_action table system_symb shape symb2 descr in
-      table, symb2
+  | Some (symb2, is) ->
+    let subst =
+      Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
+    (* Careful, the substitution does not substitute the action symbol
+       [symb] by [symb2]. We must do it manually. *)
+    let descr = Action.subst_descr [subst] descr in 
+    let descr = { descr with name = symb2 } in
+    let table = add_action table system_symb shape symb2 descr in
+    table, symb2
 
-  | _ -> assert false
-
-  | exception Not_found ->    
-      let table = Action.define_symbol table symb indices action in
-      let table = add_action table system_symb shape symb descr in
-      table, symb
+  | None -> 
+    let table = Action.define_symbol table symb indices action in
+    let table = add_action table system_symb shape symb descr in
+    table, symb

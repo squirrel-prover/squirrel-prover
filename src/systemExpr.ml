@@ -91,9 +91,8 @@ let make_bi_descr s1 s2 d1 d2 =
   if not ( d1.indices = d2.indices ) then
     incompatible "cannot merge two actions with disctinct indices";
 
-  if Action.same_shape d1.action d2.action <> None then
+  if Action.same_shape d1.action d2.action = None then 
     incompatible "cannot merge two actions with different shapes";
-
 
   let condition =
     let is1,t1 = d1.condition 
