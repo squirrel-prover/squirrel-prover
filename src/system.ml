@@ -22,14 +22,9 @@ let system_err e = raise (SystemError e)
 (*------------------------------------------------------------------*)
 module ShapeCmp = struct
   type t = Action.shape
-  let rec compare (u : t) (v : t) = match u,v with
-    | a :: u, b :: v -> 
-      let res = Stdlib.compare a b in
-      if res = 0 then compare u v
-      else res
-    | _ :: _, [] -> -1
-    | [], _ :: _ -> 1
-    | [], [] -> 0
+  (* The minus allows to iter over the shapes in the same order that we 
+     used to. *)
+  let rec compare (u : t) (v : t) = - (Stdlib.compare u v)
 end
 
 module Msh = Map.Make (ShapeCmp)
