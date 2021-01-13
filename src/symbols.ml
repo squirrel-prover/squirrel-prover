@@ -47,6 +47,8 @@ type data = ..
 type data += Empty
 type data += AssociatedFunctions of (fname t) list
 
+
+(*------------------------------------------------------------------*)
 let to_string s = s
 
 type table = (edef * data) Ms.t
@@ -70,10 +72,49 @@ let fresh prefix table =
   in
   find i0
 
+(*------------------------------------------------------------------*)
+type namespace = 
+  | NChannel 
+  | NName    
+  | NAction  
+  | NFunction
+  | NMacro   
+  | NSystem  
+  | NProcess 
+
+let pp_namespace fmt = function
+  | NChannel  -> Fmt.pf fmt "Channel" 
+  | NName     -> Fmt.pf fmt "Name"    
+  | NAction   -> Fmt.pf fmt "Action"  
+  | NFunction -> Fmt.pf fmt "Function"
+  | NMacro    -> Fmt.pf fmt "Macro"   
+  | NSystem   -> Fmt.pf fmt "System"  
+  | NProcess  -> Fmt.pf fmt "Process"
+
+let edef_namespace_opt : edef -> namespace option = fun e ->
+  match e with
+  | Exists (Channel  _) -> Some NChannel
+  | Exists (Name     _) -> Some NName
+  | Exists (Action   _) -> Some NAction
+  | Exists (Function _) -> Some NFunction
+  | Exists (Macro    _) -> Some NMacro
+  | Exists (System   _) -> Some NSystem
+  | Exists (Process  _) -> Some NProcess 
+  | Reserved            -> None 
+
+let edef_namespace x = oget (edef_namespace_opt x)
+
+let get_namespace : table -> string -> namespace option = 
+  fun table s ->
+  let f (x,_) = edef_namespace_opt x in  
+  obind f (Ms.find_opt s table)
+
+(*------------------------------------------------------------------*)
 exception Unbound_identifier of string
-exception Incorrect_namespace
+exception Incorrect_namespace 
 exception Multiple_declarations of string
 
+(*------------------------------------------------------------------*)
 let def_of_string s table =
   try fst (Ms.find s table) with Not_found -> raise @@ Unbound_identifier s
 
@@ -93,6 +134,7 @@ let of_string_opt s table =
     | Reserved, _ -> None
   with Not_found -> None
 
+(*------------------------------------------------------------------*)
 module type Namespace = sig
   type ns
   type def
@@ -225,7 +267,7 @@ module Name = Make (struct
   type ns = name
   type local_def = int
   let construct d = Name d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Name d) -> d
     | _ -> raise Incorrect_namespace
 end)
@@ -234,7 +276,7 @@ module Channel = Make (struct
   type ns = channel
   type local_def = unit
   let construct d = Channel d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Channel d) -> d
     | _ -> raise Incorrect_namespace
 end)
@@ -243,7 +285,7 @@ module System = Make (struct
   type ns = system
   type local_def = unit
   let construct d = System d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (System d) -> d
     | _ -> raise Incorrect_namespace
 end)
@@ -252,7 +294,7 @@ module Process = Make (struct
   type ns = process
   type local_def = unit
   let construct d = Process d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Process d) -> d
     | _ -> raise Incorrect_namespace
 end)
@@ -261,7 +303,7 @@ module Function = Make (struct
   type ns = fname
   type local_def = int * function_def
   let construct d = Function d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Function d) -> d
     | _ -> raise Incorrect_namespace
 end)
@@ -276,7 +318,7 @@ module Macro = Make (struct
   type ns = macro
   type local_def = macro_def
   let construct d = Macro d
-  let deconstruct = function
+  let deconstruct s = match s with
     | Exists (Macro d) -> d
     | _ -> raise Incorrect_namespace
 end)

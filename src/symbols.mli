@@ -67,6 +67,21 @@ type edef =
   | Exists : 'a def -> edef
   | Reserved
 
+(*------------------------------------------------------------------*)
+type namespace = 
+  | NChannel 
+  | NName    
+  | NAction  
+  | NFunction
+  | NMacro   
+  | NSystem  
+  | NProcess 
+
+val pp_namespace : Format.formatter -> namespace -> unit
+
+val get_namespace : table -> string -> namespace option 
+
+(*------------------------------------------------------------------*)
 (** {2 Data}
   * In addition to their definition data, some more data can be attached
   * to symbols. This is used for data that is defined in modules that
@@ -81,9 +96,9 @@ type data += AssociatedFunctions of (fname t) list
 
 (** {2 Basic namespace-independent operations} *)
 
-exception Multiple_declarations of string
 exception Unbound_identifier of string
-exception Incorrect_namespace
+exception Incorrect_namespace 
+exception Multiple_declarations of string
 
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string

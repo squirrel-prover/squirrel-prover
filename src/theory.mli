@@ -135,6 +135,7 @@ type conversion_error =
   | Index_not_var of term
   | Assign_no_state of string
   | StrictAliasError
+  | BadNamespace of string * Symbols.namespace
 
 exception Conv of conversion_error
 

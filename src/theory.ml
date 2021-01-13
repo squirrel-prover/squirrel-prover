@@ -1,3 +1,5 @@
+open Utils
+
 type kind = Sorts.esort
 
 type term =
@@ -122,8 +124,11 @@ type conversion_error =
   | Index_not_var of term
   | Assign_no_state of string
   | StrictAliasError
+  | BadNamespace of string * Symbols.namespace
 
 exception Conv of conversion_error
+
+let conv_err e = raise (Conv e)
 
 let pp_error ppf = function
   | Arity_error (s,i,j) -> Fmt.pf ppf "Symbol %s used with arity %i, but \
@@ -162,10 +167,14 @@ let pp_error ppf = function
       Fmt.pf ppf "Only states can be assigned values, and the \
                   function symbols %s is not a state" s
 
-  | StrictAliasError -> Fmt.pf ppf "Strict alias mode in processus: error" 
+  | StrictAliasError -> Fmt.pf ppf "Strict alias error in processus" 
+
+  | BadNamespace (s,n) -> 
+    Fmt.pf ppf "Kind error: %s has kind %a" s 
+      Symbols.pp_namespace n
 
 let check_arity s actual expected =
-  if actual <> expected then raise @@ Conv (Arity_error (s,actual,expected))
+  if actual <> expected then conv_err (Arity_error (s,actual,expected))
 
 type env = (string*kind) list
 
@@ -194,26 +203,26 @@ let function_kind table f : kind list * kind =
     | Macro (Global arity) -> ckind arity 0
     | Macro (Input|Output|Frame) -> [], Sorts.emessage
     | Macro (Cond|Exec) -> [], Sorts.eboolean
-    | _ -> raise @@ Conv (Untyped_symbol f)
+    | _ -> conv_err (Untyped_symbol f)
 
 let check_state table s n =
   match Symbols.def_of_string s table with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
-    | _ -> raise @@ Conv (Assign_no_state s)
+    | _ -> conv_err (Assign_no_state s)
 
 let check_name table s n =
   try
     let arity = Symbols.Name.def_of_string s table in
-    if arity <> n then raise @@ Conv (Index_error (s,n,arity))
+    if arity <> n then conv_err (Index_error (s,n,arity))
   with Symbols.Unbound_identifier _ -> assert false
 
 let check_action table s n =
   match Action.find_symbol s table with
   | (l, _) ->
     let arity = List.length l in
-    if arity <> n then raise @@ Conv (Index_error (s,n,arity))
+    if arity <> n then conv_err (Index_error (s,n,arity))
   | exception Not_found -> assert false
 
 
@@ -281,46 +290,46 @@ let is_at = function At _ -> true | _ -> false
 let get_ts = function At ts | MaybeAt ts -> Some ts | _ -> None
                        
 let make_app table cntxt s l =
-  let arity_error i = Conv (Arity_error (s, List.length l, i)) in
-  let ts_unexpected = Conv (Timestamp_unexpected (App (s,l))) in
+  let arity_error i = conv_err (Arity_error (s, List.length l, i)) in
+  let ts_unexpected () = conv_err (Timestamp_unexpected (App (s,l))) in
+
   match Symbols.def_of_string s table with
   | Symbols.Reserved -> assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->
-        if is_at cntxt then raise ts_unexpected;
+        if is_at cntxt then ts_unexpected ();
         if List.length l <> a + message_arity fdef then
           raise (arity_error (a + message_arity fdef)) ;
         Fun (s,l,None)
     | Symbols.Name arity ->
-        if is_at cntxt then raise ts_unexpected;
+        if is_at cntxt then ts_unexpected ();
         check_arity s (List.length l) arity ;
         Name (s,l)
     | Symbols.Macro (Symbols.State (arity,_)) ->
         check_arity s (List.length l) arity ;
         Get (s,get_ts cntxt,l)
     | Symbols.Macro (Symbols.Global arity) ->
-        if List.length l <> arity then raise @@ arity_error arity;
+        if List.length l <> arity then arity_error arity;
         Fun (s,l,get_ts cntxt)
     | Symbols.Macro (Symbols.Local (targs,_)) ->
-        if is_at cntxt then raise ts_unexpected;
+        if is_at cntxt then ts_unexpected ();
         if List.length targs <> List.length l then
-          raise @@ arity_error (List.length targs) ;
+          arity_error (List.length targs) ;
         Fun (s,l,None)
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
         if cntxt = NoTS then
-          raise @@ Conv (Timestamp_expected (App (s,l)));
-        if l <> [] then raise @@ arity_error 0;
+          conv_err (Timestamp_expected (App (s,l)));
+        if l <> [] then arity_error 0;
         Fun (s,[],get_ts cntxt)
     | Symbols.Action arity ->
-        if arity <> List.length l then raise @@ arity_error arity ;
+        if arity <> List.length l then arity_error arity ;
         Taction (s,l)
     | Symbols.Channel _ 
     | Symbols.Process _ 
     | Symbols.System  _ ->
-        Printer.prt `Error "incorrect %s@." s ;
-        raise Symbols.Incorrect_namespace
+        raise (Conv (BadNamespace (s, oget(Symbols.get_namespace table s))))
     end
   | exception Symbols.Unbound_identifier s ->
       (* By default we interpret s as a variable,
@@ -330,10 +339,7 @@ let make_app table cntxt s l =
        * we raise Unbound_identifier. We could also
        * raise Type_error because a variable is never of
        * a sort that can be applied to indices. *)
-      if l <> [] then begin
-        Printer.prt `Error "incorrect %s@." s ;
-        raise @@ Symbols.Unbound_identifier s
-      end ;
+      if l <> [] then conv_err (Undefined s);
       AVar s
 
 (** Conversion *)
@@ -352,12 +358,12 @@ let pp_subst ppf s =
 let rec assoc : type a. subst -> string -> a Sorts.sort -> a Term.term =
 fun subst st kind ->
   match subst with
-  | [] -> raise @@ Conv (Undefined st)
+  | [] -> conv_err (Undefined st)
   | ESubst (v,t)::_ when v = st ->
       begin try
         Term.cast kind t
       with
-      | Term.Uncastable -> raise @@ Conv (Type_error (App (st,[]),
+      | Term.Uncastable -> conv_err (Type_error (App (st,[]),
                                                       Sorts.ESort kind))
       end
   | _::q -> assoc q st kind
@@ -563,7 +569,7 @@ let rec convert :
 and conv_index env subst t =
   match convert env subst t Sorts.Index with
     | Term.Var x -> x
-    | _ -> raise @@ Conv (Index_not_var t)
+    | _ -> conv_err (Index_not_var t)
 
 and conv_app :
   type s.
@@ -577,7 +583,7 @@ and conv_app :
 
   let get_at () =
     match get_ts app_cntxt with
-    | None -> raise @@ Conv (Timestamp_expected t)
+    | None -> conv_err (Timestamp_expected t)
     | Some ts -> ts in
   
   let type_error = ty_error t sort in
@@ -707,7 +713,7 @@ and conv_app :
         (* TODO: check this *)
         match opt_ts with
           | Some ts -> ts
-          | None -> raise @@ Conv (Timestamp_expected t)
+          | None -> conv_err (Timestamp_expected t)
       in
       begin match sort with
         | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
@@ -778,7 +784,7 @@ let check_signature table checksign pk =
   let correct_type = match def checksign, def pk  with
     | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
     | _ -> false
-    | exception Not_found -> raise @@ Conv (Undefined (to_string checksign ^
+    | exception Not_found -> conv_err (Undefined (to_string checksign ^
                                                        " or " ^ to_string pk))
   in
   if correct_type then
