@@ -55,3 +55,4 @@ goal unforgeable_3 :
  collision.
  case H0.
 Qed.
+<
