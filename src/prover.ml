@@ -631,10 +631,35 @@ let start_proof () = match !current_goal, !goals with
 
 let current_goal () = !current_goal
 
+(*------------------------------------------------------------------*)
+type decl_error = 
+  | Conv_error of Theory.conversion_error
+  | Multiple_declarations of string 
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
+
+let pp_decl_error0 fmt = function
+  | Conv_error e -> Theory.pp_error fmt e
+  | Multiple_declarations s ->
+    let pp_loc _fmt = ()        (* TODO: locations *) in
+    Fmt.pf fmt
+      "@[Multiple declarations %t of the symbol: %s.@]@."
+      pp_loc
+      s
+  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
+
+  | SystemError e -> System.pp_system_error fmt e
+
+let pp_decl_error fmt e = 
+  Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
+
+exception Decl_error of decl_error
+
+let decl_error e = raise (Decl_error e)
 
 (*------------------------------------------------------------------*)
 
-let declare table = function
+let declare0 table = function
   | Decl.Decl_channel s            -> Channel.declare table s 
   | Decl.Decl_process (id,pkind,p) -> Process.declare table id pkind p
 
@@ -672,37 +697,15 @@ let declare table = function
   | Decl.Decl_abstract decl -> 
     Theory.declare_abstract table decl.name decl.index_arity decl.message_arity
 
-type decl_error = 
-  | Conv_error of Theory.conversion_error
-  | Multiple_declarations of string 
-  | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
-
-let pp_decl_error0 fmt = function
-  | Conv_error e -> Theory.pp_error fmt e
-  | Multiple_declarations s ->
-    let pp_loc _fmt = ()        (* TODO: locations *) in
-    Fmt.pf fmt
-      "@[Multiple declarations %t of the symbol: %s.@]@."
-      pp_loc
-      s
-  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
-
-  | SystemError e -> System.pp_system_error fmt e
-
-let pp_decl_error fmt e = 
-  Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
-
-exception Decl_error of decl_error
-
-let decl_error e = raise (Decl_error e)
+let declare table decl =
+  try declare0 table decl with
+  | Theory.Conv e -> decl_error (Conv_error e)
+  | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
+  | System.SystemError e -> decl_error (SystemError e)
+  | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
 
 let declare_list table decls = 
   (* For debugging *)
   (* Fmt.epr "%a@." Decl.pp_decls decls; *)
 
-   try List.fold_left (fun table d -> declare table d) table decls with
-     | Theory.Conv e -> decl_error (Conv_error e)
-     | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
-     | System.SystemError e -> decl_error (SystemError e)
-     | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
+  List.fold_left (fun table d -> declare table d) table decls 
