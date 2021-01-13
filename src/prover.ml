@@ -655,8 +655,10 @@ let pp_decl_error_i fmt = function
 
   | SystemError e -> System.pp_system_error fmt e
 
-let pp_decl_error fmt (loc,e) = 
-  Fmt.pf fmt "Declaration failed: %a." pp_decl_error_i e
+let pp_decl_error pp_loc_err fmt (loc,e) = 
+  Fmt.pf fmt "%aDeclaration failed: %a." 
+    pp_loc_err loc 
+    pp_decl_error_i e
 
 exception Decl_error of decl_error
 

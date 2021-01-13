@@ -1,5 +1,6 @@
-
 open Utils
+
+module L = Location
 
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
@@ -37,6 +38,17 @@ let parse_next parser_fun =
     parser_fun (Utils.oget !lexbuf) !filename
 
 (*------------------------------------------------------------------*)
+(** Print precise location error (to be caught by emacs) *)
+let pp_loc_error ppf loc =
+  if !interactive then
+    let lexbuf = Lexing.from_channel stdin in
+    (* Not sure startpos does anything *)
+    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    Fmt.pf ppf
+      "[error-%d-%d]"
+      (max 0 (loc.L.loc_bchar - startpos))
+      (max 0 (loc.L.loc_echar - startpos))
+
 type cmd_error = 
   | Unexpected_command 
   | StartProofError of string
@@ -174,7 +186,7 @@ let rec main_loop ~test ?(save=true) state =
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
   | exception (Decl_error e) when not test ->
-    error ~test state (fun fmt -> pp_decl_error fmt e)
+    error ~test state (fun fmt -> pp_decl_error pp_loc_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in

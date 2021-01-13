@@ -201,7 +201,9 @@ type decl_error =  Location.t * decl_error_i
 
 exception Decl_error of decl_error
 
-val pp_decl_error : Format.formatter -> decl_error -> unit
+val pp_decl_error : 
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration Processing} *)
