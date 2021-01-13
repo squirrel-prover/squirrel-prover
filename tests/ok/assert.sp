@@ -1,9 +1,9 @@
 abstract a:message
 abstract b:message
 
-axiom ax : a=b
-
 system null.
+
+axiom ax : a=b.
 
 goal assert_msg : forall (i:message), a=b.
 Proof.

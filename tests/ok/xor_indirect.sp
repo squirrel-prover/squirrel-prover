@@ -2,9 +2,10 @@ channel c
 
 abstract ok : message
 name b : index->index->message
-axiom len_ok : forall (i,j:index), len(ok) = len(b(i,j))
 
 system A : !_i new a; !_j out(c,b(i,j)).
+
+axiom len_ok : forall (i,j:index), len(ok) = len(b(i,j)).
 
 equiv test (i,j,ii,jj:index) :
   diff(output@pred(A(i,j)),output@pred(A(ii,jj))),

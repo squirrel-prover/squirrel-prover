@@ -1,8 +1,9 @@
 abstract ok : message
 mutable s : message
 channel c
-axiom init_ok : s@init = ok
 system !_i in(c,x);s:=s;out(c,x).
+
+axiom init_ok : s@init = ok.
 
 goal forall t:timestamp, s@t = ok.
 Proof.
