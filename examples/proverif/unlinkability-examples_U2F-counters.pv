@@ -1,0 +1,101 @@
+(*
+
+ ------------ U2F -------------
+ --------   Yubikey    --------
+
+
+Processes:
+
+T_reg =  For a given app_id, T_reg produces the key handle that
+ would be produced by the Yubikey with sk as a secret key 
+
+T_auth =  T_auth models the challenge signing of the Yubikey,
+ and always uses counter1 
+
+T_auth2 = T_auth2 models the challenge signing of the Yubikey,
+ and may use either counter1 or counter2 
+
+ ------------------------------------------------------
+
+We give full control of the USB channel to the attacker, as we
+do not care about the others interactions but only care about the
+token itself. ski is the master key of yubikey_i and we associate the counteri to yubikey_i.
+We check whether two accounts (id1, id2) on the same yubikey sk1 with the same counter
+is distinguishable from two accounts (id1, id2) on two different yubikeys (with different counters)
+
+  -----------------------------------------------------
+
+An attack is found by Proverif, in the case where 
+the same counter is used on a token for two different identities.
+
+*)
+
+
+
+free usb : channel.
+(* Definitions for key signature and mac *)
+
+type id.
+type pkey.
+type skey.
+type int.
+
+
+free counters:channel [private].
+free zero:int.
+
+fun s(int): int.
+fun pk(skey) :  pkey.
+fun smac(bitstring,skey) : skey.
+fun mac(bitstring,skey) : bitstring.
+fun sign(bitstring, skey ) :  bitstring.
+reduc forall m:  bitstring ,  k :  skey ;  getmess( sign(m, k )) = m. 
+reduc forall m:  bitstring ,  k :  skey ;  checksign( sign(m, k ) ,pk(k)) = m. 
+
+
+
+let T_reg(sk:skey,app_id:id) =
+    new rnd:bitstring;
+    let tsk = smac((rnd,sk),sk) in 
+    let handle = mac((tsk,app_id),sk) in 
+    out(usb,(handle,rnd,pk(tsk))). 
+
+
+let T_auth(sk:skey,app_id:id) =
+    in(usb,(handle:bitstring,rnd:bitstring,challenge:bitstring));
+    let tsk = smac((rnd,sk),sk) in
+    	if handle = mac((tsk,app_id),sk) then
+           (
+	   in(counters,(i:int,j:int));
+	   out(counters,(s(i),j));
+	   out(usb,sign((app_id,challenge,i),tsk))
+	   ).
+
+let T_auth2(sk:skey,app_id:id) =
+    in(usb,(handle:bitstring,rnd:bitstring,challenge:bitstring));
+    let tsk = smac((rnd,sk),sk) in
+	if handle = mac((tsk,app_id),sk) then
+           (	   
+	   in(counters,(i:int,j:int));
+	   out(counters, (choice[s(i),i],choice[j,s(j)]));
+	   out(usb,sign((app_id,challenge,choice[i,j]),tsk))
+	   ).
+
+
+
+process
+(! in (counters,(x:int, y:int)) ; out(counters,(x,y)) ) |
+
+(
+new sk1:skey; new sk2:skey;
+out(counters, (zero, zero));
+!new id1:id; new id2:id;
+  (
+   !T_reg(sk1,id1)|
+   !T_auth(sk1,id1) |
+   !T_auth2(choice[sk1,sk2],id2) |
+   !T_reg(choice[sk1,sk2],id2)
+  )
+)
+
+
