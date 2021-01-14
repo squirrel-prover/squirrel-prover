@@ -35,12 +35,12 @@ type formula = Theory.formula
   * other than existential choices. They may be useful, though, e.g. to
   * model mixnets. *)
 
-(** Process types *)
-type process =
+(** Process types *)                   
+type process_i =
   | Null                                    (** Null process *)
   | New of string * process                 (** Name creation *)
-  | In  of string * string * process        (** Input *)
-  | Out of string * term * process          (** Output *)
+  | In  of Channel.p_channel * string * process (** Input *)
+  | Out of Channel.p_channel * term * process   (** Output *)
   | Set of string * string list * term * process
                                             (** [Set (s,l,t,p)] stores [t]
                                               * in cell [s(l)] and
@@ -62,6 +62,8 @@ type process =
       (** [Alias (p,i)] behaves as [p] but [i] will be used
         * as a naming prefix for its actions. *)
 
+and process = process_i Location.located
+
 val pp_process : Format.formatter -> process -> unit
 
 (** Check that a process is well-typed in some environment. *)
@@ -80,12 +82,16 @@ val declare_system :
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
 
-type proc_error =
+type proc_error_i =
   | UnknownProcess of string
   | UnknownChannel of string
   | Arity_error of string*int*int
   | StrictAliasError of string
 
-val pp_proc_error : Format.formatter -> proc_error -> unit
+type proc_error = Location.t * proc_error_i
+                  
+val pp_proc_error :
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> proc_error -> unit
 
 exception ProcError of proc_error

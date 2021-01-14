@@ -19,3 +19,6 @@ val of_string : string -> Symbols.table -> channel
 (** [declare s] declares a channel named [s].
   * @raise Theory.Multiple_declaration if the channel is already declared. *)
 val declare : Symbols.table -> string -> Symbols.table
+
+(** Type of a parsed channel name *)
+ type p_channel = string Location.located

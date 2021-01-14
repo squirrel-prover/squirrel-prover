@@ -176,7 +176,10 @@ let () =
       Alcotest.check_raises "fails" Parser.Error
         (fun () -> 
            ignore (parse_process table "in(c,x) then null" : Process.process)) ;
-      begin match parse_process table "(in(c,x);out(c,x) | in(c,x))" with
+      begin
+        match
+          Location.unloc (parse_process table "(in(c,x);out(c,x) | in(c,x))")
+        with
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
@@ -336,16 +339,16 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
                        : Symbols.table )
            with
-             (Prover.Decl_error (_, Prover.KDecl, 
-                                 Conv_error (Arity_error ("C",1,0)))) -> 
+             (Process.ProcError (_, 
+                                 Arity_error ("C",1,0))) -> 
              raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Symbols.Unbound_identifier "D")
+      Alcotest.check_raises "fails" Ok        
         (fun () -> 
-           ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
-                   : Symbols.table ))
+           try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
+                       : Symbols.table )
+           with Process.ProcError (_, Process.UnknownProcess "D") -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

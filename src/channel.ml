@@ -10,7 +10,9 @@ let pp_channel ppf c =
 
 let fail : 'a -> unit = function _ -> assert false
 
-
+(*------------------------------------------------------------------*)
+type p_channel = string Location.located
+    
 (*------------------------------------------------------------------*)
 let table_c = declare Symbols.builtins_table "c"
 

@@ -161,15 +161,15 @@ sep:
 top_process:
 | p=process EOF                    { p }
 
-process:
+process_i:
 | NULL                          { Process.Null }
-| LPAREN ps=processes RPAREN    { ps }
+| LPAREN ps=processes_i RPAREN  { ps }
 | id=ID terms=term_list         { Process.Apply (id,terms) }
 | id=ID COLON p=process         { Process.Alias (p,id) }
 | NEW id=ID SEMICOLON p=process { Process.New (id,p) }
-| IN LPAREN c=ID COMMA id=ID RPAREN p=process_cont
+| IN LPAREN c=loc(ID) COMMA id=ID RPAREN p=process_cont
                                 { Process.In (c,id,p) }
-| OUT LPAREN c=ID COMMA t=term RPAREN p=process_cont
+| OUT LPAREN c=loc(ID) COMMA t=term RPAREN p=process_cont
                                 { Process.Out (c,t,p) }
 | IF f=formula THEN p=process p0=else_process
                                 { Process.Exists
@@ -188,16 +188,21 @@ process:
                                    Process.Set (id,l,t,p) }
 | s=BANG p=process              { Process.Repl (s,p) }
 
-processes:
-| p=process                        { p }
-| p=process PARALLEL ps=processes  { Process.Parallel (p,ps) }
+process:
+| p=loc(process_i) { p }
+
+processes_i:
+| p=process_i                             { p }
+| p=process PARALLEL ps=loc(processes_i)  { Process.Parallel (p,ps) }
 
 process_cont:
-|                                { Process.Null }
+|                                { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | SEMICOLON p=process            { p }
 
 else_process:
-| %prec EMPTY_ELSE               { Process.Null }
+| %prec EMPTY_ELSE               { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
 indices:
