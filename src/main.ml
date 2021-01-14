@@ -185,6 +185,8 @@ let rec main_loop ~test ?(save=true) state =
     error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
+  | exception (Process.ProcError e) ->
+    error ~test state (fun fmt -> Process.pp_proc_error fmt e)
   | exception (Decl_error e) when not test ->
     error ~test state (fun fmt -> pp_decl_error pp_loc_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->

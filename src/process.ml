@@ -108,6 +108,28 @@ let rec pp_process ppf process =
 
 let is_out = function Out _ -> true | _ -> false
 
+(*------------------------------------------------------------------*)
+type proc_error =
+  | UnknownProcess of string
+  | UnknownChannel of string
+  | Arity_error of string*int*int
+  | StrictAliasError of string
+
+let pp_proc_error fmt = function
+  | UnknownProcess s ->
+    Fmt.pf fmt "unknown processus %s" s
+
+  | UnknownChannel s ->
+    Fmt.pf fmt "unknown channel %s" s
+
+  | StrictAliasError s -> Fmt.pf fmt "Strict alias error: %s" s
+
+  | Arity_error (s,i,j) -> Fmt.pf fmt "Process %s used with arity %i, but \
+                                       defined with arity %i" s i j
+
+exception ProcError of proc_error
+    
+let proc_err e = raise (ProcError e)
 
 (*------------------------------------------------------------------*)
 (** We extend the symbols data with (bi)-processus descriptions and 
@@ -126,8 +148,11 @@ let find_process table pname =
   (* The data associated to a process must be a [Process_data _]. *)
 
 let find_process0 table name =
-  let pname = Symbols.Process.of_string name table in
-  find_process table pname
+  try
+    let pname = Symbols.Process.of_string name table in
+    find_process table pname
+  with
+  | Symbols.Unbound_identifier _ -> proc_err (UnknownProcess name)
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
@@ -140,7 +165,7 @@ let check_proc table env p =
     | Alias (Out (_,m,p), _) as proc ->
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ()) 
-      then raise Theory.(Conv (StrictAliasError "missing alias"))
+      then proc_err (StrictAliasError "missing alias")
       else
         let () = Theory.check table ~local:true env m Sorts.emessage in
         check_p env p
@@ -171,13 +196,12 @@ let check_proc table env p =
         try
           let kind,_ = find_process0 table id in
           if List.length kind <> List.length ts then
-            raise @@
-            Theory.(Conv (Arity_error (id, List.length ts, List.length kind)));
+            proc_err (Arity_error (id, List.length ts, List.length kind));
           List.iter2
             (fun (_, k) t -> Theory.check table ~local:true env t k)
             kind ts
         with
-        | Not_found -> raise @@ Theory.(Conv (Undefined id))
+        | Not_found -> proc_err (UnknownProcess id)
       end
   
   in
@@ -258,7 +282,7 @@ type p_env = {
 
 let parse_channel c =
   try Channel.of_string c with
-  | Not_found -> raise @@ Theory.Conv (Undefined c)
+  | Not_found -> proc_err (UnknownChannel c)
 
 let parse_proc (system_name : System.system_name) init_table proc =
 
@@ -317,7 +341,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let table,a' = try Action.fresh_symbol table ~exact a with
       | Symbols.Multiple_declarations s -> 
         let err = "symbol " ^ a ^ " is already defined" in
-        raise Theory.(Conv (StrictAliasError err))
+        proc_err (StrictAliasError err)
     in
 
     let action = List.rev env.action in

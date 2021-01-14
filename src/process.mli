@@ -76,3 +76,16 @@ val declare : Symbols.table -> id -> pkind -> process -> Symbols.table
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
   Symbols.table -> string -> process -> Symbols.table
+
+(*------------------------------------------------------------------*)
+(** {2 Error handling}*)
+
+type proc_error =
+  | UnknownProcess of string
+  | UnknownChannel of string
+  | Arity_error of string*int*int
+  | StrictAliasError of string
+
+val pp_proc_error : Format.formatter -> proc_error -> unit
+
+exception ProcError of proc_error
