@@ -58,6 +58,7 @@ rule token = parse
 | "else"              { ELSE }
 | "let"               { LET }
 | "XOR"               { XOR }
+| "by"                { BY }
 | "in"                { IN }
 | "out"               { OUT }
 | "new"               { NEW }

@@ -21,6 +21,7 @@ type tac_error =
   | FailWithUnexpected of tac_error
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
+  | GoalNotClosed
 
 let tac_error_strings =
   [ (More, "More");
@@ -61,6 +62,7 @@ let rec tac_error_to_string = function
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | SystemError _ -> "System_Error"
+  | GoalNotClosed -> "GoalNotClosed"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "More results required"
@@ -102,6 +104,7 @@ let rec pp_tac_error ppf = function
   | FailWithUnexpected t -> Fmt.pf ppf "The tactic did not fail with the expected \
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
+  | GoalNotClosed -> Fmt.pf ppf "Cannot close goal"
 
 
 let strings_tac_error =
@@ -181,6 +184,12 @@ let rec andthen_list = function
   | [] -> raise (Tactic_hard_failure (Failure "empty anthen_list"))
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
+
+let by_tac tac judge sk fk =
+  let sk l fk = match l with
+    | [] -> sk [] fk
+    | _ -> raise (Tactic_soft_failure GoalNotClosed) in
+  tac judge sk fk
 
 let not_branching tac j sk fk =
   tac j
@@ -286,6 +295,7 @@ type 'a ast =
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
   | CheckFail : tac_error * 'a ast -> 'a ast
+  | By : 'a ast -> 'a ast
 
 module type AST_sig = sig
 
@@ -317,6 +327,7 @@ module AST (M:S) = struct
     | AndThen tl -> andthen_list (List.map (eval modifiers) tl)
     | OrElse tl -> orelse_list (List.map (eval modifiers) tl)
     | Try t -> try_tac (eval modifiers t)
+    | By t -> by_tac (eval modifiers t)
     | NotBranching t -> not_branching (eval modifiers t)
     | Repeat t -> repeat (eval modifiers t)
     | Ident -> id
@@ -343,6 +354,7 @@ module AST (M:S) = struct
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
+    | By t -> Fmt.pf ppf "@[by %a@]" pp t
     | Ident -> Fmt.pf ppf "id"
     | Try t ->
       Fmt.pf ppf "(try @[%a@])" pp t

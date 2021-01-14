@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY
 %token PROOF QED UNDO ABORT
 %token EOF
 %token EMPTY_ELSE
@@ -35,9 +35,11 @@
 %left AND
 %nonassoc NOT
 
+%nonassoc tac_prec
+
 %left PLUS
 %nonassoc REPEAT
-%left SEMICOLON
+%right SEMICOLON
 %nonassoc TRY
 %nonassoc NOSIMPL
 %nonassoc NOBRANCH
@@ -301,6 +303,7 @@ tac_errors:
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
+  | BY t=tac %prec tac_prec            { Tactics.By t }
   | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
   | TRY l=tac                          { Tactics.Try l }
   | REPEAT t=tac                       { Tactics.Repeat t }
