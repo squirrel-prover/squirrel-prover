@@ -98,7 +98,7 @@ let make_bi_descr s1 s2 d1 d2 =
     and is2,t2 = d2.condition in
     if is1 <> is2 then
       incompatible "cannot merge two actions with disctinct \
-                    condtion indexes";
+                    condition indexes";
     is1, Term.make_bi_term t1 t2 in
   
   let updates = 
