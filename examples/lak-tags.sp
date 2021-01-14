@@ -73,16 +73,17 @@ Proof.
   exists i,k1.
   assert input@T(i,k1)=nR(j).
   fresh M3.
-  depends R(j),R2(j).
+  by depends R(j),R2(j).
+
   (* RIGHT *)
   euf M0.
   exists i,k.
   assert input@T(i,k)=nR(j).
   fresh M3.
-  depends R(j),R2(j).
+  by depends R(j),R2(j).
 
   (* WA => COND *)
-  exists i,k.
+  by exists i,k.
 Qed.
 
 goal wa_R2: forall j:index,
@@ -101,7 +102,7 @@ Proof.
 
   (* WA => COND *)
   apply H0.
-  exists i,k.
+  by exists i,k.
   apply H0.
 
   (* COND => WA *)
@@ -111,13 +112,14 @@ Proof.
   exists i,k1.
   assert input@T(i,k1)=nR(j).
   fresh M3.
-  depends R(j),R1(j).
+  by depends R(j),R1(j).
+
   (* RIGHT *)
   euf M0.
   exists i,k.
   assert input@T(i,k)=nR(j).
   fresh M3.
-  depends R(j),R1(j).
+  by depends R(j),R1(j).
 Qed.
 
 goal [left] wa_R1_left:
@@ -137,7 +139,7 @@ Proof.
   exists k.
   assert input@T(i,k)=nR(j).
   fresh M3.
-  depends R(j),R2(j).
+  by depends R(j),R2(j).
 Qed.
 
 goal [right] wa_R1_right:
@@ -155,7 +157,7 @@ Proof.
   euf M0.
   assert input@T(i,k)=nR(j).
   fresh M3.
-  depends R(j),R2(j).
+  by depends R(j),R2(j).
 Qed.
 
 
@@ -169,8 +171,8 @@ Proof.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
   repeat split.
-  depends R(j),R2(j).
-  depends R(j),R1(j).
+  by depends R(j),R1(j).
+  by depends R(j),R2(j).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -184,7 +186,7 @@ Proof.
       snd(output@T(i,k)) = snd(input@R1(j)) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       input@T(i,k) = output@R(j)).
-  apply wa_R1 to j.
+  by apply wa_R1 to j.
 
   equivalent
     (if exec@pred(R1(j)) &&
@@ -211,19 +213,19 @@ Proof.
   	   if exec@pred(R1(j))
   	   then h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))).
   fa.
-  exists i,k. exists i,k.
+  by exists i,k. by exists i,k.
   project.
   (* LEFT *)
   fa.
   apply wa_R1_left to i1,j.
   apply H1.
-  exists k.
+  by exists k.
   yesif.
   (* RIGHT *)
   fa.
   apply wa_R1_right to i1,j,k1.
-  apply H1.
-  yesif.
+  by apply H1.
+  by yesif.
 
   fa 2. fadup 1.
   fa 1. fadup 1.
@@ -231,8 +233,8 @@ Proof.
   ifcond 1, exec@pred(R1(j)).
   fa 1.
   yesif 1.
-  apply tags_neq; project.
-  fresh 1.
+  by apply tags_neq; project.
+  by fresh 1.
 
   (* Case R2 *)
   expand frame@R2(j); expand exec@R2(j).
@@ -245,8 +247,8 @@ Proof.
       snd(output@T(i,k)) = snd(input@R2(j)) &&
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j))).
-  apply wa_R2 to j.
-  fadup 1.
+  by apply wa_R2 to j.
+  by fadup 1.
 
   (* Case T *)
   expand frame@T(i,k); expand exec@T(i,k).
@@ -257,10 +259,9 @@ Proof.
   yesif 2.
   apply tags_neq; project.
   assert fst(input@R1(j))=nT(i,k).
-  fresh M2.
+  by fresh M2.
   assert fst(input@R1(j))=nT(i,k).
   fresh M2.
   fresh 2.
-  fresh 1. yesif 1.
-
+  by fresh 1; yesif 1.
 Qed.

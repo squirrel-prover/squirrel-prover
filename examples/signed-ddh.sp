@@ -28,7 +28,7 @@ name k :  index -> index -> message
 
 signature sign,checksign,pk
 
-process Pchall(i:index) =
+process PchallP(i:index) =
   out(cP, <pk(skP),g^a(i)>);
   in(cP, t);
   let gS = snd(fst(t)) in
@@ -42,7 +42,7 @@ process Pchall(i:index) =
       out(cP, diff(ok,ko))
   else null
 
-process S(i:index) =
+process SP(i:index) =
   in(cS, sP);
   let gP = snd(sP) in
   let pkP = fst(sP) in
@@ -53,10 +53,10 @@ process S(i:index) =
     out(cS,ok)
 
 
-system [secretP] (!_i Pchall(i) | !_j S(j)).
+system [secretP] (!_i Pchall: PchallP(i) | !_j S: SP(j)).
 
 
-process P(i:index) =
+process PP(i:index) =
   out(cP, <pk(skP),g^a(i)>);
   in(cP, t);
   let gs = snd(fst(t)) in
@@ -65,7 +65,7 @@ process P(i:index) =
     out(cP,sign(<<gs,g^a(i)>,pks>,skP))
 
 
-process Schall(i:index) =
+process SchallP(i:index) =
   in(cS, sP);
   let gp = snd(sP) in
   let pkp = fst(sP) in
@@ -80,7 +80,7 @@ process Schall(i:index) =
       else out(cS, diff(ok,ko))
   else null
 
-system [secretS] (!_i P(i) | !_j Schall(j)).
+system [secretS] (!_i P: PP(i) | !_j Schall: SchallP(j)).
 
 
 goal [none,secretP] P_charac :
