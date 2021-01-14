@@ -112,6 +112,21 @@ let find_shape table shape =
   with Found (x,y) -> Some (x,y)
 
 (*------------------------------------------------------------------*)
+
+(** Define dummy action symbols in table and register them
+  * in the map symbs from shapes to symbols. *)
+let rec define_dummies table symbs len =
+  let table,symbs =
+    if len>0 then define_dummies table symbs (len-1) else table,symbs
+  in
+  let dummy = Action.dummy len in
+  let dum_shape = Action.get_shape dummy in
+  if Msh.mem dum_shape symbs then table,symbs else
+  let table,dum_symb = Action.fresh_symbol ~exact:false table "_Dummy" in
+  let table = Action.define_symbol table dum_symb [] dummy in
+  let symbs = Msh.add dum_shape dum_symb symbs in
+  table,symbs
+
 let register_action table system_symb symb indices action descr =
   let shape = Action.get_shape action in
   match find_shape table shape with
@@ -141,13 +156,8 @@ let register_action table system_symb symb indices action descr =
     (* Add action description to system. *)
     let table = add_action table system_symb shape symb descr in
     (* Define dummy action symbol if needed. *)
-    let dummy = Action.dummy (List.length action) in
-    let dum_shape = Action.get_shape dummy in
     let descrs,symbs = get_data table system_symb in
-    if Msh.mem dum_shape symbs then table,symb,descr else
-    let table,dum_symb = Action.fresh_symbol ~exact:false table "_Dummy" in
-    let table = Action.define_symbol table dum_symb [] dummy in
-    let symbs = Msh.add dum_shape dum_symb symbs in
+    let table,symbs = define_dummies table symbs (List.length action) in
     let data = System_data (descrs,symbs) in
     let table = Symbols.System.redefine table system_symb ~data () in
     table, symb, descr
