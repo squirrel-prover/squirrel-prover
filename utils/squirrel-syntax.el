@@ -115,6 +115,10 @@
   "intctxt"
 ))
 
+(defvar squirrel-closing-keywords '(
+  "by"
+))
+
 (defvar squirrel-tacticals-keywords '(
   "try"
   "orelse"
@@ -138,6 +142,16 @@
 	  "\\|" squirrel-operator-char-4
           "\\)"))
 
+(defface squirrel-tactics-closing-face
+  (proof-face-specs
+   (:foreground "red")
+   (:foreground "red")
+   ())
+  "Face for names of closing tactics in proof scripts."
+  :group 'proof-faces)
+
+(defconst squirrel-tactics-closing-face 'squirrel-tactics-closing-face)
+
 (defvar squirrel-font-lock-keywords
   (list
     (cons (proof-ids-to-regexp squirrel-prog-keywords)      'font-lock-keyword-face)
@@ -147,6 +161,7 @@
                                                           'proof-tacticals-name-face)
     (cons (proof-ids-to-regexp squirrel-tactic-keywords)    'proof-tactics-name-face)
     (cons (proof-ids-to-regexp squirrel-decl-keywords)    'font-lock-constant-face)
+    (cons (proof-ids-to-regexp squirrel-closing-keywords)    'squirrel-tactics-closing-face)
     (cons (proof-ids-to-regexp squirrel-fun-keywords)    'font-lock-preprocessor-face)
     (cons (proof-ids-to-regexp squirrel-type-keywords)    'font-lock-variable-name-face)
 	)
