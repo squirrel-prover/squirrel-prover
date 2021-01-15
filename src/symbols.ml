@@ -1,7 +1,16 @@
 open Utils
 
-(** Type of symbols *)
-type 'a t = string
+(** Type of symbols.
+  * The group should be understood as a namespace,
+  * though it does not correspond to the (poorly named) namespace type
+  * below. *)
+type symb = { group: string; name: string }
+
+(** Symbols of type ['a t] are symbols of namespace ['a]. *)
+type 'a t = symb
+
+type group = string
+let default_group = ""
 
 type kind = Sorts.esort
 
@@ -49,9 +58,11 @@ type data += AssociatedFunctions of (fname t) list
 
 
 (*------------------------------------------------------------------*)
-let to_string s = s
+let to_string s = s.name
 
-let pp = Format.pp_print_string
+let pp fmt symb = Format.pp_print_string fmt symb.name
+
+module Ms = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
 type table = (edef * data) Ms.t
 
@@ -61,14 +72,15 @@ let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
 let table_add table name d = Ms.add name d table
 
-let fresh prefix table =
+let fresh ?(group=default_group) prefix table =
   let substrings = Pcre.exec ~rex:prefix_count_regexp prefix in
   let prefix = Pcre.get_substring substrings 1 in
   let i0 = Pcre.get_substring substrings 2 in
   let i0 = if i0 = "" then 0 else int_of_string i0 in
   let rec find i =
     let s = if i=0 then prefix else prefix ^ string_of_int i in
-    if Ms.mem s table then find (i+1) else s
+    let symb = {group;name=s} in
+    if Ms.mem symb table then find (i+1) else symb
   in
   find i0
 
@@ -104,8 +116,8 @@ let edef_namespace_opt : edef -> namespace option = fun e ->
 
 let edef_namespace x = oget (edef_namespace_opt x)
 
-let get_namespace : table -> string -> namespace option = 
-  fun table s ->
+let get_namespace ?(group=default_group) table s =
+  let s = { group; name=s } in
   let f (x,_) = edef_namespace_opt x in  
   obind f (Ms.find_opt s table)
 
@@ -115,22 +127,25 @@ exception Incorrect_namespace
 exception Multiple_declarations of string
 
 (*------------------------------------------------------------------*)
-let def_of_string s table =
-  try fst (Ms.find s table) with Not_found -> raise @@ Unbound_identifier s
+let def_of_string ?(group=default_group) s table =
+  let t = { group; name=s } in
+  try fst (Ms.find t table) with Not_found -> raise @@ Unbound_identifier s
 
-let is_defined s table = Ms.mem s table
+let is_defined ?(group=default_group) name table = Ms.mem {group;name} table
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
-let of_string s table =
-  try match Ms.find s table with
-    | Exists d, _ -> Wrapped (s,d)
+let of_string ?(group=default_group) s table =
+  let t = { group ; name=s } in
+  try match Ms.find t table with
+    | Exists d, _ -> Wrapped (t,d)
     | Reserved, _ -> raise @@ Unbound_identifier s
   with Not_found -> raise @@ Unbound_identifier s
 
-let of_string_opt s table =
-  try match Ms.find s table with
-    | Exists d, _ -> Some (Wrapped (s,d))
+let of_string_opt ?(group=default_group) s table =
+  let t = { group; name=s } in
+  try match Ms.find t table with
+    | Exists d, _ -> Some (Wrapped (t,d))
     | Reserved, _ -> None
   with Not_found -> None
 
@@ -163,6 +178,7 @@ end
 module type S = sig
   type ns
   type local_def
+  val group : string
   val construct : local_def -> ns def
   val deconstruct : edef -> local_def
 end
@@ -173,15 +189,18 @@ module Make (N:S) : Namespace
   type ns = N.ns
   type def = N.local_def
 
+  let group = N.group
+
   let reserve table name =
-    let symb = fresh name table in 
+    let symb = fresh ~group name table in
     let table = Ms.add symb (Reserved,Empty) table in
     table,symb
 
   let reserve_exact table name =
-    if Ms.mem name table then raise (Multiple_declarations name);
-    let table = Ms.add name (Reserved,Empty) table in
-    table,name
+    let symb = {group;name} in
+    if Ms.mem symb table then raise (Multiple_declarations name);
+    let table = Ms.add symb (Reserved,Empty) table in
+    table,symb
 
   let define table symb ?(data=Empty) value =
     assert (fst (Ms.find symb table) = Reserved) ;
@@ -192,18 +211,19 @@ module Make (N:S) : Namespace
     Ms.add symb (Exists (N.construct value), data) table
 
   let declare table name ?(data=Empty) value =
-    let symb = fresh name table in
+    let symb = fresh ~group name table in
     let table = 
       table_add table symb (Exists (N.construct value), data) 
     in
     table, symb
 
   let declare_exact table name ?(data=Empty) value =
-    if Ms.mem name table then raise @@ Multiple_declarations name;
-    let table = 
-      table_add table name (Exists (N.construct value), data) 
+    let symb = {group;name} in
+    if Ms.mem symb table then raise @@ Multiple_declarations name;
+    let table =
+      table_add table symb (Exists (N.construct value), data)
     in
-    table, name
+    table, symb
 
   let get_all (name:ns t) table =
     (* We know that [name] is bound in [table]. *)
@@ -213,34 +233,35 @@ module Make (N:S) : Namespace
   let get_def name table = fst (get_all name table)
   let get_data name table = snd (get_all name table)
 
-  let cast_of_string name =
-    name
+  let cast_of_string name = {group;name}
 
   let of_string name table =
+    let symb = {group;name} in
     try
-      ignore (N.deconstruct (fst (Ms.find name table))) ;
-      name
+      ignore (N.deconstruct (fst (Ms.find symb table))) ;
+      symb
     with Not_found -> raise @@ Unbound_identifier name
 
   let of_string_opt name table =
+    let symb = {group;name} in
     try
-      ignore (N.deconstruct (fst (Ms.find name table))) ;
-      Some name
+      ignore (N.deconstruct (fst (Ms.find symb table))) ;
+      Some symb
     with Not_found -> None
 
-  let def_of_string s table =
+  let def_of_string name table =
     try
-      N.deconstruct (fst (Ms.find s table))
-    with Not_found -> raise @@ Unbound_identifier s
+      N.deconstruct (fst (Ms.find {group;name} table))
+    with Not_found -> raise @@ Unbound_identifier name
 
-  let data_of_string s table =
+  let data_of_string name table =
     try
-      let def,data = Ms.find s table in
+      let def,data = Ms.find {group;name} table in
         (* Check that we are in the current namespace
          * before returning the associated data. *)
         ignore (N.deconstruct def) ;
         data
-    with Not_found -> raise @@ Unbound_identifier s
+    with Not_found -> raise @@ Unbound_identifier name
 
   let iter f table =
     Ms.iter
@@ -263,6 +284,7 @@ end
 module Action = Make (struct
   type ns = action
   type local_def = int
+  let group = default_group
   let construct d = Action d
   let deconstruct = function
     | Exists (Action d) -> d
@@ -272,6 +294,7 @@ end)
 module Name = Make (struct
   type ns = name
   type local_def = int
+  let group = default_group
   let construct d = Name d
   let deconstruct s = match s with
     | Exists (Name d) -> d
@@ -281,6 +304,7 @@ end)
 module Channel = Make (struct
   type ns = channel
   type local_def = unit
+  let group = default_group
   let construct d = Channel d
   let deconstruct s = match s with
     | Exists (Channel d) -> d
@@ -290,6 +314,7 @@ end)
 module System = Make (struct
   type ns = system
   type local_def = unit
+  let group = default_group
   let construct d = System d
   let deconstruct s = match s with
     | Exists (System d) -> d
@@ -299,6 +324,7 @@ end)
 module Process = Make (struct
   type ns = process
   type local_def = unit
+  let group = "process"
   let construct d = Process d
   let deconstruct s = match s with
     | Exists (Process d) -> d
@@ -308,6 +334,7 @@ end)
 module Function = Make (struct
   type ns = fname
   type local_def = int * function_def
+  let group = default_group
   let construct d = Function d
   let deconstruct s = match s with
     | Exists (Function d) -> d
@@ -318,11 +345,12 @@ let is_ftype s ftype table =
   match Function.get_def s table with
     | _,t when t = ftype -> true
     | _ -> false
-    | exception Not_found -> raise @@ Unbound_identifier s
+    | exception Not_found -> raise @@ Unbound_identifier s.name
 
 module Macro = Make (struct
   type ns = macro
   type local_def = macro_def
+  let group = default_group
   let construct d = Macro d
   let deconstruct s = match s with
     | Exists (Macro d) -> d

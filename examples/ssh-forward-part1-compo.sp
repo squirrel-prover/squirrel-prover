@@ -71,12 +71,6 @@ abstract dec : message -> message -> message
 name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
-axiom [auth] hashnotfor :
-  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
-
-(* This is an axiom that simply states the existence of an index *)
-axiom [auth] freshindex : exists (l:index), True
-
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
@@ -192,6 +186,11 @@ process Sauth =
 
 system [auth]  K: (Pauth | Sauth).
 
+axiom [auth] hashnotfor :
+  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+
+(* This is an axiom that simply states the existence of an index *)
+axiom [auth] freshindex : exists (l:index), True.
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)

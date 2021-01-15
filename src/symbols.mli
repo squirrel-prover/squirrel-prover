@@ -5,6 +5,12 @@
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
 
+(** Symbol groups:
+  * symbols with the same name can exist in different groups.
+  * Groups are usually called namespaces, but what we (improperly)
+  * call namespaces here is different: it's more of a name kind. *)
+type group
+
 (** Type of tables of persistent symbol definitions.
   * It is currently ineffective. *)
 type table
@@ -79,7 +85,7 @@ type namespace =
 
 val pp_namespace : Format.formatter -> namespace -> unit
 
-val get_namespace : table -> string -> namespace option 
+val get_namespace : ?group:group -> table -> string -> namespace option
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
@@ -108,16 +114,16 @@ val pp : Format.formatter -> 'a t -> unit
 
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_string : string -> table -> edef
+val def_of_string : ?group:group -> string -> table -> edef
 
-val is_defined : string -> table -> bool
+val is_defined : ?group:group -> string -> table -> bool
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 (** [of_string s] returns the symbol associated to [s]
   * together with its defining data.
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val of_string : string -> table -> wrapped
+val of_string : ?group:group -> string -> table -> wrapped
 
 (** {2 Namespaces} *)
 
