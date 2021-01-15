@@ -79,11 +79,6 @@ val iter_descrs :
   (Action.descr -> unit) -> 
   unit
 
-val fold_descrs : 
-  'a -> Symbols.table -> system_expr -> 
-  ('a -> Action.descr -> 'a) -> 
-  'a
-
 val map_descrs : 
   Symbols.table -> system_expr -> 
   (Action.descr -> 'a) -> 

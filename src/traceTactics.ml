@@ -153,10 +153,9 @@ let () =
 
 (** Case analysis on a timestamp *)
 let timestamp_case (TacticsArgs.Timestamp ts) s =
-  let f = ref (Atom (`Timestamp (`Eq,ts,Term.Init))) in
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
-  let add_action descr =
+  let mk_case descr =
     let indices =
       let env = ref @@ TraceSequent.get_env s in
       List.map
@@ -170,16 +169,18 @@ let timestamp_case (TacticsArgs.Timestamp ts) s =
     let name = 
       SystemExpr.action_to_term table system 
         (Action.subst_action subst descr.Action.action) in
-    let case =
-      let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
-      let at = Term.subst subst at in
-      if indices = [] then at else
-        Exists (List.map (fun x -> Vars.EVar x) indices,at)
-    in
-    f := Term.Or (case,!f)
+    let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
+    let at = Term.subst subst at in
+    if indices = [] then at else
+      Exists (List.map (fun x -> Vars.EVar x) indices,at)
   in
-  SystemExpr.iter_descrs table system add_action ;
-  [TraceSequent.add_formula !f s]
+  let cases = SystemExpr.map_descrs table system mk_case in
+  let f =
+    List.fold_right Term.mk_or
+      (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
+      Term.False
+  in
+  [TraceSequent.add_formula f s]
 
 
 let () =

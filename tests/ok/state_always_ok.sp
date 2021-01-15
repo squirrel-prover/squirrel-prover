@@ -10,8 +10,8 @@ Proof.
   induction.
   case t.
   case H0.
-  (* t = A(i) *)
-  apply IH0 to pred(A(i)).
   (* t = init *)
   apply init_ok.
+  (* t = A(i) *)
+  apply IH0 to pred(A(i)).
 Qed.

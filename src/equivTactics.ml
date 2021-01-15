@@ -194,7 +194,7 @@ let induction TacticsArgs.(Timestamp ts) s =
                ::!goals
     in    
     SystemExpr.iter_descrs table system add_action ;
-    init_goal::!goals
+    init_goal :: List.rev !goals
   | _  ->
     Tactics.soft_failure
       (Tactics.Failure "expected a timestamp variable")

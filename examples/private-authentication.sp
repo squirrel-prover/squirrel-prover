@@ -32,10 +32,10 @@ name r2 : index -> message
 
 abstract plus : message -> message -> message
 
-process PA(i:index) =
+process A(i:index) =
   out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
 
-process PB(i:index) =
+process B(i:index) =
   in(cB, mess);
   let dmess = dec(mess, kB) in
   out(cB,
@@ -47,7 +47,7 @@ process PB(i:index) =
       r(i), pk(diff(kA,kAbis)))
   ).
 
-system out(cA,<pk(kA),pk(kB)>); (!_i A: PA(i) | !_j B: PB(j)).
+system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
 axiom length :
   forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2)).

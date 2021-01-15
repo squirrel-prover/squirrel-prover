@@ -198,12 +198,6 @@ let iter_descrs
   let f _ a = f a in
   System.Msh.iter f (descrs table system)
 
-let fold_descrs
-    (acc : 'a) table system 
-    (f : 'a -> Action.descr -> 'a) =
-  let f _ a acc = f acc a in
-  System.Msh.fold f (descrs table system) acc
-
 let map_descrs 
     table system 
     (f : Action.descr -> 'a) =

@@ -48,8 +48,7 @@ name rr : index -> message
 abstract ok : message
 abstract ko : message
 
-process ReaderP(k:index) =
-  Reader: 
+process Reader(k:index) =
   out(cR, nr(k));
   in(cR, mess);
   if exists (i,j:index),
@@ -57,7 +56,6 @@ process ReaderP(k:index) =
       fst(dec(mess, diff(kE(i),kbE(i,j)))) = tagT &&
       fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
   then
-    Reader1:
     out(cR,
       try find i,j such that
         dec(mess, diff(kE(i),kbE(i,j))) <> fail &&
@@ -67,12 +65,12 @@ process ReaderP(k:index) =
         enc(<tagR,<snd(snd(dec(mess, diff(kE(i),kbE(i,j))))),nr(k)>>, rr(k),
             diff(kE(i),kbE(i,j)))).
 
-process TagP(i:index, j:index) =
+process Tag(i:index, j:index) =
   in(cT, nR);
   let cipher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
-  Tag: out(cT, cipher).
+  out(cT, cipher).
 
-system (!_k ReaderP(k) | !_i !_j TagP(i,j)).
+system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
 axiom tags_neq : tagR <> tagT
 
@@ -241,10 +239,10 @@ Proof.
 
   fa.
   (* find condA => condB *)
-  intctxt M2. 
+  intctxt M2.
+  by apply tags_neq.
   by exists j2.
-  by apply tags_neq. 
-  
+
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
   by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
