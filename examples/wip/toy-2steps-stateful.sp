@@ -1,5 +1,27 @@
 (*******************************************************************************
 TOY EXAMPLE WITH STATE
+
+The goal is to prove the equivalence of these 2 systems:
+
+LEFT SYSTEM
+T -> R : h(kT(i),key(i))
+R -> T : ok
+
+RIGHT SYSTEM
+T -> R : h(nIdeal(i,j),key(i))
+R -> T : ok
+
+Remarks:
+-  nIdeal(i,j) is a "magic" nonce, since it is shared between the tag and the
+reader.
+- The reader conditional is modelled with a try find because we need the index
+ii to know which line we need to update in the database.
+
+Current state of the proof:
+- The direction honest => cond seems incorrect to me in the way it is handled
+here, I think we might need to express something more "imprecise" as what we did
+with examples/wip.sp. But we cannot model the reader's conditional with
+"if exists ...".
 *******************************************************************************)
 
 hash h
@@ -37,22 +59,6 @@ process reader(k:index) =
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
-goal [left] matchingStates : 
-forall (i,j,jj,k:index),
-  exec@T(i,j) && R(k,i,jj) < T(i,j)
-  => kT(i)@pred(T(i,j)) <> kR(i)@pred(R(k,i,jj)).
-Proof.
-intros.
-executable T(i,j).
-apply H1 to R(k,i,jj).
-expand exec@R(k,i,jj). expand cond@R(k,i,jj).
-euf M1.
-admit.
-assert kT(i)@pred(T(i,j)) = kT(i)@pred(T(i,j1)).
-assert T(i,j1) < T(i,j).
-admit.
-Qed.
-
 goal [left] stateInequalityTag :
 forall (i,j,j':index)
   T(i,j) < T(i,j') => kT(i)@T(i,j) <> kT(i)@T(i,j').
@@ -85,20 +91,16 @@ equiv real_ideal.
 Proof.
 induction t.
 
+(* CASE R(k,ii,jj) *)
 expand frame@R(k,ii,jj).
 fa 0.
 fa 1.
 expand output@R(k,ii,jj).
 expand exec@R(k,ii,jj).
-equivalent 
+equivalent
   cond@R(k,ii,jj),
-  diff(
-    exists (j:index), T(ii,j) < R(k,ii,jj) && output@T(ii,j) = input@R(k,ii,jj),
-    T(ii,jj) < R(k,ii,jj) && output@T(ii,jj) = input@R(k,ii,jj)
-  ).
-
+  exists (j:index), T(ii,j) < R(k,ii,jj) && output@T(ii,j) = input@R(k,ii,jj).
 split.
-
 (* cond => honest *)
 project.
 (* LEFT *)
@@ -110,19 +112,20 @@ exists j.
 expand cond@R(k,ii,jj).
 euf M0.
 admit. (* need induction? *)
-
+exists j.
 (* honest => cond *)
+expand cond@R(k,ii,jj).
 project.
 (* LEFT *)
-expand cond@R(k,ii,jj).
 admit. (* ??? *)
 (* RIGHT *)
-expand cond@R(k,ii,jj).
+admit. (* ??? *)
+fadup 1.
 
-admit. (* we should be able to use fadup 1. *)
-
+(* CASE R1(k) *)
 admit.
 
+(* CASE T(i,j) *)
 expandall.
 fa 0. fa 1.
 prf 1.
@@ -131,14 +134,9 @@ fa 1.
 yesif 1.
 project.
 split.
-
-apply matchingStates to i,j,jj,k.
-expand exec@T(i,j).
-expand cond@T(i,j).
-
+admit. (* reasonning on states? *)
 apply stateInequalityTag to i,j1,j.
-
-apply readerPlaysAfterTag to R(k,ii,jj). 
+apply readerPlaysAfterTag to R(k,ii,jj).
 apply H1 to ii,jj,k.
 expand exec@T(ii,jj).
 expand cond@T(ii,jj).
