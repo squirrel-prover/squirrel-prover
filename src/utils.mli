@@ -30,7 +30,12 @@ module String : sig
     val split_on_integer : string -> string * int option
   end
 
-module Imap : Map.S with type key = int
+(*------------------------------------------------------------------*)
+module Mi : Map.S with type key = int
+module Si : Set.S with type elt = int
+
+module Ms : Map.S with type key = string
+module Ss : Set.S with type elt = string
 
 (*------------------------------------------------------------------*)
 module type Ordered = sig
@@ -97,9 +102,6 @@ val pp_ne_list :
 val pp_list :
   (Format.formatter -> 'a -> unit) ->
   Format.formatter -> 'a list -> unit
-
-(*------------------------------------------------------------------*)
-val map_of_iter : (('a -> unit) -> unit) -> ('a -> 'b) -> 'b list
 
 (*------------------------------------------------------------------*)
 val fst3 : 'a * 'b * 'c -> 'a

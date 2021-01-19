@@ -156,44 +156,46 @@ val subst : subst -> 'a term -> 'a term
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 
-(** [subst_macros_ts l ts t] replaces [ts] by [pred(ts)] in the term [t]
+(** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)
-val subst_macros_ts : string list -> Sorts.timestamp term -> 'a term -> 'a term
+val subst_macros_ts : 
+  Symbols.table -> 
+  string list -> Sorts.timestamp term -> 'a term -> 'a term
 
 (** {2 Predefined symbols} *)
 
 val empty : Sorts.message term
 
-val in_macro : Sorts.message msymb
-val out_macro : Sorts.message msymb
+val in_macro    : Sorts.message msymb
+val out_macro   : Sorts.message msymb
 val frame_macro : Sorts.message msymb
-val cond_macro : Sorts.boolean msymb
-val exec_macro : Sorts.boolean msymb
+val cond_macro  : Sorts.boolean msymb
+val exec_macro  : Sorts.boolean msymb
 
-val f_true : fsymb
-val f_false : fsymb
-val f_and : fsymb
-val f_or : fsymb
-val f_not : fsymb
-val f_ite : fsymb
+val f_true   : fsymb
+val f_false  : fsymb
+val f_and    : fsymb
+val f_or     : fsymb
+val f_not    : fsymb
+val f_ite    : fsymb
 
-val f_diff : fsymb
+val f_diff   : fsymb
 
-val f_succ : fsymb
+val f_succ   : fsymb
 
-val f_fail : fsymb
+val f_fail   : fsymb
 
-val f_xor : fsymb
-val f_zero : fsymb
+val f_xor    : fsymb
+val f_zero   : fsymb
 
-val f_pair : fsymb
-val f_fst : fsymb
-val f_snd : fsymb
+val f_pair   : fsymb
+val f_fst    : fsymb
+val f_snd    : fsymb
 
-val f_exp : fsymb
-val f_g : fsymb
+val f_exp    : fsymb
+val f_g      : fsymb
 
-val f_len : fsymb
+val f_len    : fsymb
 val f_zeroes : fsymb
 
 val mk_not : formula -> formula

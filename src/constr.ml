@@ -15,7 +15,7 @@ open Utils
    constraints solving, the union-find structure contains an
    *under-approximation* of equality equivalence classes. *)
 
-let log_constr = Log.log Log.LogConstr;;
+let log_constr = Log.log Log.LogConstr
   
 (* Comment this for debugging *)
 let log_constr = ignore

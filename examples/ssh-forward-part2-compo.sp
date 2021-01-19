@@ -86,17 +86,6 @@ hash h with oracle forall (m:message,sk:message), sk = hKey
 senc enc,dec with h
 
 
-(* Based on a difference between the bitstring lengths, we can assume that it is
-impossible to confuse a hash with the tag forwarded, and another hash. *)
-
-axiom [auth] hashlengthnotpair : forall (m1,m2:message),
-   <forwarded,h(m1,hKey)> <> h(m2, hKey)
-
-(* The following axiom is a modelling trick. We need at some point to apply an
-hypothesis that require to instantiate an index, but this index is not used. *)
-axiom [auth] freshindex : exists (l:index), True
-
-
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
  || exists (i:index, m1:message, m2:message)
@@ -112,14 +101,6 @@ signature sign,checksign,pk with oracle forall (m:message,sk:message)
       m = h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
 )
 
-axiom [auth] signnottag :
-  forall (m1,m2:message),
-  fst(sign(m1,m2)) <> anssign &&
-  fst(sign(m1,m2)) <> reqsign
-
-axiom [auth] difftags :
-  anssign <> forwarded &&
-  forwarded <> reqsign && reqsign <> anssign
 
 (** We first present the general SSH process. *)
 
@@ -141,7 +122,7 @@ process P1FA =
     if x <> fail then
     if fst(x) = reqsign then
     out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,r2(i),k11))
-  )
+  ).
 
 process PDIS =
   (* begin S0 *)
@@ -171,7 +152,7 @@ process PDIS =
     let y = dec(signans,k11) in
     if y <> fail then
     if fst(y) = anssign then
-    Pok: out(cP, enc(snd(y),r4,gB^a1))
+    Pok: out(cP, enc(snd(y),r4,gB^a1)).
 
 
 process SDIS =
@@ -187,7 +168,7 @@ process SDIS =
   in(cS, encP );
   let x = dec(encP,gP^b1) in
   if checksign(x,pk(kP)) = <forwarded,sidS> then
-    Sok : out(cS,ok)
+    Sok : out(cS,ok).
 
 system [fullSSH] K: (P1FA | SDIS | PDIS).
 
@@ -333,6 +314,26 @@ process SDISauth =
       Sfail :  out(cS,diff(ok,ko))
 
 system [auth] K: ( P1FAauth | SDISauth | PDISauth).
+
+
+(* Based on a difference between the bitstring lengths, we can assume that it is
+impossible to confuse a hash with the tag forwarded, and another hash. *)
+
+axiom [auth] hashlengthnotpair : forall (m1,m2:message),
+   <forwarded,h(m1,hKey)> <> h(m2, hKey)
+
+(* The following axiom is a modelling trick. We need at some point to apply an
+hypothesis that require to instantiate an index, but this index is not used. *)
+axiom [auth] freshindex : exists (l:index), True
+
+axiom [auth] signnottag :
+  forall (m1,m2:message),
+  fst(sign(m1,m2)) <> anssign &&
+  fst(sign(m1,m2)) <> reqsign
+
+axiom [auth] difftags :
+  anssign <> forwarded &&
+  forwarded <> reqsign && reqsign <> anssign.
 
 
 

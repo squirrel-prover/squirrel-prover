@@ -17,13 +17,13 @@ val pp_abstract_decl : Format.formatter -> abstract_decl -> unit
 
 (** Information for a goal or axiom declaration *)
 type goal_decl = { gname   : string option;
-                   gsystem : Action.system;
+                   gsystem : SystemExpr.p_system_expr;
                    gform   : Theory.formula; }
 
 val pp_goal_decl : Format.formatter -> goal_decl -> unit
 
 (** Information for a system declaration *)
-type system_decl = { sname    : Action.system_name option;
+type system_decl = { sname    : string option;
                      sprocess : Process.process; }
 
 val pp_system_decl : Format.formatter -> system_decl -> unit
@@ -38,7 +38,7 @@ type orcl_tag_info = Theory.formula
 val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 (** Declarations *)
-type declaration =
+type declaration_i =
   | Decl_channel of string
   | Decl_process of Process.id * Process.pkind * Process.process
   | Decl_axiom   of goal_decl
@@ -54,7 +54,15 @@ type declaration =
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
 
+type declaration = declaration_i Location.located
+
 type declarations = declaration list
 
+(*------------------------------------------------------------------*)
+(** {2 Debugging pretty printers}*)
+
+(** Do not print the location information. *)
 val pp_decl  : Format.formatter -> declaration  -> unit
+
+(** Do not print the location information. *)
 val pp_decls : Format.formatter -> declarations -> unit

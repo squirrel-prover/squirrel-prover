@@ -21,8 +21,6 @@ abstract id : index -> message
 abstract id': index -> index -> message
 
 name dummy : message
-axiom len_id : forall (i:index) len(id(i)) = len(dummy)
-axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
 
 name key : index -> message
 name key': index -> index -> message
@@ -30,14 +28,13 @@ name key': index -> index -> message
 abstract error : message
 abstract tag0 : message
 abstract tag1 : message
-axiom tags_neq : tag0 <> tag1
 
-channel c
+channel c.
 
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>)
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>).
 
 process reader =
   new nr;
@@ -51,10 +48,14 @@ process reader =
              xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
            xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
-    out(c,error)
+    out(c,error).
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
+axiom len_id : forall (i:index) len(id(i)) = len(dummy)
+axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
+
+axiom tags_neq : tag0 <> tag1.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
@@ -183,8 +184,8 @@ fa 1.
 fresh 1.
 yesif 1.
 repeat split.
-depends R(r1), R2(r1).
 depends R(r1), R1(r1).
+depends R(r1), R2(r1).
 
 (* Case R1 *)
 expand frame@R1(r); expand exec@R1(r).
@@ -303,7 +304,7 @@ fresh M2.
 assert (fst(input@R1(r)) = nt(i,t)).
 fresh M2.
 fresh 1. yesif 1.
-xor 1, n_PRF1.
+xor 1, n_PRF.
 yesif 1.
-apply len_id to i; apply len_id' to i,t; namelength n_PRF1,dummy.
+apply len_id to i; apply len_id' to i,t; namelength n_PRF,dummy.
 Qed.

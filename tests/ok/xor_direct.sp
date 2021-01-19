@@ -7,10 +7,10 @@ name n : message
 name m : message
 name k : message
 
-axiom len_ko_n : len(ko XOR n) = len(k)
-axiom len_ko_m : len(ko XOR m) = len(k)
-
 system null.
+
+axiom len_ko_n : len(ko XOR n) = len(k)
+axiom len_ko_m : len(ko XOR m) = len(k).
 
 equiv testXorOneArg : diff(f(ok),f(ok)),diff(n,m) XOR k.
 Proof.

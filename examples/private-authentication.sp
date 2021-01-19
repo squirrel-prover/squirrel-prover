@@ -32,11 +32,8 @@ name r2 : index -> message
 
 abstract plus : message -> message -> message
 
-axiom length :
-  forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2))
-
 process A(i:index) =
-  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB)))
+  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
 
 process B(i:index) =
   in(cB, mess);
@@ -48,9 +45,12 @@ process B(i:index) =
        else
          <n(i), n(i)>),
       r(i), pk(diff(kA,kAbis)))
-  )
+  ).
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
+
+axiom length :
+  forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2)).
 
 (* Helper lemma for pushing conditionals. Such reasoning should soon be automatic.
  * Note that the lemma would be simpler (and more general) if we could quantify

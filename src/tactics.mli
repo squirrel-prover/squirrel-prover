@@ -12,7 +12,7 @@
 
   * As an example, if a tactic [tac] simply needs to change a goal
   * [j] into a list of subgoals [l], [tac j sk fk] should simply be
-  * [sk l fk]. In particular, if [l] is empty, the initial will
+  * [sk l fk]. In particular, if [l] is empty, the initial goal will
   * be considered proved.
   *
   * When a tactic cannot produce new results, it should call its failure
@@ -48,6 +48,9 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
+  | GoalNotClosed
 
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
@@ -127,6 +130,7 @@ type 'a ast =
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
   | CheckFail : tac_error * 'a ast -> 'a ast
+  | By : 'a ast -> 'a ast
 
 module type AST_sig = sig
 

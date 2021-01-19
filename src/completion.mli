@@ -5,11 +5,14 @@ type state
 (** [complete l] construct a complete term rewritting system from the set of
     equations inside l.
     May timeout. *)
-val complete : (Term.message * Term.message) list -> state Utils.timeout_r
+val complete : 
+  Symbols.table -> (Term.message * Term.message) list -> 
+  state Utils.timeout_r
 
 (** [check_disequalities s neqs l] checks that all disequalities inside [l] are
     implied by inequalities inside neqs, w.r.t [s]. *)
-val check_disequalities : state ->  (Term.message * Term.message) list
+val check_disequalities : 
+  state ->  (Term.message * Term.message) list
   -> (Term.message * Term.message) list -> bool
 
 (** [check_equalities s l] checks that all equalities inside [l] hold
@@ -29,4 +32,4 @@ val name_index_cnstrs :
 val name_indep_cnstrs : state -> Term.message list -> Term.formula list
 
 (** Print the set of rules in the initial TRS (e.g. dec(enc(x,y,r),y) -> x) *)
-val print_init_trs : Format.formatter -> unit
+val print_init_trs : Format.formatter -> Symbols.table -> unit

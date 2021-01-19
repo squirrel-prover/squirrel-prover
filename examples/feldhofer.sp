@@ -39,8 +39,6 @@ senc enc,dec
 abstract tagR : message
 abstract tagT : message
 
-axiom tags_neq : tagR <> tagT
-
 name nr : index  -> message
 name nt : index -> index -> message
 
@@ -49,8 +47,6 @@ name rr : index -> message
 
 abstract ok : message
 abstract ko : message
-
-axiom fail_not_pair : forall (x,y:message), fail <> <x,y>
 
 process Reader(k:index) =
   out(cR, nr(k));
@@ -67,14 +63,18 @@ process Reader(k:index) =
         fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
       in
         enc(<tagR,<snd(snd(dec(mess, diff(kE(i),kbE(i,j))))),nr(k)>>, rr(k),
-            diff(kE(i),kbE(i,j))))
+            diff(kE(i),kbE(i,j)))).
 
 process Tag(i:index, j:index) =
   in(cT, nR);
   let cipher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
-  out(cT, cipher)
+  out(cT, cipher).
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
+
+axiom tags_neq : tagR <> tagT
+
+axiom fail_not_pair : forall (x,y:message), fail <> <x,y>.
 
 goal wa_Reader1 :
   forall (k:index),
@@ -96,17 +96,16 @@ Proof.
   (* First projection. *)
   intctxt M0.
   exists i, j1.
-  depends Reader(k), Reader1(k).
+  by depends Reader(k), Reader1(k).
 
   (* Second projection. *)
   intctxt M0.
   exists i,j.
-  depends Reader(k), Reader1(k).
+  by depends Reader(k), Reader1(k).
 
   (* Direction <= *)
   exists i,j.
-  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
-
+  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
@@ -129,7 +128,7 @@ Proof.
 
   notleft H1.
   apply H1 to i,j; case H2.
-  apply fail_not_pair to tagT, <input@Tag(i,j), nt(i,j)>.
+  by apply fail_not_pair to tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
 
@@ -139,12 +138,11 @@ Proof.
 
   intctxt M0.
   apply H1 to i,j1; case H2.
-  depends Reader(k),Reader2(k).
+  by depends Reader(k),Reader2(k).
 
   intctxt M0.
   apply H1 to i,j; case H2.
-  depends Reader(k),Reader2(k).
-
+  by depends Reader(k),Reader2(k).
 Qed.
 
 goal lemma : forall (i,j,i1,j1:index),
@@ -158,19 +156,18 @@ Proof.
   case H0.
   assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt M3.
-  case H0.
-  apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
-  apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
+  by case H0.
+  by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
+  by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
   assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
   intctxt M1.
   case H0.
   assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt M3.
-  case H0.
-  apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
-  apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
-
+  by case H0.
+  by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
+  by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 Qed.
 
 equiv unlinkability.
@@ -183,7 +180,7 @@ Proof.
 
   expand seq(k->nr(k)),k.
   expandall.
-  fa 3.
+  by fa 3.
 
   (* Action 2/4: Reader1 *)
 
@@ -195,7 +192,7 @@ Proof.
       Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
       output@Tag(i,j) = input@Reader1(k) &&
       input@Tag(i,j) = output@Reader(k).
-  apply wa_Reader1 to k.
+  by apply wa_Reader1 to k.
 
   expand output@Reader1(k).
   fa 2. fa 3. fadup 3.
@@ -236,26 +233,27 @@ Proof.
           enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
               diff(kE(i),kbE(i,j))))).
   fa.
-  exists i,j.
-  exists i,j.
+  by exists i,j.
+  by exists i,j.
   project.
 
   fa.
   (* find condA => condB *)
   intctxt M2.
-  apply tags_neq.
-  exists j2.
+  by apply tags_neq.
+  by exists j2.
+
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
-  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
+  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa.
   (* find condA => condB *)
   intctxt M2.
-  apply tags_neq.
+  by apply tags_neq.
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
-  apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
+  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa 3; fadup 3.
   fa 3; fadup 3.
@@ -264,7 +262,7 @@ Proof.
   expand seq(i,j->nt(i,j)),i,j.
   fa 5.
   fresh 6.
-  fresh 5; yesif 5.
+  by fresh 5; yesif 5.
 
   (* Action 3/4: Reader2 *)
 
@@ -276,11 +274,11 @@ Proof.
       Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
       output@Tag(i,j) = input@Reader2(k) &&
       input@Tag(i,j) = output@Reader(k)).
-  apply wa_Reader2 to k.
+  by apply wa_Reader2 to k.
 
   fa 2.
   fa 3; fadup 3.
-  fa 3; fadup 3.
+  by fa 3; fadup 3.
 
   (* Action 4/4: Tag *)
 
@@ -291,6 +289,5 @@ Proof.
   expand seq(i,j->nt(i,j)),i,j.
   fa 4.
   fresh 5.
-  fresh 4; yesif 4.
-
+  by fresh 4; yesif 4.
 Qed.

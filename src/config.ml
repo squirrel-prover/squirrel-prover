@@ -11,7 +11,7 @@ type p_set_param = string * p_param_val
 (*------------------------------------------------------------------*)
 (* parameter type *)
                    
-module M = Map.Make(String)
+module M = Utils.Ms
 
 type param_kind =
   | PBool

@@ -1,11 +1,58 @@
 (** State in proof mode.
   * TODO goals do not belong here *)
 
+module L = Location
+
+(*------------------------------------------------------------------*)
+type decl_error_i = 
+  | Conv_error            of Theory.conversion_error
+  | Multiple_declarations of string 
+  | SystemError           of System.system_error
+  | SystemExprError       of SystemExpr.system_expr_err
+
+type dkind = KDecl | KGoal
+
+type decl_error =  L.t * dkind * decl_error_i
+
+let pp_decl_error_i fmt = function
+  | Conv_error e -> Theory.pp_error fmt e
+  | Multiple_declarations s ->
+    Fmt.pf fmt
+      "@[Multiple declarations of the symbol: %s.@]@." s
+  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
+
+  | SystemError e -> System.pp_system_error fmt e
+
+let pp_decl_error pp_loc_err fmt (loc,k,e) = 
+  let pp_k fmt = function
+    | KDecl -> Fmt.pf fmt "Declaration"
+    | KGoal -> Fmt.pf fmt "Goal declaration" in
+  Fmt.pf fmt "%a%a failed: %a."     
+    pp_loc_err loc 
+    pp_k k
+    pp_decl_error_i e
+
+exception Decl_error of decl_error
+
+let decl_error loc k e = raise (Decl_error (loc,k,e))
+
+let error_handler loc k f a =
+  let decl_error = decl_error loc k in
+  try f a with
+  | Theory.Conv e -> decl_error (Conv_error e)
+  | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
+  | System.SystemError e -> decl_error (SystemError e)
+  | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
+
+(*------------------------------------------------------------------*)
 module Goal = struct
   type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   let get_env = function
     | Trace j -> TraceSequent.get_env j
     | Equiv j -> EquivSequent.get_env j
+  let get_table = function
+    | Trace j -> TraceSequent.table j
+    | Equiv j -> EquivSequent.get_table j
   let pp ch = function
     | Trace j -> TraceSequent.pp ch j
     | Equiv j -> EquivSequent.pp ch j
@@ -25,12 +72,25 @@ let goals_proved = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
-type gm_input =
-  | Gm_goal of string * Goal.t
+
+(*------------------------------------------------------------------*)
+type p_goal_name = P_unknown | P_named of string
+
+type p_goal = 
+  | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
+  | P_equiv_goal of 
+      Theory.env * 
+      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
+                            SystemExpr.p_single_system
+
+type gm_input_i = 
+  | Gm_goal of p_goal_name * p_goal 
   | Gm_proof
 
+type gm_input = gm_input_i L.located
 
-
+(*------------------------------------------------------------------*)
 type option_name =
   | Oracle_for_symbol of string
 
@@ -42,6 +102,7 @@ type option_def = option_name * option_val
 let option_defs : option_def list ref= ref []
 
 type proof_state = { goals : named_goal list;
+                     table : Symbols.table;
                      current_goal : named_goal option;
                      subgoals : Goal.t list;
                      goals_proved : named_goal list;
@@ -61,19 +122,21 @@ let reset () =
     option_defs := [];
     Config.reset_params ()
 
-let save_state mode =
+let save_state mode table =
   proof_states_history :=
-    {goals = !goals;
-     current_goal = !current_goal;
-     subgoals = !subgoals;
-     goals_proved = !goals_proved;
-     option_defs = !option_defs;
-     params = Config.get_params ();
-     prover_mode = mode} :: (!proof_states_history)
+    { goals = !goals;
+      table = table;
+      current_goal = !current_goal;
+      subgoals = !subgoals;
+      goals_proved = !goals_proved;
+      option_defs = !option_defs;
+      params = Config.get_params ();
+      prover_mode = mode }
+    :: (!proof_states_history)
 
 let rec reset_state n =
   match (!proof_states_history,n) with
-  | [],_ -> GoalMode
+  | [],_ -> (GoalMode, Symbols.builtins_table)
   | p::q,0 ->
     proof_states_history := q;
 
@@ -83,7 +146,8 @@ let rec reset_state n =
     goals_proved := p.goals_proved;
     option_defs := p.option_defs;
     Config.set_params p.params;
-    p.prover_mode
+    
+    ( p.prover_mode, p.table )
   | _::q, n -> proof_states_history := q; reset_state (n-1)
 
 
@@ -186,7 +250,9 @@ module Make_AST (T : Table_sig) :
       | "apply",[TacticsArgs.String_name id] ->
           Fmt.pf ppf "apply %s" id
       | "apply", TacticsArgs.String_name id :: l ->
-          let l = List.map (function TacticsArgs.Theory t -> t | _ -> assert false) l in
+          let l = List.map (function
+            | TacticsArgs.Theory t -> t 
+            | _ -> assert false) l in
           Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
@@ -215,7 +281,8 @@ module type Tactics_sig = sig
 
   val register : string -> ?help:string -> (judgment -> judgment list) -> unit
 
-  val register_typed : string -> ?help:string ->
+  val register_typed : 
+    string -> ?help:string ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
@@ -245,58 +312,63 @@ struct
     assert (not (Hashtbl.mem table id)) ;
     Hashtbl.add table id { maker = f ; help = help}
 
-  let rec convert_args parser_args tactic_type j =
-    let env =
-      match M.to_goal j with
-      | Goal.Trace t -> TraceSequent.get_env t
-      | Goal.Equiv e -> EquivSequent.get_env e
+  let convert_args table parser_args tactic_type j =
+    let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
+
+    let rec conv_args parser_args tactic_type j =
+      let env =
+        match M.to_goal j with
+        | Goal.Trace t -> TraceSequent.get_env t
+        | Goal.Equiv e -> EquivSequent.get_env e
+      in
+      let tsubst = Theory.subst_of_env env in
+      let open TacticsArgs in
+      match parser_args, tactic_type with
+      | [Theory p], Sort Timestamp ->
+        Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
+      | [Theory p], Sort Message ->
+        Arg (Message   (Theory.convert conv_cntxt tsubst p Sorts.Message))
+      | [Theory p], Sort Boolean ->
+        Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
+      | [Theory (App (p,[]))], Sort String ->
+        Arg (String p)
+      | [Int_parsed i], Sort Int ->
+        Arg (Int i)
+      | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
+      | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
+      | [Theory (App (p,[]))], Sort Index ->
+        Arg (Index (Theory.convert_index table tsubst (Theory.var p)))
+      | th1::q, Sort (Pair (Opt s1, s2)) ->
+        begin match conv_args [th1] (Sort (Opt s1)) j with
+          | Arg arg1 ->
+            let Arg arg2 = conv_args q (Sort s2) j in
+            Arg (Pair (arg1, arg2))
+          | exception Theory.(Conv _) ->
+            let Arg arg2 = conv_args (th1::q) (Sort s2) j in
+            Arg (Pair (Opt (s1, None), arg2))
+        end
+      | th1::q, Sort (Pair (s1, s2)) ->
+        let Arg arg1 = conv_args [th1] (Sort s1) j in
+        let Arg arg2 = conv_args q (Sort s2) j in
+        Arg (Pair (arg1, arg2))
+      | [], Sort (Opt a) ->
+        Arg (Opt (a, None))
+      | [], Sort (Pair (Opt a, b)) ->
+        let Arg arg2 = conv_args [] (Sort b) j in
+        Arg (Pair (Opt (a, None), arg2))
+      | [th], Sort (Opt a) ->
+        let Arg arg = conv_args [th] (Sort a) j in
+        Arg (Opt
+               (a,
+                (Some (cast a arg))
+               )
+            )
+      | [], _ -> raise Theory.(Conv (Tactic_type "more arguments expected"))
+      | p, _ -> raise Theory.(Conv (Tactic_type "too many arguments"))
+
     in
-    let tsubst = Theory.subst_of_env env in
-    let open TacticsArgs in
-    match parser_args, tactic_type with
-    | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert InGoal tsubst p Sorts.Timestamp))
-    | [Theory p], Sort Message ->
-      Arg (Message   (Theory.convert InGoal tsubst p Sorts.Message))
-    | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert InGoal tsubst p Sorts.Boolean))
-    | [Theory (App (p,[]))], Sort String ->
-      Arg (String p)
-    | [Int_parsed i], Sort Int ->
-      Arg (Int i)
-    | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
-    | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
-    | [Theory (App (p,[]))], Sort Index ->
-      Arg (Index (Theory.convert_index tsubst (Theory.var p)))
-    | th1::q, Sort (Pair (Opt s1, s2)) ->
-      begin match convert_args [th1] (Sort (Opt s1)) j with
-        | Arg arg1 ->
-          let Arg arg2 = convert_args q (Sort s2) j in
-          Arg (Pair (arg1, arg2))
-        | exception Theory.(Conv _) ->
-          let Arg arg2 = convert_args (th1::q) (Sort s2) j in
-          Arg (Pair (Opt (s1, None), arg2))
-      end
-    | th1::q, Sort (Pair (s1, s2)) ->
-      let Arg arg1 = convert_args [th1] (Sort s1) j in
-      let Arg arg2 = convert_args q (Sort s2) j in
-      Arg (Pair (arg1, arg2))
-    | [], Sort (Opt a) ->
-      Arg (Opt (a, None))
-    | [], Sort (Pair (Opt a, b)) ->
-      let Arg arg2 = convert_args [] (Sort b) j in
-      Arg (Pair (Opt (a, None), arg2))
-    | [th], Sort (Opt a) ->
-      let Arg arg = convert_args [th] (Sort a) j in
-      Arg (Opt
-             (a,
-              (Some (cast a arg))
-             )
-          )
-    | [], _ -> raise Theory.(Conv (Tactic_type "more arguments expected"))
-    | p, _ -> raise Theory.(Conv (Tactic_type "too many arguments"))
-
-
+    conv_args parser_args tactic_type j
+      
   let register id ?(help="") f =
     register_general id ~help:help
       (function
@@ -304,15 +376,18 @@ struct
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
               | exception Tactics.Tactic_soft_failure e -> fk e
-              | exception Action.BiSystemError e -> Tactics.hard_failure
-                                                      (Tactics.Failure e)
+              | exception System.SystemError e -> 
+                Tactics.hard_failure (Tactics.SystemError e)
+              | exception SystemExpr.BiSystemError e -> 
+                Tactics.hard_failure (Tactics.SystemExprError e)
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-  let register_typed id  ?(help="") f sort =
+  let register_typed id ?(help="") f sort =
     register_general id ~help:help
       (fun args s sk fk ->
-         match convert_args args (TacticsArgs.Sort sort) s with
+         let table = Goal.get_table (M.to_goal s) in
+         match convert_args table args (TacticsArgs.Sort sort) s with
          | TacticsArgs.Arg (th)  ->
            begin
              try
@@ -321,8 +396,10 @@ struct
                  match f (th) s with
                  | subgoals -> sk subgoals fk
                  | exception Tactics.Tactic_soft_failure e -> fk e
-                 | exception Action.BiSystemError e -> Tactics.hard_failure
-                                                         (Tactics.Failure e)
+                 | exception System.SystemError e ->
+                   Tactics.hard_failure (Tactics.SystemError e)
+                 | exception SystemExpr.BiSystemError e -> 
+                   Tactics.hard_failure (Tactics.SystemExprError e)
                end
              with TacticsArgs.Uncastable ->
                Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
@@ -430,10 +507,14 @@ let get_goal_formula gname =
 
 (** Declare Goals And Proofs *)
 
-let make_trace_goal ~system f  =
-  Goal.Trace (TraceSequent.init ~system (Theory.convert InGoal [] f Sorts.Boolean))
+let make_trace_goal ~system ~table f  =
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+  let g = Theory.convert conv_env [] f Sorts.Boolean in
+  Goal.Trace (TraceSequent.init ~system table g)
 
-let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
+let make_equiv_goal
+    ~table (system_name : System.system_name)
+    env (l : [`Message of 'a | `Formula of 'b] list) =
   let env =
     List.fold_left
       (fun env (x, Sorts.ESort s) ->
@@ -442,27 +523,29 @@ let make_equiv_goal env (l : [`Message of 'a | `Formula of 'b] list) =
       Vars.empty_env env
   in
   let subst = Theory.subst_of_env env in
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   let convert = function
     | `Formula f ->
-        EquivSequent.Formula (Theory.convert InGoal subst f Sorts.Boolean)
+        EquivSequent.Formula (Theory.convert conv_env subst f Sorts.Boolean)
     | `Message m ->
-        EquivSequent.Message (Theory.convert InGoal subst m Sorts.Message)
+        EquivSequent.Message (Theory.convert conv_env subst m Sorts.Message)
   in
-  Goal.Equiv (EquivSequent.init Action.(SimplePair default_system_name)
-                env (List.map convert l))
+  let se = SystemExpr.simple_pair table system_name in
+  Goal.Equiv (EquivSequent.init se table env (List.map convert l))
 
 
-let make_equiv_goal_process system_1 system_2 =
+let make_equiv_goal_process ~table system_1 system_2 =
+  let open SystemExpr in
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
-  let term = Term.Macro(Term.frame_macro,[],Term.Var ts) in
+  let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let system =
     match system_1, system_2 with
-    | Action.Left id1, Action.Right id2 when id1 = id2 ->
-      Action.SimplePair id1
-    | _ -> Action.Pair (system_1, system_2)
+    | Left id1, Right id2 when id1 = id2 ->
+      SystemExpr.simple_pair table id1
+    | _ -> SystemExpr.pair table system_1 system_2
   in
-  Goal.Equiv (EquivSequent.init system !env [(EquivSequent.Message term)])
+  Goal.Equiv (EquivSequent.init system table !env [(EquivSequent.Message term)])
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -474,13 +557,37 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-let add_new_goal (gname,g) =
+let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
+
+let declare_new_goal_i table (gname,g) =
+  let gname = match gname with
+    | P_unknown -> unnamed_goal ()
+    | P_named s -> s in
+  let g = match g with
+    | P_equiv_goal (env,l) -> 
+      let system_symb = 
+        System.of_string SystemExpr.default_system_name table
+      in
+      make_equiv_goal ~table system_symb env l
+    | P_equiv_goal_process (a,b) -> 
+      let a = SystemExpr.parse_single table a
+      and b = SystemExpr.parse_single table b in
+      make_equiv_goal_process ~table a b
+
+    | P_trace_goal (s,f) -> 
+      let s = SystemExpr.parse_se table s in
+      make_trace_goal ~system:s ~table f
+  in
+
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
     raise @@ ParseError "A formula or goal with this name alread exists"
   else
-    goals :=  (gname,g) :: !goals
+    goals :=  (gname,g) :: !goals;
 
-let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
+  (gname,g)
+
+let declare_new_goal table loc n g = 
+  error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal (gname,j) =
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
@@ -488,8 +595,9 @@ let add_proved_goal (gname,j) =
   else
     goals_proved := (gname,j) :: !goals_proved
 
-let define_oracle_tag_formula h f =
-  let formula = Theory.convert InGoal [] f Sorts.Boolean in
+let define_oracle_tag_formula table h f =
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+  let formula = Theory.convert conv_env [] f Sorts.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
@@ -576,67 +684,50 @@ let current_goal () = !current_goal
 
 (*------------------------------------------------------------------*)
 
-let declare = function
-  | Decl.Decl_channel s             -> Channel.declare s
-  | Decl.Decl_process (id,pkind,p)  -> Process.declare id pkind p
+let declare_i table = function
+  | Decl.Decl_channel s            -> Channel.declare table s 
+  | Decl.Decl_process (id,pkind,p) -> Process.declare table id pkind p
 
   | Decl.Decl_axiom (gdecl) ->
     let name = match gdecl.gname with 
       | None -> unnamed_goal ()
       | Some n -> n
     in
-    let goal = make_trace_goal gdecl.gsystem gdecl.gform in
-    add_proved_goal (name, goal)
+    let se = SystemExpr.parse_se table gdecl.gsystem in
+    let goal = make_trace_goal se table gdecl.gform in
+    add_proved_goal (name, goal);
+    table
 
-  | Decl.Decl_system (sdecl) ->
+  | Decl.Decl_system sdecl ->
     let name = match sdecl.sname with 
-      | None -> Action.default_system_name
+      | None -> SystemExpr.default_system_name
       | Some n -> n
     in
-    let new_table = Process.declare_system Symbols.dummy_table name sdecl.sprocess in
-    ignore(new_table)           (* TODO: stateless *)
+    Process.declare_system table name sdecl.sprocess
 
   | Decl.Decl_hash (a, n, tagi) ->
-    let () = Utils.oiter (define_oracle_tag_formula n) tagi in
-    Theory.declare_hash ?index_arity:a n 
+    let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
+    Theory.declare_hash table ?index_arity:a n 
 
-  | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc enc dec pk
-  | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc senc sdec
-  | Decl.Decl_name (s, a)           -> Theory.declare_name s a
-  | Decl.Decl_state (s, a, k)       -> Theory.declare_state s a k
-  | Decl.Decl_macro (s, args, k, t) -> Theory.declare_macro s args k t
+  | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
+  | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
+  | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
+  | Decl.Decl_state (s, a, k)       -> Theory.declare_state table s a k
+  | Decl.Decl_macro (s, args, k, t) -> Theory.declare_macro table s args k t
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) -> 
-    Theory.declare_senc_joint_with_hash senc sdec h
+    Theory.declare_senc_joint_with_hash table senc sdec h
   | Decl.Decl_sign (sign, checksign, pk, tagi) -> 
-    let () = Utils.oiter (define_oracle_tag_formula sign) tagi in
-    Theory.declare_signature sign checksign pk
+    let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
+    Theory.declare_signature table sign checksign pk
   | Decl.Decl_abstract decl -> 
-    Theory.declare_abstract decl.name decl.index_arity decl.message_arity
+    Theory.declare_abstract table decl.name decl.index_arity decl.message_arity
 
-type decl_error = 
-  | Conv_error of Theory.conversion_error
-  | Multiple_declarations of string 
+let declare table decl =
+  let loc = L.loc decl in
+  error_handler loc KDecl (declare_i table) (L.unloc decl)
 
-let pp_decl_error0 fmt = function
-  | Conv_error e -> Theory.pp_error fmt e
-  | Multiple_declarations s ->
-    let pp_loc _fmt = ()        (* TODO: locations *) in
-    Fmt.pf fmt
-      "@[Multiple declarations %t of the symbol: %s.@]@."
-      pp_loc
-      s
-
-let pp_decl_error fmt e = 
-  Fmt.pf fmt "Declaration failed: %a." pp_decl_error0 e
-
-exception Decl_error of decl_error
-
-let decl_error e = raise (Decl_error e)
-
-let declare_list decls = 
+let declare_list table decls = 
   (* For debugging *)
   (* Fmt.epr "%a@." Decl.pp_decls decls; *)
 
-   try List.fold_left (fun () d -> declare d) () decls with
-     | Theory.Conv e -> decl_error (Conv_error e)
-     | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
+  List.fold_left (fun table d -> declare table d) table decls 

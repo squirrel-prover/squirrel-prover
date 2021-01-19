@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY
 %token PROOF QED UNDO ABORT
 %token EOF
 %token EMPTY_ELSE
@@ -35,9 +35,11 @@
 %left AND
 %nonassoc NOT
 
+%nonassoc tac_prec
+
 %left PLUS
 %nonassoc REPEAT
-%left SEMICOLON
+%right SEMICOLON
 %nonassoc TRY
 %nonassoc NOSIMPL
 %nonassoc NOBRANCH
@@ -52,6 +54,14 @@
 %type <Prover.parsed_input> interactive
 
 %%
+
+(* Locations *)
+%inline loc(X):
+| x=X {
+    { Location.pl_desc = x;
+      Location.pl_loc  = Location.make $startpos $endpos;
+    }
+  }
 
 (* Terms *)
 
@@ -151,15 +161,15 @@ sep:
 top_process:
 | p=process EOF                    { p }
 
-process:
+process_i:
 | NULL                          { Process.Null }
-| LPAREN ps=processes RPAREN    { ps }
+| LPAREN ps=processes_i RPAREN  { ps }
 | id=ID terms=term_list         { Process.Apply (id,terms) }
 | id=ID COLON p=process         { Process.Alias (p,id) }
 | NEW id=ID SEMICOLON p=process { Process.New (id,p) }
-| IN LPAREN c=ID COMMA id=ID RPAREN p=process_cont
+| IN LPAREN c=loc(ID) COMMA id=ID RPAREN p=process_cont
                                 { Process.In (c,id,p) }
-| OUT LPAREN c=ID COMMA t=term RPAREN p=process_cont
+| OUT LPAREN c=loc(ID) COMMA t=term RPAREN p=process_cont
                                 { Process.Out (c,t,p) }
 | IF f=formula THEN p=process p0=else_process
                                 { Process.Exists
@@ -178,16 +188,21 @@ process:
                                    Process.Set (id,l,t,p) }
 | s=BANG p=process              { Process.Repl (s,p) }
 
-processes:
-| p=process                        { p }
-| p=process PARALLEL ps=processes  { Process.Parallel (p,ps) }
+process:
+| p=loc(process_i) { p }
+
+processes_i:
+| p=process_i                             { p }
+| p=process PARALLEL ps=loc(processes_i)  { Process.Parallel (p,ps) }
 
 process_cont:
-|                                { Process.Null }
+|                                { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | SEMICOLON p=process            { p }
 
 else_process:
-| %prec EMPTY_ELSE               { Process.Null }
+| %prec EMPTY_ELSE               { let loc = Location.make $startpos $endpos in
+                                   Location.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
 indices:
@@ -222,7 +237,7 @@ index_arity:
 |                                { 0 }
 | LPAREN i=INT RPAREN            { i }
 
-declaration:
+declaration_i:
 | HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
 | HASH e=ID WITH ORACLE f=formula  
                           { Decl.Decl_hash (None, e, Some f) }
@@ -265,6 +280,9 @@ declaration:
                           { Decl.(Decl_system { sname = Some id; 
                                                 sprocess = p}) }
 
+declaration: 
+| ldecl=loc(declaration_i)                  { ldecl }
+
 declaration_list:
 | decl=declaration                        { [decl] }
 | decl=declaration decls=declaration_list { decl :: decls }
@@ -290,6 +308,7 @@ tac_errors:
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
+  | BY t=tac %prec tac_prec            { Tactics.By t }
   | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
   | TRY l=tac                          { Tactics.Try l }
   | REPEAT t=tac                       { Tactics.Repeat t }
@@ -361,41 +380,43 @@ equiv_env:
 | LPAREN vs=arg_list RPAREN { vs }
 
 system:
-|                         { Action.(SimplePair default_system_name) }
-| LBRACKET LEFT RBRACKET  { Action.(Single (Left default_system_name)) }
-| LBRACKET RIGHT RBRACKET { Action.(Single (Right default_system_name)) }
-| LBRACKET NONE COMMA i=ID RBRACKET  { Action.(SimplePair i) }
-| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.(Single (Left i)) }
-| LBRACKET RIGHT COMMA i=ID RBRACKET { Action.(Single (Right i)) }
+|                         { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Single (P_Left default_system_name)) }
+| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Single (P_Right default_system_name)) }
+| LBRACKET NONE  COMMA i=ID RBRACKET { SystemExpr.(P_SimplePair i) }
+| LBRACKET LEFT  COMMA i=ID RBRACKET { SystemExpr.(P_Single (P_Left i)) }
+| LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Single (P_Right i)) }
 
 bsystem:
-|                         { Action.(SimplePair default_system_name) }
-| LBRACKET i=ID RBRACKET  { Action.(SimplePair i) }
+|                         { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET i=ID RBRACKET  { SystemExpr.(P_SimplePair i) }
 
 single_system:
-| LBRACKET LEFT RBRACKET  { Action.(Left default_system_name)}
-| LBRACKET RIGHT RBRACKET { Action.(Right default_system_name)}
-| LBRACKET LEFT COMMA i=ID RBRACKET  { Action.(Left i) }
-| LBRACKET RIGHT COMMA i=ID RBRACKET { Action.(Right i)}
+| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Left default_system_name)}
+| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Right default_system_name)}
+| LBRACKET LEFT COMMA i=ID RBRACKET  { SystemExpr.(P_Left i) }
+| LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Right i)}
 
-goal:
+goal_i:
 | GOAL s=system i=ID COLON f=formula DOT
-                 { Prover.Gm_goal (i, Prover.make_trace_goal s f) }
+                 { Prover.Gm_goal (P_named i, P_trace_goal (s, f)) }
 | GOAL s=system f=formula DOT
-                 { Prover.Gm_goal (Prover.unnamed_goal (),
-                                   Prover.make_trace_goal s f) }
+                 { Prover.Gm_goal (P_unknown, P_trace_goal (s, f)) }
 | EQUIV n=ID env=equiv_env COLON l=equiv DOT
-                 { Prover.Gm_goal (n, Prover.make_equiv_goal env l) }
+                 { Prover.Gm_goal (P_named n, P_equiv_goal (env, l)) }
 | EQUIV n=ID DOT
                  { Prover.Gm_goal
-                     (n, Prover.make_equiv_goal_process
-                           Action.(Left default_system_name)
-			                     Action.(Right default_system_name)) }
+                     (P_named n, P_equiv_goal_process
+                                   (SystemExpr.(P_Left  default_system_name),
+			                              SystemExpr.(P_Right default_system_name))) }
 | EQUIV b1=single_system b2=single_system n=ID DOT
                  { Prover.Gm_goal
-                     (n, Prover.make_equiv_goal_process b1 b2)}
+                     (P_named n, Prover.P_equiv_goal_process (b1, b2))}
 
 | PROOF          { Prover.Gm_proof }
+
+goal: 
+| goal=loc(goal_i) { goal }
 
 option_param:
 | TRUE  { Config.Param_bool true  }

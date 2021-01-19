@@ -31,21 +31,21 @@ let pp_abstract_decl fmt decl =
     Sorts.pp_e Sorts.emessage
 
 (*------------------------------------------------------------------*)
-type goal_decl = { gname   : string option;
-                   gsystem : Action.system;
-                   gform   : Theory.formula; }
+type goal_decl = { gname   : string option ;
+                   gsystem : SystemExpr.p_system_expr ;
+                   gform   : Theory.formula ; }
 
 let pp_goal_decl fmt decl =
   let name = match decl.gname with
     | Some s -> s
     | None -> "_?" in
   Fmt.pf fmt "@[<hov 2>axiom [%a] %s =@ %a@]"
-    Action.pp_system decl.gsystem
+    SystemExpr.pp_p_system decl.gsystem
     name
     Theory.pp decl.gform
 
 (*------------------------------------------------------------------*)
-type system_decl = { sname    : Action.system_name option;
+type system_decl = { sname    : string option;
                      sprocess : Process.process; }
 
 let pp_system_decl fmt sys = 
@@ -62,7 +62,7 @@ type orcl_tag_info = Theory.formula
 let pp_orcl_tag_info = Theory.pp
 
 (*------------------------------------------------------------------*)
-type declaration =
+type declaration_i =
   | Decl_channel of string
   | Decl_process of Process.id * Process.pkind * Process.process
   | Decl_axiom   of goal_decl
@@ -78,9 +78,12 @@ type declaration =
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
 
+type declaration = declaration_i Location.located
+
 type declarations = declaration list
 
-let pp_decl fmt = function
+(*------------------------------------------------------------------*)
+let pp_decl fmt decl = match Location.unloc decl with
   | Decl_channel c -> Fmt.pf fmt "channel %s" c
   | Decl_process (pid, pkind, p) -> 
     Fmt.pf fmt "@[<hov 2>process %s %a =@ %a@]" 

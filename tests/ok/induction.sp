@@ -3,15 +3,15 @@ name k : message
 abstract ok : message
 channel c
 
+system !_i in(c,x); if fst(x)=h(snd(x),k) then out(c,h(ok,k)).
+
 (* This axiom is incorrect, due to the special minimal element
  * in timestamp domains of meta-interpretations, but we cannot
  * write it with A(i) instead of t because A is not yet
  * created. TODO *)
 axiom happens_le :
   forall (t:timestamp,tt:timestamp),
-  t <= tt && happens(tt) => happens(t)
-
-system !_i in(c,x); if fst(x)=h(snd(x),k) then out(c,h(ok,k)).
+  t <= tt && happens(tt) => happens(t).
 
 goal
   forall (t:timestamp,i:index),

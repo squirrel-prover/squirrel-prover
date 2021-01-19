@@ -65,7 +65,7 @@ end = struct
   
   exception Non_existing_hypothesis
   
-  module M = Map.Make(String)
+  module M = Utils.Ms
   
   (* A set of hypotheses is made of two maps. One maps hypothesis names
      (according to [name]) to variables, and the second maps
@@ -204,7 +204,8 @@ type formula_hypotheses = (formula_tag, Term.formula) H.hypotheses
 
 module S : sig
   type t = private {
-    system : Action.system ;
+    system : SystemExpr.system_expr ;
+    table : Symbols.table;
     env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
@@ -232,7 +233,7 @@ module S : sig
       * multiple sequents. *)
   }
 
-  val init_sequent : Action.system -> t
+  val init_sequent : SystemExpr.system_expr -> Symbols.table -> t
 
   (** Updates a sequent.
       [keep_trs] must be [true] only if the udates leaves the TRS associated to
@@ -240,7 +241,8 @@ module S : sig
       Idem for [keep_models] and the models.
       [keep_trs] and [keep_models] default to [false]. *)
   val update :
-    ?system:Action.system ->
+    ?system:SystemExpr.system_expr ->
+    ?table:Symbols.table ->
     ?env:Vars.env ->
     ?happens_hypotheses:Term.timestamp list ->
     ?message_hypotheses:message_hypotheses ->
@@ -260,30 +262,32 @@ module S : sig
   val set_models : t -> Constr.models -> unit
 end = struct
   type t = {
-    system : Action.system ;
-    env : Vars.env;
+    system             : SystemExpr.system_expr ;
+    table              : Symbols.table;
+    env                : Vars.env;
     happens_hypotheses : Term.timestamp list;
     message_hypotheses : message_hypotheses;
-    trace_hypotheses :  trace_hypotheses;
+    trace_hypotheses   :  trace_hypotheses;
     formula_hypotheses : formula_hypotheses;
-    conclusion : Term.formula;
-    trs : Completion.state option ref;
-    models : Constr.models option ref;
+    conclusion         : Term.formula;
+    trs                : Completion.state option ref;
+    models             : Constr.models option ref;
   }
 
-  let init_sequent system = {
-    system = system ;
-    env = Vars.empty_env;
+  let init_sequent system table = {
+    system             = system ;
+    table              = table;
+    env                = Vars.empty_env;
     happens_hypotheses = [];
     message_hypotheses = H.empty;
-    trace_hypotheses =  H.empty ;
+    trace_hypotheses   =  H.empty ;
     formula_hypotheses = H.empty;
-    conclusion = Term.True;
-    trs = ref None;
-    models = ref None;
+    conclusion         = Term.True;
+    trs                = ref None;
+    models             = ref None;
   }
 
-  let update ?system ?env ?happens_hypotheses
+  let update ?system ?table ?env ?happens_hypotheses
       ?message_hypotheses ?trace_hypotheses ?formula_hypotheses
       ?conclusion ?(keep_trs=false) ?(keep_models=false) t =
     let trs = 
@@ -296,6 +300,7 @@ end = struct
       else ref None 
     in
     let system = Utils.odflt t.system system
+    and table  = Utils.odflt t.table table
     and env    = Utils.odflt t.env env
     and happens_hypotheses = 
       Utils.odflt t.happens_hypotheses happens_hypotheses
@@ -310,6 +315,7 @@ end = struct
     in
     {
       system = system ;
+      table = table ;
       env = env ;
       happens_hypotheses = happens_hypotheses ;
       message_hypotheses = message_hypotheses ;
@@ -337,7 +343,7 @@ let pp ppf s =
   let open Fmt in
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
-    Action.pp_system s.system;
+    SystemExpr.pp_system s.system;
   if s.env <> Vars.empty_env then
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
   (* Print happens hypotheses *)
@@ -417,17 +423,17 @@ let remove_message_hypothesis pred s =
 let add_trace_hypothesis ?(prefix="T") s tf =
   S.update ~trace_hypotheses:(H.add true () tf prefix s.trace_hypotheses) s
 
-class iter_macros ~system f = object (self)
-  inherit Iter.iter ~system as super
+class iter_macros ~system table f = object (self)
+  inherit Iter.iter ~system table as super
   method visit_message t =
     match t with
       | Term.Macro ((m,sort,is),[],a) ->
           if List.for_all
                Vars.(function EVar v -> not (is_new v))
                (Term.get_vars t) &&
-             Macros.is_defined m a
+             Macros.is_defined m a table
           then
-            let def = Macros.get_definition system sort m is a in
+            let def = Macros.get_definition system table sort m is a in
               f t def ;
               self#visit_message def
       | t -> super#visit_message t
@@ -448,6 +454,7 @@ let rec add_macro_defs s at =
   let iter =
     new iter_macros
       ~system:s.system
+      s.table
       (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs)
   in
     iter#visit_formula (Term.Atom at) ;
@@ -471,11 +478,12 @@ let rec add_happens s ts =
   in
     match ts with
       | Term.Action (symb,indices) ->
-          let a = Action.of_term symb indices in
-          let system = s.system in
-          add_formula ~prefix:"C"
-               (snd (Action.get_descr system a).Action.condition)
-            s
+        let a = Action.of_term symb indices s.table in
+        let system = s.system in
+        let table  = s.table in
+        add_formula ~prefix:"C"
+          (snd (SystemExpr.descr_of_action table system a).Action.condition)
+          s
       | _ -> s
 
 (* Depending on the shape of the formula, we add it to the corresponding set of
@@ -504,7 +512,7 @@ let get_trs s : Completion.state timeout_r =
   | Some trs -> Result trs
   | None ->
     let eqs,_ = get_eqs_neqs s in
-    match Completion.complete eqs with
+    match Completion.complete s.table eqs with
     | Timeout -> Timeout
     | Result trs ->
       let () = S.set_trs s trs in
@@ -527,7 +535,11 @@ let get_env s = s.env
 
 let system s = s.system
 
+let table s = s.table
+
 let set_system system s = S.update ~system:system s 
+
+let set_table table s = S.update ~table:table s 
 
 let pi projection s =
   let pi_term t = Term.pi_term ~projection t in
@@ -555,8 +567,8 @@ let set_conclusion a s =
       | Term.Atom (#message_atom as at) -> add_macro_defs s at
       | _ -> s
 
-let init ~system (goal : Term.formula) =
-  set_conclusion goal (init_sequent system)
+let init ~system table (goal : Term.formula) =
+  set_conclusion goal (init_sequent system table)
 
 let get_conclusion s = s.conclusion
 

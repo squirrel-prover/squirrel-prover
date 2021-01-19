@@ -5,10 +5,10 @@ abstract ko : message
 
 name dummy : message
 
-axiom len_ok : len(ok) = len(dummy)
-axiom len_ko : len(ko) = len(dummy)
-
 system null.
+
+axiom len_ok : len(ok) = len(dummy)
+axiom len_ko : len(ko) = len(dummy).
 
 goal forall (t:timestamp),
   xor(output@t,output@t) = zero.

@@ -29,7 +29,6 @@ abstract ko : message
 abstract error : message
 abstract tag0 : message
 abstract tag1 : message
-axiom tags_neq : tag0 <> tag1
 
 channel c
 
@@ -59,6 +58,8 @@ process reader =
     out(c,error)
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
+
+axiom tags_neq : tag0 <> tag1.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)

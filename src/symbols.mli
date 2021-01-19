@@ -5,15 +5,15 @@
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
 
+(** Symbol groups:
+  * symbols with the same name can exist in different groups.
+  * Groups are usually called namespaces, but what we (improperly)
+  * call namespaces here is different: it's more of a name kind. *)
+type group
+
 (** Type of tables of persistent symbol definitions.
   * It is currently ineffective. *)
 type table
-
-(* Dummy table, for transition only. It will eventually disappear. *)
-val dummy_table : table
-
-(** Empty symbol table, for testing. *)
-val empty_table : table
 
 (** Each possible namespace is represented by an abstract datatype.
   * Their names are descriptive; [fname] is for function symbols. *)
@@ -23,6 +23,8 @@ type name
 type action
 type fname
 type macro
+type system
+type process
 
 (** {2 Symbol definitions}
   *
@@ -42,7 +44,7 @@ type function_def =
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
-val is_ftype : fname t -> function_def -> bool
+val is_ftype : fname t -> function_def -> table -> bool
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
@@ -59,16 +61,33 @@ type macro_def =
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel : unit -> channel def
-  | Name : int -> name def
-  | Action : int -> action def
-  | Function : (int * function_def) -> fname def
-  | Macro : macro_def -> macro def
+  | Channel  : unit                 -> channel def
+  | Name     : int                  -> name    def
+  | Action   : int                  -> action  def
+  | Function : (int * function_def) -> fname   def
+  | Macro    : macro_def            -> macro   def
+  | System   : unit                 -> system  def
+  | Process  : unit                 -> process def
 
 type edef =
   | Exists : 'a def -> edef
   | Reserved
 
+(*------------------------------------------------------------------*)
+type namespace = 
+  | NChannel 
+  | NName    
+  | NAction  
+  | NFunction
+  | NMacro   
+  | NSystem  
+  | NProcess 
+
+val pp_namespace : Format.formatter -> namespace -> unit
+
+val get_namespace : ?group:group -> table -> string -> namespace option
+
+(*------------------------------------------------------------------*)
 (** {2 Data}
   * In addition to their definition data, some more data can be attached
   * to symbols. This is used for data that is defined in modules that
@@ -83,35 +102,28 @@ type data += AssociatedFunctions of (fname t) list
 
 (** {2 Basic namespace-independent operations} *)
 
-exception Multiple_declarations of string
 exception Unbound_identifier of string
-exception Incorrect_namespace
+exception Incorrect_namespace 
+exception Multiple_declarations of string
 
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string
 
+(** Pretty-print a symbol. *)
+val pp : Format.formatter -> 'a t -> unit
+
 (** [def_of_string s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_string : string -> edef
+val def_of_string : ?group:group -> string -> table -> edef
+
+val is_defined : ?group:group -> string -> table -> bool
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
 (** [of_string s] returns the symbol associated to [s]
   * together with its defining data.
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val of_string : string -> wrapped
-
-(** {2 Testing utilities} *)
-
-(** Wrap a function into a new one which runs the previous one but
-  * restores the table of symbols to its initial state before
-  * terminating (either by returning a value or raising an exception).
-  * This is mainly for testing purposes. *)
-val run_restore : (unit -> unit) -> (unit -> unit)
-
-(** Clear the symbol table, and restore all symbols declared with the builtin
-    flag. *)
-val restore_builtin : unit -> unit
+val of_string : ?group:group -> string -> table -> wrapped
 
 (** {2 Namespaces} *)
 
@@ -127,6 +139,9 @@ module type Namespace = sig
   (** Reserve a fresh symbol name, resembling the given string. *)
   val reserve : table -> string -> table * ns t
 
+  (** Reserve a fresh symbol name. *)
+  val reserve_exact : table -> string -> table * ns t
+
   (** Define a symbol name that has been previously reserved
     * using [fresh]. *)
   val define : table -> ns t -> ?data:data -> def -> table
@@ -137,46 +152,116 @@ module type Namespace = sig
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
   val declare :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
 
   (** Like declare, but use the exact string as symbol name.
     * @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
-    table -> string -> ?builtin:bool -> ?data:data -> def -> table * ns t
+    table -> string -> ?data:data -> def -> table * ns t
 
   (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
-  val of_string : string -> ns t
+  val of_string : string -> table -> ns t
+
+  (** [of_string s] returns [Some s] as a symbol, if it exists in this 
+      namespace, and None otherwise. *) 
+  val of_string_opt : string -> table -> ns t option
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
 
+  (** Get definition and data at once. *)
+  val get_all : ns t -> table -> def * data
+
   (** Get definition associated to some symbol. *)
-  val get_def : ns t -> def
+  val get_def : ns t -> table -> def
 
   (** [def_of_string s] is equivalent to [get_def (of_string s)]. *)
-  val def_of_string : string -> def
+  val def_of_string : string -> table -> def
 
   (** Get data associated to some symbol. *)
-  val get_data : ns t -> data
+  val get_data : ns t -> table -> data
 
   (** [data_of_string s] is equivalent to [get_data (of_string s)]. *)
-  val data_of_string : string -> data
-
-  (** Get definition and data at once. *)
-  val get_all : ns t -> def * data
+  val data_of_string : string -> table -> data
 
   (** Iterate on the defined symbols of this namespace. *)
-  val iter : (ns t -> def -> data -> unit) -> unit
+  val iter : (ns t -> def -> data -> unit) -> table -> unit
 
   (** Fold over the defined symbols of this namespace. *)
-  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> 'a
+  val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
-module Channel : Namespace with type def = unit with type ns = channel
-module Name : Namespace with type def = int with type ns = name
-module Action : Namespace with type def = int with type ns = action
+module Channel  : Namespace with type def = unit with type ns = channel
+module Name     : Namespace with type def = int  with type ns = name
+module Action   : Namespace with type def = int  with type ns = action
+module System   : Namespace with type def = unit with type ns = system
+module Process  : Namespace with type def = unit with type ns = process
 module Function : Namespace
   with type def = int * function_def with type ns = fname
+module Macro    : Namespace with type def = macro_def with type ns = macro
 
-module Macro : Namespace with type def = macro_def with type ns = macro
+(*------------------------------------------------------------------*)
+(** {2 Builtins} *)
+
+val builtins_table : table
+
+
+(** {3 Macro builtins} *)
+
+val inp   : macro t
+val out   : macro t
+val cond  : macro t
+val exec  : macro t
+val frame : macro t
+
+(** {3 Channel builtins} *)
+
+val dummy_channel_string : string
+val dummy_channel : channel t
+
+(** {3 Function symbols builtins} *)
+
+val fs_diff   : fname t
+
+(** Boolean connectives *)
+
+val fs_true   : fname t
+val fs_false  : fname t
+val fs_and    : fname t
+val fs_or     : fname t
+val fs_not    : fname t
+val fs_ite    : fname t
+
+(** Successor over natural numbers *)
+
+val fs_succ   : fname t
+
+(** Fail *)
+
+val fs_fail   : fname t
+
+(** Xor and its unit *)
+
+val fs_xor    : fname t
+val fs_zero   : fname t
+
+(** Pairing *)
+
+val fs_pair   : fname t
+val fs_fst    : fname t
+val fs_snd    : fname t
+
+(** Exp **)
+
+val fs_exp    : fname t
+val fs_g      : fname t
+
+(** Empty *)
+
+val fs_empty  : fname t
+
+(** Length *)
+
+val fs_len    : fname t
+val fs_zeroes : fname t

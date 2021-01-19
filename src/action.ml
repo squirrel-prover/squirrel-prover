@@ -33,10 +33,10 @@ let rec get_shape = function
       sum_choice = (s, List.length ls) }
     :: get_shape l
 
-let rec indices = function
+let rec get_indices = function
   | [] -> []
   | a :: l ->
-    snd a.par_choice @ snd a.sum_choice @ indices l
+    snd a.par_choice @ snd a.sum_choice @ get_indices l
 
 let same_shape a b : Term.subst option =
   let rec same acc a b = match a,b with
@@ -58,28 +58,33 @@ let same_shape a b : Term.subst option =
 
 (** Action symbols *)
 
-let shape_to_symb = Hashtbl.create 97
-
 type Symbols.data += Data of Vars.index list * action
 
-let fresh_symbol table name = Symbols.Action.reserve table name
+let fresh_symbol table ~exact name = 
+  if exact 
+  then Symbols.Action.reserve_exact table name
+  else Symbols.Action.reserve       table name
+
 let define_symbol table symb args action =
-  Hashtbl.add shape_to_symb (get_shape action) symb ;
   let data = Data (args,action) in
   Symbols.Action.define table symb ~data (List.length args)
-let find_symbol s =
-  match Symbols.Action.data_of_string s with
+
+let find_symbol s table =
+  match Symbols.Action.data_of_string s table with
     | Data (x,y) -> x,y
     | _ -> assert false
-let of_symbol s =
-  match Symbols.Action.get_data s with
+
+let of_symbol s table =
+  match Symbols.Action.get_data s table with
     | Data (x,y) -> x,y
     | _ -> assert false
-let iter f =
+
+let iter f table =
   Symbols.Action.iter
     (fun s _ -> function
        | Data (args,action) -> f s args action
        | _ -> assert false)
+    table
 
 (** Pretty-printing *)
 
@@ -135,32 +140,11 @@ let rec subst_action (s : Term.subst) (a : action) : action =
       sum_choice = q, List.map (Term.subst_var s) lq }
     :: subst_action s l
 
-let to_term a =
-  let indices = indices a in
-  Term.Action (Hashtbl.find shape_to_symb (get_shape a), indices)
-
-let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) : action =
-  let l',a = of_symbol s in
+let of_term (s:Symbols.action Symbols.t) (l:Vars.index list) table : action =
+  let l',a = of_symbol s table in
   let subst =
     List.map2 (fun x y -> Term.ESubst (Term.Var x,Term.Var y)) l' l in
   subst_action subst a
-
-let rec dummy_action k =
-  let a =
-    if k = 0 then [] else
-      { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy_action (k-1)
-  in
-  let s = get_shape a in
-  let data = Data ([],a) in
-  if not (Hashtbl.mem shape_to_symb s) then
-    Hashtbl.add shape_to_symb s
-      (snd
-         (Symbols.Action.declare Symbols.dummy_table "_Dummy" ~data 0)) ;
-  a
-
-let pp_action ppf a = Term.pp ppf (to_term a)
-
-let pp = pp_action
 
 let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
 
@@ -175,13 +159,18 @@ let pp_parsed_action ppf a = pp_action_f pp_strings (0,[]) ppf a
   * conditions). *)
 
 type descr = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : Vars.index list ;
+  name      : Symbols.action Symbols.t ;
+  action    : action ;
+  input     : Channel.t * string ;
+  indices   : Vars.index list ;
   condition : Vars.index list * Term.formula ;
-  updates : (Term.state * Term.message) list ;
-  output : Channel.t * Term.message
+  updates   : (Term.state * Term.message) list ;
+  output    : Channel.t * Term.message
 }
+
+let pp_descr_short ppf descr =
+  let t = Term.Action (descr.name, descr.indices) in
+  Term.pp ppf t
 
 let pp_descr ppf descr =
   Fmt.pf ppf "@[<v 0>name: @[<hov>%a@]@;\
@@ -189,7 +178,7 @@ let pp_descr ppf descr =
               @[<hv 2>condition:@ @[<hov>%a@]@]@;\
               %a\
               @[<hv 2>output:@ @[<hov>%a@]@]@]"
-    pp_action descr.action
+    pp_descr_short descr
     (Utils.pp_ne_list "@[<hv 2>indices:@ @[<hov>%a@]@]@;" Vars.pp_list)
     descr.indices
     Term.pp (snd descr.condition)
@@ -214,6 +203,7 @@ let pi_descr s d =
 let subst_descr subst descr =
   let action = subst_action subst descr.action in
   let input = descr.input in
+  let name = descr.name in
   let subst_term = Term.subst subst in
   let indices = List.map (Term.subst_var subst) descr.indices  in
   let condition =
@@ -226,231 +216,13 @@ let subst_descr subst descr =
       descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
-  {action; input; indices; condition; updates; output }
-
-(** Associates a description to each action.
-  * TODO store this as part of Symbols data ? *)
-
-type system_name = string
-
-let default_system_name = "default"
-
-type single_system =
-  | Left of system_name
-  | Right of system_name
-
-let get_proj = function
-  | Left _ -> Term.Left
-  | Right _ -> Term.Right
-
-let get_id = function
-  | Left id | Right id -> id
-
-(** This table maps system names to action shape. It will allow to get all
-   shapes corresponding to some system. *)
-let systems  : (system_name, shape) Hashtbl.t =
-  Hashtbl.create 97
-
-exception BiSystemError of string
+  {name; action; input; indices; condition; updates; output }
 
 
-type system =
-  | Single of single_system
-  | SimplePair of system_name
-  | Pair of single_system * single_system
-
-
-let pp_single fmt = function
-  | Left id -> Fmt.pf fmt "%s/left" id
-  | Right id -> Fmt.pf fmt "%s/right" id
-
-let pp_system fmt = function
-  | Single s -> Fmt.pf fmt "%a" pp_single s
-  | SimplePair id -> Fmt.pf fmt "%s/both" id
-  | Pair (s1, s2) ->  Fmt.pf fmt "%a|%a" pp_single s1 pp_single s2
-
-let project_system proj = function
-  | Single s -> raise @@ BiSystemError "cannot project system which is not a bi-process"
-  | SimplePair id ->
-    begin
-      match proj with
-      | Term.Left -> Single (Left id)
-      | Term.Right -> Single (Right id)
-      | Term.None ->  raise @@ BiSystemError "cannot project a system with None"
-    end
-  | Pair (s1, s2) ->
-    begin
-      match proj with
-      | Term.Left -> Single s1
-      | Term.Right -> Single s2
-      | Term.None -> raise @@ BiSystemError "cannot project a system with None"
-    end
-
-let action_to_descr : ((shape * system_name), descr) Hashtbl.t =
-  Hashtbl.create 97
-
-let reset () =
-  Hashtbl.clear action_to_descr;
-  Hashtbl.clear systems;
-  Hashtbl.clear shape_to_symb
-
-let is_fresh system_name =
-  not (Hashtbl.mem systems system_name)
-
-let register table system_name symb indices action descr =
-  let s = get_shape action in
-  Hashtbl.add systems system_name s;
-  match to_term action with
-  | Term.Action (symb2, is) when indices <> is ->
-      raise @@
-      BiSystemError "Cannot register a shape twice with distinct indices."
-  | Term.Action (symb2, is) ->
-      let subst =
-        Term.ESubst (Term.Action (symb,is), Term.Action (symb2,is)) in
-      let descr = subst_descr [subst] descr in
-      Hashtbl.add action_to_descr (s,system_name) descr;
-      table, symb2
-  | _ -> assert false
-  | exception Not_found ->
-      Hashtbl.add action_to_descr (s,system_name) descr ;
-      let table = define_symbol table symb indices action in
-      table, symb
-
-
-let make_bi_descr d1 d2 =
-  if d1.input <> d2.input || d1.indices <> d2.indices then
-    raise @@ BiSystemError "cannot merge two actions with disctinct \
-                            inputs or indexes";
-  { d1 with
-    condition = (let is1,t1 = d1.condition and is2,t2 = d2.condition in
-                 if is1 <> is2 then
-                   raise @@
-                   BiSystemError "cannot merge two actions with disctinct \
-                                  condtion indexes";
-                 is1, Term.make_bi_term t1 t2);
-    updates = List.map2 (fun (st1, m1) (st2, m2) ->
-          if st1 <> st2 then
-            raise @@ BiSystemError "cannot merge two actions with disctinct \
-                                    states";
-        st1,Term.make_bi_term m1 m2)
-        d1.updates d2.updates;
-    output = (let c1,m1 = d1.output and c2,m2 = d2.output in
-                if c1 <> c2 then
-                  raise @@
-                  BiSystemError "cannot merge two actions with disctinct \
-                                 ouput channels";
-                c1, Term.make_bi_term m1 m2) }
-
-let get_descr_of_shape system shape =
-  match system with
-  (* we simply project he description according to the projection *)
-  | Single s ->  pi_descr (get_proj s)
-                           (Hashtbl.find action_to_descr (shape, get_id s))
-  | SimplePair id ->       pi_descr Term.None
-                             (Hashtbl.find action_to_descr (shape, id))
-  (* else we need to obtain the two corresponding set of shapes, project them
-     correctly, and combine them into a single term. *)
-  | Pair (s1, s2) ->
-    let left_a = Hashtbl.find action_to_descr (shape, get_id s1) in
-    let right_a = Hashtbl.find action_to_descr (shape, get_id s2) in
-      (* else, we combine both actions together. *)
-      make_bi_descr
-        (pi_descr (get_proj s1) left_a)
-        (pi_descr (get_proj s2) right_a)
-
-let get_descr system a =
-  let descr = get_descr_of_shape system (get_shape a) in
-  (* We know that [descr.action] and [a] have the same shape,
-   * but run [same_shape] anyway to obtain the substitution from
-   * one to the other. *)
-  match same_shape descr.action a with
-  | None -> assert false
-  | Some subst ->
-    subst_descr subst descr
-
-let get_descrs system =
-  match system with
-  | Pair (s1, s2) ->
-    (* we must check that the two systems have the same set of shapes *)
-    let left_shapes = Hashtbl.find_all systems (get_id s1) in
-    let right_shapes = Hashtbl.find_all systems (get_id s2) in
-    if not(Utils.List.inclusion left_shapes right_shapes
-           && Utils.List.inclusion right_shapes left_shapes) then
-      raise @@
-      BiSystemError "Cannot iter over a bisytem with distinct control flow";
-    List.map
-      (fun shape -> (get_descr_of_shape system shape))
-      left_shapes
-  | SimplePair id ->
-    let shapes = Hashtbl.find_all systems id in
-    List.map
-      (fun shape -> (get_descr_of_shape system shape))
-      shapes
-  | Single s ->
-    (* we must projet before iterating *)
-    let shapes = Hashtbl.find_all systems (get_id s) in
-    List.map
-      (fun shape -> pi_descr (get_proj s)
-                      (Hashtbl.find action_to_descr (shape,get_id s)))
-      shapes
-
-let iter_descrs system f =
-  List.iter f (get_descrs system)
-
-(* A substition over a description is allows to either substitute the condition
-   or the output of the descr, for a given shape. *)
-type esubst_descr =
-  | Condition of Term.formula * action
-  | Output of Term.message * action
-
-type subst_descr = esubst_descr list
-
-let rec subst s d =
-  match s with
-  | [] -> d
-  | Condition (f,a) :: q ->
-    begin
-      match same_shape a d.action with
-      | None -> subst q d
-      | Some s ->
-          subst q {d with condition = (fst(d.condition), Term.subst s f)}
-    end
-  | Output (t,a) :: q ->
-    begin
-      match same_shape a d.action with
-      | None -> subst q d
-      | Some s ->
-          subst q {d with output = (fst(d.output), Term.subst s t)}
-    end
-
-
-exception SystemNotFresh
-
-(* Given an original system and a descr substitution, register the new simple
-   system obtained from the susbtition. *)
-let clone_system_subst original_system new_system substd =
-  let odescrs = get_descrs original_system in
-  let ndescrs = List.map (subst substd) odescrs in
-  if (Hashtbl.mem systems new_system) then
-    let cdescrs =  get_descrs (SimplePair new_system) in
-    if not(Utils.List.inclusion ndescrs cdescrs
-           && Utils.List.inclusion cdescrs ndescrs) then
-      raise SystemNotFresh
-    else
-      ()
-  else
-    List.iter
-      (function d ->
-         let s = get_shape d.action in
-         Hashtbl.add systems new_system s;
-         Hashtbl.add action_to_descr (s,new_system) d;
-      )
-  ndescrs
-
-
+(*------------------------------------------------------------------*)
 let debug = false
 
-let pp_actions ppf () =
+let pp_actions ppf table =
   Fmt.pf ppf "@[<v 2>Available action shapes:@;@;@[" ;
   let comma = ref false in
   iter
@@ -465,12 +237,10 @@ let pp_actions ppf () =
        else
          Fmt.pf ppf "%s%a"
            (Symbols.to_string symbol)
-           pp_indices indices) ;
+           pp_indices indices) 
+    table;
   Fmt.pf ppf "@]@]@."
 
-let pp_descrs ppf system =
-  Fmt.pf ppf "@[<v 2>Available actions:@;@;";
-  iter_descrs system (fun descr ->
-      Fmt.pf ppf "@[<v 0>@[%a@]@;@]@;"
-        pp_descr descr) ;
-  Fmt.pf ppf "@]%!@."
+let rec dummy len =
+  if len = 0 then [] else
+     { par_choice = 0,[] ; sum_choice = 0,[] } :: dummy (len-1)

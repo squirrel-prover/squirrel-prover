@@ -13,8 +13,8 @@ let declare_global table name ~inputs ~indices ~ts t =
 
 open Term
 
-let is_defined name a =
-  match Symbols.Macro.get_all name with
+let is_defined name a table =
+  match Symbols.Macro.get_all name table with
     | Symbols.Input, _ -> false
     | Symbols.(Output | Cond | State _), _ ->
         (* We can expand the definitions of output@A and state@A
@@ -39,26 +39,28 @@ let is_defined name a =
          * its sequential predecessors. *)
         begin match a with
           | Action (s,_) ->
-              let action = snd (Action.of_symbol s) in
+              let action = snd (Action.of_symbol s table) in
               List.length inputs <= List.length action
           | _ -> false
         end
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  Action.system -> a Sorts.sort ->
-  Symbols.macro Symbols.t -> Vars.index list -> Term.timestamp -> a Term.term =
-  fun system sort name args a ->
+  type a.  SystemExpr.system_expr ->  Symbols.table -> 
+  a Sorts.sort -> Symbols.macro Symbols.t ->
+  Vars.index list -> Term.timestamp -> 
+  a Term.term =
+  fun se table sort name args a ->
   match sort with
   | Sorts.Message ->
     begin
-      match Symbols.Macro.get_all name with
+      match Symbols.Macro.get_all name table with
       | Symbols.Input, _ -> assert false
       | Symbols.Output, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
-            snd Action.((get_descr system action).output)
+            let action = Action.of_term symb indices table in
+            snd SystemExpr.((descr_of_action table se action).Action.output)
           | _ -> assert false
         end
       | Symbols.Frame, _ ->
@@ -77,8 +79,8 @@ let get_definition :
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
-            let descr = Action.get_descr system action in
+            let action = Action.of_term symb indices table in
+            let descr = SystemExpr.descr_of_action table se action in
             begin try
               (* Look for an update of the state macro [name] in the
               updates of [action] *)
@@ -108,7 +110,7 @@ let get_definition :
       | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
           | Action (tsymb,tidx) ->
-            let action = Action.of_term tsymb tidx in
+            let action = Action.of_term tsymb tidx table in
             assert (List.length inputs <= List.length action) ;
             let idx_subst =
               List.map2
@@ -128,7 +130,8 @@ let get_definition :
                 (fun (subst,action) x ->
                    let in_tm =
                      Term.Macro (in_macro,[],
-                                 Action.to_term (List.rev action))
+                                 SystemExpr.action_to_term table se
+                                   (List.rev action))
                    in
                    Term.ESubst (Term.Var x,in_tm) :: subst,
                    List.tl action)
@@ -140,10 +143,10 @@ let get_definition :
               let proj_t proj = Term.pi_term ~projection:proj t in
               (* The expansion of the body of the macro only depends on the
                  projections, not on the system names. *)
-              match system with
+              match se with
               (* the body of the macro is expanded by projecting
                  according to the projection in case of single systems. *)
-              | Single (s) -> proj_t (Action.get_proj s)
+              | Single (s) -> proj_t (SystemExpr.get_proj s)
               (* For diff cases, if the system corresponds to a left and a right
                  projection of systems we can simply project the macro as is. *)
               | SimplePair _
@@ -151,8 +154,8 @@ let get_definition :
               (* If we do not have a left and right projection, we must
                  reconstruct the body of the macros to have the correct
                  definition on each side. *)
-              | Pair (s1, s2)  -> Term.Diff (proj_t (Action.get_proj s1),
-                                             proj_t (Action.get_proj s2))
+              | Pair (s1, s2)  -> Term.Diff (proj_t (SystemExpr.get_proj s1),
+                                             proj_t (SystemExpr.get_proj s2))
             end
           | _ -> assert false
         end
@@ -162,12 +165,13 @@ let get_definition :
     end
   | Sorts.Boolean ->
     begin
-      match Symbols.Macro.get_all name with
+      match Symbols.Macro.get_all name table with
       | Symbols.Cond, _ ->
         begin match a with
           | Action (symb,indices) ->
-            let action = Action.of_term symb indices in
-            snd Action.((get_descr system action).condition)
+            let action = Action.of_term symb indices table in
+            let descr = SystemExpr.descr_of_action table se action in
+            snd Action.(descr.condition)
           | _ -> assert false
         end
       | Symbols.Exec, _ ->
@@ -183,11 +187,14 @@ let get_definition :
   | _ -> assert false
 
 let get_dummy_definition :
-  type a. Action.system -> a Sorts.sort ->
-  Symbols.macro Symbols.t -> Vars.index list -> a Term.term =
-  fun system sort mn indices ->
-  match Symbols.Macro.get_all mn with
+  type a. SystemExpr.system_expr -> Symbols.table -> 
+  a Sorts.sort -> Symbols.macro Symbols.t -> 
+  Vars.index list -> 
+  a Term.term =
+  fun se table sort mn indices ->
+  match Symbols.Macro.get_all mn table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
-        let dummy_action = Action.dummy_action (List.length inputs) in
-        get_definition system sort mn indices (Action.to_term dummy_action)
+      let dummy_action = Action.dummy (List.length inputs) in
+      let tdummy_action = SystemExpr.action_to_term table se dummy_action in
+      get_definition se table sort mn indices tdummy_action
     | _ -> assert false

@@ -49,6 +49,8 @@ type action = (Vars.index list) t
   * they are obtained by replacing lists of indices by their lengths. *)
 type shape = int t
 
+val get_indices : action -> Vars.index list
+
 (** [depends a b] test if [a] must occur before [b] as far
     as the control-flow is concerned -- it does not (cannot)
     take messages into account. It is not reflexive. *)
@@ -69,71 +71,43 @@ val get_shape : action -> shape
     substitution sending [a] to [b]. *)
 val same_shape : action -> action -> Term.subst option
 
-(** Convert action to the corresponding [Action] timestamp term. *)
-val to_term : action -> Term.timestamp
-
 (** Convert [Action] parameters to an action. *)
-val of_term : Symbols.action Symbols.t -> Vars.index list -> action
+val of_term : 
+  Symbols.action Symbols.t -> Vars.index list -> 
+  Symbols.table -> 
+  action
 
-(** Get dummy action of some length. Guarantees that a symbol exists for it. *)
-val dummy_action : int -> action
+(** Return a dummy action of a given length. *)
+val dummy : int -> action
 
-
+(*------------------------------------------------------------------*)
 (** {2 Action symbols}
   *
   * Action symbols are used to refer to actions in a concise manner.
   * They are indexed and are associated to an action using the argument
   * indices. *)
 
-(** Get a fresh symbol whose name starts with the given prefix. *)
+type Symbols.data += Data of Vars.index list * action
+
+(** Get a fresh symbol whose name starts with the given prefix. 
+    If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
-  Symbols.table -> string -> Symbols.table * Symbols.action Symbols.t
+  Symbols.table -> exact:bool -> string -> 
+  Symbols.table * Symbols.action Symbols.t
 
-val find_symbol : string -> Vars.index list * action
+val define_symbol :
+  Symbols.table -> 
+  Symbols.Action.ns Symbols.t -> Vars.index list -> action -> 
+  Symbols.table
 
-val of_symbol : Symbols.action Symbols.t -> Vars.index list * action
+val find_symbol : string -> Symbols.table -> Vars.index list * action
 
-(** {2 Systems} *)
-
-(** The user specifies one or more (bi)systems, identified using names.
-  * Each (bi)system is a set of (bi)actions, obtained from a (bi)process. *)
-
-type system_name = string
-
-val default_system_name : string
-
-(** A single system, that is a system without diff, is given by the name of a
-   (bi)system , and either Left or Right. *)
-
-type single_system =
-  | Left of system_name
-  | Right of system_name
+val of_symbol : 
+  Symbols.action Symbols.t -> Symbols.table -> 
+  Vars.index list * action
 
 
-val get_proj : single_system -> Term.projection
-
-(* A system defines either a system without diff, or a system with diff.  It can
-   be obtained from:
-    - a single system;
-    - a system obtained from a system name,
-   as it was declared, considered with its diff terms;
-    - a system obtained by
-   combinaison of two single system, one for the left and one for the right. *)
-type system =
-  | Single of single_system
-  | SimplePair of system_name
-  | Pair of single_system * single_system
-
-val pp_system : Format.formatter -> system -> unit
-
-
-(** Prject a system according to the given projection.  The pojection must not
-   be None, and the system must be a bi system, i.e either SimplePair or Pair.
-   *)
-val project_system : Term.projection -> system -> system
-
-exception BiSystemError of string
-
+(*------------------------------------------------------------------*)
 (** {2 Action descriptions}
   *
   * Describe the behavior of an action: it consists of an input, followed by a
@@ -141,12 +115,13 @@ exception BiSystemError of string
 
 (** Type of action descriptions. *)
 type descr = {
-  action : action ;
-  input : Channel.t * string ;
-  indices : Vars.index list ;
+  name      : Symbols.action Symbols.t ;
+  action    : action ;
+  input     : Channel.t * string ;
+  indices   : Vars.index list ;
   condition : Vars.index list * Term.formula ;
-  updates : (Term.state * Term.message) list ;
-  output : Channel.t * Term.message
+  updates   : (Term.state * Term.message) list ;
+  output    : Channel.t * Term.message
 }
 
 (** [pi_descr s a] returns the projection of the description. As descriptions
@@ -156,56 +131,15 @@ type descr = {
    the action.  *)
 val pi_descr : Term.projection -> descr -> descr
 
-(** [get_descr a] returns the description corresponding to the action [a] in the
-   [system].  Raise Not_found if no action corresponds to [a]. *)
-val get_descr : system -> action -> descr
 
-(** Iterate over all action descriptions in [system].
-  * Only one representative of each action shape will be passed
-  * to the function, with indices that are not guaranteed to be fresh. *)
-val iter_descrs : system -> (descr -> unit) -> unit
-
-(** {2 Registration of actions} *)
-
-(** Specify if a given system name is not already in use. *)
-val is_fresh : system_name -> bool
-
-(** Register an action symbol in a system,
-  * associating it with an action description.
-  * The set of registered actions for this system name will define
-  * the protocol under study.
-  * Returns the updated table and the actual action symbol used
-  * (currently the proposed symbol may not be used for technical
-  * reasons that will eventually disappear TODO). *)
-val register :
-  Symbols.table -> system_name ->
-  Symbols.action Symbols.t -> Vars.index list ->
-  action -> descr -> Symbols.table * Symbols.action Symbols.t
-
-(** Reset all action definitions done through [register]. *)
-val reset : unit -> unit
-
-
-type esubst_descr =
-  | Condition of Term.formula * action
-  | Output of Term.message * action
-
-type subst_descr = esubst_descr list
-
-exception SystemNotFresh
-
-val clone_system_subst : system -> system_name -> subst_descr -> unit
-
+(*------------------------------------------------------------------*)
 (** {2 Pretty-printing} *)
 
 (** Format an action, displayed through its structure. *)
 val pp_action_structure : Format.formatter -> action -> unit
 
-(** Format an action, displayed through its symbol. *)
-val pp_action : Format.formatter -> action -> unit
-
-(** Alias for [pp_action]. *)
-val pp : Format.formatter -> action -> unit
+(** Format the action name of an action description. *)
+val pp_descr_short : Format.formatter -> descr -> unit
 
 (** Formatter for descriptions. *)
 val pp_descr : Format.formatter -> descr -> unit
@@ -217,11 +151,10 @@ val pp_shape : Format.formatter -> shape -> unit
 val pp_parsed_action : Format.formatter -> (string list) item list -> unit
 
 (** Pretty-print all actions. *)
-val pp_actions : Format.formatter -> unit -> unit
+val pp_actions : Format.formatter -> Symbols.table -> unit
 
-(** Pretty-print all action descriptions. *)
-val pp_descrs : Format.formatter -> system -> unit
 
+(*------------------------------------------------------------------*)
 (** {2 Substitution} *)
 
 (** Apply a term substitution to an action's indices. *)

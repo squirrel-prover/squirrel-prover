@@ -6,12 +6,12 @@ name m : index->message
 abstract ok : message
 abstract ko : message
 
+system null.
+
 axiom len_ok_ko : forall i:index, len(ok XOR ko) = len(n(i))
 axiom len_ko_ok : forall i:index, len(ko XOR ok) = len(m(i))
 axiom len_ok : forall i:index, len(ok) = len(n(i))
-axiom len_ko : forall i:index, len(ko) = len(m(i))
-
-system null.
+axiom len_ko : forall i:index, len(ko) = len(m(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index) :

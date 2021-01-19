@@ -131,13 +131,9 @@ let rec disjunction_to_atom_list = function
 
 (** Builtins *)
 
-let mk_fname f arity =
-  let info = 0, Symbols.Abstract arity in
-  snd
-    (Symbols.Function.declare_exact Symbols.dummy_table f ~builtin:true info),
-  []
+let mk f = (f,[])
 
-let f_diff = mk_fname "diff" 2
+let f_diff = mk Symbols.fs_diff
 
 (** Boolean function symbols, where booleans are typed as messages.
   * The true/false constants are used in message_of_formula,
@@ -146,43 +142,47 @@ let f_diff = mk_fname "diff" 2
 
 let eboolean,emessage = Sorts.eboolean,Sorts.emessage
 
-let f_false = mk_fname "false" 0
-let f_true = mk_fname "true" 0
-let f_and = mk_fname "and" 2
-let f_or = mk_fname "or" 2
-let f_not = mk_fname "not" 1
-let f_ite = mk_fname "if" 3
+(** Boolean connectives *)
 
-let f_fail = mk_fname "fail" 0
+let f_false  = mk Symbols.fs_false
+let f_true   = mk Symbols.fs_true
+let f_and    = mk Symbols.fs_and
+let f_or     = mk Symbols.fs_or
+let f_not    = mk Symbols.fs_not
+let f_ite    = mk Symbols.fs_ite
+
+(** Fail *)
+
+let f_fail   = mk Symbols.fs_fail
 
 (** Xor and its unit *)
 
-let f_xor = mk_fname "xor" 2
-let f_zero = mk_fname "zero" 0
+let f_xor    = mk Symbols.fs_xor
+let f_zero   = mk Symbols.fs_zero
 
 (** Successor over natural numbers *)
 
-let f_succ = mk_fname "succ" 1
+let f_succ   = mk Symbols.fs_succ
 
 (** Pairing *)
 
-let f_pair = mk_fname "pair" 2
-let f_fst = mk_fname "fst" 1
-let f_snd = mk_fname "snd" 1
+let f_pair   = mk Symbols.fs_pair
+let f_fst    = mk Symbols.fs_fst
+let f_snd    = mk Symbols.fs_snd
 
 (** Exp **)
 
-let f_exp = mk_fname "exp" 2
-let f_g = mk_fname "g" 0
+let f_exp    = mk Symbols.fs_exp
+let f_g      = mk Symbols.fs_g
 
 (** Empty *)
 
-let empty = Fun (mk_fname "empty" 0, [])
+let empty    = Fun (mk Symbols.fs_empty, [])
 
 (** Length *)
 
-let f_len = mk_fname "len" 1
-let f_zeroes = mk_fname "zeroes" 1
+let f_len    = mk Symbols.fs_len
+let f_zeroes = mk Symbols.fs_zeroes
 
 (** Convert a boolean term to a message term, used in frame macro definition **)
 
@@ -288,36 +288,13 @@ and pp_generic_atom ppf = function
 
 
 (** Declare input and output macros.
-  * TODO this should be moved to the builtin symbol table in Symbols.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
-                       "input" ~builtin:true
-                       Symbols.Input),
-                Sorts.Message,
-                [])
-let out_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
-                        "output" ~builtin:true
-                        Symbols.Output),
-                 Sorts.Message,
-                 [])
+let in_macro    = (Symbols.inp,   Sorts.Message, [])
+let out_macro   = (Symbols.out,   Sorts.Message, [])
+let frame_macro = (Symbols.frame, Sorts.Message, [])
 
-let cond_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
-                         "cond" ~builtin:true
-                         Symbols.Cond),
-                 Sorts.Boolean,
-                 [])
-
-let exec_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
-                         "exec" ~builtin:true
-                         Symbols.Exec),
-                 Sorts.Boolean,
-                 [])
-
-let frame_macro = (snd (Symbols.Macro.declare_exact Symbols.dummy_table
-                          "frame" ~builtin:true
-                          Symbols.Frame),
-                   Sorts.Message,
-                   [])
+let cond_macro  = (Symbols.cond, Sorts.Boolean, [])
+let exec_macro  = (Symbols.exec, Sorts.Boolean, [])
 
 let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt
@@ -545,11 +522,11 @@ and subst_generic_atom s = function
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
 
-let subst_macros_ts l ts t =
+let subst_macros_ts table l ts t =
   let rec subst_term : type a. a term -> a term = fun t -> match t with
     | Macro ((symb,s,ind), terms, ts') ->
       let terms' = List.map subst_term terms in
-      begin match Symbols.Macro.get_all symb with
+      begin match Symbols.Macro.get_all symb table with
       | Symbols.State _, _ ->
         if (List.mem (Symbols.to_string symb) l && ts=ts')
         then Macro((symb,s,ind), terms', ts')
@@ -729,13 +706,13 @@ let () =
     end ;
   ] ;
   Checks.add_suite "Projection" [
-    "Simple example", `Quick, Symbols.run_restore @@ begin fun () ->
+    "Simple example", `Quick, begin fun () ->
       let a = mkvar "a" Sorts.Message in
       let b = mkvar "b" Sorts.Message in
       let c = mkvar "c" Sorts.Message in
       let def = Symbols.Abstract 2 in
-      let _,f =
-        Symbols.Function.declare_exact Symbols.empty_table "f" (0,def) in
+      let table,f =
+        Symbols.Function.declare_exact Symbols.builtins_table "f" (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term Left t in

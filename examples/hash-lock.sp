@@ -100,8 +100,8 @@ Proof.
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
   repeat split.
-  depends R(j1), R2(j1).
   depends R(j1), R1(j1).
+  depends R(j1), R2(j1).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).

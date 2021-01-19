@@ -1,5 +1,6 @@
-
 open Utils
+
+module L = Location
 
 module Initialization = struct
   (* Opening these modules is only useful for their side effects,
@@ -37,6 +38,17 @@ let parse_next parser_fun =
     parser_fun (Utils.oget !lexbuf) !filename
 
 (*------------------------------------------------------------------*)
+(** Print precise location error (to be caught by emacs) *)
+let pp_loc_error ppf loc =
+  if !interactive then
+    let lexbuf = Lexing.from_channel stdin in
+    (* Not sure startpos does anything *)
+    let startpos = lexbuf.Lexing.lex_curr_p.pos_cnum in
+    Fmt.pf ppf
+      "[error-%d-%d]"
+      (max 0 (loc.L.loc_bchar - startpos))
+      (max 0 (loc.L.loc_echar - startpos))
+
 type cmd_error = 
   | Unexpected_command 
   | StartProofError of string
@@ -56,29 +68,34 @@ let cmd_error e = raise (Cmd_error e)
 open Prover
 open Tactics
 
+(* State of the main loop.
+   TODO: include everything currently handled statefully in Prover.ml *)
+type loop_state = { mode : Prover.prover_mode;
+                    table : Symbols.table; }
+
 (** The main loop body. *)
-let main_loop_body ~test mode =
+let main_loop_body ~test state =
   match
     let parse_buf =
       Parserbuf.parse_from_buf
         ~test ~interactive:!interactive
         Parser.interactive
     in
-    mode, parse_next parse_buf
+    state.mode, parse_next parse_buf
   with
     | mode, ParsedUndo nb_undo ->
-      let new_mode = reset_state nb_undo in
+      let new_mode, new_table = reset_state nb_undo in
       let () = match new_mode with
         | ProofMode -> Printer.pr "%a" pp_goal ()
-        | GoalMode -> Printer.pr "%a" Action.pp_actions ()
+        | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
         | WaitQed -> ()
         | AllDone -> assert false in
-      new_mode
+      { mode = new_mode; table = new_table; }
 
     | GoalMode, ParsedInputDescr decls ->
-      Prover.declare_list decls;
-      Printer.pr "%a" Action.pp_actions ();
-      GoalMode 
+      let table = Prover.declare_list state.table decls in
+      Printer.pr "%a" System.pp_systems table;
+      { mode = GoalMode; table = table; }
 
     | ProofMode, ParsedTactic utac ->
       if not !interactive then
@@ -90,40 +107,40 @@ let main_loop_body ~test mode =
                | Some (i, _) -> i
                | None -> assert false);
           complete_proof ();
-          WaitQed
+          { state with mode = WaitQed }
       | false ->
           Printer.pr "%a" pp_goal ();
-          ProofMode
+          { state with mode = ProofMode }
       end
 
     | WaitQed, ParsedQed ->
       Printer.prt `Result "Exiting proof mode.@.";
-      GoalMode
+      { state with mode = GoalMode }
 
     | GoalMode, ParsedSetOption sp ->
       Config.set_param sp;
-      GoalMode
+      { state with mode = GoalMode }
 
     | GoalMode, ParsedGoal goal ->
       begin
-        match goal with
+        match L.unloc goal with
         | Prover.Gm_proof ->
           begin
             match start_proof () with
             | None ->
               Printer.pr "%a" pp_goal ();
-              ProofMode
+              { state with mode = ProofMode }
             | Some es -> cmd_error (StartProofError es)
           end
         | Prover.Gm_goal (i,f) ->
-          add_new_goal (i,f);
+          let i,f = Prover.declare_new_goal state.table (L.loc goal) i f in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;
-          GoalMode
+          { state with mode = GoalMode; }
       end
 
-    | GoalMode, EOF -> AllDone 
+    | GoalMode, EOF -> { state with mode = AllDone; }
 
     | WaitQed, ParsedAbort ->
       if test then raise @@ Failure "Trying to abort a completed proof." else
@@ -132,7 +149,7 @@ let main_loop_body ~test mode =
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
       Prover.reset ();
-      GoalMode
+      { state with mode = GoalMode; }
 
     | _, ParsedQed ->
       if test then raise @@ Failure "unfinished" else 
@@ -146,42 +163,46 @@ let main_loop_body ~test mode =
     [save] allows to specify is the current state must be saved, so that
     one can backtrack.
 *)
-let rec main_loop ~test ?(save=true) mode =
+let rec main_loop ~test ?(save=true) state =
   if !interactive then Printer.prt `Prompt "";
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
-  if save then save_state mode ;
+  if save then save_state state.mode state.table ;
 
-  match main_loop_body ~test mode with
+  match
+    let new_state = main_loop_body ~test state in
+    new_state, new_state.mode with
   (* exit prover *)
-  | AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
+  | _, AllDone -> Printer.pr "Goodbye!@." ; if not test then exit 0
 
   (* loop *)
-  | new_mode -> (main_loop[@tailrec]) ~test new_mode
+  | new_state, _ -> (main_loop[@tailrec]) ~test new_state
 
   (* exception handling *)
   | exception (Parserbuf.Error s) -> 
-    error ~test mode (fun fmt -> Fmt.string fmt s)
+    error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Prover.ParseError s) -> 
-    error ~test mode (fun fmt -> Fmt.string fmt s)
-  | exception (Decl_error e) ->
-    error ~test mode (fun fmt -> pp_decl_error fmt e)
+    error ~test state (fun fmt -> Fmt.string fmt s)
   | exception (Cmd_error e) ->
-    error ~test mode (fun fmt -> pp_cmd_error fmt e)
+    error ~test state (fun fmt -> pp_cmd_error fmt e)
+  | exception (Process.ProcError e) ->
+    error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
+  | exception (Decl_error e) when not test ->
+    error ~test state (fun fmt -> pp_decl_error pp_loc_error fmt e)
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in
-    error ~test mode pp_e
+    error ~test state pp_e
   | exception (Tactic_hard_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic ill-formed or unapplicable: %a." 
         Tactics.pp_tac_error e in
-    error ~test mode pp_e
+    error ~test state pp_e
 
-and error ~test mode e =
+and error ~test state e =
   Printer.prt `Error "%t" e;
   if !interactive 
-  then (main_loop[@tailrec]) ~test ~save:false mode 
+  then (main_loop[@tailrec]) ~test ~save:false state
   else if not test then exit 1
 
 
@@ -191,10 +212,8 @@ let start_main_loop ?(test=false) () =
    * TODO this is not doable anymore (with refactoring this code)
    * concerning definitions of functions, names, ... symbols;
    * it should not matter if we do not undo the initial definitions *)
-  Process.reset ();
   Prover.reset ();
-  Symbols.restore_builtin ();
-  main_loop ~test GoalMode
+  main_loop ~test { mode = GoalMode; table = Symbols.builtins_table; }
 
 let interactive_prover () =
   Printer.prt `Start "Squirrel Prover interactive mode.";
@@ -224,9 +243,12 @@ let main () =
     let filename = List.hd !args in
     run filename
 
+
+(*------------------------------------------------------------------*)
 let () =
+  let exception Ok in
   let test = true in
-  Parserbuf.add_suite_restore "Tactics" [
+  Checks.add_suite "Tactics" [
     "Exists Intro", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.Undefined "a1"))
@@ -242,7 +264,7 @@ let () =
         (Failure "unfinished")
         (fun () -> run ~test "tests/alcotest/ts_leq_not_lt.sp")
     end ;
-    "SEnc Bad SSC - INCTXT 1", `Quick, begin fun () ->
+    "SEnc Bad SSC - INTCTXT 1", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure SEncNoRandom)
         (fun () -> run ~test "tests/alcotest/intctxt_nornd.sp")
@@ -277,10 +299,18 @@ let () =
         (Tactic_soft_failure SEncNoRandom)
         (fun () -> run ~test "tests/alcotest/cca_nornd.sp")
     end ;
-    "Axiom Systems", `Quick, begin fun () ->
+    "Axiom Systems - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_hard_failure NoAssumpSystem)
         (fun () -> run ~test "tests/alcotest/axiom2.sp")
+    end ;
+    "Axiom Systems - 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () -> 
+           try run ~test "tests/alcotest/axiom3.sp" with
+           | Prover.Decl_error (_, KDecl, 
+                                SystemError (System.SE_UnknownSystem "test")) ->
+             raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
@@ -325,7 +355,7 @@ let () =
         (fun () -> run ~test "tests/alcotest/undo.sp")
     end ;
   ] ;
-  Parserbuf.add_suite_restore "Equivalence" [
+  Checks.add_suite "Equivalence" [
     "Fresh Frame", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Failure "unfinished")

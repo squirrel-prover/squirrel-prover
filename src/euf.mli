@@ -46,7 +46,8 @@ val key_ssc :
   ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
-  system:Action.system ->
+  system:SystemExpr.system_expr ->
+  table:Symbols.table ->
   Term.fname -> Term.name -> unit
 
 (** Same as [key_ssc] but returns a boolean. *)
@@ -54,7 +55,8 @@ val check_key_ssc :
   ?allow_vars : bool ->
   ?messages:(Term.message list) -> ?elems:(EquivSequent.elem list) ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
-  system:Action.system ->
+  system:SystemExpr.system_expr ->
+  table:Symbols.table ->
   Term.fname -> Term.name -> bool
 
 (** [mk_rule proc head_fn key_n] create the euf rule associated to an given head
@@ -65,6 +67,7 @@ val mk_rule :
   ?elems:EquivSequent.elem list ->
   ?drop_head:bool ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
-  system:Action.system ->
+  system:SystemExpr.system_expr ->
+  table:Symbols.table ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->
   head_fn:Term.fname -> key_n:Term.name -> key_is:Vars.index list -> euf_rule

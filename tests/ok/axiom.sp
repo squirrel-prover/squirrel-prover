@@ -3,13 +3,11 @@
 
 name k:message
 
+system  null.
 
 axiom dummy_false_axiom :
 forall (ma : message),
-exists (m:message), m=k && ma=k
-
-
-system  null.
+exists (m:message), m=k && ma=k.
 
 goal [left] dummy :
 forall (ma : message),

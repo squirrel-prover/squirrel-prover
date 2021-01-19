@@ -5,10 +5,10 @@ type elem =
 type t
 type sequent = t
 
-(* Initialize a sequent for the diff-equivalence of the given system.  Remark
-   that if the projection of the system is not None, the goal will be
-   trivial. *)
-val init : Action.system -> Vars.env -> elem list -> t
+(** Initialize a sequent for the diff-equivalence of the given system.  
+    Remark that if the projection of the system is not None, the goal will 
+    be trivial. *)
+val init : SystemExpr.system_expr -> Symbols.table -> Vars.env -> elem list -> t
 
 val pp : Format.formatter -> t -> unit
 
@@ -17,7 +17,10 @@ val pp_init : Format.formatter -> t -> unit
 val get_env : t -> Vars.env
 val set_env : Vars.env -> t -> t
 
-val get_system : t ->  Action.system
+val get_system : t -> SystemExpr.system_expr
+val get_table  : t -> Symbols.table
+
+val set_table  : t -> Symbols.table -> t
 
 (** Get the list of biterms describing the two frames. *)
 val get_biframe : t -> elem list

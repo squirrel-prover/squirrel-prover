@@ -102,13 +102,12 @@ let parse_from_buf
 (** Testing *)
 
 let parse_theory_buf ?(test=false) lexbuf filename =
-  Process.reset () ;
   parse_from_buf ~test Parser.declarations lexbuf filename
 
 let parse_theory_test ?(test=false) filename =
   let lexbuf = Lexing.from_channel (Stdlib.open_in filename) in
   let decls = parse_theory_buf ~test lexbuf filename in
-  Prover.declare_list decls
+  Prover.declare_list Symbols.builtins_table decls
 
 let parse parser parser_name string =
   let lexbuf = Lexing.from_string string in
@@ -120,18 +119,12 @@ let parse parser parser_name string =
       parser_name (Lexing.lexeme lexbuf) ;
     raise e
 
-let parse_process ?(typecheck=false) str =
+let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc [] p ;
+    if typecheck then Process.check_proc table [] p ;
     p
 
 let parse_formula = parse Parser.top_formula "formula"
-
-let add_suite_restore name suite =
-  Checks.add_suite name
-    (List.map
-       (fun (a,b,c) -> a, b, Symbols.run_restore c)
-       suite)
 
 let () =
   let check s =
@@ -144,7 +137,7 @@ let () =
       Alcotest.(check bool) "equal formulas" true
         (f = ff)
   in
-  add_suite_restore "Formula parsing" [
+  Checks.add_suite "Formula parsing" [
     "Boolean constants", `Quick, begin fun () ->
       check "True" ;
       check "False"
@@ -171,48 +164,68 @@ let () =
   ]
 
 let () =
-  add_suite_restore "Process parsing" [
+  let table = Channel.declare Symbols.builtins_table "c" in
+
+  Checks.add_suite "Process parsing" [
     "Null", `Quick, begin fun () ->
-      ignore (parse_process "null")
+      ignore (parse_process table "null" : Process.process)
     end ;
     "Simple", `Quick, begin fun () ->
-      Channel.declare "c" ;
-      ignore (parse_process "in(c,x);out(c,x);null") ;
-      ignore (parse_process "in(c,x);out(c,x)") ;
+      ignore (parse_process table "in(c,x);out(c,x);null" : Process.process) ;
+      ignore (parse_process table "in(c,x);out(c,x)" : Process.process) ;
       Alcotest.check_raises "fails" Parser.Error
-        (fun () -> ignore (parse_process "in(c,x) then null")) ;
-      begin match parse_process "(in(c,x);out(c,x) | in(c,x))" with
+        (fun () -> 
+           ignore (parse_process table "in(c,x) then null" : Process.process)) ;
+      begin
+        match
+          Location.unloc (parse_process table "(in(c,x);out(c,x) | in(c,x))")
+        with
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process
-                "if u=true then if True then null else null else null")
+      ignore (parse_process table 
+                "if u=true then if True then null else null else null" 
+              : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
-      Channel.declare "c" ;
-      ignore (parse_process "in(c,x);out(c,<x,x>)")
+      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
-      Channel.declare "c" ;
-      Prover.declare Decl.(Decl_abstract { name = "error";
-                                           index_arity = 0;
-                                           message_arity = 0;}) ;
-      ignore (parse_process "in(c,x); out(c, if x=x then x else error)")
+      let table = 
+        let decl_i = Decl.Decl_abstract { name = "error";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
+      ignore (parse_process table "in(c,x); out(c, if x=x then x else error)" 
+              : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
-      Channel.declare "c" ;
-      Prover.declare Decl.(Decl_state ("s", 1, Sorts.emessage)) ;
-      Prover.declare Decl.(Decl_state ("ss", 2, Sorts.emessage)) ;
-      Prover.declare Decl.(Decl_abstract { name = "error";
-                                     index_arity = 0;
-                                     message_arity = 0;}) ;
-      ignore (parse_process "in(c,x); \
-                             try find i such that s(i) = x in \
-                               out(c,ss(i,i))
-                             else out(c,error)") ;
-      ignore (parse_process "in(c,x); \
-                             out(c, try find i such that s(i) = x in ss(i,i) \
-                                    else error)")
+      let table = 
+        let decl_i = Decl.Decl_state ("s", 1, Sorts.emessage) in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
+      let table = 
+        let decl_i = Decl.Decl_state ("ss", 2, Sorts.emessage) in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
+      let table = 
+        let decl_i = Decl.Decl_abstract { name = "error";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
+        let decl = Location.mk_loc Location._dummy decl_i in
+        Prover.declare table decl in
+      ignore (parse_process table
+                "in(c,x); \
+                 try find i such that s(i) = x in \
+                 out(c,ss(i,i))\
+                 else out(c,error)"
+              : Process.process) ;
+      ignore (parse_process table
+                "in(c,x); \
+                 out(c, try find i such that s(i) = x in ss(i,i) \
+                 else error)"
+              : Process.process)
     end
     (* Lost when strongly typing Theory.convert: we do not convert
      * Theory.terms to Term.message, and thus cannot represent constants
@@ -232,84 +245,117 @@ let () =
   ];;
 
 let () =
+  let exception Ok in
   let test = true in
-  add_suite_restore "Models" [
+  Checks.add_suite "Models" [
     "Null model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/null.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/null.sp"
+              : Symbols.table )
     end ;
     "Simple model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/process.sp"
+              : Symbols.table )
     end ;
     "Proc arg", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process_arg.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/process_arg.sp"
+              : Symbols.table )
     end ;
     "Proc par", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/process_par.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/process_par.sp"
+              : Symbols.table )
     end ;
     "Name declaration", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/name.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/name.sp"
+              : Symbols.table )
     end ;
     "Pairs", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/pairs.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/pairs.sp"
+              : Symbols.table )
     end ;
     "Basic theory", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/theory.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/theory.sp"
+              : Symbols.table )
     end ;
     "Multiple declarations", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Multiple_declarations "c"))
-        (fun () -> parse_theory_test ~test "tests/alcotest/multiple.sp")
+      Alcotest.check_raises "fails" Ok
+        (fun () -> 
+           try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
+                       : Symbols.table )
+           with (Prover.Decl_error (_,Prover.KDecl, 
+                                    Multiple_declarations "c")) -> raise Ok)
     end ;
     "Action creation", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/actions.sp" ;
-      ignore (Action.find_symbol "IOIO1") ;
-      ignore (Action.find_symbol "IOIO2")
+      let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
+      ignore (Action.find_symbol "IOIO1" table) ;
+      ignore (Action.find_symbol "IOIO2" table)
       (* TODO test resulting action structure *)
     end ;
     "Let in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_let.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
+              : Symbols.table )
       (* TODO test resulting action structure *)
     end ;
     "New in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_name.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/action_name.sp"
+              : Symbols.table )
       (* TODO test resulting action structure *)
     end ;
     "Find in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_find.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/action_find.sp"
+              : Symbols.table )
       (* TODO test resulting action structure *)
     end ;
     "Updates in actions", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/action_set.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/action_set.sp"
+              : Symbols.table )
       (* TODO test resulting action structure *)
     end ;
     "LAK model", `Quick, begin fun () ->
-      parse_theory_test ~test "tests/alcotest/lak.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/lak.sp"
+              : Symbols.table )
     end ;
     "LAK model, again", `Quick, begin fun () ->
       (* We do this again, on purpose, to check that all definitions
        * from the previous run are gone. The macros from Term used
        * to not be re-initialized. *)
-      parse_theory_test ~test "tests/alcotest/lak.sp"
+      ignore (parse_theory_test ~test "tests/alcotest/lak.sp"
+              : Symbols.table )
     end ;
     "Local Process", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error
-           (Conv_error (Type_error (App ("n",[]),Sorts.etimestamp))))
-        (fun () -> parse_theory_test ~test "tests/alcotest/proc_local.sp")
+      Alcotest.check_raises "fails" Ok
+        (fun () -> 
+           try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp" 
+                       : Symbols.table ) 
+           with 
+             Prover.Decl_error (_, Prover.KDecl, 
+                                Conv_error (
+                 Type_error (App ("n",[]),Sorts.(ESort Timestamp)))) -> 
+             raise Ok)
     end ;
-    "Apply Proc", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Conv_error (Arity_error ("C",1,0))))
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_type.sp")
+    "Apply Proc - 0", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        
+        (fun () ->
+           try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
+                       : Symbols.table )
+           with
+             (Process.ProcError (_, 
+                                 Arity_error ("C",1,0))) -> 
+             raise Ok)
     end ;
-    "Apply Proc", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Conv_error (Undefined "D")))
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_nodef.sp")
+    "Apply Proc - 1", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok        
+        (fun () -> 
+           try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
+                       : Symbols.table )
+           with Process.ProcError (_, Process.UnknownProcess "D") -> raise Ok)
     end ;
-    "Apply Proc", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Prover.Decl_error (Multiple_declarations "C"))
-      (fun () -> parse_theory_test ~test "tests/alcotest/process_mult.sp")
+    "Apply Proc - 2", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () -> 
+           try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
+                       : Symbols.table )
+           with Prover.Decl_error (_, Prover.KDecl, 
+                                   Multiple_declarations "C") -> raise Ok)
     end ;
   ];;
