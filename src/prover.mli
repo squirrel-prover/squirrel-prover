@@ -32,19 +32,19 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 type p_goal_name = P_unknown | P_named of string
 
-type p_goal = 
+type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of 
-      Theory.env * 
-      [ `Message of Theory.term | `Formula of Theory.formula ] list 
-  | P_equiv_goal_process of SystemExpr.p_single_system * 
+  | P_equiv_goal of
+      Theory.env *
+      [ `Message of Theory.term | `Formula of Theory.formula ] list
+  | P_equiv_goal_process of SystemExpr.p_single_system *
                             SystemExpr.p_single_system
 
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof]  : start a proof. *)
-type gm_input_i = 
-  | Gm_goal of p_goal_name * p_goal 
+type gm_input_i =
+  | Gm_goal of p_goal_name * p_goal
   | Gm_proof
 
 type gm_input = gm_input_i Location.located
@@ -94,21 +94,27 @@ module type Tactics_sig = sig
 
   (* Allows to register a general tactic. Used when the arguments of the tactic
      are complex. *)
+
   val register_general :
-    string -> ?help:string -> (TacticsArgs.parser_arg list -> tac) -> unit
+    string -> ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list ->
+    (TacticsArgs.parser_arg list -> tac) -> unit
 
   (* Register a macro, built using the AST. *)
   val register_macro :
-    string -> ?modifiers:string list -> ?help:string ->
+    string -> ?modifiers:string list ->  ?general_help:string ->
+    ?detailed_help:string -> ?usages_sorts : TacticsArgs.esort list ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
 (* The remaining functions allows to easily register a tactic, without having to
    manage type conversions, or the tail recursvity. It is simply required to
    give a function over judgments, expecting some arguments of the given
    sort. *)
-  val register : string -> ?help:string ->  (judgment -> judgment list) -> unit
-  val register_typed :     
-    string -> ?help:string ->
+  val register : string -> ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list -> (judgment -> judgment list) -> unit
+
+  val register_typed :
+    string ->  ?general_help:string ->  ?detailed_help:string ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
@@ -117,11 +123,11 @@ module type Tactics_sig = sig
      giving them the arguments provided to the first tactic. Used to define
      polymorphic tactics, that will try to apply tactics of distinct types. *)
   val register_orelse :
-    string -> ?help:string -> string list -> unit
-
+    string -> ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list -> string list -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
-  val pp : Format.formatter -> string -> unit
+  val pp : bool -> Format.formatter -> string -> unit
 
   (* Print all tactics with their help. Do not print tactics without help
      string. *)
@@ -141,8 +147,8 @@ val get_goal_formula : string -> formula * SystemExpr.system_expr
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)
-val make_trace_goal : 
-  system:SystemExpr.system_expr -> table:Symbols.table -> 
+val make_trace_goal :
+  system:SystemExpr.system_expr -> table:Symbols.table ->
   Theory.formula -> Goal.t
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
@@ -151,11 +157,11 @@ val make_equiv_goal :
   [ `Message of Theory.term | `Formula of Theory.formula ] list ->
   Goal.t
 
-(** Produces an equivalence goal based on the process and the two 
+(** Produces an equivalence goal based on the process and the two
     system expressions. *)
-val make_equiv_goal_process : 
-  table:Symbols.table -> 
-  SystemExpr.single_system -> SystemExpr.single_system -> 
+val make_equiv_goal_process :
+  table:Symbols.table ->
+  SystemExpr.single_system -> SystemExpr.single_system ->
   Goal.t
 
 type parsed_input =
@@ -169,9 +175,9 @@ type parsed_input =
   | EOF
 
 (** Declare a new goal to the current goals, and returns it *)
-val declare_new_goal : 
-  Symbols.table -> 
-  Location.t -> p_goal_name -> p_goal -> 
+val declare_new_goal :
+  Symbols.table ->
+  Location.t -> p_goal_name -> p_goal ->
   named_goal
 
 (** Store a proved goal, allowing to apply it. *)
@@ -198,9 +204,9 @@ val start_proof : unit -> string option
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type decl_error_i = 
+type decl_error_i =
   | Conv_error            of Theory.conversion_error
-  | Multiple_declarations of string 
+  | Multiple_declarations of string
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err
 
@@ -210,7 +216,7 @@ type decl_error =  Location.t * dkind * decl_error_i
 
 exception Decl_error of decl_error
 
-val pp_decl_error : 
+val pp_decl_error :
   (Format.formatter -> Location.t -> unit) ->
   Format.formatter -> decl_error -> unit
 
@@ -222,4 +228,3 @@ val declare      : Symbols.table -> Decl.declaration  -> Symbols.table
 
 (** Process a list of declaration. *)
 val declare_list : Symbols.table -> Decl.declarations -> Symbols.table
-

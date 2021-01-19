@@ -54,7 +54,7 @@ let pure_equiv_typed t arg s =
 (* Admit tactic *)
 let () =
   T.register_general "admit"
-    ~help:"Closes the current goal, or drop a bi-frame element.\
+    ~general_help:"Closes the current goal, or drop a bi-frame element.\
            \n Usage: admit [pos]."
     (function
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
@@ -81,7 +81,7 @@ let simpl =
 
 let () =
   T.register_macro "simpl"
-    ~help:"Automatically simplify the goal.\n Usage: simpl."
+    ~general_help:"Automatically simplify the goal.\n Usage: simpl."
     simpl
 
 exception NoReflMacros
@@ -100,7 +100,7 @@ end
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
 let refl (s : EquivSequent.t) =
-  let iter = 
+  let iter =
     new exist_macros
       ~system:(EquivSequent.get_system s)
       (EquivSequent.get_table s) in
@@ -117,7 +117,7 @@ let refl (s : EquivSequent.t) =
 
 let () =
   T.register "refl"
-    ~help:"Closes a reflexive goal.\n Usage: refl."
+    ~general_help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
 
@@ -133,7 +133,7 @@ let assumption s =
 
 let () =
   T.register "assumption"
-    ~help:"Close a goal contained in its hypothesis.\n Usage: assump."
+    ~general_help:"Close a goal contained in its hypothesis.\n Usage: assump."
     (only_equiv assumption)
 
 
@@ -173,7 +173,7 @@ let induction TacticsArgs.(Timestamp ts) s =
                       s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
     in
     let goals = ref [] in
-    (** [add_action _action descr] adds to goals the goal corresponding to the 
+    (** [add_action _action descr] adds to goals the goal corresponding to the
       * case where [t] is instantiated by [descr]. *)
     let add_action descr =
       let env = ref @@ EquivSequent.get_env induc_goal in
@@ -184,15 +184,15 @@ let induction TacticsArgs.(Timestamp ts) s =
              Term.ESubst (Term.Var i, Term.Var i'))
           descr.Action.indices
       in
-      let name = 
+      let name =
         SystemExpr.action_to_term table system
-          (Action.subst_action subst descr.Action.action) 
+          (Action.subst_action subst descr.Action.action)
       in
       let ts_subst = [Term.ESubst(ts,name)] in
       goals := (EquivSequent.apply_subst ts_subst induc_goal
                 |> EquivSequent.set_env !env)
                ::!goals
-    in    
+    in
     SystemExpr.iter_descrs table system add_action ;
     init_goal :: List.rev !goals
   | _  ->
@@ -201,7 +201,7 @@ let induction TacticsArgs.(Timestamp ts) s =
 
 let () =
   T.register_typed "induction"
-    ~help:"Apply the induction scheme to the given timestamp.\
+    ~general_help:"Apply the induction scheme to the given timestamp.\
            \n Usage: induction t."
     (pure_equiv_typed induction) TacticsArgs.Timestamp
 (*
@@ -228,7 +228,7 @@ let () = T.register_typed  "enrich_mess"
     (pure_equiv_typed enrich_mess) TacticsArgs.Message
 
 let () = T.register_orelse "enrich"
-    ~help:"Enrich the goal with the given term.\
+    ~general_help:"Enrich the goal with the given term.\
            \n Usage: enrich t."
     ["enrich_bool"; "enrich_mess"]
 
@@ -307,7 +307,7 @@ let fa TacticsArgs.(Int i) s =
 
 let () =
   T.register_typed "fa"
-    ~help:"Break function applications on the nth term of the sequence.\
+    ~general_help:"Break function applications on the nth term of the sequence.\
            \n Usage: fa i."
     (pure_equiv_typed fa) TacticsArgs.Int
 
@@ -521,7 +521,7 @@ let fadup TacticsArgs.(Opt (Int, p)) s =
 
 let () =
  T.register_typed "fadup"
-   ~help:"When applied without argument, tries to remove all terms that are \
+   ~general_help:"When applied without argument, tries to remove all terms that are \
           duplicates, or context of duplicates. \
           \n When applied on a formula of the form (exec@pred(tau) && phi), \
           with frame@pred(tau) in the biframe, tries to remove phi if it  \
@@ -661,7 +661,7 @@ let mk_phi_proj system table env name indices proj biframe =
              * indices of our name's occurrences *)
             let new_action =
               SystemExpr.action_to_term table system
-                (Action.subst_action subst a.Action.action) 
+                (Action.subst_action subst a.Action.action)
             in
             let indices_a =
               List.map
@@ -752,7 +752,7 @@ let fresh TacticsArgs.(Int i) s =
 
 let () =
   T.register_typed "fresh"
-    ~help:"Removes a name if fresh.\n Usage: fresh i."
+    ~general_help:"Removes a name if fresh.\n Usage: fresh i."
     (pure_equiv_typed fresh) TacticsArgs.Int
 
 (* PRF axiom *)
@@ -800,7 +800,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
       (List.map (EquivSequent.pi_elem proj) (e_without_hash @ biframe)) in
     (* check syntactic side condition *)
     Euf.key_ssc
-      ~elems:frame ~allow_functions:(fun x -> false) 
+      ~elems:frame ~allow_functions:(fun x -> false)
       ~system ~table hash_fn key_n;
     (* we compute the list of hashes from the frame *)
     let list_of_hashes_from_frame =
@@ -928,7 +928,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
             let new_action =
               SystemExpr.action_to_term
                 table system
-                (Action.subst_action subst a.Action.action) 
+                (Action.subst_action subst a.Action.action)
             in
             let list_of_is_m =
               List.map
@@ -1026,8 +1026,8 @@ let prf TacticsArgs.(Int i) s =
             mk_prf_phi_proj Term.Right system table env biframe e hash in
           let table,n = Symbols.Name.declare table "n_PRF" 0 in
           let s = EquivSequent.set_table s table in
-          let oracle_formula = 
-            Prover.get_oracle_tag_formula (Symbols.to_string fn) 
+          let oracle_formula =
+            Prover.get_oracle_tag_formula (Symbols.to_string fn)
           in
           let final_if_formula = match oracle_formula with
             | Term.False -> combine_conj_formulas phi_left phi_right
@@ -1059,7 +1059,7 @@ let prf TacticsArgs.(Int i) s =
 
 let () =
   T.register_typed "prf"
-    ~help:"Apply the PRF axiom.\n Usage: prf i."
+    ~general_help:"Apply the PRF axiom.\n Usage: prf i."
     (pure_equiv_typed prf) TacticsArgs.Int
 
 (** Symmetric encryption **)
@@ -1263,7 +1263,7 @@ let cca1 TacticsArgs.(Int i) s =
             ->
             begin
               try
-                Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk) 
+                Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                   ~system ~table fndec sk;
                 if not (List.mem (EquivSequent.Message
                                     (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
@@ -1343,7 +1343,7 @@ let cca1 TacticsArgs.(Int i) s =
 
 let () =
  T.register_typed "cca1"
-   ~help:"Apply the cca1 axiom on all encryptions of the given message. \
+   ~general_help:"Apply the cca1 axiom on all encryptions of the given message. \
           Encryption at toplevel are replaced by the length of the \
           plaintext. \
           Encryption not at toplevel are replaced by the encryption of the \
@@ -1503,7 +1503,7 @@ let enckp
 
 let () =
  T.register_typed "enckp"
-   ~help:"Change key in some encryption subterm. \
+   ~general_help:"Change key in some encryption subterm. \
           The term and new key can be passed as arguments, \
           otherwise the tactic applies to the first subterm of the form \
           enc(_,r,k) where r is a name and k features a diff operator.\
@@ -1617,7 +1617,7 @@ let xor TacticsArgs.(Pair (Int i,
       try
         match opt_m with
         | None -> mk_xor_if_term system table env e biframe
-        | Some (TacticsArgs.Message m) -> 
+        | Some (TacticsArgs.Message m) ->
           mk_xor_if_term_name system table env e m biframe
       with Not_xor -> Tactics.soft_failure
                         (Tactics.Failure
@@ -1634,7 +1634,7 @@ let xor TacticsArgs.(Pair (Int i,
 
 let () =
  T.register_typed "xor"
-   ~help:"Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is fresh.
+   ~general_help:"Removes biterm (n(i0,...,ik) XOR t) if n(i0,...,ik) is fresh.
           \n Usage without giving the fresh name (should be xor's first
           argument): xor i.
           \n Usage giving the fresh name: xor i, n(i0,...,ik)."
@@ -1717,7 +1717,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"
-  ~help:"Expand all occurrences of the given macro, or expand the given \
+  ~general_help:"Expand all occurrences of the given macro, or expand the given \
          sequence using the given indices.\
          \n Usage: expand macro. expand seq(i,k...->t(i,k,...)),i1,k1,..."
   (function
@@ -1780,9 +1780,9 @@ let expand_all () s =
   let system = EquivSequent.get_system s in
   let table  = EquivSequent.get_table s in
   let expand_all_macros = function
-    | EquivSequent.Message e -> 
+    | EquivSequent.Message e ->
       EquivSequent.Message (expand_all_macros e system table)
-    | EquivSequent.Formula e -> 
+    | EquivSequent.Formula e ->
       EquivSequent.Formula (expand_all_macros e system table)
   in
   let biframe = EquivSequent.get_biframe s
@@ -1791,7 +1791,7 @@ let expand_all () s =
   [EquivSequent.set_biframe s biframe]
 
 let () = T.register "expandall"
-    ~help:"Expand all occurrences of macros that are about explicit actions.
+    ~general_help:"Expand all occurrences of macros that are about explicit actions.
            \n Usage: expandall."
          (pure_equiv_typed expand_all ())
 
@@ -1841,7 +1841,7 @@ let () = T.register_typed "equiv_formula" (only_equiv_typed equiv_formula)
     TacticsArgs.(Pair (Boolean, Boolean))
 
 let () = T.register_orelse "equivalent"
-  ~help:"Replace all occurrences of a formula by another, and ask to prove \
+  ~general_help:"Replace all occurrences of a formula by another, and ask to prove \
          \n that they are equivalent.
          \n Usage: equiv t1, t2."
   ["equiv_formula"; "equiv_mess"]
@@ -1917,14 +1917,14 @@ let yes_no_if b TacticsArgs.(Int i) s =
 
 let () =
  T.register_typed "noif"
-   ~help:"Try to prove diff equivalence by proving that the condition at the \
+   ~general_help:"Try to prove diff equivalence by proving that the condition at the \
           \n i-th position implies False.\
           \n Usage: noif i."
    (only_equiv_typed (yes_no_if false)) TacticsArgs.Int
 
 let () =
  T.register_typed "yesif"
-   ~help:"Try to prove diff equivalence by proving that the condition at the \
+   ~general_help:"Try to prove diff equivalence by proving that the condition at the \
           \n i-th position is True.\
           \n Usage: yesif i."
    (only_equiv_typed (yes_no_if true)) TacticsArgs.Int
@@ -2015,7 +2015,7 @@ let ifcond TacticsArgs.(Pair (Int i,
 
 let () =
   T.register_typed "ifcond"
-    ~help: "If the given conditional implies that the given formula f is true, \
+    ~general_help: "If the given conditional implies that the given formula f is true, \
             push the formula f at top-level in all the subterms of the then \
             branch. \
             If the int parameter j is given, will push the formula only in the \
@@ -2056,7 +2056,7 @@ let trivial_if (TacticsArgs.Int i) s =
 
 let () =
  T.register_typed "trivialif"
-   ~help:"Simplify a conditional when the two branches are equal.\
+   ~general_help:"Simplify a conditional when the two branches are equal.\
           \n Usage: trivialif i."
    (only_equiv_typed trivial_if) TacticsArgs.Int
 
@@ -2093,7 +2093,7 @@ let ifeq
      Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () = T.register_typed "ifeq"
-    ~help:"If the given conditional implies the equality of the two given terms,\
+    ~general_help:"If the given conditional implies the equality of the two given terms,\
            substitute the first one by the second one inside the positive branch\
            of the conditional.
            \n Usage: ifeq i,t1,t2."
@@ -2150,8 +2150,8 @@ end
    all the names appearing inside the terms are only used inside those, returns
    true. *)
 let is_ddh_context system table a b c elem_list =
-  let a,b,c = Symbols.Name.of_string a table, 
-              Symbols.Name.of_string b table, 
+  let a,b,c = Symbols.Name.of_string a table,
+              Symbols.Name.of_string b table,
               Symbols.Name.of_string c table in
   let iter = new ddh_context ~system table false a b c in
   let iterfm = new find_macros ~system table false in
@@ -2190,7 +2190,7 @@ let ddh na nb nc s sk fk =
    then does not have the correct arity. *)
 
 let () = T.register_general "ddh"
-    ~help:"Closes the current system, if it is an instance of a context of ddh.\
+    ~general_help:"Closes the current system, if it is an instance of a context of ddh.\
            \n Usage: ddh a, b, c."
     (function
        | [TacticsArgs.String_name v1;

@@ -10,6 +10,7 @@ type parser_arg =
 
 (* The types are explicit, in order to type the tactics. *)
 type _ sort =
+  | None : unit sort
   | Message : Sorts.message sort
   | Boolean : Sorts.boolean sort
   | Timestamp : Sorts.timestamp sort
@@ -20,6 +21,7 @@ type _ sort =
   | Opt : 'a sort -> ('a option) sort
 
 type _ arg =
+  | None : unit arg
   | Message : Term.message -> Sorts.message arg
   | Boolean : Term.formula -> Sorts.boolean arg
   | Timestamp : Term.timestamp -> Sorts.timestamp arg
@@ -39,3 +41,5 @@ type earg = Arg : ('a arg) -> earg
 exception Uncastable
 
 val cast:  'a sort -> 'b arg -> 'a arg
+
+val pp_esort : Format.formatter -> esort -> unit
