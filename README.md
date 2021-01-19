@@ -3,11 +3,12 @@
 
 ## Build
 
-You need OCaml version 4.07 or more. The prover is known to build with OCaml
-up to 4.10.0, although with deprecation warnings.
+You need OCaml version 4.08 or more. The prover is known to build with OCaml
+up to 4.10.0.
 
 We recommend that you use opam (version 2.0 or more). It will notably allow
-you to install the required tools and libraries, with the following command:
+you to install the required tools and libraries, with the following command
+inside this directory:
 ```
 $ opam install . -y --deps-only
 ```
@@ -18,8 +19,7 @@ builds the prover and testing binaries and runs tests:
 $ make
 ```
 
-You can also just build the prover with `make squirrel`, test with
-`make test`.
+You can also just build the prover with `make squirrel`, test with `make test`.
 
 The documentation for developers may be built with `make doc`.
 
@@ -103,6 +103,9 @@ Axioms can be declared in the prologue using the "axiom" keyword:
 ```
 axiom NAME : <formula>.
 ```
+Note that an axiom can only be declared after the corresponding system
+has been declared.
+
 Axioms can be declared for a specific system, rather than the default
 one:
 ```
