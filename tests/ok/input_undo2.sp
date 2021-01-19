@@ -1,8 +1,7 @@
-(* Test that it is possible to undo the first system declaration. *)
-channel c
+(* Test that it is possible to undo the second block of declarations. *)
+channel c.
 system in(c,x);out(c,x).
 undo 1.
-channel c
 system in(c,x);out(c,<x,x>).
 goal test :
   output@A = <input@A,input@A>.
