@@ -780,6 +780,7 @@ let occurrences_of_action_descr ~system table action_descr hash_fn key_n =
   let iter = new Iter.get_f_messages ~system table hash_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
+  iter#visit_formula (snd action_descr.Action.condition) ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
 let mk_prf_phi_proj proj system table env biframe e hash =

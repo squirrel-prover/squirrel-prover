@@ -135,6 +135,12 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2. yesif 2.
   project.
+  split. 
+  assert nT(i,k) = fst(input@R2(j)). fresh M1. 
+  assert nT(i,k) = fst(input@R1(j)). fresh M1.
+  split.
+  assert nT(i,k) = fst(input@R1(j)). fresh M1. 
+  assert nT(i,k) = fst(input@R2(j)). fresh M1.
   fresh 2.
   fresh 1. yesif 1.
 Qed.

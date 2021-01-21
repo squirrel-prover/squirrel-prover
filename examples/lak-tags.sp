@@ -258,10 +258,16 @@ Proof.
   prf 2.
   yesif 2.
   apply tags_neq; project.
-  assert fst(input@R1(j))=nT(i,k).
-  by fresh M2.
-  assert fst(input@R1(j))=nT(i,k).
-  fresh M2.
+  split.
+  assert fst(input@R2(j))=nT(i,k). by fresh M2.
+  split.
+  assert fst(input@R1(j))=nT(i,k). by fresh M2.
+  assert fst(input@R1(j))=nT(i,k). by fresh M2.
+  split.
+  split.  
+  assert fst(input@R1(j))=nT(i,k). by fresh M2.
+  assert fst(input@R1(j))=nT(i,k). by fresh M2.
+  assert fst(input@R2(j))=nT(i,k). by fresh M2.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.
