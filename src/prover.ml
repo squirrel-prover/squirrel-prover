@@ -341,86 +341,13 @@ struct
     Hashtbl.add table id { maker = f ;
                            help = {general_help; detailed_help; usages_sorts} }
 
-  (* TODO: move this to TacticsArgs *)
-  let convert_args table parser_args tactic_type env =
-    let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
-
-    let rec conv_args parser_args tactic_type env =
-      let tsubst = Theory.subst_of_env env in
-      let module TA = TacticsArgs in
-      match parser_args, tactic_type with
-      | [TA.Theory p], TA.Sort Timestamp ->
-        TA.Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
-          
-      | [TA.Theory p], TA.Sort Message ->
-        TA.Arg (Message   (Theory.convert conv_cntxt tsubst p Sorts.Message))
-          
-      | [TA.Theory p], TA.Sort Boolean ->
-        TA.Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
-          
-      | [TA.Theory (L.{ pl_desc = App (p,[]) } )], TA.Sort String ->
-        TA.Arg (String (L.unloc p)) (* TODO: location *)
-          
-      | [TA.Int_parsed i], TA.Sort Int ->
-        TA.Arg (Int i)
-          
-      | [TA.Theory t], TA.Sort String ->
-        raise Theory.(Conv (L.loc t, String_expected (L.unloc t)))
-                                     
-      | [TA.Theory t], TA.Sort Int ->
-        raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
-                                  
-      | [TA.Theory p], TA.Sort Index ->
-        Arg (Index (Theory.convert_index table tsubst p))
-      (* old code: *)
-      (* Arg (Index (Theory.convert_index table tsubst (Theory.var p))) *)
-          
-      | th1::q, TA.Sort (Pair (Opt s1, s2)) ->
-        begin match conv_args [th1] (Sort (Opt s1)) env with
-          | Arg arg1 ->
-            let Arg arg2 = conv_args q (Sort s2) env in
-            Arg (Pair (arg1, arg2))
-          | exception Theory.(Conv _) ->
-            let Arg arg2 = conv_args (th1::q) (Sort s2) env in
-            Arg (Pair (Opt (s1, None), arg2))
-        end
-        
-      | th1::q, TA.Sort (Pair (s1, s2)) ->
-        let Arg arg1 = conv_args [th1] (Sort s1) env in
-        let Arg arg2 = conv_args q (Sort s2) env in
-        Arg (Pair (arg1, arg2))
-          
-      | [], TA.Sort (Opt a) ->
-        Arg (Opt (a, None))
-          
-      | [], TA.Sort (Pair (Opt a, b)) ->
-        let Arg arg2 = conv_args [] (Sort b) env in
-        Arg (Pair (Opt (a, None), arg2))
-          
-      | [th], TA.Sort (Opt a) ->
-        let Arg arg = conv_args [th] (Sort a) env in
-        Arg (Opt
-               (a,
-                (Some (TA.cast a arg))
-               )
-            )
-
-      (* TODO: location *)
-      | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
-      (* TODO: location *)
-      | p, _  -> raise Theory.(Conv (L._dummy, Tactic_type "too many arguments"))
-
-    in
-    conv_args parser_args tactic_type env
-
-
-  let convert_args table parser_args tactic_type j =
+  let convert_args table j parser_args tactic_type =
     let env =
       match M.to_goal j with
       | Goal.Trace t -> TraceSequent.get_env t
       | Goal.Equiv e -> EquivSequent.get_env e
     in
-    convert_args table parser_args tactic_type env
+    TacticsArgs.convert_args table env parser_args tactic_type 
   
   let register id ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) f =
     register_general id ~general_help ~detailed_help ~usages_sorts
@@ -440,7 +367,7 @@ struct
     register_general id ~general_help ~detailed_help ~usages_sorts:[TacticsArgs.Sort sort]
       (fun args s sk fk ->
          let table = Goal.get_table (M.to_goal s) in
-         match convert_args table args (TacticsArgs.Sort sort) s with
+         match convert_args table s args (TacticsArgs.Sort sort) with
          | TacticsArgs.Arg (th)  ->
            try
              let th = TacticsArgs.cast sort th in
