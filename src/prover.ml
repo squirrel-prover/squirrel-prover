@@ -363,8 +363,9 @@ struct
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-  let register_typed id  ?(general_help="")  ?(detailed_help="")  f sort =
-    register_general id ~general_help ~detailed_help ~usages_sorts:[TacticsArgs.Sort sort]
+  let register_typed id  ?(general_help="")  ?(detailed_help="") f sort =
+    register_general id
+      ~general_help ~detailed_help ~usages_sorts:[TacticsArgs.Sort sort]
       (fun args s sk fk ->
          let table = Goal.get_table (M.to_goal s) in
          match convert_args table s args (TacticsArgs.Sort sort) with
@@ -381,7 +382,7 @@ struct
                  Tactics.hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
-             Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
+             Tactics.hard_failure (Tactics.Failure "ill-formed arguments") 
       )
 
   let register_orelse id

@@ -9,7 +9,7 @@ type parser_arg =
 
 type ('a, 'b) pair
 
-type eterm
+type eterm = [`ET]
 
 (*------------------------------------------------------------------*)
 (* The types are explicit, in order to type the tactics. *)
@@ -79,6 +79,7 @@ let rec cast: type a b. a sort -> b arg -> a arg =
       | Boolean  , Boolean   -> t
       | Timestamp, Timestamp -> t
       | Index    , Index     -> t
+      | ETerm    , ETerm     -> t
       | Int      , Int       -> t
       | String   , String    -> t
       | None     , None      -> t

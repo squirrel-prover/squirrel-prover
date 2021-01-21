@@ -215,22 +215,24 @@ let () =
            (Tactics.Failure "improper arguments"))
 *)
 
-let enrich_bool TacticsArgs.(Boolean f) s =
-  [EquivSequent.set_biframe s (EquivSequent.Formula f :: EquivSequent.get_biframe s)]
+let enrich arg s = match arg with
+  | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
+    [ EquivSequent.set_biframe s (EquivSequent.Formula f ::
+                                  EquivSequent.get_biframe s) ]
 
-let enrich_mess TacticsArgs.(Message t) s =
-  [EquivSequent.set_biframe s (EquivSequent.Message t :: EquivSequent.get_biframe s)]
+  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+    [ EquivSequent.set_biframe s (EquivSequent.Message f ::
+                                  EquivSequent.get_biframe s) ]
 
-let () = T.register_typed "enrich_bool"
-    (pure_equiv_typed enrich_bool) TacticsArgs.Boolean
+  | TacticsArgs.ETerm (Sorts.Index, _, loc)
+  | TacticsArgs.ETerm (Sorts.Timestamp, _, loc) ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a message of boolean timestamp variable")
 
-let () = T.register_typed "enrich_mess"
-    (pure_equiv_typed enrich_mess) TacticsArgs.Message
-
-let () = T.register_orelse "enrich"
+let () = T.register_typed "enrich"
     ~general_help:"Enrich the goal with the given term.\
-           \n Usage: enrich t."
-    ["enrich_bool"; "enrich_mess"]
+                   \n Usage: enrich t."
+    (pure_equiv_typed enrich) TacticsArgs.ETerm
 
 (** Function application *)
 
@@ -1797,8 +1799,8 @@ let () = T.register "expandall"
 
 (** Replace all occurrences of [t1] by [t2] inside of [s],
   * and add a subgoal to prove that [t1 <=> t2]. *)
-let equiv_formula TacticsArgs.(Pair (Boolean f1, Boolean f2)) (s : EquivSequent.t) =
-  let env = EquivSequent.get_env s in
+let equiv_formula f1 f2 (s : EquivSequent.t) =
+  let env    = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
   let table  = EquivSequent.get_table s in
     (* goal for the equivalence of t1 and t2 *)
@@ -1816,10 +1818,10 @@ let equiv_formula TacticsArgs.(Pair (Boolean f1, Boolean f2)) (s : EquivSequent.
 
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
-let equiv_message TacticsArgs.(Pair (Message m1, Message m2)) (s : EquivSequent.t) =
-  let env = EquivSequent.get_env s in
+let equiv_message m1 m2 (s : EquivSequent.t) =
+  let env    = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
-  let table = EquivSequent.get_table s in
+  let table  = EquivSequent.get_table s in
     (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
       TraceSequent.init ~system table
@@ -1831,19 +1833,34 @@ let equiv_message TacticsArgs.(Pair (Message m1, Message m2)) (s : EquivSequent.
         Prover.Goal.Equiv
           (EquivSequent.apply_subst [Term.ESubst (m1,m2)] s) ]
     in
-    subgoals
+    subgoals 
 
-let () = T.register_typed "equiv_mess" (only_equiv_typed equiv_message)
-    TacticsArgs.(Pair (Message, Message))
 
-let () = T.register_typed "equiv_formula" (only_equiv_typed equiv_formula)
-    TacticsArgs.(Pair (Boolean, Boolean))
+let equivalent arg s = match arg with
+  | TacticsArgs.Pair (t1,t2) ->
+    match t1, t2 with
+      | TacticsArgs.ETerm (Sorts.Boolean, f1, _),
+        TacticsArgs.ETerm (Sorts.Boolean, f2, _) ->
+        equiv_formula f1 f2 s
 
-let () = T.register_orelse "equivalent"
-  ~general_help:"Replace all occurrences of a formula by another, and ask to prove \
-         \n that they are equivalent.
-         \n Usage: equiv t1, t2."
-  ["equiv_formula"; "equiv_mess"]
+      | TacticsArgs.ETerm (Sorts.Message, f1, _),
+        TacticsArgs.ETerm (Sorts.Message, f2, _) ->
+        equiv_message f1 f2 s
+
+      | TacticsArgs.ETerm (_, _, _),
+        TacticsArgs.ETerm (_, _, _)  ->
+        (* TODO: improve error message + add locations *)
+        Tactics.hard_failure
+          (Tactics.Failure "expected a pair of messages or a pair of booleans") 
+
+let () = T.register_typed "equivalent"
+    ~general_help:"Replace all occurrences of a formula by another, and ask to \
+                   prove\
+                   \n that they are equivalent.\
+                   \n Usage: equiv t1, t2."
+    (only_equiv_typed equivalent)
+    TacticsArgs.(Pair (ETerm, ETerm))
+
 
 let simplify_ite b env system table cond positive_branch negative_branch =
   if b then

@@ -151,7 +151,7 @@ let () =
     left_not_intro TacticsArgs.String
 
 (** Case analysis on a timestamp *)
-let timestamp_case (TacticsArgs.Timestamp ts) s =
+let timestamp_case (ts : Term.timestamp) s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let mk_case descr =
@@ -181,12 +181,6 @@ let timestamp_case (TacticsArgs.Timestamp ts) s =
   in
   [TraceSequent.add_formula f s]
 
-let tscase_sort : Sorts.timestamp TacticsArgs.sort = TacticsArgs.Timestamp
-
-let () =
-  T.register_typed "tscase" timestamp_case tscase_sort
-
-
 (** Case analysis on a disjunctive hypothesis *)
 let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
   let s,f =
@@ -201,11 +195,6 @@ let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
     Tactics.soft_failure
       (Tactics.Failure "can only be applied to a disjunction") ;
   List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas
-
-let hcase_sort : string TacticsArgs.sort = TacticsArgs.String
-
-let () =
-  T.register_typed "hcase" hypothesis_case hcase_sort
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -229,7 +218,7 @@ let case_cond orig vars c t e s =
     s |> add_formula c'
       |> apply_subst else_subst ]
 
-let message_case (TacticsArgs.Message m) s =
+let message_case (m : Term.message) s =
            begin match m with
              | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
              | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
@@ -253,10 +242,35 @@ let message_case (TacticsArgs.Message m) s =
                Tactics.(soft_failure (Failure "improper argument"))
            end
 
+
+let tscase_sort : Sorts.timestamp TacticsArgs.sort = TacticsArgs.Timestamp
+
+let () =
+  T.register_typed "tscase" timestamp_case tscase_sort
+
+let hcase_sort : string TacticsArgs.sort = TacticsArgs.String
+
+let () =
+  T.register_typed "hcase" hypothesis_case hcase_sort
+
 let messcase_sort : Sorts.message TacticsArgs.sort = TacticsArgs.Message
 
 let () =
-  T.register_typed "messcase" message_case messcase_sort
+  T.register_typed "messcase" message_case messase_sort
+
+
+let case arg s = match arg with
+  | TacticsArgs.ETerm (Sorts.Timestamp, f, loc) ->
+    timestamp_case f s
+
+  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+    message_case f s
+
+  | ?? -> assert false          (* TODO *)
+    
+  | _ -> Tactics.hard_failure
+           (Tactics.Failure "expected TODO")
+
 
 let () =
   let open Tactics in

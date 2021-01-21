@@ -120,9 +120,7 @@ module type Tactics_sig = sig
 
   (* Allows to register a tactic, which is a specific orelse over other
      predefined tactics. It will try to apply the given tactics in the list, by
-     giving them the arguments provided to the first tactic. Used to define
-     polymorphic tactics, that will try to apply tactics of distinct types. 
-     Conversion errors are caught for everybody but the last tactic of the list.
+     giving them the arguments provided to the first tactic. 
   *)
   val register_orelse :
     string -> ?general_help:string ->  ?detailed_help:string ->
