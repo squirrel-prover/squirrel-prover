@@ -221,10 +221,10 @@ let enrich_bool TacticsArgs.(Boolean f) s =
 let enrich_mess TacticsArgs.(Message t) s =
   [EquivSequent.set_biframe s (EquivSequent.Message t :: EquivSequent.get_biframe s)]
 
-let () = T.register_typed  "enrich_bool"
+let () = T.register_typed "enrich_bool"
     (pure_equiv_typed enrich_bool) TacticsArgs.Boolean
 
-let () = T.register_typed  "enrich_mess"
+let () = T.register_typed "enrich_mess"
     (pure_equiv_typed enrich_mess) TacticsArgs.Message
 
 let () = T.register_orelse "enrich"
@@ -1669,10 +1669,8 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
         (EquivSequent.set_hypothesis_biframe s hypo_biframe)
         biframe]
   | _ ->
-    Tactics.soft_failure
+    Tactics.hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
-  | exception Theory.(Conv e) ->
-    Tactics.soft_failure (Cannot_convert e)
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) =
@@ -1698,7 +1696,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
-    | exception Theory.(Conv (Type_error _)) ->
+    | exception Theory.(Conv (_,Type_error _)) ->
       begin
         match Theory.convert conv_env tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
@@ -1709,11 +1707,12 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
           else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | _ ->
           Tactics.soft_failure (Tactics.Failure "can only expand macros")
-        | exception Theory.(Conv e) ->
-          Tactics.soft_failure (Cannot_convert e)
+          (* TODO: cleanup  *)
+        (* | exception Theory.(Conv e) ->
+         *   Tactics.soft_failure (Cannot_convert e) *)
       end
-    | exception Theory.(Conv e) ->
-      Tactics.soft_failure (Cannot_convert e)
+    (* | exception Theory.(Conv e) ->
+     *   Tactics.soft_failure (Cannot_convert e) *)
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"

@@ -1,3 +1,7 @@
+module L = Location
+type lsymb = Theory.lsymb
+
+(*------------------------------------------------------------------*)
 let pp_type fmt (l : (Sorts.esort * int) list) =
   let pp_single fmt (k,i) = match i with
     | 0 -> ()
@@ -12,11 +16,12 @@ let pp_args fmt (l : (string * Sorts.esort) list) =
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
 (*------------------------------------------------------------------*)
-type macro_decl = string * (string * Sorts.esort) list * Sorts.esort * Theory.term 
+type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term 
 
 let pp_macro_decl fmt (s, args, k, t) =
-  Fmt.pf fmt "@[<hov 2>term %s : %a → %a =@ %a@]" 
-    s pp_args args Sorts.pp_e k Theory.pp t
+  Fmt.pf fmt "@[<hov 2>term %s : %a → %a =@ %a@]" s
+    pp_args (List.map (fun (x,y) -> (L.unloc x, y)) args)
+    Sorts.pp_e k Theory.pp t
 
 (*------------------------------------------------------------------*)
 type abstract_decl = { name          : string;
@@ -64,14 +69,14 @@ let pp_orcl_tag_info = Theory.pp
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of string
-  | Decl_process of Process.id * Process.pkind * Process.process
+  | Decl_process of lsymb * (lsymb * Sorts.esort) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
   | Decl_hash             of int option * string * orcl_tag_info option
   | Decl_aenc             of string * string * string
   | Decl_senc             of string * string                 
-  | Decl_senc_w_join_hash of string * string * string
+  | Decl_senc_w_join_hash of string * string * lsymb
   | Decl_sign             of string * string * string * orcl_tag_info option
   | Decl_name             of string * int 
   | Decl_state            of string * int * Sorts.esort
@@ -87,7 +92,9 @@ let pp_decl fmt decl = match Location.unloc decl with
   | Decl_channel c -> Fmt.pf fmt "channel %s" c
   | Decl_process (pid, pkind, p) -> 
     Fmt.pf fmt "@[<hov 2>process %s %a =@ %a@]" 
-      pid Process.pp_pkind pkind Process.pp_process p
+      (L.unloc pid)
+      Process.pp_pkind (List.map (fun (x,y) -> (L.unloc x, y)) pkind)
+      Process.pp_process p
 
   | Decl_axiom decl -> pp_goal_decl fmt decl
   | Decl_system sys -> pp_system_decl fmt sys
@@ -110,7 +117,7 @@ let pp_decl fmt decl = match Location.unloc decl with
   | Decl_senc (s,d) ->
     Fmt.pf fmt "@[<hov 2>senc %s, %s@]" s d 
   | Decl_senc_w_join_hash (s,d,h) ->
-    Fmt.pf fmt "@[<hov 2>senc %s, %s with hash %s@]" s d h
+    Fmt.pf fmt "@[<hov 2>senc %s, %s with hash %s@]" s d (L.unloc h)
   | Decl_sign (s,c,p,t) -> 
     begin
       match t with

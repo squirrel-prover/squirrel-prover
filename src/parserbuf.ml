@@ -3,6 +3,8 @@
 
 let () = Printexc.record_backtrace true
 
+module L = Location
+  
 (** Generic exception for user errors, that should be reported
   * with the given explanation. *)
 exception Error of string
@@ -29,20 +31,22 @@ let pp_error pp_loc pp_pref_loc e = match e with
                 pp_pref_loc ()
                 pp_loc ()
                 s)
-  | Symbols.Unbound_identifier s->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[%aUnbound identifier %a : %s.@]@."
-                pp_pref_loc ()
-                pp_loc ()
-                s)
-  | Theory.Conv err ->
-      Some (fun ppf () ->
-              Fmt.pf ppf
-                "@[%aError %a: %a.@]@."
-                pp_pref_loc ()
-                pp_loc ()
-                Theory.pp_error err)
+  (* I believe these two exceptions can no longer be thrown by the parser. *)
+  (* TODO: cleanup *)
+  (* | Symbols.Unbound_identifier s->
+   *     Some (fun ppf () ->
+   *             Fmt.pf ppf
+   *               "@[%aUnbound identifier %a : %s.@]@."
+   *               pp_pref_loc ()
+   *               pp_loc ()
+   *               s) *)
+  (* | Theory.Conv err ->
+   *     Some (fun ppf () ->
+   *             Fmt.pf ppf
+   *               "@[%aError %a: %a.@]@."
+   *               pp_pref_loc ()
+   *               pp_loc ()
+   *               Theory.pp_error err) *)
   | _ -> None
 
 let pp_loc interactive filename lexbuf ppf () =
@@ -134,8 +138,14 @@ let () =
   let eqf s ss =
     let f = parse_formula s in
     let ff = parse_formula ss in
-      Alcotest.(check bool) "equal formulas" true
-        (f = ff)
+    (* Fmt.epr "@[<v>checking that:@;\
+     *          @[%a@]@;\
+     *          and:@;\
+     *          @[%a@]@;\
+     *          are equal@;@]"
+     *   Theory.pp f Theory.pp ff;     *)
+    Alcotest.(check bool) "equal formulas" true
+      (Theory.equal f ff)
   in
   Checks.add_suite "Formula parsing" [
     "Boolean constants", `Quick, begin fun () ->
@@ -327,9 +337,11 @@ let () =
            try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp" 
                        : Symbols.table ) 
            with 
-             Prover.Decl_error (_, Prover.KDecl, 
-                                Conv_error (
-                 Type_error (App ("n",[]),Sorts.(ESort Timestamp)))) -> 
+             Theory.Conv
+               (_,
+                Theory.Type_error (
+                  App (L.{ pl_desc = "n" },[]),
+                  Sorts.(ESort Timestamp))) -> 
              raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
@@ -355,7 +367,7 @@ let () =
         (fun () -> 
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
-           with Prover.Decl_error (_, Prover.KDecl, 
-                                   Multiple_declarations "C") -> raise Ok)
+           with Process.ProcError (_, 
+                                   ProcessAlreadyDecl "C") -> raise Ok)
     end ;
   ];;

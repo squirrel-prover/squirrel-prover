@@ -5,24 +5,24 @@
   * of conditionals, since it is not necessary for correspondences. We will
   * do it separately for equivalences. *)
 
-(** {2 Kinds}
-  * For messages, function, state and processes. For the latter,
-  * the name of variables is given together with their kinds. *)
-
-(** The kind of a process gives, for each of its input variables,
-  * the expected kind for that variable. *)
-type pkind = (string*Sorts.esort) list
-
-val pp_pkind : (string * Sorts.esort) list Fmt.t
-
-(** Process declarations allow to bind identifiers to processes. *)
-type id = string
 
 (** Processes, using terms and facts from [Theory] *)
 
 type term = Theory.term
 
 type formula = Theory.formula
+
+type lsymb = Theory.lsymb
+
+(** {2 Kinds}
+  * For messages, function, state and processes. For the latter,
+  * the name of variables is given together with their kinds. *)
+
+(** The kind of a process gives, for each of its input variables,
+  * the expected kind for that variable. *)
+type pkind = (string * Sorts.esort) list
+
+val pp_pkind : (string * Sorts.esort) list Fmt.t
 
 
 (** {2 Front-end processes}
@@ -38,27 +38,27 @@ type formula = Theory.formula
 (** Process types *)                   
 type process_i =
   | Null                                    (** Null process *)
-  | New of string * process                 (** Name creation *)
-  | In  of Channel.p_channel * string * process (** Input *)
+  | New of lsymb * process                 (** Name creation *)
+  | In  of Channel.p_channel * lsymb * process (** Input *)
   | Out of Channel.p_channel * term * process   (** Output *)
-  | Set of string * string list * term * process
+  | Set of lsymb * lsymb list * term * process
                                             (** [Set (s,l,t,p)] stores [t]
                                               * in cell [s(l)] and
                                               * continues with [p]. *)
   | Parallel of process * process           (** Parallel composition *)
-  | Let of string * term * process          (** Local definition *)
-  | Repl of string * process
+  | Let of lsymb * term * process          (** Local definition *)
+  | Repl of lsymb * process
       (** [Repl (x,p)] is the parallel composition of [p[x:=i]]
         * for all indices [i]. *)
-  | Exists of string list * formula * process * process
+  | Exists of lsymb list * formula * process * process
       (** [Exists (vars,test,p,q)] evalues to [p[vars:=indices]]
         * if there exists [indices] such that [test[vars:=indices]]
         * is true, and [q] otherwise. Note that this construct
         * subsumes the common conditional construct. *)
-  | Apply of id * term list
+  | Apply of lsymb * term list
       (** Process invocation: [Apply (p,ts)] gets expanded
         * to [p(ts)]. *)
-  | Alias of process * id
+  | Alias of process * lsymb
       (** [Alias (p,i)] behaves as [p] but [i] will be used
         * as a naming prefix for its actions. *)
 
@@ -70,7 +70,7 @@ val pp_process : Format.formatter -> process -> unit
 val check_proc : Symbols.table -> Theory.env -> process -> unit
 
 (** Declare a named process. The body of the definition is type-checked. *)
-val declare : Symbols.table -> id -> pkind -> process -> Symbols.table
+val declare : Symbols.table -> lsymb -> pkind -> process -> Symbols.table
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
@@ -84,8 +84,9 @@ val declare_system :
 
 type proc_error_i =
   | UnknownProcess of string
+  | ProcessAlreadyDecl of string
   | UnknownChannel of string
-  | Arity_error of string*int*int
+  | Arity_error of string * int * int
   | StrictAliasError of string
 
 type proc_error = Location.t * proc_error_i

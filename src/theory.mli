@@ -14,22 +14,23 @@
   * function applications, macros, variables, names etc. *)
 type kind = Sorts.esort
 
-
-type term =
+type lsymb = string Location.located
+    
+type term_i =
   | Tinit
   | Tpred of term
-  | Diff of term*term
-  | Seq of string list * term
-  | ITE of term*term*term
-  | Find of string list * term * term * term
+  | Diff  of term * term
+  | Seq   of lsymb list * term
+  | ITE   of term * term * term
+  | Find  of lsymb list * term * term * term
 
-  | App of string * term list 
+  | App of lsymb * term list 
   (** An application of a symbol to some arguments which as not been
     * disambiguated yet (it can be a name, a function symbol
     * application, a variable, ...)
     * [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
 
-  | AppAt of string * term list * term 
+  | AppAt of lsymb * term list * term 
   (** An application of a symbol to some arguments, at a given
     * timestamp.  As for [App _], the head function symbol has not been
     * disambiguated yet.
@@ -37,21 +38,23 @@ type term =
                  
   | Compare of Atom.ord*term*term
   | Happens of term
-  | ForAll of (string * kind) list * term
-  | Exists of (string * kind) list * term
-  | And of term * term
-  | Or of term * term
+  | ForAll  of (lsymb * kind) list * term
+  | Exists  of (lsymb * kind) list * term
+  | And  of term * term
+  | Or   of term * term
   | Impl of term * term
-  | Not of term
+  | Not  of term
   | True
   | False
 
+and term = term_i Location.located
+
 type formula = term
 
-val pp : Format.formatter -> term -> unit
+val pp_i : Format.formatter -> term_i -> unit
+val pp   : Format.formatter -> term   -> unit
 
-(** [var x] makes the variable [App (x,\[\])] *)
-val var : string -> term
+val equal : term -> term -> bool
 
 (** {2 Declaration of new symbols} *)
 
@@ -59,8 +62,7 @@ val var : string -> term
 (** Declare a new function symbol of type message->message->message, * which
     satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash 
-  : Symbols.table -> ?index_arity
-                     :int -> string
+  : Symbols.table -> ?index_arity:int -> string
   -> Symbols.table
 
 (** Asymmetric encryption function symbols are defined by the triplet
@@ -81,7 +83,7 @@ val declare_senc
     (enc,dec).
     It models an authenticated encryption, jointly secure with hashes of the key.*)
 val declare_senc_joint_with_hash 
-  : Symbols.table -> string -> string -> string
+  : Symbols.table -> string -> string -> lsymb
   -> Symbols.table
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
@@ -116,34 +118,47 @@ val declare_macro :
 
 (** {2 Term builders } *)
 
-val empty : term
+val empty : Location.t -> term
+
+(** [var_i x] make a variable represented as [App (x,\[\])] *)  
+val var_i        : Location.t -> string -> term_i
+val var          : Location.t -> string -> term
+val var_of_lsymb : lsymb                -> term
+
+val destr_var : term_i -> lsymb option
+
 
 (** {2 Type-checking} *)
 
-type conversion_error =
-  | Arity_error of string*int*int
-  | Untyped_symbol of string
-  | Index_error of string*int*int
-  | Undefined of string
-  | Type_error of term * Sorts.esort
-  | Timestamp_expected of term
-  | Timestamp_unexpected of term
-  | Untypable_equality of term
-  | String_expected of term
-  | Int_expected of term
-  | Tactic_type of string
-  | Index_not_var of term
-  | Assign_no_state of string
-  | BadNamespace of string * Symbols.namespace
+type conversion_error_i =
+  | Arity_error          of string*int*int
+  | Untyped_symbol       of string
+  | Index_error          of string*int*int
+  | Undefined            of string
+  | UndefinedOfKind      of string * Symbols.namespace
+  | Type_error           of term_i * Sorts.esort
+  | Timestamp_expected   of term_i
+  | Timestamp_unexpected of term_i
+  | Untypable_equality   of term_i
+  | String_expected      of term_i
+  | Int_expected         of term_i
+  | Tactic_type          of string
+  | Index_not_var        of term_i
+  | Assign_no_state      of string
+  | BadNamespace         of string * Symbols.namespace
+
+type conversion_error = Location.t * conversion_error_i
 
 exception Conv of conversion_error
 
-val pp_error : Format.formatter -> conversion_error -> unit
+val pp_error :
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> conversion_error -> unit
 
-type env = (string*Sorts.esort) list
+type env = (string * Sorts.esort) list
 
 val check : Symbols.table -> ?local:bool -> env -> term -> Sorts.esort -> unit
-val check_state : Symbols.table -> string -> int -> Sorts.esort
+val check_state : Symbols.table -> lsymb -> int -> Sorts.esort
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the
@@ -154,7 +169,7 @@ val check_signature : Symbols.table -> Term.fname -> Term.fname -> Term.fname op
 (** {2 Conversions}
   * Convert terms inside the theory to terms of the prover. *)
 
-val subst : term -> (string*term) list -> term
+val subst : term -> (string * term_i) list -> term
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 

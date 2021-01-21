@@ -2,7 +2,6 @@ type tac_error =
   | More
   | Failure of string
   | AndThen_Failure of tac_error
-  | Cannot_convert of Theory.conversion_error
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
@@ -42,7 +41,6 @@ let tac_error_strings =
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
   | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
-  | Cannot_convert _ -> "CannotConvert"
   | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
   | Undefined s -> "Undefined, "^s
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
@@ -85,7 +83,6 @@ let rec pp_tac_error ppf = function
   | NotDDHContext ->
       Fmt.pf ppf "The current system cannot be seen as a context \
                   of the given DDH shares"
-  | Cannot_convert e -> Fmt.pf ppf "Cannot convert: %a" Theory.pp_error e
   | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
   | SystemError e -> System.pp_system_error ppf e
   | SEncNoRandom ->
@@ -210,10 +207,11 @@ let checkfail_tac exc t j sk fk =
     let sk l fk = raise (Tactic_soft_failure DidNotFail) in
     t j sk fk
   with Tactic_soft_failure e when e = exc -> sk [j] fk
-     | Tactic_soft_failure (Cannot_convert _) when exc=CannotConvert -> sk [j] fk
+     | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
      | Tactic_soft_failure (Failure _) when exc=Failure "" -> sk [j] fk
      | Tactic_soft_failure e
-     | Tactic_hard_failure e -> raise (Tactic_hard_failure (FailWithUnexpected e))
+     | Tactic_hard_failure e ->
+       raise (Tactic_hard_failure (FailWithUnexpected e))
 
 let repeat t j sk fk =
   let rec aux j sk fk =

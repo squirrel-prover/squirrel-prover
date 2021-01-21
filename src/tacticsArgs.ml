@@ -2,44 +2,44 @@
 
 type parser_arg =
   | String_name of string
-  | Int_parsed of int
-  | Theory of Theory.term
+  | Int_parsed  of int
+  | Theory      of Theory.term
 
 type ('a, 'b) pair
 
 type _ sort =
-  | None : unit sort
-  | Message : Sorts.message sort
-  | Boolean : Sorts.boolean sort
+  | None      : unit sort
+  | Message   : Sorts.message sort
+  | Boolean   : Sorts.boolean sort
   | Timestamp : Sorts.timestamp sort
-  | Index : Sorts.index sort
-  | Int : int sort
-  | String : string sort
-  | Pair : ('a sort * 'b sort) -> ('a * 'b) sort
-  | Opt : 'a sort -> ('a option) sort
+  | Index     : Sorts.index sort
+  | Int       : int sort
+  | String    : string sort
+  | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
+  | Opt       : 'a sort -> ('a option) sort
 
 type _ arg =
-  | None : unit arg
-  | Message : Term.message -> Sorts.message arg
-  | Boolean : Term.formula -> Sorts.boolean arg
+  | None      : unit arg
+  | Message   : Term.message -> Sorts.message arg
+  | Boolean   : Term.formula -> Sorts.boolean arg
   | Timestamp : Term.timestamp -> Sorts.timestamp arg
-  | Index : Vars.index -> Sorts.index arg
-  | Int : int -> int arg
-  | String : string -> string arg
-  | Pair : 'a arg * 'b arg -> ('a * 'b) arg
-  | Opt : ('a sort * 'a arg option) -> ('a option) arg
+  | Index     : Vars.index -> Sorts.index arg
+  | Int       : int -> int arg
+  | String    : string -> string arg
+  | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
+  | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
 let rec sort : type a. a arg -> a sort =
   function
-  | None -> None
-  | Message _ -> Message
-  | Boolean _ -> Boolean
-  | Timestamp _ ->  Timestamp
-  | Index _ -> Index
-  | Int _ -> Int
-  | String _ -> String
+  | None        -> None
+  | Message _   -> Message
+  | Boolean _   -> Boolean
+  | Timestamp _ -> Timestamp
+  | Index _     -> Index
+  | Int _       -> Int
+  | String _    -> String
   | Pair (a, b) -> Pair (sort a, sort b)
-  | Opt (s,_) -> Opt s
+  | Opt (s,_)   -> Opt s
 
 type esort = Sort : ('a sort) -> esort
 
@@ -55,24 +55,24 @@ let rec cast: type a b. a sort -> b arg -> a arg =
   | Opt s, Opt (r, Some q) -> Opt(s, Some (cast s q))
   | _ -> begin
       match kind, sort t with
-      | Message, Message -> t
-      | Boolean, Boolean -> t
+      | Message  , Message   -> t
+      | Boolean  , Boolean   -> t
       | Timestamp, Timestamp -> t
-      | Index, Index -> t
-      | Int, Int -> t
-      | String, String -> t
-      | None, None -> t
+      | Index    , Index     -> t
+      | Int      , Int       -> t
+      | String   , String    -> t
+      | None     , None      -> t
       | _ -> raise Uncastable
     end
 
 let sort_to_string  : type a. a sort -> string = function
-  | None -> ""
-  | Message -> "m"
-  | Boolean -> "f"
+  | None      -> ""
+  | Message   -> "m"
+  | Boolean   -> "f"
   | Timestamp -> "ts"
-  | Index -> "idx"
-  | Int -> "i"
-  | String -> "H"
+  | Index     -> "idx"
+  | Int       -> "i"
+  | String    -> "H"
   | _ -> assert false
 
 type counters = { message : int; boolean : int; timestamp : int; index : int; int : int; string : int}

@@ -6,6 +6,8 @@ type tac = TraceSequent.t Tactics.tac
 
 module T = Prover.TraceTactics
 
+module L = Location
+  
 (** Propositional connectives *)
 
 (** Reduce a goal with a disjunction conclusion into the goal
@@ -356,8 +358,8 @@ let goal_exists_intro  ths (s : TraceSequent.t) =
       let nu = Theory.parse_subst table (TraceSequent.get_env s) vs ths in
       let new_formula = Term.subst nu f in
       [TraceSequent.set_conclusion new_formula s]
-    with Theory.(Conv (Undefined x)) ->
-      Tactics.soft_failure (Tactics.Undefined x)
+    with Theory.(Conv (_, Undefined x)) ->
+      Tactics.soft_failure (Tactics.Undefined x) (* TODO: location *)
     end
   | _ ->
       Tactics.soft_failure (Tactics.Failure "cannot introduce exists")
@@ -544,8 +546,6 @@ let expand_mess (TacticsArgs.Message t) s =
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                          Macros.get_definition system table sort mn is a)]
     else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
-  | exception Theory.(Conv e) ->
-    Tactics.soft_failure (Tactics.Cannot_convert e)
   | _ ->
     Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
@@ -980,8 +980,6 @@ let parse_substd table tsubst s =
                     | _ -> failure ()
                   end
                 | _ -> assert false
-                | exception Theory.Conv e ->
-                  Tactics.(soft_failure (Cannot_convert e))
               end
             | _ -> failure ()
           end
@@ -996,7 +994,10 @@ let parse_substd table tsubst s =
 let rec parse_indexes =
   function
   | [] -> ([],[],[])
-  | TacticsArgs.Theory (Theory.App (i,[])) :: q -> let id,vs,rem = parse_indexes q in
+
+  | TacticsArgs.Theory (L.{ pl_desc = Theory.App (i,[]) } ) :: q ->
+    let i = L.unloc i in
+    let id,vs,rem = parse_indexes q in
     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
     Theory.ESubst (i, Term.Var var)::id
   , (Vars.EVar var)::vs, rem
@@ -1071,9 +1072,10 @@ let () =
            \nUsage: systemsubstitute new_sytem_name,i1,...,ik,\
            cond@T, newcond, output@T, newoutput, ... "
     (function
-      | TacticsArgs.Theory (App (system_name,[])) :: q  ->
+      | TacticsArgs.Theory (L.{ pl_desc = App (system_name,[]) } ) :: q  ->
         let subst_index, vs, subst_descr = parse_indexes q in
-
+        let system_name = L.unloc system_name in
+        
         fun s sk fk -> begin
             match system_subst system_name subst_index vs subst_descr s with
              | subgoals -> sk subgoals fk
@@ -1356,8 +1358,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) =
     Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
   let subst =
     let table = TraceSequent.table s in
-    try Theory.parse_subst table (TraceSequent.get_env s) uvars ths with
-      | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
+    Theory.parse_subst table (TraceSequent.get_env s) uvars ths 
   in
   (* Formula with universal quantifications introduced. *)
   let f = Term.subst subst f in
