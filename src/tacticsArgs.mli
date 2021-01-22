@@ -67,3 +67,19 @@ val convert_as_string : parser_arg list -> string option
 val convert_args :
   Symbols.table -> Vars.env ->
   parser_arg list -> esort -> earg
+
+
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
+type tac_arg_error_i =
+  | CannotConvETerm 
+
+type tac_arg_error = Location.t * tac_arg_error_i
+
+exception TacArgError of tac_arg_error
+
+val pp_tac_arg_error :
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> tac_arg_error -> unit
+

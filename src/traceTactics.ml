@@ -270,6 +270,7 @@ let () =
                    Sort TacticsArgs.Message]
     case_tac
 
+(*------------------------------------------------------------------*)
 let depends TacticsArgs.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
   | Term.Action( n1, is1), Term.Action (n2, is2) ->
@@ -861,7 +862,7 @@ let apply_substitute subst s =
   [TraceSequent.apply_subst subst s]
 
 
-let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
+let substitute_mess (m1, m2) s =
   let subst =
         let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
         if Completion.check_equalities trs [(m1,m2)] then
@@ -871,15 +872,7 @@ let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   in
   apply_substitute subst s
 
-
-let messsubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Message, Message))
-
-let () =
-  T.register_typed "messsubstitute"
-    substitute_mess messsubstitute_sort
-
-
-let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
+let substitute_ts (ts1, ts2) s =
   let subst =
       let models = Tactics.timeout_get (TraceSequent.get_models s) in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
@@ -889,13 +882,16 @@ let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   in
   apply_substitute subst s
 
-let tssubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Timestamp, Timestamp))
-
-let () =
-  T.register_typed "tssubstitute"
-    substitute_ts tssubstitute_sort
-
-let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
+let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
+  let i1, i2 =  match i1, i2 with
+    | Var i1, Var i2 -> i1, i2
+    | (Diff _ | Macro _), _
+    | _, (Macro _ | Diff _) ->
+      Tactics.hard_failure
+        (Tactics.Failure "only variables are supported when substituting \
+                          index terms")
+  in
+  
   let subst =
     let models = Tactics.timeout_get (TraceSequent.get_models s) in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
@@ -905,18 +901,35 @@ let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   in
   apply_substitute subst s
 
-let idxsubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Index, Index))
+let substitute_tac arg s =
+  let open TacticsArgs in
+  match arg with
+  | Pair (ETerm (Sorts.Message, f1, _), ETerm (Sorts.Message, f2, _)) ->
+    substitute_mess (f1,f2) s
+
+  | Pair (ETerm (Sorts.Timestamp, f1, _), ETerm (Sorts.Timestamp, f2, _)) ->
+    substitute_ts (f1,f2) s
+
+  | Pair (ETerm (Sorts.Index, f1, _), ETerm (Sorts.Index, f2, _)) ->
+    substitute_idx (f1,f2) s
+      
+  | _ ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+                        index variables")
+
 
 let () =
-  T.register_typed "idxsubstitute"
-    substitute_idx idxsubstitute_sort
-
-let () =
-  T.register_orelse "substitute"
+  T.register_typed "substitute"
     ~general_help:"If the sequent implies that the arguments i1, i2 are equals, \
                    replaces all occurences of i1 by i2 inside the sequent."
-      ["tssubstitute"; "messsubstitute"; "idxsubstitute"]
-     ~usages_sorts:[Sort tssubstitute_sort; Sort messsubstitute_sort; Sort idxsubstitute_sort]
+    ~usages_sorts:[TacticsArgs.(Sort (Pair (Index, Index)));
+                   TacticsArgs.(Sort (Pair (Timestamp, Timestamp)));
+                   TacticsArgs.(Sort (Pair (Message, Message)))]
+    substitute_tac TacticsArgs.(Pair (ETerm, ETerm))
+
+
+(*------------------------------------------------------------------*)
 let autosubst s =
   let eq,s =
     try

@@ -196,7 +196,10 @@ let rec main_loop ~test ?(save=true) state =
       
   | exception (Theory.Conv e) when not test ->
     error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
-      
+
+  | exception (TacticsArgs.TacArgError e) when not test ->
+    error ~test state (fun fmt -> TacticsArgs.pp_tac_arg_error pp_loc_error fmt e)
+
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in

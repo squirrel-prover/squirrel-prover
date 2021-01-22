@@ -187,12 +187,23 @@ let pp_esort ppf (Sort s) =
 
 
 (*------------------------------------------------------------------*)
-type tac_arg_error =
-  | CannotConvETerm             (* this gives bad error messages ... *)
+type tac_arg_error_i =
+  | CannotConvETerm 
+
+type tac_arg_error = L.t * tac_arg_error_i
 
 exception TacArgError of tac_arg_error
 
-let tac_arg_error e = raise (TacArgError e)
+let pp_tac_arg_error_i ppf = function
+  | CannotConvETerm -> Fmt.pf ppf "cannot convert the term as a message, \
+                                   timestamp, boolean and an index"
+
+let pp_tac_arg_error pp_loc_err ppf (loc,e) =
+  Fmt.pf ppf "%a%a"
+    pp_loc_err loc
+    pp_tac_arg_error_i e
+
+let tac_arg_error loc e = raise (TacArgError (loc,e))
     
 (*------------------------------------------------------------------*)
 
@@ -205,7 +216,7 @@ let convert_args table env parser_args tactic_type =
   let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
   
   let rec conv_args parser_args tactic_type env =
-    let tsubst = Theory.subst_of_env env in
+    let tsubst = Theory.subst_of_env env in    
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
       Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
@@ -219,7 +230,7 @@ let convert_args table env parser_args tactic_type =
     | [Theory p], Sort ETerm ->
       let et = match Theory.econvert conv_cntxt tsubst p with
         | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
-        | None -> tac_arg_error CannotConvETerm in
+        | None -> tac_arg_error (L.loc p) CannotConvETerm in
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->

@@ -1865,9 +1865,9 @@ let equivalent arg s = match arg with
 
       | TacticsArgs.ETerm (_, _, _),
         TacticsArgs.ETerm (_, _, _)  ->
-        (* TODO: improve error message + add locations *)
+        (* TODO: improve error message + add locations *)        
         Tactics.hard_failure
-          (Tactics.Failure "expected a pair of messages or a pair of booleans") 
+          (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
 
 let () = T.register_typed "equivalent"
     ~general_help:"Replace all occurrences of a formula by another, and ask to \

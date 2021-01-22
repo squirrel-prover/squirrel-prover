@@ -22,5 +22,5 @@ goal unforgeable_1 :
 
 Proof.
  nosimpl(intros).
- checkfail idxsubstitute a, b with NotEqualArguments.
+ checkfail substitute a, b with NotEqualArguments.
 Abort.

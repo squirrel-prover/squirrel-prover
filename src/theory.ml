@@ -896,6 +896,7 @@ let econvert conv_cntxt tsubst t : eterm option =
   
   List.find_map conv_s
     [Sorts.emessage;
+     Sorts.eindex;
      Sorts.etimestamp;
      Sorts.eboolean] 
     
