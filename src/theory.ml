@@ -885,6 +885,21 @@ and conv_app :
         | _ -> raise type_error
       end
 
+type eterm = ETerm : 'a Sorts.sort * 'a Term.term * L.t -> eterm 
+                                                        
+let econvert conv_cntxt tsubst t : eterm option =
+  let conv_s = function
+    | Sorts.ESort sort -> try
+        let tt = convert conv_cntxt tsubst t sort in
+        Some (ETerm (sort, tt, L.loc t))
+      with Conv _ -> None in
+  
+  List.find_map conv_s
+    [Sorts.emessage;
+     Sorts.etimestamp;
+     Sorts.eboolean] 
+    
+
 let convert_index table = conv_index { table = table; cntxt = InGoal; }
 
 (** Declaration functions *)

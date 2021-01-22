@@ -6,6 +6,8 @@ module L = Location
 (*------------------------------------------------------------------*)
 type decl_error_i =
   | Multiple_declarations of string
+
+  (* TODO: remove these errors, catch directly at top-level *)
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err
 
@@ -310,9 +312,11 @@ module type Tactics_sig = sig
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
-  val register_orelse :
-    string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list -> string list -> unit
+  val register_typed :
+    string ->  ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list ->
+    ('a TacticsArgs.arg -> judgment -> judgment list) ->
+    'a TacticsArgs.sort  -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
 
@@ -363,9 +367,15 @@ struct
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-  let register_typed id  ?(general_help="")  ?(detailed_help="") f sort =
+  let register_typed id
+      ?(general_help="") ?(detailed_help="") ?(usages_sorts)
+      f sort =
+    let usages_sorts = match usages_sorts with
+      | None -> [TacticsArgs.Sort sort]
+      | Some u -> u in
+    
     register_general id
-      ~general_help ~detailed_help ~usages_sorts:[TacticsArgs.Sort sort]
+      ~general_help ~detailed_help ~usages_sorts
       (fun args s sk fk ->
          let table = Goal.get_table (M.to_goal s) in
          match convert_args table s args (TacticsArgs.Sort sort) with
@@ -384,17 +394,6 @@ struct
            with TacticsArgs.Uncastable ->
              Tactics.hard_failure (Tactics.Failure "ill-formed arguments") 
       )
-
-  let register_orelse id
-      ?(general_help="") ?(detailed_help="") ?(usages_sorts=[])
-      ids =
-    register_general id
-      ~general_help ~detailed_help ~usages_sorts
-      (fun args s sk fk -> AST.eval ["nosimpl"]
-          (Tactics.OrElse
-             (List.map (fun id -> Tactics.Abstract (id,args) ) ids)
-          )
-          s sk fk)
 
   let register_macro id ?(modifiers=["nosimpl"])  ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) m =
     register_general id ~general_help ~detailed_help ~usages_sorts

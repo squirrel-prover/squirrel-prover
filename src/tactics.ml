@@ -18,8 +18,11 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+
+  (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
+                         
   | GoalNotClosed
 
 let tac_error_strings =

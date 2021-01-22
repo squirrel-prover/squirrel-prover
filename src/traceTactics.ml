@@ -182,7 +182,7 @@ let timestamp_case (ts : Term.timestamp) s =
   [TraceSequent.add_formula f s]
 
 (** Case analysis on a disjunctive hypothesis *)
-let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
+let hypothesis_case hypothesis_name (s : TraceSequent.t) =
   let s,f =
     TraceSequent.select_formula_hypothesis hypothesis_name s ~remove:true in
   let rec disjunction_to_list acc = function
@@ -242,43 +242,33 @@ let message_case (m : Term.message) s =
                Tactics.(soft_failure (Failure "improper argument"))
            end
 
-
-let tscase_sort : Sorts.timestamp TacticsArgs.sort = TacticsArgs.Timestamp
-
-let () =
-  T.register_typed "tscase" timestamp_case tscase_sort
-
-let hcase_sort : string TacticsArgs.sort = TacticsArgs.String
-
-let () =
-  T.register_typed "hcase" hypothesis_case hcase_sort
-
-let messcase_sort : Sorts.message TacticsArgs.sort = TacticsArgs.Message
-
-let () =
-  T.register_typed "messcase" message_case messase_sort
-
-
-let case arg s = match arg with
-  | TacticsArgs.ETerm (Sorts.Timestamp, f, loc) ->
-    timestamp_case f s
-
-  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
-    message_case f s
-
-  | ?? -> assert false          (* TODO *)
-    
-  | _ -> Tactics.hard_failure
-           (Tactics.Failure "expected TODO")
+let case_tac (args : TacticsArgs.parser_arg list) s
+    (sk : TraceSequent.t list Tactics.sk) fk =
+  try begin
+    match TacticsArgs.convert_as_string args with
+    | Some str when TraceSequent.mem_hypothesis str s ->
+      sk (hypothesis_case str s) fk
+    | _ ->
+      let env, tbl = TraceSequent.get_env s, TraceSequent.table s in
+      match TacticsArgs.convert_args tbl env args TacticsArgs.(Sort ETerm) with
+      | TacticsArgs.Arg (ETerm (Sorts.Timestamp, f, loc)) ->
+        sk (timestamp_case f s) fk
+      | TacticsArgs.Arg (ETerm (Sorts.Message, f, loc)) ->
+        sk (message_case f s) fk
+      | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  end
+  with Tactics.Tactic_soft_failure e -> fk e
 
 
 let () =
   let open Tactics in
-  T.register_orelse "case"
+  T.register_general "case"
     ~general_help:"Perform case analysis on a timestamp, a message built using a \
                    conditional, or a disjunction hypothesis."
-    ["tscase"; "hcase"; "messcase"]
-    ~usages_sorts:[Sort tscase_sort; Sort hcase_sort; Sort messcase_sort]
+    ~usages_sorts:[Sort TacticsArgs.Timestamp;
+                   Sort TacticsArgs.String;
+                   Sort TacticsArgs.Message]
+    case_tac
 
 let depends TacticsArgs.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
@@ -537,7 +527,7 @@ let constraints (s : TraceSequent.t) =
     []
   else Tactics.soft_failure (Tactics.Failure "constraints satisfiable")
 
-let expand_bool (TacticsArgs.Boolean t) s =
+let expand_bool t s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
@@ -550,7 +540,7 @@ let expand_bool (TacticsArgs.Boolean t) s =
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
-let expand_mess (TacticsArgs.Message t) s =
+let expand_mess t s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
@@ -563,15 +553,23 @@ let expand_mess (TacticsArgs.Message t) s =
   | _ ->
     Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
-let () =
-  T.register_typed "messexpand" expand_mess TacticsArgs.Message;
-  T.register_typed "boolexpand" expand_bool TacticsArgs.Boolean
+let expand arg s = match arg with
+  | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
+    expand_mess f s
 
-let () = T.register_orelse "expand"
+  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+    expand_bool f s
+
+  | TacticsArgs.ETerm ((Sorts.Index | Sorts.Timestamp), _, loc) ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a message or boolean term")
+
+let () = T.register_typed "expand"
     ~general_help:"Expand all occurences of the given macro inside the goal."
-    ~usages_sorts:[TacticsArgs.(Sort Message); TacticsArgs.(Sort Boolean);]
-    ["messexpand"; "boolexpand"]
+    ~usages_sorts:[Sort TacticsArgs.Message; Sort TacticsArgs.Boolean]
+    expand TacticsArgs.ETerm
 
+(*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =

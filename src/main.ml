@@ -181,16 +181,22 @@ let rec main_loop ~test ?(save=true) state =
   (* exception handling *)
   | exception (Parserbuf.Error s) -> 
     error ~test state (fun fmt -> Fmt.string fmt s)
+      
   | exception (Prover.ParseError s) -> 
     error ~test state (fun fmt -> Fmt.string fmt s)
+      
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
+      
   | exception (Process.ProcError e) ->
     error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
+      
   | exception (Decl_error e) when not test ->
     error ~test state (fun fmt -> pp_decl_error pp_loc_error fmt e)
+      
   | exception (Theory.Conv e) when not test ->
     error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
+      
   | exception (Tactic_soft_failure e) when not test ->
     let pp_e fmt = 
       Fmt.pf fmt "Tactic failed: %a." Tactics.pp_tac_error e in

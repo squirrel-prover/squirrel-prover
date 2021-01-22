@@ -115,16 +115,9 @@ module type Tactics_sig = sig
 
   val register_typed :
     string ->  ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
-
-  (* Allows to register a tactic, which is a specific orelse over other
-     predefined tactics. It will try to apply the given tactics in the list, by
-     giving them the arguments provided to the first tactic. 
-  *)
-  val register_orelse :
-    string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list -> string list -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
   val pp : bool -> Format.formatter -> string -> unit

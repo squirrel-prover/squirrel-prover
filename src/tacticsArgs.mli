@@ -9,9 +9,6 @@ type parser_arg =
   | Theory      of Theory.term
 
 (*------------------------------------------------------------------*)
-type eterm = [`ET]
-
-(*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
@@ -21,7 +18,7 @@ type _ sort =
   | Timestamp : Sorts.timestamp sort        
   | Index     : Sorts.index     sort
         
-  | ETerm     : eterm           sort
+  | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
 
   | Int       : int sort
@@ -39,8 +36,8 @@ type _ arg =
   | Timestamp : Term.timestamp -> Sorts.timestamp arg
   | Index     : Vars.index     -> Sorts.index     arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> eterm arg
-  (** A [Term.term] with its sorts, for many-morphic tactics. *)
+  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  (** A [Term.term] with its sorts. *)
         
   | Int       : int -> int arg
   | String    : string -> string arg
@@ -65,6 +62,8 @@ val pp_esort : Format.formatter -> esort -> unit
 (*------------------------------------------------------------------*)
 (** {2 Argument conversion} *)
 
+val convert_as_string : parser_arg list -> string option
+  
 val convert_args :
   Symbols.table -> Vars.env ->
   parser_arg list -> esort -> earg

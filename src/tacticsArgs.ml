@@ -9,8 +9,6 @@ type parser_arg =
 
 type ('a, 'b) pair
 
-type eterm = [`ET]
-
 (*------------------------------------------------------------------*)
 (* The types are explicit, in order to type the tactics. *)
 type _ sort =
@@ -21,7 +19,7 @@ type _ sort =
   | Timestamp : Sorts.timestamp sort        
   | Index     : Sorts.index     sort
 
-  | ETerm     : eterm           sort
+  | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
         
   | Int       : int sort
@@ -38,8 +36,7 @@ type _ arg =
   | Timestamp : Term.timestamp -> Sorts.timestamp arg
   | Index     : Vars.index     -> Sorts.index     arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * L.t -> eterm arg
-  (* The location is the location of the parsed arguments. *)
+  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
 
   | Int       : int -> int arg
   | String    : string -> string arg
@@ -198,26 +195,15 @@ exception TacArgError of tac_arg_error
 let tac_arg_error e = raise (TacArgError e)
     
 (*------------------------------------------------------------------*)
-    
+
+let convert_as_string parser_args = match parser_args with
+  | [Theory (L.{ pl_desc = App (p,[]) } )] ->
+    Some (L.unloc p) (* TODO: location *)
+  | _ -> None
+
 let convert_args table env parser_args tactic_type =
   let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
-
-  let conv_eterm tsubst t =
-    let conv_s = function
-      | Sorts.ESort sort -> try
-        let tt = Theory.convert conv_cntxt tsubst t sort in
-        Some (ETerm (sort, tt, L.loc t))
-      with Theory.Conv _ -> None
-    in
-    match 
-      List.find_map conv_s
-        [Sorts.emessage;
-         Sorts.etimestamp;
-         Sorts.eboolean] with
-    | Some r -> r
-    | None -> tac_arg_error CannotConvETerm
-  in      
-        
+  
   let rec conv_args parser_args tactic_type env =
     let tsubst = Theory.subst_of_env env in
     match parser_args, tactic_type with
@@ -231,8 +217,10 @@ let convert_args table env parser_args tactic_type =
       Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
 
     | [Theory p], Sort ETerm ->
-      Arg (conv_eterm tsubst p)
-
+      let et = match Theory.econvert conv_cntxt tsubst p with
+        | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
+        | None -> tac_arg_error CannotConvETerm in
+      Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
       Arg (String (L.unloc p)) (* TODO: location *)
