@@ -84,6 +84,9 @@ fa 0. fa 1. fa 1.
 prf 1.
 yesif 1.
 project.
+split.
+admit. (* ??? *)
+admit. (* ??? *)
 fresh 1.
 yesif 1.
 admit. (* ??? *)

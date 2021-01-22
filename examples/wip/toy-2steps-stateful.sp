@@ -22,6 +22,10 @@ Current state of the proof:
 here, I think we might need to express something more "imprecise" as what we did
 with examples/wip.sp. But we cannot model the reader's conditional with
 "if exists ...".
+
+WARNING
+- Actually, this equivalence cannot hold because a tag and a reader can be
+desynchronised in the left system, while it cannot happen in the right system.
 *******************************************************************************)
 
 hash h
