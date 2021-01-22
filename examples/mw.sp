@@ -299,10 +299,16 @@ prf 2. (* we apply PRF under XOR to be able to use XOR tactic later on *)
 yesif 2.
 apply tags_neq.
 project.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)).
-fresh M2.
+split.
+assert (fst(input@R2(r)) = nt(i,t)). fresh M2.
+split.
+assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
+assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
+split.
+split.
+assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
+assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
+assert (fst(input@R2(r)) = nt(i,t)). fresh M2.
 fresh 1. yesif 1.
 xor 1, n_PRF.
 yesif 1.

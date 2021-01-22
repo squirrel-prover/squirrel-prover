@@ -134,7 +134,13 @@ Proof.
   expand cond@T(i,k); expand output@T(i,k).
   fa 0. fa 1. fa 1. fa 1.
   prf 2. yesif 2.
-  by project.
+  project.
+  split. 
+  assert nT(i,k) = fst(input@R2(j)). by fresh M1. 
+  assert nT(i,k) = fst(input@R1(j)). by fresh M1.
+  split.
+  assert nT(i,k) = fst(input@R1(j)). by fresh M1. 
+  assert nT(i,k) = fst(input@R2(j)). by fresh M1.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

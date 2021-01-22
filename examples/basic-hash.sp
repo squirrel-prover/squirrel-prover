@@ -103,7 +103,13 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
   yesif 2. 
-  by project.
+  project.
+  split.
+  by fresh M0.
+  by fresh M0.
+  split.  
+  by fresh M0.
+  by fresh M0.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.
