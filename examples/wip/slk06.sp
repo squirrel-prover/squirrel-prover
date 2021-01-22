@@ -46,13 +46,6 @@ mutable TS : message
 channel cT
 channel cR
 
-axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
-axiom stateTSInit : TS@init = TSinit
-
-axiom TSaxiom :
-  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk
-
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
@@ -80,6 +73,14 @@ process reader(jj:index) =
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
+
+
+axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
+axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
+axiom stateTSInit : TS@init = TSinit
+
+axiom TSaxiom :
+  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk.
 
 goal auth_R1 :
 forall (jj,ii:index),
