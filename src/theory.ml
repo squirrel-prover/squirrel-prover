@@ -893,12 +893,14 @@ let econvert conv_cntxt tsubst t : eterm option =
         let tt = convert conv_cntxt tsubst t sort in
         Some (ETerm (sort, tt, L.loc t))
       with Conv _ -> None in
-  
+
+  (* careful about the order. Because boolean is a subtyped of message, we
+     need to try boolean (the most precise type) first. *)
   List.find_map conv_s
-    [Sorts.emessage;
+    [Sorts.eboolean;
+     Sorts.emessage;
      Sorts.eindex;
-     Sorts.etimestamp;
-     Sorts.eboolean] 
+     Sorts.etimestamp] 
     
 
 let convert_index table = conv_index { table = table; cntxt = InGoal; }

@@ -202,7 +202,8 @@ val convert : conv_env -> subst -> term -> 'a Sorts.sort -> 'a Term.term
     The location is the location of the original [Theory.term].  *)
 type eterm = ETerm : 'a Sorts.sort * 'a Term.term * Location.t -> eterm 
 
-(** Convert a term to any sort (tries sequentially all conversions). *)
+(** Convert a term to any sort (tries sequentially all conversions). 
+    Should return the most precise sort (i.e. [Boolean] before [Message]). *)
 val econvert : conv_env -> subst -> term -> eterm option
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
