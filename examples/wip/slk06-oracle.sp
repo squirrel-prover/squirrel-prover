@@ -61,13 +61,6 @@ channel cT
 channel cR
 channel c
 
-axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
-axiom stateTSInit : TS@init = TSinit
-
-axiom TSaxiom :
-  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk
-
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
@@ -98,6 +91,15 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h1(m,key1)))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
+
+
+
+axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
+axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
+axiom stateTSInit : TS@init = TSinit
+
+axiom TSaxiom :
+  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk.
 
 goal lastUpdateTag_ : 
 forall (t:timestamp), forall (i:index),
