@@ -33,22 +33,14 @@ channel cB
 
 (* initial value for counter *)
 abstract myZero : message
-axiom counterInit : d@init = myZero
 
 (* myPred and mySucc functions for counter *)
 abstract myPred : message->message
 abstract mySucc : message->message
-axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
 
 (* order relation for counter *)
 abstract orderOk : message
 abstract order : message->message->message
-axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
-axiom orderTrans :
-  forall (n1,n2,n3:message),
-    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
-    => order(n1,n3) = orderOk
-axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
 
 (* processes *)
 process A =
@@ -66,6 +58,19 @@ process B =
     out(cB,error)
 
 system ((!_i A) | (!_j B)).
+
+(* AXIOMS *)
+
+axiom counterInit : d@init = myZero
+axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
+axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
+axiom orderTrans :
+  forall (n1,n2,n3:message),
+    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
+    => order(n1,n3) = orderOk
+axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
+
+(* GOALS *)
 
 goal counterIncrease :
   forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.

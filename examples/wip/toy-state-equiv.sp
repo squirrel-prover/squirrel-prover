@@ -22,14 +22,18 @@ mutable kT : index->message
 
 channel cT
 
-axiom stateInit :
-  forall (i:index), kT(i)@init = seed(i)
-
 process tag(i:index,j:index) =
   kT(i) := hkey(kT(i),key(i));
   out(cT, diff(kT(i),n(i,j)))
 
 system (!_i !_j T: tag(i,j)).
+
+(* AXIOMS *)
+
+axiom stateInit :
+  forall (i:index), kT(i)@init = seed(i).
+
+(* GOALS *)
 
 goal stateUpdate :
 forall (t:timestamp), (forall (i,j:index), t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
@@ -61,6 +65,11 @@ Proof.
 induction.
 case t.
 case H0.
+
+(* t = init *)
+left.
+
+(* t = T(i1,j) *)
 assert (i=i1 || i<>i1).
 case H0.
 
@@ -84,8 +93,6 @@ case H1.
   apply H1 to j'.
   case H2.
 
-(* t = init *)
-left.
 Qed.
 
 (* A more convenient version of the lemma, because our apply
