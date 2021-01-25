@@ -1,4 +1,5 @@
-
+module L = Location
+  
 (** Symbols *)
 
 type 'a indexed_symbol = 'a * Vars.index list

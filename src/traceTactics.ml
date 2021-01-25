@@ -6,6 +6,8 @@ type tac = TraceSequent.t Tactics.tac
 
 module T = Prover.TraceTactics
 
+module L = Location
+  
 (** Propositional connectives *)
 
 (** Reduce a goal with a disjunction conclusion into the goal
@@ -149,7 +151,7 @@ let () =
     left_not_intro TacticsArgs.String
 
 (** Case analysis on a timestamp *)
-let timestamp_case (TacticsArgs.Timestamp ts) s =
+let timestamp_case (ts : Term.timestamp) s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let mk_case descr =
@@ -179,14 +181,8 @@ let timestamp_case (TacticsArgs.Timestamp ts) s =
   in
   [TraceSequent.add_formula f s]
 
-let tscase_sort : Sorts.timestamp TacticsArgs.sort = TacticsArgs.Timestamp
-
-let () =
-  T.register_typed "tscase" timestamp_case tscase_sort
-
-
 (** Case analysis on a disjunctive hypothesis *)
-let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
+let hypothesis_case hypothesis_name (s : TraceSequent.t) =
   let s,f =
     TraceSequent.select_formula_hypothesis hypothesis_name s ~remove:true in
   let rec disjunction_to_list acc = function
@@ -199,11 +195,6 @@ let hypothesis_case (TacticsArgs.String hypothesis_name) (s : TraceSequent.t) =
     Tactics.soft_failure
       (Tactics.Failure "can only be applied to a disjunction") ;
   List.rev_map (fun f -> TraceSequent.add_formula f s ) formulas
-
-let hcase_sort : string TacticsArgs.sort = TacticsArgs.String
-
-let () =
-  T.register_typed "hcase" hypothesis_case hcase_sort
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -227,7 +218,7 @@ let case_cond orig vars c t e s =
     s |> add_formula c'
       |> apply_subst else_subst ]
 
-let message_case (TacticsArgs.Message m) s =
+let message_case (m : Term.message) s =
            begin match m with
              | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
              | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
@@ -251,19 +242,35 @@ let message_case (TacticsArgs.Message m) s =
                Tactics.(soft_failure (Failure "improper argument"))
            end
 
-let messcase_sort : Sorts.message TacticsArgs.sort = TacticsArgs.Message
+let case_tac (args : TacticsArgs.parser_arg list) s
+    (sk : TraceSequent.t list Tactics.sk) fk =
+  try begin
+    match TacticsArgs.convert_as_string args with
+    | Some str when TraceSequent.mem_hypothesis str s ->
+      sk (hypothesis_case str s) fk
+    | _ ->
+      let env, tbl = TraceSequent.get_env s, TraceSequent.table s in
+      match TacticsArgs.convert_args tbl env args TacticsArgs.(Sort ETerm) with
+      | TacticsArgs.Arg (ETerm (Sorts.Timestamp, f, loc)) ->
+        sk (timestamp_case f s) fk
+      | TacticsArgs.Arg (ETerm (Sorts.Message, f, loc)) ->
+        sk (message_case f s) fk
+      | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  end
+  with Tactics.Tactic_soft_failure e -> fk e
 
-let () =
-  T.register_typed "messcase" message_case messcase_sort
 
 let () =
   let open Tactics in
-  T.register_orelse "case"
+  T.register_general "case"
     ~general_help:"Perform case analysis on a timestamp, a message built using a \
                    conditional, or a disjunction hypothesis."
-    ["tscase"; "hcase"; "messcase"]
-    ~usages_sorts:[Sort tscase_sort; Sort hcase_sort; Sort messcase_sort]
+    ~usages_sorts:[Sort TacticsArgs.Timestamp;
+                   Sort TacticsArgs.String;
+                   Sort TacticsArgs.Message]
+    case_tac
 
+(*------------------------------------------------------------------*)
 let depends TacticsArgs.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
   | Term.Action( n1, is1), Term.Action (n2, is2) ->
@@ -356,8 +363,8 @@ let goal_exists_intro  ths (s : TraceSequent.t) =
       let nu = Theory.parse_subst table (TraceSequent.get_env s) vs ths in
       let new_formula = Term.subst nu f in
       [TraceSequent.set_conclusion new_formula s]
-    with Theory.(Conv (Undefined x)) ->
-      Tactics.soft_failure (Tactics.Undefined x)
+    with Theory.(Conv (_, Undefined x)) ->
+      Tactics.soft_failure (Tactics.Undefined x) (* TODO: location *)
     end
   | _ ->
       Tactics.soft_failure (Tactics.Failure "cannot introduce exists")
@@ -521,7 +528,7 @@ let constraints (s : TraceSequent.t) =
     []
   else Tactics.soft_failure (Tactics.Failure "constraints satisfiable")
 
-let expand_bool (TacticsArgs.Boolean t) s =
+let expand_bool t s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
@@ -534,7 +541,7 @@ let expand_bool (TacticsArgs.Boolean t) s =
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
-let expand_mess (TacticsArgs.Message t) s =
+let expand_mess t s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   let succ subst = [TraceSequent.apply_subst subst s] in
@@ -544,20 +551,26 @@ let expand_mess (TacticsArgs.Message t) s =
       succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                          Macros.get_definition system table sort mn is a)]
     else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
-  | exception Theory.(Conv e) ->
-    Tactics.soft_failure (Tactics.Cannot_convert e)
   | _ ->
     Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
-let () =
-  T.register_typed "messexpand" expand_mess TacticsArgs.Message;
-  T.register_typed "boolexpand" expand_bool TacticsArgs.Boolean
+let expand arg s = match arg with
+  | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
+    expand_mess f s
 
-let () = T.register_orelse "expand"
+  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+    expand_bool f s
+
+  | TacticsArgs.ETerm ((Sorts.Index | Sorts.Timestamp), _, loc) ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a message or boolean term")
+
+let () = T.register_typed "expand"
     ~general_help:"Expand all occurences of the given macro inside the goal."
-    ~usages_sorts:[TacticsArgs.(Sort Message); TacticsArgs.(Sort Boolean);]
-    ["messexpand"; "boolexpand"]
+    ~usages_sorts:[Sort TacticsArgs.Message; Sort TacticsArgs.Boolean]
+    expand TacticsArgs.ETerm
 
+(*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =
@@ -849,7 +862,7 @@ let apply_substitute subst s =
   [TraceSequent.apply_subst subst s]
 
 
-let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
+let substitute_mess (m1, m2) s =
   let subst =
         let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
         if Completion.check_equalities trs [(m1,m2)] then
@@ -859,15 +872,7 @@ let substitute_mess TacticsArgs.(Pair (Message m1, Message m2)) s =
   in
   apply_substitute subst s
 
-
-let messsubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Message, Message))
-
-let () =
-  T.register_typed "messsubstitute"
-    substitute_mess messsubstitute_sort
-
-
-let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
+let substitute_ts (ts1, ts2) s =
   let subst =
       let models = Tactics.timeout_get (TraceSequent.get_models s) in
       if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
@@ -877,13 +882,16 @@ let substitute_ts TacticsArgs.(Pair (Timestamp ts1, Timestamp ts2)) s =
   in
   apply_substitute subst s
 
-let tssubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Timestamp, Timestamp))
-
-let () =
-  T.register_typed "tssubstitute"
-    substitute_ts tssubstitute_sort
-
-let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
+let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
+  let i1, i2 =  match i1, i2 with
+    | Var i1, Var i2 -> i1, i2
+    | (Diff _ | Macro _), _
+    | _, (Macro _ | Diff _) ->
+      Tactics.hard_failure
+        (Tactics.Failure "only variables are supported when substituting \
+                          index terms")
+  in
+  
   let subst =
     let models = Tactics.timeout_get (TraceSequent.get_models s) in
     if Constr.query models [(`Index (`Eq,i1,i2))] then
@@ -893,18 +901,35 @@ let substitute_idx TacticsArgs.(Pair (Index i1, Index i2)) s =
   in
   apply_substitute subst s
 
-let idxsubstitute_sort : 'a TacticsArgs.sort = TacticsArgs.(Pair (Index, Index))
+let substitute_tac arg s =
+  let open TacticsArgs in
+  match arg with
+  | Pair (ETerm (Sorts.Message, f1, _), ETerm (Sorts.Message, f2, _)) ->
+    substitute_mess (f1,f2) s
+
+  | Pair (ETerm (Sorts.Timestamp, f1, _), ETerm (Sorts.Timestamp, f2, _)) ->
+    substitute_ts (f1,f2) s
+
+  | Pair (ETerm (Sorts.Index, f1, _), ETerm (Sorts.Index, f2, _)) ->
+    substitute_idx (f1,f2) s
+      
+  | _ ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a pair of messages, booleans or a pair of \
+                        index variables")
+
 
 let () =
-  T.register_typed "idxsubstitute"
-    substitute_idx idxsubstitute_sort
-
-let () =
-  T.register_orelse "substitute"
+  T.register_typed "substitute"
     ~general_help:"If the sequent implies that the arguments i1, i2 are equals, \
                    replaces all occurences of i1 by i2 inside the sequent."
-      ["tssubstitute"; "messsubstitute"; "idxsubstitute"]
-     ~usages_sorts:[Sort tssubstitute_sort; Sort messsubstitute_sort; Sort idxsubstitute_sort]
+    ~usages_sorts:[TacticsArgs.(Sort (Pair (Index, Index)));
+                   TacticsArgs.(Sort (Pair (Timestamp, Timestamp)));
+                   TacticsArgs.(Sort (Pair (Message, Message)))]
+    substitute_tac TacticsArgs.(Pair (ETerm, ETerm))
+
+
+(*------------------------------------------------------------------*)
 let autosubst s =
   let eq,s =
     try
@@ -980,8 +1005,6 @@ let parse_substd table tsubst s =
                     | _ -> failure ()
                   end
                 | _ -> assert false
-                | exception Theory.Conv e ->
-                  Tactics.(soft_failure (Cannot_convert e))
               end
             | _ -> failure ()
           end
@@ -996,7 +1019,10 @@ let parse_substd table tsubst s =
 let rec parse_indexes =
   function
   | [] -> ([],[],[])
-  | TacticsArgs.Theory (Theory.App (i,[])) :: q -> let id,vs,rem = parse_indexes q in
+
+  | TacticsArgs.Theory (L.{ pl_desc = Theory.App (i,[]) } ) :: q ->
+    let i = L.unloc i in
+    let id,vs,rem = parse_indexes q in
     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
     Theory.ESubst (i, Term.Var var)::id
   , (Vars.EVar var)::vs, rem
@@ -1071,9 +1097,10 @@ let () =
            \nUsage: systemsubstitute new_sytem_name,i1,...,ik,\
            cond@T, newcond, output@T, newoutput, ... "
     (function
-      | TacticsArgs.Theory (App (system_name,[])) :: q  ->
+      | TacticsArgs.Theory (L.{ pl_desc = App (system_name,[]) } ) :: q  ->
         let subst_index, vs, subst_descr = parse_indexes q in
-
+        let system_name = L.unloc system_name in
+        
         fun s sk fk -> begin
             match system_subst system_name subst_index vs subst_descr s with
              | subgoals -> sk subgoals fk
@@ -1356,8 +1383,7 @@ let apply id (ths:Theory.term list) (s : TraceSequent.t) =
     Tactics.(soft_failure (Failure "incorrect number of arguments")) ;
   let subst =
     let table = TraceSequent.table s in
-    try Theory.parse_subst table (TraceSequent.get_env s) uvars ths with
-      | Theory.Conv e -> Tactics.(soft_failure (Cannot_convert e))
+    Theory.parse_subst table (TraceSequent.get_env s) uvars ths 
   in
   (* Formula with universal quantifications introduced. *)
   let f = Term.subst subst f in

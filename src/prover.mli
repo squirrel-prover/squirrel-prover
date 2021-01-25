@@ -34,10 +34,10 @@ type p_goal_name = P_unknown | P_named of string
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of
-      Theory.env *
-      [ `Message of Theory.term | `Formula of Theory.formula ] list
-  | P_equiv_goal_process of SystemExpr.p_single_system *
+  | P_equiv_goal of 
+      (Theory.lsymb * Sorts.esort) list * 
+      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
 (** Goal mode input types:
@@ -115,16 +115,9 @@ module type Tactics_sig = sig
 
   val register_typed :
     string ->  ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
-
-  (* Allows to register a tactic, which is a specific orelse over other
-     predefined tactics. It will try to apply the given tactics in the list, by
-     giving them the arguments provided to the first tactic. Used to define
-     polymorphic tactics, that will try to apply tactics of distinct types. *)
-  val register_orelse :
-    string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list -> string list -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
   val pp : bool -> Format.formatter -> string -> unit
@@ -205,7 +198,6 @@ val start_proof : unit -> string option
 (** {2 Error handling} *)
 
 type decl_error_i =
-  | Conv_error            of Theory.conversion_error
   | Multiple_declarations of string
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err

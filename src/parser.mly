@@ -20,9 +20,8 @@
 %token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY
 %token PROOF QED UNDO ABORT
 %token EOF
-%token EMPTY_ELSE
 
-%nonassoc EMPTY_ELSE
+%nonassoc empty_else
 
 %left XOR
 %left EXP
@@ -64,27 +63,43 @@
   }
 
 (* Terms *)
+lsymb:
+| id=loc(ID) { id }
+
+timestamp_i:
+| id=lsymb terms=term_list               { Theory.App (id, terms) }
+| PRED LPAREN ts=timestamp RPAREN        { Theory.Tpred ts }
+| INIT                                   { Theory.Tinit }
 
 timestamp:
-| id=ID terms=term_list             { Theory.App (id, terms) }
-| PRED LPAREN ts=timestamp RPAREN   { Theory.Tpred ts }
-| INIT                              { Theory.Tinit }
+| ts=loc(timestamp_i) { ts }
 
-term:
-| LPAREN t=term RPAREN                    { t }
-| id=ID terms=term_list                   { Theory.App (id, terms) }
-| id=ID terms=term_list AT ts=timestamp   { Theory.AppAt (id,terms,ts) }
-| LANGLE t=term COMMA t0=term RANGLE      { Theory.App ("pair", [t;t0]) }
-| t=term XOR t0=term                      { Theory.App ("xor",  [t;t0]) }
-| t=term EXP t0=term                      { Theory.App ("exp",  [t;t0])}
+term_i:
+| LPAREN t=term_i RPAREN                     { t }
+| id=lsymb terms=term_list                   { Theory.App (id, terms) }
+| id=lsymb terms=term_list AT ts=timestamp   { Theory.AppAt (id,terms,ts) }
+| LANGLE t=term COMMA t0=term RANGLE      
+    { let loc = Location.make $startpos $endpos in
+      let fsymb = Location.mk_loc loc "pair" in
+      Theory.App (fsymb, [t;t0]) }
+| t=term XOR t0=term                      
+    { let loc = Location.make $startpos $endpos in
+      let fsymb = Location.mk_loc loc "xor" in
+      Theory.App (fsymb,  [t;t0]) }
+| t=term EXP t0=term                      
+    { let loc = Location.make $startpos $endpos in
+      let fsymb = Location.mk_loc loc "exp" in
+      Theory.App (fsymb,  [t;t0])}
 | INIT                                    { Theory.Tinit }
 | IF b=formula THEN t=term t0=else_term   { Theory.ITE (b,t,t0) }
 | FIND is=indices SUCHTHAT b=formula IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }
 | PRED LPAREN t=term RPAREN               { Theory.Tpred t }
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
-| SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
+| SEQ LPAREN i=ids ARROW t=term RPAREN   { Theory.Seq (i,t) }
 
+term:
+| t=loc(term_i) { t }
 
 term_list:
 |                                    { [] }
@@ -96,8 +111,10 @@ tm_list:
 | COMMA tm=term tms=tm_list { tm::tms }
 
 else_term:
-| %prec EMPTY_ELSE               { Theory.App ("zero", []) }
-| ELSE t=term                    { t }
+| %prec empty_else   { let loc = Location.make $startpos $endpos in
+                       let fsymb = Location.mk_loc loc "zero" in
+                       Location.mk_loc loc (Theory.App (fsymb, [])) }
+| ELSE t=term        { t }
 
 (* Facts, aka booleans *)
 
@@ -121,36 +138,44 @@ arg_list:
 | is=ids COLON k=kind COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
 
 ids:
-| id=ID                             { [id] }
-| id=ID COMMA ids=ids               { id::ids }
+| id=lsymb                             { [id] }
+| id=lsymb COMMA ids=ids               { id::ids }
 
 top_formula:
 | f=formula EOF                    { f }
 
-formula:
-| LPAREN f=formula RPAREN                 { f }
+formula_i:
+| LPAREN f=formula_i RPAREN               { f }
 | f=formula AND f0=formula                { Theory.And (f,f0) }
 | f=formula OR f0=formula                 { Theory.Or (f,f0) }
 | f=formula DARROW f0=formula             { Theory.Impl (f,f0) }
-| f=formula DEQUIVARROW f0=formula        { Theory.And (Theory.Impl (f,f0), 
-                                                        Theory.Impl (f0,f)) }
 | NOT f=formula                           { Theory.Not (f) }
 | FALSE                                   { Theory.False }
 | TRUE                                    { Theory.True }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
-| pid=PID terms=term_list                 { Theory.App (pid, terms) }
-| pid=PID terms=term_list AT ts=timestamp { Theory.AppAt (pid, terms, ts) }
-| HAPPENS LPAREN ts=timestamp RPAREN      { Theory.Happens ts }
+| f=formula DEQUIVARROW f0=formula
+    { let loc = Location.make $startpos $endpos in      
+      Theory.And (Location.mk_loc loc (Theory.Impl (f,f0)), 
+                  Location.mk_loc loc (Theory.Impl (f0,f))) }
+
+| pid=loc(PID) terms=term_list   { Theory.App (pid, terms) }
+| pid=loc(PID) terms=term_list AT ts=timestamp
+                                 { Theory.AppAt (pid, terms, ts) }
+| HAPPENS LPAREN ts=timestamp RPAREN
+                                 { Theory.Happens ts }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Theory.Exists (vs,f)  }
 | FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Theory.ForAll (vs,f)  }
-| EXISTS id=ID COLON k=kind sep f=formula %prec QUANTIF
+| EXISTS id=lsymb COLON k=kind sep f=formula %prec QUANTIF
                                  { Theory.Exists ([id,k],f)  }
-| FORALL id=ID COLON k=kind sep f=formula %prec QUANTIF
+| FORALL id=lsymb COLON k=kind sep f=formula %prec QUANTIF
                                  { Theory.ForAll ([id,k],f)  }
 | DIFF LPAREN f=formula COMMA g=formula RPAREN 
                                  { Theory.Diff (f,g) }
+
+formula:
+| f=loc(formula_i) { f }
 
 sep:
 |       {()}
@@ -162,31 +187,29 @@ top_process:
 | p=process EOF                    { p }
 
 process_i:
-| NULL                          { Process.Null }
-| LPAREN ps=processes_i RPAREN  { ps }
-| id=ID terms=term_list         { Process.Apply (id,terms) }
-| id=ID COLON p=process         { Process.Alias (p,id) }
-| NEW id=ID SEMICOLON p=process { Process.New (id,p) }
-| IN LPAREN c=loc(ID) COMMA id=ID RPAREN p=process_cont
-                                { Process.In (c,id,p) }
-| OUT LPAREN c=loc(ID) COMMA t=term RPAREN p=process_cont
-                                { Process.Out (c,t,p) }
+| NULL                             { Process.Null }
+| LPAREN ps=processes_i RPAREN     { ps }
+| id=lsymb terms=term_list         { Process.Apply (id,terms) }
+| id=lsymb COLON p=process         { Process.Alias (p,id) }
+| NEW id=lsymb SEMICOLON p=process { Process.New (id,p) }
+| IN LPAREN c=lsymb COMMA id=lsymb RPAREN p=process_cont
+    { Process.In (c,id,p) }
+| OUT LPAREN c=lsymb COMMA t=term RPAREN p=process_cont
+    { Process.Out (c,t,p) }
 | IF f=formula THEN p=process p0=else_process
-                                { Process.Exists
-                                     ([],f,p,p0) }
+    { Process.Exists ([],f,p,p0) }
 | FIND is=indices SUCHTHAT f=formula IN p=process p0=else_process
-                                { Process.Exists
-                                     (is,f,p,p0) }
-| LET id=ID EQ t=term IN p=process
-                                { Process.Let (id,t,p) }
-| id=ID terms=term_list ASSIGN t=term p=process_cont
-                                { let to_idx = function
-                                     | Theory.App(x,[]) -> x
-                                     | t -> raise @@ Theory.Conv (Index_not_var t)
-                                   in
-                                   let l = List.map to_idx terms in
-                                   Process.Set (id,l,t,p) }
-| s=BANG p=process              { Process.Repl (s,p) }
+    { Process.Exists (is,f,p,p0) }
+| LET id=lsymb EQ t=term IN p=process
+    { Process.Let (id,t,p) }
+| id=lsymb terms=term_list ASSIGN t=term p=process_cont
+    { let to_idx t = match Location.unloc t with
+        | Theory.App(x,[]) -> x
+        | ti -> raise @@ Theory.Conv (Location.loc t, Theory.Index_not_var ti)
+      in
+      let l = List.map to_idx terms in
+      Process.Set (id,l,t,p) }
+| s=loc(BANG) p=process { Process.Repl (s,p) }
 
 process:
 | p=loc(process_i) { p }
@@ -201,13 +224,13 @@ process_cont:
 | SEMICOLON p=process            { p }
 
 else_process:
-| %prec EMPTY_ELSE               { let loc = Location.make $startpos $endpos in
+| %prec empty_else               { let loc = Location.make $startpos $endpos in
                                    Location.mk_loc loc Process.Null }
 | ELSE p=process                 { p }
 
 indices:
-| id=ID                          { [id] }
-| id=ID COMMA ids=indices        { id::ids }
+| id=lsymb                          { [id] }
+| id=lsymb COMMA ids=indices        { id::ids }
 
 opt_arg_list:
 | LPAREN args=arg_list RPAREN    { args }
@@ -244,7 +267,7 @@ declaration_i:
 | AENC e=ID COMMA d=ID COMMA p=ID
                           { Decl.Decl_aenc (e, d, p) }
 | SENC e=ID COMMA d=ID    { Decl.Decl_senc (e, d) }
-| SENC e=ID COMMA d=ID WITH h=ID
+| SENC e=ID COMMA d=ID WITH h=lsymb
                           { Decl.Decl_senc_w_join_hash (e, d, h) }
 | SIGNATURE s=ID COMMA c=ID COMMA p=ID
                           { Decl.Decl_sign (s, c, p, None) }
@@ -263,7 +286,7 @@ declaration_i:
 | CHANNEL e=ID            { Decl.Decl_channel e }
 | TERM e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
-| PROCESS e=ID args=opt_arg_list EQ p=process
+| PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
 | AXIOM s=bsystem f=formula
                           { Decl.(Decl_axiom { gname = None;

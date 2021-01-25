@@ -52,14 +52,14 @@ Proof.
   exists i, k1.
   assert (input@T(i,k1) = nR(j)).
   fresh M2.
-  depends R(j), R2(j).
+  by depends R(j), R2(j).
   euf M0.
   exists i, k.
   assert (input@T(i,k) = nR(j)).
   fresh M2.
-  depends R(j), R2(j).
+  by depends R(j), R2(j).
 
-  exists i,k.
+  by exists i,k.
 Qed.
 
 goal wa_R2:
@@ -74,7 +74,7 @@ Proof.
   expand cond@R2(j).
   split.
 
-  apply H0. exists i,k.
+  by apply H0; exists i,k.
   apply H0.
 
   project.
@@ -82,12 +82,12 @@ Proof.
   exists i, k1.
   assert (input@T(i,k1) = nR(j)).
   fresh M2.
-  depends R(j), R1(j).
+  by depends R(j), R1(j).
   euf M0.
   exists i, k.
   assert (input@T(i,k) = nR(j)).
   fresh M2.
-  depends R(j), R1(j).
+  by depends R(j), R1(j).
 Qed.
 
 equiv unlinkability.
@@ -100,8 +100,8 @@ Proof.
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
   repeat split.
-  depends R(j1), R1(j1).
-  depends R(j1), R2(j1).
+  by depends R(j1), R1(j1).
+  by depends R(j1), R2(j1).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -113,8 +113,8 @@ Proof.
       snd(output@T(i,k)) = snd(input@R1(j)) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       input@T(i,k) = output@R(j)).
-  apply wa_R1 to j.
-  fadup 1.
+  by apply wa_R1 to j.
+  by fadup 1.
 
   (* Case R2 *)
   expand frame@R2(j); expand exec@R2(j).
@@ -126,8 +126,8 @@ Proof.
       snd(output@T(i,k)) = snd(input@R2(j)) &&
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j))).
-  apply wa_R2 to j.
-  fadup 1.
+  by apply wa_R2 to j.
+  by fadup 1.
 
   (* Case T *)
   expand frame@T(i,k); expand exec@T(i,k).
@@ -136,11 +136,11 @@ Proof.
   prf 2. yesif 2.
   project.
   split. 
-  assert nT(i,k) = fst(input@R2(j)). fresh M1. 
-  assert nT(i,k) = fst(input@R1(j)). fresh M1.
+  assert nT(i,k) = fst(input@R2(j)). by fresh M1. 
+  assert nT(i,k) = fst(input@R1(j)). by fresh M1.
   split.
-  assert nT(i,k) = fst(input@R1(j)). fresh M1. 
-  assert nT(i,k) = fst(input@R2(j)). fresh M1.
+  assert nT(i,k) = fst(input@R1(j)). by fresh M1. 
+  assert nT(i,k) = fst(input@R2(j)). by fresh M1.
   fresh 2.
-  fresh 1. yesif 1.
+  by fresh 1; yesif 1.
 Qed.

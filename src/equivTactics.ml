@@ -4,6 +4,7 @@ type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
 
+(*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
 exception Out_of_range
@@ -18,6 +19,7 @@ let nth i l =
     | e::tl -> if i=0 then acc,e,tl else aux (i-1) (e::acc) tl
   in aux i [] l
 
+(*------------------------------------------------------------------*)
 (** {2 Tactics} *)
 
 (** Wrap a tactic expecting an equivalence goal (and returning arbitrary
@@ -51,6 +53,7 @@ let pure_equiv_typed t arg s =
  List.map (fun s -> Prover.Goal.Equiv s) res
 
 
+(*------------------------------------------------------------------*)
 (* Admit tactic *)
 let () =
   T.register_general "admit"
@@ -68,6 +71,7 @@ let () =
            end
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
 
+(*------------------------------------------------------------------*)
 (** Automatic simplification *)
 let simpl =
   Tactics.(
@@ -84,6 +88,7 @@ let () =
     ~general_help:"Automatically simplify the goal.\n Usage: simpl."
     simpl
 
+(*------------------------------------------------------------------*)
 exception NoReflMacros
 
 class exist_macros ~(system:SystemExpr.system_expr) table = object (self)
@@ -120,7 +125,7 @@ let () =
     ~general_help:"Closes a reflexive goal.\n Usage: refl."
     (only_equiv refl)
 
-
+(*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
 let assumption s =
@@ -136,7 +141,7 @@ let () =
     ~general_help:"Close a goal contained in its hypothesis.\n Usage: assump."
     (only_equiv assumption)
 
-
+(*------------------------------------------------------------------*)
 (** Given a judgement [s] of the form H0 => E, where E is the conclusion
    biframe, and a timestamp [ts] wich does not occur inside the hypothesis
    H0, produce the judgments H0 => E{ts -> init} and E{ts->pred ts} => E.
@@ -215,23 +220,28 @@ let () =
            (Tactics.Failure "improper arguments"))
 *)
 
-let enrich_bool TacticsArgs.(Boolean f) s =
-  [EquivSequent.set_biframe s (EquivSequent.Formula f :: EquivSequent.get_biframe s)]
+(*------------------------------------------------------------------*)
+let enrich arg s = match arg with
+  | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
+    [ EquivSequent.set_biframe s (EquivSequent.Formula f ::
+                                  EquivSequent.get_biframe s) ]
 
-let enrich_mess TacticsArgs.(Message t) s =
-  [EquivSequent.set_biframe s (EquivSequent.Message t :: EquivSequent.get_biframe s)]
+  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+    [ EquivSequent.set_biframe s (EquivSequent.Message f ::
+                                  EquivSequent.get_biframe s) ]
 
-let () = T.register_typed  "enrich_bool"
-    (pure_equiv_typed enrich_bool) TacticsArgs.Boolean
+  | TacticsArgs.ETerm (Sorts.Index, _, loc)
+  | TacticsArgs.ETerm (Sorts.Timestamp, _, loc) ->
+    Tactics.hard_failure
+      (Tactics.Failure "expected a message or boolean term")
 
-let () = T.register_typed  "enrich_mess"
-    (pure_equiv_typed enrich_mess) TacticsArgs.Message
-
-let () = T.register_orelse "enrich"
+let () = T.register_typed "enrich"
     ~general_help:"Enrich the goal with the given term.\
-           \n Usage: enrich t."
-    ["enrich_bool"; "enrich_mess"]
+                   \n Usage: enrich t."
+    ~usages_sorts:[Sort TacticsArgs.Message; Sort TacticsArgs.Boolean]
+    (pure_equiv_typed enrich) TacticsArgs.ETerm
 
+(*------------------------------------------------------------------*)
 (** Function application *)
 
 exception No_common_head
@@ -311,6 +321,7 @@ let () =
            \n Usage: fa i."
     (pure_equiv_typed fa) TacticsArgs.Int
 
+(*------------------------------------------------------------------*)
 (** Check if an element appears twice in the biframe,
   * or if it is [input@t] with some [frame@t'] appearing in the frame
   * with [pred(t) <= t'] guaranteed,
@@ -529,6 +540,7 @@ let () =
           \n Usages: fadup. fadup i."
    (pure_equiv_typed fadup) TacticsArgs.(Opt Int)
 
+(*------------------------------------------------------------------*)
 (** Fresh *)
 
 exception Name_found
@@ -755,7 +767,8 @@ let () =
     ~general_help:"Removes a name if fresh.\n Usage: fresh i."
     (pure_equiv_typed fresh) TacticsArgs.Int
 
-(* PRF axiom *)
+(*------------------------------------------------------------------*)
+(** PRF axiom *)
 
 exception Not_hash
 
@@ -1063,6 +1076,7 @@ let () =
     ~general_help:"Apply the PRF axiom.\n Usage: prf i."
     (pure_equiv_typed prf) TacticsArgs.Int
 
+(*------------------------------------------------------------------*)
 (** Symmetric encryption **)
 
 class check_symenc_key ~system table enc_fn dec_fn key_n = object (self)
@@ -1352,6 +1366,7 @@ let () =
           \n Usage: cca1 i."
    (only_equiv_typed cca1) TacticsArgs.Int
 
+(*------------------------------------------------------------------*)
 (** Encryption key privacy  *)
 
 let enckp
@@ -1512,6 +1527,7 @@ let () =
    (only_equiv_typed enckp)
    TacticsArgs.(Pair (Int, Pair (Opt Message,Opt Message)))
 
+(*------------------------------------------------------------------*)
 (** XOR *)
 
 exception Not_xor
@@ -1641,6 +1657,7 @@ let () =
           \n Usage giving the fresh name: xor i, n(i0,...,ik)."
    (pure_equiv_typed xor) TacticsArgs.(Pair (Int, Opt Message))
 
+(*------------------------------------------------------------------*)  
 (* Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let env = EquivSequent.get_env s in
@@ -1670,10 +1687,8 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
         (EquivSequent.set_hypothesis_biframe s hypo_biframe)
         biframe]
   | _ ->
-    Tactics.soft_failure
+    Tactics.hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
-  | exception Theory.(Conv e) ->
-    Tactics.soft_failure (Cannot_convert e)
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) =
@@ -1699,7 +1714,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
-    | exception Theory.(Conv (Type_error _)) ->
+    | exception Theory.(Conv (_,Type_error _)) ->
       begin
         match Theory.convert conv_env tsubst term Sorts.Message with
         | Macro ((mn, sort, is),l,a) ->
@@ -1710,11 +1725,12 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
           else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | _ ->
           Tactics.soft_failure (Tactics.Failure "can only expand macros")
-        | exception Theory.(Conv e) ->
-          Tactics.soft_failure (Cannot_convert e)
+          (* TODO: cleanup  *)
+        (* | exception Theory.(Conv e) ->
+         *   Tactics.soft_failure (Cannot_convert e) *)
       end
-    | exception Theory.(Conv e) ->
-      Tactics.soft_failure (Cannot_convert e)
+    (* | exception Theory.(Conv e) ->
+     *   Tactics.soft_failure (Cannot_convert e) *)
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"
@@ -1744,6 +1760,7 @@ let () = T.register_general "expand"
          Tactics.hard_failure
            (Tactics.Failure "improper arguments"))
 
+(*------------------------------------------------------------------*)
 (** Expands all macro occurrences inside the biframe, if the macro is not at
   * some pred(A) but about at a concrete action.
   * Acts recursively, also expanding the macros inside macro definition. *)
@@ -1796,11 +1813,11 @@ let () = T.register "expandall"
            \n Usage: expandall."
          (pure_equiv_typed expand_all ())
 
-
+(*------------------------------------------------------------------*)
 (** Replace all occurrences of [t1] by [t2] inside of [s],
   * and add a subgoal to prove that [t1 <=> t2]. *)
-let equiv_formula TacticsArgs.(Pair (Boolean f1, Boolean f2)) (s : EquivSequent.t) =
-  let env = EquivSequent.get_env s in
+let equiv_formula f1 f2 (s : EquivSequent.t) =
+  let env    = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
   let table  = EquivSequent.get_table s in
     (* goal for the equivalence of t1 and t2 *)
@@ -1818,10 +1835,10 @@ let equiv_formula TacticsArgs.(Pair (Boolean f1, Boolean f2)) (s : EquivSequent.
 
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
-let equiv_message TacticsArgs.(Pair (Message m1, Message m2)) (s : EquivSequent.t) =
-  let env = EquivSequent.get_env s in
+let equiv_message m1 m2 (s : EquivSequent.t) =
+  let env    = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
-  let table = EquivSequent.get_table s in
+  let table  = EquivSequent.get_table s in
     (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
       TraceSequent.init ~system table
@@ -1833,20 +1850,37 @@ let equiv_message TacticsArgs.(Pair (Message m1, Message m2)) (s : EquivSequent.
         Prover.Goal.Equiv
           (EquivSequent.apply_subst [Term.ESubst (m1,m2)] s) ]
     in
-    subgoals
+    subgoals 
 
-let () = T.register_typed "equiv_mess" (only_equiv_typed equiv_message)
-    TacticsArgs.(Pair (Message, Message))
 
-let () = T.register_typed "equiv_formula" (only_equiv_typed equiv_formula)
-    TacticsArgs.(Pair (Boolean, Boolean))
+let equivalent arg s = match arg with
+  | TacticsArgs.Pair (t1,t2) ->
+    match t1, t2 with
+      | TacticsArgs.ETerm (Sorts.Boolean, f1, _),
+        TacticsArgs.ETerm (Sorts.Boolean, f2, _) ->
+        equiv_formula f1 f2 s
 
-let () = T.register_orelse "equivalent"
-  ~general_help:"Replace all occurrences of a formula by another, and ask to prove \
-         \n that they are equivalent.
-         \n Usage: equiv t1, t2."
-  ["equiv_formula"; "equiv_mess"]
+      | TacticsArgs.ETerm (Sorts.Message, f1, _),
+        TacticsArgs.ETerm (Sorts.Message, f2, _) ->
+        equiv_message f1 f2 s
 
+      | TacticsArgs.ETerm (_, _, _),
+        TacticsArgs.ETerm (_, _, _)  ->
+        (* TODO: improve error message + add locations *)        
+        Tactics.hard_failure
+          (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
+
+let () = T.register_typed "equivalent"
+    ~general_help:"Replace all occurrences of a formula by another, and ask to \
+                   prove\
+                   \n that they are equivalent."
+    ~usages_sorts:[TacticsArgs.(Sort (Pair (Message, Message)));
+                   TacticsArgs.(Sort (Pair (Boolean, Boolean)))]
+    (only_equiv_typed equivalent)
+    TacticsArgs.(Pair (ETerm, ETerm))
+
+
+(*------------------------------------------------------------------*)
 let simplify_ite b env system table cond positive_branch negative_branch =
   if b then
     (* replace in the biframe the ite by its positive branch *)
@@ -1930,6 +1964,7 @@ let () =
           \n Usage: yesif i."
    (only_equiv_typed (yes_no_if true)) TacticsArgs.Int
 
+(*------------------------------------------------------------------*)
 exception Not_ifcond
 
 (* Push the formula [f] in the message [term].
@@ -2024,6 +2059,8 @@ let () =
             \n Usage: ifcond i,f. ifcond i,j,f."
    (only_equiv_typed ifcond) TacticsArgs.(Pair (Int, Pair( Opt Int, Boolean)))
 
+
+(*------------------------------------------------------------------*)
 let trivial_if (TacticsArgs.Int i) s =
   let env = EquivSequent.get_env s in
   let system = EquivSequent.get_system s in
@@ -2061,6 +2098,8 @@ let () =
           \n Usage: trivialif i."
    (only_equiv_typed trivial_if) TacticsArgs.Int
 
+
+(*------------------------------------------------------------------*)
 (* allows to replace inside the positive branch of an if then else a term by
    another, if the condition implies there equality. *)
 let ifeq
@@ -2101,6 +2140,7 @@ let () = T.register_typed "ifeq"
     (only_equiv_typed ifeq) TacticsArgs.(Pair (Int, Pair (Message, Message)))
 
 
+(*------------------------------------------------------------------*)
 exception Not_context
 
 class ddh_context ~(system:SystemExpr.system_expr) table exact a b c = object (self)

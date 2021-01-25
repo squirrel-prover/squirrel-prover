@@ -5,8 +5,9 @@ module L = Location
 
 (*------------------------------------------------------------------*)
 type decl_error_i =
-  | Conv_error            of Theory.conversion_error
   | Multiple_declarations of string
+
+  (* TODO: remove these errors, catch directly at top-level *)
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err
 
@@ -15,7 +16,6 @@ type dkind = KDecl | KGoal
 type decl_error =  L.t * dkind * decl_error_i
 
 let pp_decl_error_i fmt = function
-  | Conv_error e -> Theory.pp_error fmt e
   | Multiple_declarations s ->
     Fmt.pf fmt
       "@[Multiple declarations of the symbol: %s.@]@." s
@@ -39,7 +39,6 @@ let decl_error loc k e = raise (Decl_error (loc,k,e))
 let error_handler loc k f a =
   let decl_error = decl_error loc k in
   try f a with
-  | Theory.Conv e -> decl_error (Conv_error e)
   | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
   | System.SystemError e -> decl_error (SystemError e)
   | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
@@ -78,10 +77,10 @@ type p_goal_name = P_unknown | P_named of string
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of
-      Theory.env *
-      [ `Message of Theory.term | `Formula of Theory.formula ] list
-  | P_equiv_goal_process of SystemExpr.p_single_system *
+  | P_equiv_goal of 
+      (Theory.lsymb * Sorts.esort) list * 
+      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
 type gm_input_i =
@@ -313,9 +312,11 @@ module type Tactics_sig = sig
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
 
-  val register_orelse :
-    string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list -> string list -> unit
+  val register_typed :
+    string ->  ?general_help:string ->  ?detailed_help:string ->
+    ?usages_sorts : TacticsArgs.esort list ->
+    ('a TacticsArgs.arg -> judgment -> judgment list) ->
+    'a TacticsArgs.sort  -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
 
@@ -336,67 +337,22 @@ struct
 
   type tac = judgment Tactics.tac
 
-  let register_general id ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) f =
+  let register_general id
+      ?(general_help="")
+      ?(detailed_help="")
+      ?(usages_sorts=[]) f =
     assert (not (Hashtbl.mem table id)) ;
-    Hashtbl.add table id { maker = f ; help = {general_help; detailed_help; usages_sorts} }
+    Hashtbl.add table id { maker = f ;
+                           help = {general_help; detailed_help; usages_sorts} }
 
-  let convert_args table parser_args tactic_type j =
-    let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
-
-    let rec conv_args parser_args tactic_type j =
-      let env =
-        match M.to_goal j with
-        | Goal.Trace t -> TraceSequent.get_env t
-        | Goal.Equiv e -> EquivSequent.get_env e
-      in
-      let tsubst = Theory.subst_of_env env in
-      let open TacticsArgs in
-      match parser_args, tactic_type with
-      | [Theory p], Sort Timestamp ->
-        Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
-      | [Theory p], Sort Message ->
-        Arg (Message   (Theory.convert conv_cntxt tsubst p Sorts.Message))
-      | [Theory p], Sort Boolean ->
-        Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
-      | [Theory (App (p,[]))], Sort String ->
-        Arg (String p)
-      | [Int_parsed i], Sort Int ->
-        Arg (Int i)
-      | [Theory t], Sort String -> raise Theory.(Conv (String_expected t))
-      | [Theory t], Sort Int -> raise Theory.(Conv (Int_expected t))
-      | [Theory (App (p,[]))], Sort Index ->
-        Arg (Index (Theory.convert_index table tsubst (Theory.var p)))
-      | th1::q, Sort (Pair (Opt s1, s2)) ->
-        begin match conv_args [th1] (Sort (Opt s1)) j with
-          | Arg arg1 ->
-            let Arg arg2 = conv_args q (Sort s2) j in
-            Arg (Pair (arg1, arg2))
-          | exception Theory.(Conv _) ->
-            let Arg arg2 = conv_args (th1::q) (Sort s2) j in
-            Arg (Pair (Opt (s1, None), arg2))
-        end
-      | th1::q, Sort (Pair (s1, s2)) ->
-        let Arg arg1 = conv_args [th1] (Sort s1) j in
-        let Arg arg2 = conv_args q (Sort s2) j in
-        Arg (Pair (arg1, arg2))
-      | [], Sort (Opt a) ->
-        Arg (Opt (a, None))
-      | [], Sort (Pair (Opt a, b)) ->
-        let Arg arg2 = conv_args [] (Sort b) j in
-        Arg (Pair (Opt (a, None), arg2))
-      | [th], Sort (Opt a) ->
-        let Arg arg = conv_args [th] (Sort a) j in
-        Arg (Opt
-               (a,
-                (Some (cast a arg))
-               )
-            )
-      | [], _ -> raise Theory.(Conv (Tactic_type "more arguments expected"))
-      | p, _ -> raise Theory.(Conv (Tactic_type "too many arguments"))
-
+  let convert_args table j parser_args tactic_type =
+    let env =
+      match M.to_goal j with
+      | Goal.Trace t -> TraceSequent.get_env t
+      | Goal.Equiv e -> EquivSequent.get_env e
     in
-    conv_args parser_args tactic_type j
-
+    TacticsArgs.convert_args table env parser_args tactic_type 
+  
   let register id ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) f =
     register_general id ~general_help ~detailed_help ~usages_sorts
       (function
@@ -411,38 +367,33 @@ struct
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
 
-  let register_typed id  ?(general_help="")  ?(detailed_help="")  f sort =
-    register_general id ~general_help ~detailed_help ~usages_sorts:[TacticsArgs.Sort sort]
-      (fun args s sk fk ->
-         let table = Goal.get_table (M.to_goal s) in
-         match convert_args table args (TacticsArgs.Sort sort) s with
-         | TacticsArgs.Arg (th)  ->
-           begin
-             try
-               let th = TacticsArgs.cast sort th in
-               begin
-                 match f (th) s with
-                 | subgoals -> sk subgoals fk
-                 | exception Tactics.Tactic_soft_failure e -> fk e
-                 | exception System.SystemError e ->
-                   Tactics.hard_failure (Tactics.SystemError e)
-                 | exception SystemExpr.BiSystemError e ->
-                   Tactics.hard_failure (Tactics.SystemExprError e)
-               end
-             with TacticsArgs.Uncastable ->
-               Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
-           end
-         | exception Theory.(Conv e) -> fk (Tactics.Cannot_convert e)
-      )
-
-  let register_orelse id  ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) ids =
+  let register_typed id
+      ?(general_help="") ?(detailed_help="") ?(usages_sorts)
+      f sort =
+    let usages_sorts = match usages_sorts with
+      | None -> [TacticsArgs.Sort sort]
+      | Some u -> u in
+    
     register_general id
       ~general_help ~detailed_help ~usages_sorts
-      (fun args s sk fk -> AST.eval ["nosimpl"]
-          (Tactics.OrElse
-             (List.map (fun id -> Tactics.Abstract (id,args) ) ids)
-          )
-          s sk fk)
+      (fun args s sk fk ->
+         let table = Goal.get_table (M.to_goal s) in
+         match convert_args table s args (TacticsArgs.Sort sort) with
+         | TacticsArgs.Arg (th)  ->
+           try
+             let th = TacticsArgs.cast sort th in
+             begin
+               match f (th) s with
+               | subgoals -> sk subgoals fk
+               | exception Tactics.Tactic_soft_failure e -> fk e
+               | exception System.SystemError e ->
+                 Tactics.hard_failure (Tactics.SystemError e)
+               | exception SystemExpr.BiSystemError e ->
+                 Tactics.hard_failure (Tactics.SystemExprError e)
+             end
+           with TacticsArgs.Uncastable ->
+             Tactics.hard_failure (Tactics.Failure "ill-formed arguments") 
+      )
 
   let register_macro id ?(modifiers=["nosimpl"])  ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) m =
     register_general id ~general_help ~detailed_help ~usages_sorts
@@ -605,7 +556,9 @@ let declare_new_goal_i table (gname,g) =
       let system_symb =
         System.of_string SystemExpr.default_system_name table
       in
+      let env = List.map (fun (x,y) -> L.unloc x, y) env in
       make_equiv_goal ~table system_symb env l
+        
     | P_equiv_goal_process (a,b) ->
       let a = SystemExpr.parse_single table a
       and b = SystemExpr.parse_single table b in
@@ -723,7 +676,9 @@ let current_goal () = !current_goal
 
 let declare_i table = function
   | Decl.Decl_channel s            -> Channel.declare table s
-  | Decl.Decl_process (id,pkind,p) -> Process.declare table id pkind p
+  | Decl.Decl_process (id,pkind,p) ->
+    let pkind = List.map (fun (x,y) -> L.unloc x, y) pkind in
+    Process.declare table id pkind p
 
   | Decl.Decl_axiom (gdecl) ->
     let name = match gdecl.gname with
@@ -750,7 +705,10 @@ let declare_i table = function
   | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
   | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
   | Decl.Decl_state (s, a, k)       -> Theory.declare_state table s a k
-  | Decl.Decl_macro (s, args, k, t) -> Theory.declare_macro table s args k t
+  | Decl.Decl_macro (s, args, k, t) ->
+    let args = List.map (fun (x,y) -> L.unloc x, y) args in
+    Theory.declare_macro table s args k t
+      
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h
   | Decl.Decl_sign (sign, checksign, pk, tagi) ->

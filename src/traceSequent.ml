@@ -42,6 +42,8 @@ module H : sig
 
   val mem : 'b -> ('a, 'b) hypotheses -> bool
 
+  val mem_id : string -> ('a, 'b) hypotheses -> bool
+
   val find : string -> ('a, 'b) hypotheses -> ('a, 'b) hypothesis
 
   val map :  ( ('a, 'b) hypothesis ->  ('a, 'b) hypothesis)
@@ -160,7 +162,7 @@ end = struct
     M.exists (fun _ hs_list ->
         List.exists (fun hypo -> hypo.hypothesis = f) hs_list)
       hs
-  
+
   let find name hs =
     let rec aux id hs =
       match hs with
@@ -170,6 +172,12 @@ end = struct
     let name_prefix,_ = get_name_prefix name in
     let hs_list = M.find name_prefix hs in
     aux 0 (List.rev (get_visible hs_list))
+
+  let mem_id name hs =
+    try
+      let _ : ('a,'b) hypothesis = find name hs in
+      true
+    with Not_found -> false
   
   let map f hs =
     M.map (fun h -> List.map f h) hs
@@ -371,6 +379,11 @@ let is_hypothesis f s =
 
 let get_trace_atoms s=
     List.map (fun h -> h.H.hypothesis) (H.to_list s.trace_hypotheses)
+
+let mem_hypothesis id s = 
+  H.mem_id id s.formula_hypotheses ||
+  H.mem_id id s.trace_hypotheses   ||
+  H.mem_id id s.message_hypotheses
 
 let get_hypothesis id s =
   try (H.find id s.formula_hypotheses).H.hypothesis with Not_found ->

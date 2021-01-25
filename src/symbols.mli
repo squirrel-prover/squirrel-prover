@@ -125,6 +125,10 @@ type wrapped = Wrapped : 'a t * 'a def -> wrapped
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val of_string : ?group:group -> string -> table -> wrapped
 
+(** [of_string_opt s] is the same as [of_string_opt s], but return [None] 
+    if [s] is not defined. *)
+val of_string_opt : ?group:group -> string -> table -> wrapped option
+
 (** {2 Namespaces} *)
 
 (** Signature for namespaces. *)

@@ -1,10 +1,12 @@
 (** Syntax of declarations parsed by the prover. The processing of the
     declarations is done later, in the Prover module. *)
 
+type lsymb = Theory.lsymb
+               
 (** { 1 Declarations } *)
 
 (** Information for a macro declaration *)
-type macro_decl = string * (string * Sorts.esort) list * Sorts.esort * Theory.term 
+type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term 
 
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
@@ -40,14 +42,14 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 (** Declarations *)
 type declaration_i =
   | Decl_channel of string
-  | Decl_process of Process.id * Process.pkind * Process.process
+  | Decl_process of lsymb * (lsymb * Sorts.esort) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
   | Decl_hash             of int option * string * orcl_tag_info option
   | Decl_aenc             of string * string * string
   | Decl_senc             of string * string                 
-  | Decl_senc_w_join_hash of string * string * string
+  | Decl_senc_w_join_hash of string * string * lsymb
   | Decl_sign             of string * string * string * orcl_tag_info option
   | Decl_name             of string * int 
   | Decl_state            of string * int * Sorts.esort

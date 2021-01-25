@@ -31,7 +31,6 @@ type tac_error =
   | More
   | Failure of string
   | AndThen_Failure of tac_error
-  | Cannot_convert of Theory.conversion_error
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
