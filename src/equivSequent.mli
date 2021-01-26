@@ -14,11 +14,11 @@ val pp : Format.formatter -> t -> unit
 
 val pp_init : Format.formatter -> t -> unit
 
-val get_env : t -> Vars.env
+val env : t -> Vars.env
 val set_env : Vars.env -> t -> t
 
-val get_system : t -> SystemExpr.system_expr
-val get_table  : t -> Symbols.table
+val system : t -> SystemExpr.system_expr
+val table  : t -> Symbols.table
 
 val set_table  : t -> Symbols.table -> t
 

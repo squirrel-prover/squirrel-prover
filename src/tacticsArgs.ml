@@ -1,11 +1,16 @@
 module L = Location
 
-
+type intro_arg =
+  | IA_Star
+  | IA_Unnamed of Location.t
+  | IA_Named   of Theory.lsymb
+    
 (*------------------------------------------------------------------*)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
+  | IntroArgs   of intro_arg list
 
 type ('a, 'b) pair
 

@@ -39,6 +39,8 @@ rule token = parse
 | '.'                 { DOT }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
+| '*'                 { STAR }
+| '_'                 { UNDERSCORE }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }
@@ -75,6 +77,7 @@ rule token = parse
 | "aenc"              { AENC }
 | "senc"              { SENC }
 | "signature"         { SIGNATURE }
+| "intro"             { INTRO }
 | "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }

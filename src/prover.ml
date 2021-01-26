@@ -47,18 +47,18 @@ let error_handler loc k f a =
 module Goal = struct
   type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   let get_env = function
-    | Trace j -> TraceSequent.get_env j
-    | Equiv j -> EquivSequent.get_env j
+    | Trace j -> TraceSequent.env j
+    | Equiv j -> EquivSequent.env j
   let get_table = function
     | Trace j -> TraceSequent.table j
-    | Equiv j -> EquivSequent.get_table j
+    | Equiv j -> EquivSequent.table j
   let pp ch = function
     | Trace j -> TraceSequent.pp ch j
     | Equiv j -> EquivSequent.pp ch j
   let pp_init ch = function
     | Trace j ->
-        assert (TraceSequent.get_env j = Vars.empty_env) ;
-        Term.pp ch (TraceSequent.get_conclusion j)
+        assert (TraceSequent.env j = Vars.empty_env) ;
+        Term.pp ch (TraceSequent.conclusion j)
     | Equiv j -> EquivSequent.pp_init ch j
 end
 
@@ -348,8 +348,8 @@ struct
   let convert_args table j parser_args tactic_type =
     let env =
       match M.to_goal j with
-      | Goal.Trace t -> TraceSequent.get_env t
-      | Goal.Equiv e -> EquivSequent.get_env e
+      | Goal.Trace t -> TraceSequent.env t
+      | Goal.Equiv e -> EquivSequent.env e
     in
     TacticsArgs.convert_args table env parser_args tactic_type 
   
@@ -487,8 +487,8 @@ let get_goal_formula gname =
     List.filter (fun (name,_) -> name = gname) !goals_proved
   with
     | [(_,Goal.Trace f)] ->
-        assert (TraceSequent.get_env f = Vars.empty_env) ;
-        TraceSequent.get_conclusion f, TraceSequent.system f
+        assert (TraceSequent.env f = Vars.empty_env) ;
+        TraceSequent.conclusion f, TraceSequent.system f
     | [] -> raise @@ Tactics.Tactic_hard_failure
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false

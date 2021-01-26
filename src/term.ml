@@ -50,18 +50,18 @@ type generic_atom = [
   | `Happens of Sorts.timestamp term
 ]
 and _ term =
-  | Fun : fsymb *  Sorts.message term list -> Sorts.message term
-  | Name : nsymb -> Sorts.message term
-  | Macro :
+  | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
+  | Name   : nsymb -> Sorts.message term
+  | Macro  :
       'a msymb * Sorts.message term list * Sorts.timestamp term ->
       'a term
-  | Seq : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred : Sorts.timestamp term -> Sorts.timestamp term
+  | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
+  | Pred   : Sorts.timestamp term -> Sorts.timestamp term
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
       Sorts.timestamp term
-  | Init : Sorts.timestamp term
-  | Var : 'a Vars.var -> 'a term
+  | Init   : Sorts.timestamp term
+  | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
 
@@ -75,15 +75,14 @@ and _ term =
 
   | Atom : generic_atom -> Sorts.boolean term
 
-
   | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
   | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | And : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Or : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Not : Sorts.boolean term  -> Sorts.boolean term
-  | Impl : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | True : Sorts.boolean term
-  | False : Sorts.boolean term
+  | And    : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Or     : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Not    : Sorts.boolean term -> Sorts.boolean term
+  | Impl   : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | True   : Sorts.boolean term
+  | False  : Sorts.boolean term
 
 type 'a t = 'a term
 

@@ -107,8 +107,8 @@ end
 let refl (s : EquivSequent.t) =
   let iter =
     new exist_macros
-      ~system:(EquivSequent.get_system s)
-      (EquivSequent.get_table s) in
+      ~system:(EquivSequent.system s)
+      (EquivSequent.table s) in
   try
     (* we check that the frame does not contain macro *)
     List.iter iter#visit_term (EquivSequent.get_biframe s);
@@ -151,7 +151,7 @@ let () =
    subgoals, but equivalence sequents currently support at most one
    hypothesis. *)
 let induction TacticsArgs.(Timestamp ts) s =
-  let env = EquivSequent.get_env s in
+  let env = EquivSequent.env s in
   match ts with
   | Var t as ts ->
     (* Check that variable does not occur in the premise. *)
@@ -167,8 +167,8 @@ let induction TacticsArgs.(Timestamp ts) s =
         (Tactics.Failure "Variable should not occur in the premise");
     (* Remove ts from the sequent, as it will become unused. *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
-    let table  = EquivSequent.get_table s in
-    let system = EquivSequent.get_system s in
+    let table  = EquivSequent.table s in
+    let system = EquivSequent.system s in
     let subst = [Term.ESubst (ts, Pred ts)] in
     let goal = EquivSequent.get_biframe s in
     let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
@@ -181,7 +181,7 @@ let induction TacticsArgs.(Timestamp ts) s =
     (** [add_action _action descr] adds to goals the goal corresponding to the
       * case where [t] is instantiated by [descr]. *)
     let add_action descr =
-      let env = ref @@ EquivSequent.get_env induc_goal in
+      let env = ref @@ EquivSequent.env induc_goal in
       let subst =
         List.map
           (fun i ->
@@ -288,7 +288,7 @@ let fa TacticsArgs.(Int i) s =
           (* Special case for try find, otherwise we use fa_expand *)
           match e with
           | EquivSequent.Message Find (vars,c,t,e) ->
-            let env = ref (EquivSequent.get_env s) in
+            let env = ref (EquivSequent.env s) in
             let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
             let subst =
               List.map2
@@ -390,7 +390,7 @@ let rec filter_fa_dup table res assump elems =
    assumptions, or elements that contain a subterm which is neither a duplicate
    nor an assumption. *)
 let fa_dup s =
-  let table = EquivSequent.get_table s in
+  let table = EquivSequent.table s in
   let biframe = EquivSequent.get_biframe s
                 |> List.rev
                 |> filter_fa_dup table [] (EquivSequent.get_hypothesis_biframe s)
@@ -470,8 +470,8 @@ let fa_dup_int i s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
       let biframe_without_e = List.rev_append before after in
-      let system = EquivSequent.get_system s in
-      let table  = EquivSequent.get_table s in
+      let system = EquivSequent.system s in
+      let table  = EquivSequent.table s in
       begin try
         (* we expect that e is of the form exec@pred(tau) && phi *)
         let (tau,phi) =
@@ -748,9 +748,9 @@ let fresh TacticsArgs.(Int i) s =
     | before, e, after ->
         (* the biframe to consider when checking the freshness *)
         let biframe = List.rev_append before after in
-        let system = EquivSequent.get_system s in
-        let table  = EquivSequent.get_table s in
-        let env    = EquivSequent.get_env s in
+        let system = EquivSequent.system s in
+        let table  = EquivSequent.table s in
+        let env    = EquivSequent.env s in
         begin match mk_if_term system table env e biframe with
         | if_term ->
           let biframe = List.rev_append before (if_term::after) in
@@ -1009,9 +1009,9 @@ let prf TacticsArgs.(Int i) s =
   match nth i (EquivSequent.get_biframe s) with
     | before, e, after ->
       let biframe = List.rev_append before after in
-      let system = (EquivSequent.get_system s) in
-      let table = EquivSequent.get_table s in
-      let env = EquivSequent.get_env s in
+      let system = (EquivSequent.system s) in
+      let table = EquivSequent.table s in
+      let env = EquivSequent.env s in
       let e = match e with
         | EquivSequent.Message m ->
           EquivSequent.Message (Term.head_normal_biterm m)
@@ -1208,9 +1208,9 @@ let cca1 TacticsArgs.(Int i) s =
   match nth i (EquivSequent.get_biframe s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let system = (EquivSequent.get_system s) in
-    let table = EquivSequent.get_table s in
-    let env = EquivSequent.get_env s in
+    let system = (EquivSequent.system s) in
+    let table = EquivSequent.table s in
+    let env = EquivSequent.env s in
     let e = match e with
       | EquivSequent.Message m ->
         EquivSequent.Message (Term.head_normal_biterm m)
@@ -1377,9 +1377,9 @@ let enckp
     Tactics.soft_failure (Tactics.Failure "Out of range position")
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let table = EquivSequent.get_table s in
-    let system = EquivSequent.get_system s in
-    let env = EquivSequent.get_env s in
+    let table = EquivSequent.table s in
+    let system = EquivSequent.system s in
+    let env = EquivSequent.env s in
 
     (* Apply tactic to replace key(s) in [enc] using [new_key].
      * Precondition:
@@ -1627,9 +1627,9 @@ let xor TacticsArgs.(Pair (Int i,
   | before, e, after ->
     (* the biframe to consider when checking the freshness *)
     let biframe = List.rev_append before after in
-    let system = EquivSequent.get_system s in
-    let table = EquivSequent.get_table s in
-    let env = EquivSequent.get_env s in
+    let system = EquivSequent.system s in
+    let table = EquivSequent.table s in
+    let env = EquivSequent.env s in
     let res =
       try
         match opt_m with
@@ -1660,8 +1660,8 @@ let () =
 (*------------------------------------------------------------------*)  
 (* Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
-  let env = EquivSequent.get_env s in
-  let table = EquivSequent.get_table s in
+  let env = EquivSequent.env s in
+  let table = EquivSequent.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   match Theory.convert conv_env tsubst term Sorts.Message with
@@ -1692,7 +1692,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) =
-  let tsubst = Theory.subst_of_env (EquivSequent.get_env s) in
+  let tsubst = Theory.subst_of_env (EquivSequent.env s) in
   (* final function once the subtitustion has been computed *)
   let succ subst =
     let apply_subst = function
@@ -1702,7 +1702,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
     [EquivSequent.set_biframe s
       (List.map apply_subst (EquivSequent.get_biframe s))]
   in
-  let table = EquivSequent.get_table s in
+  let table = EquivSequent.table s in
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   match Theory.convert conv_env tsubst term Sorts.Boolean with
@@ -1710,7 +1710,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       if Macros.is_defined mn a table then
         succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                            Macros.get_definition
-                             (EquivSequent.get_system s) table sort mn is a)]
+                             (EquivSequent.system s) table sort mn is a)]
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
@@ -1721,7 +1721,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
           if Macros.is_defined mn a table then
             succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                                Macros.get_definition
-                                 (EquivSequent.get_system s) table sort mn is a)]
+                                 (EquivSequent.system s) table sort mn is a)]
           else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
         | _ ->
           Tactics.soft_failure (Tactics.Failure "can only expand macros")
@@ -1795,8 +1795,8 @@ let expand_all () s =
     in
     aux t
   in
-  let system = EquivSequent.get_system s in
-  let table  = EquivSequent.get_table s in
+  let system = EquivSequent.system s in
+  let table  = EquivSequent.table s in
   let expand_all_macros = function
     | EquivSequent.Message e ->
       EquivSequent.Message (expand_all_macros e system table)
@@ -1817,9 +1817,9 @@ let () = T.register "expandall"
 (** Replace all occurrences of [t1] by [t2] inside of [s],
   * and add a subgoal to prove that [t1 <=> t2]. *)
 let equiv_formula f1 f2 (s : EquivSequent.t) =
-  let env    = EquivSequent.get_env s in
-  let system = EquivSequent.get_system s in
-  let table  = EquivSequent.get_table s in
+  let env    = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table  = EquivSequent.table s in
     (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
       TraceSequent.init ~system table
@@ -1836,9 +1836,9 @@ let equiv_formula f1 f2 (s : EquivSequent.t) =
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
 let equiv_message m1 m2 (s : EquivSequent.t) =
-  let env    = EquivSequent.get_env s in
-  let system = EquivSequent.get_system s in
-  let table  = EquivSequent.get_table s in
+  let env    = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table  = EquivSequent.table s in
     (* goal for the equivalence of t1 and t2 *)
     let trace_sequent =
       TraceSequent.init ~system table
@@ -1915,9 +1915,9 @@ let get_ite ~system table elem =
   iter#get_ite
 
 let yes_no_if b TacticsArgs.(Int i) s =
-  let env = EquivSequent.get_env s in
-  let system = EquivSequent.get_system s in
-  let table = EquivSequent.get_table s in
+  let env = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table = EquivSequent.table s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
@@ -2026,9 +2026,9 @@ let ifcond TacticsArgs.(Pair (Int i,
       | _ ->  Tactics.soft_failure
                 (Tactics.Failure "can only be applied to a conditional")
     in
-    let env = EquivSequent.get_env s in
-    let system = EquivSequent.get_system s in
-    let table = EquivSequent.get_table s in
+    let env = EquivSequent.env s in
+    let system = EquivSequent.system s in
+    let table = EquivSequent.table s in
       begin try
         let new_elem = EquivSequent.Message
           (ITE (cond, push_formula j f positive_branch, negative_branch))
@@ -2062,9 +2062,9 @@ let () =
 
 (*------------------------------------------------------------------*)
 let trivial_if (TacticsArgs.Int i) s =
-  let env = EquivSequent.get_env s in
-  let system = EquivSequent.get_system s in
-  let table = EquivSequent.get_table s in
+  let env = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table = EquivSequent.table s in
   match nth i (EquivSequent.get_biframe s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
@@ -2115,9 +2115,9 @@ let ifeq
       | _ -> Tactics.soft_failure
                (Tactics.Failure "Can only be applied to a conditional.")
     in
-    let env = EquivSequent.get_env s in
-    let system = EquivSequent.get_system s in
-    let table = EquivSequent.get_table s in
+    let env = EquivSequent.env s in
+    let system = EquivSequent.system s in
+    let table = EquivSequent.table s in
       let new_elem =
         EquivSequent.Message (ITE (cond,
                                    Term.subst [Term.ESubst (t1,t2)] positive_branch,
@@ -2217,8 +2217,8 @@ let is_ddh_context system table a b c elem_list =
   with Not_context | Name_found -> false
 
 let ddh na nb nc s sk fk =
-  let system = EquivSequent.get_system s in
-  let table = EquivSequent.get_table s in
+  let system = EquivSequent.system s in
+  let table = EquivSequent.table s in
   if is_ddh_context system table na nb nc
       (EquivSequent.get_biframe s) then
       sk [] fk
@@ -2243,7 +2243,7 @@ let () = T.register_general "ddh"
 
 (*------------------------------------------------------------------*)
 let print_tac TacticsArgs.None s = 
-  Tactics.print_system (EquivSequent.get_table s) (EquivSequent.get_system s);
+  Tactics.print_system (EquivSequent.table s) (EquivSequent.system s);
   [s] 
 
 let () =

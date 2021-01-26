@@ -1,12 +1,19 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
+type intro_arg =
+  | IA_Star
+  | IA_Unnamed of Location.t
+  | IA_Named   of Theory.lsymb
+    
+(*------------------------------------------------------------------*)
 (* Types defined directly in the parsing. Note that all tactics not defined in
    the parser must rely on the Theory type, even to parse strings. *)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
+  | IntroArgs   of intro_arg list
 
 (*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)

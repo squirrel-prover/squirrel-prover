@@ -7,7 +7,7 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY INTRO
 %token PROOF QED UNDO ABORT
 %token EOF
 
@@ -61,6 +61,17 @@
       Location.pl_loc  = Location.make $startpos $endpos;
     }
   }
+
+(* Lists *)
+%inline empty:
+| { () }
+
+%inline slist(X, S):
+| l=separated_list(S, X) { l }
+
+%inline slist1(X, S):
+| l=separated_nonempty_list(S, X) { l }
+
 
 (* Terms *)
 lsymb:
@@ -328,6 +339,14 @@ tac_errors:
 | i=ID                    { [i] }
 | i=ID COMMA t=tac_errors { i::t }
 
+intro_param:
+| STAR              { TacticsArgs.IA_Star }
+| l=loc(UNDERSCORE) { TacticsArgs.IA_Unnamed (Location.loc l) }
+| id=lsymb          { TacticsArgs.IA_Named id }
+
+intro_params:
+| l=slist1(intro_param,empty) { TacticsArgs.IntroArgs l }
+
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
@@ -340,6 +359,10 @@ tac:
    * because they are reserved. *)
   | LEFT                               { Tactics.Abstract ("left",[]) }
   | RIGHT                              { Tactics.Abstract ("right",[]) }
+
+  | INTRO p=intro_params               { Tactics.Abstract
+                                           ("intro",[p]) }
+
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }
   | NOSIMPL t=tac                      { Tactics.Modifier

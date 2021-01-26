@@ -36,11 +36,6 @@ val add_xeq :
   'a list * 'a list * 'a list ->
   'a list * 'a list * 'a list
 
-val add_xeq_eq :
-  ord_eq -> 'a ->
-  'a list * 'a list ->
-  'a list * 'a list
-
 val pp_ord : Format.formatter -> ord -> unit
 
 val trace_atoms_ts : trace_atom list -> Term.timestamp list
