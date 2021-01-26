@@ -25,7 +25,7 @@ In order to prove the authentication goals, we have to prove that an input
 cannot be equal to some values, ie that values stored in states are not
 deducible.
 The corresponding goals secretStateTag and secretStateReader are not yet fully
-proven: 
+proven:
   - admit. (* ok *) ==> I think it is possible to conclude using reasonings on
 state values, but it is to be confirmed.
   - admit. (* TODO *) ==> I have not yet managed to conclude, and/or have not
@@ -101,7 +101,7 @@ axiom stateTSInit : TS@init = TSinit
 axiom TSaxiom :
   forall (x:message), TSorder(x,TSnext(x)) = TSorderOk.
 
-goal lastUpdateTag_ : 
+goal lastUpdateTag_ :
 forall (t:timestamp), forall (i:index),
   (kT(i)@t = kT(i)@init && forall (j':index) t < T1(i,j')) ||
   (exists j:index,
@@ -113,25 +113,28 @@ induction.
 case t.
 case H0.
 
-substitute t,R(jj). 
-apply IH0 to pred(R(jj)). 
-apply H0 to i. 
+substitute t,init.
+left.
+
+substitute t,R(jj).
+apply IH0 to pred(R(jj)).
+apply H0 to i.
 case H1.
 left. apply H1 to j'.
 right. exists j. apply H1 to j'.
 case H2.
 
-substitute t,R1(jj,ii). 
-apply IH0 to pred(R1(jj,ii)). 
-apply H0 to i. 
+substitute t,R1(jj,ii).
+apply IH0 to pred(R1(jj,ii)).
+apply H0 to i.
 case H1.
 left. apply H1 to j'.
 right. exists j. apply H1 to j'.
 case H2.
 
-substitute t,R2(jj). 
-apply IH0 to pred(R2(jj)). 
-apply H0 to i. 
+substitute t,R2(jj).
+apply IH0 to pred(R2(jj)).
+apply H0 to i.
 case H1.
 left. apply H1 to j'.
 right. exists j. apply H1 to j'.
@@ -203,9 +206,6 @@ case H2.
 admit. (* TODO *)
 admit. (* TODO *)
 admit. (* TODO *)
-
-substitute t,init.
-left.
 Qed.
 
 goal lastUpdateT :
@@ -245,7 +245,7 @@ forall (jj,ii:index),
   kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
   || (exists (jj':index),
        kR(ii)@pred(R1(jj,ii)) =
-         h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3)).
+         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)).
 Proof.
 admit. (* TODO probably very similar to lastUpdateT *)
 Qed.
@@ -271,7 +271,7 @@ case H0.
 apply stateReaderInit to ii.
 fresh M2.
 (* general case *)
-assert input@t = h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
+assert input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
 euf M2.
 (* case euf 1/3 - R1(jj1,ii) *)
 assert R1(jj',ii) < R1(jj,ii). admit. (* ok *)
@@ -286,7 +286,7 @@ Qed.
 
 goal secretStateTag :
 forall (t:timestamp), forall (i,j:index),
-  t < T1(i,j) => 
+  t < T1(i,j) =>
     ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)>
       && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> ).
 Proof.
@@ -304,7 +304,7 @@ fresh M3.
 assert fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
 euf M2.
 (* case euf 1/3 - R1(jj,i)  *)
-admit. 
+admit.
 (* case euf 2/3 - T1(i,j1) *)
 assert T1(i,j') < T1(i,j). admit. (* ok *)
 case H0.
@@ -364,16 +364,16 @@ case H0.
 apply stateTagInit to i.
 apply stateReaderInit to ii.
 case H0.
-assert h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3) = idinit(i).
+assert h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i).
 fresh M6.
 (* general case *)
 case H0.
 apply stateReaderInit to ii.
 assert idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
 fresh M5.
-assert 
+assert
   h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
-  h3(<<kR(ii)@R1(jj',ii),pin(ii)>,TS@R1(jj',ii)>,key3).
+  h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
 collision.
 
 (* case euf 2/2 - A(kk) *)
