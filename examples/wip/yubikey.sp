@@ -35,21 +35,8 @@ mutable SCpt: index->message
 channel cT
 channel cR
 
-axiom stateYubikeyInit : forall (i:index), YCpt(i)@init = myZero
-
-axiom stateServerInit : forall (i:index), SCpt(i)@init = myZero
-
 abstract orderOk : message
 abstract order : message->message->message
-
-axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
-
-axiom orderTrans :
-  forall (n1,n2,n3:message),
-    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
-    => order(n1,n3) = orderOk
-
-axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
 
 (* When the key is plugged, its counter is incremented *)
 process yubikeyplug(i:index,j:index) =
@@ -64,7 +51,6 @@ process yubikeypress(i:index,j:index) =
        let cpt = YCpt(i) in 
        YCpt(i) := mySucc(YCpt(i)); 
        out(cT,<pid(i),<nonce(i,j),enc(<secret(i),cpt>,npr(i,j),k(i))>>)
-
 
 (* When the server receives a message, it checks whether it corresponds to a pid in its database,
 and checks also that the counter inside the otp is strictly greater than the counter associated to 
@@ -84,6 +70,18 @@ process server(ii:index) =
 system ((!_i !_j Plug: yubikeyplug(i,j)) | (!_i !_j Press: yubikeypress(i,j)) | (!_ii S: server(ii))).
 
 
+axiom stateYubikeyInit : forall (i:index), YCpt(i)@init = myZero
+
+axiom stateServerInit : forall (i:index), SCpt(i)@init = myZero
+
+axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
+
+axiom orderTrans :
+  forall (n1,n2,n3:message),
+    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
+    => order(n1,n3) = orderOk
+
+axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
 
 (* I expressed a non-injective version of authentication but since the encryption outputted by the yubikey contains a random number, I think that this property will imply the injective one *)
@@ -305,7 +303,11 @@ induction.
 case t.
 case H0.
 
-(* 1 /8 *)
+(* 1/8 *)
+substitute t, init.
+left.
+
+(* 2/8 *)
 substitute t, Plug(i1,j).
 apply IH0 to pred(Plug(i1,j)).
 apply H0 to i.
@@ -317,7 +319,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 2/8 *)
+(* 3/8 *)
 substitute t, Plug1(i1,j).
 apply IH0 to pred(Plug1(i1,j)).
 apply H0 to i.
@@ -329,7 +331,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 3/8 *)
+(* 4/8 *)
 substitute t, Press(i1,j).
 apply IH0 to pred(Press(i1,j)).
 apply H0 to i.
@@ -341,7 +343,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 4/8 *)
+(* 5/8 *)
 substitute t, Press1(i1,j).
 apply IH0 to pred(Press1(i1,j)).
 apply H0 to i.
@@ -353,7 +355,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* interesting case *)
+(* 6/8 - interesting case *)
 substitute t, S(ii,i1).
 apply IH0 to pred(S(ii,i1)).
 apply H0 to i.
@@ -387,7 +389,7 @@ case H2.
 apply H1 to jj'.
 case H2.
 
-(* 5/8 *)
+(* 7/8 *)
 substitute t, S1(ii,i1).
 apply IH0 to pred(S1(ii,i1)).
 apply H0 to i.
@@ -399,7 +401,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 6/8 *)
+(* 8/8 *)
 substitute t, S2(ii).
 apply IH0 to pred(S2(ii)).
 apply H0 to i.
@@ -410,10 +412,6 @@ right.
 exists jj.
 apply H1 to jj'.
 case H2.
-
-(* 7/ 8*)
-substitute t, init.
-left.
 Qed.
 
 goal lastUpdateServer :

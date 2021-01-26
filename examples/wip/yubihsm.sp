@@ -11,7 +11,7 @@ S   -> Y   : accept
 
 with
 - ks = keystream(kh,pid)
-- aead = senc(ks,k) XOR <k2,pid>, mac(<k2,pid>,k) >
+- aead = < senc(ks,k) XOR <k2,pid>, mac(<k2,pid>,k) >
 - otp = senc(<sid,ctr>,npr,k2)
 
 PUBLIC DATA
@@ -42,6 +42,10 @@ Here, we model the incrementation by 1 of the counter.
 
 - As in [1], we model the two counters (session and token counters) as a single
 counter. 
+
+- Diff terms are here to model a real system and an ideal system. 
+The ideal system uses a different key k2'(i,j) for each generated otp.
+The goal is to being able to apply the intctxt tactic for the auth goal.
 *******************************************************************************)
 senc enc,dec
 
@@ -63,12 +67,14 @@ abstract kh: index -> message
 name k: index -> message
 (* AES working key k2, stored inside the AEAD *)
 name k2: index -> message
+name k2': index -> index -> message
 
 abstract keystream: message -> message -> message
 
 (* random values *)
 name nonce: index -> index -> message
 name npr: index -> index -> message
+name n: index -> message
 
 (* counters *)
 mutable YCtr: index -> message (* YubiKey counter *)
@@ -81,20 +87,8 @@ channel cY
 channel cS
 channel cHSM
 
-axiom stateYubikeyInit: forall (i:index), YCtr(i)@init = myZero
-axiom stateServerInit: forall (i:index), SCtr(i)@init = myZero
-
 abstract orderOk: message
 abstract order: message -> message -> message
-
-axiom orderSucc: forall (n:message), order(n,mySucc(n)) = orderOk
-
-axiom orderTrans:
-  forall (n1,n2,n3:message),
-    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
-    => order(n1,n3) = orderOk
-
-axiom orderStrict: forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
 
 (* When the key is plugged, the counter is incremented. *)
 process yubikeyplug(i:index,j:index) =
@@ -111,7 +105,7 @@ process yubikeypress(i:index,j:index) =
   if x2 = startpress then  
     let ctr = YCtr(i) in 
     YCtr(i) := mySucc(YCtr(i)); 
-    out(cY,<pid(i),<nonce(i,j),enc(<sid(i),ctr>,npr(i,j),k2(i))>>)
+    out(cY,<pid(i),<nonce(i,j),enc(<sid(i),ctr>,npr(i,j),diff(k2(i),k2'(i,j)))>>)
 
 (* When the server receives a message:
    - it checks whether it corresponds to a pid in its database,
@@ -145,13 +139,17 @@ process YSM_AEAD_YUBIKEY_OTP_DECODE(ii:index) =
   try find i such that fst(xdata) = <pid(i),kh(i)> in
     let aead = fst(snd(xdata)) in
     let otp = snd(snd(xdata)) in
-    if 
+    if
       dec(aead XOR <k2(i),pid(i)>,k(i)) <> fail
-      && dec(otp,k2(i)) <> fail
       && dec(aead XOR <k2(i),pid(i)>,k(i)) = keystream(kh(i),pid(i)) 
-      && fst(dec(otp,k2(i))) = sid(i)
+      && diff (dec(otp,k2(i)) <> fail && fst(dec(otp,k2(i))) = sid(i),
+               exists (j:index), 
+                 dec(otp,k2'(i,j)) <> fail && fst(dec(otp,k2'(i,j))) = sid(i))
     then 
-      out(cHSM,snd(dec(otp,k2(i))))
+      out(cHSM,
+        diff (snd(dec(otp,k2(i))),
+              try find j such that fst(dec(otp,k2'(i,j))) = sid(i) in 
+                snd(dec(otp,k2'(i,j))))).
 
 system 
   ( (!_i !_j Plug: yubikeyplug(i,j)) | 
@@ -161,7 +159,43 @@ system
     (!_ii Write: write_AEAD(ii)) |
     (!_ii Decode: YSM_AEAD_YUBIKEY_OTP_DECODE(ii)) ).
 
+axiom stateYubikeyInit: forall (i:index), YCtr(i)@init = myZero
+axiom stateServerInit: forall (i:index), SCtr(i)@init = myZero
 
+axiom orderSucc: forall (n:message), order(n,mySucc(n)) = orderOk
 
+axiom orderTrans:
+  forall (n1,n2,n3:message),
+    (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
+    => order(n1,n3) = orderOk
 
+axiom orderStrict: forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
+(* Authentication goal for the ideal system *)
+goal [right] auth:
+ forall (ii,i,ii':index),
+  ( cond@Server1(ii,i) && cond@Decode(ii',i) )
+  => 
+  ( exists (j:index), 
+    Press(i,j) < Decode(ii',i) 
+    && snd(snd(output@Press(i,j))) = snd(snd(input@Decode(ii',i))) ).
+Proof.
+intros.
+expand cond@Decode(ii',i).
+intctxt M3.
+exists j.
+Qed.
+
+equiv realIdeal.
+Proof.
+induction t.
+
+expandall. fa 0.
+
+expandall. fa 0.
+
+expandall. 
+fa 0. fa 1. fa 1. fa 1. fa 1.
+fresh 1. yesif 1.
+(* ??? *) 
+Qed.
