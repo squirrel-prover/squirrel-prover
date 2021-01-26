@@ -66,7 +66,7 @@ Proof.
   apply H0.
   project.
   (* LEFT *) by euf M0; exists i, k1.
-  (* RIGHT *) by euf M0; exists i,k.
+  (* RIGHT *) by euf M0; exists i,k. 
 Qed.
 
 (* Equivalence goal expressing unlinkability *)

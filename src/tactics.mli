@@ -160,3 +160,6 @@ val timeout_get : 'a Utils.timeout_r -> 'a
 
 (** Raise a hard failure. *)
 val hard_failure : tac_error -> 'a
+
+(** Print the system to the user. *)
+val print_system : Symbols.table -> SystemExpr.system_expr -> unit

@@ -2239,3 +2239,13 @@ let () = T.register_general "ddh"
           TacticsArgs.String_name v3] ->
          pure_equiv (ddh v1 v2 v3)
        | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+
+
+(*------------------------------------------------------------------*)
+let print_tac TacticsArgs.None s = 
+  Tactics.print_system (EquivSequent.get_table s) (EquivSequent.get_system s);
+  [s] 
+
+let () =
+  T.register_typed "print" ~general_help:"Shows the current system."
+    (pure_equiv_typed print_tac) TacticsArgs.None

@@ -390,3 +390,13 @@ let hard_failure e = raise (Tactic_hard_failure e)
 let timeout_get = function
   | Utils.Result a -> a
   | Utils.Timeout -> hard_failure TacTimeout
+
+
+(*------------------------------------------------------------------*)
+let print_system table system =
+  Printer.prt `Result "@.%a@.%a@."
+    (SystemExpr.pp_descrs table) system
+    (if Config.print_trs_equations ()
+     then Completion.print_init_trs
+     else (fun _fmt _ -> ()))
+    table

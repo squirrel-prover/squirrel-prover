@@ -280,6 +280,8 @@ let convert_args table env parser_args tactic_type =
              )
           )
 
+    | [], Sort None -> Arg None
+      
     (* TODO: location *)
     | [], _ -> raise Theory.(Conv (L._dummy, Tactic_type "more arguments expected"))
 

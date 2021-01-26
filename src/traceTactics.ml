@@ -45,20 +45,16 @@ let () =
     goal_true_intro
     ~usages_sorts:[Sort None]
 
-let print (s : TraceSequent.t) =
-  let table = TraceSequent.table s in
-  Printer.prt `Result "@.%a@.%a@."
-    (SystemExpr.pp_descrs table) (TraceSequent.system s)
-    (if Config.print_trs_equations ()
-     then Completion.print_init_trs
-     else (fun _fmt _ -> ()))
-    (TraceSequent.table s);
-   [s]
+(*------------------------------------------------------------------*)
+let print_tac s =
+  Tactics.print_system (TraceSequent.table s) (TraceSequent.system s);
+  [s]
 
 let () =
   T.register "print" ~general_help:"Shows the current system."
-    print
+    print_tac
 
+(*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
 let goal_and_right (s : TraceSequent.t) =
