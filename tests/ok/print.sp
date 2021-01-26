@@ -17,7 +17,7 @@ Qed.
 
 
 (* The main test, with a non-empty list of bound variables. *)
-goal bar : forall (tau : timestamp),forall (tau':timestamp),
+goal bar : forall (tau, tau' : timestamp),
   output@tau = a(output@tau').
 Proof.
   (* print in trace sequent *)
