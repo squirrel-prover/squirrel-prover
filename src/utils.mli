@@ -116,3 +116,11 @@ type 'a timeout_r =
     Returns [Result (f x)] if the computation terminated in the imparted
     time, and [Timeout] otherwise. *)
 val timeout : int -> ('a -> 'b) -> 'a -> 'b timeout_r
+
+(*------------------------------------------------------------------*)
+val as_seq0 : 'a list -> unit
+val as_seq1 : 'a list -> 'a
+val as_seq2 : 'a list -> 'a * 'a
+val as_seq3 : 'a list -> 'a * 'a * 'a
+val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
+                         

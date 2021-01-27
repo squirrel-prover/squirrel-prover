@@ -34,6 +34,7 @@ module H : sig
   val id_by_name  : string  -> hyps -> Ident.t
 
   val fresh_id : string -> hyps -> Ident.t
+  val fresh_ids : string list -> hyps -> Ident.t list
   
   val add       : Ident.t -> hyp -> hyps -> hyps
   val add_exact : string  -> hyp -> hyps -> hyps
@@ -54,6 +55,8 @@ module H : sig
 
   val map :  (hyp ->  hyp) -> hyps -> hyps
 
+  val fold : (Ident.t -> Term.formula -> 'a -> 'a) -> hyps -> 'a -> 'a
+    
   val pps : Format.formatter -> hyps -> unit
 
 end = struct 
@@ -104,7 +107,15 @@ end = struct
     let name = if is_fresh name hyps then name else aux 0
     in
     Ident.create name
-  
+
+  let fresh_ids names hyps =
+    let ids, _ = List.fold_left (fun (ids,hyps) name ->
+        let id = fresh_id name hyps in
+        (* We add the id to [hyps] to reserve the name *)
+        (id :: ids, Mid.add id Term.True hyps)
+      ) ([], hyps) names in
+    List.rev ids
+    
   let add id hyp hyps =
     assert (not (Mid.mem id hyps)); 
     if not (is_fresh (Ident.name id) hyps)
@@ -128,7 +139,9 @@ end = struct
     Mid.exists (fun id' _ -> Ident.name id' = name) hyps
   
   let map f hyps = Mid.map (fun h -> f h) hyps
- 
+
+  let fold func hyps init = Mid.fold func hyps init
+  
   let pps ppf hyps =
     let pp_sep fmt () = Fmt.pf ppf "@;" in
     Fmt.pf ppf "@[<v 0>%a@]"
@@ -263,12 +276,23 @@ let pp ppf s =
 
 (*------------------------------------------------------------------*)  
 module Hyps = struct
-  let fresh_id ?(exact=false) name s =
+  let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
-    if Ident.name id <> name
+    if (not approx) && Ident.name id <> name && name <> "_"
     then hyp_error (HypExists name)
     else id
-  
+
+  let fresh_ids ?(approx=false) names s =
+    let ids = H.fresh_ids names s.hyps in
+    if approx then ids else
+      begin
+        List.iter2 (fun id name ->
+            if Ident.name id <> name && name <> "_"
+            then hyp_error (HypExists name)
+          ) ids names;
+        ids
+      end
+
   let is_hyp f s = H.exists (fun _ f' -> f = f') s.hyps
 
   let by_id   id s = H.by_id   id s.hyps
@@ -278,6 +302,8 @@ module Hyps = struct
   let mem_name id s = H.mem_name id s.hyps
 
   let find ffind s = H.find ffind s.hyps
+
+  let exists ffind s = H.exists ffind s.hyps
 
   class iter_macros ~system table f = object (self)
     inherit Iter.iter ~system table as super
@@ -360,6 +386,9 @@ module Hyps = struct
       (* TODO: performances, less updates ? *)
       S.update ~hyps:hyps s
 
+  let remove id s = S.update ~hyps:(H.remove id s.hyps) s
+
+  let fold func s init = H.fold func s.hyps init
 end
 
 (*------------------------------------------------------------------*)
@@ -406,10 +435,10 @@ let set_conclusion a s =
 let init ~system table (goal : Term.formula) =
   set_conclusion goal (init_sequent system table)
 
-let get_conclusion s = s.conclusion
+let conclusion s = s.conclusion
 
 (*------------------------------------------------------------------*)
-let apply_subst subst s =
+let subst subst s =
   if subst = [] then s else
     S.update
       ~hyps:(filter_map_hyps (Term.subst subst) s.hyps)

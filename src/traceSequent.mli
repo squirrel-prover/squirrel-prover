@@ -64,11 +64,14 @@ val pp_hyp   : Format.formatter -> hyp   -> unit
 val pp_ldecl : Format.formatter -> ldecl -> unit  
              
 module Hyps : sig
-  (** Create a fresh name for a hypothesis that is guaranteed fresh. \
+  (** Create a fresh name for a hypothesis that is guaranteed fresh. 
       If [~approx] is [true], the name can be changed (defaut to false). 
-      Hypotheses names are guaranteed to have unique names (i.e. Ident.name part),
-      except for unnamed hypothesis, which all uses "_". *)
+      Hypotheses names are guaranteed to have unique names (i.e. unique
+      Ident.name), except for unnamed hypothesis, which all uses "_". *)
   val fresh_id : ?approx:bool -> string -> sequent -> Ident.t
+
+  (** Batched [fresh_id]. *)
+  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
   
   (** [add_formula id f s] returns the sequent [s] with [f] added to its
       hypotheses. The new sequent will be automatically enriched with
@@ -88,8 +91,9 @@ module Hyps : sig
     * @raise Not_found if there is no such hypothesis. *)
   val by_id : Ident.t -> sequent -> formula
 
-  (** Same as [by_id], but does a look-up by name. *)
-  val by_name : string -> sequent -> formula
+  (** Same as [by_id], but does a look-up by name and returns the full local 
+      declaration. *)
+  val by_name : string -> sequent -> ldecl
 
   (** [mem_id id s] returns true if there is an hypothesis with id [id] 
       in [s]. *)
@@ -101,11 +105,21 @@ module Hyps : sig
   (** Find the first local declaration satisfying a predicate. *)
   val find : (Ident.t -> formula -> bool) -> sequent -> ldecl
 
-  (** [subst subst s] returns the sequent [s] where the substitution has
-      been applied to all hypotheses. It removes trivial equalities (e.g x=x). *)
-  val subst : Term.subst -> sequent -> sequent
+  (** Find if there exists a local declaration satisfying a predicate. *)
+  val exists : (Ident.t -> formula -> bool) -> sequent -> bool
+
+  (** Removes a formula. *)
+  val remove : Ident.t -> sequent -> sequent
+
+  val fold : (Ident.t -> formula -> 'a -> 'a) -> sequent -> 'a -> 'a
 end
 
+
+(** [subst subst s] returns the sequent [s] where the substitution has
+    been applied to all hypotheses and the conclusion.
+    It removes trivial equalities (e.g x=x). *)
+val subst : Term.subst -> sequent -> sequent
+  
 (*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
 

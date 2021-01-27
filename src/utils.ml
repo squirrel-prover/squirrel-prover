@@ -312,3 +312,12 @@ let timeout timeout f x =
   with
   | Timeout -> finish (); Timeout
   | exn     -> finish (); raise exn
+
+(* -------------------------------------------------------------------- *)
+let as_seq0 = function [] -> ()                     | _ -> assert false
+let as_seq1 = function [x] -> x                     | _ -> assert false
+let as_seq2 = function [x1; x2] -> (x1, x2)         | _ -> assert false
+let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
+
+let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
+  | _ -> assert false

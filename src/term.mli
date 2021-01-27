@@ -35,7 +35,7 @@ type state = Sorts.message msymb
 
 (** {3 Pretty printing} *)
 
-val pp_name : Format.formatter -> name -> unit
+val pp_name  : Format.formatter -> name -> unit
 val pp_nsymb : Format.formatter -> nsymb -> unit
 
 val pp_fname : Format.formatter -> fname -> unit
@@ -200,19 +200,25 @@ val f_g      : fsymb
 val f_len    : fsymb
 val f_zeroes : fsymb
 
-val mk_not : formula -> formula
-val mk_and : formula -> formula -> formula
-val mk_or : formula -> formula -> formula
-val mk_impl : formula -> formula -> formula
-val mk_ite : formula -> message -> message -> message
+val mk_not    : formula                 -> formula
+val mk_and    : formula -> formula      -> formula
+val mk_ands   : formula list            -> formula
+val mk_or     : formula -> formula      -> formula
+val mk_ors    : formula list            -> formula
+val mk_impl   : formula -> formula      -> formula
+val mk_impls  : formula list -> formula -> formula
+  
 val mk_forall : Vars.evar list -> formula -> formula
 val mk_exists : Vars.evar list -> formula -> formula
+
+val mk_ite    : formula -> message -> message -> message
+  
 val message_of_formula : formula -> message
 
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
-val mk_indices_eq : Vars.index list -> Vars.index list -> formula
+val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
 (** Convert a boolean term to a message term, used in frame macro definition **)
 val boolToMessage : formula -> message
