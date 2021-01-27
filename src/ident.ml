@@ -22,13 +22,15 @@ let fresh t = create (name t)
 let tag_compare i i' = i'.tag - i.tag
   
 let compare i i' =
-  if i'.tag = i.tag then 0
-  else match Stdlib.compare i i' with
+  if i'.tag = i.tag then 0 
+  else match Stdlib.compare i.name i'.name with
     | 0 -> tag_compare i i'
     | c -> c
     
 let hash i = i.tag
 
+let to_string id = (name id) ^ "/" ^ (string_of_int (tag id))
+                                     
 (*------------------------------------------------------------------*)
 let pp ppf id = Fmt.pf ppf "%s" (name id)
 

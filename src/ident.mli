@@ -18,6 +18,9 @@ val fresh : ident -> ident
 val compare : ident -> ident -> int
 val hash : ident -> int
 
+(** Full ident, with the tag. *)
+val to_string : ident -> string
+
 (*------------------------------------------------------------------*)
 val pp     : Format.formatter -> ident -> unit
 val pp_full: Format.formatter -> ident -> unit

@@ -13,7 +13,7 @@ let pp_hyp_error fmt = function
   | HypAlreadyExists s ->
     Fmt.pf fmt "an hypothesis named %s already exists" s     
   | HypUnknown s ->
-    Fmt.pf fmt "no hypothesis named %s" s     
+    Fmt.pf fmt "unknown hypothesis %s" s     
 
 (*------------------------------------------------------------------*)  
 type hyp = Term.formula
@@ -30,6 +30,8 @@ module H : sig
 
   val empty : hyps
 
+  val is_hyp : Term.formula -> hyps -> bool
+    
   val by_id   : Ident.t -> hyps -> hyp
   val by_name : string  -> hyps -> ldecl
 
@@ -40,7 +42,7 @@ module H : sig
   val fresh_ids : string list -> hyps -> Ident.t list
   
   val add       : Ident.t -> hyp -> hyps -> hyps
-  val add_exact : string  -> hyp -> hyps -> hyps
+  (* val add_exact : string  -> hyp -> hyps -> hyps *)
 
   val find_opt : (Ident.t -> hyp -> bool) -> hyps -> ldecl option
   val find_all : (Ident.t -> hyp -> bool) -> hyps -> ldecl list
@@ -66,21 +68,17 @@ module H : sig
 
 end = struct 
   module Mid = Ident.Mid
-  
+
+  (* We are using maps from idents to hypothesis, though we do not exploit
+     much that map structure. *)
   type hyps = hyp Mid.t
   
   let empty =  Mid.empty
-  
-  let by_id id hyps =
-    try Mid.find id hyps
-    with Not_found -> hyp_error (HypUnknown (Ident.name id))
 
-  let by_name name hyps =
-    try Mid.find_first (fun id -> Ident.name id = name) hyps
-    with Not_found -> hyp_error (HypUnknown name)
-                        
-  let hyp_by_name name hyps = snd (by_name name hyps)
-  let id_by_name name hyps  = fst (by_name name hyps)
+  let pps ppf hyps =
+    let pp_sep fmt () = Fmt.pf ppf "" in
+    Fmt.pf ppf "@[<v 0>%a@]"
+      (Fmt.list ~sep:pp_sep pp_ldecl) (Mid.bindings hyps)
       
   let find_opt func hyps =
     let exception Found of Ident.t * hyp in
@@ -101,22 +99,32 @@ end = struct
         ) hyps ;
       None
     with Found -> !found
-    
+
+  let by_id id hyps =
+    try Mid.find id hyps
+    with Not_found -> hyp_error (HypUnknown (Ident.to_string id))
+  (* the latter case should not happen *)
+
+  let by_name name hyps =
+    match find_opt (fun id _ -> Ident.name id = name) hyps with
+    | Some (id,f) -> id, f
+    | None -> hyp_error (HypUnknown name)
+
+  let hyp_by_name name hyps = snd (by_name name hyps)
+  let id_by_name name hyps  = fst (by_name name hyps)
+
   let filter f hyps = Mid.filter (fun id a -> f id a) hyps
  
   let find_all f hyps = Mid.bindings (filter f hyps)
 
   let exists f hyps = Mid.exists f hyps
-    
+
+  let is_hyp f hyps = exists (fun _ f' -> f = f') hyps
+      
   let remove id hyps = Mid.remove id hyps
 
   let to_list hyps = Mid.bindings hyps
-
-  let pps ppf hyps =
-    let pp_sep fmt () = Fmt.pf ppf "" in
-    Fmt.pf ppf "@[<v 0>%a@]"
-      (Fmt.list ~sep:pp_sep pp_ldecl) (to_list hyps)
-     
+    
   (* Note: "_" is always fresh, to allow several unnamed hypotheses. *)
   let is_fresh name hyps =
     name = "_" || Mid.for_all (fun id' _ -> Ident.name id' <> name) hyps
@@ -144,19 +152,14 @@ end = struct
     assert (not (Mid.mem id hyps)); 
     if not (is_fresh (Ident.name id) hyps)
     then hyp_error (HypAlreadyExists (Ident.name id))
-    else Mid.add id hyp hyps
-  (* (\* TODO: should we still do that ? *\)
-   *   let hs_list = M.find name_prefix hs in
-   *     (\* we only add the formula if it is a fresh one. *\)
-   *     let res = if List.mem v hs_list then hs_list else v::hs_list in
-   *     M.add name_prefix res hs
-   *   with Not_found -> M.add name_prefix ([v]) hs *)
+    (* do we really want to not add twice an hypothesis ? *)
+    else if is_hyp hyp hyps then hyps else Mid.add id hyp hyps
 
-  let add_exact name hyp hyps =
-    let id = fresh_id name hyps in
-    if Ident.name id <> name
-    then hyp_error (HypAlreadyExists name)
-    else Mid.add id hyp hyps
+  (* let add_exact name hyp hyps =
+   *   let id = fresh_id name hyps in
+   *   if Ident.name id <> name
+   *   then hyp_error (HypAlreadyExists name)
+   *   else Mid.add id hyp hyps *)
   
   let mem_id id hyps = Mid.mem id hyps
   let mem_name name hyps =
@@ -312,7 +315,7 @@ module Hyps = struct
         ids
       end
 
-  let is_hyp f s = H.exists (fun _ f' -> f = f') s.hyps
+  let is_hyp f s = H.is_hyp f s.hyps
 
   let by_id   id s = H.by_id   id s.hyps
   let by_name id s = H.by_name id s.hyps
@@ -362,20 +365,21 @@ module Hyps = struct
     
     iter#visit_formula (Term.Atom at) ;
     
-    List.fold_left
-      (* TODO: remove auto naming ? *)
-      (add_message_atom (H.fresh_id "D" s.hyps))
-      s
-      !macro_eqs
+    List.fold_left (add_message_atom None) s !macro_eqs
 
-  and add_message_atom id s at =
+  and add_message_atom (id : Ident.t option) s at =
     let f = Term.Atom (at :> generic_atom) in
-    let hyps = H.add id f s.hyps in
-    let s =
-      S.update ~keep_trs:false ~keep_models:true
-        ~hyps s in
-    
-    add_macro_defs s (at :> generic_atom)
+    if H.is_hyp f s.hyps then s else
+      (* TODO: remove auto naming ? *)
+      let id = match id with       
+        | None -> H.fresh_id "D" s.hyps
+        | Some id -> id in
+      let hyps = H.add id f s.hyps in
+      let s =
+        S.update ~keep_trs:false ~keep_models:true
+          ~hyps s in
+      
+      add_macro_defs s (at :> generic_atom)
 
   let rec add_happens id s ts =
     let f = Term.Atom (`Happens ts :> generic_atom) in
@@ -400,7 +404,7 @@ module Hyps = struct
      hyps. *)
   and add_formula id f s =
     match f with
-    | Term.Atom (#Atom.message_atom as at) -> add_message_atom id s at
+    | Term.Atom (#Atom.message_atom as at) -> add_message_atom (Some id) s at
     | Term.Atom (`Happens ts)              -> add_happens      id s ts
     | _ ->
       let hyps = H.add id f s.hyps in
