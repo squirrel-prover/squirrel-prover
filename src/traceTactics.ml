@@ -447,39 +447,40 @@ let () =
 
 (*------------------------------------------------------------------*)
 let simpl_left s =
-  match
-    Hyps.find
-      (fun _ f -> match f with
-         | False | And _ | Exists _ -> true
-         | _ -> false)
-      s
-  with
-    | id, False -> []
-    | id, And (f,g) ->
-      let s = Hyps.remove id s in
-      let idl, idr = Utils.as_seq2
-          (Hyps.fresh_ids ~approx:true
-             [(Ident.name id) ^ "_1";
-              (Ident.name id) ^ "_2"]
-             s) in        
-      [Hyps.add_formula idl f (Hyps.add_formula idr g s)]
-      
-    | id, Exists (vs,f) ->
-      let s = Hyps.remove id s in
-      let env = ref @@ TraceSequent.env s in
-      let subst =
-        List.map
-          (fun (Vars.EVar v) ->
-             Term.ESubst  (Term.Var v,
-                           Term.Var (Vars.make_fresh_from_and_update env v)))
-          vs
-      in
-      let f = Term.subst subst f in
-      [Hyps.add_formula (Ident.fresh id) f (TraceSequent.set_env !env s)]
+  let id, f =
+    let func _ f = match f with
+      | False | And _ | Exists _ -> true
+      | _ -> false in
+    match Hyps.find_opt func s with
+    | Some (id,f) -> id, f
+    | None -> Tactics.soft_failure (Failure "nothing to introduce")
+  in
 
-    | _ -> assert false
-    | exception Not_found ->
-      Tactics.soft_failure (Tactics.Failure "no such hypothesis")
+  match f with
+  | False -> []
+  | And (f,g) ->
+    let s = Hyps.remove id s in
+    let idl, idr = Utils.as_seq2
+        (Hyps.fresh_ids ~approx:true
+           [(Ident.name id) ^ "_1";
+            (Ident.name id) ^ "_2"]
+           s) in        
+    [Hyps.add_formula idl f (Hyps.add_formula idr g s)]
+
+  | Exists (vs,f) ->
+    let s = Hyps.remove id s in
+    let env = ref @@ TraceSequent.env s in
+    let subst =
+      List.map
+        (fun (Vars.EVar v) ->
+           Term.ESubst  (Term.Var v,
+                         Term.Var (Vars.make_fresh_from_and_update env v)))
+        vs
+    in
+    let f = Term.subst subst f in
+    [Hyps.add_formula (Ident.fresh id) f (TraceSequent.set_env !env s)]
+
+  | _ -> assert false
 
 let () =
   T.register "simpl_left"
@@ -909,7 +910,6 @@ let fresh (TacticsArgs.String m) s =
                (Tactics.Failure "can only be applied on message hypothesis")
     end
   with
-  | Not_found -> Tactics.(soft_failure (Undefined m))
   | EquivTactics.Var_found ->
     Tactics.soft_failure
       (Tactics.Failure "can only be applied on ground terms")
@@ -1000,15 +1000,17 @@ let () =
 
 (*------------------------------------------------------------------*)
 let autosubst s =
-  let id, f =
-    try
-      Hyps.find
-        (fun _ f -> match f with
-           | Atom (`Timestamp (`Eq, Term.Var x, Term.Var y)) -> true
-           | Atom (`Index (`Eq, x, y)) -> true
-           | _ -> false)
+  let id, f = match
+      Hyps.find_map
+        (fun id f -> match f with
+           | Atom (`Timestamp (`Eq, Term.Var x, Term.Var y) as atom) ->
+             Some (id, atom)
+           | Atom (`Index (`Eq, x, y) as atom) ->
+             Some (id,atom)
+           | _ -> None)
         s
-    with Not_found -> Tactics.(soft_failure (Failure "no equality found"))
+    with | Some (id,f) -> id, f
+         | None -> Tactics.(soft_failure (Failure "no equality found"))
   in
   let s = Hyps.remove id s in
   
@@ -1027,8 +1029,8 @@ let autosubst s =
         TraceSequent.subst [Term.ESubst (Term.Var x, Term.Var y)] s
   in 
     match f with
-    | Atom (`Timestamp (`Eq, Term.Var x, Term.Var y)) -> [process x y]
-    | Atom (`Index (`Eq, x, y))                       -> [process x y]
+    | `Timestamp (`Eq, Term.Var x, Term.Var y) -> [process x y]
+    | `Index (`Eq, x, y)                       -> [process x y]
     | _ -> assert false
 
 (*------------------------------------------------------------------*)
@@ -1401,11 +1403,7 @@ let euf_apply
     (TacticsArgs.String hyp_name)
     (s : TraceSequent.t) =
   let table = TraceSequent.table s in
-  let id, at =
-    try Hyps.by_name hyp_name s
-    with Not_found ->
-      Tactics.hard_failure (Tactics.Failure ("no hypothesis named " ^ hyp_name))
-  in
+  let id, at = Hyps.by_name hyp_name s in
   
   let (h,key,m,_,_,extra_goals,drop_head) as p = get_params table at in
   let extra_goals = List.map (fun x ->
@@ -1464,9 +1462,10 @@ let () =
 let apply name (ths:Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
   let f,system =
-    try let _, f = Hyps.by_name name s in
+    if Hyps.mem_name name s then
+      let _, f = Hyps.by_name name s in
       f, TraceSequent.system s
-    with Not_found -> Prover.get_goal_formula name in
+    else Prover.get_goal_formula name in
   
   (* Verify that it applies to the current system. *)
   begin

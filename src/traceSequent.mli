@@ -87,8 +87,7 @@ module Hyps : sig
       of the sequent [s].  *)
   val is_hyp : formula -> sequent -> bool
 
-  (** [by_id id s] returns the hypothesis with id [id] in [s].
-    * @raise Not_found if there is no such hypothesis. *)
+  (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
   val by_id : Ident.t -> sequent -> formula
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
@@ -103,7 +102,10 @@ module Hyps : sig
   val mem_name : string -> sequent -> bool
 
   (** Find the first local declaration satisfying a predicate. *)
-  val find : (Ident.t -> formula -> bool) -> sequent -> ldecl
+  val find_opt : (Ident.t -> formula -> bool) -> sequent -> ldecl option
+
+  (** Exceptionless *)
+  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
 
   (** Find if there exists a local declaration satisfying a predicate. *)
   val exists : (Ident.t -> formula -> bool) -> sequent -> bool
@@ -175,7 +177,8 @@ val get_all_terms : sequent -> Term.message list
 (** {2 Error handling} *)
 
 type hyp_error =
-  | HypExists of string
+  | HypAlreadyExists of string
+  | HypUnknown of string
     
 exception Hyp_error of hyp_error
 

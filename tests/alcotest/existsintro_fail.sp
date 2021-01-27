@@ -25,6 +25,6 @@ goal unforgeable :
   input@A3=h(input@A,k) => exists (a:index), (input@A2 = na(a)).
   Proof.
   simpl.
-  euf M0.
+  euf H.
   exists a1.
 Qed.
