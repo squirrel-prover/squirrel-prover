@@ -50,7 +50,8 @@ type tac_error =
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
   | GoalNotClosed
-
+  | NothingToIntroduce
+    
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
 

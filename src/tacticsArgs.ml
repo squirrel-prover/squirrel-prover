@@ -1,10 +1,20 @@
 module L = Location
 
 type intro_arg =
-  | IA_Star
+  | IA_Star    of Location.t
   | IA_Unnamed of Location.t
   | IA_Named   of Theory.lsymb
-    
+
+let pp_intro_arg fmt = function
+  | IA_Star    _ -> Fmt.pf fmt "*"
+  | IA_Unnamed _ -> Fmt.pf fmt "_"
+  | IA_Named   s -> Fmt.pf fmt "%s" (L.unloc s)
+
+let pp_intro_args fmt args =
+  let pp_sep fmt () = Fmt.pf fmt "@ " in
+  Fmt.pf fmt "@[<hv 2>%a@]"
+    (Fmt.list ~sep:pp_sep pp_intro_arg) args
+  
 (*------------------------------------------------------------------*)
 type parser_arg =
   | String_name of string

@@ -2,10 +2,12 @@
    requiring type conversions. *)
 
 type intro_arg =
-  | IA_Star
+  | IA_Star    of Location.t
   | IA_Unnamed of Location.t
   | IA_Named   of Theory.lsymb
-    
+
+val pp_intro_args : Format.formatter -> intro_arg list -> unit
+  
 (*------------------------------------------------------------------*)
 (* Types defined directly in the parsing. Note that all tactics not defined in
    the parser must rely on the Theory type, even to parse strings. *)

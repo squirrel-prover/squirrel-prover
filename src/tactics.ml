@@ -24,7 +24,8 @@ type tac_error =
   | SystemExprError of SystemExpr.system_expr_err
                          
   | GoalNotClosed
-
+  | NothingToIntroduce
+    
 let tac_error_strings =
   [ (More, "More");
    (NotEqualArguments, "NotEqualArguments");
@@ -39,7 +40,8 @@ let tac_error_strings =
    (NoReflMacros , "NoReflMacros");
    (TacTimeout, "TacTimeout");
    (CannotConvert, "CannotConvert");
-   (DidNotFail, "DidNotFail")]
+   (DidNotFail, "DidNotFail");
+   (NothingToIntroduce, "NothingToIntroduce")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -60,6 +62,7 @@ let rec tac_error_to_string = function
   | NoReflMacros
   | TacTimeout
   | CannotConvert
+  | NothingToIntroduce
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | SystemError _ -> "System_Error"
@@ -105,7 +108,8 @@ let rec pp_tac_error ppf = function
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
   | GoalNotClosed -> Fmt.pf ppf "Cannot close goal"
-
+  | NothingToIntroduce ->
+    Fmt.pf ppf "nothing to introduce"
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in

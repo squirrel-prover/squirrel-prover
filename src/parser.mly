@@ -340,7 +340,7 @@ tac_errors:
 | i=ID COMMA t=tac_errors { i::t }
 
 intro_param:
-| STAR              { TacticsArgs.IA_Star }
+| l=loc(STAR)       { TacticsArgs.IA_Star (Location.loc l)}
 | l=loc(UNDERSCORE) { TacticsArgs.IA_Unnamed (Location.loc l) }
 | id=lsymb          { TacticsArgs.IA_Named id }
 
