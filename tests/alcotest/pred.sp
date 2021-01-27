@@ -5,5 +5,5 @@ system null.
 
 goal forall (t:timestamp), t <= pred(t) => False.
 Proof.
-  intros.
+  intro t Hleq.
 Qed.

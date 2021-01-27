@@ -43,7 +43,7 @@ Proof.
  simpl.
  executable OutFalse.
  depends Out, OutFalse.
- apply H1 to Out.
+ apply H0 to Out.
  expand exec@Out.
  nosimpl(expand exec@OutFalse; expand cond@Out;  expand cond@OutFalse; simpl).
  euf M0.
