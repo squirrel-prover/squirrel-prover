@@ -8,6 +8,6 @@ goal test :
  forall (x:message,i:index,j:index), i <> j => h(n(i,i),x) <> n(i,j).
 Proof.
  nosimpl(intros).
- nosimpl(fresh M0).
+ nosimpl(fresh H0).
  case H0.
 Qed.

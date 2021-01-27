@@ -16,7 +16,7 @@ system (out(c,enc(m,r,k)) |   out(c,enc(m2,r,k)) | ( in(c,x); let y = dec(x,k) i
 goal output@A2 <> fail => output@A2 = m.
 Proof.
   simpl.
-  nosimpl(intctxt D0).
+  nosimpl(intctxt D).
 
   simpl.
   simpl.
