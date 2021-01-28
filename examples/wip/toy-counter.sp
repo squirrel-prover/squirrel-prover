@@ -31,11 +31,7 @@ mutable d : message
 channel cA
 channel cB
 
-(* initial value for counter *)
-abstract myZero : message
-
-(* myPred and mySucc functions for counter *)
-abstract myPred : message->message
+(* mySucc function for counter *)
 abstract mySucc : message->message
 
 (* order relation for counter *)
@@ -61,8 +57,6 @@ system ((!_i A) | (!_j B)).
 
 (* AXIOMS *)
 
-axiom counterInit : d@init = myZero
-axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
 axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
 axiom orderTrans :
   forall (n1,n2,n3:message),

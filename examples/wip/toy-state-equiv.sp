@@ -28,11 +28,6 @@ process tag(i:index,j:index) =
 
 system (!_i !_j T: tag(i,j)).
 
-(* AXIOMS *)
-
-axiom stateInit :
-  forall (i:index), kT(i)@init = seed(i).
-
 (* GOALS *)
 
 goal stateUpdate :

@@ -26,7 +26,6 @@ hash h3
 abstract ok : message
 abstract error : message
 
-abstract TSinit : message
 abstract TSorderOk : message
 abstract TSorder : message->message->message
 abstract TSnext : message->message
@@ -36,7 +35,6 @@ name k : message
 name key1 : index->message
 name key2 : index->message
 name key3 : index->message
-name idinit : index->message
 name pin : index->message
 
 mutable kT : index->message (* <ID,TSlast> *)
@@ -73,14 +71,6 @@ process reader(jj:index) =
     out(cR, error)
 
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
-
-
-axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
-axiom stateTSInit : TS@init = TSinit
-
-axiom TSaxiom :
-  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk.
 
 goal auth_R1 :
 forall (jj,ii:index),
