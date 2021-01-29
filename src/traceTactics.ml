@@ -363,9 +363,7 @@ let do_intro (iname : Theory.lsymb option) (s : TraceSequent.t) =
     new_judge
 
   | Exists ([],f) ->
-    assert false
-    (* TODO: when does this case appears ? *)
-    (* TraceSequent.set_conclusion f s *)
+    TraceSequent.set_conclusion f s
     
   | Impl(lhs,rhs)->
     let id = mk_id () in    
@@ -1816,7 +1814,7 @@ let () =
          * but we must respect [close]. *)
         let fk =
           if close then
-            fun _ -> fk (Failure "cannot automatically prove goal")
+            fun _ -> fk GoalNotClosed
           else
             fun _ -> sk [g] fk
         in

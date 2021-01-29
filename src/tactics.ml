@@ -193,6 +193,7 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
+(* TODO: add an auto at the en of the tactic. *)
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk

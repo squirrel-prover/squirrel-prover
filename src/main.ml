@@ -349,8 +349,7 @@ let () =
     end ;
     "Indexed abstract", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure
-           (Tactics.Failure "cannot automatically prove goal"))
+        (Tactic_soft_failure Tactics.GoalNotClosed)
         (fun () -> run ~test "tests/alcotest/idx_abs.sp")
     end ;
     "Indexed collision", `Quick, begin fun () ->

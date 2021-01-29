@@ -88,6 +88,11 @@ let () =
     ~general_help:"Automatically simplify the goal.\n Usage: simpl."
     simpl
 
+(* TODO: add auto tac *)
+(* let tac_auto s sk fk =
+ *   let fk _ = fk Tactics.GoalNotClosed in 
+ *   sk (Tactics.AST.eval simpl s) *)
+
 (*------------------------------------------------------------------*)
 exception NoReflMacros
 
