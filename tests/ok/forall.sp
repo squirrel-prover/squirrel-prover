@@ -14,7 +14,7 @@ goal test :
   forall (x:timestamp, y:index, z:message),
   x=x.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal forall x:timestamp, True.

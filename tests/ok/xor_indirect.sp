@@ -16,7 +16,7 @@ Proof.
   expand output@A(ii,jj).
   xor 1.
   nosimpl(yesif 1).
-  apply len_ok to i,j; apply len_ok to ii,jj.
+  apply len_ok to i,j. apply len_ok to ii, jj.
   admit. (* Induction hypothesis.*)
 Qed.
 

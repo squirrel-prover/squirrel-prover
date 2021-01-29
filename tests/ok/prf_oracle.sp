@@ -15,11 +15,12 @@ Proof.
 prf 1.
 
 yesif 1.
-project.
+by project; auto.
 fresh 1.
 
 prf 0.
-yesif 0.
+yesif 0. 
+by auto.
 Qed.
 
 
@@ -30,25 +31,26 @@ Proof.
 
 induction t.
 expandall.
-fa 0.
-fa 1. fa 1. prf 1.
+fa 0; fa 1; fa 1. 
+prf 1.
 (* easy case, it is the firt produced hash. *)
 yesif 1.
-project.
-fresh 1.
+by project; auto.
+by fresh 1.
 
 expandall.
-fa 0.
-fa 1; fa 1. prf 1. yesif 1.
+fa 0; fa 1; fa 1. 
+prf 1. 
+yesif 1. 
 project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-case H0.
-depends A, A1.
+by split; intro H; case H; depends A, A1; auto.
 
-case H0.
-depends A, A1.
+split. by auto. 
+split. by auto. 
+by intro H; case H; depends A, A1; auto.
 
 fresh 1.
 Qed.

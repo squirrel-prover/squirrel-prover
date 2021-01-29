@@ -4,5 +4,5 @@ system ((A:out(c,ok)) | (B:out(c,ok))).
 
 goal A <= B => A < B.
 Proof.
- simpl.
+ by auto.
 Qed.

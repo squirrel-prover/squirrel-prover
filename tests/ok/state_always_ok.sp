@@ -8,10 +8,12 @@ axiom init_ok : s@init = ok.
 goal forall t:timestamp, s@t = ok.
 Proof.
   induction.
-  case t.
-  case H0.
+  intro Hind.
+  case t. intro H.
+  case H.
   (* t = init *)
-  apply init_ok.
-  (* t = A(i) *)
-  apply IH0 to pred(A(i)).
+  apply init_ok. 
+  
+  (* t = A(i) *) 
+  apply Hind to pred(A(i)). 
 Qed.

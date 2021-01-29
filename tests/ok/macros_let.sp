@@ -6,5 +6,5 @@ system
 
 goal output@A = <input@A,input@A>.
 Proof.
- simpl.
+ by auto.
 Qed.

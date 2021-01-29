@@ -6,5 +6,5 @@ system in(c,x);out(c,<x,x>).
 goal test :
   output@A = <input@A,input@A>.
 Proof.
- simpl.
+ by auto.
 Qed.

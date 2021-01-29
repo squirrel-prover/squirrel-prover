@@ -6,17 +6,17 @@ system
 goal testA :
   output@A = empty.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal testA1 :
   output@A1 = empty.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal testA2 :
   output@A2 = input@A2.
 Proof.
- simpl.
+ by auto.
 Qed.

@@ -40,12 +40,16 @@ system (P | S).
 goal charac :
   exec@OutFalse => False.
 Proof.
- simpl.
- executable OutFalse.
- depends Out, OutFalse.
- apply H0 to Out.
- expand exec@Out.
- nosimpl(expand exec@OutFalse; expand cond@Out;  expand cond@OutFalse; simpl).
+ intro He.
+ executable OutFalse; intro Hexec.
+ depends Out, OutFalse; intro Hle.
+ apply Hexec to Out.
+ nosimpl(expand exec@Out).
+
+(* TODO: destruct Hexec  *)
+ TODO.
+
+ expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
  euf M0.
  (* we prove the goal where the message satisfies the tag *)
  case H5.

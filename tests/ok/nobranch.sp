@@ -129,7 +129,7 @@ forall (i,k:index),
 ).
 Proof.
 nosimpl(
-try ((nobranch ((repeat ((split + intro )))
+try ((nobranch ((repeat ((split + intro *)))
       ))))
 .
 admit.
