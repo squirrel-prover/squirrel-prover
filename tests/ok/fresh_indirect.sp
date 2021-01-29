@@ -10,6 +10,7 @@ Proof.
   expand output@A(i,j).
   expand output@A(ii,jj).
   fresh 1.
-  yesif 1.
+  yesif 1. 
+  by auto.
   admit. (* Induction hypothesis.*)
 Qed.

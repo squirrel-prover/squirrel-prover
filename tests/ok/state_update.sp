@@ -10,7 +10,7 @@ Qed.
 
 goal not_update: forall (i,j:index), i<>j => s(i)@A(j) = s(i)@pred(A(j)).
 Proof.
-  intros.
+  intro i j Hneq.
   expand s(i)@A(j).
-  noif.
+  by noif; auto.
 Qed.

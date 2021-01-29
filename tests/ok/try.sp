@@ -11,6 +11,6 @@ out(c,ok) else out(c,x)).
 goal not_else :
 forall (i:index,j:index), happens(A1(i)) => output@A1(i) <> k(j).
 Proof.
-  simpl.
-  apply C0 to j.
+  intro i j Hap Heq.
+  apply C to j.
 Qed.

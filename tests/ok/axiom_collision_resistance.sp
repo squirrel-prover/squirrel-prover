@@ -18,7 +18,7 @@ goal unforgeable :
   output@A(b) <> h(n(a),k)).
 
 Proof.
-simpl.
+intro a b Hneq Heq.
 apply collision_resistance to
     n(b),
    n(a).

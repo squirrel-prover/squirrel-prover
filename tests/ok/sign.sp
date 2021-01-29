@@ -14,8 +14,8 @@ system (out(c,sign(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
 goal forall tau:timestamp, cond@A1 => False.
 Proof.
-  intros.
+  intro tau Hcond.
   expand cond@A1.
-  nosimpl(euf M0).
-  simpl.
+  nosimpl(euf Hcond).
+  auto.
 Qed.

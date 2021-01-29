@@ -12,6 +12,6 @@ goal collision_absurd :
   output@tau <> h(m,k).
 
 Proof.
-  simpl.
-  euf M0.
+  intro tau Heq.
+  euf Heq. by auto.
 Qed.

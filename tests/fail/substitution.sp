@@ -21,6 +21,6 @@ goal unforgeable_1 :
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intros).
+ nosimpl(intro a b c H).
  checkfail substitute a, b with NotEqualArguments.
 Abort.

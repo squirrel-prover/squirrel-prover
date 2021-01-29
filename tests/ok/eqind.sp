@@ -10,5 +10,5 @@ goal function :
   i = j =>
   m1(i) = m1(j).
 Proof.
- simpl.
+ by auto.
 Qed.

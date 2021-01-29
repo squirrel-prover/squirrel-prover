@@ -16,8 +16,9 @@ goal test :
   h(fst(output@A(i)),k) <> n(i,j).
 
 Proof.
- nosimpl(intros).
- nosimpl(fresh M0).
+ nosimpl(intro i j Hneq Heq).
+ nosimpl(fresh Heq).
+(* TODO: destruct *)
  nosimpl(constraints).
  nosimpl(constraints).
  nosimpl(constraints).

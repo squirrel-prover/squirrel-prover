@@ -11,6 +11,6 @@ system null.
 goal
   h(a,k)=x && h(b,k)=y && y=h(c,k) => b=c.
 Proof.
-  nosimpl(intros; collision).
+  intro H. nosimpl(collision).
   auto.
 Qed.

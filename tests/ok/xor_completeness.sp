@@ -5,7 +5,7 @@ system null.
 goal forall (x,y,z:message),
   x = xor(y,z) => xor(y,x) = z.
 Proof.
-intros.
+auto.
 Qed.
 
 goal forall (a,x,y,z:message),
@@ -13,7 +13,7 @@ goal forall (a,x,y,z:message),
   =>
   xor(a,x) = f(ff(snd(y),f(z))).
 Proof.
-intros.
+auto.
 Qed.
 
 goal forall (a,x,y,z:message),
@@ -21,5 +21,5 @@ goal forall (a,x,y,z:message),
   =>
   xor(a,x) = f(xor(snd(y),f(z))).
 Proof.
-intros.
+auto.
 Qed.

@@ -8,6 +8,7 @@ system in(c,x);out(c,h(x,k)).
 goal foo :
   h(<n,input@A>,k) = n => False.
 Proof.
-  simpl.
-  euf M0.
+  intro Heq.
+  euf Heq. 
+  by auto.
 Qed.

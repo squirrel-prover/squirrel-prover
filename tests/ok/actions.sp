@@ -6,5 +6,5 @@ goal foo :
   forall (i:index),
   output@S(i) = n(i).
 Proof.
- simpl.
+ auto.
 Qed.

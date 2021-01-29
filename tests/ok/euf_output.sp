@@ -15,6 +15,6 @@ goal unforgeable :
   output@A(b) <> h(n(a),k).
 
 Proof.
-  simpl.
-  collision.
+  intro a b Hneq Heq.
+  by collision; auto.
 Qed.

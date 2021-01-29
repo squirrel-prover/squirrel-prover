@@ -11,6 +11,6 @@ Proof.
   expandall.
   fa 0; fa 1; fa 1.
   prf 1.
-  yesif 1.
+  yesif 1. by auto.
   fresh 1.
 Qed.

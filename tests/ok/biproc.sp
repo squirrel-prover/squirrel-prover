@@ -13,30 +13,31 @@ system [toto] A(diff(ko,koo)).
 
 goal test : output@B = diff(ok,ko).
 Proof.
-  intros.
+  intro *.
 Qed.
 
 goal [left] test_left : cond@B => output@B = input@B.
 Proof.
-expand cond@B.
+  intro Hc.
+  expand cond@B.
 Qed.
 
 goal [right] test_right : output@B = ko.
 Proof.
-  intros.
+  intro *.
 Qed.
 
 goal [none, toto] test2 : output@B = diff(ko,koo).
 Proof.
-  intros.
+  intro *.
 Qed.
 
 goal [left, toto] test_left2 : cond@B => output@B = ko.
 Proof.
-expand cond@B.
+  intro *.
 Qed.
 
 goal [right, toto] test_right2 : output@B = koo.
 Proof.
-  intros.
+  intro *.
 Qed.

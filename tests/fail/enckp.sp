@@ -46,8 +46,10 @@ system [sharedrnd] !_i
 
 equiv  [left,sharedrnd]  [right,sharedrnd] test.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0.
-expandall. fa 1. fa 2. fa 2. fa 2.
+enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. 
+by auto.
+expandall. 
+fa 1; fa 2; fa 2; fa 2.
 checkfail enckp 2 with SEncSharedRandom.
 Abort.
 (** END TEST **)
@@ -57,8 +59,8 @@ Abort.
 system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
 equiv  [left,sharedrndframe]  [right,sharedrndframe] test2.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0.
-enrich enc(m,r1(i),k). expandall. fa 2. fa 3. fa 3. fa 3.
+enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
+enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
  checkfail enckp 3 with SEncSharedRandom.
 Abort.
 (** END TEST **)
@@ -69,8 +71,8 @@ system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
 
 equiv [left,nornd] [right,nornd] test3.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0.
-expandall. fa 1. fa 2. fa 2. fa 2.
+enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
+expandall. fa 1; fa 2; fa 2; fa 2.
 checkfail enckp 3 with SEncNoRandom.
 Abort.
 (** END TEST **)

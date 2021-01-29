@@ -32,8 +32,8 @@ goal stateSemantics1:
   forall (i,j:index),
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof.
-nosimpl(intros).
-simpl.
+nosimpl(intro *).
+auto.
 Qed.
 
 goal stateSemantics2:
@@ -42,20 +42,17 @@ goal stateSemantics2:
       < h(k1(i)@pred(T1(i,j)),key(i)),
         <h(k1(i)@pred(T1(i,j)),key(i)),k2(i)@pred(T1(i,j))>>.
 Proof.
-nosimpl(intros).
-simpl.
+auto.
 Qed.
 
 goal stateSemantics3:
   forall (i,j:index), output@T2(i,j) = <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
 Proof.
-nosimpl(intros).
-simpl.
+auto.
 Qed.
 
 goal stateSemantics4:
   forall (i,j:index), output@T3(i,j) = <h(k1(i)@pred(T3(i,j)),key(i)),<k1(i)@pred(T3(i,j)),k2(i)@pred(T3(i,j))>>.
 Proof.
-nosimpl(intros).
-simpl.
+auto.
 Qed.

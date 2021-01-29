@@ -14,7 +14,7 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
+ intro ma.
  apply dummy_false_axiom to ma.
 Qed.
 
@@ -23,7 +23,7 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
+ intro ma.
  apply dummy_false_axiom to ma.
 Qed.
 
@@ -32,6 +32,6 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
+ intro ma.
  apply dummy_false_axiom to ma.
 Qed.
