@@ -33,6 +33,39 @@ module List = struct
 
   let inclusion a b =
     List.for_all (fun x -> List.mem x b)  a
+
+  (*------------------------------------------------------------------*)
+  let rec drop0 i l =
+    if i = 0 then l else
+      match l with
+      | _ :: t -> drop0 (i-1) t
+      | [] -> l
+        
+  let drop i l =
+    if i < 0 then failwith "invalid argument";
+    drop0 i l
+
+  (*------------------------------------------------------------------*)
+  let rec take0 i l =
+    if i = 0 then []
+    else match l with
+      | [] -> []
+      | x :: t -> x :: take0 (i - 1) l
+                    
+  let rec take i l =
+    if i < 0 then failwith "invalid argument";
+    take0 i l
+
+  (*------------------------------------------------------------------*)
+  let rec takedrop0 l i r =
+    if i = 0 then List.rev l, r
+    else match r with
+      | [] -> List.rev l, r
+      | x :: t -> takedrop0 (x :: l) (i - 1) t
+
+  let takedrop i l =
+    if i < 0 then failwith "invalid argument";
+    takedrop0 [] i l
 end
 
 (*------------------------------------------------------------------*)

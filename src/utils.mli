@@ -21,6 +21,16 @@ module List : sig
   val split_pred : ('a -> bool) -> 'a list -> 'a list * 'a list
 
   val inclusion : 'a list -> 'a list -> bool
+ 
+  (** [take n l] returns up to the [n] first elements from list [l], if available. *)
+  val take : int -> 'a list -> 'a list
+
+  (** [drop n l] returns [l] without the first [n] elements, or the empty list 
+      if [l]  have less than n elements. *)
+  val drop : int -> 'a list -> 'a list
+      
+  (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
+  val takedrop : int -> 'a list -> 'a list * 'a list
 end
 
 (*------------------------------------------------------------------*)
