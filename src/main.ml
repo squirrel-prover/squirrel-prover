@@ -360,7 +360,7 @@ let () =
     end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Failure "Equations satisfiable"))
+        (Tactic_soft_failure CongrFail)
         (fun () -> run ~test "tests/alcotest/try.sp")
     end ;
     "Undo does not maintain old truth", `Quick, begin fun () ->

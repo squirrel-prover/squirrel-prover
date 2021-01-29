@@ -49,6 +49,7 @@ type tac_error =
   | FailWithUnexpected of tac_error
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
+  | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
     

@@ -397,7 +397,11 @@ let rec do_intros (intros : Args.intro_arg list) s =
     try do_intros [Args.IA_Star loc] (do_intro None s) with
     | Tactics.Tactic_soft_failure NothingToIntroduce -> s
 
-      
+(** Correponds to `intro *`, to use in automated tactics. *)
+let intro_all (s : TraceSequent.t) : TraceSequent.t list =
+  let star = Args.IA_Star L._dummy in
+  [do_intros [star] s]
+    
 let intro_tac args s sk fk =
   try match args with
     | [Args.IntroArgs intros] -> sk [do_intros intros s] fk
@@ -642,7 +646,7 @@ let congruence (s : TraceSequent.t) =
   in
   if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
     []
-  else soft_failure (Tactics.Failure "Equations satisfiable")
+  else soft_failure CongrFail
 
 let () = T.register "congruence"
     ~general_help:"Tries to derive false from the messages equalities."
@@ -1772,32 +1776,40 @@ let () =
         | exception Tactics.Tactic_soft_failure e -> fk e
       end)
   in
+  (* let pp_tac str s sk fk =
+   *   Fmt.epr "pp: %s@." str;
+   *   sk [s] fk in *)
+  
   let open Tactics in
   (* Simplify goal. We will never backtrack on these applications. *)
-  let simplify =
-    andthen_list [
+  let simplify ~intro =
+    andthen_list (
       (* Try assumption first to avoid loosing the possibility
-       * of doing it after introductions. *)
-      try_tac (wrap assumption) ;
-      repeat (wrap simpl_left) ;
+         * of doing it after introductions. *)
+      try_tac (wrap assumption) ::
+      (if intro then [wrap intro_all] else []) @
+      repeat (wrap simpl_left) ::
       (* Learn new term equalities from constraints before
        * learning new index equalities from term equalities,
        * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
-      (wrap eq_trace) ;
-      (wrap eq_names) ;
+      (wrap eq_trace) ::
+      (wrap eq_names) ::
       (* Simplify equalities using substitution. *)
-      repeat (wrap autosubst)
-    ]
-  in
+      [repeat (wrap autosubst)]
+    ) in
+  
   (* Attempt to close a goal. *)
   let conclude =
     orelse_list [(wrap congruence); (wrap constraints); (wrap assumption)]
   in
   let (>>) = andthen ~cut:true in
+  
   (* If [close] then automatically prove the goal,
    * otherwise it may also be reduced to a single subgoal. *)
   let rec simpl close : TraceSequent.t tac =
-    simplify >> try_tac conclude >>
+    (* if [close], we introduce as much as possible to help. *)
+    simplify ~intro:close >>
+    try_tac conclude >>
       fun g sk fk ->
         (* If we still have a goal, we can try to split a conjunction
          * and prove the remaining subgoals, or return this goal,
