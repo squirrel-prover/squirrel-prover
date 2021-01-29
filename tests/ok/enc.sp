@@ -19,9 +19,12 @@ induction t.
 expandall.
 fresh 1.
 yesif 1.
+by auto.
 
 expandall.
-fa 2. fa 3. fa 3. fa 3.  cca1 3.
+fa 2; fa 3; fa 3; fa 3.  
+cca1 3.
 
 admit 3.
+by auto.
 Qed.

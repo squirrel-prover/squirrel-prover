@@ -18,9 +18,11 @@ goal
   t = A(i) => not(happens(t)).
 Proof.
   induction.
+  intro t1 i Hind i.
   assert(happens(A(i))).
-  apply happens_le to A(i), t.
-  euf C0.
+  by apply happens_le to A(i), t.
+  euf C.
+  intro Hle Heq.
   apply happens_le to A(i1), A(i).
-  apply IH0 to A(i1), i1.
+  apply Hind to A(i1), i1.
 Qed.

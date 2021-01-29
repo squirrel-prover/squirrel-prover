@@ -6,7 +6,7 @@ system null.
 
 goal n = f(m) => False.
 Proof.
-  nosimpl(intro).
-  nosimpl(fresh M0).
-  nosimpl(false_left).
+  nosimpl(intro Heq).
+  nosimpl(fresh Heq).
+  by auto.
 Qed.
