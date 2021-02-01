@@ -1,14 +1,35 @@
 module L = Location
 
-type intro_arg =
-  | IA_Star    of Location.t
-  | IA_Unnamed of Location.t
-  | IA_Named   of Theory.lsymb
+type intro_pattern =
+  | IP_Star    of Location.t    (** '*' *)
+  | IP_Unnamed of Location.t    (** '_' *)
+  | IP_AnyName of Location.t    (** '?' *)
+  | IP_Named   of Theory.lsymb
 
-let pp_intro_arg fmt = function
-  | IA_Star    _ -> Fmt.pf fmt "*"
-  | IA_Unnamed _ -> Fmt.pf fmt "_"
-  | IA_Named   s -> Fmt.pf fmt "%s" (L.unloc s)
+  | IP_Or      of intro_pattern list
+  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
+        
+  | IP_And     of intro_pattern list
+  (** e.g. \[H1 H2\] to destruct a conjunction. *)
+
+  | IP_Split 
+  (** e.g. \[\] to split a disjunction or conjunction. *)
+
+let rec pp_intro_arg fmt = function
+  | IP_Star    _ -> Fmt.pf fmt "*"
+  | IP_Unnamed _ -> Fmt.pf fmt "_"
+  | IP_AnyName _ -> Fmt.pf fmt "?"
+  | IP_Named   s -> Fmt.pf fmt "%s" (L.unloc s)
+
+  | IP_Or      l ->
+    let sep fmt () = Fmt.pf fmt "|" in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_intro_arg) l
+
+  | IP_And      l ->
+    let sep fmt () = Fmt.pf fmt " " in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_intro_arg) l
+
+  | IP_Split -> Fmt.pf fmt "[]"
 
 let pp_intro_args fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in
@@ -20,7 +41,7 @@ type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
-  | IntroArgs   of intro_arg list
+  | IntroPat    of intro_pattern list
 
 type ('a, 'b) pair
 

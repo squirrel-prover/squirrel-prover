@@ -80,58 +80,6 @@ let () =
     goal_and_right
     ~usages_sorts:[Sort None]
 
-(* TODO: add back the tactic, and rename to destruct. *)
-(* (\*------------------------------------------------------------------*\)
- * (\** Compute the goals resulting from the addition of a list of
- *   * formulas as hypotheses,
- *   * followed by the left intro of existentials, conjunctions
- *   * and disjunctions (if branching flag is set). *\)
- * let left_introductions ~branching s l =
- *   let rec left_introductions s = function
- *   | (Term.And (f,g),prefix) :: l -> left_introductions s
- *                                       ((f,prefix)::(g,prefix)::l)
- *   | (Term.Or (f,g),prefix) :: l when branching ->
- *       left_introductions s ((f,prefix)::l) @
- *       left_introductions s ((g,prefix)::l)
- *   | (Term.Exists (vars,f),prefix) :: l ->
- *       let env = TraceSequent.env s in
- *       let subst,env =
- *         List.fold_left
- *           (fun (subst,env) (Vars.EVar v) ->
- *              let env,v' =
- *                Vars.make_fresh env (Vars.sort v) (Vars.name v)
- *              in
- *              let item = Term.ESubst (Var v, Var v') in
- *              item::subst, env)
- *           ([],env)
- *           vars
- *       in
- *       let f = Term.subst subst f in
- *         left_introductions (TraceSequent.set_env env s) ((f,prefix)::l)
- *   | (f, "") :: l -> left_introductions
- *                       (Hyps.add_formula f s) l
- *   | (f, prefix) :: l -> left_introductions
- *                           (TraceSequent.add_formula ~prefix f s) l
- *   | [] -> [s]
- *   in left_introductions s l
- * 
- * let all_left_introductions s l = left_introductions ~branching:true s l
- * 
- * let left_introductions s l =
- *   match left_introductions ~branching:false s l with
- *     | [s] -> s
- *     | _ -> assert false
- * 
- * let left_intros (Args.String hyp_name) s =
- *   match TraceSequent.select_formula_hypothesis hyp_name s ~remove:true with
- *     | s,formula -> [left_introductions s [(formula,"")]]
- *     | exception Not_found ->
- *       soft_failure (Tactics.Failure "no such hypothesis")
- * 
- * let () =
- *   T.register_typed "introsleft"
- *     ~general_help:"Simplify conjunctions and existentials in an hypothesis."
- *     left_intros Args.String *)
 
 (*------------------------------------------------------------------*)
 (* TODO: this should maybe not be a tactic, but only a rewriting rule ?
@@ -201,19 +149,21 @@ let timestamp_case (ts : Term.timestamp) s =
   [TraceSequent.set_conclusion goal s]
 
 (** Case analysis on a disjunctive hypothesis *)
-let hypothesis_case hyp_name (s : TraceSequent.t) =
-  let id,f = Hyps.by_name hyp_name s in
+let hypothesis_case id (s : TraceSequent.t) =
+  let f = Hyps.by_id id s in
   let s = Hyps.remove id s in
-  let rec disjunction_to_list acc = function
-    | Or (f,g) :: l -> disjunction_to_list acc (f::g::l)
-    | f :: l -> disjunction_to_list (f::acc) l
-    | [] -> acc
-  in
-  let formulas = disjunction_to_list [] [f] in
-  if List.length formulas = 1 then
-    soft_failure
-      (Tactics.Failure "can only be applied to a disjunction") ;
-  List.rev_map (fun f -> Hyps.add_formula (Ident.fresh id) f s ) formulas
+  match f with
+  | Or (f,g) ->
+    let idf = Hyps.fresh_id "_" s in
+    let sf = Hyps.add_formula idf f s in
+    
+    let idg = Hyps.fresh_id "_" s in
+    let sg = Hyps.add_formula idg g s in
+
+    [(idf, sf); (idg, sg)]
+    
+  | _ -> soft_failure (Tactics.Failure "can only be applied to a disjunction")
+  
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -268,7 +218,9 @@ let case_tac (args : Args.parser_arg list) s
   try begin
     match Args.convert_as_string args with
     | Some str when Hyps.mem_name str s ->
-      sk (hypothesis_case str s) fk
+      let id, _ = Hyps.by_name str s in
+      let ss = List.map snd (hypothesis_case id s) in      
+      sk ss fk
     | _ ->
       let env, tbl = TraceSequent.env s, TraceSequent.table s in
       match Args.convert_args tbl env args Args.(Sort ETerm) with
@@ -328,15 +280,47 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** [do_intro name judge] introduces the topmost connective
+(** Compute the goals resulting from the addition of a list of
+  * formulas as hypotheses,
+  * followed by the left intro of existentials, conjunctions
+  * and disjunctions (if branching flag is set). *)
+let do_and_pat (hid : Ident.t) s :
+  TraceSequent.sequent * [`Var of Vars.evar | `Hyp of Ident.t] list =
+  match Hyps.by_id hid s with
+  | Term.And (f,g) ->
+    let s = Hyps.remove hid s in
+    let idf, idg = Utils.as_seq2 (Hyps.fresh_ids ["_"; "_"] s) in
+    let s = Hyps.add_formula idf f (Hyps.add_formula idg g s) in
+    (s, [`Hyp idf; `Hyp idg])
+
+  | Term.Exists ((Vars.EVar v) :: vars,f) ->
+    let s = Hyps.remove hid s in
+
+    let env = TraceSequent.env s in    
+    let env,v' = Vars.make_fresh env (Vars.sort v) (Vars.name v) in
+    let subst = [Term.ESubst (Var v, Var v')] in
+    let s = TraceSequent.set_env env s in    
+    let f = Term.subst subst f in
+    let idf = Hyps.fresh_id "_" s in
+    let s = Hyps.add_formula idf f s in
+    (s, [`Var (EVar v'); `Hyp idf])
+
+  | _ -> soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
+
+(*------------------------------------------------------------------*)
+(** Target of an introduction pattern application. *)
+type ip_target = T_concl | T_id of Ident.t
+
+(** [do_intro name t judge] introduces the topmost connective
     of the conclusion formula (naming it [name]), when this can be done in
-    an invertible and non-branching manner. *)
+    an invertible and non-branching manner. 
+    When [name] is [None], a name is automatically chosen. *)
 let do_intro (iname : Theory.lsymb option) (s : TraceSequent.t) =
-  (* for all cases exception [ForAll _] *)
+  (* for all cases except [ForAll _] *)
   let mk_id () = match iname with
     | None       -> Hyps.fresh_id ~approx:true "H" s
     | Some iname -> Hyps.fresh_id ~approx:false (L.unloc iname) s in
-  
+
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar x) :: vs,f) ->
     let iname = match iname with
@@ -380,29 +364,32 @@ let do_intro (iname : Theory.lsymb option) (s : TraceSequent.t) =
     
   | _ -> soft_failure Tactics.NothingToIntroduce
 
-let rec do_intros (intros : Args.intro_arg list) s =
+let rec do_intros (intros : Args.intro_pattern list) (t : ip_target) s =
   match intros with
   | [] -> s
-  | (Args.IA_Unnamed loc) :: intros ->
+  | (Args.IP_Unnamed loc) :: intros ->
     let intro = Some (L.mk_loc loc "_") in
-    do_intros intros (do_intro intro s)
+    do_intros intros t (do_intro intro s)
 
-  | (Args.IA_Named name) :: intros ->
+  | (Args.IP_AnyName loc) :: intros ->
+    do_intros intros t (do_intro None s)
+
+  | (Args.IP_Named name) :: intros ->
     let intro = Some name in
-    do_intros intros (do_intro intro s)
+    do_intros intros t (do_intro intro s)
 
-  | (Args.IA_Star loc) :: intros ->
-    try do_intros [Args.IA_Star loc] (do_intro None s) with
+  | (Args.IP_Star loc) :: intros ->
+    try do_intros [Args.IP_Star loc] t (do_intro None s) with
     | Tactics.Tactic_soft_failure NothingToIntroduce -> s
 
 (** Correponds to `intro *`, to use in automated tactics. *)
 let intro_all (s : TraceSequent.t) : TraceSequent.t list =
-  let star = Args.IA_Star L._dummy in
-  [do_intros [star] s]
+  let star = Args.IP_Star L._dummy in
+  [do_intros [star] T_concl s]
     
 let intro_tac args s sk fk =
   try match args with
-    | [Args.IntroArgs intros] -> sk [do_intros intros s] fk
+    | [Args.IntroPat intros] -> sk [do_intros intros T_concl s] fk
                                           
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
   with Tactics.Tactic_soft_failure e -> fk e
@@ -1838,6 +1825,7 @@ let () =
     (function
        | [] -> simpl false
        | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
+
   T.register_general "auto"
     ~usages_sorts:[Sort None]
     (function

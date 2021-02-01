@@ -35,6 +35,7 @@ rule token = parse
 | '>'                 { RANGLE }
 | '['                 { LBRACKET }
 | ']'                 { RBRACKET }
+| '?'                 { QMARK }
 | ','                 { COMMA }
 | '.'                 { DOT }
 | ':'                 { COLON }

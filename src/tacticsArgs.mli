@@ -1,23 +1,38 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
-type intro_arg =
-  | IA_Star    of Location.t
-  | IA_Unnamed of Location.t
-  | IA_Named   of Theory.lsymb
+(*------------------------------------------------------------------*)
+(** {2 Intro patterns} *)
 
-val pp_intro_args : Format.formatter -> intro_arg list -> unit
+type intro_pattern =
+  | IP_Star    of Location.t    (** '*' *)
+  | IP_Unnamed of Location.t    (** '_' *)
+  | IP_AnyName of Location.t    (** '?' *)
+  | IP_Named   of Theory.lsymb
+
+  | IP_Or      of intro_pattern list
+  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
+        
+  | IP_And     of intro_pattern list
+  (** e.g. \[H1 H2\] to destruct a conjunction. *)
+
+  | IP_Split 
+  (** e.g. \[\] to split a disjunction or conjunction. *)
+
+val pp_intro_args : Format.formatter -> intro_pattern list -> unit
   
 (*------------------------------------------------------------------*)
-(* Types defined directly in the parsing. Note that all tactics not defined in
-   the parser must rely on the Theory type, even to parse strings. *)
+(** {2 Tactic arguments types} *)
+  
+(** Types used during parsing. 
+    Note that all tactics not defined in the parser must rely on the Theory 
+    type, even to parse strings. *)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
-  | IntroArgs   of intro_arg list
+  | IntroPat    of intro_pattern list
 
-(*------------------------------------------------------------------*)
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
@@ -35,7 +50,6 @@ type _ sort =
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
-(*------------------------------------------------------------------*)
 (** Tactic arguments *)
 type _ arg =
   | None      : unit arg 

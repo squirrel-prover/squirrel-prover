@@ -7,7 +7,7 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE QMARK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
@@ -340,12 +340,18 @@ tac_errors:
 | i=ID COMMA t=tac_errors { i::t }
 
 intro_param:
-| l=loc(STAR)       { TacticsArgs.IA_Star (Location.loc l)}
-| l=loc(UNDERSCORE) { TacticsArgs.IA_Unnamed (Location.loc l) }
-| id=lsymb          { TacticsArgs.IA_Named id }
+| l=loc(STAR)       { TacticsArgs.IP_Star (Location.loc l)}
+| l=loc(UNDERSCORE) { TacticsArgs.IP_Unnamed (Location.loc l) }
+| l=loc(QMARK)      { TacticsArgs.IP_AnyName (Location.loc l) }
+| id=lsymb          { TacticsArgs.IP_Named id }
+| LBRACKET RBRACKET { TacticsArgs.IP_Split }
+| LBRACKET intro_param          ips=slist(intro_param, empty)    RBRACKET
+        { TacticsArgs.IP_And ips }
+| LBRACKET intro_param PARALLEL ips=slist(intro_param, PARALLEL) RBRACKET
+        { TacticsArgs.IP_Or ips }
 
 intro_params:
-| l=slist1(intro_param,empty) { TacticsArgs.IntroArgs l }
+| l=slist1(intro_param,empty) { TacticsArgs.IntroPat l }
 
 tac:
   | LPAREN t=tac RPAREN                { t }
