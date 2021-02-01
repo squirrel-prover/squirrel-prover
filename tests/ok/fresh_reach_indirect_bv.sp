@@ -17,10 +17,6 @@ goal test :
 
 Proof.
  nosimpl(intro i j Hneq Heq).
- nosimpl(fresh Heq).
-(* TODO: destruct *)
- nosimpl(constraints).
- nosimpl(constraints).
- nosimpl(constraints).
- nosimpl(constraints).
+ nosimpl(fresh Heq). 
+ by intro H; case H.
 Qed.
