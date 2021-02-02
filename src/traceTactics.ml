@@ -616,14 +616,6 @@ let () =
     simpl_left
     ~usages_sorts:[Sort None]
 
-(* tactic completely unused *)
-(* let () =
- *   T.register_macro "anyintro"
- *     ~general_help:"Introduce topmost connective of goal formula, when invertible."
- *     ~usages_sorts:[Sort None]
- *     (OrElse
- *        [ Abstract ("split",[]) ; Abstract ("intro",[]) ]) *)
-
 (*------------------------------------------------------------------*)
 (** Induction *)
 
@@ -1627,7 +1619,7 @@ let apply name (ths:Theory.term list) (s : TraceSequent.t) =
         List.rev (s'::subgoals)
     | f ->
       (* TODO: named hypothesis *)
-      let id = Hyps.fresh_id ~approx:true name s in
+      let id = Hyps.fresh_id ~approx:true ("H" ^ name) s in
       Hyps.add_formula id f s ::
       List.rev subgoals
   in

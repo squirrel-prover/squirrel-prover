@@ -46,7 +46,7 @@ Proof.
  apply Hexec to Out.
  nosimpl(expand exec@Out).
 
- destruct Hexec0 as [Hexec0 Hcond].
+ destruct HHexec as [Hexec0 Hcond].
 
  expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
  euf Hcond.

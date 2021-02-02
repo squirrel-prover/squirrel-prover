@@ -17,7 +17,7 @@ Proof.
   xor 1.
   nosimpl(yesif 1).
   apply len_ok to ii,jj. 
-  apply len_ok to i,i.
+  apply len_ok to i,j. 
   admit. (* Induction hypothesis.*)
 Qed.
 
