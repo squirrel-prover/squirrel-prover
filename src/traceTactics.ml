@@ -112,6 +112,54 @@ let () =
     ~general_help:"Push a negation inside a formula."
     left_not_intro Args.String
 
+
+(*------------------------------------------------------------------*)    
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
+
+(** Apply a naming pattern to a variable or hypothesis. *)
+let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
+  match ip_handler with
+  | `Var Vars.EVar v ->
+    let env = ref (TraceSequent.env s) in
+    
+    let v' = match nip with
+      | Args.Unnamed _
+      | Args.AnyName _ ->
+        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
+
+      | Args.Named lsymb ->
+        let name = L.unloc lsymb in
+        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
+    
+        if Vars.name v' <> name then
+          hard_failure (
+            Tactics.Failure ("variable name " ^ name ^ " already in use"));
+        v'    
+    in 
+    let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
+
+    (* FIXME: we substitute everywhere. This is inefficient. *)    
+    TraceSequent.subst subst (TraceSequent.set_env !env s)
+
+  | `Hyp hid ->
+    let f = Hyps.by_id hid s in        
+    let s = Hyps.remove hid s in
+    
+    let id = match nip with
+      | Args.AnyName l ->
+        if Ident.name hid = "_"
+        then Hyps.fresh_id ~approx:true "H" s
+        else Ident.fresh hid 
+
+      | Args.Named lsymb -> Hyps.fresh_id ~approx:false (L.unloc lsymb) s
+                              
+      | Args.Unnamed lsymb -> Hyps.fresh_id "_" s in
+   
+    Hyps.add_formula id f s
+
 (*------------------------------------------------------------------*)
 (** Type for case and destruct tactics handlers *)
 type c_handler =
@@ -237,10 +285,12 @@ let case_tac (args : Args.parser_arg list) s
     (sk : TraceSequent.t list Tactics.sk) fk =
   try
     let cres = do_case_tac args s in
-    let ss = List.map snd cres in
+    let ss = List.map (fun (CHyp id, s) ->
+        (* TODO: location *)
+        do_naming_pat (`Hyp id) (Args.AnyName L._dummy) s
+      ) cres in
     sk ss fk
   with Tactics.Tactic_soft_failure e -> fk e
-
 
 let () =
   let open Tactics in
@@ -287,54 +337,7 @@ let () =
     false_left
     ~usages_sorts:[Sort None]
 
-
-(*------------------------------------------------------------------*)    
-type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
-  | `Hyp of Ident.t
-]
-
-(** Apply a naming pattern to a variable or hypothesis. *)
-let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
-  match ip_handler with
-  | `Var Vars.EVar v ->
-    let env = ref (TraceSequent.env s) in
-    
-    let v' = match nip with
-      | Args.Unnamed _
-      | Args.AnyName _ ->
-        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
-
-      | Args.Named lsymb ->
-        let name = L.unloc lsymb in
-        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
-    
-        if Vars.name v' <> name then
-          hard_failure (
-            Tactics.Failure ("variable name " ^ name ^ " already in use"));
-        v'    
-    in 
-    let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
-
-    (* FIXME: we substitute everywhere. This is inefficient. *)    
-    TraceSequent.subst subst (TraceSequent.set_env !env s)
-
-  | `Hyp hid ->
-    let f = Hyps.by_id hid s in        
-    let s = Hyps.remove hid s in
-    
-    let id = match nip with
-      | Args.AnyName l ->
-        if Ident.name hid = "_"
-        then Hyps.fresh_id ~approx:true "H" s
-        else Ident.fresh hid 
-
-      | Args.Named lsymb -> Hyps.fresh_id ~approx:false (L.unloc lsymb) s
-                              
-      | Args.Unnamed lsymb -> Hyps.fresh_id "_" s in
-   
-    Hyps.add_formula id f s
-
+(*------------------------------------------------------------------*)
 (** Apply a And pattern (this is a destruct).
     Note that variables in handlers have not been added to the env yet. *)
 let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
@@ -415,7 +418,6 @@ and do_simpl_pat (h : ip_handler) (ip : Args.simpl_pat) s
   | `Hyp id, Args.SAndOr ao_ip ->
     do_and_or_pat id ao_ip s
 
-  
 (*------------------------------------------------------------------*)
 (** [do_intro name t judge] introduces the topmost connective
     of the conclusion formula. *)
@@ -459,7 +461,6 @@ let rec do_intro (s : TraceSequent.t) : ip_handler * TraceSequent.sequent =
 let do_intro_pat (ip : Args.simpl_pat) s : TraceSequent.sequent list =
   let handler, s = do_intro s in
   do_simpl_pat handler ip s
-  
 
 let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
@@ -637,9 +638,10 @@ let induction s  =
          let env,v' = Vars.make_fresh_from (TraceSequent.env s) v in
          let _,v'' = Vars.make_fresh_from env v in
          (* Introduce v as v'. *)
-         let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')]
-             (ForAll (vs,f))
-         in
+         let f' = match vs with
+           | [] -> f
+           | _ -> ForAll (vs,f) in
+         let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')] f' in
          (* Use v'' to form induction hypothesis. *)
          let (-->) a b = Impl (a,b) in
          let ih =
