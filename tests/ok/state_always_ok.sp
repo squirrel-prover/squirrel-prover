@@ -9,8 +9,7 @@ goal forall t:timestamp, s@t = ok.
 Proof.
   induction.
   intro Hind.
-  case t. intro H.
-  case H.
+  case t. 
   (* t = init *)
   apply init_ok. 
   

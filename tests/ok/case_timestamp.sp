@@ -6,6 +6,8 @@ goal forall t:timestamp,
   t = init || (t = A || exists i:index, t = A1(i)).
 Proof.
   intro tau. 
-  case tau.
-  by auto.
+  case tau.  
+  by left. 
+  by right; left. 
+  by right; right; exists i.
 Qed.

@@ -18,5 +18,6 @@ goal test :
 Proof.
  nosimpl(intro i j Hneq Heq).
  nosimpl(fresh Heq). 
- by intro H; case H.
+ intro H.
+ repeat case H. 
 Qed.
