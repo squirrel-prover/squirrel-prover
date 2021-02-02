@@ -205,12 +205,6 @@ let by_tac tac judge sk fk =
     | _ -> raise (Tactic_soft_failure GoalNotClosed) in
   tac judge sk fk
 
-let not_branching tac j sk fk =
-  tac j
-    (fun l _ -> if List.length l <= 1 then sk l fk else
-        fk (Failure "branching tactic under non branching instruction"))
-    fk
-
 let id j sk fk = sk [j] fk
 
 let try_tac t j sk fk =
@@ -305,7 +299,6 @@ type 'a ast =
   | AndThen : 'a ast list -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
-  | NotBranching : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
@@ -343,7 +336,6 @@ module AST (M:S) = struct
     | OrElse tl -> orelse_list (List.map (eval modifiers) tl)
     | Try t -> try_tac (eval modifiers t)
     | By t -> by_tac (eval modifiers t)
-    | NotBranching t -> not_branching (eval modifiers t)
     | Repeat t -> repeat (eval modifiers t)
     | Ident -> id
     | Modifier (id,t) -> eval (id::modifiers) t
@@ -373,8 +365,6 @@ module AST (M:S) = struct
     | Ident -> Fmt.pf ppf "id"
     | Try t ->
       Fmt.pf ppf "(try @[%a@])" pp t
-    | NotBranching t ->
-      Fmt.pf ppf "(nobranch @[%a@])" pp t
     | Repeat t ->
       Fmt.pf ppf "(repeat @[%a@])" pp t
     | CheckFail (e, t) ->

@@ -114,7 +114,6 @@ rule token = parse
 | "repeat"            { REPEAT }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
-| "nobranch"          { NOBRANCH }
 | "checkfail"         { CHECKFAIL }
 | '+'                 { PLUS }
 | ("cond"|"exec") as n { PID n }

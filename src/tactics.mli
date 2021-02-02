@@ -127,7 +127,6 @@ type 'a ast =
   | AndThen : 'a ast list -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
-  | NotBranching : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
