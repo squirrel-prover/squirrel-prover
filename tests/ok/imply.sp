@@ -1,5 +1,5 @@
 system null.
-goal test : forall (i:index), exists (), i=i => True.
+goal test : forall (i:index), i=i => True.
 Proof.
  by auto.
 Qed.

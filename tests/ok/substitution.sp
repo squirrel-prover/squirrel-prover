@@ -21,8 +21,8 @@ goal unforgeable_1 :
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intro a b c H Hneq).
- (* TODO: destruct H and correct the proof*)
+ nosimpl(intro a b c [H G] Hneq).
  substitute a, c.
- collision.
+ collision. 
+ by auto.
 Qed.

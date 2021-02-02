@@ -46,15 +46,14 @@ Proof.
  apply Hexec to Out.
  nosimpl(expand exec@Out).
 
-(* TODO: destruct Hexec  *)
- TODO.
+ destruct Hexec0 as [Hexec0 Hcond].
 
  expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
- euf M0.
+ euf Hcond.
  (* we prove the goal where the message satisfies the tag *)
- case H5.
- apply H2 to i.
- nosimpl(notleft H3).
- (* the honnestly produced hash case is direclty in contradiciton with the condition of S *)
- simpl.
+ intro [Hneq | [i Heq]]. 
+ by apply He_2_1 to i. 
+
+ nosimpl(notleft He_2_2). 
+ by auto.
 Qed.

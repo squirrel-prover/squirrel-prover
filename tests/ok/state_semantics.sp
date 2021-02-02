@@ -32,7 +32,6 @@ goal stateSemantics1:
   forall (i,j:index),
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof.
-nosimpl(intro *).
 auto.
 Qed.
 

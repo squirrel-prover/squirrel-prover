@@ -18,7 +18,14 @@ goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
 Proof.
 nosimpl(intro H).
 nosimpl(notleft H).
-(* TODO: destruct H and conclude *)
-nosimpl(introsleft H0).
+nosimpl(destruct H).
 simpl.
+Qed.
+
+goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
+Proof.
+nosimpl(intro H).
+nosimpl(notleft H).
+nosimpl(destruct H as [t [Hc Hcc]]). 
+auto.
 Qed.
