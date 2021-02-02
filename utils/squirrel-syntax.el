@@ -84,6 +84,8 @@
   "induction"
   "intro"
   "intros"
+  "destruct"
+  "as"
   "introsleft"
   "left"
   "notleft"

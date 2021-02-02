@@ -22,8 +22,10 @@ let pp_hyp fmt f = Term.pp fmt f
                          
 type ldecl = Ident.t * hyp
 
-let pp_ldecl ppf (id,hyp) =
-  Fmt.pf ppf "%a: %a@;" Ident.pp id pp_hyp hyp
+let pp_ldecl ?(dbg=false) ppf (id,hyp) =
+  Fmt.pf ppf "%a: %a@;"
+    (if dbg then Ident.pp_full else Ident.pp) id
+    pp_hyp hyp
     
 module H : sig
   type hyps
@@ -41,8 +43,7 @@ module H : sig
   val fresh_id : string -> hyps -> Ident.t
   val fresh_ids : string list -> hyps -> Ident.t list
   
-  val add       : Ident.t -> hyp -> hyps -> hyps
-  (* val add_exact : string  -> hyp -> hyps -> hyps *)
+  val add : force:bool -> Ident.t -> hyp -> hyps -> hyps
 
   val find_opt : (Ident.t -> hyp -> bool) -> hyps -> ldecl option
   val find_all : (Ident.t -> hyp -> bool) -> hyps -> ldecl list
@@ -64,7 +65,7 @@ module H : sig
 
   val fold : (Ident.t -> Term.formula -> 'a -> 'a) -> hyps -> 'a -> 'a
     
-  val pps : Format.formatter -> hyps -> unit
+  val pps : ?dbg:bool -> Format.formatter -> hyps -> unit
 
 end = struct 
   module Mid = Ident.Mid
@@ -75,10 +76,10 @@ end = struct
   
   let empty =  Mid.empty
 
-  let pps ppf hyps =
+  let pps ?(dbg=false) ppf hyps =
     let pp_sep fmt () = Fmt.pf ppf "" in
     Fmt.pf ppf "@[<v 0>%a@]"
-      (Fmt.list ~sep:pp_sep pp_ldecl) (Mid.bindings hyps)
+      (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg)) (Mid.bindings hyps)
       
   let find_opt func hyps =
     let exception Found of Ident.t * hyp in
@@ -148,18 +149,12 @@ end = struct
       ) ([], hyps) names in
     List.rev ids
     
-  let add id hyp hyps =
+  let add ~force id hyp hyps =
     assert (not (Mid.mem id hyps)); 
     if not (is_fresh (Ident.name id) hyps)
     then hyp_error (HypAlreadyExists (Ident.name id))
     (* do we really want to not add twice an hypothesis ? *)
-    else if is_hyp hyp hyps then hyps else Mid.add id hyp hyps
-
-  (* let add_exact name hyp hyps =
-   *   let id = fresh_id name hyps in
-   *   if Ident.name id <> name
-   *   then hyp_error (HypAlreadyExists name)
-   *   else Mid.add id hyp hyps *)
+    else if is_hyp hyp hyps && not force then hyps else Mid.add id hyp hyps
   
   let mem_id id hyps = Mid.mem id hyps
   let mem_name name hyps =
@@ -306,6 +301,7 @@ module Hyps = struct
 
   let fresh_ids ?(approx=false) names s =
     let ids = H.fresh_ids names s.hyps in
+    
     if approx then ids else
       begin
         List.iter2 (fun id name ->
@@ -367,23 +363,25 @@ module Hyps = struct
     
     List.fold_left (add_message_atom None) s !macro_eqs
 
-  and add_message_atom (id : Ident.t option) s at =
+  and add_message_atom ?(force=false) (id : Ident.t option) s at =
     let f = Term.Atom (at :> generic_atom) in
-    if H.is_hyp f s.hyps then s else
-      (* TODO: remove auto naming ? *)
-      let id = match id with       
-        | None -> H.fresh_id "D" s.hyps
-        | Some id -> id in
-      let hyps = H.add id f s.hyps in
-      let s =
-        S.update ~keep_trs:false ~keep_models:true
-          ~hyps s in
-      
-      add_macro_defs s (at :> generic_atom)
+    let recurse = not (H.is_hyp f s.hyps) in
+    
+    (* TODO: remove auto naming ? *)
+    let id = match id with       
+      | None -> H.fresh_id "D" s.hyps
+      | Some id -> id in
+    let hyps = H.add ~force id f s.hyps in
+    let s =
+      S.update ~keep_trs:false ~keep_models:true
+        ~hyps s in
 
-  let rec add_happens id s ts =
+    (* [recurse] boolean to avoid looping *)
+    if recurse then add_macro_defs s (at :> generic_atom) else s
+
+  let rec add_happens ?(force=false) id s ts =
     let f = Term.Atom (`Happens ts :> generic_atom) in
-    let hyps = H.add id f s.hyps in
+    let hyps = H.add ~force id f s.hyps in
     let s =
       S.update ~keep_trs:true ~keep_models:false
         ~hyps s in
@@ -400,20 +398,24 @@ module Hyps = struct
         s
     | _ -> s
 
-  (* Depending on the shape of the formula, we add it to the corresponding set of
-     hyps. *)
-  and add_formula id f s =
+  (** if [force], we add the formula to [Hyps] even if it already exists. *)
+  and add_formula ?(force=false) id f s =
     match f with
-    | Term.Atom (#Atom.message_atom as at) -> add_message_atom (Some id) s at
-    | Term.Atom (`Happens ts)              -> add_happens      id s ts
+    | Term.Atom (#Atom.message_atom as at) -> add_message_atom ~force (Some id) s at
+    | Term.Atom (`Happens ts)              -> add_happens ~force id s ts
     | _ ->
-      let hyps = H.add id f s.hyps in
+      let hyps = H.add ~force id f s.hyps in
       (* TODO: performances, less updates ? *)
       S.update ~hyps:hyps s
 
+  let add_formula id f s = add_formula ~force:true id f s
+  
   let remove id s = S.update ~hyps:(H.remove id s.hyps) s
 
   let fold func s init = H.fold func s.hyps init
+
+  let pp fmt s = H.pps fmt s.hyps
+  let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
 end
 
 (*------------------------------------------------------------------*)

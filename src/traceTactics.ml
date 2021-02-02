@@ -113,8 +113,14 @@ let () =
     left_not_intro Args.String
 
 (*------------------------------------------------------------------*)
+(** Type for case and destruct tactics handlers *)
+type c_handler =
+  | CHyp of Ident.t
+
+type c_res = c_handler * TraceSequent.sequent
+                           
 (** Case analysis on a timestamp *)
-let timestamp_case (ts : Term.timestamp) s =
+let timestamp_case (ts : Term.timestamp) s : c_res list =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
 
@@ -139,29 +145,27 @@ let timestamp_case (ts : Term.timestamp) s =
       Exists (List.map (fun x -> Vars.EVar x) indices,at) in
   
   let cases = SystemExpr.map_descrs table system mk_case in
-  let f =
-    List.fold_right Term.mk_or
-      (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
-      Term.False in
 
-  let goal = Term.mk_impl f (TraceSequent.conclusion s) in
+  List.map (fun f ->
+      let id = Hyps.fresh_id "_" s in
+      ( CHyp id, Hyps.add_formula id f s )
+    ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
+
   
-  [TraceSequent.set_conclusion goal s]
-
-(** Case analysis on a disjunctive hypothesis *)
-let hypothesis_case id (s : TraceSequent.t) =
+(** Case analysis on an hypothesis *)
+let hypothesis_case id (s : TraceSequent.t) : c_res list =
   let f = Hyps.by_id id s in
   let s = Hyps.remove id s in
   match f with
   | Or (f,g) ->
-    let idf = Hyps.fresh_id "_" s in
+    let idf = Ident.fresh id in
     let sf = Hyps.add_formula idf f s in
     
-    let idg = Hyps.fresh_id "_" s in
+    let idg = Ident.fresh id in
     let sg = Hyps.add_formula idg g s in
 
-    [(idf, sf); (idg, sg)]
-    
+    [(CHyp idf, sf); (CHyp idg, sg)]
+
   | _ -> soft_failure (Tactics.Failure "can only be applied to a disjunction")
   
 
@@ -181,16 +185,17 @@ let case_cond orig vars c t e s =
   let then_subst = [ Term.ESubst (orig,t) ] in
   let else_subst = [ Term.ESubst (orig,e) ] in
 
-  let then_concl = Term.mk_impl c  (TraceSequent.conclusion s) in
-  let else_concl = Term.mk_impl c' (TraceSequent.conclusion s) in
+  let idthen, idelse = Hyps.fresh_id "_" s, Hyps.fresh_id "_" s in
   
-  [ s |> TraceSequent.set_env !env
-      |> TraceSequent.set_conclusion then_concl
-      |> TraceSequent.subst then_subst ;
-    s |> TraceSequent.set_conclusion else_concl
-      |> TraceSequent.subst else_subst ]
+  let sthen = Hyps.add_formula idthen c  s
+  and selse = Hyps.add_formula idthen c' s in
 
-let message_case (m : Term.message) s =
+  let sthen = TraceSequent.set_env !env sthen in
+  
+  [ ( CHyp idthen, TraceSequent.subst then_subst sthen );
+    ( CHyp idelse, TraceSequent.subst else_subst selse ) ]
+
+let message_case (m : Term.message) s : c_res list =
   begin match m with
     | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
@@ -213,23 +218,27 @@ let message_case (m : Term.message) s =
       Tactics.(soft_failure (Failure "improper argument"))
   end
 
+let do_case_tac (args : Args.parser_arg list) s =
+  match Args.convert_as_string args with
+  | Some str when Hyps.mem_name str s ->
+    let id, _ = Hyps.by_name str s in
+    hypothesis_case id s
+
+  | _ ->
+    let env, tbl = TraceSequent.env s, TraceSequent.table s in
+    match Args.convert_args tbl env args Args.(Sort ETerm) with
+    | Args.Arg (ETerm (Sorts.Timestamp, f, loc)) ->
+      timestamp_case f s
+    | Args.Arg (ETerm (Sorts.Message, f, loc)) ->
+      message_case f s
+    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+
 let case_tac (args : Args.parser_arg list) s
     (sk : TraceSequent.t list Tactics.sk) fk =
-  try begin
-    match Args.convert_as_string args with
-    | Some str when Hyps.mem_name str s ->
-      let id, _ = Hyps.by_name str s in
-      let ss = List.map snd (hypothesis_case id s) in      
-      sk ss fk
-    | _ ->
-      let env, tbl = TraceSequent.env s, TraceSequent.table s in
-      match Args.convert_args tbl env args Args.(Sort ETerm) with
-      | Args.Arg (ETerm (Sorts.Timestamp, f, loc)) ->
-        sk (timestamp_case f s) fk
-      | Args.Arg (ETerm (Sorts.Message, f, loc)) ->
-        sk (message_case f s) fk
-      | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  end
+  try
+    let cres = do_case_tac args s in
+    let ss = List.map snd cres in
+    sk ss fk
   with Tactics.Tactic_soft_failure e -> fk e
 
 
@@ -279,60 +288,141 @@ let () =
     ~usages_sorts:[Sort None]
 
 
-(*------------------------------------------------------------------*)
-(** Compute the goals resulting from the addition of a list of
-  * formulas as hypotheses,
-  * followed by the left intro of existentials, conjunctions
-  * and disjunctions (if branching flag is set). *)
-let do_and_pat (hid : Ident.t) s :
-  TraceSequent.sequent * [`Var of Vars.evar | `Hyp of Ident.t] list =
-  match Hyps.by_id hid s with
-  | Term.And (f,g) ->
+(*------------------------------------------------------------------*)    
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
+
+(** Apply a naming pattern to a variable or hypothesis. *)
+let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
+  match ip_handler with
+  | `Var Vars.EVar v ->
+    let env = ref (TraceSequent.env s) in
+    
+    let v' = match nip with
+      | Args.Unnamed _
+      | Args.AnyName _ ->
+        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
+
+      | Args.Named lsymb ->
+        let name = L.unloc lsymb in
+        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
+    
+        if Vars.name v' <> name then
+          hard_failure (
+            Tactics.Failure ("variable name " ^ name ^ " already in use"));
+        v'    
+    in 
+    let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
+
+    (* FIXME: we substitute everywhere. This is inefficient. *)    
+    TraceSequent.subst subst (TraceSequent.set_env !env s)
+
+  | `Hyp hid ->
+    let f = Hyps.by_id hid s in        
     let s = Hyps.remove hid s in
+    
+    let id = match nip with
+      | Args.AnyName l ->
+        if Ident.name hid = "_"
+        then Hyps.fresh_id ~approx:true "H" s
+        else Ident.fresh hid 
+
+      | Args.Named lsymb -> Hyps.fresh_id ~approx:false (L.unloc lsymb) s
+                              
+      | Args.Unnamed lsymb -> Hyps.fresh_id "_" s in
+   
+    Hyps.add_formula id f s
+
+(** Apply a And pattern (this is a destruct).
+    Note that variables in handlers have not been added to the env yet. *)
+let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
+  let form = Hyps.by_id hid s in
+  let s = Hyps.remove hid s in
+  
+  match form with
+  | Term.And (f,g) ->
     let idf, idg = Utils.as_seq2 (Hyps.fresh_ids ["_"; "_"] s) in
     let s = Hyps.add_formula idf f (Hyps.add_formula idg g s) in
-    (s, [`Hyp idf; `Hyp idg])
+    ([`Hyp idf; `Hyp idg], s)
 
   | Term.Exists ((Vars.EVar v) :: vars,f) ->
-    let s = Hyps.remove hid s in
-
-    let env = TraceSequent.env s in    
-    let env,v' = Vars.make_fresh env (Vars.sort v) (Vars.name v) in
+    let v' = Vars.make_new_from v in
     let subst = [Term.ESubst (Var v, Var v')] in
-    let s = TraceSequent.set_env env s in    
+
+    let f = match vars with
+      | [] -> f
+      | _ -> Term.Exists (vars,f) in
     let f = Term.subst subst f in
-    let idf = Hyps.fresh_id "_" s in
+    
+    let idf = Ident.fresh hid in
     let s = Hyps.add_formula idf f s in
-    (s, [`Var (EVar v'); `Hyp idf])
+    
+    ([`Var (EVar v'); `Hyp idf], s)
+
+  | Term.Exists ([],f) ->
+    let idf = Ident.fresh hid in
+    let s = Hyps.add_formula idf f s in
+    ([`Hyp idf], s)
 
   | _ -> soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
 
+(** Apply an And/Or pattern to an ident hypothesis handler. *)
+let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
+  : TraceSequent.sequent list =
+  match pat with
+  | Args.And s_ip ->
+    (* Destruct the hypothesis *)
+    let handlers, s = do_and_pat hid s in
+
+    if List.length handlers <> List.length s_ip then
+      hard_failure (Tactics.PatNumError (List.length s_ip, List.length handlers));
+
+    (* Apply, for left to right, the simple patterns, and collect everything *)
+    let ss = List.fold_left2 (fun ss handler ip ->
+        List.map (do_simpl_pat handler ip) ss
+        |> List.flatten
+      ) [s] handlers s_ip in
+    ss
+
+  | Args.Or s_ip ->
+    (* Compute the cases *)
+    let ss = hypothesis_case hid s in
+
+    if List.length ss <> List.length s_ip then
+      hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
+    
+    (* For each case, apply the corresponding simple pattern *)
+    List.map2 (fun (CHyp id, s) ip ->
+        do_simpl_pat (`Hyp id) ip s
+      ) ss s_ip
+
+    (* Collect all cases *)
+    |> List.flatten
+
+  | Args.Split -> assert false  (* TODO *)
+
+(** Apply an simple pattern a handler. *)
+and do_simpl_pat (h : ip_handler) (ip : Args.simpl_pat) s
+  : TraceSequent.sequent list =
+  match h, ip with
+  | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
+                          
+  | `Var _, Args.SAndOr ao_ip ->
+    hard_failure (Tactics.Failure "intro pattern not applicable")
+
+  | `Hyp id, Args.SAndOr ao_ip ->
+    do_and_or_pat id ao_ip s
+
+  
 (*------------------------------------------------------------------*)
-(** Target of an introduction pattern application. *)
-type ip_target = T_concl | T_id of Ident.t
-
 (** [do_intro name t judge] introduces the topmost connective
-    of the conclusion formula (naming it [name]), when this can be done in
-    an invertible and non-branching manner. 
-    When [name] is [None], a name is automatically chosen. *)
-let do_intro (iname : Theory.lsymb option) (s : TraceSequent.t) =
-  (* for all cases except [ForAll _] *)
-  let mk_id () = match iname with
-    | None       -> Hyps.fresh_id ~approx:true "H" s
-    | Some iname -> Hyps.fresh_id ~approx:false (L.unloc iname) s in
-
+    of the conclusion formula. *)
+let rec do_intro (s : TraceSequent.t) : ip_handler * TraceSequent.sequent =
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar x) :: vs,f) ->
-    let iname = match iname with
-      | Some iname -> L.unloc iname
-      | None -> Vars.name x in
-    
-    let env = ref (TraceSequent.env s) in
-    let x' = Vars.make_fresh_and_update env (Vars.sort x) iname in
-    
-    if Vars.name x' <> iname then
-      hard_failure (
-        Tactics.Failure ("variable name " ^ iname ^ " already in use"));
+    let x' = Vars.make_new_from x in
 
     let subst = [Term.ESubst (Term.Var x, Term.Var x')] in
 
@@ -341,55 +431,62 @@ let do_intro (iname : Theory.lsymb option) (s : TraceSequent.t) =
       | _ -> ForAll (vs,f) in
     
     let new_formula = Term.subst subst f in
-    let new_judge = TraceSequent.set_conclusion new_formula s
-                    |> TraceSequent.set_env (!env)
-    in
-    new_judge
+    ( `Var (Vars.EVar x'),
+      TraceSequent.set_conclusion new_formula s )
 
-  | Exists ([],f) ->
-    TraceSequent.set_conclusion f s
-    
+  | ForAll ([],f) ->
+    (* FIXME: this case should never happen. *)
+    do_intro (TraceSequent.set_conclusion f s)
+      
   | Impl(lhs,rhs)->
-    let id = mk_id () in    
-    Hyps.add_formula id lhs (TraceSequent.set_conclusion rhs s)
+    let id = Hyps.fresh_id "_" s in
+    ( `Hyp id,
+      Hyps.add_formula id lhs (TraceSequent.set_conclusion rhs s) )
     
   | Not f ->
-    let id = mk_id () in    
-    Hyps.add_formula id f (TraceSequent.set_conclusion False s)
+    let id = Hyps.fresh_id "_" s in
+    ( `Hyp id,
+      Hyps.add_formula id f (TraceSequent.set_conclusion False s) )
     
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
-    let id = mk_id () in    
-    Hyps.add_formula id (Atom h) (TraceSequent.set_conclusion False s)
+    let id = Hyps.fresh_id "_" s in
+    ( `Hyp id,
+      Hyps.add_formula id (Atom h) (TraceSequent.set_conclusion False s) )
     
   | _ -> soft_failure Tactics.NothingToIntroduce
 
-let rec do_intros (intros : Args.intro_pattern list) (t : ip_target) s =
+let do_intro_pat (ip : Args.simpl_pat) s : TraceSequent.sequent list =
+  let handler, s = do_intro s in
+  do_simpl_pat handler ip s
+  
+
+let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
-  | [] -> s
-  | (Args.IP_Unnamed loc) :: intros ->
-    let intro = Some (L.mk_loc loc "_") in
-    do_intros intros t (do_intro intro s)
+  | [] -> [s]
 
-  | (Args.IP_AnyName loc) :: intros ->
-    do_intros intros t (do_intro None s)
+  | (Args.SimplPat s_ip) :: intros ->
+    let ss = do_intro_pat s_ip s in
+    List.map (do_intros intros) ss
+    |> List.flatten
 
-  | (Args.IP_Named name) :: intros ->
-    let intro = Some name in
-    do_intros intros t (do_intro intro s)
-
-  | (Args.IP_Star loc) :: intros ->
-    try do_intros [Args.IP_Star loc] t (do_intro None s) with
-    | Tactics.Tactic_soft_failure NothingToIntroduce -> s
+  | (Args.Star loc) :: intros ->
+    try 
+      let s_ip = Args.(SNamed (AnyName loc)) in
+      let ss = do_intro_pat s_ip s in
+      List.map (do_intros [Args.Star loc]) ss
+      |> List.flatten
+           
+    with Tactics.Tactic_soft_failure NothingToIntroduce -> [s]
 
 (** Correponds to `intro *`, to use in automated tactics. *)
 let intro_all (s : TraceSequent.t) : TraceSequent.t list =
-  let star = Args.IP_Star L._dummy in
-  [do_intros [star] T_concl s]
+  let star = Args.Star L._dummy in
+  do_intros [star] s
     
 let intro_tac args s sk fk =
   try match args with
-    | [Args.IntroPat intros] -> sk [do_intros intros T_concl s] fk
+    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
                                           
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
   with Tactics.Tactic_soft_failure e -> fk e
@@ -400,6 +497,39 @@ let () =
                    it can be done in an invertible, non-branching fashion.\
                    \n\nUsage: intro a b _ c *"
     intro_tac
+
+
+(*------------------------------------------------------------------*)
+let do_destruct hid (pat : Args.and_or_pat option) s =
+  match pat with
+  | Some pat -> do_and_or_pat hid pat s
+                  
+  | None ->
+    let handlers, s = do_and_pat hid s in
+    [List.fold_left (fun s handler ->
+         (* TODO: location errors *)
+         do_naming_pat handler (Args.AnyName L._dummy) s
+       ) s handlers]
+      
+let destruct_tac args s sk fk =
+  try match args with
+    | [Args.String_name h; Args.AndOrPat pat] ->
+      let hid, _ = Hyps.by_name h s in
+      sk (do_destruct hid (Some pat) s) fk
+        
+    | [Args.String_name h] ->
+      let hid, _ = Hyps.by_name h s in
+      sk (do_destruct hid None s) fk
+        
+    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  with Tactics.Tactic_soft_failure e -> fk e
+  
+let () =
+  T.register_general "destruct"
+    ~general_help:"Destruct an hypothesis. An optional And/Or introduction \
+                   pattern can be given.\
+                   \n\nUsage:\ndestruct H.\ndestruct H as [A | [B C]]."
+    destruct_tac
 
 
 (*------------------------------------------------------------------*)
@@ -441,30 +571,6 @@ let () =
            | subgoals -> sk subgoals fk
            | exception Tactics.Tactic_soft_failure e -> fk e)
 
-(* TODO: re-introduce tactic ? this looks like a sub-case of desctruct *)
-(* (\*------------------------------------------------------------------*\)
- * let exists_left (Args.String hyp_name) s  =
- *   let s,f = TraceSequent.select_formula_hypothesis hyp_name s ~remove:true in
- *     match f with
- *       | Exists (vs,f) ->
- *           let env = ref @@ TraceSequent.env s in
- *           let subst =
- *             List.map
- *               (fun (Vars.EVar v) ->
- *                  Term.ESubst  (Term.Var v,
- *                                Term.Var (Vars.make_fresh_from_and_update env v))
- *               )
- *               vs
- *           in
- *           let f = Term.subst subst f in
- *           let s = TraceSequent.add_formula f (TraceSequent.set_env !env s) in
- *             [s]
- *       | _ -> soft_failure @@ Tactics.Failure "improper arguments"
- * 
- * let () =
- *   T.register_typed "existsleft"
- *     ~general_help:"Introduce existential quantifier in hypothesis H."
- *     exists_left Args.String *)
 
 (*------------------------------------------------------------------*)
 let simpl_left s =

@@ -79,6 +79,8 @@ rule token = parse
 | "senc"              { SENC }
 | "signature"         { SIGNATURE }
 | "intro"             { INTRO }
+| "destruct"          { DESTRUCT }
+| "as"                { AS } 
 | "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }

@@ -52,7 +52,8 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
-    
+  | PatNumError of int * int    (* given, need *)
+                   
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
 

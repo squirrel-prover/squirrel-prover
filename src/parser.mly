@@ -17,7 +17,8 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY INTRO
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL
+%token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
 
@@ -339,20 +340,31 @@ tac_errors:
 | i=ID                    { [i] }
 | i=ID COMMA t=tac_errors { i::t }
 
-intro_param:
-| l=loc(STAR)       { TacticsArgs.IP_Star (Location.loc l)}
-| l=loc(UNDERSCORE) { TacticsArgs.IP_Unnamed (Location.loc l) }
-| l=loc(QMARK)      { TacticsArgs.IP_AnyName (Location.loc l) }
-| id=lsymb          { TacticsArgs.IP_Named id }
-| LBRACKET RBRACKET { TacticsArgs.IP_Split }
-| LBRACKET intro_param          ips=slist(intro_param, empty)    RBRACKET
-        { TacticsArgs.IP_And ips }
-| LBRACKET intro_param PARALLEL ips=slist(intro_param, PARALLEL) RBRACKET
-        { TacticsArgs.IP_Or ips }
+(*------------------------------------------------------------------*)
+naming_pat:
+| l=loc(UNDERSCORE) { TacticsArgs.Unnamed (Location.loc l) }
+| l=loc(QMARK)      { TacticsArgs.AnyName (Location.loc l) }
+| id=lsymb          { TacticsArgs.Named id }
 
-intro_params:
-| l=slist1(intro_param,empty) { TacticsArgs.IntroPat l }
+and_or_pat:
+| LBRACKET s=simpl_pat          ips=slist(simpl_pat, empty)    RBRACKET
+                    { TacticsArgs.And (s :: ips) }
+| LBRACKET s=simpl_pat PARALLEL ips=slist(simpl_pat, PARALLEL) RBRACKET
+                    { TacticsArgs.Or  (s :: ips) }
+| LBRACKET RBRACKET { TacticsArgs.Split }
 
+simpl_pat:
+| n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
+| ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
+
+intro_pat:
+| l=loc(STAR)       { TacticsArgs.Star (Location.loc l)}
+| pat=simpl_pat     { TacticsArgs.SimplPat pat }
+
+intro_pat_list:
+| l=slist1(intro_pat,empty) { l }
+
+(*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
@@ -366,8 +378,15 @@ tac:
   | LEFT                               { Tactics.Abstract ("left",[]) }
   | RIGHT                              { Tactics.Abstract ("right",[]) }
 
-  | INTRO p=intro_params               { Tactics.Abstract
-                                           ("intro",[p]) }
+  | INTRO p=intro_pat_list             { Tactics.Abstract
+                                           ("intro",[TacticsArgs.IntroPat p]) }
+
+  | DESTRUCT i=ID                      { Tactics.Abstract
+                                           ("destruct",[TacticsArgs.String_name i]) }
+
+  | DESTRUCT i=ID AS p=and_or_pat      { Tactics.Abstract
+                                           ("destruct",[TacticsArgs.String_name i;
+                                                        TacticsArgs.AndOrPat p]) }
 
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }

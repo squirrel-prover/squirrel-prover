@@ -26,7 +26,9 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
-    
+
+  | PatNumError of int * int    (* given, need *)
+                   
 let tac_error_strings =
   [ (More, "More");
     (NotEqualArguments, "NotEqualArguments");
@@ -70,6 +72,7 @@ let rec tac_error_to_string = function
   | SystemExprError _ -> "SystemExpr_Error"
   | SystemError _ -> "System_Error"
   | GoalNotClosed -> "GoalNotClosed"
+  | PatNumError _ -> "PatNumError"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -114,6 +117,8 @@ let rec pp_tac_error ppf = function
   | CongrFail -> Fmt.pf ppf "congruence closure failed"
   | NothingToIntroduce ->
     Fmt.pf ppf "nothing to introduce"
+  | PatNumError (give, need) ->
+    Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in

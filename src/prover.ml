@@ -243,11 +243,12 @@ module Make_AST (T : Table_sig) :
   type judgment = T.judgment
 
   let pp_arg ppf = function
-    | TacticsArgs.Int_parsed i   -> Fmt.int ppf i
-    | TacticsArgs.String_name s  -> Fmt.string ppf s
-    | TacticsArgs.Theory th      -> Theory.pp ppf th
-    | TacticsArgs.IntroArgs args -> TacticsArgs.pp_intro_args ppf args
-
+    | TacticsArgs.Int_parsed i  -> Fmt.int ppf i
+    | TacticsArgs.String_name s -> Fmt.string ppf s
+    | TacticsArgs.Theory th     -> Theory.pp ppf th
+    | TacticsArgs.IntroPat args -> TacticsArgs.pp_intro_pats ppf args
+    | TacticsArgs.AndOrPat pat -> TacticsArgs.pp_and_or_pat ppf pat
+                                     
   let simpl () =
     let tsimpl = TraceTable.get "simpl" [] in
     let esimpl = EquivTable.get "simpl" [] in

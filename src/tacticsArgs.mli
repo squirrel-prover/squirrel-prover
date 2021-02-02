@@ -4,22 +4,35 @@
 (*------------------------------------------------------------------*)
 (** {2 Intro patterns} *)
 
-type intro_pattern =
-  | IP_Star    of Location.t    (** '*' *)
-  | IP_Unnamed of Location.t    (** '_' *)
-  | IP_AnyName of Location.t    (** '?' *)
-  | IP_Named   of Theory.lsymb
+type naming_pat =
+  | Unnamed of Location.t    (** '_' *)
+  | AnyName of Location.t    (** '?' *)
+  | Named   of Theory.lsymb
 
-  | IP_Or      of intro_pattern list
+type and_or_pat =
+  | Or      of simpl_pat list
   (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
         
-  | IP_And     of intro_pattern list
+  | And     of simpl_pat list
   (** e.g. \[H1 H2\] to destruct a conjunction. *)
-
-  | IP_Split 
+        
+  | Split 
   (** e.g. \[\] to split a disjunction or conjunction. *)
 
-val pp_intro_args : Format.formatter -> intro_pattern list -> unit
+and simpl_pat =
+  | SAndOr of and_or_pat
+  | SNamed of naming_pat
+
+type intro_pattern =
+  | Star     of Location.t    (** '*' *)
+  | SimplPat of simpl_pat
+
+(*------------------------------------------------------------------*)
+val pp_naming_pat : Format.formatter -> naming_pat         -> unit
+val pp_and_or_pat : Format.formatter -> and_or_pat         -> unit
+val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
+val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
+val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
   
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
@@ -32,7 +45,8 @@ type parser_arg =
   | Int_parsed  of int
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
-
+  | AndOrPat    of and_or_pat
+      
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort

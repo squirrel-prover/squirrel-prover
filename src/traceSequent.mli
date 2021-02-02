@@ -61,7 +61,7 @@ type hyp = Term.formula
 type ldecl = Ident.t * hyp
 
 val pp_hyp   : Format.formatter -> hyp   -> unit
-val pp_ldecl : Format.formatter -> ldecl -> unit  
+val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit  
              
 module Hyps : sig
   (** Create a fresh name for a hypothesis that is guaranteed fresh. 
@@ -114,6 +114,10 @@ module Hyps : sig
   val remove : Ident.t -> sequent -> sequent
 
   val fold : (Ident.t -> formula -> 'a -> 'a) -> sequent -> 'a -> 'a
+
+  val pp : Format.formatter -> sequent -> unit
+    
+  val pp_dbg : Format.formatter -> sequent -> unit
 end
 
 
