@@ -686,7 +686,7 @@ let mk_phi_proj system table env name indices proj biframe =
                 indices_a in
             (* if new_action occurs before an action of the frame *)
             let disj =
-              List.fold_left Term.mk_or Term.False
+              Term.mk_ors
                 (List.sort_uniq Stdlib.compare
                   (List.map
                     (fun (t,strict) ->
@@ -696,7 +696,7 @@ let mk_phi_proj system table env name indices proj biframe =
                     list_of_actions_from_frame))
             (* then indices of name in new_action and of [name] differ *)
             and conj =
-              List.fold_left Term.mk_and True
+              Term.mk_ands
                 (List.map
                    (fun is -> Term.mk_indices_neq is indices)
                    indices_a)
@@ -956,7 +956,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
                 list_of_is_m in
             (* if new_action occurs before an action of the frame *)
             let disj =
-              List.fold_left Term.mk_or Term.False
+              Term.mk_ors
                 (List.sort_uniq Stdlib.compare
                   (List.map
                     (fun (t,strict) ->
@@ -966,11 +966,11 @@ let mk_prf_phi_proj proj system table env biframe e hash =
                     list_of_actions_from_frame))
             (* then if key indices are equal then hashed messages differ *)
             and conj =
-              List.fold_left Term.mk_and True
+              Term.mk_ands
                 (List.map
                    (fun (is,m) -> Term.mk_impl
                        (Term.mk_indices_eq key_is is)
-                     (Term.Atom (`Message (`Neq, t, m))))
+                       (Term.Atom (`Message (`Neq, t, m))))
                    list_of_is_m)
             in
             (Term.mk_forall forall_vars (Term.mk_impl disj conj))::formulas)

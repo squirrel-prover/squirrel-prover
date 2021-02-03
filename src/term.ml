@@ -565,17 +565,13 @@ let mk_and t1 t2 = match t1,t2 with
   | True, t | t, True -> t
   | t1,t2 -> And (t1,t2)
 
-let mk_ands ts = match ts with
-  | [] -> True
-  | a :: ts -> List.fold_left (fun tres t0 -> mk_and t0 tres) a ts
+let mk_ands ts = List.fold_left mk_and True ts
 
 let mk_or t1 t2 = match t1,t2 with
   | False, t | t, False -> t
   | t1,t2 -> Or (t1,t2)
 
-let mk_ors ts = match ts with
-  | [] -> False
-  | a :: ts -> List.fold_left (fun tres t0 -> mk_or t0 tres) a ts
+let mk_ors ts = List.fold_left mk_or False ts
 
 let mk_impl t1 t2 = match t1,t2 with
   | False, _ -> True

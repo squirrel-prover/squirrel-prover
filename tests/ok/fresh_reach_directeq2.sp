@@ -8,6 +8,6 @@ Proof.
 nosimpl(intro i1 i2 j Heq).
 nosimpl(fresh Heq; intro H).
 nosimpl(case H).
-by right.
 by left.
+by right.
 Qed.
