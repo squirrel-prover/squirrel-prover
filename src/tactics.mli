@@ -117,6 +117,8 @@ module type S = sig
 
 end
 
+type selector = int list
+    
 (** AST for tactics, with abstract leaves corresponding to prover-specific
   * tactics, with prover-specific arguments. Modifiers have no internal
   * semantics: they are printed, but ignored during evaluation -- they
@@ -124,14 +126,15 @@ end
   * evaluation in richer ways in the future. *)
 type 'a ast =
   | Abstract of string * 'a list
-  | AndThen : 'a ast list -> 'a ast
-  | OrElse : 'a ast list -> 'a ast
-  | Try : 'a ast -> 'a ast
-  | Repeat : 'a ast -> 'a ast
-  | Ident : 'a ast
-  | Modifier : string * 'a ast -> 'a ast
-  | CheckFail : tac_error * 'a ast -> 'a ast
-  | By : 'a ast -> 'a ast
+  | AndThen    : 'a ast list -> 'a ast
+  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
+  | OrElse     : 'a ast list -> 'a ast
+  | Try        : 'a ast -> 'a ast
+  | Repeat     : 'a ast -> 'a ast
+  | Ident      : 'a ast
+  | Modifier   : string * 'a ast -> 'a ast
+  | CheckFail  : tac_error * 'a ast -> 'a ast
+  | By         : 'a ast -> 'a ast
 
 module type AST_sig = sig
 

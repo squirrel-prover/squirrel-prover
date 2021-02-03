@@ -161,6 +161,9 @@ type 'a sk = 'a -> fk -> a
 
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(** Selector for tactic *)
+type selector = int list
+
 (** Basic Tactics *)
 
 let fail sk fk = fk (Failure "fail")
@@ -176,6 +179,20 @@ let map t l sk fk =
              aux (List.rev_append r acc) l fk)
           fk
   in aux [] l fk
+
+
+(** Like [map], but only apply the tactic to selected judgements. *)
+let map_sel (sel : selector) t l sk fk =
+  let rec aux i acc l fk = match l with
+    | [] -> sk (List.rev acc) fk
+    | e::l ->
+      if List.mem i sel then
+        t e
+          (fun r fk ->
+             aux (i + 1) (List.rev_append r acc) l fk)
+          fk
+      else aux (i + 1) (e :: acc) l fk
+  in aux 1 [] l fk
 
 let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
 
@@ -198,7 +215,11 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
-(* TODO: add an auto at the en of the tactic. *)
+let andthen_sel tac1 sel tac2 judge sk fk : a =
+  let sk l fk' = map_sel sel tac2 l sk fk' in
+  tac1 judge sk fk
+
+(* TODO: add an auto at the end of the tactic. *)
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk
@@ -297,6 +318,7 @@ end
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen : 'a ast list -> 'a ast
+  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
@@ -331,15 +353,16 @@ module AST (M:S) = struct
   type judgment = M.judgment
 
   let rec eval modifiers = function
-    | Abstract (id,args) -> eval_abstract modifiers id args
-    | AndThen tl -> andthen_list (List.map (eval modifiers) tl)
-    | OrElse tl -> orelse_list (List.map (eval modifiers) tl)
-    | Try t -> try_tac (eval modifiers t)
-    | By t -> by_tac (eval modifiers t)
-    | Repeat t -> repeat (eval modifiers t)
-    | Ident -> id
-    | Modifier (id,t) -> eval (id::modifiers) t
-    | CheckFail (e,t) -> checkfail_tac e (eval modifiers t)
+    | Abstract (id,args)  -> eval_abstract modifiers id args
+    | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
+    | AndThenSel (t,s,t') -> andthen_sel (eval modifiers t) s (eval modifiers t')
+    | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
+    | Try t               -> try_tac (eval modifiers t)
+    | By t                -> by_tac (eval modifiers t)
+    | Repeat t            -> repeat (eval modifiers t)
+    | Ident               -> id
+    | Modifier (id,t)     -> eval (id::modifiers) t
+    | CheckFail (e,t)     -> checkfail_tac e (eval modifiers t)
 
   let pp_args fmt l =
     Fmt.list
@@ -358,6 +381,13 @@ module AST (M:S) = struct
     | AndThen ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
+        
+    | AndThenSel (t,s,t') ->
+      Fmt.pf ppf "@[(%a;@ %a: %a)@]"
+        pp t 
+        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) s
+        pp t'
+        
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts

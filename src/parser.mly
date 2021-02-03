@@ -325,9 +325,9 @@ declarations:
 | decls=declaration_list DOT { decls }
 
 tactic_param:
-| t=term    { TacticsArgs.Theory t }
-| f=formula { TacticsArgs.Theory f }
-| i=INT     { TacticsArgs.Int_parsed i }
+| t=term                    { TacticsArgs.Theory t }
+| f=formula %prec tac_prec  { TacticsArgs.Theory f }
+| i=INT                     { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -364,9 +364,18 @@ intro_pat_list:
 | l=slist1(intro_pat,empty) { l }
 
 (*------------------------------------------------------------------*)
+int:
+|i=INT { i }
+
+selector:
+| l=slist1(int,COMMA) { l }
+
+(*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
+  | l=tac SEMICOLON s=selector COLON r=tac %prec tac_prec
+                                       { Tactics.AndThenSel (l,s,r) }
   | BY t=tac %prec tac_prec            { Tactics.By t }
   | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
   | TRY l=tac                          { Tactics.Try l }
@@ -379,6 +388,10 @@ tac:
 
   | INTRO p=intro_pat_list             { Tactics.Abstract
                                            ("intro",[TacticsArgs.IntroPat p]) }
+
+  | t=tac DARROW p=intro_pat_list      { Tactics.AndThen
+                                           [t;Tactics.Abstract
+                                                ("intro",[TacticsArgs.IntroPat p])] }
 
   | DESTRUCT i=ID                      { Tactics.Abstract
                                            ("destruct",[TacticsArgs.String_name i]) }

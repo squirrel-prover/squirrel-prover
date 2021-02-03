@@ -199,23 +199,28 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
       ( CHyp id, Hyps.add_formula id f s )
     ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
 
-  
-(** Case analysis on an hypothesis *)
-let hypothesis_case id (s : TraceSequent.t) : c_res list =
-  let f = Hyps.by_id id s in
+(** Case analysis on an hypothesis.
+    When [many], recurses. *)
+let hypothesis_case ~many id (s : TraceSequent.t) : c_res list =
+  let rec case acc = function
+    | Or (f,g) ->
+      if many then case (case acc g) f else [f; g]
+    | _ as f -> f :: acc in
+
+  let form = Hyps.by_id id s in
   let s = Hyps.remove id s in
-  match f with
-  | Or (f,g) ->
-    let idf = Ident.fresh id in
-    let sf = Hyps.add_formula idf f s in
-    
-    let idg = Ident.fresh id in
-    let sg = Hyps.add_formula idg g s in
 
-    [(CHyp idf, sf); (CHyp idg, sg)]
+  let cases = case [] form in
 
-  | _ -> soft_failure (Tactics.Failure "can only be applied to a disjunction")
-  
+  if cases = [] then
+    soft_failure (Tactics.Failure "can only be applied to a disjunction");
+
+  List.map (fun g ->
+      let idg = Ident.fresh id in
+      let sg = Hyps.add_formula idg g s in
+      ( CHyp idg, sg )
+    ) cases
+
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
@@ -270,7 +275,7 @@ let do_case_tac (args : Args.parser_arg list) s =
   match Args.convert_as_string args with
   | Some str when Hyps.mem_name str s ->
     let id, _ = Hyps.by_name str s in
-    hypothesis_case id s
+    hypothesis_case ~many:true id s
 
   | _ ->
     let env, tbl = TraceSequent.env s, TraceSequent.table s in
@@ -338,6 +343,21 @@ let () =
     ~usages_sorts:[Sort None]
 
 (*------------------------------------------------------------------*)
+let revert (hid : Ident.t) s =
+  let f = Hyps.by_id hid s in
+  let s = Hyps.remove hid s in
+  TraceSequent.set_conclusion (Term.Impl (f,TraceSequent.conclusion s)) s
+
+let revert_str (Args.String hyp_name) s =
+  let hid,_ = Hyps.by_name hyp_name s in
+  [revert hid s]
+  
+let () =
+  T.register_typed "revert"
+    ~general_help:"Push a negation inside a formula."
+    revert_str Args.String
+
+(*------------------------------------------------------------------*)
 (** Apply a And pattern (this is a destruct).
     Note that variables in handlers have not been added to the env yet. *)
 let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
@@ -390,8 +410,8 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
     ss
 
   | Args.Or s_ip ->
-    (* Compute the cases *)
-    let ss = hypothesis_case hid s in
+    (* Destruct one Or *)
+    let ss = hypothesis_case ~many:false hid s in
 
     if List.length ss <> List.length s_ip then
       hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
@@ -404,7 +424,14 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
     (* Collect all cases *)
     |> List.flatten
 
-  | Args.Split -> assert false  (* TODO *)
+  | Args.Split ->
+    (* Destruct many Or *)
+    let ss = hypothesis_case ~many:true hid s in
+    
+    (* For each case, apply the corresponding simple pattern *)
+    List.map (fun (CHyp id, s) ->
+        revert id s
+      ) ss
 
 (** Apply an simple pattern a handler. *)
 and do_simpl_pat (h : ip_handler) (ip : Args.simpl_pat) s
@@ -944,8 +971,11 @@ let mk_fresh_indirect system table env n is t =
   let list_of_actions_from_term =
     let iter = new EquivTactics.get_actions ~system table false in
     iter#visit_message t ;
-    iter#get_actions
-  and tbl_of_action_indices = Hashtbl.create 10 in
+    iter#get_actions in
+  
+  let tbl_of_action_indices : (Action.descr, Vars.index list list) Hashtbl.t =
+    Hashtbl.create 10 in
+  
   SystemExpr.(iter_descrs table system
     (fun action_descr ->
       let iter = new EquivTactics.get_name_indices ~system table true n in
@@ -956,6 +986,7 @@ let mk_fresh_indirect system table env n is t =
       let action_indices = iter#get_indices in
       if List.length action_indices > 0 then
         Hashtbl.add tbl_of_action_indices action_descr action_indices));
+  
   Hashtbl.fold
     (fun a indices_a formulas ->
       List.fold_left

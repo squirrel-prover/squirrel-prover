@@ -12,12 +12,12 @@ type naming_pat =
 type and_or_pat =
   | Or      of simpl_pat list
   (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
-        
+               
+  | Split 
+  (** \[\] to do a case. *)
+
   | And     of simpl_pat list
   (** e.g. \[H1 H2\] to destruct a conjunction. *)
-        
-  | Split 
-  (** e.g. \[\] to split a disjunction or conjunction. *)
 
 and simpl_pat =
   | SAndOr of and_or_pat
