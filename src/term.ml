@@ -606,11 +606,14 @@ let mk_indices_neq vect_i vect_j =
     (fun acc e -> mk_or acc e)
     False
     (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+
 let mk_indices_eq vect_i vect_j =
   List.fold_left
     (fun acc e -> mk_and acc e)
     True
-    (List.map2 (fun i j -> Atom (`Index (`Eq, i, j))) vect_i vect_j)
+    (List.map2 (fun i j ->
+         if i = j then True else Atom (`Index (`Eq, i, j))
+       ) vect_i vect_j)
 
 (** Projection *)
 

@@ -939,32 +939,30 @@ let mk_fresh_direct system table env n is t =
     iter#visit_message t ;
     iter#get_indices
   in
-  (* build the disjunction expressing that there exists a name subterm of [t]
-  * equal to the name ([n],[is]) *)
-  List.fold_left
-    Term.mk_or Term.False
-    (List.sort_uniq Stdlib.compare
-      (List.map
-       (fun j ->
-          (* select bound variables, to quantify universally over them *)
-          let bv =
-            List.filter
-              (fun i -> not (Vars.mem env (Vars.name i)))
-              j
-          in
-          let env_local = ref env in
-          let bv' =
-            List.map (Vars.make_fresh_from_and_update env_local) bv in
-          let subst =
-            List.map2
-              (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-              bv bv'
-          in
-          let j = List.map (Term.subst_var subst) j in
-          Term.mk_exists
-            (List.map (fun i -> Vars.EVar i) bv')
-            (Term.mk_indices_eq is j))
-       list_of_indices))
+  (* build the formula expressing that there exists a name subterm of [t]
+   * equal to the name ([n],[is]) *)
+  let mk_case (js : Sorts.index Vars.var list) =
+    (* select bound variables *)
+    let bv = List.filter (fun i -> not (Vars.mem env (Vars.name i))) js in
+    
+    let env_local = ref env in
+    let bv' = List.map (Vars.make_fresh_from_and_update env_local) bv in
+
+    let subst =
+      List.map2
+        (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+        bv bv'
+    in
+    
+    let js = List.map (Term.subst_var subst) js in
+
+    Term.mk_exists
+      (List.map (fun i -> Vars.EVar i) bv')
+      (Term.mk_indices_eq is js)
+  in
+
+  let cases = List.map mk_case list_of_indices in  
+  Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect system table env n is t =
@@ -973,10 +971,9 @@ let mk_fresh_indirect system table env n is t =
     iter#visit_message t ;
     iter#get_actions in
   
-  let tbl_of_action_indices : (Action.descr, Vars.index list list) Hashtbl.t =
-    Hashtbl.create 10 in
+  let tbl_of_action_indices = ref [] in
   
-  SystemExpr.(iter_descrs table system
+  let () = SystemExpr.(iter_descrs table system
     (fun action_descr ->
       let iter = new EquivTactics.get_name_indices ~system table true n in
       iter#visit_formula (snd action_descr.condition) ;
@@ -985,58 +982,80 @@ let mk_fresh_indirect system table env n is t =
       (* we add only actions in which name [n] occurs *)
       let action_indices = iter#get_indices in
       if List.length action_indices > 0 then
-        Hashtbl.add tbl_of_action_indices action_descr action_indices));
-  
-  Hashtbl.fold
-    (fun a indices_a formulas ->
-      List.fold_left
-        Term.mk_or formulas
-        (List.map
-          (fun is_a ->
-            let env_local = ref env in
-            (* All indices occurring in [a] and [indices_a]. *)
-            let indices =
-              List.sort_uniq Stdlib.compare
-                (a.Action.indices @ is_a) in
-            let indices' =
-              List.map (Vars.make_fresh_from_and_update env_local) indices in
-            let subst =
-              List.map2
-                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-                indices indices'
-            in
-            (* we apply [subst] to the action [a] and to [indices_a] *)
-            let new_action =
-              SystemExpr.action_to_term table system
-                (Action.subst_action subst a.Action.action)
-            in
-            let is_a = List.map (Term.subst_var subst) is_a in
-            let timestamp_inequalities =
-              List.fold_left Term.mk_or Term.False
-                (List.sort_uniq Stdlib.compare
-                   (List.map
-                    (fun (action_from_term,strict) ->
-                      if strict
-                      (* [strict] is true if [action_from_term] refers to 
-                         an input *)
-                      then Term.Atom (`Timestamp (`Lt,
-                                                  new_action,
-                                                  action_from_term))
-                      else Term.Atom (Term.mk_timestamp_leq
-                                        new_action
-                                        action_from_term))
-                    list_of_actions_from_term))
-            in
-            let index_equalities =
-              Term.mk_indices_eq is is_a
-            in
-            Term.mk_exists
-              (List.map (fun i -> Vars.EVar i) indices')
-              (Term.mk_and timestamp_inequalities index_equalities))
-          indices_a))
-    tbl_of_action_indices
-    Term.False
+        tbl_of_action_indices :=
+          (action_descr, action_indices)
+          :: !tbl_of_action_indices))
+  in
 
+  (* the one case occuring in [a] with indices [is_a].'
+     For n[is] to be equal to n[is_a], we must have is=is_a.
+     Hence we substitute is_a by is. *)
+  let mk_case a is_a =
+    let env_local = ref env in
+
+    (* We only quantify over indices that are not in is_a *)
+    let eindices =
+      List.filter (fun v -> not (List.mem v is_a)) a.Action.indices in
+    
+    let eindices' =
+      List.map (Vars.make_fresh_from_and_update env_local) eindices in
+
+    (* refresh existantially quant. indices, and subst is_a by is. *)
+    let subst =
+      List.map2
+        (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+        (eindices @ is_a) (eindices' @ is)
+    in
+    
+    (* we apply [subst] to the action [a] *)
+    let new_action =
+      SystemExpr.action_to_term table system
+        (Action.subst_action subst a.Action.action) in
+
+    let timestamp_inequalities =
+      Term.mk_ors
+        (List.sort_uniq Stdlib.compare
+           (List.map
+              (fun (action_from_term,strict) ->
+                 if strict
+                 (* [strict] is true if [action_from_term] refers to 
+                    an input *)
+                 then Term.Atom (`Timestamp (`Lt,
+                                             new_action,
+                                             action_from_term))
+                 else Term.Atom (Term.mk_timestamp_leq
+                                   new_action
+                                   action_from_term))
+              list_of_actions_from_term))
+    in
+
+    (* Remark that the equations below are not redundant.
+       Indeed, assume is = (i,j) and is_a = (i',i').
+       Then, the substitution [subst] will map i' to i 
+       (the second substitution i->j is shadowed) 
+       But, by substituting in the vector of equalities, we correctly retrieve
+       that i = j. *)
+    let idx_eqs =
+      Term.mk_indices_eq is (List.map (Term.subst_var subst) is_a)
+    in
+              
+    Term.mk_exists
+      (List.map (fun i -> Vars.EVar i) eindices')
+      (Term.mk_and
+         timestamp_inequalities
+         idx_eqs)
+  in
+
+  (* Do all cases of action [a] *)
+  let mk_cases_descr (a, indices_a) =
+    List.map (mk_case a) indices_a in
+
+  let cases = List.map mk_cases_descr !tbl_of_action_indices
+              |> List.flatten in
+
+  mk_ors cases        
+        
+             
 let fresh (Args.String m) s =
   try
     let id,hyp = Hyps.by_name m s in

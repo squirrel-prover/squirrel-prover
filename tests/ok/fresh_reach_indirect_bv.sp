@@ -17,7 +17,5 @@ goal test :
 
 Proof.
  nosimpl(intro i j Hneq Heq).
- nosimpl(fresh Heq). 
- intro H.
- repeat case H. 
+ fresh Heq => [] _; auto.
 Qed.
