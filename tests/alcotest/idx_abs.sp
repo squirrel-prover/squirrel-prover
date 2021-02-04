@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract f : index->message
 
 system null.

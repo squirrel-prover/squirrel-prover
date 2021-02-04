@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (** Euf Test Suite  *)
 
 

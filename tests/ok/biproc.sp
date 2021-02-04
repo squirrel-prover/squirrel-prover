@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : message
 abstract ko : message
 abstract koo : message

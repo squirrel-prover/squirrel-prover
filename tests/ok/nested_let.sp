@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 abstract f : message->message
 abstract ff : message->message

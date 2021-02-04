@@ -1,3 +1,5 @@
+(* set autoIntro=false. *)
+
 (* Testing block creation, input terms and index management *)
 channel c
 process IO = in(c,x);out(c,<x,x>)

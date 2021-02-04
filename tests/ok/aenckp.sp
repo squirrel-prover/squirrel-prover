@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 aenc enc,dec,pk
 name k1 : message
 name k2 : message

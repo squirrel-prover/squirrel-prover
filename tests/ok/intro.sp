@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel ch
 abstract ok : message
 

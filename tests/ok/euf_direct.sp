@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n : message
 name k : message
 hash h

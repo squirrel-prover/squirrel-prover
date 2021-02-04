@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 system null.
 
 axiom pair_neq_snd :

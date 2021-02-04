@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Same as euf_output but with output@0[b] replaced by its definition *)
 
 hash h

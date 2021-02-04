@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing that macros induced by a let definition
  * have the right number of parameters even in case of
  * a dummy input in the action. *)

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name k : index -> message
 
 abstract ok : message

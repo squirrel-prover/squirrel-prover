@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 set processStrictAliasMode=true.
 
 hash h

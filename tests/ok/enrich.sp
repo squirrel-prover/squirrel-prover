@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 channel c
 

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Checking the treatment of bound variables in indirect cases for xor. *)
 
 name n : index->message

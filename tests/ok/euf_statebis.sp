@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 mutable s : message
 hash h
 name k : message

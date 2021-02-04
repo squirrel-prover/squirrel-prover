@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 system A: in(c,x);out(c,zero);
        B: in(c,y); if False then out(c,diff(x,y)) else out(c,zero).

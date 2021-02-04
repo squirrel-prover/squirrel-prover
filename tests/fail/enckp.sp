@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 
 senc enc,dec
@@ -46,7 +48,8 @@ system [sharedrnd] !_i
 
 equiv  [left,sharedrnd]  [right,sharedrnd] test.
 Proof.
-enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. 
+enrich diff(n,m); induction t. 
+expandall; fresh 0; yesif 0. 
 by auto.
 expandall. 
 fa 1; fa 2; fa 2; fa 2.

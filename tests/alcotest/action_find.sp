@@ -1,3 +1,5 @@
+(* set autoIntro=false. *)
+
 channel c
 mutable s:index->index->message
 name ok:message

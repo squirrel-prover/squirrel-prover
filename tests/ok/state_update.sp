@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 mutable s : index->message
 abstract f : message->message
 

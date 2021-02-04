@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 
 system new n; out(c,n).

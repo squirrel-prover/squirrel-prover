@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing euf over signatures. *)
 
 hash h

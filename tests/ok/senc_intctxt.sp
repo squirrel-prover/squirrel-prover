@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing euf over signatures. *)
 
 senc enc,dec

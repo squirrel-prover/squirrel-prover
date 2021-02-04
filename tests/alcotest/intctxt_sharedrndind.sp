@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing intctxt. *)
 
 senc enc,dec

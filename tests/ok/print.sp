@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract a : message -> message
 
 name n : index -> message

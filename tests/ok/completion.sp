@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract m1 : message
 abstract m2 : message
 abstract m3 : message

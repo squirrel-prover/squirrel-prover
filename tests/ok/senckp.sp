@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 senc enc,dec
 name k1 : message
 name k2 : message

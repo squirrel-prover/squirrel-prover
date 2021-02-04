@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 system null.
 
 (* This should not pass: it is not true for the initial timestamp epsilon,

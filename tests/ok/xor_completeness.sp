@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract f : message->message
 abstract ff : message->message->message
 system null.

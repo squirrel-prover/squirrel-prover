@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Check that equality constraints on key indices are properly obtained
  * for direct cases. *)
 

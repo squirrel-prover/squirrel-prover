@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 system null.
 
 goal forall (x:message,y:message,z:message),
