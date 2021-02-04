@@ -48,14 +48,14 @@ Proof.
  apply Hexec to Out.
  nosimpl(expand exec@Out).
 
- destruct HHexec as [Hexec0 Hcond].
+ destruct H as [Hexec0 Hcond].
 
  expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
  euf Hcond.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
- by apply He_2_1 to i. 
+ by apply H0 to i. 
 
- nosimpl(notleft He_2_2). 
+ nosimpl(notleft H1). 
  by auto.
 Qed.

@@ -85,7 +85,7 @@ goal wa_Reader1 :
       output@Tag(i,j) = input@Reader1(k) &&
       input@Tag(i,j) = output@Reader(k)).
 Proof.
-  intros.
+  intro *.
   expand exec@Reader1(k).
   expand cond@Reader1(k).
   expand output@Reader(k).
@@ -94,12 +94,12 @@ Proof.
   project; apply tags_neq.
 
   (* First projection. *)
-  intctxt M0.
+  intctxt Mneq.
   exists i, j1.
   by depends Reader(k), Reader1(k).
 
   (* Second projection. *)
-  intctxt M0.
+  intctxt Mneq.
   exists i,j.
   by depends Reader(k), Reader1(k).
 
@@ -118,7 +118,7 @@ goal wa_Reader2 :
       output@Tag(i,j) = input@Reader2(k) &&
       input@Tag(i,j) = output@Reader(k)).
 Proof.
-  intros.
+  intro *.
   expand exec@Reader2(k).
   expand cond@Reader2(k).
   expand output@Reader(k).
@@ -126,45 +126,45 @@ Proof.
 
   (* Direction => is the obvious one *)
 
-  notleft H1.
-  apply H1 to i,j; case H2.
+  notleft H0.
+  apply H0 to i,j; case H1.
   by apply fail_not_pair to tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
 
-  notleft H1.
+  notleft H0.
   apply tags_neq.
   project.
 
-  intctxt M0.
-  apply H1 to i,j1; case H2.
+  intctxt Mneq.
+  apply H0 to i,j1; case H1.
   by depends Reader(k),Reader2(k).
 
-  intctxt M0.
-  apply H1 to i,j; case H2.
+  intctxt Mneq.
+  apply H0 to i,j; case H1.
   by depends Reader(k),Reader2(k).
 Qed.
 
 goal lemma : forall (i,j,i1,j1:index),
   output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
 Proof.
-  intros.
-  project.
+  intro *.
+  project. 
 
   assert dec(output@Tag(i,j),kE(i1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
-  intctxt M1.
-  case H0.
+  intctxt HA.
+  case H.
   assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt M3.
+  intctxt HA0.
   by case H0.
   by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
   by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
   assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
-  intctxt M1.
-  case H0.
+  intctxt HA.
+  case H.
   assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt M3.
+  intctxt HA0.
   by case H0.
   by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
   by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
@@ -232,14 +232,14 @@ Proof.
         in
           enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
               diff(kE(i),kbE(i,j))))).
-  fa.
+  fa. 
   by exists i,j.
   by exists i,j.
   project.
 
   fa.
   (* find condA => condB *)
-  intctxt M2.
+  intctxt Mneq.
   by apply tags_neq.
   by exists j2.
 
@@ -249,7 +249,7 @@ Proof.
 
   fa.
   (* find condA => condB *)
-  intctxt M2.
+  intctxt Mneq.
   by apply tags_neq.
   (* find condB => condA *)
   apply lemma to i,j,i1,j1.
