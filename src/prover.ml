@@ -112,6 +112,10 @@ type proof_state = { goals : named_goal list;
 
 let proof_states_history : proof_state list ref = ref []
 
+let abort () =
+    current_goal := None;
+    subgoals := []
+
 let reset () =
     proof_states_history := [];
     goals := [];

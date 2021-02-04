@@ -42,7 +42,7 @@ let check_kind kind default = match kind, default with
   | _ -> false
     
 (*------------------------------------------------------------------*)
-(* declaration of new parameters *)
+(** {2 declaration of new parameters} *)
 
 let decl name kind ?check default (params : params) =
   if M.mem name params then
@@ -53,6 +53,10 @@ let decl name kind ?check default (params : params) =
       | None -> fun _ -> true
       | Some f -> f in
     M.add name (kind,check, default) params
+
+(*------------------------------------------------------------------*)
+(** list of parameters strings (to be set in *.sp files) and 
+   default value. *)
 
 let s_timeout = "timeout"
 let v_timeout = Param_int 2
@@ -66,13 +70,21 @@ let v_print_equ = Param_bool false
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
+let s_auto_into = "autoIntro"
+let v_auto_intro = Param_bool true
+
+(*------------------------------------------------------------------*)
+(** Default parameters values.
+    Add one line for each new parameter. *)
 let default_params =
   let params = decl s_timeout ~check:check_timeout PInt v_timeout M.empty in
   let params = decl s_print_equ PBool v_print_equ params in
   let params = decl s_strict_alias_mode PBool v_strict_alias_mode params in
+  let params = decl s_auto_into PBool v_auto_intro params in
   params
 
-(* reference to the current parameters *)
+(*------------------------------------------------------------------*)
+(** reference to the current parameters *)
 let params = ref default_params
 
 let reset_params () = params := default_params
@@ -82,7 +94,7 @@ let get_params () = !params
 let set_params p = params := p
 
 (*------------------------------------------------------------------*)
-(* look-up functions *)
+(** {2 look-up functions} *)
 
 let solver_timeout () = get_int (M.find s_timeout !params)
 
@@ -90,8 +102,10 @@ let print_trs_equations () = get_bool (M.find s_print_equ !params)
 
 let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 
+let auto_intro () = get_bool (M.find s_auto_into !params) 
+
 (*------------------------------------------------------------------*)
-(* set functions *)
+(** {2 set functions} *)
 
 let set_param (s,p) =
   match M.find s !params with

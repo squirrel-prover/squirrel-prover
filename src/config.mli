@@ -1,5 +1,5 @@
 (*------------------------------------------------------------------*)
-(* parser types *)
+(** {2 parser types} *)
 
 (** Parser parameter values *)
 type p_param_val =
@@ -12,7 +12,7 @@ type p_set_param = string * p_param_val
 
 
 (*------------------------------------------------------------------*)
-(* parameter state *)
+(** {2 parameter state} *)
 
 type params
 
@@ -23,7 +23,7 @@ val get_params : unit -> params
 val set_params : params -> unit
 
 (*------------------------------------------------------------------*)
-(* look-up functions *)
+(** {2 look-up functions} *)
 
 (** timeout for the solver (completion.ml and constr.ml), in seconds. *)
 val solver_timeout : unit -> int
@@ -34,8 +34,10 @@ val print_trs_equations : unit -> bool
 (** Strict alias mode for processus. *)
 val strict_alias_mode : unit -> bool
 
+(** Automatic introductions (in hypotheses and the conclusion). *)
+val auto_intro : unit -> bool
 
 (*------------------------------------------------------------------*)
-(* set function *)
+(** {2  set functions} *)
 
 val set_param : p_set_param -> unit

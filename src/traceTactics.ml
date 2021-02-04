@@ -1492,14 +1492,6 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
       (TraceSequent.conclusion sequent) in
   TraceSequent.set_conclusion goal sequent
 
-  (* Old version, adding hypotheses*)
-  (* let sequent =
-   *   if eq_indices = Term.True then sequent else
-   *     TraceSequent.add_formula eq_indices sequent
-   * in
-   *   TraceSequent.add_formula new_f
-   *     (TraceSequent.add_formula le_cnstr sequent) *)
-
 let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
@@ -1536,11 +1528,6 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
  
   let goal = Term.mk_impls [eq_indices; eq_hashes] (TraceSequent.conclusion s) in
   TraceSequent.set_conclusion goal s
-
-  (* Old version, adding hypotheses*)
-  (* TraceSequent.add_formula eq_hashes s
-   * |> TraceSequent.add_formula eq_indices *)
-
 
 let euf_apply_facts drop_head s
     ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
@@ -1886,14 +1873,6 @@ let collision_resistance (s : TraceSequent.t) =
     let goal = Term.mk_impl (Term.mk_ands new_facts) (TraceSequent.conclusion s) in
     [TraceSequent.set_conclusion goal s]
 
-    (* Old version, adding hypotheses*)
-    (* let s =
-     *   List.fold_left
-     *     (fun s f -> TraceSequent.add_formula f s)
-     *     s new_facts
-     * in
-     * [s] *)
-
 let () = T.register "collision"
     ~general_help:"Collects all equalities between hashes occurring at toplevel in\
                    message hypotheses, and adds the equalities between \
@@ -1924,6 +1903,8 @@ let () =
       try_tac (wrap assumption) ::
       (if intro then [wrap intro_all] else []) @
       repeat (wrap simpl_left) ::
+      (* (if intro then [repeat (wrap simpl_left)] else []) @ *)
+      
       (* Learn new term equalities from constraints before
        * learning new index equalities from term equalities,
        * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
@@ -1943,7 +1924,7 @@ let () =
    * otherwise it may also be reduced to a single subgoal. *)
   let rec simpl close : TraceSequent.t tac =
     (* if [close], we introduce as much as possible to help. *)
-    simplify ~intro:close >>
+    simplify ~intro:(close || Config.auto_intro ()) >>
     try_tac conclude >>
       fun g sk fk ->
         (* If we still have a goal, we can try to split a conjunction

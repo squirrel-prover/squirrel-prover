@@ -148,7 +148,7 @@ let main_loop_body ~test state =
 
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
-      Prover.reset ();
+      Prover.abort ();
       { state with mode = GoalMode; }
 
     | _, ParsedQed ->
