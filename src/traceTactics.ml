@@ -63,6 +63,39 @@ let () =
   T.register "print" ~general_help:"Shows the current system."
     print_tac
 
+
+(*------------------------------------------------------------------*)
+let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
+  | `Timestamp (ord,_,_) -> Some ord
+  | `Message   (ord,_,_) -> Some (ord :> Term.ord)
+  | `Index     (ord,_,_) -> Some (ord :> Term.ord)
+  | `Happens _           -> None
+
+let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+
+(** Chooses a name for a formula, depending on an old name (if any), and the
+    formula shape. *)
+let choose_name f = match f with
+  | Atom at ->
+    let sort = match at with
+      | `Timestamp _ -> "C"
+      | `Message _ -> "M"
+      | `Index _ -> "I"
+      | `Happens _ -> "Hap" in
+
+    let ord = match get_ord at with
+      | Some `Eq  -> "eq"
+      | Some `Neq -> "neq"
+      | Some `Leq -> "le"
+      | Some `Geq -> "ge"
+      | Some `Lt  -> "lt"
+      | Some `Gt  -> "gt"
+      | None      -> "" in
+
+    sort ^ ord
+
+  | _ -> "H"
+
 (*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
@@ -151,7 +184,7 @@ let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
     let id = match nip with
       | Args.AnyName l ->
         if Ident.name hid = "_"
-        then Hyps.fresh_id ~approx:true "H" s
+        then Hyps.fresh_id ~approx:true (choose_name f) s
         else Ident.fresh hid 
 
       | Args.Named lsymb -> Hyps.fresh_id ~approx:false (L.unloc lsymb) s
@@ -615,10 +648,11 @@ let simpl_left s =
   | False -> []
   | And (f,g) ->
     let s = Hyps.remove id s in
-    let idl, idr = Utils.as_seq2
+    let idl, idr =
+      Utils.as_seq2
         (Hyps.fresh_ids ~approx:true
-           [(Ident.name id) ^ "_1";
-            (Ident.name id) ^ "_2"]
+           [choose_name f;
+            choose_name f]
            s) in        
     [Hyps.add_formula idl f (Hyps.add_formula idr g s)]
 
@@ -633,7 +667,9 @@ let simpl_left s =
         vs
     in
     let f = Term.subst subst f in
-    [Hyps.add_formula (Ident.fresh id) f (TraceSequent.set_env !env s)]
+    let name = choose_name f in
+    let idf = Hyps.fresh_id ~approx:true name s in
+    [Hyps.add_formula idf f (TraceSequent.set_env !env s)]
 
   | _ -> assert false
 
@@ -1656,7 +1692,7 @@ let apply name (ths:Theory.term list) (s : TraceSequent.t) =
         List.rev (s'::subgoals)
     | f ->
       (* TODO: named hypothesis *)
-      let id = Hyps.fresh_id ~approx:true ("H" ^ name) s in
+      let id = Hyps.fresh_id ~approx:true (choose_name f) s in
       Hyps.add_formula id f s ::
       List.rev subgoals
   in
@@ -1719,12 +1755,13 @@ let fa s =
 
           | Term.ITE (c,t,e), Term.ITE (c',t',e') ->
             let subgoals =
-              let open TraceSequent in
+              let open TraceSequent in                
               [ s |> set_conclusion (Term.mk_impl c c') ;
                 
                 s |> set_conclusion (Term.mk_impl c' c) ;
                 
-                s |> set_conclusion (Term.mk_impls [c;c']
+                s |> set_conclusion (Term.mk_impls
+                                       (if c = c' then [c] else [c;c'])
                                        (Term.Atom (`Message (`Eq,t,t'))));
                 
                 s |> set_conclusion (Term.mk_impls [Term.Not c;Term.Not c']
@@ -1752,7 +1789,6 @@ let fa s =
 
           | Term.Find (vars,c,t,e),
             Term.Find (vars',c',t',e') when vars = vars' ->
-
             (* We could simply verify that [e = e'],
              * and that [t = t'] and [c <=> c'] for fresh index variables.
              *
@@ -1778,9 +1814,9 @@ let fa s =
                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
                 vars vars'
             in
-            let c = Term.subst subst c in
+            let c  = Term.subst subst c in
             let c' = Term.subst subst c' in
-            let t = Term.subst subst t in
+            let t  = Term.subst subst t in
             let t' = Term.subst subst t' in
 
             (* Extract unused variables. *)
