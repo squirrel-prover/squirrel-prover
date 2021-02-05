@@ -5,9 +5,9 @@
 (** {2 Intro patterns} *)
 
 type naming_pat =
-  | Unnamed of Location.t    (** '_' *)
-  | AnyName of Location.t    (** '?' *)
-  | Named   of Theory.lsymb
+  | Unnamed   (** '_' *)
+  | AnyName   (** '?' *)
+  | Named of string
 
 type and_or_pat =
   | Or      of simpl_pat list

@@ -341,9 +341,9 @@ tac_errors:
 
 (*------------------------------------------------------------------*)
 naming_pat:
-| l=loc(UNDERSCORE) { TacticsArgs.Unnamed (Location.loc l) }
-| l=loc(QMARK)      { TacticsArgs.AnyName (Location.loc l) }
-| id=lsymb          { TacticsArgs.Named id }
+| UNDERSCORE  { TacticsArgs.Unnamed }
+| QMARK       { TacticsArgs.AnyName }
+| id=ID       { TacticsArgs.Named id }
 
 and_or_pat:
 | LBRACKET s=simpl_pat          ips=slist(simpl_pat, empty)    RBRACKET

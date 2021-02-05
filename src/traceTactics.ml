@@ -65,38 +65,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
-  | `Timestamp (ord,_,_) -> Some ord
-  | `Message   (ord,_,_) -> Some (ord :> Term.ord)
-  | `Index     (ord,_,_) -> Some (ord :> Term.ord)
-  | `Happens _           -> None
-
-let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
-
-(** Chooses a name for a formula, depending on an old name (if any), and the
-    formula shape. *)
-let choose_name f = match f with
-  | Atom at ->
-    let sort = match at with
-      | `Timestamp _ -> "C"
-      | `Message _ -> "M"
-      | `Index _ -> "I"
-      | `Happens _ -> "Hap" in
-
-    let ord = match get_ord at with
-      | Some `Eq  -> "eq"
-      | Some `Neq -> "neq"
-      | Some `Leq -> "le"
-      | Some `Geq -> "ge"
-      | Some `Lt  -> "lt"
-      | Some `Gt  -> "gt"
-      | None      -> "" in
-
-    sort ^ ord
-
-  | _ -> "H"
-
-(*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
 let goal_and_right (s : TraceSequent.t) =
@@ -137,7 +105,9 @@ let left_not_intro (Args.String hyp_name) s =
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
   match formula with
-  | Not f -> [Hyps.add_formula (Ident.fresh id) (not_f f) s]
+  | Not f ->
+    [Hyps.add Args.AnyName (not_f f) s]
+
   | _ -> soft_failure (Tactics.Failure "cannot introduce negation")
 
 let () =
@@ -159,12 +129,11 @@ let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
     let env = ref (TraceSequent.env s) in
     
     let v' = match nip with
-      | Args.Unnamed _
-      | Args.AnyName _ ->
+      | Args.Unnamed 
+      | Args.AnyName ->
         Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
 
-      | Args.Named lsymb ->
-        let name = L.unloc lsymb in
+      | Args.Named name ->
         let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
     
         if Vars.name v' <> name then
@@ -180,18 +149,8 @@ let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
   | `Hyp hid ->
     let f = Hyps.by_id hid s in        
     let s = Hyps.remove hid s in
-    
-    let id = match nip with
-      | Args.AnyName l ->
-        if Ident.name hid = "_"
-        then Hyps.fresh_id ~approx:true (choose_name f) s
-        else Ident.fresh hid 
-
-      | Args.Named lsymb -> Hyps.fresh_id ~approx:false (L.unloc lsymb) s
-                              
-      | Args.Unnamed lsymb -> Hyps.fresh_id "_" s in
-   
-    Hyps.add_formula id f s
+       
+    Hyps.add nip f s
 
 (*------------------------------------------------------------------*)
 (** Type for case and destruct tactics handlers *)
@@ -228,8 +187,8 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
   let cases = SystemExpr.map_descrs table system mk_case in
 
   List.map (fun f ->
-      let id = Hyps.fresh_id "_" s in
-      ( CHyp id, Hyps.add_formula id f s )
+      let id, s = Hyps.add_i Args.Unnamed f s in
+      ( CHyp id, s )
     ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
 
 (** Case analysis on an hypothesis.
@@ -249,8 +208,8 @@ let hypothesis_case ~many id (s : TraceSequent.t) : c_res list =
     soft_failure (Tactics.Failure "can only be applied to a disjunction");
 
   List.map (fun g ->
-      let idg = Ident.fresh id in
-      let sg = Hyps.add_formula idg g s in
+      let ng = Ident.name id in
+      let idg, sg = Hyps.add_i (Args.Named ng) g s in
       ( CHyp idg, sg )
     ) cases
 
@@ -270,11 +229,9 @@ let case_cond orig vars c t e s =
   let t = Term.subst subst t in
   let then_subst = [ Term.ESubst (orig,t) ] in
   let else_subst = [ Term.ESubst (orig,e) ] in
-
-  let idthen, idelse = Hyps.fresh_id "_" s, Hyps.fresh_id "_" s in
   
-  let sthen = Hyps.add_formula idthen c  s
-  and selse = Hyps.add_formula idthen c' s in
+  let idthen, sthen = Hyps.add_i Args.Unnamed c  s
+  and idelse, selse = Hyps.add_i Args.Unnamed c' s in
 
   let sthen = TraceSequent.set_env !env sthen in
   
@@ -325,7 +282,7 @@ let case_tac (args : Args.parser_arg list) s
     let cres = do_case_tac args s in
     let ss = List.map (fun (CHyp id, s) ->
         (* TODO: location *)
-        do_naming_pat (`Hyp id) (Args.AnyName L._dummy) s
+        do_naming_pat (`Hyp id) Args.AnyName s
       ) cres in
     sk ss fk
   with Tactics.Tactic_soft_failure e -> fk e
@@ -395,12 +352,11 @@ let () =
     Note that variables in handlers have not been added to the env yet. *)
 let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
   let form = Hyps.by_id hid s in
-  let s = Hyps.remove hid s in
-  
+  let s = Hyps.remove hid s in  
   match form with
   | Term.And (f,g) ->
-    let idf, idg = Utils.as_seq2 (Hyps.fresh_ids ["_"; "_"] s) in
-    let s = Hyps.add_formula idf f (Hyps.add_formula idg g s) in
+    let ids, s = Hyps.add_i_list [(Args.Unnamed, f); (Args.Unnamed, g)] s in
+    let idf, idg = Utils.as_seq2 ids in
     ([`Hyp idf; `Hyp idg], s)
 
   | Term.Exists ((Vars.EVar v) :: vars,f) ->
@@ -412,14 +368,12 @@ let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
       | _ -> Term.Exists (vars,f) in
     let f = Term.subst subst f in
     
-    let idf = Ident.fresh hid in
-    let s = Hyps.add_formula idf f s in
+    let idf, s = Hyps.add_i Args.Unnamed f s in
     
     ([`Var (EVar v'); `Hyp idf], s)
 
   | Term.Exists ([],f) ->
-    let idf = Ident.fresh hid in
-    let s = Hyps.add_formula idf f s in
+    let idf,s = Hyps.add_i Args.Unnamed f s in
     ([`Hyp idf], s)
 
   | _ -> soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
@@ -501,20 +455,23 @@ let rec do_intro (s : TraceSequent.t) : ip_handler * TraceSequent.sequent =
     do_intro (TraceSequent.set_conclusion f s)
       
   | Impl(lhs,rhs)->
-    let id = Hyps.fresh_id "_" s in
-    ( `Hyp id,
-      Hyps.add_formula id lhs (TraceSequent.set_conclusion rhs s) )
+    let id, s =
+      Hyps.add_i Args.Unnamed lhs (TraceSequent.set_conclusion rhs s)
+    in
+    ( `Hyp id, s )
     
   | Not f ->
-    let id = Hyps.fresh_id "_" s in
-    ( `Hyp id,
-      Hyps.add_formula id f (TraceSequent.set_conclusion False s) )
+    let id, s =
+      Hyps.add_i Args.Unnamed f (TraceSequent.set_conclusion False s)
+    in
+    ( `Hyp id, s )
     
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
-    let id = Hyps.fresh_id "_" s in
-    ( `Hyp id,
-      Hyps.add_formula id (Atom h) (TraceSequent.set_conclusion False s) )
+    let id, s =
+      Hyps.add_i Args.Unnamed (Atom h) (TraceSequent.set_conclusion False s)
+    in
+    ( `Hyp id, s )
     
   | _ -> soft_failure Tactics.NothingToIntroduce
 
@@ -533,7 +490,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
 
   | (Args.Star loc) :: intros ->
     try 
-      let s_ip = Args.(SNamed (AnyName loc)) in
+      let s_ip = Args.(SNamed AnyName) in
       let ss = do_intro_pat s_ip s in
       List.map (do_intros [Args.Star loc]) ss
       |> List.flatten
@@ -569,7 +526,7 @@ let do_destruct hid (pat : Args.and_or_pat option) s =
     let handlers, s = do_and_pat hid s in
     [List.fold_left (fun s handler ->
          (* TODO: location errors *)
-         do_naming_pat handler (Args.AnyName L._dummy) s
+         do_naming_pat handler Args.AnyName s
        ) s handlers]
       
 let destruct_tac args s sk fk =
@@ -648,13 +605,7 @@ let simpl_left s =
   | False -> []
   | And (f,g) ->
     let s = Hyps.remove id s in
-    let idl, idr =
-      Utils.as_seq2
-        (Hyps.fresh_ids ~approx:true
-           [choose_name f;
-            choose_name f]
-           s) in        
-    [Hyps.add_formula idl f (Hyps.add_formula idr g s)]
+    [Hyps.add_list [(Args.AnyName, f); (Args.AnyName, g)] s]
 
   | Exists (vs,f) ->
     let s = Hyps.remove id s in
@@ -667,9 +618,7 @@ let simpl_left s =
         vs
     in
     let f = Term.subst subst f in
-    let name = choose_name f in
-    let idf = Hyps.fresh_id ~approx:true name s in
-    [Hyps.add_formula idf f (TraceSequent.set_env !env s)]
+    [Hyps.add Args.AnyName f (TraceSequent.set_env !env s)]
 
   | _ -> assert false
 
@@ -787,10 +736,8 @@ let congruence (s : TraceSequent.t) =
       conclusions
   in
   let s = List.fold_left (fun s atom ->
-      Hyps.add_formula (Hyps.fresh_id "_" s)
-        (Term.Atom (atom :> generic_atom)) s)
-      s
-      term_conclusions
+      Hyps.add Args.AnyName (Term.Atom (atom :> generic_atom)) s
+    ) s term_conclusions
   in
   if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
     []
@@ -817,10 +764,8 @@ let constraints (s : TraceSequent.t) =
       conclusions
   in
   let new_s = List.fold_left (fun s atom ->
-      Hyps.add_formula (Hyps.fresh_id "_" s)
-        (Term.Atom (atom :> generic_atom)) s)
-      s
-      trace_conclusions
+      Hyps.add Args.AnyName (Term.Atom (atom :> generic_atom)) s
+    ) s trace_conclusions
   in
   if Tactics.timeout_get (TraceSequent.constraints_valid new_s) then
     []
@@ -882,11 +827,9 @@ let eq_names (s : TraceSequent.t) =
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
-    List.fold_left
-      (fun s c ->
-         let id = Hyps.fresh_id ~approx:true "Ieq" s in
-         Hyps.add_formula id c s)
-      s new_eqs in
+    List.fold_left (fun s c ->
+        Hyps.add Args.AnyName c s
+      ) s new_eqs in
   
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
@@ -895,11 +838,9 @@ let eq_names (s : TraceSequent.t) =
       (TraceSequent.get_all_terms s)
   in
   let s =
-    List.fold_left
-      (fun s c ->
-         let id = Hyps.fresh_id ~approx:true "TSeq" s in
-         Hyps.add_formula id c s)
-      s cnstrs
+    List.fold_left (fun s c ->
+        Hyps.add Args.AnyName c s
+      ) s cnstrs
   in
   [s]
 
@@ -944,11 +885,9 @@ let eq_trace (s : TraceSequent.t) =
       [] terms
   in
   let s =
-    List.fold_left
-      (fun s c ->
-         let id = Hyps.fresh_id ~approx:true "Teq" s in
-         Hyps.add_formula id c s)
-      s facts
+    List.fold_left (fun s c ->
+        Hyps.add Args.AnyName c s
+      ) s facts
   in
   [s]
 
@@ -1692,8 +1631,7 @@ let apply name (ths:Theory.term list) (s : TraceSequent.t) =
         List.rev (s'::subgoals)
     | f ->
       (* TODO: named hypothesis *)
-      let id = Hyps.fresh_id ~approx:true (choose_name f) s in
-      Hyps.add_formula id f s ::
+      Hyps.add Args.AnyName f s ::
       List.rev subgoals
   in
   
@@ -1728,8 +1666,7 @@ let tac_assert (Args.Boolean f) s =
   let s1 = TraceSequent.set_conclusion f s in
   (* TODO: named hypothesis, e.g. `assert (ident : type)` 
      or `assert ident := type` *)
-  let id = Hyps.fresh_id ~approx:true "HA" s in
-  let s2 = Hyps.add_formula id f s in
+  let s2 = Hyps.add Args.AnyName f s in
   [s1 ;s2]
 
 let () =

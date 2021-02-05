@@ -2,9 +2,9 @@ module L = Location
 
 (*------------------------------------------------------------------*)
 type naming_pat =
-  | Unnamed of Location.t    (** '_' *)
-  | AnyName of Location.t    (** '?' *)
-  | Named   of Theory.lsymb
+  | Unnamed                  (** '_' *)
+  | AnyName                  (** '?' *)
+  | Named   of string
 
 type and_or_pat =
   | Or      of simpl_pat list
@@ -27,9 +27,9 @@ type intro_pattern =
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
-  | Unnamed _ -> Fmt.pf fmt "_"
-  | AnyName _ -> Fmt.pf fmt "?"
-  | Named   s -> Fmt.pf fmt "%s" (L.unloc s)
+  | Unnamed -> Fmt.pf fmt "_"
+  | AnyName -> Fmt.pf fmt "?"
+  | Named s -> Fmt.pf fmt "%s" s
 
 let rec pp_and_or_pat fmt = function
   | Or      l ->

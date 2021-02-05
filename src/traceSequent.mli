@@ -7,7 +7,9 @@
 *)
 
 open Term
-    
+
+module Args = TacticsArgs
+  
 (** {2 Sequent type and basic operations} *)
 
 type t
@@ -63,25 +65,22 @@ type ldecl = Ident.t * hyp
 val pp_hyp   : Format.formatter -> hyp   -> unit
 val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit  
              
-module Hyps : sig
-  (** Create a fresh name for a hypothesis that is guaranteed fresh. 
-      If [~approx] is [true], the name can be changed (defaut to false). 
-      Hypotheses names are guaranteed to have unique names (i.e. unique
-      Ident.name), except for unnamed hypothesis, which all uses "_". *)
-  val fresh_id : ?approx:bool -> string -> sequent -> Ident.t
+module Hyps : sig  
+  (** [add id f s] returns the sequent [s] with [f] added to its hypotheses. 
+      The new sequent will be automatically enriched with equalities 
+      expressing relevant macro definitions, as well as conditions of all 
+      named actions that are assumed to happen. *)
+  val add : Args.naming_pat -> formula -> sequent -> sequent
 
-  (** Batched [fresh_id]. *)
-  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
-  
-  (** [add_formula id f s] returns the sequent [s] with [f] added to its
-      hypotheses. The new sequent will be automatically enriched with
-      equalities expressing relevant macro definitions, as well as conditions
-      of all named actions that are assumed to happen. *)
-  val add_formula : Ident.t -> formula -> sequent -> sequent
+  (** Same as [add], but also returns the ident of the added hypothesis. *)
+  val add_i : Args.naming_pat -> formula -> sequent -> Ident.t * sequent
 
-  (* (\** Same as [add_formula], but the name is explicitely given. *\)
-   * val add_named_formula : string -> formula -> sequent -> sequent *)
+  val add_list :
+    (Args.naming_pat * formula) list -> sequent -> sequent
 
+  val add_i_list :
+    (Args.naming_pat * formula) list -> sequent -> Ident.t list * sequent
+                                                          
   (*------------------------------------------------------------------*)
   (** [is_hyp f s] returns true if the formula appears inside the hypotesis
       of the sequent [s].  *)

@@ -1,6 +1,8 @@
 open Utils
 open Atom
 
+module Args = TacticsArgs
+  
 type hyp_error =
   | HypAlreadyExists of string
   | HypUnknown of string
@@ -14,6 +16,39 @@ let pp_hyp_error fmt = function
     Fmt.pf fmt "an hypothesis named %s already exists" s     
   | HypUnknown s ->
     Fmt.pf fmt "unknown hypothesis %s" s     
+
+
+(*------------------------------------------------------------------*)
+let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
+  | `Timestamp (ord,_,_) -> Some ord
+  | `Message   (ord,_,_) -> Some (ord :> Term.ord)
+  | `Index     (ord,_,_) -> Some (ord :> Term.ord)
+  | `Happens _           -> None
+
+let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
+
+(** Chooses a name for a formula, depending on an old name (if any), and the
+    formula shape. *)
+let choose_name f = match f with
+  | Term.Atom at ->
+    let sort = match at with
+      | `Timestamp _ -> "C"
+      | `Message _ -> "M"
+      | `Index _ -> "I"
+      | `Happens _ -> "Hap" in
+
+    let ord = match get_ord at with
+      | Some `Eq  -> "eq"
+      | Some `Neq -> "neq"
+      | Some `Leq -> "le"
+      | Some `Geq -> "ge"
+      | Some `Lt  -> "lt"
+      | Some `Gt  -> "gt"
+      | None      -> "" in
+
+    sort ^ ord
+
+  | _ -> "H"
 
 (*------------------------------------------------------------------*)  
 type hyp = Term.formula
@@ -43,7 +78,7 @@ module H : sig
   val fresh_id : string -> hyps -> Ident.t
   val fresh_ids : string list -> hyps -> Ident.t list
   
-  val add : force:bool -> Ident.t -> hyp -> hyps -> hyps
+  val add : force:bool -> Ident.t -> hyp -> hyps -> Ident.t * hyps
 
   val find_opt : (Ident.t -> hyp -> bool) -> hyps -> ldecl option
   val find_all : (Ident.t -> hyp -> bool) -> hyps -> ldecl list
@@ -151,10 +186,13 @@ end = struct
     
   let add ~force id hyp hyps =
     assert (not (Mid.mem id hyps)); 
-    if not (is_fresh (Ident.name id) hyps)
-    then hyp_error (HypAlreadyExists (Ident.name id))
-    (* do we really want to not add twice an hypothesis ? *)
-    else if is_hyp hyp hyps && not force then hyps else Mid.add id hyp hyps
+
+    if not (is_fresh (Ident.name id) hyps) then
+      hyp_error (HypAlreadyExists (Ident.name id));
+
+    match find_opt (fun _ hyp' -> hyp = hyp') hyps with
+    | Some (id',_) when not force -> id', hyps  
+    | _ -> id, Mid.add id hyp hyps
   
   let mem_id id hyps = Mid.mem id hyps
   let mem_name name hyps =
@@ -351,7 +389,7 @@ module Hyps = struct
 
   (** Add to [s] equalities corresponding to the expansions of all macros
     * occurring in [at]. *)
-  let rec add_macro_defs s at =
+  let rec add_macro_defs (s : sequent) at =
     let macro_eqs : message_atom list ref = ref [] in
     let iter =
       new iter_macros
@@ -361,9 +399,9 @@ module Hyps = struct
     
     iter#visit_formula (Term.Atom at) ;
     
-    List.fold_left (add_message_atom None) s !macro_eqs
+    List.fold_left (fun i s -> snd (add_message_atom None i s)) s !macro_eqs
 
-  and add_message_atom ?(force=false) (id : Ident.t option) s at =
+  and add_message_atom ?(force=false) (id : Ident.t option) (s : sequent) at =
     let f = Term.Atom (at :> generic_atom) in
     let recurse = not (H.is_hyp f s.hyps) in
     
@@ -371,17 +409,19 @@ module Hyps = struct
     let id = match id with       
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in
-    let hyps = H.add ~force id f s.hyps in
+    let id, hyps = H.add ~force id f s.hyps in
     let s =
       S.update ~keep_trs:false ~keep_models:true
         ~hyps s in
-
+    
     (* [recurse] boolean to avoid looping *)
-    if recurse then add_macro_defs s (at :> generic_atom) else s
+    let s = if recurse then add_macro_defs s (at :> generic_atom) else s in
 
-  let rec add_happens ?(force=false) id s ts =
+    id, s
+
+  let rec add_happens ?(force=false) id (s : sequent) ts =
     let f = Term.Atom (`Happens ts :> generic_atom) in
-    let hyps = H.add ~force id f s.hyps in
+    let id, hyps = H.add ~force id f s.hyps in
     let s =
       S.update ~keep_trs:true ~keep_models:false
         ~hyps s in
@@ -393,22 +433,44 @@ module Hyps = struct
       let table  = s.table in
       
       (* TODO: remove auto naming ? *)
-      add_formula (H.fresh_id "C" s.hyps)
-        (snd (SystemExpr.descr_of_action table system a).Action.condition)
-        s
-    | _ -> s
+      let _, s =
+        add_formula (H.fresh_id "C" s.hyps)
+          (snd (SystemExpr.descr_of_action table system a).Action.condition)
+          s in
+      (id, s)
+      
+    | _ -> id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
-  and add_formula ?(force=false) id f s =
+  and add_formula ?(force=false) id f (s : sequent) =
     match f with
     | Term.Atom (#Atom.message_atom as at) -> add_message_atom ~force (Some id) s at
     | Term.Atom (`Happens ts)              -> add_happens ~force id s ts
     | _ ->
-      let hyps = H.add ~force id f s.hyps in
+      let id, hyps = H.add ~force id f s.hyps in
       (* TODO: performances, less updates ? *)
-      S.update ~hyps:hyps s
+      id, S.update ~hyps:hyps s
 
-  let add_formula id f s = add_formula ~force:true id f s
+  let add_i npat f s =
+    let force, name = match npat with
+      | Args.Unnamed -> true, "_"
+      | Args.AnyName -> false, choose_name f
+      | Args.Named s -> true, s in
+
+    let id = H.fresh_id name s.hyps in
+    
+    add_formula ~force id f s
+
+  let add npat f s = snd (add_i npat f s)
+
+  let add_i_list l (s : sequent) =
+    let s, ids = List.fold_left (fun (s, ids) (npat,f) ->
+        let id, s = add_i npat f s in
+        s, id :: ids
+      ) (s,[]) l in
+    List.rev ids, s
+
+  let add_list l s = snd (add_i_list l s)
   
   let remove id s = S.update ~hyps:(H.remove id s.hyps) s
 
