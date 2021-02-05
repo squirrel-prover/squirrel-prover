@@ -19,7 +19,7 @@ R -> T : h(ID,PIN)
 *******************************************************************************)
 
 (*******************************************************************************
-Trying to prove the secret of state values with phases.
+Trying to prove the secret of the states with an equivalence.
 *******************************************************************************)
 
 abstract ok : message
@@ -34,6 +34,7 @@ name k : message
 name key1 : message
 name key2 : message
 name key3 : message
+name fresh : message
 
 hash h
 hash h1
@@ -50,8 +51,6 @@ mutable TS : message
 channel cT
 channel cR
 channel c
-
-name nIdeal : index->message
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
@@ -79,38 +78,90 @@ process reader(jj:index) =
   else
     out(cR, error)
 
-process outReaderState(i:index) =
-  out(cR, diff(kR(i),nIdeal(i)))
-
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
-        | (!_i P: outReaderState(i))
         | !_kk (in(c,m); out(c,h1(m,key1)))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
-axiom phases :
-  forall (t:timestamp),
-  ( exists (i:index), t = P(i) ) || ( forall (i:index), t < P(i) ).
+(* /!\ incorrect modelling of state initial values *)
+axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>.
+axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii).
 
-equiv secretTagState.
+equiv strong_sec (t,t':timestamp,ii:index) : frame@t, diff(kR(ii)@t',fresh).
 Proof.
 induction t.
 
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
-admit.
+(* case t = init *)
+induction t'.
+(* case t' = init *)
+equivalent kR(ii)@init,idinit(ii).
+apply stateReaderInit to ii.
+fresh 1.
+(* case t' = R1(jj,ii1) *)
+admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)
 
+(* case t = R(jj) *)
 expandall.
-fa 0. fa 1. fa 1.
-(* Here, kR(i)@pred(P(i,j)) is equal to h3(m,key3) with m already hased
-in the frame, so I don't see how we can use PRF. *)
+fa 0. fa 1. fa 1. fa 1.
+admit 2. (* traiter le cas de TSnext ??? *)
+prf 1.
+yesif 1.
+project.
+split.
+admit. (* ??? *)
+split.
+admit. (* ??? *)
+admit. (* ok, monotonicity of TS *)
+split.
+admit. (* ok, monotonicity of TS *)
+split.
+admit. (* ??? *)
+admit. (* ??? *)
+fresh 1.
 
+(* case t = R1(jj,ii1) *)
+expandall.
+fa 0. fa 1. fa 2.
+admit 1. (* on a besoin de cond => honest pour faire du FADUP ??? or on a besoin du secret pour prouver cond => honest... *)
+prf 1.
+yesif 1. project.
+split.
 admit.
+split.
+admit. (* ok, monotonicity of kR *)
 admit.
+split.
 admit.
+split.
+admit. (* ok, monotonicity of kR *)
+admit.
+fresh 1.
+
+(* case t = R2(jj) *)
+admit. (* similar to R1(jj,ii1) *)
+
+(* case t = T(i,j) *)
+admit.
+
+(* case t = T1(i,j) *)
+admit.
+
+(* case t = T2(i,j) *)
+expandall.
+fa 0. fa 1.
+admit.
+
+(* case t = T3(i,j) *)
+expandall.
+fa 0. fa 1.
+admit.
+
+(* case t = A(kk) *)
+admit.
+
+(* case t = A1(kk) *)
+admit.
+
+(* case t = A2(kk) *)
 admit.
 Qed.

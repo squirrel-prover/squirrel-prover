@@ -28,25 +28,12 @@ channel cR
 abstract deltaInit : message
 abstract myPred : message->message
 
-axiom stateTagInit : forall (i:index), kT(i)@init = seed(i)
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = seed(ii) 
-
 (* the try find construct does not allow to get a return value (the value with which
 the database should be updated), so we use a private function updateReader *)
 abstract updateReader : index->message->message (* should be private *)
-axiom updateReaderAxiom : 
-  forall (i:index,xk:message), 
-    updateReader(i,hMsg(hState(xk,keyState(i)),keyMsg(i))) = hState(xk,keyState(i))
 
 abstract testOk : message
 abstract readerTest : index->message->message->message->message
-
-axiom readerTestOk :
-  forall (i:index,xkR:message,x:message,delta:message),
-  ( readerTest(i,xkR,x,delta) = testOk )
-  <=> 
-  ( x = hMsg(xkR,keyMsg(i))
-    || readerTest(i,hState(xkR,keyState(i)),x,myPred(delta)) = testOk )
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
@@ -63,6 +50,17 @@ process reader(k:index) =
     out(cR,ko)
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
+
+axiom updateReaderAxiom : 
+  forall (i:index,xk:message), 
+    updateReader(i,hMsg(hState(xk,keyState(i)),keyMsg(i))) = hState(xk,keyState(i)).
+
+axiom readerTestOk :
+  forall (i:index,xkR:message,x:message,delta:message),
+  ( readerTest(i,xkR,x,delta) = testOk )
+  <=> 
+  ( x = hMsg(xkR,keyMsg(i))
+    || readerTest(i,hState(xkR,keyState(i)),x,myPred(delta)) = testOk ).
 
 goal auth_R :
   forall (k,ii:index), 
