@@ -371,6 +371,7 @@ Qed.
 goal [none, auth] S_charac :
    exec@Sok =>(cond@Sfail => False).
 Proof.
+  intro *.
   expand exec@Sok; expand cond@Sok; expand cond@Sfail.
 
   euf H1.
@@ -378,7 +379,7 @@ Proof.
 (* oracle clase *)
 
   case H2.
-  case H3.
+  case H2.
 (* sub case with wrong tag *)
   apply H0 to i.
   assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey). 
@@ -396,24 +397,24 @@ Proof.
   executable pred(Sok).
 
   depends SDIS, Sok.
-  apply H4 to P3(i).
+  apply H2 to P3(i).
   expand exec@P3(i).
   expand cond@P3(i).
 
 (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
-  intctxt D.
+  intctxt D1.
 
 (* Ill-tagged cases *)
-  apply signnottag to sidPaF@P2,kP.
-  apply difftags.
+  by apply signnottag to sidPaF@P2,kP.
+  by apply difftags.
 
 (* Honest case *)
   assert PDIS5 <= Sok.
-  case H6.
-  apply H4 to PDIS5.
+  case H4.
+  apply H2 to PDIS5.
   expand exec@PDIS5.
   expand cond@PDIS5. 
-  apply H1 to i.
+  apply H0 to i.
   right.
   collision.
 Qed.
@@ -458,26 +459,26 @@ Proof.
   apply S_charac.
   depends Sok, Sfail.
   executable Sfail.
-  apply H1 to Sok.
+  apply H0 to Sok.
   expand exec@Sfail.
 
   fa 17. fa 18. noif 18.
   (* A3 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDIS *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDIS1 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDSI2 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDIS3 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDIS4 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDIS5 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* Pok *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* PDISauth7 *)
   expandall; fa 17.
   expand seq(i -> b(i)),i. expand seq(i -> bke1(i)),i.
@@ -488,10 +489,10 @@ Proof.
   apply P_charac.
   depends PDIS5, Pfail.
   executable Pfail.
-  by apply H to PDIS5.
-  expand exec@Pfail.
+  by apply H0 to PDIS5.
+  by expand exec@Pfail.
 
-  by fa 17. fa 18. noif 18.
+  by fa 17; fa 18; noif 18.
  (* A4 *)
   by expandall; fa 17.
  (* A5 *)
