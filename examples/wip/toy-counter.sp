@@ -14,10 +14,15 @@ B = in(d, i : nat); in(c, y);
     else out(d, i + 1)
 
 P = ! A | ! B | out(d, 0) | ! in(d, i : nat); out(d, i)
-*******************************************************************************)
 
-(* In this model, we do not use private channels since actions (input/condition/
-   update/output) are atomic. *)
+COMMENTS
+- In this model, we do not use private channels since actions (input/condition/
+   update/output) are atomic.
+
+PROOFS
+- monotonicity of the counter
+- secrecy (as a reachability property)
+*******************************************************************************)
 
 hash h
 
@@ -31,11 +36,7 @@ mutable d : message
 channel cA
 channel cB
 
-(* initial value for counter *)
-abstract myZero : message
-
-(* myPred and mySucc functions for counter *)
-abstract myPred : message->message
+(* mySucc function for counter *)
 abstract mySucc : message->message
 
 (* order relation for counter *)
@@ -61,13 +62,11 @@ system ((!_i A) | (!_j B)).
 
 (* AXIOMS *)
 
-axiom counterInit : d@init = myZero
-axiom predSucc : forall (n:message), myPred(mySucc(n)) = n
-axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
+axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk.
 axiom orderTrans :
   forall (n1,n2,n3:message),
     (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
-    => order(n1,n3) = orderOk
+    => order(n1,n3) = orderOk.
 axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
 (* GOALS *)
@@ -80,6 +79,7 @@ apply orderSucc to d@pred(t).
 case t. case H0.
 Qed.
 
+(* A more general result than counterIncrease *)
 goal counterIncreaseBis :
   forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
 Proof.

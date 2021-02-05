@@ -33,8 +33,6 @@ hash h2
 abstract ok : message
 abstract error : message
 
-name seed1 : index->message
-name seed2 : index->message
 name key1 : index->message
 name key2 : index->message
 name k : index->message
@@ -47,13 +45,6 @@ channel cT
 channel cR
 
 name nR : index->index->message
-
-axiom stateTagInit :
-  forall (i:index),
-    kT(i)@init = < seed1(i), seed2(i) >
-axiom stateReaderInit :
-  forall (ii:index),
-    kR(ii)@init = < seed1(ii), seed2(ii) >
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
@@ -117,7 +108,7 @@ admit. (* ok, state invariant *)
 fresh 2.
 yesif 2.
 (* cond@R1(jj,ii) *)
-equivalent 
+equivalent
   (input@R1(jj,ii) = h1(xor(xor(fst(kR(ii)@pred(R1(jj,ii))),r1(jj)),k(ii)),key1(ii))),
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 admit. (* ??? can we use auth ??? *)
@@ -136,7 +127,7 @@ split.
 admit. (* ??? *)
 split.
 admit. (* ??? *)
-(* it seems to me that the previous case is possible: if T(i,j1) aborts, 
+(* it seems to me that the previous case is possible: if T(i,j1) aborts,
 then values of kT(i) is the same @T(i,j1) and @T(i,j),
 and we could have input@T(i,j) = input@T(i,j1)  *)
 (* so I don't see how we could derive False *)
@@ -145,11 +136,11 @@ fresh 1.
 
 (* case t = T1(i,j) *)
 expandall.
-fa 0. fa 1. 
+fa 0. fa 1.
 admit. (* ??? can we use auth ??? *)
 
 (* case t = T2(i,j) *)
 expandall.
-fa 0. fa 1. 
+fa 0. fa 1.
 admit. (* ??? can we use auth ??? *)
 Qed.

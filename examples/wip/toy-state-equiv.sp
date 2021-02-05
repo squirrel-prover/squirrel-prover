@@ -7,6 +7,11 @@ The goal is to prove the equivalence between:
 - a system outputting the updated value kT(i) hashed with key(i) (ie same key for
 all sessions of identity i),
 - and a system outputting a fresh name at each session.
+
+PROOFS
+- lastUpdate
+- stateInequality
+- equivalence between real and ideal systems
 *******************************************************************************)
 
 hash hkey
@@ -28,15 +33,11 @@ process tag(i:index,j:index) =
 
 system (!_i !_j T: tag(i,j)).
 
-(* AXIOMS *)
-
-axiom stateInit :
-  forall (i:index), kT(i)@init = seed(i).
-
 (* GOALS *)
 
 goal stateUpdate :
-forall (t:timestamp), (forall (i,j:index), t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
+forall (t:timestamp), (forall (i,j:index), 
+  t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
 Proof.
 simpl.
 Qed.

@@ -30,27 +30,9 @@ abstract plus : message->message->message
 
 abstract rangeOk : message
 abstract range : message->message->message
-(* range(kT,kR) = rangeOk iif there exists n, kT=h^n(kR) *)
-axiom rangeAxiom :
-  forall (xkT,xkR:message),
-    range(xkT,xkR) = rangeOk
-    <=> ( exists (i:index,z:message,z':message),
-            xkT = hState(<seed(i),plus(z,z')>,keyState(i))
-            && xkR = hState(<seed(i),z>,keyState(i)) )
 
 abstract updateTag : index->message->message (* should be private *)
-axiom updateTagAxiom :
-  forall (i:index,z:message),
-    updateTag(i,hState(<seed(i),z>,keyState(i))) = hState(<seed(i),plus(z,delta)>,keyState(i))
-
 abstract updateReader : index->message->message (* should be private *)
-axiom updateReaderAxiom :
-  forall (ii:index,x:message), updateReader(ii,hMsg(x,keyMsg(ii))) = x
-
-axiom stateTagInit :
-  forall (i:index), kT(i)@init = hState(<seed(i),delta>,keyState(i))
-axiom stateReaderInit :
-  forall (i:index), kR(i)@init = hState(<seed(i),delta>,keyState(i))
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
@@ -69,6 +51,24 @@ process reader(k:index) =
     out(cR,ko)
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
+
+(* range(kT,kR) = rangeOk iif there exists n, kT=h^n(kR) *)
+axiom rangeAxiom :
+  forall (xkT,xkR:message),
+    range(xkT,xkR) = rangeOk
+    <=> ( exists (i:index,z:message,z':message),
+            xkT = hState(<seed(i),plus(z,z')>,keyState(i))
+            && xkR = hState(<seed(i),z>,keyState(i)) ).
+axiom updateTagAxiom :
+  forall (i:index,z:message),
+    updateTag(i,hState(<seed(i),z>,keyState(i))) = hState(<seed(i),plus(z,delta)>,keyState(i)).
+axiom updateReaderAxiom :
+  forall (ii:index,x:message), updateReader(ii,hMsg(x,keyMsg(ii))) = x.
+
+axiom stateTagInit :
+  forall (i:index), kT(i)@init = hState(<seed(i),delta>,keyState(i)).
+axiom stateReaderInit :
+  forall (i:index), kR(i)@init = hState(<seed(i),delta>,keyState(i)).
 
 goal auth_R :
   forall (k,ii:index,delta:message),

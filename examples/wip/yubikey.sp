@@ -2,13 +2,13 @@
 YUBIKEY
 
 C -> S: pid || otp || nonce
-S -> C: otp || nonce || hmac || status 
+S -> C: otp || nonce || hmac || status
 
 Warning: this last message is unclear and not modelled at all and replaced by "accept"
 It was also not modelled in the Tamarin/Sapic file provided in Robert's thesis
 
 otp is an encryption of a triple (secret(i), cpt, npr(i,j)), and it is modelled here as a randomized encryptio of a pair (secret(i), cpt).
-According to the specification in Robert's thesis, AES is used. 
+According to the specification in Robert's thesis, AES is used.
 I rely on intctxt ... not sure that this is legitimate.
 *******************************************************************************)
 senc enc,dec
@@ -18,10 +18,7 @@ abstract endplug: message
 abstract startpress: message
 abstract accept:message
 
-abstract myZero : message
 abstract mySucc : message->message
-abstract myPred : message->message
-
 
 abstract pid : index -> message
 name k: index -> message
@@ -35,61 +32,52 @@ mutable SCpt: index->message
 channel cT
 channel cR
 
-axiom stateYubikeyInit : forall (i:index), YCpt(i)@init = myZero
-
-axiom stateServerInit : forall (i:index), SCpt(i)@init = myZero
-
 abstract orderOk : message
 abstract order : message->message->message
 
-axiom orderSucc : forall (n:message), order(n,mySucc(n)) = orderOk
+(* When the key is plugged, its counter is incremented *)
+process yubikeyplug(i:index,j:index) =
+  in(cT, x1);
+  if x1 = startplug then YCpt(i) := succ(YCpt(i)); out(cT,endplug)
+
+(* When the key is pressed, an otp is sent with the current value of the counter,
+and the counter is imcremented *)
+process yubikeypress(i:index,j:index) =
+  in(cT,x2);
+  if x2 = startpress then
+       let cpt = YCpt(i) in
+       YCpt(i) := mySucc(YCpt(i));
+       out(cT,<pid(i),<nonce(i,j),enc(<secret(i),cpt>,npr(i,j),k(i))>>)
+
+(* When the server receives a message, it checks whether it corresponds to a pid in its database,
+and checks also that the counter inside the otp is strictly greater than the counter associated to
+the token. If so, the value inside the otp is used to update the database.
+Now, the counter value associated to this token is this new value *)
+
+(* Warning: If I replace the non-failure test "dec(snd(snd(y1)),k(i)) <> fail"
+by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to apply intctxt and to prove the goal auth *)
+process server(ii:index) =
+  in(cR,y1);
+   try find  i such that fst(y1) = pid(i) in
+     if  dec(snd(snd(y1)),k(i)) <> fail && order(SCpt(i),snd(dec(snd(snd(y1)),k(i)))) =orderOk then
+     SCpt(i) := snd(dec(snd(snd(y1)),k(i)));
+     out(cR,accept)
+
+
+system ((!_i !_j Plug: yubikeyplug(i,j)) | (!_i !_j Press: yubikeypress(i,j)) | (!_ii S: server(ii))).
 
 axiom orderTrans :
   forall (n1,n2,n3:message),
     (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
     => order(n1,n3) = orderOk
 
-axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk
-
-(* When the key is plugged, its counter is incremented *)
-process yubikeyplug(i:index,j:index) =
-  in(cT, x1);
-  if x1 = startplug then YCpt(i) := succ(YCpt(i)); out(cT,endplug) 
-
-(* When the key is pressed, an otp is sent with the current value of the counter, 
-and the counter is imcremented *)
-process yubikeypress(i:index,j:index) =
-  in(cT,x2);
-  if x2 = startpress then  
-       let cpt = YCpt(i) in 
-       YCpt(i) := mySucc(YCpt(i)); 
-       out(cT,<pid(i),<nonce(i,j),enc(<secret(i),cpt>,npr(i,j),k(i))>>)
-
-
-(* When the server receives a message, it checks whether it corresponds to a pid in its database,
-and checks also that the counter inside the otp is strictly greater than the counter associated to 
-the token. If so, the value inside the otp is used to update the database. 
-Now, the counter value associated to this token is this new value *)
-
-(* Warning: If I replace the non-failure test "dec(snd(snd(y1)),k(i)) <> fail" 
-by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to apply intctxt and to prove the goal auth *)
-process server(ii:index) =
-  in(cR,y1); 
-   try find  i such that fst(y1) = pid(i) in
-     if  dec(snd(snd(y1)),k(i)) <> fail && order(SCpt(i),snd(dec(snd(snd(y1)),k(i)))) =orderOk then
-     SCpt(i) := snd(dec(snd(snd(y1)),k(i))); 
-     out(cR,accept)
-
-
-system ((!_i !_j Plug: yubikeyplug(i,j)) | (!_i !_j Press: yubikeypress(i,j)) | (!_ii S: server(ii))).
-
-
+axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
 
 (* I expressed a non-injective version of authentication but since the encryption outputted by the yubikey contains a random number, I think that this property will imply the injective one *)
 (* This is one of the property stated by Robert *)
 goal auth:
-   forall (ii,i:index), cond@S(ii,i) => 
+   forall (ii,i:index), cond@S(ii,i) =>
     (exists (j:index), Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))).
 Proof.
 intros.
@@ -97,12 +85,12 @@ expand cond@S(ii,i).
 intctxt M1.
 exists j.
 Qed.
-  
+
 (* injectivity version Stephanie *)
 (* Warning: admit which is true in the symbolic setting but we need an hypothesis in the computational model *)
 goal auth_injective_bis:
-   forall (ii,i:index), cond@S(ii,i) => 
-    (exists (j:index), (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))) &&   
+   forall (ii,i:index), cond@S(ii,i) =>
+    (exists (j:index), (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))) &&
       (forall (j':index), (Press(i,j') < S(ii,i) && snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => j=j')).
 Proof.
 intros.
@@ -115,7 +103,7 @@ assert (npr(i,j) = npr(i,j')).
 help.
 admit.
 Qed.
-  
+
 
 
 (* The counter SCpt(i) strictly increases when t is an action S performed by the the server with tag i. *)
@@ -129,7 +117,7 @@ Qed.
 
 (* The counter SCpt(i) increases (not strictly) between pred(t) and t *)
 goal counterIncrease:
-forall (t:timestamp), forall (i:index), (t > init && exec@t) => 
+forall (t:timestamp), forall (i:index), (t > init && exec@t) =>
 (order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk || SCpt(i)@pred(t) = SCpt(i)@t).
 Proof.
 intros.
@@ -159,7 +147,7 @@ Qed.
 
 (* The counter SCpt(i) increases (not strictly) between t' and t when t' < t *)
 goal counterIncreaseBis:
-forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < t) => 
+forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < t) =>
 (order(SCpt(i)@t',SCpt(i)@t) = orderOk || SCpt(i)@t' = SCpt(i)@t).
 
 
@@ -196,12 +184,12 @@ Qed.
 
 (* Solene: This is an injective version of the authentication property shown before.*)
 goal auth_injective:
-   forall (ii,i:index), exec@S(ii,i) => 
-    (exists (j:index), 
-      Press(i,j) < S(ii,i) 
+   forall (ii,i:index), exec@S(ii,i) =>
+    (exists (j:index),
+      Press(i,j) < S(ii,i)
       && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))
-      && (forall (ii1:index), 
-           (exec@S(ii1,i) 
+      && (forall (ii1:index),
+           (exec@S(ii1,i)
             && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii1,i)))
             && SCpt(i)@S(ii1,i) = SCpt(i)@S(ii,i))
            => ii1 = ii)
@@ -239,7 +227,7 @@ apply orderStrict to SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i).
 Qed.
 
 goal noreplayInv:
-  forall (ii, ii1, i:index),    exec@S(ii1,i) && S(ii,i) < S(ii1,i) 
+  forall (ii, ii1, i:index),    exec@S(ii1,i) && S(ii,i) < S(ii1,i)
      => order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
 Proof.
 intros.
@@ -261,8 +249,8 @@ Qed.
 
 
 
-goal noreplayNew: 
-  forall (ii, ii1, i:index),   exec@S(ii1,i) && S(ii,i) <= S(ii1,i) 
+goal noreplayNew:
+  forall (ii, ii1, i:index),   exec@S(ii1,i) && S(ii,i) <= S(ii1,i)
      && SCpt(i)@S(ii,i)  =  SCpt(i)@S(ii1,i) => ii = ii1.
 Proof.
 intros.
@@ -276,8 +264,8 @@ Qed.
 
 goal monotonicity:
  forall (ii, ii1, i:index),   exec@S(ii1,i) && exec@S(ii,i) &&
-     order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk 
-     => S(ii,i) < S(ii1,i). 
+     order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk
+     => S(ii,i) < S(ii1,i).
 Proof.
 intros.
 assert(S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)).
@@ -305,7 +293,11 @@ induction.
 case t.
 case H0.
 
-(* 1 /8 *)
+(* 1/8 *)
+substitute t, init.
+left.
+
+(* 2/8 *)
 substitute t, Plug(i1,j).
 apply IH0 to pred(Plug(i1,j)).
 apply H0 to i.
@@ -317,7 +309,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 2/8 *)
+(* 3/8 *)
 substitute t, Plug1(i1,j).
 apply IH0 to pred(Plug1(i1,j)).
 apply H0 to i.
@@ -329,7 +321,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 3/8 *)
+(* 4/8 *)
 substitute t, Press(i1,j).
 apply IH0 to pred(Press(i1,j)).
 apply H0 to i.
@@ -341,7 +333,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 4/8 *)
+(* 5/8 *)
 substitute t, Press1(i1,j).
 apply IH0 to pred(Press1(i1,j)).
 apply H0 to i.
@@ -353,7 +345,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* interesting case *)
+(* 6/8 - interesting case *)
 substitute t, S(ii,i1).
 apply IH0 to pred(S(ii,i1)).
 apply H0 to i.
@@ -387,7 +379,7 @@ case H2.
 apply H1 to jj'.
 case H2.
 
-(* 5/8 *)
+(* 7/8 *)
 substitute t, S1(ii,i1).
 apply IH0 to pred(S1(ii,i1)).
 apply H0 to i.
@@ -399,7 +391,7 @@ exists jj.
 apply H1 to jj'.
 case H2.
 
-(* 6/8 *)
+(* 8/8 *)
 substitute t, S2(ii).
 apply IH0 to pred(S2(ii)).
 apply H0 to i.
@@ -410,14 +402,10 @@ right.
 exists jj.
 apply H1 to jj'.
 case H2.
-
-(* 7/ 8*)
-substitute t, init.
-left.
 Qed.
 
 goal lastUpdateServer :
-forall (i,ii:index), SCpt(i)@S(ii,i) = SCpt(i)@init || 
+forall (i,ii:index), SCpt(i)@S(ii,i) = SCpt(i)@init ||
 (exists (jj:index), SCpt(i)@S(ii,i) = snd(dec(snd(snd(input@S(jj,i))),k(i)))).
 Proof.
 intros.
@@ -428,6 +416,3 @@ left.
 right.
 exists jj.
 Qed.
-
-
-

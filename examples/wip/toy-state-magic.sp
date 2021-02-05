@@ -20,7 +20,8 @@ channel cR
 process tag(i:index,j:index) =
   out(cT, hMsg(seed(i),keyMsg(i,j)))
 
-(* k = entry k in the database (ie for a given tag's identity), kk = reader's session for entry k *)
+(* k = entry k in the database (ie for a given tag's identity), 
+   kk = reader's session for entry k *)
 process reader(k:index,kk:index) =
   in(cT,x);
   if x = hMsg(seed(k),keyMsg(k,kk)) then
@@ -34,7 +35,8 @@ goal wa_R :
 (* (i,j)=(k,kk) is necessary to have keyMsg(i,j)=keyMsg(k,kk) *)
 forall (k,kk:index),
   cond@R(k,kk) =>
-  (exists (i,j:index), T(i,j) < R(k,kk) && output@T(i,j) = input@R(k,kk) && i=k && j=kk).
+  ( exists (i,j:index), 
+    T(i,j) < R(k,kk) && output@T(i,j) = input@R(k,kk) && i=k && j=kk ).
 Proof.
 intros.
 expand cond@R(k,kk).

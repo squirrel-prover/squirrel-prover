@@ -92,14 +92,9 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
-
-
+(* /!\ incorrect modelling of state initial values *)
 axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii)
-axiom stateTSInit : TS@init = TSinit
-
-axiom TSaxiom :
-  forall (x:message), TSorder(x,TSnext(x)) = TSorderOk.
+axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii).
 
 goal lastUpdateTag_ :
 forall (t:timestamp), forall (i:index),
@@ -203,9 +198,29 @@ left. apply H1 to j'.
 right. exists j1. apply H1 to j'.
 case H2.
 
-admit. (* TODO *)
-admit. (* TODO *)
-admit. (* TODO *)
+substitute t,A(kk).
+apply IH0 to pred(A(kk)).
+apply H0 to i.
+case H1.
+left. apply H1 to j'.
+right. exists j. apply H1 to j'.
+case H2.
+
+substitute t,A1(kk).
+apply IH0 to pred(A1(kk)).
+apply H0 to i.
+case H1.
+left. apply H1 to j'.
+right. exists j. apply H1 to j'.
+case H2.
+
+substitute t,A2(kk).
+apply IH0 to pred(A2(kk)).
+apply H0 to i.
+case H1.
+left. apply H1 to j'.
+right. exists j. apply H1 to j'.
+case H2.
 Qed.
 
 goal lastUpdateT :

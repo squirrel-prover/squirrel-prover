@@ -24,8 +24,6 @@ mutable kR : index->message
 channel cT
 channel cR
 
-axiom stateTagInit : forall (i:index), kT(i)@init = seed(i)
-
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   kT(i) := hState(kT(i),keyState(i));
@@ -51,6 +49,7 @@ process reader(k:index) =
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
+axiom stateTagInit : forall (i:index), kT(i)@init = seed(i).
 
 goal wa_R0 :
 forall (k:index,i:index),

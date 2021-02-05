@@ -28,8 +28,6 @@ hash h2
 abstract ok : message
 abstract error : message
 
-name seed1 : index->message
-name seed2 : index->message
 name key1 : index->message
 name key2 : index->message
 name k : index->message
@@ -40,13 +38,6 @@ mutable kR : index->message (* <k1,k2> *)
 
 channel cT
 channel cR
-
-axiom stateTagInit :
-  forall (i:index),
-    kT(i)@init = < seed1(i), seed2(i) >
-axiom stateReaderInit :
-  forall (ii:index),
-    kR(ii)@init = < seed1(ii), seed2(ii) >
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =

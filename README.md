@@ -3,8 +3,7 @@
 
 ## Build
 
-You need OCaml version 4.08 or more. The prover is known to build with OCaml
-up to 4.10.0.
+You need OCaml version 4.10 or more.
 
 We recommend that you use opam (version 2.0 or more). It will notably allow
 you to install the required tools and libraries, with the following command

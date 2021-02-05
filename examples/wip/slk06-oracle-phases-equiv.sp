@@ -18,23 +18,29 @@ R -> T : h(ID,PIN)
          ID' := h(ID,PIN,TS)
 *******************************************************************************)
 
-hash h
-hash h1
-hash h2
-hash h3
+(*******************************************************************************
+Trying to prove the secret of state values with phases.
+*******************************************************************************)
 
 abstract ok : message
 abstract error : message
 
+abstract TSinit : message
 abstract TSorderOk : message
 abstract TSorder : message->message->message
 abstract TSnext : message->message
 
 name k : message
+name key1 : message
+name key2 : message
+name key3 : message
 
-name key1 : index->message
-name key2 : index->message
-name key3 : index->message
+hash h
+hash h1
+hash h2
+hash h3
+
+name idinit : index->message
 name pin : index->message
 
 mutable kT : index->message (* <ID,TSlast> *)
@@ -43,15 +49,18 @@ mutable TS : message
 
 channel cT
 channel cR
+channel c
+
+name nIdeal : index->message
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
   in(cR, x1);
   if fst(x1) = h(snd(x1),k) && TSorder(snd(kT(i)),snd(x1)) = TSorderOk then
-    out(cT, h1(fst(kT(i)),key1(i)));
+    out(cT, h1(fst(kT(i)),key1));
     in(cR, x3);
-    if x3 = h2(<fst(kT(i)),pin(i)>,key2(i)) then
-      kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3(i)), snd(x1)>;
+    if x3 = h2(<fst(kT(i)),pin(i)>,key2) then
+      kT(i) := <h3(<<fst(kT(i)),pin(i)>,snd(x1)>,key3), snd(x1)>;
       out(cT, ok)
     else
       out(cT, error)
@@ -63,35 +72,45 @@ process reader(jj:index) =
   TS := TSnext(TS);
   out(cR, <h(TS,k),TS>);
   in(cT, x2);
-  try find ii such that x2 = h1(kR(ii), key1(ii)) in
-    let m = h2(<kR(ii),pin(ii)>,key2(ii)) in
-    kR(ii) := h3(<<kR(ii),pin(ii)>,TS>,key3(ii));
+  try find ii such that x2 = h1(kR(ii), key1) in
+    let m = h2(<kR(ii),pin(ii)>,key2) in
+    kR(ii) := h3(<<kR(ii),pin(ii)>,TS>,key3);
     out(cR, m)
   else
     out(cR, error)
 
-system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
+process outReaderState(i:index) =
+  out(cR, diff(kR(i),nIdeal(i)))
 
-goal auth_R1 :
-forall (jj,ii:index),
-  cond@R1(jj,ii)
-  =>
-  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
-Proof.
-intros.
-expand cond@R1(jj,ii).
-euf M0.
-exists j.
-Qed.
+system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
+        | (!_i P: outReaderState(i))
+        | !_kk (in(c,m); out(c,h1(m,key1)))
+        | !_kk (in(c,m); out(c,h2(m,key2)))
+        | !_kk (in(c,m); out(c,h3(m,key3)))).
 
-goal auth_T1 :
-forall (i,j:index),
-  cond@T1(i,j)
-  =>
-  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j)).
+axiom phases :
+  forall (t:timestamp),
+  ( exists (i:index), t = P(i) ) || ( forall (i:index), t < P(i) ).
+
+equiv secretTagState.
 Proof.
-intros.
-expand cond@T1(i,j).
-euf M0.
-exists jj.
+induction t.
+
+admit.
+admit.
+admit.
+admit.
+admit.
+admit.
+admit.
+
+expandall.
+fa 0. fa 1. fa 1.
+(* Here, kR(i)@pred(P(i,j)) is equal to h3(m,key3) with m already hased
+in the frame, so I don't see how we can use PRF. *)
+
+admit.
+admit.
+admit.
+admit.
 Qed.
