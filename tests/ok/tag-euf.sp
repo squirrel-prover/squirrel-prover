@@ -51,10 +51,12 @@ Proof.
  destruct H as [Hexec0 Hcond].
 
  expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
+ destruct He as [_ [He H1]].
  euf Hcond.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
- by apply H0 to i. 
+
+ by apply He to i. 
 
  nosimpl(notleft H1). 
  by auto.

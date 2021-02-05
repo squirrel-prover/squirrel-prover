@@ -25,8 +25,7 @@ expand exec@B.
 equivalent cond@B, False. 
 by intro Hcond; apply trivial_if.
 noif 1.
-
-intro He.
+by auto.
 expand frame@B1.
 by fa 0.
 Qed.

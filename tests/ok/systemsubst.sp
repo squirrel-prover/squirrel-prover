@@ -25,7 +25,7 @@ Proof.
   expand cond@A(a); expand cond@A1(a). split; split. 
   by auto. 
   by intro _; left. 
-  by intro H; notleft H.
+  by intro H; notleft H; auto.
   by auto.
   by euf Heq; auto.
 Qed.

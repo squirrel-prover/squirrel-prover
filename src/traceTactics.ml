@@ -1875,8 +1875,7 @@ let () =
          * of doing it after introductions. *)
       try_tac (wrap assumption) ::
       (if intro then [wrap intro_all] else []) @
-      repeat (wrap simpl_left) ::
-      (* (if intro then [repeat (wrap simpl_left)] else []) @ *)
+      (if intro then [repeat (wrap simpl_left)] else []) @
       
       (* Learn new term equalities from constraints before
        * learning new index equalities from term equalities,

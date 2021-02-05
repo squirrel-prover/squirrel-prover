@@ -24,10 +24,11 @@ goal
 exec@O =>
   output@O = k.
 Proof.
- intro Hexec.
+ intro _.
 
  expand exec@O.
- expand cond@O.
+ expand cond@O. 
+ auto.
 Qed.
 
 goal

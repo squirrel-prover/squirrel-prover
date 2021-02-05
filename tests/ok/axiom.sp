@@ -17,7 +17,8 @@ ma=k.
 
 Proof.
  intro ma.
- apply dummy_false_axiom to ma.
+ apply dummy_false_axiom to ma. 
+ auto.
 Qed.
 
 goal [right]
@@ -27,6 +28,7 @@ ma=k.
 Proof.
  intro ma.
  apply dummy_false_axiom to ma.
+ auto.
 Qed.
 
 goal
@@ -36,4 +38,5 @@ ma=k.
 Proof.
  intro ma.
  apply dummy_false_axiom to ma.
+ auto.
 Qed.

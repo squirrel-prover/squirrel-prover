@@ -11,8 +11,9 @@ abstract y : message
 system null.
 
 goal
-  h(a,k)=x && h(b,k)=y && y=h(c,k) => b=c.
+  h(a,k)=x => h(b,k)=y => y=h(c,k) => b=c.
 Proof.
-  intro H. nosimpl(collision).
+  intro _ _ _. 
+  nosimpl(collision).
   auto.
 Qed.
