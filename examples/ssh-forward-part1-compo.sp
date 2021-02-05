@@ -200,16 +200,16 @@ Proof.
   simpl.
   expand cond@Pok;expand cond@Pfail; expand pkS1@Pok.
   substitute fst(input@Pok), pk(kS).
-  euf M0.
+  euf Meq0.
   expand sidP@Pok.
-  case H2.
-  case H2.
+  case H1.
+  case H1.
 
   collision.
 
-  apply H0 to i.
+  by apply H0 to i.
 
-  apply hashnotfor to <<g^a1,input@P1>,input@P1^a1>, x2.
+  by apply hashnotfor to <<g^a1,input@P1>,input@P1^a1>, x2.
 
   collision.
 
@@ -221,16 +221,17 @@ Qed.
 goal [none, auth] S_charac :
   cond@Sok => (cond@Sfail => False).
 Proof.
-  simpl.
+  intro *.
   expand cond@Sok; expand cond@Sfail.
-  euf M0.
+  euf H.
 
   case H1.
-  case H2.
+  case H1.
   apply H0 to i.
-  collision.
 
-  apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
+  by collision.
+
+  by apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
 
   collision.
   apply freshindex.
@@ -266,20 +267,25 @@ Proof.
    expand exec@Pfail.
    executable pred(Pfail).
    depends Pok, Pfail.
-   apply H2 to Pok.
+   apply H1 to Pok.
    expand exec@Pok.
-   apply P_charac.
+   by apply P_charac.
 
-   fa 7. fa 8.
-   noif 8.
+   fa 7; fa 8.
+   by noif 8.
+
    (* A *)
-   expandall; fa 7.
+   by expandall; fa 7.
+
    (* S *)
-   expandall; fa 7.
+   by expandall; fa 7.
+
    (* S1 *)
-   expandall; fa 7.
+   by expandall; fa 7.
+
    (* Sok *)
-   expandall; fa 7.
+   by expandall; fa 7.
+
    (* Sauth3 *)
    expandall; fa 7.
    expand seq(i->g^a(i)),i.
@@ -290,12 +296,13 @@ Proof.
    expand exec@Sfail.
    executable pred(Sfail).
    depends Sok, Sfail.
-   apply H2 to Sok.
+   apply H1 to Sok.
    expand exec@Sok.
-   apply S_charac.
+   by apply S_charac.
 
-   fa 7. fa 8.
-   noif 8.
+   fa 7; fa 8.
+   by noif 8.
+
    (* A1 *)
-   expandall; fa 7.
+   by expandall; fa 7.
 Qed.

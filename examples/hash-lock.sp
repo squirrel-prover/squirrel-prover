@@ -43,20 +43,22 @@ goal wa_R1:
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       input@T(i,k) = output@R(j)).
 Proof.
-  intro.
+  intro *.
   expand cond@R1(j).
   split.
 
   project.
-  euf M0.
+  euf Meq.
   exists i, k1.
   assert (input@T(i,k1) = nR(j)).
-  fresh M2.
+  fresh Meq1.  
+  case H.
   by depends R(j), R2(j).
-  euf M0.
+  euf Meq.
   exists i, k.
   assert (input@T(i,k) = nR(j)).
-  fresh M2.
+  fresh Meq1.
+  case H.
   by depends R(j), R2(j).
 
   by exists i,k.
@@ -70,23 +72,25 @@ goal wa_R2:
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j))).
 Proof.
-  intro.
+  intro *.
   expand cond@R2(j).
   split.
 
-  by apply H0; exists i,k.
-  apply H0.
+  by apply H; exists i,k.
+  apply H.
 
   project.
-  euf M0.
+  euf Meq.
   exists i, k1.
   assert (input@T(i,k1) = nR(j)).
-  fresh M2.
+  fresh Meq1.
+  case H0.
   by depends R(j), R1(j).
-  euf M0.
+  euf Meq.
   exists i, k.
   assert (input@T(i,k) = nR(j)).
-  fresh M2.
+  fresh Meq1. 
+  case H0.
   by depends R(j), R1(j).
 Qed.
 
@@ -136,11 +140,11 @@ Proof.
   prf 2. yesif 2.
   project.
   split. 
-  assert nT(i,k) = fst(input@R2(j)). by fresh M1. 
-  assert nT(i,k) = fst(input@R1(j)). by fresh M1.
+  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0. 
+  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0.
   split.
-  assert nT(i,k) = fst(input@R1(j)). by fresh M1. 
-  assert nT(i,k) = fst(input@R2(j)). by fresh M1.
+  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0. 
+  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

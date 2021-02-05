@@ -46,7 +46,7 @@ goal unforgeable_2 :
 Proof.
  intro a b Heq.
  nosimpl(collision).
- intro Hn.
+ auto.
 Qed.
 
 
@@ -58,5 +58,5 @@ Proof.
  intro a b Heq.
  collision.
  intro Heq2.
- case Ieq.
+ case H.
 Qed.

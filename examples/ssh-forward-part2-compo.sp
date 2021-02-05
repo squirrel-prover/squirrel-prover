@@ -343,25 +343,25 @@ Proof.
   expand exec@PDIS5.
   expand cond@PDIS5; expand cond@Pfail.
   substitute pkSa@PDIS5,pk(kS).
-  euf M0.
+  euf Meq0.
 
   (* oracle case *)
-  case H3.
-  case H3.
+  case H2.
+  case H2.
   apply hashlengthnotpair to <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
   apply signnottag to sidPa@P2, kP.
-  apply H1 to i1.
+  apply H0 to i1.
   left; right.
-  collision.
+  by collision.
 
   (* honest case SDIS *)
   collision.
   apply freshindex.
-  apply H1 to l.
+  by apply H0 to l.
 
   apply freshindex.
-  apply H1 to l.
+  apply H0 to l.
   right.
   collision.
 Qed.
@@ -373,23 +373,22 @@ goal [none, auth] S_charac :
 Proof.
   expand exec@Sok; expand cond@Sok; expand cond@Sfail.
 
-  euf M0.
+  euf H1.
 
 (* oracle clase *)
 
   case H2.
   case H3.
 (* sub case with wrong tag *)
-  apply H1 to i.
-  help.
-  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey).
-  collision.
+  apply H0 to i.
+  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey). 
+  by collision.
 
-  apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
+  by apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
 
-  apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
+  by apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
@@ -397,12 +396,12 @@ Proof.
   executable pred(Sok).
 
   depends SDIS, Sok.
-  apply H2 to P3(i).
+  apply H4 to P3(i).
   expand exec@P3(i).
   expand cond@P3(i).
 
 (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
-  intctxt D2.
+  intctxt D.
 
 (* Ill-tagged cases *)
   apply signnottag to sidPaF@P2,kP.
@@ -410,10 +409,10 @@ Proof.
 
 (* Honest case *)
   assert PDIS5 <= Sok.
-  case H4.
-  apply H2 to PDIS5.
+  case H6.
+  apply H4 to PDIS5.
   expand exec@PDIS5.
-  expand cond@PDIS5.
+  expand cond@PDIS5. 
   apply H1 to i.
   right.
   collision.
@@ -489,16 +488,16 @@ Proof.
   apply P_charac.
   depends PDIS5, Pfail.
   executable Pfail.
-  apply H1 to PDIS5.
+  by apply H to PDIS5.
   expand exec@Pfail.
 
-  fa 17. fa 18. noif 18.
+  by fa 17. fa 18. noif 18.
  (* A4 *)
-  expandall; fa 17.
+  by expandall; fa 17.
  (* A5 *)
-  expandall; fa 17.
+  by expandall; fa 17.
  (* A6 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* A7 *)
-  expandall; fa 17.
+  by expandall; fa 17.
 Qed.

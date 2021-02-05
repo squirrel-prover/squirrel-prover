@@ -57,5 +57,5 @@ Proof.
  intro a b Heq.
  collision. 
  intro Heq2. 
- case Ieq. 
+ case H. 
 Qed.

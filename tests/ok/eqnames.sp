@@ -28,7 +28,7 @@ goal independency :
   h(n1,k) <> n2.
 Proof.
  intro Heq.
- case Ieq.
+ case H.
 Qed.
 
 
@@ -38,5 +38,5 @@ goal independency_bis :
   h(m1(i),k) <> m1(j).
 Proof.
  intro i j Hneq Heq.
- case Ieq.
+ case H.
 Qed.

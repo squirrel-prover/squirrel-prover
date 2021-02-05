@@ -152,20 +152,20 @@ Proof.
   project. 
 
   assert dec(output@Tag(i,j),kE(i1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
-  intctxt HA.
+  intctxt Meq0.
   case H.
   assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt HA0.
-  by case H0.
+  intctxt Meq2.
+  by case H.
   by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
   by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
   assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
-  intctxt HA.
+  intctxt Meq0.
   case H.
   assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
-  intctxt HA0.
-  by case H0.
+  intctxt Meq2.
+  by case H.
   by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
   by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 Qed.

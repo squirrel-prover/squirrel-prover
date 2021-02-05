@@ -76,26 +76,25 @@ goal wa_R1 : forall r:index,
    output@R(r) = input@T(i,t)).
 Proof.
 
-  intros; split.
+  intro *; split.
 
   (* Cond => WA *)
   project.
   (* left *)
-  euf M0.
+  euf Meq.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
   (* right *)
-  euf M0.
+  euf Meq.
   exists i,t.
   assert (input@T(i,t) = nr(r)).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 
   (* WA => Cond *)
   exists i,t.
-
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -112,12 +111,12 @@ goal [left] wa_R1_left : forall (i,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intros.
-  euf M0.
+  intro *.
+  euf Meq.
   exists t.
   assert input@T(i,t) = nr(r).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -131,11 +130,11 @@ goal [right] wa_R1_right : forall (i,t,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intros.
-  euf M0.
+  intro *.
+  euf Meq.
   assert input@T(i,t) = nr(r).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 Qed.
 
 equiv unlinkability.
@@ -235,10 +234,12 @@ equivalent
 project.
   (* Left *)
   fa; try exists i,t.
-  fa. apply wa_R1_left to i1,r. apply H1. exists t.
+  fa. apply wa_R1_left to i1,r. apply H0. 
+  by exists t.
   (* Right *)
   fa; try exists i,t.
-  fa. apply wa_R1_right to i1,t1,r. apply H1.
+  fa. apply wa_R1_right to i1,t1,r. 
+  by apply H0.
 
 fa 5.
 fadup 5.
@@ -268,17 +269,18 @@ split.
 (* proof of lemma: Cond => WA *)
 project.
 (* left *)
-euf M1.
+euf Meq.
 exists i,t1.
 assert (nr(r) = input@T(i,t1)).
-fresh M3.
-depends R(r), R1(r).
+fresh Meq1.
+by case H; depends R(r), R1(r).
+
 (* right *)
-euf M1.
+euf Meq.
 exists i,t.
 assert (nr(r) = input@T(i,t)).
-fresh M3.
-depends R(r), R1(r).
+fresh Meq1.
+by case H; depends R(r), R1(r).
 
 (* proof of lemma: WA => Cond *)
 exists i,t.
@@ -311,41 +313,42 @@ expand cond@T1(i,t); split.
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
   apply tags_neq; project.
   (* Left *)
-  euf M1.
+  euf Meq0.
   assert R1(r) < T1(i,t).
-    case H1.
-    depends T(i,t),T1(i,t).
+    case H0.
+    by depends T(i,t),T1(i,t).
   assert cond@R1(r).
     executable pred(T1(i,t)).
-    apply H2 to R1(r); expand exec@R1(r).
+    by apply H1 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
-  euf M4.
+  euf Meq2.
   exists r; split.
   case output@R1(r).
-  euf M6.
-  apply H2 to i,t.
+  euf Meq4.
+  apply H1 to i,t.
   assert nr(r) = input@T(i,t).
-  fresh M6.
-  depends R(r),R2(r).
+  fresh Meq4.
+  by case H1; depends R(r),R2(r).
+
   (* Right *)
-  euf M1.
+  euf Meq0.
   assert R1(r) < T1(i,t).
-    case H1; depends T(i,t),T1(i,t).
+    by case H0; depends T(i,t),T1(i,t).
   assert cond@R1(r).
-    executable pred(T1(i,t)); apply H2 to R1(r); expand exec@R1(r).
+    by executable pred(T1(i,t)); apply H1 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
-  euf M4.
+  euf Meq2.
   exists r; split.
   case output@R1(r).
-  euf M6.
-  apply H2 to i,t.
+  euf Meq4.
+  apply H1 to i,t.
   assert nr(r) = input@T(i,t).
-  fresh M6.
-  depends R(r),R2(r).
+  fresh Meq4.
+  by case H1; depends R(r),R2(r).
   (* Honest => Cond *)
   case output@R1(r).
-  project; euf M4.
-  apply H1 to i,t.
+  project; euf Meq3.
+  by apply H0 to i,t.
 
 fa 6.
 fadup 5.
@@ -366,47 +369,47 @@ equivalent
       snd(input@R1(r)) = snd(output@T(i,t)) &&
       R(r) < T(i,t) &&
       input@T(i,t) = output@R(r)).
-split; apply H1.
+split; apply H0.
   (* Honest => Cond *)
   case output@R1(r).
-  project; euf M4.
-  apply H2 to i,t.
+  project; euf Meq3.
+  apply H1 to i,t.
   (* Cond => Honest *)
   assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
   apply tags_neq; project.
   (* Left *)
-  euf M1.
+  euf Meq0.
   assert R1(r) < T2(i,t).
-    case H2.
-    depends T(i,t),T2(i,t).
+    case H1.
+    by depends T(i,t),T2(i,t).
   assert cond@R1(r).
     executable pred(T2(i,t)).
-    apply H3 to R1(r); expand exec@R1(r).
+    by apply H2 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
-  euf M4.
+  euf Meq2.
   exists r; split.
   case output@R1(r).
-  euf M6.
-  apply H3 to i,t.
+  euf Meq4.
+  apply H2 to i,t.
   assert nr(r) = input@T(i,t).
-  fresh M6.
-  depends R(r),R2(r).
+  fresh Meq4.
+  by case H2; depends R(r),R2(r).
   (* Right *)
-  euf M1.
+  euf Meq0.
   assert R1(r) < T2(i,t).
-    case H2; depends T(i,t),T2(i,t).
+    by case H1; depends T(i,t),T2(i,t).
   assert cond@R1(r).
-    executable pred(T2(i,t)); apply H3 to R1(r); expand exec@R1(r).
+    by executable pred(T2(i,t)); apply H2 to R1(r); expand exec@R1(r).
   expand cond@R1(r).
-  euf M4.
+  euf Meq2.
   exists r; split.
   case output@R1(r).
-  euf M6.
-  apply H3 to i,t.
+  euf Meq4.
+  apply H2 to i,t.
   assert nr(r) = input@T(i,t).
-  fresh M6.
-  depends R(r),R2(r).
+  fresh Meq4.
+  by case H2; depends R(r),R2(r).
 
 fa 6.
 fadup 5.
