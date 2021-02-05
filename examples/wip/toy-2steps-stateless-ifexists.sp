@@ -65,17 +65,19 @@ split.
 expand cond@R(k).
 project.
 (* LEFT *)
-euf M0.
+euf Meq.
 exists ii,j.
 (* RIGHT *)
-fresh M0.
+fresh Meq. 
+case H.
+by exists ii,jj. 
 admit. (* ??? *)
 admit. (* ??? *)
-exists ii,jj.
+
 (* honest => cond *)
 expand cond@R(k).
-exists i,j.
-fadup 1.
+by exists i,j.
+by fadup 1.
 
 (* CASE R1(k) *)
 expand frame@R1(k).
@@ -89,27 +91,27 @@ equivalent
 split.
 (* not(honest) => not(cond) *)
 expand cond@R1(k).
-notleft H0.
-apply H0 to i,j.
+notleft H.
+apply H to i,j.
 (* not(cond) => not(honest) *)
 expand cond@R1(k).
-notleft H0.
+notleft H.
 project.
 (* LEFT *)
-euf M0.
-apply H0 to ii,j.
-case H1.
+euf Meq.
+apply H to ii,j.
+case H0.
 (* RIGHT *)
-fresh M0.
+fresh Meq. 
+case H0.
+by apply H to ii,jj; case H0.
 admit.
 admit.
-apply H0 to ii,jj.
-case H1.
 fadup 1.
 
 (* CASE T(i,j) *)
 expandall.
-fa 0. fa 1. fa 1.
+fa 0; fa 1; fa 1.
 prf 1.
 yesif 1.
 project.

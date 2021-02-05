@@ -44,11 +44,6 @@ channel cR
 mutable kT : index->message
 mutable kR : index->message
 
-axiom stateTagInit :
-  forall (i:index), kT(i)@init = seed(i)
-axiom stateReaderInit :
-  forall (ii:index), kR(ii)@init = seed(ii)
-
 process tag(i:index,j:index) =
   kT(i) := h(diff(kT(i),nIdeal(i,j)),key(i));
   out(cT, kT(i))
@@ -62,6 +57,11 @@ process reader(k:index) =
     out(cR,ko)
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
+
+axiom stateTagInit :
+  forall (i:index), kT(i)@init = seed(i).
+axiom stateReaderInit :
+  forall (ii:index), kR(ii)@init = seed(ii).
 
 goal [left] stateInequalityTag :
 forall (i,j,j':index)
@@ -86,9 +86,9 @@ induction.
 executable T(ii,jj).
 apply H1 to R(k,ii,jj).
 expand exec@R(k,ii,jj). expand cond@R(k,ii,jj).
-euf M0.
-apply IH0 to R(k1,ii,jj).
-apply H3 to ii,jj,k1.
+euf H3.
+apply H to R(k1,ii,jj).
+apply H4 to ii,jj,k1.
 Qed.
 
 equiv real_ideal.
@@ -104,19 +104,19 @@ expand exec@R(k,ii,jj).
 equivalent
   cond@R(k,ii,jj),
   exists (j:index), T(ii,j) < R(k,ii,jj) && output@T(ii,j) = input@R(k,ii,jj).
-split.
+split. 
 (* cond => honest *)
 project.
 (* LEFT *)
 expand cond@R(k,ii,jj).
-euf M0.
+euf H.
 apply stateInequalityReader to k1,k,ii,jj1,jj.
-exists j.
+by exists j.
 (* RIGHT *)
 expand cond@R(k,ii,jj).
-euf M0.
+euf H.
 admit. (* need induction? *)
-exists j.
+by exists j.
 (* honest => cond *)
 expand cond@R(k,ii,jj).
 project.
@@ -124,14 +124,14 @@ project.
 admit. (* ??? *)
 (* RIGHT *)
 admit. (* ??? *)
-fadup 1.
+by fadup 1.
 
 (* CASE R1(k) *)
 admit.
 
 (* CASE T(i,j) *)
 expandall.
-fa 0. fa 1.
+fa 0; fa 1.
 prf 1.
 ifcond 1,exec@pred(T(i,j)).
 fa 1.
@@ -139,7 +139,8 @@ yesif 1.
 project.
 split.
 admit. (* reasonning on states? *)
-apply stateInequalityTag to i,j1,j.
+split;1: by apply stateInequalityTag to i,j1,j.
+(* Adrien: tactics below did not apply before my changes. *)
 apply readerPlaysAfterTag to R(k,ii,jj).
 apply H1 to ii,jj,k.
 expand exec@T(ii,jj).

@@ -74,9 +74,9 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 goal counterIncrease :
   forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.
 Proof.
-intros.
+intro t Hc.
 apply orderSucc to d@pred(t).
-case t. case H0.
+case t. 
 Qed.
 
 (* A more general result than counterIncrease *)
@@ -84,25 +84,25 @@ goal counterIncreaseBis :
   forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
 Proof.
 induction.
-apply IH0 to pred(t).
+apply H to pred(t).
 assert (t' < pred(t) || t' >= pred(t)).
 case H1.
 (* case t' < pred(t) *)
 apply H0 to t'.
 apply counterIncrease to t.
-apply orderTrans to d@t',d@pred(t),d@t.
+by apply orderTrans to d@t',d@pred(t),d@t.
 (* case t' >= pred(t) *)
 assert t' = pred(t).
-apply counterIncrease to t.
+by apply counterIncrease to t.
 Qed.
 
 goal secretReach : forall (j:index), cond@B(j) => False.
 Proof.
-intros.
+intro j Hcond.
 expand cond@B(j).
-euf M0.
+euf Hcond.
 assert pred(A(i)) < pred(B(j)).
 apply counterIncreaseBis to pred(B(j)).
-apply H0 to pred(A(i)).
+apply H to pred(A(i)).
 apply orderStrict to d@pred(A(i)),d@pred(B(j)).
 Qed.

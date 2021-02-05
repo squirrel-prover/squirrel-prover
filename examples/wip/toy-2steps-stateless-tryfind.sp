@@ -65,9 +65,10 @@ expand exec@R(k,ii,jj).
 expand cond@R(k,ii,jj).
 project.
 (* LEFT *)
-euf M0.
+euf H0.
 (* RIGHT *)
-fresh M0.
+fresh H0. 
+case H1.
 admit. (* ??? *)
 admit. (* need induction? *)
 (* honest => cond *)
