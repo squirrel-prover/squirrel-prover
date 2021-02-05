@@ -10,10 +10,10 @@ system !_i in(c,x);out(c,h(x,k)).
 
 goal forall t:timestamp, exec@t => input@t <> k.
 Proof.
-  intros.
+  intro *.
   assert h(fresh,input@t) = h(fresh,k).
-  euf M1.
-  executable t. apply H1 to A(i).
+  euf Meq0.
+  executable t. apply H0 to A(i).
   expand exec@A(i); expand cond@A(i).
-  fresh M2.
+  fresh Meq1.
 Qed.
