@@ -508,13 +508,20 @@ let filter_map_hyps func hyps =
 (*------------------------------------------------------------------*)
 let pi projection s =
   let pi_term t = Term.pi_term ~projection t in
+
+  let hyps = filter_map_hyps pi_term s.hyps in
+  let s = 
   S.update
     ~conclusion:(pi_term s.conclusion)
-    ~hyps:(filter_map_hyps pi_term s.hyps)
+    ~hyps:H.empty
     ~keep_trs:false
     ~keep_models:false
-    s
+    s in
 
+  (* We add back manually all formulas, to ensure that definitions are 
+     unrolled. *)
+  H.fold (fun id f s -> snd (Hyps.add_formula id f s)) hyps s
+  
 let set_conclusion a s =
   let s = S.update ~conclusion:a s in
     match a with
@@ -529,10 +536,16 @@ let conclusion s = s.conclusion
 (*------------------------------------------------------------------*)
 let subst subst s =
   if subst = [] then s else
-    S.update
-      ~hyps:(filter_map_hyps (Term.subst subst) s.hyps)
-      ~conclusion:(Term.subst subst s.conclusion)
-      s
+    let hyps = filter_map_hyps (Term.subst subst) s.hyps in
+    let s =
+      S.update
+        ~hyps:H.empty
+        ~conclusion:(Term.subst subst s.conclusion)
+        s in
+
+    (* We add back manually all formulas, to ensure that definitions are 
+       unrolled. *)
+    H.fold (fun id f s -> snd (Hyps.add_formula id f s)) hyps s
 
 (*------------------------------------------------------------------*)
 let get_message_atoms s =
