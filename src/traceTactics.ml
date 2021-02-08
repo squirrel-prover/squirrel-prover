@@ -1948,11 +1948,11 @@ let project s =
                                            single process")      
   | _ ->
     let s1 = TraceSequent.set_system
-        SystemExpr.(project_system Term.Left  system) s in
+        SystemExpr.(project_system PLeft  system) s in
     let s2 = TraceSequent.set_system
-        SystemExpr.(project_system Term.Right system) s in
-    let s1 = TraceSequent.pi Left s1 in
-    let s2 = TraceSequent.pi Right s2 in
+        SystemExpr.(project_system PRight system) s in
+    let s1 = TraceSequent.pi PLeft s1 in
+    let s2 = TraceSequent.pi PRight s2 in
     [s1;s2]
 
 let () =

@@ -229,7 +229,7 @@ val boolToMessage : formula -> message
   * distinction between biterms (general terms) and terms (terms
   * without diff operators)? *)
 
-type projection = Left | Right | None
+type projection = PLeft | PRight | PNone
 
 (** Evaluate all diff operators wrt a projection.
   * If the projection is [None], the input term is returned unchanged.

@@ -613,7 +613,7 @@ let mk_indices_eq vect_i vect_j =
 
 (** Projection *)
 
-type projection = Left | Right | None
+type projection = PLeft | PRight | PNone
 
 let pi_term ~projection term =
 
@@ -630,9 +630,9 @@ let pi_term ~projection term =
   | Diff (a, b) ->
     begin
       match s with
-      | Left -> pi_term s a
-      | Right -> pi_term s b
-      | None -> Diff (a, b)
+      | PLeft -> pi_term s a
+      | PRight -> pi_term s b
+      | PNone -> Diff (a, b)
     end
   | ITE (a, b, c) -> ITE (pi_term s a, pi_term s b, pi_term s c)
   | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
@@ -657,8 +657,8 @@ let pi_term ~projection term =
 let rec head_pi_term : type a. projection -> a term -> a term =
   fun s t ->
   match t,s with
-  | Diff (t,_), Left
-  | Diff (_,t), Right -> head_pi_term s t
+  | Diff (t,_), PLeft
+  | Diff (_,t), PRight -> head_pi_term s t
   | _ -> t
 
 let diff a b =
@@ -667,7 +667,7 @@ let diff a b =
   if a = b then a else Diff (a,b)
 
 let head_normal_biterm : type a. a term -> a term = fun t ->
-  match head_pi_term Left t, head_pi_term Right t with
+  match head_pi_term PLeft t, head_pi_term PRight t with
   | Fun (f,l), Fun (f',l') when f=f' -> Fun (f, List.map2 diff l l')
   | Name n, Name n' when n=n' -> Name n
   | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
@@ -725,8 +725,8 @@ let () =
         Symbols.Function.declare_exact Symbols.builtins_table "f" (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
-      let r = head_pi_term Left t in
-        assert (pi_term  ~projection:Left t = f a) ;
+      let r = head_pi_term PLeft t in
+        assert (pi_term  ~projection:PLeft t = f a) ;
         assert (r = f (Diff (a,b)))
     end ;
   ]

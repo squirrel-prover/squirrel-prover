@@ -3,8 +3,8 @@ type single_system =
   | Right of Symbols.system Symbols.t
 
 let get_proj = function
-  | Left _ -> Term.Left
-  | Right _ -> Term.Right
+  | Left _ -> Term.PLeft
+  | Right _ -> Term.PRight
 
 let get_id = function
   | Left id | Right id -> id
@@ -64,16 +64,16 @@ let project_system proj = function
   | SimplePair id ->
     begin
       match proj with
-      | Term.Left  -> Single (Left id)
-      | Term.Right -> Single (Right id)
-      | Term.None  -> bisystem_error SE_NoneProject
+      | Term.PLeft  -> Single (Left id)
+      | Term.PRight -> Single (Right id)
+      | Term.PNone  -> bisystem_error SE_NoneProject
     end
   | Pair (s1, s2) ->
     begin
       match proj with
-      | Term.Left  -> Single s1
-      | Term.Right -> Single s2
-      | Term.None  -> bisystem_error SE_NoneProject
+      | Term.PLeft  -> Single s1
+      | Term.PRight -> Single s2
+      | Term.PNone  -> bisystem_error SE_NoneProject
     end
 
 (*------------------------------------------------------------------*)
@@ -135,7 +135,7 @@ let descr_of_shape table (se : system_expr) shape =
 
   | SimplePair id ->
     let descr = getd id in
-    Action.pi_descr Term.None descr
+    Action.pi_descr Term.PNone descr
 
   (* else we need to obtain the two corresponding sets of shapes,
      project them correctly, and combine them into a single term. *)
@@ -182,7 +182,7 @@ let descrs table se =
   | SimplePair id ->
     let fds = System.descrs table id in
     System.Msh.mapi
-      (fun shape descr -> Action.pi_descr Term.None descr)
+      (fun shape descr -> Action.pi_descr Term.PNone descr)
       fds
   | Single s ->
     (* we must projet before iterating *)

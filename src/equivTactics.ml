@@ -117,7 +117,7 @@ let refl (s : EquivSequent.t) =
   try
     (* we check that the frame does not contain macro *)
     List.iter iter#visit_term (EquivSequent.get_biframe s);
-    if EquivSequent.get_frame Term.Left s = EquivSequent.get_frame Term.Right s
+    if EquivSequent.get_frame PLeft s = EquivSequent.get_frame PRight s
     then
       []
     else
@@ -719,18 +719,18 @@ let mk_phi_proj system table env name indices proj biframe =
 let fresh_cond system table env t biframe =
   let (n_left, ind_left, n_right, ind_right) =
     match
-      Term.pi_term Term.Left t, Term.pi_term Term.Right t
+      Term.pi_term PLeft t, Term.pi_term PRight t
     with
     | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
     | _ -> raise Not_name
   in
-  let system_left = SystemExpr.(project_system Term.Left system) in
+  let system_left = SystemExpr.(project_system PLeft system) in
   let phi_left =
-    mk_phi_proj system_left table env n_left ind_left Term.Left biframe
+    mk_phi_proj system_left table env n_left ind_left PLeft biframe
   in
-  let system_right = SystemExpr.(project_system Term.Right system) in
+  let system_right = SystemExpr.(project_system PRight system) in
   let phi_right =
-    mk_phi_proj system_right table env n_right ind_right Term.Right biframe
+    mk_phi_proj system_right table env n_right ind_right PRight biframe
   in
   mk_ands
     (* remove duplicates, and then concatenate *)
@@ -1040,9 +1040,9 @@ let prf TacticsArgs.(Int i) s =
             inside a context that bind variables is not supported")
         else
           let phi_left =
-            mk_prf_phi_proj Term.Left system table env biframe e hash in
+            mk_prf_phi_proj PLeft system table env biframe e hash in
           let phi_right =
-            mk_prf_phi_proj Term.Right system table env biframe e hash in
+            mk_prf_phi_proj PRight system table env biframe e hash in
           let table,n = Symbols.Name.declare table "n_PRF" 0 in
           let s = EquivSequent.set_table s table in
           let oracle_formula =
@@ -1451,8 +1451,8 @@ let enckp
         try
           (* For each key we actually only need to verify the SSC
            * wrt. the appropriate projection of the system. *)
-          let sysl = SystemExpr.(project_system Term.Left system) in
-          let sysr = SystemExpr.(project_system Term.Right system) in
+          let sysl = SystemExpr.(project_system PLeft system) in
+          let sysr = SystemExpr.(project_system PRight system) in
           List.iter ssc
             (List.sort_uniq Stdlib.compare
                [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
@@ -1548,13 +1548,13 @@ let mk_xor_if_term_base system table env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term) =
   let biframe =
     EquivSequent.Message (Term.Diff (l_left, l_right)) :: biframe in
-  let system_left = SystemExpr.(project_system Term.Left system) in
+  let system_left = SystemExpr.(project_system PLeft system) in
   let phi_left =
-    mk_phi_proj system_left table env n_left is_left Term.Left biframe
+    mk_phi_proj system_left table env n_left is_left PLeft biframe
   in
-  let system_right = SystemExpr.(project_system Term.Right system) in
+  let system_right = SystemExpr.(project_system PRight system) in
   let phi_right =
-    mk_phi_proj system_right table env n_right is_right Term.Right biframe
+    mk_phi_proj system_right table env n_right is_right PRight biframe
   in
   let len_left =
     Term.(Atom (`Message (`Eq,
@@ -1582,7 +1582,7 @@ let mk_xor_if_term system table env e biframe =
       begin match e with
       | EquivSequent.Message t ->
         begin match
-          Term.pi_term Term.Left t, Term.pi_term Term.Right t
+          Term.pi_term PLeft t, Term.pi_term PRight t
         with
         | (Fun (fl,[Term.Name (nl,isl);ll]),
            Fun (fr,[Term.Name (nr,isr);lr]))
@@ -1601,13 +1601,13 @@ let mk_xor_if_term_name system table env e mess_name biframe =
       begin match mess_name with
       | n ->
         begin match
-          Term.pi_term Term.Left n, Term.pi_term Term.Right n
+          Term.pi_term PLeft n, Term.pi_term PRight n
         with
         | Name (nl,isl), Name (nr,isr) ->
           begin match e with
           | EquivSequent.Message t ->
             begin match
-              Term.pi_term Term.Left t, Term.pi_term Term.Right t
+              Term.pi_term PLeft t, Term.pi_term PRight t
             with
             | (Fun (fl,ll),Fun (fr,lr))
               when (fl = Term.f_xor && fr = Term.f_xor)
