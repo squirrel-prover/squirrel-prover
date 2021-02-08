@@ -105,54 +105,49 @@ forall (t:timestamp), forall (i:index),
     (forall (j':index), T1(i,j')<=T1(i,j) || t<T1(i,j'))).
 Proof.
 induction.
-case t.
-case H0.
+nosimpl(revert H => IH0).
+case t. 
 
 substitute t,init.
 left.
 
 substitute t,R(jj).
-apply IH0 to pred(R(jj)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+have H := IH0 to pred(R(jj)).
+have P := H to i; case P.
+by left; apply H0 to j'.
+right; exists j; apply H1 to j'. 
+by case H0.
 
 substitute t,R1(jj,ii).
-apply IH0 to pred(R1(jj,ii)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+have H := IH0 to pred(R1(jj,ii)).
+have P := H to i; case P.
+by left; apply H0 to j'.
+right; exists j; apply H1 to j'.
+by case H0.
 
 substitute t,R2(jj).
-apply IH0 to pred(R2(jj)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+have H := IH0 to pred(R2(jj)).
+have P := H to i; case P.
+by left; apply H0 to j'.
+right; exists j; apply H1 to j'.
+by case H0.
 
 substitute t,T(i1,j).
-apply IH0 to pred(T(i1,j)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j1. apply H1 to j'.
-case H2.
+have H := IH0 to pred(T(i1,j)).
+have P := H to i; case P.
+by left; apply H0 to j'.
+right; exists j1; apply H1 to j'.
+by case H0.
 
 substitute t,T1(i1,j).
-apply IH0 to pred(T1(i1,j)).
-apply H0 to i.
-case H1.
+have H := IH0 to pred(T1(i1,j)).
+have P := H to i; case P.
 (* *)
-assert (i=i1 || i<>i1).
-case H2.
+assert C := (i=i1 || i<>i1).
+case C.
 (* case i=i1 *)
 right.
-exists j.
+by exists j.
 (* case i<>i1 *)
 left.
 split.
@@ -160,35 +155,33 @@ case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-apply H1 to j'.
+by apply H0 to j'.
 (* *)
-assert (i=i1 || i<>i1).
-case H2.
+assert C := (i=i1 || i<>i1).
+case C.
 (* case i=i1 *)
 right.
-exists j.
+by exists j.
 (* case i<>i1 *)
 right.
 exists j1.
 split.
-case (if i = i1 then
+by case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-assert (j=j1 || j<>j1).
-case H2.
+assert C := (j=j1 || j<>j1).
+case C.
 apply H1 to j'.
-case H2.
-apply H1 to j'.
-case H2.
+by case H0.
+by have Hyp := H1 to j'; case Hyp.
 
 substitute t,T2(i1,j).
-apply IH0 to pred(T2(i1,j)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j1. apply H1 to j'.
-case H2.
+have IHA := IH0 to pred(T2(i1,j)).
+have P := IHA to i; case P. 
+by left; apply H to j'.
+right; exists j1; have P := H0 to j'.
+by case P.
 
 substitute t,T3(i1,j).
 apply IH0 to pred(T3(i1,j)).
