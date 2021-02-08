@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT HAVE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -427,6 +427,15 @@ tac:
   | APPLY i=ID TO t=tactic_params      { Tactics.Abstract
                                           ("apply",
                                            TacticsArgs.String_name i :: t) }
+
+  | HAVE ip=simpl_pat ASSIGN i=ID      { Tactics.Abstract ("have",
+                                          TacticsArgs.SimplPat ip ::
+                                          [TacticsArgs.String_name i]) }
+  | HAVE ip=simpl_pat ASSIGN i=ID TO t=tactic_params 
+                                       { Tactics.Abstract ("have",
+                                          TacticsArgs.SimplPat ip ::
+                                          TacticsArgs.String_name i :: t) }
+
   | HELP                               { Tactics.Abstract
                                           ("help",
                                            []) }
@@ -434,6 +443,7 @@ tac:
   | HELP i=ID                          { Tactics.Abstract
                                           ("help",
                                            [TacticsArgs.String_name i]) }
+
   | DDH i1=ID COMMA i2=ID COMMA i3=ID  { Tactics.Abstract
                                           ("ddh",
                                            [TacticsArgs.String_name i1;

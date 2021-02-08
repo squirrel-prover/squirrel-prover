@@ -1585,11 +1585,11 @@ let () =
     (euf_apply intctxt_param) Args.String
 
 (*------------------------------------------------------------------*)
-(* TODO: renamed `have` ?*)
-(** [apply gp ths judge] applies the formula named [gp],
+(** [apply ip gp ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
-  * and eliminating implications (and negations) underneath. *)
-let apply name (ths:Theory.term list) (s : TraceSequent.t) =
+  * and eliminating implications (and negations) underneath. 
+  * If given an introduction patterns, apply it to the generated hypothesis. *)
+let apply ip name (ths:Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
   let f,system =
     if Hyps.mem_name name s then
@@ -1630,34 +1630,53 @@ let apply name (ths:Theory.term list) (s : TraceSequent.t) =
         let s' = TraceSequent.set_conclusion h s in
         List.rev (s'::subgoals)
     | f ->
-      (* TODO: named hypothesis *)
-      Hyps.add Args.AnyName f s ::
-      List.rev subgoals
+      let idf, s0 = Hyps.add_i Args.AnyName f s in
+      let s0 = match ip with
+        | None -> [s0]
+        | Some ip -> do_simpl_pat (`Hyp idf) ip s0 in
+      s0 @ List.rev subgoals
   in
   
   aux [] f
 
+(* we use tac_apply for both the `apply` and `have` tactics.
+   Note that both tactic are defined in the parser, and get different arguments. *)
+let tac_apply args s sk fk =
+  let ip, args = match args with
+    | Args.SimplPat ip :: args -> Some ip, args
+    | args                     -> None, args in
+  match args with
+  | Args.String_name id :: th_terms ->
+    let th_terms =
+      List.map
+        (function
+          | Args.Theory th -> th
+          | _ -> hard_failure
+                   (Tactics.Failure "improper arguments"))
+        th_terms
+    in
+    begin match apply ip id th_terms s with
+      | subgoals -> sk subgoals fk
+      | exception Tactics.Tactic_soft_failure e -> fk e
+    end
+  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+
+  
 (* Does not rely on the typed register as it parses a subst *)
 let () =
   T.register_general "apply"
     ~general_help:"Apply an hypothesis with its universally quantified variables \
                    instantiated with the arguments.\
                    \n\nUsage: apply H to v1, v2, ..."
-    (function
-      | Args.String_name id :: th_terms ->
-          let th_terms =
-            List.map
-              (function
-                 | Args.Theory th -> th
-                 | _ -> hard_failure
-                          (Tactics.Failure "improper arguments"))
-              th_terms
-          in
-          fun s sk fk -> begin match apply id th_terms s with
-            | subgoals -> sk subgoals fk
-            | exception Tactics.Tactic_soft_failure e -> fk e
-          end
-      | _ -> Tactics.(hard_failure (Failure "improper arguments")))
+    tac_apply
+
+let () =
+  T.register_general "have"
+    ~general_help:"Like the apply tactic, but names the new hypothesis (can take \
+                   an simple introduction pattern)\
+                   \n\nUsage: have N := H to v1, v2, ...\n       \
+                   have ip := H to v1, v2, ..."
+    tac_apply
 
 (*------------------------------------------------------------------*)
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
