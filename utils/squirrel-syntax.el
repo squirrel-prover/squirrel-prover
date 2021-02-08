@@ -61,6 +61,7 @@
   "admit"
   "anyintro"
   "apply"
+  "have"
   "assert"
   "assumption"
   "auto"
