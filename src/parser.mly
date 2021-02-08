@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -358,7 +358,7 @@ simpl_pat:
 
 intro_pat:
 | l=loc(STAR)       { TacticsArgs.Star (Location.loc l)}
-| pat=simpl_pat     { TacticsArgs.SimplPat pat }
+| pat=simpl_pat     { TacticsArgs.Simpl pat }
 
 intro_pat_list:
 | l=slist1(intro_pat,empty) { l }
@@ -369,6 +369,9 @@ int:
 
 selector:
 | l=slist1(int,COMMA) { l }
+
+tac_formula:
+ | f=formula  %prec tac_prec { f }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -399,6 +402,13 @@ tac:
   | DESTRUCT i=ID AS p=and_or_pat      { Tactics.Abstract
                                            ("destruct",[TacticsArgs.String_name i;
                                                         TacticsArgs.AndOrPat p]) }
+
+  | ASSERT p=tac_formula               { Tactics.Abstract
+                                           ("assert", [TacticsArgs.Theory p]) }
+  | ASSERT ip=simpl_pat ASSIGN p=tac_formula
+                                       { Tactics.Abstract
+                                           ("assert", [TacticsArgs.Theory p;
+                                                       TacticsArgs.SimplPat ip]) }
 
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }

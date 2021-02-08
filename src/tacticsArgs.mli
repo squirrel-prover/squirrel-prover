@@ -24,8 +24,8 @@ and simpl_pat =
   | SNamed of naming_pat
 
 type intro_pattern =
-  | Star     of Location.t    (** '*' *)
-  | SimplPat of simpl_pat
+  | Star  of Location.t    (** '*' *)
+  | Simpl of simpl_pat
 
 (*------------------------------------------------------------------*)
 val pp_naming_pat : Format.formatter -> naming_pat         -> unit
@@ -46,6 +46,7 @@ type parser_arg =
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
+  | SimplPat    of simpl_pat
       
 (** Tactic arguments sorts *)
 type _ sort =
@@ -104,7 +105,6 @@ val convert_as_string : parser_arg list -> string option
 val convert_args :
   Symbols.table -> Vars.env ->
   parser_arg list -> esort -> earg
-
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)

@@ -483,7 +483,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
   | [] -> [s]
 
-  | (Args.SimplPat s_ip) :: intros ->
+  | (Args.Simpl s_ip) :: intros ->
     let ss = do_intro_pat s_ip s in
     List.map (do_intros intros) ss
     |> List.flatten
@@ -1662,19 +1662,34 @@ let () =
 (*------------------------------------------------------------------*)
 (** [tac_assert f j sk fk] generates two subgoals, one where [f] needs
   * to be proved, and the other where [f] is assumed. *)
-let tac_assert (Args.Boolean f) s =
-  let s1 = TraceSequent.set_conclusion f s in
-  (* TODO: named hypothesis, e.g. `assert (ident : type)` 
-     or `assert ident := type` *)
-  let s2 = Hyps.add Args.AnyName f s in
-  [s1 ;s2]
+let tac_assert (args : Args.parser_arg list) s sk fk =
+  try
+    let env, tbl = TraceSequent.env s, TraceSequent.table s in
+    let ip, f = match args with
+      | [f] -> None, f
+      | [f; Args.SimplPat ip] -> Some ip, f
+      | _ -> Tactics.(hard_failure (Failure "improper argument")) in
+
+    let f = match Args.convert_args tbl env [f] Args.(Sort Boolean) with
+      | Args.(Arg (Boolean f)) -> f
+      | _ -> Tactics.(hard_failure (Failure "improper argument")) in
+    
+    let s1 = TraceSequent.set_conclusion f s in
+    let id, s2 = Hyps.add_i Args.AnyName f s in
+    let s2 = match ip with
+      | Some ip -> do_simpl_pat (`Hyp id) ip s2
+      | None -> [s2] in
+    sk (s1 :: s2) fk
+    
+  with Tactics.Tactic_soft_failure e -> fk e
 
 let () =
-  T.register_typed "assert"
+  T.register_general "assert"
     ~general_help:"Add an assumption to the set of hypothesis, and produce the \
                    goal for\
-                   \nthe proof of the assumption."
-    tac_assert Args.Boolean
+                   \nthe proof of the assumption.\n\
+                   usage: assert f.\n       assert intro_pat := f."
+    tac_assert
 
 (*------------------------------------------------------------------*)
 (** [fa s] handles some goals whose conclusion formula is of the form

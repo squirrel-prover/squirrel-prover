@@ -251,8 +251,9 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.String_name s -> Fmt.string ppf s
     | TacticsArgs.Theory th     -> Theory.pp ppf th
     | TacticsArgs.IntroPat args -> TacticsArgs.pp_intro_pats ppf args
-    | TacticsArgs.AndOrPat pat -> TacticsArgs.pp_and_or_pat ppf pat
-                                     
+    | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
+    | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
+                                    
   let simpl () =
     let tsimpl = TraceTable.get "simpl" [] in
     let esimpl = EquivTable.get "simpl" [] in

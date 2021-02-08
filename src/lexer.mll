@@ -112,6 +112,7 @@ rule token = parse
 | "undo"              { UNDO }
 | "try"               { TRY }
 | "repeat"            { REPEAT }
+| "assert"            { ASSERT }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }

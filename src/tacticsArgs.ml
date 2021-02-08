@@ -22,7 +22,7 @@ and simpl_pat =
 
 type intro_pattern =
   | Star     of Location.t    (** '*' *)
-  | SimplPat of simpl_pat
+  | Simpl of simpl_pat
 
 
 (*------------------------------------------------------------------*)
@@ -48,7 +48,7 @@ and pp_simpl_pat fmt = function
 
 let rec pp_intro_pat fmt = function
   | Star     _    -> Fmt.pf fmt "*"
-  | SimplPat s_ip -> pp_simpl_pat fmt s_ip
+  | Simpl s_ip -> pp_simpl_pat fmt s_ip
 
 let pp_intro_pats fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in
@@ -62,7 +62,8 @@ type parser_arg =
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
-        
+  | SimplPat    of simpl_pat
+      
 type ('a, 'b) pair
 
 (*------------------------------------------------------------------*)
