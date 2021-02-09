@@ -1671,7 +1671,7 @@ let () =
     tac_apply
 
 let () =
-  T.register_general "have"
+  T.register_general "use"
     ~general_help:"Like the apply tactic, but names the new hypothesis (can take \
                    an simple introduction pattern)\
                    \n\nUsage: have N := H to v1, v2, ...\n       \

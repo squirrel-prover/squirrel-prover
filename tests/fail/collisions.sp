@@ -28,5 +28,5 @@ goal unforgeable_1 :
   output@A(b) <> h(na(a),k).
 
 Proof.
-  checkfail collision with NoSSC.
+  checkfail collision exn NoSSC.
 Abort.

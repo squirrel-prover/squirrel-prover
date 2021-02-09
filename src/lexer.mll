@@ -113,7 +113,8 @@ rule token = parse
 | "try"               { TRY }
 | "repeat"            { REPEAT }
 | "assert"            { ASSERT }
-| "have"              { HAVE }
+| "exn"               { EXN }
+| "use"               { USE }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }

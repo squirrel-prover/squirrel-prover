@@ -16,8 +16,8 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
-%token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT HAVE
+%token WITH ORACLE EXN
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -371,7 +371,10 @@ selector:
 | l=slist1(int,COMMA) { l }
 
 tac_formula:
- | f=formula  %prec tac_prec { f }
+| f=formula  %prec tac_prec { f }
+
+as_ip:
+| AS ip=simpl_pat { ip }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -418,7 +421,7 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                  { Tactics.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
-  | CHECKFAIL t=tac WITH ts=tac_errors { Tactics.CheckFail
+  | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
 
   | APPLY i=ID                         { Tactics.Abstract
@@ -428,13 +431,17 @@ tac:
                                           ("apply",
                                            TacticsArgs.String_name i :: t) }
 
-  | HAVE ip=simpl_pat ASSIGN i=ID      { Tactics.Abstract ("have",
-                                          TacticsArgs.SimplPat ip ::
-                                          [TacticsArgs.String_name i]) }
-  | HAVE ip=simpl_pat ASSIGN i=ID TO t=tactic_params 
-                                       { Tactics.Abstract ("have",
-                                          TacticsArgs.SimplPat ip ::
-                                          TacticsArgs.String_name i :: t) }
+  | USE i=ID ip=as_ip? 
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i]) }
+
+  | USE i=ID WITH t=tactic_params ip=as_ip?
+    { let ip : TacticsArgs.parser_arg list = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
   | HELP                               { Tactics.Abstract
                                           ("help",

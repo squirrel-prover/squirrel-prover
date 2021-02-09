@@ -19,7 +19,7 @@ system null.
 (* Fail if the key occurs in the frame. *)
 equiv fail (x:message) : k,enc(n,r,diff(k,kbis)).
 Proof.
-  checkfail enckp 1 with BadSSC.
+  checkfail enckp 1 exn BadSSC.
 Abort.
 (** END TEST **)
 
@@ -28,7 +28,7 @@ Abort.
 (* Fail if the key occurs in the context. *)
 equiv fail : <k,enc(n,r,diff(k,kbis))>.
 Proof.
-  checkfail enckp 0 with BadSSC.
+  checkfail enckp 0 exn BadSSC.
 Abort.
 (** END TEST **)
 
@@ -36,7 +36,7 @@ Abort.
 (* Fail if the encryption is under a decryption. *)
 equiv fail (x:message) : dec(enc(n,r,diff(k,kbis)),k).
 Proof.
-  checkfail enckp 0 with Failure.
+  checkfail enckp 0 exn Failure.
 Abort.
 (** END TEST **)
 
@@ -53,7 +53,7 @@ expandall; fresh 0; yesif 0.
 by auto.
 expandall. 
 fa 1; fa 2; fa 2; fa 2.
-checkfail enckp 2 with SEncSharedRandom.
+checkfail enckp 2 exn SEncSharedRandom.
 Abort.
 (** END TEST **)
 
@@ -64,7 +64,7 @@ equiv  [left,sharedrndframe]  [right,sharedrndframe] test2.
 Proof.
 enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
 enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
- checkfail enckp 3 with SEncSharedRandom.
+ checkfail enckp 3 exn SEncSharedRandom.
 Abort.
 (** END TEST **)
 
@@ -76,7 +76,7 @@ equiv [left,nornd] [right,nornd] test3.
 Proof.
 enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
 expandall. fa 1; fa 2; fa 2; fa 2.
-checkfail enckp 3 with SEncNoRandom.
+checkfail enckp 3 exn SEncNoRandom.
 Abort.
 (** END TEST **)
 
@@ -102,6 +102,6 @@ Abort.
 (* Fail if there is a free message variable. *)
 equiv fail (x:message) : enc(x,r,diff(k,k)).
 Proof.
-  checkfail enckp 0 with BadSSC.
+  checkfail enckp 0 exn BadSSC.
 Abort.
 (** END TEST **)

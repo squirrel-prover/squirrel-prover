@@ -34,7 +34,7 @@ goal key_in_mess:
   h(k,k) = k => False.
 Proof.
   intro Heq.
-  checkfail euf Heq with BadSSC.
+  checkfail euf Heq exn BadSSC.
 Abort.
 (** END TEST **)
 
@@ -43,7 +43,7 @@ goal message_var :
   h(m3,k) = m1 => m3 <> m2  .
 Proof.
   intro m1 m2 m3 Heq.
-  checkfail euf Heq with BadSSC.
+  checkfail euf Heq exn BadSSC.
 Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
@@ -54,7 +54,7 @@ goal [none,condSSC] forall tau:timestamp,
   (if cond@tau then ok else zero) <> h(ok,k).
 Proof.
   intro tau Heq.
-  checkfail euf Heq with BadSSC.
+  checkfail euf Heq exn BadSSC.
 Abort.
 (** END TEST **)
 (* k occurs in the context *)
@@ -62,7 +62,7 @@ Abort.
 goal (k = h(u,k)) => False.
 Proof.
   nosimpl(intro Heq).
-  checkfail euf Heq with BadSSC.
+  checkfail euf Heq exn BadSSC.
 Abort.
 
 (* euf should not allow to conclude here, and only yeld zero=zero *)
@@ -80,14 +80,14 @@ goal [none, joint] forall tau:timestamp, cond@A3 => False.
 Proof.
   intro tau Hcond.
   expand cond@A3.
-  checkfail euf Hcond with BadSSC.
+  checkfail euf Hcond exn BadSSC.
 Abort.
 
 
 goal [none, joint] forall tau:timestamp, output@A4<>h(m,k).
 Proof.
   intro tau Heq.
-  checkfail euf Heq with BadSSC.
+  checkfail euf Heq exn BadSSC.
 Abort.
 
 (**********************************************)
@@ -129,5 +129,5 @@ Proof.
    * there should not be a second index variable i1 in the
    * second case. *)
   by auto.
-  checkfail assert (i1=i1) with CannotConvert.
+  checkfail assert (i1=i1) exn CannotConvert.
 Abort.
