@@ -1,7 +1,5 @@
 open Graph
 
-open Atom
-
 open Utils
 
 (* - Huet's unification algorithm using union-find.
@@ -20,6 +18,25 @@ let log_constr = Log.log Log.LogConstr
 (* Comment this for debugging *)
 let log_constr = ignore
 
+
+(*------------------------------------------------------------------*)
+(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
+let norm_xatom (o, l, r) =
+  match o with
+  | `Eq | `Neq | `Leq -> [(o, l, r)]
+  | `Geq -> [(`Leq, r, l)]
+  | `Lt -> (`Leq, l, r) :: [(`Neq, l, r)]
+  | `Gt -> (`Leq, r, l) :: [(`Neq, r, l)]
+
+(** Precondition : must only be called on Eq | Leq | Neq atoms *)
+let add_xeq od xeq (eqs, leqs, neqs) =
+  match od with
+  | `Eq -> (xeq :: eqs, leqs, neqs)
+  | `Leq -> (eqs, xeq :: leqs, neqs)
+  | `Neq -> (eqs, leqs, xeq :: neqs)
+  | _ -> assert false
+
+(*------------------------------------------------------------------*)
 module Utv : sig
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
@@ -125,13 +142,13 @@ type constr_instance = { eqs : (ut * ut) list;
 
 (* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
-let mk_instance (l : trace_atom list) =
+let mk_instance (l : Term.trace_atom list) =
   let eqs, leqs, neqs =
     List.fold_left
-      (fun acc (x:trace_atom) -> match x with
+      (fun acc (x : Term.trace_atom) -> match x with
          | `Timestamp (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
          | `Index (od,i1,i2) ->
-             add_xeq (od:>Atom.ord) (uvari i1, uvari i2) acc)
+             add_xeq (od :> Term.ord) (uvari i1, uvari i2) acc)
       ([],[],[])
       l in
   let rec subterms acc x = match x.cnt with
@@ -341,7 +358,7 @@ let unify uf eqs elems =
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs (l : trace_atom list) =
+let mgu_eqs (l : Term.trace_atom list) =
   let instance = mk_instance l in
   unify instance.uf instance.eqs instance.elems
 
@@ -592,7 +609,7 @@ let norm_tatom = function
 
 (* [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : trace_atom list) : models timeout_r =
+let models_conjunct (l : Term.trace_atom list) : models timeout_r =
   let l = List.map norm_tatom l |> List.flatten in
   let instance = mk_instance l in
   Utils.timeout (Config.solver_timeout ()) split instance
@@ -635,10 +652,12 @@ let ind_query (model : model) (ord,i,i') : bool =
   | _ -> assert false
 
 let _query (model : model) = function
-  | `Timestamp (o,a,b) -> List.for_all (ts_query model) (norm_xatom (o,a,b))
-  | `Index (o,a,b) -> List.for_all (ind_query model) (norm_xatom ((o:>ord),a,b))
+  | `Timestamp (o,a,b) ->
+    List.for_all (ts_query model) (norm_xatom (o,a,b))
+  | `Index (o,a,b) ->
+    List.for_all (ind_query model) (norm_xatom ((o :> Term.ord),a,b))
 
-let query (models : models) (ats : trace_atom list) =
+let query (models : models) (ats : Term.trace_atom list) =
   List.for_all (fun model -> List.for_all (_query model) ats) models
 
 (* [max_elems_model model elems] returns the maximal elements of [elems]

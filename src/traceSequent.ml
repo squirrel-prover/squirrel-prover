@@ -1,5 +1,4 @@
 open Utils
-open Atom
 
 module Args = TacticsArgs
   
@@ -390,7 +389,7 @@ module Hyps = struct
   (** Add to [s] equalities corresponding to the expansions of all macros
     * occurring in [at]. *)
   let rec add_macro_defs (s : sequent) at =
-    let macro_eqs : message_atom list ref = ref [] in
+    let macro_eqs : Term.message_atom list ref = ref [] in
     let iter =
       new iter_macros
         ~system:s.system
@@ -402,7 +401,7 @@ module Hyps = struct
     List.fold_left (fun i s -> snd (add_message_atom None i s)) s !macro_eqs
 
   and add_message_atom ?(force=false) (id : Ident.t option) (s : sequent) at =
-    let f = Term.Atom (at :> generic_atom) in
+    let f = Term.Atom (at :> Term.generic_atom) in
     let recurse = not (H.is_hyp f s.hyps) in
     
     (* TODO: remove auto naming ? *)
@@ -415,36 +414,23 @@ module Hyps = struct
         ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
-    let s = if recurse then add_macro_defs s (at :> generic_atom) else s in
+    let s = if recurse then add_macro_defs s (at :> Term.generic_atom) else s in
 
     id, s
 
   let rec add_happens ?(force=false) id (s : sequent) ts =
-    let f = Term.Atom (`Happens ts :> generic_atom) in
+    let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
     let s =
       S.update ~keep_trs:true ~keep_models:false
         ~hyps s in
-    
-    match ts with
-    | Term.Action (symb,indices) ->
-      let a = Action.of_term symb indices s.table in
-      let system = s.system in
-      let table  = s.table in
-      
-      (* TODO: remove auto naming ? *)
-      let _, s =
-        add_formula (H.fresh_id "C" s.hyps)
-          (snd (SystemExpr.descr_of_action table system a).Action.condition)
-          s in
-      (id, s)
-      
-    | _ -> id, s
+
+    id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
   and add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (#Atom.message_atom as at) -> add_message_atom ~force (Some id) s at
+    | Term.Atom (#Term.message_atom as at) -> add_message_atom ~force (Some id) s at
     | Term.Atom (`Happens ts)              -> add_happens ~force id s ts
     | _ ->
       let id, hyps = H.add ~force id f s.hyps in
@@ -525,7 +511,7 @@ let pi projection s =
 let set_conclusion a s =
   let s = S.update ~conclusion:a s in
     match a with
-      | Term.Atom (#message_atom as at) -> Hyps.add_macro_defs s at
+      | Term.Atom Term.(#message_atom as at) -> Hyps.add_macro_defs s at
       | _ -> s
 
 let init ~system table (goal : Term.formula) =
@@ -616,14 +602,14 @@ let maximal_elems s tss =
 let get_ts_equalities s =
   match get_models s with
   | Result models ->
-    let ts = trace_atoms_ts (get_trace_atoms s) in
+    let ts = Atom.trace_atoms_ts (get_trace_atoms s) in
     Result (Constr.get_ts_equalities models ts)
   | Timeout -> Timeout
 
 let get_ind_equalities s =
   match get_models s with
   | Result models ->
-    let inds = trace_atoms_ind (get_trace_atoms s) in
+    let inds = Atom.trace_atoms_ind (get_trace_atoms s) in
     Result (Constr.get_ind_equalities models inds)
   | Timeout -> Timeout    
 

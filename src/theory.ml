@@ -26,8 +26,8 @@ type term_i =
       disambiguated yet.
       [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
                  
-  | Compare of Atom.ord*term*term
-  | Happens of term
+  | Compare of Term.ord * term * term
+  | Happens of term list
   | ForAll  of (lsymb * kind) list * term
   | Exists  of (lsymb * kind) list * term
   | And  of term * term
@@ -48,10 +48,13 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | False, False -> true
 
   | Tpred   a, Tpred   a'
-  | Happens a, Happens a'
   | Not     a, Not     a' ->
     equal a a'
 
+  | Happens l, Happens l' ->
+    List.length l = List.length l' &&
+    List.for_all2 equal l l'
+    
   | Diff (a,b), Diff (a',b')
   | And  (a,b), And  (a',b')
   | Impl (a,b), Impl (a',b')
@@ -149,8 +152,9 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
             
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Atom.pp_ord ord pp_term tr
-  | Happens t -> Fmt.pf ppf "happens(%a)" pp_term t
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
+      
+  | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
@@ -624,7 +628,7 @@ let rec convert :
                              conv Sorts.Timestamp v))
             with Conv (_,Type_error _ ) ->
               match o with
-                | #Atom.ord_eq as o ->
+                | #Term.ord_eq as o ->
                     begin try
                         Term.Atom (`Index (o,
                                            conv_index env subst u, 
@@ -642,9 +646,11 @@ let rec convert :
         | _ -> raise type_error
       end
 
-  | Happens t ->
+  | Happens ts ->
       begin match sort with
-        | Sorts.Boolean -> Term.Atom (`Happens (conv Sorts.Timestamp t))
+        | Sorts.Boolean ->
+          let ts = List.map (conv Sorts.Timestamp) ts in
+          Term.Atom (`Happens ts)
         | _ -> raise type_error
       end
 
@@ -988,7 +994,7 @@ let subst t (s : (string * term_i) list) =
       end
     | Tinit -> Tinit
     | Tpred t -> Tpred (aux t)
-    | Happens t -> Happens (aux t)
+    | Happens t -> Happens (List.map aux t)
     | App (s,l) -> App (s, List.map aux l)
     | AppAt _-> assert false
     | Seq (vs,t) -> Seq (vs, aux t)
@@ -1079,22 +1085,25 @@ let find_app_terms t (names : string list) =
 
     | AppAt (x',l,ts) ->
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
-      List.fold_left (fun accu elem -> aux elem accu name) acc (ts::l)
+      aux_list (ts::l) acc name
         
-    | Diff (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Seq (_,t') -> aux t' acc name
-    | ITE (c,t,e) -> aux c (aux t (aux e acc name) name) name
-    | Find (_,c,t,e) -> aux c (aux t (aux e acc name) name) name
+    | Diff (t1,t2)      -> aux t1 (aux t2 acc name) name
+    | Seq (_,t')        -> aux t' acc name
+    | ITE (c,t,e)       -> aux c (aux t (aux e acc name) name) name
+    | Find (_,c,t,e)    -> aux c (aux t (aux e acc name) name) name
     | Compare (_,t1,t2) -> aux t1 (aux t2 acc name) name
-    | Happens t' -> aux t' acc name
-    | ForAll (_,t') -> aux t' acc name
-    | Exists (_,t') -> aux t' acc name
-    | And (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Or (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Impl (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Not t' -> aux t' acc name
-    | _ -> acc
-  in
+    | Happens t'        -> aux_list t' acc name
+    | ForAll (_,t')     -> aux t' acc name
+    | Exists (_,t')     -> aux t' acc name
+    | And (t1,t2)       -> aux t1 (aux t2 acc name) name
+    | Or (t1,t2)        -> aux t1 (aux t2 acc name) name
+    | Impl (t1,t2)      -> aux t1 (aux t2 acc name) name
+    | Not t'            -> aux t' acc name
+    | _                 -> acc
+
+  and aux_list l acc name =
+    List.fold_left (fun accu elem -> aux elem accu name) acc l in
+  
   List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
 
 (** Tests *)

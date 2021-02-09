@@ -36,8 +36,8 @@ type term_i =
     * disambiguated yet.
     * [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)\@tau] *)
                  
-  | Compare of Atom.ord*term*term
-  | Happens of term
+  | Compare of Term.ord * term * term
+  | Happens of term list
   | ForAll  of (lsymb * kind) list * term
   | Exists  of (lsymb * kind) list * term
   | And  of term * term

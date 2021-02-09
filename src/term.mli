@@ -6,6 +6,7 @@
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
+(*------------------------------------------------------------------*)
 (** {2 Symbols}
   *
   * We have function, name and macro symbols. Each symbol
@@ -33,6 +34,7 @@ type 'a msymb = mname * 'a Sorts.sort * Vars.index list
 
 type state = Sorts.message msymb
 
+(*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
 
 val pp_name  : Format.formatter -> name -> unit
@@ -44,6 +46,7 @@ val pp_fsymb : Format.formatter -> fsymb -> unit
 val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> 'a msymb -> unit
 
+(*------------------------------------------------------------------*)
 (** {2 Terms} *)
 
 (** ['a term] is the type of terms of sort ['a].
@@ -54,13 +57,15 @@ val pp_msymb :  Format.formatter -> 'a msymb -> unit
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
+val pp_ord   : Format.formatter -> ord -> unit
+  
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type generic_atom = [
   | `Message of (ord_eq,Sorts.message term) _atom
   | `Timestamp of (ord,Sorts.timestamp term) _atom
   | `Index of (ord_eq,Vars.index) _atom
-  | `Happens of Sorts.timestamp term
+  | `Happens of Sorts.timestamp term list
 ]
 and _ term =
   | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
@@ -103,21 +108,31 @@ type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
-type message_atom = [ `Message of ord_eq * message * message ]
+
+type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+                    
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
 ]
 
+type eq_atom = [
+  | `Message   of (ord_eq,Sorts.message term) _atom
+  | `Timestamp of (ord,Sorts.timestamp term) _atom
+  | `Index     of (ord_eq,Vars.index) _atom
+]
+
+(*------------------------------------------------------------------*)
 exception Not_a_disjunction
 
 val disjunction_to_atom_list : formula -> generic_atom list
 
-
+(*------------------------------------------------------------------*)
 val pp : Format.formatter -> 'a term -> unit
 
 val sort : 'a term -> 'a Sorts.t
 
+(*------------------------------------------------------------------*)
 exception Uncastable
 
 (** [cast kind t] returns [t] if it is of the given sort.
@@ -126,6 +141,7 @@ exception Uncastable
   * @raise Uncastable if the term does not have the expected sort. *)
 val cast : 'a Sorts.sort -> 'b term -> 'a term
 
+(*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : 'a term -> Vars.evar list
@@ -139,6 +155,7 @@ val get_vars : 'a term -> Vars.evar list
   * input timestamps. *)
 val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 (** Substitutions for all purpose, applicable to terms and timestamps.
@@ -164,6 +181,7 @@ val subst_macros_ts :
   Symbols.table -> 
   string list -> Sorts.timestamp term -> 'a term -> 'a term
 
+(*------------------------------------------------------------------*)
 (** {2 Predefined symbols} *)
 
 val empty : Sorts.message term
@@ -200,6 +218,9 @@ val f_g      : fsymb
 val f_len    : fsymb
 val f_zeroes : fsymb
 
+(*------------------------------------------------------------------*)
+(** {2 Smart constructors} *)
+  
 val mk_not    : formula                 -> formula
 val mk_and    : formula -> formula      -> formula
 val mk_ands   : formula list            -> formula
@@ -220,9 +241,17 @@ val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
 val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
+(*------------------------------------------------------------------*)
+(** {2 Simplification} *)
+val not_eq_atom : eq_atom -> eq_atom
+
+val not_simpl : formula -> formula
+
+(*------------------------------------------------------------------*)
 (** Convert a boolean term to a message term, used in frame macro definition **)
 val boolToMessage : formula -> message
 
+(*------------------------------------------------------------------*)
 (** Convert from bi-terms to terms
   *
   * TODO Could we use a strong typing of [term] to make a static

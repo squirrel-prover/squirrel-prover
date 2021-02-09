@@ -1,5 +1,3 @@
-open Atom
-
 open Term
 
 type tac = TraceSequent.t Tactics.tac
@@ -86,27 +84,11 @@ let () =
 (* TODO: this should maybe not be a tactic, but only a rewriting rule ?
    Not obvious, as this is a deep rewriting. *)
 let left_not_intro (Args.String hyp_name) s =
-  let rec not_f = function
-    | Exists (vs, f) -> ForAll(vs, not_f f)
-    | ForAll (vs, f) -> Exists(vs, not_f f)
-    | And (a, b) -> Or (not_f a, not_f b)
-    | Or (a, b) -> And (not_f a, not_f b)
-    | Impl (a, b) -> And(a, not_f b)
-    | True -> False
-    | False -> True
-    | Not f -> f
-    | Atom (#message_atom as a) ->
-        Atom (Atom.not_message_atom a :> generic_atom)
-    | Atom (#trace_atom as a) ->
-        Atom (Atom.not_trace_atom a :> generic_atom)
-    | m -> Not m
-  in
-
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
   match formula with
   | Not f ->
-    [Hyps.add Args.AnyName (not_f f) s]
+    [Hyps.add Args.AnyName (Term.not_simpl f) s]
 
   | _ -> soft_failure (Tactics.Failure "cannot introduce negation")
 
@@ -729,8 +711,8 @@ let congruence (s : TraceSequent.t) =
     with Term.Not_a_disjunction -> []
   in
   let term_conclusions =
-    List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
-        | #message_atom as a -> (Atom.not_message_atom a)::acc
+    List.fold_left (fun acc (conc:Term.generic_atom) -> match conc with
+        | #message_atom as a -> (Term.not_eq_atom a)::acc
         | _ -> acc)
       []
       conclusions
@@ -757,8 +739,8 @@ let constraints (s : TraceSequent.t) =
     with Term.Not_a_disjunction -> []
   in
   let trace_conclusions =
-    List.fold_left (fun acc (conc:Atom.generic_atom) -> match conc with
-        | #trace_atom as a -> (Atom.not_trace_atom a)::acc
+    List.fold_left (fun acc (conc:Term.generic_atom) -> match conc with
+        | #trace_atom as a -> (Term.not_eq_atom a)::acc
         | _ -> acc)
       []
       conclusions

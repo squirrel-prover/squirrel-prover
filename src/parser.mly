@@ -172,7 +172,7 @@ formula_i:
 | pid=loc(PID) terms=term_list   { Theory.App (pid, terms) }
 | pid=loc(PID) terms=term_list AT ts=timestamp
                                  { Theory.AppAt (pid, terms, ts) }
-| HAPPENS LPAREN ts=timestamp RPAREN
+| HAPPENS LPAREN ts=slist1(timestamp,empty) RPAREN
                                  { Theory.Happens ts }
 | EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
                                  { Theory.Exists (vs,f)  }
