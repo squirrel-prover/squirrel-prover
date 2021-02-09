@@ -539,13 +539,16 @@ let subst subst s =
     let hyps = filter_map_hyps (Term.subst subst) s.hyps in
     let s =
       S.update
-        ~hyps:H.empty
+        ~hyps:hyps
         ~conclusion:(Term.subst subst s.conclusion)
         s in
 
     (* We add back manually all formulas, to ensure that definitions are 
        unrolled. *)
-    H.fold (fun id f s -> snd (Hyps.add_formula id f s)) hyps s
+    (* FIXME: this seems very ineficient *)
+    H.fold (fun id f s ->
+        let s = Hyps.remove id s in        
+        snd (Hyps.add_formula id f s)) hyps s
 
 (*------------------------------------------------------------------*)
 let get_message_atoms s =
