@@ -68,35 +68,32 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 (* Minimal sequentiality assumption needed for the proofs *)
 axiom sequentiality :
   forall (t:timestamp), forall (i,j:index),
-    T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')
-
-(* "Empty" system, useful only to define the axiom sequentiality
-   where we need to talk about actions T(i,j) and T1(i,j), which
-   are defined only after the previous system *)
-system [sequence] null.
+    T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j').
 
 goal updateTag :
 forall (t:timestamp), forall (i,j:index), (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
-induction.
-case t. case H0.
+nosimpl(induction; intro IH0).
+case t. 
 
-apply IH0 to pred(R(jj)). apply H0 to i,j.
-apply IH0 to pred(R1(jj,ii)). apply H0 to i,j.
-apply IH0 to pred(R2(jj)). apply H0 to i,j.
+by use IH0 with pred(R(jj)) as H0;     use H0 with i,j.
+by use IH0 with pred(R1(jj,ii)) as H0; use H0 with i,j.
+by use IH0 with pred(R2(jj)) as H0;    use H0 with i,j.
 
-assert T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j).
+assert H0 := T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j).
 case H0.
-apply IH0 to pred(T(i1,j1)). apply H0 to i,j.
+by use IH0 with pred(T(i1,j1)) as H0; use H0 with i,j.
 
-assert i=i1 || i<>i1. case H0.
-assert j=j1 || j<>j1. case H0.
+assert H0 := i=i1 || i<>i1. 
+case H0.
+assert H0 := j=j1 || j<>j1.
+case H0.
 (* case i=i1 && j<>j1 *)
-apply sequentiality to t. apply H0 to i,j. exists j1.
+by use sequentiality with t as H0; use H0 with i,j; exists j1.
 (* case i<>i1 *)
-apply IH0 to pred(T1(i1,j1)). apply H0 to i,j.
+use IH0 with pred(T1(i1,j1)) as H0; use H0 with i,j as M1.
 assert kT(i)@T1(i1,j1) = kT(i)@pred(T1(i1,j1)).
-case (if i = i1 then
+by case (if i = i1 then
        <xor(fst(kT(i1)@pred(T1(i1,j1))),
             h2(snd(kT(i1)@pred(T1(i1,j1))),key2(i1))),
         xor(snd(kT(i1)@pred(T1(i1,j1))),
@@ -104,7 +101,7 @@ case (if i = i1 then
                key1(i1)))>
        else kT(i)@pred(T1(i1,j1))).
 
-apply IH0 to pred(T2(i1,j1)). apply H0 to i,j.
+by use IH0 with pred(T2(i1,j1)) as H0; use H0 with i,j.
 Qed.
 
 goal readerUpdateTerm :
@@ -114,7 +111,7 @@ goal readerUpdateTerm :
       snd(kR(ii)@pred(R1(jj,ii)))
         XOR h1(fst(kR(ii)@pred(R1(jj,ii))) XOR r1(jj) XOR k(ii), key1(ii)) >.
 Proof.
-simpl.
+auto.
 Qed.
 
 goal auth_R1_weak :
@@ -123,9 +120,9 @@ forall (jj,ii:index),
   =>
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 Proof.
-intros.
+intro jj ii H.
 expand cond@R1(jj,ii).
-euf M0.
+euf H.
 
   (* case 1/3: equality with hashed message in update@R1 *)
   (* this case is easily handled in the version with induction
@@ -135,7 +132,7 @@ euf M0.
   euf tactic *)
   (* here, without the induction, we have to find another way to conclude *)
 
-  assert
+  assert M2 :=
     input@R1(jj,ii) =
       h1(xor(xor(fst(kR(ii)@pred(R1(jj1,ii))),r1(jj1)),k(ii)),key1(ii)).
   euf M2. (* here again, we have 3 different cases *)
@@ -145,26 +142,26 @@ euf M0.
 
     (* case 2/3: equality with hashed message in output@T *)
     (* honest case *)
-    exists j. case H0.
+    by exists j; case H0.
 
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
-    apply updateTag to pred(T1(ii,j)).
+    use updateTag with pred(T1(ii,j)) as H1.
     depends T(ii,j),T1(ii,j).
-    apply H1 to ii,j.
+    use H1 with ii,j.
     exists j.
-    case H0.
+    by case H0.
 
   (* case 2/3: equality with hashed message in output@T *)
   (* honest case *)
-  exists j.
+  by exists j.
 
   (* case 3/3: equality with hashed message in update@T1 *)
   (* if there is an update@T1, then action T happened before *)
-  apply updateTag to pred(T1(ii,j)).
+  use updateTag with pred(T1(ii,j)) as H0.
   depends T(ii,j),T1(ii,j).
-  apply H0 to ii,j.
-  exists j.
+  use H0 with ii,j.
+  by exists j.
 Qed.
 
 (* Same goal as before, but trying a different proof *)
@@ -174,9 +171,9 @@ forall (jj,ii:index),
   =>
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 Proof.
-intros.
-expand exec@R1(jj,ii). expand cond@R1(jj,ii).
-euf M0.
+intro jj ii H.
+expand exec@R1(jj,ii); expand cond@R1(jj,ii).
+euf H0.
 
   (* case 1/3: equality with hashed message in update@R1 *)
   (* this case is easily handled in the version with induction
@@ -198,28 +195,29 @@ euf M0.
   assert kR(ii)@pred(R1(jj1,ii)) = kR(ii)@pred(R(jj1)).
   admit.
   (* we can deduce the following equality *)
-  assert h2(snd(kR(ii)@pred(R(jj1))),key2(ii)) = r1(jj1) XOR r1(jj).
+  assert M4 := h2(snd(kR(ii)@pred(R(jj1))),key2(ii)) = r1(jj1) XOR r1(jj).
   euf M4.
   admit. (* TODO use the fact that state increases to show that M5 is false ? *)
   depends T(ii,j),T1(ii,j). depends R(jj1),R1(jj1,ii).
   exists j.
-  apply readerUpdateTerm to jj,ii.
-  apply readerUpdateTerm to jj1,ii.
-  assert fst(kR(ii)@pred(R1(jj,ii))) = fst(kR(ii)@R1(jj1,ii)).
-  executable pred(R1(jj,ii)).
-  apply H1 to R1(jj1,ii).
+  use readerUpdateTerm with jj,ii  as M6.
+  use readerUpdateTerm with jj1,ii as M7.
+  assert M8 := fst(kR(ii)@pred(R1(jj,ii))) = fst(kR(ii)@R1(jj1,ii)).
+  nosimpl(executable pred(R1(jj,ii)); 1: by auto). 
+  intro H1.
+  use H1 with R1(jj1,ii) as H2.
   expand exec@R1(jj1,ii). expand cond@R1(jj1,ii).
   admit. (* TODO ??? *)
 
   (* case 2/3: equality with hashed message in output@T *)
   (* honest case *)
-  exists j.
+  by exists j.
 
   (* case 3/3: equality with hashed message in update@T1 *)
   (* if there is an update@T1, then action T happened before *)
-  apply updateTag to pred(T1(ii,j)).
+  use updateTag with pred(T1(ii,j)) as H1.
   depends T(ii,j),T1(ii,j).
-  apply H1 to ii,j.
+  use H1 with ii,j.
   exists j.
 Qed.
 
@@ -229,29 +227,30 @@ forall (t:timestamp), forall (jj,ii:index),
   =>
   (exists (j:index), T(ii,j) < t && output@T(ii,j) = input@t).
 Proof.
-induction.
+nosimpl(induction; intro IH0).
+intro jj ii.
 substitute t,R1(jj,ii).
 expand exec@R1(jj,ii). expand cond@R1(jj,ii).
-euf M0.
+euf H0.
 
   (* case 1/3: equality with hashed message in update@R1 *)
-  apply IH0 to R1(jj1,ii).
+  use IH0 with R1(jj1,ii) as H1.
   executable pred(R1(jj,ii)).
-  apply H2 to R1(jj1,ii).
-  apply H1 to jj1,ii.
+  use H2 with R1(jj1,ii).
+  use H1 with jj1,ii.
   expand exec@R1(jj1,ii). expand cond@R1(jj1,ii).
-  exists j.
+  by exists j.
 
   (* case 2/3: equality with hashed message in output@T *)
   (* honest case *)
-  exists j.
+  by exists j.
 
   (* case 3/3: equality with hashed message in update@T1 *)
   (* if there is an update@T1, then action T happened before *)
-  apply updateTag to pred(T1(ii,j)).
+  use updateTag with pred(T1(ii,j)) as H1.
   depends T(ii,j),T1(ii,j).
-  apply H1 to ii,j.
-  exists j.
+  use H1 with ii,j.
+  by exists j.
 Qed.
 
 goal auth_T1_induction_weak :
@@ -262,20 +261,21 @@ forall (t:timestamp), forall (i,j:index),
    R1(jj,i) < t &&
    output@R1(jj,i) = input@t).
 Proof.
-induction.
+nosimpl(induction). 
+intro IH0 i j.
 substitute t,T1(i,j).
 expand exec@T1(i,j). expand cond@T1(i,j).
-euf M0.
+euf H0.
 
   (* case 1/2: equality with hashed message in output@R1 *)
   (* honest case *)
-  exists jj.
+  by exists jj.
 
   (* case 2/2: equality with hashed message in update@T1 *)
-  apply IH0 to T1(i,j1).
+  use IH0 with T1(i,j1) as H1.
   executable pred(T1(i,j)).
-  apply H2 to T1(i,j1).
-  apply H1 to i,j1.
+  use H2 with T1(i,j1).
+  use H1 with i,j1.
   expand exec@T1(i,j1). expand cond@T1(i,j1).
   exists jj.
 Qed.
