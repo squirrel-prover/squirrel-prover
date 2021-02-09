@@ -23,15 +23,17 @@ let log_constr = ignore
 (** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
 let norm_xatom (o, l, r) =
   match o with
-  | `Eq | `Neq | `Leq -> [(o, l, r)]
+  | `Eq
+  | `Neq
+  | `Leq -> [(o, l, r)]
   | `Geq -> [(`Leq, r, l)]
-  | `Lt -> (`Leq, l, r) :: [(`Neq, l, r)]
-  | `Gt -> (`Leq, r, l) :: [(`Neq, r, l)]
+  | `Lt  -> (`Leq, l, r) :: [(`Neq, l, r)]
+  | `Gt  -> (`Leq, r, l) :: [(`Neq, r, l)]
 
 (** Precondition : must only be called on Eq | Leq | Neq atoms *)
 let add_xeq od xeq (eqs, leqs, neqs) =
   match od with
-  | `Eq -> (xeq :: eqs, leqs, neqs)
+  | `Eq  -> (xeq :: eqs, leqs, neqs)
   | `Leq -> (eqs, xeq :: leqs, neqs)
   | `Neq -> (eqs, leqs, xeq :: neqs)
   | _ -> assert false
@@ -59,7 +61,7 @@ end = struct
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
   type ut = { hash : int;
-              cnt : ut_cnt }
+              cnt  : ut_cnt; }
 
   and ut_cnt =
     | UVar of uvar
