@@ -116,19 +116,19 @@ type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Index     of (ord_eq,Vars.index) _atom
   | `Happens   of Sorts.timestamp term
 ]
 
 type trace_eq_atom = [
-  | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Timestamp of (ord_eq,timestamp)  _atom
+  | `Index     of (ord_eq,Vars.index) _atom
 ]
 
 type eq_atom = [
-  | `Message   of (ord_eq,Sorts.message term) _atom
-  | `Timestamp of (ord,Sorts.timestamp term) _atom
-  | `Index     of (ord_eq,Vars.index) _atom
+  | `Message   of (ord_eq, message) _atom
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
 ]
 
 (*------------------------------------------------------------------*)
@@ -253,7 +253,6 @@ val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 (** {2 Simplification} *)
 val not_message_atom  : message_atom  -> message_atom
 val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
-val not_eq_atom       : eq_atom       -> eq_atom
 
 val not_simpl : formula -> formula
 

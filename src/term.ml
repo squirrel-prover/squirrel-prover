@@ -46,9 +46,9 @@ type ord_eq = [ `Eq | `Neq ]
 type ('a,'b) _atom = 'a * 'b * 'b
              
 type generic_atom = [
-  | `Message   of (ord_eq,Sorts.message term) _atom
-  | `Timestamp of (ord,Sorts.timestamp term) _atom
-  | `Index     of (ord_eq,Vars.index) _atom
+  | `Message   of (ord_eq, Sorts.message term)   _atom
+  | `Timestamp of (ord,    Sorts.timestamp term) _atom
+  | `Index     of (ord_eq, Vars.index)           _atom
   | `Happens   of Sorts.timestamp term
 ]
 
@@ -101,19 +101,20 @@ type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Index     of (ord_eq,Vars.index) _atom
   | `Happens   of Sorts.timestamp term
 ]
 
 type trace_eq_atom = [
-  | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
 ]
 
+(* Subsets of atoms that are equalities *)
 type eq_atom = [
-  | `Message   of (ord_eq,Sorts.message term) _atom
-  | `Timestamp of (ord,Sorts.timestamp term) _atom
-  | `Index     of (ord_eq,Vars.index) _atom
+  | `Message   of (ord_eq, message) _atom
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
 ]
 
 (*------------------------------------------------------------------*)
@@ -139,19 +140,6 @@ let rec sort : type a. a term -> a Sorts.t =
   | Impl _              -> Sorts.Boolean
   | True                -> Sorts.Boolean
   | False               -> Sorts.Boolean
-
-(*------------------------------------------------------------------*)
-let not_ord o = match o with
-  | `Eq -> `Neq
-  | `Neq -> `Eq
-  | `Leq -> `Gt
-  | `Geq -> `Lt
-  | `Lt -> `Geq
-  | `Gt -> `Leq
-
-let not_ord_eq o = match o with
-  | `Eq -> `Neq
-  | `Neq -> `Eq
 
 (*------------------------------------------------------------------*)
 let disjunction_to_literals f =
@@ -707,22 +695,35 @@ let mk_indices_eq vect_i vect_j =
 
 (*------------------------------------------------------------------*)
 (** Simplification *)
+
+let not_ord o = match o with
+  | `Eq -> `Neq
+  | `Neq -> `Eq
+  | `Leq -> `Gt
+  | `Geq -> `Lt
+  | `Lt -> `Geq
+  | `Gt -> `Leq
+
+let not_ord_eq o = match o with
+  | `Eq -> `Neq
+  | `Neq -> `Eq
     
 let not_ord (o,l,r) = (not_ord o, l, r)
 
 let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
 
+(*------------------------------------------------------------------*)
 let not_message_atom (at : message_atom) = match at with
   | `Message t          -> `Message (not_ord_eq t)
 
 let not_trace_eq_atom (at : trace_eq_atom) : trace_eq_atom = match at with
-  | `Timestamp (o,t,t') -> `Timestamp (not_ord (o,t,t'))
-  | `Index (o,i,i')     -> `Index (not_ord_eq (o,i,i'))
+  | `Timestamp (o,t,t') -> `Timestamp (not_ord_eq (o,t,t'))
+  | `Index (o,i,i')     -> `Index     (not_ord_eq (o,i,i'))
 
 let not_eq_atom (at : eq_atom) : eq_atom = match at with
-  | `Timestamp (o,t,t') -> `Timestamp (not_ord (o,t,t'))
-  | `Index (o,i,i')     -> `Index (not_ord_eq (o,i,i'))
-  | `Message t          -> `Message (not_ord_eq t)
+  | `Timestamp (o,t,t') -> `Timestamp (not_ord_eq (o,t,t'))
+  | `Index (o,i,i')     -> `Index     (not_ord_eq (o,i,i'))
+  | `Message t          -> `Message   (not_ord_eq t)
 
 let rec not_simpl = function
     | Exists (vs, f) -> ForAll(vs, not_simpl f)
@@ -733,7 +734,16 @@ let rec not_simpl = function
     | True           -> False
     | False          -> True
     | Not f          -> f
-    | Atom (#eq_atom as a) -> Atom (not_eq_atom a :> generic_atom)
+    | Atom atom ->
+      begin
+        match atom with
+        | (`Message _                 as at)
+        | (`Index _                   as at)
+        | (`Timestamp (#ord_eq, _, _) as at) ->
+          Atom (not_eq_atom at :> generic_atom)
+
+        | `Timestamp _ | `Happens _  -> Not (Atom atom)
+      end          
     | m -> Not m
 
 
