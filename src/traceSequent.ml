@@ -538,15 +538,20 @@ let subst subst s =
 
 (*------------------------------------------------------------------*)
 let get_message_atoms s =
-  List.fold_left (fun atoms (_,hyp) -> match hyp with
-      | Term.Atom (`Message atom) -> atom :: atoms
+  List.fold_left (fun atoms (_,hyp) -> match hyp with 
+      | Term.(Atom (`Message at)) -> at :: atoms
+      | Term.(Not (Atom (#message_atom as at))) ->
+        let `Message neg_at = Term.not_message_atom at in
+        neg_at :: atoms
       | _ -> atoms
     ) [] (H.to_list s.hyps)
 
-let get_trace_atoms s =
+let get_trace_literals s =
   List.fold_left (fun atoms (id,hyp) -> match hyp with
-      | Term.Atom (`Timestamp a as atom) -> atom :: atoms
-      | Term.Atom (`Index a     as atom) -> atom :: atoms
+      | Term.(Atom (#trace_atom as at)) ->
+        (`Pos, at) :: atoms
+      | Term.(Not (Atom (#trace_atom as at))) ->
+        (`Neg, at) :: atoms
       | _ -> atoms
     ) [] (H.to_list s.hyps)
 
@@ -587,8 +592,8 @@ let get_models s : Constr.models timeout_r =
   match !(s.models) with
   | Some models -> Result models
   | None ->
-    let trace_atoms = get_trace_atoms s in
-    match Constr.models_conjunct trace_atoms with
+    let trace_literals = get_trace_literals s in
+    match Constr.models_conjunct trace_literals with
     | Timeout -> Timeout
     | Result models ->
       let () = S.set_models s models in
@@ -602,14 +607,16 @@ let maximal_elems s tss =
 let get_ts_equalities s =
   match get_models s with
   | Result models ->
-    let ts = Atom.trace_atoms_ts (get_trace_atoms s) in
+    let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
+             |>  Atom.trace_atoms_ts in
     Result (Constr.get_ts_equalities models ts)
   | Timeout -> Timeout
 
 let get_ind_equalities s =
   match get_models s with
   | Result models ->
-    let inds = Atom.trace_atoms_ind (get_trace_atoms s) in
+    let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
+               |> Atom.trace_atoms_ind in
     Result (Constr.get_ind_equalities models inds)
   | Timeout -> Timeout    
 
@@ -623,7 +630,7 @@ let get_all_terms s =
   let atoms = get_message_atoms s in
   let atoms =
     match s.conclusion with
-      | Term.Atom (`Message atom) -> atom::atoms
+      | Term.Atom (`Message atom) -> atom :: atoms
       | _ -> atoms
   in
   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms

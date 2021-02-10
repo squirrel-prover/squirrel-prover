@@ -44,12 +44,12 @@ type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
 type ('a,'b) _atom = 'a * 'b * 'b
-
+             
 type generic_atom = [
   | `Message   of (ord_eq,Sorts.message term) _atom
   | `Timestamp of (ord,Sorts.timestamp term) _atom
   | `Index     of (ord_eq,Vars.index) _atom
-  | `Happens   of Sorts.timestamp term list
+  | `Happens   of Sorts.timestamp term
 ]
 
 and _ term =
@@ -89,13 +89,23 @@ and _ term =
 
 type 'a t = 'a term
 
+(*------------------------------------------------------------------*)
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
+(*------------------------------------------------------------------*)
+(** Subset of all atoms (the subsets are not disjoint). *)
+    
 type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
                     
 type trace_atom = [
+  | `Timestamp of (ord,timestamp) _atom
+  | `Index of (ord_eq,Vars.index) _atom
+  | `Happens   of Sorts.timestamp term
+]
+
+type trace_eq_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
 ]
@@ -144,14 +154,17 @@ let not_ord_eq o = match o with
   | `Neq -> `Eq
 
 (*------------------------------------------------------------------*)
-exception Not_a_disjunction
+let disjunction_to_literals f =
+  let exception Not_a_disjunction in
 
-let rec disjunction_to_atom_list = function
+  let rec aux = function
   | False -> []
-  | Atom at -> [at]
-  | Or (a, b) -> disjunction_to_atom_list a @ disjunction_to_atom_list b
-  | _ -> raise Not_a_disjunction
+  | Atom at -> [`Pos, at]
+  | Not (Atom at) -> [`Neg, at]
+  | Or (a, b) -> aux a @ aux b
+  | _ -> raise Not_a_disjunction in
 
+  try Some (aux f) with Not_a_disjunction -> None
 
 (*------------------------------------------------------------------*)
 (** Builtins *)
@@ -225,6 +238,11 @@ let pp_ord ppf = function
   | `Lt -> Fmt.pf ppf "<"
   | `Gt -> Fmt.pf ppf ">"
 
+let rec is_and_happens = function
+  | And (l, r) -> is_and_happens l && is_and_happens r
+  | Atom (`Happens _) -> true
+  | _ -> false
+
 let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
 
@@ -297,11 +315,14 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Exists (vs, b) ->
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
-      
+
   | And (Impl (bl1,br1), Impl(br2,bl2)) when bl1=bl2 && br1=br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
       pp bl1 pp br1
-      
+
+  | And _ as f when is_and_happens f ->
+    pp_and_happens ppf f
+                                     
   | And (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       pp bl pp br
@@ -332,16 +353,26 @@ and pp_trace_atom ppf : trace_atom -> unit = function
       
   | `Index (o,il,ir) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
-      
-and pp_generic_atom ppf = function
-  | `Happens a ->
-    Fmt.pf ppf "@[<hv 2>happens(%a)@]"
-      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp) a
-                    
+
+  | `Happens a -> pp_happens ppf [a]
+
+and pp_generic_atom ppf = function                   
   | #message_atom as a -> pp_message_atom ppf a
                             
   | #trace_atom as a -> pp_trace_atom ppf a
 
+and pp_happens ppf (ts : timestamp list) =
+  Fmt.pf ppf "@[<hv 2>happens(%a)@]"
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp) ts
+  
+and pp_and_happens ppf f =
+  let rec collect acc = function
+    | And (l, r) -> collect (collect acc l) r
+    | Atom (`Happens ts) -> [ts]
+    | _ -> assert false in
+
+  pp_happens ppf (collect [] f)
+    
 (*------------------------------------------------------------------*)
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
@@ -470,14 +501,13 @@ let get_set_vars : 'a term -> S.t =
       termvars ts (termvars ts' vars)
     | `Index (ord, i, i') ->
       termvars (Var i) (termvars (Var i') vars)
-
+    | `Happens ts -> termvars ts vars
+                       
   and generic_atom_vars t vars = match t with
-    | `Happens ts -> termsvars ts vars
     | #message_atom as a -> message_atom_vars a vars
     | #trace_atom as a -> trace_atom_vars a vars
-
-
   in
+  
   termvars term S.empty
 
 let get_vars t = get_set_vars t |> S.elements
@@ -572,12 +602,15 @@ and subst_message_atom (s : subst) (`Message (ord, a1, a2)) =
   `Message (ord, subst s a1, subst s a2)
 
 and subst_trace_atom (s:subst) = function
+  | `Happens a -> `Happens (subst s a)
+                            
   | `Timestamp (ord, ts, ts') ->
     `Timestamp (ord, subst s ts, subst s ts')
+      
   | `Index (ord, i, i') ->
     `Index(ord, subst_var s i,subst_var s i')
+      
 and subst_generic_atom s = function
-  | `Happens a         -> `Happens (List.map (subst s) a)
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom   as a -> (subst_trace_atom s a :> generic_atom)
 
@@ -679,6 +712,13 @@ let not_ord (o,l,r) = (not_ord o, l, r)
 
 let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
 
+let not_message_atom (at : message_atom) = match at with
+  | `Message t          -> `Message (not_ord_eq t)
+
+let not_trace_eq_atom (at : trace_eq_atom) : trace_eq_atom = match at with
+  | `Timestamp (o,t,t') -> `Timestamp (not_ord (o,t,t'))
+  | `Index (o,i,i')     -> `Index (not_ord_eq (o,i,i'))
+
 let not_eq_atom (at : eq_atom) : eq_atom = match at with
   | `Timestamp (o,t,t') -> `Timestamp (not_ord (o,t,t'))
   | `Index (o,i,i')     -> `Index (not_ord_eq (o,i,i'))
@@ -737,7 +777,7 @@ let pi_term ~projection term =
    | `Message  (o,t1,t2)      -> `Message (o, pi_term s t1, pi_term s t2)
    | `Timestamp (o, ts1, ts2) -> `Timestamp (o, pi_term s ts1, pi_term s ts2)
    | `Index (o, i1, i2) as r  -> r
-   | `Happens t               -> `Happens (List.map (pi_term s) t)
+   | `Happens t               -> `Happens (pi_term s t)
 
   in pi_term projection term
 

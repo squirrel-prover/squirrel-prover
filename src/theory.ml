@@ -649,8 +649,10 @@ let rec convert :
   | Happens ts ->
       begin match sort with
         | Sorts.Boolean ->
-          let ts = List.map (conv Sorts.Timestamp) ts in
-          Term.Atom (`Happens ts)
+          let atoms = List.map (fun t ->
+              Term.Atom (`Happens (conv Sorts.Timestamp t))
+            ) ts in
+          Term.mk_ands atoms
         | _ -> raise type_error
       end
 

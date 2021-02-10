@@ -18,9 +18,17 @@ let log_constr = Log.log Log.LogConstr
 (* Comment this for debugging *)
 let log_constr = ignore
 
+type trace_literal = [`Pos | `Neg] * Term.trace_atom
+
+(** Normalized trace literal *)
+type ntrace_literal = [
+  | Term.trace_atom 
+  | `NotHappens   of Sorts.timestamp Term.term
+]
 
 (*------------------------------------------------------------------*)
-(** Replace an atom by an equivalent list of atoms using only Eq,Neq and Leq *)
+(** Replace an atom by an equivalent list of atoms using only [`Eq], [`Neq]
+    and [`Leq] *)
 let norm_xatom (o, l, r) =
   match o with
   | `Eq
@@ -50,12 +58,14 @@ module Utv : sig
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
     | UInit
+    | UUndef                    (* (x <> UUndef) iff. (Happens x) *)
 
-  val uvari : Vars.index -> ut
-  val uts : Term.timestamp -> ut
-  val uname : Symbols.action Symbols.t -> ut list -> ut
-  val upred : ut -> ut
-  val uinit : ut
+  val uvari  : Vars.index -> ut
+  val uts    : Term.timestamp -> ut
+  val uname  : Symbols.action Symbols.t -> ut list -> ut
+  val upred  : ut -> ut
+  val uinit  : ut
+  val uundef : ut
 
 end = struct
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
@@ -68,6 +78,7 @@ end = struct
     | UPred of ut
     | UName of Symbols.action Symbols.t * ut list
     | UInit
+    | UUndef
 
   module Ut = struct
     type t = ut
@@ -94,8 +105,13 @@ end = struct
   let uname a us = UName (a, us) |> make
 
   let uinit = UInit |> make
+
+  let uundef = UUndef |> make              
               
-  let upred u = if u.cnt = UInit then uinit else UPred u |> make
+  let upred u =
+    if u.cnt = UInit then uinit
+    else if u.cnt = UUndef then uundef
+    else UPred u |> make
 
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
@@ -112,13 +128,14 @@ let pp_uvar ppf = function
   | Uind index -> Vars.pp ppf index
 
 let rec pp_ut_cnt ppf = function
-  | UVar uv -> pp_uvar ppf uv
+  | UVar uv  -> pp_uvar ppf uv
   | UPred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp_ut_cnt ts.cnt
   | UName (a,is) ->
     Fmt.pf ppf "@[%a[%a]@]"
       Fmt.string (Symbols.to_string a)
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
-  | UInit -> Fmt.pf ppf "init"
+  | UInit  -> Fmt.pf ppf "init"
+  | UUndef -> Fmt.pf ppf "undef"
 
 let pp_ut ppf ut = Fmt.pf ppf "%a" pp_ut_cnt ut.cnt
 
@@ -144,19 +161,24 @@ type constr_instance = { eqs : (ut * ut) list;
 
 (* Prepare the tatoms list by transforming it into a list of equalities
     that must be unified.  *)
-let mk_instance (l : Term.trace_atom list) =
+let mk_instance (l : ntrace_literal list) : constr_instance =
   let eqs, leqs, neqs =
     List.fold_left
-      (fun acc (x : Term.trace_atom) -> match x with
+      (fun acc (x : ntrace_literal) -> match x with
          | `Timestamp (od,ts1,ts2) -> add_xeq od (uts ts1, uts ts2) acc
          | `Index (od,i1,i2) ->
-             add_xeq (od :> Term.ord) (uvari i1, uvari i2) acc)
-      ([],[],[])
-      l in
+           add_xeq (od :> Term.ord) (uvari i1, uvari i2) acc
+         | `Happens ts    -> add_xeq `Neq (uts ts, uundef) acc
+         | `NotHappens ts -> add_xeq `Eq  (uts ts, uundef) acc
+      ) ([],[],[]) l in
+  
   let rec subterms acc x = match x.cnt with
     | UName (_,is) -> x :: is @ acc
-    | UPred y -> subterms (x :: acc) y
-    | UVar _ | UInit -> x :: acc in
+    | UPred y      -> subterms (x :: acc) y
+    | UVar _
+    | UInit
+    | UUndef -> x :: acc in
+  
   let elems =
     List.fold_left (fun acc (a,b) -> a :: b :: acc) [uinit] (eqs @ leqs @ neqs)
     |> List.fold_left subterms []
@@ -165,10 +187,10 @@ let mk_instance (l : Term.trace_atom list) =
   let uf = Uuf.create elems in
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
  
-(* [mgu ut uf] applies the mgu represented by [uf] to [ut].
+(** [mgu ut uf] applies the mgu represented by [uf] to [ut].
    Return init if it contains a cycle.
    If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
-   Note that [mgu] normalizes pred(init) into init. *)
+   Note that [mgu] normalizes [pred(init)] into [init] (idem for [undef]). *)
 let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
   
   let rec mgu_ uf ut lv =
@@ -177,7 +199,8 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
     (Uuf.union uf ut nut, nut)
 
   and mgu_aux uf ut lv =
-    if List.mem ut lv then (uf, uinit)
+    if List.mem ut lv then assert false (* TODO: old: (uf, uinit) *)
+                           
     else match ut.cnt with
       | UVar _ ->
         let uf = if ext_support then Uuf.extend uf ut else uf in
@@ -205,7 +228,26 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
         let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
         
-        if ut_equal rut ut then uf, uinit else mgu_ uf rut (ut :: lv)
+        if ut_equal rut ut
+        then begin
+          (* Not sure that this is indeed an invariant. 
+             The only other possibility should be [ruf = uundef], which means 
+             that that there is no model. *)
+          assert (rut.cnt = uinit.cnt);
+          uf, uinit
+        end
+        else mgu_ uf rut (ut :: lv)
+
+      | UUndef ->
+        let uf = if ext_support then Uuf.extend uf ut else uf in
+        let rut = Uuf.find uf ut in
+        
+        if ut_equal rut ut
+        then begin
+          assert (rut.cnt = uundef.cnt);
+          uf, uundef
+        end
+        else mgu_ uf rut (ut :: lv)
 
       | UPred ut' ->
         let uf, nut' = mgu_ uf ut' lv in
@@ -226,17 +268,21 @@ let mgus uf uts =
 
 exception No_mgu
 
- (* Ordering var > name > pred > init *)
+ (** Pre-ordering [var > name > pred > init > undef].
+     When choosing a representent in the union-find, we take the smallest.
+     E.g. the representent of the set [(var x, undef)] is [undef] *)
 let norm_ut_compare x y = match x.cnt, y.cnt with
-  | UVar _, _    -> true
-  | _, UVar _    -> false
-  | UName _, _   -> true
-  | _, UName _   -> false
-  | UPred _, _   -> true
-  | _, UPred _   -> false
-  | UInit, UInit -> true
+  | UVar _, _      -> true
+  | _, UVar _      -> false
+  | UName _, _     -> true
+  | _, UName _     -> false
+  | UPred _, _     -> true
+  | _, UPred _     -> false
+  | UInit, _       -> true
+  | _, UInit       -> false
+  | UUndef, UUndef -> true
  
-(* [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
+(** [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
    ordering [norm_ut_compare]. We use this to choose the representents in
    the union-find. *)
 let swap x y = if norm_ut_compare x y then x, y else y, x
@@ -248,9 +294,8 @@ let no_mgu x y = match x.cnt, y.cnt with
   | _ -> ()
 
 
-(**************************************)
-(* This is alsmost Huet's unification *)
-(**************************************)
+(*------------------------------------------------------------------*)
+(** This is alsmost Huet's unification *)
 
 let rec unif uf eqs = match eqs with
   | [] -> uf
@@ -273,9 +318,8 @@ let rec unif uf eqs = match eqs with
       unif uf eqs
 
 
-(*********************)
-(* Names unification *)
-(*********************)
+(*------------------------------------------------------------------*)
+(** Names unification *)
 
 (* Now, it remains to unify name or init equalities that may have been missed. *)
 let unif_idx uf =
@@ -347,12 +391,10 @@ let rec fpt_unif_idx uf =
   let finished, uf = merge_eq_class uf |> unif_idx in
   if finished then uf else fpt_unif_idx uf
 
+(*------------------------------------------------------------------*)
+(** {2 Final unification algorithm} *)
 
-(********************************)
-(* Final unification algorithm. *)
-(********************************)
-
-(* Returns the mgu for [eqs], starting from the mgu [uf] *)
+(** Returns the mgu for [eqs], starting from the mgu [uf] *)
 let unify uf eqs elems =
   let uf = unif uf eqs |> fpt_unif_idx in
   (* We compute all mgu's, to check for the absence of cycles. *)
@@ -360,14 +402,13 @@ let unify uf eqs elems =
   uf
 
 (** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs (l : Term.trace_atom list) =
+let mgu_eqs l =
   let instance = mk_instance l in
   unify instance.uf instance.eqs instance.elems
 
 
-(*****************************)
-(* Order models using graphs *)
-(*****************************)
+(*------------------------------------------------------------------*)
+(** {2 Order models using graphs} *)
 
 module UtG = Persistent.Digraph.Concrete(struct
     type t = ut
@@ -414,7 +455,7 @@ let cycle_eqs g =
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
     [] sccs
 
-(* [leq_unify uf leqs elems] compute the fixpoint of:
+(** [leq_unify uf leqs elems] compute the fixpoint of:
     - compute the inequality graph [g]
     - get [g] SCCs and the corresponding equalities
     - unify the new equalities *)
@@ -425,11 +466,10 @@ let rec leq_unify uf leqs elems =
   else leq_unify uf' leqs elems
 
 
-(***********************************)
-(* Discrete Order Case Disjunction *)
-(***********************************)
+(*------------------------------------------------------------------*)
+(** {2 Discrete Order Case Disjunction} *)
 
-(* [min_pred uf g u x] returns [j] where [j] is the smallest integer such
+(** [min_pred uf g u x] returns [j] where [j] is the smallest integer such
     that [P^j(x) <= u] in the graph [g], if it exists.
     Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let min_pred uf g u x =
@@ -442,7 +482,7 @@ let min_pred uf g u x =
   in
   minp uf 0 x
 
-(* [max_pred uf g u x] returns [j] where [j] is the largest integer such
+(** [max_pred uf g u x] returns [j] where [j] is the largest integer such
    that [u <= P^j(x)] in the graph [g], if it exists, with a particular case 
    if init occurs.
    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
@@ -464,7 +504,7 @@ let max_pred uf g u x =
   else
     None
 
-(* [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
+(** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
     such that [u] equals [P^k(x)]. *)
 let decomp u =
   let rec fdec i u = match u.cnt with
@@ -472,7 +512,7 @@ let decomp u =
     | _ -> (i,u) in
   fdec 0 u
 
-(* [nu] must be normalized and [x] basic *)
+(** [nu] must be normalized and [x] basic *)
 let no_case_disj uf nu x minj maxj =
   let nu_i, nu_y = decomp nu in
   ut_equal (snd (mgu uf x)) uinit ||
@@ -480,12 +520,12 @@ let no_case_disj uf nu x minj maxj =
 
 module UtGOp = Oper.P(UtG)
 
-(* [kpred x i] return [P^i(x)] *)
+(** [kpred x i] return [P^i(x)] *)
 let rec kpred x = function
   | 0 -> x
   | i -> kpred (upred x) (i - 1)
 
-(* [g] must be transitive and [x] basic *)
+(** [g] must be transitive and [x] basic *)
 let add_disj uf g u x =
   let uf, nu = mgu uf u in
   obind (fun (uf,minj) ->
@@ -538,13 +578,13 @@ let get_basics uf elems =
   |> List.sort_uniq ut_compare
 
 
-(* Type of a model, which is a satisfiable and normalized instance, and the
+(** Type of a model, which is a satisfiable and normalized instance, and the
     graph representing the inequalities of the instance (which is always
     transitive). *)
 type model = { inst : constr_instance;
                tr_graph : UtG.t }
 
-(* [split instance] return a disjunction of satisfiable and normalized instances
+(** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split instance : model list =
   try
@@ -599,35 +639,51 @@ let rec split instance : model list =
     log_constr (fun () -> Printer.prt `Error "@[<v 2>No_mgu:@;@]@.");
     []
 
-(* The minimal models a of constraint.
+(** The minimal models a of constraint.
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
 
 let pts (o, t, t') = `Timestamp (o, t, t')
 
-let norm_tatom = function
-  | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
-  | `Index _ as x -> [x]
+(** Normalized a trace literal into a list of normalized trace literal using 
+    [`Eq], [`Neq] and [`Leq]. *)
+let norm_trace_literal (lit : trace_literal) : ntrace_literal list =
+  (* Get a normalized trace literal. *)
+  let lit = match lit with
+    | `Neg, `Happens t -> `NotHappens t
+    | `Pos, `Happens t -> `Happens t
+    | `Pos, (#Term.trace_eq_atom as atom) -> atom
+    | `Neg, (#Term.trace_eq_atom as atom) ->
+      (Term.not_trace_eq_atom atom :> ntrace_literal) in
 
-(* [models_conjunct l] returns the list of minimal models of the conjunct.
+  (* Use only [`Eq], [`Neq] and [`Leq]. *)
+  let norm = function
+  | `Timestamp (o,t,t') -> norm_xatom (o,t,t') |> List.map pts
+  | (`NotHappens _ | `Happens _ | `Index _) as x -> [x] in
+
+  norm lit
+
+(** [models_conjunct l] returns the list of minimal models of the conjunct.
     [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : Term.trace_atom list) : models timeout_r =
-  let l = List.map norm_tatom l |> List.flatten in
+let models_conjunct (l : trace_literal list)
+  : models timeout_r =
+  let l = List.map norm_trace_literal l |> List.flatten in
   let instance = mk_instance l in
   Utils.timeout (Config.solver_timeout ()) split instance
 
 let m_is_sat models = models <> []
 
 
-(* Adds [ut] to the model [uf], if necessary, and return its normal form.
-   There is no need to modify the rest of the model, since we are not adding
-   an equality, disequality or inequality. *)
+(** [ext_support model ut] adds [ut] to the model union-find, if necessary, and
+    return its normal form.
+    There is no need to modify the rest of the model, since we are not adding
+    an equality, disequality or inequality. *)
 let ext_support (model : model) (ut : ut) =
   let uf, ut = mgu ~ext_support:true model.inst.uf ut in
   { model with inst = { model.inst with uf = uf } }, ut
 
-(** Only Eq, Neq and Leq. *)
-let ts_query (model : model) (ord, ts, ts') : bool =
+(** Only for comparisons [`Eq], [`Neq] and [`Leq]. *)
+let ts_query (model : model) ord ts ts' : bool =
   let model, u = ext_support model (uts ts) in
   let model, v = ext_support model (uts ts') in
   match ord with
@@ -644,25 +700,35 @@ let ts_query (model : model) (ord, ts, ts') : bool =
       ) model.inst.neqs
   | _ -> assert false
 
-(** Only Eq and Neq. *)
-let ind_query (model : model) (ord,i,i') : bool =
+(** Only for comparisons [`Eq] and [`Neq]. *)
+let ind_query (model : model) (ord : Term.ord_eq) i i' : bool =
   let model, u = ext_support model (uvari i) in
   let model, v = ext_support model (uvari i') in
   match ord with
   | `Eq -> ut_equal u v
-  | `Leq -> UtG.mem_edge model.tr_graph u v
-  | _ -> assert false
+  | `Neq ->
+    (* In that case, we are very unprecise, as we only check whether
+       the inequality already appeared, modulo known equalities. *)
+    List.exists (fun (a,b) ->
+        let na, nb = mgu model.inst.uf a |> snd,
+                     mgu model.inst.uf b |> snd in
+        ((u = na) && (v = nb))
+        || ((v = na) && (u = nb))
+      ) model.inst.neqs
 
-let _query (model : model) = function
-  | `Timestamp (o,a,b) ->
-    List.for_all (ts_query model) (norm_xatom (o,a,b))
-  | `Index (o,a,b) ->
-    List.for_all (ind_query model) (norm_xatom ((o :> Term.ord),a,b))
+let _query_nliteral model (atom : ntrace_literal) = match atom with
+  | `Timestamp (o, ts, ts') -> ts_query  model o ts ts'
+  | `Index     (o, i, i')   -> ind_query model o i  i'
+  | `Happens a | `NotHappens a -> assert false (* TODO *)
 
-let query (models : models) (ats : Term.trace_atom list) =
+let _query (model : model) (at : trace_literal) =
+  let natoms = norm_trace_literal at in
+  List.for_all (_query_nliteral model) natoms
+
+let query (models : models) (ats : trace_literal list) =
   List.for_all (fun model -> List.for_all (_query model) ats) models
 
-(* [max_elems_model model elems] returns the maximal elements of [elems]
+(** [max_elems_model model elems] returns the maximal elements of [elems]
     in [model], *with* redundancy modulo [model]'s equality relation. *)
 let max_elems_model (model : model) elems =
   (* We normalize to obtain the representant of each timestamp. *)
@@ -692,18 +758,18 @@ let maximal_elems (models : models) (elems : Term.timestamp list) =
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
-  Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) maxs
+  Utils.classes (fun ts ts' -> query models [`Pos, `Timestamp (`Eq,ts,ts')]) maxs
   |> List.map List.hd
 
 let get_ts_equalities (models : models) ts =
-  Utils.classes (fun ts ts' -> query models [`Timestamp (`Eq,ts,ts')]) ts
+  Utils.classes (fun ts ts' -> query models [`Pos, `Timestamp (`Eq,ts,ts')]) ts
 
 let get_ind_equalities (models : models) inds =
-  Utils.classes (fun i j -> query models [`Index (`Eq,i,j)]) inds
+  Utils.classes (fun i j -> query models [`Pos, `Index (`Eq,i,j)]) inds
 
-(****************)
-(* Tests Suites *)
-(****************)
+(*------------------------------------------------------------------*)
+(** Tests Suites *)
+
 open Term
 open Sorts
 let env = ref Vars.empty_env
@@ -772,25 +838,27 @@ let () =
 
     ("Cycles_2", `Quick,
      fun () ->
+       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [pb_eq1; pb_eq2; pb_eq3; pb_eq6; pb_eq7; pb_eq8]
        and failures = [pb_eq4; pb_eq5] in
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> if models_conjunct pb <> (Result []) 
+             (fun () -> if models_conjunct (mk pb) <> (Result []) 
                then raise Sat
                else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> if models_conjunct pb <> (Result []) 
+             (fun () -> if models_conjunct (mk pb) <> (Result []) 
                then () else 
                  raise Unsat ))
          failures;);
 
     ("Graph", `Quick,
      fun () ->
+       let mk l = List.map (fun x -> `Pos, x) l in
        let successes = [(`Timestamp (`Leq, tau, tau'')) :: pb_eq1;
 
                         (`Timestamp (`Neq, tau, tau3)) ::
@@ -818,7 +886,7 @@ let () =
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
              (fun () ->
-                if models_conjunct pb <> Result []
+                if models_conjunct (mk pb) <> Result []
                 then raise Sat
                 else ()))
          successes;
@@ -826,7 +894,7 @@ let () =
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
              (fun () ->
-                if models_conjunct pb <> Result []
+                if models_conjunct (mk pb) <> Result []
                 then ()
                 else raise Unsat ))
          failures;)

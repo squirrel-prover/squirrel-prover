@@ -65,7 +65,7 @@ type generic_atom = [
   | `Message of (ord_eq,Sorts.message term) _atom
   | `Timestamp of (ord,Sorts.timestamp term) _atom
   | `Index of (ord_eq,Vars.index) _atom
-  | `Happens of Sorts.timestamp term list
+  | `Happens of Sorts.timestamp term
 ]
 and _ term =
   | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
@@ -108,10 +108,19 @@ type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
+(*------------------------------------------------------------------*)
+(** {2 Subset of all atoms} *)
+(** (the subsets are not disjoint). *)
 
 type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
                     
 type trace_atom = [
+  | `Timestamp of (ord,timestamp) _atom
+  | `Index of (ord_eq,Vars.index) _atom
+  | `Happens   of Sorts.timestamp term
+]
+
+type trace_eq_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom
 ]
@@ -123,9 +132,8 @@ type eq_atom = [
 ]
 
 (*------------------------------------------------------------------*)
-exception Not_a_disjunction
-
-val disjunction_to_atom_list : formula -> generic_atom list
+val disjunction_to_literals :
+  formula -> ([ `Pos | `Neg ] * generic_atom) list option
 
 (*------------------------------------------------------------------*)
 val pp : Format.formatter -> 'a term -> unit
@@ -243,7 +251,9 @@ val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
-val not_eq_atom : eq_atom -> eq_atom
+val not_message_atom  : message_atom  -> message_atom
+val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
+val not_eq_atom       : eq_atom       -> eq_atom
 
 val not_simpl : formula -> formula
 

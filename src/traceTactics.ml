@@ -706,19 +706,23 @@ let () = T.register_typed "expand"
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =
- let conclusions =
-    try Term.disjunction_to_atom_list (TraceSequent.conclusion s)
-    with Term.Not_a_disjunction -> []
+  let conclusions =
+    Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
   in
+  
   let term_conclusions =
-    List.fold_left (fun acc (conc:Term.generic_atom) -> match conc with
-        | #message_atom as a -> (Term.not_eq_atom a)::acc
+    List.fold_left (fun acc conc -> match conc with
+        | `Pos, (#message_atom as at) ->
+          let at = (at :> Term.generic_atom) in
+          Term.(Not (Atom at)) :: acc
+        | `Neg, (#message_atom as at) ->
+          Term.Atom at :: acc
         | _ -> acc)
       []
       conclusions
   in
-  let s = List.fold_left (fun s atom ->
-      Hyps.add Args.AnyName (Term.Atom (atom :> generic_atom)) s
+  let s = List.fold_left (fun s f ->
+      Hyps.add Args.AnyName f s
     ) s term_conclusions
   in
   if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
@@ -735,21 +739,24 @@ let () = T.register "congruence"
   * formulas. *)
 let constraints (s : TraceSequent.t) =
   let conclusions =
-    try Term.disjunction_to_atom_list (TraceSequent.conclusion s)
-    with Term.Not_a_disjunction -> []
+    Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
   in
   let trace_conclusions =
-    List.fold_left (fun acc (conc:Term.generic_atom) -> match conc with
-        | #trace_atom as a -> (Term.not_eq_atom a)::acc
+    List.fold_left (fun acc conc -> match conc with
+        | `Pos, (#trace_atom as at) ->
+          let at = (at :> Term.generic_atom) in
+          Term.(Not (Atom at)) :: acc
+        | `Neg, (#trace_atom as at) ->
+          Term.Atom at :: acc
         | _ -> acc)
       []
       conclusions
   in
-  let new_s = List.fold_left (fun s atom ->
-      Hyps.add Args.AnyName (Term.Atom (atom :> generic_atom)) s
+  let s = List.fold_left (fun s f ->
+      Hyps.add Args.AnyName f s
     ) s trace_conclusions
   in
-  if Tactics.timeout_get (TraceSequent.constraints_valid new_s) then
+  if Tactics.timeout_get (TraceSequent.constraints_valid s) then
     []
   else soft_failure (Tactics.Failure "constraints satisfiable")
 
@@ -1069,7 +1076,7 @@ let substitute_mess (m1, m2) s =
 let substitute_ts (ts1, ts2) s =
   let subst =
       let models = Tactics.timeout_get (TraceSequent.get_models s) in
-      if Constr.query models [(`Timestamp (`Eq,ts1,ts2))] then
+      if Constr.query models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -1088,7 +1095,7 @@ let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
   
   let subst =
     let models = Tactics.timeout_get (TraceSequent.get_models s) in
-    if Constr.query models [(`Index (`Eq,i1,i2))] then
+    if Constr.query models [(`Pos, `Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
       soft_failure Tactics.NotEqualArguments
