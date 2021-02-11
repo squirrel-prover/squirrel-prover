@@ -44,6 +44,7 @@ let tac_error_strings =
     (NoReflMacros , "NoReflMacros");
     (TacTimeout, "TacTimeout");
     (CannotConvert, "CannotConvert");
+    (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
     (NothingToIntroduce, "NothingToIntroduce")]
 
@@ -68,10 +69,10 @@ let rec tac_error_to_string = function
   | CannotConvert
   | CongrFail
   | NothingToIntroduce
+  | GoalNotClosed
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | SystemError _ -> "System_Error"
-  | GoalNotClosed -> "GoalNotClosed"
   | PatNumError _ -> "PatNumError"
 
 let rec pp_tac_error ppf = function

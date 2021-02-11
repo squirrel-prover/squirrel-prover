@@ -4,5 +4,5 @@ system null.
 
 goal forall (t:timestamp), not (happens (init)).
 Proof.
-  intro t. 
-Qed.
+  checkfail auto exn GoalNotClosed.
+Abort.

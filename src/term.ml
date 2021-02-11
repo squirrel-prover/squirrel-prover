@@ -696,19 +696,9 @@ let mk_indices_eq vect_i vect_j =
 (*------------------------------------------------------------------*)
 (** Simplification *)
 
-let not_ord o = match o with
-  | `Eq -> `Neq
-  | `Neq -> `Eq
-  | `Leq -> `Gt
-  | `Geq -> `Lt
-  | `Lt -> `Geq
-  | `Gt -> `Leq
-
 let not_ord_eq o = match o with
   | `Eq -> `Neq
   | `Neq -> `Eq
-    
-let not_ord (o,l,r) = (not_ord o, l, r)
 
 let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
 
