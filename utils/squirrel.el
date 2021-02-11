@@ -69,7 +69,7 @@ proof-save-command-regexp proof-no-regexp
  proof-shell-error-regexp "\\[error>"
  proof-shell-result-regexp "\\[result>"
  proof-shell-annotated-prompt-regexp "\\[>"
- proof-shell-eager-annotation-start "\\[start>"
+ proof-shell-eager-annotation-start "\\[start>\\|\\[dbg>"
 
  proof-shell-interrupt-regexp    "Interrupted"
 
