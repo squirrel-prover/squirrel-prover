@@ -356,7 +356,7 @@ and pp_happens ppf (ts : timestamp list) =
 and pp_and_happens ppf f =
   let rec collect acc = function
     | And (l, r) -> collect (collect acc l) r
-    | Atom (`Happens ts) -> [ts]
+    | Atom (`Happens ts) -> ts :: acc
     | _ -> assert false in
 
   pp_happens ppf (collect [] f)

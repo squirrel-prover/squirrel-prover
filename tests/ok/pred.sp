@@ -33,6 +33,12 @@ Proof.
  auto.
 Qed.
 
+(* happens with two conditions *)
+goal forall (t:timestamp), happens(init, init).
+Proof.
+ auto.
+Qed.
+
 (* check that the negation fails *)
 goal forall (t:timestamp), not (happens (init)).
 Proof.
