@@ -846,27 +846,32 @@ let rec split (instance : constr_instance) : model list =
 
       | true -> (* no violations for now *)        
         let instance = { instance with uf = uf } in
+
+        (* Looking for segment disjunctions, e.g. if
+           pred(τ) ≤ τ' ≤ τ
+           then we know that (τ' = pred(τ) ∨ τ' = τ) *)
         begin match find_segment_disj instance g with
-          | Some (uf, new_eqs) ->
+          | Some (uf, new_eqs) -> (* found a new segment disjunction *)
             List.map (fun eq ->
                 log_segment_eq eq;
                 split { instance with eqs = eq :: instance.eqs; }
               ) new_eqs
             |> List.flatten
 
-          | None -> [ { inst = instance; tr_graph = g } ]
-        end
+          | None -> (* no new segment disjunction *)
 
-      (* | Some new_eqs ->
-       *   (\* check that these are indeed new equalities *\)
-       *   assert (List.for_all (fun (v,v') ->
-       *       not (ut_equal (snd (mgu uf v)) (snd (mgu uf v')))
-       *     ) new_eqs);
-       * 
-       *   log_new_init_eqs new_eqs;
-       *                     
-       *   split { instance with uf = uf;
-       *                         eqs = new_eqs @ instance.eqs; }  *)
+            (* we look whether all initial clauses of the problem have already
+               been split *)
+            match instance.clauses with
+            | [] ->             (* no clause left, we are done *)
+              [ { inst = instance; tr_graph = g } ]
+
+            | disj :: clauses -> (* we found a clause to split *)
+              let inst = { instance with clauses = clauses; } in
+              let insts = List.map (fun f -> add_form inst f) disj in
+              List.map split insts
+              |> List.flatten
+        end
     end
 
   with
