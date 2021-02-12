@@ -108,7 +108,7 @@ let rec pp_ut_cnt ppf = function
       Fmt.string (Symbols.to_string a)
       (Fmt.list pp_ut_cnt) (List.map (fun x -> x.cnt) is)
   | UInit  -> Fmt.pf ppf "init"
-  | UUndef -> Fmt.pf ppf "undef"
+  | UUndef -> Fmt.pf ppf "⊥"
 
 let pp_ut ppf ut = Fmt.pf ppf "%a" pp_ut_cnt ut.cnt
 
@@ -263,6 +263,23 @@ type constr_instance = {
   uf      : Uuf.t;
 }
 
+(*------------------------------------------------------------------*)
+let pp_constr_instance fmt inst =
+  let pp_el s fmt (ut1, ut2) =
+    Fmt.pf fmt "%a %s %a" pp_ut ut1 s pp_ut ut2 in
+  
+  Fmt.pf fmt "@[<v 0>\
+          @[<hov 2>eqs:@ %a@]@;\
+          @[<hov 2>leqs:@ %a@]@;\
+          @[<hov 2>neqs:@ %a@]@;\
+          @[<hov 2>clauses:@ %a@]\
+          @]"
+    (Fmt.list ~sep:Fmt.comma (pp_el "=")) inst.eqs
+    (Fmt.list ~sep:Fmt.comma (pp_el "≤")) inst.leqs
+    (Fmt.list ~sep:Fmt.comma (pp_el "≠")) inst.neqs
+    (Fmt.list ~sep:Fmt.comma Form.pp_disj) inst.clauses
+    
+(*------------------------------------------------------------------*)
 let all_terms (inst : constr_instance) =
   let term_lit acc (_,ut1,ut2) = ut1 :: ut2 :: acc in
   
@@ -330,10 +347,6 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
-
-    (* Printer.prt `Dbg "mgu of %a = %a"
-     *   pp_ut ut pp_ut nut; *)
-
     (Uuf.union uf ut nut, nut)
 
   and mgu_aux uf ut lv =
@@ -417,20 +430,9 @@ let no_mgu x y = match x.cnt, y.cnt with
 let rec unif uf eqs = match eqs with
   | [] -> uf
   | (x,y) :: eqs ->
-    (* Printer.prt `Dbg "unify %a = %a"
-     *   pp_ut x pp_ut y; *)
-
-    
     let rx,ry = Uuf.find uf x, Uuf.find uf y in
-    if ut_equal rx ry then
-      begin
-        (* Printer.prt `Dbg "already unified as %a"
-         *   pp_ut rx; *)
-        unif uf eqs end
+    if ut_equal rx ry then unif uf eqs 
     else
-      (* let () = Printer.prt `Dbg "union %a = %a"
-       *     pp_ut rx pp_ut ry in *)
-
       let () = no_mgu rx ry in
       let rx,ry = swap rx ry in
 
@@ -523,14 +525,10 @@ let rec fpt_unif_idx uf =
 (** {2 Final unification algorithm} *)
 
 (** Returns the mgu for [eqs], starting from the mgu [uf] *)
-let unify uf eqs elems =
-  (* Printer.prt `Dbg "starting unify: %d equations" (List.length eqs); *)
-  
+let unify uf eqs elems =  
   let uf = unif uf eqs |> fpt_unif_idx in
   (* We compute all mgu's, to check for cycles. *)
-  (* Printer.prt `Dbg "computing mgus"; *)
   let uf,_ = mgus uf elems in
-  (* Printer.prt `Dbg "computing mgus done"; *)
 
   (* We check that [init] and [undef] are not equal. *)
   (* FIXME: this check is done in 3 different places *)
@@ -636,23 +634,41 @@ let build_graph (uf : Uuf.t) neqs leqs =
   let uf, g = bg uf leqs UtG.empty in
   (uf, add_preds_and_init g)
 
+(*------------------------------------------------------------------*)
+let pp_scc fmt scc =
+  Fmt.pf fmt "@[<hv 2>%a@]" 
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " =@ ") pp_ut) scc
+    
+let log_cycles sccs =
+  let sccs = List.filter (fun scc -> List.length scc > 1) sccs in
+  if List.length sccs > 0 then
+    log_constr (fun () ->
+        Printer.prt `Dbg
+          "@[<v 2>Adding SCCs equalities:@, %a@]"
+          (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ") pp_scc) sccs)
 
-(* For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
+(*------------------------------------------------------------------*)
+(** For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
     x=x_1 /\ ... /\ x = x_n   *)
 let cycle_eqs g =
   let sccs = Scc.scc_list g in
+  
+  log_cycles sccs;
+  
   List.fold_left (fun acc scc -> match scc with
       | [] -> raise (Failure "Constraints: Empty SCC")
       | x :: scc' -> List.fold_left (fun acc y -> (x,y) :: acc) acc scc')
     [] sccs
 
+(*------------------------------------------------------------------*)
 (** [leq_unify uf leqs neqs elems] compute the fixpoint of:
     - compute the inequality graph [g]
     - get [g] SCCs and the corresponding equalities
     - unify the new equalities *)
 let rec leq_unify uf leqs neqs elems =
   let uf, g = build_graph uf neqs leqs in
-  let uf' = unify uf (cycle_eqs g) elems in
+  let cycles = cycle_eqs g in 
+  let uf' = unify uf cycles elems in
   if Uuf.union_count uf = Uuf.union_count uf' then uf,g
   else leq_unify uf' leqs neqs elems
 
@@ -771,14 +787,9 @@ let neq_sat uf g neqs : bool =
      - 1) [u = P^k(u)] and [v = P^k'(u)] for [k < k'].
      - 2) *)
   for_all (fun u v ->
-      (* Printer.prt `Dbg "checking @[<hov>%a ≤ %a@]"
-       *   pp_ut u pp_ut v; *)
-
+      (* FIXME: we are recomputing mgu multiple times below *)
       let uf, u = mgu uf u in
-      let uf, v = mgu uf v in   (* we are recomputing mgu multiple times below *)
-
-      (* Printer.prt `Dbg "normed as @[<hov>%a ≤ %a@]"
-       *   pp_ut u pp_ut v; *)
+      let uf, v = mgu uf v in 
       
       let violation1 = is_kpred uf v u in
 
@@ -799,12 +810,6 @@ let neq_sat uf g neqs : bool =
       not (violation1 || violation2)
     ) g
     
-
-(* let neq_sat uf g neqs =
- *   Printer.prt `Dbg "new_sat start"; 
- *   let res = neq_sat uf g neqs in
- *   Printer.prt `Dbg "new_sat done";
- *   res *)
   
 (*------------------------------------------------------------------*)
 let get_basics uf elems =
@@ -815,15 +820,21 @@ let get_basics uf elems =
 (*------------------------------------------------------------------*)
 let log_segment_eq eq =
   log_constr (fun () -> Printer.prt `Dbg
-                 "@[<v 2>Adding segment equality:@;%a@]"
+                 "@[<v 2>Adding segment equality:@, %a@]"
                  (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
                     pp_ut pp_ut) eq)
 
 let log_split f =
   log_constr (fun () -> Printer.prt `Dbg
-                 "@[<v 2>Splitting clause:@;%a@]"
+                 "@[<v 2>Splitting clause:@, %a@]"
                  Form.pp_disj f)
 
+let log_done () =
+  log_constr (fun () -> Printer.prt `Dbg "@[<v 2>Model done@]")
+
+let log_instr inst =
+  log_constr (fun () -> Printer.prt `Dbg "@[<v 2>Solving:@;%a@]"
+                 pp_constr_instance inst)
 
 (*------------------------------------------------------------------*)
 (** Type of a model, which is a satisfiable and normalized instance, and the
@@ -835,33 +846,29 @@ type model = { inst     : constr_instance;
 let find_segment_disj instance g =
   let exception Found of Uuf.t * (ut * ut) list in
 
-  (* Printer.prt `Dbg "find_segment_disj start"; *)
-  
   let basics = get_basics instance.uf instance.elems in
-  (* Printer.prt `Dbg "basics done"; *)
-  let r = try
-      let () = UtG.iter_vertex (fun u ->
-          List.iter (fun x -> match add_disj instance.uf g u x with
-              | None -> ()
-              | Some (uf, l) -> raise (Found (uf,l))
-            ) basics
-        ) g in
-      None
-    with Found (x,y) -> Some (x, y)
-  in  (* Printer.prt `Dbg "find_segment_disj done";  *)
-  r
+  try
+    let () = UtG.iter_vertex (fun u ->
+        List.iter (fun x -> match add_disj instance.uf g u x with
+            | None -> ()
+            | Some (uf, l) -> raise (Found (uf,l))
+          ) basics
+      ) g in
+    None
+  with Found (x,y) -> Some (x, y)
 
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split (instance : constr_instance) : model list =
   try
-    Printer.prt `Dbg "unifying";
+    log_instr instance;
+    
     let uf = unify instance.uf instance.eqs instance.elems in
-    Printer.prt `Dbg "leq_unifying";
+    
     let uf,g = leq_unify uf instance.leqs instance.neqs instance.elems in
-    Printer.prt `Dbg "computing transitive closure";
+    
     let g = UtGOp.transitive_closure g in
-    Printer.prt `Dbg "trying to conclude";
+    
     begin match neq_sat uf g instance.neqs with
       | false -> [] (* dis-equalities violated *)
 
@@ -885,13 +892,14 @@ let rec split (instance : constr_instance) : model list =
                been split *)
             match instance.clauses with
             | [] ->             (* no clause left, we are done *)
+              log_done ();
               [ { inst = instance; tr_graph = g } ]
 
             | disj :: clauses -> (* we found a clause to split *)
               log_split disj;
               
               let inst = { instance with clauses = clauses; } in
-              let insts = List.map (fun f -> add_form inst f) disj in
+              let insts = List.map (fun f -> add_form inst f ) disj in
               List.map split insts
               |> List.flatten
         end
