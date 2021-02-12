@@ -349,6 +349,7 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
     let uf = Uuf.extend uf nut in
     (Uuf.union uf ut nut, nut)
 
+  (* Invariant: returns the representent of [ut] in [uf] *)
   and mgu_aux uf ut lv =
     if List.mem ut lv then (uf, uundef)
                            
@@ -379,9 +380,18 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
 
       | UPred ut' ->
         let uf, nut' = mgu_ uf ut' lv in
+
         (* the [upred] smart constructor normalizes pred(undef) into undef) *)
-        (uf, upred nut') in 
-  
+        let pnut' = upred nut' in
+
+        (* here, we are not certain that [pnut] is its own representent, so
+           we ensure it. *)
+        let uf = Uuf.extend uf pnut' in (* even if not ext_support *)
+        let rpnut' = Uuf.find uf pnut' in
+        if ut_equal rpnut' pnut' then (uf, rpnut')
+        else mgu_ uf rpnut' (ut :: lv)
+  in 
+
   mgu_ uf ut []
       
 
