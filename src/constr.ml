@@ -838,6 +838,19 @@ let log_split f =
   log_constr (fun () -> Printer.prt `Dbg
                  "@[<v 2>Splitting clause:@, %a@]"
                  Form.pp_disj f)
+    
+let log_init_eqs eqs =
+  let pp_eq fmt (ut1, ut2) =
+    Fmt.pf fmt "%a = %a" pp_ut ut1 pp_ut ut2 in
+  
+  let pp_eqs fmt eqs =    
+    Fmt.pf fmt "@[<hv 2>%a@]" 
+      (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
+      
+  log_constr (fun () ->
+      Printer.prt `Dbg
+        "@[<v 2>Adding new init equalities:@, %a@]"
+        pp_eqs eqs)
 
 let log_done () =
   log_constr (fun () -> Printer.prt `Dbg "@[<v 2>Model done@]")
@@ -867,6 +880,36 @@ let find_segment_disj instance g =
     None
   with Found (x,y) -> Some (x, y)
 
+
+(*------------------------------------------------------------------*)
+(** Looks for instances of the rule:
+    ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
+let find_eq_init uf neqs =
+  Fmt.epr "uf:@. %a@." Uuf.print uf;
+  
+  let new_eqs = List.filter_map (fun (ut1, ut2) ->
+      Fmt.epr "init: %a and %a@." pp_ut ut1 pp_ut ut2;
+      
+      let uf, uts = mgus uf [ut1;ut2] in
+      let ut1, ut2 = Utils.as_seq2 uts in
+
+      Fmt.epr "init2: %a and %a@." pp_ut ut1 pp_ut ut2;
+
+      if ut_equal ut1 uundef || ut_equal ut2 uundef then None
+      else
+        let ut = if ut_equal ut1 uundef then ut2 else ut1 in
+        let _, put = mgu uf (upred ut) in
+        Fmt.epr "put: %a@." pp_ut put;
+        
+        if ut_equal put uundef &&
+           (not (ut_equal put uinit)) &&
+           (not (ut_equal ut uinit))
+        then Some (ut, uinit)
+        else None
+    ) neqs in
+  if new_eqs = [] then None else Some new_eqs
+
+(*------------------------------------------------------------------*)
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split (instance : constr_instance) : model list =
@@ -878,17 +921,22 @@ let rec split (instance : constr_instance) : model list =
     let uf,g = leq_unify uf instance.leqs instance.neqs instance.elems in
     
     let g = UtGOp.transitive_closure g in
-    
-    begin match neq_sat uf g instance.neqs with
-      | false -> [] (* dis-equalities violated *)
 
-      | true -> (* no violations for now *)        
-        let instance = { instance with uf = uf } in
+    begin match find_eq_init uf instance.neqs with
+      | Some new_eqs ->
+        log_init_eqs new_eqs;
+        split { instance with uf = uf; eqs = new_eqs @ instance.eqs; }
+        
+      | None -> match neq_sat uf g instance.neqs with
+        | false -> [] (* dis-equalities violated *)
 
-        (* Looking for segment disjunctions, e.g. if
-           pred(τ) ≤ τ' ≤ τ
-           then we know that (τ' = pred(τ) ∨ τ' = τ) *)
-        begin match find_segment_disj instance g with
+        | true -> (* no violations for now *)        
+          let instance = { instance with uf = uf } in
+
+          (* Looking for segment disjunctions, e.g. if
+             pred(τ) ≤ τ' ≤ τ
+             then we know that (τ' = pred(τ) ∨ τ' = τ) *)
+          match find_segment_disj instance g with
           | Some (uf, new_eqs) -> (* found a new segment disjunction *)
             List.map (fun eq ->
                 log_segment_eq eq;
@@ -898,8 +946,8 @@ let rec split (instance : constr_instance) : model list =
 
           | None -> (* no new segment disjunction *)
 
-            (* we look whether all initial clauses of the problem have already
-               been split *)
+            (* we look whether all initial clauses of the problem have 
+               already been split *)
             match instance.clauses with
             | [] ->             (* no clause left, we are done *)
               log_done ();
@@ -907,14 +955,12 @@ let rec split (instance : constr_instance) : model list =
 
             | disj :: clauses -> (* we found a clause to split *)
               log_split disj;
-              
+
               let inst = { instance with clauses = clauses; } in
               let insts = List.map (fun f -> add_form inst f ) disj in
               List.map split insts
               |> List.flatten
-        end
     end
-
   with
   | No_mgu ->
     log_constr (fun () -> Printer.prt `Dbg "@[<v 2>No_mgu@]");
