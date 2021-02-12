@@ -62,25 +62,25 @@ goal wa_R1: forall j:index,
     input@T(i,k) = output@R(j)).
 
 Proof.
-  intros.
+  intro *.
   expand cond@R1(j).
   split.
 
   (* COND => WA *)
   apply tags_neq; project.
   (* LEFT *)
-  euf M0.
+  euf Meq.
   exists i,k1.
   assert input@T(i,k1)=nR(j).
-  fresh M3.
-  by depends R(j),R2(j).
+  fresh Meq1.
+  by case H; depends R(j),R2(j).
 
   (* RIGHT *)
-  euf M0.
+  euf Meq.
   exists i,k.
   assert input@T(i,k)=nR(j).
-  fresh M3.
-  by depends R(j),R2(j).
+  fresh Meq1.
+  by case H; depends R(j),R2(j).
 
   (* WA => COND *)
   by exists i,k.
@@ -96,30 +96,30 @@ goal wa_R2: forall j:index,
     input@T(i,k) = output@R(j))).
 
 Proof.
-  intros.
+  intro *.
   expand cond@R2(j).
   split.
 
   (* WA => COND *)
-  apply H0.
+  apply H.
   by exists i,k.
-  apply H0.
 
   (* COND => WA *)
+  apply H.
   apply tags_neq; project.
-  (* LEFT *)
-  euf M0.
+  (* LEFT *) 
+  euf Meq.
   exists i,k1.
   assert input@T(i,k1)=nR(j).
-  fresh M3.
-  by depends R(j),R1(j).
+  fresh Meq1.
+  by case H0; depends R(j),R1(j).
 
   (* RIGHT *)
-  euf M0.
+  euf Meq.
   exists i,k.
   assert input@T(i,k)=nR(j).
-  fresh M3.
-  by depends R(j),R1(j).
+  fresh Meq1.
+  by case H0; depends R(j),R1(j).
 Qed.
 
 goal [left] wa_R1_left:
@@ -133,13 +133,13 @@ goal [left] wa_R1_left:
     input@T(i,k) = output@R(j)).
 
 Proof.
-  intros.
+  intro *.
   apply tags_neq.
-  euf M0.
+  euf Meq.
   exists k.
   assert input@T(i,k)=nR(j).
-  fresh M3.
-  by depends R(j),R2(j).
+  fresh Meq1.
+  by case H; depends R(j),R2(j).
 Qed.
 
 goal [right] wa_R1_right:
@@ -152,12 +152,12 @@ goal [right] wa_R1_right:
     input@T(i,k) = output@R(j)).
 
 Proof.
-  intros.
+  intro *.
   apply tags_neq.
-  euf M0.
+  euf Meq.
   assert input@T(i,k)=nR(j).
-  fresh M3.
-  by depends R(j),R2(j).
+  fresh Meq1.
+  by case H; depends R(j),R2(j).
 Qed.
 
 
@@ -215,20 +215,21 @@ Proof.
   fa.
   by exists i,k. by exists i,k.
   project.
+
   (* LEFT *)
   fa.
   apply wa_R1_left to i1,j.
-  apply H1.
+  apply H0.
   by exists k.
   yesif.
   (* RIGHT *)
   fa.
   apply wa_R1_right to i1,j,k1.
-  by apply H1.
+  by apply H0.
   by yesif.
 
-  fa 2. fadup 1.
-  fa 1. fadup 1.
+  fa 2; fadup 1.
+  fa 1; fadup 1.
   prf 1.
   ifcond 1, exec@pred(R1(j)).
   fa 1.
@@ -259,15 +260,15 @@ Proof.
   yesif 2.
   apply tags_neq; project.
   split.
-  assert fst(input@R2(j))=nT(i,k). by fresh M2.
+  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
   split.
-  assert fst(input@R1(j))=nT(i,k). by fresh M2.
-  assert fst(input@R1(j))=nT(i,k). by fresh M2.
+  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
+  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
   split.
   split.  
-  assert fst(input@R1(j))=nT(i,k). by fresh M2.
-  assert fst(input@R1(j))=nT(i,k). by fresh M2.
-  assert fst(input@R2(j))=nT(i,k). by fresh M2.
+  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
+  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
+  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

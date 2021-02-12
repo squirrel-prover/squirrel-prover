@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 name n : message
@@ -9,14 +11,12 @@ goal one :
   h(m,k) <> h(n,k).
 
 Proof.
-  simpl.
-  euf M0.
+  by intro Heq; euf Heq; auto.
 Qed.
 
 goal two :
   n <> h(n,k).
 
 Proof.
-  simpl.
-  euf M0.
+  by intro Heq; euf Heq; auto.
 Qed.

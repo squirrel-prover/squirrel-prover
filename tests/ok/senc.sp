@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel cR
 channel cT
 

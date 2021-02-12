@@ -74,13 +74,13 @@ let pp_init ppf j =
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     j.frame
 
-let get_env j = j.env
+let env j = j.env
 
 let set_env e j = {j with env = e}
 
-let get_system j = j.system
+let system j = j.system
 
-let get_table j = j.table
+let table j = j.table
 
 let set_table j table = { j with table = table }
 

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n1 : message
 
 abstract ok : message
@@ -13,13 +15,13 @@ axiom len_ko : len(ko) = len(dummy).
 goal forall (t:timestamp),
   xor(output@t,output@t) = zero.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal forall (m:message,t:timestamp),
   xor(output@t,xor(m,output@t)) = m.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal forall (m:message,n:message,x:message),
@@ -27,12 +29,13 @@ goal forall (m:message,n:message,x:message),
   snd(xor(x,m)) = m =>
   m = n.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 equiv test : diff(xor(n1,ok),xor(n1,ko)).
 Proof.
   xor 0.
   yesif 0.
-  apply len_ok; apply len_ko; namelength n1,dummy.
+  apply len_ok; apply len_ko; namelength n1,dummy. 
+  by auto.
 Qed.

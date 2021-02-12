@@ -7,7 +7,9 @@
 *)
 
 open Term
-    
+
+module Args = TacticsArgs
+  
 (** {2 Sequent type and basic operations} *)
 
 type t
@@ -19,18 +21,7 @@ val pp : Format.formatter -> sequent -> unit
     the given formula as conclusion. *)
 val init : 
   system:SystemExpr.system_expr -> Symbols.table -> formula -> sequent
-
-(** [get_name_prefix s] hypthesis names can be built given a prefix. This
-   function allows to obtain the prefix of a formula. It can be used to create a
-   new hypothesis from an old one. *)
-val get_name_prefix : string -> string * int
-
-(** [add_formula f s] returns the sequent [s] with [f] added to its
-    hypotheses. The new sequent will be automatically enriched with
-    equalities expressing relevant macro definitions, as well as conditions
-    of all named actions that are assumed to happen. *)
-val add_formula : ?prefix:string -> formula -> sequent -> sequent
-
+  
 (** Get the system which the sequent is reasoning about. *)
 val system : sequent -> SystemExpr.system_expr
 
@@ -52,76 +43,89 @@ val pi : Term.projection -> sequent -> sequent
   * the environment set to [e]. *)
 val set_env : Vars.env -> sequent -> sequent
 
-(** [get_env s] returns the environment of the sequent. *)
-val get_env : sequent -> Vars.env
+(** [env s] returns the environment of the sequent. *)
+val env : sequent -> Vars.env
 
 (** [set_conclusion f s] set the conclusion formula of the sequent to [f]. *)
 val set_conclusion : formula -> sequent -> sequent
 
-(** [get_conclusion s] returns the conclusion formula of the sequent. *)
-val get_conclusion : sequent -> formula
+(** [conclusion s] returns the conclusion formula of the sequent. *)
+val conclusion : sequent -> formula
 
-(** {2 Finding and hypotheses} *)
 
-(** [is_hypothesis f s] returns true if the formula appears inside the hypotesis
-   of the sequent [s]. Might be used to prove the validity of a sequent, if its
-   conclusion formula appears inside its hypothesis. *)
-val is_hypothesis : formula -> sequent -> bool
+(*------------------------------------------------------------------*)
+(** {2 Hypotheses} *)
 
-(** [mem_hypothesis id s] returns true if there is an hypothesis named [id] 
-    in [s]. *)
-val mem_hypothesis : string -> sequent -> bool
+(** Hypothesis *)
+type hyp = Term.formula
 
-(** [get_hypothesis id s] returns the hypothesis named [id] in [s].
-  * @raise Not_found if there is no such hypothesis. *)
-val get_hypothesis : string -> sequent -> formula
+(** Local declaration *)
+type ldecl = Ident.t * hyp
 
-(** Tags attached to message hypotheses. *)
-type message_hypothesis_tag = {
-  t_euf : bool
-    (** Indicates that the euf tactic has been applied to the hypothesis. *)
-}
+val pp_hyp   : Format.formatter -> hyp   -> unit
+val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit  
+             
+module Hyps : sig  
+  (** [add id f s] returns the sequent [s] with [f] added to its hypotheses. 
+      The new sequent will be automatically enriched with equalities 
+      expressing relevant macro definitions, as well as conditions of all 
+      named actions that are assumed to happen. *)
+  val add : Args.naming_pat -> formula -> sequent -> sequent
 
-type formula_tag = unit
+  (** Same as [add], but also returns the ident of the added hypothesis. *)
+  val add_i : Args.naming_pat -> formula -> sequent -> Ident.t * sequent
 
-(** [select_message_hypothesis name s update] returns the message
-   (dis)equality corresponding to the given name inside the hypothesis of [s],
-   together with a sequent identical to [s] except that the tag of the
-   selected hypothesis has been updated using [update]. *)
-val select_message_hypothesis :
-  ?remove:bool ->
-  ?update:(message_hypothesis_tag -> message_hypothesis_tag) ->
-  string -> sequent ->
-  (sequent * Atom.message_atom)
+  val add_list :
+    (Args.naming_pat * formula) list -> sequent -> sequent
 
-val select_formula_hypothesis :
-  ?remove:bool ->
-  ?update:(formula_tag -> formula_tag) ->
-  string -> sequent ->
-  (sequent * formula)
+  val add_i_list :
+    (Args.naming_pat * formula) list -> sequent -> Ident.t list * sequent
+                                                          
+  (*------------------------------------------------------------------*)
+  (** [is_hyp f s] returns true if the formula appears inside the hypotesis
+      of the sequent [s].  *)
+  val is_hyp : formula -> sequent -> bool
 
-(** Find the first formula satisfying a predicate. *)
-val find_formula_hypothesis :
-  (formula -> bool) -> sequent -> formula
+  (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
+  val by_id : Ident.t -> sequent -> formula
 
-(** Find the first formula satisfying a predicate,
-  * return it together with the sequent from which the formula
-  * has been removed. *)
+  (** Same as [by_id], but does a look-up by name and returns the full local 
+      declaration. *)
+  val by_name : string -> sequent -> ldecl
 
-val remove_formula_hypothesis :
-  (formula -> bool) -> sequent -> formula * sequent
+  (** [mem_id id s] returns true if there is an hypothesis with id [id] 
+      in [s]. *)
+  val mem_id : Ident.t -> sequent -> bool
 
-val remove_trace_hypothesis :
-  (Atom.trace_atom -> bool) -> sequent -> Atom.trace_atom * sequent
+  (** Same as [mem_id], but does a look-up by name. *)  
+  val mem_name : string -> sequent -> bool
 
-val remove_message_hypothesis :
-  (Atom.message_atom -> bool) -> sequent -> Atom.message_atom * sequent
+  (** Find the first local declaration satisfying a predicate. *)
+  val find_opt : (Ident.t -> formula -> bool) -> sequent -> ldecl option
 
-(** [apply_subst subst s] returns the sequent [s] where the substitution has
-   been applied to all hypotheses. It also set [visible] to [false], when the
-   hypothesis becomes trivial (e.g x=x). *)
-val apply_subst : Term.subst -> sequent -> sequent
+  (** Exceptionless *)
+  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
 
+  (** Find if there exists a local declaration satisfying a predicate. *)
+  val exists : (Ident.t -> formula -> bool) -> sequent -> bool
+
+  (** Removes a formula. *)
+  val remove : Ident.t -> sequent -> sequent
+
+  val fold : (Ident.t -> formula -> 'a -> 'a) -> sequent -> 'a -> 'a
+
+  val pp : Format.formatter -> sequent -> unit
+    
+  val pp_dbg : Format.formatter -> sequent -> unit
+end
+
+
+(** [subst subst s] returns the sequent [s] where the substitution has
+    been applied to all hypotheses and the conclusion.
+    It removes trivial equalities (e.g x=x). *)
+val subst : Term.subst -> sequent -> sequent
+  
+(*------------------------------------------------------------------*)
 (** {2 Automated reasoning} *)
 
 (** [get_trs s] returns a term rewriting system that corresponds to the set of
@@ -163,8 +167,22 @@ val get_ind_equalities : sequent -> Vars.index list list Utils.timeout_r
 val maximal_elems : sequent -> Term.timestamp list ->
   Term.timestamp list Utils.timeout_r
 
+
+(*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
 (** [get_all_terms s] returns all the term appearing at toplevel
   * in message hypotheses of [s]. *)
 val get_all_terms : sequent -> Term.message list
+
+
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
+type hyp_error =
+  | HypAlreadyExists of string
+  | HypUnknown of string
+    
+exception Hyp_error of hyp_error
+
+val pp_hyp_error : Format.formatter -> hyp_error -> unit

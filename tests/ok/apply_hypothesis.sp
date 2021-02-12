@@ -1,8 +1,12 @@
+set autoIntro=false.
+
 system null.
 
 goal forall (x:message,y:message,z:message),
   (x = y => y = z) => x = y => y = z.
 Proof.
-  nosimpl(intros).
-  apply H0.
+  nosimpl(intro x y z H Heq).
+  nosimpl(apply H). 
+  by assumption. 
+  by assumption.
 Qed.

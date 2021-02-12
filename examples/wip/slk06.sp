@@ -78,9 +78,9 @@ forall (jj,ii:index),
   =>
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 Proof.
-intros.
+intro *.
 expand cond@R1(jj,ii).
-euf M0.
+euf H.
 exists j.
 Qed.
 
@@ -90,8 +90,8 @@ forall (i,j:index),
   =>
   (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j)).
 Proof.
-intros.
+intro *.
 expand cond@T1(i,j).
-euf M0.
+euf H.
 exists jj.
 Qed.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing euf over signatures. *)
 
 senc enc,dec
@@ -14,9 +16,9 @@ system (out(c,enc(m,r,k)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
 
 goal output@A1 <> fail => output@A1 = m.
 Proof.
-  simpl.
-  nosimpl(intctxt D0).
+  intro Hneq.
+  nosimpl(intctxt D).
 
-  simpl.
-  simpl.
+  by auto.
+  by auto. 
 Qed.

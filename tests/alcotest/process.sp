@@ -1,3 +1,5 @@
+(* set autoIntro=false. *)
+
 (* test process definition *)
 (* Disable this for now. It used to be possible but was causing confusion
    because the special treatment of c=true below applied to x=true when x is a

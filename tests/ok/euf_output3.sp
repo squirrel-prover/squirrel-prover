@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Same as euf_output but with output@0[b] replaced by its definition *)
 
 hash h
@@ -17,6 +19,5 @@ goal unforgeable :
   h(n(b),k) <> h(n(a),k).
 
 Proof.
-  simpl.
-  euf M0.
+  by intro a b _ Heq; euf Heq; auto.
 Qed.

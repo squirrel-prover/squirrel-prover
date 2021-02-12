@@ -55,6 +55,9 @@ type gm_input = gm_input_i Location.located
 
 type proof_state
 
+(** Abort the current proof. *)
+val abort : unit -> unit
+
 (** Set the proof_state to its initial state. *)
 val reset : unit -> unit
 

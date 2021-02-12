@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 
 name n : index -> message

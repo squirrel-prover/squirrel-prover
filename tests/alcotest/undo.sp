@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract x:message
 abstract y:message
 

@@ -1,3 +1,5 @@
+(* set autoIntro=false. *)
+
 (* A simple model using a declared primitive *)
 hash h
 channel c

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : message
 abstract ko : message
 
@@ -17,6 +19,7 @@ Proof.
   nosimpl(xor 1).
   nosimpl(yesif 1).
   namelength k,n; namelength k,m.
+  by auto.
   simpl.
 Qed.
 

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing that macros induced by a let definition
  * have the right number of parameters even in case of
  * a dummy input in the action. *)
@@ -16,6 +18,7 @@ goal collision_absurd :
   output@tau <> h(m,k).
 
 Proof.
-  simpl.
-  euf M0.
+  intro tau Heq.
+  euf Heq. 
+  by auto.
 Qed.

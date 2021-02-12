@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 name n : message
@@ -13,11 +15,11 @@ goal collision_absurd :
   output@tau <> h(m,k) &&   ( output@tau <> h(t,k) || output@tau <> h(t,k)).
 
 Proof.
-simpl.
+intro tau.
 split.
 cycle 1.
 cycle 2.
 left.
-euf M0.
-euf M0.
+by intro Heq; euf Heq; auto.
+by intro Heq; euf Heq; auto.
 Qed.

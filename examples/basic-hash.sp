@@ -41,12 +41,12 @@ goal wa_R :
       fst(output@T(i,k)) = fst(input@R(j)) &&
       snd(output@T(i,k)) = snd(input@R(j))).
 Proof.
-  intros.
+  intro *.
   expand cond@R(j).
   split.
   project.
-  (* LEFT *) by euf M0; exists i, k1.
-  (* RIGHT *) by euf M0; exists i,k.
+  (* LEFT *) by euf Meq; exists i, k1.
+  (* RIGHT *) by euf Meq; exists i,k.
   by exists i,k.
 Qed.
 
@@ -59,14 +59,14 @@ goal wa_R1 :
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       snd(output@T(i,k)) = snd(input@R1(j)))).
 Proof.
-  intros.
+  intro *.
   expand cond@R1(j).
   split.
-  apply H0. exists i,k.
-  apply H0.
+  apply H. exists i,k.
+  apply H.
   project.
-  (* LEFT *) by euf M0; exists i, k1.
-  (* RIGHT *) by euf M0; exists i,k. 
+  (* LEFT *) by euf Meq; exists i, k1.
+  (* RIGHT *) by euf Meq; exists i,k. 
 Qed.
 
 (* Equivalence goal expressing unlinkability *)
@@ -100,16 +100,12 @@ Proof.
   (* Case T *)
   expand frame@T(i,k); expand exec@T(i,k).
   expand cond@T(i,k); expand output@T(i,k).
-  fa 0. fa 1. fa 1. fa 1.
+  fa 0; fa 1; fa 1; fa 1.
   prf 2.
   yesif 2. 
   project.
-  split.
-  by fresh M0.
-  by fresh M0.
-  split.  
-  by fresh M0.
-  by fresh M0.
+  split; by fresh Meq.
+  split; by fresh Meq.
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

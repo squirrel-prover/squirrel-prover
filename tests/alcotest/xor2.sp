@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n : message
 name m : message
 name k : message

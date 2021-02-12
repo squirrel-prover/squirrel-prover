@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n : index->message
 
 system null.
@@ -9,7 +11,7 @@ goal eq_timestamps :
   output@tau1 = output@tau2.
 
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal eq_names :
@@ -19,19 +21,19 @@ goal eq_names :
   n(i) <> n(j).
 
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal functionality :
   forall (x:message, y:message),
   x = y => fst(x) = fst(y).
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal contradiction :
   forall (x:message, y:message),
   (x = y && x <> y) => False.
 Proof.
-  simpl.
+  by auto.
 Qed.

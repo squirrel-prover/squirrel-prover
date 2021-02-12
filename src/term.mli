@@ -35,7 +35,7 @@ type state = Sorts.message msymb
 
 (** {3 Pretty printing} *)
 
-val pp_name : Format.formatter -> name -> unit
+val pp_name  : Format.formatter -> name -> unit
 val pp_nsymb : Format.formatter -> nsymb -> unit
 
 val pp_fname : Format.formatter -> fname -> unit
@@ -63,15 +63,18 @@ type generic_atom = [
   | `Happens of Sorts.timestamp term
 ]
 and _ term =
-  | Fun : fsymb *  Sorts.message term list -> Sorts.message term
-  | Name : nsymb -> Sorts.message term
-  | Macro :  'a msymb * Sorts.message term list * Sorts.timestamp term
+  | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
+  | Name   : nsymb -> Sorts.message term
+
+  | Macro  :
+      'a msymb * Sorts.message term list * Sorts.timestamp term
       -> 'a term
-  | Seq : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred : Sorts.timestamp term -> Sorts.timestamp term
+        
+  | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
+  | Pred   : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
-  | Init : Sorts.timestamp term
-  | Var : 'a Vars.var -> 'a term
+  | Init   : Sorts.timestamp term
+  | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
 
@@ -85,15 +88,14 @@ and _ term =
 
   | Atom : generic_atom -> Sorts.boolean term
 
-
   | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
   | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | And : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Or : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Not : Sorts.boolean term  -> Sorts.boolean term
-  | Impl : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | True : Sorts.boolean term
-  | False : Sorts.boolean term
+  | And    : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Or     : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Not    : Sorts.boolean term  -> Sorts.boolean term
+  | Impl   : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | True   : Sorts.boolean term
+  | False  : Sorts.boolean term
 
 type 'a t = 'a term
 
@@ -198,19 +200,25 @@ val f_g      : fsymb
 val f_len    : fsymb
 val f_zeroes : fsymb
 
-val mk_not : formula -> formula
-val mk_and : formula -> formula -> formula
-val mk_or : formula -> formula -> formula
-val mk_impl : formula -> formula -> formula
-val mk_ite : formula -> message -> message -> message
+val mk_not    : formula                 -> formula
+val mk_and    : formula -> formula      -> formula
+val mk_ands   : formula list            -> formula
+val mk_or     : formula -> formula      -> formula
+val mk_ors    : formula list            -> formula
+val mk_impl   : formula -> formula      -> formula
+val mk_impls  : formula list -> formula -> formula
+  
 val mk_forall : Vars.evar list -> formula -> formula
 val mk_exists : Vars.evar list -> formula -> formula
+
+val mk_ite    : formula -> message -> message -> message
+  
 val message_of_formula : formula -> message
 
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
-val mk_indices_eq : Vars.index list -> Vars.index list -> formula
+val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
 (** Convert a boolean term to a message term, used in frame macro definition **)
 val boolToMessage : formula -> message
@@ -221,7 +229,7 @@ val boolToMessage : formula -> message
   * distinction between biterms (general terms) and terms (terms
   * without diff operators)? *)
 
-type projection = Left | Right | None
+type projection = PLeft | PRight | PNone
 
 (** Evaluate all diff operators wrt a projection.
   * If the projection is [None], the input term is returned unchanged.

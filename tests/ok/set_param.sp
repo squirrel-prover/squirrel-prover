@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 set printTRSEquations=false.
 
 system null.

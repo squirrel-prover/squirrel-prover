@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n : message
 name m : message
 abstract f : message->message
@@ -6,7 +8,7 @@ system null.
 
 goal n = f(m) => False.
 Proof.
-  nosimpl(intro).
-  nosimpl(fresh M0).
-  nosimpl(false_left).
+  nosimpl(intro Heq).
+  nosimpl(fresh Heq).
+  by auto.
 Qed.

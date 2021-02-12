@@ -173,8 +173,8 @@ goal [right] auth:
     Press(i,j) < Decode(ii',i)
     && snd(snd(output@Press(i,j))) = snd(snd(input@Decode(ii',i))) ).
 Proof.
-intros.
+intro ii i ii' *.
 expand cond@Decode(ii',i).
-intctxt M3.
+intctxt Mneq0.
 exists j.
 Qed.

@@ -122,6 +122,7 @@ let get_namespace ?(group=default_group) table s =
   obind f (Ms.find_opt s table)
 
 (*------------------------------------------------------------------*)
+(* TODO: group exception together + improve errors *)
 exception Unbound_identifier of string
 exception Incorrect_namespace 
 exception Multiple_declarations of string

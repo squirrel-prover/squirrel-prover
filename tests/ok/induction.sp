@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 abstract ok : message
@@ -18,9 +20,11 @@ goal
   t = A(i) => not(happens(t)).
 Proof.
   induction.
+  intro Hind i Heq Hhap.
   assert(happens(A(i))).
-  apply happens_le to A(i), t.
-  euf C0.
+  by apply happens_le to A(i), t.
+  euf C.
+  intro Hle Eqin.
   apply happens_le to A(i1), A(i).
-  apply IH0 to A(i1), i1.
+  apply Hind to A(i1), i1.
 Qed.

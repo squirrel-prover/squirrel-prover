@@ -54,11 +54,6 @@ let add_xeq od xeq (eqs, leqs, neqs) =
   | `Neq -> (eqs, leqs, xeq :: neqs)
   | _ -> assert false
 
-let add_xeq_eq od xeq (eqs, neqs) =
-  match od with
-  | `Eq -> (xeq :: eqs, neqs)
-  | `Neq -> (eqs, xeq :: neqs)
-
 type trace_atom = [
   | `Timestamp of (ord,Term.timestamp) _atom
   | `Index of (ord_eq,Vars.index) _atom

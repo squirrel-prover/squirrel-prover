@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : message
 abstract ko : message
 
@@ -25,8 +27,10 @@ Proof.
 induction t.
 nosimpl(expandall).
 fa 0. fa 1.
-equivalent ok=ok, True.
+equivalent ok=ok, True. 
+by auto.
 nosimpl(expandall).
-fa 0. fa 1.
+fa 0; fa 1.
 equivalent ok=ok, True.
+by auto.
 Qed.

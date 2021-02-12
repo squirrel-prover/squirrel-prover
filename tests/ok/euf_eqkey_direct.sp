@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Check that equality constraints on key indices are properly obtained
  * for direct cases. *)
 
@@ -11,9 +13,9 @@ goal forall (a,b,i:index),
   h(n,k(i,i)) = h(n,k(a,b)) =>
   a = b.
 Proof.
-  intros.
-  nosimpl(euf M0).
+  intro a b i Heq.
+  euf Heq. 
   (* There should be one direct case,
    * where index i should be equal to both a and b. *)
-  simpl.
+  intro _ _; auto.
 Qed.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n1 : message
 
 abstract ok : message

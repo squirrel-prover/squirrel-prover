@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (***************************************************************************
  *  Adding an axiom that clash with the existing signature axiomatization: *
  *  checksign(sign(x,y),pk(y)) -> true                                     *

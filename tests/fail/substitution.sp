@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k:message
 name cst:message
@@ -21,6 +23,6 @@ goal unforgeable_1 :
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intros).
- checkfail substitute a, b with NotEqualArguments.
+ nosimpl(intro a b c H).
+ checkfail substitute a, b exn NotEqualArguments.
 Abort.

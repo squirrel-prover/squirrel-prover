@@ -139,12 +139,11 @@ Proof.
   expand cond@S1; expand cond@S4.
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
-  euf M0.
+  euf Meq.
 
-  case H2.
-  apply H0 to i.
-
-  notleft H1.
+  case H1.
+  by apply H to i.
+  notleft H0. 
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
@@ -153,12 +152,12 @@ goal [none, auth] P1_charac :
 Proof.
   expand cond@P1; expand cond@P4.
   substitute pkS@P1,pk(kS).
-  euf M0.
+  euf Meq.
 
-  case H3.
-  apply H0 to i.
+  case H2.
+  by apply H to i.
 
-  notleft H1.
+  notleft H0.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -196,24 +195,25 @@ Proof.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). depends P1, P4. apply H2 to P1. expand exec@P1. apply P1_charac.
+   executable pred(P4). depends P1, P4. apply H1 to P1. expand exec@P1.
+   by apply P1_charac.
 
-   fa 7; noif 7.
+   by fa 7; noif 7.
 
    (* A *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* A1 *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* S *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* S1 *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* S2 *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* S3 *)
    expandall.
@@ -224,13 +224,14 @@ Proof.
    expand frame@S4; expand exec@S4.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). depends S1, S4. apply H2 to S1. expand exec@S1. apply S1_charac.
+   executable pred(S4). depends S1, S4. apply H1 to S1. expand exec@S1. 
+   by apply S1_charac.
 
-   fa 6. fa 7. noif 7.
+   by fa 6; fa 7; noif 7.
 
    (* A2 *)
-   expandall; fa 6.
+   by expandall; fa 6.
 
    (* A3 *)
-   expandall; fa 6.
+   by expandall; fa 6.
 Qed.

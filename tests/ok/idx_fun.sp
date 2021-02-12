@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract id : index->message
 
 hash h (2)

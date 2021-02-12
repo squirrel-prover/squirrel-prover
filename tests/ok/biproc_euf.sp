@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name ok : message
 name ko : message
 
@@ -15,12 +17,12 @@ system [toto] (A(h(ko,k)) | in(c,x)).
 
 goal test : input@A1 <> h(ko,k).
 Proof.
-  intros.
-  euf M0.
+  intro Hm.
+  euf Hm; auto.
 Qed.
 
 goal [left,toto]  input@A1 <> h(ok,k).
 Proof.
-  intros.
-  euf M0.
+  intro Hm.
+  euf Hm; auto.
 Qed.

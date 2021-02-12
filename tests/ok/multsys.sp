@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name ok : message
 name ko : message
 name koo : message
@@ -15,7 +17,9 @@ Proof.
 induction t.
 
 expandall.
-fa 0. fa 1. noif 1.
+fa 0; fa 1. 
+noif 1. 
+by auto.
 
 expandall.
 fa 0.
@@ -26,8 +30,10 @@ Proof.
 induction t.
 
 expandall.
-fa 0. fa 1. noif 1.
+fa 0; fa 1. 
+noif 1.
+by auto.
 
 expandall.
-fa 0.
+by fa 0.
 Qed.

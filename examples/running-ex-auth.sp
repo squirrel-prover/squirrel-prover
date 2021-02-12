@@ -26,8 +26,8 @@ goal auth :
     && snd(input@R(j,i)) = snd(output@T(i,j')).
 
 Proof.
- simpl.
+ intro i j Hcond.
  expand cond@R(j,i).
- euf M0.
- exists j1.
+ euf Hcond.
+ intro *; exists j1.
 Qed.

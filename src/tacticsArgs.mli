@@ -1,14 +1,53 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
-(* Types defined directly in the parsing. Note that all tactics not defined in
-   the parser must rely on the Theory type, even to parse strings. *)
+(*------------------------------------------------------------------*)
+(** {2 Intro patterns} *)
+
+type naming_pat =
+  | Unnamed   (** '_' *)
+  | AnyName   (** '?' *)
+  | Named of string
+
+type and_or_pat =
+  | Or      of simpl_pat list
+  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
+               
+  | Split 
+  (** \[\] to do a case. *)
+
+  | And     of simpl_pat list
+  (** e.g. \[H1 H2\] to destruct a conjunction. *)
+
+and simpl_pat =
+  | SAndOr of and_or_pat
+  | SNamed of naming_pat
+
+type intro_pattern =
+  | Star  of Location.t    (** '*' *)
+  | Simpl of simpl_pat
+
+(*------------------------------------------------------------------*)
+val pp_naming_pat : Format.formatter -> naming_pat         -> unit
+val pp_and_or_pat : Format.formatter -> and_or_pat         -> unit
+val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
+val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
+val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
+  
+(*------------------------------------------------------------------*)
+(** {2 Tactic arguments types} *)
+  
+(** Types used during parsing. 
+    Note that all tactics not defined in the parser must rely on the Theory 
+    type, even to parse strings. *)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
-
-(*------------------------------------------------------------------*)
+  | IntroPat    of intro_pattern list
+  | AndOrPat    of and_or_pat
+  | SimplPat    of simpl_pat
+      
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort
@@ -26,7 +65,6 @@ type _ sort =
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
-(*------------------------------------------------------------------*)
 (** Tactic arguments *)
 type _ arg =
   | None      : unit arg 
@@ -67,7 +105,6 @@ val convert_as_string : parser_arg list -> string option
 val convert_args :
   Symbols.table -> Vars.env ->
   parser_arg list -> esort -> earg
-
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)

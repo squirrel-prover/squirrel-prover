@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k:message
 name cst:message
@@ -21,7 +23,8 @@ goal unforgeable_1 :
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intros).
+ nosimpl(intro a b c [H G] Hneq).
  substitute a, c.
- collision.
+ collision. 
+ by auto.
 Qed.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing intctxt. *)
 
 senc enc,dec
@@ -14,8 +16,8 @@ system (out(c,enc(m,r,k)) | out(c,r) |  ( in(c,x); let y = dec(x,k) in out(c,y))
 
 goal output@A2 <> fail => output@A2 = m.
 Proof.
-  simpl.
-  nosimpl(intctxt D0).
+  intro Hneq.
+  nosimpl(intctxt D).
 
   simpl.
   simpl.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k:message
 channel c
@@ -15,7 +17,5 @@ goal unforgeable :
   output@tau <> h(m,k).
 
 Proof.
-  simpl.
-  euf M0.
-
+  by intro tau Heq; euf Heq; auto.
 Qed.

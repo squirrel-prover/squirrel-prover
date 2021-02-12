@@ -92,7 +92,8 @@ fa 0. fa 1. fa 1.
 fresh 1.
 yesif 1.
 split.
-depends R(jj),R2(jj). depends R(jj),R1(jj,ii).
+by depends R(jj),R2(jj). 
+by depends R(jj),R1(jj,ii).
 
 (* case t = R1(jj,ii) *)
 expandall.
@@ -112,7 +113,7 @@ equivalent
   (input@R1(jj,ii) = h1(xor(xor(fst(kR(ii)@pred(R1(jj,ii))),r1(jj)),k(ii)),key1(ii))),
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 admit. (* ??? can we use auth ??? *)
-fadup 1.
+by fadup 1.
 
 (* case t = R2(jj) *)
 expandall.
@@ -132,7 +133,7 @@ then values of kT(i) is the same @T(i,j1) and @T(i,j),
 and we could have input@T(i,j) = input@T(i,j1)  *)
 (* so I don't see how we could derive False *)
 admit. (* ??? *)
-fresh 1.
+by fresh 1.
 
 (* case t = T1(i,j) *)
 expandall.

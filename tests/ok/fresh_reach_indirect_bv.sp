@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 
@@ -16,10 +18,6 @@ goal test :
   h(fst(output@A(i)),k) <> n(i,j).
 
 Proof.
- nosimpl(intros).
- nosimpl(fresh M0).
- nosimpl(constraints).
- nosimpl(constraints).
- nosimpl(constraints).
- nosimpl(constraints).
+ nosimpl(intro i j Hneq Heq).
+ fresh Heq => [] _; auto.
 Qed.

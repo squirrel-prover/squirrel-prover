@@ -22,24 +22,30 @@ type tac_error =
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
-                         
-  | GoalNotClosed
 
+  | CongrFail
+  | GoalNotClosed
+  | NothingToIntroduce
+
+  | PatNumError of int * int    (* given, need *)
+                   
 let tac_error_strings =
   [ (More, "More");
-   (NotEqualArguments, "NotEqualArguments");
-   (Bad_SSC, "BadSSC");
-   (NoSSC, "NoSSC");
-   (NoAssumpSystem, "NoAssumpSystem");
-   (NotDDHContext, "NotDDHContext");
-   (SEncNoRandom, "SEncNoRandom");
-   (SEncSharedRandom, "SEncSharedRandom");
-   (SEncRandomNotFresh, "SEncRandomNotFresh");
-   (NoRefl , "NoRefl");
-   (NoReflMacros , "NoReflMacros");
-   (TacTimeout, "TacTimeout");
-   (CannotConvert, "CannotConvert");
-   (DidNotFail, "DidNotFail")]
+    (NotEqualArguments, "NotEqualArguments");
+    (Bad_SSC, "BadSSC");
+    (NoSSC, "NoSSC");
+    (NoAssumpSystem, "NoAssumpSystem");
+    (NotDDHContext, "NotDDHContext");
+    (SEncNoRandom, "SEncNoRandom");
+    (CongrFail, "CongrFail");
+    (SEncSharedRandom, "SEncSharedRandom");
+    (SEncRandomNotFresh, "SEncRandomNotFresh");
+    (NoRefl , "NoRefl");
+    (NoReflMacros , "NoReflMacros");
+    (TacTimeout, "TacTimeout");
+    (CannotConvert, "CannotConvert");
+    (DidNotFail, "DidNotFail");
+    (NothingToIntroduce, "NothingToIntroduce")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -60,52 +66,59 @@ let rec tac_error_to_string = function
   | NoReflMacros
   | TacTimeout
   | CannotConvert
+  | CongrFail
+  | NothingToIntroduce
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | SystemError _ -> "System_Error"
   | GoalNotClosed -> "GoalNotClosed"
+  | PatNumError _ -> "PatNumError"
 
 let rec pp_tac_error ppf = function
-  | More -> Fmt.string ppf "More results required"
+  | More -> Fmt.string ppf "more results required"
   | Failure s -> Fmt.pf ppf "%s" s
   | AndThen_Failure t ->
       Fmt.pf ppf
-        "A sequence of tactic applications eventually failed \
+        "a sequence of tactic applications eventually failed \
          with the following error: %a"
         pp_tac_error t
-  | NotEqualArguments -> Fmt.pf ppf "Arguments not equals"
-  | Bad_SSC -> Fmt.pf ppf "Key does not satisfy the syntactic side condition"
+  | NotEqualArguments -> Fmt.pf ppf "arguments not equals"
+  | Bad_SSC -> Fmt.pf ppf "key does not satisfy the syntactic side condition"
   | NoSSC ->
       Fmt.pf ppf
-        "No key which satisfies the syntactic condition has been found"
-  | Undefined x -> Fmt.pf ppf "Undefined use of %s" x
+        "no key which satisfies the syntactic condition has been found"
+  | Undefined x -> Fmt.pf ppf "undefined use of %s" x
   | NotDepends (a, b) ->
-      Fmt.pf ppf "Action %s does not depend on action %s" a b
+      Fmt.pf ppf "action %s does not depend on action %s" a b
   | NoAssumpSystem ->
-      Fmt.pf ppf "No assumption with given name for the current system"
+      Fmt.pf ppf "no assumption with given name for the current system"
   | NotDDHContext ->
-      Fmt.pf ppf "The current system cannot be seen as a context \
+      Fmt.pf ppf "the current system cannot be seen as a context \
                   of the given DDH shares"
   | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
   | SystemError e -> System.pp_system_error ppf e
   | SEncNoRandom ->
-    Fmt.string ppf "An encryption is performed without a random name"
+    Fmt.string ppf "an encryption is performed without a random name"
   | SEncSharedRandom ->
-    Fmt.string ppf "Two encryptions share the same random"
+    Fmt.string ppf "two encryptions share the same random"
   | SEncRandomNotFresh ->
-    Fmt.string ppf "A random used for an encryption is used elsewhere"
+    Fmt.string ppf "a random used for an encryption is used elsewhere"
   | NoRefl  ->
-    Fmt.string ppf "Frames not identical"
+    Fmt.string ppf "frames not identical"
   | NoReflMacros ->
-    Fmt.string ppf "Frames contain macros that may not be diff-equivalent"
-  | TacTimeout -> Fmt.pf ppf "Time-out"
-  | DidNotFail -> Fmt.pf ppf "The tactic did not fail"
-  | CannotConvert -> Fmt.pf ppf "Conversion error"
-  | FailWithUnexpected t -> Fmt.pf ppf "The tactic did not fail with the expected \
+    Fmt.string ppf "frames contain macros that may not be diff-equivalent"
+  | TacTimeout -> Fmt.pf ppf "time-out"
+  | DidNotFail -> Fmt.pf ppf "the tactic did not fail"
+  | CannotConvert -> Fmt.pf ppf "conversion error"
+  | FailWithUnexpected t -> Fmt.pf ppf "the tactic did not fail with the expected \
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
-  | GoalNotClosed -> Fmt.pf ppf "Cannot close goal"
-
+  | GoalNotClosed -> Fmt.pf ppf "cannot close goal"
+  | CongrFail -> Fmt.pf ppf "congruence closure failed"
+  | NothingToIntroduce ->
+    Fmt.pf ppf "nothing to introduce"
+  | PatNumError (give, need) ->
+    Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in
@@ -148,6 +161,9 @@ type 'a sk = 'a -> fk -> a
 
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(** Selector for tactic *)
+type selector = int list
+
 (** Basic Tactics *)
 
 let fail sk fk = fk (Failure "fail")
@@ -163,6 +179,20 @@ let map t l sk fk =
              aux (List.rev_append r acc) l fk)
           fk
   in aux [] l fk
+
+
+(** Like [map], but only apply the tactic to selected judgements. *)
+let map_sel (sel : selector) t l sk fk =
+  let rec aux i acc l fk = match l with
+    | [] -> sk (List.rev acc) fk
+    | e::l ->
+      if List.mem i sel then
+        t e
+          (fun r fk ->
+             aux (i + 1) (List.rev_append r acc) l fk)
+          fk
+      else aux (i + 1) (e :: acc) l fk
+  in aux 1 [] l fk
 
 let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
 
@@ -185,17 +215,16 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
+let andthen_sel tac1 sel tac2 judge sk fk : a =
+  let sk l fk' = map_sel sel tac2 l sk fk' in
+  tac1 judge sk fk
+
+(* TODO: add an auto at the end of the tactic. *)
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk
     | _ -> raise (Tactic_soft_failure GoalNotClosed) in
   tac judge sk fk
-
-let not_branching tac j sk fk =
-  tac j
-    (fun l _ -> if List.length l <= 1 then sk l fk else
-        fk (Failure "branching tactic under non branching instruction"))
-    fk
 
 let id j sk fk = sk [j] fk
 
@@ -289,9 +318,9 @@ end
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen : 'a ast list -> 'a ast
+  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
-  | NotBranching : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
   | Ident : 'a ast
   | Modifier : string * 'a ast -> 'a ast
@@ -324,16 +353,16 @@ module AST (M:S) = struct
   type judgment = M.judgment
 
   let rec eval modifiers = function
-    | Abstract (id,args) -> eval_abstract modifiers id args
-    | AndThen tl -> andthen_list (List.map (eval modifiers) tl)
-    | OrElse tl -> orelse_list (List.map (eval modifiers) tl)
-    | Try t -> try_tac (eval modifiers t)
-    | By t -> by_tac (eval modifiers t)
-    | NotBranching t -> not_branching (eval modifiers t)
-    | Repeat t -> repeat (eval modifiers t)
-    | Ident -> id
-    | Modifier (id,t) -> eval (id::modifiers) t
-    | CheckFail (e,t) -> checkfail_tac e (eval modifiers t)
+    | Abstract (id,args)  -> eval_abstract modifiers id args
+    | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
+    | AndThenSel (t,s,t') -> andthen_sel (eval modifiers t) s (eval modifiers t')
+    | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
+    | Try t               -> try_tac (eval modifiers t)
+    | By t                -> by_tac (eval modifiers t)
+    | Repeat t            -> repeat (eval modifiers t)
+    | Ident               -> id
+    | Modifier (id,t)     -> eval (id::modifiers) t
+    | CheckFail (e,t)     -> checkfail_tac e (eval modifiers t)
 
   let pp_args fmt l =
     Fmt.list
@@ -352,6 +381,13 @@ module AST (M:S) = struct
     | AndThen ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
+        
+    | AndThenSel (t,s,t') ->
+      Fmt.pf ppf "@[(%a;@ %a: %a)@]"
+        pp t 
+        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) s
+        pp t'
+        
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
@@ -359,8 +395,6 @@ module AST (M:S) = struct
     | Ident -> Fmt.pf ppf "id"
     | Try t ->
       Fmt.pf ppf "(try @[%a@])" pp t
-    | NotBranching t ->
-      Fmt.pf ppf "(nobranch @[%a@])" pp t
     | Repeat t ->
       Fmt.pf ppf "(repeat @[%a@])" pp t
     | CheckFail (e, t) ->

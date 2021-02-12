@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Verify that the failure to convert try-find terms to the congruence
    closure internal representation does not result in incorrect
    results. *)

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Check that equality constraints on key indices are properly obtained
  * for indirect cases. *)
 
@@ -12,10 +14,10 @@ goal forall (tau:timestamp,a,b:index),
   output@tau = h(n,k(a,b)) =>
   a = b.
 Proof.
-  intros.
-  nosimpl(euf M0).
+  intro tau a b Heq.
+  nosimpl(euf Heq).
   (* There should be one indirect case,
    * where a newly introduced index i should be
    * equal to both a and b. *)
-  simpl.
+  auto.
 Qed.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Test that it is possible to undo the first system declaration. *)
 channel c
 system in(c,x);out(c,x).
@@ -7,5 +9,5 @@ system in(c,x);out(c,<x,x>).
 goal test :
   output@A = <input@A,input@A>.
 Proof.
- simpl.
+ by auto.
 Qed.

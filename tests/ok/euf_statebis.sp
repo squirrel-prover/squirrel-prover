@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 mutable s : message
 hash h
 name k : message
@@ -5,6 +7,6 @@ system s := s.
 
 goal forall tau:timestamp, output@tau <> h(zero,k).
 Proof.
-  intros.
-  euf M0.
+  intro tau Heq.
+  euf Heq.
 Qed.

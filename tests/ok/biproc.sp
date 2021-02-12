@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : message
 abstract ko : message
 abstract koo : message
@@ -13,30 +15,31 @@ system [toto] A(diff(ko,koo)).
 
 goal test : output@B = diff(ok,ko).
 Proof.
-  intros.
+  auto.
 Qed.
 
 goal [left] test_left : cond@B => output@B = input@B.
 Proof.
-expand cond@B.
+  intro Hc.
+  expand cond@B.
 Qed.
 
 goal [right] test_right : output@B = ko.
 Proof.
-  intros.
+  auto.
 Qed.
 
 goal [none, toto] test2 : output@B = diff(ko,koo).
 Proof.
-  intros.
+  auto.
 Qed.
 
 goal [left, toto] test_left2 : cond@B => output@B = ko.
 Proof.
-expand cond@B.
+  auto.
 Qed.
 
 goal [right, toto] test_right2 : output@B = koo.
 Proof.
-  intros.
+  auto.
 Qed.

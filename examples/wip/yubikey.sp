@@ -80,10 +80,10 @@ goal auth:
    forall (ii,i:index), cond@S(ii,i) =>
     (exists (j:index), Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))).
 Proof.
-intros.
+intro ii i Hcond.
 expand cond@S(ii,i).
-intctxt M1.
-exists j.
+intctxt Mneq.
+by exists j.
 Qed.
 
 (* injectivity version Stephanie *)
@@ -93,13 +93,15 @@ goal auth_injective_bis:
     (exists (j:index), (Press(i,j) < S(ii,i) && snd(snd(output@Press(i,j))) = snd(snd(input@S(ii,i)))) &&
       (forall (j':index), (Press(i,j') < S(ii,i) && snd(snd(output@Press(i,j'))) = snd(snd(input@S(ii,i)))) => j=j')).
 Proof.
-intros.
+intro ii i Hcond.
 expand cond@S(ii,i).
-intctxt M1.
+intctxt Mneq.
 exists j.
 expand output@Press(i,j').
-assert (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i))).
-assert (npr(i,j) = npr(i,j')).
+assert H :=
+ (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i))).
+assert H1 :=
+ (npr(i,j) = npr(i,j')).
 help.
 admit.
 Qed.
@@ -110,8 +112,8 @@ Qed.
 goal counterIncreaseStrictly:
 forall (ii,i:index), cond@S(ii,i) => order(SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i)) = orderOk.
 Proof.
-intros.
-expand cond@S(ii,i).
+intro ii i Hcond.
+by expand cond@S(ii,i).
 Qed.
 
 
@@ -120,27 +122,21 @@ goal counterIncrease:
 forall (t:timestamp), forall (i:index), (t > init && exec@t) =>
 (order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk || SCpt(i)@pred(t) = SCpt(i)@t).
 Proof.
-intros.
-case t.
-case H1.
-right.
-right.
-right.
-right.
+intro t i H.
+case t; 
+1,2,3,4,6,7: by right.
 
-assert(i = i1 || i <>i1).
+assert H1 := (i = i1 || i <>i1).
 case H1.
 (* i = i1 *)
 left.
 substitute t, S(ii,i).
 expand exec@S(ii,i).
-apply counterIncreaseStrictly to ii, i.
+by use counterIncreaseStrictly with ii, i.
 (* i <>i1 *)
 right.
-case(if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
+by case(if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
        SCpt(i)@pred(S(ii,i1))).
-right.
-right.
 Qed.
 
 
@@ -152,34 +148,35 @@ forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < 
 
 
 Proof.
-induction.
-apply IH0 to pred(t).
-assert (t' >= pred(t) || t' <pred(t)).
+nosimpl(induction; intro IH0). 
+intro t' i *.
+use IH0 with pred(t) as H0.
+assert H2 := (t' >= pred(t) || t' <pred(t)).
 case H2.
 
 (* case t' >= pred(t) *)
 assert t' = pred(t).
-apply counterIncrease to t.
-apply H2 to i.
-substitute pred(t), t'.
+use counterIncrease with t as H1.
+use H1 with i.
+by substitute pred(t), t'.
 
 (* case t' < pred(t) *)
-apply H1 to t'.
+use H0 with t' as H2.
 executable t.
-apply H3 to pred(t).
-apply H2 to i.
+use H1 with pred(t) as H4.
+use H2 with i as H5.
 
-apply counterIncrease to t.
-apply H6 to i.
+use counterIncrease with t as H6.
+use H6 with i as H7.
 case H5.
-case H6.
+case H7.
 
 (* 1/2 *)
-left.
-apply orderTrans to SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
+left. 
+by use orderTrans with SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
 
 (* 2/2 *)
-case H6.
+by case H7.
 Qed.
 
 (* Solene: This is an injective version of the authentication property shown before.*)
@@ -195,56 +192,60 @@ goal auth_injective:
            => ii1 = ii)
     ).
 Proof.
-intros.
+intro ii i H.
 expand exec@S(ii,i).
 expand cond@S(ii,i).
-intctxt M1.
+intctxt Mneq.
 exists j.
 expand exec@S(ii1,i).
 expand cond@S(ii1,i).
-assert ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ).
+assert H2 :=
+ ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ).
 case H2.
 
-assert order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
-assert ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ).
+assert M9 :=
+ order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
+assert H2 :=
+ ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ).
 case H2.
-apply counterIncreaseBis to pred(S(ii1,i)).
-apply H2 to S(ii,i).
-apply H3 to i.
+use counterIncreaseBis with pred(S(ii1,i)) as H2.
+use H2 with S(ii,i) as H3.
+use H3 with i as H4.
 case H4.
-apply orderTrans to SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
-apply orderStrict to SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+by use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
+by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
 
-assert order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk.
-assert ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ).
+assert _ := order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk.
+assert H2 :=
+ ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ).
 case H2.
-apply counterIncreaseBis to pred(S(ii,i)).
-apply H2 to S(ii1,i).
-apply H3 to i.
+use counterIncreaseBis with pred(S(ii,i)) as H2.
+use H2 with S(ii1,i) as H3.
+use H3 with i as H4.
 case H4.
-apply orderTrans to SCpt(i)@S(ii1,i),SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i).
-apply orderStrict to SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i).
+by use orderTrans with SCpt(i)@S(ii1,i),SCpt(i)@pred(S(ii,i)),SCpt(i)@S(ii,i).
+by use orderStrict with SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i).
 Qed.
 
 goal noreplayInv:
   forall (ii, ii1, i:index),    exec@S(ii1,i) && S(ii,i) < S(ii1,i)
      => order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
 Proof.
-intros.
-apply counterIncreaseStrictly to ii1, i.
-apply counterIncreaseBis to pred(S(ii1,i)).
-apply H1 to S(ii,i).
+intro ii ii1 i H.
+use counterIncreaseStrictly with ii1, i as M0.
+use counterIncreaseBis with pred(S(ii1,i)) as H1.
+use H1 with S(ii,i) as H2.
 
-executable S(ii1,i).
-apply H3 to pred(S(ii1,i)).
-assert(S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))).
+nosimpl(executable S(ii1,i); 1: by auto). 
+intro H3.
+use H3 with pred(S(ii1,i)) as H4.
+assert H5 := (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))).
 case H5.
 
-apply H2 to i.
+use H2 with i as H5.
 case H5.
-apply orderTrans to SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
-
-expand exec@S(ii1,i).
+by use orderTrans with SCpt(i)@S(ii,i), SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
+by expand exec@S(ii1,i).
 Qed.
 
 
@@ -253,13 +254,12 @@ goal noreplayNew:
   forall (ii, ii1, i:index),   exec@S(ii1,i) && S(ii,i) <= S(ii1,i)
      && SCpt(i)@S(ii,i)  =  SCpt(i)@S(ii1,i) => ii = ii1.
 Proof.
-intros.
-assert(S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)).
+intro ii ii1 i *.
+assert H1 := (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)).
 case H1.
-apply noreplayInv to ii, ii1, i.
-apply orderStrict to SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
+use noreplayInv with ii, ii1, i as M1.
+by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
 Qed.
-
 
 
 goal monotonicity:
@@ -267,16 +267,17 @@ goal monotonicity:
      order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk
      => S(ii,i) < S(ii1,i).
 Proof.
-intros.
-assert(S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)).
+intro ii ii1 i *.
+assert H2 :=
+  (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)).
 case H2.
-apply orderStrict to SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
 
-apply noreplayInv to ii1, ii, i.
+use noreplayInv with ii1, ii, i as M1.
 
-apply orderTrans to SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i).
+use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i), SCpt(i)@S(ii,i) as M2.
 
-apply orderStrict to SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
+use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
 Qed.
 
 
@@ -289,130 +290,130 @@ forall (t:timestamp), forall (i:index), (SCpt(i)@t = SCpt(i)@init && forall (ii:
 (exists jj:index, SCpt(i)@t = SCpt(i)@S(jj,i) && S(jj,i) <= t &&
 (forall (jj':index), S(jj',i) <= S(jj,i) || t < S(jj',i))).
 Proof.
-induction.
+nosimpl(induction; intro IH0).
+intro i.
 case t.
-case H0.
 
 (* 1/8 *)
 substitute t, init.
-left.
+by left.
 
 (* 2/8 *)
 substitute t, Plug(i1,j).
-apply IH0 to pred(Plug(i1,j)).
-apply H0 to i.
+use IH0 with pred(Plug(i1,j)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii.
+by use H with ii.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 3/8 *)
 substitute t, Plug1(i1,j).
-apply IH0 to pred(Plug1(i1,j)).
-apply H0 to i.
+use IH0 with pred(Plug1(i1,j)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii.
+by use H with ii.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 4/8 *)
 substitute t, Press(i1,j).
-apply IH0 to pred(Press(i1,j)).
-apply H0 to i.
+use IH0 with pred(Press(i1,j)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii.
+by use H with ii.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 5/8 *)
 substitute t, Press1(i1,j).
-apply IH0 to pred(Press1(i1,j)).
-apply H0 to i.
+use IH0 with pred(Press1(i1,j)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii.
+by use H with ii.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 6/8 - interesting case *)
 substitute t, S(ii,i1).
-apply IH0 to pred(S(ii,i1)).
-apply H0 to i.
+use IH0 with pred(S(ii,i1)) as H0.
+use H0 with i as H1.
 case H1.
 (**)
-assert (i=i1 || i<>i1).
+assert H2 := (i=i1 || i<>i1).
 case H2.
 (* i = i1 *)
 right.
-exists ii.
+by exists ii.
 (* i <> i1 *)
 left.
 split.
 case (if i=i1 then  snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
        SCpt(i)@pred(S(ii,i1))).
-apply H1 to ii1.
+by use H with ii1.
 (**)
-assert (i=i1 || i<>i1).
+assert H2 := (i=i1 || i<>i1).
 case H2.
 (* i = i1 *)
 right.
-exists ii.
+by exists ii.
 (* i <> i1 *)
 right.
 exists jj.
 split.
-case (if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
+by case (if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
        SCpt(i)@pred(S(ii,i1))).
-assert (jj = jj' || jj <> jj').
+assert H2 := (jj = jj' || jj <> jj').
 case H2.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 7/8 *)
 substitute t, S1(ii,i1).
-apply IH0 to pred(S1(ii,i1)).
-apply H0 to i.
+use IH0 with pred(S1(ii,i1)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii1.
+by use H with ii1.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 
 (* 8/8 *)
 substitute t, S2(ii).
-apply IH0 to pred(S2(ii)).
-apply H0 to i.
+use IH0 with pred(S2(ii)) as H0.
+use H0 with i as H1.
 case H1.
 left.
-apply H1 to ii1.
+by use H with ii1.
 right.
 exists jj.
-apply H1 to jj'.
-case H2.
+use H1 with jj' as H2.
+by case H2.
 Qed.
 
 goal lastUpdateServer :
 forall (i,ii:index), SCpt(i)@S(ii,i) = SCpt(i)@init ||
 (exists (jj:index), SCpt(i)@S(ii,i) = snd(dec(snd(snd(input@S(jj,i))),k(i)))).
 Proof.
-intros.
-apply lastUpdateServer_ to S(ii,i).
-apply H0 to i.
+intro i ii.
+use lastUpdateServer_ with S(ii,i) as H0.
+use H0 with i as H1.
 case H1.
-left.
+by left.
 right.
-exists jj.
+by exists jj.
 Qed.

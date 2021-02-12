@@ -7,7 +7,7 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE QMARK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
@@ -16,8 +16,9 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
-%token WITH ORACLE
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH NOBRANCH CHECKFAIL BY
+%token WITH ORACLE EXN
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
+%token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
 
@@ -41,7 +42,6 @@
 %right SEMICOLON
 %nonassoc TRY
 %nonassoc NOSIMPL
-%nonassoc NOBRANCH
 
 %start declarations
 %start top_formula
@@ -61,6 +61,17 @@
       Location.pl_loc  = Location.make $startpos $endpos;
     }
   }
+
+(* Lists *)
+%inline empty:
+| { () }
+
+%inline slist(X, S):
+| l=separated_list(S, X) { l }
+
+%inline slist1(X, S):
+| l=separated_nonempty_list(S, X) { l }
+
 
 (* Terms *)
 lsymb:
@@ -314,9 +325,9 @@ declarations:
 | decls=declaration_list DOT { decls }
 
 tactic_param:
-| t=term    { TacticsArgs.Theory t }
-| f=formula { TacticsArgs.Theory f }
-| i=INT     { TacticsArgs.Int_parsed i }
+| t=term                    { TacticsArgs.Theory t }
+| f=formula %prec tac_prec  { TacticsArgs.Theory f }
+| i=INT                     { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -328,9 +339,49 @@ tac_errors:
 | i=ID                    { [i] }
 | i=ID COMMA t=tac_errors { i::t }
 
+(*------------------------------------------------------------------*)
+naming_pat:
+| UNDERSCORE  { TacticsArgs.Unnamed }
+| QMARK       { TacticsArgs.AnyName }
+| id=ID       { TacticsArgs.Named id }
+
+and_or_pat:
+| LBRACKET s=simpl_pat          ips=slist(simpl_pat, empty)    RBRACKET
+                    { TacticsArgs.And (s :: ips) }
+| LBRACKET s=simpl_pat PARALLEL ips=slist(simpl_pat, PARALLEL) RBRACKET
+                    { TacticsArgs.Or  (s :: ips) }
+| LBRACKET RBRACKET { TacticsArgs.Split }
+
+simpl_pat:
+| n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
+| ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
+
+intro_pat:
+| l=loc(STAR)       { TacticsArgs.Star (Location.loc l)}
+| pat=simpl_pat     { TacticsArgs.Simpl pat }
+
+intro_pat_list:
+| l=slist1(intro_pat,empty) { l }
+
+(*------------------------------------------------------------------*)
+int:
+|i=INT { i }
+
+selector:
+| l=slist1(int,COMMA) { l }
+
+tac_formula:
+| f=formula  %prec tac_prec { f }
+
+as_ip:
+| AS ip=simpl_pat { ip }
+
+(*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
+  | l=tac SEMICOLON s=selector COLON r=tac %prec tac_prec
+                                       { Tactics.AndThenSel (l,s,r) }
   | BY t=tac %prec tac_prec            { Tactics.By t }
   | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
   | TRY l=tac                          { Tactics.Try l }
@@ -340,16 +391,37 @@ tac:
    * because they are reserved. *)
   | LEFT                               { Tactics.Abstract ("left",[]) }
   | RIGHT                              { Tactics.Abstract ("right",[]) }
+
+  | INTRO p=intro_pat_list             { Tactics.Abstract
+                                           ("intro",[TacticsArgs.IntroPat p]) }
+
+  | t=tac DARROW p=intro_pat_list      { Tactics.AndThen
+                                           [t;Tactics.Abstract
+                                                ("intro",[TacticsArgs.IntroPat p])] }
+
+  | DESTRUCT i=ID                      { Tactics.Abstract
+                                           ("destruct",[TacticsArgs.String_name i]) }
+
+  | DESTRUCT i=ID AS p=and_or_pat      { Tactics.Abstract
+                                           ("destruct",[TacticsArgs.String_name i;
+                                                        TacticsArgs.AndOrPat p]) }
+
+  | ASSERT p=tac_formula               { Tactics.Abstract
+                                           ("assert", [TacticsArgs.Theory p]) }
+  | ASSERT ip=simpl_pat ASSIGN p=tac_formula
+                                       { Tactics.Abstract
+                                           ("assert", [TacticsArgs.Theory p;
+                                                       TacticsArgs.SimplPat ip]) }
+
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }
   | NOSIMPL t=tac                      { Tactics.Modifier
                                           ("nosimpl", t) }
-  | NOBRANCH t=tac                     { Tactics.NotBranching (t) }
   | CYCLE i=INT                        { Tactics.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                  { Tactics.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
-  | CHECKFAIL t=tac WITH ts=tac_errors { Tactics.CheckFail
+  | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
 
   | APPLY i=ID                         { Tactics.Abstract
@@ -358,6 +430,19 @@ tac:
   | APPLY i=ID TO t=tactic_params      { Tactics.Abstract
                                           ("apply",
                                            TacticsArgs.String_name i :: t) }
+
+  | USE i=ID ip=as_ip? 
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i]) }
+
+  | USE i=ID WITH t=tactic_params ip=as_ip?
+    { let ip : TacticsArgs.parser_arg list = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
+
   | HELP                               { Tactics.Abstract
                                           ("help",
                                            []) }
@@ -365,6 +450,7 @@ tac:
   | HELP i=ID                          { Tactics.Abstract
                                           ("help",
                                            [TacticsArgs.String_name i]) }
+
   | DDH i1=ID COMMA i2=ID COMMA i3=ID  { Tactics.Abstract
                                           ("ddh",
                                            [TacticsArgs.String_name i1;

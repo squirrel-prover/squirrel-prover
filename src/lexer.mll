@@ -35,10 +35,13 @@ rule token = parse
 | '>'                 { RANGLE }
 | '['                 { LBRACKET }
 | ']'                 { RBRACKET }
+| '?'                 { QMARK }
 | ','                 { COMMA }
 | '.'                 { DOT }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
+| '*'                 { STAR }
+| '_'                 { UNDERSCORE }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }
@@ -75,6 +78,9 @@ rule token = parse
 | "aenc"              { AENC }
 | "senc"              { SENC }
 | "signature"         { SIGNATURE }
+| "intro"             { INTRO }
+| "destruct"          { DESTRUCT }
+| "as"                { AS } 
 | "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
@@ -106,9 +112,11 @@ rule token = parse
 | "undo"              { UNDO }
 | "try"               { TRY }
 | "repeat"            { REPEAT }
+| "assert"            { ASSERT }
+| "exn"               { EXN }
+| "use"               { USE }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
-| "nobranch"          { NOBRANCH }
 | "checkfail"         { CHECKFAIL }
 | '+'                 { PLUS }
 | ("cond"|"exec") as n { PID n }

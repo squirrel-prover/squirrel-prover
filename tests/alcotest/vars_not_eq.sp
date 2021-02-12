@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 name n : message
 name m : message
 abstract f : message->message
@@ -8,12 +10,12 @@ goal test :
   forall (x:message, y:message),
   n = m => False.
 Proof.
-  intros.
+  intro x y _.
 Qed.
 
 goal test2 :
   forall (x:message, y:message),
   f(n) = h(m) => False.
 Proof.
-  intros.
+  intro *.
 Qed.

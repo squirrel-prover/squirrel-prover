@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k:message
 name cst:message
@@ -20,8 +22,8 @@ goal dummy :
   forall (tau1 : timestamp, tau2 : timestamp, a : index, b: message),
   tau1 = tau2 =>
   output@tau1= output@tau2.
- Proof.
- simpl.
+Proof.
+ by auto.
 Qed.
 
 goal unforgeable_1 :
@@ -30,19 +32,20 @@ goal unforgeable_1 :
   output@A(b) <> h(na(a),k).
 
 Proof.
- help left.
- help.
- collision.
+ intro a b Hneq Heq.
+ collision.  
+ by auto.
 Qed.
 
 goal unforgeable_2 :
   forall (a : index, b : index),
   output@B(b) <> h(na(a),k).
 
- Proof.
- simpl.
+Proof.
+ intro a b Heq.
  nosimpl(collision).
-eqnames.
+ nosimpl(intro Heq2).
+ eqnames.
 Qed.
 
 
@@ -50,8 +53,9 @@ goal unforgeable_3 :
   forall (a : index, b : index),
   output@C(b) <> h(na(a),k).
 
- Proof.
- simpl.
- collision.
- case H0.
+Proof.
+ intro a b Heq.
+ collision. 
+ intro Heq2. 
+ case H. 
 Qed.

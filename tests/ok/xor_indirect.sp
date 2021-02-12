@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 
 abstract ok : message
@@ -16,7 +18,8 @@ Proof.
   expand output@A(ii,jj).
   xor 1.
   nosimpl(yesif 1).
-  apply len_ok to i,j; apply len_ok to ii,jj.
+  apply len_ok to ii,jj. 
+  apply len_ok to i,j. 
   admit. (* Induction hypothesis.*)
 Qed.
 

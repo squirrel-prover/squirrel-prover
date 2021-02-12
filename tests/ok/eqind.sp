@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 
@@ -10,5 +12,5 @@ goal function :
   i = j =>
   m1(i) = m1(j).
 Proof.
- simpl.
+ by auto.
 Qed.

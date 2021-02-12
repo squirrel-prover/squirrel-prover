@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k:message
 name cst:message
@@ -13,23 +15,24 @@ system O:
 goal dummy :
 cond@O1 => input@O1 <>k.
 Proof.
-simpl.
+intro Hc.
 expand cond@O1.
-notleft H0.
+nosimpl(notleft Hc; assumption).
 Qed.
 
 goal
 exec@O =>
   output@O = k.
- Proof.
-simpl.
+Proof.
+ intro _.
 
-expand exec@O.
-expand cond@O.
+ expand exec@O.
+ expand cond@O. 
+ auto.
 Qed.
 
 goal
  frame@O = <frame@pred(O),<if exec@O then true else false,if exec@O then output@O else zero>>.
 Proof.
-simpl.
+  auto.
 Qed.

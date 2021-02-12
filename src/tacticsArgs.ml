@@ -1,12 +1,69 @@
 module L = Location
 
+(*------------------------------------------------------------------*)
+type naming_pat =
+  | Unnamed                  (** '_' *)
+  | AnyName                  (** '?' *)
+  | Named   of string
 
+type and_or_pat =
+  | Or      of simpl_pat list
+  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
+        
+  | Split 
+  (** e.g. \[\] to do a case. *)
+
+  | And     of simpl_pat list
+  (** e.g. \[H1 H2\] to destruct a conjunction. *)
+        
+and simpl_pat =
+  | SAndOr of and_or_pat
+  | SNamed of naming_pat
+
+type intro_pattern =
+  | Star     of Location.t    (** '*' *)
+  | Simpl of simpl_pat
+
+
+(*------------------------------------------------------------------*)
+let pp_naming_pat fmt = function
+  | Unnamed -> Fmt.pf fmt "_"
+  | AnyName -> Fmt.pf fmt "?"
+  | Named s -> Fmt.pf fmt "%s" s
+
+let rec pp_and_or_pat fmt = function
+  | Or      l ->
+    let sep fmt () = Fmt.pf fmt "|" in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
+
+  | And      l ->
+    let sep fmt () = Fmt.pf fmt " " in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
+
+  | Split -> Fmt.pf fmt "[]"
+
+and pp_simpl_pat fmt = function
+  | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
+  | SNamed n_ip  -> pp_naming_pat fmt n_ip
+
+let rec pp_intro_pat fmt = function
+  | Star     _    -> Fmt.pf fmt "*"
+  | Simpl s_ip -> pp_simpl_pat fmt s_ip
+
+let pp_intro_pats fmt args =
+  let pp_sep fmt () = Fmt.pf fmt "@ " in
+  Fmt.pf fmt "@[<hv 2>%a@]"
+    (Fmt.list ~sep:pp_sep pp_intro_pat) args
+  
 (*------------------------------------------------------------------*)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int
   | Theory      of Theory.term
-
+  | IntroPat    of intro_pattern list
+  | AndOrPat    of and_or_pat
+  | SimplPat    of simpl_pat
+      
 type ('a, 'b) pair
 
 (*------------------------------------------------------------------*)

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 
 abstract ok:message
@@ -9,13 +11,13 @@ equiv test.
 Proof.
 induction t.
 expandall.
-fa 0.
-fa 1.
-nosimpl(ifeq 1,input@A,ok).
-simpl.
+fa 0; fa 1.
+nosimpl(ifeq 1,input@A,ok). 
+by auto.
+
 nosimpl(fadup).
-assumption.
+by assumption.
 
 expandall.
-fa 0.
+by fa 0.
 Qed.

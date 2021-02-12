@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* This file contains an unsound axiom, dummy_false_axiom.
    It is a test of application of an axiom with existential variables *)
 
@@ -14,8 +16,9 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
- apply dummy_false_axiom to ma.
+ intro ma.
+ apply dummy_false_axiom to ma. 
+ auto.
 Qed.
 
 goal [right]
@@ -23,8 +26,9 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
+ intro ma.
  apply dummy_false_axiom to ma.
+ auto.
 Qed.
 
 goal
@@ -32,6 +36,7 @@ forall (ma : message),
 ma=k.
 
 Proof.
- simpl.
+ intro ma.
  apply dummy_false_axiom to ma.
+ auto.
 Qed.

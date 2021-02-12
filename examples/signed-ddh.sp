@@ -90,7 +90,7 @@ Proof.
   expand cond@Pchall1(i).
   expand pkS(i)@Pchall1(i).
   substitute fst(fst(input@Pchall1(i))), pk(skS).
-  euf M0.
+  euf Meq.
   exists j.
 Qed.
 
@@ -101,14 +101,14 @@ Proof.
   expand exec@S1(r).
   executable pred(S1(r)).
   depends S(r), S1(r).
-  apply H2 to S(r).
+  apply H1 to S(r).
   expand exec@S(r).
   expand cond@S(r).
   expand cond@S1(r).
   expand pkp(r)@S1(r).
   substitute  fst(input@S(r)), pk(skP).
-  euf M0.
-  exists i.
+  euf H0.
+  by exists i.
 Qed.
 
 
@@ -162,9 +162,9 @@ Proof.
     expand cond@Schall3(j).
     executable pred(Schall3(j)).
     depends S1(j), Schall3(j).
-    apply H2 to S1(j).
+    apply H1 to S1(j).
     apply S_charac to j.
-    apply H1 to s.
+    by apply H0 to s.
 
     fa 5.
     fa 6.
@@ -220,10 +220,10 @@ Proof.
     expand cond@Pchall3(i).
     executable pred(Pchall3(i)).
     depends Pchall1(i), Pchall3(i).
-    apply H2 to Pchall1(i).
+    apply H1 to Pchall1(i).
     expand exec@Pchall1(i).
     apply P_charac to i.
-    apply H1 to j.
+    by apply H0 to j.
 
     fa 5.
     fa 6.
@@ -231,20 +231,24 @@ Proof.
     (* A *)
     expandall.
     expand  seq(i->g^a(i)), i.
-    fa 6.
+    by fa 6.
+
     (* S *)
     expandall.
     expand  seq(i->g^b(i)), j.
-    fa 6.
+    by fa 6.
+
     (* S1 *)
     expandall.
     expand  seq(i->g^b(i)), j.
-    fa 6.
+    by fa 6.
+
     (* A1 *)
     expandall.
     expand  seq(i->g^b(i)), j.
-    fa 6.
+    by fa 6.
+
     (* A2 *)
      expandall.
-     fa 5.
+     by fa 5.
 Qed.

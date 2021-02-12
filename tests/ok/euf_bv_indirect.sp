@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Testing euf's behaviour when bound variables are used in indirect cases. *)
 
 hash h
@@ -15,9 +17,9 @@ goal forall (tau:timestamp,i,j,w:index),
   output@tau = h(n(i,j),k(w,w)) =>
   i = j.
 Proof.
-  intros.
-  nosimpl(euf M0).
-  simpl.
+  intro tau i j w Heq.
+  nosimpl(euf Heq).
+  auto.
 Qed.
 
 (* Similar to previous example but this time the equality i=j
@@ -26,7 +28,7 @@ goal forall (tau:timestamp,i,j,w:index),
   output@tau = h(n(w,w),k(i,j)) =>
   i = j.
 Proof.
-  intros.
-  nosimpl(euf M0).
-  simpl.
+  intro tau i j w Heq.
+  nosimpl(euf Heq).
+  auto.
 Qed.

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract a : message
 abstract b : message
 abstract f : message->message
@@ -9,7 +11,6 @@ axiom two : forall x:message, (forall x:message, f(x)=a) => f(x)=b.
 
 goal f(a)=b.
 Proof.
-  intros.
   apply two to a.
   apply one.
 Qed.

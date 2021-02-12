@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 system
   in(c,x);
@@ -6,5 +8,5 @@ system
 
 goal output@A = <input@A,input@A>.
 Proof.
- simpl.
+ by auto.
 Qed.

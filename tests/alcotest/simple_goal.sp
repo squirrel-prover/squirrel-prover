@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* test *)
 name n1:message
 name n2:message

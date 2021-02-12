@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 abstract ok : message
 
@@ -16,8 +18,16 @@ Qed.
 
 goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
 Proof.
-nosimpl(intro).
-nosimpl(notleft H0).
-nosimpl(introsleft H0).
+nosimpl(intro H).
+nosimpl(notleft H).
+nosimpl(destruct H).
 simpl.
+Qed.
+
+goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
+Proof.
+nosimpl(intro H).
+nosimpl(notleft H).
+nosimpl(destruct H as [t [Hc Hc2]]). 
+auto.
 Qed.

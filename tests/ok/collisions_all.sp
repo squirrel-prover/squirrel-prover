@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract a : message
 abstract b : message
 abstract c : message
@@ -9,8 +11,9 @@ abstract y : message
 system null.
 
 goal
-  h(a,k)=x && h(b,k)=y && y=h(c,k) => b=c.
+  h(a,k)=x => h(b,k)=y => y=h(c,k) => b=c.
 Proof.
-  nosimpl(intros; collision).
+  intro _ _ _. 
+  nosimpl(collision).
   auto.
 Qed.

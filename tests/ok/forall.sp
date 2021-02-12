@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* This test was present as part of the euf.sp file,
  * I extracted it for clarity. I'm not sure that it
  * shows wanted features.
@@ -14,7 +16,7 @@ goal test :
   forall (x:timestamp, y:index, z:message),
   x=x.
 Proof.
- simpl.
+ by auto.
 Qed.
 
 goal forall x:timestamp, True.

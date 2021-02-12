@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h (1)
 name k : message
 
@@ -9,8 +11,8 @@ system null.
 
 goal forall (i,j:index) f(h(i,a,k)) = h(j,b,k) => a = b.
 Proof.
-  nosimpl(intros).
-  nosimpl(euf M0).
+  nosimpl(intro i j Heq).
+  nosimpl(euf Heq; intro Eqab). 
   (* Since i=j is possible, EUF should not dismiss the hash of a. *)
-  assumption.
+  nosimpl(assumption).
 Qed.

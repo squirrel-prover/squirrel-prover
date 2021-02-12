@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 (* Similar to euf_let test but not at toplevel:
  * Testing that macros induced by a let definition
  * have the right number of parameters even in case of
@@ -18,6 +20,7 @@ goal collision_absurd :
   output@tau <> h(m,k).
 
 Proof.
-  simpl.
-  euf M0.
+  intro tau Heq.
+  euf Heq. 
+  by auto.
 Qed.

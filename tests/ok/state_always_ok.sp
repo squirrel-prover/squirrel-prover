@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : message
 mutable s : message
 channel c
@@ -8,10 +10,12 @@ axiom init_ok : s@init = ok.
 goal forall t:timestamp, s@t = ok.
 Proof.
   induction.
-  case t.
-  case H0.
+  intro Hind.
+  case t. 
   (* t = init *)
-  apply init_ok.
-  (* t = A(i) *)
-  apply IH0 to pred(A(i)).
+  by apply init_ok. 
+
+  (* t = A(i) *) 
+  destruct H as [i _].
+  apply Hind to pred(A(i)). 
 Qed.

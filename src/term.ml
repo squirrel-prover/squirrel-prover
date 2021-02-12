@@ -50,18 +50,18 @@ type generic_atom = [
   | `Happens of Sorts.timestamp term
 ]
 and _ term =
-  | Fun : fsymb *  Sorts.message term list -> Sorts.message term
-  | Name : nsymb -> Sorts.message term
-  | Macro :
+  | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
+  | Name   : nsymb -> Sorts.message term
+  | Macro  :
       'a msymb * Sorts.message term list * Sorts.timestamp term ->
       'a term
-  | Seq : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred : Sorts.timestamp term -> Sorts.timestamp term
+  | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
+  | Pred   : Sorts.timestamp term -> Sorts.timestamp term
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
       Sorts.timestamp term
-  | Init : Sorts.timestamp term
-  | Var : 'a Vars.var -> 'a term
+  | Init   : Sorts.timestamp term
+  | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
 
@@ -75,15 +75,14 @@ and _ term =
 
   | Atom : generic_atom -> Sorts.boolean term
 
-
   | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
   | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | And : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Or : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Not : Sorts.boolean term  -> Sorts.boolean term
-  | Impl : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | True : Sorts.boolean term
-  | False : Sorts.boolean term
+  | And    : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Or     : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | Not    : Sorts.boolean term -> Sorts.boolean term
+  | Impl   : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
+  | True   : Sorts.boolean term
+  | False  : Sorts.boolean term
 
 type 'a t = 'a term
 
@@ -566,14 +565,21 @@ let mk_and t1 t2 = match t1,t2 with
   | True, t | t, True -> t
   | t1,t2 -> And (t1,t2)
 
+let mk_ands ts = List.fold_left mk_and True ts
+
 let mk_or t1 t2 = match t1,t2 with
   | False, t | t, False -> t
   | t1,t2 -> Or (t1,t2)
+
+let mk_ors ts = List.fold_left mk_or False ts
 
 let mk_impl t1 t2 = match t1,t2 with
   | False, _ -> True
   | True, t -> t
   | t1,t2 -> Impl (t1,t2)
+
+let mk_impls ts t =
+  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
 
 let mk_ite c t e = match c with
   | True -> t
@@ -596,15 +602,18 @@ let mk_indices_neq vect_i vect_j =
     (fun acc e -> mk_or acc e)
     False
     (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+
 let mk_indices_eq vect_i vect_j =
   List.fold_left
     (fun acc e -> mk_and acc e)
     True
-    (List.map2 (fun i j -> Atom (`Index (`Eq, i, j))) vect_i vect_j)
+    (List.map2 (fun i j ->
+         if i = j then True else Atom (`Index (`Eq, i, j))
+       ) vect_i vect_j)
 
 (** Projection *)
 
-type projection = Left | Right | None
+type projection = PLeft | PRight | PNone
 
 let pi_term ~projection term =
 
@@ -621,9 +630,9 @@ let pi_term ~projection term =
   | Diff (a, b) ->
     begin
       match s with
-      | Left -> pi_term s a
-      | Right -> pi_term s b
-      | None -> Diff (a, b)
+      | PLeft -> pi_term s a
+      | PRight -> pi_term s b
+      | PNone -> Diff (a, b)
     end
   | ITE (a, b, c) -> ITE (pi_term s a, pi_term s b, pi_term s c)
   | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
@@ -648,8 +657,8 @@ let pi_term ~projection term =
 let rec head_pi_term : type a. projection -> a term -> a term =
   fun s t ->
   match t,s with
-  | Diff (t,_), Left
-  | Diff (_,t), Right -> head_pi_term s t
+  | Diff (t,_), PLeft
+  | Diff (_,t), PRight -> head_pi_term s t
   | _ -> t
 
 let diff a b =
@@ -658,7 +667,7 @@ let diff a b =
   if a = b then a else Diff (a,b)
 
 let head_normal_biterm : type a. a term -> a term = fun t ->
-  match head_pi_term Left t, head_pi_term Right t with
+  match head_pi_term PLeft t, head_pi_term PRight t with
   | Fun (f,l), Fun (f',l') when f=f' -> Fun (f, List.map2 diff l l')
   | Name n, Name n' when n=n' -> Name n
   | Macro (m,l,ts), Macro (m',l',ts') when m=m' && ts=ts' ->
@@ -716,8 +725,8 @@ let () =
         Symbols.Function.declare_exact Symbols.builtins_table "f" (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
-      let r = head_pi_term Left t in
-        assert (pi_term  ~projection:Left t = f a) ;
+      let r = head_pi_term PLeft t in
+        assert (pi_term  ~projection:PLeft t = f a) ;
         assert (r = f (Diff (a,b)))
     end ;
   ]

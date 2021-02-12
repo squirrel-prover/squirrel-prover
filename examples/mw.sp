@@ -72,26 +72,25 @@ goal wa_R1 : forall r:index,
    output@R(r) = input@T(i,t)).
 Proof.
 
-  intros; split.
+  intro *; split.
 
   (* Cond => WA *)
   project.
   (* left *)
-  euf M0.
+  euf Meq.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
   (* right *)
-  euf M0.
+  euf Meq.
   exists i,t.
   assert (input@T(i,t) = nr(r)).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 
   (* WA => Cond *)
-  exists i,t.
-
+  by exists i,t.
 Qed.
 
 (* Same with R2 *)
@@ -113,21 +112,20 @@ Proof.
   (* Cond => WA *)
   project.
   (* left *)
-  euf M1.
+  euf Meq.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
-  fresh M3.
-  depends R(r), R1(r).
+  fresh Meq1.
+  by case H; depends R(r), R1(r).
   (* right *)
-  euf M1.
+  euf Meq.
   exists i,t.
   assert (input@T(i,t) = nr(r)).
-  fresh M3.
-  depends R(r), R1(r).
+  fresh Meq1.
+  by case H; depends R(r), R1(r).
 
   (* WA => Cond *)
-  exists i,t.
-
+  by exists i,t.
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -144,12 +142,12 @@ goal [left] wa_R1_left : forall (i,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intros.
-  euf M0.
+  intro *.
+  euf Meq.
   exists t.
   assert input@T(i,t) = nr(r).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -163,11 +161,11 @@ goal [right] wa_R1_right : forall (i,t,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intros.
-  euf M0.
+  intro *.
+  euf Meq.
   assert input@T(i,t) = nr(r).
-  fresh M2.
-  depends R(r), R2(r).
+  fresh Meq1.
+  by case H; depends R(r), R2(r).
 Qed.
 
 
@@ -240,8 +238,8 @@ equivalent
 
 (* IF-THEN-ELSE *)
 nosimpl(fa); try auto.
-nosimpl(intro); split; assumption.
-nosimpl(intro); split; assumption.
+by intro *; split; exists i,t. 
+by intro *; split; exists i,t. 
 
 (* TRY-FIND *)
 (* We have index variables corresponding to the existentials from
@@ -250,12 +248,12 @@ nosimpl(intro); split; assumption.
 project.
 fa.
 apply wa_R1_left to i1,r.
-apply H1.
-exists t.
+apply H0.
+by exists t.
 yesif.
 fa.
 apply wa_R1_right to i1,t1,r.
-apply H1.
+by apply H0.
 yesif.
 
 fa 2. fadup 1.
@@ -300,15 +298,15 @@ yesif 2.
 apply tags_neq.
 project.
 split.
-assert (fst(input@R2(r)) = nt(i,t)). fresh M2.
+by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
 split.
-assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
+by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
+by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
 split.
 split.
-assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
-assert (fst(input@R1(r)) = nt(i,t)). fresh M2.
-assert (fst(input@R2(r)) = nt(i,t)). fresh M2.
+by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
+by assert (fst(input@R1(r)) = nt(i,t)); fresh Meq0.
+by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
 fresh 1. yesif 1.
 xor 1, n_PRF.
 yesif 1.

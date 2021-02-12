@@ -105,54 +105,49 @@ forall (t:timestamp), forall (i:index),
     (forall (j':index), T1(i,j')<=T1(i,j) || t<T1(i,j'))).
 Proof.
 induction.
-case t.
-case H0.
+nosimpl(revert H => IH0).
+case t. 
 
 substitute t,init.
 left.
 
 substitute t,R(jj).
-apply IH0 to pred(R(jj)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+use IH0 with pred(R(jj)) as H.
+use H with i as P; case P.
+by left; use H0 with j'.
+right; exists j; use H1 with j'. 
+by case H0.
 
 substitute t,R1(jj,ii).
-apply IH0 to pred(R1(jj,ii)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+use IH0 with pred(R1(jj,ii)) as H.
+use H with i as P; case P.
+by left; use H0 with j'.
+right; exists j; use H1 with j'.
+by case H0.
 
 substitute t,R2(jj).
-apply IH0 to pred(R2(jj)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+use IH0 with pred(R2(jj)) as H.
+use H with i as P; case P.
+by left; use H0 with j'.
+right; exists j; use H1 with j'.
+by case H0.
 
 substitute t,T(i1,j).
-apply IH0 to pred(T(i1,j)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j1. apply H1 to j'.
-case H2.
+use IH0 with pred(T(i1,j)) as H.
+use H with i as P; case P.
+by left; use H0 with j'.
+right; exists j1; use H1 with j'.
+by case H0.
 
 substitute t,T1(i1,j).
-apply IH0 to pred(T1(i1,j)).
-apply H0 to i.
-case H1.
+use IH0 with pred(T1(i1,j)) as H.
+use H with i as P; case P.
 (* *)
-assert (i=i1 || i<>i1).
-case H2.
+assert C := (i=i1 || i<>i1).
+case C.
 (* case i=i1 *)
 right.
-exists j.
+by exists j.
 (* case i<>i1 *)
 left.
 split.
@@ -160,67 +155,64 @@ case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-apply H1 to j'.
+by use H0 with j'.
 (* *)
-assert (i=i1 || i<>i1).
-case H2.
+assert C := (i=i1 || i<>i1).
+case C.
 (* case i=i1 *)
 right.
-exists j.
+by exists j.
 (* case i<>i1 *)
 right.
 exists j1.
 split.
-case (if i = i1 then
+by case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-assert (j=j1 || j<>j1).
-case H2.
-apply H1 to j'.
-case H2.
-apply H1 to j'.
-case H2.
+assert C := (j=j1 || j<>j1).
+case C.
+use H1 with j'.
+by case H0.
+by use H1 with j' as Hyp; case Hyp.
 
 substitute t,T2(i1,j).
-apply IH0 to pred(T2(i1,j)).
-apply H0 to i.
-case H1.
-left. apply H1 to j'.
-right. exists j1. apply H1 to j'.
-case H2.
+use IH0 with pred(T2(i1,j)) as IHA.
+use IHA with i as P; case P. 
+by left; use H with j'.
+right; exists j1; use H0 with j' as P.
+by case P.
 
 substitute t,T3(i1,j).
-apply IH0 to pred(T3(i1,j)).
-apply H0 to i.
+use IH0 with pred(T3(i1,j)) as H0.
+use H0 with i as H1.
 case H1.
-left. apply H1 to j'.
-right. exists j1. apply H1 to j'.
-case H2.
+by left; use H with j'.
+by right; exists j1; use H1 with j' as H; case H.
 
 substitute t,A(kk).
-apply IH0 to pred(A(kk)).
-apply H0 to i.
+use IH0 with pred(A(kk)) as H0.
+use H0 with i as H1.
 case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+by left; use H with j'.
+right; exists j; use H1 with j' as H2.
+by case H2.
 
 substitute t,A1(kk).
-apply IH0 to pred(A1(kk)).
-apply H0 to i.
+use IH0 with pred(A1(kk)) as H0.
+use H0 with i as H1.
 case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+by left; use H with j'.
+right; exists j; use H1 with j' as H2.
+by case H2.
 
 substitute t,A2(kk).
-apply IH0 to pred(A2(kk)).
-apply H0 to i.
+use IH0 with pred(A2(kk)) as H0.
+use H0 with i as H1.
 case H1.
-left. apply H1 to j'.
-right. exists j. apply H1 to j'.
-case H2.
+by left; use H with j'.
+right; exists j; use H1 with j' as H2.
+by case H2.
 Qed.
 
 goal lastUpdateT :
@@ -230,13 +222,11 @@ forall (i,j:index),
        < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
          snd(input@T(i,j')) >).
 Proof.
-intros.
-apply lastUpdateTag_ to T(i,j).
-apply H0 to i.
-case H1.
-left.
-right.
-exists j1.
+intro i j.
+use lastUpdateTag_ with T(i,j) as H0.
+use H0 with i as H1.
+case H1; 1: by left.
+by right; exists j1.
 Qed.
 
 goal lastUpdatePredT1 :
@@ -246,13 +236,12 @@ forall (i,j:index),
        < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
          snd(input@T(i,j')) >).
 Proof.
-intros.
-apply lastUpdateTag_ to pred(T1(i,j)).
-apply H0 to i.
-case H1.
-left.
-right.
-exists j1.
+intro i j.
+use lastUpdateTag_ with pred(T1(i,j)) as H0.
+use H0 with i as H1.
+case H1; 
+1: by left.
+by right; exists j1.
 Qed.
 
 goal lastUpdatePredR1 :
@@ -280,16 +269,17 @@ forall (t:timestamp), forall (jj,ii:index),
   t < R1(jj,ii) => input@t <> kR(ii)@pred(R1(jj,ii)).
 Proof.
 induction.
-apply lastUpdatePredR1 to jj,ii.
+use lastUpdatePredR1 with jj,ii as H0.
 case H0.
 (* init case *)
-apply stateReaderInit to ii.
-fresh M2.
+use stateReaderInit with ii as M2.
+by fresh M2.
 (* general case *)
-assert input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
+assert M2 := 
+  input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
 euf M2.
 (* case euf 1/3 - R1(jj1,ii) *)
-assert R1(jj',ii) < R1(jj,ii). admit. (* ok *)
+assert H0 := R1(jj',ii) < R1(jj,ii). admit. (* ok *)
 case H0.
 admit. (* ok *)
 admit. (* ok *)
@@ -305,54 +295,57 @@ forall (t:timestamp), forall (i,j:index),
     ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)>
       && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> ).
 Proof.
-induction.
+nosimpl(induction; intro IH i j).
+intro *.
 split.
 
 (* case split 1/2 *)
-apply lastUpdatePredT1 to i,j.
+use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
-apply stateTagInit to i.
-assert idinit(i) = fst(kT(i)@init).
-fresh M3.
+use stateTagInit with i as H0.
+assert M3 := idinit(i) = fst(kT(i)@init).
+by fresh M3.
 (* general case *)
-assert fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+assert M2 :=
+  fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
 euf M2.
 (* case euf 1/3 - R1(jj,i)  *)
 admit.
 (* case euf 2/3 - T1(i,j1) *)
-assert T1(i,j') < T1(i,j). admit. (* ok *)
-case H0.
+assert H1 := T1(i,j') < T1(i,j). admit. (* ok *)
+case H.
 admit. (* ok *)
 admit. (* ok *)
 admit. (* ok *)
 (* case euf 3/3 - A2(kk) *)
-apply IH0 to A2(kk).
-apply H1 to i,j'.
+use IH with A2(kk) as H1.
+use H1 with i,j' as H2.
 admit. (* TODO *)
 admit. (* TODO *)
 admit. (* TODO *)
 
 (* case split 2/2 *)
-apply lastUpdatePredT1 to i,j.
+use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
-apply stateTagInit to i.
-assert idinit(i) = fst(kT(i)@init).
-fresh M3.
+use stateTagInit with i.
+assert M3 := idinit(i) = fst(kT(i)@init).
+by fresh M3.
 (* general case *)
-assert fst(fst(input@t)) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+assert M2 :=
+  fst(fst(input@t)) = 
+  h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
 euf M2.
 admit. (* TODO *)
 admit. (* TODO *)
 
-apply IH0 to A2(kk).
-apply H1 to i,j'.
+use IH with A2(kk) as H1.
+use H1 with i,j' as H2.
 admit. (* TODO *)
 admit. (* TODO *)
 admit. (* TODO *)
 Qed.
-
 
 
 goal auth_R1 :
@@ -361,39 +354,41 @@ forall (jj,ii:index),
   =>
   (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
 Proof.
-intros.
+intro jj ii Hcond.
 expand cond@R1(jj,ii).
 
-euf M0.
+euf Hcond.
 
 (* case euf 1/2 - T(i,j) *)
-assert (i=ii || i<>ii).
+assert H0 := (i=ii || i<>ii).
 case H0.
 (* case i=ii - honest case *)
-exists j.
+by exists j.
 (* case i<>ii - absurd, we derive a contradiction *)
-apply lastUpdateT to i,j.
-apply lastUpdatePredR1 to jj,ii.
+use lastUpdateT with i,j as H0.
+use lastUpdatePredR1 with jj,ii as H1.
 case H0.
 (* init case *)
-apply stateTagInit to i.
-apply stateReaderInit to ii.
-case H0.
-assert h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i).
-fresh M6.
+use stateTagInit with i.
+use stateReaderInit with ii.
+case H1.
+assert M6 :=
+ h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i).
+by fresh M6.
 (* general case *)
-case H0.
-apply stateReaderInit to ii.
-assert idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
-fresh M5.
-assert
+case H1.
+use stateReaderInit with ii.
+assert M5 :=
+ idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+by fresh M5.
+assert _ :=
   h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
   h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
-collision.
+by collision.
 
 (* case euf 2/2 - A(kk) *)
-apply secretStateReader to A(kk).
-apply H0 to jj,ii.
+use secretStateReader with A(kk) as H0.
+by use H0 with jj,ii.
 Qed.
 
 goal auth_T1 :
@@ -402,12 +397,12 @@ forall (i,j:index),
   =>
   (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j)).
 Proof.
-intros.
+intro i j Hcond.
 expand cond@T1(i,j).
-euf M0.
+euf Hcond.
 (* case euf 1/2 - honest case R1(jj,i) *)
-exists jj.
+by exists jj.
 (* case euf 2/2 - A1(kk) coming from the process oracle *)
-apply secretStateTag to A1(kk).
-apply H0 to i,j.
+use secretStateTag with A1(kk) as H0.
+by use H0 with i,j.
 Qed.

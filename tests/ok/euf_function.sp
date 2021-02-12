@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h
 name k : message
 name n1 : message
@@ -9,13 +11,13 @@ system null.
 goal function_right : h(m,k) <> n1 XOR n2.
 
 Proof.
-  simpl.
-  euf M0.
+  intro Heq.
+  euf Heq.
 Qed.
 
 goal function_left : n1 XOR n2 <> h(m,k).
 
 Proof.
-  simpl.
-  euf M0.
+  intro Heq.
+  euf Heq.
 Qed.

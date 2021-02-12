@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 system null.
 
 (* This should not pass: it is not true for the initial timestamp epsilon,
@@ -5,5 +7,5 @@ system null.
 
 goal forall (t:timestamp), t <= pred(t) => False.
 Proof.
-  intros.
+  intro t Hleq.
 Qed.

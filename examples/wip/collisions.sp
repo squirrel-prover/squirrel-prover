@@ -1,6 +1,7 @@
 (* This is an extension of tests/ok/collisions.sp with an extra goal
  * at the end, that does not work apparently due to a limitation of
  * constraint solving. *)
+(* UPDATE: the proof script are outdated, and some tactics no longer exist *)
 
 hash h
 name k:message

@@ -148,7 +148,7 @@ let main_loop_body ~test state =
 
     | ProofMode, ParsedAbort ->
       Printer.prt `Result "Exiting proof mode and aborting current proof.@.";
-      Prover.reset ();
+      Prover.abort ();
       { state with mode = GoalMode; }
 
     | _, ParsedQed ->
@@ -187,7 +187,10 @@ let rec main_loop ~test ?(save=true) state =
       
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
-      
+
+  | exception (TraceSequent.Hyp_error e) when not test ->
+    error ~test state (fun fmt -> TraceSequent.pp_hyp_error fmt e)
+
   | exception (Process.ProcError e) ->
     error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
       
@@ -346,8 +349,7 @@ let () =
     end ;
     "Indexed abstract", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure
-           (Tactics.Failure "cannot automatically prove goal"))
+        (Tactic_soft_failure Tactics.GoalNotClosed)
         (fun () -> run ~test "tests/alcotest/idx_abs.sp")
     end ;
     "Indexed collision", `Quick, begin fun () ->
@@ -357,7 +359,7 @@ let () =
     end ;
     "Find equality", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Tactic_soft_failure (Failure "Equations satisfiable"))
+        (Tactic_soft_failure CongrFail)
         (fun () -> run ~test "tests/alcotest/try.sp")
     end ;
     "Undo does not maintain old truth", `Quick, begin fun () ->

@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 hash h (1)
 name k : message
 
@@ -8,6 +10,6 @@ system null.
 
 goal forall (i,j:index) h(i,a,k) = h(j,b,k) => a = b.
 Proof.
-  nosimpl(intros).
+  nosimpl(intro i j Heq).
   collision.
 Qed.

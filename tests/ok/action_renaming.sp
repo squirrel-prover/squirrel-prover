@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 abstract ok : index->message
 channel c
 
@@ -17,5 +19,5 @@ Qed.
 
 goal [none,alt] three : forall k:index, cond@A(k) => input@A(k) = ok(k).
 Proof.
-  intros; expand cond@A(k).
+  intro k Cond; expand cond@A(k).
 Qed.

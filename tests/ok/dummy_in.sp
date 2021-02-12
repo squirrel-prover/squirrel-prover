@@ -1,3 +1,5 @@
+set autoIntro=false.
+
 channel c
 abstract ok : message
 system (!_i in(c,x);A:out(c,ok);B:out(c,x) |

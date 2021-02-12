@@ -150,7 +150,7 @@ let get_definition :
               (* For diff cases, if the system corresponds to a left and a right
                  projection of systems we can simply project the macro as is. *)
               | SimplePair _
-              | Pair (Left _, Right _) -> proj_t None
+              | Pair (Left _, Right _) -> proj_t PNone
               (* If we do not have a left and right projection, we must
                  reconstruct the body of the macros to have the correct
                  definition on each side. *)

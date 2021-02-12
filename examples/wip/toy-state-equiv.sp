@@ -45,14 +45,14 @@ Qed.
 goal onlyTagActions :
 forall (t:timestamp), t <> init => exists (i,j:index), t=T(i,j).
 Proof.
-intros.
-case t. case H0.
+intro t Hneq.
+case t. 
 Qed.
 
 goal notInit :
 forall (t:timestamp), (exists (t':timestamp), t' < t)  => (t <> init).
 Proof.
-intros.
+auto. 
 Qed.
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
@@ -65,35 +65,33 @@ goal lastUpdate_ : forall (t:timestamp) forall (i:index)
 Proof.
 induction.
 case t.
-case H0.
 
 (* t = init *)
-left.
+by left.
 
 (* t = T(i1,j) *)
 assert (i=i1 || i<>i1).
 case H0.
 
 (* t = T(i,j) *)
-right. exists j.
+by right; exists j.
 
 (* t = T(i1,j) with i<>i1 *)
 substitute t,T(i1,j).
 assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
 expand kT(i)@T(i1,j).
-noif.
-apply IH0 to pred(T(i1,j)).
+by noif.
+apply H to pred(T(i1,j)).
 apply H0 to i.
 case H1.
 
   left.
-  apply H1 to j'.
+  by apply H1 to j'.
 
   right.
   exists j1.
-  apply H1 to j'.
-  case H2.
-
+  apply H2 to j'.
+  by case H1.
 Qed.
 
 (* A more convenient version of the lemma, because our apply
@@ -105,9 +103,9 @@ goal lastUpdate : forall (t:timestamp,i:index)
    T(i,j) <= t &&
    (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
 Proof.
-  intros.
+  intro t i.
   apply lastUpdate_ to t.
-  apply H0 to i.
+  apply H to i.
 Qed.
 
 goal stateInequality :
@@ -118,7 +116,7 @@ Proof.
 induction.
 substitute t, T(i,j).
 assert kT(i')@t' = hkey(kT(i)@pred(T(i,j)),key(i)).
-euf M1.
+euf Meq0.
 
 (* T(i,j1) < T(i,j)
    kT(i)@pred(T(i,j1)) = kT(i)@pred(T(i,j))
@@ -132,15 +130,15 @@ case H1.
 (* kT(i)@pred(T(i,j)) = kT(i)@init
    this can actually happen only if tag i has not played from init to pred(T(i,j))
    but we know that T(i,j1) < T(i,j): absurd *)
-apply H1 to j1; case H0.
+by apply H1 to j1; case H0.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
    then we should have that T(i,j1) <= T(i,j2) *)
 assert (T(i,j1) <= T(i,j2)).
-apply H1 to j1; case H2; case H0.
+by apply H2 to j1; case H1; case H0.
 
-apply IH0 to T(i,j2).
-apply H2 to pred(T(i,j1)).
+apply H to T(i,j2).
+apply H1 to pred(T(i,j1)).
 apply H3 to i,j2,i.
 
 Qed.
@@ -148,10 +146,10 @@ Qed.
 goal stateInequalityHelpful :
 (forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
-intros.
+intro i j j' Hlt Heq.
 apply stateInequality to T(i,j).
-apply H0 to T(i,j').
-apply H1 to i,j,i.
+apply H to T(i,j').
+apply H0 to i,j,i.
 Qed.
 
 equiv test.
