@@ -135,7 +135,7 @@ module Form = struct
              
   (** Subset of formulas we use. *)
   type form =
-    | Lit    of lit
+    | Lit  of lit
     | Disj of form list        (* of length > 1 *)
     | Conj of form list        (* of length > 1 *)
              
@@ -144,6 +144,30 @@ module Form = struct
 
   (** Disjunction of formulas *)
   type disjunction = form list
+      
+  (*------------------------------------------------------------------*)
+  (** Pretty printers *)
+
+  let pp_lit fmt (od, ut1, ut2 : lit) =
+    Fmt.pf fmt "@[<hv 2>(%a %a %a)@]"
+      pp_ut ut1 Term.pp_ord (od :> Term.ord) pp_ut ut2
+
+  let rec pp_form fmt = function
+    | Lit l -> pp_lit fmt l
+    | Disj l -> pp_disj fmt l
+    | Conj l -> pp_conj fmt l
+
+  and pp_disj fmt l =
+    Fmt.pf fmt "@[<hv 2>%a@]"
+      (Fmt.list
+         ~sep:(fun fmt () -> Fmt.pf fmt " ||@ ")
+         pp_form) l
+
+  and pp_conj fmt l =
+    Fmt.pf fmt "@[<hv 2>%a@]"
+      (Fmt.list
+         ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ")
+         pp_form) l
 
   (*------------------------------------------------------------------*)
   (** Smart constructors *)
@@ -795,13 +819,10 @@ let log_segment_eq eq =
                  (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
                     pp_ut pp_ut) eq)
 
-(* let log_new_init_eqs new_eqs =
- *   log_constr (fun () ->
- *       List.iter (fun eq ->
- *           Printer.prt `Dbg
- *             "@[<v 2>Adding equality:@;%a@]"
- *             (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
- *                pp_ut pp_ut) eq) new_eqs) *)
+let log_split f =
+  log_constr (fun () -> Printer.prt `Dbg
+                 "@[<v 2>Splitting clause:@;%a@]"
+                 Form.pp_disj f)
 
 
 (*------------------------------------------------------------------*)
@@ -867,6 +888,8 @@ let rec split (instance : constr_instance) : model list =
               [ { inst = instance; tr_graph = g } ]
 
             | disj :: clauses -> (* we found a clause to split *)
+              log_split disj;
+              
               let inst = { instance with clauses = clauses; } in
               let insts = List.map (fun f -> add_form inst f) disj in
               List.map split insts
