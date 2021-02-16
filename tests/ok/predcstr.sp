@@ -29,10 +29,11 @@ Proof.
  checkfail auto exn GoalNotClosed. 
 Abort.
 
+(* True thanks to the property of trace models:
+   ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
 goal _ : happens(A) => happens(pred(A)).
 Proof.
- intro Hap.
- by auto.
+ by intro Hap.
 Qed.
 
 goal _ (i:index): happens(B(i)) => happens(pred(B(i))).

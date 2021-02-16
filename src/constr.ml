@@ -260,7 +260,6 @@ type constr_instance = {
   eqs     : (ut * ut) list;
   neqs    : (ut * ut) list;
   leqs    : (ut * ut) list; 
-  elems   : ut list;
   clauses : Form.disjunction list;   (* clauses that have not yet been split *)
   uf      : Uuf.t;
 }
@@ -321,7 +320,7 @@ let mk_instance (l : Form.form list) : constr_instance =
   let inst =
     { uf = Uuf.create [];       (* dummy, real uf build after *)
       eqs = []; leqs = []; neqs = [];
-      elems = []; clauses = []; }
+      clauses = []; }
   in
   let l = Form.Lit (`Neq, uinit, uundef) :: l in
   let inst = List.fold_left add_form inst l in
@@ -337,7 +336,7 @@ let mk_instance (l : Form.form list) : constr_instance =
               |> List.sort_uniq ut_compare in
 
   let uf = Uuf.create elems in
-  { inst with uf = uf; elems = elems; }
+  { inst with uf = uf; }
 
 (*------------------------------------------------------------------*)
 (** [mgu ut uf] applies the mgu represented by [uf] to [ut].
@@ -551,10 +550,12 @@ let unify uf eqs elems =
   in
   uf
 
+let elems uf = List.flatten (Uuf.classes uf)
+
 (** Only compute the mgu for the equality constraints in [l] *)
 let mgu_eqs l =
   let instance = mk_instance l in
-  unify instance.uf instance.eqs instance.elems    
+  unify instance.uf instance.eqs (elems instance.uf)
 
 
 (*------------------------------------------------------------------*)
@@ -573,29 +574,49 @@ module Scc = Components.Make(UtG)
 (** {2 Misc} *)
 
 (*------------------------------------------------------------------*)
-let is_not_init uf (u : ut) =
-  (* Looks for an equivalent class containing [u] and an action [A(_)].
-     Note that, because [Pred _] is larger than [Name _] in [norm_ut_compare], 
-     we need to go through [u]'s full class. *)
+(** [get_class uf u] returns [u]'s equivalence class. *)
+let get_class uf u =
+  let uf, u = mgu uf u in
+
   let classes = Uuf.classes uf in (* remark: [Uuf.classes] uses memoisation *)
-  List.exists (fun classe ->
-      List.exists (ut_equal u) classe &&
-      List.exists (fun u' -> match u'.cnt with
-          | UName _ -> true
-          | _ -> false
-        ) classe
+
+  List.find (fun classe ->
+      List.exists (ut_equal u) classe
     ) classes
+  
 
 (* memoisation *)
-let is_not_init = 
+let get_class = 
   let module Memo = Uuf.Memo2 (Ut) in
   let memo = Memo.create 256 in
   fun uf (ut : ut) ->
     try Memo.find memo (uf,ut) with
     | Not_found ->
-      let res = is_not_init uf ut in
+      let res = get_class uf ut in
       Memo.add memo (uf, ut) res;
       res
+
+(*------------------------------------------------------------------*)
+(** Returns true if the element cannot be equal to [init] *)
+let is_not_init uf neqs (u : ut) =
+  let uf, u = mgu uf u in
+
+  (* Looks for an action [A(_)] in the equivalent class of [u].
+     Note that, because [Pred _] is larger than [Name _] in [norm_ut_compare], 
+     we need to go through [u]'s full class. *)
+  let u_class = get_class uf u in
+  List.exists (fun u' -> match u'.cnt with
+      | UName _ -> true
+      | _ -> false
+    ) u_class
+  ||
+
+  List.exists (fun (ut1,ut2) ->
+      let uf,ut1 = mgu uf ut1
+      and _, ut2 = mgu uf ut2 in
+      (ut_equal ut2 uinit && ut_equal ut1 u) || 
+      (ut_equal ut1 uinit && ut_equal ut2 u) 
+    ) neqs
   
 (*------------------------------------------------------------------*)
 (** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
@@ -620,47 +641,50 @@ let is_undef uf ut = snd (mgu uf ut) = uundef
 (* Remark: [uf] under-approximate equalities, hence any equality it contains 
    is sound. *)
 
-let get_pred = function
+let get_pred ut = match ut.cnt with
   | UPred t -> t
   | _ -> assert false
 
+let is_pred ut = match ut.cnt with
+  | UPred _ -> true
+  | _ -> false 
+
 (** [is_undef uf ut] returns [true] if [ut] must be defined in [uf], 
-    under dis-equalities [neqs]. *)
-let is_def uf neqs ut =
-
-  (* [ut] before normalization.
-     We need this for the third case. *)
-  let ut0 = ut in
-  let is_pred = match ut0.cnt with
-    | UPred _ -> true
-    | _ -> false in
-
+    under dis-equalities [neqs]. 
+    This does not look for instances of the axiom:
+    ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ))
+*)
+let is_def ?explain:(explain=false) uf neqs ut =
   let uf, ut = mgu uf ut in
 
-  let swap u v = if ut_equal u uundef then v, u else u, v in
+  let is_init = ut_equal ut uinit in
+  if explain && is_init then
+    dbg "is_def(%a): is equal to %a" pp_ut ut pp_ut uinit;
 
-  let res =
-  ut_equal ut uinit ||
-  
-  is_kpred uf uinit ut ||
-
-  (* Corresponds to the axiom:
-     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
-  (is_pred && (is_not_init uf (get_pred ut0.cnt))) ||
+  let init_is_kpred = is_kpred uf uinit ut in
+  if explain && init_is_kpred then
+    dbg "is_def(%a): %a is its k-predecessor" pp_ut ut pp_ut uinit;
   
   (* Remark: we cannot use [uf] alone, as it is an under-approximation.
      Instead, we look for a contradiction in the conjunction of [uf] and 
      known inequalities [neqs]. *)
-  List.exists (fun (u,v) ->
+  let swap u v = if ut_equal u uundef then v, u else u, v in
+  let in_neqs = List.exists (fun (u,v) ->
       let uf,u = mgu uf u
       and _, v = mgu uf v in
       let u, v = swap u v in
-      (ut_equal v uundef) && (ut_equal ut u || is_kpred uf u ut)
+      let b = (ut_equal v uundef) && (ut_equal ut u || is_kpred uf u ut) in
       (* ∃ k ≥ 0, u = P^k(ut) ∧ u ≠ undef  *)
-    ) neqs     
-in
 
-Printer.prt `Dbg "is_def: %a %a" pp_ut ut Fmt.bool res; res
+      if explain && b then
+        dbg "is_def(%a): is equal to %a, and %a ≠ %a" 
+          pp_ut ut pp_ut u pp_ut u pp_ut uundef;
+      b
+    ) neqs     
+
+  in is_init || init_is_kpred || in_neqs
+
+
 (* Build the inequality graph. There is a edge from S to S' if there exits
    u in S and v in S' such that:
    i)   u <= v
@@ -822,7 +846,6 @@ let for_all (f : UtG.vertex -> UtG.vertex -> bool) g : bool =
 
 (** Check that [instance] satisfies the dis-equality constraints and the rule:
     ∀ x, x <= P(x) <=> false
-    [None] is unsat.
     Precondition: [g] must be transitive. *)
 let neq_sat uf g neqs : bool =
   (* All dis-equalities in neqs must hold *)
@@ -836,14 +859,8 @@ let neq_sat uf g neqs : bool =
     ) neqs
   &&
 
-  (* Looks for elements in equal to undef that must be defined. *)
-  (List.for_all (fun classe ->
-       Printer.prt `Dbg "classe: %a" (Fmt.list pp_ut) classe;
-       let res = not (List.exists (ut_equal uundef) classe) ||
-                 List.for_all (fun ut -> not (is_def uf neqs ut)) classe in
-       Printer.prt `Dbg "res: %a" Fmt.bool res; res
-     ) (Uuf.classes uf))  
-  &&
+  (* Looks for elements in undef equivalence class that are defined. *)
+  (not (is_def ~explain:true uf neqs uundef)) &&
 
   (* Look for contradiction in [g], i.e. an edge [u ≤ v] such that one of 
      the following holds: 
@@ -901,6 +918,17 @@ let log_init_eqs eqs =
   dbg "@[<v 2>Adding new init equalities:@, %a@]"
     pp_eqs eqs
 
+let log_new_neqs neqs =
+  let pp_neq fmt (ut1, ut2) =
+    Fmt.pf fmt "%a ≠ %a" pp_ut ut1 pp_ut ut2 in
+  
+  let pp_neqs fmt eqs =    
+    Fmt.pf fmt "@[<hv 2>%a@]" 
+      (Fmt.list ~sep:Fmt.comma pp_neq) eqs in
+      
+  dbg "@[<v 2>Adding new dis-equalities:@, %a@]"
+    pp_neqs neqs
+
 let log_done () = dbg "@[<v 2>Model done@]"
 
 let log_instr inst = 
@@ -916,7 +944,7 @@ type model = { inst     : constr_instance;
 let find_segment_disj instance g =
   let exception Found of Uuf.t * (ut * ut) list in
 
-  let basics = get_basics instance.uf instance.elems in
+  let basics = get_basics instance.uf (elems instance.uf) in
   try
     let () = UtG.iter_vertex (fun u ->
         List.iter (fun x -> match add_disj instance.uf g u x with
@@ -950,15 +978,37 @@ let find_eq_init uf neqs =
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
+(** Looks for instances of the rule:
+    ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
+let find_new_undef uf neqs = 
+  let elems = elems uf in
+
+  (* we look for new instances of the rule *)
+  let undefs = 
+    List.filter_map (fun ut -> 
+        if is_not_init uf neqs ut && 
+           is_def uf neqs ut && 
+           not (is_def uf neqs (upred ut))
+        then Some (upred ut)
+        else None
+      ) elems in
+  
+  (* we remove duplicates *)
+  let _, undefs = List.fold_left (fun (uf,acc) x -> 
+      let uf, x = mgu uf x in uf, x :: acc
+    ) (uf,[]) undefs in
+  List.sort_uniq ut_compare undefs 
+
+(*------------------------------------------------------------------*)
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
 let rec split (instance : constr_instance) : model list =
   try
     log_instr instance;
     
-    let uf = unify instance.uf instance.eqs instance.elems in
+    let uf = unify instance.uf instance.eqs (elems instance.uf) in
     
-    let uf,g = leq_unify uf instance.leqs instance.neqs instance.elems in
+    let uf,g = leq_unify uf instance.leqs instance.neqs (elems instance.uf) in
     
     let g = UtGOp.transitive_closure g in
 
@@ -967,39 +1017,46 @@ let rec split (instance : constr_instance) : model list =
         log_init_eqs new_eqs;
         split { instance with uf = uf; eqs = new_eqs @ instance.eqs; }
         
-      | None -> match neq_sat uf g instance.neqs with
-        | false -> [] (* dis-equalities violated *)
+      | None -> match find_new_undef uf instance.neqs with
+        | _ :: _ as undefs ->
+          let new_neqs = List.map (fun ut -> ut, uundef) undefs in
+          log_new_neqs new_neqs;
+          split { instance with uf = uf; neqs = new_neqs @ instance.neqs; }
+          
+        
+        | [] -> match neq_sat uf g instance.neqs with
+          | false -> [] (* dis-equalities violated *)
 
-        | true -> (* no violations for now *)        
-          let instance = { instance with uf = uf } in
+          | true -> (* no violations for now *)        
+            let instance = { instance with uf = uf } in
 
-          (* Looking for segment disjunctions, e.g. if
-             pred(τ) ≤ τ' ≤ τ
-             then we know that (τ' = pred(τ) ∨ τ' = τ) *)
-          match find_segment_disj instance g with
-          | Some (uf, new_eqs) -> (* found a new segment disjunction *)
-            List.map (fun eq ->
-                log_segment_eq eq;
-                split { instance with eqs = eq :: instance.eqs; }
-              ) new_eqs
-            |> List.flatten
-
-          | None -> (* no new segment disjunction *)
-
-            (* we look whether all initial clauses of the problem have 
-               already been split *)
-            match instance.clauses with
-            | [] ->             (* no clause left, we are done *)
-              log_done ();
-              [ { inst = instance; tr_graph = g } ]
-
-            | disj :: clauses -> (* we found a clause to split *)
-              log_split disj;
-
-              let inst = { instance with clauses = clauses; } in
-              let insts = List.map (fun f -> add_form inst f ) disj in
-              List.map split insts
+            (* Looking for segment disjunctions, e.g. if
+               pred(τ) ≤ τ' ≤ τ
+               then we know that (τ' = pred(τ) ∨ τ' = τ) *)
+            match find_segment_disj instance g with
+            | Some (uf, new_eqs) -> (* found a new segment disjunction *)
+              List.map (fun eq ->
+                  log_segment_eq eq;
+                  split { instance with eqs = eq :: instance.eqs; }
+                ) new_eqs
               |> List.flatten
+
+            | None -> (* no new segment disjunction *)
+
+              (* we look whether all initial clauses of the problem have 
+                 already been split *)
+              match instance.clauses with
+              | [] ->             (* no clause left, we are done *)
+                log_done ();
+                [ { inst = instance; tr_graph = g } ]
+
+              | disj :: clauses -> (* we found a clause to split *)
+                log_split disj;
+
+                let inst = { instance with clauses = clauses; } in
+                let insts = List.map (fun f -> add_form inst f ) disj in
+                List.map split insts
+                |> List.flatten
     end
   with
   | No_mgu ->
@@ -1163,7 +1220,7 @@ let () =
     | Result _ -> raise Sat
     | Timeout -> raise Timeout in
 
-  Checks.add_suite "Unification" [
+  Checks.add_suite "Constr" [
     ("Cycles", `Quick,
      fun () ->
        let mk l = List.map (fun x -> `Pos, x) l in
