@@ -100,6 +100,32 @@ module Si = Set.Make (Int)
 module Ms = Map.Make (String)
 module Ss = Set.Make (String)
 
+
+(*------------------------------------------------------------------*)
+(* Option type functions *)
+
+let some x = Some x
+
+let oget = function
+  | Some u -> u
+  | None -> raise Not_found
+
+let odflt dflt = function
+  | Some u -> u
+  | None -> dflt
+
+let obind f a = match a with
+  | None -> None
+  | Some x -> f x
+
+let omap f a = match a with
+  | None -> None
+  | Some x -> Some (f x)
+
+let oiter f a = match a with
+  | None -> ()
+  | Some x -> f x
+
 (*------------------------------------------------------------------*)
 module type Ordered = sig
   type t
@@ -166,12 +192,52 @@ module Uf (Ord: Ordered) = struct
   type v = Ord.t
   module Vmap = Map.Make(Ord)
 
-  (** [rmap] is the inverse of map.
-      [cpt] counts the number of non-trivial unions *)
-  type t = { map : int Vmap.t;
-             rmap : v Mi.t;
-             puf : Vuf.t;
-             cpt : int }
+  module Smart : sig 
+    (** [rmap] is the inverse of map.
+        [cpt] counts the number of non-trivial unions .
+        [id] is guaranteed to be different for different union-find structures. *)
+    type t = private { map : int Vmap.t;
+               rmap : v Mi.t;
+               puf : Vuf.t;
+               cpt : int;
+               id : int; }
+
+    val mk : 
+      ?map:(int Vmap.t) ->
+      ?rmap:(v Mi.t) ->
+      ?puf:Vuf.t ->
+      ?cpt:int -> 
+      t ->
+      t
+
+    val empty : int -> t
+
+  end = struct
+    type t = { map : int Vmap.t;
+               rmap : v Mi.t;
+               puf : Vuf.t;
+               cpt : int;
+               id : int; }
+
+    let cpt_id = ref 0
+    let mk_id () = incr cpt_id; !cpt_id
+    
+    let empty d = {
+      map = Vmap.empty; 
+      rmap = Mi.empty; 
+      puf = Vuf.create d; 
+      cpt = 0;
+      id = mk_id (); 
+    }
+
+    let mk ?map ?rmap ?puf ?cpt t =
+      let map  = odflt t.map map
+      and rmap = odflt t.rmap rmap
+      and puf  = odflt t.puf puf
+      and cpt  = odflt t.cpt cpt in
+      { map; rmap; puf; cpt; id = mk_id (); }
+  end
+  include Smart
 
   let print ppf t =
     let binds = Mi.bindings t.rmap
@@ -189,18 +255,19 @@ module Uf (Ord: Ordered) = struct
           ( i+1, Vmap.add a i m, Mi.add i a rm ))
         ( 0, Vmap.empty, Mi.empty ) l
     in
-    { map = m;
-      rmap = rm;
-      puf = Vuf.create (List.length l);
-      cpt = 0 }
+    Smart.mk ~map:m ~rmap:rm ~cpt:0 (Smart.empty (List.length l))
+
+  let id t = t.id
 
   (** [extend t v] add the element [v] to [t], if necessary. *)
   let extend t v =
     if Vmap.mem v t.map then t
-    else let i, uf = Vuf.extend t.puf in
-      { t with puf = uf;
-               map = Vmap.add v i t.map;
-               rmap = Mi.add i v t.rmap }
+    else
+      let i, uf = Vuf.extend t.puf in
+      Smart.mk ~puf:uf
+               ~map:(Vmap.add v i t.map)
+               ~rmap:(Mi.add i v t.rmap) 
+               t
 
   let find t u =
     let ru_eqc = Vmap.find u t.map |> Vuf.find t.puf in
@@ -210,16 +277,21 @@ module Uf (Ord: Ordered) = struct
     let i = Vmap.find u t.map
     and i' = Vmap.find u' t.map in
 
-    { t with map = Vmap.add u i' t.map
-                   |> Vmap.add u' i;
-             rmap = Mi.add i u' t.rmap
-                    |> Mi.add i' u }
+    Smart.mk
+      ~map:(Vmap.add u i' t.map
+            |> Vmap.add u' i)
+      ~rmap:(Mi.add i u' t.rmap
+             |> Mi.add i' u) 
+      t
 
   let union t u u' =
     let iu, iu' = Vmap.find u t.map, Vmap.find u' t.map in
     let ri, ri' = Vuf.find t.puf iu, Vuf.find t.puf iu' in
-    let t' = { t with puf = Vuf.union t.puf iu iu';
-                      cpt = if ri <> ri' then t.cpt + 1 else t.cpt }
+    let t' = 
+      Smart.mk
+        ~puf:(Vuf.union t.puf iu iu')
+        ~cpt:(if ri <> ri' then t.cpt + 1 else t.cpt) 
+        t
     in
     let n_ri' = Vmap.find u' t'.map |> Vuf.find t'.puf in
     if ri' <> n_ri' then swap t' u u' else t'
@@ -228,7 +300,8 @@ module Uf (Ord: Ordered) = struct
     | [] -> raise (Failure "Uf: add_acc")
     | l :: t -> (a :: l) :: t
 
-  let classes t =
+
+  let comp_classes t =
     let l = List.init (Mi.cardinal t.rmap) (fun i -> (Vuf.find t.puf i, i))
             |> List.sort (fun (a, _) (a', _) -> Stdlib.compare a a')
     in
@@ -243,6 +316,23 @@ module Uf (Ord: Ordered) = struct
     in
     List.map (List.map (fun x -> Mi.find x t.rmap)) l_eqc
 
+
+  module MemoV = struct
+    type _t = t
+    type t = _t
+    let hash t = t.id
+    let equal t t' = t.id = t'.id
+  end
+  module Memo = Ephemeron.K1.Make(MemoV)
+  let memo = Memo.create 256 
+
+  (* memoisation *)
+  let classes t = try Memo.find memo t with
+    | Not_found ->
+      let cs = comp_classes t in
+      Memo.add memo t cs; 
+      cs
+
   (** [union_count t] is the number of non-trivial unions done building [t] *)
   let union_count t = t.cpt
 end
@@ -252,31 +342,6 @@ end
 let rec fpt f a =
   let b = f a in
   if b = a then b else fpt f b
-
-(*------------------------------------------------------------------*)
-(* Option type functions *)
-
-let some x = Some x
-
-let oget = function
-  | Some u -> u
-  | None -> raise Not_found
-
-let odflt dflt = function
-  | Some u -> u
-  | None -> dflt
-
-let obind f a = match a with
-  | None -> None
-  | Some x -> f x
-
-let omap f a = match a with
-  | None -> None
-  | Some x -> Some (f x)
-
-let oiter f a = match a with
-  | None -> ()
-  | Some x -> f x
 
 (*------------------------------------------------------------------*)
 let classes (f_eq : 'a -> 'a -> bool) (l : 'a list) : 'a list list =

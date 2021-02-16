@@ -14,8 +14,8 @@ open Utils
    *under-approximation* of equality equivalence classes. *)
 
 (* Comment in/out for debugging *)
-let dbg s = Printer.prt `Ignore s
-(* let dbg s = Printer.prt `Dbg s *)
+(* let dbg s = Printer.prt `Ignore s *)
+let dbg s = Printer.prt `Dbg s
 
 
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
@@ -59,17 +59,17 @@ end = struct
     let hash t = Hashtbl.hash t.cnt
     let equal t t' =  t.cnt = t'.cnt
   end
-  module Hut = Weak.Make(Ut)
+  module Hut = Ephemeron.K1.Make(Ut)
 
   let hcons_cpt = ref 0
-  let ht = Hut.create 257
+  let ht = Hut.create 256 
 
   let make cnt =
     let ut = { hash = !hcons_cpt ; cnt = cnt } in
     try Hut.find ht ut with
     | Not_found ->
       incr hcons_cpt;
-      Hut.add ht ut;
+      Hut.add ht ut ut;
       ut
 
   let uvar tv = UVar (Utv tv) |> make
@@ -848,7 +848,7 @@ let log_init_eqs eqs =
 let log_done () = dbg "@[<v 2>Model done@]"
 
 let log_instr inst = 
-  dbg "@[<v 2>Solving:@;%a@]" pp_constr_instance inst
+  dbg "@[<v 2>Solving:@ %a@]" pp_constr_instance inst
 
 (*------------------------------------------------------------------*)
 (** Type of a model, which is a satisfiable and normalized instance, and the

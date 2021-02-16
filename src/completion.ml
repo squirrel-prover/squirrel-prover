@@ -343,6 +343,8 @@ end = struct
 
   type v = CufTmp.v
 
+  let id = CufTmp.id 
+
   let extend = CufTmp.extend
 
   let create = CufTmp.create
@@ -362,6 +364,8 @@ end = struct
     let t = CufTmp.extend (CufTmp.extend t v) v' in
     if Cst.compare v v' < 0 then CufTmp.union t v' v
     else CufTmp.union t v v'
+
+  module Memo = CufTmp.Memo
 end
 
 (* State of the completion and normalization algorithms, which stores a

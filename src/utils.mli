@@ -64,6 +64,10 @@ module Uf (Ord: Ordered) : sig
 
   val create : v list -> t
 
+  (** Guaranteed to be different for different union-find structures. 
+      Suitable for memoisation. *)
+  val id : t -> int
+
   (** [extend t v] add the element [v] to [t], if necessary. *)
   val extend : t -> v -> t
 
@@ -81,6 +85,8 @@ module Uf (Ord: Ordered) : sig
 
   (** [union_count t] is the number of non-trivial unions done building [t] *)
   val union_count : t -> int
+
+  module Memo : Ephemeron.S with type key = t
 end
 
 (*------------------------------------------------------------------*)
