@@ -288,10 +288,12 @@ module Uf (Ord: Ordered) = struct
     let iu, iu' = Vmap.find u t.map, Vmap.find u' t.map in
     let ri, ri' = Vuf.find t.puf iu, Vuf.find t.puf iu' in
     let t' = 
-      Smart.mk
+      if ri <> ri' 
+      then Smart.mk
         ~puf:(Vuf.union t.puf iu iu')
-        ~cpt:(if ri <> ri' then t.cpt + 1 else t.cpt) 
+        ~cpt:(t.cpt + 1) 
         t
+      else t
     in
     let n_ri' = Vmap.find u' t'.map |> Vuf.find t'.puf in
     if ri' <> n_ri' then swap t' u u' else t'
@@ -324,13 +326,15 @@ module Uf (Ord: Ordered) = struct
     let equal t t' = t.id = t'.id
   end
   module Memo = Ephemeron.K1.Make(MemoV)
-  let memo = Memo.create 256 
+  module Memo2 (H2:Hashtbl.HashedType) = Ephemeron.K2.Make (MemoV) (H2)
+
+  let memo_cl = Memo.create 256 
 
   (* memoisation *)
-  let classes t = try Memo.find memo t with
+  let classes t = try Memo.find memo_cl t with
     | Not_found ->
       let cs = comp_classes t in
-      Memo.add memo t cs; 
+      Memo.add memo_cl t cs; 
       cs
 
   (** [union_count t] is the number of non-trivial unions done building [t] *)

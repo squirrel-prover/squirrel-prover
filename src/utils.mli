@@ -64,29 +64,31 @@ module Uf (Ord: Ordered) : sig
 
   val create : v list -> t
 
-  (** Guaranteed to be different for different union-find structures. 
-      Suitable for memoisation. *)
-  val id : t -> int
-
   (** [extend t v] add the element [v] to [t], if necessary. *)
   val extend : t -> v -> t
 
   val find : t -> v  -> v
 
   (** [union t u v] always uses the representent of [v], i.e.
-    [find [union t u v] u] = [find t v] *)
+    [find \[union t u v\] u] = [find t v] *)
   val union : t -> v -> v -> t
 
   (** [classes t] return the list of equivalence classes of [t], where a class
-      is represented by the list of its elements. *)
+      is represented by the list of its elements. 
+      Remark: uses memoisation. *)
   val classes: t -> v list list
 
   val print : Format.formatter -> t -> unit
 
-  (** [union_count t] is the number of non-trivial unions done building [t] *)
+  (** [union_count t] is the number of non-trivial unions done building [t]. *)
   val union_count : t -> int
 
+  (** For further memoisation. *)
   module Memo : Ephemeron.S with type key = t
+
+  (** For further memoisation. *)
+  module Memo2 (H2 : Hashtbl.HashedType) : Ephemeron.S 
+    with type key = (t * H2.t)
 end
 
 (*------------------------------------------------------------------*)

@@ -41,6 +41,8 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
+  module Ut : Hashtbl.HashedType with type t = ut
+
 end = struct
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
@@ -570,6 +572,32 @@ module Scc = Components.Make(UtG)
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
 
+(*------------------------------------------------------------------*)
+let is_not_init uf (u : ut) =
+  (* Looks for an equivalent class containing [u] and an action [A(_)].
+     Note that, because [Pred _] is larger than [Name _] in [norm_ut_compare], 
+     we need to go through [u]'s full class. *)
+  let classes = Uuf.classes uf in (* remark: [Uuf.classes] uses memoisation *)
+  List.exists (fun classe ->
+      List.exists (ut_equal u) classe &&
+      List.exists (fun u' -> match u'.cnt with
+          | UName _ -> true
+          | _ -> false
+        ) classe
+    ) classes
+
+(* memoisation *)
+let is_not_init = 
+  let module Memo = Uuf.Memo2 (Ut) in
+  let memo = Memo.create 256 in
+  fun uf (ut : ut) ->
+    try Memo.find memo (uf,ut) with
+    | Not_found ->
+      let res = is_not_init uf ut in
+      Memo.add memo (uf, ut) res;
+      res
+  
+(*------------------------------------------------------------------*)
 (** [decomp u] returns the pair [(k,x]) where [k] is the maximal integer
     such that [u] equals [P^k(x)]. *)
 let decomp u =
@@ -591,17 +619,34 @@ let is_kpred uf u v =
 let is_undef uf ut = snd (mgu uf ut) = uundef
 (* Remark: [uf] under-approximate equalities, hence any equality it contains 
    is sound. *)
-                           
+
+let get_pred = function
+  | UPred t -> t
+  | _ -> assert false
+
 (** [is_undef uf ut] returns [true] if [ut] must be defined in [uf], 
     under dis-equalities [neqs]. *)
 let is_def uf neqs ut =
+
+  (* [ut] before normalization.
+     We need this for the third case. *)
+  let ut0 = ut in
+  let is_pred = match ut0.cnt with
+    | UPred _ -> true
+    | _ -> false in
+
   let uf, ut = mgu uf ut in
 
   let swap u v = if ut_equal u uundef then v, u else u, v in
 
+  let res =
   ut_equal ut uinit ||
   
   is_kpred uf uinit ut ||
+
+  (* Corresponds to the axiom:
+     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
+  (is_pred && (is_not_init uf (get_pred ut0.cnt))) ||
   
   (* Remark: we cannot use [uf] alone, as it is an under-approximation.
      Instead, we look for a contradiction in the conjunction of [uf] and 
@@ -613,7 +658,9 @@ let is_def uf neqs ut =
       (ut_equal v uundef) && (ut_equal ut u || is_kpred uf u ut)
       (* ∃ k ≥ 0, u = P^k(ut) ∧ u ≠ undef  *)
     ) neqs     
-  
+in
+
+Printer.prt `Dbg "is_def: %a %a" pp_ut ut Fmt.bool res; res
 (* Build the inequality graph. There is a edge from S to S' if there exits
    u in S and v in S' such that:
    i)   u <= v
@@ -788,7 +835,16 @@ let neq_sat uf g neqs : bool =
       not violation
     ) neqs
   &&
-  
+
+  (* Looks for elements in equal to undef that must be defined. *)
+  (List.for_all (fun classe ->
+       Printer.prt `Dbg "classe: %a" (Fmt.list pp_ut) classe;
+       let res = not (List.exists (ut_equal uundef) classe) ||
+                 List.for_all (fun ut -> not (is_def uf neqs ut)) classe in
+       Printer.prt `Dbg "res: %a" Fmt.bool res; res
+     ) (Uuf.classes uf))  
+  &&
+
   (* Look for contradiction in [g], i.e. an edge [u ≤ v] such that one of 
      the following holds: 
      - 1) [u = P^k(u)] and [v = P^k'(u)] for [k < k'].
