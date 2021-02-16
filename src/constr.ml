@@ -13,10 +13,10 @@ open Utils
    constraints solving, the union-find structure contains an
    *under-approximation* of equality equivalence classes. *)
 
-let log_constr = Log.log Log.LogConstr
-  
-(* Comment this for debugging *)
-(* let log_constr = ignore *)
+(* Comment in/out for debugging *)
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
 
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
 
@@ -652,10 +652,8 @@ let pp_scc fmt scc =
 let log_cycles sccs =
   let sccs = List.filter (fun scc -> List.length scc > 1) sccs in
   if List.length sccs > 0 then
-    log_constr (fun () ->
-        Printer.prt `Dbg
-          "@[<v 2>Adding SCCs equalities:@, %a@]"
-          (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ") pp_scc) sccs)
+    dbg "@[<v 2>Adding SCCs equalities:@, %a@]"
+      (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " &&@ ") pp_scc) sccs
 
 (*------------------------------------------------------------------*)
 (** For every SCC (x,x_1,...,x_n) in the graph, we add the equalities
@@ -747,14 +745,13 @@ let add_disj uf g u x =
                 kpred x (maxj + i))
                         |> mgus uf in
 
-            log_constr (fun () ->
-                Printer.prt `Dbg "@[<v 2>Disjunction:@;\
-                                    to_split:%a@;\
-                                    minj:%d@;\
-                                    maxj:%d@;\
-                                    base:%a@]"
-                  pp_ut u
-                  minj maxj pp_ut x);
+            dbg "@[<v 2>Disjunction:@;\
+                 to_split:%a@;\
+                 minj:%d@;\
+                 maxj:%d@;\
+                 base:%a@]"
+              pp_ut u
+              minj maxj pp_ut x;
             Some (uf, List.map (fun x -> (nu,x)) l)
         ) (max_pred uf g nu x) 
     ) (min_pred uf g nu x)
@@ -785,8 +782,8 @@ let neq_sat uf g neqs : bool =
   List.for_all (fun (u,v) ->
       let violation = ut_equal (mgu uf u |> snd) (mgu uf v |> snd) in
 
-      if violation then log_constr (fun () ->
-          Printer.prt `Dbg "disequality %a ≠ %a violated" pp_ut u pp_ut v);
+      if violation then 
+        dbg "disequality %a ≠ %a violated" pp_ut u pp_ut v;
       
       not violation
     ) neqs
@@ -803,19 +800,20 @@ let neq_sat uf g neqs : bool =
       
       let violation1 = is_kpred uf v u in
 
-      if violation1 then log_constr (fun () ->
-          Printer.prt `Dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
-                            @[<hov>is_kpred %a %a@]"
-            pp_ut u pp_ut v
-            pp_ut v pp_ut u);
+      if violation1 then 
+        dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
+             @[<hov>is_kpred %a %a@]"
+          pp_ut u pp_ut v
+          pp_ut v pp_ut u;
 
       let violation2 = is_undef uf u || is_undef uf v in
 
-      if violation2 then log_constr (fun () ->
-          let x = if is_undef uf u then u else v in
-          Printer.prt `Dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
-                            @[<hov>is_undef %a@]"
-            pp_ut u pp_ut v pp_ut x);
+      if violation2 then begin
+        let x = if is_undef uf u then u else v in
+        dbg "contradiction: @[<hov>%a ≤ %a@] and@ \
+             @[<hov>is_undef %a@]"
+          pp_ut u pp_ut v pp_ut x 
+      end;
 
       not (violation1 || violation2)
     ) g
@@ -829,15 +827,12 @@ let get_basics uf elems =
     
 (*------------------------------------------------------------------*)
 let log_segment_eq eq =
-  log_constr (fun () -> Printer.prt `Dbg
-                 "@[<v 2>Adding segment equality:@, %a@]"
-                 (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
-                    pp_ut pp_ut) eq)
+  dbg "@[<v 2>Adding segment equality:@, %a@]"
+    (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
+       pp_ut pp_ut) eq
 
 let log_split f =
-  log_constr (fun () -> Printer.prt `Dbg
-                 "@[<v 2>Splitting clause:@, %a@]"
-                 Form.pp_disj f)
+  dbg "@[<v 2>Splitting clause:@, %a@]" Form.pp_disj f
     
 let log_init_eqs eqs =
   let pp_eq fmt (ut1, ut2) =
@@ -847,17 +842,13 @@ let log_init_eqs eqs =
     Fmt.pf fmt "@[<hv 2>%a@]" 
       (Fmt.list ~sep:Fmt.comma pp_eq) eqs in
       
-  log_constr (fun () ->
-      Printer.prt `Dbg
-        "@[<v 2>Adding new init equalities:@, %a@]"
-        pp_eqs eqs)
+  dbg "@[<v 2>Adding new init equalities:@, %a@]"
+    pp_eqs eqs
 
-let log_done () =
-  log_constr (fun () -> Printer.prt `Dbg "@[<v 2>Model done@]")
+let log_done () = dbg "@[<v 2>Model done@]"
 
-let log_instr inst =
-  log_constr (fun () -> Printer.prt `Dbg "@[<v 2>Solving:@;%a@]"
-                 pp_constr_instance inst)
+let log_instr inst = 
+  dbg "@[<v 2>Solving:@;%a@]" pp_constr_instance inst
 
 (*------------------------------------------------------------------*)
 (** Type of a model, which is a satisfiable and normalized instance, and the
@@ -884,22 +875,15 @@ let find_segment_disj instance g =
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
-let find_eq_init uf neqs =
-  Fmt.epr "uf:@. %a@." Uuf.print uf;
-  
-  let new_eqs = List.filter_map (fun (ut1, ut2) ->
-      Fmt.epr "init: %a and %a@." pp_ut ut1 pp_ut ut2;
-      
+let find_eq_init uf neqs =  
+  let new_eqs = List.filter_map (fun (ut1, ut2) ->     
       let uf, uts = mgus uf [ut1;ut2] in
       let ut1, ut2 = Utils.as_seq2 uts in
-
-      Fmt.epr "init2: %a and %a@." pp_ut ut1 pp_ut ut2;
 
       if ut_equal ut1 uundef || ut_equal ut2 uundef then None
       else
         let ut = if ut_equal ut1 uundef then ut2 else ut1 in
         let _, put = mgu uf (upred ut) in
-        Fmt.epr "put: %a@." pp_ut put;
         
         if ut_equal put uundef &&
            (not (ut_equal put uinit)) &&
@@ -963,7 +947,7 @@ let rec split (instance : constr_instance) : model list =
     end
   with
   | No_mgu ->
-    log_constr (fun () -> Printer.prt `Dbg "@[<v 2>No_mgu@]");
+    dbg "@[<v 2>No_mgu@]";
     []
 
 (** The minimal models a of constraint.

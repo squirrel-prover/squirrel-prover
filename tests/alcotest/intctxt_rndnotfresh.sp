@@ -14,11 +14,8 @@ abstract u : message
 
 system (out(c,enc(m,r,k)) | out(c,r) |  ( in(c,x); let y = dec(x,k) in out(c,y))).
 
-goal _ : output@A2 <> fail => output@A2 = m.
+goal _ : happens(A2) => output@A2 <> fail => output@A2 = m.
 Proof.
-  intro Hneq.
+  intro Hap Hneq.
   nosimpl(intctxt D).
-
-  simpl.
-  simpl.
 Qed.

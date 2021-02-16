@@ -2,6 +2,8 @@
 
 type state
 
+val pp_state : Format.formatter -> state -> unit
+
 (** [complete l] construct a complete term rewritting system from the set of
     equations inside l.
     May timeout. *)

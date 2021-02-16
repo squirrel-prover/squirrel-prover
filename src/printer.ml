@@ -40,6 +40,7 @@ type pp = [
   | `Result
   | `Error
   | `Dbg
+  | `Ignore (* do not print *)
   | `Goal
   | `Default
 ]
@@ -51,6 +52,7 @@ let pp_pref (ty : pp) =
   | `Result  -> pr "@[[result> "
   | `Error   -> pr "@[[error> "
   | `Dbg     -> pr "@[[dbg> "
+  | `Ignore  -> ()
   | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
@@ -61,10 +63,15 @@ let pp_suf (ty : pp) =
   | `Result  -> pr "@.@]@."
   | `Error   -> pr "@.@]@."
   | `Dbg     -> pr "@.@]@."
+  | `Ignore  -> ()
   | `Goal    -> pr "@.@]@."
   | `Default -> ()
 
 
-let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) (get_std ()) fmt
+let prt ty fmt = 
+  let out = match ty with
+    | `Ignore -> dummy_fmt
+    | _ -> get_std () in
+    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) out fmt
 
 let pr fmt = prt `Default fmt

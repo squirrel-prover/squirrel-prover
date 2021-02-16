@@ -1,7 +1,13 @@
 open Utils
 
 module Args = TacticsArgs
-  
+
+(*------------------------------------------------------------------*)
+(* For debugging *)
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
+(*------------------------------------------------------------------*)  
 type hyp_error =
   | HypAlreadyExists of string
   | HypUnknown of string
@@ -328,6 +334,82 @@ let pp ppf s =
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 
+
+(*------------------------------------------------------------------*)
+let get_message_atoms s =
+  List.fold_left (fun atoms (_,hyp) -> match hyp with 
+      | Term.(Atom (`Message at)) -> at :: atoms
+      | Term.(Not (Atom (#message_atom as at))) ->
+        let `Message neg_at = Term.not_message_atom at in
+        neg_at :: atoms
+      | _ -> atoms
+    ) [] (H.to_list s.hyps)
+
+let get_trace_literals s =
+  List.fold_left (fun atoms (id,hyp) -> match hyp with
+      | Term.(Atom (#trace_atom as at)) ->
+        (`Pos, at) :: atoms
+      | Term.(Not (Atom (#trace_atom as at))) ->
+        (`Neg, at) :: atoms
+      | _ -> atoms
+    ) [] (H.to_list s.hyps)
+
+(*------------------------------------------------------------------*)
+(** Constraints *)
+
+let get_models s : Constr.models timeout_r =
+  match !(s.models) with
+  | Some models -> Result models
+  | None ->
+    let trace_literals = get_trace_literals s in
+    match Constr.models_conjunct trace_literals with
+    | Timeout -> Timeout
+    | Result models ->
+      let () = S.set_models s models in
+      Result models
+
+let query s q =
+  let models = Tactics.timeout_get (get_models s) in
+  Constr.query models q
+
+let query_happens s a = query s [`Pos, `Happens a]
+
+let maximal_elems s tss =
+  match get_models s with
+  | Result models -> Result (Constr.maximal_elems models tss)
+  | Timeout -> Timeout
+
+let get_ts_equalities s =
+  match get_models s with
+  | Result models ->
+    let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
+             |>  Atom.trace_atoms_ts in
+    Result (Constr.get_ts_equalities models ts)
+  | Timeout -> Timeout
+
+let get_ind_equalities s =
+  match get_models s with
+  | Result models ->
+    let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
+               |> Atom.trace_atoms_ind in
+    Result (Constr.get_ind_equalities models inds)
+  | Timeout -> Timeout    
+
+let constraints_valid s =
+  match get_models s with
+  | Result models -> Result (not (Constr.m_is_sat models))
+  | Timeout -> Timeout
+
+(*------------------------------------------------------------------*)
+let get_all_terms s =
+  let atoms = get_message_atoms s in
+  let atoms =
+    match s.conclusion with
+      | Term.Atom (`Message atom) -> atom :: atoms
+      | _ -> atoms
+  in
+  List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
+
 (*------------------------------------------------------------------*)  
 module Hyps = struct
   let fresh_id ?(approx=false) name s =
@@ -373,7 +455,7 @@ module Hyps = struct
            Macros.is_defined m a table
         then
           let def = Macros.get_definition system table sort m is a in
-          f t def ;
+          f a t def ;
           self#visit_message def
       | t -> super#visit_message t
     method visit_formula f =
@@ -387,18 +469,21 @@ module Hyps = struct
   end
 
   (** Add to [s] equalities corresponding to the expansions of all macros
-    * occurring in [at]. *)
+    * occurring in [at], if [at] happened. *)
   let rec add_macro_defs (s : sequent) at =
-    let macro_eqs : Term.message_atom list ref = ref [] in
+    let macro_eqs : (Term.timestamp * Term.message_atom) list ref = ref [] in
     let iter =
       new iter_macros
         ~system:s.system
         s.table
-        (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs) in
+        (fun a t t' -> 
+           macro_eqs := (a, `Message (`Eq,t,t')) :: !macro_eqs) in
     
     iter#visit_formula (Term.Atom at) ;
     
-    List.fold_left (fun i s -> snd (add_message_atom None i s)) s !macro_eqs
+    List.fold_left (fun s (a,eq) -> 
+        if query_happens s a then snd (add_message_atom None s eq) else s
+      ) s !macro_eqs
 
   and add_message_atom ?(force=false) (id : Ident.t option) (s : sequent) at =
     let f = Term.Atom (at :> Term.generic_atom) in
@@ -537,25 +622,6 @@ let subst subst s =
         snd (Hyps.add_formula id f s)) hyps s
 
 (*------------------------------------------------------------------*)
-let get_message_atoms s =
-  List.fold_left (fun atoms (_,hyp) -> match hyp with 
-      | Term.(Atom (`Message at)) -> at :: atoms
-      | Term.(Not (Atom (#message_atom as at))) ->
-        let `Message neg_at = Term.not_message_atom at in
-        neg_at :: atoms
-      | _ -> atoms
-    ) [] (H.to_list s.hyps)
-
-let get_trace_literals s =
-  List.fold_left (fun atoms (id,hyp) -> match hyp with
-      | Term.(Atom (#trace_atom as at)) ->
-        (`Pos, at) :: atoms
-      | Term.(Not (Atom (#trace_atom as at))) ->
-        (`Neg, at) :: atoms
-      | _ -> atoms
-    ) [] (H.to_list s.hyps)
-
-(*------------------------------------------------------------------*)
 (** TRS *)
 
 let get_eqs_neqs s =
@@ -575,62 +641,19 @@ let get_trs s : Completion.state timeout_r =
       let () = S.set_trs s trs in
       Result trs
 
+
 let message_atoms_valid s =
   match get_trs s with
   | Timeout -> Timeout
   | Result trs ->
+    let () = dbg "trs: %a" Completion.pp_state trs in
+
     let _, neqs = get_eqs_neqs s in
     Result (
       List.exists (fun eq ->
-          Completion.check_equalities trs [eq])
+          if Completion.check_equalities trs [eq] then
+            let () = dbg "dis-equality %a ≠ %a violated" 
+                Term.pp (fst eq) Term.pp (snd eq) in
+            true
+          else false)
         neqs)
-
-(*------------------------------------------------------------------*)
-(** Constraints *)
-
-let get_models s : Constr.models timeout_r =
-  match !(s.models) with
-  | Some models -> Result models
-  | None ->
-    let trace_literals = get_trace_literals s in
-    match Constr.models_conjunct trace_literals with
-    | Timeout -> Timeout
-    | Result models ->
-      let () = S.set_models s models in
-      Result models
-
-let maximal_elems s tss =
-  match get_models s with
-  | Result models -> Result (Constr.maximal_elems models tss)
-  | Timeout -> Timeout
-
-let get_ts_equalities s =
-  match get_models s with
-  | Result models ->
-    let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
-             |>  Atom.trace_atoms_ts in
-    Result (Constr.get_ts_equalities models ts)
-  | Timeout -> Timeout
-
-let get_ind_equalities s =
-  match get_models s with
-  | Result models ->
-    let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
-               |> Atom.trace_atoms_ind in
-    Result (Constr.get_ind_equalities models inds)
-  | Timeout -> Timeout    
-
-let constraints_valid s =
-  match get_models s with
-  | Result models -> Result (not (Constr.m_is_sat models))
-  | Timeout -> Timeout
-
-(*------------------------------------------------------------------*)
-let get_all_terms s =
-  let atoms = get_message_atoms s in
-  let atoms =
-    match s.conclusion with
-      | Term.Atom (`Message atom) -> atom :: atoms
-      | _ -> atoms
-  in
-  List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms

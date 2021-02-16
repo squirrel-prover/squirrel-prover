@@ -44,6 +44,7 @@
   "frame"
   "seq"
   "diff"
+  "happens"
   "len"
   "xor"
   ))

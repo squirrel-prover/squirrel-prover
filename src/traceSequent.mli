@@ -140,6 +140,11 @@ val get_trs : sequent -> Completion.state Utils.timeout_r
     May timeout. *)
 val get_models : sequent -> Constr.models Utils.timeout_r
 
+(** See [Constr.query] *)
+val query : t -> Constr.trace_literal list -> bool
+
+val query_happens : t -> Term.timestamp -> bool
+
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
   * messages on both sides of the sequents make the sequent valid. 
   * May timeout. *)

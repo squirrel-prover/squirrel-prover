@@ -10,9 +10,16 @@ module L = Location
 
 module Hyps = TraceSequent.Hyps
 
+(*------------------------------------------------------------------*)
+(* Comment in/out for debugging *)
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
+(*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
+(*------------------------------------------------------------------*)
 (** Propositional connectives *)
 
 (** Reduce a goal with a disjunction conclusion into the goal
@@ -96,7 +103,6 @@ let () =
   T.register_typed "notleft"
     ~general_help:"Push a negation inside a formula."
     left_not_intro Args.String
-
 
 (*------------------------------------------------------------------*)    
 type ip_handler = [
@@ -437,22 +443,19 @@ let rec do_intro (s : TraceSequent.t) : ip_handler * TraceSequent.sequent =
     do_intro (TraceSequent.set_conclusion f s)
       
   | Impl(lhs,rhs)->
-    let id, s =
-      Hyps.add_i Args.Unnamed lhs (TraceSequent.set_conclusion rhs s)
-    in
+    let id, s = Hyps.add_i Args.Unnamed lhs s in
+    let s = TraceSequent.set_conclusion rhs s in
     ( `Hyp id, s )
     
   | Not f ->
-    let id, s =
-      Hyps.add_i Args.Unnamed f (TraceSequent.set_conclusion False s)
-    in
+    let id, s = Hyps.add_i Args.Unnamed f s in
+    let s = TraceSequent.set_conclusion False s in
     ( `Hyp id, s )
     
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
-    let id, s =
-      Hyps.add_i Args.Unnamed (Atom h) (TraceSequent.set_conclusion False s)
-    in
+    let id, s = Hyps.add_i Args.Unnamed (Atom h) s in 
+    let s = TraceSequent.set_conclusion False s in
     ( `Hyp id, s )
     
   | _ -> soft_failure Tactics.NothingToIntroduce
@@ -667,8 +670,7 @@ let expand_macro t s =
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
         let s_hap =
-          let models = Tactics.timeout_get (TraceSequent.get_models s) in
-          if Constr.query models [`Pos, `Happens a]
+          if TraceSequent.query_happens s a
           then []
           else [TraceSequent.set_conclusion (Term.Atom (`Happens a)) s]
         in
@@ -703,9 +705,14 @@ let () = T.register_typed "expand"
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =
+  dbg "conclusion: %a" Term.pp (TraceSequent.conclusion s);
+
+
   let conclusions =
     Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
   in
+
+  dbg "%d" (List.length conclusions);
   
   let term_conclusions =
     List.fold_left (fun acc conc -> match conc with
@@ -723,6 +730,7 @@ let congruence (s : TraceSequent.t) =
     ) s term_conclusions
   in
   if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
+    let () = dbg "closed by congruence" in
     []
   else soft_failure CongrFail
 
@@ -754,6 +762,7 @@ let constraints (s : TraceSequent.t) =
     ) s trace_conclusions
   in
   if Tactics.timeout_get (TraceSequent.constraints_valid s) then
+    let () = dbg "closed by constraints" in
     []
   else soft_failure (Tactics.Failure "constraints satisfiable")
 
@@ -766,7 +775,8 @@ let () = T.register "constraints"
 let assumption (s : TraceSequent.t) =
   let goal = TraceSequent.conclusion s in
   if goal = Term.True || Hyps.is_hyp goal s then
-      []
+    let () = dbg "assumption %a" Term.pp goal in
+    []
   else
     soft_failure (Tactics.Failure "Conclusion is not an hypothesis")
 
@@ -814,6 +824,7 @@ let eq_names (s : TraceSequent.t) =
   let new_eqs = Completion.name_indep_cnstrs trs terms in
   let s =
     List.fold_left (fun s c ->
+        let () = dbg "new name equality (indep): %a" Term.pp c in
         Hyps.add Args.AnyName c s
       ) s new_eqs in
   
@@ -825,6 +836,7 @@ let eq_names (s : TraceSequent.t) =
   in
   let s =
     List.fold_left (fun s c ->
+        let () = dbg "new index equality (names): %a" Term.pp c in
         Hyps.add Args.AnyName c s
       ) s cnstrs
   in
@@ -872,6 +884,7 @@ let eq_trace (s : TraceSequent.t) =
   in
   let s =
     List.fold_left (fun s c ->
+        let () = dbg "new trace equality: %a" Term.pp c in
         Hyps.add Args.AnyName c s
       ) s facts
   in
@@ -1145,6 +1158,7 @@ let autosubst s =
   
   let process : type a. a Vars.var -> a Vars.var -> TraceSequent.t =
     fun x y ->
+
       (* Just remove the equality if x and y are the same variable. *)
       if x = y then s else
       (* Otherwise substitute the newest variable by the oldest one,
@@ -1152,6 +1166,9 @@ let autosubst s =
       let x,y =
         if x.Vars.name_suffix <= y.Vars.name_suffix then y,x else x,y
       in
+
+      let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in
+
       let s =
         TraceSequent.set_env (Vars.rm_var (TraceSequent.env s) x) s
       in
@@ -1889,7 +1906,8 @@ let () =
   
   let open Tactics in
   (* Simplify goal. We will never backtrack on these applications. *)
-  let simplify ~intro =
+  let simplify ~intro s sk fk =
+    dbg "simplify"; 
     andthen_list (
       (* Try assumption first to avoid loosing the possibility
          * of doing it after introductions. *)
@@ -1904,11 +1922,12 @@ let () =
       (wrap eq_names) ::
       (* Simplify equalities using substitution. *)
       [repeat (wrap autosubst)]
-    ) in
+    ) s sk fk in
   
   (* Attempt to close a goal. *)
-  let conclude =
-    orelse_list [(wrap congruence); (wrap constraints); (wrap assumption)]
+  let conclude s sk fk =
+    dbg "conclude";
+    orelse_list [(wrap congruence); (wrap constraints); (wrap assumption)] s sk fk
   in
   let (>>) = andthen ~cut:true in
   
