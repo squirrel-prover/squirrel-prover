@@ -59,10 +59,10 @@ let pp_pref (ty : pp) =
 let pp_suf (ty : pp) =
   match ty with
   | `Prompt  -> pr "@.@]@."
-  | `Start   -> pr "@.@]@."
+  | `Start   -> pr "@.<]@]@."
   | `Result  -> pr "@.@]@."
   | `Error   -> pr "@.@]@."
-  | `Dbg     -> pr "@.@]@."
+  | `Dbg     -> pr "@.<]@]@."
   | `Ignore  -> ()
   | `Goal    -> pr "@.@]@."
   | `Default -> ()
