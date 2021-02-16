@@ -660,38 +660,35 @@ let () = T.register "induction"
     induction
 
 (*------------------------------------------------------------------*)
-let expand_bool t s =
+let expand_macro t s =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
-  let succ subst = [TraceSequent.subst subst s] in
   match t with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
-        succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                           Macros.get_definition system table sort mn is a)]
+        let s_hap =
+          let models = Tactics.timeout_get (TraceSequent.get_models s) in
+          if Constr.query models [`Pos, `Happens a]
+          then []
+          else [TraceSequent.set_conclusion (Term.Atom (`Happens a)) s]
+        in
+        
+        let mdef = Macros.get_definition system table sort mn is a in
+        let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
+        let s' = TraceSequent.subst subst s in
+        s_hap @ [s']
+
       else soft_failure (Tactics.Failure "cannot expand this macro")
+
     | _ ->
       soft_failure (Tactics.Failure "can only expand macros")
 
-let expand_mess t s =
-  let system = TraceSequent.system s in
-  let table  = TraceSequent.table s in
-  let succ subst = [TraceSequent.subst subst s] in
-  match t with
-  | Macro ((mn, sort, is),l,a) ->
-    if Macros.is_defined mn a table then
-      succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                         Macros.get_definition system table sort mn is a)]
-    else soft_failure (Tactics.Failure "cannot expand this macro")
-  | _ ->
-    soft_failure (Tactics.Failure "can only expand macros")
-
 let expand arg s = match arg with
   | Args.ETerm (Sorts.Boolean, f, loc) ->
-    expand_mess f s
+    expand_macro f s
 
   | Args.ETerm (Sorts.Message, f, loc) ->
-    expand_bool f s
+    expand_macro f s
 
   | Args.ETerm ((Sorts.Index | Sorts.Timestamp), _, loc) ->
     hard_failure

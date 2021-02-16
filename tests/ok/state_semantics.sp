@@ -32,28 +32,45 @@ system (!_i !_j Tag(i,j)).
 
 goal stateSemantics1:
   forall (i,j:index),
+    happens (T(i,j)) => 
     output@T(i,j) = <h(k1(i)@pred(T(i,j)),key(i)),k2(i)@pred(T(i,j))>.
 Proof.
 auto.
 Qed.
 
+
 goal stateSemantics2:
   forall (i,j:index),
+    (* happens (T(i,j)) => *)
     output@T1(i,j) =
       < h(k1(i)@pred(T1(i,j)),key(i)),
         <h(k1(i)@pred(T1(i,j)),key(i)),k2(i)@pred(T1(i,j))>>.
 Proof.
-auto.
-Qed.
+ auto.     (* TODO: should fail *)
+Abort.
+
+goal stateSemantics2TODO:
+  forall (i,j:index),
+    happens (T(i,j)) =>
+    output@T1(i,j) =
+      < h(k1(i)@pred(T1(i,j)),key(i)),
+        <h(k1(i)@pred(T1(i,j)),key(i)),k2(i)@pred(T1(i,j))>>.
+Proof.
+ auto.     (* TODO: should fail too *)
+Abort.
 
 goal stateSemantics3:
-  forall (i,j:index), output@T2(i,j) = <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
+  forall (i,j:index), 
+    happens (T2(i,j)) => 
+  output@T2(i,j) = <h(k1(i)@pred(T2(i,j)),key(i)),k2(i)@pred(T2(i,j))>.
 Proof.
 auto.
 Qed.
 
 goal stateSemantics4:
-  forall (i,j:index), output@T3(i,j) = <h(k1(i)@pred(T3(i,j)),key(i)),<k1(i)@pred(T3(i,j)),k2(i)@pred(T3(i,j))>>.
+  forall (i,j:index), 
+  happens (T3(i,j)) => 
+  output@T3(i,j) = <h(k1(i)@pred(T3(i,j)),key(i)),<k1(i)@pred(T3(i,j)),k2(i)@pred(T3(i,j))>>.
 Proof.
 auto.
 Qed.
