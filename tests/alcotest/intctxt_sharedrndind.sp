@@ -14,7 +14,7 @@ abstract u : message
 
 system ( !_i out(c,enc(m(i),r,k)) | ( in(c,x); let y = dec(x,k) in out(c,y))).
 
-goal output@A1 <> fail => exists i:index, output@A1 = m(i).
+goal _ : output@A1 <> fail => exists i:index, output@A1 = m(i).
 Proof.
   intro Hneq.
   nosimpl(intctxt D).

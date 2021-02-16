@@ -6,7 +6,7 @@ abstract f : message->message
 channel c
 system out(c,m).
 
-goal forall tau:timestamp, n = f(frame@tau) => False.
+goal _ (tau:timestamp): n = f(frame@tau) => False.
 Proof.
   nosimpl(intro tau Heq).
   nosimpl(fresh Heq).

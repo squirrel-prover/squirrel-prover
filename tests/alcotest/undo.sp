@@ -5,7 +5,7 @@ abstract y:message
 
 system null.
 
-goal x=y.
+goal _ : x=y.
 Proof.
   nosimpl(assert x=y).
   admit.

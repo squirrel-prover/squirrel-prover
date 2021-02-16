@@ -10,7 +10,7 @@ name k : index->index->message
 
 system !_i out(c,h(n,k(i,i))).
 
-goal forall (tau:timestamp,a,b:index),
+goal _ (tau:timestamp,a,b:index):
   output@tau = h(n,k(a,b)) =>
   a = b.
 Proof.

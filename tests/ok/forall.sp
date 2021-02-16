@@ -19,5 +19,5 @@ Proof.
  by auto.
 Qed.
 
-goal forall x:timestamp, True.
-goal forall () True.
+goal _ (x:timestamp) : True.
+goal _ : forall (), True.

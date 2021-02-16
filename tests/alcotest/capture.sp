@@ -9,7 +9,7 @@ system null.
 axiom one : f(a)=a
 axiom two : forall x:message, (forall x:message, f(x)=a) => f(x)=b.
 
-goal f(a)=b.
+goal _: f(a)=b.
 Proof.
   apply two to a.
   apply one.

@@ -41,6 +41,7 @@ and term = term_i L.located
     
     
 type formula = term
+
 (*------------------------------------------------------------------*)
 let rec equal t t' = match L.unloc t, L.unloc t' with
   | Tinit, Tinit
@@ -691,8 +692,8 @@ let rec convert :
         List.map f new_subst
       in
       begin match sort, L.unloc tm with
-        | Sorts.Boolean, ForAll _ -> Term.ForAll (vs,f)
-        | Sorts.Boolean, Exists _ -> Term.Exists (vs,f)
+        | Sorts.Boolean, ForAll _ -> Term.mk_forall vs f
+        | Sorts.Boolean, Exists _ -> Term.mk_exists vs f
         | _ -> raise type_error
       end
   | Seq (vs,t) ->

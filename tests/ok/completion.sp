@@ -8,7 +8,7 @@ abstract h : message -> message
 
 system null.
 
-goal  False.
+goal _:  False.
 Proof.
 assert fst( h(<<m3,m2>,m3>))=m1.
 assert  <m1,m2> = h(<<m3,m2>,m3>).
@@ -16,7 +16,7 @@ admit.
 admit.
 Qed.
 
-goal  forall (x:message), False.
+goal _ (x:message) : False.
 Proof.
 intro x.
 assert fst( h(<<m3,x>,m3>))=m1.
@@ -25,7 +25,7 @@ admit.
 admit.
 Qed.
 
-goal  forall (x:message), <m1,m2> <> h(<<m3,x>,m3>).
+goal _ (x:message) : <m1,m2> <> h(<<m3,x>,m3>).
 Proof.
 intro x Heq.
 assert fst( h(<<m3,x>,m3>))=m1.

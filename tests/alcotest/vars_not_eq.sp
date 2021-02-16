@@ -6,15 +6,13 @@ abstract f : message->message
 abstract h : message->message
 system null.
 
-goal test :
-  forall (x:message, y:message),
+goal test (x:message, y:message) :
   n = m => False.
 Proof.
   intro x y _.
 Qed.
 
-goal test2 :
-  forall (x:message, y:message),
+goal test2 (x:message, y:message) :
   f(n) = h(m) => False.
 Proof.
   intro *.

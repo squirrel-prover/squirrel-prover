@@ -14,8 +14,7 @@ axiom collision_resistance :
 forall ( ma : message, mb : message),
 h(ma,k)=h(mb,k) => ma = mb.
 
-goal unforgeable :
-  forall (a:index, b:index),
+goal unforgeable (a:index, b:index) :
   (b <> a =>
   output@A(b) <> h(n(a),k)).
 

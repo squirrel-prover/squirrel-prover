@@ -8,7 +8,7 @@ system A: !_i
        let a = f(x) in
        let b = ff(a) in
        out(c,b).
-goal forall i:index, output@A(i) = ff(f(input@A(i))).
+goal _ (i:index): output@A(i) = ff(f(input@A(i))).
 Proof.
   auto.
 Qed.

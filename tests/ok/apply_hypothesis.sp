@@ -2,7 +2,7 @@ set autoIntro=false.
 
 system null.
 
-goal forall (x:message,y:message,z:message),
+goal _ (x:message,y:message,z:message) :
   (x = y => y = z) => x = y => y = z.
 Proof.
   nosimpl(intro x y z H Heq).

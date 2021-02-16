@@ -20,7 +20,7 @@ expand cond@O1.
 nosimpl(notleft Hc; assumption).
 Qed.
 
-goal
+goal _:
 exec@O =>
   output@O = k.
 Proof.
@@ -31,7 +31,7 @@ Proof.
  auto.
 Qed.
 
-goal
+goal _:
  frame@O = <frame@pred(O),<if exec@O then true else false,if exec@O then output@O else zero>>.
 Proof.
   auto.

@@ -18,8 +18,7 @@ system O: out(ch,cst); (
 ).
 
 
-goal dummy :
-  forall (tau1 : timestamp, tau2 : timestamp, a : index, b: message),
+goal dummy (tau1 : timestamp, tau2 : timestamp, a : index, b: message) :
   tau1 = tau2 =>
   output@tau1= output@tau2.
 Proof.

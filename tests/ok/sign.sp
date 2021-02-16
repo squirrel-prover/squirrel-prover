@@ -14,7 +14,7 @@ abstract u : message
 
 system (out(c,sign(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
-goal forall tau:timestamp, cond@A1 => False.
+goal _ (tau:timestamp): cond@A1 => False.
 Proof.
   intro tau Hcond.
   expand cond@A1.

@@ -2,7 +2,7 @@ set autoIntro=false.
 
 system null.
 
-goal False => exists x:index, x<>x.
+goal _: False => exists x:index, x<>x.
 Proof.
   by auto.
 Qed.

@@ -6,7 +6,7 @@ system
   let y = <x,x> in
   out(c,y).
 
-goal output@A = <input@A,input@A>.
+goal _: output@A = <input@A,input@A>.
 Proof.
  by auto.
 Qed.

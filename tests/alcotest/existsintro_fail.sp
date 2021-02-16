@@ -22,8 +22,7 @@ axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
 na(a) <>  <ma, mb>.
 
-goal unforgeable :
-  forall (tau : timestamp, tau2:timestamp, b:index),
+goal unforgeable (tau : timestamp, tau2:timestamp, b:index) :
   input@A3=h(input@A,k) => exists (a:index), (input@A2 = na(a)).
   Proof.
   intro tau tau2 b Heq.

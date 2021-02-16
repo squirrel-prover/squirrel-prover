@@ -484,9 +484,9 @@ equiv:
 | ei=equiv_item                 { [ei] }
 | ei=equiv_item COMMA eis=equiv { ei::eis }
 
-equiv_env:
-|                           { [] }
-| LPAREN vs=arg_list RPAREN { vs }
+args:
+|                                         { [] }
+| LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
 system:
 |                         { SystemExpr.(P_SimplePair default_system_name) }
@@ -506,16 +506,21 @@ single_system:
 | LBRACKET LEFT COMMA i=ID RBRACKET  { SystemExpr.(P_Left i) }
 | LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Right i)}
 
+gname:
+| i=ID       { P_named i }
+| UNDERSCORE { P_unknown }
+
 goal_i:
-| GOAL s=system i=ID COLON f=formula DOT
-                 { Prover.Gm_goal (P_named i, P_trace_goal (s, f)) }
-| GOAL s=system f=formula DOT
-                 { Prover.Gm_goal (P_unknown, P_trace_goal (s, f)) }
-| EQUIV n=ID env=equiv_env COLON l=equiv DOT
-                 { Prover.Gm_goal (P_named n, P_equiv_goal (env, l)) }
-| EQUIV n=ID DOT
+| GOAL s=system n=gname args=args COLON f=formula DOT
+    { let f_i = Theory.ForAll (args, f) in
+      let fa = Location.mk_loc (Location.loc f) f_i in
+      Prover.Gm_goal (n, P_trace_goal (s, fa)) }
+
+| EQUIV n=gname env=args COLON l=equiv DOT
+                 { Prover.Gm_goal (n, P_equiv_goal (env, l)) }
+| EQUIV n=gname DOT
                  { Prover.Gm_goal
-                     (P_named n, P_equiv_goal_process
+                     (n, P_equiv_goal_process
                                    (SystemExpr.(P_Left  default_system_name),
 			                              SystemExpr.(P_Right default_system_name))) }
 | EQUIV b1=single_system b2=single_system n=ID DOT

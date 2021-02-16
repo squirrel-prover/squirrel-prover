@@ -9,7 +9,7 @@ abstract f : message->message
 
 system null.
 
-goal forall (i,j:index) f(h(i,a,k)) = h(j,b,k) => a = b.
+goal _ (i,j:index) : f(h(i,a,k)) = h(j,b,k) => a = b.
 Proof.
   nosimpl(intro i j Heq).
   nosimpl(euf Heq; intro Eqab). 
