@@ -12,19 +12,17 @@ system O:
  in(ch,x); if x=k then out(ch,x).
 
 
-goal dummy :
-cond@O1 => input@O1 <>k.
+goal _ :
+happens(O1) => cond@O1 => input@O1 <>k.
 Proof.
-intro Hc.
+intro Hap Hc.
 expand cond@O1.
-nosimpl(notleft Hc; assumption).
 Qed.
 
 goal _:
-exec@O =>
-  output@O = k.
+happens(O) => exec@O => output@O = k.
 Proof.
- intro _.
+ intro _ _.
 
  expand exec@O.
  expand cond@O. 
@@ -32,7 +30,8 @@ Proof.
 Qed.
 
 goal _:
- frame@O = <frame@pred(O),<if exec@O then true else false,if exec@O then output@O else zero>>.
+happens(O) => 
+frame@O = <frame@pred(O),<if exec@O then true else false,if exec@O then output@O else zero>>.
 Proof.
   auto.
 Qed.

@@ -6,7 +6,12 @@ system
   let y = <x,x> in
   out(c,y).
 
-goal _: output@A = <input@A,input@A>.
+goal _: happens(A) => output@A = <input@A,input@A>.
 Proof.
  by auto.
 Qed.
+
+goal _: output@A = <input@A,input@A>.
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.

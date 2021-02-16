@@ -25,35 +25,35 @@ Proof.
  by auto.
 Qed.
 
-goal unforgeable_1 :
-  forall (a : index, b : index),
+goal unforgeable_1 (a : index, b : index) :
+ happens(A(b)) => 
   b <> a =>
   output@A(b) <> h(na(a),k).
 
 Proof.
- intro a b Hneq Heq.
+ intro a b Hap Hneq Heq.
  collision.  
  by auto.
 Qed.
 
-goal unforgeable_2 :
-  forall (a : index, b : index),
+goal unforgeable_2 (a : index, b : index):
+ happens(B(b)) => 
   output@B(b) <> h(na(a),k).
 
 Proof.
- intro a b Heq.
+ intro a b Hap Heq.
  nosimpl(collision).
  nosimpl(intro Heq2).
  eqnames.
 Qed.
 
 
-goal unforgeable_3 :
-  forall (a : index, b : index),
+goal unforgeable_3 (a : index, b : index):
+ happens(C(b)) => 
   output@C(b) <> h(na(a),k).
 
 Proof.
- intro a b Heq.
+ intro a b Hap Heq.
  collision. 
  intro Heq2. 
  case H. 

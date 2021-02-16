@@ -17,13 +17,12 @@ system O: out(ch,cst); (
   | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
-goal unforgeable_1 :
-  forall (a : index, b : index, c : index),
-  b <> a && c=a=>
+goal unforgeable_1 (a : index, b : index, c : index):
+  happens (A(b)) => b <> a && c=a=>
   output@A(b) <> h(na(c),k).
 
 Proof.
- nosimpl(intro a b c [H G] Hneq).
+ nosimpl(intro a b c Hap [H G] Hneq).
  substitute a, c.
  collision. 
  by auto.

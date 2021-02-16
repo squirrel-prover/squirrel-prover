@@ -14,10 +14,10 @@ system out(c,seq(a,b -> h(n(a,a),k(b,b)))).
  * where the same variable v is introduced to represent the bound
  * index a. Then n(v,v) = n(i,j) and thus i=j. *)
 goal _ (tau:timestamp,i,j,w:index):
-  output@tau = h(n(i,j),k(w,w)) =>
+  happens(tau) => output@tau = h(n(i,j),k(w,w)) =>
   i = j.
 Proof.
-  intro tau i j w Heq.
+  intro tau i j w Hap Heq.
   nosimpl(euf Heq).
   auto.
 Qed.
@@ -25,10 +25,10 @@ Qed.
 (* Similar to previous example but this time the equality i=j
  * comes from the index constraints on key indices. *)
 goal _ (tau:timestamp,i,j,w:index):
-  output@tau = h(n(w,w),k(i,j)) =>
+  happens(tau) => output@tau = h(n(w,w),k(i,j)) =>
   i = j.
 Proof.
-  intro tau i j w Heq.
+  intro tau i j w Hap Heq.
   nosimpl(euf Heq).
   auto.
 Qed.

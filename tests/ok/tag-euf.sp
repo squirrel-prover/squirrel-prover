@@ -40,13 +40,14 @@ process S =
 system (P | S).
 
 goal charac :
-  exec@OutFalse => False.
+ happens (OutFalse) => exec@OutFalse => False.
 Proof.
- intro He.
+ intro Hap He.
  executable OutFalse; intro Hexec.
  depends Out, OutFalse; intro Hle.
  apply Hexec to Out.
- nosimpl(expand exec@Out).
+ nosimpl(expand exec@Out); 
+ 1: by auto.
 
  destruct H as [Hexec0 Hcond].
 

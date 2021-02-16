@@ -13,10 +13,10 @@ system !_a in(c,x); if True || x<> k then out(c,h(n,k)).
 
 goal unforgeable :
   forall (tau:timestamp),
-  output@tau <> h(m,k).
+  happens(tau) => output@tau <> h(m,k).
 
 Proof.
-  intro tau Heq.
+  intro tau Hap Heq.
   (* we cannot directly apply euf, as k appears as a condition.
      But the condition True || x<> k is equivalent to True, so we can remove it.
   *)

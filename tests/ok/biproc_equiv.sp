@@ -6,9 +6,9 @@ system A: in(c,x);out(c,zero);
 
 
 
-goal trivial_if : cond@B => False.
+goal trivial_if : happens(B) => cond@B => False.
 Proof.
-intro Hcond.
+intro Hap Hcond.
 expand cond@B.
 Qed.
 

@@ -15,11 +15,10 @@ forall ( ma : message, mb : message),
 h(ma,k)=h(mb,k) => ma = mb.
 
 goal unforgeable (a:index, b:index) :
-  (b <> a =>
-  output@A(b) <> h(n(a),k)).
+  happens(A(b)) => b <> a => output@A(b) <> h(n(a),k).
 
 Proof.
-intro a b Hneq Heq.
+intro a b Hap Hneq Heq.
 apply collision_resistance to
     n(b),
    n(a).

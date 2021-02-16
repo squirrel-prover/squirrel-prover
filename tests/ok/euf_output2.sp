@@ -12,10 +12,9 @@ name m : message
 
 system !_a out(c,h(n,k)).
 
-goal unforgeable :
-  forall (tau:timestamp),
-  output@tau <> h(m,k).
+goal unforgeable (tau:timestamp):
+  happens(tau) => output@tau <> h(m,k).
 
 Proof.
-  by intro tau Heq; euf Heq; auto.
+  by intro tau Hap Heq; euf Heq; auto.
 Qed.

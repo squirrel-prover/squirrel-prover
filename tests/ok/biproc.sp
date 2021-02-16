@@ -13,33 +13,33 @@ system A(diff(ok,ko)).
 system [toto] A(diff(ko,koo)).
 
 
-goal test : output@B = diff(ok,ko).
+goal test : happens(B) => output@B = diff(ok,ko).
 Proof.
   auto.
 Qed.
 
-goal [left] test_left : cond@B => output@B = input@B.
+goal [left] test_left : happens(B) => cond@B => output@B = input@B.
 Proof.
-  intro Hc.
+  intro Hap Hc.
   expand cond@B.
 Qed.
 
-goal [right] test_right : output@B = ko.
+goal [right] test_right : happens(B) => output@B = ko.
 Proof.
   auto.
 Qed.
 
-goal [none, toto] test2 : output@B = diff(ko,koo).
+goal [none, toto] test2 : happens(B) => output@B = diff(ko,koo).
 Proof.
   auto.
 Qed.
 
-goal [left, toto] test_left2 : cond@B => output@B = ko.
+goal [left, toto] test_left2 : happens(B) => cond@B => output@B = ko.
 Proof.
   auto.
 Qed.
 
-goal [right, toto] test_right2 : output@B = koo.
+goal [right, toto] test_right2 : happens(B) => output@B = koo.
 Proof.
   auto.
 Qed.

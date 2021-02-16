@@ -7,10 +7,10 @@ system !_i in(c,x);s:=s;out(c,x).
 
 axiom init_ok : s@init = ok.
 
-goal _ (t:timestamp): s@t = ok.
+goal _ (t:timestamp): happens(t) => s@t = ok.
 Proof.
   induction.
-  intro Hind.
+  intro Hind Hap.
   case t. 
   (* t = init *)
   by apply init_ok. 

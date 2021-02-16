@@ -28,9 +28,12 @@ let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
   | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
 
-let pp_mname ppf s =
+let pp_mname_s ppf s =
   let open Fmt in
-  (styled `Bold (styled `Magenta Utils.ident)) ppf (Symbols.to_string s)
+  (styled `Bold (styled `Magenta Utils.ident)) ppf s
+
+let pp_mname ppf s =
+  pp_mname_s ppf (Symbols.to_string s)
 
 let pp_msymb ppf (m,s,is) =
   Fmt.pf ppf "%a%a"
@@ -350,7 +353,8 @@ and pp_generic_atom ppf = function
   | #trace_atom as a -> pp_trace_atom ppf a
 
 and pp_happens ppf (ts : timestamp list) =
-  Fmt.pf ppf "@[<hv 2>happens(%a)@]"
+  Fmt.pf ppf "@[<hv 2>%a(%a)@]"
+    pp_mname_s "happens"
     (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp) ts
   
 and pp_and_happens ppf f =
