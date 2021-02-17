@@ -19,7 +19,7 @@ axiom len_ko_ok : forall i:index, len(ko XOR ok) = len(n(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (tau:timestamp,i:index) : output@tau, n(i) XOR diff(ok,m(i)).
-Proof.  
+Proof.
   xor 1.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
@@ -27,8 +27,8 @@ Proof.
     (forall (i1,i2:index) A(i1)<=tau => i2 <> i && i1<>i),
     True.
   admit.
-  nosimpl(yesif 1). 
-  by namelength n(i),m(i); apply len_ok to i; auto.
+  nosimpl(yesif 1).
+  by namelength n(i),m(i); use len_ok with i; auto.
 
   fa 1.
   admit. (* Ignore final equivalence goal. *)
@@ -46,7 +46,7 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
-  by apply len_ko_ok to i; apply len_ko to i.
+  by use len_ko_ok with i; use len_ko with i.
   fa 1.
   admit. (* Ignore final equivalence goal. *)
 Qed.

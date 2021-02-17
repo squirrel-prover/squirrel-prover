@@ -113,17 +113,17 @@ equiv unreach.
     simpl.
 
      expand exec@S2(j).
-    apply S_charac to j.
+    use S_charac with j.
      expand cond@S2(j).
 
-    apply H0 to s.
+    use H0 with s.
 
 
      depends S(j), S2(j).
 
      executable S2(j).
 
-     apply H2 to S(j).
+     use H2 with S(j).
 
      fa 2.
      noif 3.

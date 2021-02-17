@@ -91,14 +91,14 @@ goal auth_R_step : forall (delta:message,k,ii:index),
    exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j)).
 Proof.
 intros.
-apply readerTestOk to ii,x,input@R(k,ii),delta.
-apply H1.
+use readerTestOk with ii,x,input@R(k,ii),delta.
+use H1.
 case H3.
 (* euf M2 ?
    Problème avec la variable x. *)
 admit.
-apply H0 to hState(x,keyState(ii)).
-apply stacked_step to ii,kR(ii)@R(k,ii),x.
+use H0 with hState(x,keyState(ii)).
+use stacked_step with ii,kR(ii)@R(k,ii),x.
 Qed.
 
 goal auth_R :
@@ -108,8 +108,8 @@ goal auth_R :
 Proof.
 intros.
 
-apply readerTestOk to ii,kR(ii)@R(k,ii),input@R(k,ii),deltaMax.
-apply H0.
+use readerTestOk with ii,kR(ii)@R(k,ii),input@R(k,ii),deltaMax.
+use H0.
 case H2.
 
   (* case H2 => direct case - sync *)
@@ -123,8 +123,8 @@ case H2.
   exists ii,j.
 
   (* case H2 => recursive case - desync *)
-  apply readerTestOk to ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaMax).
-  apply H2.
+  use readerTestOk with ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaMax).
+  use H2.
   case H4.
 
     (* case H4 => direct case - sync *)

@@ -8,7 +8,6 @@ channel c
 system !_i in(c,x); if fst(x)=h(snd(x),k) then out(c,h(ok,k)).
 
 (* TODO: old semantics of happens. either udpate or delete the example. *)
-
 (* (* This axiom is incorrect, due to the special minimal element *)
 (*  * in timestamp domains of meta-interpretations, but we cannot *)
 (*  * write it with A(i) instead of t because A is not yet *)

@@ -45,8 +45,8 @@ Proof.
  intro Hap He.
  executable OutFalse; intro Hexec.
  depends Out, OutFalse; intro Hle.
- apply Hexec to Out.
- nosimpl(expand exec@Out); 
+ use Hexec with Out.
+ nosimpl(expand exec@Out);
  1: by auto.
 
  destruct H as [Hexec0 Hcond].
@@ -57,7 +57,7 @@ Proof.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
 
- by apply He to i. 
+ by use He with i. 
 
  nosimpl(notleft H1). 
  by auto.

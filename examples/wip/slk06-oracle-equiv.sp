@@ -95,7 +95,7 @@ induction t.
 induction t'.
 (* case t' = init *)
 equivalent kR(ii)@init,idinit(ii).
-apply stateReaderInit to ii.
+use stateReaderInit with ii.
 fresh 1.
 (* case t' = R1(jj,ii1) *)
 admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)

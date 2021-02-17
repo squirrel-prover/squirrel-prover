@@ -56,7 +56,7 @@ Proof.
 simpl.
 expand cond@R1(j,i).
 euf M0.
-apply tags_neq.
+use tags_neq.
 exists k.
 assert (nR(j) = input@T(i,k)).
 fresh M2.
@@ -81,7 +81,7 @@ intros.
 assert cond@T1(i,k).
 expand exec@T1(i,k).
 expand cond@T1(i,k).
-apply tags_neq.
+use tags_neq.
 euf M0.
 exists j.
 case H1.

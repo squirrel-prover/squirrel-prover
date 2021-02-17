@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE EXN
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -90,15 +90,15 @@ term_i:
 | LPAREN t=term_i RPAREN                     { t }
 | id=lsymb terms=term_list                   { Theory.App (id, terms) }
 | id=lsymb terms=term_list AT ts=timestamp   { Theory.AppAt (id,terms,ts) }
-| LANGLE t=term COMMA t0=term RANGLE      
+| LANGLE t=term COMMA t0=term RANGLE
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "pair" in
       Theory.App (fsymb, [t;t0]) }
-| t=term XOR t0=term                      
+| t=term XOR t0=term
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "xor" in
       Theory.App (fsymb,  [t;t0]) }
-| t=term EXP t0=term                      
+| t=term EXP t0=term
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "exp" in
       Theory.App (fsymb,  [t;t0])}
@@ -166,8 +166,8 @@ formula_i:
 | TRUE                                    { Theory.True }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
 | f=formula DEQUIVARROW f0=formula
-    { let loc = Location.make $startpos $endpos in      
-      Theory.And (Location.mk_loc loc (Theory.Impl (f,f0)), 
+    { let loc = Location.make $startpos $endpos in
+      Theory.And (Location.mk_loc loc (Theory.Impl (f,f0)),
                   Location.mk_loc loc (Theory.Impl (f0,f))) }
 
 | pid=loc(PID) terms=term_list   { Theory.App (pid, terms) }
@@ -183,7 +183,7 @@ formula_i:
                                  { Theory.Exists ([id,k],f)  }
 | FORALL id=lsymb COLON k=kind sep f=formula %prec QUANTIF
                                  { Theory.ForAll ([id,k],f)  }
-| DIFF LPAREN f=formula COMMA g=formula RPAREN 
+| DIFF LPAREN f=formula COMMA g=formula RPAREN
                                  { Theory.Diff (f,g) }
 
 formula:
@@ -274,7 +274,7 @@ index_arity:
 
 declaration_i:
 | HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
-| HASH e=ID WITH ORACLE f=formula  
+| HASH e=ID WITH ORACLE f=formula
                           { Decl.Decl_hash (None, e, Some f) }
 | AENC e=ID COMMA d=ID COMMA p=ID
                           { Decl.Decl_aenc (e, d, p) }
@@ -302,20 +302,20 @@ declaration_i:
                           { Decl.Decl_process (e, args, p) }
 | AXIOM s=bsystem f=formula
                           { Decl.(Decl_axiom { gname = None;
-                                               gsystem = s; 
+                                               gsystem = s;
                                                gform = f; }) }
 | AXIOM s=bsystem i=ID COLON f=formula
                           { Decl.(Decl_axiom { gname = Some i;
-                                               gsystem = s; 
+                                               gsystem = s;
                                                gform = f; }) }
-| SYSTEM p=process 
-                          { Decl.(Decl_system { sname = None; 
+| SYSTEM p=process
+                          { Decl.(Decl_system { sname = None;
                                                 sprocess = p}) }
-| SYSTEM LBRACKET id=ID RBRACKET p=process 
-                          { Decl.(Decl_system { sname = Some id; 
+| SYSTEM LBRACKET id=ID RBRACKET p=process
+                          { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }
 
-declaration: 
+declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
 
 declaration_list:
@@ -407,13 +407,6 @@ tac:
                                            ("destruct",[TacticsArgs.String_name i;
                                                         TacticsArgs.AndOrPat p]) }
 
-  | ASSERT p=tac_formula               { Tactics.Abstract
-                                           ("assert", [TacticsArgs.Theory p]) }
-  | ASSERT ip=simpl_pat ASSIGN p=tac_formula
-                                       { Tactics.Abstract
-                                           ("assert", [TacticsArgs.Theory p;
-                                                       TacticsArgs.SimplPat ip]) }
-
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }
   | NOSIMPL t=tac                      { Tactics.Modifier
@@ -424,15 +417,14 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
   | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
+  | ASSERT p=tac_formula ip=as_ip?
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract
+        ("assert", TacticsArgs.Theory p::ip) }
 
-  | APPLY i=ID                         { Tactics.Abstract
-                                          ("apply",
-                                           [TacticsArgs.String_name i]) }
-  | APPLY i=ID TO t=tactic_params      { Tactics.Abstract
-                                          ("apply",
-                                           TacticsArgs.String_name i :: t) }
-
-  | USE i=ID ip=as_ip? 
+  | USE i=ID ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
@@ -536,7 +528,7 @@ goal_i:
 
 | PROOF          { Prover.Gm_proof }
 
-goal: 
+goal:
 | goal=loc(goal_i) { goal }
 
 option_param:

@@ -13,7 +13,7 @@ Proof.
   intro *.
   assert h(fresh,input@t) = h(fresh,k).
   euf Meq0.
-  executable t. apply H0 to A(i).
+  executable t. use H0 with A(i).
   expand exec@A(i); expand cond@A(i).
   fresh Meq1.
 Qed.

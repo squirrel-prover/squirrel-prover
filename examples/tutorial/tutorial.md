@@ -160,7 +160,7 @@ goal wa :
 Proof.
 simpl.
 expand cond@R(j,i).
-euf M0.
+euf H.
 exists k.
 Qed.
 (*

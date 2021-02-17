@@ -81,20 +81,20 @@ substitute t,T(i1,j).
 assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
 expand kT(i)@T(i1,j).
 by noif.
-apply H to pred(T(i1,j)).
-apply H0 to i.
+use H with pred(T(i1,j)).
+use H0 with i.
 case H1.
 
   left.
-  by apply H1 to j'.
+  by use H1 with j'.
 
   right.
   exists j1.
-  apply H2 to j'.
+  use H2 with j'.
   by case H1.
 Qed.
 
-(* A more convenient version of the lemma, because our apply
+(* A more convenient version of the lemma, because our use
    tactic is too primitive. *)
 goal lastUpdate : forall (t:timestamp,i:index)
   (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
@@ -104,8 +104,8 @@ goal lastUpdate : forall (t:timestamp,i:index)
    (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
 Proof.
   intro t i.
-  apply lastUpdate_ to t.
-  apply H to i.
+  use lastUpdate_ with t.
+  use H with i.
 Qed.
 
 goal stateInequality :
@@ -120,26 +120,26 @@ euf Meq0.
 
 (* T(i,j1) < T(i,j)
    kT(i)@pred(T(i,j1)) = kT(i)@pred(T(i,j))
-   in order to apply IH0 we need timestamps of the form T(i,_)
+   in order to use IH0 we need timestamps of the form T(i,_)
    but pred(_) has no reason to be of that form...
    this is where lastUpdate comes into play *)
 
-apply lastUpdate to pred(T(i,j)),i.
+use lastUpdate with pred(T(i,j)),i.
 case H1.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@init
    this can actually happen only if tag i has not played from init to pred(T(i,j))
    but we know that T(i,j1) < T(i,j): absurd *)
-by apply H1 to j1; case H0.
+by use H1 with j1; case H0.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
    then we should have that T(i,j1) <= T(i,j2) *)
 assert (T(i,j1) <= T(i,j2)).
-by apply H2 to j1; case H1; case H0.
+by use H2 with j1; case H1; case H0.
 
-apply H to T(i,j2).
-apply H1 to pred(T(i,j1)).
-apply H3 to i,j2,i.
+use H with T(i,j2).
+use H1 with pred(T(i,j1)).
+use H3 with i,j2,i.
 
 Qed.
 
@@ -147,9 +147,9 @@ goal stateInequalityHelpful :
 (forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
 intro i j j' Hlt Heq.
-apply stateInequality to T(i,j).
-apply H to T(i,j').
-apply H0 to i,j,i.
+use stateInequality with T(i,j).
+use H with T(i,j').
+use H0 with i,j,i.
 Qed.
 
 equiv test.
@@ -161,6 +161,6 @@ fa 0.
 fa 1. fa 1.
 expand output@T(i,j). expand kT(i)@T(i,j).
 prf 1. yesif 1.
-apply stateInequalityHelpful to i,j,j1.
+use stateInequalityHelpful with i,j,j1.
 fresh 1. yesif 1.
 Qed.

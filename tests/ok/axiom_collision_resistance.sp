@@ -19,7 +19,7 @@ goal unforgeable (a:index, b:index) :
 
 Proof.
 intro a b Hap Hneq Heq.
-apply collision_resistance to
+use collision_resistance with
     n(b),
    n(a).
 Qed.

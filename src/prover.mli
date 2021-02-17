@@ -99,7 +99,25 @@ val add_option : option_def -> unit
 (** Prover tactics, and tables for storing them. *)
 
 (* TODO module AST : Tactics.AST_sig
-  with type arg = tac_arg and type judgment = Sequent.t *)
+   with type arg = tac_arg and type judgment = Sequent.t *)
+
+
+(* Define formats of help informations for tactics *)
+type tactic_groups =
+  | Logical   (* A logic tactic is a tactic that relies on the sequence calculus
+                 logical properties. *)
+  | Structural (* A structural tactic relies on properties inherent to protocol,
+                  on equality between messages, behaviour of if _ then _ else _,
+                  action dependencies... *)
+  | Cryptographic (* Cryptographic assumptions rely on ... a cryptographic assumption ! *)
+
+
+(* The record for a detailed help tactic. *)
+type tactic_help = { general_help : string;
+                     detailed_help : string;
+                     usages_sorts : TacticsArgs.esort list;
+                     tactic_group : tactic_groups}
+
 
 (** Registry for tactics on some kind of judgment *)
 module type Tactics_sig = sig
@@ -110,25 +128,24 @@ module type Tactics_sig = sig
      are complex. *)
 
   val register_general :
-    string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list ->
+    string -> tactic_help:tactic_help ->
     (TacticsArgs.parser_arg list -> tac) -> unit
 
   (* Register a macro, built using the AST. *)
   val register_macro :
-    string -> ?modifiers:string list ->  ?general_help:string ->
-    ?detailed_help:string -> ?usages_sorts : TacticsArgs.esort list ->
+    string -> ?modifiers:string list -> tactic_help:tactic_help ->
     TacticsArgs.parser_arg Tactics.ast -> unit
 
 (* The remaining functions allows to easily register a tactic, without having to
    manage type conversions, or the tail recursvity. It is simply required to
    give a function over judgments, expecting some arguments of the given
    sort. *)
-  val register : string -> ?general_help:string ->  ?detailed_help:string ->
-    ?usages_sorts : TacticsArgs.esort list -> (judgment -> judgment list) -> unit
+  val register : string -> tactic_help:tactic_help ->
+    (judgment -> judgment list) -> unit
 
   val register_typed :
-    string ->  ?general_help:string ->  ?detailed_help:string ->
+    string ->  general_help:string ->  detailed_help:string ->
+    tactic_group:tactic_groups ->
     ?usages_sorts : TacticsArgs.esort list ->
     ('a TacticsArgs.arg -> judgment -> judgment list) ->
     'a TacticsArgs.sort  -> unit
@@ -139,6 +156,7 @@ module type Tactics_sig = sig
   (* Print all tactics with their help. Do not print tactics without help
      string. *)
   val pps : Format.formatter -> unit -> unit
+  val pp_list : Format.formatter -> unit -> unit
 end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit

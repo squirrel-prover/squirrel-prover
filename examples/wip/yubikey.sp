@@ -55,7 +55,7 @@ the token. If so, the value inside the otp is used to update the database.
 Now, the counter value associated to this token is this new value *)
 
 (* Warning: If I replace the non-failure test "dec(snd(snd(y1)),k(i)) <> fail"
-by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to apply intctxt and to prove the goal auth *)
+by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to use intctxt and with prove the goal auth *)
 process server(ii:index) =
   in(cR,y1);
    try find  i such that fst(y1) = pid(i) in
@@ -98,10 +98,10 @@ expand cond@S(ii,i).
 intctxt Mneq.
 exists j.
 expand output@Press(i,j').
-assert H :=
- (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i))).
-assert H1 :=
- (npr(i,j) = npr(i,j')).
+assert
+ (enc(<secret(i),cpt(i,j)@Press(i,j)>,npr(i,j),k(i)) = enc(<secret(i),cpt(i,j')@Press(i,j')>,npr(i,j'),k(i)))  as H.
+assert
+ (npr(i,j) = npr(i,j')) as H1.
 help.
 admit.
 Qed.
@@ -123,10 +123,10 @@ forall (t:timestamp), forall (i:index), (t > init && exec@t) =>
 (order(SCpt(i)@pred(t),SCpt(i)@t) = orderOk || SCpt(i)@pred(t) = SCpt(i)@t).
 Proof.
 intro t i H.
-case t; 
+case t;
 1,2,3,4,6,7: by right.
 
-assert H1 := (i = i1 || i <>i1).
+assert (i = i1 || i <>i1) as H1.
 case H1.
 (* i = i1 *)
 left.
@@ -148,10 +148,10 @@ forall (t:timestamp), forall (t':timestamp),  forall (i:index), (exec@t && t' < 
 
 
 Proof.
-nosimpl(induction; intro IH0). 
+nosimpl(induction; intro IH0).
 intro t' i *.
 use IH0 with pred(t) as H0.
-assert H2 := (t' >= pred(t) || t' <pred(t)).
+assert (t' >= pred(t) || t' <pred(t)) as H2.
 case H2.
 
 (* case t' >= pred(t) *)
@@ -172,7 +172,7 @@ case H5.
 case H7.
 
 (* 1/2 *)
-left. 
+left.
 by use orderTrans with SCpt(i)@t',SCpt(i)@pred(t),SCpt(i)@t.
 
 (* 2/2 *)
@@ -199,14 +199,14 @@ intctxt Mneq.
 exists j.
 expand exec@S(ii1,i).
 expand cond@S(ii1,i).
-assert H2 :=
- ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ).
+assert
+ ( S(ii,i) < S(ii1,i) || S(ii,i) = S(ii1,i) || S(ii,i) > S(ii1,i) ) as H2.
 case H2.
 
-assert M9 :=
- order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk.
-assert H2 :=
- ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ).
+assert
+ order(SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i)) = orderOk as M9.
+assert
+ ( S(ii,i) < pred(S(ii1,i)) || S(ii,i) = pred(S(ii1,i)) || S(ii,i) > pred(S(ii1,i)) ) as H2.
 case H2.
 use counterIncreaseBis with pred(S(ii1,i)) as H2.
 use H2 with S(ii,i) as H3.
@@ -215,9 +215,9 @@ case H4.
 by use orderTrans with SCpt(i)@S(ii,i),SCpt(i)@pred(S(ii1,i)),SCpt(i)@S(ii1,i).
 by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
 
-assert _ := order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk.
-assert H2 :=
- ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ).
+assert order(SCpt(i)@S(ii1,i),SCpt(i)@S(ii,i)) = orderOk as _.
+assert
+ ( S(ii1,i) < pred(S(ii,i)) || S(ii1,i) = pred(S(ii,i)) || S(ii1,i) > pred(S(ii,i)) ) as H2.
 case H2.
 use counterIncreaseBis with pred(S(ii,i)) as H2.
 use H2 with S(ii1,i) as H3.
@@ -236,10 +236,10 @@ use counterIncreaseStrictly with ii1, i as M0.
 use counterIncreaseBis with pred(S(ii1,i)) as H1.
 use H1 with S(ii,i) as H2.
 
-nosimpl(executable S(ii1,i); 1: by auto). 
+nosimpl(executable S(ii1,i); 1: by auto).
 intro H3.
 use H3 with pred(S(ii1,i)) as H4.
-assert H5 := (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))).
+assert (S(ii,i) = pred(S(ii1,i)) || S(ii,i) < pred(S(ii1,i))) as H5.
 case H5.
 
 use H2 with i as H5.
@@ -255,7 +255,7 @@ goal noreplayNew:
      && SCpt(i)@S(ii,i)  =  SCpt(i)@S(ii1,i) => ii = ii1.
 Proof.
 intro ii ii1 i *.
-assert H1 := (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i)).
+assert (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i))as H1.
 case H1.
 use noreplayInv with ii, ii1, i as M1.
 by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii1,i).
@@ -268,8 +268,8 @@ goal monotonicity:
      => S(ii,i) < S(ii1,i).
 Proof.
 intro ii ii1 i *.
-assert H2 :=
-  (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)).
+assert
+  (S(ii,i) = S(ii1,i) || S(ii,i) < S(ii1,i) || S(ii,i) > S(ii1,i)) as H2.
 case H2.
 by use orderStrict with SCpt(i)@S(ii,i),SCpt(i)@S(ii,i).
 
@@ -352,7 +352,7 @@ use IH0 with pred(S(ii,i1)) as H0.
 use H0 with i as H1.
 case H1.
 (**)
-assert H2 := (i=i1 || i<>i1).
+assert (i=i1 || i<>i1) as H2.
 case H2.
 (* i = i1 *)
 right.
@@ -364,7 +364,7 @@ case (if i=i1 then  snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
        SCpt(i)@pred(S(ii,i1))).
 by use H with ii1.
 (**)
-assert H2 := (i=i1 || i<>i1).
+assert (i=i1 || i<>i1) as H2.
 case H2.
 (* i = i1 *)
 right.
@@ -375,7 +375,7 @@ exists jj.
 split.
 by case (if i = i1 then snd(dec(snd(snd(input@S(ii,i1))),k(i1))) else
        SCpt(i)@pred(S(ii,i1))).
-assert H2 := (jj = jj' || jj <> jj').
+assert (jj = jj' || jj <> jj') as H2.
 case H2.
 use H1 with jj' as H2.
 by case H2.

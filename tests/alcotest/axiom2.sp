@@ -11,5 +11,5 @@ axiom [test] triv_false : False.
 
 goal [left] test_left_bis : False.
 Proof.
-  apply triv_false.
+  use triv_false.
 Qed.

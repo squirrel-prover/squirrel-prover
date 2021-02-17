@@ -54,7 +54,7 @@ system (!_i P(i) | !_j S(j)).
 
 goal test: exists (i:index), cond@A(i).
 Proof.
-apply freshindex.
+use freshindex.
 exists l.
 nosimpl(expand cond@A(l)).
 admit.
@@ -63,7 +63,7 @@ Qed.
 
 goal testbis: exists (i:index),cond@P1(i).
 Proof.
-apply freshindex.
+use freshindex.
 exists l.
 expand cond@P1(l).
 admit. (* Squirrel crash ici *)

@@ -34,7 +34,7 @@ Proof.
   enckp 4.
   cca1 4.
   equivalent  len(n0(i)), cst.
-  apply len_n to i.
+  use len_n with i.
 
 
   expandall.
@@ -43,7 +43,7 @@ Proof.
  enckp 4.
  cca1 4.
   equivalent  len(n0(i)), cst.
-  apply len_n to i.
+  use len_n with i.
 Qed.
 
 

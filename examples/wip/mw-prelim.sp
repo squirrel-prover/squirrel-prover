@@ -61,29 +61,29 @@ Proof.
   fa 0. fa 1. fa 1.
   fresh 1.
   yesif 1.
-  apply phase_A_A1 to i,t,r.
-  apply phase_A1_A2 to i,t.
-  apply phase_A1_A3 to i,t,r1.
+  use phase_A_A1 with i,t,r.
+  use phase_A1_A2 with i,t.
+  use phase_A1_A3 with i,t,r1.
   expandall.
   fa 0. fa 1. fa 1.
   fresh 1.
   yesif 1.
   split.
-  apply phase_A1_A2 to i1,t1.
-  apply phase_A1_A3 to i1,t1,r.
-  apply phase_A1_A2 to i1,t.
+  use phase_A1_A2 with i1,t1.
+  use phase_A1_A3 with i1,t1,r.
+  use phase_A1_A2 with i1,t.
   (* Case of tag0 hashes *)
   expandall. fa 0. fa 1. fa 1.
   prf 1. yesif 1.
-    apply tags_neq; split; project.
+    use tags_neq; split; project.
   xor 1, n_PRF.
   yesif 1.
-  apply len_id to i; apply len_id' to i,t; namelength n_PRF,dummy.
+  use len_id to i; use len_id' with i,t; namelength n_PRF,dummy.
   (* Case of tag1 hashes will be similar but will use tags_neq *)
   expandall. fa 0. fa 1. fa 1.
   prf 1. yesif 1.
-    apply tags_neq; split; project.
+    use tags_neq; split; project.
   xor 1, n_PRF1.
   yesif 1.
-  apply len_id to i; apply len_id' to i,t; namelength n_PRF1,dummy.
+  use len_id to i; use len_id' with i,t; namelength n_PRF1,dummy.
 Qed.

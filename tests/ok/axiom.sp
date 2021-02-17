@@ -16,7 +16,7 @@ ma=k.
 
 Proof.
  intro ma.
- apply dummy_false_axiom to ma. 
+ use dummy_false_axiom with ma. 
  auto.
 Qed.
 
@@ -25,7 +25,7 @@ ma=k.
 
 Proof.
  intro ma.
- apply dummy_false_axiom to ma.
+ use dummy_false_axiom with ma.
  auto.
 Qed.
 
@@ -34,6 +34,6 @@ ma=k.
 
 Proof.
  intro ma.
- apply dummy_false_axiom to ma.
+ use dummy_false_axiom with ma.
  auto.
 Qed.

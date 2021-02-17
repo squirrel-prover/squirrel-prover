@@ -22,7 +22,7 @@ set timeout=1.
 goal mygoal: False.
 
 Proof.
- nosimpl(apply mycheck to ok, ok).
+ nosimpl(use mycheck with ok, ok).
  try congruence.
  (* this does not conclude, but should not timeout *)
  admit.

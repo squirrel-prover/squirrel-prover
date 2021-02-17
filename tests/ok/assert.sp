@@ -10,13 +10,13 @@ axiom ax : a=b.
 goal assert_msg (i:message) : a=b.
 Proof.
   intro i.
-  assert (i=i).
-  apply ax.
+  assert (i=i) as T.
+  use ax.
 Qed.
 
 goal assert_cstr (i:index) : a=b.
 Proof.
   intro i.
   assert (i=i).
-  apply ax.
+  use ax.
 Qed.

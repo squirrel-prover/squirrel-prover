@@ -69,11 +69,11 @@ forall (i,j:index), cond@A1(i,j) => (exists (k:index), S(k,i,j) < A1(i,j) &&
 Proof.
 intros.
 expand cond@A1(i,j).
-apply tags_neq.
+use tags_neq.
 euf M1.
 exists k.
 assert(id(j1)=id(j)).
-apply id_neq to j1, j.
+use id_neq with j1, j.
 Qed.
 
 
@@ -88,15 +88,15 @@ fst(input@B(j,i)) = fst(output@A1(i,j))
 Proof.
 intros.
 expand cond@B(j,i).
-apply tags_neq.
+use tags_neq.
 repeat split.
 euf M1.
 substitute fst(input@B(j,i)), enc(<kab(k),id(i1)>,r1(k),ks(j)).
-apply dec to <kab(k),id(i1)>, r1(k), ks(j).
+use dec with <kab(k),id(i1)>, r1(k), ks(j).
 substitute dec(enc(<kab(k),id(i1)>,r1(k),ks(j)),ks(j)), <kab(k),id(i1)>.
-apply pair_snd to kab(k),id(i1).
+use pair_snd with kab(k),id(i1).
 substitute snd(<kab(k),id(i1)>),  id(i1).
-apply id_neq to i1, i.
+use id_neq with i1, i.
 
 admit. 
 Qed.

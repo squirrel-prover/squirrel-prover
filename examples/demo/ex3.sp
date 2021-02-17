@@ -168,9 +168,9 @@ expandall.
    executable pred(P3(i)).
 
    depends P1(i), P3(i).
-   apply H1 to P1(i).
-   apply P1_charac to i.
-   apply H0 to s.
+   use H1 with P1(i).
+   use P1_charac with i.
+   use H0 with s.
 
    expand gb(i)@P3(i). fa 5.  noif 6. simpl.
 
@@ -193,9 +193,9 @@ expandall.
    expand cond@S3(j).
    executable pred(S3(j)).
    depends S1(j), S3(j).
-   apply H1 to S1(j).
-   apply S1_charac to j.
-   apply H0 to s.
+   use H1 with S1(j).
+   use S1_charac with j.
+   use H0 with s.
 
    fa 5.
    noif 6. simpl.

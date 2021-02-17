@@ -207,14 +207,14 @@ Proof.
 
   collision.
 
-  by apply H0 to i.
+  by use H0 with i.
 
-  by apply hashnotfor to <<g^a1,input@P1>,input@P1^a1>, x2.
+  by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x2.
 
   collision.
 
-  apply freshindex.
-  apply H0 to l.
+  use freshindex.
+  use H0 with l.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
@@ -227,15 +227,15 @@ Proof.
 
   case H1.
   case H1.
-  apply H0 to i.
+  use H0 with i.
 
   by collision.
 
-  by apply hashnotfor to <<input@S,g^b1>,input@S^b1>, x2.
+  by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
 
   collision.
-  apply freshindex.
-  apply H0 to l.
+  use freshindex.
+  use H0 with l.
 Qed.
 
 
@@ -267,9 +267,9 @@ Proof.
    expand exec@Pfail.
    executable pred(Pfail).
    depends Pok, Pfail.
-   apply H1 to Pok.
+   use H1 with Pok.
    expand exec@Pok.
-   by apply P_charac.
+   by use P_charac.
 
    fa 7; fa 8.
    by noif 8.
@@ -296,9 +296,9 @@ Proof.
    expand exec@Sfail.
    executable pred(Sfail).
    depends Sok, Sfail.
-   apply H1 to Sok.
+   use H1 with Sok.
    expand exec@Sok.
-   by apply S_charac.
+   by use S_charac.
 
    fa 7; fa 8.
    by noif 8.

@@ -322,7 +322,7 @@ impossible to confuse a hash with the tag forwarded, and another hash. *)
 axiom [auth] hashlengthnotpair : forall (m1,m2:message),
    <forwarded,h(m1,hKey)> <> h(m2, hKey)
 
-(* The following axiom is a modelling trick. We need at some point to apply an
+(* The following axiom is a modelling trick. We need at some point to use an
 hypothesis that require to instantiate an index, but this index is not used. *)
 axiom [auth] freshindex : exists (l:index), True
 
@@ -348,20 +348,20 @@ Proof.
   (* oracle case *)
   case H2.
   case H2.
-  apply hashlengthnotpair to <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  use hashlengthnotpair with <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
-  apply signnottag to sidPa@P2, kP.
-  apply H0 to i1.
+  use signnottag with sidPa@P2, kP.
+  use H0 with i1.
   left; right.
   by collision.
 
   (* honest case SDIS *)
   collision.
-  apply freshindex.
-  by apply H0 to l.
+  use freshindex.
+  by use H0 with l.
 
-  apply freshindex.
-  apply H0 to l.
+  use freshindex.
+  use H0 with l.
   right.
   collision.
 Qed.
@@ -381,15 +381,15 @@ Proof.
   case H2.
   case H2.
 (* sub case with wrong tag *)
-  apply H0 to i.
+  use H0 with i.
   assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey). 
   by collision.
 
-  by apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
+  by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
 
-  by apply hashlengthnotpair to <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
+  by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
@@ -397,7 +397,7 @@ Proof.
   executable pred(Sok).
 
   depends SDIS, Sok.
-  apply H2 to P3(i).
+  use H2 with P3(i).
   expand exec@P3(i).
   expand cond@P3(i).
 
@@ -405,16 +405,16 @@ Proof.
   intctxt D1.
 
 (* Ill-tagged cases *)
-  by apply signnottag to sidPaF@P2,kP.
-  by apply difftags.
+  by use signnottag with sidPaF@P2,kP.
+  by use difftags.
 
 (* Honest case *)
   assert PDIS5 <= Sok.
   case H4.
-  apply H2 to PDIS5.
+  use H2 with PDIS5.
   expand exec@PDIS5.
   expand cond@PDIS5. 
-  apply H0 to i.
+  use H0 with i.
   right.
   collision.
 Qed.
@@ -456,10 +456,10 @@ Proof.
   expand frame@Sfail.
 
   equivalent exec@Sfail, false.
-  apply S_charac.
+  use S_charac.
   depends Sok, Sfail.
   executable Sfail.
-  apply H0 to Sok.
+  use H0 with Sok.
   expand exec@Sfail.
 
   fa 17. fa 18. noif 18.
@@ -486,10 +486,10 @@ Proof.
   expand frame@Pfail.
 
   equivalent exec@Pfail, false.
-  apply P_charac.
+  use P_charac.
   depends PDIS5, Pfail.
   executable Pfail.
-  by apply H0 to PDIS5.
+  by use H0 with PDIS5.
   by expand exec@Pfail.
 
   by fa 17; fa 18; noif 18.

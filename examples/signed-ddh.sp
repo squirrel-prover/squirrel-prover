@@ -101,7 +101,7 @@ Proof.
   expand exec@S1(r).
   executable pred(S1(r)).
   depends S(r), S1(r).
-  apply H1 to S(r).
+  use H1 with S(r).
   expand exec@S(r).
   expand cond@S(r).
   expand cond@S1(r).
@@ -162,9 +162,9 @@ Proof.
     expand cond@Schall3(j).
     executable pred(Schall3(j)).
     depends S1(j), Schall3(j).
-    apply H1 to S1(j).
-    apply S_charac to j.
-    by apply H0 to s.
+    use H1 with S1(j).
+    use S_charac with j.
+    by use H0 with s.
 
     fa 5.
     fa 6.
@@ -220,10 +220,10 @@ Proof.
     expand cond@Pchall3(i).
     executable pred(Pchall3(i)).
     depends Pchall1(i), Pchall3(i).
-    apply H1 to Pchall1(i).
+    use H1 with Pchall1(i).
     expand exec@Pchall1(i).
-    apply P_charac to i.
-    by apply H0 to j.
+    use P_charac with i.
+    by use H0 with j.
 
     fa 5.
     fa 6.

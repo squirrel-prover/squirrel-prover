@@ -49,7 +49,7 @@ Proof.
 simpl.
 expand cond@R1(j,i).
 euf M0.
-apply tags_neq.
+use tags_neq.
 exists k.
 assert (nR(j) = input@T(i,k)).
 fresh M2.
@@ -73,7 +73,7 @@ intros.
 assert cond@T1(i,k).
 expand exec@T1(i,k).
 expand cond@T1(i,k).
-apply tags_neq.
+use tags_neq.
 euf M0.
 assert (snd(input@R1(j,i)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i))).
 euf M3.
@@ -83,7 +83,7 @@ case H1.
 nosimpl(exists j).
 nosimpl(assert cond@R1(j,i)).
 executable T1(i,k).
-apply H1 to R1(j,i).
+use H1 with R1(j,i).
 expand exec@R1(j,i).
 nosimpl(expand cond@R1(j,i)).
 
