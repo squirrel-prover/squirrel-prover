@@ -59,10 +59,10 @@ induction t.
 
   equivalent len(<snd(dec(input@B(j),kB)),n(j)>),  plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   (* length reasoning *)
-  apply length to snd(dec(input@B(j),kB)),n(j).
+  use length with snd(dec(input@B(j),kB)),n(j).
   ifeq 5,    len(snd(dec(input@B(j),kB))), len(n(j)).
   trivialif 5.
-  apply length to n(j),n(j).
+  use length with n(j),n(j).
   (* length reasoing *)
   fa 5.
   fa 5.

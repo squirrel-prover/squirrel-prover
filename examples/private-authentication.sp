@@ -100,7 +100,7 @@ Proof.
       len(snd(dec(input@B(j),kB))) = len(n(j))
      then len(<snd(dec(input@B(j),kB)),n(j)>)
      else len(<n(j),n(j)>)).
-   apply if_len to fst(dec(input@B(j),kB)),diff(pk(kA),pk(kAbis)),
+   use if_len with fst(dec(input@B(j),kB)),diff(pk(kA),pk(kAbis)),
                    len(snd(dec(input@B(j),kB))),len(n(j)),
                    <snd(dec(input@B(j),kB)),n(j)>,
                    <n(j),n(j)>.
@@ -109,11 +109,11 @@ Proof.
   equivalent
     len(<snd(dec(input@B(j),kB)),n(j)>),
     plus(len(snd(dec(input@B(j),kB))),len(n(j))).
-  apply length to snd(dec(input@B(j),kB)),n(j).
+  use length with snd(dec(input@B(j),kB)),n(j).
 
   ifeq 3, len(snd(dec(input@B(j),kB))), len(n(j)).
   trivialif 3.
-  apply length to n(j),n(j).
+  use length with n(j),n(j).
   fa 3. fa 3.
   fresh 3. yesif 3.
 Qed.

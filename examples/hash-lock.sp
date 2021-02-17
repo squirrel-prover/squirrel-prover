@@ -76,8 +76,8 @@ Proof.
   expand cond@R2(j).
   split.
 
-  by apply H; exists i,k.
-  apply H.
+  by use H; exists i,k.
+  use H.
 
   project.
   euf Meq.
@@ -117,7 +117,7 @@ Proof.
       snd(output@T(i,k)) = snd(input@R1(j)) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       input@T(i,k) = output@R(j)).
-  by apply wa_R1 to j.
+  by use wa_R1 with j.
   by fadup 1.
 
   (* Case R2 *)
@@ -130,7 +130,7 @@ Proof.
       snd(output@T(i,k)) = snd(input@R2(j)) &&
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j))).
-  by apply wa_R2 to j.
+  by use wa_R2 with j.
   by fadup 1.
 
   (* Case T *)

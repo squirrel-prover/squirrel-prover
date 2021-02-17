@@ -91,7 +91,7 @@ Proof.
   expand output@Reader(k).
   split.
 
-  project; apply tags_neq.
+  project; use tags_neq.
 
   (* First projection. *)
   intctxt Mneq.
@@ -105,7 +105,7 @@ Proof.
 
   (* Direction <= *)
   exists i,j.
-  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
@@ -127,21 +127,21 @@ Proof.
   (* Direction => is the obvious one *)
 
   notleft H0.
-  apply H0 to i,j; case H1.
-  by apply fail_not_pair to tagT, <input@Tag(i,j), nt(i,j)>.
+  use H0 with i,j; case H1.
+  by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
 
   notleft H0.
-  apply tags_neq.
+  use tags_neq.
   project.
 
   intctxt Mneq.
-  apply H0 to i,j1; case H1.
+  use H0 with i,j1; case H1.
   by depends Reader(k),Reader2(k).
 
   intctxt Mneq.
-  apply H0 to i,j; case H1.
+  use H0 with i,j; case H1.
   by depends Reader(k),Reader2(k).
 Qed.
 
@@ -157,8 +157,8 @@ Proof.
   assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
-  by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
-  by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
+  by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
   assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
   intctxt Meq0.
@@ -166,8 +166,8 @@ Proof.
   assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
-  by apply fail_not_pair to tagT,<input@Tag(i,j),nt(i,j)>.
-  by apply fail_not_pair to tagT,<input@Tag(i1,j1),nt(i1,j1)>.
+  by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 Qed.
 
 equiv unlinkability.
@@ -192,7 +192,7 @@ Proof.
       Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
       output@Tag(i,j) = input@Reader1(k) &&
       input@Tag(i,j) = output@Reader(k).
-  by apply wa_Reader1 to k.
+  by use wa_Reader1 with k.
 
   expand output@Reader1(k).
   fa 2. fa 3. fadup 3.
@@ -240,20 +240,20 @@ Proof.
   fa.
   (* find condA => condB *)
   intctxt Mneq.
-  by apply tags_neq.
+  by use tags_neq.
   by exists j2.
 
   (* find condB => condA *)
-  apply lemma to i,j,i1,j1.
-  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
+  use lemma with i,j,i1,j1.
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa.
   (* find condA => condB *)
   intctxt Mneq.
-  by apply tags_neq.
+  by use tags_neq.
   (* find condB => condA *)
-  apply lemma to i,j,i1,j1.
-  by apply fail_not_pair to tagT, <input@Tag(i,j),nt(i,j)>.
+  use lemma with i,j,i1,j1.
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa 3; fadup 3.
   fa 3; fadup 3.
@@ -274,7 +274,7 @@ Proof.
       Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
       output@Tag(i,j) = input@Reader2(k) &&
       input@Tag(i,j) = output@Reader(k)).
-  by apply wa_Reader2 to k.
+  by use wa_Reader2 with k.
 
   fa 2.
   fa 3; fadup 3.

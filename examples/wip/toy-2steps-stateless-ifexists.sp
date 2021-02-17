@@ -92,19 +92,19 @@ split.
 (* not(honest) => not(cond) *)
 expand cond@R1(k).
 notleft H.
-apply H to i,j.
+use H with i,j.
 (* not(cond) => not(honest) *)
 expand cond@R1(k).
 notleft H.
 project.
 (* LEFT *)
 euf Meq.
-apply H to ii,j.
+use H with ii,j.
 case H0.
 (* RIGHT *)
 fresh Meq. 
 case H0.
-by apply H to ii,jj; case H0.
+by use H with ii,jj; case H0.
 admit.
 admit.
 fadup 1.

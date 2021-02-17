@@ -23,7 +23,7 @@ expand frame@B.
 fa 0; fa 1.
 expand exec@B.
 equivalent cond@B, False. 
-by intro Hcond; apply trivial_if.
+by intro Hcond; use trivial_if.
 noif 1.
 by auto.
 expand frame@B1.

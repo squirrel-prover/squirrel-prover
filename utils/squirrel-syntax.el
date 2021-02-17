@@ -60,7 +60,6 @@
 (defvar squirrel-tactic-keywords '(
   "admit"
   "anyintro"
-  "apply"
   "use"
   "with"
   "assert"

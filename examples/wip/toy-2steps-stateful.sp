@@ -84,11 +84,11 @@ forall (ii,jj,k:index),
 Proof.
 induction.
 executable T(ii,jj).
-apply H1 to R(k,ii,jj).
+use H1 with R(k,ii,jj).
 expand exec@R(k,ii,jj). expand cond@R(k,ii,jj).
 euf H3.
-apply H to R(k1,ii,jj).
-apply H4 to ii,jj,k1.
+use H with R(k1,ii,jj).
+use H4 with ii,jj,k1.
 Qed.
 
 equiv real_ideal.
@@ -110,7 +110,7 @@ project.
 (* LEFT *)
 expand cond@R(k,ii,jj).
 euf H.
-apply stateInequalityReader to k1,k,ii,jj1,jj.
+use stateInequalityReader with k1,k,ii,jj1,jj.
 by exists j.
 (* RIGHT *)
 expand cond@R(k,ii,jj).
@@ -139,10 +139,10 @@ yesif 1.
 project.
 split.
 admit. (* reasonning on states? *)
-split;1: by apply stateInequalityTag to i,j1,j.
-(* Adrien: tactics below did not apply before my changes. *)
-apply readerPlaysAfterTag to R(k,ii,jj).
-apply H1 to ii,jj,k.
+split;1: by use stateInequalityTag with i,j1,j.
+(* Adrien: tactics below did not use before my changes. *)
+use readerPlaysAfterTag with R(k,ii,jj).
+use H1 with ii,jj,k.
 expand exec@T(ii,jj).
 expand cond@T(ii,jj).
 

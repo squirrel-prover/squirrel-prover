@@ -72,16 +72,16 @@ right; exists j.
 
 (* t = T(i1,j) with i<>i1 *)
 assert kT(i)@t = kT(i)@pred(t).
-apply IH0 to pred(T(i1,j)).
-apply H0 to i.
+use IH0 with pred(T(i1,j)).
+use H0 with i.
 case H1.
 
   left.
-  apply H1 to j'.
+  use H1 with j'.
 
   right.
   exists j1.
-  apply H1 to j'.
+  use H1 with j'.
 (* Stef: je detaille plus pour comprendre ce qui se passe *)
 nosimpl(case H2).
   simpl.
@@ -92,7 +92,7 @@ left.
 
 Qed.
 
-(* A more convenient version of the lemma, because our apply
+(* A more convenient version of the lemma, because our use
    tactic is too primitive. *)
 goal lastUpdate : forall (t:timestamp,i:index)
   (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
@@ -102,8 +102,8 @@ goal lastUpdate : forall (t:timestamp,i:index)
    (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
 Proof.
   intros.
-  apply lastUpdate_ to t.
-  apply H0 to i.
+  use lastUpdate_ with t.
+  use H0 with i.
 Qed.
 
 goal stateInequality :
@@ -118,26 +118,26 @@ euf M1.
 
 (* T(i,j1) < T(i,j)
    kT(i)@pred(T(i,j1)) = kT(i)@pred(T(i,j))
-   in order to apply IH0 we need timestamps of the form T(i,_)
+   in order to use IH0 we need timestamps of the form T(i,_)
    but pred(_) has no reason to be of that form...
    this is where lastUpdate comes into play *)
 
-apply lastUpdate to pred(T(i,j)),i.
+use lastUpdate with pred(T(i,j)),i.
 case H1.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@init
    this can actually happen only if tag i has not played from init to pred(T(i,j))
    but we know that T(i,j1) < T(i,j): absurd *)
-apply H1 to j1; case H0.
+use H1 with j1; case H0.
 
 (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
    then we should have that T(i,j1) <= T(i,j2) *)
 assert (T(i,j1) <= T(i,j2)).
-apply H1 to j1; case H2; case H0.
+use H1 with j1; case H2; case H0.
 
-apply IH0 to T(i,j2).
-apply H2 to pred(T(i,j1)).
-apply H3 to i,j2,i.
+use IH0 with T(i,j2).
+use H2 with pred(T(i,j1)).
+use H3 with i,j2,i.
 
 Qed.
 
@@ -147,14 +147,14 @@ goal stateInequalityHelpful :
 (forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
 intros.
-apply lastUpdate to pred(T(i,j)),i.
+use lastUpdate with pred(T(i,j)),i.
 case H0.
 (* Case init *)
-apply H0 to j'.
-apply stateInequality to T(i,j1).
-apply H1 to pred(T(i,j')).
-apply H2 to i,j1,i.
-apply H0 to j'. case H3.
+use H0 with j'.
+use stateInequality with T(i,j1).
+use H1 with pred(T(i,j')).
+use H2 with i,j1,i.
+use H0 with j'. case H3.
 Qed.
 *)
 
@@ -163,9 +163,9 @@ goal stateInequalityHelpful :
 (forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
 Proof.
 intros.
-apply stateInequality to T(i,j).
-apply H0 to T(i,j').
-apply H1 to i,j,i.
+use stateInequality with T(i,j).
+use H0 with T(i,j').
+use H1 with i,j,i.
 Qed.
 
 
@@ -178,6 +178,6 @@ fa 0.
 fa 1. fa 1.
 expand output@T(i,j). expand kT(i)@T(i,j).
 prf 1. yesif 1.
-apply stateInequalityHelpful to i,j,j1.
+use stateInequalityHelpful with i,j,j1.
 fresh 1. yesif 1.
 Qed.

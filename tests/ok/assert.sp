@@ -11,12 +11,12 @@ goal assert_msg : forall (i:message), a=b.
 Proof.
   intro i.
   assert (i=i) as T.
-  apply ax.
+  use ax.
 Qed.
 
 goal assert_cstr : forall (i:index), a=b.
 Proof.
   intro i.
   assert (i=i).
-  apply ax.
+  use ax.
 Qed.

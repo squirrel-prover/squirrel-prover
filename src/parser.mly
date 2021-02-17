@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE EXN
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -416,13 +416,6 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
   | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
-
-  | APPLY i=ID                         { Tactics.Abstract
-                                          ("apply",
-                                           [TacticsArgs.String_name i]) }
-  | APPLY i=ID TO t=tactic_params      { Tactics.Abstract
-                                          ("apply",
-                                           TacticsArgs.String_name i :: t) }
   | ASSERT p=tac_formula ip=as_ip?
     { let ip = match ip with
         | None -> []

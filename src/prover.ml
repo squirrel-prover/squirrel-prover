@@ -284,15 +284,15 @@ module Make_AST (T : Table_sig) :
       | [] -> Tactics.andthen (T.get id args) (Lazy.force simpl)
       | _ -> assert false
 
+  (* a printer for tactics that follows a specific syntax.
+  TODO: tactics with "as" for intro pattern are not printed correctly.*)
   let pp_abstract ~pp_args s args ppf =
     match s,args with
-      | "apply",[TacticsArgs.String_name id] ->
-          Fmt.pf ppf "apply %s" id
-      | "apply", TacticsArgs.String_name id :: l ->
+      | "use", TacticsArgs.String_name id :: l ->
           let l = List.map (function
             | TacticsArgs.Theory t -> t
             | _ -> assert false) l in
-          Fmt.pf ppf "apply %s to %a" id (Utils.pp_list Theory.pp) l
+          Fmt.pf ppf "use %s with %a" id (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
 end)

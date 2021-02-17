@@ -36,12 +36,12 @@ Proof.
   induction t'.
 
     equivalent s@init, n.
-    apply s_init.
+    use s_init.
     fresh 1.
 
     expand s@A(i).
     (* PRF h1 *)
-    prf 1. yesif 1. case H0. apply s_jni to i1,i.
+    prf 1. yesif 1. case H0. use s_jni with i1,i.
     fresh 1.
 
   (* Case t = A(i). *)
@@ -53,21 +53,21 @@ Proof.
     project.
 
       case H0.
-        apply s_jni to i1,i.
+        use s_jni with i1,i.
         (* Consider the possibility that s@t'
            indirectly contains h2(s@A(i1),k2) for A(i1)<=t'.
            This could be ruled out because the state never gets
            updated using inputs, but that wouldn't work for
            more complex protocols. *)
         assert s@A(i) = s@A(i1).
-        apply s_inj to i,i1.
+        use s_inj with i,i1.
         (* We could conclude with the assumption t' < t...
            but the "base" case of the induction couldn't be init
            anymore. *)
         assert t' < A(i).
         admit.
 
-      apply s_inj to i1,i.
+      use s_inj with i1,i.
 
   fresh 1.
   (* Warning here we conclude by induction hypothesis which is incorrect
@@ -81,7 +81,7 @@ Proof.
   expand s@A(i).
   (* PRF h1 *)
   prf 1. yesif 1.
-    assert s@A(i) = s@A(i1). apply s_inj to i1,i.
+    assert s@A(i) = s@A(i1). use s_inj with i1,i.
   fresh 1.
   admit. (* Generalize reflexivity: there is no diff! *)
 Qed.
@@ -94,11 +94,11 @@ equiv base_case (i:index) : frame@A(i), diff(s@A(i),fresh).
 Proof.
   expandall. fa 0. fa 1. fa 1.
   (* PRF h2 *)
-  prf 1. yesif 1. apply s_jni to i,i1.
+  prf 1. yesif 1. use s_jni with i,i1.
   fresh 1.
   (* PRF h1 *)
   prf 1. yesif 1.
-    apply s_jni to i,i1.
+    use s_jni with i,i1.
   fresh 1.
   admit. (* Generalized refl as above. *)
 Qed.

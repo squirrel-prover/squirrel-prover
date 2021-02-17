@@ -62,8 +62,8 @@ Proof.
   intro *.
   expand cond@R1(j).
   split.
-  apply H. exists i,k.
-  apply H.
+  use H. exists i,k.
+  use H.
   project.
   (* LEFT *) by euf Meq; exists i, k1.
   (* RIGHT *) by euf Meq; exists i,k. 
@@ -83,7 +83,7 @@ Proof.
     (exists (i,k:index), T(i,k) < R(j) &&
        fst(output@T(i,k))=fst(input@R(j)) &&
        snd(output@T(i,k))=snd(input@R(j))).
-  by apply wa_R to j.
+  by use wa_R with j.
   by fadup 1.
 
   (* Case R1 *)
@@ -94,7 +94,7 @@ Proof.
     (not(exists (i,k:index), T(i,k) < R1(j) &&
        fst(output@T(i,k))=fst(input@R1(j)) &&
        snd(output@T(i,k))=snd(input@R1(j)))).
-  by apply wa_R1 to j.
+  by use wa_R1 with j.
   by fadup 1.
 
   (* Case T *)

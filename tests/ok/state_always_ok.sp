@@ -13,9 +13,9 @@ Proof.
   intro Hind.
   case t. 
   (* t = init *)
-  by apply init_ok. 
+  by use init_ok. 
 
   (* t = A(i) *) 
   destruct H as [i _].
-  apply Hind to pred(A(i)). 
+  use Hind with pred(A(i)). 
 Qed.

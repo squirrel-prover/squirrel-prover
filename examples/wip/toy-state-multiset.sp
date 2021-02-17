@@ -78,10 +78,10 @@ Proof.
 intros.
 expand cond@R(k,ii).
 
-apply rangeAxiom to xkT,kR(ii)@R(k,ii).
-apply H0.
+use rangeAxiom with xkT,kR(ii)@R(k,ii).
+use H0.
 
-apply updateReaderAxiom to ii,xkT.
+use updateReaderAxiom with ii,xkT.
 assert kR(ii)@R(k,ii) = xkT.
 assert xkT = hState(<seed(i),z>,keyState(i)).
 euf M6.

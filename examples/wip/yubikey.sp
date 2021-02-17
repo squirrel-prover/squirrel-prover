@@ -55,7 +55,7 @@ the token. If so, the value inside the otp is used to update the database.
 Now, the counter value associated to this token is this new value *)
 
 (* Warning: If I replace the non-failure test "dec(snd(snd(y1)),k(i)) <> fail"
-by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to apply intctxt and to prove the goal auth *)
+by fst(dec(snd(snd(y1)),k(i))) = secret(i)"  I an unable to use intctxt and with prove the goal auth *)
 process server(ii:index) =
   in(cR,y1);
    try find  i such that fst(y1) = pid(i) in

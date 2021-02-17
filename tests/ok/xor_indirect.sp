@@ -18,8 +18,8 @@ Proof.
   expand output@A(ii,jj).
   xor 1.
   nosimpl(yesif 1).
-  apply len_ok to ii,jj. 
-  apply len_ok to i,j. 
+  use len_ok with ii,jj.
+  use len_ok with i,j.
   admit. (* Induction hypothesis.*)
 Qed.
 
@@ -31,6 +31,6 @@ Proof.
   expand output@A(ii,jj).
   xor 1, diff(b(i,j),b(ii,jj)).
   nosimpl(yesif 1).
-  apply len_ok to i,j; apply len_ok to ii,jj.
+  use len_ok with i,j; use len_ok with ii,jj.
   admit. (* Induction hypothesis.*)
 Qed.

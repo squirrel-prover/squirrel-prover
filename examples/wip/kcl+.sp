@@ -38,8 +38,8 @@ Proof.
   expand cond@R1(k,i).
   euf M0.
   exists j.
-  apply tags.
-  apply tags.
+  use tags.
+  use tags.
 Qed.
 
 goal wa_snd :
@@ -51,7 +51,7 @@ goal wa_snd :
 Proof.
   intros.
   expand cond@R1(k,i).
-  apply tags.
+  use tags.
   euf M0.
   exists j.
   assert (xor(nt(i,j),snd(input@R1(k,i))) = h(<nr(k),tagR>,key(i))).

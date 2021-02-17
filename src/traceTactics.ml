@@ -735,11 +735,11 @@ let () = T.register "assumption"
 
 
 (*------------------------------------------------------------------*)
-(** [apply ip gp ths judge] applies the formula named [gp],
+(** [use ip gp ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath.
   * If given an introduction patterns, apply it to the generated hypothesis. *)
-let apply ip name (ths:Theory.term list) (s : TraceSequent.t) =
+let use ip name (ths:Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
   let f,system =
     if Hyps.mem_name name s then
@@ -789,7 +789,7 @@ let apply ip name (ths:Theory.term list) (s : TraceSequent.t) =
 
   aux [] f
 
-(* we use tac_apply for both the `apply` and `have` tactics.
+(* we use tac_apply for both the `use` and `have` tactics.
    Note that both tactic are defined in the parser, and get different arguments. *)
 let tac_apply args s sk fk =
   let ip, args = match args with
@@ -805,7 +805,7 @@ let tac_apply args s sk fk =
                    (Tactics.Failure "improper arguments"))
         th_terms
     in
-    begin match apply ip id th_terms s with
+    begin match use ip id th_terms s with
       | subgoals -> sk subgoals fk
       | exception Tactics.Tactic_soft_failure e -> fk e
     end
@@ -813,14 +813,6 @@ let tac_apply args s sk fk =
 
 
 (* Does not rely on the typed register as it parses a subst *)
-let () =
-  T.register_general "apply"
-     ~tactic_help:{general_help = "DEPRECATED -> replaced with use tactic.";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    tac_apply
-
 let () =
   T.register_general "use"
     ~tactic_help:{general_help = "Apply an hypothesis with its universally \
