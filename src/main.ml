@@ -188,8 +188,8 @@ let rec main_loop ~test ?(save=true) state =
   | exception (Cmd_error e) ->
     error ~test state (fun fmt -> pp_cmd_error fmt e)
 
-  | exception (TraceSequent.Hyp_error e) when not test ->
-    error ~test state (fun fmt -> TraceSequent.pp_hyp_error fmt e)
+  | exception (Hyps.Hyp_error e) when not test ->
+    error ~test state (fun fmt -> Hyps.pp_hyp_error fmt e)
 
   | exception (Process.ProcError e) ->
     error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)

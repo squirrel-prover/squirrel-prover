@@ -18,6 +18,7 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | GoalBadShape of string
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -72,6 +73,7 @@ let rec tac_error_to_string = function
   | GoalNotClosed
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
+  | GoalBadShape _ -> "GoalBadShape"
   | SystemError _ -> "System_Error"
   | PatNumError _ -> "PatNumError"
 
@@ -118,6 +120,8 @@ let rec pp_tac_error ppf = function
   | CongrFail -> Fmt.pf ppf "congruence closure failed"
   | NothingToIntroduce ->
     Fmt.pf ppf "nothing to introduce"
+  | GoalBadShape s ->
+    Fmt.pf ppf "goal has the wrong shape: %s" s
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 

@@ -1,81 +1,16 @@
-type elem =
-  | Formula of Term.formula
-  | Message of Term.message
-
-let pp_elem ppf = function
-  | Formula t -> Term.pp ppf t
-  | Message t -> Term.pp ppf t
-
-let pi_term projection tm = Term.pi_term ~projection tm
-
-let pi_elem s = function
-  | Formula t -> Formula (pi_term s t)
-  | Message t -> Message (pi_term s t)
-
-
 (*------------------------------------------------------------------*)
-(** {2 Equivalence formulas} *)
+(** {2 Hypotheses for equivalence sequents} *)
 
-type equiv = elem list
+module H = Hyps.Mk
+    (struct
+      type t = Equiv.form
+                 
+      let pp_hyp = Equiv.pp_form
+      let htrue = Equiv.Atom (Equiv.Equiv []) 
+    end)
 
-let pp_equiv ppf (l : equiv) =
-  Fmt.pf ppf "%a"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
-    l
-
-let pp_equiv_numbered ppf (l : equiv) =
-  let max_i = List.length l - 1 in
-  List.iteri (fun i elem ->
-      if i < max_i then
-        Fmt.pf ppf "%i: %a,@ " i pp_elem elem
-      else
-        Fmt.pf ppf "%i: %a" i pp_elem elem
-    )
-    l
-
-let subst_equiv (subst : Term.subst) (f : equiv) : equiv =
-List.map (function 
-      | Formula f -> Formula (Term.subst subst f)
-      | Message t -> Message (Term.subst subst t)
-    ) f
-
-(*------------------------------------------------------------------*)
-(** {2 Equivalence sequent hypotheses} *)
-
-type hyp = 
-  | Equiv of equiv
-  (* Equiv u corresponds to (u)^left ~ (u)^right *)
-
-  | Reach of Term.formula
-  (* Reach(φ) corresponds to (φ)^left ~ ⊤ ∧ (φ)^right ~ ⊤ *)
-
-type hyps = hyp list
-
-let pp_hyp fmt = function
-  | Equiv e -> pp_equiv fmt e
-  | Reach f -> Fmt.pf fmt "@[[%a]@]" Term.pp f
-
-let pp_hyps fmt hyps =
-  let cpt = ref (-1) in
-  let cpt_to_string i = 
-    if i < 26 
-    then Char.escaped (Char.chr (65 + i))
-    else "H" ^ string_of_int (i - 26) in
-
-  let pp_hyp_i fmt h =
-    incr cpt;
-    Fmt.pf fmt "%s: @[%a@]" (cpt_to_string (!cpt)) pp_hyp h
-  in
-
-  Fmt.pf fmt "@[<v 0>%a@]" (Fmt.list ~sep:Fmt.cut pp_hyp_i) hyps
-
-let subst_hyp (subst : Term.subst) (h : hyp) : hyp = 
-  match h with
-  | Equiv e -> Equiv (subst_equiv subst e)
-  | Reach f -> Reach (Term.subst subst f)
-
-let subst_hyps (subst : Term.subst) (hyps : hyps) : hyps = 
-  List.map (subst_hyp subst) hyps
+let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps = 
+  H.map (Equiv.subst_form subst) hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
@@ -91,40 +26,41 @@ let subst_hyps (subst : Term.subst) (hyps : hyps) : hyps =
 type t = {
   env    : Vars.env;
   table  : Symbols.table;
-  hyps   : hyps;
-  goal   : elem list;
+  hyps   : H.hyps;
+  goal   : Equiv.form;
   system : SystemExpr.system_expr;
 }
 
-let init system table env hyps l = {
+let init system table env hyps f = {
   env    = env ; 
   table  = table ;
-  goal   = l ; 
+  goal   = f ; 
   hyps   = hyps;
   system = system;
 }
 
 type sequent = t
 
+let pp_goal fmt = function
+  | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
+  | _  as f -> Equiv.pp_form fmt f
+  
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[System: %a@]@;"
     SystemExpr.pp_system j.system;
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
-  if j.hyps <> [] then
-    Fmt.pf ppf "%a@;" pp_hyps j.hyps ;
+  H.pps ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
   Fmt.styled `Bold Utils.ident ppf (String.make 40 '-') ;
-  Fmt.pf ppf "@;%a@]" pp_equiv_numbered j.goal
+  Fmt.pf ppf "@;%a@]" pp_goal j.goal
 
 let pp_init ppf j =
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env ;
-  Fmt.pf ppf "%a"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
-    j.goal
+  Fmt.pf ppf "%a" Equiv.pp_form j.goal
 
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)
@@ -147,8 +83,13 @@ let set_hyps j f = { j with hyps = f}
 
 let set_goal j f = { j with goal = f }
 
-let get_frame proj j = List.map (pi_elem proj) j.goal
+let set_equiv_goal j e = { j with goal = Equiv.Atom (Equiv.Equiv e) }
+
+let get_frame proj j = match j.goal with
+  | Equiv.Atom (Equiv.Equiv e) -> 
+    Some (List.map (Equiv.pi_elem proj) e)
+  | _ -> None
 
 let subst subst s =
-  { s with goal = subst_equiv subst s.goal;
-           hyps  = subst_hyps subst s.hyps; }
+  { s with goal = Equiv.subst_form subst s.goal;
+           hyps = subst_hyps subst s.hyps; }

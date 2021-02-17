@@ -180,14 +180,3 @@ val maximal_elems : sequent -> Term.timestamp list ->
   * in message hypotheses of [s]. *)
 val get_all_terms : sequent -> Term.message list
 
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type hyp_error =
-  | HypAlreadyExists of string
-  | HypUnknown of string
-    
-exception Hyp_error of hyp_error
-
-val pp_hyp_error : Format.formatter -> hyp_error -> unit

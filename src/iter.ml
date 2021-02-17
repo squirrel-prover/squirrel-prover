@@ -18,8 +18,8 @@ let erefresh evars =
 class iter ~system table = object (self)
 
   method visit_term t = match t with
-    | EquivSequent.Message e -> self#visit_message e
-    | EquivSequent.Formula e -> self#visit_formula e
+    | Equiv.Message e -> self#visit_message e
+    | Equiv.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
     | Fun (_, l) -> List.iter self#visit_message l
@@ -71,8 +71,8 @@ end
 class ['a] fold ~system table = object (self)
 
   method fold_term (x:'a) t = match t with
-    | EquivSequent.Message e -> self#fold_message x e
-    | EquivSequent.Formula e -> self#fold_formula x e
+    | Equiv.Message e -> self#fold_message x e
+    | Equiv.Formula e -> self#fold_formula x e
 
   method fold_message x t = match t with
     | Fun (_, l) -> List.fold_left self#fold_message x l

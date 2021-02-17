@@ -53,7 +53,8 @@ type tac_error =
   | GoalNotClosed
   | NothingToIntroduce
   | PatNumError of int * int    (* given, need *)
-                   
+  | GoalBadShape of string
+
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error
 
