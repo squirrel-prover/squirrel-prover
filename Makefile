@@ -10,7 +10,7 @@ default: squirrel
 all: squirrel test
 
 PROVER_TESTS = $(wildcard tests/ok/*.sp) $(wildcard tests/fail/*.sp)
-PROVER_EXAMPLES = $(wildcard examples/*.sp)
+PROVER_EXAMPLES = $(wildcard examples/*.sp) $(wildcard examples/tutorial/*.sp)
 
 test: squirrel alcotest okfail_test
 
