@@ -1,11 +1,11 @@
 (*
-# Introduction
+# Protocol modelling
 
-This interactive tutorial allows you to discover the tool, and start using it to perform proofs. It contains executable Squirell code, interlaced with comments in Markdown.
+This interactive tutorial allows you to discover the tool, and start using it to perform proofs. It contains executable __Squirell__ code, interlaced with comments in _Markdown_.
 
-# Messages
+## Messages
 
-Messages exchanged by a protocol are modelled using terms.
+Messages exchanged by a protocol are modelled using _terms_.
 
 Concretely, a message is either
 
@@ -13,7 +13,7 @@ Concretely, a message is either
  * the application of a function `f(m_1,...,m_k)`.
 
 
-In Squirrel, A function symbol without any assumption can be defined with:
+In __Squirrel__, a function symbol without any assumption can be defined with:
 ```
 *)
 
@@ -49,14 +49,14 @@ name key : index -> message.
 (*
 ```
 
-# Cryptographic assumptions
+## Cryptographic assumptions
 
 Symbol functions can be defined as being an encryption, or a hash function, or a signature, or... The tool will then assume that such functions satisfy some classical cryptographic assumptions.
 
 The possible sorts and corresponding assumptions are:
- * encryption,  CCA1 & INT-CTXT, symmetric and asymmetric
- * signatures, EUF-CMA
- * hash functions, PRF, and thus EUF-CMA, CR
+ * encryption,  __CCA1__ & __INT-CTXT__, symmetric and asymmetric
+ * signatures, __EUF-CMA__
+ * hash functions, __PRF__, and thus __EUF-CMA__, __CR__
 
 Each are declared in the following way.
 ```
@@ -69,7 +69,7 @@ aenc asenc,asdec,aspk.
 
 (*
 ```
-# Protocols
+## Protocols
 
 Protocols are described inside a pi-calculus. It is based on the following constructs:
  *  `new n` id used to instantiate a fresh name;
@@ -78,7 +78,7 @@ Protocols are described inside a pi-calculus. It is based on the following const
  * `act; P` correspond to the sequential composition of action `act` with process `P`;
  ... TODO
 
-As an example, we use a small RFID based protocol, with a tag and a reader, called the basic hash protocol:
+As an example, we use a small _RFID_ based protocol, with a tag and a reader, called the basic hash protocol:
 
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
