@@ -31,6 +31,9 @@ val solver_timeout : unit -> int
 (** Print equations of the TRS system. *)
 val print_trs_equations : unit -> bool
 
+(** Debug information for the constraint checker. *)
+val debug_constr : unit -> bool
+
 (** Strict alias mode for processus. *)
 val strict_alias_mode : unit -> bool
 

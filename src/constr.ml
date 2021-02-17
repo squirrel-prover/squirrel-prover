@@ -13,9 +13,7 @@ open Utils
    constraints solving, the union-find structure contains an
    *under-approximation* of equality equivalence classes. *)
 
-(* Comment in/out for debugging *)
-(* let dbg s = Printer.prt `Ignore s *)
-let dbg s = Printer.prt `Dbg s
+let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
@@ -852,7 +850,7 @@ let neq_sat uf g neqs : bool =
       let violation = ut_equal (mgu uf u |> snd) (mgu uf v |> snd) in
 
       if violation then 
-        dbg "disequality %a ≠ %a violated" pp_ut u pp_ut v;
+        dbg "dis-equality %a ≠ %a violated" pp_ut u pp_ut v;
       
       not violation
     ) neqs
