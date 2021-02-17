@@ -333,6 +333,7 @@ module type Tactics_sig = sig
 
   val pp : bool -> Format.formatter -> string -> unit
   val pps : Format.formatter -> unit -> unit
+  val pp_list : Format.formatter -> unit -> unit
 
 end
 
@@ -437,8 +438,10 @@ struct
       |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
     in
     Fmt.pf fmt "%a" Format.pp_print_text
-      "List of all tactics with short description, call help tacname for more \
-       details about a tactic. \n Tactics are organized in three categories: \n \
+      "List of all tactics with short description.\n \
+       `help tacname` gives more details about a tactic. \n\
+       `help concise` juste gives the list of tactics. \n\
+        Tactics are organized in three categories: \n \
        - logical, that rely on logical properties of the sequence;\n - \
        structural, that rely on properties of protocols and equality;\n - \
        cryptographic, that rely on some cryptographic assumption that must be \
@@ -457,7 +460,31 @@ struct
               Fmt.pf fmt "%a" (pp false) name
           ) (filter_cat helps cat)
     )
-      [Logical; Structural; Cryptographic]
+    [Logical; Structural; Cryptographic]
+
+  let pp_list fmt () =
+   let helps =
+      Hashtbl.fold (fun name tac acc -> (name, tac.help)::acc) table []
+      |> List.sort (fun (n1,_) (n2,_) -> compare n1 n2)
+    in
+    let filter_cat helps cat = List.filter (fun (y,x) -> x.tactic_group = cat) helps in
+    let str_cat = function
+      | Logical -> "Logical"
+      | Structural -> "Structural"
+      | Cryptographic -> "Cryptographic"
+    in
+    List.iter (fun cat ->
+        Fmt.pf fmt "\n%a" Fmt.(styled `Bold (styled `Red Utils.ident))
+          (str_cat cat^" tactics:\n");
+        Fmt.pf fmt "%a"
+          (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "; ")
+             (fun ppf (name,x) -> Fmt.pf ppf "%a"
+                 Fmt.(styled `Bold (styled `Magenta Utils.ident))
+                 name))
+        (filter_cat helps cat);
+    )
+    [Logical; Structural; Cryptographic]
+
 end
 
 module rec TraceTactics : Tactics_sig with type judgment = TraceSequent.t =
@@ -471,6 +498,8 @@ let pp_ast fmt t = TraceAST.pp fmt t
 let get_trace_help tac_name =
   if tac_name = "" then
     Printer.prt `Result "%a" TraceTactics.pps ()
+  else if tac_name = "concise" then
+    Printer.prt `Result "%a" TraceTactics.pp_list ()
   else
     Printer.prt `Result "%a." (TraceTactics.pp true) tac_name;
   Tactics.id
@@ -478,6 +507,8 @@ let get_trace_help tac_name =
 let get_equiv_help tac_name =
   if tac_name = "" then
     Printer.prt `Result "%a" EquivTactics.pps ()
+  else if tac_name = "concise" then
+    Printer.prt `Result "%a" TraceTactics.pp_list ()
   else
     Printer.prt `Result "%a." (EquivTactics.pp true) tac_name;
   Tactics.id
@@ -492,9 +523,14 @@ let () =
     (fun _ _ sk fk -> sk [] fk) ;
 
   TraceTactics.register_general "help"
-    ~tactic_help:{general_help = "Display all available commands.";
-                  detailed_help = "";
-                  usages_sorts = [Sort (TacticsArgs.Opt String)];
+    ~tactic_help:{general_help = "Display all available commands.\n\n\
+                                  Usages: help\n\
+                                 \        help tacname\n\
+                                 \        help concise";
+                  detailed_help = "`help tacname` gives more details about a \
+                                   tactic and `help concise` juste gives the \
+                                   list of tactics.";
+                  usages_sorts = [];
                   tactic_group = Logical}
     (function
       | [] -> get_trace_help ""
@@ -503,9 +539,14 @@ let () =
           (Tactics.Failure"improper arguments")) ;
 
   EquivTactics.register_general "help"
-    ~tactic_help:{general_help = "Display all available commands.\n Usage: help.\n help tacname.";
-                  detailed_help = "";
-                  usages_sorts = [Sort (TacticsArgs.Opt String)];
+    ~tactic_help:{general_help = "Display all available commands.\n\n\
+                                  Usages: help\n\
+                                 \        help tacname\n\
+                                 \        help concise";
+                  detailed_help = "`help tacname` gives more details about a \
+                                   tactic and `help concise` juste gives the \
+                                   list of tactics.";
+                  usages_sorts = [];
                   tactic_group = Logical}
     (function
       | [] -> get_equiv_help ""

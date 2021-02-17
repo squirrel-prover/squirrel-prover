@@ -145,6 +145,7 @@ module type Tactics_sig = sig
   (* Print all tactics with their help. Do not print tactics without help
      string. *)
   val pps : Format.formatter -> unit -> unit
+  val pp_list : Format.formatter -> unit -> unit
 end
 
 val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
