@@ -6,6 +6,7 @@ module L = Location
 (*------------------------------------------------------------------*)
 type decl_error_i =
   | Multiple_declarations of string
+  | BadEquivForm 
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError           of System.system_error
@@ -19,6 +20,10 @@ let pp_decl_error_i fmt = function
   | Multiple_declarations s ->
     Fmt.pf fmt
       "@[Multiple declarations of the symbol: %s.@]@." s
+
+  | BadEquivForm ->
+    Fmt.pf fmt "equivalence goal ill-formed"
+
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
@@ -74,13 +79,22 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 
 (*------------------------------------------------------------------*)
+(** {2 Parsed goals }*)
+
 type p_goal_name = P_unknown | P_named of string
+
+type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
+
+type p_equiv_form = 
+  | PEquiv of p_equiv
+  | PReach of Theory.formula
+  | PImpl of p_equiv_form * p_equiv_form
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of 
-      (Theory.lsymb * Sorts.esort) list * 
-      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+
+  | P_equiv_goal of (Theory.lsymb * Sorts.esort) list * p_equiv_form L.located
+
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
@@ -91,6 +105,8 @@ type gm_input_i =
 type gm_input = gm_input_i L.located
 
 (*------------------------------------------------------------------*)
+(** {2 Options }*)
+
 type option_name =
   | Oracle_for_symbol of string
 
@@ -509,8 +525,8 @@ let make_trace_goal ~system ~table f  =
   Goal.Trace (TraceSequent.init ~system table g)
 
 let make_equiv_goal
-    ~table (system_name : System.system_name)
-    env (l : [`Message of 'a | `Formula of 'b] list) =
+    ~table (system_name : System.system_name) env 
+    (p_form : p_equiv_form L.located) =
   let env =
     List.fold_left
       (fun env (x, Sorts.ESort s) ->
@@ -520,14 +536,36 @@ let make_equiv_goal
   in
   let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let convert = function
-    | `Formula f ->
-        EquivSequent.Formula (Theory.convert conv_env subst f Sorts.Boolean)
-    | `Message m ->
-        EquivSequent.Message (Theory.convert conv_env subst m Sorts.Message)
+  let convert f s = Theory.convert conv_env subst f s in
+      
+  let convert_el = function
+    | `Formula f -> EquivSequent.Formula (convert f Sorts.Boolean)
+    | `Message m -> EquivSequent.Message (convert m Sorts.Message)
   in
+
+  (* only for [equiv_form] of the shape [A -> B -> ... -> G],
+     which is all that the parser supports right now. *)
+  let rec convert_eform = function
+    | PImpl (f,f0) -> 
+      let hyps0, f = convert_eform f in
+      assert (hyps0 = []);      (* handle restricted fragment *)      
+      let rhyps, g = convert_eform f0 in
+      f :: rhyps, g
+
+    | PEquiv e -> 
+      [], EquivSequent.Equiv (List.map convert_el e)
+    | PReach f -> 
+      [], EquivSequent.Reach (convert f Sorts.Boolean)
+  in
+                    
   let se = SystemExpr.simple_pair table system_name in
-  Goal.Equiv (EquivSequent.init se table env (List.map convert l))
+  let rhyps, f = convert_eform (L.unloc p_form) in
+  let f = match f with
+    | EquivSequent.Equiv e -> e
+    | EquivSequent.Reach _ -> decl_error (L.loc p_form) KGoal BadEquivForm 
+  in
+
+  Goal.Equiv (EquivSequent.init se table env (List.rev rhyps) f)
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
@@ -535,13 +573,18 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
+
   let system =
     match system_1, system_2 with
     | Left id1, Right id2 when id1 = id2 ->
       SystemExpr.simple_pair table id1
-    | _ -> SystemExpr.pair table system_1 system_2
+    | _ -> SystemExpr.pair table system_1 system_2 
   in
-  Goal.Equiv (EquivSequent.init system table !env [(EquivSequent.Message term)])
+
+  let happens = Term.Atom (`Happens (Term.Var ts)) in
+  let hyps = [EquivSequent.Reach happens] in
+
+  Goal.Equiv (EquivSequent.init system table !env hyps [(EquivSequent.Message term)])
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -560,12 +603,12 @@ let declare_new_goal_i table (gname,g) =
     | P_unknown -> unnamed_goal ()
     | P_named s -> s in
   let g = match g with
-    | P_equiv_goal (env,l) ->
+    | P_equiv_goal (env,f) ->
       let system_symb =
         System.of_string SystemExpr.default_system_name table
       in
       let env = List.map (fun (x,y) -> L.unloc x, y) env in
-      make_equiv_goal ~table system_symb env l
+      make_equiv_goal ~table system_symb env f
         
     | P_equiv_goal_process (a,b) ->
       let a = SystemExpr.parse_single table a

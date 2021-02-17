@@ -96,11 +96,11 @@ type t = {
   system : SystemExpr.system_expr;
 }
 
-let init system table env l = {
+let init system table env hyps l = {
   env    = env ; 
   table  = table ;
-  goal  = l ; 
-  hyps   = [];
+  goal   = l ; 
+  hyps   = hyps;
   system = system;
 }
 

@@ -39,7 +39,8 @@ type sequent = t
 (** Initialize a sequent for the diff-equivalence of the given system.  
     Remark that if the projection of the system is not None, the goal will 
     be trivial. *)
-val init : SystemExpr.system_expr -> Symbols.table -> Vars.env -> equiv -> t
+val init : 
+  SystemExpr.system_expr -> Symbols.table -> Vars.env -> hyps -> equiv -> t
 
 val pp : Format.formatter -> t -> unit
 

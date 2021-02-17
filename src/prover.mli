@@ -2,6 +2,8 @@
     proved lemmas, current lemma, current goals.
     It contains the state of the proof and the history as mutable states. *)
 
+module L = Location
+
 open Term
 
 module Goal : sig
@@ -32,11 +34,20 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 type p_goal_name = P_unknown | P_named of string
 
+
+type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
+
+type p_equiv_form = 
+  | PEquiv of p_equiv
+  | PReach of Theory.formula
+  | PImpl of p_equiv_form * p_equiv_form
+
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of 
-      (Theory.lsymb * Sorts.esort) list * 
-      [ `Message of Theory.term | `Formula of Theory.formula ] list 
+
+  | P_equiv_goal of
+      (Theory.lsymb * Sorts.esort) list * p_equiv_form L.located
+
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
@@ -47,7 +58,7 @@ type gm_input_i =
   | Gm_goal of p_goal_name * p_goal
   | Gm_proof
 
-type gm_input = gm_input_i Location.located
+type gm_input = gm_input_i L.located
 
 
 (*------------------------------------------------------------------*)
@@ -150,7 +161,7 @@ val make_trace_goal :
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
   table:Symbols.table -> System.system_name -> Theory.env ->
-  [ `Message of Theory.term | `Formula of Theory.formula ] list ->
+  p_equiv_form L.located ->
   Goal.t
 
 (** Produces an equivalence goal based on the process and the two
@@ -173,7 +184,7 @@ type parsed_input =
 (** Declare a new goal to the current goals, and returns it *)
 val declare_new_goal :
   Symbols.table ->
-  Location.t -> p_goal_name -> p_goal ->
+  L.t -> p_goal_name -> p_goal ->
   named_goal
 
 (** Store a proved goal, allowing to apply it. *)
@@ -202,17 +213,18 @@ val start_proof : unit -> string option
 
 type decl_error_i =
   | Multiple_declarations of string
+  | BadEquivForm 
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err
 
 type dkind = KDecl | KGoal
 
-type decl_error =  Location.t * dkind * decl_error_i
+type decl_error =  L.t * dkind * decl_error_i
 
 exception Decl_error of decl_error
 
 val pp_decl_error :
-  (Format.formatter -> Location.t -> unit) ->
+  (Format.formatter -> L.t -> unit) ->
   Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)

@@ -29,6 +29,7 @@
 
 %nonassoc ELSE
 %nonassoc QUANTIF
+%right ARROW
 %right DARROW
 %right DEQUIVARROW
 %left OR
@@ -484,6 +485,12 @@ equiv:
 | ei=equiv_item                 { [ei] }
 | ei=equiv_item COMMA eis=equiv { ei::eis }
 
+equiv_form:
+| LBRACKET f=formula RBRACKET      { Prover.PReach f }
+| e=equiv            { Prover.PEquiv e }
+/* | LPAREN f=equiv_form RPAREN       { f } */
+| f=equiv_form ARROW f0=equiv_form { Prover.PImpl (f,f0) }
+
 args:
 |                                         { [] }
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
@@ -516,8 +523,8 @@ goal_i:
       let fa = Location.mk_loc (Location.loc f) f_i in
       Prover.Gm_goal (n, P_trace_goal (s, fa)) }
 
-| EQUIV n=gname env=args COLON l=equiv DOT
-                 { Prover.Gm_goal (n, P_equiv_goal (env, l)) }
+| EQUIV n=gname env=args COLON f=loc(equiv_form) DOT
+                 { Prover.Gm_goal (n, P_equiv_goal (env, f)) }
 | EQUIV n=gname DOT
                  { Prover.Gm_goal
                      (n, P_equiv_goal_process
