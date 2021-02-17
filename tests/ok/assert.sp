@@ -10,7 +10,7 @@ axiom ax : a=b.
 goal assert_msg : forall (i:message), a=b.
 Proof.
   intro i.
-  assert (i=i).
+  assert (i=i) as T.
   apply ax.
 Qed.
 

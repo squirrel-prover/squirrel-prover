@@ -106,7 +106,7 @@ forall (t:timestamp), forall (i:index),
 Proof.
 induction.
 nosimpl(revert H => IH0).
-case t. 
+case t.
 
 substitute t,init.
 left.
@@ -115,7 +115,7 @@ substitute t,R(jj).
 use IH0 with pred(R(jj)) as H.
 use H with i as P; case P.
 by left; use H0 with j'.
-right; exists j; use H1 with j'. 
+right; exists j; use H1 with j'.
 by case H0.
 
 substitute t,R1(jj,ii).
@@ -143,7 +143,7 @@ substitute t,T1(i1,j).
 use IH0 with pred(T1(i1,j)) as H.
 use H with i as P; case P.
 (* *)
-assert C := (i=i1 || i<>i1).
+assert (i=i1 || i<>i1) as C.
 case C.
 (* case i=i1 *)
 right.
@@ -157,7 +157,7 @@ case (if i = i1 then
        else kT(i)@pred(T1(i1,j))).
 by use H0 with j'.
 (* *)
-assert C := (i=i1 || i<>i1).
+assert (i=i1 || i<>i1) as C.
 case C.
 (* case i=i1 *)
 right.
@@ -170,7 +170,7 @@ by case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-assert C := (j=j1 || j<>j1).
+assert (j=j1 || j<>j1) as C.
 case C.
 use H1 with j'.
 by case H0.
@@ -178,7 +178,7 @@ by use H1 with j' as Hyp; case Hyp.
 
 substitute t,T2(i1,j).
 use IH0 with pred(T2(i1,j)) as IHA.
-use IHA with i as P; case P. 
+use IHA with i as P; case P.
 by left; use H with j'.
 right; exists j1; use H0 with j' as P.
 by case P.
@@ -239,7 +239,7 @@ Proof.
 intro i j.
 use lastUpdateTag_ with pred(T1(i,j)) as H0.
 use H0 with i as H1.
-case H1; 
+case H1;
 1: by left.
 by right; exists j1.
 Qed.
@@ -275,11 +275,11 @@ case H0.
 use stateReaderInit with ii as M2.
 by fresh M2.
 (* general case *)
-assert M2 := 
-  input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
+assert
+  input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) as M2.
 euf M2.
 (* case euf 1/3 - R1(jj1,ii) *)
-assert H0 := R1(jj',ii) < R1(jj,ii). admit. (* ok *)
+assert R1(jj',ii) < R1(jj,ii) as H0. admit. (* ok *)
 case H0.
 admit. (* ok *)
 admit. (* ok *)
@@ -304,16 +304,17 @@ use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
 use stateTagInit with i as H0.
-assert M3 := idinit(i) = fst(kT(i)@init).
+assert idinit(i) = fst(kT(i)@init) as M3.
 by fresh M3.
 (* general case *)
-assert M2 :=
-  fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+assert
+  fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3)
+  as M2.
 euf M2.
 (* case euf 1/3 - R1(jj,i)  *)
 admit.
 (* case euf 2/3 - T1(i,j1) *)
-assert H1 := T1(i,j') < T1(i,j). admit. (* ok *)
+assert T1(i,j') < T1(i,j) as H1. admit. (* ok *)
 case H.
 admit. (* ok *)
 admit. (* ok *)
@@ -330,12 +331,13 @@ use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
 use stateTagInit with i.
-assert M3 := idinit(i) = fst(kT(i)@init).
+assert idinit(i) = fst(kT(i)@init) as M3.
 by fresh M3.
 (* general case *)
-assert M2 :=
-  fst(fst(input@t)) = 
-  h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+assert
+  fst(fst(input@t)) =
+  h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3)
+  as M2.
 euf M2.
 admit. (* TODO *)
 admit. (* TODO *)
@@ -360,7 +362,7 @@ expand cond@R1(jj,ii).
 euf Hcond.
 
 (* case euf 1/2 - T(i,j) *)
-assert H0 := (i=ii || i<>ii).
+assert (i=ii || i<>ii) as H0.
 case H0.
 (* case i=ii - honest case *)
 by exists j.
@@ -372,18 +374,21 @@ case H0.
 use stateTagInit with i.
 use stateReaderInit with ii.
 case H1.
-assert M6 :=
- h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i).
+assert
+ h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i)
+ as M6.
 by fresh M6.
 (* general case *)
 case H1.
 use stateReaderInit with ii.
-assert M5 :=
- idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3).
+assert
+ idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3)
+ as M5.
 by fresh M5.
-assert _ :=
+assert
   h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
-  h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3).
+  h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)
+  as _.
 by collision.
 
 (* case euf 2/2 - A(kk) *)

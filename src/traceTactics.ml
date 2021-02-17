@@ -863,7 +863,7 @@ let () =
                                   and produce the goal for\
                                   \nthe proof of the assumption.\n\
                                   Usages: assert f.\n \
-                                 \       assert intro_pat :=f";
+                                 \       assert f as intro_pat";
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Logical}
