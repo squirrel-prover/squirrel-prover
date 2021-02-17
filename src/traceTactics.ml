@@ -635,7 +635,6 @@ let induction s  =
          let (-->) a b = Impl (a,b) in
          let ih =
            ForAll ((Vars.EVar v'')::vs,
-                   Atom (`Timestamp (`Neq,Term.Var v,Term.Init)) -->
                    (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
                             :> generic_atom) -->
                     Term.subst

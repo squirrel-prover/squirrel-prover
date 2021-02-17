@@ -3,6 +3,7 @@ open Term
 type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
+module Tac = Tactics
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -28,7 +29,7 @@ let nth i l =
 let only_equiv t (s : Prover.Goal.t) =
   match s with
   | Prover.Goal.Equiv s -> t s
-  | _ -> Tactics.soft_failure (Tactics.Failure "Equivalence goal expected")
+  | _ -> Tac.soft_failure (Tac.Failure "Equivalence goal expected")
 
 (** Wrap a tactic expecting and returning equivalence goals
   * into a general prover tactic. *)
@@ -44,7 +45,7 @@ let pure_equiv t s sk fk =
 let only_equiv_typed t arg (s : Prover.Goal.t) =
   match s with
   | Prover.Goal.Equiv s -> t arg s
-  | _ -> Tactics.soft_failure (Tactics.Failure "Equivalence goal expected")
+  | _ -> Tac.soft_failure (Tac.Failure "Equivalence goal expected")
 
 (** Wrap a function expecting an argument and an equivalence goal and returning
    equivalence goals into a general prover function. *)
@@ -63,18 +64,18 @@ let () =
        | [] -> only_equiv (fun _ sk fk -> sk [] fk)
        | [TacticsArgs.Int_parsed i] ->
            pure_equiv begin fun s sk fk ->
-             let before,_,after = nth i (EquivSequent.get_biframe s) in
+             let before,_,after = nth i (EquivSequent.goal s) in
              let s =
-               EquivSequent.set_biframe s (List.rev_append before after)
+               EquivSequent.set_goal s (List.rev_append before after)
              in
                sk [s] fk
            end
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+       | _ -> Tac.hard_failure (Tac.Failure "improper arguments"))
 
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 let simpl =
-  Tactics.(
+  Tac.(
     AndThen
       (Abstract ("fadup",[]) ::
        [Try(
@@ -90,8 +91,8 @@ let () =
 
 (* TODO: add auto tac *)
 (* let tac_auto s sk fk =
- *   let fk _ = fk Tactics.GoalNotClosed in 
- *   sk (Tactics.AST.eval simpl s) *)
+ *   let fk _ = fk Tac.GoalNotClosed in 
+ *   sk (Tac.AST.eval simpl s) *)
 
 (*------------------------------------------------------------------*)
 exception NoReflMacros
@@ -116,14 +117,14 @@ let refl (s : EquivSequent.t) =
       (EquivSequent.table s) in
   try
     (* we check that the frame does not contain macro *)
-    List.iter iter#visit_term (EquivSequent.get_biframe s);
+    List.iter iter#visit_term (EquivSequent.goal s);
     if EquivSequent.get_frame PLeft s = EquivSequent.get_frame PRight s
     then
       []
     else
-      Tactics.soft_failure (Tactics.NoRefl)
+      Tac.soft_failure (Tac.NoRefl)
   with
-  | NoReflMacros -> Tactics.soft_failure (Tactics.NoReflMacros)
+  | NoReflMacros -> Tac.soft_failure (Tac.NoReflMacros)
 
 let () =
   T.register "refl"
@@ -134,12 +135,19 @@ let () =
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
 let assumption s =
-  let hypothesis = EquivSequent.get_hypothesis_biframe s in
-  if List.for_all (fun elem -> List.mem elem hypothesis)
-      (EquivSequent.get_biframe s) then
-    []
+  let hyps = EquivSequent.hyps s in
+  let goal = EquivSequent.goal s in
+
+  let in_hyp = function
+    | EquivSequent.Equiv equiv -> 
+      List.for_all (fun elem -> List.mem elem equiv) goal
+    | EquivSequent.Reach _ -> false
+  in
+
+  if List.exists in_hyp hyps 
+  then []
   else
-    Tactics.soft_failure (Tactics.Failure "Conclusion different from hypothesis.")
+    Tac.soft_failure (Tac.Failure "Conclusion different from hypothesis.")
 
 let () =
   T.register "assumption"
@@ -147,46 +155,56 @@ let () =
     (only_equiv assumption)
 
 (*------------------------------------------------------------------*)
-(** Given a judgement [s] of the form H0 => E, where E is the conclusion
+
+(** Given a judgement [s] of the form Γ => E, where E is the conclusion
    biframe, and a timestamp [ts] wich does not occur inside the hypothesis
-   H0, produce the judgments H0 => E{ts -> init} and E{ts->pred ts} => E.
+   H0, produce the judgments H0 => E{ts -> init} and (Γ ∧ E{ts->pred ts}) => E.
    The second one is then direclty simplified by a case on all possible
-   values of ts, producing a judgement for each one.
-   It would be sound to keep the initial hypothesis H0 in all produced
-   subgoals, but equivalence sequents currently support at most one
-   hypothesis. *)
+   values of ts, producing a judgement for each one. *)
 let induction TacticsArgs.(Timestamp ts) s =
   let env = EquivSequent.env s in
   match ts with
   | Var t as ts ->
     (* Check that variable does not occur in the premise. *)
-    if List.exists
-         (function
+    let bound_in_hyp = function
+      | EquivSequent.Equiv e -> 
+        List.exists (function
             | EquivSequent.Message m ->
-                List.mem (Vars.EVar t) (Term.get_vars m)
+              List.mem (Vars.EVar t) (Term.get_vars m)
             | EquivSequent.Formula m ->
-                List.mem (Vars.EVar t) (Term.get_vars m))
-         (EquivSequent.get_hypothesis_biframe s)
-    then
-      Tactics.soft_failure
-        (Tactics.Failure "Variable should not occur in the premise");
+              List.mem (Vars.EVar t) (Term.get_vars m)
+          ) e
+
+      | EquivSequent.Reach f -> 
+        List.mem (Vars.EVar t) (Term.get_vars f)
+    in
+    
+    let bound_in_hyps = List.exists bound_in_hyp (EquivSequent.hyps s) in
+
+    if bound_in_hyps then
+      Tac.soft_failure
+        (Tac.Failure "Variable cannot occur in the hypotheses");
+
     (* Remove ts from the sequent, as it will become unused. *)
     let s = EquivSequent.set_env (Vars.rm_var env t) s in
     let table  = EquivSequent.table s in
     let system = EquivSequent.system s in
     let subst = [Term.ESubst (ts, Pred ts)] in
-    let goal = EquivSequent.get_biframe s in
-    let hypothesis = EquivSequent.(apply_subst_frame subst goal) in
-    let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
-    let init_goal =
-      EquivSequent.(set_biframe
-                      s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
+    let goal = EquivSequent.goal s in
+
+    let ind_hyp = EquivSequent.Equiv (EquivSequent.subst_equiv subst goal) in
+    let induc_s = EquivSequent.set_hyps s (ind_hyp :: EquivSequent.hyps s) in
+
+    let init_s =
+      EquivSequent.set_goal
+        s (EquivSequent.subst_equiv [Term.ESubst(ts,Init)] goal)
     in
+
     let goals = ref [] in
     (** [add_action _action descr] adds to goals the goal corresponding to the
       * case where [t] is instantiated by [descr]. *)
     let add_action descr =
-      let env = ref @@ EquivSequent.env induc_goal in
+      let env = ref @@ EquivSequent.env induc_s in
       let subst =
         List.map
           (fun i ->
@@ -199,15 +217,16 @@ let induction TacticsArgs.(Timestamp ts) s =
           (Action.subst_action subst descr.Action.action)
       in
       let ts_subst = [Term.ESubst(ts,name)] in
-      goals := (EquivSequent.apply_subst ts_subst induc_goal
+      goals := (EquivSequent.subst ts_subst induc_s
                 |> EquivSequent.set_env !env)
                ::!goals
     in
+
     SystemExpr.iter_descrs table system add_action ;
-    init_goal :: List.rev !goals
+    init_s :: List.rev !goals
   | _  ->
-    Tactics.soft_failure
-      (Tactics.Failure "expected a timestamp variable")
+    Tac.soft_failure
+      (Tac.Failure "expected a timestamp variable")
 
 let () =
   T.register_typed "induction"
@@ -220,25 +239,25 @@ let () =
            pure_equiv
              (fun s sk fk -> match induction th s with
                 | subgoals -> sk subgoals fk
-                | exception (Tactics.Tactic_soft_failure e) -> fk e)
-       | _ -> Tactics.hard_failure
-           (Tactics.Failure "improper arguments"))
+                | exception (Tac.Tactic_soft_failure e) -> fk e)
+       | _ -> Tac.hard_failure
+           (Tac.Failure "improper arguments"))
 *)
 
 (*------------------------------------------------------------------*)
 let enrich arg s = match arg with
   | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
-    [ EquivSequent.set_biframe s (EquivSequent.Formula f ::
-                                  EquivSequent.get_biframe s) ]
+    [ EquivSequent.set_goal s (EquivSequent.Formula f ::
+                                  EquivSequent.goal s) ]
 
   | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
-    [ EquivSequent.set_biframe s (EquivSequent.Message f ::
-                                  EquivSequent.get_biframe s) ]
+    [ EquivSequent.set_goal s (EquivSequent.Message f ::
+                                  EquivSequent.goal s) ]
 
   | TacticsArgs.ETerm (Sorts.Index, _, loc)
   | TacticsArgs.ETerm (Sorts.Timestamp, _, loc) ->
-    Tactics.hard_failure
-      (Tactics.Failure "expected a message or boolean term")
+    Tac.hard_failure
+      (Tac.Failure "expected a message or boolean term")
 
 let () = T.register_typed "enrich"
     ~general_help:"Enrich the goal with the given term.\
@@ -287,7 +306,7 @@ let fa_expand t =
   | EquivSequent.Formula e -> filterBoolAsMsg (aux (Term.head_normal_biterm e))
 
 let fa TacticsArgs.(Int i) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
     | before, e, after ->
         begin try
           (* Special case for try find, otherwise we use fa_expand *)
@@ -306,19 +325,19 @@ let fa TacticsArgs.(Int i) s =
               List.rev_append before
                 (EquivSequent.[ Message c' ; Message t' ; Message e ] @ after)
             in
-            [ EquivSequent.set_env !env (EquivSequent.set_biframe s biframe) ]
+            [ EquivSequent.set_env !env (EquivSequent.set_goal s biframe) ]
           | _ ->
             let biframe =
               List.rev_append before (fa_expand e @ after) in
-              [ EquivSequent.set_biframe s biframe ]
+              [ EquivSequent.set_goal s biframe ]
           with
           | No_common_head ->
-              Tactics.soft_failure (Tactics.Failure "No common construct")
+              Tac.soft_failure (Tac.Failure "No common construct")
           | No_FA ->
-              Tactics.soft_failure (Tactics.Failure "FA not applicable")
+              Tac.soft_failure (Tac.Failure "FA not applicable")
         end
     | exception Out_of_range ->
-        Tactics.soft_failure (Tactics.Failure "Out of range position")
+        Tac.soft_failure (Tac.Failure "Out of range position")
 
 let () =
   T.register_typed "fa"
@@ -364,7 +383,7 @@ let is_dup table elem elems =
    seen as duplicates, or context of duplicates, are removed. All elements that
    can be seen as context of duplicates and assumptions are removed, but
    replaced by the assumptions that appear as there subterms. *)
-let rec filter_fa_dup table res assump elems =
+let rec filter_fa_dup table res assump (elems : EquivSequent.equiv) =
   let rec is_fa_dup acc elems e =
     (* if an element is a duplicate wrt. elems, we remove it directly *)
     if is_dup table e elems then
@@ -396,11 +415,18 @@ let rec filter_fa_dup table res assump elems =
    nor an assumption. *)
 let fa_dup s =
   let table = EquivSequent.table s in
-  let biframe = EquivSequent.get_biframe s
+
+  (* FIXME: allow to choose the hypothesis *)
+  let hyp = List.find_map (function 
+      | EquivSequent.Equiv e -> Some e
+      | EquivSequent.Reach _ -> None) (EquivSequent.hyps s) in
+  let hyp = Utils.odflt [] hyp in
+
+  let biframe = EquivSequent.goal s
                 |> List.rev
-                |> filter_fa_dup table [] (EquivSequent.get_hypothesis_biframe s)
+                |> filter_fa_dup table [] hyp
   in
-  [EquivSequent.set_biframe s biframe]
+  [EquivSequent.set_goal s biframe]
 
 exception Not_FADUP_formula
 exception Not_FADUP_iter
@@ -472,7 +498,7 @@ class check_fadup ~(system:SystemExpr.system_expr) table tau = object (self)
 end
 
 let fa_dup_int i s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, e, after ->
       let biframe_without_e = List.rev_append before after in
       let system = EquivSequent.system s in
@@ -515,19 +541,19 @@ let fa_dup_int i s =
             EquivSequent.Formula
               (Term.Macro (Term.exec_macro,[],Term.Pred tau))
           in
-          [EquivSequent.set_biframe s (List.rev_append before (new_elem::after))]
+          [EquivSequent.set_goal s (List.rev_append before (new_elem::after))]
         else raise Not_FADUP_formula
       with
       | Not_FADUP_formula ->
-          Tactics.soft_failure (Tactics.Failure "can only apply the tactic on \
+          Tac.soft_failure (Tac.Failure "can only apply the tactic on \
           a formula of the form (exec@pred(tau) && phi) with frame@pred(tau)\
           in the biframe")
       | Not_FADUP_iter ->
-          Tactics.soft_failure (Tactics.Failure "the formula contains subterms \
+          Tac.soft_failure (Tac.Failure "the formula contains subterms \
           that are not handled by the FADUP rule")
       end
   | exception Out_of_range ->
-      Tactics.soft_failure (Tactics.Failure "out of range position")
+      Tac.soft_failure (Tac.Failure "out of range position")
 
 
 let fadup TacticsArgs.(Opt (Int, p)) s =
@@ -710,10 +736,10 @@ let mk_phi_proj system table env name indices proj biframe =
     phi_frame @ phi_actions
   with
   | Name_found ->
-      Tactics.soft_failure (Tactics.Failure "Name not fresh")
+      Tac.soft_failure (Tac.Failure "Name not fresh")
   | Var_found ->
-      Tactics.soft_failure
-        (Tactics.Failure "Variable found, unsound to apply fresh")
+      Tac.soft_failure
+        (Tac.Failure "Variable found, unsound to apply fresh")
   end
 
 let fresh_cond system table env t biframe =
@@ -749,7 +775,7 @@ let mk_if_term system table env e biframe =
   | EquivSequent.Formula f -> raise Not_name
 
 let fresh TacticsArgs.(Int i) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
     | before, e, after ->
         (* the biframe to consider when checking the freshness *)
         let biframe = List.rev_append before after in
@@ -759,13 +785,13 @@ let fresh TacticsArgs.(Int i) s =
         begin match mk_if_term system table env e biframe with
         | if_term ->
           let biframe = List.rev_append before (if_term::after) in
-          [EquivSequent.set_biframe s biframe]
+          [EquivSequent.set_goal s biframe]
         | exception Not_name ->
-          Tactics.soft_failure
-            (Tactics.Failure "Can only apply fresh tactic on names")
+          Tac.soft_failure
+            (Tac.Failure "Can only apply fresh tactic on names")
         end
     | exception Out_of_range ->
-        Tactics.soft_failure (Tactics.Failure "Out of range position")
+        Tac.soft_failure (Tac.Failure "Out of range position")
 
 let () =
   T.register_typed "fresh"
@@ -810,7 +836,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
           been replaced by zero
         - we also add the hashed message [t] *)
     let e_without_hash =
-      EquivSequent.apply_subst_frame
+      EquivSequent.subst_equiv
         [Term.ESubst (hash,Term.Fun (Term.f_zero,[]))]
         [e]
     in
@@ -980,8 +1006,8 @@ let mk_prf_phi_proj proj system table env biframe e hash =
     mk_ands (phi_frame @ phi_actions)
   with
   | Not_hash -> Term.True
-  | Euf.Bad_ssc -> Tactics.soft_failure
-    (Tactics.Failure "Key syntactic side condition not checked")
+  | Euf.Bad_ssc -> Tac.soft_failure
+    (Tac.Failure "Key syntactic side condition not checked")
   end
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
@@ -1011,7 +1037,7 @@ let combine_conj_formulas p q =
     (Term.head_normal_biterm (Term.Diff(mk_ands new_p, mk_ands !aux_q)))
 
 let prf TacticsArgs.(Int i) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
     | before, e, after ->
       let biframe = List.rev_append before after in
       let system = (EquivSequent.system s) in
@@ -1026,8 +1052,8 @@ let prf TacticsArgs.(Int i) s =
       (* search for the first occurrence of a hash in [e] *)
       begin match Iter.get_ftype ~system table e Symbols.Hash with
       | None ->
-        Tactics.soft_failure
-          (Tactics.Failure
+        Tac.soft_failure
+          (Tac.Failure
             "PRF can only be applied on a term with at least one occurrence \
              of a hash term h(t,k)")
       | Some ((Term.Fun ((fn,_), [m; key])) as hash) ->
@@ -1036,7 +1062,7 @@ let prf TacticsArgs.(Int i) s =
          * which are used by the iterator to represent bound variables. *)
         let vars = Term.get_vars hash in
         if List.exists Vars.(function EVar v -> is_new v) vars then
-          Tactics.soft_failure (Tactics.Failure "Application of this tactic \
+          Tac.soft_failure (Tac.Failure "Application of this tactic \
             inside a context that bind variables is not supported")
         else
           let phi_left =
@@ -1068,13 +1094,13 @@ let prf TacticsArgs.(Int i) s =
               Term.Name (n,[]),
               hash) in
           let new_elem =
-            EquivSequent.apply_subst_frame [Term.ESubst (hash,if_term)] [e] in
+            EquivSequent.subst_equiv [Term.ESubst (hash,if_term)] [e] in
           let biframe = (List.rev_append before (new_elem @ after)) in
-          [EquivSequent.set_biframe s biframe]
+          [EquivSequent.set_goal s biframe]
       | _ -> assert false
       end
     | exception Out_of_range ->
-        Tactics.soft_failure (Tactics.Failure "Out of range position")
+        Tac.soft_failure (Tac.Failure "Out of range position")
 
 let () =
   T.register_typed "prf"
@@ -1122,9 +1148,9 @@ class check_rand ~allow_vars ~system table enc_fn randoms = object (self)
     | Term.Fun ((fn,_), [m1; _; m2]) when fn = enc_fn ->
       raise Euf.Bad_ssc
     | Term.Name (n,_) when List.mem n randoms ->
-      Tactics.soft_failure (Tactics.SEncRandomNotFresh)
+      Tac.soft_failure (Tac.SEncRandomNotFresh)
     | Term.Var m -> if not(allow_vars) then
-        Tactics.soft_failure (Tactics.Failure "No universal quantification over \
+        Tac.soft_failure (Tac.Failure "No universal quantification over \
                                                messages allowed")
     | _ -> super#visit_message t
 end
@@ -1166,7 +1192,7 @@ let check_encryption_randomness system table case_schemata cases_direct enc_fn m
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
   let randoms = List.map (function
       | Fun ((_, _), [_; Name (r, is); _]), _-> r
-      | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
+      | _ ->  Tac.soft_failure (Tac.SEncNoRandom))
       encryptions
   in
   random_ssc ~elems ~messages ~system table enc_fn randoms;
@@ -1184,7 +1210,7 @@ let check_encryption_randomness system table case_schemata cases_direct enc_fn m
                    and it does not appear in the random. *)
                | _ -> false)) vars
       | _ -> assert false) encryptions then
-    Tactics.soft_failure (Tactics.SEncSharedRandom);
+    Tac.soft_failure (Tac.SEncSharedRandom);
 
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
@@ -1195,7 +1221,7 @@ let check_encryption_randomness system table case_schemata cases_direct enc_fn m
       | _ -> assert false
     ) encryptions in
   if List.exists (fun l -> List.length l > 1) enc_classes then
-    Tactics.soft_failure (Tactics.SEncSharedRandom)
+    Tac.soft_failure (Tac.SEncSharedRandom)
 
 
 let symenc_rnd_ssc ~system table env head_fn key_n key_is elems =
@@ -1210,7 +1236,7 @@ let symenc_rnd_ssc ~system table env head_fn key_n key_is elems =
 (** CCA1 *)
 
 let cca1 TacticsArgs.(Int i) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
     let system = (EquivSequent.system s) in
@@ -1288,8 +1314,8 @@ let cca1 TacticsArgs.(Int i) s =
                 if not (List.mem (EquivSequent.Message
                                     (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
                                  ) biframe) then
-                  Tactics.soft_failure
-                    (Tactics.Failure
+                  Tac.soft_failure
+                    (Tac.Failure
                        "The public key must be inside the frame in order to use \
                         CCA1")
                   ;
@@ -1298,11 +1324,11 @@ let cca1 TacticsArgs.(Int i) s =
                     get_subst_hide_enc enc fnenc m (Some (fnpk,is)) sk fndec r eis isk is_top_level
                   in
                   (fgoal :: fgoals,subst :: substs)
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+              with Euf.Bad_ssc ->  Tac.soft_failure Tac.Bad_SSC
             end
           | _ ->
-            Tactics.soft_failure
-              (Tactics.Failure
+            Tac.soft_failure
+              (Tac.Failure
                  "The first encryption symbol is not used with the correct public \
                   key function.")
         end
@@ -1317,7 +1343,7 @@ let cca1 TacticsArgs.(Int i) s =
             ->
             begin
               try
-                symenc_key_ssc  ~elems:(EquivSequent.get_biframe s) ~messages:[enc]
+                symenc_key_ssc  ~elems:(EquivSequent.goal s) ~messages:[enc]
                   ~system table fnenc fndec sk;
                 (* we check that the randomness is ok in the system and the
                    biframe, except for the encryptions we are looking at, which
@@ -1328,18 +1354,18 @@ let cca1 TacticsArgs.(Int i) s =
                     get_subst_hide_enc enc fnenc m (None) sk fndec r eis isk is_top_level
                   in
                   (fgoal :: fgoals,subst :: substs)
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+              with Euf.Bad_ssc ->  Tac.soft_failure Tac.Bad_SSC
             end
           | _ ->
-            Tactics.soft_failure
-              (Tactics.Failure
+            Tac.soft_failure
+              (Tac.Failure
                  "The first encryption symbol is not used with the correct public \
                   key function.")
         end
       | [] -> [], []
       | _ ->
-        Tactics.soft_failure
-          (Tactics.Failure
+        Tac.soft_failure
+          (Tac.Failure
              "CCA1 can only be applied on a term with at least one occurrence \
               of an encryption term enc(t,r,pk(k))")
     end
@@ -1349,16 +1375,16 @@ let cca1 TacticsArgs.(Int i) s =
                                         @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
                                              ~system table e Symbols.SEnc)) in
     if substs = [] then
-         Tactics.soft_failure
-          (Tactics.Failure
+         Tac.soft_failure
+          (Tac.Failure
              "CCA1 can only be applied on a term with at least one occurrence \
               of an encryption term enc(t,r,pk(k))");
-    let new_elem =    EquivSequent.apply_subst_frame substs [e] in
+    let new_elem =    EquivSequent.subst_equiv substs [e] in
     let biframe = (List.rev_append before (new_elem @ after)) in
-     Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) :: fgoals
+     Prover.Goal.Equiv (EquivSequent.set_goal s biframe) :: fgoals
 
   | exception Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "Out of range position")
+    Tac.soft_failure (Tac.Failure "Out of range position")
 
 
 let () =
@@ -1377,9 +1403,9 @@ let () =
 let enckp
   TacticsArgs.(Pair (Int i, Pair (Opt (Message, m1), Opt (Message, m2))))
   s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | exception Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "Out of range position")
+    Tac.soft_failure (Tac.Failure "Out of range position")
   | before, e, after ->
     let biframe = List.rev_append before after in
     let table = EquivSequent.table s in
@@ -1403,7 +1429,7 @@ let enckp
               (fun ((sk,isk),system) ->
                 symenc_key_ssc
                   ~system table fnenc fndec
-                  ~elems:(EquivSequent.get_biframe s) sk;
+                  ~elems:(EquivSequent.goal s) sk;
                 symenc_rnd_ssc ~system table env fnenc sk isk biframe;
                 ()
                          )
@@ -1415,7 +1441,7 @@ let enckp
           match Symbols.Function.get_data fnenc table with
           | Symbols.AssociatedFunctions [fndec;fnpk] ->
              (fun ((sk,_),system) ->
-                Euf.key_ssc ~system ~table ~elems:(EquivSequent.get_biframe s)
+                Euf.key_ssc ~system ~table ~elems:(EquivSequent.goal s)
                   ~allow_functions:(fun x -> x = fnpk) fndec sk),
                 (fun x -> Term.Fun ((fnpk,indices),[x])),
                 begin match k with
@@ -1424,8 +1450,8 @@ let enckp
                    | Term.Fun ((fnpk',indices'),[sk])
                      when fnpk = fnpk' && indices = indices' -> sk
                    | _ ->
-                       Tactics.soft_failure
-                         (Tactics.Failure
+                       Tac.soft_failure
+                         (Tac.Failure
                             "The first encryption is not used \
                              with the correct public key function")
                 end
@@ -1435,8 +1461,8 @@ let enckp
         | Term.Name n -> n,n
         | Term.(Diff (Name l, Name r)) -> l,r
         | _ ->
-            Tactics.soft_failure
-              (Tactics.Failure "Secret keys must be names")
+            Tac.soft_failure
+              (Tac.Failure "Secret keys must be names")
       in
       let skl, skr = project sk in
       let (new_skl, new_skr), new_key =
@@ -1457,10 +1483,10 @@ let enckp
             (List.sort_uniq Stdlib.compare
                [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
           let context =
-            EquivSequent.apply_subst_frame [Term.ESubst (enc,Term.empty)] [e]
+            EquivSequent.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
           in
           fresh_cond system table env (Term.Name r) (context@biframe)
-        with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
+        with Euf.Bad_ssc -> Tac.soft_failure Tac.Bad_SSC
       in
       let fresh_goal =
         Prover.Goal.Trace
@@ -1473,12 +1499,12 @@ let enckp
         Term.Fun ((fnenc,indices), [m; Term.Name r; wrap_pk new_key])
       in
       let new_elem =
-        EquivSequent.apply_subst_frame [Term.ESubst (enc,new_enc)] [e]
+        EquivSequent.subst_equiv [Term.ESubst (enc,new_enc)] [e]
       in
       let biframe = (List.rev_append before (new_elem @ after)) in
 
       [fresh_goal;
-       Prover.Goal.Equiv (EquivSequent.set_biframe s biframe)]
+       Prover.Goal.Equiv (EquivSequent.set_goal s biframe)]
 
     in
 
@@ -1496,8 +1522,8 @@ let enckp
       | Some (Term.Fun ((fnenc,indices),[m; Term.Name r; k]) as enc) ->
         apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
       | Some _ ->
-        Tactics.soft_failure
-          (Tactics.Failure ("Target must be of the form enc(_,r,_) where \
+        Tac.soft_failure
+          (Tac.Failure ("Target must be of the form enc(_,r,_) where \
                              r is a name"))
       | None ->
         let encs =
@@ -1517,8 +1543,8 @@ let enckp
             apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
           | _ :: q -> find q
           | [] ->
-            Tactics.soft_failure
-              (Tactics.Failure ("No subterm of the form enc(_,r,k) where \
+            Tac.soft_failure
+              (Tac.Failure ("No subterm of the form enc(_,r,k) where \
                                  r is a name and k contains a diff(_,_)"))
         in find encs
 
@@ -1542,7 +1568,7 @@ let rec remove_name_occ n is l = match l with
   | [Name (name,indices); t] when name = n && indices = is -> t
   | [t; Name (name,indices)] when name = n && indices = is -> t
   | _ ->
-    Tactics.(soft_failure (Failure "name is not XORed on both sides"))
+    Tac.(soft_failure (Failure "name is not XORed on both sides"))
 
 let mk_xor_if_term_base system table env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term) =
@@ -1618,7 +1644,7 @@ let mk_xor_if_term_name system table env e mess_name biframe =
             end
           | EquivSequent.Formula f -> raise Not_xor
           end
-        | _ -> Tactics.soft_failure (Tactics.Failure "Expected a name")
+        | _ -> Tac.soft_failure (Tac.Failure "Expected a name")
         end
       end
   in
@@ -1628,7 +1654,7 @@ let mk_xor_if_term_name system table env e mess_name biframe =
 
 let xor TacticsArgs.(Pair (Int i,
                            Opt (Message, opt_m))) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, e, after ->
     (* the biframe to consider when checking the freshness *)
     let biframe = List.rev_append before after in
@@ -1641,17 +1667,17 @@ let xor TacticsArgs.(Pair (Int i,
         | None -> mk_xor_if_term system table env e biframe
         | Some (TacticsArgs.Message m) ->
           mk_xor_if_term_name system table env e m biframe
-      with Not_xor -> Tactics.soft_failure
-                        (Tactics.Failure
+      with Not_xor -> Tac.soft_failure
+                        (Tac.Failure
                            "Can only apply xor tactic on terms of the form u XOR v")
     in
     begin match res with
     | if_term ->
       let biframe = List.rev_append before (if_term::after) in
-      [EquivSequent.set_biframe s biframe]
+      [EquivSequent.set_goal s biframe]
     end
   | exception Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "Out of range position")
+    Tac.soft_failure (Tac.Failure "Out of range position")
 
 
 let () =
@@ -1680,20 +1706,27 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
     (* we add the new term to the frame and the hypothesis if it does not yet
        belongs to it *)
     let biframe =
-      let old_biframe = EquivSequent.get_biframe s in
+      let old_biframe = EquivSequent.goal s in
       if List.mem new_t old_biframe then old_biframe else new_t :: old_biframe
     in
-    let hypo_biframe =
-      let old_hyp_biframe = EquivSequent.get_hypothesis_biframe s in
-      if List.mem new_t old_hyp_biframe then old_hyp_biframe
-      else new_t :: old_hyp_biframe
+    
+    let mk_hyp hyp = match hyp with
+      | EquivSequent.Equiv e ->
+        let new_e = 
+          if not (List.mem new_t e) && List.mem (EquivSequent.Message t) e
+          then new_t :: e
+          else e 
+        in
+        EquivSequent.Equiv new_e
+
+      | EquivSequent.Reach f -> hyp
     in
-    [ EquivSequent.set_biframe
-        (EquivSequent.set_hypothesis_biframe s hypo_biframe)
-        biframe]
+    let new_hyps = List.map mk_hyp (EquivSequent.hyps s) in    
+
+    [ EquivSequent.set_goal (EquivSequent.set_hyps s new_hyps) biframe]
   | _ ->
-    Tactics.hard_failure
-      (Tactics.Failure "can only expand with sequences with parameters")
+    Tac.hard_failure
+      (Tac.Failure "can only expand with sequences with parameters")
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) =
@@ -1704,8 +1737,8 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       | EquivSequent.Message e -> EquivSequent.Message (Term.subst subst e)
       | EquivSequent.Formula e -> EquivSequent.Formula (Term.subst subst e)
     in
-    [EquivSequent.set_biframe s
-      (List.map apply_subst (EquivSequent.get_biframe s))]
+    [EquivSequent.set_goal s
+      (List.map apply_subst (EquivSequent.goal s))]
   in
   let table = EquivSequent.table s in
   (* computes the substitution dependeing on the sort of term *)
@@ -1716,9 +1749,9 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
         succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                            Macros.get_definition
                              (EquivSequent.system s) table sort mn is a)]
-      else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
+      else Tac.soft_failure (Tac.Failure "cannot expand this macro")
     | _ ->
-      Tactics.soft_failure (Tactics.Failure "can only expand macros")
+      Tac.soft_failure (Tac.Failure "can only expand macros")
     | exception Theory.(Conv (_,Type_error _)) ->
       begin
         match Theory.convert conv_env tsubst term Sorts.Message with
@@ -1727,15 +1760,15 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
             succ [Term.ESubst (Macro ((mn, sort, is),l,a),
                                Macros.get_definition
                                  (EquivSequent.system s) table sort mn is a)]
-          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
+          else Tac.soft_failure (Tac.Failure "cannot expand this macro")
         | _ ->
-          Tactics.soft_failure (Tactics.Failure "can only expand macros")
+          Tac.soft_failure (Tac.Failure "can only expand macros")
           (* TODO: cleanup  *)
         (* | exception Theory.(Conv e) ->
-         *   Tactics.soft_failure (Cannot_convert e) *)
+         *   Tac.soft_failure (Cannot_convert e) *)
       end
     (* | exception Theory.(Conv e) ->
-     *   Tactics.soft_failure (Cannot_convert e) *)
+     *   Tac.soft_failure (Cannot_convert e) *)
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"
@@ -1747,23 +1780,23 @@ let () = T.register_general "expand"
         pure_equiv
           (fun s sk fk -> match expand v s with
              | subgoals -> sk subgoals fk
-             | exception (Tactics.Tactic_soft_failure e) -> fk e)
+             | exception (Tac.Tactic_soft_failure e) -> fk e)
     | (TacticsArgs.Theory v)::ids ->
         let ids =
           List.map
             (function
                | TacticsArgs.Theory th -> th
-               | _ -> Tactics.hard_failure
-                        (Tactics.Failure "improper arguments"))
+               | _ -> Tac.hard_failure
+                        (Tac.Failure "improper arguments"))
             ids
         in
         pure_equiv
           (fun s sk fk -> match expand_seq v ids s with
              | subgoals -> sk subgoals fk
-             | exception (Tactics.Tactic_soft_failure e) -> fk e)
+             | exception (Tac.Tactic_soft_failure e) -> fk e)
      | _ ->
-         Tactics.hard_failure
-           (Tactics.Failure "improper arguments"))
+         Tac.hard_failure
+           (Tac.Failure "improper arguments"))
 
 (*------------------------------------------------------------------*)
 (** Expands all macro occurrences inside the biframe, if the macro is not at
@@ -1808,10 +1841,10 @@ let expand_all () s =
     | EquivSequent.Formula e ->
       EquivSequent.Formula (expand_all_macros e system table)
   in
-  let biframe = EquivSequent.get_biframe s
+  let biframe = EquivSequent.goal s
                 |> List.map (expand_all_macros)
   in
-  [EquivSequent.set_biframe s biframe]
+  [EquivSequent.set_goal s biframe]
 
 let () = T.register "expandall"
     ~general_help:"Expand all occurrences of macros that are about explicit actions.
@@ -1834,7 +1867,7 @@ let equiv_formula f1 f2 (s : EquivSequent.t) =
     let subgoals =
       [ Prover.Goal.Trace trace_sequent;
         Prover.Goal.Equiv
-          (EquivSequent.apply_subst [Term.ESubst (f1,f2)] s) ]
+          (EquivSequent.subst [Term.ESubst (f1,f2)] s) ]
     in
     subgoals
 
@@ -1853,7 +1886,7 @@ let equiv_message m1 m2 (s : EquivSequent.t) =
     let subgoals =
       [ Prover.Goal.Trace trace_sequent;
         Prover.Goal.Equiv
-          (EquivSequent.apply_subst [Term.ESubst (m1,m2)] s) ]
+          (EquivSequent.subst [Term.ESubst (m1,m2)] s) ]
     in
     subgoals 
 
@@ -1872,8 +1905,8 @@ let equivalent arg s = match arg with
       | TacticsArgs.ETerm (_, _, _),
         TacticsArgs.ETerm (_, _, _)  ->
         (* TODO: improve error message + add locations *)        
-        Tactics.hard_failure
-          (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
+        Tac.hard_failure
+          (Tac.Failure ("expected a pair of messages or a pair of booleans"))
 
 let () = T.register_typed "equivalent"
     ~general_help:"Replace all occurrences of a formula by another, and ask to \
@@ -1923,13 +1956,13 @@ let yes_no_if b TacticsArgs.(Int i) s =
   let env = EquivSequent.env s in
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
     begin match get_ite ~system table elem with
     | None ->
-      Tactics.soft_failure
-        (Tactics.Failure
+      Tac.soft_failure
+        (Tac.Failure
           "can only be applied on a term with at least one occurrence
           of an if then else term")
     | Some (c,t,e) ->
@@ -1938,22 +1971,22 @@ let yes_no_if b TacticsArgs.(Int i) s =
        * which are used by the iterator to represent bound variables. *)
       let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
       if List.exists Vars.(function EVar v -> is_new v) vars then
-        Tactics.soft_failure (Tactics.Failure "application of this tactic \
+        Tac.soft_failure (Tac.Failure "application of this tactic \
           inside a context that bind variables is not supported")
       else
         let branch, trace_sequent =
           simplify_ite b env system table c t e in
         let new_elem =
-          EquivSequent.apply_subst_frame
+          EquivSequent.subst_equiv
             [Term.ESubst (Term.ITE (c,t,e),branch)]
             [elem]
         in
         let biframe = List.rev_append before (new_elem @ after) in
         [ Prover.Goal.Trace trace_sequent;
-          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+          Prover.Goal.Equiv (EquivSequent.set_goal s biframe) ]
     end
   | exception Out_of_range ->
-     Tactics.soft_failure (Tactics.Failure "out of range position")
+     Tac.soft_failure (Tac.Failure "out of range position")
 
 let () =
  T.register_typed "noif"
@@ -2001,16 +2034,16 @@ let push_formula (j: 'a option) f term =
       if jj < List.length terms then
         Fun (f, List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
       else
-        Tactics.soft_failure
-          (Tactics.Failure "subterm at position j does not exists")
+        Tac.soft_failure
+          (Tac.Failure "subterm at position j does not exists")
     end
   | Diff (a, b) ->
     begin match j with
     | None -> Diff (mk_ite a, mk_ite b)
     | Some (TacticsArgs.Int 0) -> Diff (mk_ite a, b)
     | Some (TacticsArgs.Int 1) -> Diff (a, mk_ite b)
-    | _ ->  Tactics.soft_failure
-              (Tactics.Failure "expected j is 0 or 1 for diff terms")
+    | _ ->  Tac.soft_failure
+              (Tac.Failure "expected j is 0 or 1 for diff terms")
     end
   | Seq (vs, t) ->
     if not_in_f_vars vs then Seq (vs, mk_ite t)
@@ -2023,13 +2056,13 @@ let push_formula (j: 'a option) f term =
 let ifcond TacticsArgs.(Pair (Int i,
                               Pair (Opt (Int, j),
                                     Boolean f))) s =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
       | EquivSequent.Message ITE (c,t,e) -> (c, t, e)
-      | _ ->  Tactics.soft_failure
-                (Tactics.Failure "can only be applied to a conditional")
+      | _ ->  Tac.soft_failure
+                (Tac.Failure "can only be applied to a conditional")
     in
     let env = EquivSequent.env s in
     let system = EquivSequent.system s in
@@ -2042,15 +2075,15 @@ let ifcond TacticsArgs.(Pair (Int i,
         let trace_sequent = TraceSequent.init ~system table Term.(Impl(cond, f))
           |> TraceSequent.set_env env in
         [ Prover.Goal.Trace trace_sequent;
-          Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+          Prover.Goal.Equiv (EquivSequent.set_goal s biframe) ]
       with
       | Not_ifcond ->
-          Tactics.soft_failure (Tactics.Failure "tactic not applicable because \
+          Tac.soft_failure (Tac.Failure "tactic not applicable because \
           the formula contains variables that overlap with variables bound by \
           a seq or a try find construct")
       end
   | exception Out_of_range ->
-    Tactics.soft_failure (Tactics.Failure "out of range position")
+    Tac.soft_failure (Tac.Failure "out of range position")
 
 
 
@@ -2070,13 +2103,13 @@ let trivial_if (TacticsArgs.Int i) s =
   let env = EquivSequent.env s in
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
     begin match get_ite ~system table elem with
     | None ->
-      Tactics.soft_failure
-        (Tactics.Failure
+      Tac.soft_failure
+        (Tac.Failure
           "can only be applied on a term with at least one occurrence \
            of an if then else term")
     | Some (c,t,e) ->
@@ -2086,16 +2119,16 @@ let trivial_if (TacticsArgs.Int i) s =
           )
       in
       let new_elem =
-        EquivSequent.apply_subst_frame
+        EquivSequent.subst_equiv
           [Term.ESubst (Term.ITE (c,t,e),t)]
           [elem]
       in
       let biframe = List.rev_append before (new_elem @ after) in
       [ trace_goal;
-        Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+        Prover.Goal.Equiv (EquivSequent.set_goal s biframe) ]
     end
   | exception Out_of_range ->
-     Tactics.soft_failure (Tactics.Failure "out of range position")
+     Tac.soft_failure (Tac.Failure "out of range position")
 
 let () =
  T.register_typed "trivialif"
@@ -2111,14 +2144,14 @@ let ifeq
     TacticsArgs.(Pair (Int i, Pair (Message t1, Message t2)))
     s
   =
-  match nth i (EquivSequent.get_biframe s) with
+  match nth i (EquivSequent.goal s) with
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
       | EquivSequent.Message ITE (c,t,e) ->
         (c, t, e)
-      | _ -> Tactics.soft_failure
-               (Tactics.Failure "Can only be applied to a conditional.")
+      | _ -> Tac.soft_failure
+               (Tac.Failure "Can only be applied to a conditional.")
     in
     let env = EquivSequent.env s in
     let system = EquivSequent.system s in
@@ -2133,9 +2166,9 @@ let ifeq
           Term.(Impl(cond, Atom (`Message (`Eq,t1,t2))))
                           |> TraceSequent.set_env env in
       [ Prover.Goal.Trace trace_sequent;
-           Prover.Goal.Equiv (EquivSequent.set_biframe s biframe) ]
+           Prover.Goal.Equiv (EquivSequent.set_goal s biframe) ]
   | exception Out_of_range ->
-     Tactics.soft_failure (Tactics.Failure "Out of range position")
+     Tac.soft_failure (Tac.Failure "Out of range position")
 
 let () = T.register_typed "ifeq"
     ~general_help:"If the given conditional implies the equality of the two given terms,\
@@ -2225,10 +2258,10 @@ let ddh na nb nc s sk fk =
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
   if is_ddh_context system table na nb nc
-      (EquivSequent.get_biframe s) then
+      (EquivSequent.goal s) then
       sk [] fk
     else
-      Tactics.soft_failure Tactics.NotDDHContext
+      Tac.soft_failure Tac.NotDDHContext
 
 (* DDH is called on strings that correspond to names, put potentially without
    the correct arity. E.g, with name a(i), we need to write ddh a, .... Thus, we
@@ -2243,12 +2276,12 @@ let () = T.register_general "ddh"
           TacticsArgs.String_name v2;
           TacticsArgs.String_name v3] ->
          pure_equiv (ddh v1 v2 v3)
-       | _ -> Tactics.hard_failure (Tactics.Failure "improper arguments"))
+       | _ -> Tac.hard_failure (Tac.Failure "improper arguments"))
 
 
 (*------------------------------------------------------------------*)
 let print_tac TacticsArgs.None s = 
-  Tactics.print_system (EquivSequent.table s) (EquivSequent.system s);
+  Tac.print_system (EquivSequent.table s) (EquivSequent.system s);
   [s] 
 
 let () =

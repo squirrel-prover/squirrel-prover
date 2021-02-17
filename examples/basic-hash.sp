@@ -36,10 +36,10 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 goal wa_R :
   forall (j:index),
-    cond@R(j) <=>
-    (exists (i,k:index), T(i,k) < R(j) &&
-      fst(output@T(i,k)) = fst(input@R(j)) &&
-      snd(output@T(i,k)) = snd(input@R(j))).
+    (cond@R(j) <=>
+      (exists (i,k:index), T(i,k) < R(j) &&
+       fst(output@T(i,k)) = fst(input@R(j)) &&
+       snd(output@T(i,k)) = snd(input@R(j)))).
 Proof.
   intro *.
   expand cond@R(j).

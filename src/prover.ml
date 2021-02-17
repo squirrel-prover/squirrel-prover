@@ -27,6 +27,7 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "Declaration"
     | KGoal -> Fmt.pf fmt "Goal declaration" in
+
   Fmt.pf fmt "%a%a failed: %a."
     pp_loc_err loc
     pp_k k

@@ -523,9 +523,9 @@ goal_i:
                      (n, P_equiv_goal_process
                                    (SystemExpr.(P_Left  default_system_name),
 			                              SystemExpr.(P_Right default_system_name))) }
-| EQUIV b1=single_system b2=single_system n=ID DOT
+| EQUIV b1=single_system b2=single_system n=gname DOT
                  { Prover.Gm_goal
-                     (P_named n, Prover.P_equiv_goal_process (b1, b2))}
+                     (n, Prover.P_equiv_goal_process (b1, b2))}
 
 | PROOF          { Prover.Gm_proof }
 

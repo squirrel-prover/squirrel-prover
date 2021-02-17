@@ -15,8 +15,7 @@ equiv simp.
 Proof.
 enrich seq(i->h(ok,k(i))).
 
- induction t.
-
+ induction t. 
  expand frame@A(i).
  expand output@A(i).
  expand exec@A(i).
