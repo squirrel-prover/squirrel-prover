@@ -343,7 +343,7 @@ let mk_instance (l : Form.form list) : constr_instance =
     Return [undef] if it contains a cycle.
     If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
     Note that [mgu] normalizes [pred(init)] and [pred(undef)] into [undef]. *)
-let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
+let mgu (uf : Uuf.t) (ut : ut) =
 
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
@@ -352,18 +352,17 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
 
   (* Invariant: returns the representent of [ut] in [uf] *)
   and mgu_aux uf ut lv =
+    let uf = Uuf.extend uf ut in
+
     if List.mem ut lv then (uf, uundef)
-                           
     else match ut.cnt with
       | UVar _ | UUndef | UInit ->
-        let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
         
         if ut_equal rut ut then (uf, rut)
         else mgu_ uf rut (ut :: lv)
 
       | UName (a,is) ->
-        let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
         if ut_equal rut ut then
 
@@ -1085,7 +1084,7 @@ let m_is_sat models = models <> []
     There is no need to modify the rest of the model, since we are not adding
     an equality, disequality or inequality. *)
 let ext_support (model : model) (ut : ut) =
-  let uf, ut = mgu ~ext_support:true model.inst.uf ut in
+  let uf, ut = mgu model.inst.uf ut in
   { model with inst = { model.inst with uf = uf } }, ut
 
 let query_lit (model : model) (ord, ut1, ut2 : Form.lit) : bool =
