@@ -13,7 +13,9 @@ Prover
 Puf
 Symbols
 TraceSequent
+TraceTactics
 EquivSequent
+EquivTactics
 Sorts
 Tactics
 TacticsArgs
