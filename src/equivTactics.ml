@@ -1676,185 +1676,202 @@ let occurrences_of_action_descr ~system table action_descr hash_fn key_n =
 
 let mk_prf_phi_proj proj system table env biframe e hash =
   begin try
-    let system = SystemExpr.(project_system proj system) in
-    let (hash_fn,t,key_n,key_is) = prf_param (Term.pi_term proj hash) in
-    (* create the frame on which we will iterate to compute phi_proj
-        - e_without_hash is the context where all occurrences of [hash] have
-          been replaced by zero
-        - we also add the hashed message [t] *)
-    let e_without_hash =
-      Equiv.subst_equiv
-        [Term.ESubst (hash,Term.Fun (Term.f_zero,[]))]
-        [e]
-    in
-    let frame =
-      (Equiv.Message t) ::
-      (List.map (Equiv.pi_elem proj) (e_without_hash @ biframe)) in
-    (* check syntactic side condition *)
-    Euf.key_ssc
-      ~elems:frame ~allow_functions:(fun x -> false)
-      ~system ~table hash_fn key_n;
-    (* we compute the list of hashes from the frame *)
-    let list_of_hashes_from_frame =
-      occurrences_of_frame ~system table frame hash_fn key_n
-    and list_of_actions_from_frame =
-      let iter = new get_actions ~system table false in
-      List.iter iter#visit_term frame ;
-      iter#get_actions
-    and tbl_of_action_hashes = Hashtbl.create 10 in
-    (* we iterate over all the actions of the (single) system *)
-    SystemExpr.(iter_descrs table system
-      (fun action_descr ->
-        (* we add only actions in which a hash occurs *)
-        let descr_proj = Action.pi_descr proj action_descr in
-        let action_hashes =
-          occurrences_of_action_descr ~system table descr_proj hash_fn key_n in
-        if List.length action_hashes > 0 then
-          Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
-    (* direct cases (for explicit occurences of hashes in the frame) *)
-    let phi_frame =
-      (List.map
-        (fun (is,m) ->
-          (* select bound variables in key indices [is] and in message [m]
-          * to quantify universally over them *)
-          let env = ref env in
-          let vars = Term.get_vars m in
-          (* we add variables from [is] while preserving unique occurrences *)
-          let vars =
-            List.fold_left
-              (fun vars i ->
-                if List.mem (Vars.EVar i) vars
-                then vars
-                else Vars.EVar i :: vars)
-              vars
-              is
-          in
-          (* we remove from [vars] free variables, ie already in [env] *)
-          let not_in_env  = function
-            | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-              not (Vars.mem !env (Vars.name i))
-            | _ -> true
-          in
-          let vars = List.filter not_in_env vars in
-          let subst =
-            List.map
-              (function Vars.EVar v ->
-                Term.(ESubst (Var v,
-                              Var (Vars.make_fresh_from_and_update env v))))
-              vars
-          in
-          let forall_vars =
-            List.map
-              (function Vars.EVar v ->
-                Vars.EVar (Term.subst_var subst v))
-              vars
-          in
-          let is = List.map (Term.subst_var subst) is in
-          let m = Term.subst subst m in
-          Term.mk_forall
-            forall_vars
-            (Term.mk_impl
-              (Term.mk_indices_eq key_is is)
-              (Term.Atom (`Message (`Neq, t, m)))))
-        list_of_hashes_from_frame)
-    (* undirect cases (for occurences of hashes in actions of the system) *)
-    and phi_actions =
-      Hashtbl.fold
-        (fun a list_of_is_m formulas ->
-          (* for each action in which a hash occurs *)
-            let env = ref env in
-            let new_action_indices =
-              List.map
-                (fun i -> Vars.make_fresh_from_and_update env i)
-                a.Action.indices
-            in
-            let is =
-              List.sort_uniq Stdlib.compare
-                (List.concat (List.map fst list_of_is_m))
-            in
-            let vars = List.sort_uniq Stdlib.compare
-              (List.concat
-                (List.map
-                  (fun (_,m) -> Term.get_vars m)
-                  list_of_is_m))
-            in
-            (* we add variables from [is] while preserving unique occurrences *)
-            let vars =
-              List.fold_left
-                (fun vars i ->
-                  if List.mem (Vars.EVar i) vars
-                  then vars
-                  else Vars.EVar i :: vars)
-                vars
-                is
-            in
-            (* we remove from [vars] free variables,
-             * ie already in [a.Action.indices] *)
-            let not_in_action_indices  = function
-              | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-                not (List.mem i a.Action.indices)
-              | _ -> true
-            in
-            let vars = List.filter not_in_action_indices vars in
-            let subst =
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                a.Action.indices new_action_indices
-              @
-              List.map
-                (function Vars.EVar v ->
-                  Term.(ESubst (Var v,
-                                Var (Vars.make_fresh_from_and_update env v))))
-                vars
-            in
-            let forall_vars =
-              List.map (fun i -> Vars.EVar i) new_action_indices
-              @
-              List.map
-                (function Vars.EVar v ->
-                  Vars.EVar (Term.subst_var subst v))
-                vars
-            in
-            (* apply [subst] to the action and to the list of
-             * key indices with the hashed messages *)
-            let new_action =
-              SystemExpr.action_to_term
-                table system
-                (Action.subst_action subst a.Action.action)
-            in
-            let list_of_is_m =
-              List.map
-                (fun (is,m) ->
-                  (List.map (Term.subst_var subst) is,Term.subst subst m))
-                list_of_is_m in
-            (* if new_action occurs before an action of the frame *)
-            let disj =
-              Term.mk_ors
-                (List.sort_uniq Stdlib.compare
-                  (List.map
-                    (fun (t,strict) ->
-                      if strict
-                      then Term.Atom (`Timestamp (`Lt, new_action, t))
-                      else Term.Atom (Term.mk_timestamp_leq new_action t))
-                    list_of_actions_from_frame))
-            (* then if key indices are equal then hashed messages differ *)
-            and conj =
-              Term.mk_ands
-                (List.map
-                   (fun (is,m) -> Term.mk_impl
-                       (Term.mk_indices_eq key_is is)
-                       (Term.Atom (`Message (`Neq, t, m))))
-                   list_of_is_m)
-            in
-            (Term.mk_forall forall_vars (Term.mk_impl disj conj))::formulas)
-        tbl_of_action_hashes
-        []
-    in
-    mk_ands (phi_frame @ phi_actions)
-  with
-  | Not_hash -> Term.True
-  | Euf.Bad_ssc -> Tactics.soft_failure
-    (Tactics.Failure "Key syntactic side condition not checked")
+      let system = SystemExpr.(project_system proj system) in
+      let (hash_fn,t,key_n,key_is) = prf_param (Term.pi_term proj hash) in
+      (* create the frame on which we will iterate to compute phi_proj
+         - e_without_hash is the context where all occurrences of [hash] have
+            been replaced by zero
+         - we also add the hashed message [t] *)
+      let e_without_hash =
+        Equiv.subst_equiv
+          [Term.ESubst (hash,Term.Fun (Term.f_zero,[]))]
+          [e]
+      in
+
+      let frame =
+        (Equiv.Message t) ::
+        (List.map (Equiv.pi_elem proj) (e_without_hash @ biframe)) in
+
+      (* check syntactic side condition *)
+      Euf.key_ssc
+        ~elems:frame ~allow_functions:(fun x -> false)
+        ~system ~table hash_fn key_n;
+
+      (* we compute the list of hashes from the frame *)
+      let list_of_hashes_from_frame =
+        occurrences_of_frame ~system table frame hash_fn key_n
+      and list_of_actions_from_frame =
+        let iter = new get_actions ~system table false in
+        List.iter iter#visit_term frame ;
+        iter#get_actions
+      and tbl_of_action_hashes = Hashtbl.create 10 in
+
+      (* we iterate over all the actions of the (single) system *)
+      SystemExpr.(iter_descrs table system (fun action_descr ->
+          (* we add only actions in which a hash occurs *)
+          let descr_proj = Action.pi_descr proj action_descr in
+          let action_hashes =
+            occurrences_of_action_descr ~system table descr_proj hash_fn key_n in
+          if List.length action_hashes > 0 then
+            Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
+
+      (* direct cases (for explicit occurences of hashes in the frame) *)
+      let phi_frame =
+        (List.map (fun (is,m) ->
+             (* select bound variables in key indices [is] and in message [m]
+                to quantify universally over them *)
+             let env = ref env in
+             let vars = Term.get_vars m in
+             (* we add variables from [is] while preserving unique occurrences *)
+             let vars = List.fold_left (fun vars i ->
+                 if List.mem (Vars.EVar i) vars
+                 then vars
+                 else Vars.EVar i :: vars)
+                 vars
+                 is
+             in
+
+             (* we remove from [vars] free variables, ie already in [env] *)
+             let not_in_env  = function
+               | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+                 not (Vars.mem !env (Vars.name i))
+               | _ -> true
+             in
+
+             let vars = List.filter not_in_env vars in
+             let subst =
+               List.map
+                 (function Vars.EVar v ->
+                    Term.(ESubst (Var v,
+                                  Var (Vars.make_fresh_from_and_update env v))))
+                 vars
+             in
+
+             let forall_vars =
+               List.map
+                 (function Vars.EVar v ->
+                    Vars.EVar (Term.subst_var subst v))
+                 vars
+             in
+
+             let is = List.map (Term.subst_var subst) is in
+             let m = Term.subst subst m in
+             Term.mk_forall
+               forall_vars
+               (Term.mk_impl
+                  (Term.mk_indices_eq key_is is)
+                  (Term.Atom (`Message (`Neq, t, m)))))
+            list_of_hashes_from_frame)
+
+      (* undirect cases (for occurences of hashes in actions of the system) *)
+      and phi_actions =
+        Hashtbl.fold
+          (fun a list_of_is_m formulas ->
+             (* for each action in which a hash occurs *)
+             let env = ref env in
+             let new_action_indices =
+               List.map
+                 (fun i -> Vars.make_fresh_from_and_update env i)
+                 a.Action.indices
+             in
+
+             let is =
+               List.sort_uniq Stdlib.compare
+                 (List.concat (List.map fst list_of_is_m))
+             in
+
+             let vars = List.sort_uniq Stdlib.compare
+                 (List.concat
+                    (List.map
+                       (fun (_,m) -> Term.get_vars m)
+                       list_of_is_m))
+             in
+             (* we add variables from [is] while preserving unique occurrences *)
+             let vars =
+               List.fold_left
+                 (fun vars i ->
+                    if List.mem (Vars.EVar i) vars
+                    then vars
+                    else Vars.EVar i :: vars)
+                 vars
+                 is
+             in
+
+             (* we remove from [vars] free variables,
+              * ie already in [a.Action.indices] *)
+             let not_in_action_indices  = function
+               | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+                 not (List.mem i a.Action.indices)
+               | _ -> true
+             in
+
+             let vars = List.filter not_in_action_indices vars in
+             let subst =
+               List.map2
+                 (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+                 a.Action.indices new_action_indices
+               @
+               List.map
+                 (function Vars.EVar v ->
+                    Term.(ESubst (Var v,
+                                  Var (Vars.make_fresh_from_and_update env v))))
+                 vars
+             in
+
+             let forall_vars =
+               List.map (fun i -> Vars.EVar i) new_action_indices
+               @
+               List.map
+                 (function Vars.EVar v ->
+                    Vars.EVar (Term.subst_var subst v))
+                 vars
+             in
+
+             (* apply [subst] to the action and to the list of
+              * key indices with the hashed messages *)
+             let new_action =
+               SystemExpr.action_to_term
+                 table system
+                 (Action.subst_action subst a.Action.action)
+             in
+             let list_of_is_m =
+               List.map
+                 (fun (is,m) ->
+                    (List.map (Term.subst_var subst) is,Term.subst subst m))
+                 list_of_is_m in
+
+             (* if new_action occurs before an action of the frame *)
+             let disj =
+               Term.mk_ors
+                 (List.sort_uniq Stdlib.compare
+                    (List.map
+                       (fun (t,strict) ->
+                          if strict
+                          then Term.Atom (`Timestamp (`Lt, new_action, t))
+                          else Term.Atom (Term.mk_timestamp_leq new_action t))
+                       list_of_actions_from_frame))
+
+             (* then if key indices are equal then hashed messages differ *)
+             and conj =
+               Term.mk_ands
+                 (List.map
+                    (fun (is,m) -> Term.mk_impl
+                        (Term.mk_indices_eq key_is is)
+                        (Term.Atom (`Message (`Neq, t, m))))
+                    list_of_is_m)
+             in
+
+             (Term.mk_forall forall_vars (Term.mk_impl disj conj))::formulas)
+          tbl_of_action_hashes
+          []
+      in
+      mk_ands (phi_frame @ phi_actions)
+
+    with
+    | Not_hash -> Term.True
+    | Euf.Bad_ssc -> 
+      Tactics.soft_failure (Tactics.Failure "Key syntactic side condition \
+                                             not checked")
   end
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
@@ -1875,7 +1892,7 @@ let combine_conj_formulas p q =
         (aux_q := List.filter (fun e -> e <> p) !aux_q; (p::common, r_p))
       else
         (common, p::r_p))
-          ([], []) p
+      ([], []) p
   in
   (* common is the intersection of p and q, aux_q is the remainder of q and
      new_p the remainder of p *)
@@ -1885,24 +1902,24 @@ let combine_conj_formulas p q =
 
 let prf TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
-    | before, e, after ->
-      let biframe = List.rev_append before after in
-      let system = (EquivSequent.system s) in
-      let table = EquivSequent.table s in
-      let env = EquivSequent.env s in
-      let e = match e with
-        | Equiv.Message m ->
-          Equiv.Message (Term.head_normal_biterm m)
-        | Equiv.Formula f ->
-          Equiv.Formula (Term.head_normal_biterm f)
-      in
-      (* search for the first occurrence of a hash in [e] *)
-      begin match Iter.get_ftype ~system table e Symbols.Hash with
+  | before, e, after ->
+    let biframe = List.rev_append before after in
+    let system = (EquivSequent.system s) in
+    let table = EquivSequent.table s in
+    let env = EquivSequent.env s in
+    let e = match e with
+      | Equiv.Message m ->
+        Equiv.Message (Term.head_normal_biterm m)
+      | Equiv.Formula f ->
+        Equiv.Formula (Term.head_normal_biterm f)
+    in
+    (* search for the first occurrence of a hash in [e] *)
+    begin match Iter.get_ftype ~system table e Symbols.Hash with
       | None ->
         Tactics.soft_failure
           (Tactics.Failure
-            "PRF can only be applied on a term with at least one occurrence \
-             of a hash term h(t,k)")
+             "PRF can only be applied on a term with at least one occurrence \
+              of a hash term h(t,k)")
       | Some ((Term.Fun ((fn,_), [m; key])) as hash) ->
         (* Context with bound variables (eg try find) are not (yet) supported.
          * This is detected by checking that there is no "new" variable,
@@ -1910,44 +1927,49 @@ let prf TacticsArgs.(Int i) s =
         let vars = Term.get_vars hash in
         if List.exists Vars.(function EVar v -> is_new v) vars then
           Tactics.soft_failure (Tactics.Failure "Application of this tactic \
-            inside a context that bind variables is not supported")
+                                                 inside a context that bind variables is not supported")
         else
           let phi_left =
             mk_prf_phi_proj PLeft system table env biframe e hash in
           let phi_right =
             mk_prf_phi_proj PRight system table env biframe e hash in
+
           let table,n = Symbols.Name.declare table "n_PRF" 0 in
           let s = EquivSequent.set_table s table in
+
           let oracle_formula =
             Prover.get_oracle_tag_formula (Symbols.to_string fn)
           in
+
           let final_if_formula = match oracle_formula with
             | Term.False -> combine_conj_formulas phi_left phi_right
             | f ->
-                    let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
-                  | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
-                  | _ -> assert false
-                    in
-                    match Vars.sort uvarm,Vars.sort uvarkey with
-                    | Sorts.(Message, Message) -> let f = Term.subst [
-                        ESubst (Term.Var uvarm,m);
-                        ESubst (Term.Var uvarkey,key);] f in
-                      Term.And (Term.Not f,  combine_conj_formulas phi_left phi_right)
-                    | _ -> assert false
+              let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
+                | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
+                | _ -> assert false
+              in
+              match Vars.sort uvarm,Vars.sort uvarkey with
+              | Sorts.(Message, Message) -> let f = Term.subst [
+                  ESubst (Term.Var uvarm,m);
+                  ESubst (Term.Var uvarkey,key);] f in
+                Term.And (Term.Not f,  
+                          combine_conj_formulas phi_left phi_right)
+              | _ -> assert false
           in
+
           let if_term =
             Term.ITE
               (final_if_formula,
-              Term.Name (n,[]),
-              hash) in
+               Term.Name (n,[]),
+               hash) in
           let new_elem =
             Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] in
           let biframe = (List.rev_append before (new_elem @ after)) in
           [EquivSequent.set_equiv_goal s biframe]
       | _ -> assert false
-      end
-    | exception Out_of_range ->
-        Tactics.soft_failure (Tactics.Failure "Out of range position")
+    end
+  | exception Out_of_range ->
+    Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () =
   T.register_typed "prf"
@@ -2008,7 +2030,9 @@ end
 
 (* Check that the given randoms are only used in random seed position for
    encryption. *)
-let random_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~system table enc_fn randoms =
+let random_ssc
+    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) 
+    ~system table enc_fn randoms =
   let ssc = new check_rand ~allow_vars ~system table enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_term elems;
@@ -2033,44 +2057,51 @@ let random_ssc ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~system table enc_
      that use the same randomness are done on the same plaintext. This is why we
      based ourselves on messages produced by Euf.mk_rule, which should simplify
      such extension if need. *)
-let check_encryption_randomness system table case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.message * Vars.index list) list
-    = List.map (fun case -> case.Euf.message,
-                                          case.Euf.action_descr.indices) case_schemata
-                    @
-                    List.map (fun case -> case.Euf.d_message, []) cases_direct
+let check_encryption_randomness 
+    system table case_schemata cases_direct enc_fn messages elems =
+  let encryptions : (Term.message * Vars.index list) list = 
+    List.map (fun case -> 
+        case.Euf.message,
+        case.Euf.action_descr.indices
+      ) case_schemata
+    @
+    List.map (fun case -> case.Euf.d_message, []) cases_direct
   in
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
+
   let randoms = List.map (function
       | Fun ((_, _), [_; Name (r, is); _]), _-> r
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
       encryptions
   in
   random_ssc ~elems ~messages ~system table enc_fn randoms;
+
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
       | (Fun ((_, _), [m; Name (_, is); _]), (actidx:Vars.index list)) ->
         let vars = Term.get_vars m in
         List.exists (function
-            Vars.EVar v ->
+              Vars.EVar v ->
               (match Vars.sort v with
-                |Sorts.Index -> (List.mem v actidx) && not (List.mem v is)
-                (* we fail if there exists an indice appearing in the message,
-                   which is an indice instantiated by the action description,
-                   and it does not appear in the random. *)
+               |Sorts.Index -> (List.mem v actidx) && not (List.mem v is)
+               (* we fail if there exists an indice appearing in the message,
+                  which is an indice instantiated by the action description,
+                  and it does not appear in the random. *)
                | _ -> false)) vars
-      | _ -> assert false) encryptions then
+      | _ -> assert false) encryptions then    
     Tactics.soft_failure (Tactics.SEncSharedRandom);
 
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), [_; Name (r, is); _]),_), (Fun ((_, _), [_; Name (r2,is2); _]),_)
-        -> (r = r2)
-      (* the patterns should match, if they match inside the declaration of randoms *)
+      | (Fun ((_, _), [_; Name (r, is); _]),_), 
+        (Fun ((_, _), [_; Name (r2,is2); _]),_) -> (r = r2)
+      (* the patterns should match, if they match inside the declaration
+         of randoms *)
       | _ -> assert false
     ) encryptions in
+
   if List.exists (fun l -> List.length l > 1) enc_classes then
     Tactics.soft_failure (Tactics.SEncSharedRandom)
 
@@ -2099,141 +2130,141 @@ let cca1 TacticsArgs.(Int i) s =
       | Equiv.Formula f ->
         Equiv.Formula (Term.head_normal_biterm f)
     in
-    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis isk  is_top_level=
+    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis isk  is_top_level =
       (* we check that the random is fresh, and the key satisfy the
                side condition. *)
       begin
 
-          (* we create the fresh cond reachability goal *)
-          let random_fresh_cond = fresh_cond system table env (Term.Name r) biframe in
-          let fresh_goal = Prover.Goal.Trace
-              (TraceSequent.init ~system table random_fresh_cond
-               |> TraceSequent.set_env env
-              )
-          in
-          let new_subst =
-            if  is_top_level then
-                Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
-            else
-              let new_m = Term.(Fun (f_zeroes, [Fun (f_len, [m])])) in
-              let new_term = match fnpk with
-                | Some fnpk ->     Term.Fun ((fnenc,eis),
-                                             [new_m; Term.Name r;
-                                              Term.Fun (fnpk, [Term.Name (sk,isk)])])
-                | None ->  Term.Fun ((fnenc,eis),
-                                     [new_m; Term.Name r; Term.Name (sk,isk)])
-              in
-              Term.ESubst (enc,
-                            new_term
-                           ) in
-          (fresh_goal, new_subst)
+        (* we create the fresh cond reachability goal *)
+        let random_fresh_cond = fresh_cond system table env (Term.Name r) biframe in
+        let fresh_goal = Prover.Goal.Trace
+            (TraceSequent.init ~system table random_fresh_cond
+             |> TraceSequent.set_env env
+            )
+        in
+        let new_subst =
+          if  is_top_level then
+            Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
+          else
+            let new_m = Term.(Fun (f_zeroes, [Fun (f_len, [m])])) in
+            let new_term = match fnpk with
+              | Some fnpk ->     Term.Fun ((fnenc,eis),
+                                           [new_m; Term.Name r;
+                                            Term.Fun (fnpk, [Term.Name (sk,isk)])])
+              | None ->  Term.Fun ((fnenc,eis),
+                                   [new_m; Term.Name r; Term.Name (sk,isk)])
+            in
+            Term.ESubst (enc,
+                         new_term
+                        ) in
+        (fresh_goal, new_subst)
       end
     in
     (* first, we check if the term is an encryption at top level, in which case
        we will completely replace the encryption by the length, else we will
        replace the plain text by the lenght *)
     let is_top_level = match e with
-   | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r;
-                                    Term.Fun ((fnpk,is), [Term.Name (sk,isk)])]))
-              when (Symbols.is_ftype fnpk Symbols.PublicKey table
-                    && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
-   | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)]))
-     when Symbols.is_ftype fnenc Symbols.SEnc table -> true
-   | _ -> false
+      | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r;
+                                               Term.Fun ((fnpk,is), [Term.Name (sk,isk)])]))
+        when (Symbols.is_ftype fnpk Symbols.PublicKey table
+              && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
+      | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)]))
+        when Symbols.is_ftype fnenc Symbols.SEnc table -> true
+      | _ -> false
     in
     (* search for the first occurrence of an asymmetric encryption in [e], that
        do not occur under a decryption symbol. *)
     let rec hide_all_encs enclist =
       begin match
           enclist
-      with
-      | (Term.Fun ((fnenc,eis), [m; Term.Name r;
-                                    Term.Fun ((fnpk,is), [Term.Name (sk,isk)])])
-              as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey table
-                                 && Symbols.is_ftype fnenc Symbols.AEnc table)
-        ->
-        begin
-          match Symbols.Function.get_data fnenc table with
-          (* we check that the encryption function is used with the associated
-             public key *)
-          | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
-            ->
-            begin
-              try
-                Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                  ~system ~table fndec sk;
-                if not (List.mem (Equiv.Message
-                                    (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
-                                 ) biframe) then
-                  Tactics.soft_failure
-                    (Tactics.Failure
-                       "The public key must be inside the frame in order to use \
-                        CCA1")
+        with
+        | (Term.Fun ((fnenc,eis), [m; Term.Name r;
+                                   Term.Fun ((fnpk,is), [Term.Name (sk,isk)])])
+           as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey table
+                              && Symbols.is_ftype fnenc Symbols.AEnc table)
+          ->
+          begin
+            match Symbols.Function.get_data fnenc table with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec; fnpk2] when fnpk2 = fnpk
+              ->
+              begin
+                try
+                  Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
+                    ~system ~table fndec sk;
+                  if not (List.mem (Equiv.Message
+                                      (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
+                                   ) biframe) then
+                    Tactics.soft_failure
+                      (Tactics.Failure
+                         "The public key must be inside the frame in order to \
+                          use CCA1")
                   ;
                   let (fgoals, substs) = hide_all_encs q in
                   let fgoal,subst =
                     get_subst_hide_enc enc fnenc m (Some (fnpk,is)) sk fndec r eis isk is_top_level
                   in
                   (fgoal :: fgoals,subst :: substs)
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-            end
-          | _ ->
-            Tactics.soft_failure
-              (Tactics.Failure
-                 "The first encryption symbol is not used with the correct public \
-                  key function.")
-        end
+                with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+              end
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct \
+                    public key function.")
+          end
 
-      | (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)])
-              as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
-        ->
-        begin
-          match Symbols.Function.get_data fnenc table with
-          (* we check that the encryption function is used with the associated
-             public key *)
-          | Symbols.AssociatedFunctions [fndec]
-            ->
-            begin
-              try
-                symenc_key_ssc  ~elems:(goal_as_equiv s) ~messages:[enc]
-                  ~system table fnenc fndec sk;
-                (* we check that the randomness is ok in the system and the
-                   biframe, except for the encryptions we are looking at, which
-                   is checked by adding a fresh reachability goal. *)
-                symenc_rnd_ssc ~system table env fnenc sk isk biframe;
+        | (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)])
+           as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
+          ->
+          begin
+            match Symbols.Function.get_data fnenc table with
+            (* we check that the encryption function is used with the associated
+               public key *)
+            | Symbols.AssociatedFunctions [fndec]
+              ->
+              begin
+                try
+                  symenc_key_ssc  ~elems:(goal_as_equiv s) ~messages:[enc]
+                    ~system table fnenc fndec sk;
+                  (* we check that the randomness is ok in the system and the
+                     biframe, except for the encryptions we are looking at, which
+                     is checked by adding a fresh reachability goal. *)
+                  symenc_rnd_ssc ~system table env fnenc sk isk biframe;
                   let (fgoals, substs) = hide_all_encs q in
                   let fgoal,subst =
                     get_subst_hide_enc enc fnenc m (None) sk fndec r eis isk is_top_level
                   in
                   (fgoal :: fgoals,subst :: substs)
-              with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
-            end
-          | _ ->
-            Tactics.soft_failure
-              (Tactics.Failure
-                 "The first encryption symbol is not used with the correct public \
-                  key function.")
-        end
-      | [] -> [], []
-      | _ ->
-        Tactics.soft_failure
-          (Tactics.Failure
-             "CCA1 can only be applied on a term with at least one occurrence \
-              of an encryption term enc(t,r,pk(k))")
-    end
+                with Euf.Bad_ssc ->  Tactics.soft_failure Tactics.Bad_SSC
+              end
+            | _ ->
+              Tactics.soft_failure
+                (Tactics.Failure
+                   "The first encryption symbol is not used with the correct public \
+                    key function.")
+          end
+        | [] -> [], []
+        | _ ->
+          Tactics.soft_failure
+            (Tactics.Failure
+               "CCA1 can only be applied on a term with at least one occurrence \
+                of an encryption term enc(t,r,pk(k))")
+      end
     in
     let fgoals, substs = hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
                                            ~system table e Symbols.AEnc)
                                         @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
                                              ~system table e Symbols.SEnc)) in
     if substs = [] then
-         Tactics.soft_failure
-          (Tactics.Failure
-             "CCA1 can only be applied on a term with at least one occurrence \
-              of an encryption term enc(t,r,pk(k))");
+      Tactics.soft_failure
+        (Tactics.Failure
+           "CCA1 can only be applied on a term with at least one occurrence \
+            of an encryption term enc(t,r,pk(k))");
     let new_elem =    Equiv.subst_equiv substs [e] in
     let biframe = (List.rev_append before (new_elem @ after)) in
-     Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) :: fgoals
+    Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) :: fgoals
 
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
@@ -2428,24 +2459,30 @@ let mk_xor_if_term_base system table env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term) =
   let biframe =
     Equiv.Message (Term.Diff (l_left, l_right)) :: biframe in
+
   let system_left = SystemExpr.(project_system PLeft system) in
   let phi_left =
     mk_phi_proj system_left table env n_left is_left PLeft biframe
   in
+
   let system_right = SystemExpr.(project_system PRight system) in
   let phi_right =
     mk_phi_proj system_right table env n_right is_right PRight biframe
   in
+
   let len_left =
     Term.(Atom (`Message (`Eq,
                           Fun (f_len,[l_left]),
                           Fun (f_len,[Name (n_left,is_left)])))) in
+
   let len_right =
     Term.(Atom (`Message (`Eq,
                           Fun (f_len,[l_right]),
                           Fun (f_len,[Name (n_right,is_right)])))) in
+
   let len =
     if len_left = len_right then [len_left] else [len_left;len_right] in
+
   let phi =
     mk_ands
       (* remove duplicates, and then concatenate *)
@@ -2453,6 +2490,7 @@ let mk_xor_if_term_base system table env biframe
        List.filter (fun x -> not (List.mem x phi_right)) phi_left @
        phi_right)
   in
+
   let then_branch = Term.Fun (Term.f_zero,[]) in
   let else_branch = term in
   Equiv.Message Term.(mk_ite phi then_branch else_branch)
@@ -2473,8 +2511,10 @@ let mk_xor_if_term system table env e biframe =
       | Equiv.Formula f -> raise Not_xor
       end
   in
+
   mk_xor_if_term_base system table env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term)
+
 
 let mk_xor_if_term_name system table env e mess_name biframe =
   let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
@@ -2521,15 +2561,18 @@ let xor TacticsArgs.(Pair (Int i,
         | None -> mk_xor_if_term system table env e biframe
         | Some (TacticsArgs.Message m) ->
           mk_xor_if_term_name system table env e m biframe
-      with Not_xor -> Tactics.soft_failure
-                        (Tactics.Failure
-                           "Can only apply xor tactic on terms of the form u XOR v")
+      with Not_xor -> 
+        Tactics.soft_failure
+          (Tactics.Failure
+             "Can only apply xor tactic on terms of the form u XOR v")
     in
     begin match res with
+
     | if_term ->
       let biframe = List.rev_append before (if_term::after) in
       [EquivSequent.set_equiv_goal s biframe]
     end
+
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "Out of range position")
 
