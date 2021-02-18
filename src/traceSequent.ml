@@ -254,6 +254,16 @@ let get_all_terms s =
 
 (*------------------------------------------------------------------*)  
 module Hyps = struct
+  (** Hypothesis *)
+  type hyp = Term.formula
+
+  (** Local declaration *)
+  type ldecl = Ident.t * hyp
+
+  let pp_hyp = Term.pp 
+  let pp_ldecl = H.pp_ldecl
+
+
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"

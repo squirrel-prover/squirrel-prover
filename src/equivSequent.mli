@@ -1,6 +1,6 @@
-module Hyps : Hyps.S with type hyp = Equiv.form
+module H : Hyps.S with type hyp = Equiv.form
 
-type hyps = Hyps.hyps
+type hyps = H.hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)

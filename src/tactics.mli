@@ -47,13 +47,13 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | GoalBadShape of string
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
   | PatNumError of int * int    (* given, need *)
-  | GoalBadShape of string
 
 (** Tactics should raise this exception if they are ill-formed. *)
 exception Tactic_hard_failure of tac_error

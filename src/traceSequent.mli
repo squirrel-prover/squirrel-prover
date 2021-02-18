@@ -55,16 +55,18 @@ val conclusion : sequent -> formula
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses} *)
 
-(** Hypothesis *)
-type hyp = Term.formula
-
-(** Local declaration *)
-type ldecl = Ident.t * hyp
-
-val pp_hyp   : Format.formatter -> hyp   -> unit
-val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit  
-             
+(** Built on top of [Hyps.H] *)
 module Hyps : sig  
+  (** Hypothesis *)
+  type hyp = Term.formula
+
+  (** Local declaration *)
+  type ldecl = Ident.t * hyp
+
+  val pp_hyp   : Format.formatter -> hyp   -> unit
+  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit  
+
+
   (** [add id f s] returns the sequent [s] with [f] added to its hypotheses. 
       The new sequent will be automatically enriched with equalities 
       expressing relevant macro definitions, as well as conditions of all 

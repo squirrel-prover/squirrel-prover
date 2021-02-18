@@ -10,7 +10,7 @@ type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
 
-module Hyps = EquivSequent.Hyps
+module Hyps = EquivSequent.H
 
 module Args = TacticsArgs
 

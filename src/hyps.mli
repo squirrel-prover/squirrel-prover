@@ -10,7 +10,7 @@ end
 module type S = sig
   type hyp 
 
-  type ldecl
+  type ldecl = Ident.t * hyp
 
   type hyps
 

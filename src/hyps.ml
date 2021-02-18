@@ -24,7 +24,7 @@ end
 module type S = sig
   type hyp 
 
-  type ldecl
+  type ldecl = Ident.t * hyp
 
   type hyps
 
@@ -69,7 +69,7 @@ end
 
 
 (*------------------------------------------------------------------*)
-module Mk (Hyp : Hyp) : S = struct 
+module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct 
   module Mid = Ident.Mid
 
   type hyp = Hyp.t

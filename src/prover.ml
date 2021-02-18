@@ -3,6 +3,8 @@
 
 module L = Location
 
+module EquivHyps = EquivSequent.H
+
 (*------------------------------------------------------------------*)
 type decl_error_i =
   | Multiple_declarations of string
@@ -589,7 +591,34 @@ let get_goal_formula gname =
         (Tactics.Failure "No proved goal with given name")
     | _ -> assert false
 
-(** Declare Goals And Proofs *)
+
+(*------------------------------------------------------------------*)
+(** {2 Convert equivalence formulas} *)
+
+let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el = 
+  match el with
+  | `Formula f -> Equiv.Formula (Theory.convert cenv s f Sorts.Boolean)
+  | `Message m -> Equiv.Message (Theory.convert cenv s m Sorts.Message)
+
+let convert_equiv (cenv : Theory.conv_env) (s : Theory.subst) (e : p_equiv) =
+  List.map (convert_el cenv s) e
+
+let convert_equiv_form cenv s (p : p_equiv_form) =
+  let rec conve p =
+    match p with
+    | PImpl (f,f0) -> 
+      Equiv.Impl (conve f, conve f0)
+    | PEquiv e -> 
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv s e))
+    | PReach f -> 
+      Equiv.Atom (Equiv.Reach (Theory.convert cenv s f Sorts.Boolean))
+  in
+
+  conve p
+
+
+(*------------------------------------------------------------------*)
+(** {2 Declare Goals And Proofs} *)
 
 let make_trace_goal ~system ~table f  =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
@@ -608,36 +637,12 @@ let make_equiv_goal
   in
   let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let convert f s = Theory.convert conv_env subst f s in
-      
-  let convert_el = function
-    | `Formula f -> EquivSequent.Formula (convert f Sorts.Boolean)
-    | `Message m -> EquivSequent.Message (convert m Sorts.Message)
-  in
 
-  (* only for [equiv_form] of the shape [A -> B -> ... -> G],
-     which is all that the parser supports right now. *)
-  let rec convert_eform = function
-    | PImpl (f,f0) -> 
-      let hyps0, f = convert_eform f in
-      assert (hyps0 = []);      (* handle restricted fragment *)      
-      let rhyps, g = convert_eform f0 in
-      f :: rhyps, g
+  let f = convert_equiv_form conv_env subst (L.unloc p_form) in
 
-    | PEquiv e -> 
-      [], EquivSequent.Equiv (List.map convert_el e)
-    | PReach f -> 
-      [], EquivSequent.Reach (convert f Sorts.Boolean)
-  in
-                    
   let se = SystemExpr.simple_pair table system_name in
-  let rhyps, f = convert_eform (L.unloc p_form) in
-  let f = match f with
-    | EquivSequent.Equiv e -> e
-    | EquivSequent.Reach _ -> decl_error (L.loc p_form) KGoal BadEquivForm 
-  in
 
-  Goal.Equiv (EquivSequent.init se table env (List.rev rhyps) f)
+  Goal.Equiv (EquivSequent.init se table env EquivHyps.empty f)
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
@@ -645,6 +650,7 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
+  let goal = Equiv.(Atom (Equiv [Message term])) in
 
   let system =
     match system_1, system_2 with
@@ -654,9 +660,13 @@ let make_equiv_goal_process ~table system_1 system_2 =
   in
 
   let happens = Term.Atom (`Happens (Term.Var ts)) in
-  let hyps = [EquivSequent.Reach happens] in
+  let hyp = Equiv.Atom (Reach happens) in
 
-  Goal.Equiv (EquivSequent.init system table !env hyps [(EquivSequent.Message term)])
+  let hyps = EquivHyps.empty in
+  let id = EquivHyps.fresh_id "H" hyps in
+  let _, hyps = EquivHyps.add ~force:false id hyp hyps in
+
+  Goal.Equiv (EquivSequent.init system table !env hyps goal)
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations

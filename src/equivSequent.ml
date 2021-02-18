@@ -12,6 +12,8 @@ module H = Hyps.Mk
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps = 
   H.map (Equiv.subst_form subst) hyps
 
+type hyps = H.hyps
+
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
 
