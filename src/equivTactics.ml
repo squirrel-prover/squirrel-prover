@@ -41,33 +41,6 @@ let nth i l =
   in aux i [] l
 
 (*------------------------------------------------------------------*)
-(** Build a trace sequent from an equivalent sequent when its conclusion is a
-    [Reach _]. *)
-let trace_seq_of_equiv_seq s = 
-  let env    = EquivSequent.env s in
-  let system = EquivSequent.system s in
-  let table  = EquivSequent.table s in
-
-  let goal = match EquivSequent.goal s with
-    | Equiv.Atom (Equiv.Reach f) -> f
-    | _ -> 
-      Tactics.soft_failure (Tactics.GoalBadShape "expected an reachability \
-                                                  formulas")
-  in
-
-  let trace_s =
-    TraceSequent.set_env env (TraceSequent.init ~system table goal)
-  in
-  
-  (* We add all relevant hypotheses *)
-  Hyps.fold (fun id hyp trace_s -> match hyp with
-      | Equiv.Atom (Equiv.Reach h) -> 
-        TraceSequent.Hyps.add (Args.Named (Ident.name id)) h trace_s
-      | _ -> trace_s
-    ) s trace_s 
-
-
-(*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
 (** Wrap a tactic expecting an equivalence goal (and returning arbitrary
@@ -121,6 +94,33 @@ let goal_as_equiv s = match EquivSequent.goal s with
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
 let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
+
+(** Build a trace sequent from an equivalent sequent when its conclusion is a
+    [Reach _]. *)
+let trace_seq_of_equiv_seq s = 
+  let env    = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table  = EquivSequent.table s in
+
+  let goal = match EquivSequent.goal s with
+    | Equiv.Atom (Equiv.Reach f) -> f
+    | _ -> 
+      Tactics.soft_failure (Tactics.GoalBadShape "expected an reachability \
+                                                  formulas")
+  in
+
+  let trace_s =
+    TraceSequent.set_env env (TraceSequent.init ~system table goal)
+  in
+  
+  (* We add all relevant hypotheses *)
+  Hyps.fold (fun id hyp trace_s -> match hyp with
+      | Equiv.Atom (Equiv.Reach h) -> 
+        TraceSequent.Hyps.add (Args.Named (Ident.name id)) h trace_s
+      | _ -> trace_s
+    ) s trace_s 
+
+let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
@@ -1309,7 +1309,7 @@ let () = T.register "expandall"
 let equiv_formula f1 f2 (s : EquivSequent.t) =
   (* goal for the equivalence of t1 and t2 *)
   let f = Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)) in
-  let trace_sequent = trace_seq_of_equiv_seq (set_reach_goal f s) in
+  let trace_sequent = trace_seq_of_reach f s in
 
   let subgoals =
     [ Prover.Goal.Trace trace_sequent;
@@ -1321,39 +1321,34 @@ let equiv_formula f1 f2 (s : EquivSequent.t) =
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
 let equiv_message m1 m2 (s : EquivSequent.t) =
-  let env    = EquivSequent.env s in
-  let system = EquivSequent.system s in
-  let table  = EquivSequent.table s in
-    (* goal for the equivalence of t1 and t2 *)
-    let trace_sequent =
-      TraceSequent.init ~system table
-        (Term.Atom (`Message (`Eq,m1,m2)))
-      |> TraceSequent.set_env env
-    in
-    let subgoals =
-      [ Prover.Goal.Trace trace_sequent;
-        Prover.Goal.Equiv
-          (EquivSequent.subst [Term.ESubst (m1,m2)] s) ]
-    in
-    subgoals
+  (* goal for the equivalence of t1 and t2 *)
+  let trace_sequent =
+    trace_seq_of_reach (Term.Atom (`Message (`Eq,m1,m2))) s
+  in
+  let subgoals =
+    [ Prover.Goal.Trace trace_sequent;
+      Prover.Goal.Equiv
+        (EquivSequent.subst [Term.ESubst (m1,m2)] s) ]
+  in
+  subgoals
 
 
 let equivalent arg s = match arg with
   | TacticsArgs.Pair (t1,t2) ->
     match t1, t2 with
-      | TacticsArgs.ETerm (Sorts.Boolean, f1, _),
-        TacticsArgs.ETerm (Sorts.Boolean, f2, _) ->
-        equiv_formula f1 f2 s
+    | TacticsArgs.ETerm (Sorts.Boolean, f1, _),
+      TacticsArgs.ETerm (Sorts.Boolean, f2, _) ->
+      equiv_formula f1 f2 s
 
-      | TacticsArgs.ETerm (Sorts.Message, f1, _),
-        TacticsArgs.ETerm (Sorts.Message, f2, _) ->
-        equiv_message f1 f2 s
+    | TacticsArgs.ETerm (Sorts.Message, f1, _),
+      TacticsArgs.ETerm (Sorts.Message, f2, _) ->
+      equiv_message f1 f2 s
 
-      | TacticsArgs.ETerm (_, _, _),
-        TacticsArgs.ETerm (_, _, _)  ->
-        (* TODO: improve error message + add locations *)
-        Tactics.hard_failure
-          (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
+    | TacticsArgs.ETerm (_, _, _),
+      TacticsArgs.ETerm (_, _, _)  ->
+      (* TODO: improve error message + add locations *)
+      Tactics.hard_failure
+        (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
 
 let () = T.register_typed "equivalent"
     ~general_help:"Replace all occurrences of a formula by another, and ask to \
@@ -1368,20 +1363,16 @@ let () = T.register_typed "equivalent"
 
 
 (*------------------------------------------------------------------*)
-let simplify_ite b env system table cond positive_branch negative_branch =
+let simplify_ite b s cond positive_branch negative_branch =
   if b then
     (* replace in the biframe the ite by its positive branch *)
     (* ask to prove that the cond of the ite is True *)
-    let trace_sequent = TraceSequent.init ~system table cond
-      |> TraceSequent.set_env env
-    in
+    let trace_sequent = trace_seq_of_reach cond s in
     (positive_branch, trace_sequent)
   else
     (* replace in the biframe the ite by its negative branch *)
     (* ask to prove that the cond of the ite implies False *)
-    let trace_sequent = TraceSequent.init ~system table (Term.Impl(cond,False))
-      |> TraceSequent.set_env env
-    in
+    let trace_sequent = trace_seq_of_reach (Term.Impl(cond,False)) s in
     (negative_branch, trace_sequent)
 
 class get_ite_term ~system table = object (self)
@@ -1402,9 +1393,9 @@ let get_ite ~system table elem =
   iter#get_ite
 
 let yes_no_if b TacticsArgs.(Int i) s =
-  let env = EquivSequent.env s in
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
+
   match nth i (goal_as_equiv s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
@@ -1414,6 +1405,7 @@ let yes_no_if b TacticsArgs.(Int i) s =
         (Tactics.Failure
           "can only be applied on a term with at least one occurrence
           of an if then else term")
+
     | Some (c,t,e) ->
       (* Context with bound variables (eg try find) are not (yet) supported.
        * This is detected by checking that there is no "new" variable,
@@ -1422,9 +1414,10 @@ let yes_no_if b TacticsArgs.(Int i) s =
       if List.exists Vars.(function EVar v -> is_new v) vars then
         Tactics.soft_failure (Tactics.Failure "application of this tactic \
           inside a context that bind variables is not supported")
+
       else
         let branch, trace_sequent =
-          simplify_ite b env system table c t e in
+          simplify_ite b s c t e in
         let new_elem =
           Equiv.subst_equiv
             [Term.ESubst (Term.ITE (c,t,e),branch)]
@@ -1434,6 +1427,7 @@ let yes_no_if b TacticsArgs.(Int i) s =
         [ Prover.Goal.Trace trace_sequent;
           Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
     end
+
   | exception Out_of_range ->
      Tactics.soft_failure (Tactics.Failure "out of range position")
 
@@ -1519,24 +1513,26 @@ let ifcond TacticsArgs.(Pair (Int i,
       | _ ->  Tactics.soft_failure
                 (Tactics.Failure "can only be applied to a conditional")
     in
-    let env = EquivSequent.env s in
-    let system = EquivSequent.system s in
-    let table = EquivSequent.table s in
-      begin try
+
+    begin try
         let new_elem = Equiv.Message
-          (ITE (cond, push_formula j f positive_branch, negative_branch))
+            (ITE (cond, push_formula j f positive_branch, negative_branch))
         in
         let biframe = List.rev_append before (new_elem :: after) in
-        let trace_sequent = TraceSequent.init ~system table Term.(Impl(cond, f))
-          |> TraceSequent.set_env env in
+        let trace_sequent = 
+          trace_seq_of_reach Term.(Impl(cond, f)) s 
+        in
+
         [ Prover.Goal.Trace trace_sequent;
           Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
       with
       | Not_ifcond ->
-          Tactics.soft_failure (Tactics.Failure "tactic not applicable because \
-          the formula contains variables that overlap with variables bound by \
-          a seq or a try find construct")
-      end
+        Tactics.soft_failure 
+          (Tactics.Failure "tactic not applicable because \
+                            the formula contains variables that overlap with \
+                            variables bound by \
+                            a seq or a try find construct")
+    end
   | exception Out_of_range ->
     Tactics.soft_failure (Tactics.Failure "out of range position")
 
@@ -1557,7 +1553,6 @@ let () =
 
 (*------------------------------------------------------------------*)
 let trivial_if (TacticsArgs.Int i) s =
-  let env = EquivSequent.env s in
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
   match nth i (goal_as_equiv s) with
@@ -1570,11 +1565,11 @@ let trivial_if (TacticsArgs.Int i) s =
           "can only be applied on a term with at least one occurrence \
            of an if then else term")
     | Some (c,t,e) ->
-      let trace_goal  = Prover.Goal.Trace
-          (TraceSequent.init ~system table (Term.Atom (`Message (`Eq,t,e)))
-           |> TraceSequent.set_env env
-          )
+      let trace_seq = 
+        trace_seq_of_reach (Term.Atom (`Message (`Eq,t,e))) s
       in
+      let trace_goal  = Prover.Goal.Trace trace_seq in
+
       let new_elem =
         Equiv.subst_equiv
           [Term.ESubst (Term.ITE (c,t,e),t)]
@@ -1611,20 +1606,19 @@ let ifeq
       | _ -> Tactics.soft_failure
                (Tactics.Failure "Can only be applied to a conditional.")
     in
-    let env = EquivSequent.env s in
-    let system = EquivSequent.system s in
-    let table = EquivSequent.table s in
-      let new_elem =
-        Equiv.Message (ITE (cond,
-                                   Term.subst [Term.ESubst (t1,t2)] positive_branch,
-                                   negative_branch))
-      in
-      let biframe = List.rev_append before (new_elem :: after) in
-      let trace_sequent = TraceSequent.init ~system table
-          Term.(Impl(cond, Atom (`Message (`Eq,t1,t2))))
-                          |> TraceSequent.set_env env in
-      [ Prover.Goal.Trace trace_sequent;
-           Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+    let new_elem =
+      Equiv.Message (ITE (cond,
+                          Term.subst [Term.ESubst (t1,t2)] positive_branch,
+                          negative_branch))
+    in
+    let biframe = List.rev_append before (new_elem :: after) in
+
+    let trace_sequent = 
+      trace_seq_of_reach Term.(Impl(cond, Atom (`Message (`Eq,t1,t2)))) s
+    in
+
+    [ Prover.Goal.Trace trace_sequent;
+      Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
 
   | exception Out_of_range ->
      Tactics.soft_failure (Tactics.Failure "Out of range position")
@@ -2130,18 +2124,19 @@ let cca1 TacticsArgs.(Int i) s =
       | Equiv.Formula f ->
         Equiv.Formula (Term.head_normal_biterm f)
     in
-    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis isk  is_top_level =
+    let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis isk is_top_level =
       (* we check that the random is fresh, and the key satisfy the
                side condition. *)
       begin
 
         (* we create the fresh cond reachability goal *)
-        let random_fresh_cond = fresh_cond system table env (Term.Name r) biframe in
-        let fresh_goal = Prover.Goal.Trace
-            (TraceSequent.init ~system table random_fresh_cond
-             |> TraceSequent.set_env env
-            )
+        let random_fresh_cond = 
+          fresh_cond system table env (Term.Name r) biframe 
         in
+
+        let fresh_seq = trace_seq_of_reach random_fresh_cond s in
+        let fresh_goal = Prover.Goal.Trace fresh_seq in
+
         let new_subst =
           if  is_top_level then
             Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
@@ -2160,6 +2155,7 @@ let cca1 TacticsArgs.(Int i) s =
         (fresh_goal, new_subst)
       end
     in
+
     (* first, we check if the term is an encryption at top level, in which case
        we will completely replace the encryption by the length, else we will
        replace the plain text by the lenght *)
@@ -2374,9 +2370,7 @@ let enckp
           fresh_cond system table env (Term.Name r) (context@biframe)
         with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
       in
-      let fresh_goal =
-        trace_seq_of_equiv_seq (set_reach_goal random_fresh_cond s) 
-      in
+      let fresh_goal = trace_seq_of_reach random_fresh_cond s in
 
       (* Equivalence goal where [enc] is modified using [new_key]. *)
       let new_enc =
