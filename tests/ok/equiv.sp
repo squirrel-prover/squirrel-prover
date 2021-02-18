@@ -26,4 +26,5 @@ equiv test : True, if ok = diff(ok,ko) then diff(n,ok).
 equiv test (i:index) : output@A(i).
 
 equiv test (i:index) : [happens(A(i))] -> output@A(i).
+
 equiv test (i:index) : [happens(A(i))] -> output@A(i) -> output@A(i).

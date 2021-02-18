@@ -85,7 +85,7 @@
   "id"
   "induction"
   "intro"
-  "intros"
+  "revert"
   "destruct"
   "as"
   "introsleft"

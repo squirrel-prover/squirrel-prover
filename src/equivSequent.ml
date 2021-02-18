@@ -145,6 +145,8 @@ module Hyps
 
   let fold func s init = H.fold func s.hyps init
 
+  let map f s = { s with hyps = H.map f s.hyps }
+
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
 end

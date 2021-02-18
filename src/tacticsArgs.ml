@@ -24,7 +24,6 @@ type intro_pattern =
   | Star     of Location.t    (** '*' *)
   | Simpl of simpl_pat
 
-
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
   | Unnamed -> Fmt.pf fmt "_"
@@ -54,6 +53,13 @@ let pp_intro_pats fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in
   Fmt.pf fmt "@[<hv 2>%a@]"
     (Fmt.list ~sep:pp_sep pp_intro_pat) args
+
+(*------------------------------------------------------------------*)
+(** handler for intro pattern application *)
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
   
 (*------------------------------------------------------------------*)
 type parser_arg =

@@ -130,13 +130,8 @@ let () =
     left_not_intro Args.String
 
 (*------------------------------------------------------------------*)
-type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
-  | `Hyp of Ident.t
-]
-
 (** Apply a naming pattern to a variable or hypothesis. *)
-let do_naming_pat (ip_handler : ip_handler) nip s : TraceSequent.sequent =
+let do_naming_pat (ip_handler : Args.ip_handler) nip s : TraceSequent.sequent =
   match ip_handler with
   | `Var Vars.EVar v ->
     let env = ref (TraceSequent.env s) in
@@ -353,7 +348,7 @@ let () =
 (*------------------------------------------------------------------*)
 (** Apply a And pattern (this is a destruct).
     Note that variables in handlers have not been added to the env yet. *)
-let do_and_pat (hid : Ident.t) s : ip_handler list * TraceSequent.sequent =
+let do_and_pat (hid : Ident.t) s : Args.ip_handler list * TraceSequent.sequent =
   let form = Hyps.by_id hid s in
   let s = Hyps.remove hid s in
   match form with
@@ -424,7 +419,7 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
       ) ss
 
 (** Apply an simple pattern a handler. *)
-and do_simpl_pat (h : ip_handler) (ip : Args.simpl_pat) s
+and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
   : TraceSequent.sequent list =
   match h, ip with
   | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
@@ -438,7 +433,7 @@ and do_simpl_pat (h : ip_handler) (ip : Args.simpl_pat) s
 (*------------------------------------------------------------------*)
 (** [do_intro name t judge] introduces the topmost connective
     of the conclusion formula. *)
-let rec do_intro (s : TraceSequent.t) : ip_handler * TraceSequent.sequent =
+let rec do_intro (s : TraceSequent.t) : Args.ip_handler * TraceSequent.sequent =
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar x) :: vs,f) ->
     let x' = Vars.make_new_from x in
@@ -769,8 +764,7 @@ let use ip name (ths:Theory.term list) (s : TraceSequent.t) =
 
   aux [] f
 
-(* we use tac_apply for both the `use` and `have` tactics.
-   Note that both tactic are defined in the parser, and get different arguments. *)
+(* we use tac_apply for both `use` tactic. *)
 let tac_apply args s sk fk =
   let ip, args = match args with
     | Args.SimplPat ip :: args -> Some ip, args

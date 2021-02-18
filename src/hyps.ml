@@ -213,6 +213,8 @@ module type HypsSeq = sig
 
   val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
 
+  val map : (hyp -> hyp) -> sequent -> sequent
+
   val remove : Ident.t -> sequent -> sequent
 
   val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a

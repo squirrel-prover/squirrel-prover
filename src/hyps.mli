@@ -170,6 +170,8 @@ module type HypsSeq = sig
   (** Find if there exists a local declaration satisfying a predicate. *)
   val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
 
+  val map : (hyp -> hyp) -> sequent -> sequent
+
   (** Removes a formula. *)
   val remove : Ident.t -> sequent -> sequent
 

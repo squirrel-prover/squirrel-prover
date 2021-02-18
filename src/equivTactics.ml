@@ -10,9 +10,20 @@ type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
 
-module Hyps = EquivSequent.H
-
 module Args = TacticsArgs
+
+module L = Location
+
+module Hyps = EquivSequent.Hyps
+
+(*------------------------------------------------------------------*)
+(* Comment in/out for debugging *)
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
+(*------------------------------------------------------------------*)
+let hard_failure = Tactics.hard_failure
+let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
 (** {2 Utilities} *)
@@ -47,6 +58,14 @@ let pure_equiv t s sk fk =
     t s (fun l fk -> sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk) fk
   in
   only_equiv t' s sk fk
+
+(** As [pure_equiv], but with an extra arguments. *)
+let pure_equiv_arg t a s sk fk =
+  let t' s sk fk =
+    t a s (fun l fk -> sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk) fk
+  in
+  only_equiv t' s sk fk
+
 
 (** Wrap a functiin expecting an equivalence goal (and returning arbitrary
   * goals) into a tactic expecting a general prover goal (which fails
@@ -161,7 +180,7 @@ let assumption s =
     | Equiv.Impl _ as f -> f = goal
   in
 
-  if Hyps.exists in_hyp (EquivSequent.hyps s)
+  if Hyps.exists in_hyp s
   then []
   else
     Tactics.soft_failure (Tactics.Failure "Conclusion different from hypothesis.")
@@ -174,28 +193,156 @@ let () =
                   tactic_group = Logical}
     (only_equiv assumption)
 
-(* (*------------------------------------------------------------------*)
- * let revert (hid : Ident.t) s =
- *   let f = Hyps.by_id hid s in
- *   let s = Hyps.remove hid s in
- *   EquivSequent.set_goal s (Equiv.Impl (f,EquivSequent.conclusion s))
- * 
- * let revert_str (Args.String hyp_name) s =
- *   let hid,_ = Hyps.by_name hyp_name s in
- *   [revert hid s]
- * 
- * let () =
- *   T.register_typed "revert"
- *     ~general_help:"Take an hypothesis H, and turns the conclusion C into the \
- *                    implication H => C."
- *     ~detailed_help:""
- *     ~tactic_group:Logical
- *     revert_str Args.String *)
+(*------------------------------------------------------------------*)
+(* TODO: factorize with the identical trace tactics *)
+let revert (hid : Ident.t) (s : EquivSequent.t) =
+  let f = Hyps.by_id hid s in
+  let s = Hyps.remove hid s in
+  EquivSequent.set_goal s (Equiv.Impl (f,EquivSequent.goal s))
 
+let revert_str (Args.String hyp_name) (s : EquivSequent.t) =
+  let hid,_ = Hyps.by_name hyp_name s in
+  [revert hid s]
 
+let () =
+  T.register_typed "revert"
+    ~general_help:"Take an hypothesis H, and turns the conclusion C into the \
+                   implication H => C."
+    ~detailed_help:""
+    ~tactic_group:Logical
+    (pure_equiv_typed revert_str) Args.String
 
+(*------------------------------------------------------------------*)
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
+  match ip_handler with
+  | `Var Vars.EVar v -> 
+    let env = ref (EquivSequent.env s) in
 
+    let v' = match nip with
+      | Args.Unnamed
+      | Args.AnyName ->
+        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
 
+      | Args.Named name ->
+        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
+
+        if Vars.name v' <> name then
+          hard_failure (
+            Tactics.Failure ("variable name " ^ name ^ " already in use"));
+        v'
+    in
+    let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
+
+    (* FIXME: we substitute everywhere. This is inefficient. *)
+    EquivSequent.subst subst (EquivSequent.set_env !env s)
+
+  | `Hyp hid ->
+    let f = Hyps.by_id hid s in
+    let s = Hyps.remove hid s in
+
+    Hyps.add nip f s
+
+(*------------------------------------------------------------------*)
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let do_and_pat (hid : Ident.t) s : Args.ip_handler list * EquivSequent.sequent =
+  soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
+
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
+  : EquivSequent.sequent list =
+  soft_failure (Tactics.Failure ("cannot apply and_or_pat to " ^ Ident.name hid))
+
+and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
+  : EquivSequent.sequent list =
+  match h, ip with
+  | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
+
+  | `Var _, Args.SAndOr ao_ip ->
+    hard_failure (Tactics.Failure "intro pattern not applicable")
+
+  | `Hyp id, Args.SAndOr ao_ip ->
+    do_and_or_pat id ao_ip s
+
+(*------------------------------------------------------------------*)
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let rec do_intro (s : EquivSequent.t) : Args.ip_handler * EquivSequent.sequent =
+  match EquivSequent.goal s with
+  (* | ForAll ((Vars.EVar x) :: vs,f) ->
+   *   let x' = Vars.make_new_from x in
+   * 
+   *   let subst = [Term.ESubst (Term.Var x, Term.Var x')] in
+   * 
+   *   let f = match vs with
+   *     | [] -> f
+   *     | _ -> ForAll (vs,f) in
+   * 
+   *   let new_formula = Term.subst subst f in
+   *   ( `Var (Vars.EVar x'),
+   *     EquivSequent.set_goal new_formula s )
+   * 
+   * | ForAll ([],f) ->
+   *   (* FIXME: this case should never happen. *)
+   *   do_intro (EquivSequent.set_goal f s) *)
+
+  | Equiv.Impl(lhs,rhs)->
+    let id, s = Hyps.add_i Args.Unnamed lhs s in
+    let s = EquivSequent.set_goal s rhs in
+    ( `Hyp id, s )
+
+  (* | Not f ->
+   *   let id, s = Hyps.add_i Args.Unnamed f s in
+   *   let s = EquivSequent.set_goal False s in
+   *   ( `Hyp id, s ) *)
+
+  | _ -> soft_failure Tactics.NothingToIntroduce
+
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let do_intro_pat (ip : Args.simpl_pat) s : EquivSequent.sequent list =
+  let handler, s = do_intro s in
+  do_simpl_pat handler ip s
+
+(* TODO: factorize with corresponding, more general, trace tactics *)
+let rec do_intros (intros : Args.intro_pattern list) s =
+  match intros with
+  | [] -> [s]
+
+  | (Args.Simpl s_ip) :: intros ->
+    let ss = do_intro_pat s_ip s in
+    List.map (do_intros intros) ss
+    |> List.flatten
+
+  | (Args.Star loc) :: intros ->
+    try
+      let s_ip = Args.(SNamed AnyName) in
+      let ss = do_intro_pat s_ip s in
+      List.map (do_intros [Args.Star loc]) ss
+      |> List.flatten
+
+    with Tactics.Tactic_soft_failure NothingToIntroduce -> [s]
+
+(** Correponds to `intro *`, to use in automated tactics. *)
+let intro_all (s : EquivSequent.t) : EquivSequent.t list =
+  let star = Args.Star L._dummy in
+  do_intros [star] s
+
+let intro_tac args s sk fk =
+  try match args with
+    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
+
+    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  with Tactics.Tactic_soft_failure e -> fk e
+
+let () =
+  T.register_general "intro"
+    ~tactic_help:{general_help = "Introduce topmost connectives of conclusion \
+                                  formula, when it can be done in an invertible, \
+                                  non-branching fashion.\
+                                  \n\nUsage: intro a b _ c *";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Logical}
+    (pure_equiv_arg intro_tac)
 
 
 (* (*------------------------------------------------------------------*)
@@ -508,7 +655,7 @@ let fa_dup s =
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp = Hyps.find_map (fun _id hyp -> match hyp with
       | Equiv.(Atom (Equiv e)) -> Some e
-      | _ -> None) (EquivSequent.hyps s) in
+      | _ -> None) s in
 
   let hyp = Utils.odflt [] hyp in
 
@@ -935,9 +1082,9 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
       | Equiv.Reach f -> hyp
     in
 
-    let new_hyps = Hyps.map mk_hyp_f (EquivSequent.hyps s) in    
+    let s = Hyps.map mk_hyp_f s in    
 
-    [ EquivSequent.set_equiv_goal (EquivSequent.set_hyps s new_hyps) biframe]
+    [ EquivSequent.set_equiv_goal s biframe]
   | _ ->
     Tactics.hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
