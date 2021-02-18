@@ -59,7 +59,8 @@ module type S = sig
   val mem_id   : Ident.t -> hyps -> bool
   val mem_name : string  -> hyps -> bool
 
-  val map :  (hyp ->  hyp) -> hyps -> hyps
+  val map  :  (hyp ->  hyp) -> hyps -> hyps
+  val mapi :  (Ident.t -> hyp ->  hyp) -> hyps -> hyps
 
   val fold : (Ident.t -> hyp -> 'a -> 'a) -> hyps -> 'a -> 'a
     
@@ -173,7 +174,8 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
   let mem_name name hyps =
     Mid.exists (fun id' _ -> Ident.name id' = name) hyps
   
-  let map f hyps = Mid.map (fun h -> f h) hyps
+  let map f hyps  = Mid.map (fun h -> f h) hyps
+  let mapi f hyps = Mid.mapi (fun h -> f h) hyps
 
   let fold func hyps init = Mid.fold func hyps init 
 end
@@ -213,7 +215,8 @@ module type HypsSeq = sig
 
   val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
 
-  val map : (hyp -> hyp) -> sequent -> sequent
+  val map  : (hyp -> hyp) -> sequent -> sequent
+  val mapi : (Ident.t -> hyp ->  hyp) -> sequent -> sequent
 
   val remove : Ident.t -> sequent -> sequent
 

@@ -1,5 +1,6 @@
 (** Generic tactics *)
 
+(*------------------------------------------------------------------*)
 (** {2 Tactics} *)
 
 (** A tactic ['a tac] is a non-deterministic computation
@@ -103,6 +104,7 @@ val try_tac : 'a tac -> 'a tac
 
 val checkfail_tac : tac_error -> 'a tac -> 'a tac
 
+(*------------------------------------------------------------------*)
 (** {2 Generic tactic syntax trees} *)
 
 module type S = sig
@@ -155,6 +157,7 @@ module AST (M:S) : AST_sig
   with type arg = M.arg
   with type judgment = M.judgment
 
+(*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
 (** Raise a soft failure. *)

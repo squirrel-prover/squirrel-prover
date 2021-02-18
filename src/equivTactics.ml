@@ -41,6 +41,33 @@ let nth i l =
   in aux i [] l
 
 (*------------------------------------------------------------------*)
+(** Build a trace sequent from an equivalent sequent when its conclusion is a
+    [Reach _]. *)
+let trace_seq_of_equiv_seq s = 
+  let env    = EquivSequent.env s in
+  let system = EquivSequent.system s in
+  let table  = EquivSequent.table s in
+
+  let goal = match EquivSequent.goal s with
+    | Equiv.Atom (Equiv.Reach f) -> f
+    | _ -> 
+      Tactics.soft_failure (Tactics.GoalBadShape "expected an reachability \
+                                                  formulas")
+  in
+
+  let trace_s =
+    TraceSequent.set_env env (TraceSequent.init ~system table goal)
+  in
+  
+  (* We add all relevant hypotheses *)
+  Hyps.fold (fun id hyp trace_s -> match hyp with
+      | Equiv.Atom (Equiv.Reach h) -> 
+        TraceSequent.Hyps.add (Args.Named (Ident.name id)) h trace_s
+      | _ -> trace_s
+    ) s trace_s 
+
+
+(*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
 (** Wrap a tactic expecting an equivalence goal (and returning arbitrary
@@ -132,21 +159,26 @@ end
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
-let refl (s : EquivSequent.t) =
+let refl (e : Equiv.equiv) (s : EquivSequent.t) =
   let iter =
-    new exist_macros
-      ~system:(EquivSequent.system s)
-      (EquivSequent.table s) in
+    new exist_macros ~system:(EquivSequent.system s) (EquivSequent.table s) in
   try
     (* we check that the frame does not contain macro *)
-    List.iter iter#visit_term (goal_as_equiv s);
+    List.iter iter#visit_term e;
     if EquivSequent.get_frame PLeft s = EquivSequent.get_frame PRight s
-    then
-      []
-    else
-      Tactics.soft_failure (Tactics.NoRefl)
+    then `True
+    else `NoRefl
   with
-  | NoReflMacros -> Tactics.soft_failure (Tactics.NoReflMacros)
+  | NoReflMacros -> `NoReflMacros
+
+
+(** Tactic that succeeds (with no new subgoal) on equivalences
+  * where the two frames are identical. *)
+let refl_tac (s : EquivSequent.t) =
+  match refl (goal_as_equiv s) s with
+    | `True         -> []
+    | `NoRefl       -> Tactics.soft_failure (Tactics.NoRefl)
+    | `NoReflMacros -> Tactics.soft_failure (Tactics.NoReflMacros)
 
 let () =
   T.register "refl"
@@ -157,7 +189,7 @@ let () =
                                    case also for macros expansions.";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    (only_equiv refl)
+    (only_equiv refl_tac)
 
 (*------------------------------------------------------------------*)
 (** For each element of the biframe, checks that it is a member of the
@@ -349,6 +381,32 @@ let () =
 
 
 (*------------------------------------------------------------------*)
+(** [tautology f s] tries to prove that [f] is always true in [s]. *)
+let rec tautology f s = match f with
+  | Equiv.Impl (f0,f1) ->
+    let s = Hyps.add Args.AnyName f0 s in
+    tautology f1 s
+  | Equiv.(Atom (Equiv e)) -> refl e s = `True
+  | Equiv.(Atom (Reach _)) -> 
+    let s = EquivSequent.set_goal s f in
+    let trace_s = trace_seq_of_equiv_seq s in
+    (* TODO: improve automation by doing more than just constraint solving ? *)
+    Tactics.timeout_get (CommonTactics.constraints trace_s) 
+
+(** [form_simpl_impl f s] simplifies the formula [f] in [s], by trying to
+    prove [f]'s hypotheses in [s]. *)
+let rec form_simpl_impl f s = match f with
+  | Equiv.Impl (f0, f1) -> 
+    if tautology f0 s then form_simpl_impl f1 s else f
+  | _ -> f
+
+let simpl_impl s = 
+  Hyps.mapi (fun id f ->
+      let s_minus = Hyps.remove id s in
+      form_simpl_impl f s_minus
+    ) s
+
+(*------------------------------------------------------------------*)
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
     Also returns a function that introduce back the generalized hypothesis.*)
@@ -363,8 +421,10 @@ let generalize (ts : timestamp) s =
       else gen_hyps
     ) s [] in
   
+  (* generalized sequent *)
   let s = List.fold_left (fun s id -> revert id s) s gen_hyps in
 
+  (* function introducing back generalized hypotheses *)
   let intro_back s =
     let ips = List.rev_map (fun id -> 
         let ip = Args.Named (Ident.name id) in
@@ -373,7 +433,6 @@ let generalize (ts : timestamp) s =
     Utils.as_seq1 (do_intros ips s) in
 
   intro_back, s
-
   
 
 (*------------------------------------------------------------------*)
@@ -431,7 +490,8 @@ let induction TacticsArgs.(Timestamp ts) s =
     in
 
     SystemExpr.iter_descrs table system add_action ;
-    init_s :: List.rev !goals
+    
+    List.map simpl_impl (init_s :: List.rev !goals)
 
   | _  ->
     Tactics.soft_failure

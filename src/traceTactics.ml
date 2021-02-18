@@ -949,31 +949,13 @@ let () = T.register "congruence"
     congruence
 
 (*------------------------------------------------------------------*)
-(** [constraints judge sk fk] proves the sequent using its trace
-  * formulas. *)
-let constraints (s : TraceSequent.t) =
-  let conclusions =
-    Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
-  in
-  let trace_conclusions =
-    List.fold_left (fun acc conc -> match conc with
-        | `Pos, (#trace_atom as at) ->
-          let at = (at :> Term.generic_atom) in
-          Term.(Not (Atom at)) :: acc
-        | `Neg, (#trace_atom as at) ->
-          Term.Atom at :: acc
-        | _ -> acc)
-      []
-      conclusions
-  in
-  let s = List.fold_left (fun s f ->
-      Hyps.add Args.AnyName f s
-    ) s trace_conclusions
-  in
-  if Tactics.timeout_get (TraceSequent.constraints_valid s) then
+(** [constraints s] proves the sequent using its trace formulas. *)
+let constraints_tac (s : TraceSequent.t) =
+  match Tactics.timeout_get (CommonTactics.constraints s) with 
+  | true ->
     let () = dbg "closed by constraints" in
     []
-  else soft_failure (Tactics.Failure "constraints satisfiable")
+  | false -> soft_failure (Tactics.Failure "constraints satisfiable")
 
 let () = T.register "constraints"
     ~tactic_help:{general_help = "Tries to derive false from the trace formulas.";
@@ -982,7 +964,7 @@ let () = T.register "constraints"
                                    them, i.e., if they are a possible trace.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
-    constraints
+    constraints_tac
 
 
 
@@ -1726,7 +1708,7 @@ let () =
 
   (* Attempt to close a goal. *)
   let conclude =
-    orelse_list [(wrap congruence); (wrap constraints); (wrap assumption)]
+    orelse_list [(wrap congruence); (wrap constraints_tac); (wrap assumption)]
   in
   let (>>) = andthen ~cut:true in
 

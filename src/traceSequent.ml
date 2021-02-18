@@ -400,7 +400,8 @@ module Hyps
 
   let fold func s init = H.fold func s.hyps init
 
-  let map f s = S.update ~hyps:(H.map f s.hyps) s
+  let map f s  = S.update ~hyps:(H.map f s.hyps)  s
+  let mapi f s = S.update ~hyps:(H.mapi f s.hyps) s
 
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
