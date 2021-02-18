@@ -435,46 +435,38 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
 let subst_macro (s:subst) (symb, sort, is) =
   (symb, sort, List.map (subst_var s) is)
 
-module S = struct
-  include Set.Make(
-  struct
-    type t = Vars.evar
-    let compare (Vars.EVar a) (Vars.EVar b) =
-      compare (Vars.name a) (Vars.name b)
-  end)
-  let add_list vars indices =
-    List.fold_left (fun vars i -> add (Vars.EVar i) vars) vars indices
-end
+(*------------------------------------------------------------------*)
+module Sv = Vars.Sv
 
-let get_set_vars : 'a term -> S.t =
+let get_set_vars : 'a term -> Sv.t =
   fun term ->
 
-  let rec termvars : type a. a term -> S.t -> S.t = fun t vars -> match t with
-    | Action (_,indices) -> S.add_list vars indices
-    | Var tv -> S.add (Vars.EVar tv) vars
+  let rec termvars : type a. a term -> Sv.t -> Sv.t = fun t vars -> match t with
+    | Action (_,indices) -> Sv.add_list vars indices
+    | Var tv -> Sv.add (Vars.EVar tv) vars
     | Pred ts -> termvars ts vars
     | Fun ((_,indices), lt) ->
-        let vars = S.add_list vars indices in
+        let vars = Sv.add_list vars indices in
         List.fold_left (fun vars x -> termvars x vars) vars lt
 
     | Macro ((_,_,indices), l, ts) ->
-      let vars = S.add_list vars indices in
+      let vars = Sv.add_list vars indices in
       termvars ts (termsvars l vars)
     | Seq (a, b) ->
-      S.diff
+      Sv.diff
         (termvars b vars)
-        (S.of_list (List.map (fun x -> Vars.EVar x) a))
-    | Name (_,indices) -> S.add_list vars indices
+        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
+    | Name (_,indices) -> Sv.add_list vars indices
     | Init -> vars
     | Diff (a, b) -> termvars a (termvars b vars)
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
-      S.diff
+      Sv.diff
         (termvars b (termvars c (termvars d vars)))
-        (S.of_list (List.map (fun x -> Vars.EVar x) a))
+        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
     | Atom a -> generic_atom_vars a vars
-    | ForAll (a, b) -> S.diff (termvars b vars) (S.of_list a)
-    | Exists (a, b) -> S.diff (termvars b vars) (S.of_list a)
+    | ForAll (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
+    | Exists (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
     | And (a, b) ->  termvars a (termvars b vars)
     | Or (a, b) ->  termvars a (termvars b vars)
     | Not a -> termvars a vars
@@ -482,7 +474,7 @@ let get_set_vars : 'a term -> S.t =
     | True -> vars
     | False -> vars
 
-  and termsvars : type a. a term list -> S.t -> S.t = fun terms vars ->
+  and termsvars : type a. a term list -> Sv.t -> Sv.t = fun terms vars ->
     List.fold_left (fun vars x -> termvars x vars) vars terms
     
   and message_atom_vars (`Message (ord, a1, a2)) vars =
@@ -500,16 +492,19 @@ let get_set_vars : 'a term -> S.t =
     | #trace_atom as a -> trace_atom_vars a vars
   in
   
-  termvars term S.empty
+  termvars term Sv.empty
 
-let get_vars t = get_set_vars t |> S.elements
+let get_vars t = get_set_vars t |> Sv.elements
+
+let fv t = get_set_vars t
+
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
   (* given a variable list and a subst s, remove from subst all
      substitution x->v where x is in the variable list. *)
   let filter_subst (vars:Vars.evar list) (s:subst) =
     List.fold_left (fun acc (ESubst (x, y)) ->
-        if S.is_empty (S.inter (S.of_list vars) (get_set_vars x))
+        if Sv.is_empty (Sv.inter (Sv.of_list vars) (get_set_vars x))
         then
           (ESubst (x, y))::acc
         else
@@ -521,15 +516,15 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
      the variable and refresh the formula with the new variables. *)
   let refresh_formula vars s f =
     let right_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars y))  S.empty s
+        (fun acc  (ESubst (x, y)) -> Sv.union acc (get_set_vars y))  Sv.empty s
     in
     let all_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars x))  right_vars s
+        (fun acc  (ESubst (x, y)) -> Sv.union acc (get_set_vars x))  right_vars s
     in
-    let env = ref (Vars.of_list (S.elements all_vars)) in
+    let env = ref (Vars.of_list (Sv.elements all_vars)) in
     let v, f = List.fold_left
      (fun  (nvars,f) (Vars.EVar v) ->
-            if S.mem (Vars.EVar v) right_vars then
+            if Sv.mem (Vars.EVar v) right_vars then
               let new_v = Vars.make_fresh_from_and_update env v in
               ((Vars.EVar new_v)::nvars, subst [ESubst (Var v,Var new_v)] f)
             else

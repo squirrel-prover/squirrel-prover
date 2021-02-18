@@ -135,6 +135,18 @@ let make_fresh_from env v =
 let make_fresh_from_and_update env v =
   make_fresh_and_update env v.var_type v.name_prefix
 
+
+(*------------------------------------------------------------------*)
+module Sv = struct
+  include Set.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = compare (name a) (name b)
+    end)
+  let add_list sv vars =
+    List.fold_left (fun vars v -> add (EVar v) sv) sv vars
+end
+
+(*------------------------------------------------------------------*)
 let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->

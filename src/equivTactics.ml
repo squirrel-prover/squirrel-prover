@@ -481,10 +481,11 @@ let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
 let fa_dup s =
   let table = EquivSequent.table s in
 
-  (* FIXME: allow to choose the hypothesis *)
-  let hyp = List.find_map (function 
-      | Equiv.Equiv e -> Some e
-      | Equiv.Reach _ -> None) (EquivSequent.hyps s) in
+  (* TODO: allow to choose the hypothesis through its id *)
+  let hyp = Hyps.find_map (fun _id hyp -> match hyp with
+      | Equiv.(Atom (Equiv e)) -> Some e
+      | _ -> None) (EquivSequent.hyps s) in
+
   let hyp = Utils.odflt [] hyp in
 
   let biframe = goal_as_equiv s
@@ -871,7 +872,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)  
-(* Sequence expansion of the sequence [term] for the given parameters [ths]. *)
+(** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let env = EquivSequent.env s in
   let table = EquivSequent.table s in
@@ -892,7 +893,13 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
       if List.mem new_t old_biframe then old_biframe else new_t :: old_biframe
     in
     
-    let mk_hyp hyp = match hyp with
+    let rec mk_hyp_f = function
+      | Equiv.Atom at -> 
+        Equiv.Atom (mk_hyp_at at)
+      | Equiv.Impl (f, f0) -> 
+        Equiv.Impl (mk_hyp_f f, mk_hyp_f f0) 
+
+    and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->
         let new_e = 
           if not (List.mem new_t e) && List.mem (Equiv.Message t) e
@@ -903,7 +910,8 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
 
       | Equiv.Reach f -> hyp
     in
-    let new_hyps = List.map mk_hyp (EquivSequent.hyps s) in    
+
+    let new_hyps = Hyps.map mk_hyp_f (EquivSequent.hyps s) in    
 
     [ EquivSequent.set_equiv_goal (EquivSequent.set_hyps s new_hyps) biframe]
   | _ ->
@@ -1435,7 +1443,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
     in
     let frame =
       (Equiv.Message t) ::
-      (List.map (EquivSequent.pi_elem proj) (e_without_hash @ biframe)) in
+      (List.map (Equiv.pi_elem proj) (e_without_hash @ biframe)) in
     (* check syntactic side condition *)
     Euf.key_ssc
       ~elems:frame ~allow_functions:(fun x -> false)

@@ -92,3 +92,14 @@ val make_fresh_from : env -> 'a var -> env * 'a var
 
 (** Combines [make_fresh_from] and [make_fresh_and_update]. *)
 val make_fresh_from_and_update : env ref -> 'a var -> 'a var
+
+
+(*------------------------------------------------------------------*)
+(** {2 Set} *)
+
+module Sv : sig 
+  include Set.S with type elt = evar
+
+  val add_list : t -> 'a var list -> t
+end
+
