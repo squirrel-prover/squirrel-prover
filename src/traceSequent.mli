@@ -1,9 +1,8 @@
 (** This module implement sequents used to prove trace properties.
     A sequent is made of:
-    - a set of hypotheses, that can be generic formulas, trace formulas or
-   (dis)equalities between messages;
+    - a set of hypotheses;
     - a conclusion formula;
-    - an environment to store all the variables appearing inside the formulas.
+    - an environment containing the sequent free variables.
 *)
 
 open Term
@@ -103,7 +102,7 @@ module Hyps : sig
   (** Find the first local declaration satisfying a predicate. *)
   val find_opt : (Ident.t -> formula -> bool) -> sequent -> ldecl option
 
-  (** Exceptionless *)
+  (** Exceptionless. *)
   val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
 
   (** Find if there exists a local declaration satisfying a predicate. *)

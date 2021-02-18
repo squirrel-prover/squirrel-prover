@@ -514,7 +514,7 @@ let () =
     ~tactic_help:{general_help = "Introduce topmost connectives of conclusion \
                                   formula, when it can be done in an invertible, \
                                   non-branching fashion.\
-                                  \n\nUsage: intro a b _ c*";
+                                  \n\nUsage: intro a b _ c *";
                   detailed_help = "";
                   usages_sorts = [];
                   tactic_group = Logical}
