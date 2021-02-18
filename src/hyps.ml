@@ -177,3 +177,46 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
 
   let fold func hyps init = Mid.fold func hyps init 
 end
+
+(*------------------------------------------------------------------*)
+(** {2 Signature of hypotheses of some sequent} *)
+
+module type HypsSeq = sig
+  type hyp 
+  type ldecl = Ident.t * hyp
+
+  type sequent
+
+  val add   : TacticsArgs.naming_pat -> hyp -> sequent -> sequent
+  val add_i : TacticsArgs.naming_pat -> hyp -> sequent -> Ident.t * sequent
+
+  val add_i_list :
+    (TacticsArgs.naming_pat * hyp) list -> sequent -> Ident.t list * sequent
+  val add_list   : (TacticsArgs.naming_pat * hyp) list -> sequent -> sequent
+
+  val pp_hyp   : Format.formatter -> 'a Term.term -> unit
+  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
+
+  val fresh_id  : ?approx:bool -> string -> sequent -> Ident.t
+  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
+
+  val is_hyp : hyp -> sequent -> bool
+
+  val by_id   : Ident.t -> sequent -> hyp
+  val by_name : string -> sequent -> ldecl
+
+  val mem_id   : Ident.t -> sequent -> bool
+  val mem_name : string -> sequent -> bool
+
+  val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
+  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
+
+  val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
+
+  val remove : Ident.t -> sequent -> sequent
+
+  val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
+
+  val pp     : Format.formatter -> sequent -> unit
+  val pp_dbg : Format.formatter -> sequent -> unit
+end

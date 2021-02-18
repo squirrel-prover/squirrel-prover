@@ -36,6 +36,7 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 goal wa_R :
   forall (j:index),
+    happens(R(j)) =>
     (cond@R(j) <=>
       (exists (i,k:index), T(i,k) < R(j) &&
        fst(output@T(i,k)) = fst(input@R(j)) &&
@@ -54,6 +55,7 @@ Qed.
 
 goal wa_R1 :
   forall (j:index),
+    happens(R1(j)) =>
     cond@R1(j) <=>
     (not(exists (i,k:index), T(i,k) < R1(j) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&

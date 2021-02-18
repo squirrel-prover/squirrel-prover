@@ -1,3 +1,5 @@
+module Args = TacticsArgs
+
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
 
@@ -63,6 +65,89 @@ let pp_init ppf j =
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env ;
   Fmt.pf ppf "%a" Equiv.pp_form j.goal
+
+
+(*------------------------------------------------------------------*)  
+(** {2 Hypotheses functions} *)
+
+(** Built on top of [H] *)
+module Hyps
+  : Hyps.HypsSeq with type hyp = Equiv.form and type sequent = t
+ = struct
+  type hyp = Equiv.form 
+
+  type ldecl = Ident.t * hyp 
+
+  type sequent = t
+
+  let pp_hyp = Term.pp 
+  let pp_ldecl = H.pp_ldecl
+
+  (* FIXME: move in hyps.ml, and get rid of duplicate in traceSequent.ml *)
+  let fresh_id ?(approx=false) name s =
+    let id = H.fresh_id name s.hyps in
+    if (not approx) && Ident.name id <> name && name <> "_"
+    then Hyps.hyp_error (Hyps.HypAlreadyExists name) 
+    else id
+
+  let fresh_ids ?(approx=false) names s =
+    let ids = H.fresh_ids names s.hyps in
+    
+    if approx then ids else
+      begin
+        List.iter2 (fun id name ->
+            if Ident.name id <> name && name <> "_"
+            then Hyps.hyp_error (Hyps.HypAlreadyExists name)
+          ) ids names;
+        ids
+      end
+
+  let is_hyp f s = H.is_hyp f s.hyps
+
+  let by_id   id s = H.by_id   id s.hyps
+  let by_name id s = H.by_name id s.hyps
+
+  let mem_id   id s = H.mem_id   id s.hyps
+  let mem_name id s = H.mem_name id s.hyps
+
+  let find_opt func s = H.find_opt func s.hyps
+
+  let find_map func s = H.find_map func s.hyps
+      
+  let exists func s = H.exists func s.hyps
+
+  let add_formula ~force id (h : hyp)(s : sequent) = 
+    let id, hyps = H.add ~force id h s.hyps in
+    id, { s with hyps = hyps }
+
+  let add_i npat (f : hyp) (s : sequent) =
+    let force, name = match npat with
+      | Args.Unnamed -> true, "_"
+      | Args.AnyName -> false, "H"
+      | Args.Named s -> true, s in
+
+    let id = H.fresh_id name s.hyps in
+    
+    add_formula ~force id f s
+
+  let add npat (f : hyp) s : sequent = snd (add_i npat f s)
+
+  let add_i_list l (s : sequent) =
+    let s, ids = List.fold_left (fun (s, ids) (npat,f) ->
+        let id, s = add_i npat f s in
+        s, id :: ids
+      ) (s,[]) l in
+    List.rev ids, s
+
+  let add_list l s = snd (add_i_list l s)
+  
+  let remove id s = { s with hyps = H.remove id s.hyps }
+
+  let fold func s init = H.fold func s.hyps init
+
+  let pp fmt s = H.pps fmt s.hyps
+  let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)

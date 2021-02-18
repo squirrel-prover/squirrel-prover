@@ -253,16 +253,17 @@ let get_all_terms s =
   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
 
 (*------------------------------------------------------------------*)  
-module Hyps = struct
-  (** Hypothesis *)
+module Hyps 
+  (* : Hyps.HypsSeq with type hyp = Term.formula and type sequent = t *)
+= struct
+  type sequent = t
+
   type hyp = Term.formula
 
-  (** Local declaration *)
   type ldecl = Ident.t * hyp
 
   let pp_hyp = Term.pp 
   let pp_ldecl = H.pp_ldecl
-
 
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in

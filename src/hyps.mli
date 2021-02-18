@@ -113,3 +113,68 @@ exception Hyp_error of hyp_error
 val pp_hyp_error : Format.formatter -> hyp_error -> unit
 
 val hyp_error : hyp_error -> 'a
+
+
+(*------------------------------------------------------------------*)
+(** {2 Signature of hypotheses of some sequent} *)
+
+module type HypsSeq = sig
+  (** Hypothesis *)
+  type hyp 
+
+  (** Local declaration *)
+  type ldecl = Ident.t * hyp
+
+  type sequent
+
+  (** Adds a hypothesis, and name it according to a naming pattern. *)
+  val add   : TacticsArgs.naming_pat -> hyp -> sequent -> sequent
+
+  (** Same as [add], but also returns the ident of the added hypothesis. *)
+  val add_i : TacticsArgs.naming_pat -> hyp -> sequent -> Ident.t * sequent
+
+  val add_i_list :
+    (TacticsArgs.naming_pat * hyp) list -> sequent -> Ident.t list * sequent
+  val add_list   : (TacticsArgs.naming_pat * hyp) list -> sequent -> sequent
+
+  val pp_hyp   : Format.formatter -> 'a Term.term -> unit
+  val pp_ldecl : ?dbg:bool -> Format.formatter -> ldecl -> unit
+
+  val fresh_id  : ?approx:bool -> string -> sequent -> Ident.t
+  val fresh_ids : ?approx:bool -> string list -> sequent -> Ident.t list
+
+  (** [is_hyp f s] returns true if the formula appears inside the hypotesis
+      of the sequent [s].  *)
+  val is_hyp : hyp -> sequent -> bool
+
+  (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
+  val by_id   : Ident.t -> sequent -> hyp
+
+  (** Same as [by_id], but does a look-up by name and returns the full local 
+      declaration. *)
+  val by_name : string -> sequent -> ldecl
+
+  (** [mem_id id s] returns true if there is an hypothesis with id [id] 
+      in [s]. *)
+  val mem_id   : Ident.t -> sequent -> bool
+
+  (** Same as [mem_id], but does a look-up by name. *)  
+  val mem_name : string -> sequent -> bool
+
+  (** Find the first local declaration satisfying a predicate. *)
+  val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
+
+  (** Exceptionless. *)
+  val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
+
+  (** Find if there exists a local declaration satisfying a predicate. *)
+  val exists : (Ident.t -> hyp -> bool) -> sequent -> bool
+
+  (** Removes a formula. *)
+  val remove : Ident.t -> sequent -> sequent
+
+  val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
+
+  val pp     : Format.formatter -> sequent -> unit
+  val pp_dbg : Format.formatter -> sequent -> unit
+end

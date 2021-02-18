@@ -1,5 +1,7 @@
+(** As much as possible, hypotheses should be manipulated through the [Hyps] 
+    module below, not the [H] module. 
+    Ideally, this should not exported. *)
 module H : Hyps.S with type hyp = Equiv.form
-
 type hyps = H.hyps
 
 (*------------------------------------------------------------------*)
@@ -21,6 +23,12 @@ val pp_init : Format.formatter -> t -> unit
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to its conclusion and hypotheses. *)
 val subst : Term.subst -> t -> t
+
+(*------------------------------------------------------------------*)
+(** {2 Hypotheses functions} *)
+
+(** Built on top of [Hyps.H].*)
+module Hyps : Hyps.HypsSeq with type hyp = Equiv.form and type sequent = t
 
 (*------------------------------------------------------------------*)
 (** {2 Accessors and utils} *)

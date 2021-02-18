@@ -174,89 +174,113 @@ let () =
                   tactic_group = Logical}
     (only_equiv assumption)
 
-(*------------------------------------------------------------------*)
+(* (*------------------------------------------------------------------*)
+ * let revert (hid : Ident.t) s =
+ *   let f = Hyps.by_id hid s in
+ *   let s = Hyps.remove hid s in
+ *   EquivSequent.set_goal s (Equiv.Impl (f,EquivSequent.conclusion s))
+ * 
+ * let revert_str (Args.String hyp_name) s =
+ *   let hid,_ = Hyps.by_name hyp_name s in
+ *   [revert hid s]
+ * 
+ * let () =
+ *   T.register_typed "revert"
+ *     ~general_help:"Take an hypothesis H, and turns the conclusion C into the \
+ *                    implication H => C."
+ *     ~detailed_help:""
+ *     ~tactic_group:Logical
+ *     revert_str Args.String *)
 
-(** Given a judgement [s] of the form Γ => E, where E is the conclusion
-   biframe, and a timestamp [ts] wich does not occur inside the hypothesis
-   H0, produce the judgments H0 => E{ts -> init} and (Γ ∧ E{ts->pred ts}) => E.
-   The second one is then direclty simplified by a case on all possible
-   values of ts, producing a judgement for each one. *)
-let induction TacticsArgs.(Timestamp ts) s =
-  let env = EquivSequent.env s in
-  match ts with
-  | Var t as ts ->
-    (* Check that variable does not occur in the premise. *)
-    let bound_in_hyp = function
-      | Equiv.Equiv e -> 
-        List.exists (function
-            | Equiv.Message m ->
-              List.mem (Vars.EVar t) (Term.get_vars m)
-            | Equiv.Formula m ->
-              List.mem (Vars.EVar t) (Term.get_vars m)
-          ) e
 
-      | Equiv.Reach f -> 
-        List.mem (Vars.EVar t) (Term.get_vars f)
-    in
-    
-    let bound_in_hyps = List.exists bound_in_hyp (EquivSequent.hyps s) in
 
-    if bound_in_hyps then
-      Tactics.soft_failure
-        (Tactics.Failure "Variable cannot occur in the hypotheses");
 
-    (* Remove ts from the sequent, as it will become unused. *)
-    let s = EquivSequent.set_env (Vars.rm_var env t) s in
-    let table  = EquivSequent.table s in
-    let system = EquivSequent.system s in
-    let subst = [Term.ESubst (ts, Pred ts)] in
-    let goal = goal_as_equiv s in
 
-    let ind_hyp = Equiv.Equiv (Equiv.subst_equiv subst goal) in
-    let induc_s = EquivSequent.set_hyps s (ind_hyp :: EquivSequent.hyps s) in
 
-    let init_s =
-      EquivSequent.set_equiv_goal
-        s (Equiv.subst_equiv [Term.ESubst(ts,Init)] goal)
-    in
 
-    let goals = ref [] in
-    (** [add_action _action descr] adds to goals the goal corresponding to the
-      * case where [t] is instantiated by [descr]. *)
-    let add_action descr =
-      let env = ref @@ EquivSequent.env induc_s in
-      let subst =
-        List.map
-          (fun i ->
-             let i' = Vars.make_fresh_from_and_update env i in
-             Term.ESubst (Term.Var i, Term.Var i'))
-          descr.Action.indices
-      in
-      let name =
-        SystemExpr.action_to_term table system
-          (Action.subst_action subst descr.Action.action)
-      in
-      let ts_subst = [Term.ESubst(ts,name)] in
-      goals := (EquivSequent.subst ts_subst induc_s
-                |> EquivSequent.set_env !env)
-               ::!goals
-    in
-
-    SystemExpr.iter_descrs table system add_action ;
-    init_s :: List.rev !goals
-  | _  ->
-    Tactics.soft_failure
-      (Tactics.Failure "expected a timestamp variable")
-
-let () =
-  T.register_typed "induction"
-    ~general_help:"Apply the induction scheme to the given timestamp."
-    ~detailed_help:"Given a timestamp ts, that does not occur in the hypothesis, \
-                    it creates two sub-goals, one where ts has been replaced by \
-                    init, and one where we assume that the goal holds on \
-                    pred(ts)."
-    ~tactic_group:Logical
-    (pure_equiv_typed induction) TacticsArgs.Timestamp
+(* (*------------------------------------------------------------------*)
+ * 
+ * (** Given a judgement [s] of the form Γ => E, where E is the conclusion
+ *    biframe, and a timestamp [ts] wich does not occur inside the hypothesis
+ *    H0, produce the judgments H0 => E{ts -> init} and (Γ ∧ E{ts->pred ts}) => E.
+ *    The second one is then direclty simplified by a case on all possible
+ *    values of ts, producing a judgement for each one. *)
+ * let induction TacticsArgs.(Timestamp ts) s =
+ *   let env = EquivSequent.env s in
+ *   match ts with
+ *   | Var t as ts ->
+ *     (* Check that variable does not occur in the premise. *)
+ *     let bound_in_hyp = function
+ *       | Equiv.Equiv e -> 
+ *         List.exists (function
+ *             | Equiv.Message m ->
+ *               List.mem (Vars.EVar t) (Term.get_vars m)
+ *             | Equiv.Formula m ->
+ *               List.mem (Vars.EVar t) (Term.get_vars m)
+ *           ) e
+ * 
+ *       | Equiv.Reach f -> 
+ *         List.mem (Vars.EVar t) (Term.get_vars f)
+ *     in
+ *     
+ *     let bound_in_hyps = List.exists bound_in_hyp (EquivSequent.hyps s) in
+ * 
+ *     if bound_in_hyps then
+ *       Tactics.soft_failure
+ *         (Tactics.Failure "Variable cannot occur in the hypotheses");
+ * 
+ *     (* Remove ts from the sequent, as it will become unused. *)
+ *     let s = EquivSequent.set_env (Vars.rm_var env t) s in
+ *     let table  = EquivSequent.table s in
+ *     let system = EquivSequent.system s in
+ *     let subst = [Term.ESubst (ts, Pred ts)] in
+ *     let goal = goal_as_equiv s in
+ * 
+ *     let ind_hyp = Equiv.Equiv (Equiv.subst_equiv subst goal) in
+ *     let induc_s = EquivSequent.set_hyps s (ind_hyp :: EquivSequent.hyps s) in
+ * 
+ *     let init_s =
+ *       EquivSequent.set_equiv_goal
+ *         s (Equiv.subst_equiv [Term.ESubst(ts,Init)] goal)
+ *     in
+ * 
+ *     let goals = ref [] in
+ *     (** [add_action _action descr] adds to goals the goal corresponding to the
+ *       * case where [t] is instantiated by [descr]. *)
+ *     let add_action descr =
+ *       let env = ref @@ EquivSequent.env induc_s in
+ *       let subst =
+ *         List.map
+ *           (fun i ->
+ *              let i' = Vars.make_fresh_from_and_update env i in
+ *              Term.ESubst (Term.Var i, Term.Var i'))
+ *           descr.Action.indices
+ *       in
+ *       let name =
+ *         SystemExpr.action_to_term table system
+ *           (Action.subst_action subst descr.Action.action)
+ *       in
+ *       let ts_subst = [Term.ESubst(ts,name)] in
+ *       goals := (EquivSequent.subst ts_subst induc_s
+ *                 |> EquivSequent.set_env !env)
+ *                ::!goals
+ *     in
+ * 
+ *     SystemExpr.iter_descrs table system add_action ;
+ *     init_s :: List.rev !goals
+ *   | _  ->
+ *     Tactics.soft_failure
+ *       (Tactics.Failure "expected a timestamp variable")
+ * 
+ * let () =
+ *   T.register_typed "induction"
+ *     ~general_help:"Apply the induction scheme to the given timestamp."
+ *     ~detailed_help:"Given a timestamp ts, that does not occur in the hypothesis, \
+ *                     it creates two sub-goals, one where ts has been replaced by \
+ *                     init, and one where we assume that the goal holds on \
+ *                     pred(ts)."
+ *     ~tactic_group:Logical
+ *     (pure_equiv_typed induction) TacticsArgs.Timestamp *)
 
 (*------------------------------------------------------------------*)
 let enrich arg s = match arg with
