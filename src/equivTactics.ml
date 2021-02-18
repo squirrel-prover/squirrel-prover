@@ -120,6 +120,8 @@ let goal_as_equiv s = match EquivSequent.goal s with
      * Fmt.epr "@."; *)
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
+let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
+
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
 let () =
@@ -1305,21 +1307,16 @@ let () = T.register "expandall"
 (** Replace all occurrences of [t1] by [t2] inside of [s],
   * and add a subgoal to prove that [t1 <=> t2]. *)
 let equiv_formula f1 f2 (s : EquivSequent.t) =
-  let env    = EquivSequent.env s in
-  let system = EquivSequent.system s in
-  let table  = EquivSequent.table s in
-    (* goal for the equivalence of t1 and t2 *)
-    let trace_sequent =
-      TraceSequent.init ~system table
-        (Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)))
-      |> TraceSequent.set_env env
-    in
-    let subgoals =
-      [ Prover.Goal.Trace trace_sequent;
-        Prover.Goal.Equiv
-          (EquivSequent.subst [Term.ESubst (f1,f2)] s) ]
-    in
-    subgoals
+  (* goal for the equivalence of t1 and t2 *)
+  let f = Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)) in
+  let trace_sequent = trace_seq_of_equiv_seq (set_reach_goal f s) in
+
+  let subgoals =
+    [ Prover.Goal.Trace trace_sequent;
+      Prover.Goal.Equiv
+        (EquivSequent.subst [Term.ESubst (f1,f2)] s) ]
+  in
+  subgoals
 
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
@@ -2186,6 +2183,7 @@ let cca1 TacticsArgs.(Int i) s =
                  "The first encryption symbol is not used with the correct public \
                   key function.")
         end
+
       | (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)])
               as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
         ->
@@ -2346,9 +2344,7 @@ let enckp
         with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
       in
       let fresh_goal =
-        Prover.Goal.Trace
-          (TraceSequent.init ~system table random_fresh_cond
-           |> TraceSequent.set_env env)
+        trace_seq_of_equiv_seq (set_reach_goal random_fresh_cond s) 
       in
 
       (* Equivalence goal where [enc] is modified using [new_key]. *)
@@ -2360,7 +2356,7 @@ let enckp
       in
       let biframe = (List.rev_append before (new_elem @ after)) in
 
-      [fresh_goal;
+      [Prover.Goal.Trace fresh_goal;
        Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe)]
 
     in
