@@ -88,7 +88,10 @@ let goal_is_equiv s = match EquivSequent.goal s with
 
 let goal_as_equiv s = match EquivSequent.goal s with
   | Atom (Equiv.Equiv e) -> e
-  | _ -> Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
+  | _ -> 
+    (* Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 100);
+     * Fmt.epr "@."; *)
+    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
 
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
@@ -345,89 +348,104 @@ let () =
     (pure_equiv_arg intro_tac)
 
 
-(* (*------------------------------------------------------------------*)
- * 
- * (** Given a judgement [s] of the form Γ => E, where E is the conclusion
- *    biframe, and a timestamp [ts] wich does not occur inside the hypothesis
- *    H0, produce the judgments H0 => E{ts -> init} and (Γ ∧ E{ts->pred ts}) => E.
- *    The second one is then direclty simplified by a case on all possible
- *    values of ts, producing a judgement for each one. *)
- * let induction TacticsArgs.(Timestamp ts) s =
- *   let env = EquivSequent.env s in
- *   match ts with
- *   | Var t as ts ->
- *     (* Check that variable does not occur in the premise. *)
- *     let bound_in_hyp = function
- *       | Equiv.Equiv e -> 
- *         List.exists (function
- *             | Equiv.Message m ->
- *               List.mem (Vars.EVar t) (Term.get_vars m)
- *             | Equiv.Formula m ->
- *               List.mem (Vars.EVar t) (Term.get_vars m)
- *           ) e
- * 
- *       | Equiv.Reach f -> 
- *         List.mem (Vars.EVar t) (Term.get_vars f)
- *     in
- *     
- *     let bound_in_hyps = List.exists bound_in_hyp (EquivSequent.hyps s) in
- * 
- *     if bound_in_hyps then
- *       Tactics.soft_failure
- *         (Tactics.Failure "Variable cannot occur in the hypotheses");
- * 
- *     (* Remove ts from the sequent, as it will become unused. *)
- *     let s = EquivSequent.set_env (Vars.rm_var env t) s in
- *     let table  = EquivSequent.table s in
- *     let system = EquivSequent.system s in
- *     let subst = [Term.ESubst (ts, Pred ts)] in
- *     let goal = goal_as_equiv s in
- * 
- *     let ind_hyp = Equiv.Equiv (Equiv.subst_equiv subst goal) in
- *     let induc_s = EquivSequent.set_hyps s (ind_hyp :: EquivSequent.hyps s) in
- * 
- *     let init_s =
- *       EquivSequent.set_equiv_goal
- *         s (Equiv.subst_equiv [Term.ESubst(ts,Init)] goal)
- *     in
- * 
- *     let goals = ref [] in
- *     (** [add_action _action descr] adds to goals the goal corresponding to the
- *       * case where [t] is instantiated by [descr]. *)
- *     let add_action descr =
- *       let env = ref @@ EquivSequent.env induc_s in
- *       let subst =
- *         List.map
- *           (fun i ->
- *              let i' = Vars.make_fresh_from_and_update env i in
- *              Term.ESubst (Term.Var i, Term.Var i'))
- *           descr.Action.indices
- *       in
- *       let name =
- *         SystemExpr.action_to_term table system
- *           (Action.subst_action subst descr.Action.action)
- *       in
- *       let ts_subst = [Term.ESubst(ts,name)] in
- *       goals := (EquivSequent.subst ts_subst induc_s
- *                 |> EquivSequent.set_env !env)
- *                ::!goals
- *     in
- * 
- *     SystemExpr.iter_descrs table system add_action ;
- *     init_s :: List.rev !goals
- *   | _  ->
- *     Tactics.soft_failure
- *       (Tactics.Failure "expected a timestamp variable")
- * 
- * let () =
- *   T.register_typed "induction"
- *     ~general_help:"Apply the induction scheme to the given timestamp."
- *     ~detailed_help:"Given a timestamp ts, that does not occur in the hypothesis, \
- *                     it creates two sub-goals, one where ts has been replaced by \
- *                     init, and one where we assume that the goal holds on \
- *                     pred(ts)."
- *     ~tactic_group:Logical
- *     (pure_equiv_typed induction) TacticsArgs.Timestamp *)
+(*------------------------------------------------------------------*)
+(** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
+    by introducing them in the goal.
+    Also returns a function that introduce back the generalized hypothesis.*)
+let generalize (ts : timestamp) s =
+  let ts = match ts with
+    | Var t -> (Vars.EVar t) 
+    | _ -> hard_failure (Failure "timestamp is not a var") in
+
+  let gen_hyps = Hyps.fold (fun id f gen_hyps -> 
+      if Vars.Sv.mem ts (Equiv.fv_form f) 
+      then id :: gen_hyps 
+      else gen_hyps
+    ) s [] in
+  
+  let s = List.fold_left (fun s id -> revert id s) s gen_hyps in
+
+  let intro_back s =
+    let ips = List.rev_map (fun id -> 
+        let ip = Args.Named (Ident.name id) in
+        Args.(Simpl (SNamed ip))
+      ) gen_hyps in
+    Utils.as_seq1 (do_intros ips s) in
+
+  intro_back, s
+
+  
+
+(*------------------------------------------------------------------*)
+(** Given a judgement [s] of the form Γ ⊢ E, and a timestamp τ, 
+    produce the judgments
+    Γ ⊢ E{ts → init}   and   (Γ, E{ts → pred τ}) ⊢ E.
+    The second one is then direclty simplified by a case on all possible
+    values of τ, producing a judgement for each one. 
+    Generalizes Γ ⊢ E over τ if necessary. *)
+let induction TacticsArgs.(Timestamp ts) s =
+  let env = EquivSequent.env s in
+  match ts with
+  | Var t as ts ->
+    (* Generalizes over [ts]. *)
+    let intro_back, s = generalize ts s in
+
+    (* Remove ts from the sequent, as it will become unused. *)
+    let s = EquivSequent.set_env (Vars.rm_var env t) s in
+    let table  = EquivSequent.table s in
+    let system = EquivSequent.system s in
+    let subst = [Term.ESubst (ts, Pred ts)] in
+    let goal = EquivSequent.goal s in
+
+    let ind_hyp = Equiv.subst_form subst goal in
+    let id_ind, induc_s = Hyps.add_i Args.Unnamed ind_hyp s in
+    (* intro back generalized hyps *)
+    let induc_s = intro_back induc_s in
+    (* rename the inducition hypothesis *)
+    let induc_s = do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
+
+    let init_goal = Equiv.subst_form [Term.ESubst(ts,Init)] goal in
+    let init_s = EquivSequent.set_goal s init_goal in
+    let init_s = intro_back init_s in
+
+    let goals = ref [] in
+    (** [add_action _action descr] adds to goals the goal corresponding to the
+      * case where [t] is instantiated by [descr]. *)
+    let add_action descr =
+      let env = ref @@ EquivSequent.env induc_s in
+      let subst =
+        List.map
+          (fun i ->
+             let i' = Vars.make_fresh_from_and_update env i in
+             Term.ESubst (Term.Var i, Term.Var i'))
+          descr.Action.indices
+      in
+      let name =
+        SystemExpr.action_to_term table system
+          (Action.subst_action subst descr.Action.action)
+      in
+      let ts_subst = [Term.ESubst(ts,name)] in
+      goals := (EquivSequent.subst ts_subst induc_s
+                |> EquivSequent.set_env !env)
+               ::!goals
+    in
+
+    SystemExpr.iter_descrs table system add_action ;
+    init_s :: List.rev !goals
+
+  | _  ->
+    Tactics.soft_failure
+      (Tactics.Failure "expected a timestamp variable")
+
+let () =
+  T.register_typed "induction"
+    ~general_help:"Apply the induction scheme to the given timestamp."
+    ~detailed_help:"Given a timestamp ts, that does not occur in the hypothesis, \
+                    it creates two sub-goals, one where ts has been replaced by \
+                    init, and one where we assume that the goal holds on \
+                    pred(ts)."
+    ~tactic_group:Logical
+    (pure_equiv_typed induction) TacticsArgs.Timestamp
 
 (*------------------------------------------------------------------*)
 let enrich arg s = match arg with
@@ -474,13 +492,13 @@ let () =
 (** Automatic simplification *)
 let simpl =
   Tactics.(
-    AndThen
-      (Abstract ("fadup",[]) ::
-       [Try(
-         AndThen [Abstract ("expandall",[]);
-                  Abstract ("fadup",[]);
-                  OrElse [Abstract ("refl",[]);
-                          Abstract ("assumption",[])]])]))
+    Try (AndThen
+           (Abstract ("fadup",[]) ::
+            [Try(
+                AndThen [Abstract ("expandall",[]);
+                         Abstract ("fadup",[]);
+                         OrElse [Abstract ("refl",[]);
+                                 Abstract ("assumption",[])]])])))
 
 let () =
   T.register_macro "simpl"
