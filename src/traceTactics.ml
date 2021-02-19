@@ -597,36 +597,38 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let simpl_left s =
-  let id, f =
-    let func _ f = match f with
-      | False | And _ | Exists _ -> true
-      | _ -> false in
-    match Hyps.find_opt func s with
-    | Some (id,f) -> id, f
-    | None -> soft_failure (Failure "nothing to introduce")
-  in
+let rec simpl_left s =
+  let func _ f = match f with
+    | False | And _ | Exists _ -> true
+    | _ -> false in
+    
+  match Hyps.find_opt func s with
+  | None -> Some s
+  | Some (id,f) -> 
+    match f with
+    | False -> None
+    | And (f,g) ->
+      let s = Hyps.remove id s in
+      simpl_left (Hyps.add_list [(Args.AnyName, f); (Args.AnyName, g)] s)
 
-  match f with
-  | False -> []
-  | And (f,g) ->
-    let s = Hyps.remove id s in
-    [Hyps.add_list [(Args.AnyName, f); (Args.AnyName, g)] s]
+    | Exists (vs,f) ->
+      let s = Hyps.remove id s in
+      let env = ref @@ TraceSequent.env s in
+      let subst =
+        List.map
+          (fun (Vars.EVar v) ->
+             Term.ESubst  (Term.Var v,
+                           Term.Var (Vars.make_fresh_from_and_update env v)))
+          vs
+      in
+      let f = Term.subst subst f in
+      simpl_left (Hyps.add Args.AnyName f (TraceSequent.set_env !env s))
 
-  | Exists (vs,f) ->
-    let s = Hyps.remove id s in
-    let env = ref @@ TraceSequent.env s in
-    let subst =
-      List.map
-        (fun (Vars.EVar v) ->
-           Term.ESubst  (Term.Var v,
-                         Term.Var (Vars.make_fresh_from_and_update env v)))
-        vs
-    in
-    let f = Term.subst subst f in
-    [Hyps.add Args.AnyName f (TraceSequent.set_env !env s)]
+    | _ -> assert false
 
-  | _ -> assert false
+let simpl_left_tac s = match simpl_left s with
+  | None -> []
+  | Some s -> [s]
 
 let () =
   T.register "simpl_left"
@@ -635,7 +637,7 @@ let () =
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-    simpl_left
+    simpl_left_tac
 
 (*------------------------------------------------------------------*)
 (** Induction *)
@@ -913,14 +915,9 @@ let () = T.register_typed "expand"
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =
-  dbg "conclusion: %a" Term.pp (TraceSequent.conclusion s);
-
-
   let conclusions =
     Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
   in
-
-  dbg "%d" (List.length conclusions);
   
   let term_conclusions =
     List.fold_left (fun acc conc -> match conc with
@@ -955,11 +952,17 @@ let () = T.register "congruence"
 (*------------------------------------------------------------------*)
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_tac (s : TraceSequent.t) =
-  match Tactics.timeout_get (CommonTactics.constraints s) with 
-  | true ->
-    let () = dbg "closed by constraints" in
+  match simpl_left s with
+  | None ->
+    let () = dbg "closed by false" in
     []
-  | false -> soft_failure (Tactics.Failure "constraints satisfiable")
+
+  | Some s ->
+    match Tactics.timeout_get (CommonTactics.constraints s) with 
+    | true ->
+      let () = dbg "closed by constraints" in
+      []
+    | false -> soft_failure (Tactics.Failure "constraints satisfiable")
 
 let () = T.register "constraints"
     ~tactic_help:
@@ -1707,7 +1710,7 @@ let () =
          * of doing it after introductions. *)
       try_tac (wrap assumption) ::
       (if intro then [wrap intro_all] else []) @
-      (if intro then [repeat (wrap simpl_left)] else []) @
+      (if intro then [wrap simpl_left_tac] else []) @
 
       (* Learn new term equalities from constraints before
        * learning new index equalities from term equalities,

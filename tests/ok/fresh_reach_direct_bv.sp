@@ -10,5 +10,4 @@ Proof.
  nosimpl(intro i j Hneq Heq).
  nosimpl(fresh Heq; intro H).
  case H. 
- auto.
 Qed.
