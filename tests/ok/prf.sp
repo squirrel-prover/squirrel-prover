@@ -1,6 +1,5 @@
 set autoIntro=false.
-
-set debugConstr=true.
+(* set debugConstr=true. *)
 
 hash h
 name k:message

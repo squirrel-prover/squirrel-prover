@@ -1376,158 +1376,158 @@ let autosubst s =
     | `Index (`Eq, x, y)                       -> [process x y]
     | _ -> assert false
 
-(*------------------------------------------------------------------*)
-(** Expects a list of theory elements of the form cond@T :: formula :: l and
-     output@T :: message :: l, and produces from it the corresponding
-     substitution over Action.descrs. *)
-let parse_substd table tsubst s =
-  let failure () = Tactics.(soft_failure (Failure "ill-typed substitution")) in
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+(* (*------------------------------------------------------------------*)
+ * (** Expects a list of theory elements of the form cond@T :: formula :: l and
+ *      output@T :: message :: l, and produces from it the corresponding
+ *      substitution over Action.descrs. *)
+ * let parse_substd table tsubst s =
+ *   let failure () = Tactics.(soft_failure (Failure "ill-typed substitution")) in
+ *   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+ * 
+ *   let rec parse_substd0 s =
+ *     match s with
+ *     | [] -> []
+ *     | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
+ *     | (Args.Theory mterm)::(Args.Theory b)::q ->
+ *       begin
+ *         match Theory.convert conv_env tsubst mterm Sorts.Boolean,
+ *               Theory.convert conv_env tsubst b Sorts.Boolean with
+ *         | Term.Macro ((mn, sort, is),l,a), ncond ->
+ *           begin
+ *             match a with
+ *             | Action (symb,indices) ->
+ *               begin
+ *                 let action = Action.of_term symb indices table in
+ *                 match Symbols.Macro.get_def mn table with
+ *                 | Symbols.Cond -> SystemExpr.Condition (ncond, action)
+ *                                   :: parse_substd0 q
+ *                 | _ -> failure ()
+ *               end
+ *             | _ -> assert false
+ *           end
+ *         | exception _ ->
+ *           begin
+ *             match Theory.convert conv_env tsubst mterm Sorts.Message,
+ *                   Theory.convert conv_env tsubst b Sorts.Message with
+ *             |Term.Macro ((mn, sort, is),l,a), nout ->
+ *               begin
+ *                 match a with
+ *                 | Action (symb,indices) ->
+ *                   begin
+ *                     let action = Action.of_term symb indices table in
+ *                     match Symbols.Macro.get_def mn table with
+ *                     | Symbols.Output -> SystemExpr.Output (nout, action)
+ *                                         :: parse_substd0 q
+ *                     | _ -> failure ()
+ *                   end
+ *                 | _ -> assert false
+ *               end
+ *             | _ -> failure ()
+ *           end
+ *         | _ ->  failure ()
+ *       end
+ *     | _ ->  failure ()
+ *   in
+ *   parse_substd0 s
+ * 
+ * (* Given a list of index names, and some remainder, instantiates the variables
+ *    and produce the substitution. *)
+ * let rec parse_indexes =
+ *   function
+ *   | [] -> ([],[],[])
+ * 
+ *   | Args.Theory (L.{ pl_desc = Theory.App (i,[]) } ) :: q ->
+ *     let i = L.unloc i in
+ *     let id,vs,rem = parse_indexes q in
+ *     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
+ *     Theory.ESubst (i, Term.Var var)::id
+ *   , (Vars.EVar var)::vs, rem
+ *   | a :: q -> let id,vs, rem = parse_indexes q in
+ *     id,vs,a::rem *)
 
-  let rec parse_substd0 s =
-    match s with
-    | [] -> []
-    | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
-    | (Args.Theory mterm)::(Args.Theory b)::q ->
-      begin
-        match Theory.convert conv_env tsubst mterm Sorts.Boolean,
-              Theory.convert conv_env tsubst b Sorts.Boolean with
-        | Term.Macro ((mn, sort, is),l,a), ncond ->
-          begin
-            match a with
-            | Action (symb,indices) ->
-              begin
-                let action = Action.of_term symb indices table in
-                match Symbols.Macro.get_def mn table with
-                | Symbols.Cond -> SystemExpr.Condition (ncond, action)
-                                  :: parse_substd0 q
-                | _ -> failure ()
-              end
-            | _ -> assert false
-          end
-        | exception _ ->
-          begin
-            match Theory.convert conv_env tsubst mterm Sorts.Message,
-                  Theory.convert conv_env tsubst b Sorts.Message with
-            |Term.Macro ((mn, sort, is),l,a), nout ->
-              begin
-                match a with
-                | Action (symb,indices) ->
-                  begin
-                    let action = Action.of_term symb indices table in
-                    match Symbols.Macro.get_def mn table with
-                    | Symbols.Output -> SystemExpr.Output (nout, action)
-                                        :: parse_substd0 q
-                    | _ -> failure ()
-                  end
-                | _ -> assert false
-              end
-            | _ -> failure ()
-          end
-        | _ ->  failure ()
-      end
-    | _ ->  failure ()
-  in
-  parse_substd0 s
-
-(* Given a list of index names, and some remainder, instantiates the variables
-   and produce the substitution. *)
-let rec parse_indexes =
-  function
-  | [] -> ([],[],[])
-
-  | Args.Theory (L.{ pl_desc = Theory.App (i,[]) } ) :: q ->
-    let i = L.unloc i in
-    let id,vs,rem = parse_indexes q in
-    let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
-    Theory.ESubst (i, Term.Var var)::id
-  , (Vars.EVar var)::vs, rem
-  | a :: q -> let id,vs, rem = parse_indexes q in
-    id,vs,a::rem
-
-let equiv_goal_from_subst system table vs substd =
-  let make_equiv a b =
-    Term.And (Term.Impl (a, b), Term.Impl (b, a))
-  in
-  let rec conj_equiv =
-    function
-    | [] -> Term.True
-    | SystemExpr.Condition (ncond, action) :: q ->
-      let taction = SystemExpr.action_to_term table system action in
-      let new_eq = make_equiv
-                  (Term.Macro (Term.cond_macro,[],taction))
-                  ncond
-      in
-      if q <> [] then
-        Term.And (new_eq, conj_equiv q)
-      else
-        new_eq
-    | SystemExpr.Output (nout, action) :: q ->
-      let taction = SystemExpr.action_to_term table system action in
-      let new_eq = Term.Atom (`Message (`Eq,
-                                        nout,
-                                        (Term.Macro (Term.out_macro,[],taction))
-                                       ))
-      in
-      if q <> [] then
-        Term.And (new_eq , conj_equiv q)
-      else
-        new_eq
-  in
-  Term.ForAll (vs, conj_equiv substd)
-
-let system_subst new_system isubst vs subst s =
-  let substdescr = parse_substd (TraceSequent.table s) isubst subst in
-  try
-    let table, new_system =
-      SystemExpr.clone_system_subst
-        (TraceSequent.table s) (TraceSequent.system s)
-        new_system substdescr in
-
-    let new_system_e =
-      match TraceSequent.system s with
-      | Pair _ | SimplePair _ ->
-        SystemExpr.simple_pair table new_system
-      | Single (Left _) ->
-        SystemExpr.single table (Left new_system)
-      | Single (Right _) ->
-        SystemExpr.single table (Right new_system)
-    in
-    let new_goal = TraceSequent.set_table table s
-                   |> TraceSequent.set_system new_system_e in
-
-    TraceSequent.set_conclusion
-      (equiv_goal_from_subst new_system_e table vs substdescr) s :: [new_goal]
-  with SystemExpr.SystemNotFresh ->
-    hard_failure
-      (Tactics.Failure "System name already defined for another system.")
-
-let () =
-  T.register_general "systemsubstitute"
-    ~tactic_help:{general_help = "Apply a substituion to the current system and \
-                                  checks its validity.";
-                  detailed_help =
-                    "Modify the system of the current proof, so that the given \
-                     substitution over some cond@T or output@T has been applied, \
-                     and produces the subgoals asking that the substitution \
-                     preserves equality of distributions. The system produced is \
-                     named after the given name, and if a previous system was \
-                     already defined in the same way it does not recreate it.
-           \n\nUsage: systemsubstitute new_sytem_name,i1,...,ik,\
-                     cond@T, newcond, output@T, newoutput, ... ";
-                  usages_sorts = [];
-                  tactic_group = Structural}
-    (function
-      | Args.Theory (L.{ pl_desc = App (system_name,[]) } ) :: q  ->
-        let subst_index, vs, subst_descr = parse_indexes q in
-        let system_name = L.unloc system_name in
-
-        fun s sk fk -> begin
-            match system_subst system_name subst_index vs subst_descr s with
-             | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure e -> fk e
-           end
-       | _ -> hard_failure (Tactics.Failure "improper arguments"))
+(* let equiv_goal_from_subst system table vs substd =
+ *   let make_equiv a b =
+ *     Term.And (Term.Impl (a, b), Term.Impl (b, a))
+ *   in
+ *   let rec conj_equiv =
+ *     function
+ *     | [] -> Term.True
+ *     | SystemExpr.Condition (ncond, action) :: q ->
+ *       let taction = SystemExpr.action_to_term table system action in
+ *       let new_eq = make_equiv
+ *                   (Term.Macro (Term.cond_macro,[],taction))
+ *                   ncond
+ *       in
+ *       if q <> [] then
+ *         Term.And (new_eq, conj_equiv q)
+ *       else
+ *         new_eq
+ *     | SystemExpr.Output (nout, action) :: q ->
+ *       let taction = SystemExpr.action_to_term table system action in
+ *       let new_eq = Term.Atom (`Message (`Eq,
+ *                                         nout,
+ *                                         (Term.Macro (Term.out_macro,[],taction))
+ *                                        ))
+ *       in
+ *       if q <> [] then
+ *         Term.And (new_eq , conj_equiv q)
+ *       else
+ *         new_eq
+ *   in
+ *   Term.ForAll (vs, conj_equiv substd)
+ * 
+ * let system_subst new_system isubst vs subst s =
+ *   let substdescr = parse_substd (TraceSequent.table s) isubst subst in
+ *   try
+ *     let table, new_system =
+ *       SystemExpr.clone_system_subst
+ *         (TraceSequent.table s) (TraceSequent.system s)
+ *         new_system substdescr in
+ * 
+ *     let new_system_e =
+ *       match TraceSequent.system s with
+ *       | Pair _ | SimplePair _ ->
+ *         SystemExpr.simple_pair table new_system
+ *       | Single (Left _) ->
+ *         SystemExpr.single table (Left new_system)
+ *       | Single (Right _) ->
+ *         SystemExpr.single table (Right new_system)
+ *     in
+ *     let new_goal = TraceSequent.set_table table s
+ *                    |> TraceSequent.set_system new_system_e in
+ * 
+ *     TraceSequent.set_conclusion
+ *       (equiv_goal_from_subst new_system_e table vs substdescr) s :: [new_goal]
+ *   with SystemExpr.SystemNotFresh ->
+ *     hard_failure
+ *       (Tactics.Failure "System name already defined for another system.")
+ * 
+ * let () =
+ *   T.register_general "systemsubstitute"
+ *     ~tactic_help:{general_help = "Apply a substituion to the current system and \
+ *                                   checks its validity.";
+ *                   detailed_help =
+ *                     "Modify the system of the current proof, so that the given \
+ *                      substitution over some cond@T or output@T has been applied, \
+ *                      and produces the subgoals asking that the substitution \
+ *                      preserves equality of distributions. The system produced is \
+ *                      named after the given name, and if a previous system was \
+ *                      already defined in the same way it does not recreate it.
+ *            \n\nUsage: systemsubstitute new_sytem_name,i1,...,ik,\
+ *                      cond@T, newcond, output@T, newoutput, ... ";
+ *                   usages_sorts = [];
+ *                   tactic_group = Structural}
+ *     (function
+ *       | Args.Theory (L.{ pl_desc = App (system_name,[]) } ) :: q  ->
+ *         let subst_index, vs, subst_descr = parse_indexes q in
+ *         let system_name = L.unloc system_name in
+ * 
+ *         fun s sk fk -> begin
+ *             match system_subst system_name subst_index vs subst_descr s with
+ *              | subgoals -> sk subgoals fk
+ *              | exception Tactics.Tactic_soft_failure e -> fk e
+ *            end
+ *        | _ -> hard_failure (Tactics.Failure "improper arguments")) *)
 
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
