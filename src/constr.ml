@@ -140,8 +140,9 @@ end
 
 module Uuf = Uf(OrdUt)
 
+
 (*------------------------------------------------------------------*)
-(** Formulas used in the constraint solving algorithm *)
+(** {2 Formulas used in the constraint solving algorithm} *)
 module Form = struct
   type ord = [`Eq | `Neq | `Leq]
 
@@ -388,8 +389,9 @@ let mk_instance (l : Form.form list) : constr_instance =
   let uf = Uuf.create elems in
   { inst with uf = uf; }
 
-
 (*------------------------------------------------------------------*)
+(** {2 Mgu application} *)
+
 (** [mgu ut uf] applies the mgu represented by [uf] to [ut].
     Return [undef] if it contains a cycle.
     If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
@@ -455,170 +457,6 @@ let mgus uf uts =
   in
   (uf, List.rev nuts_rev)
 
-exception No_mgu
-
- (** Pre-ordering [var > name > pred > init > undef].
-     When choosing a representent in the union-find, we take the smallest.
-     E.g. the representent of the set [(var x, undef)] is [undef] *)
-let norm_ut_compare x y = match x.cnt, y.cnt with
-  | UVar _, _      -> true
-  | _, UVar _      -> false
-  | UName _, _     -> true
-  | _, UName _     -> false
-  | UPred _, _     -> true
-  | _, UPred _     -> false
-  | UInit, _       -> true
-  | _, UInit       -> false
-  | UUndef, UUndef -> true
- 
-(** [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
-   ordering [norm_ut_compare]. We use this to choose the representents in
-   the union-find. *)
-let swap x y = if norm_ut_compare x y then x, y else y, x
-                                                     
-let no_mgu x y = match x.cnt, y.cnt with
-  | UName (a,_), UName (a',_) ->
-    if a <> a' then raise No_mgu else ()
-  | UInit, (UUndef | UName _)
-  | (UName _ | UUndef), UInit -> raise No_mgu
-  (* Note that [UName _] can be equal to [UUndef] *)
-  | _ -> ()
-
-
-(*------------------------------------------------------------------*)
-(** This is alsmost Huet's unification *)
-
-let rec unif uf eqs = match eqs with
-  | [] -> uf
-  | (x,y) :: eqs ->
-    let rx,ry = Uuf.find uf x, Uuf.find uf y in
-    if ut_equal rx ry then unif uf eqs 
-    else
-      let () = no_mgu rx ry in
-      let rx,ry = swap rx ry in
-
-      (* Union always uses [ry]'s representant, in that case [ry] itself, as
-         representant of the union of [rx] and [ry]'s classes. *)
-      let uf = Uuf.union uf rx ry in
-
-      let eqs = match rx.cnt, ry.cnt with
-        | UName (_,isx), UName (_,isy) -> List.combine isx isy @ eqs
-        | UPred a, UPred b -> (a,b) :: eqs
-        | _ -> eqs in
-
-      unif uf eqs
-
-
-(*------------------------------------------------------------------*)
-(** Names unification *)
-
-(* Now, it remains to unify name or init equalities that may have been missed. *)
-let unif_idx uf =
-  let aux_names idx_eqs (a1,is1) (a2,is2) =
-    if a1 <> a2 then raise No_mgu
-    else List.combine is1 is2 @ idx_eqs in
-
-  let rec aux idx_eqs cl = match cl with
-    | [] -> idx_eqs
-    | UInit :: cl' ->
-      List.iter (fun ut -> match ut with
-          | UName _ -> raise No_mgu
-          | _ -> ()
-        ) cl';
-
-      aux idx_eqs cl'
-
-    | UName (a1,is1) :: cl' ->
-      let idx_eqs = List.fold_left (fun idx_eqs ut -> match ut with
-          | UName (a2,is2) -> aux_names idx_eqs (a1,is1) (a2,is2)
-          | UInit -> raise No_mgu
-          | _ -> idx_eqs
-        ) idx_eqs cl' in
-
-      aux idx_eqs cl'
-
-    | _ :: cl' -> aux idx_eqs cl' in
-
-  let idx_eqs =
-    List.fold_left aux []
-      (Uuf.classes uf |> List.map (List.map (fun x -> x.cnt))) in
-
-  (* Unifies the indices equalities in eqs *)
-  let finished = ref true in
-  let rec unif_idx uf eqs = match eqs with
-    | [] -> uf
-    | (x,y) :: eqs ->
-      let rx,ry = Uuf.find uf x, Uuf.find uf y in
-      if ut_equal rx ry then unif_idx uf eqs
-      else begin
-        finished := false;
-        unif_idx (Uuf.union uf rx ry) eqs end in
-
-  let uf = unif_idx uf idx_eqs in
-
-  (!finished, uf)
-
-
-(* Merges union-find classes with the same mgus. *)
-let merge_eq_class uf =
-  let reps =
-    List.map (fun l -> match l with
-        | [] -> raise (Failure "merge_eq_class")
-        | x :: _ -> Uuf.find uf x) (Uuf.classes uf) in
-
-  let aux uf cls = match cls with
-    | [] -> uf
-    | rcl :: cls' -> List.fold_left (fun uf rcl' ->
-        let uf, nrcl = mgu uf rcl in
-        let uf, nrcl' = mgu uf rcl' in
-
-        if nrcl.cnt = nrcl'.cnt then Uuf.union uf rcl rcl'
-        else uf) uf cls' in
-
-  aux uf reps
-
-
-let rec fpt_unif_idx uf =
-  let finished, uf = merge_eq_class uf |> unif_idx in
-  if finished then uf else fpt_unif_idx uf
-  
-(*------------------------------------------------------------------*)
-(** {2 Final unification algorithm} *)
-
-(** Returns the mgu for [eqs], starting from the mgu [uf] *)
-let unify uf eqs elems =  
-  let uf = unif uf eqs |> fpt_unif_idx in
-  (* We compute all mgu's, to check for cycles. *)
-  let uf,_ = mgus uf elems in
-
-  (* We check that [init] and [undef] are not equal. *)
-  (* FIXME: this check is done in 3 different places *)
-  let () =
-    let _, rinit = mgu uf uinit in
-    let _, rundef = mgu uf uundef in
-    if rinit = rundef then raise No_mgu
-  in
-  uf
-
-let elems uf = List.flatten (Uuf.classes uf)
-
-(** Only compute the mgu for the equality constraints in [l] *)
-let mgu_eqs l =
-  let instance = mk_instance l in
-  unify instance.uf instance.eqs (elems instance.uf)
-
-
-(*------------------------------------------------------------------*)
-(** {2 Order models using graphs} *)
-
-module UtG = Persistent.Digraph.Concrete(struct
-    type t = ut
-    let compare t t' = ut_compare t t'
-    let equal t t' = t.hash = t'.hash
-    let hash t = t.hash
-  end)
-
-module Scc = Components.Make(UtG)
 
 (*------------------------------------------------------------------*)
 (** {2 Misc} *)
@@ -735,12 +573,182 @@ let is_def ?explain:(explain=false) uf neqs ut =
   in is_init || init_is_kpred || in_neqs
 
 
-(* Build the inequality graph. There is a edge from S to S' if there exits
-   u in S and v in S' such that:
-   i)   u <= v
-   ii)  if u = P^{k+1}(t) and v = P^k(t) and u <> undef
-   iii) or if u = init and v <> undef
-   Remark: we use [mgu uf u] as a representant for the class of u *)
+(*------------------------------------------------------------------*)
+(** {2 Equality handling} *)
+(** This is alsmost Huet's unification *)
+
+
+exception No_unif
+
+ (** Pre-ordering [var > name > pred > init > undef].
+     When choosing a representent in the union-find, we take the smallest.
+     E.g. the representent of the set [(var x, undef)] is [undef] *)
+let norm_ut_compare x y = match x.cnt, y.cnt with
+  | UVar _, _      -> true
+  | _, UVar _      -> false
+  | UName _, _     -> true
+  | _, UName _     -> false
+  | UPred _, _     -> true
+  | _, UPred _     -> false
+  | UInit, _       -> true
+  | _, UInit       -> false
+  | UUndef, UUndef -> true
+ 
+(** [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
+   ordering [norm_ut_compare]. We use this to choose the representents in
+   the union-find. *)
+let swap x y = if norm_ut_compare x y then x, y else y, x
+                                                    
+let no_mgu x y = match x.cnt, y.cnt with
+  | UName (a,_), UName (a',_) ->
+    if a <> a' then raise No_unif else ()
+  | UInit, (UUndef | UName _)
+  | (UName _ | UUndef), UInit -> raise No_unif
+  (* Note that [UName _] can be equal to [UUndef] *)
+  | _ -> ()
+
+let unif inst eqs =
+  let rec unif uf eqs = match eqs with
+    | [] -> uf
+    | (x,y) :: eqs ->
+      let rx,ry = Uuf.find uf x, Uuf.find uf y in
+      if ut_equal rx ry then unif uf eqs 
+      else
+        let () = no_mgu rx ry in
+        let rx,ry = swap rx ry in
+
+        (* Union always uses [ry]'s representant, in that case [ry] itself, as
+           representant of the union of [rx] and [ry]'s classes. *)
+        let uf = Uuf.union uf rx ry in
+
+        let eqs = match rx.cnt, ry.cnt with
+          | UName (_,isx), UName (_,isy) -> List.combine isx isy @ eqs
+          | UPred a, UPred b -> (a,b) :: eqs
+          | _ -> eqs in
+
+        unif uf eqs
+  in
+  { inst with uf = unif inst.uf eqs }
+
+(*------------------------------------------------------------------*)
+(** Names unification *)
+
+(* Now, it remains to unify name or init equalities that may have been missed. *)
+let unif_idx uf =
+  let aux_names idx_eqs (a1,is1) (a2,is2) =
+    if a1 <> a2 then raise No_unif
+    else List.combine is1 is2 @ idx_eqs in
+
+  let rec aux idx_eqs cl = match cl with
+    | [] -> idx_eqs
+    | UInit :: cl' ->
+      List.iter (fun ut -> match ut with
+          | UName _ -> raise No_unif
+          | _ -> ()
+        ) cl';
+
+      aux idx_eqs cl'
+
+    | UName (a1,is1) :: cl' ->
+      let idx_eqs = List.fold_left (fun idx_eqs ut -> match ut with
+          | UName (a2,is2) -> aux_names idx_eqs (a1,is1) (a2,is2)
+          | UInit -> raise No_unif
+          | _ -> idx_eqs
+        ) idx_eqs cl' in
+
+      aux idx_eqs cl'
+
+    | _ :: cl' -> aux idx_eqs cl' in
+
+  let idx_eqs =
+    List.fold_left aux []
+      (Uuf.classes uf |> List.map (List.map (fun x -> x.cnt))) in
+
+  (* Unifies the indices equalities in eqs *)
+  let finished = ref true in
+  let rec unif_idx uf eqs = match eqs with
+    | [] -> uf
+    | (x,y) :: eqs ->
+      let rx,ry = Uuf.find uf x, Uuf.find uf y in
+      if ut_equal rx ry then unif_idx uf eqs
+      else begin
+        finished := false;
+        unif_idx (Uuf.union uf rx ry) eqs end in
+
+  let uf = unif_idx uf idx_eqs in
+
+  (!finished, uf)
+
+
+(* Merges union-find classes with the same mgus. *)
+let merge_eq_class uf =
+  let reps =
+    List.map (fun l -> match l with
+        | [] -> raise (Failure "merge_eq_class")
+        | x :: _ -> Uuf.find uf x) (Uuf.classes uf) in
+
+  let aux uf cls = match cls with
+    | [] -> uf
+    | rcl :: cls' -> List.fold_left (fun uf rcl' ->
+        let uf, nrcl = mgu uf rcl in
+        let uf, nrcl' = mgu uf rcl' in
+
+        if nrcl.cnt = nrcl'.cnt then Uuf.union uf rcl rcl'
+        else uf) uf cls' in
+
+  aux uf reps
+
+
+let fpt_unif_idx inst =
+  let rec do_fpt uf =
+    let finished, uf = merge_eq_class uf |> unif_idx in
+    if finished then uf else do_fpt uf in
+  { inst with uf = do_fpt inst.uf }
+  
+(*------------------------------------------------------------------*)
+(** {2 Final unification algorithm} *)
+
+let elems uf = List.flatten (Uuf.classes uf)
+
+(** Returns the mgu for [eqs], starting from the mgu [uf] *)
+let unify inst eqs =  
+  let inst = unif inst eqs |> fpt_unif_idx in
+  (* We compute all mgu's, to check for cycles. *)
+  let uf,_ = mgus inst.uf (elems inst.uf) in
+
+  (* We check that [init] and [undef] are not equal. *)
+  (* FIXME: this check is done in 3 different places *)
+  let () =
+    let _, rinit = mgu uf uinit in
+    let _, rundef = mgu uf uundef in
+    if rinit = rundef then raise No_unif
+  in
+  { inst with uf = uf; }
+
+(** Only compute the mgu for the equality constraints in [l] *)
+let mgu_eqs l =
+  let instance = mk_instance l in
+  unify instance instance.eqs
+
+
+(*------------------------------------------------------------------*)
+(** {2 Order models using graphs} *)
+
+module UtG = Persistent.Digraph.Concrete(struct
+    type t = ut
+    let compare t t' = ut_compare t t'
+    let equal t t' = t.hash = t'.hash
+    let hash t = t.hash
+  end)
+
+module Scc = Components.Make(UtG)
+
+(** Build the inequality graph. There is a edge from S to S' if there exits
+    u in S and v in S' such that:
+    i)   u <= v
+    ii)  if u = P^{k+1}(t) and v = P^k(t) and u <> undef
+    iii) or if u = init and v <> undef
+    Remark: we use [mgu uf u] as a representant for the class of u *)
 let build_graph (uf : Uuf.t) neqs leqs =
   let rec bg uf leqs g = match leqs with
     | [] -> uf, g
@@ -794,12 +802,13 @@ let cycle_eqs g =
     - compute the inequality graph [g]
     - get [g] SCCs and the corresponding equalities
     - unify the new equalities *)
-let rec leq_unify uf leqs neqs elems =
-  let uf, g = build_graph uf neqs leqs in
+let rec leq_unify inst =
+  let uf, g = build_graph inst.uf inst.neqs inst.leqs in
+  let inst = { inst with uf = uf; } in
   let cycles = cycle_eqs g in 
-  let uf' = unify uf cycles elems in
-  if Uuf.union_count uf = Uuf.union_count uf' then uf,g
-  else leq_unify uf' leqs neqs elems
+  let inst' = unify inst cycles in
+  if Uuf.union_count inst.uf = Uuf.union_count inst'.uf then inst',g
+  else leq_unify inst' 
 
 
 (*------------------------------------------------------------------*)
@@ -897,7 +906,8 @@ let for_all (f : UtG.vertex -> UtG.vertex -> bool) g : bool =
 (** Check that [instance] satisfies the dis-equality constraints and the rule:
     ∀ x, x <= P(x) <=> false
     Precondition: [g] must be transitive. *)
-let neq_sat uf g neqs : bool =
+let neq_sat inst g : bool =
+  let uf = inst.uf in
   (* All dis-equalities in neqs must hold *)
   List.for_all (fun (u,v) ->
       let violation = ut_equal (mgu uf u |> snd) (mgu uf v |> snd) in
@@ -906,11 +916,11 @@ let neq_sat uf g neqs : bool =
         dbg "dis-equality %a ≠ %a violated" pp_ut u pp_ut v;
       
       not violation
-    ) neqs
+    ) inst.neqs
   &&
 
   (* Looks for elements in undef equivalence class that are defined. *)
-  (not (is_def ~explain:true uf neqs uundef)) &&
+  (not (is_def ~explain:true uf inst.neqs uundef)) &&
 
   (* Look for contradiction in [g], i.e. an edge [u ≤ v] such that one of 
      the following holds: 
@@ -1009,7 +1019,9 @@ let find_segment_disj instance g =
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀ τ, (happens(τ) ∧ ¬happens(pred(τ))) ⇒ τ = init *)
-let find_eq_init uf neqs =  
+let find_eq_init inst =  
+  let uf = inst.uf in
+
   let new_eqs = List.filter_map (fun (ut1, ut2) ->     
       let uf, uts = mgus uf [ut1;ut2] in
       let ut1, ut2 = Utils.as_seq2 uts in
@@ -1024,21 +1036,23 @@ let find_eq_init uf neqs =
            (not (ut_equal ut uinit))
         then Some (ut, uinit)
         else None
-    ) neqs in
+    ) inst.neqs in
+
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
 (** Looks for instances of the rule:
     ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
-let find_new_undef uf neqs = 
+let find_new_undef inst = 
+  let uf = inst.uf in
   let elems = elems uf in
 
   (* we look for new instances of the rule *)
   let undefs = 
     List.filter_map (fun ut -> 
-        if is_not_init uf neqs ut && 
-           is_def uf neqs ut && 
-           not (is_def uf neqs (upred ut))
+        if is_not_init uf inst.neqs ut && 
+           is_def uf inst.neqs ut && 
+           not (is_def uf inst.neqs (upred ut))
         then Some (upred ut)
         else None
       ) elems in
@@ -1056,30 +1070,27 @@ let rec split (instance : constr_instance) : model list =
   try
     log_instr instance;
     
-    let uf = unify instance.uf instance.eqs (elems instance.uf) in
-    
-    let uf,g = leq_unify uf instance.leqs instance.neqs (elems instance.uf) in
+    let instance = unify instance instance.eqs in    
+    let instance,g = leq_unify instance in
     
     let g = UtGOp.transitive_closure g in
 
-    begin match find_eq_init uf instance.neqs with
+    begin match find_eq_init instance with
       | Some new_eqs ->
         log_init_eqs new_eqs;
-        split { instance with uf = uf; eqs = new_eqs @ instance.eqs; }
+        split { instance with eqs = new_eqs @ instance.eqs; }
         
-      | None -> match find_new_undef uf instance.neqs with
+      | None -> match find_new_undef instance with
         | _ :: _ as undefs ->
           let new_neqs = List.map (fun ut -> ut, uundef) undefs in
           log_new_neqs new_neqs;
-          split { instance with uf = uf; neqs = new_neqs @ instance.neqs; }
+          split { instance with neqs = new_neqs @ instance.neqs; }
           
         
-        | [] -> match neq_sat uf g instance.neqs with
+        | [] -> match neq_sat instance g with
           | false -> [] (* dis-equalities violated *)
 
           | true -> (* no violations for now *)        
-            let instance = { instance with uf = uf } in
-
             (* Looking for segment disjunctions, e.g. if
                pred(τ) ≤ τ' ≤ τ
                then we know that (τ' = pred(τ) ∨ τ' = τ) *)
@@ -1109,8 +1120,8 @@ let rec split (instance : constr_instance) : model list =
                 |> List.flatten
     end
   with
-  | No_mgu ->
-    dbg "@[<v 2>No_mgu@]";
+  | No_unif ->
+    dbg "@[<v 2>No_unif@]";
     []
 
 (** The minimal models a of constraint.
