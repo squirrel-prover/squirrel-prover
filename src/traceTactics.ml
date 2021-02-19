@@ -943,12 +943,13 @@ let congruence (s : TraceSequent.t) =
   else soft_failure CongrFail
 
 let () = T.register "congruence"
-     ~tactic_help:{general_help = "Tries to derive false from the messages equalities.";
-                   detailed_help = "It relies on the reflexivity, transitivity \
-                                    and stability by function application \
-                                    (f(u)=f(v) <=> u=v).";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
+    ~tactic_help:
+      {general_help = "Tries to derive false from the messages equalities.";
+       detailed_help = "It relies on the reflexivity, transitivity \
+                        and stability by function application \
+                        (f(u)=f(v) <=> u=v).";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
     congruence
 
 (*------------------------------------------------------------------*)
@@ -961,12 +962,13 @@ let constraints_tac (s : TraceSequent.t) =
   | false -> soft_failure (Tactics.Failure "constraints satisfiable")
 
 let () = T.register "constraints"
-    ~tactic_help:{general_help = "Tries to derive false from the trace formulas.";
-                  detailed_help = "From ordering constraints on the timestamps, \
-                                   checks that we can build an acyclic graph on \
-                                   them, i.e., if they are a possible trace.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
+    ~tactic_help:
+      {general_help = "Tries to derive false from the trace formulas.";
+       detailed_help = "From ordering constraints on the timestamps, \
+                        checks that we can build an acyclic graph on \
+                        them, i.e., if they are a possible trace.";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
     constraints_tac
 
 
@@ -1031,14 +1033,15 @@ let eq_names (s : TraceSequent.t) =
   [s]
 
 let () = T.register "eqnames"
-     ~tactic_help:{general_help = "Add index constraints resulting from names equalities, modulo \
-                   the known equalities.";
-                   detailed_help = "Whenever n[i] = n[j], i must be equal to \
-                                    j. It does this on all anme equality implied \
-                                    by the current set of equalities.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
-     eq_names
+    ~tactic_help:
+      {general_help = "Add index constraints resulting from names equalities, \
+                       modulo the known equalities.";
+       detailed_help = "If n[i] = n[j] then i = j. \
+                        This is checked on all name equality entailed \
+                        by the current context.";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
+    eq_names
 
 (*------------------------------------------------------------------*)
 (** Add terms constraints resulting from timestamp and index equalities. *)
@@ -1083,12 +1086,13 @@ let eq_trace (s : TraceSequent.t) =
   [s]
 
 let () = T.register "eqtrace"
-    ~tactic_help:{general_help = "Add terms constraints resulting from timestamp \
-                                  and index equalities.";
-                  detailed_help = "Whenver i=j or ts=ts', we can substitute one \
-                                   by another in the other terms.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
+    ~tactic_help:
+      {general_help = "Add terms constraints resulting from timestamp \
+                       and index equalities.";
+       detailed_help = "Whenver i=j or ts=ts', we can substitute one \
+                        by another in the other terms.";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
     eq_trace
 
 (*------------------------------------------------------------------*)
@@ -1542,9 +1546,14 @@ let exec (Args.Timestamp a) s =
        Impl (Atom (Term.mk_timestamp_leq (Var var) a),
              Macro(Term.exec_macro,[],Var var)))
   in
+  let s_hap = happens_premise s a in
+  
+  s_hap @
+
   [TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
-   TraceSequent.set_conclusion
-     (Term.mk_impl formula (TraceSequent.conclusion s)) s]
+  
+    TraceSequent.set_conclusion
+      (Term.mk_impl formula (TraceSequent.conclusion s)) s]
 
 let () =
   T.register_typed "executable"
