@@ -92,20 +92,21 @@ let goal_as_equiv s = match EquivSequent.goal s with
     (* Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 100);
      * Fmt.epr "@."; *)
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
-
+      
 let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
 
 (** Build a trace sequent from an equivalent sequent when its conclusion is a
     [Reach _]. *)
-let trace_seq_of_equiv_seq s = 
+let trace_seq_of_equiv_seq ?goal s = 
   let env    = EquivSequent.env s in
   let system = EquivSequent.system s in
   let table  = EquivSequent.table s in
 
-  let goal = match EquivSequent.goal s with
-    | Equiv.Atom (Equiv.Reach f) -> f
-    | _ -> 
-      Tactics.soft_failure (Tactics.GoalBadShape "expected an reachability \
+  let goal = match goal, EquivSequent.goal s with
+    | Some g, _ -> g
+    | None, Equiv.Atom (Equiv.Reach f) -> f
+    | None, _ -> 
+      Tactics.soft_failure (Tactics.GoalBadShape "expected a reachability \
                                                   formulas")
   in
 
@@ -121,6 +122,15 @@ let trace_seq_of_equiv_seq s =
     ) s trace_s 
 
 let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
+
+(** Build the sequent showing that a timestamp happens. *)
+let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
+  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
+  if TraceSequent.query_happens s a
+  then []
+  else 
+    let s = TraceSequent.set_conclusion (Term.Atom (`Happens a)) s in
+    [Prover.Goal.Trace s]
 
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
@@ -1172,44 +1182,45 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : EquivSequent.t) =
   let tsubst = Theory.subst_of_env (EquivSequent.env s) in
-  (* final function once the subtitustion has been computed *)
-  let succ subst =
+  (* final function once the substitution has been computed *)
+  let succ a subst =
     let apply_subst = function
       | Equiv.Message e -> Equiv.Message (Term.subst subst e)
       | Equiv.Formula e -> Equiv.Formula (Term.subst subst e)
     in
-    [EquivSequent.set_equiv_goal s
-      (List.map apply_subst (goal_as_equiv s))]
+    let s_hap = happens_premise s a in
+    let new_s = 
+      EquivSequent.set_equiv_goal s (List.map apply_subst (goal_as_equiv s)) 
+    in
+    s_hap @
+    [Prover.Goal.Equiv new_s]
   in
+
   let table = EquivSequent.table s in
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+
   match Theory.convert conv_env tsubst term Sorts.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
-        succ [Term.ESubst (Macro ((mn, sort, is),l,a),
+        succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
                            Macros.get_definition
                              (EquivSequent.system s) table sort mn is a)]
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
+
     | _ ->
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
+
     | exception Theory.(Conv (_,Type_error _)) ->
-      begin
-        match Theory.convert conv_env tsubst term Sorts.Message with
-        | Macro ((mn, sort, is),l,a) ->
-          if Macros.is_defined mn a table then
-            succ [Term.ESubst (Macro ((mn, sort, is),l,a),
-                               Macros.get_definition
-                                 (EquivSequent.system s) table sort mn is a)]
-          else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
-        | _ ->
-          Tactics.soft_failure (Tactics.Failure "can only expand macros")
-          (* TODO: cleanup  *)
-        (* | exception Theory.(Conv e) ->
-         *   Tactics.soft_failure (Cannot_convert e) *)
-      end
-    (* | exception Theory.(Conv e) ->
-     *   Tactics.soft_failure (Cannot_convert e) *)
+      match Theory.convert conv_env tsubst term Sorts.Message with
+      | Macro ((mn, sort, is),l,a) ->
+        if Macros.is_defined mn a table then
+          succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
+                             Macros.get_definition
+                               (EquivSequent.system s) table sort mn is a)]
+        else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
+      | _ ->
+        Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"
@@ -1225,23 +1236,23 @@ let () = T.register_general "expand"
                   tactic_group = Structural}
   (function
     | [TacticsArgs.Theory v] ->
-        pure_equiv
-          (fun s sk fk -> match expand v s with
-             | subgoals -> sk subgoals fk
-             | exception (Tactics.Tactic_soft_failure e) -> fk e)
+      only_equiv (fun s sk fk -> match expand v s with
+          | subgoals -> sk subgoals fk
+          | exception (Tactics.Tactic_soft_failure e) -> fk e)
+
     | (TacticsArgs.Theory v)::ids ->
         let ids =
-          List.map
-            (function
+          List.map (function
                | TacticsArgs.Theory th -> th
                | _ -> Tactics.hard_failure
-                        (Tactics.Failure "improper arguments"))
-            ids
+                        (Tactics.Failure "improper arguments")
+            ) ids
         in
         pure_equiv
           (fun s sk fk -> match expand_seq v ids s with
              | subgoals -> sk subgoals fk
              | exception (Tactics.Tactic_soft_failure e) -> fk e)
+
      | _ ->
          Tactics.hard_failure
            (Tactics.Failure "improper arguments"))
