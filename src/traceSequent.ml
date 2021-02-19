@@ -376,12 +376,12 @@ module Hyps
       id, S.update ~hyps:hyps s
 
   let add_i npat f s =
-    let force, name = match npat with
-      | Args.Unnamed -> true, "_"
-      | Args.AnyName -> false, choose_name f
-      | Args.Named s -> true, s in
+    let force, approx, name = match npat with
+      | Args.Unnamed -> true, true, "_"
+      | Args.AnyName -> false, true, choose_name f
+      | Args.Named s -> true, false, s in
 
-    let id = H.fresh_id name s.hyps in
+    let id = fresh_id ~approx name s in
     
     add_formula ~force id f s
 
