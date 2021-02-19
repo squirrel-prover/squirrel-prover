@@ -15,6 +15,16 @@ Proof.
  auto.
 Qed.
 
+goal _: A <= B => A < B. 
+Proof.
+ auto.
+Qed.
+
+goal _: A < B => A <= B.
+Proof.
+ auto.
+Qed.
+
 (*------------------------------------------------------------------*)
 goal _: A >= B => happens(A,B). 
 Proof.
@@ -22,6 +32,16 @@ Proof.
 Qed.
 
 goal _: A > B => happens(A,B). 
+Proof.
+ auto.
+Qed.
+
+goal _: A < B => happens(A,B). 
+Proof.
+ auto.
+Qed.
+
+goal _: A <= B => happens(A,B). 
 Proof.
  auto.
 Qed.

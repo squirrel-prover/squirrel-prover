@@ -1085,7 +1085,7 @@ let find_new_undef inst g =
   let undefs1 = 
     UtG.fold_edges (fun ut1 ut2 undefs -> 
         (if undef_is_new inst ut1 then [ut1] else []) @
-        (if undef_is_new inst ut1 then [ut2] else []) @
+        (if undef_is_new inst ut2 then [ut2] else []) @
         undefs
       ) g []
   in
