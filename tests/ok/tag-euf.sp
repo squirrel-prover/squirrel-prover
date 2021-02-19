@@ -46,8 +46,7 @@ Proof.
  executable OutFalse; intro Hexec.
  depends Out, OutFalse; intro Hle.
  use Hexec with Out.
- nosimpl(expand exec@Out);
- 1: by auto.
+ nosimpl(expand exec@Out).
 
  destruct H as [Hexec0 Hcond].
 

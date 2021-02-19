@@ -48,11 +48,11 @@ project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-by split; intro H; case H; depends A, A1; auto.
+split; 1: by auto. 
+by split; intro H0; case H0; depends A, A1; auto. 
 
-split. by auto. 
-split. by auto. 
-by intro H; case H; depends A, A1; auto.
+split; 1: by auto. 
+by split; intro H0; case H0; depends A, A1; auto. 
 
 fresh 1.
 Qed.
