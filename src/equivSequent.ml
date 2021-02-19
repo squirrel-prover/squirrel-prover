@@ -120,13 +120,13 @@ module Hyps
     let id, hyps = H.add ~force id h s.hyps in
     id, { s with hyps = hyps }
 
-  let add_i npat (f : hyp) (s : sequent) =
-    let force, name = match npat with
-      | Args.Unnamed -> true, "_"
-      | Args.AnyName -> false, "H"
-      | Args.Named s -> true, s in
+  let add_i npat f s =
+    let force, approx, name = match npat with
+      | Args.Unnamed -> true, true, "_"
+      | Args.AnyName -> false, true, "H"
+      | Args.Named s -> true, false, s in
 
-    let id = H.fresh_id name s.hyps in
+    let id = fresh_id ~approx name s in
     
     add_formula ~force id f s
 
