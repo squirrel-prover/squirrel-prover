@@ -1,17 +1,50 @@
 set autoIntro=false.
+(* set debugConstr=true. *)
 
 abstract ok : message
 channel c
 system ((A:out(c,ok)) | (B:out(c,ok))).
 
-goal _: A >= B => A > B.
+goal _: A >= B => A > B. 
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal _: A > B => A >= B.
 Proof.
- intro Hgt.
-undo 1.
  auto.
 Qed.
+
+(*------------------------------------------------------------------*)
+goal _: A >= B => happens(A,B). 
+Proof.
+ auto.
+Qed.
+
+goal _: A > B => happens(A,B). 
+Proof.
+ auto.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* sanity checks *)
+
+goal _: happens(A,B) => A <= B. 
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.
+
+goal _: happens(A,B) => A < B. 
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.
+
+goal _: happens(A,B) => A >= B. 
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.
+
+goal _: happens(A,B) => A > B. 
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.

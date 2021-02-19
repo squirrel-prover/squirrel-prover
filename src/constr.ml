@@ -599,9 +599,9 @@ let norm_ut_compare x y = match x.cnt, y.cnt with
    the union-find. *)
 let swap x y = if norm_ut_compare x y then x, y else y, x
                                                     
-let no_mgu x y = match x.cnt, y.cnt with
+let no_mgu (x,defx) (y,defy) = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
-    if a <> a' then raise No_unif else ()
+    if a <> a' && (defx || defy) then raise No_unif else ()
   | UInit, (UUndef | UName _)
   | (UName _ | UUndef), UInit -> raise No_unif
   (* Note that [UName _] can be equal to [UUndef] *)
@@ -614,7 +614,10 @@ let unif inst eqs =
       let rx,ry = Uuf.find uf x, Uuf.find uf y in
       if ut_equal rx ry then unif uf eqs 
       else
-        let () = no_mgu rx ry in
+        let defrx = is_def uf inst.neqs rx
+        and defry = is_def uf inst.neqs ry in
+
+        let () = no_mgu (rx,defrx) (ry,defry) in
         let rx,ry = swap rx ry in
 
         (* Union always uses [ry]'s representant, in that case [ry] itself, as
@@ -622,7 +625,11 @@ let unif inst eqs =
         let uf = Uuf.union uf rx ry in
 
         let eqs = match rx.cnt, ry.cnt with
-          | UName (_,isx), UName (_,isy) -> List.combine isx isy @ eqs
+          | UName (_,isx), UName (_,isy) ->
+            if defrx || defry
+            then List.combine isx isy @ eqs
+            else eqs
+
           | UPred a, UPred b -> (a,b) :: eqs
           | _ -> eqs in
 
@@ -634,24 +641,27 @@ let unif inst eqs =
 (** Names unification *)
 
 (* Now, it remains to unify name or init equalities that may have been missed. *)
-let unif_idx uf =
-  let aux_names idx_eqs (a1,is1) (a2,is2) =
-    if a1 <> a2 then raise No_unif
+let unif_idx inst =
+  let aux_names idx_eqs (ut1,a1,is1) (ut2,a2,is2) =
+    let def1 = is_def inst.uf inst.neqs ut1
+    and def2 = is_def inst.uf inst.neqs ut2 in
+    if not (def1 || def2) then idx_eqs
+    else if a1 <> a2 then raise No_unif
     else List.combine is1 is2 @ idx_eqs in
 
-  let rec aux idx_eqs cl = match cl with
+  let rec aux idx_eqs (cl : ut list) = match cl with
     | [] -> idx_eqs
-    | UInit :: cl' ->
-      List.iter (fun ut -> match ut with
+    | { cnt = UInit } :: cl' ->
+      List.iter (fun ut -> match ut.cnt with
           | UName _ -> raise No_unif
           | _ -> ()
         ) cl';
 
       aux idx_eqs cl'
 
-    | UName (a1,is1) :: cl' ->
-      let idx_eqs = List.fold_left (fun idx_eqs ut -> match ut with
-          | UName (a2,is2) -> aux_names idx_eqs (a1,is1) (a2,is2)
+    | ({ cnt = UName (a1,is1) } as ut1) :: cl' ->
+      let idx_eqs = List.fold_left (fun idx_eqs ut -> match ut.cnt with
+          | UName (a2,is2) -> aux_names idx_eqs (ut1,a1,is1) (ut,a2,is2)
           | UInit -> raise No_unif
           | _ -> idx_eqs
         ) idx_eqs cl' in
@@ -660,9 +670,7 @@ let unif_idx uf =
 
     | _ :: cl' -> aux idx_eqs cl' in
 
-  let idx_eqs =
-    List.fold_left aux []
-      (Uuf.classes uf |> List.map (List.map (fun x -> x.cnt))) in
+  let idx_eqs = List.fold_left aux [] (Uuf.classes inst.uf) in
 
   (* Unifies the indices equalities in eqs *)
   let finished = ref true in
@@ -675,9 +683,9 @@ let unif_idx uf =
         finished := false;
         unif_idx (Uuf.union uf rx ry) eqs end in
 
-  let uf = unif_idx uf idx_eqs in
+  let uf = unif_idx inst.uf idx_eqs in
 
-  (!finished, uf)
+  (!finished, { inst with uf = uf } )
 
 
 (* Merges union-find classes with the same mgus. *)
@@ -700,10 +708,11 @@ let merge_eq_class uf =
 
 
 let fpt_unif_idx inst =
-  let rec do_fpt uf =
-    let finished, uf = merge_eq_class uf |> unif_idx in
-    if finished then uf else do_fpt uf in
-  { inst with uf = do_fpt inst.uf }
+  let rec do_fpt inst =
+    let uf = merge_eq_class inst.uf in
+    let finished, inst = unif_idx { inst with uf = uf } in
+    if finished then inst else do_fpt inst in
+  do_fpt inst 
   
 (*------------------------------------------------------------------*)
 (** {2 Final unification algorithm} *)
@@ -1041,28 +1050,48 @@ let find_eq_init inst =
   if new_eqs = [] then None else Some new_eqs
 
 (*------------------------------------------------------------------*)
-(** Looks for instances of the rule:
-    ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
-let find_new_undef inst = 
+(** Check  *)
+let undef_is_new inst ut =
+  let uf, ut = mgu inst.uf ut in  
+  not (is_def uf inst.neqs ut)
+
+let remove_dups inst uts = 
+  (* we remove duplicates *)
+  let _, uts = List.fold_left (fun (uf,acc) x -> 
+      let uf, x = mgu uf x in uf, x :: acc
+    ) (inst.uf,[]) uts in
+  List.sort_uniq ut_compare uts
+
+
+(** Looks for new undefined elements. *)
+let find_new_undef inst g = 
   let uf = inst.uf in
   let elems = elems uf in
 
-  (* we look for new instances of the rule *)
-  let undefs = 
+  (** Looks for new instances of the rule:
+      ∀τ, (happens(τ) ∧ τ ≠ init) ⇒ happens(pred(τ)) *)
+  let undefs0 = 
     List.filter_map (fun ut -> 
         if is_not_init uf inst.neqs ut && 
            is_def uf inst.neqs ut && 
-           not (is_def uf inst.neqs (upred ut))
+           undef_is_new inst (upred ut)
         then Some (upred ut)
         else None
-      ) elems in
-  
-  (* we remove duplicates *)
-  let _, undefs = List.fold_left (fun (uf,acc) x -> 
-      let uf, x = mgu uf x in uf, x :: acc
-    ) (uf,[]) undefs in
-  List.sort_uniq ut_compare undefs 
+      ) elems 
+  in
 
+  (** Looks for new instances of the rule:
+      ∀τ τ', τ ≤ τ' ⇒ happens(τ,τ') *)
+  let undefs1 = 
+    UtG.fold_edges (fun ut1 ut2 undefs -> 
+        (if undef_is_new inst ut1 then [ut1] else []) @
+        (if undef_is_new inst ut1 then [ut2] else []) @
+        undefs
+      ) g []
+  in
+
+  remove_dups inst (undefs0 @ undefs1)
+  
 (*------------------------------------------------------------------*)
 (** [split instance] return a disjunction of satisfiable and normalized instances
     equivalent to [instance]. *)
@@ -1080,7 +1109,7 @@ let rec split (instance : constr_instance) : model list =
         log_init_eqs new_eqs;
         split { instance with eqs = new_eqs @ instance.eqs; }
         
-      | None -> match find_new_undef instance with
+      | None -> match find_new_undef instance g with
         | _ :: _ as undefs ->
           let new_neqs = List.map (fun ut -> ut, uundef) undefs in
           log_new_neqs new_neqs;

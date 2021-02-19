@@ -75,3 +75,24 @@ goal _ (t:timestamp): t <> init => pred(t) <= t.
 Proof.
   checkfail auto exn GoalNotClosed.
 Abort.
+
+(*------------------------------------------------------------------*)
+goal _ (t,t':timestamp): t <= t' => happens(t, t').
+Proof.
+  auto.
+Qed.
+
+goal _ (t,t':timestamp): t < t'  => happens(t,t').
+Proof.
+  auto.
+Qed.
+
+goal _ (t,t':timestamp): t > t'  => happens(t,t').
+Proof.
+  auto.
+Qed.
+
+goal _ (t,t':timestamp): t >= t' => happens(t,t').
+Proof.
+  auto.
+Qed.
