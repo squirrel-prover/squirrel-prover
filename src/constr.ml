@@ -18,6 +18,21 @@ let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
 
+let pp_trace_literal fmt (pn,at) =
+  match pn with
+  | `Pos -> Fmt.pf fmt "%a"    Term.pp_trace_atom at
+  | `Neg -> Fmt.pf fmt "¬(%a)" Term.pp_trace_atom at
+
+let pp_trace_literals fmt (l : trace_literal list) = 
+  let sep fmt () = Fmt.pf fmt " ∧ " in
+  (Fmt.list ~sep pp_trace_literal) fmt l
+
+let neg (pn, at) = 
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
 (*------------------------------------------------------------------*)
 module Utv : sig
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
@@ -312,6 +327,8 @@ let rec add_form (inst : constr_instance) (form : Form.form) =
   | Form.Disj l -> { inst with clauses = l :: inst.clauses } 
 
   | Form.Conj l -> List.fold_left add_form inst l
+
+let add_forms inst forms = List.fold_left add_form inst forms
 
 (** Make the initial constraint solving instance. *)
 let mk_instance (l : Form.form list) : constr_instance =
@@ -1113,7 +1130,21 @@ let query_one (model : model) (at : trace_literal) =
   List.for_all (query_form model) cnf
 
 let query (models : models) (ats : trace_literal list) =
-  List.for_all (fun model -> List.for_all (query_one model) ats) models
+  (* if the conjunction of trace literals is  *)
+  if List.for_all (fun model -> List.for_all (query_one model) ats) models 
+  then true
+  else 
+    let forms = List.map (fun at -> Form.mk (neg at)) ats
+                |> List.flatten in   
+    let insts = List.map (fun model -> add_forms model.inst forms) models in
+    List.for_all (fun inst -> split inst = []) insts    
+
+(* adds debugging information *)
+let query models ats =
+  dbg "query: %a" pp_trace_literals ats;
+  let b = query models ats in
+  dbg "query result: %a : %a" pp_trace_literals ats Fmt.bool b;
+  b
 
 (*------------------------------------------------------------------*)
 (** [max_elems_model model elems] returns the maximal elements of [elems]

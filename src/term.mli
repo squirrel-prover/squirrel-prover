@@ -131,6 +131,8 @@ type eq_atom = [
   | `Index     of (ord_eq, Vars.index) _atom
 ]
 
+val pp_trace_atom : Format.formatter -> trace_atom -> unit
+
 (*------------------------------------------------------------------*)
 val disjunction_to_literals :
   formula -> ([ `Pos | `Neg ] * generic_atom) list option
