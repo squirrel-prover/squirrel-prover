@@ -278,58 +278,100 @@ type constr_instance = {
 }
 
 (*------------------------------------------------------------------*)
-let pp_constr_instance fmt inst =
+let pp_constr_instance ~full fmt inst =
   let pp_el s fmt (ut1, ut2) =
     Fmt.pf fmt "%a %s %a" pp_ut ut1 s pp_ut ut2 in
-  
+
+  let pp_uf fmt =   
+    if full then 
+      Fmt.pf fmt "@[<hov 2>uf:@ %a@]@;" Uuf.print inst.uf
+    else () in
+
   Fmt.pf fmt "@[<v 0>\
-          @[<hov 2>eqs:@ %a@]@;\
-          @[<hov 2>leqs:@ %a@]@;\
-          @[<hov 2>neqs:@ %a@]@;\
-          @[<hov 2>clauses:@ %a@]\
-          @]"
+              %t\
+              @[<hov 2>eqs:@ %a@]@;\
+              @[<hov 2>leqs:@ %a@]@;\
+              @[<hov 2>neqs:@ %a@]@;\
+              @[<hov 2>clauses:@ %a@]\
+              @]"
+    pp_uf
     (Fmt.list ~sep:Fmt.comma (pp_el "=")) inst.eqs
     (Fmt.list ~sep:Fmt.comma (pp_el "≤")) inst.leqs
     (Fmt.list ~sep:Fmt.comma (pp_el "≠")) inst.neqs
     (Fmt.list ~sep:Fmt.comma Form.pp_disj) inst.clauses
-    
+
 (*------------------------------------------------------------------*)
-let all_terms (inst : constr_instance) =
-  let term_lit acc (_,ut1,ut2) = ut1 :: ut2 :: acc in
-  
-  let rec terms_form acc = function
-    | Form.Lit lit -> term_lit acc lit
-    | Form.Disj l
-    | Form.Conj l -> terms_forms acc l
-      
-  and terms_forms acc l = List.fold_left terms_form acc l in
-  
+let term_lit acc (_,ut1,ut2) = ut1 :: ut2 :: acc 
+
+let rec terms_form acc = function
+  | Form.Lit lit -> term_lit acc lit
+  | Form.Disj l
+  | Form.Conj l -> terms_forms acc l
+
+and terms_forms acc l = List.fold_left terms_form acc l 
+
+let all_terms (inst : constr_instance) =  
   (* init, undef *)
   let terms = [uundef; uinit] in
 
   (* eqs, neqs, leqs *)
   let terms = List.fold_left (fun acc (a,b) ->
-        a :: b :: acc
+      a :: b :: acc
     ) terms (inst.eqs @ inst.leqs @ inst.neqs) in
 
   (* formulas *)
   List.fold_left terms_forms terms inst.clauses
 
+let rec subterms acc x = match x.cnt with
+  | UName (_,is) -> x :: is @ acc
+  | UPred y      -> subterms (x :: acc) y
+  | UVar _
+  | UInit
+  | UUndef -> x :: acc 
 
-let rec add_form (inst : constr_instance) (form : Form.form) =
-  let add el l = if List.mem el l then l else el :: l in
+(*------------------------------------------------------------------*)
+let extends inst uts =
+  let uts = List.fold_left subterms [] uts
+            |> List.sort_uniq ut_compare in
+  let uf = List.fold_left Uuf.extend inst.uf uts in
+  { inst with uf = uf }
   
+let add_elem el l = if List.mem el l then l else el :: l 
+
+let add_eqs ?(extend=true) inst (ut1,ut2) =
+  let inst = if extend then extends inst [ut1;ut2] else inst in
+  { inst with eqs  = add_elem (ut1,ut2) inst.eqs  }
+
+let add_neqs ?(extend=true) inst (ut1,ut2) =
+  let inst = if extend then extends inst [ut1;ut2] else inst in
+  { inst with neqs  = add_elem (ut1,ut2) inst.neqs  }
+
+let add_leqs ?(extend=true) inst (ut1,ut2) =
+  let inst = if extend then extends inst [ut1;ut2] else inst in
+  { inst with leqs  = add_elem (ut1,ut2) inst.leqs  }
+
+let add_clause ?(extend=true) inst c =
+  let uts = terms_forms [] c in
+  let inst = if extend then extends inst uts else inst in  
+  { inst with clauses = c :: inst.clauses } 
+
+(** Add a formula to a constraint solving instance *)
+let rec add_form ?(extend=true) (inst : constr_instance) (form : Form.form) = 
+
   match form with
-  | Form.Lit (`Eq,  ut1, ut2) -> { inst with eqs  = add (ut1,ut2) inst.eqs  }
-  | Form.Lit (`Neq, ut1, ut2) -> { inst with neqs = add (ut1,ut2) inst.neqs }
-  | Form.Lit (`Leq, ut1, ut2) -> { inst with leqs = add (ut1,ut2) inst.leqs }
+  | Form.Lit (`Eq,  ut1, ut2) -> add_eqs  ~extend inst (ut1,ut2)
+  | Form.Lit (`Neq, ut1, ut2) -> add_neqs ~extend inst (ut1,ut2)
+  | Form.Lit (`Leq, ut1, ut2) -> add_leqs ~extend inst (ut1,ut2)
 
-  | Form.Disj l -> { inst with clauses = l :: inst.clauses } 
+  | Form.Disj l -> add_clause ~extend inst l
 
-  | Form.Conj l -> List.fold_left add_form inst l
+  | Form.Conj l -> List.fold_left (add_form ~extend) inst l
 
-let add_forms inst forms = List.fold_left add_form inst forms
+(** Add formulas to a constraint solving instance *)
+let add_forms ?(extend=true) inst forms = 
+  List.fold_left add_form inst forms
 
+(*------------------------------------------------------------------*)
 (** Make the initial constraint solving instance. *)
 let mk_instance (l : Form.form list) : constr_instance =
   let inst =
@@ -338,20 +380,14 @@ let mk_instance (l : Form.form list) : constr_instance =
       clauses = []; }
   in
   let l = Form.Lit (`Neq, uinit, uundef) :: l in
-  let inst = List.fold_left add_form inst l in
-
-  let rec subterms acc x = match x.cnt with
-    | UName (_,is) -> x :: is @ acc
-    | UPred y      -> subterms (x :: acc) y
-    | UVar _
-    | UInit
-    | UUndef -> x :: acc in
+  let inst = List.fold_left (add_form ~extend:false) inst l in
   
   let elems = List.fold_left subterms [] (all_terms inst)
               |> List.sort_uniq ut_compare in
 
   let uf = Uuf.create elems in
   { inst with uf = uf; }
+
 
 (*------------------------------------------------------------------*)
 (** [mgu ut uf] applies the mgu represented by [uf] to [ut].
@@ -946,7 +982,7 @@ let log_new_neqs neqs =
 let log_done () = dbg "@[<v 2>Model done@]"
 
 let log_instr inst = 
-  dbg "@[<v 2>Solving:@ %a@]" pp_constr_instance inst
+  dbg "@[<v 2>Solving:@ %a@]" (pp_constr_instance ~full:false) inst
 
 (*------------------------------------------------------------------*)
 (** Type of a model, which is a satisfiable and normalized instance, and the
@@ -1136,8 +1172,10 @@ let query (models : models) (ats : trace_literal list) =
   else 
     let forms = List.map (fun at -> Form.mk (neg at)) ats
                 |> List.flatten in   
-    let insts = List.map (fun model -> add_forms model.inst forms) models in
-    List.for_all (fun inst -> split inst = []) insts    
+    let insts = List.map (fun model ->
+        add_forms model.inst forms 
+      ) models in
+    List.for_all (fun inst -> split inst = []) insts
 
 (* adds debugging information *)
 let query models ats =

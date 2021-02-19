@@ -1,5 +1,7 @@
 set autoIntro=false.
 
+set debugConstr=true.
+
 hash h
 name k:message
 channel c
@@ -37,14 +39,16 @@ by fresh 1.
 
 expandall.
 fa 0.
-fa 1; fa 1. prf 1. yesif 1. 
+fa 1; fa 1.
+prf 1. 
+yesif 1. 
 project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-by intro H; case H; depends A, A1; auto.
 
-by split; intro H; case H; depends A, A1; auto.
+by split; intro H0; case H0; depends A, A1; auto. 
+by split; intro H0; case H0; depends A, A1; auto. 
 
 fresh 1.
 Qed.
