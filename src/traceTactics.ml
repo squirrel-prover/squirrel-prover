@@ -839,16 +839,22 @@ let () =
 (*------------------------------------------------------------------*)
 (** {2 Structural Tactics} *)
 
+let happens_premise (s : TraceSequent.sequent) (a : Term.timestamp) =
+  if TraceSequent.query_happens s a
+  then []
+  else [TraceSequent.set_conclusion (Term.Atom (`Happens a)) s]
+
 (*------------------------------------------------------------------*)
 let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
   match a1, a2 with
   | Term.Action(n1, is1), Term.Action (n2, is2) ->
-    let table = TraceSequent.table s in
+    let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
       let atom = (Atom (`Timestamp (`Lt,a1,a2))) in
 
+      let s_hap = happens_premise s a2 in
       let g = Term.mk_impl atom (TraceSequent.conclusion s) in
-      [TraceSequent.set_conclusion g s]
+      s_hap @ [TraceSequent.set_conclusion g s]
     else
       soft_failure
         (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
@@ -857,8 +863,9 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
 
 let () =
   T.register_typed "depends"
-    ~general_help:"If the second action given as argument depends on the first \
-                   action,\
+    ~general_help:"If the second action depends on the first \
+                   action, and if the second \
+                   \naction happened, \
                    \nadd the corresponding timestamp inequality."
     ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
                     occurs in the trace, we can add A1[i]. "
@@ -872,11 +879,7 @@ let expand_macro t s =
   match t with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
-        let s_hap =
-          if TraceSequent.query_happens s a
-          then []
-          else [TraceSequent.set_conclusion (Term.Atom (`Happens a)) s]
-        in
+        let s_hap = happens_premise s a in
         
         let mdef = Macros.get_definition system table sort mn is a in
         let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
