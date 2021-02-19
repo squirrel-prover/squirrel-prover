@@ -1570,6 +1570,7 @@ let () =
 
 
 (*------------------------------------------------------------------*)
+(* TODO: should be a rewriting rule *)
 let trivial_if (TacticsArgs.Int i) s =
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
@@ -1642,9 +1643,9 @@ let ifeq
      Tactics.soft_failure (Tactics.Failure "Out of range position")
 
 let () = T.register_typed "ifeq"
-    ~general_help:"If the given conditional implies the equality of the two given terms,\
-           substitute the first one by the second one inside the positive branch\
-           of the conditional."
+    ~general_help:"If the given conditional implies the equality of the two \
+                   given terms, substitute the first one by the second one \
+                   inside the positive branch of the conditional."
 
     ~detailed_help:"This asks to prove that the equality is indeed implied by \
                     the condition, we can then replace any term by its equal \
