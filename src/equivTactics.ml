@@ -132,6 +132,10 @@ let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
     let s = TraceSequent.set_conclusion (Term.Atom (`Happens a)) s in
     [Prover.Goal.Trace s]
 
+let query_happens (s : EquivSequent.t) (a : Term.timestamp) =
+  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
+  TraceSequent.query_happens s a
+
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
 let () =
@@ -1259,13 +1263,16 @@ let () = T.register_general "expand"
 
 (*------------------------------------------------------------------*)
 (** Expands all macro occurrences inside the biframe, if the macro is not at
-  * some pred(A) but about at a concrete action.
+  * some pred(A) but about at a concrete action that is known to happen.
   * Acts recursively, also expanding the macros inside macro definition. *)
 let expand_all () s =
   let expand_all_macros t system table =
     let rec aux : type a. a term -> a term = function
-      | Macro ((mn, sort, is),l,a) when Macros.is_defined mn a table ->
-                aux (Macros.get_definition system table sort mn is a)
+      | Macro ((mn, sort, is),l,a) as m
+        when Macros.is_defined mn a table ->
+        if query_happens s a 
+        then aux (Macros.get_definition system table sort mn is a)
+        else m
       | Macro _ as m -> m
       | Fun (f, l) -> Fun (f, List.map aux l)
       | Name n as a-> a
