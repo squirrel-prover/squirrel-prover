@@ -1131,7 +1131,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   match Theory.convert conv_env tsubst term Sorts.Message with
   (* we expect term to be a sequence *)
-  | Seq ( vs, t) ->
+  | Seq ( vs, t) as term_seq ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst table env vs ths in
@@ -1153,7 +1153,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->
         let new_e = 
-          if not (List.mem new_t e) && List.mem (Equiv.Message t) e
+          if not (List.mem new_t e) && List.mem (Equiv.Message term_seq) e
           then new_t :: e
           else e 
         in

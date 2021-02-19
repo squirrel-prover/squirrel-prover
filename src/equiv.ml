@@ -28,7 +28,7 @@ let fv_elem = function
 type equiv = elem list
 
 let pp_equiv ppf (l : equiv) =
-  Fmt.pf ppf "%a"
+  Fmt.pf ppf "@[%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@ ") pp_elem)
     l
 
