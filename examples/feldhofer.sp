@@ -247,15 +247,14 @@ Proof.
   use lemma with i,j,i1,j1.
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 
-  (* FIXME: this should not be necessary *)
-  by substitute fst(snd(dec(input@Reader1(k),kE(i1)))), nr(k).
-
-  fa.
+  fa. 
   (* find condA => condB *)
-  intctxt Mneq.
+  exists i.
+  intctxt Mneq. 
   by use tags_neq.
   (* find condB => condA *)
-  use lemma with i,j,i1,j1.
+  by use lemma with i,j,i1,j1 as Hlem. 
+  use lemma with i,j,i1,j1 as Hlem. 
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa 3; fadup 3.

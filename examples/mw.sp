@@ -183,13 +183,13 @@ fresh 1.
 yesif 1.
 repeat split.
 depends R(r1), R1(r1).
-depends R(r1), R2(r1).
+by depends R(r1), R2(r1).
 
 (* Case R1 *)
 expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
 
-fa 0. fa 1.
+fa 0; fa 1.
 
 equivalent
   (exists (i,t:index),
@@ -200,7 +200,7 @@ equivalent
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
    R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-use wa_R1 with r.
+by use wa_R1 with r.
 
 (* Perform a similar rewriting in try-find condition,
    also propagating exec@pred(R1(r)) there, and changing
@@ -246,18 +246,19 @@ by intro *; split; exists i,t.
    the if-then-else condition: i,t for the honest formula and
    i1,t1 for the condition. *)
 project.
-fa.
+fa. 
 use wa_R1_left with i1,r.
-use H0.
+use H1. 
 by exists t.
 yesif.
 fa.
+exists i1.
 use wa_R1_right with i1,t1,r.
-by use H0.
-yesif.
+by use H1.
+by yesif.
 
-fa 2. fadup 1.
-fa 1. fadup 1.
+fa 2; fadup 1.
+fa 1; fadup 1.
 prf 1.
 ifcond 1, 1, exec@pred(R1(r)).
 fa 1.
@@ -281,9 +282,9 @@ equivalent
      fst(output@T(i,t)) = fst(input@R2(r)) &&
      snd(output@T(i,t)) = snd(input@R2(r)) &&
      R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-use wa_R2 with r.
+by use wa_R2 with r.
 
-fadup 1.
+by fadup 1.
 
 (* Case T *)
 expand frame@T(i,t); expand exec@T(i,t).

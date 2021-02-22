@@ -52,15 +52,15 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R1: forall j:index,
-  cond@R1(j)
-  <=>
-  (exists (i,k:index),
-    T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal wa_R1 (j:index):
+  happens(R1(j)) =>
+    (cond@R1(j)
+     <=>
+     (exists (i,k:index),
+       T(i,k) < R1(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R1(j)) &&
+       fst(output@T(i,k)) = fst(input@R1(j)) &&
+       input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   expand cond@R1(j).
@@ -86,15 +86,15 @@ Proof.
   by exists i,k.
 Qed.
 
-goal wa_R2: forall j:index,
-  cond@R2(j)
-  <=>
-  (not(exists (i,k:index),
-    T(i,k) < R2(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R2(j)) &&
-    fst(output@T(i,k)) = fst(input@R2(j)) &&
-    input@T(i,k) = output@R(j))).
-
+goal wa_R2 (j:index):
+  happens(R2(j)) =>
+   (cond@R2(j)
+    <=>
+    (not(exists (i,k:index),
+      T(i,k) < R2(j) && R(j) < T(i,k) &&
+      snd(output@T(i,k)) = snd(input@R2(j)) &&
+      fst(output@T(i,k)) = fst(input@R2(j)) &&
+      input@T(i,k) = output@R(j)))).
 Proof.
   intro *.
   expand cond@R2(j).
@@ -122,16 +122,15 @@ Proof.
   by case H0; depends R(j),R1(j).
 Qed.
 
-goal [left] wa_R1_left:
-  forall (i,j:index),
-    (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i)))
-    <=>
-    (exists k:index,
-    T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal [left] wa_R1_left (i,j:index):
+  happens(R1(j)) =>
+    ((snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i)))
+     <=>
+     (exists k:index,
+     T(i,k) < R1(j) && R(j) < T(i,k) &&
+     snd(output@T(i,k)) = snd(input@R1(j)) &&
+     fst(output@T(i,k)) = fst(input@R1(j)) &&
+     input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   use tags_neq.
@@ -142,15 +141,14 @@ Proof.
   by case H; depends R(j),R2(j).
 Qed.
 
-goal [right] wa_R1_right:
-  forall (i,j,k:index),
-    (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k)))
-    <=>
-    (T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal [right] wa_R1_right (i,j,k:index):
+  happens(R1(j)) =>
+    ((snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k)))
+     <=>
+     (T(i,k) < R1(j) && R(j) < T(i,k) &&
+     snd(output@T(i,k)) = snd(input@R1(j)) &&
+     fst(output@T(i,k)) = fst(input@R1(j)) &&
+     input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   use tags_neq.
@@ -170,9 +168,9 @@ Proof.
   expand cond@R(j); expand output@R(j).
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
-  repeat split.
-  by depends R(j),R1(j).
-  by depends R(j),R2(j).
+  repeat split. 
+  by depends R(j1),R1(j1).
+  by depends R(j1),R2(j1).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -219,13 +217,14 @@ Proof.
   (* LEFT *)
   fa.
   use wa_R1_left with i1,j.
-  use H0.
-  by exists k.
+  use H1.
+  by exists k. 
+
   yesif.
   (* RIGHT *)
   fa.
   use wa_R1_right with i1,j,k1.
-  by use H0.
+  by exists i1; use H1.
   by yesif.
 
   fa 2; fadup 1.

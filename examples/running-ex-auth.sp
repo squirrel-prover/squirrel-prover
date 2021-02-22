@@ -18,15 +18,15 @@ process reader(j:index) =
 
 system (!_j R: reader(j) | !_i !_j T: tag(i,j)).
 
-goal auth :
-  forall (i:index, j:index),
-    cond@R(j,i) =>
-    exists (j':index), T(i,j') < R(j,i)
-    && fst(input@R(j,i)) = fst(output@T(i,j'))
-    && snd(input@R(j,i)) = snd(output@T(i,j')).
+goal auth (i:index, j:index):
+  happens(R(j,i)) =>
+    (cond@R(j,i) =>
+     exists (j':index), T(i,j') < R(j,i)
+     && fst(input@R(j,i)) = fst(output@T(i,j'))
+     && snd(input@R(j,i)) = snd(output@T(i,j'))).
 
 Proof.
- intro i j Hcond.
+ intro i j Hap Hcond.
  expand cond@R(j,i).
  euf Hcond.
  intro *; exists j1.

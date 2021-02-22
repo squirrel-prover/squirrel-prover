@@ -195,7 +195,7 @@ equivalent
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
-use wa_R1 with r.
+by use wa_R1 with r.
 
 fadup 5.
 
@@ -232,14 +232,19 @@ equivalent
              H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
 project.
-  (* Left *)
-  fa; try exists i,t.
-  fa. use wa_R1_left with i1,r. use H0. 
-  by exists t.
-  (* Right *)
-  fa; try exists i,t.
-  fa. use wa_R1_right with i1,t1,r. 
-  by use H0.
+
+(* Left *)
+fa; try exists i,t.
+fa. 
+use wa_R1_left with i1,r as [H1 H2]. 
+use H1. 
+by exists t.
+(* Right *)
+fa; try exists i,t.
+fa. 
+use wa_R1_right with i1,t1,r as [H1 H2]. 
+exists i1.
+by use H1.
 
 fa 5.
 fadup 5.
@@ -273,14 +278,14 @@ euf Meq.
 exists i,t1.
 assert (nr(r) = input@T(i,t1)).
 fresh Meq1.
-by case H; depends R(r), R1(r).
+by case H0; depends R(r), R1(r).
 
 (* right *)
 euf Meq.
 exists i,t.
 assert (nr(r) = input@T(i,t)).
 fresh Meq1.
-by case H; depends R(r), R1(r).
+by case H0; depends R(r), R1(r).
 
 (* proof of lemma: WA => Cond *)
 exists i,t.
@@ -314,21 +319,19 @@ expand cond@T1(i,t); split.
   use tags_neq; project.
   (* Left *)
   euf Meq0.
-  assert R1(r) < T1(i,t).
-    case H0.
-    by depends T(i,t),T1(i,t).
-  assert cond@R1(r).
-    executable pred(T1(i,t)).
-    by use H1 with R1(r); expand exec@R1(r).
+  assert R1(r) < T1(i,t) as HClt;
+  1: by case H1; depends T(i,t),T1(i,t).
+  assert cond@R1(r);
+  1: by executable pred(T1(i,t)); use H2 with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf Meq2.
-  exists r; split.
+  exists r; split. 
   case output@R1(r).
   euf Meq4.
-  use H1 with i,t.
   assert nr(r) = input@T(i,t).
-  fresh Meq4.
-  by case H1; depends R(r),R2(r).
+  fresh Meq2.
+  case H1.
+  by case H2; depends R(r),R2(r). 
 
   (* Right *)
   euf Meq0.

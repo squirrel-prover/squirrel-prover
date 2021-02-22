@@ -35,13 +35,13 @@ process reader(j:index) =
 
 system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
 
-goal wa_R1:
-  forall (j:index),
-    cond@R1(j) <=>
-    (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) &&
-      snd(output@T(i,k)) = snd(input@R1(j)) &&
-      fst(output@T(i,k)) = fst(input@R1(j)) &&
-      input@T(i,k) = output@R(j)).
+goal wa_R1 (j:index):
+  happens(R1(j)) =>
+    (cond@R1(j) <=>
+     (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R1(j)) &&
+       fst(output@T(i,k)) = fst(input@R1(j)) &&
+       input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   expand cond@R1(j).
@@ -64,13 +64,13 @@ Proof.
   by exists i,k.
 Qed.
 
-goal wa_R2:
-  forall (j:index),
-    cond@R2(j) <=>
-    (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) &&
-      snd(output@T(i,k)) = snd(input@R2(j)) &&
-      fst(output@T(i,k)) = fst(input@R2(j)) &&
-      input@T(i,k) = output@R(j))).
+goal wa_R2 (j:index):
+  happens(R2(j)) =>
+   (cond@R2(j) <=>
+     (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R2(j)) &&
+       fst(output@T(i,k)) = fst(input@R2(j)) &&
+       input@T(i,k) = output@R(j)))).
 Proof.
   intro *.
   expand cond@R2(j).

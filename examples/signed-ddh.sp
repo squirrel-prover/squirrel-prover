@@ -83,8 +83,10 @@ process Schall(i:index) =
 system [secretS] (!_i P(i) | !_j Schall(j)).
 
 
-goal [none,secretP] P_charac :
-  forall (i:index), cond@Pchall1(i) => exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
+goal [none,secretP] P_charac (i:index):
+ happens(Pchall1(i)) => 
+ cond@Pchall1(i) => 
+ exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
 Proof.
   simpl.
   expand cond@Pchall1(i).
@@ -94,8 +96,9 @@ Proof.
   exists j.
 Qed.
 
-goal [none, secretS] S_charac :
-  forall (r:index), exec@S1(r) => exists (s:index), snd(input@S(r)) = g^a(s).
+goal [none, secretS] S_charac (r:index):
+ happens(S1(r)) =>
+ exec@S1(r) => exists (s:index), snd(input@S(r)) = g^a(s).
 Proof.
   simpl.
   expand exec@S1(r).
@@ -125,33 +128,33 @@ Proof.
 
     (* init *)
     expandall.
-    ddh a,b,k.
+    by ddh a,b,k.
     (* Pchall *)
     expandall.
     expand seq(i->g^a(i)), i.
-    fa 6.
+    by fa 6.
     (* Pchall1 *)
     expandall.
     expand seq(i->g^a(i)), i.
-    fa 6.
+    by fa 6.
     (* A *)
     expandall.
     expand  seq(i->g^a(i)), i.
-    fa 6.
+    by fa 6.
     (* S *)
     expandall.
     expand  seq(i->g^b(i)), j.
-    fa 6.
+    by fa 6.
     (* S1 *)
     expandall.
     expand  seq(i->g^b(i)), j.
-    fa 6.
+    by fa 6.
     (* Case Schall2 *)
     expandall.
     expand  seq(i->g^a(i)), l.
     expand seq(i->g^b(i)), j.
     expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), l, j.
-    fa 8.
+    by fa 8.
     (* Schall3 *)
     expand frame@Schall3(j).
     expand exec@Schall3(j).
@@ -162,9 +165,9 @@ Proof.
     expand cond@Schall3(j).
     executable pred(Schall3(j)).
     depends S1(j), Schall3(j).
-    use H1 with S1(j).
+    use H2 with S1(j).
     use S_charac with j.
-    by use H0 with s.
+    by use H1 with s.
 
     fa 5.
     fa 6.
@@ -220,10 +223,10 @@ Proof.
     expand cond@Pchall3(i).
     executable pred(Pchall3(i)).
     depends Pchall1(i), Pchall3(i).
-    use H1 with Pchall1(i).
+    use H2 with Pchall1(i).
     expand exec@Pchall1(i).
     use P_charac with i.
-    by use H0 with j.
+    by use H1 with j.
 
     fa 5.
     fa 6.

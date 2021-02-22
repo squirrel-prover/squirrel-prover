@@ -134,30 +134,29 @@ system [secret] ( P2 | S2).
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [none, auth] S1_charac :
-  cond@S1 => (cond@S4 => False) .
+  happens(S1,S4) => cond@S1 => (cond@S4 => False) .
 Proof.
+  intro Hap Hcond1 Hcond4.
   expand cond@S1; expand cond@S4.
   expand pkP@S1.
   substitute fst(input@S), pk(kP).
-  euf Meq.
+  euf Hcond1.
 
   case H1.
   by use H with i.
-  notleft H0. 
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
 goal [none, auth] P1_charac :
-   cond@P1 => (cond@P4 => False).
+   happens(P1,P4) => cond@P1 => (cond@P4 => False).
 Proof.
+  intro Hap Hcond1 Hcond4.
   expand cond@P1; expand cond@P4.
   substitute pkS@P1,pk(kS).
-  euf Meq.
+  euf Hcond1.
 
   case H2.
   by use H with i.
-
-  notleft H0.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -195,7 +194,9 @@ Proof.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). depends P1, P4. use H1 with P1. expand exec@P1.
+   executable pred(P4). 
+   depends P1, P4; use H2 with P1. 
+   expand exec@P1.
    by use P1_charac.
 
    by fa 7; noif 7.
@@ -224,7 +225,9 @@ Proof.
    expand frame@S4; expand exec@S4.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). depends S1, S4. use H1 with S1. expand exec@S1. 
+   executable pred(S4). 
+   depends S1, S4; use H2 with S1. 
+   expand exec@S1. 
    by use S1_charac.
 
    by fa 6; fa 7; noif 7.
