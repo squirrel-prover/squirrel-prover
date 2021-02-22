@@ -403,7 +403,7 @@ let rec tautology f s = match f with
     let s = EquivSequent.set_goal s f in
     let trace_s = trace_seq_of_equiv_seq s in
     (* TODO: improve automation by doing more than just constraint solving ? *)
-    Tactics.timeout_get (CommonTactics.constraints trace_s) 
+    Tactics.timeout_get (TraceTactics.constraints trace_s) 
 
 (** [form_simpl_impl f s] simplifies the formula [f] in [s], by trying to
     prove [f]'s hypotheses in [s]. *)

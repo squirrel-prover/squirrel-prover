@@ -597,9 +597,10 @@ let () =
 
 
 (*------------------------------------------------------------------*)
+
 let rec simpl_left s =
   let func _ f = match f with
-    | False | And _ | Exists _ -> true
+    | Term.False | Term.And _ | Term.Exists _ -> true
     | _ -> false in
     
   match Hyps.find_opt func s with
@@ -914,29 +915,37 @@ let () = T.register_typed "expand"
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) =
-  let conclusions =
-    Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
-  in
-  
-  let term_conclusions =
-    List.fold_left (fun acc conc -> match conc with
-        | `Pos, (#message_atom as at) ->
-          let at = (at :> Term.generic_atom) in
-          Term.(Not (Atom at)) :: acc
-        | `Neg, (#message_atom as at) ->
-          Term.Atom at :: acc
-        | _ -> acc)
-      []
-      conclusions
-  in
-  let s = List.fold_left (fun s f ->
-      Hyps.add Args.AnyName f s
-    ) s term_conclusions
-  in
-  if Tactics.timeout_get (TraceSequent.message_atoms_valid s) then
+  match simpl_left s with
+  | None -> Utils.Result true
+  | Some s ->
+    let conclusions =
+      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
+    in
+
+    let term_conclusions =
+      List.fold_left (fun acc conc -> match conc with
+          | `Pos, (#message_atom as at) ->
+            let at = (at :> Term.generic_atom) in
+            Term.(Not (Atom at)) :: acc
+          | `Neg, (#message_atom as at) ->
+            Term.Atom at :: acc
+          | _ -> acc)
+        []
+        conclusions
+    in
+    let s = List.fold_left (fun s f ->
+        Hyps.add Args.AnyName f s
+      ) s term_conclusions
+    in
+    TraceSequent.message_atoms_valid s
+
+(** [constraints s] proves the sequent using its trace formulas. *)
+let congruence_tac (s : TraceSequent.t) =
+  match Tactics.timeout_get (congruence s) with 
+  | true ->
     let () = dbg "closed by congruence" in
     []
-  else soft_failure CongrFail
+  | false -> soft_failure Tactics.CongrFail
 
 let () = T.register "congruence"
     ~tactic_help:
@@ -946,22 +955,40 @@ let () = T.register "congruence"
                         (f(u)=f(v) <=> u=v).";
        usages_sorts = [Sort None];
        tactic_group = Structural}
-    congruence
+    congruence_tac
 
 (*------------------------------------------------------------------*)
+let constraints (s : TraceSequent.t) =
+  match simpl_left s with
+  | None -> Utils.Result true
+  | Some s ->
+    let conclusions =
+      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
+    in
+    let trace_conclusions =
+      List.fold_left (fun acc conc -> match conc with
+          | `Pos, (#trace_atom as at) ->
+            let at = (at :> Term.generic_atom) in
+            Term.(Not (Atom at)) :: acc
+          | `Neg, (#trace_atom as at) ->
+            Term.Atom at :: acc
+          | _ -> acc)
+        []
+        conclusions
+    in
+    let s = List.fold_left (fun s f ->
+        Hyps.add Args.AnyName f s
+      ) s trace_conclusions
+    in
+    TraceSequent.constraints_valid s
+
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_tac (s : TraceSequent.t) =
-  match simpl_left s with
-  | None ->
-    let () = dbg "closed by false" in
+  match Tactics.timeout_get (constraints s) with 
+  | true ->
+    let () = dbg "closed by constraints" in
     []
-
-  | Some s ->
-    match Tactics.timeout_get (CommonTactics.constraints s) with 
-    | true ->
-      let () = dbg "closed by constraints" in
-      []
-    | false -> soft_failure (Tactics.Failure "constraints satisfiable")
+  | false -> soft_failure (Tactics.Failure "constraints satisfiable")
 
 let () = T.register "constraints"
     ~tactic_help:
@@ -1716,7 +1743,7 @@ let simplify ~close ~intro =
 
   (* Attempt to close a goal. *)
   let do_conclude =
-    Tactics.orelse_list [wrap congruence; 
+    Tactics.orelse_list [wrap congruence_tac; 
                          wrap constraints_tac; 
                          wrap assumption]
 

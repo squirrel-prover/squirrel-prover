@@ -48,7 +48,6 @@ let tac_error_strings =
     (CannotConvert, "CannotConvert");
     (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
-    (MustHappen _, "MustHappen");
     (NothingToIntroduce, "NothingToIntroduce")]
 
 let rec tac_error_to_string = function
@@ -73,13 +72,12 @@ let rec tac_error_to_string = function
   | CongrFail
   | NothingToIntroduce
   | GoalNotClosed
-  | MustHappen _ 
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
-  | GoalBadShape _ -> "GoalBadShape"
-  | SystemError _ -> "System_Error"
-  | PatNumError _ -> "PatNumError"
-
+  | GoalBadShape    _ -> "GoalBadShape"
+  | SystemError     _ -> "System_Error"
+  | PatNumError     _ -> "PatNumError"
+  | MustHappen      _ -> "MustHappen"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"

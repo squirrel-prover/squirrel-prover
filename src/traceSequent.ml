@@ -178,26 +178,46 @@ let pp ppf s =
 
 
 (*------------------------------------------------------------------*)
+let rec simpl_form acc hyp = 
+  match hyp with
+  | Term.And (f,g) -> simpl_form (simpl_form acc f) g
+
+  | Exists (vs,f) ->
+    let subst =
+      List.map
+        (fun (Vars.EVar v) ->
+           Term.ESubst  (Term.Var v,
+                         Term.Var (Vars.make_new_from v)))
+        vs
+    in
+    let f = Term.subst subst f in
+    simpl_form acc f
+
+  | _ as f -> f :: acc
+
+(*------------------------------------------------------------------*)
 let get_message_atoms s =
-  List.fold_left (fun atoms (_,hyp) -> match hyp with 
+  let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
+  List.fold_left (fun atoms hyp -> match hyp with 
       | Term.(Atom (`Message at)) -> at :: atoms
       | Term.(Not (Atom (#message_atom as at))) ->
         let `Message neg_at = Term.not_message_atom at in
         neg_at :: atoms
       | _ -> atoms
-    ) [] (H.to_list s.hyps)
+    ) [] hyps
 
 let get_trace_literals s =
-  List.fold_left (fun atoms (id,hyp) -> match hyp with
+  let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
+  List.fold_left (fun atoms hyp -> match hyp with
       | Term.(Atom (#trace_atom as at)) ->
         (`Pos, at) :: atoms
       | Term.(Not (Atom (#trace_atom as at))) ->
         (`Neg, at) :: atoms
       | _ -> atoms
-    ) [] (H.to_list s.hyps)
+    ) [] hyps
 
 (*------------------------------------------------------------------*)
-(** Constraints *)
+(** Prepare constraints or TRS query *)
 
 let get_models s : Constr.models timeout_r =
   match !(s.models) with

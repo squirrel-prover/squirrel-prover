@@ -1,4 +1,5 @@
 set autoIntro=false.
+(* set debugTactics=true. *)
 
 abstract ok : message
 abstract ko : message
@@ -27,6 +28,6 @@ equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1, k).
   nosimpl(yesif 1).
-  use len_ko_n; use len_ko_m.
-  simpl.
+  by use len_ko_n; use len_ko_m.
+  auto.
 Qed.
