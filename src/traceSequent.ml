@@ -328,38 +328,47 @@ module Hyps
            Macros.is_defined m a table
         then
           let def = Macros.get_definition system table sort m is a in
-          f a t def ;
+          f a (`Message (t, def)) ;
           self#visit_message def
       | t -> super#visit_message t
-    method visit_formula f =
-      (* Do not visit macros. When a macro formula is defined we could add
-       * an hyp stating the equivalence between the macro and its
-       * expansion. But we'll probably take care of that later as part of a
-       * larger redesign of the macro expansion system. *)
-      match f with
-      | Term.Macro ((m,sort,is),[],a) -> ()
+    method visit_formula t = 
+      match t with
+      | Term.Macro ((m,sort,is),[],a) -> 
+        if List.for_all
+            Vars.(function EVar v -> not (is_new v))
+            (Term.get_vars t) &&
+           Macros.is_defined m a table
+        then
+          let def = Macros.get_definition system table sort m is a in
+          f a (`Boolean (t, def)) ;
+          self#visit_formula def
       | t -> super#visit_formula t
   end
 
   (** Add to [s] equalities corresponding to the expansions of all macros
-    * occurring in [at], if [at] happened. *)
-  let rec add_macro_defs (s : sequent) at =
-    let macro_eqs : (Term.timestamp * Term.message_atom) list ref = ref [] in
+    * occurring in [f], if [f] happened. *)
+  let rec add_macro_defs (s : sequent) f =
+    let macro_eqs : (Term.timestamp * Term.formula) list ref = ref [] in
     let iter =
       new iter_macros
         ~system:s.system
         s.table
-        (fun a t t' -> 
-           macro_eqs := (a, `Message (`Eq,t,t')) :: !macro_eqs) in
+        (fun a el -> match el with
+           |`Message (t,t') ->
+             macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs
+           |`Boolean (f,f') -> () (* TODO: add that f <=> f' *)
+        ) in
     
-    iter#visit_formula (Term.Atom at) ;
+    iter#visit_formula f ;
     
-    List.fold_left (fun s (a,eq) -> 
-        if query_happens s a then snd (add_message_atom None s eq) else s
+    List.fold_left (fun s (a,f) -> 
+        if query_happens s a 
+        then snd (add_form_aux None s f)
+        else s
       ) s !macro_eqs
 
-  and add_message_atom ?(force=false) (id : Ident.t option) (s : sequent) at =
-    let f = Term.Atom (at :> Term.generic_atom) in
+  and add_form_aux
+      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.formula) =
     let recurse = not (H.is_hyp f s.hyps) in
     
     (* TODO: remove auto naming ? *)
@@ -368,15 +377,15 @@ module Hyps
       | Some id -> id in
     let id, hyps = H.add ~force id f s.hyps in
     let s =
-      S.update ~keep_trs:false ~keep_models:true
+      S.update ~keep_trs:false ~keep_models:false
         ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
-    let s = if recurse then add_macro_defs s (at :> Term.generic_atom) else s in
+    let s = if recurse then add_macro_defs s f else s in
 
     id, s
 
-  let rec add_happens ?(force=false) id (s : sequent) ts =
+  let add_happens ?(force=false) id (s : sequent) ts =
     let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
     let s =
@@ -386,14 +395,14 @@ module Hyps
     id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
-  and add_formula ?(force=false) id f (s : sequent) =
+  let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (#Term.message_atom as at) -> add_message_atom ~force (Some id) s at
-    | Term.Atom (`Happens ts)              -> add_happens ~force id s ts
-    | _ ->
-      let id, hyps = H.add ~force id f s.hyps in
-      (* TODO: performances, less updates ? *)
-      id, S.update ~hyps:hyps s
+    | Term.Atom (#Term.message_atom) -> add_form_aux ~force (Some id) s f
+    | Term.Atom (`Happens ts)        -> add_happens ~force id s ts
+    | _ -> add_form_aux ~force (Some id) s f
+      (* let id, hyps = H.add ~force id f s.hyps in
+       * (* TODO: performances, less updates ? *)
+       * id, S.update ~hyps:hyps s *)
 
   let add_i npat f s =
     let force, approx, name = match npat with
@@ -472,7 +481,7 @@ let pi projection s =
 let set_conclusion a s =
   let s = S.update ~conclusion:a s in
     match a with
-      | Term.Atom Term.(#message_atom as at) -> Hyps.add_macro_defs s at
+      | Term.Atom Term.(#message_atom) -> Hyps.add_macro_defs s a
       | _ -> s
 
 let init ~system table (goal : Term.formula) =

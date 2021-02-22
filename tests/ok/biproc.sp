@@ -21,7 +21,7 @@ Qed.
 goal [left] test_left : happens(B) => cond@B => output@B = input@B.
 Proof.
   intro Hap Hc.
-  expand cond@B.
+  by expand cond@B.
 Qed.
 
 goal [right] test_right : happens(B) => output@B = ko.
