@@ -482,7 +482,6 @@ let mem_assoc x sort subst =
   try let _ = assoc subst x sort in true
   with Conv (_, Undefined _) -> false
 
-
 (** Helper for converting constructs with binders.
   * Given a list of variables, returns a substitution (in the same order
   * so that shadowing works as expected).
@@ -1061,15 +1060,19 @@ let declare_state table s (typed_args : (lsymb * Sorts.esort) list)
          env, (Vars.EVar x')::vars, item::tsubst)
       (Vars.empty_env,[],[])
       typed_args
-  in *)
+  in *) 
   let subst = subst_of_bvars typed_args in
-  let t = convert conv_env subst t Sorts.Message in
-  let vs =
-    let f : (lsymb * Sorts.esort) -> Vars.index = function
-      | (v,s) -> conv_index conv_env subst v 
+  let t = convert conv_env subst t Sorts.Message in  
+  let vs : Vars.index list =
+    let f x : Vars.index = match x with
+      | ESubst (_,Term.Var i) -> 
+        begin match Vars.sort i with
+          | Sorts.Index -> i
+          | _ -> assert false
+        end
       | _ -> assert false
     in
-    List.map f typed_args
+    List.map f subst
   in
   let data = StateInit_data (vs,t) in
   let table, _ =
