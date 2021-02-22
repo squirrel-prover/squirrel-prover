@@ -19,7 +19,7 @@ Proof.
     (forall (i1:index), (diff(n(i) <> n(i1), m(i) <> n(i1)))),
     True.
   admit.
-  yesif 1.
+  by yesif 1.
 Qed.
 
 (* Secondary test, without any bound variable, just to check
@@ -33,5 +33,5 @@ Proof.
     (diff(n(i), m(i)) <> n(i)),
     True.
   admit.
-  yesif 1.
+  by yesif 1.
 Qed.

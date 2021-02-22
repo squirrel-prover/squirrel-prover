@@ -7,12 +7,12 @@ system A: if True then out(c,ok).
 
 goal _: True || False.
 Proof.
-left.
+by left.
 Qed.
 
 goal _: False || True.
 Proof.
-right.
+by right.
 Qed.
 
 
@@ -21,7 +21,7 @@ Proof.
 nosimpl(intro H).
 nosimpl(notleft H).
 nosimpl(destruct H).
-simpl.
+auto.
 Qed.
 
 goal _: not(forall (t:index), not(cond@A)|| not(cond@A)) => True.

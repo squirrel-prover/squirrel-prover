@@ -11,5 +11,5 @@ Proof.
   case tau.  
   by left. 
   by right; left. 
-  by right; right; exists i.
+  by right; right. 
 Qed.

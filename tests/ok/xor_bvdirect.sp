@@ -27,7 +27,7 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
-  use len_ok_ko with i; use len_ko_ok with i.
+  by use len_ok_ko with i; use len_ko_ok with i.
   refl.
 Qed.
 
@@ -43,6 +43,6 @@ Proof.
     True.
   admit.
   nosimpl(yesif 1).
-  use len_ok with i; use len_ko with i.
+  by use len_ok with i; use len_ko with i.
   refl.
 Qed.

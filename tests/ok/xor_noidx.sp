@@ -16,5 +16,5 @@ Proof.
   fa 0; fa 1; fa 1.
   xor 1.
   yesif 1.
-  use len_ok.
+  by use len_ok.
 Qed.

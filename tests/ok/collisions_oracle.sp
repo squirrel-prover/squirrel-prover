@@ -52,5 +52,5 @@ Proof.
  intro a b Hap Heq.
  collision.
  intro Heq2.
- case H.
+ by case H.
 Qed.

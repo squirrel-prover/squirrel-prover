@@ -16,7 +16,7 @@ goal _ :
 happens(O1) => cond@O1 => input@O1 <>k.
 Proof.
 intro Hap Hc.
-expand cond@O1.
+by expand cond@O1.
 Qed.
 
 goal _:

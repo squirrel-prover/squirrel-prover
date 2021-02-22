@@ -18,7 +18,7 @@ by project; auto.
 fresh 1.
 
 prf 0.
-yesif 0.
+by yesif 0.
 Qed.
 
 
@@ -49,5 +49,5 @@ else it is automatically simplified. *)
 by split; intro H0; case H0; depends A, A1; auto. 
 by split; intro H0; case H0; depends A, A1; auto. 
 
-fresh 1.
+by fresh 1.
 Qed.

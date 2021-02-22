@@ -44,7 +44,7 @@ Proof.
  intro a b Hap Heq.
  nosimpl(collision).
  nosimpl(intro Heq2).
- eqnames.
+ by eqnames.
 Qed.
 
 
@@ -56,5 +56,5 @@ Proof.
  intro a b Hap Heq.
  collision. 
  intro Heq2. 
- case H. 
+ by case H. 
 Qed.
