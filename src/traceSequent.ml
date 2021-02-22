@@ -360,7 +360,7 @@ module Hyps
     let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
     let s =
-      S.update ~keep_trs:true ~keep_models:false
+      S.update ~keep_trs:false ~keep_models:false
         ~hyps s in
 
     id, s
