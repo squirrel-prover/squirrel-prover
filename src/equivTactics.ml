@@ -125,12 +125,8 @@ let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 
 (** Build the sequent showing that a timestamp happens. *)
 let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
-  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
-  if TraceSequent.query_happens s a
-  then []
-  else 
-    let s = TraceSequent.set_conclusion (Term.Atom (`Happens a)) s in
-    [Prover.Goal.Trace s]
+  let s = trace_seq_of_equiv_seq ~goal:(Term.Atom (`Happens a)) s in
+  Prover.Goal.Trace s
 
 let query_happens (s : EquivSequent.t) (a : Term.timestamp) =
   let s = trace_seq_of_equiv_seq ~goal:Term.False s in
@@ -1192,12 +1188,12 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       | Equiv.Message e -> Equiv.Message (Term.subst subst e)
       | Equiv.Formula e -> Equiv.Formula (Term.subst subst e)
     in
-    let s_hap = happens_premise s a in
     let new_s = 
       EquivSequent.set_equiv_goal s (List.map apply_subst (goal_as_equiv s)) 
-    in
-    s_hap @
-    [Prover.Goal.Equiv new_s]
+    in   
+    
+    [happens_premise s a;
+     Prover.Goal.Equiv new_s]
   in
 
   let table = EquivSequent.table s in

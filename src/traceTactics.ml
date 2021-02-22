@@ -842,9 +842,7 @@ let () =
 (** {2 Structural Tactics} *)
 
 let happens_premise (s : TraceSequent.sequent) (a : Term.timestamp) =
-  if TraceSequent.query_happens s a
-  then []
-  else [TraceSequent.set_conclusion (Term.Atom (`Happens a)) s]
+  TraceSequent.set_conclusion (Term.Atom (`Happens a)) s
 
 (*------------------------------------------------------------------*)
 let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
@@ -856,7 +854,7 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
 
       let s_hap = happens_premise s a2 in
       let g = Term.mk_impl atom (TraceSequent.conclusion s) in
-      s_hap @ [TraceSequent.set_conclusion g s]
+      [s_hap; TraceSequent.set_conclusion g s]
     else
       soft_failure
         (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
@@ -886,7 +884,7 @@ let expand_macro t s =
         let mdef = Macros.get_definition system table sort mn is a in
         let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
         let s' = TraceSequent.subst subst s in
-        s_hap @ [s']
+        [s_hap; s']
 
       else soft_failure (Tactics.Failure "cannot expand this macro")
 
@@ -1549,11 +1547,9 @@ let exec (Args.Timestamp a) s =
        Impl (Atom (Term.mk_timestamp_leq (Var var) a),
              Macro(Term.exec_macro,[],Var var)))
   in
-  let s_hap = happens_premise s a in
-  
-  s_hap @
+  [happens_premise s a ;
 
-  [TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
+   TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
   
     TraceSequent.set_conclusion
       (Term.mk_impl formula (TraceSequent.conclusion s)) s]
