@@ -1109,7 +1109,7 @@ let fresh_param m1 m2 = match m1,m2 with
 let mk_fresh_direct system table env n is t =
   (* iterate over [t] to search subterms of [t] equal to a name *)
   let list_of_indices =
-    let iter = new EquivTactics.get_name_indices ~system table false n in
+    let iter = new Fresh.get_name_indices ~system table false n in
     iter#visit_message t ;
     iter#get_indices
   in
@@ -1141,7 +1141,7 @@ let mk_fresh_direct system table env n is t =
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect system table env n is t =
   let list_of_actions_from_term =
-    let iter = new EquivTactics.get_actions ~system table false in
+    let iter = new Fresh.get_actions ~system table false in
     iter#visit_message t ;
     iter#get_actions in
 
@@ -1149,7 +1149,7 @@ let mk_fresh_indirect system table env n is t =
 
   let () = SystemExpr.(iter_descrs table system
     (fun action_descr ->
-      let iter = new EquivTactics.get_name_indices ~system table true n in
+      let iter = new Fresh.get_name_indices ~system table true n in
       iter#visit_formula (snd action_descr.condition) ;
       iter#visit_message (snd action_descr.output) ;
       List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
@@ -1252,7 +1252,7 @@ let fresh (Args.String m) s =
                (Tactics.Failure "can only be applied on message hypothesis")
     end
   with
-  | EquivTactics.Var_found ->
+  | Fresh.Var_found ->
     soft_failure
       (Tactics.Failure "can only be applied on ground terms")
 
@@ -1688,91 +1688,100 @@ let () =
 (*------------------------------------------------------------------*)
 (** Automated goal simplification *)
 
-let () =
-  let wrap f = (fun (s: TraceSequent.t) sk fk ->
-      begin match f s with
-        | subgoals -> sk subgoals fk
-        | exception Tactics.Tactic_soft_failure e -> fk e
-      end)
-  in
-  (* let pp_tac str s sk fk =
-   *   Fmt.epr "pp: %s@." str;
-   *   sk [s] fk in *)
+let wrap f = (fun (s: TraceSequent.t) sk fk ->
+    match f s with
+      | subgoals -> sk subgoals fk
+      | exception Tactics.Tactic_soft_failure e -> fk e
+    )
 
-  let open Tactics in
   (* Simplify goal. We will never backtrack on these applications. *)
-  let simplify ~intro =
-    andthen_list (
-      (* Try assumption first to avoid loosing the possibility
-         * of doing it after introductions. *)
-      try_tac (wrap assumption) ::
-      (if intro then [wrap intro_all] else []) @
-      (if intro then [wrap simpl_left_tac] else []) @
+let simplify ~close ~intro =
+  let open Tactics in
+  andthen_list (
+    (* Try assumption first to avoid loosing the possibility
+       * of doing it after introductions. *)
+    (if close then [try_tac (wrap assumption)] else []) @
+    (if close || intro then [wrap intro_all;
+                             wrap simpl_left_tac] else []) @
 
-      (* Learn new term equalities from constraints before
-       * learning new index equalities from term equalities,
-       * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
-      (wrap eq_trace) ::
-      (wrap eq_names) ::
-      (* Simplify equalities using substitution. *)
-      [repeat (wrap autosubst)]
-    ) in
+    (* Learn new term equalities from constraints before
+     * learning new index equalities from term equalities,
+     * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
+    (wrap eq_trace) ::
+    (wrap eq_names) ::
+    (* Simplify equalities using substitution. *)
+    [repeat (wrap autosubst)]
+  ) 
 
   (* Attempt to close a goal. *)
-  let conclude =
-    orelse_list [(wrap congruence); (wrap constraints_tac); (wrap assumption)]
-  in
-  let (>>) = andthen ~cut:true in
+  let do_conclude =
+    Tactics.orelse_list [wrap congruence; 
+                         wrap constraints_tac; 
+                         wrap assumption]
 
-  (* If [close] then automatically prove the goal,
-   * otherwise it may also be reduced to a single subgoal. *)
-  let rec simpl close : TraceSequent.t tac =
-    (* if [close], we introduce as much as possible to help. *)
-    simplify ~intro:(close || Config.auto_intro ()) >>
-    try_tac conclude >>
-      fun g sk fk ->
-        (* If we still have a goal, we can try to split a conjunction
-         * and prove the remaining subgoals, or return this goal,
-         * but we must respect [close]. *)
-        let fk =
-          if close then
-            fun _ -> fk GoalNotClosed
-          else
-            fun _ -> sk [g] fk
-        in
-        (wrap goal_and_right) g
-          (fun l _ -> match l with
-             | [g1;g2] ->
-                 simpl close g1
-                   (fun l' _ ->
-                      if l'=[] then
-                        simpl close g2 sk fk
-                      else
-                        simpl true g2
-                          (fun l'' fk -> assert (l'' = []) ; sk l' fk)
-                          fk)
-                   fk
-             | _ -> assert false)
-          fk
-  in
-  T.register_general "simpl"
-    ~tactic_help:{general_help = "Automatically simplify a goal, without closing \
-                                  it.";
+(* If [close] then automatically prove the goal,
+ * otherwise it may also be reduced to a single subgoal. *)
+let rec simpl ~conclude close : TraceSequent.t Tactics.tac =
+  let open Tactics in
+  let (>>) = andthen ~cut:true in
+  (* if [close], we introduce as much as possible to help. *)
+  simplify ~close ~intro:(Config.auto_intro ()) >> 
+
+  if not conclude
+  then (fun g sk fk -> sk [g] fk)
+  else try_tac do_conclude >>
+    fun g sk fk ->
+    (* If we still have a goal, we can try to split a conjunction
+     * and prove the remaining subgoals, or return this goal,
+     * but we must respect [close]. *)
+    let fk =
+      if close then
+        fun _ -> fk GoalNotClosed
+      else
+        fun _ -> sk [g] fk
+    in
+    (wrap goal_and_right) g
+      (fun l _ -> match l with
+         | [g1;g2] ->
+           simpl ~conclude close g1
+             (fun l' _ ->
+                if l'=[] then
+                  simpl ~conclude close g2 sk fk
+                else
+                  simpl ~conclude true g2
+                    (fun l'' fk -> assert (l'' = []) ; sk l' fk)
+                    fk)
+             fk
+         | _ -> assert false)
+      fk
+
+let () = T.register_general "autosimpl"
+    ~tactic_help:{general_help = "Simplify a goal, without closing \
+                                  it. Automatically called after each tactic.";
                   detailed_help = "Performs introductions, eqtrace and eqnames.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     (function
-       | [] -> simpl false
-       | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
+      | [] -> simpl ~conclude:(Config.auto_intro ()) false
+      | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
+
+  T.register_general "simpl"
+    ~tactic_help:{general_help = "Simplifies a goal.";
+                  detailed_help = "Performs introductions, eqtrace and eqnames.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Structural}
+    (function
+      | [] -> simpl ~conclude:true false
+      | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
 
   T.register_general "auto"
-     ~tactic_help:{general_help = "Automatically simplify a goal, and may close it.";
+     ~tactic_help:{general_help = "Closes a goal.";
                    detailed_help = "Behaves like simpl, but also calls \
                                     congruence, constraints and assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     (function
-       | [] -> simpl true
+       | [] -> simpl ~conclude:true true
        | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
 
@@ -1813,7 +1822,7 @@ let apply_yes_no_if b s =
   let table  = TraceSequent.table s in
   let conclusion = TraceSequent.conclusion s in
   (* search for the first occurrence of an if-then-else in [elem] *)
-  let iter = new EquivTactics.get_ite_term ~system table in
+  let iter = new Iter.get_ite_term ~system table in
   List.iter iter#visit_formula [conclusion];
   match iter#get_ite with
   | None ->
@@ -2054,7 +2063,7 @@ let euf_apply_facts drop_head s
     List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
   if Symbols.is_ftype head_fn Symbols.SEnc table then
-    EquivTactics.check_encryption_randomness
+    Cca.check_encryption_randomness
       system table
       rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
   schemata_premises @ direct_premises

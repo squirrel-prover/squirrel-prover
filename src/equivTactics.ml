@@ -561,34 +561,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** Automatic simplification *)
-let simpl =
-  Tactics.(
-    Try (AndThen
-           (Abstract ("fadup",[]) ::
-            [Try(
-                AndThen [Abstract ("expandall",[]);
-                         Abstract ("fadup",[]);
-                         OrElse [Abstract ("refl",[]);
-                                 Abstract ("assumption",[])]])])))
-
-let () =
-  T.register_macro "simpl"
-     ~tactic_help:{general_help = "Automatically simplify the goal.";
-                   detailed_help = "This tactics automatically calls fadup, \
-                                    expands the macros, and closes goals using \
-                                    refl or assumption.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural }
-    simpl
-
-(* TODO: add auto tac *)
-(* let tac_auto s sk fk =
- *   let fk _ = fk Tactics.GoalNotClosed in
- *   sk (Tactics.AST.eval simpl s) *)
-
-
-(*------------------------------------------------------------------*)
 (** Function application *)
 
 exception No_common_head
@@ -901,70 +873,22 @@ let () =
 (*------------------------------------------------------------------*)
 (** Fresh *)
 
-exception Name_found
-exception Var_found
-exception Not_name
-
-class find_name ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
-
-  method visit_message t = match t with
-    | Term.Name (n,_) -> if n = name then raise Name_found
-    | Term.Var m -> raise Var_found
-    | _ -> super#visit_message t
-end
-
-class get_name_indices ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
-
-  val mutable indices : (Vars.index list) list = []
-  method get_indices = List.sort_uniq Stdlib.compare indices
-
-  method visit_message t = match t with
-    | Term.Name (n,is) -> if n = name then indices <- is::indices
-    | Term.Var m -> raise Var_found
-    | _ -> super#visit_message t
-end
-
-class get_actions ~(system:SystemExpr.system_expr) table exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
-
-  (* The boolean is set to true only for input macros.
-   * In that case, when building phi_proj we require a strict inequality on
-   * timestamps because we have to consider only actions occurring before
-   * the input.*)
-  val mutable actions : (Term.timestamp * bool) list = []
-  method get_actions = List.sort_uniq Stdlib.compare actions
-
-  method visit_macro mn is a = match Symbols.Macro.get_def mn table with
-    | Symbols.Input -> actions <- (a,true)::actions
-    | Symbols.(Output | State _ | Cond | Exec | Frame) ->
-      actions <- (a,false)::actions
-    | _ -> (actions <- (a, false)::actions; self#visit_macro mn is a)
-end
-
-let rec mk_ands = function
-  | [] -> Term.True
-  | [a] -> a
-  | [a; b] -> Term.And(a, b)
-  | p::q -> Term.And(p, mk_ands q)
-
 (** Construct the formula expressing freshness for some projection. *)
 let mk_phi_proj system table env name indices proj biframe =
   let proj_frame = List.map (Equiv.pi_elem proj) biframe in
   begin try
     let list_of_indices_from_frame =
-      let iter = new get_name_indices ~system table false name in
+      let iter = new Fresh.get_name_indices ~system table false name in
         List.iter iter#visit_term proj_frame ;
         iter#get_indices
     and list_of_actions_from_frame =
-      let iter = new get_actions ~system table false in
+      let iter = new Fresh.get_actions ~system table false in
       List.iter iter#visit_term proj_frame ;
       iter#get_actions
     and tbl_of_action_indices = Hashtbl.create 10 in
     SystemExpr.(iter_descrs table system
       (fun action_descr ->
-        let iter = new get_name_indices ~system table true name in
+        let iter = new Fresh.get_name_indices ~system table true name in
         let descr_proj = Action.pi_descr proj action_descr in
         iter#visit_formula (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
@@ -1062,9 +986,9 @@ let mk_phi_proj system table env name indices proj biframe =
     in
     phi_frame @ phi_actions
   with
-  | Name_found ->
+  | Fresh.Name_found ->
       Tactics.soft_failure (Tactics.Failure "Name not fresh")
-  | Var_found ->
+  | Fresh.Var_found ->
       Tactics.soft_failure
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
@@ -1075,7 +999,7 @@ let fresh_cond system table env t biframe =
       Term.pi_term PLeft t, Term.pi_term PRight t
     with
     | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
-    | _ -> raise Not_name
+    | _ -> raise Fresh.Not_name
   in
   let system_left = SystemExpr.(project_system PLeft system) in
   let phi_left =
@@ -1099,7 +1023,7 @@ let mk_if_term system table env e biframe =
     let then_branch = Term.Fun (Term.f_zero,[]) in
     let else_branch = t in
     Equiv.Message Term.(mk_ite phi then_branch else_branch)
-  | Equiv.Formula f -> raise Not_name
+  | Equiv.Formula f -> raise Fresh.Not_name
 
 let fresh TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
@@ -1113,7 +1037,7 @@ let fresh TacticsArgs.(Int i) s =
         | if_term ->
           let biframe = List.rev_append before (if_term::after) in
           [EquivSequent.set_equiv_goal s biframe]
-        | exception Not_name ->
+        | exception Fresh.Not_name ->
           Tactics.soft_failure
             (Tactics.Failure "Can only apply fresh tactic on names")
         end
@@ -1389,20 +1313,12 @@ let simplify_ite b s cond positive_branch negative_branch =
     let trace_sequent = trace_seq_of_reach (Term.Impl(cond,False)) s in
     (negative_branch, trace_sequent)
 
-class get_ite_term ~system table = object (self)
-  inherit Iter.iter_approx_macros ~exact:true ~system table as super
-  val mutable ite : (Term.formula * Term.message * Term.message) option = None
-  method get_ite = ite
-  method visit_message = function
-    | Term.ITE (c,t,e) ->
-        ite <- Some (c,t,e)
-    | m -> super#visit_message m
-end
+
 (** [get_ite ~system table elem] returns None if there is no ITE term in [elem],
     Some ite otherwise, where [ite] is the first ITE term encountered.
     Does not explore macros. *)
 let get_ite ~system table elem =
-  let iter = new get_ite_term ~system table in
+  let iter = new Iter.get_ite_term ~system table in
   List.iter iter#visit_term [elem];
   iter#get_ite
 
@@ -1652,6 +1568,56 @@ let () = T.register_typed "ifeq"
 
 
 (*------------------------------------------------------------------*)
+(** Automatic simplification *)
+
+let auto ~conclude s sk fk = 
+  let wrap tac s sk fk = 
+    try sk (tac s) fk with
+    | Tactics.Tactic_soft_failure e -> fk e in
+
+  let open Tactics in
+  match s with
+  | Prover.Goal.Equiv s ->
+    let sk l fk = sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
+
+    let wfadup = wrap (fadup (Args.Opt (Args.Int, None))) in
+    andthen_list
+      [try_tac wfadup;
+       try_tac
+         (andthen_list 
+            [wrap (expand_all ());
+             try_tac wfadup;
+             orelse_list [wrap refl_tac;
+                          wrap assumption]])]
+      s sk fk
+
+  | Prover.Goal.Trace t ->
+    let sk l fk = sk (List.map (fun s -> Prover.Goal.Trace s) l) fk in
+    TraceTactics.simplify ~close:conclude ~intro:conclude t sk fk
+
+let tac_auto ~conclude args s sk fk =
+  try auto ~conclude s sk fk with
+  | Tactics.Tactic_soft_failure e -> sk [s] fk  (* this is not a mistake. *)
+
+let () =
+  T.register_general "auto"
+    ~tactic_help:{general_help = "Automatically proves the goal.";
+                  detailed_help = "Same as simpl.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Structural }
+    (tac_auto ~conclude:true)
+
+let () =
+  T.register_general "simpl"
+    ~tactic_help:{general_help = "Automatically simplify the goal.";
+                  detailed_help = "This tactics automatically calls fadup, \
+                                   expands the macros, and closes goals using \
+                                   refl or assumption.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Structural }
+    (tac_auto ~conclude:false)
+
+(*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)
 
 (*------------------------------------------------------------------*)
@@ -1710,7 +1676,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
       let list_of_hashes_from_frame =
         occurrences_of_frame ~system table frame hash_fn key_n
       and list_of_actions_from_frame =
-        let iter = new get_actions ~system table false in
+        let iter = new Fresh.get_actions ~system table false in
         List.iter iter#visit_term frame ;
         iter#get_actions
       and tbl_of_action_hashes = Hashtbl.create 10 in
@@ -1993,136 +1959,6 @@ let () =
 (*------------------------------------------------------------------*)
 (** Symmetric encryption **)
 
-class check_symenc_key ~system table enc_fn dec_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system table as super
-  method visit_message t = match t with
-    | Term.Fun ((fn,_), [m;r; Term.Name _]) when fn = enc_fn ->
-      self#visit_message m; self#visit_message r
-    | Term.Fun ((fn,_), [m; Term.Name _]) when fn = dec_fn ->
-      self#visit_message m
-    | Term.Fun ((fn,_), [m;r; Diff(Term.Name _, Term.Name _)]) when fn = enc_fn ->
-      self#visit_message m; self#visit_message r
-    | Term.Fun ((fn,_), [m;  Diff(Term.Name _, Term.Name _)]) when fn = dec_fn ->
-      self#visit_message m
-    | Term.Name (n,_) when n = key_n -> raise Euf.Bad_ssc
-    | Term.Var m -> raise Euf.Bad_ssc
-    | _ -> super#visit_message t
-end
-
-let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system table enc_fn dec_fn key_n =
-  let ssc = new check_symenc_key ~system table enc_fn dec_fn key_n in
-  List.iter ssc#visit_message messages ;
-  List.iter ssc#visit_term elems ;
-  SystemExpr.(iter_descrs table system
-    (fun action_descr ->
-       ssc#visit_formula (snd action_descr.condition) ;
-       ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
-
-
-(* Iterator to check that the given randoms are only used in random seed
-   position for encryption. *)
-class check_rand ~allow_vars ~system table enc_fn randoms = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system table as super
-  method visit_message t = match t with
-    | Term.Fun ((fn,_), [m1;Term.Name _; m2]) when fn = enc_fn ->
-      self#visit_message m1; self#visit_message m2
-    | Term.Fun ((fn,_), [m1; _; m2]) when fn = enc_fn ->
-      raise Euf.Bad_ssc
-    | Term.Name (n,_) when List.mem n randoms ->
-      Tactics.soft_failure (Tactics.SEncRandomNotFresh)
-    | Term.Var m -> if not(allow_vars) then
-        Tactics.soft_failure (Tactics.Failure "No universal quantification over \
-                                               messages allowed")
-    | _ -> super#visit_message t
-end
-
-(* Check that the given randoms are only used in random seed position for
-   encryption. *)
-let random_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) 
-    ~system table enc_fn randoms =
-  let ssc = new check_rand ~allow_vars ~system table enc_fn randoms in
-  List.iter ssc#visit_message messages;
-  List.iter ssc#visit_term elems;
-  SystemExpr.(iter_descrs table system
-    (fun action_descr ->
-       ssc#visit_formula (snd action_descr.condition) ;
-       ssc#visit_message (snd action_descr.output) ;
-       List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
-
-
-  (* Given cases produced by an Euf.mk_rule for some symmetric encryption
-     scheme, check that all occurences of the encryption use a dedicated
-     randomness.
-     It checks that:
-      - a randomness is only used inside a randomness position
-      - there does not exists two messages from different place with the
-     same randomness
-      - if inside an action A[I], the encryption enc(m,r,sk) is produced,
-       the index variables appearing in both m and I should also appear in r.
-
-     This could be refined into a tactic where we ask to prove that encryptions
-     that use the same randomness are done on the same plaintext. This is why we
-     based ourselves on messages produced by Euf.mk_rule, which should simplify
-     such extension if need. *)
-let check_encryption_randomness 
-    system table case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.message * Vars.index list) list = 
-    List.map (fun case -> 
-        case.Euf.message,
-        case.Euf.action_descr.indices
-      ) case_schemata
-    @
-    List.map (fun case -> case.Euf.d_message, []) cases_direct
-  in
-  let encryptions = List.sort_uniq Stdlib.compare encryptions in
-
-  let randoms = List.map (function
-      | Fun ((_, _), [_; Name (r, is); _]), _-> r
-      | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
-      encryptions
-  in
-  random_ssc ~elems ~messages ~system table enc_fn randoms;
-
-  (* we check that encrypted messages based on indices, do not depend on free
-     indices instantiated by the action w.r.t the indices of the random. *)
-  if List.exists (function
-      | (Fun ((_, _), [m; Name (_, is); _]), (actidx:Vars.index list)) ->
-        let vars = Term.get_vars m in
-        List.exists (function
-              Vars.EVar v ->
-              (match Vars.sort v with
-               |Sorts.Index -> (List.mem v actidx) && not (List.mem v is)
-               (* we fail if there exists an indice appearing in the message,
-                  which is an indice instantiated by the action description,
-                  and it does not appear in the random. *)
-               | _ -> false)) vars
-      | _ -> assert false) encryptions then    
-    Tactics.soft_failure (Tactics.SEncSharedRandom);
-
-  (* we check that no encryption is shared between multiple encryptions *)
-  let enc_classes = Utils.classes (fun m1 m2 ->
-      match m1, m2 with
-      | (Fun ((_, _), [_; Name (r, is); _]),_), 
-        (Fun ((_, _), [_; Name (r2,is2); _]),_) -> (r = r2)
-      (* the patterns should match, if they match inside the declaration
-         of randoms *)
-      | _ -> assert false
-    ) encryptions in
-
-  if List.exists (fun l -> List.length l > 1) enc_classes then
-    Tactics.soft_failure (Tactics.SEncSharedRandom)
-
-
-let symenc_rnd_ssc ~system table env head_fn key_n key_is elems =
-  let rule =
-    Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
-      ~system ~table ~env ~mess:Term.empty ~sign:Term.empty
-      ~head_fn ~key_n ~key_is
-  in
-  check_encryption_randomness system table
-    rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems
 
 (** CCA1 *)
 
@@ -2237,12 +2073,12 @@ let cca1 TacticsArgs.(Int i) s =
               ->
               begin
                 try
-                  symenc_key_ssc  ~elems:(goal_as_equiv s) ~messages:[enc]
+                  Cca.symenc_key_ssc  ~elems:(goal_as_equiv s) ~messages:[enc]
                     ~system table fnenc fndec sk;
                   (* we check that the randomness is ok in the system and the
                      biframe, except for the encryptions we are looking at, which
                      is checked by adding a fresh reachability goal. *)
-                  symenc_rnd_ssc ~system table env fnenc sk isk biframe;
+                  Cca.symenc_rnd_ssc ~system table env fnenc sk isk biframe;
                   let (fgoals, substs) = hide_all_encs q in
                   let fgoal,subst =
                     get_subst_hide_enc enc fnenc m (None) sk fndec r eis isk is_top_level
@@ -2324,10 +2160,10 @@ let enckp
           match Symbols.Function.get_data fnenc table with
             | Symbols.AssociatedFunctions [fndec] ->
               (fun ((sk,isk),system) ->
-                symenc_key_ssc
+                Cca.symenc_key_ssc
                   ~system table fnenc fndec
                   ~elems:(goal_as_equiv s) sk;
-                symenc_rnd_ssc ~system table env fnenc sk isk biframe;
+                Cca.symenc_rnd_ssc ~system table env fnenc sk isk biframe;
                 ()
                          )
                 ,
@@ -2669,7 +2505,7 @@ let is_ddh_context system table a b c elem_list =
    (* we then check inside the frame *)
     List.iter iter#visit_term elem_list;
     true
-  with Not_context | Name_found -> false
+  with Not_context | Fresh.Name_found -> false
 
 let ddh na nb nc s sk fk =
   let system = EquivSequent.system s in

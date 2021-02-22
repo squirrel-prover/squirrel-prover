@@ -13,18 +13,18 @@ system (!_i ( out(c, diff((g^a(i))^b(i),g^k(i))))
 
 
 equiv ddh_goal.
-	Proof.
-nosimpl(
-	induction t).
-fadup; expandall; refl + assumption.
-    fadup; try (expandall; refl + assumption).
-    fadup; try (expandall; refl + assumption).
-	cycle 1.
-    expand exec@A1(j).
-	nosimpl(expandall).
+Proof.
+ nosimpl(induction t).
+ fadup; expandall; refl + assumption.
+ fadup; try (expandall; refl + assumption).
+ fadup; try (expandall; refl + assumption).
+ cycle 1.
+ expand exec@A1(j). 
+ by auto.
+ nosimpl(expandall).
 
-    fadup; try (expandall; refl + assumption).
+ fadup; try (expandall; refl + assumption).
 
-	fa 0. fa 1. fa 1.
-ddh a, b, k.
+ fa 0; fa 1; fa 1.
+ ddh a, b, k.
 Qed.

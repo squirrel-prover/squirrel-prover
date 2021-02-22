@@ -224,7 +224,6 @@ let andthen_sel tac1 sel tac2 judge sk fk : a =
   let sk l fk' = map_sel sel tac2 l sk fk' in
   tac1 judge sk fk
 
-(* TODO: add an auto at the end of the tactic. *)
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk
@@ -363,7 +362,8 @@ module AST (M:S) = struct
     | AndThenSel (t,s,t') -> andthen_sel (eval modifiers t) s (eval modifiers t')
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
-    | By t                -> by_tac (eval modifiers t)
+    | By t                -> 
+      andthen_list [eval modifiers t; eval [] (Abstract ("auto",[]))] 
     | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
     | Modifier (id,t)     -> eval (id::modifiers) t

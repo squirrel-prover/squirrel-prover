@@ -216,3 +216,16 @@ let get_ftypes ?excludesymtype ~system table elem stype =
   let iter = new get_ftypes_term ?excludesymtype ~system table stype in
   List.iter iter#visit_term [elem];
   iter#get_func
+
+
+
+(** {2 If-Then-Else} *)
+class get_ite_term ~system table = object (self)
+  inherit iter_approx_macros ~exact:true ~system table as super
+  val mutable ite : (Term.formula * Term.message * Term.message) option = None
+  method get_ite = ite
+  method visit_message = function
+    | Term.ITE (c,t,e) ->
+        ite <- Some (c,t,e)
+    | m -> super#visit_message m
+end

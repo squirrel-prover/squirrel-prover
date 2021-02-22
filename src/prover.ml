@@ -6,6 +6,9 @@ module L = Location
 module EquivHyps = EquivSequent.H
 
 (*------------------------------------------------------------------*)
+let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
+
+(*------------------------------------------------------------------*)
 type decl_error_i =
   | Multiple_declarations of string
   | BadEquivForm 
@@ -240,6 +243,9 @@ module type Table_sig = sig
   val to_goal : judgment -> Goal.t
   val from_trace : TraceSequent.t -> judgment
   val from_equiv : Goal.t -> judgment
+
+  val table_name : string
+  val pp_goal_concl : Format.formatter -> judgment -> unit
 end
 
 module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
@@ -252,6 +258,9 @@ module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
   let to_goal j = Goal.Trace j
   let from_trace j = j
   let from_equiv e = assert false
+
+  let table_name = "Trace"
+  let pp_goal_concl ppf j = Term.pp ppf (TraceSequent.conclusion j)
 end
 
 module EquivTable : Table_sig with type judgment = Goal.t = struct
@@ -264,11 +273,18 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
   let to_goal j = j
   let from_trace j = Goal.Trace j
   let from_equiv j = j
+
+  let table_name = "Equiv"
+  let pp_goal_concl ppf j = match j with
+    | Goal.Trace j -> Term.pp ppf (TraceSequent.conclusion j)
+    | Goal.Equiv j -> Equiv.pp_form ppf (EquivSequent.goal j)
 end
 
 (** Functor building AST evaluators for our judgment types. *)
 module Make_AST (T : Table_sig) :
-  (Tactics.AST_sig with type arg = TacticsArgs.parser_arg with type judgment = T.judgment)
+  (Tactics.AST_sig 
+   with type arg = TacticsArgs.parser_arg 
+   with type judgment = T.judgment)
 = Tactics.AST(struct
 
   type arg = TacticsArgs.parser_arg
@@ -283,24 +299,27 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
 
-  let simpl () =
-    let tsimpl = TraceTable.get "simpl" [] in
-    let esimpl = EquivTable.get "simpl" [] in
-      fun s sk fk ->
-        match T.to_goal s with
-          | Goal.Trace t ->
-              let sk l fk = sk (List.map T.from_trace l) fk in
-              tsimpl t sk fk
-          | Goal.Equiv e ->
-              let sk l fk = sk (List.map T.from_equiv l) fk in
-              esimpl (Goal.Equiv e) sk fk
+  let autosimpl () =
+    let tautosimpl = TraceTable.get "autosimpl" [] in
 
-  let simpl = Lazy.from_fun simpl
+    (* No difference between simpl and autosimpl in equivalence mode *)
+    let eautosimpl = EquivTable.get "simpl" [] in
+
+    fun s sk fk ->
+      match T.to_goal s with
+      | Goal.Trace t ->
+        let sk l fk = sk (List.map T.from_trace l) fk in
+        tautosimpl t sk fk
+      | Goal.Equiv e ->
+        let sk l fk = sk (List.map T.from_equiv l) fk in
+        eautosimpl (Goal.Equiv e) sk fk
+
+  let autosimpl = Lazy.from_fun autosimpl
 
   let eval_abstract mods id args : judgment Tactics.tac =
     match mods with
       | "nosimpl"::_ -> T.get id args
-      | [] -> Tactics.andthen (T.get id args) (Lazy.force simpl)
+      | [] -> Tactics.andthen (T.get id args) (Lazy.force autosimpl)
       | _ -> assert false
 
   (* a printer for tactics that follows a specific syntax.
@@ -372,6 +391,13 @@ struct
       ~tactic_help
       f =
     assert (not (Hashtbl.mem table id)) ;
+
+    let f args s sk fk = 
+      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]" 
+        table_name
+        id M.pp_goal_concl s;
+      f args s sk fk in 
+
     Hashtbl.add table id { maker = f ;
                            help = tactic_help}
 

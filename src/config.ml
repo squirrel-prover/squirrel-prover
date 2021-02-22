@@ -70,6 +70,9 @@ let v_print_equ = Param_bool false
 let s_debug_constr = "debugConstr"
 let v_debug_constr = Param_bool false
 
+let s_debug_tactics = "debugTactics"
+let v_debug_tactics = Param_bool false
+
 let s_strict_alias_mode = "processStrictAliasMode"
 let v_strict_alias_mode = Param_bool false
 
@@ -83,6 +86,7 @@ let default_params =
       decl s_timeout ~check:check_timeout PInt v_timeout M.empty 
   |>  decl s_print_equ PBool v_print_equ 
   |>  decl s_debug_constr PBool v_debug_constr 
+  |>  decl s_debug_tactics PBool v_debug_tactics
   |>  decl s_strict_alias_mode PBool v_strict_alias_mode 
   |>  decl s_auto_into PBool v_auto_intro 
 
@@ -104,6 +108,7 @@ let solver_timeout () = get_int (M.find s_timeout !params)
 let print_trs_equations () = get_bool (M.find s_print_equ !params)
 
 let debug_constr () = get_bool (M.find s_debug_constr !params)
+let debug_tactics () = get_bool (M.find s_debug_tactics !params)
 
 let strict_alias_mode () = get_bool (M.find s_strict_alias_mode !params)
 

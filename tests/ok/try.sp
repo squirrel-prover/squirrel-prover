@@ -14,6 +14,6 @@ goal not_else :
 forall (i:index,j:index), happens(A1(i)) => cond@A1(i) => output@A1(i) <> k(j).
 Proof.
   intro i j Hap C Heq.
-  expand cond@A1(i).
-  use C with j.
+  expand cond@A1(i); 1: auto.
+  by use C with j. 
 Qed.

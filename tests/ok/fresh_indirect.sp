@@ -11,8 +11,8 @@ equiv test (i,j,ii,jj:index) :
 
 Proof.
   intro *.
-  expand output@A(i,j).
-  expand output@A(ii,jj).
+  expand output@A(i,j); 1: by auto.
+  expand output@A(ii,jj); 1: by auto.
   fresh 1.
   yesif 1. 
   by auto.
