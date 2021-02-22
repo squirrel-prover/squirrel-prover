@@ -17,5 +17,5 @@ Proof.
 
   (* t = A(i) *) 
   destruct H as [i _].
-  use Hind with pred(A(i)). 
+  by use Hind with pred(A(i)).
 Qed.

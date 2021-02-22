@@ -27,6 +27,7 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | MustHappen of Term.timestamp
 
   | PatNumError of int * int    (* given, need *)
                    
@@ -47,6 +48,7 @@ let tac_error_strings =
     (CannotConvert, "CannotConvert");
     (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
+    (MustHappen _, "MustHappen");
     (NothingToIntroduce, "NothingToIntroduce")]
 
 let rec tac_error_to_string = function
@@ -71,11 +73,13 @@ let rec tac_error_to_string = function
   | CongrFail
   | NothingToIntroduce
   | GoalNotClosed
+  | MustHappen _ 
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | GoalBadShape _ -> "GoalBadShape"
   | SystemError _ -> "System_Error"
   | PatNumError _ -> "PatNumError"
+
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -124,6 +128,8 @@ let rec pp_tac_error ppf = function
     Fmt.pf ppf "goal has the wrong shape: %s" s
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
+  | MustHappen t->
+    Fmt.pf ppf "timestamp %a must happen" Term.pp t
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in

@@ -850,11 +850,12 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
   | Term.Action(n1, is1), Term.Action (n2, is2) ->
     let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
-      let atom = (Atom (`Timestamp (`Lt,a1,a2))) in
-
-      let s_hap = happens_premise s a2 in
-      let g = Term.mk_impl atom (TraceSequent.conclusion s) in
-      [s_hap; TraceSequent.set_conclusion g s]
+      if not (TraceSequent.query_happens s a2) 
+      then soft_failure (Tactics.MustHappen a2)
+      else
+        let atom = (Atom (`Timestamp (`Lt,a1,a2))) in       
+        let g = Term.mk_impl atom (TraceSequent.conclusion s) in
+        [TraceSequent.set_conclusion g s]
     else
       soft_failure
         (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
@@ -879,12 +880,12 @@ let expand_macro t s =
   match t with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
-        let s_hap = happens_premise s a in
-        
-        let mdef = Macros.get_definition system table sort mn is a in
-        let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
-        let s' = TraceSequent.subst subst s in
-        [s_hap; s']
+        if not (TraceSequent.query_happens s a) 
+        then soft_failure (Tactics.MustHappen a)
+        else          
+          let mdef = Macros.get_definition system table sort mn is a in
+          let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
+          [TraceSequent.subst subst s]
 
       else soft_failure (Tactics.Failure "cannot expand this macro")
 

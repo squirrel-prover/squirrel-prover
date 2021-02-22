@@ -54,6 +54,7 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | MustHappen of Term.timestamp
   | PatNumError of int * int    (* given, need *)
 
 (** Tactics should raise this exception if they are ill-formed. *)

@@ -15,6 +15,5 @@ Qed.
 goal _ (i:index): happens(A(i)) => A(i) < A1(i).
 Proof.
   intro i Hap.
-  depends A(i), A1(i).
-  checkfail auto exn GoalNotClosed.
+  checkfail (depends A(i), A1(i)) exn MustHappen.
 Abort.

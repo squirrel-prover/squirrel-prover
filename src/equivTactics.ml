@@ -1116,8 +1116,8 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       EquivSequent.set_equiv_goal s (List.map apply_subst (goal_as_equiv s)) 
     in   
     
-    [happens_premise s a;
-     Prover.Goal.Equiv new_s]
+    if not (query_happens s a) then soft_failure (Tactics.MustHappen a)
+    else [Prover.Goal.Equiv new_s]
   in
 
   let table = EquivSequent.table s in

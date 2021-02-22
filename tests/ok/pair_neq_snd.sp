@@ -13,23 +13,23 @@ axiom pair_eq_snd_absurd :
 goal _ (x,y:message): <x,y> = y => False.
 Proof.
   intro x y Heq.
-  use pair_neq_snd with x,y.
+  by use pair_neq_snd with x,y.
 Qed.
 
 goal _ (x,y:message): <x,y> <> y.
 Proof.
   intro x y Heq.
-  use pair_neq_snd with x,y.
+  by use pair_neq_snd with x,y.
 Qed.
 
 goal _ (x,y:message): <x,y> = y => False.
 Proof.
   intro x y Heq.
-  use pair_eq_snd_absurd with x,y.
+  by use pair_eq_snd_absurd with x,y.
 Qed.
 
 goal _ (x,y:message): <x,y> <> y.
 Proof.
   intro x y Heq.
-  use pair_eq_snd_absurd with x,y.
+  by use pair_eq_snd_absurd with x,y.
 Qed.
