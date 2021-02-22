@@ -72,9 +72,9 @@ val get_shape : action -> shape
 val same_shape : action -> action -> Term.subst option
 
 (** Convert [Action] parameters to an action. *)
-val of_term : 
-  Symbols.action Symbols.t -> Vars.index list -> 
-  Symbols.table -> 
+val of_term :
+  Symbols.action Symbols.t -> Vars.index list ->
+  Symbols.table ->
   action
 
 (** Return a dummy action of a given length. *)
@@ -89,21 +89,21 @@ val dummy : int -> action
 
 type Symbols.data += Data of Vars.index list * action
 
-(** Get a fresh symbol whose name starts with the given prefix. 
+(** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
-  Symbols.table -> exact:bool -> string -> 
+  Symbols.table -> exact:bool -> string ->
   Symbols.table * Symbols.action Symbols.t
 
 val define_symbol :
-  Symbols.table -> 
-  Symbols.Action.ns Symbols.t -> Vars.index list -> action -> 
+  Symbols.table ->
+  Symbols.Action.ns Symbols.t -> Vars.index list -> action ->
   Symbols.table
 
 val find_symbol : string -> Symbols.table -> Vars.index list * action
 
-val of_symbol : 
-  Symbols.action Symbols.t -> Symbols.table -> 
+val of_symbol :
+  Symbols.action Symbols.t -> Symbols.table ->
   Vars.index list * action
 
 

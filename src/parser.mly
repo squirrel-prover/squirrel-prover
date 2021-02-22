@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE EXN
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
+%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -89,15 +89,15 @@ term_i:
 | LPAREN t=term_i RPAREN                     { t }
 | id=lsymb terms=term_list                   { Theory.App (id, terms) }
 | id=lsymb terms=term_list AT ts=timestamp   { Theory.AppAt (id,terms,ts) }
-| LANGLE t=term COMMA t0=term RANGLE      
+| LANGLE t=term COMMA t0=term RANGLE
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "pair" in
       Theory.App (fsymb, [t;t0]) }
-| t=term XOR t0=term                      
+| t=term XOR t0=term
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "xor" in
       Theory.App (fsymb,  [t;t0]) }
-| t=term EXP t0=term                      
+| t=term EXP t0=term
     { let loc = Location.make $startpos $endpos in
       let fsymb = Location.mk_loc loc "exp" in
       Theory.App (fsymb,  [t;t0])}
@@ -165,8 +165,8 @@ formula_i:
 | TRUE                                    { Theory.True }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
 | f=formula DEQUIVARROW f0=formula
-    { let loc = Location.make $startpos $endpos in      
-      Theory.And (Location.mk_loc loc (Theory.Impl (f,f0)), 
+    { let loc = Location.make $startpos $endpos in
+      Theory.And (Location.mk_loc loc (Theory.Impl (f,f0)),
                   Location.mk_loc loc (Theory.Impl (f0,f))) }
 
 | pid=loc(PID) terms=term_list   { Theory.App (pid, terms) }
@@ -182,7 +182,7 @@ formula_i:
                                  { Theory.Exists ([id,k],f)  }
 | FORALL id=lsymb COLON k=kind sep f=formula %prec QUANTIF
                                  { Theory.ForAll ([id,k],f)  }
-| DIFF LPAREN f=formula COMMA g=formula RPAREN 
+| DIFF LPAREN f=formula COMMA g=formula RPAREN
                                  { Theory.Diff (f,g) }
 
 formula:
@@ -255,9 +255,9 @@ msg_or_bool:
 | MESSAGE                        { Sorts.emessage }
 | BOOLEAN                        { Sorts.eboolean }
 
-state_type:
+/* state_type:
 | t=msg_or_bool                  { 0, t }
-| INDEX ARROW t=state_type       { let n,k = t in n+1,k }
+| INDEX ARROW t=state_type       { let n,k = t in n+1,k } */
 
 msg_type:
 | MESSAGE                        { 0 }
@@ -273,7 +273,7 @@ index_arity:
 
 declaration_i:
 | HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
-| HASH e=ID WITH ORACLE f=formula  
+| HASH e=ID WITH ORACLE f=formula
                           { Decl.Decl_hash (None, e, Some f) }
 | AENC e=ID COMMA d=ID COMMA p=ID
                           { Decl.Decl_aenc (e, d, p) }
@@ -292,8 +292,8 @@ declaration_i:
                                     { name = e;
                                       index_arity=index_arity;
                                       message_arity=message_arity;}) }
-| MUTABLE e=ID COLON t=state_type
-                          { Decl.Decl_state (e, (fst t), (snd t)) }
+| MUTABLE e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+                          { Decl.Decl_state (e, args, typ, t) }
 | CHANNEL e=ID            { Decl.Decl_channel e }
 | TERM e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
@@ -301,20 +301,20 @@ declaration_i:
                           { Decl.Decl_process (e, args, p) }
 | AXIOM s=bsystem f=formula
                           { Decl.(Decl_axiom { gname = None;
-                                               gsystem = s; 
+                                               gsystem = s;
                                                gform = f; }) }
 | AXIOM s=bsystem i=ID COLON f=formula
                           { Decl.(Decl_axiom { gname = Some i;
-                                               gsystem = s; 
+                                               gsystem = s;
                                                gform = f; }) }
-| SYSTEM p=process 
-                          { Decl.(Decl_system { sname = None; 
+| SYSTEM p=process
+                          { Decl.(Decl_system { sname = None;
                                                 sprocess = p}) }
-| SYSTEM LBRACKET id=ID RBRACKET p=process 
-                          { Decl.(Decl_system { sname = Some id; 
+| SYSTEM LBRACKET id=ID RBRACKET p=process
+                          { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }
 
-declaration: 
+declaration:
 | ldecl=loc(declaration_i)                  { ldecl }
 
 declaration_list:
@@ -431,7 +431,7 @@ tac:
                                           ("apply",
                                            TacticsArgs.String_name i :: t) }
 
-  | USE i=ID ip=as_ip? 
+  | USE i=ID ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
@@ -524,7 +524,7 @@ goal_i:
 
 | PROOF          { Prover.Gm_proof }
 
-goal: 
+goal:
 | goal=loc(goal_i) { goal }
 
 option_param:

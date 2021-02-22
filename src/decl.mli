@@ -2,11 +2,11 @@
     declarations is done later, in the Prover module. *)
 
 type lsymb = Theory.lsymb
-               
+
 (** { 1 Declarations } *)
 
 (** Information for a macro declaration *)
-type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term 
+type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
 
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
@@ -48,11 +48,11 @@ type declaration_i =
 
   | Decl_hash             of int option * string * orcl_tag_info option
   | Decl_aenc             of string * string * string
-  | Decl_senc             of string * string                 
+  | Decl_senc             of string * string
   | Decl_senc_w_join_hash of string * string * lsymb
   | Decl_sign             of string * string * string * orcl_tag_info option
-  | Decl_name             of string * int 
-  | Decl_state            of string * int * Sorts.esort
+  | Decl_name             of string * int
+  | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
 

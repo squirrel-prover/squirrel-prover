@@ -46,9 +46,9 @@ let is_defined name a table =
     | Symbols.Global _, _ -> assert false
 
 let get_definition :
-  type a.  SystemExpr.system_expr ->  Symbols.table -> 
+  type a.  SystemExpr.system_expr ->  Symbols.table ->
   a Sorts.sort -> Symbols.macro Symbols.t ->
-  Vars.index list -> Term.timestamp -> 
+  Vars.index list -> Term.timestamp ->
   a Term.term =
   fun se table sort name args a ->
   match sort with
@@ -65,7 +65,8 @@ let get_definition :
         end
       | Symbols.Frame, _ ->
           begin match a with
-            | Term.Init -> Term.Fun (f_zero,[])
+            | Term.Action (s,_) when s = Symbols.init_action -> Term.Fun (f_zero,[])
+            (* | Term.Init -> Term.Fun (f_zero,[]) *)
             | Term.Action _ ->
                 Term.Fun(Term.f_pair,
                   [Term.Macro ((name,sort,args), [], Term.Pred a);
@@ -176,7 +177,8 @@ let get_definition :
         end
       | Symbols.Exec, _ ->
         begin match a with
-          | Term.Init -> Term.True
+          | Term.Action (s,_) when s = Symbols.init_action -> Term.True
+          (* | Term.Init -> Term.True *)
           | Term.Action _ ->
             Term.And (Macro ((name, sort, args),[], Term.Pred a),
                       Macro (Term.cond_macro, [], a))
@@ -187,9 +189,9 @@ let get_definition :
   | _ -> assert false
 
 let get_dummy_definition :
-  type a. SystemExpr.system_expr -> Symbols.table -> 
-  a Sorts.sort -> Symbols.macro Symbols.t -> 
-  Vars.index list -> 
+  type a. SystemExpr.system_expr -> Symbols.table ->
+  a Sorts.sort -> Symbols.macro Symbols.t ->
+  Vars.index list ->
   a Term.term =
   fun se table sort mn indices ->
   match Symbols.Macro.get_all mn table with

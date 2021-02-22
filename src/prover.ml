@@ -77,10 +77,10 @@ type p_goal_name = P_unknown | P_named of string
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of 
-      (Theory.lsymb * Sorts.esort) list * 
-      [ `Message of Theory.term | `Formula of Theory.formula ] list 
-  | P_equiv_goal_process of SystemExpr.p_single_system * 
+  | P_equiv_goal of
+      (Theory.lsymb * Sorts.esort) list *
+      [ `Message of Theory.term | `Formula of Theory.formula ] list
+  | P_equiv_goal_process of SystemExpr.p_single_system *
                             SystemExpr.p_single_system
 
 type gm_input_i =
@@ -253,7 +253,7 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.IntroPat args -> TacticsArgs.pp_intro_pats ppf args
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
-                                    
+
   let simpl () =
     let tsimpl = TraceTable.get "simpl" [] in
     let esimpl = EquivTable.get "simpl" [] in
@@ -358,8 +358,8 @@ struct
       | Goal.Trace t -> TraceSequent.env t
       | Goal.Equiv e -> EquivSequent.env e
     in
-    TacticsArgs.convert_args table env parser_args tactic_type 
-  
+    TacticsArgs.convert_args table env parser_args tactic_type
+
   let register id ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) f =
     register_general id ~general_help ~detailed_help ~usages_sorts
       (function
@@ -380,7 +380,7 @@ struct
     let usages_sorts = match usages_sorts with
       | None -> [TacticsArgs.Sort sort]
       | Some u -> u in
-    
+
     register_general id
       ~general_help ~detailed_help ~usages_sorts
       (fun args s sk fk ->
@@ -399,7 +399,7 @@ struct
                  Tactics.hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
-             Tactics.hard_failure (Tactics.Failure "ill-formed arguments") 
+             Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
       )
 
   let register_macro id ?(modifiers=["nosimpl"])  ?(general_help="")  ?(detailed_help="")  ?(usages_sorts=[]) m =
@@ -565,7 +565,7 @@ let declare_new_goal_i table (gname,g) =
       in
       let env = List.map (fun (x,y) -> L.unloc x, y) env in
       make_equiv_goal ~table system_symb env l
-        
+
     | P_equiv_goal_process (a,b) ->
       let a = SystemExpr.parse_single table a
       and b = SystemExpr.parse_single table b in
@@ -711,11 +711,14 @@ let declare_i table = function
   | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
   | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
   | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
-  | Decl.Decl_state (s, a, k)       -> Theory.declare_state table s a k
+  | Decl.Decl_state (s, args, k, t) ->
+    (* let args = List.map (fun (x,y) -> L.unloc x, y) args in *)
+    (* Theory.declare_macro table s args k t *)
+    Theory.declare_state table s args k t
   | Decl.Decl_macro (s, args, k, t) ->
     let args = List.map (fun (x,y) -> L.unloc x, y) args in
     Theory.declare_macro table s args k t
-      
+
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h
   | Decl.Decl_sign (sign, checksign, pk, tagi) ->
