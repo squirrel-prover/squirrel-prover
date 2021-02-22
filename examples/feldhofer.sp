@@ -76,16 +76,17 @@ axiom tags_neq : tagR <> tagT
 
 axiom fail_not_pair : forall (x,y:message), fail <> <x,y>.
 
-goal wa_Reader1 :
-  forall (k:index),
-    exec@Reader1(k)
-    <=>
-    exec@pred(Reader1(k)) && (exists (i,j:index),
-      Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
-      output@Tag(i,j) = input@Reader1(k) &&
-      input@Tag(i,j) = output@Reader(k)).
+goal wa_Reader1 (k:index):
+  happens(Reader1(k)) => 
+    (exec@Reader1(k)
+     <=>
+     exec@pred(Reader1(k)) && (exists (i,j:index),
+       Tag(i,j) < Reader1(k) && Reader(k) < Reader1(k)  &&
+       output@Tag(i,j) = input@Reader1(k) &&
+       input@Tag(i,j) = output@Reader(k))).
 Proof.
   intro *.
+  depends Reader(k), Reader1(k).
   expand exec@Reader1(k).
   expand cond@Reader1(k).
   expand output@Reader(k).
@@ -95,37 +96,37 @@ Proof.
 
   (* First projection. *)
   intctxt Mneq.
-  exists i, j1.
-  by depends Reader(k), Reader1(k).
+  by exists i, j1.
 
   (* Second projection. *)
   intctxt Mneq.
-  exists i,j.
-  by depends Reader(k), Reader1(k).
+  by exists i,j. 
 
   (* Direction <= *)
   exists i,j.
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+  expand output@Tag(i,j).
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
-goal wa_Reader2 :
-  forall (k:index),
-    exec@Reader2(k)
-    <=>
-    exec@pred(Reader2(k)) && not (exists (i,j:index),
-      Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
-      output@Tag(i,j) = input@Reader2(k) &&
-      input@Tag(i,j) = output@Reader(k)).
+goal wa_Reader2 (k:index):
+  happens(Reader2(k)) =>
+    (exec@Reader2(k)
+     <=>
+     exec@pred(Reader2(k)) && not (exists (i,j:index),
+       Tag(i,j) < Reader2(k) && Reader(k) < Reader2(k)  &&
+       output@Tag(i,j) = input@Reader2(k) &&
+       input@Tag(i,j) = output@Reader(k))).
 Proof.
   intro *.
   expand exec@Reader2(k).
   expand cond@Reader2(k).
+  depends Reader(k),Reader2(k).
   expand output@Reader(k).
   split.
 
   (* Direction => is the obvious one *)
-
+  expand output@Tag(i,j). 
   notleft H0.
   use H0 with i,j; case H1.
   by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
@@ -137,16 +138,15 @@ Proof.
   project.
 
   intctxt Mneq.
-  use H0 with i,j1; case H1.
-  by depends Reader(k),Reader2(k).
+  by use H0 with i,j1; case H1.
 
   intctxt Mneq.
-  use H0 with i,j; case H1.
-  by depends Reader(k),Reader2(k).
+  by use H0 with i,j; case H1.
 Qed.
 
-goal lemma : forall (i,j,i1,j1:index),
-  output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
+goal lemma (i,j,i1,j1:index):
+  happens(Tag(i,j),Tag(i1,j1)) => 
+     output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
 Proof.
   intro *.
   project. 
@@ -237,7 +237,7 @@ Proof.
   by exists i,j.
   project.
 
-  fa.
+  fa. 
   (* find condA => condB *)
   intctxt Mneq.
   by use tags_neq.
@@ -245,7 +245,10 @@ Proof.
 
   (* find condB => condA *)
   use lemma with i,j,i1,j1.
-  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
+
+  (* FIXME: this should not be necessary *)
+  by substitute fst(snd(dec(input@Reader1(k),kE(i1)))), nr(k).
 
   fa.
   (* find condA => condB *)

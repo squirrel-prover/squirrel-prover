@@ -293,6 +293,7 @@ let convert_args table env parser_args tactic_type =
     | [Theory p], Sort ETerm ->
       let et = match Theory.econvert conv_cntxt tsubst p with
         | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
+        (* FIXME: this does not give any conversion error to the user. *)
         | None -> tac_arg_error (L.loc p) CannotConvETerm in
       Arg et
 
