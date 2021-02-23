@@ -881,8 +881,9 @@ let declare_system table (system_name:string) proc =
   check_proc table [] proc ;
   let table, system_name = System.declare_empty table system_name in
 
-
-  (* let table,a' = Action.fresh_symbol table ~exact:false "INIT"  in *)
+  (* before parsing the system, we register the init action,
+  using for the updates the initial values declared when declaring
+  a mutable construct *)
   let a' = Symbols.init_action in
   let action = [ Action.{ par_choice = (0,[]);
                           sum_choice = (0,[]) } ]

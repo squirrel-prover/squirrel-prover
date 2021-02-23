@@ -97,13 +97,15 @@ val declare_signature
 val declare_name
   : Symbols.table -> string -> int -> Symbols.table
 
-(** [declare_state n i s] declares a new state symbol of type
-  * [index^i -> s] where [s] is either [boolean] or [message]. *)
+(** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
+    a new state symbol of type [s1->...->sn->s]
+    where [si] is [index] and [s] is [message]
+    such that [s(t1,...,tn)@init] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_state :
   Symbols.table -> string -> (lsymb*Sorts.esort) list -> Sorts.esort -> term
   -> Symbols.table
-  (* : Symbols.table -> string -> int -> Sorts.esort
-  -> Symbols.table *)
+(** [get_init_states] returns all the initial values of declared state symbols,
+    used to register the init action *)
 val get_init_states :
   Symbols.table -> (Term.state * Term.message) list
 
