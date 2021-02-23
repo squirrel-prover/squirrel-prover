@@ -210,13 +210,11 @@ let () =
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
-    (* "Try", `Quick, begin fun () ->
+    "Try", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_state ("s", 1, Sorts.emessage) in
-        let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
-      let table =
-        let decl_i = Decl.Decl_state ("ss", 2, Sorts.emessage) in
+        let decl_i = Decl.Decl_abstract { name = "ok";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table decl in
       let table =
@@ -227,16 +225,16 @@ let () =
         Prover.declare table decl in
       ignore (parse_process table
                 "in(c,x); \
-                 try find i such that s(i) = x in \
-                 out(c,ss(i,i))\
+                 try find i such that x = x in \
+                 out(c,ok)\
                  else out(c,error)"
               : Process.process) ;
       ignore (parse_process table
                 "in(c,x); \
-                 out(c, try find i such that s(i) = x in ss(i,i) \
+                 out(c, try find i such that x = x in ok \
                  else error)"
               : Process.process)
-    end *)
+    end
     (* Lost when strongly typing Theory.convert: we do not convert
      * Theory.terms to Term.message, and thus cannot represent constants
      * of type boolean. This should not be too constraining.
