@@ -870,7 +870,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       facts = [] ;
       updates = [] }
   in
-  let proc,_,table = p_in ~table:init_table ~env ~pos:1 ~pos_indices:[] proc in
+  let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
   (proc, table)
 
 let declare_system table (system_name:string) proc =
@@ -885,13 +885,10 @@ let declare_system table (system_name:string) proc =
   using for the updates the initial values declared when declaring
   a mutable construct *)
   let a' = Symbols.init_action in
-  let action = [ Action.{ par_choice = (0,[]);
-                          sum_choice = (0,[]) } ]
-  in
   let updates = Theory.get_init_states table in
   let action_descr =
     Action.{ name = a';
-             action;
+             action = [];
              input = (Symbols.dummy_channel,"$dummyInp");
              indices = [];
              condition = ([], Term.True);
@@ -899,7 +896,7 @@ let declare_system table (system_name:string) proc =
              output = (Symbols.dummy_channel, Term.empty) }
   in
   let table, _, _ =
-    System.register_action table system_name a' [] action action_descr
+    System.register_action table system_name a' [] [] action_descr
   in
 
   let proc,table = parse_proc system_name table proc in
