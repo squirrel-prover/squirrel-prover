@@ -570,7 +570,6 @@ let rec convert :
   | Tinit ->
       begin match sort with
         | Sorts.Timestamp -> Term.Action (Symbols.init_action,[])
-        (* | Sorts.Timestamp -> Term.Init *)
         | _ -> raise type_error
       end
 
@@ -1046,26 +1045,11 @@ let declare_state table s (typed_args : (lsymb * Sorts.esort) list)
     (k : Sorts.esort) t =
   let ts_init = Term.Action (Symbols.init_action, []) in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
-  (* let env,typed_args,tsubst =
-    List.fold_left
-      (fun (env,vars,tsubst) (x,Sorts.ESort k) ->
-         let env,x' = Vars.make_fresh env k x in
-         let item = match k with
-           | Sorts.Index -> ESubst (x, Term.Var x')
-           (* | Sorts.Message -> ESubst (x, Term.Var x') *)
-           (* TODO raise error if sort is not index *)
-           | _ -> assert false
-         in
-         assert (Vars.name x' = x) ;
-         env, (Vars.EVar x')::vars, item::tsubst)
-      (Vars.empty_env,[],[])
-      typed_args
-  in *) 
   let subst = subst_of_bvars typed_args in
-  let t = convert conv_env subst t Sorts.Message in  
-  let vs : Vars.index list =
+  let t = convert conv_env subst t Sorts.Message in
+  let indices : Vars.index list =
     let f x : Vars.index = match x with
-      | ESubst (_,Term.Var i) -> 
+      | ESubst (_,Term.Var i) ->
         begin match Vars.sort i with
           | Sorts.Index -> i
           | _ -> assert false
@@ -1074,7 +1058,7 @@ let declare_state table s (typed_args : (lsymb * Sorts.esort) list)
     in
     List.map f subst
   in
-  let data = StateInit_data (vs,t) in
+  let data = StateInit_data (indices,t) in
   let table, _ =
     Symbols.Macro.declare_exact table
       s

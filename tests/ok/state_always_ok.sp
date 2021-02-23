@@ -1,7 +1,7 @@
 set autoIntro=false.
 
 abstract ok : message
-mutable s : message
+mutable s : message = empty
 channel c
 system !_i in(c,x);s:=s;out(c,x).
 

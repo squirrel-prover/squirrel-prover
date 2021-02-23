@@ -83,7 +83,6 @@ end = struct
     | Term.Pred ts -> upred (uts ts)
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvari l)
-    (* | Term.Init -> uinit *)
     | _ -> failwith "Not implemented"
 end
 

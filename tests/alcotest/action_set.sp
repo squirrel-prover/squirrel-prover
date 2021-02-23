@@ -1,5 +1,5 @@
 (* set autoIntro=false. *)
 
 channel c
-mutable s:index->message
+mutable s(i:index): message = empty
 system !_i in(c,x); s(i):=x.

@@ -29,7 +29,7 @@ let is_defined name a table =
         end
     | Symbols.(Exec | Frame), _ ->
         begin match a with
-          | Action _ | Init -> true
+          | Action _ -> true
           | _ -> false
         end
     | Symbols.Local _, _ -> true
@@ -66,7 +66,6 @@ let get_definition :
       | Symbols.Frame, _ ->
           begin match a with
             | Term.Action (s,_) when s = Symbols.init_action -> Term.Fun (f_zero,[])
-            (* | Term.Init -> Term.Fun (f_zero,[]) *)
             | Term.Action _ ->
                 Term.Fun(Term.f_pair,
                   [Term.Macro ((name,sort,args), [], Term.Pred a);
@@ -178,7 +177,6 @@ let get_definition :
       | Symbols.Exec, _ ->
         begin match a with
           | Term.Action (s,_) when s = Symbols.init_action -> Term.True
-          (* | Term.Init -> Term.True *)
           | Term.Action _ ->
             Term.And (Macro ((name, sort, args),[], Term.Pred a),
                       Macro (Term.cond_macro, [], a))

@@ -870,7 +870,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       facts = [] ;
       updates = [] }
   in
-  let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
+  let proc,_,table = p_in ~table:init_table ~env ~pos:1 ~pos_indices:[] proc in
   (proc, table)
 
 let declare_system table (system_name:string) proc =

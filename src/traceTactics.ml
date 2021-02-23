@@ -170,26 +170,31 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
       List.map
         (fun i -> Vars.make_fresh_from_and_update env i)
         descr.Action.indices in
-    
+
     let subst =
       List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
         descr.Action.indices indices in
-    
+
     let name =
       SystemExpr.action_to_term table system
         (Action.subst_action subst descr.Action.action) in
-    
+
     let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
     let at = Term.subst subst at in
     if indices = [] then at else
       Exists (List.map (fun x -> Vars.EVar x) indices,at) in
-  
+
   let cases = SystemExpr.map_descrs table system mk_case in
+
+  (* List.map (fun f ->
+      let id, s = Hyps.add_i Args.Unnamed f s in
+      ( CHyp id, s )
+    ) (Atom (`Timestamp (`Eq,ts,Term.Action (Symbols.init_action,[]))) :: cases) *)
 
   List.map (fun f ->
       let id, s = Hyps.add_i Args.Unnamed f s in
       ( CHyp id, s )
-    ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
+    ) cases
 
 (** Case analysis on an hypothesis.
     When [many], recurses. *)
@@ -650,14 +655,14 @@ let induction s  =
          let (-->) a b = Impl (a,b) in
          let ih =
            ForAll ((Vars.EVar v'')::vs,
-                   Atom (`Timestamp (`Neq,Term.Var v,Term.Init)) -->
+                   Atom (`Timestamp (`Neq,Term.Var v,Term.Action (Symbols.init_action,[]))) -->
                    (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
                             :> generic_atom) -->
                     Term.subst
                       [Term.ESubst (Term.Var v,Term.Var v'')] f)) in
-         
+
          let goal = Term.mk_impl ih f' in
-         
+
          let s = s |> TraceSequent.set_env env
                    |> TraceSequent.set_conclusion goal in
          [s]
