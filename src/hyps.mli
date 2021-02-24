@@ -134,6 +134,7 @@ module type HypsSeq = sig
 
   val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
 
+  (** Clear trivial hypotheses and reload hypotheses *)
   val clear_triv : sequent -> sequent
 
   val pp     : Format.formatter -> sequent -> unit

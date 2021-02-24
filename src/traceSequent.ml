@@ -445,7 +445,17 @@ module Hyps
   let mapi f s = S.update ~hyps:(H.mapi f s.hyps) s
 
   (*------------------------------------------------------------------*)
+  (* We add back manually all formulas, to ensure that definitions are 
+     unrolled. *)
+  (* FIXME: this seems very ineficient *)
+  let reload s =
+    H.fold (fun id f s ->
+        let s = remove id s in        
+        snd (add_formula id f s)) s.hyps s
+
+  (*------------------------------------------------------------------*)
   let clear_triv s = 
+    let s = reload s in
     S.update ~hyps:(H.filter (fun _ f -> not (f_triv f)) s.hyps) s
 
   let pp fmt s = H.pps fmt s.hyps
@@ -503,12 +513,7 @@ let subst subst s =
         ~conclusion:(Term.subst subst s.conclusion)
         s in
 
-    (* We add back manually all formulas, to ensure that definitions are 
-       unrolled. *)
-    (* FIXME: this seems very ineficient *)
-    H.fold (fun id f s ->
-        let s = Hyps.remove id s in        
-        snd (Hyps.add_formula id f s)) hyps s
+    Hyps.reload s
 
 
 (*------------------------------------------------------------------*)
