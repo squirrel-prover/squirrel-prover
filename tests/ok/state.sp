@@ -1,6 +1,6 @@
 set autoIntro=false.
 
-mutable s : message
+mutable s : message = empty
 abstract v : message
 
 channel c

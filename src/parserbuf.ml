@@ -4,7 +4,7 @@
 let () = Printexc.record_backtrace true
 
 module L = Location
-  
+
 (** Generic exception for user errors, that should be reported
   * with the given explanation. *)
 exception Error of string
@@ -184,7 +184,7 @@ let () =
       ignore (parse_process table "in(c,x);out(c,x);null" : Process.process) ;
       ignore (parse_process table "in(c,x);out(c,x)" : Process.process) ;
       Alcotest.check_raises "fails" Parser.Error
-        (fun () -> 
+        (fun () ->
            ignore (parse_process table "in(c,x) then null" : Process.process)) ;
       begin
         match
@@ -193,33 +193,31 @@ let () =
         | Process.Parallel _ -> ()
         | _ -> assert false
       end ;
-      ignore (parse_process table 
-                "if u=true then if True then null else null else null" 
+      ignore (parse_process table
+                "if u=true then if True then null else null else null"
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
       ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
-      let table = 
+      let table =
         let decl_i = Decl.Decl_abstract { name = "error";
                                           index_arity = 0;
                                           message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table decl in
-      ignore (parse_process table "in(c,x); out(c, if x=x then x else error)" 
+      ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
               : Process.process)
     end ;
     "Try", `Quick, begin fun () ->
-      let table = 
-        let decl_i = Decl.Decl_state ("s", 1, Sorts.emessage) in
+      let table =
+        let decl_i = Decl.Decl_abstract { name = "ok";
+                                          index_arity = 0;
+                                          message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table decl in
-      let table = 
-        let decl_i = Decl.Decl_state ("ss", 2, Sorts.emessage) in
-        let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
-      let table = 
+      let table =
         let decl_i = Decl.Decl_abstract { name = "error";
                                           index_arity = 0;
                                           message_arity = 0;} in
@@ -227,13 +225,13 @@ let () =
         Prover.declare table decl in
       ignore (parse_process table
                 "in(c,x); \
-                 try find i such that s(i) = x in \
-                 out(c,ss(i,i))\
+                 try find i such that x = x in \
+                 out(c,ok)\
                  else out(c,error)"
               : Process.process) ;
       ignore (parse_process table
                 "in(c,x); \
-                 out(c, try find i such that s(i) = x in ss(i,i) \
+                 out(c, try find i such that x = x in ok \
                  else error)"
               : Process.process)
     end
@@ -288,10 +286,10 @@ let () =
     end ;
     "Multiple declarations", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
                        : Symbols.table )
-           with (Prover.Decl_error (_,Prover.KDecl, 
+           with (Prover.Decl_error (_,Prover.KDecl,
                                     Multiple_declarations "c")) -> raise Ok)
     end ;
     "Action creation", `Quick, begin fun () ->
@@ -333,41 +331,50 @@ let () =
     end ;
     "Local Process", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
-           try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp" 
-                       : Symbols.table ) 
-           with 
+        (fun () ->
+           try ignore (parse_theory_test ~test "tests/alcotest/proc_local.sp"
+                       : Symbols.table )
+           with
              Theory.Conv
                (_,
                 Theory.Type_error (
                   App (L.{ pl_desc = "n" },[]),
-                  Sorts.(ESort Timestamp))) -> 
+                  Sorts.(ESort Timestamp))) ->
              raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        
+
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_type.sp"
                        : Symbols.table )
            with
-             (Process.ProcError (_, 
-                                 Arity_error ("C",1,0))) -> 
+             (Process.ProcError (_,
+                                 Arity_error ("C",1,0))) ->
              raise Ok)
     end ;
     "Apply Proc - 1", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok        
-        (fun () -> 
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                        : Symbols.table )
            with Process.ProcError (_, Process.UnknownProcess "D") -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
-        (fun () -> 
+        (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
-           with Process.ProcError (_, 
+           with Process.ProcError (_,
                                    ProcessAlreadyDecl "C") -> raise Ok)
+    end ;
+    "Duplicated State Update", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try ignore (parse_theory_test ~test
+                        "tests/alcotest/state_duplicated_update.sp"
+                       : Symbols.table )
+           with Process.ProcError (_,
+                                   DuplicatedUpdate "s") -> raise Ok)
     end ;
   ];;

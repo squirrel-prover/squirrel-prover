@@ -4,7 +4,7 @@ hash h
 name k : message
 name n : message
 name m : message
-mutable s : message
+mutable s : message = empty
 
 channel c
 

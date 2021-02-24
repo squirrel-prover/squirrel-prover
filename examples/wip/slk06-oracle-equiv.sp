@@ -44,9 +44,9 @@ hash h3
 name idinit : index->message
 name pin : index->message
 
-mutable kT : index->message (* <ID,TSlast> *)
-mutable kR : index->message (* <ID> *)
-mutable TS : message
+mutable kT(i:index) : message = <idinit(i),TSinit>
+mutable kR(ii:index) : message = idinit(ii)
+mutable TS : message = TSinit
 
 channel cT
 channel cR
@@ -83,10 +83,6 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
-(* /!\ incorrect modelling of state initial values *)
-axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>.
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii).
-
 equiv strong_sec (t,t':timestamp,ii:index) : frame@t, diff(kR(ii)@t',fresh).
 Proof.
 induction t.
@@ -95,8 +91,8 @@ induction t.
 induction t'.
 (* case t' = init *)
 equivalent kR(ii)@init,idinit(ii).
-use stateReaderInit with ii.
-fresh 1.
+expand frame@init.
+fresh 0. yesif 0.
 (* case t' = R1(jj,ii1) *)
 admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)
 

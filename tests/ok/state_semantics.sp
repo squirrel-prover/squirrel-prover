@@ -6,8 +6,8 @@ hash h
 
 name key : index->message
 
-mutable k1 : index->message
-mutable k2 : index->message
+mutable k1(i:index): message = empty
+mutable k2(i:index): message = empty
 
 channel c
 

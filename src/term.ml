@@ -60,7 +60,6 @@ and _ term =
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
       Sorts.timestamp term
-  | Init   : Sorts.timestamp term
   | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
@@ -106,7 +105,6 @@ let rec sort : type a. a term -> a Sorts.t =
   | Var v -> Vars.sort v
   | Pred _ -> Sorts.Timestamp
   | Action _ -> Sorts.Timestamp
-  | Init -> Sorts.Timestamp
   | Diff (a, b) -> sort a
   | ITE (a, b, c) -> Sorts.Message
   | Find (a, b, c, d) -> Sorts.Message
@@ -231,7 +229,6 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
         (fun ppf () ->
            Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
         ppf ()
-  | Init -> Fmt.styled `Green (fun ppf () -> Fmt.pf ppf "init") ppf ()
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
@@ -386,7 +383,6 @@ let get_set_vars : 'a term -> S.t =
         (termvars b vars)
         (S.of_list (List.map (fun x -> Vars.EVar x) a))
     | Name (_,indices) -> S.add_list vars indices
-    | Init -> vars
     | Diff (a, b) -> termvars a (termvars b vars)
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
@@ -474,7 +470,6 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Var m -> Var m
     | Pred ts -> Pred (subst s ts)
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
-    | Init -> Init
     | Diff (a, b) -> Diff (subst s a, subst s b)
     | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
     | Atom a-> Atom (subst_generic_atom s a)
@@ -625,7 +620,6 @@ let pi_term ~projection term =
   | Seq (a, b) -> Seq (a, pi_term s b)
   | Pred t -> Pred (pi_term s t)
   | Action (a, b) -> Action (a, b)
-  | Init -> Init
   | Var a -> Var a
   | Diff (a, b) ->
     begin
@@ -674,7 +668,6 @@ let head_normal_biterm : type a. a term -> a term = fun t ->
       Macro (m, List.map2 diff l l', ts)
   | Pred t, Pred t' -> Pred (diff t t')
   | Action (a,is), Action (a',is') when a=a' && is=is' -> Action (a,is)
-  | Init, Init -> Init
   | Var x, Var x' when x=x' -> Var x
   | ITE (i,t,e), ITE (i',t',e') -> ITE (diff i i', diff t t', diff e e')
   | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->

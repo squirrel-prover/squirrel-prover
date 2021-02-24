@@ -5,7 +5,6 @@
     is updated using h1. *)
 
 channel c
-mutable s : message
 hash h1
 hash h2
 name k1 : message
@@ -13,10 +12,9 @@ name k2 : message
 name fresh : message
 name n : message
 
-system !_i s:=h1(s,k1);out(c,h2(s,k2)).
+mutable s : message = n
 
-(** Warning: improper way of specifying initial state! *)
-axiom s_init : s@init = n.
+system !_i s:=h1(s,k1);out(c,h2(s,k2)).
 
 (** We should be able to prove these axioms, right? *)
 axiom s_inj : forall (i,j:index) s@A(i)=s@A(j) => i=j.
@@ -36,12 +34,12 @@ Proof.
   induction t'.
 
     equivalent s@init, n.
-    use s_init.
-    fresh 1.
+    expand frame@init.
+    fresh 0.
 
     expand s@A(i).
     (* PRF h1 *)
-    prf 1. yesif 1. case H0. use s_jni with i1,i.
+    prf 1. yesif 1. case H. use s_jni with i1,i.
     fresh 1.
 
   (* Case t = A(i). *)
@@ -52,7 +50,7 @@ Proof.
   prf 1. yesif 1.
     project.
 
-      case H0.
+      case H.
         use s_jni with i1,i.
         (* Consider the possibility that s@t'
            indirectly contains h2(s@A(i1),k2) for A(i1)<=t'.

@@ -9,9 +9,9 @@ let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 (*------------------------------------------------------------------*)
 type pkind = (string * Sorts.esort) list
 
-let pp_pkind = 
+let pp_pkind =
   let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Sorts.pp_e e in
-  (Fmt.list pp_el) 
+  (Fmt.list pp_el)
 
 (*------------------------------------------------------------------*)
 type id = string
@@ -35,7 +35,7 @@ type process_i =
   | Alias of process * lsymb
 
 and process = process_i L.located
-  
+
 (*------------------------------------------------------------------*)
 let rec pp_process ppf process =
   let open Fmt in
@@ -131,9 +131,10 @@ type proc_error_i =
   | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
+  | DuplicatedUpdate of string
 
 type proc_error = L.t * proc_error_i
-                  
+
 let pp_proc_error_i fmt = function
   | UnknownProcess s ->
     Fmt.pf fmt "unknown processus %s" s
@@ -144,21 +145,24 @@ let pp_proc_error_i fmt = function
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
 
   | ProcessAlreadyDecl s -> Fmt.pf fmt "processus name [%s] already exists" s
-                              
+
   | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
                                        defined with arity %i" s i j
 
-let pp_proc_error pp_loc_err fmt (loc,e) = 
-  Fmt.pf fmt "%aproc error: %a."     
-    pp_loc_err loc 
+  | DuplicatedUpdate s -> Fmt.pf fmt "state %s can only be updated once \
+                                      in an action" s
+
+let pp_proc_error pp_loc_err fmt (loc,e) =
+  Fmt.pf fmt "%aproc error: %a."
+    pp_loc_err loc
     pp_proc_error_i e
 
 exception ProcError of proc_error
-    
+
 let proc_err loc e = raise (ProcError (loc,e))
 
 (*------------------------------------------------------------------*)
-(** We extend the symbols data with (bi)-processus descriptions and 
+(** We extend the symbols data with (bi)-processus descriptions and
     their types. *)
 type Symbols.data += Process_data of pkind * process
 
@@ -170,7 +174,7 @@ let declare_nocheck table name kind proc =
   with Symbols.Multiple_declarations _ ->
     proc_err (L.loc name) (ProcessAlreadyDecl (L.unloc name))
 
-let find_process table pname = 
+let find_process table pname =
   match Symbols.Process.get_all pname table with
   | (), Process_data (kind,proc) -> kind,proc
   | _ -> assert false
@@ -183,10 +187,10 @@ let find_process0 table (lsymb : lsymb) =
     find_process table pname
   with
   | Symbols.Unbound_identifier _ -> proc_err (L.loc lsymb) (UnknownProcess name)
-  
+
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
-let check_proc table env p = 
+let check_proc table env p =
   let rec check_p (env : (string * Sorts.esort) list) proc =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -196,7 +200,7 @@ let check_proc table env p =
     | Out (_,m,p)
     | Alias (L.{ pl_desc = Out (_,m,p) },_) ->
       (* raise an error if we are in strict alias mode *)
-      if is_out proc && (Config.strict_alias_mode ()) 
+      if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
       else
         let () = Theory.check table ~local:true env m Sorts.emessage in
@@ -239,7 +243,7 @@ let check_proc table env p =
         with
         | Not_found -> proc_err (L.loc id) (UnknownProcess (L.unloc id))
       end
-  
+
   in
   check_p env p
 
@@ -377,7 +381,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = Config.strict_alias_mode () in
     let table,a' = try Action.fresh_symbol table ~exact a with
-      | Symbols.Multiple_declarations s -> 
+      | Symbols.Multiple_declarations s ->
         let err = "symbol " ^ a ^ " is already defined" in
         proc_err loc (StrictAliasError err)
     in
@@ -456,12 +460,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     debug "output = %a,%a.@."
       Channel.pp_channel (fst output) Term.pp (snd output) ;
-    let action_descr =      
+    let action_descr =
       Action.{ name = a';
                action;
                input = (in_ch, in_var);
-               indices = indices; 
-               condition; updates; output } 
+               indices = indices;
+               condition; updates; output }
     in
 
     let table, new_a, action_descr =
@@ -490,7 +494,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
      * otherwise use id as the new alias. *)
     let a' = match L.unloc proc with Alias (_,a) -> a | _ -> id in
     let t,p = find_process0 table id in
-    
+
     let isubst', msubst' =
       (* TODO avoid or handle conflicts with variables already
        * in domain of subst, i.e. variables bound above the apply *)
@@ -501,8 +505,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
           | Sorts.ESort Sorts.Message,_ ->
             let v'_th = Theory.subst v tsubst in
             let v'_tm = conv_term table env (Term.Var ts) v Sorts.Message in
-            iacc, (x, L.unloc v'_th, v'_tm) :: macc 
-                  
+            iacc, (x, L.unloc v'_th, v'_tm) :: macc
+
           | Sorts.ESort Sorts.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc (L.unloc i) env.isubst in
             let i'_th = Theory.subst v tsubst in
@@ -510,7 +514,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
           | _ -> assert false)
         (env.isubst,env.msubst) t args
     in
-    
+
     let env =
     { env with
       alias  = L.unloc a' ;
@@ -543,13 +547,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
   | _ -> assert false
 
   in
-  
+
   (* treatment of Let(x,t,p) constructs
    * the boolean [search_dep] indicates whether we have to search in [t] if
    * there are some get terms for state macros that have already been updated *)
   let p_let ?(search_dep=false) ~table ~env proc = match L.unloc proc with
 
-  | Let (x,t,p) -> 
+  | Let (x,t,p) ->
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
       if search_dep
@@ -558,7 +562,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
     let body =
       Term.subst_macros_ts table updated_states (Term.Var ts)
-        (conv_term table env (Term.Var ts) t Sorts.Message) 
+        (conv_term table env (Term.Var ts) t Sorts.Message)
     in
     let invars = List.map snd env.inputs in
     let table,x' =
@@ -571,7 +575,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         List.rev_map (fun i -> Theory.var dum (Vars.name i)) env.indices
       in
       Theory.App (x', is)
-    in    
+    in
     let x'_tm =
       Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
                   Term.Var ts)
@@ -593,7 +597,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let rec p_in ~table ~env ~pos ~pos_indices proc =
     let p, pos, table = p_in_i ~table ~env ~pos ~pos_indices proc in
     (L.mk_loc (L.loc proc) p, pos, table)
-    
+
   and p_in_i ~table ~env ~pos ~pos_indices proc =
     match L.unloc proc with
     | Null -> (Null,pos,table)
@@ -617,7 +621,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       ( Repl (L.mk_loc (L.loc i) (Vars.name i'), p'),
         pos',
         table )
-      
+
     | Apply _ | Alias _ | New _ ->
       let table,env,p = p_common ~table ~env proc in
       p_in_i ~table ~env ~pos ~pos_indices p
@@ -641,12 +645,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
                   inputs = (ch,x')::env.inputs ;
                   msubst = (L.unloc x, in_th, in_tm) :: env.msubst }
       in
-      
+
       let par_choice = pos, List.rev pos_indices in
-      let (p',_,table : process * int * Symbols.table) = 
+      let (p',_,table : process * int * Symbols.table) =
         p_cond ~table ~env ~pos:0 ~par_choice p in
       let x' = L.mk_loc (L.loc x) (Vars.name x') in
-        
+
       ( In (c,x',p'),
         pos+1,
         table )
@@ -666,7 +670,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   and p_cond ~table ~env ~pos ~par_choice proc =
     let p, pos, table = p_cond_i ~table ~env ~pos ~par_choice proc in
     (L.mk_loc (L.loc proc) p, pos, table)
-    
+
   and p_cond_i ~table ~env ~pos ~par_choice proc =
     match L.unloc proc with
     | Apply _ | Alias _ | New _ ->
@@ -677,7 +681,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let x',t',table,env,p = p_let ~table ~env proc in
       let p',pos',table = p_cond ~table ~env ~pos ~par_choice p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
-      
+
       ( Let (x', t', p'),
         pos',
         table )
@@ -730,7 +734,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
       (* [evs] could re-use the locations of [evars] *)
       let evs = List.map (fun (_,x) -> mk_dum (Vars.name x)) s in
-      
+
       ( Exists (evs,cond',p',q'),
         pos_q,
         table )
@@ -753,7 +757,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   and p_update ~table ~env (proc : process) =
     let p, pos, table = p_update_i ~table ~env proc in
     (L.mk_loc (L.loc proc) p, pos, table)
-    
+
   and p_update_i ~table ~env (proc : process) =
     let loc = L.loc proc in
     match L.unloc proc with
@@ -765,7 +769,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let x',t',table,env,p = p_let ~search_dep:true ~table ~env proc in
       let p',pos',table = p_update ~table ~env p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
-      
+
       ( Let (x', t', p'),
         pos',
         table )
@@ -777,7 +781,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
            - either the value at the end of the current action,
            - either the value before the current action.
              There is no in-between value. *)
-        failwith "Cannot update twice the same state in an action"
+        proc_err loc (DuplicatedUpdate (L.unloc s))
       else
         let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
         let l' =
@@ -801,7 +805,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
         (* we could re-use the location in [l] here. *)
         let l' = List.map (fun x -> mk_dum (Vars.name x)) l' in
-        
+
         ( Set (s,l',t',p'),
           pos',
           table )
@@ -822,7 +826,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
          same initial process. *)
       let p' = L.mk_loc loc (Out (c,t',p')) in
       let a' = mk_dum (Symbols.to_string a') in
-      
+
       ( Alias (p', a'),
         pos',
         table )
@@ -831,7 +835,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let table,env,a' = register_action loc env.alias None table env in
       let pnull = L.mk_loc loc Null in
       let a' = mk_dum (Symbols.to_string a') in
-      
+
       ( Alias (pnull, a'),
         0,
         table)
@@ -851,8 +855,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let p'_i = Out (c_dummy, Theory.empty dum,p') in
       let p' = L.mk_loc loc p'_i in
       let a' = mk_dum (Symbols.to_string a') in
-      
-      ( Alias (p', a'), 
+
+      ( Alias (p', a'),
         pos',
         table )
 
@@ -880,6 +884,24 @@ let declare_system table (system_name:string) proc =
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc table [] proc ;
   let table, system_name = System.declare_empty table system_name in
+
+  (* before parsing the system, we register the init action,
+  using for the updates the initial values declared when declaring
+  a mutable construct *)
+  let a' = Symbols.init_action in
+  let updates = Theory.get_init_states table in
+  let action_descr =
+    Action.{ name = a';
+             action = [];
+             input = (Symbols.dummy_channel,"$dummyInp");
+             indices = [];
+             condition = ([], Term.True);
+             updates;
+             output = (Symbols.dummy_channel, Term.empty) }
+  in
+  let table, _, _ =
+    System.register_action table system_name a' [] [] action_descr
+  in
 
   let proc,table = parse_proc system_name table proc in
   Printer.pr "@[<v 2>Processed system:@;@;@[%a@]@]@.@." pp_process proc ;

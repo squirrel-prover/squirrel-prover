@@ -48,9 +48,9 @@ project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
+split. by auto. 
 by split; intro H; case H; depends A, A1; auto.
 
-split. by auto. 
 split. by auto. 
 by intro H; case H; depends A, A1; auto.
 

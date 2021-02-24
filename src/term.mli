@@ -69,11 +69,10 @@ and _ term =
   | Macro  :
       'a msymb * Sorts.message term list * Sorts.timestamp term
       -> 'a term
-        
+
   | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
   | Pred   : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
-  | Init   : Sorts.timestamp term
   | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term

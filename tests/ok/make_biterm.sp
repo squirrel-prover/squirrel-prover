@@ -7,7 +7,7 @@ abstract koo : message
 
 abstract f : message->message
 
-mutable S : message
+mutable S : message = empty
 
 name n : message
 name m : message
@@ -27,7 +27,7 @@ Proof.
 induction t.
 nosimpl(expandall).
 fa 0. fa 1.
-equivalent ok=ok, True. 
+equivalent ok=ok, True.
 by auto.
 nosimpl(expandall).
 fa 0; fa 1.

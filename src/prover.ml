@@ -783,7 +783,10 @@ let declare_i table = function
   | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
   | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
   | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
-  | Decl.Decl_state (s, a, k)       -> Theory.declare_state table s a k
+  | Decl.Decl_state (s, args, k, t) ->
+    (* let args = List.map (fun (x,y) -> L.unloc x, y) args in *)
+    (* Theory.declare_macro table s args k t *)
+    Theory.declare_state table s args k t
   | Decl.Decl_macro (s, args, k, t) ->
     let args = List.map (fun (x,y) -> L.unloc x, y) args in
     Theory.declare_macro table s args k t

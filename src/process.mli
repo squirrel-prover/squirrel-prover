@@ -35,7 +35,7 @@ val pp_pkind : (string * Sorts.esort) list Fmt.t
   * other than existential choices. They may be useful, though, e.g. to
   * model mixnets. *)
 
-(** Process types *)                   
+(** Process types *)
 type process_i =
   | Null                                    (** Null process *)
   | New of lsymb * process                 (** Name creation *)
@@ -74,7 +74,7 @@ val declare : Symbols.table -> lsymb -> pkind -> process -> Symbols.table
 
 (** Final declaration of the system under consideration,
   * which triggers the computation of its internal representation
-  * as a set of actions. In that process, name creations are compiled away. 
+  * as a set of actions. In that process, name creations are compiled away.
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
   Symbols.table -> string -> process -> Symbols.table
@@ -88,9 +88,10 @@ type proc_error_i =
   | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
+  | DuplicatedUpdate of string
 
 type proc_error = Location.t * proc_error_i
-                  
+
 val pp_proc_error :
   (Format.formatter -> Location.t -> unit) ->
   Format.formatter -> proc_error -> unit

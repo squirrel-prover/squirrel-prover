@@ -60,8 +60,8 @@ let same_shape a b : Term.subst option =
 
 type Symbols.data += Data of Vars.index list * action
 
-let fresh_symbol table ~exact name = 
-  if exact 
+let fresh_symbol table ~exact name =
+  if exact
   then Symbols.Action.reserve_exact table name
   else Symbols.Action.reserve       table name
 
@@ -237,7 +237,7 @@ let pp_actions ppf table =
        else
          Fmt.pf ppf "%s%a"
            (Symbols.to_string symbol)
-           pp_indices indices) 
+           pp_indices indices)
     table;
   Fmt.pf ppf "@]@]@."
 

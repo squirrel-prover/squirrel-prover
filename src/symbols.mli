@@ -74,14 +74,14 @@ type edef =
   | Reserved
 
 (*------------------------------------------------------------------*)
-type namespace = 
-  | NChannel 
-  | NName    
-  | NAction  
+type namespace =
+  | NChannel
+  | NName
+  | NAction
   | NFunction
-  | NMacro   
-  | NSystem  
-  | NProcess 
+  | NMacro
+  | NSystem
+  | NProcess
 
 val pp_namespace : Format.formatter -> namespace -> unit
 
@@ -103,7 +103,7 @@ type data += AssociatedFunctions of (fname t) list
 (** {2 Basic namespace-independent operations} *)
 
 exception Unbound_identifier of string
-exception Incorrect_namespace 
+exception Incorrect_namespace
 exception Multiple_declarations of string
 
 (** Converts a symbol to a string, for printing purposes. *)
@@ -125,7 +125,7 @@ type wrapped = Wrapped : 'a t * 'a def -> wrapped
   * @raise Unbound_identifier if no such symbol has been defined. *)
 val of_string : ?group:group -> string -> table -> wrapped
 
-(** [of_string_opt s] is the same as [of_string_opt s], but return [None] 
+(** [of_string_opt s] is the same as [of_string_opt s], but return [None]
     if [s] is not defined. *)
 val of_string_opt : ?group:group -> string -> table -> wrapped option
 
@@ -167,8 +167,8 @@ module type Namespace = sig
     * @raise Unbound_identifier otherwise. *)
   val of_string : string -> table -> ns t
 
-  (** [of_string s] returns [Some s] as a symbol, if it exists in this 
-      namespace, and None otherwise. *) 
+  (** [of_string s] returns [Some s] as a symbol, if it exists in this
+      namespace, and None otherwise. *)
   val of_string_opt : string -> table -> ns t option
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
@@ -210,6 +210,7 @@ module Macro    : Namespace with type def = macro_def with type ns = macro
 
 val builtins_table : table
 
+val init_action : action t
 
 (** {3 Macro builtins} *)
 

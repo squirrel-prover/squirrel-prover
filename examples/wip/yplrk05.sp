@@ -33,8 +33,11 @@ name key2 : index->message
 name k : index->message
 name r1 : index->message
 
-mutable kT : index->message (* <k1,k2> *)
-mutable kR : index->message (* <k1,k2> *)
+name k1init : index->message
+name k2init : index->message
+
+mutable kT(i:index) : message = <k1init(i),k2init(i)>
+mutable kR(ii:index) : message = <k1init(ii),k2init(ii)>
 
 channel cT
 channel cR

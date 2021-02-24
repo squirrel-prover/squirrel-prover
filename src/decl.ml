@@ -5,7 +5,7 @@ type lsymb = Theory.lsymb
 let pp_type fmt (l : (Sorts.esort * int) list) =
   let pp_single fmt (k,i) = match i with
     | 0 -> ()
-    | i -> 
+    | i ->
       assert (i > 0);
       Fmt.pf fmt "%a^%d" Sorts.pp_e k i
   in
@@ -16,7 +16,7 @@ let pp_args fmt (l : (string * Sorts.esort) list) =
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
 (*------------------------------------------------------------------*)
-type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term 
+type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
 
 let pp_macro_decl fmt (s, args, k, t) =
   Fmt.pf fmt "@[<hov 2>term %s : %a → %a =@ %a@]" s
@@ -29,7 +29,7 @@ type abstract_decl = { name          : string;
                        message_arity : int; }
 
 let pp_abstract_decl fmt decl =
-  Fmt.pf fmt "@[<hov 2>abstract %s : %a → %a@]" 
+  Fmt.pf fmt "@[<hov 2>abstract %s : %a → %a@]"
     decl.name
     pp_type [ (Sorts.eindex, decl.index_arity);
               (Sorts.emessage, decl.message_arity) ]
@@ -53,7 +53,7 @@ let pp_goal_decl fmt decl =
 type system_decl = { sname    : string option;
                      sprocess : Process.process; }
 
-let pp_system_decl fmt sys = 
+let pp_system_decl fmt sys =
   let name = match sys.sname with
     | Some s -> s
     | None -> "_?" in
@@ -75,11 +75,11 @@ type declaration_i =
 
   | Decl_hash             of int option * string * orcl_tag_info option
   | Decl_aenc             of string * string * string
-  | Decl_senc             of string * string                 
+  | Decl_senc             of string * string
   | Decl_senc_w_join_hash of string * string * lsymb
   | Decl_sign             of string * string * string * orcl_tag_info option
-  | Decl_name             of string * int 
-  | Decl_state            of string * int * Sorts.esort
+  | Decl_name             of string * int
+  | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
 
@@ -90,8 +90,8 @@ type declarations = declaration list
 (*------------------------------------------------------------------*)
 let pp_decl fmt decl = match Location.unloc decl with
   | Decl_channel c -> Fmt.pf fmt "channel %s" c
-  | Decl_process (pid, pkind, p) -> 
-    Fmt.pf fmt "@[<hov 2>process %s %a =@ %a@]" 
+  | Decl_process (pid, pkind, p) ->
+    Fmt.pf fmt "@[<hov 2>process %s %a =@ %a@]"
       (L.unloc pid)
       Process.pp_pkind (List.map (fun (x,y) -> (L.unloc x, y)) pkind)
       Process.pp_process p
@@ -105,35 +105,36 @@ let pp_decl fmt decl = match Location.unloc decl with
       | Some a -> Fmt.pf fmt "%d" a in
     begin
       match t with
-      | None -> 
+      | None ->
         Fmt.pf fmt "@[<hov 2>hash %s %a@]" n pp_ar i
-      | Some t -> 
-        Fmt.pf fmt "@[<hov 2>hash %s %a with tag@ %a@]" 
+      | Some t ->
+        Fmt.pf fmt "@[<hov 2>hash %s %a with tag@ %a@]"
           n pp_ar i pp_orcl_tag_info t
     end
 
   | Decl_aenc (s,d,p) ->
     Fmt.pf fmt "@[<hov 2>aenc %s, %s, %s@]" s d p
   | Decl_senc (s,d) ->
-    Fmt.pf fmt "@[<hov 2>senc %s, %s@]" s d 
+    Fmt.pf fmt "@[<hov 2>senc %s, %s@]" s d
   | Decl_senc_w_join_hash (s,d,h) ->
     Fmt.pf fmt "@[<hov 2>senc %s, %s with hash %s@]" s d (L.unloc h)
-  | Decl_sign (s,c,p,t) -> 
+  | Decl_sign (s,c,p,t) ->
     begin
       match t with
-      | None -> 
+      | None ->
         Fmt.pf fmt "@[<hov 2>sign %s, %s, %s@]" s c p
-      | Some t -> 
-        Fmt.pf fmt "@[<hov 2>sign %s, %s, %s with tag@ %a@]" 
+      | Some t ->
+        Fmt.pf fmt "@[<hov 2>sign %s, %s, %s with tag@ %a@]"
           s c p pp_orcl_tag_info t
     end
 
   | Decl_name (s,i) ->
-    Fmt.pf fmt "@[<hov 2>name %s : %a → %a@]" 
+    Fmt.pf fmt "@[<hov 2>name %s : %a → %a@]"
       s pp_type [Sorts.eindex, i] Sorts.pp_e Sorts.emessage
-  | Decl_state (s,i,k) ->
-    Fmt.pf fmt "@[<hov 2>mutable %s : %a → %a@]" 
-      s pp_type [Sorts.eindex, i] Sorts.pp_e k
+  | Decl_state decl -> pp_macro_decl fmt decl
+  (* | Decl_state (s,i,k) ->
+    Fmt.pf fmt "@[<hov 2>mutable %s : %a → %a@]"
+      s pp_type [Sorts.eindex, i] Sorts.pp_e k *)
   | Decl_abstract decl -> pp_abstract_decl fmt decl
   | Decl_macro decl -> pp_macro_decl fmt decl
 

@@ -180,28 +180,33 @@ let induction TacticsArgs.(Timestamp ts) s =
     let induc_goal = EquivSequent.set_hypothesis_biframe s hypothesis in
     let init_goal =
       EquivSequent.(set_biframe
-                      s (apply_subst_frame [Term.ESubst(ts,Init)] goal))
+                      s (apply_subst_frame [Term.ESubst(ts,Action(Symbols.init_action,[]))] goal))
     in
     let goals = ref [] in
     (** [add_action _action descr] adds to goals the goal corresponding to the
       * case where [t] is instantiated by [descr]. *)
     let add_action descr =
-      let env = ref @@ EquivSequent.env induc_goal in
-      let subst =
-        List.map
-          (fun i ->
-             let i' = Vars.make_fresh_from_and_update env i in
-             Term.ESubst (Term.Var i, Term.Var i'))
-          descr.Action.indices
-      in
-      let name =
-        SystemExpr.action_to_term table system
-          (Action.subst_action subst descr.Action.action)
-      in
-      let ts_subst = [Term.ESubst(ts,name)] in
-      goals := (EquivSequent.apply_subst ts_subst induc_goal
-                |> EquivSequent.set_env !env)
-               ::!goals
+      if descr.Action.name = Symbols.init_action
+      then ()
+      else
+        begin
+        let env = ref @@ EquivSequent.env induc_goal in
+        let subst =
+          List.map
+            (fun i ->
+               let i' = Vars.make_fresh_from_and_update env i in
+               Term.ESubst (Term.Var i, Term.Var i'))
+            descr.Action.indices
+        in
+        let name =
+          SystemExpr.action_to_term table system
+            (Action.subst_action subst descr.Action.action)
+        in
+        let ts_subst = [Term.ESubst(ts,name)] in
+        goals := (EquivSequent.apply_subst ts_subst induc_goal
+                  |> EquivSequent.set_env !env)
+                 ::!goals
+        end
     in
     SystemExpr.iter_descrs table system add_action ;
     init_goal :: List.rev !goals
@@ -963,7 +968,6 @@ let expand_all () s =
       | Atom (`Index _) as a-> a
       | Atom (`Timestamp _) as a->  a
       | Atom (`Happens _) as a->  a
-      | Init -> Init
       | Pred _ as a -> a
       | Action _ as a -> a
     in

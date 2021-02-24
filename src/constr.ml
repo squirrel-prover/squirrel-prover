@@ -16,7 +16,7 @@ open Utils
    *under-approximation* of equality equivalence classes. *)
 
 let log_constr = Log.log Log.LogConstr
-  
+
 (* Comment this for debugging *)
 let log_constr = ignore
 
@@ -75,14 +75,14 @@ end = struct
   let uname a us = UName (a, us) |> make
 
   let uinit = UInit |> make
-              
+
   let upred u = if u.cnt = UInit then uinit else UPred u |> make
 
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
     | Term.Pred ts -> upred (uts ts)
+    | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvari l)
-    | Term.Init -> uinit
     | _ -> failwith "Not implemented"
 end
 
@@ -145,13 +145,13 @@ let mk_instance (l : trace_atom list) =
 
   let uf = Uuf.create elems in
   { uf = uf; eqs = eqs; new_eqs = []; leqs = leqs; neqs = neqs; elems = elems }
- 
+
 (* [mgu ut uf] applies the mgu represented by [uf] to [ut].
    Return init if it contains a cycle.
    If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
    Note that [mgu] normalizes pred(init) into init. *)
 let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
-  
+
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
@@ -185,16 +185,16 @@ let mgu ?(ext_support=false) (uf : Uuf.t) (ut : ut) =
       | UInit ->
         let uf = if ext_support then Uuf.extend uf ut else uf in
         let rut = Uuf.find uf ut in
-        
+
         if ut_equal rut ut then uf, uinit else mgu_ uf rut (ut :: lv)
 
       | UPred ut' ->
         let uf, nut' = mgu_ uf ut' lv in
         (* the [upred] smart constructor normalizes pred(init) into init) *)
-        (uf, upred nut') in 
-  
+        (uf, upred nut') in
+
   mgu_ uf ut []
-      
+
 
 let mgus uf uts =
   let uf, nuts_rev =
@@ -216,12 +216,12 @@ let norm_ut_compare x y = match x.cnt, y.cnt with
   | UPred _, _   -> true
   | _, UPred _   -> false
   | UInit, UInit -> true
- 
-(* [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the 
+
+(* [let sx,sy = swap x y] guarantees that [x] is greater than [y] for the
    ordering [norm_ut_compare]. We use this to choose the representents in
    the union-find. *)
 let swap x y = if norm_ut_compare x y then x, y else y, x
-                                                     
+
 let no_mgu x y = match x.cnt, y.cnt with
   | UName (a,_), UName (a',_) ->
     if a <> a' then raise No_mgu else ()
@@ -381,7 +381,7 @@ let build_graph (uf : Uuf.t) leqs =
           | _ -> g in
         UtG.add_edge g uinit v
       ) g g in
-    
+
   let uf, g = bg uf leqs UtG.empty in
   (uf, add_preds_and_init g)
 
@@ -424,7 +424,7 @@ let min_pred uf g u x =
   minp uf 0 x
 
 (* [max_pred uf g u x] returns [j] where [j] is the largest integer such
-   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case 
+   that [u <= P^j(x)] in the graph [g], if it exists, with a particular case
    if init occurs.
    Precond: [g] must be a transitive graph, [u] normalized and [x] basic. *)
 let max_pred uf g u x =
@@ -487,7 +487,7 @@ let add_disj uf g u x =
                   pp_ut u
                   minj maxj pp_ut x);
             Some (uf, List.map (fun x -> (nu,x)) l)
-        ) (max_pred uf g nu x) 
+        ) (max_pred uf g nu x)
     ) (min_pred uf g nu x)
 
 
@@ -512,7 +512,7 @@ let neq_sat uf g neqs =
         | (k,y), (k',y') ->
           ut_equal y y' && k < k'
       ) g)
-      
+
 let get_basics uf elems =
   List.map (fun x -> mgu uf x |> snd) elems
   |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
@@ -545,7 +545,7 @@ let rec split instance : model list =
                   ) basics
               ) g in
             let instance = { instance with uf = uf } in
-            
+
             [ { inst = instance; tr_graph = g } ]
           with Found (uf, new_eqs) ->
             List.map (fun eq ->
@@ -570,7 +570,7 @@ let rec split instance : model list =
                   "@[<v 2>Adding init equality:@;%a@;@]@."
                   (Fmt.pair ~sep:(fun ppf () -> Fmt.pf ppf ", ")
                      pp_ut pp_ut) eq) new_eqs);
-                          
+
         split { instance with uf = uf;
                               eqs = new_eqs @ instance.eqs;
                               new_eqs = new_eqs @ instance.new_eqs } end
@@ -756,15 +756,15 @@ let () =
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
-             (fun () -> if models_conjunct pb <> (Result []) 
+             (fun () -> if models_conjunct pb <> (Result [])
                then raise Sat
                else ()))
          successes;
 
        List.iteri (fun i pb ->
            Alcotest.check_raises ("unsat" ^ string_of_int i) Unsat
-             (fun () -> if models_conjunct pb <> (Result []) 
-               then () else 
+             (fun () -> if models_conjunct pb <> (Result [])
+               then () else
                  raise Unsat ))
          failures;);
 
@@ -793,7 +793,7 @@ let () =
                        (`Timestamp (`Leq, tau3, tau4)) ::
                        (`Timestamp (`Leq, tau4, tau'')) ::
                        pb_eq1] in
-       
+
        List.iteri (fun i pb ->
            Alcotest.check_raises ("sat" ^ string_of_int i) Sat
              (fun () ->

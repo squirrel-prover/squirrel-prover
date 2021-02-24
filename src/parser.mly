@@ -255,9 +255,9 @@ msg_or_bool:
 | MESSAGE                        { Sorts.emessage }
 | BOOLEAN                        { Sorts.eboolean }
 
-state_type:
+/* state_type:
 | t=msg_or_bool                  { 0, t }
-| INDEX ARROW t=state_type       { let n,k = t in n+1,k }
+| INDEX ARROW t=state_type       { let n,k = t in n+1,k } */
 
 msg_type:
 | MESSAGE                        { 0 }
@@ -292,8 +292,8 @@ declaration_i:
                                     { name = e;
                                       index_arity=index_arity;
                                       message_arity=message_arity;}) }
-| MUTABLE e=ID COLON t=state_type
-                          { Decl.Decl_state (e, (fst t), (snd t)) }
+| MUTABLE e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+                          { Decl.Decl_state (e, args, typ, t) }
 | CHANNEL e=ID            { Decl.Decl_channel e }
 | TERM e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
