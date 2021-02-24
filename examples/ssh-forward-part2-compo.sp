@@ -339,9 +339,10 @@ axiom [auth] difftags :
 
 
 goal [none, auth] P_charac :
-  happens(PDIS5, Pfail) => exec@PDIS5 => (cond@Pfail => False) .
+  happens(Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
   intro Hap He Hc.
+  depends PDIS5, Pfail => Hap2.
   expand exec@PDIS5.
   expand cond@PDIS5; expand cond@Pfail.
   substitute pkSa@PDIS5,pk(kS).
@@ -375,9 +376,10 @@ Qed.
 
 (* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
 goal [none, auth] S_charac :
-   happens(Sok, Sfail) => exec@Sok =>(cond@Sfail => False).
+   happens(Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
   intro Hap He Hc.
+  depends Sok, Sfail => Hap2.
   expand exec@Sok; expand cond@Sok; expand cond@Sfail.
   destruct He as [_ Hchk].
 
@@ -447,7 +449,7 @@ Proof.
   by expandall; fa 17.
  (* P3 *)
   expandall; fa 17.
-  by expand seq(i -> r2(i)),i.
+  by expand seq(i1 -> r2(i1)),i.
  (* A *)
   by expandall; fa 17.
   (* A1 *)
@@ -462,16 +464,18 @@ Proof.
   by expandall; fa 17.
   (* SDISauth3 *)
   expandall; fa 17.
-  by expand seq(i -> a(i)),i.
+  by expand seq(i1 -> a(i1)),i.
   (* Sfail *)
   expand frame@Sfail.
 
-  equivalent exec@Sfail, false.
-  use S_charac.
-  depends Sok, Sfail.
-  executable Sfail.
-  use H0 with Sok.
-  expand exec@Sfail.
+  equivalent exec@Sfail, false. 
+  split; 2: by auto. 
+  intro Hfail.
+  use S_charac; try auto.
+  depends Sok, Sfail => _.
+  executable Sfail; 1,2: auto.  
+  by intro H0; use H0 with Sok.
+  by expand exec@Sfail.
 
   by fa 17; fa 18; noif 18.
   (* A3 *)
@@ -492,15 +496,18 @@ Proof.
   by expandall; fa 17.
   (* PDISauth7 *)
   expandall; fa 17.
-  expand seq(i -> b(i)),i. expand seq(i -> bke1(i)),i.
+  expand seq(i1 -> b(i1)),i. 
+  by expand seq(i1 -> bke1(i1)),i.
   (* Pfail *)
   expand frame@Pfail.
 
-  equivalent exec@Pfail, false.
-  use P_charac.
-  depends PDIS5, Pfail.
-  executable Pfail.
-  by use H0 with PDIS5.
+  equivalent exec@Pfail, false. 
+  split; 2: by auto. 
+  intro Hfail.
+  use P_charac; try auto.
+  depends PDIS5, Pfail => _.
+  executable Pfail; 1,2: auto.  
+  by intro H0; use H0 with PDIS5.
   by expand exec@Pfail.
 
   by fa 17; fa 18; noif 18.
