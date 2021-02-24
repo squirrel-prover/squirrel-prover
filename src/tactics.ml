@@ -29,6 +29,8 @@ type tac_error =
   | NothingToIntroduce
   | MustHappen of Term.timestamp
 
+  | NoCollision
+
   | PatNumError of int * int    (* given, need *)
                    
 let tac_error_strings =
@@ -46,6 +48,7 @@ let tac_error_strings =
     (NoReflMacros , "NoReflMacros");
     (TacTimeout, "TacTimeout");
     (CannotConvert, "CannotConvert");
+    (NoCollision, "NoCollision");
     (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
     (NothingToIntroduce, "NothingToIntroduce")]
@@ -72,6 +75,7 @@ let rec tac_error_to_string = function
   | CongrFail
   | NothingToIntroduce
   | GoalNotClosed
+  | NoCollision
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
   | GoalBadShape    _ -> "GoalBadShape"
@@ -119,15 +123,23 @@ let rec pp_tac_error ppf = function
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
   | GoalNotClosed -> Fmt.pf ppf "cannot close goal"
+
   | CongrFail -> Fmt.pf ppf "congruence closure failed"
+
   | NothingToIntroduce ->
     Fmt.pf ppf "nothing to introduce"
+
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
+
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
+
   | MustHappen t->
     Fmt.pf ppf "timestamp %a must happen" Term.pp t
+
+  | NoCollision ->
+    Fmt.pf ppf "no collision found" 
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in

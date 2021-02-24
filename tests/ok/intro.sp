@@ -13,11 +13,24 @@ system A: if True then out(ch,ok).
 axiom fooa : a = b => False.
 axiom foob : b = c => False.
 
-goal foo : forall (i : index, l : index, j : index),
+goal _ (i : index, l : index, j : index):
  (a = b || (b = c && c = d)) => False.
 
 Proof.
  intro _ _ _ [H | [H G]]. 
  by use fooa.
  by use foob.
+Qed.
+
+goal _ (i : index, j: index, k : index) :
+  (exists (l : index), False) => False.
+Proof.
+ intro i j k [l _]; auto.
+Qed.
+
+goal _ (i : index, j: index, k : index) :
+  (exists (l : index), True) => False.
+Proof.
+ intro i j k [l _].
+ admit.
 Qed.

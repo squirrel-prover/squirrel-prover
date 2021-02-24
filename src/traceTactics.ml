@@ -1372,7 +1372,6 @@ let () =
                    Args.(Sort (Pair (Message, Message)))]
     substitute_tac Args.(Pair (ETerm, ETerm))
 
-
 (*------------------------------------------------------------------*)
 let autosubst s =
   let id, f = match
@@ -1716,6 +1715,8 @@ let () =
 (*------------------------------------------------------------------*)
 (** Automated goal simplification *)
 
+let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
+
 let wrap f = (fun (s: TraceSequent.t) sk fk ->
     match f s with
       | subgoals -> sk subgoals fk
@@ -1738,7 +1739,8 @@ let simplify ~close ~intro =
     (wrap eq_trace) ::
     (wrap eq_names) ::
     (* Simplify equalities using substitution. *)
-    [repeat (wrap autosubst)]
+    (repeat (wrap autosubst)) ::
+    [clear_triv]
   ) 
 
   (* Attempt to close a goal. *)
@@ -2211,8 +2213,10 @@ let collision_resistance (s : TraceSequent.t) =
            | _ -> acc)
         [] hash_eqs
     in
+    let f_coll = Term.mk_ands new_facts in
+    if f_coll = Term.True then soft_failure Tactics.NoCollision;
 
-    let goal = Term.mk_impl (Term.mk_ands new_facts) (TraceSequent.conclusion s) in
+    let goal = Term.mk_impl f_coll (TraceSequent.conclusion s) in
     [TraceSequent.set_conclusion goal s]
 
 let () = T.register "collision"

@@ -40,6 +40,18 @@ let choose_name f = match f with
   | _ -> "H"
 
 (*------------------------------------------------------------------*)
+let atom_triv = function
+  | `Message   (`Eq,t1,t2) when t1=t2 -> true
+  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
+  | `Index     (`Eq,i1,i2) when i1=i2 -> true
+  | _ -> false 
+
+let f_triv = function
+  | Term.True -> true
+  | Term.Atom atom -> atom_triv atom
+  | _ -> false 
+
+(*------------------------------------------------------------------*)
 module FHyp = struct
   type t = Term.formula
   let pp_hyp fmt f = Term.pp fmt f
@@ -432,6 +444,10 @@ module Hyps
   let map f s  = S.update ~hyps:(H.map f s.hyps)  s
   let mapi f s = S.update ~hyps:(H.mapi f s.hyps) s
 
+  (*------------------------------------------------------------------*)
+  let clear_triv s = 
+    S.update ~hyps:(H.filter (fun _ f -> not (f_triv f)) s.hyps) s
+
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
 end
@@ -446,20 +462,8 @@ let set_system system s = S.update ~system:system s
 let set_table  table  s = S.update ~table:table   s 
 
 (*------------------------------------------------------------------*)
-let atom_triv = function
-  | `Message   (`Eq,t1,t2) when t1=t2 -> true
-  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
-  | `Index     (`Eq,i1,i2) when i1=i2 -> true
-  | _ -> false 
-
-let f_triv = function
-  | Term.True -> true
-  | Term.Atom atom -> atom_triv atom
-  | _ -> false 
-
 let filter_map_hyps func hyps =
   H.map (fun f -> func f) hyps
-  |> H.filter (fun _ f -> not (f_triv f))
     
 (*------------------------------------------------------------------*)
 let pi projection s =
@@ -505,6 +509,7 @@ let subst subst s =
     H.fold (fun id f s ->
         let s = Hyps.remove id s in        
         snd (Hyps.add_formula id f s)) hyps s
+
 
 (*------------------------------------------------------------------*)
 (** TRS *)

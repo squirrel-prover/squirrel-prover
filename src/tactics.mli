@@ -55,6 +55,7 @@ type tac_error =
   | GoalNotClosed
   | NothingToIntroduce
   | MustHappen of Term.timestamp
+  | NoCollision
   | PatNumError of int * int    (* given, need *)
 
 (** Tactics should raise this exception if they are ill-formed. *)

@@ -222,6 +222,8 @@ module type HypsSeq = sig
 
   val fold : (Ident.t -> hyp -> 'a -> 'a) -> sequent -> 'a -> 'a
 
+  val clear_triv : sequent -> sequent
+
   val pp     : Format.formatter -> sequent -> unit
   val pp_dbg : Format.formatter -> sequent -> unit
 end
