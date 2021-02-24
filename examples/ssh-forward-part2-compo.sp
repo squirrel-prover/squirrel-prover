@@ -43,6 +43,7 @@ tion: a technique for protocol composition with long term shared secrets.
 In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
+set autoIntro=false.
 
 abstract ok : message
 abstract ko : message
@@ -338,32 +339,37 @@ axiom [auth] difftags :
 
 
 goal [none, auth] P_charac :
-  exec@PDIS5 => (cond@Pfail => False) .
+  happens(PDIS5, Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
+  intro Hap He Hc.
   expand exec@PDIS5.
   expand cond@PDIS5; expand cond@Pfail.
   substitute pkSa@PDIS5,pk(kS).
-  euf Meq0.
+  destruct He as [_ [_ Hchk]].
+  euf Hchk => Euf. 
 
   (* oracle case *)
-  case H2.
-  case H2.
-  use hashlengthnotpair with <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  destruct Euf as [H1 [_|[i [m [m1 [_|[i1 H2]]]]]]]; 
+  1: by auto.
+  by use hashlengthnotpair with <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
   use signnottag with sidPa@P2, kP.
-  use H0 with i1.
-  left; right.
+  use Hc with i1.
+  destruct H2 as [m2 [m3 H2]].  (* TODO: H2 is bugged here *)
+  left; right. 
   by collision.
 
   (* honest case SDIS *)
-  collision.
-  use freshindex.
-  by use H0 with l.
+  intro Heq. 
+  use freshindex as [l _].
+  use Hc with l.
+  by case Euf; collision => _.
 
-  use freshindex.
-  use H0 with l.
+  intro Heq.
+  use freshindex as [l _].
+  use Hc with l.
   right.
-  collision.
+  by case Euf; collision => _.
 Qed.
 
 
