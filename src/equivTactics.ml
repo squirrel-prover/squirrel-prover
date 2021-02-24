@@ -17,9 +17,7 @@ module L = Location
 module Hyps = EquivSequent.Hyps
 
 (*------------------------------------------------------------------*)
-(* Comment in/out for debugging *)
-let dbg s = Printer.prt `Ignore s
-(* let dbg s = Printer.prt `Dbg s *)
+let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
