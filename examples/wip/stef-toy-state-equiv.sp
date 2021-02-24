@@ -18,12 +18,9 @@ name key : index->message
 name seed : index->message
 name n : index->index->message
 
-mutable kT : index->message
+mutable kT(i:index) : message = seed(i)
 
 channel cT
-
-axiom stateInit :
-  forall (i:index), kT(i)@init = seed(i)
 
 process tag(i:index,j:index) =
   kT(i) := hkey(kT(i),key(i));
@@ -43,14 +40,14 @@ Qed.
 goal onlyTagActions :
 forall (t:timestamp), t <> init => exists (i,j:index), t=T(i,j).
 Proof.
-intros.
-case t. case H0.
+intro *.
+case t.
 Qed.
 
 goal notInit :
 forall (t:timestamp), (exists (t':timestamp), t' < t)  => (t <> init).
 Proof.
-intros.
+intro *.
 Qed.
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
@@ -63,7 +60,8 @@ goal lastUpdate_ : forall (t:timestamp) forall (i:index)
 Proof.
 induction.
 case t.
-case H0.
+left.
+case H.
 assert (i=i1 || i<>i1).
 case H0.
 

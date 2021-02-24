@@ -18,8 +18,8 @@ name seed : index->message
 name keyState : index->message
 name keyMsg : index->message
 
-mutable kT : index->message
-mutable kR : index->message
+mutable kT(i:index) : message = seed(i)
+mutable kR(ii:index) : message = seed(ii)
 
 channel cT
 channel cR
@@ -49,16 +49,14 @@ process reader(k:index) =
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
-axiom stateTagInit : forall (i:index), kT(i)@init = seed(i).
-
 goal wa_R0 :
 forall (k:index,i:index),
   cond@R(k,i) =>
   (exists (j:index), T(i,j) < R(k,i) && output@T(i,j) = input@R(k,i)).
 Proof.
-intros.
+intro *.
 expand cond@R(k,i).
-euf M0.
+euf H.
 exists j.
 Qed.
 
@@ -69,9 +67,9 @@ forall (k:index,i:index),
   cond@R1(k,i) =>
   (exists (j:index), T(i,j) < R1(k,i) && output@T(i,j) = input@R1(k,i)).
 Proof.
-intros.
+intro *.
 expand cond@R1(k,i).
-euf M0.
+euf Meq.
 exists j.
 Qed.
 
@@ -81,8 +79,8 @@ forall (k:index,i:index),
   cond@R2(k,i) =>
   (exists (j:index), T(i,j) < R2(k,i) && output@T(i,j) = input@R2(k,i)).
 Proof.
-intros.
+intro *.
 expand cond@R2(k,i).
-euf M0.
+euf Meq.
 exists j.
 Qed.

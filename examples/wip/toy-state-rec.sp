@@ -19,8 +19,8 @@ name seed : index->message
 name keyState : index->message
 name keyMsg : index->message
 
-mutable kT : index->message 
-mutable kR : index->message
+mutable kT(i:index) : message = seed(i)
+mutable kR(ii:index) : message = seed(ii)
 
 channel cT
 channel cR
@@ -66,14 +66,14 @@ goal auth_R :
   forall (k,ii:index), 
     cond@R(k,ii) => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
 Proof.
-intros.
+intro *.
 expand cond@R(k,ii).
 use readerTestOk with ii,kR(ii)@pred(R(k,ii)),input@R(k,ii),deltaInit.
 use H0.
 case H2.
 
   (* case H2 => direct case - sync *)
-  euf M1.
+  euf Meq.
   exists ii,j.
 
   (* case H2 => recursive case - desync *)
@@ -82,7 +82,7 @@ case H2.
   case H4.
 
     (* case H4 => direct case - sync *)
-    euf M2.
+    euf Meq0.
     exists ii,j.
 
     (* case H4 => recursive case - desync *)

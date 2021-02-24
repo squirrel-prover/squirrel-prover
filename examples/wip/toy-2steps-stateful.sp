@@ -41,8 +41,8 @@ name nIdeal : index->index->message
 channel cT
 channel cR
 
-mutable kT : index->message
-mutable kR : index->message
+mutable kT(i:index) : message = seed(i)
+mutable kR(ii:index) : message = seed(ii)
 
 process tag(i:index,j:index) =
   kT(i) := h(diff(kT(i),nIdeal(i,j)),key(i));
@@ -57,11 +57,6 @@ process reader(k:index) =
     out(cR,ko)
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
-
-axiom stateTagInit :
-  forall (i:index), kT(i)@init = seed(i).
-axiom stateReaderInit :
-  forall (ii:index), kR(ii)@init = seed(ii).
 
 goal [left] stateInequalityTag :
 forall (i,j,j':index)

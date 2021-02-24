@@ -19,9 +19,6 @@ name seed : index->message
 name keyState : index->message
 name keyMsg : index->message
 
-mutable kT : index->message
-mutable kR : index->message
-
 channel cT
 channel cR
 
@@ -33,6 +30,9 @@ abstract range : message->message->message
 
 abstract updateTag : index->message->message (* should be private *)
 abstract updateReader : index->message->message (* should be private *)
+
+mutable kT(i:index) : message = hState(<seed(i),delta>,keyState(i))
+mutable kR(ii:index) : message = hState(<seed(ii),delta>,keyState(ii))
 
 (* i = tag's identity, j = tag's session for identity i *)
 process tag(i:index,j:index) =
@@ -65,17 +65,12 @@ axiom updateTagAxiom :
 axiom updateReaderAxiom :
   forall (ii:index,x:message), updateReader(ii,hMsg(x,keyMsg(ii))) = x.
 
-axiom stateTagInit :
-  forall (i:index), kT(i)@init = hState(<seed(i),delta>,keyState(i)).
-axiom stateReaderInit :
-  forall (i:index), kR(i)@init = hState(<seed(i),delta>,keyState(i)).
-
 goal auth_R :
   forall (k,ii:index,delta:message),
     cond@R(k,ii)
     => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
 Proof.
-intros.
+intro *.
 expand cond@R(k,ii).
 
 use rangeAxiom with xkT,kR(ii)@R(k,ii).
@@ -83,8 +78,8 @@ use H0.
 
 use updateReaderAxiom with ii,xkT.
 assert kR(ii)@R(k,ii) = xkT.
-assert xkT = hState(<seed(i),z>,keyState(i)).
-euf M6.
+use H.
+euf Meq4.
 (* Error "Tactic failed: Key does not satisfy the syntactic side condition."
 Coming from variable messages?  *)
 Qed.

@@ -21,8 +21,8 @@ name seed : index->message
 name keyMsg : index->message
 name keyState : index->message
 
-mutable kT : index->message
-mutable kR : index->message
+mutable kT(i:index) : message = seed(i)
+mutable kR(ii:index) : message = seed(ii)
 
 channel cT
 channel cR
@@ -48,8 +48,8 @@ forall (k,ii:index),
   cond@R(k,ii) =>
   (exists (j:index), T(ii,j) < R(k,ii) && output@T(ii,j) = input@R(k,ii)).
 Proof.
-intros.
+intro *.
 expand cond@R(k,ii).
-euf M0.
+euf H.
 exists j.
 Qed.

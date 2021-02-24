@@ -19,8 +19,8 @@ name seed : index->message
 name keyState : index->message
 name keyMsg : index->message
 
-mutable kT : index->message 
-mutable kR : index->message
+mutable kT(i:index) : message = seed(i)
+mutable kR(ii:index) : message = seed(ii)
 
 channel cT
 channel cR
@@ -90,15 +90,12 @@ goal auth_R_step : forall (delta:message,k,ii:index),
    readerTest(ii,x,input@R(k,ii),delta) = testOk =>
    exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j)).
 Proof.
-intros.
+intro *.
 use readerTestOk with ii,x,input@R(k,ii),delta.
-use H1.
-case H3.
-(* euf M2 ?
+case H1.
+(* euf Meq0 ?
    Problème avec la variable x. *)
 admit.
-use H0 with hState(x,keyState(ii)).
-use stacked_step with ii,kR(ii)@R(k,ii),x.
 Qed.
 
 goal auth_R :
@@ -106,16 +103,16 @@ goal auth_R :
     ( readerTest(ii,kR(ii)@R(k,ii),input@R(k,ii),delta) = testOk )
     => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
 Proof.
-intros.
+intro *.
 
 use readerTestOk with ii,kR(ii)@R(k,ii),input@R(k,ii),deltaMax.
 use H0.
-case H2.
+case H0.
 
   (* case H2 => direct case - sync *)
   assert kR(ii)@R(k,ii) = hState(kR(ii)@R(k,ii),keyState(ii)).
   admit.
-  euf M2.
+  euf Meq1.
   (** Deux questions :
       1) Est-ce que la théorie autorise bien EUF ici, sachant qu'on a une variable
          de type message dans le séquent (même si pas dans M2) ?
@@ -125,13 +122,9 @@ case H2.
   (* case H2 => recursive case - desync *)
   use readerTestOk with ii,hState(kR(ii)@R(k,ii),keyState(ii)),input@R(k,ii),myPred(deltaMax).
   use H2.
-  case H4.
+  case H2.
 
     (* case H4 => direct case - sync *)
-    assert kR(ii)@R(k,ii) = hState(hState(kR(ii)@R(k,ii),keyState(ii)),keyState(ii)).
-    admit.
-    euf M3.
-    exists ii,j.
 
     (* case H4 => recursive case - desync *)
 
