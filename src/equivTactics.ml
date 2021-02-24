@@ -1580,7 +1580,7 @@ let auto ~conclude s sk fk =
   let open Tactics in
   match s with
   | Prover.Goal.Equiv s ->
-    let sk l fk = 
+    let sk l _ = 
       if conclude && l <> [] 
       then fk GoalNotClosed
       else sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
