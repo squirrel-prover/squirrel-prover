@@ -54,7 +54,10 @@ abstract endplug: message
 abstract startpress: message
 abstract accept:message
 
+abstract myZero : message
 abstract mySucc : message -> message
+
+abstract AEADinit : index -> message
 
 (* public/secret id *)
 abstract pid: index -> message
@@ -75,11 +78,11 @@ name npr: index -> index -> message
 name n: index -> message
 
 (* counters *)
-mutable YCtr: index -> message (* YubiKey counter *)
-mutable SCtr: index -> message (* server counter *)
+mutable YCtr(i:index) : message = myZero
+mutable SCtr(i:index) : message = myZero
 
 (* authentication server's database *)
-mutable AEAD : index -> message
+mutable AEAD(i:index) : message = AEADinit(i)
 
 channel cY
 channel cS

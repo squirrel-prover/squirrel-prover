@@ -104,8 +104,8 @@ end = struct
   let rec uts ts = match ts with
     | Term.Var tv -> uvar tv
     | Term.Pred ts -> upred (uts ts)
+    | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvari l)
-    | Term.Init -> uinit
     | _ -> failwith "Not implemented"
 end
 
@@ -397,7 +397,6 @@ let mk_instance (l : Form.form list) : constr_instance =
     If [ext_support] is [true], add [ut] to [uf]'s support if necessary.
     Note that [mgu] normalizes [pred(init)] and [pred(undef)] into [undef]. *)
 let mgu (uf : Uuf.t) (ut : ut) =
-
   let rec mgu_ uf ut lv =
     let uf, nut = mgu_aux uf ut lv in
     let uf = Uuf.extend uf nut in
@@ -446,7 +445,7 @@ let mgu (uf : Uuf.t) (ut : ut) =
   in 
 
   mgu_ uf ut []
-      
+
 
 let mgus uf uts =
   let uf, nuts_rev =
@@ -778,7 +777,7 @@ let build_graph (uf : Uuf.t) neqs leqs =
         (* case iii) *)
         if is_def uf neqs v then UtG.add_edge g uinit v else g
       ) g g in
-    
+
   let uf, g = bg uf leqs UtG.empty in
   (uf, add_preds_and_init g)
 
@@ -892,7 +891,7 @@ let add_disj uf g u x =
               pp_ut u
               minj maxj pp_ut x;
             Some (uf, List.map (fun x -> (nu,x)) l)
-        ) (max_pred uf g nu x) 
+        ) (max_pred uf g nu x)
     ) (min_pred uf g nu x)
 
 
@@ -962,6 +961,7 @@ let neq_sat inst g : bool =
     
   
 (*------------------------------------------------------------------*)
+
 let get_basics uf elems =
   List.map (fun x -> mgu uf x |> snd) elems
   |> List.filter (fun x -> match x.cnt with UPred _ -> false | _ -> true)
@@ -1291,12 +1291,12 @@ and pb_eq2 = [`Timestamp (`Eq,tau, Pred tau)]
 and pb_eq3 = (`Timestamp (`Eq,tau, Pred tau'))
              :: (`Timestamp (`Eq,tau', Pred tau''))
              :: [`Timestamp (`Eq,tau'', tau)]
-and pb_eq4 = (`Timestamp (`Eq,Term.Init, Pred tau))
+and pb_eq4 = (`Timestamp (`Eq,Term.init, Pred tau))
              :: (`Timestamp (`Eq,tau, Pred tau'))
              :: (`Timestamp (`Eq,tau', Pred tau''))
              :: (`Timestamp (`Eq,tau, Action (a,[i])))
              :: [`Timestamp (`Eq,tau'', Action (a,[i]))]
-and pb_eq5 = (`Timestamp (`Eq,Term.Init, Pred tau))
+and pb_eq5 = (`Timestamp (`Eq,Term.init, Pred tau))
              :: (`Timestamp (`Eq,tau, Pred tau'))
              :: (`Timestamp (`Eq,tau', Action (a,[i'])))
              :: (`Timestamp (`Eq,tau, Action (a,[i])))                 
@@ -1370,7 +1370,7 @@ let () =
                        (`Timestamp (`Leq, tau3, tau4)) ::
                        (`Timestamp (`Leq, tau4, tau'')) ::
                        pb_eq1] in
-       
+
        List.iteri (fun i pb ->
            Alcotest.check_raises ("graph(sat)" ^ string_of_int i) Sat
              (fun () -> test (models_conjunct (mk pb))))

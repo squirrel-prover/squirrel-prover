@@ -1,6 +1,7 @@
-mutable s : message
-mutable permut : message
+abstract n0 : message
 abstract v : message
+
+mutable s : message = n0
 
 channel c
 

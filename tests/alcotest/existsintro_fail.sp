@@ -10,7 +10,7 @@ name na : index -> message
 name nb : index -> message
 name nc : index -> message
 name mc : index -> message
-mutable s : message
+mutable s : message = empty
 
 system out(c,cst);
 (
@@ -27,5 +27,5 @@ goal unforgeable (tau : timestamp, tau2:timestamp, b:index) :
   Proof.
   intro tau tau2 b Heq.
   euf Heq. intro Hts Hin.
-  exists a1. 
+  exists a1.
 Qed.

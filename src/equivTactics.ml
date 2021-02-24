@@ -475,7 +475,7 @@ let induction TacticsArgs.(Timestamp ts) s =
     (* rename the inducition hypothesis *)
     let induc_s = do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
 
-    let init_goal = Equiv.subst_form [Term.ESubst(ts,Init)] goal in
+    let init_goal = Equiv.subst_form [Term.ESubst(ts,Term.init)] goal in
     let init_s = EquivSequent.set_goal s init_goal in
     let init_s = intro_back init_s in
 
@@ -483,22 +483,27 @@ let induction TacticsArgs.(Timestamp ts) s =
     (** [add_action _action descr] adds to goals the goal corresponding to the
       * case where [t] is instantiated by [descr]. *)
     let add_action descr =
-      let env = ref @@ EquivSequent.env induc_s in
-      let subst =
-        List.map
-          (fun i ->
-             let i' = Vars.make_fresh_from_and_update env i in
-             Term.ESubst (Term.Var i, Term.Var i'))
-          descr.Action.indices
-      in
-      let name =
-        SystemExpr.action_to_term table system
-          (Action.subst_action subst descr.Action.action)
-      in
-      let ts_subst = [Term.ESubst(ts,name)] in
-      goals := (EquivSequent.subst ts_subst induc_s
-                |> EquivSequent.set_env !env)
-               ::!goals
+      if descr.Action.name = Symbols.init_action
+      then ()
+      else
+        begin
+          let env = ref @@ EquivSequent.env induc_s in
+          let subst =
+            List.map
+              (fun i ->
+                 let i' = Vars.make_fresh_from_and_update env i in
+                 Term.ESubst (Term.Var i, Term.Var i'))
+              descr.Action.indices
+          in
+          let name =
+            SystemExpr.action_to_term table system
+              (Action.subst_action subst descr.Action.action)
+          in
+          let ts_subst = [Term.ESubst(ts,name)] in
+          goals := (EquivSequent.subst ts_subst induc_s
+                    |> EquivSequent.set_env !env)
+                   ::!goals 
+        end
     in
 
     SystemExpr.iter_descrs table system add_action ;
@@ -1213,7 +1218,6 @@ let expand_all () s =
       | Atom (`Index _) as a-> a
       | Atom (`Timestamp _) as a->  a
       | Atom (`Happens _) as a->  a
-      | Init -> Init
       | Pred _ as a -> a
       | Action _ as a -> a
     in

@@ -1,6 +1,6 @@
 set autoIntro=false.
 
-mutable s : message
+mutable s : message = empty
 hash h
 name k : message
 system s := s.

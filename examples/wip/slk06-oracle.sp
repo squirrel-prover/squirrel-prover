@@ -53,9 +53,9 @@ hash h3
 name idinit : index->message
 name pin : index->message
 
-mutable kT : index->message (* <ID,TSlast> *)
-mutable kR : index->message (* <ID> *)
-mutable TS : message
+mutable kT(i:index) : message = <idinit(i),TSinit>
+mutable kR(ii:index) : message = idinit(ii)
+mutable TS : message = TSinit
 
 channel cT
 channel cR
@@ -91,10 +91,6 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h1(m,key1)))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
-
-(* /!\ incorrect modelling of state initial values *)
-axiom stateTagInit : forall (i:index), kT(i)@init = <idinit(i),TSinit>
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = idinit(ii).
 
 goal lastUpdateTag_ :
 forall (t:timestamp), forall (i:index),
@@ -272,8 +268,7 @@ induction.
 use lastUpdatePredR1 with jj,ii as H0.
 case H0.
 (* init case *)
-use stateReaderInit with ii as M2.
-by fresh M2.
+admit. (* FRESH *)
 (* general case *)
 assert
   input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) as M2.
@@ -303,9 +298,8 @@ split.
 use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
-use stateTagInit with i as H0.
 assert idinit(i) = fst(kT(i)@init) as M3.
-by fresh M3.
+admit. (* FRESH *)
 (* general case *)
 assert
   fst(input@t) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3)
@@ -330,9 +324,8 @@ admit. (* TODO *)
 use lastUpdatePredT1 with i,j as H0.
 case H0.
 (* init case *)
-use stateTagInit with i.
 assert idinit(i) = fst(kT(i)@init) as M3.
-by fresh M3.
+admit. (* FRESH *)
 (* general case *)
 assert
   fst(fst(input@t)) =
@@ -371,20 +364,17 @@ use lastUpdateT with i,j as H0.
 use lastUpdatePredR1 with jj,ii as H1.
 case H0.
 (* init case *)
-use stateTagInit with i.
-use stateReaderInit with ii.
 case H1.
 assert
  h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) = idinit(i)
  as M6.
-by fresh M6.
+admit. (* FRESH *)
 (* general case *)
 case H1.
-use stateReaderInit with ii.
 assert
  idinit(ii) = h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3)
  as M5.
-by fresh M5.
+admit. (* FRESH *)
 assert
   h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3) =
   h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)

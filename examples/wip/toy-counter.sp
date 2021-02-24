@@ -30,8 +30,9 @@ name secret : message
 name key : message
 
 abstract error : message
+abstract myZero : message
 
-mutable d : message
+mutable d : message = myZero
 
 channel cA
 channel cB

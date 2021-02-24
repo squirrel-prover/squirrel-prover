@@ -193,10 +193,15 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
 
   let cases = SystemExpr.map_descrs table system mk_case in
 
+  (* List.map (fun f ->
+      let id, s = Hyps.add_i Args.Unnamed f s in
+      ( CHyp id, s )
+    ) (Atom (`Timestamp (`Eq,ts,Term.Action (Symbols.init_action,[]))) :: cases) *)
+
   List.map (fun f ->
       let id, s = Hyps.add_i Args.Unnamed f s in
       ( CHyp id, s )
-    ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
+    ) cases
 
 (** Case analysis on an hypothesis.
     When [nb=`Any], recurses. 

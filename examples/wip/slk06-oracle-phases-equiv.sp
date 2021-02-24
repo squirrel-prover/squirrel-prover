@@ -43,9 +43,9 @@ hash h3
 name idinit : index->message
 name pin : index->message
 
-mutable kT : index->message (* <ID,TSlast> *)
-mutable kR : index->message (* <ID> *)
-mutable TS : message
+mutable kT(i:index) : message = <idinit(i),TSinit>
+mutable kR(ii:index) : message = idinit(ii)
+mutable TS : message = TSinit
 
 channel cT
 channel cR

@@ -85,22 +85,22 @@ let fresh ?(group=default_group) prefix table =
   find i0
 
 (*------------------------------------------------------------------*)
-type namespace = 
-  | NChannel 
-  | NName    
-  | NAction  
+type namespace =
+  | NChannel
+  | NName
+  | NAction
   | NFunction
-  | NMacro   
-  | NSystem  
-  | NProcess 
+  | NMacro
+  | NSystem
+  | NProcess
 
 let pp_namespace fmt = function
-  | NChannel  -> Fmt.pf fmt "Channel" 
-  | NName     -> Fmt.pf fmt "Name"    
-  | NAction   -> Fmt.pf fmt "Action"  
+  | NChannel  -> Fmt.pf fmt "Channel"
+  | NName     -> Fmt.pf fmt "Name"
+  | NAction   -> Fmt.pf fmt "Action"
   | NFunction -> Fmt.pf fmt "Function"
-  | NMacro    -> Fmt.pf fmt "Macro"   
-  | NSystem   -> Fmt.pf fmt "System"  
+  | NMacro    -> Fmt.pf fmt "Macro"
+  | NSystem   -> Fmt.pf fmt "System"
   | NProcess  -> Fmt.pf fmt "Process"
 
 let edef_namespace_opt : edef -> namespace option = fun e ->
@@ -111,20 +111,20 @@ let edef_namespace_opt : edef -> namespace option = fun e ->
   | Exists (Function _) -> Some NFunction
   | Exists (Macro    _) -> Some NMacro
   | Exists (System   _) -> Some NSystem
-  | Exists (Process  _) -> Some NProcess 
-  | Reserved            -> None 
+  | Exists (Process  _) -> Some NProcess
+  | Reserved            -> None
 
 let edef_namespace x = oget (edef_namespace_opt x)
 
 let get_namespace ?(group=default_group) table s =
   let s = { group; name=s } in
-  let f (x,_) = edef_namespace_opt x in  
+  let f (x,_) = edef_namespace_opt x in
   obind f (Ms.find_opt s table)
 
 (*------------------------------------------------------------------*)
 (* TODO: group exception together + improve errors *)
 exception Unbound_identifier of string
-exception Incorrect_namespace 
+exception Incorrect_namespace
 exception Multiple_declarations of string
 
 (*------------------------------------------------------------------*)
@@ -184,7 +184,7 @@ module type S = sig
   val deconstruct : edef -> local_def
 end
 
-module Make (N:S) : Namespace 
+module Make (N:S) : Namespace
   with type ns = N.ns with type def = N.local_def = struct
 
   type ns = N.ns
@@ -213,8 +213,8 @@ module Make (N:S) : Namespace
 
   let declare table name ?(data=Empty) value =
     let symb = fresh ~group name table in
-    let table = 
-      table_add table symb (Exists (N.construct value), data) 
+    let table =
+      table_add table symb (Exists (N.construct value), data)
     in
     table, symb
 
@@ -365,6 +365,15 @@ end)
 (* reference used to build the table. Must not be exported in the .mli *)
 let builtin_ref = ref empty_table
 
+(** {Action builtins} *)
+
+let mk_action a =
+  let table, a = Action.reserve_exact !builtin_ref a in
+  builtin_ref := table;
+  a
+
+let init_action = mk_action "init"
+
 (** {3 Macro builtins} *)
 
 let mk_macro m def =
@@ -380,8 +389,8 @@ let frame = mk_macro "frame"  Frame
 
 (** {3 Channel builtins} *)
 
-let dummy_channel_string = "ø" 
-let table,dummy_channel = 
+let dummy_channel_string = "ø"
+let table,dummy_channel =
   Channel.declare_exact !builtin_ref dummy_channel_string ()
 let () = builtin_ref := table
 

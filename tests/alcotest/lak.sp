@@ -13,11 +13,11 @@ abstract ko:message
 
 (* Reader database entries for keys and old keys *)
 
-mutable km : index->message
-mutable ks : index->index->message
+mutable km(i:index): message = empty
+mutable ks(i:index,j:index): message = empty
 
-mutable okm : index->message
-mutable oks : index->index->message
+mutable okm(i:index): message = empty
+mutable oks(i:index,j:index): message = empty
 
 (* Macros for looking up (old) keys in Reader biprocess *)
 

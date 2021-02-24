@@ -1,6 +1,6 @@
 set autoIntro=false.
 
-mutable s : index->message
+mutable s(i:index): message = empty
 abstract f : message->message
 
 system !_i s(i):=f(s(i)).

@@ -9,13 +9,13 @@
   * to make sure that types make sense, and of the conversion to replace
   * strings by proper sorted variables.
   *
-  * Symbols cannot be disambiguated at parsing time, hence we use very 
+  * Symbols cannot be disambiguated at parsing time, hence we use very
   * permissives [App] and [AppAt] constructors which represents
   * function applications, macros, variables, names etc. *)
 type kind = Sorts.esort
 
 type lsymb = string Location.located
-    
+
 type term_i =
   | Tinit
   | Tpred of term
@@ -24,13 +24,13 @@ type term_i =
   | ITE   of term * term * term
   | Find  of lsymb list * term * term * term
 
-  | App of lsymb * term list 
+  | App of lsymb * term list
   (** An application of a symbol to some arguments which as not been
     * disambiguated yet (it can be a name, a function symbol
     * application, a variable, ...)
     * [App(f,t1 :: ... :: tn)] is [f (t1, ..., tn)] *)
 
-  | AppAt of lsymb * term list * term 
+  | AppAt of lsymb * term list * term
   (** An application of a symbol to some arguments, at a given
     * timestamp.  As for [App _], the head function symbol has not been
     * disambiguated yet.
@@ -61,52 +61,59 @@ val equal : term -> term -> bool
 
 (** Declare a new function symbol of type message->message->message, * which
     satisfies PRF, and thus collision-resistance and EUF. *)
-val declare_hash 
+val declare_hash
   : Symbols.table -> ?index_arity:int -> string
   -> Symbols.table
 
 (** Asymmetric encryption function symbols are defined by the triplet
     (enc,dec,pk).
     It models an authenticated encryption. *)
-val declare_aenc 
-  : Symbols.table -> string -> string -> string 
+val declare_aenc
+  : Symbols.table -> string -> string -> string
   -> Symbols.table
 
 (** Symmetric encryption function symbols are defined by the couple
     (enc,dec).
     It models an authenticated encryption. *)
-val declare_senc 
+val declare_senc
   : Symbols.table -> string -> string
   -> Symbols.table
 
 (** Symmetric encryption function symbols are defined by the couple
     (enc,dec).
     It models an authenticated encryption, jointly secure with hashes of the key.*)
-val declare_senc_joint_with_hash 
+val declare_senc_joint_with_hash
   : Symbols.table -> string -> string -> lsymb
   -> Symbols.table
 
 (** A signature is defined by a triplet, corresponding to (sign,checksign,pk).
     It satisfies EUF. *)
-val declare_signature 
-  : Symbols.table -> string -> string -> string 
+val declare_signature
+  : Symbols.table -> string -> string -> string
   -> Symbols.table
 
 (** [declare_name n i] declares a new name of type
   * [index^i -> message]. *)
-val declare_name 
+val declare_name
   : Symbols.table -> string -> int -> Symbols.table
 
-(** [declare_state n i s] declares a new state symbol of type
-  * [index^i -> s] where [s] is either [boolean] or [message]. *)
-val declare_state 
-  : Symbols.table -> string -> int -> Sorts.esort 
+(** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
+    a new state symbol of type [s1->...->sn->s]
+    where [si] is [index] and [s] is [message]
+    such that value of [s(t1,...,tn)] for init timestamp
+    expands to [t\[x1:=t1,...,xn:=tn\]]. *)
+val declare_state :
+  Symbols.table -> string -> (lsymb*Sorts.esort) list -> Sorts.esort -> term
   -> Symbols.table
+(** [get_init_states] returns all the initial values of declared state symbols,
+    used to register the init action *)
+val get_init_states :
+  Symbols.table -> (Term.state * Term.message) list
 
 (** [declare_abstract n i m] declares a new function symbol
   * of type [index^i -> message^m -> message]. *)
-val declare_abstract : 
-  Symbols.table -> string -> index_arity:int -> message_arity:int 
+val declare_abstract :
+  Symbols.table -> string -> index_arity:int -> message_arity:int
   -> Symbols.table
 
 (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
@@ -120,7 +127,7 @@ val declare_macro :
 
 val empty : Location.t -> term
 
-(** [var_i x] make a variable represented as [App (x,\[\])] *)  
+(** [var_i x] make a variable represented as [App (x,\[\])] *)
 val var_i        : Location.t -> string -> term_i
 val var          : Location.t -> string -> term
 val var_of_lsymb : lsymb                -> term
@@ -187,9 +194,9 @@ val convert_index : Symbols.table -> subst -> term -> Vars.index
 (** Conversion context.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
   *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit 
+  * - [InProc ts]: we are converting a term in a process at an implicit
   *   timestamp [ts]. *)
-type conv_cntxt = 
+type conv_cntxt =
   | InProc of Term.timestamp
   | InGoal
 
@@ -200,9 +207,9 @@ val convert : conv_env -> subst -> term -> 'a Sorts.sort -> 'a Term.term
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)
-type eterm = ETerm : 'a Sorts.sort * 'a Term.term * Location.t -> eterm 
+type eterm = ETerm : 'a Sorts.sort * 'a Term.term * Location.t -> eterm
 
-(** Convert a term to any sort (tries sequentially all conversions). 
+(** Convert a term to any sort (tries sequentially all conversions).
     Should return the most precise sort (i.e. [Boolean] before [Message]). *)
 val econvert : conv_env -> subst -> term -> eterm option
 

@@ -74,11 +74,10 @@ and _ term =
   | Macro  :
       'a msymb * Sorts.message term list * Sorts.timestamp term
       -> 'a term
-        
+
   | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
   | Pred   : Sorts.timestamp term -> Sorts.timestamp term
   | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
-  | Init   : Sorts.timestamp term
   | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
@@ -195,9 +194,10 @@ val subst_macros_ts :
   string list -> Sorts.timestamp term -> 'a term -> 'a term
 
 (*------------------------------------------------------------------*)
-(** {2 Predefined symbols} *)
+(** {2 Builtins} *)
 
-val empty : Sorts.message term
+val empty : message 
+val init : timestamp
 
 val in_macro    : Sorts.message msymb
 val out_macro   : Sorts.message msymb
