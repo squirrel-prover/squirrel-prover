@@ -131,6 +131,7 @@ type proc_error_i =
   | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
+  | DuplicatedUpdate of string
 
 type proc_error = L.t * proc_error_i
 
@@ -147,6 +148,9 @@ let pp_proc_error_i fmt = function
 
   | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
                                        defined with arity %i" s i j
+
+  | DuplicatedUpdate s -> Fmt.pf fmt "state %s can only be updated once \
+                                      in an action" s
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aproc error: %a."
@@ -777,7 +781,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
            - either the value at the end of the current action,
            - either the value before the current action.
              There is no in-between value. *)
-        failwith "Cannot update twice the same state in an action"
+        proc_err loc (DuplicatedUpdate (L.unloc s))
       else
         let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
         let l' =

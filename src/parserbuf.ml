@@ -368,4 +368,13 @@ let () =
            with Process.ProcError (_,
                                    ProcessAlreadyDecl "C") -> raise Ok)
     end ;
+    "Duplicated State Update", `Quick, begin fun () ->
+      Alcotest.check_raises "fails" Ok
+        (fun () ->
+           try ignore (parse_theory_test ~test
+                        "tests/alcotest/state_duplicated_update.sp"
+                       : Symbols.table )
+           with Process.ProcError (_,
+                                   DuplicatedUpdate "s") -> raise Ok)
+    end ;
   ];;
