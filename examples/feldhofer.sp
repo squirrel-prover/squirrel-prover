@@ -178,7 +178,7 @@ Proof.
 
   (* Action 1/4: Reader *)
 
-  expand seq(k->nr(k)),k.
+  expand seq(k1->nr(k1)),k.
   expandall.
   by fa 3.
 
@@ -260,7 +260,7 @@ Proof.
   fa 3; fadup 3.
   fa 3; fadup 3.
   enckp 3, k_fresh.
-  expand seq(k->nr(k)),k.
+  expand seq(k1->nr(k1)),k.
   expand seq(i,j->nt(i,j)),i,j.
   fa 5.
   fresh 6.
@@ -288,7 +288,7 @@ Proof.
   fa 2. fa 3.  fa 3.
 
   enckp 3, k_fresh.
-  expand seq(i,j->nt(i,j)),i,j.
+  expand seq(i,j1->nt(i,j1)),i,j.
   fa 4.
   fresh 5.
   by fresh 4; yesif 4.

@@ -131,15 +131,15 @@ Proof.
     by ddh a,b,k.
     (* Pchall *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expand seq(i1->g^a(i1)), i.
     by fa 6.
     (* Pchall1 *)
     expandall.
-    expand seq(i->g^a(i)), i.
+    expand seq(i1->g^a(i1)), i.
     by fa 6.
     (* A *)
     expandall.
-    expand  seq(i->g^a(i)), i.
+    expand  seq(i1->g^a(i1)), i.
     by fa 6.
     (* S *)
     expandall.
@@ -171,7 +171,7 @@ Proof.
 
     fa 5.
     fa 6.
-    noif 6.
+    by noif 6.
     (* A1 *)
     expandall.
     expand  seq(i->g^b(i)), j.
@@ -198,21 +198,21 @@ Proof.
 
     (* init *)
     expandall.
-    ddh a,b,k.
+    by ddh a,b,k.
     (* Pchall *)
     expandall.
-    expand seq(i->g^a(i)), i.
-    fa 6.
+    expand seq(i1->g^a(i1)), i.
+    by fa 6.
     (* Pchall1 *)
     expandall.
-    expand seq(i->g^a(i)), i.
-    fa 6.
+    expand seq(i1->g^a(i1)), i.
+    by fa 6.
     (* Case Pchall2 *)
     expandall.
-    expand  seq(i->g^a(i)), i.
+    expand seq(i->g^a(i)), i.
     expand seq(i->g^b(i)), j.
-    expand seq(i,j->(diff(g^a(i)^b(j), g^k(i,j)))), i, j.
-    fa 8.
+    expand seq(i,j1->(diff(g^a(i)^b(j1), g^k(i,j1)))), i, j.
+    by fa 8.
     (* Pchall3 *)
     expand frame@Pchall3(i).
     expand exec@Pchall3(i).
@@ -233,7 +233,7 @@ Proof.
     noif 6.
     (* A *)
     expandall.
-    expand  seq(i->g^a(i)), i.
+    expand  seq(i1->g^a(i1)), i.
     by fa 6.
 
     (* S *)
