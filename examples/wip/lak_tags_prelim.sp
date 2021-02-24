@@ -39,23 +39,23 @@ Proof.
   fa 1. fa 2.
   fresh 2.
   yesif 2.
-  apply phase_A_A1 to i,k,j.
-  apply phase_A1_A2 to i,k.
-  apply phase_A1_A3 to i,k,j1.
+  use phase_A_A1 with i,k,j.
+  use phase_A1_A2 with i,k.
+  use phase_A1_A3 with i,k,j1.
   expandall.
   fa 1. fa 2.
   fresh 2.
   yesif 2.
-  apply phase_A1_A2 to i1,k1.
+  use phase_A1_A2 with i1,k1.
   (* Case of tag1 hashes *)
   expandall. fa 1. fa 2.
   prf 2. yesif 2.
-    apply tags_neq; split; project.
+    use tags_neq; split; project.
   fresh 2.
   (* Case of tag2 hashes *)
   expandall. fa 1. fa 2.
   prf 2. yesif 2.
-    apply tags_neq; split; project.
+    use tags_neq; split; project.
     admit. (* ??? *)
   fresh 2.
 Qed.

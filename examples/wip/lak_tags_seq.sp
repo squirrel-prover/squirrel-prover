@@ -54,7 +54,7 @@ goal wa_R1: forall j:index,
 Proof.
 intros; split.
 (* cond => wa *)
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
 euf M0.
 exists i,k1.
@@ -85,7 +85,7 @@ goal wa_R2: forall j:index,
 Proof.
 intros; split.
 (* cond => wa *)
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
 euf M0.
 exists i,k1.
@@ -114,7 +114,7 @@ goal [left] wa_R1_left: forall (i,j:index),
 
 Proof.
 intros.
-apply tags_neq.
+use tags_neq.
 euf M0.
 exists k.
 assert input@T(i,k)=nR(j).
@@ -133,7 +133,7 @@ goal [right] wa_R1_right: forall (i,j,k:index),
 
 Proof.
 intros.
-apply tags_neq.
+use tags_neq.
 euf M0.
 assert input@T(i,k)=nR(j).
 fresh M3.
@@ -170,7 +170,7 @@ equivalent
    fst(output@T(i,k)) = fst(input@R1(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
 
-apply wa_R1 to j.
+use wa_R1 with j.
 
 equivalent
   (if exec@pred(R1(j)) &&
@@ -202,14 +202,14 @@ exists i,k.
 project.
 (* LEFT *)
 fa.
-apply wa_R1_left to i1,j.
-apply H1.
+use wa_R1_left with i1,j.
+use H1.
 exists k.
 yesif.
 (* RIGHT *)
 fa.
-apply wa_R1_right to i1,j,k1.
-apply H1.
+use wa_R1_right with i1,j,k1.
+use H1.
 yesif.
 
 fa 5. fadup 4.
@@ -232,7 +232,7 @@ equivalent
    fst(output@T(i,k)) = fst(input@R2(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
 
-apply wa_R2 to j.
+use wa_R2 with j.
 
 fadup 4.
 
@@ -257,7 +257,7 @@ expand cond@T1(i,k); split.
 
 (* cond => honest *)
 expand m2(i,k)@T1(i,k).
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
 euf M0.
 assert R1(j) < T1(i,k).
@@ -265,7 +265,7 @@ assert R1(j) < T1(i,k).
   depends T(i,k),T1(i,k).
 assert cond@R1(j).
   executable pred(T1(i,k)).
-  apply H2 to R1(j).
+  use H2 with R1(j).
   expand exec@R1(j).
 assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)).
 assert nR(j) = input@T(i,k).
@@ -289,7 +289,7 @@ case try find i,k such that
    We know D0: output@R1(j) = h(<snd(input@R1(j)),nR(j)>,key(i1))
    but the hashed message can only depend *)
 (* TODO euf D0 crashes here... I'm re-using wa_R1_left instead *)
-apply wa_R1_left to i1,j. apply H3.
+use wa_R1_left with i1,j. use H3.
 (* TODO understand why these "harmless" substitutions break the proof
 substitute fst(output@T(i1,k2)),nT(i1,k2).
 substitute fst(input@R1(j)),nT(i1,k2). *)
@@ -301,7 +301,7 @@ exists j.
 (* If try-find fails, we contradict cond@R1(j).
    Here we do not care that this condition gives us uselessly new indices. *)
 expand cond@R1(j).
-apply H2 to i1,k1.
+use H2 with i1,k1.
 
 (* RIGHT *)
 euf M0.
@@ -310,7 +310,7 @@ assert R1(j) < T1(i,k).
   depends T(i,k),T1(i,k).
 assert cond@R1(j).
   executable pred(T1(i,k)).
-  apply H2 to R1(j).
+  use H2 with R1(j).
   expand exec@R1(j).
 assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)).
 assert nR(j) = input@T(i,k).
@@ -324,20 +324,20 @@ case try find i,k such that
         snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
       in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
 
-apply wa_R1_right to i1,j,k1. apply H3.
+use wa_R1_right with i1,j,k1. use H3.
 assert h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)) = h(<<nR(j),nT(i1,k1)>,tag1>,key'(i1,k1)).
 euf M10. 
 exists j.
 
 expand cond@R1(j).
-apply H2 to i1,k1.
+use H2 with i1,k1.
 
 (* honest => cond *)
 case output@R1(j).
 expand m2(i,k)@T1(i,k).
 project; euf M4.
 false_left. false_left.
-apply H1 to i,k.
+use H1 with i,k.
 
 fa 5. fa 6. 
 fadup 4.
@@ -356,27 +356,27 @@ equivalent exec@pred(T2(i,k)) && cond@T2(i,k),
   input@T(i,k) = output@R(j)).
 
 expand cond@T2(i,k). split.
-apply H1.
+use H1.
 
 (* honest => cond *)
 case output@R1(j).
 expand m2(i,k)@T2(i,k).
 project; euf M4.
 false_left. false_left.
-apply H2 to i,k.
+use H2 with i,k.
 
 (* cond => honest *)
 expand m2(i,k)@T2(i,k).
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
-apply H1.
+use H1.
 euf M0.
 assert R1(j) < T2(i,k).
   case H2.
   depends T(i,k),T2(i,k).
 assert cond@R1(j).
   executable pred(T2(i,k)).
-  apply H3 to R1(j).
+  use H3 with R1(j).
   expand exec@R1(j).
 assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)).
 assert nR(j) = input@T(i,k).
@@ -390,13 +390,13 @@ case try find i,k such that
         snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i))
       in h(<<snd(input@R1(j)),nR(j)>,tag2>,key(i)).
 
-apply wa_R1_left to i1,j. apply H4.
+use wa_R1_left with i1,j. use H4.
 assert h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) = h(<<nR(j),nT(i1,k2)>,tag1>,key(i1)).
 euf M10. 
 exists j.
 
 expand cond@R1(j).
-apply H3 to i1,k1.
+use H3 with i1,k1.
 (* RIGHT *)
 euf M0.
 assert R1(j) < T2(i,k).
@@ -404,7 +404,7 @@ assert R1(j) < T2(i,k).
   depends T(i,k),T2(i,k).
 assert cond@R1(j).
   executable pred(T2(i,k)).
-  apply H3 to R1(j).
+  use H3 with R1(j).
   expand exec@R1(j).
 assert snd(input@R1(j)) = h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)).
 assert nR(j) = input@T(i,k).
@@ -418,15 +418,15 @@ case try find i,k such that
         snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k))
       in h(<<snd(input@R1(j)),nR(j)>,tag2>,key'(i,k)).
 
-apply wa_R1_right to i1,j,k1. apply H4.
+use wa_R1_right with i1,j,k1. use H4.
 assert h(<<input@T(i,k),nT(i,k)>,tag1>,key'(i,k)) = h(<<nR(j),nT(i1,k1)>,tag1>,key'(i1,k1)).
 euf M10. 
 
-apply H1.
+use H1.
 exists j.
 
 expand cond@R1(j).
-apply H3 to i1,k1.
+use H3 with i1,k1.
 
 
 fa 5. fa 6. 

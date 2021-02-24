@@ -11,6 +11,6 @@ axiom two : forall x:message, (forall x:message, f(x)=a) => f(x)=b.
 
 goal f(a)=b.
 Proof.
-  apply two to a.
-  apply one.
+  use two with a.
+  use one.
 Qed.

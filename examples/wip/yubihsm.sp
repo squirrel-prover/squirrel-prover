@@ -45,7 +45,7 @@ counter.
 
 - Diff terms are here to model a real system and an ideal system.
 The ideal system uses a different key k2'(i,j) for each generated otp.
-The goal is to being able to apply the intctxt tactic for the auth goal.
+The goal is to being able to use the intctxt tactic for the auth goal.
 *******************************************************************************)
 senc enc,dec
 

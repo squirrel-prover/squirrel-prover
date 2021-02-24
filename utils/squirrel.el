@@ -153,5 +153,112 @@ error and then highlight in the script buffer."
           'display-ansi-colors)
 
 
+;; The following is a way to nicely display some Markdown constructs inside the comments of Squirrel files. I probably did it in the most inefficient possible way, sorry.
+
+(defface md-keyword
+  '((t :foreground "yellow3"
+      ))
+  "face for user defined variables."
+  :group 'my-mode )
+
+(defconst  md-keyword 'md-keyword)
+
+
+(defface md-title
+  '((t :foreground "hotpink"
+       :height 1.3
+      ))
+  "face for user defined variables."
+  :group 'my-mode )
+
+(defface md-title2
+  '((t :foreground "mediumpurple"
+       :height 1.15
+      ))
+  "face for user defined variables."
+  :group 'my-mode )
+
+
+(defface md-italic
+  '((t :slant italic
+      ))
+  "face for user defined variables."
+  :group 'my-mode )
+
+
+(defface md-bold
+  '((t :weight bold
+      ))
+  "face for user defined variables."
+  :group 'my-mode )
+
+
+(defconst  md-title 'md-title)
+(defconst  md-title2 'md-title2)
+(defconst  md-italic 'md-italic)
+(defconst  md-bold 'md-bold)
+
+(defun md-keywordfont (limit)
+  "Search for quoted symbols in comments.
+Match group 0 is the entire construct, 1 the symbol."
+  (let (res)
+    (while
+        (and (setq res (re-search-forward "`\\(.*?\\)`" limit t))
+             (not (nth 4 (syntax-ppss)))))  ; Continue, unless in a comment
+    res))
+
+(defun md-titlefont (limit)
+  "Search for quoted symbols in comments.
+Match group 0 is the entire construct, 1 the symbol."
+  (let (res)
+    (while
+        (and (setq res (re-search-forward "^\\(#[^#].*?\n\\)" limit t))
+             (not (nth 4 (syntax-ppss)))))  ; Continue, unless in a comment
+    res))
+
+(defun md-title2font (limit)
+  "Search for quoted symbols in comments.
+Match group 0 is the entire construct, 1 the symbol."
+  (let (res)
+    (while
+        (and (setq res (re-search-forward "^\\(##.*?\n\\)" limit t))
+             (not (nth 4 (syntax-ppss)))))  ; Continue, unless in a comment
+    res))
+
+(defun md-italicfont (limit)
+  "Search for quoted symbols in comments.
+Match group 0 is the entire construct, 1 the symbol."
+  (let (res)
+    (while
+        (and (setq res (re-search-forward "_\\(.*?\\)_" limit t))
+             (not (nth 4 (syntax-ppss)))))  ; Continue, unless in a comment
+    res))
+
+
+(defun md-boldfont (limit)
+  "Search for quoted symbols in comments.
+Match group 0 is the entire construct, 1 the symbol."
+  (let (res)
+    (while
+        (and (setq res (re-search-forward "__\\(.*?\\)__" limit t))
+             (not (nth 4 (syntax-ppss)))))  ; Continue, unless in a comment
+    res))
+
+
+(defun my-highlight-symbol-activate ()
+  "Highlight symbols quoted in BACKTICK-TICK in comments."
+  (font-lock-add-keywords nil
+                          '(
+			    (md-keywordfont (1 md-keyword prepend) )
+			    (md-titlefont (1 md-title prepend) )
+			    (md-title2font (1 md-title2 prepend) )
+			    (md-italicfont (1 md-italic prepend) )
+			    (md-boldfont (1 md-bold prepend) )
+			    )
+			  )
+  )
+
+(add-hook 'squirrel-mode-hook #'my-highlight-symbol-activate)
+
 (provide 'squirrel)
 ;;; squirrel.el ends here

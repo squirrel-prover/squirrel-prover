@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE EXN
-%token APPLY TO TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -406,13 +406,6 @@ tac:
                                            ("destruct",[TacticsArgs.String_name i;
                                                         TacticsArgs.AndOrPat p]) }
 
-  | ASSERT p=tac_formula               { Tactics.Abstract
-                                           ("assert", [TacticsArgs.Theory p]) }
-  | ASSERT ip=simpl_pat ASSIGN p=tac_formula
-                                       { Tactics.Abstract
-                                           ("assert", [TacticsArgs.Theory p;
-                                                       TacticsArgs.SimplPat ip]) }
-
   | EXISTS t=tactic_params             { Tactics.Abstract
                                           ("exists",t) }
   | NOSIMPL t=tac                      { Tactics.Modifier
@@ -423,13 +416,12 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
   | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
-
-  | APPLY i=ID                         { Tactics.Abstract
-                                          ("apply",
-                                           [TacticsArgs.String_name i]) }
-  | APPLY i=ID TO t=tactic_params      { Tactics.Abstract
-                                          ("apply",
-                                           TacticsArgs.String_name i :: t) }
+  | ASSERT p=tac_formula ip=as_ip?
+    { let ip = match ip with
+        | None -> []
+        | Some ip -> [TacticsArgs.SimplPat ip] in
+      Tactics.Abstract
+        ("assert", TacticsArgs.Theory p::ip) }
 
   | USE i=ID ip=as_ip?
     { let ip = match ip with

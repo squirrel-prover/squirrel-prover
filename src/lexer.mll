@@ -80,7 +80,7 @@ rule token = parse
 | "signature"         { SIGNATURE }
 | "intro"             { INTRO }
 | "destruct"          { DESTRUCT }
-| "as"                { AS } 
+| "as"                { AS }
 | "init"              { INIT }
 | "index"             { INDEX }
 | "message"           { MESSAGE }
@@ -105,9 +105,7 @@ rule token = parse
 | "Proof."            { PROOF }
 | "Qed."              { QED }
 | "Abort."            { ABORT }
-| "apply"             { APPLY }
 | "help"              { HELP }
-| "to"                { TO }
 | "cycle"             { CYCLE }
 | "undo"              { UNDO }
 | "try"               { TRY }

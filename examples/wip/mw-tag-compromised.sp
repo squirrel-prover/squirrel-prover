@@ -100,9 +100,9 @@ Proof.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
   fresh M6.
-  apply compromisedCredentials.
+  use compromisedCredentials.
   depends R(r), R2(r).
-  apply compromisedCredentials.
+  use compromisedCredentials.
   (* right *)
   euf M4.
   exists i,t.
@@ -129,7 +129,7 @@ goal wa_R2 : forall r:index,
    output@R(r) = input@T(i,t)).
 Proof.
 
-  apply tags_neq; split.
+  use tags_neq; split.
 
   (* Cond => WA *)
   project.
@@ -138,9 +138,9 @@ Proof.
   exists i,t1.
   assert (input@T(i,t1) = nr(r)).
   fresh M7.
-  apply compromisedCredentials.
+  use compromisedCredentials.
   depends R(r), R1(r).
-  apply compromisedCredentials.
+  use compromisedCredentials.
   (* right *)
   euf M5.
   exists i,t.
@@ -174,9 +174,9 @@ Proof.
   exists t.
   assert input@T(i,t) = nr(r).
   fresh M4.
-  apply compromisedCredentials.
+  use compromisedCredentials.
   depends R(r), R2(r).
-  apply compromisedCredentials.
+  use compromisedCredentials.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -231,10 +231,10 @@ equivalent
    snd(output@T(i,t)) = snd(input@R1(r)) &&
    R(r) < T(i,t) && output@R(r) = input@T(i,t)).
 split.
-apply compromisedCredentials.
-apply wa_R1 to r.
-apply compromisedCredentials.
-apply wa_R1 to r.
+use compromisedCredentials.
+use wa_R1 with r.
+use compromisedCredentials.
+use wa_R1 with r.
 
 (* Perform a similar rewriting in try-find condition,
    also propagating exec@pred(R1(r)) there, and changing
@@ -281,18 +281,18 @@ nosimpl(intro); split; assumption.
    i1,t1 for the condition. *)
 project.
 fa.
-apply compromisedCredentials.
+use compromisedCredentials.
 false_left.
-apply wa_R1_left to i,r.
-apply H1.
+use wa_R1_left with i,r.
+use H1.
 yesif.
-apply compromisedCredentials.
+use compromisedCredentials.
 fa.
-apply compromisedCredentials.
-apply wa_R1_right to i,t,r.
-apply H1.
+use compromisedCredentials.
+use wa_R1_right with i,t,r.
+use H1.
 yesif.
-apply compromisedCredentials.
+use compromisedCredentials.
 
 fa 2. fadup 1.
 fa 1. fadup 1.
@@ -300,10 +300,10 @@ prf 1.
 ifcond 1, 1, exec@pred(R1(r)).
 fa 1.
 yesif 1.
-apply tags_neq; project.
+use tags_neq; project.
 xor 1,n_PRF.
 yesif 1.
-apply len_id to i; apply len_id' to i,t; namelength n_PRF, dummy.
+use len_id to i; use len_id' with i,t; namelength n_PRF, dummy.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -320,9 +320,9 @@ equivalent
      snd(output@T(i,t)) = snd(input@R2(r)) &&
      R(r) < T(i,t) && output@R(r) = input@T(i,t)).
 split.
-apply compromisedCredentials.
+use compromisedCredentials.
 false_left.
-apply wa_R2 to r.
+use wa_R2 with r.
 exists i,t.
 
 fadup 1.
@@ -335,9 +335,9 @@ fa 1.
 fa 1.
 fa 1.
 
-prf 2. (* we apply PRF under XOR to be able to use XOR tactic later on *)
+prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
 yesif 2.
-apply tags_neq.
+use tags_neq.
 project.
 assert (fst(input@R1(r)) = nt(i,t)).
 fresh M2.
@@ -346,5 +346,5 @@ fresh M2.
 fresh 1. yesif 1.
 xor 1, n_PRF1.
 yesif 1.
-apply len_id to i; apply len_id' to i,t; namelength n_PRF1,dummy.
+use len_id to i; use len_id' with i,t; namelength n_PRF1,dummy.
 Qed.

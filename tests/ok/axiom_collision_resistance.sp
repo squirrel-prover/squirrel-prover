@@ -21,7 +21,7 @@ goal unforgeable :
 
 Proof.
 intro a b Hneq Heq.
-apply collision_resistance to
+use collision_resistance with
     n(b),
    n(a).
 Qed.

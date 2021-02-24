@@ -67,7 +67,7 @@ Proof.
   split.
 
   (* COND => WA *)
-  apply tags_neq; project.
+  use tags_neq; project.
   (* LEFT *)
   euf Meq.
   exists i,k1.
@@ -101,12 +101,12 @@ Proof.
   split.
 
   (* WA => COND *)
-  apply H.
+  use H.
   by exists i,k.
 
   (* COND => WA *)
-  apply H.
-  apply tags_neq; project.
+  use H.
+  use tags_neq; project.
   (* LEFT *) 
   euf Meq.
   exists i,k1.
@@ -134,7 +134,7 @@ goal [left] wa_R1_left:
 
 Proof.
   intro *.
-  apply tags_neq.
+  use tags_neq.
   euf Meq.
   exists k.
   assert input@T(i,k)=nR(j).
@@ -153,7 +153,7 @@ goal [right] wa_R1_right:
 
 Proof.
   intro *.
-  apply tags_neq.
+  use tags_neq.
   euf Meq.
   assert input@T(i,k)=nR(j).
   fresh Meq1.
@@ -186,7 +186,7 @@ Proof.
       snd(output@T(i,k)) = snd(input@R1(j)) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       input@T(i,k) = output@R(j)).
-  by apply wa_R1 to j.
+  by use wa_R1 with j.
 
   equivalent
     (if exec@pred(R1(j)) &&
@@ -218,14 +218,14 @@ Proof.
 
   (* LEFT *)
   fa.
-  apply wa_R1_left to i1,j.
-  apply H0.
+  use wa_R1_left with i1,j.
+  use H0.
   by exists k.
   yesif.
   (* RIGHT *)
   fa.
-  apply wa_R1_right to i1,j,k1.
-  by apply H0.
+  use wa_R1_right with i1,j,k1.
+  by use H0.
   by yesif.
 
   fa 2; fadup 1.
@@ -234,7 +234,7 @@ Proof.
   ifcond 1, exec@pred(R1(j)).
   fa 1.
   yesif 1.
-  by apply tags_neq; project.
+  by use tags_neq; project.
   by fresh 1.
 
   (* Case R2 *)
@@ -248,7 +248,7 @@ Proof.
       snd(output@T(i,k)) = snd(input@R2(j)) &&
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j))).
-  by apply wa_R2 to j.
+  by use wa_R2 with j.
   by fadup 1.
 
   (* Case T *)
@@ -258,7 +258,7 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
   yesif 2.
-  apply tags_neq; project.
+  use tags_neq; project.
   split.
   assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
   split.

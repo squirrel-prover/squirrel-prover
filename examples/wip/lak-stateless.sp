@@ -65,9 +65,9 @@ Proof.
   (* Now we have R1(j1,i) < R1(jj,i) < R1(j,i)
    * we will appeal to to the induction hypothesis with
    * t = R1(jj,i) and jj = j1. *)
-  apply IH0 to R1(jj,i),i,jj,j1.
+  use IH0 with R1(jj,i),i,jj,j1.
 
-  apply happens_le to R1(j1,i), R1(jj,i).
+  use happens_le with R1(j1,i), R1(jj,i).
 
 Qed.
 
@@ -81,7 +81,7 @@ goal wa :
 Proof.
   intros.
   euf C0.
-  apply no_confusion to R1(j,i),i,j,j1.
-  apply happens_le to R1(j1,i), R1(j,i).
+  use no_confusion with R1(j,i),i,j,j1.
+  use happens_le with R1(j1,i), R1(j,i).
   exists i,k.
 Qed.

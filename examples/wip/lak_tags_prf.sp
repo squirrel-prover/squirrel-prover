@@ -46,7 +46,7 @@ goal [left] wa_left :
 Proof.
 simpl.
 expand cond@R1(j,i,k).
-apply tags_neq.
+use tags_neq.
 euf M0.
 exists i,k1.
 Qed.
@@ -61,7 +61,7 @@ goal [right] wa_right:
 Proof.
 simpl.
 expand cond@R1(j,i,k).
-apply tags_neq.
+use tags_neq.
 euf M0.
 exists i,k.
 Qed.

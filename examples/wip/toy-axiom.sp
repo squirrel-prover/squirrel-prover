@@ -21,7 +21,7 @@ goal mygoal: False.
 
 Proof.
  print.
- apply autre to ok.
+ use autre with ok.
  admit.
 Qed.
 
@@ -32,7 +32,7 @@ goal othergoal: False.
 
 Proof.
  print.
- nosimpl(apply mycheck to ok, ok).
+ nosimpl(use mycheck with ok, ok).
  try congruence.
  admit.
 Qed.

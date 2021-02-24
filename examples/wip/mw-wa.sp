@@ -77,7 +77,7 @@ Proof.
   assert cond@T1(i,t).
   expand exec@T1(i,t).
   expand cond@T1(i,t).
-  apply tags_neq.
+  use tags_neq.
 
   assert (H(<tag1,<input@T(i,t),nt(i,t)>>,key(i)) = xor(input@T1(i,t),id(i))).
   euf M2.
@@ -96,7 +96,7 @@ Proof.
   assert cond@R1(r,i).
   assert exec@R1(r,i).
   executable T1(i,t).
-  apply H2 to R1(r,i).
+  use H2 with R1(r,i).
   expand exec@R1(r,i).
   expand cond@R1(r,i).
 

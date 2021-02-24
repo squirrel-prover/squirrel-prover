@@ -54,7 +54,7 @@ goal wa_R1: forall j:index,
 Proof.
 intros; split.
 (* cond => wa *)
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
 euf M0.
 exists i,k1.
@@ -85,7 +85,7 @@ goal wa_R2: forall j:index,
 Proof.
 intros; split.
 (* cond => wa *)
-apply tags_neq; project.
+use tags_neq; project.
 (* LEFT *)
 euf M0.
 exists i,k1.
@@ -114,7 +114,7 @@ goal [left] wa_R1_left: forall (i,j:index),
 
 Proof.
 intros.
-apply tags_neq.
+use tags_neq.
 euf M0.
 exists k.
 assert input@T(i,k)=nR(j).
@@ -133,7 +133,7 @@ goal [right] wa_R1_right: forall (i,j,k:index),
 
 Proof.
 intros.
-apply tags_neq.
+use tags_neq.
 euf M0.
 assert input@T(i,k)=nR(j).
 fresh M3.
@@ -169,7 +169,7 @@ equivalent
    fst(output@T(i,k)) = fst(input@R1(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
 
-apply wa_R1 to j.
+use wa_R1 with j.
 
 equivalent
   (if exec@pred(R1(j)) &&
@@ -201,14 +201,14 @@ exists i,k.
 project.
 (* LEFT *)
 fa.
-apply wa_R1_left to i1,j.
-apply H1.
+use wa_R1_left with i1,j.
+use H1.
 exists k.
 yesif.
 (* RIGHT *)
 fa.
-apply wa_R1_right to i1,j,k1.
-apply H1.
+use wa_R1_right with i1,j,k1.
+use H1.
 yesif.
 
 fa 1. fadup 0.
@@ -218,7 +218,7 @@ prf 2.
 ifcond 2, exec@pred(R1(j)).
 fa 2.
 yesif 2.
-apply tags_neq; project.
+use tags_neq; project.
 fresh 2.
 
 (* Case R2: OK *)
@@ -235,7 +235,7 @@ equivalent
    fst(output@T(i,k)) = fst(input@R2(j)) &&
    R(j) < T(i,k) && input@T(i,k) = output@R(j)).
 
-apply wa_R2 to j.
+use wa_R2 with j.
 
 fadup 0.
 
@@ -248,7 +248,7 @@ fa 2.
 fa 2.
 prf 3.
 yesif 3.
-apply tags_neq; project.
+use tags_neq; project.
 assert fst(input@R1(j))=nT(i,k).
 fresh M2.
 depends T(i,k),T2(i,k).

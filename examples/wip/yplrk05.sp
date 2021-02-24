@@ -74,19 +74,19 @@ goal updateTag :
 forall (t:timestamp), forall (i,j:index), (t >= T(i,j) && t < T1(i,j)) => kT(i)@T(i,j) = kT(i)@t.
 Proof.
 nosimpl(induction; intro IH0).
-case t. 
+case t.
 
 by use IH0 with pred(R(jj)) as H0;     use H0 with i,j.
 by use IH0 with pred(R1(jj,ii)) as H0; use H0 with i,j.
 by use IH0 with pred(R2(jj)) as H0;    use H0 with i,j.
 
-assert H0 := T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j).
+assert T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j) as H0.
 case H0.
 by use IH0 with pred(T(i1,j1)) as H0; use H0 with i,j.
 
-assert H0 := i=i1 || i<>i1. 
+assert i=i1 || i<>i1 as H0.
 case H0.
-assert H0 := j=j1 || j<>j1.
+assert j=j1 || j<>j1 as H0.
 case H0.
 (* case i=i1 && j<>j1 *)
 by use sequentiality with t as H0; use H0 with i,j; exists j1.
@@ -132,9 +132,10 @@ euf H.
   euf tactic *)
   (* here, without the induction, we have to find another way to conclude *)
 
-  assert M2 :=
+  assert
     input@R1(jj,ii) =
-      h1(xor(xor(fst(kR(ii)@pred(R1(jj1,ii))),r1(jj1)),k(ii)),key1(ii)).
+      h1(xor(xor(fst(kR(ii)@pred(R1(jj1,ii))),r1(jj1)),k(ii)),key1(ii))
+    as M2.
   euf M2. (* here again, we have 3 different cases *)
 
     (* case 1/3: equality with hashed message in update@R1 *)
@@ -195,15 +196,15 @@ euf H0.
   assert kR(ii)@pred(R1(jj1,ii)) = kR(ii)@pred(R(jj1)).
   admit.
   (* we can deduce the following equality *)
-  assert M4 := h2(snd(kR(ii)@pred(R(jj1))),key2(ii)) = r1(jj1) XOR r1(jj).
+  assert h2(snd(kR(ii)@pred(R(jj1))),key2(ii)) = r1(jj1) XOR r1(jj) as M4.
   euf M4.
   admit. (* TODO use the fact that state increases to show that M5 is false ? *)
   depends T(ii,j),T1(ii,j). depends R(jj1),R1(jj1,ii).
   exists j.
   use readerUpdateTerm with jj,ii  as M6.
   use readerUpdateTerm with jj1,ii as M7.
-  assert M8 := fst(kR(ii)@pred(R1(jj,ii))) = fst(kR(ii)@R1(jj1,ii)).
-  nosimpl(executable pred(R1(jj,ii)); 1: by auto). 
+  assert fst(kR(ii)@pred(R1(jj,ii))) = fst(kR(ii)@R1(jj1,ii)) as M8.
+  nosimpl(executable pred(R1(jj,ii)); 1: by auto).
   intro H1.
   use H1 with R1(jj1,ii) as H2.
   expand exec@R1(jj1,ii). expand cond@R1(jj1,ii).
@@ -261,7 +262,7 @@ forall (t:timestamp), forall (i,j:index),
    R1(jj,i) < t &&
    output@R1(jj,i) = input@t).
 Proof.
-nosimpl(induction). 
+nosimpl(induction).
 intro IH0 i j.
 substitute t,T1(i,j).
 expand exec@T1(i,j). expand cond@T1(i,j).

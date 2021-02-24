@@ -22,9 +22,9 @@ Proof.
   induction.
   intro Hind i Heq Hhap.
   assert(happens(A(i))).
-  by apply happens_le to A(i), t.
+  by use happens_le with A(i), t.
   euf C.
   intro Hle Eqin.
-  apply happens_le to A(i1), A(i).
-  apply Hind to A(i1), i1.
+  use happens_le with A(i1), A(i).
+  use Hind with A(i1), i1.
 Qed.

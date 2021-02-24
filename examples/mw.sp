@@ -107,7 +107,7 @@ goal wa_R2 : forall r:index,
    output@R(r) = input@T(i,t)).
 Proof.
 
-  apply tags_neq; split.
+  use tags_neq; split.
 
   (* Cond => WA *)
   project.
@@ -200,7 +200,7 @@ equivalent
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
    R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-apply wa_R1 to r.
+use wa_R1 with r.
 
 (* Perform a similar rewriting in try-find condition,
    also propagating exec@pred(R1(r)) there, and changing
@@ -238,8 +238,8 @@ equivalent
 
 (* IF-THEN-ELSE *)
 nosimpl(fa); try auto.
-by intro *; split; exists i,t. 
-by intro *; split; exists i,t. 
+by intro *; split; exists i,t.
+by intro *; split; exists i,t.
 
 (* TRY-FIND *)
 (* We have index variables corresponding to the existentials from
@@ -247,13 +247,13 @@ by intro *; split; exists i,t.
    i1,t1 for the condition. *)
 project.
 fa.
-apply wa_R1_left to i1,r.
-apply H0.
+use wa_R1_left with i1,r.
+use H0.
 by exists t.
 yesif.
 fa.
-apply wa_R1_right to i1,t1,r.
-by apply H0.
+use wa_R1_right with i1,t1,r.
+by use H0.
 yesif.
 
 fa 2. fadup 1.
@@ -262,10 +262,10 @@ prf 1.
 ifcond 1, 1, exec@pred(R1(r)).
 fa 1.
 yesif 1.
-apply tags_neq; project.
+use tags_neq; project.
 xor 1,n_PRF.
 yesif 1.
-apply len_id to i; apply len_id' to i,t; namelength n_PRF, dummy.
+use len_id with i; use len_id' with i,t; namelength n_PRF, dummy.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -281,7 +281,7 @@ equivalent
      fst(output@T(i,t)) = fst(input@R2(r)) &&
      snd(output@T(i,t)) = snd(input@R2(r)) &&
      R(r) < T(i,t) && output@R(r) = input@T(i,t)).
-apply wa_R2 to r.
+use wa_R2 with r.
 
 fadup 1.
 
@@ -293,9 +293,9 @@ fa 1.
 fa 1.
 fa 1.
 
-prf 2. (* we apply PRF under XOR to be able to use XOR tactic later on *)
+prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
 yesif 2.
-apply tags_neq.
+use tags_neq.
 project.
 split.
 by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
@@ -310,5 +310,5 @@ by assert (fst(input@R2(r)) = nt(i,t)); fresh Meq0.
 fresh 1. yesif 1.
 xor 1, n_PRF.
 yesif 1.
-apply len_id to i; apply len_id' to i,t; namelength n_PRF,dummy.
+use len_id with i; use len_id' with i,t; namelength n_PRF,dummy.
 Qed.

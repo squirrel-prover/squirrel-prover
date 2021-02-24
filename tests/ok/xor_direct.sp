@@ -27,6 +27,6 @@ equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1, k).
   nosimpl(yesif 1).
-  apply len_ko_n; apply len_ko_m.
+  use len_ko_n; use len_ko_m.
   simpl.
 Qed.

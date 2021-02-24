@@ -75,7 +75,7 @@ goal counterIncrease :
   forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.
 Proof.
 intro t Hc.
-apply orderSucc to d@pred(t).
+use orderSucc with d@pred(t).
 case t. 
 Qed.
 
@@ -84,16 +84,16 @@ goal counterIncreaseBis :
   forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
 Proof.
 induction.
-apply H to pred(t).
+use H with pred(t).
 assert (t' < pred(t) || t' >= pred(t)).
 case H1.
 (* case t' < pred(t) *)
-apply H0 to t'.
-apply counterIncrease to t.
-by apply orderTrans to d@t',d@pred(t),d@t.
+use H0 with t'.
+use counterIncrease with t.
+by use orderTrans with d@t',d@pred(t),d@t.
 (* case t' >= pred(t) *)
 assert t' = pred(t).
-by apply counterIncrease to t.
+by use counterIncrease with t.
 Qed.
 
 goal secretReach : forall (j:index), cond@B(j) => False.
@@ -102,7 +102,7 @@ intro j Hcond.
 expand cond@B(j).
 euf Hcond.
 assert pred(A(i)) < pred(B(j)).
-apply counterIncreaseBis to pred(B(j)).
-apply H to pred(A(i)).
-apply orderStrict to d@pred(A(i)),d@pred(B(j)).
+use counterIncreaseBis with pred(B(j)).
+use H with pred(A(i)).
+use orderStrict with d@pred(A(i)),d@pred(B(j)).
 Qed.

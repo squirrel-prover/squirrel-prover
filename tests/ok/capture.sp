@@ -12,7 +12,7 @@ axiom two : forall x:message, (forall x:message, f(x)=a) => f(x)=b.
 goal forall x:message, f(x)=b.
 Proof.
   intro x.
-  apply two to x. 
+  use two with x. 
   intro x'.
-  apply one to x'.
+  use one with x'.
 Qed.

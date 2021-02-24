@@ -142,7 +142,7 @@ Proof.
   euf Meq.
 
   case H1.
-  by apply H to i.
+  by use H with i.
   notleft H0. 
 Qed.
 
@@ -155,7 +155,7 @@ Proof.
   euf Meq.
 
   case H2.
-  by apply H to i.
+  by use H with i.
 
   notleft H0.
 Qed.
@@ -195,8 +195,8 @@ Proof.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). depends P1, P4. apply H1 to P1. expand exec@P1.
-   by apply P1_charac.
+   executable pred(P4). depends P1, P4. use H1 with P1. expand exec@P1.
+   by use P1_charac.
 
    by fa 7; noif 7.
 
@@ -224,8 +224,8 @@ Proof.
    expand frame@S4; expand exec@S4.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). depends S1, S4. apply H1 to S1. expand exec@S1. 
-   by apply S1_charac.
+   executable pred(S4). depends S1, S4. use H1 with S1. expand exec@S1. 
+   by use S1_charac.
 
    by fa 6; fa 7; noif 7.
 

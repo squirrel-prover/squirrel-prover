@@ -17,7 +17,7 @@ goal unforgeable :
 
 Proof.
   intro tau Heq.
-  (* we cannot directly apply euf, as k appears as a condition.
+  (* we cannot directly use euf, as k appears as a condition.
      But the condition True || x<> k is equivalent to True, so we can remove it.
   *)
   systemsubstitute simplified,a,cond@A(a),True,cond@A1(a),False.

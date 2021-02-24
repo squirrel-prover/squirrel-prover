@@ -18,6 +18,6 @@ goal foo : forall (i : index, l : index, j : index),
 
 Proof.
  intro _ _ _ [H | [H G]]. 
- by apply fooa.
- by apply foob.
+ by use fooa.
+ by use foob.
 Qed.
