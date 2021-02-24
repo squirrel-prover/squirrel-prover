@@ -1,3 +1,5 @@
+open Utils
+
 module L = Location
 
 (*------------------------------------------------------------------*)
@@ -856,7 +858,58 @@ let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
 
 
 (*------------------------------------------------------------------*)
-(** Tests *)
+(** {2 Destructors} *)
+
+let rec destr_exists = function
+  | Exists (vs, f) -> 
+    begin
+      match destr_exists f with
+      | Some (vs', f) -> Some (vs @ vs', f)
+      | None -> Some (vs, f)
+    end
+  | _ -> None
+
+let rec destr_forall = function
+  | ForAll (vs, f) -> 
+    begin
+      match destr_forall f with
+      | Some (vs', f) -> Some (vs @ vs', f)
+      | None -> Some (vs, f)
+    end
+  | _ -> None
+
+let rec destr_or = function
+  | Or (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_ors l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, Or (f, g) -> omap (fun l -> l @ [g]) (destr_ors (l-1) f)
+  | _ -> None
+
+let rec destr_and = function
+  | And (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_ands l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, And (f, g) -> omap (fun l -> l @ [g]) (destr_ands (l-1) f)
+  | _ -> None
+
+let rec destr_impl = function
+  | Impl (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_impls l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, Impl (f, g) -> omap (fun l -> l @ [g]) (destr_impls (l-1) f)
+  | _ -> None
+
+(*------------------------------------------------------------------*)
+(** {2 Tests} *)
 
 let () =
   let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in

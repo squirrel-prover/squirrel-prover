@@ -266,7 +266,22 @@ val not_simpl : formula -> formula
 val boolToMessage : formula -> message
 
 (*------------------------------------------------------------------*)
-(** Convert from bi-terms to terms
+(** {2 Destructors} *)
+
+val destr_forall : formula -> (Vars.evar list * formula) option
+val destr_exists : formula -> (Vars.evar list * formula) option
+
+val destr_and  : formula -> (formula * formula) option
+val destr_or   : formula -> (formula * formula) option
+val destr_impl : formula -> (formula * formula) option
+
+(** left-associative *)
+val destr_ands  : int -> formula -> formula list option
+val destr_ors   : int -> formula -> formula list option
+val destr_impls : int -> formula -> formula list option
+
+(*------------------------------------------------------------------*)
+(** {2 Convert from bi-terms to terms}
   *
   * TODO Could we use a strong typing of [term] to make a static
   * distinction between biterms (general terms) and terms (terms

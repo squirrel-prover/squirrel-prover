@@ -5,6 +5,7 @@
     - Cryptographic -> relies on a cryptographic assumptions, that must be assumed.*)
 
 open Term
+open Utils
 
 type tac = TraceSequent.t Tactics.tac
 
@@ -17,9 +18,7 @@ module L = Location
 module Hyps = TraceSequent.Hyps
 
 (*------------------------------------------------------------------*)
-(* Comment in/out for debugging *)
-let dbg s = Printer.prt `Ignore s
-(* let dbg s = Printer.prt `Dbg s *)
+let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
@@ -200,20 +199,28 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
     ) (Atom (`Timestamp (`Eq,ts,Term.Init)) :: cases)
 
 (** Case analysis on an hypothesis.
-    When [many], recurses. *)
-let hypothesis_case ~many id (s : TraceSequent.t) : c_res list =
+    When [nb=`Any], recurses. 
+    When [nb=`Some l], destruct [l]. *)
+let hypothesis_case ~nb id (s : TraceSequent.t) : c_res list =
+  let destr_err () =
+    soft_failure (Tactics.Failure "can only be applied to a disjunction")
+  in
+
   let rec case acc = function
-    | Or (f,g) ->
-      if many then case (case acc g) f else [f; g]
+    | Or (f,g) -> case (case acc g) f
     | _ as f -> f :: acc in
 
   let form = Hyps.by_id id s in
   let s = Hyps.remove id s in
 
-  let cases = case [] form in
+  let cases = match nb with
+    | `Any -> case [] form 
+    | `Some l -> match Term.destr_ors l form with
+      | None -> destr_err ()
+      | Some cases -> cases
+  in
 
-  if cases = [] then
-    soft_failure (Tactics.Failure "can only be applied to a disjunction");
+  if cases = [] then destr_err ();
 
   List.map (fun g ->
       let ng = Ident.name id in
@@ -273,7 +280,7 @@ let do_case_tac (args : Args.parser_arg list) s =
   match Args.convert_as_string args with
   | Some str when Hyps.mem_name str s ->
     let id, _ = Hyps.by_name str s in
-    hypothesis_case ~many:true id s
+    hypothesis_case ~nb:`Any id s
 
   | _ ->
     let env, tbl = TraceSequent.env s, TraceSequent.table s in
@@ -346,35 +353,50 @@ let () =
     revert_str Args.String
 
 (*------------------------------------------------------------------*)
-(** Apply a And pattern (this is a destruct).
+(** Apply a And pattern (this is a destruct) of length [l].
     Note that variables in handlers have not been added to the env yet. *)
-let do_and_pat (hid : Ident.t) s : Args.ip_handler list * TraceSequent.sequent =
-  let form = Hyps.by_id hid s in
-  let s = Hyps.remove hid s in
-  match form with
-  | Term.And (f,g) ->
-    let ids, s = Hyps.add_i_list [(Args.Unnamed, f); (Args.Unnamed, g)] s in
-    let idf, idg = Utils.as_seq2 ids in
-    ([`Hyp idf; `Hyp idg], s)
+let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * TraceSequent.sequent =
+  let destr_fail () = 
+    soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid)) 
+  in
+  let get_destr = function
+    | Some x -> x
+    | None -> destr_fail () in
 
-  | Term.Exists ((Vars.EVar v) :: vars,f) ->
-    let v' = Vars.make_new_from v in
-    let subst = [Term.ESubst (Var v, Var v')] in
+  assert (len > 0);
+  if len = 1 then ([`Hyp hid], s) else
+    let form = Hyps.by_id hid s in
+    let s = Hyps.remove hid s in
 
-    let f = match vars with
-      | [] -> f
-      | _ -> Term.Exists (vars,f) in
-    let f = Term.subst subst f in
+    match form with
+    | Term.And _ ->
+      let ands = get_destr (Term.destr_ands len form) in
+      let ands = List.map (fun x -> Args.Unnamed, x) ands in
+      let ids, s = Hyps.add_i_list ands s in
+      List.map (fun id -> `Hyp id) ids, s
 
-    let idf, s = Hyps.add_i Args.Unnamed f s in
+    | Term.Exists _ ->
+      let vs, f = get_destr (Term.destr_exists form) in
 
-    ([`Var (EVar v'); `Hyp idf], s)
+      if List.length vs < len - 1 then
+        hard_failure (Tactics.PatNumError (len - 1, List.length vs));
 
-  | Term.Exists ([],f) ->
-    let idf,s = Hyps.add_i Args.Unnamed f s in
-    ([`Hyp idf], s)
+      let vs, vs' = List.takedrop (len - 1) vs in
+      let vs_fresh, subst = 
+        List.split (
+          List.map (fun (Vars.EVar v) -> 
+              let v_f = Vars.make_new_from v in
+              Vars.EVar v_f, Term.ESubst (Var v, Var v_f)
+            ) vs)
+      in
+      let f = Term.mk_exists vs' f in
+      let f = Term.subst subst f in
 
-  | _ -> soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
+      let idf, s = Hyps.add_i Args.Unnamed f s in
+
+      ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
+
+    | _ -> destr_fail ()
 
 (** Apply an And/Or pattern to an ident hypothesis handler. *)
 let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
@@ -382,7 +404,7 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
   match pat with
   | Args.And s_ip ->
     (* Destruct the hypothesis *)
-    let handlers, s = do_and_pat hid s in
+    let handlers, s = do_and_pat hid (List.length s_ip) s in
 
     if List.length handlers <> List.length s_ip then
       hard_failure (Tactics.PatNumError (List.length s_ip, List.length handlers));
@@ -395,8 +417,7 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
     ss
 
   | Args.Or s_ip ->
-    (* Destruct one Or *)
-    let ss = hypothesis_case ~many:false hid s in
+    let ss = hypothesis_case ~nb:(`Some (List.length s_ip)) hid s in
 
     if List.length ss <> List.length s_ip then
       hard_failure (Tactics.PatNumError (List.length s_ip, List.length ss));
@@ -411,7 +432,7 @@ let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
 
   | Args.Split ->
     (* Destruct many Or *)
-    let ss = hypothesis_case ~many:true hid s in
+    let ss = hypothesis_case ~nb:`Any hid s in
 
     (* For each case, apply the corresponding simple pattern *)
     List.map (fun (CHyp id, s) ->
@@ -517,26 +538,23 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-let do_destruct hid (pat : Args.and_or_pat option) s =
-  match pat with
-  | Some pat -> do_and_or_pat hid pat s
-
-  | None ->
-    let handlers, s = do_and_pat hid s in
-    [List.fold_left (fun s handler ->
-         (* TODO: location errors *)
-         do_naming_pat handler Args.AnyName s
-       ) s handlers]
+let do_destruct hid s =
+  (* Only destruct the top-most connective *)
+  let handlers, s = do_and_pat hid 2 s in
+  [List.fold_left (fun s handler ->
+       (* TODO: location errors *)
+       do_naming_pat handler Args.AnyName s
+     ) s handlers]
 
 let destruct_tac args s sk fk =
   try match args with
     | [Args.String_name h; Args.AndOrPat pat] ->
       let hid, _ = Hyps.by_name h s in
-      sk (do_destruct hid (Some pat) s) fk
+      sk (do_and_or_pat hid pat s) fk
 
     | [Args.String_name h] ->
       let hid, _ = Hyps.by_name h s in
-      sk (do_destruct hid None s) fk
+      sk (do_destruct hid s) fk
 
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
   with Tactics.Tactic_soft_failure e -> fk e

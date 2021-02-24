@@ -34,3 +34,32 @@ Proof.
  intro i j k [l _].
  admit.
 Qed.
+
+goal _ (i : index, j: index, k : index) :
+  (exists (i, l, l1, l2, l3 : index), True) => False.
+Proof.
+ intro i j k [l2 l3 l4 Hap]. 
+ admit.
+Qed.
+
+goal _ (i : index, j: index, k : index) :
+  (False || False || False) => False.
+Proof.
+ intro i j k [_|_|_]; assumption.
+Qed.
+
+goal _ (i : index, j: index, k : index) :
+  (((a = b && a = c && c = d) => a = b) &&
+   ((a = b && a = c && c = d) => a = c) &&
+   ((a = b && a = c && c = d) => c = d)).
+Proof.
+ intro i j k. 
+ split;
+ 1: split.
+ intro [_ _ _]; assumption.
+ intro [_ _ _]; assumption.
+ intro [_ _ _]; assumption.
+Qed.
+
+
+
