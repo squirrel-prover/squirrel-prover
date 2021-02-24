@@ -349,7 +349,7 @@ Proof.
   euf Hchk => Euf. 
 
   (* oracle case *)
-  destruct Euf as [H1 [_|[i [m [m1 [_|[i1 H2]]]]]]]; 
+  destruct Euf as [H1 [_|[i m m1 [_|[i1 H2]]]]]; 
   1: by auto.
   by use hashlengthnotpair with <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
@@ -375,22 +375,22 @@ Qed.
 
 (* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
 goal [none, auth] S_charac :
-   exec@Sok =>(cond@Sfail => False).
+   happens(Sok, Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
-  intro *.
+  intro Hap He Hc.
   expand exec@Sok; expand cond@Sok; expand cond@Sfail.
+  destruct He as [_ Hchk].
 
-  euf H1.
+  euf Hchk => Euf. 
 
 (* oracle clase *)
-
-  case H2.
-  case H2.
+  destruct Euf as [[_|[i m m1 H1]] H2]; 1: by auto.
+  destruct H1 as [H1| [i1 m2 m3 H1]]. 
 (* sub case with wrong tag *)
-  use H0 with i.
-  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey). 
+  use Hc with i.
+  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey);
+  1: by auto.
   by collision.
-
   by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
@@ -400,29 +400,34 @@ Proof.
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
 
-  executable pred(Sok).
-
-  depends SDIS, Sok.
-  use H2 with P3(i).
+  intro Meq.
+  executable pred(Sok); 1,2: by auto => H2.
+  
+  depends SDIS, Sok => _.
+  use H2 with P3(i) as H3; 2: by auto.
   expand exec@P3(i).
   expand cond@P3(i).
-
+  destruct H3 as [H3 [Mneq Meq0]]. 
+  
+  assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1; 
+  1: by auto.
 (* We have that x3 is a message encrypted with the secret key, we use the intctxt of encryption *)
-  intctxt D1.
+  intctxt D1; 4: by auto. 
 
 (* Ill-tagged cases *)
   by use signnottag with sidPaF@P2,kP.
   by use difftags.
 
 (* Honest case *)
-  assert PDIS5 <= Sok.
-  case H4.
-  use H2 with PDIS5.
+  intro H4 Meq1.
+  assert PDIS5 <= Sok; 
+  1: by case H4.
+  use H2 with PDIS5; 2: by auto.
   expand exec@PDIS5.
   expand cond@PDIS5. 
-  use H0 with i.
+  use Hc with i.
   right.
-  collision.
+  by collision.
 Qed.
 
 (* The equivalence for authentication is obtained by using the unreachability
@@ -437,27 +442,27 @@ Proof.
   induction t.
 
   (* P1 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* P2 *)
-  expandall; fa 17.
+  by expandall; fa 17.
  (* P3 *)
   expandall; fa 17.
-  expand seq(i -> r2(i)),i.
+  by expand seq(i -> r2(i)),i.
  (* A *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* A1 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* A 2 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* SDIS *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* SDIS1 *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* Sok *)
-  expandall; fa 17.
+  by expandall; fa 17.
   (* SDISauth3 *)
   expandall; fa 17.
-  expand seq(i -> a(i)),i.
+  by expand seq(i -> a(i)),i.
   (* Sfail *)
   expand frame@Sfail.
 
@@ -468,7 +473,7 @@ Proof.
   use H0 with Sok.
   expand exec@Sfail.
 
-  fa 17. fa 18. noif 18.
+  by fa 17; fa 18; noif 18.
   (* A3 *)
   by expandall; fa 17.
   (* PDIS *)
