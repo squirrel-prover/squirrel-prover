@@ -498,44 +498,87 @@ let get_vars t = get_set_vars t |> Sv.elements
 
 let fv t = get_set_vars t
 
+(*------------------------------------------------------------------*)
+(** Smart constructors for boolean terms. *)
+
+let mk_not t1 = match t1 with
+  | Not t -> t
+  | t -> Not t
+
+let mk_and t1 t2 = match t1,t2 with
+  | True, t | t, True -> t
+  | t1,t2 -> And (t1,t2)
+
+let mk_ands ts = List.fold_left mk_and True ts
+
+let mk_or t1 t2 = match t1,t2 with
+  | False, t | t, False -> t
+  | t1,t2 -> Or (t1,t2)
+
+let mk_ors ts = List.fold_left mk_or False ts
+
+let mk_impl t1 t2 = match t1,t2 with
+  | False, _ -> True
+  | True, t -> t
+  | t1,t2 -> Impl (t1,t2)
+
+let mk_impls ts t =
+  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
+
+let mk_ite c t e = match c with
+  | True -> t
+  | False -> e
+  | _ -> ITE (c,t,e)
+
+let mk_forall l f = 
+  if l = [] then f 
+  else match f with
+    | ForAll (l', f) -> ForAll (l @ l', f)
+    | _ -> ForAll (l, f)
+
+let mk_exists l f = 
+  if l = [] then f 
+  else match f with
+    | Exists (l', f) -> Exists (l @ l', f)
+    | _ -> Exists (l, f)
+
+let message_of_formula f =
+  ITE (f, Fun (f_true,[]), Fun (f_false,[]))
+
+let mk_timestamp_leq t1 t2 = match t1,t2 with
+  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
+  | _ -> `Timestamp (`Leq, t1, t2)
+
+(** Operations on vectors of indices of the same length. *)
+let mk_indices_neq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_or acc e)
+    False
+    (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+
+let mk_indices_eq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_and acc e)
+    True
+    (List.map2 (fun i j ->
+         if i = j then True else Atom (`Index (`Eq, i, j))
+       ) vect_i vect_j)
+
+(*------------------------------------------------------------------*)
+(** given a variable [x] and a subst [s], remove from [s] all
+    substitution [v->_]. *)
+let filter_subst (var:Vars.evar) (s:subst) =
+  let s = 
+    List.fold_left (fun acc (ESubst (x, y)) ->
+        if Sv.is_empty (Sv.inter (Sv.singleton var) (get_set_vars x))
+        then (ESubst (x, y))::acc
+        else acc
+      ) [] s in 
+
+  List.rev s
+
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
-  (* given a variable list and a subst s, remove from subst all
-     substitution x->v where x is in the variable list. *)
-  let filter_subst (vars:Vars.evar list) (s:subst) =
-    List.fold_left (fun acc (ESubst (x, y)) ->
-        if Sv.is_empty (Sv.inter (Sv.of_list vars) (get_set_vars x))
-        then
-          (ESubst (x, y))::acc
-        else
-          acc)
-      [] s
-  in
-  (* given a list of variables vars, a substitution s, and a formula f, if some
-     var in vars appears in the right hand side of the variables s, we refresh
-     the variable and refresh the formula with the new variables. *)
-  let refresh_formula vars s f =
-    let right_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> Sv.union acc (get_set_vars y))  Sv.empty s
-    in
-    let all_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> Sv.union acc (get_set_vars x))  right_vars s
-    in
-    let env = ref (Vars.of_list (Sv.elements all_vars)) in
-    let v, f = List.fold_left
-     (fun  (nvars,f) (Vars.EVar v) ->
-            if Sv.mem (Vars.EVar v) right_vars then
-              let new_v = Vars.make_fresh_from_and_update env v in
-              ((Vars.EVar new_v)::nvars, subst [ESubst (Var v,Var new_v)] f)
-            else
-              ((Vars.EVar v)::nvars,f)
-     )
-
-      ([],f)
-      vars
-    in
-    List.rev v, f
-  in
   let new_term : a term =
     match t with
     | Fun ((fs,is), lt) ->
@@ -544,9 +587,23 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
     | Macro (m, l, ts) ->
       Macro (subst_macro s m, List.map (subst s) l, subst s ts)
-    | Seq (a, b) ->
-      let s = filter_subst (List.map (fun x -> Vars.EVar x) a) s in
-      Seq (a, subst s b)
+
+    (* Seq in annoying to do *)
+    | Seq ([], f) -> Seq ([], subst s f)
+
+    | Seq ([a], f) -> 
+      let a, f = subst_binding (Vars.EVar a) s f in
+      let a = Vars.ecast a Sorts.Index in
+      Seq ([a],f)
+
+    | Seq (a :: vs, f) -> 
+      let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
+      let a = Vars.ecast a Sorts.Index in
+      let vs, f = match f with
+        | Seq (vs, f) -> vs, f
+        | _ -> assert false in
+      Seq (a :: vs,f)
+      
     | Var m -> Var m
     | Pred ts -> Pred (subst s ts)
     | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
@@ -560,30 +617,64 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     | Impl (a, b) -> Impl (subst s a, subst s b)
     | True -> True
     | False -> False
-    | ForAll (a, b) ->
-      let filtered_s = filter_subst a s in
-      let new_a, new_b = refresh_formula a filtered_s b in
-      ForAll (new_a, subst filtered_s new_b)
-    | Exists (a, b) ->
-      let filtered_s = filter_subst a s in
-      let new_a, new_b = refresh_formula a filtered_s b in
-      Exists (new_a, subst filtered_s new_b)
-    | Find (a, b, c, d) ->
-      let ea = List.map (fun x -> Vars.EVar x) a in
-      let filtered_s = filter_subst ea s in
-      let new_ea, new_b = refresh_formula ea filtered_s b in
-      let new_ea, new_c = refresh_formula ea filtered_s c in
-      let new_ea, new_d = refresh_formula ea filtered_s d in
-      let final_a = List.map (fun (Vars.EVar x) ->
-          match Vars.sort x  with
-          | Sorts.Index -> (x :> Vars.index)
-          | _ -> assert false
-        )
-         new_ea in
-      Find (final_a, subst filtered_s new_b, subst filtered_s new_c,
-            subst filtered_s new_d)
+
+    | ForAll ([], f) -> subst s f
+
+    | ForAll (a :: vs, f) ->
+      let a, f = subst_binding a s (ForAll (vs,f)) in
+      mk_forall [a] f
+
+    | Exists ([], f) -> subst s f
+
+    | Exists (a :: vs, f) ->
+      let a, f = subst_binding a s (Exists (vs,f)) in
+      mk_exists [a] f
+
+    | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d) 
+
+    | Find (v :: vs, b, c, d) -> 
+      (* used because [v :: vs] are not bound in [d]  *)
+      let dummy = Fun (f_zero,[]) in
+
+      let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
+      let v = Vars.ecast v Sorts.Index in
+      match f with
+      | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
+      | _ -> assert false
   in
   assoc s new_term
+
+and subst_binding 
+  : type a. Vars.evar -> esubst list -> a term -> Vars.evar * a term =
+  fun var s f ->
+  let right_fv = 
+    List.fold_left (fun acc (ESubst (x, y)) -> 
+        Sv.union acc (get_set_vars y)
+      ) Sv.empty s in
+
+  let all_vars = 
+    List.fold_left (fun acc (ESubst (x, y)) -> 
+        Sv.union acc (get_set_vars x)
+      ) right_fv s in
+
+  let env = ref (Vars.of_list (Sv.elements all_vars)) in
+
+  (* clear [v] entries in [s] *)
+  let s = filter_subst var s in
+
+  (* if [v] is appears in the RHS of [s], refresh [v] carefully *)
+  let var, s = 
+    if Sv.mem var right_fv 
+    then 
+      match var with 
+      | Vars.EVar v ->
+        let new_v = Vars.make_fresh_from_and_update env v in
+        let s = (ESubst (Var v,Var new_v)) :: s in
+        
+        ( Vars.EVar new_v, s)
+    else ( var, s ) in
+  
+  var, subst s f
 
 and subst_message_atom (s : subst) (`Message (ord, a1, a2)) =
   `Message (ord, subst s a1, subst s a2)
@@ -632,64 +723,6 @@ let subst_macros_ts table l ts t =
     | _ -> a
   in
   subst_term t
-
-
-(*------------------------------------------------------------------*)
-(** Smart constructors for boolean terms. *)
-
-let mk_not t1 = match t1 with
-  | Not t -> t
-  | t -> Not t
-
-let mk_and t1 t2 = match t1,t2 with
-  | True, t | t, True -> t
-  | t1,t2 -> And (t1,t2)
-
-let mk_ands ts = List.fold_left mk_and True ts
-
-let mk_or t1 t2 = match t1,t2 with
-  | False, t | t, False -> t
-  | t1,t2 -> Or (t1,t2)
-
-let mk_ors ts = List.fold_left mk_or False ts
-
-let mk_impl t1 t2 = match t1,t2 with
-  | False, _ -> True
-  | True, t -> t
-  | t1,t2 -> Impl (t1,t2)
-
-let mk_impls ts t =
-  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
-
-let mk_ite c t e = match c with
-  | True -> t
-  | False -> e
-  | _ -> ITE (c,t,e)
-
-let mk_forall l f = if l = [] then f else ForAll (l,f)
-let mk_exists l f = if l = [] then f else Exists (l,f)
-
-let message_of_formula f =
-  ITE (f, Fun (f_true,[]), Fun (f_false,[]))
-
-let mk_timestamp_leq t1 t2 = match t1,t2 with
-  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
-  | _ -> `Timestamp (`Leq, t1, t2)
-
-(** Operations on vectors of indices of the same length. *)
-let mk_indices_neq vect_i vect_j =
-  List.fold_left
-    (fun acc e -> mk_or acc e)
-    False
-    (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
-
-let mk_indices_eq vect_i vect_j =
-  List.fold_left
-    (fun acc e -> mk_and acc e)
-    True
-    (List.map2 (fun i j ->
-         if i = j then True else Atom (`Index (`Eq, i, j))
-       ) vect_i vect_j)
 
 
 (*------------------------------------------------------------------*)

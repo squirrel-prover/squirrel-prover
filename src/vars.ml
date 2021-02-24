@@ -147,6 +147,18 @@ module Sv = struct
 end
 
 (*------------------------------------------------------------------*)
+let cast : type a b. a var -> b Sorts.sort -> b var = 
+  fun x s -> match sort x, s with
+  | Sorts.Boolean,   Sorts.Boolean   -> x
+  | Sorts.Message,   Sorts.Message   -> x
+  | Sorts.Index,     Sorts.Index     -> x
+  | Sorts.Timestamp, Sorts.Timestamp -> x
+  | _, _ -> assert false
+
+let ecast : type a. evar -> a Sorts.sort -> a var = 
+  fun (EVar v) s -> cast v s
+
+(*------------------------------------------------------------------*)
 let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->

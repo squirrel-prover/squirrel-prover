@@ -36,5 +36,5 @@ enrich seq(i->h(ok,k(i))).
  by auto.
  fa 2.
 
- expand seq(i->h(ok,k(i))),i.
+ expand seq(i1->h(ok,k(i1))),i.
 Qed.
