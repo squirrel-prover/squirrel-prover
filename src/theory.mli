@@ -100,7 +100,8 @@ val declare_name
 (** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
     a new state symbol of type [s1->...->sn->s]
     where [si] is [index] and [s] is [message]
-    such that [s(t1,...,tn)@init] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
+    such that value of [s(t1,...,tn)] for init timestamp
+    expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_state :
   Symbols.table -> string -> (lsymb*Sorts.esort) list -> Sorts.esort -> term
   -> Symbols.table
