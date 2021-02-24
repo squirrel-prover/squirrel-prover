@@ -13,8 +13,8 @@ equiv [left,s1] [right,s2] test.
 Proof.
 nosimpl(induction t).
 simpl.
-expand frame@A; 1: auto.
-expand output@A; 1:auto.
+expand frame@A.
+expand output@A.
 expand S@A; expand St@A.
 (* The output should simplify into <input@A,ok> or,
    equivalently, diff(<input@A,ok>,<input@A,ok>).

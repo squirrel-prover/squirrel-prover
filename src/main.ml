@@ -376,24 +376,24 @@ let () =
     end ;
     "Fresh System", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
-        (Failure "unfinished")
+        (Tactics.Tactic_soft_failure Tactics.GoalNotClosed)
         (fun () -> run ~test "tests/alcotest/fresh_system.sp")
     end ;
-    "Make biterm", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Failure "unfinished")
-        (fun () -> run ~test "tests/alcotest/fresh_system.sp")
-    end ;
+    (* "Make biterm", `Quick, begin fun () ->
+     *   Alcotest.check_raises "fails"
+     *     (Failure "unfinished")
+     *     (fun () -> run ~test "tests/alcotest/fresh_system.sp")
+     * end ; *)
     "DDH", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure Tactics.NotDDHContext)
         (fun () -> run ~test "tests/alcotest/ddh.sp")
     end ;
-    "DDH2", `Quick, begin fun () ->
-      Alcotest.check_raises "fails"
-        (Tactic_soft_failure Tactics.NotDDHContext)
-        (fun () -> run ~test "tests/alcotest/ddh.sp")
-    end ;
+    (* "DDH2", `Quick, begin fun () ->
+     *   Alcotest.check_raises "fails"
+     *     (Tactic_soft_failure Tactics.NotDDHContext)
+     *     (fun () -> run ~test "tests/alcotest/ddh.sp")
+     * end ; *)
     "FA Dup Input", `Quick, begin fun () ->
       Alcotest.check_raises "fails"
         (Tactic_soft_failure (Tactics.NoReflMacros))

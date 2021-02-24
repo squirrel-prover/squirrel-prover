@@ -65,7 +65,6 @@
   "with"
   "assert"
   "assumption"
-  "auto"
   "case"
   "collision"
   "congruence"
@@ -121,6 +120,7 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
+  "auto"
 ))
 
 (defvar squirrel-tacticals-keywords '(

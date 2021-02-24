@@ -1578,9 +1578,16 @@ let auto ~conclude s sk fk =
   let open Tactics in
   match s with
   | Prover.Goal.Equiv s ->
-    let sk l fk = sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
+    let sk l fk = 
+      if conclude && l <> [] 
+      then fk GoalNotClosed
+      else sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
+    let fk _ = sk [s] fk in
 
-    let wfadup = wrap (fadup (Args.Opt (Args.Int, None))) in
+    let wfadup s sk fk = 
+      let fk _ = sk [s] fk in
+      wrap (fadup (Args.Opt (Args.Int, None))) s sk fk in
+
     andthen_list
       [try_tac wfadup;
        try_tac
@@ -1596,8 +1603,8 @@ let auto ~conclude s sk fk =
     TraceTactics.simplify ~close:conclude ~intro:conclude t sk fk
 
 let tac_auto ~conclude args s sk fk =
-  try auto ~conclude s sk fk with
-  | Tactics.Tactic_soft_failure e -> sk [s] fk  (* this is not a mistake. *)
+   auto ~conclude s sk fk 
+
 
 let () =
   T.register_general "auto"

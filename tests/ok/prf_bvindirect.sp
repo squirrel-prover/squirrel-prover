@@ -24,7 +24,7 @@ Proof.
 	          (A(i1) <= tau => (m(i) <> n(i2) && m(i) <> n(i1)))))),
     True.
   admit.
-  by yesif 1.
+  yesif 1; 1: by auto.
   fresh 1.
   admit. (* Ignore final equivalence goal. *)
 Qed.

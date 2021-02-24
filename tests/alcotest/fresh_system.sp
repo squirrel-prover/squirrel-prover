@@ -12,6 +12,7 @@ equiv test (i:index) :
 Proof.
   intro Hap.
   expand output@A(i).
-  by auto.
   fresh 0.
+  auto.
 Qed.
+

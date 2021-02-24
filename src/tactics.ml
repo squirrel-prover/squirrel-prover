@@ -158,7 +158,6 @@ let rec tac_error_of_strings = function
   | ["Undefined"; s] -> Undefined s
   | _ ->  raise (Failure "exception name unknown")
 
-
 exception Tactic_soft_failure of tac_error
 
 exception Tactic_hard_failure of tac_error
@@ -204,6 +203,14 @@ let map t l sk fk =
 
 (** Like [map], but only apply the tactic to selected judgements. *)
 let map_sel (sel : selector) t l sk fk =
+  let max_list l = match l with
+    | [] -> assert false
+    | a :: l -> List.fold_left max a l
+  in
+  let max_sel = max_list sel in
+  if max_sel > List.length l then 
+    raise (Tactic_hard_failure (Failure ("no goal " ^ string_of_int max_sel)));
+
   let rec aux i acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
