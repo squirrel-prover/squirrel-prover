@@ -2058,6 +2058,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   in
   let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
 
+  (* TODO: use an existential for new indices. *)
   let sequent = TraceSequent.set_env case.env sequent in
 
   let goal =

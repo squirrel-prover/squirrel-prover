@@ -181,9 +181,35 @@ type 'a sk = 'a -> fk -> a
 
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(*------------------------------------------------------------------*)
 (** Selector for tactic *)
 type selector = int list
 
+let check_sel sel_tacs l =
+  (* check that there a no selector for non-existing goal *)
+  let max_list l = match l with
+    | [] -> assert false
+    | a :: l -> List.fold_left max a l
+  in
+  let max_sel = 
+    List.fold_left (fun m (sel,_) -> 
+        max m (max_list sel)
+      ) 0 sel_tacs in
+  if max_sel > List.length l then 
+    raise (Tactic_hard_failure (Failure ("no goal " ^ string_of_int max_sel)));
+
+  (* check that selectors are disjoint *)
+  let all_sel = List.fold_left (fun all (s,_) -> s @ all) [] sel_tacs in
+  let _ = 
+    List.fold_left (fun acc s ->
+        if List.mem s acc then
+          raise (Tactic_hard_failure
+                   (Failure ("selector " ^ string_of_int s ^ " appears twice")));
+        s :: acc
+      ) [] all_sel in
+  ()
+
+(*------------------------------------------------------------------*)
 (** Basic Tactics *)
 
 let fail sk fk = fk (Failure "fail")
@@ -200,26 +226,20 @@ let map t l sk fk =
           fk
   in aux [] l fk
 
-
 (** Like [map], but only apply the tactic to selected judgements. *)
-let map_sel (sel : selector) t l sk fk =
-  let max_list l = match l with
-    | [] -> assert false
-    | a :: l -> List.fold_left max a l
-  in
-  let max_sel = max_list sel in
-  if max_sel > List.length l then 
-    raise (Tactic_hard_failure (Failure ("no goal " ^ string_of_int max_sel)));
+let map_sel sel_tacs l sk fk =
+  check_sel sel_tacs l;         (* check user input *)
 
   let rec aux i acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
-      if List.mem i sel then
+      match List.find_opt (fun (sel,_) -> List.mem i sel) sel_tacs with
+      | Some (_,t) ->
         t e
           (fun r fk ->
              aux (i + 1) (List.rev_append r acc) l fk)
           fk
-      else aux (i + 1) (e :: acc) l fk
+      | None -> aux (i + 1) (e :: acc) l fk
   in aux 1 [] l fk
 
 let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
@@ -243,8 +263,8 @@ let rec andthen_list = function
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
-let andthen_sel tac1 sel tac2 judge sk fk : a =
-  let sk l fk' = map_sel sel tac2 l sk fk' in
+let andthen_sel tac1 sel_tacs judge sk fk : a =
+  let sk l fk' = map_sel sel_tacs l sk fk' in
   tac1 judge sk fk
 
 let by_tac tac judge sk fk =
@@ -345,7 +365,7 @@ end
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen : 'a ast list -> 'a ast
-  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
+  | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
@@ -382,7 +402,10 @@ module AST (M:S) = struct
   let rec eval modifiers = function
     | Abstract (id,args)  -> eval_abstract modifiers id args
     | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
-    | AndThenSel (t,s,t') -> andthen_sel (eval modifiers t) s (eval modifiers t')
+    | AndThenSel (t,tl)   -> 
+      let tl = List.map (fun (s,t') -> s, (eval modifiers t')) tl in
+      andthen_sel (eval modifiers t) tl
+
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
     | By t                -> 
@@ -410,12 +433,23 @@ module AST (M:S) = struct
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
         
-    | AndThenSel (t,s,t') ->
-      Fmt.pf ppf "@[(%a;@ %a: %a)@]"
+    | AndThenSel (t,l) ->
+      let pp_sel_tac fmt (sel,s) = 
+        Fmt.pf ppf "@[%a: %a@]"
+          pp t 
+          (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) sel
+      in
+      let pp_sel_tacs fmt l = match l with
+        | [(sel,s)] -> pp_sel_tac fmt (sel, s)
+        | _ -> 
+          Fmt.pf fmt "@[[%a]@]"
+            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "|") pp_sel_tac) l
+      in
+          
+      Fmt.pf ppf "@[(%a;@ %a)@]"
         pp t 
-        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) s
-        pp t'
-        
+        pp_sel_tacs l
+
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts

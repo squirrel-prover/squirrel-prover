@@ -132,7 +132,7 @@ type selector = int list
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen    : 'a ast list -> 'a ast
-  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
+  | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
   | Try        : 'a ast -> 'a ast
   | Repeat     : 'a ast -> 'a ast

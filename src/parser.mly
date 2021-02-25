@@ -377,12 +377,20 @@ tac_formula:
 as_ip:
 | AS ip=simpl_pat { ip }
 
+%inline sel_tac:
+| s=selector COLON r=tac { (s,r) }
+
+sel_tacs:
+| l=slist1(sel_tac,PARALLEL) { l }
+
 (*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
   | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
-  | l=tac SEMICOLON s=selector COLON r=tac %prec tac_prec
-                                       { Tactics.AndThenSel (l,s,r) }
+  | l=tac SEMICOLON LBRACKET sls=sel_tacs RBRACKET
+                                       { Tactics.AndThenSel (l,sls) }
+  | l=tac SEMICOLON sl=sel_tac %prec tac_prec
+                                       { Tactics.AndThenSel (l,[sl]) }
   | BY t=tac %prec tac_prec            { Tactics.By t }
   | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
   | TRY l=tac                          { Tactics.Try l }
