@@ -34,6 +34,57 @@ let neg (pn, at) =
   (pn, at)
 
 (*------------------------------------------------------------------*)
+module TraceLits : sig 
+  type t = private C of trace_literal list
+
+  val mk : trace_literal list -> t
+
+  val compare : t -> t -> int
+  val equal : t -> t -> bool
+  val hash : t -> int
+
+  module Memo : Ephemeron.S with type key = t
+end = struct
+  type t = C of trace_literal list
+ 
+  let mk l = C (List.sort_uniq Stdlib.compare l)
+
+  let compare (C l) (C l') = 
+    let ll, ll' = List.length l, List.length l' in
+    if ll <> ll' then Stdlib.compare ll ll' 
+    else
+      let exception Done of int in
+      try 
+        List.iter2 (fun lit lit' ->
+            (* FIXME: if we add hash-consing, update *)
+            let c = Stdlib.compare lit lit' in
+            if c <> 0 then raise (Done c) 
+          ) l l';
+        0
+      with Done c -> c
+
+  let equal t t' = compare t t' = 0
+
+  let combine acc n = acc * 65599 + n
+
+  let combine_list fhash hash l =
+    List.fold_left (fun hash x -> 
+        combine hash (fhash x)
+      ) hash l
+
+  (* FIXME: if we add hash-consing, change [Hashtbl.hash] to the literal tag *)
+  let hash (C l) = combine_list Hashtbl.hash 0 l
+
+  module Memo = Ephemeron.K1.Make(struct 
+      type _t = t
+      type t = _t
+      let equal = equal
+      let hash = hash
+    end)
+end
+
+
+(*------------------------------------------------------------------*)
 module Utv : sig
   type uvar = Utv of Vars.timestamp | Uind of Vars.index
 
@@ -1157,14 +1208,25 @@ let rec split (instance : constr_instance) : model list =
     Here, minimanility means inclusion w.r.t. the predicates. *)
 type models = model list
 
-(** [models_conjunct l] returns the list of minimal models of the conjunct.
-    [l] must use only Eq, Neq and Leq. *)
-let models_conjunct (l : trace_literal list)
-  : models timeout_r =
+let tot = ref 0.
+let cptd = ref 0
+
+let models_conjunct (l : trace_literal list) : models timeout_r =
   let l = Form.mk_list l in
   let instance = mk_instance l in
-  Utils.timeout (Config.solver_timeout ())
-    split instance
+  Utils.timeout (Config.solver_timeout ()) split instance 
+
+(** Memoisation *)
+let models_conjunct =
+  let memo = TraceLits.Memo.create 256 in
+  fun (l : trace_literal list) -> 
+    let (C l) as lits = TraceLits.mk l in
+    try TraceLits.Memo.find memo lits with
+    | Not_found ->
+      let res = models_conjunct l in
+      TraceLits.Memo.add memo lits res;
+      res
+
 
 let m_is_sat models = models <> []
 
