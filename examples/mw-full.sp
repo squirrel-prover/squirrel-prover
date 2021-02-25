@@ -37,7 +37,8 @@ process tag(i:index, t:index)=
   new nt;
   out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) then out(c,ok)
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) 
+  then out(c,ok)
   else out(c,ko)
 
 process reader =
@@ -176,16 +177,16 @@ enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
 induction t.
 
 (* Init case *)
-admit. (* see comment above *)
+by admit. (* see comment above *)
 
 (* Case R - Done *)
 expand frame@R(r). fa 4.
-expand seq(r->nr(r)), r.
+by expand seq(r1->nr(r1)), r.
 
 (* Case R1  WIP *)
 expand frame@R1(r); expand exec@R1(r).
 expand cond@R1(r); expand output@R1(r).
-fa 4. fa 5.
+fa 4; fa 5.
 
 equivalent
   (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
@@ -249,10 +250,10 @@ by use H1.
 fa 5.
 fadup 5.
 fa 5.
-expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
-                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
+expand seq(i,r1,t->xor((diff(id(i),id'(i,t))),
+                  H(<tag1,<nr(r1),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
-fadup 5.
+by fadup 5.
 
 (* Case R2 *)
 expand frame@R2(r); expand exec@R2(r).
@@ -295,7 +296,7 @@ fadup 5.
 (* Case T *)
 expand frame@T(i,t). fa 4.
 expand seq(i,t->nt(i,t)),i,t.
-expand seq(i,t->xor((diff(id(i),id'(i,t))),
+by expand seq(i,t->xor((diff(id(i),id'(i,t))),
                 H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
 
 (* Case T1 *)
@@ -325,33 +326,39 @@ expand cond@T1(i,t); split.
   1: by executable pred(T1(i,t)); use H2 with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf Meq2.
-  exists r; split. 
+  exists r. 
+  assert R(r) < T(i,t) as _.
+    assert nr(r) = input@T(i,t) as HF.
+    fresh HF.
+    case H2.  
+    case H1.
+    by depends R(r),R2(r). 
+  (* + *)
   case output@R1(r).
-  euf Meq4.
-  assert nr(r) = input@T(i,t).
-  fresh Meq2.
-  case H1.
-  by case H2; depends R(r),R2(r). 
+  by euf Meq4.
+  by use H2 with i,t.
 
   (* Right *)
   euf Meq0.
   assert R1(r) < T1(i,t).
-    by case H0; depends T(i,t),T1(i,t).
+    by case H1; depends T(i,t),T1(i,t).
   assert cond@R1(r).
-    by executable pred(T1(i,t)); use H1 with R1(r); expand exec@R1(r).
+    by executable pred(T1(i,t)); use H2 with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf Meq2.
-  exists r; split.
+  exists r.
+  assert R(r) < T(i,t) as _.
+    assert nr(r) = input@T(i,t).
+    fresh Meq4.
+    by case H2; depends R(r),R2(r).
   case output@R1(r).
   euf Meq4.
-  use H1 with i,t.
-  assert nr(r) = input@T(i,t).
-  fresh Meq4.
-  by case H1; depends R(r),R2(r).
+  by use H2 with i,t.
+
   (* Honest => Cond *)
   case output@R1(r).
   project; euf Meq3.
-  by use H0 with i,t.
+  by use H1 with i,t.
 
 fa 6.
 fadup 5.
@@ -372,11 +379,11 @@ equivalent
       snd(input@R1(r)) = snd(output@T(i,t)) &&
       R(r) < T(i,t) &&
       input@T(i,t) = output@R(r)).
-split; use H0.
+split; use H1.
   (* Honest => Cond *)
   case output@R1(r).
   project; euf Meq3.
-  use H1 with i,t.
+  by use H2 with i,t.
   (* Cond => Honest *)
   assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))).
@@ -384,35 +391,38 @@ split; use H0.
   (* Left *)
   euf Meq0.
   assert R1(r) < T2(i,t).
-    case H1.
+    case H2.
     by depends T(i,t),T2(i,t).
   assert cond@R1(r).
     executable pred(T2(i,t)).
-    by use H2 with R1(r); expand exec@R1(r).
+    by use H3 with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf Meq2.
-  exists r; split.
+  exists r.
+  assert R(r) < T(i,t).
+    assert nr(r) = input@T(i,t).
+    fresh Meq4.
+    by case H3; depends R(r),R2(r).
   case output@R1(r).
   euf Meq4.
-  use H2 with i,t.
-  assert nr(r) = input@T(i,t).
-  fresh Meq4.
-  by case H2; depends R(r),R2(r).
+  use H3 with i,t.
+
   (* Right *)
   euf Meq0.
   assert R1(r) < T2(i,t).
-    by case H1; depends T(i,t),T2(i,t).
+    by case H2; depends T(i,t),T2(i,t).
   assert cond@R1(r).
-    by executable pred(T2(i,t)); use H2 with R1(r); expand exec@R1(r).
+    by executable pred(T2(i,t)); use H3 with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   euf Meq2.
-  exists r; split.
+  exists r.
+  assert R(r) < T(i,t).
+    assert nr(r) = input@T(i,t).
+    fresh Meq4.
+    by case H3; depends R(r),R2(r).
   case output@R1(r).
   euf Meq4.
-  use H2 with i,t.
-  assert nr(r) = input@T(i,t).
-  fresh Meq4.
-  by case H2; depends R(r),R2(r).
+  by use H3 with i,t.
 
 fa 6.
 fadup 5.
