@@ -141,4 +141,9 @@ val as_seq1 : 'a list -> 'a
 val as_seq2 : 'a list -> 'a * 'a
 val as_seq3 : 'a list -> 'a * 'a * 'a
 val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
-                         
+
+(*------------------------------------------------------------------*)
+(** {2 Hash} *)
+
+val hcombine : int -> int -> int
+val hcombine_list : ('a -> int) -> int -> 'a list -> int                         

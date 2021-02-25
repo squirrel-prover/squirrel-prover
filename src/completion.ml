@@ -716,9 +716,9 @@ end = struct
 end
 
 
-(*****************)
-(* Normalization *)
-(*****************)
+(*------------------------------------------------------------------*)
+(** {2 Normalization} *)
+
 
 (* [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
     using the xor rules in [state]. *)
@@ -827,9 +827,8 @@ let rec normalize_csts state = function
   | Ccst _ | Cxor _ as t -> normalize state t
 
 
-(**************)
-(* Completion *)
-(**************)
+(*------------------------------------------------------------------*)
+(** {2 Completion} *)
 
 (* Finalize the completion, by normalizing all ground and erules using the xor
     rules. This handles critical pair of the form:
@@ -936,6 +935,28 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
   complete_state state
   |> finalize_completion
 
+let tot = ref 0.
+let cptd = ref 0
+
+module Memo = Ephemeron.K2.Make
+    (struct 
+      type t = Symbols.table
+      let equal t t' = Symbols.tag t = Symbols.tag t'
+      let hash t = Symbols.tag t 
+    end)
+    (struct 
+      type t = (Term.message * Term.message) list
+      let equal_p (t0, t1) (t0', t1') = t0 = t0' && t1 = t1'
+      let equal l l' = 
+        let l, l' = List.sort_uniq Stdlib.compare l,
+                    List.sort_uniq Stdlib.compare l' in
+        List.length l = List.length l' &&
+        List.for_all2 equal_p l l'
+
+      let hash_p (t0, t1) = Utils.hcombine (Hashtbl.hash t0) (Hashtbl.hash t1)
+      let hash l = Utils.hcombine_list hash_p 0 l
+    end)
+
 let complete table (l : (Term.message * Term.message) list) 
   : state timeout_r=
   let l =
@@ -946,16 +967,27 @@ let complete table (l : (Term.message * Term.message) list)
       []
       l
   in
-  Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l
+  Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l 
+
+(** With memoisation *)
+let complete = 
+  let memo = Memo.create 256 in
+  fun table l ->
+    try Memo.find memo (table,l) with
+    | Not_found -> 
+      let res = complete table l in
+      Memo.add memo (table,l) res;
+      res
+  
 
 
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
     pp_e_rules (init_erules table)
 
-(****************)
-(* Dis-equality *)
-(****************)
+(*------------------------------------------------------------------*)
+(** {2 Dis-equality} *)
+
 (* returns true if the cterm corresponds to a ground term, e.g without macros
    and vars. *)
 let rec is_ground_term = function
@@ -1002,11 +1034,10 @@ let check_equality state (u,v) =
 let check_equalities state l = List.for_all (check_equality state) l
 
 
-(**********************************)
-(* Names and Constants Equalities *)
-(**********************************)
+(*------------------------------------------------------------------*)
+(** {2 Names and Constants Equalities} *)
 
-(* [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
+(** [star_apply (f : 'a -> 'b list) (l : 'a list)] applies [f] to the
     first element of [l] and all the other elements of [l], and return the
     concatenation of the results of these application.
     If [l] is the list [a1],...,[an], then [star_apply f l] returns:
@@ -1078,9 +1109,8 @@ let name_indep_cnstrs state l =
   |>  List.filter (function Term.True -> false | _ -> true)
   |>  List.sort_uniq Stdlib.compare
 
-(****************)
-(* Tests Suites *)
-(****************)
+(*------------------------------------------------------------------*)
+(** {2 Tests Suites} *)
 
 let mk_cst () = ccst (Cst.mk_flat ())
 

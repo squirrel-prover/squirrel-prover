@@ -15,6 +15,9 @@ type group
   * It is currently ineffective. *)
 type table
 
+(** Associates a unique tag to a table. For memoisation. *)
+val tag : table -> int
+
 (** Each possible namespace is represented by an abstract datatype.
   * Their names are descriptive; [fname] is for function symbols. *)
 

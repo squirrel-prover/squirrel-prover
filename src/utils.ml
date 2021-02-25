@@ -423,3 +423,11 @@ let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 
 let as_seq4 = function [x1; x2; x3; x4] -> (x1, x2, x3, x4)
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let hcombine acc n = acc * 65599 + n
+
+let hcombine_list fhash hash l =
+  List.fold_left (fun hash x -> 
+      hcombine hash (fhash x)
+    ) hash l

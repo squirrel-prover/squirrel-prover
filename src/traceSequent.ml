@@ -157,8 +157,8 @@ end = struct
       env = env ;
       hyps = hyps ;
       conclusion = conclusion ;
-      trs = trs ;
-      models = models ; }
+      trs = trs ;               (* FIXME: right now this is useless *)
+      models = models ;         (* FIXME: right now this is useless *) }
   
   let set_trs t trs = match !(t.trs) with
     | None -> t.trs := Some trs

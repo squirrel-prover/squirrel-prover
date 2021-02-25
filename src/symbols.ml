@@ -64,9 +64,37 @@ let pp fmt symb = Format.pp_print_string fmt symb.name
 
 module Ms = Map.Make (struct type t = symb let compare = Stdlib.compare end)
 
-type table = (edef * data) Ms.t
+(*------------------------------------------------------------------*)
+module Table : sig
+  type table_c = (edef * data) Ms.t
 
-let empty_table = Ms.empty
+  type table = private { 
+    cnt : table_c;
+    tag : int;
+  }
+
+  val mk : table_c -> table
+  val tag : table -> int
+end = struct
+  type table_c = (edef * data) Ms.t
+
+  type table = { 
+    cnt : table_c;
+    tag : int;
+  }
+  
+  let mk = 
+    let cpt_tag = ref 0 in
+    fun t ->
+      { cnt = t; tag = (incr cpt_tag; !cpt_tag) }
+
+  let tag t = t.tag
+end
+
+include Table
+
+(*------------------------------------------------------------------*)
+let empty_table : table = mk Ms.empty
 
 let prefix_count_regexp = Pcre.regexp "([^0-9]*)([0-9]*)"
 
@@ -116,10 +144,10 @@ let edef_namespace_opt : edef -> namespace option = fun e ->
 
 let edef_namespace x = oget (edef_namespace_opt x)
 
-let get_namespace ?(group=default_group) table s =
+let get_namespace ?(group=default_group) (table : table) s =
   let s = { group; name=s } in
   let f (x,_) = edef_namespace_opt x in
-  obind f (Ms.find_opt s table)
+  obind f (Ms.find_opt s table.cnt)
 
 (*------------------------------------------------------------------*)
 (* TODO: group exception together + improve errors *)
@@ -128,24 +156,25 @@ exception Incorrect_namespace
 exception Multiple_declarations of string
 
 (*------------------------------------------------------------------*)
-let def_of_string ?(group=default_group) s table =
+let def_of_string ?(group=default_group) s (table : table) =
   let t = { group; name=s } in
-  try fst (Ms.find t table) with Not_found -> raise @@ Unbound_identifier s
+  try fst (Ms.find t table.cnt) with Not_found -> raise @@ Unbound_identifier s
 
-let is_defined ?(group=default_group) name table = Ms.mem {group;name} table
+let is_defined ?(group=default_group) name (table : table) = 
+  Ms.mem {group;name} table.cnt
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
-let of_string ?(group=default_group) s table =
+let of_string ?(group=default_group) s (table : table) =
   let t = { group ; name=s } in
-  try match Ms.find t table with
+  try match Ms.find t table.cnt with
     | Exists d, _ -> Wrapped (t,d)
     | Reserved, _ -> raise @@ Unbound_identifier s
   with Not_found -> raise @@ Unbound_identifier s
 
-let of_string_opt ?(group=default_group) s table =
+let of_string_opt ?(group=default_group) s (table : table) =
   let t = { group; name=s } in
-  try match Ms.find t table with
+  try match Ms.find t table.cnt with
     | Exists d, _ -> Some (Wrapped (t,d))
     | Reserved, _ -> None
   with Not_found -> None
@@ -192,93 +221,95 @@ module Make (N:S) : Namespace
 
   let group = N.group
 
-  let reserve table name =
-    let symb = fresh ~group name table in
-    let table = Ms.add symb (Reserved,Empty) table in
-    table,symb
+  let reserve (table : table) name =
+    let symb = fresh ~group name table.cnt in
+    let table_c = Ms.add symb (Reserved,Empty) table.cnt in
+    mk table_c, symb
 
-  let reserve_exact table name =
+  let reserve_exact (table : table) name =
     let symb = {group;name} in
-    if Ms.mem symb table then raise (Multiple_declarations name);
-    let table = Ms.add symb (Reserved,Empty) table in
-    table,symb
+    if Ms.mem symb table.cnt then raise (Multiple_declarations name);
+    let table_c = Ms.add symb (Reserved,Empty) table.cnt in
+    mk table_c, symb
 
-  let define table symb ?(data=Empty) value =
-    assert (fst (Ms.find symb table) = Reserved) ;
-    Ms.add symb (Exists (N.construct value), data) table
+  let define (table : table) symb ?(data=Empty) value =
+    assert (fst (Ms.find symb table.cnt) = Reserved) ;
+    let table_c = Ms.add symb (Exists (N.construct value), data) table.cnt in
+    mk table_c
 
-  let redefine table symb ?(data=Empty) value =
-    assert (Ms.mem symb table) ;
-    Ms.add symb (Exists (N.construct value), data) table
+  let redefine (table : table) symb ?(data=Empty) value =
+    assert (Ms.mem symb table.cnt) ;
+    let table_c = Ms.add symb (Exists (N.construct value), data) table.cnt in
+    mk table_c
 
-  let declare table name ?(data=Empty) value =
-    let symb = fresh ~group name table in
-    let table =
-      table_add table symb (Exists (N.construct value), data)
+  let declare (table : table) name ?(data=Empty) value =
+    let symb = fresh ~group name table.cnt in
+    let table_c =
+      table_add table.cnt symb (Exists (N.construct value), data)
     in
-    table, symb
+    mk table_c, symb
 
-  let declare_exact table name ?(data=Empty) value =
+  let declare_exact (table : table) name ?(data=Empty) value =
     let symb = {group;name} in
-    if Ms.mem symb table then raise @@ Multiple_declarations name;
-    let table =
-      table_add table symb (Exists (N.construct value), data)
+    if Ms.mem symb table.cnt then raise @@ Multiple_declarations name;
+    let table_c =
+      table_add table.cnt symb (Exists (N.construct value), data)
     in
-    table, symb
+    mk table_c, symb
 
-  let get_all (name:ns t) table =
+  let get_all (name:ns t) (table : table) =
     (* We know that [name] is bound in [table]. *)
-    let def,data = Ms.find name table in
+    let def,data = Ms.find name table.cnt in
     N.deconstruct def, data
 
-  let get_def name table = fst (get_all name table)
-  let get_data name table = snd (get_all name table)
+  let get_def name (table : table) = fst (get_all name table)
+  let get_data name (table : table) = snd (get_all name table)
 
   let cast_of_string name = {group;name}
 
-  let of_string name table =
+  let of_string name (table : table) =
     let symb = {group;name} in
     try
-      ignore (N.deconstruct (fst (Ms.find symb table))) ;
+      ignore (N.deconstruct (fst (Ms.find symb table.cnt))) ;
       symb
     with Not_found -> raise @@ Unbound_identifier name
 
-  let of_string_opt name table =
+  let of_string_opt name (table : table) =
     let symb = {group;name} in
     try
-      ignore (N.deconstruct (fst (Ms.find symb table))) ;
+      ignore (N.deconstruct (fst (Ms.find symb table.cnt))) ;
       Some symb
     with Not_found -> None
 
-  let def_of_string name table =
+  let def_of_string name (table : table) =
     try
-      N.deconstruct (fst (Ms.find {group;name} table))
+      N.deconstruct (fst (Ms.find {group;name} table.cnt))
     with Not_found -> raise @@ Unbound_identifier name
 
-  let data_of_string name table =
+  let data_of_string name (table : table) =
     try
-      let def,data = Ms.find {group;name} table in
+      let def,data = Ms.find {group;name} table.cnt in
         (* Check that we are in the current namespace
          * before returning the associated data. *)
         ignore (N.deconstruct def) ;
         data
     with Not_found -> raise @@ Unbound_identifier name
 
-  let iter f table =
+  let iter f (table : table) =
     Ms.iter
       (fun s (def,data) ->
          try f s (N.deconstruct def) data with
            | Incorrect_namespace -> ())
-      table
+      table.cnt
 
-  let fold f acc table =
+  let fold f acc (table : table) =
     Ms.fold
       (fun s (def,data) acc ->
          try
            let def = N.deconstruct def in
            f s def data acc
          with Incorrect_namespace -> acc)
-      table acc
+      table.cnt acc
 
 end
 

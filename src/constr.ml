@@ -65,15 +65,8 @@ end = struct
 
   let equal t t' = compare t t' = 0
 
-  let combine acc n = acc * 65599 + n
-
-  let combine_list fhash hash l =
-    List.fold_left (fun hash x -> 
-        combine hash (fhash x)
-      ) hash l
-
   (* FIXME: if we add hash-consing, change [Hashtbl.hash] to the literal tag *)
-  let hash (C l) = combine_list Hashtbl.hash 0 l
+  let hash (C l) = Utils.hcombine_list Hashtbl.hash 0 l
 
   module Memo = Ephemeron.K1.Make(struct 
       type _t = t
