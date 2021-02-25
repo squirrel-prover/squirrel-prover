@@ -29,7 +29,8 @@ val cast  : 'a var -> 'b Sorts.sort -> 'b var
 val ecast :   evar -> 'a Sorts.sort -> 'a var
 
 (** Print a variable, only showing its name. *)
-val pp : Format.formatter -> 'a var -> unit
+val pp   : Format.formatter -> 'a var -> unit
+val pp_e : Format.formatter ->   evar -> unit
 
 (** Print a list of variables, only showing their names. *)
 val pp_list : Format.formatter -> 'a var list -> unit

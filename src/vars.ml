@@ -143,7 +143,7 @@ module Sv = struct
       let compare (EVar a) (EVar b) = compare (name a) (name b)
     end)
   let add_list sv vars =
-    List.fold_left (fun vars v -> add (EVar v) sv) sv vars
+    List.fold_left (fun sv v -> add (EVar v) sv) sv vars
 end
 
 (*------------------------------------------------------------------*)

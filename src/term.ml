@@ -2,6 +2,9 @@ open Utils
 
 module L = Location
 
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
 (*------------------------------------------------------------------*)
 (** Symbols *)
 
@@ -565,6 +568,8 @@ let mk_indices_eq vect_i vect_j =
        ) vect_i vect_j)
 
 (*------------------------------------------------------------------*)
+(** {2 Substitutions} *)
+
 (** given a variable [x] and a subst [s], remove from [s] all
     substitution [v->_]. *)
 let filter_subst (var:Vars.evar) (s:subst) =
@@ -577,71 +582,85 @@ let filter_subst (var:Vars.evar) (s:subst) =
 
   List.rev s
 
+(** Check if the substitutions only susbtitutes variables *)
+let is_var_subst s =
+  List.for_all (fun (ESubst (t,_)) -> match t with
+      | Var _ -> true
+      | _ -> false) s
+
+(** Returns the variables appearing in a substitution LHS. *)
+let subst_support s =
+  List.fold_left (fun supp (ESubst (t,_)) -> 
+    Sv.union supp (get_set_vars t)) Sv.empty s
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
-  let new_term : a term =
-    match t with
-    | Fun ((fs,is), lt) ->
-      Fun ((fs, List.map (subst_var s) is),
-           List.map (subst s) lt)
-    | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
-    | Macro (m, l, ts) ->
-      Macro (subst_macro s m, List.map (subst s) l, subst s ts)
+  if is_var_subst s && 
+     Sv.disjoint (subst_support s) (get_set_vars t)
+  then t
+  else
+    let new_term : a term =
+      match t with
+      | Fun ((fs,is), lt) ->
+        Fun ((fs, List.map (subst_var s) is),
+             List.map (subst s) lt)
+      | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
+      | Macro (m, l, ts) ->
+        Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
-    (* Seq in annoying to do *)
-    | Seq ([], f) -> Seq ([], subst s f)
+      (* Seq in annoying to do *)
+      | Seq ([], f) -> Seq ([], subst s f)
 
-    | Seq ([a], f) -> 
-      let a, f = subst_binding (Vars.EVar a) s f in
-      let a = Vars.ecast a Sorts.Index in
-      Seq ([a],f)
+      | Seq ([a], f) -> 
+        let a, f = subst_binding (Vars.EVar a) s f in
+        let a = Vars.ecast a Sorts.Index in
+        Seq ([a],f)
 
-    | Seq (a :: vs, f) -> 
-      let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
-      let a = Vars.ecast a Sorts.Index in
-      let vs, f = match f with
-        | Seq (vs, f) -> vs, f
-        | _ -> assert false in
-      Seq (a :: vs,f)
-      
-    | Var m -> Var m
-    | Pred ts -> Pred (subst s ts)
-    | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
-    | Diff (a, b) -> Diff (subst s a, subst s b)
-    | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
-    | Atom a-> Atom (subst_generic_atom s a)
-    | And (a, b) -> And (subst s a, subst s b)
-    | Or (a, b) -> Or (subst s a, subst s b)
-    | Not a -> Not (subst s a)
-    | Impl (a, b) -> Impl (subst s a, subst s b)
-    | True -> True
-    | False -> False
+      | Seq (a :: vs, f) -> 
+        let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
+        let a = Vars.ecast a Sorts.Index in
+        let vs, f = match f with
+          | Seq (vs, f) -> vs, f
+          | _ -> assert false in
+        Seq (a :: vs,f)
 
-    | ForAll ([], f) -> subst s f
+      | Var m -> Var m
+      | Pred ts -> Pred (subst s ts)
+      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Diff (a, b) -> Diff (subst s a, subst s b)
+      | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
+      | Atom a-> Atom (subst_generic_atom s a)
+      | And (a, b) -> And (subst s a, subst s b)
+      | Or (a, b) -> Or (subst s a, subst s b)
+      | Not a -> Not (subst s a)
+      | Impl (a, b) -> Impl (subst s a, subst s b)
+      | True -> True
+      | False -> False
 
-    | ForAll (a :: vs, f) ->
-      let a, f = subst_binding a s (ForAll (vs,f)) in
-      mk_forall [a] f
+      | ForAll ([], f) -> subst s f
 
-    | Exists ([], f) -> subst s f
+      | ForAll (a :: vs, f) ->
+        let a, f = subst_binding a s (ForAll (vs,f)) in
+        mk_forall [a] f
 
-    | Exists (a :: vs, f) ->
-      let a, f = subst_binding a s (Exists (vs,f)) in
-      mk_exists [a] f
+      | Exists ([], f) -> subst s f
 
-    | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d) 
+      | Exists (a :: vs, f) ->
+        let a, f = subst_binding a s (Exists (vs,f)) in
+        mk_exists [a] f
 
-    | Find (v :: vs, b, c, d) -> 
-      (* used because [v :: vs] are not bound in [d]  *)
-      let dummy = Fun (f_zero,[]) in
+      | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d) 
 
-      let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
-      let v = Vars.ecast v Sorts.Index in
-      match f with
-      | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
-      | _ -> assert false
-  in
-  assoc s new_term
+      | Find (v :: vs, b, c, d) -> 
+        (* used because [v :: vs] are not bound in [d]  *)
+        let dummy = Fun (f_zero,[]) in
+
+        let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
+        let v = Vars.ecast v Sorts.Index in
+        match f with
+        | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
+        | _ -> assert false
+    in 
+    assoc s new_term
 
 and subst_binding 
   : type a. Vars.evar -> esubst list -> a term -> Vars.evar * a term =
@@ -669,7 +688,6 @@ and subst_binding
       | Vars.EVar v ->
         let new_v = Vars.make_fresh_from_and_update env v in
         let s = (ESubst (Var v,Var new_v)) :: s in
-        
         ( Vars.EVar new_v, s)
     else ( var, s ) in
   

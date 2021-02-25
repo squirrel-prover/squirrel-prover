@@ -979,8 +979,6 @@ let complete =
       Memo.add memo (table,l) res;
       res
   
-
-
 let print_init_trs fmt table =
   Fmt.pf fmt "@[<v 2>Rewriting rules:@;%a@]"
     pp_e_rules (init_erules table)
