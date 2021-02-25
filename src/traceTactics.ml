@@ -874,7 +874,7 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
   | Term.Action(n1, is1), Term.Action (n2, is2) ->
     let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
-      if not (TraceSequent.query_happens s a2) 
+      if not (TraceSequent.query_happens ~precise:true s a2) 
       then soft_failure (Tactics.MustHappen a2)
       else
         let atom = (Atom (`Timestamp (`Lt,a1,a2))) in       
@@ -904,7 +904,7 @@ let expand_macro t s =
   match t with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
-        if not (TraceSequent.query_happens s a) 
+        if not (TraceSequent.query_happens ~precise:true s a) 
         then soft_failure (Tactics.MustHappen a)
         else          
           let mdef = Macros.get_definition system table sort mn is a in
@@ -1098,7 +1098,9 @@ let () = T.register "eqnames"
 (*------------------------------------------------------------------*)
 (** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : TraceSequent.t) =
-  let ts_classes = Tactics.timeout_get (TraceSequent.get_ts_equalities s) in
+  let ts_classes = 
+    Tactics.timeout_get (TraceSequent.get_ts_equalities ~precise:false s) 
+  in
   let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
   let ts_subst =
     let rec asubst e = function
@@ -1108,7 +1110,9 @@ let eq_trace (s : TraceSequent.t) =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let ind_classes = Tactics.timeout_get (TraceSequent.get_ind_equalities s) in
+  let ind_classes = 
+    Tactics.timeout_get (TraceSequent.get_ind_equalities ~precise:false s) 
+  in
   let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
   let ind_subst =
     let rec asubst e = function
@@ -1340,7 +1344,7 @@ let substitute_mess (m1, m2) s =
 let substitute_ts (ts1, ts2) s =
   let subst =
       let models = Tactics.timeout_get (TraceSequent.get_models s) in
-      if Constr.query models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
+      if Constr.query ~precise:true models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
         soft_failure Tactics.NotEqualArguments
@@ -1359,7 +1363,7 @@ let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
 
   let subst =
     let models = Tactics.timeout_get (TraceSequent.get_models s) in
-    if Constr.query models [(`Pos, `Index (`Eq,i1,i2))] then
+    if Constr.query ~precise:true models [(`Pos, `Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
       soft_failure Tactics.NotEqualArguments
@@ -2043,7 +2047,8 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
   (* The action occured before the test H(m,k) = s. *)
   let maximal_elems =
     Tactics.timeout_get
-      (TraceSequent.maximal_elems sequent (precise_ts s @ precise_ts m))
+      (TraceSequent.maximal_elems
+         ~precise:false sequent (precise_ts s @ precise_ts m))
   in
   let le_cnstr =
     List.map

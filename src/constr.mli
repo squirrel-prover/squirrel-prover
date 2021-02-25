@@ -18,18 +18,19 @@ val m_is_sat : models -> bool
     This is an under-approximation (i.e. correct but not complete).
     Because we under-approximate, we are very unprecise on dis-equalities
     (i.e. atoms of the form [(Neq,_,_)]). *)
-val query : models -> trace_literal list -> bool
+val query : precise:bool -> models -> trace_literal list -> bool
 
 (** [maximal_elems models elems] computes a set of elements which contains
     the maximal elements of [elems] in every model in [models].
     This can only be over-approximated, and our result may not be the best.
     This function may be non-deterministic. *)
-val maximal_elems : models -> Term.timestamp list -> Term.timestamp list
+val maximal_elems : 
+  precise:bool -> models -> Term.timestamp list -> Term.timestamp list
 
 (** [get_ts_equalities models ts], given a list of models [models] and a list
-    of timespoints [ts], gives back the classes for equality in all models **)
-val get_ts_equalities : models -> Term.timestamp list ->
-  Term.timestamp list list
+    of timespoints [ts], gives back the classes for equality in all models. *)
+val get_ts_equalities : 
+  precise:bool -> models -> Term.timestamp list -> Term.timestamp list list
 
-val get_ind_equalities : models -> Vars.index list ->
-  Vars.index list list
+val get_ind_equalities : 
+  precise:bool -> models -> Vars.index list -> Vars.index list list

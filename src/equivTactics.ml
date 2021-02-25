@@ -1119,7 +1119,8 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       EquivSequent.set_equiv_goal s (List.map apply_subst (goal_as_equiv s)) 
     in   
     
-    if not (query_happens s a) then soft_failure (Tactics.MustHappen a)
+    if not (query_happens ~precise:true s a) 
+    then soft_failure (Tactics.MustHappen a)
     else [Prover.Goal.Equiv new_s]
   in
 
@@ -1193,7 +1194,7 @@ let expand_all () s =
     let rec aux : type a. a term -> a term = function
       | Macro ((mn, sort, is),l,a) as m
         when Macros.is_defined mn a table ->
-        if query_happens s a 
+        if query_happens ~precise:true s a 
         then aux (Macros.get_definition system table sort mn is a)
         else m
       | Macro _ as m -> m

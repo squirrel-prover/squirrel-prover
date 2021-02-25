@@ -84,9 +84,9 @@ val get_trs : sequent -> Completion.state Utils.timeout_r
 val get_models : sequent -> Constr.models Utils.timeout_r
 
 (** See [Constr.query] *)
-val query : t -> Constr.trace_literal list -> bool
+val query : precise:bool -> t -> Constr.trace_literal list -> bool
 
-val query_happens : t -> Term.timestamp -> bool
+val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
   * messages on both sides of the sequents make the sequent valid. 
@@ -102,17 +102,20 @@ val constraints_valid : sequent -> bool Utils.timeout_r
 (** [get_ts_equalities s] returns all the equalities between timestamps
     derivable from its hypothesis. 
     May timeout. *)
-val get_ts_equalities : sequent -> Term.timestamp list list Utils.timeout_r
+val get_ts_equalities :
+  precise:bool -> sequent -> Term.timestamp list list Utils.timeout_r
 
 (** [get_ind_equalities s] returns all the equalities between indices
     derivable from its hypothesis. 
     May timeout. *)
-val get_ind_equalities : sequent -> Vars.index list list Utils.timeout_r
+val get_ind_equalities :
+  precise:bool -> sequent -> Vars.index list list Utils.timeout_r
 
 (** [maximal_elems s ts] returns the maximal elements of the timestamps,
     according to their ordering derived from the hypothesis in [s]. 
     May timeout. *)
-val maximal_elems : sequent -> Term.timestamp list ->
+val maximal_elems : 
+  precise:bool -> sequent -> Term.timestamp list -> 
   Term.timestamp list Utils.timeout_r
 
 

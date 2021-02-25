@@ -1205,11 +1205,12 @@ let query_one (model : model) (at : trace_literal) =
   let cnf = Form.mk at in
   List.for_all (query_form model) cnf
 
-let query (models : models) (ats : trace_literal list) =
+let query ~precise (models : models) (ats : trace_literal list) =
   (* if the conjunction of trace literals is  *)
   if List.for_all (fun model -> List.for_all (query_one model) ats) models 
   then true
-  else 
+  else if not precise then false 
+  else
     let forms = List.map (fun at -> Form.mk (neg at)) ats
                 |> List.flatten in   
     let insts = List.map (fun model ->
@@ -1218,9 +1219,10 @@ let query (models : models) (ats : trace_literal list) =
     List.for_all (fun inst -> split inst = []) insts
 
 (* adds debugging information *)
-let query models ats =
-  dbg "query: %a" pp_trace_literals ats;
-  let b = query models ats in
+let query ~precise models ats =
+  dbg "%squery: %a" 
+    (if precise then "precise " else "") pp_trace_literals ats;
+  let b = query ~precise models ats in
   dbg "query result: %a : %a" pp_trace_literals ats Fmt.bool b;
   b
 
@@ -1244,7 +1246,7 @@ let max_elems_model (model : model) elems =
 
   model, melems
 
-let maximal_elems (models : models) (elems : Term.timestamp list) =
+let maximal_elems ~precise (models : models) (elems : Term.timestamp list) =
   (* Invariant: [maxs_acc] is sorted and without duplicates. *)
   let rmodels, maxs = List.fold_left (fun (models, maxs_acc) m ->
       let m, m_maxs = max_elems_model m elems in
@@ -1255,14 +1257,20 @@ let maximal_elems (models : models) (elems : Term.timestamp list) =
   (* Now, we try to remove duplicates, i.e. elements which are in [maxs]
      and are equal in every model of [models], by picking an arbitrary
      element in each equivalence class. *)
-  Utils.classes (fun ts ts' -> query models [`Pos, `Timestamp (`Eq,ts,ts')]) maxs
+  Utils.classes (fun ts ts' -> 
+      query ~precise models [`Pos, `Timestamp (`Eq,ts,ts')]
+    ) maxs
   |> List.map List.hd
 
-let get_ts_equalities (models : models) ts =
-  Utils.classes (fun ts ts' -> query models [`Pos, `Timestamp (`Eq,ts,ts')]) ts
+let get_ts_equalities ~precise (models : models) ts =
+  Utils.classes (fun ts ts' -> 
+      query  ~precise models [`Pos, `Timestamp (`Eq,ts,ts')]
+    ) ts
 
-let get_ind_equalities (models : models) inds =
-  Utils.classes (fun i j -> query models [`Pos, `Index (`Eq,i,j)]) inds
+let get_ind_equalities ~precise (models : models) inds =
+  Utils.classes (fun i j ->
+      query  ~precise models [`Pos, `Index (`Eq,i,j)]
+    ) inds
 
 
 (*------------------------------------------------------------------*)

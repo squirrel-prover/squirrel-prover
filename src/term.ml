@@ -570,7 +570,7 @@ let mk_indices_eq vect_i vect_j =
 let filter_subst (var:Vars.evar) (s:subst) =
   let s = 
     List.fold_left (fun acc (ESubst (x, y)) ->
-        if Sv.is_empty (Sv.inter (Sv.singleton var) (get_set_vars x))
+        if not (Sv.mem var (get_set_vars x))
         then (ESubst (x, y))::acc
         else acc
       ) [] s in 
@@ -646,6 +646,9 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
 and subst_binding 
   : type a. Vars.evar -> esubst list -> a term -> Vars.evar * a term =
   fun var s f ->
+  (* clear [v] entries in [s] *)
+  let s = filter_subst var s in
+
   let right_fv = 
     List.fold_left (fun acc (ESubst (x, y)) -> 
         Sv.union acc (get_set_vars y)
@@ -657,9 +660,6 @@ and subst_binding
       ) right_fv s in
 
   let env = ref (Vars.of_list (Sv.elements all_vars)) in
-
-  (* clear [v] entries in [s] *)
-  let s = filter_subst var s in
 
   (* if [v] is appears in the RHS of [s], refresh [v] carefully *)
   let var, s = 

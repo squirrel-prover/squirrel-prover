@@ -242,31 +242,31 @@ let get_models s : Constr.models timeout_r =
       let () = S.set_models s models in
       Result models
 
-let query s q =
+let query ~precise s q =
   let models = Tactics.timeout_get (get_models s) in
-  Constr.query models q
+  Constr.query ~precise models q
 
-let query_happens s a = query s [`Pos, `Happens a]
+let query_happens ~precise s a = query ~precise s [`Pos, `Happens a]
 
-let maximal_elems s tss =
+let maximal_elems ~precise s tss =
   match get_models s with
-  | Result models -> Result (Constr.maximal_elems models tss)
+  | Result models -> Result (Constr.maximal_elems ~precise models tss)
   | Timeout -> Timeout
 
-let get_ts_equalities s =
+let get_ts_equalities ~precise s =
   match get_models s with
   | Result models ->
     let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
              |>  Atom.trace_atoms_ts in
-    Result (Constr.get_ts_equalities models ts)
+    Result (Constr.get_ts_equalities ~precise models ts)
   | Timeout -> Timeout
 
-let get_ind_equalities s =
+let get_ind_equalities ~precise s =
   match get_models s with
   | Result models ->
     let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
                |> Atom.trace_atoms_ind in
-    Result (Constr.get_ind_equalities models inds)
+    Result (Constr.get_ind_equalities ~precise models inds)
   | Timeout -> Timeout    
 
 let constraints_valid s =
@@ -374,7 +374,7 @@ module Hyps
     iter#visit_formula f ;
     
     List.fold_left (fun s (a,f) -> 
-        if query_happens s a 
+        if query_happens ~precise:true s a 
         then snd (add_form_aux None s f)
         else s
       ) s !macro_eqs
@@ -382,11 +382,12 @@ module Hyps
   and add_form_aux
       ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.formula) =
     let recurse = not (H.is_hyp f s.hyps) in
-    
+
     (* TODO: remove auto naming ? *)
     let id = match id with       
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in
+
     let id, hyps = H.add ~force id f s.hyps in
     let s =
       S.update ~keep_trs:false ~keep_models:false
@@ -401,7 +402,7 @@ module Hyps
     let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
     let s =
-      S.update ~keep_trs:false ~keep_models:false
+      S.update ~keep_trs:true ~keep_models:false
         ~hyps s in
 
     id, s
@@ -412,9 +413,6 @@ module Hyps
     | Term.Atom (#Term.message_atom) -> add_form_aux ~force (Some id) s f
     | Term.Atom (`Happens ts)        -> add_happens ~force id s ts
     | _ -> add_form_aux ~force (Some id) s f
-      (* let id, hyps = H.add ~force id f s.hyps in
-       * (* TODO: performances, less updates ? *)
-       * id, S.update ~hyps:hyps s *)
 
   let add_i npat f s =
     let force, approx, name = match npat with
