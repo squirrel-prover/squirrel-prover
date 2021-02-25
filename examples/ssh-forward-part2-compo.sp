@@ -449,7 +449,7 @@ Proof.
   by expandall; fa 17.
  (* P3 *)
   expandall; fa 17.
-  by expand seq(i1 -> r2(i1)),i.
+  by expand seq(i -> r2(i)),i.
  (* A *)
   by expandall; fa 17.
   (* A1 *)
@@ -464,7 +464,7 @@ Proof.
   by expandall; fa 17.
   (* SDISauth3 *)
   expandall; fa 17.
-  by expand seq(i1 -> a(i1)),i.
+  by expand seq(i -> a(i)),i.
   (* Sfail *)
   expand frame@Sfail.
 
@@ -496,8 +496,8 @@ Proof.
   by expandall; fa 17.
   (* PDISauth7 *)
   expandall; fa 17.
-  expand seq(i1 -> b(i1)),i. 
-  by expand seq(i1 -> bke1(i1)),i.
+  expand seq(i -> b(i)),i. 
+  by expand seq(i -> bke1(i)),i.
   (* Pfail *)
   expand frame@Pfail.
 

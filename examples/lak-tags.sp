@@ -224,7 +224,7 @@ Proof.
   (* RIGHT *)
   fa.
   use wa_R1_right with i1,j,k1.
-  by exists i1; use H1.
+  by use H1.
   by yesif.
 
   fa 2; fadup 1.

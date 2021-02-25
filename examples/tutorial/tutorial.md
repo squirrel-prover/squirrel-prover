@@ -154,6 +154,7 @@ TODO, describe each step of the proof.
 *)
 goal wa :
   forall (i:index, j:index),
+    happens(R(j,i)) =>
      cond@R(j,i) =>
          exists (k:index),
               T(i,k) <= R(j,i) && fst(input@R(j,i)) = nT(i,k).

@@ -266,7 +266,7 @@ Proof.
    by expandall; fa 7.
    (* Pauth3 *)
    expandall; fa 7.
-   by expand seq(i1->g^b(i1)),i. 
+   by expand seq(i->g^b(i)),i. 
    (* Pfail *)
    expand frame@Pfail.
 
@@ -297,7 +297,7 @@ Proof.
 
    (* Sauth3 *)
    expandall; fa 7.
-   by expand seq(i1->g^a(i1)),i.
+   by expand seq(i->g^a(i)),i.
    (* Safil *)
    expand frame@Sfail.
 

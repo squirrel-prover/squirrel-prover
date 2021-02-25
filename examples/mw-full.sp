@@ -181,7 +181,7 @@ by admit. (* see comment above *)
 
 (* Case R - Done *)
 expand frame@R(r). fa 4.
-by expand seq(r1->nr(r1)), r.
+by expand seq(r->nr(r)), r.
 
 (* Case R1  WIP *)
 expand frame@R1(r); expand exec@R1(r).
@@ -244,14 +244,13 @@ by exists t.
 fa; try exists i,t.
 fa. 
 use wa_R1_right with i1,t1,r as [H1 H2]. 
-exists i1.
 by use H1.
 
 fa 5.
 fadup 5.
 fa 5.
-expand seq(i,r1,t->xor((diff(id(i),id'(i,t))),
-                  H(<tag1,<nr(r1),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
+expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
+                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
 by fadup 5.
 

@@ -252,7 +252,6 @@ use H1.
 by exists t.
 yesif.
 fa.
-exists i1.
 use wa_R1_right with i1,t1,r.
 by use H1.
 by yesif.
