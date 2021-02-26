@@ -259,8 +259,8 @@ let pp_error_i ppf = function
       Fmt.pf ppf "An index must be a variable, the term %a \
                   cannot be seen as an index" pp_i i
   | Assign_no_state s ->
-      Fmt.pf ppf "Only states can be assigned values, and the \
-                  function symbols %s is not a state" s
+      Fmt.pf ppf "Only mutables can be assigned values, and the \
+                  symbols %s is not a mutable" s
 
   | BadNamespace (s,n) ->
     Fmt.pf ppf "Kind error: %s has kind %a" s
@@ -314,7 +314,10 @@ let check_state table (s : lsymb) n =
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
+        
     | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
+    | exception (Symbols.Unbound_identifier _) ->
+      conv_err (L.loc s) (Undefined (L.unloc s))
 
 let check_name table (s : lsymb) n =
   try
@@ -327,7 +330,7 @@ let check_action table (s : lsymb) n =
   | (l, _) ->
     let arity = List.length l in
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  | exception Not_found -> assert false
+  | exception (Symbols.Unbound_identifier _) -> assert false
 
 
 (** Applications *)
