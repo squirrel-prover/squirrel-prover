@@ -323,14 +323,16 @@ let check_name table (s : lsymb) n =
   try
     let arity = Symbols.Name.def_of_string (L.unloc s) table in
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  with Symbols.Unbound_identifier _ -> assert false
+  with Symbols.Unbound_identifier _ ->
+    conv_err (L.loc s) (Undefined (L.unloc s))
 
 let check_action table (s : lsymb) n =
   match Action.find_symbol (L.unloc s) table with
   | (l, _) ->
     let arity = List.length l in
     if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  | exception (Symbols.Unbound_identifier _) -> assert false
+  | exception (Symbols.Unbound_identifier _) ->
+    conv_err (L.loc s) (Undefined (L.unloc s))
 
 
 (** Applications *)
