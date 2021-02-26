@@ -1,5 +1,7 @@
 module L = Location
 
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 type naming_pat =
   | Unnamed                  (** '_' *)
@@ -64,7 +66,7 @@ type ip_handler = [
 (*------------------------------------------------------------------*)
 (** One tactic argument (in the parser) *)
 type parser_arg =
-  | String_name of string
+  | String_name of lsymb
   | Int_parsed  of int
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
@@ -87,7 +89,7 @@ type _ sort =
   (** Boolean, timestamp or message *)
         
   | Int       : int sort
-  | String    : string sort
+  | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
@@ -103,7 +105,7 @@ type _ arg =
   | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
 
   | Int       : int -> int arg
-  | String    : string -> string arg
+  | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
@@ -271,9 +273,9 @@ let tac_arg_error loc e = raise (TacArgError (loc,e))
     
 (*------------------------------------------------------------------*)
 
-let convert_as_string parser_args = match parser_args with
+let convert_as_lsymb parser_args = match parser_args with
   | [Theory (L.{ pl_desc = App (p,[]) } )] ->
-    Some (L.unloc p) (* TODO: location *)
+    Some p
   | _ -> None
 
 let convert_args table env parser_args tactic_type =
@@ -299,7 +301,7 @@ let convert_args table env parser_args tactic_type =
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String (L.unloc p)) (* TODO: location *)
+      Arg (String p) (* TODO: location *)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)

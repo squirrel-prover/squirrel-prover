@@ -1,6 +1,8 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 (** {2 Intro patterns} *)
 
@@ -48,7 +50,7 @@ type ip_handler = [
     Note that all tactics not defined in the parser must rely on the Theory 
     type, even to parse strings. *)
 type parser_arg =
-  | String_name of string
+  | String_name of lsymb
   | Int_parsed  of int
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
@@ -68,7 +70,7 @@ type _ sort =
   (** Boolean, timestamp or message *)
 
   | Int       : int sort
-  | String    : string sort
+  | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
@@ -85,7 +87,7 @@ type _ arg =
   (** A [Term.term] with its sorts. *)
         
   | Int       : int -> int arg
-  | String    : string -> string arg
+  | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
@@ -107,7 +109,7 @@ val pp_esort : Format.formatter -> esort -> unit
 (*------------------------------------------------------------------*)
 (** {2 Argument conversion} *)
 
-val convert_as_string : parser_arg list -> string option
+val convert_as_lsymb : parser_arg list -> lsymb option
   
 val convert_args :
   Symbols.table -> Vars.env ->

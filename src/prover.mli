@@ -4,6 +4,8 @@
 
 module L = Location
 
+type lsymb = Theory.lsymb
+
 open Term
 
 module Goal : sig
@@ -151,7 +153,7 @@ module type Tactics_sig = sig
     'a TacticsArgs.sort  -> unit
 
   val get : string -> TacticsArgs.parser_arg list -> tac
-  val pp : bool -> Format.formatter -> string -> unit
+  val pp : bool -> Format.formatter -> lsymb -> unit
 
   (* Print all tactics with their help. Do not print tactics without help
      string. *)
@@ -168,7 +170,7 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 exception ParseError of string
 
-val get_goal_formula : string -> formula * SystemExpr.system_expr
+val get_goal_formula : lsymb -> formula * SystemExpr.system_expr
 
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)

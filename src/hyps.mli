@@ -1,5 +1,9 @@
 (** Generic hypotheses, used in trace and equivalence sequent. *)
 
+module L=Location
+
+type lsymb = Theory.lsymb
+
 module type Hyp = sig 
   type t 
   val pp_hyp : Format.formatter -> t -> unit
@@ -19,10 +23,10 @@ module type S = sig
   val is_hyp : hyp -> hyps -> bool
     
   val by_id   : Ident.t -> hyps -> hyp
-  val by_name : string  -> hyps -> ldecl
+  val by_name : lsymb   -> hyps -> ldecl
 
-  val hyp_by_name : string  -> hyps -> hyp
-  val id_by_name  : string  -> hyps -> Ident.t
+  val hyp_by_name : lsymb -> hyps -> hyp
+  val id_by_name  : lsymb -> hyps -> Ident.t
 
   val fresh_id : string -> hyps -> Ident.t
   val fresh_ids : string list -> hyps -> Ident.t list
@@ -60,15 +64,19 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-type hyp_error =
+type hyp_error_i =
   | HypAlreadyExists of string
   | HypUnknown of string
-    
+
+type hyp_error = L.t option * hyp_error_i
+
 exception Hyp_error of hyp_error
 
-val pp_hyp_error : Format.formatter -> hyp_error -> unit
+val pp_hyp_error : 
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> hyp_error -> unit
 
-val hyp_error : hyp_error -> 'a
+val hyp_error : loc:L.t option -> hyp_error_i -> 'a
 
 
 (*------------------------------------------------------------------*)
@@ -108,7 +116,7 @@ module type HypsSeq = sig
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
-  val by_name : string -> sequent -> ldecl
+  val by_name : lsymb -> sequent -> ldecl
 
   (** [mem_id id s] returns true if there is an hypothesis with id [id] 
       in [s]. *)

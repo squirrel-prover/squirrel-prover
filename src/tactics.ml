@@ -1,3 +1,5 @@
+module L = Location
+
 type tac_error =
   | More
   | Failure of string
@@ -158,19 +160,28 @@ let rec tac_error_of_strings = function
   | ["Undefined"; s] -> Undefined s
   | _ ->  raise (Failure "exception name unknown")
 
-exception Tactic_soft_failure of tac_error
+exception Tactic_soft_failure of L.t option * tac_error
 
-exception Tactic_hard_failure of tac_error
+exception Tactic_hard_failure of L.t option * tac_error
+
+let soft_failure ?loc e = raise (Tactic_soft_failure (loc,e))
+let hard_failure ?loc e = raise (Tactic_hard_failure (loc,e))
 
 let () =
+  let s_lopt = function
+    | None   -> ""
+    | Some l -> "at " ^ (L.tostring l)
+  in
+  
   Printexc.register_printer
     (function
-       | Tactic_hard_failure e ->
+       | Tactic_hard_failure (l,e) ->
+           Some (Format.sprintf "Tactic_hard_failure(%s) at %s" 
+                   (tac_error_to_string e) (s_lopt l))
+       | Tactic_soft_failure (l,e) ->
            Some
-             (Format.sprintf "Tactic_hard_failure(%s)" (tac_error_to_string e))
-       | Tactic_soft_failure e ->
-           Some
-             (Format.sprintf "Tactic_soft_failure(%s)" (tac_error_to_string e))
+             (Format.sprintf "Tactic_soft_failure(%s) at %s"
+                (tac_error_to_string e) (s_lopt l))
        | _ -> None)
 
 type a
@@ -196,15 +207,15 @@ let check_sel sel_tacs l =
         max m (max_list sel)
       ) 0 sel_tacs in
   if max_sel > List.length l then 
-    raise (Tactic_hard_failure (Failure ("no goal " ^ string_of_int max_sel)));
+    hard_failure (Failure ("no goal " ^ string_of_int max_sel));
 
   (* check that selectors are disjoint *)
   let all_sel = List.fold_left (fun all (s,_) -> s @ all) [] sel_tacs in
   let _ = 
     List.fold_left (fun acc s ->
         if List.mem s acc then
-          raise (Tactic_hard_failure
-                   (Failure ("selector " ^ string_of_int s ^ " appears twice")));
+          hard_failure 
+            (Failure ("selector " ^ string_of_int s ^ " appears twice"));
         s :: acc
       ) [] all_sel in
   ()
@@ -259,7 +270,7 @@ let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
   tac1 judge sk fk
 
 let rec andthen_list = function
-  | [] -> raise (Tactic_hard_failure (Failure "empty anthen_list"))
+  | [] -> hard_failure (Failure "empty anthen_list")
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
@@ -270,7 +281,7 @@ let andthen_sel tac1 sel_tacs judge sk fk : a =
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk
-    | _ -> raise (Tactic_soft_failure GoalNotClosed) in
+    | _ -> soft_failure GoalNotClosed in
   tac judge sk fk
 
 let id j sk fk = sk [j] fk
@@ -283,14 +294,14 @@ let try_tac t j sk fk =
 
 let checkfail_tac exc t j sk fk =
   try
-    let sk l fk = raise (Tactic_soft_failure DidNotFail) in
+    let sk l fk = soft_failure DidNotFail in
     t j sk fk
-  with Tactic_soft_failure e when e = exc -> sk [j] fk
+  with Tactic_soft_failure (_,e) when e = exc -> sk [j] fk
      | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
-     | Tactic_soft_failure (Failure _) when exc=Failure "" -> sk [j] fk
-     | Tactic_soft_failure e
-     | Tactic_hard_failure e ->
-       raise (Tactic_hard_failure (FailWithUnexpected e))
+     | Tactic_soft_failure (_, Failure _) when exc=Failure "" -> sk [j] fk
+     | Tactic_soft_failure (l,e)
+     | Tactic_hard_failure (l,e) ->
+       raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
 let repeat t j sk fk =
   let rec aux j sk fk =
@@ -473,15 +484,12 @@ module AST (M:S) = struct
     let tac = eval [] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
-    let fk tac_error = raise @@ Tactic_soft_failure tac_error in
+    let fk tac_error = soft_failure tac_error in
     let sk l _ = raise (Return l) in
     try ignore (tac j sk fk) ; assert false with Return l -> l
 
 end
 
-
-let soft_failure e = raise (Tactic_soft_failure e)
-let hard_failure e = raise (Tactic_hard_failure e)
 
 let timeout_get = function
   | Utils.Result a -> a

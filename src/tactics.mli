@@ -59,11 +59,11 @@ type tac_error =
   | PatNumError of int * int    (* given, need *)
 
 (** Tactics should raise this exception if they are ill-formed. *)
-exception Tactic_hard_failure of tac_error
+exception Tactic_soft_failure of Location.t option * tac_error
 
 (** This tactic should be raised by the evaluation of a tactic, based on the
     tac_error returned by its failure. *)
-exception Tactic_soft_failure of tac_error
+exception Tactic_hard_failure of Location.t option * tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
 
@@ -163,14 +163,14 @@ module AST (M:S) : AST_sig
 (** {2 Utilities} *)
 
 (** Raise a soft failure. *)
-val soft_failure : tac_error -> 'a
+val soft_failure : ?loc:Location.t -> tac_error -> 'a
 
 (** Unwrap the result of a computation that may timeout, or raise a soft
     timeout failure. *)
 val timeout_get : 'a Utils.timeout_r -> 'a
 
 (** Raise a hard failure. *)
-val hard_failure : tac_error -> 'a
+val hard_failure : ?loc:Location.t -> tac_error -> 'a
 
 (** Print the system to the user. *)
 val print_system : Symbols.table -> SystemExpr.system_expr -> unit

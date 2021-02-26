@@ -16,6 +16,8 @@ module L = Location
 
 module Hyps = EquivSequent.Hyps
 
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
@@ -364,7 +366,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
       List.map (do_intros [Args.Star loc]) ss
       |> List.flatten
 
-    with Tactics.Tactic_soft_failure NothingToIntroduce -> [s]
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
 (** Correponds to `intro *`, to use in automated tactics. *)
 let intro_all (s : EquivSequent.t) : EquivSequent.t list =
@@ -376,7 +378,7 @@ let intro_tac args s sk fk =
     | [Args.IntroPat intros] -> sk (do_intros intros s) fk
 
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  with Tactics.Tactic_soft_failure e -> fk e
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   T.register_general "intro"
@@ -1166,20 +1168,20 @@ let () = T.register_general "expand"
     | [TacticsArgs.Theory v] ->
       only_equiv (fun s sk fk -> match expand v s with
           | subgoals -> sk subgoals fk
-          | exception (Tactics.Tactic_soft_failure e) -> fk e)
+          | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
 
     | (TacticsArgs.Theory v)::ids ->
         let ids =
           List.map (function
                | TacticsArgs.Theory th -> th
-               | _ -> Tactics.hard_failure
+               | _ -> Tactics.hard_failure 
                         (Tactics.Failure "improper arguments")
             ) ids
         in
         pure_equiv
           (fun s sk fk -> match expand_seq v ids s with
              | subgoals -> sk subgoals fk
-             | exception (Tactics.Tactic_soft_failure e) -> fk e)
+             | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
 
      | _ ->
          Tactics.hard_failure
@@ -1576,7 +1578,7 @@ let () = T.register_typed "ifeq"
 let auto ~conclude s sk fk = 
   let wrap tac s sk fk = 
     try sk (tac s) fk with
-    | Tactics.Tactic_soft_failure e -> fk e in
+    | Tactics.Tactic_soft_failure (_,e) -> fk e in
 
   let open Tactics in
   match s with
@@ -2492,6 +2494,8 @@ end
    all the names appearing inside the terms are only used inside those, returns
    true. *)
 let is_ddh_context system table a b c elem_list =
+  (* TODO: location *)
+  let a,b,c = L.unloc a, L.unloc b, L.unloc c in
   let a,b,c = Symbols.Name.of_string a table,
               Symbols.Name.of_string b table,
               Symbols.Name.of_string c table in
@@ -2517,7 +2521,7 @@ let is_ddh_context system table a b c elem_list =
     true
   with Not_context | Fresh.Name_found -> false
 
-let ddh na nb nc s sk fk =
+let ddh (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
   let system = EquivSequent.system s in
   let table = EquivSequent.table s in
   if is_ddh_context system table na nb nc

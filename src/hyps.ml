@@ -1,17 +1,33 @@
+module L = Location
+
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)  
-type hyp_error =
+type hyp_error_i =
   | HypAlreadyExists of string
   | HypUnknown of string
-      
+
+type hyp_error = L.t option * hyp_error_i
+
 exception Hyp_error of hyp_error
                      
-let hyp_error e = raise (Hyp_error e)
+let hyp_error ~loc e = raise (Hyp_error (loc,e))
 
-let pp_hyp_error fmt = function
+let pp_hyp_error pp_loc_error fmt (he : hyp_error)  = 
+  let pp_loc_error_opt ppf = function
+    | None -> ()
+    | Some l -> pp_loc_error ppf l
+  in
+
+  let l,e = he in
+  match e with
   | HypAlreadyExists s ->
-    Fmt.pf fmt "an hypothesis named %s already exists" s     
+    Fmt.pf fmt "%aan hypothesis named %s already exists" 
+      pp_loc_error_opt l s     
+
   | HypUnknown s ->
-    Fmt.pf fmt "unknown hypothesis %s" s     
+    Fmt.pf fmt "%aunknown hypothesis %s" 
+      pp_loc_error_opt l s     
 
 (*------------------------------------------------------------------*) 
 module type Hyp =sig 
@@ -33,10 +49,10 @@ module type S = sig
   val is_hyp : hyp -> hyps -> bool
     
   val by_id   : Ident.t -> hyps -> hyp
-  val by_name : string  -> hyps -> ldecl
+  val by_name : lsymb   -> hyps -> ldecl
 
-  val hyp_by_name : string  -> hyps -> hyp
-  val id_by_name  : string  -> hyps -> Ident.t
+  val hyp_by_name : lsymb -> hyps -> hyp
+  val id_by_name  : lsymb -> hyps -> Ident.t
 
   val fresh_id : string -> hyps -> Ident.t
   val fresh_ids : string list -> hyps -> Ident.t list
@@ -114,13 +130,13 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
 
   let by_id id hyps =
     try Mid.find id hyps
-    with Not_found -> hyp_error (HypUnknown (Ident.to_string id))
+    with Not_found -> hyp_error ~loc:None (HypUnknown (Ident.to_string id))
   (* the latter case should not happen *)
 
-  let by_name name hyps =
-    match find_opt (fun id _ -> Ident.name id = name) hyps with
+  let by_name (name : lsymb) hyps =
+    match find_opt (fun id _ -> Ident.name id = L.unloc name) hyps with
     | Some (id,f) -> id, f
-    | None -> hyp_error (HypUnknown name)
+    | None -> hyp_error ~loc:(Some (L.loc name)) (HypUnknown (L.unloc name))
 
   let hyp_by_name name hyps = snd (by_name name hyps)
   let id_by_name name hyps  = fst (by_name name hyps)
@@ -164,7 +180,7 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
     assert (not (Mid.mem id hyps)); 
 
     if not (is_fresh (Ident.name id) hyps) then
-      hyp_error (HypAlreadyExists (Ident.name id));
+      hyp_error ~loc:None (HypAlreadyExists (Ident.name id));
 
     match find_opt (fun _ hyp' -> hyp = hyp') hyps with
     | Some (id',_) when not force -> id', hyps  
@@ -205,7 +221,7 @@ module type HypsSeq = sig
   val is_hyp : hyp -> sequent -> bool
 
   val by_id   : Ident.t -> sequent -> hyp
-  val by_name : string -> sequent -> ldecl
+  val by_name : lsymb   -> sequent -> ldecl
 
   val mem_id   : Ident.t -> sequent -> bool
   val mem_name : string -> sequent -> bool

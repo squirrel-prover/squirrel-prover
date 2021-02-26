@@ -17,6 +17,8 @@ module L = Location
 
 module Hyps = TraceSequent.Hyps
 
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
@@ -279,8 +281,8 @@ let message_case (m : Term.message) s : c_res list =
   end
 
 let do_case_tac (args : Args.parser_arg list) s =
-  match Args.convert_as_string args with
-  | Some str when Hyps.mem_name str s ->
+  match Args.convert_as_lsymb args with
+  | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
     hypothesis_case ~nb:`Any id s
 
@@ -302,7 +304,7 @@ let case_tac (args : Args.parser_arg list) s
         do_naming_pat (`Hyp id) Args.AnyName s
       ) cres in
     sk ss fk
-  with Tactics.Tactic_soft_failure e -> fk e
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   let open Tactics in
@@ -327,7 +329,7 @@ let () =
 let false_left s =
   if Hyps.exists (fun _ f -> match f with False -> true | _ -> false) s
   then []
-  else Tactics.(soft_failure @@ Failure "no False assumption")
+  else Tactics.(soft_failure (Failure "no False assumption"))
 
 let () =
   T.register "false_left"
@@ -514,7 +516,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
       List.map (do_intros [Args.Star loc]) ss
       |> List.flatten
 
-    with Tactics.Tactic_soft_failure NothingToIntroduce -> [s]
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
 (** Correponds to `intro *`, to use in automated tactics. *)
 let intro_all (s : TraceSequent.t) : TraceSequent.t list =
@@ -526,7 +528,7 @@ let intro_tac args s sk fk =
     | [Args.IntroPat intros] -> sk (do_intros intros s) fk
 
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  with Tactics.Tactic_soft_failure e -> fk e
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   T.register_general "intro"
@@ -560,7 +562,7 @@ let destruct_tac args s sk fk =
       sk (do_destruct hid s) fk
 
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  with Tactics.Tactic_soft_failure e -> fk e
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   T.register_general "destruct"
@@ -614,7 +616,7 @@ let () =
        in
          match goal_exists_intro ths s with
            | subgoals -> sk subgoals fk
-           | exception Tactics.Tactic_soft_failure e -> fk e)
+           | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
 
 
 (*------------------------------------------------------------------*)
@@ -695,14 +697,14 @@ let induction s  =
          [s]
        )
      | _ ->
-       soft_failure @@ Tactics.Failure
-         "Conclusion must be an \
-          universal quantification over a timestamp"
+       Tactics.soft_failure 
+         (Tactics.Failure
+            "conclusion must be an universal quantification over a timestamp")
     )
   | _ ->
-    soft_failure @@ Tactics.Failure
-      "Conclusion must be an \
-       universal quantification over a timestamp"
+    Tactics.soft_failure 
+      (Tactics.Failure "Conclusion must be an \
+                        universal quantification over a timestamp")
 
 let () = T.register "induction"
      ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
@@ -734,14 +736,14 @@ let () = T.register "assumption"
 
 
 (*------------------------------------------------------------------*)
-(** [use ip gp ths judge] applies the formula named [gp],
+(** [use ip name ths judge] applies the formula named [gp],
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath.
   * If given an introduction patterns, apply it to the generated hypothesis. *)
-let use ip name (ths:Theory.term list) (s : TraceSequent.t) =
+let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
   let f,system =
-    if Hyps.mem_name name s then
+    if Hyps.mem_name (L.unloc name) s then
       let _, f = Hyps.by_name name s in
       f, TraceSequent.system s
     else Prover.get_goal_formula name in
@@ -805,7 +807,7 @@ let tac_apply args s sk fk =
     in
     begin match use ip id th_terms s with
       | subgoals -> sk subgoals fk
-      | exception Tactics.Tactic_soft_failure e -> fk e
+      | exception Tactics.Tactic_soft_failure (_,e) -> fk e
     end
   | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
@@ -845,7 +847,7 @@ let tac_assert (args : Args.parser_arg list) s sk fk =
       | None -> [s2] in
     sk (s1 :: s2) fk
 
-  with Tactics.Tactic_soft_failure e -> fk e
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   T.register_general "assert"
@@ -1756,7 +1758,7 @@ let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
 let wrap f = (fun (s: TraceSequent.t) sk fk ->
     match f s with
       | subgoals -> sk subgoals fk
-      | exception Tactics.Tactic_soft_failure e -> fk e
+      | exception Tactics.Tactic_soft_failure (_,e) -> fk e
     )
 
   (* Simplify goal. We will never backtrack on these applications. *)
@@ -1917,7 +1919,7 @@ let yes_no_if b =
     | [] ->
       fun s sk fk -> begin match apply_yes_no_if b s with
         | subgoals -> sk subgoals fk
-        | exception Tactics.Tactic_soft_failure e -> fk e
+        | exception Tactics.Tactic_soft_failure (_,e) -> fk e
       end
     | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
@@ -1976,9 +1978,9 @@ let euf_param table (t : Term.formula) : unforgeabiliy_param =
     | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
       begin match Theory.check_signature table checksign pk with
         | None ->
-          Tactics.(soft_failure @@
-                   Failure "the message does not correspond \
-                            to a signature check with the associated pk")
+          Tactics.(soft_failure 
+                     (Failure "the message does not correspond \
+                               to a signature check with the associated pk"))
         | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
       end
     | (`Eq, Fun ((hash, _), [m; Name key]), s)
