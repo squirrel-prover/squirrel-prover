@@ -91,7 +91,7 @@ Proof.
   simpl.
   expand cond@Pchall1(i).
   expand pkS(i)@Pchall1(i).
-  substitute fst(fst(input@Pchall1(i))), pk(skS).
+  subst fst(fst(input@Pchall1(i))), pk(skS).
   euf Meq.
   exists j.
 Qed.
@@ -109,7 +109,7 @@ Proof.
   expand cond@S(r).
   expand cond@S1(r).
   expand pkp(r)@S1(r).
-  substitute  fst(input@S(r)), pk(skP).
+  subst  fst(input@S(r)), pk(skP).
   euf H0.
   by exists i.
 Qed.

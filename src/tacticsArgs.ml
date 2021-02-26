@@ -62,6 +62,7 @@ type ip_handler = [
 ]
   
 (*------------------------------------------------------------------*)
+(** One tactic argument (in the parser) *)
 type parser_arg =
   | String_name of string
   | Int_parsed  of int

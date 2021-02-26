@@ -17,7 +17,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT
 %token WITH ORACLE EXN
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE REWRITE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -335,6 +335,11 @@ tactic_params:
 | t=tactic_param                        { [t] }
 | t=tactic_param COMMA ts=tactic_params { t::ts }
 
+/* tactic_paramsS: */
+/* |                                 { [] } */
+/* | t=tactic_param                  { [t] } */
+/* | t=tactic_param ts=tactic_params { t::ts } */
+
 tac_errors:
 |                         { [] }
 | i=ID                    { [i] }
@@ -443,6 +448,9 @@ tac:
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
       Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
+
+  | REWRITE p=tactic_params IN?
+    { Tactics.Abstract ("rewrite", p) }
 
   | HELP                               { Tactics.Abstract
                                           ("help",

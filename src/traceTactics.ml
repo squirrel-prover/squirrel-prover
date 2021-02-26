@@ -1387,9 +1387,20 @@ let substitute_tac arg s =
 
 (* TODO: rename in rewrite, and have a separate substitute tactic *)
 let () =
-  T.register_typed "substitute"
-    ~general_help:"If the sequent implies that the arguments i1, i2 are equals, \
-                   replaces all occurences of i1 by i2 inside the sequent."
+  T.register_typed "subst"
+    ~general_help:"If i = t where i is a variable, substitute all occurences \
+                   of i by t and remove i from the context variables."
+    ~detailed_help:""
+    ~tactic_group:Structural
+    ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
+                   Args.(Sort (Pair (Timestamp, Timestamp)));
+                   Args.(Sort (Pair (Message, Message)))]
+    substitute_tac Args.(Pair (ETerm, ETerm))
+
+(* TODO: rename in rewrite, and have a separate substitute tactic *)
+let () =
+  T.register_typed "rewrite"
+    ~general_help:"If t1 = t2, rewrite all occurences of t1 into t2 in the goal."
     ~detailed_help:""
     ~tactic_group:Structural
     ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
