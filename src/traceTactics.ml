@@ -185,18 +185,15 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
     let name =
       SystemExpr.action_to_term table system
         (Action.subst_action subst descr.Action.action) in
+    let name = Term.subst subst name in
 
     let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
-    let at = Term.subst subst at in
+
     if indices = [] then at else
-      Exists (List.map (fun x -> Vars.EVar x) indices,at) in
+      Exists (List.map (fun x -> Vars.EVar x) indices,at) 
+  in
 
   let cases = SystemExpr.map_descrs table system mk_case in
-
-  (* List.map (fun f ->
-      let id, s = Hyps.add_i Args.Unnamed f s in
-      ( CHyp id, s )
-    ) (Atom (`Timestamp (`Eq,ts,Term.Action (Symbols.init_action,[]))) :: cases) *)
 
   List.map (fun f ->
       let id, s = Hyps.add_i Args.Unnamed f s in
@@ -205,7 +202,7 @@ let timestamp_case (ts : Term.timestamp) s : c_res list =
 
 (** Case analysis on an hypothesis.
     When [nb=`Any], recurses. 
-    When [nb=`Some l], destruct [l]. *)
+    When [nb=`Some l], destruct at most [l]. *)
 let hypothesis_case ~nb id (s : TraceSequent.t) : c_res list =
   let destr_err () =
     soft_failure (Tactics.Failure "can only be applied to a disjunction")
@@ -310,17 +307,18 @@ let case_tac (args : Args.parser_arg list) s
 let () =
   let open Tactics in
   T.register_general "case"
-     ~tactic_help:{general_help = "Perform case analysis on a timestamp, a message built using a \
-                   conditional, or a disjunction hypothesis.";
-                   detailed_help = "A timestamp will be instantiated by all \
-                                    possible actions, a disjunction hypothesis A \
-                                    v B => C will produce two goals A => B and B \
-                                    => C, and a message with a conditional will \
-                                    be split into the two branches.";
-                   usages_sorts = [Sort Args.Timestamp;
-                                   Sort Args.String;
-                                   Sort Args.Message];
-                  tactic_group = Logical}
+    ~tactic_help:
+      {general_help = "Perform case analysis on a timestamp, a message built \
+                       using a conditional, or a disjunction hypothesis.";
+       detailed_help = "A timestamp will be instantiated by all \
+                        possible actions, a disjunction hypothesis A \
+                        v B => C will produce two goals A => B and B \
+                        => C, and a message with a conditional will \
+                        be split into the two branches.";
+       usages_sorts = [Sort Args.Timestamp;
+                       Sort Args.String;
+                       Sort Args.Message];
+       tactic_group = Logical}
     case_tac
 
 
