@@ -377,14 +377,14 @@ tactic_params:
 | t=tactic_param COMMA ts=tactic_params { t::ts }
 
 rewrite_param:
-| f=sformula  { TacticsArgs.Theory f }
+| f=sformula  { f }
 
 rewrite_params:
 | slist(rewrite_param, empty) { [] }
 
 rewrite_in:
-|             { [] }
-| IN id=lsymb { [TacticsArgs.String_name id] }
+|             { None }
+| IN id=lsymb { Some id }
 
 tac_errors:
 |                         { [] }
@@ -496,7 +496,7 @@ tac:
       Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
   | REWRITE p=rewrite_params w=rewrite_in
-    { Tactics.Abstract ("rewrite", w @ p) }
+    { Tactics.Abstract ("rewrite", [TacticsArgs.RewriteIn (w, p)]) }
 
   | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { Tactics.Abstract
                                           ("ddh",

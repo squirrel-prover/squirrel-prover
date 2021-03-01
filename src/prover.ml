@@ -305,6 +305,16 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
 
+    | TacticsArgs.RewriteIn (in_opt, forms) ->
+      let pp_in ppf = function
+        | None      -> ()
+        | Some symb -> Fmt.pf ppf " in %s" (L.unloc symb)
+      in
+
+      Fmt.pf ppf "%a%a"
+        (Fmt.list ~sep:Fmt.sp Theory.pp) forms
+        pp_in in_opt
+
   let autosimpl () =
     let tautosimpl = TraceTable.get "autosimpl" [] in
 

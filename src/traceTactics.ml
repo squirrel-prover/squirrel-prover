@@ -1399,16 +1399,57 @@ let () =
                    Args.(Sort (Pair (Message, Message)))]
     substitute_tac Args.(Pair (ETerm, ETerm))
 
-(* TODO: rename in rewrite, and have a separate substitute tactic *)
+
+(*------------------------------------------------------------------*)
+type rw_target = [`Goal | `Hyp of Ident.t]
+
+(** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
+let rewrite (t: rw_target) (rw_args : Term.formula list) =
+  assert false
+
+(** Parse rewrite tactic arguments. *)
+let p_rw_args (rw_args : Theory.formula list) s : Term.formula list =
+  let p_rw_arg rw_arg = 
+    match Args.convert_as_lsymb [Args.Theory rw_arg] with
+    | Some str when Hyps.mem_name (L.unloc str) s ->
+      let _,f = Hyps.by_name str s in
+      f
+    | _ -> 
+      let conv_env = Theory.{ table = TraceSequent.table s;
+                              cntxt = InGoal; } in      
+      let subst = Theory.subst_of_env (TraceSequent.env s) in
+      Theory.convert conv_env subst rw_arg Sorts.Boolean 
+  in
+  List.map p_rw_arg rw_args
+
+
+let rewrite_tac args s sk fk =
+  match args with
+  | [Args.RewriteIn (in_opt, rw_args)] ->
+    let target = match in_opt with
+      | Some symb -> `Hyp (fst (Hyps.by_name symb s))
+      | None -> `Goal 
+    in
+    let rw_args = p_rw_args rw_args s in
+
+    sk (rewrite target rw_args) fk
+
+  | _ -> hard_failure (Tactics.Failure "improper arguments")
+
+
+
 let () =
-  T.register_typed "rewrite"
-    ~general_help:"If t1 = t2, rewrite all occurences of t1 into t2 in the goal."
-    ~detailed_help:""
-    ~tactic_group:Structural
-    ~usages_sorts:[Args.(Sort (Pair (Index, Index)));
-                   Args.(Sort (Pair (Timestamp, Timestamp)));
-                   Args.(Sort (Pair (Message, Message)))]
-    substitute_tac Args.(Pair (ETerm, ETerm))
+  T.register_general "rewrite"
+    ~tactic_help:{
+      general_help =
+        "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
+         Usage: rewrite Heq.\n\
+         rewrite (t = t') (s = s').\n       \
+         rewrite (t = t') Heq in H.\n       ";
+      detailed_help = "";
+      usages_sorts  = [];
+      tactic_group  = Structural;}
+    rewrite_tac 
 
 (*------------------------------------------------------------------*)
 let autosubst s =

@@ -72,6 +72,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
+  | RewriteIn   of lsymb option * Theory.formula list
       
 type ('a, 'b) pair
 
