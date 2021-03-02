@@ -1407,8 +1407,25 @@ type rw =  ([`Once | `Many | `Any ] * Term.esubst)
 (** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
 let rewrite (t: rw_target) (rws : rw list) s =
   let rec do1 (f : Term.formula) (rw : rw) = 
-    let mult, subst = rw in
-    Term.subst [subst] f
+    let mult, rw_rule = rw in
+    let Term.ESubst (r, l) = rw_rule in
+
+    (* [r_f] is a subterm of [f] such that [mv] unifies [r_f] and [r]. *)
+    let do_occ : type a. a term -> Term.Match.mv -> a term = 
+      fun r_f mv ->
+        let subst = Term.Match.to_subst mv in
+        Term.cast (Term.sort r_f) (Term.subst subst l)
+    in
+
+    (* tries to find an occurence of [r] and rewrite it. *)
+    let f_r = Term.Match.find_map f r do_occ in
+
+    match mult, f_r with
+    | (`Once | `Many), None -> hard_failure (Failure "nothing to rewrite")
+
+    | (`Many | `Any), Some f_r -> do1 f_r (`Any, rw_rule)
+    | `Once,          Some f_r -> f_r
+    | `Any,           None     -> f
   in
 
   let f, s = match t with
@@ -1422,7 +1439,8 @@ let rewrite (t: rw_target) (rws : rw list) s =
     | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
   in
 
-  [srw]
+  [assert false; srw]           (* TODO: missing premises + matching should only assign free variables. *)
+  (* [srw] *)
 
 
 (** Parse rewrite tactic arguments. *)
@@ -1496,7 +1514,7 @@ let () =
         "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
          Usage: rewrite Heq.\n\
          rewrite (t = t') (s = s').\n       \
-         rewrite (t = t') Heq in H.\n       ";
+         rewrite (t = t') Heq in H.";
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}

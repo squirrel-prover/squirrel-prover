@@ -107,6 +107,8 @@ type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
+type eterm = ETerm : 'a term -> eterm
+
 (*------------------------------------------------------------------*)
 (** {2 Subset of all atoms} *)
 (** (the subsets are not disjoint). *)
@@ -192,6 +194,27 @@ val subst_var : subst -> 'a Vars.var -> 'a Vars.var
 val subst_macros_ts : 
   Symbols.table -> 
   string list -> Sorts.timestamp term -> 'a term -> 'a term
+
+(*------------------------------------------------------------------*)
+(** {2 Matching and rewriting} *)
+
+module Match : sig
+  type mv = eterm Vars.Mv.t
+
+  val to_subst : mv -> subst
+
+  (** [try_match t pat] tries to match [pat] with [t]. If it succeeds, it 
+      returns a map instantiating [pat]'s free variables as substerms 
+      of [t].   *)
+  val try_match : 'a term -> 'b term -> mv option
+
+  (** [find_map t pat func] looks for an occurence [t'] of [pat] in [t],
+      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
+      It returns the term obtained from [t] by replacing a *single* occurence
+      of [t'] by [func t' θ]. *)
+  val find_map :
+    'a term -> 'b term -> ('b term -> mv -> 'b term) -> 'a term option
+end
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

@@ -163,6 +163,73 @@ let disjunction_to_literals f =
 
   try Some (aux f) with Not_a_disjunction -> None
 
+
+(*------------------------------------------------------------------*)
+exception Uncastable
+
+let cast: type a b. a Sorts.sort -> b term -> a term =
+  fun kind t ->
+  match kind, sort t with
+     | Sorts.Index, Sorts.Index -> t
+     | Sorts.Message, Sorts.Message -> t
+     | Sorts.Boolean, Sorts.Boolean -> t
+     | Sorts.Timestamp, Sorts.Timestamp -> t
+     | _ -> raise Uncastable
+
+(*------------------------------------------------------------------*)
+type eterm = ETerm : 'a term -> eterm
+
+(** [app func t] applies [func] to [t]. [func] must preserve types. *)
+let app : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func x ->
+  let ETerm x0 = func (ETerm x) in
+  cast (sort x) x0
+  
+(** Does not recurse. 
+    Applies to arguments of index atoms (see atom_map). *)
+let rec tmap : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func0 t -> 
+  let func : type c. c term -> c term = fun x -> app func0 x in
+
+  match t with
+  | True     -> t  
+  | False    -> t  
+  | Action _ -> t
+  | Name _   -> t
+  | Var _    -> t
+      
+  | Fun (f,terms)     -> Fun (f, List.map func terms)
+  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts) 
+  | Seq (vs, b)       -> Seq (vs, func b)      
+  | Pred ts           -> Pred (func ts)                 
+  | Diff (bl, br)     -> Diff (func bl, func br)      
+  | ITE (b, c, d)     -> ITE (func b, func c, func d)        
+  | Find (b, c, d, e) -> Find (b, func c, func d, func e)        
+  | ForAll (vs, b)    -> ForAll (vs, func b)      
+  | Exists (vs, b)    -> Exists (vs, func b)
+  | And (a,b)         -> And (func a, func b)
+  | Or (a,b)          -> Or (func a, func b)
+  | Impl (a,b)        -> Impl (func a, func b)      
+  | Not b             -> Not (func b)      
+  | Atom at           -> Atom (atom_map func0 at)
+
+and atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
+  match at with
+  | `Message   (o,t1,t2) -> `Message   (o, tmap func t1, tmap func t2)
+  | `Timestamp (o,t1,t2) -> `Timestamp (o, tmap func t1, tmap func t2)
+  | `Index     (o,t1,t2) ->     
+    let t1 = match tmap func (Var t1) with
+      | Var t1 -> t1
+      | _ -> assert false
+    and t2 = match tmap func (Var t2) with
+      | Var t2 -> t2
+      | _ -> assert false
+    in
+    `Index (o, t1, t2)
+
+  | `Happens t -> `Happens (tmap func t)
+
+                
 (*------------------------------------------------------------------*)
 (** Builtins *)
 
@@ -400,17 +467,6 @@ let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
 type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
-
-exception Uncastable
-
-let cast: type a b. a Sorts.sort -> b term -> a term =
-  fun kind t ->
-  match kind, sort t with
-     | Sorts.Index, Sorts.Index -> t
-     | Sorts.Message, Sorts.Message -> t
-     | Sorts.Boolean, Sorts.Boolean -> t
-     | Sorts.Timestamp, Sorts.Timestamp -> t
-     | _ -> raise Uncastable
 
 
 let rec assoc : type a. subst -> a term -> a term =
@@ -748,99 +804,154 @@ let subst_macros_ts table l ts t =
 (** {2 Matching and rewriting} *)
 
 module Match = struct 
-  type 'a pat = 'a term * Vars.evar list
+  (** Variable assignment (types must be compatible). *)
+  type mv = eterm Mv.t
 
-  type ebind = ETerm : 'a term -> ebind
-
-  type subst = ebind Mv.t
-    
-  let try_match : type a b. a term -> b pat -> subst option = 
+  let to_subst (mv : mv) : subst =
+    Mv.fold (fun v t subst -> 
+        match v, t with
+        | Vars.EVar v, ETerm t -> 
+          ESubst (Var v, cast (Vars.sort v) t) :: subst
+      ) mv [] 
+      
+  (** [try_match t pat] tries to match [pat] with [t]. If it succeeds, it 
+      returns a map instantiating [pat]'s free variables as substerms 
+      of [t].   *)
+  let try_match : type a b. a term -> b term -> mv option = 
     fun t pat -> 
     let exception NoMatch in
+    
+    let rec tmatch : type a b. a term -> b term -> mv -> mv =
+      fun t pat mv -> match t, pat with
+        | _, Var v' -> 
+          begin
+            match cast (Vars.sort v') t with
+            | exception Uncastable -> raise NoMatch
+            | t -> vmatch t v' mv
+          end
 
-    let rec tmatch : type a b. a term -> b term -> subst -> subst =
-      fun t pat mv -> 
-    match t, pat with
-    | Fun (symb, terms), Fun (symb', terms') -> 
-      let mv = smatch symb symb' mv in
-      tmatch_l terms terms' mv
+        | Fun (symb, terms), Fun (symb', terms') -> 
+          let mv = smatch symb symb' mv in
+          tmatch_l terms terms' mv
 
-    | Name symb, Name symb' -> 
-      smatch symb symb' mv
+        | Name symb, Name symb' -> 
+          smatch symb symb' mv
 
-    | Macro ((s, sort, is), terms, ts), Macro ((s', sort', is'), terms', ts') -> 
-      if not (Sorts.equal sort sort') then raise NoMatch;
+        | Macro ((s, sort, is), terms, ts), 
+          Macro ((s', sort', is'), terms', ts') -> 
+          if not (Sorts.equal sort sort') then raise NoMatch;
 
-      let mv = smatch (s,is) (s',is') mv in
-      tmatch_l terms terms' (tmatch ts ts' mv)
+          let mv = smatch (s,is) (s',is') mv in
+          tmatch_l terms terms' (tmatch ts ts' mv)
 
-    | Seq _, _ -> raise NoMatch
+        | Seq _, _ -> raise NoMatch
 
-    | Pred ts, Pred ts' -> tmatch ts ts' mv
+        | Pred ts, Pred ts' -> tmatch ts ts' mv
 
-    | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
+        | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
 
-    | Var v, Var v' -> assert false
+        | Diff (a,b), Diff (a', b') ->
+          tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
 
-    | Diff (a,b), Diff (a', b') ->
-      tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
+        | ITE (b,t1,t2), ITE (b',t1',t2') ->
+          tmatch_l [t1;t2] [t1';t2'] (tmatch b b' mv)
 
-    | ITE (b,t1,t2), ITE (b',t1',t2') ->
-      tmatch_l [t1;t2] [t1';t2'] (tmatch b b' mv)
+        | Find _, _ -> raise NoMatch
 
-    | Find _, _ -> raise NoMatch
+        | Atom at, Atom at' -> atmatch at at' mv
 
-    | Atom at, Atom at' -> atmatch at at' mv
+        | ForAll _, _ 
+        | Exists _, _ -> raise NoMatch
 
-    | ForAll _, _ 
-    | Exists _, _ -> raise NoMatch
+        | And (a,b), And (a', b') 
+        | Or (a,b), Or (a', b') 
+        | Impl (a,b), Impl (a', b') ->
+          tmatch_l [a;b] [a';b'] mv
 
-    | And (a,b), And (a', b') 
-    | Or (a,b), Or (a', b') 
-    | Impl (a,b), Impl (a', b') ->
-      tmatch_l [a;b] [a';b'] mv
+        | Not a, Not a' -> tmatch a a' mv
 
-    | Not a, Not a' -> tmatch a a' mv
+        | True, True -> mv
+        | False, False -> mv
 
-    | True, True -> mv
-    | False, False -> mv
+        | _, _ -> raise NoMatch
 
-    | _, _ -> raise NoMatch
-                
-    and tmatch_l : type a b. a term list -> b term list -> subst -> subst =
+    and tmatch_l : type a b. a term list -> b term list -> mv -> mv =
       fun tl patl mv -> 
         List.fold_left2 (fun mv t pat -> tmatch t pat mv) mv tl patl
 
     and smatch : type a. 
       (a Symbols.t * Vars.index list) -> 
       (a Symbols.t * Vars.index list) -> 
-      subst -> subst = 
+      mv -> mv = 
       fun (fn, is) (fn', is') mv ->
-        
+
         if fn <> fn' then raise NoMatch;
-        
+
         List.fold_left2 (fun mv i i' -> vmatch (Var i) i' mv) mv is is'
-          
-    and vmatch : type a. a term -> a Vars.var -> subst -> subst = fun t v mv ->
+
+    (* Match a variable of the pattern with a term. *)
+    and vmatch : type a. a term -> a Vars.var -> mv -> mv = fun t v mv ->
       let ev = Vars.EVar v in
       match Mv.find ev mv with
+      (* If this is the first time we see the variable, store the subterm. *)
       | exception Not_found -> Mv.add ev (ETerm t) mv
-      | ETerm t' ->       
-        if t <> t' then raise NoMatch else mv
+
+      (* If we already saw the variable, check that the subterms are identical. *)
+      | ETerm t' -> match cast (sort t) t' with
+        | exception Uncastable -> raise NoMatch
+        (* TODO: alpha-equivalent *)
+        | t' -> if t <> t' then raise NoMatch else mv
 
     and atmatch (at : generic_atom) (at' : generic_atom) mv =
-      assert false
+      match at, at' with
+      | `Message (ord, t1, t2), `Message (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [t1;t2] [t1';t2'] mv
+
+      | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [t1;t2] [t1';t2'] mv
+
+      | `Index (ord, t1, t2), `Index (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [Var t1; Var t2] [Var t1'; Var t2'] mv
+
+      | `Happens ts, `Happens ts' -> tmatch ts ts' mv
+
+      | _, _ -> raise NoMatch
     in
 
-    let tpat, vspat = pat in 
-    try Some (tmatch t tpat Mv.empty) with
+    try Some (tmatch t pat Mv.empty) with
     | NoMatch -> None
-      
+
   
+  (** [find_map t pat func] looks for an occurence [t'] of [pat] in [t],
+      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
+      It returns the term obtained from [t] by replacing a *single* occurence
+      of [t'] by [func t' θ]. *)
   let find_map :
-  type a b. a term -> b pat -> (b term -> subst -> b term) -> a term
-  = fun t p func ->
-    assert false    
+    type a b. a term -> b term -> (b term -> mv -> b term) -> a term option
+    = fun t pat func ->
+      let found = ref false in
+      let spat = sort pat in
+
+      let rec find : type a. a term -> a term = fun t ->
+        if !found then t (* we already found a match *)
+
+        (* no match yet, check if head matches *)
+        else 
+          match try_match t pat with
+          (* head does not match, recurse  *)
+          | None -> tmap (fun (ETerm t) -> ETerm (find t)) t
+
+          | Some mv -> (* head matches *)
+            found := true;      (* stop looking for a match *)
+            let t' = func (cast spat t) mv in
+            cast (sort t) t'    (* cast needed *)
+      in
+      
+      let t = find t in
+      if !found then Some t else None
 
 end
 

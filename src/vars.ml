@@ -146,7 +146,7 @@ module Sv = struct
     List.fold_left (fun sv v -> add (EVar v) sv) sv vars
 end
 
-module Ms = struct
+module Mv = struct
   include Map.Make(struct
       type t = evar
       let compare (EVar a) (EVar b) = compare (name a) (name b)
