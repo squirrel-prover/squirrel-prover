@@ -1,6 +1,8 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
+module L = Location
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -43,9 +45,22 @@ type ip_handler = [
   | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
+
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
-  
+
+(*------------------------------------------------------------------*)
+(** Parsed arguments for rewrite *)
+type rw_arg = { 
+  rw_mult : [`Once | `Many | `Any ];         (* ε | ! | ? *)
+  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_type : [
+    | `Form of Theory.formula   (* formula or hypothesis ident *)
+    | `Expand of Theory.lsymb
+  ];
+}
+
+(*------------------------------------------------------------------*)  
 (** Types used during parsing. 
     Note that all tactics not defined in the parser must rely on the Theory 
     type, even to parse strings. *)
@@ -56,7 +71,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
-  | RewriteIn   of lsymb option * Theory.formula list
+  | RewriteIn   of lsymb option * rw_arg list
       
 (** Tactic arguments sorts *)
 type _ sort =

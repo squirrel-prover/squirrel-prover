@@ -22,6 +22,8 @@ val emessage : esort
 val etimestamp : esort
 val eindex : esort
 
+val equal : 'a sort -> 'b sort -> bool
+
 val pp : Format.formatter -> 'a sort -> unit
 
 val pp_e : Format.formatter -> esort -> unit

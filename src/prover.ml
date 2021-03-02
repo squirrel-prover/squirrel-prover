@@ -4,6 +4,7 @@
 module L = Location
 
 module EquivHyps = EquivSequent.H
+module Args = TacticsArgs
 
 type lsymb = Theory.lsymb
 
@@ -305,15 +306,39 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
 
-    | TacticsArgs.RewriteIn (in_opt, forms) ->
+    | TacticsArgs.RewriteIn (in_opt, rw_args) ->
       let pp_in ppf = function
         | None      -> ()
         | Some symb -> Fmt.pf ppf " in %s" (L.unloc symb)
       in
 
+      let pp_dir ppf d = match L.unloc d with
+        | `LeftToRight -> ()
+        | `RightToLeft -> Fmt.pf ppf "-"
+      in
+
+      let pp_mult ppf = function
+        | `Once -> ()
+        | `Many -> Fmt.pf ppf "!"
+        | `Any -> Fmt.pf ppf  "?"
+      in
+
+      let pp_type ppf = function
+        | `Form f      -> Theory.pp ppf f
+        | `Expand symb -> Fmt.pf ppf "%s" (L.unloc symb)
+      in
+
+      let pp_rw_arg ppf rw_arg =
+      Fmt.pf ppf "%a%a%a"
+        pp_dir  rw_arg.Args.rw_dir
+        pp_mult rw_arg.Args.rw_mult
+        pp_type rw_arg.Args.rw_type
+      in
+
       Fmt.pf ppf "%a%a"
-        (Fmt.list ~sep:Fmt.sp Theory.pp) forms
+        (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
         pp_in in_opt
+
 
   let autosimpl () =
     let tautosimpl = TraceTable.get "autosimpl" [] in

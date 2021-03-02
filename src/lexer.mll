@@ -37,11 +37,13 @@ rule token = parse
 | ']'                 { RBRACKET }
 | '?'                 { QMARK }
 | ','                 { COMMA }
+| "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
+| '/'                 { SLASH }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }

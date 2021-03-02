@@ -19,7 +19,7 @@
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
-%token DOT
+%token DOT SLASH BANGU
 %token WITH ORACLE EXN
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE REWRITE
 %token BY INTRO AS DESTRUCT
@@ -376,16 +376,33 @@ tactic_params:
 | t=tactic_param                        { [t] }
 | t=tactic_param COMMA ts=tactic_params { t::ts }
 
-rewrite_param:
-| f=sformula  { f }
+(*------------------------------------------------------------------*)
+rw_mult:
+| BANGU  { `Many }
+| QMARK  { `Any }
+|        { `Once }
 
-rewrite_params:
-| slist(rewrite_param, empty) { [] }
+rw_dir:
+|       { `LeftToRight }
+| MINUS { `RightToLeft }
 
-rewrite_in:
+rw_type:
+| f=sformula      { `Form f }   /* [f] can also be a hypothesis ident. */
+| SLASH id=lsymb  { `Expand id }
+
+rw_param:
+| m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
+                                                     rw_dir = d; 
+                                                     rw_type = t; } }
+
+rw_params:
+| slist(rw_param, empty) { [] }
+
+rw_in:
 |             { None }
 | IN id=lsymb { Some id }
 
+(*------------------------------------------------------------------*)
 tac_errors:
 |                         { [] }
 | i=ID                    { [i] }
@@ -495,7 +512,7 @@ tac:
         | Some ip -> [TacticsArgs.SimplPat ip] in
       Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
-  | REWRITE p=rewrite_params w=rewrite_in
+  | REWRITE p=rw_params w=rw_in
     { Tactics.Abstract ("rewrite", [TacticsArgs.RewriteIn (w, p)]) }
 
   | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { Tactics.Abstract

@@ -64,6 +64,15 @@ type ip_handler = [
 ]
   
 (*------------------------------------------------------------------*)
+(** Parsed arguments for rewrite *)
+type rw_arg = { 
+  rw_mult : [`Once | `Many | `Any ];         (* ε | ! | ? *)
+  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_type : [`Form of Theory.formula | `Expand of Theory.lsymb];
+}
+
+
+(*------------------------------------------------------------------*)
 (** One tactic argument (in the parser) *)
 type parser_arg =
   | String_name of lsymb
@@ -72,7 +81,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
-  | RewriteIn   of lsymb option * Theory.formula list
+  | RewriteIn   of lsymb option * rw_arg list
       
 type ('a, 'b) pair
 

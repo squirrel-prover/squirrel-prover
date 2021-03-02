@@ -2,6 +2,9 @@ open Utils
 
 module L = Location
 
+module Sv = Vars.Sv
+module Mv = Vars.Mv
+
 let dbg s = Printer.prt `Ignore s
 (* let dbg s = Printer.prt `Dbg s *)
 
@@ -440,7 +443,6 @@ let subst_macro (s:subst) (symb, sort, is) =
   (symb, sort, List.map (subst_var s) is)
 
 (*------------------------------------------------------------------*)
-module Sv = Vars.Sv
 
 let get_set_vars : 'a term -> Sv.t =
   fun term ->
@@ -743,7 +745,107 @@ let subst_macros_ts table l ts t =
 
 
 (*------------------------------------------------------------------*)
-(** Simplification *)
+(** {2 Matching and rewriting} *)
+
+module Match = struct 
+  type 'a pat = 'a term * Vars.evar list
+
+  type ebind = ETerm : 'a term -> ebind
+
+  type subst = ebind Mv.t
+    
+  let try_match : type a b. a term -> b pat -> subst option = 
+    fun t pat -> 
+    let exception NoMatch in
+
+    let rec tmatch : type a b. a term -> b term -> subst -> subst =
+      fun t pat mv -> 
+    match t, pat with
+    | Fun (symb, terms), Fun (symb', terms') -> 
+      let mv = smatch symb symb' mv in
+      tmatch_l terms terms' mv
+
+    | Name symb, Name symb' -> 
+      smatch symb symb' mv
+
+    | Macro ((s, sort, is), terms, ts), Macro ((s', sort', is'), terms', ts') -> 
+      if not (Sorts.equal sort sort') then raise NoMatch;
+
+      let mv = smatch (s,is) (s',is') mv in
+      tmatch_l terms terms' (tmatch ts ts' mv)
+
+    | Seq _, _ -> raise NoMatch
+
+    | Pred ts, Pred ts' -> tmatch ts ts' mv
+
+    | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
+
+    | Var v, Var v' -> assert false
+
+    | Diff (a,b), Diff (a', b') ->
+      tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
+
+    | ITE (b,t1,t2), ITE (b',t1',t2') ->
+      tmatch_l [t1;t2] [t1';t2'] (tmatch b b' mv)
+
+    | Find _, _ -> raise NoMatch
+
+    | Atom at, Atom at' -> atmatch at at' mv
+
+    | ForAll _, _ 
+    | Exists _, _ -> raise NoMatch
+
+    | And (a,b), And (a', b') 
+    | Or (a,b), Or (a', b') 
+    | Impl (a,b), Impl (a', b') ->
+      tmatch_l [a;b] [a';b'] mv
+
+    | Not a, Not a' -> tmatch a a' mv
+
+    | True, True -> mv
+    | False, False -> mv
+
+    | _, _ -> raise NoMatch
+                
+    and tmatch_l : type a b. a term list -> b term list -> subst -> subst =
+      fun tl patl mv -> 
+        List.fold_left2 (fun mv t pat -> tmatch t pat mv) mv tl patl
+
+    and smatch : type a. 
+      (a Symbols.t * Vars.index list) -> 
+      (a Symbols.t * Vars.index list) -> 
+      subst -> subst = 
+      fun (fn, is) (fn', is') mv ->
+        
+        if fn <> fn' then raise NoMatch;
+        
+        List.fold_left2 (fun mv i i' -> vmatch (Var i) i' mv) mv is is'
+          
+    and vmatch : type a. a term -> a Vars.var -> subst -> subst = fun t v mv ->
+      let ev = Vars.EVar v in
+      match Mv.find ev mv with
+      | exception Not_found -> Mv.add ev (ETerm t) mv
+      | ETerm t' ->       
+        if t <> t' then raise NoMatch else mv
+
+    and atmatch (at : generic_atom) (at' : generic_atom) mv =
+      assert false
+    in
+
+    let tpat, vspat = pat in 
+    try Some (tmatch t tpat Mv.empty) with
+    | NoMatch -> None
+      
+  
+  let find_map :
+  type a b. a term -> b pat -> (b term -> subst -> b term) -> a term
+  = fun t p func ->
+    assert false    
+
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Simplification} *)
 
 let not_ord_eq o = match o with
   | `Eq -> `Neq
@@ -787,7 +889,7 @@ let rec not_simpl = function
 
 
 (*------------------------------------------------------------------*)
-(** Projection *)
+(** {2 Projection} *)
 
 type projection = PLeft | PRight | PNone
 

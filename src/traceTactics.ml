@@ -1402,25 +1402,76 @@ let () =
 
 (*------------------------------------------------------------------*)
 type rw_target = [`Goal | `Hyp of Ident.t]
+type rw =  ([`Once | `Many | `Any ] * Term.esubst)
 
 (** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
-let rewrite (t: rw_target) (rw_args : Term.formula list) =
-  assert false
+let rewrite (t: rw_target) (rws : rw list) s =
+  let rec do1 (f : Term.formula) (rw : rw) = 
+    let mult, subst = rw in
+    Term.subst [subst] f
+  in
+
+  let f, s = match t with
+    | `Goal -> TraceSequent.conclusion s, s
+    | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
+  in
+  let f = List.fold_left do1 f rws in
+  
+  let srw = match t with
+    | `Goal -> TraceSequent.set_conclusion f s
+    | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
+  in
+
+  [srw]
+
 
 (** Parse rewrite tactic arguments. *)
-let p_rw_args (rw_args : Theory.formula list) s : Term.formula list =
-  let p_rw_arg rw_arg = 
-    match Args.convert_as_lsymb [Args.Theory rw_arg] with
+let p_rw_args (rw_args : Args.rw_arg list) s : rw list =
+  let to_subst ~loc = function
+    | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
+    | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
+    | Term.Atom (`Index     (`Eq, t1, t2)) -> 
+      Term.ESubst (Term.Var t1,Term.Var t2)
+    | _ -> hard_failure ?loc (Tactics.Failure "not an equality")
+  in
+
+  let p_rw_type (rw_type : Theory.formula) = 
+    match Args.convert_as_lsymb [Args.Theory rw_type] with
     | Some str when Hyps.mem_name (L.unloc str) s ->
       let _,f = Hyps.by_name str s in
-      f
+      to_subst ~loc:None f
+
     | _ -> 
       let conv_env = Theory.{ table = TraceSequent.table s;
                               cntxt = InGoal; } in      
       let subst = Theory.subst_of_env (TraceSequent.env s) in
-      Theory.convert conv_env subst rw_arg Sorts.Boolean 
+      let f = Theory.convert conv_env subst rw_type Sorts.Boolean in
+      to_subst ~loc:(Some (L.loc rw_type))  f
   in
-  List.map p_rw_arg rw_args
+
+  let p_rw_arg (rw_arg : Args.rw_arg) = 
+    let t = match rw_arg.rw_type with
+      | `Form f -> 
+        let f = p_rw_type f in
+        begin 
+          match L.unloc rw_arg.rw_dir with
+          | `LeftToRight -> f
+          | `RightToLeft -> 
+            let Term.ESubst (t1,t2) = f in
+            Term.ESubst (t2,t1)
+        end
+
+      | `Expand mid -> 
+        if L.unloc rw_arg.rw_dir <> `LeftToRight then
+          hard_failure ~loc:(L.loc rw_arg.rw_dir)
+            (Failure "expand cannot take a direction");
+        
+        assert false            (* TODO *)
+    in
+    rw_arg.rw_mult, t
+  in
+
+  List.map p_rw_arg rw_args 
 
 
 let rewrite_tac args s sk fk =
@@ -1432,7 +1483,7 @@ let rewrite_tac args s sk fk =
     in
     let rw_args = p_rw_args rw_args s in
 
-    sk (rewrite target rw_args) fk
+    sk (rewrite target rw_args s) fk
 
   | _ -> hard_failure (Tactics.Failure "improper arguments")
 

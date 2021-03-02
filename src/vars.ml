@@ -146,17 +146,34 @@ module Sv = struct
     List.fold_left (fun sv v -> add (EVar v) sv) sv vars
 end
 
+module Ms = struct
+  include Map.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = compare (name a) (name b)
+    end)
+end
+
 (*------------------------------------------------------------------*)
+exception CastError
+
 let cast : type a b. a var -> b Sorts.sort -> b var = 
   fun x s -> match sort x, s with
   | Sorts.Boolean,   Sorts.Boolean   -> x
   | Sorts.Message,   Sorts.Message   -> x
   | Sorts.Index,     Sorts.Index     -> x
   | Sorts.Timestamp, Sorts.Timestamp -> x
-  | _, _ -> assert false
+  | _, _ -> raise CastError
 
 let ecast : type a. evar -> a Sorts.sort -> a var = 
   fun (EVar v) s -> cast v s
+
+let equal : type a b. a var -> b var -> bool = fun v v' ->
+  match sort v, sort v' with
+  | Sorts.Boolean,   Sorts.Boolean   -> v = v'
+  | Sorts.Message,   Sorts.Message   -> v = v'
+  | Sorts.Index,     Sorts.Index     -> v = v'
+  | Sorts.Timestamp, Sorts.Timestamp -> v = v'
+  | _, _ -> false
 
 (*------------------------------------------------------------------*)
 let () =
