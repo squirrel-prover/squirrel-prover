@@ -648,6 +648,12 @@ let () =
                   tactic_group = Logical}
     (fun _ -> Tactics.id)
 
+let is_goal_formula (gname : lsymb) =
+  match List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved with
+    | [(_,Goal.Trace f)] -> true
+    | [] -> false
+    | _ -> assert false
+
 let get_goal_formula (gname : lsymb) =
   match
     List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved

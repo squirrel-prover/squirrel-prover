@@ -29,7 +29,9 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | NothingToRewrite
   | MustHappen of Term.timestamp
+  | NotHypothesis
 
   | NoCollision
 
@@ -50,10 +52,12 @@ let tac_error_strings =
     (NoReflMacros , "NoReflMacros");
     (TacTimeout, "TacTimeout");
     (CannotConvert, "CannotConvert");
+    (NotHypothesis, "NotHypothesis");
     (NoCollision, "NoCollision");
     (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
-    (NothingToIntroduce, "NothingToIntroduce")]
+    (NothingToIntroduce, "NothingToIntroduce");
+    (NothingToRewrite, "NothingToRewrite")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -76,7 +80,9 @@ let rec tac_error_to_string = function
   | CannotConvert
   | CongrFail
   | NothingToIntroduce
+  | NothingToRewrite
   | GoalNotClosed
+  | NotHypothesis
   | NoCollision
   | DidNotFail as e -> List.assoc e tac_error_strings
   | SystemExprError _ -> "SystemExpr_Error"
@@ -131,14 +137,20 @@ let rec pp_tac_error ppf = function
   | NothingToIntroduce ->
     Fmt.pf ppf "nothing to introduce"
 
+  | NothingToRewrite ->
+    Fmt.pf ppf "nothing to rewrite"
+
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
 
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
 
-  | MustHappen t->
+  | MustHappen t ->
     Fmt.pf ppf "timestamp %a must happen" Term.pp t
+
+  | NotHypothesis ->
+    Fmt.pf ppf "the conclusion does not appear in the hypotheses"
 
   | NoCollision ->
     Fmt.pf ppf "no collision found" 

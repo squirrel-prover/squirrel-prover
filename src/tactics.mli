@@ -54,7 +54,9 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | NothingToRewrite
   | MustHappen of Term.timestamp
+  | NotHypothesis
   | NoCollision
   | PatNumError of int * int    (* given, need *)
 

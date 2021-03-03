@@ -172,6 +172,8 @@ exception ParseError of string
 
 val get_goal_formula : lsymb -> formula * SystemExpr.system_expr
 
+val is_goal_formula : lsymb -> bool
+
 (** Produces a trace goal from a parsed formula,
   * for reasoning on the traces of the given system. *)
 val make_trace_goal :

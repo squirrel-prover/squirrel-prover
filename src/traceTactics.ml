@@ -724,8 +724,7 @@ let assumption (s : TraceSequent.t) =
   if goal = Term.True || Hyps.is_hyp goal s then
     let () = dbg "assumption %a" Term.pp goal in
     []
-  else
-    soft_failure (Tactics.Failure "Conclusion is not an hypothesis")
+  else soft_failure Tactics.NotHypothesis
 
 let () = T.register "assumption"
      ~tactic_help:{general_help = "Search for the conclusion inside the hypothesis.";
@@ -734,14 +733,11 @@ let () = T.register "assumption"
                   tactic_group = Logical}
     assumption
 
-
 (*------------------------------------------------------------------*)
-(** [use ip name ths judge] applies the formula named [gp],
-  * eliminating its universally quantified variables using [ths],
-  * and eliminating implications (and negations) underneath.
-  * If given an introduction patterns, apply it to the generated hypothesis. *)
-let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
-  (* Get formula to apply. *)
+let is_hyp_or_lemma name s =
+  Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula name
+
+let get_hyp_or_lemma name s =
   let f,system =
     if Hyps.mem_name (L.unloc name) s then
       let _, f = Hyps.by_name name s in
@@ -756,6 +752,16 @@ let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
     | Single (Right s1), SystemExpr.SimplePair s2 when s1 = s2 -> ()
     | _ -> hard_failure Tactics.NoAssumpSystem
   end ;
+  f
+
+(*------------------------------------------------------------------*)
+(** [use ip name ths judge] applies the formula named [gp],
+  * eliminating its universally quantified variables using [ths],
+  * and eliminating implications (and negations) underneath.
+  * If given an introduction patterns, apply it to the generated hypothesis. *)
+let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
+  (* Get formula to apply. *)
+  let f = get_hyp_or_lemma name s in
 
   (* Get universally quantifier variables, verify that lengths match. *)
   let uvars,f = match f with
@@ -1427,7 +1433,7 @@ let rewrite (t: rw_target) (rws : rw_erule list) s =
       let occ = Term.Match.find f { p_term = l; p_vars = sv; } in
 
       match mult, occ with
-      | (`Once | `Many), None -> hard_failure (Failure "nothing to rewrite")
+      | (`Once | `Many), None -> soft_failure Tactics.NothingToRewrite
 
       | (`Many | `Any), Some occ -> do1 (rw_inst occ) (`Any,sv,l,r)
       | `Once,          Some occ -> rw_inst occ
@@ -1473,8 +1479,8 @@ let p_rw_args (rw_args : Args.rw_arg list) s
   let p_rw_rule (rw_type : Theory.formula) 
     : (Vars.Sv.t * Term.esubst) * TraceSequent.sequent list = 
     match Args.convert_as_lsymb [Args.Theory rw_type] with
-    | Some str when Hyps.mem_name (L.unloc str) s ->
-      let _,f = Hyps.by_name str s in
+    | Some str when is_hyp_or_lemma str s ->
+      let f = get_hyp_or_lemma str s in
 
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
@@ -1540,9 +1546,10 @@ let () =
     ~tactic_help:{
       general_help =
         "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Heq.\n\
-         rewrite (t = t') (s = s').\n       \
-         rewrite (t = t') Heq in H.";
+         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n\
+         rewrite Lemma Axiom (t=t').\n       \
+         rewrite (forall (x:message), t = t').\n       \
+         rewrite (t = t') Lemma in H.";
       detailed_help = "";
       usages_sorts  = [];
       tactic_group  = Structural;}
