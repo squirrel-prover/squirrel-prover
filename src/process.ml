@@ -128,6 +128,7 @@ let is_out p = is_out_i (L.unloc p)
 type proc_error_i =
   | UnknownProcess of string
   | ProcessAlreadyDecl of string
+  | SystemAlreadyDecl of string
   | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
@@ -144,7 +145,9 @@ let pp_proc_error_i fmt = function
 
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
 
-  | ProcessAlreadyDecl s -> Fmt.pf fmt "processus name [%s] already exists" s
+  | ProcessAlreadyDecl s -> Fmt.pf fmt "a processus named [%s] already exists" s
+
+  | SystemAlreadyDecl s -> Fmt.pf fmt "a system named [%s] already exists" s
 
   | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
                                        defined with arity %i" s i j
@@ -877,10 +880,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
   (proc, table)
 
-let declare_system table (system_name:string) proc =
-  if not (System.is_fresh system_name table) then begin
-    Fmt.epr "System %s already defined" system_name;
-    assert false end;
+let declare_system table (system_name : lsymb) proc =
+  let loc, system_name = L.loc system_name, L.unloc system_name in
+
+  if not (System.is_fresh system_name table) then 
+    proc_err loc (SystemAlreadyDecl system_name);
+
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc table [] proc ;
   let table, system_name = System.declare_empty table system_name in

@@ -50,13 +50,13 @@ let pp_goal_decl fmt decl =
     Theory.pp decl.gform
 
 (*------------------------------------------------------------------*)
-type system_decl = { sname    : string option;
+type system_decl = { sname    : Theory.lsymb option;
                      sprocess : Process.process; }
 
 let pp_system_decl fmt sys =
   let name = match sys.sname with
-    | Some s -> s
-    | None -> "_?" in
+    | Some s -> L.unloc s
+    | None -> "default" in
   Fmt.pf fmt "@[<hov 2>system %s =@ %a@]"
     name
     Process.pp_process sys.sprocess

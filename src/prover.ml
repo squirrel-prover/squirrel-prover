@@ -872,7 +872,7 @@ let current_goal () = !current_goal
 
 (*------------------------------------------------------------------*)
 
-let declare_i table = function
+let declare_i table decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let pkind = List.map (fun (x,y) -> L.unloc x, y) pkind in
@@ -890,7 +890,7 @@ let declare_i table = function
 
   | Decl.Decl_system sdecl ->
     let name = match sdecl.sname with
-      | None -> SystemExpr.default_system_name
+      | None -> L.mk_loc (L.loc decl) SystemExpr.default_system_name
       | Some n -> n
     in
     Process.declare_system table name sdecl.sprocess
@@ -920,7 +920,7 @@ let declare_i table = function
 
 let declare table decl =
   let loc = L.loc decl in
-  error_handler loc KDecl (declare_i table) (L.unloc decl)
+  error_handler loc KDecl (declare_i table) decl
 
 let declare_list table decls =
   (* For debugging *)

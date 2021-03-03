@@ -25,7 +25,7 @@ type goal_decl = { gname   : string option;
 val pp_goal_decl : Format.formatter -> goal_decl -> unit
 
 (** Information for a system declaration *)
-type system_decl = { sname    : string option;
+type system_decl = { sname    : Theory.lsymb option;
                      sprocess : Process.process; }
 
 val pp_system_decl : Format.formatter -> system_decl -> unit

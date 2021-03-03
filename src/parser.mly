@@ -352,7 +352,7 @@ declaration_i:
 | SYSTEM p=process
                           { Decl.(Decl_system { sname = None;
                                                 sprocess = p}) }
-| SYSTEM LBRACKET id=ID RBRACKET p=process
+| SYSTEM LBRACKET id=lsymb RBRACKET p=process
                           { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }
 
