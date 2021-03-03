@@ -74,6 +74,7 @@ type rw_arg = {
   rw_type : [`Form of Theory.formula | `Expand of Theory.lsymb];
 }
 
+type rw_in = [`All | `Hyps of lsymb list] option 
 
 (*------------------------------------------------------------------*)
 (** One tactic argument (in the parser) *)
@@ -84,7 +85,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
-  | RewriteIn   of lsymb option * rw_arg list
+  | RewriteIn   of rw_arg list * rw_in
       
 type ('a, 'b) pair
 

@@ -403,8 +403,9 @@ rw_params:
 | l=slist1(rw_param, empty) { l }
 
 rw_in:
-|             { None }
-| IN id=lsymb { Some id }
+|                          { None }
+| IN l=slist1(lsymb,COMMA) { Some (`Hyps l) }
+| IN STAR                  { Some `All }
 
 (*------------------------------------------------------------------*)
 tac_errors:
@@ -517,7 +518,7 @@ tac:
       Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
   | REWRITE p=rw_params w=rw_in
-    { Tactics.Abstract ("rewrite", [TacticsArgs.RewriteIn (w, p)]) }
+    { Tactics.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
 
   | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { Tactics.Abstract
                                           ("ddh",

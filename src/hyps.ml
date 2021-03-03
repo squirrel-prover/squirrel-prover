@@ -226,6 +226,8 @@ module type HypsSeq = sig
   val mem_id   : Ident.t -> sequent -> bool
   val mem_name : string -> sequent -> bool
 
+  val to_list : sequent -> ldecl list
+
   val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
   val find_map : (Ident.t -> hyp -> 'a option) -> sequent -> 'a option
 

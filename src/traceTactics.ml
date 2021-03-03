@@ -1422,8 +1422,12 @@ let check_rule (sv, l, r) =
 
 let check_erule (sv, Term.ESubst (l,r)) = check_rule (sv, l, r)
 
-(** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
-let rewrite (t: rw_target) (rws : (Args.rw_count * rw_erule) list) s =
+(** [rewrite ~all tgt rw_args] rewrites [rw_args] in [tgt].
+    If [all] is true, then does not fail if no rewriting occurs. *)
+let rewrite ~all
+    (targets: rw_target list) (rws : (Args.rw_count * rw_erule) list) s =
+  let found1 = ref false in
+
   let rec do1 
     : type a. Term.formula -> Args.rw_count -> a rw_rule -> Term.formula = 
     fun f mult (sv, l, r) ->
@@ -1431,6 +1435,7 @@ let rewrite (t: rw_target) (rws : (Args.rw_count * rw_erule) list) s =
       (* Substitutes all instances of [occ.occ] by [r] (where free variables
          are instantiated according to [occ.mv]. *)
       let rw_inst (occ : a Term.Match.match_occ) =
+        found1 := true;
         let subst = Term.Match.to_subst occ.mv in
         let r_f = Term.cast (Term.sort occ.occ) (Term.subst subst r) in
         Term.subst [Term.ESubst (occ.occ, r_f)] f
@@ -1440,28 +1445,38 @@ let rewrite (t: rw_target) (rws : (Args.rw_count * rw_erule) list) s =
       let occ = Term.Match.find f { p_term = l; p_vars = sv; } in
 
       match mult, occ with
-      | (`Once | `Many), None -> soft_failure Tactics.NothingToRewrite
+      | (`Once | `Many), None -> 
+        if not all 
+        then soft_failure Tactics.NothingToRewrite 
+        else f
 
       | (`Many | `Any), Some occ -> do1 (rw_inst occ) `Any (sv,l,r)
       | `Once,          Some occ -> rw_inst occ
       | `Any,           None     -> f
   in
 
-  let f, s = match t with
-    | `Goal -> TraceSequent.conclusion s, s
-    | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
-  in
-  let f = List.fold_left 
-      (fun f (mult, (sv, Term.ESubst (l,r))) -> 
-         do1 f mult (sv,l,r)
-      ) f rws in
-
-  let srw = match t with
+  (* rewrite in a single targert *)
+  let do_target s t =
+    let f, s = match t with
+      | `Goal -> TraceSequent.conclusion s, s
+      | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
+    in
+    let f = List.fold_left 
+        (fun f (mult, (sv, Term.ESubst (l,r))) -> 
+           do1 f mult (sv,l,r)
+        ) f rws in
+    
+    match t with
     | `Goal -> TraceSequent.set_conclusion f s
     | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
   in
+  
+  let s = [List.fold_left do_target s targets] in
 
-  [srw] 
+  if all && not !found1 then soft_failure Tactics.NothingToRewrite;
+
+  s
+
 
 
 (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
@@ -1542,16 +1557,19 @@ let p_rw_args (rw_args : Args.rw_arg list) s
 
 let rewrite_tac args s sk fk =
   match args with
-  | [Args.RewriteIn (in_opt, rw_args)] ->
-    let target = match in_opt with
-      | Some symb -> `Hyp (fst (Hyps.by_name symb s))
-      | None -> `Goal 
+  | [Args.RewriteIn (rw_args, in_opt)] ->
+    let target, all = match in_opt with
+      | Some (`Hyps symbs) -> 
+        List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
+      | Some `All -> 
+        `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s), true
+      | None -> [`Goal], false
     in
     let rw_args = p_rw_args rw_args s in
     let rw_rules, subgoals = List.split rw_args in
     let subgoals = List.flatten subgoals in
     
-    sk (subgoals @ rewrite target rw_rules s) fk
+    sk (subgoals @ rewrite ~all target rw_rules s) fk
 
   | _ -> hard_failure (Tactics.Failure "improper arguments")
 

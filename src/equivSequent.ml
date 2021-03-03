@@ -113,6 +113,8 @@ module Hyps
   let find_opt func s = H.find_opt func s.hyps
 
   let find_map func s = H.find_map func s.hyps
+
+  let to_list s = H.to_list s.hyps
       
   let exists func s = H.exists func s.hyps
 

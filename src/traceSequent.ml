@@ -322,6 +322,8 @@ module Hyps
   let by_id   id s = H.by_id   id s.hyps
   let by_name id s = H.by_name id s.hyps
 
+  let to_list s = H.to_list s.hyps
+
   let mem_id   id s = H.mem_id   id s.hyps
   let mem_name id s = H.mem_name id s.hyps
 

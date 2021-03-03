@@ -125,6 +125,8 @@ module type HypsSeq = sig
   (** Same as [mem_id], but does a look-up by name. *)  
   val mem_name : string -> sequent -> bool
 
+  val to_list : sequent -> ldecl list
+
   (** Find the first local declaration satisfying a predicate. *)
   val find_opt : (Ident.t -> hyp -> bool) -> sequent -> ldecl option
 

@@ -306,10 +306,13 @@ module Make_AST (T : Table_sig) :
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
 
-    | TacticsArgs.RewriteIn (in_opt, rw_args) ->
+    | TacticsArgs.RewriteIn (rw_args, in_opt) ->
       let pp_in ppf = function
         | None      -> ()
-        | Some symb -> Fmt.pf ppf " in %s" (L.unloc symb)
+        | Some `All -> Fmt.pf ppf " in *"
+        | Some (`Hyps symb) -> 
+          Fmt.pf ppf " in %a"
+            (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
       in
 
       let pp_dir ppf d = match L.unloc d with
