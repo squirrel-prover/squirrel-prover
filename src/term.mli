@@ -201,12 +201,16 @@ val subst_macros_ts :
 module Match : sig
   type mv = eterm Vars.Mv.t
 
+  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
+      be matched.  *)
+  type 'a pat = { p_term : 'a term; p_vars : Vars.Sv.t }
+
   val to_subst : mv -> subst
 
-  (** [try_match t pat] tries to match [pat] with [t]. If it succeeds, it 
-      returns a map instantiating [pat]'s free variables as substerms 
-      of [t].   *)
-  val try_match : 'a term -> 'b term -> mv option
+  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
+      returns a map instantiating the variables [p.p_vars] as substerms 
+      of [t]. *)
+  val try_match : 'a term -> 'b pat -> mv option
 
   (** Occurrence matched *)
   type 'a match_occ = { occ : 'a term;
@@ -215,13 +219,13 @@ module Match : sig
   (** [find t pat] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
       It returns the occurrence matched [{occ = t'; mv = θ}]. *)
-  val find : 'a term -> 'b term -> 'b match_occ option
+  val find : 'a term -> 'b pat -> 'b match_occ option
 
-  (** [find_map t pat func] behaves has [find], but also computes the term 
+  (** [find_map t p func] behaves has [find], but also computes the term 
       obtained from [t] by replacing a *single* occurence of [t'] by 
       [func t' θ]. *)
   val find_map :
-    'a term -> 'b term -> ('b term -> mv -> 'b term) -> 
+    'a term -> 'b pat -> ('b term -> mv -> 'b term) -> 
     ('b match_occ * 'a term) option
 end
 

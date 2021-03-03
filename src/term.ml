@@ -813,14 +813,19 @@ module Match = struct
         | Vars.EVar v, ETerm t -> 
           ESubst (Var v, cast (Vars.sort v) t) :: subst
       ) mv [] 
+
+  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
+      be matched.  *)
+  type 'a pat = { p_term : 'a term; p_vars : Sv.t }
       
-  (** [try_match t pat] tries to match [pat] with [t]. If it succeeds, it 
-      returns a map instantiating [pat]'s free variables as substerms 
-      of [t].   *)
-  let try_match : type a b. a term -> b term -> mv option = 
-    fun t pat -> 
+  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
+      returns a map instantiating the variables [p.p_vars] as substerms 
+      of [t]. *)
+  let try_match : type a b. a term -> b pat -> mv option = 
+    fun t p -> 
     let exception NoMatch in
     
+    (* Invariant: [mv] supports in included in [p.p_vars]. *)
     let rec tmatch : type a b. a term -> b term -> mv -> mv =
       fun t pat mv -> match t, pat with
         | _, Var v' -> 
@@ -892,15 +897,21 @@ module Match = struct
     (* Match a variable of the pattern with a term. *)
     and vmatch : type a. a term -> a Vars.var -> mv -> mv = fun t v mv ->
       let ev = Vars.EVar v in
-      match Mv.find ev mv with
-      (* If this is the first time we see the variable, store the subterm. *)
-      | exception Not_found -> Mv.add ev (ETerm t) mv
+      
+      if not (Sv.mem ev p.p_vars) 
+      then if t = Var v then mv else raise NoMatch (* [v] not in the pattern *)
 
-      (* If we already saw the variable, check that the subterms are identical. *)
-      | ETerm t' -> match cast (sort t) t' with
-        | exception Uncastable -> raise NoMatch
-        (* TODO: alpha-equivalent *)
-        | t' -> if t <> t' then raise NoMatch else mv
+      else (* [v] in the pattern *)
+        match Mv.find ev mv with
+        (* If this is the first time we see the variable, store the subterm. *)
+        | exception Not_found -> Mv.add ev (ETerm t) mv
+
+        (* If we already saw the variable, check that the subterms are
+           identical. *)
+        | ETerm t' -> match cast (sort t) t' with
+          | exception Uncastable -> raise NoMatch
+          (* TODO: alpha-equivalent *)
+          | t' -> if t <> t' then raise NoMatch else mv
 
     and atmatch (at : generic_atom) (at' : generic_atom) mv =
       match at, at' with
@@ -921,10 +932,10 @@ module Match = struct
       | _, _ -> raise NoMatch
     in
 
-    try Some (tmatch t pat Mv.empty) with
+    try Some (tmatch t p.p_term Mv.empty) with
     | NoMatch -> None
 
-  
+
   (** Occurrence matched *)
   type 'a match_occ = { occ : 'a term;
                         mv  : mv; }
@@ -933,24 +944,24 @@ module Match = struct
       obtained from [t] by replacing a *single* occurence of [t'] by 
       [func t' θ]. *)
   let find_map :
-    type a b. a term -> b term -> (b term -> mv -> b term) -> 
+    type a b. a term -> b pat -> (b term -> mv -> b term) -> 
     (b match_occ * a term) option
-    = fun t pat func ->
+    = fun t p func ->
       let found = ref None in
-      let spat = sort pat in
+      let s_p = sort p.p_term in
 
       let rec find : type a. a term -> a term = fun t ->
         if (!found) <> None then t (* we already found a match *)
 
         (* no match yet, check if head matches *)
         else 
-          match try_match t pat with
+          match try_match t p with
           (* head does not match, recurse  *)
           | None -> tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            found := Some ({ occ = cast spat t; mv = mv; }); 
-            let t' = func (cast spat t) mv in
+            found := Some ({ occ = cast s_p t; mv = mv; }); 
+            let t' = func (cast s_p t) mv in
             cast (sort t) t'    (* cast needed *)
       in
       
@@ -962,9 +973,9 @@ module Match = struct
   (** [find t pat] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
       It returns the occurrence matched [{occ = t'; mv = θ}]. *)
-  let find : type a b. a term -> b term -> b match_occ option = 
-    fun t pat -> 
-    omap fst (find_map t pat (fun t' _ -> t'))
+  let find : type a b. a term -> b pat -> b match_occ option = 
+    fun t p -> 
+    omap fst (find_map t p (fun t' _ -> t'))
 end
 
 (*------------------------------------------------------------------*)

@@ -1402,31 +1402,36 @@ let () =
 
 (*------------------------------------------------------------------*)
 type rw_target = [`Goal | `Hyp of Ident.t]
-type rw =  ([`Once | `Many | `Any ] * Term.esubst)
+
+(* Invariant: if (_,sv,l,r) is a rewrite rule, then
+   sv ⊆ FV(l) and FV(r) ⊆ FV(l). *)
+type 'a rw_rule =  ([`Once | `Many | `Any ] * Vars.Sv.t * 'a term * 'a term)
+
+type rw_erule =  ([`Once | `Many | `Any ] * Vars.Sv.t * Term.esubst)
+
 
 (** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
-let rewrite (t: rw_target) (rws : rw list) s =
-  let rec do1 : 
-    type a. Term.formula -> [`Once | `Many | `Any] -> a term -> a term -> 
-    Term.formula = fun f mult r l ->
+let rewrite (t: rw_target) (rws : rw_erule list) s =
+  let rec do1 : type a. Term.formula -> a rw_rule -> Term.formula = 
+    fun f (mult, sv, l, r) ->
 
-    (* Substitutes all instances of [occ.occ] by [l] (where free variables
-       are instantiated according to [occ.mv]. *)
-    let rw_inst (occ : a Term.Match.match_occ) =
-      let subst = Term.Match.to_subst occ.mv in
-      let l_f = Term.cast (Term.sort occ.occ) (Term.subst subst l) in
-      Term.subst [Term.ESubst (occ.occ, l_f)] f
-    in
-    
-    (* tries to find an occurence of [r] and rewrite it. *)
-    let occ = Term.Match.find f r in
+      (* Substitutes all instances of [occ.occ] by [r] (where free variables
+         are instantiated according to [occ.mv]. *)
+      let rw_inst (occ : a Term.Match.match_occ) =
+        let subst = Term.Match.to_subst occ.mv in
+        let r_f = Term.cast (Term.sort occ.occ) (Term.subst subst r) in
+        Term.subst [Term.ESubst (occ.occ, r_f)] f
+      in
 
-    match mult, occ with
-    | (`Once | `Many), None -> hard_failure (Failure "nothing to rewrite")
+      (* tries to find an occurence of [l] and rewrite it. *)
+      let occ = Term.Match.find f { p_term = l; p_vars = sv; } in
 
-    | (`Many | `Any), Some occ -> do1 (rw_inst occ) `Any r l
-    | `Once,          Some occ -> rw_inst occ
-    | `Any,           None     -> f
+      match mult, occ with
+      | (`Once | `Many), None -> hard_failure (Failure "nothing to rewrite")
+
+      | (`Many | `Any), Some occ -> do1 (rw_inst occ) (`Any,sv,l,r)
+      | `Once,          Some occ -> rw_inst occ
+      | `Any,           None     -> f
   in
 
   let f, s = match t with
@@ -1434,62 +1439,69 @@ let rewrite (t: rw_target) (rws : rw list) s =
     | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
   in
   let f = List.fold_left 
-      (fun f (mult, Term.ESubst (r,l)) -> 
-         do1 f mult r l
+      (fun f (mult, sv, Term.ESubst (l,r)) -> 
+         do1 f (mult,sv,l,r)
       ) f rws in
-  
+
   let srw = match t with
     | `Goal -> TraceSequent.set_conclusion f s
     | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
   in
 
-  [srw]           (* TODO: matching should only assign free variables. *)
+  [srw] 
 
 
 (** Parse rewrite tactic arguments. *)
-let p_rw_args (rw_args : Args.rw_arg list) s : rw list =
-  let to_subst ~loc = function
-    | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Index     (`Eq, t1, t2)) -> 
-      Term.ESubst (Term.Var t1,Term.Var t2)
-    | _ -> hard_failure ?loc (Tactics.Failure "not an equality")
+let p_rw_args (rw_args : Args.rw_arg list) s : rw_erule list =
+  let to_rule ~loc f = 
+    let vs, f = match Term.destr_forall f with
+      | Some (vs, f) -> Vars.Sv.of_list vs, f
+      | None -> Vars.Sv.empty, f
+    in
+    let e = match f with
+      | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
+      | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
+      | Term.Atom (`Index     (`Eq, t1, t2)) -> 
+        Term.ESubst (Term.Var t1,Term.Var t2)
+      | _ -> hard_failure ?loc (Tactics.Failure "not an equality") 
+    in
+    vs, e
   in
 
-  let p_rw_type (rw_type : Theory.formula) = 
+  let p_rw_type (rw_type : Theory.formula) : Vars.Sv.t * Term.esubst = 
     match Args.convert_as_lsymb [Args.Theory rw_type] with
     | Some str when Hyps.mem_name (L.unloc str) s ->
       let _,f = Hyps.by_name str s in
-      to_subst ~loc:None f
+      to_rule ~loc:None f
 
     | _ -> 
       let conv_env = Theory.{ table = TraceSequent.table s;
                               cntxt = InGoal; } in      
       let subst = Theory.subst_of_env (TraceSequent.env s) in
       let f = Theory.convert conv_env subst rw_type Sorts.Boolean in
-      to_subst ~loc:(Some (L.loc rw_type))  f
+      to_rule ~loc:(Some (L.loc rw_type))  f
   in
 
-  let p_rw_arg (rw_arg : Args.rw_arg) = 
-    let t = match rw_arg.rw_type with
+  let p_rw_arg (rw_arg : Args.rw_arg) : rw_erule = 
+    let vs, e = match rw_arg.rw_type with
       | `Form f -> 
-        let f = p_rw_type f in
-        begin 
-          match L.unloc rw_arg.rw_dir with
-          | `LeftToRight -> f
+        let vs, e = p_rw_type f in
+        let e = match L.unloc rw_arg.rw_dir with
+          | `LeftToRight -> e
           | `RightToLeft -> 
-            let Term.ESubst (t1,t2) = f in
+            let Term.ESubst (t1,t2) = e in
             Term.ESubst (t2,t1)
-        end
+        in
+        vs, e
 
       | `Expand mid -> 
         if L.unloc rw_arg.rw_dir <> `LeftToRight then
           hard_failure ~loc:(L.loc rw_arg.rw_dir)
             (Failure "expand cannot take a direction");
         
-        assert false            (* TODO *)
+        hard_failure (Failure "expand not yet implemented");
     in
-    rw_arg.rw_mult, t
+    (rw_arg.rw_mult, vs, e)
   in
 
   List.map p_rw_arg rw_args 
