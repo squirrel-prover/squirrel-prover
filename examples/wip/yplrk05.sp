@@ -233,7 +233,7 @@ forall (t:timestamp), forall (jj,ii:index),
 Proof.
 nosimpl(induction; intro IH0).
 intro jj ii.
-substitute t,R1(jj,ii).
+subst t,R1(jj,ii).
 expand exec@R1(jj,ii). expand cond@R1(jj,ii).
 euf H0.
 
@@ -267,7 +267,7 @@ forall (t:timestamp), forall (i,j:index),
 Proof.
 nosimpl(induction).
 intro IH0 i j.
-substitute t,T1(i,j).
+subst t,T1(i,j).
 expand exec@T1(i,j). expand cond@T1(i,j).
 euf H0.
 

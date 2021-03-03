@@ -110,7 +110,7 @@ goal stateInequality :
      t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t').
 Proof.
 induction.
-substitute t, T(i,j).
+subst t, T(i,j).
 assert kT(i')@t' = hkey(kT(i)@pred(T(i,j)),key(i)).
 euf M1.
 

@@ -104,38 +104,38 @@ induction.
 nosimpl(revert H => IH0).
 case t.
 
-substitute t,init.
-left.
+subst t,init.
+left. 
 
-substitute t,R(jj).
+subst t,R(jj).
 use IH0 with pred(R(jj)) as H.
 use H with i as P; case P.
 by left; use H0 with j'.
 right; exists j; use H1 with j'.
 by case H0.
 
-substitute t,R1(jj,ii).
+subst t,R1(jj,ii).
 use IH0 with pred(R1(jj,ii)) as H.
 use H with i as P; case P.
 by left; use H0 with j'.
 right; exists j; use H1 with j'.
 by case H0.
 
-substitute t,R2(jj).
+subst t,R2(jj).
 use IH0 with pred(R2(jj)) as H.
 use H with i as P; case P.
 by left; use H0 with j'.
 right; exists j; use H1 with j'.
 by case H0.
 
-substitute t,T(i1,j).
+subst t,T(i1,j).
 use IH0 with pred(T(i1,j)) as H.
 use H with i as P; case P.
 by left; use H0 with j'.
 right; exists j1; use H1 with j'.
 by case H0.
 
-substitute t,T1(i1,j).
+subst t,T1(i1,j).
 use IH0 with pred(T1(i1,j)) as H.
 use H with i as P; case P.
 (* *)
@@ -172,21 +172,21 @@ use H1 with j'.
 by case H0.
 by use H1 with j' as Hyp; case Hyp.
 
-substitute t,T2(i1,j).
+subst t,T2(i1,j).
 use IH0 with pred(T2(i1,j)) as IHA.
 use IHA with i as P; case P.
 by left; use H with j'.
 right; exists j1; use H0 with j' as P.
 by case P.
 
-substitute t,T3(i1,j).
+subst t,T3(i1,j).
 use IH0 with pred(T3(i1,j)) as H0.
 use H0 with i as H1.
 case H1.
 by left; use H with j'.
 by right; exists j1; use H1 with j' as H; case H.
 
-substitute t,A(kk).
+subst t,A(kk).
 use IH0 with pred(A(kk)) as H0.
 use H0 with i as H1.
 case H1.
@@ -194,7 +194,7 @@ by left; use H with j'.
 right; exists j; use H1 with j' as H2.
 by case H2.
 
-substitute t,A1(kk).
+subst t,A1(kk).
 use IH0 with pred(A1(kk)) as H0.
 use H0 with i as H1.
 case H1.
@@ -202,7 +202,7 @@ by left; use H with j'.
 right; exists j; use H1 with j' as H2.
 by case H2.
 
-substitute t,A2(kk).
+subst t,A2(kk).
 use IH0 with pred(A2(kk)) as H0.
 use H0 with i as H1.
 case H1.

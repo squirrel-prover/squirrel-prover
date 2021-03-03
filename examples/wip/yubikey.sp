@@ -130,7 +130,7 @@ assert (i = i1 || i <>i1) as H1.
 case H1.
 (* i = i1 *)
 left.
-substitute t, S(ii,i).
+subst t, S(ii,i).
 expand exec@S(ii,i).
 by use counterIncreaseStrictly with ii, i.
 (* i <>i1 *)
@@ -158,7 +158,7 @@ case H2.
 assert t' = pred(t).
 use counterIncrease with t as H1.
 use H1 with i.
-by substitute pred(t), t'.
+by subst pred(t), t'.
 
 (* case t' < pred(t) *)
 use H0 with t' as H2.
@@ -295,11 +295,11 @@ intro i.
 case t.
 
 (* 1/8 *)
-substitute t, init.
+subst t, init.
 by left.
 
 (* 2/8 *)
-substitute t, Plug(i1,j).
+subst t, Plug(i1,j).
 use IH0 with pred(Plug(i1,j)) as H0.
 use H0 with i as H1.
 case H1.
@@ -311,7 +311,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 3/8 *)
-substitute t, Plug1(i1,j).
+subst t, Plug1(i1,j).
 use IH0 with pred(Plug1(i1,j)) as H0.
 use H0 with i as H1.
 case H1.
@@ -323,7 +323,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 4/8 *)
-substitute t, Press(i1,j).
+subst t, Press(i1,j).
 use IH0 with pred(Press(i1,j)) as H0.
 use H0 with i as H1.
 case H1.
@@ -335,7 +335,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 5/8 *)
-substitute t, Press1(i1,j).
+subst t, Press1(i1,j).
 use IH0 with pred(Press1(i1,j)) as H0.
 use H0 with i as H1.
 case H1.
@@ -347,7 +347,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 6/8 - interesting case *)
-substitute t, S(ii,i1).
+subst t, S(ii,i1).
 use IH0 with pred(S(ii,i1)) as H0.
 use H0 with i as H1.
 case H1.
@@ -381,7 +381,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 7/8 *)
-substitute t, S1(ii,i1).
+subst t, S1(ii,i1).
 use IH0 with pred(S1(ii,i1)) as H0.
 use H0 with i as H1.
 case H1.
@@ -393,7 +393,7 @@ use H1 with jj' as H2.
 by case H2.
 
 (* 8/8 *)
-substitute t, S2(ii).
+subst t, S2(ii).
 use IH0 with pred(S2(ii)) as H0.
 use H0 with i as H1.
 case H1.

@@ -345,7 +345,7 @@ Proof.
   depends PDIS5, Pfail => Hap2.
   expand exec@PDIS5.
   expand cond@PDIS5; expand cond@Pfail.
-  subst pkSa@PDIS5,pk(kS).
+  rewrite (pkSa@PDIS5 = pk(kS)) in *; 1: auto.
   destruct He as [_ [_ Hchk]].
   euf Hchk => Euf. 
 

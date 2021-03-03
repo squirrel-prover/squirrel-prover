@@ -139,7 +139,7 @@ Proof.
   intro Hap Hcond1 Hcond4.
   expand cond@S1; expand cond@S4.
   expand pkP@S1.
-  subst fst(input@S), pk(kP).
+  rewrite (fst(input@S) = pk(kP)) in Hcond1.
   euf Hcond1.
 
   case H1.
@@ -152,7 +152,7 @@ goal [none, auth] P1_charac :
 Proof.
   intro Hap Hcond1 Hcond4.
   expand cond@P1; expand cond@P4.
-  subst pkS@P1,pk(kS).
+  rewrite (pkS@P1 = pk(kS)) in *.
   euf Hcond1.
 
   case H2.

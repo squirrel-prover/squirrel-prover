@@ -77,7 +77,7 @@ case H0.
 by right; exists j.
 
 (* t = T(i1,j) with i<>i1 *)
-substitute t,T(i1,j).
+subst t,T(i1,j).
 assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
 expand kT(i)@T(i1,j).
 by noif.
@@ -114,7 +114,7 @@ goal stateInequality :
      t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t').
 Proof.
 induction.
-substitute t, T(i,j).
+subst t, T(i,j).
 assert kT(i')@t' = hkey(kT(i)@pred(T(i,j)),key(i)).
 euf Meq0.
 

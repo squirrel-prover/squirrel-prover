@@ -91,11 +91,11 @@ expand cond@B(j,i).
 use tags_neq.
 repeat split.
 euf M1.
-substitute fst(input@B(j,i)), enc(<kab(k),id(i1)>,r1(k),ks(j)).
+subst fst(input@B(j,i)), enc(<kab(k),id(i1)>,r1(k),ks(j)).
 use dec with <kab(k),id(i1)>, r1(k), ks(j).
-substitute dec(enc(<kab(k),id(i1)>,r1(k),ks(j)),ks(j)), <kab(k),id(i1)>.
+subst dec(enc(<kab(k),id(i1)>,r1(k),ks(j)),ks(j)), <kab(k),id(i1)>.
 use pair_snd with kab(k),id(i1).
-substitute snd(<kab(k),id(i1)>),  id(i1).
+subst snd(<kab(k),id(i1)>),  id(i1).
 use id_neq with i1, i.
 
 admit. 

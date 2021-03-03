@@ -202,7 +202,7 @@ Proof.
   intro Hap HcOk HcFail.
   depends Pok, Pfail => _.
   expand cond@Pok;expand cond@Pfail; expand pkS1@Pok.
-  subst fst(input@Pok), pk(kS).
+  rewrite (fst(input@Pok) = pk(kS)) in HcOk; 1: auto.
   destruct HcOk as [_ HcOk].
   euf HcOk => Euf.
   expand sidP@Pok.
