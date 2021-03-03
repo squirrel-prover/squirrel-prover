@@ -51,8 +51,11 @@ type ip_handler = [
 
 (*------------------------------------------------------------------*)
 (** Parsed arguments for rewrite *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
 type rw_arg = { 
-  rw_mult : [`Once | `Many | `Any ];         (* ε | ! | ? *)
+  rw_mult : rw_count;
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
   rw_type : [
     | `Form of Theory.formula   (* formula or hypothesis ident *)

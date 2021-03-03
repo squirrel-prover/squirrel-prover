@@ -55,6 +55,7 @@ type tac_error =
   | GoalNotClosed
   | NothingToIntroduce
   | NothingToRewrite
+  | BadRewriteRule
   | MustHappen of Term.timestamp
   | NotHypothesis
   | NoCollision

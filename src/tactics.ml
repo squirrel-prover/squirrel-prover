@@ -30,6 +30,7 @@ type tac_error =
   | GoalNotClosed
   | NothingToIntroduce
   | NothingToRewrite
+  | BadRewriteRule
   | MustHappen of Term.timestamp
   | NotHypothesis
 
@@ -57,7 +58,8 @@ let tac_error_strings =
     (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
     (NothingToIntroduce, "NothingToIntroduce");
-    (NothingToRewrite, "NothingToRewrite")]
+    (NothingToRewrite, "NothingToRewrite");
+    (BadRewriteRule, "BadRewriteRule")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -81,6 +83,7 @@ let rec tac_error_to_string = function
   | CongrFail
   | NothingToIntroduce
   | NothingToRewrite
+  | BadRewriteRule
   | GoalNotClosed
   | NotHypothesis
   | NoCollision
@@ -139,6 +142,9 @@ let rec pp_tac_error ppf = function
 
   | NothingToRewrite ->
     Fmt.pf ppf "nothing to rewrite"
+
+  | BadRewriteRule ->
+    Fmt.pf ppf "invalid rewriting: rhs variables are not all bound by the lhs"
 
   | GoalBadShape s ->
     Fmt.pf ppf "goal has the wrong shape: %s" s
@@ -308,12 +314,16 @@ let checkfail_tac exc t j sk fk =
   try
     let sk l fk = soft_failure DidNotFail in
     t j sk fk
-  with Tactic_soft_failure (_,e) when e = exc -> sk [j] fk
-     | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
-     | Tactic_soft_failure (_, Failure _) when exc=Failure "" -> sk [j] fk
-     | Tactic_soft_failure (l,e)
-     | Tactic_hard_failure (l,e) ->
-       raise (Tactic_hard_failure (l, FailWithUnexpected e))
+  with 
+  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc -> 
+    sk [j] fk
+  | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
+  | (Tactic_soft_failure (_, Failure _) |
+     Tactic_hard_failure (_, Failure _) )
+    when exc=Failure "" -> sk [j] fk
+  | Tactic_soft_failure (l,e)
+  | Tactic_hard_failure (l,e) ->
+    raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
 let repeat t j sk fk =
   let rec aux j sk fk =
