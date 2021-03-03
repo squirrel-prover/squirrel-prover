@@ -34,3 +34,6 @@ val get_ts_equalities :
 
 val get_ind_equalities : 
   precise:bool -> models -> Vars.index list -> Vars.index list list
+
+(** [find_eq_action models t] looks for an action [ts] equal to [t]. *)
+val find_eq_action : models -> Term.timestamp -> Term.timestamp option

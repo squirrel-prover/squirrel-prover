@@ -19,10 +19,7 @@ let is_defined name a table =
     | Symbols.(Output | Cond | State _), _ ->
         (* We can expand the definitions of output@A and state@A
          * when A is an action name. We cannot do so for a variable
-         * or a predecessor.
-         * TODO generalize the approach so that we expand output@ts
-         * when the judgment's constraints tell us that ts=A for some
-         * name A. *)
+         * or a predecessor. *)
         begin match a with
           | Action _ -> true
           | _ -> false

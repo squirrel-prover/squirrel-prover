@@ -98,6 +98,8 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
+  val ut_to_term : 'a Sorts.sort -> ut -> 'a Term.term 
+
   module Ut : Hashtbl.HashedType with type t = ut
 
 end = struct
@@ -151,6 +153,29 @@ end = struct
     | Term.Action (s,_) when s = Symbols.init_action -> uinit
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | _ -> failwith "Not implemented"
+
+  let utv_to_var : type a. a Sorts.sort -> uvar -> a Vars.var =
+    fun s utv ->
+    match utv with
+    | Uind i -> Vars.cast i s
+    | Utv  t -> Vars.cast t s
+
+  let ut_to_var : type a. a Sorts.sort -> ut -> a Vars.var =
+    fun s ut -> 
+    match ut.cnt with
+    | UVar (Uind i) -> Vars.cast i s
+    | UVar (Utv t)  -> Vars.cast t s
+    | _ -> assert false
+
+  let rec ut_to_term : type a. a Sorts.sort -> ut -> a Term.term = 
+    fun s ut ->
+    match ut.cnt with
+    | UVar tv -> Term.Var (utv_to_var s tv)
+    | UName (a, is) -> 
+      Term.cast s (Term.Action (a, List.map (ut_to_var Sorts.Index) is))
+    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Sorts.Timestamp ut))
+    | UInit  -> Term.cast s Term.init
+    | UUndef -> assert false
 end
 
 open Utv
@@ -1240,14 +1265,20 @@ let query_lit (model : model) (ord, ut1, ut2 : Form.lit) : bool =
   | `Eq -> ut_equal u v
   | `Leq -> UtG.mem_edge model.tr_graph u v
   | `Neq ->
-    (* In that case, we are very unprecise, as we only check whether
-       the inequality already appeared, modulo known equalities. *)
-    List.exists (fun (a,b) ->
-        let na, nb = mgu model.inst.uf a |> snd,
-                     mgu model.inst.uf b |> snd in
-        ((u = na) && (v = nb))
-        || ((v = na) && (u = nb))
-      ) model.inst.neqs
+    if ut_equal ut1 uundef || ut_equal ut2 uundef then
+      (* when querying a happens, use the more precise [is_def] function *)
+      let ut = if ut_equal ut1 uundef then ut2 else ut1 in
+      is_def model.inst.uf model.inst.neqs ut
+
+    else
+      (* In that case, we are very unprecise, as we only check whether
+         the inequality already appeared, modulo known equalities. *)
+      List.exists (fun (a,b) ->
+          let na, nb = mgu model.inst.uf a |> snd,
+                       mgu model.inst.uf b |> snd in
+          ((u = na) && (v = nb))
+          || ((v = na) && (u = nb))
+        ) model.inst.neqs
 
 (* Note that we could not extend formulas easily to, e.g., negation, because
    we only under-approximate entailed equalities. *)
@@ -1319,7 +1350,7 @@ let maximal_elems ~precise (models : models) (elems : Term.timestamp list) =
 
 let get_ts_equalities ~precise (models : models) ts =
   Utils.classes (fun ts ts' -> 
-      query  ~precise models [`Pos, `Timestamp (`Eq,ts,ts')]
+      query ~precise models [`Pos, `Timestamp (`Eq,ts,ts')]
     ) ts
 
 let get_ind_equalities ~precise (models : models) inds =
@@ -1327,6 +1358,28 @@ let get_ind_equalities ~precise (models : models) inds =
       query  ~precise models [`Pos, `Index (`Eq,i,j)]
     ) inds
 
+
+let find_eq_action (models : models) (t : Term.timestamp) =
+  (** [action_model model t] returns an action equal to [t] in [model] *)
+  let action_model model = 
+    let model, ut = ext_support model (uts t) in
+    let uf = model.inst.uf in
+    let classe = get_class uf ut in
+    List.find_map (fun ut -> match ut.cnt with
+        | UName _ -> Some (ut_to_term Sorts.Timestamp ut)
+        | _ -> None
+      ) classe
+  in
+
+  (* compute an action equal to [t] in one model. *)
+  match List.find_map action_model models with
+  | None -> None
+  | Some term ->
+  (* check that [t] = [term] in all models. *)
+    if query ~precise:true models [`Pos, `Timestamp (`Eq,t,term)] 
+    then Some term 
+    else None
+    
 
 (*------------------------------------------------------------------*)
 (** Tests Suites *)

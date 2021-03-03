@@ -904,30 +904,44 @@ let () =
     depends Args.(Pair (Timestamp, Timestamp))
 
 (*------------------------------------------------------------------*)
-let expand_macro t s =
+let expand_macro ~canfail t (s : TraceSequent.sequent) =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   match t with
-    | Macro ((mn, sort, is),l,a) ->
-      if Macros.is_defined mn a table then
-        if not (TraceSequent.query_happens ~precise:true s a) 
-        then soft_failure (Tactics.MustHappen a)
-        else          
+    | Macro ((mn, sort, is),l,a0) ->
+      let a = 
+        if Macros.is_defined mn a0 table then Some a0
+        else
+          let models = Tactics.timeout_get (TraceSequent.get_models s) in
+          Constr.find_eq_action models a0
+      in
+
+      begin
+        match a with
+        | None when canfail ->
+          soft_failure (Tactics.Failure "macro at undetermined action") 
+        | None -> s
+        | Some a ->         
+          if canfail && not (TraceSequent.query_happens ~precise:true s a) then
+            soft_failure (Tactics.MustHappen a);
+
+          if canfail && not (Macros.is_defined mn a table) then 
+            soft_failure (Tactics.Failure "cannot expand this macro");
+
           let mdef = Macros.get_definition system table sort mn is a in
           let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
-          [TraceSequent.subst subst s]
+          TraceSequent.subst subst s
+      end
 
-      else soft_failure (Tactics.Failure "cannot expand this macro")
-
-    | _ ->
-      soft_failure (Tactics.Failure "can only expand macros")
+    | _ -> soft_failure (Tactics.Failure "can only expand macros")
+      
 
 let expand arg s = match arg with
   | Args.ETerm (Sorts.Boolean, f, loc) ->
-    expand_macro f s
+    [expand_macro ~canfail:true f s]
 
   | Args.ETerm (Sorts.Message, f, loc) ->
-    expand_macro f s
+    [expand_macro ~canfail:true f s]
 
   | Args.ETerm ((Sorts.Index | Sorts.Timestamp), _, loc) ->
     hard_failure
