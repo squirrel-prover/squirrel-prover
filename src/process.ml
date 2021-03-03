@@ -324,7 +324,7 @@ type p_env = {
 
 let parse_channel c =
   try Channel.of_string (L.unloc c) with
-  | Not_found -> proc_err (L.loc c) (UnknownChannel (L.unloc c))
+  | Symbols.Unbound_identifier _ -> proc_err (L.loc c) (UnknownChannel (L.unloc c))
 
 let parse_proc (system_name : System.system_name) init_table proc =
 
