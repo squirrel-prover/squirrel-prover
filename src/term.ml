@@ -176,58 +176,6 @@ let cast: type a b. a Sorts.sort -> b term -> a term =
      | Sorts.Timestamp, Sorts.Timestamp -> t
      | _ -> raise Uncastable
 
-(*------------------------------------------------------------------*)
-type eterm = ETerm : 'a term -> eterm
-
-(** [app func t] applies [func] to [t]. [func] must preserve types. *)
-let app : type a. (eterm -> eterm) -> a term -> a term = 
-  fun func x ->
-  let ETerm x0 = func (ETerm x) in
-  cast (sort x) x0
-  
-(** Does not recurse. 
-    Applies to arguments of index atoms (see atom_map). *)
-let rec tmap : type a. (eterm -> eterm) -> a term -> a term = 
-  fun func0 t -> 
-  let func : type c. c term -> c term = fun x -> app func0 x in
-
-  match t with
-  | True     -> t  
-  | False    -> t  
-  | Action _ -> t
-  | Name _   -> t
-  | Var _    -> t
-      
-  | Fun (f,terms)     -> Fun (f, List.map func terms)
-  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts) 
-  | Seq (vs, b)       -> Seq (vs, func b)      
-  | Pred ts           -> Pred (func ts)                 
-  | Diff (bl, br)     -> Diff (func bl, func br)      
-  | ITE (b, c, d)     -> ITE (func b, func c, func d)        
-  | Find (b, c, d, e) -> Find (b, func c, func d, func e)        
-  | ForAll (vs, b)    -> ForAll (vs, func b)      
-  | Exists (vs, b)    -> Exists (vs, func b)
-  | And (a,b)         -> And (func a, func b)
-  | Or (a,b)          -> Or (func a, func b)
-  | Impl (a,b)        -> Impl (func a, func b)      
-  | Not b             -> Not (func b)      
-  | Atom at           -> Atom (atom_map func0 at)
-
-and atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
-  match at with
-  | `Message   (o,t1,t2) -> `Message   (o, tmap func t1, tmap func t2)
-  | `Timestamp (o,t1,t2) -> `Timestamp (o, tmap func t1, tmap func t2)
-  | `Index     (o,t1,t2) ->     
-    let t1 = match tmap func (Var t1) with
-      | Var t1 -> t1
-      | _ -> assert false
-    and t2 = match tmap func (Var t2) with
-      | Var t2 -> t2
-      | _ -> assert false
-    in
-    `Index (o, t1, t2)
-
-  | `Happens t -> `Happens (tmap func t)
 
                 
 (*------------------------------------------------------------------*)
@@ -799,6 +747,60 @@ let subst_macros_ts table l ts t =
   in
   subst_term t
 
+(*------------------------------------------------------------------*)
+type eterm = ETerm : 'a term -> eterm
+
+(** [app func t] applies [func] to [t]. [func] must preserve types. *)
+let app : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func x ->
+  let ETerm x0 = func (ETerm x) in
+  cast (sort x) x0
+  
+let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
+  let func : type c. c term -> c term = fun x -> app func x in
+
+  match at with
+  | `Message   (o,t1,t2) -> `Message   (o, func t1, func t2)
+  | `Timestamp (o,t1,t2) -> `Timestamp (o, func t1, func t2)
+  | `Index     (o,t1,t2) ->     
+    let t1 = match func (Var t1) with
+      | Var t1 -> t1
+      | _ -> assert false
+    and t2 = match func (Var t2) with
+      | Var t2 -> t2
+      | _ -> assert false
+    in
+    `Index (o, t1, t2)
+
+  | `Happens t -> `Happens (func t)
+
+(** Does not recurse. 
+    Applies to arguments of index atoms (see atom_map). *)
+let tmap : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func0 t -> 
+  let func : type c. c term -> c term = fun x -> app func0 x in
+
+  match t with
+  | True     -> t  
+  | False    -> t  
+  | Action _ -> t
+  | Name _   -> t
+  | Var _    -> t
+      
+  | Fun (f,terms)     -> Fun (f, List.map func terms)
+  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts) 
+  | Seq (vs, b)       -> Seq (vs, func b)      
+  | Pred ts           -> Pred (func ts)                 
+  | Diff (bl, br)     -> Diff (func bl, func br)      
+  | ITE (b, c, d)     -> ITE (func b, func c, func d)        
+  | Find (b, c, d, e) -> Find (b, func c, func d, func e)        
+  | ForAll (vs, b)    -> ForAll (vs, func b)      
+  | Exists (vs, b)    -> Exists (vs, func b)
+  | And (a,b)         -> And (func a, func b)
+  | Or (a,b)          -> Or (func a, func b)
+  | Impl (a,b)        -> Impl (func a, func b)      
+  | Not b             -> Not (func b)      
+  | Atom at           -> Atom (atom_map func0 at)
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
@@ -817,7 +819,12 @@ module Match = struct
   (** A pattern is a term [t] and a subset of [t]'s free variables that must 
       be matched.  *)
   type 'a pat = { p_term : 'a term; p_vars : Sv.t }
-      
+
+  let pp_pat fmt p =
+    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ vars = @[%a@]}@]"
+      pp p.p_term 
+      (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.p_vars)
+
   (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
       returns a map instantiating the variables [p.p_vars] as substerms 
       of [t]. *)

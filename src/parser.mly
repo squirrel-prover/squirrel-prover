@@ -387,7 +387,11 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| f=sformula      { `Form f }   /* [f] can also be a hypothesis ident. */
+| f=sformula      { `Form f }  
+
+/* ad-hoc rule to allow hypothesis identifiers  */
+| id=lsymb        { `Form (L.mk_loc (L.loc id) (Theory.App (id,[]))) }  
+
 | SLASH id=lsymb  { `Expand id }
 
 rw_param:
@@ -396,7 +400,7 @@ rw_param:
                                                      rw_type = t; } }
 
 rw_params:
-| slist(rw_param, empty) { [] }
+| l=slist1(rw_param, empty) { l }
 
 rw_in:
 |             { None }
