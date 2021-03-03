@@ -1451,8 +1451,10 @@ let rewrite (t: rw_target) (rws : rw_erule list) s =
   [srw] 
 
 
-(** Parse rewrite tactic arguments. *)
-let p_rw_args (rw_args : Args.rw_arg list) s : rw_erule list =
+(** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
+    showing each rule validity. *)
+let p_rw_args (rw_args : Args.rw_arg list) s 
+  : (rw_erule * TraceSequent.sequent list) list =
   let to_rule ~loc f = 
     let vs, f = match Term.destr_forall f with
       | Some (vs, f) -> Vars.Sv.of_list vs, f
@@ -1468,31 +1470,40 @@ let p_rw_args (rw_args : Args.rw_arg list) s : rw_erule list =
     vs, e
   in
 
-  let p_rw_type (rw_type : Theory.formula) : Vars.Sv.t * Term.esubst = 
+  let p_rw_rule (rw_type : Theory.formula) 
+    : (Vars.Sv.t * Term.esubst) * TraceSequent.sequent list = 
     match Args.convert_as_lsymb [Args.Theory rw_type] with
     | Some str when Hyps.mem_name (L.unloc str) s ->
       let _,f = Hyps.by_name str s in
-      to_rule ~loc:None f
+
+      (* We are using an hypothesis, hence no new sub-goals *)
+      let premise = [] in
+
+      to_rule ~loc:None f, premise
 
     | _ -> 
       let conv_env = Theory.{ table = TraceSequent.table s;
                               cntxt = InGoal; } in      
       let subst = Theory.subst_of_env (TraceSequent.env s) in
       let f = Theory.convert conv_env subst rw_type Sorts.Boolean in
-      to_rule ~loc:(Some (L.loc rw_type))  f
+
+      (* create new sub-goal *)
+      let premise = [TraceSequent.set_conclusion f s] in
+
+      to_rule ~loc:(Some (L.loc rw_type)) f, premise
   in
 
-  let p_rw_arg (rw_arg : Args.rw_arg) : rw_erule = 
-    let vs, e = match rw_arg.rw_type with
+  let p_rw_arg (rw_arg : Args.rw_arg) : rw_erule * TraceSequent.sequent list = 
+    let vs, e, subgoals = match rw_arg.rw_type with
       | `Form f -> 
-        let vs, e = p_rw_type f in
+        let (vs, e), subgoals = p_rw_rule f in
         let e = match L.unloc rw_arg.rw_dir with
           | `LeftToRight -> e
           | `RightToLeft -> 
             let Term.ESubst (t1,t2) = e in
             Term.ESubst (t2,t1)
         in
-        vs, e
+        vs, e, subgoals
 
       | `Expand mid -> 
         if L.unloc rw_arg.rw_dir <> `LeftToRight then
@@ -1501,7 +1512,7 @@ let p_rw_args (rw_args : Args.rw_arg list) s : rw_erule list =
         
         hard_failure (Failure "expand not yet implemented");
     in
-    (rw_arg.rw_mult, vs, e)
+    (rw_arg.rw_mult, vs, e), subgoals
   in
 
   List.map p_rw_arg rw_args 
@@ -1515,8 +1526,10 @@ let rewrite_tac args s sk fk =
       | None -> `Goal 
     in
     let rw_args = p_rw_args rw_args s in
-
-    sk (rewrite target rw_args s) fk
+    let rw_rules, subgoals = List.split rw_args in
+    let subgoals = List.flatten subgoals in
+    
+    sk (subgoals @ rewrite target rw_rules s) fk
 
   | _ -> hard_failure (Tactics.Failure "improper arguments")
 

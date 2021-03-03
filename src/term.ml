@@ -760,9 +760,17 @@ let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
   let func : type c. c term -> c term = fun x -> app func x in
 
   match at with
-  | `Message   (o,t1,t2) -> `Message   (o, func t1, func t2)
-  | `Timestamp (o,t1,t2) -> `Timestamp (o, func t1, func t2)
-  | `Index     (o,t1,t2) ->     
+  | `Message (o,t1,t2) -> 
+    let t1 = func t1
+    and t2 = func t2 in
+    `Message (o, t1, t2)
+
+  | `Timestamp (o,t1,t2) ->
+    let t1 = func t1
+    and t2 = func t2 in
+    `Timestamp (o, t1, t2)
+      
+  | `Index (o,t1,t2) ->     
     let t1 = match func (Var t1) with
       | Var t1 -> t1
       | _ -> assert false
@@ -791,16 +799,44 @@ let tmap : type a. (eterm -> eterm) -> a term -> a term =
   | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts) 
   | Seq (vs, b)       -> Seq (vs, func b)      
   | Pred ts           -> Pred (func ts)                 
-  | Diff (bl, br)     -> Diff (func bl, func br)      
-  | ITE (b, c, d)     -> ITE (func b, func c, func d)        
-  | Find (b, c, d, e) -> Find (b, func c, func d, func e)        
+
+  | Diff (bl, br)     -> 
+    let bl = func bl in
+    let br = func br in
+    Diff (bl, br)      
+
+  | ITE (b, c, d) -> 
+    let b = func b 
+    and c = func c
+    and d = func d in
+    ITE (b, c, d)        
+
+  | Find (b, c, d, e) -> 
+    let c = func c 
+    and d = func d 
+    and e = func e in
+    Find (b, c, d, e)
+        
   | ForAll (vs, b)    -> ForAll (vs, func b)      
   | Exists (vs, b)    -> Exists (vs, func b)
-  | And (a,b)         -> And (func a, func b)
-  | Or (a,b)          -> Or (func a, func b)
-  | Impl (a,b)        -> Impl (func a, func b)      
-  | Not b             -> Not (func b)      
-  | Atom at           -> Atom (atom_map func0 at)
+
+  | And (a,b) -> 
+    let a = func a 
+    and b = func b in
+    And (a, b)
+
+  | Or (a,b) -> 
+    let a = func a 
+    and b = func b in
+    Or (a, b)
+
+  | Impl (a,b) -> 
+    let a = func a 
+    and b = func b in
+    Impl (a, b)
+
+  | Not b -> Not (func b)      
+  | Atom at -> Atom (atom_map func0 at)
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
@@ -831,6 +867,8 @@ module Match = struct
   let try_match : type a b. a term -> b pat -> mv option = 
     fun t p -> 
     let exception NoMatch in
+    dbg "try_match: %a with %a" pp t pp_pat p;
+
     
     (* Invariant: [mv] supports in included in [p.p_vars]. *)
     let rec tmatch : type a b. a term -> b term -> mv -> mv =
@@ -854,7 +892,7 @@ module Match = struct
           if not (Sorts.equal sort sort') then raise NoMatch;
 
           let mv = smatch (s,is) (s',is') mv in
-          tmatch_l terms terms' (tmatch ts ts' mv)
+          tmatch ts ts' (tmatch_l terms terms' mv)
 
         | Seq _, _ -> raise NoMatch
 
@@ -940,7 +978,7 @@ module Match = struct
     in
 
     try Some (tmatch t p.p_term Mv.empty) with
-    | NoMatch -> None
+    | NoMatch -> dbg "match failed"; None
 
 
   (** Occurrence matched *)
@@ -956,17 +994,24 @@ module Match = struct
     = fun t p func ->
       let found = ref None in
       let s_p = sort p.p_term in
+      
+      dbg "find_map: %a with %a" pp t pp_pat p;
 
       let rec find : type a. a term -> a term = fun t ->
-        if (!found) <> None then t (* we already found a match *)
+        dbg "find in: %a" pp t;
+
+        if (!found) <> None then (dbg "already found"; t) (* we already found a match *)
 
         (* no match yet, check if head matches *)
         else 
           match try_match t p with
           (* head does not match, recurse  *)
-          | None -> tmap (fun (ETerm t) -> ETerm (find t)) t
+          | None -> 
+            dbg "head no match";
+            tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
+            dbg "head match";
             found := Some ({ occ = cast s_p t; mv = mv; }); 
             let t' = func (cast s_p t) mv in
             cast (sort t) t'    (* cast needed *)
