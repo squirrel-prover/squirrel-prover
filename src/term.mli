@@ -208,12 +208,21 @@ module Match : sig
       of [t].   *)
   val try_match : 'a term -> 'b term -> mv option
 
-  (** [find_map t pat func] looks for an occurence [t'] of [pat] in [t],
+  (** Occurrence matched *)
+  type 'a match_occ = { occ : 'a term;
+                        mv  : mv; }
+
+  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It returns the term obtained from [t] by replacing a *single* occurence
-      of [t'] by [func t' θ]. *)
+      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
+  val find : 'a term -> 'b term -> 'b match_occ option
+
+  (** [find_map t pat func] behaves has [find], but also computes the term 
+      obtained from [t] by replacing a *single* occurence of [t'] by 
+      [func t' θ]. *)
   val find_map :
-    'a term -> 'b term -> ('b term -> mv -> 'b term) -> 'a term option
+    'a term -> 'b term -> ('b term -> mv -> 'b term) -> 
+    ('b match_occ * 'a term) option
 end
 
 (*------------------------------------------------------------------*)

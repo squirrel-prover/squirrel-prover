@@ -925,18 +925,22 @@ module Match = struct
     | NoMatch -> None
 
   
-  (** [find_map t pat func] looks for an occurence [t'] of [pat] in [t],
-      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It returns the term obtained from [t] by replacing a *single* occurence
-      of [t'] by [func t' θ]. *)
+  (** Occurrence matched *)
+  type 'a match_occ = { occ : 'a term;
+                        mv  : mv; }
+                        
+  (** [find_map t pat func] behaves has [find], but also computes the term 
+      obtained from [t] by replacing a *single* occurence of [t'] by 
+      [func t' θ]. *)
   let find_map :
-    type a b. a term -> b term -> (b term -> mv -> b term) -> a term option
+    type a b. a term -> b term -> (b term -> mv -> b term) -> 
+    (b match_occ * a term) option
     = fun t pat func ->
-      let found = ref false in
+      let found = ref None in
       let spat = sort pat in
 
       let rec find : type a. a term -> a term = fun t ->
-        if !found then t (* we already found a match *)
+        if (!found) <> None then t (* we already found a match *)
 
         (* no match yet, check if head matches *)
         else 
@@ -945,14 +949,22 @@ module Match = struct
           | None -> tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            found := true;      (* stop looking for a match *)
+            found := Some ({ occ = cast spat t; mv = mv; }); 
             let t' = func (cast spat t) mv in
             cast (sort t) t'    (* cast needed *)
       in
       
       let t = find t in
-      if !found then Some t else None
+      match !found with
+      | None -> None
+      | Some occ -> Some (occ,t)
 
+  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
+      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
+      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
+  let find : type a b. a term -> b term -> b match_occ option = 
+    fun t pat -> 
+    omap fst (find_map t pat (fun t' _ -> t'))
 end
 
 (*------------------------------------------------------------------*)

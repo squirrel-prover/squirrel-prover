@@ -1406,25 +1406,26 @@ type rw =  ([`Once | `Many | `Any ] * Term.esubst)
 
 (** [rewrite tgt rw_args] rewrites [rw_args] in [tgt]. *)
 let rewrite (t: rw_target) (rws : rw list) s =
-  let rec do1 (f : Term.formula) (rw : rw) = 
-    let mult, rw_rule = rw in
-    let Term.ESubst (r, l) = rw_rule in
+  let rec do1 : 
+    type a. Term.formula -> [`Once | `Many | `Any] -> a term -> a term -> 
+    Term.formula = fun f mult r l ->
 
-    (* [r_f] is a subterm of [f] such that [mv] unifies [r_f] and [r]. *)
-    let do_occ : type a. a term -> Term.Match.mv -> a term = 
-      fun r_f mv ->
-        let subst = Term.Match.to_subst mv in
-        Term.cast (Term.sort r_f) (Term.subst subst l)
+    (* Substitutes all instances of [occ.occ] by [l] (where free variables
+       are instantiated according to [occ.mv]. *)
+    let rw_inst (occ : a Term.Match.match_occ) =
+      let subst = Term.Match.to_subst occ.mv in
+      let l_f = Term.cast (Term.sort occ.occ) (Term.subst subst l) in
+      Term.subst [Term.ESubst (occ.occ, l_f)] f
     in
-
+    
     (* tries to find an occurence of [r] and rewrite it. *)
-    let f_r = Term.Match.find_map f r do_occ in
+    let occ = Term.Match.find f r in
 
-    match mult, f_r with
+    match mult, occ with
     | (`Once | `Many), None -> hard_failure (Failure "nothing to rewrite")
 
-    | (`Many | `Any), Some f_r -> do1 f_r (`Any, rw_rule)
-    | `Once,          Some f_r -> f_r
+    | (`Many | `Any), Some occ -> do1 (rw_inst occ) `Any r l
+    | `Once,          Some occ -> rw_inst occ
     | `Any,           None     -> f
   in
 
@@ -1432,15 +1433,17 @@ let rewrite (t: rw_target) (rws : rw list) s =
     | `Goal -> TraceSequent.conclusion s, s
     | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
   in
-  let f = List.fold_left do1 f rws in
+  let f = List.fold_left 
+      (fun f (mult, Term.ESubst (r,l)) -> 
+         do1 f mult r l
+      ) f rws in
   
   let srw = match t with
     | `Goal -> TraceSequent.set_conclusion f s
     | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
   in
 
-  [assert false; srw]           (* TODO: missing premises + matching should only assign free variables. *)
-  (* [srw] *)
+  [srw]           (* TODO: matching should only assign free variables. *)
 
 
 (** Parse rewrite tactic arguments. *)
