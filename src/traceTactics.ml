@@ -111,8 +111,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(* TODO: this should maybe not be a tactic, but only a rewriting rule ?
-   Not obvious, as this is a deep rewriting. *)
 let left_not_intro (Args.String hyp_name) s =
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
@@ -1033,8 +1031,6 @@ let () = T.register "constraints"
 
 (*------------------------------------------------------------------*)
 (** Length *)
-
-(* TODO: this should be an axiom in some library, not a rule *)
 
 let namelength Args.(Pair (Message n, Message m)) s =
   match n, m with
