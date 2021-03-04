@@ -396,6 +396,7 @@ module Hyps
   and add_form_aux
       ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.formula) =
     let recurse = not (H.is_hyp f s.hyps) && (Config.auto_intro ()) in
+    (* let recurse = not (H.is_hyp f s.hyps) in *)
 
     (* TODO: remove auto naming ? *)
     let id = match id with       

@@ -440,6 +440,9 @@ Proof.
   use Hc with i.
   right.
   expand pkSa, sidPa. 
+  assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
+          h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol;
+  1: auto.
   by collision.
 Qed.
 
