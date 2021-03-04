@@ -201,11 +201,10 @@ goal [none, auth] P_charac :
 Proof.
   intro Hap HcOk HcFail.
   depends Pok, Pfail => _.
-  expand cond@Pok;expand cond@Pfail; expand pkS1@Pok.
+  expand cond, pkS1.
   rewrite (fst(input@Pok) = pk(kS)) in HcOk; 1: auto.
   destruct HcOk as [_ HcOk].
   euf HcOk => Euf.
-  expand sidP@Pok.
   destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.  
   destruct H1 as [_|[x3 H1]].
 
@@ -228,7 +227,7 @@ goal [none, auth] S_charac :
 Proof.
   intro Hap HcOk HcFail.
   depends Sok, Sfail => _.
-  expand cond@Sok; expand cond@Sfail.
+  expand cond.
   euf HcOk => Euf.
 
   destruct Euf as [[_|H1] H2]; 1: by auto.
@@ -271,13 +270,13 @@ Proof.
    expand frame@Pfail.
 
    equivalent exec@Pfail, False.
-     expand exec@Pfail. 
+     expand exec. 
      split; 2: by auto => _.
      depends Pok, Pfail => _.
      executable pred(Pfail); 1,2: by auto.
      intro He; use He with Pok; 2: by auto.
    
-     expand exec@Pok.
+     expand exec.
      by use P_charac.
 
    fa 7; fa 8.
@@ -304,13 +303,13 @@ Proof.
    expand frame@Sfail.
 
    equivalent exec@Sfail, False.
-     expand exec@Sfail. 
+     expand exec. 
      split; 2: by auto => _.
      depends Sok, Sfail => _.
      executable pred(Sfail); 1,2: by auto.
      intro He; use He with Sok; 2: by auto.
    
-     expand exec@Sok.
+     expand exec.
      by use S_charac.
 
    fa 7; fa 8.

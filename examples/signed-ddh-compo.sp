@@ -137,8 +137,7 @@ goal [none, auth] S1_charac :
   happens(S1,S4) => cond@S1 => (cond@S4 => False) .
 Proof.
   intro Hap Hcond1 Hcond4.
-  expand cond@S1; expand cond@S4.
-  expand pkP@S1.
+  expand cond, pkP.
   rewrite (fst(input@S) = pk(kP)) in Hcond1.
   euf Hcond1.
 
@@ -151,7 +150,7 @@ goal [none, auth] P1_charac :
    happens(P1,P4) => cond@P1 => (cond@P4 => False).
 Proof.
   intro Hap Hcond1 Hcond4.
-  expand cond@P1; expand cond@P4.
+  expand cond.
   rewrite (pkS@P1 = pk(kS)) in *.
   euf Hcond1.
 

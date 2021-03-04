@@ -89,8 +89,7 @@ goal [none,secretP] P_charac (i:index):
  exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
 Proof.
   simpl.
-  expand cond@Pchall1(i).
-  expand pkS(i)@Pchall1(i).
+  expand cond, pkS(i)@Pchall1(i).
   rewrite (fst(fst(input@Pchall1(i))) = pk(skS)) in Meq.
   euf Meq.
   exists j.
@@ -101,13 +100,11 @@ goal [none, secretS] S_charac (r:index):
  exec@S1(r) => exists (s:index), snd(input@S(r)) = g^a(s).
 Proof.
   simpl.
-  expand exec@S1(r).
+  expand exec.
   executable pred(S1(r)).
   depends S(r), S1(r).
   use H1 with S(r).
-  expand exec@S(r).
-  expand cond@S(r).
-  expand cond@S1(r).
+  expand exec, cond.
   expand pkp(r)@S1(r).
   rewrite (fst(input@S(r)) = pk(skP)) in *.
   euf H0.
@@ -162,7 +159,7 @@ Proof.
 
 
     equivalent exec@pred(Schall3(j)) && cond@Schall3(j), False.
-    expand cond@Schall3(j).
+    expand cond.
     executable pred(Schall3(j)).
     depends S1(j), Schall3(j).
     use H2 with S1(j).
@@ -220,11 +217,11 @@ Proof.
 
 
     equivalent exec@pred(Pchall3(i)) && cond@Pchall3(i), False.
-    expand cond@Pchall3(i).
+    expand cond.
     executable pred(Pchall3(i)).
     depends Pchall1(i), Pchall3(i).
     use H2 with Pchall1(i).
-    expand exec@Pchall1(i).
+    expand exec.
     use P_charac with i.
     by use H1 with j.
 

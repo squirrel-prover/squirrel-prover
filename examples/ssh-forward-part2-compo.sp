@@ -343,8 +343,7 @@ goal [none, auth] P_charac :
 Proof.
   intro Hap He Hc.
   depends PDIS5, Pfail => Hap2.
-  expand exec@PDIS5.
-  expand cond@PDIS5; expand cond@Pfail.
+  expand exec, cond.
   rewrite (pkSa@PDIS5 = pk(kS)) in *; 1: auto.
   destruct He as [_ [_ Hchk]].
   euf Hchk => Euf. 
@@ -380,7 +379,7 @@ goal [none, auth] S_charac :
 Proof.
   intro Hap He Hc.
   depends Sok, Sfail => Hap2.
-  expand exec@Sok; expand cond@Sok; expand cond@Sfail.
+  expand exec, cond.
   destruct He as [_ Hchk].
 
   euf Hchk => Euf. 
@@ -407,8 +406,7 @@ Proof.
   
   depends SDIS, Sok => _.
   use H2 with P3(i) as H3; 2: by auto.
-  expand exec@P3(i).
-  expand cond@P3(i).
+  expand exec, cond.
   destruct H3 as [H3 [Mneq Meq0]]. 
   
   assert (x3(i)@P3(i) = dec(input@P3(i),k11)) as D1; 
@@ -425,8 +423,7 @@ Proof.
   assert PDIS5 <= Sok; 
   1: by case H4.
   use H2 with PDIS5; 2: by auto.
-  expand exec@PDIS5.
-  expand cond@PDIS5. 
+  expand exec, cond. 
   use Hc with i.
   right.
   by collision.

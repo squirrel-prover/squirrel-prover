@@ -87,9 +87,7 @@ goal wa_Reader1 (k:index):
 Proof.
   intro *.
   depends Reader(k), Reader1(k).
-  expand exec@Reader1(k).
-  expand cond@Reader1(k).
-  expand output@Reader(k).
+  expand exec, cond, output.
   split.
 
   project; use tags_neq.
@@ -104,7 +102,7 @@ Proof.
 
   (* Direction <= *)
   exists i,j.
-  expand output@Tag(i,j).
+  expand output.
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 Qed.
 
@@ -119,14 +117,13 @@ goal wa_Reader2 (k:index):
        input@Tag(i,j) = output@Reader(k))).
 Proof.
   intro *.
-  expand exec@Reader2(k).
-  expand cond@Reader2(k).
+  expand exec, cond.
   depends Reader(k),Reader2(k).
-  expand output@Reader(k).
+  expand output.
   split.
 
   (* Direction => is the obvious one *)
-  expand output@Tag(i,j). 
+  expand output. 
   notleft H0.
   use H0 with i,j; case H1.
   by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.

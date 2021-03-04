@@ -62,7 +62,7 @@ goal wa_R1 :
       snd(output@T(i,k)) = snd(input@R1(j)))).
 Proof.
   intro *.
-  expand cond@R1(j).
+  expand cond.
   split.
   use H. exists i,k.
   use H.

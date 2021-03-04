@@ -63,7 +63,7 @@ goal wa_R1 (j:index):
        input@T(i,k) = output@R(j))).
 Proof.
   intro *.
-  expand cond@R1(j).
+  expand cond.
   split.
 
   (* COND => WA *)
@@ -97,7 +97,7 @@ goal wa_R2 (j:index):
       input@T(i,k) = output@R(j)))).
 Proof.
   intro *.
-  expand cond@R2(j).
+  expand cond.
   split.
 
   (* WA => COND *)

@@ -27,7 +27,7 @@ goal auth (i:index, j:index):
 
 Proof.
  intro i j Hap Hcond.
- expand cond@R(j,i).
+ expand cond.
  euf Hcond.
  intro *; exists j1.
 Qed.
