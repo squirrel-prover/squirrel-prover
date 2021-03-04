@@ -9,16 +9,10 @@ type system_name = Symbols.system Symbols.t
 (*------------------------------------------------------------------*)
 type system_error = 
   | SE_ShapeError
-  | SE_UnknownSystem of string
-  | SE_SystemAlreadyDefined of string
 
 let pp_system_error fmt = function
   | SE_ShapeError -> 
     Fmt.pf fmt "cannot register a shape twice with distinct indices" 
-  | SE_UnknownSystem s -> 
-    Fmt.pf fmt "system [%s] unknown" s
-  | SE_SystemAlreadyDefined s -> 
-    Fmt.pf fmt "system [%s] already defined" s
 
 exception SystemError of system_error
 

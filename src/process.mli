@@ -83,7 +83,6 @@ val declare_system :
 (** {2 Error handling}*)
 
 type proc_error_i =
-  | SystemAlreadyDecl of string
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string

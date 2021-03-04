@@ -12,8 +12,6 @@ val pp_systems : Format.formatter -> Symbols.table -> unit
 
 type system_error = 
   | SE_ShapeError
-  | SE_UnknownSystem of string
-  | SE_SystemAlreadyDefined of string
 
 val pp_system_error : Format.formatter -> system_error -> unit
 

@@ -126,7 +126,6 @@ let is_out p = is_out_i (L.unloc p)
 
 (*------------------------------------------------------------------*)
 type proc_error_i =
-  | SystemAlreadyDecl  of string
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
@@ -135,8 +134,6 @@ type proc_error = L.t * proc_error_i
 
 let pp_proc_error_i fmt = function
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
-
-  | SystemAlreadyDecl s -> Fmt.pf fmt "a system named [%s] already exists" s
 
   | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
                                        defined with arity %i" s i j
