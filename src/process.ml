@@ -325,9 +325,12 @@ type p_env = {
 
 }
 
-let parse_channel c =
-  try Channel.of_string (L.unloc c) with
-  | Symbols.Unbound_identifier _ -> proc_err (L.loc c) (UnknownChannel (L.unloc c))
+let parse_channel c table : Channel.channel =
+  try Channel.of_string (L.unloc c) table with
+  | Symbols.Unbound_identifier _ -> 
+    proc_err (L.loc c) (UnknownChannel (L.unloc c))
+
+let parse_channel = Printexc.print parse_channel
 
 let parse_proc (system_name : System.system_name) init_table proc =
 
@@ -639,6 +642,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     | In (c,x,p) ->
       let ch = parse_channel c table in
+      Fmt.epr "a@.";
       let env,x' = make_fresh env Sorts.Message (L.unloc x) in
       let in_th =
         Theory.var_i dum (Vars.name x')
