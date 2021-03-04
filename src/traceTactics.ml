@@ -261,17 +261,20 @@ let message_case (m : Term.message) s : c_res list =
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
     | Term.Macro ((m,Sorts.Message,is),[],ts) as o
       when Macros.is_defined m ts (TraceSequent.table s) ->
-      begin match
-          Macros.get_definition
-            (TraceSequent.system s)
-            (TraceSequent.table s)
-            Sorts.Message
-            m is ts
-        with
-        | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
-        | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
-        | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
-      end
+      if not (TraceSequent.query_happens ~precise:true s ts) 
+      then soft_failure (Tactics.MustHappen ts)
+      else
+        begin match
+            Macros.get_definition
+              (TraceSequent.system s)
+              (TraceSequent.table s)
+              Sorts.Message
+              m is ts
+          with
+          | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
+          | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
+          | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
+        end
     | _ ->
       Tactics.(soft_failure (Failure "message is not a conditional"))
     | exception _ ->
