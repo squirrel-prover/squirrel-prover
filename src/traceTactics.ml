@@ -116,7 +116,7 @@ let left_not_intro (Args.String hyp_name) s =
   let s = Hyps.remove id s in
   match formula with
   | Not f ->
-    [Hyps.add Args.AnyName (Term.not_simpl f) s]
+    [Hyps.add (Args.Named (Ident.name id)) (Term.not_simpl f) s]
 
   | _ -> soft_failure (Tactics.Failure "cannot introduce negation")
 
