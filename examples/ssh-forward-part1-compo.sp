@@ -206,15 +206,15 @@ Proof.
   destruct HcOk as [_ HcOk].
   euf HcOk => Euf.
   destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.  
-  destruct H1 as [_|[x3 H1]].
-
+  expand sidP1; destruct H1 as [_|[x3 H1]].
+  
   collision => _; use HcFail with i.
   by auto.
 
   by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
   
   intro Heq. 
-  case Euf; collision => _;
+  expand sidP1; case Euf; expand sidS1; collision => _;
   use freshindex as [l _];
   use HcFail with l. 
   by auto. 
@@ -228,7 +228,7 @@ Proof.
   intro Hap HcOk HcFail.
   depends Sok, Sfail => _.
   expand cond.
-  euf HcOk => Euf.
+  expand sidS1; euf HcOk => Euf.
 
   destruct Euf as [[_|H1] H2]; 1: by auto.
   destruct H1 as [i x x1 [_|[x2 H1]]].
@@ -238,7 +238,7 @@ Proof.
 
   by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
 
-  intro _; case Euf; collision => _;
+  intro _; case Euf; expand sidP1; collision => _;
   use freshindex as [l _];
   use HcFail with l; 
   auto.

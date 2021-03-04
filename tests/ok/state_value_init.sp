@@ -32,5 +32,5 @@ Qed.
 goal updateAtInit:
   forall (i,j:index), kT(i,j)@init = n0(i,j).
 Proof.
-auto.
+ by intro *; expand kT.
 Qed.

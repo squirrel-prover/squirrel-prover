@@ -346,12 +346,14 @@ Proof.
   expand exec, cond.
   rewrite (pkSa@PDIS5 = pk(kS)) in *; 1: auto.
   destruct He as [_ [_ Hchk]].
+  expand sidPa.
   euf Hchk => Euf. 
 
   (* oracle case *)
   destruct Euf as [H1 [_|[i m m1 [_|[i1 H2]]]]]; 
   1: by auto.
-  by use hashlengthnotpair with <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+  by use hashlengthnotpair with 
+   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
 
   use signnottag with sidPa@P2, kP.
   use Hc with i1.
@@ -363,13 +365,13 @@ Proof.
   intro Heq. 
   use freshindex as [l _].
   use Hc with l.
-  by case Euf; collision => _.
+  by case Euf; expand sidSa; collision => _.
 
   intro Heq.
   use freshindex as [l _].
   use Hc with l.
   right.
-  by case Euf; collision => _.
+  by case Euf; expand sidS3; collision => _.
 Qed.
 
 
@@ -382,6 +384,7 @@ Proof.
   expand exec, cond.
   destruct He as [_ Hchk].
 
+  expand sidSa, x4.
   euf Hchk => Euf. 
 
 (* oracle clase *)
@@ -395,8 +398,13 @@ Proof.
   by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
 
 (* else, it comes from P2, and is not well tagged *)
+  
+ by use hashlengthnotpair with 
+  <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
+ intro *; case Euf; expand sidPaF. 
 
-  by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11>.
+ (*   (* TODO: check why in the previous subgoals, in the second subgoal we can show *) *)
+ (* assert happens(SDIS). auto. *)
 
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
@@ -404,8 +412,11 @@ Proof.
   intro Meq.
   executable pred(Sok); 1,2: by auto => H2.
   
-  depends SDIS, Sok => _.
-  use H2 with P3(i) as H3; 2: by auto.
+  depends SDIS, Sok => _.  
+  assert happens(SDIS); 1: auto.
+  assert happens(P3(i)); 1: case Euf; auto.
+  expand x3(i)@P3(i).
+  use H2 with P3(i) as H3; 2: case Euf; auto.
   expand exec, cond.
   destruct H3 as [H3 [Mneq Meq0]]. 
   
@@ -420,12 +431,15 @@ Proof.
 
 (* Honest case *)
   intro H4 Meq1.
+  assert happens(PDIS5); 1: case H4; auto.
+  expand x3(i)@P3(i), sidPa.
   assert PDIS5 <= Sok; 
-  1: by case H4.
+  1: by case H4; case Euf.
   use H2 with PDIS5; 2: by auto.
   expand exec, cond. 
   use Hc with i.
   right.
+  expand pkSa, sidPa. 
   by collision.
 Qed.
 
