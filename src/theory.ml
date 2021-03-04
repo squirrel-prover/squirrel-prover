@@ -291,9 +291,8 @@ let message_arity fdef = let open Symbols in match fdef with
   * In the latter case, the timestamp argument is not accounted for. *)
 let function_kind table (f : lsymb): kind list * kind =
   let open Symbols in
-  let loc, f = L.loc f, L.unloc f in
-  match def_of_string f table with
-  | Reserved -> assert false (* we should never encounter a situation where we
+  match def_of_lsymb f table with
+  | Reserved _ -> assert false (* we should never encounter a situation where we
                                 try to type a reserved symbol. *)
   | Exists d ->
     let ckind index_arity message_arity =
@@ -307,32 +306,26 @@ let function_kind table (f : lsymb): kind list * kind =
     | Macro (Global arity) -> ckind arity 0
     | Macro (Input|Output|Frame) -> [], Sorts.emessage
     | Macro (Cond|Exec) -> [], Sorts.eboolean
-    | _ -> conv_err loc (Untyped_symbol f)
+    | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
 let check_state table (s : lsymb) n =
-  match Symbols.def_of_string (L.unloc s) table with
+  match Symbols.def_of_lsymb s table with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
         
     | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
-    | exception (Symbols.Unbound_identifier _) ->
-      conv_err (L.loc s) (Undefined (L.unloc s))
 
 let check_name table (s : lsymb) n =
-  try
-    let arity = Symbols.Name.def_of_string (L.unloc s) table in
-    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  with Symbols.Unbound_identifier _ ->
-    conv_err (L.loc s) (Undefined (L.unloc s))
+    let arity = Symbols.Name.def_of_lsymb s table in
+    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
+    ()
 
 let check_action table (s : lsymb) n =
-  match Action.find_symbol (L.unloc s) table with
-  | (l, _) ->
-    let arity = List.length l in
-    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  | exception (Symbols.Unbound_identifier _) ->
-    conv_err (L.loc s) (Undefined (L.unloc s))
+  let l,_ = Action.find_symbol s table in
+  let arity = List.length l in
+  if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
+  ()
 
 
 (** Applications *)
@@ -409,8 +402,8 @@ let make_app_i table cntxt lsymb l =
   let ts_unexpected () =
     conv_err loc (Timestamp_unexpected (App (lsymb,l))) in
 
-  match Symbols.def_of_string (L.unloc lsymb) table with
-  | Symbols.Reserved -> assert false
+  match Symbols.def_of_lsymb lsymb table with
+  | Symbols.Reserved _ -> assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->
@@ -449,7 +442,7 @@ let make_app_i table cntxt lsymb l =
       conv_err loc (BadNamespace (s,
                                   oget(Symbols.get_namespace table s)))
     end
-  | exception Symbols.Unbound_identifier s ->
+  | exception Symbols.SymbError (loc, Symbols.Unbound_identifier s) ->
       (* By default we interpret s as a variable,
        * but this is only possible if it is not indexed.
        * If that is not the case, the user probably meant
@@ -457,7 +450,8 @@ let make_app_i table cntxt lsymb l =
        * we raise Unbound_identifier. We could also
        * raise Type_error because a variable is never of
        * a sort that can be applied to indices. *)
-      if l <> [] then conv_err loc (Undefined (L.unloc lsymb));
+      if l <> [] then 
+        raise (Symbols.SymbError (loc, Symbols.Unbound_identifier s));
       AVar lsymb
 
 let make_app loc table cntxt lsymb l =
@@ -513,25 +507,25 @@ let ty_error tm sort = Conv (L.loc tm,
 
 
 let get_fun table lsymb =
-  match Symbols.Function.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Function.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NFunction))
 
 let get_name table lsymb =
-  match Symbols.Name.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Name.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NName))
 
 let get_action table lsymb =
-  match Symbols.Action.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Action.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NAction))
 
 let get_macro table lsymb =
-  match Symbols.Macro.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Macro.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
@@ -785,7 +779,7 @@ and conv_app :
       begin match sort with
         | Sorts.Message ->
             let open Symbols in
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (symb, Function (i,_)) ->
                 let indices,messages =
                   List.init i (fun k -> conv_index env subst (List.nth l k)),
@@ -821,7 +815,7 @@ and conv_app :
       let open Symbols in
       begin match sort with
         | Sorts.Message ->
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                  (* I am not sure of the location to use in
                     check_arity_i below  *)
@@ -845,7 +839,7 @@ and conv_app :
               | Wrapped (_, System _)             -> raise ts_unexpected
             end
         | Sorts.Boolean ->
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Cond|Exec)) ->
                 (* I am not sure of the location to use in
                     check_arity_i below  *)
@@ -935,16 +929,16 @@ let declare_aenc table enc dec pk =
   let data = AssociatedFunctions [dec; pk] in
   fst (Function.declare_exact table enc ~data (0,AEnc))
 
-let declare_senc table enc dec =
+let declare_senc table (enc : lsymb) (dec : lsymb) =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string enc] in
+  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
   let table, dec = Function.declare_exact table dec ~data (0,SDec) in
   let data = AssociatedFunctions [dec] in
   fst (Function.declare_exact table enc ~data (0,SEnc))
 
-let declare_senc_joint_with_hash table enc dec (h : lsymb) =
+let declare_senc_joint_with_hash table (enc : lsymb) (dec : lsymb) (h : lsymb) =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string enc;
+  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
                                   get_fun table h] in
   let table, dec = Function.declare_exact table dec ~data (0,SDec) in
   let data = AssociatedFunctions [dec] in
@@ -1154,22 +1148,23 @@ let () =
   Checks.add_suite "Theory" [
     "Declarations", `Quick,
     begin fun () ->
-      ignore (declare_hash Symbols.builtins_table "h" : Symbols.table);
-      let table = declare_hash Symbols.builtins_table "h" in
+      ignore (declare_hash Symbols.builtins_table (mk "h") : Symbols.table);
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice"
-        (Symbols.Multiple_declarations "h")
-        (fun () -> ignore (declare_hash table "h" : Symbols.table)) ;
-      let table = declare_hash Symbols.builtins_table "h" in
+        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
+        (fun () -> ignore (declare_hash table (mk "h") : Symbols.table)) ;
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice"
-        (Symbols.Multiple_declarations "h")
-        (fun () -> ignore (declare_aenc table "h" "dec" "pk" : Symbols.table) )
+        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
+        (fun () -> ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk") 
+                           : Symbols.table) )
     end;
 
     "Term building", `Quick,
     begin fun () ->
-      let table = declare_hash Symbols.builtins_table "h" in
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       ignore (make_app L._dummy table NoTS (mk "x") []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
@@ -1183,8 +1178,10 @@ let () =
 
     "Type checking", `Quick,
     begin fun () ->
-      let table = declare_aenc Symbols.builtins_table "e" "dec" "pk" in
-      let table = declare_hash table "h" in
+      let table = 
+        declare_aenc Symbols.builtins_table (mk "e") (mk "dec") (mk "pk") 
+      in
+      let table = declare_hash table (mk "h") in
       let x = mk (App (mk "x", [])) in
       let y = mk (App (mk "y", [])) in
       let env = ["x",Sorts.emessage;"y",Sorts.emessage] in

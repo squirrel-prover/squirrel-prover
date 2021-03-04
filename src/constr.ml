@@ -1,21 +1,23 @@
-open Graph
+(** - Huet's unification algorithm using union-find.
+     See "Unification: A Multidisciplinary Survey" by Kevin Knight.
+    
+    - Note that there is difficulty in the handling of names, which is not
+    standard. Basically, they should behave as function symbols that dont have
+    to be unified, except with other names.
+    
+    - Also, note that during the unification and graph-based inequality
+    constraints solving, the union-find structure contains an
+    *under-approximation* of equality equivalence classes. *)
 
+open Graph
 open Utils
 
-(* - Huet's unification algorithm using union-find.
-   See "Unification: A Multidisciplinary Survey" by Kevin Knight.
+module L = Location
 
-   - Note that there is difficulty in the handling of names, which is not
-   standard. Basically, they should behave as function symbols that dont have
-   to be unified, except with other names.
-
-   - Also, note that during the unification and graph-based inequality
-   constraints solving, the union-find structure contains an
-   *under-approximation* of equality equivalence classes. *)
-
+(*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
-
+(*------------------------------------------------------------------*)
 type trace_literal = [`Pos | `Neg] * Term.trace_atom
 
 let pp_trace_literal fmt (pn,at) =
@@ -1397,7 +1399,7 @@ and i' = Vars.make_fresh_and_update env Index "i"
 
 let table = Symbols.builtins_table
               
-let table, a = Symbols.Action.declare table "a" 1
+let table, a = Symbols.Action.declare table (L.mk_loc L._dummy "a") 1
 
 let pb_eq1 = (`Timestamp (`Eq,tau, Pred tau'))
              :: (`Timestamp (`Eq,tau', Pred tau''))

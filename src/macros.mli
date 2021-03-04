@@ -6,7 +6,7 @@
   * A fresh name is generated for the macro if needed. *)
 val declare_global :
   Symbols.table ->
-  string ->
+  Symbols.lsymb ->
   inputs:Vars.message list ->
   indices:Vars.index list ->
   ts:Vars.timestamp ->

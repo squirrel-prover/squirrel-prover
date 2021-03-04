@@ -6,19 +6,19 @@ type lsymb = Theory.lsymb
 (** {2 Declarations } *)
 
 (** Information for a macro declaration *)
-type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
+type macro_decl = lsymb * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
 
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
 (** Information for an abstract declaration *)
-type abstract_decl = { name          : string;
+type abstract_decl = { name          : lsymb;
                        index_arity   : int;
                        message_arity : int; }
 
 val pp_abstract_decl : Format.formatter -> abstract_decl -> unit
 
 (** Information for a goal or axiom declaration *)
-type goal_decl = { gname   : string option;
+type goal_decl = { gname   : lsymb option;
                    gsystem : SystemExpr.p_system_expr;
                    gform   : Theory.formula; }
 
@@ -41,17 +41,17 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
 (** Declarations *)
 type declaration_i =
-  | Decl_channel of string
+  | Decl_channel of lsymb
   | Decl_process of lsymb * (lsymb * Sorts.esort) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
-  | Decl_hash             of int option * string * orcl_tag_info option
-  | Decl_aenc             of string * string * string
-  | Decl_senc             of string * string
-  | Decl_senc_w_join_hash of string * string * lsymb
-  | Decl_sign             of string * string * string * orcl_tag_info option
-  | Decl_name             of string * int
+  | Decl_hash             of int option * lsymb * orcl_tag_info option
+  | Decl_aenc             of lsymb * lsymb * lsymb
+  | Decl_senc             of lsymb * lsymb
+  | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
+  | Decl_sign             of lsymb * lsymb * lsymb * orcl_tag_info option
+  | Decl_name             of lsymb * int
   | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl

@@ -11,14 +11,12 @@ type t = channel
 
 val pp_channel : Format.formatter -> channel -> unit
 
-(** [of_string s] retrieves the channel previously declared
-  * under the name [s].
-  * @raise Not_found if the channel is not declared. *)
-val of_string : string -> Symbols.table -> channel
+(** [of_lsymb s] retrieves the channel previously declared
+  * under the name [s]. *)
+val of_lsymb : Symbols.lsymb -> Symbols.table -> channel
 
-(** [declare s] declares a channel named [s].
-  * @raise Theory.Multiple_declaration if the channel is already declared. *)
-val declare : Symbols.table -> string -> Symbols.table
+(** [declare s] declares a channel named [s]. *)
+val declare : Symbols.table -> Symbols.lsymb -> Symbols.table
 
 (** Type of a parsed channel name *)
  type p_channel = string Location.located

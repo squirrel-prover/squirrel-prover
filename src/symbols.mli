@@ -2,6 +2,10 @@
   * separated into namespaces, and where each symbol is attached to a
   * definition whose type depends on the namespace. *)
 
+type lsymb = string Location.located
+
+
+(*------------------------------------------------------------------*)
 (** ['a t] is the type of symbols of namespace ['a]. *)
 type 'a t
 
@@ -28,6 +32,20 @@ type fname
 type macro
 type system
 type process
+
+(*------------------------------------------------------------------*)
+type namespace =
+  | NChannel
+  | NName
+  | NAction
+  | NFunction
+  | NMacro
+  | NSystem
+  | NProcess
+
+val pp_namespace : Format.formatter -> namespace -> unit
+
+val get_namespace : ?group:group -> table -> string -> namespace option
 
 (** {2 Symbol definitions}
   *
@@ -74,21 +92,7 @@ type _ def =
 
 type edef =
   | Exists : 'a def -> edef
-  | Reserved
-
-(*------------------------------------------------------------------*)
-type namespace =
-  | NChannel
-  | NName
-  | NAction
-  | NFunction
-  | NMacro
-  | NSystem
-  | NProcess
-
-val pp_namespace : Format.formatter -> namespace -> unit
-
-val get_namespace : ?group:group -> table -> string -> namespace option
+  | Reserved of namespace
 
 (*------------------------------------------------------------------*)
 (** {2 Data}
@@ -105,32 +109,28 @@ type data += AssociatedFunctions of (fname t) list
 
 (** {2 Basic namespace-independent operations} *)
 
-exception Unbound_identifier of string
-exception Incorrect_namespace
-exception Multiple_declarations of string
-
 (** Converts a symbol to a string, for printing purposes. *)
 val to_string : 'a t -> string
 
 (** Pretty-print a symbol. *)
 val pp : Format.formatter -> 'a t -> unit
 
-(** [def_of_string s] returns the definition of the symbol named [s].
+(** [def_of_lsymb s] returns the definition of the symbol named [s].
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val def_of_string : ?group:group -> string -> table -> edef
+val def_of_lsymb : ?group:group -> lsymb -> table -> edef
 
 val is_defined : ?group:group -> string -> table -> bool
 
 type wrapped = Wrapped : 'a t * 'a def -> wrapped
 
-(** [of_string s] returns the symbol associated to [s]
+(** [of_lsymb s] returns the symbol associated to [s]
   * together with its defining data.
   * @raise Unbound_identifier if no such symbol has been defined. *)
-val of_string : ?group:group -> string -> table -> wrapped
+val of_lsymb : ?group:group -> lsymb -> table -> wrapped
 
-(** [of_string_opt s] is the same as [of_string_opt s], but return [None]
+(** [of_lsymb_opt s] is the same as [of_lsymb_opt s], but return [None]
     if [s] is not defined. *)
-val of_string_opt : ?group:group -> string -> table -> wrapped option
+val of_lsymb_opt : ?group:group -> lsymb -> table -> wrapped option
 
 (** {2 Namespaces} *)
 
@@ -144,10 +144,10 @@ module type Namespace = sig
   type def
 
   (** Reserve a fresh symbol name, resembling the given string. *)
-  val reserve : table -> string -> table * ns t
+  val reserve : table -> lsymb -> table * ns t
 
   (** Reserve a fresh symbol name. *)
-  val reserve_exact : table -> string -> table * ns t
+  val reserve_exact : table -> lsymb -> table * ns t
 
   (** Define a symbol name that has been previously reserved
     * using [fresh]. *)
@@ -159,20 +159,20 @@ module type Namespace = sig
   (** Declare a new symbol, with a name resembling the given string,
     * defined by the given value. *)
   val declare :
-    table -> string -> ?data:data -> def -> table * ns t
+    table -> lsymb -> ?data:data -> def -> table * ns t
 
   (** Like declare, but use the exact string as symbol name.
     * @raise Multiple_declarations if the name is not available. *)
   val declare_exact :
-    table -> string -> ?data:data -> def -> table * ns t
+    table -> lsymb -> ?data:data -> def -> table * ns t
 
-  (** [of_string s] returns [s] as a symbol, if it exists in this namespace.
+  (** [of_lsymb s] returns [s] as a symbol, if it exists in this namespace.
     * @raise Unbound_identifier otherwise. *)
-  val of_string : string -> table -> ns t
+  val of_lsymb : lsymb -> table -> ns t
 
-  (** [of_string s] returns [Some s] as a symbol, if it exists in this
+  (** [of_lsymb s] returns [Some s] as a symbol, if it exists in this
       namespace, and None otherwise. *)
-  val of_string_opt : string -> table -> ns t option
+  val of_lsymb_opt : lsymb -> table -> ns t option
 
   (** [cast_of_string s] always returns [s] as a symbol. *)
   val cast_of_string : string -> ns t
@@ -183,14 +183,14 @@ module type Namespace = sig
   (** Get definition associated to some symbol. *)
   val get_def : ns t -> table -> def
 
-  (** [def_of_string s] is equivalent to [get_def (of_string s)]. *)
-  val def_of_string : string -> table -> def
+  (** [def_of_lsymb s] is equivalent to [get_def (of_lsymb s)]. *)
+  val def_of_lsymb : lsymb -> table -> def
 
   (** Get data associated to some symbol. *)
   val get_data : ns t -> table -> data
 
-  (** [data_of_string s] is equivalent to [get_data (of_string s)]. *)
-  val data_of_string : string -> table -> data
+  (** [data_of_lsymb s] is equivalent to [get_data (of_lsymb s)]. *)
+  val data_of_lsymb : lsymb -> table -> data
 
   (** Iterate on the defined symbols of this namespace. *)
   val iter : (ns t -> def -> data -> unit) -> table -> unit
@@ -209,6 +209,22 @@ module Function : Namespace
 module Macro    : Namespace with type def = macro_def with type ns = macro
 
 (*------------------------------------------------------------------*)
+(** {2 Error Handling} *)
+
+type symb_err_i = 
+  | Unbound_identifier    of string
+  | Incorrect_namespace   of namespace * namespace (* expected, got *)
+  | Multiple_declarations of string
+
+type symb_err = Location.t * symb_err_i
+
+val pp_symb_error :
+  (Format.formatter -> Location.t -> unit) ->
+  Format.formatter -> symb_err -> unit
+
+exception SymbError of symb_err
+
+(*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 
 val builtins_table : table
@@ -225,7 +241,7 @@ val frame : macro t
 
 (** {3 Channel builtins} *)
 
-val dummy_channel_string : string
+val dummy_channel_lsymb : lsymb
 val dummy_channel : channel t
 
 (** {3 Function symbols builtins} *)

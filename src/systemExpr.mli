@@ -96,9 +96,9 @@ type esubst_descr =
 
 type subst_descr = esubst_descr list
 
-val clone_system_subst : 
-  Symbols.table -> system_expr -> string -> subst_descr -> 
-  Symbols.table * Symbols.system Symbols.t
+(* val clone_system_subst : 
+ *   Symbols.table -> system_expr -> string -> subst_descr -> 
+ *   Symbols.table * Symbols.system Symbols.t *)
 
 
 (*------------------------------------------------------------------*)
@@ -111,15 +111,17 @@ val pp_descrs : Symbols.table -> Format.formatter -> system_expr -> unit
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
 
-val default_system_name : string
+type lsymb = Symbols.lsymb
+
+val default_system_name : lsymb
 
 type p_single_system =
-  | P_Left  of string
-  | P_Right of string
+  | P_Left  of lsymb
+  | P_Right of lsymb
 
 type p_system_expr =
   | P_Single     of p_single_system
-  | P_SimplePair of string
+  | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
 val parse_single : Symbols.table -> p_single_system -> single_system

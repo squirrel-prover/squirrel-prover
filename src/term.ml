@@ -1239,7 +1239,8 @@ let () =
       let c = mkvar "c" Sorts.Message in
       let def = Symbols.Abstract 2 in
       let table,f =
-        Symbols.Function.declare_exact Symbols.builtins_table "f" (0,def) in
+        Symbols.Function.declare_exact 
+          Symbols.builtins_table (L.mk_loc L._dummy "f") (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term PLeft t in

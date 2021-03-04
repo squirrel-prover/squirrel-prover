@@ -344,8 +344,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try run ~test "tests/alcotest/axiom3.sp" with
-           | Prover.Decl_error (_, KDecl, 
-                                SystemError (System.SE_UnknownSystem "test")) ->
+           | Symbols.SymbError (_, Symbols.Unbound_identifier "test") ->
              raise Ok)
     end ;
     "Substitution no capture", `Quick, begin fun () ->

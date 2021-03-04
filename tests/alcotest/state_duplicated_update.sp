@@ -12,6 +12,6 @@ system
   s := s;
   out(c,s).
 
-goal forall (a:index), s@A(a) = <s@pred(A(a)),input@A(a)>.
+goal _ (a:index) : s@A(a) = <s@pred(A(a)),input@A(a)>.
 Proof.
 Qed.

@@ -1921,7 +1921,9 @@ let prf TacticsArgs.(Int i) s =
           let phi_right =
             mk_prf_phi_proj PRight system table env biframe e hash in
 
-          let table,n = Symbols.Name.declare table "n_PRF" 0 in
+          let table,n = 
+            Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") 0 
+          in
           let s = EquivSequent.set_table s table in
 
           let oracle_formula =
@@ -2495,10 +2497,9 @@ end
    true. *)
 let is_ddh_context system table a b c elem_list =
   (* TODO: location *)
-  let a,b,c = L.unloc a, L.unloc b, L.unloc c in
-  let a,b,c = Symbols.Name.of_string a table,
-              Symbols.Name.of_string b table,
-              Symbols.Name.of_string c table in
+  let a,b,c = Symbols.Name.of_lsymb a table,
+              Symbols.Name.of_lsymb b table,
+              Symbols.Name.of_lsymb c table in
   let iter = new ddh_context ~system table false a b c in
   let iterfm = new find_macros ~system table false in
   let exists_macro =

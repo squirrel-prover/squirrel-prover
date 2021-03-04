@@ -314,30 +314,32 @@ index_arity:
 | LPAREN i=INT RPAREN            { i }
 
 declaration_i:
-| HASH e=ID a=index_arity { Decl.Decl_hash (Some a, e, None) }
-| HASH e=ID WITH ORACLE f=formula
+| HASH e=lsymb a=index_arity
+                          { Decl.Decl_hash (Some a, e, None) }
+| HASH e=lsymb WITH ORACLE f=formula
                           { Decl.Decl_hash (None, e, Some f) }
-| AENC e=ID COMMA d=ID COMMA p=ID
+| AENC e=lsymb COMMA d=lsymb COMMA p=lsymb
                           { Decl.Decl_aenc (e, d, p) }
-| SENC e=ID COMMA d=ID    { Decl.Decl_senc (e, d) }
-| SENC e=ID COMMA d=ID WITH h=lsymb
+| SENC e=lsymb COMMA d=lsymb
+                          { Decl.Decl_senc (e, d) }
+| SENC e=lsymb COMMA d=lsymb WITH h=lsymb
                           { Decl.Decl_senc_w_join_hash (e, d, h) }
-| SIGNATURE s=ID COMMA c=ID COMMA p=ID
+| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
                           { Decl.Decl_sign (s, c, p, None) }
-| SIGNATURE s=ID COMMA c=ID COMMA p=ID
+| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
   WITH ORACLE f=formula   { Decl.Decl_sign (s, c, p, Some f) }
-| NAME e=ID COLON t=name_type
+| NAME e=lsymb COLON t=name_type
                           { Decl.Decl_name (e, t) }
-| ABSTRACT e=ID COLON t=abs_type
+| ABSTRACT e=lsymb COLON t=abs_type
                           { let index_arity,message_arity = t in
                             Decl.(Decl_abstract
                                     { name = e;
                                       index_arity=index_arity;
                                       message_arity=message_arity;}) }
-| MUTABLE e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+| MUTABLE e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }
-| CHANNEL e=ID            { Decl.Decl_channel e }
-| TERM e=ID args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+| CHANNEL e=lsymb         { Decl.Decl_channel e }
+| TERM e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
@@ -345,7 +347,7 @@ declaration_i:
                           { Decl.(Decl_axiom { gname = None;
                                                gsystem = s;
                                                gform = f; }) }
-| AXIOM s=bsystem i=ID COLON f=formula
+| AXIOM s=bsystem i=lsymb COLON f=formula
                           { Decl.(Decl_axiom { gname = Some i;
                                                gsystem = s;
                                                gform = f; }) }
@@ -589,22 +591,22 @@ system:
 |                         { SystemExpr.(P_SimplePair default_system_name) }
 | LBRACKET LEFT RBRACKET  { SystemExpr.(P_Single (P_Left default_system_name)) }
 | LBRACKET RIGHT RBRACKET { SystemExpr.(P_Single (P_Right default_system_name)) }
-| LBRACKET NONE  COMMA i=ID RBRACKET { SystemExpr.(P_SimplePair i) }
-| LBRACKET LEFT  COMMA i=ID RBRACKET { SystemExpr.(P_Single (P_Left i)) }
-| LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Single (P_Right i)) }
+| LBRACKET NONE  COMMA i=lsymb RBRACKET { SystemExpr.(P_SimplePair i) }
+| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Left i)) }
+| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Right i)) }
 
 bsystem:
-|                         { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET i=ID RBRACKET  { SystemExpr.(P_SimplePair i) }
+|                            { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET i=lsymb RBRACKET  { SystemExpr.(P_SimplePair i) }
 
 single_system:
 | LBRACKET LEFT RBRACKET  { SystemExpr.(P_Left default_system_name)}
 | LBRACKET RIGHT RBRACKET { SystemExpr.(P_Right default_system_name)}
-| LBRACKET LEFT COMMA i=ID RBRACKET  { SystemExpr.(P_Left i) }
-| LBRACKET RIGHT COMMA i=ID RBRACKET { SystemExpr.(P_Right i)}
+| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Left i) }
+| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Right i)}
 
 gname:
-| i=ID       { P_named i }
+| i=lsymb    { P_named i }
 | UNDERSCORE { P_unknown }
 
 goal_i:

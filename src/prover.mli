@@ -34,7 +34,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 (*------------------------------------------------------------------*)
 (** {2 Type of parsed new goal } *)
 
-type p_goal_name = P_unknown | P_named of string
+type p_goal_name = P_unknown | P_named of lsymb
 
 
 type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
@@ -42,7 +42,7 @@ type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list
 type p_equiv_form = 
   | PEquiv of p_equiv
   | PReach of Theory.formula
-  | PImpl of p_equiv_form * p_equiv_form
+  | PImpl  of p_equiv_form * p_equiv_form
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
@@ -234,7 +234,6 @@ val start_proof : unit -> string option
 (** {2 Error handling} *)
 
 type decl_error_i =
-  | Multiple_declarations of string
   | BadEquivForm 
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err

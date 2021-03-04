@@ -13,7 +13,6 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
 type decl_error_i =
-  | Multiple_declarations of string
   | BadEquivForm 
 
   (* TODO: remove these errors, catch directly at top-level *)
@@ -25,10 +24,6 @@ type dkind = KDecl | KGoal
 type decl_error =  L.t * dkind * decl_error_i
 
 let pp_decl_error_i fmt = function
-  | Multiple_declarations s ->
-    Fmt.pf fmt
-      "@[Multiple declarations of the symbol: %s.@]@." s
-
   | BadEquivForm ->
     Fmt.pf fmt "equivalence goal ill-formed"
 
@@ -53,7 +48,6 @@ let decl_error loc k e = raise (Decl_error (loc,k,e))
 let error_handler loc k f a =
   let decl_error = decl_error loc k in
   try f a with
-  | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
   | System.SystemError e -> decl_error (SystemError e)
   | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
 
@@ -78,10 +72,10 @@ end
 
 type named_goal = string * Goal.t
 
-let goals : named_goal list ref = ref []
+let goals : named_goal list          ref = ref []
 let current_goal : named_goal option ref = ref None
-let subgoals : Goal.t list ref = ref []
-let goals_proved = ref []
+let subgoals : Goal.t list           ref = ref []
+let goals_proved : named_goal list   ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
@@ -89,7 +83,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 (*------------------------------------------------------------------*)
 (** {2 Parsed goals }*)
 
-type p_goal_name = P_unknown | P_named of string
+type p_goal_name = P_unknown | P_named of lsymb
 
 type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
 
@@ -755,7 +749,8 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
+let unnamed_goal () = 
+  L.mk_loc L._dummy ("unnamedgoal"^(string_of_int (List.length (!goals_proved))))
 
 let declare_new_goal_i table (gname,g) =
   let gname = match gname with
@@ -764,7 +759,7 @@ let declare_new_goal_i table (gname,g) =
   let g = match g with
     | P_equiv_goal (env,f) ->
       let system_symb =
-        System.of_string SystemExpr.default_system_name table
+        System.of_lsymb SystemExpr.default_system_name table
       in
       let env = List.map (fun (x,y) -> L.unloc x, y) env in
       make_equiv_goal ~table system_symb env f
@@ -778,23 +773,24 @@ let declare_new_goal_i table (gname,g) =
       make_trace_goal ~system:s ~table f
   in
 
-  if List.exists (fun (name,_) -> name = gname) !goals_proved then
+  if List.exists (fun (name,_) -> name = L.unloc gname) !goals_proved then
     raise @@ ParseError "A formula or goal with this name alread exists"
   else
-    goals :=  (gname,g) :: !goals;
+    goals :=  (L.unloc gname,g) :: !goals;
 
-  (gname,g)
+  (L.unloc gname,g)
 
 let declare_new_goal table loc n g =
   error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal (gname,j) =
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
+    (* TODO: location *)
     raise @@ ParseError "A formula with this name alread exists"
   else
     goals_proved := (gname,j) :: !goals_proved
 
-let define_oracle_tag_formula table h f =
+let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   let formula = Theory.convert conv_env [] f Sorts.Boolean in
     (match formula with
@@ -802,7 +798,7 @@ let define_oracle_tag_formula table h f =
        (
          match Vars.sort uvarm,Vars.sort uvarkey with
          | Sorts.(Message, Message) ->
-           add_option (Oracle_for_symbol h, Oracle_formula formula)
+           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
          | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
        )
@@ -894,12 +890,12 @@ let declare_i table decl = match L.unloc decl with
     in
     let se = SystemExpr.parse_se table gdecl.gsystem in
     let goal = make_trace_goal se table gdecl.gform in
-    add_proved_goal (name, goal);
+    add_proved_goal (L.unloc name, goal);
     table
 
   | Decl.Decl_system sdecl ->
     let name = match sdecl.sname with
-      | None -> L.mk_loc (L.loc decl) SystemExpr.default_system_name
+      | None -> SystemExpr.default_system_name
       | Some n -> n
     in
     Process.declare_system table name sdecl.sprocess

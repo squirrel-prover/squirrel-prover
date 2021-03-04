@@ -1,6 +1,9 @@
 open Utils
 open Term
 
+module L = Location
+
+(*------------------------------------------------------------------*)
 module Cst = struct
   type msym = Message of (Sorts.message Term.msymb)
             | Bool of (Sorts.boolean Term.msymb)
@@ -1115,14 +1118,15 @@ let mk_cst () = ccst (Cst.mk_flat ())
 let (++) a b = cfun Term.f_xor [a;b]
 
 let () =
+  let mk c = L.mk_loc Location._dummy c in
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
        let fi = 0, Symbols.Abstract 0 in
        let table,ffs =
-         Symbols.Function.declare_exact Symbols.builtins_table "f" fi in
+         Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =
-         Symbols.Function.declare_exact table "h" fi in
+         Symbols.Function.declare_exact table (mk "h") fi in
        let ffs,hfs = (ffs,[]), (hfs,[]) in
        let f a b = cfun ffs [a;b] in
        let h a b = cfun hfs [a;b] in

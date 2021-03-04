@@ -905,7 +905,7 @@ let () =
     depends Args.(Pair (Timestamp, Timestamp))
 
 (*------------------------------------------------------------------*)
-let expand_macro ~canfail t (s : TraceSequent.sequent) =
+let unfold_macro ~canfail t (s : TraceSequent.sequent) =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   match t with
@@ -916,12 +916,12 @@ let expand_macro ~canfail t (s : TraceSequent.sequent) =
           let models = Tactics.timeout_get (TraceSequent.get_models s) in
           Constr.find_eq_action models a0
       in
-
+      if a = None && canfail then
+        soft_failure (Tactics.Failure "macro at undetermined action");
+      
       begin
         match a with
-        | None when canfail ->
-          soft_failure (Tactics.Failure "macro at undetermined action") 
-        | None -> s
+        | None -> None
         | Some a ->         
           if canfail && not (TraceSequent.query_happens ~precise:true s a) then
             soft_failure (Tactics.MustHappen a);
@@ -930,30 +930,50 @@ let expand_macro ~canfail t (s : TraceSequent.sequent) =
             soft_failure (Tactics.Failure "cannot expand this macro");
 
           let mdef = Macros.get_definition system table sort mn is a in
-          let subst = [Term.ESubst (Macro ((mn, sort, is),l,a0), mdef)] in
-          TraceSequent.subst subst s
+          Some (Term.ESubst (Macro ((mn, sort, is),l,a0), mdef))
       end
 
-    | _ -> soft_failure (Tactics.Failure "can only expand macros")
-      
+    | _ -> 
+      if canfail then soft_failure (Tactics.Failure "can only expand macros");
+      None
 
-let expand arg s = match arg with
-  | Args.ETerm (Sorts.Boolean, f, loc) ->
-    [expand_macro ~canfail:true f s]
+let expand_macro t (s : TraceSequent.sequent) =
+  let subst = [oget (unfold_macro ~canfail:true t s)] in
+  TraceSequent.subst subst s
+     
 
-  | Args.ETerm (Sorts.Message, f, loc) ->
-    [expand_macro ~canfail:true f s]
+let expand args s = 
+  let tbl = TraceSequent.table s in
+  match Args.convert_as_lsymb args with
+  | Some m ->
+    assert false
 
-  | Args.ETerm ((Sorts.Index | Sorts.Timestamp), _, loc) ->
-    hard_failure
-      (Tactics.Failure "expected a message or boolean term")
+  | _ ->
+    let env = TraceSequent.env s in
+    match Args.convert_args tbl env args Args.(Sort ETerm) with
+    | Args.Arg (Args.ETerm (Sorts.Boolean, f, loc)) ->
+      expand_macro f s
+        
+    | Args.Arg (Args.ETerm (Sorts.Message, f, loc)) ->
+      expand_macro f s
+        
+    | _ ->
+      hard_failure (Tactics.Failure "expected a message or boolean term")
 
-let () = T.register_typed "expand"
-    ~general_help:"Expand all occurences of the given macro inside the goal."
-    ~detailed_help:"Can only be called over macros with fully defined timestamps."
-    ~tactic_group:Structural
-    ~usages_sorts:[Sort Args.Message; Sort Args.Boolean]
-    expand Args.ETerm
+let expand_tac args s sk fk =
+  try sk [expand args s] fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+
+
+let () = T.register_general "expand"
+    ~tactic_help:{
+      general_help  = "Expand all occurences of the given macro inside the \
+                       goal.";
+      detailed_help = "Can only be called over macros with fully defined \
+                       timestamps.";
+      tactic_group  = Structural;
+      usages_sorts  = [Sort Args.String; Sort Args.Message; Sort Args.Boolean]; }
+    expand_tac
 
 (*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else

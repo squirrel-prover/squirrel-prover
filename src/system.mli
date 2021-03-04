@@ -23,13 +23,12 @@ exception SystemError of system_error
 (*------------------------------------------------------------------*)
 (** {2 Access functions} *)
 
-val of_string : string -> Symbols.table -> system_name
+type lsymb = Symbols.lsymb
+
+val of_lsymb : lsymb -> Symbols.table -> system_name
 
 (** Declare a new system, without any associated actions. *)
-val declare_empty : Symbols.table -> string -> Symbols.table * system_name
-
-(** Specify if a given system name is not already in use. *)
-val is_fresh : string -> Symbols.table -> bool
+val declare_empty : Symbols.table -> lsymb -> Symbols.table * system_name
 
 (** @Raise Not_found if no action corresponds to the wanted shape. *)
 val descr_of_shape :

@@ -1,3 +1,8 @@
+module L = Location
+
+type lsymb = Symbols.lsymb
+
+(*------------------------------------------------------------------*)
 type single_system =
   | Left  of Symbols.system Symbols.t
   | Right of Symbols.system Symbols.t
@@ -271,15 +276,12 @@ exception SystemNotFresh
 
 (* Given an original system and a descr substitution, register the new simple
    system obtained from the susbtition. *)
-let clone_system_subst table original_system new_system substd =
-  let odescrs = descrs table original_system in
-  let symbs = symbs table original_system in
-  let ndescrs = System.Msh.map (subst substd) odescrs in
-  let data = System.System_data (ndescrs,symbs) in
-  try Symbols.System.declare_exact table new_system ~data () with
-  | Symbols.Multiple_declarations _ ->
-    raise (System.SystemError (System.SE_SystemAlreadyDefined new_system))
-
+(* let clone_system_subst table original_system new_system substd =
+ *   let odescrs = descrs table original_system in
+ *   let symbs = symbs table original_system in
+ *   let ndescrs = System.Msh.map (subst substd) odescrs in
+ *   let data = System.System_data (ndescrs,symbs) in
+ *   Symbols.System.declare_exact table new_system ~data ()  *)
 
 let pp_descrs table ppf system =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";
@@ -292,32 +294,32 @@ let pp_descrs table ppf system =
 (*------------------------------------------------------------------*)
 (** {2 Parser types } *)
 
-let default_system_name = "default"
+let default_system_name = L.mk_loc Location._dummy "default"
 
 type p_single_system =
-  | P_Left  of string
-  | P_Right of string
+  | P_Left  of lsymb
+  | P_Right of lsymb
 
 type p_system_expr =
   | P_Single     of p_single_system
-  | P_SimplePair of string
+  | P_SimplePair of lsymb
   | P_Pair       of p_single_system * p_single_system
 
 let pp_p_single fmt = function
-  | P_Left id  -> Fmt.pf fmt "%s/left"  id
-  | P_Right id -> Fmt.pf fmt "%s/right" id
+  | P_Left id  -> Fmt.pf fmt "%s/left"  (L.unloc id)
+  | P_Right id -> Fmt.pf fmt "%s/right" (L.unloc id)
 
 let pp_p_system fmt = function
   | P_Single s      -> Fmt.pf fmt "%a" pp_p_single s
-  | P_SimplePair id -> Fmt.pf fmt "%s/both" id
+  | P_SimplePair id -> Fmt.pf fmt "%s/both" (L.unloc id)
   | P_Pair (s1, s2) -> Fmt.pf fmt "%a|%a" pp_p_single s1 pp_p_single s2
 
 let parse_single table = function
-  | P_Left a  -> Left  (System.of_string a table)
-  | P_Right a -> Right (System.of_string a table)
+  | P_Left a  -> Left  (System.of_lsymb a table)
+  | P_Right a -> Right (System.of_lsymb a table)
 
 let parse_se table p_se = match p_se with
     | P_Single s       -> single table (parse_single table s)
-    | P_SimplePair str -> simple_pair table (System.of_string str table)
+    | P_SimplePair str -> simple_pair table (System.of_lsymb str table)
     | P_Pair (a,b)     -> 
       pair table (parse_single table a) (parse_single table b) 
