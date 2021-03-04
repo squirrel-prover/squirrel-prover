@@ -109,13 +109,9 @@ type formula = Sorts.boolean term
 
 type eterm = ETerm : 'a term -> eterm
 
-(** Does not recurse. 
-    Applies to arguments of index atoms. *)
+(** Does not recurse. *)
 val tmap  : (eterm -> eterm) -> 'a term -> 'a term 
 val titer : (eterm -> unit) -> 'a term -> unit
-
-(** Recurse. 
-    Applies to arguments of index atoms. *)
 val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
 
 (*------------------------------------------------------------------*)

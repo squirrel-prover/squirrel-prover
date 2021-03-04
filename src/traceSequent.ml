@@ -277,7 +277,7 @@ let constraints_valid s =
   | Timeout -> Timeout
 
 (*------------------------------------------------------------------*)
-let get_all_terms s =
+let get_all_messages s =
   let atoms = get_message_atoms s in
   let atoms =
     match s.conclusion with
@@ -285,6 +285,16 @@ let get_all_terms s =
       | _ -> atoms
   in
   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
+
+(* (\*------------------------------------------------------------------*\)
+ * let get_all_terms s =
+ *   let atoms = get_message_atoms s in
+ *   let atoms =
+ *     match s.conclusion with
+ *       | Term.Atom (`Message atom) -> atom :: atoms
+ *       | _ -> atoms
+ *   in
+ *   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms *)
 
 (*------------------------------------------------------------------*)  
 module Hyps 

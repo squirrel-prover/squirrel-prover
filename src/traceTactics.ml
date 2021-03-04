@@ -905,7 +905,7 @@ let () =
     depends Args.(Pair (Timestamp, Timestamp))
 
 (*------------------------------------------------------------------*)
-let unfold_macro ~canfail t (s : TraceSequent.sequent) =
+let unfold_macro t (s : TraceSequent.sequent) =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
   match t with
@@ -916,49 +916,64 @@ let unfold_macro ~canfail t (s : TraceSequent.sequent) =
           let models = Tactics.timeout_get (TraceSequent.get_models s) in
           Constr.find_eq_action models a0
       in
-      if a = None && canfail then
+
+      if a = None then
         soft_failure (Tactics.Failure "macro at undetermined action");
+
+      let a = oget a in
+
+      if not (TraceSequent.query_happens ~precise:true s a) then
+        soft_failure (Tactics.MustHappen a);
       
-      begin
-        match a with
-        | None -> None
-        | Some a ->         
-          if canfail && not (TraceSequent.query_happens ~precise:true s a) then
-            soft_failure (Tactics.MustHappen a);
-
-          if canfail && not (Macros.is_defined mn a table) then 
-            soft_failure (Tactics.Failure "cannot expand this macro");
-
-          let mdef = Macros.get_definition system table sort mn is a in
-          Some (Term.ESubst (Macro ((mn, sort, is),l,a0), mdef))
-      end
-
+      if not (Macros.is_defined mn a table) then 
+        soft_failure (Tactics.Failure "cannot expand this macro");
+      
+      let mdef = Macros.get_definition system table sort mn is a in
+      [Term.ESubst (Macro ((mn, sort, is),l,a0), mdef)]
+      
     | _ -> 
-      if canfail then soft_failure (Tactics.Failure "can only expand macros");
-      None
+      soft_failure (Tactics.Failure "can only expand macros")
+
+let unfold_macro ~canfail t s =
+  try unfold_macro t s with
+  | Tactics.Tactic_soft_failure _ when not canfail -> []
+
 
 let expand_macro t (s : TraceSequent.sequent) =
-  let subst = [oget (unfold_macro ~canfail:true t s)] in
+  let subst = unfold_macro ~canfail:true t s in
+  if subst = [] then hard_failure (Failure "nothing to expand");
+
   TraceSequent.subst subst s
      
 
-let find_occ_macro : type a. Symbols.macro Symbols.t -> a term -> Term.St.t =
-  fun m t -> 
-  let rec find st t = 
-    (* let st = match t with
-     *   | Macro (m', _, _) when m' = m -> Term.St.add t st
-     *   | _ -> st in
-     * Term.tmap (fun ETerm t -> ETerm *)
-    assert false
-    in
-    assert false
+let find_occs_macro
+  : type a. Symbols.macro Symbols.t -> ?st:Term.St.t -> a term -> Term.St.t =
+  fun m ?st t -> 
+  let rec find st (ETerm t) = 
+    let st = match t with
+      | Macro ((m',_,_), _, _) when m' = m -> Term.St.add (Term.ETerm t) st
+      | _ -> st in
+    Term.tfold (fun t st -> find st t) t st
+  in
+  find (Utils.odflt Term.St.empty st) (ETerm t)
       
 let expand args s = 
   let tbl = TraceSequent.table s in
   match Args.convert_as_lsymb args with
   | Some m ->
     let m = Symbols.Macro.of_lsymb m tbl in
-    assert false
+    let occs = 
+      Hyps.fold (fun _ f occs -> find_occs_macro m ~st:occs f) s St.empty 
+    in 
+    let occs = find_occs_macro m ~st:occs (TraceSequent.conclusion s) in
+    let subst = 
+      Term.St.fold (fun (ETerm t) subst -> 
+          unfold_macro ~canfail:false t s @ subst
+        ) occs [] in
+    
+    if subst = [] then hard_failure (Failure "nothing to expand");
+
+    TraceSequent.subst subst s
 
   | _ ->
     let env = TraceSequent.env s in
@@ -1111,7 +1126,7 @@ let () =
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
   let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
-  let terms = TraceSequent.get_all_terms s in
+  let terms = TraceSequent.get_all_messages s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
   let new_eqs = Completion.name_indep_cnstrs trs terms in
@@ -1125,7 +1140,7 @@ let eq_names (s : TraceSequent.t) =
      names. *)
   let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
   let cnstrs = Completion.name_index_cnstrs trs
-      (TraceSequent.get_all_terms s)
+      (TraceSequent.get_all_messages s)
   in
   let s =
     List.fold_left (fun s c ->
@@ -1173,7 +1188,7 @@ let eq_trace (s : TraceSequent.t) =
     (List.map (function [] -> [] | p::q -> asubst p q) ind_classes)
     |> List.flatten
   in
-  let terms = TraceSequent.get_all_terms s in
+  let terms = TraceSequent.get_all_messages s in
   let facts =
     List.fold_left
       (fun acc t ->
@@ -2442,7 +2457,7 @@ let collision_resistance (s : TraceSequent.t) =
               ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
               ~system ~table hash key
          | _ -> false)
-      (TraceSequent.get_all_terms s)
+      (TraceSequent.get_all_messages s)
   in
   let hashes = List.sort_uniq Stdlib.compare hashes in
   if List.length hashes = 0 then

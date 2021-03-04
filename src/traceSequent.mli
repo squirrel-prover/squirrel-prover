@@ -127,7 +127,7 @@ val maximal_elems :
     It removes trivial equalities (e.g x=x). *)
 val subst : Term.subst -> sequent -> sequent
 
-(** [get_all_terms s] returns all the term appearing at toplevel
-  * in message hypotheses of [s]. *)
-val get_all_terms : sequent -> Term.message list
+(** [get_all_terms s] returns all the messages appearing at toplevel
+  * in [s]. *)
+val get_all_messages : sequent -> Term.message list
 
