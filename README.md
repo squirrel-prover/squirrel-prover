@@ -43,6 +43,11 @@ Examples of developments in Squirrel can be found in:
 
 ## Quick guide
 
+For a first introduction to the syntax, we recommend to open with ProofGeneral
+the `examples/tutorial/tutorial.sp`, that provides a run through of the syntax
+with executables snippets. Then, browsing the `examples` folder should provide a
+wide variety of examples, starting e.g. with `basic-hash.sp`.
+
 Squirrel developments are conventionally written in `.sp` files. They start
 with a system description, followed by some lemmas corresponding to trace
 properties.
@@ -69,6 +74,9 @@ name <id> : index -> .. -> index -> message        (* indexed name *)
 mutable <id> : index -> .. -> index -> <msg_type>  (* indexed memory cell *)
 ```
 
+Declarations blocks are delimited with a `.`, which defines the next bunch of
+code that will be processed by Squirrel.
+
 #### Processes
 
 Processes are then declared as follows, using previously declared channels:
@@ -84,8 +92,7 @@ be able to refer to their copies.
 
 #### System
 
-Finally, the system under study is declared. Note the period (`.`) that
-terminates this statement:
+Finally, the system under study is declared:
 ```
 system <process>.
 ```
@@ -98,7 +105,7 @@ system [NAME] <process>.
 
 ### Axioms, lemmas and proofs
 
-Axioms can be declared in the prologue using the "axiom" keyword:
+Axioms can be declared using the "axiom" keyword:
 ```
 axiom NAME : <formula>.
 ```
@@ -132,6 +139,8 @@ obtain a list of all available tactics (for reachability or equivalence
 goals, depending on the context).
 
 ## Developper details
+
+We refer the reader to `CONTRIBUTING.md` for coding conventions.
 
 # Documentation
 
