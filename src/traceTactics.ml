@@ -930,7 +930,7 @@ let expand_macro ~canfail t (s : TraceSequent.sequent) =
             soft_failure (Tactics.Failure "cannot expand this macro");
 
           let mdef = Macros.get_definition system table sort mn is a in
-          let subst = [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)] in
+          let subst = [Term.ESubst (Macro ((mn, sort, is),l,a0), mdef)] in
           TraceSequent.subst subst s
       end
 
