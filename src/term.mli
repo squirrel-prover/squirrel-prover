@@ -109,6 +109,15 @@ type formula = Sorts.boolean term
 
 type eterm = ETerm : 'a term -> eterm
 
+(** Does not recurse. 
+    Applies to arguments of index atoms. *)
+val tmap  : (eterm -> eterm) -> 'a term -> 'a term 
+val titer : (eterm -> unit) -> 'a term -> unit
+
+(** Recurse. 
+    Applies to arguments of index atoms. *)
+val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
+
 (*------------------------------------------------------------------*)
 (** {2 Subset of all atoms} *)
 (** (the subsets are not disjoint). *)
@@ -315,6 +324,12 @@ val destr_impl : formula -> (formula * formula) option
 val destr_ands  : int -> formula -> formula list option
 val destr_ors   : int -> formula -> formula list option
 val destr_impls : int -> formula -> formula list option
+
+(*------------------------------------------------------------------*)
+(** {2 Sets and Maps } *)
+
+module St : Set.S with type elt = eterm
+module Mt : Map.S with type key = eterm
 
 (*------------------------------------------------------------------*)
 (** {2 Convert from bi-terms to terms}

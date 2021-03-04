@@ -838,6 +838,72 @@ let tmap : type a. (eterm -> eterm) -> a term -> a term =
   | Not b -> Not (func b)      
   | Atom at -> Atom (atom_map func0 at)
 
+let titer (f : eterm -> unit) (t : 'a term) : unit = 
+  let g e = f e; e in
+  ignore (tmap g t)
+
+let eterms : type a. a term list -> eterm list = fun l -> 
+  List.map (fun x -> ETerm x) l
+
+(** Recurse. 
+    Applies to arguments of index atoms (see atom_fold). *)
+let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b = 
+  fun f0 t v -> 
+  let f : type a. a term -> 'b -> 'b = fun x v -> f0 (ETerm x) v in
+
+  (* let rec tfolds : eterm list -> 'b -> 'b = fun ts v ->
+   *   List.fold_left (fun v (ETerm t) -> tfold v t) v ts *)
+
+  let rec tfold : type a. 'b -> a term -> 'b = fun v t ->
+    match t with
+    | True     -> f t v
+    | False    -> f t v  
+    | Action _ -> f t v
+    | Name _   -> f t v
+    | Var _    -> f t v
+      
+    | Fun (_,terms)    -> 
+      List.fold_left tfold v terms
+
+      (* f t (tfolds (eterms terms) v) *)
+    | Macro (_, l, ts) -> 
+      let v = List.fold_left tfold v l in
+      let v = tfold v ts in
+      f t v
+      (* f t (tfolds (eterms l) (tfold t v)) *)
+
+    | Seq (_, b) -> f t (tfold v b)
+    | Pred ts    -> f t (tfold v ts)
+
+    | Diff (bl, br)     -> 
+      f t (tfold (tfold v bl) br)
+
+    | ITE (b, c, d)
+    | Find (_, b, c, d) -> 
+      f t (tfold (tfold (tfold v b) c) d)        
+
+    | Not b
+    | ForAll (_, b)  
+    | Exists (_, b) -> f t (tfold v b)
+
+    | Or   (a,b)
+    | Impl (a,b)
+    | And  (a,b) -> 
+      f t (tfold (tfold v a) b)
+
+    | Atom at -> f t (atom_fold at v)
+
+  and atom_fold : generic_atom -> 'b -> 'b = 
+    fun at v ->
+      match at with
+      | `Message (o,t1,t2)   -> tfold (tfold v t1) t2
+      | `Timestamp (o,t1,t2) -> tfold (tfold v t1) t2
+      | `Index (o,t1,t2)     -> tfold (tfold v (Var t1)) (Var t2)
+      | `Happens t -> tfold v t
+
+  in
+  tfold v t
+
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
 
@@ -1208,6 +1274,18 @@ let rec destr_impls l f = match l, f with
   | 1, _ -> Some [f]
   | _, Impl (f, g) -> omap (fun l -> l @ [g]) (destr_impls (l-1) f)
   | _ -> None
+
+
+(*------------------------------------------------------------------*)
+(** {2 Sets and Maps } *)
+
+module T = struct
+  type t = eterm
+  let compare = Stdlib.compare
+end
+
+module Mt = Map.Make (T)
+module St = Set.Make (T)
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

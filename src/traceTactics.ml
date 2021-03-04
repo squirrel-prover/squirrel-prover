@@ -942,10 +942,22 @@ let expand_macro t (s : TraceSequent.sequent) =
   TraceSequent.subst subst s
      
 
+let find_occ_macro : type a. Symbols.macro Symbols.t -> a term -> Term.St.t =
+  fun m t -> 
+  let rec find st t = 
+    (* let st = match t with
+     *   | Macro (m', _, _) when m' = m -> Term.St.add t st
+     *   | _ -> st in
+     * Term.tmap (fun ETerm t -> ETerm *)
+    assert false
+    in
+    assert false
+      
 let expand args s = 
   let tbl = TraceSequent.table s in
   match Args.convert_as_lsymb args with
   | Some m ->
+    let m = Symbols.Macro.of_lsymb m tbl in
     assert false
 
   | _ ->
