@@ -957,9 +957,9 @@ let find_occs_macro
   in
   find (Utils.odflt Term.St.empty st) (ETerm t)
       
-let expand args s = 
+let expand arg s = 
   let tbl = TraceSequent.table s in
-  match Args.convert_as_lsymb args with
+  match Args.convert_as_lsymb [arg] with
   | Some m ->
     let m = Symbols.Macro.of_lsymb m tbl in
     let occs = 
@@ -977,7 +977,7 @@ let expand args s =
 
   | _ ->
     let env = TraceSequent.env s in
-    match Args.convert_args tbl env args Args.(Sort ETerm) with
+    match Args.convert_args tbl env [arg] Args.(Sort ETerm) with
     | Args.Arg (Args.ETerm (Sorts.Boolean, f, loc)) ->
       expand_macro f s
         
@@ -987,8 +987,11 @@ let expand args s =
     | _ ->
       hard_failure (Tactics.Failure "expected a message or boolean term")
 
+let expands args s =
+  List.fold_left (fun s arg -> expand arg s) s args 
+
 let expand_tac args s sk fk =
-  try sk [expand args s] fk
+  try sk [expands args s] fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 
