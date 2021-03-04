@@ -111,8 +111,6 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(* TODO: this should maybe not be a tactic, but only a rewriting rule ?
-   Not obvious, as this is a deep rewriting. *)
 let left_not_intro (Args.String hyp_name) s =
   let id, formula = Hyps.by_name hyp_name s in
   let s = Hyps.remove id s in
@@ -263,17 +261,20 @@ let message_case (m : Term.message) s : c_res list =
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
     | Term.Macro ((m,Sorts.Message,is),[],ts) as o
       when Macros.is_defined m ts (TraceSequent.table s) ->
-      begin match
-          Macros.get_definition
-            (TraceSequent.system s)
-            (TraceSequent.table s)
-            Sorts.Message
-            m is ts
-        with
-        | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
-        | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
-        | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
-      end
+      if not (TraceSequent.query_happens ~precise:true s ts) 
+      then soft_failure (Tactics.MustHappen ts)
+      else
+        begin match
+            Macros.get_definition
+              (TraceSequent.system s)
+              (TraceSequent.table s)
+              Sorts.Message
+              m is ts
+          with
+          | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
+          | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
+          | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
+        end
     | _ ->
       Tactics.(soft_failure (Failure "message is not a conditional"))
     | exception _ ->
@@ -1047,8 +1048,6 @@ let () = T.register "constraints"
 
 (*------------------------------------------------------------------*)
 (** Length *)
-
-(* TODO: this should be an axiom in some library, not a rule *)
 
 let namelength Args.(Pair (Message n, Message m)) s =
   match n, m with

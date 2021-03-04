@@ -3,8 +3,12 @@ Channel
 Checks
 Completion
 Constr
+Cca
+Decl
 Euf
-Log
+Fresh
+Hyps
+Iter
 Main
 Squirrel
 Parserbuf
@@ -17,6 +21,7 @@ TraceTactics
 EquivSequent
 EquivTactics
 Sorts
+SystemExpr
 Tactics
 TacticsArgs
 Term

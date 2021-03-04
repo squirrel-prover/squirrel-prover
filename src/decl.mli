@@ -3,7 +3,7 @@
 
 type lsymb = Theory.lsymb
 
-(** { 1 Declarations } *)
+(** {2 Declarations } *)
 
 (** Information for a macro declaration *)
 type macro_decl = string * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
