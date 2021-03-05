@@ -97,7 +97,7 @@ Proof.
   by case C; 1: depends R(r), R2(r).
 
   (* WA => Cond *)
-  by intro [i t _]; exists i,t.
+  by intro [i t _]; expand output; exists i,t.
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -115,7 +115,7 @@ goal [left] wa_R1_left (i,r:index):
   output@R(r) = input@T(i,t).
 Proof.
   intro i r.
-  split; 2: auto.
+  split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t.
   assert input@T(i,t) = nr(r) as F; 1: auto.
@@ -135,7 +135,7 @@ goal [right] wa_R1_right (i,t,r:index):
   output@R(r) = input@T(i,t).
 Proof.
   intro i t r.
-  split; 2:auto.
+  split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
@@ -242,16 +242,16 @@ project.
 fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
      4: auto].
 intro [_ [i t _]].
-fa; 2,3,4: auto.
+fa; 2,3,4: intro *; expand output; auto.
 intro Meq.
 use wa_R1_left with i1,r as [H1 H2]. 
-use H1 as [_ _]; 2: auto.
-by exists t. 
+use H1 as [_ _]; 2: expand output; auto.
+by expand output; exists t. 
 (* Right *)
 fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
      4: auto].
 intro [_ [i t _]].
-fa; 2,3,4: auto.
+fa; 2,3,4: intro *; expand output; auto.
 intro Meq.
 use wa_R1_right with i1,t1,r as [H1 H2]. 
 by use H1.
@@ -299,7 +299,7 @@ fresh F => C.
 by case C; 2:depends R(r), R1(r).
 
 (* proof of lemma: WA => Cond *)
-by intro [i t _]; exists i,t.
+by intro [i t _]; expand output; exists i,t.
 
 by fadup 5.
 
@@ -374,7 +374,7 @@ expand cond@T1(i,t); split.
   (* Honest => Cond *)
   intro [_ [r _]]. 
   simpl.
-  case output@R1(r).
+  case output@R1(r); expand output.
   by project; euf Meq. 
 
   by use H0 with i,t.
@@ -401,7 +401,7 @@ equivalent
 split; intro [_ H1]; simpl.
   (* Honest => Cond *)
   intro [r H2]; use H1.
-  case output@R1(r).
+  case output@R1(r); expand output.
   by project; euf Meq.
   by use H0 with i,t.
   (* Cond => Honest *)
