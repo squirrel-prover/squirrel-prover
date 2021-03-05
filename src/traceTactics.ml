@@ -738,12 +738,13 @@ let () = T.register "assumption"
 let is_hyp_or_lemma name s =
   Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula name
 
+(** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
 let get_hyp_or_lemma name s =
-  let f,system =
+  let hyp_opt, (f,system) =
     if Hyps.mem_name (L.unloc name) s then
-      let _, f = Hyps.by_name name s in
-      f, TraceSequent.system s
-    else Prover.get_goal_formula name in
+      let id, f = Hyps.by_name name s in
+      Some id, (f, TraceSequent.system s)
+    else None, Prover.get_goal_formula name in
 
   (* Verify that it applies to the current system. *)
   begin
@@ -753,7 +754,7 @@ let get_hyp_or_lemma name s =
     | Single (Right s1), SystemExpr.SimplePair s2 when s1 = s2 -> ()
     | _ -> hard_failure Tactics.NoAssumpSystem
   end ;
-  f
+  hyp_opt, f
 
 (*------------------------------------------------------------------*)
 (** [use ip name ths judge] applies the formula named [gp],
@@ -762,7 +763,7 @@ let get_hyp_or_lemma name s =
   * If given an introduction patterns, apply it to the generated hypothesis. *)
 let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
-  let f = get_hyp_or_lemma name s in
+  let _, f = get_hyp_or_lemma name s in
 
   (* Get universally quantifier variables, verify that lengths match. *)
   let uvars,f = match f with
@@ -1481,14 +1482,15 @@ type rw_erule =  (Vars.Sv.t * Term.esubst)
 (** Check that the rule is correct. *)
 let check_rule (sv, l, r) =
   let fvl, fvr = Term.fv l, Term.fv r in
-  Vars.Sv.subset sv fvl && Vars.Sv.subset fvr fvl
+  Vars.Sv.subset sv fvl && Vars.Sv.subset (Vars.Sv.inter fvr sv) fvl
 
 let check_erule (sv, Term.ESubst (l,r)) = check_rule (sv, l, r)
 
 (** [rewrite ~all tgt rw_args] rewrites [rw_args] in [tgt].
     If [all] is true, then does not fail if no rewriting occurs. *)
-let rewrite ~all
-    (targets: rw_target list) (rws : (Args.rw_count * rw_erule) list) s =
+let rewrite ~all 
+    (targets: rw_target list)
+    (rws : (Args.rw_count * Ident.t option * rw_erule) list) s =
   let found1 = ref false in
 
   let rec do1 
@@ -1518,15 +1520,24 @@ let rewrite ~all
       | `Any,           None     -> f
   in
 
+  let is_same hyp_id target_id = match hyp_id, target_id with
+    | None, _ | _, None -> false
+    | Some hyp_id, Some target_id ->
+      Ident.name hyp_id = Ident.name target_id && 
+      Ident.name hyp_id <> "_" 
+  in
+
   (* rewrite in a single targert *)
   let do_target s t =
-    let f, s = match t with
-      | `Goal -> TraceSequent.conclusion s, s
-      | `Hyp id -> Hyps.by_id id s, Hyps.remove id s
+    let f, s, tgt_id = match t with
+      | `Goal -> TraceSequent.conclusion s, s, None
+      | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
     in
     let f = List.fold_left 
-        (fun f (mult, (sv, Term.ESubst (l,r))) -> 
-           do1 f mult (sv,l,r)
+        (fun f (mult,  id_opt, (sv, Term.ESubst (l,r))) -> 
+           if is_same id_opt tgt_id 
+           then f (* we do not rewrite H in H *)
+           else do1 f mult (sv,l,r)
         ) f rws in
     
     match t with
@@ -1545,7 +1556,9 @@ let rewrite ~all
 (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
     showing each rule validity. *)
 let p_rw_args (rw_args : Args.rw_arg list) s 
-  : ((Args.rw_count * rw_erule) * TraceSequent.sequent list) list =
+  : ( (Args.rw_count * Ident.t option * rw_erule) * 
+      TraceSequent.sequent list 
+    ) list =
   let to_rule ~loc dir f = 
     let vs, f = match Term.destr_forall f with
       | Some (vs, f) -> Vars.Sv.of_list vs, f
@@ -1574,15 +1587,15 @@ let p_rw_args (rw_args : Args.rw_arg list) s
   in
 
   let p_rw_rule dir (rw_type : Theory.formula) 
-    : rw_erule * TraceSequent.sequent list = 
+    : rw_erule * TraceSequent.sequent list * Ident.t option = 
     match Args.convert_as_lsymb [Args.Theory rw_type] with
     | Some str when is_hyp_or_lemma str s ->
-      let f = get_hyp_or_lemma str s in
+      let id_opt, f = get_hyp_or_lemma str s in
 
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      to_rule ~loc:None dir f, premise
+      to_rule ~loc:None dir f, premise, id_opt
 
     | _ -> 
       let conv_env = Theory.{ table = TraceSequent.table s;
@@ -1593,26 +1606,27 @@ let p_rw_args (rw_args : Args.rw_arg list) s
       (* create new sub-goal *)
       let premise = [TraceSequent.set_conclusion f s] in
 
-      to_rule ~loc:(Some (L.loc rw_type)) dir f, premise
+      to_rule ~loc:(Some (L.loc rw_type)) dir f, premise, None
   in
 
 
   let p_rw_arg (rw_arg : Args.rw_arg) 
-    : (Args.rw_count * rw_erule) * TraceSequent.sequent list = 
-    let vs, e, subgoals = match rw_arg.rw_type with
+    : (Args.rw_count * Ident.t option * rw_erule) * TraceSequent.sequent list = 
+    let vs, e, id_opt, subgoals = match rw_arg.rw_type with
       | `Form f -> 
         let dir = L.unloc rw_arg.rw_dir in
-        let (vs, e), subgoals = p_rw_rule dir f in
-        vs, e, subgoals
+        (* (rewrite rule, subgols, hyp id) if applicable *)
+        let (vs, e), subgoals, id_opt = p_rw_rule dir f in
+        vs, e, id_opt, subgoals
 
       | `Expand mid -> 
         if L.unloc rw_arg.rw_dir <> `LeftToRight then
-          hard_failure ~loc:(L.loc rw_arg.rw_dir)
+          hard_failure ~loc:(L.loc rw_arg.rw_dir) 
             (Failure "expand cannot take a direction");
         
         hard_failure (Failure "expand not yet implemented");
     in
-    (rw_arg.rw_mult, (vs, e)), subgoals
+    (rw_arg.rw_mult, id_opt, (vs, e)), subgoals
   in
 
   List.map p_rw_arg rw_args 

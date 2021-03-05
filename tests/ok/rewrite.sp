@@ -23,8 +23,8 @@ goal _ (x, y, z : message) :
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
   intro x y z H.
-  rewrite (forall (x : message), f(x) = a).
-  by intro x1; use foo with x1.
+  rewrite (forall (x : message), f(x) = a);
+  1: by intro x1; use foo with x1.
   assumption.
 Qed.
 
