@@ -67,7 +67,7 @@ Qed.
 
 equiv anonymity.
 Proof.
-  enrich pk(kA); enrich pk(kB).
+  enrich pk(kA), pk(kB).
 
   induction t.
 

@@ -251,9 +251,7 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich a1; enrich b1;
-   enrich seq(i-> g^b(i)); enrich seq(i-> g^a(i));
-   enrich kP; enrich kS; enrich hKey.
+   enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
 
    induction t.
 

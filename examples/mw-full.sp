@@ -172,11 +172,11 @@ Proof.
    - we can finally get rid of the nonces nr and nt in the first
      two sequences using fresh. *)
 
-enrich seq(r -> nr(r)).
-enrich seq(i,t -> nt(i,t)).
-enrich seq(i,t -> diff(id(i),id'(i,t)) XOR
-                  H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))).
-enrich seq(i,r,t -> diff(id(i),id'(i,t)) XOR
+enrich seq(r -> nr(r)),
+       seq(i,t -> nt(i,t)),
+       seq(i,t -> diff(id(i),id'(i,t)) XOR
+                  H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))),
+       seq(i,r,t -> diff(id(i),id'(i,t)) XOR
                     H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
 induction t.
 

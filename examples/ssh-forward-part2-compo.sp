@@ -452,8 +452,9 @@ Qed.
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-  enrich a1; enrich b1; enrich seq(i-> b(i)); enrich seq(i-> a(i)); enrich kP; enrich kS;
-  enrich ake11; enrich bke11; enrich seq(i-> bke1(i)); enrich seq(i-> ake1(i)); enrich k11; enrich hKey; enrich r; enrich seq(i->r2(i)); enrich r3; enrich r4; enrich r5.
+  enrich a1, b1, seq(i-> b(i)), seq(i-> a(i)), kP, kS;
+  enrich ake11, bke11, seq(i-> bke1(i)), seq(i-> ake1(i)), k11, hKey, r, 
+   seq(i->r2(i)), r3, r4, r5.
 
   induction t.
 

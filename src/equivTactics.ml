@@ -527,26 +527,39 @@ let () =
 (*------------------------------------------------------------------*)
 let enrich arg s = match arg with
   | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
-    [ EquivSequent.set_equiv_goal s (Equiv.Formula f ::
-                                  goal_as_equiv s) ]
+    EquivSequent.set_equiv_goal s (Equiv.Formula f :: goal_as_equiv s) 
 
   | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
-    [ EquivSequent.set_equiv_goal s (Equiv.Message f ::
-                                  goal_as_equiv s) ]
+    EquivSequent.set_equiv_goal s (Equiv.Message f :: goal_as_equiv s)
 
   | TacticsArgs.ETerm (Sorts.Index, _, loc)
   | TacticsArgs.ETerm (Sorts.Timestamp, _, loc) ->
     Tactics.hard_failure
       (Tactics.Failure "expected a message or boolean term")
 
-let () = T.register_typed "enrich"
-    ~general_help:"Enrich the goal with the given term."
-    ~detailed_help:"This is usually called before the induction, to enrich the \
-                    induction hypothesis, and then allow to solve multiple cases \
-                    more simply."
-    ~tactic_group:Logical
-    ~usages_sorts:[Sort TacticsArgs.Message; Sort TacticsArgs.Boolean]
-    (pure_equiv_typed enrich) TacticsArgs.ETerm
+let enrich_a arg s = 
+  let tbl, env = EquivSequent.table s, EquivSequent.env s in
+  match TacticsArgs.convert_args tbl env [arg] Args.(Sort ETerm) with
+  | Args.Arg (ETerm _ as arg) -> enrich arg s
+  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+
+let enrichs args s = 
+  List.fold_left (fun s arg -> enrich_a arg s) s args
+
+let enrich_tac args s sk fk = 
+  try sk [enrichs args s] fk with
+  | Tactics.Tactic_soft_failure (_,e) -> fk e
+
+let () = 
+  T.register_general "enrich"
+    ~tactic_help:{
+      general_help  = "Enrich the goal with the given term.";
+      detailed_help = "This is usually called before the induction, to enrich the \
+                       induction hypothesis, and then allow to solve multiple cases \
+                       more simply.";
+      tactic_group  = Logical;
+      usages_sorts  = [Sort TacticsArgs.Message; Sort TacticsArgs.Boolean]; }
+    (pure_equiv_arg enrich_tac)
 
 
 (*------------------------------------------------------------------*)

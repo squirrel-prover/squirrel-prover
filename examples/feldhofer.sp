@@ -169,7 +169,7 @@ Qed.
 
 equiv unlinkability.
 Proof.
-  enrich seq(k->nr(k)). enrich seq(i,j->nt(i,j)).
+  enrich seq(k->nr(k)), seq(i,j->nt(i,j)).
 
   induction t.
 

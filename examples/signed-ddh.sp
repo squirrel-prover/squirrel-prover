@@ -115,11 +115,8 @@ Qed.
 
 equiv [left,secretS] [right,secretS] strongSecS.
 Proof.
-    enrich skP.
-    enrich skS.
-    enrich seq(i->g^a(i)).
-    enrich seq(i->g^b(i)).
-    enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+    enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
+           seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
 
     induction t.
 
@@ -185,11 +182,8 @@ Qed.
 
 equiv [left,secretP] [right,secretP] strongSecP.
 Proof.
-    enrich skP.
-    enrich skS.
-    enrich seq(i->g^a(i)).
-    enrich seq(i->g^b(i)).
-    enrich seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
+    enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
+           seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
 
     induction t.
 
