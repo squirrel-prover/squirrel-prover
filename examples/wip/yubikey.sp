@@ -17,6 +17,8 @@ abstract startplug: message
 abstract endplug: message
 abstract startpress: message
 abstract accept:message
+abstract myzero: message
+abstract myone: message
 
 abstract mySucc : message->message
 
@@ -26,8 +28,8 @@ name secret: index -> message
 name nonce: index->index->message
 name npr: index->index->message
 
-mutable YCpt: index->message
-mutable SCpt: index->message
+mutable YCpt(i:index): message = myzero
+mutable SCpt(i:index): message = myzero
 
 channel cT
 channel cR
