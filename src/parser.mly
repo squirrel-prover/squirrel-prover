@@ -21,7 +21,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU
 %token WITH ORACLE EXN
-%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE REWRITE
+%token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE REWRITE REVERT
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -500,12 +500,16 @@ tac:
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
   | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
                                          (Tactics.tac_error_of_strings  ts,t) }
+
+  | REVERT ids=slist1(lsymb, empty)     
+    { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
+      Tactics.Abstract ("revert", ids) }
+
   | ASSERT p=tac_formula ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
-      Tactics.Abstract
-        ("assert", TacticsArgs.Theory p::ip) }
+      Tactics.Abstract ("assert", TacticsArgs.Theory p::ip) }
 
   | USE i=lsymb ip=as_ip?
     { let ip = match ip with
@@ -548,6 +552,7 @@ help_tac_i:
 | EXISTS    { "exists"}    
 | USE       { "use"}      
 | REWRITE   { "rewrite"}  
+| REVERT    { "revert"}  
 | DDH       { "ddh"}      
 | ASSERT    { "assert"}   
 | DESTRUCT  { "destruct"} 

@@ -346,17 +346,29 @@ let revert (hid : Ident.t) s =
   let s = Hyps.remove hid s in
   TraceSequent.set_conclusion (Term.Impl (f,TraceSequent.conclusion s)) s
 
-let revert_str (Args.String hyp_name) s =
+let revert_str (hyp_name : lsymb) s =
   let hid,_ = Hyps.by_name hyp_name s in
-  [revert hid s]
+  revert hid s
 
+let revert_tac (args : Args.parser_arg list) s sk fk = 
+  try
+    let s = 
+      List.fold_left (fun s arg -> match arg with
+          | Args.String_name arg -> revert_str arg s
+          | _ -> hard_failure (Failure "improper arguments")
+        ) s args in
+    sk [s] fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+      
 let () =
-  T.register_typed "revert"
-    ~general_help:"Take an hypothesis H, and turns the conclusion C into the \
-                   implication H => C."
-    ~detailed_help:""
-    ~tactic_group:Logical
-    revert_str Args.String
+  T.register_general "revert"
+    ~tactic_help:{
+      general_help = "Take an hypothesis H, and turns the conclusion C into the \
+                      implication H => C.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    revert_tac
 
 (*------------------------------------------------------------------*)
 (** Apply a And pattern (this is a destruct) of length [l].

@@ -116,6 +116,7 @@ rule token = parse
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
+| "revert"            { REVERT }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
