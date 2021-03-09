@@ -370,6 +370,34 @@ let () =
       usages_sorts = []; }
     revert_tac
 
+
+(*------------------------------------------------------------------*)
+let clear (hid : Ident.t) s = Hyps.remove hid s
+
+let clear_str (hyp_name : lsymb) s =
+  let hid,_ = Hyps.by_name hyp_name s in
+  clear hid s
+
+let clear_tac (args : Args.parser_arg list) s sk fk = 
+  try
+    let s = 
+      List.fold_left (fun s arg -> match arg with
+          | Args.String_name arg -> clear_str arg s
+          | _ -> hard_failure (Failure "improper arguments")
+        ) s args in
+    sk [s] fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+      
+let () =
+  T.register_general "clear"
+    ~tactic_help:{
+      general_help = "Clear an hypothesis.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    clear_tac
+
+
 (*------------------------------------------------------------------*)
 (** Apply a And pattern (this is a destruct) of length [l].
     Note that variables in handlers have not been added to the env yet. *)
