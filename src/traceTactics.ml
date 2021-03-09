@@ -930,6 +930,9 @@ let unfold_macro t (s : TraceSequent.sequent) =
         soft_failure (Tactics.Failure "cannot expand this macro");
       
       let mdef = Macros.get_definition system table sort mn is a in
+      (* TODO: generalize this ? *)
+      let mdef = Term.subst [Term.ESubst (a, a0)] mdef in
+
       [Term.ESubst (Macro ((mn, sort, is),l,a0), mdef)]
       
     | _ -> 

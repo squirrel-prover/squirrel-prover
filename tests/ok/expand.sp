@@ -13,9 +13,9 @@ system ((B: !_j in(c,x); if x = ok(j) then out(c,<x,ok(j)>)) |
 
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@B(i),ok(i)> = b =>
-   <input@B(i),ok(i)> = d =>
-   <input@C(j),ko(j)> = b => (output@t'' = b => <input@B(i),ok(i)> = ok(i))) =>
+  (<input@t,ok(i)> = b =>
+   <input@t,ok(i)> = d =>
+   <input@t',ko(j)> = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 
@@ -31,9 +31,9 @@ Qed.
 (* Same, but choosing the expand timestamps manually *)
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@B(i),ok(i)> = b =>
-   <input@B(i),ok(i)> = d =>
-   <input@C(j),ko(j)> = b => (output@t'' = b => <input@B(i),ok(i)> = ok(i))) =>
+  (<input@t,ok(i)> = b =>
+   <input@t,ok(i)> = d =>
+   <input@t',ko(j)> = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 
@@ -49,9 +49,9 @@ Qed.
 (* Same, but expanding only one timestamp *)
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@B(i),ok(i)> = b =>
-   <input@B(i),ok(i)> = d =>
-   output@t' = b => (output@t'' = b => <input@B(i),ok(i)> = ok(i))) =>
+  (<input@t,ok(i)> = b =>
+   <input@t,ok(i)> = d =>
+   output@t' = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 
