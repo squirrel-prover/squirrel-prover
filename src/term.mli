@@ -119,6 +119,8 @@ val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
 (** (the subsets are not disjoint). *)
 
 type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+
+type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
@@ -137,13 +139,33 @@ type eq_atom = [
   | `Index     of (ord_eq, Vars.index) _atom
 ]
 
+val pp_eq_atom    : Format.formatter -> eq_atom    -> unit
 val pp_trace_atom : Format.formatter -> trace_atom -> unit
 
 (*------------------------------------------------------------------*)
-val disjunction_to_literals :
-  formula -> ([ `Pos | `Neg ] * generic_atom) list option
+(** Literals. *)
+
+type literal = [`Neg | `Pos] * generic_atom
+
+type eq_literal = [`Pos | `Neg] * eq_atom
+
+type trace_literal = [`Pos | `Neg] * trace_atom
+
+val pp_literal  : Format.formatter -> literal      -> unit
+val pp_literals : Format.formatter -> literal list -> unit
+
+val pp_trace_literal  : Format.formatter -> trace_literal      -> unit
+val pp_trace_literals : Format.formatter -> trace_literal list -> unit
+
+val neg_lit : literal -> literal 
+
+val neg_trace_lit : trace_literal -> trace_literal 
+
+val disjunction_to_literals : formula -> literal list option
 
 (*------------------------------------------------------------------*)
+(** {2 Pretty-printer and cast} *)
+
 val pp : Format.formatter -> 'a term -> unit
 
 val sort : 'a term -> 'a Sorts.t
@@ -297,7 +319,9 @@ val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
+
 val not_message_atom  : message_atom  -> message_atom
+val not_index_atom    : index_atom    -> index_atom
 val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
 val not_simpl : formula -> formula
@@ -320,6 +344,18 @@ val destr_impl : formula -> (formula * formula) option
 val destr_ands  : int -> formula -> formula list option
 val destr_ors   : int -> formula -> formula list option
 val destr_impls : int -> formula -> formula list option
+
+val destr_var : 'a term -> 'a Vars.var option
+val destr_pair : 'a term -> ('a term * 'a term) option
+
+(** Existential type for atoms. 
+    Constraints on allowed ordering are lost. *)
+type eatom = 
+  | EOrd : ord * 'a term * 'a term -> eatom
+  | EHappens : timestamp -> eatom
+
+val destr_atom : generic_atom -> eatom 
+val of_eatom   : eatom -> generic_atom
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

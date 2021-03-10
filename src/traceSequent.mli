@@ -89,9 +89,9 @@ val query : precise:bool -> t -> Constr.trace_literal list -> bool
 val query_happens : precise:bool -> t -> Term.timestamp -> bool
 
 (** If [message_atoms_valid s] returns [true] then (dis)equalities over
-  * messages on both sides of the sequents make the sequent valid. 
+  * terms on both sides of the sequents make the sequent valid. 
   * May timeout. *)
-val message_atoms_valid : sequent -> bool Utils.timeout_r
+val eq_atoms_valid : sequent -> bool Utils.timeout_r
 
 (** [constraints_valid s] returns true if constraints make the sequent valid,
   * taking into account constraint trace formula hypotheses and atomic

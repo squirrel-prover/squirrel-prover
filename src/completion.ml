@@ -949,6 +949,15 @@ let normalize state u =
                 |> term_grnd_normalize state
                 |> term_e_normalize state) u
 
+(* [normalize_cterm state u]
+    Preconditions: [u] must be ground. *)
+let normalize ?(print=false) state u =
+  let u_normed = normalize state u in
+  if print then dbg "%a normalized to %a" pp_cterm u pp_cterm u_normed;
+  u_normed
+
+  
+
 let rec normalize_csts state = function
   | Cfun (fn,ari,ts) -> cfun fn ari (List.map (normalize_csts state) ts)
   | Cvar _ as t -> t
@@ -1073,32 +1082,46 @@ module Memo = Ephemeron.K2.Make
       let hash t = Symbols.tag t 
     end)
     (struct 
-      type t = (Term.message * Term.message) list
-      let equal_p (t0, t1) (t0', t1') = t0 = t0' && t1 = t1'
+      type t = Term.esubst list
+      let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
+        Sorts.equal (Term.sort t0) (Term.sort t0') &&
+        let t0', t1' = Term.cast (Term.sort t0) t0', 
+                       Term.cast (Term.sort t0) t1' in
+        t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,
                     List.sort_uniq Stdlib.compare l' in
         List.length l = List.length l' &&
         List.for_all2 equal_p l l'
 
-      let hash_p (t0, t1) = Utils.hcombine (Hashtbl.hash t0) (Hashtbl.hash t1)
+      let hash_p (Term.ESubst (t0, t1)) =
+        Utils.hcombine (Hashtbl.hash t0) (Hashtbl.hash t1)
       let hash l = Utils.hcombine_list hash_p 0 l
     end)
 
-let complete table (l : (Term.message * Term.message) list) 
+let complete table (l : Term.esubst list) 
   : state timeout_r=
   let l =
     List.fold_left
-      (fun l (u,v) ->
-         try (cterm_of_term u, cterm_of_term v) :: l with
-           | Unsupported_conversion -> l)
+      (fun l (Term.ESubst (u,v)) ->
+         try
+           let cu, cv = cterm_of_term u, cterm_of_term v in
+
+           dbg "Completion: %a = %a added as %a = %a"
+             Term.pp u Term.pp v pp_cterm cu pp_cterm cv; 
+
+           (cu, cv):: l 
+
+         with Unsupported_conversion -> 
+           dbg "Completion: %a = %a ignored (unsupported)" Term.pp u Term.pp v; 
+           l)
       []
       l
   in
   Utils.timeout (Config.solver_timeout ()) (complete_cterms table) l 
 
 (** With memoisation *)
-let complete = 
+let complete : Symbols.table -> Term.esubst list -> state Utils.timeout_r =
   let memo = Memo.create 256 in
   fun table l ->
     try Memo.find memo (table,l) with
@@ -1141,6 +1164,8 @@ let check_disequality_cterm state neqs (u,v) =
   (* if the term are grounds and have different normal form, return disequal *)
   || (is_ground_term u && is_ground_term v && (u <> v))
 
+(** [check_disequalities s neqs l] checks that all disequalities inside [l] are
+    implied by inequalities inside neqs, w.r.t [s]. *)
 let check_disequality state neqs (u,v) =
   try check_disequality_cterm state neqs (cterm_of_term u, cterm_of_term v)
   with
@@ -1155,12 +1180,21 @@ let check_disequalities state neqs l =
      Precondition: [u] and [v] must be ground *)
 let check_equality_cterm state (u,v) =
   assert (state.completed);
-  normalize state u = normalize state v
+  normalize ~print:true state u = normalize ~print:true state v
 
-let check_equality state (u,v) =
-  try check_equality_cterm state (cterm_of_term u, cterm_of_term v)
-  with
-  | Unsupported_conversion -> false
+let check_equality state (Term.ESubst (u,v)) =  
+  try
+    let cu, cv = cterm_of_term u, cterm_of_term v in
+    let bool = check_equality_cterm state (cu, cv) in
+
+    dbg "check_equality: %a = %a as %a = %a: %a"
+      Term.pp u Term.pp v pp_cterm cu pp_cterm cv Fmt.bool bool;
+
+    bool
+
+  with Unsupported_conversion -> 
+    dbg "check_equality: %a = %a ignored (unsupported)" Term.pp u Term.pp v;
+    false
 
 let check_equalities state l = List.for_all (check_equality state) l
 

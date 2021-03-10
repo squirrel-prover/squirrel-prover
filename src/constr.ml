@@ -17,23 +17,7 @@ module L = Location
 (*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_constr () then `Dbg else `Ignore) s
 
-(*------------------------------------------------------------------*)
-type trace_literal = [`Pos | `Neg] * Term.trace_atom
-
-let pp_trace_literal fmt (pn,at) =
-  match pn with
-  | `Pos -> Fmt.pf fmt "%a"    Term.pp_trace_atom at
-  | `Neg -> Fmt.pf fmt "¬(%a)" Term.pp_trace_atom at
-
-let pp_trace_literals fmt (l : trace_literal list) = 
-  let sep fmt () = Fmt.pf fmt " ∧ " in
-  (Fmt.list ~sep pp_trace_literal) fmt l
-
-let neg (pn, at) = 
-  let pn = match pn with
-    | `Pos -> `Neg
-    | `Neg -> `Pos in
-  (pn, at)
+type trace_literal = Term.trace_literal
 
 (*------------------------------------------------------------------*)
 module TraceLits : sig 
@@ -1304,7 +1288,7 @@ let query ~precise (models : models) (ats : trace_literal list) =
   then true
   else if not precise then false 
   else
-    let forms = List.map (fun at -> Form.mk (neg at)) ats
+    let forms = List.map (fun at -> Form.mk (Term.neg_trace_lit at)) ats
                 |> List.flatten in   
     let insts = List.map (fun model ->
         add_forms model.inst forms 
@@ -1314,9 +1298,9 @@ let query ~precise (models : models) (ats : trace_literal list) =
 (* adds debugging information *)
 let query ~precise models ats =
   dbg "%squery: %a" 
-    (if precise then "precise " else "") pp_trace_literals ats;
+    (if precise then "precise " else "") Term.pp_trace_literals ats;
   let b = query ~precise models ats in
-  dbg "query result: %a : %a" pp_trace_literals ats Fmt.bool b;
+  dbg "query result: %a : %a" Term.pp_trace_literals ats Fmt.bool b;
   b
 
 (*------------------------------------------------------------------*)

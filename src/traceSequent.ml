@@ -210,25 +210,60 @@ let rec simpl_form acc hyp =
   | _ as f -> f :: acc
 
 (*------------------------------------------------------------------*)
-let get_message_atoms s =
+let get_atoms (s : sequent) : Term.literal list =
   let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
   List.fold_left (fun atoms hyp -> match hyp with 
-      | Term.(Atom (`Message at)) -> at :: atoms
-      | Term.(Not (Atom (#message_atom as at))) ->
-        let `Message neg_at = Term.not_message_atom at in
-        neg_at :: atoms
+      | Term.Atom at -> (`Pos, at) :: atoms
+      | Term.(Not (Atom at)) -> (`Neg, at) :: atoms
       | _ -> atoms
-    ) [] hyps
+    ) [] hyps 
 
-let get_trace_literals s =
-  let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
-  List.fold_left (fun atoms hyp -> match hyp with
-      | Term.(Atom (#trace_atom as at)) ->
-        (`Pos, at) :: atoms
-      | Term.(Not (Atom (#trace_atom as at))) ->
-        (`Neg, at) :: atoms
-      | _ -> atoms
-    ) [] hyps
+let get_message_atoms (s : sequent) : Term.message_atom list =
+  let do1 (at : Term.literal) : Term.message_atom option =
+    match at with 
+    | `Pos, (`Message _ as at) -> Some at
+    | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms s)
+
+let get_trace_literals (s : sequent) : Term.trace_literal list =
+  let do1 (at : Term.literal) : Term.trace_literal option =
+    match at with 
+    | x, Term.(#trace_atom as at) -> Some (x, at)
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms s)
+
+let get_eq_atoms (s : sequent) : Term.eq_atom list =
+  let do1 (at : Term.literal) : Term.eq_atom option =
+    match at with               (* FIXME: improve this *)
+    | `Pos, Term.(#message_atom as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Pos, Term.(#index_atom as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Pos, Term.(`Timestamp ((`Eq | `Neq), _, _) as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Neg, Term.(#message_atom as at) -> 
+      Some (Term.not_message_atom at :> Term.eq_atom)
+
+    | `Neg, Term.(#index_atom as at) -> 
+      Some (Term.not_index_atom at :> Term.eq_atom)
+
+    | `Neg, Term.(`Timestamp (`Eq, a, b)) -> 
+      Some (`Timestamp (`Neq, a,b) :> Term.eq_atom)
+
+    | `Neg, Term.(`Timestamp (`Neq, a, b)) -> 
+      Some (`Timestamp (`Eq, a,b) :> Term.eq_atom)
+
+    | _, `Happens _ 
+    | _, `Timestamp ((`Leq | `Geq | `Lt | `Gt), _, _) -> None
+  in
+  List.filter_map do1 (get_atoms s) 
+
 
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
@@ -281,20 +316,10 @@ let get_all_messages s =
   let atoms = get_message_atoms s in
   let atoms =
     match s.conclusion with
-      | Term.Atom (`Message atom) -> atom :: atoms
+      | Term.Atom (`Message _ as atom) -> atom :: atoms
       | _ -> atoms
   in
-  List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms
-
-(* (\*------------------------------------------------------------------*\)
- * let get_all_terms s =
- *   let atoms = get_message_atoms s in
- *   let atoms =
- *     match s.conclusion with
- *       | Term.Atom (`Message atom) -> atom :: atoms
- *       | _ -> atoms
- *   in
- *   List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms *)
+  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
 
 (*------------------------------------------------------------------*)  
 module Hyps 
@@ -533,10 +558,18 @@ let subst subst s =
 (** TRS *)
 
 let get_eqs_neqs s =
-  List.fold_left (fun (eqs, neqs) atom -> match atom with
-      | `Eq,  a, b -> (a,b) :: eqs, neqs
-      | `Neq, a, b -> eqs, (a,b) :: neqs
-    ) ([],[]) (get_message_atoms s)
+  List.fold_left (fun (eqs, neqs) (atom : Term.eq_atom) -> match atom with
+      | `Message   (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Timestamp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Index     (`Eq,  a, b) -> 
+        Term.ESubst (Term.Var a,Term.Var b) :: eqs, neqs
+
+      | `Message   (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | `Timestamp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | `Index     (`Neq, a, b) -> 
+        eqs, Term.ESubst (Term.Var a,Term.Var b) :: neqs
+
+    ) ([],[]) (get_eq_atoms s)
 
 let get_trs s : Completion.state timeout_r =
   match !(s.trs) with
@@ -550,7 +583,7 @@ let get_trs s : Completion.state timeout_r =
       Result trs
 
 
-let message_atoms_valid s =
+let eq_atoms_valid s =
   match get_trs s with
   | Timeout -> Timeout
   | Result trs ->
@@ -558,10 +591,12 @@ let message_atoms_valid s =
 
     let _, neqs = get_eqs_neqs s in
     Result (
-      List.exists (fun eq ->
-          if Completion.check_equalities trs [eq] then
-            let () = dbg "dis-equality %a ≠ %a violated" 
-                Term.pp (fst eq) Term.pp (snd eq) in
+      List.exists (fun (Term.ESubst (a, b)) ->
+          if Completion.check_equalities trs [Term.ESubst (a, b)] then
+            let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
             true
-          else false)
+          else
+            let () = dbg "dis-equality %a ≠ %a: no violation" 
+                Term.pp a Term.pp b in
+            false)
         neqs)

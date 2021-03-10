@@ -402,12 +402,12 @@ let () =
 (** Apply a And pattern (this is a destruct) of length [l].
     Note that variables in handlers have not been added to the env yet. *)
 let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * TraceSequent.sequent =
-  let destr_fail () = 
-    soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid)) 
+  let destr_fail s = 
+    soft_failure (Tactics.Failure ("cannot destruct: " ^ s)) 
   in
-  let get_destr = function
+  let get_destr ~orig = function
     | Some x -> x
-    | None -> destr_fail () in
+    | None -> destr_fail (Fmt.str "%a" Term.pp orig) in
 
   assert (len > 0);
   if len = 1 then ([`Hyp hid], s) else
@@ -415,14 +415,33 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * TraceSequent.seque
     let s = Hyps.remove hid s in
 
     match form with
+    | Term.Atom at ->
+      begin
+        match Term.destr_atom at with
+        | Term.EOrd (`Eq,a,b) ->
+          let a1, a2 = get_destr ~orig:a (destr_pair a)
+          and b1, b2 = get_destr ~orig:b (destr_pair b) in
+
+          let f1 = Atom (Term.of_eatom (Term.EOrd (`Eq, a1, b1)))
+          and f2 = Atom (Term.of_eatom (Term.EOrd (`Eq, a2, b2))) in
+
+          let forms = List.map (fun x -> Args.Unnamed, x) [f1;f2] in
+          let ids, s = Hyps.add_i_list forms s in
+          List.map (fun id -> `Hyp id) ids, s
+
+        | Term.EOrd (_,_,_) 
+        | Term.EHappens _ -> 
+          destr_fail (Fmt.str "%a" Term.pp form)
+      end
+
     | Term.And _ ->
-      let ands = get_destr (Term.destr_ands len form) in
+      let ands = get_destr ~orig:form (Term.destr_ands len form) in
       let ands = List.map (fun x -> Args.Unnamed, x) ands in
       let ids, s = Hyps.add_i_list ands s in
       List.map (fun id -> `Hyp id) ids, s
 
     | Term.Exists _ ->
-      let vs, f = get_destr (Term.destr_exists form) in
+      let vs, f = get_destr ~orig:form (Term.destr_exists form) in
 
       if List.length vs < len - 1 then
         hard_failure (Tactics.PatNumError (len - 1, List.length vs));
@@ -442,7 +461,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * TraceSequent.seque
 
       ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
 
-    | _ -> destr_fail ()
+    | _ -> destr_fail (Fmt.str "cannot destruct %a" Term.pp form)
 
 (** Apply an And/Or pattern to an ident hypothesis handler. *)
 let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
@@ -762,7 +781,7 @@ let () = T.register "induction"
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TraceSequent.t) =
   let goal = TraceSequent.conclusion s in
-  if goal = Term.True || Hyps.is_hyp goal s then
+  if goal = Term.True || Hyps.is_hyp goal s || Hyps.is_hyp False s then
     let () = dbg "assumption %a" Term.pp goal in
     []
   else soft_failure Tactics.NotHypothesis
@@ -1052,7 +1071,7 @@ let () = T.register_general "expand"
 (*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
-let congruence (s : TraceSequent.t) =
+let congruence (s : TraceSequent.t) : bool Utils.timeout_r =
   match simpl_left s with
   | None -> Utils.Result true
   | Some s ->
@@ -1062,12 +1081,11 @@ let congruence (s : TraceSequent.t) =
 
     let term_conclusions =
       List.fold_left (fun acc conc -> match conc with
-          | `Pos, (#message_atom as at) ->
+          | `Pos, (#generic_atom as at) ->
             let at = (at :> Term.generic_atom) in
             Term.(Not (Atom at)) :: acc
-          | `Neg, (#message_atom as at) ->
-            Term.Atom at :: acc
-          | _ -> acc)
+          | `Neg, (#generic_atom as at) ->
+            Term.Atom at :: acc)
         []
         conclusions
     in
@@ -1075,7 +1093,7 @@ let congruence (s : TraceSequent.t) =
         Hyps.add Args.AnyName f s
       ) s term_conclusions
     in
-    TraceSequent.message_atoms_valid s
+    TraceSequent.eq_atoms_valid s
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let congruence_tac (s : TraceSequent.t) =
@@ -1083,7 +1101,10 @@ let congruence_tac (s : TraceSequent.t) =
   | true ->
     let () = dbg "closed by congruence" in
     []
-  | false -> soft_failure Tactics.CongrFail
+
+  | false -> 
+    let () = dbg "congruence failed" in
+    soft_failure Tactics.CongrFail
 
 let () = T.register "congruence"
     ~tactic_help:
@@ -1447,7 +1468,7 @@ let apply_substitute subst s =
 let substitute_mess (m1, m2) s =
   let subst =
         let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
-        if Completion.check_equalities trs [(m1,m2)] then
+        if Completion.check_equalities trs [Term.ESubst (m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
           soft_failure Tactics.NotEqualArguments
@@ -2070,10 +2091,12 @@ let simplify ~close ~intro =
     (if close || intro then [wrap intro_all;
                              wrap simpl_left_tac] else []) @
 
+    (* try again *)
+    (if close then [try_tac (wrap assumption)] else []) @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
-    (wrap eq_trace) ::
+    (if intro then [wrap eq_trace] else []) @
     (wrap eq_names) ::
     (* Simplify equalities using substitution. *)
     (repeat (wrap autosubst)) ::
@@ -2539,7 +2562,8 @@ let collision_resistance (s : TraceSequent.t) =
     let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
     let hash_eqs =
       make_eq [] hashes
-      |> List.filter (fun eq -> Completion.check_equalities trs [eq])
+      |> List.filter (fun (a,b) -> 
+          Completion.check_equalities trs [Term.ESubst (a,b)])
     in
     let new_facts =
       List.fold_left

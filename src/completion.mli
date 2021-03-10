@@ -8,20 +8,11 @@ val pp_state : Format.formatter -> state -> unit
     equations inside l.
     May timeout. *)
 val complete : 
-  Symbols.table -> (Term.message * Term.message) list -> 
-  state Utils.timeout_r
-
-(** [check_disequalities s neqs l] checks that all disequalities inside [l] are
-    implied by inequalities inside neqs, w.r.t [s]. *)
-val check_disequalities : 
-  state ->
-  (Term.message * Term.message) list ->
-  (Term.message * Term.message) list -> 
-  bool
+  Symbols.table -> Term.esubst list -> state Utils.timeout_r
 
 (** [check_equalities s l] checks that all equalities inside [l] hold
     w.r.t [s] *)
-val check_equalities : state -> (Term.message * Term.message) list -> bool
+val check_equalities : state -> Term.esubst list -> bool
 
 (** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
     rewrite relation in [state], and add the corresponding index equalities.

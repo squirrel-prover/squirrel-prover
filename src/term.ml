@@ -108,6 +108,8 @@ type formula = Sorts.boolean term
 (** Subset of all atoms (the subsets are not disjoint). *)
     
 type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+
+type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
@@ -149,20 +151,6 @@ let rec sort : type a. a term -> a Sorts.t =
   | Impl _ -> Sorts.Boolean
   | True -> Sorts.Boolean
   | False -> Sorts.Boolean
-
-(*------------------------------------------------------------------*)
-let disjunction_to_literals f =
-  let exception Not_a_disjunction in
-
-  let rec aux = function
-  | False -> []
-  | Atom at -> [`Pos, at]
-  | Not (Atom at) -> [`Neg, at]
-  | Or (a, b) -> aux a @ aux b
-  | _ -> raise Not_a_disjunction in
-
-  try Some (aux f) with Not_a_disjunction -> None
-
 
 (*------------------------------------------------------------------*)
 exception Uncastable
@@ -386,6 +374,58 @@ and pp_and_happens ppf f =
     | _ -> assert false in
 
   pp_happens ppf (collect [] f)
+
+let pp_eq_atom ppf at = pp_generic_atom ppf (at :> generic_atom)
+
+
+(*------------------------------------------------------------------*)
+(** Literals. *)
+
+type literal = [`Neg | `Pos] * generic_atom
+
+type eq_literal = [`Pos | `Neg] * eq_atom
+
+type trace_literal = [`Pos | `Neg] * trace_atom
+
+let pp_literal fmt ((pn,at) : literal) =
+  match pn with
+  | `Pos -> Fmt.pf fmt "%a"    pp_generic_atom at
+  | `Neg -> Fmt.pf fmt "¬(%a)" pp_generic_atom at
+
+let pp_literals fmt (l : literal list) = 
+  let sep fmt () = Fmt.pf fmt " ∧ " in
+  (Fmt.list ~sep pp_literal) fmt l
+
+let pp_trace_literal fmt (lit : trace_literal) =
+  pp_literal fmt (lit :> literal)
+
+let pp_trace_literals fmt (l : trace_literal list) = 
+  pp_literals fmt (l :> literal list)
+
+let neg_lit ((pn, at) : literal) : literal = 
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
+let neg_trace_lit ((pn, at) : trace_literal) : trace_literal = 
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
+
+let disjunction_to_literals f =
+  let exception Not_a_disjunction in
+
+  let rec aux = function
+  | False -> []
+  | Atom at -> [`Pos, at]
+  | Not (Atom at) -> [`Neg, at]
+  | Or (a, b) -> aux a @ aux b
+  | _ -> raise Not_a_disjunction in
+
+  try Some (aux f) with Not_a_disjunction -> None
     
 (*------------------------------------------------------------------*)
 (** Declare input and output macros.
@@ -1054,6 +1094,9 @@ let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
 let not_message_atom (at : message_atom) = match at with
   | `Message t          -> `Message (not_ord_eq t)
 
+let not_index_atom (at : index_atom) = match at with
+  | `Index t            -> `Index (not_ord_eq t)
+
 let not_trace_eq_atom (at : trace_eq_atom) : trace_eq_atom = match at with
   | `Timestamp (o,t,t') -> `Timestamp (not_ord_eq (o,t,t'))
   | `Index (o,i,i')     -> `Index     (not_ord_eq (o,i,i'))
@@ -1220,6 +1263,44 @@ let rec destr_impls l f = match l, f with
   | _, Impl (f, g) -> omap (fun l -> l @ [g]) (destr_impls (l-1) f)
   | _ -> None
 
+let destr_pair : type a. a term -> (a term * a term) option = function
+  | Fun (f_pair, terms) ->
+    let t1, t2 = as_seq2 terms in
+    Some (t1, t2)
+
+  | _ -> None
+
+let destr_var : type a. a term -> a Vars.var option = function
+  | Var v -> Some v
+  | _ -> None
+
+type eatom = 
+  | EOrd : ord * 'a term * 'a term -> eatom
+  | EHappens : timestamp -> eatom
+      
+let destr_atom (at : generic_atom) : eatom = 
+  match at with
+  | `Message (ord, a, b)   -> EOrd ((ord :> ord), a, b)
+  | `Timestamp (ord, a, b) -> EOrd (ord, a, b)
+  | `Index (ord, a, b)     -> EOrd ((ord :> ord), Var a, Var b)
+  | `Happens t             -> EHappens t
+
+let as_ord_eq (ord : ord) : ord_eq = match ord with
+  | `Eq  -> `Eq
+  | `Neq -> `Neq
+  | _ -> assert false
+
+let of_eatom (eat : eatom) : generic_atom = match eat with
+  | EHappens t -> `Happens t
+  | EOrd (ord, t1, t2) ->
+    match sort t1 with
+    | Sorts.Message   -> `Message   (as_ord_eq ord, t1, t2)
+    | Sorts.Timestamp -> `Timestamp (ord, t1, t2)
+    | Sorts.Index     ->
+      let i1, i2 = oget (destr_var t1), oget (destr_var t2) in
+      `Index (as_ord_eq ord, i1, i2)
+
+    | Sorts.Boolean   -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
