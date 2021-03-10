@@ -4,7 +4,8 @@ open Term
 module L = Location
 
 (*------------------------------------------------------------------*)
-let dbg s = Printer.prt (if Config.debug_completion () then `Dbg else `Ignore) s
+let dbg s = 
+  Printer.prt (if Config.debug_completion () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
 module Cst = struct
@@ -300,8 +301,7 @@ let subterms l =
   subs [] l
 
 
-(* Create equational rules for some common theories.
-    TODO: Arity checks should probably be done somehow. *)
+(* Create equational rules for some common theories. *)
 module Theories = struct
 
   (** N-ary pair. *)
@@ -471,21 +471,23 @@ end
 
 (* State of the completion and normalization algorithms, which stores a
     term rewriting system:
-    - uf :  Equalities between constants.
-    - xor_rules : List of initial xor rules, normalized by uf.
+    - id : integer unique to a run of the completion procedure.
+    - uf : equalities between constants.
+    - xor_rules : list of initial xor rules, normalized by uf.
                   Remark that we do not saturate this set by ACUN (this is an
                   optimisation, to have a faster saturation).
                   A set {a1,...,an} corresponds to a1 + ... + an -> 0
-    - sat_xor_rules : List of saturated xor rules, to avoid re-computing it.
+    - sat_xor_rules : list of saturated xor rules, to avoid re-computing it.
                       The integer counter indicates the version of [state.uf]
                       that was used when the saturated set was computed.
-    - grnd_rules : Grounds flat rules of the form "ground term -> constant"
-    - e_rules : General rules. For the completion algorithm to succeed, these
+    - grnd_rules : grounds flat rules of the form "ground term -> constant"
+    - e_rules : general rules. For the completion algorithm to succeed, these
                 rules must be of a restricted form:
                 - No "xor" and no "succ".
                 - initially, each rule in e_rule must start by a destructor,
                   which may appear only once in e_rule. *)
-type state = { uf            : Cuf.t;
+type state = { id            : int;
+               uf            : Cuf.t;
                xor_rules     : Cset.t list;
                sat_xor_rules : (Cset.t list * int) option;
                grnd_rules    : (cterm * Cst.t) list;
@@ -547,14 +549,14 @@ let pp_state ppf s =
     (List.length s.e_rules)     pp_e_rules s.e_rules
 
 
-let rec term_uf_normalize state t = match t with
-  | Cfun (f,ari,ts) -> cfun f ari (List.map (term_uf_normalize state) ts)
-  | Cxor ts -> cxor (List.map (term_uf_normalize state) ts)
-  | Ccst c -> ccst (Cuf.find state.uf c)
+let rec term_uf_normalize uf t = match t with
+  | Cfun (f,ari,ts) -> cfun f ari (List.map (term_uf_normalize uf) ts)
+  | Cxor ts -> cxor (List.map (term_uf_normalize uf) ts)
+  | Ccst c -> ccst (Cuf.find uf c)
   | Cvar _ -> t
 
-let p_terms_uf_normalize state (t,t') =
-  ( term_uf_normalize state t, term_uf_normalize state t')
+let p_terms_uf_normalize uf (t,t') =
+  ( term_uf_normalize uf t, term_uf_normalize uf t')
 
 (* Remark: here, we cannot act directly on the set, as this would silently
    remove duplicates, which we need to apply the nilpotence rule. *)
@@ -619,6 +621,8 @@ end = struct
         List.fold_left (fun uf (a,b) -> Cuf.union uf a b) state.uf new_eqs
       in
       { state with uf = uf }          
+
+  let deduce_eqs = Prof.mk_unary "Xor.deduce_eqs" deduce_eqs
 end
 
 
@@ -636,11 +640,14 @@ end = struct
         { state with uf = Cuf.union state.uf (get_cst a) b }
       ) { state with grnd_rules = r_other } r_trivial
 
+  let deduce_triv_eqs = Prof.mk_unary "Ground.deduce_triv_eqs" deduce_triv_eqs
+
+
   (* Deduce constants equalities from the ground rules. *)
   let deduce_eqs state =
     (* We get all ground rules, normalized by constant equality rules. *)
     let grules = List.map (fun (t,c) ->
-        (term_uf_normalize state t, Cuf.find state.uf c)
+        (term_uf_normalize state.uf t, Cuf.find state.uf c)
       ) state.grnd_rules in
 
     (* We look for critical pairs, which are necessary of the form:
@@ -652,6 +659,8 @@ end = struct
             else state
           ) state grules
       ) state grules
+
+  let deduce_eqs = Prof.mk_unary "Ground.deduce_eqs" deduce_eqs
 end
 
 (* Simple unification implementation *)
@@ -708,9 +717,31 @@ module Unify = struct
 
   (* We normalize by constant equality rules before unifying.
       This is *not* modulo ACUN. *)
-  let unify state u v =
-    let u,v = p_terms_uf_normalize state (u,v) in
+  let unify uf u v =
+    let u,v = p_terms_uf_normalize uf (u,v) in
     unify_aux [(u,v)] empty_subst
+
+
+  (* (\** memoisation *\)
+   * module U = struct
+   *   type t = cterm * cterm
+   *   let hash (t,t') = Utils.hcombine (Hashtbl.hash t) (Hashtbl.hash t')
+   *   let equal (s,t) (s',t') =  s = s' && t = t'
+   * end 
+   * module Memo2 = Cuf.Memo2 (U) 
+   * 
+   * let unify = 
+   *   let memo = Memo2.create 256 in
+   *   fun uf u v ->
+   *     try Memo2.find memo (uf,(u,v)) with
+   *     | Not_found -> 
+   *       let r = unify uf u v in
+   *       Memo2.add memo (uf, (u,v)) r;
+   *       r *)
+
+  (* REM ?*)
+  (** profiling *)
+  let unify = Prof.mk_ternary "unify" unify
 end
 
 
@@ -725,25 +756,12 @@ end = struct
     { state with uf = Cuf.union state.uf a b;
                  grnd_rules = eqs @ state.grnd_rules
                               |> List.sort_uniq Stdlib.compare }
-
-
-  (* (\** Add an e_rule or a grnd_rule, depending.  *\)
-   * let add_rule state (t1,t2) = match t2 with
-   *   | Ccst c2 when is_ground_cterm t1 ->
-   *     add_grnd_rule state t1 c2
-   *   | _ -> 
-   *     let e_rules = 
-   *       if List.mem (t1,t2) state.e_rules 
-   *       then state.e_rules
-   *       else (t1,t2) :: state.e_rules 
-   *     in
-   *     { state with e_rules } *)
         
 
-  (* Try to superpose two rules at head position, and add a new equality to get
+  (** Try to superpose two rules at head position, and add a new equality to get
       local confluence if necessary. *)
   let head_superpose state (l,r) (l',r') =
-    match Unify.unify state l l' with
+    match Unify.unify state.uf l l' with
     | Unify.No_mgu -> state
     | Unify.Mgu sigma ->
       match Unify.subst_apply r sigma, Unify.subst_apply r' sigma with
@@ -757,6 +775,9 @@ end = struct
          adding them to the set of ground equalities. If one of the two terms is
          not ground, we should probably always abort. *)
       | _ -> assert false
+
+  (* REM *)
+  let head_superpose = Prof.mk_ternary "head_superpose" head_superpose
 
   (** [grnd_superpose state (l,r) (t,a)]: Try all superposition of a ground rule
       [t] -> [a] into an e_rule [l] -> [r], and add new equalities to get local
@@ -774,7 +795,7 @@ end = struct
       | Cxor _ -> assert false
 
       | Cfun (fn, ari, ts) ->
-        let state, acc = match Unify.unify state lst t with
+        let state, acc = match Unify.unify state.uf lst t with
           | Unify.No_mgu -> ( state, acc )
           | Unify.Mgu sigma ->
             (* Here, we have the critical pair:
@@ -811,36 +832,45 @@ end = struct
 
     aux state [] l (fun x -> x)
 
+  (* REM *)
+  let grnd_superpose = Prof.mk_ternary "grnd_superpose" grnd_superpose
 
-  (* [deduce_aux state r_open r_closed]. Invariant:
-      - r_closed: e_rules already superposed with all other rules.
-      - r_open: e_rules to superpose. *)
+  (** [deduce_aux state r_open r_closed]. Invariant:
+      - [r_closed]: e_rules already superposed with all other rules.
+      - [r_open]: e_rules to superpose. *)
   let rec deduce_aux state r_open r_closed = match r_open with
     | [] -> { state with e_rules = List.sort_uniq Stdlib.compare r_closed }
 
     | rule :: r_open' ->
-      let state, r_open' = List.fold_left (fun (state, r_open') rule' ->
-          let (state, new_rs) = grnd_superpose state rule rule' in
-          ( state, new_rs @ r_open' )
-        ) ( state, r_open') state.grnd_rules in
+      let state, r_open' = 
+        List.fold_left (fun (state, r_open') rule' ->
+            let (state, new_rs) = grnd_superpose state rule rule' in
+            ( state, new_rs @ r_open' )
+          ) ( state, r_open') state.grnd_rules 
+      in
 
       let state = List.fold_left (fun state rule' ->
           head_superpose state rule rule'
-        ) state r_closed in
+        ) state r_closed 
+      in
 
       let state = List.fold_left (fun state rule' ->
           head_superpose state rule rule'
-        ) state r_open' in
+        ) state r_open' 
+      in
 
       deduce_aux state r_open' (rule :: r_closed )
   
 
-  (* Deduce new rules (constant, ground and e_) from the non-ground rules. *)
+  (** Deduce new rules (constant, ground and erule) from the non-ground
+      rules. *)
   let deduce_eqs state =
     let erules = state.e_rules
-                 |> List.map (p_terms_uf_normalize state) in
+                 |> List.map (p_terms_uf_normalize state.uf) in
 
     deduce_aux state erules []
+      
+  let deduce_eqs = Prof.mk_unary "Erule.deduce_eqs" deduce_eqs
 end
 
 
@@ -932,20 +962,20 @@ let rec term_e_normalize state u = match u with
     let rec find_unif = function
       | [] -> raise Find_unif_fail
       | (l, r) :: l' ->
-        match Unify.unify state u l with
+        match Unify.unify state.uf u l with
         | Unify.No_mgu -> find_unif l'
         | Unify.Mgu sigma -> l, r, sigma in
     try
       let l,r,sigma = find_unif state.e_rules in
-      assert (term_uf_normalize state (Unify.subst_apply l sigma)
-              = term_uf_normalize state u);
+      assert (term_uf_normalize state.uf (Unify.subst_apply l sigma)
+              = term_uf_normalize state.uf u);
       Unify.subst_apply r sigma
     with Find_unif_fail -> u
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
 let normalize state u =
-  fpt (fun x -> term_uf_normalize state x
+  fpt (fun x -> term_uf_normalize state.uf x
                 |> term_grnd_normalize state
                 |> term_e_normalize state) u
 
@@ -1008,6 +1038,7 @@ let rec complete_state state =
   if start <> stop_cond state then complete_state state
   else state
 
+let complete_state = Prof.mk_unary "complete_state" complete_state
 
 let check_zero_arity table fname =
   assert (fst (Symbols.Function.get_def fname table) = 0)
@@ -1055,6 +1086,8 @@ let init_erules table =
     (Theories.mk_pair 2 (F Symbols.fs_pair) [F Symbols.fs_fst;F Symbols.fs_snd])
     table
 
+let state_id = ref 0
+
 let complete_cterms table (l : (cterm * cterm) list) : state =
   let grnd_rules, xor_rules = List.fold_left (fun (acc, xacc) (u,v) ->
       let eqs, xeqs, a = flatten u
@@ -1062,7 +1095,8 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
       ( (ccst a, b) :: eqs @ eqs' @ acc, xeqs @ xeqs' @ xacc )
     ) ([], []) l in
 
-  let state = { uf = Cuf.create [];
+  let state = { id = (incr state_id; !state_id); 
+                uf = Cuf.create [];
                 grnd_rules = grnd_rules;
                 xor_rules = xor_rules;
                 sat_xor_rules = None;

@@ -28,7 +28,10 @@ module List : sig
   (** [drop n l] returns [l] without the first [n] elements, or the empty list 
       if [l]  have less than n elements. *)
   val drop : int -> 'a list -> 'a list
-      
+
+  (** Update in an associative list *)
+  val assoc_up : 'a -> ('b -> 'b) -> ('a * 'b) list -> ('a * 'b) list
+
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
 end

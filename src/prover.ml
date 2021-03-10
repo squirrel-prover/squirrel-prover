@@ -608,6 +608,24 @@ let () =
                   tactic_group = Logical}
     (fun _ _ sk fk -> sk [] fk) ;
 
+  TraceTactics.register_general "prof"
+    ~tactic_help:{general_help = "Print profiling information.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (fun _ s sk fk -> 
+       Printer.prt `Dbg "%a" Prof.print ();
+      sk [s] fk) ;
+
+  EquivTactics.register_general "prof"
+    ~tactic_help:{general_help = "Print profiling information.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (fun _ s sk fk -> 
+       Printer.prt `Dbg "%a" Prof.print ();
+      sk [s] fk) ;
+
   TraceTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
                                   Usages: help\n\

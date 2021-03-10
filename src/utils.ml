@@ -34,6 +34,12 @@ module List = struct
   let inclusion a b =
     List.for_all (fun x -> List.mem x b)  a
 
+  let rec assoc_up s f = function
+    | [] -> raise Not_found
+    | (a,b) :: t ->
+      if a = s then (a, f b) :: t
+      else (a,b) :: assoc_up s f t
+
   (*------------------------------------------------------------------*)
   let rec drop0 i l =
     if i = 0 then l else
@@ -196,11 +202,13 @@ module Uf (Ord: Ordered) = struct
     (** [rmap] is the inverse of map.
         [cpt] counts the number of non-trivial unions .
         [id] is guaranteed to be different for different union-find structures. *)
-    type t = private { map : int Vmap.t;
-               rmap : v Mi.t;
-               puf : Vuf.t;
-               cpt : int;
-               id : int; }
+    type t = private { 
+      map : int Vmap.t;
+      rmap : v Mi.t;
+      puf : Vuf.t;
+      cpt : int;
+      id : int; 
+    }
 
     val mk : 
       ?map:(int Vmap.t) ->
