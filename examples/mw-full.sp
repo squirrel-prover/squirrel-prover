@@ -62,6 +62,10 @@ process reader =
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
 axiom tags_neq : tag0 <> tag1.
+goal tags_neq0 : tag0 = tag1 => False. 
+Proof. 
+ use tags_neq; auto. 
+Qed.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
@@ -332,50 +336,53 @@ expand cond@T1(i,t); split.
   use tags_neq; project.
   (* Left *)
   simpl.
-  euf Meq0 => Ctrace _ _; 2:auto.
+  euf Meq0 => Ctrace [_ [A B]] _; 2:auto.
   assert R1(r) < T1(i,t) as HClt;
   1: by case Ctrace; depends T(i,t),T1(i,t).
+  clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
     by intro HH; use HH with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond].
-  euf Hcond => _ _ _; 1:auto.
+  euf Hcond => _ [_ [_ _]] _; 1:auto.
   exists r.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
     case C; 2,3:auto. 
-    by case Ctrace; 1: depends R(r),R2(r). 
+    by depends R(r),R2(r). 
   case output@R1(r).
   by euf Meq1.
   by use H0 with i,t.
 
   (* Right *)
-  euf Meq0 => Ctrace _ _; 2: auto.
+  euf Meq0 => Ctrace [_ [A B]] [? ?]; 2: auto.
   simpl.
-  assert R1(r) < T1(i,t).
+  assert R1(r) < T1(i,t) as Clt.
     by case Ctrace; depends T(i,t),T1(i,t).
+  clear Ctrace.
   assert cond@R1(r) as Hcond.
     executable pred(T1(i,t)); 1,2: auto.
     by intro Hex; use Hex with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond].
-  euf Hcond => _ _ _; 1:auto.
-  exists r.
+  euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto | 2: clear D F].
+  exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r).
+    by case C; 1: depends R(r),R2(r); try constraints.
+  simpl.
   case output@R1(r).
-  euf Meq1 => _ _ _; 1,2:auto.
+  euf Meq1 => A0 [A1 _] [_ _]; 1,2: by congruence.
   by use H0 with i,t.
 
   (* Honest => Cond *)
   intro [_ [r _]]. 
   simpl.
   case output@R1(r); expand output.
-  by project; euf Meq. 
+  by project; euf Meq.
 
   by use H0 with i,t.
 
@@ -402,7 +409,8 @@ split; intro [_ H1]; simpl.
   (* Honest => Cond *)
   intro [r H2]; use H1.
   case output@R1(r); expand output.
-  by project; euf Meq.
+  (* by project; euf Meq. *)
+  by project; euf Meq => _ [F _] *.
   by use H0 with i,t.
   (* Cond => Honest *)
   intro Meq.
@@ -414,6 +422,7 @@ split; intro [_ H1]; simpl.
   euf Meq0 => Ct _ _; 2:auto.
   assert R1(r) < T2(i,t) as _.
     by case Ct; try depends T(i,t),T2(i,t).
+  clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto.    
     by intro He; use He with R1(r); expand exec@R1(r).
@@ -424,7 +433,6 @@ split; intro [_ H1]; simpl.
   assert R(r) < T(i,t).
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    case Ct; 2:auto.
     by case C; 1: depends R(r),R2(r).
   case output@R1(r).
   by euf Meq1.
@@ -434,6 +442,7 @@ split; intro [_ H1]; simpl.
   euf Meq0 => Ct _ [_ _]; 2:auto.
   assert R1(r) < T2(i,t) as _.
     by case Ct; depends T(i,t),T2(i,t).
+  clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto => He.
     by use He with R1(r); expand exec@R1(r).
@@ -444,7 +453,6 @@ split; intro [_ H1]; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    case Ct; 2:auto.
     by case C; 1: depends R(r),R2(r).
   case output@R1(r).
   by euf Meq1.

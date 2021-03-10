@@ -2091,8 +2091,6 @@ let simplify ~close ~intro =
     (if close || intro then [wrap intro_all;
                              wrap simpl_left_tac] else []) @
 
-    (* try again *)
-    (if close then [try_tac (wrap assumption)] else []) @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)

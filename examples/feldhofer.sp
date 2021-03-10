@@ -25,6 +25,8 @@ induction for wa_* goals.
 This is a "light" model without the last check of T.
 *******************************************************************************)
 
+set timeout=4.
+
 channel cR
 channel cT
 
