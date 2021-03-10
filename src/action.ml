@@ -79,6 +79,10 @@ let of_symbol s table =
     | Data (x,y) -> x,y
     | _ -> assert false
 
+let arity s table = 
+  let l,_ = of_symbol s table in
+  List.length l
+
 let iter f table =
   Symbols.Action.iter
     (fun s _ -> function

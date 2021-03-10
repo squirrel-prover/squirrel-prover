@@ -106,6 +106,7 @@ val of_symbol :
   Symbols.action Symbols.t -> Symbols.table ->
   Vars.index list * action
 
+val arity : Symbols.action Symbols.t -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}

@@ -287,7 +287,7 @@ let message_arity fdef = let open Symbols in match fdef with
   | AEnc|SEnc -> 3
   | Abstract a -> a
 
-(** Get the kind of a function of macro definition.
+(** Get the kind of a function or macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
 let function_kind table (f : lsymb): kind list * kind =
   let open Symbols in

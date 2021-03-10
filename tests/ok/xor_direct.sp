@@ -24,6 +24,7 @@ Proof.
   simpl.
 Qed.
 
+set debugCompletion=true.
 equiv testXorTwoArg : diff(f(ok),f(ok)),diff(ko,ko) XOR diff(n,m) XOR k.
 Proof.
   nosimpl(xor 1, k).
