@@ -101,10 +101,30 @@ end = struct
     | UInit
     | UUndef
 
+  (** Hash-consing.
+     In [hash] and [equal], we can assume that strit subterms
+     are properly hash-consed (but not the term itself). *)
   module Ut = struct
     type t = ut
-    let hash t = Hashtbl.hash t.cnt
-    let equal t t' =  t.cnt = t'.cnt
+
+    let hash t = match t.cnt with
+      | UPred t' -> Utils.hcombine 0 t'.hash
+      | UInit -> 1
+      | UUndef -> 2
+      | UVar uv -> Utils.hcombine 3 (Hashtbl.hash uv)
+      | UName (a,ts) -> 
+        Utils.hcombine_list (fun x -> x.hash) (Hashtbl.hash a) ts
+
+    let equal t t' = match t.cnt, t'.cnt with
+      | UPred t, UPred t' -> t.hash = t'.hash
+      | UInit, UInit 
+      | UUndef, UUndef -> true
+      | UVar uv, UVar uv' -> uv = uv'
+      | UName (a,ts), UName (a',ts') -> 
+        a = a' &&
+        List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
+      | _ -> false
+      
   end
   module Hut = Ephemeron.K1.Make(Ut)
 

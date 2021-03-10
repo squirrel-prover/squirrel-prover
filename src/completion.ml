@@ -46,20 +46,16 @@ module Cst = struct
     | Csucc _, _ -> -1
     | _, Csucc _ -> 1
     | _,_ -> Stdlib.compare c c'
-
-  (*  let equal c c' = compare c c' = 0 *)
-
-  (* let hash c = Hashtbl.hash c *)
 end
 
 (*------------------------------------------------------------------*)
 type varname = int
 
-let sort_ts ts = List.sort Stdlib.compare ts
+let sort_ts compare ts = List.sort compare ts
 
 (* [nilpotence_norm l] normalize [l] using the nilpotence rule x + x -> 0. *)
-let nilpotence_norm l =
-  let l = sort_ts l in
+let nilpotence_norm compare l =
+  let l = sort_ts compare l in
   let rec aux = function
     | a :: b :: l' ->
       if a = b then aux l'
@@ -81,42 +77,108 @@ type gfsymb =
 
 (*------------------------------------------------------------------*)
 module CTerm : sig
-  type cterm = private
+  type cterm = private { 
+    hash : int;
+    cnt  : cterm_cnt;
+  }
+
+  and cterm_cnt = private
     | Cfun of gfsymb * int * cterm list (* the integer is index arity *)
     | Ccst of Cst.t
     | Cvar of varname
     | Cxor of cterm list
 
+  val c_equal : cterm -> cterm -> bool
+  val c_hash : cterm -> int
+  val c_compare : cterm -> cterm -> int
+
   (** Smart constructors. *)
-    val cfun : gfsymb -> int (* index arity *) -> cterm list -> cterm 
-    val ccst : Cst.t -> cterm
-    val cvar : varname -> cterm
-    val cxor : cterm list -> cterm
+
+  (** [cfun g i ts], [i] is the index arity *)
+  val cfun : gfsymb -> int -> cterm list -> cterm 
+
+  val ccst : Cst.t -> cterm
+  val cvar : varname -> cterm
+  val cxor : cterm list -> cterm
 
 end = struct
   (** Terms used during the completion and normalization.
       Remark: Cxor never appears during the completion. *)
-  type cterm =
-    | Cfun of gfsymb * int * cterm list
+  type cterm = { 
+    hash : int;
+    cnt  : cterm_cnt;
+  }
+
+  and cterm_cnt = 
+    | Cfun of gfsymb * int * cterm list 
     | Ccst of Cst.t
     | Cvar of varname
     | Cxor of cterm list
 
-  let simplify_set t = match t with
-  | Cxor [] -> Cfun (F Symbols.fs_zero, 0, [])
-  | Cxor [t] -> t
-  | _ -> t
+  (*------------------------------------------------------------------*)
+  (** Hash-consing.
+      In [hash] and [equal], we can assume that strit subterms
+      are properly hash-consed (but not the term itself). *)
+  module Ct = struct
+    type t = cterm
 
+    let hash t = match t.cnt with
+      | Cxor ts -> Utils.hcombine_list (fun x -> x.hash) 0 ts
+      | Cfun (f,i,ts) ->
+        Utils.hcombine_list (fun x -> x.hash) 
+          (Utils.hcombine i (hcombine 1 (Hashtbl.hash f)))
+          ts
+      | Ccst c -> hcombine 2 (Hashtbl.hash c)
+      | Cvar v -> hcombine 3 v
+
+    let equal t t' = match t.cnt, t'.cnt with
+      | Cxor ts, Cxor ts' -> List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
+      | Cfun (f,i,ts), Cfun (f',i',ts') ->
+        f = f' && i = i' &&
+        List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
+      | Ccst c, Ccst c' -> c = c'
+      | Cvar v, Cvar v' -> v = v'
+      | _ -> false
+      
+  end
+  module Hct = Ephemeron.K1.Make(Ct)
+
+  let hcons_cpt = ref 0
+  let hct = Hct.create 256 
+
+  (* Care, [make] must not be exported, and must only be called by the smart
+     constructors below. *)
+  let make cnt =
+    let ct = { hash = !hcons_cpt ; cnt = cnt } in
+    try Hct.find hct ct with
+    | Not_found ->
+      incr hcons_cpt;
+      Hct.add hct ct ct;
+      ct
+
+  (*------------------------------------------------------------------*)
+  let c_equal t t' = t.hash = t'.hash
+
+  let c_hash t = t.hash
+
+  let c_compare t t' = Stdlib.compare t.hash t'.hash
+
+  (*------------------------------------------------------------------*)
   (** Smart constructors *)
 
-  let ccst c = Ccst c
+  let simplify_set t = match t with
+    | Cxor [] -> make (Cfun (F Symbols.fs_zero, 0, []))
+    | Cxor [t] -> t
+    | _ -> make t
 
-  let cvar v = Cvar v
+  let ccst c = make (Ccst c)
 
-  let rec cfun f i ts = 
+  let cvar v = make (Cvar v)
+
+  let rec cfun f i (ts : cterm list) : cterm = 
     if f = F Symbols.fs_succ
-    then begin match ts with
-      | [Ccst cst] -> Ccst (Cst.Csucc cst)
+    then begin match List.map (fun x -> x.cnt) ts with
+      | [Ccst cst] -> make (Ccst (Cst.Csucc cst))
       | _ -> assert false end
     else if f = F Symbols.fs_xor
     then cxor ts
@@ -125,24 +187,23 @@ end = struct
       begin
         assert (i = 0);
         match f with
-        | F f -> Ccst (Cgfuncst (`F f))
-        | A a -> Ccst (Cgfuncst (`A a))
-        | N a -> Ccst (Cgfuncst (`N a))
+        | F f -> make (Ccst (Cgfuncst (`F f)))
+        | A a -> make (Ccst (Cgfuncst (`A a)))
+        | N a -> make (Ccst (Cgfuncst (`N a)))
         | GPred | M _ -> assert false
       end
-    else Cfun (f, i, ts)
+    else make (Cfun (f, i, ts))
 
-  and cxor ts =
+  and cxor (ts : cterm list) : cterm =
     (* We group the xor *)
-    let ts = List.fold_left (fun ts t -> match t with
+    let ts = List.fold_left (fun ts t -> match t.cnt with
         | Cfun (f,_,_) when f = F Symbols.fs_xor -> 
           assert false
 
         | Cxor ts' -> ts' @ ts
         | _ -> t :: ts) [] ts in
     (* We remove duplicate *)
-    let ts = sort_ts ts
-             |> nilpotence_norm in
+    let ts = nilpotence_norm (fun x y -> Stdlib.compare x.hash y.hash) ts in
     (* We simplify in case its a singleton or empty list. *)
     simplify_set (Cxor ts)
 end
@@ -196,7 +257,7 @@ and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
 let rec term_of_cterm : type a. a Sorts.sort -> cterm -> a Term.term = 
   fun s c -> 
   let open Term in 
-  match c with 
+  match c.cnt with 
   | Cfun (F f, ari, cterms) -> 
     let cis, cterms = List.takedrop ari cterms in
     let is = indices_of_cterms cis
@@ -250,7 +311,7 @@ let pp_gsymb ppf = function
   | N x   -> Symbols.pp ppf x
   | GPred -> Fmt.pf ppf "pred"
 
-let rec pp_cterm ppf = function
+let rec pp_cterm ppf t = match t.cnt with
   | Cvar v -> Fmt.pf ppf "v#%d" v
   | Ccst c -> Cst.print ppf c
 
@@ -263,12 +324,12 @@ let rec pp_cterm ppf = function
     Fmt.pf ppf "++(@[<hov 1>%a@])"
       (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp_cterm) ts
 
-let rec is_ground_cterm = function
+let rec is_ground_cterm t = match t.cnt with
   | Ccst _ -> true
   | Cvar _ -> false
   | Cxor ts | Cfun (_, _, ts) -> List.for_all is_ground_cterm ts
 
-let rec no_macros = function
+let rec no_macros t = match t.cnt with
   | Cfun (M _, _, ts) -> false
 
   | Ccst _ | Cvar _ -> true
@@ -278,23 +339,27 @@ let rec no_macros = function
 
   | Cfun ((A _ | F _ | N _), _, ts) -> List.for_all no_macros ts
 
-let is_cst = function Ccst _ -> true | _ -> false
+let is_cst t = match t.cnt with
+  | Ccst _ -> true
+  | _      -> false
 
-let is_cfun = function Cfun _ -> true | _ -> false
+let is_cfun t = match t.cnt with
+  | Cfun _ -> true
+  | _      -> false
 
-let is_name = function 
+let is_name t = match t.cnt with
   | Cfun (N _, _, _)
   | Ccst (Cst.Cgfuncst (`N _)) -> true
   | _ -> false
 
-let get_cst = function
+let get_cst t = match t.cnt with
   | Ccst c -> c
   | _ -> assert false
 
 let subterms l =
   let rec subs acc = function
     | [] -> acc
-    | x :: l -> match x with
+    | x :: l -> match x.cnt with
       | Ccst _ | Cvar _ -> subs (x :: acc) l
       | Cfun (_,_,fl) -> subs (x :: acc) (fl @ l)
       | Cxor xl -> subs (x :: acc) (xl @ l) in
@@ -376,7 +441,8 @@ module Cset = struct
 
   (* [of_list l] is modulo nilpotence. For example:
       [of_list [a;b;a;c] = [b;c]] *)
-  let of_list l = nilpotence_norm l |> of_list
+  let of_list l = nilpotence_norm Stdlib.compare l |> 
+                  of_list
 
   let print ppf s =
     Fmt.pf ppf "@[<hov>%a@]"
@@ -405,7 +471,7 @@ module Cset = struct
 end
 
 (* Flatten a ground term, introducing new constants and rewrite rules. *)
-let rec flatten t = match t with
+let rec flatten t = match t.cnt with
   | Cfun (F f, _, _) when f = Symbols.fs_succ ->
     assert false
 
@@ -494,6 +560,9 @@ type state = { id            : int;
                e_rules       : (cterm * cterm) list;
                completed     : bool }
 
+(*------------------------------------------------------------------*)
+(** {2 Pretty Printers} *)
+
 let pp_xor_rules ppf xor_rules =
   Fmt.pf ppf "@[<v>%a@]"
     (Fmt.list
@@ -549,11 +618,30 @@ let pp_state ppf s =
     (List.length s.e_rules)     pp_e_rules s.e_rules
 
 
-let rec term_uf_normalize uf t = match t with
+(*------------------------------------------------------------------*)
+(** {2 Normalization} *)
+
+let rec term_uf_normalize uf t = match t.cnt with
   | Cfun (f,ari,ts) -> cfun f ari (List.map (term_uf_normalize uf) ts)
   | Cxor ts -> cxor (List.map (term_uf_normalize uf) ts)
   | Ccst c -> ccst (Cuf.find uf c)
   | Cvar _ -> t
+
+(** memoisation *)
+let term_uf_normalize = 
+  let module U = struct
+    type t = cterm 
+    let hash t = c_hash t
+    let equal s s' = c_equal s s'
+  end in 
+  let module Memo = Cuf.Memo2 (U) in
+  let memo = Memo.create 256 in
+  fun uf v ->
+    try Memo.find memo (uf,v) with
+    | Not_found -> 
+      let r = term_uf_normalize uf v in
+      Memo.add memo (uf,v) r;
+      r
 
 let p_terms_uf_normalize uf (t,t') =
   ( term_uf_normalize uf t, term_uf_normalize uf t')
@@ -681,7 +769,7 @@ module Unify = struct
 
   (** [subst_apply t sigma] applies [sigma] to [t], checking for cycles. *)
   let subst_apply t sigma =
-    let rec aux sigma occurs t = match t with
+    let rec aux sigma occurs t = match t.cnt with
       | Cfun (f, ari, ts) -> cfun f ari (List.map (aux sigma occurs) ts)
       | Cxor ts -> cxor (List.map (aux sigma occurs) ts)
       | Ccst _ -> t
@@ -697,47 +785,51 @@ module Unify = struct
     | [] -> Mgu sigma
     | (u,v) :: eqs' ->
       match subst_apply u sigma, subst_apply v sigma with
-      | Cfun (f,ari,ts), Cfun (g,ari',ts') ->
+      | { cnt = Cfun (f,ari,ts)}, { cnt = Cfun (g,ari',ts')} ->
         if f <> g then No_mgu
         else begin
           assert (ari = ari'); 
           unify_aux ((List.combine ts ts') @ eqs') sigma
         end
 
-      | Cxor ts, Cxor ts' -> unify_aux ((List.combine ts ts') @ eqs') sigma
+      | { cnt = Cxor ts}, { cnt = Cxor ts'} ->
+        unify_aux ((List.combine ts ts') @ eqs') sigma
 
-      | Ccst a, Ccst b -> if a = b then unify_aux eqs' sigma else No_mgu
+      | { cnt = Ccst a}, { cnt = Ccst b} ->
+        if a = b then unify_aux eqs' sigma else No_mgu
 
-      | (Cvar x as tx), t | t, (Cvar x as tx) ->
+      | ({ cnt = Cvar x} as tx), t | t, ({ cnt = Cvar x } as tx) ->
         assert (not (Mi.mem x sigma));
         let sigma = if t = tx then sigma else Mi.add x t sigma in
         unify_aux eqs' sigma
 
       | _ ->  No_mgu
 
+  let unify_normed u v = unify_aux [(u,v)] empty_subst
+
+  (** memoisation *)
+  let unify_normed = 
+    let module U = struct
+      type t = cterm * cterm
+      let hash (t,t') = Utils.hcombine (c_hash t) (c_hash t')
+      let equal (s,t) (s',t') = c_equal s s' && c_equal t t'
+    end in 
+    let module Memo = Ephemeron.K1.Make (U) in
+    let memo = Memo.create 256 in
+    fun u v ->
+      try Memo.find memo (u,v) with
+      | Not_found -> 
+        let r = unify_normed u v in
+        Memo.add memo (u,v) r;
+        r
+
+  (* let unify_normed = Prof.mk_binary "unify_normed" unify_normed *)
+
   (* We normalize by constant equality rules before unifying.
       This is *not* modulo ACUN. *)
   let unify uf u v =
     let u,v = p_terms_uf_normalize uf (u,v) in
-    unify_aux [(u,v)] empty_subst
-
-
-  (* (\** memoisation *\)
-   * module U = struct
-   *   type t = cterm * cterm
-   *   let hash (t,t') = Utils.hcombine (Hashtbl.hash t) (Hashtbl.hash t')
-   *   let equal (s,t) (s',t') =  s = s' && t = t'
-   * end 
-   * module Memo2 = Cuf.Memo2 (U) 
-   * 
-   * let unify = 
-   *   let memo = Memo2.create 256 in
-   *   fun uf u v ->
-   *     try Memo2.find memo (uf,(u,v)) with
-   *     | Not_found -> 
-   *       let r = unify uf u v in
-   *       Memo2.add memo (uf, (u,v)) r;
-   *       r *)
+    unify_normed u v
 
   (* REM ?*)
   (** profiling *)
@@ -765,9 +857,14 @@ end = struct
     | Unify.No_mgu -> state
     | Unify.Mgu sigma ->
       match Unify.subst_apply r sigma, Unify.subst_apply r' sigma with
-      | rs, rs' when rs = rs' -> state
-      | Ccst a, Ccst b when a <> b -> { state with uf = Cuf.union state.uf a b }
-      | Ccst a, rs | rs, Ccst a -> add_grnd_rule state rs a
+      | rs, rs' when c_equal rs rs' -> state
+
+      | { cnt = Ccst a}, { cnt = Ccst b} when a <> b ->
+        { state with uf = Cuf.union state.uf a b }
+
+      | { cnt = Ccst a}, rs
+      | rs, { cnt = Ccst a} -> 
+        add_grnd_rule state rs a
 
       (* This last case should not be possible under our restrictions on
          non-ground rules. Still, if we relaxed the restriction, we could try to
@@ -789,7 +886,7 @@ end = struct
      *  - [lst] is a subterm of [l].
      *  - [f_cntxt] is a function building the context where [lst] appears.
           For example, we have that [f_cntxt lst = l]. *)
-    let rec aux state acc lst f_cntxt = match lst with
+    let rec aux state acc lst f_cntxt = match lst.cnt with
       (* never superpose at variable position *)
       | Ccst _ | Cvar _ -> ( state, acc )
       | Cxor _ -> assert false
@@ -806,7 +903,7 @@ end = struct
             (* No critical pair *)
             if la_sigma = r_sigma then ( state, acc )
 
-            else match la_sigma with
+            else match la_sigma.cnt with
               | Ccst c ->
                 (* Using the subterm property, we know that if [la_sigma] is
                    ground, then so is [r_sigma] *)
@@ -904,7 +1001,7 @@ let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
 
 (* [term_grnd_normalize state u]
     Precondition: [u] must be ground and its xor grouped. *)
-let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
+let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u.cnt with
   | Cvar _ -> u
 
   | Ccst c ->
@@ -922,7 +1019,7 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
        - finally, we normalize the two set of constants using the xor rules. *)
     let csts0, fterms0 = List.split_pred is_cst ts in
     let csts1, fterms1 = List.map (term_grnd_normalize state) fterms0
-                         |> nilpotence_norm
+                         |> nilpotence_norm c_compare
                          |> List.split_pred is_cst in
 
     (* We only have to normalize the constants in [ts], i.e. [csts0 @ csts1]. *)
@@ -949,7 +1046,7 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u with
 
 (** [term_e_normalize state u]
     Precondition: [u] must be ground and its xors grouped. *)
-let rec term_e_normalize state u = match u with
+let rec term_e_normalize state u = match u.cnt with
   | Ccst _ | Cvar _ -> u
 
   | Cxor ts -> cxor ( List.map (term_e_normalize state) ts)
@@ -987,11 +1084,10 @@ let normalize ?(print=false) state u =
   u_normed
 
   
-
-let rec normalize_csts state = function
+let rec normalize_csts state t = match t.cnt with
   | Cfun (fn,ari,ts) -> cfun fn ari (List.map (normalize_csts state) ts)
-  | Cvar _ as t -> t
-  | Ccst _ | Cxor _ as t -> normalize state t
+  | Cvar _ -> t
+  | Ccst _ | Cxor _ -> normalize state t
 
 
 (*------------------------------------------------------------------*)
@@ -1173,7 +1269,7 @@ let print_init_trs fmt table =
 
 (** Returns true if the cterm corresponds to a ground term, e.g without macros
     and vars. *)
-let rec is_ground_term = function
+let rec is_ground_term t = match t.cnt with
   | Cfun (M _, _, _) 
   | Ccst (Cst.Cmvar _) 
   | Cvar _ -> false
@@ -1268,7 +1364,7 @@ let x_index_cnstrs state l select f_cnstr =
     rewrite relation in [state], and add the corresponding index equalities.
     E.g., if n(i,j) and n(k,l) are equal, then i = k and j = l.*)
 let name_index_cnstrs state l =
-  let n_cnstr a b = match a,b with
+  let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [False] else []
       
