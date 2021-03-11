@@ -650,14 +650,10 @@ let () =
 let goal_exists_intro  ths (s : TraceSequent.t) =
   match TraceSequent.conclusion s with
   | Exists (vs,f) when List.length ths = List.length vs ->
-    begin try
-      let table = TraceSequent.table s in
-      let nu = Theory.parse_subst table (TraceSequent.env s) vs ths in
-      let new_formula = Term.subst nu f in
-      [TraceSequent.set_conclusion new_formula s]
-    with Theory.(Conv (_, Undefined x)) ->
-      soft_failure (Tactics.Undefined x) (* TODO: location *)
-    end
+    let table = TraceSequent.table s in
+    let nu = Theory.parse_subst table (TraceSequent.env s) vs ths in
+    let new_formula = Term.subst nu f in 
+    [TraceSequent.set_conclusion new_formula s]
   | _ ->
       soft_failure (Tactics.Failure "cannot introduce exists")
 
@@ -1527,7 +1523,6 @@ let substitute_tac arg s =
       (Tactics.Failure "expected a pair of messages, booleans or a pair of \
                         index variables")
 
-(* TODO: rename in rewrite, and have a separate substitute tactic *)
 let () =
   T.register_typed "subst"
     ~general_help:"If i = t where i is a variable, substitute all occurences \
@@ -1589,7 +1584,7 @@ let rewrite ~all
       | `Once,          Some occ -> rw_inst occ
       | `Any,           None     -> f
   in
-
+  
   let is_same hyp_id target_id = match hyp_id, target_id with
     | None, _ | _, None -> false
     | Some hyp_id, Some target_id ->

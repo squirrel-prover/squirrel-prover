@@ -10,7 +10,6 @@ type tac_error =
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
-  | Undefined of string
   | NotDDHContext
   | SEncNoRandom
   | SEncSharedRandom
@@ -65,7 +64,6 @@ let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
   | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
   | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
-  | Undefined s -> "Undefined, "^s
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | More
   | NotEqualArguments
@@ -107,7 +105,6 @@ let rec pp_tac_error ppf = function
   | NoSSC ->
       Fmt.pf ppf
         "no key which satisfies the syntactic condition has been found"
-  | Undefined x -> Fmt.pf ppf "undefined use of %s" x
   | NotDepends (a, b) ->
       Fmt.pf ppf "action %s does not depend on action %s" a b
   | NoAssumpSystem ->
@@ -175,7 +172,6 @@ let rec tac_error_of_strings = function
     )
   | "AndThenFailure"::q -> AndThen_Failure (tac_error_of_strings q)
   | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
-  | ["Undefined"; s] -> Undefined s
   | _ ->  raise (Failure "exception name unknown")
 
 exception Tactic_soft_failure of L.t option * tac_error

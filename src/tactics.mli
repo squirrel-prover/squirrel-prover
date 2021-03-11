@@ -38,7 +38,6 @@ type tac_error =
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
-  | Undefined of string
   | NotDDHContext
   | SEncNoRandom
   | SEncSharedRandom

@@ -278,7 +278,7 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try run ~test "tests/alcotest/existsintro_fail.sp" with
-           | Tactic_soft_failure (_, Tactics.Undefined "a1") -> raise Ok)
+           | Theory.(Conv (_, Undefined "a1")) -> raise Ok)
     end ;
     "Vars not eq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
