@@ -20,7 +20,9 @@ module Hyps = TraceSequent.Hyps
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
+let dbg ?(force=false) s =
+  let mode = if Config.debug_tactics () || force then `Dbg else `Ignore in
+  Printer.prt mode s
 
 (*------------------------------------------------------------------*)
 let hard_failure = Tactics.hard_failure
@@ -89,6 +91,9 @@ let () =
                   tactic_group = Logical}
     print_tac
 
+(*------------------------------------------------------------------*)
+let get_models s = Tactics.timeout_get (TraceSequent.get_models s)
+let get_trs    s = Tactics.timeout_get (TraceSequent.get_trs s)
 
 (*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
@@ -787,10 +792,11 @@ let assumption (s : TraceSequent.t) =
   else soft_failure Tactics.NotHypothesis
 
 let () = T.register "assumption"
-     ~tactic_help:{general_help = "Search for the conclusion inside the hypothesis.";
-                  detailed_help = "";
-                  usages_sorts = [Sort None];
-                  tactic_group = Logical}
+    ~tactic_help:{
+      general_help = "Search for the conclusion inside the hypothesis.";
+      detailed_help = "";
+      usages_sorts = [Sort None];
+      tactic_group = Logical }
     assumption
 
 (*------------------------------------------------------------------*)
@@ -973,7 +979,7 @@ let unfold_macro t (s : TraceSequent.sequent) =
       let a = 
         if Macros.is_defined mn a0 table then Some a0
         else
-          let models = Tactics.timeout_get (TraceSequent.get_models s) in
+          let models = get_models s in
           Constr.find_eq_action models a0
       in
 
@@ -1193,7 +1199,7 @@ let () =
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
-  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
+  let trs = get_trs s in
   let terms = TraceSequent.get_all_messages s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
@@ -1206,9 +1212,9 @@ let eq_names (s : TraceSequent.t) =
 
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
-  let cnstrs = Completion.name_index_cnstrs trs
-      (TraceSequent.get_all_messages s)
+  let trs = get_trs s in
+  let cnstrs = 
+    Completion.name_index_cnstrs trs (TraceSequent.get_all_messages s)
   in
   let s =
     List.fold_left (fun s c ->
@@ -1467,7 +1473,7 @@ let apply_substitute subst s =
 
 let substitute_mess (m1, m2) s =
   let subst =
-        let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
+        let trs = get_trs s in
         if Completion.check_equalities trs [Term.ESubst (m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
@@ -1477,7 +1483,7 @@ let substitute_mess (m1, m2) s =
 
 let substitute_ts (ts1, ts2) s =
   let subst =
-      let models = Tactics.timeout_get (TraceSequent.get_models s) in
+      let models = get_models s in
       if Constr.query ~precise:true models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -1496,7 +1502,7 @@ let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
   in
 
   let subst =
-    let models = Tactics.timeout_get (TraceSequent.get_models s) in
+    let models = get_models s in
     if Constr.query ~precise:true models [(`Pos, `Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
@@ -2071,6 +2077,29 @@ let () =
 
 
 (*------------------------------------------------------------------*)
+(** New goal simplification *)
+    
+let new_simpl ~congr ~constr s =
+  let goals = Term.decompose_ands (TraceSequent.conclusion s) in
+  let goals = List.filter_map (fun goal ->
+      if Hyps.is_hyp goal s || Term.f_triv goal then None
+      else match goal with
+        | Term.Atom Term.(#trace_atom as at) -> 
+          if constr && Constr.query ~precise:true (get_models s) [`Pos, at] 
+          then None 
+          else Some goal
+
+        | Term.Atom (`Message (`Eq, t1, t2)) -> 
+          if congr && Completion.check_equalities (get_trs s) [Term.ESubst (t1,t2)] 
+          then None
+          else Some goal          
+
+        | _ -> Some goal
+    ) goals in
+  [TraceSequent.set_conclusion (Term.mk_ands goals) s]
+
+
+(*------------------------------------------------------------------*)
 (** Automated goal simplification *)
 
 let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
@@ -2081,23 +2110,30 @@ let wrap f = (fun (s: TraceSequent.t) sk fk ->
       | exception Tactics.Tactic_soft_failure (_,e) -> fk e
     )
 
-  (* Simplify goal. We will never backtrack on these applications. *)
-let simplify ~close ~intro =
+(* Simplify goal. *)
+let simplify ~close ~strong =
   let open Tactics in
+  let intro = Config.auto_intro () in
+  
+  let assumption = if close then [try_tac (wrap assumption)] else [] in
+  let new_simpl ~congr ~constr = 
+    if strong && not intro then [wrap (new_simpl ~congr ~constr)] else [] 
+  in
   andthen_list (
     (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
-    (if close then [try_tac (wrap assumption)] else []) @
+    assumption @ (new_simpl ~congr:false ~constr:false) @ assumption @
     (if close || intro then [wrap intro_all;
                              wrap simpl_left_tac] else []) @
-
+    assumption @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
     (* (if intro then [wrap eq_trace] else []) @ *)
-    (wrap eq_names) ::
+    (if strong then [wrap eq_names] else []) @
     (* Simplify equalities using substitution. *)
     (repeat (wrap autosubst)) ::
+    assumption @ (new_simpl ~congr:true ~constr:true) @ assumption @
     [clear_triv]
   ) 
 
@@ -2107,15 +2143,15 @@ let simplify ~close ~intro =
                          wrap constraints_tac; 
                          wrap assumption]
 
-(* If [close] then automatically prove the goal,
+(* If [close] then tries to automatically prove the goal,
  * otherwise it may also be reduced to a single subgoal. *)
-let rec simpl ~conclude close : TraceSequent.t Tactics.tac =
+let rec simpl ~strong ~close : TraceSequent.t Tactics.tac =
   let open Tactics in
   let (>>) = andthen ~cut:true in
   (* if [close], we introduce as much as possible to help. *)
-  simplify ~close ~intro:(Config.auto_intro ()) >> 
+  simplify ~close ~strong >> 
 
-  if not conclude
+  if not strong
   then (fun g sk fk -> sk [g] fk)
   else try_tac do_conclude >>
     fun g sk fk ->
@@ -2123,20 +2159,19 @@ let rec simpl ~conclude close : TraceSequent.t Tactics.tac =
      * and prove the remaining subgoals, or return this goal,
      * but we must respect [close]. *)
     let fk =
-      if close then
-        fun _ -> fk GoalNotClosed
-      else
-        fun _ -> sk [g] fk
+      if close 
+      then fun _ -> fk GoalNotClosed
+      else fun _ -> sk [g] fk
     in
     (wrap goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
-           simpl ~conclude close g1
+           simpl ~strong ~close g1
              (fun l' _ ->
                 if l'=[] then
-                  simpl ~conclude close g2 sk fk
+                  simpl ~strong ~close g2 sk fk
                 else
-                  simpl ~conclude true g2
+                  simpl ~strong ~close:true g2
                     (fun l'' fk -> assert (l'' = []) ; sk l' fk)
                     fk)
              fk
@@ -2150,7 +2185,7 @@ let () = T.register_general "autosimpl"
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     (function
-      | [] -> simpl ~conclude:(Config.auto_intro ()) false
+      | [] -> simpl ~strong:(Config.auto_intro ()) ~close:false
       | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
 
   T.register_general "simpl"
@@ -2159,7 +2194,7 @@ let () = T.register_general "autosimpl"
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     (function
-      | [] -> simpl ~conclude:true false
+      | [] -> simpl ~strong:true ~close:false
       | _ -> hard_failure (Tactics.Failure "no argument allowed")) ;
 
   T.register_general "auto"
@@ -2169,7 +2204,7 @@ let () = T.register_general "autosimpl"
                   usages_sorts = [Sort None];
                   tactic_group = Structural}
     (function
-       | [] -> simpl ~conclude:true true
+       | [] -> simpl ~strong:true ~close:true
        | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
 
@@ -2557,7 +2592,7 @@ let collision_resistance (s : TraceSequent.t) =
                | _ -> acc)
             (make_eq acc q) q
     in
-    let trs = Tactics.timeout_get (TraceSequent.get_trs s) in
+    let trs = get_trs s in
     let hash_eqs =
       make_eq [] hashes
       |> List.filter (fun (a,b) -> 

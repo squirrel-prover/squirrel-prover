@@ -11,6 +11,7 @@ name n:message
 name m:message
 system null.
 
+set debugTactics=true.
 (* Test direct case *)
 equiv test : h(diff(m,n),k),h(diff(n,m),k) .
 Proof.

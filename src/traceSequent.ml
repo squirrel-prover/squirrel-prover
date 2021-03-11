@@ -42,18 +42,6 @@ let choose_name f = match f with
   | _ -> "H"
 
 (*------------------------------------------------------------------*)
-let atom_triv = function
-  | `Message   (`Eq,t1,t2) when t1=t2 -> true
-  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
-  | `Index     (`Eq,i1,i2) when i1=i2 -> true
-  | _ -> false 
-
-let f_triv = function
-  | Term.True -> true
-  | Term.Atom atom -> atom_triv atom
-  | _ -> false 
-
-(*------------------------------------------------------------------*)
 module FHyp = struct
   type t = Term.formula
   let pp_hyp fmt f = Term.pp fmt f
@@ -495,7 +483,7 @@ module Hyps
   (*------------------------------------------------------------------*)
   let clear_triv s = 
     let s = reload s in
-    S.update ~hyps:(H.filter (fun _ f -> not (f_triv f)) s.hyps) s
+    S.update ~hyps:(H.filter (fun _ f -> not (Term.f_triv f)) s.hyps) s
 
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps

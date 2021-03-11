@@ -86,16 +86,16 @@ Proof.
 
   (* Cond => WA *)
   intro [i t Meq].
-  project.
+  project. 
   (* left *)
   euf Meq => _ _ _; 1: auto.
-  exists i,t1. 
+  exists i,t1; simpl.
   assert (input@T(i,t1) = nr(r)) as F; 1: auto.
   fresh F => C.
   by case C; 1: depends R(r), R2(r).
   (* right *)
   euf Meq => _ _ _; 1:auto.
-  exists i,t.
+  exists i,t; simpl.
   assert (input@T(i,t) = nr(r)) as F; 1: auto.
   fresh F => C.
   by case C; 1: depends R(r), R2(r).
@@ -121,7 +121,7 @@ Proof.
   intro i r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
-  exists t.
+  exists t; simpl.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
   by case C; 1:depends R(r), R2(r).
@@ -148,7 +148,6 @@ Qed.
 
 equiv unlinkability.
 Proof.
-prof.
 (* Before starting the proof by induction we enrich the biframe.
    The following sequences over-approximate the messages that the
    attacker may learn during protocol executions. Note that the
@@ -256,8 +255,8 @@ fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
      4: auto].
 intro [_ [i t _]].
 fa; 2,3,4: intro *; expand output; auto.
-intro Meq.
-use wa_R1_right with i1,t1,r as [H1 H2]. 
+intro Meq; simpl.
+use wa_R1_right with i1,t1,r as [H1 H2].
 by use H1.
 
 fa 5.
@@ -290,14 +289,14 @@ intro [i t Meq].
 project.
 (* left *)
 euf Meq => _ _ _; 1:auto.
-exists i,t1.
+exists i,t1; simpl.
 assert (nr(r) = input@T(i,t1)) as F; 1:auto.
 fresh F => C.
 by case C; 2:depends R(r), R1(r).
 
 (* right *)
 euf Meq => _ _ _; 1:auto.
-exists i,t.
+exists i,t; simpl.
 assert (nr(r) = input@T(i,t)) as F; 1:auto.
 fresh F => C.
 by case C; 2:depends R(r), R1(r).
@@ -329,7 +328,7 @@ equivalent exec@pred(T1(i,t)) && cond@T1(i,t),
   input@T(i,t) = output@R(r).
 expand cond@T1(i,t); split.
   (* Cond => Honest *)
-  intro [_ Meq].
+  intro [_ Meq]; simpl.
   assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)));
   1: auto.
@@ -346,12 +345,13 @@ expand cond@T1(i,t); split.
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond => _ [_ [_ _]] _; 1:auto.
-  exists r.
+  exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
     case C; 2,3:auto. 
     by depends R(r),R2(r). 
+  simpl.
   case output@R1(r).
   by euf Meq1.
   by use H0 with i,t.
@@ -367,20 +367,20 @@ expand cond@T1(i,t); split.
     by intro Hex; use Hex with R1(r); expand exec@R1(r).
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond].
-  euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto | 2: clear D F].
+  euf Hcond => Clt1 [_ [D F]] [? ?]; [1:auto].
   exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1:auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r); try constraints.
+    by case C; [1: depends R(r),R2(r) |
+                2: depends R(r),R1(r)].
   simpl.
   case output@R1(r).
-  euf Meq1 => A0 [A1 _] [_ _]; 1,2: by congruence.
-  by use H0 with i,t.
+  euf Meq1 => A0 [A1 _] [_ _]; 1,2: by auto.
+  by use H0 with i,t. 
 
   (* Honest => Cond *)
-  intro [_ [r _]]. 
-  simpl.
+  intro [_ [r _]]; simpl.
   case output@R1(r); expand output.
   by project; euf Meq.
 
@@ -429,11 +429,12 @@ split; intro [_ H1]; simpl.
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond]. 
   euf Hcond => _ _ _; 1: auto.
-  exists r.
+  exists r; simpl.
   assert R(r) < T(i,t).
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
-    by case C; 1: depends R(r),R2(r).
+    by case C; 1: depends R(r),R2(r). 
+  simpl.
   case output@R1(r).
   by euf Meq1.
   by use H0 with i,t.
@@ -445,20 +446,21 @@ split; intro [_ H1]; simpl.
   clear Ct.
   assert cond@R1(r) as Hcond.
     executable pred(T2(i,t)); 1,2: auto => He.
-    by use He with R1(r); expand exec@R1(r).
+    by use He with R1(r); expand exec@R1(r). 
   expand cond@R1(r).
   destruct Hcond as [i1 t1 Hcond].
   euf Hcond; 1: auto => _ _ [_ _].
-  exists r. 
+  exists r; simpl.
   assert R(r) < T(i,t) as _.
     assert nr(r) = input@T(i,t) as HF; 1: auto.
     fresh HF => C.
     by case C; 1: depends R(r),R2(r).
+  simpl.
   case output@R1(r).
   by euf Meq1.
   by use H0 with i,t.
 
-fa 6. prof.
+fa 6. 
 by fadup 5.
 
 Qed.

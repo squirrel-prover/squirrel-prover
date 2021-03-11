@@ -1588,7 +1588,7 @@ let () = T.register_typed "ifeq"
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
-let auto ~conclude s sk fk = 
+let auto ~conclude ~strong s sk fk = 
   let wrap tac s sk fk = 
     try sk (tac s) fk with
     | Tactics.Tactic_soft_failure (_,e) -> fk e in
@@ -1618,7 +1618,7 @@ let auto ~conclude s sk fk =
 
   | Prover.Goal.Trace t ->
     let sk l fk = sk (List.map (fun s -> Prover.Goal.Trace s) l) fk in
-    TraceTactics.simplify ~close:conclude ~intro:conclude t sk fk
+    TraceTactics.simplify ~close:conclude ~strong t sk fk
 
 let tac_auto ~conclude args s sk fk =
    auto ~conclude s sk fk 
@@ -1630,7 +1630,7 @@ let () =
                   detailed_help = "Same as simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~conclude:true)
+    (tac_auto ~conclude:true  ~strong:true)
 
 let () =
   T.register_general "simpl"
@@ -1640,7 +1640,18 @@ let () =
                                    refl or assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~conclude:false)
+    (tac_auto ~conclude:false ~strong:true)
+
+
+let () =
+  T.register_general "autosimpl"
+    ~tactic_help:{general_help = "Automatically simplify the goal.";
+                  detailed_help = "This tactics automatically calls fadup, \
+                                   expands the macros, and closes goals using \
+                                   refl or assumption.";
+                  usages_sorts = [Sort None];
+                  tactic_group = Structural }
+    (tac_auto ~conclude:false ~strong:false)
 
 (*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)

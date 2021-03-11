@@ -340,8 +340,7 @@ module Make_AST (T : Table_sig) :
   let autosimpl () =
     let tautosimpl = TraceTable.get "autosimpl" [] in
 
-    (* No difference between simpl and autosimpl in equivalence mode *)
-    let eautosimpl = EquivTable.get "simpl" [] in
+    let eautosimpl = EquivTable.get "autosimpl" [] in
 
     fun s sk fk ->
       match T.to_goal s with

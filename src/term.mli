@@ -187,6 +187,8 @@ val get_vars : 'a term -> Vars.evar list
 (** [fv t] returns the free variables of [t]. *)
 val fv : 'a term -> Vars.Sv.t
 
+val f_triv : formula -> bool
+
 (** [precise_ts t] returns a list [l] of timestamps such that
   * any term that appears in [(t)^I] that is not an attacker
   * symbol or a frame must appear in a macro applied to a timestamp

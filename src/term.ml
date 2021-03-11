@@ -426,6 +426,20 @@ let disjunction_to_literals f =
   | _ -> raise Not_a_disjunction in
 
   try Some (aux f) with Not_a_disjunction -> None
+
+
+(*------------------------------------------------------------------*)
+let atom_triv = function
+  | `Message   (`Eq,t1,t2) when t1=t2 -> true
+  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
+  | `Index     (`Eq,i1,i2) when i1=i2 -> true
+  | _ -> false 
+
+let f_triv = function
+  | True -> true
+  | Atom atom -> atom_triv atom
+  | _ -> false 
+
     
 (*------------------------------------------------------------------*)
 (** Declare input and output macros.
