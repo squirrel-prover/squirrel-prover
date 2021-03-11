@@ -502,6 +502,9 @@ let rec flatten t = match t.cnt with
   | Cvar _ -> assert false
 
 
+(*------------------------------------------------------------------*)
+(** {2 Union-find} *)
+
 module CufTmp = Uf (Cst)
 
 module Cuf : sig
@@ -535,6 +538,32 @@ end = struct
   module Memo2 = CufTmp.Memo2
 end
 
+
+(*------------------------------------------------------------------*)
+(** {2 Map of cterms} *)
+
+module Mct = Map.Make (struct
+    type t = cterm
+    let compare t t' = Stdlib.compare t.hash t'.hash    
+  end)
+
+module Sct = Set.Make (struct
+    type t = cterm
+    let compare t t' = Stdlib.compare t.hash t'.hash
+  end)
+
+
+module Scst = Set.Make (struct
+    type t = Cst.t
+    let compare t t' = Stdlib.compare t t'
+  end)
+
+(*------------------------------------------------------------------*)
+(** {2 State of the complation procedure} *)
+
+type grnd_rules = Scst.t Mct.t
+type e_rules = Sct.t Mct.t
+
 (* State of the completion and normalization algorithms, which stores a
     term rewriting system:
     - id : integer unique to a run of the completion procedure.
@@ -556,8 +585,8 @@ type state = { id            : int;
                uf            : Cuf.t;
                xor_rules     : Cset.t list;
                sat_xor_rules : (Cset.t list * int) option;
-               grnd_rules    : (cterm * Cst.t) list;
-               e_rules       : (cterm * cterm) list;
+               grnd_rules    : grnd_rules;
+               e_rules       : e_rules; 
                completed     : bool }
 
 (*------------------------------------------------------------------*)
@@ -579,27 +608,44 @@ let pp_sat_xor_rules ppf sat_xor_rules = match sat_xor_rules with
       ) sat
   | None -> Fmt.pf ppf "Not yet saturated"
               
-let pp_grnd_rules ppf grnd_rules =
+let pp_grnd_rules ppf (grnd_rules : Scst.t Mct.t) =
+  let grnd_rules = List.fold_left (fun acc (t, s) ->
+      List.fold_left
+        (fun acc t' -> (t, t') :: acc)
+        acc (Scst.elements s)     
+    ) [] (Mct.bindings grnd_rules) in
+
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,a) -> Fmt.pf ppf "%a -> %a" pp_cterm t Cst.print a)
   ) grnd_rules
 
-let pp_e_rules ppf e_rules =
+let pp_e_rules ppf (e_rules : Sct.t Mct.t) =
+  let e_rules = List.fold_left (fun acc (t, s) ->
+      List.fold_left
+        (fun acc t' -> (t, t') :: acc)
+        acc (Sct.elements s)     
+    ) [] (Mct.bindings e_rules) in
+
   Fmt.pf ppf "@[<v>%a@]"
   (Fmt.list
      ~sep:(fun ppf () -> Fmt.pf ppf "@;")
      (fun ppf (t,s) -> Fmt.pf ppf "%a -> %a" pp_cterm t pp_cterm s)
   ) e_rules
 
+let count_g (m : Scst.t Mct.t) = 
+  Mct.fold (fun _ s c -> c + Scst.cardinal s) m 0
+
+let count_e (m : Sct.t Mct.t) = 
+  Mct.fold (fun _ s c -> c + Sct.cardinal s) m 0
 
 let count_rules s = 
   let sat_xor_rules = fst (odflt ([],0) s.sat_xor_rules) in
   List.length (s.xor_rules) +
   List.length (sat_xor_rules) +
-  List.length (s.grnd_rules) +
-  List.length (s.e_rules)
+  count_g (s.grnd_rules) +
+  count_e (s.e_rules)
   
 let pp_state ppf s =
   let sat_xor_rules = fst (odflt ([],0) s.sat_xor_rules) in
@@ -614,8 +660,8 @@ let pp_state ppf s =
     Cuf.print s.uf
     (List.length s.xor_rules)   pp_xor_rules s.xor_rules
     (List.length sat_xor_rules) pp_sat_xor_rules s.sat_xor_rules
-    (List.length s.grnd_rules)  pp_grnd_rules s.grnd_rules
-    (List.length s.e_rules)     pp_e_rules s.e_rules
+    (count_g s.grnd_rules)  pp_grnd_rules s.grnd_rules
+    (count_e s.e_rules)     pp_e_rules s.e_rules
 
 
 (*------------------------------------------------------------------*)
@@ -714,6 +760,108 @@ end = struct
 end
 
 
+(*------------------------------------------------------------------*)
+(** {Set of rules functions} *)
+
+(** Add some already flattened ground rule *)
+let add_rule (grules : grnd_rules) (t,a) =
+  Mct.update t (fun s -> 
+      let s = odflt Scst.empty s in
+      Some (Scst.add a s))
+    grules
+
+let add_rules (grules : grnd_rules) l =
+  List.fold_left add_rule grules l
+
+let add_rules_set (grules : grnd_rules) t s =
+  Mct.update t (fun s' -> 
+      let s' = odflt Scst.empty s' in
+      Some (Scst.union s s'))
+    grules
+
+(** Add some e_rule *)
+let add_erule (erules : e_rules) (t,a) =
+  Mct.update t (fun s -> 
+      let s = odflt Sct.empty s in
+      Some (Sct.add a s))
+    erules
+
+let add_erules (erules : e_rules) l =
+  List.fold_left add_erule erules l
+
+let add_erules_set (erules : e_rules) t s =
+  Mct.update t (fun s' -> 
+      let s' = odflt Sct.empty s' in
+      Some (Sct.union s s'))
+    erules
+
+let norm_grnd_rules uf (rules : grnd_rules) =
+  Mct.fold (fun t s rules ->
+      add_rules_set rules (term_uf_normalize uf t) (Scst.map (Cuf.find uf) s) 
+    ) rules Mct.empty 
+
+let norm_e_rules uf (rules : e_rules) =
+  Mct.fold (fun t s rules ->
+      add_erules_set rules (term_uf_normalize uf t) (Sct.map (term_uf_normalize uf) s)
+    ) rules Mct.empty 
+
+let fold_grules : (cterm * Cst.t -> 'a -> 'a) -> grnd_rules -> 'a -> 'a =
+  fun f grules acc ->
+  Mct.fold (fun l s acc ->
+      Scst.fold (fun r acc ->
+          f (l,r) acc 
+        ) s acc
+    ) grules acc
+
+let fold_erules : (cterm * cterm -> 'a -> 'a) -> e_rules -> 'a -> 'a =
+  fun f erules acc ->
+  Mct.fold (fun l s acc ->
+      Sct.fold (fun r acc ->
+          f (l,r) acc 
+        ) s acc
+    ) erules acc
+
+let iter_grules : (cterm * Cst.t -> unit) -> grnd_rules -> unit =
+  fun f grules ->
+  fold_grules (fun rule () -> f rule) grules ()
+
+let iter_erules : (cterm * cterm -> unit) -> e_rules -> unit =
+  fun f erules ->
+  fold_erules (fun rule () -> f rule) erules ()
+
+let find_grules :
+  (cterm * Cst.t -> bool) -> grnd_rules -> (cterm * Cst.t) option =
+  fun f grules ->
+  let exception Found of cterm * Cst.t in
+  try
+    iter_grules (fun (a,b) -> if f (a,b) then raise (Found (a,b))) grules; 
+    None
+  with Found (a,b) -> Some (a,b)
+
+let find_erules :
+  (cterm * cterm -> bool) -> e_rules -> (cterm * cterm) option =
+  fun f erules ->
+  let exception Found of cterm * cterm in
+  try
+    iter_erules (fun (a,b) -> if f (a,b) then raise (Found (a,b))) erules;
+    None
+  with Found (a,b) -> Some (a,b)
+
+let find_map_erules : (cterm * cterm -> 'a option) -> e_rules -> 'a option =
+  fun f erules ->
+  let found = ref None in
+  let exception Found in
+  try
+    iter_erules (fun (a,b) -> 
+        let r = f (a,b) in
+        if r <> None then 
+          let () = found := r in
+          raise Found
+      ) erules;
+    None
+  with Found -> !found
+
+(*------------------------------------------------------------------*)
 module Ground : sig
   val deduce_triv_eqs : state -> state
   val deduce_eqs : state -> state
@@ -721,32 +869,31 @@ end = struct
 
   (* Deduce trivial constants equalities from the ground rules. *)
   let deduce_triv_eqs state =
-    let r_trivial, r_other =
-      List.partition (fun (a,_) -> is_cst a) state.grnd_rules in
+    let r_trivial, r_other = 
+      Mct.partition (fun a _ -> is_cst a) state.grnd_rules in
 
-    List.fold_left (fun state (a,b) ->
+    fold_grules (fun (a,b) state ->
         { state with uf = Cuf.union state.uf (get_cst a) b }
-      ) { state with grnd_rules = r_other } r_trivial
+      ) r_trivial { state with grnd_rules = r_other } 
 
   let deduce_triv_eqs = Prof.mk_unary "Ground.deduce_triv_eqs" deduce_triv_eqs
-
-
+    
   (* Deduce constants equalities from the ground rules. *)
   let deduce_eqs state =
     (* We get all ground rules, normalized by constant equality rules. *)
-    let grules = List.map (fun (t,c) ->
-        (term_uf_normalize state.uf t, Cuf.find state.uf c)
-      ) state.grnd_rules in
+    let grules = norm_grnd_rules state.uf state.grnd_rules in
 
     (* We look for critical pairs, which are necessary of the form:
        c <- t -> c'
        because the rules are flat. For each such critical pair, we add c = c'. *)
-    List.fold_left (fun state (t,c) ->
-        List.fold_left (fun state (t',c') ->
-            if t = t' then { state with uf = Cuf.union state.uf c c' }
-            else state
-          ) state grules
-      ) state grules
+    Mct.fold (fun t s state ->
+        if Scst.is_empty s then state 
+        else
+          let c = Scst.choose s in
+          Scst.fold (fun c' state ->
+              { state with uf = Cuf.union state.uf c c' }
+            ) s state 
+      ) grules state
 
   let deduce_eqs = Prof.mk_unary "Ground.deduce_eqs" deduce_eqs
 end
@@ -844,10 +991,11 @@ end = struct
   (** [add_grnd_rule state l a]: the term [l] must be ground. *)
   let add_grnd_rule state (l : cterm) (a : Cst.t) =
     let eqs, xeqs, b = flatten l in
+    let grules = add_rules state.grnd_rules eqs in
+        
     assert (xeqs = []);
     { state with uf = Cuf.union state.uf a b;
-                 grnd_rules = eqs @ state.grnd_rules
-                              |> List.sort_uniq Stdlib.compare }
+                 grnd_rules = grules }
         
 
   (** Try to superpose two rules at head position, and add a new equality to get
@@ -932,40 +1080,51 @@ end = struct
   (* REM *)
   let grnd_superpose = Prof.mk_ternary "grnd_superpose" grnd_superpose
 
+
+  let rec select_erule (r_open : e_rules) = 
+    if Mct.is_empty r_open then None
+    else 
+      let t, s = Mct.choose r_open in
+      if Sct.is_empty s
+      then select_erule (Mct.remove t r_open)
+      else
+        let t' = Sct.choose s in
+        let s = Sct.remove t' s in
+        Some ((t,t'), Mct.add t s r_open)
+          
   (** [deduce_aux state r_open r_closed]. Invariant:
       - [r_closed]: e_rules already superposed with all other rules.
       - [r_open]: e_rules to superpose. *)
-  let rec deduce_aux state r_open r_closed = match r_open with
-    | [] -> { state with e_rules = List.sort_uniq Stdlib.compare r_closed }
+  let rec deduce_aux state (r_open : e_rules) (r_closed : e_rules) = 
+    match select_erule r_open with
+    | None -> { state with e_rules = r_closed }
 
-    | rule :: r_open' ->
+    | Some (rule, r_open') ->
       let state, r_open' = 
-        List.fold_left (fun (state, r_open') rule' ->
+        fold_grules (fun rule' (state, r_open') ->
             let (state, new_rs) = grnd_superpose state rule rule' in
-            ( state, new_rs @ r_open' )
-          ) ( state, r_open') state.grnd_rules 
+            ( state, add_erules r_open' new_rs)
+          ) state.grnd_rules ( state, r_open') 
       in
 
-      let state = List.fold_left (fun state rule' ->
+      let state = fold_erules (fun rule' state ->
           head_superpose state rule rule'
-        ) state r_closed 
+        ) r_closed state
       in
 
-      let state = List.fold_left (fun state rule' ->
+      let state = fold_erules (fun rule' state ->
           head_superpose state rule rule'
-        ) state r_open' 
+        ) r_open' state
       in
 
-      deduce_aux state r_open' (rule :: r_closed )
+      deduce_aux state r_open' (add_erule r_closed rule)
   
 
   (** Deduce new rules (constant, ground and erule) from the non-ground
       rules. *)
   let deduce_eqs state =
-    let erules = state.e_rules
-                 |> List.map (p_terms_uf_normalize state.uf) in
-
-    deduce_aux state erules []
+    let erules = norm_e_rules state.uf state.e_rules in
+    deduce_aux state erules Mct.empty 
       
   let deduce_eqs = Prof.mk_unary "Erule.deduce_eqs" deduce_eqs
 end
@@ -975,7 +1134,7 @@ end
 (** {2 Normalization} *)
 
 
-(* [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
+(** [set_grnd_normalize state s] : Normalize [s], which is a sum of terms,
     using the xor rules in [state]. *)
 let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
   let sat_rules = match state.sat_xor_rules with
@@ -999,9 +1158,10 @@ let set_grnd_normalize (state : state) (s : Cset.t) : Cset.t =
   aux s sat_rules
 
 
-(* [term_grnd_normalize state u]
+(** [term_grnd_normalize state u]
     Precondition: [u] must be ground and its xor grouped. *)
-let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u.cnt with
+let rec term_grnd_normalize (state : state) (u : cterm) : cterm = 
+  match u.cnt with
   | Cvar _ -> u
 
   | Ccst c ->
@@ -1015,7 +1175,7 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u.cnt wi
     (* This part is a bit messy:
        - first, we split between constants and fterms.
        - then, we normalize only the fterms, and split the result (again) into
-       constants and fterms.
+         constants and fterms.
        - finally, we normalize the two set of constants using the xor rules. *)
     let csts0, fterms0 = List.split_pred is_cst ts in
     let csts1, fterms1 = List.map (term_grnd_normalize state) fterms0
@@ -1024,10 +1184,10 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u.cnt wi
 
     (* We only have to normalize the constants in [ts], i.e. [csts0 @ csts1]. *)
     let csts_norm = List.map get_cst (csts0 @ csts1)
-                       |> Cset.of_list (* Cset.of_list is modulo nilpotence *)
-                       |> set_grnd_normalize state
-                       |> Cset.elements
-                       |> List.map (fun x -> ccst x) in
+                    |> Cset.of_list (* Cset.of_list is modulo nilpotence *)
+                    |> set_grnd_normalize state
+                    |> Cset.elements
+                    |> List.map (fun x -> ccst x) in
 
     cxor (csts_norm @ fterms1)
 
@@ -1035,12 +1195,11 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm = match u.cnt wi
     let nts = List.map (term_grnd_normalize state) ts in
     let u' = cfun fn ari nts in
 
-    (* Optimisation: storing rules by head function symbols would help here. *)
+    (* TODO: storing rules by head function symbols would help here. *)
     if List.for_all (fun c -> not (is_cfun c)) nts then
-      try
-        let _, a = List.find (fun (l,_) -> l = u') state.grnd_rules in
-        ccst a
-      with Not_found -> u'
+      match find_grules (fun (l,_) -> l = u') state.grnd_rules with 
+      | Some (_,a) -> ccst a
+      | None -> u'
     else u'
 
 
@@ -1055,19 +1214,18 @@ let rec term_e_normalize state u = match u.cnt with
     let nts = List.map (term_e_normalize state) ts in
     let u = cfun fn ari nts in
 
-    let exception Find_unif_fail in
-    let rec find_unif = function
-      | [] -> raise Find_unif_fail
-      | (l, r) :: l' ->
-        match Unify.unify state.uf u l with
-        | Unify.No_mgu -> find_unif l'
-        | Unify.Mgu sigma -> l, r, sigma in
-    try
-      let l,r,sigma = find_unif state.e_rules in
+    let find_unif (l,r) =
+      match Unify.unify state.uf u l with
+      | Unify.No_mgu -> None
+      | Unify.Mgu sigma -> Some (l, r, sigma)
+    in
+    
+    match find_map_erules find_unif state.e_rules with
+    | Some (l,r,sigma) ->
       assert (term_uf_normalize state.uf (Unify.subst_apply l sigma)
               = term_uf_normalize state.uf u);
       Unify.subst_apply r sigma
-    with Find_unif_fail -> u
+    | None -> u
 
 (* [normalize_cterm state u]
     Preconditions: [u] must be ground. *)
@@ -1102,37 +1260,44 @@ let rec normalize_csts state t = match t.cnt with
     is joined by replacing (R2) by:
     f(b + c) -> d *)
 let finalize_completion state =
-  let grnds =
-    List.map (fun (t,c) -> (normalize_csts state t, c)) state.grnd_rules
-    |> List.sort_uniq Stdlib.compare in
+  let grnds = 
+   Mct.fold (fun t s grules ->
+        Mct.add (normalize_csts state t) (Scst.map (Cuf.find state.uf) s) grules
+      ) state.grnd_rules Mct.empty
+  in
   let erules =
-    List.map (fun (t,s) ->
-        (normalize_csts state t, normalize_csts state s)
-      ) state.e_rules
-    |> List.sort_uniq Stdlib.compare in
+    Mct.fold (fun t s erules ->
+        let s = Sct.map (normalize_csts state) s in
+        Mct.add (normalize_csts state t) s erules
+      ) state.e_rules Mct.empty
+  in
 
-  { state with
-    grnd_rules = grnds;
-    e_rules = erules;
-    completed = true }
-
+  let state = { state with
+                grnd_rules = grnds;
+                e_rules = erules;
+                completed = true } in
+  dbg "@[<v 0>Finaled state:@; %a@]" pp_state state;   
+  state
+  
 let rec complete_state state =
   dbg "%a" pp_state state; 
   
-  let stop_cond state =
-  ( Cuf.union_count state.uf,
-    List.length state.grnd_rules,
-    List.length state.e_rules ) in
+  let cond_equal state1 state2 = 
+    Cuf.union_count state1.uf = Cuf.union_count state2.uf &&
+    Mct.equal Scst.equal state1.grnd_rules state2.grnd_rules &&
+    Mct.equal Sct.equal state1.e_rules state2.e_rules
+  in
 
-  let start = stop_cond state in
+  let s_state = state in
 
   let state = Ground.deduce_triv_eqs state
               |> Xor.deduce_eqs
               |> Ground.deduce_eqs
               |> Erules.deduce_eqs in
 
-  if start <> stop_cond state then complete_state state
-  else state
+  if cond_equal s_state state 
+  then state
+  else complete_state state
 
 let complete_state = Prof.mk_unary "complete_state" complete_state
 
@@ -1163,23 +1328,26 @@ let init_erules table =
         let dec, pk = dec_pk table f1 f2 in
         (* We only allow an index arity of zero for crypto primitives *)
         check_zero_arities table [fname; dec; pk];
-        (Theories.mk_aenc (F fname) (F dec) (F pk)) :: erules
+        add_erule erules (Theories.mk_aenc (F fname) (F dec) (F pk)) 
 
       | (_, Symbols.SEnc), Symbols.AssociatedFunctions [sdec] ->
         is_sdec table sdec;
         (* We only allow an index arity of zero for crypto primitives *)
         check_zero_arities table [fname; sdec];
-        (Theories.mk_senc (F fname) (F sdec)) :: erules
+        add_erule erules (Theories.mk_senc (F fname) (F sdec)) 
 
       | (_, Symbols.CheckSign), Symbols.AssociatedFunctions [f1; f2] ->
         let msig, pk = sig_pk table f1 f2 in
         (* We only allow an index arity of zero for crypto primitives *)
         check_zero_arities table [fname; msig; pk];
-        (Theories.mk_sig (F msig) (F fname) (F pk)) :: erules
+        add_erule erules (Theories.mk_sig (F msig) (F fname) (F pk)) 
 
       | _ -> erules
     ) 
-    (Theories.mk_pair 2 (F Symbols.fs_pair) [F Symbols.fs_fst;F Symbols.fs_snd])
+    (add_erules
+       Mct.empty 
+       (Theories.mk_pair 2 (F Symbols.fs_pair) [F Symbols.fs_fst;
+                                                F Symbols.fs_snd]))
     table
 
 let state_id = ref 0
@@ -1190,6 +1358,8 @@ let complete_cterms table (l : (cterm * cterm) list) : state =
       and  eqs', xeqs', b = flatten v in
       ( (ccst a, b) :: eqs @ eqs' @ acc, xeqs @ xeqs' @ xacc )
     ) ([], []) l in
+
+  let grnd_rules = add_rules Mct.empty grnd_rules in
 
   let state = { id = (incr state_id; !state_id); 
                 uf = Cuf.create [];
@@ -1422,6 +1592,7 @@ let name_indep_cnstrs state l =
     n_cnstr
   |>  List.filter (function Term.True -> false | _ -> true)
   |>  List.sort_uniq Stdlib.compare
+
 
 (*------------------------------------------------------------------*)
 (** {2 Tests Suites} *)

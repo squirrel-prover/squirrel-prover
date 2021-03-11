@@ -15,5 +15,5 @@ forall (i:index,j:index), happens(A1(i)) => cond@A1(i) => output@A1(i) <> k(j).
 Proof.
   intro i j Hap C Heq.
   expand cond@A1(i).
-  by use C with j. 
+  by use C with j.  
 Qed.

@@ -143,12 +143,12 @@ Proof.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.
   fresh F => C.
-  by case C; 1:depends R(r), R2(r).
+  by case C; 1:depends R(r), R2(r).  
 Qed.
 
 equiv unlinkability.
 Proof.
-
+prof.
 (* Before starting the proof by induction we enrich the biframe.
    The following sequences over-approximate the messages that the
    attacker may learn during protocol executions. Note that the
@@ -458,7 +458,7 @@ split; intro [_ H1]; simpl.
   by euf Meq1.
   by use H0 with i,t.
 
-fa 6.
+fa 6. prof.
 by fadup 5.
 
 Qed.
