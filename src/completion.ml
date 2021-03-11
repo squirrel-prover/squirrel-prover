@@ -928,6 +928,8 @@ module Unify = struct
 
     try aux sigma [] t with Unify_cycle -> assert false
 
+  let subst_apply t sigma = if Mi.is_empty sigma then t else subst_apply t sigma
+
   let rec unify_aux eqs sigma = match eqs with
     | [] -> Mgu sigma
     | (u,v) :: eqs' ->
@@ -1222,8 +1224,8 @@ let rec term_e_normalize state u = match u.cnt with
     
     match find_map_erules find_unif state.e_rules with
     | Some (l,r,sigma) ->
-      assert (term_uf_normalize state.uf (Unify.subst_apply l sigma)
-              = term_uf_normalize state.uf u);
+      (* assert (term_uf_normalize state.uf (Unify.subst_apply l sigma)
+       *         = term_uf_normalize state.uf u); *)
       Unify.subst_apply r sigma
     | None -> u
 

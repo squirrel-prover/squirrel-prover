@@ -2094,7 +2094,7 @@ let simplify ~close ~intro =
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
-    (if intro then [wrap eq_trace] else []) @
+    (* (if intro then [wrap eq_trace] else []) @ *)
     (wrap eq_names) ::
     (* Simplify equalities using substitution. *)
     (repeat (wrap autosubst)) ::
