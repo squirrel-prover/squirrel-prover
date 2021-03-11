@@ -345,6 +345,13 @@ val destr_ands  : int -> formula -> formula list option
 val destr_ors   : int -> formula -> formula list option
 val destr_impls : int -> formula -> formula list option
 
+val decompose_forall : formula -> Vars.evar list * formula
+val decompose_exists : formula -> Vars.evar list * formula
+
+val decompose_ands  : formula -> formula list 
+val decompose_ors   : formula -> formula list 
+val decompose_impls : formula -> formula list 
+
 val destr_var : 'a term -> 'a Vars.var option
 val destr_pair : 'a term -> ('a term * 'a term) option
 

@@ -192,6 +192,7 @@ let pp ppf s =
 
 
 (*------------------------------------------------------------------*)
+(* FIXME: this create new variables which are not declared in the sequent. *)
 let rec simpl_form acc hyp = 
   match hyp with
   | Term.And (f,g) -> simpl_form (simpl_form acc f) g

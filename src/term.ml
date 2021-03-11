@@ -1224,6 +1224,12 @@ let rec destr_exists = function
     end
   | _ -> None
 
+let rec decompose_exists = function
+  | Exists (vs, f) -> 
+    let vs', f0 = decompose_exists f in
+    vs @ vs', f0
+  | _ as f -> [], f
+
 let rec destr_forall = function
   | ForAll (vs, f) -> 
     begin
@@ -1232,6 +1238,12 @@ let rec destr_forall = function
       | None -> Some (vs, f)
     end
   | _ -> None
+
+let rec decompose_forall = function
+  | ForAll (vs, f) -> 
+    let vs', f0 = decompose_forall f in
+    vs @ vs', f0
+  | _ as f -> [], f
 
 let rec destr_or = function
   | Or (f, g) -> Some (f,g) 
@@ -1243,6 +1255,10 @@ let rec destr_ors l f = match l, f with
   | _, Or (f, g) -> omap (fun l -> l @ [g]) (destr_ors (l-1) f)
   | _ -> None
 
+let rec decompose_ors f = match f with
+  | Or (f, g) -> decompose_ors f @ decompose_ors g
+  | _ -> [f]
+
 let rec destr_and = function
   | And (f, g) -> Some (f,g) 
   | _ -> None
@@ -1253,6 +1269,10 @@ let rec destr_ands l f = match l, f with
   | _, And (f, g) -> omap (fun l -> l @ [g]) (destr_ands (l-1) f)
   | _ -> None
 
+let rec decompose_ands f = match f with
+  | And (f, g) -> decompose_ands f @ decompose_ands g
+  | _ -> [f]
+
 let rec destr_impl = function
   | Impl (f, g) -> Some (f,g) 
   | _ -> None
@@ -1262,6 +1282,10 @@ let rec destr_impls l f = match l, f with
   | 1, _ -> Some [f]
   | _, Impl (f, g) -> omap (fun l -> l @ [g]) (destr_impls (l-1) f)
   | _ -> None
+
+let rec decompose_impls f = match f with
+  | Impl (f, g) -> decompose_impls f @ decompose_impls g
+  | _ -> [f]
 
 let destr_pair : type a. a term -> (a term * a term) option = function
   | Fun (f_pair, terms) ->
