@@ -321,8 +321,8 @@ module Make_AST (T : Table_sig) :
       in
 
       let pp_type ppf = function
-        | `Form f      -> Theory.pp ppf f
-        | `Expand symb -> Fmt.pf ppf "%s" (L.unloc symb)
+        | `Form f   -> Theory.pp ppf f
+        | `Expand t -> Theory.pp ppf t
       in
 
       let pp_rw_arg ppf rw_arg =

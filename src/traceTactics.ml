@@ -973,14 +973,22 @@ let () =
 
 type rw_target = [`Goal | `Hyp of Ident.t]
 
+let target_all s : rw_target list =
+  `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
+
 (* Invariant: if (sv,l,r) is a rewrite rule, then
    sv ⊆ FV(l) and FV(r) ⊆ FV(l). *)
 type 'a rw_rule =  (Vars.Sv.t * 'a term * 'a term)
 
 type rw_erule =  (Vars.Sv.t * Term.esubst)
 
-(* The ident is the ident of the hyp the rule came from (if any) *)
-type rw_arg =  Args.rw_count * Ident.t option * rw_erule
+type rw_arg = 
+  | Rw_rw of Ident.t option * rw_erule 
+  (* The ident is the ident of the hyp the rule came from (if any) *)
+             
+  | Rw_expand of Theory.term
+
+type rw_earg = Args.rw_count * rw_arg
 
 (** Check that the rule is correct. *)
 let check_rule (sv, l, r) =
@@ -1003,6 +1011,9 @@ let do_target
   match t with
   | `Goal -> TraceSequent.set_conclusion f s
   | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
+
+let do_targets doit s targets : sequent = 
+  List.fold_left (do_target doit) s targets
 
 (*------------------------------------------------------------------*)
 let unfold_macro t (s : sequent) =
@@ -1037,16 +1048,17 @@ let unfold_macro t (s : sequent) =
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
 
-let unfold_macro ~canfail t s =
+let unfold_macro ~canfail t s : Term.esubst list =
   try unfold_macro t s with
   | Tactics.Tactic_soft_failure _ when not canfail -> []
 
 
-let expand_macro t (s : sequent) =
+let expand_macro (targets : rw_target list) t (s : sequent) : sequent =
   let subst = unfold_macro ~canfail:true t s in
   if subst = [] then hard_failure (Failure "nothing to expand");
 
-  TraceSequent.subst subst s
+  let doit (f,_) : Term.formula = Term.subst subst f in
+  do_targets doit s targets 
      
 
 let find_occs_macro
@@ -1060,15 +1072,20 @@ let find_occs_macro
   in
   find (Utils.odflt Term.St.empty st) (ETerm t)
       
-let expand arg s = 
+let expand (targets : rw_target list) (arg : Theory.term) s = 
   let tbl = TraceSequent.table s in
-  match Args.convert_as_lsymb [arg] with
+  match Args.convert_as_lsymb [Args.Theory arg] with
   | Some m ->
     let m = Symbols.Macro.of_lsymb m tbl in
     let occs = 
-      Hyps.fold (fun _ f occs -> find_occs_macro m ~st:occs f) s St.empty 
-    in 
-    let occs = find_occs_macro m ~st:occs (TraceSequent.conclusion s) in
+      List.fold_left (fun occs target -> match target with
+          | `Goal -> 
+            find_occs_macro m ~st:occs (TraceSequent.conclusion s) 
+          | `Hyp id ->
+            let f = Hyps.by_id id s in
+            find_occs_macro m ~st:occs f
+        ) St.empty targets
+    in
     let subst = 
       Term.St.fold (fun (ETerm t) subst -> 
           unfold_macro ~canfail:false t s @ subst
@@ -1076,25 +1093,32 @@ let expand arg s =
     
     if subst = [] then hard_failure (Failure "nothing to expand");
 
-    TraceSequent.subst subst s
+    let doit (f,_) : Term.formula = Term.subst subst f in
+    do_targets doit s targets 
 
   | _ ->
     let env = TraceSequent.env s in
-    match Args.convert_args tbl env [arg] Args.(Sort ETerm) with
+    match Args.convert_args tbl env [Args.Theory arg] Args.(Sort ETerm) with
     | Args.Arg (Args.ETerm (Sorts.Boolean, f, loc)) ->
-      expand_macro f s
+      expand_macro targets f s
         
     | Args.Arg (Args.ETerm (Sorts.Message, f, loc)) ->
-      expand_macro f s
+      expand_macro targets f s
         
     | _ ->
       hard_failure (Tactics.Failure "expected a message or boolean term")
 
 let expands args s =
-  List.fold_left (fun s arg -> expand arg s) s args 
+  List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
 
 let expand_tac args s sk fk =
-  try sk [expands args s] fk
+  try 
+    let args = List.map (function
+        | Args.Theory t -> t
+        | _ -> hard_failure (Failure "improper arguments")
+      ) args
+    in
+    sk [expands args s] fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 
@@ -1111,11 +1135,11 @@ let () = T.register_general "expand"
 
 (*------------------------------------------------------------------*)
 
-(** [rewrite ~all tgt rw_args] rewrites [rw_args] in [tgt].
+(** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
     If [all] is true, then does not fail if no rewriting occurs. *)
 let rewrite ~all 
     (targets: rw_target list)
-    (rws : (Args.rw_count * Ident.t option * rw_erule) list) s =
+    (rw : Args.rw_count * Ident.t option * rw_erule) s =
   let found1 = ref false in
 
   let rec do1 
@@ -1152,20 +1176,15 @@ let rewrite ~all
       Ident.name hyp_id <> "_" 
   in
 
-  let do_all (f,tgt_id) =
-    let rws = 
-      List.filter (fun (mult,  id_opt, _) -> 
-          not (is_same id_opt tgt_id)
-        ) rws 
-    in
-
-    List.fold_left 
-      (fun f (mult,  id_opt, (sv, Term.ESubst (l,r))) -> 
-         do1 f mult (sv,l,r)
-      ) f rws 
+  let doit (f,tgt_id) =
+    match rw with
+    | mult,  id_opt, (sv, Term.ESubst (l,r)) ->
+      if is_same id_opt tgt_id 
+      then f 
+      else do1 f mult (sv,l,r)          
   in
  
-  let s = [List.fold_left (do_target do_all) s targets] in
+  let s = [do_targets doit s targets] in
 
   if all && not !found1 then soft_failure Tactics.NothingToRewrite;
 
@@ -1174,11 +1193,8 @@ let rewrite ~all
 
 
 (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
-    showing each rule validity. *)
-let p_rw_args (rw_args : Args.rw_arg list) s 
-  : ( (Args.rw_count * Ident.t option * rw_erule) * 
-      sequent list 
-    ) list =
+    showing the rule validity. *)
+let p_rw_arg (rw_arg : Args.rw_arg) s : rw_earg * sequent list =
   let to_rule ~loc dir f = 
     let vs, f = match Term.destr_forall f with
       | Some (vs, f) -> Vars.Sv.of_list vs, f
@@ -1231,45 +1247,52 @@ let p_rw_args (rw_args : Args.rw_arg list) s
 
 
   let p_rw_arg (rw_arg : Args.rw_arg) 
-    : (Args.rw_count * Ident.t option * rw_erule) * sequent list = 
-    let vs, e, id_opt, subgoals = match rw_arg.rw_type with
+    : rw_earg * (sequent list) = 
+    let rw, subgoals = match rw_arg.rw_type with
       | `Form f -> 
         let dir = L.unloc rw_arg.rw_dir in
         (* (rewrite rule, subgols, hyp id) if applicable *)
         let (vs, e), subgoals, id_opt = p_rw_rule dir f in
-        vs, e, id_opt, subgoals
+        Rw_rw (id_opt, (vs, e)), subgoals
 
-      | `Expand mid -> 
+      | `Expand t -> 
         if L.unloc rw_arg.rw_dir <> `LeftToRight then
           hard_failure ~loc:(L.loc rw_arg.rw_dir) 
             (Failure "expand cannot take a direction");
         
-        hard_failure (Failure "expand not yet implemented");
+         Rw_expand t, []
     in
-    (rw_arg.rw_mult, id_opt, (vs, e)), subgoals
+    (rw_arg.rw_mult, rw), subgoals
   in
 
-  List.map p_rw_arg rw_args 
+  p_rw_arg rw_arg
 
+
+let rewrite_arg rw_arg in_opt s =
+  let targets, all = match in_opt with
+    | Some (`Hyps symbs) -> 
+      List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
+    | Some `All -> target_all s, true
+    | None -> [`Goal], false
+  in
+  let (rw_c,rw_arg), subgoals = p_rw_arg rw_arg s in
+  
+  match rw_arg with
+  | Rw_rw (id, erule) -> 
+    subgoals @ rewrite ~all targets (rw_c, id, erule) s
+  | Rw_expand arg -> [expand targets arg s]
 
 let rewrite_tac args s sk fk =
   match args with
   | [Args.RewriteIn (rw_args, in_opt)] ->
-    let target, all = match in_opt with
-      | Some (`Hyps symbs) -> 
-        List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
-      | Some `All -> 
-        `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s), true
-      | None -> [`Goal], false
+    let seqs = 
+      List.fold_right (fun rw_arg seqs ->
+          List.concat_map (rewrite_arg rw_arg in_opt) seqs
+        ) rw_args [s]
     in
-    let rw_args = p_rw_args rw_args s in
-    let rw_rules, subgoals = List.split rw_args in
-    let subgoals = List.flatten subgoals in
-    
-    sk (subgoals @ rewrite ~all target rw_rules s) fk
+    sk seqs fk
 
   | _ -> hard_failure (Tactics.Failure "improper arguments")
-
 
 
 let () =

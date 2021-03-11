@@ -71,7 +71,7 @@ type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 type rw_arg = { 
   rw_mult : rw_count; 
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
-  rw_type : [`Form of Theory.formula | `Expand of Theory.lsymb];
+  rw_type : [`Form of Theory.formula | `Expand of Theory.term];
 }
 
 type rw_in = [`All | `Hyps of lsymb list] option 

@@ -82,6 +82,8 @@
   "forall"
   "help"
   "id"
+  "clear"
+  "prof"
   "induction"
   "intro"
   "revert"

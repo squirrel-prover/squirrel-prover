@@ -13,6 +13,8 @@ channel ch
 
 system A: !_i in(ch,x);out(ch,<ok(i),x>).
 
+system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
+
 axiom foo : forall (x : message), f(x) = a.
 axiom foog : forall (x : message), gg(x,b) = c.
 
@@ -158,7 +160,7 @@ Proof.
   assumption.
 Qed.
 
-set debugTactics=true.
+(* set debugTactics=true. *)
 
 (*------------------------------------------------------------------*)
 (* cannot rewrite if all rhs variables are not bound by the lhs *)
@@ -169,3 +171,17 @@ Proof.
   intro x y z.
   checkfail rewrite (forall (t : message), f(a) = t) exn BadRewriteRule.
 Abort.
+
+
+(*------------------------------------------------------------------*)
+(* cannot rewrite if all rhs variables are not bound by the lhs *)
+(* same goal, but proved chaining rewrites. *)
+goal [none, bis] _ (x, y, z : message, i : index) :
+(input@A(i) = a => f(a) = c) =>
+ happens(A(i)) => b = c => cond@A(i) => f(a) = b.
+Proof.
+  intro x y z i Ass Hap H1. 
+  rewrite /cond H1. 
+  assumption.
+Qed.
+

@@ -83,22 +83,29 @@
 lsymb:
 | id=loc(ID) { id }
 
-timestamp_i:
-| id=lsymb terms=term_list               { Theory.App (id, terms) }
+/* non-ambiguous timestamp */
+stimestamp_i:
+| LPAREN t=timestamp_i RPAREN            { t }
+| id=lsymb                               { Theory.App (id, []) }
 | PRED LPAREN ts=timestamp RPAREN        { Theory.Tpred ts }
 | INIT                                   { Theory.Tinit }
+
+/* ambiguous timestamp */
+timestamp_i:
+| t=stimestamp_i                         { t }
+| id=lsymb terms=term_list1              { Theory.App (id, terms) }
+
+/* stimestamp: */
+/* | ts=loc(stimestamp_i) { ts } */
 
 timestamp:
 | ts=loc(timestamp_i) { ts }
 
-parens:
-| LPAREN RPAREN { }
-
 /* non-ambiguous term */
 sterm_i:
-| LPAREN t=term_i RPAREN                  { t }
-| id=lsymb parens?                        { Theory.App (id, []) }
-| id=lsymb parens? AT ts=timestamp        { Theory.AppAt (id,[],ts) }
+| LPAREN t=term_i RPAREN          { t }
+| id=lsymb                        { Theory.App (id, []) }
+/* | id=lsymb AT ts=stimestamp       { Theory.AppAt (id,[],ts) } */
 
 | LANGLE t=term COMMA t0=term RANGLE
     { let loc = L.make $startpos $endpos in
@@ -115,6 +122,7 @@ sterm_i:
 term_i:
 | f=sterm_i                                  { f }
 | id=lsymb terms=term_list1                  { Theory.App (id, terms) }
+| id=lsymb AT ts=timestamp                   { Theory.AppAt (id,[],ts) }
 | id=lsymb terms=term_list1 AT ts=timestamp  { Theory.AppAt (id,terms,ts) }
 
 | t=term XOR t0=term
@@ -140,8 +148,8 @@ term_i:
                        L.mk_loc loc (Theory.App (fsymb, [])) }
 | ELSE t=term       { t }
 
-/* sterm: */
-/* | t=loc(sterm_i) { t } */
+sterm:
+| t=loc(sterm_i) { t }
 
 term:
 | t=loc(term_i) { t }
@@ -193,6 +201,8 @@ sformula_i:
 | FALSE                                   { Theory.False }
 | TRUE                                    { Theory.True }
 
+| pid=loc(PID)                            { Theory.App (pid, []) }
+
 | HAPPENS LPAREN ts=slist1(timestamp,COMMA) RPAREN
                                  { Theory.Happens ts }
 
@@ -212,7 +222,7 @@ formula_i:
       Theory.And (L.mk_loc loc (Theory.Impl (f,f0)),
                   L.mk_loc loc (Theory.Impl (f0,f))) }
 
-| pid=loc(PID) terms=term_list   { Theory.App (pid, terms) }
+| pid=loc(PID) terms=term_list1   { Theory.App (pid, terms) }
 | pid=loc(PID) terms=term_list AT ts=timestamp
                                  { Theory.AppAt (pid, terms, ts) }
 
@@ -395,7 +405,8 @@ rw_type:
 /* ad-hoc rule to allow hypothesis identifiers  */
 | id=lsymb        { `Form (L.mk_loc (L.loc id) (Theory.App (id,[]))) }  
 
-| SLASH id=lsymb  { `Expand id }
+| SLASH t=sterm  { `Expand t }
+| SLASH t=sformula  { `Expand t }
 
 rw_param:
 | m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 

@@ -403,7 +403,7 @@ let make_app_i table cntxt lsymb l =
     conv_err loc (Timestamp_unexpected (App (lsymb,l))) in
 
   match Symbols.def_of_lsymb lsymb table with
-  | Symbols.Reserved _ -> assert false
+  | Symbols.Reserved _ -> Fmt.epr "%s@." (L.unloc lsymb); assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->

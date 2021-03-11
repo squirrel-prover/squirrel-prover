@@ -15,13 +15,13 @@ type namespace =
   | NProcess
 
 let pp_namespace fmt = function
-  | NChannel  -> Fmt.pf fmt "Channel"
-  | NName     -> Fmt.pf fmt "Name"
-  | NAction   -> Fmt.pf fmt "Action"
-  | NFunction -> Fmt.pf fmt "Function"
-  | NMacro    -> Fmt.pf fmt "Macro"
-  | NSystem   -> Fmt.pf fmt "System"
-  | NProcess  -> Fmt.pf fmt "Process"
+  | NChannel  -> Fmt.pf fmt "channel"
+  | NName     -> Fmt.pf fmt "name"
+  | NAction   -> Fmt.pf fmt "action"
+  | NFunction -> Fmt.pf fmt "function"
+  | NMacro    -> Fmt.pf fmt "macro"
+  | NSystem   -> Fmt.pf fmt "system"
+  | NProcess  -> Fmt.pf fmt "process"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.

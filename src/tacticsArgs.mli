@@ -58,8 +58,8 @@ type rw_arg = {
   rw_mult : rw_count;
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
   rw_type : [
-    | `Form of Theory.formula   (* formula or hypothesis ident *)
-    | `Expand of Theory.lsymb
+    | `Form   of Theory.formula   (* formula or hypothesis ident *)
+    | `Expand of Theory.term      (* term or macro name *)
   ];
 }
 
