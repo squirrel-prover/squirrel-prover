@@ -1286,9 +1286,9 @@ let rewrite_tac args s sk fk =
   match args with
   | [Args.RewriteIn (rw_args, in_opt)] ->
     let seqs = 
-      List.fold_right (fun rw_arg seqs ->
+      List.fold_left (fun seqs rw_arg ->
           List.concat_map (rewrite_arg rw_arg in_opt) seqs
-        ) rw_args [s]
+        ) [s] rw_args 
     in
     sk seqs fk
 

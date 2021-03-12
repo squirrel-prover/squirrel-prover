@@ -174,8 +174,6 @@ Abort.
 
 
 (*------------------------------------------------------------------*)
-(* cannot rewrite if all rhs variables are not bound by the lhs *)
-(* same goal, but proved chaining rewrites. *)
 goal [none, bis] _ (x, y, z : message, i : index) :
 (input@A(i) = a => f(a) = c) =>
  happens(A(i)) => b = c => cond@A(i) => f(a) = b.
@@ -185,3 +183,18 @@ Proof.
   assumption.
 Qed.
 
+system [terce] 
+ !_i
+   in(ch,x);
+   let t = <a,x> in 
+   let t' = <t,t> in
+   if x = a then out(ch,t').
+
+(*------------------------------------------------------------------*)
+goal [none, terce] _ (x : message, i : index) :
+(* (input@A(i) = a => f(a) = c) => *)
+ happens(A(i)) => x = input@A(i) => output@A(i) = <<a,x>,<a,x>>.
+Proof.
+  intro x i Hap Eq. 
+  rewrite /output /t' /t Eq; congruence.
+Qed.
