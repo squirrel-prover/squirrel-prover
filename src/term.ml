@@ -256,7 +256,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
         
   | Fun ((s,[]),[t1;t2]) when Symbols.to_string s = "exp" ->
-    Fmt.pf ppf "%a^%a" pp t1 pp t2
+    Fmt.pf ppf "%a ^ %a" pp t1 pp t2
       
   | Fun (f,terms) ->
       Fmt.pf ppf "%a%a"

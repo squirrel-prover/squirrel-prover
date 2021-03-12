@@ -934,6 +934,10 @@ let tac_apply args s sk fk =
   | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
 
+let tac_apply args s sk fk =
+  try tac_apply args s sk fk with
+  | Tactics.Tactic_soft_failure (_,e) -> fk e
+
 (* Does not rely on the typed register as it parses a subst *)
 let () =
   T.register_general "use"
@@ -1125,7 +1129,7 @@ let unfold_macro ~canfail t s : Term.esubst list =
 
 let expand_macro (targets : rw_target list) t (s : sequent) : sequent =
   let subst = unfold_macro ~canfail:true t s in
-  if subst = [] then hard_failure (Failure "nothing to expand");
+  if subst = [] then soft_failure (Failure "nothing to expand");
 
   let doit (f,_) = Term.subst subst f, [] in
   let s, subs = do_targets doit s targets in
@@ -1163,7 +1167,7 @@ let expand (targets : rw_target list) (arg : Theory.term) s =
           unfold_macro ~canfail:false t s @ subst
         ) occs [] in
     
-    if subst = [] then hard_failure (Failure "nothing to expand");
+    if subst = [] then soft_failure (Failure "nothing to expand");
 
     let doit (f,_) = Term.subst subst f, [] in
     let s, subs = do_targets doit s targets in
@@ -1385,6 +1389,9 @@ let rewrite_tac args s sk fk =
 
   | _ -> hard_failure (Tactics.Failure "improper arguments")
 
+let rewrite_tac args s sk fk =
+  try rewrite_tac args s sk fk with
+  | Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
   T.register_general "rewrite"
