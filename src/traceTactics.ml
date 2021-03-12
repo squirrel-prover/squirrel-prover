@@ -976,14 +976,17 @@ type rw_target = [`Goal | `Hyp of Ident.t]
 let target_all s : rw_target list =
   `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
 
-(* Invariant: if (sv,l,r) is a rewrite rule, then
-   sv ⊆ FV(l) and FV(r) ⊆ FV(l). *)
-type 'a rw_rule =  (Vars.Sv.t * 'a term * 'a term)
+(** A rewrite rule is a tuple: 
+    (universally quantified variables, premisses, left term, right term)
+    Invariant: if (sv,φ,l,r) is a rewrite rule, then
+    - sv ⊆ FV(l)
+    - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
+type 'a rw_rule =  (Vars.Sv.t * Term.formula list * 'a term * 'a term)
 
-type rw_erule =  (Vars.Sv.t * Term.esubst)
+type rw_erule = (Vars.Sv.t * Term.formula list * Term.esubst)
 
 type rw_arg = 
-  | Rw_rw of Ident.t option * rw_erule 
+  | Rw_rw of Ident.t option * rw_erule
   (* The ident is the ident of the hyp the rule came from (if any) *)
              
   | Rw_expand of Theory.term
@@ -991,30 +994,45 @@ type rw_arg =
 type rw_earg = Args.rw_count * rw_arg
 
 (** Check that the rule is correct. *)
-let check_rule (sv, l, r) =
+let check_rule ((sv, h, l, r) : 'a rw_rule) : bool =
   let fvl, fvr = Term.fv l, Term.fv r in
-  Vars.Sv.subset sv fvl && Vars.Sv.subset (Vars.Sv.inter fvr sv) fvl
+  let sh = List.fold_left (fun sh h ->
+      Vars.Sv.union sh (Term.fv h)
+    ) Vars.Sv.empty h
+  in
+  Vars.Sv.subset sv fvl && 
+  Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl
 
-let check_erule (sv, Term.ESubst (l,r)) = check_rule (sv, l, r)
+let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : bool =
+  check_rule (sv, h, l, r)
 
 (* rewrite in a single target *)
 let do_target 
-    (doit : (Term.formula * Ident.t option) -> Term.formula) 
-    (s : sequent) (t : rw_target) : sequent =
+    (doit : (Term.formula * Ident.t option) -> Term.formula * Term.formula list) 
+    (s : sequent) (t : rw_target) : sequent * sequent list =
   let f, s, tgt_id = match t with
     | `Goal -> TraceSequent.conclusion s, s, None
     | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
   in
 
-  let f = doit (f,tgt_id) in
+  let f,subs = doit (f,tgt_id) in
+  let subs : sequent list = 
+    List.map (fun sub -> TraceSequent.set_conclusion sub s) subs
+  in
 
   match t with
-  | `Goal -> TraceSequent.set_conclusion f s
-  | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s
+  | `Goal -> TraceSequent.set_conclusion f s, subs
+  | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s, subs
 
-let do_targets doit s targets : sequent = 
-  List.fold_left (do_target doit) s targets
-
+let do_targets doit (s : sequent) targets : sequent * sequent list = 
+  let s, subs = 
+    List.fold_left (fun (s,subs) target ->
+        let s, subs' = do_target doit s target in
+        s, (List.rev subs') @ subs
+      ) (s,[]) targets
+  in
+  s, List.rev subs
+    
 (*------------------------------------------------------------------*)
 let unfold_macro t (s : sequent) =
   let system = TraceSequent.system s in
@@ -1057,8 +1075,10 @@ let expand_macro (targets : rw_target list) t (s : sequent) : sequent =
   let subst = unfold_macro ~canfail:true t s in
   if subst = [] then hard_failure (Failure "nothing to expand");
 
-  let doit (f,_) : Term.formula = Term.subst subst f in
-  do_targets doit s targets 
+  let doit (f,_) = Term.subst subst f, [] in
+  let s, subs = do_targets doit s targets in
+  assert (subs = []);
+  s
      
 
 let find_occs_macro
@@ -1093,8 +1113,10 @@ let expand (targets : rw_target list) (arg : Theory.term) s =
     
     if subst = [] then hard_failure (Failure "nothing to expand");
 
-    let doit (f,_) : Term.formula = Term.subst subst f in
-    do_targets doit s targets 
+    let doit (f,_) = Term.subst subst f, [] in
+    let s, subs = do_targets doit s targets in
+    assert (subs = []);
+    s
 
   | _ ->
     let env = TraceSequent.env s in
@@ -1138,13 +1160,19 @@ let () = T.register_general "expand"
 (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
     If [all] is true, then does not fail if no rewriting occurs. *)
 let rewrite ~all 
-    (targets: rw_target list)
-    (rw : Args.rw_count * Ident.t option * rw_erule) s =
-  let found1 = ref false in
+    (targets: rw_target list) 
+    (rw : Args.rw_count * Ident.t option * rw_erule) s 
+  : sequent * sequent list =
+  let found1, cpt_occ = ref false, ref 0 in
 
+  (* Return: (f, subs) *)
   let rec do1 
-    : type a. Term.formula -> Args.rw_count -> a rw_rule -> Term.formula = 
-    fun f mult (sv, l, r) ->
+    : type a. Term.formula -> Args.rw_count -> a rw_rule -> 
+      Term.formula * Term.formula list = 
+    fun f mult (sv, rsubs, l, r) ->
+      if !cpt_occ > 1000 then   (* hard-coded *)
+          hard_failure (Failure "max nested rewriting reached (1000)");
+      incr cpt_occ;
 
       (* Substitutes all instances of [occ.occ] by [r] (where free variables
          are instantiated according to [occ.mv]. *)
@@ -1152,7 +1180,8 @@ let rewrite ~all
         found1 := true;
         let subst = Term.Match.to_subst occ.mv in
         let r_f = Term.cast (Term.sort occ.occ) (Term.subst subst r) in
-        Term.subst [Term.ESubst (occ.occ, r_f)] f
+        ( Term.subst [Term.ESubst (occ.occ, r_f)] f, 
+          List.map (Term.subst subst) rsubs ) 
       in
 
       (* tries to find an occurence of [l] and rewrite it. *)
@@ -1162,11 +1191,15 @@ let rewrite ~all
       | (`Once | `Many), None -> 
         if not all 
         then soft_failure Tactics.NothingToRewrite 
-        else f
+        else f, []
 
-      | (`Many | `Any), Some occ -> do1 (rw_inst occ) `Any (sv,l,r)
+      | (`Many | `Any), Some occ -> 
+        let f, subs  = rw_inst occ in
+        let f, subs' = do1 f `Any (sv, rsubs, l, r) in
+        f, subs @ subs'
+
       | `Once,          Some occ -> rw_inst occ
-      | `Any,           None     -> f
+      | `Any,           None     -> f, []
   in
   
   let is_same hyp_id target_id = match hyp_id, target_id with
@@ -1178,28 +1211,29 @@ let rewrite ~all
 
   let doit (f,tgt_id) =
     match rw with
-    | mult,  id_opt, (sv, Term.ESubst (l,r)) ->
+    | mult,  id_opt, (sv, subs, Term.ESubst (l,r)) ->
       if is_same id_opt tgt_id 
-      then f 
-      else do1 f mult (sv,l,r)          
+      then f, []
+      else do1 f mult (sv, subs, l, r)          
   in
  
-  let s = [do_targets doit s targets] in
+  let s, subs = do_targets doit s targets in
 
   if all && not !found1 then soft_failure Tactics.NothingToRewrite;
 
-  s
+  s, subs
 
 
 
 (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
     showing the rule validity. *)
 let p_rw_arg (rw_arg : Args.rw_arg) s : rw_earg * sequent list =
-  let to_rule ~loc dir f = 
-    let vs, f = match Term.destr_forall f with
-      | Some (vs, f) -> Vars.Sv.of_list vs, f
-      | None -> Vars.Sv.empty, f
-    in
+  let to_rule ~loc dir f : rw_erule = 
+    let vs, f = Term.decompose_forall f in
+    let vs = Vars.Sv.of_list vs in
+    
+    let forms = List.rev (Term.decompose_impls f) in 
+    let subs, f = List.rev (List.tl forms), List.hd forms in
 
     let e = match f with
       | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
@@ -1216,10 +1250,11 @@ let p_rw_arg (rw_arg : Args.rw_arg) s : rw_earg * sequent list =
         Term.ESubst (t2,t1)
     in
 
-    if not (check_erule (vs, e)) then (* FIXME: slightly incorrect error message *)
+    (* FIXME: slightly incorrect error message *)
+    if not (check_erule (vs, subs, e)) then 
       hard_failure Tactics.BadRewriteRule;
 
-    vs, e
+    vs, subs, e
   in
 
   let p_rw_rule dir (rw_type : Theory.formula) 
@@ -1252,8 +1287,8 @@ let p_rw_arg (rw_arg : Args.rw_arg) s : rw_earg * sequent list =
       | `Form f -> 
         let dir = L.unloc rw_arg.rw_dir in
         (* (rewrite rule, subgols, hyp id) if applicable *)
-        let (vs, e), subgoals, id_opt = p_rw_rule dir f in
-        Rw_rw (id_opt, (vs, e)), subgoals
+        let rule, subgoals, id_opt = p_rw_rule dir f in
+        Rw_rw (id_opt, rule), subgoals
 
       | `Expand t -> 
         if L.unloc rw_arg.rw_dir <> `LeftToRight then
@@ -1279,7 +1314,11 @@ let rewrite_arg rw_arg in_opt s =
   
   match rw_arg with
   | Rw_rw (id, erule) -> 
-    subgoals @ rewrite ~all targets (rw_c, id, erule) s
+    let s, subs = rewrite ~all targets (rw_c, id, erule) s in
+    subgoals @                  (* prove rule *)
+    subs @                      (* prove instances premisses *)
+    [s]                         (* final sequent *)
+
   | Rw_expand arg -> [expand targets arg s]
 
 let rewrite_tac args s sk fk =

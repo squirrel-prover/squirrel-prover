@@ -9,6 +9,7 @@ abstract e : message
 abstract ok : index   -> message
 abstract f  : message -> message
 abstract gg  : message -> message -> message
+abstract f0  : message -> message
 channel ch
 
 system A: !_i in(ch,x);out(ch,<ok(i),x>).
@@ -197,4 +198,41 @@ goal [none, terce] _ (x : message, i : index) :
 Proof.
   intro x i Hap Eq. 
   rewrite /output /t' /t Eq; congruence.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* rewrite rule with premisses *)
+goal _ (x : message) : 
+ (forall (u,v : message), u = f(a) => <u,v> = <b,v>) =>
+ x = f(a) => 
+ <x,c> = <b,c>.
+Proof.
+ intro x H Eq.
+ rewrite H; 1: assumption. 
+ congruence.
+Qed.
+
+(* several occurences *)
+goal _ (x : message) : 
+ (forall (u,v : message), u = f(a) => <f0(u),v> = <b,v>) =>
+ x = f(a) => 
+ f(x) = f(a) => 
+ <f0(x),<f0(f(x)),c>> = <b,<b,c>>.
+Proof.
+ intro x H Eq Eq2.
+ rewrite H; 1: assumption. 
+ rewrite H; 1: assumption.
+ congruence.
+Qed.
+
+(* same with !H *)
+goal _ (x : message) : 
+ (forall (u,v : message), u = f(a) => <f0(u),v> = <b,v>) =>
+ x = f(a) => 
+ f(x) = f(a) => 
+ <f0(x),<f0(f(x)),c>> = <b,<b,c>>.
+Proof.
+ intro x H Eq Eq2.
+ rewrite !H; 1,2: assumption. 
+ congruence.
 Qed.

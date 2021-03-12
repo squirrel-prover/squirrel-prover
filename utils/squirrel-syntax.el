@@ -64,11 +64,8 @@
   "use"
   "with"
   "assert"
-  "assumption"
   "case"
   "collision"
-  "congruence"
-  "constraints"
   "depends"
   "eqnames"
   "eqtraces"
@@ -123,6 +120,9 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
+  "assumption"
+  "congruence"
+  "constraints"
   "auto"
 ))
 
