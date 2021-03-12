@@ -76,7 +76,9 @@ exception Undefined_Variable
 
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
-val rm_var : env -> 'a var -> env
+val rm_var  : env -> 'a var -> env
+
+val rm_evar : env -> evar -> env
 
 
 (** [make_fresh env sort prefix]

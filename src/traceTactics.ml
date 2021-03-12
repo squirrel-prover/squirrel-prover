@@ -726,6 +726,58 @@ let () =
     simpl_left_tac
 
 (*------------------------------------------------------------------*)
+(** Generalize *)
+
+let generalize ~loc (v : Vars.evar) s : sequent =
+  let env = TraceSequent.env s in
+  if not (List.mem v (Vars.to_list env)) then
+    hard_failure (Failure (Fmt.str "unknown variable %a" Vars.pp_e v));
+
+  let bad_hyps = Hyps.fold (fun id f bad_hyps -> 
+      if Vars.Sv.mem v (Term.fv f) 
+      then id :: bad_hyps
+      else bad_hyps
+    ) s [] in
+  
+  if bad_hyps <> [] then
+    soft_failure (Failure (Fmt.str "%a appears in hypotheses %a" 
+                             Vars.pp_e v (Fmt.list Ident.pp) bad_hyps));
+
+  let goal = Term.mk_forall [v] (TraceSequent.conclusion s) in
+  let env = Vars.rm_evar env v in
+ 
+  TraceSequent.set_conclusion goal s
+  |> TraceSequent.set_env env
+
+
+let generalize_tac (args : Args.parser_arg list) s sk fk = 
+  try
+    let s = 
+      List.fold_left (fun s arg -> 
+          let tbl, env = TraceSequent.table s, TraceSequent.env s in
+          match Args.convert_args tbl env [arg] (Args.Sort Args.ETerm) with
+          | Args.Arg (Args.ETerm (_, Term.Var v, loc)) ->
+            generalize ~loc (Vars.EVar v) s
+
+          | Args.Arg (Args.ETerm (_, _, loc)) ->
+            hard_failure ~loc (Failure "arguments must be variables")
+
+          | _ -> hard_failure (Failure "improper arguments")
+        ) s args in
+    sk [s] fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+      
+let () =
+  T.register_general "generalize"
+    ~tactic_help:{
+      general_help = "Generalize over some variables";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    generalize_tac
+  
+
+(*------------------------------------------------------------------*)
 (** Induction *)
 
 let induction s  =

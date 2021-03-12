@@ -22,7 +22,7 @@
 %token DOT SLASH BANGU
 %token WITH ORACLE EXN
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR
+%token REWRITE REVERT CLEAR GENERALIZE
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -517,6 +517,10 @@ tac:
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       Tactics.Abstract ("revert", ids) }
 
+  | GENERALIZE ids=slist1(sterm, empty)     
+    { let ids = List.map (fun id -> TacticsArgs.Theory id) ids in
+      Tactics.Abstract ("generalize", ids) }
+
   | CLEAR ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
       Tactics.Abstract ("clear", ids) }
@@ -563,16 +567,17 @@ tac:
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
 help_tac_i:
-| LEFT      { "left"}     
-| RIGHT     { "right"}    
-| EXISTS    { "exists"}    
-| USE       { "use"}      
-| REWRITE   { "rewrite"}  
-| REVERT    { "revert"}  
-| DDH       { "ddh"}      
-| ASSERT    { "assert"}   
-| DESTRUCT  { "destruct"} 
-| INTRO     { "intro"} 
+| LEFT       { "left"}     
+| RIGHT      { "right"}    
+| EXISTS     { "exists"}    
+| USE        { "use"}      
+| REWRITE    { "rewrite"}  
+| REVERT     { "revert"}  
+| GENERALIZE { "generalize"}  
+| DDH        { "ddh"}      
+| ASSERT     { "assert"}   
+| DESTRUCT   { "destruct"} 
+| INTRO      { "intro"} 
 
 help_tac:
 | l=loc(help_tac_i) { l }

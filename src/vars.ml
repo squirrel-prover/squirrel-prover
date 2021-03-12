@@ -101,6 +101,8 @@ let rm_var (e1,e2) v =
    in
   M.remove (name v) e1, M.add v.name_prefix new_suffix e2
 
+let rm_evar e (EVar v) = rm_var e v
+
 let prefix_count_regexp = Pcre.regexp "_*([^0-9]*)([0-9]*)"
 
 let make_fresh ((e1,e2):env) var_type name_prefix =

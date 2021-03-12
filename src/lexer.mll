@@ -117,6 +117,7 @@ rule token = parse
 | "use"               { USE }
 | "rewrite"           { REWRITE }
 | "revert"            { REVERT }
+| "generalize"        { GENERALIZE }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
