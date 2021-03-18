@@ -75,10 +75,10 @@ process reader(jj:index) =
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 goal auth_R1 :
-forall (jj,ii:index),
-  cond@R1(jj,ii)
+forall (jj,ii:index), happens(R1(jj,ii)) =>
+  (cond@R1(jj,ii)
   =>
-  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
+  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
 Proof.
 intro *.
 expand cond@R1(jj,ii).
@@ -87,10 +87,10 @@ exists j.
 Qed.
 
 goal auth_T1 :
-forall (i,j:index),
-  cond@T1(i,j)
+forall (i,j:index), happens(T1(i,j)) =>
+  (cond@T1(i,j)
   =>
-  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j)).
+  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
 Proof.
 intro *.
 expand cond@T1(i,j).

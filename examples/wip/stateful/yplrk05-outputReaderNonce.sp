@@ -78,12 +78,8 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 (* Minimal sequentiality assumption needed for the proofs *)
 axiom sequentiality :
   forall (t:timestamp), forall (i,j:index),
-    T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')
-
-(* "Empty" system, useful only to define the axiom sequentiality
-   where we need to talk about actions T(i,j) and T1(i,j), which
-   are defined only after the previous system *)
-system [sequence] null.
+    happens(T(i,j),t,T1(i,j)) =>
+    (T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')).
 
 equiv outputReader.
 Proof.
@@ -95,8 +91,8 @@ fa 0. fa 1. fa 1.
 fresh 1.
 yesif 1.
 split.
-by depends R(jj),R2(jj). 
-by depends R(jj),R1(jj,ii).
+assert happens(R2(jj1)). by depends R(jj1),R2(jj1). 
+assert happens(R1(jj1,ii)). by depends R(jj1),R1(jj1,ii).
 
 (* case t = R1(jj,ii) *)
 expandall.
@@ -127,8 +123,6 @@ expandall.
 fa 0. fa 1. fa 1.
 prf 1.
 yesif 1.
-split.
-admit. (* ??? *)
 split.
 admit. (* ??? *)
 (* it seems to me that the previous case is possible: if T(i,j1) aborts,

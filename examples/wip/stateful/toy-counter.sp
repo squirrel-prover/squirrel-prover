@@ -73,23 +73,26 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 (* GOALS *)
 
 goal counterIncrease :
-  forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.
+  forall (t:timestamp), happens(t) => 
+    (t > init => order(d@pred(t),d@t) = orderOk).
 Proof.
-intro t Hc.
+intro t Hap Hc.
 use orderSucc with d@pred(t).
 case t. 
 Qed.
 
 (* A more general result than counterIncrease *)
 goal counterIncreaseBis :
-  forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
+  forall (t,t':timestamp), happens(t) =>
+    (t' < t => order(d@t',d@t) = orderOk).
 Proof.
 induction.
-use H with pred(t).
-assert (t' < pred(t) || t' >= pred(t)).
-case H1.
+assert (t' < pred(t) || t' >= pred(t)). admit. 
+(* QUESTION SOLENE - If I add happens(pred(t)) in the goal, then I have 
+to prove happens(pred(pred(t))) because of the induction hypthesis. *)
+case H0.
+use H with pred(t),t'.
 (* case t' < pred(t) *)
-use H0 with t'.
 use counterIncrease with t.
 by use orderTrans with d@t',d@pred(t),d@t.
 (* case t' >= pred(t) *)
@@ -97,13 +100,12 @@ assert t' = pred(t).
 by use counterIncrease with t.
 Qed.
 
-goal secretReach : forall (j:index), cond@B(j) => False.
+goal secretReach : forall (j:index), happens(B(j)) => (cond@B(j) => False).
 Proof.
-intro j Hcond.
+intro *.
 expand cond@B(j).
-euf Hcond.
+euf H.
 assert pred(A(i)) < pred(B(j)).
-use counterIncreaseBis with pred(B(j)).
-use H with pred(A(i)).
+use counterIncreaseBis with pred(B(j)),pred(A(i)).
 use orderStrict with d@pred(A(i)),d@pred(B(j)).
 Qed.

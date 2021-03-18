@@ -54,10 +54,7 @@ process reader(k:index) =
 
 system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
-axiom deltaMaxAxiom : myPred(deltaZero) = deltaZero
-
-axiom stateTagInit : forall (i:index), kT(i)@init = seed(i).
-axiom stateReaderInit : forall (ii:index), kR(ii)@init = seed(ii).
+axiom deltaMaxAxiom : myPred(deltaZero) = deltaZero.
 
 axiom updateReaderAxiom : 
   forall (i:index,xk:message), 
@@ -81,6 +78,8 @@ axiom stacked_step : forall (i:index,x,y:message)
 goal auth_R_step : forall (delta:message,k,ii:index),
   (* The auth property to prove is generalized over "stacked" database entries,
      so in this lemma we have a (non-prenex) quantification over messages. *)
+  happens(R(k,ii)) =>
+  (
   (* Property for myPred(delta). *)
   (forall (x:message), stacked(ii,kR(ii)@R(k,ii),x) = testOk =>
    readerTest(ii,x,input@R(k,ii),myPred(delta)) = testOk =>
@@ -88,20 +87,23 @@ goal auth_R_step : forall (delta:message,k,ii:index),
   (* Property for delta. *)
   (forall (x:message), stacked(ii,kR(ii)@R(k,ii),x) = testOk =>
    readerTest(ii,x,input@R(k,ii),delta) = testOk =>
-   exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j)).
+   exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j))
+  ).
 Proof.
 intro *.
 use readerTestOk with ii,x,input@R(k,ii),delta.
-case H1.
+use H0. case H2.
 (* euf Meq0 ?
    Problème avec la variable x. *)
+admit.
 admit.
 Qed.
 
 goal auth_R :
   forall (k,ii:index,delta:message), 
-    ( readerTest(ii,kR(ii)@R(k,ii),input@R(k,ii),delta) = testOk )
-    => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
+    happens(R(k,ii)) =>
+    ( readerTest(ii,kR(ii)@R(k,ii),input@R(k,ii),delta) = testOk
+      => (exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j)) ).
 Proof.
 intro *.
 

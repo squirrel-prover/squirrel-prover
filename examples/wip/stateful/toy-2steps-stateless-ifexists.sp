@@ -69,7 +69,7 @@ euf Meq.
 exists ii,j.
 (* RIGHT *)
 fresh Meq. 
-case H.
+case H0.
 by exists ii,jj. 
 admit. (* ??? *)
 admit. (* ??? *)
@@ -91,20 +91,20 @@ equivalent
 split.
 (* not(honest) => not(cond) *)
 expand cond@R1(k).
-notleft H.
-use H with i,j.
+notleft H0.
+use H0 with i,j.
 (* not(cond) => not(honest) *)
 expand cond@R1(k).
-notleft H.
+notleft H0.
 project.
 (* LEFT *)
 euf Meq.
-use H with ii,j.
-case H0.
+use H0 with ii,j.
+case H1.
 (* RIGHT *)
 fresh Meq. 
-case H0.
-by use H with ii,jj; case H0.
+case H1.
+by use H0 with ii,jj; case H1.
 admit.
 admit.
 fadup 1.

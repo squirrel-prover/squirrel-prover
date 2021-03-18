@@ -36,82 +36,71 @@ system (!_i !_j T: tag(i,j)).
 (* GOALS *)
 
 goal stateUpdate :
-forall (t:timestamp), (forall (i,j:index), 
-  t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
+forall (t:timestamp), happens(t) =>
+  (forall (i,j:index), t=T(i,j) => kT(i)@t = hkey(kT(i)@pred(t),key(i))).
 Proof.
-simpl.
+by auto.
 Qed.
 
 goal onlyTagActions :
-forall (t:timestamp), t <> init => exists (i,j:index), t=T(i,j).
+forall (t:timestamp), happens(t) => (t <> init => exists (i,j:index), t=T(i,j)).
 Proof.
-intro t Hneq.
+intro t Hap Hneq.
 case t. 
+by exists i,j.
 Qed.
 
 goal notInit :
-forall (t:timestamp), (exists (t':timestamp), t' < t)  => (t <> init).
+forall (t:timestamp), happens(t) =>
+  ((exists (t':timestamp), t' < t)  => (t <> init)).
 Proof.
-auto. 
+by auto. 
 Qed.
 
 (* kT(i)@t = kT(i)@t' where t' is init or the previous update of kT(i) *)
-goal lastUpdate_ : forall (t:timestamp) forall (i:index)
-  (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
-  (exists j:index,
-   kT(i)@t = kT(i)@T(i,j) &&
-   T(i,j) <= t &&
-   (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
+goal lastUpdate : forall (t:timestamp) forall (i:index)
+  happens(t) =>
+  ((kT(i)@t = kT(i)@init && forall (j':index), happens(T(i,j')) => t < T(i,j')) ||
+    (exists j:index,
+     kT(i)@t = kT(i)@T(i,j) &&
+     T(i,j) <= t &&
+     (forall (j':index), happens(T(i,j')) => (T(i,j')<=T(i,j) || t<T(i,j'))))).
 Proof.
 induction.
 case t.
 
 (* t = init *)
-by left.
+left.
 
 (* t = T(i1,j) *)
 assert (i=i1 || i<>i1).
 case H0.
 
 (* t = T(i,j) *)
-by right; exists j.
+right; exists j.
 
 (* t = T(i1,j) with i<>i1 *)
 subst t,T(i1,j).
 assert kT(i)@T(i1,j) = kT(i)@pred(T(i1,j)).
 expand kT(i)@T(i1,j).
 by noif.
-use H with pred(T(i1,j)).
-use H0 with i.
-case H1.
+use H with pred(T(i1,j)),i.
+case H0.
 
   left.
-  by use H1 with j'.
+  by use H0 with j'.
 
   right.
   exists j1.
-  use H2 with j'.
-  by case H1.
-Qed.
-
-(* A more convenient version of the lemma, because our use
-   tactic is too primitive. *)
-goal lastUpdate : forall (t:timestamp,i:index)
-  (kT(i)@t = kT(i)@init && forall (j':index) t < T(i,j')) ||
-  (exists j:index,
-   kT(i)@t = kT(i)@T(i,j) &&
-   T(i,j) <= t &&
-   (forall (j':index), T(i,j')<=T(i,j) || t<T(i,j'))).
-Proof.
-  intro t i.
-  use lastUpdate_ with t.
-  use H with i.
+  use H1 with j'.
+  by case H0.
 Qed.
 
 goal stateInequality :
   forall (t:timestamp),
   (forall (t':timestamp), forall (i,j,i':index)
-     t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t').
+     happens(t) =>
+     (t = T(i,j) && t' < t => kT(i)@t <> kT(i')@t')).
 Proof.
 induction.
 subst t, T(i,j).
@@ -135,21 +124,18 @@ by use H1 with j1; case H0.
 (* kT(i)@pred(T(i,j)) = kT(i)@T(i,j2)
    then we should have that T(i,j1) <= T(i,j2) *)
 assert (T(i,j1) <= T(i,j2)).
-by use H2 with j1; case H1; case H0.
+use H2 with j1. case H1. case H0. case H0.
 
-use H with T(i,j2).
-use H1 with pred(T(i,j1)).
-use H3 with i,j2,i.
-
+by use H with T(i,j2),pred(T(i,j1)),i,j2,i.
 Qed.
 
 goal stateInequalityHelpful :
-(forall (i,j,j':index), T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j'))).
+forall (i,j,j':index), 
+  happens(T(i,j)) => 
+    ( T(i,j')<T(i,j) => kT(i)@pred(T(i,j)) <> kT(i)@pred(T(i,j')) ).
 Proof.
-intro i j j' Hlt Heq.
-use stateInequality with T(i,j).
-use H with T(i,j').
-use H0 with i,j,i.
+intro i j j' Hap Hlt Heq.
+by use stateInequality with T(i,j),T(i,j'),i,j,i.
 Qed.
 
 equiv test.
