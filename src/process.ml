@@ -604,7 +604,6 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c table in
-      Fmt.epr "a@.";
       let env,x' = make_fresh env Sorts.Message (L.unloc x) in
       let in_th =
         Theory.var_i dum (Vars.name x')
