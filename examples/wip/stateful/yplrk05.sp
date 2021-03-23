@@ -82,9 +82,9 @@ Proof.
 nosimpl(induction; intro IH0).
 case t.
 
-by use IH0 with pred(R(jj)),i,j as H0;     use H0 with i,j.
+by use IH0 with pred(R(jj)),i,j as H0 ; use H0 with i,j.
 by use IH0 with pred(R1(jj,ii)),i,j as H0; use H0 with i,j.
-by use IH0 with pred(R2(jj)),i,j as H0;    use H0 with i,j.
+by use IH0 with pred(R2(jj)),i,j as H0; use H0 with i,j.
 
 assert T(i1,j1) = T(i,j) || T(i1,j1) > T(i,j) as H0.
 case H0.
@@ -157,6 +157,10 @@ euf H0.
     (* case 3/3: equality with hashed message in update@T1 *)
     (* if there is an update@T1, then action T happened before *)
     use updateTag with pred(T1(ii,j)),ii,j as H2.
+
+    (* TODO: adrien, this should work*)
+    (* depends T(ii,j),T1(ii,j); 1: by auto  *)
+
     exists j. split.
     case H1.
     assert happens(T1(ii,j)).
@@ -165,19 +169,19 @@ euf H0.
     by depends T(ii,j),T1(ii,j).
     case H1. 
     assert happens(T1(ii,j)).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
     assert happens(T1(ii,j)).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
     case H1.
     assert happens(T1(ii,j)).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
     assert happens(T1(ii,j)).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
     case H1.
     assert happens(pred(T1(ii,j))).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
     assert happens(pred(T1(ii,j))).
-    depends T(ii,j),T1(ii,j).
+    by depends T(ii,j),T1(ii,j).
   (* case 2/3: equality with hashed message in output@T *)
   (* honest case *)
   by exists j.
