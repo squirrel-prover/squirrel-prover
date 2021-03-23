@@ -403,9 +403,6 @@ Proof.
   <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
  intro *; case Euf; expand sidPaF. 
 
- (*   (* TODO: check why in the previous subgoals, in the second subgoal we can show *) *)
- (* assert happens(SDIS). auto. *)
-
 (* Honest case of signature produced by Fa.
    We need to prove that the sign req received by FA comes from PDIS. *)
 
@@ -443,7 +440,8 @@ Proof.
   assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
           h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol;
   1: auto.
-  by collision.
+  collision => [[A _] _]. 
+  by rewrite A. 
 Qed.
 
 (* The equivalence for authentication is obtained by using the unreachability
