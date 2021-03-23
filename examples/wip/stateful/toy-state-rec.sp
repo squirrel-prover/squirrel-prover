@@ -64,7 +64,8 @@ axiom readerTestOk :
 
 goal auth_R :
   forall (k,ii:index), 
-    cond@R(k,ii) => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) ).
+    happens(R(k,ii)) =>
+    (cond@R(k,ii) => ( exists (i,j:index), T(i,j) < R(k,ii) && input@R(k,ii) = output@T(i,j) )).
 Proof.
 intro *.
 expand cond@R(k,ii).

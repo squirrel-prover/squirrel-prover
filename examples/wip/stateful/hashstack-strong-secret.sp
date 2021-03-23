@@ -17,14 +17,18 @@ mutable s : message = n
 system !_i s:=h1(s,k1);out(c,h2(s,k2)).
 
 (** We should be able to prove these axioms, right? *)
-axiom s_inj : forall (i,j:index) s@A(i)=s@A(j) => i=j.
-axiom s_jni : forall (i,j:index) i<>j => s@A(i)<>s@A(j).
+axiom s_inj : 
+  forall (i,j:index), happens(A(i),A(j)) => (s@A(i)=s@A(j) => i=j).
+axiom s_jni : 
+  forall (i,j:index), happens(A(i),A(j)) => (i<>j => s@A(i)<>s@A(j)).
 
 (** We cannot assume t' < t but we will use it in the proof.
     This hypothesis is not restrictive as we can always take a larger t,
     and restrict the frame to any smaller one afterwards. *)
-equiv strong_sec (t,t':timestamp) : frame@t, diff(s@t',fresh).
+equiv strong_sec (t,t':timestamp) : 
+  [happens(t,t')] -> frame@t, diff(s@t',fresh).
 Proof.
+  intro *.
   induction t.
 
   (* Case t = init.
@@ -35,12 +39,12 @@ Proof.
 
     equivalent s@init, n.
     expand frame@init.
-    fresh 0.
+    by fresh 0.
 
     expand s@A(i).
     (* PRF h1 *)
-    prf 1. yesif 1. case H. use s_jni with i1,i.
-    fresh 1.
+    prf 1. yesif 1. case H0. use s_jni with i1,i.
+    by fresh 1.
 
   (* Case t = A(i). *)
 
@@ -51,7 +55,7 @@ Proof.
     project.
 
       case H.
-        use s_jni with i1,i.
+        by use s_jni with i1,i.
         (* Consider the possibility that s@t'
            indirectly contains h2(s@A(i1),k2) for A(i1)<=t'.
            This could be ruled out because the state never gets
@@ -65,21 +69,26 @@ Proof.
         assert t' < A(i).
         admit.
 
-      use s_inj with i1,i.
+      by use s_inj with i1,i.
 
   fresh 1.
   (* Warning here we conclude by induction hypothesis which is incorrect
      because the assumption t'<t might not be valid anymore. We need to
      handle the "base" case t'=t separately. This is shown in next goals. *)
+  admit. 
+  (* QUESTION SOLENE - For me, the goal should be automatically closed,
+  or do I miss something? *)
 Qed.
 
 (* Perhaps not useful, just a warmup. *)
-equiv almost_base_case (i:index) : frame@pred(A(i)), diff(s@A(i),fresh).
+equiv almost_base_case (i:index) : 
+  [happens(pred(A(i)),A(i))] -> frame@pred(A(i)), diff(s@A(i),fresh).
 Proof.
+  intro *.
   expand s@A(i).
   (* PRF h1 *)
   prf 1. yesif 1.
-    assert s@A(i) = s@A(i1). use s_inj with i1,i.
+    assert s@A(i) = s@A(i1). by use s_inj with i1,i.
   fresh 1.
   admit. (* Generalize reflexivity: there is no diff! *)
 Qed.
@@ -88,15 +97,17 @@ Qed.
    it is not replaced by fresh on the right. However it occurs in
    h2(s@A(i),k2) and this hash is fresh: we get rid of it using
    prf. *)
-equiv base_case (i:index) : frame@A(i), diff(s@A(i),fresh).
+equiv base_case (i:index) : 
+  [happens(A(i))] -> frame@A(i), diff(s@A(i),fresh).
 Proof.
+  intro *.
   expandall. fa 0. fa 1. fa 1.
   (* PRF h2 *)
-  prf 1. yesif 1. use s_jni with i,i1.
+  prf 1. yesif 1. by use s_jni with i,i1.
   fresh 1.
   (* PRF h1 *)
   prf 1. yesif 1.
-    use s_jni with i,i1.
+    by use s_jni with i,i1.
   fresh 1.
   admit. (* Generalized refl as above. *)
 Qed.

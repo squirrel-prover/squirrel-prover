@@ -51,36 +51,36 @@ system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
 goal wa_R0 :
 forall (k:index,i:index),
-  cond@R(k,i) =>
-  (exists (j:index), T(i,j) < R(k,i) && output@T(i,j) = input@R(k,i)).
+  happens(R(k,i)) =>
+  (cond@R(k,i) =>
+    (exists (j:index), T(i,j) < R(k,i) && output@T(i,j) = input@R(k,i))).
 Proof.
 intro *.
 expand cond@R(k,i).
 euf H.
-exists j.
+by exists j.
 Qed.
-
-
 
 goal wa_R1 :
 forall (k:index,i:index),
-  cond@R1(k,i) =>
-  (exists (j:index), T(i,j) < R1(k,i) && output@T(i,j) = input@R1(k,i)).
+  happens(R1(k,i)) =>
+  (cond@R1(k,i) =>
+    (exists (j:index), T(i,j) < R1(k,i) && output@T(i,j) = input@R1(k,i))).
 Proof.
 intro *.
 expand cond@R1(k,i).
 euf Meq.
-exists j.
+by exists j.
 Qed.
-
 
 goal wa_R2 :
 forall (k:index,i:index),
-  cond@R2(k,i) =>
-  (exists (j:index), T(i,j) < R2(k,i) && output@T(i,j) = input@R2(k,i)).
+  happens(R2(k,i)) =>
+  (cond@R2(k,i) =>
+    (exists (j:index), T(i,j) < R2(k,i) && output@T(i,j) = input@R2(k,i))).
 Proof.
 intro *.
 expand cond@R2(k,i).
 euf Meq.
-exists j.
+by exists j.
 Qed.

@@ -34,17 +34,18 @@ system ((!_k !_kk R: reader(k,kk)) | (!_i !_j T: tag(i,j))).
 goal wa_R :
 (* (i,j)=(k,kk) is necessary to have keyMsg(i,j)=keyMsg(k,kk) *)
 forall (k,kk:index),
-  cond@R(k,kk) =>
-  ( exists (i,j:index), 
-    T(i,j) < R(k,kk) && output@T(i,j) = input@R(k,kk) && i=k && j=kk ).
+  happens(R(k,kk)) => 
+  (cond@R(k,kk) =>
+    exists (i,j:index), 
+      T(i,j) < R(k,kk) && output@T(i,j) = input@R(k,kk) && i=k && j=kk).
 Proof.
-intros.
+intro *.
 expand cond@R(k,kk).
 project.
 (* LEFT *)
-euf M0.
+euf H.
 exists k,kk.
 (* RIGHT *)
-euf M0.
+euf H.
 exists k,kk.
 Qed.
