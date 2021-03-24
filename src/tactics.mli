@@ -85,6 +85,10 @@ type 'a sk = 'a -> fk -> a
   * parameter unconstrained. *)
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(** Run a tactic that does not fail  *)
+val run : 'a tac -> 'a -> 'a list
+
+(*------------------------------------------------------------------*)
 (** {2 Generic tactics and tactic combinators} *)
 
 val id : 'a tac

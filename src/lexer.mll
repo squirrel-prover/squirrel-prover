@@ -43,6 +43,8 @@ rule token = parse
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
+| "//"                { SLASHSLASH }
+| "/="                { SLASHEQUAL }
 | '/'                 { SLASH }
 | "="                 { EQ }
 | "<>"                { NEQ }
@@ -118,6 +120,7 @@ rule token = parse
 | "rewrite"           { REWRITE }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
+| "depends"           { DEPENDS }
 | "clear"             { CLEAR }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }

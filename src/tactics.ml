@@ -218,6 +218,17 @@ type 'a sk = 'a -> fk -> a
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
 (*------------------------------------------------------------------*)
+let run : 'a tac -> 'a -> 'a list = fun tac a ->
+  let exception Done in
+  let found = ref None in
+
+  let fk _ = assert false in
+  let sk res _ = found := Some res; raise Done in
+
+  try ignore (tac a sk fk : a); assert false 
+  with Done -> Utils.oget !found
+  
+(*------------------------------------------------------------------*)
 (** Selector for tactic *)
 type selector = int list
 

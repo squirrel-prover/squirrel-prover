@@ -46,7 +46,8 @@ Proof.
  executable OutFalse; 
  1,2: by auto.
  intro Hexec.
- depends Out, OutFalse; intro Hle.
+ depends Out, OutFalse; 1: auto.
+ intro Hle.
  use Hexec with Out.
  nosimpl(expand exec@Out).
 

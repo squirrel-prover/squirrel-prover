@@ -342,7 +342,7 @@ goal [none, auth] P_charac :
   happens(Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
   intro Hap He Hc.
-  depends PDIS5, Pfail => Hap2.
+  depends PDIS5, Pfail => // Hap2.
   expand exec, cond.
   rewrite (pkSa@PDIS5 = pk(kS)) in *; 1: auto.
   destruct He as [_ [_ Hchk]].
@@ -380,7 +380,7 @@ goal [none, auth] S_charac :
    happens(Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
   intro Hap He Hc.
-  depends Sok, Sfail => Hap2.
+  depends Sok, Sfail => // Hap2.
   expand exec, cond.
   destruct He as [_ Hchk].
 
@@ -409,7 +409,7 @@ Proof.
   intro Meq.
   executable pred(Sok); 1,2: by auto => H2.
   
-  depends SDIS, Sok => _.  
+  depends SDIS, Sok => // _.  
   assert happens(SDIS); 1: auto.
   assert happens(P3(i)); 1: case Euf; auto.
   expand x3(i)@P3(i).
@@ -485,7 +485,7 @@ Proof.
   split; 2: by auto. 
   intro Hfail.
   use S_charac; try auto.
-  depends Sok, Sfail => _.
+  depends Sok, Sfail => // _.
   executable Sfail; 1,2: auto.  
   by intro H0; use H0 with Sok.
   by expand exec@Sfail.
@@ -518,7 +518,7 @@ Proof.
   split; 2: by auto. 
   intro Hfail.
   use P_charac; try auto.
-  depends PDIS5, Pfail => _.
+  depends PDIS5, Pfail => // _.
   executable Pfail; 1,2: auto.  
   by intro H0; use H0 with PDIS5.
   by expand exec@Pfail.

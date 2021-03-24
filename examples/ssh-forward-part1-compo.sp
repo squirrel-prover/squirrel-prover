@@ -200,7 +200,7 @@ goal [none, auth] P_charac :
   happens(Pfail) => cond@Pok => (cond@Pfail => False) .
 Proof.
   intro Hap HcOk HcFail.
-  depends Pok, Pfail => _.
+  depends Pok, Pfail => // _.
   expand cond, pkS1.
   rewrite (fst(input@Pok) = pk(kS)) in HcOk; 1: auto.
   destruct HcOk as [_ HcOk].
@@ -226,7 +226,7 @@ goal [none, auth] S_charac :
   happens(Sfail) => cond@Sok => (cond@Sfail => False).
 Proof.
   intro Hap HcOk HcFail.
-  depends Sok, Sfail => _.
+  depends Sok, Sfail => // _.
   expand cond.
   expand sidS1; euf HcOk => Euf.
 
@@ -270,7 +270,7 @@ Proof.
    equivalent exec@Pfail, False.
      expand exec. 
      split; 2: by auto => _.
-     depends Pok, Pfail => _.
+     depends Pok, Pfail => // _.
      executable pred(Pfail); 1,2: by auto.
      intro He; use He with Pok; 2: by auto.
    
@@ -303,7 +303,7 @@ Proof.
    equivalent exec@Sfail, False.
      expand exec. 
      split; 2: by auto => _.
-     depends Sok, Sfail => _.
+     depends Sok, Sfail => // _.
      executable pred(Sfail); 1,2: by auto.
      intro He; use He with Sok; 2: by auto.
    

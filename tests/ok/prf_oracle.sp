@@ -50,10 +50,10 @@ project.
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
 split; 1: by auto. 
-by split; intro H0; case H0; depends A, A1; auto. 
+by split; intro H0; case H0; depends A, A1. 
 
 split; 1: by auto. 
-by split; intro H0; case H0; depends A, A1; auto. 
+by split; intro H0; case H0; depends A, A1. 
 
 fresh 1.
 Qed.

@@ -1,5 +1,6 @@
 %{
   module L  = Location
+  module T  = Tactics
 %}
 
 %token <int> INT
@@ -19,10 +20,10 @@
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
-%token DOT SLASH BANGU
+%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
 %token WITH ORACLE EXN
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDS
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -45,6 +46,7 @@
 
 %left PLUS
 %right SEMICOLON
+%nonassoc BY
 %nonassoc REPEAT
 %nonassoc TRY
 %nonassoc NOSIMPL
@@ -445,7 +447,9 @@ simpl_pat:
 | ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
 
 intro_pat:
-| l=loc(STAR)       { TacticsArgs.Star (L.loc l)}
+| l=loc(SLASHSLASH) { TacticsArgs.Tryauto  (L.loc l)}
+| l=loc(SLASHEQUAL) { TacticsArgs.Simplify (L.loc l)}
+| l=loc(STAR)       { TacticsArgs.Star     (L.loc l)}
 | pat=simpl_pat     { TacticsArgs.Simpl pat }
 
 intro_pat_list:
@@ -473,96 +477,104 @@ sel_tacs:
 (*------------------------------------------------------------------*)
 tac:
   | LPAREN t=tac RPAREN                { t }
-  | l=tac SEMICOLON r=tac              { Tactics.AndThen [l;r] }
+  | l=tac SEMICOLON r=tac              { T.AndThen [l;r] }
   | l=tac SEMICOLON LBRACKET sls=sel_tacs RBRACKET
-                                       { Tactics.AndThenSel (l,sls) }
+                                       { T.AndThenSel (l,sls) }
   | l=tac SEMICOLON sl=sel_tac %prec tac_prec
-                                       { Tactics.AndThenSel (l,[sl]) }
-  | BY t=tac %prec tac_prec            { Tactics.By t }
-  | l=tac PLUS r=tac                   { Tactics.OrElse [l;r] }
-  | TRY l=tac                          { Tactics.Try l }
-  | REPEAT t=tac                       { Tactics.Repeat t }
-  | id=ID t=tactic_params              { Tactics.Abstract (id,t) }
-  (* A few special cases for tactics whose names are not parsed as ID
-   * because they are reserved. *)
-  | LEFT                               { Tactics.Abstract ("left",[]) }
-  | RIGHT                              { Tactics.Abstract ("right",[]) }
+                                       { T.AndThenSel (l,[sl]) }
+  | BY t=tac %prec tac_prec            { T.By t }
+  | l=tac PLUS r=tac                   { T.OrElse [l;r] }
+  | TRY l=tac                          { T.Try l }
+  | REPEAT t=tac                       { T.Repeat t }
+  | id=ID t=tactic_params              { T.Abstract (id,t) }
 
-  | INTRO p=intro_pat_list             { Tactics.Abstract
+  (* Special cases for tactics whose names are not parsed as ID
+   * because they are reserved. *)
+
+  | LEFT                               { T.Abstract ("left",[]) }
+  | RIGHT                              { T.Abstract ("right",[]) }
+
+  | INTRO p=intro_pat_list             { T.Abstract
                                            ("intro",[TacticsArgs.IntroPat p]) }
 
-  | t=tac DARROW p=intro_pat_list      { Tactics.AndThen
-                                           [t;Tactics.Abstract
+  | t=tac DARROW p=intro_pat_list      { T.AndThen
+                                           [t;T.Abstract
                                                 ("intro",[TacticsArgs.IntroPat p])] }
 
-  | DESTRUCT i=lsymb                   { Tactics.Abstract
+  | DESTRUCT i=lsymb                   { T.Abstract
                                            ("destruct",[TacticsArgs.String_name i]) }
 
-  | DESTRUCT i=lsymb AS p=and_or_pat   { Tactics.Abstract
+  | DESTRUCT i=lsymb AS p=and_or_pat   { T.Abstract
                                            ("destruct",[TacticsArgs.String_name i;
                                                         TacticsArgs.AndOrPat p]) }
 
-  | EXISTS t=tactic_params             { Tactics.Abstract
+  | DEPENDS args=tactic_params         { T.Abstract ("depends",args) }
+  | DEPENDS args=tactic_params BY t=tac
+                                       { T.AndThenSel
+                                           (T.Abstract ("depends",args), 
+                                            [[1], t]) }
+
+  | EXISTS t=tactic_params             { T.Abstract
                                           ("exists",t) }
-  | NOSIMPL t=tac                      { Tactics.Modifier
+  | NOSIMPL t=tac                      { T.Modifier
                                           ("nosimpl", t) }
-  | CYCLE i=INT                        { Tactics.Abstract
+  | CYCLE i=INT                        { T.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed i]) }
-  | CYCLE MINUS i=INT                  { Tactics.Abstract
+  | CYCLE MINUS i=INT                  { T.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed (-i)]) }
-  | CHECKFAIL t=tac EXN ts=tac_errors  { Tactics.CheckFail
-                                         (Tactics.tac_error_of_strings  ts,t) }
+  | CHECKFAIL t=tac EXN ts=tac_errors  { T.CheckFail
+                                         (T.tac_error_of_strings  ts,t) }
 
   | REVERT ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
-      Tactics.Abstract ("revert", ids) }
+      T.Abstract ("revert", ids) }
 
   | GENERALIZE ids=slist1(sterm, empty)     
     { let ids = List.map (fun id -> TacticsArgs.Theory id) ids in
-      Tactics.Abstract ("generalize", ids) }
+      T.Abstract ("generalize", ids) }
 
   | CLEAR ids=slist1(lsymb, empty)     
     { let ids = List.map (fun id -> TacticsArgs.String_name id) ids in
-      Tactics.Abstract ("clear", ids) }
+      T.Abstract ("clear", ids) }
 
   | ASSERT p=tac_formula ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
-      Tactics.Abstract ("assert", TacticsArgs.Theory p::ip) }
+      T.Abstract ("assert", TacticsArgs.Theory p::ip) }
 
   | USE i=lsymb ip=as_ip?
     { let ip = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
-      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i]) }
+      T.Abstract ("use", ip @ [TacticsArgs.String_name i]) }
 
   | USE i=lsymb WITH t=tactic_params ip=as_ip?
     { let ip : TacticsArgs.parser_arg list = match ip with
         | None -> []
         | Some ip -> [TacticsArgs.SimplPat ip] in
-      Tactics.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
+      T.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
   | REWRITE p=rw_params w=rw_in
-    { Tactics.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
+    { T.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
 
-  | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { Tactics.Abstract
+  | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { T.Abstract
                                           ("ddh",
                                            [TacticsArgs.String_name i1;
 					                                  TacticsArgs.String_name i2;
 					                                  TacticsArgs.String_name i3;
 				                                   ]) }
 
-  | HELP                               { Tactics.Abstract
+  | HELP                               { T.Abstract
                                           ("help",
                                            []) }
 
-  | HELP i=lsymb                          { Tactics.Abstract
+  | HELP i=lsymb                          { T.Abstract
                                           ("help",
                                            [TacticsArgs.String_name i]) }
 
   | HELP h=help_tac
-   { Tactics.Abstract ("help",[TacticsArgs.String_name h]) }
+   { T.Abstract ("help",[TacticsArgs.String_name h]) }
 
 (* A few special cases for tactics whose names are not parsed as ID
  * because they are reserved. *)
@@ -574,6 +586,7 @@ help_tac_i:
 | REWRITE    { "rewrite"}  
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  
+| DEPENDS    { "depends"}  
 | DDH        { "ddh"}      
 | ASSERT     { "assert"}   
 | DESTRUCT   { "destruct"} 

@@ -28,8 +28,10 @@ and simpl_pat =
   | SNamed of naming_pat
 
 type intro_pattern =
-  | Star  of Location.t    (** '*' *)
-  | Simpl of simpl_pat
+  | Star      of Location.t    (** '*' *)
+  | Tryauto   of Location.t    (** '//' *)
+  | Simplify  of Location.t    (** '/=' *)
+  | Simpl     of simpl_pat
 
 (*------------------------------------------------------------------*)
 val pp_naming_pat : Format.formatter -> naming_pat         -> unit

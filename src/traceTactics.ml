@@ -571,47 +571,14 @@ let do_intro_pat (ip : Args.simpl_pat) s : sequent list =
   let handler, s = do_intro s in
   do_simpl_pat handler ip s
 
-let rec do_intros (intros : Args.intro_pattern list) s =
-  match intros with
-  | [] -> [s]
-
-  | (Args.Simpl s_ip) :: intros ->
-    let ss = do_intro_pat s_ip s in
-    List.map (do_intros intros) ss
-    |> List.flatten
-
-  | (Args.Star loc) :: intros ->
-    try
-      let s_ip = Args.(SNamed AnyName) in
-      let ss = do_intro_pat s_ip s in
-      List.map (do_intros [Args.Star loc]) ss
-      |> List.flatten
-
-    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
-
 (** Correponds to `intro *`, to use in automated tactics. *)
-let intro_all (s : TraceSequent.t) : TraceSequent.t list =
-  let star = Args.Star L._dummy in
-  do_intros [star] s
-
-let intro_tac args s sk fk =
-  try match args with
-    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
-
-    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
-
-let () =
-  T.register_general "intro"
-    ~tactic_help:{general_help = "Introduce topmost connectives of conclusion \
-                                  formula, when it can be done in an invertible, \
-                                  non-branching fashion.\
-                                  \n\nUsage: intro a b _ c *";
-                  detailed_help = "";
-                  usages_sorts = [];
-                  tactic_group = Logical}
-    intro_tac
-
+let rec intro_all (s : TraceSequent.t) : TraceSequent.t list =
+  try
+    let s_ip = Args.(SNamed AnyName) in
+    let ss = do_intro_pat s_ip s in
+    List.concat_map intro_all ss
+      
+  with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
 (*------------------------------------------------------------------*)
 let do_destruct hid s =
@@ -1005,12 +972,10 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
   | Term.Action(n1, is1), Term.Action (n2, is2) ->
     let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
-      if not (TraceSequent.query_happens ~precise:true s a2) 
-      then soft_failure (Tactics.MustHappen a2)
-      else
         let atom = (Atom (`Timestamp (`Lt,a1,a2))) in       
         let g = Term.mk_impl atom (TraceSequent.conclusion s) in
-        [TraceSequent.set_conclusion g s]
+        [happens_premise s a2; 
+         TraceSequent.set_conclusion g s]
     else
       soft_failure
         (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
@@ -2246,7 +2211,7 @@ let new_simpl ~congr ~constr s =
 
 let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
 
-(* Simplify goal. *)
+(** Simplify goal. *)
 let simplify ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
@@ -2342,6 +2307,54 @@ let () = T.register_general "autosimpl"
     (function
        | [] -> simpl ~strong:true ~close:true
        | _ -> hard_failure (Tactics.Failure "no argument allowed"))
+
+
+(*------------------------------------------------------------------*)
+let rec do_intros (intros : Args.intro_pattern list) s =
+  match intros with
+  | [] -> [s]
+
+  | Args.Simplify l :: intros ->
+    let tac = simpl ~strong:true ~close:false in
+    let ss = Tactics.run tac s in
+    do_intros_list intros ss
+
+  | Args.Tryauto l :: intros ->
+    let tac = Tactics.try_tac (simpl ~strong:true ~close:true) in
+    let ss = Tactics.run tac s in
+    do_intros_list intros ss
+
+  | (Args.Simpl s_ip) :: intros ->
+    let ss = do_intro_pat s_ip s in
+    do_intros_list intros ss
+
+  | (Args.Star loc) :: intros ->
+    try
+      let s_ip = Args.(SNamed AnyName) in
+      let ss = do_intro_pat s_ip s in
+      List.concat_map (do_intros [Args.Star loc]) ss
+
+    with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+
+and do_intros_list intros ss = List.concat_map (do_intros intros) ss
+
+let intro_tac args s sk fk =
+  try match args with
+    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
+
+    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+
+let () =
+  T.register_general "intro"
+    ~tactic_help:{general_help = "Introduce topmost connectives of conclusion \
+                                  formula, when it can be done in an invertible, \
+                                  non-branching fashion.\
+                                  \n\nUsage: intro a b _ c *";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Logical}
+    intro_tac
 
 
 (*------------------------------------------------------------------*)

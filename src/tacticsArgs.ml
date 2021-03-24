@@ -23,8 +23,10 @@ and simpl_pat =
   | SNamed of naming_pat
 
 type intro_pattern =
-  | Star     of Location.t    (** '*' *)
-  | Simpl of simpl_pat
+  | Star      of Location.t    (** '*' *)
+  | Tryauto   of Location.t    (** '//' *)
+  | Simplify  of Location.t    (** '/=' *)
+  | Simpl     of simpl_pat
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
@@ -48,8 +50,11 @@ and pp_simpl_pat fmt = function
   | SNamed n_ip  -> pp_naming_pat fmt n_ip
 
 let rec pp_intro_pat fmt = function
+  | Simplify _    -> Fmt.pf fmt "/="
+  | Tryauto  _    -> Fmt.pf fmt "//"
   | Star     _    -> Fmt.pf fmt "*"
   | Simpl s_ip -> pp_simpl_pat fmt s_ip
+
 
 let pp_intro_pats fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in

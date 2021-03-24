@@ -350,9 +350,23 @@ let do_intro_pat (ip : Args.simpl_pat) s : EquivSequent.sequent list =
   do_simpl_pat handler ip s
 
 (* TODO: factorize with corresponding, more general, trace tactics *)
+let rec intro_all (s : EquivSequent.t) : EquivSequent.t list =
+  try
+    let s_ip = Args.(SNamed AnyName) in
+    let ss = do_intro_pat s_ip s in
+    List.concat_map intro_all ss
+      
+  with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
+
+(* TODO: factorize with corresponding, more general, trace tactics *)
 let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
   | [] -> [s]
+
+  | Args.Tryauto l :: intros 
+  | Args.Simplify l :: intros ->
+    (* TODO: implement after code factorization *)
+    hard_failure (Failure "not yet implemented for equiv sequents")
 
   | (Args.Simpl s_ip) :: intros ->
     let ss = do_intro_pat s_ip s in
