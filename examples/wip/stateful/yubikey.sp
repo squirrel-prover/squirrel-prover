@@ -163,9 +163,7 @@ goal counterIncreaseBis:
 Proof.
 nosimpl(induction; intro IH0).
 intro t' i *.
-assert (t' = pred(t) || t' <pred(t)) as H0. admit. 
-(* QUESTION SOLENE - If I add happens(pred(t)) in the goal, then I have 
-to prove happens(pred(pred(t))) because of the induction hypthesis. *)
+assert (t' = pred(t) || t' <pred(t)) as H0; 1: by case t. 
 case H0.
 
 (* case t' = pred(t) *)

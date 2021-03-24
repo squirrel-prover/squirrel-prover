@@ -83,13 +83,11 @@ Qed.
 
 (* A more general result than counterIncrease *)
 goal counterIncreaseBis :
-  forall (t,t':timestamp), happens(t) =>
+  forall (t,t':timestamp), 
     (t' < t => order(d@t',d@t) = orderOk).
 Proof.
 induction.
-assert (t' < pred(t) || t' >= pred(t)). admit. 
-(* QUESTION SOLENE - If I add happens(pred(t)) in the goal, then I have 
-to prove happens(pred(pred(t))) because of the induction hypthesis. *)
+assert (t' < pred(t) || t' >= pred(t)); 1: by case t. 
 case H0.
 use H with pred(t),t'.
 (* case t' < pred(t) *)
