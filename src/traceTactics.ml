@@ -986,8 +986,8 @@ let () =
   T.register_typed "depends"
     ~general_help:"If the second action depends on the first \
                    action, and if the second \
-                   \naction happened, \
-                   \nadd the corresponding timestamp inequality."
+                   action happened, \
+                   add the corresponding timestamp inequality."
     ~detailed_help:"Whenever action A1[i] must happen before A2[i], if A2[i] \
                     occurs in the trace, we can add A1[i]. "
     ~tactic_group:Structural
@@ -1368,7 +1368,7 @@ let () =
     ~tactic_help:{
       general_help =
         "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
-         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n\
+         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
          rewrite Lemma Axiom (t=t').\n       \
          rewrite (forall (x:message), t = t').\n       \
          rewrite (t = t') Lemma in H.";
