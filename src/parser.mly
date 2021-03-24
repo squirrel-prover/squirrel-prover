@@ -44,8 +44,8 @@
 %nonassoc tac_prec
 
 %left PLUS
-%nonassoc REPEAT
 %right SEMICOLON
+%nonassoc REPEAT
 %nonassoc TRY
 %nonassoc NOSIMPL
 
