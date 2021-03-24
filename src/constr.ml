@@ -1377,6 +1377,7 @@ let find_eq_action (models : models) (t : Term.timestamp) =
     let uf = model.inst.uf in
     let classe = get_class uf ut in
     List.find_map (fun ut -> match ut.cnt with
+        | UInit
         | UName _ -> Some (ut_to_term Sorts.Timestamp ut)
         | _ -> None
       ) classe
