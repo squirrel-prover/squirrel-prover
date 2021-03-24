@@ -64,21 +64,7 @@ module S : sig
     (** Hypotheses *)
     
     conclusion : Term.formula;
-    (** The conclusion / right-hand side formula of the sequent. *)
-    
-    trs : Completion.state option ref;
-    (** Either [None], or the term rewriting system
-      * corresponding to the current message hyps.
-      * Must be se to [None] if message hyps change. 
-      * We use a reference to try to share the TRS accross 
-      * multiple sequents. *)
-    
-    models : Constr.models option ref;
-    (** Either [None], or the models corresponding to the current
-      * trace hyps.
-      * Must be set to [None] if trace hyps change. 
-      * We use a reference to try to share the models accross 
-      * multiple sequents. *)
+    (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
   val init_sequent : SystemExpr.system_expr -> Symbols.table -> t
@@ -94,17 +80,7 @@ module S : sig
     ?env:Vars.env ->
     ?hyps:H.hyps ->
     ?conclusion:Term.formula ->
-    ?keep_trs:bool ->
-    ?keep_models:bool -> 
     t -> t
-
-  (** Set the trs of a sequent. 
-      Raise [Invalid_argument ..] if already set. *)
-  val set_trs : t -> Completion.state -> unit
-
-  (** Set the models of a sequent. 
-      Raise [Invalid_argument ..] if already set. *)
-  val set_models : t -> Constr.models -> unit
 end = struct
   type t = {
     system       : SystemExpr.system_expr ;
@@ -112,8 +88,6 @@ end = struct
     env          : Vars.env;
     hyps         : H.hyps;
     conclusion   : Term.formula;
-    trs          : Completion.state option ref;
-    models       : Constr.models option ref;
   }
 
   let init_sequent system table = {
@@ -122,21 +96,9 @@ end = struct
     env          = Vars.empty_env;
     hyps         = H.empty;
     conclusion   = Term.True;
-    trs          = ref None;
-    models       = ref None;
   }
 
-  let update ?system ?table ?env ?hyps
-      ?conclusion ?(keep_trs=false) ?(keep_models=false) t =
-    let trs = 
-      if keep_trs || hyps = None 
-      then t.trs 
-      else ref None 
-    and models =
-      if keep_models || hyps = None 
-      then t.models
-      else ref None 
-    in
+  let update ?system ?table ?env ?hyps ?conclusion t =
     let system       = Utils.odflt t.system system
     and table        = Utils.odflt t.table table
     and env          = Utils.odflt t.env env
@@ -146,17 +108,7 @@ end = struct
       table = table ;
       env = env ;
       hyps = hyps ;
-      conclusion = conclusion ;
-      trs = trs ;               (* FIXME: right now this is useless *)
-      models = models ;         (* FIXME: right now this is useless *) }
-  
-  let set_trs t trs = match !(t.trs) with
-    | None -> t.trs := Some trs
-    | Some _ -> raise (Invalid_argument "traceSequent: trs already set")
-
-  let set_models t models = match !(t.models) with
-    | None -> t.models := Some models
-    | Some _ -> raise (Invalid_argument "traceSequent: models already set")
+      conclusion = conclusion ; } 
 end
 
 include S
@@ -258,15 +210,8 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
 (** Prepare constraints or TRS query *)
 
 let get_models s : Constr.models timeout_r =
-  match !(s.models) with
-  | Some models -> Result models
-  | None ->
-    let trace_literals = get_trace_literals s in
-    match Constr.models_conjunct trace_literals with
-    | Timeout -> Timeout
-    | Result models ->
-      let () = S.set_models s models in
-      Result models
+  let trace_literals = get_trace_literals s in
+  Constr.models_conjunct trace_literals 
 
 let query ~precise s q =
   let models = Tactics.timeout_get (get_models s) in
@@ -418,9 +363,7 @@ module Hyps
       | Some id -> id in
 
     let id, hyps = H.add ~force id f s.hyps in
-    let s =
-      S.update ~keep_trs:false ~keep_models:false
-        ~hyps s in
+    let s = S.update ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
     let s = if recurse then add_macro_defs s f else s in
@@ -430,10 +373,7 @@ module Hyps
   let add_happens ?(force=false) id (s : sequent) ts =
     let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
-    let s =
-      S.update ~keep_trs:true ~keep_models:false
-        ~hyps s in
-
+    let s = S.update ~hyps s in
     id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
@@ -511,8 +451,6 @@ let pi projection s =
   S.update
     ~conclusion:(pi_term s.conclusion)
     ~hyps:H.empty
-    ~keep_trs:false
-    ~keep_models:false
     s in
 
   (* We add back manually all formulas, to ensure that definitions are 
@@ -561,16 +499,8 @@ let get_eqs_neqs s =
     ) ([],[]) (get_eq_atoms s)
 
 let get_trs s : Completion.state timeout_r =
-  match !(s.trs) with
-  | Some trs -> Result trs
-  | None ->
-    let eqs,_ = get_eqs_neqs s in
-    match Completion.complete s.table eqs with
-    | Timeout -> Timeout
-    | Result trs ->
-      let () = S.set_trs s trs in
-      Result trs
-
+  let eqs,_ = get_eqs_neqs s in
+  Completion.complete s.table eqs 
 
 let eq_atoms_valid s =
   match get_trs s with
