@@ -35,6 +35,9 @@ type tac_error =
 
   | NoCollision
 
+  | HypAlreadyExists of string
+  | HypUnknown of string
+
   | PatNumError of int * int    (* given, need *)
                    
 let tac_error_strings =
@@ -86,11 +89,13 @@ let rec tac_error_to_string = function
   | NotHypothesis
   | NoCollision
   | DidNotFail as e -> List.assoc e tac_error_strings
-  | SystemExprError _ -> "SystemExpr_Error"
-  | GoalBadShape    _ -> "GoalBadShape"
-  | SystemError     _ -> "System_Error"
-  | PatNumError     _ -> "PatNumError"
-  | MustHappen      _ -> "MustHappen"
+  | HypAlreadyExists _ -> "HypAlreadyExists"
+  | HypUnknown       _ -> "HypUnknown"
+  | SystemExprError  _ -> "SystemExpr_Error"
+  | GoalBadShape     _ -> "GoalBadShape"
+  | SystemError      _ -> "System_Error"
+  | PatNumError      _ -> "PatNumError"
+  | MustHappen       _ -> "MustHappen"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -154,6 +159,12 @@ let rec pp_tac_error ppf = function
 
   | NotHypothesis ->
     Fmt.pf ppf "the conclusion does not appear in the hypotheses"
+
+  | HypAlreadyExists s ->
+    Fmt.pf ppf "an hypothesis named %s already exists" s     
+
+  | HypUnknown s ->
+    Fmt.pf ppf "unknown hypothesis %s" s
 
   | NoCollision ->
     Fmt.pf ppf "no collision found" 

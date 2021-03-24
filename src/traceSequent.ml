@@ -3,6 +3,7 @@ open Utils
 module Args = TacticsArgs
 
 module L = Location
+module T = Tactics
 
 (*------------------------------------------------------------------*)
 (* For debugging *)
@@ -132,21 +133,9 @@ let pp ppf s =
 
 
 (*------------------------------------------------------------------*)
-(* FIXME: this create new variables which are not declared in the sequent. *)
 let rec simpl_form acc hyp = 
   match hyp with
   | Term.And (f,g) -> simpl_form (simpl_form acc f) g
-
-  | Exists (vs,f) ->
-    let subst =
-      List.map
-        (fun (Vars.EVar v) ->
-           Term.ESubst  (Term.Var v,
-                         Term.Var (Vars.make_new_from v)))
-        vs
-    in
-    let f = Term.subst subst f in
-    simpl_form acc f
 
   | _ as f -> f :: acc
 
@@ -214,7 +203,7 @@ let get_models s : Constr.models timeout_r =
   Constr.models_conjunct trace_literals 
 
 let query ~precise s q =
-  let models = Tactics.timeout_get (get_models s) in
+  let models = T.timeout_get (get_models s) in
   Constr.query ~precise models q
 
 let query_happens ~precise s a = query ~precise s [`Pos, `Happens a]
@@ -271,7 +260,7 @@ module Hyps
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"
-    then Hyps.hyp_error ~loc:None (Hyps.HypAlreadyExists name) 
+    then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name) 
     else id
 
   let fresh_ids ?(approx=false) names s =
@@ -281,7 +270,7 @@ module Hyps
       begin
         List.iter2 (fun id name ->
             if Ident.name id <> name && name <> "_"
-            then Hyps.hyp_error ~loc:None (Hyps.HypAlreadyExists name)
+            then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name)
           ) ids names;
         ids
       end

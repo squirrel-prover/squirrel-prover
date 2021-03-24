@@ -1,4 +1,5 @@
 module Args = TacticsArgs
+module T = Tactics
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
@@ -87,7 +88,7 @@ module Hyps
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"
-    then Hyps.hyp_error ~loc:None (Hyps.HypAlreadyExists name) 
+    then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name) 
     else id
 
   let fresh_ids ?(approx=false) names s =
@@ -97,7 +98,7 @@ module Hyps
       begin
         List.iter2 (fun id name ->
             if Ident.name id <> name && name <> "_"
-            then Hyps.hyp_error ~loc:None (Hyps.HypAlreadyExists name)
+            then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name)
           ) ids names;
         ids
       end

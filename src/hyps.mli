@@ -10,7 +10,14 @@ module type Hyp = sig
   val htrue : t
 end
 
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
+
+val hyp_error : loc:L.t option -> Tactics.tac_error -> 'a
+
 (*------------------------------------------------------------------*) 
+(** {2 Signature} *)
+
 module type S = sig
   type hyp 
 
@@ -60,23 +67,6 @@ module type S = sig
 end
 
 module Mk (Hyp : Hyp) : S with type hyp = Hyp.t
-
-(*------------------------------------------------------------------*)
-(** {2 Error handling} *)
-
-type hyp_error_i =
-  | HypAlreadyExists of string
-  | HypUnknown of string
-
-type hyp_error = L.t option * hyp_error_i
-
-exception Hyp_error of hyp_error
-
-val pp_hyp_error : 
-  (Format.formatter -> Location.t -> unit) ->
-  Format.formatter -> hyp_error -> unit
-
-val hyp_error : loc:L.t option -> hyp_error_i -> 'a
 
 
 (*------------------------------------------------------------------*)

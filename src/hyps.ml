@@ -1,33 +1,10 @@
 module L = Location
+module T = Tactics
 
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)  
-type hyp_error_i =
-  | HypAlreadyExists of string
-  | HypUnknown of string
-
-type hyp_error = L.t option * hyp_error_i
-
-exception Hyp_error of hyp_error
-                     
-let hyp_error ~loc e = raise (Hyp_error (loc,e))
-
-let pp_hyp_error pp_loc_error fmt (he : hyp_error)  = 
-  let pp_loc_error_opt ppf = function
-    | None -> ()
-    | Some l -> pp_loc_error ppf l
-  in
-
-  let l,e = he in
-  match e with
-  | HypAlreadyExists s ->
-    Fmt.pf fmt "%aan hypothesis named %s already exists" 
-      pp_loc_error_opt l s     
-
-  | HypUnknown s ->
-    Fmt.pf fmt "%aunknown hypothesis %s" 
-      pp_loc_error_opt l s     
+let hyp_error ~loc e = raise (T.Tactic_soft_failure (loc,e))
 
 (*------------------------------------------------------------------*) 
 module type Hyp =sig 
@@ -129,14 +106,14 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
     with Found -> !found
 
   let by_id id hyps =
-    try Mid.find id hyps
-    with Not_found -> hyp_error ~loc:None (HypUnknown (Ident.to_string id))
+    try Mid.find id hyps with
+      Not_found -> hyp_error ~loc:None (T.HypUnknown (Ident.to_string id))
   (* the latter case should not happen *)
 
   let by_name (name : lsymb) hyps =
     match find_opt (fun id _ -> Ident.name id = L.unloc name) hyps with
     | Some (id,f) -> id, f
-    | None -> hyp_error ~loc:(Some (L.loc name)) (HypUnknown (L.unloc name))
+    | None -> hyp_error ~loc:(Some (L.loc name)) (T.HypUnknown (L.unloc name))
 
   let hyp_by_name name hyps = snd (by_name name hyps)
   let id_by_name name hyps  = fst (by_name name hyps)
@@ -180,7 +157,7 @@ module Mk (Hyp : Hyp) : S with type hyp = Hyp.t = struct
     assert (not (Mid.mem id hyps)); 
 
     if not (is_fresh (Ident.name id) hyps) then
-      hyp_error ~loc:None (HypAlreadyExists (Ident.name id));
+      hyp_error ~loc:None (T.HypAlreadyExists (Ident.name id));
 
     match find_opt (fun _ hyp' -> hyp = hyp') hyps with
     | Some (id',_) when not force -> id', hyps  

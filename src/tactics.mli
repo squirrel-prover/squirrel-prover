@@ -58,6 +58,8 @@ type tac_error =
   | MustHappen of Term.timestamp
   | NotHypothesis
   | NoCollision
+  | HypAlreadyExists of string
+  | HypUnknown of string
   | PatNumError of int * int    (* given, need *)
 
 (** Tactics should raise this exception if they are ill-formed. *)

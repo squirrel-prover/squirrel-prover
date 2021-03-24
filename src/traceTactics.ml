@@ -30,6 +30,11 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+let wrap_fail f (s: TraceSequent.t) sk fk =
+  try sk (f s) fk with
+  | Tactics.Tactic_soft_failure (_,e) -> fk e
+
+(*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
 (** Propositional connectives *)
@@ -2241,44 +2246,38 @@ let new_simpl ~congr ~constr s =
 
 let clear_triv s sk fk = sk [Hyps.clear_triv s] fk
 
-let wrap f = (fun (s: TraceSequent.t) sk fk ->
-    match f s with
-      | subgoals -> sk subgoals fk
-      | exception Tactics.Tactic_soft_failure (_,e) -> fk e
-    )
-
 (* Simplify goal. *)
 let simplify ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
   
-  let assumption = if close then [try_tac (wrap assumption)] else [] in
+  let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
   let new_simpl ~congr ~constr = 
-    if strong && not intro then [wrap (new_simpl ~congr ~constr)] else [] 
+    if strong && not intro then [wrap_fail (new_simpl ~congr ~constr)] else [] 
   in
   andthen_list (
     (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
     assumption @ (new_simpl ~congr:false ~constr:false) @ assumption @
-    (if close || intro then [wrap intro_all;
-                             wrap simpl_left_tac] else []) @
+    (if close || intro then [wrap_fail intro_all;
+                             wrap_fail simpl_left_tac] else []) @
     assumption @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
     (* (if intro then [wrap eq_trace] else []) @ *)
-    (if strong then [wrap eq_names] else []) @
+    (if strong then [wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
-    (repeat (wrap autosubst)) ::
+    (repeat (wrap_fail autosubst)) ::
     assumption @ (new_simpl ~congr:true ~constr:true) @ assumption @
     [clear_triv]
   ) 
 
   (* Attempt to close a goal. *)
   let do_conclude =
-    Tactics.orelse_list [wrap congruence_tac; 
-                         wrap constraints_tac; 
-                         wrap assumption]
+    Tactics.orelse_list [wrap_fail congruence_tac; 
+                         wrap_fail constraints_tac; 
+                         wrap_fail assumption]
 
 (* If [close] then tries to automatically prove the goal,
  * otherwise it may also be reduced to a single subgoal. *)
@@ -2300,7 +2299,7 @@ let rec simpl ~strong ~close : TraceSequent.t Tactics.tac =
       then fun _ -> fk GoalNotClosed
       else fun _ -> sk [g] fk
     in
-    (wrap goal_and_right) g
+    (wrap_fail goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
            simpl ~strong ~close g1
