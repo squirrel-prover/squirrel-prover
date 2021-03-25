@@ -12,8 +12,8 @@ exception Bad_ssc
   * inspecting each of the multiple expansions of a same macro. *)
 class check_key
     ~allow_vars ~allow_functions
-    ~system table head_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~system table as super
+    ~cntxt head_fn key_n = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m
@@ -32,8 +32,8 @@ end
 (** Collect occurences of some function and key,
   * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
-class get_f_messages ~drop_head ~system table head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~drop_head ~system table head_fn key_n
+class get_f_messages ~drop_head ~cntxt head_fn key_n = object (self)
+  inherit Iter.get_f_messages ~drop_head ~cntxt head_fn key_n
   method visit_formula _ = ()
 end
 
@@ -43,13 +43,13 @@ end
   * Return unit on success, raise [Bad_ssc] otherwise. *)
 let key_ssc
     ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
-    ~system ~table head_fn key_n =
+    ~cntxt head_fn key_n =
   let ssc = 
-    new check_key ~allow_vars ~allow_functions ~system table head_fn key_n 
+    new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n 
   in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
-  SystemExpr.(iter_descrs table system
+  SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -60,11 +60,11 @@ let key_ssc
   * such that k satisfies the SSC. *)
 let check_key_ssc
     ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions 
-    ~system ~table head_fn key_n =
+    ~cntxt head_fn key_n =
   try
     key_ssc
       ~allow_vars ~messages ~elems ~allow_functions
-      ~system ~table head_fn key_n ;
+      ~cntxt head_fn key_n ;
     true
   with Bad_ssc -> false
 
@@ -73,8 +73,8 @@ let check_key_ssc
   * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
 let hashes_of_action_descr
-    ?(drop_head=true) ~system table action_descr head_fn key_n =
-  let iter = new get_f_messages ~drop_head ~system table head_fn key_n in
+    ?(drop_head=true) ~cntxt action_descr head_fn key_n =
+  let iter = new get_f_messages ~drop_head ~cntxt head_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
@@ -124,7 +124,7 @@ let pp_euf_rule ppf rule =
 (** {2 Build the Euf rule} *)
 
 let mk_rule ?(elems=[]) ?(drop_head=true)
-    ~allow_functions ~system ~table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
+    ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
   let mk_of_hash action_descr (is,m) =
     (* Indices [key_is] from [env] must correspond to [is],
@@ -210,20 +210,22 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
 
   let mk_case_schema action_descr =
     let hashes = 
-      hashes_of_action_descr ~drop_head ~system table action_descr head_fn key_n
+      hashes_of_action_descr ~drop_head ~cntxt action_descr head_fn key_n
     in
 
     List.map (mk_of_hash action_descr) hashes
   in
 
   (* indirect cases *)
-  let case_schemata = SystemExpr.map_descrs table system mk_case_schema in
+  let case_schemata = 
+    SystemExpr.map_descrs cntxt.table cntxt.system mk_case_schema 
+  in
 
   (* direct cases *)
   let cases_direct = 
     let hashes =
       let iter = 
-        new get_f_messages ~drop_head ~system table head_fn key_n 
+        new get_f_messages ~drop_head ~cntxt head_fn key_n 
       in
       iter#visit_message mess ;
       iter#visit_message sign ;

@@ -291,17 +291,17 @@ module Hyps
       
   let exists func s = H.exists func s.hyps
 
-  class iter_macros ~system table f = object (self)
-    inherit Iter.iter ~system table as super
+  class iter_macros ~cntxt f = object (self)
+    inherit Iter.iter ~cntxt as super
     method visit_message t =
       match t with
       | Term.Macro ((m,sort,is),[],a) ->
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
             (Term.get_vars t) &&
-           Macros.is_defined m a table
+           Macros.is_defined m a cntxt.table
         then
-          let def = Macros.get_definition system table sort m is a in
+          let def = Macros.get_definition cntxt sort m is a in
           f a (`Message (t, def)) ;
           self#visit_message def
       | t -> super#visit_message t
@@ -311,9 +311,9 @@ module Hyps
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
             (Term.get_vars t) &&
-           Macros.is_defined m a table
+           Macros.is_defined m a cntxt.table
         then
-          let def = Macros.get_definition system table sort m is a in
+          let def = Macros.get_definition cntxt sort m is a in
           f a (`Boolean (t, def)) ;
           self#visit_formula def
       | t -> super#visit_formula t
@@ -323,10 +323,15 @@ module Hyps
     * occurring in [f], if [f] happened. *)
   let rec add_macro_defs (s : sequent) f =
     let macro_eqs : (Term.timestamp * Term.formula) list ref = ref [] in
+    let cntxt = Constr.{ 
+        table = s.table;
+        system = s.system;
+        models = None;
+      } in
+        
     let iter =
       new iter_macros
-        ~system:s.system
-        s.table
+        ~cntxt
         (fun a el -> match el with
            |`Message (t,t') ->
              macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs

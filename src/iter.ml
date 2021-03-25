@@ -1,21 +1,21 @@
 open Term
 
+(*------------------------------------------------------------------*)
 let refresh vars =
-  List.map
-    (fun v ->
-       ESubst (Var v, Var (Vars.make_new_from v)))
-    vars
+  List.map (fun v ->
+      ESubst (Var v, Var (Vars.make_new_from v))
+    ) vars
 
 let erefresh evars =
-  List.map
-    (function Vars.EVar v ->
-       ESubst (Var v, Var (Vars.make_new_from v)))
-    evars
+  List.map (function Vars.EVar v ->
+      ESubst (Var v, Var (Vars.make_new_from v))
+    ) evars
 
+(*------------------------------------------------------------------*)
 (** Iterate over all boolean and message subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
-class iter ~system table = object (self)
+class iter ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method visit_term t = match t with
     | Equiv.Message e -> self#visit_message e
@@ -25,7 +25,7 @@ class iter ~system table = object (self)
     | Fun (_, l) -> List.iter self#visit_message l
     | Macro ((mn,sort,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
-        self#visit_message (Macros.get_definition system table sort mn is a)
+        self#visit_message (Macros.get_definition cntxt sort mn is a)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | ITE (a, b, c) ->
@@ -58,7 +58,7 @@ class iter ~system table = object (self)
     | Macro ((mn,Sorts.Boolean,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#visit_formula
-          (Macros.get_definition system table Sorts.Boolean mn is a)
+          (Macros.get_definition cntxt Sorts.Boolean mn is a)
     | Var _ -> ()
 
 end
@@ -68,7 +68,7 @@ end
   * When a macro is encountered, its expansion is visited as well.
   * Note that [iter] could be obtained as a derived class of [fold],
   * but this would break the way we modify the iteration using inheritance.  *)
-class ['a] fold ~system table = object (self)
+class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method fold_term (x:'a) t = match t with
     | Equiv.Message e -> self#fold_message x e
@@ -78,7 +78,7 @@ class ['a] fold ~system table = object (self)
     | Fun (_, l) -> List.fold_left self#fold_message x l
     | Macro ((mn,sort,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
-        self#fold_message x (Macros.get_definition system table sort mn is a)
+        self#fold_message x (Macros.get_definition cntxt sort mn is a)
     | Name _ | Var _ -> x
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
     | ITE (a, b, c) ->
@@ -110,7 +110,7 @@ class ['a] fold ~system table = object (self)
     | Macro ((mn,Sorts.Boolean,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#fold_formula x
-          (Macros.get_definition system table Sorts.Boolean mn is a)
+          (Macros.get_definition cntxt Sorts.Boolean mn is a)
     | Var _ -> x
 
 end
@@ -124,25 +124,25 @@ end
   * with [exact], in which case all macros will be expanded and must
   * thus be defined. 
   * If [full] is false, may not visit all macros. *)
-class iter_approx_macros ~exact ~full ~system table = object (self)
+class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self)
 
-  inherit iter ~system table as super
+  inherit iter ~cntxt as super
 
   val mutable checked_macros = []
 
   method visit_macro mn is a =
-    match Symbols.Macro.get_def mn table with
+    match Symbols.Macro.get_def mn cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
-            if full || Macros.is_defined mn a table then
+            if full || Macros.is_defined mn a cntxt.table then
               self#visit_message
-                (Macros.get_definition system table Sorts.Message mn is a)
+                (Macros.get_definition cntxt Sorts.Message mn is a)
             else ()
           else if not (List.mem mn checked_macros) then begin
             checked_macros <- mn :: checked_macros ;
             self#visit_message
-              (Macros.get_dummy_definition system table Sorts.Message mn is)
+              (Macros.get_dummy_definition cntxt Sorts.Message mn is)
           end
       | Symbols.Local _ -> assert false (* TODO *)
 
@@ -161,8 +161,8 @@ end
 (** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
    might obtain meaningless terms provided by [get_dummy_definition]. *)
-class get_f_messages ?(drop_head=true) ~system table f k = object (self)
-  inherit iter_approx_macros ~exact:true ~full:true ~system table as super
+class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object (self)
+  inherit iter_approx_macros ~exact:true ~full:true ~cntxt as super
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
   method visit_message = function
@@ -188,17 +188,18 @@ end
 
 (** Get the terms of given type, that do not appear under a symbol of the
    excluded type. *)
-class get_ftypes_term ?excludesymtype ~system table symtype = object (self)
-  inherit iter_approx_macros ~exact:true ~full:true ~system table as super
+class get_ftypes_term
+    ?excludesymtype ~(cntxt:Constr.trace_cntxt) symtype = object (self)
+  inherit iter_approx_macros ~exact:true ~full:true ~cntxt as super
   val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
     | Term.Fun ((fn,_), l) as fn_term ->
-        if Symbols.is_ftype fn symtype table
+        if Symbols.is_ftype fn symtype cntxt.table
         then func <-  fn_term :: func
         else begin
           match excludesymtype with
-          | Some ex when Symbols.is_ftype fn ex table -> ()
+          | Some ex when Symbols.is_ftype fn ex cntxt.table -> ()
           | _ -> List.iter self#visit_message l
         end
     | m -> super#visit_message m
@@ -208,23 +209,23 @@ end
    with a function symbol head of the fiven ftype, [Some fun] otherwise, where
    [fun] is the first term of the given type encountered. Does not explore
    macros. *)
-let get_ftype ~system table elem stype =
-  let iter = new get_ftypes_term ~system table stype in
+let get_ftype ~(cntxt:Constr.trace_cntxt) elem stype =
+  let iter = new get_ftypes_term ~cntxt stype in
   List.iter iter#visit_term [elem];
   match iter#get_func with
   | p::q -> Some p
   | [] -> None
 
-let get_ftypes ?excludesymtype ~system table elem stype =
-  let iter = new get_ftypes_term ?excludesymtype ~system table stype in
+let get_ftypes ?excludesymtype ~(cntxt:Constr.trace_cntxt) elem stype =
+  let iter = new get_ftypes_term ?excludesymtype ~cntxt stype in
   List.iter iter#visit_term [elem];
   iter#get_func
 
 
 
 (** {2 If-Then-Else} *)
-class get_ite_term ~system table = object (self)
-  inherit iter_approx_macros ~exact:true ~full:false ~system table as super
+class get_ite_term ~(cntxt:Constr.trace_cntxt) = object (self)
+  inherit iter_approx_macros ~exact:true ~full:false ~cntxt as super
   val mutable ite : (Term.formula * Term.message * Term.message) option = None
   method get_ite = ite
   method visit_message = function

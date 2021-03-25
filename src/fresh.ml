@@ -3,8 +3,8 @@ exception Name_found
 exception Var_found
 exception Not_name
 
-class find_name ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
+class find_name ~(cntxt:Constr.trace_cntxt) exact name = object (self)
+  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   method visit_message t = match t with
     | Term.Name (n,_) -> if n = name then raise Name_found
@@ -12,8 +12,8 @@ class find_name ~(system:SystemExpr.system_expr) table exact name = object (self
     | _ -> super#visit_message t
 end
 
-class get_name_indices ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
+class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
+  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   val mutable indices : (Vars.index list) list = []
   method get_indices = List.sort_uniq Stdlib.compare indices
@@ -24,8 +24,8 @@ class get_name_indices ~(system:SystemExpr.system_expr) table exact name = objec
     | _ -> super#visit_message t
 end
 
-class get_actions ~(system:SystemExpr.system_expr) table exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
+class get_actions ~(cntxt:Constr.trace_cntxt) exact = object (self)
+  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   (* The boolean is set to true only for input macros.
    * In that case, when building phi_proj we require a strict inequality on
@@ -34,7 +34,7 @@ class get_actions ~(system:SystemExpr.system_expr) table exact = object (self)
   val mutable actions : (Term.timestamp * bool) list = []
   method get_actions = List.sort_uniq Stdlib.compare actions
 
-  method visit_macro mn is a = match Symbols.Macro.get_def mn table with
+  method visit_macro mn is a = match Symbols.Macro.get_def mn cntxt.table with
     | Symbols.Input -> actions <- (a,true)::actions
     | Symbols.(Output | State _ | Cond | Exec | Frame) ->
       actions <- (a,false)::actions

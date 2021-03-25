@@ -30,6 +30,18 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+let get_models s = Tactics.timeout_get (TraceSequent.get_models s)
+let get_trs    s = Tactics.timeout_get (TraceSequent.get_trs s)
+
+(*------------------------------------------------------------------*)
+let mk_trace_cntxt s = 
+  Constr.{
+    table  = TraceSequent.table s;
+    system = TraceSequent.system s;
+    models = Some (get_models s);
+  }
+
+(*------------------------------------------------------------------*)
 let wrap_fail f (s: TraceSequent.t) sk fk =
   try sk (f s) fk with
   | Tactics.Tactic_soft_failure (_,e) -> fk e
@@ -96,10 +108,6 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     print_tac
-
-(*------------------------------------------------------------------*)
-let get_models s = Tactics.timeout_get (TraceSequent.get_models s)
-let get_trs    s = Tactics.timeout_get (TraceSequent.get_trs s)
 
 (*------------------------------------------------------------------*)
 (** Split a conjunction conclusion,
@@ -277,8 +285,7 @@ let message_case (m : Term.message) s : c_res list =
       else
         begin match
             Macros.get_definition
-              (TraceSequent.system s)
-              (TraceSequent.table s)
+              (mk_trace_cntxt s)
               Sorts.Message
               m is ts
           with
@@ -1059,35 +1066,17 @@ let do_targets doit (s : sequent) targets : sequent * sequent list =
   in
   s, List.rev subs
     
+
 (*------------------------------------------------------------------*)
 let unfold_macro t (s : sequent) =
-  let system = TraceSequent.system s in
-  let table  = TraceSequent.table s in
   match t with
-    | Macro ((mn, sort, is),l,a0) ->
-      let a = 
-        if Macros.is_defined mn a0 table then Some a0
-        else
-          let models = get_models s in
-          Constr.find_eq_action models a0
-      in
-
-      if a = None then
-        soft_failure (Tactics.Failure "macro at undetermined action");
-
-      let a = oget a in
-
+    | Macro ((mn, sort, is),l,a) ->
       if not (TraceSequent.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
       
-      if not (Macros.is_defined mn a table) then 
-        soft_failure (Tactics.Failure "cannot expand this macro");
-      
-      let mdef = Macros.get_definition system table sort mn is a in
-      (* TODO: generalize this ? *)
-      let mdef = Term.subst [Term.ESubst (a, a0)] mdef in
+      let mdef = Macros.get_definition (mk_trace_cntxt s) sort mn is a in
 
-      [Term.ESubst (Macro ((mn, sort, is),l,a0), mdef)]
+      [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)]
       
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
@@ -1604,10 +1593,10 @@ let fresh_param m1 m2 = match m1,m2 with
                         t=n or n=t")
 
 (* Direct cases - names appearing in the term [t] *)
-let mk_fresh_direct system table env n is t =
+let mk_fresh_direct (cntxt : Constr.trace_cntxt) env n is t =
   (* iterate over [t] to search subterms of [t] equal to a name *)
   let list_of_indices =
-    let iter = new Fresh.get_name_indices ~system table false n in
+    let iter = new Fresh.get_name_indices ~cntxt false n in
     iter#visit_message t ;
     iter#get_indices
   in
@@ -1637,17 +1626,17 @@ let mk_fresh_direct system table env n is t =
   Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect system table env n is t =
+let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
   let list_of_actions_from_term =
-    let iter = new Fresh.get_actions ~system table false in
+    let iter = new Fresh.get_actions ~cntxt false in
     iter#visit_message t ;
     iter#get_actions in
 
   let tbl_of_action_indices = ref [] in
 
-  let () = SystemExpr.(iter_descrs table system
+  let () = SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
-      let iter = new Fresh.get_name_indices ~system table true n in
+      let iter = new Fresh.get_name_indices ~cntxt true n in
       iter#visit_formula (snd action_descr.condition) ;
       iter#visit_message (snd action_descr.output) ;
       List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
@@ -1681,7 +1670,7 @@ let mk_fresh_indirect system table env n is t =
 
     (* we apply [subst] to the action [a] *)
     let new_action =
-      SystemExpr.action_to_term table system
+      SystemExpr.action_to_term cntxt.table cntxt.system
         (Action.subst_action subst a.Action.action) in
 
     let timestamp_inequalities =
@@ -1734,12 +1723,10 @@ let fresh (Args.String m) s =
     begin match hyp with
       | Atom (`Message (`Eq,m1,m2)) ->
         let (n,is,t) = fresh_param m1 m2 in
-        let env    = TraceSequent.env s in
-        let system = TraceSequent.system s in
-        let table  = TraceSequent.table s in
-
-        let phi_direct = mk_fresh_direct system table env n is t in
-        let phi_indirect = mk_fresh_indirect system table env n is t in
+        let env   = TraceSequent.env s in
+        let cntxt = mk_trace_cntxt s in
+        let phi_direct = mk_fresh_direct cntxt env n is t in
+        let phi_indirect = mk_fresh_indirect cntxt env n is t in
         let phi = Term.mk_or phi_direct phi_indirect in
 
         let goal = Term.mk_impl phi (TraceSequent.conclusion s) in
@@ -2390,11 +2377,10 @@ let () =
  * condition is true (resp. false). *)
 
 let apply_yes_no_if b s =
-  let system = TraceSequent.system s in
-  let table  = TraceSequent.table s in
+  let cntxt = mk_trace_cntxt s in
   let conclusion = TraceSequent.conclusion s in
   (* search for the first occurrence of an if-then-else in [elem] *)
-  let iter = new Iter.get_ite_term ~system table in
+  let iter = new Iter.get_ite_term ~cntxt in
   List.iter iter#visit_formula [conclusion];
   match iter#get_ite with
   | None ->
@@ -2627,17 +2613,16 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
 let euf_apply_facts drop_head s
     ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
   let env = TraceSequent.env s in
-  let system = TraceSequent.system s in
-  let table  = TraceSequent.table s in
+  let cntxt = mk_trace_cntxt s in
 
   (* check that the SSCs hold *)
-  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~system ~table head_fn key_n;
+  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~cntxt head_fn key_n;
 
   (* build the rule *)
   let rule =
     Euf.mk_rule
       ~elems:[] ~drop_head ~allow_functions
-      ~system ~table ~env ~mess ~sign
+      ~cntxt ~env ~mess ~sign
       ~head_fn ~key_n ~key_is
   in
 
@@ -2646,9 +2631,9 @@ let euf_apply_facts drop_head s
   and direct_premises =
     List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
-  if Symbols.is_ftype head_fn Symbols.SEnc table then
+  if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table then
     Cca.check_encryption_randomness
-      system table
+      cntxt
       rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
   schemata_premises @ direct_premises
 
@@ -2725,15 +2710,17 @@ let collision_resistance (s : TraceSequent.t) =
     List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-           let system = TraceSequent.system s in
-           let table  = TraceSequent.table s in
-            Symbols.is_ftype hash Symbols.Hash table
+           let cntxt = mk_trace_cntxt s in
+
+            Symbols.is_ftype hash Symbols.Hash cntxt.table
             && Euf.check_key_ssc
               ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-              ~system ~table hash key
+              ~cntxt hash key
+
          | _ -> false)
       (TraceSequent.get_all_messages s)
   in
+
   let hashes = List.sort_uniq Stdlib.compare hashes in
   if List.length hashes = 0 then
     soft_failure Tactics.NoSSC

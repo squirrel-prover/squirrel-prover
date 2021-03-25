@@ -21,9 +21,10 @@ val is_defined :
   Symbols.macro Symbols.t -> Term.timestamp -> Symbols.table -> bool
 
 (** Return the term corresponding to the declared macro,
-  * if the macro can be expanded. *)
+    if the macro can be expanded.
+    Does *not* check that the timestamp happens ! *)
 val get_definition :
-  SystemExpr.system_expr -> Symbols.table -> 'a Sorts.sort ->
+  Constr.trace_cntxt -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> 
   Vars.index list -> Term.timestamp -> 
   'a Term.term
@@ -33,6 +34,6 @@ val get_definition :
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  SystemExpr.system_expr -> Symbols.table -> 'a Sorts.sort ->
+  Constr.trace_cntxt -> 'a Sorts.sort ->
   Symbols.macro Symbols.t -> Vars.index list -> 
   'a Term.term

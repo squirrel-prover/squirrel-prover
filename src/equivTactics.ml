@@ -95,6 +95,7 @@ let goal_as_equiv s = match EquivSequent.goal s with
       
 let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
 
+(*------------------------------------------------------------------*)
 (** Build a trace sequent from an equivalent sequent when its conclusion is a
     [Reach _]. *)
 let trace_seq_of_equiv_seq ?goal s = 
@@ -123,6 +124,19 @@ let trace_seq_of_equiv_seq ?goal s =
 
 let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 
+(*------------------------------------------------------------------*)
+let get_models s =
+  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
+  Tactics.timeout_get (TraceSequent.get_models s)
+
+let mk_trace_cntxt s = 
+  Constr.{
+    table  = EquivSequent.table s;
+    system = EquivSequent.system s;
+    models = Some (get_models s);
+  }
+
+(*------------------------------------------------------------------*)
 (** Build the sequent showing that a timestamp happens. *)
 let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
   let s = trace_seq_of_equiv_seq ~goal:(Term.Atom (`Happens a)) s in
@@ -158,8 +172,8 @@ let () =
 (*------------------------------------------------------------------*)
 exception NoReflMacros
 
-class exist_macros ~(system:SystemExpr.system_expr) table = object (self)
-  inherit Iter.iter ~system table as super
+class exist_macros ~(cntxt:Constr.trace_cntxt) = object (self)
+  inherit Iter.iter ~cntxt as super
   method visit_message t = match t with
     | Term.Macro _ -> raise NoReflMacros
     | _ -> super#visit_message t
@@ -173,7 +187,7 @@ end
   * where the two frames are identical. *)
 let refl (e : Equiv.equiv) (s : EquivSequent.t) =
   let iter =
-    new exist_macros ~system:(EquivSequent.system s) (EquivSequent.table s) in
+    new exist_macros ~cntxt:(mk_trace_cntxt s) in
   try
     (* we check that the frame does not contain macro *)
     List.iter iter#visit_term e;
@@ -762,9 +776,9 @@ let fa_dup s =
 exception Not_FADUP_formula
 exception Not_FADUP_iter
 
-class check_fadup ~(system:SystemExpr.system_expr) table tau = object (self)
+class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
-  inherit [Term.timestamp list] Iter.fold ~system table as super
+  inherit [Term.timestamp list] Iter.fold ~cntxt as super
 
   method check_formula f = ignore (self#fold_formula [Term.Pred tau] f)
 
@@ -832,8 +846,7 @@ let fa_dup_int i s =
   match nth i (goal_as_equiv s) with
   | before, e, after ->
       let biframe_without_e = List.rev_append before after in
-      let system = EquivSequent.system s in
-      let table  = EquivSequent.table s in
+      let cntxt = mk_trace_cntxt s in
       begin try
         (* we expect that e is of the form exec@pred(tau) && phi *)
         let (tau,phi) =
@@ -865,7 +878,7 @@ let fa_dup_int i s =
         if List.mem frame_at_pred_tau biframe_without_e then
           (* we iterate over the formula phi to check if it contains only
            * allowed subterms *)
-          let iter = new check_fadup ~system table tau in
+          let iter = new check_fadup ~cntxt tau in
           iter#check_formula phi ;
           (* on success, we keep only exec@pred(tau) *)
           let new_elem =
@@ -906,21 +919,22 @@ let () =
 (** Fresh *)
 
 (** Construct the formula expressing freshness for some projection. *)
-let mk_phi_proj system table env name indices proj biframe =
+let mk_phi_proj cntxt env name indices proj biframe =
   let proj_frame = List.map (Equiv.pi_elem proj) biframe in
   begin try
     let list_of_indices_from_frame =
-      let iter = new Fresh.get_name_indices ~system table false name in
+      let iter = new Fresh.get_name_indices ~cntxt false name in
         List.iter iter#visit_term proj_frame ;
         iter#get_indices
     and list_of_actions_from_frame =
-      let iter = new Fresh.get_actions ~system table false in
+      let iter = new Fresh.get_actions ~cntxt false in
       List.iter iter#visit_term proj_frame ;
       iter#get_actions
     and tbl_of_action_indices = Hashtbl.create 10 in
-    SystemExpr.(iter_descrs table system
+
+    SystemExpr.(iter_descrs cntxt.table cntxt.system
       (fun action_descr ->
-        let iter = new Fresh.get_name_indices ~system table true name in
+        let iter = new Fresh.get_name_indices ~cntxt true name in
         let descr_proj = Action.pi_descr proj action_descr in
         iter#visit_formula (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
@@ -929,6 +943,7 @@ let mk_phi_proj system table env name indices proj biframe =
         let action_indices = iter#get_indices in
         if List.length action_indices > 0 then
           Hashtbl.add tbl_of_action_indices descr_proj action_indices));
+
     (* direct cases (for explicit occurrences of [name] in the frame) *)
     let phi_frame =
         (List.map
@@ -986,7 +1001,7 @@ let mk_phi_proj system table env name indices proj biframe =
             (* apply [subst] to the action and to the list of
              * indices of our name's occurrences *)
             let new_action =
-              SystemExpr.action_to_term table system
+              SystemExpr.action_to_term cntxt.table cntxt.system
                 (Action.subst_action subst a.Action.action)
             in
             let indices_a =
@@ -1025,21 +1040,24 @@ let mk_phi_proj system table env name indices proj biframe =
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
-let fresh_cond system table env t biframe =
+let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe =
   let (n_left, ind_left, n_right, ind_right) =
     match
       Term.pi_term PLeft t, Term.pi_term PRight t
     with
     | (Name (nl,isl), Name (nr,isr)) -> (nl,isl,nr,isr)
     | _ -> raise Fresh.Not_name
-  in
-  let system_left = SystemExpr.(project_system PLeft system) in
+  in  
+  let system_left = SystemExpr.(project_system PLeft cntxt.system) in
+  let cntxt_left = { cntxt with system = system_left } in
   let phi_left =
-    mk_phi_proj system_left table env n_left ind_left PLeft biframe
+    mk_phi_proj cntxt_left env n_left ind_left PLeft biframe
   in
-  let system_right = SystemExpr.(project_system PRight system) in
+
+  let system_right = SystemExpr.(project_system PRight cntxt.system) in
+  let cntxt_right = { cntxt with system = system_right } in
   let phi_right =
-    mk_phi_proj system_right table env n_right ind_right PRight biframe
+    mk_phi_proj cntxt_right env n_right ind_right PRight biframe
   in
   mk_ands
     (* remove duplicates, and then concatenate *)
@@ -1048,10 +1066,10 @@ let fresh_cond system table env t biframe =
      phi_right)
 
 (** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
-let mk_if_term system table env e biframe =
+let mk_if_term cntxt env e biframe =
   match e with
   | Equiv.Message t ->
-    let phi = fresh_cond system table env t biframe in
+    let phi = fresh_cond cntxt env t biframe in
     let then_branch = Term.Fun (Term.f_zero,[]) in
     let else_branch = t in
     Equiv.Message Term.(mk_ite phi then_branch else_branch)
@@ -1062,10 +1080,9 @@ let fresh TacticsArgs.(Int i) s =
     | before, e, after ->
         (* the biframe to consider when checking the freshness *)
         let biframe = List.rev_append before after in
-        let system = EquivSequent.system s in
-        let table  = EquivSequent.table s in
+        let cntxt = mk_trace_cntxt s in
         let env    = EquivSequent.env s in
-        begin match mk_if_term system table env e biframe with
+        begin match mk_if_term cntxt env e biframe with
         | if_term ->
           let biframe = List.rev_append before (if_term::after) in
           [EquivSequent.set_equiv_goal s biframe]
@@ -1161,8 +1178,8 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
         succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
-                           Macros.get_definition
-                             (EquivSequent.system s) table sort mn is a)]
+                           Macros.get_definition (mk_trace_cntxt s)
+                             sort mn is a)]
       else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
 
     | _ ->
@@ -1174,7 +1191,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
         if Macros.is_defined mn a table then
           succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
                              Macros.get_definition
-                               (EquivSequent.system s) table sort mn is a)]
+                               (mk_trace_cntxt s) sort mn is a)]
         else Tactics.soft_failure (Tactics.Failure "cannot expand this macro")
       | _ ->
         Tactics.soft_failure (Tactics.Failure "can only expand macros")
@@ -1219,12 +1236,14 @@ let () = T.register_general "expand"
   * some pred(A) but about at a concrete action that is known to happen.
   * Acts recursively, also expanding the macros inside macro definition. *)
 let expand_all () s =
-  let expand_all_macros t system table =
+  let cntxt = mk_trace_cntxt s in
+
+  let expand_all_macros t =
     let rec aux : type a. a term -> a term = function
       | Macro ((mn, sort, is),l,a) as m
-        when Macros.is_defined mn a table ->
+        when Macros.is_defined mn a cntxt.table ->
         if query_happens ~precise:true s a 
-        then aux (Macros.get_definition system table sort mn is a)
+        then aux (Macros.get_definition cntxt sort mn is a)
         else m
       | Macro _ as m -> m
       | Fun (f, l) -> Fun (f, List.map aux l)
@@ -1251,13 +1270,11 @@ let expand_all () s =
     in
     aux t
   in
-  let system = EquivSequent.system s in
-  let table  = EquivSequent.table s in
   let expand_all_macros = function
     | Equiv.Message e ->
-      Equiv.Message (expand_all_macros e system table)
+      Equiv.Message (expand_all_macros e)
     | Equiv.Formula e ->
-      Equiv.Formula (expand_all_macros e system table)
+      Equiv.Formula (expand_all_macros e)
   in
   let biframe = goal_as_equiv s
                 |> List.map (expand_all_macros)
@@ -1346,22 +1363,21 @@ let simplify_ite b s cond positive_branch negative_branch =
     (negative_branch, trace_sequent)
 
 
-(** [get_ite ~system table elem] returns None if there is no ITE term in [elem],
+(** [get_ite ~cntxt elem] returns None if there is no ITE term in [elem],
     Some ite otherwise, where [ite] is the first ITE term encountered.
     Does not explore macros. *)
-let get_ite ~system table elem =
-  let iter = new Iter.get_ite_term ~system table in
+let get_ite ~cntxt elem =
+  let iter = new Iter.get_ite_term ~cntxt in
   List.iter iter#visit_term [elem];
   iter#get_ite
 
 let yes_no_if b TacticsArgs.(Int i) s =
-  let system = EquivSequent.system s in
-  let table = EquivSequent.table s in
+  let cntxt = mk_trace_cntxt s in
 
   match nth i (goal_as_equiv s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
-    begin match get_ite ~system table elem with
+    begin match get_ite ~cntxt elem with
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
@@ -1515,13 +1531,13 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: should be a rewriting rule *)
-let trivial_if (TacticsArgs.Int i) s =
-  let system = EquivSequent.system s in
-  let table = EquivSequent.table s in
+let trivial_if (TacticsArgs.Int i) (s : EquivSequent.sequent) =
+  let cntxt = mk_trace_cntxt s in
+
   match nth i (goal_as_equiv s) with
   | before, elem, after ->
     (* search for the first occurrence of an if-then-else in [elem] *)
-    begin match get_ite ~system table elem with
+    begin match get_ite ~cntxt elem with
     | None ->
       Tactics.soft_failure
         (Tactics.Failure
@@ -1681,27 +1697,28 @@ let prf_param hash =
       (hash_fn,t,key_n,key_is)
   | _ -> raise Not_hash
 
-(** [occurrences_of_frame ~system table frame hash_fn key_n]
+(** [occurrences_of_frame ~cntxt frame hash_fn key_n]
   * returns the list of pairs [is,m] such that [f(m,key_n[is])]
   * occurs in [frame]. Does not explore macros. *)
-let occurrences_of_frame ~system table frame hash_fn key_n =
-  let iter = new Iter.get_f_messages ~system table hash_fn key_n in
+let occurrences_of_frame ~cntxt frame hash_fn key_n =
+  let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
   List.iter iter#visit_term frame ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
-(** [occurrences_of_action_descr ~system table action_descr hash_fn key_n]
+(** [occurrences_of_action_descr ~cntxt action_descr hash_fn key_n]
   * returns the list of pairs [is,m] such that [hash_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
-let occurrences_of_action_descr ~system table action_descr hash_fn key_n =
-  let iter = new Iter.get_f_messages ~system table hash_fn key_n in
+let occurrences_of_action_descr ~cntxt action_descr hash_fn key_n =
+  let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   iter#visit_formula (snd action_descr.Action.condition) ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
-let mk_prf_phi_proj proj system table env biframe e hash =
+let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
   begin try
-      let system = SystemExpr.(project_system proj system) in
+      let system = SystemExpr.(project_system proj cntxt.system) in
+      let cntxt = { cntxt with system = system } in
       let (hash_fn,t,key_n,key_is) = prf_param (Term.pi_term proj hash) in
       (* create the frame on which we will iterate to compute phi_proj
          - e_without_hash is the context where all occurrences of [hash] have
@@ -1720,23 +1737,23 @@ let mk_prf_phi_proj proj system table env biframe e hash =
       (* check syntactic side condition *)
       Euf.key_ssc
         ~elems:frame ~allow_functions:(fun x -> false)
-        ~system ~table hash_fn key_n;
+        ~cntxt hash_fn key_n;
 
       (* we compute the list of hashes from the frame *)
       let list_of_hashes_from_frame =
-        occurrences_of_frame ~system table frame hash_fn key_n
+        occurrences_of_frame ~cntxt frame hash_fn key_n
       and list_of_actions_from_frame =
-        let iter = new Fresh.get_actions ~system table false in
+        let iter = new Fresh.get_actions ~cntxt false in
         List.iter iter#visit_term frame ;
         iter#get_actions
       and tbl_of_action_hashes = Hashtbl.create 10 in
 
       (* we iterate over all the actions of the (single) system *)
-      SystemExpr.(iter_descrs table system (fun action_descr ->
+      SystemExpr.(iter_descrs cntxt.table cntxt.system (fun action_descr ->
           (* we add only actions in which a hash occurs *)
           let descr_proj = Action.pi_descr proj action_descr in
           let action_hashes =
-            occurrences_of_action_descr ~system table descr_proj hash_fn key_n in
+            occurrences_of_action_descr ~cntxt descr_proj hash_fn key_n in
           if List.length action_hashes > 0 then
             Hashtbl.add tbl_of_action_hashes descr_proj action_hashes));
 
@@ -1856,7 +1873,7 @@ let mk_prf_phi_proj proj system table env biframe e hash =
               * key indices with the hashed messages *)
              let new_action =
                SystemExpr.action_to_term
-                 table system
+                 cntxt.table cntxt.system
                  (Action.subst_action subst a.Action.action)
              in
              let list_of_is_m =
@@ -1929,9 +1946,9 @@ let prf TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let system = (EquivSequent.system s) in
-    let table = EquivSequent.table s in
+    let cntxt = mk_trace_cntxt s in
     let env = EquivSequent.env s in
+
     let e = match e with
       | Equiv.Message m ->
         Equiv.Message (Term.head_normal_biterm m)
@@ -1939,7 +1956,7 @@ let prf TacticsArgs.(Int i) s =
         Equiv.Formula (Term.head_normal_biterm f)
     in
     (* search for the first occurrence of a hash in [e] *)
-    begin match Iter.get_ftype ~system table e Symbols.Hash with
+    begin match Iter.get_ftype ~cntxt e Symbols.Hash with
       | None ->
         Tactics.soft_failure
           (Tactics.Failure
@@ -1955,12 +1972,12 @@ let prf TacticsArgs.(Int i) s =
                                                  inside a context that bind variables is not supported")
         else
           let phi_left =
-            mk_prf_phi_proj PLeft system table env biframe e hash in
+            mk_prf_phi_proj PLeft cntxt env biframe e hash in
           let phi_right =
-            mk_prf_phi_proj PRight system table env biframe e hash in
+            mk_prf_phi_proj PRight cntxt env biframe e hash in
 
           let table,n = 
-            Symbols.Name.declare table (L.mk_loc L._dummy "n_PRF") 0 
+            Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") 0 
           in
           let s = EquivSequent.set_table s table in
 
@@ -2018,8 +2035,8 @@ let cca1 TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let system = (EquivSequent.system s) in
-    let table = EquivSequent.table s in
+    let cntxt = mk_trace_cntxt s in
+    let table = cntxt.table in
     let env = EquivSequent.env s in
     let e = match e with
       | Equiv.Message m ->
@@ -2034,7 +2051,7 @@ let cca1 TacticsArgs.(Int i) s =
 
         (* we create the fresh cond reachability goal *)
         let random_fresh_cond = 
-          fresh_cond system table env (Term.Name r) biframe 
+          fresh_cond cntxt env (Term.Name r) biframe 
         in
 
         let fresh_seq = trace_seq_of_reach random_fresh_cond s in
@@ -2065,7 +2082,7 @@ let cca1 TacticsArgs.(Int i) s =
     let is_top_level = match e with
       | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r;
                                                Term.Fun ((fnpk,is), [Term.Name (sk,isk)])]))
-        when (Symbols.is_ftype fnpk Symbols.PublicKey table
+        when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
               && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
       | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)]))
         when Symbols.is_ftype fnenc Symbols.SEnc table -> true
@@ -2091,7 +2108,7 @@ let cca1 TacticsArgs.(Int i) s =
               begin
                 try
                   Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
-                    ~system ~table fndec sk;
+                    ~cntxt fndec sk;
                   if not (List.mem (Equiv.Message
                                       (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
                                    ) biframe) then
@@ -2125,12 +2142,12 @@ let cca1 TacticsArgs.(Int i) s =
               ->
               begin
                 try
-                  Cca.symenc_key_ssc  ~elems:(goal_as_equiv s) ~messages:[enc]
-                    ~system table fnenc fndec sk;
+                  Cca.symenc_key_ssc ~elems:(goal_as_equiv s) ~messages:[enc]
+                    ~cntxt fnenc fndec sk;
                   (* we check that the randomness is ok in the system and the
                      biframe, except for the encryptions we are looking at, which
                      is checked by adding a fresh reachability goal. *)
-                  Cca.symenc_rnd_ssc ~system table env fnenc sk isk biframe;
+                  Cca.symenc_rnd_ssc ~cntxt env fnenc sk isk biframe;
                   let (fgoals, substs) = hide_all_encs q in
                   let fgoal,subst =
                     get_subst_hide_enc enc fnenc m (None) sk fndec r eis isk is_top_level
@@ -2153,9 +2170,9 @@ let cca1 TacticsArgs.(Int i) s =
       end
     in
     let fgoals, substs = hide_all_encs ((Iter.get_ftypes ~excludesymtype:Symbols.ADec
-                                           ~system table e Symbols.AEnc)
+                                           ~cntxt e Symbols.AEnc)
                                         @ (Iter.get_ftypes ~excludesymtype:Symbols.SDec
-                                             ~system table e Symbols.SEnc)) in
+                                             ~cntxt e Symbols.SEnc)) in
     if substs = [] then
       Tactics.soft_failure
         (Tactics.Failure
@@ -2193,8 +2210,8 @@ let enckp
     Tactics.soft_failure (Tactics.Failure "Out of range position")
   | before, e, after ->
     let biframe = List.rev_append before after in
-    let table = EquivSequent.table s in
-    let system = EquivSequent.system s in
+    let cntxt = mk_trace_cntxt s in
+    let table = cntxt.table in
     let env = EquivSequent.env s in
 
     (* Apply tactic to replace key(s) in [enc] using [new_key].
@@ -2212,21 +2229,24 @@ let enckp
           match Symbols.Function.get_data fnenc table with
             | Symbols.AssociatedFunctions [fndec] ->
               (fun ((sk,isk),system) ->
-                Cca.symenc_key_ssc
-                  ~system table fnenc fndec
-                  ~elems:(goal_as_equiv s) sk;
-                Cca.symenc_rnd_ssc ~system table env fnenc sk isk biframe;
-                ()
-                         )
-                ,
-                (fun x -> x),
-                k
+                 let cntxt = Constr.{ cntxt with system } in
+                 Cca.symenc_key_ssc
+                   ~cntxt fnenc fndec
+                   ~elems:(goal_as_equiv s) sk;
+                 Cca.symenc_rnd_ssc ~cntxt env fnenc sk isk biframe;
+                 ()
+              )
+              ,
+              (fun x -> x),
+              k
             | _ -> assert false
+
         else
           match Symbols.Function.get_data fnenc table with
           | Symbols.AssociatedFunctions [fndec;fnpk] ->
              (fun ((sk,_),system) ->
-                Euf.key_ssc ~system ~table ~elems:(goal_as_equiv s)
+               let cntxt = Constr.{ cntxt with system } in
+                Euf.key_ssc ~cntxt ~elems:(goal_as_equiv s)
                   ~allow_functions:(fun x -> x = fnpk) fndec sk),
                 (fun x -> Term.Fun ((fnpk,indices),[x])),
                 begin match k with
@@ -2262,15 +2282,15 @@ let enckp
         try
           (* For each key we actually only need to verify the SSC
            * wrt. the appropriate projection of the system. *)
-          let sysl = SystemExpr.(project_system PLeft system) in
-          let sysr = SystemExpr.(project_system PRight system) in
+          let sysl = SystemExpr.(project_system PLeft cntxt.system) in
+          let sysr = SystemExpr.(project_system PRight cntxt.system) in
           List.iter ssc
             (List.sort_uniq Stdlib.compare
                [(skl, sysl); (skr, sysr); (new_skl, sysl); (new_skr, sysr)]) ;
           let context =
             Equiv.subst_equiv [Term.ESubst (enc,Term.empty)] [e]
           in
-          fresh_cond system table env (Term.Name r) (context@biframe)
+          fresh_cond cntxt env (Term.Name r) (context@biframe)
         with Euf.Bad_ssc -> Tactics.soft_failure Tactics.Bad_SSC
       in
       let fresh_goal = trace_seq_of_reach random_fresh_cond s in
@@ -2308,8 +2328,8 @@ let enckp
                              r is a name"))
       | None ->
         let encs =
-          Iter.get_ftypes ~excludesymtype:Symbols.ADec ~system table e Symbols.AEnc @
-          Iter.get_ftypes ~excludesymtype:Symbols.SDec ~system table e Symbols.SEnc
+          Iter.get_ftypes ~excludesymtype:Symbols.ADec ~cntxt e Symbols.AEnc @
+          Iter.get_ftypes ~excludesymtype:Symbols.SDec ~cntxt e Symbols.SEnc
         in
         (** Run [apply] on first item in [encs] that is well-formed
           * and has a diff in its key.
@@ -2352,19 +2372,21 @@ let rec remove_name_occ n is l = match l with
   | _ ->
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
-let mk_xor_if_term_base system table env biframe
+let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term) =
   let biframe =
     Equiv.Message (Term.Diff (l_left, l_right)) :: biframe in
 
-  let system_left = SystemExpr.(project_system PLeft system) in
+  let system_left = SystemExpr.(project_system PLeft cntxt.system) in
+  let cntxt_left = { cntxt with system = system_left } in
   let phi_left =
-    mk_phi_proj system_left table env n_left is_left PLeft biframe
+    mk_phi_proj cntxt_left env n_left is_left PLeft biframe
   in
 
-  let system_right = SystemExpr.(project_system PRight system) in
+  let system_right = SystemExpr.(project_system PRight cntxt.system) in
+  let cntxt_right = { cntxt with system = system_right } in
   let phi_right =
-    mk_phi_proj system_right table env n_right is_right PRight biframe
+    mk_phi_proj cntxt_right env n_right is_right PRight biframe
   in
 
   let len_left =
@@ -2392,7 +2414,7 @@ let mk_xor_if_term_base system table env biframe
   let else_branch = term in
   Equiv.Message Term.(mk_ite phi then_branch else_branch)
 
-let mk_xor_if_term system table env e biframe =
+let mk_xor_if_term cntxt env e biframe =
   let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
       begin match e with
       | Equiv.Message t ->
@@ -2409,11 +2431,11 @@ let mk_xor_if_term system table env e biframe =
       end
   in
 
-  mk_xor_if_term_base system table env biframe
+  mk_xor_if_term_base cntxt env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term)
 
 
-let mk_xor_if_term_name system table env e mess_name biframe =
+let mk_xor_if_term_name cntxt env e mess_name biframe =
   let (n_left, is_left, l_left, n_right, is_right, l_right, term) =
       begin match mess_name with
       | n ->
@@ -2439,7 +2461,7 @@ let mk_xor_if_term_name system table env e mess_name biframe =
         end
       end
   in
-  mk_xor_if_term_base system table env biframe
+  mk_xor_if_term_base cntxt env biframe
     (n_left, is_left, l_left, n_right, is_right, l_right, term)
 
 
@@ -2449,15 +2471,14 @@ let xor TacticsArgs.(Pair (Int i,
   | before, e, after ->
     (* the biframe to consider when checking the freshness *)
     let biframe = List.rev_append before after in
-    let system = EquivSequent.system s in
-    let table = EquivSequent.table s in
+    let cntxt = mk_trace_cntxt s in
     let env = EquivSequent.env s in
     let res =
       try
         match opt_m with
-        | None -> mk_xor_if_term system table env e biframe
+        | None -> mk_xor_if_term cntxt env e biframe
         | Some (TacticsArgs.Message m) ->
-          mk_xor_if_term_name system table env e m biframe
+          mk_xor_if_term_name cntxt env e m biframe
       with Not_xor -> 
         Tactics.soft_failure
           (Tactics.Failure
@@ -2486,11 +2507,11 @@ let () =
 (*------------------------------------------------------------------*)
 exception Not_context
 
-class ddh_context ~(system:SystemExpr.system_expr) table exact a b c = object (self)
- inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
+class ddh_context ~(cntxt:Constr.trace_cntxt) exact a b c = object (self)
+ inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   method visit_macro mn is a =
-    match Symbols.Macro.get_def mn table with
+    match Symbols.Macro.get_def mn cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | _ -> super#visit_macro mn is a
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
@@ -2519,11 +2540,11 @@ end
 
 exception Macro_found
 
-class find_macros ~(system:SystemExpr.system_expr) table exact  = object (self)
- inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
+class find_macros ~(cntxt:Constr.trace_cntxt) exact = object (self)
+ inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   method visit_macro mn is a =
-    match Symbols.Macro.get_def mn table with
+    match Symbols.Macro.get_def mn cntxt.table with
     | Symbols.(Input | Output | State _ | Cond | Exec | Frame) ->
       raise Macro_found
     | _ -> self#visit_macro mn is a
@@ -2533,13 +2554,13 @@ end
 (** If all the terms of a system can be seen as a context of the terms, where
    all the names appearing inside the terms are only used inside those, returns
    true. *)
-let is_ddh_context system table a b c elem_list =
+let is_ddh_context (cntxt : Constr.trace_cntxt) a b c elem_list =
   (* TODO: location *)
-  let a,b,c = Symbols.Name.of_lsymb a table,
-              Symbols.Name.of_lsymb b table,
-              Symbols.Name.of_lsymb c table in
-  let iter = new ddh_context ~system table false a b c in
-  let iterfm = new find_macros ~system table false in
+  let a,b,c = Symbols.Name.of_lsymb a cntxt.table,
+              Symbols.Name.of_lsymb b cntxt.table,
+              Symbols.Name.of_lsymb c cntxt.table in
+  let iter = new ddh_context ~cntxt false a b c in
+  let iterfm = new find_macros ~cntxt false in
   let exists_macro =
     try
       List.iter iterfm#visit_term elem_list; false
@@ -2549,7 +2570,7 @@ let is_ddh_context system table a b c elem_list =
     (* we check that a b and c only occur in the correct form inside the system,
        if the elements contain some macro based on the system.*)
    if exists_macro then
-    SystemExpr.iter_descrs table system (
+    SystemExpr.iter_descrs cntxt.table cntxt.system (
       fun d ->
         iter#visit_formula (snd d.condition) ;
         iter#visit_message (snd d.output) ;
@@ -2561,9 +2582,8 @@ let is_ddh_context system table a b c elem_list =
   with Not_context | Fresh.Name_found -> false
 
 let ddh (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
-  let system = EquivSequent.system s in
-  let table = EquivSequent.table s in
-  if is_ddh_context system table na nb nc
+  let cntxt = mk_trace_cntxt s in
+  if is_ddh_context cntxt na nb nc
       (goal_as_equiv s) then
       sk [] fk
     else

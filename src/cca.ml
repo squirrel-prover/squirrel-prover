@@ -1,7 +1,7 @@
 open Term
 
-class check_symenc_key ~system table enc_fn dec_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~system table as super
+class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;r; Term.Name _]) when fn = enc_fn ->
       self#visit_message m; self#visit_message r
@@ -16,11 +16,11 @@ class check_symenc_key ~system table enc_fn dec_fn key_n = object (self)
     | _ -> super#visit_message t
 end
 
-let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system table enc_fn dec_fn key_n =
-  let ssc = new check_symenc_key ~system table enc_fn dec_fn key_n in
+let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
+  let ssc = new check_symenc_key ~cntxt enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_term elems ;
-  SystemExpr.(iter_descrs table system
+  SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -29,8 +29,8 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~system table enc_fn dec_fn key_n 
 
 (* Iterator to check that the given randoms are only used in random seed
    position for encryption. *)
-class check_rand ~allow_vars ~system table enc_fn randoms = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~full:true ~system table as super
+class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m1;Term.Name _; m2]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
@@ -48,11 +48,11 @@ end
    encryption. *)
 let random_ssc
     ?(allow_vars=false) ?(messages=[]) ?(elems=[]) 
-    ~system table enc_fn randoms =
-  let ssc = new check_rand ~allow_vars ~system table enc_fn randoms in
+    ~cntxt enc_fn randoms =
+  let ssc = new check_rand ~allow_vars ~cntxt enc_fn randoms in
   List.iter ssc#visit_message messages;
   List.iter ssc#visit_term elems;
-  SystemExpr.(iter_descrs table system
+  SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
        ssc#visit_formula (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
@@ -74,7 +74,7 @@ let random_ssc
      based ourselves on messages produced by Euf.mk_rule, which should simplify
      such extension if need. *)
 let check_encryption_randomness 
-    system table case_schemata cases_direct enc_fn messages elems =
+    ~cntxt case_schemata cases_direct enc_fn messages elems =
   let encryptions : (Term.message * Vars.index list) list = 
     List.map (fun case -> 
         case.Euf.message,
@@ -90,7 +90,7 @@ let check_encryption_randomness
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
       encryptions
   in
-  random_ssc ~elems ~messages ~system table enc_fn randoms;
+  random_ssc ~elems ~messages ~cntxt enc_fn randoms;
 
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
@@ -122,11 +122,11 @@ let check_encryption_randomness
     Tactics.soft_failure (Tactics.SEncSharedRandom)
 
 
-let symenc_rnd_ssc ~system table env head_fn key_n key_is elems =
+let symenc_rnd_ssc ~cntxt env head_fn key_n key_is elems =
   let rule =
     Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
-      ~system ~table ~env ~mess:Term.empty ~sign:Term.empty
+      ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n ~key_is
   in
-  check_encryption_randomness system table
+  check_encryption_randomness ~cntxt
     rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems
