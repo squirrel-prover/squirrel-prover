@@ -2477,23 +2477,26 @@ let euf_param table (t : Term.formula) : unforgeabiliy_param =
     | Atom (`Message at) -> at
     | _ -> bad_param () in
 
-    match at with
-    | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
-    | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
-      begin match Theory.check_signature table checksign pk with
-        | None ->
-          Tactics.(soft_failure 
-                     (Failure "the message does not correspond \
-                               to a signature check with the associated pk"))
-        | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
-      end
-    | (`Eq, Fun ((hash, _), [m; Name key]), s)
-      when Symbols.is_ftype hash Symbols.Hash table ->
-      (hash, key, m, s, (fun x -> false), [], true)
-    | (`Eq, s, Fun ((hash, _), [m; Name key]))
-      when Symbols.is_ftype hash Symbols.Hash table ->
-      (hash, key, m, s, (fun x -> false), [], true)
-    | _ -> bad_param ()
+  match at with
+  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
+  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
+    begin match Theory.check_signature table checksign pk with
+      | None ->
+        Tactics.(soft_failure 
+                   (Failure "the message does not correspond \
+                             to a signature check with the associated pk"))
+      | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
+    end
+
+  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+    when Symbols.is_ftype hash Symbols.Hash table ->
+    (hash, key, m, s, (fun x -> false), [], true)
+
+  | (`Eq, s, Fun ((hash, _), [m; Name key]))
+    when Symbols.is_ftype hash Symbols.Hash table ->
+    (hash, key, m, s, (fun x -> false), [], true)
+
+  | _ -> bad_param ()
 
 
 let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
@@ -2508,22 +2511,23 @@ let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
   let at = match t with
     | Atom (`Message at) -> at
     | _ -> bad_param () in
-
+  
   let param_dec sdec key m s =
-      match Symbols.Function.get_data sdec table with
-        | Symbols.AssociatedFunctions [senc] ->
-          (senc, key, m, s,  (fun x -> x = sdec),
-           [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false )
-        | Symbols.AssociatedFunctions [senc; h] ->
-          (senc, key, m, s,  (fun x -> x = sdec || x = h),
-           [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false)
-
-        | _ -> assert false in
-
+    match Symbols.Function.get_data sdec table with
+    | Symbols.AssociatedFunctions [senc] ->
+      (senc, key, m, s,  (fun x -> x = sdec),
+       [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false )
+    | Symbols.AssociatedFunctions [senc; h] ->
+      (senc, key, m, s,  (fun x -> x = sdec || x = h),
+       [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false)
+      
+    | _ -> assert false in
+  
   match at with
   | (`Eq, Fun ((sdec, _), [m; Name key]), s)
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
+
   | (`Eq, s, Fun ((sdec, is), [m; Name key]))
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
@@ -2531,6 +2535,7 @@ let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
   | (`Neq, (Fun ((sdec, _), [m; Name key]) as s), Fun (fail, _))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
     param_dec sdec key m s
+
   | (`Neq, Fun (fail, _), (Fun ((sdec, is), [m; Name key]) as s))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
     param_dec sdec key m s
@@ -2624,13 +2629,18 @@ let euf_apply_facts drop_head s
   let env = TraceSequent.env s in
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
+
+  (* check that the SSCs hold *)
   Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~system ~table head_fn key_n;
+
+  (* build the rule *)
   let rule =
     Euf.mk_rule
       ~elems:[] ~drop_head ~allow_functions
       ~system ~table ~env ~mess ~sign
       ~head_fn ~key_n ~key_is
   in
+
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
   and direct_premises =

@@ -116,106 +116,118 @@ let pp_euf_rule ppf rule =
     (Fmt.list pp_euf_direct) rule.cases_direct
 
 let mk_rule ?(elems=[]) ?(drop_head=true)
-  ~allow_functions ~system ~table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
-  { hash = head_fn;
-    key = key_n;
-    case_schemata =
-      SystemExpr.map_descrs table system
-        (fun action_descr ->
-          hashes_of_action_descr
-            ~drop_head ~system table action_descr head_fn key_n
-          |> List.map (fun (is,m) ->
-            (* Indices [key_is] from [env] must correspond to [is],
-             * which contains indices from [action_descr.indices]
-             * but also bound variables.
-             *
-             * Rather than refreshing all action indices, and generating
-             * new variable names for bound variables, we avoid it in
-             * simple cases: if a variable only occurs once in
-             * [is] then the only equality constraint on it is that
-             * it must be equal to the corresponding variable of [key_is],
-             * hence we can replace it by that variable rather
-             * than creating a new variable and an equality constraint.
-             * This is not sound with multiple occurrences in [is] since
-             * they induce equalities on the indices that pre-exist in
-             * [key_is].
-             *
-             * We compute next the list [safe_is] of simple cases,
-             * and the substitution for them. *)
-            let env = ref env in
-            let safe_is,subst_is =
-              let multiple i =
-                let n = List.length (List.filter ((=) i) is) in
-                  assert (n > 0) ;
-                  n > 1
-              in
-              List.fold_left2
-                (fun (safe_is,subst) i j ->
-                   if multiple i then safe_is,subst else
-                     i::safe_is,
-                     Term.(ESubst (Var i, Var j))::subst)
-                ([],[])
-                is key_is
-            in
-            (* Refresh action indices other than [safe_is] indices. *)
-            let subst_fresh =
-              List.map
-                (fun i ->
-                   Term.(ESubst (Var i,
-                                 Var (Vars.make_fresh_from_and_update env i))))
-                (List.filter
-                   (fun x -> not (List.mem x safe_is))
-                   action_descr.Action.indices)
-            in
-            (* Refresh bound variables from m and is, except those already
-             * handled above. *)
-            let subst_bv =
-              (* Compute variables from m, add those from is
-               * while preserving unique occurrences in the list. *)
-              let vars = Term.get_vars m in
-              let vars =
-                List.fold_left
-                  (fun vars i ->
-                     if List.mem (Vars.EVar i) vars then vars else
-                       Vars.EVar i :: vars)
-                  vars
-                  is
-              in
-              (* Remove already handled variables, create substitution. *)
-              let index_not_seen i =
-                not (List.mem i safe_is) &&
-                not (List.mem i action_descr.Action.indices)
-              in
-              let not_seen = function
-                | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-                    index_not_seen i
-                | _ -> true
-              in
-              let vars = List.filter not_seen vars in
-              List.map
-                (function Vars.EVar v ->
-                   Term.(ESubst (Var v,
-                                 Var (Vars.make_fresh_from_and_update env v))))
-                vars
-            in
-            let subst = subst_fresh @ subst_is @ subst_bv in
-            let new_action_descr = Action.subst_descr subst action_descr in
-            { message = Term.subst subst m ;
-              key_indices = List.map (Term.subst_var subst) is ;
-              action_descr = new_action_descr;
-              env = !env }))
-      |> List.flatten;
+    ~allow_functions ~system ~table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
-    cases_direct =
-      let hashes =
-        let iter = 
-          new get_f_messages ~drop_head ~system table head_fn key_n 
-        in
-        iter#visit_message mess ;
-        iter#visit_message sign ;
-        List.iter iter#visit_term elems ;
-        iter#get_occurrences
+  let mk_of_hash action_descr (is,m) =
+    (* Indices [key_is] from [env] must correspond to [is],
+     * which contains indices from [action_descr.indices]
+     * but also bound variables.
+     *
+     * Rather than refreshing all action indices, and generating
+     * new variable names for bound variables, we avoid it in
+     * simple cases: if a variable only occurs once in
+     * [is] then the only equality constraint on it is that
+     * it must be equal to the corresponding variable of [key_is],
+     * hence we can replace it by that variable rather
+     * than creating a new variable and an equality constraint.
+     * This is not sound with multiple occurrences in [is] since
+     * they induce equalities on the indices that pre-exist in
+     * [key_is].
+     *
+     * We compute next the list [safe_is] of simple cases,
+     * and the substitution for them. *)
+    let env = ref env in
+
+    let safe_is,subst_is =
+      let multiple i =
+        let n = List.length (List.filter ((=) i) is) in
+        assert (n > 0) ;
+        n > 1
       in
+      List.fold_left2 (fun (safe_is,subst) i j ->
+          if multiple i then safe_is,subst else
+            i::safe_is,
+            Term.(ESubst (Var i, Var j))::subst
+        ) ([],[]) is key_is
+    in
+
+    (* Refresh action indices other than [safe_is] indices. *)
+    let subst_fresh =
+      List.map (fun i ->
+          Term.(ESubst (Var i,
+                        Var (Vars.make_fresh_from_and_update env i))))
+        (List.filter
+           (fun x -> not (List.mem x safe_is))
+           action_descr.Action.indices)
+    in
+
+    (* Refresh bound variables from m and is, except those already
+     * handled above. *)
+    let subst_bv =
+      (* Compute variables from m, add those from is
+       * while preserving unique occurrences in the list. *)
+      let vars = Term.get_vars m in
+      let vars =
+        List.fold_left (fun vars i ->
+            if List.mem (Vars.EVar i) vars then vars else
+              Vars.EVar i :: vars
+          ) vars is
+      in
+      (* Remove already handled variables, create substitution. *)
+      let index_not_seen i =
+        not (List.mem i safe_is) &&
+        not (List.mem i action_descr.Action.indices)
+      in
+      let not_seen = function
+        | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
+          index_not_seen i
+        | _ -> true
+      in
+
+      let vars = List.filter not_seen vars in
       List.map
-        (fun (d_key_indices,d_message) -> {d_key_indices;d_message})
-        hashes }
+        (function Vars.EVar v ->
+           Term.(ESubst (Var v,
+                         Var (Vars.make_fresh_from_and_update env v))))
+        vars
+    in
+    
+    let subst = subst_fresh @ subst_is @ subst_bv in
+    let new_action_descr = Action.subst_descr subst action_descr in
+    { message = Term.subst subst m ;
+      key_indices = List.map (Term.subst_var subst) is ;
+      action_descr = new_action_descr;
+      env = !env }
+  in
+
+  let mk_case_schema action_descr =
+    let hashes = 
+      hashes_of_action_descr ~drop_head ~system table action_descr head_fn key_n
+    in
+
+    List.map (mk_of_hash action_descr) hashes
+  in
+
+  (* indirect cases *)
+  let case_schemata = SystemExpr.map_descrs table system mk_case_schema in
+
+  (* direct cases *)
+  let cases_direct = 
+    let hashes =
+      let iter = 
+        new get_f_messages ~drop_head ~system table head_fn key_n 
+      in
+      iter#visit_message mess ;
+      iter#visit_message sign ;
+      List.iter iter#visit_term elems ;
+      iter#get_occurrences
+    in
+    List.map
+      (fun (d_key_indices,d_message) -> {d_key_indices;d_message})
+      hashes
+  in
+
+  { hash          = head_fn;
+    key           = key_n;
+    case_schemata = List.flatten case_schemata;
+    cases_direct  = cases_direct; }
