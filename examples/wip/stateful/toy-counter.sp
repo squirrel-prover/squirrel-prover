@@ -24,6 +24,8 @@ PROOFS
 - secrecy (as a reachability property)
 *******************************************************************************)
 
+set autoIntro = false.
+
 hash h
 
 name secret : message
@@ -78,7 +80,8 @@ goal counterIncrease :
 Proof.
 intro t Hap Hc.
 use orderSucc with d@pred(t).
-case t. 
+case t; 2,3,4: expand d@t; by congruence.
+by eqtrace.
 Qed.
 
 (* A more general result than counterIncrease *)
@@ -87,14 +90,17 @@ goal counterIncreaseBis :
     (t' < t => order(d@t',d@t) = orderOk).
 Proof.
 induction.
+intro *.
 assert (t' < pred(t) || t' >= pred(t)); 1: by case t. 
 case H0.
 use H with pred(t),t'.
 (* case t' < pred(t) *)
-use counterIncrease with t.
+use counterIncrease with t; 2,3: by eqtrace.
 by use orderTrans with d@t',d@pred(t),d@t.
+by constraints.
+by eqtrace.
 (* case t' >= pred(t) *)
-assert t' = pred(t).
+assert t' = pred(t). by eqtrace.
 by use counterIncrease with t.
 Qed.
 
@@ -103,7 +109,9 @@ Proof.
 intro *.
 expand cond@B(j).
 euf H.
-assert pred(A(i)) < pred(B(j)).
+intro *.
+assert pred(A(i)) < pred(B(j)). by eqtrace.
 use counterIncreaseBis with pred(B(j)),pred(A(i)).
-use orderStrict with d@pred(A(i)),d@pred(B(j)).
+use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
+by eqtrace.
 Qed.

@@ -1630,7 +1630,10 @@ let auto ~conclude ~strong s sk fk =
       if conclude && l <> [] 
       then fk GoalNotClosed
       else sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
-    let fk _ = sk [s] fk in
+    let fk _ = 
+      if conclude 
+      then fk GoalNotClosed
+      else sk [s] fk in
 
     let wfadup s sk fk = 
       let fk _ = sk [s] fk in
