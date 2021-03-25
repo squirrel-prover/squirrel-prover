@@ -1,4 +1,6 @@
-(* Exception thrown when the axiom syntactic side-conditions do not hold. *)
+(** {2 SSCs checking} *)
+
+(** Exception thrown when the axiom syntactic side-conditions do not hold. *)
 exception Bad_ssc
 
 (** Iterate on terms, raise Bad_ssc if the hash key occurs other than
@@ -35,8 +37,6 @@ class get_f_messages ~drop_head ~system table head_fn key_n = object (self)
   method visit_formula _ = ()
 end
 
-exception Found
-
 (** Check the key syntactic side-condition in the given list of messages
   * and in the outputs, conditions and updates of all system actions:
   * [key_n] must appear only in key position of [head_fn].
@@ -67,6 +67,8 @@ let check_key_ssc
       ~system ~table head_fn key_n ;
     true
   with Bad_ssc -> false
+
+(*------------------------------------------------------------------*)
 (** [hashes_of_action_descr ~system action_descr head_fn key_n]
   * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
@@ -76,6 +78,9 @@ let hashes_of_action_descr
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
+
+(*------------------------------------------------------------------*)
+(** {2 Euf rules datatypes} *)
 
 type euf_schema = { message : Term.message;
                     key_indices : Vars.index list;
@@ -114,6 +119,9 @@ let pp_euf_rule ppf rule =
     Term.pp_name rule.key
     (Fmt.list pp_euf_schema) rule.case_schemata
     (Fmt.list pp_euf_direct) rule.cases_direct
+
+(*------------------------------------------------------------------*)
+(** {2 Build the Euf rule} *)
 
 let mk_rule ?(elems=[]) ?(drop_head=true)
     ~allow_functions ~system ~table ~env ~mess ~sign ~head_fn ~key_n ~key_is =
