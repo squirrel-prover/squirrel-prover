@@ -7,9 +7,9 @@ name k : message
 
 system null.
 
-goal forall i:index, id(i)=id(i).
+goal _ (i:index): id(i)=id(i).
 Proof.
   auto.
 Qed.
 
-goal forall (x:message,i,j:index), h(i,j,x,k) = x.
+goal _ (x:message,i,j:index): h(i,j,x,k) = x.

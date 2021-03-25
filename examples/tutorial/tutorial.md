@@ -92,7 +92,7 @@ called the basic hash protocol:
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 
-T --> R : <nT, h(nT,kT)>
+T --> R : (nT, h(nT,kT))
 R --> T : ok
 
 
@@ -112,7 +112,7 @@ multiple identies, and thus depend on some index variable `i`.
 
 process tag(i:index) =
   new nT;
-  T : out(cT, <nT, h(nT,key(i))>).
+  T : out(cT, (nT, h(nT,key(i)))).
 
 (*
 ```
@@ -177,6 +177,7 @@ T(i,k).
 *)
 goal wa :
   forall (i:index, j:index),
+    happens(R(j,i)) =>
      cond@R(j,i) =>
          exists (k:index),
               T(i,k) <= R(j,i) && fst(input@R(j,i)) = nT(i,k).

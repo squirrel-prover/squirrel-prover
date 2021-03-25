@@ -50,23 +50,24 @@ Abort.
 (* Failure when the key occurs inside an action condition. *)
 system [condSSC] in(c,x); if x=k then out(c,x).
 
-goal [none,condSSC] forall tau:timestamp,
+goal [none,condSSC] _ (tau:timestamp) :
+  happens(tau) =>
   (if cond@tau then ok else zero) <> h(ok,k).
 Proof.
-  intro tau Heq.
+  intro tau Hap Heq.
   checkfail euf Heq exn BadSSC.
 Abort.
 (** END TEST **)
 (* k occurs in the context *)
 
-goal (k = h(u,k)) => False.
+goal _: (k = h(u,k)) => False.
 Proof.
   nosimpl(intro Heq).
   checkfail euf Heq exn BadSSC.
 Abort.
 
 (* euf should not allow to conclude here, and only yeld zero=zero *)
-goal h(zero,h(zero,k)) <> h(zero,k).
+goal _: h(zero,h(zero,k)) <> h(zero,k).
 Proof.
   intro Heq.
   nosimpl(euf Heq).
@@ -76,15 +77,15 @@ Abort.
 (* h and euf cannot both use the same key *)
 system [joint] (out(c,h(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
-goal [none, joint] forall tau:timestamp, cond@A3 => False.
+goal [none, joint] _ (tau:timestamp): happens(A3) => cond@A3 => False.
 Proof.
-  intro tau Hcond.
+  intro tau Hap Hcond.
   expand cond@A3.
   checkfail euf Hcond exn BadSSC.
 Abort.
 
 
-goal [none, joint] forall tau:timestamp, output@A4<>h(m,k).
+goal [none, joint] _ (tau:timestamp): output@A4<>h(m,k).
 Proof.
   intro tau Heq.
   checkfail euf Heq exn BadSSC.
@@ -96,17 +97,18 @@ Abort.
 
 system [boundvars] out(c,seq(i,j -> h(n2(i,j),k1(i)))).
 
-goal [none, boundvars] forall (tau:timestamp, j,j1,j2:index),
+goal [none, boundvars] _ (tau:timestamp, j,j1,j2:index):
+  happens(tau) =>
   (if cond@tau then ok else ok) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
-  intro tau j j1 j2 Heq.
+  intro tau j j1 j2 Hap Heq.
   nosimpl(euf Heq). nosimpl(intro Hle Hn Hj).
   (* We should have M1: n(j,j3) = n(j1,j2), and the goal should not magically close.
      We check that j from the seq is thus indeed replaced by j3 inside this check.
   *)
 Abort.
 
-goal forall (j,j1,j2:index),
+goal _ (j,j1,j2:index):
   seq(i,j -> h(n2(i,j),k1(i))) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
   intro j j1 j2 Hseq.
@@ -118,11 +120,12 @@ Proof.
 Abort.
 
 
-system [dupnames] !_i out(c,<h(n,k),h(m,k)>).
+system [dupnames] !_i out(c,(h(n,k),h(m,k))).
 
-goal [none, dupnames] forall tau:timestamp, output@tau = h(u,k) => False.
+goal [none, dupnames] _ (tau:timestamp): 
+ happens(tau) => output@tau = h(u,k) => False.
 Proof.
-  intro tau Heq.
+  intro tau Hap Heq.
   nosimpl(euf Heq).
   (* Here EUF should create two cases for action A(_).
    * In each case a fresh index variable i should be created;

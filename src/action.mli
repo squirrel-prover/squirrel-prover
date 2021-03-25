@@ -92,7 +92,7 @@ type Symbols.data += Data of Vars.index list * action
 (** Get a fresh symbol whose name starts with the given prefix.
     If [exact] is true, the symbol must be exactly the argument. *)
 val fresh_symbol :
-  Symbols.table -> exact:bool -> string ->
+  Symbols.table -> exact:bool -> Symbols.lsymb ->
   Symbols.table * Symbols.action Symbols.t
 
 val define_symbol :
@@ -100,12 +100,13 @@ val define_symbol :
   Symbols.Action.ns Symbols.t -> Vars.index list -> action ->
   Symbols.table
 
-val find_symbol : string -> Symbols.table -> Vars.index list * action
+val find_symbol : Symbols.lsymb -> Symbols.table -> Vars.index list * action
 
 val of_symbol :
   Symbols.action Symbols.t -> Symbols.table ->
   Vars.index list * action
 
+val arity : Symbols.action Symbols.t -> Symbols.table -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Action descriptions}

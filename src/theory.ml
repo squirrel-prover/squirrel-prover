@@ -25,9 +25,10 @@ type term_i =
       timestamp.  As for [App _], the head function symbol has not been
       disambiguated yet.
       [AppAt(f,t1 :: ... :: tn,tau)] is [f (t1, ..., tn)@tau] *)
+                 
+  | Compare of Term.ord * term * term
+  | Happens of term list
 
-  | Compare of Atom.ord*term*term
-  | Happens of term
   | ForAll  of (lsymb * kind) list * term
   | Exists  of (lsymb * kind) list * term
   | And  of term * term
@@ -41,6 +42,7 @@ and term = term_i L.located
 
 
 type formula = term
+
 (*------------------------------------------------------------------*)
 let rec equal t t' = match L.unloc t, L.unloc t' with
   | Tinit, Tinit
@@ -48,10 +50,13 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | False, False -> true
 
   | Tpred   a, Tpred   a'
-  | Happens a, Happens a'
   | Not     a, Not     a' ->
     equal a a'
 
+  | Happens l, Happens l' ->
+    List.length l = List.length l' &&
+    List.for_all2 equal l l'
+    
   | Diff (a,b), Diff (a',b')
   | And  (a,b), And  (a',b')
   | Impl (a,b), Impl (a',b')
@@ -149,8 +154,9 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
 
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Atom.pp_ord ord pp_term tr
-  | Happens t -> Fmt.pf ppf "happens(%a)" pp_term t
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
+      
+  | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
@@ -253,8 +259,8 @@ let pp_error_i ppf = function
       Fmt.pf ppf "An index must be a variable, the term %a \
                   cannot be seen as an index" pp_i i
   | Assign_no_state s ->
-      Fmt.pf ppf "Only states can be assigned values, and the \
-                  function symbols %s is not a state" s
+      Fmt.pf ppf "Only mutables can be assigned values, and the \
+                  symbols %s is not a mutable" s
 
   | BadNamespace (s,n) ->
     Fmt.pf ppf "Kind error: %s has kind %a" s
@@ -281,13 +287,12 @@ let message_arity fdef = let open Symbols in match fdef with
   | AEnc|SEnc -> 3
   | Abstract a -> a
 
-(** Get the kind of a function of macro definition.
+(** Get the kind of a function or macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
 let function_kind table (f : lsymb): kind list * kind =
   let open Symbols in
-  let loc, f = L.loc f, L.unloc f in
-  match def_of_string f table with
-  | Reserved -> assert false (* we should never encounter a situation where we
+  match def_of_lsymb f table with
+  | Reserved _ -> assert false (* we should never encounter a situation where we
                                 try to type a reserved symbol. *)
   | Exists d ->
     let ckind index_arity message_arity =
@@ -301,27 +306,26 @@ let function_kind table (f : lsymb): kind list * kind =
     | Macro (Global arity) -> ckind arity 0
     | Macro (Input|Output|Frame) -> [], Sorts.emessage
     | Macro (Cond|Exec) -> [], Sorts.eboolean
-    | _ -> conv_err loc (Untyped_symbol f)
+    | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
 let check_state table (s : lsymb) n =
-  match Symbols.def_of_string (L.unloc s) table with
+  match Symbols.def_of_lsymb s table with
     | Symbols.(Exists (Macro (State (arity,kind)))) ->
         check_arity s n arity ;
         kind
+        
     | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
 
 let check_name table (s : lsymb) n =
-  try
-    let arity = Symbols.Name.def_of_string (L.unloc s) table in
-    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  with Symbols.Unbound_identifier _ -> assert false
+    let arity = Symbols.Name.def_of_lsymb s table in
+    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
+    ()
 
 let check_action table (s : lsymb) n =
-  match Action.find_symbol (L.unloc s) table with
-  | (l, _) ->
-    let arity = List.length l in
-    if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity))
-  | exception Not_found -> assert false
+  let l,_ = Action.find_symbol s table in
+  let arity = List.length l in
+  if arity <> n then conv_err (L.loc s) (Index_error (L.unloc s,n,arity));
+  ()
 
 
 (** Applications *)
@@ -398,8 +402,8 @@ let make_app_i table cntxt lsymb l =
   let ts_unexpected () =
     conv_err loc (Timestamp_unexpected (App (lsymb,l))) in
 
-  match Symbols.def_of_string (L.unloc lsymb) table with
-  | Symbols.Reserved -> assert false
+  match Symbols.def_of_lsymb lsymb table with
+  | Symbols.Reserved _ -> Fmt.epr "%s@." (L.unloc lsymb); assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->
@@ -438,7 +442,7 @@ let make_app_i table cntxt lsymb l =
       conv_err loc (BadNamespace (s,
                                   oget(Symbols.get_namespace table s)))
     end
-  | exception Symbols.Unbound_identifier s ->
+  | exception Symbols.SymbError (loc, Symbols.Unbound_identifier s) ->
       (* By default we interpret s as a variable,
        * but this is only possible if it is not indexed.
        * If that is not the case, the user probably meant
@@ -446,7 +450,8 @@ let make_app_i table cntxt lsymb l =
        * we raise Unbound_identifier. We could also
        * raise Type_error because a variable is never of
        * a sort that can be applied to indices. *)
-      if l <> [] then conv_err loc (Undefined (L.unloc lsymb));
+      if l <> [] then 
+        raise (Symbols.SymbError (loc, Symbols.Unbound_identifier s));
       AVar lsymb
 
 let make_app loc table cntxt lsymb l =
@@ -502,25 +507,25 @@ let ty_error tm sort = Conv (L.loc tm,
 
 
 let get_fun table lsymb =
-  match Symbols.Function.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Function.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NFunction))
 
 let get_name table lsymb =
-  match Symbols.Name.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Name.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NName))
 
 let get_action table lsymb =
-  match Symbols.Action.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Action.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NAction))
 
 let get_macro table lsymb =
-  match Symbols.Macro.of_string_opt (L.unloc lsymb) table with
+  match Symbols.Macro.of_lsymb_opt lsymb table with
   | Some n -> n
   | None ->
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
@@ -623,7 +628,7 @@ let rec convert :
                              conv Sorts.Timestamp v))
             with Conv (_,Type_error _ ) ->
               match o with
-                | #Atom.ord_eq as o ->
+                | #Term.ord_eq as o ->
                     begin try
                         Term.Atom (`Index (o,
                                            conv_index env subst u,
@@ -641,9 +646,13 @@ let rec convert :
         | _ -> raise type_error
       end
 
-  | Happens t ->
+  | Happens ts ->
       begin match sort with
-        | Sorts.Boolean -> Term.Atom (`Happens (conv Sorts.Timestamp t))
+        | Sorts.Boolean ->
+          let atoms = List.map (fun t ->
+              Term.Atom (`Happens (conv Sorts.Timestamp t))
+            ) ts in
+          Term.mk_ands atoms
         | _ -> raise type_error
       end
 
@@ -682,8 +691,8 @@ let rec convert :
         List.map f new_subst
       in
       begin match sort, L.unloc tm with
-        | Sorts.Boolean, ForAll _ -> Term.ForAll (vs,f)
-        | Sorts.Boolean, Exists _ -> Term.Exists (vs,f)
+        | Sorts.Boolean, ForAll _ -> Term.mk_forall vs f
+        | Sorts.Boolean, Exists _ -> Term.mk_exists vs f
         | _ -> raise type_error
       end
   | Seq (vs,t) ->
@@ -770,7 +779,7 @@ and conv_app :
       begin match sort with
         | Sorts.Message ->
             let open Symbols in
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (symb, Function (i,_)) ->
                 let indices,messages =
                   List.init i (fun k -> conv_index env subst (List.nth l k)),
@@ -806,7 +815,7 @@ and conv_app :
       let open Symbols in
       begin match sort with
         | Sorts.Message ->
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                  (* I am not sure of the location to use in
                     check_arity_i below  *)
@@ -830,7 +839,7 @@ and conv_app :
               | Wrapped (_, System _)             -> raise ts_unexpected
             end
         | Sorts.Boolean ->
-            begin match of_string (L.unloc f) env.table with
+            begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Cond|Exec)) ->
                 (* I am not sure of the location to use in
                     check_arity_i below  *)
@@ -920,16 +929,16 @@ let declare_aenc table enc dec pk =
   let data = AssociatedFunctions [dec; pk] in
   fst (Function.declare_exact table enc ~data (0,AEnc))
 
-let declare_senc table enc dec =
+let declare_senc table (enc : lsymb) (dec : lsymb) =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string enc] in
+  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
   let table, dec = Function.declare_exact table dec ~data (0,SDec) in
   let data = AssociatedFunctions [dec] in
   fst (Function.declare_exact table enc ~data (0,SEnc))
 
-let declare_senc_joint_with_hash table enc dec (h : lsymb) =
+let declare_senc_joint_with_hash table (enc : lsymb) (dec : lsymb) (h : lsymb) =
   let open Symbols in
-  let data = AssociatedFunctions [Function.cast_of_string enc;
+  let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
                                   get_fun table h] in
   let table, dec = Function.declare_exact table dec ~data (0,SDec) in
   let data = AssociatedFunctions [dec] in
@@ -987,7 +996,7 @@ let subst t (s : (string * term_i) list) =
       end
     | Tinit -> Tinit
     | Tpred t -> Tpred (aux t)
-    | Happens t -> Happens (aux t)
+    | Happens t -> Happens (List.map aux t)
     | App (s,l) -> App (s, List.map aux l)
     | AppAt _-> assert false
     | Seq (vs,t) -> Seq (vs, aux t)
@@ -1116,22 +1125,21 @@ let find_app_terms t (names : string list) =
 
     | AppAt (x',l,ts) ->
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
-      List.fold_left (fun accu elem -> aux elem accu name) acc (ts::l)
+      aux_list (ts::l) acc name
 
-    | Diff (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Seq (_,t') -> aux t' acc name
-    | ITE (c,t,e) -> aux c (aux t (aux e acc name) name) name
-    | Find (_,c,t,e) -> aux c (aux t (aux e acc name) name) name
     | Compare (_,t1,t2) -> aux t1 (aux t2 acc name) name
-    | Happens t' -> aux t' acc name
-    | ForAll (_,t') -> aux t' acc name
-    | Exists (_,t') -> aux t' acc name
-    | And (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Or (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Impl (t1,t2) -> aux t1 (aux t2 acc name) name
-    | Not t' -> aux t' acc name
-    | _ -> acc
-  in
+    | Happens t'        -> aux_list t' acc name
+    | ForAll (_,t')     -> aux t' acc name
+    | Exists (_,t')     -> aux t' acc name
+    | And (t1,t2)       -> aux t1 (aux t2 acc name) name
+    | Or (t1,t2)        -> aux t1 (aux t2 acc name) name
+    | Impl (t1,t2)      -> aux t1 (aux t2 acc name) name
+    | Not t'            -> aux t' acc name
+    | _                 -> acc
+
+  and aux_list l acc name =
+    List.fold_left (fun accu elem -> aux elem accu name) acc l in
+  
   List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
 
 (** Tests *)
@@ -1140,22 +1148,23 @@ let () =
   Checks.add_suite "Theory" [
     "Declarations", `Quick,
     begin fun () ->
-      ignore (declare_hash Symbols.builtins_table "h" : Symbols.table);
-      let table = declare_hash Symbols.builtins_table "h" in
+      ignore (declare_hash Symbols.builtins_table (mk "h") : Symbols.table);
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice"
-        (Symbols.Multiple_declarations "h")
-        (fun () -> ignore (declare_hash table "h" : Symbols.table)) ;
-      let table = declare_hash Symbols.builtins_table "h" in
+        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
+        (fun () -> ignore (declare_hash table (mk "h") : Symbols.table)) ;
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       Alcotest.check_raises
         "h cannot be defined twice"
-        (Symbols.Multiple_declarations "h")
-        (fun () -> ignore (declare_aenc table "h" "dec" "pk" : Symbols.table) )
+        (Symbols.SymbError (L._dummy, Multiple_declarations "h"))
+        (fun () -> ignore (declare_aenc table (mk "h") (mk "dec") (mk "pk") 
+                           : Symbols.table) )
     end;
 
     "Term building", `Quick,
     begin fun () ->
-      let table = declare_hash Symbols.builtins_table "h" in
+      let table = declare_hash Symbols.builtins_table (mk "h") in
       ignore (make_app L._dummy table NoTS (mk "x") []) ;
       Alcotest.check_raises
         "hash function expects two arguments"
@@ -1169,8 +1178,10 @@ let () =
 
     "Type checking", `Quick,
     begin fun () ->
-      let table = declare_aenc Symbols.builtins_table "e" "dec" "pk" in
-      let table = declare_hash table "h" in
+      let table = 
+        declare_aenc Symbols.builtins_table (mk "e") (mk "dec") (mk "pk") 
+      in
+      let table = declare_hash table (mk "h") in
       let x = mk (App (mk "x", [])) in
       let y = mk (App (mk "y", [])) in
       let env = ["x",Sorts.emessage;"y",Sorts.emessage] in

@@ -28,7 +28,10 @@ module List : sig
   (** [drop n l] returns [l] without the first [n] elements, or the empty list 
       if [l]  have less than n elements. *)
   val drop : int -> 'a list -> 'a list
-      
+
+  (** Update in an associative list *)
+  val assoc_up : 'a -> ('b -> 'b) -> ('a * 'b) list -> ('a * 'b) list
+
   (** [takedrop n l] returns the a result equal to [take n l, drop n l]. *)
   val takedrop : int -> 'a list -> 'a list * 'a list
 end
@@ -70,17 +73,25 @@ module Uf (Ord: Ordered) : sig
   val find : t -> v  -> v
 
   (** [union t u v] always uses the representent of [v], i.e.
-    [find [union t u v] u] = [find t v] *)
+    [find \[union t u v\] u] = [find t v] *)
   val union : t -> v -> v -> t
 
   (** [classes t] return the list of equivalence classes of [t], where a class
-      is represented by the list of its elements. *)
+      is represented by the list of its elements. 
+      Remark: uses memoisation. *)
   val classes: t -> v list list
 
   val print : Format.formatter -> t -> unit
 
-  (** [union_count t] is the number of non-trivial unions done building [t] *)
+  (** [union_count t] is the number of non-trivial unions done building [t]. *)
   val union_count : t -> int
+
+  (** For further memoisation. *)
+  module Memo : Ephemeron.S with type key = t
+
+  (** For further memoisation. *)
+  module Memo2 (H2 : Hashtbl.HashedType) : Ephemeron.S 
+    with type key = (t * H2.t)
 end
 
 (*------------------------------------------------------------------*)
@@ -133,4 +144,9 @@ val as_seq1 : 'a list -> 'a
 val as_seq2 : 'a list -> 'a * 'a
 val as_seq3 : 'a list -> 'a * 'a * 'a
 val as_seq4 : 'a list -> 'a * 'a * 'a * 'a
-                         
+
+(*------------------------------------------------------------------*)
+(** {2 Hash} *)
+
+val hcombine : int -> int -> int
+val hcombine_list : ('a -> int) -> int -> 'a list -> int                         

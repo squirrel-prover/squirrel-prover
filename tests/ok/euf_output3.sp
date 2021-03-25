@@ -13,10 +13,8 @@ name n : index->message
 
 system !_a out(c,h(n(a),k)).
 
-goal unforgeable :
-  forall (a:index, b:index),
-  b <> a =>
-  h(n(b),k) <> h(n(a),k).
+goal unforgeable (a:index, b:index):
+b <> a => h(n(b),k) <> h(n(a),k).
 
 Proof.
   by intro a b _ Heq; euf Heq; auto.

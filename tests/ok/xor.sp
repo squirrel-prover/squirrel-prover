@@ -12,20 +12,20 @@ system null.
 axiom len_ok : len(ok) = len(dummy)
 axiom len_ko : len(ko) = len(dummy).
 
-goal forall (t:timestamp),
+goal _ (t:timestamp):
   xor(output@t,output@t) = zero.
 Proof.
  by auto.
 Qed.
 
-goal forall (m:message,t:timestamp),
+goal _ (m:message,t:timestamp):
   xor(output@t,xor(m,output@t)) = m.
 Proof.
  by auto.
 Qed.
 
-goal forall (m:message,n:message,x:message),
-  x = xor(m,<m,n>) &&
+goal _ (m:message,n:message,x:message):
+  x = xor(m,(m,n)) &&
   snd(xor(x,m)) = m =>
   m = n.
 Proof.

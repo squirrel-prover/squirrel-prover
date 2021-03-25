@@ -23,6 +23,14 @@ let emessage = ESort Message
 let etimestamp = ESort Timestamp
 let eindex = ESort Index
 
+let equal : type a b. a sort -> b sort -> bool =
+ fun a b -> match a,b with
+   | Message, Message     -> true
+   | Boolean, Timestamp   -> true
+   | Index, Timestamp     -> true
+   | Timestamp, Timestamp -> true
+   | _ -> false
+
 let pp : type a. Format.formatter -> a sort -> unit = fun ppf -> function
   | Message -> Fmt.pf ppf "message"
   | Index -> Fmt.pf ppf "index"

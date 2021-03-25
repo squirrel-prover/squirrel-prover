@@ -8,7 +8,8 @@ name fresh : message
 channel c
 system !_i in(c,x);out(c,h(x,k)).
 
-goal forall t:timestamp, exec@t => input@t <> k.
+goal _ (t:timestamp):
+ happens(t) => exec@t => input@t <> k.
 Proof.
   intro *.
   assert h(fresh,input@t) = h(fresh,k).

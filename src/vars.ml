@@ -101,6 +101,8 @@ let rm_var (e1,e2) v =
    in
   M.remove (name v) e1, M.add v.name_prefix new_suffix e2
 
+let rm_evar e (EVar v) = rm_var e v
+
 let prefix_count_regexp = Pcre.regexp "_*([^0-9]*)([0-9]*)"
 
 let make_fresh ((e1,e2):env) var_type name_prefix =
@@ -135,6 +137,47 @@ let make_fresh_from env v =
 let make_fresh_from_and_update env v =
   make_fresh_and_update env v.var_type v.name_prefix
 
+
+(*------------------------------------------------------------------*)
+module Sv = struct
+  include Set.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = compare (name a) (name b)
+    end)
+  let add_list sv vars =
+    List.fold_left (fun sv v -> add (EVar v) sv) sv vars
+end
+
+module Mv = struct
+  include Map.Make(struct
+      type t = evar
+      let compare (EVar a) (EVar b) = compare (name a) (name b)
+    end)
+end
+
+(*------------------------------------------------------------------*)
+exception CastError
+
+let cast : type a b. a var -> b Sorts.sort -> b var = 
+  fun x s -> match sort x, s with
+  | Sorts.Boolean,   Sorts.Boolean   -> x
+  | Sorts.Message,   Sorts.Message   -> x
+  | Sorts.Index,     Sorts.Index     -> x
+  | Sorts.Timestamp, Sorts.Timestamp -> x
+  | _, _ -> raise CastError
+
+let ecast : type a. evar -> a Sorts.sort -> a var = 
+  fun (EVar v) s -> cast v s
+
+let equal : type a b. a var -> b var -> bool = fun v v' ->
+  match sort v, sort v' with
+  | Sorts.Boolean,   Sorts.Boolean   -> v = v'
+  | Sorts.Message,   Sorts.Message   -> v = v'
+  | Sorts.Index,     Sorts.Index     -> v = v'
+  | Sorts.Timestamp, Sorts.Timestamp -> v = v'
+  | _, _ -> false
+
+(*------------------------------------------------------------------*)
 let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->

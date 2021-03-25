@@ -10,7 +10,7 @@ name m : index->message
 
 channel c
 
-system !_i out(c,<h(n(i),k),seq(i->h(n(i),k))>).
+system !_i out(c,(h(n(i),k),seq(i->h(n(i),k)))).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (tau:timestamp,i:index) : output@tau, diff(h(n(i),k),h(m(i),k)).
@@ -24,7 +24,7 @@ Proof.
 	          (A(i1) <= tau => (m(i) <> n(i2) && m(i) <> n(i1)))))),
     True.
   admit.
-  yesif 1.
+  yesif 1; 1: by auto.
   fresh 1.
   admit. (* Ignore final equivalence goal. *)
 Qed.

@@ -11,31 +11,31 @@ system null.
 
 equiv test : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0.
+  by enckp 0.
 Qed.
 
 equiv test_arg1 : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0, enc(n,r,diff(k1,k2)).
+  by enckp 0, enc(n,r,diff(k1,k2)).
 Qed.
 
 equiv test_arg2 : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0, k2.
+  by enckp 0, k2.
 Qed.
 
 equiv test_arg3 : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0, enc(n,r,diff(k1,k2)), k2.
+  by enckp 0, enc(n,r,diff(k1,k2)), k2.
 Qed.
 
 equiv test_arg4 : enc(n,r,diff(k1,k2)).
 Proof.
-  enckp 0, diff(k2,k1).
-  enckp 0.
+  enckp 0, diff(k2,k1); 1: by auto.
+  by enckp 0.
 Qed.
 
-equiv test_ctxt : <enc(n,r,diff(k1,k2)),ok>.
+equiv test_ctxt : (enc(n,r,diff(k1,k2)),ok).
 Proof.
   nosimpl(enckp 0).
   auto.
@@ -46,16 +46,16 @@ Qed.
 
 equiv test_diffsimpl : enc(n,r,diff(k1,k1)).
 Proof.
-  enckp 0.
+  by enckp 0.
 Qed.
 
 equiv test_diffsimpl_explicit : enc(n,r,diff(k1,k1)).
 Proof.
   (* Note: using k1 results in useless substitution. *)
-  enckp 0, enc(n,r,diff(k1,k1)).
+  by enckp 0, enc(n,r,diff(k1,k1)).
 Qed.
 
-equiv test_diffsimpl_ctxt : <enc(n,r,diff(k1,k1)),ok>.
+equiv test_diffsimpl_ctxt : (enc(n,r,diff(k1,k1)),ok).
 Proof.
   nosimpl(enckp 0).
   auto.

@@ -8,9 +8,9 @@ channel c
 system in(c,x);out(c,h(x,k)).
 
 goal foo :
-  h(<n,input@A>,k) = n => False.
+  happens(A) => h((n,input@A),k) = n => False.
 Proof.
-  intro Heq.
+  intro Hap Heq.
   euf Heq. 
   by auto.
 Qed.

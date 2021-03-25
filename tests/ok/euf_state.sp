@@ -10,11 +10,9 @@ channel c
 
 system s:= h(n,k); out(c,s).
 
-goal collision_absurd :
-
-  forall (tau:timestamp),
-  output@tau <> h(m,k).
+goal collision_absurd (tau:timestamp):
+ happens(tau) => output@tau <> h(m,k).
 
 Proof.
-  by intro tau Heq; euf Heq; auto.
+  by intro tau Hap Heq; euf Heq; auto.
 Qed.

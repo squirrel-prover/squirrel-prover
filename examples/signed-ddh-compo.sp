@@ -4,9 +4,9 @@ SIGNED DDH
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 
-P -> S : <pk(kP), g^a>
-S -> P : <pk(kS),g^b>,sign(<<g^a,g^b>,pk(kP)>,kS)
-P -> S : sign(<<g^b,g^a>,pk(kS)>,kP)
+P -> S : (pk(kP), g^a)
+S -> P : (pk(kS),g^b),sign(((g^a,g^b),pk(kP)),kS)
+P -> S : sign(((g^b,g^a),pk(kS)),kP)
 
 We leverage the composition result of [1], to prove the security of a single
 session in the presence of an adversary with access to a "backdoor" about the
@@ -49,19 +49,19 @@ name a : index -> message
 name b : index -> message
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
- (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
+ (sk <> kP || exists (i:index, x1:message, x2:message) m=((x1,g^a(i)),x2) )
   &&
- (sk <> kS || exists (i:index, x1:message, x2:message) m=<<x1,g^b(i)>,x2>)
+ (sk <> kS || exists (i:index, x1:message, x2:message) m=((x1,g^b(i)),x2))
 
 hash h
 
 process P =
-  out(cP, <pk(kP),g^a1>);
+  out(cP, (pk(kP),g^a1));
   in(cP, t);
   let gS = snd(fst(t)) in
   let pkS = fst(fst(t)) in
-  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
-    out(cP,sign(<<gS,g^a1>,pkS>,kP));
+  if checksign(snd(t),pkS) = ((g^a1,gS),pk(kP)) then
+    out(cP,sign(((gS,g^a1),pkS),kP));
     in(cP, challenge);
     if pkS= pk(kS) then
       if snd(fst(t)) = g^b1 then
@@ -78,9 +78,9 @@ process S =
   in(cS, sP);
   let gP = snd(sP) in
   let pkP = fst(sP) in
-  out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
+  out(cS, ( (pk(kS),g^b1), sign(((gP,g^b1),pkP),kS)));
   in(cS, signed);
-  if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
+  if checksign(signed,pkP) = ((g^b1,gP),pk(kS)) then
     out(cS,ok);
     in(cS, challenge);
     if pkP=pk(kP) then
@@ -98,13 +98,13 @@ system [auth] ( P | S).
 
 
 process P2 =
-  out(cP, <pk(kP),g^a1>);
+  out(cP, (pk(kP),g^a1));
   in(cP, t);
   let gS = snd(fst(t)) in
   let pkS = fst(fst(t)) in
 
-  if checksign(snd(t),pkS) = <<g^a1,gS>,pk(kP)> then
-    out(cP,sign(<<gS,g^a1>,pkS>,kP));
+  if checksign(snd(t),pkS) = ((g^a1,gS),pk(kP)) then
+    out(cP,sign(((gS,g^a1),pkS),kP));
     in(cP, challenge);
     if pkS= pk(kS) then
       if snd(fst(t)) = g^b1 then
@@ -117,9 +117,9 @@ process S2 =
 	in(cS, sP);
 	let gP = snd(sP) in
 	let pkP = fst(sP) in
-	out(cS, < <pk(kS),g^b1>, sign(<<gP,g^b1>,pkP>,kS)>);
+	out(cS, ( (pk(kS),g^b1), sign(((gP,g^b1),pkP),kS)));
 	in(cS, signed);
-        if checksign(signed,pkP) = <<g^b1,gP>,pk(kS)> then
+        if checksign(signed,pkP) = ((g^b1,gP),pk(kS)) then
 	out(cS,ok);
 	in(cS, challenge);
 	if pkP=pk(kP) then
@@ -134,30 +134,28 @@ system [secret] ( P2 | S2).
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [none, auth] S1_charac :
-  cond@S1 => (cond@S4 => False) .
+  happens(S1,S4) => cond@S1 => (cond@S4 => False) .
 Proof.
-  expand cond@S1; expand cond@S4.
-  expand pkP@S1.
-  substitute fst(input@S), pk(kP).
-  euf Meq.
+  intro Hap Hcond1 Hcond4.
+  expand cond, pkP.
+  rewrite (fst(input@S) = pk(kP)) in Hcond1.
+  euf Hcond1.
 
   case H1.
   by use H with i.
-  notleft H0. 
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
 goal [none, auth] P1_charac :
-   cond@P1 => (cond@P4 => False).
+   happens(P1,P4) => cond@P1 => (cond@P4 => False).
 Proof.
-  expand cond@P1; expand cond@P4.
-  substitute pkS@P1,pk(kS).
-  euf Meq.
+  intro Hap Hcond1 Hcond4.
+  expand cond.
+  rewrite (pkS@P1 = pk(kS)) in *.
+  euf Hcond1.
 
   case H2.
   by use H with i.
-
-  notleft H0.
 Qed.
 
 (** The strong secrecy is directly obtained through ddh. *)
@@ -172,8 +170,7 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich kP; enrich g^a1; enrich g^b1; enrich kS.
-   enrich seq(i-> g^b(i)); enrich seq(i-> g^a(i)).
+   enrich kP, g^a1, g^b1, kS, seq(i-> g^b(i)), seq(i-> g^a(i)).
 
    induction t.
 
@@ -195,7 +192,9 @@ Proof.
    fa 6.
 
    equivalent exec@pred(P4) && cond@P4, False.
-   executable pred(P4). depends P1, P4. use H1 with P1. expand exec@P1.
+   executable pred(P4). 
+   depends P1, P4; use H2 with P1. 
+   expand exec@P1.
    by use P1_charac.
 
    by fa 7; noif 7.
@@ -224,7 +223,9 @@ Proof.
    expand frame@S4; expand exec@S4.
 
    equivalent exec@pred(S4) && cond@S4, False.
-   executable pred(S4). depends S1, S4. use H1 with S1. expand exec@S1. 
+   executable pred(S4). 
+   depends S1, S4; use H2 with S1. 
+   expand exec@S1. 
    by use S1_charac.
 
    by fa 6; fa 7; noif 7.

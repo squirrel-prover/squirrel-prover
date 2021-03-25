@@ -22,6 +22,8 @@ R -> T : h(ID,PIN)
 Trying to prove the secret of state values with phases.
 *******************************************************************************)
 
+set autoIntro=false.
+
 abstract ok : message
 abstract error : message
 
@@ -89,8 +91,8 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
 axiom phases :
-  forall (t:timestamp),
-  ( exists (i:index), t = P(i) ) || ( forall (i:index), t < P(i) ).
+  forall (t:timestamp), happens(t) =>
+  ( exists (i:index), t = P(i) ) || ( forall (i:index), happens(P(i)) => t < P(i) ).
 
 equiv secretTagState.
 Proof.

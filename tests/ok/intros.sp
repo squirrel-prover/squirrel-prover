@@ -5,26 +5,26 @@ abstract ok : message
 
 system A: if True then out(c,ok).
 
-goal True || False.
+goal _: True || False.
 Proof.
-left.
+by left.
 Qed.
 
-goal False || True.
+goal _: False || True.
 Proof.
-right.
+by right.
 Qed.
 
 
-goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
+goal _: not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
 Proof.
 nosimpl(intro H).
 nosimpl(notleft H).
 nosimpl(destruct H).
-simpl.
+auto.
 Qed.
 
-goal not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
+goal _: not(forall (t:index), not(cond@A)|| not(cond@A)) => True.
 Proof.
 nosimpl(intro H).
 nosimpl(notleft H).

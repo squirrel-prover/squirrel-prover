@@ -6,6 +6,7 @@
   * representations necessary for the front-end involving
   * processes, axioms, etc. *)
 
+(*------------------------------------------------------------------*)
 (** {2 Symbols}
   *
   * We have function, name and macro symbols. Each symbol
@@ -33,6 +34,7 @@ type 'a msymb = mname * 'a Sorts.sort * Vars.index list
 
 type state = Sorts.message msymb
 
+(*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
 
 val pp_name  : Format.formatter -> name -> unit
@@ -44,6 +46,7 @@ val pp_fsymb : Format.formatter -> fsymb -> unit
 val pp_mname :  Format.formatter -> mname -> unit
 val pp_msymb :  Format.formatter -> 'a msymb -> unit
 
+(*------------------------------------------------------------------*)
 (** {2 Terms} *)
 
 (** ['a term] is the type of terms of sort ['a].
@@ -54,6 +57,8 @@ val pp_msymb :  Format.formatter -> 'a msymb -> unit
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
+val pp_ord   : Format.formatter -> ord -> unit
+  
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type generic_atom = [
@@ -102,21 +107,70 @@ type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
-type message_atom = [ `Message of ord_eq * message * message ]
+type eterm = ETerm : 'a term -> eterm
+
+(** Does not recurse. *)
+val tmap  : (eterm -> eterm) -> 'a term -> 'a term 
+val titer : (eterm -> unit) -> 'a term -> unit
+val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
+
+(*------------------------------------------------------------------*)
+(** {2 Subset of all atoms} *)
+(** (the subsets are not disjoint). *)
+
+type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+
+type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
+                    
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Index     of (ord_eq,Vars.index) _atom
+  | `Happens   of Sorts.timestamp term
 ]
 
-exception Not_a_disjunction
+type trace_eq_atom = [
+  | `Timestamp of (ord_eq,timestamp)  _atom
+  | `Index     of (ord_eq,Vars.index) _atom
+]
 
-val disjunction_to_atom_list : formula -> generic_atom list
+type eq_atom = [
+  | `Message   of (ord_eq, message) _atom
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
+]
 
+val pp_eq_atom    : Format.formatter -> eq_atom    -> unit
+val pp_trace_atom : Format.formatter -> trace_atom -> unit
+
+(*------------------------------------------------------------------*)
+(** Literals. *)
+
+type literal = [`Neg | `Pos] * generic_atom
+
+type eq_literal = [`Pos | `Neg] * eq_atom
+
+type trace_literal = [`Pos | `Neg] * trace_atom
+
+val pp_literal  : Format.formatter -> literal      -> unit
+val pp_literals : Format.formatter -> literal list -> unit
+
+val pp_trace_literal  : Format.formatter -> trace_literal      -> unit
+val pp_trace_literals : Format.formatter -> trace_literal list -> unit
+
+val neg_lit : literal -> literal 
+
+val neg_trace_lit : trace_literal -> trace_literal 
+
+val disjunction_to_literals : formula -> literal list option
+
+(*------------------------------------------------------------------*)
+(** {2 Pretty-printer and cast} *)
 
 val pp : Format.formatter -> 'a term -> unit
 
 val sort : 'a term -> 'a Sorts.t
 
+(*------------------------------------------------------------------*)
 exception Uncastable
 
 (** [cast kind t] returns [t] if it is of the given sort.
@@ -125,9 +179,15 @@ exception Uncastable
   * @raise Uncastable if the term does not have the expected sort. *)
 val cast : 'a Sorts.sort -> 'b term -> 'a term
 
+(*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
   * The returned list is guaranteed to have no duplicate elements. *)
 val get_vars : 'a term -> Vars.evar list
+
+(** [fv t] returns the free variables of [t]. *)
+val fv : 'a term -> Vars.Sv.t
+
+val f_triv : formula -> bool
 
 (** [precise_ts t] returns a list [l] of timestamps such that
   * any term that appears in [(t)^I] that is not an attacker
@@ -138,6 +198,7 @@ val get_vars : 'a term -> Vars.evar list
   * input timestamps. *)
 val precise_ts : Sorts.message term -> Sorts.timestamp term list
 
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 (** Substitutions for all purpose, applicable to terms and timestamps.
@@ -163,9 +224,45 @@ val subst_macros_ts :
   Symbols.table -> 
   string list -> Sorts.timestamp term -> 'a term -> 'a term
 
-(** {2 Predefined symbols} *)
+(*------------------------------------------------------------------*)
+(** {2 Matching and rewriting} *)
 
-val empty : Sorts.message term
+module Match : sig
+  type mv = eterm Vars.Mv.t
+
+  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
+      be matched.  *)
+  type 'a pat = { p_term : 'a term; p_vars : Vars.Sv.t }
+
+  val to_subst : mv -> subst
+
+  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
+      returns a map instantiating the variables [p.p_vars] as substerms 
+      of [t]. *)
+  val try_match : 'a term -> 'b pat -> mv option
+
+  (** Occurrence matched *)
+  type 'a match_occ = { occ : 'a term;
+                        mv  : mv; }
+
+  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
+      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
+      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
+  val find : 'a term -> 'b pat -> 'b match_occ option
+
+  (** [find_map t p func] behaves has [find], but also computes the term 
+      obtained from [t] by replacing a *single* occurence of [t'] by 
+      [func t' θ]. *)
+  val find_map :
+    'a term -> 'b pat -> ('b term -> mv -> 'b term) -> 
+    ('b match_occ * 'a term) option
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Builtins} *)
+
+val empty : message 
+val init : timestamp
 
 val in_macro    : Sorts.message msymb
 val out_macro   : Sorts.message msymb
@@ -199,6 +296,9 @@ val f_g      : fsymb
 val f_len    : fsymb
 val f_zeroes : fsymb
 
+(*------------------------------------------------------------------*)
+(** {2 Smart constructors} *)
+  
 val mk_not    : formula                 -> formula
 val mk_and    : formula -> formula      -> formula
 val mk_ands   : formula list            -> formula
@@ -219,10 +319,61 @@ val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula
 val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
 
+(*------------------------------------------------------------------*)
+(** {2 Simplification} *)
+
+val not_message_atom  : message_atom  -> message_atom
+val not_index_atom    : index_atom    -> index_atom
+val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
+
+val not_simpl : formula -> formula
+
+(*------------------------------------------------------------------*)
 (** Convert a boolean term to a message term, used in frame macro definition **)
 val boolToMessage : formula -> message
 
-(** Convert from bi-terms to terms
+(*------------------------------------------------------------------*)
+(** {2 Destructors} *)
+
+val destr_forall : formula -> (Vars.evar list * formula) option
+val destr_exists : formula -> (Vars.evar list * formula) option
+
+val destr_and  : formula -> (formula * formula) option
+val destr_or   : formula -> (formula * formula) option
+val destr_impl : formula -> (formula * formula) option
+
+(** left-associative *)
+val destr_ands  : int -> formula -> formula list option
+val destr_ors   : int -> formula -> formula list option
+val destr_impls : int -> formula -> formula list option
+
+val decompose_forall : formula -> Vars.evar list * formula
+val decompose_exists : formula -> Vars.evar list * formula
+
+val decompose_ands  : formula -> formula list 
+val decompose_ors   : formula -> formula list 
+val decompose_impls : formula -> formula list 
+
+val destr_var : 'a term -> 'a Vars.var option
+val destr_pair : 'a term -> ('a term * 'a term) option
+
+(** Existential type for atoms. 
+    Constraints on allowed ordering are lost. *)
+type eatom = 
+  | EOrd : ord * 'a term * 'a term -> eatom
+  | EHappens : timestamp -> eatom
+
+val destr_atom : generic_atom -> eatom 
+val of_eatom   : eatom -> generic_atom
+
+(*------------------------------------------------------------------*)
+(** {2 Sets and Maps } *)
+
+module St : Set.S with type elt = eterm
+module Mt : Map.S with type key = eterm
+
+(*------------------------------------------------------------------*)
+(** {2 Convert from bi-terms to terms}
   *
   * TODO Could we use a strong typing of [term] to make a static
   * distinction between biterms (general terms) and terms (terms

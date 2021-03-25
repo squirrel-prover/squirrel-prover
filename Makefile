@@ -16,8 +16,10 @@ test: squirrel alcotest okfail_test
 
 .PHONY: ok_test ok_test_end alcotest
 
-
+# Directory for logging test runs
+RUNLOGDIR=_build/log
 okfail_test:
+	rm -rf $(RUNLOGDIR)
 	@$(MAKE) -j8 okfail_test_end
 	@$(MAKE) -j8 examples_end
 
@@ -39,7 +41,11 @@ examples_end: $(PROVER_EXAMPLES:.sp=.ok)
 tests/test_prologue.ok:
 	@echo "Running tests/ok/*.sp, tests/fail/*.sp and examples/*.sp."
 %.ok: tests/test_prologue.ok %.sp
-	@if ./squirrel $(@:.ok=.sp) > /dev/null 2> /dev/null ; then echo -n . ; \
+	@mkdir -p `dirname $(RUNLOGDIR)/$(@:.ok=.sp)`
+	@if ./squirrel $(@:.ok=.sp) \
+	  > $(RUNLOGDIR)/$(@:.ok=.sp) \
+	  2> $(RUNLOGDIR)/$(@:.ok=.sp.stderr) \
+	 ; then echo -n . ; \
 	 else echo "[FAIL] $(@:.ok=.sp)" >> tests/tests.ko ; echo -n '!' ; fi
 
 alcotest: version sanity

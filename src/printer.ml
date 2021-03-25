@@ -34,33 +34,44 @@ let set_style_renderer x =
 
 let pr x = Fmt.pf (get_std ()) x
 
-type pp =
-  [ `Prompt
+type pp = [
+  | `Prompt
   | `Start
   | `Result
   | `Error
+  | `Dbg
+  | `Ignore (* do not print *)
   | `Goal
-  | `Default]
+  | `Default
+]
 
-let pp_pref ty =
+let pp_pref (ty : pp) =
   match ty with
-  | `Prompt -> pr "@[[> "
-  | `Start -> pr "@[[start> "
-  | `Result -> pr "@[[result> "
-  | `Error -> pr "@[[error> "
-  | `Goal -> pr "@[[goal> "
+  | `Prompt  -> pr "@[[> "
+  | `Start   -> pr "@[[start> "
+  | `Result  -> pr "@[[result> "
+  | `Error   -> pr "@[[error> "
+  | `Dbg     -> pr "@[[dbg> "
+  | `Ignore  -> ()
+  | `Goal    -> pr "@[[goal> "
   | `Default -> ()
 
-let pp_suf ty =
+let pp_suf (ty : pp) =
   match ty with
-  | `Prompt -> pr "@.@]@."
-  | `Start -> pr "@.@]@."
-  | `Result -> pr "@.@]@."
-  | `Error -> pr "@.@]@."
-  | `Goal -> pr "@.@]@."
+  | `Prompt  -> pr "@.@]@."
+  | `Start   -> pr "@.<]@]@."
+  | `Result  -> pr "@.@]@."
+  | `Error   -> pr "@.@]@."
+  | `Dbg     -> pr "@.<]@]@."
+  | `Ignore  -> ()
+  | `Goal    -> pr "@.@]@."
   | `Default -> ()
 
 
-let prt ty fmt = pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) (get_std ()) fmt
+let prt ty fmt = 
+  let out = match ty with
+    | `Ignore -> dummy_fmt
+    | _ -> get_std () in
+    pp_pref ty; Fmt.kpf (fun fmt -> pp_suf ty) out fmt
 
 let pr fmt = prt `Default fmt

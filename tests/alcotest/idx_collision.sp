@@ -8,8 +8,8 @@ abstract b : message
 
 system null.
 
-goal forall (i,j:index) h(i,a,k) = h(j,b,k) => a = b.
+goal _ (i,j:index) : h(i,a,k) = h(j,b,k) => a = b.
 Proof.
   nosimpl(intro i j Heq).
-  collision.
+  checkfail collision exn NoCollision.
 Qed.

@@ -93,51 +93,46 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
 goal lastUpdateTag_ :
-forall (t:timestamp), forall (i:index),
-  (kT(i)@t = kT(i)@init && forall (j':index) t < T1(i,j')) ||
-  (exists j:index,
+forall (t:timestamp), forall (i:index), happens(t) =>
+  ((kT(i)@t = kT(i)@init && forall (j':index), happens(T1(i,j')) => t < T1(i,j')) ||
+   (exists j:index,
     kT(i)@t = kT(i)@T1(i,j) &&
     T1(i,j) <= t &&
-    (forall (j':index), T1(i,j')<=T1(i,j) || t<T1(i,j'))).
+    (forall (j':index), happens(T1(i,j')) => T1(i,j')<=T1(i,j) || t<T1(i,j')))).
 Proof.
 induction.
 nosimpl(revert H => IH0).
 case t.
 
-substitute t,init.
-left.
+subst t,init.
+left. 
 
-substitute t,R(jj).
-use IH0 with pred(R(jj)) as H.
-use H with i as P; case P.
-by left; use H0 with j'.
-right; exists j; use H1 with j'.
-by case H0.
+subst t,R(jj).
+use IH0 with pred(R(jj)),i as P; case P.
+by left; use H with j'.
+right; exists j; use H0 with j'.
+by case H.
 
-substitute t,R1(jj,ii).
-use IH0 with pred(R1(jj,ii)) as H.
-use H with i as P; case P.
-by left; use H0 with j'.
-right; exists j; use H1 with j'.
-by case H0.
+subst t,R1(jj,ii).
+use IH0 with pred(R1(jj,ii)),i as P; case P.
+by left; use H with j'.
+right; exists j; use H0 with j'.
+by case H.
 
-substitute t,R2(jj).
-use IH0 with pred(R2(jj)) as H.
-use H with i as P; case P.
-by left; use H0 with j'.
-right; exists j; use H1 with j'.
-by case H0.
+subst t,R2(jj).
+use IH0 with pred(R2(jj)),i as P; case P.
+by left; use H with j'.
+right; exists j; use H0 with j'.
+by case H.
 
-substitute t,T(i1,j).
-use IH0 with pred(T(i1,j)) as H.
-use H with i as P; case P.
-by left; use H0 with j'.
-right; exists j1; use H1 with j'.
-by case H0.
+subst t,T(i1,j).
+use IH0 with pred(T(i1,j)),i as P; case P.
+by left; use H with j'.
+right; exists j1; use H0 with j'.
+by case H.
 
-substitute t,T1(i1,j).
-use IH0 with pred(T1(i1,j)) as H.
-use H with i as P; case P.
+subst t,T1(i1,j).
+use IH0 with pred(T1(i1,j)),i as P; case P.
 (* *)
 assert (i=i1 || i<>i1) as C.
 case C.
@@ -151,7 +146,7 @@ case (if i = i1 then
        <h3(<<fst(kT(i1)@pred(T1(i1,j))),pin(i1)>,snd(input@T(i1,j))>,key3),
         snd(input@T(i1,j))>
        else kT(i)@pred(T1(i1,j))).
-by use H0 with j'.
+by use H with j'.
 (* *)
 assert (i=i1 || i<>i1) as C.
 case C.
@@ -168,101 +163,94 @@ by case (if i = i1 then
        else kT(i)@pred(T1(i1,j))).
 assert (j=j1 || j<>j1) as C.
 case C.
-use H1 with j'.
-by case H0.
-by use H1 with j' as Hyp; case Hyp.
+use H0 with j'.
+by case H.
+by use H0 with j' as Hyp; case Hyp.
 
-substitute t,T2(i1,j).
-use IH0 with pred(T2(i1,j)) as IHA.
-use IHA with i as P; case P.
+subst t,T2(i1,j).
+use IH0 with pred(T2(i1,j)),i as P; case P.
 by left; use H with j'.
 right; exists j1; use H0 with j' as P.
 by case P.
 
-substitute t,T3(i1,j).
-use IH0 with pred(T3(i1,j)) as H0.
-use H0 with i as H1.
+subst t,T3(i1,j).
+use IH0 with pred(T3(i1,j)),i as H1.
 case H1.
 by left; use H with j'.
-by right; exists j1; use H1 with j' as H; case H.
+by right; exists j1; use H0 with j' as H; case H.
 
-substitute t,A(kk).
-use IH0 with pred(A(kk)) as H0.
-use H0 with i as H1.
+subst t,A(kk).
+use IH0 with pred(A(kk)),i as H1.
 case H1.
 by left; use H with j'.
-right; exists j; use H1 with j' as H2.
+right; exists j; use H0 with j' as H2.
 by case H2.
 
-substitute t,A1(kk).
-use IH0 with pred(A1(kk)) as H0.
-use H0 with i as H1.
+subst t,A1(kk).
+use IH0 with pred(A1(kk)),i as H1.
 case H1.
 by left; use H with j'.
-right; exists j; use H1 with j' as H2.
+right; exists j; use H0 with j' as H2.
 by case H2.
 
-substitute t,A2(kk).
-use IH0 with pred(A2(kk)) as H0.
-use H0 with i as H1.
+subst t,A2(kk).
+use IH0 with pred(A2(kk)),i as H1.
 case H1.
 by left; use H with j'.
-right; exists j; use H1 with j' as H2.
+right; exists j; use H0 with j' as H2.
 by case H2.
 Qed.
 
 goal lastUpdateT :
-forall (i,j:index),
-  kT(i)@T(i,j) = kT(i)@init
-  || (exists (j':index), kT(i)@T(i,j) =
+forall (i,j:index), happens(T(i,j)) =>
+  (kT(i)@T(i,j) = kT(i)@init
+   || (exists (j':index), kT(i)@T(i,j) =
        < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
-         snd(input@T(i,j')) >).
+         snd(input@T(i,j')) >)).
 Proof.
 intro i j.
-use lastUpdateTag_ with T(i,j) as H0.
-use H0 with i as H1.
+use lastUpdateTag_ with T(i,j),i as H1.
 case H1; 1: by left.
 by right; exists j1.
 Qed.
 
 goal lastUpdatePredT1 :
-forall (i,j:index),
-  kT(i)@pred(T1(i,j)) = kT(i)@init
-  || (exists (j':index), kT(i)@pred(T1(i,j)) =
+forall (i,j:index), happens(T1(i,j)) =>
+  (kT(i)@pred(T1(i,j)) = kT(i)@init
+   || (exists (j':index), kT(i)@pred(T1(i,j)) =
        < h3(<<fst(kT(i)@pred(T1(i,j'))),pin(i)>,snd(input@T(i,j'))>,key3),
-         snd(input@T(i,j')) >).
+         snd(input@T(i,j')) >)).
 Proof.
 intro i j.
-use lastUpdateTag_ with pred(T1(i,j)) as H0.
-use H0 with i as H1.
+use lastUpdateTag_ with pred(T1(i,j)),i as H1.
 case H1;
 1: by left.
 by right; exists j1.
 Qed.
 
 goal lastUpdatePredR1 :
-forall (jj,ii:index),
-  kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
-  || (exists (jj':index),
+forall (jj,ii:index), happens(pred(R1(jj,ii))) =>
+  (kR(ii)@pred(R1(jj,ii)) = kR(ii)@init
+   || (exists (jj':index),
        kR(ii)@pred(R1(jj,ii)) =
-         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)).
+         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3))).
 Proof.
 admit. (* TODO probably very similar to lastUpdateT *)
 Qed.
 
 goal lastUpdateR :
-forall (jj,ii:index),
-  kR(ii)@R(jj) = kR(ii)@init
-  || (exists (jj':index),
+forall (jj,ii:index), happens(R(jj)) =>
+  (kR(ii)@R(jj) = kR(ii)@init
+   || (exists (jj':index),
        kR(ii)@R(jj) =
-         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3)).
+         h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3))).
 Proof.
 admit. (* TODO probably very similar to lastUpdatePredT1 *)
 Qed.
 
 goal secretStateReader :
-forall (t:timestamp), forall (jj,ii:index),
-  t < R1(jj,ii) => input@t <> kR(ii)@pred(R1(jj,ii)).
+forall (t:timestamp), forall (jj,ii:index), happens(R1(jj,ii)) =>
+  (t < R1(jj,ii) => input@t <> kR(ii)@pred(R1(jj,ii))).
 Proof.
 induction.
 use lastUpdatePredR1 with jj,ii as H0.
@@ -274,7 +262,7 @@ assert
   input@t = h3(<<kR(ii)@pred(R1(jj',ii)),pin(ii)>,TS@pred(R1(jj',ii))>,key3) as M2.
 euf M2.
 (* case euf 1/3 - R1(jj1,ii) *)
-assert R1(jj',ii) < R1(jj,ii) as H0. admit. (* ok *)
+assert R1(jj',ii) < R1(jj,ii) as H1. admit. (* ok *)
 case H0.
 admit. (* ok *)
 admit. (* ok *)
@@ -285,10 +273,10 @@ admit. (* TODO *)
 Qed.
 
 goal secretStateTag :
-forall (t:timestamp), forall (i,j:index),
-  t < T1(i,j) =>
+forall (t:timestamp), forall (i,j:index), happens(T1(i,j)) =>
+  (t < T1(i,j) =>
     ( input@t <> <fst(kT(i)@pred(T1(i,j))),pin(i)>
-      && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> ).
+      && input@t <> <<fst(kT(i)@pred(T1(i,j))),pin(i)>,snd(input@T(i,j))> )).
 Proof.
 nosimpl(induction; intro IH i j).
 intro *.
@@ -314,8 +302,7 @@ admit. (* ok *)
 admit. (* ok *)
 admit. (* ok *)
 (* case euf 3/3 - A2(kk) *)
-use IH with A2(kk) as H1.
-use H1 with i,j' as H2.
+use IH with A2(kk),i,j' as H1.
 admit. (* TODO *)
 admit. (* TODO *)
 admit. (* TODO *)
@@ -335,8 +322,7 @@ euf M2.
 admit. (* TODO *)
 admit. (* TODO *)
 
-use IH with A2(kk) as H1.
-use H1 with i,j' as H2.
+use IH with A2(kk),i,j' as H2.
 admit. (* TODO *)
 admit. (* TODO *)
 admit. (* TODO *)
@@ -344,12 +330,12 @@ Qed.
 
 
 goal auth_R1 :
-forall (jj,ii:index),
-  cond@R1(jj,ii)
+forall (jj,ii:index), happens(R1(jj,ii)) =>
+  (cond@R1(jj,ii)
   =>
-  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii)).
+  (exists (j:index), T(ii,j) < R1(jj,ii) && output@T(ii,j) = input@R1(jj,ii))).
 Proof.
-intro jj ii Hcond.
+intro jj ii Hap Hcond.
 expand cond@R1(jj,ii).
 
 euf Hcond.
@@ -382,22 +368,20 @@ assert
 by collision.
 
 (* case euf 2/2 - A(kk) *)
-use secretStateReader with A(kk) as H0.
-by use H0 with jj,ii.
+by use secretStateReader with A(kk),jj,ii.
 Qed.
 
 goal auth_T1 :
-forall (i,j:index),
-  cond@T1(i,j)
+forall (i,j:index), happens(T1(i,j)) =>
+  (cond@T1(i,j)
   =>
-  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j)).
+  (exists (jj:index), R1(jj,i) < T1(i,j) && output@R1(jj,i) = input@T1(i,j))).
 Proof.
-intro i j Hcond.
+intro i j Hap Hcond.
 expand cond@T1(i,j).
 euf Hcond.
 (* case euf 1/2 - honest case R1(jj,i) *)
 by exists jj.
 (* case euf 2/2 - A1(kk) coming from the process oracle *)
-use secretStateTag with A1(kk) as H0.
-by use H0 with i,j.
+by use secretStateTag with A1(kk),i,j.
 Qed.

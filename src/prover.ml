@@ -3,9 +3,17 @@
 
 module L = Location
 
+module EquivHyps = EquivSequent.H
+module Args = TacticsArgs
+
+type lsymb = Theory.lsymb
+
+(*------------------------------------------------------------------*)
+let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
+
 (*------------------------------------------------------------------*)
 type decl_error_i =
-  | Multiple_declarations of string
+  | BadEquivForm 
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError           of System.system_error
@@ -16,9 +24,9 @@ type dkind = KDecl | KGoal
 type decl_error =  L.t * dkind * decl_error_i
 
 let pp_decl_error_i fmt = function
-  | Multiple_declarations s ->
-    Fmt.pf fmt
-      "@[Multiple declarations of the symbol: %s.@]@." s
+  | BadEquivForm ->
+    Fmt.pf fmt "equivalence goal ill-formed"
+
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
@@ -27,6 +35,7 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
     | KDecl -> Fmt.pf fmt "Declaration"
     | KGoal -> Fmt.pf fmt "Goal declaration" in
+
   Fmt.pf fmt "%a%a failed: %a."
     pp_loc_err loc
     pp_k k
@@ -39,7 +48,6 @@ let decl_error loc k e = raise (Decl_error (loc,k,e))
 let error_handler loc k f a =
   let decl_error = decl_error loc k in
   try f a with
-  | Symbols.Multiple_declarations s -> decl_error (Multiple_declarations s)
   | System.SystemError e -> decl_error (SystemError e)
   | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
 
@@ -64,23 +72,32 @@ end
 
 type named_goal = string * Goal.t
 
-let goals : named_goal list ref = ref []
+let goals : named_goal list          ref = ref []
 let current_goal : named_goal option ref = ref None
-let subgoals : Goal.t list ref = ref []
-let goals_proved = ref []
+let subgoals : Goal.t list           ref = ref []
+let goals_proved : named_goal list   ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 
 (*------------------------------------------------------------------*)
-type p_goal_name = P_unknown | P_named of string
+(** {2 Parsed goals }*)
+
+type p_goal_name = P_unknown | P_named of lsymb
+
+type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
+
+type p_equiv_form = 
+  | PEquiv of p_equiv
+  | PReach of Theory.formula
+  | PImpl of p_equiv_form * p_equiv_form
 
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
-  | P_equiv_goal of
-      (Theory.lsymb * Sorts.esort) list *
-      [ `Message of Theory.term | `Formula of Theory.formula ] list
-  | P_equiv_goal_process of SystemExpr.p_single_system *
+
+  | P_equiv_goal of (Theory.lsymb * Sorts.esort) list * p_equiv_form L.located
+
+  | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
 type gm_input_i =
@@ -90,6 +107,8 @@ type gm_input_i =
 type gm_input = gm_input_i L.located
 
 (*------------------------------------------------------------------*)
+(** {2 Options }*)
+
 type option_name =
   | Oracle_for_symbol of string
 
@@ -221,35 +240,52 @@ module type Table_sig = sig
   val to_goal : judgment -> Goal.t
   val from_trace : TraceSequent.t -> judgment
   val from_equiv : Goal.t -> judgment
+
+  val table_name : string
+  val pp_goal_concl : Format.formatter -> judgment -> unit
 end
 
 module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
   type judgment = TraceSequent.t
   let table = Hashtbl.create 97
+
+  (* TODO:location *)
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+      | Not_found -> Tactics.hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
   let to_goal j = Goal.Trace j
   let from_trace j = j
   let from_equiv e = assert false
+
+  let table_name = "Trace"
+  let pp_goal_concl ppf j = Term.pp ppf (TraceSequent.conclusion j)
 end
 
 module EquivTable : Table_sig with type judgment = Goal.t = struct
   type judgment = Goal.t
   let table = Hashtbl.create 97
+
+  (* TODO:location *)
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> raise @@ Tactics.Tactic_hard_failure
+      | Not_found -> Tactics.hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
   let to_goal j = j
   let from_trace j = Goal.Trace j
   let from_equiv j = j
+
+  let table_name = "Equiv"
+  let pp_goal_concl ppf j = match j with
+    | Goal.Trace j -> Term.pp ppf (TraceSequent.conclusion j)
+    | Goal.Equiv j -> Equiv.pp_form ppf (EquivSequent.goal j)
 end
 
 (** Functor building AST evaluators for our judgment types. *)
 module Make_AST (T : Table_sig) :
-  (Tactics.AST_sig with type arg = TacticsArgs.parser_arg with type judgment = T.judgment)
+  (Tactics.AST_sig 
+   with type arg = TacticsArgs.parser_arg 
+   with type judgment = T.judgment)
 = Tactics.AST(struct
 
   type arg = TacticsArgs.parser_arg
@@ -258,30 +294,69 @@ module Make_AST (T : Table_sig) :
 
   let pp_arg ppf = function
     | TacticsArgs.Int_parsed i  -> Fmt.int ppf i
-    | TacticsArgs.String_name s -> Fmt.string ppf s
+    | TacticsArgs.String_name s -> Fmt.string ppf (L.unloc s)
     | TacticsArgs.Theory th     -> Theory.pp ppf th
     | TacticsArgs.IntroPat args -> TacticsArgs.pp_intro_pats ppf args
     | TacticsArgs.AndOrPat pat  -> TacticsArgs.pp_and_or_pat ppf pat
     | TacticsArgs.SimplPat pat  -> TacticsArgs.pp_simpl_pat ppf pat
 
-  let simpl () =
-    let tsimpl = TraceTable.get "simpl" [] in
-    let esimpl = EquivTable.get "simpl" [] in
-      fun s sk fk ->
-        match T.to_goal s with
-          | Goal.Trace t ->
-              let sk l fk = sk (List.map T.from_trace l) fk in
-              tsimpl t sk fk
-          | Goal.Equiv e ->
-              let sk l fk = sk (List.map T.from_equiv l) fk in
-              esimpl (Goal.Equiv e) sk fk
+    | TacticsArgs.RewriteIn (rw_args, in_opt) ->
+      let pp_in ppf = function
+        | None      -> ()
+        | Some `All -> Fmt.pf ppf " in *"
+        | Some (`Hyps symb) -> 
+          Fmt.pf ppf " in %a"
+            (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
+      in
 
-  let simpl = Lazy.from_fun simpl
+      let pp_dir ppf d = match L.unloc d with
+        | `LeftToRight -> ()
+        | `RightToLeft -> Fmt.pf ppf "-"
+      in
+
+      let pp_mult ppf = function
+        | `Once -> ()
+        | `Many -> Fmt.pf ppf "!"
+        | `Any -> Fmt.pf ppf  "?"
+      in
+
+      let pp_type ppf = function
+        | `Form f   -> Theory.pp ppf f
+        | `Expand t -> Theory.pp ppf t
+      in
+
+      let pp_rw_arg ppf rw_arg =
+      Fmt.pf ppf "%a%a%a"
+        pp_dir  rw_arg.Args.rw_dir
+        pp_mult rw_arg.Args.rw_mult
+        pp_type rw_arg.Args.rw_type
+      in
+
+      Fmt.pf ppf "%a%a"
+        (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
+        pp_in in_opt
+
+
+  let autosimpl () =
+    let tautosimpl = TraceTable.get "autosimpl" [] in
+
+    let eautosimpl = EquivTable.get "autosimpl" [] in
+
+    fun s sk fk ->
+      match T.to_goal s with
+      | Goal.Trace t ->
+        let sk l fk = sk (List.map T.from_trace l) fk in
+        tautosimpl t sk fk
+      | Goal.Equiv e ->
+        let sk l fk = sk (List.map T.from_equiv l) fk in
+        eautosimpl (Goal.Equiv e) sk fk
+
+  let autosimpl = Lazy.from_fun autosimpl
 
   let eval_abstract mods id args : judgment Tactics.tac =
     match mods with
       | "nosimpl"::_ -> T.get id args
-      | [] -> Tactics.andthen (T.get id args) (Lazy.force simpl)
+      | [] -> Tactics.andthen (T.get id args) (Lazy.force autosimpl)
       | _ -> assert false
 
   (* a printer for tactics that follows a specific syntax.
@@ -292,7 +367,7 @@ module Make_AST (T : Table_sig) :
           let l = List.map (function
             | TacticsArgs.Theory t -> t
             | _ -> assert false) l in
-          Fmt.pf ppf "use %s with %a" id (Utils.pp_list Theory.pp) l
+          Fmt.pf ppf "use %s with %a" (L.unloc id) (Utils.pp_list Theory.pp) l
       | _ -> raise Not_found
 
 end)
@@ -331,7 +406,7 @@ module type Tactics_sig = sig
 
   val get : string -> TacticsArgs.parser_arg list -> tac
 
-  val pp : bool -> Format.formatter -> string -> unit
+  val pp : bool -> Format.formatter -> lsymb -> unit
   val pps : Format.formatter -> unit -> unit
   val pp_list : Format.formatter -> unit -> unit
 
@@ -353,6 +428,13 @@ struct
       ~tactic_help
       f =
     assert (not (Hashtbl.mem table id)) ;
+
+    let f args s sk fk = 
+      dbg "@[<hov>%s table: calling tactic %s on@ @[%a@]@]" 
+        table_name
+        id M.pp_goal_concl s;
+      f args s sk fk in 
+
     Hashtbl.add table id { maker = f ;
                            help = tactic_help}
 
@@ -370,7 +452,7 @@ struct
         | [] ->
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
-              | exception Tactics.Tactic_soft_failure e -> fk e
+              | exception Tactics.Tactic_soft_failure (_,e) -> fk e
               | exception System.SystemError e ->
                 Tactics.hard_failure (Tactics.SystemError e)
               | exception SystemExpr.BiSystemError e ->
@@ -396,7 +478,7 @@ struct
              begin
                match f (th) s with
                | subgoals -> sk subgoals fk
-               | exception Tactics.Tactic_soft_failure e -> fk e
+               | exception Tactics.Tactic_soft_failure (_,e) -> fk e
                | exception System.SystemError e ->
                  Tactics.hard_failure (Tactics.SystemError e)
                | exception SystemExpr.BiSystemError e ->
@@ -410,18 +492,19 @@ struct
     register_general id ~tactic_help
       (fun args s sk fk ->
          if args = [] then AST.eval modifiers m s sk fk else
-           raise @@ Tactics.Tactic_hard_failure
+           Tactics.hard_failure
              (Tactics.Failure "this tactic does not take arguments"))
 
-  let pp details fmt id =
+  let pp details fmt (id : lsymb) =
+    let id_u = L.unloc id in
     let help =
-      try (Hashtbl.find table id).help with
-      | Not_found -> raise @@ Tactics.Tactic_hard_failure
-          (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
+      try (Hashtbl.find table id_u).help with
+      | Not_found -> Tactics.hard_failure ~loc:(L.loc id)
+          (Tactics.Failure (Printf.sprintf "unknown tactic %S" id_u))
     in
     Fmt.pf fmt  "@.@[- %a -@\n @[<hov 3>   %a @\n %a @\n%s @[%a @] @]@]@."
       Fmt.(styled `Bold (styled `Magenta Utils.ident))
-      id
+      id_u
       Format.pp_print_text
       help.general_help
       Format.pp_print_text
@@ -429,7 +512,7 @@ struct
       (if List.length help.usages_sorts = 0 then ""
        else if List.length help.usages_sorts =1 then "Usage:"
        else "Usages:")
-      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@\n") (pp_usage id))
+      (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@\n") (pp_usage id_u))
       help.usages_sorts
 
   let pps fmt () =
@@ -446,7 +529,9 @@ struct
        structural, that rely on properties of protocols and equality;\n - \
        cryptographic, that rely on some cryptographic assumption that must be \
        explicitly stated.\n";
-    let filter_cat helps cat = List.filter (fun (y,x) -> x.tactic_group = cat) helps in
+    let filter_cat helps cat = 
+      List.filter (fun (y,x) -> x.tactic_group = cat) helps 
+    in
     let str_cat = function
       | Logical -> "Logical"
       | Structural -> "Structural"
@@ -454,10 +539,10 @@ struct
     in
     List.iter (fun cat ->
         Fmt.pf fmt "\n%a" Fmt.(styled `Bold (styled `Red Utils.ident))
-    (str_cat cat^" tactics:");
+          (str_cat cat^" tactics:");
         List.iter (fun (name, help) ->
             if help.general_help <> "" then
-              Fmt.pf fmt "%a" (pp false) name
+              Fmt.pf fmt "%a" (pp false) (L.mk_loc L._dummy name)
           ) (filter_cat helps cat)
     )
     [Logical; Structural; Cryptographic]
@@ -495,19 +580,19 @@ module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
 
 let pp_ast fmt t = TraceAST.pp fmt t
 
-let get_trace_help tac_name =
-  if tac_name = "" then
+let get_trace_help (tac_name : lsymb) =
+  if L.unloc tac_name = "" then
     Printer.prt `Result "%a" TraceTactics.pps ()
-  else if tac_name = "concise" then
+  else if L.unloc tac_name = "concise" then
     Printer.prt `Result "%a" TraceTactics.pp_list ()
   else
     Printer.prt `Result "%a." (TraceTactics.pp true) tac_name;
   Tactics.id
 
-let get_equiv_help tac_name =
-  if tac_name = "" then
+let get_equiv_help (tac_name : lsymb) =
+  if L.unloc tac_name = "" then
     Printer.prt `Result "%a" EquivTactics.pps ()
-  else if tac_name = "concise" then
+  else if L.unloc tac_name = "concise" then
     Printer.prt `Result "%a" TraceTactics.pp_list ()
   else
     Printer.prt `Result "%a." (EquivTactics.pp true) tac_name;
@@ -522,6 +607,24 @@ let () =
                   tactic_group = Logical}
     (fun _ _ sk fk -> sk [] fk) ;
 
+  TraceTactics.register_general "prof"
+    ~tactic_help:{general_help = "Print profiling information.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (fun _ s sk fk -> 
+       Printer.prt `Dbg "%a" Prof.print ();
+      sk [s] fk) ;
+
+  EquivTactics.register_general "prof"
+    ~tactic_help:{general_help = "Print profiling information.";
+                  detailed_help = "";
+                  usages_sorts = [Sort None];
+                  tactic_group = Logical}
+    (fun _ s sk fk -> 
+       Printer.prt `Dbg "%a" Prof.print ();
+      sk [s] fk) ;
+
   TraceTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
                                   Usages: help\n\
@@ -533,10 +636,9 @@ let () =
                   usages_sorts = [];
                   tactic_group = Logical}
     (function
-      | [] -> get_trace_help ""
+      | [] -> get_trace_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_trace_help tac_name
-      | _ ->  raise @@ Tactics.Tactic_hard_failure
-          (Tactics.Failure"improper arguments")) ;
+      | _ ->  Tactics.hard_failure (Tactics.Failure"improper arguments")) ;
 
   EquivTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
@@ -549,10 +651,9 @@ let () =
                   usages_sorts = [];
                   tactic_group = Logical}
     (function
-      | [] -> get_equiv_help ""
+      | [] -> get_equiv_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_equiv_help tac_name
-      | _ ->  raise @@ Tactics.Tactic_hard_failure
-          (Tactics.Failure"improper arguments")) ;
+      | _ ->  Tactics.hard_failure (Tactics.Failure"improper arguments")) ;
 
   TraceTactics.register_general "id"
     ~tactic_help:{general_help = "Identity.";
@@ -561,18 +662,51 @@ let () =
                   tactic_group = Logical}
     (fun _ -> Tactics.id)
 
-let get_goal_formula gname =
+let is_goal_formula (gname : lsymb) =
+  match List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved with
+    | [(_,Goal.Trace f)] -> true
+    | [] -> false
+    | _ -> assert false
+
+let get_goal_formula (gname : lsymb) =
   match
-    List.filter (fun (name,_) -> name = gname) !goals_proved
+    List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved
   with
     | [(_,Goal.Trace f)] ->
         assert (TraceSequent.env f = Vars.empty_env) ;
         TraceSequent.conclusion f, TraceSequent.system f
-    | [] -> raise @@ Tactics.Tactic_hard_failure
-        (Tactics.Failure "No proved goal with given name")
+    | [] -> Tactics.hard_failure ~loc:(L.loc gname)
+        (Tactics.Failure ("no proved goal named " ^ (L.unloc gname)))
     | _ -> assert false
 
-(** Declare Goals And Proofs *)
+
+(*------------------------------------------------------------------*)
+(** {2 Convert equivalence formulas} *)
+
+let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el = 
+  match el with
+  | `Formula f -> Equiv.Formula (Theory.convert cenv s f Sorts.Boolean)
+  | `Message m -> Equiv.Message (Theory.convert cenv s m Sorts.Message)
+
+let convert_equiv (cenv : Theory.conv_env) (s : Theory.subst) (e : p_equiv) =
+  List.map (convert_el cenv s) e
+
+let convert_equiv_form cenv s (p : p_equiv_form) =
+  let rec conve p =
+    match p with
+    | PImpl (f,f0) -> 
+      Equiv.Impl (conve f, conve f0)
+    | PEquiv e -> 
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv s e))
+    | PReach f -> 
+      Equiv.Atom (Equiv.Reach (Theory.convert cenv s f Sorts.Boolean))
+  in
+
+  conve p
+
+
+(*------------------------------------------------------------------*)
+(** {2 Declare Goals And Proofs} *)
 
 let make_trace_goal ~system ~table f  =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
@@ -580,8 +714,8 @@ let make_trace_goal ~system ~table f  =
   Goal.Trace (TraceSequent.init ~system table g)
 
 let make_equiv_goal
-    ~table (system_name : System.system_name)
-    env (l : [`Message of 'a | `Formula of 'b] list) =
+    ~table (system_name : System.system_name) env 
+    (p_form : p_equiv_form L.located) =
   let env =
     List.fold_left
       (fun env (x, Sorts.ESort s) ->
@@ -591,14 +725,12 @@ let make_equiv_goal
   in
   let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let convert = function
-    | `Formula f ->
-        EquivSequent.Formula (Theory.convert conv_env subst f Sorts.Boolean)
-    | `Message m ->
-        EquivSequent.Message (Theory.convert conv_env subst m Sorts.Message)
-  in
+
+  let f = convert_equiv_form conv_env subst (L.unloc p_form) in
+
   let se = SystemExpr.simple_pair table system_name in
-  Goal.Equiv (EquivSequent.init se table env (List.map convert l))
+
+  Goal.Equiv (EquivSequent.init se table env EquivHyps.empty f)
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
@@ -606,13 +738,23 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
+  let goal = Equiv.(Atom (Equiv [Message term])) in
+
   let system =
     match system_1, system_2 with
     | Left id1, Right id2 when id1 = id2 ->
       SystemExpr.simple_pair table id1
-    | _ -> SystemExpr.pair table system_1 system_2
+    | _ -> SystemExpr.pair table system_1 system_2 
   in
-  Goal.Equiv (EquivSequent.init system table !env [(EquivSequent.Message term)])
+
+  let happens = Term.Atom (`Happens (Term.Var ts)) in
+  let hyp = Equiv.Atom (Reach happens) in
+
+  let hyps = EquivHyps.empty in
+  let id = EquivHyps.fresh_id "H" hyps in
+  let _, hyps = EquivHyps.add ~force:false id hyp hyps in
+
+  Goal.Equiv (EquivSequent.init system table !env hyps goal)
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -624,20 +766,20 @@ type parsed_input =
   | ParsedGoal of gm_input
   | EOF
 
-let unnamed_goal () = "unnamedgoal"^(string_of_int (List.length (!goals_proved)))
+let unnamed_goal () = 
+  L.mk_loc L._dummy ("unnamedgoal"^(string_of_int (List.length (!goals_proved))))
 
 let declare_new_goal_i table (gname,g) =
   let gname = match gname with
     | P_unknown -> unnamed_goal ()
     | P_named s -> s in
   let g = match g with
-    | P_equiv_goal (env,l) ->
+    | P_equiv_goal (env,f) ->
       let system_symb =
-        System.of_string SystemExpr.default_system_name table
+        System.of_lsymb SystemExpr.default_system_name table
       in
       let env = List.map (fun (x,y) -> L.unloc x, y) env in
-      make_equiv_goal ~table system_symb env l
-
+      make_equiv_goal ~table system_symb env f
     | P_equiv_goal_process (a,b) ->
       let a = SystemExpr.parse_single table a
       and b = SystemExpr.parse_single table b in
@@ -648,23 +790,24 @@ let declare_new_goal_i table (gname,g) =
       make_trace_goal ~system:s ~table f
   in
 
-  if List.exists (fun (name,_) -> name = gname) !goals_proved then
+  if List.exists (fun (name,_) -> name = L.unloc gname) !goals_proved then
     raise @@ ParseError "A formula or goal with this name alread exists"
   else
-    goals :=  (gname,g) :: !goals;
+    goals :=  (L.unloc gname,g) :: !goals;
 
-  (gname,g)
+  (L.unloc gname,g)
 
 let declare_new_goal table loc n g =
   error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal (gname,j) =
   if List.exists (fun (name,_) -> name = gname) !goals_proved then
+    (* TODO: location *)
     raise @@ ParseError "A formula with this name alread exists"
   else
     goals_proved := (gname,j) :: !goals_proved
 
-let define_oracle_tag_formula table h f =
+let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   let formula = Theory.convert conv_env [] f Sorts.Boolean in
     (match formula with
@@ -672,7 +815,7 @@ let define_oracle_tag_formula table h f =
        (
          match Vars.sort uvarm,Vars.sort uvarkey with
          | Sorts.(Message, Message) ->
-           add_option (Oracle_for_symbol h, Oracle_formula formula)
+           add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
          | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"
        )
@@ -695,9 +838,8 @@ let complete_proof () =
     current_goal := None;
     subgoals := []
   with Not_found ->
-    raise @@ Tactics.Tactic_hard_failure
-      (Tactics.Failure "Cannot complete proof \
-               with empty current goal")
+    Tactics.hard_failure
+      (Tactics.Failure "Cannot complete proof with empty current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -723,8 +865,7 @@ let eval_tactic_focus tac = match !subgoals with
 
 let cycle i l =
   let rec cyc acc i = function
-    | [] -> raise @@ Tactics.Tactic_hard_failure
-        (Tactics.Failure "Cycle error.")
+    | [] -> Tactics.hard_failure (Tactics.Failure "cycle error")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in
@@ -753,7 +894,7 @@ let current_goal () = !current_goal
 
 (*------------------------------------------------------------------*)
 
-let declare_i table = function
+let declare_i table decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let pkind = List.map (fun (x,y) -> L.unloc x, y) pkind in
@@ -766,7 +907,7 @@ let declare_i table = function
     in
     let se = SystemExpr.parse_se table gdecl.gsystem in
     let goal = make_trace_goal se table gdecl.gform in
-    add_proved_goal (name, goal);
+    add_proved_goal (L.unloc name, goal);
     table
 
   | Decl.Decl_system sdecl ->
@@ -801,7 +942,7 @@ let declare_i table = function
 
 let declare table decl =
   let loc = L.loc decl in
-  error_handler loc KDecl (declare_i table) (L.unloc decl)
+  error_handler loc KDecl (declare_i table) decl
 
 let declare_list table decls =
   (* For debugging *)

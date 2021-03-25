@@ -6,8 +6,8 @@ unbounded verification of privacy-type properties. Journal of Computer
 Security, 27(3):277–342, 2019.
 
 R --> T : nR
-T --> R : <nT,h(<<nR,nT>,tag1>,kT)>
-R --> T : h(<<h(<<nR,nT>,tag1>,kT),nR>,tag2>,kR)
+T --> R : (nT,h(((nR,nT),tag1),kT))
+R --> T : h(((h(((nR,nT),tag1),kT),nR),tag2),kR)
 
 We consider tags in the messages (tag1 and tag2) to ease the proof.
 
@@ -31,20 +31,20 @@ channel cR
 process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
-  let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in
-  out(cT,<nT,m2>)
+  let m2 = h(((nR,nT),tag1),diff(key(i),key'(i,k))) in
+  out(cT,(nT,m2))
 
 process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
   if exists (i,k:index),
-     snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
+     snd(x) = h(((nR,fst(x)),tag1),diff(key(i),key'(i,k)))
   then
     out(cR, try find i,k such that
-              snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
+              snd(x) = h(((nR,fst(x)),tag1),diff(key(i),key'(i,k)))
             in
-              h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
+              h(((snd(x),nR),tag2),diff(key(i),key'(i,k))))
   else
     out(cR,ko)
 
@@ -52,18 +52,18 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 axiom tags_neq : tag1 <> tag2.
 
-goal wa_R1: forall j:index,
-  cond@R1(j)
-  <=>
-  (exists (i,k:index),
-    T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal wa_R1 (j:index):
+  happens(R1(j)) =>
+    (cond@R1(j)
+     <=>
+     (exists (i,k:index),
+       T(i,k) < R1(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R1(j)) &&
+       fst(output@T(i,k)) = fst(input@R1(j)) &&
+       input@T(i,k) = output@R(j))).
 Proof.
   intro *.
-  expand cond@R1(j).
+  expand cond.
   split.
 
   (* COND => WA *)
@@ -86,18 +86,18 @@ Proof.
   by exists i,k.
 Qed.
 
-goal wa_R2: forall j:index,
-  cond@R2(j)
-  <=>
-  (not(exists (i,k:index),
-    T(i,k) < R2(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R2(j)) &&
-    fst(output@T(i,k)) = fst(input@R2(j)) &&
-    input@T(i,k) = output@R(j))).
-
+goal wa_R2 (j:index):
+  happens(R2(j)) =>
+   (cond@R2(j)
+    <=>
+    (not(exists (i,k:index),
+      T(i,k) < R2(j) && R(j) < T(i,k) &&
+      snd(output@T(i,k)) = snd(input@R2(j)) &&
+      fst(output@T(i,k)) = fst(input@R2(j)) &&
+      input@T(i,k) = output@R(j)))).
 Proof.
   intro *.
-  expand cond@R2(j).
+  expand cond.
   split.
 
   (* WA => COND *)
@@ -122,16 +122,15 @@ Proof.
   by case H0; depends R(j),R1(j).
 Qed.
 
-goal [left] wa_R1_left:
-  forall (i,j:index),
-    (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i)))
-    <=>
-    (exists k:index,
-    T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal [left] wa_R1_left (i,j:index):
+  happens(R1(j)) =>
+    ((snd(input@R1(j)) = h(((nR(j),fst(input@R1(j))),tag1),key(i)))
+     <=>
+     (exists k:index,
+     T(i,k) < R1(j) && R(j) < T(i,k) &&
+     snd(output@T(i,k)) = snd(input@R1(j)) &&
+     fst(output@T(i,k)) = fst(input@R1(j)) &&
+     input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   use tags_neq.
@@ -142,15 +141,14 @@ Proof.
   by case H; depends R(j),R2(j).
 Qed.
 
-goal [right] wa_R1_right:
-  forall (i,j,k:index),
-    (snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k)))
-    <=>
-    (T(i,k) < R1(j) && R(j) < T(i,k) &&
-    snd(output@T(i,k)) = snd(input@R1(j)) &&
-    fst(output@T(i,k)) = fst(input@R1(j)) &&
-    input@T(i,k) = output@R(j)).
-
+goal [right] wa_R1_right (i,j,k:index):
+  happens(R1(j)) =>
+    ((snd(input@R1(j)) = h(((nR(j),fst(input@R1(j))),tag1),key'(i,k)))
+     <=>
+     (T(i,k) < R1(j) && R(j) < T(i,k) &&
+     snd(output@T(i,k)) = snd(input@R1(j)) &&
+     fst(output@T(i,k)) = fst(input@R1(j)) &&
+     input@T(i,k) = output@R(j))).
 Proof.
   intro *.
   use tags_neq.
@@ -170,9 +168,9 @@ Proof.
   expand cond@R(j); expand output@R(j).
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
-  repeat split.
-  by depends R(j),R1(j).
-  by depends R(j),R2(j).
+  repeat split. 
+  by depends R(j1),R1(j1).
+  by depends R(j1),R2(j1).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -196,9 +194,9 @@ Proof.
         input@T(i,k) = output@R(j))
      then (try find i,k such that
              snd(input@R1(j)) =
-             h(<<nR(j),fst(input@R1(j))>,tag1>,diff(key(i),key'(i,k)))
+             h(((nR(j),fst(input@R1(j))),tag1),diff(key(i),key'(i,k)))
            in
-             h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))),
+             h(((snd(input@R1(j)),nR(j)),tag2),diff(key(i),key'(i,k))))),
     (if exec@pred(R1(j)) &&
         exists (i,k:index),
         (T(i,k) < R1(j) && R(j) < T(i,k) && snd(output@T(i,k)) = snd(input@R1(j)) &&
@@ -211,7 +209,7 @@ Proof.
   	    R(j) < T(i,k) && input@T(i,k) = output@R(j)))
            in
   	   if exec@pred(R1(j))
-  	   then h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))).
+  	   then h(((snd(input@R1(j)),nR(j)),tag2),diff(key(i),key'(i,k))))).
   fa.
   by exists i,k. by exists i,k.
   project.
@@ -219,13 +217,14 @@ Proof.
   (* LEFT *)
   fa.
   use wa_R1_left with i1,j.
-  use H0.
-  by exists k.
+  use H1.
+  by exists k. 
+
   yesif.
   (* RIGHT *)
   fa.
   use wa_R1_right with i1,j,k1.
-  by use H0.
+  by use H1.
   by yesif.
 
   fa 2; fadup 1.

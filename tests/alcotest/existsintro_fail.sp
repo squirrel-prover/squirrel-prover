@@ -14,16 +14,15 @@ mutable s : message = empty
 
 system out(c,cst);
 (
-  (!_a out(c,<h(na(a),k),na(a)>))
+  (!_a out(c,(h(na(a),k),na(a))))
   |  (in(c,m1); out(c,m1); in(c,m2); if m1=h(m2,k) then out(c,m2))
  ).
 
 axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
-na(a) <>  <ma, mb>.
+na(a) <>  (ma, mb).
 
-goal unforgeable :
-  forall (tau : timestamp, tau2:timestamp, b:index),
+goal unforgeable (tau : timestamp, tau2:timestamp, b:index) :
   input@A3=h(input@A,k) => exists (a:index), (input@A2 = na(a)).
   Proof.
   intro tau tau2 b Heq.

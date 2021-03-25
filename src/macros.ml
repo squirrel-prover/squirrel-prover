@@ -1,4 +1,7 @@
-(** Macro definitions *)
+open Term
+
+(*------------------------------------------------------------------*)
+(** {2 Macro definitions} *)
 
 type Symbols.data +=
     Global_data of Vars.message list * Vars.index list * Vars.timestamp
@@ -9,9 +12,8 @@ let declare_global table name ~inputs ~indices ~ts t =
   let def = Symbols.Global (List.length indices) in
     Symbols.Macro.declare table name ~data def
 
-(** Macro expansions *)
-
-open Term
+(*------------------------------------------------------------------*)
+(** {2 Macro expansions} *)
 
 let is_defined name a table =
   match Symbols.Macro.get_all name table with
@@ -19,10 +21,7 @@ let is_defined name a table =
     | Symbols.(Output | Cond | State _), _ ->
         (* We can expand the definitions of output@A and state@A
          * when A is an action name. We cannot do so for a variable
-         * or a predecessor.
-         * TODO generalize the approach so that we expand output@ts
-         * when the judgment's constraints tell us that ts=A for some
-         * name A. *)
+         * or a predecessor. *)
         begin match a with
           | Action _ -> true
           | _ -> false
@@ -45,12 +44,13 @@ let is_defined name a table =
         end
     | Symbols.Global _, _ -> assert false
 
-let get_definition :
-  type a.  SystemExpr.system_expr ->  Symbols.table ->
+(*------------------------------------------------------------------*)
+let get_def :
+  type a.  SystemExpr.system_expr -> Symbols.table ->
   a Sorts.sort -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp ->
   a Term.term =
-  fun se table sort name args a ->
+  fun system table sort name args a ->
   match sort with
   | Sorts.Message ->
     begin
@@ -60,7 +60,10 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            snd SystemExpr.((descr_of_action table se action).Action.output)
+            let descr = 
+              SystemExpr.descr_of_action table system action 
+            in
+            snd descr.Action.output
           | _ -> assert false
         end
       | Symbols.Frame, _ ->
@@ -80,7 +83,9 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            let descr = SystemExpr.descr_of_action table se action in
+            let descr = 
+              SystemExpr.descr_of_action table system action 
+            in
             begin try
               (* Look for an update of the state macro [name] in the
               updates of [action] *)
@@ -130,7 +135,7 @@ let get_definition :
                 (fun (subst,action) x ->
                    let in_tm =
                      Term.Macro (in_macro,[],
-                                 SystemExpr.action_to_term table se
+                                 SystemExpr.action_to_term table system
                                    (List.rev action))
                    in
                    Term.ESubst (Term.Var x,in_tm) :: subst,
@@ -143,7 +148,7 @@ let get_definition :
               let proj_t proj = Term.pi_term ~projection:proj t in
               (* The expansion of the body of the macro only depends on the
                  projections, not on the system names. *)
-              match se with
+              match system with
               (* the body of the macro is expanded by projecting
                  according to the projection in case of single systems. *)
               | Single (s) -> proj_t (SystemExpr.get_proj s)
@@ -170,7 +175,9 @@ let get_definition :
         begin match a with
           | Action (symb,indices) ->
             let action = Action.of_term symb indices table in
-            let descr = SystemExpr.descr_of_action table se action in
+            let descr = 
+              SystemExpr.descr_of_action table system action 
+            in
             snd Action.(descr.condition)
           | _ -> assert false
         end
@@ -186,15 +193,48 @@ let get_definition :
     end
   | _ -> assert false
 
+(*------------------------------------------------------------------*)
+let get_definition :
+  type a. Constr.trace_cntxt ->
+  a Sorts.sort -> Symbols.macro Symbols.t ->
+  Vars.index list -> Term.timestamp ->
+  a Term.term =
+  fun cntxt sort name args ts ->
+  let ts_action = 
+    if is_defined name ts cntxt.table 
+    then Some ts
+    else match cntxt.models with
+      | Some models -> Constr.find_eq_action models ts
+      | None -> None
+  in
+
+  (* FIXME: we are throwing a tactic error there *)
+  if ts_action = None then
+    Tactics.soft_failure (Tactics.Failure "macro at undetermined action");
+  
+  let ts_action = Utils.oget ts_action in
+
+  (* FIXME: idem + improve error message *)  
+  if not (is_defined name ts_action cntxt.table) then 
+    Tactics.soft_failure (Tactics.Failure "cannot expand this macro");
+
+  let mdef = get_def cntxt.system cntxt.table sort name args ts_action in
+  Term.subst [Term.ESubst (ts_action, ts)] mdef 
+
+
+
+(*------------------------------------------------------------------*)
 let get_dummy_definition :
-  type a. SystemExpr.system_expr -> Symbols.table ->
+  type a. Constr.trace_cntxt ->
   a Sorts.sort -> Symbols.macro Symbols.t ->
   Vars.index list ->
   a Term.term =
-  fun se table sort mn indices ->
-  match Symbols.Macro.get_all mn table with
+  fun cntxt sort mn indices ->
+  match Symbols.Macro.get_all mn cntxt.table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
       let dummy_action = Action.dummy (List.length inputs) in
-      let tdummy_action = SystemExpr.action_to_term table se dummy_action in
-      get_definition se table sort mn indices tdummy_action
+      let tdummy_action = 
+        SystemExpr.action_to_term cntxt.table cntxt.system dummy_action 
+      in
+      get_definition cntxt sort mn indices tdummy_action
     | _ -> assert false

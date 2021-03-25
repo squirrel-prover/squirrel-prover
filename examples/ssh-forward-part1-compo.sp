@@ -43,6 +43,8 @@ In Proceedings of the 2020 ACM SIGSAC Conference on Computer and
 Communications Security, pages 1427–1444, 2020.
 *******************************************************************************)
 
+set autoIntro=false.
+
 abstract ok : message
 abstract ko : message
 abstract forwarded : message
@@ -74,12 +76,12 @@ hash h with oracle forall (m:message,sk:message), sk = hKey
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
- || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> )  (* O_forward *)
+ || exists (i:index, x1:message, x2:message) m=h(((g^a(i),x1),x2), hKey) (* O_PS *)
+ || exists (x:message) m=(forwarded,x) )  (* O_forward *)
   &&
 (sk <> kS
- || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> ) (* O_forward) *)
+ || exists (i:index, x1:message, x2:message) m=h(((x1,g^b(i)),x2), hKey) (* O_PS *)
+ || exists (x:message) m=(forwarded,x) ) (* O_forward) *)
 
 
 (** We first present the general ssh process. *)
@@ -93,7 +95,7 @@ process P =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidP = h(((g^a1,gB),gB^a1), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
     Pok : out(cP, enc(sign(sidP,kP),gB^a1))
@@ -107,8 +109,8 @@ process S =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <pk(kS),sign(sidS, kS)>);
+  let sidS = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, (pk(kS),sign(sidS, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
     Sok : out(cS,ok)
@@ -155,7 +157,7 @@ process Pauth =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidP = h(((g^a1,gB),gB^a1), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
      out(cP, enc(sign(sidP,kP),gB^a1));
@@ -173,8 +175,8 @@ process Sauth =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <pk(kS),sign(sidS, kS)>);
+  let sidS = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, (pk(kS),sign(sidS, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
       out(cS,ok);
@@ -187,7 +189,7 @@ process Sauth =
 system [auth]  K: (Pauth | Sauth).
 
 axiom [auth] hashnotfor :
-  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+  forall (x1,x2:message), h(x1,hKey) <> (forwarded,x2)
 
 (* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True.
@@ -195,47 +197,51 @@ axiom [auth] freshindex : exists (l:index), True.
 
 (** Prove that the condition above the only diff term inside S is never true. **)
 goal [none, auth] P_charac :
-  cond@Pok => (cond@Pfail => False) .
+  happens(Pfail) => cond@Pok => (cond@Pfail => False) .
 Proof.
-  simpl.
-  expand cond@Pok;expand cond@Pfail; expand pkS1@Pok.
-  substitute fst(input@Pok), pk(kS).
-  euf Meq0.
-  expand sidP@Pok.
-  case H1.
-  case H1.
+  intro Hap HcOk HcFail.
+  depends Pok, Pfail => // _.
+  expand cond, pkS1.
+  rewrite (fst(input@Pok) = pk(kS)) in HcOk; 1: auto.
+  destruct HcOk as [_ HcOk].
+  euf HcOk => Euf.
+  destruct Euf as [H [_|[i x1 x2 H1]]]; 1: by auto.  
+  expand sidP1; destruct H1 as [_|[x3 H1]].
+  
+  collision => _; use HcFail with i.
+  by auto.
 
-  collision.
-
-  by use H0 with i.
-
-  by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x2.
-
-  collision.
-
-  use freshindex.
-  use H0 with l.
+  by use hashnotfor with ((g^a1,input@P1),input@P1^a1), x3.
+  
+  intro Heq. 
+  expand sidP1; case Euf; expand sidS1; collision => _;
+  use freshindex as [l _];
+  use HcFail with l. 
+  by auto. 
+  by auto.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
 goal [none, auth] S_charac :
-  cond@Sok => (cond@Sfail => False).
+  happens(Sfail) => cond@Sok => (cond@Sfail => False).
 Proof.
-  intro *.
-  expand cond@Sok; expand cond@Sfail.
-  euf H.
+  intro Hap HcOk HcFail.
+  depends Sok, Sfail => // _.
+  expand cond.
+  expand sidS1; euf HcOk => Euf.
 
-  case H1.
-  case H1.
-  use H0 with i.
+  destruct Euf as [[_|H1] H2]; 1: by auto.
+  destruct H1 as [i x x1 [_|[x2 H1]]].
 
+  use HcFail with i.
   by collision.
 
-  by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
+  by use hashnotfor with ((input@S,g^b1),input@S^b1), x2.
 
-  collision.
-  use freshindex.
-  use H0 with l.
+  intro _; case Euf; expand sidP1; collision => _;
+  use freshindex as [l _];
+  use HcFail with l; 
+  auto.
 Qed.
 
 
@@ -245,31 +251,31 @@ some simple enriching of the induction hypothesis, and then dup applications. *)
 
 equiv [left, auth] [right, auth] auth.
 Proof.
-   enrich a1; enrich b1;
-   enrich seq(i-> b(i)); enrich seq(i-> a(i));
-   enrich kP; enrich kS; enrich hKey.
+   enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
 
    induction t.
 
    (* P *)
-   expandall; fa 7.
+   by expandall; fa 7.
    (* P1 *)
-   expandall; fa 7.
+   by expandall; fa 7.
    (* Pok *)
-   expandall; fa 7.
+   by expandall; fa 7.
    (* Pauth3 *)
    expandall; fa 7.
-   expand seq(i->g^b(i)),i.
+   by expand seq(i->g^b(i)),i. 
    (* Pfail *)
    expand frame@Pfail.
 
    equivalent exec@Pfail, False.
-   expand exec@Pfail.
-   executable pred(Pfail).
-   depends Pok, Pfail.
-   use H1 with Pok.
-   expand exec@Pok.
-   by use P_charac.
+     expand exec. 
+     split; 2: by auto => _.
+     depends Pok, Pfail => // _.
+     executable pred(Pfail); 1,2: by auto.
+     intro He; use He with Pok; 2: by auto.
+   
+     expand exec.
+     by use P_charac.
 
    fa 7; fa 8.
    by noif 8.
@@ -288,17 +294,21 @@ Proof.
 
    (* Sauth3 *)
    expandall; fa 7.
-   expand seq(i->g^a(i)),i.
+   by expand seq(i->g^a(i)),i.
    (* Safil *)
    expand frame@Sfail.
 
+   expand frame@Sfail.
+
    equivalent exec@Sfail, False.
-   expand exec@Sfail.
-   executable pred(Sfail).
-   depends Sok, Sfail.
-   use H1 with Sok.
-   expand exec@Sok.
-   by use S_charac.
+     expand exec. 
+     split; 2: by auto => _.
+     depends Sok, Sfail => // _.
+     executable pred(Sfail); 1,2: by auto.
+     intro He; use He with Sok; 2: by auto.
+   
+     expand exec.
+     by use S_charac.
 
    fa 7; fa 8.
    by noif 8.

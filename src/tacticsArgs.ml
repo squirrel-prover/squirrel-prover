@@ -1,5 +1,7 @@
 module L = Location
 
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 type naming_pat =
   | Unnamed                  (** '_' *)
@@ -21,9 +23,10 @@ and simpl_pat =
   | SNamed of naming_pat
 
 type intro_pattern =
-  | Star     of Location.t    (** '*' *)
-  | Simpl of simpl_pat
-
+  | Star      of Location.t    (** '*' *)
+  | Tryauto   of Location.t    (** '//' *)
+  | Simplify  of Location.t    (** '/=' *)
+  | Simpl     of simpl_pat
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
@@ -47,22 +50,47 @@ and pp_simpl_pat fmt = function
   | SNamed n_ip  -> pp_naming_pat fmt n_ip
 
 let rec pp_intro_pat fmt = function
+  | Simplify _    -> Fmt.pf fmt "/="
+  | Tryauto  _    -> Fmt.pf fmt "//"
   | Star     _    -> Fmt.pf fmt "*"
   | Simpl s_ip -> pp_simpl_pat fmt s_ip
+
 
 let pp_intro_pats fmt args =
   let pp_sep fmt () = Fmt.pf fmt "@ " in
   Fmt.pf fmt "@[<hv 2>%a@]"
     (Fmt.list ~sep:pp_sep pp_intro_pat) args
+
+(*------------------------------------------------------------------*)
+(** handler for intro pattern application *)
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
   
 (*------------------------------------------------------------------*)
+(** Parsed arguments for rewrite *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
+type rw_arg = { 
+  rw_mult : rw_count; 
+  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_type : [`Form of Theory.formula | `Expand of Theory.term];
+}
+
+type rw_in = [`All | `Hyps of lsymb list] option 
+
+(*------------------------------------------------------------------*)
+(** One tactic argument (in the parser) *)
 type parser_arg =
-  | String_name of string
+  | String_name of lsymb
   | Int_parsed  of int
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
+  | RewriteIn   of rw_arg list * rw_in
       
 type ('a, 'b) pair
 
@@ -80,7 +108,7 @@ type _ sort =
   (** Boolean, timestamp or message *)
         
   | Int       : int sort
-  | String    : string sort
+  | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
@@ -96,7 +124,7 @@ type _ arg =
   | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
 
   | Int       : int -> int arg
-  | String    : string -> string arg
+  | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
@@ -264,9 +292,9 @@ let tac_arg_error loc e = raise (TacArgError (loc,e))
     
 (*------------------------------------------------------------------*)
 
-let convert_as_string parser_args = match parser_args with
+let convert_as_lsymb parser_args = match parser_args with
   | [Theory (L.{ pl_desc = App (p,[]) } )] ->
-    Some (L.unloc p) (* TODO: location *)
+    Some p
   | _ -> None
 
 let convert_args table env parser_args tactic_type =
@@ -287,11 +315,12 @@ let convert_args table env parser_args tactic_type =
     | [Theory p], Sort ETerm ->
       let et = match Theory.econvert conv_cntxt tsubst p with
         | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
+        (* FIXME: this does not give any conversion error to the user. *)
         | None -> tac_arg_error (L.loc p) CannotConvETerm in
       Arg et
 
     | [Theory (L.{ pl_desc = App (p,[]) } )], Sort String ->
-      Arg (String (L.unloc p)) (* TODO: location *)
+      Arg (String p) (* TODO: location *)
 
     | [Int_parsed i], Sort Int ->
       Arg (Int i)

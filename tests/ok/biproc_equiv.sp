@@ -6,10 +6,10 @@ system A: in(c,x);out(c,zero);
 
 
 
-goal trivial_if : cond@B => False.
+goal trivial_if : happens(B) => cond@B => False.
 Proof.
-intro Hcond.
-expand cond@B.
+intro Hap Hcond.
+by expand cond@B.
 Qed.
 
 equiv test_left_bis.
@@ -22,8 +22,8 @@ by fa 0.
 expand frame@B.
 fa 0; fa 1.
 expand exec@B.
-equivalent cond@B, False. 
-by intro Hcond; use trivial_if.
+equivalent cond@B, False.
+by expand cond@B; auto. 
 noif 1.
 by auto.
 expand frame@B1.

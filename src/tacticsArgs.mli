@@ -1,6 +1,10 @@
 (** Arguments types for tactics, used to unify the declaration of tactics
    requiring type conversions. *)
 
+module L = Location
+
+type lsymb = Theory.lsymb
+
 (*------------------------------------------------------------------*)
 (** {2 Intro patterns} *)
 
@@ -24,8 +28,10 @@ and simpl_pat =
   | SNamed of naming_pat
 
 type intro_pattern =
-  | Star  of Location.t    (** '*' *)
-  | Simpl of simpl_pat
+  | Star      of Location.t    (** '*' *)
+  | Tryauto   of Location.t    (** '//' *)
+  | Simplify  of Location.t    (** '/=' *)
+  | Simpl     of simpl_pat
 
 (*------------------------------------------------------------------*)
 val pp_naming_pat : Format.formatter -> naming_pat         -> unit
@@ -34,19 +40,45 @@ val pp_simpl_pat  : Format.formatter -> simpl_pat          -> unit
 val pp_intro_pat  : Format.formatter -> intro_pattern      -> unit
 val pp_intro_pats : Format.formatter -> intro_pattern list -> unit
   
+
+(*------------------------------------------------------------------*)
+(** handler for intro pattern application *)
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
+
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)
-  
+
+(*------------------------------------------------------------------*)
+(** Parsed arguments for rewrite *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
+type rw_arg = { 
+  rw_mult : rw_count;
+  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_type : [
+    | `Form   of Theory.formula   (* formula or hypothesis ident *)
+    | `Expand of Theory.term      (* term or macro name *)
+  ];
+}
+
+type rw_in = [`All | `Hyps of lsymb list] option 
+
+(*------------------------------------------------------------------*)  
 (** Types used during parsing. 
     Note that all tactics not defined in the parser must rely on the Theory 
     type, even to parse strings. *)
 type parser_arg =
-  | String_name of string
+  | String_name of lsymb
   | Int_parsed  of int
   | Theory      of Theory.term
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
+  | RewriteIn   of rw_arg list * rw_in
       
 (** Tactic arguments sorts *)
 type _ sort =
@@ -61,7 +93,7 @@ type _ sort =
   (** Boolean, timestamp or message *)
 
   | Int       : int sort
-  | String    : string sort
+  | String    : lsymb sort
   | Pair      : ('a sort * 'b sort) -> ('a * 'b) sort
   | Opt       : 'a sort -> ('a option) sort
 
@@ -78,7 +110,7 @@ type _ arg =
   (** A [Term.term] with its sorts. *)
         
   | Int       : int -> int arg
-  | String    : string -> string arg
+  | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
 
@@ -100,7 +132,7 @@ val pp_esort : Format.formatter -> esort -> unit
 (*------------------------------------------------------------------*)
 (** {2 Argument conversion} *)
 
-val convert_as_string : parser_arg list -> string option
+val convert_as_lsymb : parser_arg list -> lsymb option
   
 val convert_args :
   Symbols.table -> Vars.env ->

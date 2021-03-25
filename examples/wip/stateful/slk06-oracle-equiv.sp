@@ -22,6 +22,8 @@ R -> T : h(ID,PIN)
 Trying to prove the secret of the states with an equivalence.
 *******************************************************************************)
 
+set autoIntro=false.
+
 abstract ok : message
 abstract error : message
 
@@ -83,55 +85,35 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
         | !_kk (in(c,m); out(c,h2(m,key2)))
         | !_kk (in(c,m); out(c,h3(m,key3)))).
 
-equiv strong_sec (t,t':timestamp,ii:index) : frame@t, diff(kR(ii)@t',fresh).
+equiv strong_sec (t,t':timestamp,ii:index) : [happens(t,t')] -> frame@t, diff(kR(ii)@t',fresh).
 Proof.
+intro Hap.
 induction t.
 
 (* case t = init *)
 induction t'.
-(* case t' = init *)
-equivalent kR(ii)@init,idinit(ii).
-expand frame@init.
-fresh 0. yesif 0.
-(* case t' = R1(jj,ii1) *)
-admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)
+  (* case t' = init *)
+  equivalent kR(ii)@init,idinit(ii); 1: auto.
+  expand frame@init.
+  fresh 0. 
+  yesif 0. auto.
+  (* case t' = R1(jj,ii1) *)
+  admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)
+  (* case t' = ... *)
+  admit. admit. admit. admit. admit. admit. admit. admit. admit.
 
 (* case t = R(jj) *)
-expandall.
-fa 0. fa 1. fa 1. fa 1.
-admit 2. (* traiter le cas de TSnext ??? *)
-prf 1.
-yesif 1.
-project.
-split.
-admit. (* ??? *)
-split.
-admit. (* ??? *)
-admit. (* ok, monotonicity of TS *)
-split.
-admit. (* ok, monotonicity of TS *)
-split.
-admit. (* ??? *)
-admit. (* ??? *)
-fresh 1.
+admit.
 
 (* case t = R1(jj,ii1) *)
 expandall.
 fa 0. fa 1. fa 2.
 admit 1. (* on a besoin de cond => honest pour faire du FADUP ??? or on a besoin du secret pour prouver cond => honest... *)
 prf 1.
-yesif 1. project.
-split.
-admit.
-split.
-admit. (* ok, monotonicity of kR *)
-admit.
-split.
-admit.
-split.
-admit. (* ok, monotonicity of kR *)
+yesif 1. 
 admit.
 fresh 1.
+admit.
 
 (* case t = R2(jj) *)
 admit. (* similar to R1(jj,ii1) *)
@@ -143,13 +125,9 @@ admit.
 admit.
 
 (* case t = T2(i,j) *)
-expandall.
-fa 0. fa 1.
 admit.
 
 (* case t = T3(i,j) *)
-expandall.
-fa 0. fa 1.
 admit.
 
 (* case t = A(kk) *)

@@ -4,7 +4,7 @@ BASIC HASH
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 
-T --> R : <nT, h(nT,kT)>
+T --> R : (nT, h(nT,kT))
 R --> T : ok
 *******************************************************************************)
 
@@ -21,7 +21,7 @@ channel cR
 
 process tag(i:index,k:index) =
   new nT;
-  out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>)
+  out(cT, (nT, h(nT,diff(key(i),key'(i,k)))))
 
 process reader(j:index) =
   in(cT,x);
@@ -36,10 +36,11 @@ system ((!_j R: reader(j)) | (!_i !_k T: tag(i,k))).
 
 goal wa_R :
   forall (j:index),
-    cond@R(j) <=>
-    (exists (i,k:index), T(i,k) < R(j) &&
-      fst(output@T(i,k)) = fst(input@R(j)) &&
-      snd(output@T(i,k)) = snd(input@R(j))).
+    happens(R(j)) =>
+    (cond@R(j) <=>
+      (exists (i,k:index), T(i,k) < R(j) &&
+       fst(output@T(i,k)) = fst(input@R(j)) &&
+       snd(output@T(i,k)) = snd(input@R(j)))).
 Proof.
   intro *.
   expand cond@R(j).
@@ -54,13 +55,14 @@ Qed.
 
 goal wa_R1 :
   forall (j:index),
+    happens(R1(j)) =>
     cond@R1(j) <=>
     (not(exists (i,k:index), T(i,k) < R1(j) &&
       fst(output@T(i,k)) = fst(input@R1(j)) &&
       snd(output@T(i,k)) = snd(input@R1(j)))).
 Proof.
   intro *.
-  expand cond@R1(j).
+  expand cond.
   split.
   use H. exists i,k.
   use H.

@@ -1,3 +1,5 @@
+module L = Location
+
 type tac_error =
   | More
   | Failure of string
@@ -8,7 +10,6 @@ type tac_error =
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
-  | Undefined of string
   | NotDDHContext
   | SEncNoRandom
   | SEncSharedRandom
@@ -18,6 +19,7 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | GoalBadShape of string
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -26,6 +28,15 @@ type tac_error =
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | NothingToRewrite
+  | BadRewriteRule
+  | MustHappen of Term.timestamp
+  | NotHypothesis
+
+  | NoCollision
+
+  | HypAlreadyExists of string
+  | HypUnknown of string
 
   | PatNumError of int * int    (* given, need *)
                    
@@ -44,14 +55,18 @@ let tac_error_strings =
     (NoReflMacros , "NoReflMacros");
     (TacTimeout, "TacTimeout");
     (CannotConvert, "CannotConvert");
+    (NotHypothesis, "NotHypothesis");
+    (NoCollision, "NoCollision");
+    (GoalNotClosed, "GoalNotClosed");
     (DidNotFail, "DidNotFail");
-    (NothingToIntroduce, "NothingToIntroduce")]
+    (NothingToIntroduce, "NothingToIntroduce");
+    (NothingToRewrite, "NothingToRewrite");
+    (BadRewriteRule, "BadRewriteRule")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
   | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
   | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
-  | Undefined s -> "Undefined, "^s
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | More
   | NotEqualArguments
@@ -68,11 +83,19 @@ let rec tac_error_to_string = function
   | CannotConvert
   | CongrFail
   | NothingToIntroduce
+  | NothingToRewrite
+  | BadRewriteRule
+  | GoalNotClosed
+  | NotHypothesis
+  | NoCollision
   | DidNotFail as e -> List.assoc e tac_error_strings
-  | SystemExprError _ -> "SystemExpr_Error"
-  | SystemError _ -> "System_Error"
-  | GoalNotClosed -> "GoalNotClosed"
-  | PatNumError _ -> "PatNumError"
+  | HypAlreadyExists _ -> "HypAlreadyExists"
+  | HypUnknown       _ -> "HypUnknown"
+  | SystemExprError  _ -> "SystemExpr_Error"
+  | GoalBadShape     _ -> "GoalBadShape"
+  | SystemError      _ -> "System_Error"
+  | PatNumError      _ -> "PatNumError"
+  | MustHappen       _ -> "MustHappen"
 
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"
@@ -87,7 +110,6 @@ let rec pp_tac_error ppf = function
   | NoSSC ->
       Fmt.pf ppf
         "no key which satisfies the syntactic condition has been found"
-  | Undefined x -> Fmt.pf ppf "undefined use of %s" x
   | NotDepends (a, b) ->
       Fmt.pf ppf "action %s does not depend on action %s" a b
   | NoAssumpSystem ->
@@ -114,11 +136,38 @@ let rec pp_tac_error ppf = function
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
   | GoalNotClosed -> Fmt.pf ppf "cannot close goal"
+
   | CongrFail -> Fmt.pf ppf "congruence closure failed"
+
   | NothingToIntroduce ->
     Fmt.pf ppf "nothing to introduce"
+
+  | NothingToRewrite ->
+    Fmt.pf ppf "nothing to rewrite"
+
+  | BadRewriteRule ->
+    Fmt.pf ppf "invalid rewriting: rhs variables are not all bound by the lhs"
+
+  | GoalBadShape s ->
+    Fmt.pf ppf "goal has the wrong shape: %s" s
+
   | PatNumError (give, need) ->
     Fmt.pf ppf "invalid number of patterns (%d given, %d needed)" give need
+
+  | MustHappen t ->
+    Fmt.pf ppf "timestamp %a must happen" Term.pp t
+
+  | NotHypothesis ->
+    Fmt.pf ppf "the conclusion does not appear in the hypotheses"
+
+  | HypAlreadyExists s ->
+    Fmt.pf ppf "an hypothesis named %s already exists" s     
+
+  | HypUnknown s ->
+    Fmt.pf ppf "unknown hypothesis %s" s
+
+  | NoCollision ->
+    Fmt.pf ppf "no collision found" 
 
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in
@@ -134,23 +183,30 @@ let rec tac_error_of_strings = function
     )
   | "AndThenFailure"::q -> AndThen_Failure (tac_error_of_strings q)
   | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
-  | ["Undefined"; s] -> Undefined s
   | _ ->  raise (Failure "exception name unknown")
 
+exception Tactic_soft_failure of L.t option * tac_error
 
-exception Tactic_soft_failure of tac_error
+exception Tactic_hard_failure of L.t option * tac_error
 
-exception Tactic_hard_failure of tac_error
+let soft_failure ?loc e = raise (Tactic_soft_failure (loc,e))
+let hard_failure ?loc e = raise (Tactic_hard_failure (loc,e))
 
 let () =
+  let s_lopt = function
+    | None   -> ""
+    | Some l -> "at " ^ (L.tostring l)
+  in
+  
   Printexc.register_printer
     (function
-       | Tactic_hard_failure e ->
+       | Tactic_hard_failure (l,e) ->
+           Some (Format.sprintf "Tactic_hard_failure(%s) at %s" 
+                   (tac_error_to_string e) (s_lopt l))
+       | Tactic_soft_failure (l,e) ->
            Some
-             (Format.sprintf "Tactic_hard_failure(%s)" (tac_error_to_string e))
-       | Tactic_soft_failure e ->
-           Some
-             (Format.sprintf "Tactic_soft_failure(%s)" (tac_error_to_string e))
+             (Format.sprintf "Tactic_soft_failure(%s) at %s"
+                (tac_error_to_string e) (s_lopt l))
        | _ -> None)
 
 type a
@@ -161,9 +217,46 @@ type 'a sk = 'a -> fk -> a
 
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(*------------------------------------------------------------------*)
+let run : 'a tac -> 'a -> 'a list = fun tac a ->
+  let exception Done in
+  let found = ref None in
+
+  let fk _ = assert false in
+  let sk res _ = found := Some res; raise Done in
+
+  try ignore (tac a sk fk : a); assert false 
+  with Done -> Utils.oget !found
+  
+(*------------------------------------------------------------------*)
 (** Selector for tactic *)
 type selector = int list
 
+let check_sel sel_tacs l =
+  (* check that there a no selector for non-existing goal *)
+  let max_list l = match l with
+    | [] -> assert false
+    | a :: l -> List.fold_left max a l
+  in
+  let max_sel = 
+    List.fold_left (fun m (sel,_) -> 
+        max m (max_list sel)
+      ) 0 sel_tacs in
+  if max_sel > List.length l then 
+    hard_failure (Failure ("no goal " ^ string_of_int max_sel));
+
+  (* check that selectors are disjoint *)
+  let all_sel = List.fold_left (fun all (s,_) -> s @ all) [] sel_tacs in
+  let _ = 
+    List.fold_left (fun acc s ->
+        if List.mem s acc then
+          hard_failure 
+            (Failure ("selector " ^ string_of_int s ^ " appears twice"));
+        s :: acc
+      ) [] all_sel in
+  ()
+
+(*------------------------------------------------------------------*)
 (** Basic Tactics *)
 
 let fail sk fk = fk (Failure "fail")
@@ -180,18 +273,20 @@ let map t l sk fk =
           fk
   in aux [] l fk
 
-
 (** Like [map], but only apply the tactic to selected judgements. *)
-let map_sel (sel : selector) t l sk fk =
+let map_sel sel_tacs l sk fk =
+  check_sel sel_tacs l;         (* check user input *)
+
   let rec aux i acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
-      if List.mem i sel then
+      match List.find_opt (fun (sel,_) -> List.mem i sel) sel_tacs with
+      | Some (_,t) ->
         t e
           (fun r fk ->
              aux (i + 1) (List.rev_append r acc) l fk)
           fk
-      else aux (i + 1) (e :: acc) l fk
+      | None -> aux (i + 1) (e :: acc) l fk
   in aux 1 [] l fk
 
 let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
@@ -211,19 +306,18 @@ let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
   tac1 judge sk fk
 
 let rec andthen_list = function
-  | [] -> raise (Tactic_hard_failure (Failure "empty anthen_list"))
+  | [] -> hard_failure (Failure "empty anthen_list")
   | [t] -> t
   | t::l -> andthen t (andthen_list l)
 
-let andthen_sel tac1 sel tac2 judge sk fk : a =
-  let sk l fk' = map_sel sel tac2 l sk fk' in
+let andthen_sel tac1 sel_tacs judge sk fk : a =
+  let sk l fk' = map_sel sel_tacs l sk fk' in
   tac1 judge sk fk
 
-(* TODO: add an auto at the end of the tactic. *)
 let by_tac tac judge sk fk =
   let sk l fk = match l with
     | [] -> sk [] fk
-    | _ -> raise (Tactic_soft_failure GoalNotClosed) in
+    | _ -> soft_failure GoalNotClosed in
   tac judge sk fk
 
 let id j sk fk = sk [j] fk
@@ -236,14 +330,18 @@ let try_tac t j sk fk =
 
 let checkfail_tac exc t j sk fk =
   try
-    let sk l fk = raise (Tactic_soft_failure DidNotFail) in
+    let sk l fk = soft_failure DidNotFail in
     t j sk fk
-  with Tactic_soft_failure e when e = exc -> sk [j] fk
-     | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
-     | Tactic_soft_failure (Failure _) when exc=Failure "" -> sk [j] fk
-     | Tactic_soft_failure e
-     | Tactic_hard_failure e ->
-       raise (Tactic_hard_failure (FailWithUnexpected e))
+  with 
+  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc -> 
+    sk [j] fk
+  | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
+  | (Tactic_soft_failure (_, Failure _) |
+     Tactic_hard_failure (_, Failure _) )
+    when exc=Failure "" -> sk [j] fk
+  | Tactic_soft_failure (l,e)
+  | Tactic_hard_failure (l,e) ->
+    raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
 let repeat t j sk fk =
   let rec aux j sk fk =
@@ -318,7 +416,7 @@ end
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen : 'a ast list -> 'a ast
-  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
+  | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse : 'a ast list -> 'a ast
   | Try : 'a ast -> 'a ast
   | Repeat : 'a ast -> 'a ast
@@ -355,10 +453,14 @@ module AST (M:S) = struct
   let rec eval modifiers = function
     | Abstract (id,args)  -> eval_abstract modifiers id args
     | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
-    | AndThenSel (t,s,t') -> andthen_sel (eval modifiers t) s (eval modifiers t')
+    | AndThenSel (t,tl)   -> 
+      let tl = List.map (fun (s,t') -> s, (eval modifiers t')) tl in
+      andthen_sel (eval modifiers t) tl
+
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
-    | By t                -> by_tac (eval modifiers t)
+    | By t                -> 
+      andthen_list [eval modifiers t; eval [] (Abstract ("auto",[]))] 
     | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
     | Modifier (id,t)     -> eval (id::modifiers) t
@@ -382,12 +484,23 @@ module AST (M:S) = struct
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
         
-    | AndThenSel (t,s,t') ->
-      Fmt.pf ppf "@[(%a;@ %a: %a)@]"
+    | AndThenSel (t,l) ->
+      let pp_sel_tac fmt (sel,s) = 
+        Fmt.pf ppf "@[%a: %a@]"
+          pp t 
+          (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) sel
+      in
+      let pp_sel_tacs fmt l = match l with
+        | [(sel,s)] -> pp_sel_tac fmt (sel, s)
+        | _ -> 
+          Fmt.pf fmt "@[[%a]@]"
+            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "|") pp_sel_tac) l
+      in
+          
+      Fmt.pf ppf "@[(%a;@ %a)@]"
         pp t 
-        (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) s
-        pp t'
-        
+        pp_sel_tacs l
+
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
@@ -411,15 +524,12 @@ module AST (M:S) = struct
     let tac = eval [] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
-    let fk tac_error = raise @@ Tactic_soft_failure tac_error in
+    let fk tac_error = soft_failure tac_error in
     let sk l _ = raise (Return l) in
     try ignore (tac j sk fk) ; assert false with Return l -> l
 
 end
 
-
-let soft_failure e = raise (Tactic_soft_failure e)
-let hard_failure e = raise (Tactic_hard_failure e)
 
 let timeout_get = function
   | Utils.Result a -> a

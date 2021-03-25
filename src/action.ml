@@ -70,7 +70,7 @@ let define_symbol table symb args action =
   Symbols.Action.define table symb ~data (List.length args)
 
 let find_symbol s table =
-  match Symbols.Action.data_of_string s table with
+  match Symbols.Action.data_of_lsymb s table with
     | Data (x,y) -> x,y
     | _ -> assert false
 
@@ -78,6 +78,10 @@ let of_symbol s table =
   match Symbols.Action.get_data s table with
     | Data (x,y) -> x,y
     | _ -> assert false
+
+let arity s table = 
+  let l,_ = of_symbol s table in
+  List.length l
 
 let iter f table =
   Symbols.Action.iter

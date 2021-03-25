@@ -1,22 +1,14 @@
 open Utils
-open Atom
 
 module Args = TacticsArgs
-  
-type hyp_error =
-  | HypAlreadyExists of string
-  | HypUnknown of string
-      
-exception Hyp_error of hyp_error
-                     
-let hyp_error e = raise (Hyp_error e)
 
-let pp_hyp_error fmt = function
-  | HypAlreadyExists s ->
-    Fmt.pf fmt "an hypothesis named %s already exists" s     
-  | HypUnknown s ->
-    Fmt.pf fmt "unknown hypothesis %s" s     
+module L = Location
+module T = Tactics
 
+(*------------------------------------------------------------------*)
+(* For debugging *)
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
 
 (*------------------------------------------------------------------*)
 let get_ord (at : Term.generic_atom ) : Term.ord option = match at with
@@ -50,159 +42,17 @@ let choose_name f = match f with
 
   | _ -> "H"
 
-(*------------------------------------------------------------------*)  
-type hyp = Term.formula
-                
-let pp_hyp fmt f = Term.pp fmt f
-                         
-type ldecl = Ident.t * hyp
+(*------------------------------------------------------------------*)
+module FHyp = struct
+  type t = Term.formula
+  let pp_hyp fmt f = Term.pp fmt f
 
-let pp_ldecl ?(dbg=false) ppf (id,hyp) =
-  Fmt.pf ppf "%a: %a@;"
-    (if dbg then Ident.pp_full else Ident.pp) id
-    pp_hyp hyp
-    
-module H : sig
-  type hyps
-
-  val empty : hyps
-
-  val is_hyp : Term.formula -> hyps -> bool
-    
-  val by_id   : Ident.t -> hyps -> hyp
-  val by_name : string  -> hyps -> ldecl
-
-  val hyp_by_name : string  -> hyps -> hyp
-  val id_by_name  : string  -> hyps -> Ident.t
-
-  val fresh_id : string -> hyps -> Ident.t
-  val fresh_ids : string list -> hyps -> Ident.t list
-  
-  val add : force:bool -> Ident.t -> hyp -> hyps -> Ident.t * hyps
-
-  val find_opt : (Ident.t -> hyp -> bool) -> hyps -> ldecl option
-  val find_all : (Ident.t -> hyp -> bool) -> hyps -> ldecl list
-
-  val find_map : (Ident.t -> hyp -> 'a option) -> hyps -> 'a option
-    
-  val exists : (Ident.t -> hyp -> bool) -> hyps -> bool
-    
-  val remove : Ident.t -> hyps -> hyps
-
-  val filter : (Ident.t -> hyp -> bool) -> hyps -> hyps
-
-  val to_list : hyps -> ldecl list
-
-  val mem_id   : Ident.t -> hyps -> bool
-  val mem_name : string  -> hyps -> bool
-
-  val map :  (hyp ->  hyp) -> hyps -> hyps
-
-  val fold : (Ident.t -> Term.formula -> 'a -> 'a) -> hyps -> 'a -> 'a
-    
-  val pps : ?dbg:bool -> Format.formatter -> hyps -> unit
-
-end = struct 
-  module Mid = Ident.Mid
-
-  (* We are using maps from idents to hypothesis, though we do not exploit
-     much that map structure. *)
-  type hyps = hyp Mid.t
-  
-  let empty =  Mid.empty
-
-  let pps ?(dbg=false) ppf hyps =
-    let pp_sep fmt () = Fmt.pf ppf "" in
-    Fmt.pf ppf "@[<v 0>%a@]"
-      (Fmt.list ~sep:pp_sep (pp_ldecl ~dbg)) (Mid.bindings hyps)
-      
-  let find_opt func hyps =
-    let exception Found of Ident.t * hyp in
-    try
-      Mid.iter (fun id a ->
-          if func id a then raise (Found (id,a)) else ()
-        ) hyps ;
-      None
-    with Found (id,a) -> Some (id,a)
-
-  let find_map (func : Ident.t -> Term.formula -> 'a option) hyps = 
-    let exception Found in
-    let found = ref None in
-    try
-      Mid.iter (fun id a -> match func id a with
-          | None -> ()
-          | Some _ as res -> found := res; raise Found
-        ) hyps ;
-      None
-    with Found -> !found
-
-  let by_id id hyps =
-    try Mid.find id hyps
-    with Not_found -> hyp_error (HypUnknown (Ident.to_string id))
-  (* the latter case should not happen *)
-
-  let by_name name hyps =
-    match find_opt (fun id _ -> Ident.name id = name) hyps with
-    | Some (id,f) -> id, f
-    | None -> hyp_error (HypUnknown name)
-
-  let hyp_by_name name hyps = snd (by_name name hyps)
-  let id_by_name name hyps  = fst (by_name name hyps)
-
-  let filter f hyps = Mid.filter (fun id a -> f id a) hyps
- 
-  let find_all f hyps = Mid.bindings (filter f hyps)
-
-  let exists f hyps = Mid.exists f hyps
-
-  let is_hyp f hyps = exists (fun _ f' -> f = f') hyps
-      
-  let remove id hyps = Mid.remove id hyps
-
-  let to_list hyps = Mid.bindings hyps
-    
-  (* Note: "_" is always fresh, to allow several unnamed hypotheses. *)
-  let is_fresh name hyps =
-    name = "_" || Mid.for_all (fun id' _ -> Ident.name id' <> name) hyps
-      
-  let fresh_id name hyps =
-    let rec aux n =
-      let s = name ^ string_of_int n in
-      if is_fresh s hyps
-      then s
-      else aux (n+1)
-    in
-    let name = if is_fresh name hyps then name else aux 0
-    in
-    Ident.create name
-
-  let fresh_ids names hyps =
-    let ids, _ = List.fold_left (fun (ids,hyps) name ->
-        let id = fresh_id name hyps in
-        (* We add the id to [hyps] to reserve the name *)
-        (id :: ids, Mid.add id Term.True hyps)
-      ) ([], hyps) names in
-    List.rev ids
-    
-  let add ~force id hyp hyps =
-    assert (not (Mid.mem id hyps)); 
-
-    if not (is_fresh (Ident.name id) hyps) then
-      hyp_error (HypAlreadyExists (Ident.name id));
-
-    match find_opt (fun _ hyp' -> hyp = hyp') hyps with
-    | Some (id',_) when not force -> id', hyps  
-    | _ -> id, Mid.add id hyp hyps
-  
-  let mem_id id hyps = Mid.mem id hyps
-  let mem_name name hyps =
-    Mid.exists (fun id' _ -> Ident.name id' = name) hyps
-  
-  let map f hyps = Mid.map (fun h -> f h) hyps
-
-  let fold func hyps init = Mid.fold func hyps init 
+  let htrue = Term.True
 end
 
+module H = Hyps.Mk(FHyp)
+
+(*------------------------------------------------------------------*)
 module S : sig
   type t = private {
     system : SystemExpr.system_expr ;
@@ -215,21 +65,7 @@ module S : sig
     (** Hypotheses *)
     
     conclusion : Term.formula;
-    (** The conclusion / right-hand side formula of the sequent. *)
-    
-    trs : Completion.state option ref;
-    (** Either [None], or the term rewriting system
-      * corresponding to the current message hyps.
-      * Must be se to [None] if message hyps change. 
-      * We use a reference to try to share the TRS accross 
-      * multiple sequents. *)
-    
-    models : Constr.models option ref;
-    (** Either [None], or the models corresponding to the current
-      * trace hyps.
-      * Must be set to [None] if trace hyps change. 
-      * We use a reference to try to share the models accross 
-      * multiple sequents. *)
+    (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
   val init_sequent : SystemExpr.system_expr -> Symbols.table -> t
@@ -245,17 +81,7 @@ module S : sig
     ?env:Vars.env ->
     ?hyps:H.hyps ->
     ?conclusion:Term.formula ->
-    ?keep_trs:bool ->
-    ?keep_models:bool -> 
     t -> t
-
-  (** Set the trs of a sequent. 
-      Raise [Invalid_argument ..] if already set. *)
-  val set_trs : t -> Completion.state -> unit
-
-  (** Set the models of a sequent. 
-      Raise [Invalid_argument ..] if already set. *)
-  val set_models : t -> Constr.models -> unit
 end = struct
   type t = {
     system       : SystemExpr.system_expr ;
@@ -263,8 +89,6 @@ end = struct
     env          : Vars.env;
     hyps         : H.hyps;
     conclusion   : Term.formula;
-    trs          : Completion.state option ref;
-    models       : Constr.models option ref;
   }
 
   let init_sequent system table = {
@@ -273,21 +97,9 @@ end = struct
     env          = Vars.empty_env;
     hyps         = H.empty;
     conclusion   = Term.True;
-    trs          = ref None;
-    models       = ref None;
   }
 
-  let update ?system ?table ?env ?hyps
-      ?conclusion ?(keep_trs=false) ?(keep_models=false) t =
-    let trs = 
-      if keep_trs || hyps = None 
-      then t.trs 
-      else ref None 
-    and models =
-      if keep_models || hyps = None 
-      then t.models
-      else ref None 
-    in
+  let update ?system ?table ?env ?hyps ?conclusion t =
     let system       = Utils.odflt t.system system
     and table        = Utils.odflt t.table table
     and env          = Utils.odflt t.env env
@@ -297,17 +109,7 @@ end = struct
       table = table ;
       env = env ;
       hyps = hyps ;
-      conclusion = conclusion ;
-      trs = trs ;
-      models = models ; }
-  
-  let set_trs t trs = match !(t.trs) with
-    | None -> t.trs := Some trs
-    | Some _ -> raise (Invalid_argument "traceSequent: trs already set")
-
-  let set_models t models = match !(t.models) with
-    | None -> t.models := Some models
-    | Some _ -> raise (Invalid_argument "traceSequent: models already set")
+      conclusion = conclusion ; } 
 end
 
 include S
@@ -329,12 +131,136 @@ let pp ppf s =
   (* Print conclusion formula and close box. *)
   pf ppf "@;%a@]" Term.pp s.conclusion
 
+
+(*------------------------------------------------------------------*)
+let rec simpl_form acc hyp = 
+  match hyp with
+  | Term.And (f,g) -> simpl_form (simpl_form acc f) g
+
+  | _ as f -> f :: acc
+
+(*------------------------------------------------------------------*)
+let get_atoms (s : sequent) : Term.literal list =
+  let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
+  List.fold_left (fun atoms hyp -> match hyp with 
+      | Term.Atom at -> (`Pos, at) :: atoms
+      | Term.(Not (Atom at)) -> (`Neg, at) :: atoms
+      | _ -> atoms
+    ) [] hyps 
+
+let get_message_atoms (s : sequent) : Term.message_atom list =
+  let do1 (at : Term.literal) : Term.message_atom option =
+    match at with 
+    | `Pos, (`Message _ as at) -> Some at
+    | `Neg, (`Message _ as at) -> Some (Term.not_message_atom at)
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms s)
+
+let get_trace_literals (s : sequent) : Term.trace_literal list =
+  let do1 (at : Term.literal) : Term.trace_literal option =
+    match at with 
+    | x, Term.(#trace_atom as at) -> Some (x, at)
+    | _ -> None
+  in
+  List.filter_map do1 (get_atoms s)
+
+let get_eq_atoms (s : sequent) : Term.eq_atom list =
+  let do1 (at : Term.literal) : Term.eq_atom option =
+    match at with               (* FIXME: improve this *)
+    | `Pos, Term.(#message_atom as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Pos, Term.(#index_atom as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Pos, Term.(`Timestamp ((`Eq | `Neq), _, _) as at) -> 
+      Some (at :> Term.eq_atom)
+
+    | `Neg, Term.(#message_atom as at) -> 
+      Some (Term.not_message_atom at :> Term.eq_atom)
+
+    | `Neg, Term.(#index_atom as at) -> 
+      Some (Term.not_index_atom at :> Term.eq_atom)
+
+    | `Neg, Term.(`Timestamp (`Eq, a, b)) -> 
+      Some (`Timestamp (`Neq, a,b) :> Term.eq_atom)
+
+    | `Neg, Term.(`Timestamp (`Neq, a, b)) -> 
+      Some (`Timestamp (`Eq, a,b) :> Term.eq_atom)
+
+    | _, `Happens _ 
+    | _, `Timestamp ((`Leq | `Geq | `Lt | `Gt), _, _) -> None
+  in
+  List.filter_map do1 (get_atoms s) 
+
+
+(*------------------------------------------------------------------*)
+(** Prepare constraints or TRS query *)
+
+let get_models s : Constr.models timeout_r =
+  let trace_literals = get_trace_literals s in
+  Constr.models_conjunct trace_literals 
+
+let query ~precise s q =
+  let models = T.timeout_get (get_models s) in
+  Constr.query ~precise models q
+
+let query_happens ~precise s a = query ~precise s [`Pos, `Happens a]
+
+let maximal_elems ~precise s tss =
+  match get_models s with
+  | Result models -> Result (Constr.maximal_elems ~precise models tss)
+  | Timeout -> Timeout
+
+let get_ts_equalities ~precise s =
+  match get_models s with
+  | Result models ->
+    let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
+             |>  Atom.trace_atoms_ts in
+    Result (Constr.get_ts_equalities ~precise models ts)
+  | Timeout -> Timeout
+
+let get_ind_equalities ~precise s =
+  match get_models s with
+  | Result models ->
+    let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
+               |> Atom.trace_atoms_ind in
+    Result (Constr.get_ind_equalities ~precise models inds)
+  | Timeout -> Timeout    
+
+let constraints_valid s =
+  match get_models s with
+  | Result models -> Result (not (Constr.m_is_sat models))
+  | Timeout -> Timeout
+
+(*------------------------------------------------------------------*)
+let get_all_messages s =
+  let atoms = get_message_atoms s in
+  let atoms =
+    match s.conclusion with
+      | Term.Atom (`Message _ as atom) -> atom :: atoms
+      | _ -> atoms
+  in
+  List.fold_left (fun acc (`Message (_,a,b)) -> a :: b :: acc) [] atoms
+
 (*------------------------------------------------------------------*)  
-module Hyps = struct
+module Hyps 
+  (* : Hyps.HypsSeq with type hyp = Term.formula and type sequent = t *)
+= struct
+  type sequent = t
+
+  type hyp = Term.formula
+
+  type ldecl = Ident.t * hyp
+
+  let pp_hyp = Term.pp 
+  let pp_ldecl = H.pp_ldecl
+
   let fresh_id ?(approx=false) name s =
     let id = H.fresh_id name s.hyps in
     if (not approx) && Ident.name id <> name && name <> "_"
-    then hyp_error (HypAlreadyExists name) 
+    then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name) 
     else id
 
   let fresh_ids ?(approx=false) names s =
@@ -344,7 +270,7 @@ module Hyps = struct
       begin
         List.iter2 (fun id name ->
             if Ident.name id <> name && name <> "_"
-            then hyp_error (HypAlreadyExists name)
+            then Hyps.hyp_error ~loc:None (T.HypAlreadyExists name)
           ) ids names;
         ids
       end
@@ -353,6 +279,8 @@ module Hyps = struct
 
   let by_id   id s = H.by_id   id s.hyps
   let by_name id s = H.by_name id s.hyps
+
+  let to_list s = H.to_list s.hyps
 
   let mem_id   id s = H.mem_id   id s.hyps
   let mem_name id s = H.mem_name id s.hyps
@@ -363,101 +291,99 @@ module Hyps = struct
       
   let exists func s = H.exists func s.hyps
 
-  class iter_macros ~system table f = object (self)
-    inherit Iter.iter ~system table as super
+  class iter_macros ~cntxt f = object (self)
+    inherit Iter.iter ~cntxt as super
     method visit_message t =
       match t with
       | Term.Macro ((m,sort,is),[],a) ->
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
             (Term.get_vars t) &&
-           Macros.is_defined m a table
+           Macros.is_defined m a cntxt.table
         then
-          let def = Macros.get_definition system table sort m is a in
-          f t def ;
+          let def = Macros.get_definition cntxt sort m is a in
+          f a (`Message (t, def)) ;
           self#visit_message def
       | t -> super#visit_message t
-    method visit_formula f =
-      (* Do not visit macros. When a macro formula is defined we could add
-       * an hyp stating the equivalence between the macro and its
-       * expansion. But we'll probably take care of that later as part of a
-       * larger redesign of the macro expansion system. *)
-      match f with
-      | Term.Macro ((m,sort,is),[],a) -> ()
+    method visit_formula t = 
+      match t with
+      | Term.Macro ((m,sort,is),[],a) -> 
+        if List.for_all
+            Vars.(function EVar v -> not (is_new v))
+            (Term.get_vars t) &&
+           Macros.is_defined m a cntxt.table
+        then
+          let def = Macros.get_definition cntxt sort m is a in
+          f a (`Boolean (t, def)) ;
+          self#visit_formula def
       | t -> super#visit_formula t
   end
 
   (** Add to [s] equalities corresponding to the expansions of all macros
-    * occurring in [at]. *)
-  let rec add_macro_defs (s : sequent) at =
-    let macro_eqs : message_atom list ref = ref [] in
+    * occurring in [f], if [f] happened. *)
+  let rec add_macro_defs (s : sequent) f =
+    let macro_eqs : (Term.timestamp * Term.formula) list ref = ref [] in
+    let cntxt = Constr.{ 
+        table = s.table;
+        system = s.system;
+        models = None;
+      } in
+        
     let iter =
       new iter_macros
-        ~system:s.system
-        s.table
-        (fun t t' -> macro_eqs := `Message (`Eq,t,t') :: !macro_eqs) in
+        ~cntxt
+        (fun a el -> match el with
+           |`Message (t,t') ->
+             macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs
+           |`Boolean (f,f') -> () (* TODO: add that f <=> f' *)
+        ) in
     
-    iter#visit_formula (Term.Atom at) ;
+    iter#visit_formula f ;
     
-    List.fold_left (fun i s -> snd (add_message_atom None i s)) s !macro_eqs
+    List.fold_left (fun s (a,f) -> 
+        if query_happens ~precise:true s a 
+        then snd (add_form_aux None s f)
+        else s
+      ) s !macro_eqs
 
-  and add_message_atom ?(force=false) (id : Ident.t option) (s : sequent) at =
-    let f = Term.Atom (at :> generic_atom) in
-    let recurse = not (H.is_hyp f s.hyps) in
-    
+  and add_form_aux
+      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.formula) =
+    let recurse = not (H.is_hyp f s.hyps) && (Config.auto_intro ()) in
+    (* let recurse = not (H.is_hyp f s.hyps) in *)
+
     (* TODO: remove auto naming ? *)
     let id = match id with       
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in
+
     let id, hyps = H.add ~force id f s.hyps in
-    let s =
-      S.update ~keep_trs:false ~keep_models:true
-        ~hyps s in
+    let s = S.update ~hyps s in
     
     (* [recurse] boolean to avoid looping *)
-    let s = if recurse then add_macro_defs s (at :> generic_atom) else s in
+    let s = if recurse then add_macro_defs s f else s in
 
     id, s
 
-  let rec add_happens ?(force=false) id (s : sequent) ts =
-    let f = Term.Atom (`Happens ts :> generic_atom) in
+  let add_happens ?(force=false) id (s : sequent) ts =
+    let f = Term.Atom (`Happens ts :> Term.generic_atom) in
     let id, hyps = H.add ~force id f s.hyps in
-    let s =
-      S.update ~keep_trs:true ~keep_models:false
-        ~hyps s in
-    
-    match ts with
-    | Term.Action (symb,indices) ->
-      let a = Action.of_term symb indices s.table in
-      let system = s.system in
-      let table  = s.table in
-      
-      (* TODO: remove auto naming ? *)
-      let _, s =
-        add_formula (H.fresh_id "C" s.hyps)
-          (snd (SystemExpr.descr_of_action table system a).Action.condition)
-          s in
-      (id, s)
-      
-    | _ -> id, s
+    let s = S.update ~hyps s in
+    id, s
 
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
-  and add_formula ?(force=false) id f (s : sequent) =
+  let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (#Atom.message_atom as at) -> add_message_atom ~force (Some id) s at
-    | Term.Atom (`Happens ts)              -> add_happens ~force id s ts
-    | _ ->
-      let id, hyps = H.add ~force id f s.hyps in
-      (* TODO: performances, less updates ? *)
-      id, S.update ~hyps:hyps s
+    | Term.Atom (#Term.message_atom) -> add_form_aux ~force (Some id) s f
+    | Term.Atom (`Happens ts)        -> add_happens ~force id s ts
+    | _ -> add_form_aux ~force (Some id) s f
 
   let add_i npat f s =
-    let force, name = match npat with
-      | Args.Unnamed -> true, "_"
-      | Args.AnyName -> false, choose_name f
-      | Args.Named s -> true, s in
+    let force, approx, name = match npat with
+      | Args.Unnamed -> true, true, "_"
+      | Args.AnyName -> false, true, choose_name f
+      | Args.Named s -> true, false, s in
 
-    let id = H.fresh_id name s.hyps in
+    let id = fresh_id ~approx name s in
     
     add_formula ~force id f s
 
@@ -476,6 +402,23 @@ module Hyps = struct
 
   let fold func s init = H.fold func s.hyps init
 
+  let map f s  = S.update ~hyps:(H.map f s.hyps)  s
+  let mapi f s = S.update ~hyps:(H.mapi f s.hyps) s
+
+  (*------------------------------------------------------------------*)
+  (* We add back manually all formulas, to ensure that definitions are 
+     unrolled. *)
+  (* FIXME: this seems very ineficient *)
+  let reload s =
+    H.fold (fun id f s ->
+        let s = remove id s in        
+        snd (add_formula id f s)) s.hyps s
+
+  (*------------------------------------------------------------------*)
+  let clear_triv s = 
+    let s = reload s in
+    S.update ~hyps:(H.filter (fun _ f -> not (Term.f_triv f)) s.hyps) s
+
   let pp fmt s = H.pps fmt s.hyps
   let pp_dbg fmt s = H.pps ~dbg:true fmt s.hyps
 end
@@ -490,20 +433,8 @@ let set_system system s = S.update ~system:system s
 let set_table  table  s = S.update ~table:table   s 
 
 (*------------------------------------------------------------------*)
-let atom_triv = function
-  | `Message   (`Eq,t1,t2) when t1=t2 -> true
-  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
-  | `Index     (`Eq,i1,i2) when i1=i2 -> true
-  | _ -> false 
-
-let f_triv = function
-  | Term.True -> true
-  | Term.Atom atom -> atom_triv atom
-  | _ -> false 
-
 let filter_map_hyps func hyps =
   H.map (fun f -> func f) hyps
-  |> H.filter (fun _ f -> not (f_triv f))
     
 (*------------------------------------------------------------------*)
 let pi projection s =
@@ -514,8 +445,6 @@ let pi projection s =
   S.update
     ~conclusion:(pi_term s.conclusion)
     ~hyps:H.empty
-    ~keep_trs:false
-    ~keep_models:false
     s in
 
   (* We add back manually all formulas, to ensure that definitions are 
@@ -525,7 +454,7 @@ let pi projection s =
 let set_conclusion a s =
   let s = S.update ~conclusion:a s in
     match a with
-      | Term.Atom (#message_atom as at) -> Hyps.add_macro_defs s at
+      | Term.Atom Term.(#message_atom) -> Hyps.add_macro_defs s a
       | _ -> s
 
 let init ~system table (goal : Term.formula) =
@@ -543,101 +472,44 @@ let subst subst s =
         ~conclusion:(Term.subst subst s.conclusion)
         s in
 
-    (* We add back manually all formulas, to ensure that definitions are 
-       unrolled. *)
-    (* FIXME: this seems very ineficient *)
-    H.fold (fun id f s ->
-        let s = Hyps.remove id s in        
-        snd (Hyps.add_formula id f s)) hyps s
+    Hyps.reload s
 
-(*------------------------------------------------------------------*)
-let get_message_atoms s =
-  List.fold_left (fun atoms (_,hyp) -> match hyp with
-      | Term.Atom (`Message atom) -> atom :: atoms
-      | _ -> atoms
-    ) [] (H.to_list s.hyps)
-
-let get_trace_atoms s =
-  List.fold_left (fun atoms (id,hyp) -> match hyp with
-      | Term.Atom (`Timestamp a as atom) -> atom :: atoms
-      | Term.Atom (`Index a     as atom) -> atom :: atoms
-      | _ -> atoms
-    ) [] (H.to_list s.hyps)
 
 (*------------------------------------------------------------------*)
 (** TRS *)
 
 let get_eqs_neqs s =
-  List.fold_left (fun (eqs, neqs) atom -> match atom with
-      | `Eq,  a, b -> (a,b) :: eqs, neqs
-      | `Neq, a, b -> eqs, (a,b) :: neqs
-    ) ([],[]) (get_message_atoms s)
+  List.fold_left (fun (eqs, neqs) (atom : Term.eq_atom) -> match atom with
+      | `Message   (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Timestamp (`Eq,  a, b) -> Term.ESubst (a,b) :: eqs, neqs
+      | `Index     (`Eq,  a, b) -> 
+        Term.ESubst (Term.Var a,Term.Var b) :: eqs, neqs
+
+      | `Message   (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | `Timestamp (`Neq, a, b) -> eqs, Term.ESubst (a,b) :: neqs
+      | `Index     (`Neq, a, b) -> 
+        eqs, Term.ESubst (Term.Var a,Term.Var b) :: neqs
+
+    ) ([],[]) (get_eq_atoms s)
 
 let get_trs s : Completion.state timeout_r =
-  match !(s.trs) with
-  | Some trs -> Result trs
-  | None ->
-    let eqs,_ = get_eqs_neqs s in
-    match Completion.complete s.table eqs with
-    | Timeout -> Timeout
-    | Result trs ->
-      let () = S.set_trs s trs in
-      Result trs
+  let eqs,_ = get_eqs_neqs s in
+  Completion.complete s.table eqs 
 
-let message_atoms_valid s =
+let eq_atoms_valid s =
   match get_trs s with
   | Timeout -> Timeout
   | Result trs ->
+    let () = dbg "trs: %a" Completion.pp_state trs in
+
     let _, neqs = get_eqs_neqs s in
     Result (
-      List.exists (fun eq ->
-          Completion.check_equalities trs [eq])
+      List.exists (fun (Term.ESubst (a, b)) ->
+          if Completion.check_equalities trs [Term.ESubst (a, b)] then
+            let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
+            true
+          else
+            let () = dbg "dis-equality %a ≠ %a: no violation" 
+                Term.pp a Term.pp b in
+            false)
         neqs)
-
-(*------------------------------------------------------------------*)
-(** Constraints *)
-
-let get_models s : Constr.models timeout_r =
-  match !(s.models) with
-  | Some models -> Result models
-  | None ->
-    let trace_atoms = get_trace_atoms s in
-    match Constr.models_conjunct trace_atoms with
-    | Timeout -> Timeout
-    | Result models ->
-      let () = S.set_models s models in
-      Result models
-
-let maximal_elems s tss =
-  match get_models s with
-  | Result models -> Result (Constr.maximal_elems models tss)
-  | Timeout -> Timeout
-
-let get_ts_equalities s =
-  match get_models s with
-  | Result models ->
-    let ts = trace_atoms_ts (get_trace_atoms s) in
-    Result (Constr.get_ts_equalities models ts)
-  | Timeout -> Timeout
-
-let get_ind_equalities s =
-  match get_models s with
-  | Result models ->
-    let inds = trace_atoms_ind (get_trace_atoms s) in
-    Result (Constr.get_ind_equalities models inds)
-  | Timeout -> Timeout    
-
-let constraints_valid s =
-  match get_models s with
-  | Result models -> Result (not (Constr.m_is_sat models))
-  | Timeout -> Timeout
-
-(*------------------------------------------------------------------*)
-let get_all_terms s =
-  let atoms = get_message_atoms s in
-  let atoms =
-    match s.conclusion with
-      | Term.Atom (`Message atom) -> atom::atoms
-      | _ -> atoms
-  in
-  List.fold_left (fun acc (_,a,b) -> a :: b :: acc) [] atoms

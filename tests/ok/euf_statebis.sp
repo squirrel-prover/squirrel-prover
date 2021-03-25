@@ -5,8 +5,8 @@ hash h
 name k : message
 system s := s.
 
-goal forall tau:timestamp, output@tau <> h(zero,k).
+goal _ (tau:timestamp) : happens(tau) => output@tau <> h(zero,k).
 Proof.
-  intro tau Heq.
+  intro tau Hap Heq.
   euf Heq.
 Qed.

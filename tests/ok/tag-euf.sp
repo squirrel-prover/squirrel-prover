@@ -21,7 +21,7 @@ hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) 
 term test : boolean = zero
 
 process P =
-  Pout: out(cP, <g^a0, h(g^a0,kP)>)
+  Pout: out(cP, (g^a0, h(g^a0,kP)))
 
 process S =
   in(cS, sP);
@@ -40,24 +40,28 @@ process S =
 system (P | S).
 
 goal charac :
-  exec@OutFalse => False.
+ happens (OutFalse) => exec@OutFalse => False.
 Proof.
- intro He.
- executable OutFalse; intro Hexec.
- depends Out, OutFalse; intro Hle.
+ intro Hap He.
+ executable OutFalse; 
+ 1,2: by auto.
+ intro Hexec.
+ depends Out, OutFalse; 1: auto.
+ intro Hle.
  use Hexec with Out.
  nosimpl(expand exec@Out).
 
  destruct H as [Hexec0 Hcond].
 
- expand exec@OutFalse; expand cond@Out; expand cond@OutFalse; simpl.
+ expand exec@OutFalse; expand cond@Out; expand cond@OutFalse.
  destruct He as [_ [He H1]].
  euf Hcond.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
-
- by use He with i. 
-
  nosimpl(notleft H1). 
  by auto.
+
+ by use He with i.  
+ auto.
+ auto.
 Qed.

@@ -1,5 +1,6 @@
 (** Generic tactics *)
 
+(*------------------------------------------------------------------*)
 (** {2 Tactics} *)
 
 (** A tactic ['a tac] is a non-deterministic computation
@@ -37,7 +38,6 @@ type tac_error =
   | NoSSC
   | NoAssumpSystem
   | NotDepends of string * string
-  | Undefined of string
   | NotDDHContext
   | SEncNoRandom
   | SEncSharedRandom
@@ -47,19 +47,27 @@ type tac_error =
   | TacTimeout
   | DidNotFail
   | FailWithUnexpected of tac_error
+  | GoalBadShape of string
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
   | CongrFail
   | GoalNotClosed
   | NothingToIntroduce
+  | NothingToRewrite
+  | BadRewriteRule
+  | MustHappen of Term.timestamp
+  | NotHypothesis
+  | NoCollision
+  | HypAlreadyExists of string
+  | HypUnknown of string
   | PatNumError of int * int    (* given, need *)
-                   
+
 (** Tactics should raise this exception if they are ill-formed. *)
-exception Tactic_hard_failure of tac_error
+exception Tactic_soft_failure of Location.t option * tac_error
 
 (** This tactic should be raised by the evaluation of a tactic, based on the
     tac_error returned by its failure. *)
-exception Tactic_soft_failure of tac_error
+exception Tactic_hard_failure of Location.t option * tac_error
 
 val pp_tac_error : Format.formatter -> tac_error -> unit
 
@@ -77,6 +85,10 @@ type 'a sk = 'a -> fk -> a
   * parameter unconstrained. *)
 type 'a tac = 'a -> 'a list sk -> fk -> a
 
+(** Run a tactic that does not fail  *)
+val run : 'a tac -> 'a -> 'a list
+
+(*------------------------------------------------------------------*)
 (** {2 Generic tactics and tactic combinators} *)
 
 val id : 'a tac
@@ -102,6 +114,7 @@ val try_tac : 'a tac -> 'a tac
 
 val checkfail_tac : tac_error -> 'a tac -> 'a tac
 
+(*------------------------------------------------------------------*)
 (** {2 Generic tactic syntax trees} *)
 
 module type S = sig
@@ -127,7 +140,7 @@ type selector = int list
 type 'a ast =
   | Abstract of string * 'a list
   | AndThen    : 'a ast list -> 'a ast
-  | AndThenSel : 'a ast * selector * 'a ast -> 'a ast
+  | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
   | Try        : 'a ast -> 'a ast
   | Repeat     : 'a ast -> 'a ast
@@ -154,17 +167,18 @@ module AST (M:S) : AST_sig
   with type arg = M.arg
   with type judgment = M.judgment
 
+(*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
 (** Raise a soft failure. *)
-val soft_failure : tac_error -> 'a
+val soft_failure : ?loc:Location.t -> tac_error -> 'a
 
 (** Unwrap the result of a computation that may timeout, or raise a soft
     timeout failure. *)
 val timeout_get : 'a Utils.timeout_r -> 'a
 
 (** Raise a hard failure. *)
-val hard_failure : tac_error -> 'a
+val hard_failure : ?loc:Location.t -> tac_error -> 'a
 
 (** Print the system to the user. *)
 val print_system : Symbols.table -> SystemExpr.system_expr -> unit

@@ -4,32 +4,32 @@ system null.
 
 axiom pair_neq_snd :
   forall (x:message, y:message),
-  <x,y> <> y
+  (x,y) <> y
 
 axiom pair_eq_snd_absurd :
   forall (x:message, y:message),
-  <x,y> = y => False.
+  (x,y) = y => False.
 
-goal forall (x,y:message), <x,y> = y => False.
+goal _ (x,y:message): (x,y) = y => False.
 Proof.
   intro x y Heq.
-  use pair_neq_snd with x,y.
+  by use pair_neq_snd with x,y.
 Qed.
 
-goal forall (x,y:message), <x,y> <> y.
+goal _ (x,y:message): (x,y) <> y.
 Proof.
   intro x y Heq.
-  use pair_neq_snd with x,y.
+  by use pair_neq_snd with x,y.
 Qed.
 
-goal forall (x,y:message), <x,y> = y => False.
+goal _ (x,y:message): (x,y) = y => False.
 Proof.
   intro x y Heq.
-  use pair_eq_snd_absurd with x,y.
+  by use pair_eq_snd_absurd with x,y.
 Qed.
 
-goal forall (x,y:message), <x,y> <> y.
+goal _ (x,y:message): (x,y) <> y.
 Proof.
   intro x y Heq.
-  use pair_eq_snd_absurd with x,y.
+  by use pair_eq_snd_absurd with x,y.
 Qed.

@@ -6,7 +6,7 @@ channel c
 system in(c,x); let y = x in out(c,h(y,k)).
 
 goal test :
-  output@A = input@A.
+  happens(A) => output@A = input@A.
 Proof.
   admit.
   (* TODO This test seems broken to me, we should not be able to

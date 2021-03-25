@@ -170,11 +170,13 @@ axiom orderStrict: forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 (* Authentication goal for the ideal system *)
 goal [right] auth:
  forall (ii,i,ii':index),
-  ( cond@Server1(ii,i) && cond@Decode(ii',i) )
+  happens(Server1(ii,i),Decode(ii',i))
   =>
-  ( exists (j:index),
+  ((cond@Server1(ii,i) && cond@Decode(ii',i))
+    =>
+    (exists (j:index),
     Press(i,j) < Decode(ii',i)
-    && snd(snd(output@Press(i,j))) = snd(snd(input@Decode(ii',i))) ).
+    && snd(snd(output@Press(i,j))) = snd(snd(input@Decode(ii',i))))).
 Proof.
 intro ii i ii' *.
 expand cond@Decode(ii',i).

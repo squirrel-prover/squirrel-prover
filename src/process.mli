@@ -77,15 +77,12 @@ val declare : Symbols.table -> lsymb -> pkind -> process -> Symbols.table
   * as a set of actions. In that process, name creations are compiled away.
   * Other constructs are grouped into action descriptions. *)
 val declare_system :
-  Symbols.table -> string -> process -> Symbols.table
+  Symbols.table -> lsymb -> process -> Symbols.table
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling}*)
 
 type proc_error_i =
-  | UnknownProcess of string
-  | ProcessAlreadyDecl of string
-  | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string

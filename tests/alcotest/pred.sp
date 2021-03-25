@@ -2,10 +2,7 @@ set autoIntro=false.
 
 system null.
 
-(* This should not pass: it is not true for the initial timestamp epsilon,
- * though it is true for all actions. *)
-
-goal forall (t:timestamp), t <= pred(t) => False.
+goal _ (t:timestamp) : not (happens (init)).
 Proof.
-  intro t Hleq.
+  intro t. 
 Qed.

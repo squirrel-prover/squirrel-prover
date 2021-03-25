@@ -44,6 +44,7 @@
   "frame"
   "seq"
   "diff"
+  "happens"
   "len"
   "xor"
   ))
@@ -63,14 +64,11 @@
   "use"
   "with"
   "assert"
-  "assumption"
-  "auto"
   "case"
   "collision"
-  "congruence"
-  "constraints"
   "depends"
   "eqnames"
+  "generalize"
   "eqtraces"
   "euf"
   "executable"
@@ -82,9 +80,11 @@
   "forall"
   "help"
   "id"
+  "clear"
+  "prof"
   "induction"
   "intro"
-  "intros"
+  "revert"
   "destruct"
   "as"
   "introsleft"
@@ -96,7 +96,8 @@
   "simpl"
   "simpl_left"
   "split"
-  "substitute"
+  "subst"
+  "rewrite"
   "systemsubstitute"
   "true"
   "cca1"
@@ -120,6 +121,10 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
+  "assumption"
+  "congruence"
+  "constraints"
+  "auto"
 ))
 
 (defvar squirrel-tacticals-keywords '(
@@ -132,6 +137,9 @@
 
 
 (defvar squirrel-tactical-char "\\(;\\|\\+\\)")
+
+
+;; (defvar squirrel-operator-pairs "[^a-z'_ ][ ]*\\((\\)[^)]*\\()\\)")
 
 (defvar squirrel-operator-char-1 "=\\|<\\|>\\|~")
 (defvar squirrel-operator-char-2 "\\-")

@@ -4,7 +4,13 @@ channel c
 system in(c,x);out(c,x).
 
 goal test :
-  output@A = input@A.
+  happens(A) => output@A = input@A.
 Proof.
  by auto.
 Qed.
+
+goal test2 :
+  output@A = input@A.
+Proof.
+ checkfail auto exn GoalNotClosed.
+Abort.

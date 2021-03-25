@@ -31,22 +31,6 @@ let pp_error pp_loc pp_pref_loc e = match e with
                 pp_pref_loc ()
                 pp_loc ()
                 s)
-  (* I believe these two exceptions can no longer be thrown by the parser. *)
-  (* TODO: cleanup *)
-  (* | Symbols.Unbound_identifier s->
-   *     Some (fun ppf () ->
-   *             Fmt.pf ppf
-   *               "@[%aUnbound identifier %a : %s.@]@."
-   *               pp_pref_loc ()
-   *               pp_loc ()
-   *               s) *)
-  (* | Theory.Conv err ->
-   *     Some (fun ppf () ->
-   *             Fmt.pf ppf
-   *               "@[%aError %a: %a.@]@."
-   *               pp_pref_loc ()
-   *               pp_loc ()
-   *               Theory.pp_error err) *)
   | _ -> None
 
 let pp_loc interactive filename lexbuf ppf () =
@@ -174,7 +158,7 @@ let () =
   ]
 
 let () =
-  let table = Channel.declare Symbols.builtins_table "c" in
+  let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
 
   Checks.add_suite "Process parsing" [
     "Null", `Quick, begin fun () ->
@@ -198,11 +182,11 @@ let () =
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
+      ignore (parse_process table "in(c,x);out(c,(x,x))" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = "error";
+        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
                                           index_arity = 0;
                                           message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
@@ -212,13 +196,13 @@ let () =
     end ;
     "Try", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = "ok";
+        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "ok";
                                           index_arity = 0;
                                           message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table decl in
       let table =
-        let decl_i = Decl.Decl_abstract { name = "error";
+        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
                                           index_arity = 0;
                                           message_arity = 0;} in
         let decl = Location.mk_loc Location._dummy decl_i in
@@ -289,15 +273,16 @@ let () =
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/multiple.sp"
                        : Symbols.table )
-           with (Prover.Decl_error (_,Prover.KDecl,
+           with (Symbols.SymbError (_,
                                     Multiple_declarations "c")) -> raise Ok)
     end ;
-    "Action creation", `Quick, begin fun () ->
-      let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
-      ignore (Action.find_symbol "IOIO1" table) ;
-      ignore (Action.find_symbol "IOIO2" table)
-      (* TODO test resulting action structure *)
-    end ;
+    (* TODO: this test is no longer possible because we must provid locations *)
+    (* "Action creation", `Quick, begin fun () ->
+     *   let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
+     *   ignore (Action.find_symbol "IOIO1" table) ;
+     *   ignore (Action.find_symbol "IOIO2" table)
+     *   (\* TODO test resulting action structure *\)
+     * end ; *)
     "Let in actions", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
               : Symbols.table )
@@ -358,15 +343,15 @@ let () =
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_nodef.sp"
                        : Symbols.table )
-           with Process.ProcError (_, Process.UnknownProcess "D") -> raise Ok)
+           with Symbols.SymbError (_, Symbols.Unbound_identifier "D") -> raise Ok)
     end ;
     "Apply Proc - 2", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () ->
            try ignore (parse_theory_test ~test "tests/alcotest/process_mult.sp"
                        : Symbols.table )
-           with Process.ProcError (_,
-                                   ProcessAlreadyDecl "C") -> raise Ok)
+           with Symbols.SymbError (_,
+                                   Symbols.Multiple_declarations "C") -> raise Ok)
     end ;
     "Duplicated State Update", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok

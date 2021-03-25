@@ -24,6 +24,8 @@ PROOFS
 - secrecy (as a reachability property)
 *******************************************************************************)
 
+set autoIntro = false.
+
 hash h
 
 name secret : message
@@ -73,37 +75,43 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 (* GOALS *)
 
 goal counterIncrease :
-  forall (t:timestamp), t > init => order(d@pred(t),d@t) = orderOk.
+  forall (t:timestamp), happens(t) => 
+    (t > init => order(d@pred(t),d@t) = orderOk).
 Proof.
-intro t Hc.
+intro t Hap Hc.
 use orderSucc with d@pred(t).
-case t. 
+case t; 2,3,4: expand d@t; by congruence.
+by eqtrace.
 Qed.
 
 (* A more general result than counterIncrease *)
 goal counterIncreaseBis :
-  forall (t:timestamp), forall (t':timestamp), t' < t => order(d@t',d@t) = orderOk.
+  forall (t,t':timestamp), 
+    (t' < t => order(d@t',d@t) = orderOk).
 Proof.
 induction.
-use H with pred(t).
-assert (t' < pred(t) || t' >= pred(t)).
-case H1.
+intro *.
+assert (t' < pred(t) || t' >= pred(t)); 1: by case t. 
+case H0.
+use H with pred(t),t'.
 (* case t' < pred(t) *)
-use H0 with t'.
-use counterIncrease with t.
+use counterIncrease with t; 2,3: by eqtrace.
 by use orderTrans with d@t',d@pred(t),d@t.
+by constraints.
+by eqtrace.
 (* case t' >= pred(t) *)
-assert t' = pred(t).
+assert t' = pred(t). by eqtrace.
 by use counterIncrease with t.
 Qed.
 
-goal secretReach : forall (j:index), cond@B(j) => False.
+goal secretReach : forall (j:index), happens(B(j)) => (cond@B(j) => False).
 Proof.
-intro j Hcond.
+intro *.
 expand cond@B(j).
-euf Hcond.
-assert pred(A(i)) < pred(B(j)).
-use counterIncreaseBis with pred(B(j)).
-use H with pred(A(i)).
-use orderStrict with d@pred(A(i)),d@pred(B(j)).
+euf H.
+intro *.
+assert pred(A(i)) < pred(B(j)). by eqtrace.
+use counterIncreaseBis with pred(B(j)),pred(A(i)).
+use orderStrict with d@pred(A(i)),d@pred(B(j)); by congruence.
+by eqtrace.
 Qed.

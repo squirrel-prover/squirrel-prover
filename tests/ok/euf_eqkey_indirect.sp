@@ -10,11 +10,11 @@ name k : index->index->message
 
 system !_i out(c,h(n,k(i,i))).
 
-goal forall (tau:timestamp,a,b:index),
-  output@tau = h(n,k(a,b)) =>
+goal _ (tau:timestamp,a,b:index):
+  happens(tau) => output@tau = h(n,k(a,b)) =>
   a = b.
 Proof.
-  intro tau a b Heq.
+  intro tau a b Hap Heq.
   nosimpl(euf Heq).
   (* There should be one indirect case,
    * where a newly introduced index i should be

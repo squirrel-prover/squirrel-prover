@@ -1,5 +1,14 @@
+open Utils
+
 module L = Location
-  
+
+module Sv = Vars.Sv
+module Mv = Vars.Mv
+
+let dbg s = Printer.prt `Ignore s
+(* let dbg s = Printer.prt `Dbg s *)
+
+(*------------------------------------------------------------------*)
 (** Symbols *)
 
 type 'a indexed_symbol = 'a * Vars.index list
@@ -27,28 +36,33 @@ let pp_fsymb ppf (fn,is) = match is with
   | [] -> Fmt.pf ppf "%a" pp_fname fn
   | _ -> Fmt.pf ppf "%a(%a)" pp_fname fn Vars.pp_list is
 
-let pp_mname ppf s =
+let pp_mname_s ppf s =
   let open Fmt in
-  (styled `Bold (styled `Magenta Utils.ident)) ppf (Symbols.to_string s)
+  (styled `Bold (styled `Magenta Utils.ident)) ppf s
+
+let pp_mname ppf s =
+  pp_mname_s ppf (Symbols.to_string s)
 
 let pp_msymb ppf (m,s,is) =
   Fmt.pf ppf "%a%a"
     pp_mname m
     (Utils.pp_ne_list "(%a)" Vars.pp_list) is
 
+(*------------------------------------------------------------------*)
 (** Atoms and terms *)
 
 type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
 type ('a,'b) _atom = 'a * 'b * 'b
-
+             
 type generic_atom = [
-  | `Message of (ord_eq,Sorts.message term) _atom
-  | `Timestamp of (ord,Sorts.timestamp term) _atom
-  | `Index of (ord_eq,Vars.index) _atom
-  | `Happens of Sorts.timestamp term
+  | `Message   of (ord_eq, Sorts.message term)   _atom
+  | `Timestamp of (ord,    Sorts.timestamp term) _atom
+  | `Index     of (ord_eq, Vars.index)           _atom
+  | `Happens   of Sorts.timestamp term
 ]
+
 and _ term =
   | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
   | Name   : nsymb -> Sorts.message term
@@ -56,7 +70,7 @@ and _ term =
       'a msymb * Sorts.message term list * Sorts.timestamp term ->
       'a term
   | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred   : Sorts.timestamp term -> Sorts.timestamp term
+  | Pred   : Sorts.timestamp term -> Sorts.timestamp term        
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
       Sorts.timestamp term
@@ -85,21 +99,41 @@ and _ term =
 
 type 'a t = 'a term
 
+(*------------------------------------------------------------------*)
 type message = Sorts.message term
 type timestamp = Sorts.timestamp term
 type formula = Sorts.boolean term
 
-type message_atom = [ `Message of ord_eq * message
-                               * message ]
+(*------------------------------------------------------------------*)
+(** Subset of all atoms (the subsets are not disjoint). *)
+    
+type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+
+type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
+                    
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
-  | `Index of (ord_eq,Vars.index) _atom
+  | `Index     of (ord_eq,Vars.index) _atom
+  | `Happens   of Sorts.timestamp term
 ]
 
+type trace_eq_atom = [
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
+]
+
+(* Subsets of atoms that are equalities *)
+type eq_atom = [
+  | `Message   of (ord_eq, message) _atom
+  | `Timestamp of (ord_eq, timestamp) _atom
+  | `Index     of (ord_eq, Vars.index) _atom
+]
+
+(*------------------------------------------------------------------*)
 let rec sort : type a. a term -> a Sorts.t =
   function
-  | Fun _ -> Sorts.Message
-  | Name _ -> Sorts.Message
+  | Fun _               -> Sorts.Message
+  | Name _              -> Sorts.Message
   | Macro ((_,s,_),_,_) -> s
   | Seq _ -> Sorts.Message
   | Var v -> Vars.sort v
@@ -118,18 +152,24 @@ let rec sort : type a. a term -> a Sorts.t =
   | True -> Sorts.Boolean
   | False -> Sorts.Boolean
 
-exception Not_a_disjunction
+(*------------------------------------------------------------------*)
+exception Uncastable
 
-let rec disjunction_to_atom_list = function
-  | False -> []
-  | Atom at -> [at]
-  | Or (a, b) -> disjunction_to_atom_list a @ disjunction_to_atom_list b
-  | _ -> raise Not_a_disjunction
+let cast: type a b. a Sorts.sort -> b term -> a term =
+  fun kind t ->
+  match kind, sort t with
+     | Sorts.Index, Sorts.Index -> t
+     | Sorts.Message, Sorts.Message -> t
+     | Sorts.Boolean, Sorts.Boolean -> t
+     | Sorts.Timestamp, Sorts.Timestamp -> t
+     | _ -> raise Uncastable
 
 
+                
+(*------------------------------------------------------------------*)
 (** Builtins *)
 
-let mk f = (f,[])
+let mk f : fsymb = (f,[])
 
 let f_diff = mk Symbols.fs_diff
 
@@ -182,6 +222,10 @@ let empty    = Fun (mk Symbols.fs_empty, [])
 let f_len    = mk Symbols.fs_len
 let f_zeroes = mk Symbols.fs_zeroes
 
+(** Init action *)
+let init = Action(Symbols.init_action,[])
+
+(*------------------------------------------------------------------*)
 (** Convert a boolean term to a message term, used in frame macro definition **)
 
 let boolToMessage b = ITE (b,Fun (f_true,[]),Fun (f_false,[]))
@@ -197,22 +241,32 @@ let pp_ord ppf = function
   | `Lt -> Fmt.pf ppf "<"
   | `Gt -> Fmt.pf ppf ">"
 
+let rec is_and_happens = function
+  | And (l, r) -> is_and_happens l && is_and_happens r
+  | Atom (`Happens _) -> true
+  | _ -> false
+
 let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
+
   | Fun ((s,[]),terms) when Symbols.to_string s = "pair" ->
       Fmt.pf ppf "%a"
         (Utils.pp_ne_list
-           "<@[<hov>%a@]>"
+           "(@[<hov>%a@])"
            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+        
   | Fun ((s,[]),[t1;t2]) when Symbols.to_string s = "exp" ->
-    Fmt.pf ppf "%a^%a" pp t1 pp t2
+    Fmt.pf ppf "%a ^ %a" pp t1 pp t2
+      
   | Fun (f,terms) ->
       Fmt.pf ppf "%a%a"
         pp_fsymb f
         (Utils.pp_ne_list
            "(@[<hov>%a@])"
            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
+        
   | Name n -> pp_nsymb ppf n
+                
   | Macro (m, l, ts) ->
       Fmt.pf ppf "@[%a%a@%a@]"
         pp_msymb m
@@ -220,18 +274,23 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
            "(@[<hov>%a@])"
            (Fmt.list ~sep:Fmt.comma pp)) l
         pp ts
+        
   | Seq (vs, b) ->
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
       Vars.pp_list vs pp b
+      
   | Pred ts -> Fmt.pf ppf "@[<hov>pred(%a)@]" pp ts
+                 
   | Action (symb,indices) ->
       Fmt.styled `Green
         (fun ppf () ->
            Fmt.pf ppf "%s%a" (Symbols.to_string symb) pp_indices indices)
         ppf ()
+
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
+      
   | ITE (b, c, d) ->
     if d = Fun (f_zero,[]) then
       Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
@@ -241,6 +300,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
     else
       Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
         pp b pp c pp d
+        
   | Find (b, c, d, e) ->
     if e = Fun (f_zero,[]) then
       Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a)@]"
@@ -248,42 +308,140 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
     else
       Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a@ else@ %a)@]"
         Vars.pp_list b pp c pp d pp e
+        
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
+      
   | Exists (vs, b) ->
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp b
+
   | And (Impl (bl1,br1), Impl(br2,bl2)) when bl1=bl2 && br1=br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
       pp bl1 pp br1
+
+  | And _ as f when is_and_happens f ->
+    pp_and_happens ppf f
+                                     
   | And (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       pp bl pp br
+      
   | Or (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
       pp bl pp br
+      
   | Impl (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
       pp bl pp br
+      
   | Not b ->
     Fmt.pf ppf "not(@[%a@])" pp b
+      
   | Atom a -> pp_generic_atom ppf a
+                
   | True -> Fmt.pf ppf "True"
+              
   | False -> Fmt.pf ppf "False"
+               
 and pp_message_atom ppf (`Message (o,tl,tr)) =
   Fmt.pf ppf "@[%a@ %a@ %a@]" pp tl pp_ord o pp tr
+    
 and pp_trace_atom ppf : trace_atom -> unit = function
   | `Timestamp (o,tl,tr) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" pp tl pp_ord o pp tr
+      
   | `Index (o,il,ir) ->
     Fmt.pf ppf "@[<hv>%a@ %a@ %a@]" Vars.pp il pp_ord o Vars.pp ir
-and pp_generic_atom ppf = function
-  | `Happens a -> Fmt.pf ppf "happens(%a)" pp a
+
+  | `Happens a -> pp_happens ppf [a]
+
+and pp_generic_atom ppf = function                   
   | #message_atom as a -> pp_message_atom ppf a
+                            
   | #trace_atom as a -> pp_trace_atom ppf a
 
+and pp_happens ppf (ts : timestamp list) =
+  Fmt.pf ppf "@[<hv 2>%a(%a)@]"
+    pp_mname_s "happens"
+    (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt ",@ ") pp) ts
+  
+and pp_and_happens ppf f =
+  let rec collect acc = function
+    | And (l, r) -> collect (collect acc l) r
+    | Atom (`Happens ts) -> ts :: acc
+    | _ -> assert false in
 
+  pp_happens ppf (collect [] f)
+
+let pp_eq_atom ppf at = pp_generic_atom ppf (at :> generic_atom)
+
+
+(*------------------------------------------------------------------*)
+(** Literals. *)
+
+type literal = [`Neg | `Pos] * generic_atom
+
+type eq_literal = [`Pos | `Neg] * eq_atom
+
+type trace_literal = [`Pos | `Neg] * trace_atom
+
+let pp_literal fmt ((pn,at) : literal) =
+  match pn with
+  | `Pos -> Fmt.pf fmt "%a"    pp_generic_atom at
+  | `Neg -> Fmt.pf fmt "¬(%a)" pp_generic_atom at
+
+let pp_literals fmt (l : literal list) = 
+  let sep fmt () = Fmt.pf fmt " ∧ " in
+  (Fmt.list ~sep pp_literal) fmt l
+
+let pp_trace_literal fmt (lit : trace_literal) =
+  pp_literal fmt (lit :> literal)
+
+let pp_trace_literals fmt (l : trace_literal list) = 
+  pp_literals fmt (l :> literal list)
+
+let neg_lit ((pn, at) : literal) : literal = 
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
+let neg_trace_lit ((pn, at) : trace_literal) : trace_literal = 
+  let pn = match pn with
+    | `Pos -> `Neg
+    | `Neg -> `Pos in
+  (pn, at)
+
+
+let disjunction_to_literals f =
+  let exception Not_a_disjunction in
+
+  let rec aux = function
+  | False -> []
+  | Atom at -> [`Pos, at]
+  | Not (Atom at) -> [`Neg, at]
+  | Or (a, b) -> aux a @ aux b
+  | _ -> raise Not_a_disjunction in
+
+  try Some (aux f) with Not_a_disjunction -> None
+
+
+(*------------------------------------------------------------------*)
+let atom_triv = function
+  | `Message   (`Eq,t1,t2) when t1=t2 -> true
+  | `Timestamp (`Eq,t1,t2) when t1=t2 -> true
+  | `Index     (`Eq,i1,i2) when i1=i2 -> true
+  | _ -> false 
+
+let f_triv = function
+  | True -> true
+  | Atom atom -> atom_triv atom
+  | _ -> false 
+
+    
+(*------------------------------------------------------------------*)
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
 let in_macro    = (Symbols.inp,   Sorts.Message, [])
@@ -305,22 +463,12 @@ let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> fu
 
 let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
 
+(*------------------------------------------------------------------*)
 (** Substitutions *)
 
 type esubst = ESubst : 'a term * 'a term -> esubst
 
 type subst = esubst list
-
-exception Uncastable
-
-let cast: type a b. a Sorts.sort -> b term -> a term =
-  fun kind t ->
-  match kind, sort t with
-     | Sorts.Index, Sorts.Index -> t
-     | Sorts.Message, Sorts.Message -> t
-     | Sorts.Boolean, Sorts.Boolean -> t
-     | Sorts.Timestamp, Sorts.Timestamp -> t
-     | _ -> raise Uncastable
 
 
 let rec assoc : type a. subst -> a term -> a term =
@@ -352,46 +500,36 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
 let subst_macro (s:subst) (symb, sort, is) =
   (symb, sort, List.map (subst_var s) is)
 
+(*------------------------------------------------------------------*)
 
-module S = struct
-  include Set.Make(
-  struct
-    type t = Vars.evar
-    let compare (Vars.EVar a) (Vars.EVar b) =
-      compare (Vars.name a) (Vars.name b)
-  end)
-  let add_list vars indices =
-    List.fold_left (fun vars i -> add (Vars.EVar i) vars) vars indices
-end
-
-let get_set_vars : 'a term -> S.t =
+let get_set_vars : 'a term -> Sv.t =
   fun term ->
 
-  let rec termvars : type a. a term -> S.t -> S.t = fun t vars -> match t with
-    | Action (_,indices) -> S.add_list vars indices
-    | Var tv -> S.add (Vars.EVar tv) vars
+  let rec termvars : type a. a term -> Sv.t -> Sv.t = fun t vars -> match t with
+    | Action (_,indices) -> Sv.add_list vars indices
+    | Var tv -> Sv.add (Vars.EVar tv) vars
     | Pred ts -> termvars ts vars
     | Fun ((_,indices), lt) ->
-        let vars = S.add_list vars indices in
+        let vars = Sv.add_list vars indices in
         List.fold_left (fun vars x -> termvars x vars) vars lt
 
     | Macro ((_,_,indices), l, ts) ->
-      let vars = S.add_list vars indices in
-      termvars ts (List.fold_left (fun vars x -> termvars x vars) vars l)
+      let vars = Sv.add_list vars indices in
+      termvars ts (termsvars l vars)
     | Seq (a, b) ->
-      S.diff
+      Sv.diff
         (termvars b vars)
-        (S.of_list (List.map (fun x -> Vars.EVar x) a))
-    | Name (_,indices) -> S.add_list vars indices
+        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
+    | Name (_,indices) -> Sv.add_list vars indices
     | Diff (a, b) -> termvars a (termvars b vars)
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
-      S.diff
+      Sv.diff
         (termvars b (termvars c (termvars d vars)))
-        (S.of_list (List.map (fun x -> Vars.EVar x) a))
+        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
     | Atom a -> generic_atom_vars a vars
-    | ForAll (a, b) -> S.diff (termvars b vars) (S.of_list a)
-    | Exists (a, b) -> S.diff (termvars b vars) (S.of_list a)
+    | ForAll (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
+    | Exists (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
     | And (a, b) ->  termvars a (termvars b vars)
     | Or (a, b) ->  termvars a (termvars b vars)
     | Not a -> termvars a vars
@@ -399,6 +537,9 @@ let get_set_vars : 'a term -> S.t =
     | True -> vars
     | False -> vars
 
+  and termsvars : type a. a term list -> Sv.t -> Sv.t = fun terms vars ->
+    List.fold_left (fun vars x -> termvars x vars) vars terms
+    
   and message_atom_vars (`Message (ord, a1, a2)) vars =
    termvars a1 (termvars a2 vars)
 
@@ -407,115 +548,226 @@ let get_set_vars : 'a term -> S.t =
       termvars ts (termvars ts' vars)
     | `Index (ord, i, i') ->
       termvars (Var i) (termvars (Var i') vars)
-
+    | `Happens ts -> termvars ts vars
+                       
   and generic_atom_vars t vars = match t with
-    | `Happens a -> termvars a vars
     | #message_atom as a -> message_atom_vars a vars
     | #trace_atom as a -> trace_atom_vars a vars
-
-
   in
-  termvars term S.empty
+  
+  termvars term Sv.empty
 
-let get_vars t = get_set_vars t |> S.elements
+let get_vars t = get_set_vars t |> Sv.elements
+
+let fv t = get_set_vars t
+
+(*------------------------------------------------------------------*)
+(** Smart constructors for boolean terms. *)
+
+let mk_not t1 = match t1 with
+  | Not t -> t
+  | t -> Not t
+
+let mk_and t1 t2 = match t1,t2 with
+  | True, t | t, True -> t
+  | t1,t2 -> And (t1,t2)
+
+let mk_ands ts = List.fold_left mk_and True ts
+
+let mk_or t1 t2 = match t1,t2 with
+  | False, t | t, False -> t
+  | t1,t2 -> Or (t1,t2)
+
+let mk_ors ts = List.fold_left mk_or False ts
+
+let mk_impl t1 t2 = match t1,t2 with
+  | False, _ -> True
+  | True, t -> t
+  | t1,t2 -> Impl (t1,t2)
+
+let mk_impls ts t =
+  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
+
+let mk_ite c t e = match c with
+  | True -> t
+  | False -> e
+  | _ -> ITE (c,t,e)
+
+let mk_forall l f = 
+  if l = [] then f 
+  else match f with
+    | ForAll (l', f) -> ForAll (l @ l', f)
+    | _ -> ForAll (l, f)
+
+let mk_exists l f = 
+  if l = [] then f 
+  else match f with
+    | Exists (l', f) -> Exists (l @ l', f)
+    | _ -> Exists (l, f)
+
+let message_of_formula f =
+  ITE (f, Fun (f_true,[]), Fun (f_false,[]))
+
+let mk_timestamp_leq t1 t2 = match t1,t2 with
+  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
+  | _ -> `Timestamp (`Leq, t1, t2)
+
+(** Operations on vectors of indices of the same length. *)
+let mk_indices_neq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_or acc e)
+    False
+    (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+
+let mk_indices_eq vect_i vect_j =
+  List.fold_left
+    (fun acc e -> mk_and acc e)
+    True
+    (List.map2 (fun i j ->
+         if i = j then True else Atom (`Index (`Eq, i, j))
+       ) vect_i vect_j)
+
+(*------------------------------------------------------------------*)
+(** {2 Substitutions} *)
+
+(** given a variable [x] and a subst [s], remove from [s] all
+    substitution [v->_]. *)
+let filter_subst (var:Vars.evar) (s:subst) =
+  let s = 
+    List.fold_left (fun acc (ESubst (x, y)) ->
+        if not (Sv.mem var (get_set_vars x))
+        then (ESubst (x, y))::acc
+        else acc
+      ) [] s in 
+
+  List.rev s
+
+(** Check if the substitutions only susbtitutes variables *)
+let is_var_subst s =
+  List.for_all (fun (ESubst (t,_)) -> match t with
+      | Var _ -> true
+      | _ -> false) s
+
+(** Returns the variables appearing in a substitution LHS. *)
+let subst_support s =
+  List.fold_left (fun supp (ESubst (t,_)) -> 
+    Sv.union supp (get_set_vars t)) Sv.empty s
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
-  (* given a variable list and a subst s, remove from subst all
-     substitution x->v where x is in the variable list. *)
-  let filter_subst (vars:Vars.evar list) (s:subst) =
-    List.fold_left (fun acc (ESubst (x, y)) ->
-        if S.is_empty (S.inter (S.of_list vars) (get_set_vars x))
-        then
-          (ESubst (x, y))::acc
-        else
-          acc)
-      [] s
-  in
-  (* given a list of variables vars, a substitution s, and a formula f, if some
-     var in vars appears in the right hand side of the variables s, we refresh
-     the variable and refresh the formula with the new variables. *)
-  let refresh_formula vars s f =
-    let right_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars y))  S.empty s
-    in
-    let all_vars = List.fold_left
-        (fun acc  (ESubst (x, y)) -> S.union acc (get_set_vars x))  right_vars s
-    in
-    let env = ref (Vars.of_list (S.elements all_vars)) in
-    let v, f = List.fold_left
-     (fun  (nvars,f) (Vars.EVar v) ->
-            if S.mem (Vars.EVar v) right_vars then
-              let new_v = Vars.make_fresh_from_and_update env v in
-              ((Vars.EVar new_v)::nvars, subst [ESubst (Var v,Var new_v)] f)
-            else
-              ((Vars.EVar v)::nvars,f)
-     )
+  if is_var_subst s && 
+     Sv.disjoint (subst_support s) (get_set_vars t)
+  then t
+  else
+    let new_term : a term =
+      match t with
+      | Fun ((fs,is), lt) ->
+        Fun ((fs, List.map (subst_var s) is),
+             List.map (subst s) lt)
+      | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
+      | Macro (m, l, ts) ->
+        Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
-      ([],f)
-      vars
-    in
-    List.rev v, f
-  in
-  let new_term : a term =
-    match t with
-    | Fun ((fs,is), lt) ->
-      Fun ((fs, List.map (subst_var s) is),
-           List.map (subst s) lt)
-    | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
-    | Macro (m, l, ts) ->
-      Macro (subst_macro s m, List.map (subst s) l, subst s ts)
-    | Seq (a, b) ->
-      let s = filter_subst (List.map (fun x -> Vars.EVar x) a) s in
-      Seq (a, subst s b)
-    | Var m -> Var m
-    | Pred ts -> Pred (subst s ts)
-    | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
-    | Diff (a, b) -> Diff (subst s a, subst s b)
-    | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
-    | Atom a-> Atom (subst_generic_atom s a)
-    | And (a, b) -> And (subst s a, subst s b)
-    | Or (a, b) -> Or (subst s a, subst s b)
-    | Not a -> Not (subst s a)
-    | Impl (a, b) -> Impl (subst s a, subst s b)
-    | True -> True
-    | False -> False
-    | ForAll (a, b) ->
-      let filtered_s = filter_subst a s in
-      let new_a, new_b = refresh_formula a filtered_s b in
-      ForAll (new_a, subst filtered_s new_b)
-    | Exists (a, b) ->
-      let filtered_s = filter_subst a s in
-      let new_a, new_b = refresh_formula a filtered_s b in
-      Exists (new_a, subst filtered_s new_b)
-    | Find (a, b, c, d) ->
-      let ea = List.map (fun x -> Vars.EVar x) a in
-      let filtered_s = filter_subst ea s in
-      let new_ea, new_b = refresh_formula ea filtered_s b in
-      let new_ea, new_c = refresh_formula ea filtered_s c in
-      let new_ea, new_d = refresh_formula ea filtered_s d in
-      let final_a = List.map (fun (Vars.EVar x) ->
-          match Vars.sort x  with
-          | Sorts.Index -> (x :> Vars.index)
-          | _ -> assert false
-        )
-         new_ea in
-      Find (final_a, subst filtered_s new_b, subst filtered_s new_c,
-            subst filtered_s new_d)
-  in
-  assoc s new_term
+      (* Seq in annoying to do *)
+      | Seq ([], f) -> Seq ([], subst s f)
+
+      | Seq ([a], f) -> 
+        let a, f = subst_binding (Vars.EVar a) s f in
+        let a = Vars.ecast a Sorts.Index in
+        Seq ([a],f)
+
+      | Seq (a :: vs, f) -> 
+        let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
+        let a = Vars.ecast a Sorts.Index in
+        let vs, f = match f with
+          | Seq (vs, f) -> vs, f
+          | _ -> assert false in
+        Seq (a :: vs,f)
+
+      | Var m -> Var m
+      | Pred ts -> Pred (subst s ts)
+      | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
+      | Diff (a, b) -> Diff (subst s a, subst s b)
+      | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
+      | Atom a-> Atom (subst_generic_atom s a)
+      | And (a, b) -> And (subst s a, subst s b)
+      | Or (a, b) -> Or (subst s a, subst s b)
+      | Not a -> Not (subst s a)
+      | Impl (a, b) -> Impl (subst s a, subst s b)
+      | True -> True
+      | False -> False
+
+      | ForAll ([], f) -> subst s f
+
+      | ForAll (a :: vs, f) ->
+        let a, f = subst_binding a s (ForAll (vs,f)) in
+        mk_forall [a] f
+
+      | Exists ([], f) -> subst s f
+
+      | Exists (a :: vs, f) ->
+        let a, f = subst_binding a s (Exists (vs,f)) in
+        mk_exists [a] f
+
+      | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d) 
+
+      | Find (v :: vs, b, c, d) -> 
+        (* used because [v :: vs] are not bound in [d]  *)
+        let dummy = Fun (f_zero,[]) in
+
+        let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
+        let v = Vars.ecast v Sorts.Index in
+        match f with
+        | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
+        | _ -> assert false
+    in 
+    assoc s new_term
+
+and subst_binding 
+  : type a. Vars.evar -> esubst list -> a term -> Vars.evar * a term =
+  fun var s f ->
+  (* clear [v] entries in [s] *)
+  let s = filter_subst var s in
+
+  let right_fv = 
+    List.fold_left (fun acc (ESubst (x, y)) -> 
+        Sv.union acc (get_set_vars y)
+      ) Sv.empty s in
+
+  let all_vars = 
+    List.fold_left (fun acc (ESubst (x, y)) -> 
+        Sv.union acc (get_set_vars x)
+      ) right_fv s in
+
+  let env = ref (Vars.of_list (Sv.elements all_vars)) in
+
+  (* if [v] is appears in the RHS of [s], refresh [v] carefully *)
+  let var, s = 
+    if Sv.mem var right_fv 
+    then 
+      match var with 
+      | Vars.EVar v ->
+        let new_v = Vars.make_fresh_from_and_update env v in
+        let s = (ESubst (Var v,Var new_v)) :: s in
+        ( Vars.EVar new_v, s)
+    else ( var, s ) in
+  
+  var, subst s f
 
 and subst_message_atom (s : subst) (`Message (ord, a1, a2)) =
   `Message (ord, subst s a1, subst s a2)
 
 and subst_trace_atom (s:subst) = function
+  | `Happens a -> `Happens (subst s a)
+                            
   | `Timestamp (ord, ts, ts') ->
     `Timestamp (ord, subst s ts, subst s ts')
+      
   | `Index (ord, i, i') ->
     `Index(ord, subst_var s i,subst_var s i')
+      
 and subst_generic_atom s = function
-  | `Happens a -> `Happens (subst s a)
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
-  | #trace_atom as a -> (subst_trace_atom s a :> generic_atom)
+  | #trace_atom   as a -> (subst_trace_atom s a :> generic_atom)
 
 let subst_macros_ts table l ts t =
   let rec subst_term : type a. a term -> a term = fun t -> match t with
@@ -549,64 +801,349 @@ let subst_macros_ts table l ts t =
   in
   subst_term t
 
+(*------------------------------------------------------------------*)
+type eterm = ETerm : 'a term -> eterm
 
-(** Smart constructors for boolean terms. *)
+(** [app func t] applies [func] to [t]. [func] must preserve types. *)
+let app : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func x ->
+  let ETerm x0 = func (ETerm x) in
+  cast (sort x) x0
+  
+let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
+  let func : type c. c term -> c term = fun x -> app func x in
 
-let mk_not t1 = match t1 with
-  | Not t -> t
-  | t -> Not t
+  match at with
+  | `Message (o,t1,t2) -> 
+    let t1 = func t1
+    and t2 = func t2 in
+    `Message (o, t1, t2)
 
-let mk_and t1 t2 = match t1,t2 with
-  | True, t | t, True -> t
-  | t1,t2 -> And (t1,t2)
+  | `Timestamp (o,t1,t2) ->
+    let t1 = func t1
+    and t2 = func t2 in
+    `Timestamp (o, t1, t2)
+      
+  | `Index (o,t1,t2) ->     
+    let t1 = match func (Var t1) with
+      | Var t1 -> t1
+      | _ -> assert false
+    and t2 = match func (Var t2) with
+      | Var t2 -> t2
+      | _ -> assert false
+    in
+    `Index (o, t1, t2)
 
-let mk_ands ts = List.fold_left mk_and True ts
+  | `Happens t -> `Happens (func t)
 
-let mk_or t1 t2 = match t1,t2 with
-  | False, t | t, False -> t
-  | t1,t2 -> Or (t1,t2)
+(** Does not recurse. 
+    Applies to arguments of index atoms (see atom_map). *)
+let tmap : type a. (eterm -> eterm) -> a term -> a term = 
+  fun func0 t -> 
+  let func : type c. c term -> c term = fun x -> app func0 x in
 
-let mk_ors ts = List.fold_left mk_or False ts
+  match t with
+  | True     -> t  
+  | False    -> t  
+  | Action _ -> t
+  | Name _   -> t
+  | Var _    -> t
+      
+  | Fun (f,terms)     -> Fun (f, List.map func terms)
+  | Macro (m, l, ts)  -> Macro (m, List.map func l, func ts) 
+  | Seq (vs, b)       -> Seq (vs, func b)      
+  | Pred ts           -> Pred (func ts)                 
 
-let mk_impl t1 t2 = match t1,t2 with
-  | False, _ -> True
-  | True, t -> t
-  | t1,t2 -> Impl (t1,t2)
+  | Diff (bl, br)     -> 
+    let bl = func bl in
+    let br = func br in
+    Diff (bl, br)      
 
-let mk_impls ts t =
-  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
+  | ITE (b, c, d) -> 
+    let b = func b 
+    and c = func c
+    and d = func d in
+    ITE (b, c, d)        
 
-let mk_ite c t e = match c with
-  | True -> t
-  | False -> e
-  | _ -> ITE (c,t,e)
+  | Find (b, c, d, e) -> 
+    let c = func c 
+    and d = func d 
+    and e = func e in
+    Find (b, c, d, e)
+        
+  | ForAll (vs, b)    -> ForAll (vs, func b)      
+  | Exists (vs, b)    -> Exists (vs, func b)
 
-let mk_forall l f = if l = [] then f else ForAll (l,f)
-let mk_exists l f = if l = [] then f else Exists (l,f)
+  | And (a,b) -> 
+    let a = func a 
+    and b = func b in
+    And (a, b)
 
-let message_of_formula f =
-  ITE (f, Fun (f_true,[]), Fun (f_false,[]))
+  | Or (a,b) -> 
+    let a = func a 
+    and b = func b in
+    Or (a, b)
 
-let mk_timestamp_leq t1 t2 = match t1,t2 with
-  | _, Pred t2' -> `Timestamp (`Lt, t1, t2')
-  | _ -> `Timestamp (`Leq, t1, t2)
+  | Impl (a,b) -> 
+    let a = func a 
+    and b = func b in
+    Impl (a, b)
 
-(** Operations on vectors of indices of the same length. *)
-let mk_indices_neq vect_i vect_j =
-  List.fold_left
-    (fun acc e -> mk_or acc e)
-    False
-    (List.map2 (fun i j -> Atom (`Index (`Neq, i, j))) vect_i vect_j)
+  | Not b -> Not (func b)      
+  | Atom at -> Atom (atom_map func0 at)
 
-let mk_indices_eq vect_i vect_j =
-  List.fold_left
-    (fun acc e -> mk_and acc e)
-    True
-    (List.map2 (fun i j ->
-         if i = j then True else Atom (`Index (`Eq, i, j))
-       ) vect_i vect_j)
+let titer (f : eterm -> unit) (t : 'a term) : unit = 
+  let g e = f e; e in
+  ignore (tmap g t)
 
-(** Projection *)
+let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b = 
+  fun f t v -> 
+  let vref : 'b ref = ref v in
+  let fi e = vref := (f e !vref) in  
+  titer fi t;
+  !vref
+
+(*------------------------------------------------------------------*)
+(** {2 Matching and rewriting} *)
+
+module Match = struct 
+  (** Variable assignment (types must be compatible). *)
+  type mv = eterm Mv.t
+
+  let to_subst (mv : mv) : subst =
+    Mv.fold (fun v t subst -> 
+        match v, t with
+        | Vars.EVar v, ETerm t -> 
+          ESubst (Var v, cast (Vars.sort v) t) :: subst
+      ) mv [] 
+
+  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
+      be matched.  *)
+  type 'a pat = { p_term : 'a term; p_vars : Sv.t }
+
+  let pp_pat fmt p =
+    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ vars = @[%a@]}@]"
+      pp p.p_term 
+      (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.p_vars)
+
+  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
+      returns a map instantiating the variables [p.p_vars] as substerms 
+      of [t]. *)
+  let try_match : type a b. a term -> b pat -> mv option = 
+    fun t p -> 
+    let exception NoMatch in
+    dbg "try_match: %a with %a" pp t pp_pat p;
+
+    
+    (* Invariant: [mv] supports in included in [p.p_vars]. *)
+    let rec tmatch : type a b. a term -> b term -> mv -> mv =
+      fun t pat mv -> match t, pat with
+        | _, Var v' -> 
+          begin
+            match cast (Vars.sort v') t with
+            | exception Uncastable -> raise NoMatch
+            | t -> vmatch t v' mv
+          end
+
+        | Fun (symb, terms), Fun (symb', terms') -> 
+          let mv = smatch symb symb' mv in
+          tmatch_l terms terms' mv
+
+        | Name symb, Name symb' -> 
+          smatch symb symb' mv
+
+        | Macro ((s, sort, is), terms, ts), 
+          Macro ((s', sort', is'), terms', ts') -> 
+          if not (Sorts.equal sort sort') then raise NoMatch;
+
+          let mv = smatch (s,is) (s',is') mv in
+          tmatch ts ts' (tmatch_l terms terms' mv)
+
+        | Seq _, _ -> raise NoMatch
+
+        | Pred ts, Pred ts' -> tmatch ts ts' mv
+
+        | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
+
+        | Diff (a,b), Diff (a', b') ->
+          tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
+
+        | ITE (b,t1,t2), ITE (b',t1',t2') ->
+          tmatch_l [t1;t2] [t1';t2'] (tmatch b b' mv)
+
+        | Find _, _ -> raise NoMatch
+
+        | Atom at, Atom at' -> atmatch at at' mv
+
+        | ForAll _, _ 
+        | Exists _, _ -> raise NoMatch
+
+        | And (a,b), And (a', b') 
+        | Or (a,b), Or (a', b') 
+        | Impl (a,b), Impl (a', b') ->
+          tmatch_l [a;b] [a';b'] mv
+
+        | Not a, Not a' -> tmatch a a' mv
+
+        | True, True -> mv
+        | False, False -> mv
+
+        | _, _ -> raise NoMatch
+
+    and tmatch_l : type a b. a term list -> b term list -> mv -> mv =
+      fun tl patl mv -> 
+        List.fold_left2 (fun mv t pat -> tmatch t pat mv) mv tl patl
+
+    and smatch : type a. 
+      (a Symbols.t * Vars.index list) -> 
+      (a Symbols.t * Vars.index list) -> 
+      mv -> mv = 
+      fun (fn, is) (fn', is') mv ->
+
+        if fn <> fn' then raise NoMatch;
+
+        List.fold_left2 (fun mv i i' -> vmatch (Var i) i' mv) mv is is'
+
+    (* Match a variable of the pattern with a term. *)
+    and vmatch : type a. a term -> a Vars.var -> mv -> mv = fun t v mv ->
+      let ev = Vars.EVar v in
+      
+      if not (Sv.mem ev p.p_vars) 
+      then if t = Var v then mv else raise NoMatch (* [v] not in the pattern *)
+
+      else (* [v] in the pattern *)
+        match Mv.find ev mv with
+        (* If this is the first time we see the variable, store the subterm. *)
+        | exception Not_found -> Mv.add ev (ETerm t) mv
+
+        (* If we already saw the variable, check that the subterms are
+           identical. *)
+        | ETerm t' -> match cast (sort t) t' with
+          | exception Uncastable -> raise NoMatch
+          (* TODO: alpha-equivalent *)
+          | t' -> if t <> t' then raise NoMatch else mv
+
+    and atmatch (at : generic_atom) (at' : generic_atom) mv =
+      match at, at' with
+      | `Message (ord, t1, t2), `Message (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [t1;t2] [t1';t2'] mv
+
+      | `Timestamp (ord, t1, t2), `Timestamp (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [t1;t2] [t1';t2'] mv
+
+      | `Index (ord, t1, t2), `Index (ord', t1', t2') -> 
+        if ord <> ord' then raise NoMatch;
+        tmatch_l [Var t1; Var t2] [Var t1'; Var t2'] mv
+
+      | `Happens ts, `Happens ts' -> tmatch ts ts' mv
+
+      | _, _ -> raise NoMatch
+    in
+
+    try Some (tmatch t p.p_term Mv.empty) with
+    | NoMatch -> dbg "match failed"; None
+
+
+  (** Occurrence matched *)
+  type 'a match_occ = { occ : 'a term;
+                        mv  : mv; }
+                        
+  (** [find_map t pat func] behaves has [find], but also computes the term 
+      obtained from [t] by replacing a *single* occurence of [t'] by 
+      [func t' θ]. *)
+  let find_map :
+    type a b. a term -> b pat -> (b term -> mv -> b term) -> 
+    (b match_occ * a term) option
+    = fun t p func ->
+      let found = ref None in
+      let s_p = sort p.p_term in
+      
+      dbg "find_map: %a with %a" pp t pp_pat p;
+
+      let rec find : type a. a term -> a term = fun t ->
+        dbg "find in: %a" pp t;
+
+        if (!found) <> None then (dbg "already found"; t) (* we already found a match *)
+
+        (* no match yet, check if head matches *)
+        else 
+          match try_match t p with
+          (* head does not match, recurse  *)
+          | None -> 
+            dbg "head no match";
+            tmap (fun (ETerm t) -> ETerm (find t)) t
+
+          | Some mv -> (* head matches *)
+            dbg "head match";
+            found := Some ({ occ = cast s_p t; mv = mv; }); 
+            let t' = func (cast s_p t) mv in
+            cast (sort t) t'    (* cast needed *)
+      in
+      
+      let t = find t in
+      match !found with
+      | None -> None
+      | Some occ -> Some (occ,t)
+
+  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
+      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
+      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
+  let find : type a b. a term -> b pat -> b match_occ option = 
+    fun t p -> 
+    omap fst (find_map t p (fun t' _ -> t'))
+end
+
+(*------------------------------------------------------------------*)
+(** {2 Simplification} *)
+
+let not_ord_eq o = match o with
+  | `Eq -> `Neq
+  | `Neq -> `Eq
+
+let not_ord_eq (o,l,r) = (not_ord_eq o, l, r)
+
+(*------------------------------------------------------------------*)
+let not_message_atom (at : message_atom) = match at with
+  | `Message t          -> `Message (not_ord_eq t)
+
+let not_index_atom (at : index_atom) = match at with
+  | `Index t            -> `Index (not_ord_eq t)
+
+let not_trace_eq_atom (at : trace_eq_atom) : trace_eq_atom = match at with
+  | `Timestamp (o,t,t') -> `Timestamp (not_ord_eq (o,t,t'))
+  | `Index (o,i,i')     -> `Index     (not_ord_eq (o,i,i'))
+
+let not_eq_atom (at : eq_atom) : eq_atom = match at with
+  | `Timestamp (o,t,t') -> `Timestamp (not_ord_eq (o,t,t'))
+  | `Index (o,i,i')     -> `Index     (not_ord_eq (o,i,i'))
+  | `Message t          -> `Message   (not_ord_eq t)
+
+let rec not_simpl = function
+    | Exists (vs, f) -> ForAll(vs, not_simpl f)
+    | ForAll (vs, f) -> Exists(vs, not_simpl f)
+    | And (a, b)     -> Or (not_simpl a, not_simpl b)
+    | Or (a, b)      -> And (not_simpl a, not_simpl b)
+    | Impl (a, b)    -> And(a, not_simpl b)
+    | True           -> False
+    | False          -> True
+    | Not f          -> f
+    | Atom atom ->
+      begin
+        match atom with
+        | (`Message _                 as at)
+        | (`Index _                   as at)
+        | (`Timestamp (#ord_eq, _, _) as at) ->
+          Atom (not_eq_atom at :> generic_atom)
+
+        | `Timestamp _ | `Happens _  -> Not (Atom atom)
+      end          
+    | m -> Not m
+
+
+(*------------------------------------------------------------------*)
+(** {2 Projection} *)
 
 type projection = PLeft | PRight | PNone
 
@@ -641,10 +1178,10 @@ let pi_term ~projection term =
   | Atom a -> Atom (pi_generic_atom s a)
 
   and pi_generic_atom s = function
-   | `Message  (o,t1,t2) -> `Message (o, pi_term s t1, pi_term s t2)
+   | `Message  (o,t1,t2)      -> `Message (o, pi_term s t1, pi_term s t2)
    | `Timestamp (o, ts1, ts2) -> `Timestamp (o, pi_term s ts1, pi_term s ts2)
-   | `Index (o, i1, i2) as r -> r
-   | `Happens t -> `Happens (pi_term s t)
+   | `Index (o, i1, i2) as r  -> r
+   | `Happens t               -> `Happens (pi_term s t)
 
   in pi_term projection term
 
@@ -688,6 +1225,135 @@ let head_normal_biterm : type a. a term -> a term = fun t ->
 let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
   head_normal_biterm (Diff (t1, t2))
 
+
+(*------------------------------------------------------------------*)
+(** {2 Destructors} *)
+
+let rec destr_exists = function
+  | Exists (vs, f) -> 
+    begin
+      match destr_exists f with
+      | Some (vs', f) -> Some (vs @ vs', f)
+      | None -> Some (vs, f)
+    end
+  | _ -> None
+
+let rec decompose_exists = function
+  | Exists (vs, f) -> 
+    let vs', f0 = decompose_exists f in
+    vs @ vs', f0
+  | _ as f -> [], f
+
+let rec destr_forall = function
+  | ForAll (vs, f) -> 
+    begin
+      match destr_forall f with
+      | Some (vs', f) -> Some (vs @ vs', f)
+      | None -> Some (vs, f)
+    end
+  | _ -> None
+
+let rec decompose_forall = function
+  | ForAll (vs, f) -> 
+    let vs', f0 = decompose_forall f in
+    vs @ vs', f0
+  | _ as f -> [], f
+
+let rec destr_or = function
+  | Or (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_ors l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, Or (f, g) -> omap (fun l -> l @ [g]) (destr_ors (l-1) f)
+  | _ -> None
+
+let rec decompose_ors f = match f with
+  | Or (f, g) -> decompose_ors f @ decompose_ors g
+  | _ -> [f]
+
+let rec destr_and = function
+  | And (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_ands l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, And (f, g) -> omap (fun l -> l @ [g]) (destr_ands (l-1) f)
+  | _ -> None
+
+let rec decompose_ands f = match f with
+  | And (f, g) -> decompose_ands f @ decompose_ands g
+  | _ -> [f]
+
+let rec destr_impl = function
+  | Impl (f, g) -> Some (f,g) 
+  | _ -> None
+
+let rec destr_impls l f = match l, f with
+  | _ when l < 0 -> assert false
+  | 1, _ -> Some [f]
+  | _, Impl (f, g) -> omap (fun l -> l @ [g]) (destr_impls (l-1) f)
+  | _ -> None
+
+let rec decompose_impls f = match f with
+  | Impl (f, g) -> decompose_impls f @ decompose_impls g
+  | _ -> [f]
+
+let destr_pair : type a. a term -> (a term * a term) option = function
+  | Fun (f_pair, terms) ->
+    let t1, t2 = as_seq2 terms in
+    Some (t1, t2)
+
+  | _ -> None
+
+let destr_var : type a. a term -> a Vars.var option = function
+  | Var v -> Some v
+  | _ -> None
+
+type eatom = 
+  | EOrd : ord * 'a term * 'a term -> eatom
+  | EHappens : timestamp -> eatom
+      
+let destr_atom (at : generic_atom) : eatom = 
+  match at with
+  | `Message (ord, a, b)   -> EOrd ((ord :> ord), a, b)
+  | `Timestamp (ord, a, b) -> EOrd (ord, a, b)
+  | `Index (ord, a, b)     -> EOrd ((ord :> ord), Var a, Var b)
+  | `Happens t             -> EHappens t
+
+let as_ord_eq (ord : ord) : ord_eq = match ord with
+  | `Eq  -> `Eq
+  | `Neq -> `Neq
+  | _ -> assert false
+
+let of_eatom (eat : eatom) : generic_atom = match eat with
+  | EHappens t -> `Happens t
+  | EOrd (ord, t1, t2) ->
+    match sort t1 with
+    | Sorts.Message   -> `Message   (as_ord_eq ord, t1, t2)
+    | Sorts.Timestamp -> `Timestamp (ord, t1, t2)
+    | Sorts.Index     ->
+      let i1, i2 = oget (destr_var t1), oget (destr_var t2) in
+      `Index (as_ord_eq ord, i1, i2)
+
+    | Sorts.Boolean   -> assert false
+
+(*------------------------------------------------------------------*)
+(** {2 Sets and Maps } *)
+
+module T = struct
+  type t = eterm
+  let compare = Stdlib.compare
+end
+
+module Mt = Map.Make (T)
+module St = Set.Make (T)
+
+(*------------------------------------------------------------------*)
+(** {2 Tests} *)
+
 let () =
   let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in
   Checks.add_suite "Head normalization" [
@@ -715,7 +1381,8 @@ let () =
       let c = mkvar "c" Sorts.Message in
       let def = Symbols.Abstract 2 in
       let table,f =
-        Symbols.Function.declare_exact Symbols.builtins_table "f" (0,def) in
+        Symbols.Function.declare_exact 
+          Symbols.builtins_table (L.mk_loc L._dummy "f") (0,def) in
       let f x = Fun ((f,[]),[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term PLeft t in

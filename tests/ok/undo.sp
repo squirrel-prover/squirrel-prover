@@ -2,10 +2,10 @@ set autoIntro=false.
 
 system null.
 
-goal True.
+goal _:True.
 
 
-goal False.
+goal _:False.
 undo 1.
 Proof.
   simpl.

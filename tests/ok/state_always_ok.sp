@@ -7,15 +7,19 @@ system !_i in(c,x);s:=s;out(c,x).
 
 axiom init_ok : s@init = ok.
 
-goal forall t:timestamp, s@t = ok.
+(* set debugCompletion=true. *)
+(* set debugTactics=true. *)
+
+goal _ (t:timestamp): happens(t) => s@t = ok.
 Proof.
   induction.
-  intro Hind.
+  intro Hind Hap.
   case t. 
   (* t = init *)
   by use init_ok. 
 
   (* t = A(i) *) 
   destruct H as [i _].
-  use Hind with pred(A(i)). 
+  expand s.
+  by use Hind with pred(A(i)).
 Qed.

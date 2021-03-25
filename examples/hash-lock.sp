@@ -5,7 +5,7 @@ HASH-LOCK
 Trans. Inf. Syst. Secur., 13(1):7:1–7:23, 2009.
 
 R --> T : nR
-T --> R : < nT, h(<nR,nT>,kT) >
+T --> R : ( nT, h((nR,nT),kT) )
 R --> T : ok
 *******************************************************************************)
 
@@ -22,29 +22,29 @@ channel cR
 process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
-  out(cT,<nT,h(<nR,nT>,diff(key(i),key'(i,k)))>)
+  out(cT,(nT,h((nR,nT),diff(key(i),key'(i,k)))))
 
 process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-  if exists (i,k:index), snd(x) = h(<nR,fst(x)>,diff(key(i),key'(i,k))) then
+  if exists (i,k:index), snd(x) = h((nR,fst(x)),diff(key(i),key'(i,k))) then
     out(cR,ok)
   else
     out(cR,ko)
 
 system ((!_j R:reader(j)) | (!_i !_k T: tag(i,k))).
 
-goal wa_R1:
-  forall (j:index),
-    cond@R1(j) <=>
-    (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) &&
-      snd(output@T(i,k)) = snd(input@R1(j)) &&
-      fst(output@T(i,k)) = fst(input@R1(j)) &&
-      input@T(i,k) = output@R(j)).
+goal wa_R1 (j:index):
+  happens(R1(j)) =>
+    (cond@R1(j) <=>
+     (exists (i,k:index), T(i,k) < R1(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R1(j)) &&
+       fst(output@T(i,k)) = fst(input@R1(j)) &&
+       input@T(i,k) = output@R(j))).
 Proof.
   intro *.
-  expand cond@R1(j).
+  expand cond.
   split.
 
   project.
@@ -64,16 +64,16 @@ Proof.
   by exists i,k.
 Qed.
 
-goal wa_R2:
-  forall (j:index),
-    cond@R2(j) <=>
-    (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) &&
-      snd(output@T(i,k)) = snd(input@R2(j)) &&
-      fst(output@T(i,k)) = fst(input@R2(j)) &&
-      input@T(i,k) = output@R(j))).
+goal wa_R2 (j:index):
+  happens(R2(j)) =>
+   (cond@R2(j) <=>
+     (not(exists (i,k:index), T(i,k) < R2(j) && R(j) < T(i,k) &&
+       snd(output@T(i,k)) = snd(input@R2(j)) &&
+       fst(output@T(i,k)) = fst(input@R2(j)) &&
+       input@T(i,k) = output@R(j)))).
 Proof.
   intro *.
-  expand cond@R2(j).
+  expand cond.
   split.
 
   by use H; exists i,k.

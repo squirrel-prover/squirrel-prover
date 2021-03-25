@@ -26,6 +26,7 @@ with examples/wip.sp. But we cannot model the reader's conditional with
 WARNING
 - Actually, this equivalence cannot hold because a tag and a reader can be
 desynchronised in the left system, while it cannot happen in the right system.
+=> PROOF NOT UPDATED WITH NEW TRACE MODEL
 *******************************************************************************)
 
 hash h

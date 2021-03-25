@@ -126,9 +126,6 @@ let is_out p = is_out_i (L.unloc p)
 
 (*------------------------------------------------------------------*)
 type proc_error_i =
-  | UnknownProcess of string
-  | ProcessAlreadyDecl of string
-  | UnknownChannel of string
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
@@ -136,15 +133,7 @@ type proc_error_i =
 type proc_error = L.t * proc_error_i
 
 let pp_proc_error_i fmt = function
-  | UnknownProcess s ->
-    Fmt.pf fmt "unknown processus %s" s
-
-  | UnknownChannel s ->
-    Fmt.pf fmt "unknown channel %s" s
-
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
-
-  | ProcessAlreadyDecl s -> Fmt.pf fmt "processus name [%s] already exists" s
 
   | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
                                        defined with arity %i" s i j
@@ -167,12 +156,9 @@ let proc_err loc e = raise (ProcError (loc,e))
 type Symbols.data += Process_data of pkind * process
 
 let declare_nocheck table name kind proc =
-  try
     let data = Process_data (kind,proc) in
     let def = () in
-    Symbols.Process.declare_exact table (L.unloc name) ~data def
-  with Symbols.Multiple_declarations _ ->
-    proc_err (L.loc name) (ProcessAlreadyDecl (L.unloc name))
+    Symbols.Process.declare_exact table name ~data def
 
 let find_process table pname =
   match Symbols.Process.get_all pname table with
@@ -181,12 +167,8 @@ let find_process table pname =
   (* The data associated to a process must be a [Process_data _]. *)
 
 let find_process0 table (lsymb : lsymb) =
-  let name = L.unloc lsymb in
-  try
-    let pname = Symbols.Process.of_string name table in
-    find_process table pname
-  with
-  | Symbols.Unbound_identifier _ -> proc_err (L.loc lsymb) (UnknownProcess name)
+  let name = Symbols.Process.of_lsymb lsymb table in
+  find_process table name
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
@@ -230,20 +212,14 @@ let check_proc table env p =
       Theory.check table ~local:true env test Sorts.eboolean ;
       check_p env p
     | Apply (id, ts) ->
-      begin
-        try
-          let kind,_ = find_process0 table id in
-          if List.length kind <> List.length ts then
-            proc_err loc (Arity_error (L.unloc id,
-                                       List.length ts,
-                                       List.length kind));
-          List.iter2
-            (fun (_, k) t -> Theory.check table ~local:true env t k)
-            kind ts
-        with
-        | Not_found -> proc_err (L.loc id) (UnknownProcess (L.unloc id))
-      end
-
+      let kind,_ = find_process0 table id in
+      if List.length kind <> List.length ts then
+        proc_err loc (Arity_error (L.unloc id,
+                                   List.length ts,
+                                   List.length kind));
+      List.iter2
+        (fun (_, k) t -> Theory.check table ~local:true env t k)
+        kind ts
   in
   check_p env p
 
@@ -283,7 +259,7 @@ type p_env = {
    * unambiguous "refreshed" variables. For example, !_i !_i P(i)
    * becomes !_i !_i0 P(i0): in the second binding, i is refreshed into
    * i0. *)
-  alias : string ;
+  alias : lsymb ;
     (* current alias used for action names in the process *)
   indices : Vars.index list ;
     (* current list of bound indices (coming from Repl or Exists constructs),
@@ -315,16 +291,12 @@ type p_env = {
   facts : Term.formula list ;
     (* list of formulas to create the condition term of the action,
      * indices and variables are the ones after the refresh *)
-  updates : (string * Vars.index list * Term.message) list ;
+  updates : (lsymb * Vars.index list * Term.message) list ;
     (* list of updates performed in the action,
      * indices in the second component, and indices and variables in the
      * Term.message are the ones after the refresh *)
 
 }
-
-let parse_channel c =
-  try Channel.of_string (L.unloc c) with
-  | Not_found -> proc_err (L.loc c) (UnknownChannel (L.unloc c))
 
 let parse_proc (system_name : System.system_name) init_table proc =
 
@@ -380,11 +352,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let register_action loc a output table env =
     (* In strict alias mode, we require that the alias T is available. *)
     let exact = Config.strict_alias_mode () in
-    let table,a' = try Action.fresh_symbol table ~exact a with
-      | Symbols.Multiple_declarations s ->
-        let err = "symbol " ^ a ^ " is already defined" in
-        proc_err loc (StrictAliasError err)
-    in
+    let table,a' = Action.fresh_symbol table ~exact a in
 
     let action = List.rev env.action in
     let in_ch, in_var = match env.inputs with
@@ -439,7 +407,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let updates =
       List.map
         (fun (s,l,t) ->
-          (Symbols.Macro.of_string s table, Sorts.Message, l),
+          (Symbols.Macro.of_lsymb s table, Sorts.Message, l),
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
@@ -517,7 +485,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     let env =
     { env with
-      alias  = L.unloc a' ;
+      alias  = a' ;
       isubst = isubst' ;
       msubst = msubst' }
     in
@@ -528,7 +496,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
      * does not prevent conflicts with variables bound in
      * the process (in Repl, Let, In...) *)
     let table,n' =
-      Symbols.Name.declare table (L.unloc n) (List.length env.indices) in
+      Symbols.Name.declare table n (List.length env.indices) in
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in
       Theory.App
@@ -541,7 +509,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     (table,env,p)
 
   | Alias (p,a) ->
-    let env = { env with alias = L.unloc a } in
+    let env = { env with alias = a } in
     (table,env,p)
 
   | _ -> assert false
@@ -557,7 +525,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
       if search_dep
-      then Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+      then Theory.find_app_terms t' (List.map (fun (s,_,_) -> L.unloc s) env.updates)
       else []
     in
     let body =
@@ -566,7 +534,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
     let invars = List.map snd env.inputs in
     let table,x' =
-      Macros.declare_global table (L.unloc x) ~inputs:invars
+      Macros.declare_global table x ~inputs:invars
         ~indices:(List.rev env.indices) ~ts body
     in
     let x'_th =
@@ -635,7 +603,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         table)
 
     | In (c,x,p) ->
-      let ch = parse_channel c table in
+      let ch = Channel.of_lsymb c table in
       let env,x' = make_fresh env Sorts.Message (L.unloc x) in
       let in_th =
         Theory.var_i dum (Vars.name x')
@@ -775,7 +743,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         table )
 
     | Set (s,l,t,p) ->
-      if List.exists (fun (s',_,_) -> L.unloc s = s') env.updates
+      if List.exists (fun (s',_,_) -> L.unloc s = L.unloc s') env.updates
       then
         (* Not allowed because a state macro can have only 2 values:
            - either the value at the end of the current action,
@@ -791,7 +759,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
             l
         in
         let updated_states =
-          Theory.find_app_terms t' (List.map (fun (s,_,_) -> s) env.updates)
+          Theory.find_app_terms t' (List.map (fun (s,_,_) -> L.unloc s) env.updates)
         in
         let t'_tm =
           Term.subst_macros_ts table updated_states (Term.Var ts)
@@ -799,7 +767,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         in
         let env =
           { env with
-            updates = (L.unloc s,l',t'_tm)::env.updates }
+            updates = (s,l',t'_tm)::env.updates }
         in
         let p',pos',table = p_update ~table ~env p in
 
@@ -811,7 +779,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
           table )
 
     | Out (c,t,p) ->
-      let ch = parse_channel c table in
+      let ch = Channel.of_lsymb c table in
       let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
 
       let table,env,a' = register_action loc env.alias (Some (ch,t)) table env in
@@ -850,7 +818,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       in
       let p',pos',table = p_in ~table ~env ~pos:0 ~pos_indices:[] proc in
 
-      let c_dummy = L.mk_loc L._dummy Symbols.dummy_channel_string in
+      let c_dummy = Symbols.dummy_channel_lsymb in
 
       let p'_i = Out (c_dummy, Theory.empty dum,p') in
       let p' = L.mk_loc loc p'_i in
@@ -863,7 +831,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   in
 
   let env =
-    { alias = "A" ;
+    { alias = L.mk_loc L._dummy "A" ;
       indices = [] ;
       vars_env = env_ts ;
       isubst = [] ;
@@ -877,10 +845,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
   (proc, table)
 
-let declare_system table (system_name:string) proc =
-  if not (System.is_fresh system_name table) then begin
-    Fmt.epr "System %s already defined" system_name;
-    assert false end;
+let declare_system table (system_name : lsymb) proc =
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
   check_proc table [] proc ;
   let table, system_name = System.declare_empty table system_name in

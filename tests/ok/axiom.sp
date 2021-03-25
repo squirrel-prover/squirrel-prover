@@ -11,8 +11,7 @@ axiom dummy_false_axiom :
 forall (ma : message),
 exists (m:message), m=k && ma=k.
 
-goal [left] dummy :
-forall (ma : message),
+goal [left] dummy (ma : message) :
 ma=k.
 
 Proof.
@@ -21,8 +20,7 @@ Proof.
  auto.
 Qed.
 
-goal [right]
-forall (ma : message),
+goal [right] _ (ma : message):
 ma=k.
 
 Proof.
@@ -31,8 +29,7 @@ Proof.
  auto.
 Qed.
 
-goal
-forall (ma : message),
+goal _ (ma : message) :
 ma=k.
 
 Proof.

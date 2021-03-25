@@ -12,7 +12,7 @@ abstract u : message
 
 senc enc,dec
 
-system !_i (out(c,<diff(n,m), enc(n,r(i),sk)>) | out(c,enc(m,r(i),sk))).
+system !_i (out(c,(diff(n,m), enc(n,r(i),sk))) | out(c,enc(m,r(i),sk))).
 
 equiv test.
 Proof.
@@ -24,8 +24,10 @@ fresh 0.
 yesif 0.
 by auto.
 
-expandall.
-fa 1; fa 2; fa 2; fa 2.  cca1 2.
+expandall. 
+fa 1; fa 2; fa 2. 
+fa 2.  
+cca1 2.
 
 admit 2.
 Qed.

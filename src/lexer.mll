@@ -37,11 +37,15 @@ rule token = parse
 | ']'                 { RBRACKET }
 | '?'                 { QMARK }
 | ','                 { COMMA }
+| "!"                 { BANGU }
 | '.'                 { DOT }
 | ':'                 { COLON }
 | ';'                 { SEMICOLON }
 | '*'                 { STAR }
 | '_'                 { UNDERSCORE }
+| "//"                { SLASHSLASH }
+| "/="                { SLASHEQUAL }
+| '/'                 { SLASH }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }
@@ -113,6 +117,11 @@ rule token = parse
 | "assert"            { ASSERT }
 | "exn"               { EXN }
 | "use"               { USE }
+| "rewrite"           { REWRITE }
+| "revert"            { REVERT }
+| "generalize"        { GENERALIZE }
+| "depends"           { DEPENDS }
+| "clear"             { CLEAR }
 | "ddh"               { DDH }
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }

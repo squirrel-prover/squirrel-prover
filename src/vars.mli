@@ -25,8 +25,14 @@ val name : 'a var -> string
 
 val sort : 'a var -> 'a Sorts.t
 
+val cast  : 'a var -> 'b Sorts.sort -> 'b var
+val ecast :   evar -> 'a Sorts.sort -> 'a var
+
+val equal : 'a var -> 'b var -> bool
+
 (** Print a variable, only showing its name. *)
-val pp : Format.formatter -> 'a var -> unit
+val pp   : Format.formatter -> 'a var -> unit
+val pp_e : Format.formatter ->   evar -> unit
 
 (** Print a list of variables, only showing their names. *)
 val pp_list : Format.formatter -> 'a var list -> unit
@@ -70,7 +76,9 @@ exception Undefined_Variable
 
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
-val rm_var : env -> 'a var -> env
+val rm_var  : env -> 'a var -> env
+
+val rm_evar : env -> evar -> env
 
 
 (** [make_fresh env sort prefix]
@@ -92,3 +100,16 @@ val make_fresh_from : env -> 'a var -> env * 'a var
 
 (** Combines [make_fresh_from] and [make_fresh_and_update]. *)
 val make_fresh_from_and_update : env ref -> 'a var -> 'a var
+
+
+(*------------------------------------------------------------------*)
+(** {2 Set and Maps} *)
+
+module Sv : sig 
+  include Set.S with type elt = evar
+
+  val add_list : t -> 'a var list -> t
+end
+
+module Mv : Map.S with type key = evar
+

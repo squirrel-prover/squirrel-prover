@@ -1,3 +1,7 @@
+module L = Location
+type lsymb = Symbols.lsymb
+
+(*------------------------------------------------------------------*)
 include Symbols.System
 
 type system_name = Symbols.system Symbols.t
@@ -5,16 +9,10 @@ type system_name = Symbols.system Symbols.t
 (*------------------------------------------------------------------*)
 type system_error = 
   | SE_ShapeError
-  | SE_UnknownSystem of string
-  | SE_SystemAlreadyDefined of string
 
 let pp_system_error fmt = function
   | SE_ShapeError -> 
     Fmt.pf fmt "cannot register a shape twice with distinct indices" 
-  | SE_UnknownSystem s -> 
-    Fmt.pf fmt "system [%s] unknown" s
-  | SE_SystemAlreadyDefined s -> 
-    Fmt.pf fmt "system [%s] already defined" s
 
 exception SystemError of system_error
 
@@ -36,23 +34,15 @@ module Msh = Map.Make (ShapeCmp)
   * be obtained through the first map, but this avoids a double lookup. *)
 type Symbols.data += System_data of Action.descr Msh.t * Symbols.action Symbols.t Msh.t
 
-let of_string system_name (table : Symbols.table) =
-  try Symbols.System.of_string system_name table with
-  | Symbols.Unbound_identifier _ -> 
-    system_err (SE_UnknownSystem system_name)
+let of_string (name : lsymb) (table : Symbols.table) =
+  Symbols.System.of_lsymb name table 
 
 let declare_empty table system_name =
   let def = () in
   let data = System_data (Msh.empty,Msh.empty) in
-  try Symbols.System.declare_exact table system_name ~data def with
-  | Symbols.Multiple_declarations _ ->
-    system_err (SE_SystemAlreadyDefined system_name)
+  Symbols.System.declare_exact table system_name ~data def 
 
 (*------------------------------------------------------------------*)
-let is_fresh s_str table =
-  try ignore (Symbols.System.of_string s_str table); false
-  with Symbols.Unbound_identifier _ -> true
-
 let get_data table s_symb =
   match Symbols.System.get_data s_symb table with
     | System_data (m,d) -> m,d
@@ -120,7 +110,9 @@ let rec define_dummies table symbs len =
   let dummy = Action.dummy len in
   let dum_shape = Action.get_shape dummy in
   if Msh.mem dum_shape symbs then table,symbs else
-  let table,dum_symb = Action.fresh_symbol ~exact:false table "_Dummy" in
+  let table,dum_symb = 
+    Action.fresh_symbol ~exact:false table (L.mk_loc Location._dummy "_Dummy") 
+  in
   let table = Action.define_symbol table dum_symb [] dummy in
   let symbs = Msh.add dum_shape dum_symb symbs in
   table,symbs

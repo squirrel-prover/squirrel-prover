@@ -11,6 +11,7 @@ name n:message
 name m:message
 system null.
 
+set debugTactics=true.
 (* Test direct case *)
 equiv test : h(diff(m,n),k),h(diff(n,m),k) .
 Proof.
@@ -26,7 +27,7 @@ by auto.
 Qed.
 
 
-system [test]  in(c,x); let surp = diff(m,n) in let mac = h(<x,surp>,k) in  out(c,mac); out(c,h(diff(<x,n>,<x,m>),k)).
+system [test]  in(c,x); let surp = diff(m,n) in let mac = h((x,surp),k) in  out(c,mac); out(c,h(diff((x,n),(x,m)),k)).
 
 equiv [left,test] [right,test] test2.
 Proof.
@@ -48,11 +49,11 @@ project.
 
 (* Here, if the macros are not correclty projected, we cannot prove the goal,
 else it is automatically simplified. *)
-split. by auto. 
-by split; intro H; case H; depends A, A1; auto.
+split; 1: by auto. 
+by split; intro H0; case H0; depends A, A1. 
 
-split. by auto. 
-by intro H; case H; depends A, A1; auto.
+split; 1: by auto. 
+by split; intro H0; case H0; depends A, A1. 
 
 fresh 1.
 Qed.

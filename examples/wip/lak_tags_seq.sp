@@ -291,8 +291,8 @@ case try find i,k such that
 (* TODO euf D0 crashes here... I'm re-using wa_R1_left instead *)
 use wa_R1_left with i1,j. use H3.
 (* TODO understand why these "harmless" substitutions break the proof
-substitute fst(output@T(i1,k2)),nT(i1,k2).
-substitute fst(input@R1(j)),nT(i1,k2). *)
+subst fst(output@T(i1,k2)),nT(i1,k2).
+subst fst(input@R1(j)),nT(i1,k2). *)
 assert h(<<input@T(i,k),nT(i,k)>,tag1>,key(i)) = h(<<nR(j),nT(i1,k2)>,tag1>,key(i1)).
 euf M10. (* This is almost a collision-resistance step *)
 

@@ -26,11 +26,11 @@ Qed.
 goal condAtInit:
   cond@init.
 Proof.
-expand cond@init.
+by expand cond@init.
 Qed.
 
 goal updateAtInit:
   forall (i,j:index), kT(i,j)@init = n0(i,j).
 Proof.
-auto.
+ by intro *; expand kT.
 Qed.
