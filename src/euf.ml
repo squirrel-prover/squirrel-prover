@@ -11,7 +11,7 @@ exception Bad_ssc
 class check_key
     ~allow_vars ~allow_functions
     ~system table head_fn key_n = object (self)
-  inherit Iter.iter_approx_macros ~exact:false ~system table as super
+  inherit Iter.iter_approx_macros ~exact:false ~full:true ~system table as super
   method visit_message t = match t with
     | Term.Fun ((fn,_), [m;Term.Name _]) when fn = head_fn ->
       self#visit_message m

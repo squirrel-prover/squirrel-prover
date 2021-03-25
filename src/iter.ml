@@ -122,8 +122,9 @@ end
   * any guarantee on the indices and action used for that expansion,
   * because [get_dummy_definition] is used -- this behaviour is disabled
   * with [exact], in which case all macros will be expanded and must
-  * thus be defined. *)
-class iter_approx_macros ~exact ~system table = object (self)
+  * thus be defined. 
+  * If [full] is false, may not visit all macros. *)
+class iter_approx_macros ~exact ~full ~system table = object (self)
 
   inherit iter ~system table as super
 
@@ -134,8 +135,10 @@ class iter_approx_macros ~exact ~system table = object (self)
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
-            self#visit_message
-              (Macros.get_definition system table Sorts.Message mn is a)
+            if full || Macros.is_defined mn a table then
+              self#visit_message
+                (Macros.get_definition system table Sorts.Message mn is a)
+            else ()
           else if not (List.mem mn checked_macros) then begin
             checked_macros <- mn :: checked_macros ;
             self#visit_message
@@ -159,7 +162,7 @@ end
    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
    might obtain meaningless terms provided by [get_dummy_definition]. *)
 class get_f_messages ?(drop_head=true) ~system table f k = object (self)
-  inherit iter_approx_macros ~exact:true ~system table as super
+  inherit iter_approx_macros ~exact:true ~full:true ~system table as super
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
   method visit_message = function
@@ -186,7 +189,7 @@ end
 (** Get the terms of given type, that do not appear under a symbol of the
    excluded type. *)
 class get_ftypes_term ?excludesymtype ~system table symtype = object (self)
-  inherit iter_approx_macros ~exact:true ~system table as super
+  inherit iter_approx_macros ~exact:true ~full:true ~system table as super
   val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
@@ -221,7 +224,7 @@ let get_ftypes ?excludesymtype ~system table elem stype =
 
 (** {2 If-Then-Else} *)
 class get_ite_term ~system table = object (self)
-  inherit iter_approx_macros ~exact:true ~system table as super
+  inherit iter_approx_macros ~exact:true ~full:false ~system table as super
   val mutable ite : (Term.formula * Term.message * Term.message) option = None
   method get_ite = ite
   method visit_message = function

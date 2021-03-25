@@ -4,7 +4,7 @@ exception Var_found
 exception Not_name
 
 class find_name ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
+  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
 
   method visit_message t = match t with
     | Term.Name (n,_) -> if n = name then raise Name_found
@@ -13,7 +13,7 @@ class find_name ~(system:SystemExpr.system_expr) table exact name = object (self
 end
 
 class get_name_indices ~(system:SystemExpr.system_expr) table exact name = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
+  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
 
   val mutable indices : (Vars.index list) list = []
   method get_indices = List.sort_uniq Stdlib.compare indices
@@ -25,7 +25,7 @@ class get_name_indices ~(system:SystemExpr.system_expr) table exact name = objec
 end
 
 class get_actions ~(system:SystemExpr.system_expr) table exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~system table as super
+  inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
 
   (* The boolean is set to true only for input macros.
    * In that case, when building phi_proj we require a strict inequality on

@@ -2487,7 +2487,7 @@ let () =
 exception Not_context
 
 class ddh_context ~(system:SystemExpr.system_expr) table exact a b c = object (self)
- inherit Iter.iter_approx_macros ~exact ~system table as super
+ inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
 
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn table with
@@ -2520,7 +2520,7 @@ end
 exception Macro_found
 
 class find_macros ~(system:SystemExpr.system_expr) table exact  = object (self)
- inherit Iter.iter_approx_macros ~exact ~system table as super
+ inherit Iter.iter_approx_macros ~exact ~full:true ~system table as super
 
   method visit_macro mn is a =
     match Symbols.Macro.get_def mn table with
