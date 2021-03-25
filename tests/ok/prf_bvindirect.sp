@@ -10,7 +10,7 @@ name m : index->message
 
 channel c
 
-system !_i out(c,<h(n(i),k),seq(i->h(n(i),k))>).
+system !_i out(c,(h(n(i),k),seq(i->h(n(i),k)))).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (tau:timestamp,i:index) : output@tau, diff(h(n(i),k),h(m(i),k)).

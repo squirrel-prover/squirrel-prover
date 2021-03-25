@@ -26,7 +26,7 @@ Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the key occurs in the context. *)
-equiv fail : <k,enc(n,r,diff(k,kbis))>.
+equiv fail : (k,enc(n,r,diff(k,kbis))).
 Proof.
   checkfail enckp 0 exn BadSSC.
 Abort.
@@ -44,7 +44,7 @@ Abort.
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the random seed occurs in another action. *)
 system [sharedrnd] !_i
-       (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>) | out(c,enc(m,r1(i),diff(k,kbis)))).
+       (out(c,(diff(n,m), enc(n,r1(i),diff(k,kbis)))) | out(c,enc(m,r1(i),diff(k,kbis)))).
 
 equiv  [left,sharedrnd]  [right,sharedrnd] test.
 Proof.
@@ -59,7 +59,7 @@ Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the random seed occur in the context. *)
-system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
+system  [sharedrndframe] !_i (out(c,(diff(n,m), enc(n,r1(i),diff(k,kbis))))).
 equiv  [left,sharedrndframe]  [right,sharedrndframe] test2.
 Proof.
 enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
@@ -70,7 +70,7 @@ Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the ranodm seed is not a name. *)
-system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
+system [nornd] !_i (out(c,(n, enc(n,r1(i),diff(k,kbis)))) | out(c,enc(n,ok,k))).
 
 equiv [left,nornd] [right,nornd] test3.
 Proof.
@@ -82,7 +82,7 @@ Abort.
 
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the random occurs in the context. *)
-equiv test : <r,enc(n,r,diff(k,kbis))>.
+equiv test : (r,enc(n,r,diff(k,kbis))).
 Proof.
   enckp 0.
   (* the tactic succeeds, but create a false reachability goal *)

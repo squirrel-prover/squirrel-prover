@@ -20,8 +20,8 @@ PFA <-> PDIS : SSH key exchange, deriving an ideal key k11.
 
 PDIS -> SDIS : g^a
 SDIS-> PDIS : g^b, pkS, sign(h(g^a,g^b, g^ab),skS) )
-PDIS -> PFA : enc(<"sign request",h(g^a,g^b, g^ab)>,k11 )
-PFA -> PDIS : enc(<"sign answer",sign(h(g^a,g^b, g^ab),skP)>,k11 )
+PDIS -> PFA : enc(("sign request",h(g^a,g^b, g^ab)),k11 )
+PFA -> PDIS : enc(("sign answer",sign(h(g^a,g^b, g^ab),skP)),k11 )
 PDIS -> SDIS : enc( sign(g(g^a,g^b,g^ab),skP) , g^ab)
 
 
@@ -90,16 +90,16 @@ senc enc,dec with h
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
  || exists (i:index, m1:message, m2:message)
-      m = <forwarded, h(<<g^a(i),m1>,m2>, hKey)> (* O_FPS *)
+      m = (forwarded, h(((g^a(i),m1),m2), hKey)) (* O_FPS *)
  || exists (i:index, m1:message, m2:message)
-      m = h(<<g^ake1(i),m1>,m2>, hKey) (* O_KE1 *)
+      m = h(((g^ake1(i),m1),m2), hKey) (* O_KE1 *)
  )
   &&
 (sk <> kS
  || exists (i:index, m1:message, m2:message)
-      m = <forwarded, h(<<m1,g^b(i)>,m2>, hKey)> (* O_FPS *)
+      m = (forwarded, h(((m1,g^b(i)),m2), hKey)) (* O_FPS *)
  || exists (i:index, m1:message, m2:message)
-      m = h(<<m1,g^bke1(i)>,m2>, hKey) (* O_KE1 *)
+      m = h(((m1,g^bke1(i)),m2), hKey) (* O_KE1 *)
 )
 
 
@@ -110,7 +110,7 @@ process P1FA =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidP = h(<<g^ake11,gB>,k11>, hKey) in
+  let sidP = h(((g^ake11,gB),k11), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
   out(cP, enc(sign(sidP,kP),r,k11));
@@ -122,7 +122,7 @@ process P1FA =
     let x = dec(y,k11) in
     if x <> fail then
     if fst(x) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x)>,kP)>,r2(i),k11))
+    out(cP, enc((anssign, sign((forwarded,snd(x)),kP)),r2(i),k11))
   ).
 
 process PDIS =
@@ -132,8 +132,8 @@ process PDIS =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
-  out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
+  let sidS0 = h(((gP0,g^bke11),k11), hKey) in
+  out(cS, ((pk(kS),g^bke11),sign(sidS0, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
       out(cS,ok);
@@ -145,10 +145,10 @@ process PDIS =
   out(cP,ok);
   (* begin Pdis1 *)
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidP = h(((g^a1,gB),gB^a1), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
-    out(cP, enc( <reqsign, sidP>,r3,k11));
+    out(cP, enc( (reqsign, sidP),r3,k11));
     in(cP, signans);
     let y = dec(signans,k11) in
     if y <> fail then
@@ -164,11 +164,11 @@ process SDIS =
 
   (* begin SDIS1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <<pk(kS),g^b1>,sign(sidS, kS)>);
+  let sidS = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, ((pk(kS),g^b1),sign(sidS, kS)));
   in(cS, encP );
   let x = dec(encP,gP^b1) in
-  if checksign(x,pk(kP)) = <forwarded,sidS> then
+  if checksign(x,pk(kP)) = (forwarded,sidS) then
     Sok : out(cS,ok).
 
 system [fullSSH] K: (P1FA | SDIS | PDIS).
@@ -180,7 +180,7 @@ process P1FADDH =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidP = h(<<g^ake11,gB>,k11>, hKey) in
+  let sidP = h(((g^ake11,gB),k11), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
   out(cP, enc(sign(sidP,kP),r,k11));
@@ -192,7 +192,7 @@ process P1FADDH =
     let x2= dec(y,k11) in
     if x2 <> fail then
     if fst(x2) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x2)>,kP)>,r2(i),k11))
+    out(cP, enc((anssign, sign((forwarded,snd(x2)),kP)),r2(i),k11))
   )
 
 process PDISDDH =
@@ -202,8 +202,8 @@ process PDISDDH =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0 = h(<<gP0,g^bke11>,k11>, hKey) in
-  out(cS, <<pk(kS),g^bke11>,sign(sidS0, kS)>);
+  let sidS0 = h(((gP0,g^bke11),k11), hKey) in
+  out(cS, ((pk(kS),g^bke11),sign(sidS0, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP0^bke11),pk(kP)) = sidS0 then
   out(cS,ok);
@@ -242,7 +242,7 @@ process P1FAauth =
   out(cP,ok);
   (* begin P1 *)
   in(cP,t);
-  let sidPaF = h(<<g^ake11,gB>,k11>, hKey) in
+  let sidPaF = h(((g^ake11,gB),k11), hKey) in
   let pkSaF = fst(t) in
   if pkSaF = pk(kS) && checksign(snd(t),pkS) = sidPaF then
   out(cP, enc(sign(sidPaF,kP),r,k11));
@@ -254,7 +254,7 @@ process P1FAauth =
     let x3 = dec(y3,k11) in
     if x3 <> fail then
     if fst(x3) = reqsign then
-    out(cP, enc(<anssign, sign(<forwarded,snd(x3)>,kP)>,r2(i),k11))
+    out(cP, enc((anssign, sign((forwarded,snd(x3)),kP)),r2(i),k11))
   )
 
 process PDISauth =
@@ -264,8 +264,8 @@ process PDISauth =
   (* end S0 *)
   (* begin S1 *)
   in(cS,garbage);
-  let sidS0a = h(<<gP1,g^bke11>,k11>, hKey) in
-  out(cS, <<pk(kS),g^bke11>,sign(sidS0a, kS)>);
+  let sidS0a = h(((gP1,g^bke11),k11), hKey) in
+  out(cS, ((pk(kS),g^bke11),sign(sidS0a, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP1^bke11),pk(kP)) = sidS0a then
   out(cS,ok);
@@ -278,10 +278,10 @@ process PDISauth =
   (* begin Pdis1 *)
 
   in(cP,t);
-  let sidPa = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidPa = h(((g^a1,gB),gB^a1), hKey) in
   let pkSa = fst(t) in
   if pkSa = pk(kS) && checksign(snd(t),pkSa) = sidPa then
-  out(cP, enc( <reqsign, sidPa>,r3,k11));
+  out(cP, enc( (reqsign, sidPa),r3,k11));
   in(cP, signans);
   let ya = dec(signans,k11) in
   if ya <> fail then
@@ -302,11 +302,11 @@ process SDISauth =
 
   (* begin SDIS1 *)
   in(cS,garbage);
-  let sidSa = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <<pk(kS),g^b1>,sign(sidSa, kS)>);
+  let sidSa = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, ((pk(kS),g^b1),sign(sidSa, kS)));
   in(cS, encP );
   let x4 = dec(encP,gP^b1) in
-  if checksign(x4,pk(kP)) = <forwarded,sidSa> then
+  if checksign(x4,pk(kP)) = (forwarded,sidSa) then
     out(cS,ok);
     in(cS,challenge);
     try find i such that gP = g^a(i) || gP = g^a1 in
@@ -321,7 +321,7 @@ system [auth] K: ( P1FAauth | SDISauth | PDISauth).
 impossible to confuse a hash with the tag forwarded, and another hash. *)
 
 axiom [auth] hashlengthnotpair : forall (m1,m2:message),
-   <forwarded,h(m1,hKey)> <> h(m2, hKey)
+   (forwarded,h(m1,hKey)) <> h(m2, hKey)
 
 (* The following axiom is a modelling trick. We need at some point to use an
 hypothesis that require to instantiate an index, but this index is not used. *)
@@ -353,7 +353,7 @@ Proof.
   destruct Euf as [H1 [_|[i m m1 [_|[i1 H2]]]]]; 
   1: by auto.
   by use hashlengthnotpair with 
-   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+   ((m,g^b(i)),m1), ((g^a1,input@PDIS4),input@PDIS4^a1).
 
   use signnottag with sidPa@P2, kP.
   use Hc with i1.
@@ -392,15 +392,15 @@ Proof.
   destruct H1 as [H1| [i1 m2 m3 H1]]. 
 (* sub case with wrong tag *)
   use Hc with i.
-  assert h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey) = h(<<g^a(i),m>,m1>,hKey);
+  assert h(((input@SDIS,g^b1),input@SDIS^b1),hKey) = h(((g^a(i),m),m1),hKey);
   1: by auto.
   by collision.
-  by use hashlengthnotpair with <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake1(i1),m2>,m3>.
+  by use hashlengthnotpair with ((input@SDIS,g^b1),input@SDIS^b1), ((g^ake1(i1),m2),m3).
 
 (* else, it comes from P2, and is not well tagged *)
   
  by use hashlengthnotpair with 
-  <<input@SDIS,g^b1>,input@SDIS^b1>, <<g^ake11,input@P1>,k11> as Hlen;
+  ((input@SDIS,g^b1),input@SDIS^b1), ((g^ake11,input@P1),k11) as Hlen;
  intro *; case Euf; expand sidPaF. 
 
 (* Honest case of signature produced by Fa.
@@ -437,8 +437,8 @@ Proof.
   use Hc with i.
   right.
   expand pkSa, sidPa. 
-  assert (h(<<g^a1,input@PDIS4>,input@PDIS4^a1>,hKey) =
-          h(<<input@SDIS,g^b1>,input@SDIS^b1>,hKey)) as Hcol;
+  assert (h(((g^a1,input@PDIS4),input@PDIS4^a1),hKey) =
+          h(((input@SDIS,g^b1),input@SDIS^b1),hKey)) as Hcol;
   1: auto.
   collision => [[A _] _]. 
   by rewrite A. 

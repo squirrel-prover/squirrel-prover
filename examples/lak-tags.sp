@@ -6,8 +6,8 @@ unbounded verification of privacy-type properties. Journal of Computer
 Security, 27(3):277–342, 2019.
 
 R --> T : nR
-T --> R : <nT,h(<<nR,nT>,tag1>,kT)>
-R --> T : h(<<h(<<nR,nT>,tag1>,kT),nR>,tag2>,kR)
+T --> R : (nT,h(((nR,nT),tag1),kT))
+R --> T : h(((h(((nR,nT),tag1),kT),nR),tag2),kR)
 
 We consider tags in the messages (tag1 and tag2) to ease the proof.
 
@@ -31,20 +31,20 @@ channel cR
 process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
-  let m2 = h(<<nR,nT>,tag1>,diff(key(i),key'(i,k))) in
-  out(cT,<nT,m2>)
+  let m2 = h(((nR,nT),tag1),diff(key(i),key'(i,k))) in
+  out(cT,(nT,m2))
 
 process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
   if exists (i,k:index),
-     snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
+     snd(x) = h(((nR,fst(x)),tag1),diff(key(i),key'(i,k)))
   then
     out(cR, try find i,k such that
-              snd(x) = h(<<nR,fst(x)>,tag1>,diff(key(i),key'(i,k)))
+              snd(x) = h(((nR,fst(x)),tag1),diff(key(i),key'(i,k)))
             in
-              h(<<snd(x),nR>,tag2>,diff(key(i),key'(i,k))))
+              h(((snd(x),nR),tag2),diff(key(i),key'(i,k))))
   else
     out(cR,ko)
 
@@ -124,7 +124,7 @@ Qed.
 
 goal [left] wa_R1_left (i,j:index):
   happens(R1(j)) =>
-    ((snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key(i)))
+    ((snd(input@R1(j)) = h(((nR(j),fst(input@R1(j))),tag1),key(i)))
      <=>
      (exists k:index,
      T(i,k) < R1(j) && R(j) < T(i,k) &&
@@ -143,7 +143,7 @@ Qed.
 
 goal [right] wa_R1_right (i,j,k:index):
   happens(R1(j)) =>
-    ((snd(input@R1(j)) = h(<<nR(j),fst(input@R1(j))>,tag1>,key'(i,k)))
+    ((snd(input@R1(j)) = h(((nR(j),fst(input@R1(j))),tag1),key'(i,k)))
      <=>
      (T(i,k) < R1(j) && R(j) < T(i,k) &&
      snd(output@T(i,k)) = snd(input@R1(j)) &&
@@ -194,9 +194,9 @@ Proof.
         input@T(i,k) = output@R(j))
      then (try find i,k such that
              snd(input@R1(j)) =
-             h(<<nR(j),fst(input@R1(j))>,tag1>,diff(key(i),key'(i,k)))
+             h(((nR(j),fst(input@R1(j))),tag1),diff(key(i),key'(i,k)))
            in
-             h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))),
+             h(((snd(input@R1(j)),nR(j)),tag2),diff(key(i),key'(i,k))))),
     (if exec@pred(R1(j)) &&
         exists (i,k:index),
         (T(i,k) < R1(j) && R(j) < T(i,k) && snd(output@T(i,k)) = snd(input@R1(j)) &&
@@ -209,7 +209,7 @@ Proof.
   	    R(j) < T(i,k) && input@T(i,k) = output@R(j)))
            in
   	   if exec@pred(R1(j))
-  	   then h(<<snd(input@R1(j)),nR(j)>,tag2>,diff(key(i),key'(i,k))))).
+  	   then h(((snd(input@R1(j)),nR(j)),tag2),diff(key(i),key'(i,k))))).
   fa.
   by exists i,k. by exists i,k.
   project.

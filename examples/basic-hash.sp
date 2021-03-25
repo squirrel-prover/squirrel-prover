@@ -4,7 +4,7 @@ BASIC HASH
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 
-T --> R : <nT, h(nT,kT)>
+T --> R : (nT, h(nT,kT))
 R --> T : ok
 *******************************************************************************)
 
@@ -21,7 +21,7 @@ channel cR
 
 process tag(i:index,k:index) =
   new nT;
-  out(cT, <nT, h(nT,diff(key(i),key'(i,k)))>)
+  out(cT, (nT, h(nT,diff(key(i),key'(i,k)))))
 
 process reader(j:index) =
   in(cT,x);

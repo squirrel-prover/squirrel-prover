@@ -8,19 +8,19 @@ abstract h : message -> message
 
 system null.
 
-goal _: <m1,m2> = h(<<m3,m2>,m3>) => fst( h(<<m3,m2>,m3>))=m1.
+goal _: (m1,m2) = h(((m3,m2),m3)) => fst( h(((m3,m2),m3)))=m1.
 Proof. 
  auto. 
 Qed.
 
-goal _ (x:message) : <m1,m2> = h(<<m3,x>,m3>) => fst( h(<<m3,x>,m3>))=m1.
+goal _ (x:message) : (m1,m2) = h(((m3,x),m3)) => fst( h(((m3,x),m3)))=m1.
 Proof. 
  auto. 
 Qed.
 
-goal _ (x:message) : <m1,m2> <> h(<<m3,x>,m3>).
+goal _ (x:message) : (m1,m2) <> h(((m3,x),m3)).
 Proof.
 intro x Heq.
-assert fst( h(<<m3,x>,m3>))=m1. auto.
+assert fst( h(((m3,x),m3)))=m1. auto.
 admit.
 Qed.

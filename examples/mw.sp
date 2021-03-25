@@ -9,8 +9,8 @@ Birgit Pfitzmann, and Patrick D. McDaniel, editors, Proceedings of the
 ACM, 2004.
 
 R --> T: nr
-T --> R: nt, id + H(<c0, nr, nt>,k)
-R --> T: id + H(<c1, nr, nt>,k)
+T --> R: nt, id + H((c0, nr, nt),k)
+R --> T: id + H((c1, nr, nt),k)
 
 This is a "light" model without the last check of T.
 *******************************************************************************)
@@ -34,7 +34,7 @@ channel c.
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>).
+  out(c,(nt,xor(diff(id(i),id'(i,t)),H((tag0,(x,nt)),diff(key(i),key'(i,t)))))).
 
 process reader =
   new nr;
@@ -42,11 +42,11 @@ process reader =
   in(c,m);
   if exists (i,t:index),
      xor(diff(id(i),id'(i,t)),snd(m)) =
-     H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
+     H((tag0,(nr,fst(m))),diff(key(i),key'(i,t)))
   then
     out(c, try find i,t such that
-             xor(diff(id(i),id'(i,t)),snd(m)) = H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t))) in
-           xor(diff(id(i),id'(i,t)),H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
+             xor(diff(id(i),id'(i,t)),snd(m)) = H((tag0,(nr,fst(m))),diff(key(i),key'(i,t))) in
+           xor(diff(id(i),id'(i,t)),H((tag1,(nr,fst(m))),diff(key(i),key'(i,t)))))
   else
     out(c,error).
 
@@ -62,7 +62,7 @@ axiom tags_neq : tag0 <> tag1.
 goal wa_R1 : forall r:index,
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-   H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
+   H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t))))
   <=>
   (exists (i,t:index),
    T(i,t) < R1(r) &&
@@ -97,7 +97,7 @@ Qed.
 goal wa_R2 : forall r:index,
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-   H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
+   H((tag0,(nr(r),fst(input@R2(r)))),diff(key(i),key'(i,t))))
   <=>
   (exists (i,t:index),
    T(i,t) < R2(r) &&
@@ -133,7 +133,7 @@ Qed.
     because it is not involved in the condition. *)
 goal [left] wa_R1_left : forall (i,r:index),
   xor(id(i),snd(input@R1(r))) =
-  H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
+  H((tag0,(nr(r),fst(input@R1(r)))),key(i))
   <=>
   exists t:index,
   T(i,t) < R1(r) &&
@@ -153,7 +153,7 @@ Qed.
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [right] wa_R1_right : forall (i,t,r:index),
   xor(id'(i,t),snd(input@R1(r))) =
-  H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
+  H((tag0,(nr(r),fst(input@R1(r)))),key'(i,t))
   <=>
   T(i,t) < R1(r) &&
   fst(output@T(i,t)) = fst(input@R1(r)) &&
@@ -194,7 +194,7 @@ fa 0; fa 1.
 equivalent
   (exists (i,t:index),
    diff(id(i),id'(i,t)) XOR snd(input@R1(r)) =
-   H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
+   H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t)))),
   (exists (i,t:index),
    T(i,t) < R1(r) &&
    fst(output@T(i,t)) = fst(input@R1(r)) &&
@@ -214,10 +214,10 @@ equivalent
       R(r) < T(i,t) && output@R(r) = input@T(i,t)
    then try find i,t such that
       xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-      H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))
+      H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t)))
    in
       diff(id(i),id'(i,t)) XOR
-      H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
+      H((tag1,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t)))),
   (if exec@pred(R1(r)) &&
       exists (i,t:index),
       T(i,t) < R1(r) &&
@@ -234,7 +234,7 @@ equivalent
    in
    if exec@pred(R1(r)) then
       diff(id(i),id'(i,t)) XOR
-      H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
+      H((tag1,(nr(r),nt(i,t))),diff(key(i),key'(i,t)))).
 
 (* IF-THEN-ELSE *)
 nosimpl(fa); try auto.
@@ -276,7 +276,7 @@ fa 0. fa 1.
 equivalent
   (exists (i,t:index),
      xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-     H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
+     H((tag0,(nr(r),fst(input@R2(r)))),diff(key(i),key'(i,t)))),
   (exists (i,t:index), T(i,t) < R2(r) &&
      fst(output@T(i,t)) = fst(input@R2(r)) &&
      snd(output@T(i,t)) = snd(input@R2(r)) &&

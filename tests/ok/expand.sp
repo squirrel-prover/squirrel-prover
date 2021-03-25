@@ -8,14 +8,14 @@ abstract ko : index -> message
 abstract b : message
 abstract d : message
 
-system ((B: !_j in(c,x); if x = ok(j) then out(c,<x,ok(j)>)) |
-        (C: !_j in(c,x); if x = ko(j) then out(c,<x,ko(j)>))).
+system ((B: !_j in(c,x); if x = ok(j) then out(c,(x,ok(j)))) |
+        (C: !_j in(c,x); if x = ko(j) then out(c,(x,ko(j))))).
 
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@t,ok(i)> = b =>
-   <input@t,ok(i)> = d =>
-   <input@t',ko(j)> = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
+  ((input@t,ok(i)) = b =>
+   (input@t,ok(i)) = d =>
+   (input@t',ko(j)) = b => (output@t'' = b => (input@t,ok(i)) = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 
@@ -31,9 +31,9 @@ Qed.
 (* Same, but choosing the expand timestamps manually *)
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@t,ok(i)> = b =>
-   <input@t,ok(i)> = d =>
-   <input@t',ko(j)> = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
+  ((input@t,ok(i)) = b =>
+   (input@t,ok(i)) = d =>
+   (input@t',ko(j)) = b => (output@t'' = b => (input@t,ok(i)) = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 
@@ -49,9 +49,9 @@ Qed.
 (* Same, but expanding only one timestamp *)
 goal _ (t, t', t'' : timestamp, i, j: index) :
   happens(t,t') => t = B(i) => t' = C(j) => 
-  (<input@t,ok(i)> = b =>
-   <input@t,ok(i)> = d =>
-   output@t' = b => (output@t'' = b => <input@t,ok(i)> = ok(i))) =>
+  ((input@t,ok(i)) = b =>
+   (input@t,ok(i)) = d =>
+   output@t' = b => (output@t'' = b => (input@t,ok(i)) = ok(i))) =>
   output@t = b =>
   output@t = d =>
   output@t' = b => 

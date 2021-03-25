@@ -83,7 +83,7 @@ As an example, we use a small _RFID_ based protocol, with a tag and a reader, ca
 [A] Mayla Brusò, Kostas Chatzikokolakis, and Jerry den Hartog. Formal
 Verification of Privacy for RFID Systems. pages 75–88, July 2010.
 
-T --> R : <nT, h(nT,kT)>
+T --> R : (nT, h(nT,kT))
 R --> T : ok
 
 
@@ -102,7 +102,7 @@ We then define a first process of a protocol, which may correspond to multiple i
 
 process tag(i:index) =
   new nT;
-  T : out(cT, <nT, h(nT,key(i))>).
+  T : out(cT, (nT, h(nT,key(i)))).
 
 (*
 ```

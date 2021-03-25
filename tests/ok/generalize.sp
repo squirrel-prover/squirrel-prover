@@ -12,7 +12,7 @@ abstract gg  : message -> message -> message
 abstract f0  : message -> message
 channel ch
 
-system A: !_i in(ch,x);out(ch,<ok(i),x>).
+system A: !_i in(ch,x);out(ch,(ok(i),x)).
 
 goal _ :
  (forall (x,y : message), x = a || y = b) =>

@@ -109,7 +109,7 @@ sterm_i:
 | id=lsymb                        { Theory.App (id, []) }
 /* | id=lsymb AT ts=stimestamp       { Theory.AppAt (id,[],ts) } */
 
-| LANGLE t=term COMMA t0=term RANGLE
+| LPAREN t=term COMMA t0=term RPAREN
     { let loc = L.make $startpos $endpos in
       let fsymb = L.mk_loc loc "pair" in
       Theory.App (fsymb, [t;t0]) }

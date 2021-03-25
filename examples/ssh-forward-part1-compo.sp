@@ -76,12 +76,12 @@ hash h with oracle forall (m:message,sk:message), sk = hKey
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
 (sk <> kP
- || exists (i:index, x1:message, x2:message) m=h(<<g^a(i),x1>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> )  (* O_forward *)
+ || exists (i:index, x1:message, x2:message) m=h(((g^a(i),x1),x2), hKey) (* O_PS *)
+ || exists (x:message) m=(forwarded,x) )  (* O_forward *)
   &&
 (sk <> kS
- || exists (i:index, x1:message, x2:message) m=h(<<x1,g^b(i)>,x2>, hKey) (* O_PS *)
- || exists (x:message) m=<forwarded,x> ) (* O_forward) *)
+ || exists (i:index, x1:message, x2:message) m=h(((x1,g^b(i)),x2), hKey) (* O_PS *)
+ || exists (x:message) m=(forwarded,x) ) (* O_forward) *)
 
 
 (** We first present the general ssh process. *)
@@ -95,7 +95,7 @@ process P =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidP = h(((g^a1,gB),gB^a1), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
     Pok : out(cP, enc(sign(sidP,kP),gB^a1))
@@ -109,8 +109,8 @@ process S =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <pk(kS),sign(sidS, kS)>);
+  let sidS = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, (pk(kS),sign(sidS, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
     Sok : out(cS,ok)
@@ -157,7 +157,7 @@ process Pauth =
  (* begin P1 *)
 
   in(cP,t);
-  let sidP = h(<<g^a1,gB>,gB^a1>, hKey) in
+  let sidP = h(((g^a1,gB),gB^a1), hKey) in
   let pkS = fst(t) in
   if pkS = pk(kS) && checksign(snd(t),pkS) = sidP then
      out(cP, enc(sign(sidP,kP),gB^a1));
@@ -175,8 +175,8 @@ process Sauth =
 
   (* begin S1 *)
   in(cS,garbage);
-  let sidS = h(<<gP,g^b1>,gP^b1>, hKey) in
-  out(cS, <pk(kS),sign(sidS, kS)>);
+  let sidS = h(((gP,g^b1),gP^b1), hKey) in
+  out(cS, (pk(kS),sign(sidS, kS)));
   in(cS, encP );
   if checksign(dec(encP,gP^b1),pk(kP)) = sidS then
       out(cS,ok);
@@ -189,7 +189,7 @@ process Sauth =
 system [auth]  K: (Pauth | Sauth).
 
 axiom [auth] hashnotfor :
-  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+  forall (x1,x2:message), h(x1,hKey) <> (forwarded,x2)
 
 (* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True.
@@ -211,7 +211,7 @@ Proof.
   collision => _; use HcFail with i.
   by auto.
 
-  by use hashnotfor with <<g^a1,input@P1>,input@P1^a1>, x3.
+  by use hashnotfor with ((g^a1,input@P1),input@P1^a1), x3.
   
   intro Heq. 
   expand sidP1; case Euf; expand sidS1; collision => _;
@@ -236,7 +236,7 @@ Proof.
   use HcFail with i.
   by collision.
 
-  by use hashnotfor with <<input@S,g^b1>,input@S^b1>, x2.
+  by use hashnotfor with ((input@S,g^b1),input@S^b1), x2.
 
   intro _; case Euf; expand sidP1; collision => _;
   use freshindex as [l _];

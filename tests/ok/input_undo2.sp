@@ -6,9 +6,9 @@ system in(c,x);out(c,x).
 
 undo 1.
 
-system in(c,x);out(c,<x,x>).
+system in(c,x);out(c,(x,x)).
 goal test :
-  happens(A) => output@A = <input@A,input@A>.
+  happens(A) => output@A = (input@A,input@A).
 Proof.
  by auto.
 Qed.

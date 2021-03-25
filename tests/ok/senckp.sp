@@ -35,7 +35,7 @@ Proof.
   by enckp 0.
 Qed.
 
-equiv test_ctxt : <enc(n,r,diff(k1,k2)),ok>.
+equiv test_ctxt : (enc(n,r,diff(k1,k2)),ok).
 Proof.
   nosimpl(enckp 0).
   auto.
@@ -55,7 +55,7 @@ Proof.
   by enckp 0, enc(n,r,diff(k1,k1)).
 Qed.
 
-equiv test_diffsimpl_ctxt : <enc(n,r,diff(k1,k1)),ok>.
+equiv test_diffsimpl_ctxt : (enc(n,r,diff(k1,k1)),ok).
 Proof.
   nosimpl(enckp 0).
   auto.

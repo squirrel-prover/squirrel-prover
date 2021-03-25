@@ -6,8 +6,8 @@ attacker for equivalence properties. In 2014 ACM Conference on
 Computer and Communications Security, CCS ’14, pages 609–620.
 ACM, 2014
 
-A -> B : enc(<pkA,n0>,r0,pkB)
-B -> A : enc(<n0,n0>,r,pkA)
+A -> B : enc((pkA,n0),r0,pkB)
+B -> A : enc((n0,n0),r,pkA)
 
 This is a "light" model without the last check of A.
 *******************************************************************************)
@@ -33,7 +33,7 @@ name r2 : index -> message
 abstract plus : message -> message -> message
 
 process A(i:index) =
-  out(cA,  enc(<pk(kA),n0(i)>,r0(i),pk(kB))).
+  out(cA,  enc((pk(kA),n0(i)),r0(i),pk(kB))).
 
 process B(i:index) =
   in(cB, mess);
@@ -41,16 +41,16 @@ process B(i:index) =
   out(cB,
     enc(
       (if fst(dmess) = diff(pk(kA),pk(kAbis)) && len(snd(dmess)) = len(n(i)) then
-         <snd(dmess), n(i)>
+         (snd(dmess), n(i))
        else
-         <n(i), n(i)>),
+         (n(i), n(i))),
       r(i), pk(diff(kA,kAbis)))
   ).
 
-system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
+system out(cA,(pk(kA),pk(kB))); (!_i A(i) | !_j B(j)).
 
 axiom length :
-  forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2)).
+  forall (m1:message, m2:message) len((m1,m2)) = plus(len(m1),len(m2)).
 
 (* Helper lemma for pushing conditionals. Such reasoning should soon be automatic.
  * Note that the lemma would be simpler (and more general) if we could quantify
@@ -93,21 +93,21 @@ Proof.
      if
        fst(dec(input@B(j),kB)) = diff(pk(kA),pk(kAbis)) &&
        len(snd(dec(input@B(j),kB))) = len(n(j))
-     then <snd(dec(input@B(j),kB)),n(j)>
-     else <n(j),n(j)>),
+     then (snd(dec(input@B(j),kB)),n(j))
+     else (n(j),n(j))),
     (if
       fst(dec(input@B(j),kB)) = diff(pk(kA),pk(kAbis)) &&
       len(snd(dec(input@B(j),kB))) = len(n(j))
-     then len(<snd(dec(input@B(j),kB)),n(j)>)
-     else len(<n(j),n(j)>)).
+     then len((snd(dec(input@B(j),kB)),n(j)))
+     else len((n(j),n(j)))).
    use if_len with fst(dec(input@B(j),kB)),diff(pk(kA),pk(kAbis)),
                    len(snd(dec(input@B(j),kB))),len(n(j)),
-                   <snd(dec(input@B(j),kB)),n(j)>,
-                   <n(j),n(j)>.
+                   (snd(dec(input@B(j),kB)),n(j)),
+                   (n(j),n(j)).
 
   (* length reasoning *)
   equivalent
-    len(<snd(dec(input@B(j),kB)),n(j)>),
+    len((snd(dec(input@B(j),kB)),n(j))),
     plus(len(snd(dec(input@B(j),kB))),len(n(j))).
   use length with snd(dec(input@B(j),kB)),n(j).
 

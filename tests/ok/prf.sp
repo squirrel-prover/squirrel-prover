@@ -22,7 +22,7 @@ by yesif 0.
 Qed.
 
 
-system [test]  in(c,x); let surp = diff(m,n) in let mac = h(<x,surp>,k) in  out(c,mac); out(c,h(diff(<x,n>,<x,m>),k)).
+system [test]  in(c,x); let surp = diff(m,n) in let mac = h((x,surp),k) in  out(c,mac); out(c,h(diff((x,n),(x,m)),k)).
 
 equiv [left,test] [right,test] test2.
 Proof.

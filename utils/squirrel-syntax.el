@@ -68,6 +68,7 @@
   "collision"
   "depends"
   "eqnames"
+  "generalize"
   "eqtraces"
   "euf"
   "executable"
@@ -136,6 +137,9 @@
 
 
 (defvar squirrel-tactical-char "\\(;\\|\\+\\)")
+
+
+;; (defvar squirrel-operator-pairs "[^a-z'_ ][ ]*\\((\\)[^)]*\\()\\)")
 
 (defvar squirrel-operator-char-1 "=\\|<\\|>\\|~")
 (defvar squirrel-operator-char-2 "\\-")

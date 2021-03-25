@@ -21,7 +21,7 @@ hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) 
 term test : boolean = zero
 
 process P =
-  Pout: out(cP, <g^a0, h(g^a0,kP)>)
+  Pout: out(cP, (g^a0, h(g^a0,kP)))
 
 process S =
   in(cS, sP);

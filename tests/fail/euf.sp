@@ -120,7 +120,7 @@ Proof.
 Abort.
 
 
-system [dupnames] !_i out(c,<h(n,k),h(m,k)>).
+system [dupnames] !_i out(c,(h(n,k),h(m,k))).
 
 goal [none, dupnames] _ (tau:timestamp): 
  happens(tau) => output@tau = h(u,k) => False.
