@@ -4,6 +4,8 @@
     another hash h2. It will become more complex with SLK where another state
     is updated using h1. *)
 
+set autoIntro=false.
+
 channel c
 hash h1
 hash h2
@@ -28,7 +30,7 @@ axiom s_jni :
 equiv strong_sec (t,t':timestamp) : 
   [happens(t,t')] -> frame@t, diff(s@t',fresh).
 Proof.
-  intro *.
+  intro Hap.
   induction t.
 
   (* Case t = init.
@@ -37,13 +39,17 @@ Proof.
 
   induction t'.
 
-    equivalent s@init, n.
+    equivalent s@init, n; 1: by auto.
     expand frame@init.
     by fresh 0.
 
     expand s@A(i).
     (* PRF h1 *)
-    prf 1. yesif 1. case H0. use s_jni with i1,i.
+    prf 1.
+    yesif 1. 
+    intro ? [] ?; 2: auto. 
+    use s_jni with i1,i; 2,3: auto. 
+    by expand s.
     by fresh 1.
 
   (* Case t = A(i). *)
@@ -51,22 +57,24 @@ Proof.
   expandall.
   fa 0. fa 1. fa 1.
   (* PRF h2 *)
-  prf 1. yesif 1.
-    project.
+  prf 1. 
+  yesif 1.
+  intro i1.
+    project => H Meq.
 
       case H.
-        by use s_jni with i1,i.
+        by use s_jni with i1,i; expand s.
         (* Consider the possibility that s@t'
            indirectly contains h2(s@A(i1),k2) for A(i1)<=t'.
            This could be ruled out because the state never gets
            updated using inputs, but that wouldn't work for
            more complex protocols. *)
-        assert s@A(i) = s@A(i1).
-        use s_inj with i,i1.
+        assert s@A(i) = s@A(i1); 1: auto.
+        use s_inj with i,i1; 2,3: auto.
         (* We could conclude with the assumption t' < t...
            but the "base" case of the induction couldn't be init
            anymore. *)
-        assert t' < A(i).
+        assert t' < A(i); 2: auto.
         admit.
 
       by use s_inj with i1,i.
@@ -84,11 +92,14 @@ Qed.
 equiv almost_base_case (i:index) : 
   [happens(pred(A(i)),A(i))] -> frame@pred(A(i)), diff(s@A(i),fresh).
 Proof.
-  intro *.
+  intro Hap.
   expand s@A(i).
   (* PRF h1 *)
-  prf 1. yesif 1.
-    assert s@A(i) = s@A(i1). by use s_inj with i1,i.
+  prf 1. 
+  yesif 1.
+  intro i1 H Meq.
+    assert s@A(i) = s@A(i1); by use s_inj with i1,i; expand s. 
+
   fresh 1.
   admit. (* Generalize reflexivity: there is no diff! *)
 Qed.
@@ -100,14 +111,19 @@ Qed.
 equiv base_case (i:index) : 
   [happens(A(i))] -> frame@A(i), diff(s@A(i),fresh).
 Proof.
-  intro *.
+  intro Hap.
   expandall. fa 0. fa 1. fa 1.
   (* PRF h2 *)
-  prf 1. yesif 1. by use s_jni with i,i1.
+  prf 1. 
+  yesif 1. 
+    intro i1 H Meq.
+    by use s_jni with i,i1; expand s.
   fresh 1.
   (* PRF h1 *)
-  prf 1. yesif 1.
-    by use s_jni with i,i1.
+  prf 1. 
+  yesif 1. 
+    intro i1 *.
+    by use s_jni with i,i1; try expand s. 
   fresh 1.
   admit. (* Generalized refl as above. *)
 Qed.

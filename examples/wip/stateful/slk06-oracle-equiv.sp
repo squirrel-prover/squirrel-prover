@@ -22,6 +22,8 @@ R -> T : h(ID,PIN)
 Trying to prove the secret of the states with an equivalence.
 *******************************************************************************)
 
+set autoIntro=false.
+
 abstract ok : message
 abstract error : message
 
@@ -85,15 +87,16 @@ system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))
 
 equiv strong_sec (t,t':timestamp,ii:index) : [happens(t,t')] -> frame@t, diff(kR(ii)@t',fresh).
 Proof.
-intro *.
+intro Hap.
 induction t.
 
 (* case t = init *)
 induction t'.
   (* case t' = init *)
-  equivalent kR(ii)@init,idinit(ii).
+  equivalent kR(ii)@init,idinit(ii); 1: auto.
   expand frame@init.
-  fresh 0. yesif 0.
+  fresh 0. 
+  yesif 0. auto.
   (* case t' = R1(jj,ii1) *)
   admit. (* lastUpdate pour exprimer kR avec h3 puis PRF *)
   (* case t' = ... *)

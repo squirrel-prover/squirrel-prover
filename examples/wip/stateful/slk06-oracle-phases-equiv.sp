@@ -22,6 +22,8 @@ R -> T : h(ID,PIN)
 Trying to prove the secret of state values with phases.
 *******************************************************************************)
 
+set autoIntro=false.
+
 abstract ok : message
 abstract error : message
 

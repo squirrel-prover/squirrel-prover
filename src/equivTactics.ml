@@ -1600,7 +1600,10 @@ let auto ~conclude s sk fk =
       if conclude && l <> [] 
       then fk GoalNotClosed
       else sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
-    let fk _ = sk [s] fk in
+    let fk _ = 
+      if conclude 
+      then fk GoalNotClosed
+      else sk [s] fk in
 
     let wfadup s sk fk = 
       let fk _ = sk [s] fk in
@@ -1618,6 +1621,7 @@ let auto ~conclude s sk fk =
 
   | Prover.Goal.Trace t ->
     let sk l fk = sk (List.map (fun s -> Prover.Goal.Trace s) l) fk in
+    dbg "here";
     TraceTactics.simplify ~close:conclude ~intro:conclude t sk fk
 
 let tac_auto ~conclude args s sk fk =

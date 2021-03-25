@@ -985,7 +985,7 @@ let unfold_macro ~canfail t s =
 
 let expand_macro t (s : TraceSequent.sequent) =
   let subst = unfold_macro ~canfail:true t s in
-  if subst = [] then hard_failure (Failure "nothing to expand");
+  if subst = [] then soft_failure (Failure "nothing to expand");
 
   TraceSequent.subst subst s
      
@@ -1015,7 +1015,7 @@ let expand arg s =
           unfold_macro ~canfail:false t s @ subst
         ) occs [] in
     
-    if subst = [] then hard_failure (Failure "nothing to expand");
+    if subst = [] then soft_failure (Failure "nothing to expand");
 
     TraceSequent.subst subst s
 
