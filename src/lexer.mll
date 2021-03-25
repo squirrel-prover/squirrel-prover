@@ -126,7 +126,6 @@ rule token = parse
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
 | '+'                 { PLUS }
-| ("cond"|"exec") as n { PID n }
 | name as n           { ID n }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }

@@ -85,7 +85,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 type p_goal_name = P_unknown | P_named of lsymb
 
-type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
+type p_equiv = Theory.term list 
 
 type p_equiv_form = 
   | PEquiv of p_equiv
@@ -683,10 +683,15 @@ let get_goal_formula (gname : lsymb) =
 (*------------------------------------------------------------------*)
 (** {2 Convert equivalence formulas} *)
 
-let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el = 
-  match el with
-  | `Formula f -> Equiv.Formula (Theory.convert cenv s f Sorts.Boolean)
-  | `Message m -> Equiv.Message (Theory.convert cenv s m Sorts.Message)
+let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el =   
+  match Theory.econvert cenv s el with
+  (* FIXME: this does not give any conversion error to the user. *)
+  | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
+  | Some (Theory.ETerm (s,t,_)) -> match s with
+    | Sorts.Message -> Equiv.Message t
+    | Sorts.Boolean -> Equiv.Formula t
+    | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
+                                          bool or message)")
 
 let convert_equiv (cenv : Theory.conv_env) (s : Theory.subst) (e : p_equiv) =
   List.map (convert_el cenv s) e

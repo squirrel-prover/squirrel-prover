@@ -37,7 +37,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 type p_goal_name = P_unknown | P_named of lsymb
 
 
-type p_equiv = [ `Message of Theory.term | `Formula of Theory.formula ] list 
+type p_equiv = Theory.term list 
 
 type p_equiv_form = 
   | PEquiv of p_equiv

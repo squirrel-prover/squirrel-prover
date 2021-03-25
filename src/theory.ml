@@ -154,7 +154,7 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
 
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
+    Fmt.pf ppf "@[<h>(%a@ %a@ %a)@]" pp_term tl Term.pp_ord ord pp_term tr
       
   | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
   | ForAll (vs, b) ->
@@ -550,8 +550,11 @@ let rec convert :
   let loc = L.loc tm in
 
   let conv ?(subst=subst) s t = convert env subst t s in
-  let type_error = ty_error tm sort in
+  let type_error () = raise (ty_error tm sort) in
 
+  (* REM *)
+  Fmt.epr "convert: %a to type %a@." pp tm Sorts.pp sort;
+  
   match L.unloc tm with
   | App   (f,terms) ->
     (* if [f] is a variable name appearing in [subst], then substitute. *)
@@ -575,13 +578,13 @@ let rec convert :
   | Tinit ->
       begin match sort with
         | Sorts.Timestamp -> Term.Action (Symbols.init_action,[])
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Tpred t ->
       begin match sort with
         | Sorts.Timestamp -> Term.Pred (conv Sorts.Timestamp t)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Diff (l,r) -> Term.Diff (conv sort l, conv sort r)
@@ -589,62 +592,66 @@ let rec convert :
       begin match sort with
         | Sorts.Message ->
             Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | And (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.And (conv sort l, conv sort r)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
   | Or (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.Or (conv sort l, conv sort r)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
   | Impl (l,r) ->
       begin match sort with
         | Sorts.Boolean -> Term.Impl (conv sort l, conv sort r)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
   | Not t ->
       begin match sort with
         | Sorts.Boolean -> Term.Not (conv sort t)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
   | True | False ->
       begin match sort with
         | Sorts.Boolean -> if L.unloc tm = True then Term.True else Term.False
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Compare (o,u,v) ->
-      begin match sort with
-        | Sorts.Boolean ->
+    Fmt.epr "1 %a and %a@." pp u pp v;
+    begin match sort with
+      | Sorts.Boolean ->
+        begin try
+            Fmt.epr "2@.";
+            Term.Atom
+              (`Timestamp (o,
+                           conv Sorts.Timestamp u,
+                           conv Sorts.Timestamp v))
+          with Conv (_,Type_error _ ) ->
+          match o with
+          | #Term.ord_eq as o ->
             begin try
-              Term.Atom
-                (`Timestamp (o,
-                             conv Sorts.Timestamp u,
-                             conv Sorts.Timestamp v))
-            with Conv (_,Type_error _ ) ->
-              match o with
-                | #Term.ord_eq as o ->
-                    begin try
-                        Term.Atom (`Index (o,
-                                           conv_index env subst u,
-                                           conv_index env subst v))
-                    with Conv (_,Type_error _ ) ->
-                      try
-                        Term.Atom (`Message (o,
-                                             conv Sorts.Message u,
-                                             conv Sorts.Message v))
-                      with Conv (_,Type_error _ ) ->
-                        conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
-                    end
-                | _ -> conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
+                Fmt.epr "3@.";
+                Term.Atom (`Index (o,
+                                   conv_index env subst u,
+                                   conv_index env subst v))
+              with Conv (_,Type_error _ ) ->
+              try
+                Fmt.epr "4@.";
+                Term.Atom (`Message (o,
+                                     conv Sorts.Message u,
+                                     conv Sorts.Message v))
+              with Conv (_,Type_error _ ) ->
+                conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
             end
-        | _ -> raise type_error
-      end
+          | _ -> conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
+        end
+      | _ -> type_error ()
+    end
 
   | Happens ts ->
       begin match sort with
@@ -653,7 +660,7 @@ let rec convert :
               Term.Atom (`Happens (conv Sorts.Timestamp t))
             ) ts in
           Term.mk_ands atoms
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Find (vs,c,t,e) ->
@@ -664,7 +671,7 @@ let rec convert :
         | ESubst (_,Term.Var v) ->
           begin match Vars.sort v with
             | Sorts.Index -> v
-            | _ -> raise type_error
+            | _ -> type_error ()
           end
         | _ -> assert false
       in
@@ -676,7 +683,7 @@ let rec convert :
         let t = conv ~subst:(new_subst@subst) sort t in
         let e = conv sort e in
         Term.Find (is,c,t,e)
-      | _ -> raise type_error
+      | _ -> type_error ()
     end
 
   | ForAll (vs,f) | Exists (vs,f) ->
@@ -693,7 +700,7 @@ let rec convert :
       begin match sort, L.unloc tm with
         | Sorts.Boolean, ForAll _ -> Term.mk_forall vs f
         | Sorts.Boolean, Exists _ -> Term.mk_exists vs f
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
   | Seq (vs,t) ->
       let new_subst = subst_of_bvars (List.map (fun x -> x, Sorts.eindex) vs) in
@@ -703,7 +710,7 @@ let rec convert :
           | ESubst (_, Term.Var v) ->
             begin match Vars.sort v with
               | Sorts.Index -> v
-                | _ -> raise type_error
+                | _ -> type_error ()
               end
           | _ -> assert false
         in
@@ -711,7 +718,7 @@ let rec convert :
       in
       begin match sort with
         | Sorts.Message -> Term.Seq (vs, t)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
 and conv_index env subst t =
@@ -737,7 +744,7 @@ and conv_app :
     | None -> conv_err loc (Timestamp_expected (L.unloc t))
     | Some ts -> ts in
 
-  let type_error = ty_error t sort in
+  let type_error () = raise (ty_error t sort) in
 
   match L.unloc app with
   | AVar s -> assoc subst s sort
@@ -759,14 +766,14 @@ and conv_app :
       begin match sort with
         | Sorts.Boolean -> Term.True
         | Sorts.Message -> Term.(Fun (f_true,[]))
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
       begin match sort with
         | Sorts.Boolean -> Term.False
         | Sorts.Message -> Term.(Fun (f_false,[]))
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   (* End of special cases. *)
@@ -807,7 +814,7 @@ and conv_app :
               | Wrapped (_, Process _) -> raise ts_expected
               | Wrapped (_, System _)  -> raise ts_expected
             end
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Fun (f, l, Some ts) ->
@@ -828,7 +835,7 @@ and conv_app :
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
                 assert false
-              | Wrapped (s, Macro (Cond|Exec)) -> raise type_error
+              | Wrapped (s, Macro (Cond|Exec)) -> type_error ()
 
               | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
               | Wrapped (_, Channel _)            -> raise ts_unexpected
@@ -846,7 +853,7 @@ and conv_app :
                   check_arity_i (L.loc f) "cond" (List.length l) 0 ;
                   Term.Macro ((s,sort,[]),[],ts)
               | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
-                raise type_error
+                type_error ()
               | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
               | Wrapped (_, Channel _)            -> raise ts_unexpected
               | Wrapped (_, Name _)               -> raise ts_unexpected
@@ -856,7 +863,7 @@ and conv_app :
               | Wrapped (_, Process _)            -> raise ts_unexpected
               | Wrapped (_, System _)             -> raise ts_unexpected
             end
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Get (s,opt_ts,is) ->
@@ -872,7 +879,7 @@ and conv_app :
       in
       begin match sort with
         | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Name (s, is) ->
@@ -881,7 +888,7 @@ and conv_app :
         | Sorts.Message ->
           Term.Name ( get_name env.table s ,
                       List.map (conv_index env subst) is )
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
   | Taction (a,is) ->
@@ -890,7 +897,7 @@ and conv_app :
         | Sorts.Timestamp ->
           Term.Action ( get_action env.table a,
                         List.map (conv_index env subst) is )
-        | _ -> raise type_error
+        | _ -> type_error ()
       end
 
 type eterm = ETerm : 'a Sorts.sort * 'a Term.term * L.t -> eterm

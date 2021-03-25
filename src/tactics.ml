@@ -3,7 +3,6 @@ module L = Location
 type tac_error =
   | More
   | Failure of string
-  | AndThen_Failure of tac_error
   | CannotConvert
   | NotEqualArguments
   | Bad_SSC
@@ -65,7 +64,6 @@ let tac_error_strings =
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
-  | AndThen_Failure te -> "AndThenFailure, "^(tac_error_to_string te)
   | NotDepends (s1, s2) -> "NotDepends, "^s1^", "^s2
   | FailWithUnexpected te -> "FailWithUnexpected, "^(tac_error_to_string te)
   | More
@@ -100,11 +98,6 @@ let rec tac_error_to_string = function
 let rec pp_tac_error ppf = function
   | More -> Fmt.string ppf "more results required"
   | Failure s -> Fmt.pf ppf "%s" s
-  | AndThen_Failure t ->
-      Fmt.pf ppf
-        "a sequence of tactic applications eventually failed \
-         with the following error: %a"
-        pp_tac_error t
   | NotEqualArguments -> Fmt.pf ppf "arguments not equals"
   | Bad_SSC -> Fmt.pf ppf "key does not satisfy the syntactic side condition"
   | NoSSC ->
@@ -181,7 +174,6 @@ let rec tac_error_of_strings = function
       | None -> raise (Failure "exception name unknown")
       | Some e -> e
     )
-  | "AndThenFailure"::q -> AndThen_Failure (tac_error_of_strings q)
   | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
   | _ ->  raise (Failure "exception name unknown")
 
