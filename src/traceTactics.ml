@@ -2704,14 +2704,14 @@ let () =
   * hashes that occur at toplevel in message hypotheses,
   * and adds the equalities of the messages hashed with the same key. *)
 let collision_resistance (s : TraceSequent.t) =
+  let cntxt = mk_trace_cntxt s in
+
   (* We collect all hashes appearing inside the hypotheses, and which satisfy
      the syntactic side condition. *)
   let hashes =
     List.filter
       (fun t -> match t with
          | Fun ((hash, _), [m; Name (key,_)]) ->
-           let cntxt = mk_trace_cntxt s in
-
             Symbols.is_ftype hash Symbols.Hash cntxt.table
             && Euf.check_key_ssc
               ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
@@ -2722,44 +2722,47 @@ let collision_resistance (s : TraceSequent.t) =
   in
 
   let hashes = List.sort_uniq Stdlib.compare hashes in
-  if List.length hashes = 0 then
-    soft_failure Tactics.NoSSC
-  else
-    let rec make_eq acc hash_list =
-      match hash_list with
-      | [] -> acc
-      | h1::q ->
-          List.fold_left
-            (fun acc h2 ->
-               match h1, h2 with
-               | Fun (hash1, [_; Name key1]),
-                 Fun (hash2, [_; Name key2])
-                 when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
-               | _ -> acc)
-            (make_eq acc q) q
-    in
-    let trs = get_trs s in
-    let hash_eqs =
-      make_eq [] hashes
-      |> List.filter (fun (a,b) -> 
-          Completion.check_equalities trs [Term.ESubst (a,b)])
-    in
-    let new_facts =
-      List.fold_left
-        (fun acc (h1,h2) ->
-           match h1, h2 with
-           | Fun ((hash1, _), [m1; Name key1]),
-             Fun ((hash2, _), [m2; Name key2])
-             when hash1 = hash2 && key1 = key2 ->
-             Term.Atom (`Message (`Eq, m1, m2)) :: acc
-           | _ -> acc)
-        [] hash_eqs
-    in
-    let f_coll = Term.mk_ands new_facts in
-    if f_coll = Term.True then soft_failure Tactics.NoCollision;
 
-    let goal = Term.mk_impl f_coll (TraceSequent.conclusion s) in
-    [TraceSequent.set_conclusion goal s]
+  if List.length hashes = 0 then soft_failure Tactics.NoSSC;
+  
+  let rec make_eq acc hash_list =
+    match hash_list with
+    | [] -> acc
+    | h1::q ->
+      List.fold_left
+        (fun acc h2 ->
+           match h1, h2 with
+           | Fun (hash1, [_; Name key1]),
+             Fun (hash2, [_; Name key2])
+             when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
+           | _ -> acc)
+        (make_eq acc q) q
+  in
+
+  let trs = get_trs s in
+  let hash_eqs =
+    make_eq [] hashes
+    |> List.filter (fun (a,b) -> 
+        Completion.check_equalities trs [Term.ESubst (a,b)])
+  in
+
+  let new_facts =
+    List.fold_left
+      (fun acc (h1,h2) ->
+         match h1, h2 with
+         | Fun ((hash1, _), [m1; Name key1]),
+           Fun ((hash2, _), [m2; Name key2])
+           when hash1 = hash2 && key1 = key2 ->
+           Term.Atom (`Message (`Eq, m1, m2)) :: acc
+         | _ -> acc)
+      [] hash_eqs
+  in
+  let f_coll = Term.mk_ands new_facts in
+
+  if f_coll = Term.True then soft_failure Tactics.NoCollision;
+
+  let goal = Term.mk_impl f_coll (TraceSequent.conclusion s) in
+  [TraceSequent.set_conclusion goal s]
 
 let () = T.register "collision"
     ~tactic_help:{general_help = "Collects all equalities between hashes \
@@ -2769,7 +2772,7 @@ let () = T.register "collision"
                                   the same valid key.";
                   detailed_help = "A key is valid if it is only used in a key \
                                    position. Remark that this could be relaxed, \
-                                   as CR holds for any fresh key, even known to \
+                                   as CR holds for any valid key, even known to \
                                    the attacker.";
                   usages_sorts = [Sort None];
                   tactic_group = Cryptographic}
