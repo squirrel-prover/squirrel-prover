@@ -185,7 +185,8 @@ and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
 and pp_ots ppf ots = Fmt.option pp_ts ppf ots
 
-and pp_term ppf t = pp_term_i ppf (L.unloc t)
+and pp_term ppf t = 
+  Fmt.pf ppf "%a" pp_term_i (L.unloc t)
 
 let pp   = pp_term
 let pp_i = pp_term_i

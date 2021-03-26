@@ -5,7 +5,6 @@
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
-%token <string> PID  /* predicate identifier */
 %token <string> BANG
 %token AT PRED
 %token LPAREN RPAREN
@@ -30,6 +29,8 @@
 
 %nonassoc empty_else
 
+%nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
+
 %left XOR
 %left EXP
 
@@ -41,6 +42,8 @@
 %left OR
 %left AND
 /* %nonassoc NOT */
+
+%nonassoc AT
 
 %nonassoc tac_prec
 
@@ -85,47 +88,39 @@
 lsymb:
 | id=loc(ID) { id }
 
-/* non-ambiguous timestamp */
-stimestamp_i:
-| LPAREN t=timestamp_i RPAREN            { t }
-| id=lsymb                               { Theory.App (id, []) }
-| PRED LPAREN ts=timestamp RPAREN        { Theory.Tpred ts }
-| INIT                                   { Theory.Tinit }
-
-/* ambiguous timestamp */
-timestamp_i:
-| t=stimestamp_i                         { t }
-| id=lsymb terms=term_list1              { Theory.App (id, terms) }
-
-/* stimestamp: */
-/* | ts=loc(stimestamp_i) { ts } */
-
-timestamp:
-| ts=loc(timestamp_i) { ts }
-
 /* non-ambiguous term */
 sterm_i:
 | LPAREN t=term_i RPAREN          { t }
 | id=lsymb                        { Theory.App (id, []) }
-/* | id=lsymb AT ts=stimestamp       { Theory.AppAt (id,[],ts) } */
 
 | LPAREN t=term COMMA t0=term RPAREN
     { let loc = L.make $startpos $endpos in
       let fsymb = L.mk_loc loc "pair" in
       Theory.App (fsymb, [t;t0]) }
 
-| INIT                                    { Theory.Tinit }
+/* formula */
 
-| PRED LPAREN t=term RPAREN               { Theory.Tpred t }
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
 | SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
+
+| NOT f=sterm                             { Theory.Not (f) }
+| FALSE                                   { Theory.False }
+| TRUE                                    { Theory.True }
+
+| HAPPENS LPAREN ts=slist1(term,COMMA) RPAREN
+                                          { Theory.Happens ts }
+
+/* timestamp */
+
+| PRED LPAREN ts=term RPAREN             { Theory.Tpred ts }
+| INIT                                   { Theory.Tinit }
 
 /* ambiguous term */
 term_i:
 | f=sterm_i                                  { f }
 | id=lsymb terms=term_list1                  { Theory.App (id, terms) }
-| id=lsymb AT ts=timestamp                   { Theory.AppAt (id,[],ts) }
-| id=lsymb terms=term_list1 AT ts=timestamp  { Theory.AppAt (id,terms,ts) }
+| id=lsymb AT ts=term                        { Theory.AppAt (id,[],ts) }
+| id=lsymb terms=term_list1 AT ts=term       { Theory.AppAt (id,terms,ts) }
 
 | t=term XOR t0=term
     { let loc = L.make $startpos $endpos in
@@ -137,11 +132,31 @@ term_i:
       let fsymb = L.mk_loc loc "exp" in
       Theory.App (fsymb,  [t;t0])}
  
-| IF b=formula THEN t=term t0=else_term
+| IF b=term THEN t=term t0=else_term
                                           { Theory.ITE (b,t,t0) }
 
-| FIND is=indices SUCHTHAT b=formula IN t=term t0=else_term
+| FIND is=indices SUCHTHAT b=term IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }
+
+
+| f=term AND f0=term                { Theory.And (f,f0) }
+| f=term OR f0=term                 { Theory.Or (f,f0) }
+| f=term DARROW f0=term             { Theory.Impl (f,f0) }
+| f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
+
+| EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
+                                 { Theory.Exists (vs,f)  }
+| FORALL LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
+                                 { Theory.ForAll (vs,f)  }
+| EXISTS id=lsymb COLON k=kind sep f=term %prec QUANTIF
+                                 { Theory.Exists ([id,k],f)  }
+| FORALL id=lsymb COLON k=kind sep f=term %prec QUANTIF
+                                 { Theory.ForAll ([id,k],f)  }
+
+| f=term DEQUIVARROW f0=term
+    { let loc = L.make $startpos $endpos in
+      Theory.And (L.mk_loc loc (Theory.Impl (f,f0)),
+                  L.mk_loc loc (Theory.Impl (f0,f))) }
 
 /* non-ambiguous term */
 %inline else_term:
@@ -170,7 +185,7 @@ tm_list:
 
 (* Facts, aka booleans *)
 
-ord:
+%inline ord:
 | EQ                             { `Eq }
 | NEQ                            { `Neq }
 | LEQ                            { `Leq }
@@ -194,54 +209,7 @@ ids:
 | id=lsymb COMMA ids=ids               { id::ids }
 
 top_formula:
-| f=formula EOF                    { f }
-
-/* non-ambiguous formula */
-sformula_i:
-| LPAREN f=formula_i RPAREN               { f }
-| NOT f=sformula                          { Theory.Not (f) }
-| FALSE                                   { Theory.False }
-| TRUE                                    { Theory.True }
-
-| pid=loc(PID)                            { Theory.App (pid, []) }
-
-| HAPPENS LPAREN ts=slist1(timestamp,COMMA) RPAREN
-                                 { Theory.Happens ts }
-
-| DIFF LPAREN f=formula COMMA g=formula RPAREN
-                                 { Theory.Diff (f,g) }
-
-/* ambiguous formula */
-formula_i:
-| f=sformula_i                            { f }
-| f=formula AND f0=formula                { Theory.And (f,f0) }
-| f=formula OR f0=formula                 { Theory.Or (f,f0) }
-| f=formula DARROW f0=formula             { Theory.Impl (f,f0) }
-| f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
-
-| f=formula DEQUIVARROW f0=formula
-    { let loc = L.make $startpos $endpos in
-      Theory.And (L.mk_loc loc (Theory.Impl (f,f0)),
-                  L.mk_loc loc (Theory.Impl (f0,f))) }
-
-| pid=loc(PID) terms=term_list1   { Theory.App (pid, terms) }
-| pid=loc(PID) terms=term_list AT ts=timestamp
-                                 { Theory.AppAt (pid, terms, ts) }
-
-| EXISTS LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Theory.Exists (vs,f)  }
-| FORALL LPAREN vs=arg_list RPAREN sep f=formula %prec QUANTIF
-                                 { Theory.ForAll (vs,f)  }
-| EXISTS id=lsymb COLON k=kind sep f=formula %prec QUANTIF
-                                 { Theory.Exists ([id,k],f)  }
-| FORALL id=lsymb COLON k=kind sep f=formula %prec QUANTIF
-                                 { Theory.ForAll ([id,k],f)  }
-
-sformula:
-| f=loc(sformula_i) { f }
-
-formula:
-| f=loc(formula_i) { f }
+| f=term EOF                    { f }
 
 sep:
 |       {()}
@@ -262,9 +230,9 @@ process_i:
     { Process.In (c,id,p) }
 | OUT LPAREN c=lsymb COMMA t=term RPAREN p=process_cont
     { Process.Out (c,t,p) }
-| IF f=formula THEN p=process p0=else_process
+| IF f=term THEN p=process p0=else_process
     { Process.Exists ([],f,p,p0) }
-| FIND is=indices SUCHTHAT f=formula IN p=process p0=else_process
+| FIND is=indices SUCHTHAT f=term IN p=process p0=else_process
     { Process.Exists (is,f,p,p0) }
 | LET id=lsymb EQ t=term IN p=process
     { Process.Let (id,t,p) }
@@ -329,7 +297,7 @@ index_arity:
 declaration_i:
 | HASH e=lsymb a=index_arity
                           { Decl.Decl_hash (Some a, e, None) }
-| HASH e=lsymb WITH ORACLE f=formula
+| HASH e=lsymb WITH ORACLE f=term
                           { Decl.Decl_hash (None, e, Some f) }
 | AENC e=lsymb COMMA d=lsymb COMMA p=lsymb
                           { Decl.Decl_aenc (e, d, p) }
@@ -340,7 +308,7 @@ declaration_i:
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
                           { Decl.Decl_sign (s, c, p, None) }
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-  WITH ORACLE f=formula   { Decl.Decl_sign (s, c, p, Some f) }
+  WITH ORACLE f=term   { Decl.Decl_sign (s, c, p, Some f) }
 | NAME e=lsymb COLON t=name_type
                           { Decl.Decl_name (e, t) }
 | ABSTRACT e=lsymb COLON t=abs_type
@@ -356,11 +324,11 @@ declaration_i:
                           { Decl.Decl_macro (e, args, typ, t) }
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
-| AXIOM s=bsystem f=formula
+| AXIOM s=bsystem f=term
                           { Decl.(Decl_axiom { gname = None;
                                                gsystem = s;
                                                gform = f; }) }
-| AXIOM s=bsystem i=lsymb COLON f=formula
+| AXIOM s=bsystem i=lsymb COLON f=term
                           { Decl.(Decl_axiom { gname = Some i;
                                                gsystem = s;
                                                gform = f; }) }
@@ -382,9 +350,8 @@ declarations:
 | decls=declaration_list DOT { decls }
 
 tactic_param:
-| t=term                    { TacticsArgs.Theory t }
-| f=formula %prec tac_prec  { TacticsArgs.Theory f }
-| i=INT                     { TacticsArgs.Int_parsed i }
+| f=term %prec tac_prec  { TacticsArgs.Theory f }
+| i=INT                  { TacticsArgs.Int_parsed i }
 
 tactic_params:
 |                                       { [] }
@@ -402,13 +369,9 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| f=sformula      { `Form f }  
-
-/* ad-hoc rule to allow hypothesis identifiers  */
-| id=lsymb        { `Form (L.mk_loc (L.loc id) (Theory.App (id,[]))) }  
+| f=sterm      { `Form f }  
 
 | SLASH t=sterm  { `Expand t }
-| SLASH t=sformula  { `Expand t }
 
 rw_param:
 | m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
@@ -463,7 +426,7 @@ selector:
 | l=slist1(int,COMMA) { l }
 
 tac_formula:
-| f=formula  %prec tac_prec { f }
+| f=term  %prec tac_prec { f }
 
 as_ip:
 | AS ip=simpl_pat { ip }
@@ -608,16 +571,12 @@ undo:
 tactic:
 | t=tac DOT                           { t }
 
-equiv_item:
-| t=term           { `Message t }
-| f=formula        { `Formula f }
-
 equiv:
-| ei=equiv_item                 { [ei] }
-| ei=equiv_item COMMA eis=equiv { ei::eis }
+| ei=term                 { [ei] }
+| ei=term COMMA eis=equiv { ei::eis }
 
 equiv_form:
-| LBRACKET f=formula RBRACKET      { Prover.PReach f }
+| LBRACKET f=term RBRACKET      { Prover.PReach f }
 | e=equiv            { Prover.PEquiv e }
 /* | LPAREN f=equiv_form RPAREN       { f } */
 | f=equiv_form ARROW f0=equiv_form { Prover.PImpl (f,f0) }
@@ -649,7 +608,7 @@ gname:
 | UNDERSCORE { P_unknown }
 
 goal_i:
-| GOAL s=system n=gname args=args COLON f=formula DOT
+| GOAL s=system n=gname args=args COLON f=term DOT
     { let f_i = Theory.ForAll (args, f) in
       let fa = L.mk_loc (L.loc f) f_i in
       Prover.Gm_goal (n, P_trace_goal (s, fa)) }
