@@ -14,13 +14,13 @@ name mc : index -> message
 
 system O: out(ch,cst); out(ch,k); (
     (A: !_a out(ch,h(na(a),k)))
-  | (B: !_b out(ch,h((nb(b),nb(b)),k)))
-  | (C: !_c out(ch,h((nc(c),mc(c)),k)))
+  | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
+  | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
 axiom name_not_pair :
 forall (ma : message, mb : message, a:index),
-na(a) <>  (ma, mb).
+na(a) <>  <ma, mb>.
 
 goal unforgeable_1 :
   forall (a : index, b : index),

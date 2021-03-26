@@ -9,8 +9,8 @@ Cambridge, MA, USA, August 11-13, 2004. Proceedings, volume 3156
 of Lecture Notes in Computer Science, pages 357–370. Springer, 2004.
 
 R --> T : nr
-T --> R : enc((tagT,(nr,nt)),rt,k)
-R --> T : enc((tagR,(nt,nr)),rr,k)
+T --> R : enc(<tagT,<nr,nt>>,rt,k)
+R --> T : enc(<tagR,<nt,nr>>,rr,k)
 
 We replace the AES algorithm of the original protocol by a randomized
 symmetric encryption, the closest primitive currently supported in
@@ -64,19 +64,19 @@ process Reader(k:index) =
         fst(dec(mess, diff(kE(i),kbE(i,j)))) = tagT &&
         fst(snd(dec(mess, diff(kE(i),kbE(i,j))))) = nr(k)
       in
-        enc((tagR,(snd(snd(dec(mess, diff(kE(i),kbE(i,j))))),nr(k))), rr(k),
+        enc(<tagR,<snd(snd(dec(mess, diff(kE(i),kbE(i,j))))),nr(k)>>, rr(k),
             diff(kE(i),kbE(i,j)))).
 
 process Tag(i:index, j:index) =
   in(cT, nR);
-  let cipher = enc((tagT,(nR,nt(i,j))), rt(i,j), diff(kE(i),kbE(i,j))) in
+  let cipher = enc(<tagT,<nR,nt(i,j)>>, rt(i,j), diff(kE(i),kbE(i,j))) in
   out(cT, cipher).
 
 system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
 axiom tags_neq : tagR <> tagT
 
-axiom fail_not_pair : forall (x,y:message), fail <> (x,y).
+axiom fail_not_pair : forall (x,y:message), fail <> <x,y>.
 
 goal wa_Reader1 (k:index):
   happens(Reader1(k)) => 
@@ -105,7 +105,7 @@ Proof.
   (* Direction <= *)
   exists i,j.
   expand output.
-  by use fail_not_pair with tagT, (input@Tag(i,j),nt(i,j)). 
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 Qed.
 
 (* Action Reader2 is the empty else branch of the reader. *)
@@ -128,7 +128,7 @@ Proof.
   expand output. 
   notleft H0.
   use H0 with i,j; case H1.
-  by use fail_not_pair with tagT, (input@Tag(i,j), nt(i,j)).
+  by use fail_not_pair with tagT, <input@Tag(i,j), nt(i,j)>.
 
   (* Direction <= *)
 
@@ -150,23 +150,23 @@ Proof.
   intro *.
   project. 
 
-  assert dec(output@Tag(i,j),kE(i1)) = (tagT,(input@Tag(i1,j1),nt(i1,j1))).
+  assert dec(output@Tag(i,j),kE(i1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
   intctxt Meq0.
   case H.
-  assert dec(output@Tag(i1,j1),kE(i)) = (tagT,(input@Tag(i,j),nt(i,j))).
+  assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
-  by use fail_not_pair with tagT,(input@Tag(i,j),nt(i,j)).
-  by use fail_not_pair with tagT,(input@Tag(i1,j1),nt(i1,j1)).
+  by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 
-  assert dec(output@Tag(i,j),kbE(i1,j1)) = (tagT,(input@Tag(i1,j1),nt(i1,j1))).
+  assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
   intctxt Meq0.
   case H.
-  assert dec(output@Tag(i1,j1),kbE(i,j)) = (tagT,(input@Tag(i,j),nt(i,j))).
+  assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
-  by use fail_not_pair with tagT,(input@Tag(i,j),nt(i,j)).
-  by use fail_not_pair with tagT,(input@Tag(i1,j1),nt(i1,j1)).
+  by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
+  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
 Qed.
 
 equiv unlinkability.
@@ -210,8 +210,8 @@ Proof.
            fst(dec(input@Reader1(k),diff(kE(i),kbE(i,j)))) = tagT) &&
           fst(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))) = nr(k)
         in
-          enc((tagR,(snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
-                     nr(k))),
+          enc(<tagR,<snd(snd(dec(input@Reader1(k),diff(kE(i),kbE(i,j))))),
+                     nr(k)>>,
               rr(k),
               diff(kE(i),kbE(i,j))))),
     (if
@@ -229,7 +229,7 @@ Proof.
            output@Tag(i,j) = input@Reader1(k) &&
            input@Tag(i,j) = output@Reader(k))
         in
-          enc((tagR,(nt(i,j),nr(k))),rr(k),
+          enc(<tagR,<nt(i,j),nr(k)>>,rr(k),
               diff(kE(i),kbE(i,j))))).
   fa. 
   by exists i,j.
@@ -244,7 +244,7 @@ Proof.
 
   (* find condB => condA *)
   use lemma with i,j,i1,j1.
-  by use fail_not_pair with tagT, (input@Tag(i,j),nt(i,j)). 
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 
   fa. 
   (* find condA => condB *)
@@ -252,7 +252,7 @@ Proof.
   by use tags_neq.
   (* find condB => condA *)
   use lemma with i,j,i1,j1 as Hlem. 
-  by use fail_not_pair with tagT, (input@Tag(i,j),nt(i,j)).
+  by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa 3; fadup 3.
   fa 3; fadup 3.

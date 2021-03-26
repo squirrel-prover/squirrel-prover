@@ -93,7 +93,7 @@ sterm_i:
 | LPAREN t=term_i RPAREN          { t }
 | id=lsymb                        { Theory.App (id, []) }
 
-| LPAREN t=term COMMA t0=term RPAREN
+| LANGLE t=term COMMA t0=term RANGLE
     { let loc = L.make $startpos $endpos in
       let fsymb = L.mk_loc loc "pair" in
       Theory.App (fsymb, [t;t0]) }

@@ -7,7 +7,7 @@ name m : message
 
 channel c
 
-system !_i out(c,(a(n(i)),a(m))).
+system !_i out(c,<a(n(i)),a(m)>).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv foo (tau:timestamp,i:index) : output@tau, exec@tau.

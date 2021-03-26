@@ -10,7 +10,7 @@ name r : index -> message
 
 aenc enc,dec,pk
 
-system !_i out(c,(diff(n,m), enc(n,r(i),pk(sk)))).
+system !_i out(c,<diff(n,m), enc(n,r(i),pk(sk))>).
 
 equiv test.
 Proof.

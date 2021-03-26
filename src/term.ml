@@ -252,7 +252,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Fun ((s,[]),terms) when Symbols.to_string s = "pair" ->
       Fmt.pf ppf "%a"
         (Utils.pp_ne_list
-           "(@[<hov>%a@])"
+           "<@[<hov>%a@]>"
            (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",@,") pp)) terms
         
   | Fun ((s,[]),[t1;t2]) when Symbols.to_string s = "exp" ->

@@ -5,7 +5,7 @@ HASH-LOCK
 Trans. Inf. Syst. Secur., 13(1):7:1–7:23, 2009.
 
 R --> T : nR
-T --> R : ( nT, h((nR,nT),kT) )
+T --> R : < nT, h(<nR,nT>,kT) >
 R --> T : ok
 *******************************************************************************)
 
@@ -22,13 +22,13 @@ channel cR
 process tag(i:index,k:index) =
   new nT;
   in(cR,nR);
-  out(cT,(nT,h((nR,nT),diff(key(i),key'(i,k)))))
+  out(cT,<nT,h(<nR,nT>,diff(key(i),key'(i,k)))>)
 
 process reader(j:index) =
   new nR;
   out(cR,nR);
   in(cT,x);
-  if exists (i,k:index), snd(x) = h((nR,fst(x)),diff(key(i),key'(i,k))) then
+  if exists (i,k:index), snd(x) = h(<nR,fst(x)>,diff(key(i),key'(i,k))) then
     out(cR,ok)
   else
     out(cR,ko)

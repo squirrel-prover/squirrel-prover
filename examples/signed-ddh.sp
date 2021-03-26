@@ -4,9 +4,9 @@ SIGNED DDH
 [G] ISO/IEC 9798-3:2019, IT Security techniques – Entity authentication –
 Part 3: Mechanisms using digital signature techniques.
 
-P -> S : (pk(kP), g^a)
-S -> P : (pk(kS),g^b),sign(((g^a,g^b),pk(kP)),kS)
-P -> S : sign(((g^b,g^a),pk(kS)),kP)
+P -> S : <pk(kP), g^a>
+S -> P : <pk(kS),g^b>,sign(<<g^a,g^b>,pk(kP)>,kS)
+P -> S : sign(<<g^b,g^a>,pk(kS)>,kP)
 
 We consider multiple sessions but two agents only: each agent playing his own role.
 1/ We analyse whether the key as computed by P is indistinguishable from g^k with k fresh (system secretP).
@@ -29,12 +29,12 @@ name k :  index -> index -> message
 signature sign,checksign,pk
 
 process Pchall(i:index) =
-  out(cP, (pk(skP),g^a(i)));
+  out(cP, <pk(skP),g^a(i)>);
   in(cP, t);
   let gS = snd(fst(t)) in
   let pkS = fst(fst(t)) in
-  if checksign(snd(t),pkS) = ((g^a(i),gS),pk(skP)) && pkS = pk(skS) then
-    out(cP,sign(((gS,g^a(i)),pkS),skP));
+  if checksign(snd(t),pkS) = <<g^a(i),gS>,pk(skP)> && pkS = pk(skS) then
+    out(cP,sign(<<gS,g^a(i)>,pkS>,skP));
     in(cP, challenge);
      try find j such that gS = g^b(j) in
       out(cP, diff(g^a(i)^b(j),g^k(i,j)))
@@ -47,9 +47,9 @@ process S(i:index) =
   let gP = snd(sP) in
   let pkP = fst(sP) in
   if pkP = pk(skP) then
-  out(cS, ( (pk(skS),g^b(i)), sign(((gP,g^b(i)),pkP),skS)));
+  out(cS, < <pk(skS),g^b(i)>, sign(<<gP,g^b(i)>,pkP>,skS)>);
   in(cS, signed);
-  if checksign(signed,pkP) = ((g^b(i),gP),pk(skS)) then
+  if checksign(signed,pkP) = <<g^b(i),gP>,pk(skS)> then
     out(cS,ok)
 
 
@@ -57,12 +57,12 @@ system [secretP] (!_i Pchall(i) | !_j S(j)).
 
 
 process P(i:index) =
-  out(cP, (pk(skP),g^a(i)));
+  out(cP, <pk(skP),g^a(i)>);
   in(cP, t);
   let gs = snd(fst(t)) in
   let pks = fst(fst(t)) in
-  if checksign(snd(t),pks) = ((g^a(i),gs),pk(skP)) && pks = pk(skS) then
-    out(cP,sign(((gs,g^a(i)),pks),skP))
+  if checksign(snd(t),pks) = <<g^a(i),gs>,pk(skP)> && pks = pk(skS) then
+    out(cP,sign(<<gs,g^a(i)>,pks>,skP))
 
 
 process Schall(i:index) =
@@ -70,9 +70,9 @@ process Schall(i:index) =
   let gp = snd(sP) in
   let pkp = fst(sP) in
   if fst(sP) = pk(skP) then
-  out(cS, ( (pk(skS),g^b(i)), sign(((gp,g^b(i)),pkp),skS)));
+  out(cS, < <pk(skS),g^b(i)>, sign(<<gp,g^b(i)>,pkp>,skS)>);
   in(cS, signed);
-  if checksign(signed,pkp) = ((g^b(i),gp),pk(skS)) then
+  if checksign(signed,pkp) = <<g^b(i),gp>,pk(skS)> then
     out(cS,ok);
     in(cS, challenge);
       try find l such that gp = g^a(l) in

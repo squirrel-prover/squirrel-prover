@@ -33,10 +33,10 @@ term nextkey(k:message) : message = hkey(k,k)
 process Tag(i:index,j:index) =
   new nT;
   in(cT,nR);
-  let m2 = h((nR,nT),key(i,j)) in
-  out(cT,(nT,m2));
+  let m2 = h(<nR,nT>,key(i,j)) in
+  out(cT,<nT,m2>);
   in(cT,m3);
-  if m3 = h((m2,nR),key(i,j)) then
+  if m3 = h(<m2,nR>,key(i,j)) then
     (* TODO we would like to use key(i,j) instead of km(i)
      for the lvalue but currently this does not type *)
     km(i) := nextkey(key(i,j));
@@ -48,16 +48,16 @@ process Reader =
   new nR;
   out(cR,nR);
   in(cR,x);
-  (* TODO let (x1,x2) = x in *)
+  (* TODO let <x1,x2> = x in *)
   let x1 = fst(x) in
   let x2 = snd(x) in
-  try find i,j such that x2 = h((nR,x1),key(i,j)) in
-    out(cR,h((x2,nR),key(i,j)));
+  try find i,j such that x2 = h(<nR,x1>,key(i,j)) in
+    out(cR,h(<x2,nR>,key(i,j)));
     (* TODO same as above *)
     okm(i) := key(i,j);
     km(i) := nextkey(key(i,j))
-  else try find i,j such that x2 = h((nR,x1),okey(i,j)) in
-    out(cR,h((x2,nR),okey(i,j)))
+  else try find i,j such that x2 = h(<nR,x1>,okey(i,j)) in
+    out(cR,h(<x2,nR>,okey(i,j)))
 
 (* Bi-process expressing unlinkability
 

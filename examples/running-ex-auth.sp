@@ -8,7 +8,7 @@ name key : index -> message
 channel c
 
 process tag(i,j:index) =
-  new n; out(c, (n, H(n,key(i))))
+  new n; out(c, <n, H(n,key(i))>)
 
 process reader(j:index) =
   in(c,x);

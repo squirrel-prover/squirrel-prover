@@ -9,8 +9,8 @@ Birgit Pfitzmann, and Patrick D. McDaniel, editors, Proceedings of the
 ACM, 2004.
 
 R --> T: nr
-T --> R: nt, id + H((c0, nr, nt),k)
-R --> T: id + H((c1, nr, nt),k)
+T --> R: nt, id + H(<c0, nr, nt>,k)
+R --> T: id + H(<c1, nr, nt>,k)
 
 This is a "full" model with the last check of T, but our tool lacks a notion of
 induction over sequences to complete the proof.
@@ -36,9 +36,9 @@ channel c
 process tag(i:index, t:index)=
   in(c,x);
   new nt;
-  out(c,(nt,xor(diff(id(i),id'(i,t)),H((tag0,(x,nt)),diff(key(i),key'(i,t))))));
+  out(c,<nt,xor(diff(id(i),id'(i,t)),H(<tag0,<x,nt>>,diff(key(i),key'(i,t))))>);
   in(c,y);
-  if y = xor(diff(id(i),id'(i,t)),H((tag1,(x,nt)),diff(key(i),key'(i,t)))) 
+  if y = xor(diff(id(i),id'(i,t)),H(<tag1,<x,nt>>,diff(key(i),key'(i,t)))) 
   then out(c,ok)
   else out(c,ko)
 
@@ -48,14 +48,14 @@ process reader =
   in(c,m);
   if exists (i,t:index),
      xor(diff(id(i),id'(i,t)),snd(m)) =
-     H((tag0,(nr,fst(m))),diff(key(i),key'(i,t)))
+     H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
   then
     out(c, try find i,t such that
              xor(diff(id(i),id'(i,t)),snd(m)) =
-             H((tag0,(nr,fst(m))),diff(key(i),key'(i,t)))
+             H(<tag0,<nr,fst(m)>>,diff(key(i),key'(i,t)))
            in
              xor(diff(id(i),id'(i,t)),
-                 H((tag1,(nr,fst(m))),diff(key(i),key'(i,t)))))
+                 H(<tag1,<nr,fst(m)>>,diff(key(i),key'(i,t)))))
   else
     out(c,error)
 
@@ -72,7 +72,7 @@ Qed.
 goal wa_R1 (r:index) :
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-   H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t))))
+   H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
   <=>
   (exists (i,t:index),
    T(i,t) < R1(r) &&
@@ -109,7 +109,7 @@ Qed.
     because it is not involved in the condition. *)
 goal [left] wa_R1_left (i,r:index):
   xor(id(i),snd(input@R1(r))) =
-  H((tag0,(nr(r),fst(input@R1(r)))),key(i))
+  H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
   exists t:index,
   T(i,t) < R1(r) &&
@@ -130,7 +130,7 @@ Qed.
 (** Precise version of wa_R1 on the right: no more existentials. *)
 goal [right] wa_R1_right (i,t,r:index):
   xor(id'(i,t),snd(input@R1(r))) =
-  H((tag0,(nr(r),fst(input@R1(r)))),key'(i,t))
+  H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
   T(i,t) < R1(r) &&
   snd(output@T(i,t)) = snd(input@R1(r)) &&
@@ -153,7 +153,7 @@ Proof.
    attacker may learn during protocol executions. Note that the
    hashes using tag0 contain an arbitrary input@T(i,t) because
    no authentication can be guaranteed at this point, while
-   hashes using tag1 contain a fixed message (nr(r),nt(i,t))
+   hashes using tag1 contain a fixed message <nr(r),nt(i,t)>
    since past execution conditions can guarantee that only
    this content can be hashed.
 
@@ -178,9 +178,9 @@ Proof.
 enrich seq(r -> nr(r)),
        seq(i,t -> nt(i,t)),
        seq(i,t -> diff(id(i),id'(i,t)) XOR
-                  H((tag0,(input@T(i,t),nt(i,t))),diff(key(i),key'(i,t)))),
+                  H(<tag0,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)))),
        seq(i,r,t -> diff(id(i),id'(i,t)) XOR
-                    H((tag1,(nr(r),nt(i,t))),diff(key(i),key'(i,t)))).
+                    H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))).
 induction t.
 
 (* Init case *)
@@ -197,7 +197,7 @@ fa 4; fa 5.
 
 equivalent
   (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-                       H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t)))),
+                       H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
   (exists (i,t:index), T(i,t) < R1(r) &&
    snd(output@T(i,t)) = snd(input@R1(r)) &&
    fst(output@T(i,t)) = fst(input@R1(r)) &&
@@ -218,9 +218,9 @@ equivalent
     then
       (try find i,t such that
          xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-         H((tag0,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t))) in
+         H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
          xor(diff(id(i),id'(i,t)),
-             H((tag1,(nr(r),fst(input@R1(r)))),diff(key(i),key'(i,t)))))),
+             H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
   (if
       (exec@pred(R1(r)) &&
        exists (i,t:index),
@@ -237,7 +237,7 @@ equivalent
           R(r) < T(i,t) &&
           output@R(r) = input@T(i,t)) in
          xor(diff(id(i),id'(i,t)),
-             H((tag1,(nr(r),nt(i,t))),diff(key(i),key'(i,t)))))).
+             H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
 
 project.
 
@@ -263,7 +263,7 @@ fa 5.
 fadup 5.
 fa 5.
 expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
-                  H((tag1,(nr(r),nt(i,t))),(diff(key(i),key'(i,t)))))),
+                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
        i,r,t.
 by fadup 5.
 
@@ -276,7 +276,7 @@ fa 4. fa 5.
    and the equivalence is used under a negation. *)
 equivalent
   (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-                 H((tag0,(nr(r),fst(input@R2(r)))),diff(key(i),key'(i,t)))),
+                 H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
   (exists (i,t:index), T(i,t) < R2(r) &&
     snd(output@T(i,t)) = snd(input@R2(r)) &&
     fst(output@T(i,t)) = fst(input@R2(r)) &&
@@ -310,7 +310,7 @@ by fadup 5.
 expand frame@T(i,t). fa 4.
 expand seq(i,t->nt(i,t)),i,t.
 by expand seq(i,t->xor((diff(id(i),id'(i,t))),
-                H((tag0,(input@T(i,t),nt(i,t))),(diff(key(i),key'(i,t)))))),i,t.
+                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
 
 (* Case T1 *)
 expand frame@T1(i,t); expand exec@T1(i,t).
@@ -330,7 +330,7 @@ expand cond@T1(i,t); split.
   (* Cond => Honest *)
   intro [_ Meq]; simpl.
   assert input@T1(i,t) XOR diff(id(i),id'(i,t)) =
-         H((tag1,(input@T(i,t),nt(i,t))),diff(key(i),key'(i,t)));
+         H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t)));
   1: auto.
   use tags_neq; project.
   (* Left *)
@@ -395,7 +395,7 @@ fa 4. fa 5.
 equivalent
   (exec@pred(T2(i,t)) &&
    not(input@T2(i,t) =
-       diff(id(i),id'(i,t)) XOR H((tag1,(input@T(i,t),nt(i,t))),diff(key(i),key'(i,t))))),
+       diff(id(i),id'(i,t)) XOR H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))))),
   exec@pred(T2(i,t)) &&
   not(exists r:index,
       R1(r) < T2(i,t) &&
@@ -416,7 +416,7 @@ split; intro [_ H1]; simpl.
   intro Meq.
   use H1.
   assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
-         H((tag1,(input@T(i,t),nt(i,t))),diff(key(i),key'(i,t))); 1:auto.
+         H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))); 1:auto.
   use tags_neq; project.
   (* Left *)
   euf Meq0 => Ct _ _; 2:auto.

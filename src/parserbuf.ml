@@ -176,7 +176,7 @@ let () =
               : Process.process)
     end ;
     "Pairs", `Quick, begin fun () ->
-      ignore (parse_process table "in(c,x);out(c,(x,x))" : Process.process)
+      ignore (parse_process table "in(c,x);out(c,<x,x>)" : Process.process)
     end ;
     "If", `Quick, begin fun () ->
       let table =

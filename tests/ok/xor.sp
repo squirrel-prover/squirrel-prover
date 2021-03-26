@@ -25,7 +25,7 @@ Proof.
 Qed.
 
 goal _ (m:message,n:message,x:message):
-  x = xor(m,(m,n)) &&
+  x = xor(m,<m,n>) &&
   snd(xor(x,m)) = m =>
   m = n.
 Proof.

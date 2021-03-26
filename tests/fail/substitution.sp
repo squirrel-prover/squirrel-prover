@@ -13,8 +13,8 @@ name mc : index -> message
 
 system O: out(ch,cst); (
     (A: !_a out(ch,h(na(a),k)))
-  | (B: !_b out(ch,h((nb(b),nb(b)),k)))
-  | (C: !_c out(ch,h((nc(c),mc(c)),k)))
+  | (B: !_b out(ch,h(<nb(b),nb(b)>,k)))
+  | (C: !_c out(ch,h(<nc(c),mc(c)>,k)))
 ).
 
 goal unforgeable_1 :

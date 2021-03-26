@@ -7,7 +7,7 @@ abstract ko : message
 
 channel c
 
-system out(c,(n1,diff(xor(n1,ok),xor(n1,ko)))).
+system out(c,<n1,diff(xor(n1,ok),xor(n1,ko))>).
 
 equiv test.
 Proof.

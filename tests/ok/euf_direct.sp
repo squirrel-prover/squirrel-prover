@@ -7,7 +7,7 @@ abstract f : message->message
 system null.
 
 goal test :
-  h(n,k) = (f(n),h(f(n),k)) => f(n) = n.
+  h(n,k) = <f(n),h(f(n),k)> => f(n) = n.
 Proof.
   intro Heq.
   euf Heq. 
