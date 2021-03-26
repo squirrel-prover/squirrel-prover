@@ -81,7 +81,7 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 
 (*------------------------------------------------------------------*)
-(** {2 Parsed goals }*)
+(** {2 Parsed goals} *)
 
 type p_goal_name = P_unknown | P_named of lsymb
 
@@ -107,7 +107,7 @@ type gm_input_i =
 type gm_input = gm_input_i L.located
 
 (*------------------------------------------------------------------*)
-(** {2 Options }*)
+(** {2 Options} *)
 
 type option_name =
   | Oracle_for_symbol of string
@@ -317,7 +317,7 @@ module Make_AST (T : Table_sig) :
       | _ -> assert false
 
   (* a printer for tactics that follows a specific syntax.
-  TODO: tactics with "as" for intro pattern are not printed correctly.*)
+     TODO: tactics with "as" for intro pattern are not printed correctly.*)
   let pp_abstract ~pp_args s args ppf =
     match s,args with
       | "use", TacticsArgs.String_name id :: l ->
@@ -836,7 +836,8 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | Tactics.Abstract ("cycle",[TacticsArgs.Int_parsed i]) -> subgoals := cycle i !subgoals; false
+  | Tactics.Abstract ("cycle",[TacticsArgs.Int_parsed i]) -> 
+    subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 
 let start_proof () = match !current_goal, !goals with

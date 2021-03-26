@@ -74,6 +74,7 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     goal_or_right_1;
+
   T.register "right"
     ~tactic_help:{general_help = "Reduce a goal with a disjunction conclusion \
                                   into the goal where the conclusion has been \
@@ -83,6 +84,7 @@ let () =
                   tactic_group = Logical}
     goal_or_right_2
 
+(*------------------------------------------------------------------*)
 let goal_true_intro (s : TraceSequent.t) =
   match TraceSequent.conclusion s with
   | True -> []
