@@ -2714,31 +2714,28 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-(** [collision_resistance judge sk fk] collects all equalities between
-  * hashes that occur at toplevel in message hypotheses,
-  * and adds the equalities of the messages hashed with the same key. *)
-let collision_resistance (s : TraceSequent.t) =
+let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) = 
+  match t with
+  | Fun ((hash, _), [m; Name (key,_)]) ->
+    Symbols.is_ftype hash Symbols.Hash cntxt.table
+    && Euf.check_key_ssc
+      ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
+      ~cntxt hash key
+
+  | _ -> false
+
+(** We collect all hashes appearing inside the hypotheses, and which satisfy
+    the syntactic side condition. *)
+let top_level_hashes s =
   let cntxt = mk_trace_cntxt s in
 
-  (* We collect all hashes appearing inside the hypotheses, and which satisfy
-     the syntactic side condition. *)
-  let hashes =
-    List.filter
-      (fun t -> match t with
-         | Fun ((hash, _), [m; Name (key,_)]) ->
-            Symbols.is_ftype hash Symbols.Hash cntxt.table
-            && Euf.check_key_ssc
-              ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-              ~cntxt hash key
-
-         | _ -> false)
-      (TraceSequent.get_all_messages s)
-  in
-
-  let hashes = List.sort_uniq Stdlib.compare hashes in
+  let hashes = 
+    List.filter (valid_hash cntxt) (TraceSequent.get_all_messages s)
+    |> List.sort_uniq Stdlib.compare 
+  in   
 
   if List.length hashes = 0 then soft_failure Tactics.NoSSC;
-  
+
   let rec make_eq acc hash_list =
     match hash_list with
     | [] -> acc
@@ -2754,10 +2751,30 @@ let collision_resistance (s : TraceSequent.t) =
   in
 
   let trs = get_trs s in
-  let hash_eqs =
-    make_eq [] hashes
-    |> List.filter (fun (a,b) -> 
-        Completion.check_equalities trs [Term.ESubst (a,b)])
+
+  make_eq [] hashes
+  |> List.filter (fun (a,b) -> 
+      Completion.check_equalities trs [Term.ESubst (a,b)])
+
+
+
+(** [collision_resistance judge sk fk] applies the collision resistance axiom 
+    between the hashes:
+    - if [i = Some j], collision in hypothesis [j]
+    - if [i = None], collects all equalities between hashes that occur at
+    toplevel in message hypotheses. *)
+let collision_resistance TacticsArgs.(Opt (String, i)) (s : TraceSequent.t) =  
+
+  let hash_eqs = match i with
+    | None -> top_level_hashes s
+    | Some (String j) -> match Hyps.by_name j s with
+      | _, Term.Atom (`Message (`Eq, t1, t2)) -> 
+        let cntxt = mk_trace_cntxt s in
+        if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then 
+          soft_failure Tactics.NoSSC;
+
+        [t1,t2]
+      | _ -> soft_failure Tactics.NoCollision
   in
 
   let new_facts =
@@ -2778,16 +2795,15 @@ let collision_resistance (s : TraceSequent.t) =
   let goal = Term.mk_impl f_coll (TraceSequent.conclusion s) in
   [TraceSequent.set_conclusion goal s]
 
-let () = T.register "collision"
-    ~tactic_help:{general_help = "Collects all equalities between hashes \
-                                  occurring at toplevel in\
-                                  message hypotheses, and adds the equalities \
-                                  between messages that have the same hash with \
-                                  the same valid key.";
-                  detailed_help = "A key is valid if it is only used in a key \
-                                   position. Remark that this could be relaxed, \
-                                   as CR holds for any valid key, even known to \
-                                   the attacker.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Cryptographic}
-    collision_resistance
+let () = T.register_typed "collision"
+    ~general_help:"Collects all equalities between hashes \
+                   occurring at toplevel in\
+                   message hypotheses, and adds the equalities \
+                   between messages that have the same hash with \
+                   the same valid key."
+    ~detailed_help:"A key is valid if it is only used in a key \
+                    position. Remark that this could be relaxed, \
+                    as CR holds for any valid key, even known to \
+                    the attacker."
+    ~tactic_group:Cryptographic
+    collision_resistance Args.(Opt String)
