@@ -1023,8 +1023,6 @@ end = struct
          not ground, we should probably always abort. *)
       | _ -> assert false
 
-  (* REM *)
-  let head_superpose = Prof.mk_ternary "head_superpose" head_superpose
 
   (** [grnd_superpose state (l,r) (t,a)]: Try all superposition of a ground rule
       [t] -> [a] into an e_rule [l] -> [r], and add new equalities to get local
@@ -1078,9 +1076,6 @@ end = struct
           ( state, acc ) in
 
     aux state [] l (fun x -> x)
-
-  (* REM *)
-  let grnd_superpose = Prof.mk_ternary "grnd_superpose" grnd_superpose
 
 
   let rec select_erule (r_open : e_rules) = 

@@ -27,14 +27,6 @@
 %token PROOF QED UNDO ABORT
 %token EOF
 
-%nonassoc empty_else
-
-%nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
-
-%left XOR
-%left EXP
-
-%nonassoc ELSE
 %nonassoc QUANTIF
 %right ARROW
 %right DARROW
@@ -42,6 +34,14 @@
 %left OR
 %left AND
 /* %nonassoc NOT */
+
+%nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
+
+%left XOR
+%left EXP
+
+%nonassoc empty_else
+%nonassoc ELSE
 
 %nonassoc AT
 

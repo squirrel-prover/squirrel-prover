@@ -154,7 +154,7 @@ let rec pp_term_i ppf t = match t with
       pp_ts ts
 
   | Compare (ord,tl,tr) ->
-    Fmt.pf ppf "@[<h>(%a@ %a@ %a)@]" pp_term tl Term.pp_ord ord pp_term tr
+    Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
       
   | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
   | ForAll (vs, b) ->
@@ -552,9 +552,6 @@ let rec convert :
 
   let conv ?(subst=subst) s t = convert env subst t s in
   let type_error () = raise (ty_error tm sort) in
-
-  (* REM *)
-  Fmt.epr "convert: %a to type %a@." pp tm Sorts.pp sort;
   
   match L.unloc tm with
   | App   (f,terms) ->

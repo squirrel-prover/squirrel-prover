@@ -130,33 +130,32 @@ let () =
      *   Theory.pp f Theory.pp ff;     *)
     Alcotest.(check bool) "equal formulas" true
       (Theory.equal f ff)
-  in ()
-  (* REM *)
-  (* Checks.add_suite "Formula parsing" [
-   *   "Boolean constants", `Quick, begin fun () ->
-   *     check "True" ;
-   *     check "False"
-   *   end ;
-   *   "Boolean connectives", `Quick, begin fun () ->
-   *     (* TODO improve without parentheses:
-   *      * the pretty-printer should ideally be aware of precedences
-   *      * between connectives (and quantifiers) and only insert parentheses
-   *      * and boxes when precedences require it  *)
-   *     check "not(True)" ;
-   *     check "(True => False)" ;
-   *     check "(True || False)" ;
-   *     check "((True && True) => False)" ;
-   *   end ;
-   *   "Quantifiers", `Quick, begin fun () ->
-   *     check "forall (x:index), True" ;
-   *     check "forall (x:index), (x = x && x <> x)" ;
-   *     check "exists (x:index), True" ;
-   *     check "exists (x:index,y:message,z:index,t:timestamp), True" ;
-   *     eqf "exists x:index, True" "exists (x:index) True" ;
-   *     check "exists (x,y:index,z:message,\
-   *                    k:index,u,v:timestamp), True" ;
-   *   end
-   * ] *)
+  in 
+  Checks.add_suite "Formula parsing" [
+    "Boolean constants", `Quick, begin fun () ->
+      check "True" ;
+      check "False"
+    end ;
+    "Boolean connectives", `Quick, begin fun () ->
+      (* TODO improve without parentheses:
+       * the pretty-printer should ideally be aware of precedences
+       * between connectives (and quantifiers) and only insert parentheses
+       * and boxes when precedences require it  *)
+      check "not(True)" ;
+      check "(True => False)" ;
+      check "(True || False)" ;
+      check "((True && True) => False)" ;
+    end ;
+    "Quantifiers", `Quick, begin fun () ->
+      check "forall (x:index), True" ;
+      check "forall (x:index), (x = x && x <> x)" ;
+      check "exists (x:index), True" ;
+      check "exists (x:index,y:message,z:index,t:timestamp), True" ;
+      eqf "exists x:index, True" "exists (x:index) True" ;
+      check "exists (x,y:index,z:message,\
+                     k:index,u,v:timestamp), True" ;
+    end
+  ]
 
 let () =
   let table = Channel.declare Symbols.builtins_table (L.mk_loc L._dummy "c") in
