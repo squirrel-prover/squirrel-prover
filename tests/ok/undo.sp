@@ -8,7 +8,7 @@ goal _:True.
 goal _:False.
 undo 1.
 Proof.
-  simpl.
+  auto.
   undo 1.
-  simpl.
+  auto.
 Qed.

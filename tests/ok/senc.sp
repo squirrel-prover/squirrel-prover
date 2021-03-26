@@ -12,7 +12,5 @@ name k : message
 system null.
 goal ssenc : dec(enc(n,r,k),k) = n.
 Proof.
-
-simpl.
-
+auto.
 Qed.

@@ -2044,7 +2044,9 @@ let rec simpl ~strong ~close : TraceSequent.t Tactics.tac =
 
   if not strong
   then (fun g sk fk -> sk [g] fk)
-  else try_tac do_conclude >>
+  else 
+    (if close || Config.auto_intro ()
+     then try_tac do_conclude else Tactics.id) >>
     fun g sk fk ->
     (* If we still have a goal, we can try to split a conjunction
      * and prove the remaining subgoals, or return this goal,
