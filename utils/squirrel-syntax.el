@@ -120,6 +120,7 @@
 
 (defvar squirrel-closing-keywords '(
   "by"
+  "admit"
   "assumption"
   "congruence"
   "constraints"
