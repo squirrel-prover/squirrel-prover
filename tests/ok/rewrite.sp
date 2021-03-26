@@ -236,3 +236,29 @@ Proof.
  rewrite !H; 1,2: assumption. 
  congruence.
 Qed.
+
+(*------------------------------------------------------------------*)
+
+axiom mif_true : 
+ forall (b : boolean, x,y : message),
+ b => if b then x else y = x.
+
+axiom mif_false : 
+ forall (b : boolean, x,y : message),
+ (not b) => if b then x else y = y.
+
+goal _ (b,b' : boolean, x,y : message) : 
+  b => b' => if (b && b') then x else y = x.
+Proof.
+ intro b b' x y Hb Hb'.
+ by rewrite mif_true. 
+Qed.
+
+set debugTactics=true.
+(* s_item in rewrite  *)
+goal _ (b,b' : boolean, x,y : message) : 
+  b => b' => if (b && b') then x else y = x.
+Proof.
+ intro b b' x y Hb Hb'.
+ by rewrite mif_true. (* /=.  *)
+Qed.

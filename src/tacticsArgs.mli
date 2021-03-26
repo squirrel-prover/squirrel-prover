@@ -27,11 +27,14 @@ and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
 
-type intro_pattern =
-  | Star      of Location.t    (** '*' *)
+type s_item =
   | Tryauto   of Location.t    (** '//' *)
   | Simplify  of Location.t    (** '/=' *)
-  | Simpl     of simpl_pat
+
+type intro_pattern =
+  | Star   of Location.t    (** '*' *)
+  | SItem of s_item
+  | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
 val pp_naming_pat : Format.formatter -> naming_pat         -> unit
@@ -56,7 +59,8 @@ type ip_handler = [
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
-type rw_arg = { 
+(* rewrite item *)
+type rw_item = { 
   rw_mult : rw_count;
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
   rw_type : [
@@ -64,6 +68,10 @@ type rw_arg = {
     | `Expand of Theory.term      (* term or macro name *)
   ];
 }
+
+type rw_arg =
+  | R_item   of rw_item 
+  | R_s_item of s_item
 
 type rw_in = [`All | `Hyps of lsymb list] option 
 
@@ -113,6 +121,9 @@ type _ arg =
   | String    : lsymb -> lsymb arg
   | Pair      : 'a arg * 'b arg -> ('a * 'b) arg
   | Opt       : ('a sort * 'a arg option) -> ('a option) arg
+
+(*------------------------------------------------------------------*)
+val pp_parser_arg : Format.formatter -> parser_arg -> unit
 
 (*------------------------------------------------------------------*)
 val sort : 'a arg -> 'a sort

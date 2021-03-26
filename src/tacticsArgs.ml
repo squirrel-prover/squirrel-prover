@@ -22,11 +22,14 @@ and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
 
-type intro_pattern =
-  | Star      of Location.t    (** '*' *)
+type s_item =
   | Tryauto   of Location.t    (** '//' *)
   | Simplify  of Location.t    (** '/=' *)
-  | Simpl     of simpl_pat
+
+type intro_pattern =
+  | Star   of Location.t    (** '*' *)
+  | SItem of s_item
+  | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
 let pp_naming_pat fmt = function
@@ -49,10 +52,13 @@ and pp_simpl_pat fmt = function
   | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
   | SNamed n_ip  -> pp_naming_pat fmt n_ip
 
-let rec pp_intro_pat fmt = function
+let rec pp_s_item fmt = function
   | Simplify _    -> Fmt.pf fmt "/="
   | Tryauto  _    -> Fmt.pf fmt "//"
-  | Star     _    -> Fmt.pf fmt "*"
+
+let rec pp_intro_pat fmt = function
+  | SItem s    -> pp_s_item fmt s
+  | Star     _ -> Fmt.pf fmt "*"
   | Simpl s_ip -> pp_simpl_pat fmt s_ip
 
 
@@ -69,17 +75,52 @@ type ip_handler = [
 ]
   
 (*------------------------------------------------------------------*)
-(** Parsed arguments for rewrite *)
+(** {2 Parsed arguments for rewrite} *)
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
-type rw_arg = { 
+(** rewrite item *)
+type rw_item = { 
   rw_mult : rw_count; 
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
   rw_type : [`Form of Theory.formula | `Expand of Theory.term];
 }
 
+type rw_arg =
+  | R_item   of rw_item 
+  | R_s_item of s_item
+
 type rw_in = [`All | `Hyps of lsymb list] option 
+
+let pp_rw_count ppf = function
+  | `Once -> ()
+  | `Many -> Fmt.pf ppf "!"
+  | `Any -> Fmt.pf ppf  "?"
+
+let pp_rw_in ppf = function
+  | None      -> ()
+  | Some `All -> Fmt.pf ppf " in *"
+  | Some (`Hyps symb) -> 
+    Fmt.pf ppf " in %a"
+      (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
+
+let pp_rw_dir ppf d = match L.unloc d with
+  | `LeftToRight -> ()
+  | `RightToLeft -> Fmt.pf ppf "-"
+
+let pp_rw_type ppf = function
+  | `Form f   -> Theory.pp ppf f
+  | `Expand t -> Theory.pp ppf t
+
+let pp_rw_item ppf rw_item =
+  Fmt.pf ppf "%a%a%a"
+    pp_rw_dir   rw_item.rw_dir
+    pp_rw_count rw_item.rw_mult
+    pp_rw_type  rw_item.rw_type
+
+let pp_rw_arg ppf rw_arg = match rw_arg with
+  | R_s_item s -> pp_s_item ppf s
+  | R_item r -> pp_rw_item ppf r
 
 (*------------------------------------------------------------------*)
 (** One tactic argument (in the parser) *)
@@ -91,7 +132,21 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * rw_in
-      
+
+let pp_parser_arg ppf = function
+  | Int_parsed i  -> Fmt.int ppf i
+  | String_name s -> Fmt.string ppf (L.unloc s)
+  | Theory th     -> Theory.pp ppf th
+  | IntroPat args -> pp_intro_pats ppf args
+  | AndOrPat pat  -> pp_and_or_pat ppf pat
+  | SimplPat pat  -> pp_simpl_pat ppf pat
+
+  | RewriteIn (rw_args, in_opt) ->
+    Fmt.pf ppf "%a%a"
+      (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
+      pp_rw_in in_opt
+
+(*------------------------------------------------------------------*)      
 type ('a, 'b) pair
 
 (*------------------------------------------------------------------*)
@@ -379,3 +434,4 @@ let convert_args table env parser_args tactic_type =
 
   in
   conv_args parser_args tactic_type env
+

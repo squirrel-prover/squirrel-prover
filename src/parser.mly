@@ -370,17 +370,20 @@ rw_dir:
 | MINUS { `RightToLeft }
 
 rw_type:
-| f=sterm      { `Form f }  
-
+| f=sterm        { `Form f }  
 | SLASH t=sterm  { `Expand t }
 
-rw_param:
+rw_item:
 | m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
                                                      rw_dir = d; 
                                                      rw_type = t; } }
 
-rw_params:
-| l=slist1(rw_param, empty) { l }
+rw_arg:
+| r=rw_item { TacticsArgs.R_item r }
+| s=s_item  { TacticsArgs.R_s_item s }
+
+rw_args:
+| l=slist1(rw_arg, empty) { l }
 
 rw_in:
 |                          { None }
@@ -410,11 +413,14 @@ simpl_pat:
 | n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
 | ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
 
-intro_pat:
+s_item:
 | l=loc(SLASHSLASH) { TacticsArgs.Tryauto  (L.loc l)}
 | l=loc(SLASHEQUAL) { TacticsArgs.Simplify (L.loc l)}
-| l=loc(STAR)       { TacticsArgs.Star     (L.loc l)}
-| pat=simpl_pat     { TacticsArgs.Simpl pat }
+
+intro_pat:
+| s=s_item      { TacticsArgs.SItem (s) }
+| l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
+| pat=simpl_pat { TacticsArgs.Simpl pat }
 
 intro_pat_list:
 | l=slist1(intro_pat,empty) { l }
@@ -519,7 +525,7 @@ tac:
         | Some ip -> [TacticsArgs.SimplPat ip] in
       T.Abstract ("use", ip @ [TacticsArgs.String_name i] @ t) }
 
-  | REWRITE p=rw_params w=rw_in
+  | REWRITE p=rw_args w=rw_in
     { T.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
 
   | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { T.Abstract

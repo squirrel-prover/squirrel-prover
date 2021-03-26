@@ -375,8 +375,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
   | [] -> [s]
 
-  | Args.Tryauto l :: intros 
-  | Args.Simplify l :: intros ->
+  | Args.SItem l :: intros ->
     (* TODO: implement after code factorization *)
     hard_failure (Failure "not yet implemented for equiv sequents")
 
