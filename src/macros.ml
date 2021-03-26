@@ -79,6 +79,7 @@ let get_def :
                                           Term.Fun(Term.f_zero,[]))])])
             | _ -> assert false
           end
+
       | Symbols.State _, _ ->
         begin match a with
           | Action (symb,indices) ->
@@ -101,7 +102,7 @@ let get_def :
                 by the update term
                 - otherwise, we need to take into account the possibility that
                 [arg] and [is] might be equal, and generate a conditional *)
-                if args = is then msg
+                if args = is || a = Term.init then msg
                 else
                   Term.mk_ite
                     (Term.mk_indices_eq args is)
