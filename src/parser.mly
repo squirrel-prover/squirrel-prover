@@ -33,7 +33,8 @@
 %right DEQUIVARROW
 %left OR
 %left AND
-/* %nonassoc NOT */
+
+%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID HAPPENS FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
