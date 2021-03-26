@@ -2261,9 +2261,15 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
 
 (** Applies a rewrite item *)
 let do_rw_item 
-    (rw_item : Args.rw_item) (targets : rw_target list)
-    (all : bool) (s : TraceSequent.sequent) 
+    (rw_item : Args.rw_item) (rw_in : Args.rw_in) (s : TraceSequent.sequent) 
   : TraceSequent.sequent list =
+  let targets, all = match rw_in with
+    | Some (`Hyps symbs) -> 
+      List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
+    | Some `All -> target_all s, true
+    | None -> [`Goal], false
+  in
+
   let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
 
   match rw_arg with
@@ -2276,17 +2282,10 @@ let do_rw_item
   | Rw_expand arg -> [expand targets arg s]
 
 (** Applies a rewrite arg  *)
-let do_rw_arg rw_arg in_opt s : TraceSequent.sequent list =
-  let targets, all = match in_opt with
-    | Some (`Hyps symbs) -> 
-      List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
-    | Some `All -> target_all s, true
-    | None -> [`Goal], false
-  in
+let do_rw_arg rw_arg rw_in s : TraceSequent.sequent list =
   match rw_arg with
-  | Args.R_item rw_item  -> do_rw_item rw_item targets all s
-  | Args.R_s_item s_item -> 
-    do_s_item s_item s (* note: targets are ignored there *)
+  | Args.R_item rw_item  -> do_rw_item rw_item rw_in s
+  | Args.R_s_item s_item -> do_s_item s_item s (* targets are ignored there *)
 
 let rewrite_tac args s sk fk =
   match args with

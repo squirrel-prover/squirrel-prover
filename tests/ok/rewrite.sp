@@ -254,11 +254,22 @@ Proof.
  by rewrite mif_true. 
 Qed.
 
-set debugTactics=true.
-(* s_item in rewrite  *)
+(* check simplification item /= *)
 goal _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
  intro b b' x y Hb Hb'.
- by rewrite mif_true. (* /=.  *)
+ rewrite mif_true /=.
+
+ (* /= does not close goals, hence there should be two subgoals *)
+ admit.
+ admit.
+Qed.
+
+(* check simplification item // *)
+goal _ (b,b' : boolean, x,y : message) : 
+  b => b' => if (b && b') then x else y = x.
+Proof.
+ intro b b' x y Hb Hb'.
+ rewrite mif_true //.
 Qed.
