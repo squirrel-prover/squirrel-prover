@@ -950,7 +950,4 @@ let declare table decl =
   error_handler loc KDecl (declare_i table) decl
 
 let declare_list table decls =
-  (* For debugging *)
-  (* Fmt.epr "%a@." Decl.pp_decls decls; *)
-
   List.fold_left (fun table d -> declare table d) table decls

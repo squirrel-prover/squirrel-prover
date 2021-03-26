@@ -122,12 +122,6 @@ let () =
   let eqf s ss =
     let f = parse_formula s in
     let ff = parse_formula ss in
-    (* Fmt.epr "@[<v>checking that:@;\
-     *          @[%a@]@;\
-     *          and:@;\
-     *          @[%a@]@;\
-     *          are equal@;@]"
-     *   Theory.pp f Theory.pp ff;     *)
     Alcotest.(check bool) "equal formulas" true
       (Theory.equal f ff)
   in 

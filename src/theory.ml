@@ -404,7 +404,7 @@ let make_app_i table cntxt lsymb l =
     conv_err loc (Timestamp_unexpected (App (lsymb,l))) in
 
   match Symbols.def_of_lsymb lsymb table with
-  | Symbols.Reserved _ -> Fmt.epr "%s@." (L.unloc lsymb); assert false
+  | Symbols.Reserved _ -> assert false
   | Symbols.Exists d ->
     begin match d with
     | Symbols.Function (a,fdef) ->
@@ -620,11 +620,9 @@ let rec convert :
       end
 
   | Compare (o,u,v) ->
-    Fmt.epr "1 %a and %a@." pp u pp v;
     begin match sort with
       | Sorts.Boolean ->
         begin try
-            Fmt.epr "2@.";
             Term.Atom
               (`Timestamp (o,
                            conv Sorts.Timestamp u,
@@ -633,13 +631,11 @@ let rec convert :
           match o with
           | #Term.ord_eq as o ->
             begin try
-                Fmt.epr "3@.";
                 Term.Atom (`Index (o,
                                    conv_index env subst u,
                                    conv_index env subst v))
               with Conv (_,Type_error _ ) ->
               try
-                Fmt.epr "4@.";
                 Term.Atom (`Message (o,
                                      conv Sorts.Message u,
                                      conv Sorts.Message v))

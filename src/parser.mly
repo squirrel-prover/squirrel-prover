@@ -37,11 +37,11 @@
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
-%left XOR
-%left EXP
-
 %nonassoc empty_else
 %nonassoc ELSE
+
+%left XOR
+%left EXP
 
 %nonassoc AT
 

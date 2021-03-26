@@ -89,8 +89,6 @@ let goal_is_equiv s = match EquivSequent.goal s with
 let goal_as_equiv s = match EquivSequent.goal s with
   | Atom (Equiv.Equiv e) -> e
   | _ -> 
-    (* Printexc.print_raw_backtrace Stdlib.stderr (Printexc.get_callstack 100);
-     * Fmt.epr "@."; *)
     Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
       
 let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
