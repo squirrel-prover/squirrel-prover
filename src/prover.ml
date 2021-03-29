@@ -235,8 +235,11 @@ let pp_help fmt (th, tac_name) =
 
 module type Table_sig = sig
   type judgment
+
   val table : judgment table
+
   val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
+
   val to_goal : judgment -> Goal.t
   val from_trace : TraceSequent.t -> judgment
   val from_equiv : Goal.t -> judgment

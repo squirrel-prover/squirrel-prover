@@ -69,7 +69,6 @@ let cmd_error e = raise (Cmd_error e)
 
 
 (*------------------------------------------------------------------*)
-open Prover
 open Tactics
 
 exception Unfinished 
@@ -90,9 +89,9 @@ let main_loop_body ~test state =
     state.mode, parse_next parse_buf
   with
     | mode, ParsedUndo nb_undo ->
-      let new_mode, new_table = reset_state nb_undo in
+      let new_mode, new_table = Prover.reset_state nb_undo in
       let () = match new_mode with
-        | ProofMode -> Printer.pr "%a" pp_goal ()
+        | ProofMode -> Printer.pr "%a" Prover.pp_goal ()
         | GoalMode -> Printer.pr "%a" Action.pp_actions new_table
         | WaitQed -> ()
         | AllDone -> assert false in
@@ -106,16 +105,16 @@ let main_loop_body ~test state =
     | ProofMode, ParsedTactic utac ->
       if not !interactive then
         Printer.prt `Prompt "%a" Prover.pp_ast utac ;
-      begin match eval_tactic utac with
+      begin match Prover.eval_tactic utac with
       | true ->
           Printer.prt `Goal "Goal %s is proved"
             (match Prover.current_goal () with
                | Some (i, _) -> i
                | None -> assert false);
-          complete_proof ();
+          Prover.complete_proof ();
           { state with mode = WaitQed }
       | false ->
-          Printer.pr "%a" pp_goal ();
+          Printer.pr "%a" Prover.pp_goal ();
           { state with mode = ProofMode }
       end
 
@@ -132,9 +131,9 @@ let main_loop_body ~test state =
         match L.unloc goal with
         | Prover.Gm_proof ->
           begin
-            match start_proof () with
+            match Prover.start_proof () with
             | None ->
-              Printer.pr "%a" pp_goal ();
+              Printer.pr "%a" Prover.pp_goal ();
               { state with mode = ProofMode }
             | Some es -> cmd_error (StartProofError es)
           end
@@ -173,7 +172,7 @@ let rec main_loop ~test ?(save=true) state =
   if !interactive then Printer.prt `Prompt "";
   (* Save the state if instructed to do so.
    * In practice we save except after errors and the first call. *)
-  if save then save_state state.mode state.table ;
+  if save then Prover.save_state state.mode state.table ;
 
   match
     let new_state = main_loop_body ~test state in
@@ -197,8 +196,8 @@ let rec main_loop ~test ?(save=true) state =
   | exception (Process.ProcError e) ->
     error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
       
-  | exception (Decl_error e) when not test ->
-    error ~test state (fun fmt -> pp_decl_error pp_loc_error fmt e)
+  | exception (Prover.Decl_error e) when not test ->
+    error ~test state (fun fmt -> Prover.pp_decl_error pp_loc_error fmt e)
       
   | exception (Theory.Conv e) when not test ->
     error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
