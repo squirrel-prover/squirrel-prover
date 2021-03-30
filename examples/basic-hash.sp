@@ -46,7 +46,7 @@ Proof.
   expand cond@R(j).
   split.
   project.
-  (* LEFT *) by euf Meq; exists i, k1.
+  (* LEFT *) by euf Meq; exists i, k0.
   (* RIGHT *) by euf Meq; exists i,k.
   by exists i,k.
 Qed.
@@ -67,7 +67,7 @@ Proof.
   use H. exists i,k.
   use H.
   project.
-  (* LEFT *) by euf Meq; exists i, k1.
+  (* LEFT *) by euf Meq; exists i, k0.
   (* RIGHT *) by euf Meq; exists i,k. 
 Qed.
 

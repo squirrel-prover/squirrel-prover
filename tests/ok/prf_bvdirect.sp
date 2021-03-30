@@ -16,7 +16,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   equivalent
-    (forall (i1:index), (diff(n(i) <> n(i1), m(i) <> n(i1)))),
+    (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))),
     True.
   admit.
   by yesif 1.

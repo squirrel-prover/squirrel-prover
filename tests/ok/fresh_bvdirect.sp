@@ -14,7 +14,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   equivalent
-    (forall i1:index, i<>i1),
+    (forall i0:index, i<>i0),
     True.
   admit.
   nosimpl(yesif 1).

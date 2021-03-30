@@ -96,7 +96,7 @@ Proof.
 
   (* First projection. *)
   intctxt Mneq.
-  by exists i, j1.
+  by exists i, j0.
 
   (* Second projection. *)
   intctxt Mneq.
@@ -137,7 +137,7 @@ Proof.
   project.
 
   intctxt Mneq.
-  by use H0 with i,j1; case H1.
+  by use H0 with i,j0; case H1.
 
   intctxt Mneq.
   by use H0 with i,j; case H1.
@@ -150,23 +150,23 @@ Proof.
   intro *.
   project. 
 
-  assert dec(output@Tag(i,j),kE(i1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
+  assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>.
   intctxt Meq0.
   case H.
-  assert dec(output@Tag(i1,j1),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
+  assert dec(output@Tag(i0,j0),kE(i)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
-  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
+  by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 
-  assert dec(output@Tag(i,j),kbE(i1,j1)) = <tagT,<input@Tag(i1,j1),nt(i1,j1)>>.
+  assert dec(output@Tag(i,j),kbE(i0,j0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>>.
   intctxt Meq0.
   case H.
-  assert dec(output@Tag(i1,j1),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
+  assert dec(output@Tag(i0,j0),kbE(i,j)) = <tagT,<input@Tag(i,j),nt(i,j)>>.
   intctxt Meq2.
   by case H.
   by use fail_not_pair with tagT,<input@Tag(i,j),nt(i,j)>.
-  by use fail_not_pair with tagT,<input@Tag(i1,j1),nt(i1,j1)>.
+  by use fail_not_pair with tagT,<input@Tag(i0,j0),nt(i0,j0)>.
 Qed.
 
 equiv unlinkability.
@@ -240,10 +240,10 @@ Proof.
   (* find condA => condB *)
   intctxt Mneq.
   by use tags_neq.
-  by exists j2.
+  by exists j1.
 
   (* find condB => condA *)
-  use lemma with i,j,i1,j1.
+  use lemma with i,j,i0,j0.
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 
   fa. 
@@ -251,7 +251,7 @@ Proof.
   intctxt Mneq. 
   by use tags_neq.
   (* find condB => condA *)
-  use lemma with i,j,i1,j1 as Hlem. 
+  use lemma with i,j,i0,j0 as Hlem. 
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>.
 
   fa 3; fadup 3.

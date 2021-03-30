@@ -70,8 +70,8 @@ Proof.
   use tags_neq; project.
   (* LEFT *)
   euf Meq.
-  exists i,k1.
-  assert input@T(i,k1)=nR(j).
+  exists i,k0.
+  assert input@T(i,k0)=nR(j).
   fresh Meq1.
   by case H; depends R(j),R2(j).
 
@@ -109,8 +109,8 @@ Proof.
   use tags_neq; project.
   (* LEFT *) 
   euf Meq.
-  exists i,k1.
-  assert input@T(i,k1)=nR(j).
+  exists i,k0.
+  assert input@T(i,k0)=nR(j).
   fresh Meq1.
   by case H0; depends R(j),R1(j).
 
@@ -169,8 +169,8 @@ Proof.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
   repeat split. 
-  by depends R(j1),R1(j1).
-  by depends R(j1),R2(j1).
+  by depends R(j0),R1(j0).
+  by depends R(j0),R2(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -216,14 +216,14 @@ Proof.
 
   (* LEFT *)
   fa.
-  use wa_R1_left with i1,j.
+  use wa_R1_left with i0,j.
   use H1.
   by exists k. 
 
   yesif.
   (* RIGHT *)
   fa.
-  use wa_R1_right with i1,j,k1.
+  use wa_R1_right with i0,j,k0.
   by use H1.
   by yesif.
 

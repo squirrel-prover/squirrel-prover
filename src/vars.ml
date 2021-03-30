@@ -1,28 +1,32 @@
-(* Variables contains two name value, a name_prefix and a name_suffix. The name
+open Utils
+
+(* Variables contains two name value, a s_prefix and a i_suffix. The name
    of the variable is then the concatenation of both. This allows, given a set
-   of previously defined variables with the same name_prefix, to create the
-   simplest possible fresh variable, by incrementing the name_suffix. *)
+   of previously defined variables with the same s_prefix, to create the
+   simplest possible fresh variable, by incrementing the i_suffix. *)
 
-type 'a var =
-  { name_prefix : string;
-    name_suffix : int;
-    var_type : 'a Sorts.t }
+type 'a var = {
+  s_prefix : string;
+  i_suffix : int;
+  var_type : 'a Sorts.t
+}
 
-type index = Sorts.index var
-type message = Sorts.message var
-type boolean = Sorts.boolean var
+type index     = Sorts.index     var
+type message   = Sorts.message   var
+type boolean   = Sorts.boolean   var
 type timestamp = Sorts.timestamp var
 
 type evar = EVar : 'a var -> evar
 
+(*------------------------------------------------------------------*)
 let name v =
-  if v.name_suffix <> 0 then
-    Fmt.strf "%s%i" v.name_prefix v.name_suffix
-  else
-    Fmt.strf "%s" v.name_prefix
+  if v.i_suffix <> -1
+  then Fmt.strf "%s%i" v.s_prefix v.i_suffix
+  else Fmt.strf "%s"   v.s_prefix
 
 let sort v = v.var_type
 
+(*------------------------------------------------------------------*)
 let pp ppf v =
   Fmt.pf ppf "%s" (name v)
 
@@ -50,95 +54,110 @@ let pp_typed_list ppf (vars:evar list) =
   in
   aux [] Sorts.(ESort Message) vars
 
-let new_counter = ref 0
-let make_new_from v =
-  let name_prefix = "_" ^ v.name_prefix in
-  incr new_counter ;
-  { name_prefix ; name_suffix = !new_counter ; var_type = v.var_type }
-
-let is_new v =
-  String.sub (name v) 0 1 = "_"
+(*------------------------------------------------------------------*)
+(** {2 Environments} *)
 
 module M = Utils.Ms
 
 exception Undefined_Variable
 
-(* An environment is made of two maps. One maps variables names
-   (accordingly to [var_name]) to variables, and the second maps
-   name prefixes to the current biggest name_suffix for this
-   name_prefix. *)
-type env = (evar M.t * int M.t)
+type env = evar M.t
 
-let to_list ((e1,_):env) =
+let to_list (e1:env) =
   let _,r2 = M.bindings e1 |> List.split in
   r2
 
 let pp_env ppf e =
   pp_typed_list ppf (to_list e)
 
-let empty_env : env = (M.empty,M.empty)
+let empty_env : env = M.empty
 
-let mem (e1,_) name =
-  M.mem name e1
+let mem (e : env) name : bool = M.mem name e
 
 let of_list l =
-  let rec aux (e1, e2) (l : evar list) =
+  let rec aux e (l : evar list) =
     match l with
-    | [] -> (e1, e2)
-    | (EVar v)::q -> aux (M.add (name v) (EVar v) e1,
-                          M.add v.name_prefix v.name_suffix e2) q
+    | [] -> e
+    | EVar v :: q ->
+      let e = M.add (name v) (EVar v) e in
+      aux e q
   in
   aux empty_env l
 
-let rm_var (e1,e2) v =
-   let name_suffix =
-    try
-      (M.find v.name_prefix e2)
-    with Not_found -> 0
-   in
-   let new_suffix =
-     if name_suffix = v.name_suffix then name_suffix -1 else name_suffix
-   in
-  M.remove (name v) e1, M.add v.name_prefix new_suffix e2
+let rm_var e v = M.remove (name v) e
 
 let rm_evar e (EVar v) = rm_var e v
 
 let prefix_count_regexp = Pcre.regexp "_*([^0-9]*)([0-9]*)"
 
-let make_fresh ((e1,e2):env) var_type name_prefix =
-  let name_prefix,name_suffix =
-    let substrings = Pcre.exec ~rex:prefix_count_regexp name_prefix in
+(*------------------------------------------------------------------*)
+(** {2 Create variables} *)
+
+let new_counter = ref 0
+    
+let make_new_from v =
+  let s_prefix = "_" ^ v.s_prefix in
+  incr new_counter ;
+  { s_prefix ;
+    i_suffix = !new_counter ;
+    var_type = v.var_type; }
+
+let is_new v = String.sub (name v) 0 1 = "_"
+
+let omax a b = match a,b with
+  | None, c | c, None -> c
+  | Some a, Some b -> Some (max a b)
+
+let osucc = function
+  | None -> Some 0
+  | Some i -> Some (i+1)
+                        
+let max_suffix (e : env) prefix =
+  M.fold (fun _ (EVar v') m ->      
+      if prefix = v'.s_prefix then
+        match m with
+        | None -> Some (v'.i_suffix)
+        | Some m -> Some (max m v'.i_suffix)
+      else m
+    ) e None 
+
+let max_suffix_v (e : env) v = max_suffix e v.s_prefix
+    
+let make_fresh (e1:env) typ s_prefix =
+  let s_prefix,i_suffix =
+    let substrings = Pcre.exec ~rex:prefix_count_regexp s_prefix in
     let prefix = Pcre.get_substring substrings 1 in
     let i0 = Pcre.get_substring substrings 2 in
     let i0 = if i0 = "" then -1 else int_of_string i0 in
     prefix, i0
   in
-  let name_suffix =
-    max name_suffix
-      (try
-         (M.find name_prefix e2) + 1
-       with Not_found -> 0)
+  let i_suffix = match max_suffix e1 s_prefix with
+    | None -> i_suffix
+    | Some m -> max i_suffix (m + 1)
   in
-  let v = { name_prefix = name_prefix;
-            name_suffix = name_suffix;
-            var_type = var_type;
+
+  let v = { s_prefix = s_prefix;
+            i_suffix = i_suffix;
+            var_type = typ;
           }
   in
-  ( (M.add (name v) (EVar v) e1, M.add name_prefix name_suffix e2), v  )
+  M.add (name v) (EVar v) e1, v 
 
-let make_fresh_and_update (e:env ref) var_type name_prefix =
-  let new_env,new_var = make_fresh (!e) var_type name_prefix in
+let make_fresh_and_update (e:env ref) var_type s_prefix =
+  let new_env,new_var = make_fresh (!e) var_type s_prefix in
   e := new_env;
   new_var
 
 let make_fresh_from env v =
-  make_fresh env v.var_type v.name_prefix
+  make_fresh env v.var_type v.s_prefix
 
 let make_fresh_from_and_update env v =
-  make_fresh_and_update env v.var_type v.name_prefix
+  make_fresh_and_update env v.var_type v.s_prefix
 
 
 (*------------------------------------------------------------------*)
+(** {2 Set and Maps} *)
+
 module Sv = struct
   include Set.Make(struct
       type t = evar
@@ -156,6 +175,8 @@ module Mv = struct
 end
 
 (*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
 exception CastError
 
 let cast : type a b. a var -> b Sorts.sort -> b var = 
@@ -177,32 +198,40 @@ let equal : type a b. a var -> b var -> bool = fun v v' ->
   | Sorts.Timestamp, Sorts.Timestamp -> v = v'
   | _, _ -> false
 
+(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
+let compare x y =
+  if equal x y then 0
+  else if x.i_suffix <= y.i_suffix then -1 else 1
+                                          
 (*------------------------------------------------------------------*)
+(** {2 Tests} *)
+
 let () =
   Checks.add_suite "Vars" [
     "Prefix extension", `Quick, begin fun () ->
-      (* It should never be the case that v.name_prefix is
-       * a strict prefix of v'.name_prefix. Otherwise we can
+      (* It should never be the case that v.s_prefix is
+       * a strict prefix of v'.s_prefix. Otherwise we can
        * have different variables with the same name. *)
       let env = empty_env in
       let env,i = make_fresh env Sorts.Index "i" in
       let env,i1 = make_fresh env Sorts.Index "i" in
       let env,i2 = make_fresh env Sorts.Index "i1" in
+      
       Alcotest.(check string)
         "proper name for i"
-        (name i) "i" ;
+        "i" (name i);
+      Alcotest.(check string)
+        "proper name for i0"
+        "i0" (name i1);
       Alcotest.(check string)
         "proper name for i1"
-        (name i1) "i1" ;
-      Alcotest.(check string)
-        "proper name for i2"
-        (name i2) "i2" ;
+        "i1" (name i2);
       Alcotest.(check string)
         "same prefixes"
-        i1.name_prefix i.name_prefix ;
+        i1.s_prefix i.s_prefix ;
       Alcotest.(check string)
         "same prefixes"
-        i1.name_prefix i2.name_prefix
+        i1.s_prefix i2.s_prefix
     end ;
     "Prefix extension bis", `Quick, begin fun () ->
       (* For backward compatibility, and to avoid refreshing
@@ -215,15 +244,15 @@ let () =
       let _,i2' = make_fresh env Sorts.Index "i1" in
       let _,i2'' = make_fresh env Sorts.Index "i2" in
       Alcotest.(check string)
-        "proper name for i1"
+        "Biproper name for i1 (bis)"
         (name i1) "i1" ;
       Alcotest.(check string)
-        "proper name for i2"
+        "proper name for i2 (bis)"
         (name i2) "i2" ;
       Alcotest.(check string)
-        "proper name for i2'"
+        "proper name for i2' (bis)"
         (name i2') "i2" ;
       Alcotest.(check string)
-        "proper name for i2''"
+        "proper name for i2'' (bis)"
         (name i2'') "i2"
     end ]

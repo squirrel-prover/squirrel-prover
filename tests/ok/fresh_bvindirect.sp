@@ -16,7 +16,7 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   equivalent
-    (forall (i1,i2:index) A(i1)<=tau => i2 <> i && i1<>i),
+    (forall (i0,i1:index) A(i0)<=tau => i1 <> i && i0<>i),
     True.
   admit.
   nosimpl(yesif 1).

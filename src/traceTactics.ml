@@ -159,7 +159,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
     let v' = match nip with
       | Args.Unnamed
       | Args.AnyName ->
-        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
+        Vars.make_fresh_from_and_update env v
 
       | Args.Named name ->
         let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
@@ -1659,7 +1659,7 @@ let autosubst s =
       (* Otherwise substitute the newest variable by the oldest one,
        * and remove it from the environment. *)
       let x,y =
-        if x.Vars.name_suffix <= y.Vars.name_suffix then y,x else x,y
+        if Vars.compare x y <= 0 then y,x else x,y
       in
 
       let () = dbg "subst %a by %a" Vars.pp x Vars.pp y in

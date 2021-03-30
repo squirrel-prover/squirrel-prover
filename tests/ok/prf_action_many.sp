@@ -16,9 +16,9 @@ Proof.
   intro Hap.
   prf 1.
   equivalent
-    (forall (i1,j:index),
-      diff((A(i1,j) <= A(i,i) => n(i) <> <n(i1),n(j)>),
-           (A(i1,j) <= A(i,i) => m(i) <> <n(i1),n(j)>))),
+    (forall (i0,j:index),
+      diff((A(i0,j) <= A(i,i) => n(i) <> <n(i0),n(j)>),
+           (A(i0,j) <= A(i,i) => m(i) <> <n(i0),n(j)>))),
     True.
     (* The equivalence does not hold. We are only checking that the right
      * formula has been produced. *)

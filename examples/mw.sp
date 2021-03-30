@@ -78,8 +78,8 @@ Proof.
   project.
   (* left *)
   euf Meq.
-  exists i,t1.
-  assert (input@T(i,t1) = nr(r)).
+  exists i,t0.
+  assert (input@T(i,t0) = nr(r)).
   fresh Meq1.
   by case H; depends R(r), R2(r).
   (* right *)
@@ -113,8 +113,8 @@ Proof.
   project.
   (* left *)
   euf Meq.
-  exists i,t1.
-  assert (input@T(i,t1) = nr(r)).
+  exists i,t0.
+  assert (input@T(i,t0) = nr(r)).
   fresh Meq1.
   by case H; depends R(r), R1(r).
   (* right *)
@@ -182,8 +182,8 @@ fa 1.
 fresh 1.
 yesif 1.
 repeat split.
-depends R(r1), R1(r1).
-by depends R(r1), R2(r1).
+depends R(r0), R1(r0).
+by depends R(r0), R2(r0).
 
 (* Case R1 *)
 expand frame@R1(r); expand exec@R1(r).
@@ -244,15 +244,15 @@ by intro *; split; exists i,t.
 (* TRY-FIND *)
 (* We have index variables corresponding to the existentials from
    the if-then-else condition: i,t for the honest formula and
-   i1,t1 for the condition. *)
+   i1,t0 for the condition. *)
 project.
 fa. 
-use wa_R1_left with i1,r.
+use wa_R1_left with i0,r.
 use H1. 
 by exists t.
 yesif.
 fa.
-use wa_R1_right with i1,t1,r.
+use wa_R1_right with i0,t0,r.
 by use H1.
 by yesif.
 

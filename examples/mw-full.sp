@@ -89,8 +89,8 @@ Proof.
   project. 
   (* left *)
   euf Meq => _ _ _; 1: auto.
-  exists i,t1; simpl.
-  assert (input@T(i,t1) = nr(r)) as F; 1: auto.
+  exists i,t0; simpl.
+  assert (input@T(i,t0) = nr(r)) as F; 1: auto.
   fresh F => C.
   by case C; 1: depends R(r), R2(r).
   (* right *)
@@ -247,7 +247,7 @@ fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
 intro [_ [i t _]].
 fa; 2,3,4: intro *; expand output; auto.
 intro Meq.
-use wa_R1_left with i1,r as [H1 H2]. 
+use wa_R1_left with i0,r as [H1 H2]. 
 use H1 as [_ _]; 2: expand output; auto.
 by expand output; exists t. 
 (* Right *)
@@ -256,7 +256,7 @@ fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
 intro [_ [i t _]].
 fa; 2,3,4: intro *; expand output; auto.
 intro Meq; simpl.
-use wa_R1_right with i1,t1,r as [H1 H2].
+use wa_R1_right with i0,t0,r as [H1 H2].
 by use H1.
 
 fa 5.
@@ -289,8 +289,8 @@ intro [i t Meq].
 project.
 (* left *)
 euf Meq => _ _ _; 1:auto.
-exists i,t1; simpl.
-assert (nr(r) = input@T(i,t1)) as F; 1:auto.
+exists i,t0; simpl.
+assert (nr(r) = input@T(i,t0)) as F; 1:auto.
 fresh F => C.
 by case C; 2:depends R(r), R1(r).
 

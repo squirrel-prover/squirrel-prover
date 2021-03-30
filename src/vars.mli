@@ -1,11 +1,11 @@
 (** Basic module for variables, providing local environments to store
     variables. *)
 
+(*------------------------------------------------------------------*)
 (** {2 Variables} *)
 
 (** Type of variables of sort ['a]. *)
-type 'a var = private
-  { name_prefix : string ; name_suffix : int ; var_type : 'a Sorts.t }
+type 'a var 
 
 (** An [evar] is a variable of some sort. *)
 type evar = EVar : 'a var -> evar
@@ -14,11 +14,12 @@ type evar = EVar : 'a var -> evar
   *
   * [Vars.x] is the type of variables of sort [Sorts.x]. *)
 
-type index = Sorts.index var
-type message = Sorts.message var
-type boolean = Sorts.boolean var
+type index     = Sorts.index     var
+type message   = Sorts.message   var
+type boolean   = Sorts.boolean   var
 type timestamp = Sorts.timestamp var
 
+(*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
 
 val name : 'a var -> string
@@ -30,6 +31,9 @@ val ecast :   evar -> 'a Sorts.sort -> 'a var
 
 val equal : 'a var -> 'b var -> bool
 
+(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
+val compare : 'a var -> 'b var -> int
+  
 (** Print a variable, only showing its name. *)
 val pp   : Format.formatter -> 'a var -> unit
 val pp_e : Format.formatter ->   evar -> unit
@@ -40,22 +44,7 @@ val pp_list : Format.formatter -> 'a var list -> unit
 (** Print a list of variables, showing their names and sorts. *)
 val pp_typed_list : Format.formatter -> evar list -> unit
 
-(** [make_new_from v] generates a new variable of the same sort as
-  * [s] and whose prefix is the same as [s] but starting with ["_"];
-  * such special prefixes are forbidden in other ways to create
-  * variables.
-  * The variable is guaranteed to not appear anywhere else so far.
-  *
-  * The variables generated in this way are not meant to be seen by
-  * the user as they will feature arbitrarily large numerical suffixes;
-  * if needed they should be translated to more nicely named variables
-  * using the following API based on environments. *)
-val make_new_from : 'a var -> 'a var
-
-(** [is_new v] returns [true] iff variable [v] has been created
-  * using [make_new_from]. *)
-val is_new : 'a var -> bool
-
+(*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
 (** Local environment containg a set of variables of arbitrary sorts. *)
@@ -80,6 +69,25 @@ val rm_var  : env -> 'a var -> env
 
 val rm_evar : env -> evar -> env
 
+
+(*------------------------------------------------------------------*)
+(** {2 Create variables} *)
+
+(** [make_new_from v] generates a new variable of the same sort as
+  * [s] and whose prefix is the same as [s] but starting with ["_"];
+  * such special prefixes are forbidden in other ways to create
+  * variables.
+  * The variable is guaranteed to not appear anywhere else so far.
+  *
+  * The variables generated in this way are not meant to be seen by
+  * the user as they will feature arbitrarily large numerical suffixes;
+  * if needed they should be translated to more nicely named variables
+  * using the following API based on environments. *)
+val make_new_from : 'a var -> 'a var
+
+(** [is_new v] returns [true] iff variable [v] has been created
+  * using [make_new_from]. *)
+val is_new : 'a var -> bool
 
 (** [make_fresh env sort prefix]
   * creates a variable of sort [sort] with a name that is not

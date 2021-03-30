@@ -49,8 +49,8 @@ Proof.
 
   project.
   euf Meq.
-  exists i, k1.
-  assert (input@T(i,k1) = nR(j)).
+  exists i, k0.
+  assert (input@T(i,k0) = nR(j)).
   fresh Meq1.  
   case H.
   by depends R(j), R2(j).
@@ -81,8 +81,8 @@ Proof.
 
   project.
   euf Meq.
-  exists i, k1.
-  assert (input@T(i,k1) = nR(j)).
+  exists i, k0.
+  assert (input@T(i,k0) = nR(j)).
   fresh Meq1.
   case H0.
   by depends R(j), R1(j).
@@ -104,8 +104,8 @@ Proof.
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
   repeat split.
-  by depends R(j1), R1(j1).
-  by depends R(j1), R2(j1).
+  by depends R(j0), R1(j0).
+  by depends R(j0), R2(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).

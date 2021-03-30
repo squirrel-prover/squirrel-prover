@@ -281,7 +281,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
     let v' = match nip with
       | Args.Unnamed
       | Args.AnyName ->
-        Vars.make_fresh_and_update env (Vars.sort v) v.Vars.name_prefix
+        Vars.make_fresh_from_and_update env v
 
       | Args.Named name ->
         let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
@@ -1775,9 +1775,10 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
 
              (* we remove from [vars] free variables, ie already in [env] *)
              let not_in_env  = function
-               | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-                 not (Vars.mem !env (Vars.name i))
-               | _ -> true
+               | Vars.EVar v ->
+                 match Vars.sort v with
+                 | Sorts.Index -> not (Vars.mem !env (Vars.name v))
+                 | _ -> true
              in
 
              let vars = List.filter not_in_env vars in
@@ -1841,10 +1842,10 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
 
              (* we remove from [vars] free variables,
               * ie already in [a.Action.indices] *)
-             let not_in_action_indices  = function
-               | Vars.EVar ({Vars.var_type=Sorts.Index} as i) ->
-                 not (List.mem i a.Action.indices)
-               | _ -> true
+             let not_in_action_indices = function
+               | Vars.EVar v -> match Vars.sort v with
+                 | Sorts.Index -> not (List.mem v a.Action.indices)
+                 | _ -> true
              in
 
              let vars = List.filter not_in_action_indices vars in

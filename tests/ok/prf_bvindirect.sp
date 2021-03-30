@@ -19,9 +19,9 @@ Proof.
   (* Check that the right formula has been produced,
      using an incorrect equivalence that we admit. *)
   equivalent
-    (forall (i1,i2:index),
-      (diff((A(i1) <= tau => (n(i) <> n(i2) && n(i) <> n(i1))),
-	          (A(i1) <= tau => (m(i) <> n(i2) && m(i) <> n(i1)))))),
+    (forall (i0,i1:index),
+      (diff((A(i0) <= tau => (n(i) <> n(i1) && n(i) <> n(i0))),
+	          (A(i0) <= tau => (m(i) <> n(i1) && m(i) <> n(i0)))))),
     True.
   admit.
   yesif 1; 1: by auto.

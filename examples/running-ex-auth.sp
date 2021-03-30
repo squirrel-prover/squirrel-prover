@@ -29,5 +29,5 @@ Proof.
  intro i j Hap Hcond.
  expand cond.
  euf Hcond.
- intro *; exists j1.
+ intro *; exists j0.
 Qed.
