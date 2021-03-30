@@ -83,6 +83,7 @@
   "prof"
   "induction"
   "intro"
+  "generalize"
   "revert"
   "destruct"
   "as"
