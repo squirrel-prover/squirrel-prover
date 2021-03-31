@@ -123,6 +123,14 @@ let pp_rw_arg ppf rw_arg = match rw_arg with
   | R_item r -> pp_rw_item ppf r
 
 (*------------------------------------------------------------------*)
+type apply_in = lsymb option
+
+let pp_apply_in ppf = function
+  | None      -> ()
+  | Some symb -> 
+    Fmt.pf ppf " in %a" Fmt.string (L.unloc symb)
+
+(*------------------------------------------------------------------*)
 (** One tactic argument (in the parser) *)
 type parser_arg =
   | String_name of lsymb
@@ -132,6 +140,7 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * rw_in
+  | ApplyIn     of Theory.term * apply_in
 
 let pp_parser_arg ppf = function
   | Int_parsed i  -> Fmt.int ppf i
@@ -145,6 +154,9 @@ let pp_parser_arg ppf = function
     Fmt.pf ppf "%a%a"
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
       pp_rw_in in_opt
+
+  | ApplyIn (t, in_opt) ->
+    Fmt.pf ppf "%a%a" Theory.pp t pp_apply_in in_opt
 
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair

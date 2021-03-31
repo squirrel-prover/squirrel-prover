@@ -22,7 +22,7 @@
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
 %token WITH ORACLE EXN
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDS
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -390,6 +390,10 @@ rw_in:
 | IN l=slist1(lsymb,COMMA) { Some (`Hyps l) }
 | IN STAR                  { Some `All }
 
+apply_in:
+|             { None }
+| IN id=lsymb { Some id }
+
 (*------------------------------------------------------------------*)
 tac_errors:
 |                         { [] }
@@ -528,6 +532,9 @@ tac:
   | REWRITE p=rw_args w=rw_in
     { T.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
 
+  | APPLY t=sterm w=apply_in
+    { T.Abstract ("apply", [TacticsArgs.ApplyIn (t, w)]) }
+
   | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { T.Abstract
                                           ("ddh",
                                            [TacticsArgs.String_name i1;
@@ -556,7 +563,8 @@ help_tac_i:
 | REWRITE    { "rewrite"}  
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  
-| DEPENDS    { "depends"}  
+| DEPENDS    { "depends"}
+| APPLY      { "apply"}  
 | DDH        { "ddh"}      
 | ASSERT     { "assert"}   
 | DESTRUCT   { "destruct"} 
