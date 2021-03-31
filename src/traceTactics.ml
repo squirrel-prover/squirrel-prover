@@ -2319,6 +2319,63 @@ let () =
       tactic_group  = Structural;}
     rewrite_tac 
 
+
+(*------------------------------------------------------------------*)
+
+let apply (f : Term.formula) s =
+  let vars, f = Term.decompose_forall f in
+  let forms = List.rev (Term.decompose_impls f) in 
+  let subs, f = List.rev (List.tl forms), List.hd forms in
+
+  let goal = TraceSequent.conclusion s in
+  
+  let mv =
+    Term.Match.try_match goal { p_term = f; p_vars = Vars.Sv.of_list vars; }
+  in
+
+  match mv with
+  | None -> soft_failure ApplyMatchFailure
+  | Some mv ->
+    let subst = Term.Match.to_subst mv in
+
+    let goals = List.map (Term.subst subst) subs in
+    List.map (fun g -> TraceSequent.set_conclusion g s) goals
+    
+    
+let apply_tac (args : Args.parser_arg list) s
+    (sk : TraceSequent.t list Tactics.sk) fk =
+  try
+    let subgoals, f = match Args.convert_as_lsymb args with
+      | Some str when is_hyp_or_lemma str s ->
+        let _, f = get_hyp_or_lemma str s in
+        [], f
+
+      | _ ->
+        let env, tbl = TraceSequent.env s, TraceSequent.table s in
+        match Args.convert_args tbl env args Args.(Sort Boolean) with
+        | Args.Arg (Boolean f) ->
+          let subgoal = TraceSequent.set_conclusion f s in
+          [subgoal], f
+        | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+    in    
+    sk (subgoals @ apply f s) fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+
+let () =
+  T.register_general "apply"
+    ~tactic_help:{
+      general_help=
+        "Matches the goal with the conclusion of the formula F provided \
+         (directly, using lemma, or using an axiom), trying to instantiate \
+         F variables. Creates one subgoal for each premises of F.\n\
+         Usage: apply my_lem.\n       \
+         apply my_axiom.\n       \
+         apply (forall (x:message), F => G).";
+      detailed_help="";
+      usages_sorts=[];
+      tactic_group=Structural}
+    apply_tac 
+
 (*------------------------------------------------------------------*)
 let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with

@@ -236,9 +236,9 @@ module Match : sig
 
   val to_subst : mv -> subst
 
-  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
-      returns a map instantiating the variables [p.p_vars] as substerms 
-      of [t]. *)
+  (** [try_match t p] tries to match [p] with [t] (at head position). 
+      If it succeeds, it returns a map instantiating the variables [p.p_vars] 
+      as substerms of [t]. *)
   val try_match : 'a term -> 'b pat -> mv option
 
   (** Occurrence matched *)

@@ -926,9 +926,9 @@ module Match = struct
       pp p.p_term 
       (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.p_vars)
 
-  (** [try_match t p] tries to match [p] into [t]. If it succeeds, it 
-      returns a map instantiating the variables [p.p_vars] as substerms 
-      of [t]. *)
+  (** [try_match t p] tries to match [p] with [t] (at head position). 
+      If it succeeds, it returns a map instantiating the variables [p.p_vars] 
+      as substerms of [t]. *)
   let try_match : type a b. a term -> b pat -> mv option = 
     fun t p -> 
     let exception NoMatch in
@@ -994,6 +994,7 @@ module Match = struct
       fun tl patl mv -> 
         List.fold_left2 (fun mv t pat -> tmatch t pat mv) mv tl patl
 
+    (* match a symbol (with some indices) *)
     and smatch : type a. 
       (a Symbols.t * Vars.index list) -> 
       (a Symbols.t * Vars.index list) -> 
@@ -1023,6 +1024,7 @@ module Match = struct
           (* TODO: alpha-equivalent *)
           | t' -> if t <> t' then raise NoMatch else mv
 
+    (* matches an atom *)
     and atmatch (at : generic_atom) (at' : generic_atom) mv =
       match at, at' with
       | `Message (ord, t1, t2), `Message (ord', t1', t2') -> 

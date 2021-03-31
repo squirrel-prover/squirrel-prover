@@ -32,6 +32,8 @@ type tac_error =
   | MustHappen of Term.timestamp
   | NotHypothesis
 
+  | ApplyMatchFailure
+
   | NoCollision
 
   | HypAlreadyExists of string
@@ -40,27 +42,28 @@ type tac_error =
   | PatNumError of int * int    (* given, need *)
                    
 let tac_error_strings =
-  [ (More, "More");
-    (NotEqualArguments, "NotEqualArguments");
-    (Bad_SSC, "BadSSC");
-    (NoSSC, "NoSSC");
-    (NoAssumpSystem, "NoAssumpSystem");
-    (NotDDHContext, "NotDDHContext");
-    (SEncNoRandom, "SEncNoRandom");
-    (CongrFail, "CongrFail");
-    (SEncSharedRandom, "SEncSharedRandom");
-    (SEncRandomNotFresh, "SEncRandomNotFresh");
-    (NoRefl , "NoRefl");
-    (NoReflMacros , "NoReflMacros");
-    (TacTimeout, "TacTimeout");
-    (CannotConvert, "CannotConvert");
-    (NotHypothesis, "NotHypothesis");
-    (NoCollision, "NoCollision");
-    (GoalNotClosed, "GoalNotClosed");
-    (DidNotFail, "DidNotFail");
-    (NothingToIntroduce, "NothingToIntroduce");
-    (NothingToRewrite, "NothingToRewrite");
-    (BadRewriteRule, "BadRewriteRule")]
+  [ (More               , "More");
+    (NotEqualArguments  , "NotEqualArguments");
+    (Bad_SSC            , "BadSSC");
+    (NoSSC              , "NoSSC");
+    (NoAssumpSystem     , "NoAssumpSystem");
+    (NotDDHContext      , "NotDDHContext");
+    (SEncNoRandom       , "SEncNoRandom");
+    (CongrFail          , "CongrFail");
+    (SEncSharedRandom   , "SEncSharedRandom");
+    (SEncRandomNotFresh , "SEncRandomNotFresh");
+    (NoRefl             , "NoRefl");
+    (NoReflMacros       , "NoReflMacros");
+    (TacTimeout         , "TacTimeout");
+    (CannotConvert      , "CannotConvert");
+    (NotHypothesis      , "NotHypothesis");
+    (NoCollision        , "NoCollision");
+    (GoalNotClosed      , "GoalNotClosed");
+    (DidNotFail         , "DidNotFail");
+    (NothingToIntroduce , "NothingToIntroduce");
+    (NothingToRewrite   , "NothingToRewrite");
+    (BadRewriteRule     , "BadRewriteRule");
+    (ApplyMatchFailure  , "ApplyMatchFailure")]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -86,6 +89,7 @@ let rec tac_error_to_string = function
   | GoalNotClosed
   | NotHypothesis
   | NoCollision
+  | ApplyMatchFailure
   | DidNotFail as e -> List.assoc e tac_error_strings
   | HypAlreadyExists _ -> "HypAlreadyExists"
   | HypUnknown       _ -> "HypUnknown"
@@ -162,6 +166,10 @@ let rec pp_tac_error ppf = function
   | NoCollision ->
     Fmt.pf ppf "no collision found" 
 
+  | ApplyMatchFailure ->
+    Fmt.pf ppf "apply failed: no match found" 
+
+    
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in
   List.combine b a

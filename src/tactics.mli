@@ -56,6 +56,7 @@ type tac_error =
   | BadRewriteRule
   | MustHappen of Term.timestamp
   | NotHypothesis
+  | ApplyMatchFailure
   | NoCollision
   | HypAlreadyExists of string
   | HypUnknown of string

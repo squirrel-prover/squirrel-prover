@@ -327,7 +327,7 @@ module Form = struct
          undefined elements. 
          Indeed, when ⋄ ∈ {≤, <, ≥, >}, we have:
          ¬ (x ⋄ y) ⇔ (undef(x) ∨ undef(y) ∨ (x □ y))
-         where □ is not standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
+         where □ is the standard negation of ⋄ (e.g. if ⋄ = ≤, then □ = >) *)
       | `Neg, `Timestamp ((`Leq|`Lt|`Geq|`Gt) as ord, u, v) ->
         let nord = not_ord ord in
         let form =
