@@ -20,11 +20,11 @@ TraceSequent
 TraceTactics
 EquivSequent
 EquivTactics
-Sorts
 SystemExpr
 Tactics
 TacticsArgs
 Term
+Type
 Theory
 Utils
 Vars
