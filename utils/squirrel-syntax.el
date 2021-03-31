@@ -59,7 +59,6 @@
 
 
 (defvar squirrel-tactic-keywords '(
-  "admit"
   "anyintro"
   "use"
   "with"
@@ -83,6 +82,7 @@
   "prof"
   "induction"
   "intro"
+  "apply"
   "generalize"
   "revert"
   "destruct"
@@ -134,6 +134,7 @@
   "repeat"
   "nosimpl"
   "checkfail"
+  "exn"
 ))
 
 
