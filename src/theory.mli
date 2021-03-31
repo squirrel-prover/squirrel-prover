@@ -12,7 +12,7 @@
   * Symbols cannot be disambiguated at parsing time, hence we use very
   * permissives [App] and [AppAt] constructors which represents
   * function applications, macros, variables, names etc. *)
-type kind = Sorts.esort
+type kind = Type.esort
 
 type lsymb = string Location.located
 
@@ -103,7 +103,7 @@ val declare_name
     such that value of [s(t1,...,tn)] for init timestamp
     expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_state :
-  Symbols.table -> lsymb -> (lsymb*Sorts.esort) list -> Sorts.esort -> term
+  Symbols.table -> lsymb -> (lsymb*Type.esort) list -> Type.esort -> term
   -> Symbols.table
 (** [get_init_states] returns all the initial values of declared state symbols,
     used to register the init action *)
@@ -120,7 +120,7 @@ val declare_abstract :
   * of type [s1->...->sn->s]
   * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_macro :
-  Symbols.table -> lsymb -> (string*Sorts.esort) list -> Sorts.esort -> term
+  Symbols.table -> lsymb -> (string*Type.esort) list -> Type.esort -> term
   -> Symbols.table
 
 (** {2 Term builders } *)
@@ -143,7 +143,7 @@ type conversion_error_i =
   | Index_error          of string*int*int
   | Undefined            of string
   | UndefinedOfKind      of string * Symbols.namespace
-  | Type_error           of term_i * Sorts.esort
+  | Type_error           of term_i * Type.esort
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
   | Untypable_equality   of term_i
@@ -162,10 +162,10 @@ val pp_error :
   (Format.formatter -> Location.t -> unit) ->
   Format.formatter -> conversion_error -> unit
 
-type env = (string * Sorts.esort) list
+type env = (string * Type.esort) list
 
-val check : Symbols.table -> ?local:bool -> env -> term -> Sorts.esort -> unit
-val check_state : Symbols.table -> lsymb -> int -> Sorts.esort
+val check : Symbols.table -> ?local:bool -> env -> term -> Type.esort -> unit
+val check_state : Symbols.table -> lsymb -> int -> Type.esort
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the
@@ -203,11 +203,11 @@ type conv_cntxt =
 type conv_env = { table : Symbols.table;
                   cntxt : conv_cntxt; }
 
-val convert : conv_env -> subst -> term -> 'a Sorts.sort -> 'a Term.term
+val convert : conv_env -> subst -> term -> 'a Type.sort -> 'a Term.term
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)
-type eterm = ETerm : 'a Sorts.sort * 'a Term.term * Location.t -> eterm
+type eterm = ETerm : 'a Type.sort * 'a Term.term * Location.t -> eterm
 
 (** Convert a term to any sort (tries sequentially all conversions).
     Should return the most precise sort (i.e. [Boolean] before [Message]). *)

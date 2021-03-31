@@ -254,14 +254,14 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
 and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
 
 
-let rec term_of_cterm : type a. a Sorts.sort -> cterm -> a Term.term = 
+let rec term_of_cterm : type a. a Type.sort -> cterm -> a Term.term = 
   fun s c -> 
   let open Term in 
   match c.cnt with 
   | Cfun (F f, ari, cterms) -> 
     let cis, cterms = List.takedrop ari cterms in
     let is = indices_of_cterms cis
-    and terms = terms_of_cterms Sorts.Message cterms in
+    and terms = terms_of_cterms Type.Message cterms in
     let t = Fun ((f,is), terms) in
     cast s t
 
@@ -269,7 +269,7 @@ let rec term_of_cterm : type a. a Sorts.sort -> cterm -> a Term.term =
     let cis, cts = List.takedrop ari cterms in
     let cts = as_seq1 cts in
     let m = (m,s,indices_of_cterms cis) in
-    Macro (m, [], term_of_cterm Sorts.Timestamp cts)
+    Macro (m, [], term_of_cterm Type.Timestamp cts)
 
   | Cfun (A a, ari, is) -> 
     assert (ari = List.length is);
@@ -284,7 +284,7 @@ let rec term_of_cterm : type a. a Sorts.sort -> cterm -> a Term.term =
   | Cfun (GPred, ari, ts) ->
     assert (ari = 0);
     let ts = as_seq1 ts in
-    let pred_ts = Pred (term_of_cterm Sorts.Timestamp ts) in
+    let pred_ts = Pred (term_of_cterm Type.Timestamp ts) in
     cast s pred_ts   
 
   | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m s)
@@ -295,13 +295,13 @@ let rec term_of_cterm : type a. a Sorts.sort -> cterm -> a Term.term =
   
   | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
-and index_of_cterm i = match term_of_cterm Sorts.Index i with
+and index_of_cterm i = match term_of_cterm Type.Index i with
   | Var i -> i
   | _ -> assert false
 
 and indices_of_cterms cis = List.map index_of_cterm cis
 
-and terms_of_cterms : type a. a Sorts.sort -> cterm list -> a Term.term list =
+and terms_of_cterms : type a. a Type.sort -> cterm list -> a Term.term list =
   fun s cterms -> List.map (term_of_cterm s) cterms
 
 let pp_gsymb ppf = function
@@ -1381,7 +1381,7 @@ module Memo = Ephemeron.K2.Make
     (struct 
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
-        Sorts.equal (Term.sort t0) (Term.sort t0') &&
+        Type.equal (Term.sort t0) (Term.sort t0') &&
         let t0', t1' = Term.cast (Term.sort t0) t0', 
                        Term.cast (Term.sort t0) t1' in
         t0 = t0' && t1 = t1'
@@ -1573,12 +1573,12 @@ let name_indep_cnstrs state l =
         match l with
         | [] -> False
         | [p] -> Atom (`Message (`Eq, 
-                                 term_of_cterm Sorts.Message p, 
-                                 term_of_cterm Sorts.Message name))
+                                 term_of_cterm Type.Message p, 
+                                 term_of_cterm Type.Message name))
         | p::q ->
           Or(Atom (`Message (`Eq, 
-                             term_of_cterm Sorts.Message p, 
-                             term_of_cterm Sorts.Message name)),
+                             term_of_cterm Type.Message p, 
+                             term_of_cterm Type.Message name)),
              mk_disjunction q)
       in
       [mk_disjunction sub_names]
@@ -1616,7 +1616,7 @@ let () =
                               mk_cst (), mk_cst (), mk_cst () in
 
        let v = ccst (Cst.Cmvar (Vars.EVar (snd (
-           Vars.make_fresh Vars.empty_env (Sorts.Message) "v"))))
+           Vars.make_fresh Vars.empty_env (Type.Message) "v"))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);
                                            (b,d); (e,e'); 

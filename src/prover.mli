@@ -48,7 +48,7 @@ type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
 
   | P_equiv_goal of
-      (Theory.lsymb * Sorts.esort) list * p_equiv_form L.located
+      (Theory.lsymb * Type.esort) list * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system

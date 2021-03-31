@@ -12,22 +12,22 @@ type evar = EVar : 'a var -> evar
 
 (** {3 Aliases}
   *
-  * [Vars.x] is the type of variables of sort [Sorts.x]. *)
+  * [Vars.x] is the type of variables of sort [Type.x]. *)
 
-type index     = Sorts.index     var
-type message   = Sorts.message   var
-type boolean   = Sorts.boolean   var
-type timestamp = Sorts.timestamp var
+type index     = Type.index     var
+type message   = Type.message   var
+type boolean   = Type.boolean   var
+type timestamp = Type.timestamp var
 
 (*------------------------------------------------------------------*)
 (** {2 Functions on variables} *)
 
 val name : 'a var -> string
 
-val sort : 'a var -> 'a Sorts.t
+val sort : 'a var -> 'a Type.t
 
-val cast  : 'a var -> 'b Sorts.sort -> 'b var
-val ecast :   evar -> 'a Sorts.sort -> 'a var
+val cast  : 'a var -> 'b Type.sort -> 'b var
+val ecast :   evar -> 'a Type.sort -> 'a var
 
 val equal : 'a var -> 'b var -> bool
 
@@ -97,10 +97,10 @@ val is_new : 'a var -> bool
   * a variable with the given name concateneted with the smallest possible
   * integer is created.
   * The new environment and variable are returned.*)
-val make_fresh : env -> 'a Sorts.t -> string -> env * 'a var
+val make_fresh : env -> 'a Type.t -> string -> env * 'a var
 
 (** Same as [make_fresh], but updates the [env ref] passed as argument. *)
-val make_fresh_and_update : env ref -> 'a Sorts.t -> string -> 'a var
+val make_fresh_and_update : env ref -> 'a Type.t -> string -> 'a var
 
 (** Same as [make_fresh], but uses the sort and name prefix
   * of the variable passed as argument. *)

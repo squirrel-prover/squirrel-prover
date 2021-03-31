@@ -55,10 +55,10 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
         self#visit_message t ;
         self#visit_message t'
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
-    | Macro ((mn,Sorts.Boolean,is),l,a) ->
+    | Macro ((mn,Type.Boolean,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#visit_formula
-          (Macros.get_definition cntxt Sorts.Boolean mn is a)
+          (Macros.get_definition cntxt Type.Boolean mn is a)
     | Var _ -> ()
 
 end
@@ -107,10 +107,10 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Atom (`Message (_, t, t')) ->
         self#fold_message (self#fold_message x t) t'
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
-    | Macro ((mn,Sorts.Boolean,is),l,a) ->
+    | Macro ((mn,Type.Boolean,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#fold_formula x
-          (Macros.get_definition cntxt Sorts.Boolean mn is a)
+          (Macros.get_definition cntxt Type.Boolean mn is a)
     | Var _ -> x
 
 end
@@ -137,12 +137,12 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
           if exact then
             if full || Macros.is_defined mn a cntxt.table then
               self#visit_message
-                (Macros.get_definition cntxt Sorts.Message mn is a)
+                (Macros.get_definition cntxt Type.Message mn is a)
             else ()
           else if not (List.mem mn checked_macros) then begin
             checked_macros <- mn :: checked_macros ;
             self#visit_message
-              (Macros.get_dummy_definition cntxt Sorts.Message mn is)
+              (Macros.get_dummy_definition cntxt Type.Message mn is)
           end
       | Symbols.Local _ -> assert false (* TODO *)
 

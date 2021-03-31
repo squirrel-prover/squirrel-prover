@@ -2,7 +2,7 @@ open Utils
 
 module L = Location
 
-type kind = Sorts.esort
+type kind = Type.esort
 
 type lsymb = string L.located
 
@@ -118,7 +118,7 @@ let destr_var = function
 let pp_var_list fmt l =
   Vars.pp_typed_list fmt
     (List.map
-       (function (v,Sorts.ESort t) ->
+       (function (v,Type.ESort t) ->
           let v = L.unloc v in
           Vars.EVar (snd @@ Vars.make_fresh Vars.empty_env t v))
        l)
@@ -200,7 +200,7 @@ type conversion_error_i =
   | Index_error          of string*int*int
   | Undefined            of string
   | UndefinedOfKind      of string * Symbols.namespace
-  | Type_error           of term_i * Sorts.esort
+  | Type_error           of term_i * Type.esort
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
   | Untypable_equality   of term_i
@@ -232,7 +232,7 @@ let pp_error_i ppf = function
     Fmt.pf ppf "%a %s is undefined" Symbols.pp_namespace n s
 
   | Type_error (s, sort) ->
-    Fmt.pf ppf "Term %a is not of type %a" pp_i s Sorts.pp_e sort
+    Fmt.pf ppf "Term %a is not of type %a" pp_i s Type.pp_e sort
 
   | Timestamp_expected t ->
     Fmt.pf ppf "The term %a must be given a timestamp" pp_i t
@@ -297,16 +297,16 @@ let function_kind table (f : lsymb): kind list * kind =
                                 try to type a reserved symbol. *)
   | Exists d ->
     let ckind index_arity message_arity =
-      List.init index_arity (fun _ -> Sorts.eindex) @
-      List.init message_arity (fun _ -> Sorts.emessage),
-      Sorts.emessage
+      List.init index_arity (fun _ -> Type.eindex) @
+      List.init message_arity (fun _ -> Type.emessage),
+      Type.emessage
     in
     match d with
     | Function (i, finfo) -> ckind i (message_arity finfo)
     | Macro (Local (targs,k)) -> targs, k
     | Macro (Global arity) -> ckind arity 0
-    | Macro (Input|Output|Frame) -> [], Sorts.emessage
-    | Macro (Cond|Exec) -> [], Sorts.eboolean
+    | Macro (Input|Output|Frame) -> [], Type.emessage
+    | Macro (Cond|Exec) -> [], Type.eboolean
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
 let check_state table (s : lsymb) n =
@@ -471,7 +471,7 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
 
-let rec assoc : type a. subst -> lsymb -> a Sorts.sort -> a Term.term =
+let rec assoc : type a. subst -> lsymb -> a Type.sort -> a Term.term =
 fun subst st kind ->
   match subst with
   | [] -> conv_err (L.loc st) (Undefined (L.unloc st))
@@ -480,7 +480,7 @@ fun subst st kind ->
         Term.cast kind t
       with
       | Term.Uncastable -> conv_err (L.loc st) (Type_error (App (st,[]),
-                                                            Sorts.ESort kind))
+                                                            Type.ESort kind))
       end
   | _::q -> assoc q st kind
 
@@ -497,14 +497,14 @@ let mem_assoc x sort subst =
   *
   * TODO this may cause unintended variable captures wrt subst. *)
 let subst_of_bvars vars =
-  let make (v, Sorts.ESort s) =
+  let make (v, Type.ESort s) =
     let v = L.unloc v in
     ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
   in
   List.map make vars
 
 let ty_error tm sort = Conv (L.loc tm,
-                             Type_error (L.unloc tm, Sorts.ESort sort))
+                             Type_error (L.unloc tm, Type.ESort sort))
 
 
 let get_fun table lsymb =
@@ -546,7 +546,7 @@ type conv_env = { table : Symbols.table;
 let rec convert :
   type s.
   conv_env -> subst ->
-  term -> s Sorts.sort -> s Term.term
+  term -> s Type.sort -> s Term.term
 = fun env subst tm sort ->
   let loc = L.loc tm in
 
@@ -568,65 +568,65 @@ let rec convert :
         sort
 
   | AppAt (f,terms,ts) ->
-    let app_cntxt = At (conv Sorts.Timestamp ts) in
+    let app_cntxt = At (conv Type.Timestamp ts) in
     conv_app env app_cntxt subst
       (tm, make_app loc env.table app_cntxt f terms)
       sort
 
   | Tinit ->
       begin match sort with
-        | Sorts.Timestamp -> Term.Action (Symbols.init_action,[])
+        | Type.Timestamp -> Term.Action (Symbols.init_action,[])
         | _ -> type_error ()
       end
 
   | Tpred t ->
       begin match sort with
-        | Sorts.Timestamp -> Term.Pred (conv Sorts.Timestamp t)
+        | Type.Timestamp -> Term.Pred (conv Type.Timestamp t)
         | _ -> type_error ()
       end
 
   | Diff (l,r) -> Term.Diff (conv sort l, conv sort r)
   | ITE (i,t,e) ->
       begin match sort with
-        | Sorts.Message ->
-            Term.ITE (conv Sorts.Boolean i, conv sort t, conv sort e)
+        | Type.Message ->
+            Term.ITE (conv Type.Boolean i, conv sort t, conv sort e)
         | _ -> type_error ()
       end
 
   | And (l,r) ->
       begin match sort with
-        | Sorts.Boolean -> Term.And (conv sort l, conv sort r)
+        | Type.Boolean -> Term.And (conv sort l, conv sort r)
         | _ -> type_error ()
       end
   | Or (l,r) ->
       begin match sort with
-        | Sorts.Boolean -> Term.Or (conv sort l, conv sort r)
+        | Type.Boolean -> Term.Or (conv sort l, conv sort r)
         | _ -> type_error ()
       end
   | Impl (l,r) ->
       begin match sort with
-        | Sorts.Boolean -> Term.Impl (conv sort l, conv sort r)
+        | Type.Boolean -> Term.Impl (conv sort l, conv sort r)
         | _ -> type_error ()
       end
   | Not t ->
       begin match sort with
-        | Sorts.Boolean -> Term.Not (conv sort t)
+        | Type.Boolean -> Term.Not (conv sort t)
         | _ -> type_error ()
       end
   | True | False ->
       begin match sort with
-        | Sorts.Boolean -> if L.unloc tm = True then Term.True else Term.False
+        | Type.Boolean -> if L.unloc tm = True then Term.True else Term.False
         | _ -> type_error ()
       end
 
   | Compare (o,u,v) ->
     begin match sort with
-      | Sorts.Boolean ->
+      | Type.Boolean ->
         begin try
             Term.Atom
               (`Timestamp (o,
-                           conv Sorts.Timestamp u,
-                           conv Sorts.Timestamp v))
+                           conv Type.Timestamp u,
+                           conv Type.Timestamp v))
           with Conv (_,Type_error _ ) ->
           match o with
           | #Term.ord_eq as o ->
@@ -637,8 +637,8 @@ let rec convert :
               with Conv (_,Type_error _ ) ->
               try
                 Term.Atom (`Message (o,
-                                     conv Sorts.Message u,
-                                     conv Sorts.Message v))
+                                     conv Type.Message u,
+                                     conv Type.Message v))
               with Conv (_,Type_error _ ) ->
                 conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
             end
@@ -649,9 +649,9 @@ let rec convert :
 
   | Happens ts ->
       begin match sort with
-        | Sorts.Boolean ->
+        | Type.Boolean ->
           let atoms = List.map (fun t ->
-              Term.Atom (`Happens (conv Sorts.Timestamp t))
+              Term.Atom (`Happens (conv Type.Timestamp t))
             ) ts in
           Term.mk_ands atoms
         | _ -> type_error ()
@@ -659,12 +659,12 @@ let rec convert :
 
   | Find (vs,c,t,e) ->
     let new_subst =
-      subst_of_bvars (List.map (fun x -> x,Sorts.eindex) vs) in
+      subst_of_bvars (List.map (fun x -> x,Type.eindex) vs) in
     let is =
       let f : esubst -> Vars.index = function
         | ESubst (_,Term.Var v) ->
           begin match Vars.sort v with
-            | Sorts.Index -> v
+            | Type.Index -> v
             | _ -> type_error ()
           end
         | _ -> assert false
@@ -672,8 +672,8 @@ let rec convert :
       List.map f new_subst
     in
     begin match sort with
-      | Sorts.Message ->
-        let c = conv ~subst:(new_subst@subst) Sorts.Boolean c in
+      | Type.Message ->
+        let c = conv ~subst:(new_subst@subst) Type.Boolean c in
         let t = conv ~subst:(new_subst@subst) sort t in
         let e = conv sort e in
         Term.Find (is,c,t,e)
@@ -683,7 +683,7 @@ let rec convert :
   | ForAll (vs,f) | Exists (vs,f) ->
 
       let new_subst = subst_of_bvars vs in
-      let f = conv ~subst:(new_subst@subst) Sorts.Boolean f in
+      let f = conv ~subst:(new_subst@subst) Type.Boolean f in
       let vs =
         let f : esubst -> Vars.evar = function
           | ESubst (_, Term.Var v) -> Vars.EVar v
@@ -692,18 +692,18 @@ let rec convert :
         List.map f new_subst
       in
       begin match sort, L.unloc tm with
-        | Sorts.Boolean, ForAll _ -> Term.mk_forall vs f
-        | Sorts.Boolean, Exists _ -> Term.mk_exists vs f
+        | Type.Boolean, ForAll _ -> Term.mk_forall vs f
+        | Type.Boolean, Exists _ -> Term.mk_exists vs f
         | _ -> type_error ()
       end
   | Seq (vs,t) ->
-      let new_subst = subst_of_bvars (List.map (fun x -> x, Sorts.eindex) vs) in
-      let t = conv ~subst:(new_subst@subst) Sorts.Message t in
+      let new_subst = subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
+      let t = conv ~subst:(new_subst@subst) Type.Message t in
       let vs =
         let f : esubst -> Vars.index = function
           | ESubst (_, Term.Var v) ->
             begin match Vars.sort v with
-              | Sorts.Index -> v
+              | Type.Index -> v
                 | _ -> type_error ()
               end
           | _ -> assert false
@@ -711,12 +711,12 @@ let rec convert :
         List.map f new_subst
       in
       begin match sort with
-        | Sorts.Message -> Term.Seq (vs, t)
+        | Type.Message -> Term.Seq (vs, t)
         | _ -> type_error ()
       end
 
 and conv_index env subst t =
-  match convert env subst t Sorts.Index with
+  match convert env subst t Type.Index with
     | Term.Var x -> x
     | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
 
@@ -724,7 +724,7 @@ and conv_index env subst t =
 and conv_app :
   type s.
   conv_env -> app_cntxt -> subst ->
-  (term * app) -> s Sorts.sort -> s Term.term
+  (term * app) -> s Type.sort -> s Term.term
  = fun env app_cntxt subst (t,app) sort ->
    (* We should have [make_app app = t].
       [t] is here to have meaningful exceptions. *)
@@ -758,15 +758,15 @@ and conv_app :
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
       begin match sort with
-        | Sorts.Boolean -> Term.True
-        | Sorts.Message -> Term.(Fun (f_true,[]))
+        | Type.Boolean -> Term.True
+        | Type.Message -> Term.(Fun (f_true,[]))
         | _ -> type_error ()
       end
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
       begin match sort with
-        | Sorts.Boolean -> Term.False
-        | Sorts.Message -> Term.(Fun (f_false,[]))
+        | Type.Boolean -> Term.False
+        | Type.Message -> Term.(Fun (f_false,[]))
         | _ -> type_error ()
       end
 
@@ -775,29 +775,29 @@ and conv_app :
   | Fun (f,l,None) ->
       let ts_expected = Conv (loc, Timestamp_expected t_i) in
       let ks, f_k = function_kind env.table f in
-      assert (f_k = Sorts.emessage) ;
+      assert (f_k = Type.emessage) ;
       check_arity f (List.length l) (List.length ks) ;
       begin match sort with
-        | Sorts.Message ->
+        | Type.Message ->
             let open Symbols in
             begin match of_lsymb f env.table with
               | Wrapped (symb, Function (i,_)) ->
                 let indices,messages =
                   List.init i (fun k -> conv_index env subst (List.nth l k)),
                   List.init (List.length l - i)
-                    (fun k -> conv Sorts.Message (List.nth l (k+i)))
+                    (fun k -> conv Type.Message (List.nth l (k+i)))
                 in
                 Term.Fun ((symb,indices),messages)
               | Wrapped (s, Macro (Global _)) ->
                 let indices = List.map (conv_index env subst) l in
                 Term.Macro ((s,sort,indices),[],get_at ())
               | Wrapped (s, Macro (Local (targs,_))) ->
-                  if List.for_all (fun s -> s = Sorts.eindex) ks then
+                  if List.for_all (fun s -> s = Type.eindex) ks then
                     let indices = List.map (conv_index env subst) l in
                     Term.Macro ((s,sort,indices),[],get_at ())
                   else begin
-                    assert (List.for_all (fun s -> s = Sorts.emessage) ks) ;
-                    let l = List.map (conv Sorts.Message) l in
+                    assert (List.for_all (fun s -> s = Type.emessage) ks) ;
+                    let l = List.map (conv Type.Message) l in
                     Term.Macro ((s,sort,[]),l,get_at ())
                   end
               | Wrapped (_, Macro (Input|Output|Cond|Exec|Frame|State (_, _))) ->
@@ -815,7 +815,7 @@ and conv_app :
       let ts_unexpected = Conv (loc, Timestamp_unexpected t_i) in
       let open Symbols in
       begin match sort with
-        | Sorts.Message ->
+        | Type.Message ->
             begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                  (* I am not sure of the location to use in
@@ -839,7 +839,7 @@ and conv_app :
               | Wrapped (_, Process _)            -> raise ts_unexpected
               | Wrapped (_, System _)             -> raise ts_unexpected
             end
-        | Sorts.Boolean ->
+        | Type.Boolean ->
             begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Cond|Exec)) ->
                 (* I am not sure of the location to use in
@@ -862,7 +862,7 @@ and conv_app :
 
   | Get (s,opt_ts,is) ->
       let k = check_state env.table s (List.length is) in
-      assert (k = Sorts.emessage) ;
+      assert (k = Type.emessage) ;
       let is = List.map (conv_index env subst) is in
       let s = get_macro env.table s in
       let ts =
@@ -872,14 +872,14 @@ and conv_app :
           | None -> conv_err loc (Timestamp_expected t_i)
       in
       begin match sort with
-        | Sorts.Message -> Term.Macro ((s,sort,is),[],ts)
+        | Type.Message -> Term.Macro ((s,sort,is),[],ts)
         | _ -> type_error ()
       end
 
   | Name (s, is) ->
       check_name env.table  s (List.length is) ;
       begin match sort with
-        | Sorts.Message ->
+        | Type.Message ->
           Term.Name ( get_name env.table s ,
                       List.map (conv_index env subst) is )
         | _ -> type_error ()
@@ -888,17 +888,17 @@ and conv_app :
   | Taction (a,is) ->
       check_action env.table a (List.length is) ;
       begin match sort with
-        | Sorts.Timestamp ->
+        | Type.Timestamp ->
           Term.Action ( get_action env.table a,
                         List.map (conv_index env subst) is )
         | _ -> type_error ()
       end
 
-type eterm = ETerm : 'a Sorts.sort * 'a Term.term * L.t -> eterm
+type eterm = ETerm : 'a Type.sort * 'a Term.term * L.t -> eterm
 
 let econvert conv_cntxt tsubst t : eterm option =
   let conv_s = function
-    | Sorts.ESort sort -> try
+    | Type.ESort sort -> try
         let tt = convert conv_cntxt tsubst t sort in
         Some (ETerm (sort, tt, L.loc t))
       with Conv _ -> None in
@@ -906,10 +906,10 @@ let econvert conv_cntxt tsubst t : eterm option =
   (* careful about the order. Because boolean is a subtyped of message, we
      need to try boolean (the most precise type) first. *)
   List.find_map conv_s
-    [Sorts.eboolean;
-     Sorts.emessage;
-     Sorts.eindex;
-     Sorts.etimestamp]
+    [Type.eboolean;
+     Type.emessage;
+     Type.eindex;
+     Type.etimestamp]
 
 
 let convert_index table = conv_index { table = table; cntxt = InGoal; }
@@ -1017,26 +1017,25 @@ let subst t (s : (string * term_i) list) =
 
   in aux t
 
-let check table ?(local=false) (env:env) t (Sorts.ESort s) : unit =
+let check table ?(local=false) (env:env) t (Type.ESort s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
   in
-  let cntxt = if local then InProc (dummy_var Sorts.Timestamp) else InGoal in
+  let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
   let conv_env = { table = table; cntxt = cntxt; } in
   let subst =
-    List.map (fun (v, Sorts.ESort s) -> ESubst (v, dummy_var s)) env
+    List.map (fun (v, Type.ESort s) -> ESubst (v, dummy_var s)) env
   in
   ignore (convert conv_env subst t s)
 
 let subst_of_env (env : Vars.env) =
   let to_subst : Vars.evar -> esubst =
     fun (Vars.EVar v) ->
-    let open Sorts in
     match Vars.sort v with
-    | Index ->  ESubst (Vars.name v,Term.Var v)
-    | Timestamp -> ESubst (Vars.name v,Term.Var v)
-    | Message -> ESubst (Vars.name v,Term.Var v)
-    | Boolean -> assert false
+    | Type.Index     ->  ESubst (Vars.name v,Term.Var v)
+    | Type.Timestamp -> ESubst (Vars.name v,Term.Var v)
+    | Type.Message   -> ESubst (Vars.name v,Term.Var v)
+    | Type.Boolean   -> assert false
     in
   List.map to_subst (Vars.to_list env)
 
@@ -1051,17 +1050,17 @@ let parse_subst table env (uvars : Vars.evar list) (ts : term list) : Term.subst
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 type Symbols.data += StateInit_data of Vars.index list * Term.message
 
-let declare_state table s (typed_args : (lsymb * Sorts.esort) list)
-    (k : Sorts.esort) t =
+let declare_state table s (typed_args : (lsymb * Type.esort) list)
+    (k : Type.esort) t =
   let ts_init = Term.Action (Symbols.init_action, []) in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
   let subst = subst_of_bvars typed_args in
-  let t = convert conv_env subst t Sorts.Message in
+  let t = convert conv_env subst t Type.Message in
   let indices : Vars.index list =
     let f x : Vars.index = match x with
       | ESubst (_,Term.Var i) ->
         begin match Vars.sort i with
-          | Sorts.Index -> i
+          | Type.Index -> i
           | _ -> assert false
         end
       | _ -> assert false
@@ -1081,22 +1080,22 @@ let get_init_states table =
     (fun s def data acc -> match (def,data) with
       | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
         let (state,msg) =
-          ((s, Sorts.Message, l), t)
+          ((s, Type.Message, l), t)
         in
         (state,msg)::acc
       | _ -> acc)
     []
     table
 
-let declare_macro table s (typed_args : (string * Sorts.esort) list)
-    (k : Sorts.esort) t =
+let declare_macro table s (typed_args : (string * Type.esort) list)
+    (k : Type.esort) t =
   let env,typed_args,tsubst =
     List.fold_left
-      (fun (env,vars,tsubst) (x,Sorts.ESort k) ->
+      (fun (env,vars,tsubst) (x,Type.ESort k) ->
          let env,x' = Vars.make_fresh env k x in
          let item = match k with
-           | Sorts.Index -> ESubst (x, Term.Var x')
-           | Sorts.Message -> ESubst (x, Term.Var x')
+           | Type.Index -> ESubst (x, Term.Var x')
+           | Type.Message -> ESubst (x, Term.Var x')
            | _ -> assert false
          in
            assert (Vars.name x' = x) ;
@@ -1104,16 +1103,16 @@ let declare_macro table s (typed_args : (string * Sorts.esort) list)
       (Vars.empty_env,[],[])
       typed_args
   in
-  let _,ts_var = Vars.make_fresh env Sorts.Timestamp "ts" in
+  let _,ts_var = Vars.make_fresh env Type.Timestamp "ts" in
   let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
-  let t = convert conv_env tsubst t Sorts.Message in
+  let t = convert conv_env tsubst t Type.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
   let table, _ =
     Symbols.Macro.declare_exact table
       s
       ~data
       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Sorts.ESort (Vars.sort x)) typed_args,k)) in
+           Type.ESort (Vars.sort x)) typed_args,k)) in
   table
 
 (* TODO could be generalized into a generic fold function
@@ -1185,13 +1184,13 @@ let () =
       let table = declare_hash table (mk "h") in
       let x = mk (App (mk "x", [])) in
       let y = mk (App (mk "y", [])) in
-      let env = ["x",Sorts.emessage;"y",Sorts.emessage] in
+      let env = ["x",Type.emessage;"y",Type.emessage] in
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
-      check table env t Sorts.emessage ;
+      check table env t Type.emessage ;
       Alcotest.check_raises
         "message is not a boolean"
-        (Conv (L._dummy, Type_error (t_i, Sorts.eboolean)))
-        (fun () -> check table env t Sorts.eboolean)
+        (Conv (L._dummy, Type_error (t_i, Type.eboolean)))
+        (fun () -> check table env t Type.eboolean)
     end
   ]

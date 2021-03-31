@@ -8,13 +8,13 @@ open Utils
 type 'a var = {
   s_prefix : string;
   i_suffix : int;
-  var_type : 'a Sorts.t
+  var_type : 'a Type.t
 }
 
-type index     = Sorts.index     var
-type message   = Sorts.message   var
-type boolean   = Sorts.boolean   var
-type timestamp = Sorts.timestamp var
+type index     = Type.index     var
+type message   = Type.message   var
+type boolean   = Type.boolean   var
+type timestamp = Type.timestamp var
 
 type evar = EVar : 'a var -> evar
 
@@ -38,21 +38,21 @@ let pp_list ppf l =
 
 let pp_typed_list ppf (vars:evar list) =
   let rec aux cur_vars cur_type = function
-    | EVar v::vs when Sorts.ESort v.var_type = cur_type ->
+    | EVar v::vs when Type.ESort v.var_type = cur_type ->
         aux (EVar v::cur_vars) cur_type vs
     | vs ->
         if cur_vars <> [] then begin
           Fmt.list
             ~sep:(fun fmt () -> Fmt.pf fmt ",")
             pp_e ppf (List.rev cur_vars) ;
-          Fmt.pf ppf ":%a" Sorts.pp_e cur_type ;
+          Fmt.pf ppf ":%a" Type.pp_e cur_type ;
           if vs <> [] then Fmt.pf ppf ",@,"
         end ;
         match vs with
           | [] -> ()
-          | EVar v::vs -> aux [EVar v] (Sorts.ESort v.var_type) vs
+          | EVar v::vs -> aux [EVar v] (Type.ESort v.var_type) vs
   in
-  aux [] Sorts.(ESort Message) vars
+  aux [] Type.(ESort Message) vars
 
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
@@ -179,23 +179,23 @@ end
 
 exception CastError
 
-let cast : type a b. a var -> b Sorts.sort -> b var = 
+let cast : type a b. a var -> b Type.sort -> b var = 
   fun x s -> match sort x, s with
-  | Sorts.Boolean,   Sorts.Boolean   -> x
-  | Sorts.Message,   Sorts.Message   -> x
-  | Sorts.Index,     Sorts.Index     -> x
-  | Sorts.Timestamp, Sorts.Timestamp -> x
+  | Type.Boolean,   Type.Boolean   -> x
+  | Type.Message,   Type.Message   -> x
+  | Type.Index,     Type.Index     -> x
+  | Type.Timestamp, Type.Timestamp -> x
   | _, _ -> raise CastError
 
-let ecast : type a. evar -> a Sorts.sort -> a var = 
+let ecast : type a. evar -> a Type.sort -> a var = 
   fun (EVar v) s -> cast v s
 
 let equal : type a b. a var -> b var -> bool = fun v v' ->
   match sort v, sort v' with
-  | Sorts.Boolean,   Sorts.Boolean   -> v = v'
-  | Sorts.Message,   Sorts.Message   -> v = v'
-  | Sorts.Index,     Sorts.Index     -> v = v'
-  | Sorts.Timestamp, Sorts.Timestamp -> v = v'
+  | Type.Boolean,   Type.Boolean   -> v = v'
+  | Type.Message,   Type.Message   -> v = v'
+  | Type.Index,     Type.Index     -> v = v'
+  | Type.Timestamp, Type.Timestamp -> v = v'
   | _, _ -> false
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
@@ -213,9 +213,9 @@ let () =
        * a strict prefix of v'.s_prefix. Otherwise we can
        * have different variables with the same name. *)
       let env = empty_env in
-      let env,i = make_fresh env Sorts.Index "i" in
-      let env,i1 = make_fresh env Sorts.Index "i" in
-      let env,i2 = make_fresh env Sorts.Index "i1" in
+      let env,i = make_fresh env Type.Index "i" in
+      let env,i1 = make_fresh env Type.Index "i" in
+      let env,i2 = make_fresh env Type.Index "i1" in
       
       Alcotest.(check string)
         "proper name for i"
@@ -239,10 +239,10 @@ let () =
        * the user provides a variable name that contains a
        * numerical suffix. *)
       let env = empty_env in
-      let env,i1 = make_fresh env Sorts.Index "i1" in
-      let _,i2 = make_fresh env Sorts.Index "i" in
-      let _,i2' = make_fresh env Sorts.Index "i1" in
-      let _,i2'' = make_fresh env Sorts.Index "i2" in
+      let env,i1 = make_fresh env Type.Index "i1" in
+      let _,i2 = make_fresh env Type.Index "i" in
+      let _,i2' = make_fresh env Type.Index "i1" in
+      let _,i2'' = make_fresh env Type.Index "i2" in
       Alcotest.(check string)
         "Biproper name for i1 (bis)"
         (name i1) "i1" ;

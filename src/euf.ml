@@ -188,7 +188,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
       in
       let not_seen = function
         | Vars.EVar v -> match Vars.sort v with
-          | Sorts.Index -> index_not_seen v
+          | Type.Index -> index_not_seen v
           | _ -> true
       in
 

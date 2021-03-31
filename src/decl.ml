@@ -2,26 +2,26 @@ module L = Location
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-let pp_type fmt (l : (Sorts.esort * int) list) =
+let pp_type fmt (l : (Type.esort * int) list) =
   let pp_single fmt (k,i) = match i with
     | 0 -> ()
     | i ->
       assert (i > 0);
-      Fmt.pf fmt "%a^%d" Sorts.pp_e k i
+      Fmt.pf fmt "%a^%d" Type.pp_e k i
   in
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
-let pp_args fmt (l : (string * Sorts.esort) list) =
-  let pp_single fmt (s,k) = Fmt.pf fmt "(%s : %a)" s Sorts.pp_e k in
+let pp_args fmt (l : (string * Type.esort) list) =
+  let pp_single fmt (s,k) = Fmt.pf fmt "(%s : %a)" s Type.pp_e k in
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
 (*------------------------------------------------------------------*)
-type macro_decl = lsymb * (lsymb * Sorts.esort) list * Sorts.esort * Theory.term
+type macro_decl = lsymb * (lsymb * Type.esort) list * Type.esort * Theory.term
 
 let pp_macro_decl fmt (s, args, k, t) =
   Fmt.pf fmt "@[<hov 2>term %s : %a → %a =@ %a@]" (L.unloc s)
     pp_args (List.map (fun (x,y) -> (L.unloc x, y)) args)
-    Sorts.pp_e k Theory.pp t
+    Type.pp_e k Theory.pp t
 
 (*------------------------------------------------------------------*)
 type abstract_decl = { name          : lsymb;
@@ -31,9 +31,9 @@ type abstract_decl = { name          : lsymb;
 let pp_abstract_decl fmt decl =
   Fmt.pf fmt "@[<hov 2>abstract %s : %a → %a@]"
     (L.unloc decl.name)
-    pp_type [ (Sorts.eindex, decl.index_arity);
-              (Sorts.emessage, decl.message_arity) ]
-    Sorts.pp_e Sorts.emessage
+    pp_type [ (Type.eindex, decl.index_arity);
+              (Type.emessage, decl.message_arity) ]
+    Type.pp_e Type.emessage
 
 (*------------------------------------------------------------------*)
 type goal_decl = { gname   : lsymb option ;
@@ -69,7 +69,7 @@ let pp_orcl_tag_info = Theory.pp
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * (lsymb * Sorts.esort) list * Process.process
+  | Decl_process of lsymb * (lsymb * Type.esort) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
@@ -136,11 +136,11 @@ let pp_decl fmt decl = match Location.unloc decl with
 
   | Decl_name (s,i) ->
     Fmt.pf fmt "@[<hov 2>name %s : %a → %a@]"
-      (L.unloc s) pp_type [Sorts.eindex, i] Sorts.pp_e Sorts.emessage
+      (L.unloc s) pp_type [Type.eindex, i] Type.pp_e Type.emessage
   | Decl_state decl -> pp_macro_decl fmt decl
   (* | Decl_state (s,i,k) ->
     Fmt.pf fmt "@[<hov 2>mutable %s : %a → %a@]"
-      s pp_type [Sorts.eindex, i] Sorts.pp_e k *)
+      s pp_type [Type.eindex, i] Type.pp_e k *)
   | Decl_abstract decl -> pp_abstract_decl fmt decl
   | Decl_macro decl -> pp_macro_decl fmt decl
 

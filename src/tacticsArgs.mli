@@ -92,10 +92,10 @@ type parser_arg =
 type _ sort =
   | None      : unit sort
 
-  | Message   : Sorts.message   sort
-  | Boolean   : Sorts.boolean   sort
-  | Timestamp : Sorts.timestamp sort        
-  | Index     : Sorts.index     sort
+  | Message   : Type.message   sort
+  | Boolean   : Type.boolean   sort
+  | Timestamp : Type.timestamp sort        
+  | Index     : Type.index     sort
         
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
@@ -109,12 +109,12 @@ type _ sort =
 type _ arg =
   | None      : unit arg 
 
-  | Message   : Term.message   -> Sorts.message   arg
-  | Boolean   : Term.formula   -> Sorts.boolean   arg
-  | Timestamp : Term.timestamp -> Sorts.timestamp arg
-  | Index     : Vars.index     -> Sorts.index     arg
+  | Message   : Term.message   -> Type.message   arg
+  | Boolean   : Term.formula   -> Type.boolean   arg
+  | Timestamp : Term.timestamp -> Type.timestamp arg
+  | Index     : Vars.index     -> Type.index     arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  | ETerm     : 'a Type.sort * 'a Term.term * Location.t -> Theory.eterm arg
   (** A [Term.term] with its sorts. *)
         
   | Int       : int -> int arg

@@ -7,10 +7,10 @@ let dum : L.t = L._dummy
 let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
-type pkind = (string * Sorts.esort) list
+type pkind = (string * Type.esort) list
 
 let pp_pkind =
-  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Sorts.pp_e e in
+  let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp_e e in
   (Fmt.list pp_el)
 
 (*------------------------------------------------------------------*)
@@ -173,19 +173,19 @@ let find_process0 table (lsymb : lsymb) =
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
 let check_proc table env p =
-  let rec check_p (env : (string * Sorts.esort) list) proc =
+  let rec check_p (env : (string * Type.esort) list) proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
-    | New (x, p) -> check_p ((L.unloc x, Sorts.emessage)::env) p
-    | In (_,x,p) -> check_p ((L.unloc x, Sorts.emessage)::env) p
+    | New (x, p) -> check_p ((L.unloc x, Type.emessage)::env) p
+    | In (_,x,p) -> check_p ((L.unloc x, Type.emessage)::env) p
     | Out (_,m,p)
     | Alias (L.{ pl_desc = Out (_,m,p) },_) ->
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
       else
-        let () = Theory.check table ~local:true env m Sorts.emessage in
+        let () = Theory.check table ~local:true env m Type.emessage in
         check_p env p
     | Alias (p,_) -> check_p env p
     | Set (s, l, m, p) ->
@@ -194,22 +194,22 @@ let check_proc table env p =
       List.iter (fun x ->
           Theory.check
             table ~local:true env
-            (Theory.var_of_lsymb x) Sorts.eindex
+            (Theory.var_of_lsymb x) Type.eindex
         ) l ;
       check_p env p
     | Parallel (p, q) -> check_p env p ; check_p env q
     | Let (x, t, p) ->
-      Theory.check table ~local:true env t Sorts.emessage ;
-      check_p ((L.unloc x, Sorts.emessage)::env) p
-    | Repl (x, p) -> check_p ((L.unloc x, Sorts.eindex)::env) p
+      Theory.check table ~local:true env t Type.emessage ;
+      check_p ((L.unloc x, Type.emessage)::env) p
+    | Repl (x, p) -> check_p ((L.unloc x, Type.eindex)::env) p
     | Exists (vars, test, p, q) ->
       check_p env q ;
       let env =
         List.rev_append
-          (List.map (fun x -> L.unloc x, Sorts.eindex) vars)
+          (List.map (fun x -> L.unloc x, Type.eindex) vars)
           env
       in
-      Theory.check table ~local:true env test Sorts.eboolean ;
+      Theory.check table ~local:true env test Type.eboolean ;
       check_p env p
     | Apply (id, ts) ->
       let kind,_ = find_process0 table id in
@@ -307,8 +307,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * safety. *)
   let env_ts,ts,dummy_in =
     let env = Vars.empty_env in
-    let env,ts = Vars.make_fresh env Sorts.Timestamp "$ts" in
-    let env,dummy_in = Vars.make_fresh env Sorts.Message "$dummy" in
+    let env,ts = Vars.make_fresh env Type.Timestamp "$ts" in
+    let env,dummy_in = Vars.make_fresh env Type.Message "$dummy" in
     env,ts,dummy_in
   in
 
@@ -407,7 +407,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let updates =
       List.map
         (fun (s,l,t) ->
-          (Symbols.Macro.of_lsymb s table, Sorts.Message, l),
+          (Symbols.Macro.of_lsymb s table, Type.Message, l),
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
@@ -422,7 +422,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       | Some (c,t) ->
           c,
           Term.subst (subst_ts @ subst_input)
-            (conv_term table env action_term t Sorts.Message)
+            (conv_term table env action_term t Type.Message)
       | None -> Symbols.dummy_channel, Term.empty
     in
 
@@ -470,12 +470,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
       List.fold_left2
         (fun (iacc,macc) (x,k) v ->
           match k, L.unloc v with
-          | Sorts.ESort Sorts.Message,_ ->
+          | Type.ESort Type.Message,_ ->
             let v'_th = Theory.subst v tsubst in
-            let v'_tm = conv_term table env (Term.Var ts) v Sorts.Message in
+            let v'_tm = conv_term table env (Term.Var ts) v Type.Message in
             iacc, (x, L.unloc v'_th, v'_tm) :: macc
 
-          | Sorts.ESort Sorts.Index, Theory.App (i,[]) ->
+          | Type.ESort Type.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc (L.unloc i) env.isubst in
             let i'_th = Theory.subst v tsubst in
             (x, L.unloc i'_th, i'_tm) :: iacc, macc
@@ -530,7 +530,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
     let body =
       Term.subst_macros_ts table updated_states (Term.Var ts)
-        (conv_term table env (Term.Var ts) t Sorts.Message)
+        (conv_term table env (Term.Var ts) t Type.Message)
     in
     let invars = List.map snd env.inputs in
     let table,x' =
@@ -545,7 +545,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       Theory.App (x', is)
     in
     let x'_tm =
-      Term.Macro ((x', Sorts.Message, List.rev env.indices), [],
+      Term.Macro ((x', Type.Message, List.rev env.indices), [],
                   Term.Var ts)
     in
     let env =
@@ -578,7 +578,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         table)
 
     | Repl (i,p) ->
-      let env,i' = make_fresh env Sorts.Index (L.unloc i) in
+      let env,i' = make_fresh env Type.Index (L.unloc i) in
       let env =
         { env with
           isubst = (L.unloc i, Theory.var_i dum (Vars.name i'), i') :: env.isubst ;
@@ -604,7 +604,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c table in
-      let env,x' = make_fresh env Sorts.Message (L.unloc x) in
+      let env,x' = make_fresh env Type.Message (L.unloc x) in
       let in_th =
         Theory.var_i dum (Vars.name x')
       in
@@ -659,7 +659,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         List.fold_left
           (fun (env,s) i ->
              let i = L.unloc i in
-             let env,i' = make_fresh env Sorts.Index i in
+             let env,i' = make_fresh env Type.Index i in
              env,(i,i')::s)
           (env,[])
           (List.rev evars)
@@ -681,7 +681,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
        * with the empty list. *)
       let fact =
         Term.subst_macros_ts table [] (Term.Var ts)
-          (conv_term table env_p (Term.Var ts) cond Sorts.Boolean)
+          (conv_term table env_p (Term.Var ts) cond Type.Boolean)
       in
       let facts_p = fact::env.facts in
       let facts_q =
@@ -763,7 +763,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         in
         let t'_tm =
           Term.subst_macros_ts table updated_states (Term.Var ts)
-            (conv_term table env (Term.Var ts) t Sorts.Message)
+            (conv_term table env (Term.Var ts) t Type.Message)
         in
         let env =
           { env with

@@ -551,14 +551,14 @@ let () =
 
 (*------------------------------------------------------------------*)
 let enrich arg s = match arg with
-  | TacticsArgs.ETerm (Sorts.Boolean, f, loc) ->
+  | TacticsArgs.ETerm (Type.Boolean, f, loc) ->
     EquivSequent.set_equiv_goal s (Equiv.Formula f :: goal_as_equiv s) 
 
-  | TacticsArgs.ETerm (Sorts.Message, f, loc) ->
+  | TacticsArgs.ETerm (Type.Message, f, loc) ->
     EquivSequent.set_equiv_goal s (Equiv.Message f :: goal_as_equiv s)
 
-  | TacticsArgs.ETerm (Sorts.Index, _, loc)
-  | TacticsArgs.ETerm (Sorts.Timestamp, _, loc) ->
+  | TacticsArgs.ETerm (Type.Index, _, loc)
+  | TacticsArgs.ETerm (Type.Timestamp, _, loc) ->
     Tactics.hard_failure
       (Tactics.Failure "expected a message or boolean term")
 
@@ -1109,7 +1109,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let table = EquivSequent.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  match Theory.convert conv_env tsubst term Sorts.Message with
+  match Theory.convert conv_env tsubst term Type.Message with
   (* we expect term to be a sequence *)
   | Seq ( vs, t) as term_seq ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
@@ -1171,7 +1171,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  match Theory.convert conv_env tsubst term Sorts.Boolean with
+  match Theory.convert conv_env tsubst term Type.Boolean with
     | Macro ((mn, sort, is),l,a) ->
       if Macros.is_defined mn a table then
         succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -1183,7 +1183,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
       Tactics.soft_failure (Tactics.Failure "can only expand macros")
 
     | exception Theory.(Conv (_,Type_error _)) ->
-      match Theory.convert conv_env tsubst term Sorts.Message with
+      match Theory.convert conv_env tsubst term Type.Message with
       | Macro ((mn, sort, is),l,a) ->
         if Macros.is_defined mn a table then
           succ a [Term.ESubst (Macro ((mn, sort, is),l,a),
@@ -1320,12 +1320,12 @@ let equiv_message m1 m2 (s : EquivSequent.t) =
 let equivalent arg s = match arg with
   | TacticsArgs.Pair (t1,t2) ->
     match t1, t2 with
-    | TacticsArgs.ETerm (Sorts.Boolean, f1, _),
-      TacticsArgs.ETerm (Sorts.Boolean, f2, _) ->
+    | TacticsArgs.ETerm (Type.Boolean, f1, _),
+      TacticsArgs.ETerm (Type.Boolean, f2, _) ->
       equiv_formula f1 f2 s
 
-    | TacticsArgs.ETerm (Sorts.Message, f1, _),
-      TacticsArgs.ETerm (Sorts.Message, f2, _) ->
+    | TacticsArgs.ETerm (Type.Message, f1, _),
+      TacticsArgs.ETerm (Type.Message, f2, _) ->
       equiv_message f1 f2 s
 
     | TacticsArgs.ETerm (_, _, _),
@@ -1777,7 +1777,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              let not_in_env  = function
                | Vars.EVar v ->
                  match Vars.sort v with
-                 | Sorts.Index -> not (Vars.mem !env (Vars.name v))
+                 | Type.Index -> not (Vars.mem !env (Vars.name v))
                  | _ -> true
              in
 
@@ -1844,7 +1844,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
               * ie already in [a.Action.indices] *)
              let not_in_action_indices = function
                | Vars.EVar v -> match Vars.sort v with
-                 | Sorts.Index -> not (List.mem v a.Action.indices)
+                 | Type.Index -> not (List.mem v a.Action.indices)
                  | _ -> true
              in
 
@@ -1994,7 +1994,7 @@ let prf TacticsArgs.(Int i) s =
                 | _ -> assert false
               in
               match Vars.sort uvarm,Vars.sort uvarkey with
-              | Sorts.(Message, Message) -> let f = Term.subst [
+              | Type.(Message, Message) -> let f = Term.subst [
                   ESubst (Term.Var uvarm,m);
                   ESubst (Term.Var uvarkey,key);] f in
                 Term.And (Term.Not f,  

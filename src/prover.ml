@@ -95,7 +95,7 @@ type p_equiv_form =
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
 
-  | P_equiv_goal of (Theory.lsymb * Sorts.esort) list * p_equiv_form L.located
+  | P_equiv_goal of (Theory.lsymb * Type.esort) list * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
@@ -648,8 +648,8 @@ let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el =
   (* FIXME: this does not give any conversion error to the user. *)
   | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
   | Some (Theory.ETerm (s,t,_)) -> match s with
-    | Sorts.Message -> Equiv.Message t
-    | Sorts.Boolean -> Equiv.Formula t
+    | Type.Message -> Equiv.Message t
+    | Type.Boolean -> Equiv.Formula t
     | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
                                           bool or message)")
 
@@ -664,7 +664,7 @@ let convert_equiv_form cenv s (p : p_equiv_form) =
     | PEquiv e -> 
       Equiv.Atom (Equiv.Equiv (convert_equiv cenv s e))
     | PReach f -> 
-      Equiv.Atom (Equiv.Reach (Theory.convert cenv s f Sorts.Boolean))
+      Equiv.Atom (Equiv.Reach (Theory.convert cenv s f Type.Boolean))
   in
 
   conve p
@@ -675,7 +675,7 @@ let convert_equiv_form cenv s (p : p_equiv_form) =
 
 let make_trace_goal ~system ~table f  =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let g = Theory.convert conv_env [] f Sorts.Boolean in
+  let g = Theory.convert conv_env [] f Type.Boolean in
   Goal.Trace (TraceSequent.init ~system table g)
 
 let make_equiv_goal
@@ -683,7 +683,7 @@ let make_equiv_goal
     (p_form : p_equiv_form L.located) =
   let env =
     List.fold_left
-      (fun env (x, Sorts.ESort s) ->
+      (fun env (x, Type.ESort s) ->
          assert (not (Vars.mem env x)) ;
          fst (Vars.make_fresh env s x))
       Vars.empty_env env
@@ -701,7 +701,7 @@ let make_equiv_goal
 let make_equiv_goal_process ~table system_1 system_2 =
   let open SystemExpr in
   let env = ref Vars.empty_env in
-  let ts = Vars.make_fresh_and_update env Sorts.Timestamp "t" in
+  let ts = Vars.make_fresh_and_update env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [Message term])) in
 
@@ -774,12 +774,12 @@ let add_proved_goal (gname,j) =
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let formula = Theory.convert conv_env [] f Sorts.Boolean in
+  let formula = Theory.convert conv_env [] f Type.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
          match Vars.sort uvarm,Vars.sort uvarkey with
-         | Sorts.(Message, Message) ->
+         | Type.(Message, Message) ->
            add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
          | _ ->  raise @@ ParseError "The tag formula must be of \
                            the form forall (m:message,sk:message)"

@@ -100,7 +100,7 @@ let check_encryption_randomness
         List.exists (function
               Vars.EVar v ->
               (match Vars.sort v with
-               |Sorts.Index -> (List.mem v actidx) && not (List.mem v is)
+               |Type.Index -> (List.mem v actidx) && not (List.mem v is)
                (* we fail if there exists an indice appearing in the message,
                   which is an indice instantiated by the action description,
                   and it does not appear in the random. *)

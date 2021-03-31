@@ -154,10 +154,10 @@ type ('a, 'b) pair
 type _ sort =
   | None      : unit sort
 
-  | Message   : Sorts.message   sort
-  | Boolean   : Sorts.boolean   sort
-  | Timestamp : Sorts.timestamp sort        
-  | Index     : Sorts.index     sort
+  | Message   : Type.message   sort
+  | Boolean   : Type.boolean   sort
+  | Timestamp : Type.timestamp sort        
+  | Index     : Type.index     sort
 
   | ETerm     : Theory.eterm    sort
   (** Boolean, timestamp or message *)
@@ -171,12 +171,12 @@ type _ sort =
 type _ arg =
   | None      : unit arg 
 
-  | Message   : Term.message   -> Sorts.message   arg
-  | Boolean   : Term.formula   -> Sorts.boolean   arg
-  | Timestamp : Term.timestamp -> Sorts.timestamp arg
-  | Index     : Vars.index     -> Sorts.index     arg
+  | Message   : Term.message   -> Type.message   arg
+  | Boolean   : Term.formula   -> Type.boolean   arg
+  | Timestamp : Term.timestamp -> Type.timestamp arg
+  | Index     : Vars.index     -> Type.index     arg
 
-  | ETerm     : 'a Sorts.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  | ETerm     : 'a Type.sort * 'a Term.term * Location.t -> Theory.eterm arg
 
   | Int       : int -> int arg
   | String    : lsymb -> lsymb arg
@@ -359,13 +359,13 @@ let convert_args table env parser_args tactic_type =
     let tsubst = Theory.subst_of_env env in    
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert conv_cntxt tsubst p Sorts.Timestamp))
+      Arg (Timestamp (Theory.convert conv_cntxt tsubst p Type.Timestamp))
 
     | [Theory p], Sort Message ->
-      Arg (Message   (Theory.convert conv_cntxt tsubst p Sorts.Message))
+      Arg (Message   (Theory.convert conv_cntxt tsubst p Type.Message))
 
     | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert conv_cntxt tsubst p Sorts.Boolean))
+      Arg (Boolean   (Theory.convert conv_cntxt tsubst p Type.Boolean))
 
     | [Theory p], Sort ETerm ->
       let et = match Theory.econvert conv_cntxt tsubst p with

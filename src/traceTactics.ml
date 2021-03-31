@@ -280,7 +280,7 @@ let message_case (m : Term.message) s : c_res list =
   begin match m with
     | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
-    | Term.Macro ((m,Sorts.Message,is),[],ts) as o
+    | Term.Macro ((m,Type.Message,is),[],ts) as o
       when Macros.is_defined m ts (TraceSequent.table s) ->
       if not (TraceSequent.query_happens ~precise:true s ts) 
       then soft_failure (Tactics.MustHappen ts)
@@ -288,7 +288,7 @@ let message_case (m : Term.message) s : c_res list =
         begin match
             Macros.get_definition
               (mk_trace_cntxt s)
-              Sorts.Message
+              Type.Message
               m is ts
           with
           | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
@@ -310,9 +310,9 @@ let do_case_tac (args : Args.parser_arg list) s =
   | _ ->
     let env, tbl = TraceSequent.env s, TraceSequent.table s in
     match Args.convert_args tbl env args Args.(Sort ETerm) with
-    | Args.Arg (ETerm (Sorts.Timestamp, f, loc)) ->
+    | Args.Arg (ETerm (Type.Timestamp, f, loc)) ->
       timestamp_case f s
-    | Args.Arg (ETerm (Sorts.Message, f, loc)) ->
+    | Args.Arg (ETerm (Type.Message, f, loc)) ->
       message_case f s
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
@@ -765,7 +765,7 @@ let induction s  =
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
     (match Vars.sort v with
-       Sorts.Timestamp ->
+       Type.Timestamp ->
        (
          (* We need two fresh variables in env,
           * but one will not be kept in the final environment. *)
@@ -1138,10 +1138,10 @@ let expand (targets : rw_target list) (arg : Theory.term) s =
   | _ ->
     let env = TraceSequent.env s in
     match Args.convert_args tbl env [Args.Theory arg] Args.(Sort ETerm) with
-    | Args.Arg (Args.ETerm (Sorts.Boolean, f, loc)) ->
+    | Args.Arg (Args.ETerm (Type.Boolean, f, loc)) ->
       expand_macro targets f s
         
-    | Args.Arg (Args.ETerm (Sorts.Message, f, loc)) ->
+    | Args.Arg (Args.ETerm (Type.Message, f, loc)) ->
       expand_macro targets f s
         
     | _ ->
@@ -1407,7 +1407,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env n is t =
   in
   (* build the formula expressing that there exists a name subterm of [t]
    * equal to the name ([n],[is]) *)
-  let mk_case (js : Sorts.index Vars.var list) =
+  let mk_case (js : Type.index Vars.var list) =
     (* select bound variables *)
     let bv = List.filter (fun i -> not (Vars.mem env (Vars.name i))) js in
 
@@ -1586,7 +1586,7 @@ let substitute_ts (ts1, ts2) s =
   in
   apply_substitute subst s
 
-let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
+let substitute_idx (i1 , i2 : Type.index Term.term * Type.index Term.term) s =
   let i1, i2 =  match i1, i2 with
     | Var i1, Var i2 -> i1, i2
     | (Diff _ | Macro _), _
@@ -1608,13 +1608,13 @@ let substitute_idx (i1 , i2 : Sorts.index Term.term * Sorts.index Term.term) s =
 let substitute_tac arg s =
   let open Args in
   match arg with
-  | Pair (ETerm (Sorts.Message, f1, _), ETerm (Sorts.Message, f2, _)) ->
+  | Pair (ETerm (Type.Message, f1, _), ETerm (Type.Message, f2, _)) ->
     substitute_mess (f1,f2) s
 
-  | Pair (ETerm (Sorts.Timestamp, f1, _), ETerm (Sorts.Timestamp, f2, _)) ->
+  | Pair (ETerm (Type.Timestamp, f1, _), ETerm (Type.Timestamp, f2, _)) ->
     substitute_ts (f1,f2) s
 
-  | Pair (ETerm (Sorts.Index, f1, _), ETerm (Sorts.Index, f2, _)) ->
+  | Pair (ETerm (Type.Index, f1, _), ETerm (Type.Index, f2, _)) ->
     substitute_idx (f1,f2) s
 
   | _ ->
@@ -1688,8 +1688,8 @@ let autosubst s =
  *     | [a] -> Tactics.(soft_failure (Failure "ill-typed substitution"))
  *     | (Args.Theory mterm)::(Args.Theory b)::q ->
  *       begin
- *         match Theory.convert conv_env tsubst mterm Sorts.Boolean,
- *               Theory.convert conv_env tsubst b Sorts.Boolean with
+ *         match Theory.convert conv_env tsubst mterm Type.Boolean,
+ *               Theory.convert conv_env tsubst b Type.Boolean with
  *         | Term.Macro ((mn, sort, is),l,a), ncond ->
  *           begin
  *             match a with
@@ -1705,8 +1705,8 @@ let autosubst s =
  *           end
  *         | exception _ ->
  *           begin
- *             match Theory.convert conv_env tsubst mterm Sorts.Message,
- *                   Theory.convert conv_env tsubst b Sorts.Message with
+ *             match Theory.convert conv_env tsubst mterm Type.Message,
+ *                   Theory.convert conv_env tsubst b Type.Message with
  *             |Term.Macro ((mn, sort, is),l,a), nout ->
  *               begin
  *                 match a with
@@ -1737,7 +1737,7 @@ let autosubst s =
  *   | Args.Theory (L.{ pl_desc = Theory.App (i,[]) } ) :: q ->
  *     let i = L.unloc i in
  *     let id,vs,rem = parse_indexes q in
- *     let var =  snd (Vars.make_fresh Vars.empty_env Sorts.Index i) in
+ *     let var =  snd (Vars.make_fresh Vars.empty_env Type.Index i) in
  *     Theory.ESubst (i, Term.Var var)::id
  *   , (Vars.EVar var)::vs, rem
  *   | a :: q -> let id,vs, rem = parse_indexes q in
@@ -1830,7 +1830,7 @@ let autosubst s =
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Timestamp a) s =
-  let _,var = Vars.(make_fresh (TraceSequent.env s) Sorts.Timestamp "t") in
+  let _,var = Vars.(make_fresh (TraceSequent.env s) Type.Timestamp "t") in
   let formula =
     ForAll
       ([Vars.EVar var],
@@ -2233,7 +2233,7 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
       let conv_env = Theory.{ table = TraceSequent.table s;
                               cntxt = InGoal; } in      
       let subst = Theory.subst_of_env (TraceSequent.env s) in
-      let f = Theory.convert conv_env subst rw_type Sorts.Boolean in
+      let f = Theory.convert conv_env subst rw_type Type.Boolean in
 
       (* create new sub-goal *)
       let premise = [TraceSequent.set_conclusion f s] in
@@ -2524,9 +2524,9 @@ let () =
 (** Unforgeability Axioms *)
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
-                           * Sorts.message Term.term
+                           * Type.message Term.term
                            * (Symbols.fname Symbols.t -> bool)
-                           * Sorts.boolean Term.term  list * bool
+                           * Type.boolean Term.term  list * bool
 
 let euf_param table (t : Term.formula) : unforgeabiliy_param =
   let bad_param () =
@@ -2742,7 +2742,7 @@ let euf_apply
         | _ -> assert false
       in
       match Vars.sort uvarm,Vars.sort uvarkey with
-      | Sorts.(Message, Message) -> let f = Term.subst [
+      | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.Var uvarm,m);
           ESubst (Term.Var uvarkey,Term.Name key);] f in
         [TraceSequent.set_conclusion

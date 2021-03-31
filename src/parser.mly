@@ -195,10 +195,10 @@ tm_list:
 | RANGLE                         { `Gt }
 
 kind:
-| INDEX                          { Sorts.eindex }
-| MESSAGE                        { Sorts.emessage }
-| BOOLEAN                        { Sorts.eboolean }
-| TIMESTAMP                      { Sorts.etimestamp }
+| INDEX                          { Type.eindex }
+| MESSAGE                        { Type.emessage }
+| BOOLEAN                        { Type.eboolean }
+| TIMESTAMP                      { Type.etimestamp }
 
 arg_list:
 |                                         { [] }
@@ -276,8 +276,8 @@ name_type:
 | INDEX ARROW t=name_type        { 1 + t }
 
 msg_or_bool:
-| MESSAGE                        { Sorts.emessage }
-| BOOLEAN                        { Sorts.eboolean }
+| MESSAGE                        { Type.emessage }
+| BOOLEAN                        { Type.eboolean }
 
 /* state_type:
 | t=msg_or_bool                  { 0, t }

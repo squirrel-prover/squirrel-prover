@@ -30,9 +30,9 @@ type fsymb = Symbols.fname Symbols.t * Vars.index list
   * translating the meta-logic to the base logic. *)
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Sorts.sort * Vars.index list
+type 'a msymb = mname * 'a Type.sort * Vars.index list
 
-type state = Sorts.message msymb
+type state = Type.message msymb
 
 (*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
@@ -62,50 +62,50 @@ val pp_ord   : Format.formatter -> ord -> unit
 type ('a,'b) _atom = 'a * 'b * 'b
 
 type generic_atom = [
-  | `Message of (ord_eq,Sorts.message term) _atom
-  | `Timestamp of (ord,Sorts.timestamp term) _atom
+  | `Message of (ord_eq,Type.message term) _atom
+  | `Timestamp of (ord,Type.timestamp term) _atom
   | `Index of (ord_eq,Vars.index) _atom
-  | `Happens of Sorts.timestamp term
+  | `Happens of Type.timestamp term
 ]
 and _ term =
-  | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
-  | Name   : nsymb -> Sorts.message term
+  | Fun    : fsymb *  Type.message term list -> Type.message term
+  | Name   : nsymb -> Type.message term
 
   | Macro  :
-      'a msymb * Sorts.message term list * Sorts.timestamp term
+      'a msymb * Type.message term list * Type.timestamp term
       -> 'a term
 
-  | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred   : Sorts.timestamp term -> Sorts.timestamp term
-  | Action : Symbols.action Symbols.t * Vars.index list -> Sorts.timestamp term
+  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Pred   : Type.timestamp term -> Type.timestamp term
+  | Action : Symbols.action Symbols.t * Vars.index list -> Type.timestamp term
   | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
 
   | ITE :
-      Sorts.boolean term * Sorts.message term * Sorts.message term ->
-      Sorts.message term
+      Type.boolean term * Type.message term * Type.message term ->
+      Type.message term
   | Find :
-      Vars.index list * Sorts.boolean term *
-      Sorts.message term * Sorts.message term ->
-      Sorts.message term
+      Vars.index list * Type.boolean term *
+      Type.message term * Type.message term ->
+      Type.message term
 
-  | Atom : generic_atom -> Sorts.boolean term
+  | Atom : generic_atom -> Type.boolean term
 
-  | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | And    : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Or     : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Not    : Sorts.boolean term  -> Sorts.boolean term
-  | Impl   : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | True   : Sorts.boolean term
-  | False  : Sorts.boolean term
+  | ForAll : Vars.evar list * Type.boolean term -> Type.boolean term
+  | Exists : Vars.evar list * Type.boolean term -> Type.boolean term
+  | And    : Type.boolean term * Type.boolean term -> Type.boolean term
+  | Or     : Type.boolean term * Type.boolean term -> Type.boolean term
+  | Not    : Type.boolean term  -> Type.boolean term
+  | Impl   : Type.boolean term * Type.boolean term -> Type.boolean term
+  | True   : Type.boolean term
+  | False  : Type.boolean term
 
 type 'a t = 'a term
 
-type message = Sorts.message term
-type timestamp = Sorts.timestamp term
-type formula = Sorts.boolean term
+type message = Type.message term
+type timestamp = Type.timestamp term
+type formula = Type.boolean term
 
 type eterm = ETerm : 'a term -> eterm
 
@@ -118,14 +118,14 @@ val tfold : (eterm -> 'a -> 'a) -> 'b term -> 'a -> 'a
 (** {2 Subset of all atoms} *)
 (** (the subsets are not disjoint). *)
 
-type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+type message_atom = [ `Message of (ord_eq,Type.message term) _atom]
 
 type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index     of (ord_eq,Vars.index) _atom
-  | `Happens   of Sorts.timestamp term
+  | `Happens   of Type.timestamp term
 ]
 
 type trace_eq_atom = [
@@ -168,7 +168,7 @@ val disjunction_to_literals : formula -> literal list option
 
 val pp : Format.formatter -> 'a term -> unit
 
-val sort : 'a term -> 'a Sorts.t
+val sort : 'a term -> 'a Type.t
 
 (*------------------------------------------------------------------*)
 exception Uncastable
@@ -177,7 +177,7 @@ exception Uncastable
   * It is used to cast terms that have been unwrapped (e.g. from
   * a substitution) to the correct type.
   * @raise Uncastable if the term does not have the expected sort. *)
-val cast : 'a Sorts.sort -> 'b term -> 'a term
+val cast : 'a Type.sort -> 'b term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].
@@ -196,7 +196,7 @@ val f_triv : formula -> bool
   * Concretely, this is achieved by taking the timestamps occurring
   * in [t] but only the predecessors of timestamps occurring as
   * input timestamps. *)
-val precise_ts : Sorts.message term -> Sorts.timestamp term list
+val precise_ts : Type.message term -> Type.timestamp term list
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
@@ -222,7 +222,7 @@ val subst_var : subst -> 'a Vars.var -> 'a Vars.var
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)
 val subst_macros_ts : 
   Symbols.table -> 
-  string list -> Sorts.timestamp term -> 'a term -> 'a term
+  string list -> Type.timestamp term -> 'a term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
@@ -264,11 +264,11 @@ end
 val empty : message 
 val init : timestamp
 
-val in_macro    : Sorts.message msymb
-val out_macro   : Sorts.message msymb
-val frame_macro : Sorts.message msymb
-val cond_macro  : Sorts.boolean msymb
-val exec_macro  : Sorts.boolean msymb
+val in_macro    : Type.message msymb
+val out_macro   : Type.message msymb
+val frame_macro : Type.message msymb
+val cond_macro  : Type.boolean msymb
+val exec_macro  : Type.boolean msymb
 
 val f_true   : fsymb
 val f_false  : fsymb

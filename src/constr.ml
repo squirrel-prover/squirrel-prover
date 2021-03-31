@@ -84,7 +84,7 @@ module Utv : sig
   val uinit  : ut
   val uundef : ut
 
-  val ut_to_term : 'a Sorts.sort -> ut -> 'a Term.term 
+  val ut_to_term : 'a Type.sort -> ut -> 'a Term.term 
 
   module Ut : Hashtbl.HashedType with type t = ut
 
@@ -160,26 +160,26 @@ end = struct
     | Term.Action (s,l) -> uname s (List.map uvari l)
     | _ -> failwith "Not implemented"
 
-  let utv_to_var : type a. a Sorts.sort -> uvar -> a Vars.var =
+  let utv_to_var : type a. a Type.sort -> uvar -> a Vars.var =
     fun s utv ->
     match utv with
     | Uind i -> Vars.cast i s
     | Utv  t -> Vars.cast t s
 
-  let ut_to_var : type a. a Sorts.sort -> ut -> a Vars.var =
+  let ut_to_var : type a. a Type.sort -> ut -> a Vars.var =
     fun s ut -> 
     match ut.cnt with
     | UVar (Uind i) -> Vars.cast i s
     | UVar (Utv t)  -> Vars.cast t s
     | _ -> assert false
 
-  let rec ut_to_term : type a. a Sorts.sort -> ut -> a Term.term = 
+  let rec ut_to_term : type a. a Type.sort -> ut -> a Term.term = 
     fun s ut ->
     match ut.cnt with
     | UVar tv -> Term.Var (utv_to_var s tv)
     | UName (a, is) -> 
-      Term.cast s (Term.Action (a, List.map (ut_to_var Sorts.Index) is))
-    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Sorts.Timestamp ut))
+      Term.cast s (Term.Action (a, List.map (ut_to_var Type.Index) is))
+    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Type.Timestamp ut))
     | UInit  -> Term.cast s Term.init
     | UUndef -> assert false
 end
@@ -1378,7 +1378,7 @@ let find_eq_action (models : models) (t : Term.timestamp) =
     let classe = get_class uf ut in
     List.find_map (fun ut -> match ut.cnt with
         | UInit
-        | UName _ -> Some (ut_to_term Sorts.Timestamp ut)
+        | UName _ -> Some (ut_to_term Type.Timestamp ut)
         | _ -> None
       ) classe
   in
@@ -1407,7 +1407,7 @@ type trace_cntxt = {
 (** Tests Suites *)
 
 open Term
-open Sorts
+    
 let env = ref Vars.empty_env
 let tau = Var (Vars.make_fresh_and_update env Timestamp "tau")
 and tau' = Var (Vars.make_fresh_and_update env Timestamp "tau")

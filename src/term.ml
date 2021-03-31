@@ -20,9 +20,9 @@ type fname = Symbols.fname Symbols.t
 type fsymb = fname * Vars.index list
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Sorts.sort * Vars.index list
+type 'a msymb = mname * 'a Type.sort * Vars.index list
 
-type state = Sorts.message msymb
+type state = Type.message msymb
 
 let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
 
@@ -57,64 +57,64 @@ type ord_eq = [ `Eq | `Neq ]
 type ('a,'b) _atom = 'a * 'b * 'b
              
 type generic_atom = [
-  | `Message   of (ord_eq, Sorts.message term)   _atom
-  | `Timestamp of (ord,    Sorts.timestamp term) _atom
+  | `Message   of (ord_eq, Type.message term)   _atom
+  | `Timestamp of (ord,    Type.timestamp term) _atom
   | `Index     of (ord_eq, Vars.index)           _atom
-  | `Happens   of Sorts.timestamp term
+  | `Happens   of Type.timestamp term
 ]
 
 and _ term =
-  | Fun    : fsymb *  Sorts.message term list -> Sorts.message term
-  | Name   : nsymb -> Sorts.message term
+  | Fun    : fsymb *  Type.message term list -> Type.message term
+  | Name   : nsymb -> Type.message term
   | Macro  :
-      'a msymb * Sorts.message term list * Sorts.timestamp term ->
+      'a msymb * Type.message term list * Type.timestamp term ->
       'a term
-  | Seq    : Vars.index list * Sorts.message term -> Sorts.message term
-  | Pred   : Sorts.timestamp term -> Sorts.timestamp term        
+  | Seq    : Vars.index list * Type.message term -> Type.message term
+  | Pred   : Type.timestamp term -> Type.timestamp term        
   | Action :
       Symbols.action Symbols.t * Vars.index list ->
-      Sorts.timestamp term
+      Type.timestamp term
   | Var    : 'a Vars.var -> 'a term
 
   | Diff : 'a term * 'a term -> 'a term
 
   | ITE :
-      Sorts.boolean term * Sorts.message term * Sorts.message term ->
-      Sorts.message term
+      Type.boolean term * Type.message term * Type.message term ->
+      Type.message term
   | Find :
-      Vars.index list * Sorts.boolean term *
-      Sorts.message term * Sorts.message term ->
-      Sorts.message term
+      Vars.index list * Type.boolean term *
+      Type.message term * Type.message term ->
+      Type.message term
 
-  | Atom : generic_atom -> Sorts.boolean term
+  | Atom : generic_atom -> Type.boolean term
 
-  | ForAll : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | Exists : Vars.evar list * Sorts.boolean term -> Sorts.boolean term
-  | And    : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Or     : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | Not    : Sorts.boolean term -> Sorts.boolean term
-  | Impl   : Sorts.boolean term * Sorts.boolean term -> Sorts.boolean term
-  | True   : Sorts.boolean term
-  | False  : Sorts.boolean term
+  | ForAll : Vars.evar list * Type.boolean term -> Type.boolean term
+  | Exists : Vars.evar list * Type.boolean term -> Type.boolean term
+  | And    : Type.boolean term * Type.boolean term -> Type.boolean term
+  | Or     : Type.boolean term * Type.boolean term -> Type.boolean term
+  | Not    : Type.boolean term -> Type.boolean term
+  | Impl   : Type.boolean term * Type.boolean term -> Type.boolean term
+  | True   : Type.boolean term
+  | False  : Type.boolean term
 
 type 'a t = 'a term
 
 (*------------------------------------------------------------------*)
-type message = Sorts.message term
-type timestamp = Sorts.timestamp term
-type formula = Sorts.boolean term
+type message = Type.message term
+type timestamp = Type.timestamp term
+type formula = Type.boolean term
 
 (*------------------------------------------------------------------*)
 (** Subset of all atoms (the subsets are not disjoint). *)
     
-type message_atom = [ `Message of (ord_eq,Sorts.message term) _atom]
+type message_atom = [ `Message of (ord_eq,Type.message term) _atom]
 
 type index_atom = [ `Index of (ord_eq,Vars.index) _atom]
                     
 type trace_atom = [
   | `Timestamp of (ord,timestamp) _atom
   | `Index     of (ord_eq,Vars.index) _atom
-  | `Happens   of Sorts.timestamp term
+  | `Happens   of Type.timestamp term
 ]
 
 type trace_eq_atom = [
@@ -130,38 +130,38 @@ type eq_atom = [
 ]
 
 (*------------------------------------------------------------------*)
-let rec sort : type a. a term -> a Sorts.t =
+let rec sort : type a. a term -> a Type.t =
   function
-  | Fun _               -> Sorts.Message
-  | Name _              -> Sorts.Message
+  | Fun _               -> Type.Message
+  | Name _              -> Type.Message
   | Macro ((_,s,_),_,_) -> s
-  | Seq _ -> Sorts.Message
+  | Seq _ -> Type.Message
   | Var v -> Vars.sort v
-  | Pred _ -> Sorts.Timestamp
-  | Action _ -> Sorts.Timestamp
+  | Pred _ -> Type.Timestamp
+  | Action _ -> Type.Timestamp
   | Diff (a, b) -> sort a
-  | ITE (a, b, c) -> Sorts.Message
-  | Find (a, b, c, d) -> Sorts.Message
-  | Atom _ -> Sorts.Boolean
-  | ForAll _ -> Sorts.Boolean
-  | Exists _ -> Sorts.Boolean
-  | And _ -> Sorts.Boolean
-  | Or _ -> Sorts.Boolean
-  | Not _ -> Sorts.Boolean
-  | Impl _ -> Sorts.Boolean
-  | True -> Sorts.Boolean
-  | False -> Sorts.Boolean
+  | ITE (a, b, c) -> Type.Message
+  | Find (a, b, c, d) -> Type.Message
+  | Atom _ -> Type.Boolean
+  | ForAll _ -> Type.Boolean
+  | Exists _ -> Type.Boolean
+  | And _ -> Type.Boolean
+  | Or _ -> Type.Boolean
+  | Not _ -> Type.Boolean
+  | Impl _ -> Type.Boolean
+  | True -> Type.Boolean
+  | False -> Type.Boolean
 
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-let cast: type a b. a Sorts.sort -> b term -> a term =
+let cast: type a b. a Type.sort -> b term -> a term =
   fun kind t ->
   match kind, sort t with
-     | Sorts.Index, Sorts.Index -> t
-     | Sorts.Message, Sorts.Message -> t
-     | Sorts.Boolean, Sorts.Boolean -> t
-     | Sorts.Timestamp, Sorts.Timestamp -> t
+     | Type.Index, Type.Index -> t
+     | Type.Message, Type.Message -> t
+     | Type.Boolean, Type.Boolean -> t
+     | Type.Timestamp, Type.Timestamp -> t
      | _ -> raise Uncastable
 
 
@@ -178,7 +178,7 @@ let f_diff = mk Symbols.fs_diff
   * and other symbols are used in an untyped way in Completion
   * (in some currently unused code). *)
 
-let eboolean,emessage = Sorts.eboolean,Sorts.emessage
+let eboolean,emessage = Type.eboolean,Type.emessage
 
 (** Boolean connectives *)
 
@@ -444,12 +444,12 @@ let f_triv = function
 (*------------------------------------------------------------------*)
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
-let in_macro    = (Symbols.inp,   Sorts.Message, [])
-let out_macro   = (Symbols.out,   Sorts.Message, [])
-let frame_macro = (Symbols.frame, Sorts.Message, [])
+let in_macro    = (Symbols.inp,   Type.Message, [])
+let out_macro   = (Symbols.out,   Type.Message, [])
+let frame_macro = (Symbols.frame, Type.Message, [])
 
-let cond_macro  = (Symbols.cond, Sorts.Boolean, [])
-let exec_macro  = (Symbols.exec, Sorts.Boolean, [])
+let cond_macro  = (Symbols.cond, Type.Boolean, [])
+let exec_macro  = (Symbols.exec, Type.Boolean, [])
 
 let rec pts : type a. timestamp list -> a term -> timestamp list = fun acc -> function
   | Fun (_, lt) -> List.fold_left pts acc lt
@@ -672,12 +672,12 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
 
       | Seq ([a], f) -> 
         let a, f = subst_binding (Vars.EVar a) s f in
-        let a = Vars.ecast a Sorts.Index in
+        let a = Vars.ecast a Type.Index in
         Seq ([a],f)
 
       | Seq (a :: vs, f) -> 
         let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
-        let a = Vars.ecast a Sorts.Index in
+        let a = Vars.ecast a Type.Index in
         let vs, f = match f with
           | Seq (vs, f) -> vs, f
           | _ -> assert false in
@@ -715,7 +715,7 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
         let dummy = Fun (f_zero,[]) in
 
         let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
-        let v = Vars.ecast v Sorts.Index in
+        let v = Vars.ecast v Type.Index in
         match f with
         | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
         | _ -> assert false
@@ -954,7 +954,7 @@ module Match = struct
 
         | Macro ((s, sort, is), terms, ts), 
           Macro ((s', sort', is'), terms', ts') -> 
-          if not (Sorts.equal sort sort') then raise NoMatch;
+          if not (Type.equal sort sort') then raise NoMatch;
 
           let mv = smatch (s,is) (s',is') mv in
           tmatch ts ts' (tmatch_l terms terms' mv)
@@ -1334,13 +1334,13 @@ let of_eatom (eat : eatom) : generic_atom = match eat with
   | EHappens t -> `Happens t
   | EOrd (ord, t1, t2) ->
     match sort t1 with
-    | Sorts.Message   -> `Message   (as_ord_eq ord, t1, t2)
-    | Sorts.Timestamp -> `Timestamp (ord, t1, t2)
-    | Sorts.Index     ->
+    | Type.Message   -> `Message   (as_ord_eq ord, t1, t2)
+    | Type.Timestamp -> `Timestamp (ord, t1, t2)
+    | Type.Index     ->
       let i1, i2 = oget (destr_var t1), oget (destr_var t2) in
       `Index (as_ord_eq ord, i1, i2)
 
-    | Sorts.Boolean   -> assert false
+    | Type.Boolean   -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)
@@ -1360,27 +1360,27 @@ let () =
   let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in
   Checks.add_suite "Head normalization" [
     "Macro, different ts", `Quick, begin fun () ->
-      let ts = mkvar "ts" Sorts.Timestamp in
-      let ts' = mkvar "ts'" Sorts.Timestamp in
+      let ts = mkvar "ts" Type.Timestamp in
+      let ts' = mkvar "ts'" Type.Timestamp in
       let m = in_macro in
       let t = Diff (Macro (m,[],ts), Macro (m,[],ts')) in
       let r = head_normal_biterm t in
       assert (r = t)
     end ;
     "Boolean operator", `Quick, begin fun () ->
-      let f = mkvar "f" Sorts.Boolean in
-      let g = mkvar "g" Sorts.Boolean in
-      let f' = mkvar "f'" Sorts.Boolean in
-      let g' = mkvar "g'" Sorts.Boolean in
+      let f = mkvar "f" Type.Boolean in
+      let g = mkvar "g" Type.Boolean in
+      let f' = mkvar "f'" Type.Boolean in
+      let g' = mkvar "g'" Type.Boolean in
       let t = Diff (And (f,g), And (f',g')) in
         assert (head_normal_biterm t = And (Diff (f,f'), Diff (g,g')))
     end ;
   ] ;
   Checks.add_suite "Projection" [
     "Simple example", `Quick, begin fun () ->
-      let a = mkvar "a" Sorts.Message in
-      let b = mkvar "b" Sorts.Message in
-      let c = mkvar "c" Sorts.Message in
+      let a = mkvar "a" Type.Message in
+      let b = mkvar "b" Type.Message in
+      let c = mkvar "c" Type.Message in
       let def = Symbols.Abstract 2 in
       let table,f =
         Symbols.Function.declare_exact 
