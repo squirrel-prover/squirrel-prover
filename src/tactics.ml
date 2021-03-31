@@ -33,6 +33,7 @@ type tac_error =
   | NotHypothesis
 
   | ApplyMatchFailure
+  | ApplyBadInst
 
   | NoCollision
 
@@ -63,7 +64,8 @@ let tac_error_strings =
     (NothingToIntroduce , "NothingToIntroduce");
     (NothingToRewrite   , "NothingToRewrite");
     (BadRewriteRule     , "BadRewriteRule");
-    (ApplyMatchFailure  , "ApplyMatchFailure")]
+    (ApplyMatchFailure  , "ApplyMatchFailure");
+    (ApplyBadInst       , "ApplyBadInst") ]
 
 let rec tac_error_to_string = function
   | Failure s -> Format.sprintf "Failure %S" s
@@ -90,6 +92,7 @@ let rec tac_error_to_string = function
   | NotHypothesis
   | NoCollision
   | ApplyMatchFailure
+  | ApplyBadInst
   | DidNotFail as e -> List.assoc e tac_error_strings
   | HypAlreadyExists _ -> "HypAlreadyExists"
   | HypUnknown       _ -> "HypUnknown"
@@ -168,6 +171,9 @@ let rec pp_tac_error ppf = function
 
   | ApplyMatchFailure ->
     Fmt.pf ppf "apply failed: no match found" 
+
+  | ApplyBadInst ->
+    Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
 
     
 let strings_tac_error =

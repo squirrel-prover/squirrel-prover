@@ -57,6 +57,7 @@ type tac_error =
   | MustHappen of Term.timestamp
   | NotHypothesis
   | ApplyMatchFailure
+  | ApplyBadInst
   | NoCollision
   | HypAlreadyExists of string
   | HypUnknown of string

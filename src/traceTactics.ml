@@ -2324,13 +2324,17 @@ let () =
 
 let apply (f : Term.formula) s =
   let vars, f = Term.decompose_forall f in
+  let vars = Vars.Sv.of_list vars in
   let forms = List.rev (Term.decompose_impls f) in 
   let subs, f = List.rev (List.tl forms), List.hd forms in
 
+  if not (Vars.Sv.subset vars (Term.fv f)) then
+    soft_failure ApplyBadInst;
+  
   let goal = TraceSequent.conclusion s in
   
   let mv =
-    Term.Match.try_match goal { p_term = f; p_vars = Vars.Sv.of_list vars; }
+    Term.Match.try_match goal { p_term = f; p_vars = vars; }
   in
 
   match mv with
