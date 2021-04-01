@@ -45,3 +45,16 @@ Proof.
   intro x y j H Hyp.
   checkfail (apply Hyp) exn ApplyBadInst.
 Abort.
+
+
+(* Test `apply ... in ...`  *)
+goal _ (A,B,C,D : boolean, y : message, j : index) : 
+  A => B => C => (D => False) =>
+  (forall (x : message, i : index), A => x = ok(i) => B => D) =>
+  (C => f(y) = ok(j)) => False.
+Proof.
+  intro A B C D y j Ha Hb Hc Hfinal H Hin.
+  apply H in Hin;
+  [1,2,3: assumption |
+   4: by apply Hfinal]. 
+Qed.

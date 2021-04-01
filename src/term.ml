@@ -332,10 +332,14 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
     Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
       pp bl pp br
       
+  (* | Impl (bl, (Impl (_, _) as br)) ->
+   *   Fmt.pf ppf "@[<1>%a@ =>@ %a@]"
+   *     pp bl pp br *)
+
   | Impl (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
       pp bl pp br
-      
+
   | Not b ->
     Fmt.pf ppf "not(@[%a@])" pp b
       

@@ -75,6 +75,9 @@ type rw_arg =
 
 type rw_in = [`All | `Hyps of lsymb list] option 
 
+(*------------------------------------------------------------------*)
+type apply_in = lsymb option
+
 (*------------------------------------------------------------------*)  
 (** Types used during parsing. 
     Note that all tactics not defined in the parser must rely on the Theory 
@@ -87,7 +90,8 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * rw_in
-      
+  | ApplyIn     of Theory.term * apply_in
+                               
 (** Tactic arguments sorts *)
 type _ sort =
   | None      : unit sort

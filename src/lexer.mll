@@ -118,6 +118,7 @@ rule token = parse
 | "exn"               { EXN }
 | "use"               { USE }
 | "rewrite"           { REWRITE }
+| "apply"             { APPLY }
 | "revert"            { REVERT }
 | "generalize"        { GENERALIZE }
 | "depends"           { DEPENDS }

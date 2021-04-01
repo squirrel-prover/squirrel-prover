@@ -1006,9 +1006,9 @@ let () =
 (*------------------------------------------------------------------*)
 (** {2 Rewriting types and functions}*)
 
-type rw_target = [`Goal | `Hyp of Ident.t]
+type target = [`Goal | `Hyp of Ident.t]
 
-let target_all s : rw_target list =
+let target_all s : target list =
   `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
 
 (** A rewrite rule is a tuple: 
@@ -1044,7 +1044,7 @@ let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : bool =
 (* rewrite in a single target *)
 let do_target 
     (doit : (Term.formula * Ident.t option) -> Term.formula * Term.formula list) 
-    (s : sequent) (t : rw_target) : sequent * sequent list =
+    (s : sequent) (t : target) : sequent * sequent list =
   let f, s, tgt_id = match t with
     | `Goal -> TraceSequent.conclusion s, s, None
     | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
@@ -1088,7 +1088,7 @@ let unfold_macro ~canfail t s : Term.esubst list =
   | Tactics.Tactic_soft_failure _ when not canfail -> []
 
 
-let expand_macro (targets : rw_target list) t (s : sequent) : sequent =
+let expand_macro (targets : target list) t (s : sequent) : sequent =
   let subst = unfold_macro ~canfail:true t s in
   if subst = [] then soft_failure (Failure "nothing to expand");
 
@@ -1109,7 +1109,7 @@ let find_occs_macro
   in
   find (Utils.odflt Term.St.empty st) (ETerm t)
       
-let expand (targets : rw_target list) (arg : Theory.term) s = 
+let expand (targets : target list) (arg : Theory.term) s = 
   let tbl = TraceSequent.table s in
   match Args.convert_as_lsymb [Args.Theory arg] with
   | Some m ->
@@ -2121,7 +2121,7 @@ let do_s_item (s_item : Args.s_item) s : TraceSequent.sequent list =
 (** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
     If [all] is true, then does not fail if no rewriting occurs. *)
 let rewrite ~all 
-    (targets: rw_target list) 
+    (targets: target list) 
     (rw : Args.rw_count * Ident.t option * rw_erule) s 
   : sequent * sequent list =
   let found1, cpt_occ = ref false, ref 0 in
@@ -2321,8 +2321,8 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-
-let apply (f : Term.formula) s =
+    
+let apply (f : Term.formula) (s : TraceSequent.sequent) =
   let vars, f = Term.decompose_forall f in
   let vars = Vars.Sv.of_list vars in
   let forms = List.rev (Term.decompose_impls f) in 
@@ -2344,12 +2344,71 @@ let apply (f : Term.formula) s =
 
     let goals = List.map (Term.subst subst) subs in
     List.map (fun g -> TraceSequent.set_conclusion g s) goals
+
+(** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
+    [hyp], and replaces [hyp] by the conclusion of [f].
+    It generates a new subgoal for any remaining premises of [f], plus all 
+    premises of the original [hyp].
+
+    E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
+    `H2 : A` by `H2 : B` 
+*)
+let apply_in (form : Term.formula) (hyp : Ident.t) (s : TraceSequent.sequent) =
+  let fvars, f = Term.decompose_forall form in
+  let fvars = Vars.Sv.of_list fvars in
+  let forms = List.rev (Term.decompose_impls f) in 
+  let fprems, fconcl = List.rev (List.tl forms), List.hd forms in
+
+  let h = Hyps.by_id hyp s in
+  let forms = List.rev (Term.decompose_impls h) in 
+  let hprems, hconcl = List.rev (List.tl forms), List.hd forms in
+  
+  let try1 fprem =
+    if not (Vars.Sv.subset fvars (Term.fv fprem)) then None
+    else
+      Term.Match.try_match hconcl { p_term = fprem; p_vars = fvars; }
+  in
+
+  (* try to match a premise of [form] with [hconcl] *)
+  let rec find_match acc fprems = match fprems with
+    | [] -> None
+    | fprem :: fprems ->
+      match try1 fprem with
+      | None -> find_match (fprem :: acc) fprems
+      | Some mv ->
+        (* premises of [form], minus the matched premise *)
+        let fprems_other = List.rev_append acc fprems in
+        Some (fprems_other, mv)
+  in
+  
+  match find_match [] fprems with
+  | None -> soft_failure ApplyMatchFailure
+  | Some (fsubgoals,mv) ->
+    let subst = Term.Match.to_subst mv in
+
+    (* instantiate the inferred variables everywhere *)
+    let fprems_other = List.map (Term.subst subst) fsubgoals in
+    let fconcl = Term.subst subst fconcl in
+
+    let goal1 =
+      let s = Hyps.remove hyp s in
+      Hyps.add (Args.Named (Ident.name hyp)) fconcl s
+    in
+
+    List.map (fun prem ->
+        TraceSequent.set_conclusion prem s
+      ) (hprems @               (* remaining premises of [hyp] *)
+         fprems_other)          (* remaining premises of [form] *)
+    @
+    [goal1]
     
-    
-let apply_tac (args : Args.parser_arg list) s
-    (sk : TraceSequent.t list Tactics.sk) fk =
-  try
-    let subgoals, f = match Args.convert_as_lsymb args with
+
+(** Parse apply tactic arguments *)
+let p_apply_args (args : Args.parser_arg list) (s : TraceSequent.sequent)
+  : TraceSequent.t list * Term.formula * target =
+  match args with
+  | [Args.ApplyIn (f,in_opt)] ->
+    let subgoals, f = match Args.convert_as_lsymb [Args.Theory f] with
       | Some str when is_hyp_or_lemma str s ->
         let _, f = get_hyp_or_lemma str s in
         [], f
@@ -2361,8 +2420,24 @@ let apply_tac (args : Args.parser_arg list) s
           let subgoal = TraceSequent.set_conclusion f s in
           [subgoal], f
         | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-    in    
-    sk (subgoals @ apply f s) fk
+    in
+
+    let target = match in_opt with
+      | Some lsymb -> `Hyp (fst (Hyps.by_name lsymb s))
+      | None       -> `Goal
+    in
+    subgoals, f, target
+
+  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+
+
+let apply_tac (args : Args.parser_arg list) s
+    (sk : TraceSequent.t list Tactics.sk) fk =
+  try
+    let subgoals, f, target = p_apply_args args s in
+    match target with
+    | `Goal   -> sk (subgoals @ apply f s      ) fk
+    | `Hyp id -> sk (subgoals @ apply_in f id s) fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
