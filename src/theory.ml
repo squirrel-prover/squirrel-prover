@@ -281,33 +281,34 @@ let check_arity lsymb actual expected =
 
 type env = (string * Type.ety) list
 
-let message_arity fdef =
-  let open Symbols in
-  match fdef with
-  | PublicKey -> 1
-  | Hash | ADec | SDec | Sign | CheckSign -> 2
-  | AEnc | SEnc -> 3
-  | Abstract a -> a
+let ftype_arity ftype =
+  ftype.Type.fty_iarr + (List.length ftype.Type.fty_args)
 
 (** Get the kind of a function or macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
-let function_kind table (f : lsymb) : Type.ety list * Type.ety =
+let function_kind table (f : lsymb) : Type.ftype =
   let open Symbols in
   match def_of_lsymb f table with
-  | Reserved _ -> assert false (* we should never encounter a situation where we
-                                try to type a reserved symbol. *)
-  | Exists d ->
-    let ckind index_arity message_arity =
-      List.init index_arity (fun _ -> Type.eindex) @
-      List.init message_arity (fun _ -> Type.emessage),
-      Type.emessage
-    in
-    match d with
-    | Function (i, finfo) -> ckind i (message_arity finfo)
-    | Macro (Local (targs,k)) -> targs, k
-    | Macro (Global arity) -> ckind arity 0
-    | Macro (Input|Output|Frame) -> [], Type.emessage
-    | Macro (Cond|Exec) -> [], Type.eboolean
+  (* we should never encounter a situation where we
+     try to type a reserved symbol. *)
+  | Reserved _ -> assert false
+    
+  | Exists d -> match d with
+    | Function (fty, _) -> fty
+
+    | Macro (Local (targs,k)) ->
+      Type.mk_ftype 0 [] targs k
+
+    | Macro (Global arity) ->
+      let targs = (List.init arity (fun _ -> Type.eindex)) in
+      Type.mk_ftype 0 [] targs Type.emessage 
+
+    | Macro (Input|Output|Frame) -> 
+      Type.mk_ftype 0 [] [] Type.emessage
+
+    | Macro (Cond|Exec) ->
+      Type.mk_ftype 0 [] [] Type.eboolean
+
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
 let check_state table (s : lsymb) n =
@@ -401,7 +402,7 @@ type app_cntxt =
 let is_at = function At _ -> true | _ -> false
 let get_ts = function At ts | MaybeAt ts -> Some ts | _ -> None
 
-let make_app_i table cntxt lsymb l =
+let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
   let loc = L.loc lsymb in
 
   let arity_error i =
@@ -411,37 +412,47 @@ let make_app_i table cntxt lsymb l =
 
   match Symbols.def_of_lsymb lsymb table with
   | Symbols.Reserved _ -> assert false
+
   | Symbols.Exists d ->
     begin match d with
-    | Symbols.Function (a,fdef) ->
-        if is_at cntxt then ts_unexpected ();
-        if List.length l <> a + message_arity fdef then
-          raise (arity_error (a + message_arity fdef)) ;
-        Fun (lsymb,l,None)
+    | Symbols.Function (ftype,fdef) ->
+      if is_at cntxt then ts_unexpected ();
+      
+      if List.length l <> ftype_arity ftype then
+        raise (arity_error (ftype_arity ftype)) ;
+      
+      Fun (lsymb,l,None)
+          
     | Symbols.Name arity ->
-        if is_at cntxt then ts_unexpected ();
-        check_arity lsymb (List.length l) arity ;
-        Name (lsymb,l)
+      if is_at cntxt then ts_unexpected ();
+      check_arity lsymb (List.length l) arity ;
+      Name (lsymb,l)
+
     | Symbols.Macro (Symbols.State (arity,_)) ->
-        check_arity lsymb (List.length l) arity ;
-        Get (lsymb,get_ts cntxt,l)
+      check_arity lsymb (List.length l) arity ;
+      Get (lsymb,get_ts cntxt,l)
+
     | Symbols.Macro (Symbols.Global arity) ->
-        if List.length l <> arity then arity_error arity;
-        Fun (lsymb,l,get_ts cntxt)
+      if List.length l <> arity then arity_error arity;
+      Fun (lsymb,l,get_ts cntxt)
+
     | Symbols.Macro (Symbols.Local (targs,_)) ->
-        if is_at cntxt then ts_unexpected ();
-        if List.length targs <> List.length l then
-          arity_error (List.length targs) ;
-        Fun (lsymb,l,None)
+      if is_at cntxt then ts_unexpected ();
+      if List.length targs <> List.length l then
+        arity_error (List.length targs) ;
+      Fun (lsymb,l,None)
+
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
-        if cntxt = NoTS then
-          conv_err loc (Timestamp_expected (App (lsymb,l)));
-        if l <> [] then arity_error 0;
-        Fun (lsymb,[],get_ts cntxt)
+      if cntxt = NoTS then
+        conv_err loc (Timestamp_expected (App (lsymb,l)));
+      if l <> [] then arity_error 0;
+      Fun (lsymb,[],get_ts cntxt)
+
     | Symbols.Action arity ->
-        if arity <> List.length l then arity_error arity ;
-        Taction (lsymb,l)
+      if arity <> List.length l then arity_error arity ;
+      Taction (lsymb,l)
+
     | Symbols.Channel _
     | Symbols.Process _
     | Symbols.System  _ ->
@@ -449,19 +460,19 @@ let make_app_i table cntxt lsymb l =
       conv_err loc (BadNamespace (s,
                                   oget(Symbols.get_namespace table s)))
     end
+
   | exception Symbols.SymbError (loc, Symbols.Unbound_identifier s) ->
-      (* By default we interpret s as a variable,
-       * but this is only possible if it is not indexed.
-       * If that is not the case, the user probably meant
-       * for this symbol to not be a variable, hence
-       * we raise Unbound_identifier. We could also
-       * raise Type_error because a variable is never of
-       * a sort that can be applied to indices. *)
+    (* By default we interpret s as a variable,  but this is only
+       possible if it is not indexed. If that is not the case, the
+       user probably meant for this symbol to not be a variable,
+       hence  we raise Unbound_identifier. We could also raise
+       Type_error because a variable is never of  a sort that can be
+       applied to indices. *)
       if l <> [] then 
         raise (Symbols.SymbError (loc, Symbols.Unbound_identifier s));
       AVar lsymb
 
-let make_app loc table cntxt lsymb l =
+let make_app loc table cntxt (lsymb : lsymb) (l : term list) : app =
   L.mk_loc loc (make_app_i table cntxt lsymb l)
 
 (*------------------------------------------------------------------*)
@@ -547,8 +558,10 @@ type conv_cntxt =
   | InProc of Term.timestamp
   | InGoal
 
-type conv_env = { table : Symbols.table;
-                  cntxt : conv_cntxt; }
+type conv_env = {
+  table : Symbols.table;
+  cntxt : conv_cntxt;
+}
 
 let rec convert :
   type s.
@@ -565,11 +578,13 @@ let rec convert :
     (* if [f] is a variable name appearing in [subst], then substitute. *)
     if terms = [] && mem_assoc f sort subst
     then assoc subst f sort
+        
     (* otherwise build the application and convert it. *)
     else
       let app_cntxt = match env.cntxt with
         | InGoal -> NoTS |
           InProc ts -> MaybeAt ts in
+      
       conv_app env app_cntxt subst
         (tm, make_app loc env.table app_cntxt f terms)
         sort
@@ -766,14 +781,14 @@ and conv_app :
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
       begin match ty with
         | Type.Boolean -> Term.True
-        | Type.Message -> Term.(Fun (f_true,[]))
+        | Type.Message -> Term.mk_true
         | _ -> type_error ()
       end
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
       begin match ty with
         | Type.Boolean -> Term.False
-        | Type.Message -> Term.(Fun (f_false,[]))
+        | Type.Message -> Term.mk_false
         | _ -> type_error ()
       end
 
@@ -781,9 +796,8 @@ and conv_app :
 
   | Fun (f,l,None) ->
       let ts_expected = Conv (loc, Timestamp_expected t_i) in
-      let ks, f_k = function_kind env.table f in
-      assert (f_k = Type.emessage) ;
-      check_arity f (List.length l) (List.length ks) ;
+      let ftype = function_kind env.table f in
+      check_arity f (List.length l) (ftype_arity ftype) ;
       begin match ty with
         | Type.Message ->
             let open Symbols in
@@ -810,13 +824,7 @@ and conv_app :
                     Term.Macro ((s,ty,[]),l,get_at ())
                   end
                   
-              | Wrapped (_, Macro (Input|Output|Cond|Exec|Frame|State (_, _))) ->
-                raise ts_expected
-              | Wrapped (_, Channel _) -> raise ts_expected
-              | Wrapped (_, Name _)    -> raise ts_expected
-              | Wrapped (_, Action _)  -> raise ts_expected
-              | Wrapped (_, Process _) -> raise ts_expected
-              | Wrapped (_, System _)  -> raise ts_expected
+              | Wrapped (_, _) -> raise ts_expected
             end
             
         | _ -> type_error ()
@@ -842,14 +850,9 @@ and conv_app :
                 assert false
               | Wrapped (s, Macro (Cond|Exec)) -> type_error ()
 
-              | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
-              | Wrapped (_, Channel _)            -> raise ts_unexpected
-              | Wrapped (_, Name _)               -> raise ts_unexpected
-              | Wrapped (_, Action _)             -> raise ts_unexpected
-              | Wrapped (_, Function _)           -> raise ts_unexpected
-              | Wrapped (_, Process _)            -> raise ts_unexpected
-              | Wrapped (_, System _)             -> raise ts_unexpected
+              | Wrapped (_, _) -> raise ts_unexpected
             end
+            
         | Type.Boolean ->
             begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Cond|Exec)) ->
@@ -859,14 +862,7 @@ and conv_app :
                   Term.Macro ((s,ty,[]),[],ts)
               | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
                 type_error ()
-              | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
-              | Wrapped (_, Channel _)            -> raise ts_unexpected
-              | Wrapped (_, Name _)               -> raise ts_unexpected
-              | Wrapped (_, Action _)             -> raise ts_unexpected
-              | Wrapped (_, Function _)           -> raise ts_unexpected
-              | Wrapped (_, Macro (Local (_, _))) -> raise ts_unexpected
-              | Wrapped (_, Process _)            -> raise ts_unexpected
-              | Wrapped (_, System _)             -> raise ts_unexpected
+              | Wrapped (_, _) -> raise ts_unexpected
             end
         | _ -> type_error ()
       end

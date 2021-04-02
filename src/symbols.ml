@@ -504,7 +504,7 @@ let () = builtin_ref := table
 
 (* makes simple function types *)
 let mk_ty arity =
-  Type.mk_ftype [] (List.init arity (fun _ -> Type.emessage)) Type.emessage
+  Type.mk_ftype 0 [] (List.init arity (fun _ -> Type.emessage)) Type.emessage
     
 let mk_fsymb ?fty f arity =
   let fty = match fty with
@@ -530,7 +530,7 @@ let fs_not    = mk_fsymb "not" 1
 let fs_ite =
   let tyvar = Ident.create "t" in
   let fty = Type.mk_ftype
-      [tyvar]
+      0 [tyvar]
       [Type.eboolean; Type.etvar tyvar;Type.etvar tyvar]
       (Type.etvar tyvar) in
   mk_fsymb ~fty "if" (-1)

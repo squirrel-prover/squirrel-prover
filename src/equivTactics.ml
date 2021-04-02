@@ -558,7 +558,7 @@ let enrich (arg : Theory.eterm TacticsArgs.arg) (s : EquivSequent.t) =
         
     | Type.KMessage -> Equiv.Message f
         
-    | Type.KIndex | Type.KTimestamp ->
+    | Type.KUnknown | Type.KIndex | Type.KTimestamp ->
       hard_failure (Tactics.Failure "expected a message or boolean term")
     in
     

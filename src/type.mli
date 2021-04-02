@@ -1,25 +1,47 @@
 (** This modules provides the types used to type variables and terms.
     The type is explicit, so that we can construct terms as GADT over it. *)
 
+
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
-type boolean   = [ `Boolean]
+type boolean   = [`Boolean]
+type unknown   = [`Unknown]
 
 (*------------------------------------------------------------------*)
+(** Kinds of types *)
+type _ kind =
+  | KMessage   : message   kind
+  | KBoolean   : boolean   kind
+  | KIndex     : index     kind
+  | KTimestamp : timestamp kind
+  | KUnknown   : unknown   kind (* for type inference variable *)
+
+(*------------------------------------------------------------------*)
+(** Variable for type inference *)
+type univar
+
+val pp_univar : Format.formatter -> univar -> unit
+  
+(*------------------------------------------------------------------*)
+(** Types of terms *)
 type _ ty =
-  (** Built-in sorts *)
-  | Message   : message ty
-  | Boolean   : boolean ty
-  | Index     : index ty
+  (** Built-in types *)
+  | Message   : message   ty
+  | Boolean   : boolean   ty
+  | Index     : index     ty
   | Timestamp : timestamp ty
 
-  (** User-defined types (kind Message) *)
-  | TBase     : string -> message ty
+  (** User-defined types *)
+  | TBase   : string  -> message ty
         
-  (** Type variable (kind Message) *)
-  | TVar      : Ident.t -> message ty
+  (** Type variable *)
+  | TVar    : Ident.t -> message ty
 
+  (** Type unification variable *)
+  | TUnivar : univar  -> unknown ty
+
+(*------------------------------------------------------------------*)
 type 'a t = 'a ty
 
 type ety = ETy : 'a ty -> ety
@@ -33,16 +55,8 @@ val eindex     : ety
 val ebase : string  -> ety
 val etvar : Ident.t -> ety
 
-(*------------------------------------------------------------------*)
-(** Kinds of types *)
-type _ kind =
-  | KMessage   : message   kind
-  | KBoolean   : boolean   kind
-  | KIndex     : index     kind
-  | KTimestamp : timestamp kind
-
 val kind : 'a ty -> 'a kind
-    
+   
 (*------------------------------------------------------------------*)
 (** Equality witness for kinds *)
 type (_,_) kind_eq = Kind_eq : ('a, 'a) kind_eq
@@ -80,4 +94,18 @@ type ftype = {
   fty_out  : ety;          (** τ *)
 }
 
-val mk_ftype : Ident.t list -> ety list -> ety -> ftype
+val mk_ftype : int -> Ident.t list -> ety list -> ety -> ftype
+
+(*------------------------------------------------------------------*)
+(** {2 Type inference } *)
+
+module Infer : sig
+  type env
+
+  val mk_env : unit -> env
+    
+  val mk_univar : env -> ety * env
+                         
+  val unify_eq  : env -> ety -> ety -> env option
+  val unify_leq : env -> ety -> ety -> env option
+end
