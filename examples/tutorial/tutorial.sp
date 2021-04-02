@@ -150,11 +150,12 @@ For instance, a timestamp variable `t` allows to talk about a given point inside
 ## Macros
 
 To discuss about the value of the output performed at some timestamp, we use macros:
-* `input@t` is the value given as input by the attacker to the action at t;
-* `output@t` is the output performed by action at t;
-* `cond@t` is the executability condition at t;
-* `frame@t` is the sequence of all previous outputs up to t;
-* `exec@t` is the conjonction of all executability conditions up to t.
+
+ * `input@t` is the value given as input by the attacker to the action at t;
+ * `output@t` is the output performed by action at t;
+ * `cond@t` is the executability condition at t;
+ * `frame@t` is the sequence of all previous outputs up to t;
+ * `exec@t` is the conjonction of all executability conditions up to t.
 
 ## Formulas
 
