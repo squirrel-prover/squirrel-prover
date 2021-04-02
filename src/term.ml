@@ -51,7 +51,7 @@ let pp_msymb ppf (m,s,is) =
 (*------------------------------------------------------------------*)
 (** Atoms and terms *)
 
-type ord = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
+type ord    = [ `Eq | `Neq | `Leq | `Geq | `Lt | `Gt ]
 type ord_eq = [ `Eq | `Neq ]
 
 type ('a,'b) _atom = 'a * 'b * 'b
@@ -59,7 +59,7 @@ type ('a,'b) _atom = 'a * 'b * 'b
 type generic_atom = [
   | `Message   of (ord_eq, Type.message term)   _atom
   | `Timestamp of (ord,    Type.timestamp term) _atom
-  | `Index     of (ord_eq, Vars.index)           _atom
+  | `Index     of (ord_eq, Vars.index)          _atom
   | `Happens   of Type.timestamp term
 ]
 
@@ -941,8 +941,6 @@ module Match = struct
   let try_match : type a b. a term -> b pat -> mv option = 
     fun t p -> 
     let exception NoMatch in
-    dbg "try_match: %a with %a" pp t pp_pat p;
-
     
     (* Invariant: [mv] supports in included in [p.p_vars]. *)
     let rec tmatch : type a b. a term -> b term -> mv -> mv =
@@ -1054,7 +1052,7 @@ module Match = struct
     in
 
     try Some (tmatch t p.p_term Mv.empty) with
-    | NoMatch -> dbg "match failed"; None
+    | NoMatch -> None
 
 
   (** Occurrence matched *)
@@ -1069,25 +1067,19 @@ module Match = struct
     (b match_occ * a term) option
     = fun t p func ->
       let found = ref None in
-      let s_p = ty p.p_term in
-      
-      dbg "find_map: %a with %a" pp t pp_pat p;
+      let s_p = ty p.p_term in     
 
       let rec find : type a. a term -> a term = fun t ->
-        dbg "find in: %a" pp t;
-
-        if (!found) <> None then (dbg "already found"; t) (* we already found a match *)
+        if (!found) <> None then t (* we already found a match *)
 
         (* no match yet, check if head matches *)
         else 
           match try_match t p with
           (* head does not match, recurse  *)
           | None -> 
-            dbg "head no match";
             tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            dbg "head match";
             found := Some ({ occ = cast s_p t; mv = mv; }); 
             let t' = func (cast s_p t) mv in
             cast (ty t) t'    (* cast needed *)
