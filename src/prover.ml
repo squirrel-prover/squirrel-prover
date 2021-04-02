@@ -777,7 +777,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
-         match Vars.sort uvarm,Vars.sort uvarkey with
+         match Vars.ty uvarm,Vars.ty uvarkey with
          | Type.(Message, Message) ->
            add_option (Oracle_for_symbol (L.unloc h), Oracle_formula formula)
          | _ ->  raise @@ ParseError "The tag formula must be of \

@@ -173,11 +173,15 @@ val ty : 'a term -> 'a Type.t
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-(** [cast kind t] returns [t] if it is of the given sort.
-  * It is used to cast terms that have been unwrapped (e.g. from
-  * a substitution) to the correct type.
-  * @raise Uncastable if the term does not have the expected sort. *)
+(** [cast ty t] checks that [t] can be seen as a message of type [ty].
+    No sub-typing if necessary. 
+    @raise Uncastable if the term cannot be cast.*)
 val cast : 'a Type.ty -> 'b term -> 'a term
+
+(** [cast_st ty t] checks that [t] can be seen as a message of type [ty],
+    using sub-typing if necessary. 
+    @raise Uncastable if the term cannot be cast.*)
+val cast_st : 'a Type.ty -> 'b term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].

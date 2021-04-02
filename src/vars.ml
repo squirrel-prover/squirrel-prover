@@ -24,7 +24,9 @@ let name v =
   then Fmt.strf "%s%i" v.s_prefix v.i_suffix
   else Fmt.strf "%s"   v.s_prefix
 
-let sort v = v.var_type
+let ty v = v.var_type
+             
+let kind v = Type.kind (v.var_type)
 
 (*------------------------------------------------------------------*)
 let pp ppf v =
@@ -180,23 +182,17 @@ end
 exception CastError
 
 let cast : type a b. a var -> b Type.ty -> b var = 
-  fun x s -> match sort x, s with
-  | Type.Boolean,   Type.Boolean   -> x
-  | Type.Message,   Type.Message   -> x
-  | Type.Index,     Type.Index     -> x
-  | Type.Timestamp, Type.Timestamp -> x
-  | _, _ -> raise CastError
+  fun x s -> match Type.equal_w (ty x) s with
+    | Some Type.Type_eq -> x
+    | None -> raise CastError
 
 let ecast : type a. evar -> a Type.ty -> a var = 
   fun (EVar v) s -> cast v s
 
 let equal : type a b. a var -> b var -> bool = fun v v' ->
-  match sort v, sort v' with
-  | Type.Boolean,   Type.Boolean   -> v = v'
-  | Type.Message,   Type.Message   -> v = v'
-  | Type.Index,     Type.Index     -> v = v'
-  | Type.Timestamp, Type.Timestamp -> v = v'
-  | _, _ -> false
+  match Type.equal_w (ty v) (ty v') with
+  | None -> false
+  | Some Type.Type_eq -> v = v'
 
 (** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
 let compare x y =

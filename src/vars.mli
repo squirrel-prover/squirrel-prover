@@ -24,7 +24,9 @@ type timestamp = Type.timestamp var
 
 val name : 'a var -> string
 
-val sort : 'a var -> 'a Type.t
+val ty : 'a var -> 'a Type.ty
+
+val kind : 'a var -> 'a Type.kind
 
 val cast  : 'a var -> 'b Type.ty -> 'b var
 val ecast :   evar -> 'a Type.ty -> 'a var

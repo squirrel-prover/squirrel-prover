@@ -136,7 +136,7 @@ let rec ty : type a. a term -> a Type.t =
   | Name _               -> Type.Message
   | Macro ((_,s,_),_,_)  -> s
   | Seq _                -> Type.Message
-  | Var v                -> Vars.sort v
+  | Var v                -> Vars.ty v
   | Pred _               -> Type.Timestamp
   | Action _             -> Type.Timestamp
   | Diff (a, b)          -> ty a
@@ -155,17 +155,22 @@ let rec ty : type a. a term -> a Type.t =
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-let cast: type a b. a Type.ty -> b term -> a term =
-  fun kind t ->
-  match kind, ty t with
-     | Type.Index,     Type.Index     -> t
-     | Type.Message,   Type.Message   -> t
-     | Type.Boolean,   Type.Boolean   -> t
-     | Type.Timestamp, Type.Timestamp -> t
-     | _ -> raise Uncastable
+(** [cast ty t] checks that [t] can be seen as a message of type [ty].
+    No sub-typing. *)
+let cast : type a b. a Type.ty -> b term -> a term =
+  fun cast_ty t ->
+  match Type.equal_w (ty t) cast_ty with
+  | Some Type.Type_eq -> t
+  | None -> raise Uncastable
 
-
-                
+(** [cast_st ty t] checks that [t] can be seen as a message of type [ty],
+    using sub-typing if necessary. *)
+let cast_st : type a b. a Type.ty -> b term -> a term =
+  fun cast_ty t ->
+  match Type.subtype_w (ty t) cast_ty with
+  | Some Type.Type_eq -> t
+  | None -> raise Uncastable
+               
 (*------------------------------------------------------------------*)
 (** Builtins *)
 
@@ -918,7 +923,7 @@ module Match = struct
     Mv.fold (fun v t subst -> 
         match v, t with
         | Vars.EVar v, ETerm t -> 
-          ESubst (Var v, cast (Vars.sort v) t) :: subst
+          ESubst (Var v, cast (Vars.ty v) t) :: subst
       ) mv [] 
 
   (** A pattern is a term [t] and a subset of [t]'s free variables that must 
@@ -944,7 +949,7 @@ module Match = struct
       fun t pat mv -> match t, pat with
         | _, Var v' -> 
           begin
-            match cast (Vars.sort v') t with
+            match cast (Vars.ty v') t with
             | exception Uncastable -> raise NoMatch
             | t -> vmatch t v' mv
           end
@@ -1337,14 +1342,14 @@ let as_ord_eq (ord : ord) : ord_eq = match ord with
 let of_eatom (eat : eatom) : generic_atom = match eat with
   | EHappens t -> `Happens t
   | EOrd (ord, t1, t2) ->
-    match ty t1 with
-    | Type.Message   -> `Message   (as_ord_eq ord, t1, t2)
-    | Type.Timestamp -> `Timestamp (ord, t1, t2)
-    | Type.Index     ->
+    match Type.kind (ty t1) with
+    | Type.KMessage   -> `Message   (as_ord_eq ord, t1, t2)
+    | Type.KTimestamp -> `Timestamp (ord, t1, t2)
+    | Type.KIndex     ->
       let i1, i2 = oget (destr_var t1), oget (destr_var t2) in
       `Index (as_ord_eq ord, i1, i2)
 
-    | Type.Boolean   -> assert false
+    | Type.KBoolean   -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

@@ -284,7 +284,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
         Vars.make_fresh_from_and_update env v
 
       | Args.Named name ->
-        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
+        let v' = Vars.make_fresh_and_update env (Vars.ty v) name in
 
         if Vars.name v' <> name then
           hard_failure (
@@ -550,18 +550,20 @@ let () =
     (pure_equiv_typed induction) TacticsArgs.Timestamp
 
 (*------------------------------------------------------------------*)
-let enrich arg s = match arg with
-  | TacticsArgs.ETerm (Type.Boolean, f, loc) ->
-    EquivSequent.set_equiv_goal s (Equiv.Formula f :: goal_as_equiv s) 
-
-  | TacticsArgs.ETerm (Type.Message, f, loc) ->
-    EquivSequent.set_equiv_goal s (Equiv.Message f :: goal_as_equiv s)
-
-  | TacticsArgs.ETerm (Type.Index, _, loc)
-  | TacticsArgs.ETerm (Type.Timestamp, _, loc) ->
-    Tactics.hard_failure
-      (Tactics.Failure "expected a message or boolean term")
-
+let enrich (arg : Theory.eterm TacticsArgs.arg) (s : EquivSequent.t) =
+  match arg with
+  | TacticsArgs.ETerm (ty, f, loc) ->
+    let elem = match Type.kind ty with
+    | Type.KBoolean -> Equiv.Formula f 
+        
+    | Type.KMessage -> Equiv.Message f
+        
+    | Type.KIndex | Type.KTimestamp ->
+      hard_failure (Tactics.Failure "expected a message or boolean term")
+    in
+    
+    EquivSequent.set_equiv_goal s (elem :: goal_as_equiv s) 
+            
 let enrich_a arg s = 
   let tbl, env = EquivSequent.table s, EquivSequent.env s in
   match TacticsArgs.convert_args tbl env [arg] Args.(Sort ETerm) with
@@ -1776,7 +1778,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              (* we remove from [vars] free variables, ie already in [env] *)
              let not_in_env  = function
                | Vars.EVar v ->
-                 match Vars.sort v with
+                 match Vars.ty v with
                  | Type.Index -> not (Vars.mem !env (Vars.name v))
                  | _ -> true
              in
@@ -1843,7 +1845,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              (* we remove from [vars] free variables,
               * ie already in [a.Action.indices] *)
              let not_in_action_indices = function
-               | Vars.EVar v -> match Vars.sort v with
+               | Vars.EVar v -> match Vars.ty v with
                  | Type.Index -> not (List.mem v a.Action.indices)
                  | _ -> true
              in
@@ -1993,7 +1995,7 @@ let prf TacticsArgs.(Int i) s =
                 | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
                 | _ -> assert false
               in
-              match Vars.sort uvarm,Vars.sort uvarkey with
+              match Vars.ty uvarm,Vars.ty uvarkey with
               | Type.(Message, Message) -> let f = Term.subst [
                   ESubst (Term.Var uvarm,m);
                   ESubst (Term.Var uvarkey,key);] f in

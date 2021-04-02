@@ -663,7 +663,7 @@ let rec convert :
     let is =
       let f : esubst -> Vars.index = function
         | ESubst (_,Term.Var v) ->
-          begin match Vars.sort v with
+          begin match Vars.ty v with
             | Type.Index -> v
             | _ -> type_error ()
           end
@@ -702,7 +702,7 @@ let rec convert :
       let vs =
         let f : esubst -> Vars.index = function
           | ESubst (_, Term.Var v) ->
-            begin match Vars.sort v with
+            begin match Vars.ty v with
               | Type.Index -> v
                 | _ -> type_error ()
               end
@@ -1028,14 +1028,14 @@ let check table ?(local=false) (env:env) t (Type.ETy s) : unit =
   in
   ignore (convert conv_env subst t s)
 
-let subst_of_env (env : Vars.env) =
+let subst_of_env (env : Vars.env) : esubst list =
   let to_subst : Vars.evar -> esubst =
     fun (Vars.EVar v) ->
-    match Vars.sort v with
-    | Type.Index     ->  ESubst (Vars.name v,Term.Var v)
-    | Type.Timestamp -> ESubst (Vars.name v,Term.Var v)
-    | Type.Message   -> ESubst (Vars.name v,Term.Var v)
-    | Type.Boolean   -> assert false
+    match Vars.kind v with
+    | Type.KIndex     -> ESubst (Vars.name v,Term.Var v)
+    | Type.KTimestamp -> ESubst (Vars.name v,Term.Var v)
+    | Type.KMessage   -> ESubst (Vars.name v,Term.Var v)
+    | Type.KBoolean   -> assert false
     in
   List.map to_subst (Vars.to_list env)
 
@@ -1043,7 +1043,7 @@ let parse_subst table env (uvars : Vars.evar list) (ts : term list) : Term.subst
   let u_subst = subst_of_env env in
   let conv_env = { table = table; cntxt = InGoal; } in
   let f t (Vars.EVar u) =
-    Term.ESubst (Term.Var u, convert conv_env u_subst t (Vars.sort u))
+    Term.ESubst (Term.Var u, convert conv_env u_subst t (Vars.ty u))
   in
   List.map2 f ts uvars
 
@@ -1059,7 +1059,7 @@ let declare_state table s (typed_args : (lsymb * Type.ety) list)
   let indices : Vars.index list =
     let f x : Vars.index = match x with
       | ESubst (_,Term.Var i) ->
-        begin match Vars.sort i with
+        begin match Vars.ty i with
           | Type.Index -> i
           | _ -> assert false
         end
@@ -1112,7 +1112,7 @@ let declare_macro table s (typed_args : (string * Type.ety) list)
       s
       ~data
       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Type.ETy (Vars.sort x)) typed_args,k)) in
+           Type.ETy (Vars.ty x)) typed_args,k)) in
   table
 
 (* TODO could be generalized into a generic fold function

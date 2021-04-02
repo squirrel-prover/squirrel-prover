@@ -162,7 +162,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
         Vars.make_fresh_from_and_update env v
 
       | Args.Named name ->
-        let v' = Vars.make_fresh_and_update env (Vars.sort v) name in
+        let v' = Vars.make_fresh_and_update env (Vars.ty v) name in
 
         if Vars.name v' <> name then
           hard_failure (
@@ -764,7 +764,7 @@ let () =
 let induction s  =
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
-    (match Vars.sort v with
+    (match Vars.ty v with
        Type.Timestamp ->
        (
          (* We need two fresh variables in env,
@@ -2816,7 +2816,7 @@ let euf_apply
         | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
         | _ -> assert false
       in
-      match Vars.sort uvarm,Vars.sort uvarkey with
+      match Vars.ty uvarm,Vars.ty uvarkey with
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.Var uvarm,m);
           ESubst (Term.Var uvarkey,Term.Name key);] f in
