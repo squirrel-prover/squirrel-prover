@@ -2,7 +2,7 @@ module L = Location
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-let pp_type fmt (l : (Type.esort * int) list) =
+let pp_type fmt (l : (Type.ety * int) list) =
   let pp_single fmt (k,i) = match i with
     | 0 -> ()
     | i ->
@@ -11,12 +11,12 @@ let pp_type fmt (l : (Type.esort * int) list) =
   in
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
-let pp_args fmt (l : (string * Type.esort) list) =
+let pp_args fmt (l : (string * Type.ety) list) =
   let pp_single fmt (s,k) = Fmt.pf fmt "(%s : %a)" s Type.pp_e k in
   (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
 
 (*------------------------------------------------------------------*)
-type macro_decl = lsymb * (lsymb * Type.esort) list * Type.esort * Theory.term
+type macro_decl = lsymb * (lsymb * Type.ety) list * Type.ety * Theory.term
 
 let pp_macro_decl fmt (s, args, k, t) =
   Fmt.pf fmt "@[<hov 2>term %s : %a → %a =@ %a@]" (L.unloc s)
@@ -69,7 +69,7 @@ let pp_orcl_tag_info = Theory.pp
 (*------------------------------------------------------------------*)
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * (lsymb * Type.esort) list * Process.process
+  | Decl_process of lsymb * (lsymb * Type.ety) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 

@@ -2,7 +2,7 @@ open Utils
 
 module L = Location
 
-type kind = Type.esort
+type kind = Type.ety
 
 type lsymb = string L.located
 
@@ -118,7 +118,7 @@ let destr_var = function
 let pp_var_list fmt l =
   Vars.pp_typed_list fmt
     (List.map
-       (function (v,Type.ESort t) ->
+       (function (v,Type.ETy t) ->
           let v = L.unloc v in
           Vars.EVar (snd @@ Vars.make_fresh Vars.empty_env t v))
        l)
@@ -200,7 +200,7 @@ type conversion_error_i =
   | Index_error          of string*int*int
   | Undefined            of string
   | UndefinedOfKind      of string * Symbols.namespace
-  | Type_error           of term_i * Type.esort
+  | Type_error           of term_i * Type.ety
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
   | Untypable_equality   of term_i
@@ -471,7 +471,7 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
 
-let rec assoc : type a. subst -> lsymb -> a Type.sort -> a Term.term =
+let rec assoc : type a. subst -> lsymb -> a Type.ty -> a Term.term =
 fun subst st kind ->
   match subst with
   | [] -> conv_err (L.loc st) (Undefined (L.unloc st))
@@ -480,7 +480,7 @@ fun subst st kind ->
         Term.cast kind t
       with
       | Term.Uncastable -> conv_err (L.loc st) (Type_error (App (st,[]),
-                                                            Type.ESort kind))
+                                                            Type.ETy kind))
       end
   | _::q -> assoc q st kind
 
@@ -497,14 +497,14 @@ let mem_assoc x sort subst =
   *
   * TODO this may cause unintended variable captures wrt subst. *)
 let subst_of_bvars vars =
-  let make (v, Type.ESort s) =
+  let make (v, Type.ETy s) =
     let v = L.unloc v in
     ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
   in
   List.map make vars
 
 let ty_error tm sort = Conv (L.loc tm,
-                             Type_error (L.unloc tm, Type.ESort sort))
+                             Type_error (L.unloc tm, Type.ETy sort))
 
 
 let get_fun table lsymb =
@@ -546,7 +546,7 @@ type conv_env = { table : Symbols.table;
 let rec convert :
   type s.
   conv_env -> subst ->
-  term -> s Type.sort -> s Term.term
+  term -> s Type.ty -> s Term.term
 = fun env subst tm sort ->
   let loc = L.loc tm in
 
@@ -724,7 +724,7 @@ and conv_index env subst t =
 and conv_app :
   type s.
   conv_env -> app_cntxt -> subst ->
-  (term * app) -> s Type.sort -> s Term.term
+  (term * app) -> s Type.ty -> s Term.term
  = fun env app_cntxt subst (t,app) sort ->
    (* We should have [make_app app = t].
       [t] is here to have meaningful exceptions. *)
@@ -894,11 +894,11 @@ and conv_app :
         | _ -> type_error ()
       end
 
-type eterm = ETerm : 'a Type.sort * 'a Term.term * L.t -> eterm
+type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
 let econvert conv_cntxt tsubst t : eterm option =
   let conv_s = function
-    | Type.ESort sort -> try
+    | Type.ETy sort -> try
         let tt = convert conv_cntxt tsubst t sort in
         Some (ETerm (sort, tt, L.loc t))
       with Conv _ -> None in
@@ -1017,14 +1017,14 @@ let subst t (s : (string * term_i) list) =
 
   in aux t
 
-let check table ?(local=false) (env:env) t (Type.ESort s) : unit =
+let check table ?(local=false) (env:env) t (Type.ETy s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
   let conv_env = { table = table; cntxt = cntxt; } in
   let subst =
-    List.map (fun (v, Type.ESort s) -> ESubst (v, dummy_var s)) env
+    List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
   in
   ignore (convert conv_env subst t s)
 
@@ -1050,8 +1050,8 @@ let parse_subst table env (uvars : Vars.evar list) (ts : term list) : Term.subst
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 type Symbols.data += StateInit_data of Vars.index list * Term.message
 
-let declare_state table s (typed_args : (lsymb * Type.esort) list)
-    (k : Type.esort) t =
+let declare_state table s (typed_args : (lsymb * Type.ety) list)
+    (k : Type.ety) t =
   let ts_init = Term.Action (Symbols.init_action, []) in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
   let subst = subst_of_bvars typed_args in
@@ -1087,11 +1087,11 @@ let get_init_states table =
     []
     table
 
-let declare_macro table s (typed_args : (string * Type.esort) list)
-    (k : Type.esort) t =
+let declare_macro table s (typed_args : (string * Type.ety) list)
+    (k : Type.ety) t =
   let env,typed_args,tsubst =
     List.fold_left
-      (fun (env,vars,tsubst) (x,Type.ESort k) ->
+      (fun (env,vars,tsubst) (x,Type.ETy k) ->
          let env,x' = Vars.make_fresh env k x in
          let item = match k with
            | Type.Index -> ESubst (x, Term.Var x')
@@ -1112,7 +1112,7 @@ let declare_macro table s (typed_args : (string * Type.esort) list)
       s
       ~data
       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Type.ESort (Vars.sort x)) typed_args,k)) in
+           Type.ETy (Vars.sort x)) typed_args,k)) in
   table
 
 (* TODO could be generalized into a generic fold function

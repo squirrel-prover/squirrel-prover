@@ -1,29 +1,35 @@
-(** This modules provides the sorts used to typed variables and terms.
-    The sort is explicit, so that we can construct terms as GADT over the
-    sort. We provide ESort to wrap the explicit type. *)
+(** This modules provides the types used to type variables and terms.
+    The type is explicit, so that we can construct terms as GADT over it. *)
 
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
 type boolean   = [ `Boolean]
 
-type _ sort =
-  | Message   : message sort
-  | Boolean   : boolean sort
-  | Index     : index sort
-  | Timestamp : timestamp sort
+type _ ty =
+  (** Built-in sorts *)
+  | Message   : message ty
+  | Boolean   : boolean ty
+  | Index     : index ty
+  | Timestamp : timestamp ty
 
-type 'a t = 'a sort
+  (** User-defined types (kind Message) *)
+  | TBase     : string -> message ty
+        
+  (** Type variable (kind Message) *)
+  | TVar      : Ident.t -> message ty
 
-type esort = ESort : 'a sort -> esort
+type 'a t = 'a ty
 
-val eboolean   : esort
-val emessage   : esort
-val etimestamp : esort
-val eindex     : esort
+type ety = ETy : 'a ty -> ety
 
-val equal : 'a sort -> 'b sort -> bool
+val eboolean   : ety
+val emessage   : ety
+val etimestamp : ety
+val eindex     : ety
 
-val pp : Format.formatter -> 'a sort -> unit
+val equal : 'a ty -> 'b ty -> bool
 
-val pp_e : Format.formatter -> esort -> unit
+val pp : Format.formatter -> 'a ty -> unit
+
+val pp_e : Format.formatter -> ety -> unit

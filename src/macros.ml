@@ -47,7 +47,7 @@ let is_defined name a table =
 (*------------------------------------------------------------------*)
 let get_def :
   type a.  SystemExpr.system_expr -> Symbols.table ->
-  a Type.sort -> Symbols.macro Symbols.t ->
+  a Type.ty -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp ->
   a Term.term =
   fun system table sort name args a ->
@@ -197,7 +197,7 @@ let get_def :
 (*------------------------------------------------------------------*)
 let get_definition :
   type a. Constr.trace_cntxt ->
-  a Type.sort -> Symbols.macro Symbols.t ->
+  a Type.ty -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp ->
   a Term.term =
   fun cntxt sort name args ts ->
@@ -227,7 +227,7 @@ let get_definition :
 (*------------------------------------------------------------------*)
 let get_dummy_definition :
   type a. Constr.trace_cntxt ->
-  a Type.sort -> Symbols.macro Symbols.t ->
+  a Type.ty -> Symbols.macro Symbols.t ->
   Vars.index list ->
   a Term.term =
   fun cntxt sort mn indices ->

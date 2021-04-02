@@ -6,7 +6,7 @@ type lsymb = Theory.lsymb
 (** {2 Declarations } *)
 
 (** Information for a macro declaration *)
-type macro_decl = lsymb * (lsymb * Type.esort) list * Type.esort * Theory.term
+type macro_decl = lsymb * (lsymb * Type.ety) list * Type.ety * Theory.term
 
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
@@ -42,7 +42,7 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 (** Declarations *)
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * (lsymb * Type.esort) list * Process.process
+  | Decl_process of lsymb * (lsymb * Type.ety) list * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 

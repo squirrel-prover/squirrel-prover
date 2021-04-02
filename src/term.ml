@@ -20,7 +20,7 @@ type fname = Symbols.fname Symbols.t
 type fsymb = fname * Vars.index list
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.sort * Vars.index list
+type 'a msymb = mname * 'a Type.ty * Vars.index list
 
 type state = Type.message msymb
 
@@ -130,37 +130,37 @@ type eq_atom = [
 ]
 
 (*------------------------------------------------------------------*)
-let rec sort : type a. a term -> a Type.t =
+let rec ty : type a. a term -> a Type.t =
   function
-  | Fun _               -> Type.Message
-  | Name _              -> Type.Message
-  | Macro ((_,s,_),_,_) -> s
-  | Seq _ -> Type.Message
-  | Var v -> Vars.sort v
-  | Pred _ -> Type.Timestamp
-  | Action _ -> Type.Timestamp
-  | Diff (a, b) -> sort a
-  | ITE (a, b, c) -> Type.Message
-  | Find (a, b, c, d) -> Type.Message
-  | Atom _ -> Type.Boolean
-  | ForAll _ -> Type.Boolean
-  | Exists _ -> Type.Boolean
-  | And _ -> Type.Boolean
-  | Or _ -> Type.Boolean
-  | Not _ -> Type.Boolean
-  | Impl _ -> Type.Boolean
-  | True -> Type.Boolean
-  | False -> Type.Boolean
+  | Fun _                -> Type.Message
+  | Name _               -> Type.Message
+  | Macro ((_,s,_),_,_)  -> s
+  | Seq _                -> Type.Message
+  | Var v                -> Vars.sort v
+  | Pred _               -> Type.Timestamp
+  | Action _             -> Type.Timestamp
+  | Diff (a, b)          -> ty a
+  | ITE (a, b, c)        -> Type.Message
+  | Find (a, b, c, d)    -> Type.Message
+  | Atom _               -> Type.Boolean
+  | ForAll _             -> Type.Boolean
+  | Exists _             -> Type.Boolean
+  | And _                -> Type.Boolean
+  | Or _                 -> Type.Boolean
+  | Not _                -> Type.Boolean
+  | Impl _               -> Type.Boolean
+  | True                 -> Type.Boolean
+  | False                -> Type.Boolean
 
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-let cast: type a b. a Type.sort -> b term -> a term =
+let cast: type a b. a Type.ty -> b term -> a term =
   fun kind t ->
-  match kind, sort t with
-     | Type.Index, Type.Index -> t
-     | Type.Message, Type.Message -> t
-     | Type.Boolean, Type.Boolean -> t
+  match kind, ty t with
+     | Type.Index,     Type.Index     -> t
+     | Type.Message,   Type.Message   -> t
+     | Type.Boolean,   Type.Boolean   -> t
      | Type.Timestamp, Type.Timestamp -> t
      | _ -> raise Uncastable
 
@@ -481,8 +481,8 @@ let rec assoc : type a. subst -> a term -> a term =
   | [] -> term
   | ESubst (t1,t2)::q ->
     try
-      let term2 = cast (sort t1) term in
-      if term2 = t1 then cast (sort term) t2 else assoc q term
+      let term2 = cast (ty t1) term in
+      if term2 = t1 then cast (ty term) t2 else assoc q term
     with Uncastable -> assoc q term
 
 exception Substitution_error of string
@@ -812,7 +812,7 @@ type eterm = ETerm : 'a term -> eterm
 let app : type a. (eterm -> eterm) -> a term -> a term = 
   fun func x ->
   let ETerm x0 = func (ETerm x) in
-  cast (sort x) x0
+  cast (ty x) x0
   
 let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
   let func : type c. c term -> c term = fun x -> app func x in
@@ -1023,7 +1023,7 @@ module Match = struct
 
         (* If we already saw the variable, check that the subterms are
            identical. *)
-        | ETerm t' -> match cast (sort t) t' with
+        | ETerm t' -> match cast (ty t) t' with
           | exception Uncastable -> raise NoMatch
           (* TODO: alpha-equivalent *)
           | t' -> if t <> t' then raise NoMatch else mv
@@ -1064,7 +1064,7 @@ module Match = struct
     (b match_occ * a term) option
     = fun t p func ->
       let found = ref None in
-      let s_p = sort p.p_term in
+      let s_p = ty p.p_term in
       
       dbg "find_map: %a with %a" pp t pp_pat p;
 
@@ -1085,7 +1085,7 @@ module Match = struct
             dbg "head match";
             found := Some ({ occ = cast s_p t; mv = mv; }); 
             let t' = func (cast s_p t) mv in
-            cast (sort t) t'    (* cast needed *)
+            cast (ty t) t'    (* cast needed *)
       in
       
       let t = find t in
@@ -1337,7 +1337,7 @@ let as_ord_eq (ord : ord) : ord_eq = match ord with
 let of_eatom (eat : eatom) : generic_atom = match eat with
   | EHappens t -> `Happens t
   | EOrd (ord, t1, t2) ->
-    match sort t1 with
+    match ty t1 with
     | Type.Message   -> `Message   (as_ord_eq ord, t1, t2)
     | Type.Timestamp -> `Timestamp (ord, t1, t2)
     | Type.Index     ->

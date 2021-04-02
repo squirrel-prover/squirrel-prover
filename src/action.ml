@@ -214,8 +214,8 @@ let subst_descr subst descr =
     fst descr.condition, Term.subst subst (snd descr.condition) in
   let updates =
     List.map
-      (fun ((ss,sort,is),t) ->
-         ((ss, sort, List.map (Term.subst_var subst) is),
+      (fun ((ss,ty,is),t) ->
+         ((ss, ty, List.map (Term.subst_var subst) is),
           subst_term t))
       descr.updates
   in

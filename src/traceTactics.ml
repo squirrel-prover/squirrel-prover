@@ -2140,7 +2140,7 @@ let rewrite ~all
       let rw_inst (occ : a Term.Match.match_occ) =
         found1 := true;
         let subst = Term.Match.to_subst occ.mv in
-        let r_f = Term.cast (Term.sort occ.occ) (Term.subst subst r) in
+        let r_f = Term.cast (Term.ty occ.occ) (Term.subst subst r) in
         ( Term.subst [Term.ESubst (occ.occ, r_f)] f, 
           List.map (Term.subst subst) rsubs ) 
       in

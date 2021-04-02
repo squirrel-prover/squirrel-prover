@@ -15,6 +15,7 @@ val tag  : ident -> int
 
 val fresh : ident -> ident
 
+val equal : ident -> ident -> bool
 val compare : ident -> ident -> int
 val hash : ident -> int
 

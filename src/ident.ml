@@ -26,7 +26,9 @@ let compare i i' =
   else match Stdlib.compare i.name i'.name with
     | 0 -> tag_compare i i'
     | c -> c
-    
+
+let equal i i' = i.tag = i'.tag
+                           
 let hash i = i.tag
 
 let to_string id = (name id) ^ "/" ^ (string_of_int (tag id))

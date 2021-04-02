@@ -16,8 +16,8 @@ type decl_error_i =
   | BadEquivForm 
 
   (* TODO: remove these errors, catch directly at top-level *)
-  | SystemError           of System.system_error
-  | SystemExprError       of SystemExpr.system_expr_err
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 type dkind = KDecl | KGoal
 
@@ -95,7 +95,7 @@ type p_equiv_form =
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
 
-  | P_equiv_goal of (Theory.lsymb * Type.esort) list * p_equiv_form L.located
+  | P_equiv_goal of (Theory.lsymb * Type.ety) list * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
@@ -682,11 +682,10 @@ let make_equiv_goal
     ~table (system_name : System.system_name) env 
     (p_form : p_equiv_form L.located) =
   let env =
-    List.fold_left
-      (fun env (x, Type.ESort s) ->
-         assert (not (Vars.mem env x)) ;
-         fst (Vars.make_fresh env s x))
-      Vars.empty_env env
+    List.fold_left (fun env (x, Type.ETy s) ->
+        assert (not (Vars.mem env x)) ;
+        fst (Vars.make_fresh env s x)
+      ) Vars.empty_env env
   in
   let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in

@@ -303,7 +303,7 @@ let () =
                (_,
                 Theory.Type_error (
                   App (L.{ pl_desc = "n" },[]),
-                  Type.(ESort Timestamp))) ->
+                  Type.(ETy Timestamp))) ->
              raise Ok)
     end ;
     "Apply Proc - 0", `Quick, begin fun () ->

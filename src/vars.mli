@@ -26,8 +26,8 @@ val name : 'a var -> string
 
 val sort : 'a var -> 'a Type.t
 
-val cast  : 'a var -> 'b Type.sort -> 'b var
-val ecast :   evar -> 'a Type.sort -> 'a var
+val cast  : 'a var -> 'b Type.ty -> 'b var
+val ecast :   evar -> 'a Type.ty -> 'a var
 
 val equal : 'a var -> 'b var -> bool
 

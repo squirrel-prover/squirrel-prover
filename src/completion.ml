@@ -254,7 +254,7 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
 and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
 
 
-let rec term_of_cterm : type a. a Type.sort -> cterm -> a Term.term = 
+let rec term_of_cterm : type a. a Type.ty -> cterm -> a Term.term = 
   fun s c -> 
   let open Term in 
   match c.cnt with 
@@ -301,7 +301,7 @@ and index_of_cterm i = match term_of_cterm Type.Index i with
 
 and indices_of_cterms cis = List.map index_of_cterm cis
 
-and terms_of_cterms : type a. a Type.sort -> cterm list -> a Term.term list =
+and terms_of_cterms : type a. a Type.ty -> cterm list -> a Term.term list =
   fun s cterms -> List.map (term_of_cterm s) cterms
 
 let pp_gsymb ppf = function
@@ -1381,9 +1381,9 @@ module Memo = Ephemeron.K2.Make
     (struct 
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
-        Type.equal (Term.sort t0) (Term.sort t0') &&
-        let t0', t1' = Term.cast (Term.sort t0) t0', 
-                       Term.cast (Term.sort t0) t1' in
+        Type.equal (Term.ty t0) (Term.ty t0') &&
+        let t0', t1' = Term.cast (Term.ty t0) t0', 
+                       Term.cast (Term.ty t0) t1' in
         t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,

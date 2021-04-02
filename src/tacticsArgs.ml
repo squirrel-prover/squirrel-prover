@@ -188,7 +188,7 @@ type _ arg =
   | Timestamp : Term.timestamp -> Type.timestamp arg
   | Index     : Vars.index     -> Type.index     arg
 
-  | ETerm     : 'a Type.sort * 'a Term.term * Location.t -> Theory.eterm arg
+  | ETerm     : 'a Type.ty * 'a Term.term * Location.t -> Theory.eterm arg
 
   | Int       : int -> int arg
   | String    : lsymb -> lsymb arg

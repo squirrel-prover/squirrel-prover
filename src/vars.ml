@@ -38,7 +38,7 @@ let pp_list ppf l =
 
 let pp_typed_list ppf (vars:evar list) =
   let rec aux cur_vars cur_type = function
-    | EVar v::vs when Type.ESort v.var_type = cur_type ->
+    | EVar v::vs when Type.ETy v.var_type = cur_type ->
         aux (EVar v::cur_vars) cur_type vs
     | vs ->
         if cur_vars <> [] then begin
@@ -50,9 +50,9 @@ let pp_typed_list ppf (vars:evar list) =
         end ;
         match vs with
           | [] -> ()
-          | EVar v::vs -> aux [EVar v] (Type.ESort v.var_type) vs
+          | EVar v::vs -> aux [EVar v] (Type.ETy v.var_type) vs
   in
-  aux [] Type.(ESort Message) vars
+  aux [] Type.(ETy Message) vars
 
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
@@ -179,7 +179,7 @@ end
 
 exception CastError
 
-let cast : type a b. a var -> b Type.sort -> b var = 
+let cast : type a b. a var -> b Type.ty -> b var = 
   fun x s -> match sort x, s with
   | Type.Boolean,   Type.Boolean   -> x
   | Type.Message,   Type.Message   -> x
@@ -187,7 +187,7 @@ let cast : type a b. a var -> b Type.sort -> b var =
   | Type.Timestamp, Type.Timestamp -> x
   | _, _ -> raise CastError
 
-let ecast : type a. evar -> a Type.sort -> a var = 
+let ecast : type a. evar -> a Type.ty -> a var = 
   fun (EVar v) s -> cast v s
 
 let equal : type a b. a var -> b var -> bool = fun v v' ->

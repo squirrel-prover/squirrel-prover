@@ -7,7 +7,7 @@ let dum : L.t = L._dummy
 let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
-type pkind = (string * Type.esort) list
+type pkind = (string * Type.ety) list
 
 let pp_pkind =
   let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp_e e in
@@ -173,7 +173,7 @@ let find_process0 table (lsymb : lsymb) =
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
 let check_proc table env p =
-  let rec check_p (env : (string * Type.esort) list) proc =
+  let rec check_p (env : (string * Type.ety) list) proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
@@ -470,12 +470,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
       List.fold_left2
         (fun (iacc,macc) (x,k) v ->
           match k, L.unloc v with
-          | Type.ESort Type.Message,_ ->
+          | Type.ETy Type.Message,_ ->
             let v'_th = Theory.subst v tsubst in
             let v'_tm = conv_term table env (Term.Var ts) v Type.Message in
             iacc, (x, L.unloc v'_th, v'_tm) :: macc
 
-          | Type.ESort Type.Index, Theory.App (i,[]) ->
+          | Type.ETy Type.Index, Theory.App (i,[]) ->
             let _,i'_tm = list_assoc (L.unloc i) env.isubst in
             let i'_th = Theory.subst v tsubst in
             (x, L.unloc i'_th, i'_tm) :: iacc, macc

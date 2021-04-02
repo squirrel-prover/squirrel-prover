@@ -69,13 +69,13 @@ val is_ftype : fname t -> function_def -> table -> bool
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Type.esort
+  | State of int * Type.ety
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
   | Global of int
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
-  | Local of Type.esort list * Type.esort
+  | Local of Type.ety list * Type.ety
     (** Local macro definitions are explicitly defined by the
       * user, and may depend on arbitrary terms. *)
 

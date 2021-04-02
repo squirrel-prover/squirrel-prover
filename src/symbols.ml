@@ -36,7 +36,7 @@ type 'a t = symb
 type group = string
 let default_group = ""
 
-type kind = Type.esort
+type kind = Type.ety
 
 type function_def =
   | Hash

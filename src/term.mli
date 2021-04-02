@@ -30,7 +30,7 @@ type fsymb = Symbols.fname Symbols.t * Vars.index list
   * translating the meta-logic to the base logic. *)
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.sort * Vars.index list
+type 'a msymb = mname * 'a Type.ty * Vars.index list
 
 type state = Type.message msymb
 
@@ -168,7 +168,7 @@ val disjunction_to_literals : formula -> literal list option
 
 val pp : Format.formatter -> 'a term -> unit
 
-val sort : 'a term -> 'a Type.t
+val ty : 'a term -> 'a Type.t
 
 (*------------------------------------------------------------------*)
 exception Uncastable
@@ -177,7 +177,7 @@ exception Uncastable
   * It is used to cast terms that have been unwrapped (e.g. from
   * a substitution) to the correct type.
   * @raise Uncastable if the term does not have the expected sort. *)
-val cast : 'a Type.sort -> 'b term -> 'a term
+val cast : 'a Type.ty -> 'b term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].

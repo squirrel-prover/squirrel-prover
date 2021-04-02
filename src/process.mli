@@ -20,9 +20,9 @@ type lsymb = Theory.lsymb
 
 (** The kind of a process gives, for each of its input variables,
   * the expected kind for that variable. *)
-type pkind = (string * Type.esort) list
+type pkind = (string * Type.ety) list
 
-val pp_pkind : (string * Type.esort) list Fmt.t
+val pp_pkind : (string * Type.ety) list Fmt.t
 
 
 (** {2 Front-end processes}

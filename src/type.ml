@@ -3,38 +3,49 @@
    matching for GADT built using those types are considered as non
    exhaustive. *)
 
-type message = [`Message]
-type index = [`Index]
+type message   = [`Message]
+type index     = [`Index]
 type timestamp = [`Timestamp]
-type boolean = [ `Boolean]
+type boolean   = [ `Boolean]
 
-type _ sort =
-  | Message : message sort
-  | Boolean : boolean sort
-  | Index : index sort
-  | Timestamp : timestamp sort
+type _ ty =
+  (** Built-in sorts *)
+  | Message   : message ty
+  | Boolean   : boolean ty
+  | Index     : index ty
+  | Timestamp : timestamp ty
 
-type 'a t = 'a sort
+  (** User-defined types (kind Message) *)
+  | TBase     : string -> message ty
+        
+  (** Type variable (kind Message) *)
+  | TVar      : Ident.t -> message ty
 
-type esort = ESort : 'a sort -> esort
+type 'a t = 'a ty
 
-let eboolean = ESort Boolean
-let emessage = ESort Message
-let etimestamp = ESort Timestamp
-let eindex = ESort Index
+type ety = ETy : 'a ty -> ety
 
-let equal : type a b. a sort -> b sort -> bool =
+let eboolean   = ETy Boolean
+let emessage   = ETy Message
+let etimestamp = ETy Timestamp
+let eindex     = ETy Index
+
+let equal : type a b. a ty -> b ty -> bool =
  fun a b -> match a,b with
    | Message, Message     -> true
    | Boolean, Timestamp   -> true
    | Index, Timestamp     -> true
    | Timestamp, Timestamp -> true
+   | TVar s, TVar s'      -> Ident.equal s s'
+   | TBase s, TBase s'    -> s = s'
    | _ -> false
 
-let pp : type a. Format.formatter -> a sort -> unit = fun ppf -> function
-  | Message -> Fmt.pf ppf "message"
-  | Index -> Fmt.pf ppf "index"
+let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
+  | Message   -> Fmt.pf ppf "message"
+  | Index     -> Fmt.pf ppf "index"
   | Timestamp -> Fmt.pf ppf "timestamp"
-  | Boolean -> Fmt.pf ppf "bool"
+  | Boolean   -> Fmt.pf ppf "bool"
+  | TVar id   -> Fmt.pf ppf "'%a" Ident.pp id
+  | TBase s   -> Fmt.pf ppf "%s" s
 
-let pp_e ppf (ESort t) = pp ppf t
+let pp_e ppf (ETy t) = pp ppf t
