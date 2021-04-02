@@ -2,10 +2,9 @@ open Utils
 
 module L = Location
 
-type kind = Type.ety
-
 type lsymb = string L.located
 
+(*------------------------------------------------------------------*)
 type term_i =
   | Tinit
   | Tpred of term
@@ -29,8 +28,8 @@ type term_i =
   | Compare of Term.ord * term * term
   | Happens of term list
 
-  | ForAll  of (lsymb * kind) list * term
-  | Exists  of (lsymb * kind) list * term
+  | ForAll  of (lsymb * Type.ety) list * term
+  | Exists  of (lsymb * Type.ety) list * term
   | And  of term * term
   | Or   of term * term
   | Impl of term * term
@@ -39,7 +38,6 @@ type term_i =
   | False
 
 and term = term_i L.located
-
 
 type formula = term
 
@@ -75,7 +73,6 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
         L.unloc s = L.unloc s'
       ) l l'
       && equal a a'
-
 
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
@@ -191,8 +188,8 @@ and pp_term ppf t =
 let pp   = pp_term
 let pp_i = pp_term_i
 
-
-(** Type checking *)
+(*------------------------------------------------------------------*)
+(** {2 Error handling} *)
 
 type conversion_error_i =
   | Arity_error          of string*int*int
@@ -272,6 +269,8 @@ let pp_error pp_loc_err ppf (loc,e) =
     pp_loc_err loc
     pp_error_i e
 
+(*------------------------------------------------------------------*)
+(** {2 Type checking} *)
 
 let check_arity_i loc s actual expected =
   if actual <> expected then
@@ -280,17 +279,17 @@ let check_arity_i loc s actual expected =
 let check_arity lsymb actual expected =
   check_arity_i (L.loc lsymb) (L.unloc lsymb) actual expected
 
-type env = (string*kind) list
+type env = (string * Type.ety) list
 
 let message_arity fdef = let open Symbols in match fdef with
   | PublicKey -> 1
-  | Hash|ADec|SDec|Sign|CheckSign -> 2
-  | AEnc|SEnc -> 3
+  | Hash | ADec | SDec | Sign | CheckSign -> 2
+  | AEnc | SEnc -> 3
   | Abstract a -> a
 
 (** Get the kind of a function or macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
-let function_kind table (f : lsymb): kind list * kind =
+let function_kind table (f : lsymb) : Type.ety list * Type.ety =
   let open Symbols in
   match def_of_lsymb f table with
   | Reserved _ -> assert false (* we should never encounter a situation where we
@@ -329,6 +328,7 @@ let check_action table (s : lsymb) n =
   ()
 
 
+(*------------------------------------------------------------------*)
 (** Applications *)
 
 
@@ -337,19 +337,23 @@ let check_action table (s : lsymb) n =
 type app_i =
   | Name of lsymb * term list
   (** A name, whose arguments will always be indices. *)
+              
   | Get of lsymb * Term.timestamp option * term list
   (** [Get (s,ots,terms)] reads the contents of memory cell
     * [(s,terms)] where [terms] are evaluated as indices.
     * The second argument [ots] is for the optional timestamp at which the
     * memory read is performed. This is used for the terms appearing in
     * goals. *)
+             
   | Fun of lsymb * term list * Term.timestamp option
   (** Function symbol application,
     * where terms will be evaluated as indices or messages
     * depending on the type of the function symbol.
     * The third argument is an optional timestamp, used when
     * writing meta-logic formulas but not in processes. *)
+             
   | Taction of lsymb * term list
+                 
   | AVar of lsymb
 
 and app = app_i L.located
@@ -458,6 +462,7 @@ let make_app_i table cntxt lsymb l =
 let make_app loc table cntxt lsymb l =
   L.mk_loc loc (make_app_i table cntxt lsymb l)
 
+(*------------------------------------------------------------------*)
 (** Conversion *)
 
 type esubst = ESubst : string * 'a Term.term -> esubst
@@ -725,7 +730,7 @@ and conv_app :
   type s.
   conv_env -> app_cntxt -> subst ->
   (term * app) -> s Type.ty -> s Term.term
- = fun env app_cntxt subst (t,app) sort ->
+ = fun env app_cntxt subst (t,app) ty ->
    (* We should have [make_app app = t].
       [t] is here to have meaningful exceptions. *)
   let loc = L.loc t in
@@ -738,10 +743,10 @@ and conv_app :
     | None -> conv_err loc (Timestamp_expected (L.unloc t))
     | Some ts -> ts in
 
-  let type_error () = raise (ty_error t sort) in
+  let type_error () = raise (ty_error t ty) in
 
   match L.unloc app with
-  | AVar s -> assoc subst s sort
+  | AVar s -> assoc subst s ty
 
   (* In [Term.term], function symbols deal with the message sort,
    * and comparisons are over message, indices or timestamps.
@@ -757,14 +762,14 @@ and conv_app :
    * recover some of that flexibility. *)
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
-      begin match sort with
+      begin match ty with
         | Type.Boolean -> Term.True
         | Type.Message -> Term.(Fun (f_true,[]))
         | _ -> type_error ()
       end
 
   | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
-      begin match sort with
+      begin match ty with
         | Type.Boolean -> Term.False
         | Type.Message -> Term.(Fun (f_false,[]))
         | _ -> type_error ()
@@ -777,7 +782,7 @@ and conv_app :
       let ks, f_k = function_kind env.table f in
       assert (f_k = Type.emessage) ;
       check_arity f (List.length l) (List.length ks) ;
-      begin match sort with
+      begin match ty with
         | Type.Message ->
             let open Symbols in
             begin match of_lsymb f env.table with
@@ -788,18 +793,21 @@ and conv_app :
                     (fun k -> conv Type.Message (List.nth l (k+i)))
                 in
                 Term.Fun ((symb,indices),messages)
+                  
               | Wrapped (s, Macro (Global _)) ->
                 let indices = List.map (conv_index env subst) l in
-                Term.Macro ((s,sort,indices),[],get_at ())
+                Term.Macro ((s,ty,indices),[],get_at ())
+                  
               | Wrapped (s, Macro (Local (targs,_))) ->
                   if List.for_all (fun s -> s = Type.eindex) ks then
                     let indices = List.map (conv_index env subst) l in
-                    Term.Macro ((s,sort,indices),[],get_at ())
+                    Term.Macro ((s,ty,indices),[],get_at ())
                   else begin
                     assert (List.for_all (fun s -> s = Type.emessage) ks) ;
                     let l = List.map (conv Type.Message) l in
-                    Term.Macro ((s,sort,[]),l,get_at ())
+                    Term.Macro ((s,ty,[]),l,get_at ())
                   end
+                  
               | Wrapped (_, Macro (Input|Output|Cond|Exec|Frame|State (_, _))) ->
                 raise ts_expected
               | Wrapped (_, Channel _) -> raise ts_expected
@@ -808,24 +816,25 @@ and conv_app :
               | Wrapped (_, Process _) -> raise ts_expected
               | Wrapped (_, System _)  -> raise ts_expected
             end
+            
         | _ -> type_error ()
       end
 
   | Fun (f, l, Some ts) ->
       let ts_unexpected = Conv (loc, Timestamp_unexpected t_i) in
       let open Symbols in
-      begin match sort with
+      begin match ty with
         | Type.Message ->
             begin match of_lsymb f env.table with
               | Wrapped (s, Macro (Input|Output|Frame)) ->
                  (* I am not sure of the location to use in
                     check_arity_i below  *)
                   check_arity_i (L.loc f) "input" (List.length l) 0 ;
-                  Term.Macro ((s,sort,[]),[],ts)
+                  Term.Macro ((s,ty,[]),[],ts)
               | Wrapped (s, Macro (Global arity)) ->
                   check_arity f (List.length l) arity ;
                   let l = List.map (conv_index env subst) l in
-                  Term.Macro ((s,sort, l),[],ts)
+                  Term.Macro ((s,ty, l),[],ts)
               | Wrapped (s, Macro (Local (targs,_))) ->
                   (* TODO as above *)
                 assert false
@@ -845,7 +854,7 @@ and conv_app :
                 (* I am not sure of the location to use in
                     check_arity_i below  *)
                   check_arity_i (L.loc f) "cond" (List.length l) 0 ;
-                  Term.Macro ((s,sort,[]),[],ts)
+                  Term.Macro ((s,ty,[]),[],ts)
               | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
                 type_error ()
               | Wrapped (_, Macro (State (_, _))) -> raise ts_unexpected
@@ -871,14 +880,14 @@ and conv_app :
           | Some ts -> ts
           | None -> conv_err loc (Timestamp_expected t_i)
       in
-      begin match sort with
-        | Type.Message -> Term.Macro ((s,sort,is),[],ts)
+      begin match ty with
+        | Type.Message -> Term.Macro ((s,ty,is),[],ts)
         | _ -> type_error ()
       end
 
   | Name (s, is) ->
       check_name env.table  s (List.length is) ;
-      begin match sort with
+      begin match ty with
         | Type.Message ->
           Term.Name ( get_name env.table s ,
                       List.map (conv_index env subst) is )
@@ -887,7 +896,7 @@ and conv_app :
 
   | Taction (a,is) ->
       check_action env.table a (List.length is) ;
-      begin match sort with
+      begin match ty with
         | Type.Timestamp ->
           Term.Action ( get_action env.table a,
                         List.map (conv_index env subst) is )
@@ -898,9 +907,9 @@ type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
 let econvert conv_cntxt tsubst t : eterm option =
   let conv_s = function
-    | Type.ETy sort -> try
-        let tt = convert conv_cntxt tsubst t sort in
-        Some (ETerm (sort, tt, L.loc t))
+    | Type.ETy ty -> try
+        let tt = convert conv_cntxt tsubst t ty in
+        Some (ETerm (ty, tt, L.loc t))
       with Conv _ -> None in
 
   (* careful about the order. Because boolean is a subtyped of message, we
@@ -1142,7 +1151,9 @@ let find_app_terms t (names : string list) =
   
   List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
 
-(** Tests *)
+
+(*------------------------------------------------------------------*)
+(** {2 Tests} *)
 let () =
   let mk x = L.mk_loc L._dummy x in
   Checks.add_suite "Theory" [

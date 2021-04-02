@@ -12,7 +12,6 @@
   * Symbols cannot be disambiguated at parsing time, hence we use very
   * permissives [App] and [AppAt] constructors which represents
   * function applications, macros, variables, names etc. *)
-type kind = Type.ety
 
 type lsymb = string Location.located
 
@@ -38,8 +37,8 @@ type term_i =
                  
   | Compare of Term.ord * term * term
   | Happens of term list
-  | ForAll  of (lsymb * kind) list * term
-  | Exists  of (lsymb * kind) list * term
+  | ForAll  of (lsymb * Type.ety) list * term
+  | Exists  of (lsymb * Type.ety) list * term
   | And  of term * term
   | Or   of term * term
   | Impl of term * term
