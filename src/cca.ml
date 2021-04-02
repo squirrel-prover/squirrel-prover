@@ -3,14 +3,20 @@ open Term
 class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), [m;r; Term.Name _]) when fn = enc_fn ->
+    | Term.Fun ((fn,_), _, [m;r; Term.Name _]) when fn = enc_fn ->
       self#visit_message m; self#visit_message r
-    | Term.Fun ((fn,_), [m; Term.Name _]) when fn = dec_fn ->
+        
+    | Term.Fun ((fn,_), _, [m; Term.Name _]) when fn = dec_fn ->
       self#visit_message m
-    | Term.Fun ((fn,_), [m;r; Diff(Term.Name _, Term.Name _)]) when fn = enc_fn ->
+        
+    | Term.Fun ((fn,_), _, [m;r; Diff(Term.Name _, Term.Name _)])
+      when fn = enc_fn ->
       self#visit_message m; self#visit_message r
-    | Term.Fun ((fn,_), [m;  Diff(Term.Name _, Term.Name _)]) when fn = dec_fn ->
+        
+    | Term.Fun ((fn,_), _, [m;  Diff(Term.Name _, Term.Name _)])
+      when fn = dec_fn ->
       self#visit_message m
+        
     | Term.Name (n,_) when n = key_n -> raise Euf.Bad_ssc
     | Term.Var m -> raise Euf.Bad_ssc
     | _ -> super#visit_message t
@@ -32,15 +38,19 @@ let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
 class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
   method visit_message t = match t with
-    | Term.Fun ((fn,_), [m1;Term.Name _; m2]) when fn = enc_fn ->
+    | Term.Fun ((fn,_), _, [m1;Term.Name _; m2]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
-    | Term.Fun ((fn,_), [m1; _; m2]) when fn = enc_fn ->
+        
+    | Term.Fun ((fn,_), _, [m1; _; m2]) when fn = enc_fn ->
       raise Euf.Bad_ssc
+        
     | Term.Name (n,_) when List.mem n randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)
+        
     | Term.Var m -> if not(allow_vars) then
-        Tactics.soft_failure (Tactics.Failure "No universal quantification over \
-                                               messages allowed")
+        Tactics.soft_failure
+          (Tactics.Failure "No universal quantification over \
+                            messages allowed")
     | _ -> super#visit_message t
 end
 
@@ -86,7 +96,7 @@ let check_encryption_randomness
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
 
   let randoms = List.map (function
-      | Fun ((_, _), [_; Name (r, is); _]), _-> r
+      | Fun ((_, _), _, [_; Name (r, is); _]), _-> r
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
       encryptions
   in
@@ -95,7 +105,7 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | (Fun ((_, _), [m; Name (_, is); _]), (actidx:Vars.index list)) ->
+      | (Fun ((_, _), _, [m; Name (_, is); _]), (actidx:Vars.index list)) ->
         let vars = Term.get_vars m in
         List.exists (function
               Vars.EVar v ->
@@ -111,8 +121,8 @@ let check_encryption_randomness
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), [_; Name (r, is); _]),_), 
-        (Fun ((_, _), [_; Name (r2,is2); _]),_) -> (r = r2)
+      | (Fun ((_, _), _, [_; Name (r, is); _]),_), 
+        (Fun ((_, _), _, [_; Name (r2,is2); _]),_) -> (r = r2)
       (* the patterns should match, if they match inside the declaration
          of randoms *)
       | _ -> assert false

@@ -47,6 +47,7 @@ val pp_namespace : Format.formatter -> namespace -> unit
 
 val get_namespace : ?group:group -> table -> string -> namespace option
 
+(*------------------------------------------------------------------*)
 (** {2 Symbol definitions}
   *
   * Each symbol is defined by some data,
@@ -61,7 +62,7 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract of int (** Message arity *)
+  | Abstract 
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
@@ -82,14 +83,15 @@ type macro_def =
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
 type _ def =
-  | Channel  : unit                 -> channel def
-  | Name     : int                  -> name    def
-  | Action   : int                  -> action  def
-  | Function : (int * function_def) -> fname   def
-  | Macro    : macro_def            -> macro   def
-  | System   : unit                 -> system  def
-  | Process  : unit                 -> process def
+  | Channel  : unit      -> channel def
+  | Name     : int       -> name    def
+  | Action   : int       -> action  def
+  | Macro    : macro_def -> macro   def
+  | System   : unit      -> system  def
+  | Process  : unit      -> process def
 
+  | Function : (Type.ftype * function_def) -> fname def
+        
 type edef =
   | Exists : 'a def -> edef
   | Reserved of namespace
@@ -132,6 +134,7 @@ val of_lsymb : ?group:group -> lsymb -> table -> wrapped
     if [s] is not defined. *)
 val of_lsymb_opt : ?group:group -> lsymb -> table -> wrapped option
 
+(*------------------------------------------------------------------*)
 (** {2 Namespaces} *)
 
 (** Signature for namespaces. *)
@@ -205,7 +208,7 @@ module Action   : Namespace with type def = int  with type ns = action
 module System   : Namespace with type def = unit with type ns = system
 module Process  : Namespace with type def = unit with type ns = process
 module Function : Namespace
-  with type def = int * function_def with type ns = fname
+  with type def = Type.ftype * function_def with type ns = fname
 module Macro    : Namespace with type def = macro_def with type ns = macro
 
 (*------------------------------------------------------------------*)
@@ -228,6 +231,15 @@ exception SymbError of symb_err
 (** {2 Builtins} *)
 
 val builtins_table : table
+
+(** Returns the type of a builtin function *)
+val ftype_builtin : fname t -> Type.ftype
+
+(** Returns the type of a function *)
+val ftype : table -> fname t -> Type.ftype
+
+(*------------------------------------------------------------------*)
+(** {3 Action builtins} *)
 
 val init_action : action t
 

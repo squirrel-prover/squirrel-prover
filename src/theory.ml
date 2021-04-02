@@ -281,7 +281,9 @@ let check_arity lsymb actual expected =
 
 type env = (string * Type.ety) list
 
-let message_arity fdef = let open Symbols in match fdef with
+let message_arity fdef =
+  let open Symbols in
+  match fdef with
   | PublicKey -> 1
   | Hash | ADec | SDec | Sign | CheckSign -> 2
   | AEnc | SEnc -> 3

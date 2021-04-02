@@ -33,6 +33,9 @@ let emessage   = ETy Message
 let etimestamp = ETy Timestamp
 let eindex     = ETy Index
 
+let ebase s   = ETy (TBase s)
+let eindex id = ETy (TVar id)
+
 (*------------------------------------------------------------------*)
 (** Kinds of types *)
 type _ kind =
@@ -109,3 +112,24 @@ let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
   | TBase s   -> Fmt.pf ppf "%s" s
 
 let pp_e ppf (ETy t) = pp ppf t
+
+
+(*------------------------------------------------------------------*)
+(** {2 Function symbols type} *)
+
+(** Type of a function symbol of index arity i: 
+    ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
+*)
+type ftype = {
+  fty_iarr : int;          (** i *)
+  fty_vars : Ident.t list; (** a₁ ... 'aₙ *)  
+  fty_args : ety list;     (** τ₁ × ... × τₙ *)
+  fty_out  : ety;          (** τ *)
+}
+
+let mk_ftype iarr vars args out = {
+  fty_iarr = iarr;
+  fty_vars = vars;
+  fty_args = args;
+  fty_out  = out;
+}

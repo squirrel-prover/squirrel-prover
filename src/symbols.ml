@@ -47,7 +47,7 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract of int
+  | Abstract 
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
@@ -64,14 +64,15 @@ type system
 type process
 
 type _ def =
-  | Channel  : unit                 -> channel def
-  | Name     : int                  -> name    def
-  | Action   : int                  -> action  def
-  | Function : (int * function_def) -> fname   def
-  | Macro    : macro_def            -> macro   def
-  | System   : unit                 -> system  def
-  | Process  : unit                 -> process def
+  | Channel  : unit      -> channel def
+  | Name     : int       -> name    def
+  | Action   : int       -> action  def
+  | Macro    : macro_def -> macro   def
+  | System   : unit      -> system  def
+  | Process  : unit      -> process def
 
+  | Function : (Type.ftype * function_def) -> fname def
+        
 type edef =
   | Exists : 'a def -> edef
   | Reserved of namespace
@@ -431,7 +432,7 @@ end)
 
 module Function = Make (struct
   type ns = fname
-  type local_def = int * function_def
+  type local_def = Type.ftype * function_def
 
   let namespace = NFunction
 
@@ -501,8 +502,15 @@ let () = builtin_ref := table
 
 (** {3 Function symbols builtins} *)
 
-let mk_fsymb f arity =
-  let info = 0, Abstract arity in
+(* makes simple function types *)
+let mk_ty arity =
+  Type.mk_ftype [] (List.init arity (fun _ -> Type.emessage)) Type.emessage
+    
+let mk_fsymb ?fty f arity =
+  let fty = match fty with
+    | None -> mk_ty arity
+    | Some fty -> fty in
+  let info = fty, Abstract in
   let table, f = Function.declare_exact !builtin_ref (L.mk_loc L._dummy f) info in
   builtin_ref := table;
   f
@@ -518,7 +526,14 @@ let fs_true   = mk_fsymb "true" 0
 let fs_and    = mk_fsymb "and" 2
 let fs_or     = mk_fsymb "or" 2
 let fs_not    = mk_fsymb "not" 1
-let fs_ite    = mk_fsymb "if" 3
+
+let fs_ite =
+  let tyvar = Ident.create "t" in
+  let fty = Type.mk_ftype
+      [tyvar]
+      [Type.eboolean; Type.etvar tyvar;Type.etvar tyvar]
+      (Type.etvar tyvar) in
+  mk_fsymb ~fty "if" (-1)
 
 (** Fail *)
 
@@ -535,9 +550,9 @@ let fs_succ   = mk_fsymb "succ" 1
 
 (** Pairing *)
 
-let fs_pair   = mk_fsymb "pair" 2
-let fs_fst    = mk_fsymb "fst" 1
-let fs_snd    = mk_fsymb "snd" 1
+let fs_pair = mk_fsymb "pair" 2   
+let fs_fst = mk_fsymb "fst" 1
+let fs_snd = mk_fsymb "snd" 1
 
 (** Exp **)
 
@@ -549,7 +564,7 @@ let fs_g      = mk_fsymb "g" 0
 let fs_empty  = mk_fsymb "empty" 0
 
 (** Length *)
-
+  
 let fs_len    = mk_fsymb "len" 1
 let fs_zeroes = mk_fsymb "zeroes" 1
 
@@ -557,3 +572,9 @@ let fs_zeroes = mk_fsymb "zeroes" 1
 (** {3 Builtins table} *)
 
 let builtins_table = !builtin_ref
+
+let ftype table f =
+  match Function.get_def f table with
+  | fty, _ -> fty
+
+let ftype_builtin f = ftype builtins_table f

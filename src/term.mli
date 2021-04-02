@@ -29,7 +29,7 @@ type fsymb = Symbols.fname Symbols.t * Vars.index list
   * variables, and let definitions: everything that is expanded when
   * translating the meta-logic to the base logic. *)
 
-type mname = Symbols.macro Symbols.t
+type mname    = Symbols.macro Symbols.t
 type 'a msymb = mname * 'a Type.ty * Vars.index list
 
 type state = Type.message msymb
@@ -68,7 +68,7 @@ type generic_atom = [
   | `Happens of Type.timestamp term
 ]
 and _ term =
-  | Fun    : fsymb *  Type.message term list -> Type.message term
+  | Fun    : fsymb * Type.ftype * Type.message term list -> Type.message term
   | Name   : nsymb -> Type.message term
 
   | Macro  :
@@ -263,7 +263,7 @@ module Match : sig
 end
 
 (*------------------------------------------------------------------*)
-(** {2 Builtins} *)
+(** {2 Builtins function symbols} *)
 
 val empty : message 
 val init : timestamp
@@ -299,10 +299,37 @@ val f_g      : fsymb
 
 val f_len    : fsymb
 val f_zeroes : fsymb
-
+  
 (*------------------------------------------------------------------*)
 (** {2 Smart constructors} *)
+
+(*------------------------------------------------------------------*)
+(** {3 For terms} *)
+
+val mk_fun :
+  Symbols.table ->
+  fname ->
+  Vars.index list ->
+  Type.message term list ->
+  Type.message term
+    
+val mk_true  : message
+val mk_false : message
+
+val mk_zero : message
+
+val mk_g : message
   
+val mk_fail : message
+
+val mk_len : 'a term -> message
+
+val mk_zeroes : 'a term -> message
+
+ 
+(*------------------------------------------------------------------*)
+(** {3 For formulas} *)
+
 val mk_not    : formula                 -> formula
 val mk_and    : formula -> formula      -> formula
 val mk_ands   : formula list            -> formula
@@ -316,8 +343,6 @@ val mk_exists : Vars.evar list -> formula -> formula
 
 val mk_ite    : formula -> message -> message -> message
   
-val message_of_formula : formula -> message
-
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 
 val mk_indices_neq : Vars.index list -> Vars.index list -> formula

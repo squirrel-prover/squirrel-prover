@@ -22,7 +22,7 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Equiv.Formula e -> self#visit_formula e
 
   method visit_message t = match t with
-    | Fun (_, l) -> List.iter self#visit_message l
+    | Fun (_, _,l) -> List.iter self#visit_message l
     | Macro ((mn,sort,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#visit_message (Macros.get_definition cntxt sort mn is a)
@@ -75,7 +75,7 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Equiv.Formula e -> self#fold_formula x e
 
   method fold_message x t = match t with
-    | Fun (_, l) -> List.fold_left self#fold_message x l
+    | Fun (_, _,l) -> List.fold_left self#fold_message x l
     | Macro ((mn,sort,is),l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#fold_message x (Macros.get_definition cntxt sort mn is a)
@@ -166,7 +166,7 @@ class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object 
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
   method visit_message = function
-    | Term.Fun ((f',_), [m;k']) as m_full when f' = f ->
+    | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
         begin match k' with
           | Term.Name (k',is) when k' = k ->
               let ret_m = if drop_head then m else m_full in
@@ -174,7 +174,7 @@ class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object 
           | _ -> ()
         end ;
         self#visit_message m ; self#visit_message k'
-    | Term.Fun ((f',_), [m;r;k']) as m_full when f' = f ->
+    | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
         begin match k' with
           | Term.Name (k',is) when k' = k ->
               let ret_m = if drop_head then m else m_full in
@@ -194,9 +194,9 @@ class get_ftypes_term
   val mutable func : Term.message list = []
   method get_func = func
   method visit_message = function
-    | Term.Fun ((fn,_), l) as fn_term ->
+    | Term.Fun ((fn,_),_,l) as fn_term ->
         if Symbols.is_ftype fn symtype cntxt.table
-        then func <-  fn_term :: func
+        then func <- fn_term :: func
         else begin
           match excludesymtype with
           | Some ex when Symbols.is_ftype fn ex cntxt.table -> ()

@@ -1271,8 +1271,8 @@ let namelength Args.(Pair (Message n, Message m)) s =
   match n, m with
   | Name n, Name m ->
     let f = Term.(Atom (`Message (`Eq,
-                                  Fun (f_len,[Name n]),
-                                  Fun (f_len,[Name m])))) in
+                                  Term.mk_len (Name n),
+                                  Term.mk_len (Name m)))) in
 
     (* let id = Hyps.fresh_id ~approx:true "HL" s in
      * [Hyps.add_formula id f s] *)
@@ -2616,8 +2616,8 @@ let euf_param table (t : Term.formula) : unforgeabiliy_param =
     | _ -> bad_param () in
 
   match at with
-  | (`Eq, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])]), m)
-  | (`Eq, m, Fun ((checksign, _), [s; Fun ((pk,_), [Name key])])) ->
+  | (`Eq, Fun ((checksign, _),    _, [s; Fun ((pk,_), _, [Name key])]), m)
+  | (`Eq, m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
     begin match Theory.check_signature table checksign pk with
       | None ->
         Tactics.(soft_failure 
@@ -2626,11 +2626,11 @@ let euf_param table (t : Term.formula) : unforgeabiliy_param =
       | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
     end
 
-  | (`Eq, Fun ((hash, _), [m; Name key]), s)
+  | (`Eq, Fun ((hash, _), _, [m; Name key]), s)
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true)
 
-  | (`Eq, s, Fun ((hash, _), [m; Name key]))
+  | (`Eq, s, Fun ((hash, _), _, [m; Name key]))
     when Symbols.is_ftype hash Symbols.Hash table ->
     (hash, key, m, s, (fun x -> false), [], true)
 
@@ -2654,27 +2654,27 @@ let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
     match Symbols.Function.get_data sdec table with
     | Symbols.AssociatedFunctions [senc] ->
       (senc, key, m, s,  (fun x -> x = sdec),
-       [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false )
+       [ (Term.Atom (`Message (`Eq, s, Term.mk_fail)))], false )
     | Symbols.AssociatedFunctions [senc; h] ->
       (senc, key, m, s,  (fun x -> x = sdec || x = h),
-       [ (Term.Atom (`Message (`Eq, s, Fun (f_fail, []))))], false)
+       [ (Term.Atom (`Message (`Eq, s, Term.mk_fail)))], false)
       
     | _ -> assert false in
   
   match at with
-  | (`Eq, Fun ((sdec, _), [m; Name key]), s)
+  | (`Eq, Fun ((sdec, _), _, [m; Name key]), s)
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
 
-  | (`Eq, s, Fun ((sdec, is), [m; Name key]))
+  | (`Eq, s, Fun ((sdec, is), _, [m; Name key]))
     when Symbols.is_ftype sdec Symbols.SDec table ->
     param_dec sdec key m s
 
-  | (`Neq, (Fun ((sdec, _), [m; Name key]) as s), Fun (fail, _))
+  | (`Neq, (Fun ((sdec, _), _, [m; Name key]) as s), Fun (fail, _, _))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail->
     param_dec sdec key m s
 
-  | (`Neq, Fun (fail, _), (Fun ((sdec, is), [m; Name key]) as s))
+  | (`Neq, Fun (fail, _, _), (Fun ((sdec, is), _, [m; Name key]) as s))
     when Symbols.is_ftype sdec Symbols.SDec table && fail = Term.f_fail ->
     param_dec sdec key m s
 
@@ -2854,7 +2854,7 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) = 
   match t with
-  | Fun ((hash, _), [m; Name (key,_)]) ->
+  | Fun ((hash, _), _, [m; Name (key,_)]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
     && Euf.check_key_ssc
       ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
@@ -2881,8 +2881,8 @@ let top_level_hashes s =
       List.fold_left
         (fun acc h2 ->
            match h1, h2 with
-           | Fun (hash1, [_; Name key1]),
-             Fun (hash2, [_; Name key2])
+           | Fun (hash1, _, [_; Name key1]),
+             Fun (hash2, _, [_; Name key2])
              when hash1 = hash2 && key1 = key2 -> (h1, h2) :: acc
            | _ -> acc)
         (make_eq acc q) q
@@ -2919,8 +2919,8 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TraceSequent.t) =
     List.fold_left
       (fun acc (h1,h2) ->
          match h1, h2 with
-         | Fun ((hash1, _), [m1; Name key1]),
-           Fun ((hash2, _), [m2; Name key2])
+         | Fun ((hash1, _), _, [m1; Name key1]),
+           Fun ((hash2, _), _, [m2; Name key2])
            when hash1 = hash2 && key1 = key2 ->
            Term.Atom (`Message (`Eq, m1, m2)) :: acc
          | _ -> acc)

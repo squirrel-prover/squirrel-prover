@@ -30,6 +30,8 @@ val emessage   : ety
 val etimestamp : ety
 val eindex     : ety
 
+val ebase : string  -> ety
+val etvar : Ident.t -> ety
 
 (*------------------------------------------------------------------*)
 (** Kinds of types *)
@@ -64,3 +66,18 @@ val equal   : 'a ty -> 'b ty -> bool
 val pp : Format.formatter -> 'a ty -> unit
 
 val pp_e : Format.formatter -> ety -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 Function symbols type} *)
+
+(** Type of a function symbol of index arity i: 
+    ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
+*)
+type ftype = {
+  fty_iarr : int;          (** i *)
+  fty_vars : Ident.t list; (** a₁ ... 'aₙ *)  
+  fty_args : ety list;     (** τ₁ × ... × τₙ *)
+  fty_out  : ety;          (** τ *)
+}
+
+val mk_ftype : Ident.t list -> ety list -> ety -> ftype

@@ -612,7 +612,7 @@ exception No_common_head
 exception No_FA
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
-    | Fun (f,l) ->
+    | Fun (f,_,l) ->
       List.map (fun m -> Equiv.Message m) l
     | ITE (c,t,e) when t = e ->
       EquivSequent.[ Message t ]
@@ -637,8 +637,8 @@ let fa_expand t =
     List.map
       (fun x -> match x with
         | Equiv.Message ITE (c,t,e)
-          when (t = Term.Fun(f_true,[]) && e = Term.Fun(f_false,[]))
-          -> Equiv.Formula c
+          when t = Term.mk_true && e = Term.mk_false ->
+          Equiv.Formula c
         | _ -> x)
   in
   match t with
@@ -659,7 +659,7 @@ let fa TacticsArgs.(Int i) s =
                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
                 vars vars'
             in
-            let c' = Term.(Seq (vars, message_of_formula c)) in
+            let c' = Term.(Seq (vars, boolToMessage c)) in
             let t' = Term.subst subst t in
             let biframe =
               List.rev_append before
@@ -852,7 +852,7 @@ let fa_dup_int i s =
           let f,g = match e with
             | Equiv.Formula Term.And (f,g) -> f,g
             | Equiv.Message Term.(Seq (vars,ITE (And (f,g),tt,ff)))
-              when Term.(tt = Fun (f_true,[]) && ff = Fun (f_false,[])) ->
+              when tt = Term.mk_true && ff = Term.mk_false ->
               let subst =
                 List.map
                   (fun v ->
@@ -1069,7 +1069,7 @@ let mk_if_term cntxt env e biframe =
   match e with
   | Equiv.Message t ->
     let phi = fresh_cond cntxt env t biframe in
-    let then_branch = Term.Fun (Term.f_zero,[]) in
+    let then_branch = Term.mk_zero in
     let else_branch = t in
     Equiv.Message Term.(mk_ite phi then_branch else_branch)
   | Equiv.Formula f -> raise Fresh.Not_name
@@ -1245,7 +1245,7 @@ let expand_all () s =
         then aux (Macros.get_definition cntxt sort mn is a)
         else m
       | Macro _ as m -> m
-      | Fun (f, l) -> Fun (f, List.map aux l)
+      | Fun (f, fty, l) -> Fun (f, fty, List.map aux l)
       | Name n as a-> a
       | Var x as a -> a
       | Diff(a, b) -> Diff(aux a, aux b)
@@ -1440,36 +1440,39 @@ let push_formula (j: 'a option) f term =
   let not_in_f_vars vs =
     List.fold_left
       (fun acc v ->
-        if List.mem (Vars.EVar v) f_vars
-        then false
-        else acc)
+         if List.mem (Vars.EVar v) f_vars
+         then false
+         else acc)
       true
       vs
   in
+
   let rec mk_ite m = match m with
-  (* if c then t else e becomes if (f => c) then t else e *)
-  | ITE (c,t,e) -> ITE (Term.Impl (f,c), t, e)
-  (* m becomes if f then m else 0 *)
-  | _ -> ITE (f, m, Term.Fun (Term.f_zero,[]))
+    (* if c then t else e becomes if (f => c) then t else e *)
+    | ITE (c,t,e) -> ITE (Term.Impl (f,c), t, e)
+    (* m becomes if f then m else 0 *)
+    | _ -> ITE (f, m, Term.mk_zero)
   in
+
   match term with
-  | Fun (f,terms) ->
+  | Fun (f, fty, terms) ->
     begin match j with
-    | None -> Fun (f, List.map mk_ite terms)
-    | Some (TacticsArgs.Int jj) ->
-      if jj < List.length terms then
-        Fun (f, List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
-      else
-        Tactics.soft_failure
-          (Tactics.Failure "subterm at position j does not exists")
+      | None -> Fun (f, fty, List.map mk_ite terms)
+      | Some (TacticsArgs.Int jj) ->
+        if jj < List.length terms then
+          Fun (f, fty, List.mapi (fun i t -> if i=jj then mk_ite t else t) terms)
+        else
+          soft_failure
+            (Tactics.Failure "subterm at position j does not exists")
     end
+
   | Diff (a, b) ->
     begin match j with
-    | None -> Diff (mk_ite a, mk_ite b)
-    | Some (TacticsArgs.Int 0) -> Diff (mk_ite a, b)
-    | Some (TacticsArgs.Int 1) -> Diff (a, mk_ite b)
-    | _ ->  Tactics.soft_failure
-              (Tactics.Failure "expected j is 0 or 1 for diff terms")
+      | None -> Diff (mk_ite a, mk_ite b)
+      | Some (TacticsArgs.Int 0) -> Diff (mk_ite a, b)
+      | Some (TacticsArgs.Int 1) -> Diff (a, mk_ite b)
+      | _ ->  Tactics.soft_failure
+                (Tactics.Failure "expected j is 0 or 1 for diff terms")
     end
   | Seq (vs, t) ->
     if not_in_f_vars vs then Seq (vs, mk_ite t)
@@ -1695,7 +1698,7 @@ exception Not_hash
 
 let prf_param hash =
   match hash with
-  | Term.Fun ((hash_fn, _), [t; Name (key_n,key_is)]) ->
+  | Term.Fun ((hash_fn, _), _, [t; Name (key_n,key_is)]) ->
       (hash_fn,t,key_n,key_is)
   | _ -> raise Not_hash
 
@@ -1728,7 +1731,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
          - we also add the hashed message [t] *)
       let e_without_hash =
         Equiv.subst_equiv
-          [Term.ESubst (hash,Term.Fun (Term.f_zero,[]))]
+          [Term.ESubst (hash,Term.mk_zero)]
           [e]
       in
 
@@ -1961,11 +1964,12 @@ let prf TacticsArgs.(Int i) s =
     (* search for the first occurrence of a hash in [e] *)
     begin match Iter.get_ftype ~cntxt e Symbols.Hash with
       | None ->
-        Tactics.soft_failure
+        soft_failure
           (Tactics.Failure
              "PRF can only be applied on a term with at least one occurrence \
               of a hash term h(t,k)")
-      | Some ((Term.Fun ((fn,_), [m; key])) as hash) ->
+          
+      | Some ((Term.Fun ((fn,_), _, [m; key])) as hash) ->
         (* Context with bound variables (eg try find) are not (yet) supported.
          * This is detected by checking that there is no "new" variable,
          * which are used by the iterator to represent bound variables. *)
@@ -2061,16 +2065,19 @@ let cca1 TacticsArgs.(Int i) s =
         let fresh_goal = Prover.Goal.Trace fresh_seq in
 
         let new_subst =
-          if  is_top_level then
-            Term.ESubst (enc, Term.Fun (Term.f_len, [m]))
+          if is_top_level then
+            Term.ESubst (enc, Term.mk_len m)
           else
-            let new_m = Term.(Fun (f_zeroes, [Fun (f_len, [m])])) in
+            let new_m = Term.mk_zeroes (Term.mk_len m) in
             let new_term = match fnpk with
-              | Some fnpk ->     Term.Fun ((fnenc,eis),
-                                           [new_m; Term.Name r;
-                                            Term.Fun (fnpk, [Term.Name (sk,isk)])])
-              | None ->  Term.Fun ((fnenc,eis),
-                                   [new_m; Term.Name r; Term.Name (sk,isk)])
+              | Some (fnpk,pkis) ->
+                Term.mk_fun table fnenc eis
+                  [new_m; Term.Name r;
+                   Term.mk_fun table fnpk pkis [Term.Name (sk,isk)]]
+                  
+              | None ->
+                Term.mk_fun table fnenc eis
+                  [new_m; Term.Name r; Term.Name (sk,isk)]
             in
             Term.ESubst (enc,
                          new_term
@@ -2083,22 +2090,28 @@ let cca1 TacticsArgs.(Int i) s =
        we will completely replace the encryption by the length, else we will
        replace the plain text by the lenght *)
     let is_top_level = match e with
-      | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r;
-                                               Term.Fun ((fnpk,is), [Term.Name (sk,isk)])]))
+      | Equiv.Message
+          (Term.Fun ((fnenc,eis), _,
+                     [m; Term.Name r;
+                      Term.Fun ((fnpk,is), _, [Term.Name (sk,isk)])]))
         when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
               && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
-      | Equiv.Message (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)]))
+        
+      | Equiv.Message
+          (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name (sk,isk)]))
         when Symbols.is_ftype fnenc Symbols.SEnc table -> true
+        
       | _ -> false
     in
+    
     (* search for the first occurrence of an asymmetric encryption in [e], that
        do not occur under a decryption symbol. *)
     let rec hide_all_encs enclist =
       begin match
           enclist
         with
-        | (Term.Fun ((fnenc,eis), [m; Term.Name r;
-                                   Term.Fun ((fnpk,is), [Term.Name (sk,isk)])])
+        | (Term.Fun ((fnenc,eis), _, [m; Term.Name r;
+                                   Term.Fun ((fnpk,is), _, [Term.Name (sk,isk)])])
            as enc) :: q when (Symbols.is_ftype fnpk Symbols.PublicKey table
                               && Symbols.is_ftype fnenc Symbols.AEnc table)
           ->
@@ -2112,10 +2125,11 @@ let cca1 TacticsArgs.(Int i) s =
                 try
                   Euf.key_ssc ~messages:[enc] ~allow_functions:(fun x -> x = fnpk)
                     ~cntxt fndec sk;
-                  if not (List.mem (Equiv.Message
-                                      (Term.Fun ((fnpk,is), [Term.Name (sk,isk)]))
-                                   ) biframe) then
-                    Tactics.soft_failure
+                  if not (List.mem
+                            (Equiv.Message
+                               (Term.mk_fun table fnpk is [Term.Name (sk,isk)])
+                            ) biframe) then
+                    soft_failure
                       (Tactics.Failure
                          "The public key must be inside the frame in order to \
                           use CCA1")
@@ -2134,7 +2148,7 @@ let cca1 TacticsArgs.(Int i) s =
                     public key function.")
           end
 
-        | (Term.Fun ((fnenc,eis), [m; Term.Name r; Term.Name (sk,isk)])
+        | (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name (sk,isk)])
            as enc) :: q when Symbols.is_ftype fnenc Symbols.SEnc table
           ->
           begin
@@ -2222,8 +2236,16 @@ let enckp
      * [enc = Term.Fun ((fnenc,indices), [m; Term.Name r; k])].
      * Verify that the encryption primitive is used correctly,
      * that the randomness is fresh and that the keys satisfy their SSC. *)
-    let apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k =
-
+    let apply
+        ~(enc     : Type.message Term.term)
+        ~(new_key : Type.message Term.term option)
+        ~(fnenc   : Term.fname)
+        ~(indices : 'a) 
+        ~(m       : 'b)
+        ~(r       : Term.nsymb)
+        ~(k       : Type.message Term.term)
+      : Prover.Goal.t list =
+      
       let k = Term.head_normal_biterm k in
       (* Verify that key is well-formed, depending on whether encryption is
        * symmetric or not. Return secret key and appropriate SSC. *)
@@ -2247,23 +2269,24 @@ let enckp
         else
           match Symbols.Function.get_data fnenc table with
           | Symbols.AssociatedFunctions [fndec;fnpk] ->
-             (fun ((sk,_),system) ->
+            (fun ((sk,_),system) ->
                let cntxt = Constr.{ cntxt with system } in
-                Euf.key_ssc ~cntxt ~elems:(goal_as_equiv s)
-                  ~allow_functions:(fun x -> x = fnpk) fndec sk),
-                (fun x -> Term.Fun ((fnpk,indices),[x])),
-                begin match k with
-                   | Term.Fun ((fnpk',indices'),[sk])
-                     when fnpk = fnpk' && indices = indices' -> sk
-                   | Term.Fun ((fnpk',indices'),[sk])
-                     when fnpk = fnpk' && indices = indices' -> sk
-                   | _ ->
-                       Tactics.soft_failure
-                         (Tactics.Failure
-                            "The first encryption is not used \
-                             with the correct public key function")
-                end
-            | _ -> assert false
+               Euf.key_ssc ~cntxt ~elems:(goal_as_equiv s)
+                 ~allow_functions:(fun x -> x = fnpk) fndec sk),
+            (fun x -> Term.mk_fun table fnpk indices [x]),
+            begin match k with
+              | Term.Fun ((fnpk',indices'), _, [sk])
+                when fnpk = fnpk' && indices = indices' -> sk
+              | Term.Fun ((fnpk',indices'), _, [sk])
+                when fnpk = fnpk' && indices = indices' -> sk
+              | _ ->
+                Tactics.soft_failure
+                  (Tactics.Failure
+                     "The first encryption is not used \
+                      with the correct public key function")
+            end
+          | _ -> assert false
+
       in
       let project = function
         | Term.Name n -> n,n
@@ -2300,7 +2323,7 @@ let enckp
 
       (* Equivalence goal where [enc] is modified using [new_key]. *)
       let new_enc =
-        Term.Fun ((fnenc,indices), [m; Term.Name r; wrap_pk new_key])
+        Term.mk_fun table fnenc indices [m; Term.Name r; wrap_pk new_key]
       in
       let new_elem =
         Equiv.subst_equiv [Term.ESubst (enc,new_enc)] [e]
@@ -2316,14 +2339,14 @@ let enckp
       | Some (Message m1), Some (Message m2) -> Some m1, Some m2
       | Some (Message m1), None ->
         begin match m1 with
-          | Term.Fun ((f,_),[_;_;_]) -> Some m1, None
+          | Term.Fun ((f,_),_,[_;_;_]) -> Some m1, None
           | _ -> None, Some m1
         end
       | None, None -> None, None
       | None, Some _ -> assert false
     in
     match target with
-      | Some (Term.Fun ((fnenc,indices),[m; Term.Name r; k]) as enc) ->
+      | Some (Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc) ->
         apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
       | Some _ ->
         Tactics.soft_failure
@@ -2338,11 +2361,11 @@ let enckp
           * and has a diff in its key.
           * We could also backtrack in case of failure. *)
         let diff_key = function
-          | Term.Diff _ | Term.Fun (_,[Term.Diff _]) -> true
+          | Term.Diff _ | Term.Fun (_, _, [Term.Diff _]) -> true
           | _ -> false
         in
         let rec find = function
-          | Term.Fun ((fnenc,indices),[m; Term.Name r; k]) as enc :: _
+          | Term.Fun ((fnenc,indices), _, [m; Term.Name r; k]) as enc :: _
             when diff_key k ->
             apply ~enc ~new_key ~fnenc ~indices ~m ~r ~k
           | _ :: q -> find q
@@ -2394,13 +2417,13 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
 
   let len_left =
     Term.(Atom (`Message (`Eq,
-                          Fun (f_len,[l_left]),
-                          Fun (f_len,[Name (n_left,is_left)])))) in
+                          mk_len l_left,
+                          mk_len (Name (n_left,is_left))))) in
 
   let len_right =
     Term.(Atom (`Message (`Eq,
-                          Fun (f_len,[l_right]),
-                          Fun (f_len,[Name (n_right,is_right)])))) in
+                          mk_len l_right,
+                          mk_len (Name (n_right,is_right))))) in
 
   let len =
     if len_left = len_right then [len_left] else [len_left;len_right] in
@@ -2413,7 +2436,7 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
        phi_right)
   in
 
-  let then_branch = Term.Fun (Term.f_zero,[]) in
+  let then_branch = Term.mk_zero in
   let else_branch = term in
   Equiv.Message Term.(mk_ite phi then_branch else_branch)
 
@@ -2424,8 +2447,8 @@ let mk_xor_if_term cntxt env e biframe =
         begin match
           Term.pi_term PLeft t, Term.pi_term PRight t
         with
-        | (Fun (fl,[Term.Name (nl,isl);ll]),
-           Fun (fr,[Term.Name (nr,isr);lr]))
+        | (Fun (fl, _, [Term.Name (nl,isl);ll]),
+           Fun (fr, _, [Term.Name (nr,isr);lr]))
            when (fl = Term.f_xor && fr = Term.f_xor)
            -> (nl,isl,ll,nr,isr,lr,t)
         | _ -> raise Not_xor
@@ -2451,7 +2474,7 @@ let mk_xor_if_term_name cntxt env e mess_name biframe =
             begin match
               Term.pi_term PLeft t, Term.pi_term PRight t
             with
-            | (Fun (fl,ll),Fun (fr,lr))
+            | (Fun (fl,_,ll),Fun (fr,_,lr))
               when (fl = Term.f_xor && fr = Term.f_xor)
               -> (nl,isl,remove_name_occ nl isl ll,
                   nr,isr,remove_name_occ nr isr lr,
@@ -2520,16 +2543,16 @@ class ddh_context ~(cntxt:Constr.trace_cntxt) exact a b c = object (self)
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
      appears only as g^a, g^b and g^c. *)
   method visit_message t =
-    let g = Term.(Fun (f_g,[])) in
+    let g = Term.mk_g in
     let exp = Term.f_exp in
     match t with
     (* any name n can occur as g^n *)
-    | Term.Fun (f, [g1; Name (n,_)]) when f = exp && g1 = g-> ()
+    | Term.Fun (f, _, [g1; Name (n,_)]) when f = exp && g1 = g-> ()
     (* any names a b can occur as g^a^b *)
-    | Term.(Diff(Term.(Fun (f1,[(Fun (f2,[g1; Name (n1,_)]));
-                     Name (n2,_)
-                               ])),
-                 Term.Fun (f, [g3; Name (n3,_)])))
+    | Term.(Diff(Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name (n1,_)]));
+                                   Name (n2,_)
+                                  ])),
+                 Term.Fun (f, _, [g3; Name (n3,_)])))
       when f1 = exp && f2 = exp && g1 = g && g3=g && n3=c &&
            ((n1 = a && n2 = b) || (n1 = b && n2 = a))
       -> ()
