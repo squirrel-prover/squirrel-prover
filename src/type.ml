@@ -147,29 +147,40 @@ let mk_ftype iarr vars args out = {
 }
 
 (*------------------------------------------------------------------*)
+(** {2 Type substitution } *)
+
+(** A substitution from unification variables to (existential) types. *)
+type tsubst = univar -> ety
+
+(*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
+(** Stateful API *)
 module Infer : sig
   type env
 
   val mk_env : unit -> env
     
-  val mk_univar : env -> ety * env
+  val mk_univar : env -> ety
                          
-  val unify_eq  : env -> ety -> ety -> env option
-  val unify_leq : env -> ety -> ety -> env option
+  val unify_eq  : env -> ety -> ety -> [`Fail | `Ok]
+  val unify_leq : env -> ety -> ety -> [`Fail | `Ok]
+
+  val is_closed : env -> bool
+  val close : env -> tsubst
 end = struct
   module Mid = Ident.Mid
                  
   (* an unification environment *)
-  type env = ety Mid.t
-      
-  let mk_env () = Mid.empty
+  type env = ety Mid.t ref
+ 
+  let mk_env () = ref Mid.empty 
 
-  let mk_univar env =
+  let mk_univar (env : env) =
     let uv = Ident.create "u" in
     let ety = ETy (TUnivar uv) in
-    ety, Mid.add uv ety env
+    env := Mid.add uv ety !env;
+    ety
 
   (* Univar are maximal for this ordering *)
   let compare : type a b. a ty -> b ty -> int =
@@ -186,27 +197,37 @@ end = struct
     fun env t ->
     match t with
     | TUnivar u ->
-      let u' = Mid.find u env in
+      let u' = Mid.find u !env in
       if ETy t = u' then u' else norm_e env u'        
     | _ -> ETy t
 
-  and norm_e env ety = match ety with
+  and norm_e env ety : ety = match ety with
     | ETy t -> norm env t
 
-  let unify_eq env (et : ety) (et' : ety) =
+  (** An type inference environment is closed if every unification variable
+       normal form is a univar-free type. *)
+  let is_closed (env : env) : bool =
+    Mid.for_all (fun _ ety -> match norm_e env ety with
+        | ETy (TUnivar _) -> false
+        | _ -> true
+      ) !env
+
+  let close (env : env) : tsubst = fun (u : univar) -> Mid.find u !env
+
+  let unify_eq env (et : ety) (et' : ety) : [`Fail | `Ok] =
     let et  = norm_e env et
     and et' = norm_e env et' in
 
     let et, et' = if compare_e et et' < 0 then et', et else et, et' in
     
     match et, et' with
-    | ETy t, ETy t' when equal t t'-> Some env
+    | ETy t, ETy t' when equal t t'-> `Ok
     | ETy t, ETy t' ->
       match t, t' with
-      | TUnivar u, _ -> Some (Mid.add u et' env)
-      | _ -> None
+      | TUnivar u, _ -> env := Mid.add u et' !env; `Ok
+      | _ -> `Fail
 
   (* TODO: improve type inference by not handling subtyping constraint as
      type equality constraints. *)
-  let unify_leq env (et : ety) (et' : ety) = unify_eq env et et'
+  let unify_leq env (et : ety) (et' : ety) : [`Fail | `Ok] = unify_eq env et et'
 end

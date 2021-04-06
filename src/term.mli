@@ -168,7 +168,8 @@ val disjunction_to_literals : formula -> literal list option
 
 val pp : Format.formatter -> 'a term -> unit
 
-val ty : 'a term -> 'a Type.t
+val ty  : 'a term -> 'a Type.ty
+val ety : 'a term -> Type.ety
 
 (*------------------------------------------------------------------*)
 exception Uncastable

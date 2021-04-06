@@ -97,15 +97,25 @@ type ftype = {
 val mk_ftype : int -> Ident.t list -> ety list -> ety -> ftype
 
 (*------------------------------------------------------------------*)
+(** {2 Type substitution } *)
+
+(** A substitution from unification variables to (existential) types. *)
+type tsubst = univar -> ety
+
+(*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
+(** Stateful API *)
 module Infer : sig
   type env
 
   val mk_env : unit -> env
     
-  val mk_univar : env -> ety * env
+  val mk_univar : env -> ety
                          
-  val unify_eq  : env -> ety -> ety -> env option
-  val unify_leq : env -> ety -> ety -> env option
+  val unify_eq  : env -> ety -> ety -> [`Fail | `Ok]
+  val unify_leq : env -> ety -> ety -> [`Fail | `Ok]
+
+  val is_closed : env -> bool
+  val close : env -> tsubst
 end

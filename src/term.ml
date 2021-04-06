@@ -156,6 +156,8 @@ let rec ty : type a. a term -> a Type.t =
     | True                 -> Type.Boolean
     | False                -> Type.Boolean
 
+let ety t = Type.ETy (ty t)
+    
 (*------------------------------------------------------------------*)
 exception Uncastable
 
