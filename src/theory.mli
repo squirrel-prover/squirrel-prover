@@ -112,8 +112,12 @@ val get_init_states :
 (** [declare_abstract n i m] declares a new function symbol
   * of type [index^i -> message^m -> message]. *)
 val declare_abstract :
-  Symbols.table -> lsymb -> index_arity:int -> message_arity:int
-  -> Symbols.table
+  Symbols.table -> lsymb ->
+  index_arity:int ->
+  ty_args:Ident.t list ->
+  in_tys:Type.ety list ->
+  out_ty:Type.ety list ->
+  Symbols.table
 
 (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
   * of type [s1->...->sn->s]

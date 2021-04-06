@@ -998,43 +998,65 @@ let convert_index table =
     ty_env = Type.Infer.mk_env ()
   }
 
-(** Declaration functions *)
+(*------------------------------------------------------------------*)
+(** {2 Function declarations} *)
 
-let declare_symbol table ?(index_arity=0) name info =
-  let def = index_arity,info in
-  fst (Symbols.Function.declare_exact table name def)
+let mk_ftype iarr vars args out =
+  let mdflt ty = odflt Type.emessage ty in
+  Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
+  
+  
+let declare_hash table ?index_arity ?in_ty ?out_ty s =
+  let index_arity = odflt 0 index_arity in
+  let ftype = mk_ftype index_arity [] [in_ty] out_ty in
+  let def = ftype, Symbols.Hash in
+  fst (Symbols.Function.declare_exact table s def)
 
-let declare_hash table ?index_arity s =
-  declare_symbol table ?index_arity s Symbols.Hash
-
-let declare_aenc table enc dec pk =
+let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
   let open Symbols in
-  let table, dec = Function.declare_exact table dec (0,ADec) in
-  let table, pk = Function.declare_exact table pk (0,PublicKey) in
+  let dec_fty = mk_ftype 0 [] [ctxt_ty; sk_ty] ptxt_ty in
+  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; pk_ty] ctxt_ty in
+  let pk_fty  = mk_ftype 0 [] [sk_ty] pk_ty in
+  
+  let table, dec = Function.declare_exact table dec (dec_fty,ADec) in
+  let table, pk = Function.declare_exact table pk (pk_fty,PublicKey) in
   let data = AssociatedFunctions [dec; pk] in
-  fst (Function.declare_exact table enc ~data (0,AEnc))
+  fst (Function.declare_exact table enc ~data (enc_fty,AEnc))
 
-let declare_senc table (enc : lsymb) (dec : lsymb) =
+let declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec = 
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
-  let table, dec = Function.declare_exact table dec ~data (0,SDec) in
+  let dec_fty = mk_ftype 0 [] [ctxt_ty] ptxt_ty in
+  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
+  
+  let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
   let data = AssociatedFunctions [dec] in
-  fst (Function.declare_exact table enc ~data (0,SEnc))
+  fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
 
-let declare_senc_joint_with_hash table (enc : lsymb) (dec : lsymb) (h : lsymb) =
+let declare_senc_joint_with_hash
+    table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec h =
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
                                   get_fun table h] in
-  let table, dec = Function.declare_exact table dec ~data (0,SDec) in
+  let dec_fty = mk_ftype 0 [] [ctxt_ty] ptxt_ty in
+  let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
+  let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
   let data = AssociatedFunctions [dec] in
-  fst (Function.declare_exact table enc ~data (0,SEnc))
+  fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
 
-let declare_signature table sign checksign pk =
+let declare_signature table sign ?m_ty ?sig_ty ?sk_ty ?pk_ty checksign pk =
   let open Symbols in
-  let table,sign = Function.declare_exact table sign (0,Sign) in
-  let table,pk = Function.declare_exact table pk (0,PublicKey) in
+  let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
+
+  (* TODO: types: change output type to booleans ? *)
+  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] (Some Type.emessage) in
+  
+  let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in
+
+  let table,sign = Function.declare_exact table sign (sig_fty, Sign) in
+  let table,pk = Function.declare_exact table pk (pk_fty,PublicKey) in
   let data = AssociatedFunctions [sign; pk] in
-  fst (Function.declare_exact table checksign ~data (0,CheckSign))
+  fst (Function.declare_exact table checksign ~data (check_fty,CheckSign))
 
 let check_signature table checksign pk =
   let def x = Symbols.Function.get_def x table in
@@ -1058,9 +1080,9 @@ let check_signature table checksign pk =
 let declare_name table s arity =
   fst (Symbols.Name.declare_exact table s arity)
 
-let declare_abstract table s ~index_arity ~message_arity =
-  let def = index_arity, Symbols.Abstract message_arity in
-  fst (Symbols.Function.declare_exact table s def)
+let declare_abstract table s ~index_arity ~ty_args ~in_tys ~out_ty =  
+  let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
+  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract))
 
 (** Empty *)
 
