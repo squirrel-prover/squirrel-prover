@@ -207,6 +207,7 @@ type conversion_error_i =
   | Index_not_var        of term_i
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
+  | Freetyunivar
 
 type conversion_error = L.t * conversion_error_i
 
@@ -264,6 +265,9 @@ let pp_error_i ppf = function
     Fmt.pf ppf "Kind error: %s has kind %a" s
       Symbols.pp_namespace n
 
+  | Freetyunivar -> Fmt.pf ppf "some type variable(s) could not \
+                                       be instantiated"
+    
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
     pp_loc_err loc
@@ -584,7 +588,7 @@ type conv_state = {
 
 (*------------------------------------------------------------------*)
 let check_type state tm (t : 'a Term.term) (ty : 'b Type.ty) : unit =
-  match Type.Infer.unify_leq state.ty_env (Type.ETy ty) (Term.ety t) with
+  match Type.Infer.unify_leq state.ty_env ty (Term.ty t) with
   | `Ok -> ()
   | `Fail -> raise (ty_error tm ty)
 
@@ -593,10 +597,11 @@ let check_type_e state tm (t : 'a Term.term) (ety : Type.ety) : unit =
   check_type state tm t ty
 
 (*------------------------------------------------------------------*)
+(* internal function to Theory.ml *)
 let rec convert :
   type s. conv_state -> term -> s Type.ty -> s Term.term =
   fun state tm ty ->
-    let t = convert state tm ty in
+    let t = convert0 state tm ty in
     check_type state tm t ty;
     t
 
@@ -845,16 +850,12 @@ and conv_app :
           let open Symbols in
           begin match of_lsymb f state.table with
             | Wrapped (symb, Function (_,_)) ->
+              (* refresh all type variables in [fty] *)
+              let fty = Type.freshen_ftype fty in
+              
               let l_indices, l_messages = List.takedrop fty.Type.fty_iarr l in
               let indices =
                 List.map (fun x -> conv_index state x) l_indices
-              in
-
-              (* We create a fresh type unification variable for every free type
-                 variable in [fty]. *)
-              let () = List.iter (fun ui ->
-                  ignore (Type.Infer.mk_univar state.ty_env : Type.ety)
-                ) fty.Type.fty_vars
               in
              
               let rmessages =
@@ -975,29 +976,6 @@ and conv_app :
 
 type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
-let econvert state t : eterm option =
-  let conv_s = function
-    | Type.ETy ty -> try
-        let tt = convert state t ty in
-        Some (ETerm (ty, tt, L.loc t))
-      with Conv _ -> None in
-
-  (* careful about the order. Because boolean is a subtyped of message, we
-     need to try boolean (the most precise type) first. *)
-  List.find_map conv_s
-    [Type.eboolean;
-     Type.emessage;
-     Type.eindex;
-     Type.etimestamp]
-
-let convert_index table =
-  conv_index {
-    table = table;
-    cntxt = InGoal;
-    subst = [];
-    ty_env = Type.Infer.mk_env ()
-  }
-
 (*------------------------------------------------------------------*)
 (** {2 Function declarations} *)
 
@@ -1044,7 +1022,7 @@ let declare_senc_joint_with_hash
   let data = AssociatedFunctions [dec] in
   fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
 
-let declare_signature table sign ?m_ty ?sig_ty ?sk_ty ?pk_ty checksign pk =
+let declare_signature table ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk =
   let open Symbols in
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
@@ -1080,14 +1058,16 @@ let check_signature table checksign pk =
 let declare_name table s arity =
   fst (Symbols.Name.declare_exact table s arity)
 
-let declare_abstract table s ~index_arity ~ty_args ~in_tys ~out_ty =  
+let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty s =  
   let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
   fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract))
 
+(*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
 (** Empty *)
-
 let empty loc = L.mk_loc loc (App (L.mk_loc loc "empty", []))
-
+   
 (** Apply a partial substitution to a term.
   * This is meant for formulas and local terms in processes,
   * and does not support optional timestamps.
@@ -1123,6 +1103,49 @@ let subst t (s : (string * term_i) list) =
 
   in aux t
 
+(*------------------------------------------------------------------*)
+(** {2 Exported conversion functions} *)
+
+(* exported outside to Theory.ml *)
+let convert :
+  type s. conv_env -> subst -> term -> s Type.ty -> s Term.term =
+  fun env subst tm ty ->
+  let state = {
+    table  = env.table;
+    cntxt  = env.cntxt;
+    subst  = subst;
+    ty_env = Type.Infer.mk_env (); }
+  in
+  let t = convert state tm ty in
+
+  if not (Type.Infer.is_closed state.ty_env) then
+    conv_err (L.loc tm) Freetyunivar;
+
+  t    
+
+let econvert cenv subst t : eterm option =
+  let conv_s = function
+    | Type.ETy ty -> try
+        let tt = convert cenv subst t ty in
+        Some (ETerm (ty, tt, L.loc t))
+      with Conv _ -> None in
+
+  (* careful about the order. Because boolean is a subtyped of message, we
+     need to try boolean (the most precise type) first. *)
+  List.find_map conv_s
+    [Type.eboolean;
+     Type.emessage;
+     Type.eindex;
+     Type.etimestamp]
+
+let convert_index table subst t =
+  match convert { table = table; cntxt = InGoal; } subst t Type.Index with
+  | Term.Var x -> x
+  | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
+
+(*------------------------------------------------------------------*)
+(** {2 Exported type-checking function} *)
+
 let check table ?(local=false) (env:env) t (Type.ETy s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
@@ -1134,6 +1157,10 @@ let check table ?(local=false) (env:env) t (Type.ETy s) : unit =
   in
   ignore (convert conv_env subst t s)
 
+(*------------------------------------------------------------------*)
+(** {2 State and substitution parsing} *)
+
+(*------------------------------------------------------------------*)
 let subst_of_env (env : Vars.env) : esubst list =
   let to_subst : Vars.evar -> esubst =
     fun (Vars.EVar v) ->

@@ -314,19 +314,14 @@ val mk_fun :
   Type.message term list ->
   Type.message term
     
-val mk_true  : message
-val mk_false : message
-
-val mk_zero : message
-
-val mk_g : message
-  
-val mk_fail : message
-
-val mk_len : 'a term -> message
-
-val mk_zeroes : 'a term -> message
-
+val mk_true   : message
+val mk_false  : message
+val mk_zero   : message
+val mk_g      : message 
+val mk_fail   : message
+val mk_len    : message -> message
+val mk_zeroes : message -> message
+val mk_pair   : message -> message -> message
  
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)

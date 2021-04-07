@@ -6,7 +6,6 @@ type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
 type boolean   = [`Boolean]
-type unknown   = [`Unknown]
 
 (*------------------------------------------------------------------*)
 (** Kinds of types *)
@@ -15,13 +14,22 @@ type _ kind =
   | KBoolean   : boolean   kind
   | KIndex     : index     kind
   | KTimestamp : timestamp kind
-  | KUnknown   : unknown   kind (* for type inference variable *)
 
 (*------------------------------------------------------------------*)
-(** Variable for type inference *)
+(** Type variables *)
+type tvar
+
+val pp_tvar : Format.formatter -> tvar -> unit
+
+val tvar_of_ident : Ident.t -> tvar
+  
+(*------------------------------------------------------------------*)
+(** Variables for type inference *)
 type univar
 
 val pp_univar : Format.formatter -> univar -> unit
+
+val univar_of_ident : Ident.t -> univar
   
 (*------------------------------------------------------------------*)
 (** Types of terms *)
@@ -33,14 +41,14 @@ type _ ty =
   | Timestamp : timestamp ty
 
   (** User-defined types *)
-  | TBase   : string  -> message ty
+  | TBase     : string -> message ty
         
   (** Type variable *)
-  | TVar    : Ident.t -> message ty
+  | TVar      : tvar -> message ty
 
   (** Type unification variable *)
-  | TUnivar : univar  -> unknown ty
-
+  | TUnivar   : univar -> message ty
+ 
 (*------------------------------------------------------------------*)
 type 'a t = 'a ty
 
@@ -52,16 +60,12 @@ val emessage   : ety
 val etimestamp : ety
 val eindex     : ety
 
-val ebase : string  -> ety
-val etvar : Ident.t -> ety
+val ebase : string -> ety
 
 val kind : 'a ty -> 'a kind
    
 (*------------------------------------------------------------------*)
-(** Equality witness for kinds *)
-type (_,_) kind_eq = Kind_eq : ('a, 'a) kind_eq
-
-(** Equality witness for types *)
+(** Equality witness for types and kinds *)
 type (_,_) type_eq = Type_eq : ('a, 'a) type_eq
 
 (*------------------------------------------------------------------*)
@@ -76,6 +80,8 @@ val equal_w : 'a ty -> 'b ty -> ('a,'b) type_eq option
 
 val equal   : 'a ty -> 'b ty -> bool
 
+val equalk_w : 'a kind -> 'b kind -> ('a,'b) type_eq option
+
 (*------------------------------------------------------------------*)
 val pp : Format.formatter -> 'a ty -> unit
 
@@ -86,22 +92,32 @@ val pp_e : Format.formatter -> ety -> unit
 
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
+    
+    where for every 1 ≤ i ≤ n, tauᵢ is of kind Message or Boolean
 *)
-type ftype = {
+type ftype = private {
   fty_iarr : int;          (** i *)
-  fty_vars : Ident.t list; (** a₁ ... 'aₙ *)  
+  fty_vars : univar list;  (** a₁ ... 'aₙ *)  
   fty_args : ety list;     (** τ₁ × ... × τₙ *)
   fty_out  : ety;          (** τ *)
 }
 
-val mk_ftype : int -> Ident.t list -> ety list -> ety -> ftype
+val mk_ftype : int -> univar list -> ety list -> ety -> ftype
 
+(** [freshen_ftype fty] refreshes the quantified type variables in [fty].  *)
+val freshen_ftype : ftype -> ftype
+  
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
 
 (** A substitution from unification variables to (existential) types. *)
-type tsubst = univar -> ety
+type tsubst
 
+val tsubst   : tsubst -> 'a ty -> 'a ty
+val tsubst_e : tsubst ->   ety ->   ety
+
+val tsubst_empty : tsubst
+  
 (*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
@@ -111,10 +127,10 @@ module Infer : sig
 
   val mk_env : unit -> env
     
-  val mk_univar : env -> ety
+  val mk_univar : env -> message ty
                          
-  val unify_eq  : env -> ety -> ety -> [`Fail | `Ok]
-  val unify_leq : env -> ety -> ety -> [`Fail | `Ok]
+  val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
+  val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
 
   val is_closed : env -> bool
   val close : env -> tsubst

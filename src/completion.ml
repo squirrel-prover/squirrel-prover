@@ -222,7 +222,7 @@ exception Unsupported_conversion
 let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
   let open Term in
   match c with
-  | Fun ((f,is),terms) ->
+  | Fun ((f,is),_,terms) ->
     let is = List.map cterm_of_var is
     and terms = List.map cterm_of_term terms in
     cfun (F f) (List.length is) (is @ terms)
@@ -254,56 +254,63 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
 and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
 
 
-let rec term_of_cterm : type a. a Type.ty -> cterm -> a Term.term = 
-  fun s c -> 
-  let open Term in 
-  match c.cnt with 
-  | Cfun (F f, ari, cterms) -> 
-    let cis, cterms = List.takedrop ari cterms in
-    let is = indices_of_cterms cis
-    and terms = terms_of_cterms Type.Message cterms in
-    let t = Fun ((f,is), terms) in
-    cast s t
-
-  | Cfun (M m, ari, cterms) -> 
-    let cis, cts = List.takedrop ari cterms in
-    let cts = as_seq1 cts in
-    let m = (m,s,indices_of_cterms cis) in
-    Macro (m, [], term_of_cterm Type.Timestamp cts)
-
-  | Cfun (A a, ari, is) -> 
-    assert (ari = List.length is);
-    let is = indices_of_cterms is in 
-    cast s (Action (a, is))
-
-  | Cfun (N n, ari, is) -> 
-    assert (ari = List.length is);
-    let is = indices_of_cterms is in
-    cast s (Name (n, is))
-
-  | Cfun (GPred, ari, ts) ->
-    assert (ari = 0);
-    let ts = as_seq1 ts in
-    let pred_ts = Pred (term_of_cterm Type.Timestamp ts) in
-    cast s pred_ts   
-
-  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m s)
-
-  | Ccst (Cst.Cgfuncst (`F f)) -> cast s (Fun ((f,[]),[]))
-  | Ccst (Cst.Cgfuncst (`A a)) -> cast s (Action (a,[]))
-  | Ccst (Cst.Cgfuncst (`N n)) -> cast s (Name   (n,[]))
-  
-  | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
-
-and index_of_cterm i = match term_of_cterm Type.Index i with
-  | Var i -> i
+(*------------------------------------------------------------------*)
+let index_of_cterm i = match i.cnt with
+  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Vars.cast m Type.Index
   | _ -> assert false
+    
+let indices_of_cterms cis = List.map index_of_cterm cis
 
-and indices_of_cterms cis = List.map index_of_cterm cis
+let term_of_cterm : type a. Symbols.table -> a Type.ty -> cterm -> a Term.term =
+  fun table s c ->  
+  let rec term_of_cterm : type a. a Type.ty -> cterm -> a Term.term = 
+    fun s c -> 
+      let open Term in 
+      match c.cnt with 
+      | Cfun (F f, ari, cterms) -> 
+        let cis, cterms = List.takedrop ari cterms in
+        let is = indices_of_cterms cis
+        and terms = terms_of_cterms Type.Message cterms in
+        let t = Term.mk_fun table f is terms in
+        cast s t
 
-and terms_of_cterms : type a. a Type.ty -> cterm list -> a Term.term list =
-  fun s cterms -> List.map (term_of_cterm s) cterms
+      | Cfun (M m, ari, cterms) -> 
+        let cis, cts = List.takedrop ari cterms in
+        let cts = as_seq1 cts in
+        let m = (m,s,indices_of_cterms cis) in
+        Macro (m, [], term_of_cterm Type.Timestamp cts)
 
+      | Cfun (A a, ari, is) -> 
+        assert (ari = List.length is);
+        let is = indices_of_cterms is in 
+        cast s (Action (a, is))
+
+      | Cfun (N n, ari, is) -> 
+        assert (ari = List.length is);
+        let is = indices_of_cterms is in
+        cast s (Name (n, is))
+
+      | Cfun (GPred, ari, ts) ->
+        assert (ari = 0);
+        let ts = as_seq1 ts in
+        let pred_ts = Pred (term_of_cterm Type.Timestamp ts) in
+        cast s pred_ts   
+
+      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m s)
+
+      | Ccst (Cst.Cgfuncst (`F f)) -> cast s (Term.mk_fun table f [] [])
+      | Ccst (Cst.Cgfuncst (`A a)) -> cast s (Action (a,[]))
+      | Ccst (Cst.Cgfuncst (`N n)) -> cast s (Name   (n,[]))
+
+      | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
+
+  and terms_of_cterms : type a. a Type.ty -> cterm list -> a Term.term list =
+    fun s cterms -> List.map (term_of_cterm s) cterms
+
+  in
+  term_of_cterm s c
+
+(*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
   | F x   -> Symbols.pp ppf x
   | M x   -> Symbols.pp ppf x
@@ -1299,7 +1306,8 @@ let rec complete_state state =
 let complete_state = Prof.mk_unary "complete_state" complete_state
 
 let check_zero_arity table fname =
-  assert (fst (Symbols.Function.get_def fname table) = 0)
+  let fty, _ = Symbols.Function.get_def fname table in
+  assert (fty.Type.fty_iarr = 0)
 
 let check_zero_arities table fnames =
   List.iter (check_zero_arity table) fnames
@@ -1558,7 +1566,7 @@ let name_index_cnstrs state l =
 (** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
     rewrite relation in [state], and adds the fact that the name must be equal
     to one of the name appearing inside the term. *)
-let name_indep_cnstrs state l =
+let name_indep_cnstrs table state l =
   let n_cnstr a b = 
     if not (is_name a) && not (is_name b) then []
     else
@@ -1573,12 +1581,12 @@ let name_indep_cnstrs state l =
         match l with
         | [] -> False
         | [p] -> Atom (`Message (`Eq, 
-                                 term_of_cterm Type.Message p, 
-                                 term_of_cterm Type.Message name))
+                                 term_of_cterm table Type.Message p, 
+                                 term_of_cterm table Type.Message name))
         | p::q ->
           Or(Atom (`Message (`Eq, 
-                             term_of_cterm Type.Message p, 
-                             term_of_cterm Type.Message name)),
+                             term_of_cterm table Type.Message p, 
+                             term_of_cterm table Type.Message name)),
              mk_disjunction q)
       in
       [mk_disjunction sub_names]
@@ -1603,7 +1611,7 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
-       let fi = 0, Symbols.Abstract 0 in
+       let fi = Type.mk_ftype 0 [] [] Type.emessage, Symbols.Abstract in
        let table,ffs =
          Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =

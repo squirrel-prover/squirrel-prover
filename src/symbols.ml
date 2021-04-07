@@ -521,47 +521,48 @@ let fs_diff  = mk_fsymb "diff" 2
 
 (** Boolean connectives *)
 
-let fs_false  = mk_fsymb "false" 0
-let fs_true   = mk_fsymb "true" 0
-let fs_and    = mk_fsymb "and" 2
-let fs_or     = mk_fsymb "or" 2
-let fs_not    = mk_fsymb "not" 1
+let fs_false = mk_fsymb "false" 0
+let fs_true  = mk_fsymb "true" 0
+let fs_and   = mk_fsymb "and" 2
+let fs_or    = mk_fsymb "or" 2
+let fs_not   = mk_fsymb "not" 1
 
 let fs_ite =
-  let tyvar = Ident.create "t" in
+  let tyvar = Type.univar_of_ident (Ident.create "t") in
+  let etyvar = Type.(ETy (TUnivar tyvar)) in
   let fty = Type.mk_ftype
       0 [tyvar]
-      [Type.eboolean; Type.etvar tyvar;Type.etvar tyvar]
-      (Type.etvar tyvar) in
+      [Type.eboolean; etyvar; etyvar]
+      etyvar in
   mk_fsymb ~fty "if" (-1)
 
 (** Fail *)
 
-let fs_fail   = mk_fsymb "fail" 0
+let fs_fail = mk_fsymb "fail" 0
 
 (** Xor and its unit *)
 
-let fs_xor    = mk_fsymb "xor" 2
-let fs_zero   = mk_fsymb "zero" 0
+let fs_xor  = mk_fsymb "xor" 2
+let fs_zero = mk_fsymb "zero" 0
 
 (** Successor over natural numbers *)
 
-let fs_succ   = mk_fsymb "succ" 1
+let fs_succ = mk_fsymb "succ" 1
 
 (** Pairing *)
 
 let fs_pair = mk_fsymb "pair" 2   
-let fs_fst = mk_fsymb "fst" 1
-let fs_snd = mk_fsymb "snd" 1
+let fs_fst  = mk_fsymb "fst" 1
+let fs_snd  = mk_fsymb "snd" 1
 
 (** Exp **)
 
-let fs_exp    = mk_fsymb "exp" 2
-let fs_g      = mk_fsymb "g" 0
+let fs_exp  = mk_fsymb "exp" 2
+let fs_g    = mk_fsymb "g" 0
 
 (** Empty *)
 
-let fs_empty  = mk_fsymb "empty" 0
+let fs_empty = mk_fsymb "empty" 0
 
 (** Length *)
   

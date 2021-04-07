@@ -131,31 +131,85 @@ type eq_atom = [
 ]
 
 (*------------------------------------------------------------------*)
-let rec ty : type a. a term -> a Type.t =
+let rec kind : type a. a term -> a Type.kind =
   fun t -> match t with
-    | Fun (_,ftype,_)      ->
-      assert false
-      (* ftype.fty_out *) (* TODO: !! *)
+    | Name _               -> Type.KMessage
+    | Macro ((_,s,_),_,_)  -> Type.kind s
+    | Seq _                -> Type.KMessage
+    | Var v                -> Vars.kind v
+    | Pred _               -> Type.KTimestamp
+    | Action _             -> Type.KTimestamp
+    | Diff (a, b)          -> kind a
+    | ITE (a, b, c)        -> Type.KMessage
+    | Find (a, b, c, d)    -> Type.KMessage
+    | Atom _               -> Type.KBoolean
+    | ForAll _             -> Type.KBoolean
+    | Exists _             -> Type.KBoolean
+    | And _                -> Type.KBoolean
+    | Or _                 -> Type.KBoolean
+    | Not _                -> Type.KBoolean
+    | Impl _               -> Type.KBoolean
+    | True                 -> Type.KBoolean
+    | False                -> Type.KBoolean
+    | Fun (_,fty,_) ->
+      match fty.Type.fty_out with
+      | Type.ETy ty_out ->
+        match Type.kind ty_out with
+        | Type.KMessage -> Type.KMessage
+        | _ -> assert false     (* TODO: allow function with boolean output *)
         
-    | Name _               -> Type.Message
-    | Macro ((_,s,_),_,_)  -> s
-    | Seq _                -> Type.Message
-    | Var v                -> Vars.ty v
-    | Pred _               -> Type.Timestamp
-    | Action _             -> Type.Timestamp
-    | Diff (a, b)          -> ty a
-    | ITE (a, b, c)        -> Type.Message
-    | Find (a, b, c, d)    -> Type.Message
-    | Atom _               -> Type.Boolean
-    | ForAll _             -> Type.Boolean
-    | Exists _             -> Type.Boolean
-    | And _                -> Type.Boolean
-    | Or _                 -> Type.Boolean
-    | Not _                -> Type.Boolean
-    | Impl _               -> Type.Boolean
-    | True                 -> Type.Boolean
-    | False                -> Type.Boolean
+(*------------------------------------------------------------------*)
+let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
+  fun ?ty_env t ->
+  let must_close, ty_env = match ty_env with
+    | None        -> true, Type.Infer.mk_env ()
+    | Some ty_env -> false, ty_env
+  in
+  
+  let rec ty : type a. a term -> a Type.t =
+    fun t -> match t with
+      | Fun (_,fty,terms) ->
+        let fty = Type.freshen_ftype fty in
+        List.iter2 (fun arg (Type.ETy arg_ty) ->
+            match Type.kind arg_ty, kind arg with
+            | Type.KMessage, Type.KMessage ->
+              ignore(ty arg arg_ty);
+          ) terms fty.Type.fty_args;
+        begin
+          (* match fty.Type.fty_out *)
+          assert false
+        end
 
+      (* ftype.fty_out *) (* TODO: !! *)
+
+      | Name _               -> Type.Message
+      | Macro ((_,s,_),_,_)  -> s
+      | Seq _                -> Type.Message
+      | Var v                -> Vars.ty v
+      | Pred _               -> Type.Timestamp
+      | Action _             -> Type.Timestamp
+      | Diff (a, b)          -> ty a
+      | ITE (a, b, c)        -> Type.Message
+      | Find (a, b, c, d)    -> Type.Message
+      | Atom _               -> Type.Boolean
+      | ForAll _             -> Type.Boolean
+      | Exists _             -> Type.Boolean
+      | And _                -> Type.Boolean
+      | Or _                 -> Type.Boolean
+      | Not _                -> Type.Boolean
+      | Impl _               -> Type.Boolean
+      | True                 -> Type.Boolean
+      | False                -> Type.Boolean
+
+  in
+  
+  let tty = ty t in
+
+  if must_close
+  then Type.tsubst (Type.Infer.close ty_env) tty (* ty_env should be closed *)
+  else tty
+
+    
 let ety t = Type.ETy (ty t)
     
 (*------------------------------------------------------------------*)
@@ -268,6 +322,9 @@ let mk_len term =
 
 let mk_zeroes term =
   mk_fun Symbols.builtins_table Symbols.fs_zeroes [] [term]
+
+let mk_pair t0 t1 =
+  mk_fun Symbols.builtins_table Symbols.fs_pair [] [t0;t1]
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
@@ -1438,13 +1495,13 @@ let () =
       let b = mkvar "b" Type.Message in
       let c = mkvar "c" Type.Message in
 
-      let fty = Type.mk_ftype [] [Type.emessage;Type.emessage] Type.emessage in  
+      let fty = Type.mk_ftype 0 [] [Type.emessage;Type.emessage] Type.emessage in  
 
-      let def = Symbols.Abstract fty in
+      let def = fty, Symbols.Abstract in
       let table,f =
         Symbols.Function.declare_exact 
-          Symbols.builtins_table (L.mk_loc L._dummy "f") (fty,def) in
-      let fty = Type.mk_ftype [] [] Type.emessage in
+          Symbols.builtins_table (L.mk_loc L._dummy "f") def in
+      let fty = Type.mk_ftype 0 [] [] Type.emessage in
       let f x = Fun ((f,[]),fty,[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term PLeft t in

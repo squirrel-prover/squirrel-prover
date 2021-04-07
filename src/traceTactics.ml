@@ -1300,7 +1300,9 @@ let eq_names (s : TraceSequent.t) =
   let terms = TraceSequent.get_all_messages s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
-  let new_eqs = Completion.name_indep_cnstrs trs terms in
+  let new_eqs =
+    Completion.name_indep_cnstrs (TraceSequent.table s) trs terms
+  in
   let s =
     List.fold_left (fun s c ->
         let () = dbg "new name equality (indep): %a" Term.pp c in

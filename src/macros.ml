@@ -66,17 +66,19 @@ let get_def :
             snd descr.Action.output
           | _ -> assert false
         end
+        
       | Symbols.Frame, _ ->
           begin match a with
-            | Term.Action (s,_) when s = Symbols.init_action -> Term.Fun (f_zero,[])
+            | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
             | Term.Action _ ->
-                Term.Fun(Term.f_pair,
-                  [Term.Macro ((name,sort,args), [], Term.Pred a);
-                   Term.Fun (Term.f_pair,
-                    [Term.boolToMessage (Term.Macro (Term.exec_macro, [], a));
-                     Term.ITE(Term.Macro (Term.exec_macro, [], a),
-                                          Term.Macro (Term.out_macro, [], a),
-                                          Term.Fun(Term.f_zero,[]))])])
+              Term.mk_pair
+                (Term.Macro ((name,sort,args), [], Term.Pred a))
+                (Term.mk_pair
+                   (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
+                   (Term.ITE (Term.Macro (Term.exec_macro, [], a),
+                              Term.Macro (Term.out_macro, [], a),
+                              Term.mk_zero)))
+                
             | _ -> assert false
           end
 
@@ -113,6 +115,7 @@ let get_def :
             end
           | _ -> assert false
         end
+        
       | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
           | Action (tsymb,tidx) ->
