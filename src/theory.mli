@@ -2,6 +2,23 @@
   * functions to type-check them, and convert them to proper
   * terms and formulas of the logic. *)
 
+module L = Location
+
+type lsymb = string L.located
+
+(*------------------------------------------------------------------*)
+(** {2 Types } *)
+
+type p_ty =
+  | P_message
+  | P_boolean
+  | P_index  
+  | P_timestamp
+  | P_tbase of lsymb
+  | P_tvar  of lsymb
+
+val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
+
 (*------------------------------------------------------------------*)
 (** {2 Terms}
   *
@@ -13,8 +30,6 @@
   * Symbols cannot be disambiguated at parsing time, hence we use very
   * permissives [App] and [AppAt] constructors which represents
   * function applications, macros, variables, names etc. *)
-
-type lsymb = string Location.located
 
 type term_i =
   | Tinit
@@ -47,7 +62,7 @@ type term_i =
   | True
   | False
 
-and term = term_i Location.located
+and term = term_i L.located
 
 type formula = term
 
@@ -64,7 +79,10 @@ val equal : term -> term -> bool
     satisfies PRF, and thus collision-resistance and EUF. *)
 val declare_hash :
   Symbols.table ->
-  ?index_arity:int -> ?in_ty:Type.ety -> ?out_ty:Type.ety ->
+  ?index_arity:int ->
+  ?in_ty:Type.message Type.ty ->
+  ?k_ty:Type.message Type.ty ->
+  ?out_ty:Type.message Type.ty ->
   lsymb ->
   Symbols.table
 
@@ -73,11 +91,11 @@ val declare_hash :
     It models an authenticated encryption. *)
 val declare_aenc :
   Symbols.table ->
-  ?ptxt_ty:Type.ety ->
-  ?ctxt_ty:Type.ety ->
-  ?rnd_ty:Type.ety ->
-  ?sk_ty:Type.ety ->
-  ?pk_ty:Type.ety ->
+  ?ptxt_ty:Type.message Type.ty ->
+  ?ctxt_ty:Type.message Type.ty ->
+  ?rnd_ty:Type.message Type.ty ->
+  ?sk_ty:Type.message Type.ty ->
+  ?pk_ty:Type.message Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -86,10 +104,10 @@ val declare_aenc :
     It models an authenticated encryption. *)
 val declare_senc :
   Symbols.table ->
-  ?ptxt_ty:Type.ety ->
-  ?ctxt_ty:Type.ety ->
-  ?rnd_ty:Type.ety ->
-  ?k_ty:Type.ety ->
+  ?ptxt_ty:Type.message Type.ty ->
+  ?ctxt_ty:Type.message Type.ty ->
+  ?rnd_ty:Type.message Type.ty ->
+  ?k_ty:Type.message Type.ty ->
   lsymb -> lsymb ->
   Symbols.table
 
@@ -98,10 +116,10 @@ val declare_senc :
     It models an authenticated encryption, jointly secure with hashes of the key.*)
 val declare_senc_joint_with_hash :
   Symbols.table ->
-  ?ptxt_ty:Type.ety ->
-  ?ctxt_ty:Type.ety ->
-  ?rnd_ty:Type.ety ->
-  ?k_ty:Type.ety ->
+  ?ptxt_ty:Type.message Type.ty ->
+  ?ctxt_ty:Type.message Type.ty ->
+  ?rnd_ty:Type.message Type.ty ->
+  ?k_ty:Type.message Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -109,10 +127,10 @@ val declare_senc_joint_with_hash :
     It satisfies EUF. *)
 val declare_signature :
   Symbols.table ->
-  ?m_ty:Type.ety ->
-  ?sig_ty:Type.ety ->
-  ?sk_ty:Type.ety ->
-  ?pk_ty:Type.ety ->
+  ?m_ty:Type.message Type.ty ->
+  ?sig_ty:Type.message Type.ty ->
+  ?sk_ty:Type.message Type.ty ->
+  ?pk_ty:Type.message Type.ty ->
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
@@ -141,8 +159,8 @@ val declare_abstract :
   Symbols.table -> 
   index_arity:int ->
   ty_args:Type.univar list ->
-  in_tys:Type.ety list ->
-  out_ty:Type.ety ->
+  in_tys:Type.message Type.ty list ->
+  out_ty:Type.message Type.ty ->
   lsymb ->
   Symbols.table
 
@@ -156,11 +174,11 @@ val declare_macro :
 (*------------------------------------------------------------------*)
 (** {2 Term builders } *)
 
-val empty : Location.t -> term
+val empty : L.t -> term
 
 (** [var_i x] make a variable represented as [App (x,\[\])] *)
-val var_i        : Location.t -> string -> term_i
-val var          : Location.t -> string -> term
+val var_i        : L.t -> string -> term_i
+val var          : L.t -> string -> term
 val var_of_lsymb : lsymb                -> term
 
 val destr_var : term_i -> lsymb option
@@ -185,13 +203,14 @@ type conversion_error_i =
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
-    
-type conversion_error = Location.t * conversion_error_i
+  | UnknownTypeVar       of string
+      
+type conversion_error = L.t * conversion_error_i
 
 exception Conv of conversion_error
 
 val pp_error :
-  (Format.formatter -> Location.t -> unit) ->
+  (Format.formatter -> L.t -> unit) ->
   Format.formatter -> conversion_error -> unit
 
 type env = (string * Type.ety) list
@@ -240,7 +259,7 @@ val convert : conv_env -> subst -> term -> 'a Type.ty -> 'a Term.term
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)
-type eterm = ETerm : 'a Type.ty * 'a Term.term * Location.t -> eterm
+type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
 (** Convert a term to any sort (tries sequentially all conversions).
     Should return the most precise sort (i.e. [Boolean] before [Message]). *)

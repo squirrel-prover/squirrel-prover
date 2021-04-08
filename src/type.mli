@@ -1,7 +1,7 @@
 (** This modules provides the types used to type variables and terms.
     The type is explicit, so that we can construct terms as GADT over it. *)
 
-
+(*------------------------------------------------------------------*)
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
@@ -22,6 +22,7 @@ type tvar
 val pp_tvar : Format.formatter -> tvar -> unit
 
 val tvar_of_ident : Ident.t -> tvar
+val ident_of_tvar : tvar -> Ident.t
   
 (*------------------------------------------------------------------*)
 (** Variables for type inference *)
@@ -92,17 +93,15 @@ val pp_e : Format.formatter -> ety -> unit
 
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
-    
-    where for every 1 ≤ i ≤ n, tauᵢ is of kind Message or Boolean
 *)
 type ftype = private {
-  fty_iarr : int;          (** i *)
-  fty_vars : univar list;  (** a₁ ... 'aₙ *)  
-  fty_args : ety list;     (** τ₁ × ... × τₙ *)
-  fty_out  : ety;          (** τ *)
+  fty_iarr : int;             (** i *)
+  fty_vars : univar list;     (** a₁ ... 'aₙ *)  
+  fty_args : message ty list; (** τ₁ × ... × τₙ *)
+  fty_out  : message ty;      (** τ *)
 }
 
-val mk_ftype : int -> univar list -> ety list -> ety -> ftype
+val mk_ftype : int -> univar list -> message ty list -> message ty -> ftype
 
 (** [freshen_ftype fty] refreshes the quantified type variables in [fty].  *)
 val freshen_ftype : ftype -> ftype

@@ -168,8 +168,8 @@ val disjunction_to_literals : formula -> literal list option
 
 val pp : Format.formatter -> 'a term -> unit
 
-val ty  : 'a term -> 'a Type.ty
-val ety : 'a term -> Type.ety
+val ty  : ?ty_env:Type.Infer.env -> 'a term -> 'a Type.ty
+val ety : ?ty_env:Type.Infer.env -> 'a term -> Type.ety
 
 (*------------------------------------------------------------------*)
 exception Uncastable
@@ -280,7 +280,7 @@ val f_false  : fsymb
 val f_and    : fsymb
 val f_or     : fsymb
 val f_not    : fsymb
-val f_ite    : fsymb
+(* val f_ite    : fsymb *)
 
 val f_diff   : fsymb
 

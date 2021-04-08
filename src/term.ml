@@ -151,12 +151,7 @@ let rec kind : type a. a term -> a Type.kind =
     | Impl _               -> Type.KBoolean
     | True                 -> Type.KBoolean
     | False                -> Type.KBoolean
-    | Fun (_,fty,_) ->
-      match fty.Type.fty_out with
-      | Type.ETy ty_out ->
-        match Type.kind ty_out with
-        | Type.KMessage -> Type.KMessage
-        | _ -> assert false     (* TODO: allow function with boolean output *)
+    | Fun (_,fty,_)        -> Type.KMessage
         
 (*------------------------------------------------------------------*)
 let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
@@ -170,17 +165,14 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
     fun t -> match t with
       | Fun (_,fty,terms) ->
         let fty = Type.freshen_ftype fty in
-        List.iter2 (fun arg (Type.ETy arg_ty) ->
-            match Type.kind arg_ty, kind arg with
-            | Type.KMessage, Type.KMessage ->
-              ignore(ty arg arg_ty);
-          ) terms fty.Type.fty_args;
-        begin
-          (* match fty.Type.fty_out *)
-          assert false
-        end
-
-      (* ftype.fty_out *) (* TODO: !! *)
+        let () =
+          List.iter2 (fun arg arg_ty ->
+              match Type.Infer.unify_leq ty_env (ty arg) arg_ty with
+              | `Ok -> ()
+              | `Fail -> assert false
+            ) terms fty.Type.fty_args
+        in
+        fty.Type.fty_out
 
       | Name _               -> Type.Message
       | Macro ((_,s,_),_,_)  -> s
@@ -210,7 +202,7 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
   else tty
 
     
-let ety t = Type.ETy (ty t)
+let ety ?ty_env t = Type.ETy (ty ?ty_env t)
     
 (*------------------------------------------------------------------*)
 exception Uncastable
@@ -252,7 +244,7 @@ let f_true   = mk Symbols.fs_true
 let f_and    = mk Symbols.fs_and
 let f_or     = mk Symbols.fs_or
 let f_not    = mk Symbols.fs_not
-let f_ite    = mk Symbols.fs_ite
+(* let f_ite    = mk Symbols.fs_ite *)
 
 (** Fail *)
 
@@ -1495,13 +1487,13 @@ let () =
       let b = mkvar "b" Type.Message in
       let c = mkvar "c" Type.Message in
 
-      let fty = Type.mk_ftype 0 [] [Type.emessage;Type.emessage] Type.emessage in  
+      let fty = Type.mk_ftype 0 [] [Type.Message;Type.Message] Type.Message in  
 
       let def = fty, Symbols.Abstract in
       let table,f =
         Symbols.Function.declare_exact 
           Symbols.builtins_table (L.mk_loc L._dummy "f") def in
-      let fty = Type.mk_ftype 0 [] [] Type.emessage in
+      let fty = Type.mk_ftype 0 [] [] Type.Message in
       let f x = Fun ((f,[]),fty,[x]) in
       let t = Diff (f (Diff(a,b)), c) in
       let r = head_pi_term PLeft t in

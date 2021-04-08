@@ -36,8 +36,6 @@ type 'a t = symb
 type group = string
 let default_group = ""
 
-type kind = Type.ety
-
 type function_def =
   | Hash
   | AEnc
@@ -51,9 +49,9 @@ type function_def =
 
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * kind
+  | State  of int * Type.ety
   | Global of int
-  | Local of kind list * kind
+  | Local  of Type.ety list * Type.ety
 
 type channel
 type name
@@ -502,16 +500,18 @@ let () = builtin_ref := table
 
 (** {3 Function symbols builtins} *)
 
-(* makes simple function types *)
+(** makes simple function types *)
 let mk_ty arity =
-  Type.mk_ftype 0 [] (List.init arity (fun _ -> Type.emessage)) Type.emessage
+  Type.mk_ftype 0 [] (List.init arity (fun _ -> Type.Message)) Type.Message
     
 let mk_fsymb ?fty f arity =
   let fty = match fty with
     | None -> mk_ty arity
     | Some fty -> fty in
   let info = fty, Abstract in
-  let table, f = Function.declare_exact !builtin_ref (L.mk_loc L._dummy f) info in
+  let table, f =
+    Function.declare_exact !builtin_ref (L.mk_loc L._dummy f) info
+  in
   builtin_ref := table;
   f
 
@@ -527,14 +527,14 @@ let fs_and   = mk_fsymb "and" 2
 let fs_or    = mk_fsymb "or" 2
 let fs_not   = mk_fsymb "not" 1
 
-let fs_ite =
-  let tyvar = Type.univar_of_ident (Ident.create "t") in
-  let etyvar = Type.(ETy (TUnivar tyvar)) in
-  let fty = Type.mk_ftype
-      0 [tyvar]
-      [Type.eboolean; etyvar; etyvar]
-      etyvar in
-  mk_fsymb ~fty "if" (-1)
+(* let fs_ite =
+ *   let tyv = Type.univar_of_ident (Ident.create "t") in
+ *   let tyvar = Type.TUnivar tyv in
+ *   let fty = Type.mk_ftype
+ *       0 [tyv]
+ *       [Type.Boolean; tyvar; tyvar]
+ *       etyvar in
+ *   mk_fsymb ~fty "if" (-1) *)
 
 (** Fail *)
 

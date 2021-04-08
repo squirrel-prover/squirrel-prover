@@ -195,7 +195,7 @@ let rec main_loop ~test ?(save=true) state =
 
   | exception (Process.ProcError e) ->
     error ~test state (fun fmt -> Process.pp_proc_error pp_loc_error fmt e)
-      
+
   | exception (Prover.Decl_error e) when not test ->
     error ~test state (fun fmt -> Prover.pp_decl_error pp_loc_error fmt e)
       

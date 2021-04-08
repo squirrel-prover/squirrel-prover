@@ -242,9 +242,11 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
 
   | Var m  -> ccst (Cst.Cmvar (Vars.EVar m))
 
-  | ITE(b,c,d) -> cfun (F Symbols.fs_ite) 0 [ cterm_of_term b;
-                                              cterm_of_term c;
-                                              cterm_of_term d ]
+  (* | ITE(b,c,d) -> cfun (F Symbols.fs_ite) 0 [ cterm_of_term b;
+   *                                             cterm_of_term c;
+   *                                             cterm_of_term d ] *)
+  | ITE _ -> raise Unsupported_conversion
+
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
   | Term.Pred ts -> cfun GPred 0 [cterm_of_term ts]
@@ -428,12 +430,12 @@ module Theories = struct
 
     not_rules @ and_rules @ or_rules
 
-  (** Some simple IfThenElse rules. A lot of rules are missing. *)
-  let mk_simpl_ite () =
-    let u, v, s, b = mk_var (), mk_var (), mk_var (), mk_var () in
-    [( cfun (F Symbols.fs_ite) 0 [t_true; u; mk_var ()], u);
-     ( cfun (F Symbols.fs_ite) 0 [t_false; mk_var (); v], v);
-     ( cfun (F Symbols.fs_ite) 0 [b; s; s], s)]
+  (* (\** Some simple IfThenElse rules. A lot of rules are missing. *\)
+   * let mk_simpl_ite () =
+   *   let u, v, s, b = mk_var (), mk_var (), mk_var (), mk_var () in
+   *   [( cfun (F Symbols.fs_ite) 0 [t_true; u; mk_var ()], u);
+   *    ( cfun (F Symbols.fs_ite) 0 [t_false; mk_var (); v], v);
+   *    ( cfun (F Symbols.fs_ite) 0 [b; s; s], s)] *)
 end
 
 
@@ -1611,7 +1613,7 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
-       let fi = Type.mk_ftype 0 [] [] Type.emessage, Symbols.Abstract in
+       let fi = Type.mk_ftype 0 [] [] Type.Message, Symbols.Abstract in
        let table,ffs =
          Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =

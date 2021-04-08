@@ -3,6 +3,7 @@
    matching for GADT built using those types are considered as non
    exhaustive. *)
 
+(*------------------------------------------------------------------*)
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
@@ -24,6 +25,7 @@ type tvar = Ident.t
 let pp_tvar fmt id = Fmt.pf fmt "'%a" Ident.pp id
 
 let tvar_of_ident id = id
+let ident_of_tvar id = id
   
 (*------------------------------------------------------------------*)
 (** Variable for type inference *)
@@ -47,7 +49,7 @@ type _ ty =
   | TBase     : string -> message ty
         
   (** Type variable *)
-  | TVar      : tvar -> message ty
+  | TVar      : tvar   -> message ty
 
   (** Type unification variable *)
   | TUnivar   : univar -> message ty
@@ -145,14 +147,12 @@ let pp_e ppf (ETy t) = pp ppf t
 
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
-
-    where for every 1 ≤ i ≤ n, tauᵢ is of kind Message or Boolean
 *)
 type ftype = {
-  fty_iarr : int;          (** i *)
-  fty_vars : univar list;  (** a₁ ... 'aₙ *)  
-  fty_args : ety list;     (** τ₁ × ... × τₙ *)
-  fty_out  : ety;          (** τ *)
+  fty_iarr : int;             (** i *)
+  fty_vars : univar list;     (** a₁ ... 'aₙ *)  
+  fty_args : message ty list; (** τ₁ × ... × τₙ *)
+  fty_out  : message ty;      (** τ *)
 }
 
 let mk_ftype iarr vars args out = {
@@ -216,8 +216,8 @@ let freshen_ftype (fty : ftype) : ftype =
 
   (* compute the new function type *)
   { fty with fty_vars = vars_f;
-             fty_args = List.map (tsubst_e ts) fty.fty_args;
-             fty_out = tsubst_e ts fty.fty_out; }
+             fty_args = List.map (tsubst ts) fty.fty_args;
+             fty_out  = tsubst ts fty.fty_out; }
   
 (*------------------------------------------------------------------*)
 (** {2 Type inference } *)
@@ -302,3 +302,4 @@ end = struct
   let unify_leq env (t : 'a ty) (t' : 'b ty) : [`Fail | `Ok] =
     unify_eq env t t'
 end
+

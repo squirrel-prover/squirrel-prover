@@ -267,7 +267,7 @@ val fs_false  : fname t
 val fs_and    : fname t
 val fs_or     : fname t
 val fs_not    : fname t
-val fs_ite    : fname t
+(* val fs_ite    : fname t *)
 
 (** Successor over natural numbers *)
 

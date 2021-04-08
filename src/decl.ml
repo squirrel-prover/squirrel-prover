@@ -24,9 +24,11 @@ let pp_macro_decl fmt (s, args, k, t) =
     Type.pp_e k Theory.pp t
 
 (*------------------------------------------------------------------*)
-type abstract_decl = { name          : lsymb;
-                       index_arity   : int;
-                       message_arity : int; }
+type abstract_decl = { name        : lsymb;
+                       ty_args     : lsymb list; (* type variables *)
+                       index_arity : int;
+                       in_tys      : Theory.p_ty list;
+                       out_ty      : Theory.p_ty; }
 
 let pp_abstract_decl fmt decl =
   Fmt.pf fmt "@[<hov 2>abstract %s : %a → %a@]"

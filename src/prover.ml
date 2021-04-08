@@ -903,13 +903,12 @@ let declare_i table decl = match L.unloc decl with
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
     Theory.declare_signature table sign checksign pk
   | Decl.Decl_abstract decl ->
-    assert false                (* TODO *)
-      (* Theory.declare_abstract
-       * table decl.name
-       * index_arity:
-       * ty_args:
-       * in_tys:
-       * out_ty: *)
+    Theory.declare_abstract
+      table decl.name
+      index_arity:
+      ty_args:
+      in_tys:
+      out_ty:
 
 
 let declare table decl =

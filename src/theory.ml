@@ -5,6 +5,18 @@ module L = Location
 type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
+(** {2 Types} *)
+
+type p_ty =
+  | P_message
+  | P_boolean
+  | P_index  
+  | P_timestamp
+  | P_tbase of lsymb
+  | P_tvar  of lsymb
+
+(*------------------------------------------------------------------*)
+(** {2 Terms and formulas} *)
 type term_i =
   | Tinit
   | Tpred of term
@@ -208,6 +220,7 @@ type conversion_error_i =
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
+  | UnknownTypeVar of string        
 
 type conversion_error = L.t * conversion_error_i
 
@@ -267,11 +280,39 @@ let pp_error_i ppf = function
 
   | Freetyunivar -> Fmt.pf ppf "some type variable(s) could not \
                                        be instantiated"
-    
+
+  | UnknownTypeVar ty ->
+    Fmt.pf ppf "undefined type variable %s" ty
+
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
     pp_loc_err loc
     pp_error_i e
+
+(*------------------------------------------------------------------*)
+(** {2 Parsing types } *)
+
+let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ety =
+  match pty with
+  | P_message        -> Type.ETy (Message  )
+  | P_boolean        -> Type.ETy (Boolean  )
+  | P_index          -> Type.ETy (Index    )
+  | P_timestamp      -> Type.ETy (Timestamp)
+
+  | P_tvar tv_l ->
+    let tv =
+      try
+        List.find (fun tv' ->
+            let tv' = Type.ident_of_tvar tv' in
+            Ident.name tv' = L.unloc tv_l
+          ) tvars
+      with Not_found ->
+        conv_err (L.loc tv_l) (UnknownTypeVar (L.unloc tv_l))
+    in
+    ETy (TVar tv)
+
+  | P_tbase tb_l -> assert false (* TODO: types*)
+(* ETy (TBase    ) *)
 
 (*------------------------------------------------------------------*)
 (** {2 Type checking} *)
@@ -285,12 +326,23 @@ let check_arity lsymb actual expected =
 
 type env = (string * Type.ety) list
 
-let ftype_arity ftype =
-  ftype.Type.fty_iarr + (List.length ftype.Type.fty_args)
+(** Type of a macro *)
+type mtype = Type.ety list * Type.ety (* args, out *)
 
+(** Macro or function type *)
+type mf_type = [`Fun of Type.ftype | `Macro of mtype]
+
+let ftype_arity (fty : Type.ftype) =
+  fty.Type.fty_iarr + (List.length fty.Type.fty_args)
+                      
+let mf_type_arity (ty : mf_type) =
+  match ty with
+  | `Fun ftype   -> ftype_arity ftype
+  | `Macro (l,_) -> List.length l
+                               
 (** Get the kind of a function or macro definition.
   * In the latter case, the timestamp argument is not accounted for. *)
-let function_kind table (f : lsymb) : Type.ftype =
+let function_kind table (f : lsymb) : mf_type =
   let open Symbols in
   match def_of_lsymb f table with
   (* we should never encounter a situation where we
@@ -298,20 +350,19 @@ let function_kind table (f : lsymb) : Type.ftype =
   | Reserved _ -> assert false
     
   | Exists d -> match d with
-    | Function (fty, _) -> fty
+    | Function (fty, _) -> `Fun fty
 
-    | Macro (Local (targs,k)) ->
-      Type.mk_ftype 0 [] targs k
+    | Macro (Local (targs,k)) -> `Macro (targs, k)
 
     | Macro (Global arity) ->
       let targs = (List.init arity (fun _ -> Type.eindex)) in
-      Type.mk_ftype 0 [] targs Type.emessage 
+      `Macro (targs, Type.emessage)
 
     | Macro (Input|Output|Frame) -> 
-      Type.mk_ftype 0 [] [] Type.emessage
+      `Macro ([], Type.emessage)
 
     | Macro (Cond|Exec) ->
-      Type.mk_ftype 0 [] [] Type.eboolean
+      `Macro ([], Type.eboolean)
 
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
@@ -421,9 +472,9 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
     begin match d with
     | Symbols.Function (ftype,fdef) ->
       if is_at cntxt then ts_unexpected ();
-      
-      if List.length l <> ftype_arity ftype then
-        raise (arity_error (ftype_arity ftype)) ;
+
+      let farity = ftype_arity ftype in
+      if List.length l <> farity then raise (arity_error farity) ;
       
       Fun (lsymb,l,None)
           
@@ -554,12 +605,6 @@ let get_macro table lsymb =
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
 
 (*------------------------------------------------------------------*)
-let as_mty (Type.ETy ty) : Type.message Type.ty =
-  match Type.kind ty with
-  | Type.KMessage -> ty
-  | _ -> assert false
-
-(*------------------------------------------------------------------*)
 (** Conversion context.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
   *   timestamps must be explicitely given.
@@ -587,14 +632,13 @@ type conv_state = {
 }
 
 (*------------------------------------------------------------------*)
-let check_type state tm (t : 'a Term.term) (ty : 'b Type.ty) : unit =
-  match Type.Infer.unify_leq state.ty_env ty (Term.ty t) with
+let check_ty_leq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
+  match Type.Infer.unify_leq state.ty_env t_ty ty with
   | `Ok -> ()
-  | `Fail -> raise (ty_error tm ty)
+  | `Fail -> raise (ty_error of_t ty)
 
-let check_type_e state tm (t : 'a Term.term) (ety : Type.ety) : unit =
-  let Type.ETy ty = ety in
-  check_type state tm t ty
+let check_term_ty state ~of_t (t : 'a Term.term) (ty : 'b Type.ty) : unit =
+  check_ty_leq state ~of_t (Term.ty t) ty
 
 (*------------------------------------------------------------------*)
 (* internal function to Theory.ml *)
@@ -602,7 +646,7 @@ let rec convert :
   type s. conv_state -> term -> s Type.ty -> s Term.term =
   fun state tm ty ->
     let t = convert0 state tm ty in
-    check_type state tm t ty;
+    check_term_ty state ~of_t:tm t ty;
     t
 
 and convert0 :
@@ -842,14 +886,16 @@ and conv_app :
 
     | Fun (f,l,None) ->
       let ts_expected = Conv (loc, Timestamp_expected t_i) in
-      let fty = function_kind state.table f in
-      let () = check_arity f (List.length l) (ftype_arity fty) in
+      let mfty = function_kind state.table f in
+      let () = check_arity f (List.length l) (mf_type_arity mfty) in
       
       begin match Type.kind ty with
         | Type.KMessage ->
           let open Symbols in
           begin match of_lsymb f state.table with
             | Wrapped (symb, Function (_,_)) ->
+              let fty = match mfty with `Fun x -> x | _ -> assert false in
+              
               (* refresh all type variables in [fty] *)
               let fty = Type.freshen_ftype fty in
               
@@ -859,8 +905,8 @@ and conv_app :
               in
              
               let rmessages =
-                List.fold_left2 (fun rmessages t ety -> 
-                    let t = conv (as_mty ety) t in
+                List.fold_left2 (fun rmessages t ty -> 
+                    let t = conv ty t in
                     t :: rmessages
                   ) [] l_messages fty.Type.fty_args
               in
@@ -872,30 +918,41 @@ and conv_app :
                  type in [fty].
                  Note that [convert] checks that the type of [t] is a subtype 
                  of [ty], hence we do not need to do it here. *)
-              check_type_e state tm t fty.Type.fty_out;
+              check_term_ty state ~of_t:tm t fty.Type.fty_out;
               
               t
 
-            | Wrapped (s, Macro (Global _)) ->
-              assert (fty.Type.fty_vars = []);
+            | Wrapped (s, Symbols.Macro (Global _)) ->
+              let ty_args, Type.ETy ty_out =
+                match mfty with `Macro x -> x | _ -> assert false
+              in
+              assert (ty_args = []);
+              check_ty_leq state ~of_t:tm ty_out Type.Message;
               let indices = List.map (conv_index state) l in
               Term.Macro ((s,ty,indices),[],get_at ())
 
             | Wrapped (s, Macro (Local (targs,_))) ->
-              assert (fty.Type.fty_vars = []);
-              if List.for_all (fun s -> s = Type.eindex) fty.Type.fty_args 
+              let ty_args, Type.ETy ty_out =
+                match mfty with `Macro x -> x | _ -> assert false
+              in
+              if List.for_all (fun s -> s = Type.eindex) ty_args
               then
-                let indices = List.map (conv_index state) l in
-                Term.Macro ((s,ty,indices),[],get_at ())
-              else begin
-                assert (
-                  fty.Type.fty_iarr = 0 &&
-                  List.for_all
-                    (fun s -> s = Type.emessage)
-                    fty.Type.fty_args);
-                let l = List.map (conv Type.Message) l in
-                Term.Macro ((s,ty,[]),l,get_at ())
-              end
+                begin
+                  let indices = List.map (conv_index state) l in
+
+                  check_ty_leq state ~of_t:tm ty_out ty;
+                  
+                  Term.Macro ((s,ty,indices),[],get_at ())
+                end
+              else
+                begin
+                  assert (List.for_all (fun s -> s = Type.emessage) ty_args);
+                  let l = List.map (conv Type.Message) l in
+                  
+                  check_ty_leq state ~of_t:tm ty_out ty;
+                  
+                  Term.Macro ((s,ty,[]),l,get_at ())
+                end
 
             | Wrapped (_, _) -> raise ts_expected
           end
@@ -980,13 +1037,13 @@ type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 (** {2 Function declarations} *)
 
 let mk_ftype iarr vars args out =
-  let mdflt ty = odflt Type.emessage ty in
+  let mdflt ty = odflt Type.Message ty in
   Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
   
   
-let declare_hash table ?index_arity ?in_ty ?out_ty s =
+let declare_hash table ?index_arity ?in_ty ?k_ty ?out_ty s =
   let index_arity = odflt 0 index_arity in
-  let ftype = mk_ftype index_arity [] [in_ty] out_ty in
+  let ftype = mk_ftype index_arity [] [in_ty; k_ty] out_ty in
   let def = ftype, Symbols.Hash in
   fst (Symbols.Function.declare_exact table s def)
 
@@ -1027,7 +1084,7 @@ let declare_signature table ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk =
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
   (* TODO: types: change output type to booleans ? *)
-  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] (Some Type.emessage) in
+  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] (Some Type.Message) in
   
   let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in
 
