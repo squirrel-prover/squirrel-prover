@@ -13,6 +13,7 @@ type namespace =
   | NMacro
   | NSystem
   | NProcess
+  | NBType
 
 let pp_namespace fmt = function
   | NChannel  -> Fmt.pf fmt "channel"
@@ -22,6 +23,7 @@ let pp_namespace fmt = function
   | NMacro    -> Fmt.pf fmt "macro"
   | NSystem   -> Fmt.pf fmt "system"
   | NProcess  -> Fmt.pf fmt "process"
+  | NBType    -> Fmt.pf fmt "type"
 
 (*------------------------------------------------------------------*)
 (** Type of symbols.
@@ -60,6 +62,7 @@ type fname
 type macro
 type system
 type process
+type btype
 
 type _ def =
   | Channel  : unit      -> channel def
@@ -68,7 +71,8 @@ type _ def =
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
   | Process  : unit      -> process def
-
+  | BType    : unit      -> btype   def
+        
   | Function : (Type.ftype * function_def) -> fname def
         
 type edef =
@@ -145,6 +149,7 @@ let edef_namespace : edef -> namespace = fun e ->
   | Exists (Macro    _) -> NMacro
   | Exists (System   _) -> NSystem
   | Exists (Process  _) -> NProcess
+  | Exists (BType  _)   -> NBType
   | Reserved n          -> n
 
 let get_namespace ?(group=default_group) (table : table) s =
@@ -399,6 +404,19 @@ module Channel = Make (struct
   let construct d = Channel d
   let deconstruct ~loc s = match s with
     | Exists (Channel d) -> d
+    | _ as c -> namespace_err loc c namespace
+end)
+
+module BType = Make (struct
+  type ns = btype
+  type local_def = unit
+
+  let namespace = NBType
+
+  let group = "type"
+  let construct d = BType d
+  let deconstruct ~loc s = match s with
+    | Exists (BType d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
 

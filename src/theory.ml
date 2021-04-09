@@ -311,9 +311,9 @@ let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ety =
     in
     ETy (TVar tv)
 
-  | P_tbase tb_l -> assert false (* TODO: types*)
-(* ETy (TBase    ) *)
-
+  | P_tbase tb_l ->
+    let s = Symbols.BType.of_lsymb tb_l table in
+    Type.ETy (Type.TBase (Symbols.to_string s)) (* TODO: remove to_string *)
 
 (*------------------------------------------------------------------*)
 (** {2 Type checking} *)
@@ -510,6 +510,7 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
       Taction (lsymb,l)
 
     | Symbols.Channel _
+    | Symbols.BType _
     | Symbols.Process _
     | Symbols.System  _ ->
       let s = L.unloc lsymb in

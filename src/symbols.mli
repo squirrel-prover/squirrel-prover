@@ -32,6 +32,7 @@ type fname
 type macro
 type system
 type process
+type btype
 
 (*------------------------------------------------------------------*)
 type namespace =
@@ -42,6 +43,7 @@ type namespace =
   | NMacro
   | NSystem
   | NProcess
+  | NBType
 
 val pp_namespace : Format.formatter -> namespace -> unit
 
@@ -89,7 +91,8 @@ type _ def =
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
   | Process  : unit      -> process def
-
+  | BType    : unit      -> btype   def
+        
   | Function : (Type.ftype * function_def) -> fname def
         
 type edef =
@@ -203,6 +206,7 @@ module type Namespace = sig
 end
 
 module Channel  : Namespace with type def = unit with type ns = channel
+module BType    : Namespace with type def = unit with type ns = btype
 module Name     : Namespace with type def = int  with type ns = name
 module Action   : Namespace with type def = int  with type ns = action
 module System   : Namespace with type def = unit with type ns = system
