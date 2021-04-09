@@ -104,8 +104,8 @@ Proof.
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
   repeat split.
-  by depends R(j0), R1(j0).
   by depends R(j0), R2(j0).
+  by depends R(j0), R1(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -140,11 +140,11 @@ Proof.
   prf 2. yesif 2.
   project.
   split. 
-  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0. 
   by assert nT(i,k) = fst(input@R1(j)); fresh Meq0.
+  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0. 
   split.
-  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0. 
   by assert nT(i,k) = fst(input@R2(j)); fresh Meq0.
+  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0. 
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

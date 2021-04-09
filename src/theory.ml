@@ -1077,7 +1077,7 @@ let declare_senc_joint_with_hash
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc);
                                   get_fun table h] in
-  let dec_fty = mk_ftype 0 [] [ctxt_ty] ptxt_ty in
+  let dec_fty = mk_ftype 0 [] [ctxt_ty; k_ty] ptxt_ty in
   let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
   let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in
   let data = AssociatedFunctions [dec] in

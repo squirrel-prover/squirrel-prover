@@ -30,7 +30,8 @@ let pp_decl_error_i fmt = function
     Fmt.pf fmt "equivalence goal ill-formed"
 
   | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, must be of the form Indexⁿ → Messageᵐ → Message"
+    Fmt.pf fmt "invalid type, must be of the form\n \
+                Indexⁿ → Messageᵐ → Message"
       
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
@@ -38,8 +39,8 @@ let pp_decl_error_i fmt = function
 
 let pp_decl_error pp_loc_err fmt (loc,k,e) =
   let pp_k fmt = function
-    | KDecl -> Fmt.pf fmt "Declaration"
-    | KGoal -> Fmt.pf fmt "Goal declaration" in
+    | KDecl -> Fmt.pf fmt "declaration"
+    | KGoal -> Fmt.pf fmt "goal declaration" in
 
   Fmt.pf fmt "%a%a failed: %a."
     pp_loc_err loc
