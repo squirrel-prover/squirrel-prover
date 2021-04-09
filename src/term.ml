@@ -215,13 +215,7 @@ let ety ?ty_env t = Type.ETy (ty ?ty_env t)
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-let cast_ty : type a b. a Type.ty -> b term -> a term =
-  fun cast_ty t ->
-  match Type.equal_w (ty t) cast_ty with
-  | Some Type.Type_eq -> t
-  | None -> raise Uncastable
-
-let cast_kind : type a b. a Type.kind -> b term -> a term =
+let cast : type a b. a Type.kind -> b term -> a term =
   fun k t ->
   match Type.equalk_w (kind t) k with
   | Some Type.Type_eq -> t
@@ -648,8 +642,8 @@ let rec assoc : type a. subst -> a term -> a term =
   | [] -> term
   | ESubst (t1,t2)::q ->
     try
-      let term2 = cast_ty (ty t1) term in
-      if term2 = t1 then cast_ty (ty term) t2 else assoc q term
+      let term2 = cast (kind t1) term in
+      if term2 = t1 then cast (kind term) t2 else assoc q term
     with Uncastable -> assoc q term
 
 exception Substitution_error of string
@@ -777,12 +771,12 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
 
       | Seq ([a], f) -> 
         let a, f = subst_binding (Vars.EVar a) s f in
-        let a = Vars.ecast a Type.Index in
+        let a = Vars.ecast a Type.KIndex in
         Seq ([a],f)
 
       | Seq (a :: vs, f) -> 
         let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
-        let a = Vars.ecast a Type.Index in
+        let a = Vars.ecast a Type.KIndex in
         let vs, f = match f with
           | Seq (vs, f) -> vs, f
           | _ -> assert false in
@@ -820,7 +814,7 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
         let dummy = mk_zero in
 
         let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
-        let v = Vars.ecast v Type.Index in
+        let v = Vars.ecast v Type.KIndex in
         match f with
         | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
         | _ -> assert false
@@ -913,7 +907,7 @@ type eterm = ETerm : 'a term -> eterm
 let app : type a. (eterm -> eterm) -> a term -> a term = 
   fun func x ->
   let ETerm x0 = func (ETerm x) in
-  cast_ty (ty x) x0
+  cast (kind x) x0
   
 let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
   let func : type c. c term -> c term = fun x -> app func x in
@@ -1019,7 +1013,7 @@ module Match = struct
     Mv.fold (fun v t subst -> 
         match v, t with
         | Vars.EVar v, ETerm t -> 
-          ESubst (Var v, cast_ty (Vars.ty v) t) :: subst
+          ESubst (Var v, cast (Vars.kind v) t) :: subst
       ) mv [] 
 
   (** A pattern is a term [t] and a subset of [t]'s free variables that must 
@@ -1043,7 +1037,7 @@ module Match = struct
       fun t pat mv -> match t, pat with
         | _, Var v' -> 
           begin
-            match cast_ty (Vars.ty v') t with
+            match cast (Vars.kind v') t with
             | exception Uncastable -> raise NoMatch
             | t -> vmatch t v' mv
           end
@@ -1122,7 +1116,7 @@ module Match = struct
 
         (* If we already saw the variable, check that the subterms are
            identical. *)
-        | ETerm t' -> match cast_ty (ty t) t' with
+        | ETerm t' -> match cast (kind t) t' with
           | exception Uncastable -> raise NoMatch
           (* TODO: alpha-equivalent *)
           | t' -> if t <> t' then raise NoMatch else mv
@@ -1163,7 +1157,7 @@ module Match = struct
     (b match_occ * a term) option
     = fun t p func ->
       let found = ref None in
-      let s_p = ty p.p_term in     
+      let s_p = kind p.p_term in     
 
       let rec find : type a. a term -> a term = fun t ->
         if (!found) <> None then t (* we already found a match *)
@@ -1176,9 +1170,9 @@ module Match = struct
             tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            found := Some ({ occ = cast_ty s_p t; mv = mv; }); 
-            let t' = func (cast_ty s_p t) mv in
-            cast_ty (ty t) t'    (* cast needed *)
+            found := Some ({ occ = cast s_p t; mv = mv; }); 
+            let t' = func (cast s_p t) mv in
+            cast (kind t) t'    (* cast needed *)
       in
       
       let t = find t in

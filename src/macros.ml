@@ -1,4 +1,3 @@
-open Term
 
 (*------------------------------------------------------------------*)
 (** {2 Macro definitions} *)
@@ -23,12 +22,12 @@ let is_defined name a table =
          * when A is an action name. We cannot do so for a variable
          * or a predecessor. *)
         begin match a with
-          | Action _ -> true
+          | Term.Action _ -> true
           | _ -> false
         end
     | Symbols.(Exec | Frame), _ ->
         begin match a with
-          | Action _ -> true
+          | Term.Action _ -> true
           | _ -> false
         end
     | Symbols.Local _, _ -> true
@@ -37,7 +36,7 @@ let is_defined name a table =
          * because a global macro m(...)@A refer to inputs of A and
          * its sequential predecessors. *)
         begin match a with
-          | Action (s,_) ->
+          | Term.Action (s,_) ->
               let action = snd (Action.of_symbol s table) in
               List.length inputs <= List.length action
           | _ -> false
@@ -58,7 +57,7 @@ let get_def :
       | Symbols.Input, _ -> assert false
       | Symbols.Output, _ ->
         begin match a with
-          | Action (symb,indices) ->
+          | Term.Action (symb,indices) ->
             let action = Action.of_term symb indices table in
             let descr = 
               SystemExpr.descr_of_action table system action 
@@ -84,7 +83,7 @@ let get_def :
 
       | Symbols.State _, _ ->
         begin match a with
-          | Action (symb,indices) ->
+          | Term.Action (symb,indices) ->
             let action = Action.of_term symb indices table in
             let descr = 
               SystemExpr.descr_of_action table system action 
@@ -94,7 +93,7 @@ let get_def :
               updates of [action] *)
               let ((n,s,is),msg) = List.find
                 (fun ((n,s,is),_) ->
-                  n = name && s = ty && List.length args = List.length is)
+                  n = name && s = kind && List.length args = List.length is)
                 descr.Action.updates
               in
                 (* update found:
@@ -109,16 +108,16 @@ let get_def :
                   Term.mk_ite
                     (Term.mk_indices_eq args is)
                     msg
-                    (Term.Macro ((name,ty,args), [], Term.Pred a))
+                    (Term.Macro ((name,kind,args), [], Term.Pred a))
             with Not_found ->
-              Term.Macro ((name,ty,args), [], Term.Pred a)
+              Term.Macro ((name,kind,args), [], Term.Pred a)
             end
           | _ -> assert false
         end
         
       | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
         begin match a with
-          | Action (tsymb,tidx) ->
+          | Term.Action (tsymb,tidx) ->
             let action = Action.of_term tsymb tidx table in
             assert (List.length inputs <= List.length action) ;
             let idx_subst =
@@ -138,7 +137,7 @@ let get_def :
               List.fold_left
                 (fun (subst,action) x ->
                    let in_tm =
-                     Term.Macro (in_macro,[],
+                     Term.Macro (Term.in_macro,[],
                                  SystemExpr.action_to_term table system
                                    (List.rev action))
                    in
@@ -177,7 +176,7 @@ let get_def :
       match Symbols.Macro.get_all name table with
       | Symbols.Cond, _ ->
         begin match a with
-          | Action (symb,indices) ->
+          | Term.Action (symb,indices) ->
             let action = Action.of_term symb indices table in
             let descr = 
               SystemExpr.descr_of_action table system action 
@@ -189,7 +188,7 @@ let get_def :
         begin match a with
           | Term.Action (s,_) when s = Symbols.init_action -> Term.True
           | Term.Action _ ->
-            Term.And (Macro ((name, ty, args),[], Term.Pred a),
+            Term.And (Macro ((name, kind, args),[], Term.Pred a),
                       Macro (Term.cond_macro, [], a))
           | _ -> assert false
         end

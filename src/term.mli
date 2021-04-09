@@ -176,14 +176,9 @@ val ety : ?ty_env:Type.Infer.env -> 'a term -> Type.ety
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-(** [cast_ty ty t] checks that [t] can be seen as a message of ty [ty].
-    No sub-typing. 
+(** [cast k t] checks that [t] can be seen as a message of kind [k].
     @raise Uncastable if the term cannot be cast.*)
-val cast_ty : 'a Type.ty -> 'b term -> 'a term
-
-(** [cast_kind k t] checks that [t] can be seen as a message of kind [k].
-    @raise Uncastable if the term cannot be cast.*)
-val cast_kind : 'a Type.kind -> 'b term -> 'a term
+val cast : 'a Type.kind -> 'b term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].

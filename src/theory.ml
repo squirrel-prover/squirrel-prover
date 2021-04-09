@@ -136,28 +136,35 @@ let pp_var_list fmt l =
 
 let rec pp_term_i ppf t = match t with
   | Tinit -> Fmt.pf ppf "init"
+
   | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
+
   | ITE (i,t,e) ->
       Fmt.pf ppf
         "@[if@ %a@ then@ %a@ else@ %a@]"
         pp_term i pp_term t pp_term e
+
   | Find (vs,c,t,e) ->
       Fmt.pf ppf
         "@[try find@ %a@ such that@ %a@ in@ %a@ else@ %a@]"
         (Utils.pp_list Fmt.string) (L.unlocs vs)
         pp_term c pp_term t pp_term e
+
   | Diff (l,r) ->
       Fmt.pf ppf "diff(%a,%a)" pp_term l pp_term r
+
   | Seq (vs, b) ->
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
       (Utils.pp_list Fmt.string) (L.unlocs vs) pp_term b
 
   | App (f,[t1;t2]) when L.unloc f="exp"->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
+
   | App (f,terms) ->
     Fmt.pf ppf "%s%a"
       (L.unloc f)
       (Utils.pp_list pp_term) terms
+
   | AppAt (f,terms,ts) ->
     Fmt.pf ppf "%s%a%a"
       (L.unloc f)
@@ -168,28 +175,37 @@ let rec pp_term_i ppf t = match t with
     Fmt.pf ppf "@[<h>%a@ %a@ %a@]" pp_term tl Term.pp_ord ord pp_term tr
       
   | Happens t -> Fmt.pf ppf "happens(%a)" (Utils.pp_list pp_term) t
+
   | ForAll (vs, b) ->
     Fmt.pf ppf "@[forall (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
+
   | Exists (vs, b) ->
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
+
   | And ( L.{ pl_desc = Impl (bl1,br1)},
           L.{ pl_desc = Impl(br2,bl2)} ) when bl1=bl2 && br1=br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
       pp_term bl1 pp_term br1
+
   | And (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
       pp_term bl pp_term br
+
   | Or (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
       pp_term bl pp_term br
+
   | Impl (bl, br) ->
     Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
       pp_term bl pp_term br
+
   | Not b ->
     Fmt.pf ppf "not(@[%a@])" pp_term b
+
   | True -> Fmt.pf ppf "True"
+
   | False -> Fmt.pf ppf "False"
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
@@ -862,8 +878,8 @@ and convert0 :
       List.map f new_subst
     in
     
-    begin match ty with
-      | Type.Message -> Term.Seq (vs, t)
+    begin match Type.kind ty with
+      | Type.KMessage -> Term.Seq (vs, t)
       | _ -> type_error ()
     end
 

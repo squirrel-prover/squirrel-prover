@@ -169,8 +169,8 @@ Proof.
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
   repeat split. 
-  by depends R(j0),R1(j0).
   by depends R(j0),R2(j0).
+  by depends R(j0),R1(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -259,15 +259,13 @@ Proof.
   yesif 2.
   use tags_neq; project.
   split.
-  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
+  by split; assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
+  by assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
+
   split.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  split.
-  split.  
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
-  assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
+  by assert fst(input@R2(j))=nT(i,k); by fresh Meq0.
+  by split; assert fst(input@R1(j))=nT(i,k); by fresh Meq0.
+
   fresh 2.
   by fresh 1; yesif 1.
 Qed.

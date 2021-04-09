@@ -257,7 +257,7 @@ and cterm_of_var i = ccst (Cst.Cmvar (Vars.EVar i))
 
 (*------------------------------------------------------------------*)
 let index_of_cterm i = match i.cnt with
-  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Vars.cast m Type.Index
+  | Ccst (Cst.Cmvar (Vars.EVar m)) -> Vars.cast m Type.KIndex
   | _ -> assert false
     
 let indices_of_cterms cis = List.map index_of_cterm cis
@@ -270,9 +270,9 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
         let is = indices_of_cterms cis in
-        let terms = terms_of_cterms Type.Message cterms in
+        let terms = terms_of_cterms Type.KMessage cterms in
         let t = Term.mk_fun table f is terms in
-        Term.cast_kind kind t
+        Term.cast kind t
 
       | Cfun (M m, ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
@@ -283,37 +283,37 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in 
-        Term.cast_kind kind (Action (a, is))
+        Term.cast kind (Action (a, is))
 
       | Cfun (N n, ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
-        Term.cast_kind kind (Name (n, is))
+        Term.cast kind (Name (n, is))
 
       | Cfun (GPred, ari, ts) ->
         assert (ari = 0);
         let ts = as_seq1 ts in
         let pred_ts = Term.Pred (term_of_cterm Type.KTimestamp ts) in
-        Term.cast_kind kind pred_ts   
+        Term.cast kind pred_ts   
 
       | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m kind)
 
       | Ccst (Cst.Cgfuncst (`F f)) ->
-        Term.cast_kind kind (Term.mk_fun table f [] [])
+        Term.cast kind (Term.mk_fun table f [] [])
           
       | Ccst (Cst.Cgfuncst (`A a)) ->
-        Term.cast_kind kind (Term.Action (a,[]))
+        Term.cast kind (Term.Action (a,[]))
                                         
       | Ccst (Cst.Cgfuncst (`N n)) ->
-        Term.cast_kind kind (Term.Name   (n,[]))
+        Term.cast kind (Term.Name   (n,[]))
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
-  and terms_of_cterms : type a. a Type.ty -> cterm list -> a Term.term list =
-    fun s cterms -> List.map (term_of_cterm s) cterms
+  and terms_of_cterms : type a. a Type.kind -> cterm list -> a Term.term list =
+    fun kind cterms -> List.map (term_of_cterm kind) cterms
 
   in
-  term_of_cterm s c
+  term_of_cterm kind c
 
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
@@ -1395,8 +1395,8 @@ module Memo = Ephemeron.K2.Make
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
         Type.equal (Term.ty t0) (Term.ty t0') &&
-        let t0', t1' = Term.cast_ty (Term.ty t0) t0', 
-                       Term.cast_ty (Term.ty t0) t1' in
+        let t0', t1' = Term.cast (Term.kind t0) t0', 
+                       Term.cast (Term.kind t0) t1' in
         t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,
@@ -1546,15 +1546,15 @@ let x_index_cnstrs state l select f_cnstr =
 let name_index_cnstrs state l =
   let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
-      if n <> n' then [False] else []
+      if n <> n' then [Term.False] else []
       
     | Cfun (N n, ari, is), Cfun (N n', ari', is') ->
       assert (ari > 0 && ari' > 0);
-      if n <> n' then [False]
+      if n <> n' then [Term.False]
       else begin
         assert (ari = ari');
         List.map2 (fun x y -> 
-            Atom (`Index (`Eq, index_of_cterm x, index_of_cterm y))
+            Term.Atom (`Index (`Eq, index_of_cterm x, index_of_cterm y))
           ) is is'
       end
 
@@ -1584,14 +1584,14 @@ let name_indep_cnstrs table state l =
 
       let rec mk_disjunction l =
         match l with
-        | [] -> False
-        | [p] -> Atom (`Message (`Eq, 
-                                 term_of_cterm table Type.Message p, 
-                                 term_of_cterm table Type.Message name))
+        | [] -> Term.False
+        | [p] -> Term.Atom (`Message (`Eq, 
+                                 term_of_cterm table Type.KMessage p, 
+                                 term_of_cterm table Type.KMessage name))
         | p::q ->
           Or(Atom (`Message (`Eq, 
-                             term_of_cterm table Type.Message p, 
-                             term_of_cterm table Type.Message name)),
+                             term_of_cterm table Type.KMessage p, 
+                             term_of_cterm table Type.KMessage name)),
              mk_disjunction q)
       in
       [mk_disjunction sub_names]
