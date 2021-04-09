@@ -11,7 +11,8 @@
 %token LBRACKET RBRACKET
 %token LANGLE RANGLE
 %token AND OR NOT TRUE FALSE HAPPENS
-%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS XOR STAR UNDERSCORE QMARK
+%token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
+%token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
@@ -279,63 +280,84 @@ msg_or_bool:
 | MESSAGE                        { Type.emessage }
 | BOOLEAN                        { Type.eboolean }
 
-/* state_type:
-| t=msg_or_bool                  { 0, t }
-| INDEX ARROW t=state_type       { let n,k = t in n+1,k } */
-
-msg_type:
-| MESSAGE                        { 0 }
-| MESSAGE ARROW t=msg_type       { 1 + t }
-
-abs_type:
-| t=msg_type                     { 0,t }
-| INDEX ARROW t=abs_type         { let i,m = t in i+1,m }
+ty_var:
+| TICK id=lsymb     { id }
 
 index_arity:
 |                                { 0 }
 | LPAREN i=INT RPAREN            { i }
 
+p_ty:
+| MESSAGE      { Theory.P_message }
+| INDEX        { Theory.P_index }
+| TIMESTAMP    { Theory.P_timestamp }
+| BOOLEAN      { Theory.P_boolean }
+| tv=ty_var    { Theory.P_tvar tv }
+| l=lsymb      { Theory.P_tbase l }
+
+fun_ty:
+| l=slist1(p_ty,ARROW)      { l }
+
+ty_args:
+|                                          { [] }
+| LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
+
 declaration_i:
 | HASH e=lsymb a=index_arity
                           { Decl.Decl_hash (Some a, e, None) }
+
 | HASH e=lsymb WITH ORACLE f=term
                           { Decl.Decl_hash (None, e, Some f) }
+
 | AENC e=lsymb COMMA d=lsymb COMMA p=lsymb
                           { Decl.Decl_aenc (e, d, p) }
+
 | SENC e=lsymb COMMA d=lsymb
                           { Decl.Decl_senc (e, d) }
+
 | SENC e=lsymb COMMA d=lsymb WITH h=lsymb
                           { Decl.Decl_senc_w_join_hash (e, d, h) }
+
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
                           { Decl.Decl_sign (s, c, p, None) }
+
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-  WITH ORACLE f=term   { Decl.Decl_sign (s, c, p, Some f) }
+  WITH ORACLE f=term       
+                          { Decl.Decl_sign (s, c, p, Some f) }
+
 | NAME e=lsymb COLON t=name_type
                           { Decl.Decl_name (e, t) }
-| ABSTRACT e=lsymb COLON t=abs_type
-                          { let index_arity,message_arity = t in
-                            Decl.(Decl_abstract
-                                    { name = e;
-                                      index_arity=index_arity;
-                                      message_arity=message_arity;}) }
+
+| ABSTRACT e=lsymb a=ty_args COLON t=fun_ty
+    { Decl.(Decl_abstract
+              { name     = e;
+                ty_args  = a;
+                abs_tys  = t; }) }
+
 | MUTABLE e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }
+
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
+
 | TERM e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
+
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
-| AXIOM s=bsystem f=term
-                          { Decl.(Decl_axiom { gname = None;
-                                               gsystem = s;
-                                               gform = f; }) }
+
+| AXIOM s=bsystem f=term { Decl.(Decl_axiom { gname = None;
+                                              gsystem = s;
+                                              gform = f; }) }
+
 | AXIOM s=bsystem i=lsymb COLON f=term
                           { Decl.(Decl_axiom { gname = Some i;
                                                gsystem = s;
                                                gform = f; }) }
+
 | SYSTEM p=process
                           { Decl.(Decl_system { sname = None;
                                                 sprocess = p}) }
+
 | SYSTEM LBRACKET id=lsymb RBRACKET p=process
                           { Decl.(Decl_system { sname = Some id;
                                                 sprocess = p}) }

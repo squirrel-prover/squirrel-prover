@@ -11,11 +11,13 @@ type macro_decl = lsymb * (lsymb * Type.ety) list * Type.ety * Theory.term
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
 (** Information for an abstract declaration *)
-type abstract_decl = { name          : lsymb;
-                       index_arity   : int;
-                       message_arity : int; }
+type abstract_decl = { name    : lsymb;
+                       ty_args : lsymb list; (* type variables *)
+                       abs_tys : Theory.p_ty list; }
 
-val pp_abstract_decl : Format.formatter -> abstract_decl -> unit
+val parse_abstract_decl : Symbols.table -> abstract_decl -> Symbols.table
+                                                              
+(* val pp_abstract_decl : Format.formatter -> abstract_decl -> unit *)
 
 (** Information for a goal or axiom declaration *)
 type goal_decl = { gname   : lsymb option;
@@ -60,11 +62,11 @@ type declaration = declaration_i Location.located
 
 type declarations = declaration list
 
-(*------------------------------------------------------------------*)
-(** {2 Debugging pretty printers}*)
-
-(** Do not print the location information. *)
-val pp_decl  : Format.formatter -> declaration  -> unit
-
-(** Do not print the location information. *)
-val pp_decls : Format.formatter -> declarations -> unit
+(* (\*------------------------------------------------------------------*\)
+ * (\** {2 Debugging pretty printers}*\)
+ * 
+ * (\** Do not print the location information. *\)
+ * val pp_decl  : Format.formatter -> declaration  -> unit
+ * 
+ * (\** Do not print the location information. *\)
+ * val pp_decls : Format.formatter -> declarations -> unit *)

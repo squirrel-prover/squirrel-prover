@@ -127,6 +127,7 @@ rule token = parse
 | "nosimpl"           { NOSIMPL }
 | "checkfail"         { CHECKFAIL }
 | '+'                 { PLUS }
+| '\''                { TICK }
 | name as n           { ID n }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }

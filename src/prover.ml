@@ -1,6 +1,7 @@
 (** State in proof mode.
   * TODO goals do not belong here *)
-
+open Utils
+    
 module L = Location
 
 module EquivHyps = EquivSequent.H
@@ -902,13 +903,8 @@ let declare_i table decl = match L.unloc decl with
   | Decl.Decl_sign (sign, checksign, pk, tagi) ->
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
     Theory.declare_signature table sign checksign pk
-  | Decl.Decl_abstract decl ->
-    Theory.declare_abstract
-      table decl.name
-      index_arity:
-      ty_args:
-      in_tys:
-      out_ty:
+
+  | Decl.Decl_abstract decl -> Decl.parse_abstract_decl table decl
 
 
 let declare table decl =
