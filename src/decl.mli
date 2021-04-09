@@ -17,8 +17,6 @@ type abstract_decl = { name    : lsymb;
 
 val parse_abstract_decl : Symbols.table -> abstract_decl -> Symbols.table
                                                               
-(* val pp_abstract_decl : Format.formatter -> abstract_decl -> unit *)
-
 (** Information for a goal or axiom declaration *)
 type goal_decl = { gname   : lsymb option;
                    gsystem : SystemExpr.p_system_expr;
@@ -61,12 +59,3 @@ type declaration_i =
 type declaration = declaration_i Location.located
 
 type declarations = declaration list
-
-(* (\*------------------------------------------------------------------*\)
- * (\** {2 Debugging pretty printers}*\)
- * 
- * (\** Do not print the location information. *\)
- * val pp_decl  : Format.formatter -> declaration  -> unit
- * 
- * (\** Do not print the location information. *\)
- * val pp_decls : Format.formatter -> declarations -> unit *)
