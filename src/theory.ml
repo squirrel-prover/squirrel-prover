@@ -898,9 +898,9 @@ and conv_app :
               let fty = match mfty with `Fun x -> x | _ -> assert false in
               
               (* refresh all type variables in [fty] *)
-              let fty = Type.freshen_ftype fty in
+              let fty_op = Type.freshen_ftype fty in
               
-              let l_indices, l_messages = List.takedrop fty.Type.fty_iarr l in
+              let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
               let indices =
                 List.map (fun x -> conv_index state x) l_indices
               in
@@ -909,17 +909,17 @@ and conv_app :
                 List.fold_left2 (fun rmessages t ty -> 
                     let t = conv ty t in
                     t :: rmessages
-                  ) [] l_messages fty.Type.fty_args
+                  ) [] l_messages fty_op.Type.fty_args
               in
               let messages = List.rev rmessages in
-              
+
               let t = Term.Fun ((symb,indices),fty,messages) in
 
               (* additional type check between the type of [t] and the output 
                  type in [fty].
                  Note that [convert] checks that the type of [t] is a subtype 
                  of [ty], hence we do not need to do it here. *)
-              check_term_ty state ~of_t:tm t fty.Type.fty_out;
+              check_term_ty state ~of_t:tm t fty_op.Type.fty_out;
               
               t
 

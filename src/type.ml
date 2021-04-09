@@ -148,14 +148,20 @@ let pp_e ppf (ETy t) = pp ppf t
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
 *)
-type ftype = {
+type 'a ftype_g = {
   fty_iarr : int;             (** i *)
-  fty_vars : univar list;     (** a₁ ... 'aₙ *)  
+  fty_vars : 'a list;         (** a₁ ... 'aₙ *)  
   fty_args : message ty list; (** τ₁ × ... × τₙ *)
   fty_out  : message ty;      (** τ *)
 }
 
-let mk_ftype iarr vars args out = {
+(** A [ftype] uses [tvar] for quantified type variables. *)
+type ftype = tvar ftype_g
+
+(** An opened [ftype], using [univar] for quantified type varibales *)
+type ftype_op = univar ftype_g
+
+let mk_ftype iarr vars args out : ftype = {
   fty_iarr = iarr;
   fty_vars = vars;
   fty_args = args;
@@ -203,16 +209,16 @@ let tsubst_e s (ETy ty) = ETy (tsubst s ty)
 (*------------------------------------------------------------------*)
 (** {2 Freshen function types} *)
 
-let freshen_ftype (fty : ftype) : ftype =
+let freshen_ftype (fty : ftype) : ftype_op =
   let vars_f = List.map Ident.fresh fty.fty_vars in
   
   (* create substitution refreshing all type variables in [fty] *)
-  let ts_univar =
-    List.fold_left2 (fun ts_univar id id_f ->
-        Mid.add id (TUnivar id_f) ts_univar
+  let ts_tvar =
+    List.fold_left2 (fun ts_tvar id id_f ->
+        Mid.add id (TUnivar id_f) ts_tvar
       ) Mid.empty fty.fty_vars vars_f
   in  
-  let ts = { tsubst_empty with ts_univar } in
+  let ts = { tsubst_empty with ts_tvar } in
 
   (* compute the new function type *)
   { fty with fty_vars = vars_f;

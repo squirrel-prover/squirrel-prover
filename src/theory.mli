@@ -158,7 +158,7 @@ val get_init_states :
 val declare_abstract :
   Symbols.table -> 
   index_arity:int ->
-  ty_args:Type.univar list ->
+  ty_args:Type.tvar list ->
   in_tys:Type.message Type.ty list ->
   out_ty:Type.message Type.ty ->
   lsymb ->

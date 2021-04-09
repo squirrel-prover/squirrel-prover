@@ -94,17 +94,24 @@ val pp_e : Format.formatter -> ety -> unit
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
 *)
-type ftype = private {
+type 'a ftype_g = private {
   fty_iarr : int;             (** i *)
-  fty_vars : univar list;     (** a₁ ... 'aₙ *)  
+  fty_vars : 'a list;         (** a₁ ... 'aₙ *)  
   fty_args : message ty list; (** τ₁ × ... × τₙ *)
   fty_out  : message ty;      (** τ *)
 }
 
-val mk_ftype : int -> univar list -> message ty list -> message ty -> ftype
+(** A [ftype] uses [tvar] for quantified type variables. *)
+type ftype = tvar ftype_g
 
-(** [freshen_ftype fty] refreshes the quantified type variables in [fty].  *)
-val freshen_ftype : ftype -> ftype
+(** An opened [ftype], using [univar] for quantified type varibales *)
+type ftype_op = univar ftype_g
+  
+val mk_ftype : int -> tvar list -> message ty list -> message ty -> ftype
+
+(** [open_ftype fty] opens an [ftype] by refreshes its quantified 
+    type variables. *)
+val freshen_ftype : ftype -> ftype_op
   
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)
