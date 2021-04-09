@@ -214,7 +214,8 @@ type conversion_error_i =
   | Type_error           of term_i * Type.ety
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  | Untypable_equality   of term_i
+  (* | Untypable_equality   of term_i *)
+  | Unsupported_ord      of term_i
   | String_expected      of term_i (* TODO: move *)
   | Int_expected         of term_i (* TODO: move *)
   | Tactic_type          of string (* TODO: move *)
@@ -253,28 +254,38 @@ let pp_error_i ppf = function
   | Timestamp_unexpected t ->
     Fmt.pf ppf "The term %a must not be given a timestamp" pp_i t
 
-  | Untypable_equality t ->
-      Fmt.pf ppf
-        "Comparison %a cannot be typed@ \
-         (operands do not have the same type,@ \
-         or do not have a type@ for which the comparison is allowed)"
-        pp_i t
+  (* | Untypable_equality t ->
+   *   Fmt.pf ppf
+   *     "comparison %a cannot be typed@ \
+   *      (operands do not have the same type)"
+   *     pp_i t *)
+
+  | Unsupported_ord t ->
+    Fmt.pf ppf
+      "comparison %a cannot be typed@ \
+       (operands have a type@ for which the comparison is allowed)"
+      pp_i t
+
   | String_expected t ->
-      Fmt.pf ppf
-        "The term %a cannot be seen as a string"
-        pp_i t
+    Fmt.pf ppf
+      "The term %a cannot be seen as a string"
+      pp_i t
+      
   | Int_expected t ->
-      Fmt.pf ppf
-        "The term %a cannot be seen as a int"
-        pp_i t
+    Fmt.pf ppf
+      "The term %a cannot be seen as a int"
+      pp_i t
+
   | Tactic_type s ->
-      Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+    Fmt.pf ppf "The tactic arguments could not be parsed: %s" s
+
   | Index_not_var i ->
-      Fmt.pf ppf "An index must be a variable, the term %a \
-                  cannot be seen as an index" pp_i i
+    Fmt.pf ppf "An index must be a variable, the term %a \
+                cannot be seen as an index" pp_i i
+
   | Assign_no_state s ->
-      Fmt.pf ppf "Only mutables can be assigned values, and the \
-                  symbols %s is not a mutable" s
+    Fmt.pf ppf "Only mutables can be assigned values, and the \
+                symbols %s is not a mutable" s
 
   | BadNamespace (s,n) ->
     Fmt.pf ppf "Kind error: %s has kind %a" s
@@ -534,8 +545,9 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
 let make_app loc table cntxt (lsymb : lsymb) (l : term list) : app =
   L.mk_loc loc (make_app_i table cntxt lsymb l)
 
+
 (*------------------------------------------------------------------*)
-(** Conversion *)
+(** {2 Conversion contexts and states} *)
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 
@@ -548,21 +560,80 @@ let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
 
-let rec assoc : type a. subst -> lsymb -> a Type.ty -> a Term.term =
-fun subst st kind ->
-  match subst with
-  | [] -> conv_err (L.loc st) (Undefined (L.unloc st))
-  | ESubst (v,t)::_ when v = L.unloc st ->
-      begin try
-        Term.cast kind t
-      with
-      | Term.Uncastable -> conv_err (L.loc st) (Type_error (App (st,[]),
-                                                            Type.ETy kind))
-      end
-  | _::q -> assoc q st kind
+(** Conversion contexts.
+  * - [InGoal]: we are converting a term in a goal (or tactic). All
+  *   timestamps must be explicitely given.
+  * - [InProc ts]: we are converting a term in a process at an implicit
+  *   timestamp [ts]. *)
+type conv_cntxt =
+  | InProc of Term.timestamp
+  | InGoal
 
-let mem_assoc x sort subst =
-  try let _ = assoc subst x sort in true
+(** Exported conversion environments. *)
+type conv_env = {
+  table : Symbols.table;
+  cntxt : conv_cntxt;
+}
+
+(** Internal conversion states, containing:
+    - all the fields of a [conv_env]
+    - a type unification environment
+    - a variable substitution  *)
+type conv_state = {
+  table  : Symbols.table;
+  cntxt  : conv_cntxt;
+  subst  : subst;
+  ty_env : Type.Infer.env;
+}
+
+(*------------------------------------------------------------------*)
+(** {2 Types} *)
+
+let ty_error ty_env tm ty =
+  let ty = Type.Infer.norm ty_env ty in
+  Conv (L.loc tm, Type_error (L.unloc tm, Type.ETy ty))
+
+let check_ty_leq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
+  match Type.Infer.unify_leq state.ty_env t_ty ty with
+  | `Ok -> ()
+  | `Fail -> raise (ty_error state.ty_env of_t ty)
+
+(* let check_ty_eq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
+ *   match Type.Infer.unify_eq state.ty_env t_ty ty with
+ *   | `Ok -> ()
+ *   | `Fail -> raise (ty_error state.ty_env of_t ty) *)
+
+let check_term_ty state ~of_t (t : 'a Term.term) (ty : 'b Type.ty) : unit =
+  check_ty_leq state ~of_t (Term.ty t) ty
+
+(*------------------------------------------------------------------*)
+(** {2 Conversion} *)
+
+let rec assoc :
+  type a. conv_state -> subst -> lsymb -> a Type.ty -> a Term.term
+  = fun state subst st ty ->
+  match subst with
+    | [] -> conv_err (L.loc st) (Undefined (L.unloc st))
+              
+  | ESubst (v,t)::_ when v = L.unloc st ->
+    let kind = Type.kind ty in
+    begin
+      match Type.equalk_w (Term.kind t) kind with
+      | Some Type.Type_eq ->
+        let of_t = var_of_lsymb st in
+
+        check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty;
+        
+        t
+          
+      | None ->
+        conv_err (L.loc st) (Type_error (App (st,[]), Type.ETy ty))
+    end
+    
+  | _ :: q -> assoc state q st ty
+
+let mem_assoc state x (ty : 's Type.ty) (subst : esubst list) : bool =
+  try let _ = assoc state subst x ty in true
   with Conv (_, Undefined _) -> false
 
 (** Helper for converting constructs with binders.
@@ -579,9 +650,6 @@ let subst_of_bvars vars =
     ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
   in
   List.map make vars
-
-let ty_error tm sort = Conv (L.loc tm,
-                             Type_error (L.unloc tm, Type.ETy sort))
 
 
 let get_fun table lsymb =
@@ -609,42 +677,6 @@ let get_macro table lsymb =
     conv_err (L.loc lsymb) (UndefinedOfKind (L.unloc lsymb, Symbols.NMacro))
 
 (*------------------------------------------------------------------*)
-(** Conversion context.
-  * - [InGoal]: we are converting a term in a goal (or tactic). All
-  *   timestamps must be explicitely given.
-  * - [InProc ts]: we are converting a term in a process at an implicit
-  *   timestamp [ts]. *)
-type conv_cntxt =
-  | InProc of Term.timestamp
-  | InGoal
-
-(** Exported conversion environment. *)
-type conv_env = {
-  table : Symbols.table;
-  cntxt : conv_cntxt;
-}
-
-(** Internal conversion state, containing:
-    - all the fields of a [conv_env]
-    - a type unification environment
-    - a variable substitution  *)
-type conv_state = {
-  table  : Symbols.table;
-  cntxt  : conv_cntxt;
-  subst  : subst;
-  ty_env : Type.Infer.env;
-}
-
-(*------------------------------------------------------------------*)
-let check_ty_leq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
-  match Type.Infer.unify_leq state.ty_env t_ty ty with
-  | `Ok -> ()
-  | `Fail -> raise (ty_error of_t ty)
-
-let check_term_ty state ~of_t (t : 'a Term.term) (ty : 'b Type.ty) : unit =
-  check_ty_leq state ~of_t (Term.ty t) ty
-
-(*------------------------------------------------------------------*)
 (* internal function to Theory.ml *)
 let rec convert :
   type s. conv_state -> term -> s Type.ty -> s Term.term =
@@ -662,13 +694,13 @@ and convert0 :
     let state = { state with subst } in
     convert state t s in
   
-  let type_error () = raise (ty_error tm ty) in
+  let type_error () = raise (ty_error state.ty_env tm ty) in
   
   match L.unloc tm with
   | App   (f,terms) ->
     (* if [f] is a variable name appearing in [state.subst], then substitute. *)
-    if terms = [] && mem_assoc f ty state.subst
-    then assoc state.subst f ty
+    if terms = [] && mem_assoc state f ty state.subst
+    then assoc state state.subst f ty
         
     (* otherwise build the application and convert it. *)
     else
@@ -700,8 +732,8 @@ and convert0 :
 
   | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
   | ITE (i,t,e) ->
-      begin match ty with
-        | Type.Message ->
+      begin match Type.kind ty with
+        | Type.KMessage ->
             Term.ITE (conv Type.Boolean i, conv ty t, conv ty e)
         | _ -> type_error ()
       end
@@ -741,6 +773,7 @@ and convert0 :
                            conv Type.Timestamp u,
                            conv Type.Timestamp v))
           with Conv (_,Type_error _ ) ->
+          
           match o with
           | #Term.ord_eq as o ->
             begin try
@@ -748,27 +781,28 @@ and convert0 :
                                    conv_index state u,
                                    conv_index state v))
               with Conv (_,Type_error _ ) ->
-              try
+              
+                let tyv = Type.Infer.mk_univar state.ty_env in
+
                 Term.Atom (`Message (o,
-                                     conv Type.Message u,
-                                     conv Type.Message v))
-              with Conv (_,Type_error _ ) ->
-                conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
+                                     conv (Type.TUnivar tyv) u,
+                                     conv (Type.TUnivar tyv) v))
             end
-          | _ -> conv_err (L.loc tm) (Untypable_equality (L.unloc tm))
+            
+          | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
         end
       | _ -> type_error ()
     end
 
   | Happens ts ->
-      begin match ty with
-        | Type.Boolean ->
-          let atoms = List.map (fun t ->
-              Term.Atom (`Happens (conv Type.Timestamp t))
-            ) ts in
-          Term.mk_ands atoms
-        | _ -> type_error ()
-      end
+    begin match ty with
+      | Type.Boolean ->
+        let atoms = List.map (fun t ->
+            Term.Atom (`Happens (conv Type.Timestamp t))
+          ) ts in
+        Term.mk_ands atoms
+      | _ -> type_error ()
+    end
 
   | Find (vs,c,t,e) ->
     let new_subst =
@@ -784,8 +818,8 @@ and convert0 :
       in
       List.map f new_subst
     in
-    begin match ty with
-      | Type.Message ->
+    begin match Type.kind ty with
+      | Type.KMessage ->
         let subst = new_subst @ state.subst in
         let c = conv ~subst:subst Type.Boolean c in
         let t = conv ~subst:subst ty t in
@@ -795,39 +829,43 @@ and convert0 :
     end
 
   | ForAll (vs,f) | Exists (vs,f) ->
+    let new_subst = subst_of_bvars vs in
+    let f = conv ~subst:(new_subst @ state.subst) Type.Boolean f in
+    let vs =
+      let f : esubst -> Vars.evar = function
+        | ESubst (_, Term.Var v) -> Vars.EVar v
+        | _ -> assert false
+      in
+      List.map f new_subst
+    in
+    begin match ty, L.unloc tm with
+      | Type.Boolean, ForAll _ -> Term.mk_forall vs f
+      | Type.Boolean, Exists _ -> Term.mk_exists vs f
+      | _ -> type_error ()
+    end
 
-      let new_subst = subst_of_bvars vs in
-      let f = conv ~subst:(new_subst @ state.subst) Type.Boolean f in
-      let vs =
-        let f : esubst -> Vars.evar = function
-          | ESubst (_, Term.Var v) -> Vars.EVar v
-          | _ -> assert false
-        in
-        List.map f new_subst
-      in
-      begin match ty, L.unloc tm with
-        | Type.Boolean, ForAll _ -> Term.mk_forall vs f
-        | Type.Boolean, Exists _ -> Term.mk_exists vs f
-        | _ -> type_error ()
-      end
   | Seq (vs,t) ->
-      let new_subst = subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
-      let t = conv ~subst:(new_subst @ state.subst) Type.Message t in
-      let vs =
-        let f : esubst -> Vars.index = function
-          | ESubst (_, Term.Var v) ->
-            begin match Vars.ty v with
-              | Type.Index -> v
-                | _ -> type_error ()
-              end
-          | _ -> assert false
-        in
-        List.map f new_subst
+    let new_subst = subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
+
+    let tyv = Type.Infer.mk_univar state.ty_env in    
+    
+    let t = conv ~subst:(new_subst @ state.subst) (Type.TUnivar tyv) t in
+    let vs =
+      let f : esubst -> Vars.index = function
+        | ESubst (_, Term.Var v) ->
+          begin match Vars.ty v with
+            | Type.Index -> v
+            | _ -> type_error ()
+          end
+        | _ -> assert false
       in
-      begin match ty with
-        | Type.Message -> Term.Seq (vs, t)
-        | _ -> type_error ()
-      end
+      List.map f new_subst
+    in
+    
+    begin match ty with
+      | Type.Message -> Term.Seq (vs, t)
+      | _ -> type_error ()
+    end
 
 and conv_index state t =
   match convert state t Type.Index with
@@ -854,10 +892,10 @@ and conv_app :
       | None -> conv_err loc (Timestamp_expected (L.unloc tm))
       | Some ts -> ts in
 
-    let type_error () = raise (ty_error tm ty) in
+    let type_error () = raise (ty_error state.ty_env tm ty) in
 
     match L.unloc app with
-    | AVar s -> assoc state.subst s ty
+    | AVar s -> assoc state state.subst s ty
 
     (* In [Term.term], function symbols deal with the message sort,
      * and comparisons are over message, indices or timestamps.
@@ -873,16 +911,16 @@ and conv_app :
      * recover some of that flexibility. *)
 
     | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
-      begin match ty with
-        | Type.Boolean -> Term.True
-        | Type.Message -> Term.mk_true
+      begin match Type.kind ty with
+        | Type.KBoolean -> Term.True
+        | Type.KMessage -> Term.mk_true
         | _ -> type_error ()
       end
 
     | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
-      begin match ty with
-        | Type.Boolean -> Term.False
-        | Type.Message -> Term.mk_false
+      begin match Type.kind ty with
+        | Type.KBoolean -> Term.False
+        | Type.KMessage -> Term.mk_false
         | _ -> type_error ()
       end
 
@@ -901,7 +939,7 @@ and conv_app :
               let fty = match mfty with `Fun x -> x | _ -> assert false in
               
               (* refresh all type variables in [fty] *)
-              let fty_op = Type.freshen_ftype fty in
+              let fty_op = Type.open_ftype state.ty_env fty in
               
               let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
               let indices =
@@ -933,7 +971,7 @@ and conv_app :
               assert (ty_args = []);
               check_ty_leq state ~of_t:tm ty_out Type.Message;
               let indices = List.map (conv_index state) l in
-              Term.Macro ((s,ty,indices),[],get_at ())
+              Term.Macro ((s,Type.kind ty,indices),[],get_at ())
 
             | Wrapped (s, Macro (Local (targs,_))) ->
               let ty_args, Type.ETy ty_out =
@@ -946,7 +984,7 @@ and conv_app :
 
                   check_ty_leq state ~of_t:tm ty_out ty;
                   
-                  Term.Macro ((s,ty,indices),[],get_at ())
+                  Term.Macro ((s,Type.kind ty,indices),[],get_at ())
                 end
               else
                 begin
@@ -955,7 +993,7 @@ and conv_app :
                   
                   check_ty_leq state ~of_t:tm ty_out ty;
                   
-                  Term.Macro ((s,ty,[]),l,get_at ())
+                  Term.Macro ((s,Type.kind ty,[]),l,get_at ())
                 end
 
             | Wrapped (_, _) -> raise ts_expected
@@ -967,18 +1005,18 @@ and conv_app :
     | Fun (f, l, Some ts) ->
       let ts_unexpected = Conv (loc, Timestamp_unexpected t_i) in
       let open Symbols in
-      begin match ty with
-        | Type.Message ->
+      begin match Type.kind ty with
+        | Type.KMessage ->
           begin match of_lsymb f state.table with
             | Wrapped (s, Macro (Input|Output|Frame)) ->
               (* I am not sure of the location to use in
                  check_arity_i below  *)
               check_arity_i (L.loc f) "input" (List.length l) 0 ;
-              Term.Macro ((s,ty,[]),[],ts)
+              Term.Macro ((s,Type.kind ty,[]),[],ts)
             | Wrapped (s, Macro (Global arity)) ->
               check_arity f (List.length l) arity ;
               let l = List.map (conv_index state) l in
-              Term.Macro ((s,ty, l),[],ts)
+              Term.Macro ((s,Type.kind ty, l),[],ts)
             | Wrapped (s, Macro (Local (targs,_))) ->
               (* TODO as above *)
               assert false
@@ -987,13 +1025,13 @@ and conv_app :
             | Wrapped (_, _) -> raise ts_unexpected
           end
 
-        | Type.Boolean ->
+        | Type.KBoolean ->
           begin match of_lsymb f state.table with
             | Wrapped (s, Macro (Cond|Exec)) ->
               (* I am not sure of the location to use in
                   check_arity_i below  *)
               check_arity_i (L.loc f) "cond" (List.length l) 0 ;
-              Term.Macro ((s,ty,[]),[],ts)
+              Term.Macro ((s,Type.kind ty,[]),[],ts)
             | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
               type_error ()
             | Wrapped (_, _) -> raise ts_unexpected
@@ -1012,15 +1050,15 @@ and conv_app :
         | Some ts -> ts
         | None -> conv_err loc (Timestamp_expected t_i)
       in
-      begin match ty with
-        | Type.Message -> Term.Macro ((s,ty,is),[],ts)
+      begin match Type.kind ty with
+        | Type.KMessage -> Term.Macro ((s,Type.kind ty,is),[],ts)
         | _ -> type_error ()
       end
 
     | Name (s, is) ->
       check_name state.table  s (List.length is) ;
-      begin match ty with
-        | Type.Message ->
+      begin match Type.kind ty with
+        | Type.KMessage ->
           Term.Name ( get_name state.table s ,
                       List.map (conv_index state) is )
         | _ -> type_error ()
@@ -1269,12 +1307,12 @@ let declare_state table s (typed_args : (lsymb * Type.ety) list)
       (Symbols.State (List.length typed_args,k)) in
   table
 
-let get_init_states table =
+let get_init_states table : (Term.state * Term.message) list =
   Symbols.Macro.fold
     (fun s def data acc -> match (def,data) with
       | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
         let (state,msg) =
-          ((s, Type.Message, l), t)
+          ((s, Type.KMessage, l), t)
         in
         (state,msg)::acc
       | _ -> acc)

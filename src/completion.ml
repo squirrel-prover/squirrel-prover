@@ -1,5 +1,4 @@
 open Utils
-open Term
 
 module L = Location
 
@@ -263,46 +262,50 @@ let index_of_cterm i = match i.cnt with
     
 let indices_of_cterms cis = List.map index_of_cterm cis
 
-let term_of_cterm : type a. Symbols.table -> a Type.ty -> cterm -> a Term.term =
-  fun table s c ->  
-  let rec term_of_cterm : type a. a Type.ty -> cterm -> a Term.term = 
-    fun s c -> 
-      let open Term in 
+let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term =
+  fun table kind c ->  
+  let rec term_of_cterm : type a. a Type.kind -> cterm -> a Term.term = 
+    fun kind c -> 
       match c.cnt with 
       | Cfun (F f, ari, cterms) -> 
         let cis, cterms = List.takedrop ari cterms in
-        let is = indices_of_cterms cis
-        and terms = terms_of_cterms Type.Message cterms in
+        let is = indices_of_cterms cis in
+        let terms = terms_of_cterms Type.Message cterms in
         let t = Term.mk_fun table f is terms in
-        cast s t
+        Term.cast_kind kind t
 
       | Cfun (M m, ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
-        let m = (m,s,indices_of_cterms cis) in
-        Macro (m, [], term_of_cterm Type.Timestamp cts)
+        let m = (m,kind,indices_of_cterms cis) in
+        Macro (m, [], term_of_cterm Type.KTimestamp cts)
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in 
-        cast s (Action (a, is))
+        Term.cast_kind kind (Action (a, is))
 
       | Cfun (N n, ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
-        cast s (Name (n, is))
+        Term.cast_kind kind (Name (n, is))
 
       | Cfun (GPred, ari, ts) ->
         assert (ari = 0);
         let ts = as_seq1 ts in
-        let pred_ts = Pred (term_of_cterm Type.Timestamp ts) in
-        cast s pred_ts   
+        let pred_ts = Term.Pred (term_of_cterm Type.KTimestamp ts) in
+        Term.cast_kind kind pred_ts   
 
-      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m s)
+      | Ccst (Cst.Cmvar (Vars.EVar m)) -> Var (Vars.cast m kind)
 
-      | Ccst (Cst.Cgfuncst (`F f)) -> cast s (Term.mk_fun table f [] [])
-      | Ccst (Cst.Cgfuncst (`A a)) -> cast s (Action (a,[]))
-      | Ccst (Cst.Cgfuncst (`N n)) -> cast s (Name   (n,[]))
+      | Ccst (Cst.Cgfuncst (`F f)) ->
+        Term.cast_kind kind (Term.mk_fun table f [] [])
+          
+      | Ccst (Cst.Cgfuncst (`A a)) ->
+        Term.cast_kind kind (Term.Action (a,[]))
+                                        
+      | Ccst (Cst.Cgfuncst (`N n)) ->
+        Term.cast_kind kind (Term.Name   (n,[]))
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
@@ -1392,8 +1395,8 @@ module Memo = Ephemeron.K2.Make
       type t = Term.esubst list
       let equal_p (Term.ESubst (t0, t1)) (Term.ESubst (t0', t1')) = 
         Type.equal (Term.ty t0) (Term.ty t0') &&
-        let t0', t1' = Term.cast (Term.ty t0) t0', 
-                       Term.cast (Term.ty t0) t1' in
+        let t0', t1' = Term.cast_ty (Term.ty t0) t0', 
+                       Term.cast_ty (Term.ty t0) t1' in
         t0 = t0' && t1 = t1'
       let equal l l' = 
         let l, l' = List.sort_uniq Stdlib.compare l,

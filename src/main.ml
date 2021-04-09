@@ -199,8 +199,8 @@ let rec main_loop ~test ?(save=true) state =
   | exception (Prover.Decl_error e) when not test ->
     error ~test state (fun fmt -> Prover.pp_decl_error pp_loc_error fmt e)
       
-  | exception (Theory.Conv e) when not test ->
-    error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e)
+  (* | exception (Theory.Conv e) when not test ->
+   *   error ~test state (fun fmt -> Theory.pp_error pp_loc_error fmt e) *)
       
   | exception (Symbols.SymbError e) when not test ->
     error ~test state (fun fmt -> Symbols.pp_symb_error pp_loc_error fmt e)

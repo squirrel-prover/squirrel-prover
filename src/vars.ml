@@ -181,12 +181,12 @@ end
 
 exception CastError
 
-let cast : type a b. a var -> b Type.ty -> b var = 
-  fun x s -> match Type.equal_w (ty x) s with
+let cast : type a b. a var -> b Type.kind -> b var = 
+  fun x s -> match Type.equalk_w (kind x) s with
     | Some Type.Type_eq -> x
     | None -> raise CastError
 
-let ecast : type a. evar -> a Type.ty -> a var = 
+let ecast : type a. evar -> a Type.kind -> a var = 
   fun (EVar v) s -> cast v s
 
 let equal : type a b. a var -> b var -> bool = fun v v' ->

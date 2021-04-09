@@ -28,8 +28,8 @@ val ty : 'a var -> 'a Type.ty
 
 val kind : 'a var -> 'a Type.kind
 
-val cast  : 'a var -> 'b Type.ty -> 'b var
-val ecast :   evar -> 'a Type.ty -> 'a var
+val cast  : 'a var -> 'b Type.kind -> 'b var
+val ecast :   evar -> 'a Type.kind -> 'a var
 
 val equal : 'a var -> 'b var -> bool
 

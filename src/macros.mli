@@ -24,7 +24,7 @@ val is_defined :
     if the macro can be expanded.
     Does *not* check that the timestamp happens ! *)
 val get_definition :
-  Constr.trace_cntxt -> 'a Type.ty ->
+  Constr.trace_cntxt -> 'a Type.kind ->
   Symbols.macro Symbols.t -> 
   Vars.index list -> Term.timestamp -> 
   'a Term.term
@@ -34,6 +34,6 @@ val get_definition :
   * would be obtained with [get_definition m li ts] for some [ts],
   * except that it will feature meaningless action names in some places. *)
 val get_dummy_definition :
-  Constr.trace_cntxt -> 'a Type.ty ->
+  Constr.trace_cntxt -> 'a Type.kind ->
   Symbols.macro Symbols.t -> Vars.index list -> 
   'a Term.term

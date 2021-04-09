@@ -33,8 +33,6 @@ let ident_of_tvar id = id
 type univar = Ident.t
 
 let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp u
-
-let univar_of_ident id = id
   
 (*------------------------------------------------------------------*)
 (** Types of terms *)
@@ -114,6 +112,9 @@ let equalk_w : type a b. a kind -> b kind -> (a,b) type_eq option =
    | KMessage,   KMessage   -> Some Type_eq
      
    | _ -> None
+
+let equalk : type a b. a kind -> b kind -> bool =
+  fun a b -> equalk_w a b <> None
 
 (*------------------------------------------------------------------*)
 (** Sub-typing relation, and return a (Ocaml) type equality witness *)
@@ -207,25 +208,6 @@ let tsubst : type a. tsubst -> a ty -> a ty = fun s t ->
 let tsubst_e s (ETy ty) = ETy (tsubst s ty)
 
 (*------------------------------------------------------------------*)
-(** {2 Freshen function types} *)
-
-let freshen_ftype (fty : ftype) : ftype_op =
-  let vars_f = List.map Ident.fresh fty.fty_vars in
-  
-  (* create substitution refreshing all type variables in [fty] *)
-  let ts_tvar =
-    List.fold_left2 (fun ts_tvar id id_f ->
-        Mid.add id (TUnivar id_f) ts_tvar
-      ) Mid.empty fty.fty_vars vars_f
-  in  
-  let ts = { tsubst_empty with ts_tvar } in
-
-  (* compute the new function type *)
-  { fty with fty_vars = vars_f;
-             fty_args = List.map (tsubst ts) fty.fty_args;
-             fty_out  = tsubst ts fty.fty_out; }
-  
-(*------------------------------------------------------------------*)
 (** {2 Type inference } *)
 
 (** Stateful API *)
@@ -234,7 +216,9 @@ module Infer : sig
 
   val mk_env : unit -> env
     
-  val mk_univar : env -> message ty
+  val mk_univar : env -> univar
+
+  val norm : env -> 'a ty -> 'a ty
                          
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
   val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
@@ -253,7 +237,7 @@ end = struct
     let uv = Ident.create "u" in
     let ety = TUnivar uv in
     env := Mid.add uv ety !env;
-    ety
+    uv
 
   (* Univar are maximal for this ordering *)
   let compare : type a b. a ty -> b ty -> int =
@@ -292,7 +276,7 @@ end = struct
     let t  = norm env t
     and t' = norm env t' in
 
-    match equal_w t t' with
+    match equalk_w (kind t) (kind t') with
     | None -> `Fail
     | Some Type_eq ->
       let t, t' = if compare t t' < 0 then t', t else t, t' in
@@ -309,3 +293,25 @@ end = struct
     unify_eq env t t'
 end
 
+
+(*------------------------------------------------------------------*)
+(** {2 Freshen function types} *)
+
+let open_ftype (ty_env : Infer.env) (fty : ftype) : ftype_op =
+  let vars_f = List.map (fun _ ->
+      Infer.mk_univar ty_env
+    ) fty.fty_vars in
+  
+  (* create substitution refreshing all type variables in [fty] *)
+  let ts_tvar =
+    List.fold_left2 (fun ts_tvar id id_f ->        
+        Mid.add id (TUnivar id_f) ts_tvar
+      ) Mid.empty fty.fty_vars vars_f
+  in  
+  let ts = { tsubst_empty with ts_tvar } in
+
+  (* compute the new function type *)
+  { fty with fty_vars = vars_f;
+             fty_args = List.map (tsubst ts) fty.fty_args;
+             fty_out  = tsubst ts fty.fty_out; }
+  

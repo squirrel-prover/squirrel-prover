@@ -53,10 +53,10 @@
   "index"
   "message"
   "boolean"
-  "timestamp"
+  "timestamp"  
   ))
 
-
+(defvar squirrel-operator-type-var "'[a-z]*[a-z_'1-9]*")
 
 (defvar squirrel-tactic-keywords '(
   "anyintro"
@@ -148,8 +148,8 @@
 (defvar squirrel-operator-char-1234
   (concat "\\(" squirrel-operator-char-1
           "\\|" squirrel-operator-char-2
-	  "\\|" squirrel-operator-char-3
-	  "\\|" squirrel-operator-char-4
+          "\\|" squirrel-operator-char-3
+          "\\|" squirrel-operator-char-4
           "\\)"))
 
 (defface squirrel-tactics-closing-face
@@ -164,16 +164,17 @@
 
 (defvar squirrel-font-lock-keywords
   (list
-    (cons (proof-ids-to-regexp squirrel-prog-keywords)      'font-lock-keyword-face)
-    (cons (concat squirrel-operator-char-1234 "+")          'font-lock-type-face)
-    (cons (concat squirrel-tactical-char "+")               'proof-tacticals-name-face)
+    (cons (proof-ids-to-regexp squirrel-prog-keywords)    'font-lock-keyword-face)
+    (cons (concat squirrel-operator-char-1234 "+")        'font-lock-type-face)
+    (cons (concat squirrel-tactical-char "+")             'proof-tacticals-name-face)
     (cons (proof-ids-to-regexp squirrel-tacticals-keywords)
                                                           'proof-tacticals-name-face)
-    (cons (proof-ids-to-regexp squirrel-tactic-keywords)    'proof-tactics-name-face)
+    (cons (proof-ids-to-regexp squirrel-tactic-keywords)  'proof-tactics-name-face)
     (cons (proof-ids-to-regexp squirrel-decl-keywords)    'font-lock-constant-face)
-    (cons (proof-ids-to-regexp squirrel-closing-keywords)    'squirrel-tactics-closing-face)
-    (cons (proof-ids-to-regexp squirrel-fun-keywords)    'font-lock-preprocessor-face)
+    (cons (proof-ids-to-regexp squirrel-closing-keywords) 'squirrel-tactics-closing-face)
+    (cons (proof-ids-to-regexp squirrel-fun-keywords)     'font-lock-preprocessor-face)
     (cons (proof-ids-to-regexp squirrel-type-keywords)    'font-lock-variable-name-face)
+    (cons (concat squirrel-operator-type-var)             'font-lock-variable-name-face)
 	)
 )
 

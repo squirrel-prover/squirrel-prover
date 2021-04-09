@@ -29,8 +29,6 @@ val ident_of_tvar : tvar -> Ident.t
 type univar
 
 val pp_univar : Format.formatter -> univar -> unit
-
-val univar_of_ident : Ident.t -> univar
   
 (*------------------------------------------------------------------*)
 (** Types of terms *)
@@ -78,15 +76,47 @@ val subtype   : 'a ty -> 'b ty -> bool
 (*------------------------------------------------------------------*)
 (** Equality relation, and return a (Ocaml) type equality witness *)
 val equal_w : 'a ty -> 'b ty -> ('a,'b) type_eq option
-
 val equal   : 'a ty -> 'b ty -> bool
 
 val equalk_w : 'a kind -> 'b kind -> ('a,'b) type_eq option
+val equalk   : 'a kind -> 'b kind -> bool
 
 (*------------------------------------------------------------------*)
 val pp : Format.formatter -> 'a ty -> unit
 
 val pp_e : Format.formatter -> ety -> unit
+  
+(*------------------------------------------------------------------*)
+(** {2 Type substitution } *)
+
+(** A substitution from unification variables to (existential) types. *)
+type tsubst
+
+val tsubst   : tsubst -> 'a ty -> 'a ty
+val tsubst_e : tsubst ->   ety ->   ety
+
+val tsubst_empty : tsubst
+  
+(*------------------------------------------------------------------*)
+(** {2 Type inference } *)
+
+(** Stateful API *)
+module Infer : sig
+  type env
+
+  val mk_env : unit -> env
+    
+  val mk_univar : env -> univar
+
+  val norm : env -> 'a ty -> 'a ty
+      
+  val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
+  val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
+
+  val is_closed : env -> bool
+  val close : env -> tsubst
+end
+
 
 (*------------------------------------------------------------------*)
 (** {2 Function symbols type} *)
@@ -111,33 +141,4 @@ val mk_ftype : int -> tvar list -> message ty list -> message ty -> ftype
 
 (** [open_ftype fty] opens an [ftype] by refreshes its quantified 
     type variables. *)
-val freshen_ftype : ftype -> ftype_op
-  
-(*------------------------------------------------------------------*)
-(** {2 Type substitution } *)
-
-(** A substitution from unification variables to (existential) types. *)
-type tsubst
-
-val tsubst   : tsubst -> 'a ty -> 'a ty
-val tsubst_e : tsubst ->   ety ->   ety
-
-val tsubst_empty : tsubst
-  
-(*------------------------------------------------------------------*)
-(** {2 Type inference } *)
-
-(** Stateful API *)
-module Infer : sig
-  type env
-
-  val mk_env : unit -> env
-    
-  val mk_univar : env -> message ty
-                         
-  val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
-  val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
-
-  val is_closed : env -> bool
-  val close : env -> tsubst
-end
+val open_ftype : Infer.env -> ftype -> ftype_op

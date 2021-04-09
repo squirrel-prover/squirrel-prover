@@ -280,7 +280,7 @@ let message_case (m : Term.message) s : c_res list =
   begin match m with
     | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
-    | Term.Macro ((m,Type.Message,is),[],ts) as o
+    | Term.Macro ((m,Type.KMessage,is),[],ts) as o
       when Macros.is_defined m ts (TraceSequent.table s) ->
       if not (TraceSequent.query_happens ~precise:true s ts) 
       then soft_failure (Tactics.MustHappen ts)
@@ -288,7 +288,7 @@ let message_case (m : Term.message) s : c_res list =
         begin match
             Macros.get_definition
               (mk_trace_cntxt s)
-              Type.Message
+              Type.KMessage
               m is ts
           with
           | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
@@ -2142,7 +2142,7 @@ let rewrite ~all
       let rw_inst (occ : a Term.Match.match_occ) =
         found1 := true;
         let subst = Term.Match.to_subst occ.mv in
-        let r_f = Term.cast (Term.ty occ.occ) (Term.subst subst r) in
+        let r_f = Term.cast_ty (Term.ty occ.occ) (Term.subst subst r) in
         ( Term.subst [Term.ESubst (occ.occ, r_f)] f, 
           List.map (Term.subst subst) rsubs ) 
       in

@@ -197,7 +197,8 @@ type conversion_error_i =
   | Type_error           of term_i * Type.ety
   | Timestamp_expected   of term_i
   | Timestamp_unexpected of term_i
-  | Untypable_equality   of term_i
+  (* | Untypable_equality   of term_i *)
+  | Unsupported_ord      of term_i
   | String_expected      of term_i
   | Int_expected         of term_i
   | Tactic_type          of string

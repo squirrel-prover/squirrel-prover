@@ -546,7 +546,7 @@ let fs_or    = mk_fsymb "or" 2
 let fs_not   = mk_fsymb "not" 1
 
 (* let fs_ite =
- *   let tyv = Type.univar_of_ident (Ident.create "t") in
+ *   let tyv = mk_univar "t" in
  *   let tyvar = Type.TUnivar tyv in
  *   let fty = Type.mk_ftype
  *       0 [tyv]

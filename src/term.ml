@@ -21,7 +21,7 @@ type fsymb = fname * Vars.index list
 
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.ty * Vars.index list
+type 'a msymb = mname * 'a Type.kind * Vars.index list
 
 type state = Type.message msymb
 
@@ -134,7 +134,7 @@ type eq_atom = [
 let rec kind : type a. a term -> a Type.kind =
   fun t -> match t with
     | Name _               -> Type.KMessage
-    | Macro ((_,s,_),_,_)  -> Type.kind s
+    | Macro ((_,k,_),_,_)  -> k
     | Seq _                -> Type.KMessage
     | Var v                -> Vars.kind v
     | Pred _               -> Type.KTimestamp
@@ -164,7 +164,7 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
   let rec ty : type a. a term -> a Type.t =
     fun t -> match t with
       | Fun (_,fty,terms) ->
-        let fty = Type.freshen_ftype fty in
+        let fty = Type.open_ftype ty_env fty in
         let () =
           List.iter2 (fun arg arg_ty ->
               match Type.Infer.unify_leq ty_env (ty arg) arg_ty with
@@ -175,7 +175,15 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
         fty.Type.fty_out
 
       | Name _               -> Type.Message
-      | Macro ((_,s,_),_,_)  -> s
+      | Macro ((_,k,_),_,_)  ->
+        (* TODO: types: fix that *)
+        begin
+          match k with
+          | Type.KMessage -> Type.Message
+          | Type.KBoolean -> Type.Boolean
+          | _ -> assert false
+        end
+        
       | Seq _                -> Type.Message
       | Var v                -> Vars.ty v
       | Pred _               -> Type.Timestamp
@@ -207,19 +215,15 @@ let ety ?ty_env t = Type.ETy (ty ?ty_env t)
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-(** [cast ty t] checks that [t] can be seen as a message of type [ty].
-    No sub-typing. *)
-let cast : type a b. a Type.ty -> b term -> a term =
+let cast_ty : type a b. a Type.ty -> b term -> a term =
   fun cast_ty t ->
   match Type.equal_w (ty t) cast_ty with
   | Some Type.Type_eq -> t
   | None -> raise Uncastable
 
-(** [cast_st ty t] checks that [t] can be seen as a message of type [ty],
-    using sub-typing if necessary. *)
-let cast_st : type a b. a Type.ty -> b term -> a term =
-  fun cast_ty t ->
-  match Type.subtype_w (ty t) cast_ty with
+let cast_kind : type a b. a Type.kind -> b term -> a term =
+  fun k t ->
+  match Type.equalk_w (kind t) k with
   | Some Type.Type_eq -> t
   | None -> raise Uncastable
                
@@ -610,12 +614,12 @@ let f_triv = function
 (** Declare input and output macros.
   * We assume that they are the only symbols bound to Input/Output. *)
     
-let in_macro    = (Symbols.inp,   Type.Message, [])
-let out_macro   = (Symbols.out,   Type.Message, [])
-let frame_macro = (Symbols.frame, Type.Message, [])
+let in_macro    = (Symbols.inp,   Type.KMessage, [])
+let out_macro   = (Symbols.out,   Type.KMessage, [])
+let frame_macro = (Symbols.frame, Type.KMessage, [])
 
-let cond_macro  = (Symbols.cond, Type.Boolean, [])
-let exec_macro  = (Symbols.exec, Type.Boolean, [])
+let cond_macro  = (Symbols.cond, Type.KBoolean, [])
+let exec_macro  = (Symbols.exec, Type.KBoolean, [])
 
 let rec pts : type a. timestamp list -> a term -> timestamp list =
   fun acc -> function
@@ -644,8 +648,8 @@ let rec assoc : type a. subst -> a term -> a term =
   | [] -> term
   | ESubst (t1,t2)::q ->
     try
-      let term2 = cast (ty t1) term in
-      if term2 = t1 then cast (ty term) t2 else assoc q term
+      let term2 = cast_ty (ty t1) term in
+      if term2 = t1 then cast_ty (ty term) t2 else assoc q term
     with Uncastable -> assoc q term
 
 exception Substitution_error of string
@@ -909,7 +913,7 @@ type eterm = ETerm : 'a term -> eterm
 let app : type a. (eterm -> eterm) -> a term -> a term = 
   fun func x ->
   let ETerm x0 = func (ETerm x) in
-  cast (ty x) x0
+  cast_ty (ty x) x0
   
 let atom_map (func : eterm -> eterm) (at : generic_atom) : generic_atom =
   let func : type c. c term -> c term = fun x -> app func x in
@@ -1015,7 +1019,7 @@ module Match = struct
     Mv.fold (fun v t subst -> 
         match v, t with
         | Vars.EVar v, ETerm t -> 
-          ESubst (Var v, cast (Vars.ty v) t) :: subst
+          ESubst (Var v, cast_ty (Vars.ty v) t) :: subst
       ) mv [] 
 
   (** A pattern is a term [t] and a subset of [t]'s free variables that must 
@@ -1039,7 +1043,7 @@ module Match = struct
       fun t pat mv -> match t, pat with
         | _, Var v' -> 
           begin
-            match cast (Vars.ty v') t with
+            match cast_ty (Vars.ty v') t with
             | exception Uncastable -> raise NoMatch
             | t -> vmatch t v' mv
           end
@@ -1051,9 +1055,9 @@ module Match = struct
         | Name symb, Name symb' -> 
           smatch symb symb' mv
 
-        | Macro ((s, sort, is), terms, ts), 
-          Macro ((s', sort', is'), terms', ts') -> 
-          if not (Type.equal sort sort') then raise NoMatch;
+        | Macro ((s, k, is), terms, ts), 
+          Macro ((s', k', is'), terms', ts') -> 
+          if not (Type.equalk k k') then raise NoMatch;
 
           let mv = smatch (s,is) (s',is') mv in
           tmatch ts ts' (tmatch_l terms terms' mv)
@@ -1118,7 +1122,7 @@ module Match = struct
 
         (* If we already saw the variable, check that the subterms are
            identical. *)
-        | ETerm t' -> match cast (ty t) t' with
+        | ETerm t' -> match cast_ty (ty t) t' with
           | exception Uncastable -> raise NoMatch
           (* TODO: alpha-equivalent *)
           | t' -> if t <> t' then raise NoMatch else mv
@@ -1172,9 +1176,9 @@ module Match = struct
             tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            found := Some ({ occ = cast s_p t; mv = mv; }); 
-            let t' = func (cast s_p t) mv in
-            cast (ty t) t'    (* cast needed *)
+            found := Some ({ occ = cast_ty s_p t; mv = mv; }); 
+            let t' = func (cast_ty s_p t) mv in
+            cast_ty (ty t) t'    (* cast needed *)
       in
       
       let t = find t in

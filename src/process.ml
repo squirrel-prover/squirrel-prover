@@ -407,7 +407,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let updates =
       List.map
         (fun (s,l,t) ->
-          (Symbols.Macro.of_lsymb s table, Type.Message, l),
+          (Symbols.Macro.of_lsymb s table, Type.KMessage, l),
            Term.subst (subst_ts @ subst_input) t)
         env.updates
     in
@@ -545,7 +545,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       Theory.App (x', is)
     in
     let x'_tm =
-      Term.Macro ((x', Type.Message, List.rev env.indices), [],
+      Term.Macro ((x', Type.KMessage, List.rev env.indices), [],
                   Term.Var ts)
     in
     let env =

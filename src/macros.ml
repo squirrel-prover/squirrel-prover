@@ -47,12 +47,12 @@ let is_defined name a table =
 (*------------------------------------------------------------------*)
 let get_def :
   type a.  SystemExpr.system_expr -> Symbols.table ->
-  a Type.ty -> Symbols.macro Symbols.t ->
+  a Type.kind -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp ->
   a Term.term =
-  fun system table sort name args a ->
-  match sort with
-  | Type.Message ->
+  fun system table kind name args a ->
+  match kind with
+  | Type.KMessage ->
     begin
       match Symbols.Macro.get_all name table with
       | Symbols.Input, _ -> assert false
@@ -72,7 +72,7 @@ let get_def :
             | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
             | Term.Action _ ->
               Term.mk_pair
-                (Term.Macro ((name,sort,args), [], Term.Pred a))
+                (Term.Macro ((name,kind,args), [], Term.Pred a))
                 (Term.mk_pair
                    (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
                    (Term.ITE (Term.Macro (Term.exec_macro, [], a),
@@ -94,7 +94,7 @@ let get_def :
               updates of [action] *)
               let ((n,s,is),msg) = List.find
                 (fun ((n,s,is),_) ->
-                  n = name && s = sort && List.length args = List.length is)
+                  n = name && s = ty && List.length args = List.length is)
                 descr.Action.updates
               in
                 (* update found:
@@ -109,9 +109,9 @@ let get_def :
                   Term.mk_ite
                     (Term.mk_indices_eq args is)
                     msg
-                    (Term.Macro ((name,sort,args), [], Term.Pred a))
+                    (Term.Macro ((name,ty,args), [], Term.Pred a))
             with Not_found ->
-              Term.Macro ((name,sort,args), [], Term.Pred a)
+              Term.Macro ((name,ty,args), [], Term.Pred a)
             end
           | _ -> assert false
         end
@@ -172,7 +172,7 @@ let get_def :
       |  _ -> assert false
 
     end
-  | Type.Boolean ->
+  | Type.KBoolean ->
     begin
       match Symbols.Macro.get_all name table with
       | Symbols.Cond, _ ->
@@ -189,7 +189,7 @@ let get_def :
         begin match a with
           | Term.Action (s,_) when s = Symbols.init_action -> Term.True
           | Term.Action _ ->
-            Term.And (Macro ((name, sort, args),[], Term.Pred a),
+            Term.And (Macro ((name, ty, args),[], Term.Pred a),
                       Macro (Term.cond_macro, [], a))
           | _ -> assert false
         end
@@ -200,7 +200,7 @@ let get_def :
 (*------------------------------------------------------------------*)
 let get_definition :
   type a. Constr.trace_cntxt ->
-  a Type.ty -> Symbols.macro Symbols.t ->
+  a Type.kind -> Symbols.macro Symbols.t ->
   Vars.index list -> Term.timestamp ->
   a Term.term =
   fun cntxt sort name args ts ->
@@ -230,15 +230,15 @@ let get_definition :
 (*------------------------------------------------------------------*)
 let get_dummy_definition :
   type a. Constr.trace_cntxt ->
-  a Type.ty -> Symbols.macro Symbols.t ->
+  a Type.kind -> Symbols.macro Symbols.t ->
   Vars.index list ->
   a Term.term =
-  fun cntxt sort mn indices ->
+  fun cntxt kind mn indices ->
   match Symbols.Macro.get_all mn cntxt.table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
       let dummy_action = Action.dummy (List.length inputs) in
       let tdummy_action = 
         SystemExpr.action_to_term cntxt.table cntxt.system dummy_action 
       in
-      get_definition cntxt sort mn indices tdummy_action
+      get_definition cntxt kind mn indices tdummy_action
     | _ -> assert false

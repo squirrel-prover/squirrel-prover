@@ -30,7 +30,7 @@ type fsymb = Symbols.fname Symbols.t * Vars.index list
   * translating the meta-logic to the base logic. *)
 
 type mname    = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.ty * Vars.index list
+type 'a msymb = mname * 'a Type.kind * Vars.index list
 
 type state = Type.message msymb
 
@@ -168,21 +168,22 @@ val disjunction_to_literals : formula -> literal list option
 
 val pp : Format.formatter -> 'a term -> unit
 
+val kind : 'a term -> 'a Type.kind
+    
 val ty  : ?ty_env:Type.Infer.env -> 'a term -> 'a Type.ty
 val ety : ?ty_env:Type.Infer.env -> 'a term -> Type.ety
 
 (*------------------------------------------------------------------*)
 exception Uncastable
 
-(** [cast ty t] checks that [t] can be seen as a message of type [ty].
-    No sub-typing if necessary. 
+(** [cast_ty ty t] checks that [t] can be seen as a message of ty [ty].
+    No sub-typing. 
     @raise Uncastable if the term cannot be cast.*)
-val cast : 'a Type.ty -> 'b term -> 'a term
+val cast_ty : 'a Type.ty -> 'b term -> 'a term
 
-(** [cast_st ty t] checks that [t] can be seen as a message of type [ty],
-    using sub-typing if necessary. 
+(** [cast_kind k t] checks that [t] can be seen as a message of kind [k].
     @raise Uncastable if the term cannot be cast.*)
-val cast_st : 'a Type.ty -> 'b term -> 'a term
+val cast_kind : 'a Type.kind -> 'b term -> 'a term
 
 (*------------------------------------------------------------------*)
 (** [get_vars t] returns the free variables of [t].

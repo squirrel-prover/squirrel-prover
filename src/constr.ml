@@ -178,9 +178,9 @@ end = struct
     match ut.cnt with
     | UVar tv -> Term.Var (utv_to_var s tv)
     | UName (a, is) -> 
-      Term.cast s (Term.Action (a, List.map (ut_to_var Type.Index) is))
-    | UPred ut -> Term.cast s (Term.Pred (ut_to_term Type.Timestamp ut))
-    | UInit  -> Term.cast s Term.init
+      Term.cast_ty s (Term.Action (a, List.map (ut_to_var Type.Index) is))
+    | UPred ut -> Term.cast_ty s (Term.Pred (ut_to_term Type.Timestamp ut))
+    | UInit  -> Term.cast_ty s Term.init
     | UUndef -> assert false
 end
 
