@@ -15,6 +15,7 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 (*------------------------------------------------------------------*)
 type decl_error_i =
   | BadEquivForm 
+  | InvalidAbsType
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -28,6 +29,9 @@ let pp_decl_error_i fmt = function
   | BadEquivForm ->
     Fmt.pf fmt "equivalence goal ill-formed"
 
+  | InvalidAbsType ->
+    Fmt.pf fmt "invalid type, must be of the form Indexⁿ → Messageᵐ → Message"
+      
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
@@ -857,9 +861,64 @@ let start_proof () = match !current_goal, !goals with
 
 let current_goal () = !current_goal
 
+(*------------------------------------------------------------------*)
+(** {2 Declaration parsing} *)
+
+let parse_abstract_decl table (decl : Decl.abstract_decl) =
+    let in_tys, out_ty =
+      List.takedrop (List.length decl.abs_tys - 1) decl.abs_tys
+    in
+    let out_ty = as_seq1 out_ty in
+
+    let ty_args = List.map (fun l ->
+        let id = Ident.create (L.unloc l) in
+        Type.tvar_of_ident id
+      ) decl.ty_args
+    in
+
+    let in_tys =
+      List.map (fun pty ->
+          L.loc pty, Theory.parse_p_ty table ty_args pty
+        ) in_tys
+    in
+
+    let rec parse_in_tys p_tys : Type.message Type.ty list  =      
+      match p_tys with
+      | [] -> []
+      | (loc, Type.ETy ty) :: in_tys -> match Type.kind ty with
+        | Type.KMessage -> ty :: parse_in_tys in_tys
+        | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
+        | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
+        | Type.KBoolean   -> decl_error loc KDecl InvalidAbsType
+    in
+          
+    let rec parse_index_prefix iarr in_tys = match in_tys with
+      | [] -> iarr, []
+      | (_, Type.ETy ty) :: in_tys as in_tys0 ->
+        match Type.kind ty with
+        | Type.KIndex -> parse_index_prefix (iarr + 1) in_tys
+        | _ -> iarr, parse_in_tys in_tys0
+    in
+
+    let iarr, in_tys = parse_index_prefix 0 in_tys in
+
+    let out_ty : Type.message Type.ty =
+      match Theory.parse_p_ty table ty_args out_ty with
+      | Type.ETy ty -> match Type.kind ty with
+        | Type.KMessage -> ty
+        | _ -> decl_error (L.loc out_ty) KDecl InvalidAbsType
+    in
+    
+    Theory.declare_abstract
+      table decl.name
+      ~index_arity:iarr
+      ~ty_args
+      ~in_tys
+      ~out_ty
 
 (*------------------------------------------------------------------*)
-
+(** {2 Declaration processing} *)
+    
 let declare_i table decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
@@ -904,7 +963,7 @@ let declare_i table decl = match L.unloc decl with
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
     Theory.declare_signature table sign checksign pk
 
-  | Decl.Decl_abstract decl -> Decl.parse_abstract_decl table decl
+  | Decl.Decl_abstract decl -> parse_abstract_decl table decl
 
 
 let declare table decl =

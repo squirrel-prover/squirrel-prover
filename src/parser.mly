@@ -287,13 +287,16 @@ index_arity:
 |                                { 0 }
 | LPAREN i=INT RPAREN            { i }
 
-p_ty:
+p_ty_i:
 | MESSAGE      { Theory.P_message }
 | INDEX        { Theory.P_index }
 | TIMESTAMP    { Theory.P_timestamp }
 | BOOLEAN      { Theory.P_boolean }
 | tv=ty_var    { Theory.P_tvar tv }
 | l=lsymb      { Theory.P_tbase l }
+
+p_ty:
+|ty=loc(p_ty_i) { ty }
 
 fun_ty:
 | l=slist1(p_ty,ARROW)      { l }

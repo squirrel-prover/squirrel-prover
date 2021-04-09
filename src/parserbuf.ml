@@ -180,9 +180,12 @@ let () =
     end ;
     "If", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
-                                          ty_args = [];
-                                          abs_tys = [Theory.P_message]; } in
+        let decl_i =
+          Decl.Decl_abstract {
+            name = L.mk_loc L._dummy "error";
+            ty_args = [];
+            abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
         let decl = Location.mk_loc Location._dummy decl_i in
         Prover.declare table decl in
       ignore (parse_process table "in(c,x); out(c, if x=x then x else error)"
@@ -190,17 +193,27 @@ let () =
     end ;
     "Try", `Quick, begin fun () ->
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "ok";
-                                          ty_args = [];
-                                          abs_tys = [Theory.P_message]; } in
+        let decl_i =
+          Decl.Decl_abstract
+            { name = L.mk_loc L._dummy "ok";
+              ty_args = [];
+              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table decl
+      in
+      
       let table =
-        let decl_i = Decl.Decl_abstract { name = L.mk_loc L._dummy "error";
-                                          ty_args = [];
-                                          abs_tys = [Theory.P_message]; } in
+        let decl_i =
+          Decl.Decl_abstract
+            { name = L.mk_loc L._dummy "error";
+              ty_args = [];
+              abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
+        in
+        
         let decl = Location.mk_loc Location._dummy decl_i in
-        Prover.declare table decl in
+        Prover.declare table decl
+      in
       ignore (parse_process table
                 "in(c,x); \
                  try find i such that x = x in \

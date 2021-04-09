@@ -7,7 +7,7 @@ type lsymb = string L.located
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
 
-type p_ty =
+type p_ty_i =
   | P_message
   | P_boolean
   | P_index  
@@ -15,6 +15,8 @@ type p_ty =
   | P_tbase of lsymb
   | P_tvar  of lsymb
 
+type p_ty = p_ty_i L.located
+    
 (*------------------------------------------------------------------*)
 (** {2 Terms and formulas} *)
 type term_i =
@@ -293,7 +295,7 @@ let pp_error pp_loc_err ppf (loc,e) =
 (** {2 Parsing types } *)
 
 let parse_p_ty table (tvars : Type.tvar list) (pty : p_ty) : Type.ety =
-  match pty with
+  match L.unloc pty with
   | P_message        -> Type.ETy (Message  )
   | P_boolean        -> Type.ETy (Boolean  )
   | P_index          -> Type.ETy (Index    )
@@ -1063,7 +1065,7 @@ let declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk =
 let declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty enc dec = 
   let open Symbols in
   let data = AssociatedFunctions [Function.cast_of_string (L.unloc enc)] in
-  let dec_fty = mk_ftype 0 [] [ctxt_ty] ptxt_ty in
+  let dec_fty = mk_ftype 0 [] [ctxt_ty; k_ty] ptxt_ty in
   let enc_fty = mk_ftype 0 [] [ptxt_ty; rnd_ty; k_ty] ctxt_ty in
   
   let table, dec = Function.declare_exact table dec ~data (dec_fty,SDec) in

@@ -97,6 +97,7 @@ val get_option : option_name -> option_val option
 
 val add_option : option_def -> unit
 
+(*------------------------------------------------------------------*)
 (** {2 Tactics syntax trees} *)
 (** Prover tactics, and tables for storing them. *)
 
@@ -166,6 +167,7 @@ val pp_ast : Format.formatter -> TacticsArgs.parser_arg Tactics.ast -> unit
 module TraceTactics : Tactics_sig with type judgment = TraceSequent.t
 module EquivTactics : Tactics_sig with type judgment = Goal.t
 
+(*------------------------------------------------------------------*)
 (** {2 Utilities for parsing} *)
 
 exception ParseError of string
@@ -234,7 +236,8 @@ val start_proof : unit -> string option
 (** {2 Error handling} *)
 
 type decl_error_i =
-  | BadEquivForm 
+  | BadEquivForm
+  | InvalidAbsType
   | SystemError           of System.system_error
   | SystemExprError       of SystemExpr.system_expr_err
 
@@ -249,7 +252,7 @@ val pp_decl_error :
   Format.formatter -> decl_error -> unit
 
 (*------------------------------------------------------------------*)
-(** {2 Declaration Processing} *)
+(** {2 Declaration processing} *)
 
 (** Process a declaration. *)
 val declare      : Symbols.table -> Decl.declaration  -> Symbols.table

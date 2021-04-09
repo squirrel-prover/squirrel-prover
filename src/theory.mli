@@ -9,7 +9,7 @@ type lsymb = string L.located
 (*------------------------------------------------------------------*)
 (** {2 Types } *)
 
-type p_ty =
+type p_ty_i =
   | P_message
   | P_boolean
   | P_index  
@@ -17,6 +17,8 @@ type p_ty =
   | P_tbase of lsymb
   | P_tvar  of lsymb
 
+type p_ty = p_ty_i L.located
+    
 val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
 
 (*------------------------------------------------------------------*)

@@ -3,6 +3,7 @@
 
 type lsymb = Theory.lsymb
 
+(*------------------------------------------------------------------*)
 (** {2 Declarations } *)
 
 (** Information for a macro declaration *)
@@ -10,13 +11,13 @@ type macro_decl = lsymb * (lsymb * Type.ety) list * Type.ety * Theory.term
 
 val pp_macro_decl : Format.formatter -> macro_decl -> unit
 
+(*------------------------------------------------------------------*)
 (** Information for an abstract declaration *)
 type abstract_decl = { name    : lsymb;
                        ty_args : lsymb list; (* type variables *)
                        abs_tys : Theory.p_ty list; }
 
-val parse_abstract_decl : Symbols.table -> abstract_decl -> Symbols.table
-                                                              
+(*------------------------------------------------------------------*)
 (** Information for a goal or axiom declaration *)
 type goal_decl = { gname   : lsymb option;
                    gsystem : SystemExpr.p_system_expr;
@@ -24,12 +25,14 @@ type goal_decl = { gname   : lsymb option;
 
 val pp_goal_decl : Format.formatter -> goal_decl -> unit
 
+(*------------------------------------------------------------------*)
 (** Information for a system declaration *)
 type system_decl = { sname    : Theory.lsymb option;
                      sprocess : Process.process; }
 
 val pp_system_decl : Format.formatter -> system_decl -> unit
 
+(*------------------------------------------------------------------*)
 (** Additional oracle tagging information
     Allows to define the tag formula corresponding to some function.
     Defining a function with such a tag, is equivalent to giving to the
@@ -39,7 +42,9 @@ type orcl_tag_info = Theory.formula
 
 val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
 
-(** Declarations *)
+(*------------------------------------------------------------------*)
+(** {2 Declarations} *)
+  
 type declaration_i =
   | Decl_channel of lsymb
   | Decl_process of lsymb * (lsymb * Type.ety) list * Process.process
