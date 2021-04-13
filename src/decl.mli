@@ -7,15 +7,23 @@ type lsymb = Theory.lsymb
 (** {2 Declarations } *)
 
 (** Information for a macro declaration *)
-type macro_decl = lsymb * (lsymb * Type.ety) list * Type.ety * Theory.term
-
-val pp_macro_decl : Format.formatter -> macro_decl -> unit
+type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
 
 (*------------------------------------------------------------------*)
 (** Information for an abstract declaration *)
 type abstract_decl = { name    : lsymb;
                        ty_args : lsymb list; (* type variables *)
                        abs_tys : Theory.p_ty list; }
+
+(*------------------------------------------------------------------*)
+(** Information for a name declaration *)
+type name_decl = { n_name : lsymb ;
+                   n_type : Theory.p_ty list; }
+
+(*------------------------------------------------------------------*)
+(** Information for a base type declaration *)
+type bty_decl = { bty_name  : lsymb ;
+                  bty_infos : Symbols.bty_info list ; }
 
 (*------------------------------------------------------------------*)
 (** Information for a goal or axiom declaration *)
@@ -47,7 +55,7 @@ val pp_orcl_tag_info : Format.formatter -> orcl_tag_info -> unit
   
 type declaration_i =
   | Decl_channel of lsymb
-  | Decl_process of lsymb * (lsymb * Type.ety) list * Process.process
+  | Decl_process of lsymb * Theory.bnds * Process.process
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
@@ -60,6 +68,7 @@ type declaration_i =
   | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl
+  | Decl_bty              of bty_decl
 
 type declaration = declaration_i Location.located
 

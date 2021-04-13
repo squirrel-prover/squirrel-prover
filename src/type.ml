@@ -17,6 +17,8 @@ type _ kind =
   | KIndex     : index     kind
   | KTimestamp : timestamp kind
 
+type ekind = EKind : 'a kind -> ekind
+
 (*------------------------------------------------------------------*)
 (** Type variables *)
 
@@ -141,6 +143,16 @@ let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
   | TUnivar u -> pp_univar ppf u
 
 let pp_e ppf (ETy t) = pp ppf t
+
+
+(*------------------------------------------------------------------*)
+let pp_kind : type a. Format.formatter -> a kind -> unit = fun ppf -> function
+  | KMessage   -> Fmt.pf ppf "message"
+  | KIndex     -> Fmt.pf ppf "index"
+  | KTimestamp -> Fmt.pf ppf "timestamp"
+  | KBoolean   -> Fmt.pf ppf "bool"
+
+let pp_kinde ppf (EKind t) = pp_kind ppf t
 
 
 (*------------------------------------------------------------------*)

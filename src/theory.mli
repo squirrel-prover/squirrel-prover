@@ -21,6 +21,15 @@ type p_ty = p_ty_i L.located
     
 val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
 
+val pp_p_ty : Format.formatter -> p_ty -> unit
+
+(*------------------------------------------------------------------*)
+(** Parsed binder *)
+type bnd  = lsymb * p_ty
+
+(** Parsed binders *)
+type bnds = bnd list
+
 (*------------------------------------------------------------------*)
 (** {2 Terms}
   *
@@ -55,8 +64,8 @@ type term_i =
                  
   | Compare of Term.ord * term * term
   | Happens of term list
-  | ForAll  of (lsymb * Type.ety) list * term
-  | Exists  of (lsymb * Type.ety) list * term
+  | ForAll  of bnds * term
+  | Exists  of bnds * term
   | And  of term * term
   | Or   of term * term
   | Impl of term * term
@@ -147,7 +156,7 @@ val declare_name :
     such that value of [s(t1,...,tn)] for init timestamp
     expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_state :
-  Symbols.table -> lsymb -> (lsymb * Type.ety) list -> Type.ety -> term
+  Symbols.table -> lsymb -> bnds -> p_ty -> term
   -> Symbols.table
        
 (** [get_init_states] returns all the initial values of declared state symbols,
@@ -170,7 +179,7 @@ val declare_abstract :
   * of type [s1->...->sn->s]
   * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
 val declare_macro :
-  Symbols.table -> lsymb -> (string * Type.ety) list -> Type.ety -> term
+  Symbols.table -> lsymb -> bnds -> p_ty -> term
   -> Symbols.table
 
 (*------------------------------------------------------------------*)
@@ -207,6 +216,7 @@ type conversion_error_i =
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
   | UnknownTypeVar       of string
+  | BadPty               of Type.ekind list
       
 type conversion_error = L.t * conversion_error_i
 

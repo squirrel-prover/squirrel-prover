@@ -38,6 +38,7 @@ type 'a t = symb
 type group = string
 let default_group = ""
 
+(*------------------------------------------------------------------*)
 type function_def =
   | Hash
   | AEnc
@@ -49,12 +50,22 @@ type function_def =
   | PublicKey
   | Abstract 
 
+(*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State  of int * Type.ety
   | Global of int
   | Local  of Type.ety list * Type.ety
 
+(*------------------------------------------------------------------*)
+type bty_info = 
+  | Ty_bounded
+  | Ty_large
+  (* | Ty_fixed_length             (* TODO: types *) *)
+
+type bty_def = bty_info list
+
+(*------------------------------------------------------------------*)
 type channel
 type name
 type action
@@ -64,6 +75,7 @@ type system
 type process
 type btype
 
+(*------------------------------------------------------------------*)
 type _ def =
   | Channel  : unit      -> channel def
   | Name     : int       -> name    def
@@ -71,7 +83,7 @@ type _ def =
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
   | Process  : unit      -> process def
-  | BType    : unit      -> btype   def
+  | BType    : bty_def   -> btype   def
         
   | Function : (Type.ftype * function_def) -> fname def
         
@@ -409,7 +421,7 @@ end)
 
 module BType = Make (struct
   type ns = btype
-  type local_def = unit
+  type local_def = bty_def
 
   let namespace = NBType
 

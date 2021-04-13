@@ -16,7 +16,24 @@ type p_ty_i =
   | P_tvar  of lsymb
 
 type p_ty = p_ty_i L.located
-    
+
+let pp_p_ty_i fmt = function
+  | P_message   -> Fmt.pf fmt "message"
+  | P_boolean   -> Fmt.pf fmt "boolean"
+  | P_index     -> Fmt.pf fmt "index"
+  | P_timestamp -> Fmt.pf fmt "timestamp"
+  | P_tbase s   -> Fmt.pf fmt "%s" (L.unloc s)
+  | P_tvar s    -> Fmt.pf fmt "'%s" (L.unloc s)
+
+let pp_p_ty fmt pty = pp_p_ty_i fmt (L.unloc pty)
+
+(*------------------------------------------------------------------*)
+(** Parsed binder *)
+type bnd  = lsymb * p_ty
+
+(** Parsed binders *)
+type bnds = (lsymb * p_ty) list
+      
 (*------------------------------------------------------------------*)
 (** {2 Terms and formulas} *)
 type term_i =
@@ -42,8 +59,8 @@ type term_i =
   | Compare of Term.ord * term * term
   | Happens of term list
 
-  | ForAll  of (lsymb * Type.ety) list * term
-  | Exists  of (lsymb * Type.ety) list * term
+  | ForAll  of bnds * term
+  | Exists  of bnds * term
   | And  of term * term
   | Or   of term * term
   | Impl of term * term
@@ -126,13 +143,24 @@ let destr_var = function
   | _ -> None
 
 (*------------------------------------------------------------------*)
-let pp_var_list fmt l =
-  Vars.pp_typed_list fmt
-    (List.map
-       (function (v,Type.ETy t) ->
-          let v = L.unloc v in
-          Vars.EVar (snd @@ Vars.make_fresh Vars.empty_env t v))
-       l)
+let pp_var_list ppf l =
+  let rec aux cur_vars (cur_type : p_ty_i) = function
+    | (v,vty) :: vs when L.unloc vty = cur_type ->
+      aux ((L.unloc v) :: cur_vars) cur_type vs
+    | vs ->
+      if cur_vars <> [] then begin
+        Fmt.list
+          ~sep:(fun fmt () -> Fmt.pf fmt ",")
+          Fmt.string ppf (List.rev cur_vars) ;
+        Fmt.pf ppf ":%a" pp_p_ty_i cur_type ;
+        if vs <> [] then Fmt.pf ppf ",@,"
+      end ;
+      match vs with
+      | [] -> ()
+      | (v, vty) :: vs -> aux [L.unloc v] (L.unloc vty) vs
+  in
+  aux [] P_message l
+
 
 let rec pp_term_i ppf t = match t with
   | Tinit -> Fmt.pf ppf "init"
@@ -185,7 +213,7 @@ let rec pp_term_i ppf t = match t with
       pp_var_list vs pp_term b
 
   | And ( L.{ pl_desc = Impl (bl1,br1)},
-          L.{ pl_desc = Impl(br2,bl2)} ) when bl1=bl2 && br1=br2 ->
+          L.{ pl_desc = Impl(br2,bl2)} ) when bl1 = bl2 && br1 = br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
       pp_term bl1 pp_term br1
 
@@ -239,7 +267,8 @@ type conversion_error_i =
   | Assign_no_state      of string
   | BadNamespace         of string * Symbols.namespace
   | Freetyunivar
-  | UnknownTypeVar of string        
+  | UnknownTypeVar       of string        
+  | BadPty               of Type.ekind list
 
 type conversion_error = L.t * conversion_error_i
 
@@ -312,6 +341,11 @@ let pp_error_i ppf = function
 
   | UnknownTypeVar ty ->
     Fmt.pf ppf "undefined type variable %s" ty
+
+  | BadPty l ->
+    Fmt.pf ppf "type must be of kind %a" 
+      (Fmt.list ~sep:Fmt.comma Type.pp_kinde) l
+      
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -660,12 +694,21 @@ let mem_assoc state x (ty : 's Type.ty) (subst : esubst list) : bool =
   * Vars using an empty environment to keep the same variable names.
   *
   * TODO this may cause unintended variable captures wrt subst. *)
-let subst_of_bvars vars =
+let subst_of_bvars (vars : (lsymb * Type.ety) list) =
   let make (v, Type.ETy s) =
     let v = L.unloc v in
     ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
   in
   List.map make vars
+
+(** Idem with [p_ty] *)
+let subst_of_bnds table (vars : (lsymb * p_ty) list) =
+  let make (v, s) =
+    let v = L.unloc v in
+    let Type.ETy s = parse_p_ty table [] s in (* TODO: allow type variables *)
+    ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
+  in
+  table, List.map make vars
 
 
 let get_fun table lsymb =
@@ -822,7 +865,7 @@ and convert0 :
 
   | Find (vs,c,t,e) ->
     let new_subst =
-      subst_of_bvars (List.map (fun x -> x,Type.eindex) vs) in
+      subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
     let is =
       let f : esubst -> Vars.index = function
         | ESubst (_,Term.Var v) ->
@@ -845,7 +888,8 @@ and convert0 :
     end
 
   | ForAll (vs,f) | Exists (vs,f) ->
-    let new_subst = subst_of_bvars vs in
+    let table, new_subst = subst_of_bnds state.table vs in
+    let state = { state with table } in
     let f = conv ~subst:(new_subst @ state.subst) Type.Boolean f in
     let vs =
       let f : esubst -> Vars.evar = function
@@ -1298,29 +1342,38 @@ let parse_subst table env (uvars : Vars.evar list) (ts : term list) : Term.subst
 type Symbols.data += Local_data of Vars.evar list * Vars.evar * Term.message
 type Symbols.data += StateInit_data of Vars.index list * Term.message
 
-let declare_state table s (typed_args : (lsymb * Type.ety) list)
-    (k : Type.ety) t =
+let declare_state table s (typed_args : bnds) (pty : p_ty) t =
   let ts_init = Term.Action (Symbols.init_action, []) in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
-  let subst = subst_of_bvars typed_args in
+
+  let table, subst = subst_of_bnds table typed_args in
   let t = convert conv_env subst t Type.Message in
+
   let indices : Vars.index list =
     let f x : Vars.index = match x with
-      | ESubst (_,Term.Var i) ->
-        begin match Vars.ty i with
-          | Type.Index -> i
-          | _ -> assert false
+      | ESubst (_,Term.Var v) ->
+        begin match Vars.kind v with
+          | Type.KIndex -> v
+          | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex])
         end
       | _ -> assert false
     in
     List.map f subst
   in
+
+  (* parse the macro type *)
+  let Type.ETy ty = parse_p_ty table [] pty in
+  let () = match Type.kind ty with
+    | Type.KMessage -> ()
+    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KMessage])
+  in
+
   let data = StateInit_data (indices,t) in
   let table, _ =
     Symbols.Macro.declare_exact table
       s
       ~data
-      (Symbols.State (List.length typed_args,k)) in
+      (Symbols.State (List.length typed_args,Type.ETy ty)) in
   table
 
 let get_init_states table : (Term.state * Term.message) list =
@@ -1335,32 +1388,44 @@ let get_init_states table : (Term.state * Term.message) list =
     []
     table
 
-let declare_macro table s (typed_args : (string * Type.ety) list)
-    (k : Type.ety) t =
+let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
   let env,typed_args,tsubst =
     List.fold_left
-      (fun (env,vars,tsubst) (x,Type.ETy k) ->
-         let env,x' = Vars.make_fresh env k x in
-         let item = match k with
-           | Type.Index -> ESubst (x, Term.Var x')
-           | Type.Message -> ESubst (x, Term.Var x')
-           | _ -> assert false
+      (fun (env,vars,tsubst) (x,pty) ->
+         let Type.ETy ty = parse_p_ty table [] pty in
+         let x = L.unloc x in
+         let env,x' = Vars.make_fresh env ty x in
+         let item = match Type.kind ty with
+           | Type.KIndex -> ESubst (x, Term.Var x')
+           | Type.KMessage -> ESubst (x, Term.Var x')
+           | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex;
+                                                Type.EKind Type.KMessage])
          in
-           assert (Vars.name x' = x) ;
-           env, (Vars.EVar x')::vars, item::tsubst)
+         assert (Vars.name x' = x) ;
+         env, (Vars.EVar x')::vars, item::tsubst)
       (Vars.empty_env,[],[])
       typed_args
   in
+
   let _,ts_var = Vars.make_fresh env Type.Timestamp "ts" in
   let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
   let t = convert conv_env tsubst t Type.Message in
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
+
+  (* parse the macro type *)
+  let Type.ETy ty = parse_p_ty table [] pty in
+  let () = match Type.kind ty with
+    | Type.KBoolean | Type.KMessage -> ()
+    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KMessage;
+                                         Type.EKind Type.KBoolean])
+  in
+
   let table, _ =
     Symbols.Macro.declare_exact table
       s
       ~data
       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Type.ETy (Vars.ty x)) typed_args,k)) in
+           Type.ETy (Vars.ty x)) typed_args,Type.ETy ty)) in
   table
 
 (* TODO could be generalized into a generic fold function

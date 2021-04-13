@@ -27,6 +27,7 @@
   "hash"
   "senc"
   "abstract"
+  "type"
   "name"
   "channel"
   "mutable"
@@ -54,6 +55,9 @@
   "message"
   "boolean"
   "timestamp"  
+
+  "large"
+  "bounded"
   ))
 
 (defvar squirrel-operator-type-var "'[a-z]*[a-z_'1-9]*")

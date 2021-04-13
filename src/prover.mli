@@ -47,8 +47,7 @@ type p_equiv_form =
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
 
-  | P_equiv_goal of
-      (Theory.lsymb * Type.ety) list * p_equiv_form L.located
+  | P_equiv_goal of Theory.bnds * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
@@ -184,7 +183,7 @@ val make_trace_goal :
 
 (** Produces an equivalence goal from a sequence of parsed bi-terms. *)
 val make_equiv_goal :
-  table:Symbols.table -> System.system_name -> Theory.env ->
+  table:Symbols.table -> System.system_name -> Theory.bnds ->
   p_equiv_form L.located ->
   Goal.t
 

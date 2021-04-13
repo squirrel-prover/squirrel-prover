@@ -15,6 +15,13 @@ type _ kind =
   | KIndex     : index     kind
   | KTimestamp : timestamp kind
 
+type ekind = EKind : 'a kind -> ekind
+
+(*------------------------------------------------------------------*)
+val pp_kind : Format.formatter -> 'a kind -> unit
+
+val pp_kinde : Format.formatter -> ekind -> unit
+
 (*------------------------------------------------------------------*)
 (** Type variables *)
 type tvar
@@ -54,6 +61,11 @@ type 'a t = 'a ty
 type ety = ETy : 'a ty -> ety
 
 (*------------------------------------------------------------------*)
+val pp : Format.formatter -> 'a ty -> unit
+
+val pp_e : Format.formatter -> ety -> unit
+
+(*------------------------------------------------------------------*)
 val eboolean   : ety
 val emessage   : ety
 val etimestamp : ety
@@ -80,11 +92,6 @@ val equal   : 'a ty -> 'b ty -> bool
 
 val equalk_w : 'a kind -> 'b kind -> ('a,'b) type_eq option
 val equalk   : 'a kind -> 'b kind -> bool
-
-(*------------------------------------------------------------------*)
-val pp : Format.formatter -> 'a ty -> unit
-
-val pp_e : Format.formatter -> ety -> unit
   
 (*------------------------------------------------------------------*)
 (** {2 Type substitution } *)

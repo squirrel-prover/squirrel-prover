@@ -16,12 +16,13 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT
+%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
 %token WITH ORACLE EXN
+%token LARGE BOUNDED
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
 %token BY INTRO AS DESTRUCT
@@ -148,12 +149,15 @@ term_i:
 
 | EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
                                  { Theory.Exists (vs,f)  }
+
 | FORALL LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
                                  { Theory.ForAll (vs,f)  }
-| EXISTS id=lsymb COLON k=kind sep f=term %prec QUANTIF
-                                 { Theory.Exists ([id,k],f)  }
-| FORALL id=lsymb COLON k=kind sep f=term %prec QUANTIF
-                                 { Theory.ForAll ([id,k],f)  }
+
+| EXISTS a=arg sep f=term %prec QUANTIF
+                                 { Theory.Exists (a,f)  }
+
+| FORALL a=arg sep f=term %prec QUANTIF
+                                 { Theory.ForAll (a,f)  }
 
 | f=term DEQUIVARROW f0=term
     { let loc = L.make $startpos $endpos in
@@ -195,16 +199,13 @@ tm_list:
 | GEQ                            { `Geq }
 | RANGLE                         { `Gt }
 
-kind:
-| INDEX                          { Type.eindex }
-| MESSAGE                        { Type.emessage }
-| BOOLEAN                        { Type.eboolean }
-| TIMESTAMP                      { Type.etimestamp }
+arg:
+| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
 
 arg_list:
 |                                         { [] }
-| is=ids COLON k=kind                     { List.map (fun x -> x,k) is }
-| is=ids COLON k=kind COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
+| is=ids COLON k=p_ty                     { List.map (fun x -> x,k) is }
+| is=ids COLON k=p_ty COMMA args=arg_list { List.map (fun x -> x,k) is @ args }
 
 ids:
 | id=lsymb                             { [id] }
@@ -276,10 +277,6 @@ name_type:
 | MESSAGE                        { 0 }
 | INDEX ARROW t=name_type        { 1 + t }
 
-msg_or_bool:
-| MESSAGE                        { Type.emessage }
-| BOOLEAN                        { Type.eboolean }
-
 ty_var:
 | TICK id=lsymb     { id }
 
@@ -304,6 +301,14 @@ fun_ty:
 ty_args:
 |                                          { [] }
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
+
+bty_info:
+| BOUNDED { Symbols.Ty_bounded }
+| LARGE   { Symbols.Ty_large }
+
+bty_infos:
+| LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
+|                                           { [] }
 
 declaration_i:
 | HASH e=lsymb a=index_arity
@@ -331,18 +336,21 @@ declaration_i:
 | NAME e=lsymb COLON t=name_type
                           { Decl.Decl_name (e, t) }
 
+| TYPE e=lsymb infos=bty_infos 
+                          { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
+
 | ABSTRACT e=lsymb a=ty_args COLON t=fun_ty
     { Decl.(Decl_abstract
               { name     = e;
                 ty_args  = a;
                 abs_tys  = t; }) }
 
-| MUTABLE e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+| MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
-| TERM e=lsymb args=opt_arg_list COLON typ=msg_or_bool EQ t=term
+| TERM e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_macro (e, args, typ, t) }
 
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
@@ -622,7 +630,7 @@ equiv_form:
 | f=equiv_form ARROW f0=equiv_form { Prover.PImpl (f,f0) }
 
 args:
-|                                         { [] }
+|                                    { [] }
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
 system:
@@ -649,12 +657,14 @@ gname:
 
 goal_i:
 | GOAL s=system n=gname args=args COLON f=term DOT
-    { let f_i = Theory.ForAll (args, f) in
+    { let args : (Theory.lsymb * Theory.p_ty) list = args in
+      let f_i = Theory.ForAll (args, f) in
       let fa = L.mk_loc (L.loc f) f_i in
       Prover.Gm_goal (n, P_trace_goal (s, fa)) }
 
 | EQUIV n=gname env=args COLON f=loc(equiv_form) DOT
                  { Prover.Gm_goal (n, P_equiv_goal (env, f)) }
+
 | EQUIV n=gname DOT
                  { Prover.Gm_goal
                      (n, P_equiv_goal_process

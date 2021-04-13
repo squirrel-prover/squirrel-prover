@@ -25,6 +25,7 @@ val tag : table -> int
 (** Each possible namespace is represented by an abstract datatype.
   * Their names are descriptive; [fname] is for function symbols. *)
 
+(*------------------------------------------------------------------*)
 type channel
 type name
 type action
@@ -70,6 +71,14 @@ type function_def =
   * the specified definition. *)
 val is_ftype : fname t -> function_def -> table -> bool
 
+(*------------------------------------------------------------------*)
+type bty_info = 
+  | Ty_bounded
+  | Ty_large
+
+type bty_def = bty_info list
+
+(*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State of int * Type.ety
@@ -82,6 +91,7 @@ type macro_def =
     (** Local macro definitions are explicitly defined by the
       * user, and may depend on arbitrary terms. *)
 
+(*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.
   * Integers refer to the index arity of symbols. *)
 type _ def =
@@ -91,7 +101,7 @@ type _ def =
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
   | Process  : unit      -> process def
-  | BType    : unit      -> btype   def
+  | BType    : bty_def   -> btype   def
         
   | Function : (Type.ftype * function_def) -> fname def
         
@@ -112,6 +122,7 @@ type data = ..
 type data += Empty
 type data += AssociatedFunctions of (fname t) list
 
+(*------------------------------------------------------------------*)
 (** {2 Basic namespace-independent operations} *)
 
 (** Converts a symbol to a string, for printing purposes. *)
@@ -205,12 +216,12 @@ module type Namespace = sig
   val fold : (ns t -> def -> data -> 'a -> 'a) -> 'a -> table -> 'a
 end
 
-module Channel  : Namespace with type def = unit with type ns = channel
-module BType    : Namespace with type def = unit with type ns = btype
-module Name     : Namespace with type def = int  with type ns = name
-module Action   : Namespace with type def = int  with type ns = action
-module System   : Namespace with type def = unit with type ns = system
-module Process  : Namespace with type def = unit with type ns = process
+module Channel  : Namespace with type def = unit    with type ns = channel
+module BType    : Namespace with type def = bty_def with type ns = btype
+module Name     : Namespace with type def = int     with type ns = name
+module Action   : Namespace with type def = int     with type ns = action
+module System   : Namespace with type def = unit    with type ns = system
+module Process  : Namespace with type def = unit    with type ns = process
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = fname
 module Macro    : Namespace with type def = macro_def with type ns = macro

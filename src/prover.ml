@@ -101,7 +101,7 @@ type p_equiv_form =
 type p_goal =
   | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
 
-  | P_equiv_goal of (Theory.lsymb * Type.ety) list * p_equiv_form L.located
+  | P_equiv_goal of Theory.bnds * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
@@ -685,10 +685,12 @@ let make_trace_goal ~system ~table f  =
   Goal.Trace (TraceSequent.init ~system table g)
 
 let make_equiv_goal
-    ~table (system_name : System.system_name) env 
+    ~table (system_name : System.system_name) (env : Theory.bnds)
     (p_form : p_equiv_form L.located) =
   let env =
-    List.fold_left (fun env (x, Type.ETy s) ->
+    List.fold_left (fun env (x, s) ->
+        let x = L.unloc x in
+        let Type.ETy s = Theory.parse_p_ty table [] s in
         assert (not (Vars.mem env x)) ;
         fst (Vars.make_fresh env s x)
       ) Vars.empty_env env
@@ -748,8 +750,8 @@ let declare_new_goal_i table (gname,g) =
       let system_symb =
         System.of_lsymb SystemExpr.default_system_name table
       in
-      let env = List.map (fun (x,y) -> L.unloc x, y) env in
       make_equiv_goal ~table system_symb env f
+
     | P_equiv_goal_process (a,b) ->
       let a = SystemExpr.parse_single table a
       and b = SystemExpr.parse_single table b in
@@ -923,7 +925,10 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 let declare_i table decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
-    let pkind = List.map (fun (x,y) -> L.unloc x, y) pkind in
+    let pkind = List.map (fun (x,t) ->
+        let t = Theory.parse_p_ty table [] t in
+        L.unloc x, t
+      ) pkind in
     Process.declare table id pkind p
 
   | Decl.Decl_axiom (gdecl) ->
@@ -950,12 +955,11 @@ let declare_i table decl = match L.unloc decl with
   | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
   | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
   | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
+
   | Decl.Decl_state (s, args, k, t) ->
-    (* let args = List.map (fun (x,y) -> L.unloc x, y) args in *)
-    (* Theory.declare_macro table s args k t *)
     Theory.declare_state table s args k t
+
   | Decl.Decl_macro (s, args, k, t) ->
-    let args = List.map (fun (x,y) -> L.unloc x, y) args in
     Theory.declare_macro table s args k t
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
@@ -965,6 +969,14 @@ let declare_i table decl = match L.unloc decl with
     Theory.declare_signature table sign checksign pk
 
   | Decl.Decl_abstract decl -> parse_abstract_decl table decl
+  | Decl.Decl_bty bty_decl -> 
+    let table, _ =
+      Symbols.BType.declare_exact
+        table
+        bty_decl.bty_name
+        bty_decl.bty_infos
+    in 
+    table
 
 
 let declare table decl =
