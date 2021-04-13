@@ -762,55 +762,53 @@ let () =
 (** Induction *)
 
 let induction s  =
+  let error () = 
+    Tactics.soft_failure 
+      (Tactics.Failure
+         "conclusion must be an universal quantification over a timestamp")
+  in
+
   match TraceSequent.conclusion s with
   | ForAll ((Vars.EVar v)::vs,f) ->
-    (match Vars.ty v with
-       Type.Timestamp ->
-       (
-         (* We need two fresh variables in env,
-          * but one will not be kept in the final environment. *)
-         let env,v' = Vars.make_fresh_from (TraceSequent.env s) v in
-         let _,v'' = Vars.make_fresh_from env v in
-         (* Introduce v as v'. *)
-         let f' = match vs with
-           | [] -> f
-           | _ -> ForAll (vs,f) in
-         let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')] f' in
-         (* Use v'' to form induction hypothesis. *)
-         let (-->) a b = Impl (a,b) in
-         let ih =
-           ForAll ((Vars.EVar v'')::vs,
-                   (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
-                            :> generic_atom) -->
-                    Term.subst
-                      [Term.ESubst (Term.Var v,Term.Var v'')] f)) in
+    begin
+      match Vars.ty v with
+        Type.Timestamp ->
+        (
+          (* We need two fresh variables in env,
+           * but one will not be kept in the final environment. *)
+          let env,v' = Vars.make_fresh_from (TraceSequent.env s) v in
+          let _,v'' = Vars.make_fresh_from env v in
+          (* Introduce v as v'. *)
+          let f' = match vs with
+            | [] -> f
+            | _ -> ForAll (vs,f) in
+          let f' = Term.subst [Term.ESubst (Term.Var v,Term.Var v')] f' in
+          (* Use v'' to form induction hypothesis. *)
+          let (-->) a b = Impl (a,b) in
+          let ih =
+            ForAll ((Vars.EVar v'') :: vs,
+                    (Atom (`Timestamp (`Lt,Term.Var v'',Term.Var v)
+                           :> generic_atom) -->
+                     Term.subst
+                       [Term.ESubst (Term.Var v,Term.Var v'')] f)) in
 
-         let goal = Term.mk_impl ih f' in
+          let goal = Term.mk_impl ih f' in
 
-         let s = s |> TraceSequent.set_env env
-                   |> TraceSequent.set_conclusion goal in
-         [s]
-       )
-     | _ ->
-       Tactics.soft_failure 
-         (Tactics.Failure
-            "conclusion must be an universal quantification over a timestamp")
-    )
-  | _ ->
-    Tactics.soft_failure 
-      (Tactics.Failure "Conclusion must be an \
-                        universal quantification over a timestamp")
+          let s = TraceSequent.set_env env s
+                  |> TraceSequent.set_conclusion goal in
+          [s]
+        )
+      | _ -> error ()
+    end
+
+  | _ -> error ()
 
 let () = T.register "induction"
-     ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
-                   detailed_help = "If the conclusion is a `ForAll ts. phi`, \
-                                    where ts does not occur in the hypothesis, \
-                                    creates a sub goal where ts is init, and \
-                                    another where we assume as hypothesis phi \
-                                    over pred(ts).";
+    ~tactic_help:{general_help = "Apply the induction scheme to the conclusion.";
+                  detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
-     induction
+    induction
 
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
