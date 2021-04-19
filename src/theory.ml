@@ -73,6 +73,18 @@ and term = term_i L.located
 type formula = term
 
 (*------------------------------------------------------------------*)
+let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
+  | P_message  , P_message
+  | P_boolean  , P_boolean
+  | P_index    , P_index  
+  | P_timestamp, P_timestamp -> true
+
+  | P_tbase b, P_tbase b' -> L.unloc b = L.unloc b'
+  | P_tvar v, P_tvar v' -> L.unloc v = L.unloc v'
+
+  | _, _ -> false
+
+(*------------------------------------------------------------------*)
 let rec equal t t' = match L.unloc t, L.unloc t' with
   | Tinit, Tinit
   | True, True
@@ -108,14 +120,14 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | ForAll (l, a), ForAll (l', a')
   | Exists (l, a), Exists (l', a') ->
     List.length l = List.length l' &&
-    List. for_all2 (fun (s,k) (s',k') ->
-        L.unloc s = L.unloc s' && k = k'
+    List.for_all2 (fun (s,k) (s',k') ->
+        L.unloc s = L.unloc s' && equal_p_ty k k'
       ) l l'
-      && equal a a'
+    && equal a a'
 
   | Find (l, a, b, c), Find (l', a', b', c') ->
     List.length l = List.length l' &&
-    List. for_all2 (fun s s' ->
+    List.for_all2 (fun s s' ->
         L.unloc s = L.unloc s'
       ) l l'
     && equals [a; b; c] [a'; b'; c']
