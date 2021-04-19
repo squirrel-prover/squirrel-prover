@@ -12,25 +12,29 @@
   * We have function, name and macro symbols. Each symbol
   * can then be indexed. *)
 
-(** Type of indexed symbols in some namespace. *)
-type 'a indexed_symbol = 'a * Vars.index list
+(** Ocaml type of a typed index symbol *)
+type ('a,'b) isymb = { 
+  s_symb    : 'a;
+  s_indices : Vars.index list;
+  s_typ     : 'b; 
+}
 
 (** Names represent random values of length the security parameter. *)
 
 type name = Symbols.name Symbols.t
-type nsymb = name indexed_symbol
+type nsymb = (name, Type.message Type.ty) isymb
 
 (** Function symbols, may represent primitives or abstract functions. *)
 
 type fname = Symbols.fname Symbols.t
-type fsymb = Symbols.fname Symbols.t * Vars.index list
+type fsymb = fname * Vars.index list
 
 (** Macros are used to represent inputs, outputs, contents of state
   * variables, and let definitions: everything that is expanded when
   * translating the meta-logic to the base logic. *)
 
 type mname    = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.kind * Vars.index list
+type 'a msymb = (mname, 'a Type.kind) isymb
 
 type state = Type.message msymb
 

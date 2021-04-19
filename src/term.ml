@@ -11,25 +11,31 @@ let dbg s = Printer.prt `Ignore s
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
-type 'a indexed_symbol = 'a * Vars.index list
+(** Ocaml type of a typed index symbol *)
+type ('a,'b) isymb = { 
+  s_symb    : 'a;
+  s_indices : Vars.index list;
+  s_typ     : 'b; 
+}
 
 type name = Symbols.name Symbols.t
-type nsymb = name indexed_symbol
+type nsymb = (name, Type.message Type.ty) isymb
                               
 type fname = Symbols.fname Symbols.t
-type fsymb = fname * Vars.index list 
-
+type fsymb = fname * Vars.index list (* TODO: use isymb *)
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = mname * 'a Type.kind * Vars.index list
+type 'a msymb = (mname, 'a Type.kind) isymb
 
 type state = Type.message msymb
 
-let pp_name ppf = function s -> (Utils.kw `Yellow) ppf (Symbols.to_string s)
+(*------------------------------------------------------------------*)
+let pp_name ppf s = (Utils.kw `Yellow) ppf (Symbols.to_string s)
 
-let pp_nsymb ppf (n,is) =
-  if is <> [] then Fmt.pf ppf "%a(%a)" pp_name n Vars.pp_list is
-  else Fmt.pf ppf "%a" pp_name n
+let pp_nsymb ppf (ns : nsymb) =
+  if ns.s_indices <> [] 
+  then Fmt.pf ppf "%a(%a)" pp_name ns.s_symb Vars.pp_list ns.s_indices
+  else Fmt.pf ppf "%a" pp_name ns.s_symb
 
 let pp_fname ppf s = (Utils.kw `Bold) ppf (Symbols.to_string s)
 
@@ -44,10 +50,10 @@ let pp_mname_s ppf s =
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
 
-let pp_msymb ppf (m,s,is) =
+let pp_msymb ppf (ms : 'a msymb) =
   Fmt.pf ppf "%a%a"
-    pp_mname m
-    (Utils.pp_ne_list "(%a)" Vars.pp_list) is
+    pp_mname ms.s_symb
+    (Utils.pp_ne_list "(%a)" Vars.pp_list) ms.s_indices
 
 (*------------------------------------------------------------------*)
 (** {2 Atoms and terms} *)
@@ -134,7 +140,7 @@ type eq_atom = [
 let rec kind : type a. a term -> a Type.kind =
   fun t -> match t with
     | Name _               -> Type.KMessage
-    | Macro ((_,k,_),_,_)  -> k
+    | Macro (s,_,_)        -> s.s_typ
     | Seq _                -> Type.KMessage
     | Var v                -> Vars.kind v
     | Pred _               -> Type.KTimestamp
@@ -175,10 +181,10 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
         fty.Type.fty_out
 
       | Name _               -> Type.Message
-      | Macro ((_,k,_),_,_)  ->
+      | Macro (s,_,_)  ->
         (* TODO: types: fix that *)
         begin
-          match k with
+          match s.s_typ with
           | Type.KMessage -> Type.Message
           | Type.KBoolean -> Type.Boolean
           | _ -> assert false
@@ -225,6 +231,11 @@ let cast : type a b. a Type.kind -> b term -> a term =
 (** {2 Builtins function symbols} *)
 
 let mk f : fsymb = (f,[])
+(* { 
+ *   s_symb = f;
+ *   s_indices = [];
+ *   s_typ = Type.Message; 
+ * } *)
 
 let f_diff = mk Symbols.fs_diff
 
@@ -605,16 +616,18 @@ let f_triv = function
 
     
 (*------------------------------------------------------------------*)
-(** Declare input and output macros.
-  * We assume that they are the only symbols bound to Input/Output. *)
+(** Declare input and output macros. *)
     
-let in_macro    = (Symbols.inp,   Type.KMessage, [])
-let out_macro   = (Symbols.out,   Type.KMessage, [])
-let frame_macro = (Symbols.frame, Type.KMessage, [])
+let mk s k = { s_symb = s; s_typ = k; s_indices = []; }
 
-let cond_macro  = (Symbols.cond, Type.KBoolean, [])
-let exec_macro  = (Symbols.exec, Type.KBoolean, [])
+let in_macro    : Type.message msymb = mk Symbols.inp   Type.KMessage
+let out_macro   : Type.message msymb = mk Symbols.out   Type.KMessage
+let frame_macro : Type.message msymb = mk Symbols.frame Type.KMessage
 
+let cond_macro : Type.boolean msymb = mk Symbols.cond Type.KBoolean
+let exec_macro : Type.boolean msymb = mk Symbols.exec Type.KBoolean
+
+(*------------------------------------------------------------------*)
 let rec pts : type a. timestamp list -> a term -> timestamp list =
   fun acc -> function
     | Fun (_, _,lt) -> List.fold_left pts acc lt
@@ -662,8 +675,8 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
-let subst_macro (s:subst) (symb, sort, is) =
-  (symb, sort, List.map (subst_var s) is)
+let subst_macro (s:subst) isymb =
+  { isymb with s_indices = List.map (subst_var s) isymb.s_indices }
 
 (*------------------------------------------------------------------*)
 
@@ -678,14 +691,14 @@ let get_set_vars : 'a term -> Sv.t =
         let vars = Sv.add_list vars indices in
         List.fold_left (fun vars x -> termvars x vars) vars lt
 
-    | Macro ((_,_,indices), l, ts) ->
-      let vars = Sv.add_list vars indices in
+    | Macro (s, l, ts) ->
+      let vars = Sv.add_list vars s.s_indices in
       termvars ts (termsvars l vars)
     | Seq (a, b) ->
       Sv.diff
         (termvars b vars)
         (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
-    | Name (_,indices) -> Sv.add_list vars indices
+    | Name s -> Sv.add_list vars s.s_indices
     | Diff (a, b) -> termvars a (termvars b vars)
     | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
@@ -762,7 +775,10 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
       match t with
       | Fun ((fs,is), fty, lt) ->
         Fun ((fs, List.map (subst_var s) is), fty, List.map (subst s) lt)
-      | Name (ns,is) -> Name (ns, List.map (subst_var s) is)
+
+      | Name symb -> 
+        Name { symb with s_indices = List.map (subst_var s) symb.s_indices}
+
       | Macro (m, l, ts) ->
         Macro (subst_macro s m, List.map (subst s) l, subst s ts)
 
@@ -870,15 +886,17 @@ and subst_generic_atom s = function
 
 let subst_macros_ts table l ts t =
   let rec subst_term : type a. a term -> a term = fun t -> match t with
-    | Macro ((symb,s,ind), terms, ts') ->
+    | Macro (is, terms, ts') ->
       let terms' = List.map subst_term terms in
-      begin match Symbols.Macro.get_all symb table with
+      begin match Symbols.Macro.get_all is.s_symb table with
       | Symbols.State _, _ ->
-        if (List.mem (Symbols.to_string symb) l && ts=ts')
-        then Macro((symb,s,ind), terms', ts')
-        else Macro((symb,s,ind), terms', Pred(ts'))
-      | _ -> Macro((symb,s,ind), terms', ts')
+        if (List.mem (Symbols.to_string is.s_symb) l && ts=ts')
+        then Macro(is, terms', ts')
+        else Macro(is, terms', Pred(ts'))
+
+      | _ -> Macro(is, terms', ts')
       end
+
     | Fun (f,fty,terms)  -> Fun    (f, fty, List.map subst_term terms)
     | Seq (a, b)         -> Seq    (a, subst_term b)
     | Diff (a, b)        -> Diff   (subst_term a, subst_term b)
@@ -892,12 +910,15 @@ let subst_macros_ts table l ts t =
     | Impl (a, b)        -> Impl   (subst_term a, subst_term b)
     | Atom a             -> Atom   (subst_generic_atom a)
     | _ -> t
+
   and subst_message_atom (`Message (ord, a1, a2)) =
     `Message (ord, subst_term a1, subst_term a2)
+
   and subst_generic_atom a = match a with
     | #message_atom as a -> (subst_message_atom a :> generic_atom)
     | _ -> a
   in
+
   subst_term t
 
 (*------------------------------------------------------------------*)
@@ -1043,17 +1064,18 @@ module Match = struct
           end
 
         | Fun (symb, fty, terms), Fun (symb', fty', terms') -> 
+          (* let mv = smatch symb symb' mv in *)
           let mv = smatch symb symb' mv in
           tmatch_l terms terms' mv
 
-        | Name symb, Name symb' -> 
-          smatch symb symb' mv
+        | Name s, Name s' -> 
+          isymb_match s s' mv
 
-        | Macro ((s, k, is), terms, ts), 
-          Macro ((s', k', is'), terms', ts') -> 
-          if not (Type.equalk k k') then raise NoMatch;
+        | Macro (s, terms, ts), 
+          Macro (s', terms', ts') -> 
+          assert (Type.equalk s.s_typ s'.s_typ);
 
-          let mv = smatch (s,is) (s',is') mv in
+          let mv = isymb_match s s' mv in
           tmatch ts ts' (tmatch_l terms terms' mv)
 
         | Seq _, _ -> raise NoMatch
@@ -1091,16 +1113,25 @@ module Match = struct
       fun tl patl mv -> 
         List.fold_left2 (fun mv t pat -> tmatch t pat mv) mv tl patl
 
+    (* match an [i_symb].
+       Note: types are not checked. *)
+    and isymb_match : type a b c. 
+      ((a Symbols.t, b) isymb) -> 
+      ((a Symbols.t, c) isymb) -> 
+      mv -> mv = 
+      fun s s' mv ->
+        smatch (s.s_symb,s.s_indices) (s'.s_symb, s'.s_indices) mv
+
     (* match a symbol (with some indices) *)
     and smatch : type a. 
       (a Symbols.t * Vars.index list) -> 
       (a Symbols.t * Vars.index list) -> 
       mv -> mv = 
       fun (fn, is) (fn', is') mv ->
-
         if fn <> fn' then raise NoMatch;
-
+        
         List.fold_left2 (fun mv i i' -> vmatch (Var i) i' mv) mv is is'
+
 
     (* Match a variable of the pattern with a term. *)
     and vmatch : type a. a term -> a Vars.var -> mv -> mv = fun t v mv ->

@@ -46,14 +46,12 @@ let is_defined name a table =
 (*------------------------------------------------------------------*)
 let get_def :
   type a.  SystemExpr.system_expr -> Symbols.table ->
-  a Type.kind -> Symbols.macro Symbols.t ->
-  Vars.index list -> Term.timestamp ->
-  a Term.term =
-  fun system table kind name args a ->
-  match kind with
+  a Term.msymb -> Term.timestamp -> a Term.term =
+  fun system table symb a ->
+  match symb.s_typ with
   | Type.KMessage ->
     begin
-      match Symbols.Macro.get_all name table with
+      match Symbols.Macro.get_all symb.s_symb table with
       | Symbols.Input, _ -> assert false
       | Symbols.Output, _ ->
         begin match a with
@@ -71,7 +69,7 @@ let get_def :
             | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
             | Term.Action _ ->
               Term.mk_pair
-                (Term.Macro ((name,kind,args), [], Term.Pred a))
+                (Term.Macro (symb, [], Term.Pred a))
                 (Term.mk_pair
                    (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
                    (Term.ITE (Term.Macro (Term.exec_macro, [], a),
@@ -83,8 +81,8 @@ let get_def :
 
       | Symbols.State _, _ ->
         begin match a with
-          | Term.Action (symb,indices) ->
-            let action = Action.of_term symb indices table in
+          | Term.Action (asymb,indices) ->
+            let action = Action.of_term asymb indices table in
             let descr = 
               SystemExpr.descr_of_action table system action 
             in
@@ -93,24 +91,26 @@ let get_def :
               updates of [action] *)
               let ((n,s,is),msg) = List.find
                 (fun ((n,s,is),_) ->
-                  n = name && s = kind && List.length args = List.length is)
+                  n = symb.s_symb && 
+                  s = symb.s_typ
+                  && List.length symb.s_indices = List.length is)
                 descr.Action.updates
               in
-                (* update found:
-                - if indices [args] of the macro we want
-                to expand are equal to indices [is] corresponding to this macro
-                in the action description, then the macro expanded as defined
-                by the update term
-                - otherwise, we need to take into account the possibility that
-                [arg] and [is] might be equal, and generate a conditional *)
-                if args = is || a = Term.init then msg
-                else
-                  Term.mk_ite
-                    (Term.mk_indices_eq args is)
-                    msg
-                    (Term.Macro ((name,kind,args), [], Term.Pred a))
-            with Not_found ->
-              Term.Macro ((name,kind,args), [], Term.Pred a)
+              (* update found:
+                 - if indices [args] of the macro we want
+                   to expand are equal to indices [is] corresponding to this macro
+                   in the action description, then the macro expanded as defined
+                   by the update term
+                 - otherwise, we need to take into account the possibility that
+                   [arg] and [is] might be equal, and generate a conditional *)
+              if symb.s_indices = is || a = Term.init then msg
+              else
+                Term.mk_ite
+                  (Term.mk_indices_eq symb.s_indices is)
+                  msg
+                  (Term.Macro (symb, [], Term.Pred a))
+              with Not_found ->
+                Term.Macro (symb, [], Term.Pred a)
             end
           | _ -> assert false
         end
@@ -124,7 +124,7 @@ let get_def :
               List.map2
                 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
                 indices
-                args
+                symb.s_indices
             in
             let ts_subst = Term.ESubst (Term.Var ts, a) in
             (* Compute the relevant part of the action, i.e. the
@@ -169,11 +169,11 @@ let get_def :
         end
       | Symbols.Local _, _ -> failwith "Not implemented"
       |  _ -> assert false
-
     end
+
   | Type.KBoolean ->
     begin
-      match Symbols.Macro.get_all name table with
+      match Symbols.Macro.get_all symb.s_symb table with
       | Symbols.Cond, _ ->
         begin match a with
           | Term.Action (symb,indices) ->
@@ -188,7 +188,7 @@ let get_def :
         begin match a with
           | Term.Action (s,_) when s = Symbols.init_action -> Term.True
           | Term.Action _ ->
-            Term.And (Macro ((name, kind, args),[], Term.Pred a),
+            Term.And (Macro (symb,[], Term.Pred a),
                       Macro (Term.cond_macro, [], a))
           | _ -> assert false
         end
@@ -197,14 +197,12 @@ let get_def :
   | _ -> assert false
 
 (*------------------------------------------------------------------*)
-let get_definition :
-  type a. Constr.trace_cntxt ->
-  a Type.kind -> Symbols.macro Symbols.t ->
-  Vars.index list -> Term.timestamp ->
-  a Term.term =
-  fun cntxt sort name args ts ->
+let get_definition : type a. 
+  Constr.trace_cntxt -> 
+  a Term.msymb -> Term.timestamp -> a Term.term =
+  fun cntxt symb ts ->
   let ts_action = 
-    if is_defined name ts cntxt.table 
+    if is_defined symb.s_symb ts cntxt.table 
     then Some ts
     else match cntxt.models with
       | Some models -> Constr.find_eq_action models ts
@@ -218,26 +216,23 @@ let get_definition :
   let ts_action = Utils.oget ts_action in
 
   (* FIXME: idem + improve error message *)  
-  if not (is_defined name ts_action cntxt.table) then 
+  if not (is_defined symb.s_symb ts_action cntxt.table) then 
     Tactics.soft_failure (Tactics.Failure "cannot expand this macro");
 
-  let mdef = get_def cntxt.system cntxt.table sort name args ts_action in
+  let mdef = get_def cntxt.system cntxt.table symb ts_action in
   Term.subst [Term.ESubst (ts_action, ts)] mdef 
 
 
 
 (*------------------------------------------------------------------*)
 let get_dummy_definition :
-  type a. Constr.trace_cntxt ->
-  a Type.kind -> Symbols.macro Symbols.t ->
-  Vars.index list ->
-  a Term.term =
-  fun cntxt kind mn indices ->
-  match Symbols.Macro.get_all mn cntxt.table with
+  type a. Constr.trace_cntxt -> a Term.msymb -> a Term.term =
+  fun cntxt symb ->
+  match Symbols.Macro.get_all symb.s_symb cntxt.table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->
       let dummy_action = Action.dummy (List.length inputs) in
       let tdummy_action = 
         SystemExpr.action_to_term cntxt.table cntxt.system dummy_action 
       in
-      get_definition cntxt kind mn indices tdummy_action
+      get_definition cntxt symb tdummy_action
     | _ -> assert false

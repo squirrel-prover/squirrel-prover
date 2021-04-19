@@ -17,7 +17,7 @@ class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
       when fn = dec_fn ->
       self#visit_message m
         
-    | Term.Name (n,_) when n = key_n -> raise Euf.Bad_ssc
+    | Term.Name ns when ns.s_symb = key_n -> raise Euf.Bad_ssc
     | Term.Var m -> raise Euf.Bad_ssc
     | _ -> super#visit_message t
 end
@@ -44,7 +44,7 @@ class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
     | Term.Fun ((fn,_), _, [m1; _; m2]) when fn = enc_fn ->
       raise Euf.Bad_ssc
         
-    | Term.Name (n,_) when List.mem n randoms ->
+    | Term.Name ns when List.mem ns.s_symb randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)
         
     | Term.Var m -> if not(allow_vars) then
@@ -96,7 +96,7 @@ let check_encryption_randomness
   let encryptions = List.sort_uniq Stdlib.compare encryptions in
 
   let randoms = List.map (function
-      | Fun ((_, _), _, [_; Name (r, is); _]), _-> r
+      | Fun ((_, _), _, [_; Name r; _]), _-> r.s_symb
       | _ ->  Tactics.soft_failure (Tactics.SEncNoRandom))
       encryptions
   in
@@ -105,12 +105,12 @@ let check_encryption_randomness
   (* we check that encrypted messages based on indices, do not depend on free
      indices instantiated by the action w.r.t the indices of the random. *)
   if List.exists (function
-      | (Fun ((_, _), _, [m; Name (_, is); _]), (actidx:Vars.index list)) ->
+      | (Fun ((_, _), _, [m; Name n; _]), (actidx:Vars.index list)) ->
         let vars = Term.get_vars m in
         List.exists (function
               Vars.EVar v ->
               (match Vars.ty v with
-               |Type.Index -> (List.mem v actidx) && not (List.mem v is)
+               |Type.Index -> (List.mem v actidx) && not (List.mem v n.s_indices)
                (* we fail if there exists an indice appearing in the message,
                   which is an indice instantiated by the action description,
                   and it does not appear in the random. *)
@@ -121,8 +121,8 @@ let check_encryption_randomness
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), _, [_; Name (r, is); _]),_), 
-        (Fun ((_, _), _, [_; Name (r2,is2); _]),_) -> (r = r2)
+      | (Fun ((_, _), _, [_; Name r; _]),_), 
+        (Fun ((_, _), _, [_; Name r2; _]),_) -> r.s_symb = r2.s_symb
       (* the patterns should match, if they match inside the declaration
          of randoms *)
       | _ -> assert false

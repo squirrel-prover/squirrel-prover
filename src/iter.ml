@@ -23,9 +23,10 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method visit_message t = match t with
     | Fun (_, _,l) -> List.iter self#visit_message l
-    | Macro ((mn,k,is),l,a) ->
-        if l<>[] then failwith "Not implemented" ;
-        self#visit_message (Macros.get_definition cntxt k mn is a)
+    | Macro (ms,l,a) ->
+        if l <> [] then failwith "Not implemented" ;
+        self#visit_message (Macros.get_definition cntxt ms a)
+
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | ITE (a, b, c) ->
@@ -44,21 +45,29 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | And (l,r) | Or (l,r) | Impl (l,r) ->
         self#visit_formula l ;
         self#visit_formula r
+
     | Not f -> self#visit_formula f
+
     | True | False -> ()
+
     | Diff(a, b) -> self#visit_formula a; self#visit_formula b
+
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in
         let l = Term.subst subst l in
         self#visit_formula l
+
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
+
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
-    | Macro ((mn,Type.KBoolean,is),l,a) ->
+
+    | Macro (ms,l,a) ->
         if l<>[] then failwith "Not implemented" ;
         self#visit_formula
-          (Macros.get_definition cntxt Type.KBoolean mn is a)
+          (Macros.get_definition cntxt ms a)
+
     | Var _ -> ()
 
 end
@@ -76,16 +85,22 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method fold_message x t = match t with
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
-    | Macro ((mn,sort,is),l,a) ->
+
+    | Macro (ms,l,a) ->
         if l<>[] then failwith "Not implemented" ;
-        self#fold_message x (Macros.get_definition cntxt sort mn is a)
+        self#fold_message x (Macros.get_definition cntxt ms a)
+
     | Name _ | Var _ -> x
+
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
+
     | ITE (a, b, c) ->
         self#fold_message (self#fold_message (self#fold_formula x a) b) c
+
     | Seq (a, b) ->
         let b = Term.subst (refresh a) b in
         self#fold_message x b
+
     | Find (a, b, c, d) ->
         let subst = refresh a in
         let b = Term.subst subst b in
@@ -97,20 +112,28 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
         self#fold_formula (self#fold_formula x l) r
+
     | Not f -> self#fold_formula x f
+
     | True | False -> x
+
     | Diff(a, b) -> self#fold_formula (self#fold_formula x a) b
+
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in
         let l = Term.subst subst l in
         self#fold_formula x l
+
     | Atom (`Message (_, t, t')) ->
         self#fold_message (self#fold_message x t) t'
+
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
-    | Macro ((mn,Type.KBoolean,is),l,a) ->
-        if l<>[] then failwith "Not implemented" ;
+
+    | Macro (ms,l,a) ->
+        if l <> [] then failwith "Not implemented" ;
         self#fold_formula x
-          (Macros.get_definition cntxt Type.KBoolean mn is a)
+          (Macros.get_definition cntxt ms a)
+
     | Var _ -> x
 
 end
@@ -130,28 +153,36 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
 
   val mutable checked_macros = []
 
-  method visit_macro mn is a =
-    match Symbols.Macro.get_def mn cntxt.table with
+  method visit_macro : type a. a Term.msymb -> Term.timestamp -> unit = fun ms a ->
+    match Symbols.Macro.get_def ms.s_symb cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
-            if full || Macros.is_defined mn a cntxt.table then
-              self#visit_message
-                (Macros.get_definition cntxt Type.KMessage mn is a)
+            if full || Macros.is_defined ms.s_symb a cntxt.table then
+              self#visit
+                (Macros.get_definition cntxt ms a)
             else ()
-          else if not (List.mem mn checked_macros) then begin
-            checked_macros <- mn :: checked_macros ;
-            self#visit_message
-              (Macros.get_dummy_definition cntxt Type.KMessage mn is)
+
+          else if not (List.mem ms.s_symb checked_macros) then begin
+            checked_macros <- ms.s_symb :: checked_macros ;
+            self#visit
+              (Macros.get_dummy_definition cntxt ms)
           end
+
       | Symbols.Local _ -> assert false (* TODO *)
 
+  method visit : type a. a term -> unit = fun a ->
+    match Term.kind a with
+    | Type.KMessage -> self#visit_message a
+    | Type.KBoolean -> self#visit_formula a
+    | _ -> assert false
+
   method visit_message = function
-    | Macro ((mn,sort,is),[],a) -> self#visit_macro mn is a
+    | Macro (ms,[],a) -> self#visit_macro ms a
     | m -> super#visit_message m
 
   method visit_formula = function
-    | Macro ((mn,sort,is),[],a) -> self#visit_macro mn is a
+    | Macro (ms,[],a) -> self#visit_macro ms a
     | f -> super#visit_formula f
 
   method has_visited_macro mn = List.mem mn checked_macros
@@ -168,17 +199,18 @@ class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object 
   method visit_message = function
     | Term.Fun ((f',_),_, [m;k']) as m_full when f' = f ->
         begin match k' with
-          | Term.Name (k',is) when k' = k ->
+          | Term.Name s' when s'.s_symb = k ->
               let ret_m = if drop_head then m else m_full in
-              occurrences <- (is,ret_m) :: occurrences
+              occurrences <- (s'.s_indices,ret_m) :: occurrences
           | _ -> ()
         end ;
         self#visit_message m ; self#visit_message k'
+
     | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
         begin match k' with
-          | Term.Name (k',is) when k' = k ->
+          | Term.Name s' when s'.s_symb = k ->
               let ret_m = if drop_head then m else m_full in
-              occurrences <- (is,ret_m) :: occurrences
+              occurrences <- (s'.s_indices,ret_m) :: occurrences
           | _ -> ()
         end ;
         self#visit_message m ; self#visit_message k'
