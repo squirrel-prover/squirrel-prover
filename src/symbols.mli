@@ -73,8 +73,8 @@ val is_ftype : fname t -> function_def -> table -> bool
 
 (*------------------------------------------------------------------*)
 type bty_info = 
-  | Ty_bounded
   | Ty_large
+  | Ty_name_fixed_length
 
 type bty_def = bty_info list
 
@@ -249,6 +249,12 @@ val pp_symb_error :
   Format.formatter -> symb_err -> unit
 
 exception SymbError of symb_err
+
+(*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
+val get_bty_info   : table -> Type.tmessage -> bty_info list
+val check_bty_info : table -> Type.tmessage -> bty_info -> bool
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

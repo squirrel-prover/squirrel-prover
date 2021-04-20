@@ -1266,6 +1266,13 @@ let () = T.register "constraints"
 let namelength Args.(Pair (Message n, Message m)) s =
   match n, m with
   | Name n, Name m ->
+    let table = TraceSequent.table s in
+
+    assert (n.s_typ = m.s_typ); (* TODO: subtypes *)
+    if not Symbols.(check_bty_info table n.s_typ Ty_name_fixed_length) then
+      Tactics.soft_failure
+        (Failure "names are of a type that is not [name_fixed_length]");
+
     let f = Term.(Atom (`Message (`Eq,
                                   Term.mk_len (Name n),
                                   Term.mk_len (Name m)))) in
@@ -1293,11 +1300,12 @@ let () =
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TraceSequent.t) =
   let trs = get_trs s in
+  let table = TraceSequent.table s in
   let terms = TraceSequent.get_all_messages s in
   (* we start by collecting equalities between names implied by the indep axiom.
   *)
   let new_eqs =
-    Completion.name_indep_cnstrs (TraceSequent.table s) trs terms
+    Completion.name_indep_cnstrs table trs terms
   in
   let s =
     List.fold_left (fun s c ->
@@ -1309,7 +1317,7 @@ let eq_names (s : TraceSequent.t) =
      names. *)
   let trs = get_trs s in
   let cnstrs = 
-    Completion.name_index_cnstrs trs (TraceSequent.get_all_messages s)
+    Completion.name_index_cnstrs table trs (TraceSequent.get_all_messages s)
   in
   let s =
     List.fold_left (fun s c ->
@@ -1388,21 +1396,22 @@ let () = T.register "eqtrace"
 
 (*------------------------------------------------------------------*)
 let fresh_param m1 m2 = match m1,m2 with
-  | Name ns, _ -> (ns.s_symb, ns.s_indices, m2)
-  | _, Name ns -> (ns.s_symb, ns.s_indices, m1)
+  | Name ns, _ -> (ns, m2)
+  | _, Name ns -> (ns, m1)
   | _ ->
     soft_failure
       (Tactics.Failure "can only be applied on hypothesis of the form \
                         t=n or n=t")
 
 (* Direct cases - names appearing in the term [t] *)
-let mk_fresh_direct (cntxt : Constr.trace_cntxt) env n is t =
+let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
   (* iterate over [t] to search subterms of [t] equal to a name *)
   let list_of_indices =
-    let iter = new Fresh.get_name_indices ~cntxt false n in
+    let iter = new Fresh.get_name_indices ~cntxt false ns.s_symb in
     iter#visit_message t ;
     iter#get_indices
   in
+
   (* build the formula expressing that there exists a name subterm of [t]
    * equal to the name ([n],[is]) *)
   let mk_case (js : Type.index Vars.var list) =
@@ -1422,14 +1431,14 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env n is t =
 
     Term.mk_exists
       (List.map (fun i -> Vars.EVar i) bv')
-      (Term.mk_indices_eq is js)
+      (Term.mk_indices_eq ns.s_indices js)
   in
 
   let cases = List.map mk_case list_of_indices in
   Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
+let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t =
   let list_of_actions_from_term =
     let iter = new Fresh.get_actions ~cntxt false in
     iter#visit_message t ;
@@ -1439,7 +1448,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
 
   let () = SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
-      let iter = new Fresh.get_name_indices ~cntxt true n in
+      let iter = new Fresh.get_name_indices ~cntxt true ns.s_symb in
       iter#visit_formula (snd action_descr.condition) ;
       iter#visit_message (snd action_descr.output) ;
       List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
@@ -1468,7 +1477,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
     let subst =
       List.map2
         (fun i i' -> ESubst (Term.Var i, Term.Var i'))
-        (eindices @ is_a) (eindices' @ is)
+        (eindices @ is_a) (eindices' @ ns.s_indices)
     in
 
     (* we apply [subst] to the action [a] *)
@@ -1500,7 +1509,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
        But, by substituting in the vector of equalities, we correctly retrieve
        that i = j. *)
     let idx_eqs =
-      Term.mk_indices_eq is (List.map (Term.subst_var subst) is_a)
+      Term.mk_indices_eq ns.s_indices (List.map (Term.subst_var subst) is_a)
     in
 
     Term.mk_exists
@@ -1523,13 +1532,22 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env n is t =
 let fresh (Args.String m) s =
   try
     let id,hyp = Hyps.by_name m s in
+    
+    let table = TraceSequent.table s in
+    let env   = TraceSequent.env s in
+
     begin match hyp with
       | Atom (`Message (`Eq,m1,m2)) ->
-        let (n,is,t) = fresh_param m1 m2 in
-        let env   = TraceSequent.env s in
+        let (ns,t) = fresh_param m1 m2 in
+
+        let ty = ns.s_typ in
+        if not Symbols.(check_bty_info table ty Ty_large) then
+          Tactics.soft_failure
+            (Failure "the type of this term is not [large]");
+
         let cntxt = mk_trace_cntxt s in
-        let phi_direct = mk_fresh_direct cntxt env n is t in
-        let phi_indirect = mk_fresh_indirect cntxt env n is t in
+        let phi_direct = mk_fresh_direct cntxt env ns t in
+        let phi_indirect = mk_fresh_indirect cntxt env ns t in
         let phi = Term.mk_or phi_direct phi_indirect in
 
         let goal = Term.mk_impl phi (TraceSequent.conclusion s) in

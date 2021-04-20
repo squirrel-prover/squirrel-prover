@@ -75,7 +75,7 @@ rule token = parse
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
 | "type"              { TYPE }
-| "bounded"           { BOUNDED }
+| "name_fixed_length" { NAMEFIXEDLENGTH }
 | "large"             { LARGE }
 | "name"              { NAME }
 | "mutable"           { MUTABLE }

@@ -57,7 +57,7 @@
   "timestamp"  
 
   "large"
-  "bounded"
+  "name_fixed_length"
   ))
 
 (defvar squirrel-operator-type-var "'[a-z]*[a-z_'1-9]*")

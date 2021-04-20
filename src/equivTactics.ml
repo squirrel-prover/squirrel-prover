@@ -1039,7 +1039,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
-let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe =
+let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.formula =
   let n_left, n_right =
     match Term.pi_term PLeft t, Term.pi_term PRight t with
     | (Name nl, Name nr) -> nl, nr
@@ -1065,10 +1065,16 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe =
 let mk_if_term cntxt env e biframe =
   match e with
   | Equiv.Message t ->
+    let ty = Term.ty t in
+    if not Symbols.(check_bty_info cntxt.Constr.table ty Ty_large) then
+      Tactics.soft_failure
+        (Failure "name is of a type that is not [large]");
+
     let phi = fresh_cond cntxt env t biframe in
     let then_branch = Term.mk_zero in
     let else_branch = t in
     Equiv.Message Term.(mk_ite phi then_branch else_branch)
+
   | Equiv.Formula f -> raise Fresh.Not_name
 
 let fresh TacticsArgs.(Int i) s =
@@ -1076,12 +1082,13 @@ let fresh TacticsArgs.(Int i) s =
     | before, e, after ->
         (* the biframe to consider when checking the freshness *)
         let biframe = List.rev_append before after in
-        let cntxt = mk_trace_cntxt s in
-        let env    = EquivSequent.env s in
+        let cntxt   = mk_trace_cntxt s in
+        let env     = EquivSequent.env s in
         begin match mk_if_term cntxt env e biframe with
         | if_term ->
-          let biframe = List.rev_append before (if_term::after) in
+          let biframe = List.rev_append before (if_term :: after) in
           [EquivSequent.set_equiv_goal s biframe]
+
         | exception Fresh.Not_name ->
           Tactics.soft_failure
             (Tactics.Failure "Can only apply fresh tactic on names")

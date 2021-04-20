@@ -59,9 +59,8 @@ type macro_def =
 
 (*------------------------------------------------------------------*)
 type bty_info = 
-  | Ty_bounded
   | Ty_large
-  (* | Ty_fixed_length             (* TODO: types *) *)
+  | Ty_name_fixed_length
 
 type bty_def = bty_info list
 
@@ -497,6 +496,19 @@ module Macro = Make (struct
     | Exists (Macro d) -> d
     | _ as c -> namespace_err loc c namespace
 end)
+
+(*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
+let get_bty_info table (ty : Type.tmessage) : bty_info list =
+  match ty with
+    | Type.Message -> [Ty_large; Ty_name_fixed_length]
+    | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
+    | Type.TUnivar _ | Type.TVar _ -> []
+  
+let check_bty_info table (ty : Type.tmessage) (info : bty_info) : bool =
+  let infos = get_bty_info table ty in
+  List.mem info infos 
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

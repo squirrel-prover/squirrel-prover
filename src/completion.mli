@@ -19,7 +19,7 @@ val check_equalities : state -> Term.esubst list -> bool
     E.g., if [n[i,j]] and [n[k,l]] are equal, then the returned list
     would contain [i=k] and [j=l]. *)
 val name_index_cnstrs :
-  state -> Term.message list -> Term.formula list
+  Symbols.table -> state -> Term.message list -> Term.formula list
 
 (** [name_indep_cnstrs state l] looks for all name equals to a Term.message 
     w.r.t. the rewrite relation in [state], and adds the fact that the name must 

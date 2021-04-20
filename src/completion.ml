@@ -369,6 +369,22 @@ let is_name t = match t.cnt with
   | Ccst (Cst.Cgfuncst (`N _)) -> true
   | _ -> false
 
+let name_ty t = match t.cnt with
+  | Cfun (N (_,nty), _, _)
+  | Ccst (Cst.Cgfuncst (`N (_,nty))) -> nty
+  | _ -> assert false
+
+(** [t] is a name of type \[large\]. 
+    If [of_ty] is not [None], also checks that [t] has the correct type. *)
+let is_lname ?of_ty table t =
+  if not (is_name t) then false 
+  else
+    let nty = name_ty t in    
+    let of_ty = odflt nty of_ty in
+    Symbols.check_bty_info table nty Symbols.Ty_large &&
+    nty = of_ty
+
+
 let get_cst t = match t.cnt with
   | Ccst c -> c
   | _ -> assert false
@@ -1547,8 +1563,9 @@ let x_index_cnstrs state l select f_cnstr =
 
 (** [name_index_cnstrs state l] looks for all names that are equal w.r.t. the
     rewrite relation in [state], and add the corresponding index equalities.
+    Only applies to names with \[large\] types.
     E.g., if n(i,j) and n(k,l) are equal, then i = k and j = l.*)
-let name_index_cnstrs state l =
+let name_index_cnstrs table state l =
   let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [Term.False] else []
@@ -1570,20 +1587,23 @@ let name_index_cnstrs state l =
 
     | _ -> assert false in
 
-  x_index_cnstrs state l is_name n_cnstr
+  x_index_cnstrs state l (is_lname table) n_cnstr
 
 
 (** [name_indep_cnstrs state l] looks for all name equals to a term w.r.t. the
     rewrite relation in [state], and adds the fact that the name must be equal
-    to one of the name appearing inside the term. *)
+    to one of the name appearing inside the term. 
+    Only applies to names with \[large\] types. *)
 let name_indep_cnstrs table state l =
-  let n_cnstr a b = 
-    if not (is_name a) && not (is_name b) then []
+  let n_cnstr (a : cterm) (b : cterm) = 
+    if not (is_lname table a) && not (is_lname table b) then []
     else
-      let name, t = if is_name a then a, b else b, a in
+      let name, t = if is_lname table a then a, b else b, a in
+      let nty = name_ty name in
 
+      (* We keep only the names in [t] that are of the correct type. *)
       let sub_names = subterms [t]
-                      |> List.filter is_name
+                      |> List.filter (is_lname ~of_ty:nty table)
                       |> List.sort_uniq Stdlib.compare
       in
 

@@ -812,6 +812,7 @@ and convert0 :
       end
 
   | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
+
   | ITE (i,t,e) ->
       begin match Type.kind ty with
         | Type.KMessage ->

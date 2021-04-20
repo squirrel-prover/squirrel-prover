@@ -185,12 +185,15 @@ let check_proc table env p =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
+
     | New (x, ty, p) -> 
-      let ty = Theory.parse_p_ty table [] ty Type.KMessage in
+      let ty = Theory.parse_p_ty table [] ty Type.KMessage in 
       check_p ((L.unloc x, Type.ETy ty)::env) p
 
     | In (_,x,p) -> check_p ((L.unloc x, Type.emessage)::env) p
+
     | Out (_,m,p)
+
     | Alias (L.{ pl_desc = Out (_,m,p) },_) ->
       (* raise an error if we are in strict alias mode *)
       if is_out proc && (Config.strict_alias_mode ())
@@ -198,7 +201,9 @@ let check_proc table env p =
       else
         let () = Theory.check table ~local:true env m Type.emessage in
         check_p env p
+
     | Alias (p,_) -> check_p env p
+
     | Set (s, l, m, p) ->
       let k = Theory.check_state table s (List.length l) in
       Theory.check table ~local:true env m k ;
@@ -208,13 +213,16 @@ let check_proc table env p =
             (Theory.var_of_lsymb x) Type.eindex
         ) l ;
       check_p env p
+
     | Parallel (p, q) -> check_p env p ; check_p env q
+
     | Let (x, t, p) ->
       (* TODO: types *)
       Theory.check table ~local:true env t Type.emessage ;
       check_p ((L.unloc x, Type.emessage)::env) p
 
     | Repl (x, p) -> check_p ((L.unloc x, Type.eindex)::env) p
+
     | Exists (vars, test, p, q) ->
       check_p env q ;
       let env =

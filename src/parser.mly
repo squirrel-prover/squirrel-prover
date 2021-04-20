@@ -22,7 +22,7 @@
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
 %token WITH ORACLE EXN
-%token LARGE BOUNDED
+%token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
 %token BY INTRO AS DESTRUCT
@@ -320,8 +320,8 @@ ty_args:
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
 
 bty_info:
-| BOUNDED { Symbols.Ty_bounded }
-| LARGE   { Symbols.Ty_large }
+| NAMEFIXEDLENGTH { Symbols.Ty_name_fixed_length }
+| LARGE           { Symbols.Ty_large }
 
 bty_infos:
 | LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
