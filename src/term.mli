@@ -24,7 +24,7 @@ val mk_isymb : 'a -> 'b -> Vars.index list -> ('a,'b) isymb
 (** Names represent random values of length the security parameter. *)
 
 type name = Symbols.name Symbols.t
-type nsymb = (name, Type.message Type.ty) isymb
+type nsymb = (name, Type.tmessage) isymb
 
 (** Function symbols, may represent primitives or abstract functions. *)
 
@@ -36,9 +36,9 @@ type fsymb = fname * Vars.index list
   * translating the meta-logic to the base logic. *)
 
 type mname    = Symbols.macro Symbols.t
-type 'a msymb = (mname, 'a Type.kind) isymb
+type msymb = (mname, Type.tmessage) isymb
 
-type state = Type.message msymb
+type state = msymb
 
 (*------------------------------------------------------------------*)
 (** {3 Pretty printing} *)
@@ -50,7 +50,7 @@ val pp_fname : Format.formatter -> fname -> unit
 val pp_fsymb : Format.formatter -> fsymb -> unit
 
 val pp_mname :  Format.formatter -> mname -> unit
-val pp_msymb :  Format.formatter -> 'a msymb -> unit
+val pp_msymb :  Format.formatter -> msymb -> unit
 
 (*------------------------------------------------------------------*)
 (** {2 Terms} *)
@@ -78,8 +78,8 @@ and _ term =
   | Name   : nsymb -> Type.message term
 
   | Macro  :
-      'a msymb * Type.message term list * Type.timestamp term
-      -> 'a term
+      msymb * Type.message term list * Type.timestamp term
+      -> Type.message term
 
   | Seq    : Vars.index list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term
@@ -89,29 +89,28 @@ and _ term =
   | Diff : 'a term * 'a term -> 'a term
 
   | ITE :
-      Type.boolean term * Type.message term * Type.message term ->
+      Type.message term * Type.message term * Type.message term ->
       Type.message term
   | Find :
-      Vars.index list * Type.boolean term *
+      Vars.index list * Type.message term *
       Type.message term * Type.message term ->
       Type.message term
 
-  | Atom : generic_atom -> Type.boolean term
+  | Atom : generic_atom -> Type.message term
 
-  | ForAll : Vars.evar list * Type.boolean term -> Type.boolean term
-  | Exists : Vars.evar list * Type.boolean term -> Type.boolean term
-  | And    : Type.boolean term * Type.boolean term -> Type.boolean term
-  | Or     : Type.boolean term * Type.boolean term -> Type.boolean term
-  | Not    : Type.boolean term  -> Type.boolean term
-  | Impl   : Type.boolean term * Type.boolean term -> Type.boolean term
-  | True   : Type.boolean term
-  | False  : Type.boolean term
+  | ForAll : Vars.evar list * Type.message term -> Type.message term
+  | Exists : Vars.evar list * Type.message term -> Type.message term
+  | And    : Type.message term * Type.message term -> Type.message term
+  | Or     : Type.message term * Type.message term -> Type.message term
+  | Not    : Type.message term  -> Type.message term
+  | Impl   : Type.message term * Type.message term -> Type.message term
+  | True   : Type.message term
+  | False  : Type.message term
 
 type 'a t = 'a term
 
 type message = Type.message term
 type timestamp = Type.timestamp term
-type formula = Type.boolean term
 
 type eterm = ETerm : 'a term -> eterm
 
@@ -167,7 +166,7 @@ val neg_lit : literal -> literal
 
 val neg_trace_lit : trace_literal -> trace_literal 
 
-val disjunction_to_literals : formula -> literal list option
+val disjunction_to_literals : message -> literal list option
 
 (*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
@@ -194,7 +193,7 @@ val get_vars : 'a term -> Vars.evar list
 (** [fv t] returns the free variables of [t]. *)
 val fv : 'a term -> Vars.Sv.t
 
-val f_triv : formula -> bool
+val f_triv : message -> bool
 
 (** [precise_ts t] returns a list [l] of timestamps such that
   * any term that appears in [(t)^I] that is not an attacker
@@ -274,11 +273,11 @@ end
 val empty : message 
 val init : timestamp
 
-val in_macro    : Type.message msymb
-val out_macro   : Type.message msymb
-val frame_macro : Type.message msymb
-val cond_macro  : Type.boolean msymb
-val exec_macro  : Type.boolean msymb
+val in_macro    : msymb
+val out_macro   : msymb
+val frame_macro : msymb
+val cond_macro  : msymb
+val exec_macro  : msymb
 
 val f_true   : fsymb
 val f_false  : fsymb
@@ -329,25 +328,25 @@ val mk_zeroes : message -> message
 val mk_pair   : message -> message -> message
  
 (*------------------------------------------------------------------*)
-(** {3 For formulas} *)
+(** {3 For messages} *)
 
-val mk_not    : formula                 -> formula
-val mk_and    : formula -> formula      -> formula
-val mk_ands   : formula list            -> formula
-val mk_or     : formula -> formula      -> formula
-val mk_ors    : formula list            -> formula
-val mk_impl   : formula -> formula      -> formula
-val mk_impls  : formula list -> formula -> formula
+val mk_not    : message                 -> message
+val mk_and    : message -> message      -> message
+val mk_ands   : message list            -> message
+val mk_or     : message -> message      -> message
+val mk_ors    : message list            -> message
+val mk_impl   : message -> message      -> message
+val mk_impls  : message list -> message -> message
   
-val mk_forall : Vars.evar list -> formula -> formula
-val mk_exists : Vars.evar list -> formula -> formula
+val mk_forall : Vars.evar list -> message -> message
+val mk_exists : Vars.evar list -> message -> message
 
-val mk_ite    : formula -> message -> message -> message
+val mk_ite    : message -> message -> message -> message
   
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 
-val mk_indices_neq : Vars.index list -> Vars.index list -> formula
-val mk_indices_eq  : Vars.index list -> Vars.index list -> formula
+val mk_indices_neq : Vars.index list -> Vars.index list -> message
+val mk_indices_eq  : Vars.index list -> Vars.index list -> message
 
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
@@ -356,33 +355,35 @@ val not_message_atom  : message_atom  -> message_atom
 val not_index_atom    : index_atom    -> index_atom
 val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 
-val not_simpl : formula -> formula
+val not_simpl : message -> message
 
 (*------------------------------------------------------------------*)
 (** Convert a boolean term to a message term, used in frame macro definition **)
-val boolToMessage : formula -> message
+val boolToMessage : message -> message
 
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
-val destr_forall : formula -> (Vars.evar list * formula) option
-val destr_exists : formula -> (Vars.evar list * formula) option
+val destr_action : message -> Symbols.action Symbols.t * Vars.index list
 
-val destr_and  : formula -> (formula * formula) option
-val destr_or   : formula -> (formula * formula) option
-val destr_impl : formula -> (formula * formula) option
+val destr_forall : message -> (Vars.evar list * message) option
+val destr_exists : message -> (Vars.evar list * message) option
+
+val destr_and  : message -> (message * message) option
+val destr_or   : message -> (message * message) option
+val destr_impl : message -> (message * message) option
 
 (** left-associative *)
-val destr_ands  : int -> formula -> formula list option
-val destr_ors   : int -> formula -> formula list option
-val destr_impls : int -> formula -> formula list option
+val destr_ands  : int -> message -> message list option
+val destr_ors   : int -> message -> message list option
+val destr_impls : int -> message -> message list option
 
-val decompose_forall : formula -> Vars.evar list * formula
-val decompose_exists : formula -> Vars.evar list * formula
+val decompose_forall : message -> Vars.evar list * message
+val decompose_exists : message -> Vars.evar list * message
 
-val decompose_ands  : formula -> formula list 
-val decompose_ors   : formula -> formula list 
-val decompose_impls : formula -> formula list 
+val decompose_ands  : message -> message list 
+val decompose_ors   : message -> message list 
+val decompose_impls : message -> message list 
 
 val destr_var : 'a term -> 'a Vars.var option
 val destr_pair : 'a term -> ('a term * 'a term) option

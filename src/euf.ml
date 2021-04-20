@@ -48,10 +48,10 @@ let key_ssc
     new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n 
   in
   List.iter ssc#visit_message messages ;
-  List.iter ssc#visit_term elems ;
+  List.iter ssc#visit_message elems ;
   SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
-       ssc#visit_formula (snd action_descr.condition) ;
+       ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
@@ -229,7 +229,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
       in
       iter#visit_message mess ;
       iter#visit_message sign ;
-      List.iter iter#visit_term elems ;
+      List.iter iter#visit_message elems ;
       iter#get_occurrences
     in
     List.map

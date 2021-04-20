@@ -87,7 +87,7 @@ type name_def = {
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State of int * Type.ety
+  | State of int * Type.tmessage
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
   | Global of int

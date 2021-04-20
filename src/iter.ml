@@ -16,11 +16,6 @@ let erefresh evars =
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
 class iter ~(cntxt:Constr.trace_cntxt) = object (self)
-
-  method visit_term t = match t with
-    | Equiv.Message e -> self#visit_message e
-    | Equiv.Formula e -> self#visit_formula e
-
   method visit_message t = match t with
     | Fun (_, _,l) -> List.iter self#visit_message l
     | Macro (ms,l,a) ->
@@ -30,7 +25,7 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Name _ | Var _ -> ()
     | Diff(a, b) -> self#visit_message a; self#visit_message b
     | ITE (a, b, c) ->
-        self#visit_formula a; self#visit_message b; self#visit_message c
+        self#visit_message a; self#visit_message b; self#visit_message c
     | Seq (a, b) ->
         let b = Term.subst (refresh a) b in
         self#visit_message b
@@ -38,37 +33,26 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
         let subst = refresh a in
         let b = Term.subst subst b in
         let c = Term.subst subst c in
-        self#visit_formula b; self#visit_message c; self#visit_message d
+        self#visit_message b; self#visit_message c; self#visit_message d
 
-  method visit_formula (f:Term.formula) =
-    match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#visit_formula l ;
-        self#visit_formula r
+        self#visit_message l ;
+        self#visit_message r
 
-    | Not f -> self#visit_formula f
+    | Not f -> self#visit_message f
 
     | True | False -> ()
-
-    | Diff(a, b) -> self#visit_formula a; self#visit_formula b
 
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in
         let l = Term.subst subst l in
-        self#visit_formula l
+        self#visit_message l
 
     | Atom (`Message (_, t, t')) ->
         self#visit_message t ;
         self#visit_message t'
 
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
-
-    | Macro (ms,l,a) ->
-        if l<>[] then failwith "Not implemented" ;
-        self#visit_formula
-          (Macros.get_definition cntxt ms a)
-
-    | Var _ -> ()
 
 end
 
@@ -78,12 +62,7 @@ end
   * Note that [iter] could be obtained as a derived class of [fold],
   * but this would break the way we modify the iteration using inheritance.  *)
 class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
-
-  method fold_term (x:'a) t = match t with
-    | Equiv.Message e -> self#fold_message x e
-    | Equiv.Formula e -> self#fold_formula x e
-
-  method fold_message x t = match t with
+  method fold_message (x : 'a) t : 'a = match t with
     | Fun (_, _,l) -> List.fold_left self#fold_message x l
 
     | Macro (ms,l,a) ->
@@ -95,7 +74,7 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
 
     | ITE (a, b, c) ->
-        self#fold_message (self#fold_message (self#fold_formula x a) b) c
+        self#fold_message (self#fold_message (self#fold_message x a) b) c
 
     | Seq (a, b) ->
         let b = Term.subst (refresh a) b in
@@ -106,35 +85,24 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
         let b = Term.subst subst b in
         let c = Term.subst subst c in
         let d = Term.subst subst d in
-        self#fold_message (self#fold_message (self#fold_formula x b) c) d
+        self#fold_message (self#fold_message (self#fold_message x b) c) d
 
-  method fold_formula x f =
-    match f with
     | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#fold_formula (self#fold_formula x l) r
+        self#fold_message (self#fold_message x l) r
 
-    | Not f -> self#fold_formula x f
+    | Not f -> self#fold_message x f
 
     | True | False -> x
-
-    | Diff(a, b) -> self#fold_formula (self#fold_formula x a) b
 
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in
         let l = Term.subst subst l in
-        self#fold_formula x l
+        self#fold_message x l
 
     | Atom (`Message (_, t, t')) ->
         self#fold_message (self#fold_message x t) t'
 
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
-
-    | Macro (ms,l,a) ->
-        if l <> [] then failwith "Not implemented" ;
-        self#fold_formula x
-          (Macros.get_definition cntxt ms a)
-
-    | Var _ -> x
 
 end
 
@@ -153,29 +121,23 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
 
   val mutable checked_macros = []
 
-  method visit_macro : type a. a Term.msymb -> Term.timestamp -> unit = fun ms a ->
+  method visit_macro : Term.msymb -> Term.timestamp -> unit = fun ms a ->
     match Symbols.Macro.get_def ms.s_symb cntxt.table with
       | Symbols.(Input | Output | State _ | Cond | Exec | Frame) -> ()
       | Symbols.Global _ ->
           if exact then
             if full || Macros.is_defined ms.s_symb a cntxt.table then
-              self#visit
+              self#visit_message
                 (Macros.get_definition cntxt ms a)
             else ()
 
           else if not (List.mem ms.s_symb checked_macros) then begin
             checked_macros <- ms.s_symb :: checked_macros ;
-            self#visit
+            self#visit_message
               (Macros.get_dummy_definition cntxt ms)
           end
 
       | Symbols.Local _ -> assert false (* TODO *)
-
-  method visit : type a. a term -> unit = fun a ->
-    match Term.kind a with
-    | Type.KMessage -> self#visit_message a
-    | Type.KBoolean -> self#visit_formula a
-    | _ -> assert false
 
   method visit_message = function
     | Macro (ms,[],a) -> self#visit_macro ms a
@@ -183,7 +145,7 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
 
   method visit_formula = function
     | Macro (ms,[],a) -> self#visit_macro ms a
-    | f -> super#visit_formula f
+    | f -> super#visit_message f
 
   method has_visited_macro mn = List.mem mn checked_macros
 
@@ -243,14 +205,14 @@ end
    macros. *)
 let get_ftype ~(cntxt:Constr.trace_cntxt) elem stype =
   let iter = new get_ftypes_term ~cntxt stype in
-  List.iter iter#visit_term [elem];
+  List.iter iter#visit_message [elem];
   match iter#get_func with
   | p::q -> Some p
   | [] -> None
 
 let get_ftypes ?excludesymtype ~(cntxt:Constr.trace_cntxt) elem stype =
   let iter = new get_ftypes_term ?excludesymtype ~cntxt stype in
-  List.iter iter#visit_term [elem];
+  List.iter iter#visit_message [elem];
   iter#get_func
 
 
@@ -258,7 +220,7 @@ let get_ftypes ?excludesymtype ~(cntxt:Constr.trace_cntxt) elem stype =
 (** {2 If-Then-Else} *)
 class get_ite_term ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit iter_approx_macros ~exact:true ~full:false ~cntxt as super
-  val mutable ite : (Term.formula * Term.message * Term.message) option = None
+  val mutable ite : (Term.message * Term.message * Term.message) option = None
   method get_ite = ite
   method visit_message = function
     | Term.ITE (c,t,e) ->

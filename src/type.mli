@@ -5,13 +5,11 @@
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
-type boolean   = [`Boolean]
 
 (*------------------------------------------------------------------*)
 (** Kinds of types *)
 type _ kind =
   | KMessage   : message   kind
-  | KBoolean   : boolean   kind
   | KIndex     : index     kind
   | KTimestamp : timestamp kind
 
@@ -42,7 +40,7 @@ val pp_univar : Format.formatter -> univar -> unit
 type _ ty =
   (** Built-in types *)
   | Message   : message   ty
-  | Boolean   : boolean   ty
+  | Boolean   : message   ty
   | Index     : index     ty
   | Timestamp : timestamp ty
 

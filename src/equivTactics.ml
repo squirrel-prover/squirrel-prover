@@ -175,9 +175,6 @@ class exist_macros ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message t = match t with
     | Term.Macro _ -> raise NoReflMacros
     | _ -> super#visit_message t
-  method visit_formula t = match t with
-    | Term.Macro _ -> raise NoReflMacros
-    | _ -> super#visit_formula t
 end
 
 
@@ -188,7 +185,7 @@ let refl (e : Equiv.equiv) (s : EquivSequent.t) =
     new exist_macros ~cntxt:(mk_trace_cntxt s) in
   try
     (* we check that the frame does not contain macro *)
-    List.iter iter#visit_term e;
+    List.iter iter#visit_message e;
     if EquivSequent.get_frame PLeft s = EquivSequent.get_frame PRight s
     then `True
     else `NoRefl
@@ -553,13 +550,10 @@ let () =
 let enrich (arg : Theory.eterm TacticsArgs.arg) (s : EquivSequent.t) =
   match arg with
   | TacticsArgs.ETerm (ty, f, loc) ->
-    let elem = match Type.kind ty with
-    | Type.KBoolean -> Equiv.Formula f 
-        
-    | Type.KMessage -> Equiv.Message f
-        
-    | Type.KIndex | Type.KTimestamp ->
-      hard_failure (Tactics.Failure "expected a message or boolean term")
+    let elem : Term.message = 
+      match Type.equalk_w (Term.kind f) Type.KMessage with
+      | Some Type.Type_eq -> f
+      | None -> hard_failure (Tactics.Failure "expected a message")
     in
     
     EquivSequent.set_equiv_goal s (elem :: goal_as_equiv s) 
@@ -612,38 +606,34 @@ exception No_common_head
 exception No_FA
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
-    | Fun (f,_,l) ->
-      List.map (fun m -> Equiv.Message m) l
+    | Fun (f,_,l) -> l
     | ITE (c,t,e) when t = e ->
-      EquivSequent.[ Message t ]
+      EquivSequent.[ t ]
     | ITE (c,t,e) ->
-      EquivSequent.[ Formula c ; Message t ; Message e ]
+      EquivSequent.[ c ; t ; e ]
     | And (f,g) ->
-      EquivSequent.[ Formula f ; Formula g ]
+      EquivSequent.[ f ; g ]
     | Or (f,g) ->
-      EquivSequent.[ Formula f ; Formula g ]
+      EquivSequent.[ f ; g ]
     | Atom (`Message (_,f,g)) ->
-      EquivSequent.[ Message f ; Message g ]
+      EquivSequent.[ f ; g ]
     | Impl (f,g) ->
-      EquivSequent.[ Formula f ; Formula g ]
-    | Not f -> EquivSequent.[ Formula f ]
+      EquivSequent.[ f ; g ]
+    | Not f -> EquivSequent.[ f ]
     | True -> []
     | False -> []
     | Diff _ -> raise No_common_head
     | _ -> raise No_FA
   in
+
   (* Remve ITE(b,true,false) coming from expansion of frame macro *)
   let filterBoolAsMsg =
     List.map
       (fun x -> match x with
-        | Equiv.Message ITE (c,t,e)
-          when t = Term.mk_true && e = Term.mk_false ->
-          Equiv.Formula c
+        | ITE (c,t,e) when t = Term.mk_true && e = Term.mk_false -> c
         | _ -> x)
   in
-  match t with
-  | Equiv.Message e -> filterBoolAsMsg (aux (Term.head_normal_biterm e))
-  | Equiv.Formula e -> filterBoolAsMsg (aux (Term.head_normal_biterm e))
+  filterBoolAsMsg (aux (Term.head_normal_biterm t))
 
 let fa TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
@@ -651,7 +641,7 @@ let fa TacticsArgs.(Int i) s =
         begin try
           (* Special case for try find, otherwise we use fa_expand *)
           match e with
-          | Equiv.Message Find (vars,c,t,e) ->
+          | Find (vars,c,t,e) ->
             let env = ref (EquivSequent.env s) in
             let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
             let subst =
@@ -663,7 +653,7 @@ let fa TacticsArgs.(Int i) s =
             let t' = Term.subst subst t in
             let biframe =
               List.rev_append before
-                (Equiv.[ Message c' ; Message t' ; Message e ] @ after)
+                (Equiv.[ c' ; t' ; e ] @ after)
             in
             [ EquivSequent.set_env !env (EquivSequent.set_equiv_goal s biframe) ]
           | _ ->
@@ -706,17 +696,17 @@ let is_dup table elem elems =
       | _ -> false
     in
     match elem with
-      | Equiv.Message (Term.Macro (im,[],t)) when im = Term.in_macro ->
+      | Term.Macro (im,[],t) when im = Term.in_macro ->
           List.exists
             (function
-               | Equiv.Message (Term.Macro (fm,[],t'))
+               | Term.Macro (fm,[],t')
                  when fm = Term.frame_macro && leq (Pred t) t' -> true
                | _ -> false)
             elems
-      | Equiv.Formula (Term.Macro (em,[],t)) when em = Term.exec_macro ->
+      | Term.Macro (em,[],t) when em = Term.exec_macro ->
           List.exists
             (function
-               | Equiv.Message (Term.Macro (fm,[],t'))
+               | Term.Macro (fm,[],t')
                  when fm = Term.frame_macro && leq t t' -> true
                | _ -> false)
             elems
@@ -779,7 +769,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
   inherit [Term.timestamp list] Iter.fold ~cntxt as super
 
-  method check_formula f = ignore (self#fold_formula [Term.Pred tau] f)
+  method check_formula f = ignore (self#fold_message [Term.Pred tau] f)
 
   method extract_ts_atoms phi =
     let rec conjuncts = function
@@ -809,36 +799,41 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
   method fold_message timestamps t = match t with
     | Macro (ms,[],a)
       when (ms = Term.in_macro && (a = tau || List.mem a timestamps)) ||
-           (ms = Term.out_macro && List.mem a timestamps)
-      -> timestamps
+           (ms = Term.out_macro && List.mem a timestamps) ->
+      timestamps
+
     | ITE (Macro (ms,[],a), then_branch, _)
-      when ms = Term.exec_macro && List.mem a timestamps
-      -> self#fold_message timestamps then_branch
+      when ms = Term.exec_macro && List.mem a timestamps ->
+      self#fold_message timestamps then_branch
+
     | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
+
     | Fun _ | Seq _ | ITE _ | Find _ -> super#fold_message timestamps t
 
-  method fold_formula timestamps (f:Term.formula) =
-    match f with
     | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
+
     | Impl (phi_1,phi_2) ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ts' = self#add_atoms atoms timestamps in
       List.iter
-        (fun phi -> ignore (self#fold_formula ts' phi))
+        (fun phi -> ignore (self#fold_message ts' phi))
         (phi_2::l) ;
       timestamps
+
     | And _ as phi ->
       let atoms,l = self#extract_ts_atoms phi in
       let ts' = self#add_atoms atoms timestamps in
       List.iter
-        (fun phi -> ignore (self#fold_formula ts' phi))
+        (fun phi -> ignore (self#fold_message ts' phi))
         l ;
       timestamps
-    | Atom (`Happens _) | Var _ | Diff _ | Macro _ -> raise Not_FADUP_iter
-    | Atom (`Message _)
-    | Or _ | Not _ | ForAll _ | Exists _ -> super#fold_formula timestamps f
-    | True | False -> timestamps
 
+    | Atom (`Happens _) -> raise Not_FADUP_iter
+
+    | Atom (`Message _)
+    | Or _ | Not _ | ForAll _ | Exists _ -> super#fold_message timestamps t
+
+    | True | False -> timestamps
 end
 
 let fa_dup_int i s =
@@ -850,8 +845,8 @@ let fa_dup_int i s =
         (* we expect that e is of the form exec@pred(tau) && phi *)
         let (tau,phi) =
           let f,g = match e with
-            | Equiv.Formula Term.And (f,g) -> f,g
-            | Equiv.Message Term.(Seq (vars,ITE (And (f,g),tt,ff)))
+            | Term.And (f,g) -> f,g
+            | Term.(Seq (vars,ITE (And (f,g),tt,ff)))
               when tt = Term.mk_true && ff = Term.mk_false ->
               let subst =
                 List.map
@@ -863,6 +858,7 @@ let fa_dup_int i s =
               Term.subst subst g
             | _ -> raise Not_FADUP_formula
           in
+
           match f,g with
             | (Term.Macro (fm,[], Term.Pred tau), phi) when fm = Term.exec_macro
               -> (tau,phi)
@@ -870,22 +866,25 @@ let fa_dup_int i s =
               -> (tau,phi)
             | _ -> raise Not_FADUP_formula
         in
-        let frame_at_pred_tau =
-          Equiv.Message (Term.Macro (Term.frame_macro,[],Term.Pred tau))
+
+        let frame_at_pred_tau = 
+          Term.Macro (Term.frame_macro,[],Term.Pred tau)
         in
         (* we first check that frame@pred(tau) is in the biframe *)
-        if List.mem frame_at_pred_tau biframe_without_e then
-          (* we iterate over the formula phi to check if it contains only
-           * allowed subterms *)
-          let iter = new check_fadup ~cntxt tau in
-          iter#check_formula phi ;
-          (* on success, we keep only exec@pred(tau) *)
-          let new_elem =
-            Equiv.Formula
-              (Term.Macro (Term.exec_macro,[],Term.Pred tau))
-          in
-          [EquivSequent.set_equiv_goal s (List.rev_append before (new_elem::after))]
-        else raise Not_FADUP_formula
+        if not (List.mem frame_at_pred_tau biframe_without_e) then
+          raise Not_FADUP_formula;
+        
+        (* we iterate over the formula phi to check if it contains only
+         * allowed subterms *)
+        let iter = new check_fadup ~cntxt tau in
+        iter#check_formula phi ;
+        (* on success, we keep only exec@pred(tau) *)
+        let new_elem =
+          Term.Macro (Term.exec_macro,[],Term.Pred tau)
+        in
+        [EquivSequent.set_equiv_goal s 
+           (List.rev_append before (new_elem::after))]
+
       with
       | Not_FADUP_formula ->
           Tactics.soft_failure (Tactics.Failure "can only apply the tactic on \
@@ -895,6 +894,7 @@ let fa_dup_int i s =
           Tactics.soft_failure (Tactics.Failure "the formula contains subterms \
           that are not handled by the FADUP rule")
       end
+
   | exception Out_of_range ->
       Tactics.soft_failure (Tactics.Failure "out of range position")
 
@@ -919,15 +919,15 @@ let () =
 
 (** Construct the formula expressing freshness for some projection. *)
 let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
-  let proj_frame = List.map (Equiv.pi_elem proj) biframe in
+  let proj_frame = List.map (Equiv.pi_term proj) biframe in
   begin try
     let list_of_indices_from_frame =
       let iter = new Fresh.get_name_indices ~cntxt false n.s_symb in
-        List.iter iter#visit_term proj_frame ;
+        List.iter iter#visit_message proj_frame ;
         iter#get_indices
     and list_of_actions_from_frame =
       let iter = new Fresh.get_actions ~cntxt false in
-      List.iter iter#visit_term proj_frame ;
+      List.iter iter#visit_message proj_frame ;
       iter#get_actions
     and tbl_of_action_indices = Hashtbl.create 10 in
 
@@ -935,7 +935,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
       (fun action_descr ->
         let iter = new Fresh.get_name_indices ~cntxt true n.s_symb in
         let descr_proj = Action.pi_descr proj action_descr in
-        iter#visit_formula (snd descr_proj.condition) ;
+        iter#visit_message (snd descr_proj.condition) ;
         iter#visit_message (snd descr_proj.output) ;
         List.iter (fun (_,t) -> iter#visit_message t) descr_proj.updates;
         (* we add only actions in which name occurs *)
@@ -1039,7 +1039,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
         (Tactics.Failure "Variable found, unsound to apply fresh")
   end
 
-let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.formula =
+let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
   let n_left, n_right =
     match Term.pi_term PLeft t, Term.pi_term PRight t with
     | (Name nl, Name nr) -> nl, nr
@@ -1061,21 +1061,18 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.formula =
      phi_right)
 
 
-(** Returns the term if (phi_left && phi_right) then 0 else diff(nL,nR). *)
-let mk_if_term cntxt env e biframe =
-  match e with
-  | Equiv.Message t ->
-    let ty = Term.ty t in
-    if not Symbols.(check_bty_info cntxt.Constr.table ty Ty_large) then
-      Tactics.soft_failure
-        (Failure "name is of a type that is not [large]");
+(** Returns the term [if (phi_left && phi_right) then 0 else diff(nL,nR)]. *)
+let mk_if_term cntxt env t biframe =
+  let ty = Term.ty t in
+  if not Symbols.(check_bty_info cntxt.Constr.table ty Ty_large) then
+    Tactics.soft_failure
+      (Failure "name is of a type that is not [large]");
 
-    let phi = fresh_cond cntxt env t biframe in
-    let then_branch = Term.mk_zero in
-    let else_branch = t in
-    Equiv.Message Term.(mk_ite phi then_branch else_branch)
+  let phi = fresh_cond cntxt env t biframe in
+  let then_branch = Term.mk_zero in
+  let else_branch = t in
+  Term.(mk_ite phi then_branch else_branch)
 
-  | Equiv.Formula f -> raise Fresh.Not_name
 
 let fresh TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
@@ -1122,7 +1119,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst table env vs ths in
     (* new_t is the term of the sequence instantiated with the subst *)
-    let new_t = Equiv.Message (Term.subst subst t) in
+    let new_t = Term.subst subst t in
     (* we add the new term to the frame and the hypothesis if it does not yet
        belongs to it *)
     let biframe =
@@ -1139,7 +1136,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->
         let new_e = 
-          if not (List.mem new_t e) && List.mem (Equiv.Message term_seq) e
+          if not (List.mem new_t e) && List.mem term_seq e
           then new_t :: e
           else e 
         in
@@ -1160,12 +1157,9 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
   let tsubst = Theory.subst_of_env (EquivSequent.env s) in
   (* final function once the substitution has been computed *)
   let succ a subst =
-    let apply_subst = function
-      | Equiv.Message e -> Equiv.Message (Term.subst subst e)
-      | Equiv.Formula e -> Equiv.Formula (Term.subst subst e)
-    in
     let new_s = 
-      EquivSequent.set_equiv_goal s (List.map apply_subst (goal_as_equiv s)) 
+      EquivSequent.set_equiv_goal s 
+        (List.map (Term.subst subst) (goal_as_equiv s)) 
     in   
     
     if not (query_happens ~precise:true s a) 
@@ -1275,11 +1269,6 @@ let expand_all () s =
     aux t
   in
 
-  let expand_all_macros = function
-    | Equiv.Message e -> Equiv.Message (expand_all_macros e)
-    | Equiv.Formula e -> Equiv.Formula (expand_all_macros e)
-  in
-
   let biframe = goal_as_equiv s
                 |> List.map (expand_all_macros)
   in
@@ -1372,7 +1361,7 @@ let simplify_ite b s cond positive_branch negative_branch =
     Does not explore macros. *)
 let get_ite ~cntxt elem =
   let iter = new Iter.get_ite_term ~cntxt in
-  List.iter iter#visit_term [elem];
+  List.iter iter#visit_message [elem];
   iter#get_ite
 
 let yes_no_if b TacticsArgs.(Int i) s =
@@ -1494,14 +1483,14 @@ let ifcond TacticsArgs.(Pair (Int i,
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
-      | Equiv.Message ITE (c,t,e) -> (c, t, e)
+      | ITE (c,t,e) -> (c, t, e)
       | _ ->  Tactics.soft_failure
                 (Tactics.Failure "can only be applied to a conditional")
     in
 
     begin try
-        let new_elem = Equiv.Message
-            (ITE (cond, push_formula j f positive_branch, negative_branch))
+        let new_elem = 
+          ITE (cond, push_formula j f positive_branch, negative_branch)
         in
         let biframe = List.rev_append before (new_elem :: after) in
         let trace_sequent = 
@@ -1587,15 +1576,15 @@ let ifeq
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
-      | Equiv.Message ITE (c,t,e) ->
+      | ITE (c,t,e) ->
         (c, t, e)
       | _ -> Tactics.soft_failure
                (Tactics.Failure "Can only be applied to a conditional.")
     in
     let new_elem =
-      Equiv.Message (ITE (cond,
-                          Term.subst [Term.ESubst (t1,t2)] positive_branch,
-                          negative_branch))
+      ITE (cond,
+           Term.subst [Term.ESubst (t1,t2)] positive_branch,
+           negative_branch)
     in
     let biframe = List.rev_append before (new_elem :: after) in
 
@@ -1712,7 +1701,7 @@ let prf_param hash =
   * occurs in [frame]. Does not explore macros. *)
 let occurrences_of_frame ~cntxt frame hash_fn key_n =
   let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
-  List.iter iter#visit_term frame ;
+  List.iter iter#visit_message frame ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
 (** [occurrences_of_action_descr ~cntxt action_descr hash_fn key_n]
@@ -1722,7 +1711,7 @@ let occurrences_of_action_descr ~cntxt action_descr hash_fn key_n =
   let iter = new Iter.get_f_messages ~cntxt hash_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
-  iter#visit_formula (snd action_descr.Action.condition) ;
+  iter#visit_message (snd action_descr.Action.condition) ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
@@ -1741,8 +1730,8 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
       in
 
       let frame =
-        (Equiv.Message t) ::
-        (List.map (Equiv.pi_elem proj) (e_without_hash @ biframe)) in
+        t :: (List.map (Equiv.pi_term proj) (e_without_hash @ biframe)) 
+      in
 
       (* check syntactic side condition *)
       Euf.key_ssc
@@ -1755,7 +1744,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
 
       and list_of_actions_from_frame =
         let iter = new Fresh.get_actions ~cntxt false in
-        List.iter iter#visit_term frame ;
+        List.iter iter#visit_message frame ;
         iter#get_actions
 
       and tbl_of_action_hashes = Hashtbl.create 10 in
@@ -1965,10 +1954,7 @@ let prf TacticsArgs.(Int i) s =
     let cntxt = mk_trace_cntxt s in
     let env = EquivSequent.env s in
 
-    let e = match e with
-      | Equiv.Message m -> Equiv.Message (Term.head_normal_biterm m)
-      | Equiv.Formula f -> Equiv.Formula (Term.head_normal_biterm f)
-    in
+    let e = Term.head_normal_biterm e in
 
     (* search for the first occurrence of a hash in [e] *)
     begin match Iter.get_ftype ~cntxt e Symbols.Hash with
@@ -2059,10 +2045,7 @@ let cca1 TacticsArgs.(Int i) s =
     let table = cntxt.table in
     let env = EquivSequent.env s in
 
-    let e = match e with
-      | Equiv.Message m -> Equiv.Message (Term.head_normal_biterm m)
-      | Equiv.Formula f -> Equiv.Formula (Term.head_normal_biterm f)
-    in
+    let e = Term.head_normal_biterm e in
 
     let get_subst_hide_enc enc fnenc m fnpk sk fndec r eis is_top_level =
       (* we check that the random is fresh, and the key satisfy the
@@ -2101,15 +2084,13 @@ let cca1 TacticsArgs.(Int i) s =
        we will completely replace the encryption by the length, else we will
        replace the plain text by the lenght *)
     let is_top_level = match e with
-      | Equiv.Message
-          (Term.Fun ((fnenc,eis), _,
-                     [m; Term.Name r;
-                      Term.Fun ((fnpk,is), _, [Term.Name sk])]))
+      | Term.Fun ((fnenc,eis), _,
+                  [m; Term.Name r;
+                   Term.Fun ((fnpk,is), _, [Term.Name sk])])
         when (Symbols.is_ftype fnpk Symbols.PublicKey cntxt.table
               && Symbols.is_ftype fnenc Symbols.AEnc table) -> true
         
-      | Equiv.Message
-          (Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk]))
+      | Term.Fun ((fnenc,eis), _, [m; Term.Name r; Term.Name sk])
         when Symbols.is_ftype fnenc Symbols.SEnc table -> true
         
       | _ -> false
@@ -2139,9 +2120,8 @@ let cca1 TacticsArgs.(Int i) s =
                     ~cntxt fndec sk.s_symb;
 
                   if not (List.mem
-                            (Equiv.Message
-                               (Term.mk_fun table fnpk is [Term.Name sk])
-                            ) biframe) then
+                            (Term.mk_fun table fnpk is [Term.Name sk])
+                            biframe) then
                     soft_failure
                       (Tactics.Failure
                          "The public key must be inside the frame in order to \
@@ -2421,7 +2401,8 @@ let rec remove_name_occ ns l = match l with
 let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
     (n_left, l_left, n_right, l_right, term) =
   let biframe =
-    Equiv.Message (Term.Diff (l_left, l_right)) :: biframe in
+    (Term.Diff (l_left, l_right)) :: biframe 
+  in
 
   let system_left = SystemExpr.(project_system PLeft cntxt.system) in
   let cntxt_left = { cntxt with system = system_left } in
@@ -2453,54 +2434,35 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
 
   let then_branch = Term.mk_zero in
   let else_branch = term in
-  Equiv.Message Term.(mk_ite phi then_branch else_branch)
+  Term.mk_ite phi then_branch else_branch
 
-let mk_xor_if_term cntxt env e biframe =
-  let (n_left, l_left, n_right, l_right, term) =
-      begin match e with
-      | Equiv.Message t ->
-        begin
-          match Term.pi_term PLeft t, Term.pi_term PRight t with
-          | (Fun (fl, _, [Term.Name nl;ll]),
-             Fun (fr, _, [Term.Name nr;lr]))
-            when (fl = Term.f_xor && fr = Term.f_xor) -> 
-            (nl,ll,nr,lr,t)
-            
-          | _ -> raise Not_xor
-        end
+let mk_xor_if_term cntxt env t biframe =
+  let (n_left, l_left, n_right, l_right, term) =    
+    match Term.pi_term PLeft t, Term.pi_term PRight t with
+    | (Fun (fl, _, [Term.Name nl;ll]),
+       Fun (fr, _, [Term.Name nr;lr]))
+      when (fl = Term.f_xor && fr = Term.f_xor) -> 
+      (nl,ll,nr,lr,t)
 
-      | Equiv.Formula f -> raise Not_xor
-      end
+    | _ -> raise Not_xor
   in
 
   mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
 
 
-let mk_xor_if_term_name cntxt env e mess_name biframe =
+let mk_xor_if_term_name cntxt env t mess_name biframe =
   let n_left, l_left, n_right, l_right, term =
-      begin match mess_name with
-      | n ->
-        begin match
-          Term.pi_term PLeft n, Term.pi_term PRight n
-        with
-        | Name nl, Name nr ->
-          begin match e with
-          | Equiv.Message t ->
-            begin match
-              Term.pi_term PLeft t, Term.pi_term PRight t
-            with
-            | (Fun (fl,_,ll),Fun (fr,_,lr))
-              when (fl = Term.f_xor && fr = Term.f_xor) ->
-              (nl,remove_name_occ nl ll,
+    match Term.pi_term PLeft mess_name, Term.pi_term PRight mess_name with
+    | Name nl, Name nr ->
+      begin match Term.pi_term PLeft t, Term.pi_term PRight t with
+        | (Fun (fl,_,ll),Fun (fr,_,lr))
+          when (fl = Term.f_xor && fr = Term.f_xor) ->
+          (nl,remove_name_occ nl ll,
                nr,remove_name_occ nr lr,
-               t)
-            | _ -> raise Not_xor
-            end
-          | Equiv.Formula f -> raise Not_xor
-          end
-        | _ -> Tactics.soft_failure (Tactics.Failure "Expected a name")
-        end
+           t)
+        | _ -> raise Not_xor
       end
+    | _ -> Tactics.soft_failure (Tactics.Failure "Expected a name")
   in
   mk_xor_if_term_base cntxt env biframe (n_left, l_left, n_right, l_right, term)
 
@@ -2607,7 +2569,7 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) a b c elem_list =
   let iterfm = new find_macros ~cntxt false in
   let exists_macro =
     try
-      List.iter iterfm#visit_term elem_list; false
+      List.iter iterfm#visit_message elem_list; false
     with Macro_found -> true
   in
   try
@@ -2616,12 +2578,12 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) a b c elem_list =
    if exists_macro then
     SystemExpr.iter_descrs cntxt.table cntxt.system (
       fun d ->
-        iter#visit_formula (snd d.condition) ;
+        iter#visit_message (snd d.condition) ;
         iter#visit_message (snd d.output) ;
         List.iter (fun (_,t) -> iter#visit_message t) d.updates;
     );
    (* we then check inside the frame *)
-    List.iter iter#visit_term elem_list;
+    List.iter iter#visit_message elem_list;
     true
   with Not_context | Fresh.Name_found -> false
 

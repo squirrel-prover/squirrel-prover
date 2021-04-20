@@ -277,26 +277,26 @@ let case_cond orig vars c t e s =
     ( CHyp idelse, TraceSequent.subst else_subst selse ) ]
 
 let message_case (m : Term.message) s : c_res list =
-  begin match m with
-    | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
-    | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
-    | Term.Macro (ms,[],ts) as o
-      when Macros.is_defined ms.s_symb ts (TraceSequent.table s) 
-        && ms.s_typ = Type.KMessage ->
-      if not (TraceSequent.query_happens ~precise:true s ts) 
-      then soft_failure (Tactics.MustHappen ts)
-      else
-        begin 
-          match Macros.get_definition (mk_trace_cntxt s) ms ts with
-          | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
-          | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
-          | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
-        end
-    | _ ->
-      Tactics.(soft_failure (Failure "message is not a conditional"))
-    | exception _ ->
-      Tactics.(soft_failure (Failure "improper argument"))
-  end
+  match m with
+  | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
+  | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
+  | Term.Macro (ms,[],ts) as o
+    when Macros.is_defined ms.s_symb ts (TraceSequent.table s) ->
+
+    if not (TraceSequent.query_happens ~precise:true s ts) 
+    then soft_failure (Tactics.MustHappen ts);
+
+    begin 
+      match Macros.get_definition (mk_trace_cntxt s) ms ts with
+      | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
+      | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
+      | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
+    end
+
+  | _ ->
+    Tactics.(soft_failure (Failure "message is not a conditional"))
+  | exception _ ->
+    Tactics.(soft_failure (Failure "improper argument"))
 
 let do_case_tac (args : Args.parser_arg list) s =
   match Args.convert_as_lsymb args with
@@ -1011,9 +1011,9 @@ let target_all s : target list =
     Invariant: if (sv,φ,l,r) is a rewrite rule, then
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-type 'a rw_rule =  (Vars.Sv.t * Term.formula list * 'a term * 'a term)
+type 'a rw_rule =  (Vars.Sv.t * Term.message list * 'a term * 'a term)
 
-type rw_erule = (Vars.Sv.t * Term.formula list * Term.esubst)
+type rw_erule = (Vars.Sv.t * Term.message list * Term.esubst)
 
 type rw_arg = 
   | Rw_rw of Ident.t option * rw_erule
@@ -1038,7 +1038,7 @@ let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : bool =
 
 (* rewrite in a single target *)
 let do_target 
-    (doit : (Term.formula * Ident.t option) -> Term.formula * Term.formula list) 
+    (doit : (Term.message * Ident.t option) -> Term.message * Term.message list) 
     (s : sequent) (t : target) : sequent * sequent list =
   let f, s, tgt_id = match t with
     | `Goal -> TraceSequent.conclusion s, s, None
@@ -1065,20 +1065,23 @@ let do_targets doit (s : sequent) targets : sequent * sequent list =
     
 
 (*------------------------------------------------------------------*)
-let unfold_macro t (s : sequent) =
+let unfold_macro : type a. a Term.term -> sequent -> Term.esubst list = 
+  fun t s ->
   match t with
-    | Macro (ms,l,a) ->
-      if not (TraceSequent.query_happens ~precise:true s a) then
-        soft_failure (Tactics.MustHappen a);
-      
-      let mdef = Macros.get_definition (mk_trace_cntxt s) ms a in
+  | Macro (ms,l,a) ->
+    if not (TraceSequent.query_happens ~precise:true s a) then
+      soft_failure (Tactics.MustHappen a);
 
-      [Term.ESubst (Macro (ms,l,a), mdef)]
-      
-    | _ -> 
-      soft_failure (Tactics.Failure "can only expand macros")
+    let mdef = Macros.get_definition (mk_trace_cntxt s) ms a in
 
-let unfold_macro ~canfail t s : Term.esubst list =
+    [Term.ESubst (Macro (ms,l,a), mdef)]
+
+  | _ -> 
+    soft_failure (Tactics.Failure "can only expand macros")
+
+let unfold_macro : type a. 
+  canfail:bool -> a Term.term -> sequent -> Term.esubst list = 
+  fun ~canfail t s ->
   try unfold_macro t s with
   | Tactics.Tactic_soft_failure _ when not canfail -> []
 
@@ -1277,8 +1280,6 @@ let namelength Args.(Pair (Message n, Message m)) s =
                                   Term.mk_len (Name n),
                                   Term.mk_len (Name m)))) in
 
-    (* let id = Hyps.fresh_id ~approx:true "HL" s in
-     * [Hyps.add_formula id f s] *)
     [TraceSequent.set_conclusion
        (Term.mk_impl f (TraceSequent.conclusion s)) s]
 
@@ -1449,7 +1450,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t =
   let () = SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
       let iter = new Fresh.get_name_indices ~cntxt true ns.s_symb in
-      iter#visit_formula (snd action_descr.condition) ;
+      iter#visit_message (snd action_descr.condition) ;
       iter#visit_message (snd action_descr.output) ;
       List.iter (fun (_,t) -> iter#visit_message t) action_descr.updates;
       (* we add only actions in which name [n] occurs *)
@@ -1605,8 +1606,7 @@ let substitute_ts (ts1, ts2) s =
 let substitute_idx (i1 , i2 : Type.index Term.term * Type.index Term.term) s =
   let i1, i2 =  match i1, i2 with
     | Var i1, Var i2 -> i1, i2
-    | (Diff _ | Macro _), _
-    | _, (Macro _ | Diff _) ->
+    | (Diff _), _ | _, (Diff _) ->
       hard_failure
         (Tactics.Failure "only variables are supported when substituting \
                           index terms")
@@ -2144,8 +2144,8 @@ let rewrite ~all
 
   (* Return: (f, subs) *)
   let rec do1 
-    : type a. Term.formula -> Args.rw_count -> a rw_rule -> 
-      Term.formula * Term.formula list = 
+    : type a. Term.message -> Args.rw_count -> a rw_rule -> 
+      Term.message * Term.message list = 
     fun f mult (sv, rsubs, l, r) ->
       if !cpt_occ > 1000 then   (* hard-coded *)
           hard_failure (Failure "max nested rewriting reached (1000)");
@@ -2338,7 +2338,7 @@ let () =
 
 (*------------------------------------------------------------------*)
     
-let apply (f : Term.formula) (s : TraceSequent.sequent) =
+let apply (f : Term.message) (s : TraceSequent.sequent) =
   let vars, f = Term.decompose_forall f in
   let vars = Vars.Sv.of_list vars in
   let forms = List.rev (Term.decompose_impls f) in 
@@ -2369,7 +2369,7 @@ let apply (f : Term.formula) (s : TraceSequent.sequent) =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B` 
 *)
-let apply_in (form : Term.formula) (hyp : Ident.t) (s : TraceSequent.sequent) =
+let apply_in (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
   let fvars, f = Term.decompose_forall form in
   let fvars = Vars.Sv.of_list fvars in
   let forms = List.rev (Term.decompose_impls f) in 
@@ -2421,7 +2421,7 @@ let apply_in (form : Term.formula) (hyp : Ident.t) (s : TraceSequent.sequent) =
 
 (** Parse apply tactic arguments *)
 let p_apply_args (args : Args.parser_arg list) (s : TraceSequent.sequent)
-  : TraceSequent.t list * Term.formula * target =
+  : TraceSequent.t list * Term.message * target =
   match args with
   | [Args.ApplyIn (f,in_opt)] ->
     let subgoals, f = match Args.convert_as_lsymb [Args.Theory f] with
@@ -2549,7 +2549,7 @@ let apply_yes_no_if b s =
   let conclusion = TraceSequent.conclusion s in
   (* search for the first occurrence of an if-then-else in [elem] *)
   let iter = new Iter.get_ite_term ~cntxt in
-  List.iter iter#visit_formula [conclusion];
+  List.iter iter#visit_message [conclusion];
   match iter#get_ite with
   | None ->
     soft_failure
@@ -2617,9 +2617,9 @@ let () =
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
                            * Type.message Term.term
                            * (Symbols.fname Symbols.t -> bool)
-                           * Type.boolean Term.term  list * bool
+                           * Type.message Term.term list * bool
 
-let euf_param table (t : Term.formula) : unforgeabiliy_param =
+let euf_param table (t : Term.message) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
       (Tactics.Failure
@@ -2653,7 +2653,7 @@ let euf_param table (t : Term.formula) : unforgeabiliy_param =
   | _ -> bad_param ()
 
 
-let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
+let intctxt_param table (t : Term.message) : unforgeabiliy_param =
   let bad_param () =
     soft_failure
       (Tactics.Failure
@@ -2807,7 +2807,7 @@ let euf_apply_facts drop_head s
 
 (** Tag EUFCMA - for composition results *)
 let euf_apply
-    (get_params : Symbols.table -> Term.formula -> unforgeabiliy_param)
+    (get_params : Symbols.table -> Term.message -> unforgeabiliy_param)
     (Args.String hyp_name)
     (s : TraceSequent.t) =
   let table = TraceSequent.table s in

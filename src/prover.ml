@@ -119,7 +119,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.formula
+  | Oracle_formula of Term.message
 
 type option_def = option_name * option_val
 
@@ -649,13 +649,13 @@ let get_goal_formula (gname : lsymb) =
 (*------------------------------------------------------------------*)
 (** {2 Convert equivalence formulas} *)
 
-let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el =   
+let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el : Term.message =   
   match Theory.econvert cenv s el with
   (* FIXME: this does not give any conversion error to the user. *)
   | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
-  | Some (Theory.ETerm (s,t,_)) -> match s with
-    | Type.Message -> Equiv.Message t
-    | Type.Boolean -> Equiv.Formula t
+  | Some (Theory.ETerm (s,t,_)) -> 
+    match Term.kind t with
+    | Type.KMessage -> t
     | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
                                           bool or message)")
 
@@ -710,7 +710,7 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let env = ref Vars.empty_env in
   let ts = Vars.make_fresh_and_update env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
-  let goal = Equiv.(Atom (Equiv [Message term])) in
+  let goal = Equiv.(Atom (Equiv [term])) in
 
   let system =
     match system_1, system_2 with
@@ -892,7 +892,6 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
         | Type.KMessage -> ty :: parse_in_tys in_tys
         | Type.KIndex     -> decl_error loc KDecl InvalidAbsType
         | Type.KTimestamp -> decl_error loc KDecl InvalidAbsType
-        | Type.KBoolean   -> decl_error loc KDecl InvalidAbsType
     in
           
     let rec parse_index_prefix iarr in_tys = match in_tys with

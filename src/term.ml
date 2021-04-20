@@ -25,15 +25,15 @@ let mk_isymb s t is = {
 } 
 
 type name = Symbols.name Symbols.t
-type nsymb = (name, Type.message Type.ty) isymb
+type nsymb = (name, Type.tmessage) isymb
                               
 type fname = Symbols.fname Symbols.t
 type fsymb = fname * Vars.index list (* TODO: use isymb *)
 
 type mname = Symbols.macro Symbols.t
-type 'a msymb = (mname, 'a Type.kind) isymb
+type msymb = (mname, Type.tmessage) isymb
 
-type state = Type.message msymb
+type state = msymb
 
 (*------------------------------------------------------------------*)
 let pp_name ppf s = (Utils.kw `Yellow) ppf (Symbols.to_string s)
@@ -56,7 +56,7 @@ let pp_mname_s ppf s =
 let pp_mname ppf s =
   pp_mname_s ppf (Symbols.to_string s)
 
-let pp_msymb ppf (ms : 'a msymb) =
+let pp_msymb ppf (ms : msymb) =
   Fmt.pf ppf "%a%a"
     pp_mname ms.s_symb
     (Utils.pp_ne_list "(%a)" Vars.pp_list) ms.s_indices
@@ -80,8 +80,9 @@ and _ term =
   | Fun    : fsymb * Type.ftype * Type.message term list -> Type.message term
   | Name   : nsymb -> Type.message term
   | Macro  :
-      'a msymb * Type.message term list * Type.timestamp term ->
-      'a term
+      msymb * Type.message term list * Type.timestamp term ->
+      Type.message term
+
   | Seq    : Vars.index list * Type.message term -> Type.message term
   | Pred   : Type.timestamp term -> Type.timestamp term        
   | Action :
@@ -92,30 +93,31 @@ and _ term =
   | Diff : 'a term * 'a term -> 'a term
 
   | ITE :
-      Type.boolean term * Type.message term * Type.message term ->
+      Type.message term * Type.message term * Type.message term ->
       Type.message term
   | Find :
-      Vars.index list * Type.boolean term *
+      Vars.index list * Type.message term *
       Type.message term * Type.message term ->
       Type.message term
 
-  | Atom : generic_atom -> Type.boolean term
+  | Atom : generic_atom -> Type.message term
 
-  | ForAll : Vars.evar list * Type.boolean term -> Type.boolean term
-  | Exists : Vars.evar list * Type.boolean term -> Type.boolean term
-  | And    : Type.boolean term * Type.boolean term -> Type.boolean term
-  | Or     : Type.boolean term * Type.boolean term -> Type.boolean term
-  | Not    : Type.boolean term -> Type.boolean term
-  | Impl   : Type.boolean term * Type.boolean term -> Type.boolean term
-  | True   : Type.boolean term
-  | False  : Type.boolean term
+  | ForAll : Vars.evar list * Type.message term -> Type.message term
+  | Exists : Vars.evar list * Type.message term -> Type.message term
+  | And    : Type.message term * Type.message term -> Type.message term
+  | Or     : Type.message term * Type.message term -> Type.message term
+  | Not    : Type.message term -> Type.message term
+  | Impl   : Type.message term * Type.message term -> Type.message term
+
+  (* TODO: types: get rid of this *)
+  | True   : Type.message term
+  | False  : Type.message term
 
 type 'a t = 'a term
 
 (*------------------------------------------------------------------*)
 type message = Type.message term
 type timestamp = Type.timestamp term
-type formula = Type.boolean term
 
 (*------------------------------------------------------------------*)
 (** Subset of all atoms (the subsets are not disjoint). *)
@@ -146,7 +148,7 @@ type eq_atom = [
 let rec kind : type a. a term -> a Type.kind =
   fun t -> match t with
     | Name _               -> Type.KMessage
-    | Macro (s,_,_)        -> s.s_typ
+    | Macro (s,_,_)        -> Type.KMessage
     | Seq _                -> Type.KMessage
     | Var v                -> Vars.kind v
     | Pred _               -> Type.KTimestamp
@@ -154,15 +156,15 @@ let rec kind : type a. a term -> a Type.kind =
     | Diff (a, b)          -> kind a
     | ITE (a, b, c)        -> Type.KMessage
     | Find (a, b, c, d)    -> Type.KMessage
-    | Atom _               -> Type.KBoolean
-    | ForAll _             -> Type.KBoolean
-    | Exists _             -> Type.KBoolean
-    | And _                -> Type.KBoolean
-    | Or _                 -> Type.KBoolean
-    | Not _                -> Type.KBoolean
-    | Impl _               -> Type.KBoolean
-    | True                 -> Type.KBoolean
-    | False                -> Type.KBoolean
+    | Atom _               -> Type.KMessage
+    | ForAll _             -> Type.KMessage
+    | Exists _             -> Type.KMessage
+    | And _                -> Type.KMessage
+    | Or _                 -> Type.KMessage
+    | Not _                -> Type.KMessage
+    | Impl _               -> Type.KMessage
+    | True                 -> Type.KMessage
+    | False                -> Type.KMessage
     | Fun (_,fty,_)        -> Type.KMessage
         
 (*------------------------------------------------------------------*)
@@ -186,15 +188,8 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
         in
         fty.Type.fty_out
 
-      | Name _               -> Type.Message
-      | Macro (s,_,_)  ->
-        (* TODO: types: fix that *)
-        begin
-          match s.s_typ with
-          | Type.KMessage -> Type.Message
-          | Type.KBoolean -> Type.Boolean
-          | _ -> assert false
-        end
+      | Name _         -> Type.Message
+      | Macro (s,_,_)  -> s.s_typ
         
       | Seq _                -> Type.Message
       | Var v                -> Vars.ty v
@@ -626,12 +621,12 @@ let f_triv = function
     
 let mk s k = { s_symb = s; s_typ = k; s_indices = []; }
 
-let in_macro    : Type.message msymb = mk Symbols.inp   Type.KMessage
-let out_macro   : Type.message msymb = mk Symbols.out   Type.KMessage
-let frame_macro : Type.message msymb = mk Symbols.frame Type.KMessage
+let in_macro    : msymb = mk Symbols.inp   Type.Message
+let out_macro   : msymb = mk Symbols.out   Type.Message
+let frame_macro : msymb = mk Symbols.frame Type.Message
 
-let cond_macro : Type.boolean msymb = mk Symbols.cond Type.KBoolean
-let exec_macro : Type.boolean msymb = mk Symbols.exec Type.KBoolean
+let cond_macro : msymb = mk Symbols.cond Type.Boolean
+let exec_macro : msymb = mk Symbols.exec Type.Boolean
 
 (*------------------------------------------------------------------*)
 let rec pts : type a. timestamp list -> a term -> timestamp list =
@@ -1084,7 +1079,7 @@ module Match = struct
         | Macro (s, terms, ts), 
           Macro (s', terms', ts') -> 
           let mv = isymb_match s s' mv in
-          assert (Type.equalk s.s_typ s'.s_typ);          
+          assert (Type.equal s.s_typ s'.s_typ);          
 
           tmatch ts ts' (tmatch_l terms terms' mv)
 
@@ -1375,6 +1370,10 @@ let make_bi_term  : type a. a term -> a term -> a term = fun t1 t2 ->
 (*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
+let destr_action = function
+  | Action (s,is) -> Some (s,is)
+  | _ -> None
+
 let rec destr_exists = function
   | Exists (vs, f) -> 
     begin
@@ -1483,8 +1482,6 @@ let of_eatom (eat : eatom) : generic_atom = match eat with
     | Type.KIndex     ->
       let i1, i2 = oget (destr_var t1), oget (destr_var t2) in
       `Index (as_ord_eq ord, i1, i2)
-
-    | Type.KBoolean   -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

@@ -53,7 +53,7 @@ type function_def =
 (*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
-  | State  of int * Type.ety
+  | State  of int * Type.tmessage
   | Global of int
   | Local  of Type.ety list * Type.ety
 
@@ -502,6 +502,7 @@ end)
 
 let get_bty_info table (ty : Type.tmessage) : bty_info list =
   match ty with
+    | Type.Boolean -> []
     | Type.Message -> [Ty_large; Ty_name_fixed_length]
     | Type.TBase b -> BType.get_def (BType.cast_of_string b) table
     | Type.TUnivar _ | Type.TVar _ -> []

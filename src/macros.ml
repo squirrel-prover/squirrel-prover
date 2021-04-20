@@ -45,161 +45,140 @@ let is_defined name a table =
 
 (*------------------------------------------------------------------*)
 let get_def :
-  type a.  SystemExpr.system_expr -> Symbols.table ->
-  a Term.msymb -> Term.timestamp -> a Term.term =
+  SystemExpr.system_expr -> Symbols.table ->
+  Term.msymb -> Term.timestamp -> Term.message =
   fun system table symb a ->
-  match symb.s_typ with
-  | Type.KMessage ->
-    begin
-      match Symbols.Macro.get_all symb.s_symb table with
-      | Symbols.Input, _ -> assert false
-      | Symbols.Output, _ ->
-        begin match a with
-          | Term.Action (symb,indices) ->
-            let action = Action.of_term symb indices table in
-            let descr = 
-              SystemExpr.descr_of_action table system action 
-            in
-            snd descr.Action.output
-          | _ -> assert false
-        end
-        
-      | Symbols.Frame, _ ->
-          begin match a with
-            | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
-            | Term.Action _ ->
-              Term.mk_pair
-                (Term.Macro (symb, [], Term.Pred a))
-                (Term.mk_pair
-                   (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
-                   (Term.ITE (Term.Macro (Term.exec_macro, [], a),
-                              Term.Macro (Term.out_macro, [], a),
-                              Term.mk_zero)))
-                
-            | _ -> assert false
-          end
+  match Symbols.Macro.get_all symb.s_symb table with
+  | Symbols.Input, _ -> assert false
+  | Symbols.Output, _ ->
+    let symb, indices = oget (Term.destr_action a) in
+    let action = Action.of_term symb indices table in
+    let descr = 
+      SystemExpr.descr_of_action table system action 
+    in
+    snd descr.Action.output
 
-      | Symbols.State _, _ ->
-        begin match a with
-          | Term.Action (asymb,indices) ->
-            let action = Action.of_term asymb indices table in
-            let descr = 
-              SystemExpr.descr_of_action table system action 
-            in
-            begin try
-              (* Look for an update of the state macro [name] in the
-              updates of [action] *)
-              let (ns,msg) = List.find
-                (fun (ns,_) -> 
-                  ns.Term.s_symb = symb.s_symb && 
-                  ns.Term.s_typ = symb.s_typ
-                  && List.length symb.s_indices = List.length ns.Term.s_indices)
-                descr.Action.updates
-              in
-              (* update found:
-                 - if indices [args] of the macro we want
-                   to expand are equal to indices [is] corresponding to this macro
-                   in the action description, then the macro expanded as defined
-                   by the update term
-                 - otherwise, we need to take into account the possibility that
-                   [arg] and [is] might be equal, and generate a conditional *)
-              if symb.s_indices = ns.s_indices || a = Term.init then msg
-              else
-                Term.mk_ite
-                  (Term.mk_indices_eq symb.s_indices ns.s_indices)
-                  msg
-                  (Term.Macro (symb, [], Term.Pred a))
-              with Not_found ->
-                Term.Macro (symb, [], Term.Pred a)
-            end
-          | _ -> assert false
-        end
-        
-      | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
-        begin match a with
-          | Term.Action (tsymb,tidx) ->
-            let action = Action.of_term tsymb tidx table in
-            assert (List.length inputs <= List.length action) ;
-            let idx_subst =
-              List.map2
-                (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-                indices
-                symb.s_indices
-            in
-            let ts_subst = Term.ESubst (Term.Var ts, a) in
-            (* Compute the relevant part of the action, i.e. the
-             * prefix of length [length inputs], reversed. *)
-            let rev_action =
-              let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
-              drop (List.length action - List.length inputs) (List.rev action)
-            in
-            let subst,_ =
-              List.fold_left
-                (fun (subst,action) x ->
-                   let in_tm =
-                     Term.Macro (Term.in_macro,[],
-                                 SystemExpr.action_to_term table system
-                                   (List.rev action))
-                   in
-                   Term.ESubst (Term.Var x,in_tm) :: subst,
-                   List.tl action)
-                (ts_subst::idx_subst,rev_action)
-                inputs
-            in
-            let t = Term.subst subst body in
-            begin
-              let proj_t proj = Term.pi_term ~projection:proj t in
-              (* The expansion of the body of the macro only depends on the
-                 projections, not on the system names. *)
-              match system with
-              (* the body of the macro is expanded by projecting
-                 according to the projection in case of single systems. *)
-              | Single (s) -> proj_t (SystemExpr.get_proj s)
-              (* For diff cases, if the system corresponds to a left and a right
-                 projection of systems we can simply project the macro as is. *)
-              | SimplePair _
-              | Pair (Left _, Right _) -> proj_t PNone
-              (* If we do not have a left and right projection, we must
-                 reconstruct the body of the macros to have the correct
-                 definition on each side. *)
-              | Pair (s1, s2)  -> Term.Diff (proj_t (SystemExpr.get_proj s1),
-                                             proj_t (SystemExpr.get_proj s2))
-            end
-          | _ -> assert false
-        end
-      | Symbols.Local _, _ -> failwith "Not implemented"
-      |  _ -> assert false
-    end
+  | Symbols.Cond, _ ->
+    let symb, indices = oget (Term.destr_action a) in
+    let action = Action.of_term symb indices table in
+    let descr = 
+      SystemExpr.descr_of_action table system action 
+    in
+    snd Action.(descr.condition)
 
-  | Type.KBoolean ->
-    begin
-      match Symbols.Macro.get_all symb.s_symb table with
-      | Symbols.Cond, _ ->
-        begin match a with
-          | Term.Action (symb,indices) ->
-            let action = Action.of_term symb indices table in
-            let descr = 
-              SystemExpr.descr_of_action table system action 
-            in
-            snd Action.(descr.condition)
-          | _ -> assert false
-        end
-      | Symbols.Exec, _ ->
-        begin match a with
-          | Term.Action (s,_) when s = Symbols.init_action -> Term.True
-          | Term.Action _ ->
-            Term.And (Macro (symb,[], Term.Pred a),
-                      Macro (Term.cond_macro, [], a))
-          | _ -> assert false
-        end
+  | Symbols.Exec, _ ->
+    begin match a with
+      | Term.Action (s,_) when s = Symbols.init_action -> Term.True
+      | Term.Action _ ->
+        Term.And (Macro (symb,[], Term.Pred a),
+                  Macro (Term.cond_macro, [], a))
       | _ -> assert false
     end
-  | _ -> assert false
+
+  | Symbols.Frame, _ ->
+    begin match a with
+      | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_zero
+      | Term.Action _ ->
+        Term.mk_pair
+          (Term.Macro (symb, [], Term.Pred a))
+          (Term.mk_pair
+             (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
+             (Term.ITE (Term.Macro (Term.exec_macro, [], a),
+                        Term.Macro (Term.out_macro, [], a),
+                        Term.mk_zero)))
+
+      | _ -> assert false
+    end
+
+  | Symbols.State _, _ ->
+    let asymb, indices = oget (Term.destr_action a) in
+    let action = Action.of_term asymb indices table in
+    let descr = 
+      SystemExpr.descr_of_action table system action 
+    in
+    begin try
+        (* Look for an update of the state macro [name] in the
+           updates of [action] *)
+        let (ns,msg) = List.find
+            (fun (ns,_) -> 
+               ns.Term.s_symb = symb.s_symb && 
+               ns.Term.s_typ = symb.s_typ
+               && List.length symb.s_indices = List.length ns.Term.s_indices)
+            descr.Action.updates
+        in
+        (* update found:
+           - if indices [args] of the macro we want
+             to expand are equal to indices [is] corresponding to this macro
+             in the action description, then the macro expanded as defined
+             by the update term
+           - otherwise, we need to take into account the possibility that
+             [arg] and [is] might be equal, and generate a conditional *)
+        if symb.s_indices = ns.s_indices || a = Term.init then msg
+        else
+          Term.mk_ite
+            (Term.mk_indices_eq symb.s_indices ns.s_indices)
+            msg
+            (Term.Macro (symb, [], Term.Pred a))
+      with Not_found ->
+        Term.Macro (symb, [], Term.Pred a)
+    end
+
+  | Symbols.Global _, Global_data (inputs,indices,ts,body) ->
+    let tsymb, tidx = oget (Term.destr_action a) in
+    let action = Action.of_term tsymb tidx table in
+    assert (List.length inputs <= List.length action) ;
+    let idx_subst =
+      List.map2
+        (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
+        indices
+        symb.s_indices
+    in
+    let ts_subst = Term.ESubst (Term.Var ts, a) in
+    (* Compute the relevant part of the action, i.e. the
+         * prefix of length [length inputs], reversed. *)
+    let rev_action =
+      let rec drop n l = if n=0 then l else drop (n-1) (List.tl l) in
+      drop (List.length action - List.length inputs) (List.rev action)
+    in
+    let subst,_ =
+      List.fold_left
+        (fun (subst,action) x ->
+           let in_tm =
+             Term.Macro (Term.in_macro,[],
+                         SystemExpr.action_to_term table system
+                           (List.rev action))
+           in
+           Term.ESubst (Term.Var x,in_tm) :: subst,
+           List.tl action)
+        (ts_subst::idx_subst,rev_action)
+        inputs
+    in
+    let t = Term.subst subst body in
+    begin
+      let proj_t proj = Term.pi_term ~projection:proj t in
+      (* The expansion of the body of the macro only depends on the
+         projections, not on the system names. *)
+      match system with
+      (* the body of the macro is expanded by projecting
+         according to the projection in case of single systems. *)
+      | Single (s) -> proj_t (SystemExpr.get_proj s)
+      (* For diff cases, if the system corresponds to a left and a right
+         projection of systems we can simply project the macro as is. *)
+      | SimplePair _
+      | Pair (Left _, Right _) -> proj_t PNone
+      (* If we do not have a left and right projection, we must
+         reconstruct the body of the macros to have the correct
+         definition on each side. *)
+      | Pair (s1, s2)  -> Term.Diff (proj_t (SystemExpr.get_proj s1),
+                                     proj_t (SystemExpr.get_proj s2))
+    end
+
+  | Symbols.Local _, _ -> failwith "Not implemented"
+  |  _ -> assert false
 
 (*------------------------------------------------------------------*)
 let get_definition : type a. 
-  Constr.trace_cntxt -> 
-  a Term.msymb -> Term.timestamp -> a Term.term =
+  Constr.trace_cntxt -> Term.msymb -> Term.timestamp -> Term.message =
   fun cntxt symb ts ->
   let ts_action = 
     if is_defined symb.s_symb ts cntxt.table 

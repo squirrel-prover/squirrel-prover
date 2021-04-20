@@ -91,7 +91,7 @@ val map_descrs :
 exception SystemNotFresh
 
 type esubst_descr =
-  | Condition of Term.formula * Action.action
+  | Condition of Term.message * Action.action
   | Output of Term.message * Action.action
 
 type subst_descr = esubst_descr list

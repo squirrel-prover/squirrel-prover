@@ -206,7 +206,7 @@ let check_proc table env p =
 
     | Set (s, l, m, p) ->
       let k = Theory.check_state table s (List.length l) in
-      Theory.check table ~local:true env m k ;
+      Theory.check table ~local:true env m (Type.ETy k) ;
       List.iter (fun x ->
           Theory.check
             table ~local:true env
@@ -311,7 +311,7 @@ type p_env = {
     (* variables bound by existential quantification, after refresh *)
   action : Action.action ;
     (* the type [Action.action] describes the execution point in the protocol *)
-  facts : Term.formula list ;
+  facts : Term.message list ;
     (* list of formulas to create the condition term of the action,
      * indices and variables are the ones after the refresh *)
   updates : (lsymb * Vars.index list * Term.message) list ;
@@ -429,7 +429,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     let updates =
       List.map (fun (s,l,t) ->
-           Term.mk_isymb (Symbols.Macro.of_lsymb s table) Type.KMessage l,
+           Term.mk_isymb (Symbols.Macro.of_lsymb s table) Type.Message l,
            Term.subst (subst_ts @ subst_input) t
         ) env.updates
     in
@@ -575,7 +575,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       Theory.App (x', is)
     in
 
-    let n'_s = Term.mk_isymb x' Type.KMessage (List.rev env.indices) in
+    let n'_s = Term.mk_isymb x' Type.Message (List.rev env.indices) in
     let x'_tm = Term.Macro (n'_s, [], Term.Var ts) in
     let env =
       { env with msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }

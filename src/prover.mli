@@ -86,7 +86,7 @@ type option_name =
   | Oracle_for_symbol of string
 
 type option_val =
-  | Oracle_formula of Term.formula
+  | Oracle_formula of Term.message
 
 type option_def = option_name * option_val
 
@@ -171,7 +171,7 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 exception ParseError of string
 
-val get_goal_formula : lsymb -> formula * SystemExpr.system_expr
+val get_goal_formula : lsymb -> message * SystemExpr.system_expr
 
 val is_goal_formula : lsymb -> bool
 
@@ -215,7 +215,7 @@ val add_proved_goal : named_goal -> unit
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)
-val get_oracle_tag_formula : string -> Term.formula
+val get_oracle_tag_formula : string -> Term.message
 
 val pp_goal : Format.formatter -> unit -> unit
 

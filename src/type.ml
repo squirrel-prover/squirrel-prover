@@ -7,13 +7,11 @@
 type message   = [`Message]
 type index     = [`Index]
 type timestamp = [`Timestamp]
-type boolean   = [`Boolean]
 
 (*------------------------------------------------------------------*)
 (** Kinds of types *)
 type _ kind =
   | KMessage   : message   kind
-  | KBoolean   : boolean   kind
   | KIndex     : index     kind
   | KTimestamp : timestamp kind
 
@@ -41,7 +39,7 @@ let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp u
 type _ ty =
   (** Built-in types *)
   | Message   : message   ty
-  | Boolean   : boolean   ty
+  | Boolean   : message   ty
   | Index     : index     ty
   | Timestamp : timestamp ty
 
@@ -74,7 +72,7 @@ let ebase s   = ETy (TBase s)
 
 (*------------------------------------------------------------------*)
 let kind : type a. a ty -> a kind = function
-  | Boolean   -> KBoolean
+  | Boolean   -> KMessage
   | Index     -> KIndex
   | Timestamp -> KTimestamp
 
@@ -114,7 +112,6 @@ let equal : type a b. a ty -> b ty -> bool =
 (** Equality relation, and return a (Ocaml) type equality witness *)
 let equalk_w : type a b. a kind -> b kind -> (a,b) type_eq option =
  fun a b -> match a,b with
-   | KBoolean,   KBoolean   -> Some Type_eq
    | KIndex,     KIndex     -> Some Type_eq
    | KTimestamp, KTimestamp -> Some Type_eq
    | KMessage,   KMessage   -> Some Type_eq
@@ -156,7 +153,6 @@ let pp_kind : type a. Format.formatter -> a kind -> unit = fun ppf -> function
   | KMessage   -> Fmt.pf ppf "message"
   | KIndex     -> Fmt.pf ppf "index"
   | KTimestamp -> Fmt.pf ppf "timestamp"
-  | KBoolean   -> Fmt.pf ppf "bool"
 
 let pp_kinde ppf (EKind t) = pp_kind ppf t
 

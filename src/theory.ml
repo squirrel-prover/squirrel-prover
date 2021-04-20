@@ -451,11 +451,11 @@ let function_kind table (f : lsymb) : mf_type =
 
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
-let check_state table (s : lsymb) n : Type.ety =
+let check_state table (s : lsymb) n : Type.tmessage =
   match Symbols.def_of_lsymb s table with
-    | Symbols.(Exists (Macro (State (arity,kind)))) ->
+    | Symbols.(Exists (Macro (State (arity,ty)))) ->
         check_arity s n arity ;
-        kind
+        ty
         
     | _ -> conv_err (L.loc s) (Assign_no_state (L.unloc s))
 
@@ -995,15 +995,13 @@ and conv_app :
 
     | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
       begin match Type.kind ty with
-        | Type.KBoolean -> Term.True
-        | Type.KMessage -> Term.mk_true
+        | Type.KMessage -> Term.True
         | _ -> type_error ()
       end
 
     | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
       begin match Type.kind ty with
-        | Type.KBoolean -> Term.False
-        | Type.KMessage -> Term.mk_false
+        | Type.KMessage -> Term.False
         | _ -> type_error ()
       end
 
@@ -1054,7 +1052,7 @@ and conv_app :
               assert (ty_args = []);
               check_ty_leq state ~of_t:tm ty_out Type.Message;
               let indices = List.map (conv_index state) l in
-              let ms = Term.mk_isymb s (Type.kind ty) indices in
+              let ms = Term.mk_isymb s ty indices in
               Term.Macro (ms,[],get_at ())
 
             | Wrapped (s, Macro (Local (targs,_))) ->
@@ -1068,7 +1066,7 @@ and conv_app :
 
                   check_ty_leq state ~of_t:tm ty_out ty;
 
-                  let ms = Term.mk_isymb s (Type.kind ty) indices in
+                  let ms = Term.mk_isymb s ty indices in
                   
                   Term.Macro (ms,[],get_at ())
                 end
@@ -1079,7 +1077,7 @@ and conv_app :
                   
                   check_ty_leq state ~of_t:tm ty_out ty;
 
-                  let ms = Term.mk_isymb s (Type.kind ty) [] in
+                  let ms = Term.mk_isymb s ty [] in
                   
                   Term.Macro (ms,l,get_at ())
                 end
@@ -1100,36 +1098,26 @@ and conv_app :
               (* I am not sure of the location to use in
                  check_arity_i below  *)
               check_arity_i (L.loc f) "input" (List.length l) 0 ;
-              let ms = Term.mk_isymb s (Type.kind ty) [] in
+              let ms = Term.mk_isymb s ty [] in
               Term.Macro (ms,[],ts)
 
             | Wrapped (s, Macro (Global arity)) ->
               check_arity f (List.length l) arity ;
               let l = List.map (conv_index state) l in
 
-              let ms = Term.mk_isymb s (Type.kind ty) l in
+              let ms = Term.mk_isymb s ty l in
               Term.Macro (ms,[],ts)
 
             | Wrapped (s, Macro (Local (targs,_))) ->
               (* TODO as above *)
               assert false
 
-            | Wrapped (s, Macro (Cond|Exec)) -> type_error ()
-
-            | Wrapped (_, _) -> raise ts_unexpected
-          end
-
-        | Type.KBoolean ->
-          begin match of_lsymb f state.table with
             | Wrapped (s, Macro (Cond|Exec)) ->
-              (* I am not sure of the location to use in
+              (* FIXME: I am not sure of the location to use in
                   check_arity_i below  *)
               check_arity_i (L.loc f) "cond" (List.length l) 0 ;
-              let ms = Term.mk_isymb s (Type.kind ty) [] in
+              let ms = Term.mk_isymb s ty [] in
               Term.Macro (ms,[],ts)
-
-            | Wrapped (s, Macro (Input|Output|Frame|Global _)) ->
-              type_error ()
 
             | Wrapped (_, _) -> raise ts_unexpected
           end
@@ -1137,8 +1125,8 @@ and conv_app :
       end
 
     | Get (s,opt_ts,is) ->
+      (* TODO: types: what about k ?*)
       let k = check_state state.table s (List.length is) in
-      assert (k = Type.emessage) ;
       let is = List.map (conv_index state) is in
       let s = get_macro state.table s in
       let ts =
@@ -1149,7 +1137,7 @@ and conv_app :
       in
       begin match Type.kind ty with
         | Type.KMessage -> 
-          let ms = Term.mk_isymb s (Type.kind ty) is in
+          let ms = Term.mk_isymb s ty is in
           Term.Macro (ms,[],ts)
 
         | _ -> type_error ()
@@ -1368,7 +1356,6 @@ let subst_of_env (env : Vars.env) : esubst list =
     | Type.KIndex     -> ESubst (Vars.name v,Term.Var v)
     | Type.KTimestamp -> ESubst (Vars.name v,Term.Var v)
     | Type.KMessage   -> ESubst (Vars.name v,Term.Var v)
-    | Type.KBoolean   -> assert false
     in
   List.map to_subst (Vars.to_list env)
 
@@ -1410,14 +1397,14 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
     Symbols.Macro.declare_exact table
       s
       ~data
-      (Symbols.State (List.length typed_args,Type.ETy ty)) in
+      (Symbols.State (List.length typed_args,ty)) in
   table
 
 let get_init_states table : (Term.state * Term.message) list =
   Symbols.Macro.fold (fun s def data acc -> 
       match (def,data) with
       | ( Symbols.State (arity,kind), StateInit_data (l,t) ) ->
-        let state = Term.mk_isymb s Type.KMessage l in
+        let state = Term.mk_isymb s Type.Message l in
         (state,t) :: acc
       | _ -> acc
     ) [] table
@@ -1449,9 +1436,8 @@ let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
   (* parse the macro type *)
   let Type.ETy ty = parse_p_ty0 table [] pty in
   let () = match Type.kind ty with
-    | Type.KBoolean | Type.KMessage -> ()
-    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KMessage;
-                                         Type.EKind Type.KBoolean])
+    | Type.KMessage -> ()
+    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KMessage])
   in
 
   let table, _ =

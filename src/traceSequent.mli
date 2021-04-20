@@ -20,7 +20,7 @@ val pp : Format.formatter -> sequent -> unit
 (** [init formula table] returns a sequent with an empty set of hypotheses, and 
     the given formula as conclusion. *)
 val init : 
-  system:SystemExpr.system_expr -> Symbols.table -> formula -> sequent
+  system:SystemExpr.system_expr -> Symbols.table -> message -> sequent
   
 (** Get the system which the sequent is reasoning about. *)
 val system : sequent -> SystemExpr.system_expr
@@ -47,10 +47,10 @@ val set_env : Vars.env -> sequent -> sequent
 val env : sequent -> Vars.env
 
 (** [set_conclusion f s] set the conclusion formula of the sequent to [f]. *)
-val set_conclusion : formula -> sequent -> sequent
+val set_conclusion : message -> sequent -> sequent
 
 (** [conclusion s] returns the conclusion formula of the sequent. *)
-val conclusion : sequent -> formula
+val conclusion : sequent -> message
 
 
 (*------------------------------------------------------------------*)
@@ -65,7 +65,7 @@ val conclusion : sequent -> formula
     The new sequent will be automatically enriched with equalities 
     expressing relevant macro definitions, as well as conditions of all 
     named actions that are assumed to happen. *)
-module Hyps : Hyps.HypsSeq with type hyp = Term.formula and type sequent = t
+module Hyps : Hyps.HypsSeq with type hyp = Term.message and type sequent = t
 
  
 (*------------------------------------------------------------------*)

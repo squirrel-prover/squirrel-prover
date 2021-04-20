@@ -249,7 +249,7 @@ let action_to_term table system a =
 (** A substition over a description that allows to either substitute the condition
    or the output of the descr, for a given shape. *)
 type esubst_descr =
-  | Condition of Term.formula * Action.action
+  | Condition of Term.message * Action.action
   | Output of Term.message * Action.action
 
 type subst_descr = esubst_descr list

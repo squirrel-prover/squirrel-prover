@@ -13,7 +13,7 @@ type 'a var = {
 
 type index     = Type.index     var
 type message   = Type.message   var
-type boolean   = Type.boolean   var
+type boolean   = Type.message   var
 type timestamp = Type.timestamp var
 
 type evar = EVar : 'a var -> evar

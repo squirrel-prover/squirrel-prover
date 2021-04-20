@@ -167,7 +167,7 @@ type descr = {
   action    : action ;
   input     : Channel.t * string ;
   indices   : Vars.index list ;
-  condition : Vars.index list * Term.formula ;
+  condition : Vars.index list * Term.message ;
   updates   : (Term.state * Term.message) list ;
   output    : Channel.t * Term.message
 }

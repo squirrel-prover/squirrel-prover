@@ -44,7 +44,7 @@ the protocol and the messages. All occurences of the key must either be inside
 the hash function, or under some public key function.*)
 val key_ssc :
   ?allow_vars : bool ->
-  ?messages:(Term.message list) -> ?elems:(Equiv.elem list) ->
+  ?messages:(Term.message list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> Term.name -> unit
@@ -52,7 +52,7 @@ val key_ssc :
 (** Same as [key_ssc] but returns a boolean. *)
 val check_key_ssc :
   ?allow_vars : bool ->
-  ?messages:(Term.message list) -> ?elems:(Equiv.elem list) ->
+  ?messages:(Term.message list) -> ?elems:Equiv.equiv ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
   Term.fname -> Term.name -> bool
@@ -62,7 +62,7 @@ val check_key_ssc :
    not contain anymore the head_fn function, else they still do.  TODO:
    memoisation *)
 val mk_rule :
-  ?elems:Equiv.elem list ->
+  ?elems:Equiv.equiv ->
   ?drop_head:bool ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->

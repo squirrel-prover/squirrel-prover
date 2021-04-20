@@ -230,7 +230,7 @@ val pp_error :
 type env = (string * Type.ety) list
 
 val check : Symbols.table -> ?local:bool -> env -> term -> Type.ety -> unit
-val check_state : Symbols.table -> lsymb -> int -> Type.ety
+val check_state : Symbols.table -> lsymb -> int -> Type.tmessage
 
 (* Returns true if the given function names corresponds to some associated
    checksign and pk functions, returns Some sign, where sign is the

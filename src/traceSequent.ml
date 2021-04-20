@@ -44,7 +44,7 @@ let choose_name f = match f with
 
 (*------------------------------------------------------------------*)
 module FHyp = struct
-  type t = Term.formula
+  type t = Term.message
   let pp_hyp fmt f = Term.pp fmt f
 
   let htrue = Term.True
@@ -64,7 +64,7 @@ module S : sig
     hyps : H.hyps;
     (** Hypotheses *)
     
-    conclusion : Term.formula;
+    conclusion : Term.message;
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
@@ -80,7 +80,7 @@ module S : sig
     ?table:Symbols.table ->
     ?env:Vars.env ->
     ?hyps:H.hyps ->
-    ?conclusion:Term.formula ->
+    ?conclusion:Term.message ->
     t -> t
 end = struct
   type t = {
@@ -88,7 +88,7 @@ end = struct
     table        : Symbols.table;
     env          : Vars.env;
     hyps         : H.hyps;
-    conclusion   : Term.formula;
+    conclusion   : Term.message;
   }
 
   let init_sequent system table = {
@@ -246,11 +246,11 @@ let get_all_messages s =
 
 (*------------------------------------------------------------------*)  
 module Hyps 
-  (* : Hyps.HypsSeq with type hyp = Term.formula and type sequent = t *)
+  (* : Hyps.HypsSeq with type hyp = Term.message and type sequent = t *)
 = struct
   type sequent = t
 
-  type hyp = Term.formula
+  type hyp = Term.message
 
   type ldecl = Ident.t * hyp
 
@@ -316,14 +316,14 @@ module Hyps
         then
           let def = Macros.get_definition cntxt ms a in
           f a (`Boolean (t, def)) ;
-          self#visit_formula def
-      | t -> super#visit_formula t
+          self#visit_message def
+      | t -> super#visit_message t
   end
 
   (** Add to [s] equalities corresponding to the expansions of all macros
     * occurring in [f], if [f] happened. *)
   let rec add_macro_defs (s : sequent) f =
-    let macro_eqs : (Term.timestamp * Term.formula) list ref = ref [] in
+    let macro_eqs : (Term.timestamp * Term.message) list ref = ref [] in
     let cntxt = Constr.{ 
         table = s.table;
         system = s.system;
@@ -339,7 +339,7 @@ module Hyps
            |`Boolean (f,f') -> () (* TODO: add that f <=> f' *)
         ) in
     
-    iter#visit_formula f ;
+    iter#visit_message f ;
     
     List.fold_left (fun s (a,f) -> 
         if query_happens ~precise:true s a 
@@ -348,7 +348,7 @@ module Hyps
       ) s !macro_eqs
 
   and add_form_aux
-      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.formula) =
+      ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
     let recurse = not (H.is_hyp f s.hyps) && (Config.auto_intro ()) in
     (* let recurse = not (H.is_hyp f s.hyps) in *)
 
@@ -458,7 +458,7 @@ let set_conclusion a s =
       | Term.Atom Term.(#message_atom) -> Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system table (goal : Term.formula) =
+let init ~system table (goal : Term.message) =
   set_conclusion goal (init_sequent system table)
 
 let conclusion s = s.conclusion

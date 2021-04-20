@@ -25,10 +25,10 @@ end
 let symenc_key_ssc ?(messages=[]) ?(elems=[]) ~cntxt enc_fn dec_fn key_n =
   let ssc = new check_symenc_key ~cntxt enc_fn dec_fn key_n in
   List.iter ssc#visit_message messages ;
-  List.iter ssc#visit_term elems ;
+  List.iter ssc#visit_message elems ;
   SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
-       ssc#visit_formula (snd action_descr.condition) ;
+       ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
@@ -61,10 +61,10 @@ let random_ssc
     ~cntxt enc_fn randoms =
   let ssc = new check_rand ~allow_vars ~cntxt enc_fn randoms in
   List.iter ssc#visit_message messages;
-  List.iter ssc#visit_term elems;
+  List.iter ssc#visit_message elems;
   SystemExpr.(iter_descrs cntxt.table cntxt.system
     (fun action_descr ->
-       ssc#visit_formula (snd action_descr.condition) ;
+       ssc#visit_message (snd action_descr.condition) ;
        ssc#visit_message (snd action_descr.output) ;
        List.iter (fun (_,t) -> ssc#visit_message t) action_descr.updates))
 
