@@ -19,7 +19,10 @@ type p_ty_i =
 
 type p_ty = p_ty_i L.located
     
-val parse_p_ty : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
+val parse_p_ty0 : Symbols.table -> Type.tvar list -> p_ty -> Type.ety 
+
+val parse_p_ty : 
+  Symbols.table -> Type.tvar list -> p_ty -> 'a Type.kind -> 'a Type.ty 
 
 val pp_p_ty : Format.formatter -> p_ty -> unit
 
@@ -145,19 +148,17 @@ val declare_signature :
   lsymb -> lsymb -> lsymb ->
   Symbols.table
 
-(** [declare_name n i] declares a new name of type
+(** [declare_name n ndef] declares a new name of type
   * [index^i -> message]. *)
-val declare_name :
-  Symbols.table -> lsymb -> int -> Symbols.table
+val declare_name : Symbols.table -> lsymb -> Symbols.name_def -> Symbols.table
 
 (** [declare_state n [(x1,s1);...;(xn;sn)] s t] declares
     a new state symbol of type [s1->...->sn->s]
     where [si] is [index] and [s] is [message]
     such that value of [s(t1,...,tn)] for init timestamp
     expands to [t\[x1:=t1,...,xn:=tn\]]. *)
-val declare_state :
-  Symbols.table -> lsymb -> bnds -> p_ty -> term
-  -> Symbols.table
+val declare_state : 
+  Symbols.table -> lsymb -> bnds -> p_ty -> term -> Symbols.table
        
 (** [get_init_states] returns all the initial values of declared state symbols,
     used to register the init action *)

@@ -19,6 +19,8 @@ type ('a,'b) isymb = {
   s_typ     : 'b; 
 }
 
+val mk_isymb : 'a -> 'b -> Vars.index list -> ('a,'b) isymb
+
 (** Names represent random values of length the security parameter. *)
 
 type name = Symbols.name Symbols.t
@@ -222,6 +224,9 @@ val subst : subst -> 'a term -> 'a term
   * and [v] if the variable is not in the domain of the substitution.
   * @raise Substitution_error if [v] is mapped to a non-variable term in [s]. *)
 val subst_var : subst -> 'a Vars.var -> 'a Vars.var
+
+(** Substitute indices in an indexed symbols. *)
+val subst_isymb : subst -> ('a,'b) isymb -> ('a,'b) isymb
 
 (** [subst_macros_ts table l ts t] replaces [ts] by [pred(ts)] in the term [t]
   * if [ts] is applied to a state macro whose name is NOT in [l]. *)

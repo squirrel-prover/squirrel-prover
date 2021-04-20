@@ -79,6 +79,12 @@ type bty_info =
 type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
+type name_def = { 
+  n_iarr : int;                  (* index arity *)
+  n_ty   : Type.message Type.ty; (* type *)
+}
+
+(*------------------------------------------------------------------*)
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State of int * Type.ety
@@ -96,7 +102,7 @@ type macro_def =
   * Integers refer to the index arity of symbols. *)
 type _ def =
   | Channel  : unit      -> channel def
-  | Name     : int       -> name    def
+  | Name     : name_def  -> name    def
   | Action   : int       -> action  def
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
@@ -218,13 +224,15 @@ end
 
 module Channel  : Namespace with type def = unit    with type ns = channel
 module BType    : Namespace with type def = bty_def with type ns = btype
-module Name     : Namespace with type def = int     with type ns = name
 module Action   : Namespace with type def = int     with type ns = action
 module System   : Namespace with type def = unit    with type ns = system
 module Process  : Namespace with type def = unit    with type ns = process
+
 module Function : Namespace
   with type def = Type.ftype * function_def with type ns = fname
+
 module Macro    : Namespace with type def = macro_def with type ns = macro
+module Name     : Namespace with type def = name_def with type ns = name
 
 (*------------------------------------------------------------------*)
 (** {2 Error Handling} *)

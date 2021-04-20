@@ -23,7 +23,7 @@ type formula = Theory.formula
 (*------------------------------------------------------------------*)
 type process_i =
   | Null
-  | New of lsymb * process
+  | New of lsymb * Theory.p_ty * process
   | In  of Channel.p_channel * lsymb * process
   | Out of Channel.p_channel * term * process
   | Set of lsymb * lsymb list * term * process
@@ -65,10 +65,17 @@ let rec pp_process ppf process =
       Theory.pp t
       pp_process p
 
-  | New (s, p) ->
+  | New (s, t, p) when L.unloc t = Theory.P_message ->
     pf ppf "@[<hov>%a %a;@ @[%a@]@]"
       (kw `Red) "new"
       (kw `Magenta) (L.unloc s)
+      pp_process p
+
+  | New (s, t, p) ->
+    pf ppf "@[<hov>%a %a : %a;@ @[%a@]@]"
+      (kw `Red) "new"
+      (kw `Magenta) (L.unloc s)
+      Theory.pp_p_ty t
       pp_process p
 
   | In (c, s, p) ->
@@ -135,11 +142,12 @@ type proc_error = L.t * proc_error_i
 let pp_proc_error_i fmt = function
   | StrictAliasError s -> Fmt.pf fmt "strict alias error: %s" s
 
-  | Arity_error (s,i,j) -> Fmt.pf fmt "process %s used with arity %i, but \
-                                       defined with arity %i" s i j
+  | Arity_error (s,i,j) -> 
+    Fmt.pf fmt "process %s used with arity %i, but \
+                defined with arity %i" s i j
 
-  | DuplicatedUpdate s -> Fmt.pf fmt "state %s can only be updated once \
-                                      in an action" s
+  | DuplicatedUpdate s -> 
+    Fmt.pf fmt "state %s can only be updated once in an action" s
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aproc error: %a."
@@ -177,7 +185,10 @@ let check_proc table env p =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
-    | New (x, p) -> check_p ((L.unloc x, Type.emessage)::env) p
+    | New (x, ty, p) -> 
+      let ty = Theory.parse_p_ty table [] ty Type.KMessage in
+      check_p ((L.unloc x, Type.ETy ty)::env) p
+
     | In (_,x,p) -> check_p ((L.unloc x, Type.emessage)::env) p
     | Out (_,m,p)
     | Alias (L.{ pl_desc = Out (_,m,p) },_) ->
@@ -199,8 +210,10 @@ let check_proc table env p =
       check_p env p
     | Parallel (p, q) -> check_p env p ; check_p env q
     | Let (x, t, p) ->
+      (* TODO: types *)
       Theory.check table ~local:true env t Type.emessage ;
       check_p ((L.unloc x, Type.emessage)::env) p
+
     | Repl (x, p) -> check_p ((L.unloc x, Type.eindex)::env) p
     | Exists (vars, test, p, q) ->
       check_p env q ;
@@ -211,6 +224,7 @@ let check_proc table env p =
       in
       Theory.check table ~local:true env test Type.eboolean ;
       check_p env p
+
     | Apply (id, ts) ->
       let kind,_ = find_process0 table id in
       if List.length kind <> List.length ts then
@@ -221,6 +235,7 @@ let check_proc table env p =
         (fun (_, k) t -> Theory.check table ~local:true env t k)
         kind ts
   in
+
   check_p env p
 
 let declare table (id : lsymb) args proc =
@@ -405,11 +420,10 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let updates =
-      List.map
-        (fun (s,l,t) ->
-          (Symbols.Macro.of_lsymb s table, Type.KMessage, l),
-           Term.subst (subst_ts @ subst_input) t)
-        env.updates
+      List.map (fun (s,l,t) ->
+           Term.mk_isymb (Symbols.Macro.of_lsymb s table) Type.KMessage l,
+           Term.subst (subst_ts @ subst_input) t
+        ) env.updates
     in
 
     debug "updates = %a.@."
@@ -491,19 +505,24 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
     (table,env,p)
 
-  | New (n,p) ->
+  | New (n, pty, p) ->
+    let ty = Theory.parse_p_ty table [] pty Type.KMessage in
+
     (* TODO getting a globally fresh symbol for the name
      * does not prevent conflicts with variables bound in
      * the process (in Repl, Let, In...) *)
-    let table,n' =
-      Symbols.Name.declare table n (List.length env.indices) in
+    let ndef = Symbols.{ n_iarr = List.length env.indices; 
+                         n_ty   = ty; } in
+
+    let table,n' = Symbols.Name.declare table n ndef in
     let n'_th =
       let n' = L.mk_loc (L.loc n) (Symbols.to_string n') in
       Theory.App
         ( n',
           List.rev_map (fun i -> Theory.var dum (Vars.name i)) env.indices )
-    in
-    let n'_tm = Term.Name (n',List.rev env.indices) in
+    in    
+    let n'_s = Term.mk_isymb n' ty (List.rev env.indices) in
+    let n'_tm = Term.Name n'_s in
     let env = { env with msubst = (L.unloc n,n'_th,n'_tm) :: env.msubst }
     in
     (table,env,p)
@@ -528,15 +547,18 @@ let parse_proc (system_name : System.system_name) init_table proc =
       then Theory.find_app_terms t' (List.map (fun (s,_,_) -> L.unloc s) env.updates)
       else []
     in
+
     let body =
       Term.subst_macros_ts table updated_states (Term.Var ts)
         (conv_term table env (Term.Var ts) t Type.Message)
     in
+
     let invars = List.map snd env.inputs in
     let table,x' =
       Macros.declare_global table x ~inputs:invars
         ~indices:(List.rev env.indices) ~ts body
     in
+
     let x'_th =
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
       let is =
@@ -544,10 +566,9 @@ let parse_proc (system_name : System.system_name) init_table proc =
       in
       Theory.App (x', is)
     in
-    let x'_tm =
-      Term.Macro ((x', Type.KMessage, List.rev env.indices), [],
-                  Term.Var ts)
-    in
+
+    let n'_s = Term.mk_isymb x' Type.KMessage (List.rev env.indices) in
+    let x'_tm = Term.Macro (n'_s, [], Term.Var ts) in
     let env =
       { env with msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }
     in

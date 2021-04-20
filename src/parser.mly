@@ -223,22 +223,37 @@ sep:
 top_process:
 | p=process EOF                    { p }
 
+colon_ty:
+| COLON t=p_ty { t }
+
 process_i:
 | NULL                             { Process.Null }
 | LPAREN ps=processes_i RPAREN     { ps }
 | id=lsymb terms=term_list         { Process.Apply (id,terms) }
 | id=lsymb COLON p=process         { Process.Alias (p,id) }
-| NEW id=lsymb SEMICOLON p=process { Process.New (id,p) }
+
+| NEW id=lsymb ty=colon_ty? SEMICOLON p=process
+    { let ty = match ty with
+        | Some ty -> ty
+        | None -> L.mk_loc (L.loc id) Theory.P_message 
+      in
+      Process.New (id,ty,p) }
+
 | IN LPAREN c=lsymb COMMA id=lsymb RPAREN p=process_cont
     { Process.In (c,id,p) }
+
 | OUT LPAREN c=lsymb COMMA t=term RPAREN p=process_cont
     { Process.Out (c,t,p) }
+
 | IF f=term THEN p=process p0=else_process
     { Process.Exists ([],f,p,p0) }
+
 | FIND is=indices SUCHTHAT f=term IN p=process p0=else_process
     { Process.Exists (is,f,p,p0) }
+
 | LET id=lsymb EQ t=term IN p=process
     { Process.Let (id,t,p) }
+
 | id=lsymb terms=term_list ASSIGN t=term p=process_cont
     { let to_idx t = match L.unloc t with
         | Theory.App(x,[]) -> x
@@ -246,6 +261,7 @@ process_i:
       in
       let l = List.map to_idx terms in
       Process.Set (id,l,t,p) }
+
 | s=loc(BANG) p=process { Process.Repl (s,p) }
 
 process:
@@ -274,8 +290,9 @@ opt_arg_list:
 |                                { [] }
 
 name_type:
-| MESSAGE                        { 0 }
-| INDEX ARROW t=name_type        { 1 + t }
+| ty=p_ty                     { 0,ty }
+| INDEX ARROW t=name_type     { let i,ty = t in
+                                1 + i,ty }
 
 ty_var:
 | TICK id=lsymb     { id }
@@ -334,7 +351,8 @@ declaration_i:
                           { Decl.Decl_sign (s, c, p, Some f) }
 
 | NAME e=lsymb COLON t=name_type
-                          { Decl.Decl_name (e, t) }
+                          { let a,ty = t in 
+                            Decl.Decl_name (e, a, ty) }
 
 | TYPE e=lsymb infos=bty_infos 
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }

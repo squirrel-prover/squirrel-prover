@@ -66,6 +66,11 @@ val pp : Format.formatter -> 'a ty -> unit
 val pp_e : Format.formatter -> ety -> unit
 
 (*------------------------------------------------------------------*)
+type tmessage   = message   ty
+type ttimestamp = timestamp ty
+type tindex     = index     ty
+
+(*------------------------------------------------------------------*)
 val eboolean   : ety
 val emessage   : ety
 val etimestamp : ety
@@ -133,7 +138,7 @@ end
 *)
 type 'a ftype_g = private {
   fty_iarr : int;             (** i *)
-  fty_vars : 'a list;         (** a₁ ... 'aₙ *)  
+  fty_vars : 'a list;         (** 'a₁ ... 'aₙ *)  
   fty_args : message ty list; (** τ₁ × ... × τₙ *)
   fty_out  : message ty;      (** τ *)
 }

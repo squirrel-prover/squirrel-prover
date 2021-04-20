@@ -18,6 +18,12 @@ type ('a,'b) isymb = {
   s_typ     : 'b; 
 }
 
+let mk_isymb s t is = {
+  s_symb    = s; 
+  s_typ     = t;
+  s_indices = is; 
+} 
+
 type name = Symbols.name Symbols.t
 type nsymb = (name, Type.message Type.ty) isymb
                               
@@ -675,7 +681,11 @@ let subst_var : type a. subst -> a Vars.var -> a Vars.var =
     | _ -> raise @@ Substitution_error
         "Must map the given variable to another variable"
 
-let subst_macro (s:subst) isymb =
+let subst_isymb (s : subst) (symb : ('a,'b) isymb) : ('a,'b) isymb =
+  { symb with s_indices = List.map (subst_var s) symb.s_indices }
+
+
+let subst_macro (s : subst) isymb =
   { isymb with s_indices = List.map (subst_var s) isymb.s_indices }
 
 (*------------------------------------------------------------------*)
@@ -1073,9 +1083,9 @@ module Match = struct
 
         | Macro (s, terms, ts), 
           Macro (s', terms', ts') -> 
-          assert (Type.equalk s.s_typ s'.s_typ);
-
           let mv = isymb_match s s' mv in
+          assert (Type.equalk s.s_typ s'.s_typ);          
+
           tmatch ts ts' (tmatch_l terms terms' mv)
 
         | Seq _, _ -> raise NoMatch

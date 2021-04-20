@@ -295,25 +295,26 @@ module Hyps
     inherit Iter.iter ~cntxt as super
     method visit_message t =
       match t with
-      | Term.Macro ((m,sort,is),[],a) ->
+      | Term.Macro (ms,[],a) ->
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
             (Term.get_vars t) &&
-           Macros.is_defined m a cntxt.table
+           Macros.is_defined ms.s_symb a cntxt.table
         then
-          let def = Macros.get_definition cntxt sort m is a in
+          let def = Macros.get_definition cntxt ms a in
           f a (`Message (t, def)) ;
           self#visit_message def
+
       | t -> super#visit_message t
     method visit_formula t = 
       match t with
-      | Term.Macro ((m,sort,is),[],a) -> 
+      | Term.Macro (ms,[],a) -> 
         if List.for_all
             Vars.(function EVar v -> not (is_new v))
             (Term.get_vars t) &&
-           Macros.is_defined m a cntxt.table
+           Macros.is_defined ms.s_symb a cntxt.table
         then
-          let def = Macros.get_definition cntxt sort m is a in
+          let def = Macros.get_definition cntxt ms a in
           f a (`Boolean (t, def)) ;
           self#visit_formula def
       | t -> super#visit_formula t

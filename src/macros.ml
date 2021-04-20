@@ -89,11 +89,11 @@ let get_def :
             begin try
               (* Look for an update of the state macro [name] in the
               updates of [action] *)
-              let ((n,s,is),msg) = List.find
-                (fun ((n,s,is),_) ->
-                  n = symb.s_symb && 
-                  s = symb.s_typ
-                  && List.length symb.s_indices = List.length is)
+              let (ns,msg) = List.find
+                (fun (ns,_) -> 
+                  ns.Term.s_symb = symb.s_symb && 
+                  ns.Term.s_typ = symb.s_typ
+                  && List.length symb.s_indices = List.length ns.Term.s_indices)
                 descr.Action.updates
               in
               (* update found:
@@ -103,10 +103,10 @@ let get_def :
                    by the update term
                  - otherwise, we need to take into account the possibility that
                    [arg] and [is] might be equal, and generate a conditional *)
-              if symb.s_indices = is || a = Term.init then msg
+              if symb.s_indices = ns.s_indices || a = Term.init then msg
               else
                 Term.mk_ite
-                  (Term.mk_indices_eq symb.s_indices is)
+                  (Term.mk_indices_eq symb.s_indices ns.s_indices)
                   msg
                   (Term.Macro (symb, [], Term.Pred a))
               with Not_found ->

@@ -132,11 +132,11 @@ let check_encryption_randomness
     Tactics.soft_failure (Tactics.SEncSharedRandom)
 
 
-let symenc_rnd_ssc ~cntxt env head_fn key_n key_is elems =
+let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
     Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
       ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
-      ~head_fn ~key_n ~key_is
+      ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in
   check_encryption_randomness ~cntxt
     rule.Euf.case_schemata rule.Euf.cases_direct head_fn [] elems

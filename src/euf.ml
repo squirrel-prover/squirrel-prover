@@ -24,7 +24,7 @@ class check_key
     | Term.Fun ((fn,_), _, [_; Term.Name _])
     | Term.Fun ((fn,_), _, [_; Term.Diff (Term.Name _, Term.Name _)])
       when allow_functions fn -> ()
-    | Term.Name (n,_) when n = key_n -> raise Bad_ssc
+    | Term.Name n when n.s_symb = key_n -> raise Bad_ssc
     | Term.Var m -> if not(allow_vars) then raise Bad_ssc
     | _ -> super#visit_message t
 end

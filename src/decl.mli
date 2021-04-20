@@ -64,7 +64,7 @@ type declaration_i =
   | Decl_senc             of lsymb * lsymb
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
   | Decl_sign             of lsymb * lsymb * lsymb * orcl_tag_info option
-  | Decl_name             of lsymb * int
+  | Decl_name             of lsymb * int * Theory.p_ty
   | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
   | Decl_macro            of macro_decl

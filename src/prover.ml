@@ -690,7 +690,7 @@ let make_equiv_goal
   let env =
     List.fold_left (fun env (x, s) ->
         let x = L.unloc x in
-        let Type.ETy s = Theory.parse_p_ty table [] s in
+        let Type.ETy s = Theory.parse_p_ty0 table [] s in
         assert (not (Vars.mem env x)) ;
         fst (Vars.make_fresh env s x)
       ) Vars.empty_env env
@@ -881,7 +881,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
 
     let in_tys =
       List.map (fun pty ->
-          L.loc pty, Theory.parse_p_ty table ty_args pty
+          L.loc pty, Theory.parse_p_ty0 table ty_args pty
         ) in_tys
     in
 
@@ -906,10 +906,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     let iarr, in_tys = parse_index_prefix 0 in_tys in
 
     let out_ty : Type.message Type.ty =
-      match Theory.parse_p_ty table ty_args out_ty with
-      | Type.ETy ty -> match Type.kind ty with
-        | Type.KMessage -> ty
-        | _ -> decl_error (L.loc out_ty) KDecl InvalidAbsType
+      Theory.parse_p_ty table ty_args out_ty Type.KMessage 
     in
     
     Theory.declare_abstract
@@ -926,7 +923,7 @@ let declare_i table decl = match L.unloc decl with
   | Decl.Decl_channel s            -> Channel.declare table s
   | Decl.Decl_process (id,pkind,p) ->
     let pkind = List.map (fun (x,t) ->
-        let t = Theory.parse_p_ty table [] t in
+        let t = Theory.parse_p_ty0 table [] t in
         L.unloc x, t
       ) pkind in
     Process.declare table id pkind p
@@ -954,7 +951,9 @@ let declare_i table decl = match L.unloc decl with
 
   | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
   | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
-  | Decl.Decl_name (s, a)           -> Theory.declare_name table s a
+  | Decl.Decl_name (s, a, pty) ->
+    let ty = Theory.parse_p_ty table [] pty Type.KMessage in    
+    Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
 
   | Decl.Decl_state (s, args, k, t) ->
     Theory.declare_state table s args k t

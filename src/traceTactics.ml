@@ -280,17 +280,14 @@ let message_case (m : Term.message) s : c_res list =
   begin match m with
     | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
     | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
-    | Term.Macro ((m,Type.KMessage,is),[],ts) as o
-      when Macros.is_defined m ts (TraceSequent.table s) ->
+    | Term.Macro (ms,[],ts) as o
+      when Macros.is_defined ms.s_symb ts (TraceSequent.table s) 
+        && ms.s_typ = Type.KMessage ->
       if not (TraceSequent.query_happens ~precise:true s ts) 
       then soft_failure (Tactics.MustHappen ts)
       else
-        begin match
-            Macros.get_definition
-              (mk_trace_cntxt s)
-              Type.KMessage
-              m is ts
-          with
+        begin 
+          match Macros.get_definition (mk_trace_cntxt s) ms ts with
           | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
           | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
           | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
@@ -1070,13 +1067,13 @@ let do_targets doit (s : sequent) targets : sequent * sequent list =
 (*------------------------------------------------------------------*)
 let unfold_macro t (s : sequent) =
   match t with
-    | Macro ((mn, sort, is),l,a) ->
+    | Macro (ms,l,a) ->
       if not (TraceSequent.query_happens ~precise:true s a) then
         soft_failure (Tactics.MustHappen a);
       
-      let mdef = Macros.get_definition (mk_trace_cntxt s) sort mn is a in
+      let mdef = Macros.get_definition (mk_trace_cntxt s) ms a in
 
-      [Term.ESubst (Macro ((mn, sort, is),l,a), mdef)]
+      [Term.ESubst (Macro (ms,l,a), mdef)]
       
     | _ -> 
       soft_failure (Tactics.Failure "can only expand macros")
@@ -1101,7 +1098,8 @@ let find_occs_macro
   fun m ?st t -> 
   let rec find st (ETerm t) = 
     let st = match t with
-      | Macro ((m',_,_), _, _) when m' = m -> Term.St.add (Term.ETerm t) st
+      | Macro (ms', _, _) when ms'.s_symb = m -> 
+        Term.St.add (Term.ETerm t) st
       | _ -> st in
     Term.tfold (fun t st -> find st t) t st
   in
@@ -1390,8 +1388,8 @@ let () = T.register "eqtrace"
 
 (*------------------------------------------------------------------*)
 let fresh_param m1 m2 = match m1,m2 with
-  | Name (n,is), _ -> (n,is,m2)
-  | _, Name (n,is) -> (n,is,m1)
+  | Name ns, _ -> (ns.s_symb, ns.s_indices, m2)
+  | _, Name ns -> (ns.s_symb, ns.s_indices, m1)
   | _ ->
     soft_failure
       (Tactics.Failure "can only be applied on hypothesis of the form \
@@ -2680,7 +2678,7 @@ let intctxt_param table (t : Term.formula) : unforgeabiliy_param =
 
   | _ -> bad_param ()
 
-let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
+let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
   let open Euf in
 
   (* Equality between hashed messages *)
@@ -2692,7 +2690,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
       (fun cnstr i i' ->
          Term.mk_and cnstr (Term.Atom (`Index (`Eq, i, i'))))
       Term.True
-      key_is case.key_indices
+      key.s_indices case.key_indices
   in
 
   let system = TraceSequent.system sequent in
@@ -2725,7 +2723,7 @@ let euf_apply_schema sequent (_, (_, key_is), m, s, _, _, _) case =
       (TraceSequent.conclusion sequent) in
   TraceSequent.set_conclusion goal sequent
 
-let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_message} =
+let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
    * not in the current environment: this happens when the case is extracted
    * from under a binder, e.g. a Seq or ForAll construct. We need to add
@@ -2756,26 +2754,26 @@ let euf_apply_direct s (_, (_, key_is), m, _, _, _, _) Euf.{d_key_indices;d_mess
          let i' = Term.subst_var subst i' in
          Term.mk_and cnstr (Term.Atom (`Index (`Eq, i, i'))))
       Term.True
-      key_is d_key_indices
+      key.s_indices d_key_indices
   in
 
   let goal = Term.mk_impls [eq_indices; eq_hashes] (TraceSequent.conclusion s) in
   TraceSequent.set_conclusion goal s
 
 let euf_apply_facts drop_head s
-    ((head_fn, (key_n, key_is), mess, sign, allow_functions, _, _) as p) =
+    ((head_fn, key, mess, sign, allow_functions, _, _) as p) =
   let env = TraceSequent.env s in
   let cntxt = mk_trace_cntxt s in
 
   (* check that the SSCs hold *)
-  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~cntxt head_fn key_n;
+  Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~cntxt head_fn key.s_symb;
 
   (* build the rule *)
   let rule =
     Euf.mk_rule
       ~elems:[] ~drop_head ~allow_functions
       ~cntxt ~env ~mess ~sign
-      ~head_fn ~key_n ~key_is
+      ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in
 
   let schemata_premises =
@@ -2854,11 +2852,11 @@ let () =
 (*------------------------------------------------------------------*)
 let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) = 
   match t with
-  | Fun ((hash, _), _, [m; Name (key,_)]) ->
+  | Fun ((hash, _), _, [m; Name key]) ->
     Symbols.is_ftype hash Symbols.Hash cntxt.table
     && Euf.check_key_ssc
       ~allow_vars:true ~messages:[m] ~allow_functions:(fun x -> false)
-      ~cntxt hash key
+      ~cntxt hash key.s_symb
 
   | _ -> false
 

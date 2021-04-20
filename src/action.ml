@@ -213,11 +213,9 @@ let subst_descr subst descr =
   let condition =
     fst descr.condition, Term.subst subst (snd descr.condition) in
   let updates =
-    List.map
-      (fun ((ss,ty,is),t) ->
-         ((ss, ty, List.map (Term.subst_var subst) is),
-          subst_term t))
-      descr.updates
+    List.map (fun (ss,t) -> 
+        Term.subst_isymb subst ss, subst_term t
+      ) descr.updates
   in
   let output = fst descr.output, subst_term (snd descr.output) in
   {name; action; input; indices; condition; updates; output }

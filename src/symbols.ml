@@ -66,6 +66,12 @@ type bty_info =
 type bty_def = bty_info list
 
 (*------------------------------------------------------------------*)
+type name_def = { 
+  n_iarr : int;                  (* index arity *)
+  n_ty   : Type.message Type.ty; (* type *)
+}
+
+(*------------------------------------------------------------------*)
 type channel
 type name
 type action
@@ -78,7 +84,7 @@ type btype
 (*------------------------------------------------------------------*)
 type _ def =
   | Channel  : unit      -> channel def
-  | Name     : int       -> name    def
+  | Name     : name_def  -> name    def
   | Action   : int       -> action  def
   | Macro    : macro_def -> macro   def
   | System   : unit      -> system  def
@@ -395,7 +401,7 @@ end)
 
 module Name = Make (struct
   type ns = name
-  type local_def = int
+  type local_def = name_def
 
   let namespace = NName
 

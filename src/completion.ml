@@ -16,7 +16,7 @@ module Cst = struct
     (** Flattening of the successor of a constant *)
 
     | Cgfuncst of [
-        | `N of Symbols.name   Symbols.t
+        | `N of Symbols.name   Symbols.t * Type.message Type.ty
         | `F of Symbols.fname  Symbols.t
         | `A of Symbols.action Symbols.t
       ]
@@ -35,7 +35,7 @@ module Cst = struct
     | Csucc c   -> Fmt.pf ppf "suc(@[%a@])" print c
     | Cmvar m   -> Vars.pp_e ppf m
     | Cgfuncst (`F f) -> Symbols.pp ppf f
-    | Cgfuncst (`N n) -> Symbols.pp ppf n
+    | Cgfuncst (`N (n,_)) -> Symbols.pp ppf n
     | Cgfuncst (`A a) -> Symbols.pp ppf a
 
   (* The successor function symbol is the second smallest in the precedence
@@ -68,11 +68,11 @@ let nilpotence_norm compare l =
 (** Generalized function symbols, for [Term.fsymb], [Term.msymb] and 
     [Symbols.action Symbols.t]. *)
 type gfsymb = 
-  | F of Symbols.fname  Symbols.t (* function symbol *)
-  | M of Symbols.macro  Symbols.t (* macro *)
-  | N of Symbols.name   Symbols.t (* name *)
-  | A of Symbols.action Symbols.t (* action *)
-  | GPred                         (* predecessor *)
+  | F of Symbols.fname  Symbols.t                        (* function symbol *)
+  | M of Symbols.macro  Symbols.t * Type.ekind           (* macro *)
+  | N of Symbols.name   Symbols.t * Type.message Type.ty (* name *)
+  | A of Symbols.action Symbols.t                        (* action *)
+  | GPred                                                (* predecessor *)
 
 (*------------------------------------------------------------------*)
 module CTerm : sig
@@ -188,7 +188,7 @@ end = struct
         match f with
         | F f -> make (Ccst (Cgfuncst (`F f)))
         | A a -> make (Ccst (Cgfuncst (`A a)))
-        | N a -> make (Ccst (Cgfuncst (`N a)))
+        | N (n,t) -> make (Ccst (Cgfuncst (`N (n,t))))
         | GPred | M _ -> assert false
       end
     else make (Cfun (f, i, ts))
@@ -226,18 +226,20 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     and terms = List.map cterm_of_term terms in
     cfun (F f) (List.length is) (is @ terms)
 
-  | Macro ((m,_,is),l,ts) -> 
+  | Macro (ms,l,ts) -> 
     assert (l = []); (* TODO *)
-    let is = List.map cterm_of_var is in
-    cfun (M m) (List.length is) (is @ [cterm_of_term ts])
+    let is = List.map cterm_of_var ms.s_indices in
+    cfun
+      (M (ms.s_symb, Type.EKind ms.s_typ))
+      (List.length is) (is @ [cterm_of_term ts])
 
   | Term.Action (a,is) ->
     let is = List.map cterm_of_var is in
     cfun (A a) (List.length is) is
 
-  | Name (n,is) -> 
-    let is = List.map cterm_of_var is in
-    cfun (N n) (List.length is) is
+  | Name ns -> 
+    let is = List.map cterm_of_var ns.s_indices in
+    cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
 
   | Var m  -> ccst (Cst.Cmvar (Vars.EVar m))
 
@@ -274,10 +276,11 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
         let t = Term.mk_fun table f is terms in
         Term.cast kind t
 
-      | Cfun (M m, ari, cterms) -> 
+      | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
-        let m = (m,kind,indices_of_cterms cis) in
+        assert (Type.EKind kind = ek);
+        let m = Term.mk_isymb m kind (indices_of_cterms cis) in
         Macro (m, [], term_of_cterm Type.KTimestamp cts)
 
       | Cfun (A a, ari, is) -> 
@@ -285,10 +288,11 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
         let is = indices_of_cterms is in 
         Term.cast kind (Action (a, is))
 
-      | Cfun (N n, ari, is) -> 
+      | Cfun (N (n,nty), ari, is) -> 
         assert (ari = List.length is);
         let is = indices_of_cterms is in
-        Term.cast kind (Name (n, is))
+        let ns = Term.mk_isymb n nty is in
+        Term.cast kind (Name ns)
 
       | Cfun (GPred, ari, ts) ->
         assert (ari = 0);
@@ -304,8 +308,9 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
       | Ccst (Cst.Cgfuncst (`A a)) ->
         Term.cast kind (Term.Action (a,[]))
                                         
-      | Ccst (Cst.Cgfuncst (`N n)) ->
-        Term.cast kind (Term.Name   (n,[]))
+      | Ccst (Cst.Cgfuncst (`N (n,nty))) ->
+        let ns = Term.mk_isymb n nty [] in
+        Term.cast kind (Term.Name ns)
 
       | (Ccst (Cflat _|Csucc _)|Cvar _|Cxor _) -> assert false
 
@@ -317,11 +322,11 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
 
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
-  | F x   -> Symbols.pp ppf x
-  | M x   -> Symbols.pp ppf x
-  | A x   -> Symbols.pp ppf x
-  | N x   -> Symbols.pp ppf x
-  | GPred -> Fmt.pf ppf "pred"
+  | F x     -> Symbols.pp ppf x
+  | M (x,_) -> Symbols.pp ppf x
+  | A x     -> Symbols.pp ppf x
+  | N (x,_) -> Symbols.pp ppf x
+  | GPred   -> Fmt.pf ppf "pred"
 
 let rec pp_cterm ppf t = match t.cnt with
   | Cvar v -> Fmt.pf ppf "v#%d" v
@@ -1548,7 +1553,7 @@ let name_index_cnstrs state l =
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
       if n <> n' then [Term.False] else []
       
-    | Cfun (N n, ari, is), Cfun (N n', ari', is') ->
+    | Cfun (N (n,_), ari, is), Cfun (N (n',_), ari', is') ->
       assert (ari > 0 && ari' > 0);
       if n <> n' then [Term.False]
       else begin
@@ -1558,8 +1563,8 @@ let name_index_cnstrs state l =
           ) is is'
       end
 
-    | Cfun (N n, ari, _), Ccst (Cst.Cgfuncst (`N n'))
-    | Ccst (Cst.Cgfuncst (`N n)), Cfun (N n', ari, _) ->
+    | Cfun (N (n,_), ari, _), Ccst (Cst.Cgfuncst (`N (n',_)))
+    | Ccst (Cst.Cgfuncst (`N (n,_))), Cfun (N (n',_), ari, _) ->
       assert (ari <> 0 && n <> n');
       [False] 
 

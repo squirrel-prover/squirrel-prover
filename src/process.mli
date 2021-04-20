@@ -38,9 +38,9 @@ val pp_pkind : (string * Type.ety) list Fmt.t
 (** Process types *)
 type process_i =
   | Null                                    (** Null process *)
-  | New of lsymb * process                 (** Name creation *)
+  | New of lsymb * Theory.p_ty * process    (** Name creation *)
   | In  of Channel.p_channel * lsymb * process (** Input *)
-  | Out of Channel.p_channel * term * process   (** Output *)
+  | Out of Channel.p_channel * term * process  (** Output *)
   | Set of lsymb * lsymb list * term * process
                                             (** [Set (s,l,t,p)] stores [t]
                                               * in cell [s(l)] and

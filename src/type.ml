@@ -59,6 +59,12 @@ type 'a t = 'a ty
 
 type ety = ETy : 'a ty -> ety
 
+(*------------------------------------------------------------------*)
+type tmessage   = message   ty
+type ttimestamp = timestamp ty
+type tindex     = index     ty
+
+(*------------------------------------------------------------------*)
 let eboolean   = ETy Boolean
 let emessage   = ETy Message
 let etimestamp = ETy Timestamp
@@ -163,7 +169,7 @@ let pp_kinde ppf (EKind t) = pp_kind ppf t
 *)
 type 'a ftype_g = {
   fty_iarr : int;             (** i *)
-  fty_vars : 'a list;         (** a₁ ... 'aₙ *)  
+  fty_vars : 'a list;         (** 'a₁ ... 'aₙ *)  
   fty_args : message ty list; (** τ₁ × ... × τₙ *)
   fty_out  : message ty;      (** τ *)
 }
