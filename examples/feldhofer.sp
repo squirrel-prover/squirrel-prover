@@ -250,7 +250,7 @@ Proof.
   intro [_ [i j _]] /=.
   project.
 
-  fa => //; 3: by intro *; expand output, cipher. 
+  fa => //. 
   (* find condA => condB *)
   intro [Mneq _ _].
   intctxt Mneq => // _ _ _;
@@ -263,7 +263,7 @@ Proof.
   use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
   by expand output, cipher.
 
-  fa => //; 3: by intro *; expand output, cipher. 
+  fa => //. 
   (* find condA => condB *)
   intro [Mneq _ _].
   intctxt Mneq => // _ _ [_ _].
