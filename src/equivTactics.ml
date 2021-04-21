@@ -845,10 +845,7 @@ let fa_dup_int i s =
         let (tau,phi) =
           let f,g = match e with
             | Term.And (f,g) -> f,g
-            | Term.(Seq (vars, Fun (fite,_,[And (f,g);tt;ff])))
-              when fite = Term.f_ite &&
-                   tt = Term.mk_true && 
-                   ff = Term.mk_false ->
+            | Term.(Seq (vars, And (f,g))) ->
               let subst =
                 List.map
                   (fun v ->
