@@ -8,6 +8,7 @@ R --> T : nR
 T --> R : < nT, h(<nR,nT>,kT) >
 R --> T : ok
 *******************************************************************************)
+set autoIntro=false.
 
 hash h
 
@@ -43,25 +44,32 @@ goal wa_R1 (j:index):
        fst(output@T(i,k)) = fst(input@R1(j)) &&
        input@T(i,k) = output@R(j))).
 Proof.
-  intro *.
+  intro j Hap.
   expand cond.
   split.
 
+  (* COND => WA *)
+  intro [i k H].
   project.
-  euf Meq.
-  exists i, k0.
-  assert (input@T(i,k0) = nR(j)).
-  fresh Meq1.  
-  case H.
-  by depends R(j), R2(j).
-  euf Meq.
-  exists i, k.
-  assert (input@T(i,k) = nR(j)).
-  fresh Meq1.
-  case H.
-  by depends R(j), R2(j).
+  (* LEFT *)
+  euf H => _ _ _ //.
+  exists i,k0.
+  assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=. 
+  case C => //. 
+  by depends R(j),R2(j).
 
-  by exists i,k.
+  (* RIGHT *)
+  euf H => _ _ _ //.
+  exists i,k.
+  assert input@T(i,k)=nR(j) as Meq1; 1: by auto.
+  fresh Meq1 => C /=.
+  case C => //. 
+  by depends R(j),R2(j).
+
+  (* WA => COND *)
+  intro [i k _]; exists i,k. 
+  by expand output. 
 Qed.
 
 goal wa_R2 (j:index):
@@ -72,26 +80,35 @@ goal wa_R2 (j:index):
        fst(output@T(i,k)) = fst(input@R2(j)) &&
        input@T(i,k) = output@R(j)))).
 Proof.
-  intro *.
+  intro j Hap.
   expand cond.
   split.
 
-  by use H; exists i,k.
+  (* WA => COND *)
+  intro H [i k H0].
   use H.
-
+  exists i,k.
+  by expand output.
+  
+  (* COND => WA *)
+  intro H [i k Meq].
+  use H.
   project.
-  euf Meq.
-  exists i, k0.
-  assert (input@T(i,k0) = nR(j)).
-  fresh Meq1.
-  case H0.
-  by depends R(j), R1(j).
-  euf Meq.
-  exists i, k.
-  assert (input@T(i,k) = nR(j)).
-  fresh Meq1. 
-  case H0.
-  by depends R(j), R1(j).
+  (* LEFT *) 
+  euf Meq => _ _ _ //.
+  exists i,k0.
+  assert input@T(i,k0)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //. 
+  by depends R(j),R1(j).
+
+  (* RIGHT *)
+  euf Meq => _ _ _ //.
+  exists i,k.
+  assert input@T(i,k)=nR(j) as Meq1; 1: auto.
+  fresh Meq1 => C /=.
+  case C => //. 
+  by depends R(j),R1(j).
 Qed.
 
 equiv unlinkability.
@@ -103,7 +120,12 @@ Proof.
   expand cond@R(j); expand output@R(j).
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
+<<<<<<< HEAD
   repeat split.
+=======
+  repeat split => j0 _ //.
+  by depends R(j0), R1(j0).
+>>>>>>> dev
   by depends R(j0), R2(j0).
   by depends R(j0), R1(j0).
 
@@ -139,12 +161,16 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2. yesif 2.
   project.
-  split. 
-  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0.
-  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0. 
-  split.
-  by assert nT(i,k) = fst(input@R2(j)); fresh Meq0.
-  by assert nT(i,k) = fst(input@R1(j)); fresh Meq0. 
+  split => //. 
+  split => j * //.
+  by assert nT(i,k) = fst(input@R2(j)) as Meq0; [1: auto | 2: fresh Meq0].
+  by assert nT(i,k) = fst(input@R1(j)) as Meq0; [1: auto | 2: fresh Meq0].
+  
+  repeat split => j *.
+  auto. 
+  by assert nT(i,k) = fst(input@R1(j)) as Meq0; [1: auto | 2: fresh Meq0].
+  by assert nT(i,k) = fst(input@R2(j)) as Meq0; [1: auto | 2: fresh Meq0].
   fresh 2.
-  by fresh 1; yesif 1.
+  by fresh 1; yesif 1. 
+  auto.
 Qed.
