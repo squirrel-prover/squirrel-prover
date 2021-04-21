@@ -10,5 +10,5 @@ goal _: n = f(m) => False.
 Proof.
   nosimpl(intro Heq).
   nosimpl(fresh Heq).
-  by auto.
+  auto.
 Qed.

@@ -44,7 +44,7 @@ goal charac :
 Proof.
  intro Hap He.
  executable OutFalse; 
- 1,2: by auto.
+ 1,2: auto.
  intro Hexec.
  depends Out, OutFalse; 1: auto.
  intro Hle.
@@ -59,7 +59,7 @@ Proof.
  (* we prove the goal where the message satisfies the tag *)
  intro [Hneq | [i Heq]]. 
  nosimpl(notleft H1). 
- by auto.
+ auto.
 
  by use He with i.  
  auto.

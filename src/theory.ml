@@ -1012,7 +1012,7 @@ and conv_app :
           | Symbols.State _ -> assert false
 
           | Symbols.Global _ ->
-            assert (ty_args = []);
+            assert (List.for_all (fun x -> x = Type.eindex) ty_args);
             check_ty_leq state ~of_t:tm ty_out Type.Message;
             let indices = List.map (conv_index state) l in
             let ms = Term.mk_isymb s ty_out indices in

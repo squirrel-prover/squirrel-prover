@@ -12,5 +12,5 @@ goal foo :
 Proof.
   intro Hap Heq.
   euf Heq. 
-  by auto.
+  auto.
 Qed.

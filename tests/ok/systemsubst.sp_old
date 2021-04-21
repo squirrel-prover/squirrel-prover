@@ -23,9 +23,9 @@ Proof.
   systemsubstitute simplified,a,cond@A(a),True,cond@A1(a),False.
   intro a. 
   expand cond@A(a); expand cond@A1(a). split; split. 
-  by auto. 
+  auto. 
   by intro _; left. 
   by intro H; notleft H; auto.
-  by auto.
+  auto.
   by euf Heq; auto.
 Qed.

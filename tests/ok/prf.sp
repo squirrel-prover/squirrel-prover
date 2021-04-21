@@ -17,8 +17,7 @@ yesif 1.
 by project; auto.
 fresh 1.
 
-prf 0.
-by yesif 0.
+by prf 0. 
 Qed.
 
 

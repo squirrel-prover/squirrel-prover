@@ -1384,19 +1384,17 @@ let yes_no_if b TacticsArgs.(Int i) s =
       let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
       if List.exists Vars.(function EVar v -> is_new v) vars then
         Tactics.soft_failure (Tactics.Failure "application of this tactic \
-          inside a context that bind variables is not supported")
+          inside a context that bind variables is not supported");
 
-      else
-        let branch, trace_sequent =
-          simplify_ite b s c t e in
-        let new_elem =
-          Equiv.subst_equiv
-            [Term.ESubst (Term.mk_ite c t e,branch)]
-            [elem]
-        in
-        let biframe = List.rev_append before (new_elem @ after) in
-        [ Prover.Goal.Trace trace_sequent;
-          Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+      let branch, trace_sequent = simplify_ite b s c t e in
+      let new_elem =
+        Equiv.subst_equiv
+          [Term.ESubst (Term.mk_ite ~simpl:false c t e,branch)]
+          [elem]
+      in
+      let biframe = List.rev_append before (new_elem @ after) in
+      [ Prover.Goal.Trace trace_sequent;
+        Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
     end
 
   | exception Out_of_range ->

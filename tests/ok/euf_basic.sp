@@ -13,5 +13,5 @@ goal collision_absurd (tau:timestamp) :
 
 Proof.
   intro tau Hap Heq.
-  euf Heq. by auto.
+  euf Heq. auto.
 Qed.

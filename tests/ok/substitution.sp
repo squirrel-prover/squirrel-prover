@@ -24,6 +24,7 @@ goal unforgeable_1 (a : index, b : index, c : index):
 Proof.
  nosimpl(intro a b c Hap [H G] Hneq).
  subst a, c.
+ expand output.
  collision. 
- by auto.
+ auto.
 Qed.

@@ -18,7 +18,7 @@ Proof.
   equivalent
     (forall (i0:index), (diff(n(i) <> n(i0), m(i) <> n(i0)))),
     True.
-  admit.
+  admit. 
   by yesif 1.
 Qed.
 

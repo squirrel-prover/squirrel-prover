@@ -15,6 +15,6 @@ goal unforgeable (a:index, b:index):
   happens(A(b)) => b <> a => output@A(b) <> h(n(a),k).
 
 Proof.
-  intro a b Hap Hneq Heq.
-  by collision; auto.
+  intro a b Hap Hneq Heq /=.
+  by collision.
 Qed.

@@ -28,9 +28,9 @@ induction t.
 nosimpl(expandall).
 fa 0. fa 1.
 equivalent ok=ok, True.
-by auto.
+auto.
 nosimpl(expandall).
 fa 0; fa 1.
 equivalent ok=ok, True.
-by auto.
+auto.
 Qed.

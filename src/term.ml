@@ -20,13 +20,13 @@ type ('a,'b) isymb = {
 
 let mk_isymb s t is = 
   let () = match t with
-    | Type.TBase _ | Type.TUnivar _ -> assert false;
-    | _ -> () in
-  {
-    s_symb    = s; 
+    | Type.TVar _ | Type.TUnivar _ -> assert false;
+    | _ -> () 
+  in
+
+  { s_symb    = s; 
     s_typ     = t;
-    s_indices = is; 
-  } 
+    s_indices = is; } 
 
 type name = Symbols.name Symbols.t
 type nsymb = (name, Type.tmessage) isymb
@@ -327,9 +327,9 @@ let mk_zeroes term =
 let mk_pair t0 t1 =
   mk_fun Symbols.builtins_table Symbols.fs_pair [] [t0;t1]
 
-let mk_ite c t e = match c with
-  | True -> t
-  | False -> e
+let mk_ite ?(simpl=true) c t e = match c with
+  | True when simpl -> t
+  | False when simpl -> e
   | _ -> mk_fun Symbols.builtins_table Symbols.fs_ite [] [c;t;e]
 
 (*------------------------------------------------------------------*)

@@ -338,7 +338,7 @@ val mk_impls  : message list -> message -> message
 val mk_forall : Vars.evar list -> message -> message
 val mk_exists : Vars.evar list -> message -> message
 
-val mk_ite    : message -> message -> message -> message
+val mk_ite : ?simpl:bool -> message -> message -> message -> message
   
 val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 

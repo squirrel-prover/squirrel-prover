@@ -24,7 +24,7 @@ enrich seq(i->h(ok,k(i))).
  equivalent cond@A(i), False.
  by expand cond@A(i); auto.
  noif 2. 
- by auto.
+ auto.
 
  expand frame@A1(i).
  expand output@A1(i).
@@ -33,7 +33,7 @@ enrich seq(i->h(ok,k(i))).
  fa 2.
  equivalent cond@A1(i), True.
  expand cond@A1(i). 
- by auto.
+ auto.
  fa 2.
 
  expand seq(i->h(ok,k(i))),i.

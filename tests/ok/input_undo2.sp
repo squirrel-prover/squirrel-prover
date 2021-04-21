@@ -10,5 +10,5 @@ system in(c,x);out(c,<x,x>).
 goal test :
   happens(A) => output@A = <input@A,input@A>.
 Proof.
- by auto.
+ auto.
 Qed.

@@ -2098,6 +2098,7 @@ let simplify ~close ~strong =
     (if strong then [wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
     (repeat (wrap_fail autosubst)) ::
+    expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @ 
     [clear_triv]
   ) 

@@ -13,7 +13,7 @@ induction t.
 expandall.
 fa 0; fa 1.
 nosimpl(ifeq 1,input@A,ok). 
-by auto.
+auto.
 
 nosimpl(fadup).
 by assumption.

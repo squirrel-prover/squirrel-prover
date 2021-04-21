@@ -13,7 +13,7 @@ expand frame@A.
 expand exec@A.
 equivalent cond@A, False.
 expand cond@A. 
-by auto.
+auto.
 
 fa 0.
 
@@ -21,7 +21,7 @@ expand frame@A1.
 expand exec@A1.
 equivalent cond@A1, True.
 expand cond@A1.
-by auto.
+auto.
 
 fa 0.
 Qed.

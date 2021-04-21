@@ -11,5 +11,5 @@ goal function (i:index,j:index) :
   i = j =>
   m1(i) = m1(j).
 Proof.
- by auto.
+ auto.
 Qed.

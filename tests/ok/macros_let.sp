@@ -8,7 +8,7 @@ system
 
 goal _: happens(A) => output@A = <input@A,input@A>.
 Proof.
- by auto.
+ auto.
 Qed.
 
 goal _: output@A = <input@A,input@A>.

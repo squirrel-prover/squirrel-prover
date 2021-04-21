@@ -16,5 +16,5 @@ goal not_update: forall (i,j:index),
 Proof.
   intro i j Hhap Hneq.
   expand s(i)@A(j). 
-  by noif; auto.
+  by noif.
 Qed.

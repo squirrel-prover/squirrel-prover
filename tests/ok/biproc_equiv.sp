@@ -23,9 +23,9 @@ expand frame@B.
 fa 0; fa 1.
 expand exec@B.
 equivalent cond@B, False.
-by expand cond@B; auto. 
+by expand cond@B. 
 noif 1.
-by auto.
+auto.
 expand frame@B1.
 by fa 0.
 Qed.

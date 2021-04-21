@@ -15,6 +15,6 @@ goal foo :
 Proof.
  intro [i1 Hap].
  destruct Hap as [i2 [i3 Ha]].
- use bar with i3; 1: by auto. 
+ use bar with i3; 1: auto. 
  checkfail (auto) exn GoalNotClosed.
 Abort.

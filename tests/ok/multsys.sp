@@ -19,7 +19,7 @@ induction t.
 expandall.
 fa 0; fa 1. 
 noif 1. 
-by auto.
+auto.
 
 expandall.
 fa 0.
@@ -32,7 +32,7 @@ induction t.
 expandall.
 fa 0; fa 1. 
 noif 1.
-by auto.
+auto.
 
 expandall.
 by fa 0.
