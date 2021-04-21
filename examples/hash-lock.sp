@@ -120,14 +120,9 @@ Proof.
   expand cond@R(j); expand output@R(j).
   fa 0. fa 1. fa 1.
   fresh 1;  yesif 1.
-<<<<<<< HEAD
-  repeat split.
-=======
   repeat split => j0 _ //.
   by depends R(j0), R1(j0).
->>>>>>> dev
   by depends R(j0), R2(j0).
-  by depends R(j0), R1(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).

@@ -1426,7 +1426,7 @@ let rec decompose_impls f = match f with
   | _ -> [f]
 
 let destr_pair : type a. a term -> (a term * a term) option = function
-  | Fun (f_pair, _, terms) ->
+  | Fun (f, _, terms) when f = f_pair ->
     let t1, t2 = as_seq2 terms in
     Some (t1, t2)
 

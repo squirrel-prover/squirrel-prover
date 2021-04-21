@@ -1127,7 +1127,11 @@ let find_occs_macro : type a.
           | Macro (ms, _, _) when cond ms -> 
             Term.St.add (Term.ETerm t) st
           | _ -> st in
-        Term.tfold (fun t st -> find st t) t st
+
+        (* we do not recurse under binders *)
+        match t with
+        | ForAll _ | Exists _ | Find _ | Seq _ -> st
+        | _ -> Term.tfold (fun t st -> find st t) t st
       in
 
       find st (ETerm t)
@@ -1234,7 +1238,6 @@ let congruence (s : TraceSequent.t) : bool Utils.timeout_r =
         conclusions
     in
     let s = List.fold_left (fun s f ->
-        dbg "adding %a" Term.pp f;
         Hyps.add Args.AnyName f s
       ) s term_conclusions
     in
