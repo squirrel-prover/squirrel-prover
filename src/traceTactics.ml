@@ -1097,33 +1097,73 @@ let expand_macro (targets : target list) t (s : sequent) : sequent =
   assert (subs = []);
   s
      
+(* let find_occs_macro
+ *   : type a. [`Any | `MSymb of Symbols.macro Symbols.t]
+ *     -> ?st:Term.St.t -> a term -> Term.St.t =
+ *   fun m ?st t -> 
+ *   let cond ms = m = `MSymb ms.s_symb || m = `Any in
+ * 
+ *   let rec find st (ETerm t) = 
+ *     let st = match t with
+ *       | Macro (ms, _, _) when cond ms -> 
+ *         Term.St.add (Term.ETerm t) st
+ *       | _ -> st in
+ *     Term.tfold (fun t st -> find st t) t st
+ *   in
+ * 
+ *   find (Utils.odflt Term.St.empty st) (ETerm t) *)
 
-let find_occs_macro
-  : type a. Symbols.macro Symbols.t -> ?st:Term.St.t -> a term -> Term.St.t =
-  fun m ?st t -> 
-  let rec find st (ETerm t) = 
-    let st = match t with
-      | Macro (ms', _, _) when ms'.s_symb = m -> 
-        Term.St.add (Term.ETerm t) st
-      | _ -> st in
-    Term.tfold (fun t st -> find st t) t st
-  in
-  find (Utils.odflt Term.St.empty st) (ETerm t)
-      
+let find_occs_macro : type a. 
+  [`Any | `MSymb of Symbols.macro Symbols.t] ->
+  target list -> sequent -> Term.St.t =
+  fun m targets s -> 
+
+  let cond ms = m = `MSymb ms.s_symb || m = `Any in
+
+  let do1 : type a. Term.St.t -> a term -> Term.St.t =
+    fun st t -> 
+      let rec find st (ETerm t) = 
+        let st = match t with
+          | Macro (ms, _, _) when cond ms -> 
+            Term.St.add (Term.ETerm t) st
+          | _ -> st in
+        Term.tfold (fun t st -> find st t) t st
+      in
+
+      find st (ETerm t)
+  in  
+
+  List.fold_left (fun occs target -> match target with
+      | `Goal -> 
+        do1 occs (TraceSequent.conclusion s) 
+      | `Hyp id ->
+        let f = Hyps.by_id id s in
+        do1 occs f
+    ) St.empty targets
+
+
+let rec expand_all s = 
+  let targets = target_all s in
+  let occs = find_occs_macro `Any targets s in
+  let subst = 
+    Term.St.fold (fun (ETerm t) subst -> 
+        unfold_macro ~canfail:false t s @ subst
+      ) occs [] in
+  let doit (f,_) = Term.subst subst f, [] in
+  let s, subs = do_targets doit s targets in
+  assert (subs = []);
+  
+  (* recurse to check that no new macros can be expanded *)
+  if subst = [] then s else expand_all s
+
+let expand_all_l s : sequent list = [expand_all s]
+
 let expand (targets : target list) (arg : Theory.term) s = 
   let tbl = TraceSequent.table s in
   match Args.convert_as_lsymb [Args.Theory arg] with
   | Some m ->
     let m = Symbols.Macro.of_lsymb m tbl in
-    let occs = 
-      List.fold_left (fun occs target -> match target with
-          | `Goal -> 
-            find_occs_macro m ~st:occs (TraceSequent.conclusion s) 
-          | `Hyp id ->
-            let f = Hyps.by_id id s in
-            find_occs_macro m ~st:occs f
-        ) St.empty targets
-    in
+    let occs = find_occs_macro (`MSymb m) targets s in
     let subst = 
       Term.St.fold (fun (ETerm t) subst -> 
           unfold_macro ~canfail:false t s @ subst
@@ -2029,16 +2069,28 @@ let simplify ~close ~strong =
   let intro = Config.auto_intro () in
   
   let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
+
   let new_simpl ~congr ~constr = 
-    if strong && not intro then [wrap_fail (new_simpl ~congr ~constr)] else [] 
+    if strong && not intro 
+    then [wrap_fail (new_simpl ~congr ~constr)] @ assumption
+    else [] 
   in
+
+  let expand_all = 
+    (if strong && not intro 
+     then [wrap_fail expand_all_l] @ assumption
+     else []) 
+  in
+
   andthen_list (
     (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
-    assumption @ (new_simpl ~congr:false ~constr:false) @ assumption @
+    assumption @
+    (new_simpl ~congr:false ~constr:false) @ 
     (if close || intro then [wrap_fail intro_all;
                              wrap_fail simpl_left_tac] else []) @
     assumption @
+    expand_all @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
@@ -2046,7 +2098,7 @@ let simplify ~close ~strong =
     (if strong then [wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
     (repeat (wrap_fail autosubst)) ::
-    assumption @ (new_simpl ~congr:true ~constr:true) @ assumption @
+    assumption @ (new_simpl ~congr:true ~constr:true) @ 
     [clear_triv]
   ) 
 
