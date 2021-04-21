@@ -228,7 +228,10 @@ val pp_error :
 
 type env = (string * Type.ety) list
 
-val check : Symbols.table -> ?local:bool -> env -> term -> Type.ety -> unit
+val check : 
+  Symbols.table -> ?local:bool -> Type.Infer.env -> env -> term -> Type.ety
+  -> unit
+
 val check_state : Symbols.table -> lsymb -> int -> Type.tmessage
 
 (* Returns true if the given function names corresponds to some associated
@@ -268,7 +271,9 @@ type conv_cntxt =
 type conv_env = { table : Symbols.table;
                   cntxt : conv_cntxt; }
 
-val convert : conv_env -> subst -> term -> 'a Type.ty -> 'a Term.term
+val convert : 
+  ?ty_env:Type.Infer.env -> conv_env -> subst -> term -> 'a Type.ty
+  -> 'a Term.term
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)

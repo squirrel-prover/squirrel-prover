@@ -86,7 +86,8 @@ type proc_error_i =
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
-
+  | Freetyunivar
+  
 type proc_error = Location.t * proc_error_i
 
 val pp_proc_error :

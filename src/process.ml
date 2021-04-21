@@ -136,6 +136,7 @@ type proc_error_i =
   | Arity_error of string * int * int
   | StrictAliasError of string
   | DuplicatedUpdate of string
+  | Freetyunivar
 
 type proc_error = L.t * proc_error_i
 
@@ -148,6 +149,9 @@ let pp_proc_error_i fmt = function
 
   | DuplicatedUpdate s -> 
     Fmt.pf fmt "state %s can only be updated once in an action" s
+
+  | Freetyunivar -> Fmt.pf fmt "some type variable(s) could not \
+                                       be instantiated"
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aproc error: %a."
@@ -181,16 +185,16 @@ let find_process0 table (lsymb : lsymb) =
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
 let check_proc table env p =
-  let rec check_p (env : (string * Type.ety) list) proc =
+  let rec check_p ty_env (env : (string * Type.ety) list) proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
 
     | New (x, ty, p) -> 
       let ty = Theory.parse_p_ty table [] ty Type.KMessage in 
-      check_p ((L.unloc x, Type.ETy ty)::env) p
+      check_p ty_env  ((L.unloc x, Type.ETy ty)::env) p
 
-    | In (_,x,p) -> check_p ((L.unloc x, Type.emessage)::env) p
+    | In (_,x,p) -> check_p ty_env  ((L.unloc x, Type.emessage)::env) p
 
     | Out (_,m,p)
 
@@ -199,39 +203,41 @@ let check_proc table env p =
       if is_out proc && (Config.strict_alias_mode ())
       then proc_err loc (StrictAliasError "missing alias")
       else
-        let () = Theory.check table ~local:true env m Type.emessage in
-        check_p env p
+        (* TODO: subtypes *)
+        let () = Theory.check table ~local:true ty_env env m Type.emessage in
+        check_p ty_env  env p
 
-    | Alias (p,_) -> check_p env p
+    | Alias (p,_) -> check_p ty_env  env p
 
     | Set (s, l, m, p) ->
       let k = Theory.check_state table s (List.length l) in
-      Theory.check table ~local:true env m (Type.ETy k) ;
+      Theory.check table ~local:true ty_env env m (Type.ETy k) ;
       List.iter (fun x ->
           Theory.check
-            table ~local:true env
+            table ~local:true ty_env env
             (Theory.var_of_lsymb x) Type.eindex
         ) l ;
-      check_p env p
+      check_p ty_env  env p
 
-    | Parallel (p, q) -> check_p env p ; check_p env q
+    | Parallel (p, q) -> check_p ty_env  env p ; check_p ty_env  env q
 
     | Let (x, t, p) ->
-      (* TODO: types *)
-      Theory.check table ~local:true env t Type.emessage ;
-      check_p ((L.unloc x, Type.emessage)::env) p
+      let tyv = Type.Infer.mk_univar ty_env in
+      let ety = Type.ETy (TUnivar tyv) in
+      Theory.check table ~local:true ty_env env t ety ;
+      check_p ty_env  ((L.unloc x, ety) :: env) p
 
-    | Repl (x, p) -> check_p ((L.unloc x, Type.eindex)::env) p
+    | Repl (x, p) -> check_p ty_env  ((L.unloc x, Type.eindex)::env) p
 
     | Exists (vars, test, p, q) ->
-      check_p env q ;
+      check_p ty_env  env q ;
       let env =
         List.rev_append
           (List.map (fun x -> L.unloc x, Type.eindex) vars)
           env
       in
-      Theory.check table ~local:true env test Type.eboolean ;
-      check_p env p
+      Theory.check table ~local:true ty_env env test Type.eboolean ;
+      check_p ty_env  env p
 
     | Apply (id, ts) ->
       let kind,_ = find_process0 table id in
@@ -240,11 +246,19 @@ let check_proc table env p =
                                    List.length ts,
                                    List.length kind));
       List.iter2
-        (fun (_, k) t -> Theory.check table ~local:true env t k)
+        (fun (_, k) t -> Theory.check table ~local:true ty_env env t k)
         kind ts
   in
 
-  check_p env p
+  let ty_env = Type.Infer.mk_env () in
+
+  check_p ty_env env p;
+
+  if not (Type.Infer.is_closed ty_env) then
+    proc_err (L.loc p) Freetyunivar;
+
+  ()
+
 
 let declare table (id : lsymb) args proc =
   (* type-check and declare *)

@@ -1254,21 +1254,44 @@ let subst t (s : (string * term_i) list) =
   in aux t
 
 (*------------------------------------------------------------------*)
-(** {2 Exported conversion functions} *)
+(** {2 Exported conversion and type-checking functions} *)
+
+let check table ?(local=false) (ty_env : Type.Infer.env) (env : env) t (Type.ETy s) 
+  : unit =
+  let dummy_var s =
+    Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
+  in
+  let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
+  let subst =
+    List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
+  in
+  let state = {
+    table  = table;
+    cntxt  = cntxt;
+    subst  = subst;
+    ty_env = ty_env; }
+  in
+  ignore (convert state t s)
 
 (** exported outside to Theory.ml *)
-let convert :
-  type s. conv_env -> subst -> term -> s Type.ty -> s Term.term =
-  fun env subst tm ty ->
+let convert : type s. 
+  ?ty_env:Type.Infer.env -> 
+  conv_env -> subst -> term -> s Type.ty -> s Term.term =
+  fun ?ty_env env subst tm ty ->
+  let must_clost, ty_env = match ty_env with
+    | None -> true, Type.Infer.mk_env () 
+    | Some ty_env -> false, ty_env 
+  in
+
   let state = {
     table  = env.table;
     cntxt  = env.cntxt;
     subst  = subst;
-    ty_env = Type.Infer.mk_env (); }
+    ty_env = ty_env; }
   in
   let t = convert state tm ty in
 
-  if not (Type.Infer.is_closed state.ty_env) then
+  if must_clost && not (Type.Infer.is_closed state.ty_env) then
     conv_err (L.loc tm) Freetyunivar;
 
   t    
@@ -1292,20 +1315,6 @@ let convert_index table subst t =
   match convert { table = table; cntxt = InGoal; } subst t Type.Index with
   | Term.Var x -> x
   | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
-
-(*------------------------------------------------------------------*)
-(** {2 Exported type-checking function} *)
-
-let check table ?(local=false) (env:env) t (Type.ETy s) : unit =
-  let dummy_var s =
-    Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
-  in
-  let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
-  let conv_env = { table = table; cntxt = cntxt; } in
-  let subst =
-    List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
-  in
-  ignore (convert conv_env subst t s)
 
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)
@@ -1480,10 +1489,11 @@ let () =
       let env = ["x",Type.emessage;"y",Type.emessage] in
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
-      check table env t Type.emessage ;
+      let ty_env = Type.Infer.mk_env () in
+      check table ty_env env t Type.emessage ;
       Alcotest.check_raises
         "message is not a boolean"
         (Conv (L._dummy, Type_error (t_i, Type.eboolean)))
-        (fun () -> check table env t Type.eboolean)
+        (fun () -> check table ty_env env t Type.eboolean)
     end
   ]
