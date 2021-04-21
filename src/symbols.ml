@@ -55,7 +55,7 @@ type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State  of int * Type.tmessage
   | Global of int
-  | Local  of Type.ety list * Type.ety
+  | Local  of Type.ety list * Type.tmessage
 
 (*------------------------------------------------------------------*)
 type bty_info = 
@@ -576,14 +576,14 @@ let fs_and   = mk_fsymb "and" 2
 let fs_or    = mk_fsymb "or" 2
 let fs_not   = mk_fsymb "not" 1
 
-(* let fs_ite =
- *   let tyv = mk_univar "t" in
- *   let tyvar = Type.TUnivar tyv in
- *   let fty = Type.mk_ftype
- *       0 [tyv]
- *       [Type.Boolean; tyvar; tyvar]
- *       etyvar in
- *   mk_fsymb ~fty "if" (-1) *)
+let fs_ite =
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+  let fty = Type.mk_ftype
+      0 [tyv]
+      [Type.Boolean; tyvar; tyvar]
+      tyvar in
+  mk_fsymb ~fty "if" (-1)
 
 (** Fail *)
 
@@ -600,7 +600,18 @@ let fs_succ = mk_fsymb "succ" 1
 
 (** Pairing *)
 
-let fs_pair = mk_fsymb "pair" 2   
+let fs_pair =
+  let tyv1, tyv2 = Type.mk_tvar "t1", Type.mk_tvar "t2" in
+  let tyvar1, tyvar2 = Type.TVar tyv1, Type.TVar tyv2 in
+
+  let fty = Type.mk_ftype
+      0 [tyv1; tyv2]
+      [tyvar1; tyvar2]
+      Type.Message
+  in
+  mk_fsymb ~fty "pair" (-1)
+(* let fs_pair = mk_fsymb "pair" 2    *)
+
 let fs_fst  = mk_fsymb "fst" 1
 let fs_snd  = mk_fsymb "snd" 1
 

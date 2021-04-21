@@ -278,8 +278,10 @@ let case_cond orig vars c t e s =
 
 let message_case (m : Term.message) s : c_res list =
   match m with
-  | Term.(Find (vars,c,t,e)) as o -> case_cond o vars c t e s
-  | Term.(ITE (c,t,e)) as o -> case_cond o [] c t e s
+  | Term.Find (vars,c,t,e) as o -> case_cond o vars c t e s
+  | Term.Fun (f,_,[c;t;e]) as o when f = Term.f_ite ->
+    case_cond o [] c t e s
+
   | Term.Macro (ms,[],ts) as o
     when Macros.is_defined ms.s_symb ts (TraceSequent.table s) ->
 
@@ -288,8 +290,8 @@ let message_case (m : Term.message) s : c_res list =
 
     begin 
       match Macros.get_definition (mk_trace_cntxt s) ms ts with
-      | Term.(Find (vars,c,t,e)) -> case_cond o vars c t e s
-      | Term.(ITE (c,t,e)) -> case_cond o [] c t e s
+      | Term.Find (vars,c,t,e) -> case_cond o vars c t e s
+      | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond o [] c t e s
       | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
     end
 
@@ -1192,6 +1194,7 @@ let congruence (s : TraceSequent.t) : bool Utils.timeout_r =
         conclusions
     in
     let s = List.fold_left (fun s f ->
+        dbg "adding %a" Term.pp f;
         Hyps.add Args.AnyName f s
       ) s term_conclusions
     in
@@ -1884,7 +1887,8 @@ let fa s =
     | Term.Atom (`Message (`Eq,u,v)) ->
         begin match u,v with
 
-          | Term.ITE (c,t,e), Term.ITE (c',t',e') ->
+          | Term.Fun (f,_,[c;t;e]), Term.Fun (f',_,[c';t';e'])
+            when f = Term.f_ite && f' = Term.f_ite ->
             let subgoals =
               let open TraceSequent in
               [ s |> set_conclusion (Term.mk_impl c c') ;
@@ -2569,7 +2573,7 @@ let apply_yes_no_if b s =
         if b then (t, TraceSequent.set_conclusion c s)
         else (e, TraceSequent.set_conclusion (Term.mk_not c) s)
       in
-      let subst = [Term.ESubst (Term.ITE (c,t,e),branch)] in
+      let subst = [Term.ESubst (Term.mk_ite c t e,branch)] in
       [ trace_sequent; TraceSequent.subst subst s ]
 
 let yes_no_if b =

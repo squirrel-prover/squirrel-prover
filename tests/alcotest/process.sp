@@ -8,7 +8,7 @@
 process A(c:boolean) = if c=true then null else null
 process B(c:boolean) = if c=true then null
 *)
-process P(x:message) = if x=true then if true=x then null else null else null
+process P(x:boolean) = if x=true then if true=x then null else null else null
 process C = null
 process D = (null|(null)) (* () not allowed; empty | operand not allowed *)
 system if True then if True then null else null else null.

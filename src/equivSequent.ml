@@ -182,7 +182,7 @@ let set_equiv_goal j e = { j with goal = Equiv.Atom (Equiv.Equiv e) }
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) -> 
-    Some (List.map (Equiv.pi_elem proj) e)
+    Some (List.map (Equiv.pi_term proj) e)
   | _ -> None
 
 let subst subst s =

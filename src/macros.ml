@@ -1,3 +1,4 @@
+open Utils
 
 (*------------------------------------------------------------------*)
 (** {2 Macro definitions} *)
@@ -82,10 +83,11 @@ let get_def :
         Term.mk_pair
           (Term.Macro (symb, [], Term.Pred a))
           (Term.mk_pair
-             (Term.boolToMessage (Term.Macro (Term.exec_macro, [], a)))
-             (Term.ITE (Term.Macro (Term.exec_macro, [], a),
-                        Term.Macro (Term.out_macro, [], a),
-                        Term.mk_zero)))
+             (Term.Macro (Term.exec_macro, [], a))
+             (Term.mk_ite
+                (Term.Macro (Term.exec_macro, [], a))
+                (Term.Macro (Term.out_macro, [], a))
+                Term.mk_zero))
 
       | _ -> assert false
     end
@@ -205,7 +207,7 @@ let get_definition : type a.
 
 (*------------------------------------------------------------------*)
 let get_dummy_definition :
-  type a. Constr.trace_cntxt -> a Term.msymb -> a Term.term =
+  type a. Constr.trace_cntxt -> Term.msymb -> Term.message =
   fun cntxt symb ->
   match Symbols.Macro.get_all symb.s_symb cntxt.table with
     | Symbols.(Global _, Global_data (inputs,indices,ts,term)) ->

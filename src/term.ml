@@ -18,11 +18,15 @@ type ('a,'b) isymb = {
   s_typ     : 'b; 
 }
 
-let mk_isymb s t is = {
-  s_symb    = s; 
-  s_typ     = t;
-  s_indices = is; 
-} 
+let mk_isymb s t is = 
+  let () = match t with
+    | Type.TBase _ | Type.TUnivar _ -> assert false;
+    | _ -> () in
+  {
+    s_symb    = s; 
+    s_typ     = t;
+    s_indices = is; 
+  } 
 
 type name = Symbols.name Symbols.t
 type nsymb = (name, Type.tmessage) isymb
@@ -92,9 +96,6 @@ and _ term =
 
   | Diff : 'a term * 'a term -> 'a term
 
-  | ITE :
-      Type.message term * Type.message term * Type.message term ->
-      Type.message term
   | Find :
       Vars.index list * Type.message term *
       Type.message term * Type.message term ->
@@ -154,7 +155,6 @@ let rec kind : type a. a term -> a Type.kind =
     | Pred _               -> Type.KTimestamp
     | Action _             -> Type.KTimestamp
     | Diff (a, b)          -> kind a
-    | ITE (a, b, c)        -> Type.KMessage
     | Find (a, b, c, d)    -> Type.KMessage
     | Atom _               -> Type.KMessage
     | ForAll _             -> Type.KMessage
@@ -196,7 +196,6 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
       | Pred _               -> Type.Timestamp
       | Action _             -> Type.Timestamp
       | Diff (a, b)          -> ty a
-      | ITE (a, b, c)        -> Type.Message
       | Find (a, b, c, d)    -> Type.Message
       | Atom _               -> Type.Boolean
       | ForAll _             -> Type.Boolean
@@ -254,7 +253,7 @@ let f_true   = mk Symbols.fs_true
 let f_and    = mk Symbols.fs_and
 let f_or     = mk Symbols.fs_or
 let f_not    = mk Symbols.fs_not
-(* let f_ite    = mk Symbols.fs_ite *)
+let f_ite    = mk Symbols.fs_ite
 
 (** Fail *)
 
@@ -304,11 +303,11 @@ let mk_fun table fname indices terms =
   let fty = Symbols.ftype table fname in
   Fun ((fname,indices), fty, terms)
 
-let mk_true =
-  mk_fun Symbols.builtins_table Symbols.fs_true [] []
+let mk_true = True
+  (* mk_fun Symbols.builtins_table Symbols.fs_true [] [] *)
 
-let mk_false =
-  mk_fun Symbols.builtins_table Symbols.fs_false [] []
+let mk_false = False
+  (* mk_fun Symbols.builtins_table Symbols.fs_false [] [] *)
 
 let mk_zero =
   mk_fun Symbols.builtins_table Symbols.fs_zero [] []
@@ -327,6 +326,11 @@ let mk_zeroes term =
 
 let mk_pair t0 t1 =
   mk_fun Symbols.builtins_table Symbols.fs_pair [] [t0;t1]
+
+let mk_ite c t e = match c with
+  | True -> t
+  | False -> e
+  | _ -> mk_fun Symbols.builtins_table Symbols.fs_ite [] [c;t;e]
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
@@ -354,11 +358,6 @@ let mk_impl t1 t2 = match t1,t2 with
 
 let mk_impls ts t =
   List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
-
-let mk_ite c t e = match c with
-  | True -> t
-  | False -> e
-  | _ -> ITE (c,t,e)
 
 let mk_forall l f = 
   if l = [] then f 
@@ -392,11 +391,6 @@ let mk_indices_eq vect_i vect_j =
        ) vect_i vect_j)
 
 (*------------------------------------------------------------------*)
-(** {2 Convert a boolean term to a message term, used in frame macro definition} *)
-
-let boolToMessage b =
-  ITE (b,mk_true, mk_false)
-
 let pp_indices ppf l =
   if l <> [] then Fmt.pf ppf "(%a)" Vars.pp_list l
 
@@ -416,7 +410,20 @@ let rec is_and_happens = function
 let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Var m -> Fmt.pf ppf "%a" Vars.pp m
 
-  | Fun ((s,[]),_,terms) when Symbols.to_string s = "pair" ->
+  | Fun (s,_,[b;c; Fun (f,_,[])])
+    when s = f_ite && f = f_zero ->
+    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
+      pp b pp c
+
+  | Fun (s,_,[b;Fun (f1,_,[]);Fun (f2,_,[])]) 
+    when s = f_ite && f1 = f_true && f2 = f_false ->
+    Fmt.pf ppf "%a" pp b
+
+  | Fun (s,_,[a;b;c]) when s = f_ite ->
+    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
+      pp a pp b pp c
+
+  | Fun (s,_,terms) when s = f_pair ->
       Fmt.pf ppf "%a"
         (Utils.pp_ne_list
            "<@[<hov>%a@]>"
@@ -457,20 +464,7 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   | Diff (bl, br) ->
     Fmt.pf ppf "@[<1>diff(%a,@,%a)@]"
       pp bl pp br
-      
-  | ITE (b, c, Fun (f,_,[]))
-    when f = f_zero ->
-    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a)@]"
-      pp b pp c
-
-  | ITE (b, Fun (f1,_,[]), Fun (f2,_,[]))
-    when f1 = f_true && f2 = f_false ->
-    Fmt.pf ppf "%a" pp b
-
-  | ITE (b, c, d) ->
-    Fmt.pf ppf "@[<3>(if@ %a@ then@ %a@ else@ %a)@]"
-      pp b pp c pp d
-      
+           
   | Find (b, c, d, Fun (f,_,[])) when f = f_zero ->
     Fmt.pf ppf "@[<3>(try find %a such that@ %a@ in@ %a)@]"
       Vars.pp_list b pp c pp d
@@ -637,7 +631,6 @@ let rec pts : type a. timestamp list -> a term -> timestamp list =
         List.fold_left pts (ts :: acc) l
     | Name _ -> acc
     | Var _ -> []
-    | ITE (f,t,e) -> List.fold_left pts (pts acc f) [t;e]
     | _ -> failwith "Not implemented"
 
 let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
@@ -705,7 +698,6 @@ let get_set_vars : 'a term -> Sv.t =
         (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
     | Name s -> Sv.add_list vars s.s_indices
     | Diff (a, b) -> termvars a (termvars b vars)
-    | ITE (a, b, c) -> termvars a (termvars b (termvars c vars))
     | Find (a, b, c, d) ->
       Sv.diff
         (termvars b (termvars c (termvars d vars)))
@@ -807,7 +799,6 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
       | Pred ts -> Pred (subst s ts)
       | Action (a,indices) -> Action (a, List.map (subst_var s) indices)
       | Diff (a, b) -> Diff (subst s a, subst s b)
-      | ITE (a, b, c) -> ITE (subst s a, subst s b, subst s c)
       | Atom a-> Atom (subst_generic_atom s a)
       | And (a, b) -> And (subst s a, subst s b)
       | Or (a, b) -> Or (subst s a, subst s b)
@@ -905,7 +896,6 @@ let subst_macros_ts table l ts t =
     | Fun (f,fty,terms)  -> Fun    (f, fty, List.map subst_term terms)
     | Seq (a, b)         -> Seq    (a, subst_term b)
     | Diff (a, b)        -> Diff   (subst_term a, subst_term b)
-    | ITE (a, b, c)      -> ITE    (subst_term a, subst_term b, subst_term c)
     | Find (vs, b, t, e) -> Find   (vs, subst_term b, subst_term t, subst_term e)
     | ForAll (vs, b)     -> ForAll (vs, subst_term b)
     | Exists (vs, b)     -> Exists (vs, subst_term b)
@@ -983,12 +973,6 @@ let tmap : type a. (eterm -> eterm) -> a term -> a term =
     let bl = func bl in
     let br = func br in
     Diff (bl, br)      
-
-  | ITE (b, c, d) -> 
-    let b = func b 
-    and c = func c
-    and d = func d in
-    ITE (b, c, d)        
 
   | Find (b, c, d, e) -> 
     let c = func c 
@@ -1091,9 +1075,6 @@ module Match = struct
 
         | Diff (a,b), Diff (a', b') ->
           tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
-
-        | ITE (b,t1,t2), ITE (b',t1',t2') ->
-          tmatch_l [t1;t2] [t1';t2'] (tmatch b b' mv)
 
         | Find _, _ -> raise NoMatch
 
@@ -1294,7 +1275,6 @@ let pi_term ~projection term =
       | PRight -> pi_term s b
       | PNone -> Diff (a, b)
     end
-  | ITE (a, b, c) -> ITE (pi_term s a, pi_term s b, pi_term s c)
   | Find (vs, b, t, e) -> Find (vs, pi_term s b, pi_term s t, pi_term s e)
   | ForAll (vs, b) -> ForAll (vs, pi_term s b)
   | Exists (vs, b) -> Exists (vs, pi_term s b)
@@ -1342,7 +1322,6 @@ let head_normal_biterm : type a. a term -> a term = fun t ->
 
   | Var x, Var x' when x=x' -> Var x
 
-  | ITE (i,t,e), ITE (i',t',e') -> ITE (diff i i', diff t t', diff e e')
   | Find (is,c,t,e), Find (is',c',t',e') when is=is' ->
       Find (is, diff c c', diff t t', diff e e')
 

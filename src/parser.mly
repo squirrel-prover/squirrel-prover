@@ -133,10 +133,12 @@ term_i:
 | t=term EXP t0=term
     { let loc = L.make $startpos $endpos in
       let fsymb = L.mk_loc loc "exp" in
-      Theory.App (fsymb,  [t;t0])}
+      Theory.App (fsymb,  [t;t0]) }
  
 | IF b=term THEN t=term t0=else_term
-                                          { Theory.ITE (b,t,t0) }
+    { let loc = L.make $startpos $endpos in
+      let fsymb = L.mk_loc loc "if" in
+      Theory.App (fsymb,  [b;t;t0]) }
 
 | FIND is=indices SUCHTHAT b=term IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }

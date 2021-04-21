@@ -41,7 +41,6 @@ type term_i =
   | Tpred of term
   | Diff  of term * term
   | Seq   of lsymb list * term
-  | ITE   of term * term * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list
@@ -103,9 +102,6 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | Impl (a,b), Impl (a',b')
   | Or   (a,b), Or   (a',b') ->
     equal a a' && equal b b'
-
-  | ITE (a,b,c), ITE (a',b',c') ->
-    equal a a' && equal b b' && equal c c'
 
   | Compare (ord, a, b), Compare (ord', a', b') ->
     ord = ord' && equal a a' && equal b b'
@@ -179,11 +175,6 @@ let rec pp_term_i ppf t = match t with
 
   | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
 
-  | ITE (i,t,e) ->
-      Fmt.pf ppf
-        "@[if@ %a@ then@ %a@ else@ %a@]"
-        pp_term i pp_term t pp_term e
-
   | Find (vs,c,t,e) ->
       Fmt.pf ppf
         "@[try find@ %a@ such that@ %a@ in@ %a@ else@ %a@]"
@@ -199,6 +190,11 @@ let rec pp_term_i ppf t = match t with
 
   | App (f,[t1;t2]) when L.unloc f="exp"->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
+
+  | App (f,[i;t;e]) when L.unloc f="if"->
+    Fmt.pf ppf
+      "@[if@ %a@ then@ %a@ else@ %a@]"
+      pp_term i pp_term t pp_term e
 
   | App (f,terms) ->
     Fmt.pf ppf "%s%a"
@@ -412,7 +408,7 @@ let check_arity (lsymb : lsymb) (actual : int) (expected : int) =
 type env = (string * Type.ety) list
 
 (** Type of a macro *)
-type mtype = Type.ety list * Type.ety (* args, out *)
+type mtype = Type.ety list * Type.tmessage (* args, out *)
 
 (** Macro or function type *)
 type mf_type = [`Fun of Type.ftype | `Macro of mtype]
@@ -441,19 +437,19 @@ let function_kind table (f : lsymb) : mf_type =
 
     | Macro (Global arity) ->
       let targs = (List.init arity (fun _ -> Type.eindex)) in
-      `Macro (targs, Type.emessage)
+      `Macro (targs, Type.Message)
 
     | Macro (Input|Output|Frame) -> 
-      `Macro ([], Type.emessage)
+      `Macro ([], Type.Message)
 
     | Macro (Cond|Exec) ->
-      `Macro ([], Type.eboolean)
+      `Macro ([], Type.Boolean)
 
     | _ -> conv_err (L.loc f) (Untyped_symbol (L.unloc f))
 
 let check_state table (s : lsymb) n : Type.tmessage =
-  match Symbols.def_of_lsymb s table with
-    | Symbols.(Exists (Macro (State (arity,ty)))) ->
+  match Symbols.Macro.def_of_lsymb s table with
+    | Symbols.State (arity,ty) ->
         check_arity s n arity ;
         ty
         
@@ -676,7 +672,7 @@ let check_ty_leq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
  *   | `Fail -> raise (ty_error state.ty_env of_t ty) *)
 
 let check_term_ty state ~of_t (t : 'a Term.term) (ty : 'b Type.ty) : unit =
-  check_ty_leq state ~of_t (Term.ty t) ty
+  check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
@@ -813,13 +809,6 @@ and convert0 :
 
   | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
 
-  | ITE (i,t,e) ->
-      begin match Type.kind ty with
-        | Type.KMessage ->
-            Term.ITE (conv Type.Boolean i, conv ty t, conv ty e)
-        | _ -> type_error ()
-      end
-
   | And (l,r) ->
       begin match ty with
         | Type.Boolean -> Term.And (conv ty l, conv ty r)
@@ -955,7 +944,7 @@ and conv_index state t =
     | Term.Var x -> x
     | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
 
-(* The term [t] in argument is here for error messages. *)
+(* The term [tm] in argument is here for error messages. *)
 and conv_app :
   type s.
   conv_state -> app_cntxt -> 
@@ -970,29 +959,114 @@ and conv_app :
       let state = { state with subst } in
       convert state t s in
 
-    let get_at () =
-      match get_ts app_cntxt with
-      | None -> conv_err loc (Timestamp_expected (L.unloc tm))
-      | Some ts -> ts in
+    let get_at ts_opt =
+      match ts_opt, get_ts app_cntxt with
+      | Some ts, _ -> ts
+      | None, Some ts -> ts 
+      | None, None -> conv_err loc (Timestamp_expected (L.unloc tm))
+    in
 
     let type_error () = raise (ty_error state.ty_env tm ty) in
+
+    let conv_fapp (f : lsymb) l ts_opt : Term.message =
+      let mfty = function_kind state.table f in
+      let () = check_arity f (List.length l) (mf_type_arity mfty) in
+
+      match Symbols.of_lsymb f state.table with
+      | Symbols.Wrapped (symb, Function (_,_)) ->
+        assert (ts_opt = None);
+
+        let fty = match mfty with `Fun x -> x | _ -> assert false in
+
+        (* refresh all type variables in [fty] *)
+        let fty_op = Type.open_ftype state.ty_env fty in
+
+        let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
+        let indices =
+          List.map (fun x -> conv_index state x) l_indices
+        in
+
+        let rmessages =
+          List.fold_left2 (fun rmessages t ty -> 
+              let t = conv ty t in
+              t :: rmessages
+            ) [] l_messages fty_op.Type.fty_args
+        in
+        let messages = List.rev rmessages in
+
+        let t = Term.Fun ((symb,indices),fty,messages) in
+
+        (* additional type check between the type of [t] and the output 
+           type in [fty].
+           Note that [convert] checks that the type of [t] is a subtype 
+           of [ty], hence we do not need to do it here. *)
+        check_term_ty state ~of_t:tm t fty_op.Type.fty_out;
+
+        t
+
+      | Wrapped (s, Symbols.Macro macro) ->
+        let ty_args, ty_out =
+          match mfty with `Macro x -> x | _ -> assert false
+        in
+        begin match macro with
+          | Symbols.State _ -> assert false
+
+          | Symbols.Global _ ->
+            assert (ty_args = []);
+            check_ty_leq state ~of_t:tm ty_out Type.Message;
+            let indices = List.map (conv_index state) l in
+            let ms = Term.mk_isymb s ty_out indices in
+            Term.Macro (ms,[],get_at ts_opt)
+
+          | Local (targs,_) ->
+            if List.for_all (fun s -> s = Type.eindex) ty_args
+            then
+              begin
+                let indices = List.map (conv_index state) l in
+
+                check_ty_leq state ~of_t:tm ty_out ty;
+
+                let ms = Term.mk_isymb s ty_out indices in
+
+                Term.Macro (ms,[],get_at ts_opt)
+              end
+            else
+              begin
+                assert (List.for_all (fun s -> s = Type.emessage) ty_args);
+                let l = List.map (conv Type.Message) l in
+
+                check_ty_leq state ~of_t:tm ty_out ty;
+
+                let ms = Term.mk_isymb s ty_out [] in
+
+                Term.Macro (ms,l,get_at ts_opt)
+              end
+
+          | Input | Output | Frame ->
+            (* FIXME I am not sure of the location to use in
+               check_arity_i below  *)
+            check_arity_i (L.loc f) "input" (List.length l) 0 ;
+            (* TODO: subtypes *)
+            let ms = Term.mk_isymb s ty_out [] in
+            Term.Macro (ms, [], get_at ts_opt)
+
+          | Cond | Exec ->
+            (* FIXME: I am not sure of the location to use in
+                check_arity_i below  *)
+            check_arity_i (L.loc f) "cond" (List.length l) 0 ;
+            let ms = Term.mk_isymb s ty_out [] in
+            Term.Macro (ms, [], get_at ts_opt)
+
+        end
+
+      | Wrapped (_, _) -> assert false
+    in
+
 
     match L.unloc app with
     | AVar s -> assoc state state.subst s ty
 
-    (* In [Term.term], function symbols deal with the message sort,
-     * and comparisons are over message, indices or timestamps.
-     *
-     * In most of the code below, we restrict function types to match
-     * this constraint. But we start with a few exceptions to enable
-     * basic usage of boolean terms.
-     *
-     * In older version of the code this was more flexible:
-     * Theory.terms of type Boolean were converted to Term.message,
-     * but we lost this subtyping ability when unifying conversions
-     * and typing them more strongly. We may or may not want to
-     * recover some of that flexibility. *)
-
+    (* TODO: types: remove special cases*)
     | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
       begin match Type.kind ty with
         | Type.KMessage -> Term.True
@@ -1007,125 +1081,14 @@ and conv_app :
 
     (* End of special cases. *)
 
-    | Fun (f,l,None) ->
-      let ts_expected = Conv (loc, Timestamp_expected t_i) in
-      let mfty = function_kind state.table f in
-      let () = check_arity f (List.length l) (mf_type_arity mfty) in
-      
+    | Fun (f,l,ts_opt) -> 
       begin match Type.kind ty with
-        | Type.KMessage ->
-          let open Symbols in
-          begin match of_lsymb f state.table with
-            | Wrapped (symb, Function (_,_)) ->
-              let fty = match mfty with `Fun x -> x | _ -> assert false in
-              
-              (* refresh all type variables in [fty] *)
-              let fty_op = Type.open_ftype state.ty_env fty in
-              
-              let l_indices, l_messages = List.takedrop fty_op.Type.fty_iarr l in
-              let indices =
-                List.map (fun x -> conv_index state x) l_indices
-              in
-             
-              let rmessages =
-                List.fold_left2 (fun rmessages t ty -> 
-                    let t = conv ty t in
-                    t :: rmessages
-                  ) [] l_messages fty_op.Type.fty_args
-              in
-              let messages = List.rev rmessages in
-
-              let t = Term.Fun ((symb,indices),fty,messages) in
-
-              (* additional type check between the type of [t] and the output 
-                 type in [fty].
-                 Note that [convert] checks that the type of [t] is a subtype 
-                 of [ty], hence we do not need to do it here. *)
-              check_term_ty state ~of_t:tm t fty_op.Type.fty_out;
-              
-              t
-
-            | Wrapped (s, Symbols.Macro (Global _)) ->
-              let ty_args, Type.ETy ty_out =
-                match mfty with `Macro x -> x | _ -> assert false
-              in
-              assert (ty_args = []);
-              check_ty_leq state ~of_t:tm ty_out Type.Message;
-              let indices = List.map (conv_index state) l in
-              let ms = Term.mk_isymb s ty indices in
-              Term.Macro (ms,[],get_at ())
-
-            | Wrapped (s, Macro (Local (targs,_))) ->
-              let ty_args, Type.ETy ty_out =
-                match mfty with `Macro x -> x | _ -> assert false
-              in
-              if List.for_all (fun s -> s = Type.eindex) ty_args
-              then
-                begin
-                  let indices = List.map (conv_index state) l in
-
-                  check_ty_leq state ~of_t:tm ty_out ty;
-
-                  let ms = Term.mk_isymb s ty indices in
-                  
-                  Term.Macro (ms,[],get_at ())
-                end
-              else
-                begin
-                  assert (List.for_all (fun s -> s = Type.emessage) ty_args);
-                  let l = List.map (conv Type.Message) l in
-                  
-                  check_ty_leq state ~of_t:tm ty_out ty;
-
-                  let ms = Term.mk_isymb s ty [] in
-                  
-                  Term.Macro (ms,l,get_at ())
-                end
-
-            | Wrapped (_, _) -> raise ts_expected
-          end
-
+        | Type.KMessage -> conv_fapp f l ts_opt
         | _ -> type_error ()
       end
 
-    | Fun (f, l, Some ts) ->
-      let ts_unexpected = Conv (loc, Timestamp_unexpected t_i) in
-      let open Symbols in
-      begin match Type.kind ty with
-        | Type.KMessage ->
-          begin match of_lsymb f state.table with
-            | Wrapped (s, Macro (Input|Output|Frame)) ->
-              (* I am not sure of the location to use in
-                 check_arity_i below  *)
-              check_arity_i (L.loc f) "input" (List.length l) 0 ;
-              let ms = Term.mk_isymb s ty [] in
-              Term.Macro (ms,[],ts)
-
-            | Wrapped (s, Macro (Global arity)) ->
-              check_arity f (List.length l) arity ;
-              let l = List.map (conv_index state) l in
-
-              let ms = Term.mk_isymb s ty l in
-              Term.Macro (ms,[],ts)
-
-            | Wrapped (s, Macro (Local (targs,_))) ->
-              (* TODO as above *)
-              assert false
-
-            | Wrapped (s, Macro (Cond|Exec)) ->
-              (* FIXME: I am not sure of the location to use in
-                  check_arity_i below  *)
-              check_arity_i (L.loc f) "cond" (List.length l) 0 ;
-              let ms = Term.mk_isymb s ty [] in
-              Term.Macro (ms,[],ts)
-
-            | Wrapped (_, _) -> raise ts_unexpected
-          end
-        | _ -> type_error ()
-      end
 
     | Get (s,opt_ts,is) ->
-      (* TODO: types: what about k ?*)
       let k = check_state state.table s (List.length is) in
       let is = List.map (conv_index state) is in
       let s = get_macro state.table s in
@@ -1137,7 +1100,7 @@ and conv_app :
       in
       begin match Type.kind ty with
         | Type.KMessage -> 
-          let ms = Term.mk_isymb s ty is in
+          let ms = Term.mk_isymb s k is in
           Term.Macro (ms,[],ts)
 
         | _ -> type_error ()
@@ -1284,7 +1247,6 @@ let subst t (s : (string * term_i) list) =
     | ForAll (vs,f) -> ForAll (vs, aux f)
     | Exists (vs,f) -> Exists (vs, aux f)
     | Diff (l,r) -> Diff (aux l, aux r)
-    | ITE (i,t,e) -> ITE (aux i, aux t, aux e)
     | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
 
   and aux t = L.mk_loc (L.loc t) (aux_i (L.unloc t))
@@ -1294,7 +1256,7 @@ let subst t (s : (string * term_i) list) =
 (*------------------------------------------------------------------*)
 (** {2 Exported conversion functions} *)
 
-(* exported outside to Theory.ml *)
+(** exported outside to Theory.ml *)
 let convert :
   type s. conv_env -> subst -> term -> s Type.ty -> s Term.term =
   fun env subst tm ty ->
@@ -1434,18 +1396,14 @@ let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
 
   (* parse the macro type *)
-  let Type.ETy ty = parse_p_ty0 table [] pty in
-  let () = match Type.kind ty with
-    | Type.KMessage -> ()
-    | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KMessage])
-  in
+  let ty = parse_p_ty table [] pty Type.KMessage in
 
   let table, _ =
     Symbols.Macro.declare_exact table
       s
       ~data
       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Type.ETy (Vars.ty x)) typed_args,Type.ETy ty)) in
+           Type.ETy (Vars.ty x)) typed_args,ty)) in
   table
 
 (* TODO could be generalized into a generic fold function

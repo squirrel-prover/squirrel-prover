@@ -161,13 +161,16 @@ let pp_parser_arg ppf = function
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair
 
+
+type boolean = [`Boolean]
+
 (*------------------------------------------------------------------*)
 (* The types are explicit, in order to type the tactics. *)
 type _ sort =
   | None      : unit sort
 
   | Message   : Type.message   sort
-  | Boolean   : Type.message   sort
+  | Boolean   :      boolean   sort
   | Timestamp : Type.timestamp sort        
   | Index     : Type.index     sort
 
@@ -184,7 +187,7 @@ type _ arg =
   | None      : unit arg 
 
   | Message   : Term.message   -> Type.message   arg
-  | Boolean   : Term.message   -> Type.message   arg
+  | Boolean   : Term.message   ->      boolean   arg
   | Timestamp : Term.timestamp -> Type.timestamp arg
   | Index     : Vars.index     -> Type.index     arg
 

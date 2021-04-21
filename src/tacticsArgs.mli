@@ -52,14 +52,11 @@ type ip_handler = [
 ]
 
 (*------------------------------------------------------------------*)
-(** {2 Tactic arguments types} *)
-
-(*------------------------------------------------------------------*)
-(** Parsed arguments for rewrite *)
+(** {2 Parsed arguments for rewrite} *)
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
-(* rewrite item *)
+(** rewrite item *)
 type rw_item = { 
   rw_mult : rw_count;
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
@@ -78,7 +75,11 @@ type rw_in = [`All | `Hyps of lsymb list] option
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
 
-(*------------------------------------------------------------------*)  
+(*------------------------------------------------------------------*)
+(** {2 Tactic arguments types} *)
+
+type boolean = [`Boolean]
+
 (** Types used during parsing. 
     Note that all tactics not defined in the parser must rely on the Theory 
     type, even to parse strings. *)
@@ -97,7 +98,7 @@ type _ sort =
   | None      : unit sort
 
   | Message   : Type.message   sort
-  | Boolean   : Type.message   sort
+  | Boolean   :      boolean   sort
   | Timestamp : Type.timestamp sort        
   | Index     : Type.index     sort
         
@@ -114,7 +115,7 @@ type _ arg =
   | None      : unit arg 
 
   | Message   : Term.message   -> Type.message   arg
-  | Boolean   : Term.message   -> Type.message   arg
+  | Boolean   : Term.message   ->      boolean   arg
   | Timestamp : Term.timestamp -> Type.timestamp arg
   | Index     : Vars.index     -> Type.index     arg
 

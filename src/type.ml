@@ -24,7 +24,7 @@ type tvar = Ident.t
 
 let pp_tvar fmt id = Fmt.pf fmt "'%a" Ident.pp id
 
-let tvar_of_ident id = id
+let mk_tvar s = Ident.create s
 let ident_of_tvar id = id
   
 (*------------------------------------------------------------------*)

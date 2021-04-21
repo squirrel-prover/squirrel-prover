@@ -93,7 +93,7 @@ type macro_def =
   | Global of int
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
-  | Local of Type.ety list * Type.ety
+  | Local  of Type.ety list * Type.tmessage
     (** Local macro definitions are explicitly defined by the
       * user, and may depend on arbitrary terms. *)
 
@@ -296,7 +296,7 @@ val fs_false  : fname t
 val fs_and    : fname t
 val fs_or     : fname t
 val fs_not    : fname t
-(* val fs_ite    : fname t *)
+val fs_ite    : fname t
 
 (** Successor over natural numbers *)
 

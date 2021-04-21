@@ -349,8 +349,7 @@ module Hyps
 
   and add_form_aux
       ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
-    let recurse = not (H.is_hyp f s.hyps) && (Config.auto_intro ()) in
-    (* let recurse = not (H.is_hyp f s.hyps) in *)
+    let recurse = (not (H.is_hyp f s.hyps)) && (Config.auto_intro ()) in
 
     (* TODO: remove auto naming ? *)
     let id = match id with       
@@ -374,7 +373,6 @@ module Hyps
   (** if [force], we add the formula to [Hyps] even if it already exists. *)
   let add_formula ?(force=false) id f (s : sequent) =
     match f with
-    | Term.Atom (#Term.message_atom) -> add_form_aux ~force (Some id) s f
     | Term.Atom (`Happens ts)        -> add_happens ~force id s ts
     | _ -> add_form_aux ~force (Some id) s f
 
@@ -455,7 +453,8 @@ let pi projection s =
 let set_conclusion a s =
   let s = S.update ~conclusion:a s in
     match a with
-      | Term.Atom Term.(#message_atom) -> Hyps.add_macro_defs s a
+      | Term.Atom Term.(#message_atom) 
+        when Config.auto_intro () -> Hyps.add_macro_defs s a
       | _ -> s
 
 let init ~system table (goal : Term.message) =

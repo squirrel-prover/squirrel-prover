@@ -18,5 +18,6 @@ system (out(c,enc(m,r,k)) |   out(c,enc(m2,r,k)) | ( in(c,x); let y = dec(x,k) i
 goal _ : happens(A2) => output@A2 <> fail => output@A2 = m.
 Proof.
   intro Hap H.
-  nosimpl(intctxt D).
+  rewrite /output /y in H.
+  nosimpl(intctxt H).
 Qed.

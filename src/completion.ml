@@ -30,6 +30,10 @@ module Cst = struct
     let () = incr cst_cpt in 
     Cflat !cst_cpt
 
+  let hash = function
+    | Cgfuncst (`N (n,_)) -> Hashtbl.hash n
+    | _ as t -> Hashtbl.hash t
+
   let rec print ppf = function
     | Cflat i   -> Fmt.pf ppf "_%d" i
     | Csucc c   -> Fmt.pf ppf "suc(@[%a@])" print c
@@ -69,10 +73,32 @@ let nilpotence_norm compare l =
     [Symbols.action Symbols.t]. *)
 type gfsymb = 
   | F of Symbols.fname  Symbols.t                        (* function symbol *)
-  | M of Symbols.macro  Symbols.t * Type.ekind           (* macro *)
+  | M of Symbols.macro  Symbols.t * Type.message Type.ty (* macro *)
   | N of Symbols.name   Symbols.t * Type.message Type.ty (* name *)
   | A of Symbols.action Symbols.t                        (* action *)
   | GPred                                                (* predecessor *)
+
+let hash_gfs = function
+  | M (m, _) -> Hashtbl.hash m
+  | N (n, _) -> Hashtbl.hash n
+  | _ as f -> Hashtbl.hash f
+
+let equal_gfs f1 f2 = match f1, f2 with
+  | F f1, F f2 -> f1 = f2
+
+  | M (m1, t1), M (m2, t2) -> 
+    m1 = m2 &&
+    (assert (t1 = t2); true) (* sanity check, for now *)
+
+  | N (n1, t1), N (n2, t2) -> 
+    n1 = n2 && 
+    (assert (t1 = t2); true) (* sanity check, for now *)
+
+  | A a1, A a2 -> a1 = a2
+
+  | GPred, GPred -> true
+
+  | _ -> false
 
 (*------------------------------------------------------------------*)
 module CTerm : sig
@@ -125,15 +151,15 @@ end = struct
       | Cxor ts -> Utils.hcombine_list (fun x -> x.hash) 0 ts
       | Cfun (f,i,ts) ->
         Utils.hcombine_list (fun x -> x.hash) 
-          (Utils.hcombine i (hcombine 1 (Hashtbl.hash f)))
+          (Utils.hcombine i (hcombine 1 (hash_gfs f)))
           ts
-      | Ccst c -> hcombine 2 (Hashtbl.hash c)
+      | Ccst c -> hcombine 2 (Cst.hash c)
       | Cvar v -> hcombine 3 v
 
     let equal t t' = match t.cnt, t'.cnt with
       | Cxor ts, Cxor ts' -> List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
       | Cfun (f,i,ts), Cfun (f',i',ts') ->
-        f = f' && i = i' &&
+        equal_gfs f f' && i = i' &&
         List.for_all2 (fun x y -> x.hash = y.hash) ts ts'
       | Ccst c, Ccst c' -> c = c'
       | Cvar v, Cvar v' -> v = v'
@@ -230,7 +256,7 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     assert (l = []); (* TODO *)
     let is = List.map cterm_of_var ms.s_indices in
     cfun
-      (M (ms.s_symb, Type.EKind ms.s_typ))
+      (M (ms.s_symb, ms.s_typ))
       (List.length is) (is @ [cterm_of_term ts])
 
   | Term.Action (a,is) ->
@@ -242,11 +268,6 @@ let rec cterm_of_term : type a. a Term.term -> cterm = fun c ->
     cfun (N (ns.s_symb,ns.s_typ)) (List.length is) is
 
   | Var m  -> ccst (Cst.Cmvar (Vars.EVar m))
-
-  (* | ITE(b,c,d) -> cfun (F Symbols.fs_ite) 0 [ cterm_of_term b;
-   *                                             cterm_of_term c;
-   *                                             cterm_of_term d ] *)
-  | ITE _ -> raise Unsupported_conversion
 
   | Diff(c,d) -> cfun (F Symbols.fs_diff) 0 [cterm_of_term c; cterm_of_term d]
 
@@ -279,9 +300,9 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
       | Cfun (M (m,ek), ari, cterms) -> 
         let cis, cts = List.takedrop ari cterms in
         let cts = as_seq1 cts in
-        assert (Type.EKind kind = ek);
-        let m = Term.mk_isymb m kind (indices_of_cterms cis) in
-        Macro (m, [], term_of_cterm Type.KTimestamp cts)
+        let m = Term.mk_isymb m ek (indices_of_cterms cis) in
+        let tm = Term.Macro (m, [], term_of_cterm Type.KTimestamp cts) in
+        Term.cast kind tm
 
       | Cfun (A a, ari, is) -> 
         assert (ari = List.length is);
@@ -323,9 +344,9 @@ let term_of_cterm : type a. Symbols.table -> a Type.kind -> cterm -> a Term.term
 (*------------------------------------------------------------------*)
 let pp_gsymb ppf = function
   | F x     -> Symbols.pp ppf x
-  | M (x,_) -> Symbols.pp ppf x
+  | M (x,t) -> Fmt.pf ppf "%a : %a" Symbols.pp x Type.pp t
   | A x     -> Symbols.pp ppf x
-  | N (x,_) -> Symbols.pp ppf x
+  | N (x,t) -> Symbols.pp ppf x
   | GPred   -> Fmt.pf ppf "pred"
 
 let rec pp_cterm ppf t = match t.cnt with
@@ -1222,14 +1243,15 @@ let rec term_grnd_normalize (state : state) (u : cterm) : cterm =
     cxor (csts_norm @ fterms1)
 
   | Cfun (fn, ari, ts) ->
+    assert (ts <> []);
     let nts = List.map (term_grnd_normalize state) ts in
     let u' = cfun fn ari nts in
 
     (* TODO: storing rules by head function symbols would help here. *)
     if List.for_all (fun c -> not (is_cfun c)) nts then
-      match find_grules (fun (l,_) -> l = u') state.grnd_rules with 
-      | Some (_,a) -> ccst a
-      | None -> u'
+      match find_grules (fun (l,_) -> c_equal l u') state.grnd_rules with 
+        | Some (_,a) -> ccst a
+        | None -> u'
     else u'
 
 
@@ -1511,7 +1533,8 @@ let check_disequalities state neqs l =
      Precondition: [u] and [v] must be ground *)
 let check_equality_cterm state (u,v) =
   assert (state.completed);
-  normalize ~print:true state u = normalize ~print:true state v
+  normalize ~print:true state u = 
+  normalize ~print:true state v
 
 let check_equality state (Term.ESubst (u,v)) =  
   try

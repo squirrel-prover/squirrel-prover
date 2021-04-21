@@ -13,13 +13,13 @@
   * can then be indexed. *)
 
 (** Ocaml type of a typed index symbol *)
-type ('a,'b) isymb = { 
+type ('a,'b) isymb = private { 
   s_symb    : 'a;
   s_indices : Vars.index list;
   s_typ     : 'b; 
 }
 
-val mk_isymb : 'a -> 'b -> Vars.index list -> ('a,'b) isymb
+val mk_isymb : 'a -> Type.tmessage -> Vars.index list -> ('a,Type.tmessage) isymb
 
 (** Names represent random values of length the security parameter. *)
 
@@ -88,9 +88,6 @@ and _ term =
 
   | Diff : 'a term * 'a term -> 'a term
 
-  | ITE :
-      Type.message term * Type.message term * Type.message term ->
-      Type.message term
   | Find :
       Vars.index list * Type.message term *
       Type.message term * Type.message term ->
@@ -284,7 +281,7 @@ val f_false  : fsymb
 val f_and    : fsymb
 val f_or     : fsymb
 val f_not    : fsymb
-(* val f_ite    : fsymb *)
+val f_ite    : fsymb
 
 val f_diff   : fsymb
 
@@ -358,13 +355,10 @@ val not_trace_eq_atom : trace_eq_atom -> trace_eq_atom
 val not_simpl : message -> message
 
 (*------------------------------------------------------------------*)
-(** Convert a boolean term to a message term, used in frame macro definition **)
-val boolToMessage : message -> message
-
-(*------------------------------------------------------------------*)
 (** {2 Destructors} *)
 
-val destr_action : message -> Symbols.action Symbols.t * Vars.index list
+val destr_action : 
+  timestamp -> (Symbols.action Symbols.t * Vars.index list) option
 
 val destr_forall : message -> (Vars.evar list * message) option
 val destr_exists : message -> (Vars.evar list * message) option

@@ -606,11 +606,9 @@ exception No_common_head
 exception No_FA
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
-    | Fun (f,_,l) -> l
-    | ITE (c,t,e) when t = e ->
+    | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
       EquivSequent.[ t ]
-    | ITE (c,t,e) ->
-      EquivSequent.[ c ; t ; e ]
+    | Fun (f,_,l) -> l
     | And (f,g) ->
       EquivSequent.[ f ; g ]
     | Or (f,g) ->
@@ -630,8 +628,9 @@ let fa_expand t =
   let filterBoolAsMsg =
     List.map
       (fun x -> match x with
-        | ITE (c,t,e) when t = Term.mk_true && e = Term.mk_false -> c
-        | _ -> x)
+         | Fun (f,_,[c;t;e]) 
+           when f = Term.f_ite && t = Term.mk_true && e = Term.mk_false -> c
+         | _ -> x)
   in
   filterBoolAsMsg (aux (Term.head_normal_biterm t))
 
@@ -649,7 +648,7 @@ let fa TacticsArgs.(Int i) s =
                 (fun i i' -> ESubst (Term.Var i, Term.Var i'))
                 vars vars'
             in
-            let c' = Term.(Seq (vars, boolToMessage c)) in
+            let c' = Term.(Seq (vars, c)) in
             let t' = Term.subst subst t in
             let biframe =
               List.rev_append before
@@ -802,13 +801,13 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
            (ms = Term.out_macro && List.mem a timestamps) ->
       timestamps
 
-    | ITE (Macro (ms,[],a), then_branch, _)
-      when ms = Term.exec_macro && List.mem a timestamps ->
+    | Fun (f,_, [Macro (ms,[],a);then_branch; _])
+      when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps ->
       self#fold_message timestamps then_branch
 
     | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
 
-    | Fun _ | Seq _ | ITE _ | Find _ -> super#fold_message timestamps t
+    | Fun _ | Seq _ | Find _ -> super#fold_message timestamps t
 
     | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
 
@@ -846,8 +845,10 @@ let fa_dup_int i s =
         let (tau,phi) =
           let f,g = match e with
             | Term.And (f,g) -> f,g
-            | Term.(Seq (vars,ITE (And (f,g),tt,ff)))
-              when tt = Term.mk_true && ff = Term.mk_false ->
+            | Term.(Seq (vars, Fun (fite,_,[And (f,g);tt;ff])))
+              when fite = Term.f_ite &&
+                   tt = Term.mk_true && 
+                   ff = Term.mk_false ->
               let subst =
                 List.map
                   (fun v ->
@@ -1247,7 +1248,6 @@ let expand_all () s =
       | Name n as a-> a
       | Var x as a -> a
       | Diff(a, b) -> Diff(aux a, aux b)
-      | ITE (a, b, c) -> ITE(aux a, aux b, aux c)
       | Seq (a, b) -> Seq(a, aux b)
       | Find (a, b, c, d) -> Find(a, aux b, aux c, aux d)
       | And (l,r) -> And (aux l, aux r)
@@ -1391,7 +1391,7 @@ let yes_no_if b TacticsArgs.(Int i) s =
           simplify_ite b s c t e in
         let new_elem =
           Equiv.subst_equiv
-            [Term.ESubst (Term.ITE (c,t,e),branch)]
+            [Term.ESubst (Term.mk_ite c t e,branch)]
             [elem]
         in
         let biframe = List.rev_append before (new_elem @ after) in
@@ -1443,9 +1443,11 @@ let push_formula (j: 'a option) f term =
 
   let rec mk_ite m = match m with
     (* if c then t else e becomes if (f => c) then t else e *)
-    | ITE (c,t,e) -> ITE (Term.Impl (f,c), t, e)
+    | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> 
+      Term.mk_ite (Term.Impl (f,c)) t e
+
     (* m becomes if f then m else 0 *)
-    | _ -> ITE (f, m, Term.mk_zero)
+    | _ -> Term.mk_ite f m Term.mk_zero
   in
 
   match term with
@@ -1483,14 +1485,14 @@ let ifcond TacticsArgs.(Pair (Int i,
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
-      | ITE (c,t,e) -> (c, t, e)
+      | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
       | _ ->  Tactics.soft_failure
                 (Tactics.Failure "can only be applied to a conditional")
     in
 
     begin try
         let new_elem = 
-          ITE (cond, push_formula j f positive_branch, negative_branch)
+          Term.mk_ite cond (push_formula j f positive_branch) negative_branch
         in
         let biframe = List.rev_append before (new_elem :: after) in
         let trace_sequent = 
@@ -1547,7 +1549,7 @@ let trivial_if (TacticsArgs.Int i) (s : EquivSequent.sequent) =
 
       let new_elem =
         Equiv.subst_equiv
-          [Term.ESubst (Term.ITE (c,t,e),t)]
+          [Term.ESubst (Term.mk_ite c t e,t)]
           [elem]
       in
       let biframe = List.rev_append before (new_elem @ after) in
@@ -1576,15 +1578,15 @@ let ifeq
   | before, e, after ->
     let cond, positive_branch, negative_branch =
       match e with
-      | ITE (c,t,e) ->
-        (c, t, e)
+      | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> (c, t, e)
       | _ -> Tactics.soft_failure
                (Tactics.Failure "Can only be applied to a conditional.")
     in
     let new_elem =
-      ITE (cond,
-           Term.subst [Term.ESubst (t1,t2)] positive_branch,
-           negative_branch)
+      Term.mk_ite 
+        cond
+        (Term.subst [Term.ESubst (t1,t2)] positive_branch)
+        negative_branch
     in
     let biframe = List.rev_append before (new_elem :: after) in
 
@@ -2008,7 +2010,7 @@ let prf TacticsArgs.(Int i) s =
             | _ -> assert false
         in
 
-        let if_term = Term.ITE (final_if_formula, Term.Name ns, hash) in
+        let if_term = Term.mk_ite final_if_formula (Term.Name ns) hash in
         let new_elem =
           Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
         in

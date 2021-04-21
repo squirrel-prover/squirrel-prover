@@ -874,8 +874,7 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     let out_ty = as_seq1 out_ty in
 
     let ty_args = List.map (fun l ->
-        let id = Ident.create (L.unloc l) in
-        Type.tvar_of_ident id
+        Type.mk_tvar (L.unloc l)
       ) decl.ty_args
     in
 

@@ -26,7 +26,7 @@ type tvar
 
 val pp_tvar : Format.formatter -> tvar -> unit
 
-val tvar_of_ident : Ident.t -> tvar
+val mk_tvar : string -> tvar
 val ident_of_tvar : tvar -> Ident.t
   
 (*------------------------------------------------------------------*)

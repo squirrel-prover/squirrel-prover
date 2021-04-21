@@ -50,7 +50,6 @@ type term_i =
   | Tpred of term
   | Diff  of term * term
   | Seq   of lsymb list * term
-  | ITE   of term * term * term
   | Find  of lsymb list * term * term * term
 
   | App of lsymb * term list

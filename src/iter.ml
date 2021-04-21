@@ -18,17 +18,19 @@ let erefresh evars =
 class iter ~(cntxt:Constr.trace_cntxt) = object (self)
   method visit_message t = match t with
     | Fun (_, _,l) -> List.iter self#visit_message l
+
     | Macro (ms,l,a) ->
         if l <> [] then failwith "Not implemented" ;
         self#visit_message (Macros.get_definition cntxt ms a)
 
     | Name _ | Var _ -> ()
+
     | Diff(a, b) -> self#visit_message a; self#visit_message b
-    | ITE (a, b, c) ->
-        self#visit_message a; self#visit_message b; self#visit_message c
+
     | Seq (a, b) ->
         let b = Term.subst (refresh a) b in
         self#visit_message b
+
     | Find (a, b, c, d) ->
         let subst = refresh a in
         let b = Term.subst subst b in
@@ -72,9 +74,6 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Name _ | Var _ -> x
 
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
-
-    | ITE (a, b, c) ->
-        self#fold_message (self#fold_message (self#fold_message x a) b) c
 
     | Seq (a, b) ->
         let b = Term.subst (refresh a) b in
@@ -223,7 +222,6 @@ class get_ite_term ~(cntxt:Constr.trace_cntxt) = object (self)
   val mutable ite : (Term.message * Term.message * Term.message) option = None
   method get_ite = ite
   method visit_message = function
-    | Term.ITE (c,t,e) ->
-        ite <- Some (c,t,e)
+    | Fun (f,_,[c;t;e]) when f = Term.f_ite -> ite <- Some (c,t,e)
     | m -> super#visit_message m
 end
