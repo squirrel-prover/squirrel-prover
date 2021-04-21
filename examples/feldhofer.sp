@@ -90,7 +90,7 @@ Proof.
   intro *.
   depends Reader(k), Reader1(k); 1: auto.
   intro C.
-  expand exec, cond, output.
+  expand exec, cond. 
   split => [_ [i j [[H _] _]]].
 
   project; use tags_neq as _.
@@ -106,7 +106,6 @@ Proof.
   (* Direction <= *)
   simpl.
   exists i,j. 
-  expand output, cipher => /=.
   by use fail_not_pair with tagT, <input@Tag(i,j),nt(i,j)>. 
 Qed.
 
@@ -124,7 +123,6 @@ Proof.
   expand exec, cond.
   depends Reader(k),Reader2(k); 1: auto.
   intro C.
-  expand output.
   split.
 
   (* Direction => is the obvious one *)

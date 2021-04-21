@@ -306,18 +306,6 @@ module Hyps
           self#visit_message def
 
       | t -> super#visit_message t
-    method visit_formula t = 
-      match t with
-      | Term.Macro (ms,[],a) -> 
-        if List.for_all
-            Vars.(function EVar v -> not (is_new v))
-            (Term.get_vars t) &&
-           Macros.is_defined ms.s_symb a cntxt.table
-        then
-          let def = Macros.get_definition cntxt ms a in
-          f a (`Boolean (t, def)) ;
-          self#visit_message def
-      | t -> super#visit_message t
   end
 
   (** Add to [s] equalities corresponding to the expansions of all macros
@@ -335,8 +323,8 @@ module Hyps
         ~cntxt
         (fun a el -> match el with
            |`Message (t,t') ->
-             macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs
-           |`Boolean (f,f') -> () (* TODO: add that f <=> f' *)
+             if Term.ty t <> Type.Boolean then
+               macro_eqs := (a, Term.Atom (`Message (`Eq,t,t'))) :: !macro_eqs
         ) in
     
     iter#visit_message f ;

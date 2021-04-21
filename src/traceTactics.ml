@@ -1154,6 +1154,7 @@ let rec expand_all s =
         unfold_macro ~canfail:false t s @ subst
       ) occs [] in
   let doit (f,_) = Term.subst subst f, [] in
+
   let s, subs = do_targets doit s targets in
   assert (subs = []);
   

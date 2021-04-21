@@ -142,10 +142,6 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
     | Macro (ms,[],a) -> self#visit_macro ms a
     | m -> super#visit_message m
 
-  method visit_formula = function
-    | Macro (ms,[],a) -> self#visit_macro ms a
-    | f -> super#visit_message f
-
   method has_visited_macro mn = List.mem mn checked_macros
 
 end

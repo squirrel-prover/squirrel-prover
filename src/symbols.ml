@@ -610,7 +610,6 @@ let fs_pair =
       Type.Message
   in
   mk_fsymb ~fty "pair" (-1)
-(* let fs_pair = mk_fsymb "pair" 2    *)
 
 let fs_fst  = mk_fsymb "fst" 1
 let fs_snd  = mk_fsymb "snd" 1

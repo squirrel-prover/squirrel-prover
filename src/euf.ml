@@ -33,8 +33,9 @@ end
   * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
 class get_f_messages ~drop_head ~cntxt head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~drop_head ~cntxt head_fn key_n
-  method visit_formula _ = ()
+  inherit Iter.get_f_messages ~drop_head ~cntxt head_fn key_n as super
+  method visit_message t = 
+    if Term.ty t = Type.Boolean then () else super#visit_message t
 end
 
 (** Check the key syntactic side-condition in the given list of messages
