@@ -46,6 +46,7 @@ rule token = parse
 | "//"                { SLASHSLASH }
 | "/="                { SLASHEQUAL }
 | '/'                 { SLASH }
+| "@/"                { ATSLASH }
 | "="                 { EQ }
 | "<>"                { NEQ }
 | ">="                { GEQ }

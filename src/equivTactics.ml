@@ -376,6 +376,10 @@ let rec do_intros (intros : Args.intro_pattern list) s =
     (* TODO: implement after code factorization *)
     hard_failure (Failure "not yet implemented for equiv sequents")
 
+  | (Args.SExpnd s_e) :: intros ->
+    (* TODO: implement after code factorization *)
+    hard_failure (Failure "not yet implemented for equiv sequents")
+
   | (Args.Simpl s_ip) :: intros ->
     let ss = do_intro_pat s_ip s in
     List.map (do_intros intros) ss

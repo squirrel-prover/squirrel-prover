@@ -20,7 +20,7 @@
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
-%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH
+%token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
 %token WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
@@ -426,10 +426,19 @@ rw_type:
 | f=sterm        { `Form f }  
 | SLASH t=sterm  { `Expand t }
 
+expnd_type:
+| ATSLASH t=sterm  { `Expand t }
+
 rw_item:
 | m=rw_mult d=loc(rw_dir) t=rw_type  { TacticsArgs.{ rw_mult = m; 
                                                      rw_dir = d; 
                                                      rw_type = t; } }
+
+expnd_item:
+| d=loc(rw_dir) t=expnd_type  { TacticsArgs.{ rw_mult = `Once; 
+                                              rw_dir = d; 
+                                              rw_type = t; } }
+
 
 rw_arg:
 | r=rw_item { TacticsArgs.R_item r }
@@ -478,6 +487,7 @@ intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
 | pat=simpl_pat { TacticsArgs.Simpl pat }
+| e=expnd_item  { TacticsArgs.SExpnd e }
 
 intro_pat_list:
 | l=slist1(intro_pat,empty) { l }

@@ -2081,13 +2081,13 @@ let simplify ~close ~strong =
   in
 
   let expand_all = 
-    (if strong && not intro 
     (if strong && close && not intro 
      then [wrap_fail expand_all_l] @ assumption
      else []) 
   in
 
-  andthen_list (
+
+  andthen_list ~cut:true (
     (* Try assumption first to avoid loosing the possibility
        * of doing it after introductions. *)
     assumption @
@@ -2108,11 +2108,14 @@ let simplify ~close ~strong =
     [clear_triv]
   ) 
 
-  (* Attempt to close a goal. *)
-  let do_conclude =
-    Tactics.orelse_list [wrap_fail congruence_tac; 
-                         wrap_fail constraints_tac; 
-                         wrap_fail assumption]
+(*------------------------------------------------------------------*)
+(* Attempt to close a goal. *)
+let do_conclude =
+  Tactics.orelse_list [wrap_fail congruence_tac; 
+                       wrap_fail constraints_tac; 
+                       wrap_fail assumption]
+
+
 
 (* If [close] then tries to automatically prove the goal,
  * otherwise it may also be reduced to a single subgoal. *)
@@ -2543,6 +2546,11 @@ let rec do_intros (intros : Args.intro_pattern list) s =
   | (Args.Simpl s_ip) :: intros ->
     let ss = do_intro_pat s_ip s in
     do_intros_list intros ss
+
+  | (Args.SExpnd s_e) :: intros ->
+    let ss = do_rw_item (s_e :> Args.rw_item) None s in
+    let ss = as_seq1 ss in (* we get exactly one new goal *)
+    do_intros intros ss
 
   | (Args.Star loc) :: intros ->
     try

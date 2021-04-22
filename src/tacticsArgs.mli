@@ -5,6 +5,41 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
+
+type s_item =
+  | Tryauto   of Location.t    (** '//' *)
+  | Simplify  of Location.t    (** '/=' *)
+
+(*------------------------------------------------------------------*)
+(** {2 Parsed arguments for rewrite} *)
+
+type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
+
+(** General rewrite item *)
+type 'a rw_item_g = { 
+  rw_mult : rw_count; 
+  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_type : 'a;
+}
+
+(** Rewrite or expand item*)
+type rw_item = [`Form of Theory.formula | `Expand of Theory.term] rw_item_g
+
+(** Expand item*)
+type expnd_item = [`Expand of Theory.term] rw_item_g
+
+(** Rewrite argument, which is a rewrite or simplification item*)
+type rw_arg =
+  | R_item   of rw_item 
+  | R_s_item of s_item
+
+(** Rewrite target.
+    None means the goal. *)
+type rw_in = [`All | `Hyps of lsymb list] option 
+
+(*------------------------------------------------------------------*)
+type apply_in = lsymb option
+
 (*------------------------------------------------------------------*)
 (** {2 Intro patterns} *)
 
@@ -27,13 +62,10 @@ and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
 
-type s_item =
-  | Tryauto   of Location.t    (** '//' *)
-  | Simplify  of Location.t    (** '/=' *)
-
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
-  | SItem of s_item
+  | SItem  of s_item
+  | SExpnd of expnd_item    (** @/macro *)
   | Simpl  of simpl_pat
 
 (*------------------------------------------------------------------*)
@@ -50,30 +82,6 @@ type ip_handler = [
   | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
   | `Hyp of Ident.t
 ]
-
-(*------------------------------------------------------------------*)
-(** {2 Parsed arguments for rewrite} *)
-
-type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
-
-(** rewrite item *)
-type rw_item = { 
-  rw_mult : rw_count;
-  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
-  rw_type : [
-    | `Form   of Theory.formula   (* formula or hypothesis ident *)
-    | `Expand of Theory.term      (* term or macro name *)
-  ];
-}
-
-type rw_arg =
-  | R_item   of rw_item 
-  | R_s_item of s_item
-
-type rw_in = [`All | `Hyps of lsymb list] option 
-
-(*------------------------------------------------------------------*)
-type apply_in = lsymb option
 
 (*------------------------------------------------------------------*)
 (** {2 Tactic arguments types} *)

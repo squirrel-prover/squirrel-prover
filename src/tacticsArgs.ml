@@ -2,95 +2,40 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-(*------------------------------------------------------------------*)
-type naming_pat =
-  | Unnamed                  (** '_' *)
-  | AnyName                  (** '?' *)
-  | Named   of string
-
-type and_or_pat =
-  | Or      of simpl_pat list
-  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
-        
-  | Split 
-  (** e.g. \[\] to do a case. *)
-
-  | And     of simpl_pat list
-  (** e.g. \[H1 H2\] to destruct a conjunction. *)
-        
-and simpl_pat =
-  | SAndOr of and_or_pat
-  | SNamed of naming_pat
-
 type s_item =
   | Tryauto   of Location.t    (** '//' *)
   | Simplify  of Location.t    (** '/=' *)
-
-type intro_pattern =
-  | Star   of Location.t    (** '*' *)
-  | SItem of s_item
-  | Simpl  of simpl_pat
-
-(*------------------------------------------------------------------*)
-let pp_naming_pat fmt = function
-  | Unnamed -> Fmt.pf fmt "_"
-  | AnyName -> Fmt.pf fmt "?"
-  | Named s -> Fmt.pf fmt "%s" s
-
-let rec pp_and_or_pat fmt = function
-  | Or      l ->
-    let sep fmt () = Fmt.pf fmt "|" in
-    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
-
-  | And      l ->
-    let sep fmt () = Fmt.pf fmt " " in
-    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
-
-  | Split -> Fmt.pf fmt "[]"
-
-and pp_simpl_pat fmt = function
-  | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
-  | SNamed n_ip  -> pp_naming_pat fmt n_ip
 
 let rec pp_s_item fmt = function
   | Simplify _    -> Fmt.pf fmt "/="
   | Tryauto  _    -> Fmt.pf fmt "//"
 
-let rec pp_intro_pat fmt = function
-  | SItem s    -> pp_s_item fmt s
-  | Star     _ -> Fmt.pf fmt "*"
-  | Simpl s_ip -> pp_simpl_pat fmt s_ip
-
-
-let pp_intro_pats fmt args =
-  let pp_sep fmt () = Fmt.pf fmt "@ " in
-  Fmt.pf fmt "@[<hv 2>%a@]"
-    (Fmt.list ~sep:pp_sep pp_intro_pat) args
-
-(*------------------------------------------------------------------*)
-(** handler for intro pattern application *)
-type ip_handler = [
-  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
-  | `Hyp of Ident.t
-]
-  
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
-(** rewrite item *)
-type rw_item = { 
+(** General rewrite item *)
+type 'a rw_item_g = { 
   rw_mult : rw_count; 
   rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
-  rw_type : [`Form of Theory.formula | `Expand of Theory.term];
+  rw_type : 'a;
 }
 
+(** Rewrite or expand item*)
+type rw_item = [`Form of Theory.formula | `Expand of Theory.term] rw_item_g
+
+(** Expand item*)
+type expnd_item = [`Expand of Theory.term] rw_item_g
+
+(** Rewrite argument, which is a rewrite or simplification item*)
 type rw_arg =
   | R_item   of rw_item 
   | R_s_item of s_item
 
-type rw_in = [`All | `Hyps of lsymb list] option 
+(** Rewrite target.
+    None means the goal. *)
+type rw_in = [`All | `Hyps of lsymb list] option
 
 let pp_rw_count ppf = function
   | `Once -> ()
@@ -131,6 +76,76 @@ let pp_apply_in ppf = function
     Fmt.pf ppf " in %a" Fmt.string (L.unloc symb)
 
 (*------------------------------------------------------------------*)
+(** {2 Intro patterns} *)
+
+type naming_pat =
+  | Unnamed                  (** '_' *)
+  | AnyName                  (** '?' *)
+  | Named   of string
+
+type and_or_pat =
+  | Or      of simpl_pat list
+  (** e.g. \[H1 | H2\] to do a case on a disjunction. *)
+        
+  | Split 
+  (** e.g. \[\] to do a case. *)
+
+  | And     of simpl_pat list
+  (** e.g. \[H1 H2\] to destruct a conjunction. *)
+        
+and simpl_pat =
+  | SAndOr of and_or_pat
+  | SNamed of naming_pat
+      
+
+type intro_pattern =
+  | Star   of Location.t    (** '*' *)
+  | SItem  of s_item
+  | SExpnd of expnd_item    (** @/macro *)
+  | Simpl  of simpl_pat
+
+(*------------------------------------------------------------------*)
+let pp_naming_pat fmt = function
+  | Unnamed -> Fmt.pf fmt "_"
+  | AnyName -> Fmt.pf fmt "?"
+  | Named s -> Fmt.pf fmt "%s" s
+
+let rec pp_and_or_pat fmt = function
+  | Or      l ->
+    let sep fmt () = Fmt.pf fmt "|" in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
+
+  | And      l ->
+    let sep fmt () = Fmt.pf fmt " " in
+    Fmt.pf fmt "[%a]" (Fmt.list ~sep pp_simpl_pat) l
+
+  | Split -> Fmt.pf fmt "[]"
+
+and pp_simpl_pat fmt = function
+  | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
+  | SNamed n_ip  -> pp_naming_pat fmt n_ip
+
+let rec pp_intro_pat fmt = function
+  | SItem s    -> pp_s_item fmt s
+  | Star     _ -> Fmt.pf fmt "*"
+  | Simpl s_ip -> pp_simpl_pat fmt s_ip
+  | SExpnd e   -> pp_rw_item fmt e
+
+let pp_intro_pats fmt args =
+  let pp_sep fmt () = Fmt.pf fmt "@ " in
+  Fmt.pf fmt "@[<hv 2>%a@]"
+    (Fmt.list ~sep:pp_sep pp_intro_pat) args
+
+(*------------------------------------------------------------------*)
+(** handler for intro pattern application *)
+type ip_handler = [
+  | `Var of Vars.evar (* Careful, the variable is not added to the env  *)
+  | `Hyp of Ident.t
+]
+  
+(*------------------------------------------------------------------*)
+(** {2 Tactics args} *)
+
 (** One tactic argument (in the parser) *)
 type parser_arg =
   | String_name of lsymb

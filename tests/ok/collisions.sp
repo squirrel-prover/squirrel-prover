@@ -31,7 +31,8 @@ goal unforgeable_1 (a : index, b : index) :
   output@A(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Hneq Heq /=.
+ intro a b Hap Hneq Heq.
+ expand output.
  collision.  
  auto.
 Qed.
@@ -41,7 +42,8 @@ goal unforgeable_2 (a : index, b : index):
   output@B(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Heq /=.
+ intro a b Hap Heq.
+ expand output.
  nosimpl(collision).
  nosimpl(intro Heq2).
  by eqnames.
@@ -53,7 +55,8 @@ goal unforgeable_3 (a : index, b : index):
   output@C(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Heq /=.
+ intro a b Hap Heq.
+ expand output.
  collision. 
  intro Heq2. 
  eqnames.
