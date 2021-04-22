@@ -1424,10 +1424,10 @@ let () =
 (*------------------------------------------------------------------*)
 exception Not_ifcond
 
-(* Push the formula [f] in the message [term].
- * Goes under function symbol, diff, seq and find. If [j]=Some jj, will push
- * the formula only in the jth subterm of the then branch (if it exists,
- * otherwise raise an error). *)
+(** Push the formula [f] in the message [term].
+  * Goes under function symbol, diff, seq and find. If [j]=Some jj, will push
+  * the formula only in the jth subterm of the then branch (if it exists,
+  * otherwise raise an error). *)
 let push_formula (j: 'a option) f term =
   let f_vars = Term.get_vars f in
   let not_in_f_vars vs =
@@ -1443,13 +1443,15 @@ let push_formula (j: 'a option) f term =
   let rec mk_ite m = match m with
     (* if c then t else e becomes if (f => c) then t else e *)
     | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> 
-      Term.mk_ite (Term.Impl (f,c)) t e
+      Term.mk_ite ~simpl:false (Term.Impl (f,c)) t e
 
     (* m becomes if f then m else 0 *)
-    | _ -> Term.mk_ite f m Term.mk_zero
+    | _ -> Term.mk_ite ~simpl:false f m Term.mk_zero
   in
 
   match term with
+  | Fun (f, _, _) when f = Term.f_ite -> mk_ite term
+
   | Fun (f, fty, terms) ->
     begin match j with
       | None -> Fun (f, fty, List.map mk_ite terms)
@@ -1469,12 +1471,15 @@ let push_formula (j: 'a option) f term =
       | _ ->  Tactics.soft_failure
                 (Tactics.Failure "expected j is 0 or 1 for diff terms")
     end
+
   | Seq (vs, t) ->
     if not_in_f_vars vs then Seq (vs, mk_ite t)
     else raise Not_ifcond
+
   | Find (vs, b, t, e) ->
     if not_in_f_vars vs then Find (vs, b, mk_ite t, mk_ite e)
     else raise Not_ifcond
+
   | _ -> mk_ite term
 
 let ifcond TacticsArgs.(Pair (Int i,
@@ -1491,7 +1496,8 @@ let ifcond TacticsArgs.(Pair (Int i,
 
     begin try
         let new_elem = 
-          Term.mk_ite cond (push_formula j f positive_branch) negative_branch
+          Term.mk_ite ~simpl:false
+            cond (push_formula j f positive_branch) negative_branch
         in
         let biframe = List.rev_append before (new_elem :: after) in
         let trace_sequent = 
