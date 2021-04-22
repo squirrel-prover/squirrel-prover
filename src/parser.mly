@@ -16,7 +16,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT NONE SEQ EXP
 %token NEW OUT PARALLEL NULL
-%token CHANNEL TERM PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
@@ -253,8 +253,8 @@ process_i:
 | FIND is=indices SUCHTHAT f=term IN p=process p0=else_process
     { Process.Exists (is,f,p,p0) }
 
-| LET id=lsymb EQ t=term IN p=process
-    { Process.Let (id,t,p) }
+| LET id=lsymb ty=colon_ty? EQ t=term IN p=process
+    { Process.Let (id,t,ty,p) }
 
 | id=lsymb terms=term_list ASSIGN t=term p=process_cont
     { let to_idx t = match L.unloc t with
@@ -370,8 +370,8 @@ declaration_i:
 
 | CHANNEL e=lsymb         { Decl.Decl_channel e }
 
-| TERM e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
-                          { Decl.Decl_macro (e, args, typ, t) }
+/* | TERM e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term */
+/*                           { Decl.Decl_macro (e, args, typ, t) } */
 
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }

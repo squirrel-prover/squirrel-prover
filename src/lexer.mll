@@ -72,7 +72,6 @@ rule token = parse
 | "new"               { NEW }
 | "try find"          { FIND }
 | "such that"         { SUCHTHAT }
-| "term"              { TERM }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
 | "type"              { TYPE }

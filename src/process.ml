@@ -7,9 +7,9 @@ let dum : L.t = L._dummy
 let mk_dum (v : 'a) : 'a L.located = L.mk_loc dum v
 
 (*------------------------------------------------------------------*)
-type pkind = (string * Type.ety) list
+type proc_ty = (string * Type.ety) list
 
-let pp_pkind =
+let pp_proc_ty =
   let pp_el fmt (s,e) = Fmt.pf fmt "(%s : %a)" s Type.pp_e e in
   (Fmt.list pp_el)
 
@@ -26,9 +26,9 @@ type process_i =
   | New of lsymb * Theory.p_ty * process
   | In  of Channel.p_channel * lsymb * process
   | Out of Channel.p_channel * term * process
-  | Set of lsymb * lsymb list * term * process
   | Parallel of process * process
-  | Let of lsymb * term * process
+  | Set of lsymb * lsymb list * term * process
+  | Let of lsymb * term * Theory.p_ty option * process
   | Repl of lsymb * process
   | Exists of lsymb list * formula * process * process
   | Apply of lsymb * term list
@@ -97,10 +97,16 @@ let rec pp_process ppf process =
       pp_process p1
       pp_process p2
 
-  | Let (s, t, p) ->
-    pf ppf "@[<v>@[<2>%a %a =@ @[%a@] %a@]@ %a@]"
+  | Let (s, t, tyo, p) ->
+    let pp_tyo fmt = function
+      | None -> ()
+      | Some ty -> Fmt.pf fmt " : %a" Theory.pp_p_ty ty
+    in
+    
+    pf ppf "@[<v>@[<2>%a %a%a =@ @[%a@] %a@]@ %a@]"
       (kw `Bold) "let"
       (styled `Magenta (styled `Bold ident)) (L.unloc s)
+      pp_tyo tyo
       Theory.pp t
       (styled `Bold ident) "in"
       pp_process p
@@ -151,7 +157,7 @@ let pp_proc_error_i fmt = function
     Fmt.pf fmt "state %s can only be updated once in an action" s
 
   | Freetyunivar -> Fmt.pf fmt "some type variable(s) could not \
-                                       be instantiated"
+                                be instantiated"
 
 let pp_proc_error pp_loc_err fmt (loc,e) =
   Fmt.pf fmt "%aproc error: %a."
@@ -165,7 +171,7 @@ let proc_err loc e = raise (ProcError (loc,e))
 (*------------------------------------------------------------------*)
 (** We extend the symbols data with (bi)-processus descriptions and
     their types. *)
-type Symbols.data += Process_data of pkind * process
+type Symbols.data += Process_data of proc_ty * process
 
 let declare_nocheck table name kind proc =
     let data = Process_data (kind,proc) in
@@ -178,7 +184,7 @@ let find_process table pname =
   | _ -> assert false
   (* The data associated to a process must be a [Process_data _]. *)
 
-let find_process0 table (lsymb : lsymb) =
+let find_process_lsymb table (lsymb : lsymb) =
   let name = Symbols.Process.of_lsymb lsymb table in
   find_process table name
 
@@ -221,9 +227,13 @@ let check_proc table env p =
 
     | Parallel (p, q) -> check_p ty_env  env p ; check_p ty_env  env q
 
-    | Let (x, t, p) ->
-      let tyv = Type.Infer.mk_univar ty_env in
-      let ety = Type.ETy (TUnivar tyv) in
+    | Let (x, t, ptyo, p) ->
+      let ty : Type.tmessage = match ptyo with
+        | None -> TUnivar (Type.Infer.mk_univar ty_env)
+        | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
+      in
+      
+      let ety = Type.ETy ty in
       Theory.check table ~local:true ty_env env t ety ;
       check_p ty_env  ((L.unloc x, ety) :: env) p
 
@@ -240,7 +250,7 @@ let check_proc table env p =
       check_p ty_env  env p
 
     | Apply (id, ts) ->
-      let kind,_ = find_process0 table id in
+      let kind,_ = find_process_lsymb table id in
       if List.length kind <> List.length ts then
         proc_err loc (Arity_error (L.unloc id,
                                    List.length ts,
@@ -291,6 +301,8 @@ let print_msubst msubst =
 (* Type for data we store while parsing the process, needed to compute
  * the corresponding set of actions. *)
 type p_env = {
+  ty_env : Type.Infer.env;
+
   (* RELATED TO THE CURRENT PROCESS
    * As the process is parsed, its bound variables are renamed into
    * unambiguous "refreshed" variables. For example, !_i !_i P(i)
@@ -328,10 +340,11 @@ type p_env = {
   facts : Term.message list ;
     (* list of formulas to create the condition term of the action,
      * indices and variables are the ones after the refresh *)
-  updates : (lsymb * Vars.index list * Term.message) list ;
+  updates : (lsymb * Vars.index list * Type.tmessage * Term.message) list ;
     (* list of updates performed in the action,
      * indices in the second component, and indices and variables in the
-     * Term.message are the ones after the refresh *)
+     * Term.message are the ones after the refresh.
+     * The type can be a type unification variables. *)
 
 }
 
@@ -370,7 +383,9 @@ let parse_proc (system_name : System.system_name) init_table proc =
   in
   let conv_term table env ts t sort =
     let subst = create_subst env.isubst env.msubst in
-    Theory.convert { table = table; cntxt = InProc ts; } subst t sort
+    Theory.convert
+      ~ty_env:env.ty_env
+      { table = table; cntxt = InProc ts; } subst t sort
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in
@@ -442,8 +457,9 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in
 
     let updates =
-      List.map (fun (s,l,t) ->
-           Term.mk_isymb (Symbols.Macro.of_lsymb s table) Type.Message l,
+      List.map (fun (s,l,ty,t) ->
+          let ms = Symbols.Macro.of_lsymb s table in
+          Term.mk_isymb ms ty l,
            Term.subst (subst_ts @ subst_input) t
         ) env.updates
     in
@@ -456,9 +472,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     let output = match output with
       | Some (c,t) ->
-          c,
+        let t = 
+          (* TODO: subtypes *)
           Term.subst (subst_ts @ subst_input)
-            (conv_term table env action_term t Type.Message)
+            (conv_term table env action_term t Type.Message) 
+        in
+        c, t
+          
       | None -> Symbols.dummy_channel, Term.empty
     in
 
@@ -494,38 +514,40 @@ let parse_proc (system_name : System.system_name) init_table proc =
     match L.unloc proc with
     | Apply (id,args)
     | Alias (L.{ pl_desc = Apply (id,args) }, _) ->
-    (* Keep explicit alias if there is one,
-     * otherwise use id as the new alias. *)
-    let a' = match L.unloc proc with Alias (_,a) -> a | _ -> id in
-    let t,p = find_process0 table id in
+      (* Keep explicit alias if there is one,
+       * otherwise use id as the new alias. *)
+      let a' = match L.unloc proc with Alias (_,a) -> a | _ -> id in
+      let t,p = find_process_lsymb table id in
 
-    let isubst', msubst' =
-      (* TODO avoid or handle conflicts with variables already
-       * in domain of subst, i.e. variables bound above the apply *)
-      let tsubst = (to_tsubst env.isubst@to_tsubst env.msubst) in
-      List.fold_left2
-        (fun (iacc,macc) (x,k) v ->
-          match k, L.unloc v with
-          | Type.ETy Type.Message,_ ->
-            let v'_th = Theory.subst v tsubst in
-            let v'_tm = conv_term table env (Term.Var ts) v Type.Message in
-            iacc, (x, L.unloc v'_th, v'_tm) :: macc
+      let isubst', msubst' =
+        (* TODO avoid or handle conflicts with variables already
+         * in domain of subst, i.e. variables bound above the apply *)
+        let tsubst = (to_tsubst env.isubst@to_tsubst env.msubst) in
+        List.fold_left2
+          (fun (iacc,macc) (x,Type.ETy ty) v ->
+             match Type.kind ty, L.unloc v with
+             | Type.KMessage,_ ->
+               let v'_th = Theory.subst v tsubst in
+               let v'_tm : Term.message =
+                 conv_term table env (Term.Var ts) v ty in
 
-          | Type.ETy Type.Index, Theory.App (i,[]) ->
-            let _,i'_tm = list_assoc (L.unloc i) env.isubst in
-            let i'_th = Theory.subst v tsubst in
-            (x, L.unloc i'_th, i'_tm) :: iacc, macc
-          | _ -> assert false)
-        (env.isubst,env.msubst) t args
-    in
+               iacc, (x, L.unloc v'_th, v'_tm) :: macc
 
-    let env =
-    { env with
-      alias  = a' ;
-      isubst = isubst' ;
-      msubst = msubst' }
-    in
-    (table,env,p)
+             | Type.KIndex, Theory.App (i,[]) ->
+               let _,i'_tm = list_assoc (L.unloc i) env.isubst in
+               let i'_th = Theory.subst v tsubst in
+               (x, L.unloc i'_th, i'_tm) :: iacc, macc
+             | _ -> assert false
+          ) (env.isubst,env.msubst) t args
+      in
+
+      let env =
+        { env with
+          alias  = a' ;
+          isubst = isubst' ;
+          msubst = msubst' }
+      in
+      (table,env,p)
 
   | New (n, pty, p) ->
     let ty = Theory.parse_p_ty table [] pty Type.KMessage in
@@ -562,23 +584,35 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * there are some get terms for state macros that have already been updated *)
   let p_let ?(search_dep=false) ~table ~env proc = match L.unloc proc with
 
-  | Let (x,t,p) ->
+  | Let (x,t,ptyo, p) ->
+    let ty : Type.tmessage = match ptyo with
+      | None -> TUnivar (Type.Infer.mk_univar env.ty_env)
+      | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
+    in
+
     let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
     let updated_states =
-      if search_dep
-      then Theory.find_app_terms t' (List.map (fun (s,_,_) -> L.unloc s) env.updates)
+      if search_dep then
+        let apps = List.map (fun (s,_,_,_) -> L.unloc s) env.updates in
+        Theory.find_app_terms t' apps 
       else []
     in
 
-    let body =
+    let body : Term.message =
       Term.subst_macros_ts table updated_states (Term.Var ts)
-        (conv_term table env (Term.Var ts) t Type.Message)
+        (conv_term table env (Term.Var ts) t ty)
+    in
+
+    (* We check that we could infer ty by parsing [t] *)
+    let ty = match Type.Infer.norm env.ty_env ty with
+      | Type.TUnivar _ -> proc_err (L.loc proc) Freetyunivar
+      | _ as ty -> ty
     in
 
     let invars = List.map snd env.inputs in
     let table,x' =
       Macros.declare_global table x ~inputs:invars
-        ~indices:(List.rev env.indices) ~ts body
+        ~indices:(List.rev env.indices) ~ts body ty
     in
 
     let x'_th =
@@ -589,7 +623,13 @@ let parse_proc (system_name : System.system_name) init_table proc =
       Theory.App (x', is)
     in
 
-    let n'_s = Term.mk_isymb x' Type.Message (List.rev env.indices) in
+    (* We check that we could infer ty by parsing [t] *)
+    let ty = match Type.Infer.norm env.ty_env ty with
+      | Type.TUnivar _ -> proc_err (L.loc proc) Freetyunivar
+      | _ as ty -> ty
+    in
+
+    let n'_s = Term.mk_isymb x' ty (List.rev env.indices) in
     let x'_tm = Term.Macro (n'_s, [], Term.Var ts) in
     let env =
       { env with msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }
@@ -637,16 +677,17 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let table,env,p = p_common ~table ~env proc in
       p_in_i ~table ~env ~pos ~pos_indices p
 
-    | Let (x,t,p) ->
+    | Let (x,t,ty,p) ->
       let x',t',table,env,p = p_let ~table ~env proc in
       let p',pos',table = p_in ~table ~env ~pos ~pos_indices p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
-      ( Let (x', t', p'),
+      ( Let (x', t',ty,p'),
         pos',
         table)
 
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c table in
+      (* TODO: subtypes*)
       let env,x' = make_fresh env Type.Message (L.unloc x) in
       let in_th =
         Theory.var_i dum (Vars.name x')
@@ -688,12 +729,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let table,env,p = p_common ~table ~env proc in
       p_cond_i ~table ~env ~pos ~par_choice p
 
-    | Let (x,t,p) ->
+    | Let (x,t,ty,p) ->
       let x',t',table,env,p = p_let ~table ~env proc in
       let p',pos',table = p_cond ~table ~env ~pos ~par_choice p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
 
-      ( Let (x', t', p'),
+      ( Let (x', t',ty,p'),
         pos',
         table )
 
@@ -776,17 +817,17 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let table,env,p = p_common ~table ~env proc in
       p_update_i ~table ~env p
 
-    | Let (x,t,p) ->
+    | Let (x,t,ty,p) ->
       let x',t',table,env,p = p_let ~search_dep:true ~table ~env proc in
       let p',pos',table = p_update ~table ~env p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
 
-      ( Let (x', t', p'),
+      ( Let (x', t',ty,p'),
         pos',
         table )
 
     | Set (s,l,t,p) ->
-      if List.exists (fun (s',_,_) -> L.unloc s = L.unloc s') env.updates
+      if List.exists (fun (s',_,_,_) -> L.unloc s = L.unloc s') env.updates
       then
         (* Not allowed because a state macro can have only 2 values:
            - either the value at the end of the current action,
@@ -802,15 +843,16 @@ let parse_proc (system_name : System.system_name) init_table proc =
             l
         in
         let updated_states =
-          Theory.find_app_terms t' (List.map (fun (s,_,_) -> L.unloc s) env.updates)
+          let apps = List.map (fun (s,_,_,_) -> L.unloc s) env.updates in
+          Theory.find_app_terms t' apps            
         in
+        let ty = Theory.check_state table s (List.length l) in
         let t'_tm =
           Term.subst_macros_ts table updated_states (Term.Var ts)
-            (conv_term table env (Term.Var ts) t Type.Message)
+            (conv_term table env (Term.Var ts) t ty)
         in
         let env =
-          { env with
-            updates = (s,l',t'_tm)::env.updates }
+          { env with updates = (s,l',ty,t'_tm) :: env.updates }
         in
         let p',pos',table = p_update ~table ~env p in
 
@@ -874,7 +916,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
   in
 
   let env =
-    { alias = L.mk_loc L._dummy "A" ;
+    { ty_env = Type.Infer.mk_env ();
+      alias = L.mk_loc L._dummy "A" ;
       indices = [] ;
       vars_env = env_ts ;
       isubst = [] ;
@@ -885,7 +928,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
       facts = [] ;
       updates = [] }
   in
+
   let proc,_,table = p_in ~table:init_table ~env ~pos:0 ~pos_indices:[] proc in
+
+  if not (Type.Infer.is_closed env.ty_env) then 
+    proc_err (L.loc proc) Freetyunivar;
+
   (proc, table)
 
 let declare_system table (system_name : lsymb) proc =

@@ -31,7 +31,6 @@
   "name"
   "channel"
   "mutable"
-  "term"
   "equiv"
   "process"
   "with oracle"

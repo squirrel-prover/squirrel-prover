@@ -7,9 +7,12 @@ type Symbols.data +=
     Global_data of Vars.message list * Vars.index list * Vars.timestamp
                    * Term.message
 
-let declare_global table name ~inputs ~indices ~ts t =
+let is_tuni = function Type.TUnivar _ -> true | _ -> false
+
+let declare_global table name ~inputs ~indices ~ts t ty =
+  assert (not (is_tuni ty));
   let data = Global_data (inputs,indices,ts,t) in
-  let def = Symbols.Global (List.length indices) in
+  let def = Symbols.Global (List.length indices, ty) in
     Symbols.Macro.declare table name ~data def
 
 (*------------------------------------------------------------------*)
@@ -31,7 +34,6 @@ let is_defined name a table =
           | Term.Action _ -> true
           | _ -> false
         end
-    | Symbols.Local _, _ -> true
     | Symbols.Global _, Global_data (inputs,_,_,_) ->
         (* As for outputs and states, we can only expand on a name A,
          * because a global macro m(...)@A refer to inputs of A and
@@ -175,7 +177,6 @@ let get_def :
                                      proj_t (SystemExpr.get_proj s2))
     end
 
-  | Symbols.Local _, _ -> failwith "Not implemented"
   |  _ -> assert false
 
 (*------------------------------------------------------------------*)

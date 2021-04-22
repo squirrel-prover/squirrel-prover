@@ -433,11 +433,9 @@ let function_kind table (f : lsymb) : mf_type =
   | Exists d -> match d with
     | Function (fty, _) -> `Fun fty
 
-    | Macro (Local (targs,k)) -> `Macro (targs, k)
-
-    | Macro (Global arity) ->
+    | Macro (Global (arity, ty)) ->
       let targs = (List.init arity (fun _ -> Type.eindex)) in
-      `Macro (targs, Type.Message)
+      `Macro (targs, ty)
 
     | Macro (Input|Output|Frame) -> 
       `Macro ([], Type.Message)
@@ -569,15 +567,9 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
       check_arity lsymb (List.length l) arity ;
       Get (lsymb,get_ts cntxt,l)
 
-    | Symbols.Macro (Symbols.Global arity) ->
+    | Symbols.Macro (Symbols.Global (arity,_)) ->
       if List.length l <> arity then arity_error arity;
       Fun (lsymb,l,get_ts cntxt)
-
-    | Symbols.Macro (Symbols.Local (targs,_)) ->
-      if is_at cntxt then ts_unexpected ();
-      if List.length targs <> List.length l then
-        arity_error (List.length targs) ;
-      Fun (lsymb,l,None)
 
     | Symbols.Macro (Symbols.Input|Symbols.Output|Symbols.Cond|Symbols.Exec
                     |Symbols.Frame) ->
@@ -1004,6 +996,7 @@ and conv_app :
 
         t
 
+      (* FIXME: messy code *)
       | Wrapped (s, Symbols.Macro macro) ->
         let ty_args, ty_out =
           match mfty with `Macro x -> x | _ -> assert false
@@ -1013,34 +1006,9 @@ and conv_app :
 
           | Symbols.Global _ ->
             assert (List.for_all (fun x -> x = Type.eindex) ty_args);
-            check_ty_leq state ~of_t:tm ty_out Type.Message;
             let indices = List.map (conv_index state) l in
             let ms = Term.mk_isymb s ty_out indices in
             Term.Macro (ms,[],get_at ts_opt)
-
-          | Local (targs,_) ->
-            if List.for_all (fun s -> s = Type.eindex) ty_args
-            then
-              begin
-                let indices = List.map (conv_index state) l in
-
-                check_ty_leq state ~of_t:tm ty_out ty;
-
-                let ms = Term.mk_isymb s ty_out indices in
-
-                Term.Macro (ms,[],get_at ts_opt)
-              end
-            else
-              begin
-                assert (List.for_all (fun s -> s = Type.emessage) ty_args);
-                let l = List.map (conv Type.Message) l in
-
-                check_ty_leq state ~of_t:tm ty_out ty;
-
-                let ms = Term.mk_isymb s ty_out [] in
-
-                Term.Macro (ms,l,get_at ts_opt)
-              end
 
           | Input | Output | Frame ->
             (* FIXME I am not sure of the location to use in
@@ -1380,67 +1348,72 @@ let get_init_states table : (Term.state * Term.message) list =
       | _ -> acc
     ) [] table
 
-let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
-  let env,typed_args,tsubst =
-    List.fold_left
-      (fun (env,vars,tsubst) (x,pty) ->
-         let Type.ETy ty = parse_p_ty0 table [] pty in
-         let x = L.unloc x in
-         let env,x' = Vars.make_fresh env ty x in
-         let item = match Type.kind ty with
-           | Type.KIndex -> ESubst (x, Term.Var x')
-           | Type.KMessage -> ESubst (x, Term.Var x')
-           | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex;
-                                                Type.EKind Type.KMessage])
-         in
-         assert (Vars.name x' = x) ;
-         env, (Vars.EVar x')::vars, item::tsubst)
-      (Vars.empty_env,[],[])
-      typed_args
-  in
-
-  let _,ts_var = Vars.make_fresh env Type.Timestamp "ts" in
-  let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
-  let t = convert conv_env tsubst t Type.Message in
-  let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
-
-  (* parse the macro type *)
-  let ty = parse_p_ty table [] pty Type.KMessage in
-
-  let table, _ =
-    Symbols.Macro.declare_exact table
-      s
-      ~data
-      (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
-           Type.ETy (Vars.ty x)) typed_args,ty)) in
-  table
+(* let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
+ *   let env,typed_args,tsubst =
+ *     List.fold_left
+ *       (fun (env,vars,tsubst) (x,pty) ->
+ *          let Type.ETy ty = parse_p_ty0 table [] pty in
+ *          let x = L.unloc x in
+ *          let env,x' = Vars.make_fresh env ty x in
+ *          let item = match Type.kind ty with
+ *            | Type.KIndex -> ESubst (x, Term.Var x')
+ *            | Type.KMessage -> ESubst (x, Term.Var x')
+ *            | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex;
+ *                                                 Type.EKind Type.KMessage])
+ *          in
+ *          assert (Vars.name x' = x) ;
+ *          env, (Vars.EVar x')::vars, item::tsubst)
+ *       (Vars.empty_env,[],[])
+ *       typed_args
+ *   in
+ * 
+ *   let _,ts_var = Vars.make_fresh env Type.Timestamp "ts" in
+ *   let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
+ *   let t = convert conv_env tsubst t Type.Message in
+ *   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
+ * 
+ *   (* parse the macro type *)
+ *   let ty = parse_p_ty table [] pty Type.KMessage in
+ * 
+ *   let table, _ =
+ *     Symbols.Macro.declare_exact table
+ *       s
+ *       ~data
+ *       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
+ *            Type.ETy (Vars.ty x)) typed_args,ty)) in
+ *   table *)
 
 (* TODO could be generalized into a generic fold function
  * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)
 let find_app_terms t (names : string list) =
-  let rec aux t acc (name : string) = match L.unloc t with
+  let rec aux (name : string) acc t = match L.unloc t with
     | App (x',l) ->
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
-      List.fold_left (fun accu elem -> aux elem accu name) acc l
+      aux_list name acc l
 
     | AppAt (x',l,ts) ->
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
-      aux_list (ts::l) acc name
+      aux_list name acc (ts :: l) 
 
-    | Compare (_,t1,t2) -> aux t1 (aux t2 acc name) name
-    | Happens t'        -> aux_list t' acc name
-    | ForAll (_,t')     -> aux t' acc name
-    | Exists (_,t')     -> aux t' acc name
-    | And (t1,t2)       -> aux t1 (aux t2 acc name) name
-    | Or (t1,t2)        -> aux t1 (aux t2 acc name) name
-    | Impl (t1,t2)      -> aux t1 (aux t2 acc name) name
-    | Not t'            -> aux t' acc name
+    | And  (t1,t2)
+    | Or   (t1,t2) 
+    | Impl (t1,t2)
+    | Compare (_,t1,t2) -> aux_list name acc [t1;t2]
+    | Happens t'        -> aux_list name acc t' 
+
+    | Exists (_,t') 
+    | ForAll (_,t') -> aux name acc t' 
+
+    | Not t'            -> aux name acc t' 
+
+    (* FIXME: I think some cases may be missing *)
     | _                 -> acc
 
-  and aux_list l acc name =
-    List.fold_left (fun accu elem -> aux elem accu name) acc l in
+  and aux_list name acc l =
+    List.fold_left (aux name) acc l in
   
-  List.sort_uniq Stdlib.compare (List.fold_left (aux t) [] names)
+  let acc = List.fold_left (fun acc name -> aux name acc t) [] names in
+  List.sort_uniq Stdlib.compare acc
 
 
 (*------------------------------------------------------------------*)

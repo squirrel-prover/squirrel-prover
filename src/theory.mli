@@ -175,12 +175,12 @@ val declare_abstract :
   lsymb ->
   Symbols.table
 
-(** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
-  * of type [s1->...->sn->s]
-  * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
-val declare_macro :
-  Symbols.table -> lsymb -> bnds -> p_ty -> term
-  -> Symbols.table
+(* (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
+ *   * of type [s1->...->sn->s]
+ *   * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
+ * val declare_macro :
+ *   Symbols.table -> lsymb -> bnds -> p_ty -> term
+ *   -> Symbols.table *)
 
 (*------------------------------------------------------------------*)
 (** {2 Term builders } *)

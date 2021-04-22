@@ -136,8 +136,6 @@ class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self
               (Macros.get_dummy_definition cntxt ms)
           end
 
-      | Symbols.Local _ -> assert false (* TODO *)
-
   method visit_message = function
     | Macro (ms,[],a) -> self#visit_macro ms a
     | m -> super#visit_message m

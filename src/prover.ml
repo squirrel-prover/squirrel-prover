@@ -956,8 +956,8 @@ let declare_i table decl = match L.unloc decl with
   | Decl.Decl_state (s, args, k, t) ->
     Theory.declare_state table s args k t
 
-  | Decl.Decl_macro (s, args, k, t) ->
-    Theory.declare_macro table s args k t
+  (* | Decl.Decl_macro (s, args, k, t) ->
+   *   Theory.declare_macro table s args k t *)
 
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h

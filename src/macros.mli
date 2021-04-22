@@ -11,6 +11,7 @@ val declare_global :
   indices:Vars.index list ->
   ts:Vars.timestamp ->
   Term.message ->
+  Type.tmessage ->
   Symbols.table * Symbols.macro Symbols.t
 
 (** {2 Macro expansions} *)

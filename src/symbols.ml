@@ -54,8 +54,7 @@ type function_def =
 type macro_def =
   | Input | Output | Cond | Exec | Frame
   | State  of int * Type.tmessage
-  | Global of int
-  | Local  of Type.ety list * Type.tmessage
+  | Global of int * Type.tmessage
 
 (*------------------------------------------------------------------*)
 type bty_info = 

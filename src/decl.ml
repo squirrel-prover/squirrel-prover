@@ -79,7 +79,7 @@ type declaration_i =
   | Decl_name             of lsymb * int * Theory.p_ty
   | Decl_state            of macro_decl
   | Decl_abstract         of abstract_decl
-  | Decl_macro            of macro_decl
+  (* | Decl_macro            of macro_decl *)
   | Decl_bty              of bty_decl
 
 type declaration = declaration_i Location.located

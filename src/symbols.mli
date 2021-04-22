@@ -90,12 +90,9 @@ type macro_def =
   | State of int * Type.tmessage
     (** Macro that expands to the content of a state at a given
       * timestamp. *)
-  | Global of int
+  | Global of int * Type.tmessage
     (** Global macros are used to encapsulate let-definitions.
       * They are indexed. *)
-  | Local  of Type.ety list * Type.tmessage
-    (** Local macro definitions are explicitly defined by the
-      * user, and may depend on arbitrary terms. *)
 
 (*------------------------------------------------------------------*)
 (** Information about symbol definitions, depending on the namespace.

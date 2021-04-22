@@ -186,14 +186,9 @@ Proof.
   expand cond@R(j); expand output@R(j).
   fa 0; fa 1; fa 1.
   fresh 1; yesif 1.
-<<<<<<< HEAD
-  repeat split. 
-=======
   repeat split => // j0 H1. 
   by depends R(j0),R1(j0).
->>>>>>> dev
   by depends R(j0),R2(j0).
-  by depends R(j0),R1(j0).
 
   (* Case R1 *)
   expand frame@R1(j); expand exec@R1(j).
@@ -247,7 +242,6 @@ Proof.
   use H1 as [k1 _]; 2: auto. 
   clear H1. 
   by expand output, m2. 
-  by intro *; expand output, m2. 
   by yesif.
 
   (* RIGHT *)
@@ -257,7 +251,6 @@ Proof.
   use H1 as [k1 _]; 2: auto. 
   clear H1. 
   by expand output, m2. 
-  by intro *; expand output, m2. 
   by yesif.
 
 
@@ -266,7 +259,7 @@ Proof.
   prf 1.
   ifcond 1, exec@pred(R1(j)); 1: auto.
   fa 1.
-  yesif 1.
+  yesif 1. 
   by use tags_neq; project.
   by fresh 1.
 
