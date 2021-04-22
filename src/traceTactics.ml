@@ -7,16 +7,13 @@
 open Term
 open Utils
 
-type tac = TraceSequent.t Tactics.tac
-
+module TS = TraceSequent
 module T = Prover.TraceTactics
-
 module Args = TacticsArgs
-
 module L = Location
-
 module Hyps = TraceSequent.Hyps
 
+type tac = TraceSequent.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TraceSequent.sequent
 
@@ -1296,7 +1293,10 @@ let constraints_tac (s : TraceSequent.t) =
   | true ->
     let () = dbg "closed by constraints" in
     []
-  | false -> soft_failure (Tactics.Failure "constraints satisfiable")
+
+  | false -> 
+   let () = dbg "constraints failed" in
+   soft_failure (Tactics.Failure "constraints satisfiable")
 
 let () = T.register "constraints"
     ~tactic_help:
@@ -2082,6 +2082,7 @@ let simplify ~close ~strong =
 
   let expand_all = 
     (if strong && not intro 
+    (if strong && close && not intro 
      then [wrap_fail expand_all_l] @ assumption
      else []) 
   in
@@ -2101,7 +2102,7 @@ let simplify ~close ~strong =
     (* (if intro then [wrap eq_trace] else []) @ *)
     (if strong then [wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
-    (repeat (wrap_fail autosubst)) ::
+    (repeat ~cut:true (wrap_fail autosubst)) ::
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @ 
     [clear_triv]
@@ -2184,7 +2185,6 @@ let () = T.register_general "autosimpl"
 let do_s_item (s_item : Args.s_item) s : TraceSequent.sequent list =
   match s_item with
   | Args.Simplify l ->
-    dbg "there";
     let tac = simpl ~strong:true ~close:false in
     Tactics.run tac s 
 

@@ -269,15 +269,16 @@ let fail sk fk = fk (Failure "fail")
 
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
-let map t l sk fk =
+let map ?(cut=false) t l sk fk0 =
   let rec aux acc l fk = match l with
     | [] -> sk (List.rev acc) fk
     | e::l ->
         t e
           (fun r fk ->
+             let fk = if cut then fk0 else fk in
              aux (List.rev_append r acc) l fk)
           fk
-  in aux [] l fk
+  in aux [] l fk0
 
 (** Like [map], but only apply the tactic to selected judgements. *)
 let map_sel sel_tacs l sk fk =
@@ -305,34 +306,28 @@ let orelse_list l j =
 let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
   let sk =
     if cut then
-      fun l fk' -> map tac2 l sk fk
+      (fun l fk' -> map ~cut tac2 l sk fk)
     else
-      fun l fk' -> map tac2 l sk fk'
+      (fun l fk' -> map ~cut tac2 l sk fk')
   in
   tac1 judge sk fk
 
-let rec andthen_list = function
+let rec andthen_list ?cut = function
   | [] -> hard_failure (Failure "empty anthen_list")
   | [t] -> t
-  | t::l -> andthen t (andthen_list l)
+  | t::l -> andthen ?cut t (andthen_list ?cut l)
 
 let andthen_sel tac1 sel_tacs judge sk fk : a =
   let sk l fk' = map_sel sel_tacs l sk fk' in
   tac1 judge sk fk
 
-let by_tac tac judge sk fk =
-  let sk l fk = match l with
-    | [] -> sk [] fk
-    | _ -> soft_failure GoalNotClosed in
-  tac judge sk fk
-
 let id j sk fk = sk [j] fk
 
 let try_tac t j sk fk =
   let succeeded = ref false in
-  let sk l fk = succeeded := true ; sk l fk in
-  let fk e = if !succeeded then fk e else sk [j] fk in
-  t j sk fk
+  let sk' l fk = succeeded := true ; sk l fk in
+  let fk' e = if !succeeded then fk e else sk [j] fk in
+  t j sk' fk'
 
 let checkfail_tac exc t j sk fk =
   try
@@ -349,12 +344,14 @@ let checkfail_tac exc t j sk fk =
   | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
-let repeat t j sk fk =
+let repeat ?(cut=false) t j sk fk0 =
   let rec aux j sk fk =
     t j
-      (fun l fk -> map aux l sk fk)
+      (fun l fk -> 
+         let fk = if cut then fk0 else fk in
+         map aux l sk fk)
       (fun e -> sk [j] fk)
-  in aux j sk fk
+  in aux j sk fk0
 
 let eval_all (t : 'a tac) x =
   let l = ref [] in
@@ -466,7 +463,8 @@ module AST (M:S) = struct
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
     | By t                -> 
-      andthen_list [eval modifiers t; eval [] (Abstract ("auto",[]))] 
+      andthen_list [eval modifiers t; eval modifiers (Abstract ("auto",[]))] 
+
     | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
     | Modifier (id,t)     -> eval (id::modifiers) t

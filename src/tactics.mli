@@ -99,7 +99,7 @@ val orelse : 'a tac -> 'a tac -> 'a tac
 
 (** [repeat t] applies [t] and applies it to the generated subgoals,
   * until [t] fails. This tactic never fails. *)
-val repeat : 'a tac -> 'a tac
+val repeat : ?cut:bool -> 'a tac -> 'a tac
 
 (** [andthen t1 t2] applies [t1] and then applies [t2] to each newly
   * created subgoal. *)
@@ -109,7 +109,7 @@ val andthen : ?cut:bool -> 'a tac -> 'a tac -> 'a tac
 val orelse_list : 'a tac list -> 'a tac
 
 (** n-ary variant of [andthen]. *)
-val andthen_list : 'a tac list -> 'a tac
+val andthen_list : ?cut:bool -> 'a tac list -> 'a tac
 
 val try_tac : 'a tac -> 'a tac
 
