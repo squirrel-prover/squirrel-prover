@@ -267,6 +267,8 @@ let check_sel sel_tacs l =
 
 let fail sk fk = fk (Failure "fail")
 
+let return x sk fk = sk x fk
+
 let cut t j sk fk = t j (fun l _ -> sk l fk) fk
 
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
@@ -373,6 +375,11 @@ let eval_all (t : 'a tac) x =
   with End -> List.rev !l
 
 let () =
+  let checki ?name a b =
+    Alcotest.(check (list (list int)))
+      (match name with None -> "results" | Some s -> s)
+      a b
+  in
   Checks.add_suite "Tacticals" [
     "OrElse", `Quick, begin fun () ->
       let t1 = fun x sk fk -> sk [x] fk in
@@ -401,9 +408,8 @@ let () =
     "Repeat", `Quick, begin fun () ->
       let t : int tac =
         fun n sk fk -> if n = 0 then fk (Failure "") else sk [n-1] fk in
-      let expected = [ [0] ; [1] ; [2] ] in
-      assert (eval_all (repeat ~cut:false t) 2 = expected) ;
-      assert (eval_all (repeat ~cut:true t) 2 = [[0]])
+      checki [[0];[1];[2]] (eval_all (repeat ~cut:false t) 2) ;
+      checki [[0]] (eval_all (repeat ~cut:true t) 2)
     end ;
     "Repeat cut", `Quick, begin fun () ->
       (* Non-branching tactic that sends 0 to 1 or 2, and sends 1 to 3,
@@ -413,12 +419,10 @@ let () =
           if n = 1 then sk [3] fk else
             fk (Failure "")
       in
-      Alcotest.(check (list (list int)))
-        "result"
+      checki
         [[3];[1];[2];[0]]
         (eval_all (repeat t) 0) ;
-      Alcotest.(check (list (list int)))
-        "result"
+      checki
         [[3]]
         (eval_all (repeat ~cut:true t) 0)
     end ;
@@ -430,12 +434,10 @@ let () =
         if n = 0 then sk [1] (fun _ -> sk [2] fk) else
           fk (Failure "")
       in
-      Alcotest.(check (list (list int)))
-        "result"
+      checki
         [[1];[2];[0]]
         (eval_all (repeat t) 0) ;
-      Alcotest.(check (list (list int)))
-        "result"
+      checki
         [[1]]
         (eval_all (repeat ~cut:true t) 0)
     end ;
@@ -445,15 +447,36 @@ let () =
        * of andthen. *)
       let t : int tac = fun _ sk fk -> sk [1] (fun _ -> sk [2] fk) in
       (* Check that id is neutral for anthen, on both sides. *)
-      assert (eval_all (andthen id t) 0 = [[1];[2]]) ;
-      assert (eval_all (andthen t id) 0 = [[1];[2]]) ;
-      assert (eval_all (andthen_list [id;t]) 0 = [[1];[2]]) ;
-      assert (eval_all (andthen_list [t;id]) 0 = [[1];[2]]) ;
+      checki ~name:"id;t"
+        [[1];[2]]
+        (eval_all (andthen id t) 0) ;
+      checki ~name:"t;id"
+        [[1];[2]]
+        (eval_all (andthen t id) 0) ;
+      checki ~name:"[id;t]"
+        [[1];[2]]
+        (eval_all (andthen_list [id;t]) 0) ;
+      checki ~name:"[t;id]"
+        [[1];[2]]
+        (eval_all (andthen_list [t;id]) 0) ;
       (* This is not the case anymore when cut=true. *)
-      assert (eval_all (andthen ~cut:true t id) 0 = [[1]]) ;
-      assert (eval_all (andthen ~cut:true id t) 0 = [[1];[2]]) ;
-      assert (eval_all (andthen_list ~cut:true [t;id]) 0 = [[1]]) ;
-      assert (eval_all (andthen_list ~cut:true [id;t]) 0 = [[1];[2]])
+      checki ~name:"t!id"
+        [[1]]
+        (eval_all (andthen ~cut:true t id) 0) ;
+      checki ~name:"id!t"
+        [[1];[2]]
+        (eval_all (andthen ~cut:true id t) 0) ;
+      checki ~name:"[t!id]"
+        [[1]]
+        (eval_all (andthen_list ~cut:true [t;id]) 0) ;
+      checki ~name:"[id!t]"
+        [[1];[2]]
+        (eval_all (andthen_list ~cut:true [id;t]) 0) ;
+      (* Check that cut=true is propagated in andthen beyond the first
+       * andthen. Thus only we only backtrack on the last instance of t. *)
+      checki ~name:"[t!t!t]"
+        [[1];[2]]
+        (eval_all (andthen_list ~cut:true [t;t;t]) 0)
     end ;
     "Andthen cut branching", `Quick, begin fun () ->
       (* Andthen with cut=true and a branching tactic.
@@ -463,22 +486,34 @@ let () =
        * of t, and since t is applied to both 0 and 1, we have four
        * possibilities: [0;1;2;3], [0;1], [2;3] and []. *)
       let t : int tac = fun n sk fk -> sk [2*n;2*n+1] (fun _ -> sk [] fk) in
-      assert (eval_all t 0 = [[0;1];[]]) ;
-      assert (eval_all (andthen ~cut:true t id) 0 = [[0;1]]) ;
-      Alcotest.(check (list (list int)))
-        "result"
+      checki [[0;1];[]] (eval_all t 0) ;
+      checki [[0;1]] (eval_all (andthen ~cut:true t id) 0) ;
+      checki
         [[0;1;2;3];[0;1];[2;3];[]]
         (eval_all (andthen ~cut:true t t) 0) ;
       (* We now wrap t using cut, so there is no backtracking at all. *)
-      Alcotest.(check (list (list int)))
-        "result"
+      checki
         [[0;1;2;3]]
         (eval_all (andthen (cut t) (cut t)) 0) ;
     end ;
+    "Trytac", `Quick, begin fun () ->
+      checki
+        [[1]]
+        (eval_all (try_tac (fun _ -> fail)) 1) ;
+      checki
+        [[1]]
+        (eval_all (orelse (fun _ -> fail) id) 1) ;
+      checki
+        [[2]]
+        (eval_all (try_tac (fun _ -> return [2])) 1) ;
+      checki
+        [[2];[1]]
+        (eval_all (orelse (fun _ -> return [2]) id) 1)
+    end ;
     "Try", `Quick, begin fun () ->
       let t = fun _ sk fk -> sk [1] (fun _ -> sk [] fk) in
-      assert (eval_all (try_tac (fun _ -> fail)) 0 = [[0]]) ;
-      assert (eval_all (try_tac t) 0 = [[1];[]])
+      checki [[0]] (eval_all (try_tac (fun _ -> fail)) 0) ;
+      checki [[1];[]] (eval_all (try_tac t) 0)
     end
   ]
 
