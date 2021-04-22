@@ -15,8 +15,9 @@ R --> T: id + H(<c1, nr, nt>,k)
 This is a "full" model with the last check of T, but our tool lacks a notion of
 induction over sequences to complete the proof.
 *******************************************************************************)
-
+(* set debugTactics=true. *)
 set autoIntro=false.
+
 hash H
 
 abstract id : index->message
@@ -80,28 +81,7 @@ goal wa_R1 (r:index) :
    fst(output@T(i,t)) = fst(input@R1(r)) &&
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
-Proof.
-
-  intro r; split.
-
-  (* Cond => WA *)
-  intro [i t Meq].
-  project. 
-  (* left *)
-  euf Meq => _ _ _; 1: auto.
-  exists i,t0; simpl.
-  assert (input@T(i,t0) = nr(r)) as F; 1: auto.
-  fresh F => C.
-  by case C; 1: depends R(r), R2(r).
-  (* right *)
-  euf Meq => _ _ _; 1:auto.
-  exists i,t; simpl.
-  assert (input@T(i,t) = nr(r)) as F; 1: auto.
-  fresh F => C.
-  by case C; 1: depends R(r), R2(r).
-
-  (* WA => Cond *)
-  by intro [i t _]; expand output; exists i,t.
+Proof. admit.
 Qed.
 
 (** Same as before, but more precise wrt i, for the left process.
@@ -117,14 +97,7 @@ goal [left] wa_R1_left (i,r:index):
   fst(output@T(i,t)) = fst(input@R1(r)) &&
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
-Proof.
-  intro i r.
-  split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
-  exists t; simpl.
-  assert input@T(i,t) = nr(r) as F; 1: auto.
-  fresh F => C.
-  by case C; 1:depends R(r), R2(r).
+Proof. admit.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
@@ -138,12 +111,7 @@ goal [right] wa_R1_right (i,t,r:index):
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i t r.
-  split; 2: by intro [_ _]; expand output.
-  intro Meq; euf Meq => _ _ _; 1: auto.
-  assert input@T(i,t) = nr(r) as F; 1: auto.
-  fresh F => C.
-  by case C; 1:depends R(r), R2(r).  
+admit.
 Qed.
 
 equiv unlinkability.
@@ -187,130 +155,16 @@ induction t.
 by admit. (* see comment above *)
 
 (* Case R - Done *)
-expand frame@R(r). fa 4.
-by expand seq(r->nr(r)), r.
+admit.
 
 (* Case R1  WIP *)
-expand frame@R1(r); expand exec@R1(r).
-expand cond@R1(r); expand output@R1(r).
-fa 4; fa 5.
-
-equivalent
-  (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-                       H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))),
-  (exists (i,t:index), T(i,t) < R1(r) &&
-   snd(output@T(i,t)) = snd(input@R1(r)) &&
-   fst(output@T(i,t)) = fst(input@R1(r)) &&
-   R(r) < T(i,t) &&
-   output@R(r) = input@T(i,t)).
-by use wa_R1 with r.
-
-fadup 5.
-
-equivalent
-  (if
-      (exec@pred(R1(r)) &&
-       exists (i,t:index),
-       ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-          fst(output@T(i,t)) = fst(input@R1(r)))
-         && R(r) < T(i,t))
-        && output@R(r) = input@T(i,t)))
-    then
-      (try find i,t such that
-         xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
-         H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))) in
-         xor(diff(id(i),id'(i,t)),
-             H(<tag1,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t)))))),
-  (if
-      (exec@pred(R1(r)) &&
-       exists (i,t:index),
-       ((((T(i,t) < R1(r) && snd(output@T(i,t)) = snd(input@R1(r))) &&
-          fst(output@T(i,t)) = fst(input@R1(r)))
-         && R(r) < T(i,t))
-        && output@R(r) = input@T(i,t)))
-      then
-      (try find i,t such that
-         exec@pred(R1(r)) &&
-	 (T(i,t) < R1(r) &&
-          snd(output@T(i,t)) = snd(input@R1(r)) &&
-          fst(output@T(i,t)) = fst(input@R1(r)) &&
-          R(r) < T(i,t) &&
-          output@R(r) = input@T(i,t)) in
-         xor(diff(id(i),id'(i,t)),
-             H(<tag1,<nr(r),nt(i,t)>>,diff(key(i),key'(i,t)))))).
-
-project.
-
-(* Left *)
-fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
-     4: auto].
-intro [_ [i t _]].
-fa; 2,3,4: intro *; expand output; auto.
-intro Meq.
-use wa_R1_left with i0,r as [H1 H2]. 
-use H1 as [_ _]; 2: expand output; auto.
-by expand output; exists t. 
-(* Right *)
-fa; [1,2: by intro [_ [i t _]]; simpl; exists i,t |
-     4: auto].
-intro [_ [i t _]].
-fa; 2,3,4: intro *; expand output; auto.
-intro Meq; simpl.
-use wa_R1_right with i0,t0,r as [H1 H2].
-by use H1.
-
-fa 5.
-fadup 5.
-fa 5.
-expand seq(i,r,t->xor((diff(id(i),id'(i,t))),
-                  H(<tag1,<nr(r),nt(i,t)>>,(diff(key(i),key'(i,t)))))),
-       i,r,t.
-by fadup 5.
+admit.
 
 (* Case R2 *)
-expand frame@R2(r); expand exec@R2(r).
-expand cond@R2(r); expand output@R2(r).
-fa 4. fa 5.
-
-(* Same as wa_R1 but with @R2 instead of @R1,
-   and the equivalence is used under a negation. *)
-equivalent
-  (exists (i,t:index), xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
-                 H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t)))),
-  (exists (i,t:index), T(i,t) < R2(r) &&
-    snd(output@T(i,t)) = snd(input@R2(r)) &&
-    fst(output@T(i,t)) = fst(input@R2(r)) &&
-    input@T(i,t) = output@R(r) &&   R(r) < T(i,t)).
-
-use tags_neq.
-split.
-(* proof of lemma: Cond => WA *)
-intro [i t Meq].
-project.
-(* left *)
-euf Meq => _ _ _; 1:auto.
-exists i,t0; simpl.
-assert (nr(r) = input@T(i,t0)) as F; 1:auto.
-fresh F => C.
-by case C; 2:depends R(r), R1(r).
-
-(* right *)
-euf Meq => _ _ _; 1:auto.
-exists i,t; simpl.
-assert (nr(r) = input@T(i,t)) as F; 1:auto.
-fresh F => C.
-by case C; 2:depends R(r), R1(r).
-
-(* proof of lemma: WA => Cond *)
-by intro [i t _]; expand output; exists i,t.
-
-by fadup 5.
+admit.
 
 (* Case T *)
-expand frame@T(i,t). fa 4.
-expand seq(i,t->nt(i,t)),i,t.
-by expand seq(i,t->xor((diff(id(i),id'(i,t))),
-                H(<tag0,<input@T(i,t),nt(i,t)>>,(diff(key(i),key'(i,t)))))),i,t.
+admit.
 
 (* Case T1 *)
 expand frame@T1(i,t); expand exec@T1(i,t).
@@ -347,13 +201,12 @@ expand cond@T1(i,t); split.
   euf Hcond => _ [_ [_ _]] _; 1:auto.
   exists r; simpl.
   assert R(r) < T(i,t) as _.
-    assert nr(r) = input@T(i,t) as HF; 1:auto.
-    fresh HF => C.
-    case C; 2,3:auto. 
-    by depends R(r),R2(r). 
+    admit.
   simpl.
   case output@R1(r).
-  by euf Meq1.
+  (* Issue here *)
+  euf Meq1. auto. auto.
+
   by use H0 with i,t.
 
   (* Right *)

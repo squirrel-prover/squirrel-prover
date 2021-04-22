@@ -267,6 +267,8 @@ let check_sel sel_tacs l =
 
 let fail sk fk = fk (Failure "fail")
 
+let cut t j sk fk = t j (fun l _ -> sk l fk) fk
+
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
 let map ?(cut=false) t l sk fk0 =
@@ -306,11 +308,18 @@ let orelse_list l j =
 let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
   let sk =
     if cut then
-      (fun l fk' -> map ~cut tac2 l sk fk)
+      (fun l fk' -> map tac2 l sk fk)
     else
-      (fun l fk' -> map ~cut tac2 l sk fk')
+      (fun l fk' -> map tac2 l sk fk')
   in
   tac1 judge sk fk
+  (* let sk =
+   *   if cut then
+   *     (fun l fk' -> map ~cut tac2 l sk fk)
+   *   else
+   *     (fun l fk' -> map ~cut tac2 l sk fk')
+   * in
+   * tac1 judge sk fk *)
 
 let rec andthen_list ?cut = function
   | [] -> hard_failure (Failure "empty anthen_list")
@@ -344,14 +353,14 @@ let checkfail_tac exc t j sk fk =
   | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
-let repeat ?(cut=false) t j sk fk0 =
+let repeat ?(cut=false) t j sk fk =
   let rec aux j sk fk =
     t j
-      (fun l fk -> 
-         let fk = if cut then fk0 else fk in
+      (fun l fk' ->
+         let fk = if cut then fk else fk' in
          map aux l sk fk)
       (fun e -> sk [j] fk)
-  in aux j sk fk0
+  in aux j sk fk
 
 let eval_all (t : 'a tac) x =
   let l = ref [] in
@@ -388,6 +397,83 @@ let () =
       let expected = [ [0,1] ] in
       assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
       assert (eval_all (andthen t1 t3) (11,12) = expected) ;
+    end ;
+    "Repeat", `Quick, begin fun () ->
+      let t : int tac =
+        fun n sk fk -> if n = 0 then fk (Failure "") else sk [n-1] fk in
+      let expected = [ [0] ; [1] ; [2] ] in
+      assert (eval_all (repeat ~cut:false t) 2 = expected) ;
+      assert (eval_all (repeat ~cut:true t) 2 = [[0]])
+    end ;
+    "Repeat cut", `Quick, begin fun () ->
+      (* Non-branching tactic that sends 0 to 1 or 2, and sends 1 to 3,
+       * fails otherwise. *)
+      let t : int tac = fun n sk fk ->
+        if n = 0 then sk [1] (fun _ -> sk [2] fk) else
+          if n = 1 then sk [3] fk else
+            fk (Failure "")
+      in
+      Alcotest.(check (list (list int)))
+        "result"
+        [[3];[1];[2];[0]]
+        (eval_all (repeat t) 0) ;
+      Alcotest.(check (list (list int)))
+        "result"
+        [[3]]
+        (eval_all (repeat ~cut:true t) 0)
+    end ;
+    "Repeat cut", `Quick, begin fun () ->
+      (* Non-branching tactic that sends 0 to 1 or 2,
+       * fails otherwise. Here we see that (repeat t) also cuts
+       * backtracking on its last call to t. *)
+      let t : int tac = fun n sk fk ->
+        if n = 0 then sk [1] (fun _ -> sk [2] fk) else
+          fk (Failure "")
+      in
+      Alcotest.(check (list (list int)))
+        "result"
+        [[1];[2];[0]]
+        (eval_all (repeat t) 0) ;
+      Alcotest.(check (list (list int)))
+        "result"
+        [[1]]
+        (eval_all (repeat ~cut:true t) 0)
+    end ;
+    "Andthen cut", `Quick, begin fun () ->
+      (* Testing andthen with cut=true on a non-branching case.
+       * The flag only cuts the backtracking on the first argument
+       * of andthen. *)
+      let t : int tac = fun _ sk fk -> sk [1] (fun _ -> sk [2] fk) in
+      (* Check that id is neutral for anthen, on both sides. *)
+      assert (eval_all (andthen id t) 0 = [[1];[2]]) ;
+      assert (eval_all (andthen t id) 0 = [[1];[2]]) ;
+      assert (eval_all (andthen_list [id;t]) 0 = [[1];[2]]) ;
+      assert (eval_all (andthen_list [t;id]) 0 = [[1];[2]]) ;
+      (* This is not the case anymore when cut=true. *)
+      assert (eval_all (andthen ~cut:true t id) 0 = [[1]]) ;
+      assert (eval_all (andthen ~cut:true id t) 0 = [[1];[2]]) ;
+      assert (eval_all (andthen_list ~cut:true [t;id]) 0 = [[1]]) ;
+      assert (eval_all (andthen_list ~cut:true [id;t]) 0 = [[1];[2]])
+    end ;
+    "Andthen cut branching", `Quick, begin fun () ->
+      (* Andthen with cut=true and a branching tactic.
+       * The first invokation of t yields a success with
+       * two subgoals: [0;1]. Further successes won't be considered.
+       * The use of cut still allow backtracking in second invokation
+       * of t, and since t is applied to both 0 and 1, we have four
+       * possibilities: [0;1;2;3], [0;1], [2;3] and []. *)
+      let t : int tac = fun n sk fk -> sk [2*n;2*n+1] (fun _ -> sk [] fk) in
+      assert (eval_all t 0 = [[0;1];[]]) ;
+      assert (eval_all (andthen ~cut:true t id) 0 = [[0;1]]) ;
+      Alcotest.(check (list (list int)))
+        "result"
+        [[0;1;2;3];[0;1];[2;3];[]]
+        (eval_all (andthen ~cut:true t t) 0) ;
+      (* We now wrap t using cut, so there is no backtracking at all. *)
+      Alcotest.(check (list (list int)))
+        "result"
+        [[0;1;2;3]]
+        (eval_all (andthen (cut t) (cut t)) 0) ;
     end ;
     "Try", `Quick, begin fun () ->
       let t = fun _ sk fk -> sk [1] (fun _ -> sk [] fk) in
