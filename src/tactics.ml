@@ -355,7 +355,7 @@ let checkfail_tac exc t j sk fk =
   | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
-let repeat ?(cut=false) t j sk fk =
+let repeat ?(cut=true) t j sk fk =
   let rec aux j sk fk =
     t j
       (fun l fk' ->
@@ -421,7 +421,7 @@ let () =
       in
       checki
         [[3];[1];[2];[0]]
-        (eval_all (repeat t) 0) ;
+        (eval_all (repeat ~cut:false t) 0) ;
       checki
         [[3]]
         (eval_all (repeat ~cut:true t) 0)
@@ -436,7 +436,7 @@ let () =
       in
       checki
         [[1];[2];[0]]
-        (eval_all (repeat t) 0) ;
+        (eval_all (repeat ~cut:false t) 0) ;
       checki
         [[1]]
         (eval_all (repeat ~cut:true t) 0)
