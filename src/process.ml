@@ -453,7 +453,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       List.rev env.evars,
       Term.subst
         (subst_ts @ subst_input)
-        (List.fold_left Term.mk_and Term.True env.facts)
+        (Term.mk_ands env.facts)
     in
 
     let updates =

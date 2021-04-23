@@ -573,6 +573,7 @@ let fs_false = mk_fsymb "false" 0
 let fs_true  = mk_fsymb "true" 0
 let fs_and   = mk_fsymb "and" 2
 let fs_or    = mk_fsymb "or" 2
+let fs_impl  = mk_fsymb "impl" 2
 let fs_not   = mk_fsymb "not" 1
 
 let fs_ite =

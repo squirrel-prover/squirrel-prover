@@ -4,8 +4,6 @@
     - Strucutral -> relies on properties of protocols, or of equality over messages,...
     - Cryptographic -> relies on a cryptographic assumptions, that must be assumed.*)
 
-open Term
-
 type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
@@ -448,7 +446,7 @@ let simpl_impl s =
 (** [generalize ts s] reverts all hypotheses that talk about [ts] in [s],
     by introducing them in the goal.
     Also returns a function that introduce back the generalized hypothesis.*)
-let generalize (ts : timestamp) s =
+let generalize (ts : Term.timestamp) s =
   let ts = match ts with
     | Var t -> (Vars.EVar t) 
     | _ -> hard_failure (Failure "timestamp is not a var") in
@@ -628,11 +626,12 @@ let fa_expand t =
     | _ -> raise No_FA
   in
 
+  (* FIXME: this may no longer be necessary (type changes) *)
   (* Remve ITE(b,true,false) coming from expansion of frame macro *)
   let filterBoolAsMsg =
     List.map
       (fun x -> match x with
-         | Fun (f,_,[c;t;e]) 
+         | Term.Fun (f,_,[c;t;e]) 
            when f = Term.f_ite && t = Term.mk_true && e = Term.mk_false -> c
          | _ -> x)
   in
@@ -649,7 +648,7 @@ let fa TacticsArgs.(Int i) s =
             let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
             let subst =
               List.map2
-                (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
                 vars vars'
             in
             let c' = Term.(Seq (vars, c)) in
@@ -776,18 +775,18 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
 
   method extract_ts_atoms phi =
     let rec conjuncts = function
-      | And (f,g) :: l -> conjuncts (f::g::l)
+      | Term.And (f,g) :: l -> conjuncts (f::g::l)
       | f :: l -> f :: conjuncts l
       | [] -> []
     in
     List.partition
-      (function Atom (`Timestamp _) -> true | _ -> false)
+      (function Term.Atom (`Timestamp _) -> true | _ -> false)
       (conjuncts [phi])
 
   method add_atoms atoms timestamps =
     List.fold_left
       (fun acc at -> match at with
-        | Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
+        | Term.Atom (`Timestamp (`Leq,tau_1,tau_2)) ->
           if List.mem tau_2 acc
           then tau_1::acc
           else acc
@@ -853,7 +852,7 @@ let fa_dup_int i s =
               let subst =
                 List.map
                   (fun v ->
-                     ESubst (Var v, Var (Vars.make_new_from v)))
+                     Term.ESubst (Var v, Var (Vars.make_new_from v)))
                   vars
               in
               Term.subst subst f,
@@ -961,7 +960,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
                 List.map (Vars.make_fresh_from_and_update env) bv in
               let subst =
                 List.map2
-                  (fun i i' -> ESubst (Term.Var i, Term.Var i'))
+                  (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
                   bv bv'
               in
               let j = List.map (Term.subst_var subst) j in
@@ -969,6 +968,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
                 (List.map (fun i -> Vars.EVar i) bv')
                 (Term.mk_indices_neq n.s_indices j))
            list_of_indices_from_frame)
+
     (* indirect cases (occurrences of [name] in actions of the system) *)
     and phi_actions =
       Hashtbl.fold
@@ -981,16 +981,19 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
                 (fun i -> Vars.make_fresh_from_and_update env i)
                 a.Action.indices
             in
+
             let bv =
               List.filter
                 (fun i -> not (List.mem i a.Action.indices))
                 (List.sort_uniq Stdlib.compare (List.concat indices_a))
             in
+
             let bv' =
               List.map
                 (fun i -> Vars.make_fresh_from_and_update env i)
                 bv
             in
+
             let subst =
               List.map2
                 (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
@@ -1005,10 +1008,13 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
               SystemExpr.action_to_term cntxt.table cntxt.system
                 (Action.subst_action subst a.Action.action)
             in
+
             let indices_a =
               List.map
                 (List.map (Term.subst_var subst))
-                indices_a in
+                indices_a 
+            in
+
             (* if new_action occurs before an action of the frame *)
             let disj =
               Term.mk_ors
@@ -1028,7 +1034,8 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
             in
             let forall_var =
               List.map (fun i -> Vars.EVar i) (new_action_indices @ bv') in
-            (Term.mk_forall forall_var (Term.mk_impl disj conj))::formulas)
+            (Term.mk_forall
+               forall_var (Term.mk_impl disj conj))::formulas)
         tbl_of_action_indices
         []
     in
@@ -1056,9 +1063,9 @@ let fresh_cond (cntxt : Constr.trace_cntxt) env t biframe : Term.message =
   let cntxt_right = { cntxt with system = system_right } in
   let phi_right = mk_phi_proj cntxt_right env n_right PRight biframe in
 
-  mk_ands
+  Term.mk_ands
     (* remove duplicates, and then concatenate *)
-    ((List.filter (fun x -> not(List.mem x phi_right)) phi_left)
+    ((List.filter (fun x -> not (List.mem x phi_right)) phi_left)
      @
      phi_right)
 
@@ -1237,7 +1244,7 @@ let expand_all () s =
   let cntxt = mk_trace_cntxt s in
 
   let expand_all_macros t =
-    let rec aux : type a. a term -> a term = function
+    let rec aux : type a. a Term.term -> a Term.term = function
       | Macro (ms,l,a) as m
         when Macros.is_defined ms.s_symb a cntxt.table ->
         if query_happens ~precise:true s a 
@@ -1450,9 +1457,9 @@ let push_formula (j: 'a option) f term =
   in
 
   match term with
-  | Fun (f, _, _) when f = Term.f_ite -> mk_ite term
+  | Term.Fun (f, _, _) when f = Term.f_ite -> mk_ite term
 
-  | Fun (f, fty, terms) ->
+  | Term.Fun (f, fty, terms) ->
     begin match j with
       | None -> Fun (f, fty, List.map mk_ite terms)
       | Some (TacticsArgs.Int jj) ->
@@ -1463,7 +1470,7 @@ let push_formula (j: 'a option) f term =
             (Tactics.Failure "subterm at position j does not exists")
     end
 
-  | Diff (a, b) ->
+  | Term.Diff (a, b) ->
     begin match j with
       | None -> Diff (mk_ite a, mk_ite b)
       | Some (TacticsArgs.Int 0) -> Diff (mk_ite a, b)
@@ -1472,11 +1479,11 @@ let push_formula (j: 'a option) f term =
                 (Tactics.Failure "expected j is 0 or 1 for diff terms")
     end
 
-  | Seq (vs, t) ->
+  | Term.Seq (vs, t) ->
     if not_in_f_vars vs then Seq (vs, mk_ite t)
     else raise Not_ifcond
 
-  | Find (vs, b, t, e) ->
+  | Term.Find (vs, b, t, e) ->
     if not_in_f_vars vs then Find (vs, b, mk_ite t, mk_ite e)
     else raise Not_ifcond
 
@@ -1812,7 +1819,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              let m = Term.subst subst m in
              Term.mk_forall
                forall_vars
-               (Term.mk_impl
+               (Term.mk_impl ~simpl:false
                   (Term.mk_indices_eq key.s_indices is)
                   (Term.Atom (`Message (`Neq, t, m)))))
             list_of_hashes_from_frame)
@@ -1909,17 +1916,19 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              and conj =
                Term.mk_ands
                  (List.map
-                    (fun (is,m) -> Term.mk_impl
+                    (fun (is,m) -> Term.mk_impl ~simpl:false
                         (Term.mk_indices_eq key.s_indices is)
                         (Term.Atom (`Message (`Neq, t, m))))
                     list_of_is_m)
              in
 
-             (Term.mk_forall forall_vars (Term.mk_impl disj conj))::formulas)
+             (Term.mk_forall
+                forall_vars (Term.mk_impl ~simpl:false disj conj))
+             :: formulas)
           tbl_of_action_hashes
           []
       in
-      mk_ands (phi_frame @ phi_actions)
+      Term.mk_ands (phi_frame @ phi_actions)
 
     with
     | Not_hash -> Term.True
@@ -1932,7 +1941,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
    form (p inter q) && diff (p minus q, q minus p) *)
 let combine_conj_formulas p q =
   let rec to_list = function
-    | True  -> []
+    | Term.True  -> []
     | Term.And (a, b) -> to_list a @ to_list b
     | a -> [a]
   in
@@ -1951,8 +1960,9 @@ let combine_conj_formulas p q =
   (* common is the intersection of p and q, aux_q is the remainder of q and
      new_p the remainder of p *)
   Term.mk_and
-    (mk_ands common)
-    (Term.head_normal_biterm (Term.Diff(mk_ands new_p, mk_ands !aux_q)))
+    (Term.mk_ands common)
+    (Term.head_normal_biterm (Term.Diff(Term.mk_ands new_p, 
+                                        Term.mk_ands !aux_q)))
 
 let prf TacticsArgs.(Int i) s =
   match nth i (goal_as_equiv s) with
@@ -2265,7 +2275,7 @@ let enckp
                  let cntxt = Constr.{ cntxt with system } in
                  Cca.symenc_key_ssc
                    ~cntxt fnenc fndec
-                   ~elems:(goal_as_equiv s) sk.s_symb;
+                   ~elems:(goal_as_equiv s) sk.Term.s_symb;
                  Cca.symenc_rnd_ssc ~cntxt env fnenc sk biframe;
                  ()
               ),
@@ -2400,8 +2410,8 @@ exception Not_xor
 
 (* Removes the first occurence of Name (n,is) in the list l. *)
 let rec remove_name_occ ns l = match l with
-  | [Name ns'; t] when ns = ns' -> t
-  | [t; Name ns'] when ns = ns' -> t
+  | [Term.Name ns'; t] when ns = ns' -> t
+  | [t; Term.Name ns'] when ns = ns' -> t
   | _ ->
     Tactics.(soft_failure (Failure "name is not XORed on both sides"))
 
@@ -2432,7 +2442,7 @@ let mk_xor_if_term_base (cntxt : Constr.trace_cntxt) env biframe
   let len = if len_left = len_right then [len_left] else [len_left;len_right] in
 
   let phi =
-    mk_ands
+    Term.mk_ands
       (* remove duplicates, and then concatenate *)
       (len @
        List.filter (fun x -> not (List.mem x phi_right)) phi_left @

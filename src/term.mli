@@ -327,13 +327,13 @@ val mk_pair   : message -> message -> message
 (*------------------------------------------------------------------*)
 (** {3 For messages} *)
 
-val mk_not    : message                 -> message
-val mk_and    : message -> message      -> message
-val mk_ands   : message list            -> message
-val mk_or     : message -> message      -> message
-val mk_ors    : message list            -> message
-val mk_impl   : message -> message      -> message
-val mk_impls  : message list -> message -> message
+val mk_not    : ?simpl:bool -> message                 -> message
+val mk_and    : ?simpl:bool -> message -> message      -> message
+val mk_ands   : ?simpl:bool -> message list            -> message
+val mk_or     : ?simpl:bool -> message -> message      -> message
+val mk_ors    : ?simpl:bool -> message list            -> message
+val mk_impl   : ?simpl:bool -> message -> message      -> message
+val mk_impls  : ?simpl:bool -> message list -> message -> message
   
 val mk_forall : Vars.evar list -> message -> message
 val mk_exists : Vars.evar list -> message -> message
@@ -363,6 +363,7 @@ val destr_action :
 val destr_forall : message -> (Vars.evar list * message) option
 val destr_exists : message -> (Vars.evar list * message) option
 
+val destr_not  : message ->             message option
 val destr_and  : message -> (message * message) option
 val destr_or   : message -> (message * message) option
 val destr_impl : message -> (message * message) option

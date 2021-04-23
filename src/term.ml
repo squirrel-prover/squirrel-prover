@@ -105,6 +105,8 @@ and _ term =
 
   | ForAll : Vars.evar list * Type.message term -> Type.message term
   | Exists : Vars.evar list * Type.message term -> Type.message term
+
+
   | And    : Type.message term * Type.message term -> Type.message term
   | Or     : Type.message term * Type.message term -> Type.message term
   | Not    : Type.message term -> Type.message term
@@ -252,6 +254,7 @@ let f_false  = mk Symbols.fs_false
 let f_true   = mk Symbols.fs_true
 let f_and    = mk Symbols.fs_and
 let f_or     = mk Symbols.fs_or
+let f_impl   = mk Symbols.fs_impl
 let f_not    = mk Symbols.fs_not
 let f_ite    = mk Symbols.fs_ite
 
@@ -334,30 +337,30 @@ let mk_ite ?(simpl=true) c t e = match c with
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)
-    
-let mk_not t1 = match t1 with
+
+let mk_not ?(simpl=true) t1 = match t1 with
   | Not t -> t
   | t -> Not t
 
-let mk_and t1 t2 = match t1,t2 with
+let mk_and ?(simpl=true) t1 t2 = match t1,t2 with
   | True, t | t, True -> t
   | t1,t2 -> And (t1,t2)
 
-let mk_ands ts = List.fold_left mk_and True ts
+let mk_ands ?(simpl=true) ts = List.fold_left (mk_and ~simpl) True ts
 
-let mk_or t1 t2 = match t1,t2 with
+let mk_or ?(simpl=true) t1 t2 = match t1,t2 with
   | False, t | t, False -> t
   | t1,t2 -> Or (t1,t2)
 
-let mk_ors ts = List.fold_left mk_or False ts
+let mk_ors ?(simpl=true) ts = List.fold_left (mk_or ~simpl) False ts
 
-let mk_impl t1 t2 = match t1,t2 with
+let mk_impl ?(simpl=true) t1 t2 = match t1,t2 with
   | False, _ -> True
   | True, t -> t
   | t1,t2 -> Impl (t1,t2)
 
-let mk_impls ts t =
-  List.fold_left (fun tres t0 -> mk_impl t0 tres) t ts
+let mk_impls ?(simpl=true) ts t =
+  List.fold_left (fun tres t0 -> (mk_impl ~simpl) t0 tres) t ts
 
 let mk_forall l f = 
   if l = [] then f 
@@ -1396,6 +1399,10 @@ let rec destr_ors l f = match l, f with
 let rec decompose_ors f = match f with
   | Or (f, g) -> decompose_ors f @ decompose_ors g
   | _ -> [f]
+
+let rec destr_not = function
+  | Not f -> Some f
+  | _ -> None
 
 let rec destr_and = function
   | And (f, g) -> Some (f,g) 

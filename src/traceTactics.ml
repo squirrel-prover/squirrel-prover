@@ -976,7 +976,7 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
     let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
         let atom = (Atom (`Timestamp (`Lt,a1,a2))) in       
-        let g = Term.mk_impl atom (TraceSequent.conclusion s) in
+        let g = Term.mk_impl ~simpl:false atom (TraceSequent.conclusion s) in
         [happens_premise s a2; 
          TraceSequent.set_conclusion g s]
     else
@@ -1328,7 +1328,7 @@ let namelength Args.(Pair (Message n, Message m)) s =
                                   Term.mk_len (Name m)))) in
 
     [TraceSequent.set_conclusion
-       (Term.mk_impl f (TraceSequent.conclusion s)) s]
+       (Term.mk_impl ~simpl:false f (TraceSequent.conclusion s)) s]
 
   | _ -> Tactics.(soft_failure (Failure "expected names"))
 
@@ -1486,7 +1486,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
   Term.mk_ors (List.sort_uniq Stdlib.compare cases)
 
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
-let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t =
+let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   let list_of_actions_from_term =
     let iter = new Fresh.get_actions ~cntxt false in
     iter#visit_message t ;
@@ -1598,7 +1598,7 @@ let fresh (Args.String m) s =
         let phi_indirect = mk_fresh_indirect cntxt env ns t in
         let phi = Term.mk_or phi_direct phi_indirect in
 
-        let goal = Term.mk_impl phi (TraceSequent.conclusion s) in
+        let goal = Term.mk_impl ~simpl:false phi (TraceSequent.conclusion s) in
         [TraceSequent.set_conclusion goal s]
         (* all_left_introductions s [new_hyp,""] *)
 
@@ -1905,7 +1905,7 @@ let exec (Args.Timestamp a) s =
    TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
   
     TraceSequent.set_conclusion
-      (Term.mk_impl formula (TraceSequent.conclusion s)) s]
+      (Term.mk_impl ~simpl:false formula (TraceSequent.conclusion s)) s]
 
 let () =
   T.register_typed "executable"
@@ -1943,7 +1943,9 @@ let fa s =
                                        (if c = c' then [c] else [c;c'])
                                        (Term.Atom (`Message (`Eq,t,t'))));
 
-                s |> set_conclusion (Term.mk_impls [Term.Not c;Term.Not c']
+                s |> set_conclusion (Term.mk_impls 
+                                       [Term.mk_not c;
+                                        Term.mk_not c']
                                        (Term.Atom (`Message (`Eq,e,e')))) ]
             in
             subgoals
@@ -2009,15 +2011,15 @@ let fa s =
 
             let subgoals =
               let open TraceSequent in
-              [ s |> set_conclusion
-                       (Term.mk_impl c (Term.mk_exists unused c')) ;
+              [ set_conclusion
+                  (Term.mk_impl c (Term.mk_exists unused c')) s ;
 
-                s |> set_conclusion (Term.mk_impl c' c) ;
+                set_conclusion (Term.mk_impl c' c) s;
 
-                s |> set_conclusion (Term.mk_impls [c;c']
-                                       (Atom (`Message (`Eq,t,t'))));
+                set_conclusion (Term.mk_impls [c;c']
+                                  (Atom (`Message (`Eq,t,t')))) s;
 
-                s |> set_conclusion (Term.Atom (`Message (`Eq,e,e'))) ]
+                set_conclusion (Term.Atom (`Message (`Eq,e,e'))) s]
             in
             subgoals
 
@@ -2782,6 +2784,7 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
 
   let system = TraceSequent.system sequent in
   let table  = TraceSequent.table sequent in
+
   (* Now, we need to add the timestamp constraints. *)
   (* The action name and the action timestamp variable are equal. *)
   let action_descr_ts =
@@ -2793,21 +2796,23 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
       (TraceSequent.maximal_elems
          ~precise:false sequent (precise_ts s @ precise_ts m))
   in
+
   let le_cnstr =
     List.map
       (function ts ->
         Term.Atom (Term.mk_timestamp_leq action_descr_ts ts))
       (maximal_elems)
   in
-  let le_cnstr = List.fold_left Term.mk_or Term.False le_cnstr in
+  let le_cnstr = Term.mk_ors le_cnstr in
 
   (* TODO: use an existential for new indices. *)
   let sequent = TraceSequent.set_env case.env sequent in
 
   let goal =
-    Term.mk_impls
+    Term.mk_impls ~simpl:false
       [eq_indices; new_f; le_cnstr]
-      (TraceSequent.conclusion sequent) in
+      (TraceSequent.conclusion sequent) 
+  in
   TraceSequent.set_conclusion goal sequent
 
 let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
@@ -2839,12 +2844,14 @@ let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
     List.fold_left2
       (fun cnstr i i' ->
          let i' = Term.subst_var subst i' in
-         Term.mk_and cnstr (Term.Atom (`Index (`Eq, i, i'))))
+         Term.mk_and ~simpl:false cnstr (Term.Atom (`Index (`Eq, i, i'))))
       Term.True
       key.s_indices d_key_indices
   in
 
-  let goal = Term.mk_impls [eq_indices; eq_hashes] (TraceSequent.conclusion s) in
+  let goal = 
+    Term.mk_impls ~simpl:false [eq_indices; eq_hashes] (TS.conclusion s) 
+  in
   TraceSequent.set_conclusion goal s
 
 let euf_apply_facts drop_head s
@@ -2884,7 +2891,8 @@ let euf_apply
 
   let (h,key,m,_,_,extra_goals,drop_head) as p = get_params table at in
   let extra_goals = List.map (fun x ->
-      TraceSequent.set_conclusion (Term.mk_impl x (TraceSequent.conclusion s)) s
+      TraceSequent.set_conclusion 
+        (Term.mk_impl ~simpl:false x (TraceSequent.conclusion s)) s
     ) extra_goals in
 
   let tag_s =
@@ -2906,7 +2914,7 @@ let euf_apply
           ESubst (Term.Var uvarm,m);
           ESubst (Term.Var uvarkey,Term.Name key);] f in
         [TraceSequent.set_conclusion
-           (Term.mk_impl f (TraceSequent.conclusion s)) s]
+           (Term.mk_impl ~simpl:false f (TraceSequent.conclusion s)) s]
       | _ -> assert false in
 
   (* we create the honest sources using the classical eufcma tactic *)
@@ -3013,9 +3021,9 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TraceSequent.t) =
   in
   let f_coll = Term.mk_ands new_facts in
 
-  if f_coll = Term.True then soft_failure Tactics.NoCollision;
+  if f_coll = Term.mk_true then soft_failure Tactics.NoCollision;
 
-  let goal = Term.mk_impl f_coll (TraceSequent.conclusion s) in
+  let goal = Term.mk_impl ~simpl:false f_coll (TraceSequent.conclusion s) in
   [TraceSequent.set_conclusion goal s]
 
 let () = T.register_typed "collision"

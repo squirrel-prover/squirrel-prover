@@ -292,6 +292,7 @@ val fs_true   : fname t
 val fs_false  : fname t
 val fs_and    : fname t
 val fs_or     : fname t
+val fs_impl   : fname t
 val fs_not    : fname t
 val fs_ite    : fname t
 
