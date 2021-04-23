@@ -2567,15 +2567,16 @@ let rec do_intros (intros : Args.intro_pattern list) s =
     do_intros intros ss
 
   | (Args.StarV loc) :: intros0 ->
-    begin 
+    let repeat, s =
       try
         let handler, s = do_intro_var s in  
-        let s = do_naming_pat handler Args.AnyName s in
-        do_intros intros s
-          
+        true, do_naming_pat handler Args.AnyName s 
+
       with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> 
-        do_intros intros0 s
-    end
+        false, s
+    in
+    let intros = if repeat then intros else intros0 in
+    do_intros intros s 
 
   | (Args.Star loc) :: intros ->
     try
