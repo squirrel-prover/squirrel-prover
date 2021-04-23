@@ -779,57 +779,63 @@ let subst_macro (s : subst) isymb =
 
 (*------------------------------------------------------------------*)
 
-let get_set_vars : 'a term -> Sv.t =
-  fun term ->
+let fv : 'a term -> Sv.t = fun term ->
 
-  let rec termvars : type a. a term -> Sv.t -> Sv.t = fun t vars -> match t with
-    | Action (_,indices) -> Sv.add_list vars indices
-    | Var tv -> Sv.add (Vars.EVar tv) vars
-    | Pred ts -> termvars ts vars
+  let of_list l = 
+    let l = List.map (fun x -> Vars.EVar x) l in
+    Sv.of_list l
+  in
+
+  let rec fv : type a. a term -> Sv.t = fun t -> 
+    match t with
+    | Action (_,indices) -> of_list indices
+    | Var tv -> Sv.singleton (Vars.EVar tv) 
+    | Pred ts -> fv ts
     | Fun ((_,indices), _,lt) ->
-        let vars = Sv.add_list vars indices in
-        List.fold_left (fun vars x -> termvars x vars) vars lt
+      Sv.union (of_list indices) (fvs lt)
 
     | Macro (s, l, ts) ->
-      let vars = Sv.add_list vars s.s_indices in
-      termvars ts (termsvars l vars)
-    | Seq (a, b) ->
-      Sv.diff
-        (termvars b vars)
-        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
-    | Name s -> Sv.add_list vars s.s_indices
-    | Diff (a, b) -> termvars a (termvars b vars)
+      Sv.union
+        (of_list s.s_indices)
+        (Sv.union (fv ts) (fvs l))
+
+    | Seq (a, b) -> Sv.diff (fv b) (of_list a)
+
+    | Name s -> of_list s.s_indices
+
+    | Diff (a, b) -> fvs [a;b]
+
     | Find (a, b, c, d) ->
-      Sv.diff
-        (termvars b (termvars c (termvars d vars)))
-        (Sv.of_list (List.map (fun x -> Vars.EVar x) a))
-    | Atom a -> generic_atom_vars a vars
-    | ForAll (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
-    | Exists (a, b) -> Sv.diff (termvars b vars) (Sv.of_list a)
+      Sv.union
+        (Sv.diff (fvs [b;c]) (of_list a))
+        (fv d)
 
-  and termsvars : type a. a term list -> Sv.t -> Sv.t = fun terms vars ->
-    List.fold_left (fun vars x -> termvars x vars) vars terms
+    | Atom a -> generic_atom_vars a 
+
+    | ForAll (a, b)
+    | Exists (a, b) -> Sv.diff (fv b) (Sv.of_list a)
+
+  and fvs : type a. a term list -> Sv.t = fun terms ->
+    List.fold_left (fun sv x -> Sv.union (fv x) sv) Sv.empty terms
     
-  and message_atom_vars (`Message (ord, a1, a2)) vars =
-   termvars a1 (termvars a2 vars)
+  and message_atom_vars (`Message (ord, a1, a2)) =
+   Sv.union (fv a1) (fv a2)
 
-  and trace_atom_vars at vars = match at with
+  and trace_atom_vars at = match at with
     | `Timestamp (ord, ts, ts') ->
-      termvars ts (termvars ts' vars)
+      Sv.union (fv ts) (fv ts')
     | `Index (ord, i, i') ->
-      termvars (Var i) (termvars (Var i') vars)
-    | `Happens ts -> termvars ts vars
+      Sv.union (fv (Var i)) (fv (Var i'))
+    | `Happens ts -> fv ts
                        
-  and generic_atom_vars t vars = match t with
-    | #message_atom as a -> message_atom_vars a vars
-    | #trace_atom as a -> trace_atom_vars a vars
+  and generic_atom_vars t = match t with
+    | #message_atom as a -> message_atom_vars a 
+    | #trace_atom as a -> trace_atom_vars a 
   in
-  
-  termvars term Sv.empty
 
-let get_vars t = get_set_vars t |> Sv.elements
+  fv term
 
-let fv t = get_set_vars t
+let get_vars t = fv t |> Sv.elements
 
 
 (*------------------------------------------------------------------*)
@@ -840,7 +846,7 @@ let fv t = get_set_vars t
 let filter_subst (var:Vars.evar) (s:subst) =
   let s = 
     List.fold_left (fun acc (ESubst (x, y)) ->
-        if not (Sv.mem var (get_set_vars x))
+        if not (Sv.mem var (fv x))
         then (ESubst (x, y))::acc
         else acc
       ) [] s in 
@@ -856,11 +862,11 @@ let is_var_subst s =
 (** Returns the variables appearing in a substitution LHS. *)
 let subst_support s =
   List.fold_left (fun supp (ESubst (t,_)) -> 
-    Sv.union supp (get_set_vars t)) Sv.empty s
+    Sv.union supp (fv t)) Sv.empty s
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
   if is_var_subst s && 
-     Sv.disjoint (subst_support s) (get_set_vars t)
+     Sv.disjoint (subst_support s) (fv t)
   then t
   else
     let new_term : a term =
@@ -930,12 +936,12 @@ and subst_binding
 
   let right_fv = 
     List.fold_left (fun acc (ESubst (x, y)) -> 
-        Sv.union acc (get_set_vars y)
+        Sv.union acc (fv y)
       ) Sv.empty s in
 
   let all_vars = 
     List.fold_left (fun acc (ESubst (x, y)) -> 
-        Sv.union acc (get_set_vars x)
+        Sv.union acc (fv x)
       ) right_fv s in
 
   let env = ref (Vars.of_list (Sv.elements all_vars)) in
