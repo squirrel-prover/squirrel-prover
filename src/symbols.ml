@@ -548,13 +548,13 @@ let () = builtin_ref := table
 
 (** {3 Function symbols builtins} *)
 
-(** makes simple function types *)
-let mk_ty arity =
-  Type.mk_ftype 0 [] (List.init arity (fun _ -> Type.Message)) Type.Message
+(** makes simple function types of [ty^arity] to [ty] *)
+let mk_fty arity (ty : Type.tmessage) =
+  Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
     
-let mk_fsymb ?fty f arity =
+let mk_fsymb ?fty ?(bool=false) f arity =
   let fty = match fty with
-    | None -> mk_ty arity
+    | None -> mk_fty arity (if bool then Type.Boolean else Type.Message)
     | Some fty -> fty in
   let info = fty, Abstract in
   let table, f =
@@ -569,12 +569,12 @@ let fs_diff  = mk_fsymb "diff" 2
 
 (** Boolean connectives *)
 
-let fs_false = mk_fsymb "false" 0
-let fs_true  = mk_fsymb "true" 0
-let fs_and   = mk_fsymb "and" 2
-let fs_or    = mk_fsymb "or" 2
-let fs_impl  = mk_fsymb "impl" 2
-let fs_not   = mk_fsymb "not" 1
+let fs_false = mk_fsymb ~bool:true "false" 0
+let fs_true  = mk_fsymb ~bool:true "true" 0
+let fs_and   = mk_fsymb ~bool:true "and" 2
+let fs_or    = mk_fsymb ~bool:true "or" 2
+let fs_impl  = mk_fsymb ~bool:true "impl" 2
+let fs_not   = mk_fsymb ~bool:true "not" 1
 
 let fs_ite =
   let tyv = Type.mk_tvar "t" in

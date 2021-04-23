@@ -68,12 +68,6 @@ type term_i =
   | Happens of term list
   | ForAll  of bnds * term
   | Exists  of bnds * term
-  | And  of term * term
-  | Or   of term * term
-  | Impl of term * term
-  | Not  of term
-  | True
-  | False
 
 and term = term_i L.located
 

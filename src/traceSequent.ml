@@ -47,7 +47,7 @@ module FHyp = struct
   type t = Term.message
   let pp_hyp fmt f = Term.pp fmt f
 
-  let htrue = Term.True
+  let htrue = Term.mk_true
 end
 
 module H = Hyps.Mk(FHyp)
@@ -96,7 +96,7 @@ end = struct
     table        = table;
     env          = Vars.empty_env;
     hyps         = H.empty;
-    conclusion   = Term.True;
+    conclusion   = Term.mk_true;
   }
 
   let update ?system ?table ?env ?hyps ?conclusion t =
@@ -133,19 +133,13 @@ let pp ppf s =
 
 
 (*------------------------------------------------------------------*)
-let rec simpl_form acc hyp = 
-  match hyp with
-  | Term.And (f,g) -> simpl_form (simpl_form acc f) g
-
-  | _ as f -> f :: acc
-
-(*------------------------------------------------------------------*)
 let get_atoms (s : sequent) : Term.literal list =
-  let hyps = H.fold (fun _ f acc -> simpl_form acc f) s.hyps [] in
+  let hyps = H.fold (fun _ f acc -> Term.decompose_ands f @ acc) s.hyps [] in
   List.fold_left (fun atoms hyp -> match hyp with 
       | Term.Atom at -> (`Pos, at) :: atoms
-      | Term.(Not (Atom at)) -> (`Neg, at) :: atoms
-      | _ -> atoms
+      | _ -> match Term.destr_not hyp with
+        | Some (Term.Atom at) -> (`Neg, at) :: atoms
+        | _ -> atoms
     ) [] hyps 
 
 let get_message_atoms (s : sequent) : Term.message_atom list =

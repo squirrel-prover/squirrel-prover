@@ -23,5 +23,5 @@ Proof.
     (* The equivalence does not hold. We are only checking that the right
      * formula has been produced. *)
   admit.
-  by yesif 1.
+  by yesif 1. 
 Qed.

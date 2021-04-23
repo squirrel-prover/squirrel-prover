@@ -97,12 +97,6 @@ and _ term =
 
   | ForAll : Vars.evar list * Type.message term -> Type.message term
   | Exists : Vars.evar list * Type.message term -> Type.message term
-  | And    : Type.message term * Type.message term -> Type.message term
-  | Or     : Type.message term * Type.message term -> Type.message term
-  | Not    : Type.message term  -> Type.message term
-  | Impl   : Type.message term * Type.message term -> Type.message term
-  | True   : Type.message term
-  | False  : Type.message term
 
 type 'a t = 'a term
 
@@ -279,6 +273,7 @@ val exec_macro  : msymb
 val f_true   : fsymb
 val f_false  : fsymb
 val f_and    : fsymb
+val f_impl   : fsymb
 val f_or     : fsymb
 val f_not    : fsymb
 val f_ite    : fsymb
@@ -363,11 +358,23 @@ val destr_action :
 val destr_forall : message -> (Vars.evar list * message) option
 val destr_exists : message -> (Vars.evar list * message) option
 
-val destr_not  : message ->             message option
-val destr_and  : message -> (message * message) option
-val destr_or   : message -> (message * message) option
-val destr_impl : message -> (message * message) option
+(*------------------------------------------------------------------*)
+val destr_false : message ->               unit  option
+val destr_true  : message ->               unit  option
+val destr_not   : message ->            message  option
+val destr_and   : message -> (message * message) option
+val destr_or    : message -> (message * message) option
+val destr_impl  : message -> (message * message) option
 
+(*------------------------------------------------------------------*)
+val is_false : message -> bool
+val is_true  : message -> bool
+val is_not   : message -> bool
+val is_and   : message -> bool
+val is_or    : message -> bool
+val is_impl  : message -> bool
+
+(*------------------------------------------------------------------*)
 (** left-associative *)
 val destr_ands  : int -> message -> message list option
 val destr_ors   : int -> message -> message list option
@@ -376,21 +383,17 @@ val destr_impls : int -> message -> message list option
 val decompose_forall : message -> Vars.evar list * message
 val decompose_exists : message -> Vars.evar list * message
 
+(*------------------------------------------------------------------*)
 val decompose_ands  : message -> message list 
 val decompose_ors   : message -> message list 
 val decompose_impls : message -> message list 
 
+(*------------------------------------------------------------------*)
 val destr_var : 'a term -> 'a Vars.var option
-val destr_pair : 'a term -> ('a term * 'a term) option
+val destr_pair : message -> (message * message) option
 
-(** Existential type for atoms. 
-    Constraints on allowed ordering are lost. *)
-type eatom = 
-  | EOrd : ord * 'a term * 'a term -> eatom
-  | EHappens : timestamp -> eatom
-
-val destr_atom : generic_atom -> eatom 
-val of_eatom   : eatom -> generic_atom
+(*------------------------------------------------------------------*)
+val destr_matom : generic_atom -> (ord_eq * message * message) option 
 
 (*------------------------------------------------------------------*)
 (** {2 Sets and Maps } *)

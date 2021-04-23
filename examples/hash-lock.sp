@@ -155,16 +155,9 @@ Proof.
   expand cond@T(i,k); expand output@T(i,k).
   fa 0. fa 1. fa 1. fa 1.
   prf 2. yesif 2.
-  project.
-  split => //. 
-  split => j * //.
-  by assert nT(i,k) = fst(input@R2(j)) as Meq0; [1: auto | 2: fresh Meq0].
-  by assert nT(i,k) = fst(input@R1(j)) as Meq0; [1: auto | 2: fresh Meq0].
-  
-  repeat split => j *.
-  auto. 
-  by assert nT(i,k) = fst(input@R1(j)) as Meq0; [1: auto | 2: fresh Meq0].
-  by assert nT(i,k) = fst(input@R2(j)) as Meq0; [1: auto | 2: fresh Meq0].
+  project;
+  repeat split => > _ _ [_ Meq0]; (try fresh Meq0); auto.
+
   fresh 2.
   by fresh 1; yesif 1. 
   auto.

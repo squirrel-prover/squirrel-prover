@@ -799,7 +799,7 @@ let define_oracle_tag_formula table (h : lsymb) f =
 let get_oracle_tag_formula h =
   match get_option (Oracle_for_symbol h) with
   | Some (Oracle_formula f) -> f
-  | None -> Term.False
+  | None -> Term.mk_false
 
 let is_proof_completed () = !subgoals = []
 

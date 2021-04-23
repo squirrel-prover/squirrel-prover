@@ -122,7 +122,7 @@ let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 
 (*------------------------------------------------------------------*)
 let get_models s =
-  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
+  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
   Tactics.timeout_get (TraceSequent.get_models s)
 
 let mk_trace_cntxt s = 
@@ -139,7 +139,7 @@ let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
   Prover.Goal.Trace s
 
 let query_happens (s : EquivSequent.t) (a : Term.timestamp) =
-  let s = trace_seq_of_equiv_seq ~goal:Term.False s in
+  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
   TraceSequent.query_happens s a
 
 (*------------------------------------------------------------------*)
@@ -370,11 +370,9 @@ let rec do_intros (intros : Args.intro_pattern list) s =
   match intros with
   | [] -> [s]
 
-  | Args.SItem l :: intros ->
-    (* TODO: implement after code factorization *)
-    hard_failure (Failure "not yet implemented for equiv sequents")
-
-  | (Args.SExpnd s_e) :: intros ->
+  | Args.StarV _ :: intros 
+  | Args.SItem _ :: intros 
+  | Args.SExpnd _ :: intros ->
     (* TODO: implement after code factorization *)
     hard_failure (Failure "not yet implemented for equiv sequents")
 
@@ -606,22 +604,17 @@ let () =
 
 exception No_common_head
 exception No_FA
+
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
     | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
       EquivSequent.[ t ]
+
     | Fun (f,_,l) -> l
-    | And (f,g) ->
-      EquivSequent.[ f ; g ]
-    | Or (f,g) ->
-      EquivSequent.[ f ; g ]
+
     | Atom (`Message (_,f,g)) ->
       EquivSequent.[ f ; g ]
-    | Impl (f,g) ->
-      EquivSequent.[ f ; g ]
-    | Not f -> EquivSequent.[ f ]
-    | True -> []
-    | False -> []
+
     | Diff _ -> raise No_common_head
     | _ -> raise No_FA
   in
@@ -774,14 +767,9 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
   method check_formula f = ignore (self#fold_message [Term.Pred tau] f)
 
   method extract_ts_atoms phi =
-    let rec conjuncts = function
-      | Term.And (f,g) :: l -> conjuncts (f::g::l)
-      | f :: l -> f :: conjuncts l
-      | [] -> []
-    in
     List.partition
       (function Term.Atom (`Timestamp _) -> true | _ -> false)
-      (conjuncts [phi])
+      (Term.decompose_ands phi)
 
   method add_atoms atoms timestamps =
     List.fold_left
@@ -808,13 +796,7 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
       when f = Term.f_ite && ms = Term.exec_macro && List.mem a timestamps ->
       self#fold_message timestamps then_branch
 
-    | Macro _ | Name _ | Var _ | Diff _ -> raise Not_FADUP_iter
-
-    | Fun _ | Seq _ | Find _ -> super#fold_message timestamps t
-
-    | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
-
-    | Impl (phi_1,phi_2) ->
+    | Fun (f, _, [phi_1;phi_2]) when f = Term.f_impl ->
       let atoms,l = self#extract_ts_atoms phi_1 in
       let ts' = self#add_atoms atoms timestamps in
       List.iter
@@ -822,20 +804,22 @@ class check_fadup ~(cntxt:Constr.trace_cntxt) tau = object (self)
         (phi_2::l) ;
       timestamps
 
-    | And _ as phi ->
-      let atoms,l = self#extract_ts_atoms phi in
+    | Fun (f, _, _) when f = Term.f_and ->
+      let atoms,l = self#extract_ts_atoms t in
       let ts' = self#add_atoms atoms timestamps in
       List.iter
         (fun phi -> ignore (self#fold_message ts' phi))
         l ;
       timestamps
 
-    | Atom (`Happens _) -> raise Not_FADUP_iter
+    | Atom (`Index _) | Atom (`Timestamp _) -> timestamps
 
+    | Fun _ | Seq _ | Find _ 
     | Atom (`Message _)
-    | Or _ | Not _ | ForAll _ | Exists _ -> super#fold_message timestamps t
+    | ForAll _ | Exists _ -> super#fold_message timestamps t
 
-    | True | False -> timestamps
+    | Macro _ | Name _ | Var _ | Diff _ 
+    | Atom (`Happens _) -> raise Not_FADUP_iter
 end
 
 let fa_dup_int i s =
@@ -847,8 +831,8 @@ let fa_dup_int i s =
         (* we expect that e is of the form exec@pred(tau) && phi *)
         let (tau,phi) =
           let f,g = match e with
-            | Term.And (f,g) -> f,g
-            | Term.(Seq (vars, And (f,g))) ->
+            | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
+            | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
               let subst =
                 List.map
                   (fun v ->
@@ -880,9 +864,8 @@ let fa_dup_int i s =
         let iter = new check_fadup ~cntxt tau in
         iter#check_formula phi ;
         (* on success, we keep only exec@pred(tau) *)
-        let new_elem =
-          Term.Macro (Term.exec_macro,[],Term.Pred tau)
-        in
+        let new_elem = Term.Macro (Term.exec_macro,[],Term.Pred tau) in
+
         [EquivSequent.set_equiv_goal s 
            (List.rev_append before (new_elem::after))]
 
@@ -891,10 +874,11 @@ let fa_dup_int i s =
           Tactics.soft_failure (Tactics.Failure "can only apply the tactic on \
           a formula of the form (exec@pred(tau) && phi) with frame@pred(tau)\
           in the biframe")
+
       | Not_FADUP_iter ->
           Tactics.soft_failure (Tactics.Failure "the formula contains subterms \
           that are not handled by the FADUP rule")
-      end
+    end
 
   | exception Out_of_range ->
       Tactics.soft_failure (Tactics.Failure "out of range position")
@@ -1258,12 +1242,6 @@ let expand_all () s =
       | Diff(a, b) -> Diff(aux a, aux b)
       | Seq (a, b) -> Seq(a, aux b)
       | Find (a, b, c, d) -> Find(a, aux b, aux c, aux d)
-      | And (l,r) -> And (aux l, aux r)
-      | Or (l,r) -> Or (aux l, aux r)
-      | Impl (l,r) -> Impl (aux l, aux r)
-      | Not f -> Not (aux f)
-      | True -> True
-      | False -> False
       | ForAll (vs,l) -> ForAll (vs, aux l)
       | Exists (vs,l) -> Exists (vs, aux l)
       | Atom (`Message (o, t, t')) -> Atom (`Message (o, aux t, aux t'))
@@ -1296,7 +1274,10 @@ let () = T.register "expandall"
   * and add a subgoal to prove that [t1 <=> t2]. *)
 let equiv_formula f1 f2 (s : EquivSequent.t) =
   (* goal for the equivalence of t1 and t2 *)
-  let f = Term.And(Term.Impl(f1, f2), Term.Impl(f2, f1)) in
+  let f = 
+    Term.mk_and ~simpl:false 
+      (Term.mk_impl ~simpl:false f1 f2)
+      (Term.mk_impl ~simpl:false f2 f1) in
   let trace_sequent = trace_seq_of_reach f s in
 
   let subgoals =
@@ -1355,13 +1336,13 @@ let simplify_ite b s cond positive_branch negative_branch =
   if b then
     (* replace in the biframe the ite by its positive branch *)
     (* ask to prove that the cond of the ite is True *)
-    let trace_sequent = trace_seq_of_reach cond s in
-    (positive_branch, trace_sequent)
+    let trace_s = trace_seq_of_reach cond s in
+    (positive_branch, trace_s)
   else
     (* replace in the biframe the ite by its negative branch *)
     (* ask to prove that the cond of the ite implies False *)
-    let trace_sequent = trace_seq_of_reach (Term.Impl(cond,False)) s in
-    (negative_branch, trace_sequent)
+    let trace_s = trace_seq_of_reach (Term.mk_impl cond Term.mk_false) s in
+    (negative_branch, trace_s)
 
 
 (** [get_ite ~cntxt elem] returns None if there is no ITE term in [elem],
@@ -1450,7 +1431,7 @@ let push_formula (j: 'a option) f term =
   let rec mk_ite m = match m with
     (* if c then t else e becomes if (f => c) then t else e *)
     | Term.Fun (fs,_,[c;t;e]) when fs = Term.f_ite -> 
-      Term.mk_ite ~simpl:false (Term.Impl (f,c)) t e
+      Term.mk_ite ~simpl:false (Term.mk_impl ~simpl:false f c) t e
 
     (* m becomes if f then m else 0 *)
     | _ -> Term.mk_ite ~simpl:false f m Term.mk_zero
@@ -1508,7 +1489,7 @@ let ifcond TacticsArgs.(Pair (Int i,
         in
         let biframe = List.rev_append before (new_elem :: after) in
         let trace_sequent = 
-          trace_seq_of_reach Term.(Impl(cond, f)) s 
+          trace_seq_of_reach Term.(mk_impl ~simpl:false cond f) s 
         in
 
         [ Prover.Goal.Trace trace_sequent;
@@ -1516,8 +1497,7 @@ let ifcond TacticsArgs.(Pair (Int i,
       with
       | Not_ifcond ->
         Tactics.soft_failure 
-          (Tactics.Failure "tactic not applicable because \
-                            the formula contains variables that overlap with \
+          (Tactics.Failure "the formula contains variables that overlap with \
                             variables bound by \
                             a seq or a try find construct")
     end
@@ -1581,7 +1561,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* allows to replace inside the positive branch of an if then else a term by
-   another, if the condition implies there equality. *)
+   another, if the condition implies there is equality. *)
 let ifeq
     TacticsArgs.(Pair (Int i, Pair (Message t1, Message t2)))
     s
@@ -1602,11 +1582,12 @@ let ifeq
     in
     let biframe = List.rev_append before (new_elem :: after) in
 
-    let trace_sequent = 
-      trace_seq_of_reach Term.(Impl(cond, Atom (`Message (`Eq,t1,t2)))) s
+    let trace_s = 
+      trace_seq_of_reach 
+        (Term.mk_impl ~simpl:false cond Term.(Atom (`Message (`Eq,t1,t2)))) s
     in
 
-    [ Prover.Goal.Trace trace_sequent;
+    [ Prover.Goal.Trace trace_s;
       Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
 
   | exception Out_of_range ->
@@ -1819,7 +1800,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              let m = Term.subst subst m in
              Term.mk_forall
                forall_vars
-               (Term.mk_impl ~simpl:false
+               (Term.mk_impl
                   (Term.mk_indices_eq key.s_indices is)
                   (Term.Atom (`Message (`Neq, t, m)))))
             list_of_hashes_from_frame)
@@ -1916,14 +1897,14 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              and conj =
                Term.mk_ands
                  (List.map
-                    (fun (is,m) -> Term.mk_impl ~simpl:false
+                    (fun (is,m) -> Term.mk_impl
                         (Term.mk_indices_eq key.s_indices is)
                         (Term.Atom (`Message (`Neq, t, m))))
                     list_of_is_m)
              in
 
              (Term.mk_forall
-                forall_vars (Term.mk_impl ~simpl:false disj conj))
+                forall_vars (Term.mk_impl disj conj))
              :: formulas)
           tbl_of_action_hashes
           []
@@ -1931,22 +1912,17 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
       Term.mk_ands (phi_frame @ phi_actions)
 
     with
-    | Not_hash -> Term.True
+    | Not_hash -> Term.mk_true
     | Euf.Bad_ssc -> 
-      Tactics.soft_failure (Tactics.Failure "Key syntactic side condition \
+      Tactics.soft_failure (Tactics.Failure "key syntactic side condition \
                                              not checked")
   end
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
    form (p inter q) && diff (p minus q, q minus p) *)
 let combine_conj_formulas p q =
-  let rec to_list = function
-    | Term.True  -> []
-    | Term.And (a, b) -> to_list a @ to_list b
-    | a -> [a]
-  in
   (* we turn the conjonctions into list *)
-  let p, q= to_list p, to_list q in
+  let p, q = Term.decompose_ands p, Term.decompose_ands q in
   let aux_q = ref q in
   let (common, new_p) = List.fold_left (fun (common, r_p) p ->
       (* if an element of p is inside aux_q, we remove it from aux_q and add it
@@ -2009,19 +1985,25 @@ let prf TacticsArgs.(Int i) s =
           Prover.get_oracle_tag_formula (Symbols.to_string fn)
         in
 
-        let final_if_formula = match oracle_formula with
-          | Term.False -> combine_conj_formulas phi_left phi_right
-          | f ->
-            let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = match f with
+        let final_if_formula = 
+          if Term.is_false oracle_formula 
+          then combine_conj_formulas phi_left phi_right
+          else 
+            let (Vars.EVar uvarm),(Vars.EVar uvarkey),f = 
+              match oracle_formula with
               | ForAll ([uvarm;uvarkey],f) -> uvarm,uvarkey,f
               | _ -> assert false
             in
             match Vars.ty uvarm,Vars.ty uvarkey with
-            | Type.(Message, Message) -> let f = Term.subst [
-                ESubst (Term.Var uvarm,m);
-                ESubst (Term.Var uvarkey,key);] f in
-              Term.And (Term.Not f,  
-                        combine_conj_formulas phi_left phi_right)
+            | Type.(Message, Message) -> 
+              let f = Term.subst [
+                  ESubst (Term.Var uvarm,m);
+                  ESubst (Term.Var uvarkey,key);] f in
+              
+              Term.mk_and
+                (Term.mk_not f)  
+                (combine_conj_formulas phi_left phi_right)
+
             | _ -> assert false
         in
 

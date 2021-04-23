@@ -1591,11 +1591,11 @@ let x_index_cnstrs state l select f_cnstr =
 let name_index_cnstrs table state l =
   let n_cnstr a b = match a.cnt,b.cnt with
     | Ccst (Cst.Cgfuncst (`N n)), Ccst (Cst.Cgfuncst (`N n')) ->
-      if n <> n' then [Term.False] else []
+      if n <> n' then [Term.mk_false] else []
       
     | Cfun (N (n,_), ari, is), Cfun (N (n',_), ari', is') ->
       assert (ari > 0 && ari' > 0);
-      if n <> n' then [Term.False]
+      if n <> n' then [Term.mk_false]
       else begin
         assert (ari = ari');
         List.map2 (fun x y -> 
@@ -1606,7 +1606,7 @@ let name_index_cnstrs table state l =
     | Cfun (N (n,_), ari, _), Ccst (Cst.Cgfuncst (`N (n',_)))
     | Ccst (Cst.Cgfuncst (`N (n,_))), Cfun (N (n',_), ari, _) ->
       assert (ari <> 0 && n <> n');
-      [False] 
+      [Term.mk_false] 
 
     | _ -> assert false in
 
@@ -1632,15 +1632,16 @@ let name_indep_cnstrs table state l =
 
       let rec mk_disjunction l =
         match l with
-        | [] -> Term.False
+        | [] -> Term.mk_false
         | [p] -> Term.Atom (`Message (`Eq, 
                                  term_of_cterm table Type.KMessage p, 
                                  term_of_cterm table Type.KMessage name))
         | p::q ->
-          Or(Atom (`Message (`Eq, 
+          Term.mk_or
+            (Atom (`Message (`Eq, 
                              term_of_cterm table Type.KMessage p, 
-                             term_of_cterm table Type.KMessage name)),
-             mk_disjunction q)
+                             term_of_cterm table Type.KMessage name)))
+            (mk_disjunction q)
       in
       [mk_disjunction sub_names]
   in
@@ -1648,7 +1649,7 @@ let name_indep_cnstrs table state l =
   x_index_cnstrs state l
     (function f -> is_ground_cterm f && no_macros f)
     n_cnstr
-  |>  List.filter (function Term.True -> false | _ -> true)
+  |>  List.filter (fun f -> not (Term.is_true f)) 
   |>  List.sort_uniq Stdlib.compare
 
 

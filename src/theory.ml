@@ -60,12 +60,6 @@ type term_i =
 
   | ForAll  of bnds * term
   | Exists  of bnds * term
-  | And  of term * term
-  | Or   of term * term
-  | Impl of term * term
-  | Not  of term
-  | True
-  | False
 
 and term = term_i L.located
 
@@ -85,22 +79,16 @@ let rec equal_p_ty t t' = match L.unloc t, L.unloc t' with
 
 (*------------------------------------------------------------------*)
 let rec equal t t' = match L.unloc t, L.unloc t' with
-  | Tinit, Tinit
-  | True, True
-  | False, False -> true
+  | Tinit, Tinit -> true
 
-  | Tpred   a, Tpred   a'
-  | Not     a, Not     a' ->
+  | Tpred   a, Tpred   a' ->
     equal a a'
 
   | Happens l, Happens l' ->
     List.length l = List.length l' &&
     List.for_all2 equal l l'
     
-  | Diff (a,b), Diff (a',b')
-  | And  (a,b), And  (a',b')
-  | Impl (a,b), Impl (a',b')
-  | Or   (a,b), Or   (a',b') ->
+  | Diff (a,b), Diff (a',b') ->
     equal a a' && equal b b'
 
   | Compare (ord, a, b), Compare (ord', a', b') ->
@@ -188,13 +176,39 @@ let rec pp_term_i ppf t = match t with
     Fmt.pf ppf "@[seq(@[%a->%a@])@]"
       (Utils.pp_list Fmt.string) (L.unlocs vs) pp_term b
 
-  | App (f,[t1;t2]) when L.unloc f="exp"->
+  | App (f,[t1;t2]) when L.unloc f = "exp" ->
     Fmt.pf ppf "%a^%a" pp_term t1 pp_term t2
 
-  | App (f,[i;t;e]) when L.unloc f="if"->
+  | App (f,[i;t;e]) when L.unloc f = "if" ->
     Fmt.pf ppf
       "@[if@ %a@ then@ %a@ else@ %a@]"
       pp_term i pp_term t pp_term e
+
+  | App (f, [L.{ pl_desc = App (f1,[bl1;br1])};
+             L.{ pl_desc = App (f2,[br2;bl2])}])
+    when L.unloc f = "and" && L.unloc f1 = "impl" && L.unloc f2 = "impl" &&
+         bl1 = bl2 && br1 = br2 ->
+    Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
+      pp_term bl1 pp_term br1
+
+  | App (f,[bl;br]) when L.unloc f = "and" ->
+    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
+      pp_term bl pp_term br
+
+  | App (f,[bl;br]) when L.unloc f = "or" ->
+    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
+      pp_term bl pp_term br
+
+  | App (f,[bl;br]) when L.unloc f = "impl" ->
+    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
+      pp_term bl pp_term br
+
+  | App (f,[b]) when L.unloc f = "not" ->
+    Fmt.pf ppf "not(@[%a@])" pp_term b
+
+  | App (f,[]) when L.unloc f = "true" -> Fmt.pf ppf "True"
+
+  | App (f,[]) when L.unloc f = "false" -> Fmt.pf ppf "False"
 
   | App (f,terms) ->
     Fmt.pf ppf "%s%a"
@@ -220,29 +234,6 @@ let rec pp_term_i ppf t = match t with
     Fmt.pf ppf "@[exists (@[%a@]),@ %a@]"
       pp_var_list vs pp_term b
 
-  | And ( L.{ pl_desc = Impl (bl1,br1)},
-          L.{ pl_desc = Impl(br2,bl2)} ) when bl1 = bl2 && br1 = br2 ->
-    Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
-      pp_term bl1 pp_term br1
-
-  | And (bl, br) ->
-    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
-      pp_term bl pp_term br
-
-  | Or (bl, br) ->
-    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
-      pp_term bl pp_term br
-
-  | Impl (bl, br) ->
-    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
-      pp_term bl pp_term br
-
-  | Not b ->
-    Fmt.pf ppf "not(@[%a@])" pp_term b
-
-  | True -> Fmt.pf ppf "True"
-
-  | False -> Fmt.pf ppf "False"
 
 and pp_ts ppf ts = Fmt.pf ppf "@%a" pp_term ts
 
@@ -801,32 +792,6 @@ and convert0 :
 
   | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
 
-  | And (l,r) ->
-      begin match ty with
-        | Type.Boolean -> Term.And (conv ty l, conv ty r)
-        | _ -> type_error ()
-      end
-  | Or (l,r) ->
-      begin match ty with
-        | Type.Boolean -> Term.Or (conv ty l, conv ty r)
-        | _ -> type_error ()
-      end
-  | Impl (l,r) ->
-      begin match ty with
-        | Type.Boolean -> Term.Impl (conv ty l, conv ty r)
-        | _ -> type_error ()
-      end
-  | Not t ->
-      begin match ty with
-        | Type.Boolean -> Term.Not (conv ty t)
-        | _ -> type_error ()
-      end
-  | True | False ->
-      begin match ty with
-        | Type.Boolean -> if L.unloc tm = True then Term.True else Term.False
-        | _ -> type_error ()
-      end
-
   | Compare (o,u,v) ->
     begin match ty with
       | Type.Boolean ->
@@ -1034,27 +999,11 @@ and conv_app :
     match L.unloc app with
     | AVar s -> assoc state state.subst s ty
 
-    (* TODO: types: remove special cases*)
-    | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_true) ->
-      begin match Type.kind ty with
-        | Type.KMessage -> Term.True
-        | _ -> type_error ()
-      end
-
-    | Fun (f,[],None) when L.unloc f = Symbols.to_string (fst Term.f_false) ->
-      begin match Type.kind ty with
-        | Type.KMessage -> Term.False
-        | _ -> type_error ()
-      end
-
-    (* End of special cases. *)
-
     | Fun (f,l,ts_opt) -> 
       begin match Type.kind ty with
         | Type.KMessage -> conv_fapp f l ts_opt
         | _ -> type_error ()
       end
-
 
     | Get (s,opt_ts,is) ->
       let k = check_state state.table s (List.length is) in
@@ -1207,11 +1156,6 @@ let subst t (s : (string * term_i) list) =
     | AppAt _-> assert false
     | Seq (vs,t) -> Seq (vs, aux t)
     | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
-    | True | False as t -> t
-    | And (l,r) -> And (aux l, aux r)
-    | Or (l,r) -> Or (aux l, aux r)
-    | Impl (l,r) -> Impl (aux l, aux r)
-    | Not t -> Not (aux t)
     | ForAll (vs,f) -> ForAll (vs, aux f)
     | Exists (vs,f) -> Exists (vs, aux f)
     | Diff (l,r) -> Diff (aux l, aux r)
@@ -1395,16 +1339,11 @@ let find_app_terms t (names : string list) =
       let acc = if L.unloc x' = name then L.unloc x'::acc else acc in
       aux_list name acc (ts :: l) 
 
-    | And  (t1,t2)
-    | Or   (t1,t2) 
-    | Impl (t1,t2)
     | Compare (_,t1,t2) -> aux_list name acc [t1;t2]
     | Happens t'        -> aux_list name acc t' 
 
     | Exists (_,t') 
     | ForAll (_,t') -> aux name acc t' 
-
-    | Not t'            -> aux name acc t' 
 
     (* FIXME: I think some cases may be missing *)
     | _                 -> acc

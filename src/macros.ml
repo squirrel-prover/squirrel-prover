@@ -71,10 +71,11 @@ let get_def :
 
   | Symbols.Exec, _ ->
     begin match a with
-      | Term.Action (s,_) when s = Symbols.init_action -> Term.True
+      | Term.Action (s,_) when s = Symbols.init_action -> Term.mk_true
       | Term.Action _ ->
-        Term.And (Macro (symb,[], Term.Pred a),
-                  Macro (Term.cond_macro, [], a))
+        Term.mk_and
+          (Macro (symb,[], Term.Pred a))
+          (Macro (Term.cond_macro, [], a))
       | _ -> assert false
     end
 

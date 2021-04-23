@@ -100,6 +100,7 @@ and simpl_pat =
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
+  | StarV  of Location.t    (** '>' *)
   | SItem  of s_item
   | SExpnd of expnd_item    (** @/macro *)
   | Simpl  of simpl_pat
@@ -128,6 +129,7 @@ and pp_simpl_pat fmt = function
 let rec pp_intro_pat fmt = function
   | SItem s    -> pp_s_item fmt s
   | Star     _ -> Fmt.pf fmt "*"
+  | StarV    _ -> Fmt.pf fmt ">"
   | Simpl s_ip -> pp_simpl_pat fmt s_ip
   | SExpnd e   -> pp_rw_item fmt e
 

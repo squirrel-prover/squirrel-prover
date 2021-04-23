@@ -37,14 +37,6 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
         let c = Term.subst subst c in
         self#visit_message b; self#visit_message c; self#visit_message d
 
-    | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#visit_message l ;
-        self#visit_message r
-
-    | Not f -> self#visit_message f
-
-    | True | False -> ()
-
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in
         let l = Term.subst subst l in
@@ -85,13 +77,6 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
         let c = Term.subst subst c in
         let d = Term.subst subst d in
         self#fold_message (self#fold_message (self#fold_message x b) c) d
-
-    | And (l,r) | Or (l,r) | Impl (l,r) ->
-        self#fold_message (self#fold_message x l) r
-
-    | Not f -> self#fold_message x f
-
-    | True | False -> x
 
     | ForAll (vs,l) | Exists (vs,l) ->
         let subst = erefresh vs in

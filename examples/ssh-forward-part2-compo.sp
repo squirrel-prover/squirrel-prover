@@ -350,14 +350,15 @@ Proof.
   euf Hchk => Euf. 
 
   (* oracle case *)
-  destruct Euf as [H1 [_|[i m m1 [_|[i1 H2]]]]]; 
+  destruct Euf as [_ [_|[i m m1 [H1|[i1 H2]]]]]; 
   1: by auto.
   by use hashlengthnotpair with 
-   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1>.
+   <<m,g^b(i)>,m1>, <<g^a1,input@PDIS4>,input@PDIS4^a1> as HH.
+  (* rewrite H1 in HH. *)
 
   use signnottag with sidPa@P2, kP.
   use Hc with i1.
-  destruct H2 as [m2 [m3 H2]].  (* TODO: H2 is bugged here *)
+  destruct H2 as [m2 [m3 H2]].  
   left; right. 
   by collision.
 

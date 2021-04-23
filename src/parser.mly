@@ -1,6 +1,10 @@
 %{
   module L  = Location
   module T  = Tactics
+
+  let sloc startpos endpos s =
+    let loc = L.make startpos endpos in
+    L.mk_loc loc s
 %}
 
 %token <int> INT
@@ -76,6 +80,9 @@
     }
   }
 
+%inline lloc(X):
+| x=X { L.make $startpos $endpos }
+
 (* Lists *)
 %inline empty:
 | { () }
@@ -97,8 +104,7 @@ sterm_i:
 | id=lsymb                        { Theory.App (id, []) }
 
 | LANGLE t=term COMMA t0=term RANGLE
-    { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "pair" in
+    { let fsymb = sloc $startpos $endpos "pair" in
       Theory.App (fsymb, [t;t0]) }
 
 /* formula */
@@ -106,9 +112,13 @@ sterm_i:
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
 | SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
 
-| NOT f=sterm                             { Theory.Not (f) }
-| FALSE                                   { Theory.False }
-| TRUE                                    { Theory.True }
+| l=loc(NOT) f=sterm                             
+    { let fsymb = L.mk_loc (L.loc l) "not" in
+      Theory.App (fsymb,[f]) }
+
+| l=lloc(FALSE)  { Theory.App (L.mk_loc l "false",[]) }
+
+| l=lloc(TRUE)   { Theory.App (L.mk_loc l "true",[]) }
 
 | HAPPENS LPAREN ts=slist1(term,COMMA) RPAREN
                                           { Theory.Happens ts }
@@ -118,6 +128,13 @@ sterm_i:
 | PRED LPAREN ts=term RPAREN             { Theory.Tpred ts }
 | INIT                                   { Theory.Tinit }
 
+%inline infix_s:
+| XOR     { "xor"  }
+| EXP     { "exp"  }
+| AND     { "and"  }
+| OR      { "or"   }
+| DARROW  { "impl" }
+
 /* ambiguous term */
 term_i:
 | f=sterm_i                                  { f }
@@ -125,28 +142,22 @@ term_i:
 | id=lsymb AT ts=term                        { Theory.AppAt (id,[],ts) }
 | id=lsymb terms=term_list1 AT ts=term       { Theory.AppAt (id,terms,ts) }
 
-| t=term XOR t0=term
-    { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "xor" in
-      Theory.App (fsymb,  [t;t0]) }
+| t=term s=loc(infix_s) t0=term             { Theory.App (s, [t;t0]) }
 
-| t=term EXP t0=term
+| f=term l=lloc(DEQUIVARROW) f0=term
     { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "exp" in
-      Theory.App (fsymb,  [t;t0]) }
+      let fi = L.mk_loc l "impl" in
+      let fa = L.mk_loc l "and"  in
+      Theory.App (fa, [L.mk_loc loc (Theory.App (fi, [f;f0]));
+                       L.mk_loc loc (Theory.App (fi, [f0;f]))]) }
  
 | IF b=term THEN t=term t0=else_term
-    { let loc = L.make $startpos $endpos in
-      let fsymb = L.mk_loc loc "if" in
+    { let fsymb = sloc $startpos $endpos "if" in
       Theory.App (fsymb,  [b;t;t0]) }
 
 | FIND is=indices SUCHTHAT b=term IN t=term t0=else_term
                                           { Theory.Find (is,b,t,t0) }
 
-
-| f=term AND f0=term                { Theory.And (f,f0) }
-| f=term OR f0=term                 { Theory.Or (f,f0) }
-| f=term DARROW f0=term             { Theory.Impl (f,f0) }
 | f=term o=ord f0=term                    { Theory.Compare (o,f,f0) }
 
 | EXISTS LPAREN vs=arg_list RPAREN sep f=term %prec QUANTIF
@@ -160,11 +171,6 @@ term_i:
 
 | FORALL a=arg sep f=term %prec QUANTIF
                                  { Theory.ForAll (a,f)  }
-
-| f=term DEQUIVARROW f0=term
-    { let loc = L.make $startpos $endpos in
-      Theory.And (L.mk_loc loc (Theory.Impl (f,f0)),
-                  L.mk_loc loc (Theory.Impl (f0,f))) }
 
 /* non-ambiguous term */
 %inline else_term:
@@ -486,6 +492,7 @@ s_item:
 intro_pat:
 | s=s_item      { TacticsArgs.SItem (s) }
 | l=loc(STAR)   { TacticsArgs.Star  (L.loc l)}
+| l=loc(RANGLE) { TacticsArgs.StarV (L.loc l)}
 | pat=simpl_pat { TacticsArgs.Simpl pat }
 | e=expnd_item  { TacticsArgs.SExpnd e }
 

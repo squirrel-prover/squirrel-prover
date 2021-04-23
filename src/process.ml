@@ -770,8 +770,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let facts_p = fact::env.facts in
       let facts_q =
         match evars' with
-        | [] -> (Term.Not fact) :: env.facts
-        | qvars -> (Term.ForAll (qvars, Term.Not fact)) :: env.facts
+        | [] -> (Term.mk_not fact) :: env.facts
+        | qvars -> (Term.ForAll (qvars, Term.mk_not fact)) :: env.facts
       in
       let env_p =
         { env_p with
@@ -951,7 +951,7 @@ let declare_system table (system_name : lsymb) proc =
              action = [];
              input = (Symbols.dummy_channel,"$dummyInp");
              indices = [];
-             condition = ([], Term.True);
+             condition = ([], Term.mk_true);
              updates;
              output = (Symbols.dummy_channel, Term.empty) }
   in
