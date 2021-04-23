@@ -182,10 +182,9 @@ fa 1.
 fa 1.
 fresh 1.
 yesif 1.
-repeat split.
-by intro r0 _; depends R(r0), R1(r0). 
-auto.
-by intro r0 _; depends R(r0), R2(r0).
+by (repeat split => r0 _; 
+    try (depends R(r0), R1(r0) by auto);
+    try (depends R(r0), R2(r0) by auto)).
 
 (* Case R1 *)
 expand frame@R1(r); expand exec@R1(r).

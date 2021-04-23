@@ -444,7 +444,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
         | _ -> destr_fail (Fmt.str "%a" Term.pp form)
       end
 
-    | _ when is_and form ->
+    | Fun (fs,_,_) when fs = Term.f_and ->
       let ands = get_destr ~orig:form (Term.destr_ands len form) in
       let ands = List.map (fun x -> Args.Unnamed, x) ands in
       let ids, s = Hyps.add_i_list ands s in
@@ -457,6 +457,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
         hard_failure (Tactics.PatNumError (len - 1, List.length vs));
 
       let vs, vs' = List.takedrop (len - 1) vs in
+
       let vs_fresh, subst = 
         List.split (
           List.map (fun (Vars.EVar v) -> 
@@ -464,6 +465,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
               Vars.EVar v_f, Term.ESubst (Var v, Var v_f)
             ) vs)
       in
+
       let f = Term.mk_exists vs' f in
       let f = Term.subst subst f in
 
@@ -471,7 +473,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
 
       ( (List.map (fun x -> `Var x) vs_fresh) @ [`Hyp idf], s )
 
-    | _ -> destr_fail (Fmt.str "cannot destruct %a" Term.pp form)
+    | _ -> destr_fail (Fmt.str "%a" Term.pp form)
 
 (** Apply an And/Or pattern to an ident hypothesis handler. *)
 let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
@@ -554,9 +556,11 @@ let rec do_intro_var (s : TraceSequent.t) : Args.ip_handler * sequent =
 let rec do_intro (s : TraceSequent.t) : Args.ip_handler * sequent =
   let form = TraceSequent.conclusion s in
   match form with
-  | ForAll _ -> 
-    let h, s = do_intro_var s in
-    ((h :> Args.ip_handler), s)
+  | ForAll ([],f) ->
+    (* FIXME: this case should never happen. *)
+    do_intro (TraceSequent.set_conclusion f s)
+
+  | ForAll _ -> do_intro_var s 
 
   | Fun (fs,_,[lhs;rhs]) when fs = Term.f_impl ->
     let id, s = Hyps.add_i Args.Unnamed lhs s in

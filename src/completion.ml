@@ -1034,7 +1034,6 @@ module Unify = struct
     let u,v = p_terms_uf_normalize uf (u,v) in
     unify_normed u v
 
-  (* REM ?*)
   (** profiling *)
   let unify = Prof.mk_ternary "unify" unify
 end

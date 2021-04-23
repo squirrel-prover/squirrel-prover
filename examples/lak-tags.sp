@@ -284,20 +284,14 @@ Proof.
   fa 0. fa 1. fa 1. fa 1.
   prf 2.
   yesif 2.
-  use tags_neq; project.
+  use tags_neq. 
+  project.
   split.
-  split; intro j *.
-  by assert fst(input@R2(j))=nT(i,k) as Meq0; [1: auto | 2: fresh Meq0].
+  by split; intro > _ _ [[_ Meq] _]; fresh Meq. 
+  by (intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq). 
 
-  repeat split => _ _;
-  by assert fst(input@R1(j))=nT(i,k) as Meq0; [1: auto | 2: fresh Meq0].
-  auto.
-
-  repeat split => // j *.
-  repeat split => *;
-  by assert fst(input@R1(j))=nT(i,k) as Meq0; [1: auto | 2: fresh Meq0].
-
-  by assert fst(input@R2(j))=nT(i,k) as Meq0; [1: auto | 2: fresh Meq0].
+  repeat split => > _; try (by intro > _ [[_ Meq] _]; fresh Meq).
+  by (repeat split => > _ [[_ Meq] _]; fresh Meq). 
 
   fresh 2.
   by fresh 1; yesif 1.
