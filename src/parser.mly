@@ -81,7 +81,7 @@
   }
 
 %inline lloc(X):
-| x=X { L.make $startpos $endpos }
+| X { L.make $startpos $endpos }
 
 (* Lists *)
 %inline empty:
