@@ -266,6 +266,11 @@ type conv_cntxt =
 type conv_env = { table : Symbols.table;
                   cntxt : conv_cntxt; }
 
+(** converts and infer the type (must be a subtype of Message). *)
+val convert_i : 
+  ?ty_env:Type.Infer.env -> conv_env -> subst -> term -> 
+  Term.message * Type.tmessage
+
 val convert : 
   ?ty_env:Type.Infer.env -> conv_env -> subst -> term -> 'a Type.ty
   -> 'a Term.term

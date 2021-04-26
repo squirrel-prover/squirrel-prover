@@ -637,6 +637,8 @@ type conv_state = {
   ty_env : Type.Infer.env;
 }
 
+let mk_state table cntxt subst ty_env = { table; cntxt; subst; ty_env; }
+
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
 
@@ -647,7 +649,8 @@ let ty_error ty_env tm ty =
 let check_ty_leq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
   match Type.Infer.unify_leq state.ty_env t_ty ty with
   | `Ok -> ()
-  | `Fail -> raise (ty_error state.ty_env of_t ty)
+  | `Fail -> 
+    raise (ty_error state.ty_env of_t ty)
 
 (* let check_ty_eq state ~of_t (t_ty : 'a Type.ty) (ty : 'b Type.ty) : unit =
  *   match Type.Infer.unify_eq state.ty_env t_ty ty with
@@ -1179,13 +1182,25 @@ let check table ?(local=false) (ty_env : Type.Infer.env) (env : env) t (Type.ETy
   let subst =
     List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
   in
-  let state = {
-    table  = table;
-    cntxt  = cntxt;
-    subst  = subst;
-    ty_env = ty_env; }
-  in
+  let state = mk_state table cntxt subst ty_env in
   ignore (convert state t s)
+
+(** converts and infer the type (must be a subtype of Message).
+    exported outside to Theory.ml *)
+let convert_i ?ty_env (env : conv_env) subst tm : Term.message * Type.tmessage =
+  let must_clost, ty_env = match ty_env with
+    | None -> true, Type.Infer.mk_env () 
+    | Some ty_env -> false, ty_env 
+  in
+  let ty = Type.TUnivar (Type.Infer.mk_univar ty_env) in
+  let state = mk_state env.table env.cntxt subst ty_env in
+  let t = convert state tm ty in
+
+  if must_clost && not (Type.Infer.is_closed state.ty_env) then
+    conv_err (L.loc tm) Freetyunivar;
+
+  let ty = Type.tsubst (Type.Infer.close ty_env) ty in
+  t, ty
 
 (** exported outside to Theory.ml *)
 let convert : type s. 
@@ -1197,12 +1212,7 @@ let convert : type s.
     | Some ty_env -> false, ty_env 
   in
 
-  let state = {
-    table  = env.table;
-    cntxt  = env.cntxt;
-    subst  = subst;
-    ty_env = ty_env; }
-  in
+  let state = mk_state env.table env.cntxt subst ty_env in
   let t = convert state tm ty in
 
   if must_clost && not (Type.Infer.is_closed state.ty_env) then
@@ -1260,7 +1270,6 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
   let conv_env = { table = table; cntxt = InProc ts_init; } in
 
   let table, subst = subst_of_bnds table typed_args in
-  let t = convert conv_env subst t Type.Message in
 
   let indices : Vars.index list =
     let f x : Vars.index = match x with
@@ -1276,6 +1285,8 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
 
   (* parse the macro type *)
   let ty = parse_p_ty table [] pty Type.KMessage in
+
+  let t = convert conv_env subst t ty in
 
   let data = StateInit_data (indices,t) in
   let table, _ =
@@ -1293,41 +1304,6 @@ let get_init_states table : (Term.state * Term.message) list =
         (state,t) :: acc
       | _ -> acc
     ) [] table
-
-(* let declare_macro table s (typed_args : bnds) (pty : p_ty) t =
- *   let env,typed_args,tsubst =
- *     List.fold_left
- *       (fun (env,vars,tsubst) (x,pty) ->
- *          let Type.ETy ty = parse_p_ty0 table [] pty in
- *          let x = L.unloc x in
- *          let env,x' = Vars.make_fresh env ty x in
- *          let item = match Type.kind ty with
- *            | Type.KIndex -> ESubst (x, Term.Var x')
- *            | Type.KMessage -> ESubst (x, Term.Var x')
- *            | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex;
- *                                                 Type.EKind Type.KMessage])
- *          in
- *          assert (Vars.name x' = x) ;
- *          env, (Vars.EVar x')::vars, item::tsubst)
- *       (Vars.empty_env,[],[])
- *       typed_args
- *   in
- * 
- *   let _,ts_var = Vars.make_fresh env Type.Timestamp "ts" in
- *   let conv_env = { table = table; cntxt = InProc (Term.Var ts_var); } in
- *   let t = convert conv_env tsubst t Type.Message in
- *   let data = Local_data (List.rev typed_args,Vars.EVar ts_var,t) in
- * 
- *   (* parse the macro type *)
- *   let ty = parse_p_ty table [] pty Type.KMessage in
- * 
- *   let table, _ =
- *     Symbols.Macro.declare_exact table
- *       s
- *       ~data
- *       (Symbols.Local (List.rev_map (fun (Vars.EVar x) ->
- *            Type.ETy (Vars.ty x)) typed_args,ty)) in
- *   table *)
 
 (* TODO could be generalized into a generic fold function
  * fold : (term -> 'a -> 'a) -> term -> 'a -> 'a *)

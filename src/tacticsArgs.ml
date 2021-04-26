@@ -203,7 +203,8 @@ type _ sort =
 type _ arg =
   | None      : unit arg 
 
-  | Message   : Term.message   -> Type.message   arg
+  | Message   : Term.message * Type.tmessage -> Type.message arg
+
   | Boolean   : Term.message   ->      boolean   arg
   | Timestamp : Term.timestamp -> Type.timestamp arg
   | Index     : Vars.index     -> Type.index     arg
@@ -394,7 +395,9 @@ let convert_args table env parser_args tactic_type =
       Arg (Timestamp (Theory.convert conv_cntxt tsubst p Type.Timestamp))
 
     | [Theory p], Sort Message ->
-      Arg (Message   (Theory.convert conv_cntxt tsubst p Type.Message))
+      let t, ty = Theory.convert_i conv_cntxt tsubst p in
+
+      Arg (Message (t, ty))
 
     | [Theory p], Sort Boolean ->
       Arg (Boolean   (Theory.convert conv_cntxt tsubst p Type.Boolean))

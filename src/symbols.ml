@@ -625,7 +625,14 @@ let fs_empty = mk_fsymb "empty" 0
 
 (** Length *)
   
-let fs_len    = mk_fsymb "len" 1
+let fs_len    = 
+  let tyv = Type.mk_tvar "t" in
+  let tyvar = Type.TVar tyv in
+
+  let fty = Type.mk_ftype 0 [tyv] [tyvar] Type.Message
+  in
+  mk_fsymb ~fty "len" 1
+
 let fs_zeroes = mk_fsymb "zeroes" 1
 
 

@@ -341,7 +341,7 @@ let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t =
         in
         fty.Type.fty_out
 
-      | Name _         -> Type.Message
+      | Name ns        -> ns.s_typ
       | Macro (s,_,_)  -> s.s_typ
         
       | Seq _                -> Type.Message

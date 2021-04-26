@@ -36,6 +36,11 @@ goal _ (x : message) : N_to_T(to_N(x)) = to_T(x).
 goal _ (x : message) : gg(N_to_T(gg(to_N(gg(x))))) = gg(to_T(gg(x))).
 
 (*------------------------------------------------------------------*)
+(* check that len is polymorphique *)
+goal _ (i,j : index) : 
+len(nn(i)) = len(empty) && len(nn(j)) = len(nt(j)) => i = j.
+
+(*------------------------------------------------------------------*)
 (* check the [large] type info  *)
 goal _ (i,j : index) : nn(i) = nn(j) => i = j.
 Proof. auto. Qed.
@@ -55,4 +60,16 @@ goal _ (i,j : index) : len(nn(i)) = len(nn(j)).
 Proof. 
 intro i j. 
 checkfail (try namelength nn(i), nn(j); auto) exn GoalNotClosed.
+Abort.
+
+
+(*------------------------------------------------------------------*)
+(* check that namelength fails if call with names of different types. *)
+type NFL2 [name_fixed_length]
+name nfl2 : index -> NFL2.
+
+goal _ (i,j : index) : len(nfl(i)) = len(nfl2(j)).
+Proof.
+intro i j. 
+checkfail (by (try namelength nfl(i), nfl2(j))) exn GoalNotClosed.
 Abort.

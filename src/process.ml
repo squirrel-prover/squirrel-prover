@@ -584,7 +584,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * there are some get terms for state macros that have already been updated *)
   let p_let ?(search_dep=false) ~table ~env proc = match L.unloc proc with
 
-  | Let (x,t,ptyo, p) ->
+  | Let (x,t,ptyo,p) ->
     let ty : Type.tmessage = match ptyo with
       | None -> TUnivar (Type.Infer.mk_univar env.ty_env)
       | Some pty -> Theory.parse_p_ty table [] pty Type.KMessage
@@ -833,35 +833,35 @@ let parse_proc (system_name : System.system_name) init_table proc =
            - either the value at the end of the current action,
            - either the value before the current action.
              There is no in-between value. *)
-        proc_err loc (DuplicatedUpdate (L.unloc s))
-      else
-        let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
-        let l' =
-          List.map
-            (fun i ->
-               snd (list_assoc (L.unloc i) env.isubst))
-            l
-        in
-        let updated_states =
-          let apps = List.map (fun (s,_,_,_) -> L.unloc s) env.updates in
-          Theory.find_app_terms t' apps            
-        in
-        let ty = Theory.check_state table s (List.length l) in
-        let t'_tm =
-          Term.subst_macros_ts table updated_states (Term.Var ts)
-            (conv_term table env (Term.Var ts) t ty)
-        in
-        let env =
-          { env with updates = (s,l',ty,t'_tm) :: env.updates }
-        in
-        let p',pos',table = p_update ~table ~env p in
+        proc_err loc (DuplicatedUpdate (L.unloc s));
 
-        (* we could re-use the location in [l] here. *)
-        let l' = List.map (fun x -> mk_dum (Vars.name x)) l' in
+      let t' = Theory.subst t (to_tsubst env.isubst @ to_tsubst env.msubst) in
+      let l' =
+        List.map
+          (fun i ->
+             snd (list_assoc (L.unloc i) env.isubst))
+          l
+      in
+      let updated_states =
+        let apps = List.map (fun (s,_,_,_) -> L.unloc s) env.updates in
+        Theory.find_app_terms t' apps            
+      in
+      let ty = Theory.check_state table s (List.length l) in
+      let t'_tm =
+        Term.subst_macros_ts table updated_states (Term.Var ts)
+          (conv_term table env (Term.Var ts) t ty)
+      in
+      let env =
+        { env with updates = (s,l',ty,t'_tm) :: env.updates }
+      in
+      let p',pos',table = p_update ~table ~env p in
 
-        ( Set (s,l',t',p'),
-          pos',
-          table )
+      (* we could re-use the location in [l] here. *)
+      let l' = List.map (fun x -> mk_dum (Vars.name x)) l' in
+
+      ( Set (s,l',t',p'),
+        pos',
+        table )
 
     | Out (c,t,p) ->
       let ch = Channel.of_lsymb c table in

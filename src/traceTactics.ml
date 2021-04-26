@@ -1328,12 +1328,15 @@ let () = T.register "constraints"
 (*------------------------------------------------------------------*)
 (** Length *)
 
-let namelength Args.(Pair (Message n, Message m)) s =
-  match n, m with
+let namelength Args.(Pair (Message (tn, tyn), Message (tm, tym))) s =
+  match tn, tm with
   | Name n, Name m ->
     let table = TraceSequent.table s in
 
-    assert (n.s_typ = m.s_typ); (* TODO: subtypes *)
+    (* TODO: subtypes *)
+    if not (tyn = tym) then
+      Tactics.soft_failure (Failure "names are not of the same types");
+
     if not Symbols.(check_bty_info table n.s_typ Ty_name_fixed_length) then
       Tactics.soft_failure
         (Failure "names are of a type that is not [name_fixed_length]");

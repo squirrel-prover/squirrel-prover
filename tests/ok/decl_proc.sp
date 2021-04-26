@@ -18,6 +18,9 @@ abstract L_to_T : L -> T.
 abstract ggi ['a] : index -> 'a -> 'a.
 abstract gg  ['a] : 'a -> 'a.
 
+mutable lstate : L = to_L(empty).
+
+(*------------------------------------------------------------------*)
 process B (i : index) =
  in(c,x);
  new m : message;
@@ -28,6 +31,9 @@ process B (i : index) =
  let z = ggi(i,L_to_T(y)) in
  out (c, from_T(z)).
 
+system !_i B(i).
+
+(*------------------------------------------------------------------*)
 (* same with explicit types *)
 process B2 (i : index) =
  in(c,x);
@@ -39,5 +45,22 @@ process B2 (i : index) =
  let z : T = ggi(i,L_to_T(y)) in
  out (c, from_T(z)).
 
-system       !_i B(i).
-system [Bis] !_i B2(i).
+system [Two] !_i B2(i).
+
+(*------------------------------------------------------------------*)
+process B3 (i : index) =
+ in(c,x);
+ new l : L;
+ let gl : L = ggi(i,l) in
+ out (c, from_L(gl)).
+
+system [Three] !_i B3(i).
+
+(*------------------------------------------------------------------*)
+process State (i : index) =
+ in(c,x);
+ new l : L;
+ lstate := ggi(i,l);
+ out (c, empty).
+
+system [StateTest] !_i State(i).

@@ -123,7 +123,8 @@ type _ sort =
 type _ arg =
   | None      : unit arg 
 
-  | Message   : Term.message   -> Type.message   arg
+  | Message   : Term.message * Type.tmessage -> Type.message arg
+
   | Boolean   : Term.message   ->      boolean   arg
   | Timestamp : Term.timestamp -> Type.timestamp arg
   | Index     : Vars.index     -> Type.index     arg
