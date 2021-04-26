@@ -539,21 +539,18 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
   (* only right-associate symbol we have *)
   | Fun ((s,is),_,[bl;br]) as t when (s = Symbols.fs_impl) ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_right s) t
+    Fmt.pf ppf "@[<1>%a@]" (pp_chained_infix_right s) t
                                      
   | Fun ((s,is),_,[bl;br]) as t when Symbols.is_infix s ->
     assert (is = []);
-    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_left s) t
+    Fmt.pf ppf "@[<1>%a@]" (pp_chained_infix_left s) t
 
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "not(@[%a@])" pp b
                      
   | Fun _ as tt  when tt = mk_true ->  Fmt.pf ppf "true"             
   | Fun _  as tf when tf = mk_false -> Fmt.pf ppf "false"
-        
-  | Fun ((s,[]),_,[t1;t2]) when Symbols.to_string s = "exp" ->
-    Fmt.pf ppf "%a ^ %a" pp t1 pp t2
-      
+              
   | Fun (f,_,terms) ->
       Fmt.pf ppf "%a%a"
         pp_fsymb f

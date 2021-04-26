@@ -44,10 +44,10 @@
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
-%left INFIXSYMB 
-
 %nonassoc empty_else
 %nonassoc ELSE
+
+%left INFIXSYMB 
 
 %left XOR
 
