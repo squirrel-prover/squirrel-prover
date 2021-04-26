@@ -1248,20 +1248,18 @@ module Match = struct
   type 'a match_occ = { occ : 'a term;
                         mv  : mv; }
                         
-  (** [find_map t pat func] behaves has [find], but also computes the term 
-      obtained from [t] by replacing a *single* occurence of [t'] by 
-      [func t' θ]. *)
   let find_map :
-    type a b. a term -> b pat -> (b term -> mv -> b term) -> 
-    (b match_occ * a term) option
-    = fun t p func ->
+    type a b. many:bool -> a term -> b pat -> (b term -> mv -> b term) -> 
+    (b match_occ list * a term) option
+    = fun ~many t p func ->
       let found = ref None in
       let s_p = kind p.p_term in     
 
       let rec find : type a. a term -> a term = fun t ->
-        if (!found) <> None then t (* we already found a match *)
+        (* [many = false] and we already found a match *)
+        if (!found) <> None && not many then t 
 
-        (* no match yet, check if head matches *)
+        (* otherwise, check if head matches *)
         else 
           match try_match t p with
           (* head does not match, recurse  *)
@@ -1269,11 +1267,11 @@ module Match = struct
             tmap (fun (ETerm t) -> ETerm (find t)) t
 
           | Some mv -> (* head matches *)
-            found := Some ({ occ = cast s_p t; mv = mv; }); 
+            found := Some ({ occ = cast s_p t; mv = mv; } :: odflt [] !found); 
             let t' = func (cast s_p t) mv in
-            cast (kind t) t'    (* cast needed *)
+            cast (kind t) t' 
       in
-      
+
       let t = find t in
       match !found with
       | None -> None
@@ -1284,7 +1282,9 @@ module Match = struct
       It returns the occurrence matched [{occ = t'; mv = θ}]. *)
   let find : type a b. a term -> b pat -> b match_occ option = 
     fun t p -> 
-    omap fst (find_map t p (fun t' _ -> t'))
+    match find_map ~many:false t p (fun t' _ -> t') with
+    | None -> None
+    | Some (occs,_) -> Some (as_seq1 occs)
 end
 
 (*------------------------------------------------------------------*)

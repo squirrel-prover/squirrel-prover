@@ -1109,22 +1109,6 @@ let expand_macro (targets : target list) t (s : sequent) : sequent =
   assert (subs = []);
   s
      
-(* let find_occs_macro
- *   : type a. [`Any | `MSymb of Symbols.macro Symbols.t]
- *     -> ?st:Term.St.t -> a term -> Term.St.t =
- *   fun m ?st t -> 
- *   let cond ms = m = `MSymb ms.s_symb || m = `Any in
- * 
- *   let rec find st (ETerm t) = 
- *     let st = match t with
- *       | Macro (ms, _, _) when cond ms -> 
- *         Term.St.add (Term.ETerm t) st
- *       | _ -> st in
- *     Term.tfold (fun t st -> find st t) t st
- *   in
- * 
- *   find (Utils.odflt Term.St.empty st) (ETerm t) *)
-
 let find_occs_macro : type a. 
   [`Any | `MSymb of Symbols.macro Symbols.t] ->
   target list -> sequent -> Term.St.t =

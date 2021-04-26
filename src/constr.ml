@@ -1235,28 +1235,29 @@ type models = model list
 let tot = ref 0.
 let cptd = ref 0
 
-let models_conjunct0 (l : trace_literal list) : models =
+(*------------------------------------------------------------------*)
+let models_conjunct (l : trace_literal list) : models =
   let l = Form.mk_list l in
   let instance = mk_instance l in
   split instance 
 
 (** Memoisation *)
-let models_conjunct0 =
+let models_conjunct =
   let memo = TraceLits.Memo.create 256 in
   fun (l : trace_literal list) -> 
     let (C l) as lits = TraceLits.mk l in
     try TraceLits.Memo.find memo lits with
     | Not_found ->
-      let res = models_conjunct0 l in
+      let res = models_conjunct l in
       TraceLits.Memo.add memo lits res;
       res
 
+(** Time-out information *)
 let models_conjunct (l : trace_literal list) : models timeout_r =
-  let l = Form.mk_list l in
-  let instance = mk_instance l in
-  Utils.timeout (Config.solver_timeout ()) split instance 
+  Utils.timeout (Config.solver_timeout ()) models_conjunct l
 
 
+(*------------------------------------------------------------------*)
 let m_is_sat models = models <> []
 
 

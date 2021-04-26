@@ -251,11 +251,12 @@ module Match : sig
   val find : 'a term -> 'b pat -> 'b match_occ option
 
   (** [find_map t p func] behaves has [find], but also computes the term 
-      obtained from [t] by replacing a *single* occurence of [t'] by 
-      [func t' θ]. *)
+      obtained from [t] by replacing:
+      - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
+      - if [many = true], all occurences found. *)
   val find_map :
-    'a term -> 'b pat -> ('b term -> mv -> 'b term) -> 
-    ('b match_occ * 'a term) option
+    many:bool -> 'a term -> 'b pat -> ('b term -> mv -> 'b term) -> 
+    ('b match_occ list * 'a term) option
 end
 
 (*------------------------------------------------------------------*)
