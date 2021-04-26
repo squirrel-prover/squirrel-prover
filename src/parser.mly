@@ -318,7 +318,7 @@ p_ty_i:
 | l=lsymb      { Theory.P_tbase l }
 
 p_ty:
-|ty=loc(p_ty_i) { ty }
+| ty=loc(p_ty_i) { ty }
 
 fun_ty:
 | l=slist1(p_ty,ARROW)      { l }
@@ -694,8 +694,7 @@ gname:
 
 goal_i:
 | GOAL s=system n=gname args=args COLON f=term DOT
-    { let args : (Theory.lsymb * Theory.p_ty) list = args in
-      let f_i = Theory.ForAll (args, f) in
+    { let f_i = Theory.ForAll (args, f) in
       let fa = L.mk_loc (L.loc f) f_i in
       Prover.Gm_goal (n, P_trace_goal (s, fa)) }
 
