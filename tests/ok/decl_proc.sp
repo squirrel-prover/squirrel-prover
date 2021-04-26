@@ -3,7 +3,7 @@ set autoIntro=false.
 channel c.
 
 type T
-type L [large]
+type L  [large]
 
 abstract f : index -> message.
 

@@ -1052,9 +1052,9 @@ let mk_ftype iarr vars args out =
   Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
   
   
-let declare_hash table ?index_arity ?in_ty ?k_ty ?out_ty s =
+let declare_hash table ?index_arity ?m_ty ?k_ty ?h_ty s =
   let index_arity = odflt 0 index_arity in
-  let ftype = mk_ftype index_arity [] [in_ty; k_ty] out_ty in
+  let ftype = mk_ftype index_arity [] [m_ty; k_ty] h_ty in
   let def = ftype, Symbols.Hash in
   fst (Symbols.Function.declare_exact table s def)
 
@@ -1090,12 +1090,14 @@ let declare_senc_joint_with_hash
   let data = AssociatedFunctions [dec] in
   fst (Function.declare_exact table enc ~data (enc_fty,SEnc))
 
-let declare_signature table ?m_ty ?sig_ty ?sk_ty ?pk_ty sign checksign pk =
+let declare_signature table 
+    ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty 
+    sign checksign pk =
   let open Symbols in
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
   (* TODO: types: change output type to booleans ? *)
-  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] (Some Type.Message) in
+  let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] check_ty in
   
   let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in
 

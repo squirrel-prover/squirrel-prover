@@ -4,18 +4,11 @@ module L = Location
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
-let pp_type fmt (l : (Type.ety * int) list) =
-  let pp_single fmt (k,i) = match i with
-    | 0 -> ()
-    | i ->
-      assert (i > 0);
-      Fmt.pf fmt "%a^%d" Type.pp_e k i
-  in
-  (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
+(** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
+type c_ty = { cty_space : lsymb;
+              cty_ty    : Theory.p_ty; }
 
-let pp_args fmt (l : (string * Type.ety) list) =
-  let pp_single fmt (s,k) = Fmt.pf fmt "(%s : %a)" s Type.pp_e k in
-  (Fmt.list ~sep:(fun fmt () -> Fmt.pf fmt " →@ ") pp_single) fmt l
+type c_tys = c_ty list
 
 (*------------------------------------------------------------------*)
 type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
@@ -71,16 +64,19 @@ type declaration_i =
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
-  | Decl_hash             of int option * lsymb * orcl_tag_info option
-  | Decl_aenc             of lsymb * lsymb * lsymb
-  | Decl_senc             of lsymb * lsymb
+  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys 
+
+  | Decl_aenc of lsymb * lsymb * lsymb * c_tys 
+
+  | Decl_senc             of lsymb * lsymb * c_tys 
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
-  | Decl_sign             of lsymb * lsymb * lsymb * orcl_tag_info option
-  | Decl_name             of lsymb * int * Theory.p_ty
-  | Decl_state            of macro_decl
-  | Decl_abstract         of abstract_decl
-  (* | Decl_macro            of macro_decl *)
-  | Decl_bty              of bty_decl
+
+  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys 
+
+  | Decl_name     of lsymb * int * Theory.p_ty
+  | Decl_state    of macro_decl
+  | Decl_abstract of abstract_decl
+  | Decl_bty      of bty_decl
 
 type declaration = declaration_i Location.located
 

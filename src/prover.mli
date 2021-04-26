@@ -237,8 +237,11 @@ val start_proof : unit -> string option
 type decl_error_i =
   | BadEquivForm
   | InvalidAbsType
-  | SystemError           of System.system_error
-  | SystemExprError       of SystemExpr.system_expr_err
+  | InvalidCtySpace of string list
+  | DuplicateCty of string
+
+  | SystemError     of System.system_error
+  | SystemExprError of SystemExpr.system_expr_err
 
 type dkind = KDecl | KGoal
 

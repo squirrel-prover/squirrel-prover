@@ -6,6 +6,14 @@ type lsymb = Theory.lsymb
 (*------------------------------------------------------------------*)
 (** {2 Declarations } *)
 
+(*------------------------------------------------------------------*)
+(** Type of a crypto assumption space (e.g. plaintext, ciphertext, key). *)
+type c_ty = { cty_space : lsymb;
+              cty_ty    : Theory.p_ty; }
+
+type c_tys = c_ty list
+
+(*------------------------------------------------------------------*)
 (** Information for a macro declaration *)
 type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
 
@@ -59,16 +67,19 @@ type declaration_i =
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
-  | Decl_hash             of int option * lsymb * orcl_tag_info option
-  | Decl_aenc             of lsymb * lsymb * lsymb
-  | Decl_senc             of lsymb * lsymb
+  | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys 
+
+  | Decl_aenc of lsymb * lsymb * lsymb * c_tys 
+
+  | Decl_senc             of lsymb * lsymb * c_tys 
   | Decl_senc_w_join_hash of lsymb * lsymb * lsymb
-  | Decl_sign             of lsymb * lsymb * lsymb * orcl_tag_info option
-  | Decl_name             of lsymb * int * Theory.p_ty
-  | Decl_state            of macro_decl
-  | Decl_abstract         of abstract_decl
-  (* | Decl_macro            of macro_decl *)
-  | Decl_bty              of bty_decl
+
+  | Decl_sign of lsymb * lsymb * lsymb * orcl_tag_info option * c_tys 
+
+  | Decl_name     of lsymb * int * Theory.p_ty
+  | Decl_state    of macro_decl
+  | Decl_abstract of abstract_decl
+  | Decl_bty      of bty_decl
 
 type declaration = declaration_i Location.located
 

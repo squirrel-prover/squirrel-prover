@@ -34,6 +34,8 @@
   "equiv"
   "process"
   "with oracle"
+  "with hash"
+  "where"
 ))
 
 (defvar squirrel-fun-keywords '(

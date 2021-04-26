@@ -25,7 +25,7 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
-%token WITH ORACLE EXN
+%token WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
@@ -323,6 +323,16 @@ p_ty:
 fun_ty:
 | l=slist1(p_ty,ARROW)      { l }
 
+/* crypto assumption typed space */
+c_ty:
+| l=lsymb COLON ty=p_ty { Decl.{ cty_space = l; 
+                                 cty_ty    = ty; } }
+
+/* crypto assumption typed space */
+c_tys:
+| WHERE list=slist1(c_ty, empty) { list }
+|                                { [] }
+
 ty_args:
 |                                          { [] }
 | LBRACKET ids=slist1(ty_var,empty) RBRACKET { ids }
@@ -336,27 +346,27 @@ bty_infos:
 |                                           { [] }
 
 declaration_i:
-| HASH e=lsymb a=index_arity
-                          { Decl.Decl_hash (Some a, e, None) }
+| HASH e=lsymb a=index_arity ctys=c_tys
+                          { Decl.Decl_hash (Some a, e, None, ctys) }
 
 | HASH e=lsymb WITH ORACLE f=term
-                          { Decl.Decl_hash (None, e, Some f) }
+                          { Decl.Decl_hash (None, e, Some f, []) }
 
-| AENC e=lsymb COMMA d=lsymb COMMA p=lsymb
-                          { Decl.Decl_aenc (e, d, p) }
+| AENC e=lsymb COMMA d=lsymb COMMA p=lsymb ctys=c_tys
+                          { Decl.Decl_aenc (e, d, p, ctys) }
 
-| SENC e=lsymb COMMA d=lsymb
-                          { Decl.Decl_senc (e, d) }
+| SENC e=lsymb COMMA d=lsymb ctys=c_tys
+                          { Decl.Decl_senc (e, d, ctys) }
 
-| SENC e=lsymb COMMA d=lsymb WITH h=lsymb
+| SENC e=lsymb COMMA d=lsymb WITH HASH h=lsymb
                           { Decl.Decl_senc_w_join_hash (e, d, h) }
 
-| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
-                          { Decl.Decl_sign (s, c, p, None) }
+| SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb ctys=c_tys
+                          { Decl.Decl_sign (s, c, p, None, ctys) }
 
 | SIGNATURE s=lsymb COMMA c=lsymb COMMA p=lsymb
   WITH ORACLE f=term       
-                          { Decl.Decl_sign (s, c, p, Some f) }
+                          { Decl.Decl_sign (s, c, p, Some f, []) }
 
 | NAME e=lsymb COLON t=name_type
                           { let a,ty = t in 

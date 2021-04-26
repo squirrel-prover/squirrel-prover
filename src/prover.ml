@@ -16,6 +16,8 @@ let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 type decl_error_i =
   | BadEquivForm 
   | InvalidAbsType
+  | InvalidCtySpace of string list
+  | DuplicateCty of string
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
@@ -30,9 +32,15 @@ let pp_decl_error_i fmt = function
     Fmt.pf fmt "equivalence goal ill-formed"
 
   | InvalidAbsType ->
-    Fmt.pf fmt "invalid type, must be of the form\n \
+    Fmt.pf fmt "invalid type, must be of the form:@ \n \
                 Indexⁿ → Messageᵐ → Message"
-      
+
+  | InvalidCtySpace kws ->
+    Fmt.pf fmt "invalid space@ (allowed: @[<hov 2>%a@])"
+      (Fmt.list ~sep:Fmt.comma Fmt.string) kws
+
+  | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
+
   | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
@@ -42,7 +50,7 @@ let pp_decl_error pp_loc_err fmt (loc,k,e) =
     | KDecl -> Fmt.pf fmt "declaration"
     | KGoal -> Fmt.pf fmt "goal declaration" in
 
-  Fmt.pf fmt "%a%a failed: %a."
+  Fmt.pf fmt "@[<v 2>%a%a failed: %a.@]"
     pp_loc_err loc
     pp_k k
     pp_decl_error_i e
@@ -914,6 +922,25 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
       ~in_tys
       ~out_ty
 
+let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
+  (* check for duplicate *)
+  let _ : string list = List.fold_left (fun acc cty ->
+      let sp = L.unloc cty.Decl.cty_space in
+      if List.mem sp acc then
+        decl_error (L.loc cty.Decl.cty_space) KDecl (DuplicateCty sp);      
+      sp :: acc
+    ) [] ctys in
+
+  (* check that we only use allowed keyword *)
+  List.map (fun cty ->
+      let sp = L.unloc cty.Decl.cty_space in
+      if not (List.mem sp kws) then
+        decl_error (L.loc cty.Decl.cty_space) KDecl (InvalidCtySpace kws);
+
+      let ty = Theory.parse_p_ty table [] cty.Decl.cty_ty Type.KMessage in
+      (sp, ty)
+    ) ctys
+
 (*------------------------------------------------------------------*)
 (** {2 Declaration processing} *)
     
@@ -943,12 +970,35 @@ let declare_i table decl = match L.unloc decl with
     in
     Process.declare_system table name sdecl.sprocess
 
-  | Decl.Decl_hash (a, n, tagi) ->
+  | Decl.Decl_hash (a, n, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
-    Theory.declare_hash table ?index_arity:a n
 
-  | Decl.Decl_aenc (enc, dec, pk)   -> Theory.declare_aenc table enc dec pk
-  | Decl.Decl_senc (senc, sdec)     -> Theory.declare_senc table senc sdec
+    let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
+    let m_ty  = List.assoc_opt  "m" ctys 
+    and h_ty = List.assoc_opt   "h" ctys 
+    and k_ty   = List.assoc_opt "k" ctys in
+
+    Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n
+
+  | Decl.Decl_aenc (enc, dec, pk, ctys) ->  
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "sk"; "pk"] in 
+    let ptxt_ty = List.assoc_opt "ptxt" ctys 
+    and ctxt_ty = List.assoc_opt "ctxt" ctys 
+    and rnd_ty  = List.assoc_opt "rnd"  ctys 
+    and sk_ty   = List.assoc_opt "sk"   ctys 
+    and pk_ty   = List.assoc_opt "pk"   ctys in
+
+    Theory.declare_aenc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?sk_ty ?pk_ty enc dec pk
+
+  | Decl.Decl_senc (senc, sdec, ctys) -> 
+    let ctys = parse_ctys table ctys ["ptxt"; "ctxt"; "rnd"; "k"] in 
+    let ptxt_ty = List.assoc_opt "ptxt" ctys 
+    and ctxt_ty = List.assoc_opt "ctxt" ctys 
+    and rnd_ty  = List.assoc_opt "rnd"  ctys 
+    and k_ty   = List.assoc_opt  "k"    ctys in
+
+    Theory.declare_senc table ?ptxt_ty ?ctxt_ty ?rnd_ty ?k_ty senc sdec
+
   | Decl.Decl_name (s, a, pty) ->
     let ty = Theory.parse_p_ty table [] pty Type.KMessage in    
     Theory.declare_name table s Symbols.{ n_iarr = a; n_ty = ty; }
@@ -956,14 +1006,21 @@ let declare_i table decl = match L.unloc decl with
   | Decl.Decl_state (s, args, k, t) ->
     Theory.declare_state table s args k t
 
-  (* | Decl.Decl_macro (s, args, k, t) ->
-   *   Theory.declare_macro table s args k t *)
-
   | Decl.Decl_senc_w_join_hash (senc, sdec, h) ->
     Theory.declare_senc_joint_with_hash table senc sdec h
-  | Decl.Decl_sign (sign, checksign, pk, tagi) ->
+
+  | Decl.Decl_sign (sign, checksign, pk, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table sign) tagi in
-    Theory.declare_signature table sign checksign pk
+
+    let ctys = parse_ctys table ctys ["m"; "sig"; "check"; "sk"; "pk"] in 
+    let m_ty     = List.assoc_opt "m"     ctys 
+    and sig_ty   = List.assoc_opt "sig"   ctys 
+    and check_ty = List.assoc_opt "check" ctys 
+    and sk_ty    = List.assoc_opt "sk"    ctys 
+    and pk_ty    = List.assoc_opt "pk"    ctys in
+
+    Theory.declare_signature table 
+      ?m_ty ?sig_ty ?check_ty ?sk_ty ?pk_ty sign checksign pk
 
   | Decl.Decl_abstract decl -> parse_abstract_decl table decl
   | Decl.Decl_bty bty_decl -> 

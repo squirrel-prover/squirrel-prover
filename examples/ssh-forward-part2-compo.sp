@@ -84,7 +84,7 @@ name hKey : message
 hash h with oracle forall (m:message,sk:message), sk = hKey
 
 (* We assume that the encryption is INT-CTXT. This is assumed to hold even when the key appears under some hash functions. *)
-senc enc,dec with h
+senc enc,dec with hash h.
 
 
 signature sign,checksign,pk with oracle forall (m:message,sk:message)

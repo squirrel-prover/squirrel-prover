@@ -87,9 +87,9 @@ val equal : term -> term -> bool
 val declare_hash :
   Symbols.table ->
   ?index_arity:int ->
-  ?in_ty:Type.message Type.ty ->
+  ?m_ty:Type.message Type.ty ->
   ?k_ty:Type.message Type.ty ->
-  ?out_ty:Type.message Type.ty ->
+  ?h_ty:Type.message Type.ty ->
   lsymb ->
   Symbols.table
 
@@ -136,6 +136,7 @@ val declare_signature :
   Symbols.table ->
   ?m_ty:Type.message Type.ty ->
   ?sig_ty:Type.message Type.ty ->
+  ?check_ty:Type.message Type.ty ->
   ?sk_ty:Type.message Type.ty ->
   ?pk_ty:Type.message Type.ty ->
   lsymb -> lsymb -> lsymb ->

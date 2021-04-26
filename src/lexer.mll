@@ -99,6 +99,7 @@ rule token = parse
 | "seq"               { SEQ }
 | "oracle"            { ORACLE }
 | "with"              { WITH }
+| "where"             { WHERE }
 | "diff"              { DIFF }
 | "left"              { LEFT }
 | "^"                 { EXP }
