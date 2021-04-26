@@ -186,22 +186,14 @@ let rec pp_term_i ppf t = match t with
 
   | App (f, [L.{ pl_desc = App (f1,[bl1;br1])};
              L.{ pl_desc = App (f2,[br2;bl2])}])
-    when L.unloc f = "and" && L.unloc f1 = "impl" && L.unloc f2 = "impl" &&
+    when L.unloc f = "&&" && L.unloc f1 = "=>" && L.unloc f2 = "=>" &&
          bl1 = bl2 && br1 = br2 ->
     Fmt.pf ppf "@[<1>(%a@ <=>@ %a)@]"
       pp_term bl1 pp_term br1
 
-  | App (f,[bl;br]) when L.unloc f = "and" ->
-    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
-      pp_term bl pp_term br
-
-  | App (f,[bl;br]) when L.unloc f = "or" ->
-    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
-      pp_term bl pp_term br
-
-  | App (f,[bl;br]) when L.unloc f = "impl" ->
-    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
-      pp_term bl pp_term br
+  | App (f,[bl;br]) when Symbols.is_infix_str (L.unloc f) ->
+    Fmt.pf ppf "@[<1>(%a@ %s@ %a)@]"
+      pp_term bl (L.unloc f) pp_term br
 
   | App (f,[b]) when L.unloc f = "not" ->
     Fmt.pf ppf "not(@[%a@])" pp_term b
@@ -268,6 +260,7 @@ type conversion_error_i =
   | Freetyunivar
   | UnknownTypeVar       of string        
   | BadPty               of Type.ekind list
+  | BadInfixDecl
 
 type conversion_error = L.t * conversion_error_i
 
@@ -297,12 +290,6 @@ let pp_error_i ppf = function
 
   | Timestamp_unexpected t ->
     Fmt.pf ppf "The term %a must not be given a timestamp" pp_i t
-
-  (* | Untypable_equality t ->
-   *   Fmt.pf ppf
-   *     "comparison %a cannot be typed@ \
-   *      (operands do not have the same type)"
-   *     pp_i t *)
 
   | Unsupported_ord t ->
     Fmt.pf ppf
@@ -344,7 +331,8 @@ let pp_error_i ppf = function
   | BadPty l ->
     Fmt.pf ppf "type must be of kind %a" 
       (Fmt.list ~sep:Fmt.comma Type.pp_kinde) l
-      
+
+  | BadInfixDecl -> Fmt.pf ppf "bad infix symbol declaration"
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -537,7 +525,7 @@ let make_app_i table cntxt (lsymb : lsymb) (l : term list) : app_i =
     conv_err loc (Timestamp_unexpected (App (lsymb,l))) in
 
   match Symbols.def_of_lsymb lsymb table with
-  | Symbols.Reserved _ -> assert false
+  | Symbols.Reserved _ -> Fmt.epr "%s@." (L.unloc lsymb); assert false
 
   | Symbols.Exists d ->
     begin match d with
@@ -1131,9 +1119,21 @@ let check_signature table checksign pk =
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)
 
-let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty s =  
+let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty
+    (s : lsymb) (f_info : Symbols.symb_type) =   
+
+  (* if we declare an infix symbol, run some sanity checks *)
+  let () = match f_info with
+    | `Prefix -> ()
+    | `Infix -> 
+      if not (index_arity = 0) || 
+         not (List.length ty_args = 0) || 
+         not (List.length in_tys = 2) then
+        conv_err (L.loc s) BadInfixDecl;
+  in
+
   let ftype = Type.mk_ftype index_arity ty_args in_tys out_ty in
-  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract))
+  fst (Symbols.Function.declare_exact table s (ftype, Symbols.Abstract f_info))
 
 (*------------------------------------------------------------------*)
 (** {2 Miscellaneous} *)

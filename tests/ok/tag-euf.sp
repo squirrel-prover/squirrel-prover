@@ -16,7 +16,8 @@ channel cS
 name a0 :message
 name a : index -> message
 
-hash h with oracle forall (m:message,sk:message) ( sk <> kP || exists (i:index) m=g^a(i))
+hash h with oracle forall (m:message,sk:message) 
+ ( sk <> kP || exists (i:index) m = g ^ a(i)).
 
 process P =
   Pout: out(cP, <g^a0, h(g^a0,kP)>)

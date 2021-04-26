@@ -21,6 +21,11 @@
 let name = ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '\'']*
 let int = ['0'-'9'] ['0'-'9']*
 
+
+(* Hard-coded in Symbols.ml ! Do not change. *)
+let infix_char = ['^' '+' '-' '*' '|' '&']
+let infix_symb = infix_char ( infix_char* | (['0'-'9']* infix_char+) )
+
 rule token = parse
 | [' ' '\t']              { token lexbuf }
 | '\n'                    { newline lexbuf ; token lexbuf }
@@ -103,7 +108,6 @@ rule token = parse
 | "time"              { TIME }
 | "diff"              { DIFF }
 | "left"              { LEFT }
-| "^"                 { EXP }
 | "right"             { RIGHT }
 | "none"              { NONE }
 | "forall"            { FORALL }
@@ -134,6 +138,7 @@ rule token = parse
 | '+'                 { PLUS }
 | '\''                { TICK }
 | name as n           { ID n }
+| infix_symb as s     { INFIXSYMB s }
 | int as i            { INT (int_of_string i) }
 | eof                 { EOF }
 

@@ -183,6 +183,7 @@ let () =
         let decl_i =
           Decl.Decl_abstract {
             name = L.mk_loc L._dummy "error";
+            symb_type = `Prefix;
             ty_args = [];
             abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
@@ -196,6 +197,7 @@ let () =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "ok";
+              symb_type = `Prefix;
               ty_args = [];
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in
@@ -207,6 +209,7 @@ let () =
         let decl_i =
           Decl.Decl_abstract
             { name = L.mk_loc L._dummy "error";
+              symb_type = `Prefix;
               ty_args = [];
               abs_tys = [L.mk_loc L._dummy Theory.P_message]; }
         in

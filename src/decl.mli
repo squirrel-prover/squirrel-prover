@@ -20,6 +20,7 @@ type macro_decl = lsymb * Theory.bnds * Theory.p_ty * Theory.term
 (*------------------------------------------------------------------*)
 (** Information for an abstract declaration *)
 type abstract_decl = { name    : lsymb;
+                       symb_type : Symbols.symb_type;
                        ty_args : lsymb list; (* type variables *)
                        abs_tys : Theory.p_ty list; }
 

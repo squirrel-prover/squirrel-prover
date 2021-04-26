@@ -6,10 +6,9 @@ name k : index -> message
 
 channel c
 
-system (!_i ( out(c, diff((g^a(i))^b(i),g^k(i))))
-       | !_j ( in(c,x);out(c,g^x^a(j)))
-       )
-.
+system (!_i ( out(c, diff((g ^ a(i)) ^ b(i),g ^ k(i))))
+       | !_j ( in(c,x);out(c,g ^ x ^ a(j)))
+       ).
 
 
 equiv ddh_goal.

@@ -916,11 +916,13 @@ let parse_abstract_decl table (decl : Decl.abstract_decl) =
     in
     
     Theory.declare_abstract
-      table decl.name
+      table 
       ~index_arity:iarr
       ~ty_args
       ~in_tys
-      ~out_ty
+      ~out_ty      
+      decl.name
+      decl.symb_type
 
 let parse_ctys table (ctys : Decl.c_tys) (kws : string list) =
   (* check for duplicate *)

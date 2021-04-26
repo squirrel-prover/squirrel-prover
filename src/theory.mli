@@ -167,15 +167,8 @@ val declare_abstract :
   ty_args:Type.tvar list ->
   in_tys:Type.message Type.ty list ->
   out_ty:Type.message Type.ty ->
-  lsymb ->
+  lsymb -> Symbols.symb_type ->
   Symbols.table
-
-(* (** [declare_macro n [(x1,s1);...;(xn;sn)] s t] a macro symbol [s]
- *   * of type [s1->...->sn->s]
- *   * such that [s(t1,...,tn)] expands to [t\[x1:=t1,...,xn:=tn\]]. *)
- * val declare_macro :
- *   Symbols.table -> lsymb -> bnds -> p_ty -> term
- *   -> Symbols.table *)
 
 (*------------------------------------------------------------------*)
 (** {2 Term builders } *)
@@ -212,6 +205,7 @@ type conversion_error_i =
   | Freetyunivar
   | UnknownTypeVar       of string
   | BadPty               of Type.ekind list
+  | BadInfixDecl
       
 type conversion_error = L.t * conversion_error_i
 

@@ -1664,7 +1664,7 @@ let () =
   Checks.add_suite "Completion" [
     ("Basic", `Quick,
      fun () ->
-       let fi = Type.mk_ftype 0 [] [] Type.Message, Symbols.Abstract in
+       let fi = Type.mk_ftype 0 [] [] Type.Message, Symbols.Abstract `Prefix in
        let table,ffs =
          Symbols.Function.declare_exact Symbols.builtins_table (mk "f") fi in
        let table,hfs =

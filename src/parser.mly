@@ -9,6 +9,7 @@
 
 %token <int> INT
 %token <string> ID   /* general purpose identifier */
+%token <string> INFIXSYMB   /* infix function symbols */
 %token <string> BANG
 %token AT PRED
 %token LPAREN RPAREN
@@ -18,7 +19,7 @@
 %token EQ NEQ GEQ LEQ COMMA SEMICOLON COLON PLUS MINUS
 %token XOR STAR UNDERSCORE QMARK TICK
 %token LET IN IF THEN ELSE FIND SUCHTHAT
-%token DIFF LEFT RIGHT NONE SEQ EXP
+%token DIFF LEFT RIGHT NONE SEQ 
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
 %token MUTABLE SYSTEM SET
@@ -37,18 +38,18 @@
 %right ARROW
 %right DARROW
 %right DEQUIVARROW
-%left OR
-%left AND
+%left AND OR
 
 %nonassoc TRUE SEQ PRED NOT LPAREN INIT ID HAPPENS FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
+%left INFIXSYMB 
+
 %nonassoc empty_else
 %nonassoc ELSE
 
 %left XOR
-%left EXP
 
 %nonassoc AT
 
@@ -129,11 +130,11 @@ sterm_i:
 | INIT                                   { Theory.Tinit }
 
 %inline infix_s:
-| XOR     { "xor"  }
-| EXP     { "exp"  }
-| AND     { "and"  }
-| OR      { "or"   }
-| DARROW  { "impl" }
+| AND         { "&&"  }
+| OR          { "||"   }
+| s=INFIXSYMB { s }
+| XOR         { "xor"  }
+| DARROW      { "=>" }
 
 /* ambiguous term */
 term_i:
@@ -146,8 +147,8 @@ term_i:
 
 | f=term l=lloc(DEQUIVARROW) f0=term
     { let loc = L.make $startpos $endpos in
-      let fi = L.mk_loc l "impl" in
-      let fa = L.mk_loc l "and"  in
+      let fi = L.mk_loc l "=>" in
+      let fa = L.mk_loc l "&&"  in
       Theory.App (fa, [L.mk_loc loc (Theory.App (fi, [f;f0]));
                        L.mk_loc loc (Theory.App (fi, [f0;f]))]) }
  
@@ -345,6 +346,10 @@ bty_infos:
 | LBRACKET l=slist(bty_info,COMMA) RBRACKET { l }
 |                                           { [] }
 
+lsymb_decl:
+| id=lsymb                       { `Prefix, id }
+| LPAREN s=loc(INFIXSYMB) RPAREN { `Infix, s }
+
 declaration_i:
 | HASH e=lsymb a=index_arity ctys=c_tys
                           { Decl.Decl_hash (Some a, e, None, ctys) }
@@ -375,11 +380,13 @@ declaration_i:
 | TYPE e=lsymb infos=bty_infos 
                           { Decl.Decl_bty { bty_name = e; bty_infos = infos; } }
 
-| ABSTRACT e=lsymb a=ty_args COLON t=fun_ty
-    { Decl.(Decl_abstract
-              { name     = e;
-                ty_args  = a;
-                abs_tys  = t; }) }
+| ABSTRACT e=lsymb_decl a=ty_args COLON t=fun_ty
+    { let symb_type, name = e in
+      Decl.(Decl_abstract
+              { name      = name;
+                symb_type = symb_type;
+                ty_args   = a;
+                abs_tys   = t; }) }
 
 | MUTABLE e=lsymb args=opt_arg_list COLON typ=p_ty EQ t=term
                           { Decl.Decl_state (e, args, typ, t) }

@@ -4,6 +4,13 @@
 
 type lsymb = string Location.located
 
+(*------------------------------------------------------------------*)
+(** Type of a function symbol (Prefix or Infix)
+    - infix symbols must start by a character in [infix_first_chars]
+    - infix symbols must be without index parameters *)
+type symb_type = [ `Prefix | `Infix ]
+
+val infix_fist_chars : char list
 
 (*------------------------------------------------------------------*)
 (** ['a t] is the type of symbols of namespace ['a]. *)
@@ -65,7 +72,7 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract 
+  | Abstract of symb_type
 
 (** Indicates if a function symbol has been defined with
   * the specified definition. *)
@@ -252,6 +259,9 @@ exception SymbError of symb_err
 
 val get_bty_info   : table -> Type.tmessage -> bty_info list
 val check_bty_info : table -> Type.tmessage -> bty_info -> bool
+
+val is_infix     : fname t -> bool 
+val is_infix_str : string  -> bool 
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)

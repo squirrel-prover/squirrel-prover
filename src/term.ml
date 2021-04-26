@@ -535,22 +535,15 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
 
   | Fun _ as f when is_and_happens f -> 
     pp_and_happens ppf f
-                                     
-  | Fun (s,_,[bl;br]) when s = f_and ->
-    Fmt.pf ppf "@[<1>(%a@ &&@ %a)@]"
-      pp bl pp br
-      
-  | Fun (s,_,[bl;br]) when s = f_or ->
-    Fmt.pf ppf "@[<1>(%a@ ||@ %a)@]"
-      pp bl pp br
-      
-  (* | Impl (bl, (Impl (_, _) as br)) ->
-   *   Fmt.pf ppf "@[<1>%a@ =>@ %a@]"
-   *     pp bl pp br *)
 
-  | Fun (s,_,[bl;br]) when s = f_impl ->
-    Fmt.pf ppf "@[<1>(%a@ =>@ %a)@]"
-      pp bl pp br
+  (* only right-associate symbol we have *)
+  | Fun ((s,is),_,[bl;br]) as t when (s = Symbols.fs_impl) ->
+    assert (is = []);
+    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_right s) t
+                                     
+  | Fun ((s,is),_,[bl;br]) as t when Symbols.is_infix s ->
+    assert (is = []);
+    Fmt.pf ppf "@[<1>(%a)@]" (pp_chained_infix_left s) t
 
   | Fun (s,_,[b]) when s = f_not ->
     Fmt.pf ppf "not(@[%a@])" pp b
@@ -612,6 +605,21 @@ let rec pp : type a. Format.formatter -> a term -> unit = fun ppf -> function
 
   | Atom a -> pp_generic_atom ppf a
 
+(** for left-associative symbols *)
+and pp_chained_infix_left symb ppf = function
+  | Fun ((s,is),_,[bl;br]) when s = symb ->
+    Fmt.pf ppf "%a@ %s@ %a"
+      (pp_chained_infix_left symb) bl (Symbols.to_string s) pp br
+
+  | _ as t -> pp ppf t
+
+(** for right-associative symbols *)
+and pp_chained_infix_right symb ppf = function
+  | Fun ((s,is),_,[bl;br]) when s = symb ->
+    Fmt.pf ppf "%a@ %s@ %a"
+      pp bl (Symbols.to_string s) (pp_chained_infix_right symb) br
+
+  | _ as t -> pp ppf t
                
 and pp_message_atom ppf (`Message (o,tl,tr)) =
   Fmt.pf ppf "@[%a@ %a@ %a@]" pp tl pp_ord o pp tr
@@ -1457,7 +1465,7 @@ let () =
 
       let fty = Type.mk_ftype 0 [] [Type.Message;Type.Message] Type.Message in  
 
-      let def = fty, Symbols.Abstract in
+      let def = fty, Symbols.Abstract `Prefix in
       let table,f =
         Symbols.Function.declare_exact 
           Symbols.builtins_table (L.mk_loc L._dummy "f") def in

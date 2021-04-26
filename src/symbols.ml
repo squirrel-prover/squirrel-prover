@@ -5,6 +5,10 @@ module L = Location
 type lsymb = string L.located
 
 (*------------------------------------------------------------------*)
+(** Type of a function symbol (Prefix or Infix *)
+type symb_type = [ `Prefix | `Infix ]
+
+(*------------------------------------------------------------------*)
 type namespace =
   | NChannel
   | NName
@@ -48,7 +52,7 @@ type function_def =
   | Sign
   | CheckSign
   | PublicKey
-  | Abstract 
+  | Abstract of symb_type
 
 (*------------------------------------------------------------------*)
 type macro_def =
@@ -510,6 +514,16 @@ let check_bty_info table (ty : Type.tmessage) (info : bty_info) : bool =
   let infos = get_bty_info table ty in
   List.mem info infos 
 
+let infix_fist_chars =  ['^'; '+'; '-'; '*'; '|'; '&'; '=']
+
+let is_infix_str (s : string) : bool =
+  let first = String.get s 0  in
+  List.mem first infix_fist_chars
+
+let is_infix (s : fname t) : bool =
+  let s = to_string s in
+  is_infix_str s
+
 (*------------------------------------------------------------------*)
 (** {2 Builtins} *)
 
@@ -552,11 +566,11 @@ let () = builtin_ref := table
 let mk_fty arity (ty : Type.tmessage) =
   Type.mk_ftype 0 [] (List.init arity (fun _ -> ty)) ty
     
-let mk_fsymb ?fty ?(bool=false) f arity =
+let mk_fsymb ?fty ?(bool=false) ?(f_info=`Prefix) f arity =
   let fty = match fty with
     | None -> mk_fty arity (if bool then Type.Boolean else Type.Message)
     | Some fty -> fty in
-  let info = fty, Abstract in
+  let info = fty, Abstract f_info in
   let table, f =
     Function.declare_exact !builtin_ref (L.mk_loc L._dummy f) info
   in
@@ -571,9 +585,9 @@ let fs_diff  = mk_fsymb "diff" 2
 
 let fs_false = mk_fsymb ~bool:true "false" 0
 let fs_true  = mk_fsymb ~bool:true "true" 0
-let fs_and   = mk_fsymb ~bool:true "and" 2
-let fs_or    = mk_fsymb ~bool:true "or" 2
-let fs_impl  = mk_fsymb ~bool:true "impl" 2
+let fs_and   = mk_fsymb ~bool:true ~f_info:`Infix "&&" 2
+let fs_or    = mk_fsymb ~bool:true ~f_info:`Infix "||" 2
+let fs_impl  = mk_fsymb ~bool:true ~f_info:`Infix "=>" 2
 let fs_not   = mk_fsymb ~bool:true "not" 1
 
 let fs_ite =
@@ -591,7 +605,7 @@ let fs_fail = mk_fsymb "fail" 0
 
 (** Xor and its unit *)
 
-let fs_xor  = mk_fsymb "xor" 2
+let fs_xor  = mk_fsymb ~f_info:`Infix "xor" 2
 let fs_zero = mk_fsymb "zero" 0
 
 (** Successor over natural numbers *)
@@ -616,7 +630,7 @@ let fs_snd  = mk_fsymb "snd" 1
 
 (** Exp **)
 
-let fs_exp  = mk_fsymb "exp" 2
+let fs_exp  = mk_fsymb "^" 2
 let fs_g    = mk_fsymb "g" 0
 
 (** Empty *)
