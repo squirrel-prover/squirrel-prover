@@ -149,6 +149,7 @@ type 'a ast =
   | Modifier   : string * 'a ast -> 'a ast
   | CheckFail  : tac_error * 'a ast -> 'a ast
   | By         : 'a ast -> 'a ast
+  | Time       : 'a ast -> 'a ast
 
 module type AST_sig = sig
 

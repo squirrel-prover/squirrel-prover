@@ -1230,6 +1230,16 @@ let () = T.register_general "expand"
     expand_tac
 
 (*------------------------------------------------------------------*)
+(* cannot fail, so we don't need to catch soft errors *)
+let () = T.register "expandall"
+    ~tactic_help:{
+      general_help  = "Expand all possible macros in the sequent.";
+      detailed_help = "";
+      tactic_group  = Structural;
+      usages_sorts  = []; }
+    expand_all_l
+
+(*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
 let congruence (s : TraceSequent.t) : bool Utils.timeout_r =

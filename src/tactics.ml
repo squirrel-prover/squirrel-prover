@@ -355,6 +355,15 @@ let checkfail_tac exc t j sk fk =
   | Tactic_hard_failure (l,e) ->
     raise (Tactic_hard_failure (l, FailWithUnexpected e))
 
+let check_time t j sk fk =
+  let time = Sys.time () in
+  let sk j fk = 
+    Printer.prt `Dbg "time: %f" (Sys.time () -. time);
+    sk j fk
+  in
+  t j sk fk
+
+
 let repeat ?(cut=true) t j sk fk =
   let rec aux j sk fk =
     t j
@@ -539,15 +548,16 @@ end
   * evaluation in richer ways in the future. *)
 type 'a ast =
   | Abstract of string * 'a list
-  | AndThen : 'a ast list -> 'a ast
+  | AndThen    : 'a ast list -> 'a ast
   | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
-  | OrElse : 'a ast list -> 'a ast
-  | Try : 'a ast -> 'a ast
-  | Repeat : 'a ast -> 'a ast
-  | Ident : 'a ast
-  | Modifier : string * 'a ast -> 'a ast
-  | CheckFail : tac_error * 'a ast -> 'a ast
-  | By : 'a ast -> 'a ast
+  | OrElse     : 'a ast list -> 'a ast
+  | Try        : 'a ast -> 'a ast
+  | Repeat     : 'a ast -> 'a ast
+  | Ident      : 'a ast
+  | Modifier   : string * 'a ast -> 'a ast
+  | CheckFail  : tac_error * 'a ast -> 'a ast
+  | By         : 'a ast -> 'a ast
+  | Time       : 'a ast -> 'a ast
 
 module type AST_sig = sig
 
@@ -590,6 +600,7 @@ module AST (M:S) = struct
     | Ident               -> id
     | Modifier (id,t)     -> eval (id::modifiers) t
     | CheckFail (e,t)     -> checkfail_tac e (eval modifiers t)
+    | Time t              -> check_time (eval modifiers t)
 
   let pp_args fmt l =
     Fmt.list
@@ -605,6 +616,7 @@ module AST (M:S) = struct
             Fmt.pf ppf "@[(%s@ %a)@]" i pp_args args
         end
     | Modifier (i,t) -> Fmt.pf ppf "(%s(%a))" i pp t
+
     | AndThen ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
@@ -629,14 +641,21 @@ module AST (M:S) = struct
     | OrElse ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
+
     | By t -> Fmt.pf ppf "@[by %a@]" pp t
+
     | Ident -> Fmt.pf ppf "id"
+
     | Try t ->
       Fmt.pf ppf "(try @[%a@])" pp t
+
     | Repeat t ->
       Fmt.pf ppf "(repeat @[%a@])" pp t
+
     | CheckFail (e, t) ->
         Fmt.pf ppf "(checkfail %s @[%a@])" (tac_error_to_string e) pp t
+
+    | Time t -> Fmt.pf ppf "(time %a)" pp t
 
   exception Return of M.judgment list
 

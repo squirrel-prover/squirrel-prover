@@ -25,7 +25,7 @@
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
-%token WHERE WITH ORACLE EXN
+%token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
@@ -572,6 +572,7 @@ tac:
                                           ("exists",t) }
   | NOSIMPL t=tac                      { T.Modifier
                                           ("nosimpl", t) }
+  | TIME t=tac  %prec tac_prec         { T.Time t }
   | CYCLE i=INT                        { T.Abstract
                                          ("cycle",[TacticsArgs.Int_parsed i]) }
   | CYCLE MINUS i=INT                  { T.Abstract

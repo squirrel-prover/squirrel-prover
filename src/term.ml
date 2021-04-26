@@ -975,6 +975,7 @@ and subst_generic_atom s = function
   | #message_atom as a -> (subst_message_atom s a :> generic_atom)
   | #trace_atom   as a -> (subst_trace_atom s a :> generic_atom)
 
+
 let subst_macros_ts table l ts t =
   let rec subst_term : type a. a term -> a term = fun t -> match t with
     | Macro (is, terms, ts') ->
@@ -1006,6 +1007,24 @@ let subst_macros_ts table l ts t =
   in
 
   subst_term t
+
+
+(* (* REM *)
+ * let () = Prof.record "subst"
+ * let () = Prof.record "ty"
+ * 
+ * let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t = 
+ *   fun ?ty_env a ->
+ *   let time = Sys.time () in
+ *   let r = ty ?ty_env a in
+ *   let () = Prof.call "ty" (Sys.time () -. time) in
+ *   r
+ *   
+ * let subst : type a. subst -> a term -> a term = fun s t ->
+ *   let time = Sys.time () in
+ *   let r = subst s t in
+ *   let () = Prof.call "subst" (Sys.time () -. time) in
+ *   r *)
 
 (*------------------------------------------------------------------*)
 type eterm = ETerm : 'a term -> eterm

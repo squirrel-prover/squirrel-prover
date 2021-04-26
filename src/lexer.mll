@@ -100,6 +100,7 @@ rule token = parse
 | "oracle"            { ORACLE }
 | "with"              { WITH }
 | "where"             { WHERE }
+| "time"              { TIME }
 | "diff"              { DIFF }
 | "left"              { LEFT }
 | "^"                 { EXP }
