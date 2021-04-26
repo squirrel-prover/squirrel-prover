@@ -373,6 +373,10 @@ declaration_i:
   WITH ORACLE f=term       
                           { Decl.Decl_sign (s, c, p, Some f, []) }
 
+| DDH g=lsymb COMMA ei=lsymb_decl ctys=c_tys
+    { let e, f_info = ei in
+      Decl.Decl_ddh (g,(f_info,e), ctys) }
+
 | NAME e=lsymb COLON t=name_type
                           { let a,ty = t in 
                             Decl.Decl_name (e, a, ty) }
@@ -623,12 +627,14 @@ tac:
   | APPLY t=sterm w=apply_in
     { T.Abstract ("apply", [TacticsArgs.ApplyIn (t, w)]) }
 
-  | DDH i1=lsymb COMMA i2=lsymb COMMA i3=lsymb  { T.Abstract
-                                          ("ddh",
-                                           [TacticsArgs.String_name i1;
-					                                  TacticsArgs.String_name i2;
-					                                  TacticsArgs.String_name i3;
-				                                   ]) }
+  | DDH g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
+    { T.Abstract
+        ("ddh",
+         [TacticsArgs.String_name g;
+          TacticsArgs.String_name i1;
+					TacticsArgs.String_name i2;
+					TacticsArgs.String_name i3;
+		]) }
 
   | HELP                               { T.Abstract
                                           ("help",

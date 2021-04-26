@@ -48,6 +48,8 @@ name k11 : message  (* ideal key derived between P and S *)
 name a : index -> message
 name b : index -> message
 
+ddh g, (^) where group:message exposants:message.
+
 signature sign,checksign,pk with oracle forall (m:message,sk:message)
  (sk <> kP || exists (i:index, x1:message, x2:message) m=<<x1,g^a(i)>,x2> )
   &&
@@ -161,7 +163,7 @@ Qed.
 (** The strong secrecy is directly obtained through ddh. *)
 equiv [left,secret] [right,secret] secret.
 Proof.
-   ddh a1, b1, k11.
+   ddh g, a1, b1, k11.
 Qed.
 
 (** The equivalence for authentication is obtained by using the unreachability

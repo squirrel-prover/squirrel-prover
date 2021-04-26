@@ -7,12 +7,10 @@
 type tac = EquivSequent.t Tactics.tac
 
 module T = Prover.EquivTactics
-
 module Args = TacticsArgs
-
 module L = Location
-
 module Hyps = EquivSequent.Hyps
+module ES = EquivSequent
 
 type lsymb = Theory.lsymb
 
@@ -2524,7 +2522,9 @@ let () =
 (*------------------------------------------------------------------*)
 exception Not_context
 
-class ddh_context ~(cntxt:Constr.trace_cntxt) exact a b c = object (self)
+class ddh_context ~(cntxt:Constr.trace_cntxt) ~gen ~exp exact a b c 
+  = object (self)
+
  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
 
   method visit_macro ms a =
@@ -2535,17 +2535,15 @@ class ddh_context ~(cntxt:Constr.trace_cntxt) exact a b c = object (self)
   (* we check if the only diff are over g^ab and g^c, and that a, b and c
      appears only as g^a, g^b and g^c. *)
   method visit_message t =
-    let g = Term.mk_g in
-    let exp = Term.f_exp in
     match t with
     (* any name n can occur as g^n *)
-    | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = g-> ()
+    | Term.Fun (f, _, [g1; Name n]) when f = exp && g1 = gen -> ()
 
     (* any names a b can occur as g^a^b *)
     | Term.(Diff(Term.(Fun (f1,_, [(Fun (f2,_, [g1; Name n1]));
                                    Name n2])),
                  Term.Fun (f, _, [g3; Name n3])))
-      when f1 = exp && f2 = exp && g1 = g && g3 = g && n3.s_symb = c &&
+      when f1 = exp && f2 = exp && g1 = gen && g3 = gen && n3.s_symb = c &&
            ((n1.s_symb = a && n2.s_symb = b) || 
             (n1.s_symb = b && n2.s_symb = a)) -> ()
 
@@ -2575,18 +2573,17 @@ end
 (** If all the terms of a system can be seen as a context of the terms, where
    all the names appearing inside the terms are only used inside those, returns
    true. *)
-let is_ddh_context (cntxt : Constr.trace_cntxt) a b c elem_list =
-  (* TODO: location *)
+let is_ddh_context (cntxt : Constr.trace_cntxt) ~gen ~exp a b c elem_list =
   let a,b,c = Symbols.Name.of_lsymb a cntxt.table,
               Symbols.Name.of_lsymb b cntxt.table,
               Symbols.Name.of_lsymb c cntxt.table in
-  let iter = new ddh_context ~cntxt false a b c in
+  let iter = new ddh_context ~cntxt ~gen ~exp false a b c in
   let iterfm = new find_macros ~cntxt false in
   let exists_macro =
-    try
-      List.iter iterfm#visit_message elem_list; false
+    try List.iter iterfm#visit_message elem_list; false
     with Macro_found -> true
   in
+
   try
     (* we check that a b and c only occur in the correct form inside the system,
        if the elements contain some macro based on the system.*)
@@ -2602,13 +2599,31 @@ let is_ddh_context (cntxt : Constr.trace_cntxt) a b c elem_list =
     true
   with Not_context | Fresh.Name_found -> false
 
-let ddh (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
+let is_ddh_gen tbl gen =
+  match Symbols.Function.get_def gen tbl with
+  | _, Symbols.DDHgen -> true
+  | _ -> false
+
+let ddh (lgen : lsymb) (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
+  let tbl = ES.table s in
+  let gen_symb = Symbols.Function.of_lsymb lgen tbl in
+  
+  if not (is_ddh_gen tbl gen_symb) then
+    soft_failure ~loc:(L.loc lgen) 
+      (Failure "no DDH assumption on this generator");
+
+  let exp_symb = match Symbols.Function.get_data gen_symb tbl with
+    | Symbols.AssociatedFunctions [exp] -> exp
+    | _ -> assert false
+  in
+
+  let gen = Term.mk_fun tbl gen_symb [] [] in
+  let exp = (exp_symb, []) in
+
   let cntxt = mk_trace_cntxt s in
-  if is_ddh_context cntxt na nb nc
-      (goal_as_equiv s) then
-      sk [] fk
-    else
-      soft_failure Tactics.NotDDHContext
+  if is_ddh_context ~gen ~exp cntxt na nb nc (goal_as_equiv s) 
+  then sk [] fk
+  else soft_failure Tactics.NotDDHContext
 
 (* DDH is called on strings that correspond to names, put potentially without
    the correct arity. E.g, with name a(i), we need to write ddh a, .... Thus, we
@@ -2616,20 +2631,23 @@ let ddh (na : lsymb) (nb : lsymb) (nc : lsymb) s sk fk =
    then does not have the correct arity. *)
 
 let () = T.register_general "ddh"
-    ~tactic_help:{general_help = "Closes the current system, if it is an \
-                                  instance of a context of ddh.";
-                  detailed_help = "It must be called on strings that corresponds \
-                                   to names, but without any indices. It then \
-                                   applies ddh to all the copies of the names, \
-                                   and checks that all actions of the protocol \
-                                   uses the names in a correct way. Can be used \
-                                   in collaboration with some transitivity to \
-                                   obtain a system where ddh can be applied.";
-                  usages_sorts = [Sort (Pair (String, Pair( String, String)))];
+    ~tactic_help:
+      {general_help = "Closes the current system, if it is an \
+                       instance of a context of ddh.";
+       detailed_help = "It must be called on (generator, a, b, c) where \
+                        (a,b,c) are strings that corresponds \
+                        to names, but without any indices. It then \
+                        applies ddh to all the copies of the names, \
+                        and checks that all actions of the protocol \
+                        uses the names in a correct way. Can be used \
+                        in collaboration with some transitivity to \
+                        obtain a system where ddh can be applied.";
+                  usages_sorts = [Sort (Pair (String, Pair (String, Pair( String, String))))];
                   tactic_group = Cryptographic}
     (function
-       | [Args.String_name v1;
+       | [Args.String_name gen;
+          Args.String_name v1;
           Args.String_name v2;
           Args.String_name v3] ->
-         pure_equiv (ddh v1 v2 v3)
+         pure_equiv (ddh gen v1 v2 v3)
        | _ -> hard_failure (Tactics.Failure "improper arguments"))

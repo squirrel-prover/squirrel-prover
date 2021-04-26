@@ -22,6 +22,8 @@ name skS : message
 channel cP
 channel cS
 
+ddh g, (^) where group:message exposants:message.
+
 name a : index -> message
 name b : index -> message
 name k :  index -> index -> message
@@ -122,7 +124,7 @@ Proof.
 
     (* init *)
     expandall.
-    by ddh a,b,k.
+    by ddh g,a,b,k.
     (* Pchall *)
     expandall.
     expand seq(i->g^a(i)), i.
@@ -189,7 +191,7 @@ Proof.
 
     (* init *)
     expandall.
-    by ddh a,b,k.
+    by ddh g,a,b,k.
     (* Pchall *)
     expandall.
     expand seq(i->g^a(i)), i.

@@ -77,6 +77,8 @@ name r3 : message
 name r4 : message
 name r5 : message
 
+ddh g, (^) where group:message exposants:message.
+
 (* As ssh uses a non keyed hash function, we rely on a fixed key hKey known to the attacker *)
 (* Note that hKey has to be a name and not a constant and this key is revealed at the beginning *)
 
@@ -231,7 +233,7 @@ system [secret] K: (P1FADDH | SDISDDH | PDISDDH).
 
 equiv [left,secret] [right,secret] secret.
 Proof.
-   ddh a1, b1, c11.
+   ddh g, a1, b1, c11.
 Qed.
 
 

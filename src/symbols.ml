@@ -45,6 +45,7 @@ let default_group = ""
 (*------------------------------------------------------------------*)
 type function_def =
   | Hash
+  | DDHgen
   | AEnc
   | ADec
   | SEnc
@@ -628,10 +629,6 @@ let fs_pair =
 let fs_fst  = mk_fsymb "fst" 1
 let fs_snd  = mk_fsymb "snd" 1
 
-(** Exp **)
-
-let fs_exp  = mk_fsymb "^" 2
-let fs_g    = mk_fsymb "g" 0
 
 (** Empty *)
 

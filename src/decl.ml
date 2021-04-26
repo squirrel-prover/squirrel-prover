@@ -65,6 +65,8 @@ type declaration_i =
   | Decl_axiom   of goal_decl
   | Decl_system  of system_decl
 
+  | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys 
+
   | Decl_hash of int option * lsymb * orcl_tag_info option * c_tys 
 
   | Decl_aenc of lsymb * lsymb * lsymb * c_tys 

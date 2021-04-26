@@ -972,13 +972,20 @@ let declare_i table decl = match L.unloc decl with
     in
     Process.declare_system table name sdecl.sprocess
 
+  | Decl.Decl_ddh (g, (exp, f_info), ctys) ->
+    let ctys = parse_ctys table ctys ["group"; "exposants"] in
+    let group_ty = List.assoc_opt "group"     ctys 
+    and exp_ty   = List.assoc_opt "exposants" ctys in
+
+    Theory.declare_ddh table ?group_ty ?exp_ty g exp f_info
+
   | Decl.Decl_hash (a, n, tagi, ctys) ->
     let () = Utils.oiter (define_oracle_tag_formula table n) tagi in
 
     let ctys = parse_ctys table ctys ["m"; "h"; "k"] in
-    let m_ty  = List.assoc_opt  "m" ctys 
-    and h_ty = List.assoc_opt   "h" ctys 
-    and k_ty   = List.assoc_opt "k" ctys in
+    let m_ty = List.assoc_opt  "m" ctys 
+    and h_ty = List.assoc_opt  "h" ctys 
+    and k_ty  = List.assoc_opt "k" ctys in
 
     Theory.declare_hash table ?m_ty ?h_ty ?k_ty ?index_arity:a n
 

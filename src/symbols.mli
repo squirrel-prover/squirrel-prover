@@ -65,6 +65,7 @@ val get_namespace : ?group:group -> table -> string -> namespace option
 
 type function_def =
   | Hash
+  | DDHgen
   | AEnc
   | ADec
   | SEnc
@@ -324,11 +325,6 @@ val fs_zero   : fname t
 val fs_pair   : fname t
 val fs_fst    : fname t
 val fs_snd    : fname t
-
-(** Exp **)
-
-val fs_exp    : fname t
-val fs_g      : fname t
 
 (** Empty *)
 

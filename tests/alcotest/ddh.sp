@@ -4,6 +4,8 @@ name a : index -> message
 name b : index -> message
 name k : index -> message
 
+ddh g, (^) where group:message exposants:message.
+
 channel c
 
 system (!_i ( out(c, diff((g ^ a(i)) ^ b(i),g ^ k(i))))
@@ -24,5 +26,5 @@ Proof.
  fadup; try (expandall; refl + assumption).
 
  fa 0; fa 1; fa 1.
- ddh a, b, k.
+ ddh g, a, b, k.
 Qed.

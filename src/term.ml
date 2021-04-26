@@ -185,11 +185,6 @@ let f_pair   = mk Symbols.fs_pair
 let f_fst    = mk Symbols.fs_fst
 let f_snd    = mk Symbols.fs_snd
 
-(** Exp **)
-
-let f_exp    = mk Symbols.fs_exp
-let f_g      = mk Symbols.fs_g
-
 (** Empty *)
 
 let empty =
@@ -220,7 +215,6 @@ let mk_fbuiltin = mk_fun Symbols.builtins_table
 let mk_true  = mk_fbuiltin Symbols.fs_true  [] []
 let mk_false = mk_fbuiltin Symbols.fs_false [] []
 let mk_zero  = mk_fbuiltin Symbols.fs_zero  [] []
-let mk_g     = mk_fbuiltin Symbols.fs_g     [] []
 let mk_fail  = mk_fbuiltin Symbols.fs_fail  [] []
 
 let mk_len term    = mk_fbuiltin Symbols.fs_len    [] [term]

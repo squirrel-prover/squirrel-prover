@@ -1042,6 +1042,14 @@ let mk_ftype iarr vars args out =
   let mdflt ty = odflt Type.Message ty in
   Type.mk_ftype iarr vars (List.map mdflt args) (mdflt out)
   
+let declare_ddh table ?group_ty ?exp_ty gen exp (f_info : Symbols.symb_type) =
+  let open Symbols in
+  let gen_fty = mk_ftype 0 [] [] group_ty in
+  let exp_fty = mk_ftype 0 [] [group_ty; exp_ty] group_ty in
+
+  let table, exp = Function.declare_exact table exp (exp_fty,Abstract f_info) in
+  let data = AssociatedFunctions [exp] in
+  fst (Function.declare_exact table ~data gen (gen_fty,DDHgen))
   
 let declare_hash table ?index_arity ?m_ty ?k_ty ?h_ty s =
   let index_arity = odflt 0 index_arity in
@@ -1111,10 +1119,6 @@ let check_signature table checksign pk =
       | Symbols.AssociatedFunctions [sign; pk2] when pk2 = pk -> Some sign
       | _ -> None
   else None
-
-(* let declare_state table s arity kind =
-  let info = Symbols.State (arity,kind) in
-  fst (Symbols.Macro.declare_exact table s info) *)
 
 let declare_name table s ndef =
   fst (Symbols.Name.declare_exact table s ndef)

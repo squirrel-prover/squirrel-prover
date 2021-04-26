@@ -16,6 +16,9 @@ channel cS
 name a0 :message
 name a : index -> message
 
+abstract g : message
+abstract (^) : message -> message -> message
+
 hash h with oracle forall (m:message,sk:message) 
  ( sk <> kP || exists (i:index) m = g ^ a(i)).
 

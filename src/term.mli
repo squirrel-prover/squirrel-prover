@@ -292,9 +292,6 @@ val f_pair   : fsymb
 val f_fst    : fsymb
 val f_snd    : fsymb
 
-val f_exp    : fsymb
-val f_g      : fsymb
-
 val f_len    : fsymb
 val f_zeroes : fsymb
   
@@ -314,7 +311,6 @@ val mk_fun :
 val mk_true   : message
 val mk_false  : message
 val mk_zero   : message
-val mk_g      : message 
 val mk_fail   : message
 val mk_len    : message -> message
 val mk_zeroes : message -> message
