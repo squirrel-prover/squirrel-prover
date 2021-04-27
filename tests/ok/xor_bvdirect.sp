@@ -10,10 +10,10 @@ abstract ko : message
 
 system null.
 
-axiom len_ok_ko : forall i:index, len(ok XOR ko) = len(n(i))
-axiom len_ko_ok : forall i:index, len(ko XOR ok) = len(m(i))
-axiom len_ok : forall i:index, len(ok) = len(n(i))
-axiom len_ko : forall i:index, len(ko) = len(m(i)).
+axiom len_ok_ko (i:index): len(ok XOR ko) = len(n(i))
+axiom len_ko_ok (i:index): len(ko XOR ok) = len(m(i))
+axiom len_ok (i:index): len(ok) = len(n(i))
+axiom len_ko (i:index): len(ko) = len(m(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (i:index) :

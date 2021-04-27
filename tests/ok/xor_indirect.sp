@@ -7,7 +7,7 @@ name b : index->index->message
 
 system A : !_i new a; !_j out(c,b(i,j)).
 
-axiom len_ok : forall (i,j:index), len(ok) = len(b(i,j)).
+axiom len_ok (i,j:index): len(ok) = len(b(i,j)).
 
 equiv test (i,j,ii,jj:index) :
   (* [happens(A(i,j))] -> *)

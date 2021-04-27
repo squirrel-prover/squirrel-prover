@@ -50,7 +50,7 @@ Abort.
 (* Failure when the key occurs inside an action condition. *)
 system [condSSC] in(c,x); if x=k then out(c,x).
 
-goal [none,condSSC] _ (tau:timestamp) :
+goal [condSSC] _ (tau:timestamp) :
   happens(tau) =>
   (if cond@tau then ok else zero) <> h(ok,k).
 Proof.
@@ -77,7 +77,7 @@ Abort.
 (* h and euf cannot both use the same key *)
 system [joint] (out(c,h(m,k)) | ( in(c,x); if checksign(x,pk(k))=n then out(c,x))).
 
-goal [none, joint] _ (tau:timestamp): happens(A3) => cond@A3 => False.
+goal [ joint] _ (tau:timestamp): happens(A3) => cond@A3 => False.
 Proof.
   intro tau Hap Hcond.
   expand cond@A3.
@@ -85,7 +85,7 @@ Proof.
 Abort.
 
 
-goal [none, joint] _ (tau:timestamp): output@A4<>h(m,k).
+goal [ joint] _ (tau:timestamp): output@A4<>h(m,k).
 Proof.
   intro tau Heq.
   checkfail euf Heq exn BadSSC.
@@ -97,7 +97,7 @@ Abort.
 
 system [boundvars] out(c,seq(i,j -> h(n2(i,j),k1(i)))).
 
-goal [none, boundvars] _ (tau:timestamp, j,j1,j2:index):
+goal [ boundvars] _ (tau:timestamp, j,j1,j2:index):
   happens(tau) =>
   (if cond@tau then ok else ok) = h(n2(j1,j2),k1(j)) => j1=j2.
 Proof.
@@ -122,7 +122,7 @@ Abort.
 
 system [dupnames] !_i out(c,<h(n,k),h(m,k)>).
 
-goal [none, dupnames] _ (tau:timestamp): 
+goal [ dupnames] _ (tau:timestamp): 
  happens(tau) => output@tau = h(u,k) => False.
 Proof.
   intro tau Hap Heq.

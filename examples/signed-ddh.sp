@@ -85,7 +85,7 @@ process Schall(i:index) =
 system [secretS] (!_i P(i) | !_j Schall(j)).
 
 
-goal [none,secretP] P_charac (i:index):
+goal [secretP] P_charac (i:index):
  happens(Pchall1(i)) => 
  cond@Pchall1(i) => 
  exists (j:index), snd(fst(input@Pchall1(i))) = g^b(j).
@@ -97,7 +97,7 @@ Proof.
   exists j.
 Qed.
 
-goal [none, secretS] S_charac (r:index):
+goal [secretS] S_charac (r:index):
  happens(S1(r)) =>
  exec@S1(r) => exists (s:index), snd(input@S(r)) = g^a(s).
 Proof.

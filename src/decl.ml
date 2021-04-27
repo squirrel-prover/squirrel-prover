@@ -28,14 +28,17 @@ type bty_decl = { bty_name  : lsymb ;
                   bty_infos : Symbols.bty_info list ; }
 
 (*------------------------------------------------------------------*)
-type goal_decl = { gname   : lsymb option ;
-                   gsystem : SystemExpr.p_system_expr ;
-                   gform   : Theory.formula ; }
+type p_goal_name = P_unknown | P_named of lsymb
 
-let pp_goal_decl fmt decl =
-  let name = match decl.gname with
-    | Some s -> L.unloc s
-    | None -> "_?" in
+type p_goal_reach_cnt = { gsystem : SystemExpr.p_system_expr ;
+                          gform   : Theory.formula ; }
+
+type p_goal_reach = p_goal_name * p_goal_reach_cnt
+
+let pp_goal_reach fmt (name, decl) =
+  let name = match name with
+    | P_named s -> L.unloc s
+    | P_unknown -> "_" in
   Fmt.pf fmt "@[<hov 2>axiom [%a] %s =@ %a@]"
     SystemExpr.pp_p_system decl.gsystem
     name
@@ -62,7 +65,7 @@ let pp_orcl_tag_info = Theory.pp
 type declaration_i =
   | Decl_channel of lsymb
   | Decl_process of lsymb * Theory.bnds * Process.process
-  | Decl_axiom   of goal_decl
+  | Decl_axiom   of p_goal_reach
   | Decl_system  of system_decl
 
   | Decl_ddh of lsymb * (lsymb * Symbols.symb_type) * c_tys 

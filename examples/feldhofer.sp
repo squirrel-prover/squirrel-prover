@@ -76,7 +76,7 @@ system (!_k Reader(k) | !_i !_j Tag(i,j)).
 
 axiom tags_neq : tagR <> tagT
 
-axiom fail_not_pair : forall (x,y:message), fail <> <x,y>.
+axiom fail_not_pair (x,y:message): fail <> <x,y>.
 
 goal wa_Reader1 (k:index):
   happens(Reader1(k)) => 

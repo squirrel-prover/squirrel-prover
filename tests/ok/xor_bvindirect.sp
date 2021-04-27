@@ -13,9 +13,9 @@ channel c
 system !_i out(c,<n(i),seq(i->n(i))>).
 
 
-axiom len_ok : forall i:index, len(ok) = len(n(i))
-axiom len_ko : forall i:index, len(ko XOR m(i)) = len(n(i))
-axiom len_ko_ok : forall i:index, len(ko XOR ok) = len(n(i)).
+axiom len_ok (i:index): len(ok) = len(n(i))
+axiom len_ko (i:index): len(ko XOR m(i)) = len(n(i))
+axiom len_ko_ok (i:index): len(ko XOR ok) = len(n(i)).
 
 (* The main test, with a non-empty list of bound variables. *)
 equiv nonempty (tau:timestamp,i:index) : output@tau, n(i) XOR diff(ok,m(i)).

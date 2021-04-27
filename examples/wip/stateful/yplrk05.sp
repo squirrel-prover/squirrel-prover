@@ -69,8 +69,7 @@ process reader(jj:index) =
 system ((!_jj R: reader(jj)) | (!_i !_j T: tag(i,j))).
 
 (* Minimal sequentiality assumption needed for the proofs *)
-axiom sequentiality :
-  forall (t:timestamp), forall (i,j:index),
+axiom sequentiality (t:timestamp), forall (i,j:index):
     happens(T(i,j),t,T1(i,j)) =>
     (T(i,j) < t && t < T1(i,j) => not(exists (j':index), t = T1(i,j') && j <> j')).
 

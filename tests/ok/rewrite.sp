@@ -16,8 +16,8 @@ system A: !_i in(ch,x);out(ch,<ok(i),x>).
 
 system [bis] !_i in(ch,x);if x = a then out(ch,<ok(i),x>).
 
-axiom foo : forall (x : message), f(x) = a.
-axiom foog : forall (x : message), gg(x,b) = c.
+axiom foo (x : message) : f(x) = a.
+axiom foog (x : message) : gg(x,b) = c.
 
 (*------------------------------------------------------------------*)
 (* rewrite all instances of only the first occurrence found. *)
@@ -175,7 +175,7 @@ Abort.
 
 
 (*------------------------------------------------------------------*)
-goal [none, bis] _ (x, y, z : message, i : index) :
+goal [bis] _ (x, y, z : message, i : index) :
 (input@A(i) = a => f(a) = c) =>
  happens(A(i)) => b = c => cond@A(i) => f(a) = b.
 Proof.
@@ -192,7 +192,7 @@ system [terce]
    if x = a then out(ch,t').
 
 (*------------------------------------------------------------------*)
-goal [none, terce] _ (x : message, i : index) :
+goal [terce] _ (x : message, i : index) :
 (* (input@A(i) = a => f(a) = c) => *)
  happens(A(i)) => x = input@A(i) => output@A(i) = <<a,x>,<a,x>>.
 Proof.
@@ -239,12 +239,10 @@ Qed.
 
 (*------------------------------------------------------------------*)
 
-axiom mif_true : 
- forall (b : boolean, x,y : message),
+axiom mif_true (b : boolean, x,y : message):
  b => if b then x else y = x.
 
-axiom mif_false : 
- forall (b : boolean, x,y : message),
+axiom mif_false (b : boolean, x,y : message):
  (not b) => if b then x else y = y.
 
 goal _ (b,b' : boolean, x,y : message) : 

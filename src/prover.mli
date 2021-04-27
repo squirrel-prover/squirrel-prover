@@ -34,9 +34,6 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 (*------------------------------------------------------------------*)
 (** {2 Type of parsed new goal } *)
 
-type p_goal_name = P_unknown | P_named of lsymb
-
-
 type p_equiv = Theory.term list 
 
 type p_equiv_form = 
@@ -44,19 +41,21 @@ type p_equiv_form =
   | PReach of Theory.formula
   | PImpl  of p_equiv_form * p_equiv_form
 
-type p_goal =
-  | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
+type p_goal_form =
+  | P_trace_goal of Decl.p_goal_reach_cnt
 
   | P_equiv_goal of Theory.bnds * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
+type p_goal = Decl.p_goal_name * p_goal_form
+
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof]  : start a proof. *)
 type gm_input_i =
-  | Gm_goal of p_goal_name * p_goal
+  | Gm_goal of p_goal
   | Gm_proof
 
 type gm_input = gm_input_i L.located
@@ -205,10 +204,7 @@ type parsed_input =
   | EOF
 
 (** Declare a new goal to the current goals, and returns it *)
-val declare_new_goal :
-  Symbols.table ->
-  L.t -> p_goal_name -> p_goal ->
-  named_goal
+val declare_new_goal : Symbols.table -> L.t -> p_goal -> named_goal
 
 (** Store a proved goal, allowing to apply it. *)
 val add_proved_goal : named_goal -> unit

@@ -160,12 +160,11 @@ system
     (!_ii Write: write_AEAD(ii)) |
     (!_ii Decode: YSM_AEAD_YUBIKEY_OTP_DECODE(ii)) ).
 
-axiom orderTrans:
-  forall (n1,n2,n3:message),
+axiom orderTrans (n1,n2,n3:message):
     (order(n1,n2) = orderOk && order(n2,n3) = orderOk)
     => order(n1,n3) = orderOk
 
-axiom orderStrict: forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
+axiom orderStrict(n1,n2:message): n1 = n2 => order(n1,n2) <> orderOk.
 
 (* Authentication goal for the ideal system *)
 goal [right] auth:

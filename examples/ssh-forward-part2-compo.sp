@@ -322,15 +322,14 @@ system [auth] K: ( P1FAauth | SDISauth | PDISauth).
 (* Based on a difference between the bitstring lengths, we can assume that it is
 impossible to confuse a hash with the tag forwarded, and another hash. *)
 
-axiom [auth] hashlengthnotpair : forall (m1,m2:message),
+axiom [auth] hashlengthnotpair (m1,m2:message):
    <forwarded,h(m1,hKey)> <> h(m2, hKey)
 
 (* The following axiom is a modelling trick. We need at some point to use an
 hypothesis that require to instantiate an index, but this index is not used. *)
 axiom [auth] freshindex : exists (l:index), True
 
-axiom [auth] signnottag :
-  forall (m1,m2:message),
+axiom [auth] signnottag (m1,m2:message):
   fst(sign(m1,m2)) <> anssign &&
   fst(sign(m1,m2)) <> reqsign
 
@@ -340,7 +339,7 @@ axiom [auth] difftags :
 
 
 
-goal [none, auth] P_charac :
+goal [auth] P_charac :
   happens(Pfail) => exec@PDIS5 => (cond@Pfail => False) .
 Proof.
   intro Hap He Hc.
@@ -379,7 +378,7 @@ Qed.
 
 
 (* This is the most complex case, as the received signature was not performed by PDis, but queried by PDis to FA. *)
-goal [none, auth] S_charac :
+goal [auth] S_charac :
    happens(Sfail) => exec@Sok =>(cond@Sfail => False).
 Proof.
   intro Hap He Hc.

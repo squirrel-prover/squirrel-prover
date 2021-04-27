@@ -56,26 +56,24 @@ system ((!_k R: reader(k)) | (!_i !_j T: tag(i,j))).
 
 axiom deltaMaxAxiom : myPred(deltaZero) = deltaZero.
 
-axiom updateReaderAxiom : 
-  forall (i:index,xk:message), 
+axiom updateReaderAxiom (i:index,xk:message):
     updateReader(i,hMsg(hState(xk,keyState(i)),keyMsg(i))) = hState(xk,keyState(i)).
 
-axiom readerTestOk :
-  forall (i:index,xkR:message,x:message,delta:message),
+axiom readerTestOk (i:index,xkR:message,x:message,delta:message):
   ( readerTest(i,xkR,x,delta) = testOk )
   <=> 
   ( x = hMsg(hState(xkR,keyState(i)),keyMsg(i))
     || readerTest(i,hState(xkR,keyState(i)),x,myPred(delta)) = testOk ).
 
-axiom readerTestNotOk :
-  forall (i:index,xkR:message,x:message), readerTest(i,xkR,x,deltaZero) <> testOk.
+axiom readerTestNotOk (i:index,xkR:message,x:message):
+ readerTest(i,xkR,x,deltaZero) <> testOk.
 
-axiom stacked_init : forall (i:index,x:message) stacked(i,x,x)=testOk.
+axiom stacked_init (i:index,x:message): stacked(i,x,x)=testOk.
 
-axiom stacked_step : forall (i:index,x,y:message)
+axiom stacked_step (i:index,x,y:message):
   stacked(i,x,y)=testOk => stacked(i,x,hState(y,keyState(i)))=testOk.
 
-goal auth_R_step : forall (delta:message,k,ii:index),
+goal auth_R_step (delta:message,k,ii:index):
   (* The auth property to prove is generalized over "stacked" database entries,
      so in this lemma we have a (non-prenex) quantification over messages. *)
   happens(R(k,ii)) =>

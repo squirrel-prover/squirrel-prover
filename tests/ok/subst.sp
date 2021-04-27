@@ -8,7 +8,7 @@ abstract b : index -> message
 
 system null.
 
-axiom bar : forall (i : index), a(i) = b(i) => False.
+axiom bar (i : index): a(i) = b(i) => False.
 
 goal foo : 
   (exists (i, i1, i2 : index), a(i1) = b(i2)) => False.

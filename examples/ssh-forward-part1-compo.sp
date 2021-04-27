@@ -189,15 +189,14 @@ process Sauth =
 
 system [auth]  K: (Pauth | Sauth).
 
-axiom [auth] hashnotfor :
-  forall (x1,x2:message), h(x1,hKey) <> <forwarded,x2>
+axiom [auth] hashnotfor (x1,x2:message): h(x1,hKey) <> <forwarded,x2>
 
 (* This is an axiom that simply states the existence of an index *)
 axiom [auth] freshindex : exists (l:index), True.
 
 
 (** Prove that the condition above the only diff term inside S is never true. **)
-goal [none, auth] P_charac :
+goal [auth] P_charac :
   happens(Pfail) => cond@Pok => (cond@Pfail => False) .
 Proof.
   intro Hap HcOk HcFail.
@@ -223,7 +222,7 @@ Proof.
 Qed.
 
 (** Prove that the condition above the only diff term inside P is never true. **)
-goal [none, auth] S_charac :
+goal [auth] S_charac :
   happens(Sfail) => cond@Sok => (cond@Sfail => False).
 Proof.
   intro Hap HcOk HcFail.

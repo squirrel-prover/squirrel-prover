@@ -49,8 +49,7 @@ process B(i:index) =
 
 system out(cA,<pk(kA),pk(kB)>); (!_i A(i) | !_j B(j)).
 
-axiom length :
-  forall (m1:message, m2:message) len(<m1,m2>) = plus(len(m1),len(m2)).
+axiom length (m1:message, m2:message): len(<m1,m2>) = plus(len(m1),len(m2)).
 
 (* Helper lemma for pushing conditionals. Such reasoning should soon be automatic.
  * Note that the lemma would be simpler (and more general) if we could quantify

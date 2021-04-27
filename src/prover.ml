@@ -13,6 +13,8 @@ type lsymb = Theory.lsymb
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
+(** {Error handling} *)
+
 type decl_error_i =
   | BadEquivForm 
   | InvalidAbsType
@@ -66,6 +68,8 @@ let error_handler loc k f a =
   | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
 
 (*------------------------------------------------------------------*)
+(** {Goals} *)
+
 module Goal = struct
   type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   let get_env = function
@@ -97,8 +101,6 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 (*------------------------------------------------------------------*)
 (** {2 Parsed goals} *)
 
-type p_goal_name = P_unknown | P_named of lsymb
-
 type p_equiv = Theory.term list 
 
 type p_equiv_form = 
@@ -106,16 +108,18 @@ type p_equiv_form =
   | PReach of Theory.formula
   | PImpl of p_equiv_form * p_equiv_form
 
-type p_goal =
-  | P_trace_goal of SystemExpr.p_system_expr * Theory.formula
+type p_goal_form =
+  | P_trace_goal of Decl.p_goal_reach_cnt
 
   | P_equiv_goal of Theory.bnds * p_equiv_form L.located
 
   | P_equiv_goal_process of SystemExpr.p_single_system * 
                             SystemExpr.p_single_system
 
+type p_goal = Decl.p_goal_name * p_goal_form
+
 type gm_input_i =
-  | Gm_goal of p_goal_name * p_goal
+  | Gm_goal of p_goal
   | Gm_proof
 
 type gm_input = gm_input_i L.located
@@ -751,8 +755,10 @@ let unnamed_goal () =
 
 let declare_new_goal_i table (gname,g) =
   let gname = match gname with
-    | P_unknown -> unnamed_goal ()
-    | P_named s -> s in
+    | Decl.P_unknown -> unnamed_goal ()
+    | Decl.P_named s -> s 
+  in
+
   let g = match g with
     | P_equiv_goal (env,f) ->
       let system_symb =
@@ -765,9 +771,9 @@ let declare_new_goal_i table (gname,g) =
       and b = SystemExpr.parse_single table b in
       make_equiv_goal_process ~table a b
 
-    | P_trace_goal (s,f) ->
-      let s = SystemExpr.parse_se table s in
-      make_trace_goal ~system:s ~table f
+    | P_trace_goal reach ->
+      let s = SystemExpr.parse_se table reach.gsystem in
+      make_trace_goal ~system:s ~table reach.gform
   in
 
   if List.exists (fun (name,_) -> name = L.unloc gname) !goals_proved then
@@ -777,7 +783,7 @@ let declare_new_goal_i table (gname,g) =
 
   (L.unloc gname,g)
 
-let declare_new_goal table loc n g =
+let declare_new_goal table loc (n, g) =
   error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
 let add_proved_goal (gname,j) =
@@ -955,10 +961,10 @@ let declare_i table decl = match L.unloc decl with
       ) pkind in
     Process.declare table id pkind p
 
-  | Decl.Decl_axiom (gdecl) ->
-    let name = match gdecl.gname with
-      | None -> unnamed_goal ()
-      | Some n -> n
+  | Decl.Decl_axiom (gname,gdecl) ->
+    let name = match gname with
+      | Decl.P_unknown -> unnamed_goal ()
+      | Decl.P_named n -> n
     in
     let se = SystemExpr.parse_se table gdecl.gsystem in
     let goal = make_trace_goal se table gdecl.gform in

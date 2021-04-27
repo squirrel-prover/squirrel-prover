@@ -53,8 +53,8 @@ process reader =
 
 system (!_r R: reader | !_i !_t T: tag(i,t)).
 
-axiom len_id : forall (i:index) len(id(i)) = len(dummy)
-axiom len_id' : forall (i,t:index) len(id'(i,t)) = len(dummy)
+axiom len_id (i:index)   : len(id(i))    = len(dummy)
+axiom len_id' (i,t:index): len(id'(i,t)) = len(dummy)
 
 axiom tags_neq : tag0 <> tag1.
 

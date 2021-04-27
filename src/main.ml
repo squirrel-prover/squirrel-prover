@@ -137,8 +137,8 @@ let main_loop_body ~test state =
               { state with mode = ProofMode }
             | Some es -> cmd_error (StartProofError es)
           end
-        | Prover.Gm_goal (i,f) ->
-          let i,f = Prover.declare_new_goal state.table (L.loc goal) i f in
+        | Prover.Gm_goal g ->
+          let i,f = Prover.declare_new_goal state.table (L.loc goal) g in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
             Prover.Goal.pp_init f;

@@ -9,8 +9,7 @@ channel cT
 channel cR
 
 (* This should be builtin and automatic: TODO. *)
-axiom happens_le :
-  forall (t:timestamp,tt:timestamp),
+axiom happens_le (t:timestamp,tt:timestamp):
   t <= tt && t <> init && happens(tt) => happens(t)
 
 process tag(i:index) =

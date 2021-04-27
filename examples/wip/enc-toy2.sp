@@ -11,7 +11,7 @@ name n0 : index -> message
 name r0 : index -> message
 name r1 : index -> message
 
-axiom len_n: forall (i:index) len(n0(i)) = cst
+axiom len_n (i:index): len(n0(i)) = cst
 (*axiom forall i len(n0(i)) = cst.*)
 
 process A(i:index) =

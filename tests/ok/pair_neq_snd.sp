@@ -2,12 +2,10 @@ set autoIntro=false.
 
 system null.
 
-axiom pair_neq_snd :
-  forall (x:message, y:message),
+axiom pair_neq_snd (x:message, y:message):
   <x,y> <> y
 
-axiom pair_eq_snd_absurd :
-  forall (x:message, y:message),
+axiom pair_eq_snd_absurd (x:message, y:message):
   <x,y> = y => False.
 
 goal _ (x,y:message): <x,y> = y => False.

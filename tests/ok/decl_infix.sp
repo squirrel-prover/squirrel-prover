@@ -7,7 +7,7 @@ abstract (^^) : T -> T -> T.
 
 system null.
 
-axiom comm : forall (x, y, z : T), x ++ y ++ z = x ++ (y ++ z).
+axiom comm (x, y, z : T): x ++ y ++ z = x ++ (y ++ z).
 
 goal _  (x, y, z : T) : x ++ y ++ z = x ++ (y ++ z).
 Proof.

@@ -403,14 +403,7 @@ declaration_i:
 | PROCESS e=lsymb args=opt_arg_list EQ p=process
                           { Decl.Decl_process (e, args, p) }
 
-| AXIOM s=bsystem f=term { Decl.(Decl_axiom { gname = None;
-                                              gsystem = s;
-                                              gform = f; }) }
-
-| AXIOM s=bsystem i=lsymb COLON f=term
-                          { Decl.(Decl_axiom { gname = Some i;
-                                               gsystem = s;
-                                               gform = f; }) }
+| AXIOM g=goal_reach { Decl.Decl_axiom g }
 
 | SYSTEM p=process
                           { Decl.(Decl_system { sname = None;
@@ -695,16 +688,12 @@ args:
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
 system:
-|                         { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Single (P_Left default_system_name)) }
-| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Single (P_Right default_system_name)) }
-| LBRACKET NONE  COMMA i=lsymb RBRACKET { SystemExpr.(P_SimplePair i) }
-| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Left i)) }
-| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Single (P_Right i)) }
-
-bsystem:
-|                            { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET i=lsymb RBRACKET  { SystemExpr.(P_SimplePair i) }
+|                           { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET LEFT RBRACKET    { SystemExpr.(P_Single (P_Left default_system_name)) }
+| LBRACKET RIGHT RBRACKET   { SystemExpr.(P_Single (P_Right default_system_name)) }
+| LBRACKET i=lsymb RBRACKET { SystemExpr.(P_SimplePair i) }
+| LBRACKET LEFT  COLON i=lsymb RBRACKET { SystemExpr.(P_Single (P_Left i)) }
+| LBRACKET RIGHT COLON i=lsymb RBRACKET { SystemExpr.(P_Single (P_Right i)) }
 
 single_system:
 | LBRACKET LEFT RBRACKET  { SystemExpr.(P_Left default_system_name)}
@@ -716,11 +705,17 @@ gname:
 | i=lsymb    { P_named i }
 | UNDERSCORE { P_unknown }
 
-goal_i:
-| GOAL s=system n=gname args=args COLON f=term DOT
+goal_reach:
+| s=system n=gname args=args COLON f=term 
     { let f_i = Theory.ForAll (args, f) in
       let fa = L.mk_loc (L.loc f) f_i in
-      Prover.Gm_goal (n, P_trace_goal (s, fa)) }
+      let goal_cnt = Decl.{gsystem = s; gform = fa; } in
+      n, goal_cnt }
+
+goal_i:
+| GOAL g=goal_reach DOT
+    { let n, goal_cnt = g in
+      Prover.Gm_goal (n, Prover.P_trace_goal goal_cnt) }
 
 | EQUIV n=gname env=args COLON f=loc(equiv_form) DOT
                  { Prover.Gm_goal (n, P_equiv_goal (env, f)) }
