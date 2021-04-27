@@ -1038,17 +1038,18 @@ type rw_arg =
 type rw_earg = Args.rw_count * rw_arg
 
 (** Check that the rule is correct. *)
-let check_rule ((sv, h, l, r) : 'a rw_rule) : bool =
+let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
   let fvl, fvr = Term.fv l, Term.fv r in
   let sh = List.fold_left (fun sh h ->
       Vars.Sv.union sh (Term.fv h)
     ) Vars.Sv.empty h
   in
-  Vars.Sv.subset sv fvl && 
-  Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl
 
-let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : bool =
-  check_rule (sv, h, l, r)
+  if not (Vars.Sv.subset sv fvl) || 
+     not (Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl) then 
+    hard_failure Tactics.BadRewriteRule;
+  ()
+  
 
 (* rewrite in a single target *)
 let do_target 
@@ -2153,9 +2154,8 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
         Term.ESubst (t2,t1)
     in
 
-    (* FIXME: slightly incorrect error message *)
-    if not (check_erule (vs, subs, e)) then 
-      hard_failure Tactics.BadRewriteRule;
+    (* We check that the rule is valid *)
+    check_erule (vs, subs, e);
 
     vs, subs, e
   in
