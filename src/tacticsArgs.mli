@@ -101,6 +101,8 @@ type parser_arg =
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * rw_in
   | ApplyIn     of Theory.term * apply_in
+
+type parser_args = parser_arg list
                                
 (** Tactic arguments sorts *)
 type _ sort =

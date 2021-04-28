@@ -159,6 +159,8 @@ type parser_arg =
   | RewriteIn   of rw_arg list * rw_in
   | ApplyIn     of Theory.term * apply_in
 
+type parser_args = parser_arg list
+
 let pp_parser_arg ppf = function
   | Int_parsed i  -> Fmt.int ppf i
   | String_name s -> Fmt.string ppf (L.unloc s)

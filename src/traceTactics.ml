@@ -271,11 +271,11 @@ let case_cond orig vars c t e s =
 
 let message_case (m : Term.message) s : c_res list =
   match m with
-  | Term.Find (vars,c,t,e) as o -> case_cond o vars c t e s
-  | Term.Fun (f,_,[c;t;e]) as o when f = Term.f_ite ->
-    case_cond o [] c t e s
+  | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
+  | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite ->
+    case_cond m [] c t e s
 
-  | Term.Macro (ms,[],ts) as o
+  | Term.Macro (ms,[],ts) 
     when Macros.is_defined ms.s_symb ts (TraceSequent.table s) ->
 
     if not (TraceSequent.query_happens ~precise:true s ts) 
@@ -283,17 +283,15 @@ let message_case (m : Term.message) s : c_res list =
 
     begin 
       match Macros.get_definition (mk_trace_cntxt s) ms ts with
-      | Term.Find (vars,c,t,e) -> case_cond o vars c t e s
-      | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond o [] c t e s
+      | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
+      | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond m [] c t e s
       | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
     end
 
   | _ ->
     Tactics.(soft_failure (Failure "message is not a conditional"))
-  | exception _ ->
-    Tactics.(soft_failure (Failure "improper argument"))
 
-let do_case_tac (args : Args.parser_arg list) s =
+let do_case_tac (args : Args.parser_arg list) s : c_res list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
@@ -304,16 +302,16 @@ let do_case_tac (args : Args.parser_arg list) s =
     match Args.convert_args tbl env args Args.(Sort ETerm) with
     | Args.Arg (ETerm (Type.Timestamp, f, loc)) ->
       timestamp_case f s
+
     | Args.Arg (ETerm (Type.Message, f, loc)) ->
       message_case f s
+
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
-let case_tac (args : Args.parser_arg list) s
-    (sk : TraceSequent.t list Tactics.sk) fk =
+let case_tac (args : Args.parser_args) s sk fk =
   try
     let cres = do_case_tac args s in
     let ss = List.map (fun (CHyp id, s) ->
-        (* TODO: location *)
         do_naming_pat (`Hyp id) Args.AnyName s
       ) cres in
     sk ss fk
