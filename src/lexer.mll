@@ -60,6 +60,7 @@ rule token = parse
 | ')'                 { RPAREN }
 | '|'                 { PARALLEL }
 | "->"                { ARROW }
+| "<-"                { RARROW }
 | "=>"                { DARROW }
 | "<=>"               { DEQUIVARROW }
 | ":="                { ASSIGN }

@@ -324,36 +324,18 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
   | `Hyp id, Args.SAndOr ao_ip ->
     do_and_or_pat id ao_ip s
 
+  | _, Args.Srewrite _ ->
+    (* TODO: implement after code factorization *)
+    hard_failure (Failure "not yet implemented for equiv sequents")
+
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
 let rec do_intro (s : EquivSequent.t) : Args.ip_handler * EquivSequent.sequent =
   match EquivSequent.goal s with
-  (* | ForAll ((Vars.EVar x) :: vs,f) ->
-   *   let x' = Vars.make_new_from x in
-   * 
-   *   let subst = [Term.ESubst (Term.Var x, Term.Var x')] in
-   * 
-   *   let f = match vs with
-   *     | [] -> f
-   *     | _ -> ForAll (vs,f) in
-   * 
-   *   let new_formula = Term.subst subst f in
-   *   ( `Var (Vars.EVar x'),
-   *     EquivSequent.set_goal new_formula s )
-   * 
-   * | ForAll ([],f) ->
-   *   (* FIXME: this case should never happen. *)
-   *   do_intro (EquivSequent.set_goal f s) *)
-
   | Equiv.Impl(lhs,rhs)->
     let id, s = Hyps.add_i Args.Unnamed lhs s in
     let s = EquivSequent.set_goal s rhs in
     ( `Hyp id, s )
-
-  (* | Not f ->
-   *   let id, s = Hyps.add_i Args.Unnamed f s in
-   *   let s = EquivSequent.set_goal False s in
-   *   ( `Hyp id, s ) *)
 
   | _ -> soft_failure Tactics.NothingToIntroduce
 

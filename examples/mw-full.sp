@@ -352,8 +352,7 @@ expand cond@T1(i,t); split.
     admit.
   simpl.
   case output@R1(r) => Meq1. 
-  destruct Meq1 as [_ _ [Meq1 Meq2]].
-  rewrite Meq2.
+  destruct Meq1 as [_ _ [Meq1 ->]].
   by euf Meq1. 
 
   destruct Meq1 as [H0 _].
@@ -379,8 +378,7 @@ expand cond@T1(i,t); split.
                 2: depends R(r),R1(r)].
   simpl.
   case output@R1(r) => Meq1.
-    destruct Meq1 as [_ _ [Meq1 Meq2]].
-    rewrite Meq2.
+    destruct Meq1 as [_ _ [Meq1 ->]].
     by euf Meq1 => A0 [A1 _] [_ _].
 
     destruct Meq1 as [H0 _].
@@ -452,8 +450,7 @@ split; intro [_ H1]; simpl.
     by case C; 1: depends R(r),R2(r). 
   simpl.
   case output@R1(r) => Meq1.
-    destruct Meq1 as [_ _ [Meq1 Meq2]]. 
-    rewrite Meq2.
+    destruct Meq1 as [_ _ [Meq1 ->]]. 
     by euf Meq1.
 
     destruct Meq1 as [H0 _].
@@ -478,8 +475,7 @@ split; intro [_ H1]; simpl.
   simpl.
 
   case output@R1(r) => Meq1.
-    destruct Meq1 as [_ _ [Meq1 Meq2]]. 
-    rewrite Meq2.
+    destruct Meq1 as [_ _ [Meq1 ->]]. 
     by euf Meq1.
 
     destruct Meq1 as [H0 _].

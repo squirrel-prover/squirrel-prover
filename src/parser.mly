@@ -23,7 +23,7 @@
 %token NEW OUT PARALLEL NULL
 %token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
 %token MUTABLE SYSTEM SET
-%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW ASSIGN
+%token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
 %token DOT SLASH BANGU SLASHEQUAL SLASHSLASH ATSLASH
 %token TIME WHERE WITH ORACLE EXN
@@ -495,9 +495,14 @@ and_or_pat:
                     { TacticsArgs.Or  (s :: ips) }
 | LBRACKET RBRACKET { TacticsArgs.Split }
 
+ip_rw_dir:
+| ARROW  { `LeftToRight }
+| RARROW { `RightToLeft }
+
 simpl_pat:
 | n_ip=naming_pat  { TacticsArgs.SNamed n_ip }
 | ao_ip=and_or_pat { TacticsArgs.SAndOr ao_ip }
+| d=loc(ip_rw_dir) { TacticsArgs.Srewrite d }
 
 s_item:
 | l=loc(SLASHSLASH) { TacticsArgs.Tryauto  (L.loc l)}

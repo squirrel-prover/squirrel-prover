@@ -15,10 +15,12 @@ type s_item =
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
+type rw_dir = [`LeftToRight | `RightToLeft ] L.located
+
 (** General rewrite item *)
 type 'a rw_item_g = { 
   rw_mult : rw_count; 
-  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_dir  : rw_dir;
   rw_type : 'a;
 }
 
@@ -61,6 +63,7 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
+  | Srewrite of rw_dir                    (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)

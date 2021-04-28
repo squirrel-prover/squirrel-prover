@@ -15,10 +15,12 @@ let rec pp_s_item fmt = function
 
 type rw_count = [`Once | `Many | `Any ] (* ε | ! | ? *)
 
+type rw_dir = [`LeftToRight | `RightToLeft ] L.located
+
 (** General rewrite item *)
 type 'a rw_item_g = { 
   rw_mult : rw_count; 
-  rw_dir  : [`LeftToRight | `RightToLeft ] L.located;
+  rw_dir  : rw_dir;
   rw_type : 'a;
 }
 
@@ -96,7 +98,7 @@ type and_or_pat =
 and simpl_pat =
   | SAndOr of and_or_pat
   | SNamed of naming_pat
-      
+  | Srewrite of rw_dir                    (** -> or <-*)
 
 type intro_pattern =
   | Star   of Location.t    (** '*' *)
@@ -125,6 +127,10 @@ let rec pp_and_or_pat fmt = function
 and pp_simpl_pat fmt = function
   | SAndOr ao_ip -> pp_and_or_pat fmt ao_ip
   | SNamed n_ip  -> pp_naming_pat fmt n_ip
+
+  | Srewrite L.{ pl_desc = `LeftToRight } -> Fmt.pf fmt "->" 
+  | Srewrite L.{ pl_desc = `RightToLeft } -> Fmt.pf fmt "<-" 
+
 
 let rec pp_intro_pat fmt = function
   | SItem s    -> pp_s_item fmt s
