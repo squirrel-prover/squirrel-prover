@@ -864,8 +864,9 @@ let subst_support s =
     Sv.union supp (fv t)) Sv.empty s
 
 let rec subst : type a. subst -> a term -> a term = fun s t ->
-  if is_var_subst s && 
-     Sv.disjoint (subst_support s) (fv t)
+  if s = [] ||
+     (is_var_subst s && 
+      Sv.disjoint (subst_support s) (fv t))
   then t
   else
     let new_term : a term =

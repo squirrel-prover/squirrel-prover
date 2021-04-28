@@ -59,8 +59,8 @@ goal if_len : forall (x,x1,x2,x3,y,z:message),
   (if x=x1 && x2=x3 then len(y) else len(z)).
 Proof.
   intro x x1 x2 x3 y z.
-  assert (x=x1 || x<>x1); case H;
-  assert (x2=x3 || x2<>x3); case H;
+  assert (x=x1 || x<>x1) as H; case H;
+  assert (x2=x3 || x2<>x3) as H0; case H0;
   try ((yesif; yesif) + (noif; noif)).
 Qed.
 

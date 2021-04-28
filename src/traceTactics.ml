@@ -174,6 +174,36 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
     Hyps.add nip f s
 
 (*------------------------------------------------------------------*)
+let revert (hid : Ident.t) (s : sequent) : sequent =
+  let f = Hyps.by_id hid s in
+  let s = Hyps.remove hid s in
+  TS.set_conclusion (Term.mk_impl ~simpl:false f (TS.conclusion s)) s
+
+let revert_str (hyp_name : lsymb) s =
+  let hid,_ = Hyps.by_name hyp_name s in
+  revert hid s
+
+let revert_tac (args : Args.parser_arg list) s sk fk = 
+  try
+    let s = 
+      List.fold_left (fun s arg -> match arg with
+          | Args.String_name arg -> revert_str arg s
+          | _ -> hard_failure (Failure "improper arguments")
+        ) s args in
+    sk [s] fk
+  with Tactics.Tactic_soft_failure (_,e) -> fk e
+      
+let () =
+  T.register_general "revert"
+    ~tactic_help:{
+      general_help = "Take an hypothesis H, and turns the conclusion C into the \
+                      implication H => C.";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    revert_tac
+
+(*------------------------------------------------------------------*)
 (** Type for case and destruct tactics handlers *)
 type c_handler =
   | CHyp of Ident.t
@@ -181,46 +211,52 @@ type c_handler =
 type c_res = c_handler * sequent
 
 (** Case analysis on a timestamp *)
-let timestamp_case (ts : Term.timestamp) s : c_res list =
+let timestamp_case (ts : Term.timestamp) s : sequent list =
   let system = TraceSequent.system s in
   let table  = TraceSequent.table s in
 
-  let mk_case descr =
+  let mk_case descr : Vars.evar list * Term.timestamp =
     let indices =
-      let env = ref @@ TraceSequent.env s in
+      let env = ref (TraceSequent.env s) in
       List.map
         (fun i -> Vars.make_fresh_from_and_update env i)
-        descr.Action.indices in
+        descr.Action.indices 
+    in
 
     let subst =
       List.map2 (fun i i' -> Term.ESubst (Term.Var i,Term.Var i'))
-        descr.Action.indices indices in
+        descr.Action.indices indices 
+    in
 
     let name =
       SystemExpr.action_to_term table system
-        (Action.subst_action subst descr.Action.action) in
+        (Action.subst_action subst descr.Action.action) 
+    in
+    (* FIXME: is this second substitution useful ? *)
     let name = Term.subst subst name in
 
-    let at = Term.Atom ((`Timestamp (`Eq,ts,name)) :> generic_atom) in
-
-    if indices = [] then at else
-      Exists (List.map (fun x -> Vars.EVar x) indices,at) 
+    List.map (fun x -> Vars.EVar x) indices, name
   in
 
   let cases = SystemExpr.map_descrs table system mk_case in
 
-  List.map (fun f ->
-      let id, s = Hyps.add_i Args.Unnamed f s in
-      ( CHyp id, s )
+  List.map (fun (indices, ts_case) ->
+      let ts_subst = 
+        if indices = [] then [Term.ESubst (ts, ts_case)] else [] 
+      in
+      let goal = Term.subst ts_subst (TS.conclusion s) in 
+      let prem = 
+        Term.mk_exists indices 
+          (Term.Atom (`Timestamp (`Eq,ts, ts_case)))
+      in
+      TS.set_conclusion (Term.mk_impl ~simpl:false prem goal) s
     ) cases
 
-(** Case analysis on an hypothesis.
+(** Case analysis on disjunctions in an hypothesis.
     When [nb=`Any], recurses. 
     When [nb=`Some l], destruct at most [l]. *)
-let hypothesis_case ~nb id (s : TraceSequent.t) : c_res list =
-  let destr_err () =
-    soft_failure (Tactics.Failure "can only be applied to a disjunction")
-  in
+let hypothesis_case ~nb id (s : sequent) : c_res list =
+  let destr_err () = soft_failure (Failure "not a disjunction") in
 
   let rec case acc form = match Term.destr_or form with
     | Some (f,g) -> case (case acc g) f
@@ -247,7 +283,7 @@ let hypothesis_case ~nb id (s : TraceSequent.t) : c_res list =
 
 (** Case analysis on [orig = Find (vars,c,t,e)] in [s].
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
-let case_cond orig vars c t e s =
+let case_cond orig vars c t e s : sequent list =
   let env = ref (TraceSequent.env s) in
   let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
   let subst =
@@ -255,21 +291,39 @@ let case_cond orig vars c t e s =
       (fun i i' -> ESubst (Term.Var i, Term.Var i'))
       vars vars'
   in
-  let c' = Term.ForAll (List.map (fun i -> Vars.EVar i) vars, Term.mk_not c) in
-  let c = Term.subst subst c in
-  let t = Term.subst subst t in
-  let then_subst = [ Term.ESubst (orig,t) ] in
-  let else_subst = [ Term.ESubst (orig,e) ] in
+  let then_c = Term.subst subst c in
+  let else_c =
+    Term.mk_forall (List.map (fun i -> Vars.EVar i) vars) (Term.mk_not c) 
+  in
 
-  let idthen, sthen = Hyps.add_i Args.Unnamed c  s
-  and idelse, selse = Hyps.add_i Args.Unnamed c' s in
+  let then_t = Term.subst subst t in
+  let else_t = e in
+  
+  let mk_case case_vars case_t case_cond : sequent =   
+    let case_subst = 
+      if case_vars = [] then [Term.ESubst (orig, case_t)] else [] 
+    in
+ 
+    let prem = 
+      Term.mk_exists
+        (List.map (fun x -> Vars.EVar x) case_vars) 
+        (Term.mk_and ~simpl:false
+           case_cond
+           (Term.Atom (`Message (`Eq, orig, case_t))))
+    in
 
-  let sthen = TraceSequent.set_env !env sthen in
+    let case_goal = 
+      Term.mk_impl ~simpl:false 
+        prem
+        (Term.subst case_subst (TS.conclusion s))
+    in
+    TS.set_conclusion case_goal s
+  in    
 
-  [ ( CHyp idthen, TraceSequent.subst then_subst sthen );
-    ( CHyp idelse, TraceSequent.subst else_subst selse ) ]
+  [ mk_case vars' then_t then_c;
+    mk_case    [] else_t else_c]
 
-let message_case (m : Term.message) s : c_res list =
+let conditional_case (m : Term.message) s : sequent list =
   match m with
   | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
   | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite ->
@@ -278,8 +332,8 @@ let message_case (m : Term.message) s : c_res list =
   | Term.Macro (ms,[],ts) 
     when Macros.is_defined ms.s_symb ts (TraceSequent.table s) ->
 
-    if not (TraceSequent.query_happens ~precise:true s ts) 
-    then soft_failure (Tactics.MustHappen ts);
+    if not (TraceSequent.query_happens ~precise:true s ts) then
+      soft_failure (Tactics.MustHappen ts);
 
     begin 
       match Macros.get_definition (mk_trace_cntxt s) ms ts with
@@ -291,30 +345,43 @@ let message_case (m : Term.message) s : c_res list =
   | _ ->
     Tactics.(soft_failure (Failure "message is not a conditional"))
 
-let do_case_tac (args : Args.parser_arg list) s : c_res list =
+let boolean_case b s : sequent list =
+  let do_one b_case b_val =
+    let g = Term.subst [Term.ESubst (b, b_val)] (TS.conclusion s) in
+    TS.set_conclusion (Term.mk_impl ~simpl:false b_case g) s 
+  in
+  [ do_one b Term.mk_true;
+    do_one (Term.mk_not ~simpl:false b) Term.mk_false]
+
+(* [ty] must be the type of [m] *)
+let message_case (t : Term.message) ty s : sequent list = 
+  match ty with
+  | Type.Boolean -> boolean_case t s
+  | _ -> conditional_case t s
+
+let do_case_tac (args : Args.parser_arg list) s : sequent list =
   match Args.convert_as_lsymb args with
   | Some str when Hyps.mem_name (L.unloc str) s ->
     let id, _ = Hyps.by_name str s in
-    hypothesis_case ~nb:`Any id s
+    List.map (fun (CHyp _, ss) -> ss) (hypothesis_case ~nb:`Any id s)
 
   | _ ->
     let env, tbl = TraceSequent.env s, TraceSequent.table s in
     match Args.convert_args tbl env args Args.(Sort ETerm) with
-    | Args.Arg (ETerm (Type.Timestamp, f, loc)) ->
-      timestamp_case f s
-
-    | Args.Arg (ETerm (Type.Message, f, loc)) ->
-      message_case f s
-
+    | Args.Arg (ETerm (ty, f, _)) -> 
+      begin
+        match Type.kind ty with
+        | Type.KTimestamp -> timestamp_case f s
+                               
+        | Type.KMessage -> message_case f ty s
+                             
+        | Type.KIndex -> Tactics.(hard_failure (Failure "improper arguments"))
+      end
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
+
 let case_tac (args : Args.parser_args) s sk fk =
-  try
-    let cres = do_case_tac args s in
-    let ss = List.map (fun (CHyp id, s) ->
-        do_naming_pat (`Hyp id) Args.AnyName s
-      ) cres in
-    sk ss fk
+  try sk (do_case_tac args s) fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
@@ -349,36 +416,6 @@ let () =
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
     false_left
-
-(*------------------------------------------------------------------*)
-let revert (hid : Ident.t) s =
-  let f = Hyps.by_id hid s in
-  let s = Hyps.remove hid s in
-  TS.set_conclusion (Term.mk_impl ~simpl:false f (TS.conclusion s)) s
-
-let revert_str (hyp_name : lsymb) s =
-  let hid,_ = Hyps.by_name hyp_name s in
-  revert hid s
-
-let revert_tac (args : Args.parser_arg list) s sk fk = 
-  try
-    let s = 
-      List.fold_left (fun s arg -> match arg with
-          | Args.String_name arg -> revert_str arg s
-          | _ -> hard_failure (Failure "improper arguments")
-        ) s args in
-    sk [s] fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
-      
-let () =
-  T.register_general "revert"
-    ~tactic_help:{
-      general_help = "Take an hypothesis H, and turns the conclusion C into the \
-                      implication H => C.";
-      detailed_help = "";
-      tactic_group  = Logical;
-      usages_sorts = []; }
-    revert_tac
 
 
 (*------------------------------------------------------------------*)

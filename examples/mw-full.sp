@@ -203,10 +203,12 @@ expand cond@T1(i,t); split.
   assert R(r) < T(i,t) as _.
     admit.
   simpl.
-  case output@R1(r).
-  (* Issue here *)
-  euf Meq1. auto. auto.
+  case output@R1(r) => Meq1. 
+  destruct Meq1 as [_ _ [Meq1 Meq2]].
+  rewrite Meq2.
+  by euf Meq1. 
 
+  destruct Meq1 as [H0 _].
   by use H0 with i,t.
 
   (* Right *)
@@ -228,16 +230,23 @@ expand cond@T1(i,t); split.
     by case C; [1: depends R(r),R2(r) |
                 2: depends R(r),R1(r)].
   simpl.
-  case output@R1(r).
-  euf Meq1 => A0 [A1 _] [_ _]; 1,2: by auto.
-  by use H0 with i,t. 
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]].
+    rewrite Meq2.
+    by euf Meq1 => A0 [A1 _] [_ _].
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t. 
 
   (* Honest => Cond *)
-  intro [_ [r _]]; simpl.
-  case output@R1(r); expand output.
-  by project; euf Meq.
+  intro [_ [r H1]]; simpl. 
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]].
+    rewrite Meq2 in H1.
+    by project; euf Meq1.
 
-  by use H0 with i,t.
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t. 
 
 fa 6.
 by fadup 5.
@@ -259,18 +268,24 @@ equivalent
       R(r) < T(i,t) &&
       input@T(i,t) = output@R(r)).
 split; intro [_ H1]; simpl.
+
   (* Honest => Cond *)
   intro [r H2]; use H1.
-  case output@R1(r); expand output.
-  (* by project; euf Meq. *)
-  by project; euf Meq => _ [F _] *.
-  by use H0 with i,t.
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]].
+    rewrite Meq2 in H2.
+    by project; euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t. 
+
   (* Cond => Honest *)
   intro Meq.
   use H1.
   assert input@T2(i,t) XOR diff(id(i),id'(i,t)) =
          H(<tag1,<input@T(i,t),nt(i,t)>>,diff(key(i),key'(i,t))); 1:auto.
   use tags_neq; project.
+
   (* Left *)
   euf Meq0 => Ct _ _; 2:auto.
   assert R1(r) < T2(i,t) as _.
@@ -288,9 +303,13 @@ split; intro [_ H1]; simpl.
     fresh HF => C.
     by case C; 1: depends R(r),R2(r). 
   simpl.
-  case output@R1(r).
-  by euf Meq1.
-  by use H0 with i,t.
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]]. 
+    rewrite Meq2.
+    by euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t. 
 
   (* Right *)
   euf Meq0 => Ct _ [_ _]; 2:auto.
@@ -309,9 +328,14 @@ split; intro [_ H1]; simpl.
     fresh HF => C.
     by case C; 1: depends R(r),R2(r).
   simpl.
-  case output@R1(r).
-  by euf Meq1.
-  by use H0 with i,t.
+
+  case output@R1(r) => Meq1.
+    destruct Meq1 as [_ _ [Meq1 Meq2]]. 
+    rewrite Meq2.
+    by euf Meq1.
+
+    destruct Meq1 as [H0 _].
+    by use H0 with i,t. 
 
 fa 6. 
 by fadup 5.
