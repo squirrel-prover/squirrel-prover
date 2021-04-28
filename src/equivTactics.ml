@@ -1111,6 +1111,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let table = EquivSequent.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+  (* TODO: types *)
   match Theory.convert conv_env tsubst term Type.Message with
   (* we expect term to be a sequence *)
   | Seq ( vs, t) as term_seq ->
@@ -1180,6 +1181,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
     | _ ->
       soft_failure (Tactics.Failure "can only expand macros")
 
+    (* TODO: types*)
     | exception Theory.(Conv (_,Type_error _)) ->
       match Theory.convert conv_env tsubst term Type.Message with
       | Macro (ms,l,a) ->
@@ -1321,6 +1323,8 @@ let equivalent arg s = match arg with
 
     | Args.ETerm (_, _, _),
       Args.ETerm (_, _, _)  ->
+    (* TODO: types*)
+
       (* TODO: improve error message + add locations *)
       hard_failure
         (Tactics.Failure ("expected a pair of messages or a pair of booleans"))

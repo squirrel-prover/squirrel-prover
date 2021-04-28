@@ -417,6 +417,7 @@ let function_kind table (f : lsymb) : mf_type =
       `Macro (targs, ty)
 
     | Macro (Input|Output|Frame) -> 
+      (* TODO: subtypes*)
       `Macro ([], Type.Message)
 
     | Macro (Cond|Exec) ->
@@ -784,15 +785,15 @@ and convert0 :
   | Diff (l,r) -> Term.Diff (conv ty l, conv ty r)
 
   | Compare (o,u,v) ->
-    begin match ty with
-      | Type.Boolean ->
+    begin match Type.kind ty with
+      | Type.KMessage ->
         begin try
             Term.Atom
               (`Timestamp (o,
                            conv Type.Timestamp u,
                            conv Type.Timestamp v))
           with Conv (_,Type_error _ ) ->
-          
+
           match o with
           | #Term.ord_eq as o ->
             begin try
@@ -800,22 +801,22 @@ and convert0 :
                                    conv_index state u,
                                    conv_index state v))
               with Conv (_,Type_error _ ) ->
-              
+
                 let tyv = Type.Infer.mk_univar state.ty_env in
 
                 Term.Atom (`Message (o,
                                      conv (Type.TUnivar tyv) u,
                                      conv (Type.TUnivar tyv) v))
             end
-            
+
           | _ -> conv_err (L.loc tm) (Unsupported_ord (L.unloc tm))
         end
       | _ -> type_error ()
     end
 
   | Happens ts ->
-    begin match ty with
-      | Type.Boolean ->
+    begin match Type.kind ty with
+      | Type.KMessage ->
         let atoms = List.map (fun t ->
             Term.Atom (`Happens (conv Type.Timestamp t))
           ) ts in
@@ -858,9 +859,9 @@ and convert0 :
       in
       List.map f new_subst
     in
-    begin match ty, L.unloc tm with
-      | Type.Boolean, ForAll _ -> Term.mk_forall vs f
-      | Type.Boolean, Exists _ -> Term.mk_exists vs f
+    begin match Type.kind ty, L.unloc tm with
+      | Type.KMessage, ForAll _ -> Term.mk_forall vs f
+      | Type.KMessage, Exists _ -> Term.mk_exists vs f
       | _ -> type_error ()
     end
 
@@ -1224,20 +1225,26 @@ let convert : type s.
 
   t    
 
-let econvert cenv subst t : eterm option =
-  let conv_s = function
-    | Type.ETy ty -> try
-        let tt = convert cenv subst t ty in
-        Some (ETerm (ty, tt, L.loc t))
-      with Conv _ -> None in
+let econvert (cenv : conv_env) subst t : eterm option =
+  let loc = L.loc t in
 
-  (* careful about the order. Because boolean is a subtyped of message, we
-     need to try boolean (the most precise type) first. *)
-  List.find_map conv_s
-    [Type.eboolean;
-     Type.emessage;
-     Type.eindex;
-     Type.etimestamp]
+  (* sort index *)
+  try let tt = convert cenv subst t Type.Index in
+    Some (ETerm (Type.Index, tt, loc))
+  with Conv _ -> 
+
+  (* sort timestamp *)
+  try let tt = convert cenv subst t Type.Timestamp in
+    Some (ETerm (Type.Timestamp, tt, loc))
+  with Conv _ -> 
+
+  (* Type is inferred for sort Message *)
+  try let tt, ty = convert_i cenv subst t in
+    Some (ETerm (ty, tt, loc))
+  with Conv e -> 
+    (* REM *)
+    Fmt.epr "econvert error: %a@." (pp_error (fun _ _ -> ())) e;
+    None
 
 let convert_index table subst t =
   match convert { table = table; cntxt = InGoal; } subst t Type.Index with
