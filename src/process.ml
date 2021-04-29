@@ -385,7 +385,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
     let subst = create_subst env.isubst env.msubst in
     Theory.convert
       ~ty_env:env.ty_env
-      { table = table; cntxt = InProc ts; } subst t sort
+      { table = table; cntxt = InProc ts; } [] subst t sort
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in

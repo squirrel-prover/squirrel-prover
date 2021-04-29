@@ -7,6 +7,9 @@ module L = Location
 module EquivHyps = EquivSequent.H
 module Args = TacticsArgs
 
+module TS = TraceSequent
+module ES = EquivSequent
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -84,15 +87,15 @@ module Goal = struct
   let pp_init ch = function
     | Trace j ->
         assert (TraceSequent.env j = Vars.empty_env) ;
-        Term.pp ch (TraceSequent.conclusion j)
+        Term.pp ch (TraceSequent.goal j)
     | Equiv j -> EquivSequent.pp_init ch j
 end
 
 type named_goal = string * Goal.t
 
-let goals : named_goal list          ref = ref []
+let goals        : named_goal list   ref = ref []
 let current_goal : named_goal option ref = ref None
-let subgoals : Goal.t list           ref = ref []
+let subgoals     : Goal.t list       ref = ref []
 let goals_proved : named_goal list   ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
@@ -280,7 +283,7 @@ module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
   let from_equiv e = assert false
 
   let table_name = "Trace"
-  let pp_goal_concl ppf j = Term.pp ppf (TraceSequent.conclusion j)
+  let pp_goal_concl ppf j = Term.pp ppf (TraceSequent.goal j)
 end
 
 module EquivTable : Table_sig with type judgment = Goal.t = struct
@@ -298,7 +301,7 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
 
   let table_name = "Equiv"
   let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp ppf (TraceSequent.conclusion j)
+    | Goal.Trace j -> Term.pp ppf (TraceSequent.goal j)
     | Goal.Equiv j -> Equiv.pp_form ppf (EquivSequent.goal j)
 end
 
@@ -416,13 +419,13 @@ struct
     Hashtbl.add table id { maker = f ;
                            help = tactic_help}
 
-  let convert_args table j parser_args tactic_type =
-    let env =
+  let convert_args j parser_args tactic_type =
+    let table, env, ty_vars =
       match M.to_goal j with
-      | Goal.Trace t -> TraceSequent.env t
-      | Goal.Equiv e -> EquivSequent.env e
+      | Goal.Trace t -> TS.table t, TS.env t, TS.ty_vars t
+      | Goal.Equiv e -> ES.table e, ES.env e, ES.ty_vars e
     in
-    TacticsArgs.convert_args table env parser_args tactic_type
+    TacticsArgs.convert_args table ty_vars env parser_args tactic_type
 
   let register id ~tactic_help f =
     register_general id ~tactic_help
@@ -448,8 +451,7 @@ struct
     register_general id
       ~tactic_help:({general_help; detailed_help; usages_sorts; tactic_group})
       (fun args s sk fk ->
-         let table = Goal.get_table (M.to_goal s) in
-         match convert_args table s args (TacticsArgs.Sort sort) with
+         match convert_args s args (TacticsArgs.Sort sort) with
          | TacticsArgs.Arg (th)  ->
            try
              let th = TacticsArgs.cast sort th in
@@ -646,23 +648,27 @@ let is_goal_formula (gname : lsymb) =
     | [] -> false
     | _ -> assert false
 
-let get_goal_formula (gname : lsymb) =
+let get_goal_formula (gname : lsymb) :
+  SystemExpr.system_expr * Type.tvars * Term.message =
   match
     List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved
   with
     | [(_,Goal.Trace f)] ->
         assert (TraceSequent.env f = Vars.empty_env) ;
-        TraceSequent.conclusion f, TraceSequent.system f
-    | [] -> Tactics.hard_failure ~loc:(L.loc gname)
-        (Tactics.Failure ("no proved goal named " ^ (L.unloc gname)))
+        TS.system f, TS.ty_vars f, TS.goal f
+
+    | [] -> 
+      Tactics.hard_failure ~loc:(L.loc gname)
+        (Failure ("no proved goal named " ^ (L.unloc gname)))
+
     | _ -> assert false
 
 
 (*------------------------------------------------------------------*)
 (** {2 Convert equivalence formulas} *)
 
-let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el : Term.message =   
-  match Theory.econvert cenv s el with
+let convert_el cenv ty_vars (s : Theory.subst) el : Term.message =   
+  match Theory.econvert cenv ty_vars s el with
   (* FIXME: this does not give any conversion error to the user. *)
   | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
   | Some (Theory.ETerm (s,t,_)) -> 
@@ -671,18 +677,18 @@ let convert_el (cenv : Theory.conv_env) (s : Theory.subst) el : Term.message =
     | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
                                           bool or message)")
 
-let convert_equiv (cenv : Theory.conv_env) (s : Theory.subst) (e : p_equiv) =
-  List.map (convert_el cenv s) e
+let convert_equiv cenv ty_vars (s : Theory.subst) (e : p_equiv) =
+  List.map (convert_el cenv ty_vars s) e
 
-let convert_equiv_form cenv s (p : p_equiv_form) =
+let convert_equiv_form cenv ty_vars s (p : p_equiv_form) =
   let rec conve p =
     match p with
     | PImpl (f,f0) -> 
       Equiv.Impl (conve f, conve f0)
     | PEquiv e -> 
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv s e))
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars s e))
     | PReach f -> 
-      Equiv.Atom (Equiv.Reach (Theory.convert cenv s f Type.Boolean))
+      Equiv.Atom (Equiv.Reach (Theory.convert cenv ty_vars s f Type.Boolean))
   in
 
   conve p
@@ -691,10 +697,18 @@ let convert_equiv_form cenv s (p : p_equiv_form) =
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
-let make_trace_goal ~system ~table f  =
+let make_trace_goal ~table (pg : Decl.p_goal_reach_cnt)  =
+  let system = SystemExpr.parse_se table pg.g_system in
+
+  let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) pg.g_tyvars in  
+
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let g = Theory.convert conv_env [] f Type.Boolean in
-  Goal.Trace (TraceSequent.init ~system table g)
+  let f_i = Theory.ForAll (pg.g_vars, pg.g_form) in
+  let f = L.mk_loc (L.loc pg.g_form) f_i in
+
+  let g = Theory.convert conv_env ty_vars [] f Type.Boolean in
+
+  Goal.Trace (TS.init ~system ~ty_vars table g) 
 
 let make_equiv_goal
     ~table (system_name : System.system_name) (env : Theory.bnds)
@@ -710,7 +724,7 @@ let make_equiv_goal
   let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  let f = convert_equiv_form conv_env subst (L.unloc p_form) in
+  let f = convert_equiv_form conv_env [] subst (L.unloc p_form) in
 
   let se = SystemExpr.simple_pair table system_name in
 
@@ -771,9 +785,7 @@ let declare_new_goal_i table (gname,g) =
       and b = SystemExpr.parse_single table b in
       make_equiv_goal_process ~table a b
 
-    | P_trace_goal reach ->
-      let s = SystemExpr.parse_se table reach.gsystem in
-      make_trace_goal ~system:s ~table reach.gform
+    | P_trace_goal reach -> make_trace_goal ~table reach
   in
 
   if List.exists (fun (name,_) -> name = L.unloc gname) !goals_proved then
@@ -795,7 +807,7 @@ let add_proved_goal (gname,j) =
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let formula = Theory.convert conv_env [] f Type.Boolean in
+  let formula = Theory.convert conv_env [] [] f Type.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
@@ -966,8 +978,7 @@ let declare_i table decl = match L.unloc decl with
       | Decl.P_unknown -> unnamed_goal ()
       | Decl.P_named n -> n
     in
-    let se = SystemExpr.parse_se table gdecl.gsystem in
-    let goal = make_trace_goal se table gdecl.gform in
+    let goal = make_trace_goal table gdecl in
     add_proved_goal (L.unloc name, goal);
     table
 

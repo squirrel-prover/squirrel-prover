@@ -29,19 +29,21 @@ type hyps = H.hyps
   * to two frames, interpreting macros wrt the left and right systems
   * respectively. *)
 type t = {
-  env    : Vars.env;
-  table  : Symbols.table;
-  hyps   : H.hyps;
-  goal   : Equiv.form;
-  system : SystemExpr.system_expr;
+  env     : Vars.env;
+  table   : Symbols.table;
+  ty_vars : Type.tvars;
+  hyps    : H.hyps;
+  goal    : Equiv.form;
+  system  : SystemExpr.system_expr;
 }
 
 let init system table env hyps f = {
-  env    = env ; 
-  table  = table ;
-  goal   = f ; 
-  hyps   = hyps;
-  system = system;
+  env     = env ; 
+  table   = table ;
+  ty_vars = [];
+  goal    = f ; 
+  hyps    = hyps;
+  system  = system;
 }
 
 type sequent = t
@@ -54,8 +56,14 @@ let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
   Fmt.pf ppf "@[System: %a@]@;"
     SystemExpr.pp_system j.system;
+
+  if j.ty_vars <> [] then
+    Fmt.pf ppf "@[Type variables: %a@]@;" 
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) j.ty_vars ;
+
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "@[Variables: %a@]@;" Vars.pp_env j.env ;
+
   H.pps ppf j.hyps ;
 
   (* Print separation between hyps and conclusion *)
@@ -172,11 +180,15 @@ let set_table j table = { j with table = table }
 
 let goal j = j.goal
 
+let ty_vars j = j.ty_vars
+
 let hyps j = j.hyps
 
 let set_hyps j f = { j with hyps = f}
 
 let set_goal j f = { j with goal = f }
+
+let set_ty_vars j f = { j with ty_vars = f } 
 
 let set_equiv_goal j e = { j with goal = Equiv.Atom (Equiv.Equiv e) }
 

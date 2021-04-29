@@ -57,6 +57,10 @@ module S : sig
   type t = private {
     system : SystemExpr.system_expr ;
     table : Symbols.table;
+
+    ty_vars : Type.tvars;
+    (** Free type variables of the sequent. *)
+
     env : Vars.env;
     (** Must contain all free variables of the sequent,
       * which are logically understood as universally quantified. *)
@@ -78,38 +82,38 @@ module S : sig
   val update :
     ?system:SystemExpr.system_expr ->
     ?table:Symbols.table ->
+    ?ty_vars:Type.tvars ->
     ?env:Vars.env ->
     ?hyps:H.hyps ->
     ?conclusion:Term.message ->
     t -> t
 end = struct
   type t = {
-    system       : SystemExpr.system_expr ;
-    table        : Symbols.table;
-    env          : Vars.env;
-    hyps         : H.hyps;
-    conclusion   : Term.message;
+    system     : SystemExpr.system_expr ;
+    table      : Symbols.table;
+    ty_vars    : Type.tvars;
+    env        : Vars.env;
+    hyps       : H.hyps;
+    conclusion : Term.message;
   }
 
   let init_sequent system table = {
-    system       = system ;
-    table        = table;
-    env          = Vars.empty_env;
-    hyps         = H.empty;
-    conclusion   = Term.mk_true;
+    system     = system ;
+    table      = table;
+    ty_vars    = [];
+    env        = Vars.empty_env;
+    hyps       = H.empty;
+    conclusion = Term.mk_true;
   }
 
-  let update ?system ?table ?env ?hyps ?conclusion t =
-    let system       = Utils.odflt t.system system
-    and table        = Utils.odflt t.table table
-    and env          = Utils.odflt t.env env
-    and hyps         = Utils.odflt t.hyps hyps
-    and conclusion   = Utils.odflt t.conclusion conclusion in
-    { system = system ;
-      table = table ;
-      env = env ;
-      hyps = hyps ;
-      conclusion = conclusion ; } 
+  let update ?system ?table ?ty_vars ?env ?hyps ?conclusion t =
+    let system     = Utils.odflt t.system system
+    and table      = Utils.odflt t.table table
+    and ty_vars    = Utils.odflt t.ty_vars ty_vars
+    and env        = Utils.odflt t.env env
+    and hyps       = Utils.odflt t.hyps hyps
+    and conclusion = Utils.odflt t.conclusion conclusion in
+    { system; table; ty_vars; env; hyps; conclusion; } 
 end
 
 include S
@@ -121,8 +125,14 @@ let pp ppf s =
   pf ppf "@[<v 0>" ;
   pf ppf "@[System: %a@]@;"
     SystemExpr.pp_system s.system;
+
+  if s.ty_vars <> [] then
+    pf ppf "@[Type variables: %a@]@;" 
+      (Fmt.list ~sep:Fmt.comma Type.pp_tvar) s.ty_vars ;
+
   if s.env <> Vars.empty_env then
     pf ppf "@[Variables: %a@]@;" Vars.pp_env s.env ;
+
   (* Print hypotheses *)
   H.pps ppf s.hyps ;
 
@@ -404,12 +414,14 @@ module Hyps
 end
 
 (*------------------------------------------------------------------*)
-let env    s = s.env
-let system s = s.system
-let table  s = s.table
+let env     s = s.env
+let ty_vars s = s.ty_vars
+let system  s = s.system
+let table   s = s.table
 
 let set_env    a      s = S.update ~env:a         s
 let set_system system s = S.update ~system:system s 
+let set_ty_vars vs    s = S.update ~ty_vars:vs    s 
 let set_table  table  s = S.update ~table:table   s 
 
 (*------------------------------------------------------------------*)
@@ -431,17 +443,17 @@ let pi projection s =
      unrolled. *)
   H.fold (fun id f s -> snd (Hyps.add_formula id f s)) hyps s
   
-let set_conclusion a s =
+let set_goal a s =
   let s = S.update ~conclusion:a s in
     match a with
       | Term.Atom Term.(#message_atom) 
         when Config.auto_intro () -> Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system table (goal : Term.message) =
-  set_conclusion goal (init_sequent system table)
+let init ~system ~ty_vars table (goal : Term.message) =
+  set_goal goal (set_ty_vars ty_vars (init_sequent system table))
 
-let conclusion s = s.conclusion
+let goal s = s.conclusion
 
 (*------------------------------------------------------------------*)
 let subst subst s =

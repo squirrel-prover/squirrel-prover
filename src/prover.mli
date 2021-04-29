@@ -6,8 +6,6 @@ module L = Location
 
 type lsymb = Theory.lsymb
 
-open Term
-
 module Goal : sig
   type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
   val pp : Format.formatter -> t -> unit
@@ -170,28 +168,10 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 
 exception ParseError of string
 
-val get_goal_formula : lsymb -> message * SystemExpr.system_expr
+val get_goal_formula : 
+  lsymb -> SystemExpr.system_expr * Type.tvars * Term.message 
 
 val is_goal_formula : lsymb -> bool
-
-(** Produces a trace goal from a parsed formula,
-  * for reasoning on the traces of the given system. *)
-val make_trace_goal :
-  system:SystemExpr.system_expr -> table:Symbols.table ->
-  Theory.formula -> Goal.t
-
-(** Produces an equivalence goal from a sequence of parsed bi-terms. *)
-val make_equiv_goal :
-  table:Symbols.table -> System.system_name -> Theory.bnds ->
-  p_equiv_form L.located ->
-  Goal.t
-
-(** Produces an equivalence goal based on the process and the two
-    system expressions. *)
-val make_equiv_goal_process :
-  table:Symbols.table ->
-  SystemExpr.single_system -> SystemExpr.single_system ->
-  Goal.t
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations

@@ -20,21 +20,7 @@ type boolean   = Type.message   var
 type timestamp = Type.timestamp var
 
 (*------------------------------------------------------------------*)
-(** {2 Functions on variables} *)
-
-val name : 'a var -> string
-
-val ty : 'a var -> 'a Type.ty
-
-val kind : 'a var -> 'a Type.kind
-
-val cast  : 'a var -> 'b Type.kind -> 'b var
-val ecast :   evar -> 'a Type.kind -> 'a var
-
-val equal : 'a var -> 'b var -> bool
-
-(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
-val compare : 'a var -> 'b var -> int
+(** {2 Pretty-Printing} *)
   
 (** Print a variable, only showing its name. *)
 val pp   : Format.formatter -> 'a var -> unit
@@ -45,6 +31,25 @@ val pp_list : Format.formatter -> 'a var list -> unit
 
 (** Print a list of variables, showing their names and sorts. *)
 val pp_typed_list : Format.formatter -> evar list -> unit
+
+(*------------------------------------------------------------------*)
+(** {2 Functions on variables} *)
+
+val name : 'a var -> string
+
+val ty : 'a var -> 'a Type.ty
+
+val tsubst : Type.tsubst -> 'a var -> 'a var
+
+val kind : 'a var -> 'a Type.kind
+
+val cast  : 'a var -> 'b Type.kind -> 'b var
+val ecast :   evar -> 'a Type.kind -> 'a var
+
+val equal : 'a var -> 'b var -> bool
+
+(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
+val compare : 'a var -> 'b var -> int
 
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)

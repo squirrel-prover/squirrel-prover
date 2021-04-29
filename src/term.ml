@@ -11,7 +11,8 @@ let dbg s = Printer.prt `Ignore s
 (*------------------------------------------------------------------*)
 (** {2 Symbols} *)
 
-(** Ocaml type of a typed index symbol *)
+(** Ocaml type of a typed index symbol.
+    Invariant: [s_typ] do not contain tvar or univars *)
 type ('a,'b) isymb = { 
   s_symb    : 'a;
   s_indices : Vars.index list;
@@ -27,6 +28,7 @@ let mk_isymb s t is =
   { s_symb    = s; 
     s_typ     = t;
     s_indices = is; } 
+
 
 type name = Symbols.name Symbols.t
 type nsymb = (name, Type.tmessage) isymb
@@ -1013,24 +1015,6 @@ let subst_macros_ts table l ts t =
 
   subst_term t
 
-
-(* (* REM *)
- * let () = Prof.record "subst"
- * let () = Prof.record "ty"
- * 
- * let ty : type a. ?ty_env:Type.Infer.env -> a term -> a Type.t = 
- *   fun ?ty_env a ->
- *   let time = Sys.time () in
- *   let r = ty ?ty_env a in
- *   let () = Prof.call "ty" (Sys.time () -. time) in
- *   r
- *   
- * let subst : type a. subst -> a term -> a term = fun s t ->
- *   let time = Sys.time () in
- *   let r = subst s t in
- *   let () = Prof.call "subst" (Sys.time () -. time) in
- *   r *)
-
 (*------------------------------------------------------------------*)
 type eterm = ETerm : 'a term -> eterm
 
@@ -1110,6 +1094,20 @@ let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b =
   !vref
 
 (*------------------------------------------------------------------*)
+(** {2 Type substitution} *)
+
+let tsubst : type a. Type.tsubst -> a term -> a term = 
+  fun ts t ->
+  
+  (* no need to substitute in the types of [Name], [Macro], [Fun] *)
+  let rec tsubst : type a. a term -> a term = function
+    | Var v -> Var (Vars.tsubst ts v)
+    | _ as term -> tmap (fun (ETerm t) -> ETerm (tsubst t)) term
+  in
+
+  tsubst t
+
+(*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
 
 module Match = struct 
@@ -1123,23 +1121,43 @@ module Match = struct
           ESubst (Var v, cast (Vars.kind v) t) :: subst
       ) mv [] 
 
-  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
-      be matched.  *)
-  type 'a pat = { p_term : 'a term; p_vars : Sv.t }
+  (** A pattern is a list of free type variables, a term [t] and a subset
+      of [t]'s free variables that must be matched. 
+      The free type variables must be inferred. *)
+  type 'a pat = {
+    pat_tyvars : Type.tvars; 
+    pat_vars : Sv.t; 
+    pat_term : 'a term; 
+  }
 
   let pp_pat fmt p =
-    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ vars = @[%a@]}@]"
-      pp p.p_term 
-      (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.p_vars)
+    Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
+      pp p.pat_term 
+      (Fmt.list ~sep:Fmt.sp Type.pp_tvar) p.pat_tyvars
+      (Fmt.list ~sep:Fmt.sp Vars.pp_e) (Sv.elements p.pat_vars)
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
-      If it succeeds, it returns a map instantiating the variables [p.p_vars] 
+      If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  let try_match : type a b. a term -> b pat -> mv option = 
+  let try_match : type a b. a term -> b pat -> 
+    [`FreeTyv | `NoMatch | `Match of mv] = 
     fun t p -> 
     let exception NoMatch in
+
+    (* [ty_env] must be closed at the end of the matching *)
+    let ty_env = Type.Infer.mk_env () in
+    let univars, ty_subst  = Type.Infer.open_tvars ty_env p.pat_tyvars in
+    let pat = tsubst ty_subst p.pat_term in    
+
+    (* substitute back the univars by the corresponding tvars *)
+    let ty_subst_rev = 
+      List.fold_left2 (fun s tv tu -> 
+          Type.tsubst_add_univar s tu (Type.TVar tv)
+        ) Type.tsubst_empty p.pat_tyvars univars 
+    in
+
     
-    (* Invariant: [mv] supports in included in [p.p_vars]. *)
+    (* Invariant: [mv] supports in included in [p.pat_vars]. *)
     let rec tmatch : type a b. a term -> b term -> mv -> mv =
       fun t pat mv -> match t, pat with
         | _, Var v' -> 
@@ -1210,13 +1228,18 @@ module Match = struct
     and vmatch : type a. a term -> a Vars.var -> mv -> mv = fun t v mv ->
       let ev = Vars.EVar v in
       
-      if not (Sv.mem ev p.p_vars) 
+      if not (Sv.mem ev p.pat_vars) 
       then if t = Var v then mv else raise NoMatch (* [v] not in the pattern *)
 
-      else (* [v] in the pattern *)
+      else (* [v] in the pattern *)       
         match Mv.find ev mv with
-        (* If this is the first time we see the variable, store the subterm. *)
-        | exception Not_found -> Mv.add ev (ETerm t) mv
+        (* If this is the first time we see the variable, store the subterm 
+           and add the type information. *)
+        | exception Not_found -> 
+          if Type.Infer.unify_eq ty_env (ty t) (Vars.ty v) = `Fail then
+            raise NoMatch;
+
+          Mv.add ev (ETerm t) mv
 
         (* If we already saw the variable, check that the subterms are
            identical. *)
@@ -1245,8 +1268,21 @@ module Match = struct
       | _, _ -> raise NoMatch
     in
 
-    try Some (tmatch t p.p_term Mv.empty) with
-    | NoMatch -> None
+    try 
+      let mv = tmatch t pat Mv.empty in
+      
+      if not (Type.Infer.is_closed ty_env) 
+      then `FreeTyv
+      else 
+        let mv = 
+          Mv.fold (fun (Vars.EVar v) t mv -> 
+              let v = Vars.tsubst ty_subst_rev v in
+              Mv.add (Vars.EVar v) t mv
+            ) mv Mv.empty 
+        in
+        `Match mv
+
+    with NoMatch -> `NoMatch
 
 
   (** Occurrence matched *)
@@ -1258,7 +1294,7 @@ module Match = struct
     (b match_occ list * a term) option
     = fun ~many t p func ->
       let found = ref None in
-      let s_p = kind p.p_term in     
+      let s_p = kind p.pat_term in     
 
       let rec find : type a. a term -> a term = fun t ->
         (* [many = false] and we already found a match *)
@@ -1268,10 +1304,10 @@ module Match = struct
         else 
           match try_match t p with
           (* head does not match, recurse  *)
-          | None -> 
+          | `NoMatch | `FreeTyv -> 
             tmap (fun (ETerm t) -> ETerm (find t)) t
 
-          | Some mv -> (* head matches *)
+          | `Match mv -> (* head matches *)
             found := Some ({ occ = cast s_p t; mv = mv; } :: odflt [] !found); 
             let t' = func (cast s_p t) mv in
             cast (kind t) t' 

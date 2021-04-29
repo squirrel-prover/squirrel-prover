@@ -22,7 +22,9 @@ val pp_kinde : Format.formatter -> ekind -> unit
 
 (*------------------------------------------------------------------*)
 (** Type variables *)
+
 type tvar
+type tvars = tvar list
 
 val pp_tvar : Format.formatter -> tvar -> unit
 
@@ -31,7 +33,9 @@ val ident_of_tvar : tvar -> Ident.t
   
 (*------------------------------------------------------------------*)
 (** Variables for type inference *)
+
 type univar
+type univars = univar list
 
 val pp_univar : Format.formatter -> univar -> unit
   
@@ -105,6 +109,10 @@ type tsubst
 val tsubst   : tsubst -> 'a ty -> 'a ty
 val tsubst_e : tsubst ->   ety ->   ety
 
+val tsubst_add_tvar   : tsubst -> tvar   -> tmessage -> tsubst
+val tsubst_add_univar : tsubst -> univar -> tmessage -> tsubst
+
+
 val tsubst_empty : tsubst
   
 (*------------------------------------------------------------------*)
@@ -117,6 +125,8 @@ module Infer : sig
   val mk_env : unit -> env
     
   val mk_univar : env -> univar
+
+  val open_tvars : env -> tvars -> univars * tsubst
 
   val norm : env -> 'a ty -> 'a ty
       
@@ -133,6 +143,8 @@ end
 
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
+
+    Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = private {
   fty_iarr : int;             (** i *)

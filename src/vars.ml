@@ -28,6 +28,8 @@ let ty v = v.var_type
              
 let kind v = Type.kind (v.var_type)
 
+let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
+
 (*------------------------------------------------------------------*)
 let pp ppf v =
   Fmt.pf ppf "%s" (name v)

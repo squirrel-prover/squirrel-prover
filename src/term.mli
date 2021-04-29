@@ -12,7 +12,8 @@
   * We have function, name and macro symbols. Each symbol
   * can then be indexed. *)
 
-(** Ocaml type of a typed index symbol *)
+(** Ocaml type of a typed index symbol.
+    Invariant: [s_typ] do not contain tvar or univars *)
 type ('a,'b) isymb = private { 
   s_symb    : 'a;
   s_indices : Vars.index list;
@@ -207,8 +208,11 @@ type subst = esubst list
 
 val pp_subst : Format.formatter -> subst -> unit
 
-(** [subst s t] applies the given substitution to [t]. *)
+(** term substitution *)
 val subst : subst -> 'a term -> 'a term
+
+(** substitute type variables *)
+val tsubst : Type.tsubst -> 'a term -> 'a term
 
 (** [subst_var s v] returns [v'] if substitution [s] maps [v] to [Var v'],
   * and [v] if the variable is not in the domain of the substitution.
@@ -228,18 +232,23 @@ val subst_macros_ts :
 (** {2 Matching and rewriting} *)
 
 module Match : sig
-  type mv = eterm Vars.Mv.t
+  type mv
 
-  (** A pattern is a term [t] and a subset of [t]'s free variables that must 
-      be matched.  *)
-  type 'a pat = { p_term : 'a term; p_vars : Vars.Sv.t }
+  (** A pattern is a list of free type variables, a term [t] and a subset
+      of [t]'s free variables that must be matched. 
+      The free type variables must be inferred. *)
+  type 'a pat = { 
+    pat_tyvars : Type.tvars; 
+    pat_vars : Vars.Sv.t; 
+    pat_term : 'a term; 
+  }
 
   val to_subst : mv -> subst
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
-      If it succeeds, it returns a map instantiating the variables [p.p_vars] 
+      If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  val try_match : 'a term -> 'b pat -> mv option
+  val try_match : 'a term -> 'b pat -> [`FreeTyv | `NoMatch | `Match of mv] 
 
   (** Occurrence matched *)
   type 'a match_occ = { occ : 'a term;

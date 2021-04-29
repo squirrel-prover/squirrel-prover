@@ -30,19 +30,12 @@ type bty_decl = { bty_name  : lsymb ;
 (*------------------------------------------------------------------*)
 type p_goal_name = P_unknown | P_named of lsymb
 
-type p_goal_reach_cnt = { gsystem : SystemExpr.p_system_expr ;
-                          gform   : Theory.formula ; }
+type p_goal_reach_cnt = { g_system : SystemExpr.p_system_expr ;
+                          g_tyvars : lsymb list;
+                          g_vars   : Theory.bnds;
+                          g_form   : Theory.formula ; }
 
 type p_goal_reach = p_goal_name * p_goal_reach_cnt
-
-let pp_goal_reach fmt (name, decl) =
-  let name = match name with
-    | P_named s -> L.unloc s
-    | P_unknown -> "_" in
-  Fmt.pf fmt "@[<hov 2>axiom [%a] %s =@ %a@]"
-    SystemExpr.pp_p_system decl.gsystem
-    name
-    Theory.pp decl.gform
 
 (*------------------------------------------------------------------*)
 type system_decl = { sname    : Theory.lsymb option;

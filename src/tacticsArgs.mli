@@ -166,7 +166,7 @@ val pp_esort : Format.formatter -> esort -> unit
 val convert_as_lsymb : parser_arg list -> lsymb option
   
 val convert_args :
-  Symbols.table -> Vars.env ->
+  Symbols.table -> Type.tvars -> Vars.env ->
   parser_arg list -> esort -> earg
 
 (*------------------------------------------------------------------*)

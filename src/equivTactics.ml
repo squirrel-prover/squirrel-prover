@@ -101,9 +101,10 @@ let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
 (** Build a trace sequent from an equivalent sequent when its conclusion is a
     [Reach _]. *)
 let trace_seq_of_equiv_seq ?goal s = 
-  let env    = EquivSequent.env s in
-  let system = EquivSequent.system s in
-  let table  = EquivSequent.table s in
+  let env     = EquivSequent.env s in
+  let system  = EquivSequent.system s in
+  let table   = EquivSequent.table s in
+  let ty_vars = EquivSequent.ty_vars s in
 
   let goal = match goal, EquivSequent.goal s with
     | Some g, _ -> g
@@ -114,7 +115,7 @@ let trace_seq_of_equiv_seq ?goal s =
   in
 
   let trace_s =
-    TraceSequent.set_env env (TraceSequent.init ~system table goal)
+    TraceSequent.set_env env (TraceSequent.init ~system ~ty_vars table goal)
   in
   
   (* We add all relevant hypotheses *)
@@ -548,7 +549,7 @@ let enrich (arg : Theory.eterm Args.arg) (s : EquivSequent.t) =
             
 let enrich_a arg s = 
   let tbl, env = EquivSequent.table s, EquivSequent.env s in
-  match Args.convert_args tbl env [arg] Args.(Sort ETerm) with
+  match Args.convert_args tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) with
   | Args.Arg (ETerm _ as arg) -> enrich arg s
   | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
@@ -1088,18 +1089,18 @@ let () =
 
 (*------------------------------------------------------------------*)  
 (** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
-let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
+let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   let env = EquivSequent.env s in
   let table = EquivSequent.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  match Theory.convert_i conv_env tsubst term with
+  match Theory.convert_i conv_env (ES.ty_vars s) tsubst term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
 
     (* we parse the arguments ths, to create a substution for variables vs *)
-    let subst = Theory.parse_subst table env vs ths in
+    let subst = Theory.parse_subst table (ES.ty_vars s) env vs ths in
 
     (* new_t is the term of the sequence instantiated with the subst *)
     let new_t = Term.subst subst t in
@@ -1156,7 +1157,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  match Theory.convert_i conv_env tsubst term with
+  match Theory.convert_i conv_env (ES.ty_vars s) tsubst term with
     | Macro (ms,l,a), ty ->
       if Macros.is_defined ms.s_symb a table then
         succ a [Term.ESubst (Macro (ms,l,a),

@@ -31,15 +31,19 @@ let get_models s = Tactics.timeout_get (TraceSequent.get_models s)
 let get_trs    s = Tactics.timeout_get (TraceSequent.get_trs s)
 
 (*------------------------------------------------------------------*)
+let convert_args s args sort = 
+  Args.convert_args (TS.table s) (TS.ty_vars s) (TS.env s) args sort
+
+(*------------------------------------------------------------------*)
 let is_hyp_or_lemma name s =
   Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula name
 
 (** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
 let get_hyp_or_lemma name s =
-  let hyp_opt, (f,system) =
+  let hyp_opt, (system,tyvars,f) =
     if Hyps.mem_name (L.unloc name) s then
       let id, f = Hyps.by_name name s in
-      Some id, (f, TraceSequent.system s)
+      Some id, (TraceSequent.system s, [], f)
     else None, Prover.get_goal_formula name in
 
   (* Verify that it applies to the current system. *)
@@ -50,7 +54,8 @@ let get_hyp_or_lemma name s =
     | Single (Right s1), SystemExpr.SimplePair s2 when s1 = s2 -> ()
     | _ -> hard_failure Tactics.NoAssumpSystem
   end ;
-  hyp_opt, f
+
+  hyp_opt, tyvars, f
 
 (*------------------------------------------------------------------*)
 let mk_trace_cntxt s = 
@@ -71,13 +76,13 @@ let wrap_fail f (s: TraceSequent.t) sk fk =
 (** Propositional connectives *)
 
 let goal_or_right_1 (s : TraceSequent.t) =
-  match Term.destr_or (TraceSequent.conclusion s) with
-  | Some (lformula, _) -> [TraceSequent.set_conclusion (lformula) s]
+  match Term.destr_or (TraceSequent.goal s) with
+  | Some (lformula, _) -> [TraceSequent.set_goal (lformula) s]
   | None -> soft_failure (Tactics.Failure "not a disjunction")
 
 let goal_or_right_2 (s : TraceSequent.t) =
-  match Term.destr_or (TraceSequent.conclusion s) with
-  | Some (_, rformula) -> [TraceSequent.set_conclusion (rformula) s]
+  match Term.destr_or (TraceSequent.goal s) with
+  | Some (_, rformula) -> [TraceSequent.set_goal (rformula) s]
   | None -> soft_failure (Tactics.Failure "not a disjunction")
 
 let () =
@@ -101,7 +106,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 let goal_true_intro (s : TraceSequent.t) =
-  match TraceSequent.conclusion s with
+  match TraceSequent.goal s with
   | tt when tt = Term.mk_true -> []
   | _ -> soft_failure (Tactics.Failure "Cannot introduce true")
 
@@ -130,10 +135,10 @@ let () =
 (** Split a conjunction conclusion,
   * creating one subgoal per conjunct. *)
 let goal_and_right (s : TraceSequent.t) =
-  match Term.destr_and (TraceSequent.conclusion s) with
+  match Term.destr_and (TraceSequent.goal s) with
   | Some (lformula, rformula) ->
-    [ TraceSequent.set_conclusion lformula s ;
-      TraceSequent.set_conclusion rformula s ]
+    [ TraceSequent.set_goal lformula s ;
+      TraceSequent.set_goal rformula s ]
   | None -> soft_failure (Tactics.Failure "not a conjunction")
 
 let () =
@@ -173,13 +178,14 @@ let target_all s : target list =
   `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
 
 (** A rewrite rule is a tuple: 
-    (universally quantified variables, premisses, left term, right term)
-    Invariant: if (sv,φ,l,r) is a rewrite rule, then
+    (type variables, term variables, premisses, left term, right term)
+    Invariant: if (tyvars,sv,φ,l,r) is a rewrite rule, then
     - sv ⊆ FV(l)
     - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-type 'a rw_rule =  (Vars.Sv.t * Term.message list * 'a term * 'a term)
+type 'a rw_rule = 
+  Type.tvars * Vars.Sv.t * Term.message list * 'a term * 'a term
 
-type rw_erule = (Vars.Sv.t * Term.message list * Term.esubst)
+type rw_erule = Type.tvars * Vars.Sv.t * Term.message list * Term.esubst
 
 type rw_arg = 
   | Rw_rw of Ident.t option * rw_erule
@@ -190,7 +196,7 @@ type rw_arg =
 type rw_earg = Args.rw_count * rw_arg
 
 (** Check that the rule is correct. *)
-let check_erule ((sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
+let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
   let fvl, fvr = Term.fv l, Term.fv r in
   let sh = List.fold_left (fun sh h ->
       Vars.Sv.union sh (Term.fv h)
@@ -208,17 +214,17 @@ let do_target
     (doit : (Term.message * Ident.t option) -> Term.message * Term.message list) 
     (s : sequent) (t : target) : sequent * sequent list =
   let f, s, tgt_id = match t with
-    | `Goal -> TraceSequent.conclusion s, s, None
+    | `Goal -> TraceSequent.goal s, s, None
     | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
   in
 
   let f,subs = doit (f,tgt_id) in
   let subs : sequent list = 
-    List.map (fun sub -> TraceSequent.set_conclusion sub s) subs
+    List.map (fun sub -> TraceSequent.set_goal sub s) subs
   in
 
   match t with
-  | `Goal -> TraceSequent.set_conclusion f s, subs
+  | `Goal -> TraceSequent.set_goal f s, subs
   | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s, subs
 
 let do_targets doit (s : sequent) targets : sequent * sequent list = 
@@ -288,7 +294,7 @@ let find_occs_macro : type a.
 
   List.fold_left (fun occs target -> match target with
       | `Goal -> 
-        do1 occs (TraceSequent.conclusion s) 
+        do1 occs (TraceSequent.goal s) 
       | `Hyp id ->
         let f = Hyps.by_id id s in
         do1 occs f
@@ -331,8 +337,7 @@ let expand (targets : target list) (arg : Theory.term) s =
     s
 
   | _ ->
-    let env = TraceSequent.env s in
-    match Args.convert_args tbl env [Args.Theory arg] Args.(Sort ETerm) with
+    match convert_args s [Args.Theory arg] Args.(Sort ETerm) with
     | Args.Arg (Args.ETerm (Type.Boolean, f, loc)) ->
       expand_macro targets f s
         
@@ -391,7 +396,7 @@ let rewrite ~all
   let rec do1 
     : type a. Term.message -> Args.rw_count -> a rw_rule -> 
       Term.message * Term.message list = 
-    fun f mult (sv, rsubs, l, r) ->
+    fun f mult (tyvars, sv, rsubs, l, r) ->
       if !cpt_occ > 1000 then   (* hard-coded *)
           hard_failure (Failure "max nested rewriting reached (1000)");
       incr cpt_occ;
@@ -407,7 +412,10 @@ let rewrite ~all
       in
 
       (* tries to find an occurence of [l] and rewrite it. *)
-      let occ = Term.Match.find f { p_term = l; p_vars = sv; } in
+      let pat = 
+        Term.Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = l; } 
+      in
+      let occ = Term.Match.find f pat in
 
       match mult, occ with
       | (`Once | `Many), None -> 
@@ -417,7 +425,7 @@ let rewrite ~all
 
       | (`Many | `Any), Some occ -> 
         let f, subs  = rw_inst occ in
-        let f, subs' = do1 f `Any (sv, rsubs, l, r) in
+        let f, subs' = do1 f `Any (tyvars, sv, rsubs, l, r) in
         f, subs @ subs'
 
       | `Once,          Some occ -> rw_inst occ
@@ -433,10 +441,10 @@ let rewrite ~all
 
   let doit (f,tgt_id) =
     match rw with
-    | mult,  id_opt, (sv, subs, Term.ESubst (l,r)) ->
+    | mult,  id_opt, (tyvars, sv, subs, Term.ESubst (l,r)) ->
       if is_same id_opt tgt_id 
       then f, []
-      else do1 f mult (sv, subs, l, r)          
+      else do1 f mult (tyvars, sv, subs, l, r)          
   in
  
   let s, subs = do_targets doit s targets in
@@ -446,7 +454,7 @@ let rewrite ~all
   s, subs
 
 (** Make a rewrite rule from a formula *)
-let form_to_rw_erule ?loc dir f : rw_erule = 
+let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule = 
   let vs, f = Term.decompose_forall f in
   let vs = Vars.Sv.of_list vs in
 
@@ -468,10 +476,12 @@ let form_to_rw_erule ?loc dir f : rw_erule =
       Term.ESubst (t2,t1)
   in
 
-  (* We check that the rule is valid *)
-  check_erule (vs, subs, e);
+  let rule = ty_vars, vs, subs, e in
 
-  vs, subs, e
+  (* We check that the rule is valid *)
+  check_erule rule;
+
+  rule
 
 (** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
     showing the rule validity. *)
@@ -480,21 +490,21 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
     : rw_erule * sequent list * Ident.t option = 
     match Args.convert_as_lsymb [Args.Theory rw_type] with
     | Some str when is_hyp_or_lemma str s ->
-      let id_opt, f = get_hyp_or_lemma str s in
+      let id_opt, ty_vars, f = get_hyp_or_lemma str s in
 
       (* We are using an hypothesis, hence no new sub-goals *)
       let premise = [] in
 
-      form_to_rw_erule dir f, premise, id_opt
+      form_to_rw_erule ~ty_vars dir f, premise, id_opt
 
     | _ -> 
-      let conv_env = Theory.{ table = TraceSequent.table s;
-                              cntxt = InGoal; } in      
+      let cenv = Theory.{ table = TraceSequent.table s;
+                              cntxt = InGoal; } in 
       let subst = Theory.subst_of_env (TraceSequent.env s) in
-      let f = Theory.convert conv_env subst rw_type Type.Boolean in
+      let f = Theory.convert cenv (TS.ty_vars s) subst rw_type Type.Boolean in
 
       (* create new sub-goal *)
-      let premise = [TraceSequent.set_conclusion f s] in
+      let premise = [TraceSequent.set_goal f s] in
 
       form_to_rw_erule ~loc:(L.loc rw_type) dir f, premise, None
   in
@@ -576,7 +586,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
 let revert (hid : Ident.t) (s : sequent) : sequent =
   let f = Hyps.by_id hid s in
   let s = Hyps.remove hid s in
-  TS.set_conclusion (Term.mk_impl ~simpl:false f (TS.conclusion s)) s
+  TS.set_goal (Term.mk_impl ~simpl:false f (TS.goal s)) s
 
 let revert_str (hyp_name : lsymb) s =
   let hid,_ = Hyps.by_name hyp_name s in
@@ -643,12 +653,12 @@ let timestamp_case (ts : Term.timestamp) s : sequent list =
       let ts_subst = 
         if indices = [] then [Term.ESubst (ts, ts_case)] else [] 
       in
-      let goal = Term.subst ts_subst (TS.conclusion s) in 
+      let goal = Term.subst ts_subst (TS.goal s) in 
       let prem = 
         Term.mk_exists indices 
           (Term.Atom (`Timestamp (`Eq,ts, ts_case)))
       in
-      TS.set_conclusion (Term.mk_impl ~simpl:false prem goal) s
+      TS.set_goal (Term.mk_impl ~simpl:false prem goal) s
     ) cases
 
 (** Case analysis on disjunctions in an hypothesis.
@@ -714,9 +724,9 @@ let case_cond orig vars c t e s : sequent list =
     let case_goal = 
       Term.mk_impl ~simpl:false 
         prem
-        (Term.subst case_subst (TS.conclusion s))
+        (Term.subst case_subst (TS.goal s))
     in
-    TS.set_conclusion case_goal s
+    TS.set_goal case_goal s
   in    
 
   [ mk_case vars' then_t then_c;
@@ -746,8 +756,8 @@ let conditional_case (m : Term.message) s : sequent list =
 
 let boolean_case b s : sequent list =
   let do_one b_case b_val =
-    let g = Term.subst [Term.ESubst (b, b_val)] (TS.conclusion s) in
-    TS.set_conclusion (Term.mk_impl ~simpl:false b_case g) s 
+    let g = Term.subst [Term.ESubst (b, b_val)] (TS.goal s) in
+    TS.set_goal (Term.mk_impl ~simpl:false b_case g) s 
   in
   [ do_one b Term.mk_true;
     do_one (Term.mk_not ~simpl:false b) Term.mk_false]
@@ -765,8 +775,7 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     List.map (fun (CHyp _, ss) -> ss) (hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    let env, tbl = TraceSequent.env s, TraceSequent.table s in
-    match Args.convert_args tbl env args Args.(Sort ETerm) with
+    match convert_args s args Args.(Sort ETerm) with
     | Args.Arg (ETerm (ty, f, _)) -> 
       begin
         match Type.kind ty with
@@ -972,7 +981,7 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
 (*------------------------------------------------------------------*)
 (** [do_intro name t judge] introduces the topmost variable of the goal. *)
 let rec do_intro_var (s : TraceSequent.t) : Args.ip_handler * sequent =
-  let form = TraceSequent.conclusion s in
+  let form = TraceSequent.goal s in
   match form with
   | ForAll ((Vars.EVar x) :: vs,f) ->
     let x' = Vars.make_new_from x in
@@ -985,38 +994,38 @@ let rec do_intro_var (s : TraceSequent.t) : Args.ip_handler * sequent =
 
     let new_formula = Term.subst subst f in
     ( `Var (Vars.EVar x'),
-      TraceSequent.set_conclusion new_formula s )
+      TraceSequent.set_goal new_formula s )
 
   | ForAll ([],f) ->
     (* FIXME: this case should never happen. *)
-    do_intro_var (TraceSequent.set_conclusion f s)
+    do_intro_var (TraceSequent.set_goal f s)
 
   | _ -> soft_failure Tactics.NothingToIntroduce
 
 (** [do_intro name t judge] introduces the topmost element of the goal. *)
 let rec do_intro (s : TraceSequent.t) : Args.ip_handler * sequent =
-  let form = TraceSequent.conclusion s in
+  let form = TraceSequent.goal s in
   match form with
   | ForAll ([],f) ->
     (* FIXME: this case should never happen. *)
-    do_intro (TraceSequent.set_conclusion f s)
+    do_intro (TraceSequent.set_goal f s)
 
   | ForAll _ -> do_intro_var s 
 
   | Fun (fs,_,[lhs;rhs]) when fs = Term.f_impl ->
     let id, s = Hyps.add_i Args.Unnamed lhs s in
-    let s = TraceSequent.set_conclusion rhs s in
+    let s = TraceSequent.set_goal rhs s in
     ( `Hyp id, s )
 
   | Fun (fs,_,[f]) when fs = Term.f_not ->
     let id, s = Hyps.add_i Args.Unnamed f s in
-    let s = TraceSequent.set_conclusion Term.mk_false s in
+    let s = TraceSequent.set_goal Term.mk_false s in
     ( `Hyp id, s )
 
   | Atom (`Message (`Neq,u,v)) ->
     let h = `Message (`Eq,u,v) in
     let id, s = Hyps.add_i Args.Unnamed (Atom h) s in 
-    let s = TraceSequent.set_conclusion Term.mk_false s in
+    let s = TraceSequent.set_goal Term.mk_false s in
     ( `Hyp id, s )
 
   | _ -> soft_failure Tactics.NothingToIntroduce
@@ -1075,12 +1084,12 @@ let () =
     quantified variables in the conclusion of the judgment,
     using [ths] as existential witnesses. *)
 let goal_exists_intro  ths (s : TraceSequent.t) =
-  match TraceSequent.conclusion s with
+  match TraceSequent.goal s with
   | Exists (vs,f) when List.length ths = List.length vs ->
     let table = TraceSequent.table s in
-    let nu = Theory.parse_subst table (TraceSequent.env s) vs ths in
+    let nu = Theory.parse_subst table (TS.ty_vars s) (TS.env s) vs ths in
     let new_formula = Term.subst nu f in 
-    [TraceSequent.set_conclusion new_formula s]
+    [TraceSequent.set_goal new_formula s]
   | _ ->
       soft_failure (Tactics.Failure "cannot introduce exists")
 
@@ -1171,10 +1180,10 @@ let generalize ~loc (v : Vars.evar) s : sequent =
     soft_failure (Failure (Fmt.str "%a appears in hypotheses %a" 
                              Vars.pp_e v (Fmt.list Ident.pp) bad_hyps));
 
-  let goal = Term.mk_forall [v] (TraceSequent.conclusion s) in
+  let goal = Term.mk_forall [v] (TraceSequent.goal s) in
   let env = Vars.rm_evar env v in
  
-  TraceSequent.set_conclusion goal s
+  TraceSequent.set_goal goal s
   |> TraceSequent.set_env env
 
 
@@ -1182,8 +1191,7 @@ let generalize_tac (args : Args.parser_arg list) s sk fk =
   try
     let s = 
       List.fold_left (fun s arg -> 
-          let tbl, env = TraceSequent.table s, TraceSequent.env s in
-          match Args.convert_args tbl env [arg] (Args.Sort Args.ETerm) with
+          match convert_args s [arg] (Args.Sort Args.ETerm) with 
           | Args.Arg (Args.ETerm (_, Term.Var v, loc)) ->
             generalize ~loc (Vars.EVar v) s
 
@@ -1215,7 +1223,7 @@ let induction s  =
          "conclusion must be an universal quantification over a timestamp")
   in
 
-  match TraceSequent.conclusion s with
+  match TraceSequent.goal s with
   | ForAll ((Vars.EVar v)::vs,f) ->
     begin
       match Vars.ty v with
@@ -1242,7 +1250,7 @@ let induction s  =
           let goal = Term.mk_impl ih f' in
 
           let s = TraceSequent.set_env env s
-                  |> TraceSequent.set_conclusion goal in
+                  |> TraceSequent.set_goal goal in
           [s]
         )
       | _ -> error ()
@@ -1260,7 +1268,7 @@ let () = T.register "induction"
 (*------------------------------------------------------------------*)
 (** [assumption judge sk fk] proves the sequent using the axiom rule. *)
 let assumption (s : TraceSequent.t) =
-  let goal = TraceSequent.conclusion s in
+  let goal = TraceSequent.goal s in
   if goal = Term.mk_true || 
      Hyps.is_hyp goal s || 
      Hyps.is_hyp Term.mk_false s then
@@ -1283,11 +1291,16 @@ let () = T.register "assumption"
   * eliminating its universally quantified variables using [ths],
   * and eliminating implications (and negations) underneath.
   * If given an introduction patterns, apply it to the generated hypothesis. *)
-let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
+let use ip (name : lsymb) (ths : Theory.term list) (s : TraceSequent.t) =
   (* Get formula to apply. *)
-  let _, f = get_hyp_or_lemma name s in
+  let _, ty_vars, f = get_hyp_or_lemma name s in
 
-  (* Get universally quantifier variables, verify that lengths match. *)
+  (* FIXME *)
+  if ty_vars <> [] then
+    Tactics.(soft_failure (Failure "free type variables not supported with \
+                                    use tactic")) ;
+
+  (* Get universally quantified variables, verify that lengths match. *)
   let uvars,f = match f with
     | ForAll (uvars,f) -> uvars,f
     | _ -> [],f in
@@ -1297,7 +1310,7 @@ let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
 
   let subst =
     let table = TraceSequent.table s in
-    Theory.parse_subst table (TraceSequent.env s) uvars ths in
+    Theory.parse_subst table (TS.ty_vars s) (TS.env s) uvars ths in
 
   (* Formula with universal quantifications introduced. *)
   let f = Term.subst subst f in
@@ -1305,11 +1318,11 @@ let use ip (name : lsymb) (ths:Theory.term list) (s : TraceSequent.t) =
   (* Compute subgoals by introducing implications on the left. *)
   let rec aux subgoals = function
     | Fun (fs,_,[h;c]) when fs = Term.f_impl ->
-        let s' = TraceSequent.set_conclusion h s in
+        let s' = TraceSequent.set_goal h s in
         aux (s'::subgoals) c
 
     | Fun (fs,_,[h]) when fs = Term.f_not ->
-        let s' = TraceSequent.set_conclusion h s in
+        let s' = TraceSequent.set_goal h s in
         List.rev (s'::subgoals)
 
     | f ->
@@ -1366,17 +1379,16 @@ let () =
   * to be proved, and the other where [f] is assumed. *)
 let tac_assert (args : Args.parser_arg list) s sk fk =
   try
-    let env, tbl = TraceSequent.env s, TraceSequent.table s in
     let ip, f = match args with
       | [f] -> None, f
       | [f; Args.SimplPat ip] -> Some ip, f
       | _ -> Tactics.(hard_failure (Failure "improper argument")) in
 
-    let f = match Args.convert_args tbl env [f] Args.(Sort Boolean) with
+    let f = match convert_args s [f] Args.(Sort Boolean) with
       | Args.(Arg (Boolean f)) -> f
       | _ -> Tactics.(hard_failure (Failure "improper argument")) in
 
-    let s1 = TraceSequent.set_conclusion f s in
+    let s1 = TraceSequent.set_goal f s in
     let id, s2 = Hyps.add_i Args.AnyName f s in
     let s2 = match ip with
       | Some ip -> do_simpl_pat (`Hyp id) ip s2
@@ -1402,7 +1414,7 @@ let () =
 (** {2 Structural Tactics} *)
 
 let happens_premise (s : sequent) (a : Term.timestamp) =
-  TraceSequent.set_conclusion (Term.Atom (`Happens a)) s
+  TraceSequent.set_goal (Term.Atom (`Happens a)) s
 
 (*------------------------------------------------------------------*)
 let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
@@ -1411,9 +1423,9 @@ let depends Args.(Pair (Timestamp a1, Timestamp a2)) s =
     let table = TraceSequent.table s in    
     if Action.(depends (of_term n1 is1 table) (of_term n2 is2 table)) then
         let atom = (Atom (`Timestamp (`Lt,a1,a2))) in       
-        let g = Term.mk_impl ~simpl:false atom (TraceSequent.conclusion s) in
+        let g = Term.mk_impl ~simpl:false atom (TraceSequent.goal s) in
         [happens_premise s a2; 
-         TraceSequent.set_conclusion g s]
+         TraceSequent.set_goal g s]
     else
       soft_failure
         (Tactics.NotDepends (Fmt.strf "%a" Term.pp a1,
@@ -1441,7 +1453,7 @@ let congruence (s : TraceSequent.t) : bool Utils.timeout_r =
   | None -> Utils.Result true
   | Some s ->
     let conclusions =
-      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
+      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.goal s)) 
     in
 
     let term_conclusions =
@@ -1487,7 +1499,7 @@ let constraints (s : TraceSequent.t) =
   | None -> Utils.Result true
   | Some s ->
     let conclusions =
-      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.conclusion s)) 
+      Utils.odflt [] (Term.disjunction_to_literals (TraceSequent.goal s)) 
     in
     let trace_conclusions =
       List.fold_left (fun acc conc -> match conc with
@@ -1549,8 +1561,8 @@ let namelength Args.(Pair (Message (tn, tyn), Message (tm, tym))) s =
                                   Term.mk_len (Name n),
                                   Term.mk_len (Name m)))) in
 
-    [TraceSequent.set_conclusion
-       (Term.mk_impl ~simpl:false f (TraceSequent.conclusion s)) s]
+    [TraceSequent.set_goal
+       (Term.mk_impl ~simpl:false f (TraceSequent.goal s)) s]
 
   | _ -> Tactics.(soft_failure (Failure "expected names"))
 
@@ -1820,8 +1832,8 @@ let fresh (Args.String m) s =
         let phi_indirect = mk_fresh_indirect cntxt env ns t in
         let phi = Term.mk_or phi_direct phi_indirect in
 
-        let goal = Term.mk_impl ~simpl:false phi (TraceSequent.conclusion s) in
-        [TraceSequent.set_conclusion goal s]
+        let goal = Term.mk_impl ~simpl:false phi (TraceSequent.goal s) in
+        [TraceSequent.set_goal goal s]
         (* all_left_introductions s [new_hyp,""] *)
 
       | _ -> soft_failure
@@ -1972,10 +1984,10 @@ let exec (Args.Timestamp a) s =
   in
   [happens_premise s a ;
 
-   TraceSequent.set_conclusion Term.(Macro (exec_macro,[],a)) s;
+   TraceSequent.set_goal Term.(Macro (exec_macro,[],a)) s;
   
-    TraceSequent.set_conclusion
-      (Term.mk_impl ~simpl:false formula (TraceSequent.conclusion s)) s]
+    TraceSequent.set_goal
+      (Term.mk_impl ~simpl:false formula (TraceSequent.goal s)) s]
 
 let () =
   T.register_typed "executable"
@@ -1997,7 +2009,7 @@ let fa s =
   let unsupported () =
     Tactics.(soft_failure (Failure "equality expected")) in
 
-  match TraceSequent.conclusion s with
+  match TraceSequent.goal s with
     | Term.Atom (`Message (`Eq,u,v)) ->
         begin match u,v with
 
@@ -2005,15 +2017,15 @@ let fa s =
             when f = Term.f_ite && f' = Term.f_ite ->
             let subgoals =
               let open TraceSequent in
-              [ s |> set_conclusion (Term.mk_impl c c') ;
+              [ s |> set_goal (Term.mk_impl c c') ;
 
-                s |> set_conclusion (Term.mk_impl c' c) ;
+                s |> set_goal (Term.mk_impl c' c) ;
 
-                s |> set_conclusion (Term.mk_impls
+                s |> set_goal (Term.mk_impls
                                        (if c = c' then [c] else [c;c'])
                                        (Term.Atom (`Message (`Eq,t,t'))));
 
-                s |> set_conclusion (Term.mk_impls 
+                s |> set_goal (Term.mk_impls 
                                        [Term.mk_not c;
                                         Term.mk_not c']
                                        (Term.Atom (`Message (`Eq,e,e')))) ]
@@ -2033,7 +2045,7 @@ let fa s =
             let t = Term.subst subst t in
             let t' = Term.subst subst t' in
             let subgoals =
-              [ TraceSequent.set_conclusion
+              [ TraceSequent.set_goal
                   (Term.Atom (`Message (`Eq,t,t'))) s ]
             in
             subgoals
@@ -2081,15 +2093,15 @@ let fa s =
 
             let subgoals =
               let open TraceSequent in
-              [ set_conclusion
+              [ set_goal
                   (Term.mk_impl c (Term.mk_exists unused c')) s ;
 
-                set_conclusion (Term.mk_impl c' c) s;
+                set_goal (Term.mk_impl c' c) s;
 
-                set_conclusion (Term.mk_impls [c;c']
+                set_goal (Term.mk_impls [c;c']
                                   (Atom (`Message (`Eq,t,t')))) s;
 
-                set_conclusion (Term.Atom (`Message (`Eq,e,e'))) s]
+                set_goal (Term.Atom (`Message (`Eq,e,e'))) s]
             in
             subgoals
 
@@ -2115,7 +2127,7 @@ let () =
 (** New goal simplification *)
     
 let new_simpl ~congr ~constr s =
-  let goals = Term.decompose_ands (TraceSequent.conclusion s) in
+  let goals = Term.decompose_ands (TraceSequent.goal s) in
   let goals = List.filter_map (fun goal ->
       if Hyps.is_hyp goal s || Term.f_triv goal then None
       else match goal with
@@ -2131,7 +2143,7 @@ let new_simpl ~congr ~constr s =
 
         | _ -> Some goal
     ) goals in
-  [TraceSequent.set_conclusion (Term.mk_ands goals) s]
+  [TraceSequent.set_goal (Term.mk_ands goals) s]
 
 
 (*------------------------------------------------------------------*)
@@ -2306,7 +2318,7 @@ let () =
 
 (*------------------------------------------------------------------*)
     
-let apply (f : Term.message) (s : TraceSequent.sequent) =
+let apply ty_vars (f : Term.message) (s : TraceSequent.sequent) =
   let vars, f = Term.decompose_forall f in
   let vars = Vars.Sv.of_list vars in
   let forms = List.rev (Term.decompose_impls f) in 
@@ -2315,19 +2327,22 @@ let apply (f : Term.message) (s : TraceSequent.sequent) =
   if not (Vars.Sv.subset vars (Term.fv f)) then
     soft_failure ApplyBadInst;
   
-  let goal = TraceSequent.conclusion s in
+  let goal = TraceSequent.goal s in
   
   let mv =
-    Term.Match.try_match goal { p_term = f; p_vars = vars; }
+    Term.Match.try_match goal 
+      { pat_tyvars = ty_vars;
+        pat_vars = vars; 
+        pat_term = f; }
   in
 
   match mv with
-  | None -> soft_failure ApplyMatchFailure
-  | Some mv ->
+  | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
+  | `Match mv ->
     let subst = Term.Match.to_subst mv in
 
     let goals = List.map (Term.subst subst) subs in
-    List.map (fun g -> TraceSequent.set_conclusion g s) goals
+    List.map (fun g -> TraceSequent.set_goal g s) goals
 
 (** [apply_in f hyp s] tries to match a premise of [f] with the conclusion of
     [hyp], and replaces [hyp] by the conclusion of [f].
@@ -2337,7 +2352,7 @@ let apply (f : Term.message) (s : TraceSequent.sequent) =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B` 
 *)
-let apply_in (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
+let apply_in ty_vars (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
   let fvars, f = Term.decompose_forall form in
   let fvars = Vars.Sv.of_list fvars in
   let forms = List.rev (Term.decompose_impls f) in 
@@ -2350,7 +2365,15 @@ let apply_in (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
   let try1 fprem =
     if not (Vars.Sv.subset fvars (Term.fv fprem)) then None
     else
-      Term.Match.try_match hconcl { p_term = fprem; p_vars = fvars; }
+      let pat = Term.Match.{
+          pat_tyvars = ty_vars; 
+          pat_vars = fvars;
+          pat_term = fprem; 
+        } in
+      
+      match Term.Match.try_match hconcl pat with
+      | `NoMatch | `FreeTyv -> None
+      | `Match mv -> Some mv
   in
 
   (* try to match a premise of [form] with [hconcl] *)
@@ -2380,7 +2403,7 @@ let apply_in (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
     in
 
     List.map (fun prem ->
-        TraceSequent.set_conclusion prem s
+        TraceSequent.set_goal prem s
       ) (hprems @               (* remaining premises of [hyp] *)
          fprems_other)          (* remaining premises of [form] *)
     @
@@ -2389,20 +2412,20 @@ let apply_in (form : Term.message) (hyp : Ident.t) (s : TraceSequent.sequent) =
 
 (** Parse apply tactic arguments *)
 let p_apply_args (args : Args.parser_arg list) (s : TraceSequent.sequent)
-  : TraceSequent.t list * Term.message * target =
+  : sequent list * Type.tvars * Term.message * target =
   match args with
   | [Args.ApplyIn (f,in_opt)] ->
-    let subgoals, f = match Args.convert_as_lsymb [Args.Theory f] with
+    let subgoals, ty_vars, f = match Args.convert_as_lsymb [Args.Theory f] with
       | Some str when is_hyp_or_lemma str s ->
-        let _, f = get_hyp_or_lemma str s in
-        [], f
+        let _, ty_vars, f = get_hyp_or_lemma str s in
+        [], ty_vars, f
 
       | _ ->
-        let env, tbl = TraceSequent.env s, TraceSequent.table s in
-        match Args.convert_args tbl env args Args.(Sort Boolean) with
+        match convert_args s args Args.(Sort Boolean) with
         | Args.Arg (Boolean f) ->
-          let subgoal = TraceSequent.set_conclusion f s in
-          [subgoal], f
+          let subgoal = TraceSequent.set_goal f s in
+          [subgoal], [], f
+
         | _ -> Tactics.(hard_failure (Failure "improper arguments"))
     in
 
@@ -2410,7 +2433,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TraceSequent.sequent)
       | Some lsymb -> `Hyp (fst (Hyps.by_name lsymb s))
       | None       -> `Goal
     in
-    subgoals, f, target
+    subgoals, ty_vars, f, target
 
   | _ -> Tactics.(hard_failure (Failure "improper arguments"))
 
@@ -2418,10 +2441,10 @@ let p_apply_args (args : Args.parser_arg list) (s : TraceSequent.sequent)
 let apply_tac (args : Args.parser_arg list) s
     (sk : TraceSequent.t list Tactics.sk) fk =
   try
-    let subgoals, f, target = p_apply_args args s in
+    let subgoals, ty_vars, f, target = p_apply_args args s in
     match target with
-    | `Goal   -> sk (subgoals @ apply f s      ) fk
-    | `Hyp id -> sk (subgoals @ apply_in f id s) fk
+    | `Goal   -> sk (subgoals @ apply ty_vars f s      ) fk
+    | `Hyp id -> sk (subgoals @ apply_in ty_vars f id s) fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
@@ -2533,7 +2556,7 @@ let () =
 
 let apply_yes_no_if b s =
   let cntxt = mk_trace_cntxt s in
-  let conclusion = TraceSequent.conclusion s in
+  let conclusion = TraceSequent.goal s in
   (* search for the first occurrence of an if-then-else in [elem] *)
   let iter = new Iter.get_ite_term ~cntxt in
   List.iter iter#visit_message [conclusion];
@@ -2553,8 +2576,8 @@ let apply_yes_no_if b s =
         inside a context that bind variables is not supported")
     else
       let branch, trace_sequent =
-        if b then (t, TraceSequent.set_conclusion c s)
-        else (e, TraceSequent.set_conclusion (Term.mk_not c) s)
+        if b then (t, TraceSequent.set_goal c s)
+        else (e, TraceSequent.set_goal (Term.mk_not c) s)
       in
       let subst = [Term.ESubst (Term.mk_ite c t e,branch)] in
       [ trace_sequent; TraceSequent.subst subst s ]
@@ -2726,9 +2749,9 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
 
   let goal =
     Term.mk_impls [eq_indices; new_f; le_cnstr]
-      (TraceSequent.conclusion sequent) 
+      (TraceSequent.goal sequent) 
   in
-  TraceSequent.set_conclusion goal sequent
+  TraceSequent.set_goal goal sequent
 
 let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
   (* The components of the direct case may feature variables that are
@@ -2765,9 +2788,9 @@ let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
   in
 
   let goal = 
-    Term.mk_impls [eq_indices; eq_hashes] (TS.conclusion s) 
+    Term.mk_impls [eq_indices; eq_hashes] (TS.goal s) 
   in
-  TraceSequent.set_conclusion goal s
+  TraceSequent.set_goal goal s
 
 let euf_apply_facts drop_head s
     ((head_fn, key, mess, sign, allow_functions, _, _) as p) =
@@ -2806,8 +2829,8 @@ let euf_apply
 
   let (h,key,m,_,_,extra_goals,drop_head) as p = get_params table at in
   let extra_goals = List.map (fun x ->
-      TraceSequent.set_conclusion 
-        (Term.mk_impl x (TraceSequent.conclusion s)) s
+      TraceSequent.set_goal 
+        (Term.mk_impl x (TraceSequent.goal s)) s
     ) extra_goals in
 
   let tag_s =
@@ -2828,8 +2851,8 @@ let euf_apply
       | Type.(Message, Message) -> let f = Term.subst [
           ESubst (Term.Var uvarm,m);
           ESubst (Term.Var uvarkey,Term.Name key);] f in
-        [TraceSequent.set_conclusion
-           (Term.mk_impl f (TraceSequent.conclusion s)) s]
+        [TraceSequent.set_goal
+           (Term.mk_impl f (TraceSequent.goal s)) s]
       | _ -> assert false in
 
   (* we create the honest sources using the classical eufcma tactic *)
@@ -2938,8 +2961,8 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TraceSequent.t) =
 
   if f_coll = Term.mk_true then soft_failure Tactics.NoCollision;
 
-  let goal = Term.mk_impl ~simpl:false f_coll (TraceSequent.conclusion s) in
-  [TraceSequent.set_conclusion goal s]
+  let goal = Term.mk_impl ~simpl:false f_coll (TraceSequent.goal s) in
+  [TraceSequent.set_goal goal s]
 
 let () = T.register_typed "collision"
     ~general_help:"Collects all equalities between hashes \

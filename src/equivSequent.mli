@@ -44,10 +44,14 @@ val set_table  : t -> Symbols.table -> t
 (** Get the list of biterms describing the two frames. *)
 val goal : t -> Equiv.form
 
+val ty_vars : t -> Type.tvars
+
 (** Return a new equivalence judgment with the given biframe. *)
 val set_goal : t -> Equiv.form -> t
 
 val set_equiv_goal : t -> Equiv.equiv -> t
+
+val set_ty_vars : t -> Type.tvars -> t
 
 (** Get the list of biterms describing the hypothesis frames. *)
 val hyps : t -> hyps

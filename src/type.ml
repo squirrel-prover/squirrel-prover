@@ -21,6 +21,7 @@ type ekind = EKind : 'a kind -> ekind
 (** Type variables *)
 
 type tvar = Ident.t
+type tvars = tvar list
 
 let pp_tvar fmt id = Fmt.pf fmt "'%a" Ident.pp id
 
@@ -30,7 +31,8 @@ let ident_of_tvar id = id
 (*------------------------------------------------------------------*)
 (** Variable for type inference *)
 
-type univar = Ident.t
+type univar  = Ident.t
+type univars = univar list
 
 let pp_univar fmt u = Fmt.pf fmt "'_%a" Ident.pp u
   
@@ -162,6 +164,8 @@ let pp_kinde ppf (EKind t) = pp_kind ppf t
 
 (** Type of a function symbol of index arity i: 
     ∀'a₁ ... 'aₙ, τ₁ × ... × τₙ → τ 
+
+    Invariant: [fty_out] tvars and univars must be bounded by [fty_vars].
 *)
 type 'a ftype_g = {
   fty_iarr : int;             (** i *)
@@ -188,7 +192,7 @@ let mk_ftype iarr vars args out : ftype = {
 
 module Mid = Ident.Mid
                
-(** A substitution from unification variables to (existential) types. *)
+(** A type substitution*)
 type tsubst = {
   ts_univar : message ty Ident.Mid.t;
   ts_tvar   : message ty Ident.Mid.t;
@@ -197,6 +201,9 @@ type tsubst = {
 let tsubst_empty =
   { ts_univar = Mid.empty;
     ts_tvar   = Mid.empty; }
+
+let tsubst_add_tvar   s tv ty = { s with ts_tvar   = Mid.add tv ty s.ts_tvar; }
+let tsubst_add_univar s tu ty = { s with ts_univar = Mid.add tu ty s.ts_univar; }
   
 let tsubst : type a. tsubst -> a ty -> a ty = fun s t ->
   match t with
@@ -232,6 +239,8 @@ module Infer : sig
     
   val mk_univar : env -> univar
 
+  val open_tvars : env -> tvars -> univars * tsubst
+
   val norm : env -> 'a ty -> 'a ty
                          
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
@@ -252,6 +261,21 @@ end = struct
     let ety = TUnivar uv in
     env := Mid.add uv ety !env;
     uv
+
+  let open_tvars ty_env tvars =
+    let vars_f = List.map (fun _ ->
+        mk_univar ty_env
+      ) tvars in
+
+    (* create substitution refreshing all type variables *)
+    let ts_tvar =
+      List.fold_left2 (fun ts_tvar id id_f ->        
+          Mid.add id (TUnivar id_f) ts_tvar
+        ) Mid.empty tvars vars_f
+    in  
+    let ts = { tsubst_empty with ts_tvar } in
+    vars_f, ts
+
 
   (* Univar are maximal for this ordering *)
   let compare : type a b. a ty -> b ty -> int =
@@ -312,17 +336,7 @@ end
 (** {2 Freshen function types} *)
 
 let open_ftype (ty_env : Infer.env) (fty : ftype) : ftype_op =
-  let vars_f = List.map (fun _ ->
-      Infer.mk_univar ty_env
-    ) fty.fty_vars in
-  
-  (* create substitution refreshing all type variables in [fty] *)
-  let ts_tvar =
-    List.fold_left2 (fun ts_tvar id id_f ->        
-        Mid.add id (TUnivar id_f) ts_tvar
-      ) Mid.empty fty.fty_vars vars_f
-  in  
-  let ts = { tsubst_empty with ts_tvar } in
+  let vars_f, ts = Infer.open_tvars ty_env fty.fty_vars in
 
   (* compute the new function type *)
   { fty with fty_vars = vars_f;

@@ -711,10 +711,12 @@ gname:
 | UNDERSCORE { P_unknown }
 
 goal_reach:
-| s=system n=gname args=args COLON f=term 
-    { let f_i = Theory.ForAll (args, f) in
-      let fa = L.mk_loc (L.loc f) f_i in
-      let goal_cnt = Decl.{gsystem = s; gform = fa; } in
+| s=system n=gname tyvs=ty_args args=args COLON f=term 
+    { let goal_cnt = Decl.{ g_system = s; 
+                            g_tyvars = tyvs; 
+                            g_vars = args; 
+                            g_form = f; } 
+      in
       n, goal_cnt }
 
 goal_i:

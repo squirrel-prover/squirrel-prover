@@ -38,12 +38,12 @@ type bty_decl = { bty_name  : lsymb ;
 (** Information for a goal or axiom declaration *)
 type p_goal_name = P_unknown | P_named of lsymb
                      
-type p_goal_reach_cnt = { gsystem : SystemExpr.p_system_expr ;
-                          gform   : Theory.formula ; }
+type p_goal_reach_cnt = { g_system : SystemExpr.p_system_expr ;
+                          g_tyvars : lsymb list;
+                          g_vars   : Theory.bnds;
+                          g_form   : Theory.formula ; }
 
 type p_goal_reach = p_goal_name * p_goal_reach_cnt
-
-val pp_goal_reach : Format.formatter -> p_goal_reach -> unit
 
 (*------------------------------------------------------------------*)
 (** Information for a system declaration *)

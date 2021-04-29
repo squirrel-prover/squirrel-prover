@@ -1,7 +1,7 @@
 (** This module implement sequents used to prove trace properties.
     A sequent is made of:
     - a set of hypotheses;
-    - a conclusion formula;
+    - a goal formula;
     - an environment containing the sequent free variables.
 *)
 
@@ -17,10 +17,9 @@ type sequent = t
 
 val pp : Format.formatter -> sequent -> unit
 
-(** [init formula table] returns a sequent with an empty set of hypotheses, and 
-    the given formula as conclusion. *)
 val init : 
-  system:SystemExpr.system_expr -> Symbols.table -> message -> sequent
+  system:SystemExpr.system_expr -> ty_vars:Type.tvars ->
+  Symbols.table -> message -> sequent
   
 (** Get the system which the sequent is reasoning about. *)
 val system : sequent -> SystemExpr.system_expr
@@ -34,6 +33,8 @@ val set_system : SystemExpr.system_expr -> sequent -> sequent
 (** Change the table of a sequent. *)
 val set_table : Symbols.table -> sequent -> sequent
 
+val set_ty_vars : Type.tvar list -> sequent -> sequent
+
 (** Project diff-operators occurring in a sequent;
   * only makes sense when a sequent for a bi-system has just
   * been narrowed to a projected system. *)
@@ -46,11 +47,13 @@ val set_env : Vars.env -> sequent -> sequent
 (** [env s] returns the environment of the sequent. *)
 val env : sequent -> Vars.env
 
-(** [set_conclusion f s] set the conclusion formula of the sequent to [f]. *)
-val set_conclusion : message -> sequent -> sequent
+val ty_vars : sequent -> Type.tvar list
 
-(** [conclusion s] returns the conclusion formula of the sequent. *)
-val conclusion : sequent -> message
+(** Set the goal of the sequent. *)
+val set_goal : message -> sequent -> sequent
+
+(** Returns the goal of the sequent. *)
+val goal : sequent -> message
 
 
 (*------------------------------------------------------------------*)
@@ -123,7 +126,7 @@ val maximal_elems :
 (** {2 Misc} *)
 
 (** [subst subst s] returns the sequent [s] where the substitution has
-    been applied to all hypotheses and the conclusion.
+    been applied to all hypotheses and the goal.
     It removes trivial equalities (e.g x=x). *)
 val subst : Term.subst -> sequent -> sequent
 
