@@ -33,7 +33,7 @@ Qed.
 
 goal _:
 happens(O) => 
-frame@O = <frame@pred(O),<exec@O,if exec@O then output@O else zero>>.
+frame@O = <frame@pred(O),<of_bool(exec@O),if exec@O then output@O else zero>>.
 Proof. 
   intro *.
   by expand frame.

@@ -86,7 +86,7 @@ let get_def :
         Term.mk_pair
           (Term.Macro (symb, [], Term.Pred a))
           (Term.mk_pair
-             (Term.Macro (Term.exec_macro, [], a))
+             (Term.mk_of_bool (Term.Macro (Term.exec_macro, [], a)))
              (Term.mk_ite
                 (Term.Macro (Term.exec_macro, [], a))
                 (Term.Macro (Term.out_macro, [], a))

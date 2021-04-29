@@ -292,6 +292,8 @@ val f_pair   : fsymb
 val f_fst    : fsymb
 val f_snd    : fsymb
 
+val f_of_bool   : fsymb
+
 val f_len    : fsymb
 val f_zeroes : fsymb
   
@@ -308,13 +310,14 @@ val mk_fun :
   Type.message term list ->
   Type.message term
     
-val mk_true   : message
-val mk_false  : message
-val mk_zero   : message
-val mk_fail   : message
-val mk_len    : message -> message
-val mk_zeroes : message -> message
-val mk_pair   : message -> message -> message
+val mk_true    : message
+val mk_false   : message
+val mk_zero    : message
+val mk_fail    : message
+val mk_len     : message -> message
+val mk_zeroes  : message -> message
+val mk_of_bool : message -> message
+val mk_pair    : message -> message -> message
  
 (*------------------------------------------------------------------*)
 (** {3 For messages} *)

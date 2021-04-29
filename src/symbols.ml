@@ -615,20 +615,15 @@ let fs_succ = mk_fsymb "succ" 1
 
 (** Pairing *)
 
-let fs_pair =
-  let tyv1, tyv2 = Type.mk_tvar "t1", Type.mk_tvar "t2" in
-  let tyvar1, tyvar2 = Type.TVar tyv1, Type.TVar tyv2 in
-
-  let fty = Type.mk_ftype
-      0 [tyv1; tyv2]
-      [tyvar1; tyvar2]
-      Type.Message
-  in
-  mk_fsymb ~fty "pair" (-1)
+let fs_pair = mk_fsymb "pair" 2
 
 let fs_fst  = mk_fsymb "fst" 1
 let fs_snd  = mk_fsymb "snd" 1
 
+(** Boolean to Message *)
+let fs_of_bool  = 
+  let fty = Type.mk_ftype 0 [] [Type.Boolean] Type.Message in
+  mk_fsymb ~fty "of_bool" (-1)
 
 (** Empty *)
 

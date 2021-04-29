@@ -326,6 +326,9 @@ val fs_pair   : fname t
 val fs_fst    : fname t
 val fs_snd    : fname t
 
+(** Boolean to Message *)
+val fs_of_bool : fname t
+
 (** Empty *)
 
 val fs_empty  : fname t

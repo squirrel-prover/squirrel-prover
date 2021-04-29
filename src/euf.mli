@@ -59,8 +59,7 @@ val check_key_ssc :
 
 (** [mk_rule proc head_fn key_n] create the euf rule associated to an given head
    function and key in a process.  If drop_head is true, the message stored do
-   not contain anymore the head_fn function, else they still do.  TODO:
-   memoisation *)
+   not contain anymore the head_fn function, else they still do. *)
 val mk_rule :
   ?elems:Equiv.equiv ->
   ?drop_head:bool ->

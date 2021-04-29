@@ -39,7 +39,7 @@ process Aenc =
  new r : R;
  let c : C = enc(mT,r,pk) in
  let d : T = dec(c,sk) in
- out (c, < c, d >).
+ out (c, empty).
 
 (*------------------------------------------------------------------*)
 (* Symmetric encryption *)
@@ -53,7 +53,7 @@ process Senc =
  new r : R;
  let c : C = sencr(mT,r,k) in
  let d : T = sdecr(c,k) in
- out (c, < c, d >).
+ out (c, empty).
 
 (*------------------------------------------------------------------*)
 (* Signatures encryption *)
@@ -67,5 +67,5 @@ process Signature =
  let mypk : LP = spk(sk) in
  let s : C = sign(mT,sk) in
  let ch : boolean = checksign(s, mypk) in
- out (c, < s, ch >).
+ out (c, empty).
 

@@ -608,12 +608,12 @@ let fa_expand t =
   in
 
   (* FIXME: this may no longer be necessary (type changes) *)
-  (* Remve ITE(b,true,false) coming from expansion of frame macro *)
+  (* Remve of_bool(b) coming from expansion of frame macro *)
   let filterBoolAsMsg =
     List.map
       (fun x -> match x with
-         | Term.Fun (f,_,[c;t;e]) 
-           when f = Term.f_ite && t = Term.mk_true && e = Term.mk_false -> c
+         | Term.Fun (f,_,[c]) 
+           when f = Term.f_of_bool -> c
          | _ -> x)
   in
   filterBoolAsMsg (aux (Term.head_normal_biterm t))

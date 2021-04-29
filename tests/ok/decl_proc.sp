@@ -26,7 +26,7 @@ process B (i : index) =
  new m : message;
  new l : L;
  new t : T;
- let a = <x,<m,l>> in
+ let a = <x,<m,from_L(l)>> in
  let y = gg(to_L(a)) in
  let z = ggi(i,L_to_T(y)) in
  out (c, from_T(z)).
@@ -40,7 +40,7 @@ process B2 (i : index) =
  new m : message;
  new l : L;
  new t : T;
- let a = <x,<m,l>> in
+ let a = <x,<m,from_L(l)>> in
  let y : L = gg(to_L(a)) in
  let z : T = ggi(i,L_to_T(y)) in
  out (c, from_T(z)).

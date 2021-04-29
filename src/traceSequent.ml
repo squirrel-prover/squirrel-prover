@@ -333,7 +333,6 @@ module Hyps
       ?(force=false) (id : Ident.t option) (s : sequent) (f : Term.message) =
     let recurse = (not (H.is_hyp f s.hyps)) && (Config.auto_intro ()) in
 
-    (* TODO: remove auto naming ? *)
     let id = match id with       
       | None -> H.fresh_id "D" s.hyps
       | Some id -> id in

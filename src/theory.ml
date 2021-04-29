@@ -968,16 +968,12 @@ and conv_app :
             Term.Macro (ms,[],get_at ts_opt)
 
           | Input | Output | Frame ->
-            (* FIXME I am not sure of the location to use in
-               check_arity_i below  *)
             check_arity_i (L.loc f) "input" (List.length l) 0 ;
             (* TODO: subtypes *)
             let ms = Term.mk_isymb s ty_out [] in
             Term.Macro (ms, [], get_at ts_opt)
 
           | Cond | Exec ->
-            (* FIXME: I am not sure of the location to use in
-                check_arity_i below  *)
             check_arity_i (L.loc f) "cond" (List.length l) 0 ;
             let ms = Term.mk_isymb s ty_out [] in
             Term.Macro (ms, [], get_at ts_opt)
@@ -1111,9 +1107,6 @@ let check_signature table checksign pk =
   let correct_type = match def checksign, def pk  with
     | (_,Symbols.CheckSign), (_,Symbols.PublicKey) -> true
     | _ -> false
-    (* | exception Not_found ->
-     *   let s = Symbols.to_string checksign in
-     *   conv_err (Undefined (s ^ " or " ^ to_string pk)) *)
   in
   if correct_type then
     match Symbols.Function.get_data checksign table with

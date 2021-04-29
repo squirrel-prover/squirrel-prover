@@ -185,6 +185,9 @@ let f_pair   = mk Symbols.fs_pair
 let f_fst    = mk Symbols.fs_fst
 let f_snd    = mk Symbols.fs_snd
 
+(** Boolean to Message *)
+let f_of_bool = mk Symbols.fs_of_bool
+
 (** Empty *)
 
 let empty =
@@ -226,6 +229,8 @@ let mk_ite ?(simpl=true) c t e = match c with
   | t when t = mk_true  && simpl -> t
   | t when t = mk_false && simpl -> e
   | _ -> mk_fbuiltin Symbols.fs_ite [] [c;t;e]
+
+let mk_of_bool t = mk_fbuiltin Symbols.fs_of_bool [] [t]
 
 (*------------------------------------------------------------------*)
 (** {3 For formulas} *)

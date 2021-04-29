@@ -271,13 +271,6 @@ let () =
            with (Symbols.SymbError (_,
                                     Multiple_declarations "c")) -> raise Ok)
     end ;
-    (* TODO: this test is no longer possible because we must provid locations *)
-    (* "Action creation", `Quick, begin fun () ->
-     *   let table = parse_theory_test ~test "tests/alcotest/actions.sp" in
-     *   ignore (Action.find_symbol "IOIO1" table) ;
-     *   ignore (Action.find_symbol "IOIO2" table)
-     *   (\* TODO test resulting action structure *\)
-     * end ; *)
     "Let in actions", `Quick, begin fun () ->
       ignore (parse_theory_test ~test "tests/alcotest/action_let.sp"
               : Symbols.table )
