@@ -74,21 +74,21 @@ let error_handler loc k f a =
 (** {Goals} *)
 
 module Goal = struct
-  type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
+  type t = Trace of TS.t | Equiv of ES.t
   let get_env = function
-    | Trace j -> TraceSequent.env j
-    | Equiv j -> EquivSequent.env j
+    | Trace j -> TS.env j
+    | Equiv j -> ES.env j
   let get_table = function
-    | Trace j -> TraceSequent.table j
-    | Equiv j -> EquivSequent.table j
+    | Trace j -> TS.table j
+    | Equiv j -> ES.table j
   let pp ch = function
-    | Trace j -> TraceSequent.pp ch j
-    | Equiv j -> EquivSequent.pp ch j
+    | Trace j -> TS.pp ch j
+    | Equiv j -> ES.pp ch j
   let pp_init ch = function
     | Trace j ->
-        assert (TraceSequent.env j = Vars.empty_env) ;
-        Term.pp ch (TraceSequent.goal j)
-    | Equiv j -> EquivSequent.pp_init ch j
+        assert (TS.env j = Vars.empty_env) ;
+        Term.pp ch (TS.goal j)
+    | Equiv j -> ES.pp_init ch j
 end
 
 type named_goal = string * Goal.t
@@ -262,15 +262,15 @@ module type Table_sig = sig
   val get : string -> TacticsArgs.parser_arg list -> judgment Tactics.tac
 
   val to_goal : judgment -> Goal.t
-  val from_trace : TraceSequent.t -> judgment
+  val from_trace : TS.t -> judgment
   val from_equiv : Goal.t -> judgment
 
   val table_name : string
   val pp_goal_concl : Format.formatter -> judgment -> unit
 end
 
-module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
-  type judgment = TraceSequent.t
+module TraceTable : Table_sig with type judgment = TS.t = struct
+  type judgment = TS.t
   let table = Hashtbl.create 97
 
   (* TODO:location *)
@@ -283,7 +283,7 @@ module TraceTable : Table_sig with type judgment = TraceSequent.t = struct
   let from_equiv e = assert false
 
   let table_name = "Trace"
-  let pp_goal_concl ppf j = Term.pp ppf (TraceSequent.goal j)
+  let pp_goal_concl ppf j = Term.pp ppf (TS.goal j)
 end
 
 module EquivTable : Table_sig with type judgment = Goal.t = struct
@@ -301,8 +301,8 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
 
   let table_name = "Equiv"
   let pp_goal_concl ppf j = match j with
-    | Goal.Trace j -> Term.pp ppf (TraceSequent.goal j)
-    | Goal.Equiv j -> Equiv.pp_form ppf (EquivSequent.goal j)
+    | Goal.Trace j -> Term.pp ppf (TS.goal j)
+    | Goal.Equiv j -> Equiv.pp_form ppf (ES.goal j)
 end
 
 (** Functor building AST evaluators for our judgment types. *)
@@ -552,7 +552,7 @@ struct
 
 end
 
-module rec TraceTactics : Tactics_sig with type judgment = TraceSequent.t =
+module rec TraceTactics : Tactics_sig with type judgment = TS.t =
   Prover_tactics(TraceTable)(TraceAST)
 
 module rec EquivTactics : Tactics_sig with type judgment = Goal.t =
@@ -654,7 +654,7 @@ let get_goal_formula (gname : lsymb) :
     List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved
   with
     | [(_,Goal.Trace f)] ->
-        assert (TraceSequent.env f = Vars.empty_env) ;
+        assert (TS.env f = Vars.empty_env) ;
         TS.system f, TS.ty_vars f, TS.goal f
 
     | [] -> 
@@ -728,7 +728,7 @@ let make_equiv_goal
 
   let se = SystemExpr.simple_pair table system_name in
 
-  Goal.Equiv (EquivSequent.init se table env EquivHyps.empty f)
+  Goal.Equiv (ES.init se table env EquivHyps.empty f)
 
 
 let make_equiv_goal_process ~table system_1 system_2 =
@@ -752,7 +752,7 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let id = EquivHyps.fresh_id "H" hyps in
   let _, hyps = EquivHyps.add ~force:false id hyp hyps in
 
-  Goal.Equiv (EquivSequent.init system table !env hyps goal)
+  Goal.Equiv (ES.init system table !env hyps goal)
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations

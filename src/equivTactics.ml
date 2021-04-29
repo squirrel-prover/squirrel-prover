@@ -4,13 +4,18 @@
     - Strucutral -> relies on properties of protocols, or of equality over messages,...
     - Cryptographic -> relies on a cryptographic assumptions, that must be assumed.*)
 
-type tac = EquivSequent.t Tactics.tac
+module ES = EquivSequent
+module TS = TraceSequent
 
 module T = Prover.EquivTactics
+
 module Args = TacticsArgs
+
 module L = Location
-module Hyps = EquivSequent.Hyps
-module ES = EquivSequent
+
+module Hyps = ES.Hyps
+
+type tac = ES.t Tactics.tac
 
 type lsymb = Theory.lsymb
 
@@ -86,27 +91,27 @@ let pure_equiv_typed t arg s =
  List.map (fun s -> Prover.Goal.Equiv s) res
 
 (*------------------------------------------------------------------*)
-let goal_is_equiv s = match EquivSequent.goal s with
+let goal_is_equiv s = match ES.goal s with
   | Atom (Equiv.Equiv e) -> true
   | _ -> false
 
-let goal_as_equiv s = match EquivSequent.goal s with
+let goal_as_equiv s = match ES.goal s with
   | Atom (Equiv.Equiv e) -> e
   | _ -> 
     soft_failure (Tactics.GoalBadShape "expected an equivalence")
       
-let set_reach_goal f s = EquivSequent.set_goal s Equiv.(Atom (Reach f))
+let set_reach_goal f s = ES.set_goal s Equiv.(Atom (Reach f))
 
 (*------------------------------------------------------------------*)
 (** Build a trace sequent from an equivalent sequent when its conclusion is a
     [Reach _]. *)
 let trace_seq_of_equiv_seq ?goal s = 
-  let env     = EquivSequent.env s in
-  let system  = EquivSequent.system s in
-  let table   = EquivSequent.table s in
-  let ty_vars = EquivSequent.ty_vars s in
+  let env     = ES.env s in
+  let system  = ES.system s in
+  let table   = ES.table s in
+  let ty_vars = ES.ty_vars s in
 
-  let goal = match goal, EquivSequent.goal s with
+  let goal = match goal, ES.goal s with
     | Some g, _ -> g
     | None, Equiv.Atom (Equiv.Reach f) -> f
     | None, _ -> 
@@ -115,13 +120,13 @@ let trace_seq_of_equiv_seq ?goal s =
   in
 
   let trace_s =
-    TraceSequent.set_env env (TraceSequent.init ~system ~ty_vars table goal)
+    TS.set_env env (TS.init ~system ~ty_vars table goal)
   in
   
   (* We add all relevant hypotheses *)
   Hyps.fold (fun id hyp trace_s -> match hyp with
       | Equiv.Atom (Equiv.Reach h) -> 
-        TraceSequent.Hyps.add (Args.Named (Ident.name id)) h trace_s
+        TS.Hyps.add (Args.Named (Ident.name id)) h trace_s
       | _ -> trace_s
     ) s trace_s 
 
@@ -130,24 +135,24 @@ let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
 (*------------------------------------------------------------------*)
 let get_models s =
   let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
-  Tactics.timeout_get (TraceSequent.get_models s)
+  Tactics.timeout_get (TS.get_models s)
 
 let mk_trace_cntxt s = 
   Constr.{
-    table  = EquivSequent.table s;
-    system = EquivSequent.system s;
+    table  = ES.table s;
+    system = ES.system s;
     models = Some (get_models s);
   }
 
 (*------------------------------------------------------------------*)
 (** Build the sequent showing that a timestamp happens. *)
-let happens_premise (s : EquivSequent.t) (a : Term.timestamp) =
+let happens_premise (s : ES.t) (a : Term.timestamp) =
   let s = trace_seq_of_equiv_seq ~goal:(Term.Atom (`Happens a)) s in
   Prover.Goal.Trace s
 
-let query_happens (s : EquivSequent.t) (a : Term.timestamp) =
+let query_happens (s : ES.t) (a : Term.timestamp) =
   let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
-  TraceSequent.query_happens s a
+  TS.query_happens s a
 
 (*------------------------------------------------------------------*)
 (** Admit tactic *)
@@ -165,7 +170,7 @@ let () =
            pure_equiv begin fun s sk fk ->
              let before,_,after = nth i (goal_as_equiv s) in
              let s =
-               EquivSequent.set_equiv_goal s (List.rev_append before after)
+               ES.set_equiv_goal s (List.rev_append before after)
              in
                sk [s] fk
            end
@@ -185,13 +190,13 @@ end
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
-let refl (e : Equiv.equiv) (s : EquivSequent.t) =
+let refl (e : Equiv.equiv) (s : ES.t) =
   let iter =
     new exist_macros ~cntxt:(mk_trace_cntxt s) in
   try
     (* we check that the frame does not contain macro *)
     List.iter iter#visit_message e;
-    if EquivSequent.get_frame PLeft s = EquivSequent.get_frame PRight s
+    if ES.get_frame PLeft s = ES.get_frame PRight s
     then `True
     else `NoRefl
   with
@@ -200,7 +205,7 @@ let refl (e : Equiv.equiv) (s : EquivSequent.t) =
 
 (** Tactic that succeeds (with no new subgoal) on equivalences
   * where the two frames are identical. *)
-let refl_tac (s : EquivSequent.t) =
+let refl_tac (s : ES.t) =
   match refl (goal_as_equiv s) s with
     | `True         -> []
     | `NoRefl       -> soft_failure (Tactics.NoRefl)
@@ -221,7 +226,7 @@ let () =
 (** For each element of the biframe, checks that it is a member of the
   * hypothesis biframe. If so, close the goal. *)
 let assumption s =
-  let goal = EquivSequent.goal s in
+  let goal = ES.goal s in
 
   let in_atom = 
     (* For equivalence goals, we look for inclusion of the goal in
@@ -256,12 +261,12 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with the identical trace tactics *)
-let revert (hid : Ident.t) (s : EquivSequent.t) =
+let revert (hid : Ident.t) (s : ES.t) =
   let f = Hyps.by_id hid s in
   let s = Hyps.remove hid s in
-  EquivSequent.set_goal s (Equiv.Impl (f,EquivSequent.goal s))
+  ES.set_goal s (Equiv.Impl (f,ES.goal s))
 
-let revert_str (Args.String hyp_name) (s : EquivSequent.t) =
+let revert_str (Args.String hyp_name) (s : ES.t) =
   let hid,_ = Hyps.by_name hyp_name s in
   [revert hid s]
 
@@ -275,10 +280,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
-let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
+let do_naming_pat (ip_handler : Args.ip_handler) nip s : ES.sequent =
   match ip_handler with
   | `Var Vars.EVar v -> 
-    let env = ref (EquivSequent.env s) in
+    let env = ref (ES.env s) in
 
     let v' = match nip with
       | Args.Unnamed
@@ -296,7 +301,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
     (* FIXME: we substitute everywhere. This is inefficient. *)
-    EquivSequent.subst subst (EquivSequent.set_env !env s)
+    ES.subst subst (ES.set_env !env s)
 
   | `Hyp hid ->
     let f = Hyps.by_id hid s in
@@ -306,16 +311,16 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : EquivSequent.sequent =
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
-let do_and_pat (hid : Ident.t) s : Args.ip_handler list * EquivSequent.sequent =
+let do_and_pat (hid : Ident.t) s : Args.ip_handler list * ES.sequent =
   soft_failure (Tactics.Failure ("cannot destruct " ^ Ident.name hid))
 
 (* TODO: factorize with corresponding, more general, trace tactics *)
 let rec do_and_or_pat (hid : Ident.t) (pat : Args.and_or_pat) s
-  : EquivSequent.sequent list =
+  : ES.sequent list =
   soft_failure (Tactics.Failure ("cannot apply and_or_pat to " ^ Ident.name hid))
 
 and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
-  : EquivSequent.sequent list =
+  : ES.sequent list =
   match h, ip with
   | _, Args.SNamed n_ip -> [do_naming_pat h n_ip s]
 
@@ -331,22 +336,22 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s
 
 (*------------------------------------------------------------------*)
 (* TODO: factorize with corresponding, more general, trace tactics *)
-let rec do_intro (s : EquivSequent.t) : Args.ip_handler * EquivSequent.sequent =
-  match EquivSequent.goal s with
+let rec do_intro (s : ES.t) : Args.ip_handler * ES.sequent =
+  match ES.goal s with
   | Equiv.Impl(lhs,rhs)->
     let id, s = Hyps.add_i Args.Unnamed lhs s in
-    let s = EquivSequent.set_goal s rhs in
+    let s = ES.set_goal s rhs in
     ( `Hyp id, s )
 
   | _ -> soft_failure Tactics.NothingToIntroduce
 
 (* TODO: factorize with corresponding, more general, trace tactics *)
-let do_intro_pat (ip : Args.simpl_pat) s : EquivSequent.sequent list =
+let do_intro_pat (ip : Args.simpl_pat) s : ES.sequent list =
   let handler, s = do_intro s in
   do_simpl_pat handler ip s
 
 (* TODO: factorize with corresponding, more general, trace tactics *)
-let rec intro_all (s : EquivSequent.t) : EquivSequent.t list =
+let rec intro_all (s : ES.t) : ES.t list =
   try
     let s_ip = Args.(SNamed AnyName) in
     let ss = do_intro_pat s_ip s in
@@ -380,7 +385,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
     with Tactics.Tactic_soft_failure (_,NothingToIntroduce) -> [s]
 
 (** Correponds to `intro *`, to use in automated tactics. *)
-let intro_all (s : EquivSequent.t) : EquivSequent.t list =
+let intro_all (s : ES.t) : ES.t list =
   let star = Args.Star L._dummy in
   do_intros [star] s
 
@@ -411,7 +416,7 @@ let rec tautology f s = match f with
     tautology f1 s
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) -> 
-    let s = EquivSequent.set_goal s f in
+    let s = ES.set_goal s f in
     let trace_s = trace_seq_of_equiv_seq s in
     (* TODO: improve automation by doing more than just constraint solving ? *)
     Tactics.timeout_get (TraceTactics.constraints trace_s) 
@@ -466,18 +471,18 @@ let generalize (ts : Term.timestamp) s =
     values of τ, producing a judgement for each one. 
     Generalizes Γ ⊢ E over τ if necessary. *)
 let induction Args.(Timestamp ts) s =
-  let env = EquivSequent.env s in
+  let env = ES.env s in
   match ts with
   | Var t as ts ->
     (* Generalizes over [ts]. *)
     let intro_back, s = generalize ts s in
 
     (* Remove ts from the sequent, as it will become unused. *)
-    let s = EquivSequent.set_env (Vars.rm_var env t) s in
-    let table  = EquivSequent.table s in
-    let system = EquivSequent.system s in
+    let s = ES.set_env (Vars.rm_var env t) s in
+    let table  = ES.table s in
+    let system = ES.system s in
     let subst = [Term.ESubst (ts, Pred ts)] in
-    let goal = EquivSequent.goal s in
+    let goal = ES.goal s in
 
     let ind_hyp = Equiv.subst_form subst goal in
     let id_ind, induc_s = Hyps.add_i Args.Unnamed ind_hyp s in
@@ -487,7 +492,7 @@ let induction Args.(Timestamp ts) s =
     let induc_s = do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
 
     let init_goal = Equiv.subst_form [Term.ESubst(ts,Term.init)] goal in
-    let init_s = EquivSequent.set_goal s init_goal in
+    let init_s = ES.set_goal s init_goal in
     let init_s = intro_back init_s in
 
     let goals = ref [] in
@@ -498,7 +503,7 @@ let induction Args.(Timestamp ts) s =
       then ()
       else
         begin
-          let env = ref @@ EquivSequent.env induc_s in
+          let env = ref @@ ES.env induc_s in
           let subst =
             List.map
               (fun i ->
@@ -511,8 +516,8 @@ let induction Args.(Timestamp ts) s =
               (Action.subst_action subst descr.Action.action)
           in
           let ts_subst = [Term.ESubst(ts,name)] in
-          goals := (EquivSequent.subst ts_subst induc_s
-                    |> EquivSequent.set_env !env)
+          goals := (ES.subst ts_subst induc_s
+                    |> ES.set_env !env)
                    ::!goals 
         end
     in
@@ -536,7 +541,7 @@ let () =
     (pure_equiv_typed induction) Args.Timestamp
 
 (*------------------------------------------------------------------*)
-let enrich (arg : Theory.eterm Args.arg) (s : EquivSequent.t) =
+let enrich (arg : Theory.eterm Args.arg) (s : ES.t) =
   match arg with
   | Args.ETerm (ty, f, loc) ->
     let elem : Term.message = 
@@ -545,10 +550,10 @@ let enrich (arg : Theory.eterm Args.arg) (s : EquivSequent.t) =
       | None -> hard_failure (Tactics.Failure "expected a message")
     in
     
-    EquivSequent.set_equiv_goal s (elem :: goal_as_equiv s) 
+    ES.set_equiv_goal s (elem :: goal_as_equiv s) 
             
 let enrich_a arg s = 
-  let tbl, env = EquivSequent.table s, EquivSequent.env s in
+  let tbl, env = ES.table s, ES.env s in
   match Args.convert_args tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) with
   | Args.Arg (ETerm _ as arg) -> enrich arg s
   | _ -> Tactics.(hard_failure (Failure "improper arguments"))
@@ -574,7 +579,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 let print_tac Args.None s =
-  Tactics.print_system (EquivSequent.table s) (EquivSequent.system s);
+  Tactics.print_system (ES.table s) (ES.system s);
   [s]
 
 let () =
@@ -597,12 +602,12 @@ exception No_FA
 let fa_expand t =
   let aux : type a. a Term.term -> Equiv.equiv = function
     | Fun (f,_,[c;t;e]) when f = Term.f_ite && t = e ->
-      EquivSequent.[ t ]
+      ES.[ t ]
 
     | Fun (f,_,l) -> l
 
     | Atom (`Message (_,f,g)) ->
-      EquivSequent.[ f ; g ]
+      ES.[ f ; g ]
 
     | Diff _ -> raise No_common_head
     | _ -> raise No_FA
@@ -626,7 +631,7 @@ let fa Args.(Int i) s =
           (* Special case for try find, otherwise we use fa_expand *)
           match e with
           | Find (vars,c,t,e) ->
-            let env = ref (EquivSequent.env s) in
+            let env = ref (ES.env s) in
             let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
             let subst =
               List.map2
@@ -639,11 +644,11 @@ let fa Args.(Int i) s =
               List.rev_append before
                 (Equiv.[ c' ; t' ; e ] @ after)
             in
-            [ EquivSequent.set_env !env (EquivSequent.set_equiv_goal s biframe) ]
+            [ ES.set_env !env (ES.set_equiv_goal s biframe) ]
           | _ ->
             let biframe =
               List.rev_append before (fa_expand e @ after) in
-              [ EquivSequent.set_equiv_goal s biframe ]
+              [ ES.set_equiv_goal s biframe ]
           with
           | No_common_head ->
               soft_failure (Tactics.Failure "No common construct")
@@ -731,7 +736,7 @@ let rec filter_fa_dup table res assump (elems : Equiv.equiv) =
    assumptions, or elements that contain a subterm which is neither a duplicate
    nor an assumption. *)
 let fa_dup s =
-  let table = EquivSequent.table s in
+  let table = ES.table s in
 
   (* TODO: allow to choose the hypothesis through its id *)
   let hyp = Hyps.find_map (fun _id hyp -> match hyp with
@@ -744,7 +749,7 @@ let fa_dup s =
                 |> List.rev
                 |> filter_fa_dup table [] hyp
   in
-  [EquivSequent.set_equiv_goal s biframe]
+  [ES.set_equiv_goal s biframe]
 
 exception Not_FADUP_formula
 exception Not_FADUP_iter
@@ -855,7 +860,7 @@ let fa_dup_int i s =
         (* on success, we keep only exec@pred(tau) *)
         let new_elem = Term.Macro (Term.exec_macro,[],Term.Pred tau) in
 
-        [EquivSequent.set_equiv_goal s 
+        [ES.set_equiv_goal s 
            (List.rev_append before (new_elem::after))]
 
       with
@@ -1062,11 +1067,11 @@ let fresh Args.(Int i) s =
         (* the biframe to consider when checking the freshness *)
         let biframe = List.rev_append before after in
         let cntxt   = mk_trace_cntxt s in
-        let env     = EquivSequent.env s in
+        let env     = ES.env s in
         begin match mk_if_term cntxt env e biframe with
         | if_term ->
           let biframe = List.rev_append before (if_term :: after) in
-          [EquivSequent.set_equiv_goal s biframe]
+          [ES.set_equiv_goal s biframe]
 
         | exception Fresh.Not_name ->
           soft_failure
@@ -1090,8 +1095,8 @@ let () =
 (*------------------------------------------------------------------*)  
 (** Sequence expansion of the sequence [term] for the given parameters [ths]. *)
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
-  let env = EquivSequent.env s in
-  let table = EquivSequent.table s in
+  let env = ES.env s in
+  let table = ES.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
   match Theory.convert_i conv_env (ES.ty_vars s) tsubst term with
@@ -1132,19 +1137,19 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
 
     let s = Hyps.map mk_hyp_f s in    
 
-    [ EquivSequent.set_equiv_goal s biframe]
+    [ ES.set_equiv_goal s biframe]
 
   | _ ->
     hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
-let expand (term : Theory.term) (s : EquivSequent.t) =
-  let tsubst = Theory.subst_of_env (EquivSequent.env s) in
+let expand (term : Theory.term) (s : ES.t) =
+  let tsubst = Theory.subst_of_env (ES.env s) in
   (* final function once the substitution has been computed *)
   let succ a subst =
     let new_s = 
-      EquivSequent.set_equiv_goal s 
+      ES.set_equiv_goal s 
         (List.map (Term.subst subst) (goal_as_equiv s)) 
     in   
     
@@ -1153,7 +1158,7 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
     else [Prover.Goal.Equiv new_s]
   in
 
-  let table = EquivSequent.table s in
+  let table = ES.table s in
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
@@ -1240,7 +1245,7 @@ let expand_all () s =
   let biframe = goal_as_equiv s
                 |> List.map (expand_all_macros)
   in
-  [EquivSequent.set_equiv_goal s biframe]
+  [ES.set_equiv_goal s biframe]
 
 let () = T.register "expandall"
     ~tactic_help:{general_help = "Expand all occurrences of macros that are \
@@ -1254,7 +1259,7 @@ let () = T.register "expandall"
 (*------------------------------------------------------------------*)
 (** Replace all occurrences of [t1] by [t2] inside of [s],
   * and add a subgoal to prove that [t1 <=> t2]. *)
-let equiv_formula f1 f2 (s : EquivSequent.t) =
+let equiv_formula f1 f2 (s : ES.t) =
   (* goal for the equivalence of t1 and t2 *)
   let f = 
     Term.mk_and ~simpl:false 
@@ -1265,13 +1270,13 @@ let equiv_formula f1 f2 (s : EquivSequent.t) =
   let subgoals =
     [ Prover.Goal.Trace trace_sequent;
       Prover.Goal.Equiv
-        (EquivSequent.subst [Term.ESubst (f1,f2)] s) ]
+        (ES.subst [Term.ESubst (f1,f2)] s) ]
   in
   subgoals
 
 (** Replace all occurrences of [m1] by [m2] inside of [s],
   * and add a subgoal to prove that [Eq(m1, m2)]. *)
-let equiv_message m1 m2 (s : EquivSequent.t) =
+let equiv_message m1 m2 (s : ES.t) =
   (* goal for the equivalence of t1 and t2 *)
   let trace_sequent =
     trace_seq_of_reach (Term.Atom (`Message (`Eq,m1,m2))) s
@@ -1279,7 +1284,7 @@ let equiv_message m1 m2 (s : EquivSequent.t) =
   let subgoals =
     [ Prover.Goal.Trace trace_sequent;
       Prover.Goal.Equiv
-        (EquivSequent.subst [Term.ESubst (m1,m2)] s) ]
+        (ES.subst [Term.ESubst (m1,m2)] s) ]
   in
   subgoals
 
@@ -1364,7 +1369,7 @@ let yes_no_if b Args.(Int i) s =
       in
       let biframe = List.rev_append before (new_elem @ after) in
       [ Prover.Goal.Trace trace_sequent;
-        Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+        Prover.Goal.Equiv (ES.set_equiv_goal s biframe) ]
     end
 
   | exception Out_of_range ->
@@ -1474,7 +1479,7 @@ let ifcond Args.(Pair (Int i,
         in
 
         [ Prover.Goal.Trace trace_sequent;
-          Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+          Prover.Goal.Equiv (ES.set_equiv_goal s biframe) ]
       with
       | Not_ifcond ->
         soft_failure 
@@ -1502,7 +1507,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 (* TODO: should be a rewriting rule *)
-let trivial_if (Args.Int i) (s : EquivSequent.sequent) =
+let trivial_if (Args.Int i) (s : ES.sequent) =
   let cntxt = mk_trace_cntxt s in
 
   match nth i (goal_as_equiv s) with
@@ -1527,7 +1532,7 @@ let trivial_if (Args.Int i) (s : EquivSequent.sequent) =
       in
       let biframe = List.rev_append before (new_elem @ after) in
       [ trace_goal;
-        Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+        Prover.Goal.Equiv (ES.set_equiv_goal s biframe) ]
     end
   | exception Out_of_range ->
      soft_failure (Tactics.Failure "out of range position")
@@ -1570,7 +1575,7 @@ let ifeq Args.(Pair (Int i, Pair (Message (t1,ty1), Message (t2,ty2)))) s =
     in
 
     [ Prover.Goal.Trace trace_s;
-      Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) ]
+      Prover.Goal.Equiv (ES.set_equiv_goal s biframe) ]
 
   | exception Out_of_range ->
      soft_failure (Tactics.Failure "Out of range position")
@@ -1927,7 +1932,7 @@ let prf Args.(Int i) s =
   | before, e, after ->
     let biframe = List.rev_append before after in
     let cntxt = mk_trace_cntxt s in
-    let env = EquivSequent.env s in
+    let env = ES.env s in
 
     let e = Term.head_normal_biterm e in
 
@@ -1961,7 +1966,7 @@ let prf Args.(Int i) s =
           Symbols.Name.declare cntxt.table (L.mk_loc L._dummy "n_PRF") ndef
         in
         let ns = Term.mk_isymb n nty [] in
-        let s = EquivSequent.set_table s table in
+        let s = ES.set_table s table in
 
         let oracle_formula =
           Prover.get_oracle_tag_formula (Symbols.to_string fn)
@@ -1994,7 +1999,7 @@ let prf Args.(Int i) s =
           Equiv.subst_equiv [Term.ESubst (hash,if_term)] [e] 
         in
         let biframe = (List.rev_append before (new_elem @ after)) in
-        [EquivSequent.set_equiv_goal s biframe]
+        [ES.set_equiv_goal s biframe]
 
       | _ -> assert false
     end
@@ -2024,7 +2029,7 @@ let cca1 Args.(Int i) s =
     let biframe = List.rev_append before after in
     let cntxt = mk_trace_cntxt s in
     let table = cntxt.table in
-    let env = EquivSequent.env s in
+    let env = ES.env s in
 
     let e = Term.head_normal_biterm e in
 
@@ -2180,7 +2185,7 @@ let cca1 Args.(Int i) s =
 
     let new_elem =    Equiv.subst_equiv substs [e] in
     let biframe = (List.rev_append before (new_elem @ after)) in
-    Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe) :: fgoals
+    Prover.Goal.Equiv (ES.set_equiv_goal s biframe) :: fgoals
 
   | exception Out_of_range ->
     soft_failure (Tactics.Failure "Out of range position")
@@ -2211,7 +2216,7 @@ let enckp
     let biframe = List.rev_append before after in
     let cntxt = mk_trace_cntxt s in
     let table = cntxt.table in
-    let env = EquivSequent.env s in
+    let env = ES.env s in
 
     (* Apply tactic to replace key(s) in [enc] using [new_key].
      * Precondition:
@@ -2313,7 +2318,7 @@ let enckp
       let biframe = (List.rev_append before (new_elem @ after)) in
 
       [Prover.Goal.Trace fresh_goal;
-       Prover.Goal.Equiv (EquivSequent.set_equiv_goal s biframe)]
+       Prover.Goal.Equiv (ES.set_equiv_goal s biframe)]
 
     in
 
@@ -2459,7 +2464,7 @@ let xor Args.(Pair (Int i, Opt (Message, opt_m))) s =
     (* the biframe to consider when checking the freshness *)
     let biframe = List.rev_append before after in
     let cntxt = mk_trace_cntxt s in
-    let env = EquivSequent.env s in
+    let env = ES.env s in
     let res =
       try
         match opt_m with
@@ -2478,7 +2483,7 @@ let xor Args.(Pair (Int i, Opt (Message, opt_m))) s =
 
     | if_term ->
       let biframe = List.rev_append before (if_term::after) in
-      [EquivSequent.set_equiv_goal s biframe]
+      [ES.set_equiv_goal s biframe]
     end
 
   | exception Out_of_range ->
