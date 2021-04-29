@@ -1096,7 +1096,7 @@ let declare_signature table
   let open Symbols in
   let sig_fty   = mk_ftype 0 [] [m_ty; sk_ty] sig_ty in
 
-  (* TODO: types: change output type to booleans ? *)
+  (* TODO: change output type to booleans ? *)
   let check_fty = mk_ftype 0 [] [sig_ty; pk_ty] check_ty in
   
   let pk_fty    = mk_ftype 0 [] [sk_ty] pk_ty in

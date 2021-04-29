@@ -1093,15 +1093,17 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
   let table = EquivSequent.table s in
   let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  (* TODO: types *)
-  match Theory.convert conv_env tsubst term Type.Message with
+  match Theory.convert_i conv_env tsubst term with
   (* we expect term to be a sequence *)
-  | Seq ( vs, t) as term_seq ->
+  | (Seq (vs, t) as term_seq), ty ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
+
     (* we parse the arguments ths, to create a substution for variables vs *)
     let subst = Theory.parse_subst table env vs ths in
+
     (* new_t is the term of the sequence instantiated with the subst *)
     let new_t = Term.subst subst t in
+
     (* we add the new term to the frame and the hypothesis if it does not yet
        belongs to it *)
     let biframe =
@@ -1130,6 +1132,7 @@ let expand_seq (term:Theory.term) (ths:Theory.term list) (s:EquivSequent.t) =
     let s = Hyps.map mk_hyp_f s in    
 
     [ EquivSequent.set_equiv_goal s biframe]
+
   | _ ->
     hard_failure
       (Tactics.Failure "can only expand with sequences with parameters")
@@ -1153,8 +1156,8 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  match Theory.convert conv_env tsubst term Type.Boolean with
-    | Macro (ms,l,a) ->
+  match Theory.convert_i conv_env tsubst term with
+    | Macro (ms,l,a), ty ->
       if Macros.is_defined ms.s_symb a table then
         succ a [Term.ESubst (Macro (ms,l,a),
                              Macros.get_definition (mk_trace_cntxt s) ms a)]
@@ -1162,18 +1165,6 @@ let expand (term : Theory.term) (s : EquivSequent.t) =
 
     | _ ->
       soft_failure (Tactics.Failure "can only expand macros")
-
-    (* TODO: types*)
-    | exception Theory.(Conv (_,Type_error _)) ->
-      match Theory.convert conv_env tsubst term Type.Message with
-      | Macro (ms,l,a) ->
-        if Macros.is_defined ms.s_symb a table then
-          succ a [Term.ESubst (Macro (ms,l,a),
-                               Macros.get_definition (mk_trace_cntxt s) ms a)]
-        else soft_failure (Tactics.Failure "cannot expand this macro")
-
-      | _ ->
-        soft_failure (Tactics.Failure "can only expand macros")
 
 (* Does not rely on the typed registering, as it parsed a substitution. *)
 let () = T.register_general "expand"
@@ -1295,21 +1286,18 @@ let equiv_message m1 m2 (s : EquivSequent.t) =
 let equivalent arg s = match arg with
   | Args.Pair (t1,t2) ->
     match t1, t2 with
-    | Args.ETerm (Type.Boolean, f1, _),
-      Args.ETerm (Type.Boolean, f2, _) ->
-      equiv_formula f1 f2 s
+    | Args.ETerm (ty1, f1, _), Args.ETerm (ty2, f2, _) ->
+      match Type.kind ty1, Type.kind ty2 with
+      | Type.KMessage, Type.KMessage when ty1 = ty2 -> 
+        (* TODO: subtypes: unify ty1 and ty2 *)
+        if ty1 = Type.Boolean 
+        then equiv_formula f1 f2 s 
+        else equiv_message f1 f2 s
 
-    | Args.ETerm (Type.Message, f1, _),
-      Args.ETerm (Type.Message, f2, _) ->
-      equiv_message f1 f2 s
-
-    | Args.ETerm (_, _, _),
-      Args.ETerm (_, _, _)  ->
-    (* TODO: types*)
-
-      (* TODO: improve error message + add locations *)
-      hard_failure
-        (Tactics.Failure ("expected a pair of messages or a pair of booleans"))
+      | _ ->
+        (* TODO: improve error message + add locations *)
+        hard_failure
+          (Tactics.Failure ("expected a pair of messages of the same types"))
 
 let () = T.register_typed "equivalent"
     ~general_help:"Replace all occurrences of a formula by another, and ask to \
