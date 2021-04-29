@@ -1238,10 +1238,7 @@ let econvert (cenv : conv_env) ty_vars subst t : eterm option =
   (* Type is inferred for sort Message *)
   try let tt, ty = convert_i cenv ty_vars subst t in
     Some (ETerm (ty, tt, loc))
-  with Conv e -> 
-    (* REM *)
-    Fmt.epr "econvert error: %a@." (pp_error (fun _ _ -> ())) e;
-    None
+  with Conv e -> None
 
 let convert_index table ty_vars subst t =
   let cenv = { table = table; cntxt = InGoal; } in

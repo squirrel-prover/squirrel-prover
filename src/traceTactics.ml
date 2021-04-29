@@ -1830,11 +1830,11 @@ let fresh (Args.String m) s =
         let cntxt = mk_trace_cntxt s in
         let phi_direct = mk_fresh_direct cntxt env ns t in
         let phi_indirect = mk_fresh_indirect cntxt env ns t in
+
         let phi = Term.mk_or phi_direct phi_indirect in
 
         let goal = Term.mk_impl ~simpl:false phi (TS.goal s) in
         [TS.set_goal goal s]
-        (* all_left_introductions s [new_hyp,""] *)
 
       | _ -> soft_failure
                (Tactics.Failure "can only be applied on message hypothesis")
