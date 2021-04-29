@@ -1722,7 +1722,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
 (* Indirect cases - names ([n],[is']) appearing in actions of the system *)
 let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
   let list_of_actions_from_term =
-    let iter = new Fresh.get_actions ~cntxt false in
+    let iter = new Fresh.get_actions ~cntxt in
     iter#visit_message t ;
     iter#get_actions in
 

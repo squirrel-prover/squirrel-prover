@@ -27,8 +27,8 @@ class get_name_indices ~(cntxt:Constr.trace_cntxt) exact name = object (self)
     | _ -> super#visit_message t
 end
 
-class get_actions ~(cntxt:Constr.trace_cntxt) exact = object (self)
-  inherit Iter.iter_approx_macros ~exact ~full:true ~cntxt as super
+class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
+  inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
 
   (* The boolean is set to true only for input macros.
    * In that case, when building phi_proj we require a strict inequality on
@@ -42,5 +42,5 @@ class get_actions ~(cntxt:Constr.trace_cntxt) exact = object (self)
     | Symbols.Input -> actions <- (a,true)::actions
     | Symbols.(Output | State _ | Cond | Exec | Frame) ->
       actions <- (a,false)::actions
-    | _ -> (actions <- (a, false)::actions; self#visit_macro mn a)
+    | _ -> actions <- (a, false)::actions
 end

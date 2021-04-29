@@ -905,7 +905,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
         List.iter iter#visit_message proj_frame ;
         iter#get_indices
     and list_of_actions_from_frame =
-      let iter = new Fresh.get_actions ~cntxt false in
+      let iter = new Fresh.get_actions ~cntxt in
       List.iter iter#visit_message proj_frame ;
       iter#get_actions
     and tbl_of_action_indices = Hashtbl.create 10 in
@@ -1725,7 +1725,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
         occurrences_of_frame ~cntxt frame hash_fn key.s_symb
 
       and list_of_actions_from_frame =
-        let iter = new Fresh.get_actions ~cntxt false in
+        let iter = new Fresh.get_actions ~cntxt in
         List.iter iter#visit_message frame ;
         iter#get_actions
 
