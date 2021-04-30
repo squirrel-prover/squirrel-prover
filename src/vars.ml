@@ -127,7 +127,7 @@ let max_suffix (e : env) prefix =
 
 let max_suffix_v (e : env) v = max_suffix e v.s_prefix
     
-let make_fresh (e1:env) typ s_prefix =
+let make opt (e1 : env) typ s_prefix =
   let s_prefix,i_suffix =
     let substrings = Pcre.exec ~rex:prefix_count_regexp s_prefix in
     let prefix = Pcre.get_substring substrings 1 in
@@ -135,28 +135,34 @@ let make_fresh (e1:env) typ s_prefix =
     let i0 = if i0 = "" then -1 else int_of_string i0 in
     prefix, i0
   in
-  let i_suffix = match max_suffix e1 s_prefix with
-    | None -> i_suffix
-    | Some m -> max i_suffix (m + 1)
+  let i_suffix = match opt, max_suffix e1 s_prefix with
+    | `Shadow, _ -> i_suffix (* if `Shadow, we can reuse the suffix *)
+    | _, None -> i_suffix
+    | _, Some m -> max i_suffix (m + 1)
   in
 
   let v = { s_prefix = s_prefix;
             i_suffix = i_suffix;
-            var_type = typ;
-          }
+            var_type = typ; }
   in
   M.add (name v) (EVar v) e1, v 
 
-let make_fresh_and_update (e:env ref) var_type s_prefix =
-  let new_env,new_var = make_fresh (!e) var_type s_prefix in
+let make_r opt (e:env ref) var_type s_prefix =
+  let new_env,new_var = make opt (!e) var_type s_prefix in
   e := new_env;
   new_var
 
-let make_fresh_from env v =
-  make_fresh env v.var_type v.s_prefix
+let make_exact e typ s = 
+  let e, v = make `Approx e typ s in
+  if name v <> s then None else Some (e,v)
 
-let make_fresh_from_and_update env v =
-  make_fresh_and_update env v.var_type v.s_prefix
+let make_exact_r e typ s = 
+  let v = make_r `Approx e typ s in
+  if name v <> s then None else Some v
+
+let fresh env v = make `Approx env v.var_type v.s_prefix
+
+let fresh_r env v = make_r `Approx env v.var_type v.s_prefix
 
 
 (*------------------------------------------------------------------*)
@@ -211,9 +217,9 @@ let () =
        * a strict prefix of v'.s_prefix. Otherwise we can
        * have different variables with the same name. *)
       let env = empty_env in
-      let env,i = make_fresh env Type.Index "i" in
-      let env,i1 = make_fresh env Type.Index "i" in
-      let env,i2 = make_fresh env Type.Index "i1" in
+      let env,i  = make `Approx env Type.Index "i"  in
+      let env,i1 = make `Approx env Type.Index "i"  in
+      let env,i2 = make `Approx env Type.Index "i1" in
       
       Alcotest.(check string)
         "proper name for i"
@@ -237,10 +243,10 @@ let () =
        * the user provides a variable name that contains a
        * numerical suffix. *)
       let env = empty_env in
-      let env,i1 = make_fresh env Type.Index "i1" in
-      let _,i2 = make_fresh env Type.Index "i" in
-      let _,i2' = make_fresh env Type.Index "i1" in
-      let _,i2'' = make_fresh env Type.Index "i2" in
+      let env,i1 = make `Approx env Type.Index "i1" in
+      let _,i2   = make `Approx env Type.Index "i"  in
+      let _,i2'  = make `Approx env Type.Index "i1" in
+      let _,i2'' = make `Approx env Type.Index "i2" in
       Alcotest.(check string)
         "Biproper name for i1 (bis)"
         (name i1) "i1" ;

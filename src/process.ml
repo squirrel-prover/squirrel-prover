@@ -357,15 +357,15 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * safety. *)
   let env_ts,ts,dummy_in =
     let env = Vars.empty_env in
-    let env,ts = Vars.make_fresh env Type.Timestamp "$ts" in
-    let env,dummy_in = Vars.make_fresh env Type.Message "$dummy" in
+    let env,ts = Vars.make `Approx env Type.Timestamp "$ts" in
+    let env,dummy_in = Vars.make `Approx env Type.Message "$dummy" in
     env,ts,dummy_in
   in
 
   (* Update env.vars_env with a new variable of sort [sort] computed from
    * [name] *)
   let make_fresh env sort name =
-    let ve',x = Vars.make_fresh env.vars_env sort name in
+    let ve',x = Vars.make env.vars_env sort name in
     { env with vars_env = ve' },x
   in
 

@@ -47,6 +47,7 @@ type bnds = bnd list
 
 type term_i =
   | Tinit
+  | Tpat  
   | Tpred of term
   | Diff  of term * term
   | Seq   of lsymb list * term
@@ -214,6 +215,7 @@ type conversion_error_i =
   | UnknownTypeVar       of string
   | BadPty               of Type.ekind list
   | BadInfixDecl
+  | PatNotAllowed
       
 type conversion_error = L.t * conversion_error_i
 
@@ -226,7 +228,8 @@ val pp_error :
 type env = (string * Type.ety) list
 
 val check : 
-  Symbols.table -> ?local:bool -> Type.Infer.env -> env -> term -> Type.ety
+  Symbols.table -> ?local:bool -> ?pat:bool ->
+  Type.Infer.env -> env -> term -> Type.ety
   -> unit
 
 val check_state : Symbols.table -> lsymb -> int -> Type.tmessage
@@ -271,11 +274,15 @@ type conv_env = { table : Symbols.table;
 
 (** converts and infer the type (must be a subtype of Message). *)
 val convert_i : 
-  ?ty_env:Type.Infer.env -> conv_env -> Type.tvars -> subst -> term -> 
+  ?ty_env:Type.Infer.env ->
+  ?pat:bool ->
+  conv_env -> Type.tvars -> subst -> term -> 
   Term.message * Type.tmessage
 
 val convert : 
-  ?ty_env:Type.Infer.env -> conv_env -> Type.tvars -> subst -> 
+  ?ty_env:Type.Infer.env -> 
+  ?pat:bool ->
+  conv_env -> Type.tvars -> subst -> 
   term -> 'a Type.ty
   -> 'a Term.term
 

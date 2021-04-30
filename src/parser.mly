@@ -40,7 +40,7 @@
 %right DEQUIVARROW
 %left AND OR
 
-%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID HAPPENS FALSE DIFF
+%nonassoc TRUE SEQ PRED NOT LPAREN INIT ID UNDERSCORE HAPPENS FALSE DIFF
 
 %nonassoc EQ NEQ GEQ LEQ LANGLE RANGLE
 
@@ -101,8 +101,9 @@ lsymb:
 
 /* non-ambiguous term */
 sterm_i:
-| LPAREN t=term_i RPAREN          { t }
-| id=lsymb                        { Theory.App (id, []) }
+| LPAREN t=term_i RPAREN        { t }
+| id=lsymb                      { Theory.App (id, []) }
+| UNDERSCORE                    { Theory.Tpat }
 
 | LANGLE t=term COMMA t0=term RANGLE
     { let fsymb = sloc $startpos $endpos "pair" in
@@ -536,6 +537,13 @@ as_ip:
 
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
+
+/* apply_arg: */
+/* | hid=lsymb args=slist(sterm,empty) */
+/*     { Theory.PT_hol { p_pt_hid = hid; p_pt_args = args} } */
+
+/* | LPAREN f=term RPAREN */
+/*     { Theory.PT_form f } */
 
 (*------------------------------------------------------------------*)
 tac:

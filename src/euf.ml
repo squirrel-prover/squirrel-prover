@@ -164,7 +164,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
     let subst_fresh =
       List.map (fun i ->
           Term.(ESubst (Var i,
-                        Var (Vars.make_fresh_from_and_update env i))))
+                        Var (Vars.fresh_r env i))))
         (List.filter
            (fun x -> not (List.mem x safe_is))
            action_descr.Action.indices)
@@ -197,7 +197,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
       List.map
         (function Vars.EVar v ->
            Term.(ESubst (Var v,
-                         Var (Vars.make_fresh_from_and_update env v))))
+                         Var (Vars.fresh_r env v))))
         vars
     in
     

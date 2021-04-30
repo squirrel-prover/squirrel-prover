@@ -38,6 +38,7 @@ type bnds = (lsymb * p_ty) list
 (** {2 Terms and formulas} *)
 type term_i =
   | Tinit
+  | Tpat
   | Tpred of term
   | Diff  of term * term
   | Seq   of lsymb list * term
@@ -161,6 +162,8 @@ let pp_var_list ppf l =
 let rec pp_term_i ppf t = match t with
   | Tinit -> Fmt.pf ppf "init"
 
+  | Tpat -> Fmt.pf ppf "_"
+
   | Tpred t -> Fmt.pf ppf "pred(%a)" pp_term t
 
   | Find (vs,c,t,e) ->
@@ -261,6 +264,7 @@ type conversion_error_i =
   | UnknownTypeVar       of string        
   | BadPty               of Type.ekind list
   | BadInfixDecl
+  | PatNotAllowed
 
 type conversion_error = L.t * conversion_error_i
 
@@ -333,6 +337,8 @@ let pp_error_i ppf = function
       (Fmt.list ~sep:Fmt.comma Type.pp_kinde) l
 
   | BadInfixDecl -> Fmt.pf ppf "bad infix symbol declaration"
+
+  | PatNotAllowed -> Fmt.pf ppf "pattern not allowed"
 
 let pp_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
@@ -621,15 +627,16 @@ type conv_env = {
     - a type unification environment
     - a variable substitution  *)
 type conv_state = {
-  table   : Symbols.table;
-  cntxt   : conv_cntxt;
-  ty_vars : Type.tvar list;
-  subst   : subst;
-  ty_env  : Type.Infer.env;  
+  table     : Symbols.table;
+  cntxt     : conv_cntxt;
+  ty_vars   : Type.tvar list;
+  subst     : subst;
+  allow_pat : bool;
+  ty_env    : Type.Infer.env;  
 }
 
-let mk_state table cntxt ty_vars subst ty_env =
-  { table; cntxt; ty_vars; subst; ty_env; }
+let mk_state table cntxt ty_vars subst allow_pat ty_env =
+  { table; cntxt; ty_vars; subst; allow_pat; ty_env; }
 
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
@@ -693,7 +700,7 @@ let mem_assoc state x (ty : 's Type.ty) (subst : esubst list) : bool =
 let subst_of_bvars (vars : (lsymb * Type.ety) list) =
   let make (v, Type.ETy s) =
     let v = L.unloc v in
-    ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
+    ESubst (v, Term.Var (snd (Vars.make Vars.empty_env s v)))
   in
   List.map make vars
 
@@ -702,7 +709,7 @@ let subst_of_bnds table ty_vars (vars : (lsymb * p_ty) list) =
   let make (v, s) =
     let v = L.unloc v in
     let Type.ETy s = parse_p_ty0 table ty_vars s in
-    ESubst (v, Term.Var (snd (Vars.make_fresh Vars.empty_env s v)))
+    ESubst (v, Term.Var (snd (Vars.make Vars.empty_env s v)))
   in
   table, List.map make vars
 
@@ -752,6 +759,14 @@ and convert0 :
   let type_error () = raise (ty_error state.ty_env tm ty) in
   
   match L.unloc tm with
+  | Tpat -> 
+    if not state.allow_pat then
+      conv_err (L.loc tm) PatNotAllowed;
+
+    assert false                (* TODO *)
+    (* let p = Vars.make state.env ty "_" in
+     * Term.Var p *)
+
   | App   (f,terms) ->
     (* if [f] is a variable name appearing in [state.subst], then substitute. *)
     if terms = [] && mem_assoc state f ty state.subst
@@ -1155,6 +1170,7 @@ let subst t (s : (string * term_i) list) =
           ti
         with Not_found -> t
       end
+    | Tpat -> Tpat
     | Tinit -> Tinit
     | Tpred t -> Tpred (aux t)
     | Happens t -> Happens (List.map aux t)
@@ -1174,28 +1190,29 @@ let subst t (s : (string * term_i) list) =
 (*------------------------------------------------------------------*)
 (** {2 Exported conversion and type-checking functions} *)
 
-let check table ?(local=false) (ty_env : Type.Infer.env) (env : env) t (Type.ETy s) 
-  : unit =
+let check 
+    table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env) 
+    (env : env) t (Type.ETy s) : unit =
   let dummy_var s =
-    Term.Var (snd (Vars.make_fresh Vars.empty_env s "_"))
+    Term.Var (snd (Vars.make Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
   let subst =
     List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
   in
-  let state = mk_state table cntxt [] subst ty_env in
+  let state = mk_state table cntxt [] subst pat ty_env in
   ignore (convert state t s)
 
 (** converts and infer the type (must be a subtype of Message).
     exported outside to Theory.ml *)
-let convert_i ?ty_env (env : conv_env) ty_vars subst tm
+let convert_i ?ty_env ?(pat=false) (env : conv_env) ty_vars subst tm
   : Term.message * Type.tmessage =
   let must_clost, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env () 
     | Some ty_env -> false, ty_env 
   in
   let ty = Type.TUnivar (Type.Infer.mk_univar ty_env) in
-  let state = mk_state env.table env.cntxt ty_vars subst ty_env in
+  let state = mk_state env.table env.cntxt ty_vars subst pat ty_env in
   let t = convert state tm ty in
 
   if must_clost && not (Type.Infer.is_closed state.ty_env) then
@@ -1207,14 +1224,15 @@ let convert_i ?ty_env (env : conv_env) ty_vars subst tm
 (** exported outside to Theory.ml *)
 let convert : type s. 
   ?ty_env:Type.Infer.env -> 
+  ?pat:bool ->
   conv_env -> Type.tvars -> subst -> term -> s Type.ty -> s Term.term =
-  fun ?ty_env env ty_vars subst tm ty ->
+  fun ?ty_env ?(pat=false) env ty_vars subst tm ty ->
   let must_clost, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env () 
     | Some ty_env -> false, ty_env 
   in
 
-  let state = mk_state env.table env.cntxt ty_vars subst ty_env in
+  let state = mk_state env.table env.cntxt ty_vars subst pat ty_env in
   let t = convert state tm ty in
 
   if must_clost && not (Type.Infer.is_closed state.ty_env) then
@@ -1339,6 +1357,20 @@ let find_app_terms t (names : string list) =
   let acc = List.fold_left (fun acc name -> aux name acc t) [] names in
   List.sort_uniq Stdlib.compare acc
 
+(*------------------------------------------------------------------*)
+(** {2 Proof Terms} *)
+
+(** Parser type for a formula built by partially applying an hypothesis 
+    or a lemma *)
+type p_pt_hol = { 
+  p_pt_hid : lsymb;
+  p_pt_args : term list; 
+}
+
+(** Parser type for `apply` arguments *)
+type p_pt =
+  | PT_hol  of p_pt_hol (* (partially applied) hypothesis or lemma *)
+  | PT_form of term 
 
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)

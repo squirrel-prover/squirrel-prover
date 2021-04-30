@@ -102,7 +102,7 @@ module type HypsSeq = sig
   val is_hyp : hyp -> sequent -> bool
 
   (** [by_id id s] returns the hypothesis with id [id] in [s]. *)
-  val by_id   : Ident.t -> sequent -> hyp
+  val by_id : Ident.t -> sequent -> hyp
 
   (** Same as [by_id], but does a look-up by name and returns the full local 
       declaration. *)
@@ -110,7 +110,7 @@ module type HypsSeq = sig
 
   (** [mem_id id s] returns true if there is an hypothesis with id [id] 
       in [s]. *)
-  val mem_id   : Ident.t -> sequent -> bool
+  val mem_id : Ident.t -> sequent -> bool
 
   (** Same as [mem_id], but does a look-up by name. *)  
   val mem_name : string -> sequent -> bool

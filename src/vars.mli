@@ -81,7 +81,7 @@ val rm_evar : env -> evar -> env
 (** {2 Create variables} *)
 
 (** [make_new_from v] generates a new variable of the same sort as
-  * [s] and whose prefix is the same as [s] but starting with ["_"];
+  * [v] and whose prefix is the same as [v] but starting with ["_"];
   * such special prefixes are forbidden in other ways to create
   * variables.
   * The variable is guaranteed to not appear anywhere else so far.
@@ -96,25 +96,27 @@ val make_new_from : 'a var -> 'a var
   * using [make_new_from]. *)
 val is_new : 'a var -> bool
 
-(** [make_fresh env sort prefix]
-  * creates a variable of sort [sort] with a name that is not
-  * already present in [env].
-  * If possible the name [prefix] is used.
-  * If variable of name [prefix] already exists inside the environment,
-  * a variable with the given name concateneted with the smallest possible
-  * integer is created.
-  * The new environment and variable are returned.*)
-val make_fresh : env -> 'a Type.t -> string -> env * 'a var
+(** [make env sort name] creates a variable of sort [sort] in [env].
+    - [~opt = `Approx], appends some suffix to [name] to get a new variable.
+    - [~opt = `Shadow], uses [name], and shadows any pre-existing definition. *)
+val make : 
+  [`Approx | `Shadow] -> env -> 'a Type.t -> string -> env * 'a var
 
-(** Same as [make_fresh], but updates the [env ref] passed as argument. *)
-val make_fresh_and_update : env ref -> 'a Type.t -> string -> 'a var
+(** Stateful version of [make] *)
+val make_r : 
+  [`Approx | `Shadow] -> env ref -> 'a Type.t -> string -> 'a var
 
-(** Same as [make_fresh], but uses the sort and name prefix
-  * of the variable passed as argument. *)
-val make_fresh_from : env -> 'a var -> env * 'a var
+(** Same than [make], but uses the exact name *)
+val make_exact : env -> 'a Type.t -> string -> (env * 'a var) option
 
-(** Combines [make_fresh_from] and [make_fresh_and_update]. *)
-val make_fresh_from_and_update : env ref -> 'a var -> 'a var
+(** Stateful version of [make_exact] *)
+val make_exact_r : env ref -> 'a Type.t -> string -> 'a var option
+
+(** Create a fresh variable resembling the one given in argument. *)
+val fresh : env -> 'a var -> env * 'a var
+
+(** Stateful version of [refresh]. *)
+val fresh_r : env ref -> 'a var -> 'a var
 
 
 (*------------------------------------------------------------------*)

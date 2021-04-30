@@ -287,16 +287,14 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : ES.sequent =
 
     let v' = match nip with
       | Args.Unnamed
-      | Args.AnyName ->
-        Vars.make_fresh_from_and_update env v
+      | Args.AnyName -> Vars.fresh_r env v
 
       | Args.Named name ->
-        let v' = Vars.make_fresh_and_update env (Vars.ty v) name in
-
-        if Vars.name v' <> name then
-          hard_failure (
-            Tactics.Failure ("variable name " ^ name ^ " already in use"));
-        v'
+        match Vars.make_exact_r env (Vars.ty v) name with
+        | None ->
+          hard_failure 
+            (Tactics.Failure ("variable name " ^ name ^ " already in use"))
+        | Some v' -> v'
     in
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
@@ -507,7 +505,7 @@ let induction Args.(Timestamp ts) s =
           let subst =
             List.map
               (fun i ->
-                 let i' = Vars.make_fresh_from_and_update env i in
+                 let i' = Vars.fresh_r env i in
                  Term.ESubst (Term.Var i, Term.Var i'))
               descr.Action.indices
           in
@@ -632,7 +630,7 @@ let fa Args.(Int i) s =
           match e with
           | Find (vars,c,t,e) ->
             let env = ref (ES.env s) in
-            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let vars' = List.map (Vars.fresh_r env) vars in
             let subst =
               List.map2
                 (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
@@ -935,7 +933,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
               in
               let env = ref env in
               let bv' =
-                List.map (Vars.make_fresh_from_and_update env) bv in
+                List.map (Vars.fresh_r env) bv in
               let subst =
                 List.map2
                   (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
@@ -956,7 +954,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
             let env = ref env in
             let new_action_indices =
               List.map
-                (fun i -> Vars.make_fresh_from_and_update env i)
+                (fun i -> Vars.fresh_r env i)
                 a.Action.indices
             in
 
@@ -968,7 +966,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
 
             let bv' =
               List.map
-                (fun i -> Vars.make_fresh_from_and_update env i)
+                (fun i -> Vars.fresh_r env i)
                 bv
             in
 
@@ -1772,7 +1770,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
                List.map
                  (function Vars.EVar v ->
                     Term.(ESubst (Var v,
-                                  Var (Vars.make_fresh_from_and_update env v))))
+                                  Var (Vars.fresh_r env v))))
                  vars
              in
 
@@ -1800,7 +1798,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              let env = ref env in
              let new_action_indices =
                List.map
-                 (fun i -> Vars.make_fresh_from_and_update env i)
+                 (fun i -> Vars.fresh_r env i)
                  a.Action.indices
              in
 
@@ -1843,7 +1841,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
                List.map
                  (function Vars.EVar v ->
                     Term.(ESubst (Var v,
-                                  Var (Vars.make_fresh_from_and_update env v))))
+                                  Var (Vars.fresh_r env v))))
                  vars
              in
 

@@ -959,7 +959,7 @@ and subst_binding
     then 
       match var with 
       | Vars.EVar v ->
-        let new_v = Vars.make_fresh_from_and_update env v in
+        let new_v = Vars.fresh_r env v in
         let s = (ESubst (Var v,Var new_v)) :: s in
         ( Vars.EVar new_v, s)
     else ( var, s ) in
@@ -1471,7 +1471,7 @@ module St = Set.Make (T)
 (** {2 Tests} *)
 
 let () =
-  let mkvar x s = Var (snd (Vars.make_fresh Vars.empty_env s x)) in
+  let mkvar x s = Var (snd (Vars.make Vars.empty_env s x)) in
   Checks.add_suite "Head normalization" [
     "Macro, different ts", `Quick, begin fun () ->
       let ts = mkvar "ts" Type.Timestamp in

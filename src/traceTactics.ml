@@ -561,15 +561,14 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
     let v' = match nip with
       | Args.Unnamed
       | Args.AnyName ->
-        Vars.make_fresh_from_and_update env v
+        Vars.fresh_r env v
 
       | Args.Named name ->
-        let v' = Vars.make_fresh_and_update env (Vars.ty v) name in
-
-        if Vars.name v' <> name then
-          hard_failure (
-            Tactics.Failure ("variable name " ^ name ^ " already in use"));
-        v'
+        match Vars.make_exact_r env (Vars.ty v) name with
+        | None ->
+          hard_failure 
+            (Tactics.Failure ("variable name " ^ name ^ " already used"))
+        | Some v' -> v'
     in
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
@@ -628,7 +627,7 @@ let timestamp_case (ts : Term.timestamp) s : sequent list =
     let indices =
       let env = ref (TS.env s) in
       List.map
-        (fun i -> Vars.make_fresh_from_and_update env i)
+        (fun i -> Vars.fresh_r env i)
         descr.Action.indices 
     in
 
@@ -694,7 +693,7 @@ let hypothesis_case ~nb id (s : sequent) : c_res list =
   * This can be used with [vars = []] if orig is an [if-then-else] term. *)
 let case_cond orig vars c t e s : sequent list =
   let env = ref (TS.env s) in
-  let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+  let vars' = List.map (Vars.fresh_r env) vars in
   let subst =
     List.map2
       (fun i i' -> ESubst (Term.Var i, Term.Var i'))
@@ -1138,7 +1137,7 @@ let rec simpl_left s =
         List.map
           (fun (Vars.EVar v) ->
              Term.ESubst  (Term.Var v,
-                           Term.Var (Vars.make_fresh_from_and_update env v)))
+                           Term.Var (Vars.fresh_r env v)))
           vs
       in
       let f = Term.subst subst f in
@@ -1231,8 +1230,8 @@ let induction s  =
         (
           (* We need two fresh variables in env,
            * but one will not be kept in the final environment. *)
-          let env,v' = Vars.make_fresh_from (TS.env s) v in
-          let _,v'' = Vars.make_fresh_from env v in
+          let env,v' = Vars.fresh (TS.env s) v in
+          let _,v'' = Vars.fresh env v in
           (* Introduce v as v'. *)
           let f' = match vs with
             | [] -> f
@@ -1701,7 +1700,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
     let bv = List.filter (fun i -> not (Vars.mem env (Vars.name i))) js in
 
     let env_local = ref env in
-    let bv' = List.map (Vars.make_fresh_from_and_update env_local) bv in
+    let bv' = List.map (Vars.fresh_r env_local) bv in
 
     let subst =
       List.map2
@@ -1753,7 +1752,7 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
       List.filter (fun v -> not (List.mem v is_a)) a.Action.indices in
 
     let eindices' =
-      List.map (Vars.make_fresh_from_and_update env_local) eindices in
+      List.map (Vars.fresh_r env_local) eindices in
 
     (* refresh existantially quant. indices, and subst is_a by is. *)
     let subst =
@@ -1974,7 +1973,7 @@ let autosubst s =
 (*------------------------------------------------------------------*)
 (* TODO: this should be an axiom in some library, not a rule *)
 let exec (Args.Timestamp a) s =
-  let _,var = Vars.(make_fresh (TS.env s) Type.Timestamp "t") in
+  let _,var = Vars.make `Approx (TS.env s) Type.Timestamp "t" in
   let formula =
     Term.ForAll
       ([Vars.EVar var],
@@ -2035,7 +2034,7 @@ let fa s =
           | Term.Seq (vars,t),
             Term.Seq (vars',t') when vars = vars' ->
             let env = ref (TS.env s) in
-            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let vars' = List.map (Vars.fresh_r env) vars in
             let s = TS.set_env !env s in
             let subst =
               List.map2
@@ -2070,7 +2069,7 @@ let fa s =
 
             (* Refresh bound variables. *)
             let env = ref (TS.env s) in
-            let vars' = List.map (Vars.make_fresh_from_and_update env) vars in
+            let vars' = List.map (Vars.fresh_r env) vars in
             let s = TS.set_env !env s in
             let subst =
               List.map2
@@ -2763,7 +2762,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
     List.fold_left
       (fun (subst,env) (Vars.EVar v) ->
          if Vars.mem init_env (Vars.name v) then subst,env else
-         let env,v' = Vars.make_fresh_from env v in
+         let env,v' = Vars.fresh env v in
          let subst = Term.(ESubst (Var v, Var v')) :: subst in
          subst,env)
       ([],init_env)

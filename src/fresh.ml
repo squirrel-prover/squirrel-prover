@@ -39,8 +39,6 @@ class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
 
   method visit_macro mn a = 
     match Symbols.Macro.get_def mn.s_symb cntxt.table with
-    | Symbols.Input -> actions <- (a,true)::actions
-    | Symbols.(Output | State _ | Cond | Exec | Frame) ->
-      actions <- (a,false)::actions
-    | _ -> actions <- (a, false)::actions
+    | Symbols.Input -> actions <- (a,true)  :: actions
+    | _             -> actions <- (a,false) :: actions
 end
