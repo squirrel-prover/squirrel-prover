@@ -100,7 +100,6 @@ name rR : index->message
 (* ideal keys *)
 name ikIR : index -> index ->message
 
-
 channel cI
 channel cR.
 
@@ -111,18 +110,16 @@ process Initiator(i:index) =
  in(cR,ctR);
 
  (* first key derivation *)
- let kR = decap(ctR,skI) in
+ let dkR = decap(ctR,skI) in
 
  (* common derivations *)
  let kI2 = exct(kI(i),skex) in
- let kR2 = exct(kR,skex) in
+ let kR2 = exct(dkR,skex) in
  let s = <pk(skI),<ctI,<pk(skR),ctR>>> in
  let kIR = expd(s,kI2) XOR expd(s,kR2) in
 
  (* outputting the key should be real or random when the partner is honnest *)
- out(cI, try find j such that kR = kR(j) in  diff(ikIR(i,j), kIR) else kIR).
-
-
+ out(cI, try find j such that dkR = kR(j) in  diff(ikIR(i,j), kIR) else kIR).
 
 
 process Responder(j:index) =
@@ -132,16 +129,63 @@ process Responder(j:index) =
    out(cR,ctR);
 
    (* first key derivation *)
-   let kI = decap(ctI,skR) in
+   let dkI = decap(ctI,skR) in
 
  (* common derivations *)
- let kI2 = exct(kI,skex) in
+ let kI2 = exct(dkI,skex) in
  let kR2 = exct(kR(j),skex) in
  let s = <pk(skI),<ctI,<pk(skR),ctR>>> in
  let kIR = expd(s,kI2) XOR expd(s,kR2) in
 
  (* outputting the key should be real or random when the partner is honnest *)
- out(cR, try find i such that kI = kI(i) in  diff(ikIR(i,j), kIR) else kIR).
+ out(cR, try find i such that dkI = kI(i) in  diff(ikIR(i,j), kIR) else kIR).
 
 
 system out(cI,skex); ((!_j R: Responder(j)) | (!_i I: Initiator(i))).
+
+equiv main.
+Proof.
+ enrich skex; enrich pk(skI); enrich pk(skR).
+induction t.
+  expandall.
+  by fa 3.
+
+  (* first output of R *)
+  expandall.
+  fa 3.
+  fa 4.
+  fa 4.
+  cca1 4.
+
+  equivalent len(kR(j)), len(skex).
+  namelength kR(j), skex.
+  case j0=j.
+
+
+  assert happens(R1(j)).
+  by depends R(j), R1(j).
+
+ (* diff output  of R *)
+ admit.
+
+
+ (* first output of I *)
+  expandall.
+  fa 3.
+  fa 4.
+  fa 4.
+  cca1 4.
+
+  equivalent len(kI(i)), len(skex).
+  namelength kI(i), skex.
+  case i0=i.
+
+
+  assert happens(I1(i)).
+  by depends I(i), I1(i).
+
+ (* diff output of I *)
+
+ admit.
+
+Qed.
