@@ -1409,14 +1409,18 @@ type trace_cntxt = {
 
 open Term
     
-let env = ref Vars.empty_env
-let tau = Var (Vars.make_r env Timestamp "tau")
-and tau' = Var (Vars.make_r env Timestamp "tau")
-and tau'' = Var (Vars.make_r env Timestamp "tau")
-and tau3 = Var (Vars.make_r env Timestamp "tau")
-and tau4 = Var (Vars.make_r env Timestamp "tau")        
-and i =  Vars.make_r env Index "i"
-and i' = Vars.make_r env Index "i"
+let env = ref Vars.empty_env 
+
+let mk_var   v = Vars.make_r `Approx env Timestamp v 
+let mk_var_i v = Vars.make_r `Approx env Index     v 
+
+let tau = Var (mk_var "tau")
+and tau' = Var (mk_var "tau")
+and tau'' = Var (mk_var "tau")
+and tau3 = Var (mk_var "tau")
+and tau4 = Var (mk_var "tau")        
+and i =  mk_var_i "i"
+and i' = mk_var_i "i"
 
 let table = Symbols.builtins_table
               

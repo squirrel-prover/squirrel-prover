@@ -364,8 +364,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
   (* Update env.vars_env with a new variable of sort [sort] computed from
    * [name] *)
-  let make_fresh env sort name =
-    let ve',x = Vars.make env.vars_env sort name in
+  let make_fresh param env sort name =
+    let ve',x = Vars.make param env.vars_env sort name in
     { env with vars_env = ve' },x
   in
 
@@ -661,7 +661,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         table)
 
     | Repl (i,p) ->
-      let env,i' = make_fresh env Type.Index (L.unloc i) in
+      let env,i' = make_fresh `Shadow env Type.Index (L.unloc i) in
       let env =
         { env with
           isubst = (L.unloc i, Theory.var_i dum (Vars.name i'), i') :: env.isubst ;
@@ -688,10 +688,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
     | In (c,x,p) ->
       let ch = Channel.of_lsymb c table in
       (* TODO: subtypes*)
-      let env,x' = make_fresh env Type.Message (L.unloc x) in
-      let in_th =
-        Theory.var_i dum (Vars.name x')
-      in
+      let env,x' = make_fresh `Shadow env Type.Message (L.unloc x) in
+      let in_th = Theory.var_i dum (Vars.name x') in
       let in_tm = Term.Var x' in
       let env = { env with
                   inputs = (ch,x')::env.inputs ;
@@ -743,7 +741,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         List.fold_left
           (fun (env,s) i ->
              let i = L.unloc i in
-             let env,i' = make_fresh env Type.Index i in
+             let env,i' = make_fresh `Shadow env Type.Index i in
              env,(i,i')::s)
           (env,[])
           (List.rev evars)

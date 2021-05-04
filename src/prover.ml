@@ -717,8 +717,7 @@ let make_equiv_goal
     List.fold_left (fun env (x, s) ->
         let x = L.unloc x in
         let Type.ETy s = Theory.parse_p_ty0 table [] s in
-        assert (not (Vars.mem env x)) ;
-        fst (Vars.make env s x)
+        fst (Vars.make `Shadow env s x)
       ) Vars.empty_env env
   in
   let subst = Theory.subst_of_env env in
@@ -734,7 +733,7 @@ let make_equiv_goal
 let make_equiv_goal_process ~table system_1 system_2 =
   let open SystemExpr in
   let env = ref Vars.empty_env in
-  let ts = Vars.make_r env Type.Timestamp "t" in
+  let ts = Vars.make_r `Approx env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
 

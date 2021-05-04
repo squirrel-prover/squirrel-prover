@@ -1677,7 +1677,7 @@ let () =
                               mk_cst (), mk_cst (), mk_cst () in
 
        let v = ccst (Cst.Cmvar (Vars.EVar (snd (
-           Vars.make Vars.empty_env (Type.Message) "v"))))
+           Vars.make `Approx Vars.empty_env (Type.Message) "v"))))
        in
        let state0 = complete_cterms table [(a,b); (b,c);
                                            (b,d); (e,e'); 

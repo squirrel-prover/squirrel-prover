@@ -700,7 +700,7 @@ let mem_assoc state x (ty : 's Type.ty) (subst : esubst list) : bool =
 let subst_of_bvars (vars : (lsymb * Type.ety) list) =
   let make (v, Type.ETy s) =
     let v = L.unloc v in
-    ESubst (v, Term.Var (snd (Vars.make Vars.empty_env s v)))
+    ESubst (v, Term.Var (snd (Vars.make `Shadow Vars.empty_env s v)))
   in
   List.map make vars
 
@@ -709,7 +709,7 @@ let subst_of_bnds table ty_vars (vars : (lsymb * p_ty) list) =
   let make (v, s) =
     let v = L.unloc v in
     let Type.ETy s = parse_p_ty0 table ty_vars s in
-    ESubst (v, Term.Var (snd (Vars.make Vars.empty_env s v)))
+    ESubst (v, Term.Var (snd (Vars.make `Shadow Vars.empty_env s v)))
   in
   table, List.map make vars
 
@@ -1194,7 +1194,7 @@ let check
     table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env) 
     (env : env) t (Type.ETy s) : unit =
   let dummy_var s =
-    Term.Var (snd (Vars.make Vars.empty_env s "#dummy"))
+    Term.Var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
   let subst =
