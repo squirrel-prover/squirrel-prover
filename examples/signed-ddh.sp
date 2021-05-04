@@ -92,7 +92,7 @@ goal [secretP] P_charac (i:index):
 Proof.
   simpl.
   expand cond, pkS(i)@Pchall1(i).
-  rewrite (fst(fst(input@Pchall1(i))) = pk(skS)) in Meq.
+  rewrite (fst(fst(input@Pchall1(i))) = pk(skS)) in Meq. 
   euf Meq.
   exists j.
 Qed.

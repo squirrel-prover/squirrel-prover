@@ -397,21 +397,20 @@ let convert_args table tyvars env parser_args tactic_type =
   let conv_cntxt = Theory.{ table = table; cntxt = InGoal; } in
   
   let rec conv_args parser_args tactic_type env =
-    let tsubst = Theory.subst_of_env env in    
     match parser_args, tactic_type with
     | [Theory p], Sort Timestamp ->
-      Arg (Timestamp (Theory.convert conv_cntxt tyvars tsubst p Type.Timestamp))
+      Arg (Timestamp (Theory.convert conv_cntxt tyvars env p Type.Timestamp))
 
     | [Theory p], Sort Message ->
-      let t, ty = Theory.convert_i conv_cntxt tyvars tsubst p in
+      let t, ty = Theory.convert_i conv_cntxt tyvars env p in
 
       Arg (Message (t, ty))
 
     | [Theory p], Sort Boolean ->
-      Arg (Boolean   (Theory.convert conv_cntxt tyvars tsubst p Type.Boolean))
+      Arg (Boolean   (Theory.convert conv_cntxt tyvars env p Type.Boolean))
 
     | [Theory p], Sort ETerm ->
-      let et = match Theory.econvert conv_cntxt tyvars tsubst p with
+      let et = match Theory.econvert conv_cntxt tyvars env p with
         | Some (Theory.ETerm (s,t,l)) -> ETerm (s,t,l)
         (* FIXME: this does not give any conversion error to the user. *)
         | None -> tac_arg_error (L.loc p) CannotConvETerm in
@@ -430,7 +429,7 @@ let convert_args table tyvars env parser_args tactic_type =
       raise Theory.(Conv (L.loc t, Int_expected (L.unloc t)))
 
     | [Theory p], Sort Index ->
-      Arg (Index (Theory.convert_index table tyvars tsubst p))
+      Arg (Index (Theory.convert_index table tyvars env p))
     (* old code: *)
     (* Arg (Index (Theory.convert_index table tsubst (Theory.var p))) *)
 

@@ -43,6 +43,8 @@ val tsubst : Type.tsubst -> 'a var -> 'a var
 
 val kind : 'a var -> 'a Type.kind
 
+exception CastError
+
 val cast  : 'a var -> 'b Type.kind -> 'b var
 val ecast :   evar -> 'a Type.kind -> 'a var
 
@@ -69,7 +71,7 @@ val of_list : evar list -> env
 val mem : env -> string -> bool
 
 val find_e : env -> string -> evar
-val find   : env -> string -> 'a Type.kind -> 'a var
+val find   : env -> string -> 'a Type.kind -> 'a var 
 
 exception Undefined_Variable
 

@@ -298,6 +298,7 @@ let debug_off fmt = Format.fprintf Printer.dummy_fmt fmt
 let debug_on fmt =
   Format.printf "[DEBUG] " ;
   Format.printf fmt
+
 let debug = debug_off
 
 let print_isubst isubst =
@@ -318,18 +319,15 @@ let print_msubst msubst =
 type p_env = {
   ty_env : Type.Infer.env;
 
-  (* RELATED TO THE CURRENT PROCESS
-   * As the process is parsed, its bound variables are renamed into
-   * unambiguous "refreshed" variables. For example, !_i !_i P(i)
-   * becomes !_i !_i0 P(i0): in the second binding, i is refreshed into
-   * i0. *)
   alias : lsymb ;
     (* current alias used for action names in the process *)
+
   indices : Vars.index list ;
-    (* current list of bound indices (coming from Repl or Exists constructs),
-     * after refresh *)
+    (* current list of bound indices (coming from Repl or Exists constructs) *)
+
   vars_env : Vars.env ;
-    (* local variables environment, after refresh *)
+    (* local variables environment *)
+
   isubst : (string * Theory.term_i * Vars.index) list ;
     (* substitution for index variables (Repl, Exists, Apply)
      * mapping each variable from the original process (before refresh)
@@ -337,6 +335,7 @@ type p_env = {
      * as Theory.term and as a Vars.index suitable for use in Term.term
      * TODO items are always of the form (i, Theory.Var (Vars.name i'), i')
      *      why not keep (i,i') for simplicity? *)
+
   msubst : (string * Theory.term_i * Term.message) list ;
     (* substitution for message variables (New, Let, In, Apply)
      * each variable from the original process (before refresh)
@@ -344,21 +343,22 @@ type p_env = {
      * as a Theory.term and as a Term.message
      * (the third component is also used to map input variables to
      * input macros) *)
+
   inputs : (Channel.t * Vars.message) list ;
-    (* bound input variables, after refresh *)
+    (* bound input variables *)
 
   (* RELATED TO THE CURRENT ACTION *)
   evars : Vars.index list ;
-    (* variables bound by existential quantification, after refresh *)
+    (* variables bound by existential quantification *)
+
   action : Action.action ;
     (* the type [Action.action] describes the execution point in the protocol *)
+
   facts : Term.message list ;
-    (* list of formulas to create the condition term of the action,
-     * indices and variables are the ones after the refresh *)
+    (* list of formulas to create the condition term of the action *)
+
   updates : (lsymb * Vars.index list * Type.tmessage * Term.message) list ;
-    (* list of updates performed in the action,
-     * indices in the second component, and indices and variables in the
-     * Term.message are the ones after the refresh.
+    (* list of updates performed in the action.
      * The type can be a type unification variables. *)
 
 }
@@ -372,8 +372,8 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * safety. *)
   let env_ts,ts,dummy_in =
     let env = Vars.empty_env in
-    let env,ts = Vars.make `Approx env Type.Timestamp "$ts" in
-    let env,dummy_in = Vars.make `Approx env Type.Message "$dummy" in
+    let env,ts = Vars.make `Shadow env Type.Timestamp "$ts" in
+    let env,dummy_in = Vars.make `Shadow env Type.Message "$dummy" in
     env,ts,dummy_in
   in
 
@@ -381,26 +381,35 @@ let parse_proc (system_name : System.system_name) init_table proc =
    * [name] *)
   let make_fresh param env sort name =
     let ve',x = Vars.make param env.vars_env sort name in
-    { env with vars_env = ve' },x
+    { env with vars_env = ve' }, x
+  in
+
+  let create_subst env isubst msubst =
+    List.map (fun (x,_,tm) -> 
+        let v = Vars.find env x Type.KIndex in
+        Term.ESubst (Term.Var v, Term.Var tm)
+      ) isubst
+    @
+    List.map (fun (x,_,tm) -> 
+        let v = Vars.find env x Type.KMessage in
+        Term.ESubst (Term.Var v, tm)
+      ) msubst
   in
 
   (* Convert a Theory.term to Term.term using the special sort
    * of substitution ([isubst] and [msubst]) maintained by the
    * parsing function.
    * The special timestamp variable [ts] is used. *)
-  let create_subst isubst msubst =
-    List.map
-      (fun (x,_,v) -> Theory.ESubst (x,Term.Var v))
-      isubst @
-    List.map
-      (fun (x,_,tm) -> Theory.ESubst (x,tm))
-      msubst
-  in
-  let conv_term table env ts t sort =
-    let subst = create_subst env.isubst env.msubst in
-    Theory.convert
-      ~ty_env:env.ty_env
-      { table = table; cntxt = InProc ts; } [] subst t sort
+  let conv_term : type a.
+    Symbols.table -> p_env -> Term.timestamp -> 
+    Theory.term -> a Type.ty -> a Term.term =
+    fun table env ts t sort ->
+    let t = 
+      Theory.convert ~ty_env:env.ty_env
+        { table = table; cntxt = InProc ts; } [] env.vars_env t sort
+    in
+    let subst = create_subst env.vars_env env.isubst env.msubst in
+    Term.subst subst t
   in
 
   (* Used to get the 2nd and 3rd component associated to the string [v] in
@@ -410,8 +419,6 @@ let parse_proc (system_name : System.system_name) init_table proc =
     th,tm
   in
 
-  (* Transform elements (x,y,z) of substitutions [isubst] or [msubst]
-   * into elements (x,y). *)
   let to_tsubst subst = List.map (fun (x,y,_) -> x,y) subst in
 
   (* Register an action, when we arrive at the end of a block
@@ -532,32 +539,38 @@ let parse_proc (system_name : System.system_name) init_table proc =
       (* Keep explicit alias if there is one,
        * otherwise use id as the new alias. *)
       let a' = match L.unloc proc with Alias (_,a) -> a | _ -> id in
-      let t,p = find_process_lsymb table id in
+      let proc_ty, p = find_process_lsymb table id in
 
-      let isubst', msubst' =
+      let new_env, isubst', msubst' =
         (* TODO avoid or handle conflicts with variables already
          * in domain of subst, i.e. variables bound above the apply *)
         let tsubst = (to_tsubst env.isubst@to_tsubst env.msubst) in
         List.fold_left2
-          (fun (iacc,macc) (x,Type.ETy ty) v ->
-             match Type.kind ty, L.unloc v with
-             | Type.KMessage,_ ->
+          (fun (new_env,iacc,macc) (x,Type.ETy ty) v ->
+             let new_env, _ = make_fresh `Shadow new_env ty x in
+
+             match Type.kind ty with
+             | Type.KMessage ->
                let v'_th = Theory.subst v tsubst in
                let v'_tm : Term.message =
                  conv_term table env (Term.Var ts) v ty in
 
-               iacc, (x, L.unloc v'_th, v'_tm) :: macc
+               new_env, iacc, (x, L.unloc v'_th, v'_tm) :: macc
 
-             | Type.KIndex, Theory.App (i,[]) ->
-               let _,i'_tm = list_assoc (L.unloc i) env.isubst in
-               let i'_th = Theory.subst v tsubst in
-               (x, L.unloc i'_th, i'_tm) :: iacc, macc
+             | Type.KIndex ->
+               let v'_th = Theory.subst v tsubst in
+               let v'_tm : Type.index Term.term =
+                 conv_term table env (Term.Var ts) v ty in
+               let v'_tm = Utils.oget (Term.destr_var v'_tm) in
+
+               new_env, (x, L.unloc v'_th, v'_tm) :: iacc, macc
+               
              | _ -> assert false
-          ) (env.isubst,env.msubst) t args
+          ) (env, env.isubst,env.msubst) proc_ty args
       in
 
       let env =
-        { env with
+        { new_env with
           alias  = a' ;
           isubst = isubst' ;
           msubst = msubst' }
@@ -582,7 +595,11 @@ let parse_proc (system_name : System.system_name) init_table proc =
     in    
     let n'_s = Term.mk_isymb n' ty (List.rev env.indices) in
     let n'_tm = Term.Name n'_s in
-    let env = { env with msubst = (L.unloc n,n'_th,n'_tm) :: env.msubst }
+
+    let vars_env, _ = Vars.make `Shadow env.vars_env ty (L.unloc n) in
+
+    let env = { env with vars_env;
+                         msubst = (L.unloc n,n'_th,n'_tm) :: env.msubst }
     in
     (table,env,p)
 
@@ -646,8 +663,12 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     let n'_s = Term.mk_isymb x' ty (List.rev env.indices) in
     let x'_tm = Term.Macro (n'_s, [], Term.Var ts) in
+
+    let vars_env, _ = Vars.make `Shadow env.vars_env ty (L.unloc x) in
+    
     let env =
-      { env with msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }
+      { env with vars_env; 
+                 msubst = (L.unloc x,x'_th,x'_tm) :: env.msubst }
     in
     (x',t',table,env,p)
 
@@ -696,6 +717,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let x',t',table,env,p = p_let ~table ~env proc in
       let p',pos',table = p_in ~table ~env ~pos ~pos_indices p in
       let x' = L.mk_loc (L.loc x) (Symbols.to_string x') in
+
       ( Let (x', t',ty,p'),
         pos',
         table)
@@ -753,13 +775,11 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
     | Exists (evars, cond, p, q) ->
       let env_p,s =
-        List.fold_left
-          (fun (env,s) i ->
-             let i = L.unloc i in
+        List.fold_left (fun (env,s) i ->
+            let i = L.unloc i in
              let env,i' = make_fresh `Shadow env Type.Index i in
-             env,(i,i')::s)
-          (env,[])
-          (List.rev evars)
+            env,(i,i') :: s
+          ) (env,[]) (List.rev evars)
       in
       let evars' = List.map (fun (_,x) -> Vars.EVar x) s in
       let isubst' =
@@ -772,6 +792,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
       let cond' =
         Theory.subst cond (to_tsubst env_p.isubst @ to_tsubst env_p.msubst)
       in
+
       (* No state updates have been done yet in the current
        * action. We thus have to substitute [ts] by [pred(ts)] for all state
        * macros appearing in [t]. This is why we call [Term.subst_macros_ts]
@@ -780,7 +801,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
         Term.subst_macros_ts table [] (Term.Var ts)
           (conv_term table env_p (Term.Var ts) cond Type.Boolean)
       in
-      let facts_p = fact::env.facts in
+      let facts_p = fact :: env.facts in
       let facts_q =
         match evars' with
         | [] -> (Term.mk_not fact) :: env.facts

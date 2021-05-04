@@ -239,8 +239,7 @@ val check_signature :
   Symbols.table -> Term.fname -> Term.fname -> Term.fname option
 
 (*------------------------------------------------------------------*)
-(** {2 Conversions}
-  * Convert terms inside the theory to terms of the prover. *)
+(** {2 Substitutions} *)
 
 val subst : term -> (string * term_i) list -> term
 
@@ -248,15 +247,15 @@ type esubst = ESubst : string * 'a Term.term -> esubst
 
 type subst = esubst list
 
-val subst_of_env : Vars.env -> subst
+(*------------------------------------------------------------------*)
+(** {2 Conversions}
+  * Convert terms inside the theory to terms of the prover. *)
 
 val parse_subst :
   Symbols.table -> Type.tvars -> Vars.env -> Vars.evar list -> term list ->
   Term.subst
 
-val pp_subst : Format.formatter -> subst -> unit
-
-val convert_index : Symbols.table -> Type.tvars -> subst -> term -> Vars.index
+val convert_index : Symbols.table -> Type.tvars -> Vars.env -> term -> Vars.index
 
 (** Conversion context.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
@@ -274,13 +273,13 @@ type conv_env = { table : Symbols.table;
 val convert_i : 
   ?ty_env:Type.Infer.env ->
   ?pat:bool ->
-  conv_env -> Type.tvars -> subst -> term -> 
+  conv_env -> Type.tvars -> Vars.env -> term -> 
   Term.message * Type.tmessage
 
 val convert : 
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> subst -> 
+  conv_env -> Type.tvars -> Vars.env -> 
   term -> 'a Type.ty
   -> 'a Term.term
 
@@ -290,7 +289,7 @@ type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
 (** Convert a term to any sort (tries sequentially all conversions).
     Should return the most precise sort (i.e. [Boolean] before [Message]). *)
-val econvert : conv_env -> Type.tvars -> subst -> term -> eterm option
+val econvert : conv_env -> Type.tvars -> Vars.env -> term -> eterm option
 
 (** [find_app_terms t names] returns the sublist of [names] for which there
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the

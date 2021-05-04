@@ -131,9 +131,11 @@ and equals l l' = List.for_all2 equal l l'
 
 
 (*------------------------------------------------------------------*)
-let var_i loc x = App (L.mk_loc loc x,[])
-let var loc x = L.mk_loc loc (var_i loc x)
-let var_of_lsymb s = var (L.loc s) (L.unloc s)
+let var_i loc x : term_i = App (L.mk_loc loc x,[])
+
+let var   loc x : term = L.mk_loc loc (var_i loc x)
+
+let var_of_lsymb s : term = var (L.loc s) (L.unloc s)
 
 let destr_var = function
   | App (v, []) -> Some v
@@ -591,28 +593,41 @@ let make_app loc table cntxt (lsymb : lsymb) (l : term list) : app =
 
 
 (*------------------------------------------------------------------*)
-(** {2 ESubstitution} *)
+(** {2 Substitution} *)
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 
 type subst = esubst list
+   
+(** Apply a partial substitution to a term.
+  * This is meant for formulas and local terms in processes,
+  * and does not support optional timestamps.
+  * TODO substitution does not avoid capture. *)
+let subst t (s : (string * term_i) list) =
+  let rec aux_i = function
+    (* Variable *)
+    | App (x, []) as t ->
+      begin try
+          let ti = List.assoc (L.unloc x) s in
+          ti
+        with Not_found -> t
+      end
+    | Tpat -> Tpat
+    | Tinit -> Tinit
+    | Tpred t -> Tpred (aux t)
+    | Happens t -> Happens (List.map aux t)
+    | App (s,l) -> App (s, List.map aux l)
+    | AppAt _-> assert false
+    | Seq (vs,t) -> Seq (vs, aux t)
+    | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
+    | ForAll (vs,f) -> ForAll (vs, aux f)
+    | Exists (vs,f) -> Exists (vs, aux f)
+    | Diff (l,r) -> Diff (aux l, aux r)
+    | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
 
-let pp_esubst ppf (ESubst (t1,t2)) =
-  Fmt.pf ppf "%s->%a" t1 Term.pp t2
+  and aux t = L.mk_loc (L.loc t) (aux_i (L.unloc t))
 
-let pp_subst ppf s =
-  Fmt.pf ppf "@[<hv 0>%a@]"
-    (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
-
-let subst_of_env (env : Vars.env) : esubst list =
-  let to_subst : Vars.evar -> esubst =
-    fun (Vars.EVar v) ->
-    match Vars.kind v with
-    | Type.KIndex     -> ESubst (Vars.name v,Term.Var v)
-    | Type.KTimestamp -> ESubst (Vars.name v,Term.Var v)
-    | Type.KMessage   -> ESubst (Vars.name v,Term.Var v)
-    in
-  List.map to_subst (Vars.to_list env)
+  in aux t
 
 (*------------------------------------------------------------------*)
 (** {2 Conversion contexts and states} *)
@@ -643,14 +658,12 @@ type conv_state = {
   cntxt     : conv_cntxt;
   allow_pat : bool;
 
-  env       : unit(* Vars.env *);
-  subst     : subst;
+  env       : Vars.env;
   ty_env    : Type.Infer.env;  
 }
 
-let mk_state table cntxt ty_vars (* env *) subst allow_pat ty_env =
-  let env = () in      (* TODO *)
-  { table; cntxt; ty_vars; env; subst; allow_pat; ty_env; }
+let mk_state table cntxt ty_vars env allow_pat ty_env =
+  { table; cntxt; ty_vars; env; allow_pat; ty_env; }
 
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
@@ -676,57 +689,34 @@ let check_term_ty state ~of_t (t : 'a Term.term) (ty : 'b Type.ty) : unit =
 (*------------------------------------------------------------------*)
 (** {2 Conversion} *)
 
-let rec assoc :
-  type a. conv_state -> subst -> lsymb -> a Type.ty -> a Term.term
-  = fun state subst st ty ->
-  match subst with
-    | [] -> conv_err (L.loc st) (Undefined (L.unloc st))
-              
-  | ESubst (v,t)::_ when v = L.unloc st ->
-    let kind = Type.kind ty in
-    begin
-      match Type.equalk_w (Term.kind t) kind with
-      | Some Type.Type_eq ->
-        let of_t = var_of_lsymb st in
+let convert_var :
+  type a. conv_state -> Vars.env -> lsymb -> a Type.ty -> a Term.term
+  = fun state env st ty ->
+    try
+      let v = Vars.find env (L.unloc st) (Type.kind ty) in 
+      
+      let of_t = var_of_lsymb st in
 
-        check_ty_leq state ~of_t (Term.ty ~ty_env:state.ty_env t) ty;
-        
-        t
-          
-      | None ->
-        conv_err (L.loc st) (Type_error (App (st,[]), Type.ETy ty))
-    end
+      check_ty_leq state ~of_t (Vars.ty v) ty;
+      
+      Term.Var v
+    with
+    | Not_found -> conv_err (L.loc st) (Undefined (L.unloc st))
+    | Vars.CastError ->
+      conv_err (L.loc st) (Type_error (App (st,[]), Type.ETy ty))
+
+let convert_bnds env (vars : (lsymb * Type.ety) list) =
+  let do1 (env, v_acc) (vsymb, Type.ETy s) =
+    let env, var  = Vars.make `Shadow env s (L.unloc vsymb) in
+    env, Vars.EVar var :: v_acc
+  in
+  let env, v_acc = List.fold_left do1 (env, []) vars in
+  env, List.rev v_acc
+
+let convert_p_bnds table ty_vars env (vars : (lsymb * p_ty) list) =
+  let vars = List.map (fun (v,s) -> v, parse_p_ty0 table ty_vars s) vars in
+  convert_bnds env vars
     
-  | _ :: q -> assoc state q st ty
-
-let mem_assoc state x (ty : 's Type.ty) (subst : esubst list) : bool =
-  try let _ = assoc state subst x ty in true
-  with Conv (_, Undefined _) -> false
-
-(** Helper for converting constructs with binders.
-  * Given a list of variables, returns a substitution (in the same order
-  * so that shadowing works as expected).
-  *
-  * As was the case before with convert_formula/convert_vars, we work around
-  * Vars using an empty environment to keep the same variable names.
-  *
-  * TODO this may cause unintended variable captures wrt subst. *)
-let subst_of_bvars (vars : (lsymb * Type.ety) list) =
-  let make (v, Type.ETy s) =
-    let v = L.unloc v in
-    ESubst (v, Term.Var (snd (Vars.make `Shadow Vars.empty_env s v)))
-  in
-  List.map make vars
-
-(** Idem with [p_ty] *)
-let subst_of_bnds table ty_vars (vars : (lsymb * p_ty) list) =
-  let make (v, s) =
-    let v = L.unloc v in
-    let Type.ETy s = parse_p_ty0 table ty_vars s in
-    ESubst (v, Term.Var (snd (Vars.make `Shadow Vars.empty_env s v)))
-  in
-  table, List.map make vars
-
 
 let get_fun table lsymb =
   match Symbols.Function.of_lsymb_opt lsymb table with
@@ -766,8 +756,8 @@ and convert0 :
   fun state tm ty ->
   let loc = L.loc tm in
 
-  let conv ?(subst=state.subst) s t =
-    let state = { state with subst } in
+  let conv ?(env=state.env) s t =
+    let state = { state with env } in
     convert state t s in
   
   let type_error () = raise (ty_error state.ty_env tm ty) in
@@ -777,14 +767,13 @@ and convert0 :
     if not state.allow_pat then
       conv_err (L.loc tm) PatNotAllowed;
 
-    assert false                (* TODO *)
+    conv_err (L.loc tm) PatNotAllowed (* TODO *)
     (* let p = Vars.make state.env ty "_" in
      * Term.Var p *)
 
   | App   (f,terms) ->
-    (* if [f] is a variable name appearing in [state.subst], then substitute. *)
-    if terms = [] && mem_assoc state f ty state.subst
-    then assoc state state.subst f ty
+    if terms = [] && Vars.mem state.env (L.unloc f)
+    then convert_var state state.env f ty
         
     (* otherwise build the application and convert it. *)
     else
@@ -857,62 +846,49 @@ and convert0 :
     end
 
   | Find (vs,c,t,e) ->
-    let new_subst =
-      subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
-    let is =
-      let f : esubst -> Vars.index = function
-        | ESubst (_,Term.Var v) ->
-          begin match Vars.ty v with
-            | Type.Index -> v
-            | _ -> type_error ()
-          end
-        | _ -> assert false
-      in
-      List.map f new_subst
+    let env, evs = 
+      convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs) 
+    in
+    let is : Type.index Vars.var list =
+      List.map (function (Vars.EVar v) -> 
+        try Vars.cast v Type.KIndex 
+        with Vars.CastError -> type_error ()
+        ) evs 
     in
     begin match Type.kind ty with
       | Type.KMessage ->
-        let subst = new_subst @ state.subst in
-        let c = conv ~subst:subst Type.Boolean c in
-        let t = conv ~subst:subst ty t in
+        let c = conv ~env Type.Boolean c in
+        let t = conv ~env ty t in
         let e = conv ty e in
         Term.Find (is,c,t,e)
       | _ -> type_error ()
     end
 
   | ForAll (vs,f) | Exists (vs,f) ->
-    let table, new_subst = subst_of_bnds state.table state.ty_vars vs in
-    let state = { state with table } in
-    let f = conv ~subst:(new_subst @ state.subst) Type.Boolean f in
-    let vs =
-      let f : esubst -> Vars.evar = function
-        | ESubst (_, Term.Var v) -> Vars.EVar v
-        | _ -> assert false
-      in
-      List.map f new_subst
+    let env, evs = 
+      convert_p_bnds state.table state.ty_vars state.env vs 
     in
+    let f = conv ~env Type.Boolean f in
     begin match Type.kind ty, L.unloc tm with
-      | Type.KMessage, ForAll _ -> Term.mk_forall vs f
-      | Type.KMessage, Exists _ -> Term.mk_exists vs f
+      | Type.KMessage, ForAll _ -> Term.mk_forall evs f
+      | Type.KMessage, Exists _ -> Term.mk_exists evs f
       | _ -> type_error ()
     end
 
   | Seq (vs,t) ->
-    let new_subst = subst_of_bvars (List.map (fun x -> x, Type.eindex) vs) in
+    let env, evs = 
+      convert_bnds state.env (List.map (fun x -> x, Type.eindex) vs) 
+    in
 
     let tyv = Type.Infer.mk_univar state.ty_env in    
     
-    let t = conv ~subst:(new_subst @ state.subst) (Type.TUnivar tyv) t in
-    let vs =
-      let f : esubst -> Vars.index = function
-        | ESubst (_, Term.Var v) ->
-          begin match Vars.ty v with
-            | Type.Index -> v
-            | _ -> type_error ()
-          end
-        | _ -> assert false
-      in
-      List.map f new_subst
+    let t = conv ~env (Type.TUnivar tyv) t in
+
+    let vs : Type.index Vars.var list =
+      List.map (function (Vars.EVar v) -> 
+        try Vars.cast v Type.KIndex 
+        with Vars.CastError -> type_error ()
+        ) evs 
     in
     
     begin match Type.kind ty with
@@ -936,8 +912,8 @@ and conv_app :
     let loc = L.loc tm in
     let t_i = L.unloc tm in
 
-    let conv ?(subst=state.subst) s t =
-      let state = { state with subst } in
+    let conv ?(env=state.env) s t =
+      let state = { state with env } in
       convert state t s in
 
     let get_at ts_opt =
@@ -1017,7 +993,7 @@ and conv_app :
 
 
     match L.unloc app with
-    | AVar s -> assoc state state.subst s ty
+    | AVar s -> convert_var state state.env s ty
 
     | Fun (f,l,ts_opt) -> 
       begin match Type.kind ty with
@@ -1170,36 +1146,6 @@ let declare_abstract table ~index_arity ~ty_args ~in_tys ~out_ty
 
 (** Empty *)
 let empty loc = L.mk_loc loc (App (L.mk_loc loc "empty", []))
-   
-(** Apply a partial substitution to a term.
-  * This is meant for formulas and local terms in processes,
-  * and does not support optional timestamps.
-  * TODO substitution does not avoid capture. *)
-let subst t (s : (string * term_i) list) =
-  let rec aux_i = function
-    (* Variable *)
-    | App (x, []) as t ->
-      begin try
-          let ti = List.assoc (L.unloc x) s in
-          ti
-        with Not_found -> t
-      end
-    | Tpat -> Tpat
-    | Tinit -> Tinit
-    | Tpred t -> Tpred (aux t)
-    | Happens t -> Happens (List.map aux t)
-    | App (s,l) -> App (s, List.map aux l)
-    | AppAt _-> assert false
-    | Seq (vs,t) -> Seq (vs, aux t)
-    | Compare (o,t1,t2) -> Compare (o, aux t1, aux t2)
-    | ForAll (vs,f) -> ForAll (vs, aux f)
-    | Exists (vs,f) -> Exists (vs, aux f)
-    | Diff (l,r) -> Diff (aux l, aux r)
-    | Find (is,c,t,e) -> Find (is, aux c, aux t, aux e)
-
-  and aux t = L.mk_loc (L.loc t) (aux_i (L.unloc t))
-
-  in aux t
 
 (*------------------------------------------------------------------*)
 (** {2 Exported conversion and type-checking functions} *)
@@ -1211,25 +1157,19 @@ let check
     Term.Var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
-  let subst = subst_of_env env in
-  (* let subst = 
-   *   List.map (fun (Vars.EVar v) -> 
-   *       ESubst (Vars.name v, dummy_var (Vars.ty v))
-   *     ) (Vars.to_list env)
-   * in *)
-  let state = mk_state table cntxt [] subst pat ty_env in
+  let state = mk_state table cntxt [] env pat ty_env in
   ignore (convert state t s)
 
 (** converts and infer the type (must be a subtype of Message).
     exported outside to Theory.ml *)
-let convert_i ?ty_env ?(pat=false) (env : conv_env) ty_vars subst tm
+let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   : Term.message * Type.tmessage =
   let must_clost, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env () 
     | Some ty_env -> false, ty_env 
   in
   let ty = Type.TUnivar (Type.Infer.mk_univar ty_env) in
-  let state = mk_state env.table env.cntxt ty_vars subst pat ty_env in
+  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
   if must_clost && not (Type.Infer.is_closed state.ty_env) then
@@ -1242,14 +1182,14 @@ let convert_i ?ty_env ?(pat=false) (env : conv_env) ty_vars subst tm
 let convert : type s. 
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
-  conv_env -> Type.tvars -> subst -> term -> s Type.ty -> s Term.term =
-  fun ?ty_env ?(pat=false) env ty_vars subst tm ty ->
+  conv_env -> Type.tvars -> Vars.env -> term -> s Type.ty -> s Term.term =
+  fun ?ty_env ?(pat=false) cenv ty_vars env tm ty ->
   let must_clost, ty_env = match ty_env with
     | None -> true, Type.Infer.mk_env () 
     | Some ty_env -> false, ty_env 
   in
 
-  let state = mk_state env.table env.cntxt ty_vars subst pat ty_env in
+  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
   let t = convert state tm ty in
 
   if must_clost && not (Type.Infer.is_closed state.ty_env) then
@@ -1275,9 +1215,9 @@ let econvert (cenv : conv_env) ty_vars subst t : eterm option =
     Some (ETerm (ty, tt, loc))
   with Conv e -> None
 
-let convert_index table ty_vars subst t =
+let convert_index table ty_vars env t =
   let cenv = { table = table; cntxt = InGoal; } in
-  match convert cenv ty_vars subst t Type.Index with
+  match convert cenv ty_vars env t Type.Index with
   | Term.Var x -> x
   | _ -> conv_err (L.loc t) (Index_not_var (L.unloc t))
 
@@ -1286,10 +1226,9 @@ let convert_index table ty_vars subst t =
 
 let parse_subst table ty_vars env (uvars : Vars.evar list) (ts : term list) 
   : Term.subst =
-  let u_subst = subst_of_env env in
   let conv_env = { table = table; cntxt = InGoal; } in
   let f t (Vars.EVar u) =
-    Term.ESubst (Term.Var u, convert conv_env ty_vars u_subst t (Vars.ty u))
+    Term.ESubst (Term.Var u, convert conv_env ty_vars env t (Vars.ty u))
   in
   List.map2 f ts uvars
 
@@ -1300,24 +1239,20 @@ let declare_state table s (typed_args : bnds) (pty : p_ty) t =
   let ts_init = Term.Action (Symbols.init_action, []) in
   let conv_env = { table = table; cntxt = InProc ts_init; } in
 
-  let table, subst = subst_of_bnds table [] typed_args in
+  let env, evs = convert_p_bnds table [] Vars.empty_env typed_args in
 
-  let indices : Vars.index list =
-    let f x : Vars.index = match x with
-      | ESubst (_,Term.Var v) ->
-        begin match Vars.kind v with
-          | Type.KIndex -> v
-          | _ -> conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex])
-        end
-      | _ -> assert false
-    in
-    List.map f subst
+  let indices : Type.index Vars.var list =
+    List.map (function (Vars.EVar v) -> 
+      try Vars.cast v Type.KIndex 
+      with Vars.CastError ->
+        conv_err (L.loc pty) (BadPty [Type.EKind Type.KIndex])
+      ) evs 
   in
 
   (* parse the macro type *)
   let ty = parse_p_ty table [] pty Type.KMessage in
 
-  let t = convert conv_env [] subst t ty in
+  let t = convert conv_env [] env t ty in
 
   let data = StateInit_data (indices,t) in
   let table, _ =

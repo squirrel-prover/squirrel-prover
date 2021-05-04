@@ -500,8 +500,7 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
     | _ -> 
       let cenv = Theory.{ table = TS.table s;
                               cntxt = InGoal; } in 
-      let subst = Theory.subst_of_env (TS.env s) in
-      let f = Theory.convert cenv (TS.ty_vars s) subst rw_type Type.Boolean in
+      let f = Theory.convert cenv (TS.ty_vars s) (TS.env s) rw_type Type.Boolean in
 
       (* create new sub-goal *)
       let premise = [TS.set_goal f s] in

@@ -1095,9 +1095,8 @@ let () =
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   let env = ES.env s in
   let table = ES.table s in
-  let tsubst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  match Theory.convert_i conv_env (ES.ty_vars s) tsubst term with
+  match Theory.convert_i conv_env (ES.ty_vars s) env term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
@@ -1143,7 +1142,6 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
 
 (* Expand all occurrences of the given macro [term] inside [s] *)
 let expand (term : Theory.term) (s : ES.t) =
-  let tsubst = Theory.subst_of_env (ES.env s) in
   (* final function once the substitution has been computed *)
   let succ a subst =
     let new_s = 
@@ -1160,7 +1158,7 @@ let expand (term : Theory.term) (s : ES.t) =
   (* computes the substitution dependeing on the sort of term *)
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  match Theory.convert_i conv_env (ES.ty_vars s) tsubst term with
+  match Theory.convert_i conv_env (ES.ty_vars s) (ES.env s) term with
     | Macro (ms,l,a), ty ->
       if Macros.is_defined ms.s_symb a table then
         succ a [Term.ESubst (Macro (ms,l,a),

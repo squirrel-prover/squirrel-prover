@@ -159,9 +159,9 @@ let max_suffix (e : env) prefix =
 
 let max_suffix_v (e : env) v = max_suffix e v.s_prefix
     
-let make opt (e1 : env) typ s_prefix =
+let make opt (e1 : env) typ s_name =
   let s_prefix,i_suffix =
-    let substrings = Pcre.exec ~rex:prefix_count_regexp s_prefix in
+    let substrings = Pcre.exec ~rex:prefix_count_regexp s_name in
     let prefix = Pcre.get_substring substrings 1 in
     let i0 = Pcre.get_substring substrings 2 in
     let i0 = if i0 = "" then -1 else int_of_string i0 in
@@ -177,6 +177,7 @@ let make opt (e1 : env) typ s_prefix =
             i_suffix = i_suffix;
             var_type = typ; }
   in
+  if opt = `Shadow then assert (name v = s_name);
   M.add (name v) (EVar v) e1, v 
 
 let make_r opt (e:env ref) var_type s_prefix =

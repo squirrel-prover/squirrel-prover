@@ -667,8 +667,8 @@ let get_goal_formula (gname : lsymb) :
 (*------------------------------------------------------------------*)
 (** {2 Convert equivalence formulas} *)
 
-let convert_el cenv ty_vars (s : Theory.subst) el : Term.message =   
-  match Theory.econvert cenv ty_vars s el with
+let convert_el cenv ty_vars (env : Vars.env) el : Term.message =   
+  match Theory.econvert cenv ty_vars env el with
   (* FIXME: this does not give any conversion error to the user. *)
   | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
   | Some (Theory.ETerm (s,t,_)) -> 
@@ -677,18 +677,18 @@ let convert_el cenv ty_vars (s : Theory.subst) el : Term.message =
     | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
                                           bool or message)")
 
-let convert_equiv cenv ty_vars (s : Theory.subst) (e : p_equiv) =
-  List.map (convert_el cenv ty_vars s) e
+let convert_equiv cenv ty_vars (env : Vars.env) (e : p_equiv) =
+  List.map (convert_el cenv ty_vars env) e
 
-let convert_equiv_form cenv ty_vars s (p : p_equiv_form) =
+let convert_equiv_form cenv ty_vars env (p : p_equiv_form) =
   let rec conve p =
     match p with
     | PImpl (f,f0) -> 
       Equiv.Impl (conve f, conve f0)
     | PEquiv e -> 
-      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars s e))
+      Equiv.Atom (Equiv.Equiv (convert_equiv cenv ty_vars env e))
     | PReach f -> 
-      Equiv.Atom (Equiv.Reach (Theory.convert cenv ty_vars s f Type.Boolean))
+      Equiv.Atom (Equiv.Reach (Theory.convert cenv ty_vars env f Type.Boolean))
   in
 
   conve p
@@ -706,7 +706,7 @@ let make_trace_goal ~table (pg : Decl.p_goal_reach_cnt)  =
   let f_i = Theory.ForAll (pg.g_vars, pg.g_form) in
   let f = L.mk_loc (L.loc pg.g_form) f_i in
 
-  let g = Theory.convert conv_env ty_vars [] f Type.Boolean in
+  let g = Theory.convert conv_env ty_vars Vars.empty_env f Type.Boolean in
 
   Goal.Trace (TS.init ~system ~ty_vars table g) 
 
@@ -720,10 +720,9 @@ let make_equiv_goal
         fst (Vars.make `Shadow env s x)
       ) Vars.empty_env env
   in
-  let subst = Theory.subst_of_env env in
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  let f = convert_equiv_form conv_env [] subst (L.unloc p_form) in
+  let f = convert_equiv_form conv_env [] env (L.unloc p_form) in
 
   let se = SystemExpr.simple_pair table system_name in
 
@@ -806,7 +805,7 @@ let add_proved_goal (gname,j) =
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let formula = Theory.convert conv_env [] [] f Type.Boolean in
+  let formula = Theory.convert conv_env [] Vars.empty_env f Type.Boolean in
     (match formula with
      |  Term.ForAll ([Vars.EVar uvarm;Vars.EVar uvarkey],f) ->
        (
