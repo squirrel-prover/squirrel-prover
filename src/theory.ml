@@ -390,8 +390,6 @@ let check_arity_i loc s (actual : int) (expected : int) =
 let check_arity (lsymb : lsymb) (actual : int) (expected : int) =
   check_arity_i (L.loc lsymb) (L.unloc lsymb) actual expected
 
-type env = (string * Type.ety) list
-
 (** Type of a macro *)
 type mtype = Type.ety list * Type.tmessage (* args, out *)
 
@@ -593,7 +591,7 @@ let make_app loc table cntxt (lsymb : lsymb) (l : term list) : app =
 
 
 (*------------------------------------------------------------------*)
-(** {2 Conversion contexts and states} *)
+(** {2 ESubstitution} *)
 
 type esubst = ESubst : string * 'a Term.term -> esubst
 
@@ -605,6 +603,19 @@ let pp_esubst ppf (ESubst (t1,t2)) =
 let pp_subst ppf s =
   Fmt.pf ppf "@[<hv 0>%a@]"
     (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "@,") pp_esubst) s
+
+let subst_of_env (env : Vars.env) : esubst list =
+  let to_subst : Vars.evar -> esubst =
+    fun (Vars.EVar v) ->
+    match Vars.kind v with
+    | Type.KIndex     -> ESubst (Vars.name v,Term.Var v)
+    | Type.KTimestamp -> ESubst (Vars.name v,Term.Var v)
+    | Type.KMessage   -> ESubst (Vars.name v,Term.Var v)
+    in
+  List.map to_subst (Vars.to_list env)
+
+(*------------------------------------------------------------------*)
+(** {2 Conversion contexts and states} *)
 
 (** Conversion contexts.
   * - [InGoal]: we are converting a term in a goal (or tactic). All
@@ -628,15 +639,18 @@ type conv_env = {
     - a variable substitution  *)
 type conv_state = {
   table     : Symbols.table;
-  cntxt     : conv_cntxt;
   ty_vars   : Type.tvar list;
-  subst     : subst;
+  cntxt     : conv_cntxt;
   allow_pat : bool;
+
+  env       : unit(* Vars.env *);
+  subst     : subst;
   ty_env    : Type.Infer.env;  
 }
 
-let mk_state table cntxt ty_vars subst allow_pat ty_env =
-  { table; cntxt; ty_vars; subst; allow_pat; ty_env; }
+let mk_state table cntxt ty_vars (* env *) subst allow_pat ty_env =
+  let env = () in      (* TODO *)
+  { table; cntxt; ty_vars; env; subst; allow_pat; ty_env; }
 
 (*------------------------------------------------------------------*)
 (** {2 Types} *)
@@ -1192,14 +1206,17 @@ let subst t (s : (string * term_i) list) =
 
 let check 
     table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env) 
-    (env : env) t (Type.ETy s) : unit =
+    (env : Vars.env) t (Type.ETy s) : unit =
   let dummy_var s =
     Term.Var (snd (Vars.make `Approx Vars.empty_env s "#dummy"))
   in
   let cntxt = if local then InProc (dummy_var Type.Timestamp) else InGoal in
-  let subst =
-    List.map (fun (v, Type.ETy s) -> ESubst (v, dummy_var s)) env
-  in
+  let subst = subst_of_env env in
+  (* let subst = 
+   *   List.map (fun (Vars.EVar v) -> 
+   *       ESubst (Vars.name v, dummy_var (Vars.ty v))
+   *     ) (Vars.to_list env)
+   * in *)
   let state = mk_state table cntxt [] subst pat ty_env in
   ignore (convert state t s)
 
@@ -1266,17 +1283,6 @@ let convert_index table ty_vars subst t =
 
 (*------------------------------------------------------------------*)
 (** {2 State and substitution parsing} *)
-
-(*------------------------------------------------------------------*)
-let subst_of_env (env : Vars.env) : esubst list =
-  let to_subst : Vars.evar -> esubst =
-    fun (Vars.EVar v) ->
-    match Vars.kind v with
-    | Type.KIndex     -> ESubst (Vars.name v,Term.Var v)
-    | Type.KTimestamp -> ESubst (Vars.name v,Term.Var v)
-    | Type.KMessage   -> ESubst (Vars.name v,Term.Var v)
-    in
-  List.map to_subst (Vars.to_list env)
 
 let parse_subst table ty_vars env (uvars : Vars.evar list) (ts : term list) 
   : Term.subst =
@@ -1415,7 +1421,11 @@ let () =
       let table = declare_hash table (mk "h") in
       let x = mk (App (mk "x", [])) in
       let y = mk (App (mk "y", [])) in
-      let env = ["x",Type.emessage;"y",Type.emessage] in
+
+      let env = Vars.empty_env in
+      let env, _ = Vars.make `Approx env Type.Message "x" in
+      let env, _ = Vars.make `Approx env Type.Message "y" in
+
       let t_i = App (mk "e", [mk (App (mk "h", [x;y]));x;y]) in
       let t = mk t_i in
       let ty_env = Type.Infer.mk_env () in

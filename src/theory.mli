@@ -225,11 +225,9 @@ val pp_error :
   (Format.formatter -> L.t -> unit) ->
   Format.formatter -> conversion_error -> unit
 
-type env = (string * Type.ety) list
-
 val check : 
   Symbols.table -> ?local:bool -> ?pat:bool ->
-  Type.Infer.env -> env -> term -> Type.ety
+  Type.Infer.env -> Vars.env -> term -> Type.ety
   -> unit
 
 val check_state : Symbols.table -> lsymb -> int -> Type.tmessage

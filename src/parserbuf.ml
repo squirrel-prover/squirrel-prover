@@ -109,7 +109,7 @@ let parse parser parser_name string =
 
 let parse_process table ?(typecheck=false) str =
   let p = parse Parser.top_process "process" str in
-    if typecheck then Process.check_proc table [] p ;
+    if typecheck then Process.check_proc table Vars.empty_env p ;
     p
 
 let parse_formula = parse Parser.top_formula "formula"

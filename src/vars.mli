@@ -68,6 +68,9 @@ val of_list : evar list -> env
 
 val mem : env -> string -> bool
 
+val find_e : env -> string -> evar
+val find   : env -> string -> 'a Type.kind -> 'a var
+
 exception Undefined_Variable
 
 (** [rm_var env v] returns [env] minus the variable [v].

@@ -11,6 +11,7 @@ type 'a var = {
   var_type : 'a Type.t
 }
 
+
 type index     = Type.index     var
 type message   = Type.message   var
 type boolean   = Type.message   var
@@ -58,6 +59,30 @@ let pp_typed_list ppf (vars:evar list) =
   in
   aux [] Type.(ETy Message) vars
 
+
+(*------------------------------------------------------------------*)
+(** {2 Miscellaneous} *)
+
+exception CastError
+
+let cast : type a b. a var -> b Type.kind -> b var = 
+  fun x s -> match Type.equalk_w (kind x) s with
+    | Some Type.Type_eq -> x
+    | None -> raise CastError
+
+let ecast : type a. evar -> a Type.kind -> a var = 
+  fun (EVar v) s -> cast v s
+
+let equal : type a b. a var -> b var -> bool = fun v v' ->
+  match Type.equal_w (ty v) (ty v') with
+  | None -> false
+  | Some Type.Type_eq -> v = v'
+
+(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
+let compare x y =
+  if equal x y then 0
+  else if x.i_suffix <= y.i_suffix then -1 else 1
+
 (*------------------------------------------------------------------*)
 (** {2 Environments} *)
 
@@ -76,7 +101,14 @@ let pp_env ppf e =
 
 let empty_env : env = M.empty
 
-let mem (e : env) name : bool = M.mem name e
+let mem  (e : env) name : bool = M.mem name e
+
+let find_e e name : evar = M.find name e
+
+let find : type a. env -> string -> a Type.kind -> a var =
+  fun e name k -> 
+  let EVar v = M.find name e in
+  cast v k
 
 let of_list l =
   let rec aux e (l : evar list) =
@@ -92,7 +124,7 @@ let rm_var e v = M.remove (name v) e
 
 let rm_evar e (EVar v) = rm_var e v
 
-let prefix_count_regexp = Pcre.regexp "_*([^0-9]*)([0-9]*)"
+let prefix_count_regexp = Pcre.regexp "_*(.*[^0-9])([0-9]*)$"
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
@@ -171,7 +203,7 @@ let fresh_r env v = make_r `Approx env v.var_type v.s_prefix
 module Sv = struct
   include Set.Make(struct
       type t = evar
-      let compare (EVar a) (EVar b) = compare (name a) (name b)
+      let compare (EVar a) (EVar b) = Stdlib.compare (name a) (name b)
     end)
   let add_list sv vars =
     List.fold_left (fun sv v -> add (EVar v) sv) sv vars
@@ -180,32 +212,9 @@ end
 module Mv = struct
   include Map.Make(struct
       type t = evar
-      let compare (EVar a) (EVar b) = compare (name a) (name b)
+      let compare (EVar a) (EVar b) = Stdlib.compare (name a) (name b)
     end)
 end
-
-(*------------------------------------------------------------------*)
-(** {2 Miscellaneous} *)
-
-exception CastError
-
-let cast : type a b. a var -> b Type.kind -> b var = 
-  fun x s -> match Type.equalk_w (kind x) s with
-    | Some Type.Type_eq -> x
-    | None -> raise CastError
-
-let ecast : type a. evar -> a Type.kind -> a var = 
-  fun (EVar v) s -> cast v s
-
-let equal : type a b. a var -> b var -> bool = fun v v' ->
-  match Type.equal_w (ty v) (ty v') with
-  | None -> false
-  | Some Type.Type_eq -> v = v'
-
-(** Time-consistent: if [v] was created before [v'], then [compare v v' ≤ 0]. *)
-let compare x y =
-  if equal x y then 0
-  else if x.i_suffix <= y.i_suffix then -1 else 1
                                           
 (*------------------------------------------------------------------*)
 (** {2 Tests} *)
@@ -218,24 +227,24 @@ let () =
        * have different variables with the same name. *)
       let env = empty_env in
       let env,i  = make `Approx env Type.Index "i"  in
-      let env,i1 = make `Approx env Type.Index "i"  in
-      let env,i2 = make `Approx env Type.Index "i1" in
+      let env,i0 = make `Approx env Type.Index "i"  in
+      let env,i1 = make `Approx env Type.Index "i1" in
       
       Alcotest.(check string)
         "proper name for i"
         "i" (name i);
       Alcotest.(check string)
         "proper name for i0"
-        "i0" (name i1);
+        "i0" (name i0);
       Alcotest.(check string)
         "proper name for i1"
-        "i1" (name i2);
+        "i1" (name i1);
       Alcotest.(check string)
         "same prefixes"
-        i1.s_prefix i.s_prefix ;
+        i0.s_prefix i.s_prefix ;
       Alcotest.(check string)
         "same prefixes"
-        i1.s_prefix i2.s_prefix
+        i0.s_prefix i1.s_prefix
     end ;
     "Prefix extension bis", `Quick, begin fun () ->
       (* For backward compatibility, and to avoid refreshing

@@ -173,7 +173,7 @@ let proc_err loc e = raise (ProcError (loc,e))
     their types. *)
 type Symbols.data += Process_data of proc_ty * process
 
-let declare_nocheck table name kind proc =
+let declare_nocheck table name (kind : proc_ty) proc =
     let data = Process_data (kind,proc) in
     let def = () in
     Symbols.Process.declare_exact table name ~data def
@@ -190,17 +190,21 @@ let find_process_lsymb table (lsymb : lsymb) =
 
 (*------------------------------------------------------------------*)
 (** Type checking for processes *)
-let check_proc table env p =
-  let rec check_p ty_env (env : (string * Type.ety) list) proc =
+let check_proc table (env : Vars.env) p =
+  let rec check_p ty_env (env : Vars.env) proc =
     let loc = L.loc proc in
     match L.unloc proc with
     | Null -> ()
 
     | New (x, ty, p) -> 
       let ty = Theory.parse_p_ty table [] ty Type.KMessage in 
-      check_p ty_env  ((L.unloc x, Type.ETy ty)::env) p
+      let env, _ = Vars.make `Shadow env ty (L.unloc x) in
+      check_p ty_env env p
 
-    | In (_,x,p) -> check_p ty_env  ((L.unloc x, Type.emessage)::env) p
+    | In (_,x,p) -> 
+      (* TODO: subtypes*)
+      let env, _ = Vars.make `Shadow env (Type.Message) (L.unloc x) in
+      check_p ty_env env p
 
     | Out (_,m,p)
 
@@ -235,16 +239,20 @@ let check_proc table env p =
       
       let ety = Type.ETy ty in
       Theory.check table ~local:true ty_env env t ety ;
-      check_p ty_env  ((L.unloc x, ety) :: env) p
+      let env, _ = Vars.make `Shadow env ty (L.unloc x) in
+      check_p ty_env env p
 
-    | Repl (x, p) -> check_p ty_env  ((L.unloc x, Type.eindex)::env) p
+    | Repl (x, p) -> 
+      let env, _ = Vars.make `Shadow env Type.Index (L.unloc x) in
+      check_p ty_env env p
 
     | Exists (vars, test, p, q) ->
       check_p ty_env  env q ;
       let env =
-        List.rev_append
-          (List.map (fun x -> L.unloc x, Type.eindex) vars)
-          env
+        List.fold_left (fun env x ->
+            let env, _ = Vars.make `Shadow env Type.Index (L.unloc x) in
+            env
+          ) env vars 
       in
       Theory.check table ~local:true ty_env env test Type.eboolean ;
       check_p ty_env  env p
@@ -270,9 +278,16 @@ let check_proc table env p =
   ()
 
 
-let declare table (id : lsymb) args proc =
+let declare table (id : lsymb) (args : proc_ty) proc =
+  let env = 
+    List.fold_left (fun env (v, Type.ETy ty) ->
+        let env, _ = Vars.make `Shadow env ty v in
+        env
+      ) Vars.empty_env args 
+  in
+
   (* type-check and declare *)
-  check_proc table args proc ;
+  check_proc table env proc ;
   let table, _ = declare_nocheck table id args proc in
   table
 
@@ -936,7 +951,7 @@ let parse_proc (system_name : System.system_name) init_table proc =
 
 let declare_system table (system_name : lsymb) proc =
   Printer.pr "@[<v 2>Un-processed system:@;@;@[%a@]@]@.@." pp_process proc ;
-  check_proc table [] proc ;
+  check_proc table Vars.empty_env proc ;
   let table, system_name = System.declare_empty table system_name in
 
   (* before parsing the system, we register the init action,
