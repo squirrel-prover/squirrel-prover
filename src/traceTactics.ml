@@ -2328,10 +2328,7 @@ let apply (pat : Type.message Term.Match.pat) (s : TS.t) =
     soft_failure ApplyBadInst;
     
   let pat = { pat with pat_term = f } in
-  
-  Fmt.epr "pat: %a@." Term.Match.pp_pat pat;
-  Fmt.epr "vars: %a@." (Fmt.list Vars.pp_e) (Vars.Sv.elements (Term.fv f));
-  
+    
   match Term.Match.try_match (TS.goal s) pat with
   | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
   | `Match mv ->
