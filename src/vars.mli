@@ -68,12 +68,12 @@ val to_list : env -> evar list
 
 val of_list : evar list -> env
 
-val mem : env -> string -> bool
+val mem   : env -> 'a var -> bool
+val mem_e : env ->   evar -> bool
+val mem_s : env -> string -> bool
 
-val find_e : env -> string -> evar
+(** Note: pattern variables are not uniquely characterized by a string *)
 val find   : env -> string -> 'a Type.kind -> 'a var 
-
-exception Undefined_Variable
 
 (** [rm_var env v] returns [env] minus the variable [v].
   * returns the same [env] if no variable is found. *)
@@ -86,30 +86,30 @@ val rm_evar : env -> evar -> env
 (** {2 Create variables} *)
 
 (** [make_new_from v] generates a new variable of the same sort as
-  * [v] and whose prefix is the same as [v] but starting with ["_"];
-  * such special prefixes are forbidden in other ways to create
-  * variables.
-  * The variable is guaranteed to not appear anywhere else so far.
+  * [v] guaranteed to not appear anywhere else so far.
   *
   * The variables generated in this way are not meant to be seen by
-  * the user as they will feature arbitrarily large numerical suffixes;
-  * if needed they should be translated to more nicely named variables
-  * using the following API based on environments. *)
+  * the user. *)
 val make_new_from : 'a var -> 'a var
 
 (** [is_new v] returns [true] iff variable [v] has been created
   * using [make_new_from]. *)
 val is_new : 'a var -> bool
 
+(** Check if a variable is a pattern hole. *)
+val is_pat : 'a var -> bool
+
 (** [make env sort name] creates a variable of sort [sort] in [env].
     - [~opt = `Approx], appends some suffix to [name] to get a new variable.
     - [~opt = `Shadow], uses [name], and shadows any pre-existing definition. *)
 val make : 
-  [`Approx | `Shadow] -> env -> 'a Type.t -> string -> env * 'a var
+  ?allow_pat:bool -> [`Approx | `Shadow] -> 
+  env -> 'a Type.t -> string -> env * 'a var
 
 (** Stateful version of [make] *)
 val make_r : 
-  [`Approx | `Shadow] -> env ref -> 'a Type.t -> string -> 'a var
+  ?allow_pat:bool -> [`Approx | `Shadow] -> 
+  env ref -> 'a Type.t -> string -> 'a var
 
 (** Same than [make], but uses the exact name *)
 val make_exact : env -> 'a Type.t -> string -> (env * 'a var) option

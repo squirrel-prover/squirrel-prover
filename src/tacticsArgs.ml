@@ -163,7 +163,7 @@ type parser_arg =
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * rw_in
-  | ApplyIn     of Theory.term * apply_in
+  | ApplyIn     of Theory.p_pt * apply_in
 
 type parser_args = parser_arg list
 
@@ -181,7 +181,7 @@ let pp_parser_arg ppf = function
       pp_rw_in in_opt
 
   | ApplyIn (t, in_opt) ->
-    Fmt.pf ppf "%a%a" Theory.pp t pp_apply_in in_opt
+    Fmt.pf ppf "... %a" pp_apply_in in_opt
 
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair

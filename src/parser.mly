@@ -114,7 +114,7 @@ sterm_i:
 | DIFF LPAREN t=term COMMA t0=term RPAREN { Theory.Diff (t,t0) }
 | SEQ LPAREN i=ids ARROW t=term RPAREN    { Theory.Seq (i,t) }
 
-| l=loc(NOT) f=sterm                             
+| l=loc(NOT) f=sterm 
     { let fsymb = L.mk_loc (L.loc l) "not" in
       Theory.App (fsymb,[f]) }
 
@@ -538,12 +538,12 @@ as_ip:
 sel_tacs:
 | l=slist1(sel_tac,PARALLEL) { l }
 
-/* apply_arg: */
-/* | hid=lsymb args=slist(sterm,empty) */
-/*     { Theory.PT_hol { p_pt_hid = hid; p_pt_args = args} } */
+apply_arg:
+| hid=lsymb args=slist(sterm,empty)
+    { Theory.PT_hol { p_pt_hid = hid; p_pt_args = args} }
 
-/* | LPAREN f=term RPAREN */
-/*     { Theory.PT_form f } */
+| LPAREN f=term RPAREN
+    { Theory.PT_form f }
 
 (*------------------------------------------------------------------*)
 tac:
@@ -630,7 +630,7 @@ tac:
   | REWRITE p=rw_args w=rw_in
     { T.Abstract ("rewrite", [TacticsArgs.RewriteIn (p, w)]) }
 
-  | APPLY t=sterm w=apply_in
+  | APPLY t=apply_arg w=apply_in
     { T.Abstract ("apply", [TacticsArgs.ApplyIn (t, w)]) }
 
   | DDH g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
@@ -658,17 +658,19 @@ tac:
 help_tac_i:
 | LEFT       { "left"}     
 | RIGHT      { "right"}    
+| INTRO      { "intro"} 
+| DESTRUCT   { "destruct"} 
+| DEPENDS    { "depends"}
 | EXISTS     { "exists"}    
-| USE        { "use"}      
-| REWRITE    { "rewrite"}  
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  
-| DEPENDS    { "depends"}
+| CLEAR      { "clear"}      
+| ASSERT     { "assert"}   
+| USE        { "use"}      
+| REWRITE    { "rewrite"}  
 | APPLY      { "apply"}  
 | DDH        { "ddh"}      
-| ASSERT     { "assert"}   
-| DESTRUCT   { "destruct"} 
-| INTRO      { "intro"} 
+
 
 help_tac:
 | l=loc(help_tac_i) { l }

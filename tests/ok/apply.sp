@@ -46,7 +46,7 @@ Proof.
   checkfail (apply Hyp) exn ApplyBadInst.
 Abort.
 
-
+(*------------------------------------------------------------------*)
 (* Test `apply ... in ...`  *)
 goal _ (A,B,C,D : boolean, y : message, j : index) : 
   A => B => C => (D => False) =>
@@ -57,4 +57,54 @@ Proof.
   apply H in Hin;
   [1,2,3: assumption |
    4: by apply Hfinal]. 
+Qed.
+
+(*==================================================================*)
+(* test apply with patterns *)
+
+(*------------------------------------------------------------------*)
+(* transitivity *)
+type T.
+abstract ( -- ) : T -> T -> boolean.
+
+axiom trans (x,y,z : T) : x -- y => y -- z => x -- z.
+
+axiom mrefl (x : T) : x -- x.
+axiom sym (x,y : T) : x -- y => y -- x.
+
+goal _ (x,y,z,w : T) : x -- y => y -- z => z -- w => x -- w.
+Proof.
+  intro _ _ _.
+  apply trans _ y _.
+  assumption.
+  apply trans _ z _.
+  assumption.
+  assumption.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* small group axioms *)
+
+type G.
+
+abstract ( ** ) : G -> G -> G.
+
+abstract inv : G -> G.
+abstract ge : G.
+
+axiom inv (x : G) : inv (x) ** x = ge.
+axiom comm (x, y : G) : x ** y = y ** x.
+axiom assoc (x,y,z : G) : (x ** y) ** z = x ** (y ** z).
+axiom neuter (x : G) : ge ** x = x.
+
+goal mult_left (x,y,z : G) : x = y => z ** x = z ** y.
+Proof. auto. Qed.
+
+
+goal integre (a,b,c : G) : a ** b = a ** c => b = c.
+Proof.
+ intro H.
+ apply mult_left _ _ (inv (a)) in H.
+ rewrite !-assoc !inv !neuter in H.
+ assumption.
 Qed.

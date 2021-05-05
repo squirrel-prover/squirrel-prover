@@ -1,16 +1,14 @@
 open Utils
 
-(* Variables contains two name value, a s_prefix and a i_suffix. The name
-   of the variable is then the concatenation of both. This allows, given a set
-   of previously defined variables with the same s_prefix, to create the
-   simplest possible fresh variable, by incrementing the i_suffix. *)
-
 type 'a var = {
+  name     : string;
   s_prefix : string;
-  i_suffix : int;
+  i_suffix : int; 
+  is_new   : bool;
   var_type : 'a Type.t
 }
-
+(* [i_suffix] is stored to avoid recomputing it.
+   we use it as a unique counter for new and pat variables. *)
 
 type index     = Type.index     var
 type message   = Type.message   var
@@ -20,10 +18,11 @@ type timestamp = Type.timestamp var
 type evar = EVar : 'a var -> evar
 
 (*------------------------------------------------------------------*)
-let name v =
-  if v.i_suffix <> -1
-  then Fmt.strf "%s%i" v.s_prefix v.i_suffix
-  else Fmt.strf "%s"   v.s_prefix
+let is_new v = v.is_new
+let is_pat v = String.sub v.name 0 1 = "_"
+
+(*------------------------------------------------------------------*)
+let name v = (if v.is_new then "#" else "") ^ v.name
 
 let ty v = v.var_type
              
@@ -32,8 +31,7 @@ let kind v = Type.kind (v.var_type)
 let tsubst s v = { v with var_type = Type.tsubst s v.var_type }
 
 (*------------------------------------------------------------------*)
-let pp ppf v =
-  Fmt.pf ppf "%s" (name v)
+let pp ppf v = Fmt.pf ppf "%s%s" (if v.is_new then "#" else "") (name v)
 
 let pp_e ppf (EVar v) = pp ppf v
 
@@ -88,12 +86,10 @@ let compare x y =
 
 module M = Utils.Ms
 
-exception Undefined_Variable
-
 type env = evar M.t
 
-let to_list (e1:env) =
-  let _,r2 = M.bindings e1 |> List.split in
+let to_list (env : env) =
+  let _,r2 = M.bindings env |> List.split in
   r2
 
 let pp_env ppf e =
@@ -101,12 +97,28 @@ let pp_env ppf e =
 
 let empty_env : env = M.empty
 
-let mem  (e : env) name : bool = M.mem name e
+let mem (e : env) var : bool = M.mem (name var) e
 
-let find_e e name : evar = M.find name e
+let mem_e (e : env) (EVar var) : bool = M.mem (name var) e
 
-let find : type a. env -> string -> a Type.kind -> a var =
+let mem_s (e : env) (s : string) : bool = M.mem s e
+
+let find : type a. env -> string -> a Type.kind -> a var = 
   fun e name k -> 
+  (* let EVar v = 
+   *   let found = ref None in
+   *   let exception Found in
+   *   try
+   *     let () = 
+   *       M.iter (fun id v -> 
+   *           if id = name then 
+   *             let () = found := Some v in
+   *             raise Found) e 
+   *     in
+   *     raise Not_found
+   * 
+   *   with Found -> oget !found
+   * in *)
   let EVar v = M.find name e in
   cast v k
 
@@ -124,31 +136,27 @@ let rm_var e v = M.remove (name v) e
 
 let rm_evar e (EVar v) = rm_var e v
 
-let prefix_count_regexp = Pcre.regexp "_*(.*[^0-9])([0-9]*)$"
+let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 
 (*------------------------------------------------------------------*)
 (** {2 Create variables} *)
-
-let new_counter = ref 0
     
+let cpt_new = ref 0
 let make_new_from v =
-  let s_prefix = "_" ^ v.s_prefix in
-  incr new_counter ;
-  { s_prefix ;
-    i_suffix = !new_counter ;
-    var_type = v.var_type; }
+  incr cpt_new;
+  { v with is_new = true; i_suffix = !cpt_new; }
 
-let is_new v = String.sub (name v) 0 1 = "_"
-
-let omax a b = match a,b with
-  | None, c | c, None -> c
-  | Some a, Some b -> Some (max a b)
-
-let osucc = function
-  | None -> Some 0
-  | Some i -> Some (i+1)
+let cpt_pat = ref 0
+let make_pat typ = 
+  incr cpt_pat;
+  { name     = "_" ^ (string_of_int !cpt_pat);
+    s_prefix = "_";
+    is_new   = false;
+    i_suffix = !cpt_pat;
+    var_type = typ; }
                         
 let max_suffix (e : env) prefix =
+  assert (prefix <> "_");
   M.fold (fun _ (EVar v') m ->      
       if prefix = v'.s_prefix then
         match m with
@@ -156,32 +164,45 @@ let max_suffix (e : env) prefix =
         | Some m -> Some (max m v'.i_suffix)
       else m
     ) e None 
-
-let max_suffix_v (e : env) v = max_suffix e v.s_prefix
     
-let make opt (e1 : env) typ s_name =
-  let s_prefix,i_suffix =
-    let substrings = Pcre.exec ~rex:prefix_count_regexp s_name in
-    let prefix = Pcre.get_substring substrings 1 in
-    let i0 = Pcre.get_substring substrings 2 in
-    let i0 = if i0 = "" then -1 else int_of_string i0 in
-    prefix, i0
-  in
-  let i_suffix = match opt, max_suffix e1 s_prefix with
-    | `Shadow, _ -> i_suffix (* if `Shadow, we can reuse the suffix *)
-    | _, None -> i_suffix
-    | _, Some m -> max i_suffix (m + 1)
-  in
+let check_prefix ~allow_pat s =
+  (s = "_" || String.sub s 0 1 <> "_") &&
+  (if not allow_pat then String.sub s 0 1 <> "_" else true)
 
-  let v = { s_prefix = s_prefix;
-            i_suffix = i_suffix;
-            var_type = typ; }
-  in
-  if opt = `Shadow then assert (name v = s_name);
-  M.add (name v) (EVar v) e1, v 
 
-let make_r opt (e:env ref) var_type s_prefix =
-  let new_env,new_var = make opt (!e) var_type s_prefix in
+let _make opt env s_prefix s_suffix = 
+  let i = if s_suffix = "" then -1 else int_of_string s_suffix in
+  
+  match opt, max_suffix env s_prefix with
+    | `Shadow, _ -> i (* if `Shadow, we can reuse the suffix *)
+    | _, None -> i
+    | _, Some m -> max i (m + 1)
+  
+
+let make ?(allow_pat=false) opt (env : env) typ s_name =
+  let substrings = Pcre.exec ~rex:prefix_count_regexp s_name in
+  let s_prefix = Pcre.get_substring substrings 1 in
+  let s_suffix = Pcre.get_substring substrings 2 in
+  assert (check_prefix ~allow_pat (s_prefix));
+
+  let v = 
+    if s_prefix = "_" then make_pat typ 
+    else
+      let i_suffix = _make opt env s_prefix s_suffix in
+      let s_suffix = if i_suffix = -1 then "" else string_of_int i_suffix in      
+      let name = s_prefix ^ s_suffix in
+
+      if opt = `Shadow then assert (name = s_name);
+
+      { name; s_prefix; is_new = false; i_suffix; var_type = typ; }
+  in
+  assert (name v = v.name);
+
+  let env = M.add v.name (EVar v) env in
+  env, v 
+
+let make_r ?allow_pat opt (e:env ref) var_type s_prefix =
+  let new_env,new_var = make ?allow_pat opt (!e) var_type s_prefix in
   e := new_env;
   new_var
 
@@ -193,9 +214,9 @@ let make_exact_r e typ s =
   let v = make_r `Approx e typ s in
   if name v <> s then None else Some v
 
-let fresh env v = make `Approx env v.var_type v.s_prefix
+let fresh env v = make `Approx env v.var_type (name v)
 
-let fresh_r env v = make_r `Approx env v.var_type v.s_prefix
+let fresh_r env v = make_r `Approx env v.var_type (name v)
 
 
 (*------------------------------------------------------------------*)
@@ -240,33 +261,13 @@ let () =
       Alcotest.(check string)
         "proper name for i1"
         "i1" (name i1);
-      Alcotest.(check string)
-        "same prefixes"
-        i0.s_prefix i.s_prefix ;
-      Alcotest.(check string)
-        "same prefixes"
-        i0.s_prefix i1.s_prefix
-    end ;
-    "Prefix extension bis", `Quick, begin fun () ->
-      (* For backward compatibility, and to avoid refreshing
-       * user-provided variable names, we bump the suffix when
-       * the user provides a variable name that contains a
-       * numerical suffix. *)
-      let env = empty_env in
-      let env,i1 = make `Approx env Type.Index "i1" in
-      let _,i2   = make `Approx env Type.Index "i"  in
-      let _,i2'  = make `Approx env Type.Index "i1" in
-      let _,i2'' = make `Approx env Type.Index "i2" in
-      Alcotest.(check string)
-        "Biproper name for i1 (bis)"
-        (name i1) "i1" ;
-      Alcotest.(check string)
-        "proper name for i2 (bis)"
-        (name i2) "i2" ;
-      Alcotest.(check string)
-        "proper name for i2' (bis)"
-        (name i2') "i2" ;
-      Alcotest.(check string)
-        "proper name for i2'' (bis)"
-        (name i2'') "i2"
-    end ]
+      Alcotest.(check int)
+        "integer suffix"
+        i.i_suffix (-1);
+      Alcotest.(check int)
+        "integer suffix"
+        i0.i_suffix 0;
+      Alcotest.(check int)
+        "integer suffix"
+        i1.i_suffix 1;
+    end ;]

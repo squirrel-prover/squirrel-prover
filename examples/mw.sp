@@ -310,25 +310,11 @@ fa 1.
 prf 2. (* we use PRF under XOR to be able with use XOR tactic later on *)
 yesif 2.
 use tags_neq.
-project.
-split.
 
-split; 1: auto.
-by intro r *; 
-   assert (fst(input@R2(r)) = nt(i,t)) as Meq1; 
-   [1: auto | 2: fresh Meq1].
-
-intro r *; (split; 1: split);
-intro _ [_ [_ Meq0]]; by fresh Meq0.
-
-split; 2 : auto.
-split; intro r *.
-split; 1: split => [_ _] _.
-
-by assert (fst(input@R1(r)) = nt(i,t)) as Meq1; [1: auto | 2: fresh Meq1].
-auto.
-by assert (fst(input@R1(r)) = nt(i,t)) as Meq1; [1: auto | 2: fresh Meq1].
-by assert (fst(input@R2(r)) = nt(i,t)) as Meq1; [1: auto | 2: fresh Meq1].
+project;
+by (repeat split => > _;
+    repeat split => > _ [_ [_ Meq]];
+    fresh Meq).
 
 fresh 1. 
 yesif 1; 1: auto.

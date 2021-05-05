@@ -1515,12 +1515,12 @@ let () =
                        pb_eq1] in
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("graph(sat)" ^ string_of_int i) Sat
+           Alcotest.check_raises ("graph(sat) " ^ string_of_int i) Sat
              (fun () -> test (models_conjunct (mk pb))))
          successes;
 
        List.iteri (fun i pb ->
-           Alcotest.check_raises ("graph(unsat)" ^ string_of_int i) Unsat
+           Alcotest.check_raises ("graph(unsat) " ^ string_of_int i) Unsat
              (fun () -> test (models_conjunct (mk pb))))
          failures;)
   ]

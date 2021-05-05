@@ -299,3 +299,18 @@ val econvert : conv_env -> Type.tvars -> Vars.env -> term -> eterm option
   * exists a subterm [Theory.App(name,_)] or [Theory.AppAt(name,_,_)] in the
   * term [t]. *)
 val find_app_terms : term -> string list -> string list
+
+(*------------------------------------------------------------------*)
+(** {2 Apply arguments} *)
+
+(** Parser type for a formula built by partially applying an hypothesis 
+    or a lemma *)
+type p_pt_hol = { 
+  p_pt_hid : lsymb;
+  p_pt_args : term list; 
+}
+
+(** Parser type for `apply` arguments *)
+type p_pt =
+  | PT_hol  of p_pt_hol (* (partially applied) hypothesis or lemma *)
+  | PT_form of term 

@@ -27,6 +27,9 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+let bad_args () = hard_failure (Failure "improper arguments")
+
+(*------------------------------------------------------------------*)
 let get_models s = Tactics.timeout_get (TS.get_models s)
 let get_trs    s = Tactics.timeout_get (TS.get_trs s)
 
@@ -354,7 +357,7 @@ let expand_tac args s sk fk =
   try 
     let args = List.map (function
         | Args.Theory t -> t
-        | _ -> hard_failure (Failure "improper arguments")
+        | _ -> bad_args ()
       ) args
     in
     sk [expands args s] fk
@@ -458,8 +461,7 @@ let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule =
   let vs, f = Term.decompose_forall f in
   let vs = Vars.Sv.of_list vs in
 
-  let forms = List.rev (Term.decompose_impls f) in 
-  let subs, f = List.rev (List.tl forms), List.hd forms in
+  let subs, f = Term.decompose_impls_last f in
 
   let e = match f with
     | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
@@ -500,7 +502,9 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
     | _ -> 
       let cenv = Theory.{ table = TS.table s;
                               cntxt = InGoal; } in 
-      let f = Theory.convert cenv (TS.ty_vars s) (TS.env s) rw_type Type.Boolean in
+      let f = 
+        Theory.convert cenv (TS.ty_vars s) (TS.env s) rw_type Type.Boolean 
+      in
 
       (* create new sub-goal *)
       let premise = [TS.set_goal f s] in
@@ -595,7 +599,7 @@ let revert_tac (args : Args.parser_arg list) s sk fk =
     let s = 
       List.fold_left (fun s arg -> match arg with
           | Args.String_name arg -> revert_str arg s
-          | _ -> hard_failure (Failure "improper arguments")
+          | _ -> bad_args ()
         ) s args in
     sk [s] fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
@@ -781,9 +785,9 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
                                
         | Type.KMessage -> message_case f ty s
                              
-        | Type.KIndex -> Tactics.(hard_failure (Failure "improper arguments"))
+        | Type.KIndex -> Tactics.(bad_args ())
       end
-    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+    | _ -> Tactics.(bad_args ())
 
 
 let case_tac (args : Args.parser_args) s sk fk =
@@ -836,7 +840,7 @@ let clear_tac (args : Args.parser_arg list) s sk fk =
     let s = 
       List.fold_left (fun s arg -> match arg with
           | Args.String_name arg -> clear_str arg s
-          | _ -> hard_failure (Failure "improper arguments")
+          | _ -> bad_args ()
         ) s args in
     sk [s] fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
@@ -1060,7 +1064,7 @@ let destruct_tac args s sk fk =
       let hid, _ = Hyps.by_name h s in
       sk (do_destruct hid s) fk
 
-    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+    | _ -> Tactics.(bad_args ())
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
@@ -1106,7 +1110,7 @@ let () =
          List.map
            (function
               | Args.Theory tm -> tm
-              | _ -> Tactics.(hard_failure (Failure "improper arguments")))
+              | _ -> Tactics.(bad_args ()))
            l
        in
          match goal_exists_intro ths s with
@@ -1195,7 +1199,7 @@ let generalize_tac (args : Args.parser_arg list) s sk fk =
           | Args.Arg (Args.ETerm (_, _, loc)) ->
             hard_failure ~loc (Failure "arguments must be variables")
 
-          | _ -> hard_failure (Failure "improper arguments")
+          | _ -> bad_args ()
         ) args 
     in
 
@@ -1335,7 +1339,7 @@ let use ip (name : lsymb) (ths : Theory.term list) (s : TS.t) =
 
   aux [] f
 
-(* we use tac_apply for both `use` tactic. *)
+(* this is the `use` tactic. *)
 let tac_apply args s sk fk =
   let ip, args = match args with
     | Args.SimplPat ip :: args -> Some ip, args
@@ -1346,15 +1350,14 @@ let tac_apply args s sk fk =
       List.map
         (function
           | Args.Theory th -> th
-          | _ -> hard_failure
-                   (Tactics.Failure "improper arguments"))
+          | _ -> bad_args ())
         th_terms
     in
     begin match use ip id th_terms s with
       | subgoals -> sk subgoals fk
       | exception Tactics.Tactic_soft_failure (_,e) -> fk e
     end
-  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  | _ -> Tactics.(bad_args ())
 
 
 let tac_apply args s sk fk =
@@ -1382,11 +1385,11 @@ let tac_assert (args : Args.parser_arg list) s sk fk =
     let ip, f = match args with
       | [f] -> None, f
       | [f; Args.SimplPat ip] -> Some ip, f
-      | _ -> Tactics.(hard_failure (Failure "improper argument")) in
+      | _ -> bad_args () in
 
     let f = match convert_args s [f] Args.(Sort Boolean) with
       | Args.(Arg (Boolean f)) -> f
-      | _ -> Tactics.(hard_failure (Failure "improper argument")) in
+      | _ -> bad_args () in
 
     let s1 = TS.set_goal f s in
     let id, s2 = Hyps.add_i Args.AnyName f s in
@@ -1698,7 +1701,7 @@ let mk_fresh_direct (cntxt : Constr.trace_cntxt) env ns t =
    * equal to the name ([n],[is]) *)
   let mk_case (js : Type.index Vars.var list) =
     (* select bound variables *)
-    let bv = List.filter (fun i -> not (Vars.mem env (Vars.name i))) js in
+    let bv = List.filter (fun i -> not (Vars.mem env i)) js in
 
     let env_local = ref env in
     let bv' = List.map (Vars.fresh_r env_local) bv in
@@ -2295,7 +2298,7 @@ let rewrite_tac args s sk fk =
     in
     sk seqs fk
 
-  | _ -> hard_failure (Tactics.Failure "improper arguments")
+  | _ -> bad_args ()
 
 let rewrite_tac args s sk fk =
   try rewrite_tac args s sk fk with
@@ -2317,26 +2320,19 @@ let () =
 
 
 (*------------------------------------------------------------------*)
-    
-let apply ty_vars (f : Term.message) (s : TS.sequent) =
-  let vars, f = Term.decompose_forall f in
-  let vars = Vars.Sv.of_list vars in
-  let forms = List.rev (Term.decompose_impls f) in 
-  let subs, f = List.rev (List.tl forms), List.hd forms in
 
-  if not (Vars.Sv.subset vars (Term.fv f)) then
+let apply (pat : Type.message Term.Match.pat) (s : TS.t) =
+  let subs, f = Term.decompose_impls_last pat.pat_term in 
+
+  if not (Vars.Sv.subset pat.pat_vars (Term.fv f)) then
     soft_failure ApplyBadInst;
+    
+  let pat = { pat with pat_term = f } in
   
-  let goal = TS.goal s in
+  Fmt.epr "pat: %a@." Term.Match.pp_pat pat;
+  Fmt.epr "vars: %a@." (Fmt.list Vars.pp_e) (Vars.Sv.elements (Term.fv f));
   
-  let mv =
-    Term.Match.try_match goal 
-      { pat_tyvars = ty_vars;
-        pat_vars = vars; 
-        pat_term = f; }
-  in
-
-  match mv with
+  match Term.Match.try_match (TS.goal s) pat with
   | `NoMatch | `FreeTyv -> soft_failure ApplyMatchFailure
   | `Match mv ->
     let subst = Term.Match.to_subst mv in
@@ -2352,25 +2348,17 @@ let apply ty_vars (f : Term.message) (s : TS.sequent) =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B` 
 *)
-let apply_in ty_vars (form : Term.message) (hyp : Ident.t) (s : TS.sequent) =
-  let fvars, f = Term.decompose_forall form in
-  let fvars = Vars.Sv.of_list fvars in
-  let forms = List.rev (Term.decompose_impls f) in 
-  let fprems, fconcl = List.rev (List.tl forms), List.hd forms in
+let apply_in (pat : Type.message Term.Match.pat) (hyp : Ident.t) (s : TS.t) =
+  let fprems, fconcl = Term.decompose_impls_last pat.pat_term in 
 
   let h = Hyps.by_id hyp s in
-  let forms = List.rev (Term.decompose_impls h) in 
-  let hprems, hconcl = List.rev (List.tl forms), List.hd forms in
+  let hprems, hconcl = Term.decompose_impls_last h in
   
   let try1 fprem =
-    if not (Vars.Sv.subset fvars (Term.fv fprem)) then None
+    if not (Vars.Sv.subset pat.pat_vars (Term.fv fprem)) then None
     else
-      let pat = Term.Match.{
-          pat_tyvars = ty_vars; 
-          pat_vars = fvars;
-          pat_term = fprem; 
-        } in
-      
+      let pat = { pat with pat_term = fprem } in
+
       match Term.Match.try_match hconcl pat with
       | `NoMatch | `FreeTyv -> None
       | `Match mv -> Some mv
@@ -2411,40 +2399,85 @@ let apply_in ty_vars (form : Term.message) (hyp : Ident.t) (s : TS.sequent) =
     
 
 (** Parse apply tactic arguments *)
-let p_apply_args (args : Args.parser_arg list) (s : TS.sequent)
-  : sequent list * Type.tvars * Term.message * target =
-  match args with
-  | [Args.ApplyIn (f,in_opt)] ->
-    let subgoals, ty_vars, f = match Args.convert_as_lsymb [Args.Theory f] with
-      | Some str when is_hyp_or_lemma str s ->
-        let _, ty_vars, f = get_hyp_or_lemma str s in
-        [], ty_vars, f
+let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) : 
+  sequent list * Type.message Term.Match.pat * target =
+  let subgoals, pat, in_opt = 
+    match args with
+    | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
+      let _, tyvars, f = get_hyp_or_lemma pt.p_pt_hid s in
+      let f_args, f = Term.decompose_forall f in
 
-      | _ ->
+      let pt_args_l = List.length pt.p_pt_args in
+
+      if List.length f_args < pt_args_l then
+        hard_failure ~loc:(L.loc pt.p_pt_hid)  (Failure "too many arguments");
+
+      let f_args0, f_args1 = List.takedrop pt_args_l f_args in
+
+
+      let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
+      let pat_vars = ref (Vars.Sv.of_list f_args1) in
+
+      let subst = 
+        List.map2 (fun p_arg (Vars.EVar f_arg) ->
+            let ty = Vars.ty f_arg in
+            let t = 
+              Theory.convert ~pat:true cenv (TS.ty_vars s) (TS.env s) p_arg ty
+            in
+            let new_p_vs = 
+              Vars.Sv.filter (fun (Vars.EVar v) -> Vars.is_pat v) (Term.fv t)
+            in
+            pat_vars := Vars.Sv.union (!pat_vars) new_p_vs;
+      
+            Term.ESubst (Term.Var f_arg, t)
+          ) pt.p_pt_args f_args0
+      in
+
+      (* instantiate [f_args0] by [args] *)
+      let f = Term.subst subst f in
+
+      let pat = Term.Match.{ 
+          pat_tyvars = tyvars;
+          pat_vars = !pat_vars;
+          pat_term = f; } 
+      in      
+      [], pat, in_opt
+
+    | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
+      begin
         match convert_args s args Args.(Sort Boolean) with
         | Args.Arg (Boolean f) ->
           let subgoal = TS.set_goal f s in
-          [subgoal], [], f
 
-        | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-    in
+          let vs, f = Term.decompose_forall f in
+          let pat = Term.Match.{ 
+              pat_tyvars = [];
+              pat_vars = Vars.Sv.of_list vs; 
+              pat_term = f; } 
+          in
 
-    let target = match in_opt with
-      | Some lsymb -> `Hyp (fst (Hyps.by_name lsymb s))
-      | None       -> `Goal
-    in
-    subgoals, ty_vars, f, target
+          [subgoal], pat, in_opt
 
-  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+        | _ -> bad_args ()
+      end
+      
+    | _ -> bad_args ()
+  in
+  
+  let target = match in_opt with
+    | Some lsymb -> `Hyp (fst (Hyps.by_name lsymb s))
+    | None       -> `Goal
+  in
+  subgoals, pat, target
 
 
 let apply_tac (args : Args.parser_arg list) s
     (sk : TS.t list Tactics.sk) fk =
   try
-    let subgoals, ty_vars, f, target = p_apply_args args s in
+    let subgoals, pat, target = p_apply_args args s in
     match target with
-    | `Goal   -> sk (subgoals @ apply ty_vars f s      ) fk
-    | `Hyp id -> sk (subgoals @ apply_in ty_vars f id s) fk
+    | `Goal   -> sk (subgoals @ apply pat s      ) fk
+    | `Hyp id -> sk (subgoals @ apply_in pat id s) fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
@@ -2506,7 +2539,7 @@ let intro_tac args s sk fk =
   try match args with
     | [Args.IntroPat intros] -> sk (do_intros intros s) fk
 
-    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+    | _ -> Tactics.(bad_args ())
   with Tactics.Tactic_soft_failure (_,e) -> fk e
 
 let () =
@@ -2762,7 +2795,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
   let subst,env =
     List.fold_left
       (fun (subst,env) (Vars.EVar v) ->
-         if Vars.mem init_env (Vars.name v) then subst,env else
+         if Vars.mem init_env v then subst,env else
          let env,v' = Vars.fresh env v in
          let subst = Term.(ESubst (Var v, Var v')) :: subst in
          subst,env)

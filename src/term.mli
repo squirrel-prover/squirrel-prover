@@ -249,6 +249,8 @@ module Match : sig
     pat_term : 'a term; 
   }
 
+  val pp_pat : Format.formatter -> 'a pat -> unit
+
   val to_subst : mv -> subst
 
   (** [try_match t p] tries to match [p] with [t] (at head position). 
@@ -402,6 +404,8 @@ val decompose_exists : message -> Vars.evar list * message
 val decompose_ands  : message -> message list 
 val decompose_ors   : message -> message list 
 val decompose_impls : message -> message list 
+
+val decompose_impls_last : message -> message list * message
 
 (*------------------------------------------------------------------*)
 val destr_var : 'a term -> 'a Vars.var option

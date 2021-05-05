@@ -475,6 +475,17 @@ let decompose_ors   = mk_decompose f_or
 let decompose_ands  = mk_decompose f_and 
 let decompose_impls = mk_decompose f_impl
 
+let decompose_impls_last f =
+  let forms = decompose_impls f in
+  let rec last = function
+    | [] -> assert false
+    | [f] -> [], f
+    | f :: fs -> 
+      let prems, goal = last fs in
+      f :: prems, goal
+  in 
+  last forms
+
 (*------------------------------------------------------------------*)
 let destr_var : type a. a term -> a Vars.var option = function
   | Var v -> Some v
@@ -1133,7 +1144,7 @@ module Match = struct
     pat_vars : Sv.t; 
     pat_term : 'a term; 
   }
-
+  
   let pp_pat fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
       pp p.pat_term 

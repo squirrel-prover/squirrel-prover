@@ -20,8 +20,8 @@ Proof.
      using an incorrect equivalence that we admit. *)
   equivalent
     (forall (i0,i1:index),
-      (diff((A(i0) <= tau => (n(i) <> n(i1) && n(i) <> n(i0))),
-	          (A(i0) <= tau => (m(i) <> n(i1) && m(i) <> n(i0)))))),
+      (diff((A(i0) <= tau => (n(i) <> n(i0) && n(i) <> n(i1))),
+	          (A(i0) <= tau => (m(i) <> n(i0) && m(i) <> n(i1)))))),
     True.
   admit.
   yesif 1; 1: auto.

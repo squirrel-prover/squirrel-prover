@@ -61,6 +61,7 @@ type tac_error =
   | NoCollision
   | HypAlreadyExists of string
   | HypUnknown of string
+  | InvalidVarName
   | PatNumError of int * int    (* given, need *)
 
 (** Tactics should raise this exception if they are ill-formed. *)

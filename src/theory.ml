@@ -767,12 +767,11 @@ and convert0 :
     if not state.allow_pat then
       conv_err (L.loc tm) PatNotAllowed;
 
-    conv_err (L.loc tm) PatNotAllowed (* TODO *)
-    (* let p = Vars.make state.env ty "_" in
-     * Term.Var p *)
+    let env, p = Vars.make ~allow_pat:true `Approx state.env ty "_" in
+    Term.Var p 
 
   | App   (f,terms) ->
-    if terms = [] && Vars.mem state.env (L.unloc f)
+    if terms = [] && Vars.mem_s state.env (L.unloc f)
     then convert_var state state.env f ty
         
     (* otherwise build the application and convert it. *)
@@ -1299,7 +1298,7 @@ let find_app_terms t (names : string list) =
   List.sort_uniq Stdlib.compare acc
 
 (*------------------------------------------------------------------*)
-(** {2 Proof Terms} *)
+(** {2 Apply arguments} *)
 
 (** Parser type for a formula built by partially applying an hypothesis 
     or a lemma *)

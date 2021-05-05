@@ -40,6 +40,8 @@ type tac_error =
   | HypAlreadyExists of string
   | HypUnknown of string
 
+  | InvalidVarName
+
   | PatNumError of int * int    (* given, need *)
                    
 let tac_error_strings =
@@ -64,6 +66,7 @@ let tac_error_strings =
     (NothingToIntroduce , "NothingToIntroduce");
     (NothingToRewrite   , "NothingToRewrite");
     (BadRewriteRule     , "BadRewriteRule");
+    (InvalidVarName     , "InvalidVarName");
     (ApplyMatchFailure  , "ApplyMatchFailure");
     (ApplyBadInst       , "ApplyBadInst") ]
 
@@ -93,6 +96,7 @@ let rec tac_error_to_string = function
   | NoCollision
   | ApplyMatchFailure
   | ApplyBadInst
+  | InvalidVarName
   | DidNotFail as e -> List.assoc e tac_error_strings
   | HypAlreadyExists _ -> "HypAlreadyExists"
   | HypUnknown       _ -> "HypUnknown"
@@ -174,7 +178,8 @@ let rec pp_tac_error ppf = function
 
   | ApplyBadInst ->
     Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
-
+  
+  | InvalidVarName -> Fmt.pf ppf "invalid variable name"
     
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in

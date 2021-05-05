@@ -928,7 +928,7 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
                * to quantify universally over them *)
               let bv =
                 List.filter
-                  (fun i -> not (Vars.mem env (Vars.name i)))
+                  (fun i -> not (Vars.mem env i))
                   j
               in
               let env = ref env in
@@ -1352,7 +1352,7 @@ let yes_no_if b Args.(Int i) s =
        * This is detected by checking that there is no "new" variable,
        * which are used by the iterator to represent bound variables. *)
       let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
-      if List.exists Vars.(function EVar v -> is_new v) vars then
+      if List.exists (function Vars.(EVar v) -> Vars.is_new v) vars then
         soft_failure (Tactics.Failure "application of this tactic \
           inside a context that bind variables is not supported");
 
@@ -1758,7 +1758,7 @@ let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
              let not_in_env  = function
                | Vars.EVar v ->
                  match Vars.ty v with
-                 | Type.Index -> not (Vars.mem !env (Vars.name v))
+                 | Type.Index -> not (Vars.mem !env v)
                  | _ -> true
              in
 
