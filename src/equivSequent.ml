@@ -8,12 +8,12 @@ module H = Hyps.Mk
     (struct
       type t = Equiv.form
                  
-      let pp_hyp = Equiv.pp_form
+      let pp_hyp = Equiv.pp
       let htrue = Equiv.Atom (Equiv.Equiv []) 
     end)
 
 let subst_hyps (subst : Term.subst) (hyps : H.hyps) : H.hyps = 
-  H.map (Equiv.subst_form subst) hyps
+  H.map (Equiv.subst subst) hyps
 
 type hyps = H.hyps
 
@@ -50,7 +50,7 @@ type sequent = t
 
 let pp_goal fmt = function
   | Equiv.Atom (Equiv.Equiv e) -> Equiv.pp_equiv_numbered fmt e
-  | _  as f -> Equiv.pp_form fmt f
+  | _  as f -> Equiv.pp fmt f
   
 let pp ppf j =
   Fmt.pf ppf "@[<v 0>" ;
@@ -73,7 +73,7 @@ let pp ppf j =
 let pp_init ppf j =
   if j.env <> Vars.empty_env then
     Fmt.pf ppf "forall %a,@ " Vars.pp_env j.env ;
-  Fmt.pf ppf "%a" Equiv.pp_form j.goal
+  Fmt.pf ppf "%a" Equiv.pp j.goal
 
 
 (*------------------------------------------------------------------*)  
@@ -198,5 +198,5 @@ let get_frame proj j = match j.goal with
   | _ -> None
 
 let subst subst s =
-  { s with goal = Equiv.subst_form subst s.goal;
+  { s with goal = Equiv.subst subst s.goal;
            hyps = subst_hyps subst s.hyps; }

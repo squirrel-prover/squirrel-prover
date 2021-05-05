@@ -60,7 +60,7 @@ axiom tags_neq : tag0 <> tag1.
 
 (* Well-authentication for R1's condition, formulated in an imprecise
    way with respect to the involved indices. *)
-goal wa_R1 : forall r:index,
+goal wa_R1 (r:index):
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R1(r))) =
    H(<tag0,<nr(r),fst(input@R1(r))>>,diff(key(i),key'(i,t))))
@@ -72,7 +72,7 @@ goal wa_R1 : forall r:index,
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-  intro r; split.
+  split.
 
   (* Cond => WA *)
   intro [i t Meq].
@@ -95,7 +95,7 @@ Proof.
 Qed.
 
 (* Same with R2 *)
-goal wa_R2 : forall r:index,
+goal wa_R2 (r:index):
   (exists (i,t:index),
    xor(diff(id(i),id'(i,t)),snd(input@R2(r))) =
    H(<tag0,<nr(r),fst(input@R2(r))>>,diff(key(i),key'(i,t))))
@@ -107,7 +107,7 @@ goal wa_R2 : forall r:index,
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof.
-  intro r; use tags_neq; split. 
+  use tags_neq; split. 
 
   intro [i t Meq].
   project. 
@@ -131,7 +131,7 @@ Qed.
 (** Same as before, but more precise wrt i, for the left process.
     There has to remain an existential quantification on t,
     because it is not involved in the condition. *)
-goal [left] wa_R1_left : forall (i,r:index),
+goal [left] wa_R1_left (i,r:index):
   xor(id(i),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key(i))
   <=>
@@ -142,7 +142,6 @@ goal [left] wa_R1_left : forall (i,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
@@ -152,7 +151,7 @@ Proof.
 Qed.
 
 (** Precise version of wa_R1 on the right: no more existentials. *)
-goal [right] wa_R1_right : forall (i,t,r:index),
+goal [right] wa_R1_right (i,t,r:index):
   xor(id'(i,t),snd(input@R1(r))) =
   H(<tag0,<nr(r),fst(input@R1(r))>>,key'(i,t))
   <=>
@@ -162,7 +161,6 @@ goal [right] wa_R1_right : forall (i,t,r:index),
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i t r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.

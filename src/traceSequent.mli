@@ -18,8 +18,12 @@ type sequent = t
 val pp : Format.formatter -> sequent -> unit
 
 val init : 
-  system:SystemExpr.system_expr -> ty_vars:Type.tvars ->
-  Symbols.table -> message -> sequent
+  system:SystemExpr.system_expr -> 
+  table:Symbols.table ->
+  ty_vars:Type.tvars ->
+  env:Vars.env ->
+  goal:Term.message ->
+  sequent
   
 (** Get the system which the sequent is reasoning about. *)
 val system : sequent -> SystemExpr.system_expr

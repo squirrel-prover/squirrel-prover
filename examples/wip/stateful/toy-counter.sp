@@ -74,11 +74,10 @@ axiom orderStrict : forall (n1,n2:message), n1 = n2 => order(n1,n2) <> orderOk.
 
 (* GOALS *)
 
-goal counterIncrease :
-  forall (t:timestamp), happens(t) => 
+goal counterIncrease (t:timestamp): happens(t) => 
     (t > init => order(d@pred(t),d@t) = orderOk).
 Proof.
-intro t Hap Hc.
+intro Hap Hc.
 use orderSucc with d@pred(t).
 case t; 2,3,4: expand d@t; by congruence.
 by eqtrace.

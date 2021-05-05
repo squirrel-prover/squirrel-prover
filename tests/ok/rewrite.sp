@@ -25,7 +25,7 @@ goal _ (x, y, z : message) :
 ((a = z && a = y) && (f(z) = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite (forall (x : message), f(x) = a);
   1: by intro x1; use foo with x1.
   assumption.
@@ -36,14 +36,14 @@ goal _ (x, y, z : message) :
 ((a = z && a = y) && (f(z) = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite foo.
   assumption.
 Qed.
 
 goal foo_lem (x : message) : f(x) = a.
 Proof. 
-  by intro x; by use foo with x.
+  by use foo with x.
 Qed.
 
 (* same but through an already proved goal. *)
@@ -51,7 +51,7 @@ goal _ (x, y, z : message) :
 ((a = z && a = y) && (f(z) = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite foo_lem.
   assumption.
 Qed.
@@ -63,7 +63,7 @@ goal _ (x, y, z : message) :
 ((d = z && d = y) && (f(z) = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z foo H.
+  intro foo H.
   rewrite foo.
   assumption.
 Qed.
@@ -74,7 +74,7 @@ goal _ (x, y, z : message) :
 ((f(x) = z && f(x) = y) && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite foo.
   checkfail assumption exn NotHypothesis.
 Abort.
@@ -85,7 +85,7 @@ goal _ (x, y, z : message) :
 ((a = z && a = y) && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite !foo.
   assumption.
 Qed.
@@ -95,7 +95,7 @@ goal _ (x, y, z : message) :
 ((a = z && a = y) && (a = z || z = y)) =>
 (f(x) = z && f(x) = y && (f(z) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite ?foo.
   assumption.
 Qed.
@@ -106,7 +106,7 @@ goal _ (x, y, z : message) :
 ((c = z && c = y) && (c = z || z = y)) =>
 (gg(x,b) = z && gg(x,b) = y && (gg(z,b) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite ?foog.
   assumption.
 Qed.
@@ -115,7 +115,6 @@ Qed.
 goal _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof.
-  intro x y z.  
   checkfail rewrite foog exn NothingToRewrite.
 Abort.
 
@@ -123,7 +122,6 @@ Abort.
 goal _ (x, y, z : message) : 
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof.
-  intro x y z.  
   checkfail rewrite !foog exn NothingToRewrite.
 Abort.
 
@@ -132,7 +130,7 @@ goal _ (x, y, z : message) :
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)) =>
 (gg(x,c) = z && gg(x,c) = y && (gg(z,c) = z || z = y)).
 Proof.
-  intro x y z H.
+  intro H.
   rewrite ?foog.
   assumption.
 Qed.
@@ -144,7 +142,7 @@ a = b => c = d =>
 (gg(b,b) = gg(b,b) && gg(c,c) = gg(c,c)) =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
 Proof.
-  intro x y z AB CD H.
+  intro AB CD H.
   rewrite AB.
   rewrite -CD.
   assumption.
@@ -156,7 +154,7 @@ a = b => c = d =>
 (gg(b,b) = gg(b,b) && gg(c,c) = gg(c,c)) =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
 Proof.
-  intro x y z AB CD H.
+  intro AB CD H.
   rewrite AB -CD.
   assumption.
 Qed.
@@ -169,7 +167,6 @@ Qed.
 goal _ (x, y, z : message) : 
 f(a) = b.
 Proof.
-  intro x y z.
   checkfail rewrite (forall (t : message), f(a) = t) exn BadRewriteRule.
 Abort.
 
@@ -179,7 +176,7 @@ goal [bis] _ (x, y, z : message, i : index) :
 (input@A(i) = a => f(a) = c) =>
  happens(A(i)) => b = c => cond@A(i) => f(a) = b.
 Proof.
-  intro x y z i Ass Hap H1. 
+  intro Ass Hap H1. 
   rewrite /cond H1. 
   assumption.
 Qed.
@@ -196,7 +193,7 @@ goal [terce] _ (x : message, i : index) :
 (* (input@A(i) = a => f(a) = c) => *)
  happens(A(i)) => x = input@A(i) => output@A(i) = <<a,x>,<a,x>>.
 Proof.
-  intro x i Hap Eq. 
+  intro Hap Eq. 
   rewrite /output /t' /t Eq; congruence.
 Qed.
 
@@ -207,7 +204,7 @@ goal _ (x : message) :
  x = f(a) => 
  <x,c> = <b,c>.
 Proof.
- intro x H Eq.
+ intro H Eq.
  rewrite H; 1: assumption. 
  congruence.
 Qed.
@@ -219,7 +216,7 @@ goal _ (x : message) :
  f(x) = f(a) => 
  <f0(x),<f0(f(x)),c>> = <b,<b,c>>.
 Proof.
- intro x H Eq Eq2.
+ intro H Eq Eq2.
  rewrite H; 1: assumption. 
  rewrite H; 1: assumption.
  congruence.
@@ -232,7 +229,7 @@ goal _ (x : message) :
  f(x) = f(a) => 
  <f0(x),<f0(f(x)),c>> = <b,<b,c>>.
 Proof.
- intro x H Eq Eq2.
+ intro H Eq Eq2.
  rewrite !H; 1,2: assumption. 
  congruence.
 Qed.
@@ -248,7 +245,7 @@ axiom mif_false (b : boolean, x,y : message):
 goal _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
- intro b b' x y Hb Hb'.
+ intro Hb Hb'.
  by rewrite mif_true. 
 Qed.
 
@@ -256,7 +253,7 @@ Qed.
 goal _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
- intro b b' x y Hb Hb'.
+ intro Hb Hb'.
  rewrite mif_true /=.
 
  (* /= does not close goals, hence there should be two subgoals *)
@@ -268,6 +265,6 @@ Qed.
 goal _ (b,b' : boolean, x,y : message) : 
   b => b' => if (b && b') then x else y = x.
 Proof.
- intro b b' x y Hb Hb'.
+ intro Hb Hb'.
  rewrite mif_true //.
 Qed.

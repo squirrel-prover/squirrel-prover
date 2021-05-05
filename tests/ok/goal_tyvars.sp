@@ -22,7 +22,7 @@ Qed.
 
 goal _ ['a 'b] (a,b : 'a) : a = b => b = a.
 Proof.
-  intro > H. 
+  intro H. 
   checkfail (
     try (apply eq_sym0);
     assumption
@@ -37,7 +37,7 @@ Proof. auto. Qed.
 
 goal _ ['a 'b] (a,b : 'a) (c, d: 'b) : (b = a => c = d) => a = b => d = c.
 Proof.
-  intro > H H0.
+  intro H H0.
   apply eq_sym in H0.
   apply eq_sym.
   apply H.  

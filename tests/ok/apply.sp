@@ -21,7 +21,7 @@ goal _ (x, y : message, i : index) :
   (forall (x,y : message), x = ok(i) => gg(f(x),y) = f0(x)) =>
   gg(f(f0(<x,y>)),<y,y>) = f0(f0(<x,y>)).
 Proof.
-  intro x y i H Hyp.
+  intro H Hyp.
   apply Hyp.
   assumption.
 Qed.
@@ -32,7 +32,7 @@ goal _ (x, y : message, i : index) :
   (forall (x,y : message), x = ok(i) => gg(f(x),y) = f0(x)) =>
   gg(f(f0(<x,y>)),<y,y>) = f0(<x,y>).
 Proof.
-  intro x y j H Hyp.
+  intro H Hyp.
   checkfail (apply Hyp) exn ApplyMatchFailure.
 Abort.
 
@@ -42,7 +42,7 @@ goal _ (x, y : message, i : index) :
   (forall (x,y : message, i : index), x = ok(i) => gg(f(x),y) = f0(x)) =>
   gg(f(f0(<x,y>)),<y,y>) = f0(<x,y>).
 Proof.
-  intro x y j H Hyp.
+  intro H Hyp.
   checkfail (apply Hyp) exn ApplyBadInst.
 Abort.
 
@@ -53,7 +53,7 @@ goal _ (A,B,C,D : boolean, y : message, j : index) :
   (forall (x : message, i : index), A => x = ok(i) => B => D) =>
   (C => f(y) = ok(j)) => False.
 Proof.
-  intro A B C D y j Ha Hb Hc Hfinal H Hin.
+  intro Ha Hb Hc Hfinal H Hin.
   apply H in Hin;
   [1,2,3: assumption |
    4: by apply Hfinal]. 

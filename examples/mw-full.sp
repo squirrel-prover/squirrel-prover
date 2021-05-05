@@ -82,7 +82,7 @@ goal wa_R1 (r:index) :
    R(r) < T(i,t) &&
    output@R(r) = input@T(i,t)).
 Proof. 
-  intro r; split.
+  split.
 
   (* Cond => WA *)
   intro [i t Meq].
@@ -119,7 +119,6 @@ goal [left] wa_R1_left (i,r:index):
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof. 
-  intro i r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   exists t; simpl.
@@ -139,7 +138,6 @@ goal [right] wa_R1_right (i,t,r:index):
   R(r) < T(i,t) &&
   output@R(r) = input@T(i,t).
 Proof.
-  intro i t r.
   split; 2: by intro [_ _]; expand output.
   intro Meq; euf Meq => _ _ _; 1: auto.
   assert input@T(i,t) = nr(r) as F; 1: auto.

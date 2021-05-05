@@ -8,7 +8,7 @@ system !_i out(c,n(i)).
 
 goal _ (j:index,t:timestamp) : n(j) = input@t => A(j) < t.
 Proof.
-  nosimpl(intro i t Heq).
+  nosimpl(intro Heq).
   nosimpl(fresh Heq).
   nosimpl(intro H). 
   nosimpl(assumption).
@@ -17,7 +17,7 @@ Qed.
 (* we check that this implies that A(j) happened. *)
 goal _ (j:index,t:timestamp) : n(j) = input@t => happens(A(j)).
 Proof.
-  intro i t Heq.
+  intro Heq.
   fresh Heq.
   auto.
 Qed.

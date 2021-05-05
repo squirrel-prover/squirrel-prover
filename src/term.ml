@@ -891,12 +891,14 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
       | Seq ([], f) -> Seq ([], subst s f)
 
       | Seq ([a], f) -> 
-        let a, f = subst_binding (Vars.EVar a) s f in
+        let a, s = subst_binding (Vars.EVar a) s in
+        let f = subst s f in
         let a = Vars.ecast a Type.KIndex in
         Seq ([a],f)
 
       | Seq (a :: vs, f) -> 
-        let a, f = subst_binding (Vars.EVar a) s (Seq (vs,f)) in
+        let a, s = subst_binding (Vars.EVar a) s in
+        let f = subst s (Seq (vs,f)) in
         let a = Vars.ecast a Type.KIndex in
         let vs, f = match f with
           | Seq (vs, f) -> vs, f
@@ -912,13 +914,15 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
       | ForAll ([], f) -> subst s f
 
       | ForAll (a :: vs, f) ->
-        let a, f = subst_binding a s (ForAll (vs,f)) in
+        let a, s = subst_binding a s in
+        let f = subst s (ForAll (vs,f)) in
         mk_forall [a] f
 
       | Exists ([], f) -> subst s f
 
       | Exists (a :: vs, f) ->
-        let a, f = subst_binding a s (Exists (vs,f)) in
+        let a, s = subst_binding a s in
+        let f = subst s (Exists (vs,f)) in
         mk_exists [a] f
 
       | Find ([], b, c, d) -> Find ([], subst s b, subst s c, subst s d) 
@@ -927,7 +931,8 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
         (* used because [v :: vs] are not bound in [d]  *)
         let dummy = mk_zero in
 
-        let v, f = subst_binding (Vars.EVar v) s (Find (vs, b, c, dummy)) in
+        let v, s = subst_binding (Vars.EVar v) s in
+        let f = subst s (Find (vs, b, c, dummy)) in
         let v = Vars.ecast v Type.KIndex in
         match f with
         | Find (vs, b, c, _) -> Find (v :: vs, b, c, subst s d) 
@@ -935,9 +940,8 @@ let rec subst : type a. subst -> a term -> a term = fun s t ->
     in 
     assoc s new_term
 
-and subst_binding 
-  : type a. Vars.evar -> esubst list -> a term -> Vars.evar * a term =
-  fun var s f ->
+and subst_binding : Vars.evar -> subst -> Vars.evar * subst =
+  fun var s ->
   (* clear [v] entries in [s] *)
   let s = filter_subst var s in
 
@@ -964,7 +968,7 @@ and subst_binding
         ( Vars.EVar new_v, s)
     else ( var, s ) in
   
-  var, subst s f
+  var, s
 
 and subst_message_atom (s : subst) (`Message (ord, a1, a2)) =
   `Message (ord, subst s a1, subst s a2)

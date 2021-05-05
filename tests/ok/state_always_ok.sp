@@ -7,6 +7,7 @@ system !_i in(c,x);s:=s;out(c,x).
 
 goal _ (t:timestamp): happens(t) => s@t = ok.
 Proof.
+  generalize t.
   induction.
   intro Hind Hap.
   case t => H. 

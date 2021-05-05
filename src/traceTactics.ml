@@ -36,7 +36,7 @@ let convert_args s args sort =
 
 (*------------------------------------------------------------------*)
 let is_hyp_or_lemma name s =
-  Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula name
+  Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
 
 (** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
 let get_hyp_or_lemma name s =

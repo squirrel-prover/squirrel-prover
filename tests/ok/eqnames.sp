@@ -32,11 +32,10 @@ Proof.
 Qed.
 
 
-goal independency_bis :
- forall (i:index,j:index),
+goal independency_bis (i:index,j:index):
   i <> j =>
   h(m1(i),k) <> m1(j).
 Proof.
- intro i j Hneq Heq. simpl.
+ intro Hneq Heq. simpl.
  by case H.
 Qed.

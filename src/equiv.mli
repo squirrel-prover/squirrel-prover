@@ -30,7 +30,7 @@ val pp_atom : Format.formatter -> atom -> unit
 
 val subst_atom : Term.subst -> atom -> atom
 
-(** Free variables of an [atom]. *)
+(** Free variables *)
 val fv_atom : atom -> Vars.Sv.t
 
 (*------------------------------------------------------------------*)
@@ -38,12 +38,15 @@ val fv_atom : atom -> Vars.Sv.t
 (** We only support a small fragment for now *)
 
 type form = 
-  | Atom of atom
-  | Impl of (form * form)
+  | ForAll of Vars.evar list * form
+  | Atom   of atom
+  | Impl   of (form * form)
 
-val pp_form : Format.formatter -> form -> unit
+val pp : Format.formatter -> form -> unit
 
-val subst_form : Term.subst -> form -> form
+val mk_forall : Vars.evar list -> form -> form
 
-(** Free variables of an [atom]. *)
-val fv_form : form -> Vars.Sv.t
+val subst : Term.subst -> form -> form
+
+(** Free variables *)
+val fv : form -> Vars.Sv.t

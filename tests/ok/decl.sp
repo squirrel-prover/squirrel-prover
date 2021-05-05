@@ -52,13 +52,11 @@ Proof. checkfail auto exn GoalNotClosed. Abort.
 (* check the [named_fixed_length] type info  *)
 goal _ (i,j : index) : len(nfl(i)) = len(nfl(j)).
 Proof.
-intro i j. 
 by namelength nfl(i), nfl(j).
 Qed.
 
 goal _ (i,j : index) : len(nn(i)) = len(nn(j)).
 Proof. 
-intro i j. 
 checkfail (try namelength nn(i), nn(j); auto) exn GoalNotClosed.
 Abort.
 
@@ -70,6 +68,5 @@ name nfl2 : index -> NFL2.
 
 goal _ (i,j : index) : len(nfl(i)) = len(nfl2(j)).
 Proof.
-intro i j. 
 checkfail (by (try namelength nfl(i), nfl2(j))) exn GoalNotClosed.
 Abort.

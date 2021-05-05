@@ -151,11 +151,11 @@ Proof.
   by expand output, cipher; case C1.   
 Qed.
 
-goal lemma (i,j,i1,j1:index):
-  happens(Tag(i,j),Tag(i1,j1)) => 
-     output@Tag(i,j) = output@Tag(i1,j1) => i = i1 && j = j1.
+goal lemma (i,j,i0,j0:index):
+  happens(Tag(i,j),Tag(i0,j0)) => 
+     output@Tag(i,j) = output@Tag(i0,j0) => i = i0 && j = j0.
 Proof.
-  intro i j i0 j0 H Meq.
+  intro H Meq.
   project. 
   
   assert dec(output@Tag(i,j),kE(i0)) = <tagT,<input@Tag(i0,j0),nt(i0,j0)>> as Meq0;

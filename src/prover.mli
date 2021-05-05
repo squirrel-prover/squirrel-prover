@@ -171,7 +171,7 @@ exception ParseError of string
 val get_goal_formula : 
   lsymb -> SystemExpr.system_expr * Type.tvars * Term.message 
 
-val is_goal_formula : lsymb -> bool
+val is_goal_formula : string -> bool
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -185,9 +185,6 @@ type parsed_input =
 
 (** Declare a new goal to the current goals, and returns it *)
 val declare_new_goal : Symbols.table -> L.t -> p_goal -> named_goal
-
-(** Store a proved goal, allowing to apply it. *)
-val add_proved_goal : named_goal -> unit
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)

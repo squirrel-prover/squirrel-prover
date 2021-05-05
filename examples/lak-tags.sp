@@ -63,7 +63,7 @@ goal wa_R1 (j:index):
        fst(output@T(i,k)) = fst(input@R1(j)) &&
        input@T(i,k) = output@R(j))).
 Proof.
-  intro j Hap.
+  intro Hap.
   expand cond.
   split.
 
@@ -101,7 +101,7 @@ goal wa_R2 (j:index):
       fst(output@T(i,k)) = fst(input@R2(j)) &&
       input@T(i,k) = output@R(j)))).
 Proof.
-  intro j Hap.
+  intro Hap.
   expand cond.
   split.
 
@@ -142,7 +142,7 @@ goal [left] wa_R1_left (i,j:index):
      fst(output@T(i,k)) = fst(input@R1(j)) &&
      input@T(i,k) = output@R(j))).
 Proof.
-  intro i j Hap.
+  intro Hap.
   split; 2 : by intro [k _]; expand output, m2.
 
   intro Meq.
@@ -164,7 +164,7 @@ goal [right] wa_R1_right (i,j,k:index):
      fst(output@T(i,k)) = fst(input@R1(j)) &&
      input@T(i,k) = output@R(j))).
 Proof.
-  intro i j k Hap.
+  intro Hap.
   split; 2 : by intro [k _]; expand output, m2.
 
   intro Meq.

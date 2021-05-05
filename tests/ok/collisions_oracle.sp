@@ -30,7 +30,7 @@ goal unforgeable_1 (a : index, b : index):
  happens(A(b)) => b <> a => output@A(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap Hneq @/output Heq.
+ intro Hap Hneq @/output Heq.
  collision. 
  auto.
 Qed.
@@ -39,7 +39,7 @@ goal unforgeable_2 (a : index, b : index):
    happens(B(b)) => output@B(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap @/output Heq.
+ intro Hap @/output Heq.
  nosimpl(collision).
  auto.
 Qed.
@@ -49,7 +49,7 @@ goal unforgeable_3 (a : index, b : index):
  happens(C(b)) => output@C(b) <> h(na(a),k).
 
 Proof.
- intro a b Hap @/output Heq.
+ intro Hap @/output Heq.
  collision.
  intro Heq2.
  eqnames.

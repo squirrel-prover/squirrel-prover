@@ -15,7 +15,7 @@ goal _ (i,j,w:index):
   seq(a,b -> h(n(a,a),k(b,b))) = h(n(i,j),k(w,w)) =>
   i = j.
 Proof.
-  intro i j w Hseq.
+  intro Hseq.
   nosimpl(euf Hseq).
   auto.
 Qed.
@@ -26,7 +26,7 @@ goal _ (i,j,w:index):
   seq(a,b -> h(n(a,a),k(b,b))) = h(n(w,w),k(i,j)) =>
   i = j.
 Proof.
-  intro i j w Hseq.
+  intro Hseq.
   nosimpl(euf Hseq).
   auto.
 Qed.

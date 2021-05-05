@@ -279,12 +279,6 @@ let () =
            try run ~test "tests/alcotest/existsintro_fail.sp" with
            | Theory.(Conv (_, Undefined "a1")) -> raise Ok)
     end ;
-    "Vars not eq", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () -> 
-           try run ~test "tests/alcotest/vars_not_eq.sp" with
-           | Unfinished -> raise Ok)
-    end ;
     "TS not leq", `Quick, begin fun () ->
       Alcotest.check_raises "fails" Ok
         (fun () -> 
@@ -450,12 +444,6 @@ let () =
       Alcotest.check_raises "fails" Ok
         (fun () -> 
            try run ~test "tests/alcotest/pred.sp" with
-           | Unfinished -> raise Ok)
-    end ;
-    "Pred not injective", `Quick, begin fun () ->
-      Alcotest.check_raises "fails" Ok
-        (fun () -> 
-           try run ~test "tests/alcotest/pred2.sp" with
            | Unfinished -> raise Ok)
     end ;
   ]

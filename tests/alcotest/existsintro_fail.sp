@@ -25,7 +25,7 @@ na(a) <>  <ma, mb>.
 goal unforgeable (tau : timestamp, tau2:timestamp, b:index) :
   input@A3=h(input@A,k) => exists (a:index), (input@A2 = na(a)).
   Proof.
-  intro tau tau2 b Heq.
+  intro Heq.
   euf Heq. intro Hts Hin.
   exists a1.
 Qed.

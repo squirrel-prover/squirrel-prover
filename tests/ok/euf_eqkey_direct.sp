@@ -13,7 +13,7 @@ goal _ (a,b,i:index):
   h(n,k(i,i)) = h(n,k(a,b)) =>
   a = b.
 Proof.
-  intro a b i Heq.
+  intro Heq.
   euf Heq. 
   (* There should be one direct case,
    * where index i should be equal to both a and b. *)

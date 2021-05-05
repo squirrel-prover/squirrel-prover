@@ -119,9 +119,7 @@ let trace_seq_of_equiv_seq ?goal s =
                                                   formulas")
   in
 
-  let trace_s =
-    TS.set_env env (TS.init ~system ~ty_vars table goal)
-  in
+  let trace_s = TS.init ~system ~table ~ty_vars ~env ~goal in
   
   (* We add all relevant hypotheses *)
   Hyps.fold (fun id hyp trace_s -> match hyp with
@@ -244,16 +242,17 @@ let assumption s =
   let in_hyp _ = function
     | Equiv.Atom at -> in_atom at
     | Equiv.Impl _ as f -> f = goal
+    | Equiv.ForAll _ as f -> f = goal
   in
 
   if Hyps.exists in_hyp s
   then []
   else
-    soft_failure (Tactics.Failure "Conclusion different from hypothesis.")
+    soft_failure (Tactics.Failure "not in hypothesis.")
 
 let () =
   T.register "assumption"
-    ~tactic_help:{general_help = "Closes a goal contained in its hypothesis.";
+    ~tactic_help:{general_help = "look for the goal in the hypotheses.";
                   detailed_help = "";
                   usages_sorts = [Sort None];
                   tactic_group = Logical}
@@ -412,6 +411,7 @@ let rec tautology f s = match f with
   | Equiv.Impl (f0,f1) ->
     let s = Hyps.add Args.AnyName f0 s in
     tautology f1 s
+  | Equiv.ForAll (vs, f) -> false
   | Equiv.(Atom (Equiv e)) -> refl e s = `True
   | Equiv.(Atom (Reach _)) -> 
     let s = ES.set_goal s f in
@@ -442,7 +442,7 @@ let generalize (ts : Term.timestamp) s =
     | _ -> hard_failure (Failure "timestamp is not a var") in
 
   let gen_hyps = Hyps.fold (fun id f gen_hyps -> 
-      if Vars.Sv.mem ts (Equiv.fv_form f) 
+      if Vars.Sv.mem ts (Equiv.fv f) 
       then id :: gen_hyps 
       else gen_hyps
     ) s [] in
@@ -482,14 +482,14 @@ let induction Args.(Timestamp ts) s =
     let subst = [Term.ESubst (ts, Pred ts)] in
     let goal = ES.goal s in
 
-    let ind_hyp = Equiv.subst_form subst goal in
+    let ind_hyp = Equiv.subst subst goal in
     let id_ind, induc_s = Hyps.add_i Args.Unnamed ind_hyp s in
     (* intro back generalized hyps *)
     let induc_s = intro_back induc_s in
     (* rename the inducition hypothesis *)
     let induc_s = do_naming_pat (`Hyp id_ind) Args.AnyName induc_s in
 
-    let init_goal = Equiv.subst_form [Term.ESubst(ts,Term.init)] goal in
+    let init_goal = Equiv.subst [Term.ESubst(ts,Term.init)] goal in
     let init_s = ES.set_goal s init_goal in
     let init_s = intro_back init_s in
 
@@ -1115,10 +1115,9 @@ let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
     in
     
     let rec mk_hyp_f = function
-      | Equiv.Atom at -> 
-        Equiv.Atom (mk_hyp_at at)
-      | Equiv.Impl (f, f0) -> 
-        Equiv.Impl (mk_hyp_f f, mk_hyp_f f0) 
+      | Equiv.Atom at       -> Equiv.Atom (mk_hyp_at at)
+      | Equiv.Impl (f, f0)  -> Equiv.Impl (mk_hyp_f f, mk_hyp_f f0) 
+      | Equiv.ForAll _ as f -> f
 
     and mk_hyp_at hyp = match hyp with
       | Equiv.Equiv e ->

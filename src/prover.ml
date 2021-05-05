@@ -10,6 +10,8 @@ module Args = TacticsArgs
 module TS = TraceSequent
 module ES = EquivSequent
 
+module SE = SystemExpr
+
 type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
@@ -26,7 +28,7 @@ type decl_error_i =
 
   (* TODO: remove these errors, catch directly at top-level *)
   | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
+  | SystemExprError of SE.system_expr_err
 
 type dkind = KDecl | KGoal
 
@@ -46,7 +48,7 @@ let pp_decl_error_i fmt = function
 
   | DuplicateCty s -> Fmt.pf fmt "duplicated entry %s" s
 
-  | SystemExprError e -> SystemExpr.pp_system_expr_err fmt e
+  | SystemExprError e -> SE.pp_system_expr_err fmt e
 
   | SystemError e -> System.pp_system_error fmt e
 
@@ -68,35 +70,60 @@ let error_handler loc k f a =
   let decl_error = decl_error loc k in
   try f a with
   | System.SystemError e -> decl_error (SystemError e)
-  | SystemExpr.BiSystemError e -> decl_error (SystemExprError e)
+  | SE.BiSystemError e -> decl_error (SystemExprError e)
 
 (*------------------------------------------------------------------*)
-(** {Goals} *)
+(** {2 Goals} *)
 
 module Goal = struct
   type t = Trace of TS.t | Equiv of ES.t
+
   let get_env = function
     | Trace j -> TS.env j
     | Equiv j -> ES.env j
+
   let get_table = function
     | Trace j -> TS.table j
     | Equiv j -> ES.table j
+
   let pp ch = function
     | Trace j -> TS.pp ch j
     | Equiv j -> ES.pp ch j
+
   let pp_init ch = function
-    | Trace j ->
-        assert (TS.env j = Vars.empty_env) ;
-        Term.pp ch (TS.goal j)
+    | Trace j -> Term.pp ch (TS.goal j)
     | Equiv j -> ES.pp_init ch j
 end
 
+(*------------------------------------------------------------------*)
+
+(** An open named goal *)
 type named_goal = string * Goal.t
 
-let goals        : named_goal list   ref = ref []
-let current_goal : named_goal option ref = ref None
-let subgoals     : Goal.t list       ref = ref []
-let goals_proved : named_goal list   ref = ref []
+type named_goals = named_goal list
+
+(*------------------------------------------------------------------*)
+
+(** A goal conclusion *)
+type goal_concl = { 
+  gc_name   : string; 
+  gc_tyvars : Type.tvars;
+  gc_system : SE.system_expr;
+  gc_concl  : [`Equiv of Equiv.form | `Reach of Term.message];
+}
+
+type goal_concls = goal_concl list
+
+let mk_goal_concl gc_name gc_system gc_tyvars gc_concl =
+  { gc_name; gc_system; gc_tyvars; gc_concl }
+
+(*------------------------------------------------------------------*)
+(** {2 Prover state} *)
+
+let goals        : (goal_concl * Goal.t) list   ref = ref []
+let current_goal : (goal_concl * Goal.t) option ref = ref None
+let subgoals     : Goal.t list ref = ref []
+let goals_proved : goal_concls ref = ref []
 
 type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
@@ -116,8 +143,8 @@ type p_goal_form =
 
   | P_equiv_goal of Theory.bnds * p_equiv_form L.located
 
-  | P_equiv_goal_process of SystemExpr.p_single_system * 
-                            SystemExpr.p_single_system
+  | P_equiv_goal_process of SE.p_single_system * 
+                            SE.p_single_system
 
 type p_goal = Decl.p_goal_name * p_goal_form
 
@@ -140,15 +167,16 @@ type option_def = option_name * option_val
 
 let option_defs : option_def list ref= ref []
 
-type proof_state = { goals : named_goal list;
-                     table : Symbols.table;
-                     current_goal : named_goal option;
-                     subgoals : Goal.t list;
-                     goals_proved : named_goal list;
-                     option_defs : option_def list;
-                     params : Config.params;
-                     prover_mode : prover_mode;
-                   }
+type proof_state = { 
+  goals        : (goal_concl * Goal.t) list;
+  table        : Symbols.table;
+  current_goal : (goal_concl * Goal.t) option;
+  subgoals     : Goal.t list;
+  goals_proved : goal_concls;
+  option_defs  : option_def list;
+  params       : Config.params;
+  prover_mode  : prover_mode;
+}
 
 let proof_states_history : proof_state list ref = ref []
 
@@ -302,7 +330,7 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
   let table_name = "Equiv"
   let pp_goal_concl ppf j = match j with
     | Goal.Trace j -> Term.pp ppf (TS.goal j)
-    | Goal.Equiv j -> Equiv.pp_form ppf (ES.goal j)
+    | Goal.Equiv j -> Equiv.pp ppf (ES.goal j)
 end
 
 (** Functor building AST evaluators for our judgment types. *)
@@ -436,7 +464,7 @@ struct
               | exception Tactics.Tactic_soft_failure (_,e) -> fk e
               | exception System.SystemError e ->
                 Tactics.hard_failure (Tactics.SystemError e)
-              | exception SystemExpr.BiSystemError e ->
+              | exception SE.BiSystemError e ->
                 Tactics.hard_failure (Tactics.SystemExprError e)
             end
         | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
@@ -461,7 +489,7 @@ struct
                | exception Tactics.Tactic_soft_failure (_,e) -> fk e
                | exception System.SystemError e ->
                  Tactics.hard_failure (Tactics.SystemError e)
-               | exception SystemExpr.BiSystemError e ->
+               | exception SE.BiSystemError e ->
                  Tactics.hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
@@ -642,26 +670,36 @@ let () =
                   tactic_group = Logical}
     (fun _ -> Tactics.id)
 
-let is_goal_formula (gname : lsymb) =
-  match List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved with
-    | [(_,Goal.Trace f)] -> true
-    | [] -> false
-    | _ -> assert false
+let find_proved_goal gname : goal_concl option =
+  match List.find_opt (fun g -> g.gc_name = gname) !goals_proved with
+  | None -> None
+  | Some gconcl -> Some gconcl
 
-let get_goal_formula (gname : lsymb) :
-  SystemExpr.system_expr * Type.tvars * Term.message =
-  match
-    List.filter (fun (name,_) -> name = L.unloc gname) !goals_proved
-  with
-    | [(_,Goal.Trace f)] ->
-        assert (TS.env f = Vars.empty_env) ;
-        TS.system f, TS.ty_vars f, TS.goal f
+let exists_proved_goal gname : bool = find_proved_goal gname <> None
 
-    | [] -> 
-      Tactics.hard_failure ~loc:(L.loc gname)
-        (Failure ("no proved goal named " ^ (L.unloc gname)))
+let is_reach_gconcl gconcl : bool =
+  match gconcl.gc_concl with
+  | `Equiv _ -> false
+  | `Reach _ -> true    
 
-    | _ -> assert false
+let is_goal_formula gname : bool =
+  match find_proved_goal gname with
+  | None -> false
+  | Some gconcl -> is_reach_gconcl gconcl
+
+let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
+  match find_proved_goal (L.unloc gname) with
+  | None -> 
+    Tactics.soft_failure ~loc:(L.loc gname)
+      (Failure ("no proved goal named " ^ (L.unloc gname)))
+
+  | Some gc ->
+    match gc.gc_concl with    
+    | `Reach f -> gc.gc_system, gc.gc_tyvars, f
+
+    | _ ->
+      Tactics.soft_failure ~loc:(L.loc gname)
+        (Failure ("not an reachability goal: " ^ (L.unloc gname)))
 
 
 (*------------------------------------------------------------------*)
@@ -697,50 +735,51 @@ let convert_equiv_form cenv ty_vars env (p : p_equiv_form) =
 (*------------------------------------------------------------------*)
 (** {2 Declare Goals And Proofs} *)
 
-let make_trace_goal ~table (pg : Decl.p_goal_reach_cnt)  =
-  let system = SystemExpr.parse_se table pg.g_system in
+let make_trace_goal ~tbl gname (pg : Decl.p_goal_reach_cnt) : 
+  goal_concl * Goal.t =
+  let system = SE.parse_se tbl pg.g_system in
 
   let ty_vars = List.map (fun ls -> Type.mk_tvar (L.unloc ls)) pg.g_tyvars in  
 
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  let f_i = Theory.ForAll (pg.g_vars, pg.g_form) in
-  let f = L.mk_loc (L.loc pg.g_form) f_i in
+  let conv_env = Theory.{ table = tbl; cntxt = InGoal; } in
 
-  let g = Theory.convert conv_env ty_vars Vars.empty_env f Type.Boolean in
+  let env, evs = Theory.convert_p_bnds tbl ty_vars Vars.empty_env pg.g_vars in
 
-  Goal.Trace (TS.init ~system ~ty_vars table g) 
+  let g = Theory.convert conv_env ty_vars env pg.g_form Type.Boolean in
 
-let make_equiv_goal
-    ~table (system_name : System.system_name) (env : Theory.bnds)
-    (p_form : p_equiv_form L.located) =
-  let env =
-    List.fold_left (fun env (x, s) ->
-        let x = L.unloc x in
-        let Type.ETy s = Theory.parse_p_ty0 table [] s in
-        fst (Vars.make `Shadow env s x)
-      ) Vars.empty_env env
-  in
+  let s = TS.init ~system ~table:tbl ~ty_vars ~env ~goal:g in
+
+  let gc = mk_goal_concl gname system ty_vars (`Reach (Term.mk_forall evs g)) in
+  
+  (* final proved formula, current sequent *)
+  gc, Goal.Trace s
+
+let make_equiv_goal ~table
+    gname sname (bnds : Theory.bnds) (p_form : p_equiv_form L.located) :
+  goal_concl * Goal.t =
+  let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
+
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
   let f = convert_equiv_form conv_env [] env (L.unloc p_form) in
 
-  let se = SystemExpr.simple_pair table system_name in
+  let se = SE.simple_pair table sname in
 
-  Goal.Equiv (ES.init se table env EquivHyps.empty f)
+  let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
+  
+  gc, Goal.Equiv (ES.init se table env EquivHyps.empty f)
 
 
-let make_equiv_goal_process ~table system_1 system_2 =
-  let open SystemExpr in
-  let env = ref Vars.empty_env in
-  let ts = Vars.make_r `Approx env Type.Timestamp "t" in
+let make_equiv_goal_process ~table gname s1 s2 : goal_concl * Goal.t =
+  let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
 
   let system =
-    match system_1, system_2 with
-    | Left id1, Right id2 when id1 = id2 ->
-      SystemExpr.simple_pair table id1
-    | _ -> SystemExpr.pair table system_1 system_2 
+    match s1, s2 with
+    | SE.Left id1, SE.Right id2 when id1 = id2 ->
+      SE.simple_pair table id1
+    | _ -> SE.pair table s1 s2 
   in
 
   let happens = Term.Atom (`Happens (Term.Var ts)) in
@@ -750,7 +789,11 @@ let make_equiv_goal_process ~table system_1 system_2 =
   let id = EquivHyps.fresh_id "H" hyps in
   let _, hyps = EquivHyps.add ~force:false id hyp hyps in
 
-  Goal.Equiv (ES.init system table !env hyps goal)
+  let gc = 
+    mk_goal_concl gname system [] (`Equiv (Equiv.mk_forall [Vars.EVar ts] goal)) 
+  in
+  
+  ( gc, Goal.Equiv (ES.init system table env hyps goal) )
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -770,38 +813,40 @@ let declare_new_goal_i table (gname,g) =
     | Decl.P_unknown -> unnamed_goal ()
     | Decl.P_named s -> s 
   in
+  let gn = L.unloc gname in
 
-  let g = match g with
+  let c, g = match g with
     | P_equiv_goal (env,f) ->
-      let system_symb =
-        System.of_lsymb SystemExpr.default_system_name table
-      in
-      make_equiv_goal ~table system_symb env f
+      let system_symb = System.of_lsymb SE.default_system_name table in
+      let c, g = make_equiv_goal ~table gn system_symb env f in
+      c, g
 
     | P_equiv_goal_process (a,b) ->
-      let a = SystemExpr.parse_single table a
-      and b = SystemExpr.parse_single table b in
-      make_equiv_goal_process ~table a b
+      let a = SE.parse_single table a
+      and b = SE.parse_single table b in
+      let c, g = make_equiv_goal_process ~table gn a b in
+      c, g
 
-    | P_trace_goal reach -> make_trace_goal ~table reach
+    | P_trace_goal reach -> 
+      let c, g = make_trace_goal ~tbl:table gn reach in
+      c, g
   in
 
-  if List.exists (fun (name,_) -> name = L.unloc gname) !goals_proved then
-    raise @@ ParseError "A formula or goal with this name alread exists"
-  else
-    goals :=  (L.unloc gname,g) :: !goals;
+  if exists_proved_goal gn then
+    raise (ParseError "a goal with this name already exists");
+
+  goals :=  (c,g) :: !goals;
 
   (L.unloc gname,g)
 
 let declare_new_goal table loc (n, g) =
   error_handler loc KGoal (declare_new_goal_i table) (n, g)
 
-let add_proved_goal (gname,j) =
-  if List.exists (fun (name,_) -> name = gname) !goals_proved then
-    (* TODO: location *)
-    raise @@ ParseError "A formula with this name alread exists"
-  else
-    goals_proved := (gname,j) :: !goals_proved
+let add_proved_goal gconcl =
+  if exists_proved_goal gconcl.gc_name then
+    raise (ParseError "A formula with this name alread exists");
+
+  goals_proved := gconcl :: !goals_proved
 
 let define_oracle_tag_formula table (h : lsymb) f =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
@@ -830,12 +875,13 @@ let is_proof_completed () = !subgoals = []
 let complete_proof () =
   assert (is_proof_completed ());
   try
-    add_proved_goal (Utils.oget !current_goal);
+    let gc, _ = Utils.oget !current_goal in
+    add_proved_goal gc;
     current_goal := None;
     subgoals := []
   with Not_found ->
     Tactics.hard_failure
-      (Tactics.Failure "Cannot complete proof with empty current goal")
+      (Tactics.Failure "cannot complete proof: no current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
   | None,[] -> assert false
@@ -886,7 +932,7 @@ let start_proof () = match !current_goal, !goals with
   | _, [] ->
     Some "Cannot start a new proof (no goal remaining to prove)."
 
-let current_goal () = !current_goal
+let current_goal () = omap (fun (gc, goal) -> gc.gc_name, goal) !current_goal
 
 (*------------------------------------------------------------------*)
 (** {2 Declaration parsing} *)
@@ -976,13 +1022,13 @@ let declare_i table decl = match L.unloc decl with
       | Decl.P_unknown -> unnamed_goal ()
       | Decl.P_named n -> n
     in
-    let goal = make_trace_goal table gdecl in
-    add_proved_goal (L.unloc name, goal);
+    let gc, _ = make_trace_goal ~tbl:table (L.unloc name) gdecl in
+    add_proved_goal gc;
     table
 
   | Decl.Decl_system sdecl ->
     let name = match sdecl.sname with
-      | None -> SystemExpr.default_system_name
+      | None -> SE.default_system_name
       | Some n -> n
     in
     Process.declare_system table name sdecl.sprocess

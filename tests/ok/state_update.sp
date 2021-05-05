@@ -5,16 +5,16 @@ abstract f : message->message
 
 system !_i s(i):=f(s(i)).
 
-goal update : forall (i:index) 
+goal update (i:index):
   happens(A(i)) => s(i)@A(i) = f(s(i)@pred(A(i))).
 Proof.
   auto.
 Qed.
 
-goal not_update: forall (i,j:index), 
+goal not_update (i,j:index):
   happens(A(j)) => i<>j => s(i)@A(j) = s(i)@pred(A(j)).
 Proof.
-  intro i j Hhap Hneq.
+  intro Hhap Hneq.
   expand s(i)@A(j). 
   by noif.
 Qed.

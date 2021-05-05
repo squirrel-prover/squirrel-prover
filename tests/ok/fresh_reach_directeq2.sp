@@ -7,7 +7,7 @@ system null.
 
 goal _ (i1,i2,j:index): n(j) = f(n(i1),n(i2)) => (j = i1 || j = i2).
 Proof.
-nosimpl(intro i1 i2 j Heq).
+nosimpl(intro Heq).
 nosimpl(fresh Heq; intro H). 
 nosimpl(case H).
 by left.

@@ -30,8 +30,7 @@ by expand cond@init.
 Qed.
 
 (* set debugTactics=true. *)
-goal updateAtInit:
-  forall (i,j:index), kT(i,j)@init = n0(i,j).
+goal updateAtInit (i,j:index): kT(i,j)@init = n0(i,j).
 Proof.
- by intro *; expand kT.
+ by expand kT.
 Qed.

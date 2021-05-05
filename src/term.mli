@@ -208,6 +208,12 @@ type subst = esubst list
 
 val pp_subst : Format.formatter -> subst -> unit
 
+val is_var_subst : subst -> bool
+
+val subst_support : subst -> Vars.Sv.t
+
+val subst_binding : Vars.evar -> subst -> Vars.evar * subst 
+
 (** term substitution *)
 val subst : subst -> 'a term -> 'a term
 

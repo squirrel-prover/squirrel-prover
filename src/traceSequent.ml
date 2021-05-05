@@ -72,13 +72,14 @@ module S : sig
     (** The conclusion / right-hand side formula of the sequent. *)    
   }
 
-  val init_sequent : SystemExpr.system_expr -> Symbols.table -> t
+  val init_sequent :
+    system:SystemExpr.system_expr ->
+    table:Symbols.table ->
+    ty_vars:Type.tvars ->
+    env:Vars.env ->
+    conclusion:Term.message ->
+    t
 
-  (** Updates a sequent.
-      [keep_trs] must be [true] only if the udates leaves the TRS associated to
-      the sequent unchanged.
-      Idem for [keep_models] and the models.
-      [keep_trs] and [keep_models] default to [false]. *)
   val update :
     ?system:SystemExpr.system_expr ->
     ?table:Symbols.table ->
@@ -87,6 +88,7 @@ module S : sig
     ?hyps:H.hyps ->
     ?conclusion:Term.message ->
     t -> t
+
 end = struct
   type t = {
     system     : SystemExpr.system_expr ;
@@ -97,13 +99,13 @@ end = struct
     conclusion : Term.message;
   }
 
-  let init_sequent system table = {
-    system     = system ;
-    table      = table;
-    ty_vars    = [];
-    env        = Vars.empty_env;
-    hyps       = H.empty;
-    conclusion = Term.mk_true;
+  let init_sequent ~system ~table ~ty_vars ~env ~conclusion = {
+    system ;
+    table;
+    ty_vars;
+    env;
+    hyps = H.empty;
+    conclusion;
   }
 
   let update ?system ?table ?ty_vars ?env ?hyps ?conclusion t =
@@ -450,8 +452,8 @@ let set_goal a s =
         when Config.auto_intro () -> Hyps.add_macro_defs s a
       | _ -> s
 
-let init ~system ~ty_vars table (goal : Term.message) =
-  set_goal goal (set_ty_vars ty_vars (init_sequent system table))
+let init ~system ~table ~ty_vars ~env ~goal =
+  init_sequent ~system ~table ~ty_vars ~env ~conclusion:goal
 
 let goal s = s.conclusion
 

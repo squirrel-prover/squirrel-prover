@@ -63,20 +63,44 @@ let fv_atom = function
 (** We only support a small fragment for now *)
 
 type form = 
-  | Atom of atom
-  | Impl of (form * form)
+  | ForAll of Vars.evar list * form
+  | Atom   of atom
+  | Impl   of (form * form)
 
-let rec pp_form fmt = function
+let rec pp fmt = function
   | Atom at -> pp_atom fmt at
   | Impl (f0, f) -> 
-    Fmt.pf fmt "%a -> %a" pp_form f0 pp_form f
+    Fmt.pf fmt "%a -> %a" pp f0 pp f
+  | ForAll (vs, f) -> 
+    Fmt.pf fmt "@[forall (@[%a@]),@ %a@]"
+      Vars.pp_typed_list vs pp f
 
-let rec subst_form subst (f : form) = 
-  match f with
-  | Atom at -> Atom (subst_atom subst at)
-  | Impl (f0, f) -> Impl (subst_form subst f0, subst_form subst f)
+let mk_forall evs f = match evs, f with
+  | [], _ -> f
+  | _, ForAll (evs', f) -> ForAll (evs @ evs', f)
+  | _, _ -> ForAll (evs, f)
 
-(** Free variables of an [atom]. *)
-let rec fv_form = function
+(*------------------------------------------------------------------*)
+
+(** Free variables. *)
+let rec fv = function
   | Atom at -> fv_atom at
-  | Impl (f,f0) -> Sv.union (fv_form f) (fv_form f0)
+  | Impl (f,f0) -> Sv.union (fv f) (fv f0)
+  | ForAll (evs, b) -> Sv.diff (fv b) (Sv.of_list evs)
+
+let rec subst s (f : form) = 
+  if s = [] ||
+     (Term.is_var_subst s && 
+      Sv.disjoint (Term.subst_support s) (fv f))
+  then f
+  else 
+    match f with
+    | Atom at -> Atom (subst_atom s at)
+
+    | Impl (f0, f) -> Impl (subst s f0, subst s f)
+
+    | ForAll ([], f) -> subst s f
+    | ForAll (v :: evs, b) -> 
+      let v, s = Term.subst_binding v s in
+      let f = subst s (ForAll (evs,f)) in
+      mk_forall [v] f

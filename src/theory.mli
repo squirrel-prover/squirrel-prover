@@ -283,6 +283,10 @@ val convert :
   term -> 'a Type.ty
   -> 'a Term.term
 
+val convert_p_bnds :
+  Symbols.table -> Type.tvar list -> Vars.env -> bnds -> 
+  Vars.env * Vars.evar list
+
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)
 type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm

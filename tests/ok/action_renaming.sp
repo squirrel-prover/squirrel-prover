@@ -34,11 +34,11 @@ Abort.
 (*------------------------------------------------------------------*)
 goal [alt] three (k:index) : happens (A(k)) => cond@A(k) => input@A(k) = ok(k).
 Proof.
-  by intro k Hhap Cond; expand cond@A(k).
+  by intro Hhap Cond; expand cond@A(k).
 Qed.
 
 (* fail if the action does not happened *)
 goal [alt] threeF (k:index) : cond@A(k) => input@A(k) = ok(k).
 Proof.
-  checkfail (intro k Cond; try expand cond@A(k); auto) exn GoalNotClosed.
+  checkfail (intro Cond; try expand cond@A(k); auto) exn GoalNotClosed.
 Abort.
