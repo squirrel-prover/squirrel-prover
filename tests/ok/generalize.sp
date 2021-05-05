@@ -19,6 +19,6 @@ goal _ :
  (forall (y,x : message), x = a || y = b).
 Proof.
   intro Ass y x.
-  generalize y x.
+  generalize x y.
   assumption.
 Qed.

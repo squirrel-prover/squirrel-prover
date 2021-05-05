@@ -1163,7 +1163,7 @@ let () =
 (*------------------------------------------------------------------*)
 (** Generalize *)
 
-let generalize ~loc (v : Vars.evar) s : sequent =
+let generalize (v : Vars.evar) s : sequent =
   let env = TS.env s in
   if not (List.mem v (Vars.to_list env)) then
     hard_failure (Failure (Fmt.str "unknown variable %a" Vars.pp_e v));
@@ -1181,23 +1181,25 @@ let generalize ~loc (v : Vars.evar) s : sequent =
   let goal = Term.mk_forall [v] (TS.goal s) in
   let env = Vars.rm_evar env v in
  
-  TS.set_goal goal s
-  |> TS.set_env env
+  TS.set_env env (TS.set_goal goal s)
 
+let generalize_l vs s : sequent = List.fold_right generalize vs s
 
 let generalize_tac (args : Args.parser_arg list) s sk fk = 
   try
-    let s = 
-      List.fold_left (fun s arg -> 
+    let vars = 
+      List.map (fun arg -> 
           match convert_args s [arg] (Args.Sort Args.ETerm) with 
-          | Args.Arg (Args.ETerm (_, Term.Var v, loc)) ->
-            generalize ~loc (Vars.EVar v) s
+          | Args.Arg (Args.ETerm (_, Term.Var v, _)) -> Vars.EVar v
 
           | Args.Arg (Args.ETerm (_, _, loc)) ->
             hard_failure ~loc (Failure "arguments must be variables")
 
           | _ -> hard_failure (Failure "improper arguments")
-        ) s args in
+        ) args 
+    in
+
+    let s = generalize_l vars s in
     sk [s] fk
   with Tactics.Tactic_soft_failure (_,e) -> fk e
       
