@@ -235,6 +235,10 @@ val subst_macros_ts :
   string list -> Type.timestamp term -> 'a term -> 'a term
 
 (*------------------------------------------------------------------*)
+val refresh_vars  : 'a Vars.var list -> 'a Vars.var list * esubst list
+val erefresh_vars :   Vars.evar list ->   Vars.evar list * esubst list
+
+(*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
 
 module Match : sig

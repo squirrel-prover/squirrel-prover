@@ -139,7 +139,7 @@ let rm_evar e (EVar v) = rm_var e v
 let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 
 (*------------------------------------------------------------------*)
-(** {2 Create variables} *)
+(** {2 Create new and pattern variables} *)
     
 let cpt_new = ref 0
 let make_new_from v =
@@ -154,6 +154,9 @@ let make_pat typ =
     is_new   = false;
     i_suffix = !cpt_pat;
     var_type = typ; }
+
+(*------------------------------------------------------------------*)
+(** {2 Create variables} *)
                         
 let max_suffix (e : env) prefix =
   assert (prefix <> "_");

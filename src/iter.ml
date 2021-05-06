@@ -1,17 +1,6 @@
 open Term
 
 (*------------------------------------------------------------------*)
-let refresh vars =
-  List.map (fun v ->
-      ESubst (Var v, Var (Vars.make_new_from v))
-    ) vars
-
-let erefresh evars =
-  List.map (function Vars.EVar v ->
-      ESubst (Var v, Var (Vars.make_new_from v))
-    ) evars
-
-(*------------------------------------------------------------------*)
 (** Iterate over all boolean and message subterms.
   * Bound variables are represented as newly generated fresh variables.
   * When a macro is encountered, its expansion is visited as well. *)
@@ -28,23 +17,24 @@ class iter ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff(a, b) -> self#visit_message a; self#visit_message b
 
     | Seq (a, b) ->
-        let b = Term.subst (refresh a) b in
-        self#visit_message b
+      let _, s = Term.refresh_vars a in
+      let b = Term.subst s b in
+      self#visit_message b
 
     | Find (a, b, c, d) ->
-        let subst = refresh a in
-        let b = Term.subst subst b in
-        let c = Term.subst subst c in
-        self#visit_message b; self#visit_message c; self#visit_message d
+      let _, subst = Term.refresh_vars a in
+      let b = Term.subst subst b in
+      let c = Term.subst subst c in
+      self#visit_message b; self#visit_message c; self#visit_message d
 
     | ForAll (vs,l) | Exists (vs,l) ->
-        let subst = erefresh vs in
-        let l = Term.subst subst l in
-        self#visit_message l
+      let _, subst = Term.erefresh_vars vs in
+      let l = Term.subst subst l in
+      self#visit_message l
 
     | Atom (`Message (_, t, t')) ->
-        self#visit_message t ;
-        self#visit_message t'
+      self#visit_message t ;
+      self#visit_message t'
 
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> ()
 
@@ -68,23 +58,24 @@ class ['a] fold ~(cntxt:Constr.trace_cntxt) = object (self)
     | Diff (a, b) -> self#fold_message (self#fold_message x a) b
 
     | Seq (a, b) ->
-        let b = Term.subst (refresh a) b in
-        self#fold_message x b
+      let _, s = Term.refresh_vars a in
+      let b = Term.subst s b in
+      self#fold_message x b
 
     | Find (a, b, c, d) ->
-        let subst = refresh a in
-        let b = Term.subst subst b in
-        let c = Term.subst subst c in
-        let d = Term.subst subst d in
-        self#fold_message (self#fold_message (self#fold_message x b) c) d
+      let _, s = Term.refresh_vars a in
+      let b = Term.subst s b in
+      let c = Term.subst s c in
+      let d = Term.subst s d in
+      self#fold_message (self#fold_message (self#fold_message x b) c) d
 
     | ForAll (vs,l) | Exists (vs,l) ->
-        let subst = erefresh vs in
-        let l = Term.subst subst l in
-        self#fold_message x l
+      let _, s = Term.erefresh_vars vs in
+      let l = Term.subst s l in
+      self#fold_message x l
 
     | Atom (`Message (_, t, t')) ->
-        self#fold_message (self#fold_message x t) t'
+      self#fold_message (self#fold_message x t) t'
 
     | Atom (`Index _) | Atom (`Timestamp _) | Atom (`Happens _) -> x
 

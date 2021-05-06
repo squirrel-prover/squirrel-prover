@@ -459,6 +459,9 @@ let rewrite ~all
 (** Make a rewrite rule from a formula *)
 let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule = 
   let vs, f = Term.decompose_forall f in
+  let vs, subst = Term.erefresh_vars vs in
+  let f = Term.subst subst f in
+
   let vs = Vars.Sv.of_list vs in
 
   let subs, f = Term.decompose_impls_last f in
@@ -903,13 +906,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
 
       let vs, vs' = List.takedrop (len - 1) vs in
 
-      let vs_fresh, subst = 
-        List.split (
-          List.map (fun (Vars.EVar v) -> 
-              let v_f = Vars.make_new_from v in
-              Vars.EVar v_f, Term.ESubst (Var v, Var v_f)
-            ) vs)
-      in
+      let vs_fresh, subst = Term.erefresh_vars vs in
 
       let f = Term.mk_exists vs' f in
       let f = Term.subst subst f in
@@ -2403,6 +2400,8 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
       let _, tyvars, f = get_hyp_or_lemma pt.p_pt_hid s in
       let f_args, f = Term.decompose_forall f in
+      let f_args, subst = Term.erefresh_vars f_args in
+      let f = Term.subst subst f in
 
       let pt_args_l = List.length pt.p_pt_args in
 
@@ -2447,6 +2446,9 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
           let subgoal = TS.set_goal f s in
 
           let vs, f = Term.decompose_forall f in
+          let vs, subst = Term.erefresh_vars vs in
+          let f = Term.subst subst f in
+
           let pat = Term.Match.{ 
               pat_tyvars = [];
               pat_vars = Vars.Sv.of_list vs; 

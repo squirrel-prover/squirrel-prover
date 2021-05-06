@@ -1030,6 +1030,24 @@ let subst_macros_ts table l ts t =
 
   subst_term t
 
+
+(*------------------------------------------------------------------*)
+let refresh_vars vars =
+  let vars' = List.map Vars.make_new_from vars in
+  let subst = 
+    List.map2 (fun v v' -> ESubst (Var v, Var v')) vars vars' 
+  in
+  vars', subst
+
+let erefresh_vars evars =
+  let l = 
+    List.map (fun (Vars.EVar v) -> 
+        let v' = Vars.make_new_from v in
+        Vars.EVar v', ESubst (Var v, Var v') 
+      ) evars
+  in
+  List.split l
+
 (*------------------------------------------------------------------*)
 type eterm = ETerm : 'a term -> eterm
 
