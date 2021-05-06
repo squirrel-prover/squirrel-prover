@@ -10,6 +10,17 @@ let rec pp_s_item fmt = function
   | Simplify _    -> Fmt.pf fmt "/="
   | Tryauto  _    -> Fmt.pf fmt "//"
 
+(** Tactic target. *)
+type in_target = [`Goal | `All | `Hyps of lsymb list] 
+
+let pp_in_target ppf (in_t : in_target) = 
+  match in_t with
+  | `Goal      -> ()
+  | `All -> Fmt.pf ppf " in *"
+  | `Hyps symb -> 
+    Fmt.pf ppf " in %a"
+      (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
+
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
@@ -35,21 +46,11 @@ type rw_arg =
   | R_item   of rw_item 
   | R_s_item of s_item
 
-(** Rewrite target.
-    None means the goal. *)
-type rw_in = [`All | `Hyps of lsymb list] option
-
 let pp_rw_count ppf = function
   | `Once -> ()
   | `Many -> Fmt.pf ppf "!"
   | `Any -> Fmt.pf ppf  "?"
 
-let pp_rw_in ppf = function
-  | None      -> ()
-  | Some `All -> Fmt.pf ppf " in *"
-  | Some (`Hyps symb) -> 
-    Fmt.pf ppf " in %a"
-      (Fmt.list ~sep:Fmt.comma Fmt.string) (L.unlocs symb)
 
 let pp_rw_dir ppf d = match L.unloc d with
   | `LeftToRight -> ()
@@ -162,7 +163,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * rw_in
+  | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
 
 type parser_args = parser_arg list
@@ -178,7 +179,7 @@ let pp_parser_arg ppf = function
   | RewriteIn (rw_args, in_opt) ->
     Fmt.pf ppf "%a%a"
       (Fmt.list ~sep:Fmt.sp pp_rw_arg) rw_args
-      pp_rw_in in_opt
+      pp_in_target in_opt
 
   | ApplyIn (t, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt

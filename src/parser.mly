@@ -470,10 +470,10 @@ rw_arg:
 rw_args:
 | l=slist1(rw_arg, empty) { l }
 
-rw_in:
-|                          { None }
-| IN l=slist1(lsymb,COMMA) { Some (`Hyps l) }
-| IN STAR                  { Some `All }
+in_target:
+|                          { `Goal }
+| IN l=slist1(lsymb,COMMA) { `Hyps l }
+| IN STAR                  { `All }
 
 apply_in:
 |             { None }
@@ -631,7 +631,7 @@ tac:
         | Some ip -> [TacticsArgs.SimplPat ip] in
       mk_abstract l "use" (ip @ [TacticsArgs.String_name i] @ t) }
 
-  | l=lloc(REWRITE) p=rw_args w=rw_in
+  | l=lloc(REWRITE) p=rw_args w=in_target
     { mk_abstract l "rewrite" [TacticsArgs.RewriteIn (p, w)] }
 
   | l=lloc(APPLY) t=apply_arg w=apply_in

@@ -10,6 +10,9 @@ type s_item =
   | Tryauto   of Location.t    (** '//' *)
   | Simplify  of Location.t    (** '/=' *)
 
+(** Tactic target. *)
+type in_target = [`Goal | `All | `Hyps of lsymb list] 
+
 (*------------------------------------------------------------------*)
 (** {2 Parsed arguments for rewrite} *)
 
@@ -34,10 +37,6 @@ type expnd_item = [`Expand of Theory.term] rw_item_g
 type rw_arg =
   | R_item   of rw_item 
   | R_s_item of s_item
-
-(** Rewrite target.
-    None means the goal. *)
-type rw_in = [`All | `Hyps of lsymb list] option 
 
 (*------------------------------------------------------------------*)
 type apply_in = lsymb option
@@ -102,7 +101,7 @@ type parser_arg =
   | IntroPat    of intro_pattern list
   | AndOrPat    of and_or_pat
   | SimplPat    of simpl_pat
-  | RewriteIn   of rw_arg list * rw_in
+  | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
 
 type parser_args = parser_arg list

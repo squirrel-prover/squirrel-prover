@@ -177,8 +177,17 @@ let () =
 
 type target = [`Goal | `Hyp of Ident.t]
 
+type targets = target list
+
 let target_all s : target list =
   `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
+
+let make_in_targets (in_t : Args.in_target) s : targets * bool =
+  match in_t with
+  | `Hyps symbs -> 
+    List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
+  | `All -> target_all s, true
+  | `Goal -> [`Goal], false
 
 (** A rewrite rule is a tuple: 
     (type variables, term variables, premisses, left term, right term)
@@ -537,15 +546,9 @@ let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
 
 (** Applies a rewrite item *)
 let do_rw_item 
-    (rw_item : Args.rw_item) (rw_in : Args.rw_in) (s : TS.sequent) 
+    (rw_item : Args.rw_item) (rw_in : Args.in_target) (s : TS.sequent) 
   : TS.sequent list =
-  let targets, all = match rw_in with
-    | Some (`Hyps symbs) -> 
-      List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
-    | Some `All -> target_all s, true
-    | None -> [`Goal], false
-  in
-
+  let targets, all = make_in_targets rw_in s in
   let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
 
   match rw_arg with
@@ -2499,7 +2502,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
     do_intros_list intros ss
 
   | (Args.SExpnd s_e) :: intros ->
-    let ss = do_rw_item (s_e :> Args.rw_item) None s in
+    let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
     let ss = as_seq1 ss in (* we get exactly one new goal *)
     do_intros intros ss
 
