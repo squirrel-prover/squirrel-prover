@@ -187,15 +187,6 @@ val fv : 'a term -> Vars.Sv.t
 
 val f_triv : message -> bool
 
-(** [precise_ts t] returns a list [l] of timestamps such that
-  * any term that appears in [(t)^I] that is not an attacker
-  * symbol or a frame must appear in a macro applied to a timestamp
-  * that is less than [sigma_T(ts)] for some [ts] in [l].
-  * Concretely, this is achieved by taking the timestamps occurring
-  * in [t] but only the predecessors of timestamps occurring as
-  * input timestamps. *)
-val precise_ts : Type.message term -> Type.timestamp term list
-
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 

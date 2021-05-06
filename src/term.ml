@@ -741,19 +741,6 @@ let cond_macro : msymb = mk Symbols.cond Type.Boolean
 let exec_macro : msymb = mk Symbols.exec Type.Boolean
 
 (*------------------------------------------------------------------*)
-let rec pts : type a. timestamp list -> a term -> timestamp list =
-  fun acc -> function
-    | Fun (_, _,lt) -> List.fold_left pts acc lt
-    | Macro (s, l, ts) ->
-      if Obj.magic s = in_macro then (Pred ts) :: acc else
-        List.fold_left pts (ts :: acc) l
-    | Name _ -> acc
-    | Var _ -> []
-    | _ -> failwith "Not implemented"
-
-let precise_ts t = pts [] t |> List.sort_uniq Stdlib.compare
-
-(*------------------------------------------------------------------*)
 (** Substitutions *)
 
 type esubst = ESubst : 'a term * 'a term -> esubst

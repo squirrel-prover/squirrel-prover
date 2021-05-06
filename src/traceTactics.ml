@@ -2764,11 +2764,18 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
   let action_descr_ts =
     SystemExpr.action_to_term table system case.action_descr.Action.action
   in
+
+  let ts_list = 
+    let iter = new Fresh.get_actions ~cntxt:(mk_trace_cntxt sequent) in
+    List.iter iter#visit_message [s; m];
+    iter#get_actions
+  in
+  let ts_list = 
+    List.map (fun (ts,b) -> if b then Term.Pred ts else ts) ts_list 
+  in
   (* The action occured before the test H(m,k) = s. *)
   let maximal_elems =
-    Tactics.timeout_get
-      (TS.maximal_elems
-         ~precise:false sequent (precise_ts s @ precise_ts m))
+    Tactics.timeout_get (TS.maximal_elems ~precise:false sequent ts_list)
   in
 
   let le_cnstr =
