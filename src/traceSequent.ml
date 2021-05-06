@@ -404,7 +404,7 @@ module Hyps
   let reload s =
     H.fold (fun id f s ->
         let s = remove id s in        
-        snd (add_formula id f s)) s.hyps s
+        snd (add_formula ~force:true id f s)) s.hyps s
 
   (*------------------------------------------------------------------*)
   let clear_triv s = 

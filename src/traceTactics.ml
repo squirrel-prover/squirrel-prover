@@ -313,22 +313,23 @@ let find_occs_macro : type a.
     ) St.empty targets
 
 
-let rec expand_all s = 
-  let targets = target_all s in
-  let occs = find_occs_macro `Any targets s in
-  let subst = 
-    Term.St.fold (fun (ETerm t) subst -> 
-        unfold_macro ~canfail:false t s @ subst
-      ) occs [] in
-  let doit (f,_) = Term.subst subst f, [] in
+let expand_all targets s = 
+  let targets, all = make_in_targets targets s in
+  let canfail = not all in
 
-  let s, subs = do_targets doit s targets in
-  assert (subs = []);
-  
-  (* recurse to check that no new macros can be expanded *)
-  if subst = [] then s else expand_all s
+  let rec expand_rec s =
+    let occs = find_occs_macro `Any targets s in
+    let subst = 
+      Term.St.fold (fun (ETerm t) subst -> 
+          unfold_macro ~canfail t s @ subst
+        ) occs [] in
+    let s = TS.subst subst s in
+    if subst = [] then s else expand_rec s
+  in
 
-let expand_all_l s : sequent list = [expand_all s]
+  expand_rec s
+
+let expand_all_l tgts s : sequent list = [expand_all tgts s]
 
 let expand (targets : target list) (arg : Theory.term) s = 
   let tbl = TS.table s in
@@ -391,7 +392,7 @@ let () = T.register "expandall"
       detailed_help = "";
       tactic_group  = Structural;
       usages_sorts  = []; }
-    expand_all_l
+    (expand_all_l `All)         (* FIXME: allow user to specify targets *)
 
 
 (*------------------------------------------------------------------*)
@@ -2167,7 +2168,7 @@ let simplify ~close ~strong =
 
   let expand_all = 
     (if strong && close && not intro 
-     then [wrap_fail expand_all_l] @ assumption
+     then [wrap_fail (expand_all_l `All)] @ assumption
      else []) 
   in
 
