@@ -18,6 +18,10 @@ type lsymb = Theory.lsymb
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
 
 (*------------------------------------------------------------------*)
+let hard_failure = Tactics.hard_failure
+let soft_failure = Tactics.soft_failure
+
+(*------------------------------------------------------------------*)
 (** {Error handling} *)
 
 type decl_error_i =
@@ -304,8 +308,9 @@ module TraceTable : Table_sig with type judgment = TS.t = struct
   (* TODO:location *)
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> Tactics.hard_failure
+      | Not_found -> hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
+
   let to_goal j = Goal.Trace j
   let from_trace j = j
   let from_equiv e = assert false
@@ -321,7 +326,7 @@ module EquivTable : Table_sig with type judgment = Goal.t = struct
   (* TODO:location *)
   let get id =
     try (Hashtbl.find table id).maker with
-      | Not_found -> Tactics.hard_failure
+      | Not_found -> hard_failure
              (Tactics.Failure (Printf.sprintf "unknown tactic %S" id))
   let to_goal j = j
   let from_trace j = Goal.Trace j
@@ -362,10 +367,17 @@ module Make_AST (T : Table_sig) :
 
   let autosimpl = Lazy.from_fun autosimpl
 
-  let eval_abstract mods id args : judgment Tactics.tac =
+  let re_raise_tac loc tac s sk fk : Tactics.a =
+    try tac s sk fk with
+    | Tactics.Tactic_hard_failure (None, e) -> hard_failure ~loc e
+    | Tactics.Tactic_soft_failure (None, e) -> soft_failure ~loc e
+
+  let eval_abstract mods (id : lsymb) args : judgment Tactics.tac =
+    let loc, id = L.loc id, L.unloc id in
+    let tac = re_raise_tac loc (T.get id args) in
     match mods with
-      | "nosimpl"::_ -> T.get id args
-      | [] -> Tactics.andthen (T.get id args) (Lazy.force autosimpl)
+      | "nosimpl" :: _ -> tac
+      | [] -> Tactics.andthen tac (Lazy.force autosimpl)
       | _ -> assert false
 
   (* a printer for tactics that follows a specific syntax.
@@ -461,13 +473,13 @@ struct
         | [] ->
           fun s sk fk -> begin match f s with
               | subgoals -> sk subgoals fk
-              | exception Tactics.Tactic_soft_failure (_,e) -> fk e
+              | exception Tactics.Tactic_soft_failure e -> fk e
               | exception System.SystemError e ->
-                Tactics.hard_failure (Tactics.SystemError e)
+                hard_failure (Tactics.SystemError e)
               | exception SE.BiSystemError e ->
-                Tactics.hard_failure (Tactics.SystemExprError e)
+                hard_failure (Tactics.SystemExprError e)
             end
-        | _ -> Tactics.hard_failure (Tactics.Failure "no argument allowed"))
+        | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
   let register_typed id
       ~general_help ~detailed_help  ~tactic_group ?(usages_sorts)
@@ -486,28 +498,28 @@ struct
              begin
                match f (th) s with
                | subgoals -> sk subgoals fk
-               | exception Tactics.Tactic_soft_failure (_,e) -> fk e
+               | exception Tactics.Tactic_soft_failure e -> fk e
                | exception System.SystemError e ->
-                 Tactics.hard_failure (Tactics.SystemError e)
+                 hard_failure (Tactics.SystemError e)
                | exception SE.BiSystemError e ->
-                 Tactics.hard_failure (Tactics.SystemExprError e)
+                 hard_failure (Tactics.SystemExprError e)
              end
            with TacticsArgs.Uncastable ->
-             Tactics.hard_failure (Tactics.Failure "ill-formed arguments")
+             hard_failure (Tactics.Failure "ill-formed arguments")
       )
 
   let register_macro id ?(modifiers=["nosimpl"])  ~tactic_help m =
     register_general id ~tactic_help
       (fun args s sk fk ->
          if args = [] then AST.eval modifiers m s sk fk else
-           Tactics.hard_failure
+           hard_failure
              (Tactics.Failure "this tactic does not take arguments"))
 
   let pp details fmt (id : lsymb) =
     let id_u = L.unloc id in
     let help =
       try (Hashtbl.find table id_u).help with
-      | Not_found -> Tactics.hard_failure ~loc:(L.loc id)
+      | Not_found -> hard_failure ~loc:(L.loc id)
           (Tactics.Failure (Printf.sprintf "unknown tactic %S" id_u))
     in
     Fmt.pf fmt  "@.@[- %a -@\n @[<hov 3>   %a @\n %a @\n%s @[%a @] @]@]@."
@@ -646,7 +658,7 @@ let () =
     (function
       | [] -> get_trace_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_trace_help tac_name
-      | _ ->  Tactics.hard_failure (Tactics.Failure"improper arguments")) ;
+      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
 
   EquivTactics.register_general "help"
     ~tactic_help:{general_help = "Display all available commands.\n\n\
@@ -661,7 +673,7 @@ let () =
     (function
       | [] -> get_equiv_help (L.mk_loc L._dummy "")
       | [String_name tac_name]-> get_equiv_help tac_name
-      | _ ->  Tactics.hard_failure (Tactics.Failure"improper arguments")) ;
+      | _ ->  hard_failure (Tactics.Failure"improper arguments")) ;
 
   TraceTactics.register_general "id"
     ~tactic_help:{general_help = "Identity.";
@@ -690,7 +702,7 @@ let is_goal_formula gname : bool =
 let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
   match find_proved_goal (L.unloc gname) with
   | None -> 
-    Tactics.soft_failure ~loc:(L.loc gname)
+    soft_failure ~loc:(L.loc gname)
       (Failure ("no proved goal named " ^ (L.unloc gname)))
 
   | Some gc ->
@@ -698,7 +710,7 @@ let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
     | `Reach f -> gc.gc_system, gc.gc_tyvars, f
 
     | _ ->
-      Tactics.soft_failure ~loc:(L.loc gname)
+      soft_failure ~loc:(L.loc gname)
         (Failure ("not an reachability goal: " ^ (L.unloc gname)))
 
 
@@ -712,7 +724,7 @@ let convert_el cenv ty_vars (env : Vars.env) el : Term.message =
   | Some (Theory.ETerm (s,t,_)) -> 
     match Term.kind t with
     | Type.KMessage -> t
-    | _ -> Tactics.hard_failure (Failure "unsupported type (was expecting a \
+    | _ -> hard_failure (Failure "unsupported type (was expecting a \
                                           bool or message)")
 
 let convert_equiv cenv ty_vars (env : Vars.env) (e : p_equiv) =
@@ -880,7 +892,7 @@ let complete_proof () =
     current_goal := None;
     subgoals := []
   with Not_found ->
-    Tactics.hard_failure
+    hard_failure
       (Tactics.Failure "cannot complete proof: no current goal")
 
 let pp_goal ppf () = match !current_goal, !subgoals with
@@ -907,7 +919,7 @@ let eval_tactic_focus tac = match !subgoals with
 
 let cycle i l =
   let rec cyc acc i = function
-    | [] -> Tactics.hard_failure (Tactics.Failure "cycle error")
+    | [] -> hard_failure (Tactics.Failure "cycle error")
     | a :: l ->
       if i = 1 then l @ (List.rev (a :: acc))
       else cyc (a :: acc) (i - 1) l in
@@ -916,7 +928,7 @@ let cycle i l =
   else cyc [] i l
 
 let eval_tactic utac = match utac with
-  | Tactics.Abstract ("cycle",[TacticsArgs.Int_parsed i]) -> 
+  | Tactics.Abstract (L.{ pl_desc = "cycle"}, [TacticsArgs.Int_parsed i]) -> 
     subgoals := cycle i !subgoals; false
   | _ -> eval_tactic_focus utac
 

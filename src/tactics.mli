@@ -1,5 +1,9 @@
 (** Generic tactics *)
 
+module L = Location
+
+type lsymb = string L.located
+
 (*------------------------------------------------------------------*)
 (** {2 Tactics} *)
 
@@ -28,7 +32,7 @@
 
 (** The multiple types of tactics error. Specific ones are defined so that they
     may be caught for unit testing. *)
-type tac_error =
+type tac_error_i =
   | More
   | Failure of string
   | CannotConvert
@@ -45,7 +49,7 @@ type tac_error =
   | NoReflMacros
   | TacTimeout
   | DidNotFail
-  | FailWithUnexpected of tac_error
+  | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
   | SystemError     of System.system_error
   | SystemExprError of SystemExpr.system_expr_err
@@ -64,17 +68,19 @@ type tac_error =
   | InvalidVarName
   | PatNumError of int * int    (* given, need *)
 
+type tac_error = L.t option * tac_error_i
+
 (** Tactics should raise this exception if they are ill-formed. *)
-exception Tactic_soft_failure of Location.t option * tac_error
+exception Tactic_soft_failure of tac_error
 
 (** This tactic should be raised by the evaluation of a tactic, based on the
     tac_error returned by its failure. *)
-exception Tactic_hard_failure of Location.t option * tac_error
+exception Tactic_hard_failure of tac_error
 
-val pp_tac_error : Format.formatter -> tac_error -> unit
+val pp_tac_error_i : Format.formatter -> tac_error_i -> unit
 
 (** A basic way to parse some expected tactic errors *)
-val tac_error_of_strings : string list -> tac_error
+val tac_error_of_strings : string list -> tac_error_i
 
 (** Purely abstract type "returned" by continuations and tactics *)
 type a
@@ -114,8 +120,6 @@ val andthen_list : ?cut:bool -> 'a tac list -> 'a tac
 
 val try_tac : 'a tac -> 'a tac
 
-val checkfail_tac : tac_error -> 'a tac -> 'a tac
-
 (*------------------------------------------------------------------*)
 (** {2 Generic tactic syntax trees} *)
 
@@ -126,7 +130,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string list -> string -> arg list -> judgment tac
+  val eval_abstract : string list -> lsymb -> arg list -> judgment tac
   val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
     string -> arg list -> Format.formatter -> unit
 
@@ -140,7 +144,7 @@ type selector = int list
   * can only be used for cheap tricks now, but may be used to guide tactic
   * evaluation in richer ways in the future. *)
 type 'a ast =
-  | Abstract of string * 'a list
+  | Abstract of lsymb * 'a list
   | AndThen    : 'a ast list -> 'a ast
   | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
@@ -148,8 +152,8 @@ type 'a ast =
   | Repeat     : 'a ast -> 'a ast
   | Ident      : 'a ast
   | Modifier   : string * 'a ast -> 'a ast
-  | CheckFail  : tac_error * 'a ast -> 'a ast
-  | By         : 'a ast -> 'a ast
+  | CheckFail  : tac_error_i * 'a ast -> 'a ast
+  | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 
 module type AST_sig = sig
@@ -174,14 +178,14 @@ module AST (M:S) : AST_sig
 (** {2 Utilities} *)
 
 (** Raise a soft failure. *)
-val soft_failure : ?loc:Location.t -> tac_error -> 'a
+val soft_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Unwrap the result of a computation that may timeout, or raise a soft
     timeout failure. *)
 val timeout_get : 'a Utils.timeout_r -> 'a
 
 (** Raise a hard failure. *)
-val hard_failure : ?loc:Location.t -> tac_error -> 'a
+val hard_failure : ?loc:Location.t -> tac_error_i -> 'a
 
 (** Print the system to the user. *)
 val print_system : Symbols.table -> SystemExpr.system_expr -> unit

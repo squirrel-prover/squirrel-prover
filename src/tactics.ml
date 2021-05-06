@@ -1,6 +1,9 @@
 module L = Location
 
-type tac_error =
+type lsymb = string L.located
+
+(*------------------------------------------------------------------*)
+type tac_error_i =
   | More
   | Failure of string
   | CannotConvert
@@ -17,7 +20,7 @@ type tac_error =
   | NoReflMacros
   | TacTimeout
   | DidNotFail
-  | FailWithUnexpected of tac_error
+  | FailWithUnexpected of tac_error_i
   | GoalBadShape of string
 
   (* TODO: remove these errors, catch directly at top-level *)
@@ -43,7 +46,9 @@ type tac_error =
   | InvalidVarName
 
   | PatNumError of int * int    (* given, need *)
-                   
+
+type tac_error = L.t option * tac_error_i
+
 let tac_error_strings =
   [ (More               , "More");
     (NotEqualArguments  , "NotEqualArguments");
@@ -106,7 +111,7 @@ let rec tac_error_to_string = function
   | PatNumError      _ -> "PatNumError"
   | MustHappen       _ -> "MustHappen"
 
-let rec pp_tac_error ppf = function
+let rec pp_tac_error_i ppf = function
   | More -> Fmt.string ppf "more results required"
   | Failure s -> Fmt.pf ppf "%s" s
   | NotEqualArguments -> Fmt.pf ppf "arguments not equals"
@@ -180,7 +185,7 @@ let rec pp_tac_error ppf = function
     Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
   
   | InvalidVarName -> Fmt.pf ppf "invalid variable name"
-    
+
 let strings_tac_error =
   let (a,b) = List.split tac_error_strings in
   List.combine b a
@@ -196,9 +201,9 @@ let rec tac_error_of_strings = function
   | ["NotDepends"; s1; s2] -> NotDepends (s1, s2)
   | _ ->  raise (Failure "exception name unknown")
 
-exception Tactic_soft_failure of L.t option * tac_error
+exception Tactic_soft_failure of tac_error
 
-exception Tactic_hard_failure of L.t option * tac_error
+exception Tactic_hard_failure of tac_error
 
 let soft_failure ?loc e = raise (Tactic_soft_failure (loc,e))
 let hard_failure ?loc e = raise (Tactic_hard_failure (loc,e))
@@ -270,11 +275,11 @@ let check_sel sel_tacs l =
 (*------------------------------------------------------------------*)
 (** Basic Tactics *)
 
-let fail sk fk = fk (Failure "fail")
+let fail sk (fk : fk) = fk (None, Failure "fail")
 
-let return x sk fk = sk x fk
+let return x sk (fk : fk) = sk x fk
 
-let cut t j sk fk = t j (fun l _ -> sk l fk) fk
+let cut t j sk (fk : fk) = t j (fun l _ -> sk l fk) fk
 
 (** [map t [e1;..;eN]] returns all possible lists [l1@..@lN]
   * where [li] is a result of [t e1]. *)
@@ -305,14 +310,14 @@ let map_sel sel_tacs l sk fk =
       | None -> aux (i + 1) (e :: acc) l fk
   in aux 1 [] l fk
 
-let orelse_nojudgment a b sk fk = a sk (fun _ -> b sk fk)
+let orelse_nojudgment a b sk (fk : fk)  = a sk (fun _ -> b sk fk)
 
 let orelse a b j sk fk = orelse_nojudgment (a j) (b j) sk fk
 
 let orelse_list l j =
   List.fold_right (fun t t' -> orelse_nojudgment (t j) t') l fail
 
-let andthen ?(cut=false) tac1 tac2 judge sk fk : a =
+let andthen ?(cut=false) tac1 tac2 judge sk (fk : fk) : a =
   let sk =
     if cut then
       (fun l fk' -> map tac2 l sk fk)
@@ -333,7 +338,7 @@ let rec andthen_list ?cut = function
   | [t] -> t
   | t::l -> andthen ?cut t (andthen_list ?cut l)
 
-let andthen_sel tac1 sel_tacs judge sk fk : a =
+let andthen_sel tac1 sel_tacs judge sk (fk : fk) : a =
   let sk l fk' = map_sel sel_tacs l sk fk' in
   tac1 judge sk fk
 
@@ -345,7 +350,7 @@ let try_tac t j sk fk =
   let fk' e = if !succeeded then fk e else sk [j] fk in
   t j sk' fk'
 
-let checkfail_tac exc t j sk fk =
+let checkfail_tac exc t j (sk : 'a sk) (fk : fk) =
   try
     let sk l fk = soft_failure DidNotFail in
     t j sk fk
@@ -382,7 +387,7 @@ let eval_all (t : 'a tac) x =
   let l = ref [] in
   let exception End in
   try
-    let sk r fk = l := r :: !l ; fk More in
+    let sk r fk = l := r :: !l ; fk (None, More) in
     let fk _ = raise End in
     ignore (t x sk fk) ;
     assert false
@@ -414,14 +419,14 @@ let () =
       assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
       assert (eval_all (andthen t1 t3) (11,12) = expected) ;
 
-      let t3 = fun (x,y) sk fk -> if x+y = 0 then fk More else sk [y,x] fk in
+      let t3 = fun (x,y) sk fk -> if x+y = 0 then fk (None, More) else sk [y,x] fk in
       let expected = [ [0,1] ] in
       assert (eval_all (andthen_list [t1;t3]) (11,12) = expected) ;
       assert (eval_all (andthen t1 t3) (11,12) = expected) ;
     end ;
     "Repeat", `Quick, begin fun () ->
       let t : int tac =
-        fun n sk fk -> if n = 0 then fk (Failure "") else sk [n-1] fk in
+        fun n sk fk -> if n = 0 then fk (None, Failure "") else sk [n-1] fk in
       checki [[0];[1];[2]] (eval_all (repeat ~cut:false t) 2) ;
       checki [[0]] (eval_all (repeat ~cut:true t) 2)
     end ;
@@ -431,7 +436,7 @@ let () =
       let t : int tac = fun n sk fk ->
         if n = 0 then sk [1] (fun _ -> sk [2] fk) else
           if n = 1 then sk [3] fk else
-            fk (Failure "")
+            fk (None, Failure "")
       in
       checki
         [[3];[1];[2];[0]]
@@ -446,7 +451,7 @@ let () =
        * backtracking on its last call to t. *)
       let t : int tac = fun n sk fk ->
         if n = 0 then sk [1] (fun _ -> sk [2] fk) else
-          fk (Failure "")
+          fk (None, Failure "")
       in
       checki
         [[1];[2];[0]]
@@ -540,7 +545,7 @@ module type S = sig
 
   type judgment
 
-  val eval_abstract : string list -> string -> arg list -> judgment tac
+  val eval_abstract : string list -> lsymb -> arg list -> judgment tac
   val pp_abstract : pp_args:(Format.formatter -> arg list -> unit) ->
     string -> arg list -> Format.formatter -> unit
 
@@ -552,7 +557,7 @@ end
   * can only be used for cheap tricks now, but may be used to guide tactic
   * evaluation in richer ways in the future. *)
 type 'a ast =
-  | Abstract of string * 'a list
+  | Abstract of lsymb * 'a list
   | AndThen    : 'a ast list -> 'a ast
   | AndThenSel : 'a ast * (selector * 'a ast) list -> 'a ast
   | OrElse     : 'a ast list -> 'a ast
@@ -560,8 +565,8 @@ type 'a ast =
   | Repeat     : 'a ast -> 'a ast
   | Ident      : 'a ast
   | Modifier   : string * 'a ast -> 'a ast
-  | CheckFail  : tac_error * 'a ast -> 'a ast
-  | By         : 'a ast -> 'a ast
+  | CheckFail  : tac_error_i * 'a ast -> 'a ast
+  | By         : 'a ast * L.t -> 'a ast
   | Time       : 'a ast -> 'a ast
 
 module type AST_sig = sig
@@ -598,8 +603,9 @@ module AST (M:S) = struct
 
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
-    | By t                -> 
-      andthen_list [eval modifiers t; eval modifiers (Abstract ("auto",[]))] 
+    | By (t,loc)                -> 
+      andthen_list [eval modifiers t; 
+                    eval modifiers (Abstract (L.mk_loc loc "auto",[]))] 
 
     | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
@@ -614,6 +620,7 @@ module AST (M:S) = struct
 
   let rec pp ppf = function
     | Abstract (i,args) ->
+      let i = L.unloc i in
         begin try
           pp_abstract ~pp_args i args ppf
         with _ ->
@@ -647,7 +654,7 @@ module AST (M:S) = struct
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "+@,") pp) ts
 
-    | By t -> Fmt.pf ppf "@[by %a@]" pp t
+    | By (t,_) -> Fmt.pf ppf "@[by %a@]" pp t
 
     | Ident -> Fmt.pf ppf "id"
 
@@ -673,7 +680,7 @@ module AST (M:S) = struct
     let tac = eval [] ast in
     (* The failure should raise the soft failure,
      * according to [pp_tac_error]. *)
-    let fk tac_error = soft_failure tac_error in
+    let fk (loc,tac_error) = soft_failure ?loc tac_error in
     let sk l _ = raise (Return l) in
     try ignore (tac j sk fk) ; assert false with Return l -> l
 

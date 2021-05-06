@@ -13,7 +13,7 @@ end
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
 
-val hyp_error : loc:L.t option -> Tactics.tac_error -> 'a
+val hyp_error : loc:L.t option -> Tactics.tac_error_i -> 'a
 
 (*------------------------------------------------------------------*) 
 (** {2 Signature} *)

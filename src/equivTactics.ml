@@ -391,7 +391,7 @@ let intro_tac args s sk fk =
     | [Args.IntroPat intros] -> sk (do_intros intros s) fk
 
     | _ -> Tactics.(hard_failure (Failure "improper arguments"))
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+  with Tactics.Tactic_soft_failure e -> fk e
 
 let () =
   T.register_general "intro"
@@ -561,7 +561,7 @@ let enrichs args s =
 
 let enrich_tac args s sk fk = 
   try sk [enrichs args s] fk with
-  | Tactics.Tactic_soft_failure (_,e) -> fk e
+  | Tactics.Tactic_soft_failure e -> fk e
 
 let () = 
   T.register_general "enrich"
@@ -1183,7 +1183,7 @@ let () = T.register_general "expand"
     | [Args.Theory v] ->
       only_equiv (fun s sk fk -> match expand v s with
           | subgoals -> sk subgoals fk
-          | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
+          | exception Tactics.Tactic_soft_failure e -> fk e)
 
     | (Args.Theory v)::ids ->
         let ids =
@@ -1196,7 +1196,7 @@ let () = T.register_general "expand"
         pure_equiv
           (fun s sk fk -> match expand_seq v ids s with
              | subgoals -> sk subgoals fk
-             | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
+             | exception Tactics.Tactic_soft_failure e -> fk e)
 
      | _ ->
          hard_failure
@@ -1591,21 +1591,21 @@ let () = T.register_typed "ifeq"
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
-let auto ~conclude ~strong s sk fk = 
+let auto ~conclude ~strong s sk (fk : Tactics.fk) = 
   let wrap tac s sk fk = 
     try sk (tac s) fk with
-    | Tactics.Tactic_soft_failure (_,e) -> fk e in
+    | Tactics.Tactic_soft_failure e -> fk e in
 
   let open Tactics in
   match s with
   | Prover.Goal.Equiv s ->
     let sk l _ = 
       if conclude && l <> [] 
-      then fk GoalNotClosed
+      then fk (None, GoalNotClosed)
       else sk (List.map (fun s -> Prover.Goal.Equiv s) l) fk in
     let fk _ = 
       if conclude 
-      then fk GoalNotClosed
+      then fk (None, GoalNotClosed)
       else sk [s] fk in
 
     let wfadup s sk fk = 
@@ -1626,7 +1626,7 @@ let auto ~conclude ~strong s sk fk =
     let sk l fk = sk (List.map (fun s -> Prover.Goal.Trace s) l) fk in
     TraceTactics.simplify ~close:conclude ~strong t sk fk
 
-let tac_auto ~conclude args s sk fk =
+let tac_auto ~conclude args s sk (fk : Tactics.fk) =
    auto ~conclude s sk fk 
 
 

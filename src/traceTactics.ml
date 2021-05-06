@@ -71,7 +71,7 @@ let mk_trace_cntxt s =
 (*------------------------------------------------------------------*)
 let wrap_fail f (s: TS.t) sk fk =
   try sk (f s) fk with
-  | Tactics.Tactic_soft_failure (_,e) -> fk e
+  | Tactics.Tactic_soft_failure e -> fk e
 
 (*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
@@ -353,7 +353,7 @@ let expand (targets : target list) (arg : Theory.term) s =
 let expands args s =
   List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
 
-let expand_tac args s sk fk =
+let expand_tac args s sk (fk : Tactics.fk) =
   try 
     let args = List.map (function
         | Args.Theory t -> t
@@ -361,7 +361,7 @@ let expand_tac args s sk fk =
       ) args
     in
     sk [expands args s] fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+  with Tactics.Tactic_soft_failure e -> fk e
 
 
 let () = T.register_general "expand"
@@ -597,16 +597,16 @@ let revert_str (hyp_name : lsymb) s =
   let hid,_ = Hyps.by_name hyp_name s in
   revert hid s
 
-let revert_tac (args : Args.parser_arg list) s sk fk = 
-  try
-    let s = 
-      List.fold_left (fun s arg -> match arg with
-          | Args.String_name arg -> revert_str arg s
-          | _ -> bad_args ()
-        ) s args in
-    sk [s] fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
-      
+let revert_args (args : Args.parser_arg list) s = 
+  let s = 
+    List.fold_left (fun s arg -> match arg with
+        | Args.String_name arg -> revert_str arg s
+        | _ -> bad_args ()
+      ) s args in
+  [s]
+
+let revert_tac args s sk fk = wrap_fail (revert_args args) s sk fk
+
 let () =
   T.register_general "revert"
     ~tactic_help:{
@@ -788,14 +788,12 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
                                
         | Type.KMessage -> message_case f ty s
                              
-        | Type.KIndex -> Tactics.(bad_args ())
+        | Type.KIndex -> bad_args ()
       end
-    | _ -> Tactics.(bad_args ())
+    | _ -> bad_args ()
 
 
-let case_tac (args : Args.parser_args) s sk fk =
-  try sk (do_case_tac args s) fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+let case_tac args = wrap_fail (do_case_tac args)
 
 let () =
   let open Tactics in
@@ -838,15 +836,15 @@ let clear_str (hyp_name : lsymb) s =
   let hid,_ = Hyps.by_name hyp_name s in
   clear hid s
 
-let clear_tac (args : Args.parser_arg list) s sk fk = 
-  try
-    let s = 
-      List.fold_left (fun s arg -> match arg with
-          | Args.String_name arg -> clear_str arg s
-          | _ -> bad_args ()
-        ) s args in
-    sk [s] fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+let clear_tac_args (args : Args.parser_arg list) s = 
+  let s = 
+    List.fold_left (fun s arg -> match arg with
+        | Args.String_name arg -> clear_str arg s
+        | _ -> bad_args ()
+      ) s args in
+  [s] 
+
+let clear_tac args = wrap_fail (clear_tac_args args)
       
 let () =
   T.register_general "clear"
@@ -1051,18 +1049,19 @@ let do_destruct hid s =
        do_naming_pat handler Args.AnyName s
      ) s handlers]
 
-let destruct_tac args s sk fk =
-  try match args with
+let destruct_tac_args args s =
+  match args with
     | [Args.String_name h; Args.AndOrPat pat] ->
       let hid, _ = Hyps.by_name h s in
-      sk (do_and_or_pat hid pat s) fk
+      do_and_or_pat hid pat s
 
     | [Args.String_name h] ->
       let hid, _ = Hyps.by_name h s in
-      sk (do_destruct hid s) fk
+      do_destruct hid s
 
-    | _ -> Tactics.(bad_args ())
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+    | _ -> bad_args ()
+
+let destruct_tac args = wrap_fail (destruct_tac_args args)
 
 let () =
   T.register_general "destruct"
@@ -1107,12 +1106,12 @@ let () =
          List.map
            (function
               | Args.Theory tm -> tm
-              | _ -> Tactics.(bad_args ()))
+              | _ -> bad_args ())
            l
        in
          match goal_exists_intro ths s with
            | subgoals -> sk subgoals fk
-           | exception Tactics.Tactic_soft_failure (_,e) -> fk e)
+           | exception Tactics.Tactic_soft_failure e -> fk e)
 
 
 (*------------------------------------------------------------------*)
@@ -1186,8 +1185,7 @@ let generalize (v : Vars.evar) s : sequent =
 
 let generalize_l vs s : sequent = List.fold_right generalize vs s
 
-let generalize_tac (args : Args.parser_arg list) s sk fk = 
-  try
+let generalize_tac_args (args : Args.parser_arg list) s = 
     let vars = 
       List.map (fun arg -> 
           match convert_args s [arg] (Args.Sort Args.ETerm) with 
@@ -1200,10 +1198,10 @@ let generalize_tac (args : Args.parser_arg list) s sk fk =
         ) args 
     in
 
-    let s = generalize_l vars s in
-    sk [s] fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+    [generalize_l vars s]
       
+let generalize_tac args = wrap_fail (generalize_tac_args args)
+
 let () =
   T.register_general "generalize"
     ~tactic_help:{
@@ -1352,14 +1350,14 @@ let tac_apply args s sk fk =
     in
     begin match use ip id th_terms s with
       | subgoals -> sk subgoals fk
-      | exception Tactics.Tactic_soft_failure (_,e) -> fk e
+      | exception Tactics.Tactic_soft_failure e -> fk e
     end
-  | _ -> Tactics.(bad_args ())
+  | _ -> bad_args ()
 
 
 let tac_apply args s sk fk =
   try tac_apply args s sk fk with
-  | Tactics.Tactic_soft_failure (_,e) -> fk e
+  | Tactics.Tactic_soft_failure e-> fk e
 
 (* Does not rely on the typed register as it parses a subst *)
 let () =
@@ -1395,7 +1393,7 @@ let tac_assert (args : Args.parser_arg list) s sk fk =
       | None -> [s2] in
     sk (s1 :: s2) fk
 
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+  with Tactics.Tactic_soft_failure e -> fk e
 
 let () =
   T.register_general "assert"
@@ -2220,7 +2218,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
      * but we must respect [close]. *)
     let fk =
       if close 
-      then fun _ -> fk GoalNotClosed
+      then fun _ -> fk (None, GoalNotClosed)
       else fun _ -> sk [g] fk
     in
     (wrap_fail goal_and_right) g
@@ -2285,21 +2283,16 @@ let do_rw_arg rw_arg rw_in s : TS.sequent list =
   | Args.R_item rw_item  -> do_rw_item rw_item rw_in s
   | Args.R_s_item s_item -> do_s_item s_item s (* targets are ignored there *)
 
-let rewrite_tac args s sk fk =
+let rewrite_tac args s =
   match args with
   | [Args.RewriteIn (rw_args, in_opt)] ->
-    let seqs = 
-      List.fold_left (fun seqs rw_arg ->
-          List.concat_map (do_rw_arg rw_arg in_opt) seqs
-        ) [s] rw_args 
-    in
-    sk seqs fk
+    List.fold_left (fun seqs rw_arg ->
+        List.concat_map (do_rw_arg rw_arg in_opt) seqs
+      ) [s] rw_args 
 
   | _ -> bad_args ()
 
-let rewrite_tac args s sk fk =
-  try rewrite_tac args s sk fk with
-  | Tactics.Tactic_soft_failure (_,e) -> fk e
+let rewrite_tac args = wrap_fail (rewrite_tac args)
 
 let () =
   T.register_general "rewrite"
@@ -2470,14 +2463,13 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
   subgoals, pat, target
 
 
-let apply_tac (args : Args.parser_arg list) s
-    (sk : TS.t list Tactics.sk) fk =
-  try
-    let subgoals, pat, target = p_apply_args args s in
-    match target with
-    | `Goal   -> sk (subgoals @ apply pat s      ) fk
-    | `Hyp id -> sk (subgoals @ apply_in pat id s) fk
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+let apply_tac_args (args : Args.parser_arg list) s =
+  let subgoals, pat, target = p_apply_args args s in
+  match target with
+  | `Goal   -> subgoals @ apply pat s      
+  | `Hyp id -> subgoals @ apply_in pat id s
+
+let apply_tac args = wrap_fail (apply_tac_args args)
 
 let () =
   T.register_general "apply"
@@ -2534,12 +2526,12 @@ let rec do_intros (intros : Args.intro_pattern list) s =
 
 and do_intros_list intros ss = List.concat_map (do_intros intros) ss
 
-let intro_tac args s sk fk =
-  try match args with
-    | [Args.IntroPat intros] -> sk (do_intros intros s) fk
+let intro_args args s =
+  match args with
+  | [Args.IntroPat intros] -> do_intros intros s
+  | _ -> bad_args ()
 
-    | _ -> Tactics.(bad_args ())
-  with Tactics.Tactic_soft_failure (_,e) -> fk e
+let intro_tac args = wrap_fail (intro_args args)
 
 let () =
   T.register_general "intro"
@@ -2619,7 +2611,7 @@ let yes_no_if b =
     | [] ->
       fun s sk fk -> begin match apply_yes_no_if b s with
         | subgoals -> sk subgoals fk
-        | exception Tactics.Tactic_soft_failure (_,e) -> fk e
+        | exception Tactics.Tactic_soft_failure e -> fk e
       end
     | _ -> hard_failure (Tactics.Failure "no argument allowed"))
 
