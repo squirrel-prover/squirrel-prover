@@ -2574,12 +2574,12 @@ let project s =
 
 let () =
   T.register "project"
-     ~tactic_help:
-       {general_help = "Project a goal on a bi-system into goals on its projections.";
-        detailed_help = "Is morally equivalent to a general function \
-                         application on the diff operator.";
-        usages_sorts = [Sort None];
-        tactic_group = Structural}
+     ~tactic_help:{
+       general_help = "Turn a goal on a bi-system into one goal for each system.";
+       detailed_help = "Essentially, this is a function application on the \
+                        diff operator.";
+       usages_sorts = [Sort None];
+       tactic_group = Structural}
      project
 
 (*------------------------------------------------------------------*)
@@ -2596,23 +2596,23 @@ let apply_yes_no_if b s =
   | None ->
     soft_failure
       (Tactics.Failure
-        "can only be applied if the conclusion contains at least \
-         one occurrence of an if then else term")
+         "the conclusion must contain at least \
+          one occurrence of an if term")
+
   | Some (c,t,e) ->
     (* Context with bound variables (eg try find) are not (yet) supported.
      * This is detected by checking that there is no "new" variable,
      * which are used by the iterator to represent bound variables. *)
     let vars = (Term.get_vars c) @ (Term.get_vars t) @ (Term.get_vars e) in
     if List.exists Vars.(function EVar v -> is_new v) vars then
-      soft_failure (Tactics.Failure "application of this tactic \
-        inside a context that bind variables is not supported")
-    else
-      let branch, trace_sequent =
-        if b then (t, TS.set_goal c s)
-        else (e, TS.set_goal (Term.mk_not c) s)
-      in
-      let subst = [Term.ESubst (Term.mk_ite c t e,branch)] in
-      [ trace_sequent; TS.subst subst s ]
+      soft_failure (Tactics.Failure "cannot be applied in a under a binder");
+
+    let branch, trace_sequent =
+      if b then (t, TS.set_goal c s)
+      else (e, TS.set_goal (Term.mk_not c) s)
+    in
+    let subst = [Term.ESubst (Term.mk_ite c t e,branch)] in
+    [ trace_sequent; TS.subst subst s ]
 
 let yes_no_if b =
   (function
@@ -2625,28 +2625,30 @@ let yes_no_if b =
 
 let () =
   T.register "yesif"
-    ~tactic_help:{general_help = "Replaces the first conditional occurring in \
-                                  the conclusion by its then branch if the \
-                                  condition is true.";
-                  detailed_help = "Replaces a proof goal with conclusion `if phi \
-                                   then u else v` by the goals 'phi <=> true' \
-                                   and the original goal now with u instead of \
-                                   the conditional.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
+    ~tactic_help:{
+      general_help = "Replaces the first conditional in \
+                      the conclusion by its then branch if the \
+                      condition is true.";
+      detailed_help = "Replaces a proof goal with conclusion `if phi \
+                       then u else v` by the goals 'phi <=> true' \
+                       and the original goal now with u instead of \
+                       the conditional.";
+      usages_sorts = [Sort None];
+      tactic_group = Structural}
     (apply_yes_no_if true)
 
 let () =
   T.register "noif"
-    ~tactic_help:{general_help = "Replaces the first conditional occurring in \
-                                  the conclusion by its else branch if the \
-                                  condition is false.";
-                   detailed_help = "Replaces a proof goal with condition `if phi \
-                                    then u else v` by the goals 'phi <=> false' \
-                                    and the original goal now with v instead of \
-                                    the conditional.";
-                  usages_sorts = [Sort None];
-                  tactic_group = Structural}
+    ~tactic_help:{
+      general_help = "Replaces the first conditional in \
+                      the conclusion by its else branch if the \
+                      condition is false.";
+      detailed_help = "Replaces a proof goal with condition `if phi \
+                       then u else v` by the goals 'phi <=> false' \
+                       and the original goal now with v instead of \
+                       the conditional.";
+      usages_sorts = [Sort None];
+      tactic_group = Structural}
     (apply_yes_no_if false)
 
 
@@ -2678,9 +2680,10 @@ let euf_param table (t : Term.message) : unforgeabiliy_param =
   | (`Eq, m, Fun ((checksign, _), _, [s; Fun ((pk,_), _, [Name key])])) ->
     begin match Theory.check_signature table checksign pk with
       | None ->
-        Tactics.(soft_failure 
-                   (Failure "the message does not correspond \
-                             to a signature check with the associated pk"))
+        soft_failure 
+          (Failure "the message must be a signature check with \
+                    the associated pk")
+
       | Some sign -> (sign, key, m, s,  (fun x -> x=pk), [], true)
     end
 
