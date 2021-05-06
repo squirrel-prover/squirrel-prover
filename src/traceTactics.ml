@@ -2670,9 +2670,9 @@ let () =
 (** Unforgeability Axioms *)
 
 type unforgeabiliy_param = Term.fname * Term.nsymb * Term.message
-                           * Type.message Term.term
+                           * Term.message
                            * (Symbols.fname Symbols.t -> bool)
-                           * Type.message Term.term list * bool
+                           * Term.message list * bool
 
 let euf_param table (t : Term.message) : unforgeabiliy_param =
   let bad_param () =
