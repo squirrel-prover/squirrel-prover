@@ -116,34 +116,50 @@ let rec pp_tac_error_i ppf = function
   | Failure s -> Fmt.pf ppf "%s" s
   | NotEqualArguments -> Fmt.pf ppf "arguments not equals"
   | Bad_SSC -> Fmt.pf ppf "key does not satisfy the syntactic side condition"
+
   | NoSSC ->
       Fmt.pf ppf
         "no key which satisfies the syntactic condition has been found"
+
   | NotDepends (a, b) ->
       Fmt.pf ppf "action %s does not depend on action %s" a b
+
   | NoAssumpSystem ->
       Fmt.pf ppf "no assumption with given name for the current system"
+
   | NotDDHContext ->
       Fmt.pf ppf "the current system cannot be seen as a context \
                   of the given DDH shares"
+
   | SystemExprError e -> SystemExpr.pp_system_expr_err ppf e
+
   | SystemError e -> System.pp_system_error ppf e
+
   | SEncNoRandom ->
     Fmt.string ppf "an encryption is performed without a random name"
+
   | SEncSharedRandom ->
     Fmt.string ppf "two encryptions share the same random"
+
   | SEncRandomNotFresh ->
     Fmt.string ppf "a random used for an encryption is used elsewhere"
+
   | NoRefl  ->
     Fmt.string ppf "frames not identical"
+
   | NoReflMacros ->
     Fmt.string ppf "frames contain macros that may not be diff-equivalent"
+
   | TacTimeout -> Fmt.pf ppf "time-out"
+
   | DidNotFail -> Fmt.pf ppf "the tactic did not fail"
+
   | CannotConvert -> Fmt.pf ppf "conversion error"
+
   | FailWithUnexpected t -> Fmt.pf ppf "the tactic did not fail with the expected \
                                       exception, but failed with: %s"
                             (tac_error_to_string t)
+
   | GoalNotClosed -> Fmt.pf ppf "cannot close goal"
 
   | CongrFail -> Fmt.pf ppf "congruence closure failed"

@@ -279,52 +279,68 @@ let expand_macro (targets : target list) t (s : sequent) : sequent =
   let s, subs = do_targets doit s targets in
   assert (subs = []);
   s
-     
-let find_occs_macro : type a. 
+
+(** find occurrences of a macro in a formula *)
+let find_occs_macro_term : type a. 
+  ?st:Term.St.t ->
   [`Any | `MSymb of Symbols.macro Symbols.t] ->
-  target list -> sequent -> Term.St.t =
-  fun m targets s -> 
+  a Term.term -> Term.St.t =
+  fun ?(st=Term.St.empty) m t -> 
 
   let cond ms = m = `MSymb ms.s_symb || m = `Any in
 
-  let do1 : type a. Term.St.t -> a term -> Term.St.t =
-    fun st t -> 
-      let rec find st (ETerm t) = 
-        let st = match t with
-          | Macro (ms, _, _) when cond ms -> 
-            Term.St.add (Term.ETerm t) st
-          | _ -> st in
+  let rec find st (ETerm t) = 
+    let st = match t with
+      | Macro (ms, _, _) when cond ms -> 
+        Term.St.add (Term.ETerm t) st
+      | _ -> st in
 
-        (* we do not recurse under binders *)
-        match t with
-        | ForAll _ | Exists _ | Find _ | Seq _ -> st
-        | _ -> Term.tfold (fun t st -> find st t) t st
+    (* we do not recurse under binders *)
+    match t with
+    | ForAll _ | Exists _ | Find _ | Seq _ -> st
+    | _ -> Term.tfold (fun t st -> find st t) t st
+  in
+
+  find st (ETerm t)
+
+(** find occurrences of a macro in a sequent *)
+let find_occs_macro 
+    (m : [`Any | `MSymb of Symbols.macro Symbols.t])
+    (targets : targets) s : Term.St.t =
+  List.fold_left (fun occs target -> 
+      let form = match target with
+        | `Goal   -> TS.goal s
+        | `Hyp id -> Hyps.by_id id s
       in
-
-      find st (ETerm t)
-  in  
-
-  List.fold_left (fun occs target -> match target with
-      | `Goal -> 
-        do1 occs (TS.goal s) 
-      | `Hyp id ->
-        let f = Hyps.by_id id s in
-        do1 occs f
+      find_occs_macro_term ~st:occs m form
     ) St.empty targets
 
+let subst_of_occs_macro ~canfail (occs : Term.St.t) s : Term.subst =
+  Term.St.fold (fun (ETerm t) subst -> 
+      unfold_macro ~canfail t s @ subst
+    ) occs [] 
 
-let expand_all targets s = 
+(** expand all macros in a term *)
+let expand_all_term : type a. a term -> sequent -> a term =   
+  fun term s ->
+
+  let rec expand_rec term =
+    let occs = find_occs_macro_term `Any term in
+    let subst = subst_of_occs_macro ~canfail:false occs s in
+    if subst = [] then term else expand_rec (Term.subst subst term) 
+  in
+
+  expand_rec term
+
+(** expand all macro of some targets in a sequent *)
+let expand_all targets s : sequent = 
   let targets, all = make_in_targets targets s in
   let canfail = not all in
 
   let rec expand_rec s =
     let occs = find_occs_macro `Any targets s in
-    let subst = 
-      Term.St.fold (fun (ETerm t) subst -> 
-          unfold_macro ~canfail t s @ subst
-        ) occs [] in
-    let s = TS.subst subst s in
-    if subst = [] then s else expand_rec s
+    let subst = subst_of_occs_macro ~canfail occs s in
+    if subst = [] then s else expand_rec (TS.subst subst s)
   in
 
   expand_rec s
@@ -363,16 +379,15 @@ let expand (targets : target list) (arg : Theory.term) s =
 let expands args s =
   List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
 
-let expand_tac args s sk (fk : Tactics.fk) =
-  try 
+let expand_tac args s =
     let args = List.map (function
         | Args.Theory t -> t
         | _ -> bad_args ()
       ) args
     in
-    sk [expands args s] fk
-  with Tactics.Tactic_soft_failure e -> fk e
+    [expands args s] 
 
+let expand_tac args = wrap_fail (expand_tac args)
 
 let () = T.register_general "expand"
     ~tactic_help:{
@@ -2848,13 +2863,16 @@ let euf_apply_facts drop_head s
 
   let schemata_premises =
     List.map (fun case -> euf_apply_schema s p case) rule.Euf.case_schemata
+
   and direct_premises =
     List.map (fun case -> euf_apply_direct s p case) rule.Euf.cases_direct
   in
+
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table then
     Cca.check_encryption_randomness
       cntxt
       rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
+
   schemata_premises @ direct_premises
 
 (** Tag EUFCMA - for composition results *)
@@ -2865,10 +2883,10 @@ let euf_apply
   let table = TS.table s in
   let id, at = Hyps.by_name hyp_name s in
 
+
   let (h,key,m,_,_,extra_goals,drop_head) as p = get_params table at in
   let extra_goals = List.map (fun x ->
-      TS.set_goal 
-        (Term.mk_impl x (TS.goal s)) s
+      TS.set_goal (Term.mk_impl x (TS.goal s)) s
     ) extra_goals in
 
   let tag_s =
