@@ -145,10 +145,9 @@ type p_equiv_form =
 type p_goal_form =
   | P_trace_goal of Decl.p_goal_reach_cnt
 
-  | P_equiv_goal of Theory.bnds * p_equiv_form L.located
+  | P_equiv_goal of SE.p_system_expr * Theory.bnds * p_equiv_form L.located
 
-  | P_equiv_goal_process of SE.p_single_system * 
-                            SE.p_single_system
+  | P_equiv_goal_process of SE.p_system_expr
 
 type p_goal = Decl.p_goal_name * p_goal_form
 
@@ -767,7 +766,7 @@ let make_trace_goal ~tbl gname (pg : Decl.p_goal_reach_cnt) :
   gc, Goal.Trace s
 
 let make_equiv_goal ~table
-    gname sname (bnds : Theory.bnds) (p_form : p_equiv_form L.located) :
+    gname se (bnds : Theory.bnds) (p_form : p_equiv_form L.located) :
   goal_concl * Goal.t =
   let env, evs = Theory.convert_p_bnds table [] Vars.empty_env bnds in
 
@@ -775,24 +774,15 @@ let make_equiv_goal ~table
 
   let f = convert_equiv_form conv_env [] env (L.unloc p_form) in
 
-  let se = SE.simple_pair table sname in
-
   let gc = mk_goal_concl gname se [] (`Equiv (Equiv.mk_forall evs f)) in
   
   gc, Goal.Equiv (ES.init se table env EquivHyps.empty f)
 
 
-let make_equiv_goal_process ~table gname s1 s2 : goal_concl * Goal.t =
+let make_equiv_goal_process ~table gname system : goal_concl * Goal.t =
   let env, ts = Vars.make `Approx Vars.empty_env Type.Timestamp "t" in
   let term = Term.Macro (Term.frame_macro,[],Term.Var ts) in
   let goal = Equiv.(Atom (Equiv [term])) in
-
-  let system =
-    match s1, s2 with
-    | SE.Left id1, SE.Right id2 when id1 = id2 ->
-      SE.simple_pair table id1
-    | _ -> SE.pair table s1 s2 
-  in
 
   let happens = Term.Atom (`Happens (Term.Var ts)) in
   let hyp = Equiv.Atom (Reach happens) in
@@ -828,15 +818,14 @@ let declare_new_goal_i table (gname,g) =
   let gn = L.unloc gname in
 
   let c, g = match g with
-    | P_equiv_goal (env,f) ->
-      let system_symb = System.of_lsymb SE.default_system_name table in
-      let c, g = make_equiv_goal ~table gn system_symb env f in
+    | P_equiv_goal (p_system, env,f) ->
+      let system = SE.parse_se table p_system in
+      let c, g = make_equiv_goal ~table gn system env f in
       c, g
 
-    | P_equiv_goal_process (a,b) ->
-      let a = SE.parse_single table a
-      and b = SE.parse_single table b in
-      let c, g = make_equiv_goal_process ~table gn a b in
+    | P_equiv_goal_process p_system ->
+      let system = SE.parse_se table p_system in
+      let c, g = make_equiv_goal_process ~table gn system in
       c, g
 
     | P_trace_goal reach -> 

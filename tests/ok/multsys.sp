@@ -25,7 +25,7 @@ expandall.
 fa 0.
 Qed.
 
-equiv [left,toto] [right,toto] test2.
+equiv [toto] test2.
 Proof.
 induction t.
 

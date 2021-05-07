@@ -46,7 +46,7 @@ Abort.
 system [sharedrnd] !_i
        (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>) | out(c,enc(m,r1(i),diff(k,kbis)))).
 
-equiv  [left,sharedrnd]  [right,sharedrnd] test.
+equiv  [sharedrnd] test.
 Proof.
 enrich diff(n,m); induction t. 
 expandall; fresh 0; yesif 0. 
@@ -60,7 +60,7 @@ Abort.
 (** BEGIN TEST -- AUTOMATICALLY INCLUDED IN MANUAL **)
 (* Fail if the random seed occur in the context. *)
 system  [sharedrndframe] !_i (out(c,<diff(n,m), enc(n,r1(i),diff(k,kbis))>)).
-equiv  [left,sharedrndframe]  [right,sharedrndframe] test2.
+equiv  [sharedrndframe] test2.
 Proof.
 enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
 enrich enc(m,r1(i),k). expandall. fa 2; fa 3; fa 3; fa 3.
@@ -72,7 +72,7 @@ Abort.
 (* Fail if the ranodm seed is not a name. *)
 system [nornd] !_i (out(c,<n, enc(n,r1(i),diff(k,kbis))>) | out(c,enc(n,ok,k))).
 
-equiv [left,nornd] [right,nornd] test3.
+equiv [nornd] test3.
 Proof.
 enrich diff(n,m). induction t. expandall. fresh 0. yesif 0. by auto.
 expandall. fa 1; fa 2; fa 2; fa 2.

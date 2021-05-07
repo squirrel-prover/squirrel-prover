@@ -3,6 +3,7 @@
     It contains the state of the proof and the history as mutable states. *)
 
 module L = Location
+module SE = SystemExpr
 
 type lsymb = Theory.lsymb
 
@@ -42,10 +43,9 @@ type p_equiv_form =
 type p_goal_form =
   | P_trace_goal of Decl.p_goal_reach_cnt
 
-  | P_equiv_goal of Theory.bnds * p_equiv_form L.located
+  | P_equiv_goal of SE.p_system_expr * Theory.bnds * p_equiv_form L.located
 
-  | P_equiv_goal_process of SystemExpr.p_single_system * 
-                            SystemExpr.p_single_system
+  | P_equiv_goal_process of SE.p_system_expr
 
 type p_goal = Decl.p_goal_name * p_goal_form
 
@@ -169,7 +169,7 @@ module EquivTactics : Tactics_sig with type judgment = Goal.t
 exception ParseError of string
 
 val get_goal_formula : 
-  lsymb -> SystemExpr.system_expr * Type.tvars * Term.message 
+  lsymb -> SE.system_expr * Type.tvars * Term.message 
 
 val is_goal_formula : string -> bool
 
@@ -214,7 +214,7 @@ type decl_error_i =
   | DuplicateCty of string
 
   | SystemError     of System.system_error
-  | SystemExprError of SystemExpr.system_expr_err
+  | SystemExprError of SE.system_expr_err
 
 type dkind = KDecl | KGoal
 

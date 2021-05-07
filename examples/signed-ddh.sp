@@ -115,7 +115,7 @@ Qed.
 
 
 
-equiv [left,secretS] [right,secretS] strongSecS.
+equiv [secretS] strongSecS.
 Proof.
     enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
            seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).
@@ -182,7 +182,7 @@ Qed.
 
 
 
-equiv [left,secretP] [right,secretP] strongSecP.
+equiv [secretP] strongSecP.
 Proof.
     enrich skP, skS, seq(i->g^a(i)), seq(i->g^b(i)),
            seq(i,j->diff(g^a(i)^b(j),g^k(i,j))).

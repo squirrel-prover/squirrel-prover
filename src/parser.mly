@@ -702,19 +702,24 @@ args:
 |                                    { [] }
 | LPAREN vs0=arg_list RPAREN vs=args { vs0 @ vs }
 
-system:
-|                           { SystemExpr.(P_SimplePair default_system_name) }
-| LBRACKET LEFT RBRACKET    { SystemExpr.(P_Single (P_Left default_system_name)) }
-| LBRACKET RIGHT RBRACKET   { SystemExpr.(P_Single (P_Right default_system_name)) }
-| LBRACKET i=lsymb RBRACKET { SystemExpr.(P_SimplePair i) }
-| LBRACKET LEFT  COLON i=lsymb RBRACKET { SystemExpr.(P_Single (P_Left i)) }
-| LBRACKET RIGHT COLON i=lsymb RBRACKET { SystemExpr.(P_Single (P_Right i)) }
+system_proj:
+| LEFT                { SystemExpr.(P_Left  default_system_name) }
+| RIGHT               { SystemExpr.(P_Right default_system_name) }
+| LEFT  COLON i=lsymb { SystemExpr. P_Left                    i }
+| RIGHT COLON i=lsymb { SystemExpr. P_Right                   i }
 
-single_system:
-| LBRACKET LEFT RBRACKET  { SystemExpr.(P_Left default_system_name)}
-| LBRACKET RIGHT RBRACKET { SystemExpr.(P_Right default_system_name)}
-| LBRACKET LEFT  COMMA i=lsymb RBRACKET { SystemExpr.(P_Left i) }
-| LBRACKET RIGHT COMMA i=lsymb RBRACKET { SystemExpr.(P_Right i)}
+/* A single or bi-system */
+system:
+|                                  { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET i=lsymb        RBRACKET { SystemExpr. P_SimplePair i }
+| LBRACKET sp=system_proj RBRACKET { SystemExpr. P_Single sp }
+
+/* A bi-system */
+bisystem:
+|                                  { SystemExpr.(P_SimplePair default_system_name) }
+| LBRACKET i=lsymb RBRACKET        { SystemExpr. P_SimplePair i }
+| LBRACKET s1=system_proj COMMA s2=system_proj RBRACKET
+                                   { SystemExpr. P_Pair (s1, s2) }
 
 gname:
 | i=lsymb    { P_named i }
@@ -734,17 +739,11 @@ goal_i:
     { let n, goal_cnt = g in
       Prover.Gm_goal (n, Prover.P_trace_goal goal_cnt) }
 
-| EQUIV n=gname env=args COLON f=loc(equiv_form) DOT
-                 { Prover.Gm_goal (n, P_equiv_goal (env, f)) }
+| EQUIV s=bisystem n=gname env=args COLON f=loc(equiv_form) DOT
+                 { Prover.Gm_goal (n, P_equiv_goal (s, env, f)) }
 
-| EQUIV n=gname DOT
-                 { Prover.Gm_goal
-                     (n, P_equiv_goal_process
-                                   (SystemExpr.(P_Left  default_system_name),
-			                              SystemExpr.(P_Right default_system_name))) }
-| EQUIV b1=single_system b2=single_system n=gname DOT
-                 { Prover.Gm_goal
-                     (n, Prover.P_equiv_goal_process (b1, b2))}
+| EQUIV s=bisystem n=gname DOT
+                 { Prover.Gm_goal (n, P_equiv_goal_process s) }
 
 | PROOF          { Prover.Gm_proof }
 

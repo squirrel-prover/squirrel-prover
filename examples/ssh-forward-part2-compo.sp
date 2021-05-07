@@ -231,7 +231,7 @@ process SDISDDH =
 system [secret] K: (P1FADDH | SDISDDH | PDISDDH).
 
 
-equiv [left,secret] [right,secret] secret.
+equiv [secret] secret.
 Proof.
    ddh g, a1, b1, c11.
 Qed.
@@ -450,7 +450,7 @@ Qed.
    proofs over the two actions. The rest of the protocol can be handled through
    some simple enriching of the induction hypothesis, and then dup applications. *)
 
-equiv [left, auth] [right, auth] auth.
+equiv [auth] auth.
 Proof.
   enrich a1, b1, seq(i-> b(i)), seq(i-> a(i)), kP, kS;
   enrich ake11, bke11, seq(i-> bke1(i)), seq(i-> ake1(i)), k11, hKey, r, 

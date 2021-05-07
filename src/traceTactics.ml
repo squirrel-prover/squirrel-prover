@@ -2871,7 +2871,7 @@ let euf_apply_facts drop_head s
   if Symbols.is_ftype head_fn Symbols.SEnc cntxt.table then
     Cca.check_encryption_randomness
       cntxt
-      rule.Euf.case_schemata rule.Euf.cases_direct head_fn  [mess;sign] [];
+      rule.Euf.case_schemata rule.Euf.cases_direct head_fn [mess;sign] [];
 
   schemata_premises @ direct_premises
 

@@ -28,7 +28,7 @@ system [test]
   out(c,mac); 
   out(c,h(diff(<x,n>,<x,m>),k)).
 
-equiv [left,test] [right,test] test2.
+equiv [test] test2.
 Proof.
 
 induction t.

@@ -141,7 +141,7 @@ system [secret] (PDDH | SDDH).
 
 
 (** The strong secrecy is directly obtained through ddh. *)
-equiv [left,secret] [right,secret] secret.
+equiv [secret] secret.
 Proof.
    ddh g, a1, b1, k11.
 Qed.
@@ -249,7 +249,7 @@ Qed.
 proofs over the two actions. The rest of the protocol can be handled through
 some simple enriching of the induction hypothesis, and then dup applications. *)
 
-equiv [left, auth] [right, auth] auth.
+equiv [auth] auth.
 Proof.
    enrich a1, b1, seq(i-> g^b(i)), seq(i-> g^a(i)), kP, kS, hKey.
 

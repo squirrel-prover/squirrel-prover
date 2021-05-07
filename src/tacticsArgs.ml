@@ -378,7 +378,7 @@ exception TacArgError of tac_arg_error
 
 let pp_tac_arg_error_i ppf = function
   | CannotConvETerm -> Fmt.pf ppf "cannot convert the term as a message, \
-                                   timestamp, boolean and an index"
+                                   timestamp, boolean or an index"
 
 let pp_tac_arg_error pp_loc_err ppf (loc,e) =
   Fmt.pf ppf "%a%a"
