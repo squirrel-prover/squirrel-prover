@@ -366,15 +366,12 @@ let expand (targets : target list) (arg : Theory.term) s =
     s
 
   | _ ->
-    match convert_args s [Args.Theory arg] Args.(Sort ETerm) with
-    | Args.Arg (Args.ETerm (Type.Boolean, f, loc)) ->
-      expand_macro targets f s
-        
-    | Args.Arg (Args.ETerm (Type.Message, f, loc)) ->
+    match convert_args s [Args.Theory arg] Args.(Sort Message) with
+    | Args.Arg (Args.Message (f, _)) ->
       expand_macro targets f s
         
     | _ ->
-      hard_failure (Tactics.Failure "expected a message or boolean term")
+      hard_failure (Tactics.Failure "expected a message term")
 
 let expands args s =
   List.fold_left (fun s arg -> expand (target_all s) arg s) s args 

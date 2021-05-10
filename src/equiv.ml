@@ -70,9 +70,9 @@ type form =
 let rec pp fmt = function
   | Atom at -> pp_atom fmt at
   | Impl (f0, f) -> 
-    Fmt.pf fmt "%a -> %a" pp f0 pp f
+    Fmt.pf fmt "@[<v 2>%a ->@ %a@]" pp f0 pp f
   | ForAll (vs, f) -> 
-    Fmt.pf fmt "@[forall (@[%a@]),@ %a@]"
+    Fmt.pf fmt "@[<v 2>forall (@[%a@]),@ %a@]"
       Vars.pp_typed_list vs pp f
 
 let mk_forall evs f = match evs, f with

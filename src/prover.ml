@@ -717,14 +717,8 @@ let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
 (** {2 Convert equivalence formulas} *)
 
 let convert_el cenv ty_vars (env : Vars.env) el : Term.message =   
-  match Theory.econvert cenv ty_vars env el with
-  (* FIXME: this does not give any conversion error to the user. *)
-  | None -> raise (TacticsArgs.TacArgError (L.loc el,CannotConvETerm )) 
-  | Some (Theory.ETerm (s,t,_)) -> 
-    match Term.kind t with
-    | Type.KMessage -> t
-    | _ -> hard_failure (Failure "unsupported type (was expecting a \
-                                          bool or message)")
+  let t, _ = Theory.convert_i cenv ty_vars env el in
+  t  
 
 let convert_equiv cenv ty_vars (env : Vars.env) (e : p_equiv) =
   List.map (convert_el cenv ty_vars env) e
