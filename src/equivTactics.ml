@@ -3,6 +3,7 @@
     - Logical -> relies on the logical properties of the sequent.
     - Strucutral -> relies on properties of protocols, or of equality over messages,...
     - Cryptographic -> relies on a cryptographic assumptions, that must be assumed.*)
+open Utils
 
 module ES = EquivSequent
 module TS = TraceSequent
@@ -18,6 +19,8 @@ module Hyps = ES.Hyps
 type tac = ES.t Tactics.tac
 
 type lsymb = Theory.lsymb
+
+module Sv = Vars.Sv
 
 (*------------------------------------------------------------------*)
 let dbg s = Printer.prt (if Config.debug_tactics () then `Dbg else `Ignore) s
@@ -442,7 +445,7 @@ let generalize (ts : Term.timestamp) s =
     | _ -> hard_failure (Failure "timestamp is not a var") in
 
   let gen_hyps = Hyps.fold (fun id f gen_hyps -> 
-      if Vars.Sv.mem ts (Equiv.fv f) 
+      if Sv.mem ts (Equiv.fv f) 
       then id :: gen_hyps 
       else gen_hyps
     ) s [] in
@@ -824,15 +827,12 @@ let fa_dup_int i s =
         let (tau,phi) =
           let f,g = match e with
             | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
+
             | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
-              let subst =
-                List.map
-                  (fun v ->
-                     Term.ESubst (Var v, Var (Vars.make_new_from v)))
-                  vars
-              in
+              let _, subst = Term.refresh_vars vars in
               Term.subst subst f,
               Term.subst subst g
+
             | _ -> raise Not_FADUP_formula
           in
 
@@ -1222,10 +1222,11 @@ let expand_all () s =
       | Name n as a-> a
       | Var x as a -> a
       | Diff(a, b) -> Diff(aux a, aux b)
-      | Seq (a, b) -> Seq(a, aux b)
-      | Find (a, b, c, d) -> Find(a, aux b, aux c, aux d)
-      | ForAll (vs,l) -> ForAll (vs, aux l)
-      | Exists (vs,l) -> Exists (vs, aux l)
+      | Seq _ as a -> a
+      | Find _ as a -> a
+      | ForAll _ as a -> a
+      | Exists _ as a -> a
+
       | Atom (`Message (o, t, t')) -> Atom (`Message (o, aux t, aux t'))
       | Atom (`Index _) as a-> a
       | Atom (`Timestamp _) as a->  a
@@ -1667,10 +1668,17 @@ let () =
 
 exception Not_hash
 
-let prf_param hash =
+type prf_param = { 
+  h_fn  : Term.fname;
+  h_cnt : Term.message;
+  h_key : Term.nsymb; 
+}
+
+let prf_param hash : prf_param =
   match hash with
-  | Term.Fun ((hash_fn, _), _, [t; Name key]) ->
-      (hash_fn,t,key)
+  | Term.Fun ((h_fn, _), _, [h_cnt; Name h_key]) ->
+    { h_fn; h_cnt; h_key }
+
   | _ -> raise Not_hash
 
 (** [occurrences_of_frame ~cntxt frame hash_fn key_n]
@@ -1691,214 +1699,200 @@ let occurrences_of_action_descr ~cntxt action_descr hash_fn key_n =
   iter#visit_message (snd action_descr.Action.condition) ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
 
+(** direct cases: explicit occurence of the hash in the frame *)
+let prf_mk_direct env (param : prf_param) (is, m) =
+  (* select bound variables in key indices [is] and in message [m]
+     to quantify universally over them *)
+  let env = ref env in
+  let vars = Term.fv m in
+
+  (* we add variables from [is] while preserving unique occurrences *)
+  let vars = Sv.union vars (Sv.of_list (List.map Vars.evar is)) in
+
+  (* we remove the free variables already in [env] from [vars] *)
+  let vars = Sv.diff vars (Sv.of_list (Vars.to_list !env)) in
+
+  let vars', subst = 
+    List.map (function (Vars.EVar v) ->
+        let v' = Vars.fresh_r env v in
+        Vars.EVar v', Term.ESubst (Term.Var v, Term.Var v'))
+      (Sv.elements vars)
+    |> List.split
+  in
+
+  let is = List.map (Term.subst_var subst) is in
+  let m = Term.subst subst m in
+  Term.mk_forall
+    vars'
+    (Term.mk_impl
+       (Term.mk_indices_eq param.h_key.s_indices is)
+       (Term.Atom (`Message (`Neq, param.h_cnt, m))))
+
+(** indirect cases: occurences of hashes in actions of the system *)
+let prf_mk_indirect
+    env cntxt (param : prf_param) 
+    list_of_actions_from_frame 
+    (a, list_of_is_m) =
+  (* for each action in which a hash occurs *)
+  let env = ref env in
+  let new_action_indices =
+    List.map
+      (fun i -> Vars.fresh_r env i)
+      a.Action.indices
+  in
+
+  let is =
+    List.sort_uniq Stdlib.compare
+      (List.concat (List.map fst list_of_is_m))
+  in
+
+  let vars = List.sort_uniq Stdlib.compare
+      (List.concat
+         (List.map
+            (fun (_,m) -> Term.get_vars m)
+            list_of_is_m))
+  in
+  (* we add variables from [is] while preserving unique occurrences *)
+  let vars =
+    List.fold_left
+      (fun vars i ->
+         if List.mem (Vars.EVar i) vars
+         then vars
+         else Vars.EVar i :: vars)
+      vars
+      is
+  in
+
+  (* we remove from [vars] free variables,
+   * ie already in [a.Action.indices] *)
+  let not_in_action_indices = function
+    | Vars.EVar v -> match Vars.ty v with
+      | Type.Index -> not (List.mem v a.Action.indices)
+      | _ -> true
+  in
+
+  let vars = List.filter not_in_action_indices vars in
+  let subst =
+    List.map2
+      (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
+      a.Action.indices new_action_indices
+    @
+    List.map
+      (function Vars.EVar v ->
+         Term.(ESubst (Var v,
+                       Var (Vars.fresh_r env v))))
+      vars
+  in
+
+  let forall_vars =
+    List.map (fun i -> Vars.EVar i) new_action_indices
+    @
+    List.map
+      (function Vars.EVar v ->
+         Vars.EVar (Term.subst_var subst v))
+      vars
+  in
+
+  (* apply [subst] to the action and to the list of
+   * key indices with the hashed messages *)
+  let new_action =
+    SystemExpr.action_to_term
+      cntxt.Constr.table cntxt.system
+      (Action.subst_action subst a.Action.action)
+  in
+  let list_of_is_m =
+    List.map
+      (fun (is,m) ->
+         (List.map (Term.subst_var subst) is,Term.subst subst m))
+      list_of_is_m in
+
+  (* if new_action occurs before an action of the frame *)
+  let disj =
+    Term.mk_ors
+      (List.sort_uniq Stdlib.compare
+         (List.map
+            (fun (t,strict) ->
+               if strict
+               then Term.Atom (`Timestamp (`Lt, new_action, t))
+               else Term.Atom (Term.mk_timestamp_leq new_action t))
+            list_of_actions_from_frame))
+
+  (* then if key indices are equal then hashed messages differ *)
+  and conj =
+    Term.mk_ands
+      (List.map
+         (fun (is,m) -> Term.mk_impl
+             (Term.mk_indices_eq param.h_key.s_indices is)
+             (Term.Atom (`Message (`Neq, param.h_cnt, m))))
+         list_of_is_m)
+  in
+
+  Term.mk_forall forall_vars (Term.mk_impl disj conj)
+
+
+let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
+  let system = SystemExpr.(project_system proj cntxt.system) in
+  let cntxt = { cntxt with system = system } in
+  let param = prf_param (Term.pi_term proj hash) in
+
+  (* create the frame on which we will iterate to compute phi_proj
+     - e_without_hash is the context where all occurrences of [hash] have
+        been replaced by zero
+     - we also add the hashed message [t] *)
+  let e_without_hash =
+    Equiv.subst_equiv [Term.ESubst (hash,Term.mk_zero)] [e]
+  in
+
+  let frame =
+    param.h_cnt :: (List.map (Equiv.pi_term proj) (e_without_hash @ biframe)) 
+  in
+
+  (* check syntactic side condition *)
+  Euf.key_ssc
+    ~elems:frame ~allow_functions:(fun x -> false)
+    ~cntxt param.h_fn param.h_key.s_symb;
+
+  (* we compute the list of hashes from the frame *)
+  let list_of_hashes_from_frame = 
+    occurrences_of_frame ~cntxt frame param.h_fn param.h_key.s_symb
+
+  and list_of_actions_from_frame =
+    let iter = new Fresh.get_actions ~cntxt in
+    List.iter iter#visit_message frame ;
+    iter#get_actions
+
+  and tbl_of_action_hashes = Hashtbl.create 10 in
+
+  (* we iterate over all the actions of the (single) system *)
+  SystemExpr.(iter_descrs cntxt.table cntxt.system (fun action_descr ->
+      (* we add only actions in which a hash occurs *)
+      let descr_proj = Action.pi_descr proj action_descr in
+      let action_hashes =
+        occurrences_of_action_descr ~cntxt descr_proj param.h_fn param.h_key.s_symb
+      in
+
+      if List.length action_hashes > 0 then
+        Hashtbl.add tbl_of_action_hashes descr_proj action_hashes)
+    );
+
+
+  let phi_frame = 
+    List.map (prf_mk_direct env param) list_of_hashes_from_frame 
+  in
+
+  let indirect_hashes = Hashtbl.to_list tbl_of_action_hashes in
+  let phi_actions =
+    List.rev_map
+      (prf_mk_indirect env cntxt param list_of_actions_from_frame) 
+      indirect_hashes in
+  Term.mk_ands (phi_frame @ phi_actions)
+
 let mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
-  begin try
-      let system = SystemExpr.(project_system proj cntxt.system) in
-      let cntxt = { cntxt with system = system } in
-      let (hash_fn,t,key) = prf_param (Term.pi_term proj hash) in
-      (* create the frame on which we will iterate to compute phi_proj
-         - e_without_hash is the context where all occurrences of [hash] have
-            been replaced by zero
-         - we also add the hashed message [t] *)
-      let e_without_hash =
-        Equiv.subst_equiv
-          [Term.ESubst (hash,Term.mk_zero)]
-          [e]
-      in
-
-      let frame =
-        t :: (List.map (Equiv.pi_term proj) (e_without_hash @ biframe)) 
-      in
-
-      (* check syntactic side condition *)
-      Euf.key_ssc
-        ~elems:frame ~allow_functions:(fun x -> false)
-        ~cntxt hash_fn key.s_symb;
-
-      (* we compute the list of hashes from the frame *)
-      let list_of_hashes_from_frame = 
-        occurrences_of_frame ~cntxt frame hash_fn key.s_symb
-
-      and list_of_actions_from_frame =
-        let iter = new Fresh.get_actions ~cntxt in
-        List.iter iter#visit_message frame ;
-        iter#get_actions
-
-      and tbl_of_action_hashes = Hashtbl.create 10 in
-
-      (* we iterate over all the actions of the (single) system *)
-      SystemExpr.(iter_descrs cntxt.table cntxt.system (fun action_descr ->
-          (* we add only actions in which a hash occurs *)
-          let descr_proj = Action.pi_descr proj action_descr in
-          let action_hashes =
-            occurrences_of_action_descr ~cntxt descr_proj hash_fn key.s_symb
-          in
-          
-          if List.length action_hashes > 0 then
-            Hashtbl.add tbl_of_action_hashes descr_proj action_hashes)
-        );
-
-      (* direct cases (for explicit occurences of hashes in the frame) *)
-      let phi_frame =
-        (List.map (fun (is,m) ->
-             (* select bound variables in key indices [is] and in message [m]
-                to quantify universally over them *)
-             let env = ref env in
-             let vars = Term.get_vars m in
-             (* we add variables from [is] while preserving unique occurrences *)
-             let vars = List.fold_left (fun vars i ->
-                 if List.mem (Vars.EVar i) vars
-                 then vars
-                 else Vars.EVar i :: vars)
-                 vars
-                 is
-             in
-
-             (* we remove from [vars] free variables, ie already in [env] *)
-             let not_in_env  = function
-               | Vars.EVar v ->
-                 match Vars.ty v with
-                 | Type.Index -> not (Vars.mem !env v)
-                 | _ -> true
-             in
-
-             let vars = List.filter not_in_env vars in
-             let subst =
-               List.map
-                 (function Vars.EVar v ->
-                    Term.(ESubst (Var v,
-                                  Var (Vars.fresh_r env v))))
-                 vars
-             in
-
-             let forall_vars =
-               List.map
-                 (function Vars.EVar v ->
-                    Vars.EVar (Term.subst_var subst v))
-                 vars
-             in
-
-             let is = List.map (Term.subst_var subst) is in
-             let m = Term.subst subst m in
-             Term.mk_forall
-               forall_vars
-               (Term.mk_impl
-                  (Term.mk_indices_eq key.s_indices is)
-                  (Term.Atom (`Message (`Neq, t, m)))))
-            list_of_hashes_from_frame)
-
-      (* undirect cases (for occurences of hashes in actions of the system) *)
-      and phi_actions =
-        Hashtbl.fold
-          (fun a list_of_is_m formulas ->
-             (* for each action in which a hash occurs *)
-             let env = ref env in
-             let new_action_indices =
-               List.map
-                 (fun i -> Vars.fresh_r env i)
-                 a.Action.indices
-             in
-
-             let is =
-               List.sort_uniq Stdlib.compare
-                 (List.concat (List.map fst list_of_is_m))
-             in
-
-             let vars = List.sort_uniq Stdlib.compare
-                 (List.concat
-                    (List.map
-                       (fun (_,m) -> Term.get_vars m)
-                       list_of_is_m))
-             in
-             (* we add variables from [is] while preserving unique occurrences *)
-             let vars =
-               List.fold_left
-                 (fun vars i ->
-                    if List.mem (Vars.EVar i) vars
-                    then vars
-                    else Vars.EVar i :: vars)
-                 vars
-                 is
-             in
-
-             (* we remove from [vars] free variables,
-              * ie already in [a.Action.indices] *)
-             let not_in_action_indices = function
-               | Vars.EVar v -> match Vars.ty v with
-                 | Type.Index -> not (List.mem v a.Action.indices)
-                 | _ -> true
-             in
-
-             let vars = List.filter not_in_action_indices vars in
-             let subst =
-               List.map2
-                 (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-                 a.Action.indices new_action_indices
-               @
-               List.map
-                 (function Vars.EVar v ->
-                    Term.(ESubst (Var v,
-                                  Var (Vars.fresh_r env v))))
-                 vars
-             in
-
-             let forall_vars =
-               List.map (fun i -> Vars.EVar i) new_action_indices
-               @
-               List.map
-                 (function Vars.EVar v ->
-                    Vars.EVar (Term.subst_var subst v))
-                 vars
-             in
-
-             (* apply [subst] to the action and to the list of
-              * key indices with the hashed messages *)
-             let new_action =
-               SystemExpr.action_to_term
-                 cntxt.table cntxt.system
-                 (Action.subst_action subst a.Action.action)
-             in
-             let list_of_is_m =
-               List.map
-                 (fun (is,m) ->
-                    (List.map (Term.subst_var subst) is,Term.subst subst m))
-                 list_of_is_m in
-
-             (* if new_action occurs before an action of the frame *)
-             let disj =
-               Term.mk_ors
-                 (List.sort_uniq Stdlib.compare
-                    (List.map
-                       (fun (t,strict) ->
-                          if strict
-                          then Term.Atom (`Timestamp (`Lt, new_action, t))
-                          else Term.Atom (Term.mk_timestamp_leq new_action t))
-                       list_of_actions_from_frame))
-
-             (* then if key indices are equal then hashed messages differ *)
-             and conj =
-               Term.mk_ands
-                 (List.map
-                    (fun (is,m) -> Term.mk_impl
-                        (Term.mk_indices_eq key.s_indices is)
-                        (Term.Atom (`Message (`Neq, t, m))))
-                    list_of_is_m)
-             in
-
-             (Term.mk_forall
-                forall_vars (Term.mk_impl disj conj))
-             :: formulas)
-          tbl_of_action_hashes
-          []
-      in
-      Term.mk_ands (phi_frame @ phi_actions)
-
-    with
-    | Not_hash -> Term.mk_true
-    | Euf.Bad_ssc -> 
-      soft_failure (Tactics.Failure "key syntactic side condition \
-                                             not checked")
-  end
+  try _mk_prf_phi_proj proj cntxt env biframe e hash 
+  with
+  | Not_hash -> Term.mk_true
+  | Euf.Bad_ssc -> 
+    soft_failure (Tactics.Failure "key syntactic side condition violated")
 
 (* from two conjonction formula p and q, produce its minimal diff(p, q), of the
    form (p inter q) && diff (p minus q, q minus p) *)

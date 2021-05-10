@@ -1,3 +1,13 @@
+module Hashtbl = struct
+  include Hashtbl
+
+  let to_list (tbl : ('a, 'b) Hashtbl.t) : ('a * 'b) list = 
+    Hashtbl.fold 
+      (fun x y acc -> (x,y) :: acc)
+      tbl
+      []
+end
+
 module List = struct
   include List
 

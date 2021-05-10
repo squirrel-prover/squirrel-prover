@@ -287,8 +287,8 @@ Proof.
   use tags_neq. 
   project.
   split.
-  by split; intro > _ _ [[_ Meq] _]; fresh Meq. 
-  by (intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq). 
+  by (split; intro > _; repeat split; intro _ [[_ Meq] _]; fresh Meq). 
+  by intro > _ _ [[_ Meq] _]; fresh Meq.  
 
   repeat split => > _; try (by intro > _ [[_ Meq] _]; fresh Meq).
   by (repeat split => > _ [[_ Meq] _]; fresh Meq). 

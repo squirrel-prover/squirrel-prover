@@ -10,6 +10,8 @@ type 'a var
 (** An [evar] is a variable of some sort. *)
 type evar = EVar : 'a var -> evar
 
+val evar : 'a var -> evar
+
 (** {3 Aliases}
   *
   * [Vars.x] is the type of variables of sort [Type.x]. *)

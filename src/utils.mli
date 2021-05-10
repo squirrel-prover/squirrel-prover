@@ -1,5 +1,11 @@
 (** Utility modules. *)
 
+module Hashtbl : sig
+  include module type of Hashtbl
+
+  val to_list : ('a, 'b) t -> ('a * 'b) list
+end
+
 (*------------------------------------------------------------------*)
 module List : sig
   include module type of struct include List end

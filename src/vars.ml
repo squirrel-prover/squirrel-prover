@@ -17,6 +17,8 @@ type timestamp = Type.timestamp var
 
 type evar = EVar : 'a var -> evar
 
+let evar v = EVar v
+
 (*------------------------------------------------------------------*)
 let is_new v = v.is_new
 let is_pat v = String.sub v.name 0 1 = "_"
@@ -142,9 +144,12 @@ let prefix_count_regexp = Pcre.regexp "#*(_*.*[^0-9])([0-9]*)$"
 (** {2 Create new and pattern variables} *)
     
 let cpt_new = ref 0
+
 let make_new_from v =
   incr cpt_new;
-  { v with is_new = true; i_suffix = !cpt_new; }
+  { v with name     = v.s_prefix;
+           is_new   = true; 
+           i_suffix = !cpt_new; }
 
 let cpt_pat = ref 0
 let make_pat typ = 
