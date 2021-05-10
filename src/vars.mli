@@ -7,8 +7,12 @@
 (** Type of variables of sort ['a]. *)
 type 'a var 
 
+type 'a vars = 'a var list
+
 (** An [evar] is a variable of some sort. *)
 type evar = EVar : 'a var -> evar
+
+type evars = evar list
 
 val evar : 'a var -> evar
 

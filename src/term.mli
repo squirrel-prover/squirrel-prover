@@ -226,8 +226,10 @@ val subst_macros_ts :
   string list -> Type.timestamp term -> 'a term -> 'a term
 
 (*------------------------------------------------------------------*)
-val refresh_vars  : 'a Vars.var list -> 'a Vars.var list * esubst list
-val erefresh_vars :   Vars.evar list ->   Vars.evar list * esubst list
+type refresh_arg = [`Global | `InEnv of Vars.env ref ]
+
+val refresh_vars  : refresh_arg -> 'a Vars.vars -> 'a Vars.vars * esubst list
+val erefresh_vars : refresh_arg ->   Vars.evars ->   Vars.evars * esubst list
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)

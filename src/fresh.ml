@@ -30,15 +30,19 @@ end
 class get_actions ~(cntxt:Constr.trace_cntxt) = object (self)
   inherit Iter.iter_approx_macros ~exact:false ~full:true ~cntxt as super
 
-  (* The boolean is set to true only for input macros.
-   * In that case, when building phi_proj we require a strict inequality on
-   * timestamps because we have to consider only actions occurring before
-   * the input.*)
-  val mutable actions : (Term.timestamp * bool) list = []
-  method get_actions = List.sort_uniq Stdlib.compare actions
+  val mutable actions : Term.timestamp list = []
+  method get_actions = actions
 
-  method visit_macro mn a = 
-    match Symbols.Macro.get_def mn.s_symb cntxt.table with
-    | Symbols.Input -> actions <- (a,true)  :: actions
-    | _             -> actions <- (a,false) :: actions
+  method visit_macro mn a =     
+    let cleara, a' = match Symbols.Macro.get_def mn.s_symb cntxt.table with
+      | Symbols.Input -> true,  Term.Pred a
+      | _             -> false, a
+    in
+    if not (List.mem a' actions) then
+      actions <- a' :: actions;
+    
+    (* remove [(a,false)] if it appeared in [actions] *)
+    if cleara then 
+      actions <- List.filter (fun a0 -> a0 <> a) actions
+                     
 end

@@ -7,6 +7,9 @@ type 'a var = {
   is_new   : bool;
   var_type : 'a Type.t
 }
+
+type 'a vars = 'a var list
+
 (* [i_suffix] is stored to avoid recomputing it.
    we use it as a unique counter for new and pat variables. *)
 
@@ -16,6 +19,8 @@ type boolean   = Type.message   var
 type timestamp = Type.timestamp var
 
 type evar = EVar : 'a var -> evar
+
+type evars = evar list
 
 let evar v = EVar v
 
@@ -233,7 +238,10 @@ let fresh_r env v = make_r `Approx env v.var_type (name v)
 module Sv = struct
   include Set.Make(struct
       type t = evar
-      let compare (EVar a) (EVar b) = Stdlib.compare (name a) (name b)
+      let compare (EVar a) (EVar b) = 
+        Stdlib.compare 
+          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
+          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
     end)
   let add_list sv vars =
     List.fold_left (fun sv v -> add (EVar v) sv) sv vars
@@ -242,7 +250,10 @@ end
 module Mv = struct
   include Map.Make(struct
       type t = evar
-      let compare (EVar a) (EVar b) = Stdlib.compare (name a) (name b)
+      let compare (EVar a) (EVar b) = 
+        Stdlib.compare 
+          (a.name, a.s_prefix, a.is_new, a.i_suffix) 
+          (b.name, b.s_prefix, b.is_new, b.i_suffix) 
     end)
 end
                                           

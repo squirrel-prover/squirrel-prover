@@ -829,7 +829,7 @@ let fa_dup_int i s =
             | Term.Fun (fs,_, [f;g]) when fs = Term.f_and -> f,g
 
             | Term.Seq (vars, Term.Fun (fs,_, [f;g])) when fs = Term.f_and ->
-              let _, subst = Term.refresh_vars vars in
+              let _, subst = Term.refresh_vars `Global vars in
               Term.subst subst f,
               Term.subst subst g
 
@@ -994,13 +994,11 @@ let mk_phi_proj cntxt env (n : Term.nsymb) proj biframe =
             (* if new_action occurs before an action of the frame *)
             let disj =
               Term.mk_ors
-                (List.sort_uniq Stdlib.compare
                   (List.map
-                    (fun (t,strict) ->
-                      if strict
-                      then Term.Atom (`Timestamp (`Lt, new_action, t))
-                      else Term.Atom (Term.mk_timestamp_leq new_action t))
-                    list_of_actions_from_frame))
+                    (fun t -> 
+                      Term.Atom (Term.mk_timestamp_leq new_action t)
+                    ) list_of_actions_from_frame)
+
             (* then indices of name in new_action and of [name] differ *)
             and conj =
               Term.mk_ands
@@ -1704,21 +1702,14 @@ let prf_mk_direct env (param : prf_param) (is, m) =
   (* select bound variables in key indices [is] and in message [m]
      to quantify universally over them *)
   let env = ref env in
-  let vars = Term.fv m in
 
-  (* we add variables from [is] while preserving unique occurrences *)
+  let vars = Term.fv m in
   let vars = Sv.union vars (Sv.of_list (List.map Vars.evar is)) in
 
   (* we remove the free variables already in [env] from [vars] *)
   let vars = Sv.diff vars (Sv.of_list (Vars.to_list !env)) in
 
-  let vars', subst = 
-    List.map (function (Vars.EVar v) ->
-        let v' = Vars.fresh_r env v in
-        Vars.EVar v', Term.ESubst (Term.Var v, Term.Var v'))
-      (Sv.elements vars)
-    |> List.split
-  in
+  let vars', subst = Term.erefresh_vars (`InEnv env) (Sv.elements vars) in
 
   let is = List.map (Term.subst_var subst) is in
   let m = Term.subst subst m in
@@ -1735,63 +1726,20 @@ let prf_mk_indirect
     (a, list_of_is_m) =
   (* for each action in which a hash occurs *)
   let env = ref env in
-  let new_action_indices =
-    List.map
-      (fun i -> Vars.fresh_r env i)
-      a.Action.indices
+
+  let vars = List.fold_left (fun vars (is, m) -> 
+      let is = Sv.of_list (List.map Vars.evar is) in
+      Sv.union vars (Sv.union is (Term.fv m))
+    ) Sv.empty list_of_is_m 
   in
 
-  let is =
-    List.sort_uniq Stdlib.compare
-      (List.concat (List.map fst list_of_is_m))
-  in
+  (* we remove the free variables already in [a.Action.indices] from [vars] *)
+  let vars = Sv.diff vars (Sv.of_list (List.map Vars.evar a.Action.indices)) in
+  
+  let vars = Sv.elements vars in
 
-  let vars = List.sort_uniq Stdlib.compare
-      (List.concat
-         (List.map
-            (fun (_,m) -> Term.get_vars m)
-            list_of_is_m))
-  in
-  (* we add variables from [is] while preserving unique occurrences *)
-  let vars =
-    List.fold_left
-      (fun vars i ->
-         if List.mem (Vars.EVar i) vars
-         then vars
-         else Vars.EVar i :: vars)
-      vars
-      is
-  in
-
-  (* we remove from [vars] free variables,
-   * ie already in [a.Action.indices] *)
-  let not_in_action_indices = function
-    | Vars.EVar v -> match Vars.ty v with
-      | Type.Index -> not (List.mem v a.Action.indices)
-      | _ -> true
-  in
-
-  let vars = List.filter not_in_action_indices vars in
-  let subst =
-    List.map2
-      (fun i i' -> Term.ESubst (Term.Var i, Term.Var i'))
-      a.Action.indices new_action_indices
-    @
-    List.map
-      (function Vars.EVar v ->
-         Term.(ESubst (Var v,
-                       Var (Vars.fresh_r env v))))
-      vars
-  in
-
-  let forall_vars =
-    List.map (fun i -> Vars.EVar i) new_action_indices
-    @
-    List.map
-      (function Vars.EVar v ->
-         Vars.EVar (Term.subst_var subst v))
-      vars
-  in
+  let eindices = List.map Vars.evar a.Action.indices in
+  let vars', subst = Term.erefresh_vars (`InEnv env) (eindices @ vars) in
 
   (* apply [subst] to the action and to the list of
    * key indices with the hashed messages *)
@@ -1809,13 +1757,9 @@ let prf_mk_indirect
   (* if new_action occurs before an action of the frame *)
   let disj =
     Term.mk_ors
-      (List.sort_uniq Stdlib.compare
-         (List.map
-            (fun (t,strict) ->
-               if strict
-               then Term.Atom (`Timestamp (`Lt, new_action, t))
-               else Term.Atom (Term.mk_timestamp_leq new_action t))
-            list_of_actions_from_frame))
+      (List.map (fun t -> 
+           Term.Atom (Term.mk_timestamp_leq new_action t)
+         ) list_of_actions_from_frame)
 
   (* then if key indices are equal then hashed messages differ *)
   and conj =
@@ -1827,7 +1771,7 @@ let prf_mk_indirect
          list_of_is_m)
   in
 
-  Term.mk_forall forall_vars (Term.mk_impl disj conj)
+  Term.mk_forall vars' (Term.mk_impl disj conj)
 
 
 let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =

@@ -481,7 +481,7 @@ let rewrite ~all
 (** Make a rewrite rule from a formula *)
 let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule = 
   let vs, f = Term.decompose_forall f in
-  let vs, subst = Term.erefresh_vars vs in
+  let vs, subst = Term.erefresh_vars `Global vs in
   let f = Term.subst subst f in
 
   let vs = Vars.Sv.of_list vs in
@@ -920,7 +920,7 @@ let do_and_pat (hid : Ident.t) len s : Args.ip_handler list * sequent =
 
       let vs, vs' = List.takedrop (len - 1) vs in
 
-      let vs_fresh, subst = Term.erefresh_vars vs in
+      let vs_fresh, subst = Term.erefresh_vars `Global vs in
 
       let f = Term.mk_exists vs' f in
       let f = Term.subst subst f in
@@ -1783,19 +1783,11 @@ let mk_fresh_indirect (cntxt : Constr.trace_cntxt) env ns t : Term.message =
 
     let timestamp_inequalities =
       Term.mk_ors
-        (List.sort_uniq Stdlib.compare
-           (List.map
-              (fun (action_from_term,strict) ->
-                 if strict
-                 (* [strict] is true if [action_from_term] refers to
-                    an input *)
-                 then Term.Atom (`Timestamp (`Lt,
-                                             new_action,
-                                             action_from_term))
-                 else Term.Atom (Term.mk_timestamp_leq
-                                   new_action
-                                   action_from_term))
-              list_of_actions_from_term))
+        (List.map (fun action_from_term ->
+             Term.Atom (Term.mk_timestamp_leq
+                          new_action
+                          action_from_term)
+           ) list_of_actions_from_term)
     in
 
     (* Remark that the equations below are not redundant.
@@ -2409,7 +2401,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
       let _, tyvars, f = get_hyp_or_lemma pt.p_pt_hid s in
       let f_args, f = Term.decompose_forall f in
-      let f_args, subst = Term.erefresh_vars f_args in
+      let f_args, subst = Term.erefresh_vars `Global f_args in
       let f = Term.subst subst f in
 
       let pt_args_l = List.length pt.p_pt_args in
@@ -2455,7 +2447,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
           let subgoal = TS.set_goal f s in
 
           let vs, f = Term.decompose_forall f in
-          let vs, subst = Term.erefresh_vars vs in
+          let vs, subst = Term.erefresh_vars `Global vs in
           let f = Term.subst subst f in
 
           let pat = Term.Match.{ 
@@ -2777,9 +2769,6 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
     let iter = new Fresh.get_actions ~cntxt:(mk_trace_cntxt sequent) in
     List.iter iter#visit_message [s; m];
     iter#get_actions
-  in
-  let ts_list = 
-    List.map (fun (ts,b) -> if b then Term.Pred ts else ts) ts_list 
   in
   (* The action occured before the test H(m,k) = s. *)
   let maximal_elems =

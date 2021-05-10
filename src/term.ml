@@ -1019,17 +1019,24 @@ let subst_macros_ts table l ts t =
 
 
 (*------------------------------------------------------------------*)
-let refresh_vars vars =
-  let vars' = List.map Vars.make_new_from vars in
+type refresh_arg = [`Global | `InEnv of Vars.env ref ]
+
+let refresh_var (arg : refresh_arg) v = 
+  match arg with
+  | `Global    -> Vars.make_new_from v
+  | `InEnv env -> Vars.fresh_r env v
+
+let refresh_vars (arg : refresh_arg) vars =
+  let vars' = List.map (refresh_var arg) vars in
   let subst = 
     List.map2 (fun v v' -> ESubst (Var v, Var v')) vars vars' 
   in
   vars', subst
 
-let erefresh_vars evars =
+let erefresh_vars (arg : refresh_arg) evars =
   let l = 
     List.map (fun (Vars.EVar v) -> 
-        let v' = Vars.make_new_from v in
+        let v' = refresh_var arg v in
         Vars.EVar v', ESubst (Var v, Var v') 
       ) evars
   in
