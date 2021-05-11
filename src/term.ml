@@ -843,6 +843,27 @@ let get_vars t = fv t |> Sv.elements
 
 
 (*------------------------------------------------------------------*)
+(* constructors with more simplifications *)
+
+let mk_forall ?(simpl=false) l f = 
+  let l = 
+    if simpl then
+      let fv = fv f in
+      List.filter (fun v -> Sv.mem v fv) l 
+    else l
+  in
+  mk_forall l f
+
+let mk_exists ?(simpl=false) l f = 
+  let l = 
+    if simpl then
+      let fv = fv f in
+      List.filter (fun v -> Sv.mem v fv) l 
+    else l
+  in
+  mk_exists l f
+
+(*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
 (** given a variable [x] and a subst [s], remove from [s] all

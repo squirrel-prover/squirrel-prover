@@ -336,16 +336,16 @@ val mk_pair    : message -> message -> message
 (*------------------------------------------------------------------*)
 (** {3 For messages} *)
 
-val mk_not    : ?simpl:bool -> message                 -> message
-val mk_and    : ?simpl:bool -> message -> message      -> message
-val mk_ands   : ?simpl:bool -> message list            -> message
-val mk_or     : ?simpl:bool -> message -> message      -> message
-val mk_ors    : ?simpl:bool -> message list            -> message
-val mk_impl   : ?simpl:bool -> message -> message      -> message
-val mk_impls  : ?simpl:bool -> message list -> message -> message
+val mk_not   : ?simpl:bool -> message                 -> message
+val mk_and   : ?simpl:bool -> message      -> message -> message
+val mk_ands  : ?simpl:bool -> message list            -> message
+val mk_or    : ?simpl:bool -> message      -> message -> message
+val mk_ors   : ?simpl:bool -> message list            -> message
+val mk_impl  : ?simpl:bool -> message      -> message -> message
+val mk_impls : ?simpl:bool -> message list -> message -> message
   
-val mk_forall : Vars.evar list -> message -> message
-val mk_exists : Vars.evar list -> message -> message
+val mk_forall : ?simpl:bool -> Vars.evars -> message -> message
+val mk_exists : ?simpl:bool -> Vars.evars -> message -> message
 
 val mk_ite : ?simpl:bool -> message -> message -> message -> message
   

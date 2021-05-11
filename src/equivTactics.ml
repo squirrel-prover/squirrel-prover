@@ -1704,7 +1704,7 @@ let prf_mk_direct env (param : prf_param) (is, m) =
   let env = ref env in
 
   let vars = Term.fv m in
-  let vars = Sv.union vars (Sv.of_list (List.map Vars.evar is)) in
+  let vars = Sv.add_list vars is in
 
   (* we remove the free variables already in [env] from [vars] *)
   let vars = Sv.diff vars (Sv.of_list (Vars.to_list !env)) in
@@ -1720,17 +1720,14 @@ let prf_mk_direct env (param : prf_param) (is, m) =
        (Term.Atom (`Message (`Neq, param.h_cnt, m))))
 
 (** indirect cases: occurences of hashes in actions of the system *)
-let prf_mk_indirect
-    env cntxt (param : prf_param) 
-    list_of_actions_from_frame 
-    (a, list_of_is_m) =
-  (* for each action in which a hash occurs *)
+let prf_mk_indirect env cntxt (param : prf_param)
+    (frame_actions : Fresh.macro_ts_occs) (a, is_m_l) =
   let env = ref env in
 
   let vars = List.fold_left (fun vars (is, m) -> 
       let is = Sv.of_list (List.map Vars.evar is) in
       Sv.union vars (Sv.union is (Term.fv m))
-    ) Sv.empty list_of_is_m 
+    ) Sv.empty is_m_l
   in
 
   (* we remove the free variables already in [a.Action.indices] from [vars] *)
@@ -1749,28 +1746,36 @@ let prf_mk_indirect
       (Action.subst_action subst a.Action.action)
   in
   let list_of_is_m =
-    List.map
-      (fun (is,m) ->
-         (List.map (Term.subst_var subst) is,Term.subst subst m))
-      list_of_is_m in
+    List.map (fun (is,m) ->
+        (List.map (Term.subst_var subst) is,Term.subst subst m))
+      is_m_l in
 
-  (* if new_action occurs before an action of the frame *)
-  let disj =
-    Term.mk_ors
-      (List.map (fun t -> 
-           Term.Atom (Term.mk_timestamp_leq new_action t)
-         ) list_of_actions_from_frame)
+  (* save the environment after having renamed all free variables until now. *)
+  let env0 = !env in
+  (* if new_action occurs before a macro timestamp occurence of the frame *)
+  let do1 mts_occ = 
+    let occ_vars = Sv.elements mts_occ.Fresh.mtso_vars in
+    let occ_vars, occ_subst = Term.erefresh_vars (`InEnv (ref env0)) occ_vars in
+    let subst = occ_subst @ subst in
+    let ts   = Term.subst subst mts_occ.mtso_ts   in
+    let cond = Term.subst subst mts_occ.mtso_cond in
+    Term.mk_exists ~simpl:true occ_vars
+      (Term.mk_and 
+         (Term.Atom (Term.mk_timestamp_leq new_action ts))
+         cond)
+  in
+  let disj = Term.mk_ors (List.map do1 frame_actions) in
 
   (* then if key indices are equal then hashed messages differ *)
-  and conj =
+  let conj =
     Term.mk_ands
-      (List.map
-         (fun (is,m) -> Term.mk_impl
+      (List.map (fun (is,m) ->
+           Term.mk_impl
              (Term.mk_indices_eq param.h_key.s_indices is)
              (Term.Atom (`Message (`Neq, param.h_cnt, m))))
-         list_of_is_m)
+          list_of_is_m)
   in
-
+  
   Term.mk_forall vars' (Term.mk_impl disj conj)
 
 
@@ -1797,17 +1802,21 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
     ~cntxt param.h_fn param.h_key.s_symb;
 
   (* we compute the list of hashes from the frame *)
-  let list_of_hashes_from_frame = 
+  let frame_hashes = 
     occurrences_of_frame ~cntxt frame param.h_fn param.h_key.s_symb
+  in
+  
+  let frame_actions =
+    let actions = 
+      List.fold_left (fun acc t -> 
+          Fresh.get_actions_ext cntxt t @ acc
+        ) [] frame 
+    in
+    Fresh.clear_dup_mtso_le actions
+  in
 
-  and list_of_actions_from_frame =
-    let iter = new Fresh.get_actions ~cntxt in
-    List.iter iter#visit_message frame ;
-    iter#get_actions
-
-  and tbl_of_action_hashes = Hashtbl.create 10 in
-
-  (* we iterate over all the actions of the (single) system *)
+  (* we iterate over all the actions of the (single) system *)  
+  let tbl_of_action_hashes = Hashtbl.create 10 in
   SystemExpr.(iter_descrs cntxt.table cntxt.system (fun action_descr ->
       (* we add only actions in which a hash occurs *)
       let descr_proj = Action.pi_descr proj action_descr in
@@ -1819,15 +1828,14 @@ let _mk_prf_phi_proj proj (cntxt : Constr.trace_cntxt) env biframe e hash =
         Hashtbl.add tbl_of_action_hashes descr_proj action_hashes)
     );
 
-
   let phi_frame = 
-    List.map (prf_mk_direct env param) list_of_hashes_from_frame 
+    List.map (prf_mk_direct env param) frame_hashes
   in
 
   let indirect_hashes = Hashtbl.to_list tbl_of_action_hashes in
   let phi_actions =
     List.rev_map
-      (prf_mk_indirect env cntxt param list_of_actions_from_frame) 
+      (prf_mk_indirect env cntxt param frame_actions) 
       indirect_hashes in
   Term.mk_ands (phi_frame @ phi_actions)
 
@@ -1943,10 +1951,10 @@ let prf Args.(Int i) s =
 let () =
   T.register_typed "prf"
     ~general_help:"Apply the PRF axiom."
-    ~detailed_help:"It allows to replace a hash h(m) by 'if new_hash(m) then \
-                    zero else h(m)' where new_hash(m) expresses the fact that m \
-                    was never hashed before. Its behaviour is simalar to the \
-                    fresh tactic."
+    ~detailed_help:"It allows to replace a hash h(m,k) by 'if new_hash(m) then \
+                    zero else h(m,k)' where new_hash(m) states that m \
+                    was never hashed using key k before. Behaves similarly to \
+                    the fresh tactic."
     ~tactic_group:Cryptographic
     (pure_equiv_typed prf) Args.Int
 
