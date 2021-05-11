@@ -78,6 +78,7 @@
   "executable"
   "exists"
   "splitseq"
+  "remember"
   "existsleft"
   "expand"
   "false_left"

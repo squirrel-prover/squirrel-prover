@@ -80,6 +80,8 @@ let mk_forall evs f = match evs, f with
   | _, ForAll (evs', f) -> ForAll (evs @ evs', f)
   | _, _ -> ForAll (evs, f)
 
+let mk_reach_atom f = Atom (Reach f)
+
 (*------------------------------------------------------------------*)
 
 (** Free variables. *)

@@ -302,7 +302,6 @@ let mk_indices_eq vect_i vect_j =
          if i = j then mk_true else Atom (`Index (`Eq, i, j))
        ) vect_i vect_j)
 
-
 (*------------------------------------------------------------------*)
 (** {2 Typing} *)
 
@@ -488,6 +487,11 @@ let decompose_impls_last f =
   last forms
 
 (*------------------------------------------------------------------*)
+let as_ord_eq (ord : ord) : ord_eq = match ord with
+  | `Eq -> `Eq
+  | `Neq -> `Neq
+  | _ -> assert false
+
 let destr_var : type a. a term -> a Vars.var option = function
   | Var v -> Some v
   | _ -> None
@@ -849,7 +853,7 @@ let get_vars t = fv t |> Sv.elements
 
 
 (*------------------------------------------------------------------*)
-(* constructors with more simplifications *)
+(** {2 More smart constructors} *)
 
 let mk_forall ?(simpl=false) l f = 
   let l = 
@@ -871,6 +875,22 @@ let mk_exists ?(simpl=false) l f =
 
 let mk_lambda evs ht = match ht with
   | Lambda (evs', t) -> Lambda (evs @ evs', t) 
+
+
+let mk_atom : type a b. ord -> a term -> b term -> message =
+  fun ord t1 t2 ->
+  match kind t1, kind t2 with
+  | Type.KMessage, Type.KMessage ->    
+    Atom (`Message (as_ord_eq ord, t1, t2))
+
+  | Type.KIndex, Type.KIndex ->    
+    let v1, v2 = oget (destr_var t1), oget (destr_var t2) in
+    Atom (`Index (as_ord_eq ord, v1, v2))
+
+  | Type.KTimestamp, Type.KTimestamp ->    
+    Atom (`Timestamp (ord, t1, t2))
+
+  | _ -> assert false
 
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)

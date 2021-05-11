@@ -19,6 +19,7 @@ module Hyps = ES.Hyps
 type tac = ES.t Tactics.tac
 
 type lsymb = Theory.lsymb
+type sequent = ES.sequent
 
 module Sv = Vars.Sv
 
@@ -63,7 +64,10 @@ let convert_i s t =
   let conv_env = Theory.{ table = table; cntxt = InGoal; } in
    Theory.convert_i conv_env (ES.ty_vars s) env t
 
-(*------------------------------------------------------------------*)
+let econvert s term = 
+  let cenv = Theory.{ table = ES.table s; cntxt = InGoal; } in 
+  Theory.econvert cenv (ES.ty_vars s) (ES.env s) term
+
 let convert_ht s ht =
   let env = ES.env s in
   let table = ES.table s in
@@ -437,6 +441,38 @@ let () =
                   tactic_group = Logical}
     (pure_equiv_arg intro_tac)
 
+
+(*------------------------------------------------------------------*)
+(* TODO: factorize *)
+
+let remember (id : Theory.lsymb) (term : Theory.term) s =
+  match econvert s term with
+  | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
+  | Some (Theory.ETerm (ty, t, _)) -> 
+    let env, x = 
+      TraceTactics.make_exact ~loc:(L.loc id) (ES.env s) ty (L.unloc id) 
+    in
+    let subst = [Term.ESubst (t, Term.Var x)] in
+
+    let s = ES.subst subst (ES.set_env env s) in
+    let eq = Term.mk_atom `Eq (Term.Var x) t in
+    ES.set_goal s (Equiv.Impl (Equiv.mk_reach_atom eq, ES.goal s))
+
+let remember_tac_args (args : Args.parser_arg list) s : sequent list = 
+  match args with
+  | [Args.Remember (term, id)] -> [remember id term s]
+  | _ -> bad_args ()
+      
+let remember_tac args = wrap_fail (remember_tac_args args)
+
+let () =
+  T.register_general "remember"
+    ~tactic_help:{
+      general_help = "substitute a term by a fresh variable";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    (pure_equiv_arg remember_tac)
 
 (*------------------------------------------------------------------*)
 (** [tautology f s] tries to prove that [f] is always true in [s]. *)

@@ -114,6 +114,7 @@ rule token = parse
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
 | "splitseq"          { SPLITSEQ }
+| "remember"          { REMEMBER }
 | "goal"              { GOAL }
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }

@@ -46,6 +46,8 @@ val pp : Format.formatter -> form -> unit
 
 val mk_forall : Vars.evar list -> form -> form
 
+val mk_reach_atom : Term.message -> form
+
 val subst : Term.subst -> form -> form
 
 (** Free variables *)

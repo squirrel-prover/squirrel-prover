@@ -32,7 +32,7 @@
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
 %token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ
-%token BY INTRO AS DESTRUCT
+%token BY INTRO AS DESTRUCT REMEMBER
 %token PROOF QED UNDO ABORT
 %token EOF
 
@@ -594,6 +594,9 @@ tac:
   | l=lloc(DEPENDS) args=tactic_params BY t=tac
     { T.AndThenSel (mk_abstract l "depends" args, [[1], t]) }
 
+  | l=lloc(REMEMBER) t=term AS id=lsymb
+    { mk_abstract l "remember" [TacticsArgs.Remember (t, id)] }
+
   | l=lloc(EXISTS) t=tactic_params
     { mk_abstract l "exists" t }
 
@@ -672,6 +675,7 @@ help_tac_i:
 | INTRO      { "intro"} 
 | DESTRUCT   { "destruct"} 
 | DEPENDS    { "depends"}
+| REMEMBER   { "REMEMBER"}
 | EXISTS     { "exists"}    
 | REVERT     { "revert"}  
 | GENERALIZE { "generalize"}  

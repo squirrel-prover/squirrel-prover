@@ -104,6 +104,7 @@ type parser_arg =
   | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
   | SplitSeq    of int * Theory.hterm
+  | Remember    of Theory.term * lsymb
 
 type parser_args = parser_arg list
                                

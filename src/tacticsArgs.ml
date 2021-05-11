@@ -166,6 +166,7 @@ type parser_arg =
   | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
   | SplitSeq    of int * Theory.hterm
+  | Remember    of Theory.term * lsymb
 
 type parser_args = parser_arg list
 
@@ -186,6 +187,9 @@ let pp_parser_arg ppf = function
     Fmt.pf ppf "... %a" pp_apply_in in_opt
 
   | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." i 
+
+  | Remember (t, id) ->
+    Fmt.pf ppf "remember %a as %s" Theory.pp t (L.unloc id) 
 
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair

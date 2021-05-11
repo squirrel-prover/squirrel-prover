@@ -37,6 +37,29 @@ let get_trs    s = Tactics.timeout_get (TS.get_trs s)
 let convert_args s args sort = 
   Args.convert_args (TS.table s) (TS.ty_vars s) (TS.env s) args sort
 
+let convert_i ?pat s term = 
+  let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
+  Theory.convert_i ?pat cenv (TS.ty_vars s) (TS.env s) term
+
+let econvert s term = 
+  let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
+  Theory.econvert cenv (TS.ty_vars s) (TS.env s) term
+
+(*------------------------------------------------------------------*)
+let make_exact ?loc env ty name =  
+  match Vars.make_exact env ty name with
+  | None ->
+    hard_failure ?loc
+      (Tactics.Failure ("variable name " ^ name ^ " already used"))
+  | Some v' -> v'
+
+let make_exact_r ?loc env ty name =  
+  match Vars.make_exact_r env ty name with
+  | None ->
+    hard_failure ?loc
+      (Tactics.Failure ("variable name " ^ name ^ " already used"))
+  | Some v' -> v'
+
 (*------------------------------------------------------------------*)
 let is_hyp_or_lemma name s =
   Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
@@ -585,12 +608,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
       | Args.AnyName ->
         Vars.fresh_r env v
 
-      | Args.Named name ->
-        match Vars.make_exact_r env (Vars.ty v) name with
-        | None ->
-          hard_failure 
-            (Tactics.Failure ("variable name " ^ name ^ " already used"))
-        | Some v' -> v'
+      | Args.Named name -> make_exact_r env (Vars.ty v) name 
     in
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
@@ -2130,6 +2148,33 @@ let () =
                   tactic_group = Structural}
     fa
 
+(*------------------------------------------------------------------*)
+let remember (id : Theory.lsymb) (term : Theory.term) s =
+  match econvert s term with
+  | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
+  | Some (Theory.ETerm (ty, t, _)) -> 
+    let env, x = make_exact ~loc:(L.loc id) (TS.env s) ty (L.unloc id) in
+    let subst = [Term.ESubst (t, Term.Var x)] in
+
+    let s = TS.subst subst (TS.set_env env s) in
+    let eq = Term.mk_atom `Eq (Term.Var x) t in
+    TS.set_goal (Term.mk_impl ~simpl:false eq (TS.goal s)) s
+
+let remember_tac_args (args : Args.parser_arg list) s : sequent list = 
+  match args with
+  | [Args.Remember (term, id)] -> [remember id term s]
+  | _ -> bad_args ()
+      
+let remember_tac args = wrap_fail (remember_tac_args args)
+
+let () =
+  T.register_general "remember"
+    ~tactic_help:{
+      general_help = "substitute a term by a fresh variable";
+      detailed_help = "";
+      tactic_group  = Logical;
+      usages_sorts = []; }
+    remember_tac
 
 (*------------------------------------------------------------------*)
 (** New goal simplification *)

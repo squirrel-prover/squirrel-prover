@@ -365,6 +365,8 @@ val mk_timestamp_leq : timestamp -> timestamp -> generic_atom
 val mk_indices_neq : Vars.index list -> Vars.index list -> message
 val mk_indices_eq  : Vars.index list -> Vars.index list -> message
 
+val mk_atom : ord -> 'a term -> 'b term -> message 
+
 (*------------------------------------------------------------------*)
 (** {2 Simplification} *)
 
