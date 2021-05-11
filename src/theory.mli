@@ -80,6 +80,15 @@ val pp   : Format.formatter -> term   -> unit
 val equal : term -> term -> bool
 
 (*------------------------------------------------------------------*)
+(** {2 Higher-order terms.} *)
+
+(** For now, we need (and allow) almost no higher-order terms. *)
+type hterm_i =
+  | Lambda of bnds * term
+
+type hterm = hterm_i L.located
+
+(*------------------------------------------------------------------*)
 (** {2 Declaration of new symbols} *)
 
 
@@ -286,6 +295,11 @@ val convert :
 val convert_p_bnds :
   Symbols.table -> Type.tvar list -> Vars.env -> bnds -> 
   Vars.env * Vars.evar list
+
+val convert_ht :
+  ?ty_env:Type.Infer.env -> 
+  ?pat:bool ->
+  conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm
 
 (** Existantial type wrapping a converted term and its sort.
     The location is the location of the original [Theory.term].  *)

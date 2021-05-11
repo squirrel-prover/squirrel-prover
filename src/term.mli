@@ -161,6 +161,14 @@ val neg_trace_lit : trace_literal -> trace_literal
 val disjunction_to_literals : message -> literal list option
 
 (*------------------------------------------------------------------*)
+(** {2 Higher-order terms} *)
+
+type hterm = 
+  | Lambda of Vars.evars * message
+
+val pp_hterm : Format.formatter -> hterm -> unit
+
+(*------------------------------------------------------------------*)
 (** {2 Pretty-printer and cast} *)
 
 val pp : Format.formatter -> 'a term -> unit
@@ -230,6 +238,9 @@ type refresh_arg = [`Global | `InEnv of Vars.env ref ]
 
 val refresh_vars  : refresh_arg -> 'a Vars.vars -> 'a Vars.vars * esubst list
 val erefresh_vars : refresh_arg ->   Vars.evars ->   Vars.evars * esubst list
+
+(*------------------------------------------------------------------*)
+val apply_ht : hterm -> 'a term list -> hterm
 
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)

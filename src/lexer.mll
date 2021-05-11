@@ -80,6 +80,7 @@ rule token = parse
 | "such that"         { SUCHTHAT }
 | "process"           { PROCESS }
 | "abstract"          { ABSTRACT }
+| "fun"               { FUN }
 | "type"              { TYPE }
 | "name_fixed_length" { NAMEFIXEDLENGTH }
 | "large"             { LARGE }
@@ -112,6 +113,7 @@ rule token = parse
 | "right"             { RIGHT }
 | "forall"            { FORALL }
 | "exists"            { EXISTS }
+| "splitseq"          { SPLITSEQ }
 | "goal"              { GOAL }
 | "equiv"             { EQUIV }
 | "axiom"             { AXIOM }

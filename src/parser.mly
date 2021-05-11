@@ -23,7 +23,7 @@
 %token LET IN IF THEN ELSE FIND SUCHTHAT
 %token DIFF LEFT RIGHT SEQ 
 %token NEW OUT PARALLEL NULL
-%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE
+%token CHANNEL PROCESS HASH AENC SENC SIGNATURE NAME ABSTRACT TYPE FUN
 %token MUTABLE SYSTEM SET
 %token INIT INDEX MESSAGE BOOLEAN TIMESTAMP ARROW RARROW ASSIGN
 %token EXISTS FORALL QUANTIF GOAL EQUIV DARROW DEQUIVARROW AXIOM
@@ -31,7 +31,7 @@
 %token TIME WHERE WITH ORACLE EXN
 %token LARGE NAMEFIXEDLENGTH
 %token TRY CYCLE REPEAT NOSIMPL HELP DDH CHECKFAIL ASSERT USE 
-%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY
+%token REWRITE REVERT CLEAR GENERALIZE DEPENDS APPLY SPLITSEQ
 %token BY INTRO AS DESTRUCT
 %token PROOF QED UNDO ABORT
 %token EOF
@@ -229,6 +229,14 @@ top_formula:
 sep:
 |       {()}
 | COMMA {()}
+
+(* higher-order terms *)
+
+hterm_i:
+| FUN LPAREN args=arg_list RPAREN ARROW t=term { Theory.Lambda (args,t) }
+
+hterm:
+| t=loc(hterm_i) { t }
 
 (* Processes *)
 
@@ -637,6 +645,9 @@ tac:
   | l=lloc(APPLY) t=apply_arg w=apply_in
     { mk_abstract l "apply" [TacticsArgs.ApplyIn (t, w)] }
 
+  | l=lloc(SPLITSEQ) i=INT LPAREN ht=hterm RPAREN 
+    { mk_abstract l "splitseq" [TacticsArgs.SplitSeq (i, ht)] }
+
   | l=lloc(DDH) g=lsymb COMMA i1=lsymb COMMA i2=lsymb COMMA i3=lsymb 
     { mk_abstract l "ddh"
          [TacticsArgs.String_name g;
@@ -669,6 +680,7 @@ help_tac_i:
 | USE        { "use"}      
 | REWRITE    { "rewrite"}  
 | APPLY      { "apply"}  
+| SPLITSEQ   { "splitseq"}  
 | DDH        { "ddh"}      
 
 

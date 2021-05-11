@@ -73,6 +73,13 @@ type ttimestamp = timestamp ty
 type tindex     = index     ty
 
 (*------------------------------------------------------------------*)
+(** Higher-order *)
+type hty =
+  | Lambda of ety list * tmessage 
+
+val pp_ht : Format.formatter -> hty -> unit
+
+(*------------------------------------------------------------------*)
 val eboolean   : ety
 val emessage   : ety
 val etimestamp : ety
@@ -96,6 +103,9 @@ val subtype   : 'a ty -> 'b ty -> bool
 (** Equality relation, and return a (Ocaml) type equality witness *)
 val equal_w : 'a ty -> 'b ty -> ('a,'b) type_eq option
 val equal   : 'a ty -> 'b ty -> bool
+val eequal  :   ety ->   ety -> bool
+
+val ht_equal : hty -> hty -> bool
 
 val equalk_w : 'a kind -> 'b kind -> ('a,'b) type_eq option
 val equalk   : 'a kind -> 'b kind -> bool
@@ -128,7 +138,9 @@ module Infer : sig
 
   val open_tvars : env -> tvars -> univars * tsubst
 
-  val norm : env -> 'a ty -> 'a ty
+  val norm   : env -> 'a ty -> 'a ty
+  val enorm  : env ->   ety ->   ety
+  val htnorm : env ->   hty ->   hty
       
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
   val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]

@@ -65,6 +65,11 @@ type ttimestamp = timestamp ty
 type tindex     = index     ty
 
 (*------------------------------------------------------------------*)
+(** Higher-order *)
+type hty =
+  | Lambda of ety list * tmessage 
+
+(*------------------------------------------------------------------*)
 let eboolean   = ETy Boolean
 let emessage   = ETy Message
 let etimestamp = ETy Timestamp
@@ -110,6 +115,14 @@ let equal_w : type a b. a ty -> b ty -> (a,b) type_eq option =
 let equal : type a b. a ty -> b ty -> bool =
   fun a b -> equal_w a b <> None
 
+let eequal (ETy t1) (ETy t2) = equal t1 t2
+
+let ht_equal ht ht' = match ht, ht' with
+  | Lambda (es1, t1), Lambda (es2, t2) ->
+    List.length es1 = List.length es2 &&
+    List.for_all2 eequal es1 es2 &&
+    equal t1 t2
+
 (*------------------------------------------------------------------*)
 (** Equality relation, and return a (Ocaml) type equality witness *)
 let equalk_w : type a b. a kind -> b kind -> (a,b) type_eq option =
@@ -148,6 +161,21 @@ let pp : type a. Format.formatter -> a ty -> unit = fun ppf -> function
   | TUnivar u -> pp_univar ppf u
 
 let pp_e ppf (ETy t) = pp ppf t
+
+
+(*------------------------------------------------------------------*)
+let pp_ht fmt ht = 
+  let pp_seq fmt () = Fmt.pf fmt " * " in
+
+  let pp_ets fmt (ets : ety list) =
+    match ets with
+    | [] -> Fmt.pf fmt "()"
+    | [ety] -> pp_e fmt ety
+    | _ -> Fmt.pf fmt "@[<hv 2>(%a)@]" (Fmt.list ~sep:pp_seq pp_e) ets 
+  in
+  match ht with
+  | Lambda (ets, ty) -> 
+    Fmt.pf fmt "@[<hv 2>fun %a ->@ %a@]" pp_ets ets pp ty
 
 
 (*------------------------------------------------------------------*)
@@ -241,7 +269,9 @@ module Infer : sig
 
   val open_tvars : env -> tvars -> univars * tsubst
 
-  val norm : env -> 'a ty -> 'a ty
+  val norm   : env -> 'a ty -> 'a ty
+  val enorm  : env ->   ety ->   ety
+  val htnorm : env ->   hty ->   hty
                          
   val unify_eq  : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
   val unify_leq : env -> 'a ty -> 'b ty -> [`Fail | `Ok]
@@ -295,6 +325,11 @@ end = struct
       let u' = Mid.find u !env in
       if t = u' then u' else norm env u'        
     | _ -> t
+
+  let enorm env (ETy ty) = ETy (norm env ty)
+
+  let htnorm env ht = match ht with
+    | Lambda (evs, ty) -> Lambda (List.map (enorm env) evs, norm env ty)
 
   (** An type inference environment is closed if every unification variable
        normal form is a univar-free type. *)

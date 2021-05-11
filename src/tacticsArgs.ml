@@ -165,6 +165,7 @@ type parser_arg =
   | SimplPat    of simpl_pat
   | RewriteIn   of rw_arg list * in_target
   | ApplyIn     of Theory.p_pt * apply_in
+  | SplitSeq    of int * Theory.hterm
 
 type parser_args = parser_arg list
 
@@ -183,6 +184,8 @@ let pp_parser_arg ppf = function
 
   | ApplyIn (t, in_opt) ->
     Fmt.pf ppf "... %a" pp_apply_in in_opt
+
+  | SplitSeq (i, ht) -> Fmt.pf ppf "%d ..." i 
 
 (*------------------------------------------------------------------*)      
 type ('a, 'b) pair

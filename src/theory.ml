@@ -35,7 +35,8 @@ type bnd  = lsymb * p_ty
 type bnds = (lsymb * p_ty) list
       
 (*------------------------------------------------------------------*)
-(** {2 Terms and formulas} *)
+(** {2 Terms} *)
+
 type term_i =
   | Tinit
   | Tpat
@@ -128,7 +129,6 @@ let rec equal t t' = match L.unloc t, L.unloc t' with
   | _ -> false
 
 and equals l l' = List.for_all2 equal l l'
-
 
 (*------------------------------------------------------------------*)
 let var_i loc x : term_i = App (L.mk_loc loc x,[])
@@ -241,6 +241,16 @@ and pp_term ppf t =
 
 let pp   = pp_term
 let pp_i = pp_term_i
+
+
+(*------------------------------------------------------------------*)
+(** {2 Higher-order terms.} *)
+
+(** For now, we need (and allow) almost no higher-order terms. *)
+type hterm_i =
+  | Lambda of bnds * term
+
+type hterm = hterm_i L.located
 
 (*------------------------------------------------------------------*)
 (** {2 Error handling} *)
@@ -1040,6 +1050,24 @@ and conv_app :
 type eterm = ETerm : 'a Type.ty * 'a Term.term * L.t -> eterm
 
 (*------------------------------------------------------------------*)
+(** convert HO terms *)
+let conv_ht : conv_state -> hterm -> Type.hty * Term.hterm =
+  fun state t -> 
+  match L.unloc t with
+  | Lambda (bnds, t0) ->    
+    let env, evs = convert_p_bnds state.table state.ty_vars state.env bnds in
+    let tyv = Type.Infer.mk_univar state.ty_env in
+    let ty = Type.TUnivar tyv in
+
+    let ht = Term.Lambda (evs, convert { state with env } t0 ty) in
+
+    let bnd_tys = List.map (fun (Vars.EVar v) -> Type.ETy (Vars.ty v)) evs in
+    let hty = Type.Lambda (bnd_tys, ty) in
+    let hty = Type.Infer.htnorm state.ty_env hty in
+
+    hty, ht
+
+(*------------------------------------------------------------------*)
 (** {2 Function declarations} *)
 
 let mk_ftype iarr vars args out =
@@ -1149,6 +1177,26 @@ let empty loc = L.mk_loc loc (App (L.mk_loc loc "empty", []))
 (*------------------------------------------------------------------*)
 (** {2 Exported conversion and type-checking functions} *)
 
+
+let convert_ht : type s. 
+  ?ty_env:Type.Infer.env -> 
+  ?pat:bool ->
+  conv_env -> Type.tvars -> Vars.env -> hterm -> Type.hty * Term.hterm =
+  fun ?ty_env ?(pat=false) cenv ty_vars env ht0 -> 
+  let must_clost, ty_env = match ty_env with
+    | None -> true, Type.Infer.mk_env () 
+    | Some ty_env -> false, ty_env 
+  in
+
+  let state = mk_state cenv.table cenv.cntxt ty_vars env pat ty_env in
+  let hty, ht = conv_ht state ht0 in
+
+  if must_clost && not (Type.Infer.is_closed state.ty_env) then
+    conv_err (L.loc ht0) Freetyunivar;
+
+  hty, ht
+
+(*------------------------------------------------------------------*)
 let check 
     table ?(local=false) ?(pat=false) (ty_env : Type.Infer.env) 
     (env : Vars.env) t (Type.ETy s) : unit =
@@ -1177,7 +1225,7 @@ let convert_i ?ty_env ?(pat=false) (cenv : conv_env) ty_vars env tm
   let ty = Type.tsubst (Type.Infer.close ty_env) ty in
   t, ty
 
-(** exported outside to Theory.ml *)
+(** exported outside Theory.ml *)
 let convert : type s. 
   ?ty_env:Type.Infer.env -> 
   ?pat:bool ->
@@ -1196,6 +1244,7 @@ let convert : type s.
 
   t    
 
+(** exported outside Theory.ml *)
 let econvert (cenv : conv_env) ty_vars subst t : eterm option =
   let loc = L.loc t in
 

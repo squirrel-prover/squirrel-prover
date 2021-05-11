@@ -30,16 +30,47 @@ let hard_failure = Tactics.hard_failure
 let soft_failure = Tactics.soft_failure
 
 (*------------------------------------------------------------------*)
+let bad_args () = hard_failure (Failure "improper arguments")
+
+(*------------------------------------------------------------------*)
+let wrap_fail f (s: ES.t) sk fk =
+  try sk (f s) fk with
+  | Tactics.Tactic_soft_failure e -> fk e
+
+(*------------------------------------------------------------------*)
 let check_ty_eq ty1 ty2 = 
   if not (Type.equal ty1 ty2) then
-    hard_failure 
+    soft_failure 
       (Failure (Fmt.strf "types %a and %a are not compatible" 
                  Type.pp ty1 Type.pp ty2));
   ()
 
 (*------------------------------------------------------------------*)
+let check_hty_eq hty1 hty2 = 
+  if not (Type.ht_equal hty1 hty2) then
+    soft_failure 
+      (Failure (Fmt.strf "types %a and %a are not compatible" 
+                 Type.pp_ht hty1 Type.pp_ht hty2));
+  ()
+
+(*------------------------------------------------------------------*)
 (** {2 Utilities} *)
 
+(*------------------------------------------------------------------*)
+let convert_i s t =
+  let env = ES.env s in
+  let table = ES.table s in
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+   Theory.convert_i conv_env (ES.ty_vars s) env t
+
+(*------------------------------------------------------------------*)
+let convert_ht s ht =
+  let env = ES.env s in
+  let table = ES.table s in
+  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
+   Theory.convert_ht conv_env (ES.ty_vars s) env ht
+
+(*------------------------------------------------------------------*)
 exception Out_of_range
 
 (** When [0 <= i < List.length l], [nth i l] returns [before,e,after]
@@ -61,7 +92,7 @@ let nth i l =
 let only_equiv t (s : Prover.Goal.t) =
   match s with
   | Prover.Goal.Equiv s -> t s
-  | _ -> soft_failure (Tactics.Failure "Equivalence goal expected")
+  | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
 
 (** Wrap a tactic expecting and returning equivalence goals
   * into a general prover tactic. *)
@@ -85,7 +116,7 @@ let pure_equiv_arg t a s sk fk =
 let only_equiv_typed t arg (s : Prover.Goal.t) =
   match s with
   | Prover.Goal.Equiv s -> t arg s
-  | _ -> soft_failure (Tactics.Failure "Equivalence goal expected")
+  | _ -> soft_failure (Tactics.Failure "equivalence goal expected")
 
 (** Wrap a function expecting an argument and an equivalence goal and returning
    equivalence goals into a general prover function. *)
@@ -159,10 +190,9 @@ let query_happens (s : ES.t) (a : Term.timestamp) =
 (** Admit tactic *)
 let () =
   T.register_general "admit"
-    ~tactic_help:{general_help = "Closes the current goal, or drop a bi-frame \
-                                  element.";
-                  detailed_help = "This tactic, of course, makes the proof \
-                                   un-valid.";
+    ~tactic_help:{general_help = "Admit the current goal, or admit an element \
+                                  from a  bi-frame.";
+                  detailed_help = "This tactic, of course, is not sound";
                   usages_sorts = [Sort Args.Int];
                   tactic_group = Logical}
     (function
@@ -175,7 +205,7 @@ let () =
              in
                sk [s] fk
            end
-       | _ -> hard_failure (Tactics.Failure "improper arguments"))
+       | _ -> bad_args ())
 
 
 (*------------------------------------------------------------------*)
@@ -393,7 +423,7 @@ let intro_tac args s sk fk =
   try match args with
     | [Args.IntroPat intros] -> sk (do_intros intros s) fk
 
-    | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+    | _ -> bad_args ()
   with Tactics.Tactic_soft_failure e -> fk e
 
 let () =
@@ -557,7 +587,7 @@ let enrich_a arg s =
   let tbl, env = ES.table s, ES.env s in
   match Args.convert_args tbl (ES.ty_vars s) env [arg] Args.(Sort ETerm) with
   | Args.Arg (ETerm _ as arg) -> enrich arg s
-  | _ -> Tactics.(hard_failure (Failure "improper arguments"))
+  | _ -> bad_args ()
 
 let enrichs args s = 
   List.fold_left (fun s arg -> enrich_a arg s) s args
@@ -1093,8 +1123,7 @@ let () =
 let expand_seq (term : Theory.term) (ths : Theory.term list) (s : ES.t) =
   let env = ES.env s in
   let table = ES.table s in
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
-  match Theory.convert_i conv_env (ES.ty_vars s) env term with
+  match convert_i s term with
   (* we expect term to be a sequence *)
   | (Seq (vs, t) as term_seq), ty ->
     let vs = List.map (fun x -> Vars.EVar x) vs in
@@ -1152,10 +1181,9 @@ let expand (term : Theory.term) (s : ES.t) =
   in
 
   let table = ES.table s in
-  (* computes the substitution dependeing on the sort of term *)
-  let conv_env = Theory.{ table = table; cntxt = InGoal; } in
 
-  match Theory.convert_i conv_env (ES.ty_vars s) (ES.env s) term with
+  (* computes the substitution dependeing on the sort of term *)
+  match convert_i s term with
     | Macro (ms,l,a), ty ->
       if Macros.is_defined ms.s_symb a table then
         succ a [Term.ESubst (Macro (ms,l,a),
@@ -1187,8 +1215,7 @@ let () = T.register_general "expand"
         let ids =
           List.map (function
                | Args.Theory th -> th
-               | _ -> hard_failure 
-                        (Tactics.Failure "improper arguments")
+               | _ -> bad_args ()
             ) ids
         in
         pure_equiv
@@ -1196,9 +1223,7 @@ let () = T.register_general "expand"
              | subgoals -> sk subgoals fk
              | exception Tactics.Tactic_soft_failure e -> fk e)
 
-     | _ ->
-         hard_failure
-           (Tactics.Failure "improper arguments"))
+     | _ -> bad_args ())
 
 (*------------------------------------------------------------------*)
 (** Expands all macro occurrences inside the biframe, if the macro is not at
@@ -1957,6 +1982,74 @@ let () =
                     the fresh tactic."
     ~tactic_group:Cryptographic
     (pure_equiv_typed prf) Args.Int
+
+
+(*------------------------------------------------------------------*)
+let split_seq (i, ht) s : ES.sequent = 
+  let before, t, after =
+    try nth i (goal_as_equiv s) with
+    | Out_of_range -> 
+      soft_failure (Tactics.Failure "Out of range position")
+  in
+
+  let is, ti = match t with
+    | Seq (is, ti) -> is, ti
+    | _ -> soft_failure ~loc:(L.loc ht) (Failure "not a seq")
+  in
+
+  (* check that types are compatible *)
+  let seq_hty = 
+    Type.Lambda (List.map (fun v -> Type.ETy (Vars.ty v)) is, Type.Boolean) 
+  in
+
+  let hty, ht = convert_ht s ht in
+
+  check_hty_eq hty seq_hty;
+
+  (* compute the new sequent *)
+  let is, subst = Term.refresh_vars `Global is in
+  let ti = Term.subst subst ti in
+
+  let cond = match Term.apply_ht ht (List.map (fun v -> Term.Var v) is) with
+    | Term.Lambda ([], cond) -> cond
+    | _ -> assert false
+  in
+
+  let ti_t = Term.mk_ite cond               ti Term.mk_zero in
+  let ti_f = Term.mk_ite (Term.mk_not cond) ti Term.mk_zero in
+
+  let mk_one term =
+    let env = 
+      let vars = Vars.to_list (ES.env s) 
+                 |> Sv.of_list in
+      let vars = Sv.elements (Sv.inter vars (Term.fv term)) in
+      ref (Vars.of_list vars)
+    in
+    
+    let is, subst = Term.refresh_vars (`InEnv env) is in
+    let term = Term.subst subst term in
+    
+    Term.Seq (is, term) 
+  in
+ 
+  let frame = before @ [mk_one ti_t; mk_one ti_f] @ after in
+  ES.set_equiv_goal s frame
+  
+let split_seq_args args s : ES.sequent list =
+  match args with
+  | [Args.SplitSeq (i, ht)] -> [split_seq (i, ht) s]
+  | _ -> bad_args ()
+
+let split_seq_tac args s sk fk = wrap_fail (split_seq_args args) s sk fk
+
+let () =
+  T.register_general "splitseq"
+    ~tactic_help:{general_help = "splits a sequence according to some boolean";
+                  detailed_help = "";
+                  usages_sorts = [];
+                  tactic_group = Logical}
+    (pure_equiv_arg split_seq_tac)
+
 
 (*------------------------------------------------------------------*)
 (** Symmetric encryption **)

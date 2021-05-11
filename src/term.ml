@@ -140,14 +140,15 @@ type eq_atom = [
 ]
 
 (*------------------------------------------------------------------*)
+(** {2 Higher-order terms} *)
+
+type hterm = 
+  | Lambda of Vars.evars * message
+
+(*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)
 
 let mk f : fsymb = (f,[])
-(* { 
- *   s_symb = f;
- *   s_indices = [];
- *   s_typ = Type.Message; 
- * } *)
 
 let f_diff = mk Symbols.fs_diff
 
@@ -665,6 +666,11 @@ and pp_and_happens ppf f =
 let pp_eq_atom ppf at = pp_generic_atom ppf (at :> generic_atom)
 
 
+let pp_hterm fmt = function
+  | Lambda (evs, t) -> 
+    Fmt.pf fmt "@[<v 2>fun (@[%a@]) ->@ %a@]"
+      Vars.pp_typed_list evs pp t
+
 (*------------------------------------------------------------------*)
 (** Literals. *)
 
@@ -863,6 +869,9 @@ let mk_exists ?(simpl=false) l f =
   in
   mk_exists l f
 
+let mk_lambda evs ht = match ht with
+  | Lambda (evs', t) -> Lambda (evs @ evs', t) 
+
 (*------------------------------------------------------------------*)
 (** {2 Substitutions} *)
 
@@ -1038,6 +1047,11 @@ let subst_macros_ts table l ts t =
 
   subst_term t
 
+let rec subst_ht s ht = match ht with
+  | Lambda (ev :: evs, t) ->
+    let ev, s = subst_binding ev s in
+    mk_lambda [ev] (subst_ht s (Lambda (evs, t)))
+  | Lambda ([], t) -> Lambda ([], subst s t)
 
 (*------------------------------------------------------------------*)
 type refresh_arg = [`Global | `InEnv of Vars.env ref ]
@@ -1140,6 +1154,26 @@ let tfold : type a. (eterm -> 'b -> 'b) -> a term -> 'b -> 'b =
   let fi e = vref := (f e !vref) in  
   titer fi t;
   !vref
+
+(*------------------------------------------------------------------*)
+(** {2 Apply} *)
+
+let apply_ht (ht : hterm) terms = match ht with
+  | Lambda (evs, t) ->
+    assert (List.length terms <= List.length evs);
+    let evs0, evs1 = List.takedrop (List.length terms) evs in
+
+    let evs0, s = erefresh_vars `Global evs0 in
+    let ht = subst_ht s (Lambda (evs1, t)) in
+
+    let s_app = 
+      List.map2 (fun (Vars.EVar v) t -> 
+          ESubst (Var v, cast (Vars.kind v) t)
+        ) evs0 terms 
+    in
+    subst_ht s_app ht
+    
+
 
 (*------------------------------------------------------------------*)
 (** {2 Type substitution} *)

@@ -45,6 +45,9 @@ val name : 'a var -> string
 
 val ty : 'a var -> 'a Type.ty
 
+val norm_ty  : Type.Infer.env -> 'a var -> 'a var
+val enorm_ty : Type.Infer.env ->   evar ->   evar
+
 val tsubst : Type.tsubst -> 'a var -> 'a var
 
 val kind : 'a var -> 'a Type.kind

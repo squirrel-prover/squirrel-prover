@@ -32,6 +32,12 @@ let is_pat v = String.sub v.name 0 1 = "_"
 let name v = (if v.is_new then "#" else "") ^ v.name
 
 let ty v = v.var_type
+
+let norm_ty : type a. Type.Infer.env -> a var -> a var =
+  fun env v ->
+  { v with var_type = Type.Infer.norm env v.var_type }
+
+let enorm_ty env (EVar v) = EVar (norm_ty env v)
              
 let kind v = Type.kind (v.var_type)
 
