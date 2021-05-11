@@ -1821,6 +1821,8 @@ let fresh (Args.String m) s =
   try
     let id,hyp = Hyps.by_name m s in
     
+    let hyp = expand_all_term hyp s in
+
     let table = TS.table s in
     let env   = TS.env s in
 
