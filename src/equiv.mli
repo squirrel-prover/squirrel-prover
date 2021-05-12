@@ -52,3 +52,7 @@ val subst : Term.subst -> form -> form
 
 (** Free variables *)
 val fv : form -> Vars.Sv.t
+
+(*------------------------------------------------------------------*)
+(** {2 Matching} *)
+module Match : Term.MatchS with type t = form

@@ -5,7 +5,6 @@ type single_system =
   | Left  of Symbols.system Symbols.t
   | Right of Symbols.system Symbols.t
 
-
 val get_proj : single_system -> Term.projection
 
 (*------------------------------------------------------------------*)
@@ -24,6 +23,8 @@ type system_expr = private
 val single      : Symbols.table -> single_system -> system_expr
 val simple_pair : Symbols.table -> Symbols.system Symbols.t -> system_expr
 val pair        : Symbols.table -> single_system -> single_system -> system_expr
+
+val systems_compatible : system_expr -> system_expr -> bool
 
 val pp_system : Format.formatter -> system_expr -> unit
 
@@ -95,10 +96,6 @@ type esubst_descr =
   | Output of Term.message * Action.action
 
 type subst_descr = esubst_descr list
-
-(* val clone_system_subst : 
- *   Symbols.table -> system_expr -> string -> subst_descr -> 
- *   Symbols.table * Symbols.system Symbols.t *)
 
 
 (*------------------------------------------------------------------*)

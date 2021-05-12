@@ -1,3 +1,7 @@
+module L = Location
+
+type lsymb = Theory.lsymb
+
 (** As much as possible, hypotheses should be manipulated through the [Hyps] 
     module below, not the [H] module. 
     Ideally, this should not exported. *)
@@ -9,6 +13,8 @@ type hyps = H.hyps
 
 type t
 type sequent = t
+
+type hyp = Equiv.form
 
 (** Initialize a sequent for the diff-equivalence of the given system.  
     Remark that if the projection of the system is not None, the goal will 
@@ -22,7 +28,9 @@ val pp_init : Format.formatter -> t -> unit
 
 (** [apply_subst subst s] returns the sequent [s] where the substitution has
    been applied to its conclusion and hypotheses. *)
-val subst : Term.subst -> t -> t
+val subst     : Term.subst -> t -> t
+
+val subst_hyp : Term.subst -> hyp -> hyp
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses functions} *)
@@ -37,9 +45,11 @@ val env : t -> Vars.env
 val set_env : Vars.env -> t -> t
 
 val system : t -> SystemExpr.system_expr
+val set_system : SystemExpr.system_expr -> t -> t
+
 val table  : t -> Symbols.table
 
-val set_table  : t -> Symbols.table -> t
+val set_table  : Symbols.table -> t -> t
 
 (** Get the list of biterms describing the two frames. *)
 val goal : t -> Equiv.form
@@ -47,19 +57,45 @@ val goal : t -> Equiv.form
 val ty_vars : t -> Type.tvars
 
 (** Return a new equivalence judgment with the given biframe. *)
-val set_goal : t -> Equiv.form -> t
+val set_goal : Equiv.form -> t -> t
 
-val set_equiv_goal : t -> Equiv.equiv -> t
+val set_equiv_goal : Equiv.equiv -> t -> t
 
-val set_ty_vars : t -> Type.tvars -> t
+val set_ty_vars : Type.tvars -> t -> t
 
 (** Get the list of biterms describing the hypothesis frames. *)
 val hyps : t -> hyps
 
 (** Return a new equivalence judgment with the given hypothesis biframe. *)
-val set_hyps : t -> hyps -> t
+val set_hyps : hyps -> t -> t
 
 (** Get one of the projections of the biframe,
   * as a list of terms where diff operators have been fully
   * eliminated. *)
 val get_frame : Term.projection -> t -> Equiv.equiv option
+
+val goal_is_equiv : t -> bool
+
+val goal_as_equiv : t -> Equiv.equiv
+
+val set_reach_goal : Term.message -> t -> t
+
+(** Build a trace sequent from an equivalent sequent when its conclusion is 
+    a [Reach _]. *)
+val trace_seq_of_equiv_seq : ?goal:Term.message -> t -> TraceSequent.t
+
+val trace_seq_of_reach : Term.message -> t -> TraceSequent.t
+
+val get_terms : hyp -> Term.message list
+val get_models : t -> Constr.models
+
+val mk_trace_cntxt : t -> Constr.trace_cntxt
+
+val query_happens : precise:bool -> t -> Term.timestamp -> bool
+
+val reach_to_hyp :             Term.message -> hyp
+val hyp_to_reach : ?loc:L.t -> hyp -> Term.message
+
+(*------------------------------------------------------------------*)
+(** {2 Matching} *)
+module Match : Term.MatchS with type t = hyp

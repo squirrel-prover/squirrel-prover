@@ -62,6 +62,15 @@ let bisystem_error e = raise (BiSystemError e)
 let incompatible_error s1 s2 s = 
   raise (BiSystemError (SE_IncompatibleAction ((s1,s2),s)))
 
+
+(*------------------------------------------------------------------*)
+let systems_compatible s1 s2 =
+  match s1, s2 with
+  | s1, s2 when s1 = s2 -> true
+  | Single (Left s1),  SimplePair s2 when s1 = s2 -> true
+  | Single (Right s1), SimplePair s2 when s1 = s2 -> true
+  | _ -> false
+
 (*------------------------------------------------------------------*)
 let project_system proj = function
   | Single s -> bisystem_error (SE_NotABiProcess (get_id s))
@@ -231,6 +240,7 @@ let pair table a b =
   check_system_expr table se; se
 
 (*------------------------------------------------------------------*)
+(** {2 Misc } *)
 
 (** Get the action symbols table of a system expression.
   * We rely on the invariant that the system systems involved in an expression
@@ -273,15 +283,6 @@ let rec subst s d =
     end
 
 exception SystemNotFresh
-
-(* Given an original system and a descr substitution, register the new simple
-   system obtained from the susbtition. *)
-(* let clone_system_subst table original_system new_system substd =
- *   let odescrs = descrs table original_system in
- *   let symbs = symbs table original_system in
- *   let ndescrs = System.Msh.map (subst substd) odescrs in
- *   let data = System.System_data (ndescrs,symbs) in
- *   Symbols.System.declare_exact table new_system ~data ()  *)
 
 let pp_descrs table ppf system =
   Fmt.pf ppf "@[<v 2>Available actions:@;@;";

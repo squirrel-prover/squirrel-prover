@@ -245,18 +245,25 @@ val apply_ht : hterm -> 'a term list -> hterm
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
 
-module Match : sig
+(** A pattern is a list of free type variables, a term [t] and a subset
+    of [t]'s free variables that must be matched. 
+    The free type variables must be inferred. *)
+type 'a pat = { 
+  pat_tyvars : Type.tvars; 
+  pat_vars : Vars.Sv.t; 
+  pat_term : 'a term; 
+}
+
+(** Module signature of matching. 
+    We can only match a [Term.term] into a [Term.term] or a [Equiv.form].
+    Hence, the type of term we match into is abstract.
+    The type we match from is fixed to Term.term. *)
+module type MatchS = sig
   (** match substitution *)
   type mv
 
-  (** A pattern is a list of free type variables, a term [t] and a subset
-      of [t]'s free variables that must be matched. 
-      The free type variables must be inferred. *)
-  type 'a pat = { 
-    pat_tyvars : Type.tvars; 
-    pat_vars : Vars.Sv.t; 
-    pat_term : 'a term; 
-  }
+  (** Abstract type of terms we are matching in. *)
+  type t
 
   val pp_pat : Format.formatter -> 'a pat -> unit
 
@@ -265,7 +272,7 @@ module Match : sig
   (** [try_match t p] tries to match [p] with [t] (at head position). 
       If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  val try_match : 'a term -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+  val try_match : t -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
   (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
@@ -273,10 +280,12 @@ module Match : sig
       - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
       - if [many = true], all occurences found. *)
   val find_map :
-    many:bool -> Vars.env -> 'a term -> 'b pat -> 
+    many:bool -> Vars.env -> t -> 'b pat -> 
     ('b term -> Vars.evars -> mv -> 'b term) -> 
-    'a term option
+    t option
 end
+
+module Match : MatchS with type t = message
 
 (*------------------------------------------------------------------*)
 (** {2 Builtins function symbols} *)

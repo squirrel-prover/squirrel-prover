@@ -1,5 +1,9 @@
+module L = Location
 module Args = TacticsArgs
 module T = Tactics
+
+module TS = TraceSequent
+type lsymb = Theory.lsymb
 
 (*------------------------------------------------------------------*)
 (** {2 Hypotheses for equivalence sequents} *)
@@ -19,6 +23,8 @@ type hyps = H.hyps
 
 (*------------------------------------------------------------------*)
 (** {2 Equivalence sequent} *)
+
+type hyp = Equiv.form
 
 (** An equivalence sequent features:
   * - two frames given as a single [goal] containing bi-terms
@@ -173,10 +179,10 @@ let env j = j.env
 let set_env e j = {j with env = e}
 
 let system j = j.system
+let set_system system j = { j with system }
 
 let table j = j.table
-
-let set_table j table = { j with table = table }
+let set_table table j = { j with table = table }
 
 let goal j = j.goal
 
@@ -184,13 +190,13 @@ let ty_vars j = j.ty_vars
 
 let hyps j = j.hyps
 
-let set_hyps j f = { j with hyps = f}
+let set_hyps hyps j = { j with hyps }
 
-let set_goal j f = { j with goal = f }
+let set_goal goal j = { j with goal }
 
-let set_ty_vars j f = { j with ty_vars = f } 
+let set_ty_vars ty_vars j = { j with ty_vars } 
 
-let set_equiv_goal j e = { j with goal = Equiv.Atom (Equiv.Equiv e) }
+let set_equiv_goal e j = { j with goal = Equiv.Atom (Equiv.Equiv e) }
 
 let get_frame proj j = match j.goal with
   | Equiv.Atom (Equiv.Equiv e) -> 
@@ -200,3 +206,81 @@ let get_frame proj j = match j.goal with
 let subst subst s =
   { s with goal = Equiv.subst subst s.goal;
            hyps = subst_hyps subst s.hyps; }
+
+let subst_hyp subst f = Equiv.subst subst f
+
+(*------------------------------------------------------------------*)
+let goal_is_equiv s = match goal s with
+  | Atom (Equiv.Equiv e) -> true
+  | _ -> false
+
+let goal_as_equiv s = match goal s with
+  | Atom (Equiv.Equiv e) -> e
+  | _ -> 
+    Tactics.soft_failure (Tactics.GoalBadShape "expected an equivalence")
+      
+let set_reach_goal f s = set_goal Equiv.(Atom (Reach f)) s
+
+let reach_to_hyp t = Equiv.Atom (Equiv.Reach t)
+
+let hyp_to_reach ?loc (e : Equiv.form) = 
+  match e with
+  | Equiv.Atom (Equiv.Reach f) -> f
+  | _ ->     
+    Tactics.soft_failure ?loc (Tactics.Failure "expected a reachability formula")
+
+(*------------------------------------------------------------------*)
+let trace_seq_of_equiv_seq ?goal s = 
+  let env     = env s in
+  let system  = system s in
+  let table   = table s in
+  let ty_vars = ty_vars s in
+
+  let goal = match goal, s.goal with
+    | Some g, _ -> g
+    | None, Equiv.Atom (Equiv.Reach f) -> f
+    | None, _ -> 
+      Tactics.soft_failure (Tactics.GoalBadShape "expected a reachability \
+                                                  formulas")
+  in
+
+  let trace_s = TS.init ~system ~table ~ty_vars ~env ~goal in
+  
+  (* We add all relevant hypotheses *)
+  Hyps.fold (fun id hyp trace_s -> match hyp with
+      | Equiv.Atom (Equiv.Reach h) -> 
+        TS.Hyps.add (Args.Named (Ident.name id)) h trace_s
+      | _ -> trace_s
+    ) s trace_s 
+
+(*------------------------------------------------------------------*)
+let get_models (s : t) =
+  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
+  TS.get_models s
+
+let mk_trace_cntxt (s : t) = 
+  Constr.{
+    table  = s.table;
+    system = s.system;
+    models = Some (get_models s);
+  }
+
+let trace_seq_of_reach f s = trace_seq_of_equiv_seq (set_reach_goal f s)
+
+(*------------------------------------------------------------------*)
+let rec get_terms (f : Equiv.form) : Term.message list =
+  match f with
+  | Equiv.Atom (Equiv.Reach f) -> [f]
+  | Equiv.Atom (Equiv.Equiv e) -> e
+  | Equiv.Impl (e1, e2) -> get_terms e1 @ get_terms e2
+  | Equiv.ForAll (vs, e) -> []
+
+(*------------------------------------------------------------------*)
+let query_happens ~precise (s : t) (a : Term.timestamp) =
+  let s = trace_seq_of_equiv_seq ~goal:Term.mk_false s in
+  TS.query_happens ~precise s a
+
+
+(*------------------------------------------------------------------*)
+(** {2 Matching} *)
+module Match : Term.MatchS with type t = Equiv.form = Equiv.Match

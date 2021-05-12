@@ -7,89 +7,43 @@
 open Term
 open Utils
 
-module TS = TraceSequent
 module T = Prover.TraceTactics
 module Args = TacticsArgs
 module L = Location
+
+open LowTactics
+
+(** Extends [TraceSequent] with function relying on the [Prover] module *)
+module TraceSequent = struct
+  include TraceSequent
+
+  let is_hyp_or_lemma (name : lsymb) (s : sequent) =
+    Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
+
+  (** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
+  let get_hyp_or_lemma (name : lsymb) (s : sequent) =
+    let hyp_opt, (system,tyvars,f) =
+      if Hyps.mem_name (L.unloc name) s then
+        let id, f = Hyps.by_name name s in
+        Some id, (system s, [], f)
+      else None, Prover.get_goal_formula name in
+
+    (* Verify that it applies to the current system. *)
+    if not (SystemExpr.systems_compatible (TraceSequent.system s) system) then
+      Tactics.hard_failure Tactics.NoAssumpSystem;
+
+    hyp_opt, tyvars, f
+end
+
+module TS = TraceSequent
+
 module Hyps = TS.Hyps
 
 type tac = TS.t Tactics.tac
 type lsymb = Theory.lsymb
 type sequent = TS.sequent
 
-(*------------------------------------------------------------------*)
-let dbg ?(force=false) s =
-  let mode = if Config.debug_tactics () || force then `Dbg else `Ignore in
-  Printer.prt mode s
-
-(*------------------------------------------------------------------*)
-let hard_failure = Tactics.hard_failure
-let soft_failure = Tactics.soft_failure
-
-(*------------------------------------------------------------------*)
-let bad_args () = hard_failure (Failure "improper arguments")
-
-(*------------------------------------------------------------------*)
-let get_models s = Tactics.timeout_get (TS.get_models s)
-let get_trs    s = Tactics.timeout_get (TS.get_trs s)
-
-(*------------------------------------------------------------------*)
-let convert_args s args sort = 
-  Args.convert_args (TS.table s) (TS.ty_vars s) (TS.env s) args sort
-
-let convert_i ?pat s term = 
-  let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
-  Theory.convert_i ?pat cenv (TS.ty_vars s) (TS.env s) term
-
-let econvert s term = 
-  let cenv = Theory.{ table = TS.table s; cntxt = InGoal; } in 
-  Theory.econvert cenv (TS.ty_vars s) (TS.env s) term
-
-(*------------------------------------------------------------------*)
-let make_exact ?loc env ty name =  
-  match Vars.make_exact env ty name with
-  | None ->
-    hard_failure ?loc
-      (Tactics.Failure ("variable name " ^ name ^ " already used"))
-  | Some v' -> v'
-
-let make_exact_r ?loc env ty name =  
-  match Vars.make_exact_r env ty name with
-  | None ->
-    hard_failure ?loc
-      (Tactics.Failure ("variable name " ^ name ^ " already used"))
-  | Some v' -> v'
-
-(*------------------------------------------------------------------*)
-let is_hyp_or_lemma name s =
-  Hyps.mem_name (L.unloc name) s || Prover.is_goal_formula (L.unloc name)
-
-(** Get a hypothesis or lemma by name (in the hyp case, return its id). *)
-let get_hyp_or_lemma name s =
-  let hyp_opt, (system,tyvars,f) =
-    if Hyps.mem_name (L.unloc name) s then
-      let id, f = Hyps.by_name name s in
-      Some id, (TS.system s, [], f)
-    else None, Prover.get_goal_formula name in
-
-  (* Verify that it applies to the current system. *)
-  begin
-    match TS.system s, system with
-    | s1, s2 when s1 = s2 -> ()
-    | Single (Left s1),  SystemExpr.SimplePair s2 when s1 = s2 -> ()
-    | Single (Right s1), SystemExpr.SimplePair s2 when s1 = s2 -> ()
-    | _ -> hard_failure Tactics.NoAssumpSystem
-  end ;
-
-  hyp_opt, tyvars, f
-
-(*------------------------------------------------------------------*)
-let mk_trace_cntxt s = 
-  Constr.{
-    table  = TS.table s;
-    system = TS.system s;
-    models = Some (get_models s);
-  }
+module LT = LowTactics.LowTac(TraceSequent)
 
 (*------------------------------------------------------------------*)
 let wrap_fail f (s: TS.t) sk fk =
@@ -195,217 +149,15 @@ let () =
     ~tactic_group:Logical
     left_not_intro Args.String
 
-(*------------------------------------------------------------------*)
-(** {2 Rewriting types and functions}*)
-
-type target = [`Goal | `Hyp of Ident.t]
-
-type targets = target list
-
-let target_all s : target list =
-  `Goal :: List.map (fun ldecl -> `Hyp (fst ldecl)) (Hyps.to_list s)
-
-let make_in_targets (in_t : Args.in_target) s : targets * bool =
-  match in_t with
-  | `Hyps symbs -> 
-    List.map (fun symb -> `Hyp (fst (Hyps.by_name symb s))) symbs, false
-  | `All -> target_all s, true
-  | `Goal -> [`Goal], false
-
-(** A rewrite rule is a tuple: 
-    (type variables, term variables, premisses, left term, right term)
-    Invariant: if (tyvars,sv,φ,l,r) is a rewrite rule, then
-    - sv ⊆ FV(l)
-    - ((FV(r) ∪ FV(φ)) ∩ sv) ⊆ FV(l) *)
-type 'a rw_rule = 
-  Type.tvars * Vars.Sv.t * Term.message list * 'a term * 'a term
-
-type rw_erule = Type.tvars * Vars.Sv.t * Term.message list * Term.esubst
-
-type rw_arg = 
-  | Rw_rw of Ident.t option * rw_erule
-  (* The ident is the ident of the hyp the rule came from (if any) *)
-             
-  | Rw_expand of Theory.term
-
-type rw_earg = Args.rw_count * rw_arg
-
-(** Check that the rule is correct. *)
-let check_erule ((_, sv, h, Term.ESubst (l,r)) : rw_erule) : unit =
-  let fvl, fvr = Term.fv l, Term.fv r in
-  let sh = List.fold_left (fun sh h ->
-      Vars.Sv.union sh (Term.fv h)
-    ) Vars.Sv.empty h
-  in
-
-  if not (Vars.Sv.subset sv fvl) || 
-     not (Vars.Sv.subset (Vars.Sv.inter (Vars.Sv.union fvr sh) sv) fvl) then 
-    hard_failure Tactics.BadRewriteRule;
-  ()
-  
-
-(* rewrite in a single target *)
-let do_target 
-    (doit : (Term.message * Ident.t option) -> Term.message * Term.message list) 
-    (s : sequent) (t : target) : sequent * sequent list =
-  let f, s, tgt_id = match t with
-    | `Goal -> TS.goal s, s, None
-    | `Hyp id -> Hyps.by_id id s, Hyps.remove id s, Some id
-  in
-
-  let f,subs = doit (f,tgt_id) in
-  let subs : sequent list = 
-    List.map (fun sub -> TS.set_goal sub s) subs
-  in
-
-  match t with
-  | `Goal -> TS.set_goal f s, subs
-  | `Hyp id -> Hyps.add (Args.Named (Ident.name id)) f s, subs
-
-let do_targets doit (s : sequent) targets : sequent * sequent list = 
-  let s, subs = 
-    List.fold_left (fun (s,subs) target ->
-        let s, subs' = do_target doit s target in
-        s, (List.rev subs') @ subs
-      ) (s,[]) targets
-  in
-  s, List.rev subs
     
-
 (*------------------------------------------------------------------*)
-let unfold_macro : type a. a Term.term -> sequent -> Term.esubst list = 
-  fun t s ->
-  match t with
-  | Macro (ms,l,a) ->
-    if not (TS.query_happens ~precise:true s a) then
-      soft_failure (Tactics.MustHappen a);
-
-    let mdef = Macros.get_definition (mk_trace_cntxt s) ms a in
-
-    [Term.ESubst (Macro (ms,l,a), mdef)]
-
-  | _ -> 
-    soft_failure (Tactics.Failure "can only expand macros")
-
-let unfold_macro : type a. 
-  canfail:bool -> a Term.term -> sequent -> Term.esubst list = 
-  fun ~canfail t s ->
-  try unfold_macro t s with
-  | Tactics.Tactic_soft_failure _ when not canfail -> []
-
-
-let expand_macro (targets : target list) t (s : sequent) : sequent =
-  let subst = unfold_macro ~canfail:true t s in
-  if subst = [] then soft_failure (Failure "nothing to expand");
-
-  let doit (f,_) = Term.subst subst f, [] in
-  let s, subs = do_targets doit s targets in
-  assert (subs = []);
-  s
-
-(** find occurrences of a macro in a formula *)
-let find_occs_macro_term : type a. 
-  ?st:Term.St.t ->
-  [`Any | `MSymb of Symbols.macro Symbols.t] ->
-  a Term.term -> Term.St.t =
-  fun ?(st=Term.St.empty) m t -> 
-
-  let cond ms = m = `MSymb ms.s_symb || m = `Any in
-
-  let rec find st (ETerm t) = 
-    let st = match t with
-      | Macro (ms, _, _) when cond ms -> 
-        Term.St.add (Term.ETerm t) st
-      | _ -> st in
-
-    (* we do not recurse under binders *)
-    match t with
-    | ForAll _ | Exists _ | Find _ | Seq _ -> st
-    | _ -> Term.tfold (fun t st -> find st t) t st
-  in
-
-  find st (ETerm t)
-
-(** find occurrences of a macro in a sequent *)
-let find_occs_macro 
-    (m : [`Any | `MSymb of Symbols.macro Symbols.t])
-    (targets : targets) s : Term.St.t =
-  List.fold_left (fun occs target -> 
-      let form = match target with
-        | `Goal   -> TS.goal s
-        | `Hyp id -> Hyps.by_id id s
-      in
-      find_occs_macro_term ~st:occs m form
-    ) St.empty targets
-
-let subst_of_occs_macro ~canfail (occs : Term.St.t) s : Term.subst =
-  Term.St.fold (fun (ETerm t) subst -> 
-      unfold_macro ~canfail t s @ subst
-    ) occs [] 
-
-(** expand all macros in a term *)
-let expand_all_term : type a. a term -> sequent -> a term =   
-  fun term s ->
-
-  let rec expand_rec term =
-    let occs = find_occs_macro_term `Any term in
-    let subst = subst_of_occs_macro ~canfail:false occs s in
-    if subst = [] then term else expand_rec (Term.subst subst term) 
-  in
-
-  expand_rec term
-
-(** expand all macro of some targets in a sequent *)
-let expand_all targets s : sequent = 
-  let targets, all = make_in_targets targets s in
-  let canfail = not all in
-
-  let rec expand_rec s =
-    let occs = find_occs_macro `Any targets s in
-    let subst = subst_of_occs_macro ~canfail occs s in
-    if subst = [] then s else expand_rec (TS.subst subst s)
-  in
-
-  expand_rec s
-
-let expand_all_l tgts s : sequent list = [expand_all tgts s]
-
-let expand (targets : target list) (arg : Theory.term) s = 
-  let tbl = TS.table s in
-  match Args.convert_as_lsymb [Args.Theory arg] with
-  | Some m ->
-    let m = Symbols.Macro.of_lsymb m tbl in
-    let occs = find_occs_macro (`MSymb m) targets s in
-    let subst = 
-      Term.St.fold (fun (ETerm t) subst -> 
-          unfold_macro ~canfail:false t s @ subst
-        ) occs [] in
-    
-    if subst = [] then soft_failure (Failure "nothing to expand");
-
-    let doit (f,_) = Term.subst subst f, [] in
-    let s, subs = do_targets doit s targets in
-    assert (subs = []);
-    s
-
-  | _ ->
-    match convert_args s [Args.Theory arg] Args.(Sort Message) with
-    | Args.Arg (Args.Message (f, _)) ->
-      expand_macro targets f s
-        
-    | _ ->
-      hard_failure (Tactics.Failure "expected a message term")
-
-let expands args s =
-  List.fold_left (fun s arg -> expand (target_all s) arg s) s args 
-
 let expand_tac args s =
     let args = List.map (function
         | Args.Theory t -> t
         | _ -> bad_args ()
       ) args
     in
-    [expands args s] 
+    [LT.expands args s] 
 
 let expand_tac args = wrap_fail (expand_tac args)
 
@@ -427,181 +179,11 @@ let () = T.register "expandall"
       detailed_help = "";
       tactic_group  = Structural;
       usages_sorts  = []; }
-    (expand_all_l `All)         (* FIXME: allow user to specify targets *)
+    (LT.expand_all_l `All)         (* FIXME: allow user to specify targets *)
 
 
 (*------------------------------------------------------------------*)
 
-(** [rewrite ~all tgt rw_args] rewrites [rw_arg] in [tgt].
-    If [all] is true, then does not fail if no rewriting occurs. *)
-let rewrite ~all 
-    (targets: target list) 
-    (rw : Args.rw_count * Ident.t option * rw_erule) s 
-  : sequent * sequent list =
-  let found1, cpt_occ = ref false, ref 0 in
-  let built_subs = ref [] in
-
-  (* Return: (f, subs) *)
-  let rec doit
-    : type a. Term.message -> Args.rw_count -> a rw_rule -> 
-      Term.message * Term.message list = 
-    fun f mult (tyvars, sv, rsubs, l, r) ->
-
-      (* Substitute [occ] by [r] (where free variables
-         are instantiated according to [mv], and variables binded above the
-         matched occurrences are universally quantified in the generated 
-         sub-goals. *)
-      let rw_inst occ vars mv =
-        if !cpt_occ > 1000 then   (* hard-coded *)
-          hard_failure (Failure "max nested rewriting reached (1000)");
-        incr cpt_occ;
-        found1 := true;
-
-        let subst = Term.Match.to_subst mv in
-        let r1 = Term.cast (Term.kind occ) (Term.subst subst r) in
-        let rsubs1 = 
-          List.map (fun rsub ->
-              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
-            ) rsubs in
-        built_subs := List.rev_append rsubs1 !built_subs;
-        r1
-      in
-
-      (* tries to find an occurence of [l] and rewrite it. *)
-      let pat = 
-        Term.Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = l; } 
-      in
-      let many = match mult with `Once -> false | `Any | `Many -> true in
-
-      let f_opt = Term.Match.find_map ~many (TS.env s) f pat rw_inst in
-
-      match mult, f_opt with
-      | `Any, None -> f, List.rev !built_subs
-
-      | (`Once | `Many), None -> 
-        if not all 
-        then soft_failure Tactics.NothingToRewrite 
-        else f, []
-
-      | (`Many | `Any), Some f -> doit f `Any (tyvars, sv, rsubs, l, r)
-      | `Once, Some f -> f, List.rev !built_subs
-  in
-  
-  let is_same hyp_id target_id = match hyp_id, target_id with
-    | None, _ | _, None -> false
-    | Some hyp_id, Some target_id ->
-      Ident.name hyp_id = Ident.name target_id && 
-      Ident.name hyp_id <> "_" 
-  in
-
-  let doit_tgt (f,tgt_id) =
-    match rw with
-    | mult,  id_opt, (tyvars, sv, subs, Term.ESubst (l,r)) ->
-      if is_same id_opt tgt_id 
-      then f, []
-      else doit f mult (tyvars, sv, subs, l, r)          
-  in
- 
-  let s, subs = do_targets doit_tgt s targets in
-
-  if all && not !found1 then soft_failure Tactics.NothingToRewrite;
-
-  s, subs
-
-(** Make a rewrite rule from a formula *)
-let form_to_rw_erule ?(ty_vars=[]) ?loc dir f : rw_erule = 
-  let vs, f = Term.decompose_forall f in
-  let vs, subst = Term.erefresh_vars `Global vs in
-  let f = Term.subst subst f in
-
-  let vs = Vars.Sv.of_list vs in
-
-  let subs, f = Term.decompose_impls_last f in
-
-  let e = match f with
-    | Term.Atom (`Message   (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Timestamp (`Eq, t1, t2)) -> Term.ESubst (t1,t2)
-    | Term.Atom (`Index     (`Eq, t1, t2)) -> 
-      Term.ESubst (Term.Var t1,Term.Var t2)
-    | _ -> hard_failure ?loc (Tactics.Failure "not an equality") 
-  in
-
-  let e = match dir with
-    | `LeftToRight -> e
-    | `RightToLeft -> 
-      let Term.ESubst (t1,t2) = e in
-      Term.ESubst (t2,t1)
-  in
-
-  let rule = ty_vars, vs, subs, e in
-
-  (* We check that the rule is valid *)
-  check_erule rule;
-
-  rule
-
-(** Parse rewrite tactic arguments as rewrite rules with possible subgoals 
-    showing the rule validity. *)
-let p_rw_item (rw_arg : Args.rw_item) s : rw_earg * sequent list =
-  let p_rw_rule dir (rw_type : Theory.formula) 
-    : rw_erule * sequent list * Ident.t option = 
-    match Args.convert_as_lsymb [Args.Theory rw_type] with
-    | Some str when is_hyp_or_lemma str s ->
-      let id_opt, ty_vars, f = get_hyp_or_lemma str s in
-
-      (* We are using an hypothesis, hence no new sub-goals *)
-      let premise = [] in
-
-      form_to_rw_erule ~ty_vars dir f, premise, id_opt
-
-    | _ -> 
-      let cenv = Theory.{ table = TS.table s;
-                              cntxt = InGoal; } in 
-      let f = 
-        Theory.convert cenv (TS.ty_vars s) (TS.env s) rw_type Type.Boolean 
-      in
-
-      (* create new sub-goal *)
-      let premise = [TS.set_goal f s] in
-
-      form_to_rw_erule ~loc:(L.loc rw_type) dir f, premise, None
-  in
-
-  let p_rw_item (rw_arg : Args.rw_item) : rw_earg * (sequent list) = 
-    let rw, subgoals = match rw_arg.rw_type with
-      | `Form f -> 
-        let dir = L.unloc rw_arg.rw_dir in
-        (* (rewrite rule, subgols, hyp id) if applicable *)
-        let rule, subgoals, id_opt = p_rw_rule dir f in
-        Rw_rw (id_opt, rule), subgoals
-
-      | `Expand t -> 
-        if L.unloc rw_arg.rw_dir <> `LeftToRight then
-          hard_failure ~loc:(L.loc rw_arg.rw_dir) 
-            (Failure "expand cannot take a direction");
-        
-         Rw_expand t, []
-    in
-    (rw_arg.rw_mult, rw), subgoals
-  in
-  
-  p_rw_item rw_arg
-
-(** Applies a rewrite item *)
-let do_rw_item 
-    (rw_item : Args.rw_item) (rw_in : Args.in_target) (s : TS.sequent) 
-  : TS.sequent list =
-  let targets, all = make_in_targets rw_in s in
-  let (rw_c,rw_arg), subgoals = p_rw_item rw_item s in
-
-  match rw_arg with
-  | Rw_rw (id, erule) -> 
-    let s, subs = rewrite ~all targets (rw_c, id, erule) s in
-    subgoals @                  (* prove rule *)
-    subs @                      (* prove instances premisses *)
-    [s]                         (* final sequent *)
-
-  | Rw_expand arg -> [expand targets arg s]
 
 (*------------------------------------------------------------------*)
 (** Apply a naming pattern to a variable or hypothesis. *)
@@ -615,7 +197,7 @@ let do_naming_pat (ip_handler : Args.ip_handler) nip s : sequent =
       | Args.AnyName ->
         Vars.fresh_r env v
 
-      | Args.Named name -> make_exact_r env (Vars.ty v) name 
+      | Args.Named name -> LT.make_exact_r env (Vars.ty v) name 
     in
     let subst = [Term.ESubst (Term.Var v, Term.Var v')] in
 
@@ -791,7 +373,7 @@ let conditional_case (m : Term.message) s : sequent list =
       soft_failure (Tactics.MustHappen ts);
 
     begin 
-      match Macros.get_definition (mk_trace_cntxt s) ms ts with
+      match Macros.get_definition (TS.mk_trace_cntxt s) ms ts with
       | Term.Find (vars,c,t,e) -> case_cond m vars c t e s
       | Term.Fun (f,_,[c;t;e]) when f = Term.f_ite -> case_cond m [] c t e s
       | _ -> Tactics.(soft_failure (Failure "message is not a conditional"))
@@ -821,7 +403,7 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     List.map (fun (CHyp _, ss) -> ss) (hypothesis_case ~nb:`Any id s)
 
   | _ ->
-    match convert_args s args Args.(Sort ETerm) with
+    match LT.convert_args s args Args.(Sort ETerm) with
     | Args.Arg (ETerm (ty, f, _)) -> 
       begin
         match Type.kind ty with
@@ -1008,8 +590,8 @@ and do_simpl_pat (h : Args.ip_handler) (ip : Args.simpl_pat) s : sequent list =
   | `Hyp id, Args.Srewrite dir -> 
     let f = Hyps.by_id id s in
     let s = Hyps.remove id s in
-    let erule = form_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) f in
-    let s, subgoals = rewrite ~all:false [`Goal] (`Many, Some id, erule) s in
+    let erule = LT.form_to_rw_erule ~loc:(L.loc dir) (L.unloc dir) f in
+    let s, subgoals = LT.rewrite ~all:false [`Goal] (`Many, Some id, erule) s in
     subgoals @ [s]
 
   | `Var _, (Args.SAndOr _ | Args.Srewrite _) ->
@@ -1229,7 +811,7 @@ let generalize_l vs s : sequent = List.fold_right generalize vs s
 let generalize_tac_args (args : Args.parser_arg list) s = 
     let vars = 
       List.map (fun arg -> 
-          match convert_args s [arg] (Args.Sort Args.ETerm) with 
+          match LT.convert_args s [arg] (Args.Sort Args.ETerm) with 
           | Args.Arg (Args.ETerm (_, Term.Var v, _)) -> Vars.EVar v
 
           | Args.Arg (Args.ETerm (_, _, loc)) ->
@@ -1333,7 +915,7 @@ let () = T.register "assumption"
   * If given an introduction patterns, apply it to the generated hypothesis. *)
 let use ip (name : lsymb) (ths : Theory.term list) (s : TS.t) =
   (* Get formula to apply. *)
-  let _, ty_vars, f = get_hyp_or_lemma name s in
+  let _, ty_vars, f = TS.get_hyp_or_lemma name s in
 
   (* FIXME *)
   if ty_vars <> [] then
@@ -1423,7 +1005,7 @@ let tac_assert (args : Args.parser_arg list) s sk fk =
       | [f; Args.SimplPat ip] -> Some ip, f
       | _ -> bad_args () in
 
-    let f = match convert_args s [f] Args.(Sort Boolean) with
+    let f = match LT.convert_args s [f] Args.(Sort Boolean) with
       | Args.(Arg (Boolean f)) -> f
       | _ -> bad_args () in
 
@@ -1487,9 +1069,9 @@ let () =
 (*------------------------------------------------------------------*)
 (** [congruence judge sk fk] try to close the goal using congruence, else
     calls [fk] *)
-let congruence (s : TS.t) : bool Utils.timeout_r =
+let congruence (s : TS.t) : bool =
   match simpl_left s with
-  | None -> Utils.Result true
+  | None -> true
   | Some s ->
     let conclusions =
       Utils.odflt [] (Term.disjunction_to_literals (TS.goal s)) 
@@ -1513,7 +1095,7 @@ let congruence (s : TS.t) : bool Utils.timeout_r =
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let congruence_tac (s : TS.t) =
-  match Tactics.timeout_get (congruence s) with 
+  match congruence s with 
   | true ->
     let () = dbg "closed by congruence" in
     []
@@ -1535,7 +1117,7 @@ let () = T.register "congruence"
 (*------------------------------------------------------------------*)
 let constraints (s : TS.t) =
   match simpl_left s with
-  | None -> Utils.Result true
+  | None -> true
   | Some s ->
     let conclusions =
       Utils.odflt [] (Term.disjunction_to_literals (TS.goal s)) 
@@ -1559,7 +1141,7 @@ let constraints (s : TS.t) =
 
 (** [constraints s] proves the sequent using its trace formulas. *)
 let constraints_tac (s : TS.t) =
-  match Tactics.timeout_get (constraints s) with 
+  match constraints s with 
   | true ->
     let () = dbg "closed by constraints" in
     []
@@ -1620,7 +1202,7 @@ let () =
 (** Add index constraints resulting from names equalities, modulo the TRS.
     The judgment must have been completed before calling [eq_names]. *)
 let eq_names (s : TS.t) =
-  let trs = get_trs s in
+  let trs   = TS.get_trs s in
   let table = TS.table s in
   let terms = TS.get_all_messages s in
   (* we start by collecting equalities between names implied by the indep axiom.
@@ -1636,7 +1218,7 @@ let eq_names (s : TS.t) =
 
   (* we now collect equalities between timestamp implied by equalities between
      names. *)
-  let trs = get_trs s in
+  let trs = TS.get_trs s in
   let cnstrs = 
     Completion.name_index_cnstrs table trs (TS.get_all_messages s)
   in
@@ -1662,8 +1244,7 @@ let () = T.register "eqnames"
 (*------------------------------------------------------------------*)
 (** Add terms constraints resulting from timestamp and index equalities. *)
 let eq_trace (s : TS.t) =
-  let ts_classes = 
-    Tactics.timeout_get (TS.get_ts_equalities ~precise:false s) 
+  let ts_classes = TS.get_ts_equalities ~precise:false s
   in
   let ts_classes = List.map (List.sort_uniq Stdlib.compare) ts_classes in
   let ts_subst =
@@ -1674,8 +1255,7 @@ let eq_trace (s : TS.t) =
     List.map (function [] -> [] | p::q -> asubst p q) ts_classes
     |> List.flatten
   in
-  let ind_classes = 
-    Tactics.timeout_get (TS.get_ind_equalities ~precise:false s) 
+  let ind_classes = TS.get_ind_equalities ~precise:false s
   in
   let ind_classes = List.map (List.sort_uniq Stdlib.compare) ind_classes in
   let ind_subst =
@@ -1846,7 +1426,7 @@ let fresh (Args.String m) s =
   try
     let id,hyp = Hyps.by_name m s in
     
-    let hyp = expand_all_term hyp s in
+    let hyp = LT.expand_all_term hyp s in
 
     let table = TS.table s in
     let env   = TS.env s in
@@ -1860,7 +1440,7 @@ let fresh (Args.String m) s =
           Tactics.soft_failure
             (Failure "the type of this term is not [large]");
 
-        let cntxt = mk_trace_cntxt s in
+        let cntxt = TS.mk_trace_cntxt s in
         let phi_direct = mk_fresh_direct cntxt env ns t in
         let phi_indirect = mk_fresh_indirect cntxt env ns t in
 
@@ -1899,7 +1479,7 @@ let apply_substitute subst s =
 
 let substitute_mess (m1, m2) s =
   let subst =
-        let trs = get_trs s in
+        let trs = TS.get_trs s in
         if Completion.check_equalities trs [Term.ESubst (m1,m2)] then
           [Term.ESubst (m1,m2)]
         else
@@ -1909,7 +1489,7 @@ let substitute_mess (m1, m2) s =
 
 let substitute_ts (ts1, ts2) s =
   let subst =
-      let models = get_models s in
+      let models = TS.get_models s in
       if Constr.query ~precise:true models [(`Pos, `Timestamp (`Eq,ts1,ts2))] then
         [Term.ESubst (ts1,ts2)]
       else
@@ -1927,7 +1507,7 @@ let substitute_idx (i1 , i2 : Type.index Term.term * Type.index Term.term) s =
   in
 
   let subst =
-    let models = get_models s in
+    let models = TS.get_models s in
     if Constr.query ~precise:true models [(`Pos, `Index (`Eq,i1,i2))] then
       [Term.ESubst (Term.Var i1,Term.Var i2)]
     else
@@ -2157,10 +1737,10 @@ let () =
 
 (*------------------------------------------------------------------*)
 let remember (id : Theory.lsymb) (term : Theory.term) s =
-  match econvert s term with
+  match LT.econvert s term with
   | None -> soft_failure ~loc:(L.loc term) (Failure "type error")
   | Some (Theory.ETerm (ty, t, _)) -> 
-    let env, x = make_exact ~loc:(L.loc id) (TS.env s) ty (L.unloc id) in
+    let env, x = LT.make_exact ~loc:(L.loc id) (TS.env s) ty (L.unloc id) in
     let subst = [Term.ESubst (t, Term.Var x)] in
 
     let s = TS.subst subst (TS.set_env env s) in
@@ -2192,12 +1772,13 @@ let new_simpl ~congr ~constr s =
       if Hyps.is_hyp goal s || Term.f_triv goal then None
       else match goal with
         | Term.Atom Term.(#trace_atom as at) -> 
-          if constr && Constr.query ~precise:true (get_models s) [`Pos, at] 
+          if constr && Constr.query ~precise:true (TS.get_models s) [`Pos, at] 
           then None 
           else Some goal
 
         | Term.Atom (`Message (`Eq, t1, t2)) -> 
-          if congr && Completion.check_equalities (get_trs s) [Term.ESubst (t1,t2)] 
+          if congr && 
+             Completion.check_equalities (TS.get_trs s) [Term.ESubst (t1,t2)] 
           then None
           else Some goal          
 
@@ -2226,7 +1807,7 @@ let simplify ~close ~strong =
 
   let expand_all = 
     (if strong && close && not intro 
-     then [wrap_fail (expand_all_l `All)] @ assumption
+     then [wrap_fail (LT.expand_all_l `All)] @ assumption
      else []) 
   in
 
@@ -2342,7 +1923,7 @@ let do_s_item (s_item : Args.s_item) s : TS.sequent list =
 (** Applies a rewrite arg  *)
 let do_rw_arg rw_arg rw_in s : TS.sequent list =
   match rw_arg with
-  | Args.R_item rw_item  -> do_rw_item rw_item rw_in s
+  | Args.R_item rw_item  -> LT.do_rw_item rw_item rw_in s
   | Args.R_s_item s_item -> do_s_item s_item s (* targets are ignored there *)
 
 let rewrite_tac args s =
@@ -2373,7 +1954,7 @@ let () =
 
 (*------------------------------------------------------------------*)
 
-let apply (pat : Type.message Term.Match.pat) (s : TS.t) =
+let apply (pat : Type.message Term.pat) (s : TS.t) =
   let subs, f = Term.decompose_impls_last pat.pat_term in 
 
   if not (Vars.Sv.subset pat.pat_vars (Term.fv f)) then
@@ -2397,7 +1978,7 @@ let apply (pat : Type.message Term.Match.pat) (s : TS.t) =
     E.g., if `H1 : A -> B` and `H2 : A` then `apply H1 in H2` replaces
     `H2 : A` by `H2 : B` 
 *)
-let apply_in (pat : Type.message Term.Match.pat) (hyp : Ident.t) (s : TS.t) =
+let apply_in (pat : Type.message Term.pat) (hyp : Ident.t) (s : TS.t) =
   let fprems, fconcl = Term.decompose_impls_last pat.pat_term in 
 
   let h = Hyps.by_id hyp s in
@@ -2449,11 +2030,11 @@ let apply_in (pat : Type.message Term.Match.pat) (hyp : Ident.t) (s : TS.t) =
 
 (** Parse apply tactic arguments *)
 let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) : 
-  sequent list * Type.message Term.Match.pat * target =
+  sequent list * Type.message Term.pat * LT.target =
   let subgoals, pat, in_opt = 
     match args with
     | [Args.ApplyIn (Theory.PT_hol pt,in_opt)] ->
-      let _, tyvars, f = get_hyp_or_lemma pt.p_pt_hid s in
+      let _, tyvars, f = TS.get_hyp_or_lemma pt.p_pt_hid s in
       let f_args, f = Term.decompose_forall f in
       let f_args, subst = Term.erefresh_vars `Global f_args in
       let f = Term.subst subst f in
@@ -2496,7 +2077,7 @@ let p_apply_args (args : Args.parser_arg list) (s : TS.sequent) :
 
     | [Args.ApplyIn (Theory.PT_form f,in_opt)] ->
       begin
-        match convert_args s args Args.(Sort Boolean) with
+        match LT.convert_args s args Args.(Sort Boolean) with
         | Args.Arg (Boolean f) ->
           let subgoal = TS.set_goal f s in
 
@@ -2561,7 +2142,7 @@ let rec do_intros (intros : Args.intro_pattern list) s =
     do_intros_list intros ss
 
   | (Args.SExpnd s_e) :: intros ->
-    let ss = do_rw_item (s_e :> Args.rw_item) `Goal s in
+    let ss = LT.do_rw_item (s_e :> Args.rw_item) `Goal s in
     let ss = as_seq1 ss in (* we get exactly one new goal *)
     do_intros intros ss
 
@@ -2641,7 +2222,7 @@ let () =
  * condition is true (resp. false). *)
 
 let apply_yes_no_if b s =
-  let cntxt = mk_trace_cntxt s in
+  let cntxt = TS.mk_trace_cntxt s in
   let conclusion = TS.goal s in
   (* search for the first occurrence of an if-then-else in [elem] *)
   let iter = new Iter.get_ite_term ~cntxt in
@@ -2820,14 +2401,12 @@ let euf_apply_schema sequent (_, key, m, s, _, _, _) case =
   in
 
   let ts_list = 
-    let iter = new Fresh.get_actions ~cntxt:(mk_trace_cntxt sequent) in
+    let iter = new Fresh.get_actions ~cntxt:(TS.mk_trace_cntxt sequent) in
     List.iter iter#visit_message [s; m];
     iter#get_actions
   in
   (* The action occured before the test H(m,k) = s. *)
-  let maximal_elems =
-    Tactics.timeout_get (TS.maximal_elems ~precise:false sequent ts_list)
-  in
+  let maximal_elems = TS.maximal_elems ~precise:false sequent ts_list in
 
   let le_cnstr =
     List.map
@@ -2888,7 +2467,7 @@ let euf_apply_direct s (_, key, m, _, _, _, _) Euf.{d_key_indices;d_message} =
 let euf_apply_facts drop_head s
     ((head_fn, key, mess, sign, allow_functions, _, _) as p) =
   let env = TS.env s in
-  let cntxt = mk_trace_cntxt s in
+  let cntxt = TS.mk_trace_cntxt s in
 
   (* check that the SSCs hold *)
   Euf.key_ssc ~messages:[mess;sign] ~allow_functions ~cntxt head_fn key.s_symb;
@@ -2992,7 +2571,7 @@ let valid_hash (cntxt : Constr.trace_cntxt) (t : Term.message) =
 (** We collect all hashes appearing inside the hypotheses, and which satisfy
     the syntactic side condition. *)
 let top_level_hashes s =
-  let cntxt = mk_trace_cntxt s in
+  let cntxt = TS.mk_trace_cntxt s in
 
   let hashes = 
     List.filter (valid_hash cntxt) (TS.get_all_messages s)
@@ -3015,7 +2594,7 @@ let top_level_hashes s =
         (make_eq acc q) q
   in
 
-  let trs = get_trs s in
+  let trs = TS.get_trs s in
 
   make_eq [] hashes
   |> List.filter (fun (a,b) -> 
@@ -3034,7 +2613,7 @@ let collision_resistance TacticsArgs.(Opt (String, i)) (s : TS.t) =
     | None -> top_level_hashes s
     | Some (String j) -> match Hyps.by_name j s with
       | _, Term.Atom (`Message (`Eq, t1, t2)) -> 
-        let cntxt = mk_trace_cntxt s in
+        let cntxt = TS.mk_trace_cntxt s in
         if not (valid_hash cntxt t1) || not (valid_hash cntxt t2) then 
           soft_failure Tactics.NoSSC;
 

@@ -5,6 +5,10 @@ module Args = TacticsArgs
 module L = Location
 module T = Tactics
 
+type lsymb = Theory.lsymb
+
+type hyp = Term.message
+
 (*------------------------------------------------------------------*)
 (* For debugging *)
 let dbg s = Printer.prt `Ignore s
@@ -204,41 +208,37 @@ let get_eq_atoms (s : sequent) : Term.eq_atom list =
 (*------------------------------------------------------------------*)
 (** Prepare constraints or TRS query *)
 
-let get_models s : Constr.models timeout_r =
+let get_models_t s : Constr.models timeout_r =
   let trace_literals = get_trace_literals s in
   Constr.models_conjunct trace_literals 
 
+let get_models s = Tactics.timeout_get (get_models_t s)
+
 let query ~precise s q =
-  let models = T.timeout_get (get_models s) in
+  let models = get_models s in
   Constr.query ~precise models q
 
 let query_happens ~precise s a = query ~precise s [`Pos, `Happens a]
 
 let maximal_elems ~precise s tss =
-  match get_models s with
-  | Result models -> Result (Constr.maximal_elems ~precise models tss)
-  | Timeout -> Timeout
+  let models = get_models s in
+  Constr.maximal_elems ~precise models tss
 
 let get_ts_equalities ~precise s =
-  match get_models s with
-  | Result models ->
+  let models = get_models s in
     let ts = List.map (fun (_,x) -> x) (get_trace_literals s)
              |>  Atom.trace_atoms_ts in
-    Result (Constr.get_ts_equalities ~precise models ts)
-  | Timeout -> Timeout
+    Constr.get_ts_equalities ~precise models ts
 
 let get_ind_equalities ~precise s =
-  match get_models s with
-  | Result models ->
-    let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
-               |> Atom.trace_atoms_ind in
-    Result (Constr.get_ind_equalities ~precise models inds)
-  | Timeout -> Timeout    
+  let models = get_models s in
+  let inds = List.map (fun (_,x) -> x) (get_trace_literals s)
+             |> Atom.trace_atoms_ind in
+  Constr.get_ind_equalities ~precise models inds
 
 let constraints_valid s =
-  match get_models s with
-  | Result models -> Result (not (Constr.m_is_sat models))
-  | Timeout -> Timeout
+  let models = get_models s in
+  not (Constr.m_is_sat models)
 
 (*------------------------------------------------------------------*)
 let get_all_messages s =
@@ -469,6 +469,10 @@ let subst subst s =
 
     Hyps.reload s
 
+let subst_hyp subst t = Term.subst subst t
+
+(*------------------------------------------------------------------*)
+let get_terms t = [t]
 
 (*------------------------------------------------------------------*)
 (** TRS *)
@@ -487,24 +491,39 @@ let get_eqs_neqs s =
 
     ) ([],[]) (get_eq_atoms s)
 
-let get_trs s : Completion.state timeout_r =
+let get_trs_t s : Completion.state timeout_r =
   let eqs,_ = get_eqs_neqs s in
   Completion.complete s.table eqs 
 
-let eq_atoms_valid s =
-  match get_trs s with
-  | Timeout -> Timeout
-  | Result trs ->
-    let () = dbg "trs: %a" Completion.pp_state trs in
+let get_trs s = Tactics.timeout_get (get_trs_t s)
 
-    let _, neqs = get_eqs_neqs s in
-    Result (
-      List.exists (fun (Term.ESubst (a, b)) ->
-          if Completion.check_equalities trs [Term.ESubst (a, b)] then
-            let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
-            true
-          else
-            let () = dbg "dis-equality %a ≠ %a: no violation" 
-                Term.pp a Term.pp b in
-            false)
-        neqs)
+let eq_atoms_valid s =
+  let trs = get_trs s in
+  let () = dbg "trs: %a" Completion.pp_state trs in
+
+  let _, neqs = get_eqs_neqs s in
+  List.exists (fun (Term.ESubst (a, b)) ->
+      if Completion.check_equalities trs [Term.ESubst (a, b)] then
+        let () = dbg "dis-equality %a ≠ %a violated" Term.pp a Term.pp b in
+        true
+      else
+        let () = dbg "dis-equality %a ≠ %a: no violation" 
+            Term.pp a Term.pp b in
+        false)
+    neqs
+
+(*------------------------------------------------------------------*)
+let mk_trace_cntxt s = 
+  Constr.{
+    table  = table s;
+    system = system s;
+    models = Some (get_models s);
+  }
+
+module Match : Term.MatchS with type t = hyp = Term.Match
+
+
+let set_reach_goal t s = set_goal t s
+
+let reach_to_hyp t = t
+let hyp_to_reach ?loc t = t

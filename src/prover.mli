@@ -7,19 +7,9 @@ module SE = SystemExpr
 
 type lsymb = Theory.lsymb
 
-module Goal : sig
-  type t = Trace of TraceSequent.t | Equiv of EquivSequent.t
-  val pp : Format.formatter -> t -> unit
-  val pp_init : Format.formatter -> t -> unit
-  val get_env : t -> Vars.env
-end
-
-(** A goal of the prover is simply a name and a formula *)
-type named_goal = string * Goal.t
-
 (** [current_goal] returns the current (sub)goal of the prover,
   * if any. *)
-val current_goal : unit -> named_goal option
+val current_goal : unit -> Goal.named_goal option
 
 (** Current mode of the prover:
     - [GoalMode] : waiting for the next goal.
@@ -31,29 +21,13 @@ type prover_mode = GoalMode | ProofMode | WaitQed | AllDone
 
 
 (*------------------------------------------------------------------*)
-(** {2 Type of parsed new goal } *)
-
-type p_equiv = Theory.term list 
-
-type p_equiv_form = 
-  | PEquiv of p_equiv
-  | PReach of Theory.formula
-  | PImpl  of p_equiv_form * p_equiv_form
-
-type p_goal_form =
-  | P_trace_goal of Decl.p_goal_reach_cnt
-
-  | P_equiv_goal of SE.p_system_expr * Theory.bnds * p_equiv_form L.located
-
-  | P_equiv_goal_process of SE.p_system_expr
-
-type p_goal = Decl.p_goal_name * p_goal_form
+(** {2 Parser types} *)
 
 (** Goal mode input types:
     - [Gm_goal f] : declare a new goal f.
     - [Gm_proof]  : start a proof. *)
 type gm_input_i =
-  | Gm_goal of p_goal
+  | Gm_goal of Goal.p_goal
   | Gm_proof
 
 type gm_input = gm_input_i L.located
@@ -171,7 +145,11 @@ exception ParseError of string
 val get_goal_formula : 
   lsymb -> SE.system_expr * Type.tvars * Term.message 
 
+val get_equiv_goal_formula : 
+  lsymb -> SE.system_expr * Type.tvars * Equiv.form
+
 val is_goal_formula : string -> bool
+val is_equiv_goal_formula : string -> bool
 
 type parsed_input =
   | ParsedInputDescr of Decl.declarations
@@ -184,7 +162,7 @@ type parsed_input =
   | EOF
 
 (** Declare a new goal to the current goals, and returns it *)
-val declare_new_goal : Symbols.table -> L.t -> p_goal -> named_goal
+val declare_new_goal : Symbols.table -> L.t -> Goal.p_goal -> Goal.named_goal
 
 (** From the name of the function, returns the corresponding formula. If no tag
    formula was defined, returns False. *)

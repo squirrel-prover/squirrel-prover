@@ -141,7 +141,7 @@ let main_loop_body ~test state =
           let i,f = Prover.declare_new_goal state.table (L.loc goal) g in
           Printer.pr "@[<v 2>Goal %s :@;@[%a@]@]@."
             i
-            Prover.Goal.pp_init f;
+            Goal.pp_init f;
           { state with mode = GoalMode; }
       end
 

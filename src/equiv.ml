@@ -1,3 +1,5 @@
+open Utils
+
 (** Equivalence formulas.  *)
 
 module Sv = Vars.Sv
@@ -106,3 +108,63 @@ let rec subst s (f : form) =
       let v, s = Term.subst_binding v s in
       let f = subst s (ForAll (evs,f)) in
       mk_forall [v] f
+
+
+(*------------------------------------------------------------------*)
+(** {2 Matching} *)
+module Match : Term.MatchS with type t = form = struct 
+  module TMatch = Term.Match
+
+  (* We include Term.Match, and redefine any necessary function *)
+  include TMatch
+
+  type t = form
+
+  let try_match (t : form) pat = 
+    match t with
+    | Atom (Reach f) -> TMatch.try_match f pat
+    | _ -> `NoMatch
+
+  let rec find_map :
+    type b. many:bool -> 
+    Vars.env -> form -> b Term.pat -> 
+    (b Term.term -> Vars.evars -> mv -> b Term.term) -> 
+    form option
+    = fun ~many env e p func ->
+      match e with
+      | Atom (Reach f) -> 
+        omap (fun x -> Atom (Reach (x))) (TMatch.find_map ~many env f p func)
+      | Atom (Equiv e) -> 
+        let found = ref false in
+
+        let e = List.fold_left (fun acc f ->
+            if not !found || many then
+              match TMatch.find_map ~many env f p func with
+              | None -> f :: acc
+              | Some f -> found := true; f :: acc
+            else f :: acc
+          ) [] e
+        in
+        let e = List.rev e in
+
+        if !found then Some (Atom (Equiv e)) else None
+
+      | Impl (e1, e2) -> 
+        let found, e1 = 
+          match find_map ~many env e1 p func with
+          | Some e1 -> true, e1
+          | None -> false, e1 
+        in
+        
+        let found, e2 = 
+          if not found || many then
+            match find_map ~many env e2 p func with
+            | Some e2 -> true, e2
+            | None -> false, e2
+          else found, e2
+        in
+        if found then Some (Impl (e1, e2)) else None
+
+      | ForAll (vs, e) -> None  (* FIXME: match under binders *)
+
+end

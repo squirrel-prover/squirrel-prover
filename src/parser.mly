@@ -709,10 +709,10 @@ equiv:
 | ei=term COMMA eis=equiv { ei::eis }
 
 equiv_form:
-| LBRACKET f=term RBRACKET      { Prover.PReach f }
-| e=equiv            { Prover.PEquiv e }
+| LBRACKET f=term RBRACKET      { Goal.PReach f }
+| e=equiv                       { Goal.PEquiv e }
 /* | LPAREN f=equiv_form RPAREN       { f } */
-| f=equiv_form ARROW f0=equiv_form { Prover.PImpl (f,f0) }
+| f=equiv_form ARROW f0=equiv_form { Goal.PImpl (f,f0) }
 
 args:
 |                                    { [] }
@@ -753,13 +753,13 @@ goal_reach:
 goal_i:
 | GOAL g=goal_reach DOT
     { let n, goal_cnt = g in
-      Prover.Gm_goal (n, Prover.P_trace_goal goal_cnt) }
+      Prover.Gm_goal (n, Goal.P_trace_goal goal_cnt) }
 
 | EQUIV s=bisystem n=gname env=args COLON f=loc(equiv_form) DOT
-                 { Prover.Gm_goal (n, P_equiv_goal (s, env, f)) }
+                 { Prover.Gm_goal (n, Goal.P_equiv_goal (s, env, f)) }
 
 | EQUIV s=bisystem n=gname DOT
-                 { Prover.Gm_goal (n, P_equiv_goal_process s) }
+                 { Prover.Gm_goal (n, Goal.P_equiv_goal_process s) }
 
 | PROOF          { Prover.Gm_proof }
 

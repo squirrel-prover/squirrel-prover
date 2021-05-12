@@ -1233,9 +1233,39 @@ let tsubst : type a. Type.tsubst -> a term -> a term =
 (*------------------------------------------------------------------*)
 (** {2 Matching and rewriting} *)
 
-module Match = struct 
+(** A pattern is a list of free type variables, a term [t] and a subset
+    of [t]'s free variables that must be matched. 
+    The free type variables must be inferred. *)
+type 'a pat = { 
+  pat_tyvars : Type.tvars; 
+  pat_vars : Vars.Sv.t; 
+  pat_term : 'a term;
+}
+
+(** Module signature of matching. 
+    The type of term we match into is abstract. *)
+module type MatchS = sig
+  type mv
+
+  type t
+
+  val pp_pat : Format.formatter -> 'a pat -> unit
+
+  val to_subst : mv -> subst
+
+  val try_match : t -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
+
+  val find_map :
+    many:bool -> Vars.env -> t -> 'b pat -> 
+    ('b term -> Vars.evars -> mv -> 'b term) -> 
+    t option
+end
+
+module Match : MatchS with type t = message = struct 
   (** Variable assignment (types must be compatible). *)
   type mv = eterm Mv.t
+
+  type t = message
 
   let to_subst (mv : mv) : subst =
     Mv.fold (fun v t subst -> 
@@ -1243,15 +1273,6 @@ module Match = struct
         | Vars.EVar v, ETerm t -> 
           ESubst (Var v, cast (Vars.kind v) t) :: subst
       ) mv [] 
-
-  (** A pattern is a list of free type variables, a term [t] and a subset
-      of [t]'s free variables that must be matched. 
-      The free type variables must be inferred. *)
-  type 'a pat = {
-    pat_tyvars : Type.tvars; 
-    pat_vars : Sv.t; 
-    pat_term : 'a term; 
-  }
   
   let pp_pat fmt p =
     Fmt.pf fmt "@[<hov 0>{term = @[%a@];@ tyvars = @[%a@];@ vars = @[%a@]}@]"
