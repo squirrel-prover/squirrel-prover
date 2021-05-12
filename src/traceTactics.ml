@@ -46,11 +46,6 @@ type sequent = TS.sequent
 module LT = LowTactics.LowTac(TraceSequent)
 
 (*------------------------------------------------------------------*)
-let wrap_fail f (s: TS.t) sk fk =
-  try sk (f s) fk with
-  | Tactics.Tactic_soft_failure e -> fk e
-
-(*------------------------------------------------------------------*)
 (** {2 Logical Tactics} *)
 
 (** Propositional connectives *)
@@ -159,7 +154,7 @@ let expand_tac args s =
     in
     [LT.expands args s] 
 
-let expand_tac args = wrap_fail (expand_tac args)
+let expand_tac args = LT.wrap_fail (expand_tac args)
 
 let () = T.register_general "expand"
     ~tactic_help:{
@@ -180,9 +175,6 @@ let () = T.register "expandall"
       tactic_group  = Structural;
       usages_sorts  = []; }
     (LT.expand_all_l `All)         (* FIXME: allow user to specify targets *)
-
-
-(*------------------------------------------------------------------*)
 
 
 (*------------------------------------------------------------------*)
@@ -228,7 +220,7 @@ let revert_args (args : Args.parser_arg list) s =
       ) s args in
   [s]
 
-let revert_tac args s sk fk = wrap_fail (revert_args args) s sk fk
+let revert_tac args s sk fk = LT.wrap_fail (revert_args args) s sk fk
 
 let () =
   T.register_general "revert"
@@ -416,7 +408,7 @@ let do_case_tac (args : Args.parser_arg list) s : sequent list =
     | _ -> bad_args ()
 
 
-let case_tac args = wrap_fail (do_case_tac args)
+let case_tac args = LT.wrap_fail (do_case_tac args)
 
 let () =
   let open Tactics in
@@ -467,7 +459,7 @@ let clear_tac_args (args : Args.parser_arg list) s =
       ) s args in
   [s] 
 
-let clear_tac args = wrap_fail (clear_tac_args args)
+let clear_tac args = LT.wrap_fail (clear_tac_args args)
       
 let () =
   T.register_general "clear"
@@ -684,7 +676,7 @@ let destruct_tac_args args s =
 
     | _ -> bad_args ()
 
-let destruct_tac args = wrap_fail (destruct_tac_args args)
+let destruct_tac args = LT.wrap_fail (destruct_tac_args args)
 
 let () =
   T.register_general "destruct"
@@ -823,7 +815,7 @@ let generalize_tac_args (args : Args.parser_arg list) s =
 
     [generalize_l vars s]
       
-let generalize_tac args = wrap_fail (generalize_tac_args args)
+let generalize_tac args = LT.wrap_fail (generalize_tac_args args)
 
 let () =
   T.register_general "generalize"
@@ -1752,7 +1744,7 @@ let remember_tac_args (args : Args.parser_arg list) s : sequent list =
   | [Args.Remember (term, id)] -> [remember id term s]
   | _ -> bad_args ()
       
-let remember_tac args = wrap_fail (remember_tac_args args)
+let remember_tac args = LT.wrap_fail (remember_tac_args args)
 
 let () =
   T.register_general "remember"
@@ -1797,17 +1789,17 @@ let simplify ~close ~strong =
   let open Tactics in
   let intro = Config.auto_intro () in
   
-  let assumption = if close then [try_tac (wrap_fail assumption)] else [] in
+  let assumption = if close then [try_tac (LT.wrap_fail assumption)] else [] in
 
   let new_simpl ~congr ~constr = 
     if strong && not intro 
-    then [wrap_fail (new_simpl ~congr ~constr)] @ assumption
+    then [LT.wrap_fail (new_simpl ~congr ~constr)] @ assumption
     else [] 
   in
 
   let expand_all = 
     (if strong && close && not intro 
-     then [wrap_fail (LT.expand_all_l `All)] @ assumption
+     then [LT.wrap_fail (LT.expand_all_l `All)] @ assumption
      else []) 
   in
 
@@ -1817,17 +1809,17 @@ let simplify ~close ~strong =
        * of doing it after introductions. *)
     assumption @
     (new_simpl ~congr:false ~constr:false) @ 
-    (if close || intro then [wrap_fail intro_all;
-                             wrap_fail simpl_left_tac] else []) @
+    (if close || intro then [LT.wrap_fail intro_all;
+                             LT.wrap_fail simpl_left_tac] else []) @
     assumption @
     expand_all @
     (* Learn new term equalities from constraints before
      * learning new index equalities from term equalities,
      * otherwise this creates e.g. n(j)=n(i) from n(i)=n(j). *)
     (* (if intro then [wrap eq_trace] else []) @ *)
-    (if strong then [wrap_fail eq_names] else []) @
+    (if strong then [LT.wrap_fail eq_names] else []) @
     (* Simplify equalities using substitution. *)
-    (repeat ~cut:true (wrap_fail autosubst)) ::
+    (repeat ~cut:true (LT.wrap_fail autosubst)) ::
     expand_all @
     assumption @ (new_simpl ~congr:true ~constr:true) @ 
     [clear_triv]
@@ -1836,9 +1828,9 @@ let simplify ~close ~strong =
 (*------------------------------------------------------------------*)
 (* Attempt to close a goal. *)
 let do_conclude =
-  Tactics.orelse_list [wrap_fail congruence_tac; 
-                       wrap_fail constraints_tac; 
-                       wrap_fail assumption]
+  Tactics.orelse_list [LT.wrap_fail congruence_tac; 
+                       LT.wrap_fail constraints_tac; 
+                       LT.wrap_fail assumption]
 
 
 
@@ -1864,7 +1856,7 @@ let rec simpl ~strong ~close : TS.t Tactics.tac =
       then fun _ -> fk (None, GoalNotClosed)
       else fun _ -> sk [g] fk
     in
-    (wrap_fail goal_and_right) g
+    (LT.wrap_fail goal_and_right) g
       (fun l _ -> match l with
          | [g1;g2] ->
            simpl ~strong ~close g1
@@ -1935,7 +1927,7 @@ let rewrite_tac args s =
 
   | _ -> bad_args ()
 
-let rewrite_tac args = wrap_fail (rewrite_tac args)
+let rewrite_tac args = LT.wrap_fail (rewrite_tac args)
 
 let () =
   T.register_general "rewrite"
@@ -2112,7 +2104,7 @@ let apply_tac_args (args : Args.parser_arg list) s =
   | `Goal   -> subgoals @ apply pat s      
   | `Hyp id -> subgoals @ apply_in pat id s
 
-let apply_tac args = wrap_fail (apply_tac_args args)
+let apply_tac args = LT.wrap_fail (apply_tac_args args)
 
 let () =
   T.register_general "apply"
@@ -2174,7 +2166,7 @@ let intro_args args s =
   | [Args.IntroPat intros] -> do_intros intros s
   | _ -> bad_args ()
 
-let intro_tac args = wrap_fail (intro_args args)
+let intro_tac args = LT.wrap_fail (intro_args args)
 
 let () =
   T.register_general "intro"

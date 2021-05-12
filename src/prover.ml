@@ -646,7 +646,7 @@ let get_goal_formula gname : SE.system_expr * Type.tvars * Term.message =
 
     | _ ->
       soft_failure ~loc:(L.loc gname)
-        (Failure ("not an reachability goal: " ^ (L.unloc gname)))
+        (Failure ("not a reachability goal: " ^ (L.unloc gname)))
 
 let get_equiv_goal_formula gname : SE.system_expr * Type.tvars * Equiv.form =
   match find_proved_goal (L.unloc gname) with
@@ -660,7 +660,7 @@ let get_equiv_goal_formula gname : SE.system_expr * Type.tvars * Equiv.form =
 
     | _ ->
       soft_failure ~loc:(L.loc gname)
-        (Failure ("not an reachability goal: " ^ (L.unloc gname)))
+        (Failure ("no an equivalence goal: " ^ (L.unloc gname)))
 
 
 

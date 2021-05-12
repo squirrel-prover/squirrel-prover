@@ -54,6 +54,12 @@ module LT = LowTactics.LowTac(EquivSequent)
 (** {2 Utilities} *)
 
 (*------------------------------------------------------------------*)
+(* same as [LT.wrap_fail], but for goals *)
+let wrap_fail f (s: Goal.t) sk fk =
+  try sk (f s) fk with
+  | Tactics.Tactic_soft_failure e -> fk e
+
+(*------------------------------------------------------------------*)
 exception Out_of_range
 
 (** When [0 <= i < List.length l], [nth i l] returns [before,e,after]
@@ -1573,7 +1579,7 @@ let () = T.register_typed "ifeq"
 (*------------------------------------------------------------------*)
 (** Automatic simplification *)
 
-let auto ~conclude ~strong s sk (fk : Tactics.fk) = 
+let auto ~close ~strong s sk (fk : Tactics.fk) = 
   let wrap tac s sk fk = 
     try sk (tac s) fk with
     | Tactics.Tactic_soft_failure e -> fk e in
@@ -1582,11 +1588,11 @@ let auto ~conclude ~strong s sk (fk : Tactics.fk) =
   match s with
   | Goal.Equiv s ->
     let sk l _ = 
-      if conclude && l <> [] 
+      if close && l <> [] 
       then fk (None, GoalNotClosed)
       else sk (List.map (fun s -> Goal.Equiv s) l) fk in
     let fk _ = 
-      if conclude 
+      if close 
       then fk (None, GoalNotClosed)
       else sk [s] fk in
 
@@ -1606,10 +1612,10 @@ let auto ~conclude ~strong s sk (fk : Tactics.fk) =
 
   | Goal.Trace t ->
     let sk l fk = sk (List.map (fun s -> Goal.Trace s) l) fk in
-    TraceTactics.simplify ~close:conclude ~strong t sk fk
+    TraceTactics.simplify ~close ~strong t sk fk
 
-let tac_auto ~conclude args s sk (fk : Tactics.fk) =
-   auto ~conclude s sk fk 
+let tac_auto ~close ~strong args s sk (fk : Tactics.fk) =
+   auto ~close ~strong s sk fk 
 
 
 let () =
@@ -1618,7 +1624,7 @@ let () =
                   detailed_help = "Same as simpl.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~conclude:true  ~strong:true)
+    (tac_auto ~close:true  ~strong:true)
 
 let () =
   T.register_general "simpl"
@@ -1628,7 +1634,7 @@ let () =
                                    refl or assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~conclude:false ~strong:true)
+    (tac_auto ~close:false ~strong:true)
 
 
 let () =
@@ -1639,7 +1645,64 @@ let () =
                                    refl or assumption.";
                   usages_sorts = [Sort None];
                   tactic_group = Structural }
-    (tac_auto ~conclude:false ~strong:false)
+    (tac_auto ~close:false ~strong:false)
+
+(*------------------------------------------------------------------*)
+(* TODO: factorize *)
+let do_s_item (s_item : Args.s_item) s : Goal.t list =
+  match s_item with
+  | Args.Simplify l ->
+    let tac = auto ~strong:true ~close:false in
+    Tactics.run tac s 
+
+  | Args.Tryauto l ->
+    let tac = Tactics.try_tac (auto ~strong:true ~close:true) in
+    Tactics.run tac s 
+
+(* TODO: factorize *)
+(** Applies a rewrite arg  *)
+let do_rw_arg rw_arg rw_in (s : Goal.t) : Goal.t list =
+  match rw_arg with
+  | Args.R_item rw_item  -> 
+    begin match s with
+      | Goal.Equiv s -> 
+        let es = LT.do_rw_item rw_item rw_in s in
+        List.map (fun x -> Goal.Equiv x) es
+      | Goal.Trace s -> 
+        let ts = TraceTactics.LT.do_rw_item rw_item rw_in s in
+        List.map (fun x -> Goal.Trace x) ts
+    end
+  | Args.R_s_item s_item -> do_s_item s_item s (* targets are ignored there *)
+
+(* TODO: factorize *)
+let rewrite_tac args s =
+  match args with
+  | [Args.RewriteIn (rw_args, in_opt)] ->
+    List.fold_left (fun seqs rw_arg ->
+        List.concat_map (do_rw_arg rw_arg in_opt) seqs
+      ) [s] rw_args 
+
+  | _ -> bad_args ()
+
+(* TODO: factorize *)
+let rewrite_tac args = wrap_fail (rewrite_tac args)
+
+(* TODO: factorize *)
+let () =
+  T.register_general "rewrite"
+    ~tactic_help:{
+      general_help =
+        "If t1 = t2, rewrite all occurences of t1 into t2 in the goal.\n\
+         Usage: rewrite Hyp Lemma Axiom (forall (x:message), t = t').\n       \
+         rewrite Lemma Axiom (t=t').\n       \
+         rewrite (forall (x:message), t = t').\n       \
+         rewrite (t = t') Lemma in H.";
+      detailed_help = "";
+      usages_sorts  = [];
+      tactic_group  = Structural;}
+    rewrite_tac 
+    
+
 
 (*------------------------------------------------------------------*)
 (** {2 Cryptographic Tactics} *)
