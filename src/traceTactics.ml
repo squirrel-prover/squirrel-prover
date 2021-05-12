@@ -439,45 +439,52 @@ let rewrite ~all
     (rw : Args.rw_count * Ident.t option * rw_erule) s 
   : sequent * sequent list =
   let found1, cpt_occ = ref false, ref 0 in
+  let built_subs = ref [] in
 
   (* Return: (f, subs) *)
-  let rec do1 
+  let rec doit
     : type a. Term.message -> Args.rw_count -> a rw_rule -> 
       Term.message * Term.message list = 
     fun f mult (tyvars, sv, rsubs, l, r) ->
-      if !cpt_occ > 1000 then   (* hard-coded *)
-          hard_failure (Failure "max nested rewriting reached (1000)");
-      incr cpt_occ;
 
-      (* Substitutes all instances of [occ.occ] by [r] (where free variables
-         are instantiated according to [occ.mv]. *)
-      let rw_inst (occ : a Term.Match.match_occ) =
+      (* Substitute [occ] by [r] (where free variables
+         are instantiated according to [mv], and variables binded above the
+         matched occurrences are universally quantified in the generated 
+         sub-goals. *)
+      let rw_inst occ vars mv =
+        if !cpt_occ > 1000 then   (* hard-coded *)
+          hard_failure (Failure "max nested rewriting reached (1000)");
+        incr cpt_occ;
         found1 := true;
-        let subst = Term.Match.to_subst occ.mv in
-        let r_f = Term.cast (Term.kind occ.occ) (Term.subst subst r) in
-        ( Term.subst [Term.ESubst (occ.occ, r_f)] f, 
-          List.map (Term.subst subst) rsubs ) 
+
+        let subst = Term.Match.to_subst mv in
+        let r1 = Term.cast (Term.kind occ) (Term.subst subst r) in
+        let rsubs1 = 
+          List.map (fun rsub ->
+              Term.mk_forall ~simpl:true vars (Term.subst subst rsub)
+            ) rsubs in
+        built_subs := List.rev_append rsubs1 !built_subs;
+        r1
       in
 
       (* tries to find an occurence of [l] and rewrite it. *)
       let pat = 
         Term.Match.{ pat_tyvars = tyvars; pat_vars = sv; pat_term = l; } 
       in
-      let occ = Term.Match.find f pat in
+      let many = match mult with `Once -> false | `Any | `Many -> true in
 
-      match mult, occ with
+      let f_opt = Term.Match.find_map ~many (TS.env s) f pat rw_inst in
+
+      match mult, f_opt with
+      | `Any, None -> f, List.rev !built_subs
+
       | (`Once | `Many), None -> 
         if not all 
         then soft_failure Tactics.NothingToRewrite 
         else f, []
 
-      | (`Many | `Any), Some occ -> 
-        let f, subs  = rw_inst occ in
-        let f, subs' = do1 f `Any (tyvars, sv, rsubs, l, r) in
-        f, subs @ subs'
-
-      | `Once,          Some occ -> rw_inst occ
-      | `Any,           None     -> f, []
+      | (`Many | `Any), Some f -> doit f `Any (tyvars, sv, rsubs, l, r)
+      | `Once, Some f -> f, List.rev !built_subs
   in
   
   let is_same hyp_id target_id = match hyp_id, target_id with
@@ -487,15 +494,15 @@ let rewrite ~all
       Ident.name hyp_id <> "_" 
   in
 
-  let doit (f,tgt_id) =
+  let doit_tgt (f,tgt_id) =
     match rw with
     | mult,  id_opt, (tyvars, sv, subs, Term.ESubst (l,r)) ->
       if is_same id_opt tgt_id 
       then f, []
-      else do1 f mult (tyvars, sv, subs, l, r)          
+      else doit f mult (tyvars, sv, subs, l, r)          
   in
  
-  let s, subs = do_targets doit s targets in
+  let s, subs = do_targets doit_tgt s targets in
 
   if all && not !found1 then soft_failure Tactics.NothingToRewrite;
 

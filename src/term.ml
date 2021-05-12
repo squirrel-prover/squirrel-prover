@@ -1097,6 +1097,16 @@ let erefresh_vars (arg : refresh_arg) evars =
   in
   List.split l
 
+let refresh_vars_env env vs = 
+  let env = ref env in
+  let vs, s = refresh_vars (`InEnv env) vs in
+  !env, vs, s
+
+let erefresh_vars_env env vs = 
+  let env = ref env in
+  let vs, s = erefresh_vars (`InEnv env) vs in
+  !env, vs, s
+
 (*------------------------------------------------------------------*)
 type eterm = ETerm : 'a term -> eterm
 
@@ -1163,6 +1173,17 @@ let tmap : type a. (eterm -> eterm) -> a term -> a term =
   | Exists (vs, b)    -> Exists (vs, func b)
 
   | Atom at -> Atom (atom_map func0 at)
+
+let tmap_fold : type a. ('b -> eterm -> 'b * eterm) -> 'b -> a term -> 'b * a term = 
+  fun func b t ->
+  let bref = ref b in
+  let g t = 
+    let b, t = func !bref t in
+    bref := b;
+    t
+  in
+  let t = tmap g t in
+  !bref, t   
 
 let titer (f : eterm -> unit) (t : 'a term) : unit = 
   let g e = f e; e in
@@ -1284,8 +1305,6 @@ module Match = struct
 
           tmatch ts ts' (tmatch_l terms terms' mv)
 
-        | Seq _, _ -> raise NoMatch
-
         | Pred ts, Pred ts' -> tmatch ts ts' mv
 
         | Action (s,is), Action (s',is') -> smatch (s,is) (s',is') mv
@@ -1293,9 +1312,10 @@ module Match = struct
         | Diff (a,b), Diff (a', b') ->
           tmatch_l [a;b] [a';b'] mv (* TODO: check this *)
 
-        | Find _, _ -> raise NoMatch
-
         | Atom at, Atom at' -> atmatch at at' mv
+
+        | Find _, _ -> raise NoMatch
+        | Seq _, _ -> raise NoMatch
 
         | ForAll _, _ 
         | Exists _, _ -> raise NoMatch
@@ -1386,48 +1406,81 @@ module Match = struct
 
     with NoMatch -> `NoMatch
 
-
-  (** Occurrence matched *)
-  type 'a match_occ = { occ : 'a term;
-                        mv  : mv; }
                         
   let find_map :
-    type a b. many:bool -> a term -> b pat -> (b term -> mv -> b term) -> 
-    (b match_occ list * a term) option
-    = fun ~many t p func ->
-      let found = ref None in
+    type a b. many:bool -> 
+    Vars.env -> a term -> b pat -> 
+    (b term -> Vars.evars -> mv -> b term) -> 
+    a term option
+    = fun ~many env t p func ->
+      let cut = ref false in
       let s_p = kind p.pat_term in     
-
-      let rec find : type a. a term -> a term = fun t ->
-        (* [many = false] and we already found a match *)
-        if (!found) <> None && not many then t 
+       
+      (* the return boolean indicates whether a match was found in the subterm. *)
+      let rec find : type a. Vars.env -> Vars.evars -> a term -> bool * a term = 
+        fun env vars t ->
+        if !cut then false, t
 
         (* otherwise, check if head matches *)
         else 
           match try_match t p with
-          (* head does not match, recurse  *)
-          | `NoMatch | `FreeTyv -> 
-            tmap (fun (ETerm t) -> ETerm (find t)) t
+          (* head matches *)
+          | `Match mv -> 
+            cut := not many;    (* we cut if [many = false] *)
+            let t' = func (cast s_p t) vars mv in
+            true, cast (kind t) t'
 
-          | `Match mv -> (* head matches *)
-            found := Some ({ occ = cast s_p t; mv = mv; } :: odflt [] !found); 
-            let t' = func (cast s_p t) mv in
-            cast (kind t) t' 
+          (* head does not match, recurse with a special handling of binders *)
+          | `NoMatch | `FreeTyv -> 
+            match t with
+            | ForAll (vs, b) ->
+              let env, vs, s = erefresh_vars_env env vs in
+              let b = subst s b in              
+              let found, b = find env (vars @ vs) b in
+              let t' = cast (kind t) (ForAll (vs, b)) in
+              
+              if found then true, t' else false, t
+
+            | Exists (vs, b) -> 
+              let env, vs, s = erefresh_vars_env env vs in
+              let b = subst s b in              
+              let found, b = find env (vars @ vs) b in
+              let t' = cast (kind t) (Exists (vs, b)) in
+              
+              if found then true, t' else false, t
+
+            | Find (b, c, d, e) -> 
+              let env1, vs, s = refresh_vars_env env b in
+              let c, d = subst s c, subst s e in              
+              let vars1 = vars @ (List.map Vars.evar b) in
+              let found0, c = find env1 vars1 c in
+              let found1, d = find env1 vars1 d in
+              let found2, e = find env  vars  e in
+              let t' = cast (kind t) (Find (b, c, d, e)) in
+              let found = found0 || found1 || found2 in
+
+              if found then true, t' else false, t
+
+            | Seq (vs, b) -> 
+              let env1, vs, s = refresh_vars_env env vs in
+              let b = subst s b in              
+              let vars = vars @ (List.map Vars.evar vs) in
+              let found, b = find env vars b in
+              let t' = cast (kind t) (Seq (vs, b)) in
+
+              if found then true, t' else false, t
+
+            | _ ->
+              tmap_fold (fun found (ETerm t) -> 
+                  let found', t = find env vars t in
+                  found || found', ETerm t
+                ) false t
       in
 
-      let t = find t in
-      match !found with
-      | None -> None
-      | Some occ -> Some (occ,t)
-
-  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
-      where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
-  let find : type a b. a term -> b pat -> b match_occ option = 
-    fun t p -> 
-    match find_map ~many:false t p (fun t' _ -> t') with
-    | None -> None
-    | Some (occs,_) -> Some (as_seq1 occs)
+      let found, t = find env [] t in
+      match found with
+      | false -> None
+      | true  -> Some t
 end
 
 (*------------------------------------------------------------------*)

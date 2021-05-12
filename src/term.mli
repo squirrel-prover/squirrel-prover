@@ -246,6 +246,7 @@ val apply_ht : hterm -> 'a term list -> hterm
 (** {2 Matching and rewriting} *)
 
 module Match : sig
+  (** match substitution *)
   type mv
 
   (** A pattern is a list of free type variables, a term [t] and a subset
@@ -264,24 +265,17 @@ module Match : sig
   (** [try_match t p] tries to match [p] with [t] (at head position). 
       If it succeeds, it returns a map instantiating the variables [p.pat_vars] 
       as substerms of [t]. *)
-  val try_match : 'a term -> 'b pat -> [`FreeTyv | `NoMatch | `Match of mv] 
+  val try_match : 'a term -> 'b pat -> [ `FreeTyv | `NoMatch | `Match of mv ] 
 
-  (** Occurrence matched *)
-  type 'a match_occ = { occ : 'a term;
-                        mv  : mv; }
-
-  (** [find t pat] looks for an occurence [t'] of [pat] in [t],
+  (** [find_map env t p func] looks for an occurence [t'] of [pat] in [t],
       where [t'] is a subterm of [t] and [t] and [t'] are unifiable by [θ].
-      It returns the occurrence matched [{occ = t'; mv = θ}]. *)
-  val find : 'a term -> 'b pat -> 'b match_occ option
-
-  (** [find_map t p func] behaves has [find], but also computes the term 
-      obtained from [t] by replacing:
+      It then computes the term obtained from [t] by replacing:
       - if [many = false], a *single* occurence of [pat] by [func t' θ]. 
       - if [many = true], all occurences found. *)
   val find_map :
-    many:bool -> 'a term -> 'b pat -> ('b term -> mv -> 'b term) -> 
-    ('b match_occ list * 'a term) option
+    many:bool -> Vars.env -> 'a term -> 'b pat -> 
+    ('b term -> Vars.evars -> mv -> 'b term) -> 
+    'a term option
 end
 
 (*------------------------------------------------------------------*)

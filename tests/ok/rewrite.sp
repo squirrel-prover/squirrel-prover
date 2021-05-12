@@ -20,21 +20,32 @@ axiom foo (x : message) : f(x) = a.
 axiom foog (x : message) : gg(x,b) = c.
 
 (*------------------------------------------------------------------*)
-(* rewrite all instances of only the first occurrence found. *)
+(* (* rewrite all instances of only the first occurrence found. *) *)
+(* goal _ (x, y, z : message) :  *)
+(* ((a = z && a = y) && (f(z) = z || z = y)) => *)
+(* (f(x) = z && f(x) = y && (f(z) = z || z = y)). *)
+(* Proof. *)
+(*   intro H. *)
+(*   rewrite (forall (x : message), f(x) = a); *)
+(*   1: by intro x1; apply foo. *)
+(*   assumption. *)
+(* Qed. *)
+
+(* rewrite the first occurrence found. *)
 goal _ (x, y, z : message) : 
-((a = z && a = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+((a = z && f(z) = y) && (f(z) = z || z = y)) =>
+(f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
   rewrite (forall (x : message), f(x) = a);
-  1: by intro x1; use foo with x1.
+  1: by intro x1; apply foo.
   assumption.
 Qed.
 
 (* same but directly using the axiom. *)
 goal _ (x, y, z : message) : 
-((a = z && a = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+((a = z && f(z) = y) && (f(z) = z || z = y)) =>
+(f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
   rewrite foo.
@@ -48,8 +59,8 @@ Qed.
 
 (* same but through an already proved goal. *)
 goal _ (x, y, z : message) : 
-((a = z && a = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+((a = z && f(z) = y) && (f(z) = z || z = y)) =>
+(f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro H.
   rewrite foo_lem.
@@ -60,8 +71,8 @@ Qed.
    hypotheses have priority over lemmas and axioms). *)
 goal _ (x, y, z : message) : 
 (forall (x : message), f(x) = d) =>
-((d = z && d = y) && (f(z) = z || z = y)) =>
-(f(x) = z && f(x) = y && (f(z) = z || z = y)).
+((d = z && f(z) = y) && (f(z) = z || z = y)) =>
+(f(x) = z && f(z) = y && (f(z) = z || z = y)).
 Proof.
   intro foo H.
   rewrite foo.
@@ -143,7 +154,7 @@ a = b => c = d =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
 Proof.
   intro AB CD H.
-  rewrite AB.
+  rewrite !AB.
   rewrite -CD.
   assumption.
 Qed.
@@ -155,7 +166,7 @@ a = b => c = d =>
 (gg(a,a) = gg(a,b) && gg(d,c) = gg(c,c)).
 Proof.
   intro AB CD H.
-  rewrite AB -CD.
+  rewrite !AB -CD.
   assumption.
 Qed.
 
@@ -267,4 +278,26 @@ goal _ (b,b' : boolean, x,y : message) :
 Proof.
  intro Hb Hb'.
  rewrite mif_true //.
+Qed.
+
+(*------------------------------------------------------------------*)
+(* rewriting under bindings *)
+
+abstract p : message -> boolean.
+abstract pi : index -> boolean.
+
+goal _ (z : message) :
+  (forall (u : message), p (u)) =>
+  (forall (i : index), pi (i)) =>
+  (exists (j : message),
+    (forall (x : message), p(x) => f0(x) = j) &&
+    (forall (i : index), pi(i) => ok(i) = j) &&
+    < j, j > = z) =>
+  forall (x : message, i : index), <f0(x), ok(i)> = z.
+Proof.
+  intro HP HPi [j [H1 H2 H3]].
+  rewrite H1; 1: by intro _; apply HP.
+  rewrite H2; 1: by intro _; apply HPi.
+  rewrite H3.
+  intro _ _; congruence.
 Qed.
