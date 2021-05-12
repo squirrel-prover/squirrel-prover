@@ -5,18 +5,18 @@ class check_symenc_key ~cntxt enc_fn dec_fn key_n = object (self)
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m;r; Term.Name _]) when fn = enc_fn ->
       self#visit_message m; self#visit_message r
-        
+
     | Term.Fun ((fn,_), _, [m; Term.Name _]) when fn = dec_fn ->
       self#visit_message m
-        
+
     | Term.Fun ((fn,_), _, [m;r; Diff(Term.Name _, Term.Name _)])
       when fn = enc_fn ->
       self#visit_message m; self#visit_message r
-        
+
     | Term.Fun ((fn,_), _, [m;  Diff(Term.Name _, Term.Name _)])
       when fn = dec_fn ->
       self#visit_message m
-        
+
     | Term.Name ns when ns.s_symb = key_n -> raise Euf.Bad_ssc
     | Term.Var m -> raise Euf.Bad_ssc
     | _ -> super#visit_message t
@@ -40,13 +40,13 @@ class check_rand ~allow_vars ~cntxt enc_fn randoms = object (self)
   method visit_message t = match t with
     | Term.Fun ((fn,_), _, [m1;Term.Name _; m2]) when fn = enc_fn ->
       self#visit_message m1; self#visit_message m2
-        
+
     | Term.Fun ((fn,_), _, [m1; _; m2]) when fn = enc_fn ->
       raise Euf.Bad_ssc
-        
+
     | Term.Name ns when List.mem ns.s_symb randoms ->
       Tactics.soft_failure (Tactics.SEncRandomNotFresh)
-        
+
     | Term.Var m -> if not(allow_vars) then
         Tactics.soft_failure
           (Tactics.Failure "No universal quantification over \
@@ -57,7 +57,7 @@ end
 (* Check that the given randoms are only used in random seed position for
    encryption. *)
 let random_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) 
+    ?(allow_vars=false) ?(messages=[]) ?(elems=[])
     ~cntxt enc_fn randoms =
   let ssc = new check_rand ~allow_vars ~cntxt enc_fn randoms in
   List.iter ssc#visit_message messages;
@@ -83,10 +83,10 @@ let random_ssc
      that use the same randomness are done on the same plaintext. This is why we
      based ourselves on messages produced by Euf.mk_rule, which should simplify
      such extension if need. *)
-let check_encryption_randomness 
+let check_encryption_randomness
     ~cntxt case_schemata cases_direct enc_fn messages elems =
-  let encryptions : (Term.message * Vars.index list) list = 
-    List.map (fun case -> 
+  let encryptions : (Term.message * Vars.index list) list =
+    List.map (fun case ->
         case.Euf.message,
         case.Euf.action_descr.indices
       ) case_schemata
@@ -115,13 +115,13 @@ let check_encryption_randomness
                   which is an indice instantiated by the action description,
                   and it does not appear in the random. *)
                | _ -> false)) vars
-      | _ -> assert false) encryptions then    
+      | _ -> assert false) encryptions then
     Tactics.soft_failure (Tactics.SEncSharedRandom);
 
   (* we check that no encryption is shared between multiple encryptions *)
   let enc_classes = Utils.classes (fun m1 m2 ->
       match m1, m2 with
-      | (Fun ((_, _), _, [_; Name r; _]),_), 
+      | (Fun ((_, _), _, [_; Name r; _]),_),
         (Fun ((_, _), _, [_; Name r2; _]),_) -> r.s_symb = r2.s_symb
       (* the patterns should match, if they match inside the declaration
          of randoms *)
@@ -134,7 +134,7 @@ let check_encryption_randomness
 
 let symenc_rnd_ssc ~cntxt env head_fn key elems =
   let rule =
-    Euf.mk_rule ~elems ~drop_head:false ~allow_functions:(fun x -> false)
+    Euf.mk_rule ~fun_wrap_key:None ~elems ~drop_head:false ~allow_functions:(fun x -> false)
       ~cntxt ~env ~mess:Term.empty ~sign:Term.empty
       ~head_fn ~key_n:key.s_symb ~key_is:key.s_indices
   in

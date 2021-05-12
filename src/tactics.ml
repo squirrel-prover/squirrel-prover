@@ -16,6 +16,7 @@ type tac_error_i =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NameNotUnderEnc
   | NoRefl
   | NoReflMacros
   | TacTimeout
@@ -60,6 +61,7 @@ let tac_error_strings =
     (CongrFail          , "CongrFail");
     (SEncSharedRandom   , "SEncSharedRandom");
     (SEncRandomNotFresh , "SEncRandomNotFresh");
+    (NameNotUnderEnc    , "NameNotUnderEnc");
     (NoRefl             , "NoRefl");
     (NoReflMacros       , "NoReflMacros");
     (TacTimeout         , "TacTimeout");
@@ -88,6 +90,7 @@ let rec tac_error_to_string = function
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NameNotUnderEnc
   | NoRefl
   | NoReflMacros
   | TacTimeout
@@ -144,6 +147,9 @@ let rec pp_tac_error_i ppf = function
   | SEncRandomNotFresh ->
     Fmt.string ppf "a random used for an encryption is used elsewhere"
 
+  | NameNotUnderEnc ->
+     Fmt.string ppf "the given name does not only occur under encryptions"
+
   | NoRefl  ->
     Fmt.string ppf "frames not identical"
 
@@ -186,20 +192,20 @@ let rec pp_tac_error_i ppf = function
     Fmt.pf ppf "the conclusion does not appear in the hypotheses"
 
   | HypAlreadyExists s ->
-    Fmt.pf ppf "an hypothesis named %s already exists" s     
+    Fmt.pf ppf "an hypothesis named %s already exists" s
 
   | HypUnknown s ->
     Fmt.pf ppf "unknown hypothesis %s" s
 
   | NoCollision ->
-    Fmt.pf ppf "no collision found" 
+    Fmt.pf ppf "no collision found"
 
   | ApplyMatchFailure ->
-    Fmt.pf ppf "apply failed: no match found" 
+    Fmt.pf ppf "apply failed: no match found"
 
   | ApplyBadInst ->
     Fmt.pf ppf "apply failed: rhs variables are not all bound by the lhs"
-  
+
   | InvalidVarName -> Fmt.pf ppf "invalid variable name"
 
 let strings_tac_error =
@@ -229,11 +235,11 @@ let () =
     | None   -> ""
     | Some l -> "at " ^ (L.tostring l)
   in
-  
+
   Printexc.register_printer
     (function
        | Tactic_hard_failure (l,e) ->
-           Some (Format.sprintf "Tactic_hard_failure(%s) at %s" 
+           Some (Format.sprintf "Tactic_hard_failure(%s) at %s"
                    (tac_error_to_string e) (s_lopt l))
        | Tactic_soft_failure (l,e) ->
            Some
@@ -257,9 +263,9 @@ let run : 'a tac -> 'a -> 'a list = fun tac a ->
   let fk _ = assert false in
   let sk res _ = found := Some res; raise Done in
 
-  try ignore (tac a sk fk : a); assert false 
+  try ignore (tac a sk fk : a); assert false
   with Done -> Utils.oget !found
-  
+
 (*------------------------------------------------------------------*)
 (** Selector for tactic *)
 type selector = int list
@@ -270,19 +276,19 @@ let check_sel sel_tacs l =
     | [] -> assert false
     | a :: l -> List.fold_left max a l
   in
-  let max_sel = 
-    List.fold_left (fun m (sel,_) -> 
+  let max_sel =
+    List.fold_left (fun m (sel,_) ->
         max m (max_list sel)
       ) 0 sel_tacs in
-  if max_sel > List.length l then 
+  if max_sel > List.length l then
     hard_failure (Failure ("no goal " ^ string_of_int max_sel));
 
   (* check that selectors are disjoint *)
   let all_sel = List.fold_left (fun all (s,_) -> s @ all) [] sel_tacs in
-  let _ = 
+  let _ =
     List.fold_left (fun acc s ->
         if List.mem s acc then
-          hard_failure 
+          hard_failure
             (Failure ("selector " ^ string_of_int s ^ " appears twice"));
         s :: acc
       ) [] all_sel in
@@ -370,8 +376,8 @@ let checkfail_tac exc t j (sk : 'a sk) (fk : fk) =
   try
     let sk l fk = soft_failure DidNotFail in
     t j sk fk
-  with 
-  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc -> 
+  with
+  | (Tactic_soft_failure (_,e) | Tactic_hard_failure (_,e)) when e = exc ->
     sk [j] fk
   | Theory.Conv _ when exc=CannotConvert -> sk [j] fk
   | (Tactic_soft_failure (_, Failure _) |
@@ -383,7 +389,7 @@ let checkfail_tac exc t j (sk : 'a sk) (fk : fk) =
 
 let check_time t j sk fk =
   let time = Sys.time () in
-  let sk j fk = 
+  let sk j fk =
     Printer.prt `Dbg "time: %f" (Sys.time () -. time);
     sk j fk
   in
@@ -613,15 +619,15 @@ module AST (M:S) = struct
   let rec eval modifiers = function
     | Abstract (id,args)  -> eval_abstract modifiers id args
     | AndThen tl          -> andthen_list (List.map (eval modifiers) tl)
-    | AndThenSel (t,tl)   -> 
+    | AndThenSel (t,tl)   ->
       let tl = List.map (fun (s,t') -> s, (eval modifiers t')) tl in
       andthen_sel (eval modifiers t) tl
 
     | OrElse tl           -> orelse_list (List.map (eval modifiers) tl)
     | Try t               -> try_tac (eval modifiers t)
-    | By (t,loc)                -> 
-      andthen_list [eval modifiers t; 
-                    eval modifiers (Abstract (L.mk_loc loc "auto",[]))] 
+    | By (t,loc)                ->
+      andthen_list [eval modifiers t;
+                    eval modifiers (Abstract (L.mk_loc loc "auto",[]))]
 
     | Repeat t            -> repeat (eval modifiers t)
     | Ident               -> id
@@ -648,22 +654,22 @@ module AST (M:S) = struct
     | AndThen ts ->
       Fmt.pf ppf "@[(%a)@]"
         (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ";@,") pp) ts
-        
+
     | AndThenSel (t,l) ->
-      let pp_sel_tac fmt (sel,s) = 
+      let pp_sel_tac fmt (sel,s) =
         Fmt.pf ppf "@[%a: %a@]"
-          pp t 
+          pp t
           (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf ",") Fmt.int) sel
       in
       let pp_sel_tacs fmt l = match l with
         | [(sel,s)] -> pp_sel_tac fmt (sel, s)
-        | _ -> 
+        | _ ->
           Fmt.pf fmt "@[[%a]@]"
             (Fmt.list ~sep:(fun ppf () -> Fmt.pf ppf "|") pp_sel_tac) l
       in
-          
+
       Fmt.pf ppf "@[(%a;@ %a)@]"
-        pp t 
+        pp t
         pp_sel_tacs l
 
     | OrElse ts ->

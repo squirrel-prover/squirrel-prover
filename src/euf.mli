@@ -63,6 +63,7 @@ val check_key_ssc :
 val mk_rule :
   ?elems:Equiv.equiv ->
   ?drop_head:bool ->
+  fun_wrap_key:((Symbols.fname Symbols.t -> bool) option) ->
   allow_functions:(Symbols.fname Symbols.t -> bool) ->
   cntxt:Constr.trace_cntxt ->
   env:Vars.env -> mess:Term.message -> sign:Term.message ->

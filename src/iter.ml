@@ -88,7 +88,7 @@ end
   * any guarantee on the indices and action used for that expansion,
   * because [get_dummy_definition] is used -- this behaviour is disabled
   * with [exact], in which case all macros will be expanded and must
-  * thus be defined. 
+  * thus be defined.
   * If [full] is false, may not visit all macros. *)
 class iter_approx_macros ~exact ~full ~(cntxt:Constr.trace_cntxt) = object (self)
 
@@ -122,8 +122,13 @@ end
 
 (** Collect occurrences of [f(_,k(_))] or [f(_,_,k(_))] for a function name [f]
    and name [k]. We use the exact version of [iter_approx_macros], otherwise we
-   might obtain meaningless terms provided by [get_dummy_definition]. *)
-class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object (self)
+   might obtain meaningless terms provided by [get_dummy_definition].
+   Patterns must be of the form [f(_,_,g(k(_)))] if allow_funs is defined
+   and [allows_funs g] returns true.
+ *)
+class get_f_messages ?(drop_head=true)
+    ?(fun_wrap_key=None)
+    ~(cntxt:Constr.trace_cntxt) f k = object (self)
   inherit iter_approx_macros ~exact:true ~full:true ~cntxt as super
   val mutable occurrences : (Vars.index list * Term.message) list = []
   method get_occurrences = occurrences
@@ -138,8 +143,12 @@ class get_f_messages ?(drop_head=true) ~(cntxt:Constr.trace_cntxt) f k = object 
         self#visit_message m ; self#visit_message k'
 
     | Term.Fun ((f',_), _,[m;r;k']) as m_full when f' = f ->
-        begin match k' with
-          | Term.Name s' when s'.s_symb = k ->
+        begin match k', fun_wrap_key with
+          | Term.Name s', None when s'.s_symb = k ->
+              let ret_m = if drop_head then m else m_full in
+              occurrences <- (s'.s_indices,ret_m) :: occurrences
+          |Term.Fun ((f',_), _, [Term.Name s']), Some is_pk
+            when is_pk f' && s'.s_symb = k ->
               let ret_m = if drop_head then m else m_full in
               occurrences <- (s'.s_indices,ret_m) :: occurrences
           | _ -> ()

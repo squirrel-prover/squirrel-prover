@@ -45,6 +45,7 @@ type tac_error_i =
   | SEncNoRandom
   | SEncSharedRandom
   | SEncRandomNotFresh
+  | NameNotUnderEnc
   | NoRefl
   | NoReflMacros
   | TacTimeout
@@ -137,7 +138,7 @@ module type S = sig
 end
 
 type selector = int list
-    
+
 (** AST for tactics, with abstract leaves corresponding to prover-specific
   * tactics, with prover-specific arguments. Modifiers have no internal
   * semantics: they are printed, but ignored during evaluation -- they

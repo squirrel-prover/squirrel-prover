@@ -32,9 +32,9 @@ end
 (** Collect occurences of some function and key,
   * as in [Iter.get_f_messages] but ignoring boolean terms,
   * cf. Koutsos' PhD. *)
-class get_f_messages ~drop_head ~cntxt head_fn key_n = object (self)
-  inherit Iter.get_f_messages ~drop_head ~cntxt head_fn key_n as super
-  method visit_message t = 
+class get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n = object (self)
+  inherit Iter.get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n as super
+  method visit_message t =
     if Term.ty t = Type.Boolean then () else super#visit_message t
 end
 
@@ -45,8 +45,8 @@ end
 let key_ssc
     ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
     ~cntxt head_fn key_n =
-  let ssc = 
-    new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n 
+  let ssc =
+    new check_key ~allow_vars ~allow_functions ~cntxt head_fn key_n
   in
   List.iter ssc#visit_message messages ;
   List.iter ssc#visit_message elems ;
@@ -60,7 +60,7 @@ let key_ssc
   * This is used in the collision tactic, which looks for all h(_,k)
   * such that k satisfies the SSC. *)
 let check_key_ssc
-    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions 
+    ?(allow_vars=false) ?(messages=[]) ?(elems=[]) ~allow_functions
     ~cntxt head_fn key_n =
   try
     key_ssc
@@ -74,8 +74,8 @@ let check_key_ssc
   * returns the list of pairs [is,m] such that [head_fn(m,key_n[is])]
   * occurs in [action_descr]. *)
 let hashes_of_action_descr
-    ?(drop_head=true) ~cntxt action_descr head_fn key_n =
-  let iter = new get_f_messages ~drop_head ~cntxt head_fn key_n in
+     ?(drop_head=true) ~fun_wrap_key ~cntxt action_descr head_fn key_n =
+  let iter = new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n in
   iter#visit_message (snd action_descr.Action.output) ;
   List.iter (fun (_,m) -> iter#visit_message m) action_descr.Action.updates ;
   List.sort_uniq Stdlib.compare iter#get_occurrences
@@ -124,7 +124,7 @@ let pp_euf_rule ppf rule =
 (*------------------------------------------------------------------*)
 (** {2 Build the Euf rule} *)
 
-let mk_rule ?(elems=[]) ?(drop_head=true)
+let mk_rule ?(elems=[]) ?(drop_head=true) ~fun_wrap_key
     ~allow_functions ~cntxt ~env ~mess ~sign ~head_fn ~key_n ~key_is =
 
   let mk_of_hash action_descr (is,m) =
@@ -200,7 +200,7 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
                          Var (Vars.fresh_r env v))))
         vars
     in
-    
+
     let subst = subst_fresh @ subst_is @ subst_bv in
     let new_action_descr = Action.subst_descr subst action_descr in
     { message = Term.subst subst m ;
@@ -210,23 +210,23 @@ let mk_rule ?(elems=[]) ?(drop_head=true)
   in
 
   let mk_case_schema action_descr =
-    let hashes = 
-      hashes_of_action_descr ~drop_head ~cntxt action_descr head_fn key_n
+    let hashes =
+      hashes_of_action_descr ~fun_wrap_key ~drop_head ~cntxt action_descr head_fn key_n
     in
 
     List.map (mk_of_hash action_descr) hashes
   in
 
   (* indirect cases *)
-  let case_schemata = 
-    SystemExpr.map_descrs cntxt.table cntxt.system mk_case_schema 
+  let case_schemata =
+    SystemExpr.map_descrs cntxt.table cntxt.system mk_case_schema
   in
 
   (* direct cases *)
-  let cases_direct = 
+  let cases_direct =
     let hashes =
-      let iter = 
-        new get_f_messages ~drop_head ~cntxt head_fn key_n 
+      let iter =
+        new get_f_messages ~fun_wrap_key ~drop_head ~cntxt head_fn key_n
       in
       iter#visit_message mess ;
       iter#visit_message sign ;
